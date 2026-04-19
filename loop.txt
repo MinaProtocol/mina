@@ -1,0 +1,165 @@
+● Complete end-to-end test suite now:                               
+                                                                                                                                                                  
+  ┌─────────┬──────────────────┬─────────────────┐                                                                                                                
+  │  Proof  │ Witness vs OCaml │   Self-verify   │                                                                                                                
+  ├─────────┼──────────────────┼─────────────────┤                                                                                                                
+  │ step_b0 │ ✓ 0 diffs        │ ✓               │                
+  ├─────────┼──────────────────┼─────────────────┤
+  │ wrap_b0 │ ✓ 0 diffs        │ ✓ (newly added) │                                                                                                                
+  ├─────────┼──────────────────┼─────────────────┤                                                                                                                
+  │ step_b1 │ ✓ 0 diffs        │ ✓               │                                                                                                                
+  └─────────┴──────────────────┴─────────────────┘                                                                                                                
+                                                                  
+  The test (base case trace matches OCaml fixture) now runs the full Simple_chain base + inductive sequence:                                                      
+  1. Compile step + wrap circuits
+  2. Produce step_b0 — verify witness matches OCaml, self-verify                                                                                                  
+  3. Produce wrap_b0 (wrapping step_b0) — self-verify now explicitly checked
+  4. Produce step_b1 (inductive, verifying wrap_b0) — self-verify                                                                                                 
+                                                                                                                                                                  
+  1/1 test passed. All three kimchi proofs verify cryptographically, and all three witnesses are byte-identical to the OCaml dump_simple_chain fixtures.          
+                                                                                                                                                                  
+  Natural next step would be wrap_b1 (wrapping step_b1 to complete the full 4-proof chain) — the scaffolding is in place; it'll need the same audit of wrap advice
+   fields that we did for step_b1.                                                                                                                                
+                                                                                                                                                                  
+✻ Sautéed for 3m 45s                                              
+
+❯ yes, and this is exactly what we're going to do! devise an agentic loop plan incorporating your worklflows and any knowledge you've gained in this iteration    
+                                                                                                                                                               
+● Agentic loop plan for wrap_b1                                                                                                                                   
+                                                                  
+  Prerequisites (now ready)                                                                                                                                       
+                                             
+  - tools/witness_diff.sh compares /tmp/ps_witness_%c.txt (%c=counter) against packages/pickles/test/fixtures/witness/ocaml_{step,wrap}_b[01].txt                 
+  - PS row labels emitted to /tmp/ps_wrap_row_labels.txt via dumpRowLabels in wrapSolveAndProve                                                                   
+  - Trace file via PICKLES_TRACE_FILE=/tmp/ps_trace.txt captures every Trace.field/ivpTrace                                                                       
+  - step_b0, wrap_b0, step_b1 all pass — any regression here is a fix's collateral damage, audit immediately                                                      
+                                                                                                                                                                  
+  Per-iteration loop                                                                                                                                              
+                                                                                                                                                                  
+  1. Run: rm -f /tmp/ps_witness_*.txt /tmp/ps_trace.txt /tmp/ps_wrap_row_labels.txt
+          PICKLES_TRACE_FILE=/tmp/ps_trace.txt KIMCHI_WITNESS_DUMP=/tmp/ps_witness_%c.txt \                                                                       
+            KIMCHI_DETERMINISTIC_SEED=42 npx spago test -p pickles                                                                                                
+                                                                                                                                                                  
+  2. Assert regressions: diff witnesses 0,1,2 against their OCaml fixtures.                                                                                       
+     If ANY of step_b0 / wrap_b0 / step_b1 regressed → STOP, the last change                                                                                      
+     broke an upstream proof. Revert or narrow.                                                                                                                   
+                                                                                                                                                                  
+  3. Classify wrap_b1 failure:                                                                                                                                    
+     A. Solver crashed before /tmp/ps_witness_3.txt existed                                                                                                       
+        → goto CRASH path                                                                                                                                         
+     B. /tmp/ps_witness_3.txt exists but diverges                                                                                                                 
+        → goto WITNESS-DIFF path                                                                                                                                  
+     C. 0 diffs but self-verify fails                                                                                                                             
+        → goto SELF-VERIFY path (expect this to be another advice-layer bug,
+          NOT "kimchi-level" — our track record says it's never kimchi-level)                                                                                     
+                                                                                                                                                                  
+  CRASH path                                                                                                                                                      
+                                                                                                                                                                  
+  a. Failing assertion label from error string: "[X] [Y] [Z]"     
+  b. grep the label in packages/pickles/src/ to find the assertion line                                                                                           
+  c. Read surrounding context to identify the two values being compared:                                                                                          
+     - LHS = advice / claimed value (from input.*)                                                                                                                
+     - RHS = in-circuit recomputed value                                                                                                                          
+  d. For whichever side came from advice, find the source in the advice                                                                                           
+     struct. 99% of the time, a field in `buildWrapAdviceInput` (for wrap)                                                                                        
+     or downstream in the wrap prover uses a hardcoded placeholder/dummy                                                                                          
+     that was correct for b0 but wrong for b1.                                                                                                                    
+  e. Find the OCaml equivalent via grep in mina/src/lib/crypto/pickles/wrap.ml                                                                                    
+     or wrap_verifier.ml. Read the EXACT LINE that populates the field.                                                                                           
+  f. Translate mechanically. Cross-field conversions use Shifted.purs                                                                                             
+     instances, NEVER BigInt round-trips. Algebraic operations stay in                                                                                            
+     the source field.                                                                                                                                            
+  g. Apply fix via new input field or field override (follow the                                                                                                  
+     `stepAdvicePrevEvals` / `kimchiPrevChallengesExpanded` precedents).                                                                                          
+  h. Back to step 1.                                                                                                                                              
+                                                                                                                                                                  
+  WITNESS-DIFF path                                                                                                                                               
+                                                                  
+  a. tools/witness_diff.sh ocaml_wrap_b1.txt /tmp/ps_witness_3.txt \                                                                                              
+       /tmp/ps_wrap_row_labels.txt                                                                                                                                
+  b. Output gives col=X row=Y + label from the row labels file.
+  c. If the label is a poseidon/sponge block: look for what was absorbed                                                                                          
+     JUST BEFORE that row via the nearby labels (our fine-grained                                                                                                 
+     abs_sd / abs_cd / abs_fte / abs_pe_z / abs_ie_N / ... labels at                                                                                              
+     Wrap/FinalizeOtherProof.purs:152+ tell us the specific absorb call).                                                                                         
+  d. Dump the candidate value via Trace.fieldF and compare against the                                                                                            
+     corresponding tock_pi index if it's packed into public input, or                                                                                             
+     trace both PS and OCaml side if we have a dump.                                                                                                              
+  e. Fix via advice field (same pattern as CRASH path steps d-g).                                                                                                 
+  f. Back to step 1.                                                                                                                                              
+                                                                                                                                                                  
+  SELF-VERIFY path                                                                                                                                                
+                                                                  
+  Self-verify fail = Fiat-Shamir transcript mismatch between what the                                                                                             
+  prover absorbed vs what the verifier expects. Caused by:                                                                                                        
+  - Wrong prev_challenges stored in ProverProof (see step_b1 commit                                                                                               
+    14443c69: kimchiPrevChallengesExpanded)                                                                                                                       
+  - Wrong public_input passed to proof creation                                                                                                                   
+  - Wrong VK used                                                                                                                                                 
+                                                                                                                                                                  
+  a. For wrap_b1 this likely = wrap prover's equivalent kimchi                                                                                                    
+     prev_challenges field. Grep vestaCreateProofWithPrev in                                                                                                      
+     packages/pickles/src/Pickles/Prove/Wrap.purs for how it gets                                                                                                 
+     ctx.kimchiPrevChallenges.                                                                                                                                    
+  b. Find the OCaml source for wrap.ml's `~message:next_accumulator`                                                                                              
+     (pickles.ml:1228+). That's what kimchi stores as prev_challenges.                                                                                            
+  c. Mechanical fix as before.                                                                                                                                    
+                                                                                                                                                                  
+  Invariants to check every iteration                                                                                                                             
+                                                                                                                                                                  
+  - No hardcoded dummy/placeholder in any advice field touched this iteration                                                                                     
+  - Every new value flows through an input.* field (no let x = dummyFoo
+  in the middle of a prover function)                                                                                                                             
+  - Array usage: if size is known at the type level, convert to Vector via
+  Vector.toVector @N                                                                                                                                              
+  - Trace/diagnostic calls preserved (don't accidentally revert them while
+  reverting other changes)                                                                                                                                        
+  - Any coerceViaBits or fromBigInt <<< toBigInt requires a direct
+  OCaml citation proving it's bit-reinterpretation, not algebraic                                                                                                 
+                                                                                                                                                                  
+  Candidate first-cut wrap_b1 audit fields                                                                                                                        
+                                                                                                                                                                  
+  Based on wrap_b0's audit (commits 849bde59, c775c0c1, af635fa2), the wrap advice fields to recheck for b1 semantics:                                            
+  - prevStepAccs — for b0 = dummy step sg; for b1 = ??? (real step_b1's sg? Need to re-read wrap.ml:305-377 Step_accs handler)
+  - prevOldBpChals — for b0 = dummyWrapBpChals; for b1 = real wrap_b0 bp chals expanded                                                                           
+  - prevEvals — for b0 = wrapDummyEvals; for b1 = ???                                  
+  - prevEvals.publicEvals — for b0 = x_hat from vestaProofOracles(dummyWrapProof); for b1 = x_hat from vestaProofOracles on step_b1 — but wait, wrap_b1 wraps     
+  step_b1, so the "dummy wrap" analog is... step_b1. Needs careful reading.                                                                                       
+  - prevWrapDomainIndices — for b0 = F 1; for b1 = ???                                                                                                            
+  - prevMessagesForNextStepProofHash — for b0 = msgForNextStepDigest read from b0 step public input [32]; for b1 same idea from step_b1                           
+                                                                                                                                                                  
+  Would you like me to launch this as a /loop or run the first iteration directly?                                                                                
+                                                                                                                                                                  
+✻ Cooked for 58s                                                                                                                                                  
+                                                                                                                                                                  
+❯ wdym as a /loop command                                                                                                                                         
+                          
+● /loop is a Claude Code slash command / skill that runs a prompt repeatedly until I stop it (or until a condition is met). When invoked without an interval, I   
+  self-pace: each iteration runs, I schedule the next wake-up via ScheduleWakeup, and when I fire again the full session context is still there so I can read
+  results of the previous iteration, reason, and continue.                                                                                                        
+                                            
+  For our wrap_b1 work it would look like:                                                                                                                        
+                                                                                                                                                                  
+  /loop work through the wrap_b1 agentic plan I just described:                                                                                                   
+    - Run the test, classify failure, apply one fix per iteration,                                                                                                
+    - cite OCaml source for every algebraic change,                                                                                                               
+    - stop when wrap_b1 witness is byte-identical AND self-verifies,                                                                                              
+    - or stop if any of step_b0/wrap_b0/step_b1 regress.                                                                                                          
+                                                                                                                                                                  
+  Then I'd:                                                                                                                                                       
+  1. Run iteration 1 (run the test, diagnose, apply fix)                                                                                                          
+  2. Call ScheduleWakeup with the same prompt                                                                                                                     
+  3. When it fires, I resume with my existing context — I see the prior iteration's changes and the new test output
+  4. Repeat until done                                                                                                                                            
+                                                                                                                                                                  
+  vs. an Agent (subagent) spawn:
+  - Subagent = brand-new conversation, I'd have to brief it on everything (witness_diff workflow, all OCaml citation precedents, the "no unsafe coerce" rule,     
+  etc.)                                                                                                                                                           
+  - /loop = same me, same context, just stretched over many iterations — natural fit for debugging work where prior state matters                                 
+                                                                                                                                                                  
+  vs. just doing it now in this conversation:                                                                                                                     
+  - /loop gives it structure (each iteration is one discrete step)                                                                                                
+  - Useful if you want to step away — I'll keep grinding on it and you'll see progress when you check back                                                        
+  - Also useful if iterations take a while (test runs ~1min, compilations etc.)                                                                                   
+                                                                                                                                                                  
+  If you want me to go straight-through right now without the /loop wrapper, I can do that too. Your call.  

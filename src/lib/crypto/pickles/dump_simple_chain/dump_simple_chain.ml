@@ -99,4 +99,24 @@ let () =
   Or_error.ok_exn
     (Promise.block_on_async_exn (fun () ->
          Proof.verify_promise [ (Tick.Field.zero, b0) ] ) ) ;
-  Pickles.Pickles_trace.string "simple_chain.end" "base_case_verified"
+  Pickles.Pickles_trace.string "simple_chain.end" "base_case_verified" ;
+  (* === Inductive case (b1): self=1, prev=0, verifying b0 === *)
+  Pickles.Pickles_trace.string "simple_chain.begin" "inductive_case" ;
+  let (), (), b1 =
+    Promise.block_on_async_exn (fun () ->
+        step ~handler:(handler Tick.Field.zero b0) Tick.Field.one )
+  in
+  Or_error.ok_exn
+    (Promise.block_on_async_exn (fun () ->
+         Proof.verify_promise [ (Tick.Field.one, b1) ] ) ) ;
+  Pickles.Pickles_trace.string "simple_chain.end" "inductive_case_verified" ;
+  (* === Inductive case b2: self=2, prev=1, verifying b1 === *)
+  Pickles.Pickles_trace.string "simple_chain.begin" "inductive_case_b2" ;
+  let (), (), b2 =
+    Promise.block_on_async_exn (fun () ->
+        step ~handler:(handler Tick.Field.one b1) Tick.Field.(of_int 2) )
+  in
+  Or_error.ok_exn
+    (Promise.block_on_async_exn (fun () ->
+         Proof.verify_promise [ (Tick.Field.(of_int 2), b2) ] ) ) ;
+  Pickles.Pickles_trace.string "simple_chain.end" "inductive_case_b2_verified"
