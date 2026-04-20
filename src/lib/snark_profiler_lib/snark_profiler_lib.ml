@@ -613,6 +613,7 @@ let profile_user_command (module T : Transaction_snark.S) ~genesis_constants
                       in
                       let sgn = Sgn.Pos in
                       Currency.Amount.Signed.create ~magnitude ~sgn )
+                 ; stake_change = Currency.Amount.Signed.zero
                  ; fee_excess = Transaction.fee_excess txn |> Or_error.ok_exn
                  }
                ~init_stack:coinbase_stack_source
