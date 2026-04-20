@@ -19,6 +19,7 @@ module type S = sig
       ; second_pass_ledger : ledger
       ; fee_excess : Amount.Signed.t
       ; supply_increase : Amount.Signed.t
+      ; stake_change : Amount.Signed.t
       ; protocol_state : Zkapp_precondition.Protocol_state.View.t
       ; block_global_slot : Mina_numbers.Global_slot_since_genesis.t
             (* Slot of block when the transaction is applied. NOTE: This is at least 1 slot after the protocol_state's view, which is for the *previous* slot. *)
@@ -757,6 +758,7 @@ module Make (L : Ledger_intf.S) :
       ; second_pass_ledger : L.t
       ; fee_excess : Amount.Signed.t
       ; supply_increase : Amount.Signed.t
+      ; stake_change : Amount.Signed.t
       ; protocol_state : Zkapp_precondition.Protocol_state.View.t
       ; block_global_slot : Global_slot_since_genesis.t
       }
@@ -782,6 +784,10 @@ module Make (L : Ledger_intf.S) :
     let supply_increase { supply_increase; _ } = supply_increase
 
     let set_supply_increase t supply_increase = { t with supply_increase }
+
+    let stake_change { stake_change; _ } = stake_change
+
+    let set_stake_change t stake_change = { t with stake_change }
 
     let block_global_slot { block_global_slot; _ } = block_global_slot
   end
@@ -1658,6 +1664,7 @@ module Make (L : Ledger_intf.S) :
             L.empty ~depth:0 ()
         ; fee_excess
         ; supply_increase
+        ; stake_change = Currency.Amount.Signed.zero
         ; block_global_slot = global_slot
         }
       , { stack_frame =
@@ -1670,6 +1677,7 @@ module Make (L : Ledger_intf.S) :
         ; full_transaction_commitment = Inputs.Transaction_commitment.empty
         ; excess = Currency.Amount.(Signed.of_unsigned zero)
         ; supply_increase = Currency.Amount.(Signed.of_unsigned zero)
+        ; stake_change = Currency.Amount.(Signed.of_unsigned zero)
         ; ledger = L.empty ~depth:0 ()
         ; success = true
         ; account_update_index = Inputs.Index.zero

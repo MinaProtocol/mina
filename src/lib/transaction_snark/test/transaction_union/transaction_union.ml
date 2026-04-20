@@ -76,6 +76,7 @@ let%test_module "Transaction union tests" =
               ~connecting_ledger_right:target ~sok_digest
               ~fee_excess:(Or_error.ok_exn (Transaction.fee_excess txn))
               ~supply_increase:user_command_supply_increase
+              ~stake_change:Currency.Amount.Signed.zero
               ~pending_coinbase_stack_state
           in
           T.of_user_command ~init_stack ~statement user_command_in_block handler )

@@ -220,6 +220,7 @@ module Local_state = struct
         ; full_transaction_commitment : 'comm
         ; excess : 'signed_amount
         ; supply_increase : 'signed_amount
+        ; stake_change : 'signed_amount
         ; ledger : 'ledger
         ; success : 'bool
         ; account_update_index : 'length
@@ -272,8 +273,8 @@ module Local_state = struct
             } )
     }
 
-  let typ stack_frame call_stack excess supply_increase ledger bool comm length
-      failure_status_tbl =
+  let typ stack_frame call_stack excess supply_increase stake_change ledger bool
+      comm length failure_status_tbl =
     Pickles.Impls.Step.Typ.of_hlistable
       [ stack_frame
       ; call_stack
@@ -281,6 +282,7 @@ module Local_state = struct
       ; comm
       ; excess
       ; supply_increase
+      ; stake_change
       ; ledger
       ; bool
       ; length
@@ -969,6 +971,10 @@ module type Inputs_intf = sig
     val supply_increase : t -> Amount.Signed.t
 
     val set_supply_increase : t -> Amount.Signed.t -> t
+
+    val stake_change : t -> Amount.Signed.t
+
+    val set_stake_change : t -> Amount.Signed.t -> t
 
     val block_global_slot : t -> Global_slot_since_genesis.t
   end

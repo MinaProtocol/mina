@@ -17,13 +17,14 @@ let genesis_ledger_hash ~ledger =
 module Hashed = struct
   type t =
     { total_currency : Currency.Amount.t
+    ; total_stake : Currency.Amount.t
     ; hash : Mina_base.Frozen_ledger_hash.t
     }
 
   let hash t = t.hash
 
   let zero_total_currency (t : t) : t =
-    { hash = t.hash; total_currency = Currency.Amount.zero }
+    { t with total_currency = Currency.Amount.zero }
 end
 
 module Epoch = struct
@@ -33,13 +34,11 @@ module Epoch = struct
     let map ~f { ledger; seed } = { ledger = f ledger; seed }
 
     let to_hashed (t : Genesis_ledger.Packed.t t) : Hashed.t t =
-      let total_currency =
-        genesis_ledger_total_currency ~ledger:(Genesis_ledger.Packed.t t.ledger)
-      in
-      let hash =
-        genesis_ledger_hash ~ledger:(Genesis_ledger.Packed.t t.ledger)
-      in
-      { ledger = { hash; total_currency }; seed = t.seed }
+      let ledger = Genesis_ledger.Packed.t t.ledger in
+      let total_currency = genesis_ledger_total_currency ~ledger in
+      let total_stake = Currency.Amount.zero in
+      let hash = genesis_ledger_hash ~ledger in
+      { ledger = { hash; total_currency; total_stake }; seed = t.seed }
   end
 
   type 'ledger tt = { staking : 'ledger Data.t; next : 'ledger Data.t option }
@@ -71,8 +70,9 @@ module Ledger = struct
   type t = Genesis_ledger.Packed.t
 
   let to_hashed (t : t) : Hashed.t =
-    { hash = genesis_ledger_hash ~ledger:(Genesis_ledger.Packed.t t)
-    ; total_currency =
-        genesis_ledger_total_currency ~ledger:(Genesis_ledger.Packed.t t)
+    let ledger = Genesis_ledger.Packed.t t in
+    { hash = genesis_ledger_hash ~ledger
+    ; total_currency = genesis_ledger_total_currency ~ledger
+    ; total_stake = Currency.Amount.zero
     }
 end

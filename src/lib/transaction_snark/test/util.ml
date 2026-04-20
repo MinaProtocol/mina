@@ -223,6 +223,7 @@ let check_zkapp_command_with_merges_exn ?(logger = logger_null)
                         Mina_transaction_logic.Transaction_applied
                         .supply_increase ~constraint_constants applied_txn
                         |> Or_error.ok_exn
+                    ; stake_change = Currency.Amount.Signed.zero
                     ; sok_digest = ()
                     }
                   in

@@ -24,6 +24,7 @@ module Types = struct
           ; connecting_ledger_left : 'ledger_hash
           ; connecting_ledger_right : 'ledger_hash
           ; supply_increase : 'amount
+          ; stake_change : 'amount
           ; fee_excess : 'fee_excess
           ; sok_digest : 'sok_digest
           }
@@ -79,6 +80,7 @@ module type Concrete = sig
         ; connecting_ledger_left : 'ledger_hash
         ; connecting_ledger_right : 'ledger_hash
         ; supply_increase : 'amount
+        ; stake_change : 'amount
         ; fee_excess : 'fee_excess
         ; sok_digest : 'sok_digest
         }
@@ -133,6 +135,7 @@ module M = struct
         ; connecting_ledger_left : 'ledger_hash
         ; connecting_ledger_right : 'ledger_hash
         ; supply_increase : 'amount
+        ; stake_change : 'amount
         ; fee_excess : 'fee_excess
         ; sok_digest : 'sok_digest
         }

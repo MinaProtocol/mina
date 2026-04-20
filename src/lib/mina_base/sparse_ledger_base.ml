@@ -36,6 +36,7 @@ module Global_state = struct
     ; second_pass_ledger : sparse_ledger
     ; fee_excess : Currency.Amount.Signed.t
     ; supply_increase : Currency.Amount.Signed.t
+    ; stake_change : Currency.Amount.Signed.t
     ; protocol_state : Zkapp_precondition.Protocol_state.View.t
     ; block_global_slot : Mina_numbers.Global_slot_since_genesis.t
     }

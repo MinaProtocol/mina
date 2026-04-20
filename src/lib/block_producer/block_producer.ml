@@ -377,6 +377,12 @@ let generate_next_state ~commit_id ~zkapp_cmd_limit ~constraint_constants
                       (Ledger_proof.Cached.statement proof).supply_increase )
                     ~default:Currency.Amount.Signed.zero
                 in
+                let stake_change =
+                  Option.value_map ledger_proof_opt
+                    ~f:(fun proof ->
+                      (Ledger_proof.Cached.statement proof).stake_change )
+                    ~default:Currency.Amount.Signed.zero
+                in
                 let body_reference =
                   Staged_ledger_diff.Body.compute_reference
                     ~tag:Mina_net2.Bitswap_tag.(to_enum Body)
@@ -405,8 +411,8 @@ let generate_next_state ~commit_id ~zkapp_cmd_limit ~constraint_constants
                       ~previous_protocol_state ~blockchain_state ~current_time
                       ~block_data ~supercharge_coinbase
                       ~snarked_ledger_hash:previous_ledger_hash
-                      ~genesis_ledger_hash ~supply_increase ~logger
-                      ~constraint_constants ) )
+                      ~genesis_ledger_hash ~supply_increase ~stake_change
+                      ~logger ~constraint_constants ) )
           in
           lift_sync (fun () ->
               let snark_transition =
