@@ -50,6 +50,7 @@ let make_hashed_ledgers (config : Runtime_config.t) :
     { Genesis_data.Hashed.hash =
         Mina_base.Frozen_ledger_hash.of_base58_check_exn genesis_ledger
     ; total_currency = Currency.Amount.zero
+    ; total_stake = Currency.Amount.zero
     }
   in
   let epoch_data =
@@ -64,6 +65,7 @@ let make_hashed_ledgers (config : Runtime_config.t) :
                 { Genesis_data.Hashed.hash =
                     Mina_base.Frozen_ledger_hash.of_base58_check_exn staking
                 ; total_currency = Currency.Amount.zero
+                ; total_stake = Currency.Amount.zero
                 }
             ; seed = Mina_base.Epoch_seed.of_base58_check_exn staking_seed
             }
@@ -73,6 +75,7 @@ let make_hashed_ledgers (config : Runtime_config.t) :
                     { Genesis_data.Hashed.hash =
                         Mina_base.Frozen_ledger_hash.of_base58_check_exn next
                     ; total_currency = Currency.Amount.zero
+                    ; total_stake = Currency.Amount.zero
                     }
                 ; seed = Mina_base.Epoch_seed.of_base58_check_exn next_seed
                 } )
