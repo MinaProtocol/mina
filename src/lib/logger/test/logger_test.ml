@@ -3,8 +3,7 @@ open Core
 let rotated_log_timestamps directory log_filename =
   let prefix = log_filename ^ "." in
   let prefix_len = String.length prefix in
-  Core.Sys.readdir directory
-  |> Array.to_list
+  Core.Sys.readdir directory |> Array.to_list
   |> List.filter_map ~f:(fun name ->
          if String.is_prefix name ~prefix then
            Some (String.drop_prefix name prefix_len)
@@ -13,8 +12,10 @@ let rotated_log_timestamps directory log_filename =
 
 let parse_timestamp s =
   match String.lsplit2 s ~on:'Z' with
-  | Some (before_z, _) -> Time.of_string (before_z ^ "Z")
-  | None -> Time.of_string s
+  | Some (before_z, _) ->
+      Time.of_string (before_z ^ "Z")
+  | None ->
+      Time.of_string s
 
 let test_timestamped_logrotate_rotates_logs_when_expected () =
   let max_size = 1024 * 2 (* 2KiB *) in
@@ -33,7 +34,8 @@ let test_timestamped_logrotate_rotates_logs_when_expected () =
       Alcotest.(check bool) "rotation expected" true rotation_expected ;
       let timestamps = rotated_log_timestamps directory log_filename in
       Alcotest.(check bool)
-        "rotated log exists" true (List.length timestamps > 0) ;
+        "rotated log exists" true
+        (List.length timestamps > 0) ;
       Alcotest.(check bool)
         "rotated count within limit" true
         (List.length timestamps <= num_rotate) ;
@@ -59,8 +61,8 @@ let test_timestamped_logrotate_rotates_logs_when_expected () =
     Logger.Consumer_registry.register ~id:"test"
       ~processor:(Logger.Processor.raw ())
       ~transport:
-        (Logger_file_system.timestamped_logrotate ~directory ~log_filename ~max_size
-           ~num_rotate )
+        (Logger_file_system.timestamped_logrotate ~directory ~log_filename
+           ~max_size ~num_rotate )
       () ;
     run_test ~last_size:0 ~rotations:0 ~rotation_expected:false
   with exn ->
@@ -78,7 +80,9 @@ let test_timestamped_logrotate_multiple_rotations () =
     Int64.to_int_exn (Unix.stat (Filename.concat directory name)).st_size
   in
   let rec run_test ~last_size ~rotations =
-    let current_rotated = List.length (rotated_log_timestamps directory log_filename) in
+    let current_rotated =
+      List.length (rotated_log_timestamps directory log_filename)
+    in
     if current_rotated >= num_rotate then ()
     else (
       Logger.info logger ~module_:__MODULE__ ~location:__LOC__
@@ -93,8 +97,8 @@ let test_timestamped_logrotate_multiple_rotations () =
       Logger.Consumer_registry.register ~id:"test_multi"
         ~processor:(Logger.Processor.raw ())
         ~transport:
-          (Logger_file_system.timestamped_logrotate ~directory ~log_filename ~max_size
-             ~num_rotate )
+          (Logger_file_system.timestamped_logrotate ~directory ~log_filename
+             ~max_size ~num_rotate )
         () ;
       run_test ~last_size:0 ~rotations:0
     with exn ->

@@ -30,8 +30,7 @@ module Timestamped_logrotate = struct
         let log_stats = stat primary_log_loc in
         ( Int64.to_int_exn log_stats.st_size
         , [ O_RDWR; O_APPEND ]
-        , Time.of_span_since_epoch
-            (Time.Span.of_sec log_stats.st_mtime) )
+        , Time.of_span_since_epoch (Time.Span.of_sec log_stats.st_mtime) )
       else (0, [ O_RDWR; O_CREAT ], Time.now ())
     in
     let primary_log = openfile ~perm:log_perm ~mode primary_log_loc in
@@ -61,8 +60,7 @@ module Timestamped_logrotate = struct
   let find_unique_path base_path =
     let rec go n =
       let candidate =
-        if n = 0 then base_path
-        else base_path ^ "." ^ string_of_int n
+        if n = 0 then base_path else base_path ^ "." ^ string_of_int n
       in
       if Result.is_ok (access candidate [ `Exists ]) then go (n + 1)
       else candidate
