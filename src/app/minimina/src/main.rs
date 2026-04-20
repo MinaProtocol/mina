@@ -13,7 +13,7 @@ mod utils;
 use crate::{
     genesis_ledger::*,
     keys::{KeysManager, NodeKey},
-    native::{keys::NativeKeysManager, manager::NativeManager},
+    native::{keys::NativeKeysManager, manager::NativeManager, mina_locator},
     output::{network, node},
     service::{ServiceConfig, ServiceType},
     utils::fetch_schema,
@@ -31,7 +31,7 @@ use log::{error, info, warn};
 use std::{
     collections::HashMap,
     io::{Error, ErrorKind, Result},
-    path::Path,
+    path::{Path, PathBuf},
     process::exit,
 };
 
@@ -58,9 +58,9 @@ fn main() -> Result<()> {
 
     let directory_manager = DirectoryManager::new();
     let mode = cli.mode;
-    let bin_path = cli.bin_path;
+    let bin_path = resolve_bin_path(&mode, cli.bin_path)?;
 
-    check_execution_environment(&mode, &bin_path)?;
+    check_execution_environment(&mode)?;
 
     match cli.command {
         Command::Network(net_cmd) => match net_cmd {
@@ -84,7 +84,7 @@ fn main() -> Result<()> {
                     &mut bp_keys_opt,
                     &mut libp2p_keys_opt,
                     &mode,
-                    &bin_path,
+                    bin_path.as_deref(),
                 )?;
 
                 // build services from topology file
@@ -112,7 +112,7 @@ fn main() -> Result<()> {
                         create_network(&docker, &directory_manager, &network_id, &services)
                     }
                     ExecutionMode::Native => {
-                        let native = NativeManager::new(&network_path, &bin_path);
+                        let native = NativeManager::new(&network_path, native_bin(&bin_path));
                         if let Err(e) = native.generate_config(&services) {
                             return exit_with(format!(
                                 "Failed to generate native config with error: {e}"
@@ -194,7 +194,7 @@ fn main() -> Result<()> {
                         }
                     }
                     ExecutionMode::Native => {
-                        let native = NativeManager::new(&network_path, &bin_path);
+                        let native = NativeManager::new(&network_path, native_bin(&bin_path));
                         if let Err(e) = native.destroy() {
                             let error_message =
                                 format!("Failed to delete network '{network_id}': {e}");
@@ -265,7 +265,7 @@ fn main() -> Result<()> {
                         }
                     }
                     ExecutionMode::Native => {
-                        let native = NativeManager::new(&network_path, &bin_path);
+                        let native = NativeManager::new(&network_path, native_bin(&bin_path));
                         let services = directory_manager.get_services_info(&network_id)?;
                         match native.start_all(&services, &network_id) {
                             Ok(_) => {
@@ -304,7 +304,7 @@ fn main() -> Result<()> {
                         }
                     }
                     ExecutionMode::Native => {
-                        let native = NativeManager::new(&network_path, &bin_path);
+                        let native = NativeManager::new(&network_path, native_bin(&bin_path));
                         match native.stop_all() {
                             Ok(_) => {
                                 println!("{}", network::Stop { network_id });
@@ -487,7 +487,7 @@ fn main() -> Result<()> {
                         }
                     }
                     ExecutionMode::Native => {
-                        let native = NativeManager::new(&network_path, &bin_path);
+                        let native = NativeManager::new(&network_path, native_bin(&bin_path));
                         match native.service_logs(node_id) {
                             Ok(logs) => {
                                 if cmd.raw_output {
@@ -860,7 +860,7 @@ fn generate_default_genesis_ledger(
     network_path: &Path,
     docker_image: &str,
     mode: &ExecutionMode,
-    bin_path: &Path,
+    bin_path: Option<&Path>,
 ) -> Result<()> {
     info!("Genesis ledger not provided. Generating default genesis ledger.");
 
@@ -895,7 +895,10 @@ fn generate_default_genesis_ledger(
             );
         }
         ExecutionMode::Native => {
-            let keys_manager = NativeKeysManager::new(network_path, bin_path);
+            let keys_manager = NativeKeysManager::new(
+                network_path,
+                bin_path.expect("native mode guarantees bin_path is resolved"),
+            );
             *bp_keys_opt = Some(
                 keys_manager
                     .generate_bp_key_pairs(&all_services)
@@ -1077,7 +1080,7 @@ fn handle_genesis_ledger(
     bp_keys_opt: &mut Option<HashMap<String, NodeKey>>,
     libp2p_keys_opt: &mut Option<HashMap<String, NodeKey>>,
     mode: &ExecutionMode,
-    bin_path: &Path,
+    bin_path: Option<&Path>,
 ) -> Result<()> {
     let network_path = directory_manager.network_path(network_id);
 
@@ -1207,7 +1210,7 @@ fn handle_topology(
     }
 }
 
-fn check_execution_environment(mode: &ExecutionMode, bin_path: &Path) -> Result<()> {
+fn check_execution_environment(mode: &ExecutionMode) -> Result<()> {
     match mode {
         ExecutionMode::Docker => {
             // First check if docker itself is available
@@ -1271,65 +1274,8 @@ fn check_execution_environment(mode: &ExecutionMode, bin_path: &Path) -> Result<
                 }
             }
         }
-        ExecutionMode::Native => {
-            let mina_bin = bin_path.join("mina");
-            if mina_bin.exists() {
-                return Ok(());
-            }
-
-            // Check common locations
-            let common_paths = ["/usr/bin/mina", "/usr/local/bin/mina"];
-            let mut found_at: Option<&str> = None;
-            for path in &common_paths {
-                if Path::new(path).exists() {
-                    found_at = Some(path);
-                    break;
-                }
-            }
-
-            // Also try `which mina`
-            let which_result = std::process::Command::new("which")
-                .arg("mina")
-                .output()
-                .ok()
-                .and_then(|o| {
-                    if o.status.success() {
-                        Some(String::from_utf8_lossy(&o.stdout).trim().to_string())
-                    } else {
-                        None
-                    }
-                });
-
-            let mut msg = format!(
-                "Mina binary not found at '{}'. Searched also in {}.",
-                mina_bin.display(),
-                common_paths.join(", ")
-            );
-
-            if let Some(path) = found_at {
-                msg.push_str(&format!(
-                    " Found mina at '{}'. Use --bin-path {} to use it.",
-                    path,
-                    Path::new(path).parent().unwrap_or(Path::new("/")).display()
-                ));
-            } else if let Some(ref which_path) = which_result {
-                msg.push_str(&format!(
-                    " Found mina via PATH at '{}'. Use --bin-path {} to use it.",
-                    which_path,
-                    Path::new(which_path.as_str())
-                        .parent()
-                        .unwrap_or(Path::new("/"))
-                        .display()
-                ));
-            } else {
-                msg.push_str(
-                    " Please install mina or use --bin-path to specify the location.",
-                );
-            }
-
-            error!("{msg}");
-            Err(Error::new(ErrorKind::NotFound, msg))
-        }
+        // Native mode's mina discovery lives in `resolve_bin_path`.
+        ExecutionMode::Native => Ok(()),
     }
 }
 
@@ -1400,6 +1346,43 @@ fn exit_with(error_message: String) -> Result<()> {
     error!("{error_message}");
     println!("{}", output::Error { error_message });
     exit(1);
+}
+
+/// Decide the effective `--bin-path` for this run.
+///
+/// * Docker mode: `--bin-path` is rejected (the flag is exclusive to native mode).
+/// * Native mode, flag supplied: validate that `<dir>/mina` exists.
+/// * Native mode, flag omitted: delegate to [`mina_locator::locate`].
+fn resolve_bin_path(
+    mode: &ExecutionMode,
+    provided: Option<PathBuf>,
+) -> Result<Option<PathBuf>> {
+    match (mode, provided) {
+        (ExecutionMode::Docker, Some(_)) => Err(Error::new(
+            ErrorKind::InvalidInput,
+            "--bin-path is only valid in native mode",
+        )),
+        (ExecutionMode::Docker, None) => Ok(None),
+        (ExecutionMode::Native, Some(dir)) => {
+            let mina_bin = dir.join("mina");
+            if !mina_bin.exists() {
+                return Err(Error::new(
+                    ErrorKind::NotFound,
+                    format!("Mina binary not found at '{}'.", mina_bin.display()),
+                ));
+            }
+            Ok(Some(dir))
+        }
+        (ExecutionMode::Native, None) => mina_locator::locate().map(Some),
+    }
+}
+
+/// Unwrap the bin_path inside a native-mode branch.
+/// `resolve_bin_path` guarantees `Some(_)` when the mode is native.
+fn native_bin(bin_path: &Option<PathBuf>) -> &Path {
+    bin_path
+        .as_deref()
+        .expect("native mode guarantees bin_path is resolved")
 }
 
 fn handle_stop_error(node_id: &str, error: impl ToString) -> Result<()> {
