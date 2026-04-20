@@ -1038,6 +1038,7 @@ let apply_ordered_txns_stepwise ?(stop_at_first_pass = false) ordered_txns
             ; second_pass_ledger = ledger
             ; fee_excess = t.global_state.fee_excess
             ; supply_increase = t.global_state.supply_increase
+            ; stake_change = t.global_state.stake_change
             ; protocol_state = t.global_state.protocol_state
             ; block_global_slot = t.global_state.block_global_slot
             }
@@ -1051,6 +1052,7 @@ let apply_ordered_txns_stepwise ?(stop_at_first_pass = false) ordered_txns
                 t.local_state.full_transaction_commitment
             ; excess = t.local_state.excess
             ; supply_increase = t.local_state.supply_increase
+            ; stake_change = t.local_state.stake_change
             ; ledger
             ; success = t.local_state.success
             ; account_update_index = t.local_state.account_update_index
