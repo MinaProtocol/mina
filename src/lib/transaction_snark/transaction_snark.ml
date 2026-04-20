@@ -3478,7 +3478,8 @@ module Make_str (A : Wire_types.Concrete) = struct
     in
     let statement : Statement.With_sok.t =
       Statement.Poly.with_empty_local_state ~supply_increase
-        ~source_first_pass_ledger ~target_first_pass_ledger
+        ~stake_change:Currency.Amount.Signed.zero ~source_first_pass_ledger
+        ~target_first_pass_ledger
         ~source_second_pass_ledger:target_first_pass_ledger
         ~target_second_pass_ledger:target_first_pass_ledger
         ~pending_coinbase_stack_state
@@ -3556,6 +3557,7 @@ module Make_str (A : Wire_types.Concrete) = struct
     in
     let statement : Statement.With_sok.t =
       Statement.Poly.with_empty_local_state ~supply_increase
+        ~stake_change:Currency.Amount.Signed.zero
         ~fee_excess:(Transaction_union.fee_excess transaction)
         ~sok_digest ~source_first_pass_ledger ~target_first_pass_ledger
         ~source_second_pass_ledger:target_first_pass_ledger
@@ -4068,6 +4070,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           ; connecting_ledger_left = connecting_ledger
           ; connecting_ledger_right = connecting_ledger
           ; supply_increase
+          ; stake_change = Currency.Amount.Signed.zero
           ; fee_excess
           ; sok_digest = ()
           }
