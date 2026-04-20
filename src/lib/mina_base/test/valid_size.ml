@@ -2,6 +2,15 @@ open Core_kernel
 open Mina_base.Zkapp_command
 open Mina_base
 
+let or_error_testable =
+  let pp ppf = function
+    | Ok () ->
+        Format.fprintf ppf "Ok"
+    | Error e ->
+        Format.fprintf ppf "Error(%s)" (Error.to_string_hum e)
+  in
+  Alcotest.testable pp (Or_error.equal (fun () () -> true))
+
 let tree_gen :
     ( Account_update.t
     , Digest.Account_update.t
@@ -27,7 +36,7 @@ let tree_gen :
 
 let zkapp_type_gen =
   let open Quickcheck.Let_syntax in
-  let%bind length = Int.gen_incl 1 1000 in
+  let%bind length = Int.gen_incl 2 1000 in
   let gen_call_forest =
     List.gen_with_length length
     @@ With_stack_hash.quickcheck_generator tree_gen
@@ -38,9 +47,10 @@ let zkapp_type_gen =
   let%map memo = Signed_command_memo.gen in
   (({ fee_payer; account_updates; memo } : t), length)
 
-let genesis_constant_error limit events actions : Genesis_constants.t =
+let genesis_constant_error max_zkapp_segment events actions :
+    Genesis_constants.t =
   { Genesis_constants.Compiled.genesis_constants with
-    zkapp_transaction_cost_limit = limit
+    max_zkapp_segment_per_transaction = max_zkapp_segment
   ; max_event_elements = events
   ; max_action_elements = actions
   }
@@ -53,57 +63,48 @@ let genesis_constant_error limit events actions : Genesis_constants.t =
 let valid_size_errors_expensive () =
   Quickcheck.test ~trials:50 zkapp_type_gen ~f:(fun (x, y) ->
       let actual =
-        valid_size
-          ~genesis_constants:(genesis_constant_error 1. (2 * y) (2 * y))
+        valid_size ~genesis_constants:(genesis_constant_error 1 (2 * y) (2 * y))
         @@ read_all_proofs_from_disk x
       in
-      Alcotest.(check bool)
-        "zkapp transaction too expensive" true
-        (Or_error.equal
-           (fun () () -> true)
-           actual
-           (Error (Error.of_string "zkapp transaction too expensive")) ) )
+      Alcotest.(check or_error_testable)
+        "zkapp transaction too expensive"
+        (Or_error.error_string "zkapp transaction too expensive")
+        actual )
 
 let valid_size_errors_events () =
   Quickcheck.test ~trials:50 zkapp_type_gen ~f:(fun (x, y) ->
       let expected =
-        Error
-          ( Error.of_string
-          @@ sprintf "too many event elements (%d, max allowed is %d)" (2 * y) y
-          )
+        Or_error.errorf "too many event elements (%d, max allowed is %d)"
+          (2 * y) y
       in
       let actual =
-        valid_size ~genesis_constants:(genesis_constant_error 100000. y (2 * y))
+        valid_size ~genesis_constants:(genesis_constant_error 100000 y (2 * y))
         @@ read_all_proofs_from_disk x
       in
-      Alcotest.(check bool)
-        "too many event elements" true
-        (Or_error.equal (fun () () -> true) actual expected) )
+      Alcotest.(check or_error_testable)
+        "too many event elements" expected actual )
 
 let valid_size_errors_actions () =
   Quickcheck.test ~trials:50 zkapp_type_gen ~f:(fun (x, y) ->
       let expected =
-        Error
-          ( Error.of_string
-          @@ sprintf "too many sequence event elements (%d, max allowed is %d)"
-               (2 * y) y )
+        Or_error.errorf
+          "too many sequence event elements (%d, max allowed is %d)" (2 * y) y
       in
       let actual =
-        valid_size ~genesis_constants:(genesis_constant_error 100000. (2 * y) y)
+        valid_size ~genesis_constants:(genesis_constant_error 100000 (2 * y) y)
         @@ read_all_proofs_from_disk x
       in
-      Alcotest.(check bool)
-        "too many sequence event elements" true
-        (Or_error.equal (fun () () -> true) actual expected) )
+      Alcotest.(check or_error_testable)
+        "too many sequence event elements" expected actual )
 
 let returns_ok () =
   Quickcheck.test ~trials:50 zkapp_type_gen ~f:(fun (x, y) ->
       let actual =
         valid_size
-          ~genesis_constants:(genesis_constant_error 100000. (2 * y) (2 * y))
+          ~genesis_constants:(genesis_constant_error 100000 (2 * y) (2 * y))
         @@ read_all_proofs_from_disk x
       in
-      Alcotest.(check bool) "returns ok" true (Or_error.is_ok actual) )
+      Alcotest.(check or_error_testable) "returns ok" (Ok ()) actual )
 
 let tests =
   ( "valid size"

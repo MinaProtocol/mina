@@ -15,6 +15,8 @@ in  Pipeline.build
             [ Artifacts.Type.Daemon
             , Artifacts.Type.DaemonAppsOnly
             , Artifacts.Type.DaemonConfig
+            , Artifacts.Type.DaemonAutoHardfork
+            , Artifacts.Type.DaemonAutomode
             , Artifacts.Type.DaemonPrefork
             , Artifacts.Type.CreatePreforkGenesis
             , Artifacts.Type.LogProc

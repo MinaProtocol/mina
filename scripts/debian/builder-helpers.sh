@@ -84,7 +84,7 @@ signature_of_network() {
     mainnet)
       printf "mainnet"
       ;;
-    devnet)
+    devnet|mesa)
       printf "testnet"
       ;;
     *)
@@ -103,7 +103,16 @@ create_control_file() {
   echo "Dependencies: ${2}"
   echo "Description: ${3}"
   if [ -n "${4:-}" ]; then
-    echo "Broken/Replaces: ${4}"
+    echo "Suggests: ${4}"
+  fi
+  if [ -n "${5:-}" ]; then
+    echo "Replaces/Breaks: ${5}"
+  fi
+  if [ -n "${6:-}" ]; then
+    echo "Provides: ${6}"
+  fi
+  if [ -n "${7:-}" ]; then
+    echo "Conflicts: ${7}"
   fi
   # Make sure the directory exists
   mkdir -p "${BUILDDIR}/DEBIAN"
@@ -137,6 +146,12 @@ EOF
   if [ -n "${5:-}" ]; then
     echo "Replaces: ${5}" >> ${CONTROL}
     echo "Breaks: ${5}" >> ${CONTROL}
+  fi
+  if [ -n "${6:-}" ]; then
+    echo "Provides: ${6}" >> ${CONTROL}
+  fi
+  if [ -n "${7:-}" ]; then
+    echo "Conflicts: ${7}" >> ${CONTROL}
   fi
 
   cat <<EOF >> ${CONTROL}
@@ -280,7 +295,7 @@ copy_common_daemon_configs() {
   # devnet/mainnet also copy the magic config (config_$GITHASH_CONFIG.json).
   # This config is automatically picked up by the daemon on startup.
   case "${NETWORK_NAME}" in
-    devnet|mainnet)
+    devnet|mainnet|mesa)
       cp ../genesis_ledgers/"${NETWORK_NAME}".json \
         "${BUILDDIR}/var/lib/coda/config_${GITHASH_CONFIG}.json"
       cp ../genesis_ledgers/${NETWORK_NAME}.json "${BUILDDIR}/var/lib/coda/${NETWORK_NAME}.json"
@@ -545,11 +560,15 @@ build_daemon_deb() {
   case "${network}" in
     mainnet)
       package_name="mina-mainnet"
-      seed_list_url="mina-seed-lists/${network}_seeds.txt"
+      seed_list_url='mina-seed-lists/mainnet_seeds.txt'
       ;;
     devnet)
       package_name="${MINA_DEB_NAME}"
-      seed_list_url="seed-lists/${network}_seeds.txt"
+      seed_list_url='seed-lists/devnet_seeds.txt'
+      ;;
+    mesa)
+      package_name="mina-mesa"
+      seed_list_url='o1labs-gitops-infrastructure/mina-mesa-network/mina-mesa-network-seeds.txt'
       ;;
     *)
       echo "Unknown network name provided: ${network}"; exit 1
@@ -557,7 +576,7 @@ build_daemon_deb() {
   esac
 
   create_control_file "${package_name}" "${SHARED_DEPS}${DAEMON_DEPS}, mina-${network}-config (>=${MINA_DEB_VERSION})" \
-    'Mina Protocol Client and Daemon' "${SUGGESTED_DEPS}" "mina-${network} (<< ${MINA_DEB_VERSION})"
+    'Mina Protocol Client and Daemon' "${SUGGESTED_DEPS}" "mina-${network} (<< ${MINA_DEB_VERSION}), mina-${network}-postfork-${POSTFORK_CODENAME}"
 
   copy_common_daemon_apps "${network}"
 
@@ -572,8 +591,9 @@ build_daemon_deb() {
 
 # For automode purpose. We need to control location for both runtimes
 CURRENT_CODENAME=berkeley
-AUTOMODE_CURRENT_DIR="${BUILDDIR}/usr/lib/mina/${CURRENT_CODENAME}"
 POSTFORK_CODENAME=mesa
+AUTOMODE_CURRENT_DIR="${BUILDDIR}/usr/lib/mina/${CURRENT_CODENAME}"
+AUTOMODE_POSTFORK_DIR="${BUILDDIR}/usr/lib/mina/${POSTFORK_CODENAME}"
 
 #
 # Builds mina-NETWORK-prefork-POSTFORK_CODENAME tailored package for automode package
@@ -603,6 +623,173 @@ build_daemon_prefork_deb() {
   build_deb "${package_name}"
 }
 ## END PREFORK PACKAGE ##
+
+# Function to DRY creating symlinks for shared apps in deb packages
+# for automode runtimes that share the same dispatcher but different runtimes
+create_symlinks_for_shared_apps() {
+  local NETWORK_NAME=${1}
+
+  mkdir -p "${BUILDDIR}/usr/local/bin"
+
+  cp ../scripts/hardfork/dispatcher.sh \
+    "${BUILDDIR}/usr/local/bin/mina-dispatch"
+
+  mkdir -p "${BUILDDIR}/etc/default"
+
+  #Create env vars for the dispatcher
+  # MINA_NETWORK is hardcoded as ocaml generation code in mina_run.ml
+    cat << EOF > "${BUILDDIR}/etc/default/mina-dispatch"
+MINA_NETWORK=mesa
+MINA_PROFILE=${DUNE_PROFILE}
+RUNTIMES_BASE_PATH="/usr/lib/mina"
+MINA_LIBP2P_ENVVAR_NAME="MINA_LIBP2P_HELPER_PATH"
+EOF
+
+
+  # Create actual symlinks in the package (not using DEBIAN/links which is not standard)
+  ln -sf mina-dispatch "${BUILDDIR}/usr/local/bin/coda-libp2p_helper"
+  ln -sf mina-dispatch "${BUILDDIR}/usr/local/bin/mina-create-genesis"
+  ln -sf mina-dispatch "${BUILDDIR}/usr/local/bin/mina-generate-keypair"
+  ln -sf mina-dispatch "${BUILDDIR}/usr/local/bin/mina-validate-keypair"
+  ln -sf mina-dispatch "${BUILDDIR}/usr/local/bin/mina-standalone-snark-worker"
+  ln -sf mina-dispatch "${BUILDDIR}/usr/local/bin/mina-rocksdb-scanner"
+  ln -sf mina-dispatch "${BUILDDIR}/usr/local/bin/mina"
+
+  ln -sf "${AUTOMODE_CURRENT_DIR}/mina" mina-berkeley
+  ln -sf "${AUTOMODE_POSTFORK_DIR}/mina" mina-mesa
+
+  # Create directory for legacy binaries symlink if needed
+  mkdir -p "${BUILDDIR}/usr/lib/mina/berkeley"
+  ln -sf ../../lib/mina/berkeley/mina-create-genesis "${BUILDDIR}/usr/local/bin/mina-create-legacy-genesis"
+
+  echo "------------------------------------------------------------"
+  echo "Created symlinks in ${BUILDDIR}/usr/local/bin:"
+  find "${BUILDDIR}/usr/local/bin/" -type l -exec ls -la {} \;
+
+}
+
+# Copies common binaries and configuration for postfork automode packages
+# Includes only binaries without configuration files or genesisledgers
+# Places binaries in /usr/lib/mina/<network_name> directory
+copy_common_daemon_post_automode_apps_and_configs() {
+
+  local prefork_network="${1}"
+  local seed_list_url="${2}"
+
+  echo "------------------------------------------------------------"
+  echo "copy_common_daemon_post_automode_configs inputs:"
+  echo "Network Name: ${prefork_network} (like mainnet, devnet, berkeley)"
+  echo "Seed List URL path: ${seed_list_url} (like seed-lists/berkeley_seeds.txt)"
+
+  # Copy binaries to separate directory as we need both berkeley and mesa binaries for automode packages
+  # and they share the same dispatcher and some common apps,
+  mkdir -p "${AUTOMODE_POSTFORK_DIR}"
+  copy_common_daemon_apps "${prefork_network}" "${AUTOMODE_POSTFORK_DIR}"
+
+  # Create symlinks for shared apps in the main bin directory that
+  # dispatch to the correct runtime based on env var set in /etc/default/mina-dispatch
+  create_symlinks_for_shared_apps "${prefork_network}"
+
+  # Config files (config_<hash>.json, <network>.json) are provided by the
+  # mina-<network>-config package, so we do NOT ship them here to avoid
+  # dpkg file conflicts.  Only ship the prefork config when it differs from
+  # the postfork hash, since the config package won't contain it.
+  if [[ -n "${PREFORK_LEGACY_VERSION:-}" ]]; then
+    local prefork_short_hash="${PREFORK_LEGACY_VERSION##*-}"
+    local prefork_githash_config
+    prefork_githash_config=$(git rev-parse --short=8 "$prefork_short_hash" 2>/dev/null || echo "")
+    if [[ -n "$prefork_githash_config" ]]; then
+      if [[ "$prefork_githash_config" == "$GITHASH_CONFIG" ]]; then
+        echo "Prefork githash (${prefork_githash_config}) is the same as postfork; skipping config copy."
+      else
+        echo "Copying config for prefork daemon as config_${prefork_githash_config}.json"
+        mkdir -p "${BUILDDIR}/var/lib/coda"
+        cp "../genesis_ledgers/${prefork_network}.json" \
+           "${BUILDDIR}/var/lib/coda/config_${prefork_githash_config}.json"
+      fi
+    else
+      echo "WARNING: Could not resolve prefork commit hash from '${prefork_short_hash}'. Prefork config not shipped."
+    fi
+  fi
+
+  # Copy seed list with correct URL for postfork runtime and
+  # bash completion that points to the correct seed list URL
+  copy_common_daemon_utils "${seed_list_url}" "${AUTOMODE_POSTFORK_DIR}/mina"
+
+}
+
+
+## POSTFORK PACKAGE ##
+
+build_daemon_postfork_deb() {
+  local prefork_network="$1"
+  local package_name="mina-${prefork_network}-postfork-${POSTFORK_CODENAME}"
+
+
+  echo "------------------------------------------------------------"
+  echo "--- Building ${prefork_network} postfork deb for hardfork automode:"
+
+  create_control_file "$package_name" "${SHARED_DEPS}${DAEMON_DEPS}" \
+    'Mina Protocol Client and Daemon' "${SUGGESTED_DEPS}"
+
+  local seed_list_url
+  case "${prefork_network}" in
+    mainnet)
+      seed_list_url='mina-seed-lists/mainnet_seeds.txt'
+      ;;
+    devnet)
+      seed_list_url='seed-lists/devnet_seeds.txt'
+      ;;
+    mesa)
+      seed_list_url='o1labs-gitops-infrastructure/mina-mesa-network/mina-mesa-network-seeds.txt'
+      ;;
+    *)
+      echo "Unknown network name provided: ${prefork_network}"; exit 1
+      ;;
+  esac
+
+  copy_common_daemon_post_automode_apps_and_configs \
+    "${prefork_network}" \
+    "${seed_list_url}"
+
+  build_deb "$package_name"
+
+}
+
+## AUTOMODE METAPACKAGE ##
+
+#
+# Builds mina-NETWORK-automode transitional metapackage
+#
+# Output: mina-${NETWORK}-automode_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
+#
+# This is an empty metapackage that depends on both prefork and postfork
+# automode packages. It Conflicts/Replaces/Provides mina-${NETWORK} so that
+# running `apt-get install mina-${NETWORK}-automode` will automatically
+# remove mina-${NETWORK} and pull in both automode runtimes.
+#
+
+build_daemon_automode_deb() {
+
+  local network="$1"
+
+  echo "------------------------------------------------------------"
+  echo "--- Building ${network} automode transitional metapackage:"
+
+  local package_name="mina-${network}-automode"
+
+  local prefork_pkg="mina-${network}-prefork-${POSTFORK_CODENAME}"
+  local postfork_pkg="mina-${network}-postfork-${POSTFORK_CODENAME}"
+  local prefork_version="${PREFORK_LEGACY_VERSION:-${MINA_DEB_VERSION}}"
+  local depends="${postfork_pkg} (>= ${MINA_DEB_VERSION}), ${prefork_pkg} (>= ${prefork_version})"
+
+  create_control_file "${package_name}" "${depends}" \
+    "Transitional metapackage for Mina ${network} automode (installs both prefork and postfork runtimes)" \
+    "" "mina-${network}" "mina-${network}" "mina-${network}"
+
+  build_deb "${package_name}"
+}
+## END AUTOMODE METAPACKAGE ##
 
 ## GENERIC PACKAGE ##
 
@@ -770,6 +957,9 @@ build_archive_deb () {
     devnet)
       package_name="$MINA_ARCHIVE_DEB_NAME"
       ;;
+    mesa)
+      package_name="mina-archive-mesa${DEB_SUFFIX}"
+      ;;
     *)
       echo "Unknown network name provided: ${network}" >&2
       exit 1
@@ -882,44 +1072,23 @@ build_prefork_devnet_genesis_ledger_deb() {
 # Output: mina-create-mainnet-prefork-genesis_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
 # Dependencies: ${SHARED_DEPS}${DAEMON_DEPS}
 #
-# Utility for creating prefork genesis ledgers for post-hardfork verification.
-# Contains the runtime_genesis_ledger tool for Mina protocol.
-#
-build_prefork_mainnet_genesis_ledger_deb() {
-  echo "------------------------------------------------------------"
-  echo "--- Building Mina Generic mainnet create prefork genesis tool:"
-
-  DEB_NAME="mina-create-mainnet-prefork-genesis-ledger"
-
-  create_control_file "$DEB_NAME" \
-    "${SHARED_DEPS}${DAEMON_DEPS}" \
-    'Utility to verify post hardfork ledger for Mina'
-
-  mkdir -p "${BUILDDIR}/usr/local/bin"
-
-  # Binaries
-  cp ./default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe \
-    "${BUILDDIR}/usr/local/bin/mina-create-prefork-genesis"
-
-  build_deb "$DEB_NAME"
-}
-
-#
-# Builds mina-create-testnet-generic-prefork-genesis package for prefork genesis creation
-#
-# Output: mina-create-testnet-generic-prefork-genesis_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
+# Output: mina-create-${NETWORK}-prefork-genesis_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
 # Dependencies: ${SHARED_DEPS}${DAEMON_DEPS}
 #
-# Utility for creating prefork genesis ledgers for post-hardfork verification.
+# Utility for creating prefork genesis ledgers for postfork verification.
 # Contains the runtime_genesis_ledger tool for Mina protocol.
 #
-build_prefork_testnet_generic_genesis_ledger_deb() {
+
+build_prefork_genesis_ledger_deb() {
+
+  local network="$1"
+
   echo "------------------------------------------------------------"
-  echo "--- Building Mina Generic testnet create prefork genesis tool:"
+  echo "--- Building Mina Generic ${network} create prefork genesis tool:"
 
-  DEB_NAME="mina-create-testnet-generic-prefork-genesis-ledger"
+  local package_name="mina-create-${network}-prefork-genesis-ledger"
 
-  create_control_file "$DEB_NAME" \
+  create_control_file "$package_name" \
     "${SHARED_DEPS}${DAEMON_DEPS}" \
     'Utility to verify post hardfork ledger for Mina'
 
@@ -929,7 +1098,7 @@ build_prefork_testnet_generic_genesis_ledger_deb() {
   cp ./default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe \
     "${BUILDDIR}/usr/local/bin/mina-create-prefork-genesis"
 
-  build_deb "$DEB_NAME"
+  build_deb "$package_name"
 }
 
 ## END CREATE PREFORK GENESIS PACKAGE ##

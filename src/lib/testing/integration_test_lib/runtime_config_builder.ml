@@ -14,10 +14,7 @@ let create ~(test_config : Test_config.t) ~(genesis_ledger : Genesis_ledger.t) =
       Some
         { txpool_max_size = Some test_config.txpool_max_size
         ; peer_list_url = None
-        ; zkapp_proof_update_cost = None
-        ; zkapp_signed_single_update_cost = None
-        ; zkapp_signed_pair_update_cost = None
-        ; zkapp_transaction_cost_limit = None
+        ; max_zkapp_segment_per_transaction = None
         ; max_event_elements = None
         ; max_action_elements = None
         ; zkapp_cmd_limit_hardcap = None

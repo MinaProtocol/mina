@@ -1,8 +1,8 @@
-open Util
 open Core
 open Currency
 open Mina_base
 open Signature_lib
+open Transaction_snark_tests.Util
 module Impl = Pickles.Impls.Step
 module Inner_curve = Snark_params.Tick.Inner_curve
 module Nat = Pickles_types.Nat

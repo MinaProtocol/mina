@@ -14,8 +14,8 @@ let
     };
   toolchainHashes = {
     "1.92.0" = "sha256-sqSWJDUxc+zaz1nBWMAJKTAGBuGWP25GCftIOlCEAtA=";
-    "nightly-2024-09-05" =
-      "sha256-3aoA7PuH09g8F+60uTUQhnHrb/ARDLueSOD08ZVsWe0=";
+    "nightly-2025-12-11" =
+      "sha256-Z8PetnKGSZjqRtodJ20XqBoTe2qNG0RaklrVW7AQ3JE=";
     # copy the placeholder line with the correct toolchain name when adding a new toolchain
     # That is,
     # 1. Put the correct version name;
@@ -99,6 +99,7 @@ in {
       # Using the same toolchain which is used by the local stubs crate
       ../src/lib/crypto/kimchi_bindings/stubs/rust-toolchain.toml;
     rust_platform = rustPlatformFor toolchain.rust;
+    lock = ../src/lib/crypto/proof-systems/Cargo.lock;
   in rust_platform.buildRustPackage {
     pname = "kimchi_stubs_static_lib";
     version = "0.1.0";
@@ -109,10 +110,8 @@ in {
     buildInputs = with final; lib.optional stdenv.isDarwin libiconv;
     cargoLock = let fixupLockFile = path: builtins.readFile path;
     in {
-      lockFileContents =
-        fixupLockFile ../src/lib/crypto/proof-systems/Cargo.lock;
-      outputHashes =
-        narHashesFromCargoLock ../src/lib/crypto/proof-systems/Cargo.lock;
+      lockFileContents = fixupLockFile lock;
+      outputHashes = narHashesFromCargoLock lock;
     };
     buildPhase = ''
       cargo build -p kimchi-stubs --release --lib
@@ -146,7 +145,7 @@ in {
     '';
   };
 
-  kimchi_wasm = let
+  plonk_wasm = let
     lock = ../src/lib/crypto/proof-systems/Cargo.lock;
 
     deps = builtins.listToAttrs (map (pkg: {
@@ -161,10 +160,10 @@ in {
       version = deps.wasm-bindgen.version;
       src = final.fetchCrate {
         inherit pname version;
-        sha256 = "sha256-3RJzK7mkYFrs7C/WkhW9Rr4LdP5ofb2FdYGz1P7Uxog=";
+        sha256 = "sha256-M6WuGl7EruNopHZbqBpucu4RWz44/MSdv6f0zkYw+44=";
       };
 
-      cargoHash = "sha256-tD0OY2PounRqsRiFh8Js5nyknQ809ZcHMvCOLrvYHRE=";
+      cargoHash = "sha256-/zJzxtzOZuGyvDLdJNEQFPzFHC6IbEiWOeZYrKgGxEk=";
       nativeBuildInputs = [ final.pkg-config ];
 
       buildInputs = with final;
@@ -188,7 +187,7 @@ in {
       '';
     };
   in rustPlatform.buildRustPackage {
-    pname = "kimchi_wasm";
+    pname = "plonk_wasm";
     version = "0.1.0";
     src = final.lib.sourceByRegex ../src [
       "^lib(/crypto(/kimchi_bindings(/wasm(/.*)?)?)?)?$"
@@ -220,9 +219,17 @@ in {
       runHook preBuild
       (
       set -x
-      export RUSTFLAGS="-C target-feature=+atomics,+bulk-memory,+mutable-globals -C link-arg=--max-memory=4294967296"
-      wasm-pack build --mode no-install --target nodejs --out-dir $out/nodejs kimchi-wasm -- --features nodejs -Z build-std=panic_abort,std
-      wasm-pack build --mode no-install --target web --out-dir $out/web kimchi-wasm -Z build-std=panic_abort,std
+      export RUSTFLAGS="\
+      -C target-feature=+atomics,+bulk-memory,+mutable-globals \
+      -C link-arg=--import-memory \
+      -C link-arg=--shared-memory \
+      -C link-arg=--export=__wasm_init_tls \
+      -C link-arg=--export=__tls_base \
+      -C link-arg=--export=__tls_size \
+      -C link-arg=--export=__tls_align \
+      -C link-arg=--max-memory=4294967296"
+      wasm-pack build --mode no-install --target nodejs --out-dir $out/nodejs kimchi-wasm -- -Z build-std=panic_abort,std --features nodejs
+      wasm-pack build --mode no-install --target web --out-dir $out/web kimchi-wasm -- -Z build-std=panic_abort,std
       )
       runHook postBuild
     '';
@@ -231,6 +238,9 @@ in {
     installPhase = ":";
     cargoBuildFeatures = [ "nodejs" ];
   };
+
+  # Keep the historical package name expected by ocaml/javascript Nix code.
+  kimchi_wasm = final.plonk_wasm;
 
   # Jobs/Lint/Rust.dhall
   trace-tool = final.rustPlatform.buildRustPackage rec {

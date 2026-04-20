@@ -637,9 +637,21 @@ debian-build-rosetta-devnet: ## Build the Debian Rosetta package for devnet
 debian-build-rosetta-mainnet: ## Build the Debian Rosetta package for mainnet
 	$(call build_debian_package,rosetta_mainnet)
 
-.PHONY: debian-build-daemon-devnet-hardfork
-debian-build-daemon-devnet-hardfork: ## Build the Debian daemon package for devnet hardfork
-	$(call build_debian_package,daemon_devnet_hardfork)
+.PHONY: debian-build-daemon-devnet-postfork
+debian-build-daemon-devnet-postfork: ## Build the Debian daemon package for automote devnet post hardfork
+	$(call build_debian_package,daemon_postfork_devnet)
+
+.PHONY: debian-build-daemon-mainnet-postfork
+debian-build-daemon-mainnet-postfork: ## Build the Debian daemon package for automote mainnet post hardfork
+	$(call build_debian_package,daemon_postfork_mainnet)
+
+.PHONY: debian-build-daemon-devnet-prefork
+debian-build-daemon-devnet-prefork: ## Build the Debian daemon package for automote devnet pre hardfork
+	$(call build_debian_package,daemon_prefork_devnet)
+
+.PHONY: debian-build-daemon-mainnet-prefork
+debian-build-daemon-mainnet-prefork: ## Build the Debian daemon package for automote mainnet pre hardfork
+	$(call build_debian_package,daemon_prefork_mainnet)
 
 .PHONY: debian-daemon-storage-toolbox
 debian-daemon-storage-toolbox: ## Build the Debian daemon storage toolbox package
@@ -720,6 +732,8 @@ define build_docker_image
 		--service $(1) \
 		--version "$$MINA_DEB_VERSION" \
 		--branch "$$GITBRANCH" \
+		--deb-legacy-version "$$MINA_DEB_LEGACY_VERSION" \
+		--docker-registry "europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo" \
 		--network $(2) \
 		--no-cache
 
@@ -760,6 +774,17 @@ docker-build-daemon-devnet: start-local-debian-repo ## Build the daemon Docker i
 docker-build-daemon-mainnet: SHELL := /bin/bash
 docker-build-daemon-mainnet: start-local-debian-repo ## Build the daemon Docker image for mainnet
 	$(call build_docker_image,mina-daemon,mainnet)
+
+
+.PHONY: docker-build-daemon-devnet-automode-hardfork
+docker-build-daemon-devnet-automode-hardfork: SHELL := /bin/bash
+docker-build-daemon-devnet-automode-hardfork: start-local-debian-repo ## Build the daemon Docker image for automode devnet post hardfork
+	$(call build_docker_image,mina-daemon-auto-hardfork,devnet)
+
+.PHONY: docker-build-daemon-mainnet-automode-hardfork
+docker-build-daemon-mainnet-automode-hardfork: SHELL := /bin/bash
+docker-build-daemon-mainnet-automode-hardfork: start-local-debian-repo ## Build the daemon Docker image for automode mainnet post hardfork
+	$(call build_docker_image,mina-daemon-auto-hardfork,mainnet)
 
 .PHONY: docker-build-rosetta
 docker-build-rosetta-devnet-generic: SHELL := /bin/bash

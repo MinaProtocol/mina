@@ -580,15 +580,33 @@ module Verify_work_batcher = struct
           | `Partially_validated x | `Init x ->
               x
         in
-        List.concat_map xs ~f:(fun x ->
-            works (input x)
-            |> List.concat_map ~f:(fun { fee; prover; proofs } ->
-                   let msg = Sok_message.create ~fee ~prover in
-                   One_or_two.to_list
-                     (One_or_two.map proofs ~f:(fun p ->
-                          (Ledger_proof.Cached.read_proof_from_disk p, msg) ) ) ) )
-        |> Verifier.verify_transaction_snarks verifier
-        >>| function
+        let proof_and_msgs =
+          List.concat_map xs ~f:(fun x ->
+              List.concat_map
+                (works @@ input x)
+                ~f:(fun { fee; prover; proofs } ->
+                  let msg = Sok_message.create ~fee ~prover in
+                  One_or_two.to_list
+                    (One_or_two.map proofs ~f:(fun p ->
+                         (Ledger_proof.Cached.read_proof_from_disk p, msg) ) )
+                  ) )
+        in
+        let check_sok_digests () =
+          List.for_all proof_and_msgs ~f:(fun (proof, msg) ->
+              Sok_message.Digest.equal
+                (Ledger_proof.sok_digest proof)
+                (Sok_message.digest msg) )
+        in
+        let check () =
+          if check_sok_digests () then
+            Verifier.verify_transaction_snarks verifier
+              (List.map ~f:fst proof_and_msgs)
+          else
+            Deferred.Result.return
+              (Or_error.error_string
+                 "proof's sok message digest does not match the sok message" )
+        in
+        match%map check () with
         | Ok (Ok ()) ->
             Ok (List.map xs ~f:(fun x -> `Valid (input x)))
         | Ok (Error err) ->

@@ -1,6 +1,5 @@
 open Core
 open Async
-open Mina_base
 open Cli_lib
 open Signature_lib
 open Init
@@ -104,8 +103,10 @@ let load_config_files ~logger ~genesis_constants ~constraint_constants ~conf_dir
     make_ledger_backing ~constraint_constants ~runtime_config:config
       ~hardfork_handling
   in
-  let chain_state_locations =
-    Init.Chain_state_locations.of_config ~conf_dir config
+  let chain_state_locations, chain_id_opt =
+    Init.Chain_state_locations.of_config ~logger
+      ~signature_kind:Mina_signature_kind.t_DEPRECATED ~proof_level
+      ~genesis_constants ~constraint_constants ~conf_dir config
   in
   let genesis_dir =
     Option.value ~default:chain_state_locations.genesis genesis_dir
@@ -148,11 +149,24 @@ let load_config_files ~logger ~genesis_constants ~constraint_constants ~conf_dir
           ~metadata ;
         Error.raise err
   in
+  let chain_id = Chain_id.of_precomputed_values precomputed_values in
+  let _ =
+    match chain_id_opt with
+    | None ->
+        ()
+    | Some cid ->
+        let open Chain_id in
+        let chain_id = Lazy.force chain_id in
+        if not (Chain_id.equal cid chain_id) then
+          failwithf "Chain_id mismatch %s /= %s" (to_string cid)
+            (to_string chain_id) ()
+  in
   ( precomputed_values
   , config_jsons
   , config
   , chain_state_locations
-  , ledger_backing )
+  , ledger_backing
+  , chain_id )
 
 let setup_daemon logger ~itn_features ~default_snark_worker_fee =
   let open Command.Let_syntax in
@@ -822,7 +836,8 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
                    , config_jsons
                    , config
                    , chain_state_locations
-                   , ledger_backing ) =
+                   , ledger_backing
+                   , chain_id ) =
             load_config_files ~logger ~conf_dir ~genesis_dir
               ~proof_level:Genesis_constants.Compiled.proof_level config_files
               ~genesis_constants ~constraint_constants ~cli_proof_level
@@ -1165,10 +1180,6 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
           let%bind () = Async.Unix.mkdir ~p:() trust_dir in
           let%bind trust_system = Trust_system.create trust_dir in
           trace_database_initialization "trust_system" __LOC__ trust_dir ;
-          let genesis_state_hash =
-            (Precomputed_values.genesis_state_hashes precomputed_values)
-              .state_hash
-          in
           let genesis_ledger_hash =
             Precomputed_values.genesis_ledger precomputed_values
             |> Lazy.force |> Mina_ledger.Ledger.merkle_root
@@ -1315,22 +1326,7 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
               {|No peers were given.
 
 Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
-          let chain_id =
-            let protocol_transaction_version =
-              Protocol_version.(transaction current)
-            in
-            let protocol_network_version =
-              Protocol_version.(transaction current)
-            in
-            Chain_id.make
-              { genesis_state_hash
-              ; genesis_constants = precomputed_values.genesis_constants
-              ; constraint_system_digests =
-                  Lazy.force precomputed_values.constraint_system_digests
-              ; protocol_transaction_version
-              ; protocol_network_version
-              }
-          in
+          let chain_id = Lazy.force chain_id |> Chain_id.to_string in
           [%log info] "Daemon will use chain id %s" chain_id ;
           [%log info] "Daemon running protocol version %s"
             Protocol_version.(to_string current) ;
@@ -1899,10 +1895,7 @@ let internal_commands logger ~itn_features =
                 match mode with
                 | `Transaction ->
                     `Transaction
-                      (List.t_of_sexp
-                         (Tuple2.t_of_sexp Ledger_proof.t_of_sexp
-                            Sok_message.t_of_sexp )
-                         input_sexp )
+                      (List.t_of_sexp Ledger_proof.t_of_sexp input_sexp)
                 | `Blockchain ->
                     `Blockchain
                       (List.t_of_sexp Blockchain_snark.Blockchain.t_of_sexp
@@ -1918,7 +1911,7 @@ let internal_commands logger ~itn_features =
                 match mode with
                 | `Transaction -> (
                     match
-                      [%derive.of_yojson: (Ledger_proof.t * Sok_message.t) list]
+                      [%derive.of_yojson: Ledger_proof.t list]
                         (Yojson.Safe.from_string input_line)
                     with
                     | Ok input ->
@@ -2037,6 +2030,7 @@ let internal_commands logger ~itn_features =
                    , _config_jsons
                    , _config
                    , _chain_state_locations
+                   , _
                    , _ ) =
             load_config_files ~logger ~conf_dir ~genesis_dir ~genesis_constants
               ~constraint_constants ~proof_level ~cli_proof_level:None
@@ -2081,12 +2075,18 @@ let internal_commands logger ~itn_features =
           flag "--genesis-ledger-dir" ~aliases:[ "genesis-ledger-dir" ]
             ~doc:"DIR Directory that contains the genesis ledger"
             (optional string)
+        and from_config_hashes_only =
+          flag "--from-config-hashes-only"
+            ~aliases:[ "from-config-hashes-only" ]
+            ~doc:
+              "Compute chain_id using only the hashes in the config file, \
+               without requiring unpacked ledger data"
+            no_arg
         in
         fun () ->
           let open Deferred.Let_syntax in
           Parallel.init_master () ;
           let logger = Logger.create () in
-          let conf_dir = Mina_lib.Conf_dir.compute_conf_dir_exn conf_dir in
           let genesis_constants =
             Genesis_constants.Compiled.genesis_constants
           in
@@ -2094,45 +2094,72 @@ let internal_commands logger ~itn_features =
             Genesis_constants.Compiled.constraint_constants
           in
           let proof_level = Genesis_constants.Proof_level.Full in
-          let config_files =
-            List.map config_files ~f:(fun config_file ->
-                (config_file, `Must_exist) )
-          in
-          let%bind ( precomputed_values
-                   , _config_jsons
-                   , _config
-                   , _chain_state_locations
-                   , _ ) =
-            load_config_files ~logger ~conf_dir ~genesis_dir ~genesis_constants
-              ~constraint_constants ~proof_level ~cli_proof_level:None
-              ~hardfork_handling:Keep_running config_files
-          in
-          let chain_id =
-            let protocol_transaction_version =
-              Protocol_version.(transaction current)
+          if from_config_hashes_only then (
+            let%bind config =
+              Deferred.List.filter_map config_files ~f:(fun config_file ->
+                  match%map
+                    Genesis_ledger_helper.load_config_json config_file
+                  with
+                  | Ok config_json -> (
+                      match Runtime_config.of_yojson config_json with
+                      | Ok config ->
+                          Some config
+                      | Error err ->
+                          failwithf "Could not parse configuration file %s: %s"
+                            config_file err () )
+                  | Error err ->
+                      Error.raise err )
+              >>| List.fold ~init:Runtime_config.default
+                    ~f:Runtime_config.combine
             in
-            (*TODO: this is wrong, should be `Protocol_version.network current`, but is
-              consistent with the computation made by the daemon's entrypoint. Fix this in
-              the PR for develop.
-            *)
-            let protocol_network_version =
-              Protocol_version.(transaction current)
+            match
+              Init.Chain_state_locations.chain_id_of_config ~logger
+                ~signature_kind:Mina_signature_kind.t_DEPRECATED ~proof_level
+                ~genesis_constants ~constraint_constants config
+            with
+            | Some chain_id ->
+                printf "%s" (Chain_id.to_string chain_id) ;
+                exit 0
+            | None ->
+                eprintf
+                  "Could not compute chain_id from config hashes. Ensure the \
+                   config contains ledger.hash and epoch_data hashes.\n" ;
+                exit 1 )
+          else
+            let conf_dir = Mina_lib.Conf_dir.compute_conf_dir_exn conf_dir in
+            let config_files =
+              List.map config_files ~f:(fun config_file ->
+                  (config_file, `Must_exist) )
             in
-            let genesis_state_hash =
-              (Precomputed_values.genesis_state_hashes precomputed_values)
-                .state_hash
+            let%bind ( _
+                     , _config_jsons
+                     , config
+                     , _chain_state_locations
+                     , _
+                     , chain_id ) =
+              load_config_files ~logger ~conf_dir ~genesis_dir
+                ~genesis_constants ~constraint_constants ~proof_level
+                ~cli_proof_level:None ~hardfork_handling:Keep_running
+                config_files
             in
-            Chain_id.make
-              { genesis_state_hash
-              ; genesis_constants = precomputed_values.genesis_constants
-              ; constraint_system_digests =
-                  Lazy.force precomputed_values.constraint_system_digests
-              ; protocol_transaction_version
-              ; protocol_network_version
-              }
-          in
-          let () = printf "%s" chain_id in
-          exit 0) )
+            let chain_id = Lazy.force chain_id in
+            match
+              Init.Chain_state_locations.chain_id_of_config ~logger
+                ~signature_kind:Mina_signature_kind.t_DEPRECATED ~proof_level
+                ~genesis_constants ~constraint_constants config
+            with
+            | None ->
+                let () = printf "%s" (Chain_id.to_string chain_id) in
+                exit 0
+            | Some chain_id_from_config ->
+                if not (Chain_id.equal chain_id_from_config chain_id) then
+                  failwithf "Chain_id mismatch %s /= %s"
+                    Chain_id.(to_string chain_id_from_config)
+                    (Chain_id.to_string chain_id)
+                    ()
+                else
+                  let () = printf "%s" (Chain_id.to_string chain_id) in
+                  exit 0) )
   ; ( "print-hard-fork-genesis-timestamp"
     , Command.async
         ~summary:
