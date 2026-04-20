@@ -13,6 +13,10 @@
   stdio
   alcotest
   cmdliner
+  cohttp
+  cohttp-async
+  uri
+  yojson
   ;; mina libraries
   init
   mina_automation
