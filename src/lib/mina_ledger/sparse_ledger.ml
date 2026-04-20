@@ -143,6 +143,7 @@ let apply_zkapp_first_pass_unchecked_with_states ~constraint_constants
            ; second_pass_ledger = _ (*expected to be empty*)
            ; fee_excess
            ; supply_increase
+           ; stake_change
            ; protocol_state
            ; block_global_slot
            }
@@ -152,6 +153,7 @@ let apply_zkapp_first_pass_unchecked_with_states ~constraint_constants
         ; second_pass_ledger
         ; fee_excess
         ; supply_increase
+        ; stake_change
         ; protocol_state
         ; block_global_slot
         }
@@ -166,6 +168,7 @@ let apply_zkapp_second_pass_unchecked_with_states ~init ledger c =
            ; second_pass_ledger
            ; fee_excess
            ; supply_increase
+           ; stake_change
            ; protocol_state
            ; block_global_slot
            }
@@ -175,6 +178,7 @@ let apply_zkapp_second_pass_unchecked_with_states ~init ledger c =
         ; second_pass_ledger = !second_pass_ledger
         ; fee_excess
         ; supply_increase
+        ; stake_change
         ; protocol_state
         ; block_global_slot
         }
