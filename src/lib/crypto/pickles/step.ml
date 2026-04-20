@@ -634,6 +634,32 @@ struct
       let shifted_value =
         Shifted_value.Type2.of_field (module Tock.Field) ~shift:Shifts.tock2
       in
+      (* === TRACE: wrap-side (Tock.Field) Type2 deferred values ===
+       * These are what OCaml stores into
+       * `Types.Step.Proof_state.Per_proof.deferred_values` and are what
+       * the step circuit's `publicUnfinalizedProofs` allocates via
+       * `exists` of `Per_proof.typ` (which uses `Shifted_value.Type2.typ
+       * Other_field.typ_unchecked`). PS emits the parallel
+       * `expand_proof.wrap_deferred.*` labels. *)
+      ( let (Shifted_value.Type2.Shifted_value cip2) =
+          shifted_value combined_inner_product
+        in
+        let (Shifted_value.Type2.Shifted_value b2) = shifted_value b in
+        let (Shifted_value.Type2.Shifted_value perm2) = plonk.perm in
+        let (Shifted_value.Type2.Shifted_value zsrs2) =
+          plonk.zeta_to_srs_length
+        in
+        let (Shifted_value.Type2.Shifted_value zds2) =
+          plonk.zeta_to_domain_size
+        in
+        Pickles_trace.tock_field "expand_proof.wrap_deferred.combined_inner_product"
+          cip2 ;
+        Pickles_trace.tock_field "expand_proof.wrap_deferred.b" b2 ;
+        Pickles_trace.tock_field "expand_proof.wrap_deferred.plonk.perm" perm2 ;
+        Pickles_trace.tock_field "expand_proof.wrap_deferred.plonk.zetaToSrsLength"
+          zsrs2 ;
+        Pickles_trace.tock_field "expand_proof.wrap_deferred.plonk.zetaToDomainSize"
+          zds2 ) ;
       ( `Sg challenge_polynomial_commitment
       , { Types.Step.Proof_state.Per_proof.deferred_values =
             { plonk =
