@@ -744,6 +744,44 @@ let%test_module "Account precondition tests" =
       in
       (token_creator_pk, custom_token_id, keymap)
 
+    (* Build a zkapp_command that mints 100 of [custom_token_id] to
+       [token_holder], optionally applying [holder_update] and / or
+       [holder_precondition] to the holder's account update. *)
+    let build_mint_custom_token_cmd ~signature_kind ~account_creation_fee
+        ~token_creator ~token_creator_pk ~token_holder ~custom_token_id ~keymap
+        ?holder_update ?holder_precondition () =
+      let open Zkapp_command_builder in
+      let zkapp0 =
+        mk_forest
+          [ mk_node
+              (mk_account_update_body Signature No token_creator
+                 Token_id.default (-account_creation_fee) )
+              [ mk_node
+                  (mk_account_update_body ?update:holder_update Signature
+                     Parents_own_token token_holder custom_token_id 100 )
+                  []
+              ]
+          ]
+        |> mk_zkapp_command ~fee:7 ~fee_payer_pk:token_creator_pk
+             ~fee_payer_nonce:Account.Nonce.zero
+      in
+      let with_precondition =
+        match holder_precondition with
+        | None ->
+            zkapp0
+        | Some pc ->
+            { zkapp0 with
+              account_updates =
+                add_account_precondition ~at:1 pc zkapp0.account_updates
+            }
+      in
+      { with_precondition with
+        account_updates =
+          Zkapp_command.Call_forest.accumulate_hashes_predicated ~signature_kind
+            with_precondition.account_updates
+      }
+      |> replace_authorizations ~keymap
+
     let%test_unit "custom tokens have empty delegation" =
       (* A newly-minted custom-token account has delegate = empty. Verified
          by attaching an [Account_precondition] with [delegate = Check empty]
@@ -764,32 +802,10 @@ let%test_module "Account precondition tests" =
                       ~token_holder
                   in
                   let%bind mint_token_zkapp_command =
-                    let open Zkapp_command_builder in
-                    let zkapp0 =
-                      mk_forest
-                        [ mk_node
-                            (mk_account_update_body Signature No token_creator
-                               Token_id.default (-account_creation_fee) )
-                            [ mk_node
-                                (mk_account_update_body Signature
-                                   Parents_own_token token_holder
-                                   custom_token_id 100 )
-                                []
-                            ]
-                        ]
-                      |> mk_zkapp_command ~fee:7 ~fee_payer_pk:token_creator_pk
-                           ~fee_payer_nonce:Account.Nonce.zero
-                    in
-                    let zkapp_dummy_signatures =
-                      { zkapp0 with
-                        account_updates =
-                          add_account_precondition ~at:1 delegate_precondition
-                            zkapp0.account_updates
-                          |> Zkapp_command.Call_forest
-                             .accumulate_hashes_predicated ~signature_kind
-                      }
-                    in
-                    replace_authorizations ~keymap zkapp_dummy_signatures
+                    build_mint_custom_token_cmd ~signature_kind
+                      ~account_creation_fee ~token_creator ~token_creator_pk
+                      ~token_holder ~custom_token_id ~keymap
+                      ~holder_precondition:delegate_precondition ()
                   in
                   U.check_zkapp_command_with_merges_exn ledger
                     [ mint_token_zkapp_command ] ) ) )
@@ -814,36 +830,15 @@ let%test_module "Account precondition tests" =
                     setup_custom_token_ledger ~ledger ~token_creator
                       ~token_holder
                   in
-                  let delegate_update =
+                  let holder_update =
                     { Account_update.Update.noop with
                       delegate = Zkapp_basic.Set_or_keep.Set attempted_delegate
                     }
                   in
                   let%bind set_delegate_zkapp_command =
-                    let open Zkapp_command_builder in
-                    let zkapp0 =
-                      mk_forest
-                        [ mk_node
-                            (mk_account_update_body Signature No token_creator
-                               Token_id.default (-account_creation_fee) )
-                            [ mk_node
-                                (mk_account_update_body ~update:delegate_update
-                                   Signature Parents_own_token token_holder
-                                   custom_token_id 100 )
-                                []
-                            ]
-                        ]
-                      |> mk_zkapp_command ~fee:7 ~fee_payer_pk:token_creator_pk
-                           ~fee_payer_nonce:Account.Nonce.zero
-                    in
-                    let zkapp_dummy_signatures =
-                      { zkapp0 with
-                        account_updates =
-                          Zkapp_command.Call_forest.accumulate_hashes_predicated
-                            ~signature_kind zkapp0.account_updates
-                      }
-                    in
-                    replace_authorizations ~keymap zkapp_dummy_signatures
+                    build_mint_custom_token_cmd ~signature_kind
+                      ~account_creation_fee ~token_creator ~token_creator_pk
+                      ~token_holder ~custom_token_id ~keymap ~holder_update ()
                   in
                   U.check_zkapp_command_with_merges_exn
                     ~expected_failure:(Update_not_permitted_delegate, U.Pass_2)
