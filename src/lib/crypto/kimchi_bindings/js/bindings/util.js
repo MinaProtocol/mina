@@ -1,14 +1,46 @@
 /* global UInt64, caml_int64_of_int32, caml_create_bytes,
     caml_bytes_unsafe_set, caml_bytes_unsafe_get, caml_ml_bytes_length,
-    plonk_wasm
+    kimchi_ffi, getTsBindings
  */
 
 // Provides: tsBindings
 var tsBindings = globalThis.__snarkyTsBindings;
 
+// Provides: kimchi_backend
+// Requires: kimchi_ffi
+var kimchi_backend = kimchi_ffi ? kimchi_ffi.__kimchi_backend : 'wasm'; // default to wasm
+
+// Provides: kimchi_is_wasm
+// Requires: kimchi_backend
+var kimchi_is_wasm = kimchi_backend === 'wasm';
+
+// Provides: kimchi_is_native
+// Requires: kimchi_backend
+var kimchi_is_native = kimchi_backend === 'native';
+
+// Internal timing helper: 
+// Intentionally not exposed as a JSOO primitive. Use only for debugging
+var _report_kimchi_timing = function (label, fn) {
+  var now =
+    globalThis.performance && globalThis.performance.now
+      ? function () {
+        return globalThis.performance.now();
+      }
+      : Date.now;
+  var t0 = now();
+  try {
+    return fn();
+  } finally {
+    var dt = now() - t0;
+    if (globalThis.console && globalThis.console.log) {
+      globalThis.console.log('[kimchi timing] ' + label + ': ' + dt.toFixed(3) + 'ms');
+    }
+  }
+};
+
 // Provides: tsRustConversion
-// Requires: tsBindings, plonk_wasm
-var tsRustConversion = tsBindings.rustConversion(plonk_wasm);
+// Requires: tsBindings, kimchi_ffi
+var tsRustConversion = tsBindings.rustConversion(kimchi_ffi);
 
 // Provides: getTsBindings
 // Requires: tsBindings
@@ -74,8 +106,13 @@ var free_finalization_registry = new globalThis.FinalizationRegistry(function (
 });
 
 // Provides: free_on_finalize
-// Requires: free_finalization_registry
+// Requires: free_finalization_registry, kimchi_is_native
 var free_on_finalize = function (x) {
+  // No-op for native backend
+  if (kimchi_is_native) {
+    return x;
+  }
+
   // wasm-bindgen wrappers already carry their own finalization logic.
   // Registering an extra free path for them can cause double-free / borrow
   // errors (and eventually memory corruption).
