@@ -15,6 +15,7 @@ module Local_state = struct
       ; full_transaction_commitment : 'comm
       ; excess : 'signed_amount
       ; supply_increase : 'signed_amount
+      ; stake_change : 'signed_amount
       ; ledger : 'ledger
       ; success : 'bool
       ; account_update_index : 'length
