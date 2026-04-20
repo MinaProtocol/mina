@@ -179,6 +179,13 @@ fi
 
 log_info "Downloaded from cache: ${NEW_DEB_FILE}"
 
+# Extract version from the downloaded deb filename to pass to install.sh
+# Filename format: {package}_{version}_{arch}.deb
+NEW_DEB_BASENAME=$(basename "${NEW_DEB_FILE}")
+FORCE_VERSION=$(echo "${NEW_DEB_BASENAME}" | sed "s/^${PACKAGE}_//; s/_[^_]*\.deb$//")
+export FORCE_VERSION
+log_info "Extracted version from deb: ${FORCE_VERSION}"
+
 # Step 4: Upgrade the package
 log_info "--- Step 4: Upgrading package ---"
 
