@@ -487,7 +487,7 @@ let main () =
   Logger.(
     Consumer_registry.register ~id:"fuzz" ~processor:(Processor.raw ())
       ~transport:
-        (Transport_file_system.dumb_logrotate ~directory:"fuzz_logs"
+        (Transport_file_system.timestamped_logrotate ~directory:"fuzz_logs"
            ~log_filename:"log"
            ~max_size:(500 * 1024 * 1024)
            ~num_rotate:1 )) ;

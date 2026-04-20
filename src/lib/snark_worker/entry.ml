@@ -200,7 +200,7 @@ let command_from_rpcs ~commit_id ~proof_level:default_proof_level
             ~id:Logger.Logger_id.snark_worker
             ~processor:(Logger.Processor.raw ~log_level:file_log_level ())
             ~transport:
-              (Logger_file_system.dumb_logrotate ~directory:conf_dir
+              (Logger_file_system.timestamped_logrotate ~directory:conf_dir
                  ~log_filename:"mina-snark-worker.log"
                  ~max_size:logrotate_max_size ~num_rotate:logrotate_num_rotate )
             () ) ;

@@ -646,7 +646,7 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
           ~id:Logger.Logger_id.mina
           ~processor:(Logger.Processor.raw ~log_level:file_log_level ())
           ~transport:
-            (Logger_file_system.dumb_logrotate ~directory:conf_dir
+            (Logger_file_system.timestamped_logrotate ~directory:conf_dir
                ~log_filename:"mina.log" ~max_size:logrotate_max_size
                ~num_rotate:file_log_rotations )
           () ;
@@ -655,7 +655,7 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
           ~id:Logger.Logger_id.best_tip_diff
           ~processor:(Logger.Processor.raw ())
           ~transport:
-            (Logger_file_system.dumb_logrotate ~directory:conf_dir
+            (Logger_file_system.timestamped_logrotate ~directory:conf_dir
                ~log_filename:"mina-best-tip.log"
                ~max_size:best_tip_diff_log_size ~num_rotate:1 )
           () ;
@@ -664,7 +664,7 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
           ~id:Logger.Logger_id.rejected_blocks
           ~processor:(Logger.Processor.raw ())
           ~transport:
-            (Logger_file_system.dumb_logrotate ~directory:conf_dir
+            (Logger_file_system.timestamped_logrotate ~directory:conf_dir
                ~log_filename:"mina-rejected-blocks.log"
                ~max_size:rejected_blocks_log_size ~num_rotate:50 )
           () ;
@@ -672,7 +672,7 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
           ~id:Logger.Logger_id.oversized_logs
           ~processor:(Logger.Processor.raw ())
           ~transport:
-            (Logger_file_system.dumb_logrotate ~directory:conf_dir
+            (Logger_file_system.timestamped_logrotate ~directory:conf_dir
                ~log_filename:"mina-oversized-logs.log"
                ~max_size:logrotate_max_size ~num_rotate:20 )
           () ;

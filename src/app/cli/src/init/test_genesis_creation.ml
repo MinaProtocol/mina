@@ -9,7 +9,7 @@ let time_genesis_creation () =
   Logger.Consumer_registry.register ~id:Logger.Logger_id.mina ~commit_id
     ~processor:Internal_tracing.For_logger.processor
     ~transport:
-      (Logger_file_system.dumb_logrotate ~directory:"."
+      (Logger_file_system.timestamped_logrotate ~directory:"."
          ~log_filename:"internal-tracing.log"
          ~max_size:(1024 * 1024 * 10)
          ~num_rotate:50 )

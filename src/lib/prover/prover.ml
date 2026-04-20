@@ -384,7 +384,7 @@ module Worker = struct
         Logger.Consumer_registry.register ~id:"default"
           ~processor:(Logger.Processor.raw ()) ~commit_id
           ~transport:
-            (Logger_file_system.dumb_logrotate ~directory:conf_dir
+            (Logger_file_system.timestamped_logrotate ~directory:conf_dir
                ~log_filename:"mina-prover.log" ~max_size ~num_rotate )
           () ;
         Option.iter internal_trace_filename ~f:(fun log_filename ->

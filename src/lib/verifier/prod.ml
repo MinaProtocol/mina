@@ -303,7 +303,7 @@ module Worker = struct
           Logger.Consumer_registry.register ~id:"default" ~commit_id
             ~processor:(Logger.Processor.raw ())
             ~transport:
-              (Logger_file_system.dumb_logrotate
+              (Logger_file_system.timestamped_logrotate
                  ~directory:(Option.value_exn conf_dir)
                  ~log_filename:"mina-verifier.log" ~max_size ~num_rotate )
             () ;
@@ -313,7 +313,7 @@ module Worker = struct
               Logger.Consumer_registry.register ~id:Logger.Logger_id.mina
                 ~commit_id ~processor:Internal_tracing.For_logger.processor
                 ~transport:
-                  (Logger_file_system.dumb_logrotate
+                  (Logger_file_system.timestamped_logrotate
                      ~directory:(Option.value_exn conf_dir ^ "/internal-tracing")
                      ~log_filename
                      ~max_size:(1024 * 1024 * 10)
