@@ -15,6 +15,31 @@ module Dumb_logrotate = struct
     ; mutable primary_log_size : int
     }
 
+  let find_oldest_index ~directory ~log_filename ~num_rotate =
+    let mtime_of index =
+      let path =
+        Filename.concat directory (log_filename ^ "." ^ string_of_int index)
+      in
+      if Result.is_ok (access path [ `Exists ]) then
+        Some (stat path).st_mtime
+      else None
+    in
+    let oldest_index = ref 0 in
+    let oldest_mtime = ref Float.max_value in
+    for i = 0 to num_rotate do
+      match mtime_of i with
+      | Some mtime when Float.( < ) mtime !oldest_mtime ->
+          oldest_mtime := mtime ;
+          oldest_index := i
+      | Some _ ->
+          ()
+      | None ->
+          if Float.( < ) Float.neg_infinity !oldest_mtime then (
+            oldest_mtime := Float.neg_infinity ;
+            oldest_index := i )
+    done ;
+    !oldest_index
+
   let create ~directory ~max_size ~log_filename ~num_rotate =
     if not (Result.is_ok (access directory [ `Exists ])) then
       mkdir_p ~perm:0o755 directory ;
@@ -29,13 +54,16 @@ module Dumb_logrotate = struct
       else (0, [ O_RDWR; O_CREAT ])
     in
     let primary_log = openfile ~perm:log_perm ~mode primary_log_loc in
+    let curr_index =
+      find_oldest_index ~directory ~log_filename ~num_rotate
+    in
     { directory
     ; log_filename
     ; max_size
     ; primary_log
     ; primary_log_size
     ; num_rotate
-    ; curr_index = 0
+    ; curr_index
     }
 
   let rotate t =
