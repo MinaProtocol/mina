@@ -179,6 +179,23 @@
         "type": "github"
       }
     },
+    "kimchi-stubs-vendors": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1771867366,
+        "narHash": "sha256-TtLbwnvG6q4mz5X1S8zSONSzlZyXTT7d45ljHFDKOAc=",
+        "owner": "MinaProtocol",
+        "repo": "kimchi-stubs-vendors",
+        "rev": "0077943ca86ca74a36095cd1b2ad4c1ca08d4bd5",
+        "type": "github"
+      },
+      "original": {
+        "owner": "MinaProtocol",
+        "repo": "kimchi-stubs-vendors",
+        "rev": "0077943ca86ca74a36095cd1b2ad4c1ca08d4bd5",
+        "type": "github"
+      }
+    },
     "mirage-opam-overlays": {
       "flake": false,
       "locked": {
@@ -443,6 +460,23 @@
         "type": "github"
       }
     },
+    "proof-systems": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1772541203,
+        "narHash": "sha256-MVY1i8GgJgoV2GA3nXuIfynTsLYruXmGkZmPhgtx9f8=",
+        "owner": "o1-labs",
+        "repo": "proof-systems",
+        "rev": "5f4fa349beedad1453ef29bb843cdce950466d76",
+        "type": "github"
+      },
+      "original": {
+        "owner": "o1-labs",
+        "repo": "proof-systems",
+        "rev": "5f4fa349beedad1453ef29bb843cdce950466d76",
+        "type": "github"
+      }
+    },
     "root": {
       "inputs": {
         "describe-dune": "describe-dune",
@@ -451,6 +485,7 @@
         "flake-compat": "flake-compat",
         "flockenzeit": "flockenzeit",
         "gitignore-nix": "gitignore-nix",
+        "kimchi-stubs-vendors": "kimchi-stubs-vendors",
         "nix-filter": "nix-filter",
         "nix-npm-buildPackage": "nix-npm-buildPackage",
         "nix-utils": "nix-utils",
@@ -461,7 +496,26 @@
         "o1-opam-repository": "o1-opam-repository",
         "opam-nix": "opam-nix",
         "opam-repository": "opam-repository",
+        "proof-systems": "proof-systems",
+        "snarky": "snarky",
         "utils": "utils"
+      }
+    },
+    "snarky": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1767824453,
+        "narHash": "sha256-+vZBEyun21AqGFDJW+QQ1qUTZrZsPYEyHQ5et1C1KDA=",
+        "owner": "o1-labs",
+        "repo": "snarky",
+        "rev": "9f55ef7c2f2570365aeb24b6ddfc713f48be3117",
+        "type": "github"
+      },
+      "original": {
+        "owner": "o1-labs",
+        "repo": "snarky",
+        "rev": "9f55ef7c2f2570365aeb24b6ddfc713f48be3117",
+        "type": "github"
       }
     },
     "systems": {

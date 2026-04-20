@@ -1,4 +1,5 @@
 # An overlay defining Rust parts&dependencies of Mina
+{ proof-systems-src, kimchi-stubs-vendors-src }:
 final: prev:
 let
   rustPlatformFor = rust:
@@ -69,6 +70,10 @@ let
         allRefs = true;
       }).narHash;
     }) package;
+  proofSystemsVersion =
+    (fromTOML (builtins.readFile
+      "${proof-systems-src}/Cargo.toml")).workspace.package.version;
+
 in {
   kimchi_bindings_stubs = let
     toolchain = rustChannelFromToolchainFileOf
@@ -76,19 +81,22 @@ in {
     rust_platform = rustPlatformFor toolchain.rust;
   in rust_platform.buildRustPackage {
     pname = "kimchi_bindings_stubs";
-    version = "0.1.0";
+    version = proofSystemsVersion;
     src = final.lib.sourceByRegex ../src [
-      "^lib(/crypto(/kimchi_bindings(/stubs(/.*)?)?)?)?$"
-      "^lib(/crypto(/proof-systems(/.*)?)?)?$"
+      "^lib(/crypto(/kimchi_bindings(/stubs(/(Cargo\\.(toml|lock)|rust-toolchain\\.toml|\\.cargo(/.*)?|src(/.*)?|build\\.rs))?)?)?)?$"
     ];
     sourceRoot = "source/lib/crypto/kimchi_bindings/stubs";
+    # Add proof-systems and kimchi-stubs-vendors from dedicated flake inputs,
+    # preserving the relative path layout that Cargo.toml and
+    # .cargo/config.toml expect.
+    postUnpack = ''
+      chmod u+w source/lib/crypto source/lib/crypto/kimchi_bindings/stubs
+      cp -r ${proof-systems-src} source/lib/crypto/proof-systems
+      cp -r ${kimchi-stubs-vendors-src} source/lib/crypto/kimchi_bindings/stubs/kimchi-stubs-vendors
+    '';
+    cargoVendorDir = "kimchi-stubs-vendors";
     nativeBuildInputs = [ final.ocamlPackages_mina.ocaml ];
     buildInputs = with final; lib.optional stdenv.isDarwin libiconv;
-    cargoLock = let fixupLockFile = path: builtins.readFile path;
-    in {
-      lockFileContents =
-        fixupLockFile ../src/lib/crypto/kimchi_bindings/stubs/Cargo.lock;
-    };
     # FIXME: tests fail
     doCheck = false;
     dontUpdateAutotoolsGnuConfigScripts = true;
@@ -101,16 +109,12 @@ in {
     rust_platform = rustPlatformFor toolchain.rust;
   in rust_platform.buildRustPackage {
     pname = "kimchi_stubs_static_lib";
-    version = "0.1.0";
-    src = final.lib.sourceByRegex ../src
-      [ "^lib(/crypto(/proof-systems(/.*)?)?)?$" ];
-    sourceRoot = "source/lib/crypto/proof-systems";
+    version = proofSystemsVersion;
+    src = proof-systems-src;
     nativeBuildInputs = [ final.ocamlPackages_mina.ocaml ];
     buildInputs = with final; lib.optional stdenv.isDarwin libiconv;
-    cargoLock = let fixupLockFile = path: builtins.readFile path;
-    in {
-      lockFileContents =
-        fixupLockFile ../src/lib/crypto/proof-systems/Cargo.lock;
+    cargoLock = {
+      lockFileContents = builtins.readFile "${proof-systems-src}/Cargo.lock";
     };
     buildPhase = ''
       cargo build -p kimchi-stubs --release --lib
@@ -145,7 +149,7 @@ in {
   };
 
   plonk_wasm = let
-    lock = ../src/lib/crypto/proof-systems/Cargo.lock;
+    lock = "${proof-systems-src}/Cargo.lock";
 
     deps = builtins.listToAttrs (map (pkg: {
       inherit (pkg) name;
@@ -180,15 +184,11 @@ in {
     };
   in rustPlatform.buildRustPackage {
     pname = "plonk_wasm";
-    version = "0.1.0";
-    src = final.lib.sourceByRegex ../src [
-      "^lib(/crypto(/kimchi_bindings(/wasm(/.*)?)?)?)?$"
-      "^lib(/crypto(/proof-systems(/.*)?)?)?$"
-    ];
-    sourceRoot = "source/lib/crypto/proof-systems";
+    version = proofSystemsVersion;
+    src = proof-systems-src;
     nativeBuildInputs = [ final.wasm-pack wasm-bindgen-cli ];
     buildInputs = with final; lib.optional stdenv.isDarwin libiconv;
-    cargoLock.lockFile = lock;
+    cargoLock.lockFileContents = builtins.readFile lock;
     cargoLock.outputHashes = narHashesFromCargoLock lock;
 
     # Without this env variable, wasm pack attempts to create cache dir in root
