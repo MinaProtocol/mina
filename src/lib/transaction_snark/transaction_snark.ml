@@ -2123,6 +2123,10 @@ module Make_str (A : Wire_types.Concrete) = struct
                  global.supply_increase ) ) ;
         with_label __LOC__ (fun () ->
             run_checked
+              (Amount.Signed.Checked.assert_equal statement.stake_change
+                 (Amount.Signed.Checked.constant Amount.Signed.zero) ) ) ;
+        with_label __LOC__ (fun () ->
+            run_checked
               (let expected = statement.fee_excess in
                let got : Fee_excess.var =
                  { fee_token_l = Token_id.(Checked.constant default)
@@ -3209,6 +3213,10 @@ module Make_str (A : Wire_types.Concrete) = struct
         ; [%with_label_ "equal supply_increases"] (fun () ->
               Currency.Amount.Signed.Checked.assert_equal supply_increase
                 statement.supply_increase )
+        ; [%with_label_ "stake_change is zero"] (fun () ->
+              Currency.Amount.Signed.Checked.assert_equal statement.stake_change
+                (Currency.Amount.Signed.Checked.constant
+                   Currency.Amount.Signed.zero ) )
         ; [%with_label_ "equal fee excesses"] (fun () ->
               Fee_excess.assert_equal_checked fee_excess statement.fee_excess )
         ]
@@ -3336,6 +3344,9 @@ module Make_str (A : Wire_types.Concrete) = struct
           ; [%with_label_ "equal supply increases"] (fun () ->
                 Amount.Signed.Checked.assert_equal supply_increase
                   s.supply_increase )
+          ; [%with_label_ "stake_change is zero"] (fun () ->
+                Amount.Signed.Checked.assert_equal s.stake_change
+                  (Amount.Signed.Checked.constant Amount.Signed.zero) )
           ; [%with_label_ "equal source fee payment ledger hashes"] (fun () ->
                 Frozen_ledger_hash.assert_equal s.source.first_pass_ledger
                   s1.source.first_pass_ledger )
