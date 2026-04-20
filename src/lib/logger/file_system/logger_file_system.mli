@@ -1,10 +1,9 @@
-(** Dumb_logrotate is a Transport which persists logs to the file system by
-    using `num_rotate` log files. This Transport will rotate these logs,
-    ensuring that each log file is less than some maximum size before writing
-    to it. When the logs reach max size, the old log is deleted and a new log
-    is started.
+(** Timestamped_logrotate is a Transport which persists logs to the file system
+    using timestamp-suffixed log files (e.g. mina.log.2024-01-15T10:30:00Z).
+    When the primary log exceeds max size, it is rotated to a timestamped file
+    and the oldest rotated files beyond `num_rotate` are deleted.
 *)
-val dumb_logrotate :
+val timestamped_logrotate :
      directory:string
   -> log_filename:string
   -> max_size:int
