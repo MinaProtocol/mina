@@ -200,12 +200,11 @@ let%snarkydef_ step ~(logger : Logger.t)
           (Signed.create_var ~magnitude:(var_of_t zero) ~sgn:Sgn.Checked.pos)
         ~else_:txn_snark.stake_change)
   in
-  ignore stake_change ;
   let%bind `Success updated_consensus_state, consensus_state =
     with_label __LOC__ (fun () ->
         Consensus_state_hooks.next_state_checked ~constraint_constants
           ~prev_state:previous_state ~prev_state_hash:previous_state_hash
-          transition supply_increase )
+          transition supply_increase stake_change )
   in
   let global_slot =
     Consensus.Data.Consensus_state.global_slot_since_genesis_var consensus_state

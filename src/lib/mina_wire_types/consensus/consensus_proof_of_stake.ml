@@ -77,6 +77,7 @@ module type Concrete = sig
             ; sub_window_densities : 'length list
             ; last_vrf_output : 'vrf_output
             ; total_currency : 'amount
+            ; total_stake : 'amount
             ; curr_global_slot_since_hard_fork : 'global_slot
             ; global_slot_since_genesis : 'global_slot_since_genesis
             ; staking_epoch_data : 'staking_epoch_data
@@ -170,6 +171,7 @@ module M = struct
             ; sub_window_densities : 'length list
             ; last_vrf_output : 'vrf_output
             ; total_currency : 'amount
+            ; total_stake : 'amount
             ; curr_global_slot_since_hard_fork : 'global_slot
             ; global_slot_since_genesis : 'global_slot_since_genesis
             ; staking_epoch_data : 'staking_epoch_data
