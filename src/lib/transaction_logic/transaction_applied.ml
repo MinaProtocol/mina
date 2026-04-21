@@ -322,8 +322,7 @@ let supply_increase :
     [post - pre] where each account's contribution is
     [balance * is_staked]. zkApp commands are out of scope and return
     zero. *)
-let stake_change
-    ~(get_account_pre : Account_id.t -> Account.t option)
+let stake_change ~(get_account_pre : Account_id.t -> Account.t option)
     ~(get_account_post : Account_id.t -> Account.t option) (t : t) :
     Currency.Amount.Signed.t Or_error.t =
   let default_id pk = Account_id.create pk Token_id.default in
@@ -331,9 +330,7 @@ let stake_change
     match t.varying with
     | Command (Signed_command sc) ->
         let cmd = sc.common.user_command.data in
-        [ default_id (UC.fee_payer_pk cmd)
-        ; default_id (UC.receiver_pk cmd)
-        ]
+        [ default_id (UC.fee_payer_pk cmd); default_id (UC.receiver_pk cmd) ]
     | Command (Zkapp_command _) ->
         (* zkApp commands are out of scope in this PR; stake_change = 0. *)
         []
@@ -360,8 +357,7 @@ let stake_change
     let pre = stake_contribution (get_account_pre id) in
     let post = stake_contribution (get_account_post id) in
     Option.value_map
-      Currency.Amount.Signed.(
-        add (of_unsigned post) (negate (of_unsigned pre)))
+      Currency.Amount.Signed.(add (of_unsigned post) (negate (of_unsigned pre)))
       ~default:
         (Or_error.error_string "stake_change: per-account delta overflow")
       ~f:Or_error.return
