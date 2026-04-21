@@ -1,0 +1,5 @@
+(tests
+ (names test_stake_change_algebra)
+ (libraries alcotest core_kernel snark_params)
+ (preprocess
+  (pps ppx_jane)))
