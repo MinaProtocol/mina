@@ -3858,6 +3858,96 @@ let step_main_add_one_return () =
   in
   constraint_builder.finish_computation res
 
+(* ---- step_main No_recursion_return (N0, Output mode) ----
+   Verbatim No_recursion_return from test_no_sideloaded.ml:89-126:
+   - public_input:(Output Field.typ) — Output mode. For Output mode,
+     basic.public_input is Field.typ (the output), input_typ is Typ.unit
+     (see compile.ml:1257-1264).
+   - max_proofs_verified: N0. No prevs, no verify_one.
+   - No override_wrap_domain → default wrap_domains for N0 gives
+     h = 2^13 (common.ml:25-29).
+   - Rule body returns `public_output = Field.zero` and no previous
+     proof statements.
+   - Dual of Add_one_return at N=0: same max_proofs_verified shape, but
+     Output-only (no input) vs. Input_and_output. *)
+let step_main_no_recursion_return () =
+  let open Impls.Step in
+  let open Pickles_types in
+  let self :
+      ( Field.t
+      , Field.Constant.t
+      , Nat.N0.n
+      , Nat.N1.n )
+      Tag.t =
+    Tag.create "no_recursion_return"
+  in
+  let feature_flags = Plonk_types.Features.none_bool in
+  let feature_flags_full =
+    Kimchi_backend_common.Plonk_types.Features.Full.none
+  in
+  let rule : _ Inductive_rule.Kimchi.Promise.t =
+    { identifier = "main"
+    ; prevs = []
+    ; feature_flags
+    ; main =
+        (fun _ ->
+          Promise.return
+            { Inductive_rule.Kimchi.previous_proof_statements = []
+            ; public_output = Field.zero
+            ; auxiliary_output = ()
+            } )
+    }
+  in
+  let max_proofs_verified : (module Nat.Add.Intf with type n = Nat.N0.n) =
+    (module Nat.N0)
+  in
+  let module Step_requests = Requests.Step (Inductive_rule.Kimchi) in
+  let requests = Step_requests.create () in
+  let wrap_domains =
+    { Import.Domains.h = Pickles_base.Domain.Pow_2_roots_of_unity 13 }
+  in
+  let step_domains =
+    Vector.[ { Import.Domains.h = Pickles_base.Domain.Pow_2_roots_of_unity 9 } ]
+  in
+  let basic : _ Types_map.Compiled.basic =
+    { public_input = Field.typ
+    ; wrap_domains
+    ; step_domains
+    ; feature_flags = feature_flags_full
+    ; num_chunks = 1
+    ; zk_rows = 3
+    }
+  in
+  let step_main_fn =
+    Staged.unstage
+      (Step_main_for_dump.step_main requests max_proofs_verified rule
+         ~self_branches:(Nat.N1.n : Nat.N1.n Nat.t)
+         ~local_signature:([] : _ Hlist.H1.T(Nat).t)
+         ~local_signature_length:Hlist.Length.Z
+         ~local_branches_length:Hlist.Length.Z
+         ~proofs_verified:Hlist.Length.Z
+         ~lte:Nat.Lte.Z
+         ~public_input:(Output Field.typ)
+         ~auxiliary_typ:Typ.unit
+         ~basic
+         ~known_wrap_keys:([] : _ Hlist.H1.T(Types_map.For_step.Optional_wrap_key).t)
+         ~self )
+  in
+  let etyp = Impls.Step.input ~proofs_verified:Nat.N0.n in
+  let (T (return_typ, _conv, conv_inv)) = etyp in
+  let main () () =
+    let%map.Promise res = step_main_fn () in
+    Impls.Step.with_label "conv_inv" (fun () -> conv_inv res)
+  in
+  let constraint_builder =
+    Impl.constraint_system_manual ~input_typ:Typ.unit ~return_typ
+  in
+  let res =
+    Promise.block_on_async_exn (fun () ->
+        constraint_builder.run_circuit main )
+  in
+  constraint_builder.finish_computation res
+
 (* ---- step_main Tree_proof_return (N2, Output mode, heterogeneous prevs) ----
    Verbatim Tree_proof_return from test_no_sideloaded.ml:315-392:
    - public_input:(Output Field.typ) — Output mode, input_typ = Typ.unit,
@@ -4439,6 +4529,29 @@ let run ~output_dir =
     dump_wrap "wrap_main_add_one_return_circuit" circuit ~input_typ:typ
       ~return_typ:Impls.Wrap.Typ.unit
   in
+  (* ---- Tree_proof_return wrap circuit (N=2) ----
+     Single branch, heterogeneous prev slots [0, 2]: slot 0 is a
+     No_recursion_return proof (width 0), slot 1 is Tree_proof_return
+     itself (width 2). Wrap domain 2^13 (from [compile.wrap_domains.h.log2]
+     in dump_tree_proof_return). *)
+  let () =
+    let open Pickles_types in
+    let (Composition_types.Spec.Wrap_etyp.T (typ, conv, _conv_inv)) =
+      Impls.Wrap.input
+        ~feature_flags:Kimchi_backend_common.Plonk_types.Features.Full.none
+        ()
+    in
+    let main_fn =
+      Wrap_main_for_dump.build
+        ~pi_branches:(Hlist.Length.S Hlist.Length.Z)
+        ~padded:Vector.[ Vector.[ 0 ]; Vector.[ 2 ] ]
+        ~step_widths:Vector.[ 2 ] ~domain_log2:13
+        ~max_proofs_verified:(module Nat.N2)
+    in
+    let circuit x () = main_fn (conv x) in
+    dump_wrap "wrap_main_tree_proof_return_circuit" circuit ~input_typ:typ
+      ~return_typ:Impls.Wrap.Typ.unit
+  in
   (* ---- Pseudo module sub-circuits ---- *)
   let array1_field_ps = Impl.Typ.array ~length:1 Impl.Field.typ in
   let array1_wrap_ps = Impls.Wrap.Typ.array ~length:1 Impls.Wrap.Field.typ in
@@ -4609,5 +4722,7 @@ let run ~output_dir =
     step_main_simple_chain_n2 ;
   dump_step_main output_dir "step_main_add_one_return_circuit"
     step_main_add_one_return ;
+  dump_step_main output_dir "step_main_no_recursion_return_circuit"
+    step_main_no_recursion_return ;
   dump_step_main output_dir "step_main_tree_proof_return_circuit"
     step_main_tree_proof_return

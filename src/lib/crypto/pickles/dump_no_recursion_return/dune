@@ -1,0 +1,19 @@
+(executable
+ (name dump_no_recursion_return)
+ (flags
+  (:standard -warn-error +a)
+  -open
+  Core_kernel
+  -open
+  Pickles)
+ (preprocess
+  (pps ppx_jane))
+ (libraries
+  ; Opam libraries
+  core_kernel
+  ; Mina libraries
+  pickles
+  pickles.backend
+  pickles_types
+  promise
+  snarky.backendless))
