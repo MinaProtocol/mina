@@ -3582,8 +3582,8 @@ module Make_str (A : Wire_types.Concrete) = struct
   end
 
   let check_transaction_union ~signature_kind ?(preeval = false)
-      ~constraint_constants ~supply_increase ~source_first_pass_ledger
-      ~target_first_pass_ledger sok_message init_stack
+      ~constraint_constants ~supply_increase ~stake_change
+      ~source_first_pass_ledger ~target_first_pass_ledger sok_message init_stack
       pending_coinbase_stack_state transaction state_body global_slot handler =
     if preeval then failwith "preeval currently disabled" ;
     let sok_digest = Sok_message.digest sok_message in
@@ -3592,9 +3592,8 @@ module Make_str (A : Wire_types.Concrete) = struct
         init_stack
     in
     let statement : Statement.With_sok.t =
-      Statement.Poly.with_empty_local_state ~supply_increase
-        ~stake_change:Currency.Amount.Signed.zero ~source_first_pass_ledger
-        ~target_first_pass_ledger
+      Statement.Poly.with_empty_local_state ~supply_increase ~stake_change
+        ~source_first_pass_ledger ~target_first_pass_ledger
         ~source_second_pass_ledger:target_first_pass_ledger
         ~target_second_pass_ledger:target_first_pass_ledger
         ~pending_coinbase_stack_state
@@ -3618,7 +3617,7 @@ module Make_str (A : Wire_types.Concrete) = struct
 
   let check_transaction ~signature_kind ?preeval ~constraint_constants
       ~sok_message ~source_first_pass_ledger ~target_first_pass_ledger
-      ~init_stack ~pending_coinbase_stack_state ~supply_increase
+      ~init_stack ~pending_coinbase_stack_state ~supply_increase ~stake_change
       (transaction_in_block : Transaction.Valid.t Transaction_protocol_state.t)
       handler =
     let transaction =
@@ -3636,25 +3635,27 @@ module Make_str (A : Wire_types.Concrete) = struct
           "Called non-account_update transaction with zkapp_command transaction"
     | `Transaction t ->
         check_transaction_union ~signature_kind ?preeval ~constraint_constants
-          ~supply_increase ~source_first_pass_ledger ~target_first_pass_ledger
-          sok_message init_stack pending_coinbase_stack_state
+          ~supply_increase ~stake_change ~source_first_pass_ledger
+          ~target_first_pass_ledger sok_message init_stack
+          pending_coinbase_stack_state
           (Transaction_union.of_transaction t)
           state_body global_slot handler
 
   let check_user_command ~signature_kind ~constraint_constants ~sok_message
       ~source_first_pass_ledger ~target_first_pass_ledger ~init_stack
-      ~pending_coinbase_stack_state ~supply_increase t_in_block handler =
+      ~pending_coinbase_stack_state ~supply_increase ~stake_change t_in_block
+      handler =
     let user_command = Transaction_protocol_state.transaction t_in_block in
     check_transaction ~signature_kind ~constraint_constants ~sok_message
       ~source_first_pass_ledger ~target_first_pass_ledger ~init_stack
-      ~pending_coinbase_stack_state ~supply_increase
+      ~pending_coinbase_stack_state ~supply_increase ~stake_change
       { t_in_block with transaction = Command (Signed_command user_command) }
       handler
 
   let generate_transaction_union_witness ~signature_kind ?(preeval = false)
-      ~constraint_constants ~supply_increase ~source_first_pass_ledger
-      ~target_first_pass_ledger sok_message transaction_in_block init_stack
-      pending_coinbase_stack_state handler =
+      ~constraint_constants ~supply_increase ~stake_change
+      ~source_first_pass_ledger ~target_first_pass_ledger sok_message
+      transaction_in_block init_stack pending_coinbase_stack_state handler =
     if preeval then failwith "preeval currently disabled" ;
     let transaction =
       Transaction_protocol_state.transaction transaction_in_block
@@ -3671,8 +3672,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         init_stack
     in
     let statement : Statement.With_sok.t =
-      Statement.Poly.with_empty_local_state ~supply_increase
-        ~stake_change:Currency.Amount.Signed.zero
+      Statement.Poly.with_empty_local_state ~supply_increase ~stake_change
         ~fee_excess:(Transaction_union.fee_excess transaction)
         ~sok_digest ~source_first_pass_ledger ~target_first_pass_ledger
         ~source_second_pass_ledger:target_first_pass_ledger
@@ -3693,7 +3693,7 @@ module Make_str (A : Wire_types.Concrete) = struct
   let generate_transaction_witness ~signature_kind ?preeval
       ~constraint_constants ~sok_message ~source_first_pass_ledger
       ~target_first_pass_ledger ~init_stack ~pending_coinbase_stack_state
-      ~supply_increase
+      ~supply_increase ~stake_change
       (transaction_in_block : Transaction.Valid.t Transaction_protocol_state.t)
       handler =
     match
@@ -3706,8 +3706,8 @@ module Make_str (A : Wire_types.Concrete) = struct
           "Called non-account_update transaction with zkapp_command transaction"
     | `Transaction t ->
         generate_transaction_union_witness ~signature_kind ?preeval
-          ~constraint_constants ~supply_increase ~source_first_pass_ledger
-          ~target_first_pass_ledger sok_message
+          ~constraint_constants ~supply_increase ~stake_change
+          ~source_first_pass_ledger ~target_first_pass_ledger sok_message
           { transaction_in_block with
             transaction = Transaction_union.of_transaction t
           }

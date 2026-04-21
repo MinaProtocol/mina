@@ -150,6 +150,22 @@ let%test_module "Transaction union tests" =
               ~constraint_constants applied_transaction
             |> Or_error.ok_exn
           in
+          let stake_change =
+            let get_pre id =
+              Option.try_with (fun () ->
+                  Sparse_ledger.get_exn sparse_ledger
+                    (Sparse_ledger.find_index_exn sparse_ledger id) )
+            in
+            let get_post id =
+              Option.try_with (fun () ->
+                  Sparse_ledger.get_exn sparse_ledger_after
+                    (Sparse_ledger.find_index_exn sparse_ledger_after id) )
+            in
+            Mina_transaction_logic.Transaction_applied.stake_change
+              ~get_account_pre:get_pre ~get_account_post:get_post
+              applied_transaction
+            |> Or_error.ok_exn
+          in
           Transaction_snark.check_transaction ~signature_kind txn_in_block
             (unstage (Sparse_ledger.handler sparse_ledger))
             ~constraint_constants:U.constraint_constants
@@ -162,7 +178,7 @@ let%test_module "Transaction union tests" =
             ~init_stack:pending_coinbase_init
             ~pending_coinbase_stack_state:
               { source = source_stack; target = pending_coinbase_stack_target }
-            ~supply_increase )
+            ~supply_increase ~stake_change )
 
     let%test_unit "coinbase with new state body hash" =
       Test_util.with_randomness 123456789 (fun () ->
@@ -229,12 +245,41 @@ let%test_module "Transaction union tests" =
                 in
                 Currency.Amount.Signed.create ~magnitude ~sgn:Sgn.Neg
               in
+              let stake_change =
+                let sparse_ledger_after, applied =
+                  Result.( >>= )
+                    (Sparse_ledger.apply_transaction_first_pass
+                       ~constraint_constants ~global_slot:current_global_slot
+                       ~txn_state_view:
+                         (Mina_state.Protocol_state.Body.view state_body)
+                       sparse_ledger
+                       (Mina_transaction.Transaction.Command
+                          (Signed_command (Signed_command.forget_check t1)) ) )
+                    (fun (sl, partially_applied) ->
+                      Sparse_ledger.apply_transaction_second_pass sl
+                        partially_applied )
+                  |> Or_error.ok_exn
+                in
+                let get_pre id =
+                  Option.try_with (fun () ->
+                      Sparse_ledger.get_exn sparse_ledger
+                        (Sparse_ledger.find_index_exn sparse_ledger id) )
+                in
+                let get_post id =
+                  Option.try_with (fun () ->
+                      Sparse_ledger.get_exn sparse_ledger_after
+                        (Sparse_ledger.find_index_exn sparse_ledger_after id) )
+                in
+                Mina_transaction_logic.Transaction_applied.stake_change
+                  ~get_account_pre:get_pre ~get_account_post:get_post applied
+                |> Or_error.ok_exn
+              in
               Transaction_snark.check_user_command ~signature_kind
                 ~constraint_constants ~sok_message
                 ~source_first_pass_ledger:(Ledger.merkle_root ledger)
                 ~target_first_pass_ledger ~init_stack:pending_coinbase_stack
                 ~pending_coinbase_stack_state
-                ~supply_increase:user_command_supply_increase
+                ~supply_increase:user_command_supply_increase ~stake_change
                 { transaction = t1
                 ; block_data = state_body
                 ; global_slot = current_global_slot
