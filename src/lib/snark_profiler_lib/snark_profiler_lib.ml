@@ -811,6 +811,21 @@ let check_base_snarks ~genesis_constants ~constraint_constants ~logger
                  ~constraint_constants applied_txn
                |> Or_error.ok_exn
              in
+             let stake_change =
+               let get_pre id =
+                 Option.try_with (fun () ->
+                     Sparse_ledger.get_exn source_ledger
+                       (Sparse_ledger.find_index_exn source_ledger id) )
+               in
+               let get_post id =
+                 Option.try_with (fun () ->
+                     Sparse_ledger.get_exn target_ledger
+                       (Sparse_ledger.find_index_exn target_ledger id) )
+               in
+               Mina_transaction_logic.Transaction_applied.stake_change
+                 ~get_account_pre:get_pre ~get_account_post:get_post applied_txn
+               |> Or_error.ok_exn
+             in
              let () =
                Transaction_snark.check_transaction ~signature_kind ?preeval
                  ~constraint_constants ~sok_message
@@ -825,7 +840,7 @@ let check_base_snarks ~genesis_constants ~constraint_constants ~logger
                        coinbase_stack_target ~genesis_constants
                          ~constraint_constants ~logger
                    }
-                 ~supply_increase
+                 ~supply_increase ~stake_change
                  { Transaction_protocol_state.Poly.block_data =
                      Lazy.force
                      @@ state_body ~genesis_constants ~constraint_constants
@@ -876,6 +891,21 @@ let generate_base_snarks_witness ~genesis_constants ~constraint_constants
                  ~constraint_constants applied_txn
                |> Or_error.ok_exn
              in
+             let stake_change =
+               let get_pre id =
+                 Option.try_with (fun () ->
+                     Sparse_ledger.get_exn source_ledger
+                       (Sparse_ledger.find_index_exn source_ledger id) )
+               in
+               let get_post id =
+                 Option.try_with (fun () ->
+                     Sparse_ledger.get_exn target_ledger
+                       (Sparse_ledger.find_index_exn target_ledger id) )
+               in
+               Mina_transaction_logic.Transaction_applied.stake_change
+                 ~get_account_pre:get_pre ~get_account_post:get_post applied_txn
+               |> Or_error.ok_exn
+             in
              let () =
                Transaction_snark.generate_transaction_witness ~signature_kind
                  ?preeval ~constraint_constants ~sok_message
@@ -891,7 +921,7 @@ let generate_base_snarks_witness ~genesis_constants ~constraint_constants
                        coinbase_stack_target ~genesis_constants
                          ~constraint_constants ~logger
                    }
-                 ~supply_increase
+                 ~supply_increase ~stake_change
                  { Transaction_protocol_state.Poly.transaction = valid_txn
                  ; block_data =
                      Lazy.force
