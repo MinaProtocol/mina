@@ -316,6 +316,32 @@ struct
         absorb sponge PC delta ;
         let c = squeeze_scalar sponge in
         print_fp "c" c.inner ;
+        (* === TRACE: step-side IPA check inputs + LHS/RHS for byte-diff
+           against PS's `ipa.dbg.*` labels. Step field = Tick field = Fp.
+           Distinct prefix `ipa.dbg.step.*` so wrap-side traces don't
+           collide. Fired per verify_one invocation (4× for Tree b0+b1). *)
+        as_prover (fun () ->
+            let read_pt (x, y) =
+              (As_prover.read_var x, As_prover.read_var y)
+            in
+            let sg_x, sg_y = read_pt challenge_polynomial_commitment in
+            Pickles_trace.tick_field "ipa.dbg.step.sg.x" sg_x ;
+            Pickles_trace.tick_field "ipa.dbg.step.sg.y" sg_y ;
+            let dx, dy = read_pt delta in
+            Pickles_trace.tick_field "ipa.dbg.step.delta.x" dx ;
+            Pickles_trace.tick_field "ipa.dbg.step.delta.y" dy ;
+            let cpx, cpy = read_pt combined_polynomial in
+            Pickles_trace.tick_field "ipa.dbg.step.cp.x" cpx ;
+            Pickles_trace.tick_field "ipa.dbg.step.cp.y" cpy ;
+            let ux, uy = read_pt u in
+            Pickles_trace.tick_field "ipa.dbg.step.u.x" ux ;
+            Pickles_trace.tick_field "ipa.dbg.step.u.y" uy ;
+            let qx, qy = read_pt q in
+            Pickles_trace.tick_field "ipa.dbg.step.q.x" qx ;
+            Pickles_trace.tick_field "ipa.dbg.step.q.y" qy ;
+            let { Import.Scalar_challenge.inner = c_inner } = c in
+            Pickles_trace.tick_field "ipa.dbg.step.c"
+              (As_prover.read_var c_inner)) ;
         (* c Q + delta = z1 (G + b U) + z2 H *)
         let lhs =
           let cq = Scalar_challenge.endo q c in
@@ -332,6 +358,16 @@ struct
               in
               z_1_g_plus_b_u + z2_h )
         in
+        as_prover (fun () ->
+            let read_pt (x, y) =
+              (As_prover.read_var x, As_prover.read_var y)
+            in
+            let lx, ly = read_pt lhs in
+            Pickles_trace.tick_field "ipa.dbg.step.lhs.x" lx ;
+            Pickles_trace.tick_field "ipa.dbg.step.lhs.y" ly ;
+            let rx, ry = read_pt rhs in
+            Pickles_trace.tick_field "ipa.dbg.step.rhs.x" rx ;
+            Pickles_trace.tick_field "ipa.dbg.step.rhs.y" ry) ;
         (`Success (equal_g lhs rhs), challenges) )
 
   let assert_eq_deferred_values
