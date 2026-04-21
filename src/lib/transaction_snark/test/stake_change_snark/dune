@@ -1,0 +1,21 @@
+(library
+ (name stake_change_snark_tests)
+ (libraries
+  ;; opam libraries
+  core_kernel
+  ;; local libraries
+  currency
+  mina_base
+  mina_ledger
+  mina_numbers
+  mina_transaction
+  signature_lib
+  test_util
+  transaction_snark_tests)
+ (library_flags -linkall)
+ (inline_tests
+  (flags -verbose -show-counts))
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_version ppx_jane)))
