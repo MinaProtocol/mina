@@ -262,6 +262,7 @@ build-test-utils: ocaml_checks reformat-diff ## Build test utilities
 		src/test/command_line_tests/command_line_tests.exe \
 		src/test/archive/patch_archive_test/patch_archive_test.exe \
 		src/test/archive/archive_node_tests/archive_node_tests.exe \
+		src/test/node_status_mock_server/node_status_mock_server.exe \
 		--profile=$(DUNE_PROFILE) \
 		&& echo "✅ Build complete"
 

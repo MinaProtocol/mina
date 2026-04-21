@@ -159,5 +159,13 @@ else
     source buildkite/scripts/debian/install_official.sh --package "mina-${MINA_DEBIAN_NETWORK}" --version "$STABLE_VERSION*"
 fi
 
-# --- Step 4: Test with legacy mina ---
+# --- Step 4: Check sync with legacy mina and shutdown ---
+start_daemon_and_wait_for_sync mina
+mina client stop-daemon
+wait "$DAEMON_PID"
+
+# --- Step 5: Upgrade mina to current ---
+source buildkite/scripts/debian/install.sh "mina-${MINA_DEBIAN_NETWORK}" 1
+
+# --- Step 6: Check sync with current mina ---
 start_daemon_and_wait_for_sync mina
