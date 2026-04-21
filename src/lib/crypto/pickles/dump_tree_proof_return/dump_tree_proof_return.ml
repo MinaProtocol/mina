@@ -263,4 +263,20 @@ let () =
   assert (Impls.Step.Field.Constant.(equal one) s1) ;
   Or_error.ok_exn
     (Promise.block_on_async_exn (fun () -> Proof.verify_promise [ (s1, b1) ])) ;
-  Pickles.Pickles_trace.string "tree_proof_return.end" "inductive_case_verified"
+  Pickles.Pickles_trace.string "tree_proof_return.end" "inductive_case_verified" ;
+  (* ======================================================================
+   *  Inductive case 2 (b2): slot 0 = NRR (unchanged), slot 1 = REAL Tree
+   *  b1 proof (replacing b0). Expect self_out = 2 (= 1 + s1 with s1=1).
+   * ==================================================================== *)
+  Pickles.Pickles_trace.string "tree_proof_return.begin" "inductive_case_2" ;
+  let s2, (), b2 =
+    Promise.block_on_async_exn (fun () ->
+        step
+          ~handler:
+            (handler false No_recursion_return.example (s1, b1))
+          () )
+  in
+  assert (Impls.Step.Field.Constant.(equal (of_int 2)) s2) ;
+  Or_error.ok_exn
+    (Promise.block_on_async_exn (fun () -> Proof.verify_promise [ (s2, b2) ])) ;
+  Pickles.Pickles_trace.string "tree_proof_return.end" "inductive_case_2_verified"
