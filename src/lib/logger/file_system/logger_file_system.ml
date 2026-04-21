@@ -22,21 +22,14 @@ module Dumb_logrotate = struct
       in
       Option.try_with (fun () -> (stat path).st_mtime)
     in
-    let oldest_index = ref 0 in
-    let oldest_mtime = ref Float.max_value in
-    for i = 0 to num_rotate do
-      match mtime_of i with
-      | Some mtime when Float.( < ) mtime !oldest_mtime ->
-          oldest_mtime := mtime ;
-          oldest_index := i
-      | Some _ ->
-          ()
-      | None ->
-          if Float.( < ) Float.neg_infinity !oldest_mtime then (
-            oldest_mtime := Float.neg_infinity ;
-            oldest_index := i )
-    done ;
-    !oldest_index
+    let mtimes = List.init (num_rotate + 1) ~f:mtime_of in
+    match List.findi mtimes ~f:(fun _ m -> Option.is_none m) with
+    | Some (i, _) ->
+        i
+    | None ->
+        List.mapi mtimes ~f:(fun i m -> (i, Option.value_exn m))
+        |> List.min_elt ~compare:(fun (_, a) (_, b) -> Float.compare a b)
+        |> Option.value_map ~default:0 ~f:fst
 
   let create ~directory ~max_size ~log_filename ~num_rotate =
     if not (Result.is_ok (access directory [ `Exists ])) then
@@ -52,9 +45,7 @@ module Dumb_logrotate = struct
       else (0, [ O_RDWR; O_CREAT ])
     in
     let primary_log = openfile ~perm:log_perm ~mode primary_log_loc in
-    let curr_index =
-      find_oldest_index ~directory ~log_filename ~num_rotate
-    in
+    let curr_index = find_oldest_index ~directory ~log_filename ~num_rotate in
     { directory
     ; log_filename
     ; max_size
