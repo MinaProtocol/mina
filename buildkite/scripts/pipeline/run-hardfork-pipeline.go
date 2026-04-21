@@ -347,19 +347,23 @@ func main() {
 	// All pipeline-level env vars must be explicitly set here (even to empty)
 	// to prevent stale values from the pipeline's env: block leaking into
 	// API-created builds.
+	// OVERRIDE_GITHASH is set to the literal "fake" so the hardfork build
+	// produces a distinct GITHASH/MINA_DOCKER_TAG and cannot overwrite the
+	// standard docker images published from the same commit.
 	env := map[string]string{
 		"CODENAMES":                          *codename,
 		"CODENAMES_CONFIG":                   resolvedCodenamesConfig,
 		"NETWORK":                            *network,
 		"REPO":                               *repo,
-		"MINA_LEDGER_S3_BUCKET":             *ledgerBucket,
+		"MINA_LEDGER_S3_BUCKET":              *ledgerBucket,
 		"VERSION":                            *version,
-		"CONFIG_JSON_GZ_URL":                resolvedConfigURL,
-		"GENESIS_TIMESTAMP":                 *genesisTimestamp,
-		"PRECOMPUTED_FORK_BLOCK_PREFIX":     *precomputedPrefix,
+		"CONFIG_JSON_GZ_URL":                 resolvedConfigURL,
+		"GENESIS_TIMESTAMP":                  *genesisTimestamp,
+		"PRECOMPUTED_FORK_BLOCK_PREFIX":      *precomputedPrefix,
 		"USE_ARTIFACTS_FROM_BUILDKITE_BUILD": *useArtifactsFrom,
 		"USE_GENERIC_DOCKERS_FROM_VERSION":   "",
 		"HARDFORK_GENESIS_SLOT_DELTA":        "",
+		"OVERRIDE_GITHASH":                   "fake",
 	}
 
 	// Print configuration
