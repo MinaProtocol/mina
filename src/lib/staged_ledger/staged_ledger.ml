@@ -552,11 +552,12 @@ module T = struct
       let pre = pre_stmt.first_pass_ledger_witness in
       let get_account_pre id =
         Option.try_with (fun () ->
-            Sparse_ledger.get_exn pre
-              (Sparse_ledger.find_index_exn pre id) )
+            Sparse_ledger.get_exn pre (Sparse_ledger.find_index_exn pre id) )
       in
       let get_account_post id =
-        Option.bind (Ledger.location_of_account ledger id) ~f:(Ledger.get ledger)
+        Option.bind
+          (Ledger.location_of_account ledger id)
+          ~f:(Ledger.get ledger)
       in
       to_staged_ledger_or_error
         (Mina_transaction_logic.Transaction_applied.stake_change

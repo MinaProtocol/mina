@@ -366,8 +366,7 @@ let create_expected_statement ~constraint_constants
     in
     let lookup_account ledger id =
       Option.try_with (fun () ->
-          Sparse_ledger.get_exn ledger
-            (Sparse_ledger.find_index_exn ledger id) )
+          Sparse_ledger.get_exn ledger (Sparse_ledger.find_index_exn ledger id) )
     in
     let%map stake_change =
       Mina_transaction_logic.Transaction_applied.stake_change

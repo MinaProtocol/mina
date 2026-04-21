@@ -2474,13 +2474,9 @@ module Make_str (A : Wire_types.Concrete) = struct
       let new_account_fees = ref zero_fee in
       (* pre-tx state captured inside modify_account closures, used to compute
          stake_change per docs/unstaking-stake-change.md *)
-      let fee_payer_delegate_pre =
-        ref (Public_key.Compressed.(var_of_t empty))
-      in
+      let fee_payer_delegate_pre = ref Public_key.Compressed.(var_of_t empty) in
       let fee_payer_balance_pre = ref Currency.Balance.(var_of_t zero) in
-      let receiver_delegate_pre =
-        ref (Public_key.Compressed.(var_of_t empty))
-      in
+      let receiver_delegate_pre = ref Public_key.Compressed.(var_of_t empty) in
       let source_delegation_permitted = ref Boolean.false_ in
       let%bind root_after_fee_payer_update =
         [%with_label_ "Update fee payer"] (fun () ->
@@ -4155,8 +4151,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         let stake_change =
           match
             Amount.Signed.(
-              add target_global.stake_change
-                (negate source_global.stake_change))
+              add target_global.stake_change (negate source_global.stake_change))
           with
           | None ->
               failwith
