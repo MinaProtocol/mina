@@ -20,9 +20,7 @@ module Dumb_logrotate = struct
       let path =
         Filename.concat directory (log_filename ^ "." ^ string_of_int index)
       in
-      if Result.is_ok (access path [ `Exists ]) then
-        Some (stat path).st_mtime
-      else None
+      Option.try_with (fun () -> (stat path).st_mtime)
     in
     let oldest_index = ref 0 in
     let oldest_mtime = ref Float.max_value in
