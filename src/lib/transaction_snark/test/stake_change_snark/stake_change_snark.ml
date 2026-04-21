@@ -223,8 +223,7 @@ let%test_module "stake_change in the transaction SNARK" =
           with_ledger_of_wallets ~n:2 (fun ledger wallets ->
               let receiver = wallets.(0) in
               let validator_pk = wallets.(1).account.public_key in
-              set_delegate ledger receiver.account.public_key
-                (Some validator_pk) ;
+              set_delegate ledger receiver.account.public_key (Some validator_pk) ;
               let cb =
                 Or_error.ok_exn
                   (Coinbase.create ~amount:coinbase_amount

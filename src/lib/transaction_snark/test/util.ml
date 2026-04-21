@@ -691,7 +691,8 @@ let test_transaction_union ?expected_failure ?txn_global_slot ledger txn =
                 (Sparse_ledger.find_index_exn sparse_ledger id) )
         in
         let get_post id =
-          Option.bind (Ledger.location_of_account ledger id)
+          Option.bind
+            (Ledger.location_of_account ledger id)
             ~f:(Ledger.get ledger)
         in
         Mina_transaction_logic.Transaction_applied.stake_change
