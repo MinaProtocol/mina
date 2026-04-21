@@ -3325,6 +3325,9 @@ module Make_str (A : Wire_types.Concrete) = struct
       let%bind supply_increase =
         Amount.Signed.Checked.add s1.supply_increase s2.supply_increase
       in
+      let%bind stake_change =
+        Amount.Signed.Checked.add s1.stake_change s2.stake_change
+      in
       let%bind () =
         make_checked (fun () ->
             Local_state.Checked.assert_equal s.source.local_state
@@ -3344,9 +3347,8 @@ module Make_str (A : Wire_types.Concrete) = struct
           ; [%with_label_ "equal supply increases"] (fun () ->
                 Amount.Signed.Checked.assert_equal supply_increase
                   s.supply_increase )
-          ; [%with_label_ "stake_change is zero"] (fun () ->
-                Amount.Signed.Checked.assert_equal s.stake_change
-                  (Amount.Signed.Checked.constant Amount.Signed.zero) )
+          ; [%with_label_ "equal stake_changes"] (fun () ->
+                Amount.Signed.Checked.assert_equal stake_change s.stake_change )
           ; [%with_label_ "equal source fee payment ledger hashes"] (fun () ->
                 Frozen_ledger_hash.assert_equal s.source.first_pass_ledger
                   s1.source.first_pass_ledger )
