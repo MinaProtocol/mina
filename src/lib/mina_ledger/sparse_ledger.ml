@@ -107,6 +107,15 @@ let%test_unit "of_ledger_subset_exn with keys that don't exist works" =
 
 module T = Mina_transaction_logic.Make (L)
 
+(** Convenience: compute the stake_change of an applied transaction using
+    [pre] and [post] sparse-ledger snapshots for account lookups. *)
+let stake_change_of_applied ~pre ~post applied =
+  let lookup sl id =
+    Option.try_with (fun () -> get_exn sl (find_index_exn sl id))
+  in
+  Mina_transaction_logic.Transaction_applied.stake_change
+    ~get_account_pre:(lookup pre) ~get_account_post:(lookup post) applied
+
 let apply_transaction_logic f t x =
   let t' = ref t in
   let%map.Or_error app = f t' x in
