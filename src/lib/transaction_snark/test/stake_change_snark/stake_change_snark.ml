@@ -154,6 +154,23 @@ let%test_module "stake_change in the transaction SNARK" =
               U.test_transaction_union ledger (Command (Signed_command txn)) ) )
 
     (* ------------------------------------------------------------ *)
+    (* TODO: deferred coverage-table rows                           *)
+    (*                                                              *)
+    (* 1. Payment, fail. The row's formula is −fee·fp. A failed     *)
+    (*    payment applies (fee deducted, nonce incremented) but     *)
+    (*    body does not transfer. In the SNARK path we'd need to    *)
+    (*    construct a tx that fails via the user_command_failure    *)
+    (*    channel rather than causing apply_transactions itself to  *)
+    (*    error out — see the same TODO in the unchecked tests.     *)
+    (*                                                              *)
+    (* 2. Stake_delegation, not permitted. Requires a delegator     *)
+    (*    account with set_delegate = Proof/Both/Impossible. Today  *)
+    (*    the wallets built by U.Wallet.random_wallets use default  *)
+    (*    user permissions. Adding this means creating the account  *)
+    (*    with a custom Permissions record before inserting.        *)
+    (* ------------------------------------------------------------ *)
+
+    (* ------------------------------------------------------------ *)
     (* Fee_transfer                                                 *)
     (* ------------------------------------------------------------ *)
 
