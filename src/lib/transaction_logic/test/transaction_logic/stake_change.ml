@@ -232,7 +232,7 @@ let delegation_failed_sender_unstaked () =
 (* TODO: deferred coverage-table rows                               *)
 (*                                                                  *)
 (* 1. Payment, fail. The coverage-table row is "Payment, fail:      *)
-(*    −fee·fp". A failed payment applies (fee deducted, nonce       *)
+   (*    −fee·fp". A failed payment applies (fee deducted, nonce *)
 (*    incremented) but the body amount does not transfer.           *)
 (*    Triggering this without having the top-level                  *)
 (*    Transaction_logic.apply_transactions return Or_error.Error is *)
