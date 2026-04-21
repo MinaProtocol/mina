@@ -4,6 +4,23 @@ use std::io;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+fn mina_command_error(mina_bin: &Path, service_name: &str, e: io::Error) -> io::Error {
+    if e.kind() == io::ErrorKind::NotFound {
+        io::Error::new(
+            e.kind(),
+            format!(
+                "Failed to run '{}': {}. Is mina installed and in your PATH or specified via --bin-path?",
+                mina_bin.display(), e
+            ),
+        )
+    } else {
+        io::Error::other(format!(
+            "Failed to run mina for {}: {}",
+            service_name, e
+        ))
+    }
+}
+
 pub struct NativeKeysManager {
     pub network_path: PathBuf,
     pub bin_path: PathBuf,
@@ -22,7 +39,8 @@ impl NativeKeysManager {
         std::fs::create_dir_all(&keypair_dir)?;
 
         let privkey_path = keypair_dir.join(service_name);
-        let output = Command::new(self.bin_path.join("mina"))
+        let mina_bin = self.bin_path.join("mina");
+        let output = Command::new(&mina_bin)
             .args([
                 "advanced",
                 "generate-keypair",
@@ -30,7 +48,8 @@ impl NativeKeysManager {
                 privkey_path.to_str().unwrap(),
             ])
             .env("MINA_PRIVKEY_PASS", "naughty blue worm")
-            .output()?;
+            .output()
+            .map_err(|e| mina_command_error(&mina_bin, service_name, e))?;
 
         if !output.status.success() {
             return Err(io::Error::other(format!(
@@ -80,7 +99,8 @@ impl NativeKeysManager {
         std::fs::create_dir_all(&keypair_dir)?;
 
         let privkey_path = keypair_dir.join(service_name);
-        let output = Command::new(self.bin_path.join("mina"))
+        let mina_bin = self.bin_path.join("mina");
+        let output = Command::new(&mina_bin)
             .args([
                 "libp2p",
                 "generate-keypair",
@@ -88,7 +108,8 @@ impl NativeKeysManager {
                 privkey_path.to_str().unwrap(),
             ])
             .env("MINA_LIBP2P_PASS", "naughty blue worm")
-            .output()?;
+            .output()
+            .map_err(|e| mina_command_error(&mina_bin, service_name, e))?;
 
         if !output.status.success() {
             return Err(io::Error::other(format!(
