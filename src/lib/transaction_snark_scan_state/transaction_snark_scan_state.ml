@@ -341,7 +341,8 @@ let create_expected_statement ~constraint_constants
   let empty_local_state = Mina_state.Local_state.empty () in
   let%bind ( target_first_pass_merkle_root
            , target_second_pass_merkle_root
-           , supply_increase ) =
+           , supply_increase
+           , stake_change ) =
     let%bind first_pass_ledger_after_apply, partially_applied_transaction =
       Sparse_ledger.apply_transaction_first_pass ~constraint_constants
         ~global_slot:block_global_slot ~txn_state_view:state_view
@@ -359,13 +360,25 @@ let create_expected_statement ~constraint_constants
       Sparse_ledger.merkle_root second_pass_ledger_after_apply
       |> Frozen_ledger_hash.of_ledger_hash
     in
-    let%map supply_increase =
+    let%bind supply_increase =
       Mina_transaction_logic.Transaction_applied.supply_increase
         ~constraint_constants applied_transaction
     in
+    let lookup_account ledger id =
+      Option.try_with (fun () ->
+          Sparse_ledger.get_exn ledger
+            (Sparse_ledger.find_index_exn ledger id) )
+    in
+    let%map stake_change =
+      Mina_transaction_logic.Transaction_applied.stake_change
+        ~get_account_pre:(lookup_account first_pass_ledger_witness)
+        ~get_account_post:(lookup_account first_pass_ledger_after_apply)
+        applied_transaction
+    in
     ( target_first_pass_merkle_root
     , target_second_pass_merkle_root
-    , supply_increase )
+    , supply_increase
+    , stake_change )
   in
   let pending_coinbase_after =
     let state_body_hash = snd state_hash in
@@ -396,7 +409,7 @@ let create_expected_statement ~constraint_constants
   ; connecting_ledger_right = connecting_merkle_root
   ; fee_excess
   ; supply_increase
-  ; stake_change = Currency.Amount.Signed.zero
+  ; stake_change
   ; sok_digest = ()
   }
 

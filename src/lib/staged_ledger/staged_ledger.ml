@@ -548,6 +548,20 @@ module T = struct
         (Mina_transaction_logic.Transaction_applied.supply_increase
            ~constraint_constants applied_txn )
     in
+    let%bind stake_change =
+      let pre = pre_stmt.first_pass_ledger_witness in
+      let get_account_pre id =
+        Option.try_with (fun () ->
+            Sparse_ledger.get_exn pre
+              (Sparse_ledger.find_index_exn pre id) )
+      in
+      let get_account_post id =
+        Option.bind (Ledger.location_of_account ledger id) ~f:(Ledger.get ledger)
+      in
+      to_staged_ledger_or_error
+        (Mina_transaction_logic.Transaction_applied.stake_change
+           ~get_account_pre ~get_account_post applied_txn )
+    in
     let%map () =
       let actual_status = Ledger.status_of_applied applied_txn in
       if Transaction_status.equal pre_stmt.expected_status actual_status then
@@ -580,7 +594,7 @@ module T = struct
       ; connecting_ledger_right = connecting_ledger
       ; fee_excess = pre_stmt.fee_excess
       ; supply_increase
-      ; stake_change = Currency.Amount.Signed.zero
+      ; stake_change
       ; sok_digest = ()
       }
     in
