@@ -364,15 +364,9 @@ let create_expected_statement ~constraint_constants
       Mina_transaction_logic.Transaction_applied.supply_increase
         ~constraint_constants applied_transaction
     in
-    let lookup_account ledger id =
-      Option.try_with (fun () ->
-          Sparse_ledger.get_exn ledger (Sparse_ledger.find_index_exn ledger id) )
-    in
     let%map stake_change =
-      Mina_transaction_logic.Transaction_applied.stake_change
-        ~get_account_pre:(lookup_account first_pass_ledger_witness)
-        ~get_account_post:(lookup_account first_pass_ledger_after_apply)
-        applied_transaction
+      Sparse_ledger.stake_change_of_applied ~pre:first_pass_ledger_witness
+        ~post:first_pass_ledger_after_apply applied_transaction
     in
     ( target_first_pass_merkle_root
     , target_second_pass_merkle_root
