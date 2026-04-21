@@ -111,6 +111,8 @@ in {
     in {
       lockFileContents =
         fixupLockFile ../src/lib/crypto/proof-systems/Cargo.lock;
+      outputHashes =
+        narHashesFromCargoLock ../src/lib/crypto/proof-systems/Cargo.lock;
     };
     buildPhase = ''
       cargo build -p kimchi-stubs --release --lib
@@ -144,7 +146,7 @@ in {
     '';
   };
 
-  plonk_wasm = let
+  kimchi_wasm = let
     lock = ../src/lib/crypto/proof-systems/Cargo.lock;
 
     deps = builtins.listToAttrs (map (pkg: {
@@ -159,10 +161,10 @@ in {
       version = deps.wasm-bindgen.version;
       src = final.fetchCrate {
         inherit pname version;
-        sha256 = "sha256-IPxP68xtNSpwJjV2yNMeepAS0anzGl02hYlSTvPocz8=";
+        sha256 = "sha256-3RJzK7mkYFrs7C/WkhW9Rr4LdP5ofb2FdYGz1P7Uxog=";
       };
 
-      cargoHash = "sha256-pBeQaG6i65uJrJptZQLuIaCb/WCQMhba1Z1OhYqA8Zc=";
+      cargoHash = "sha256-tD0OY2PounRqsRiFh8Js5nyknQ809ZcHMvCOLrvYHRE=";
       nativeBuildInputs = [ final.pkg-config ];
 
       buildInputs = with final;
@@ -172,14 +174,21 @@ in {
           libiconv
         ];
 
-      checkInputs = [ final.nodejs ];
-
-      # other tests, like --test=wasm-bindgen, require it to be ran in the
-      # wasm-bindgen monorepo
-      cargoTestFlags = [ "--test=reference" ];
+      # wasm-bindgen-cli >= 0.2.100 no longer ships the `reference` test target
+      # in the crates.io tarball, so the old `--test=reference` check fails with:
+      # "error: no test target named `reference`".
+      #
+      # Keep a basic CI guardrail by smoke-testing the installed binary instead.
+      doCheck = false;
+      doInstallCheck = true;
+      installCheckPhase = ''
+        runHook preInstallCheck
+        "$out/bin/wasm-bindgen" --version | grep -F "wasm-bindgen ${version}"
+        runHook postInstallCheck
+      '';
     };
   in rustPlatform.buildRustPackage {
-    pname = "plonk_wasm";
+    pname = "kimchi_wasm";
     version = "0.1.0";
     src = final.lib.sourceByRegex ../src [
       "^lib(/crypto(/kimchi_bindings(/wasm(/.*)?)?)?)?$"
@@ -212,8 +221,8 @@ in {
       (
       set -x
       export RUSTFLAGS="-C target-feature=+atomics,+bulk-memory,+mutable-globals -C link-arg=--max-memory=4294967296"
-      wasm-pack build --mode no-install --target nodejs --out-dir $out/nodejs plonk-wasm -- --features nodejs -Z build-std=panic_abort,std
-      wasm-pack build --mode no-install --target web --out-dir $out/web plonk-wasm -Z build-std=panic_abort,std
+      wasm-pack build --mode no-install --target nodejs --out-dir $out/nodejs kimchi-wasm -- --features nodejs -Z build-std=panic_abort,std
+      wasm-pack build --mode no-install --target web --out-dir $out/web kimchi-wasm -Z build-std=panic_abort,std
       )
       runHook postBuild
     '';
