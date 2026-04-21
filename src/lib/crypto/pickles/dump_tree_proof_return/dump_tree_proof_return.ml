@@ -279,4 +279,38 @@ let () =
   assert (Impls.Step.Field.Constant.(equal (of_int 2)) s2) ;
   Or_error.ok_exn
     (Promise.block_on_async_exn (fun () -> Proof.verify_promise [ (s2, b2) ])) ;
-  Pickles.Pickles_trace.string "tree_proof_return.end" "inductive_case_2_verified"
+  Pickles.Pickles_trace.string "tree_proof_return.end" "inductive_case_2_verified" ;
+  (* ======================================================================
+   *  Inductive case 3 (b3): slot 0 = NRR (unchanged), slot 1 = REAL Tree
+   *  b2 proof (replacing b1). Expect self_out = 3 (= 1 + s2 with s2=2).
+   * ==================================================================== *)
+  Pickles.Pickles_trace.string "tree_proof_return.begin" "inductive_case_3" ;
+  let s3, (), b3 =
+    Promise.block_on_async_exn (fun () ->
+        step
+          ~handler:
+            (handler false No_recursion_return.example (s2, b2))
+          () )
+  in
+  assert (Impls.Step.Field.Constant.(equal (of_int 3)) s3) ;
+  Or_error.ok_exn
+    (Promise.block_on_async_exn (fun () -> Proof.verify_promise [ (s3, b3) ])) ;
+  Pickles.Pickles_trace.string "tree_proof_return.end" "inductive_case_3_verified" ;
+  (* ======================================================================
+   *  Inductive case 4 (b4): slot 0 = NRR (unchanged), slot 1 = REAL Tree
+   *  b3 proof (replacing b2). Expect self_out = 4 (= 1 + s3 with s3=3).
+   *  Last round: by b4, all initial base-case dummy values have cycled
+   *  out of the visible slot-1 chain.
+   * ==================================================================== *)
+  Pickles.Pickles_trace.string "tree_proof_return.begin" "inductive_case_4" ;
+  let s4, (), b4 =
+    Promise.block_on_async_exn (fun () ->
+        step
+          ~handler:
+            (handler false No_recursion_return.example (s3, b3))
+          () )
+  in
+  assert (Impls.Step.Field.Constant.(equal (of_int 4)) s4) ;
+  Or_error.ok_exn
+    (Promise.block_on_async_exn (fun () -> Proof.verify_promise [ (s4, b4) ])) ;
+  Pickles.Pickles_trace.string "tree_proof_return.end" "inductive_case_4_verified"
