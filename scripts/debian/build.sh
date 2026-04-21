@@ -20,6 +20,15 @@ fi
 
 source "${SCRIPTPATH}"/../export-git-env-vars.sh
 
+# Append optional suffix to MINA_DEB_VERSION so the produced .deb file name and
+# its internal Version: field carry the suffix. Used by the hardfork pipeline
+# to avoid collision with standard packages built from the same commit.
+if [[ -n "${MINA_DEB_VERSION_SUFFIX:-}" ]]; then
+  echo "Appending MINA_DEB_VERSION_SUFFIX='${MINA_DEB_VERSION_SUFFIX}' to MINA_DEB_VERSION='${MINA_DEB_VERSION}'"
+  MINA_DEB_VERSION="${MINA_DEB_VERSION}${MINA_DEB_VERSION_SUFFIX}"
+  export MINA_DEB_VERSION
+fi
+
 # shellcheck disable=SC1090
 BUILD_DIR="${BUILD_DIR}" source "${SCRIPTPATH}/builder-helpers.sh"
 

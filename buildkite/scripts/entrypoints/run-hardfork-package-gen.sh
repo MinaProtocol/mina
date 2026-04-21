@@ -20,6 +20,7 @@ set -euox pipefail
 #   PRECOMPUTED_FORK_BLOCK_PREFIX      - (Optional) Prefix for precomputed fork block URLs (e.g., "gs://mina_network_block_data/mainnet")
 #   USE_ARTIFACTS_FROM_BUILDKITE_BUILD - (Optional) Buildkite build number to use artifacts from (e.g., "1234")
 #   USE_GENERIC_DOCKERS_FROM_VERSION   - (Optional) Docker version to build config docker on top of (e.g., "3.3.0-compatible-aa34232")
+#   SUFFIX                             - (Optional) Suffix appended to docker tags and debian package versions (e.g., "-hardfork")
 #
 # EXAMPLE:
 #   export CODENAMES_CONFIG="Bullseye_Amd64,Focal_Arm64"
@@ -59,6 +60,7 @@ function usage() {
   PRECOMPUTED_FORK_BLOCK_PREFIX      (Optional) The prefix for precomputed fork block URLs (e.g. gs://mina_network_block_data/mainnet)
   USE_ARTIFACTS_FROM_BUILDKITE_BUILD (Optional) The Buildkite build number to use artifacts from (e.g. 1234)
   USE_GENERIC_DOCKERS_FROM_VERSION   (Optional) Docker version to build config docker on top of (e.g. 3.3.0-compatible-aa34232)
+  SUFFIX                             (Optional) Suffix appended to docker tags and debian package versions (e.g. -hardfork)
 EOF
   exit 1
 }
@@ -163,7 +165,7 @@ printf '%s.generate_hardfork_package %s %s.Type.%s %s "%s" "%s" %s %s %s %s\n' \
   "$NETWORK" \
   "$GENESIS_TIMESTAMP" \
   "$CONFIG_JSON_GZ_URL" \
-  "" \
+  "${SUFFIX:-}" \
   "$VERSION" \
   "$PRECOMPUTED_FORK_BLOCK_PREFIX" \
   "$USE_ARTIFACTS_FROM_BUILDKITE_BUILD" \

@@ -238,7 +238,7 @@ let generateDockerForCodename =
                             , verify = True
                             , version =
                                 "${version}-${DebianVersions.lowerName
-                                                codename.DebVersion}"
+                                                codename.DebVersion}${spec.suffix}"
                             , deb_version = spec.version
                             , step_key_suffix =
                                 "-${DebianVersions.lowerName
@@ -259,7 +259,7 @@ let generateDockerForCodename =
                             , verify = True
                             , version =
                                 "${version}-${DebianVersions.lowerName
-                                                codename.DebVersion}"
+                                                codename.DebVersion}${spec.suffix}"
                             , deb_version = spec.version
                             , step_key_suffix =
                                 "-${DebianVersions.lowerName
@@ -277,6 +277,7 @@ let generateDockerForCodename =
                       , deb_storage_repair_version = Some
                           spec.deb_storage_repair_version
                       , size = spec.size
+                      , version = "\\\${MINA_DOCKER_TAG}${spec.suffix}"
                       , deb_version = spec.version
                       , generic = True
                       , step_key_suffix =
@@ -294,6 +295,7 @@ let generateDockerForCodename =
                           spec.deb_storage_repair_version
                       , size = spec.size
                       , verify = True
+                      , version = "\\\${MINA_DOCKER_TAG}${spec.suffix}"
                       , deb_version = spec.version
                       , step_key_suffix =
                           "-${DebianVersions.lowerName
@@ -309,6 +311,7 @@ let generateDockerForCodename =
                       , deb_storage_repair_version = Some
                           spec.deb_storage_repair_version
                       , size = spec.size
+                      , version = "\\\${MINA_DOCKER_TAG}${spec.suffix}"
                       , deb_version = spec.version
                       , step_key_suffix =
                           "-${DebianVersions.lowerName
@@ -323,6 +326,7 @@ let generateDockerForCodename =
                       , deb_legacy_version = spec.deb_legacy_version
                       , size = spec.size
                       , verify = True
+                      , version = "\\\${MINA_DOCKER_TAG}${spec.suffix}"
                       , deb_version = spec.version
                       , step_key_suffix =
                           "-${DebianVersions.lowerName
@@ -336,6 +340,7 @@ let generateDockerForCodename =
                       , deb_profile = profile
                       , deb_legacy_version = spec.deb_legacy_version
                       , size = spec.size
+                      , version = "\\\${MINA_DOCKER_TAG}${spec.suffix}"
                       , deb_version = spec.version
                       , generic = True
                       , step_key_suffix =
@@ -370,8 +375,8 @@ let generateHfRelatedStepsForCodename =
                         { Some =
                                 \(v : Text)
                             ->  "${v}-${DebianVersions.lowerName
-                                          codename.DebVersion}"
-                        , None = "\\\${MINA_DOCKER_TAG}"
+                                          codename.DebVersion}${spec.suffix}"
+                        , None = "\\\${MINA_DOCKER_TAG}${spec.suffix}"
                         }
                         spec.use_generic_dockers_from_version
                   }
@@ -478,6 +483,7 @@ let generateHfRelatedStepsForCodename =
                           codename.Arch
                           (   [ "NETWORK_NAME=${Network.lowerName spec.network}"
                               , "MINA_DEB_CODENAME=${lowerNameCodename}"
+                              , "MINA_DEB_VERSION_SUFFIX=${spec.suffix}"
                               ]
                             # DebianVersions.overrideEnvs
                           )
@@ -637,7 +643,9 @@ let generate_hardfork_package =
               , network = network
               , version =
                   merge
-                    { Some = \(v : Text) -> v, None = "\\\$MINA_DEB_VERSION" }
+                    { Some = \(v : Text) -> "${v}${suffix}"
+                    , None = "\\\$MINA_DEB_VERSION${suffix}"
+                    }
                     version
               , genesis_timestamp = genesis_timestamp
               , config_json_gz_url = config_json_gz_url

@@ -283,6 +283,7 @@ func main() {
 		useArtifactsFrom  = flag.String("use-artifacts-from", "", "USE_ARTIFACTS_FROM_BUILDKITE_BUILD environment variable")
 		codenamesConfig   = flag.String("codenames-config", "", "CODENAMES_CONFIG environment variable (e.g. Noble_Amd64,Bullseye_Amd64). Defaults to <codename>_Amd64")
 		ledgerBucket      = flag.String("ledger-bucket", "https://s3-us-west-2.amazonaws.com/snark-keys.o1test.net", "MINA_LEDGER_S3_BUCKET environment variable")
+		suffix            = flag.String("suffix", "-hardfork", "SUFFIX environment variable. Appended to docker tags and debian package versions to prevent collision with standard builds")
 		monitor           = flag.Bool("monitor", false, "Monitor build progress in real-time")
 		pollInterval      = flag.Int("poll-interval", 10, "Polling interval in seconds")
 		showAllUpdates    = flag.Bool("show-all-updates", false, "Show all job states, not just changes")
@@ -347,9 +348,9 @@ func main() {
 	// All pipeline-level env vars must be explicitly set here (even to empty)
 	// to prevent stale values from the pipeline's env: block leaking into
 	// API-created builds.
-	// OVERRIDE_GITHASH is set to the literal "fake" so the hardfork build
-	// produces a distinct GITHASH/MINA_DOCKER_TAG and cannot overwrite the
-	// standard docker images published from the same commit.
+	// SUFFIX is appended to docker tags and debian package versions so the
+	// hardfork build cannot overwrite standard docker images / debian packages
+	// published from the same commit.
 	env := map[string]string{
 		"CODENAMES":                          *codename,
 		"CODENAMES_CONFIG":                   resolvedCodenamesConfig,
@@ -363,7 +364,7 @@ func main() {
 		"USE_ARTIFACTS_FROM_BUILDKITE_BUILD": *useArtifactsFrom,
 		"USE_GENERIC_DOCKERS_FROM_VERSION":   "",
 		"HARDFORK_GENESIS_SLOT_DELTA":        "",
-		"OVERRIDE_GITHASH":                   "fake",
+		"SUFFIX":                             *suffix,
 	}
 
 	// Print configuration
