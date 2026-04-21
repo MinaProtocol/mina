@@ -1,6 +1,5 @@
 open Core_kernel
 open Currency
-open Mina_base
 open Mina_base_test_helpers
 open Mina_ledger_test_helpers
 open Signature_lib
@@ -24,12 +23,6 @@ let gen_delegation_scenario =
   in
   let%map fee = Fee.gen_incl Fee.one (Fee.of_mina_int_exn 1) in
   (delegator, validator, fee)
-
-let set_delegate_in_ledger ledger pk new_delegate =
-  let acc_id = Account_id.create pk Token_id.default in
-  let location = Option.value_exn (Ledger.location_of_account ledger acc_id) in
-  let account = Option.value_exn (Ledger.get ledger location) in
-  Ledger.set ledger location { account with delegate = new_delegate }
 
 (* New accounts start with delegate = None. A delegation tx
    from such an account points its delegate at a real validator. *)
@@ -56,7 +49,7 @@ let opt_out_via_empty_delegation () =
         Ledger_helpers.ledger_of_accounts [ delegator; validator ]
         |> Or_error.ok_exn
       in
-      set_delegate_in_ledger ledger delegator.pk (Some validator.pk) ;
+      set_delegate ledger delegator.pk (Some validator.pk) ;
       (* Refresh nonce/balance after the first txn before submitting the next. *)
       let after = get_account_exn ledger delegator.pk in
       let sender =
@@ -77,7 +70,7 @@ let opt_out_from_legacy_self_delegated () =
       let ledger =
         Ledger_helpers.ledger_of_accounts [ delegator ] |> Or_error.ok_exn
       in
-      set_delegate_in_ledger ledger delegator.pk (Some delegator.pk) ;
+      set_delegate ledger delegator.pk (Some delegator.pk) ;
       apply_txn_exn ledger
         (signed_command ~sender:delegator ~fee
            (delegation_body ~new_delegate:Public_key.Compressed.empty) ) ;
