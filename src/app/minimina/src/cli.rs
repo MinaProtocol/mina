@@ -24,9 +24,10 @@ pub struct Cli {
     #[clap(long, default_value = "docker", global = true)]
     pub mode: ExecutionMode,
 
-    /// Path to mina binaries directory (native mode only)
-    #[clap(long, default_value = "/usr/local/bin", global = true)]
-    pub bin_path: PathBuf,
+    /// Path to mina binaries directory (native mode only).
+    /// If omitted, minimina searches /usr/local/bin, /usr/bin, and PATH.
+    #[clap(long, global = true)]
+    pub bin_path: Option<PathBuf>,
 }
 
 #[derive(Subcommand)]

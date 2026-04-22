@@ -23,14 +23,10 @@ let B/SoftFail = B.definitions/commandStep/properties/soft_fail/Type
 in  Pipeline.build
       Pipeline.Config::{
       , spec = JobSpec::{
-        , dirtyWhen =
-          [ S.strictlyStart (S.contains "src")
-          , S.exactly "buildkite/src/Jobs/Test/HardforkPipelineTest" "dhall"
-          , S.strictlyStart (S.contains "buildkite/scripts/pipeline")
-          ]
+        , dirtyWhen = [] : List S.Type
         , path = "Test"
         , name = "HardforkPipelineTest"
-        , scope = PipelineScope.AllButPullRequest
+        , scope = [] : List PipelineScope.Type
         , tags =
           [ PipelineTag.Type.Long
           , PipelineTag.Type.Test
