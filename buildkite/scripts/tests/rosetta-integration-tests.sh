@@ -284,6 +284,136 @@ rosetta-cli check:spec --all --configuration-file ${ROSETTA_CONFIGURATION_FILE}
 echo "========================= ROSETTA CLI: CHECK:CONSTRUCTION ==========================="
 rosetta-cli check:construction --configuration-file ${ROSETTA_CONFIGURATION_FILE}
 
+# rosetta-cli uses its own bundled Pallas signer from rosetta-sdk-go, so
+# check:construction above does not exercise mina-ocaml-signer's signing
+# path. The smoke test below drives /construction/* against the live rosetta
+# using mina-ocaml-signer as the offline signer and verifies the resulting
+# tx is accepted by the daemon and indexed by the archive.
+
+rosetta_online="http://127.0.0.1:${MINA_ROSETTA_ONLINE_PORT}"
+network_id_json='{"blockchain":"mina","network":"'"${MINA_NETWORK}"'"}'
+
+rosetta_post() {
+  # $1 endpoint path, $2 json body
+  curl -sf -X POST "${rosetta_online}$1" -H 'Content-Type: application/json' -d "$2"
+}
+
+signer_privkey_hex_of_file() {
+  mina-ocaml-signer hex-of-private-key-file --private-key-path "$1"
+}
+
+signer_pub_hex_of_privkey() {
+  mina-ocaml-signer derive-public-key --private-key "$1" | sed -n '4p'
+}
+
+signer_sign_tx() {
+  mina-ocaml-signer sign --private-key "$1" --unsigned-transaction "$2"
+}
+
+payment_ops_json() {
+  # $1 sender, $2 receiver, $3 amount, $4 fee
+  jq -nc --arg s "$1" --arg r "$2" --arg amt "$3" --arg fee "$4" '
+    [ {operation_identifier:{index:0}, type:"fee_payment",
+       account:{address:$s, metadata:{token_id:"1"}},
+       amount:{value:("-"+$fee), currency:{symbol:"MINA", decimals:9}}}
+    , {operation_identifier:{index:1}, type:"payment_source_dec",
+       account:{address:$s, metadata:{token_id:"1"}},
+       amount:{value:("-"+$amt), currency:{symbol:"MINA", decimals:9}}}
+    , {operation_identifier:{index:2}, related_operations:[{index:1}],
+       type:"payment_receiver_inc",
+       account:{address:$r, metadata:{token_id:"1"}},
+       amount:{value:$amt, currency:{symbol:"MINA", decimals:9}}}
+    ]'
+}
+
+fetch_nonce() {
+  # $1 sender, $2 receiver
+  rosetta_post /construction/metadata \
+    "$(jq -nc --argjson nid "$network_id_json" --arg s "$1" --arg r "$2" '
+      {network_identifier:$nid,
+       options:{sender:$s, token_id:"1", receiver:$r},
+       public_keys:[]}')" \
+    | jq -r '.metadata.nonce'
+}
+
+fetch_payloads() {
+  # $1 sender, $2 receiver, $3 nonce, $4 ops_json
+  rosetta_post /construction/payloads \
+    "$(jq -nc --argjson nid "$network_id_json" --argjson ops "$4" \
+              --arg s "$1" --arg r "$2" --arg n "$3" '
+      {network_identifier:$nid,
+       operations:$ops,
+       metadata:{sender:$s, nonce:$n, token_id:"1", receiver:$r,
+                 valid_until:"4294967295", memo:"offline-signer-smoke"},
+       public_keys:[]}')"
+}
+
+combine_signed_tx() {
+  # $1 unsigned, $2 signing_payload_hex, $3 sender_addr, $4 sender_pub_hex, $5 signature
+  rosetta_post /construction/combine \
+    "$(jq -nc --argjson nid "$network_id_json" \
+              --arg un "$1" --arg sp "$2" --arg addr "$3" --arg pub "$4" --arg sig "$5" '
+      {network_identifier:$nid,
+       unsigned_transaction:$un,
+       signatures:[{
+         signing_payload:{hex_bytes:$sp,
+                          account_identifier:{address:$addr},
+                          signature_type:"schnorr_poseidon"},
+         public_key:{hex_bytes:$pub, curve_type:"pallas"},
+         signature_type:"schnorr_poseidon",
+         hex_bytes:$sig}]}')" \
+    | jq -r '.signed_transaction'
+}
+
+submit_signed_tx() {
+  # $1 signed_transaction blob
+  rosetta_post /construction/submit \
+    "$(jq -nc --argjson nid "$network_id_json" --arg stx "$1" '
+      {network_identifier:$nid, signed_transaction:$stx}')" \
+    | jq -r '.transaction_identifier.hash'
+}
+
+wait_for_tx_in_archive() {
+  # $1 tx hash, $2 timeout seconds
+  local deadline=$(( $(date +%s) + ${2:-300} ))
+  until psql "$PG_CONN" -tAc "SELECT 1 FROM user_commands WHERE hash='$1';" | grep -q 1; do
+    if [[ $(date +%s) -ge $deadline ]]; then
+      echo "FAIL: tx $1 did not appear in archive within ${2:-300}s" >&2
+      return 1
+    fi
+    sleep 10
+  done
+}
+
+offline_signer_smoke_test() {
+  local sender_key="$SNARK_PRODUCER_KEY"
+  local sender_addr="$SNARK_PRODUCER_PK"
+  local receiver_addr="$BLOCK_PRODUCER_PUB_KEY"
+  local amount=1000
+  local fee=1000000000
+
+  local sender_priv    ; sender_priv=$(signer_privkey_hex_of_file "$sender_key")
+  local sender_pub_hex ; sender_pub_hex=$(signer_pub_hex_of_privkey "$sender_priv")
+
+  local nonce    ; nonce=$(fetch_nonce "$sender_addr" "$receiver_addr")
+  local ops      ; ops=$(payment_ops_json "$sender_addr" "$receiver_addr" "$amount" "$fee")
+  local payloads ; payloads=$(fetch_payloads "$sender_addr" "$receiver_addr" "$nonce" "$ops")
+
+  local unsigned ; unsigned=$(echo "$payloads" | jq -r '.unsigned_transaction')
+  local sp_hex   ; sp_hex=$(echo "$payloads"   | jq -r '.payloads[0].hex_bytes')
+
+  local signature ; signature=$(signer_sign_tx "$sender_priv" "$unsigned")
+  local signed    ; signed=$(combine_signed_tx "$unsigned" "$sp_hex" "$sender_addr" "$sender_pub_hex" "$signature")
+  local tx_hash   ; tx_hash=$(submit_signed_tx "$signed")
+
+  echo "offline-signer-smoke: submitted tx=${tx_hash}"
+  wait_for_tx_in_archive "$tx_hash" 300
+  echo "offline-signer-smoke: tx ${tx_hash} indexed in archive.user_commands"
+}
+
+echo "========================= OFFLINE SIGNER SMOKE TEST ==========================="
+offline_signer_smoke_test
+
 # wait until block height 11 is reached before starting check:data
 # so it gives enough time to vest the time-vesting accounts
 current_block_height=$(mina client status --json | jq -r '.blockchain_length')
