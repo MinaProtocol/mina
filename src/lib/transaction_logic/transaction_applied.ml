@@ -322,23 +322,23 @@ let supply_increase :
     [post - pre] where each account's contribution is
     [balance * is_staked]. zkApp commands are out of scope and return
     zero. *)
-let stake_change ~(get_account_pre : Account_id.t -> Account.t option)
-    ~(get_account_post : Account_id.t -> Account.t option) (t : t) :
-    Currency.Amount.Signed.t Or_error.t =
+let stake_change_of_transaction
+    ~(get_account_pre : Account_id.t -> Account.t option)
+    ~(get_account_post : Account_id.t -> Account.t option) (txn : Transaction.t)
+    : Currency.Amount.Signed.t Or_error.t =
   let default_id pk = Account_id.create pk Token_id.default in
   let touched_ids =
-    match t.varying with
-    | Command (Signed_command sc) ->
-        let cmd = sc.common.user_command.data in
+    match txn with
+    | Command (Signed_command cmd) ->
         [ default_id (UC.fee_payer_pk cmd); default_id (UC.receiver_pk cmd) ]
     | Command (Zkapp_command _) ->
         (* zkApp commands are out of scope in this PR; stake_change = 0. *)
         []
-    | Fee_transfer { fee_transfer = { data; _ }; _ } ->
-        List.map (Fee_transfer.receiver_pks data) ~f:default_id
-    | Coinbase { coinbase = { data; _ }; _ } ->
-        let base = [ default_id data.receiver ] in
-        Option.value_map data.fee_transfer ~default:base ~f:(fun ft ->
+    | Fee_transfer ft ->
+        List.map (Fee_transfer.receiver_pks ft) ~f:default_id
+    | Coinbase cb ->
+        let base = [ default_id cb.receiver ] in
+        Option.value_map cb.fee_transfer ~default:base ~f:(fun ft ->
             default_id ft.receiver_pk :: base )
   in
   let touched_ids =
@@ -370,6 +370,20 @@ let stake_change ~(get_account_pre : Account_id.t -> Account.t option)
         (Currency.Amount.Signed.add acc delta)
         ~default:(Or_error.error_string "stake_change: aggregation overflow")
         ~f:Or_error.return )
+
+let stake_change ~get_account_pre ~get_account_post (t : t) =
+  let txn : Transaction.t =
+    match t.varying with
+    | Command (Signed_command sc) ->
+        Command (Signed_command sc.common.user_command.data)
+    | Command (Zkapp_command zc) ->
+        Command (Zkapp_command zc.command.data)
+    | Fee_transfer { fee_transfer = { data; _ }; _ } ->
+        Fee_transfer data
+    | Coinbase { coinbase = { data; _ }; _ } ->
+        Coinbase data
+  in
+  stake_change_of_transaction ~get_account_pre ~get_account_post txn
 
 let transaction : t -> Transaction.t =
  fun { varying; _ } ->
