@@ -2,6 +2,11 @@
   "genesis": {
     "genesis_state_timestamp": "2025-11-27T13:00:00Z"
   },
+  "daemon": {
+    "slot_tx_end": 144800,
+    "slot_chain_end": 144880,
+    "hard_fork_genesis_slot_delta": 80
+  },
   "ledger": {
     "add_genesis_winner": false,
     "s3_data_hash": "cce08a77918b5727bf9dd7769e9a729727a394d2fa4377674311e567a9071dc2",
