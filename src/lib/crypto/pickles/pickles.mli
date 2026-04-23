@@ -574,6 +574,8 @@
     - [prev_evals]: Polynomial evaluations at zeta and zeta*omega
     - [proof]: The kimchi wrap proof (commitments + opening proof) *)
 
+module Wrap_wire_proof : module type of Wrap_wire_proof
+
 include
   Pickles_intf.S
     with type Side_loaded.Verification_key.Stable.V2.t =

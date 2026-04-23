@@ -4,11 +4,15 @@
 module Wire_types = Mina_wire_types.Pickles
 
 module Make_sig (A : Wire_types.Types.S) = struct
-  module type S =
-    Pickles_intf.S
-      with type Side_loaded.Verification_key.Stable.V2.t =
-        A.Side_loaded.Verification_key.V2.t
-       and type 'a Proof.t = 'a A.Proof.t
+  module type S = sig
+    module Wrap_wire_proof : module type of Wrap_wire_proof
+
+    include
+      Pickles_intf.S
+        with type Side_loaded.Verification_key.Stable.V2.t =
+          A.Side_loaded.Verification_key.V2.t
+         and type 'a Proof.t = 'a A.Proof.t
+  end
 end
 
 module Make_str (_ : Wire_types.Concrete) = struct
@@ -44,6 +48,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
   module Step_main_inputs = Step_main_inputs
   module Step_verifier = Step_verifier
   module Proof_cache = Proof_cache
+  module Wrap_wire_proof = Wrap_wire_proof
   module Cache = Cache
   module Storables = Compile.Storables
   module Ro = Ro

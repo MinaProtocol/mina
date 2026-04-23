@@ -17,6 +17,7 @@
   kimchi_pasta.basic
   kimchi_bindings
   kimchi_types
+  mina_wire_types
   pasta_bindings
   pickles
   pickles.backend

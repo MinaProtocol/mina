@@ -484,6 +484,8 @@ fn generate_kimchi_bindings(mut w: impl std::io::Write, env: &mut Env) {
                 decl_func!(w, env, caml_pasta_fq_plonk_proof_batch_verify => "batch_verify");
                 decl_func!(w, env, caml_pasta_fq_plonk_proof_dummy => "dummy");
                 decl_func!(w, env, caml_pasta_fq_plonk_proof_deep_copy => "deep_copy");
+                decl_func!(w, env, caml_pasta_fq_plonk_proof_write => "write");
+                decl_func!(w, env, caml_pasta_fq_plonk_proof_read => "read");
             });
         });
     });
