@@ -31,4 +31,5 @@
   snark_keys_header
   snarky.backendless
   sponge
-  tuple_lib))
+  tuple_lib
+  yojson))

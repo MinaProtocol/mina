@@ -89,6 +89,8 @@ module type S = sig
       val to_base64 : t -> string
 
       val of_base64 : string -> (t, string) Result.t
+
+      val to_yojson_full : t -> Yojson.Safe.t
     end
 
     module Proofs_verified_2 : sig

@@ -109,6 +109,50 @@ let emit_wrap_srs_if_requested ~(pickles_vk : Pickles.Verification_key.t) =
       Kimchi_bindings.Protocol.SRS.Fq.write (Some true) index.srs path ;
       Format.printf "wrote wrap SRS (msgpack) to %s@." path
 
+(* Splice [app_state] into a proof-Repr JSON at
+   [statement.messages_for_next_step_proof.app_state] (which pickles writes as
+   [null] because its stored [Proof.t] fixes ['s = unit]). The splice replaces
+   that [null] with an array of decimal strings, one per field element. *)
+let inject_app_state ~(fields : Impls.Step.Field.Constant.t array)
+    (json : Yojson.Safe.t) : Yojson.Safe.t =
+  let app_state_json : Yojson.Safe.t =
+    `List
+      (Array.to_list
+         (Array.map fields ~f:(fun f ->
+              `String (Impls.Step.Field.Constant.to_string f) ) ) )
+  in
+  let update_obj key f = function
+    | `Assoc fields ->
+        `Assoc
+          (List.map fields ~f:(fun (k, v) ->
+               if String.equal k key then (k, f v) else (k, v) ) )
+    | j ->
+        j
+  in
+  json
+  |> update_obj "statement"
+       (update_obj "messages_for_next_step_proof"
+          (update_obj "app_state" (fun _ -> app_state_json)) )
+
+(* If [SIMPLE_CHAIN_PROOF_REPR_JSON_OUT] is set, dump the pickles
+   [Proof.Repr.t] for [pickles_proof] as JSON, using pickles' own ppx-derived
+   yojson serializer, and splice the real app-state field elements into
+   [statement.messages_for_next_step_proof.app_state] in place of the [null]
+   that the raw pickles dump emits. The rest of the JSON is whatever pickles
+   produces verbatim. *)
+let emit_proof_repr_json_if_requested
+    ~(pickles_proof : Pickles_types.Nat.N1.n Pickles.Proof.t)
+    ~(app_state : Impls.Step.Field.Constant.t array) =
+  match Sys.getenv_opt "SIMPLE_CHAIN_PROOF_REPR_JSON_OUT" with
+  | None ->
+      ()
+  | Some path ->
+      let module Proof_N1 = Pickles.Proof.Make (Pickles_types.Nat.N1) in
+      let json = Proof_N1.to_yojson_full pickles_proof in
+      let json = inject_app_state ~fields:app_state json in
+      Yojson.Safe.to_file path json ;
+      Format.printf "wrote pickles proof Repr (JSON) to %s@." path
+
 (* If [SIMPLE_CHAIN_WRAP_PROOF_OUT] is set, extract the inner wrap Kimchi proof
    (Pallas) from [pickles_proof] and write it as msgpack via the kimchi-stubs
    [caml_pasta_fq_plonk_proof_write] we added.
@@ -204,4 +248,6 @@ let () =
   in
   emit_wrap_vi_if_requested ~pickles_vk ;
   emit_wrap_srs_if_requested ~pickles_vk ;
-  emit_wrap_proof_if_requested ~pickles_proof:b1
+  emit_wrap_proof_if_requested ~pickles_proof:b1 ;
+  emit_proof_repr_json_if_requested ~pickles_proof:b1
+    ~app_state:[| initial; next |]
