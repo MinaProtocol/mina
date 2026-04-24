@@ -31,7 +31,7 @@ let lowerName =
       ->  merge
             { Master = "master"
             , Compatible = "compatible"
-            , Mesa = "release/mesa"
+            , Mesa = "mesa_preflight_prefork"
             , Develop = "develop"
             }
             branch
