@@ -331,10 +331,24 @@ module Zkapp_command_info = struct
     let to_transaction cmd =
       let open M.Let_syntax in
       let%map operations = to_operations cmd in
+      let nonce = ("nonce", `Int (Unsigned.UInt32.to_int cmd.nonce)) in
+      let memo_field =
+        Option.bind cmd.memo ~f:(fun base58_check ->
+            try
+              let memo =
+                let open Mina_base.Signed_command_memo in
+                base58_check |> of_base58_check_exn |> to_string_hum
+              in
+              if String.is_empty memo then None else Some ("memo", `String memo)
+            with _ -> None )
+      in
+      let metadata_fields =
+        match memo_field with Some m -> [ nonce; m ] | None -> [ nonce ]
+      in
       { Transaction.transaction_identifier =
           { Transaction_identifier.hash = cmd.hash }
       ; operations
-      ; metadata = None
+      ; metadata = Some (`Assoc metadata_fields)
       ; related_transactions = []
       }
   end
@@ -361,4 +375,86 @@ module Zkapp_command_info = struct
       ; account_updates = Zkapp_account_update_info.dummies
       }
     ]
+
+  let%test_module "Zkapp_command_info.to_transaction metadata" =
+    ( module struct
+      module T_result = T (Result)
+
+      let metadata_fields cmd =
+        match T_result.to_transaction cmd with
+        | Ok { metadata = Some (`Assoc fields); _ } ->
+            fields
+        | Ok _ ->
+            failwith "expected metadata to be Some (`Assoc _)"
+        | Error _ ->
+            failwith "to_transaction returned Error for a valid command"
+
+      let find_field fields key = List.Assoc.find fields ~equal:String.equal key
+
+      let%test_unit "nonce is always present (memo = None)" =
+        let cmd = List.nth_exn dummies 1 in
+        let fields = metadata_fields cmd in
+        match find_field fields "nonce" with
+        | Some (`Int n) ->
+            [%test_eq: int] n (Unsigned.UInt32.to_int cmd.nonce)
+        | _ ->
+            failwith "expected nonce field to be Some (`Int _)"
+
+      let%test_unit "nonce is present even when memo is unparseable" =
+        let cmd = List.nth_exn dummies 0 in
+        let fields = metadata_fields cmd in
+        ( match find_field fields "nonce" with
+        | Some (`Int n) ->
+            [%test_eq: int] n (Unsigned.UInt32.to_int cmd.nonce)
+        | _ ->
+            failwith "expected nonce field to be Some (`Int _)" ) ;
+        [%test_eq: bool] (Option.is_some (find_field fields "memo")) false
+
+      let%test_unit "memo included when valid base58 check string" =
+        let memo_text = "rosetta-okx-test" in
+        let memo_base58 =
+          Mina_base.Signed_command_memo.(
+            create_from_string_exn memo_text |> to_base58_check)
+        in
+        let cmd = { (List.nth_exn dummies 0) with memo = Some memo_base58 } in
+        let fields = metadata_fields cmd in
+        ( match find_field fields "nonce" with
+        | Some (`Int _) ->
+            ()
+        | _ ->
+            failwith "expected nonce field" ) ;
+        match find_field fields "memo" with
+        | Some (`String m) ->
+            [%test_eq: string] m memo_text
+        | _ ->
+            failwith "expected memo field to be Some (`String _)"
+
+      let%test_unit "memo omitted when valid base58 decodes to empty string" =
+        let empty_base58 =
+          Mina_base.Signed_command_memo.(to_base58_check empty)
+        in
+        let cmd = { (List.nth_exn dummies 0) with memo = Some empty_base58 } in
+        let fields = metadata_fields cmd in
+        ( match find_field fields "nonce" with
+        | Some (`Int _) ->
+            ()
+        | _ ->
+            failwith "expected nonce field" ) ;
+        [%test_eq: bool] (Option.is_some (find_field fields "memo")) false
+
+      (* Regression pin for OKX Bug 1: metadata must never be None, since
+         that was the original symptom (zk-tx responses lacked the nonce
+         entirely). *)
+      let%test_unit "metadata is never None across all dummies" =
+        List.iter dummies ~f:(fun cmd ->
+            match T_result.to_transaction cmd with
+            | Ok { metadata = Some _; _ } ->
+                ()
+            | Ok { metadata = None; _ } ->
+                failwith
+                  (sprintf "metadata is None for zkapp command with hash %s"
+                     cmd.hash )
+            | Error _ ->
+                failwith "to_transaction returned Error for a dummy command" )
+    end )
 end
