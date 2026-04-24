@@ -70,9 +70,11 @@ if [[ -z "$SCOPES" || -z "$TAGS" || -z "$FILTER_MODE" || -z "$SELECTION" || -z "
 fi
 
 
-# Fetch mainline branches needed by monorepo.sh for merge-base calculations
+# Fetch mainline branches needed by monorepo.sh for merge-base calculations.
+# No local refspec: downstream only reads origin/$branch (see find_closest_ancestor),
+# and "$branch:$branch" fails with exit 128 when $branch is the checked-out branch.
 for branch in "${MAINLINE_BRANCHES[@]}"; do
-  git fetch origin "$branch:$branch"
+  git fetch origin "$branch"
 done
 
 # Check if yq is installed, if not install it
