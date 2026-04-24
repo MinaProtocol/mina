@@ -119,6 +119,19 @@ else
   exit 1
 fi
 
+# Map a mainline branch name to the Dhall MainlineBranch.Type tag used in
+# each job's includeIf/excludeIf `ancestor` field (see buildkite/src/Pipeline/MainlineBranch.dhall).
+# Keep in sync with the `lowerName` mapping there.
+branch_to_ancestor_tag() {
+  case "$1" in
+    master) echo "Master" ;;
+    compatible) echo "Compatible" ;;
+    develop) echo "Develop" ;;
+    mesa|release/mesa|mesa_preflight_prefork) echo "Mesa" ;;
+    *) echo "$1" ;;
+  esac
+}
+
 find_closest_ancestor() {
   CURRENT_COMMIT=$(git rev-parse HEAD)
   closest_branch=""
@@ -132,7 +145,7 @@ find_closest_ancestor() {
       closest_branch=$branch
     fi
   done
-  echo "$closest_branch"
+  branch_to_ancestor_tag "$closest_branch"
 }
 
 
