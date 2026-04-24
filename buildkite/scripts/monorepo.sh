@@ -13,6 +13,7 @@ SELECTION=""
 JOBS=""
 GIT_DIFF_FILE=""
 MAINLINE_BRANCHES=()
+declare -A MAINLINE_BRANCH_TAGS=()
 DRY_RUN=false
 
 # Parse CLI arguments
@@ -44,7 +45,23 @@ while [[ $# -gt 0 ]]; do
       shift; shift
       ;;
     --mainline-branches)
-      IFS=',' read -r -a MAINLINE_BRANCHES <<< "$2"
+      # Accept either plain branch names ("master,compatible,...") or
+      # "branch:Tag" pairs ("master:Master,compatible:Compatible,...") emitted by
+      # MainlineBranch.joinWithTag. The tag is the Dhall MainlineBranch.Type
+      # value used in each job's includeIf/excludeIf `ancestor` field.
+      IFS=',' read -r -a _entries <<< "$2"
+      for _entry in "${_entries[@]}"; do
+        if [[ "$_entry" == *:* ]]; then
+          _branch="${_entry%%:*}"
+          _tag="${_entry#*:}"
+        else
+          _branch="$_entry"
+          _tag="$_entry"
+        fi
+        MAINLINE_BRANCHES+=("$_branch")
+        MAINLINE_BRANCH_TAGS["$_branch"]="$_tag"
+      done
+      unset _entries _entry _branch _tag
       shift; shift
       ;;
     --dry-run)
@@ -119,19 +136,6 @@ else
   exit 1
 fi
 
-# Map a mainline branch name to the Dhall MainlineBranch.Type tag used in
-# each job's includeIf/excludeIf `ancestor` field (see buildkite/src/Pipeline/MainlineBranch.dhall).
-# Keep in sync with the `lowerName` mapping there.
-branch_to_ancestor_tag() {
-  case "$1" in
-    master) echo "Master" ;;
-    compatible) echo "Compatible" ;;
-    develop) echo "Develop" ;;
-    mesa|release/mesa|mesa_preflight_prefork) echo "Mesa" ;;
-    *) echo "$1" ;;
-  esac
-}
-
 find_closest_ancestor() {
   CURRENT_COMMIT=$(git rev-parse HEAD)
   closest_branch=""
@@ -145,7 +149,10 @@ find_closest_ancestor() {
       closest_branch=$branch
     fi
   done
-  branch_to_ancestor_tag "$closest_branch"
+  # Return the MainlineBranch.Type tag (e.g. "Mesa"), not the branch name
+  # ("mesa_preflight_prefork"), so it lines up with each job's includeIf/excludeIf
+  # `ancestor` field. Mapping is populated from --mainline-branches.
+  echo "${MAINLINE_BRANCH_TAGS[$closest_branch]:-$closest_branch}"
 }
 
 

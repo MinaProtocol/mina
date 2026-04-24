@@ -40,6 +40,20 @@ let join =
           \(branches : List Branch)
       ->  Extensions.join "," (Prelude.List.map Branch Text lowerName branches)
 
+-- Emit "branch:Tag" pairs so downstream tooling (e.g. monorepo.sh) can map
+-- a checked-out branch name back to its MainlineBranch.Type tag without
+-- duplicating the mapping above.
+let joinWithTag =
+          \(branches : List Branch)
+      ->  Extensions.join
+            ","
+            ( Prelude.List.map
+                Branch
+                Text
+                (\(b : Branch) -> "${lowerName b}:${capitalName b}")
+                branches
+            )
+
 let Full = [ Branch.Master, Branch.Compatible, Branch.Mesa, Branch.Develop ]
 
 in  { Type = Branch
@@ -47,4 +61,5 @@ in  { Type = Branch
     , capitalName = capitalName
     , lowerName = lowerName
     , join = join
+    , joinWithTag = joinWithTag
     }

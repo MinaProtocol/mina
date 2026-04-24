@@ -55,7 +55,7 @@ let commands
                   ++  " --tags ${PipelineTag.join requestedTags} "
                   ++  " --filter-mode ${PipelineFilterMode.show filterMode} "
                   ++  " --selection ${PipelineJobSelection.show selection} "
-                  ++  " --mainline-branches ${MainlineBranch.join
+                  ++  " --mainline-branches ${MainlineBranch.joinWithTag
                                                 MainlineBranch.Full}"
                   ++  " --jobs ./buildkite/src/gen"
                   ++  " --git-diff-file _computed_diff.txt "
