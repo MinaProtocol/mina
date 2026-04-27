@@ -113,7 +113,7 @@ NODE_ARGS_2=( --libp2p-keypair "$PWD/$CONF_DIR/libp2p_2" )
 "$MINA_EXE" libp2p generate-keypair --privkey-path $CONF_DIR/libp2p_2 
 
 if [[ "$CUSTOM_CONF" == "" ]] && [[ ! -f $CONF_DIR/ledger.json ]]; then
-  ( cd $CONF_DIR && "$SCRIPT_DIR/../prepare-test-ledger.sh" --exit-on-old-ledger -c 100000 -b 1000000 "$(cat bp.pub)" >ledger.json )
+  ( cd $CONF_DIR && "$SCRIPT_DIR/../prepare-test-ledger.sh" --exit-on-old-ledger -c 100000 -b 1000000 --output ledger.json "$(cat bp.pub)" )
 fi
 
 if [[ "$SLOT_TX_END" != "" ]]; then
