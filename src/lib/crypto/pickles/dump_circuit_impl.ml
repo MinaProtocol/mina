@@ -4277,6 +4277,27 @@ let step_main_simple_chain_n2 () =
   in
   constraint_builder.finish_computation res
 
+(* ---- Application circuits for two_phase_chain (multi-branch fixture) ----
+   Mirrors the rule bodies from `dump_two_phase_chain.ml` but emits
+   ONLY the application's CS — no step_main scaffolding. Used to
+   validate that the PureScript DSL produces an identical gate
+   sequence for the same logical operation. Foundational for the
+   trace-diff loop: if the application circuits don't match, every
+   downstream witness/oracle comparison is meaningless. *)
+
+(* Branch 0 ("make_zero") application body: assert public_input = 0. *)
+let app_circuit_two_phase_chain_make_zero (x : Impl.Field.t) () =
+  Impl.Field.Assert.equal x Impl.Field.zero
+
+(* Branch 1 ("increment") application body: allocate prev,
+   assert public_input = prev + 1. *)
+let app_circuit_two_phase_chain_increment (x : Impl.Field.t) () =
+  let prev =
+    Impl.exists Impl.Field.typ ~compute:(fun () ->
+        Impl.Field.Constant.zero )
+  in
+  Impl.Field.(Assert.equal x (one + prev))
+
 (* ---- Isolation circuits ---- *)
 
 (* Outer hash_messages_for_next_step_proof for Simple_Chain (N1):
@@ -4715,6 +4736,14 @@ let run ~output_dir =
     ~input_typ:Impl.Typ.unit ~return_typ:Impl.Typ.unit ;
   dump_step "per_proof_witness_typ_check_step_circuit" per_proof_witness_typ_check_circuit
     ~input_typ:Impl.Typ.unit ~return_typ:Impl.Typ.unit ;
+  (* Application circuits for two_phase_chain (multi-branch fixture).
+     Just the rule bodies; no step_main wrap. *)
+  dump_step "app_circuit_two_phase_chain_make_zero"
+    app_circuit_two_phase_chain_make_zero
+    ~input_typ:Impl.Field.typ ~return_typ:Impl.Typ.unit ;
+  dump_step "app_circuit_two_phase_chain_increment"
+    app_circuit_two_phase_chain_increment
+    ~input_typ:Impl.Field.typ ~return_typ:Impl.Typ.unit ;
   (* Step_main circuit for Simple_Chain *)
   dump_step_main output_dir "step_main_simple_chain_circuit"
     step_main_simple_chain ;
