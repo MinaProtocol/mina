@@ -60,11 +60,19 @@ STAKING_SEED="${STAKING_SEED:-2vahsgRV5nDPmtgr2Xo2Uq2dkngfSgvg7d1TKqQbY3wUS2ZDxC
 NEXT_SEED="${NEXT_SEED:-2vbH4D8B76WMYPRFgeuVvdWVhv6tAFoCJtg83yuJT1dud3QVSiZn}"
 
 # Default configuration
-DEFAULT_GENESIS_TIMESTAMP="$(date -u -d "$(date -u +%Y-%m-%d) $(( $(date -u +%H) + 1 )):00:00" +%Y-%m-%dT%H:%M:%SZ)"
+# Next full hour in UTC (portable: works on both GNU and BSD/macOS date)
+_next_epoch=$(( ($(date -u +%s) / 3600 + 1) * 3600 ))
+if date -u -d @0 +%s >/dev/null 2>&1; then
+    DEFAULT_GENESIS_TIMESTAMP="$(date -u -d @$_next_epoch +%Y-%m-%dT%H:%M:%SZ)"
+else
+    DEFAULT_GENESIS_TIMESTAMP="$(date -u -r $_next_epoch +%Y-%m-%dT%H:%M:%SZ)"
+fi
+unset _next_epoch
 DEFAULT_BP_KEYS=2
 DEFAULT_PLAIN_KEYS=4
 DEFAULT_EXTRA_BALANCE=100000000
 DEFAULT_EXTRA_KEYS=1
+DEFAULT_PLAIN_BALANCE=""
 DEFAULT_PREFIX="itn-testbed"
 DEFAULT_OUTPUT_DIR="$PWD"
 
@@ -74,6 +82,7 @@ BP_KEYS="$DEFAULT_BP_KEYS"
 PLAIN_KEYS="$DEFAULT_PLAIN_KEYS"
 EXTRA_BALANCE="$DEFAULT_EXTRA_BALANCE"
 EXTRA_KEYS="$DEFAULT_EXTRA_KEYS"
+PLAIN_BALANCE="$DEFAULT_PLAIN_BALANCE"
 PREFIX="$DEFAULT_PREFIX"
 OUTPUT_DIR="$DEFAULT_OUTPUT_DIR"
 MINA_BINARY=""
@@ -213,12 +222,28 @@ validate_positive_integer() {
     local value="$1"
     local name="$2"
     local max="${3:-}"
-    
+
     if ! [[ "$value" =~ ^[1-9][0-9]*$ ]]; then
         echo "Error: $name must be a positive integer, got: $value" >&2
         exit 1
     fi
-    
+
+    if [[ -n "$max" ]] && (( value > max )); then
+        echo "Error: $name must be <= $max, got: $value" >&2
+        exit 1
+    fi
+}
+
+validate_non_negative_integer() {
+    local value="$1"
+    local name="$2"
+    local max="${3:-}"
+
+    if ! [[ "$value" =~ ^(0|[1-9][0-9]*)$ ]]; then
+        echo "Error: $name must be a non-negative integer, got: $value" >&2
+        exit 1
+    fi
+
     if [[ -n "$max" ]] && (( value > max )); then
         echo "Error: $name must be <= $max, got: $value" >&2
         exit 1
@@ -262,7 +287,12 @@ while [[ $# -gt 0 ]]; do
             ;;
         -e|--extra-keys)
             EXTRA_KEYS="$2"
-            validate_positive_integer "$EXTRA_KEYS" "Extra keys" 50
+            validate_non_negative_integer "$EXTRA_KEYS" "Extra keys" 50
+            shift 2
+            ;;
+        --plain-balance)
+            PLAIN_BALANCE="$2"
+            validate_balance "$PLAIN_BALANCE"
             shift 2
             ;;
         --prefix)
@@ -325,7 +355,8 @@ echo "  Genesis Timestamp: $GENESIS_TIMESTAMP"
 echo "  Block Producer Keys: $BP_KEYS"
 echo "  Plain Keys: $PLAIN_KEYS"
 echo "  Balance for each extra key: $EXTRA_BALANCE MINA"
-echo "  Extra Keys: $EXTRA_KEYS"
+echo "  Extra Keys (with delegation): $EXTRA_KEYS"
+echo "  Plain Balance (no delegation): ${PLAIN_BALANCE:-"disabled"}"
 echo "  Key Prefix: $PREFIX"
 echo "  Staking Seed: $STAKING_SEED"
 echo "  Next Seed: $NEXT_SEED"
@@ -428,17 +459,26 @@ fi
 
 # Call prepare-test-ledger script with all keys
 echo "Calling prepare-test-ledger-hf-dryrun.sh with:"
-echo "  Extra keys: $EXTRA_KEYS"
-echo "  Balance for each extra key: $EXTRA_BALANCE MINA"
+echo "  Extra keys (with delegation): $EXTRA_KEYS"
+if [[ $EXTRA_KEYS -gt 0 ]]; then
+    echo "  Balance for each extra key: $EXTRA_BALANCE MINA"
+fi
 echo "  Total keys added to ledger: ${#KEY_ARGS[@]}"
-echo "  Number of plain keys not put into ledger: $((PLAIN_KEYS - EXTRA_KEYS))"
+if [[ -n "$PLAIN_BALANCE" ]]; then
+    BALANCE_ONLY_KEYS=$((PLAIN_KEYS - EXTRA_KEYS))
+    echo "  Plain keys with balance only (no delegation): $BALANCE_ONLY_KEYS ($PLAIN_BALANCE MINA each)"
+else
+    echo "  Number of plain keys not put into ledger: $((PLAIN_KEYS - EXTRA_KEYS))"
+fi
 # Print percentage of extra and bp keys of the total keys in ledger
-PERCENTAGE_BP_KEYS=$(( (BP_KEYS * 10000) / ${#KEY_ARGS[@]} ))
-PERCENTAGE_EXTRA_KEYS=$(( (EXTRA_KEYS * 10000) / ${#KEY_ARGS[@]} ))
-PERCENTAGE_BP_KEYS_DISPLAY=$((PERCENTAGE_BP_KEYS / 100)).$((PERCENTAGE_BP_KEYS % 100))
-PERCENTAGE_EXTRA_KEYS_DISPLAY=$((PERCENTAGE_EXTRA_KEYS / 100)).$((PERCENTAGE_EXTRA_KEYS % 100))
-echo "  Target stake ownership by active stake (block producer keys): $PERCENTAGE_BP_KEYS_DISPLAY%"
-echo "  Target stake ownership by inactive stake (plain keys): $PERCENTAGE_EXTRA_KEYS_DISPLAY%"
+if [[ ${#KEY_ARGS[@]} -gt 0 ]]; then
+    PERCENTAGE_BP_KEYS=$(( (BP_KEYS * 10000) / ${#KEY_ARGS[@]} ))
+    PERCENTAGE_EXTRA_KEYS=$(( (EXTRA_KEYS * 10000) / ${#KEY_ARGS[@]} ))
+    PERCENTAGE_BP_KEYS_DISPLAY=$((PERCENTAGE_BP_KEYS / 100)).$((PERCENTAGE_BP_KEYS % 100))
+    PERCENTAGE_EXTRA_KEYS_DISPLAY=$((PERCENTAGE_EXTRA_KEYS / 100)).$((PERCENTAGE_EXTRA_KEYS % 100))
+    echo "  Target stake ownership by active stake (block producer keys): $PERCENTAGE_BP_KEYS_DISPLAY%"
+    echo "  Target stake ownership by inactive stake (plain keys): $PERCENTAGE_EXTRA_KEYS_DISPLAY%"
+fi
 
 "$SCRIPT_DIR/prepare-test-ledger-hf-dryrun.sh" -e "$EXTRA_KEYS" -b "$EXTRA_BALANCE" "${KEY_ARGS[@]}"
 
@@ -456,6 +496,30 @@ fi
 if [[ ! -f "next.json" ]]; then
     echo "Error: Expected output file next.json was not generated by prepare script" >&2
     exit 1
+fi
+
+# Inject balance-only plain keys (those not covered by -e) into ledger files
+if [[ -n "$PLAIN_BALANCE" ]]; then
+    INJECT_START=$((EXTRA_KEYS + 1))
+    INJECT_ENTRIES=()
+    for ((i=INJECT_START; i<=PLAIN_KEYS; i++)); do
+        if [[ -f "${PREFIX}-plain${i}.pub" ]]; then
+            pk=$(cat "${PREFIX}-plain${i}.pub")
+            INJECT_ENTRIES+=("{\"pk\":\"$pk\",\"delegate\":\"$pk\",\"balance\":\"$PLAIN_BALANCE\"}")
+        else
+            echo "Error: Plain key file ${PREFIX}-plain${i}.pub not found" >&2
+            exit 1
+        fi
+    done
+
+    if [[ ${#INJECT_ENTRIES[@]} -gt 0 ]]; then
+        INJECT_JSON=$(printf '%s\n' "${INJECT_ENTRIES[@]}" | jq -s '.')
+        echo "Injecting $((PLAIN_KEYS - EXTRA_KEYS)) plain keys with balance $PLAIN_BALANCE MINA (no delegation)..."
+        for ledger_file in genesis.json staking.json next.json; do
+            jq --argjson new "$INJECT_JSON" '. + $new' "$ledger_file" > "${ledger_file}.tmp" \
+                && mv "${ledger_file}.tmp" "$ledger_file"
+        done
+    fi
 fi
 
 # Generate full runtime configuration
