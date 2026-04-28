@@ -116,6 +116,8 @@ let generateStep =
                 "export MINA_DEB_CODENAME=${DebianVersions.lowerName
                                               spec.deb_codename}"
 
+          let exportBranchNameCmd = "export BRANCH_NAME=${spec.branch}"
+
           let maybeCacheOption = if spec.no_cache then "--no-cache" else ""
 
           let maybeStartDebianRepo =
@@ -264,6 +266,8 @@ let generateStep =
           let remoteRepoCmds =
                 [ Cmd.run
                     (     exportMinaDebCmd
+                      ++  " && "
+                      ++  exportBranchNameCmd
                       ++  " && source ./buildkite/scripts/export-git-env-vars.sh "
                       ++  " && "
                       ++  buildDockerCmd
@@ -279,6 +283,8 @@ let generateStep =
                   , Local =
                     [ Cmd.run
                         (     exportMinaDebCmd
+                          ++  " && "
+                          ++  exportBranchNameCmd
                           ++  " && "
                           ++  pruneDockerImages
                           ++  maybeStartDebianRepo
