@@ -6,12 +6,7 @@ set -euo pipefail
 
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 
-VENV_DIR="$SCRIPT_DIR/patch-ledger/.venv"
-if [[ ! -d "$VENV_DIR" ]]; then
-  python3 -m venv "$VENV_DIR"
-  "$VENV_DIR/bin/pip" install -q -r "$SCRIPT_DIR/patch-ledger/requirements.txt"
-fi
-PYTHON="$VENV_DIR/bin/python"
+PATCH_LEDGER="$SCRIPT_DIR/patch-ledger/run.sh"
 
 EXTRA_KEYS=${EXTRA_KEYS:-0}
 EXTRA_KEY_BALANCE=${EXTRA_KEY_BALANCE:-10000000}
@@ -101,10 +96,10 @@ build_spec() {
 }
 
 if [[ "$NO_NEXT" == "" ]]; then
-  "$PYTHON" "$SCRIPT_DIR/patch-ledger/__main__.py" --spec "$(build_spec "next-staking-$EPOCH")" --output genesis.json
+  "$PATCH_LEDGER" --spec "$(build_spec "next-staking-$EPOCH")" --output genesis.json
 else
-  "$PYTHON" "$SCRIPT_DIR/patch-ledger/__main__.py" --spec "$(build_spec "staking-$EPOCH")" --output genesis.json
+  "$PATCH_LEDGER" --spec "$(build_spec "staking-$EPOCH")" --output genesis.json
   EPOCH=$((EPOCH-1))
 fi
-"$PYTHON" "$SCRIPT_DIR/patch-ledger/__main__.py" --spec "$(build_spec "staking-$EPOCH")" --output next.json
-"$PYTHON" "$SCRIPT_DIR/patch-ledger/__main__.py" --spec "$(build_spec "staking-$((EPOCH-1))")" --output staking.json
+"$PATCH_LEDGER" --spec "$(build_spec "staking-$EPOCH")" --output next.json
+"$PATCH_LEDGER" --spec "$(build_spec "staking-$((EPOCH-1))")" --output staking.json
