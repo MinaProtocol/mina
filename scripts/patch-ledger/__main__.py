@@ -28,6 +28,12 @@ log = logging.getLogger("patch-ledger")
 GCS_BUCKET = "mina-staking-ledgers"
 NANOMINA = 10**9
 
+KeyList = Annotated[list[str], Field(min_length=1)]
+
+import re
+
+MINA_KEY_RE = re.compile(r"^B62q[1-9A-HJ-NP-Za-km-z]{51}$")
+
 
 # ── Balance Type ──────────────────────────────────────────────────────────
 
@@ -109,21 +115,21 @@ Source = Annotated[
 
 class RemoveAccountsTransform(BaseModel):
     type: Literal["remove-accounts"]
-    keys: list[str]
+    keys: KeyList
 
 
 class CutoffDelegationTransform(BaseModel):
     """Reassign delegation using even or norm strategy, skipping accounts below cutoff."""
     type: Literal["reassign-delegation"]
     strategy: Literal["even", "norm"] = "even"
-    to: list[str]
+    to: KeyList
     delegation_cutoff: Mina = Decimal("100000")
 
 
 class ReplaceTopDelegationTransform(BaseModel):
     """Replace the top N delegates (by total stake) with the target keys 1:1."""
     type: Literal["replace-top-delegation"]
-    to: list[str]
+    to: KeyList
 
 
 class AddAccountEntry(BaseModel):
@@ -134,17 +140,17 @@ class AddAccountEntry(BaseModel):
 
 class AddAccountsTransform(BaseModel):
     type: Literal["add-accounts"]
-    entries: list[AddAccountEntry]
+    entries: Annotated[list[AddAccountEntry], Field(min_length=1)]
 
 
 class StripReceiptChainHashTransform(BaseModel):
     type: Literal["strip-receipt-chain-hash"]
-    delegate_keys: list[str]
+    delegate_keys: KeyList
 
 
 class BoostLastTransform(BaseModel):
     type: Literal["boost-last"]
-    count: int
+    count: Annotated[int, Field(ge=1)]
     balance: Mina
 
 
@@ -200,6 +206,13 @@ def resolve_aliases_in_spec(spec: Spec) -> Spec:
             resolved.append(t)
 
     return spec.model_copy(update={"transforms": resolved, "aliases": {}})
+
+
+def validate_key_prefixes(spec: Spec) -> None:
+    keys = collect_all_keys(spec)
+    bad = [k for k in keys if not MINA_KEY_RE.match(k)]
+    if bad:
+        fatal(f"Invalid keys (expected base58 B62q...): " + ", ".join(bad))
 
 
 # ── Stake Distribution ────────────────────────────────────────────────────
@@ -410,6 +423,8 @@ def apply_strip_receipt_chain_hash(
 
 def apply_boost_last(ledger: Ledger, t: BoostLastTransform) -> Ledger:
     result = list(ledger)
+    if t.count > len(result):
+        log.warning("boost-last: count %d exceeds ledger size %d", t.count, len(result))
     for i in range(max(0, len(result) - t.count), len(result)):
         result[i] = result[i].model_copy(update={"balance": t.balance})
     return result
@@ -436,6 +451,7 @@ def apply_transform(ledger: Ledger, t: Transform) -> Ledger:
 
 def run_spec(spec: Spec) -> Ledger:
     spec = resolve_aliases_in_spec(spec)
+    validate_key_prefixes(spec)
 
     source_name = type(spec.source).__name__
     ledger = load_source(spec.source)
@@ -447,6 +463,10 @@ def run_spec(spec: Spec) -> Ledger:
         ledger = apply_transform(ledger, t)
         transform_name = type(t).__name__.replace("Transform", "")
         log.info("Applied %s: %d accounts", transform_name, len(ledger))
+
+    total = sum(a.balance for a in ledger)
+    if total == 0:
+        fatal("Total balance is zero after transforms")
 
     if all_keys:
         print_stake_distribution(ledger, sorted(all_keys))
