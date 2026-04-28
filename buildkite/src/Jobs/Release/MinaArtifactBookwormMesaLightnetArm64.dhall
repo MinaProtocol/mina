@@ -38,6 +38,7 @@ in  Pipeline.build
             , PipelineTag.Type.Mesa
             , PipelineTag.Type.Arm64
             , PipelineTag.Type.Bookworm
+            , PipelineTag.Type.Lightnet
             ]
           , debVersion = DebianVersions.DebVersion.Bookworm
           , scope =
