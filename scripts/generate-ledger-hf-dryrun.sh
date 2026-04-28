@@ -88,6 +88,7 @@ OUTPUT_DIR="$DEFAULT_OUTPUT_DIR"
 MINA_BINARY=""
 RUNTIME_GENESIS_LEDGER_BINARY=""
 PAD_APP_STATE=""
+PER_KEY_PASSWORD=false
 
 export MINA_PRIVKEY_PASS="${MINA_PRIVKEY_PASS:-}"
 
@@ -145,6 +146,10 @@ OPTIONS:
   --runtime-genesis-ledger-binary PATH
                                Path to runtime_genesis_ledger binary (builds if not specified or missing)
 
+  --per-key-password          Generate a unique random password for each key
+                               and write it to a .pass file alongside the keypair.
+                               Default: off (uses MINA_PRIVKEY_PASS for all keys)
+
   --pad-app-state             Pad app state when generating ledger hashes
                                (passed to runtime_genesis_ledger)
 
@@ -196,6 +201,7 @@ OUTPUT FILES NEEDED FOR HF DRYRUN:
   - PREFIX/ directory                     Generated ledger directory
   - PREFIX-bp*.pub, PREFIX-bp*            Block producer key pairs
   - PREFIX-plain*.pub, PREFIX-plain*      Plain key pairs
+  - PREFIX-{bp,plain}*.pass               Per-key passwords (only with --per-key-password)
   - runtime_config.json                   Final runtime configuration
 
 OUTPUT FILES WHICH ARE NOT NEEDED FOR HF DRYRUN (can be deleted):
@@ -323,6 +329,10 @@ while [[ $# -gt 0 ]]; do
             PAD_APP_STATE="--pad-app-state"
             shift
             ;;
+        --per-key-password)
+            PER_KEY_PASSWORD=true
+            shift
+            ;;
         -h|--help)
             show_help
             exit 0
@@ -345,6 +355,12 @@ fi
 # Check if nix is needed after parsing arguments
 check_nix_if_needed
 
+# Check openssl dependency for per-key password generation
+if [[ "$PER_KEY_PASSWORD" == "true" ]] && ! command -v openssl >/dev/null 2>&1; then
+    echo "Error: openssl is required for --per-key-password but is not installed" >&2
+    exit 1
+fi
+
 # Change to output directory
 cd "$OUTPUT_DIR"
 
@@ -363,6 +379,7 @@ echo "  Next Seed: $NEXT_SEED"
 echo "  Output Directory: $OUTPUT_DIR"
 echo "  Mina Binary: ${MINA_BINARY:-"(will build if needed)"}"
 echo "  Runtime Genesis Ledger Binary: ${RUNTIME_GENESIS_LEDGER_BINARY:-"(will build if needed)"}"
+echo "  Per-Key Password: $PER_KEY_PASSWORD"
 echo "  Pad App State: ${PAD_APP_STATE:-"disabled"}"
 echo
 
@@ -400,26 +417,34 @@ ensure_binary() {
 ensure_binary "MINA_BINARY" "devnet" "mina"
 ensure_binary "RUNTIME_GENESIS_LEDGER_BINARY" "devnet.genesis" "runtime_genesis_ledger"
 
+# Key generation helper
+generate_key() {
+    local key_path="$1"
+    if [[ -f "$key_path" ]] && [[ -f "${key_path}.pub" ]]; then
+        echo "  Skipping $key_path (already exists)..."
+        return
+    fi
+    echo "  Generating $key_path..."
+    if [[ "$PER_KEY_PASSWORD" == "true" ]]; then
+        local pass
+        pass=$(openssl rand -base64 32)
+        MINA_PRIVKEY_PASS="$pass" "$MINA_BINARY" advanced generate-keypair --privkey-path "$key_path"
+        echo "$pass" > "${key_path}.pass"
+    else
+        "$MINA_BINARY" advanced generate-keypair --privkey-path "$key_path"
+    fi
+}
+
 # Generate block producer keys
 echo "Generating $BP_KEYS block producer keys..."
 for ((i=1; i<=BP_KEYS; i++)); do
-    if [[ -f "${PREFIX}-bp${i}" ]] && [[ -f "${PREFIX}-bp${i}.pub" ]]; then
-        echo "  Skipping ${PREFIX}-bp${i} (already exists)..."
-    else
-        echo "  Generating ${PREFIX}-bp${i}..."
-        "$MINA_BINARY" advanced generate-keypair --privkey-path "${PREFIX}-bp${i}"
-    fi
+    generate_key "${PREFIX}-bp${i}"
 done
 
 # Generate plain keys
 echo "Generating $PLAIN_KEYS plain keys..."
 for ((i=1; i<=PLAIN_KEYS; i++)); do
-    if [[ -f "${PREFIX}-plain${i}" ]] && [[ -f "${PREFIX}-plain${i}.pub" ]]; then
-        echo "  Skipping ${PREFIX}-plain${i} (already exists)..."
-    else
-        echo "  Generating ${PREFIX}-plain${i}..."
-        "$MINA_BINARY" advanced generate-keypair --privkey-path "${PREFIX}-plain${i}"
-    fi
+    generate_key "${PREFIX}-plain${i}"
 done
 
 # Build key arguments for prepare-test-ledger script
@@ -553,7 +578,10 @@ jq --slurpfile hashes hashes.json -n "$JQ_EXPR * \$hashes[0]" > runtime_config.j
 echo
 echo "=== Generation Complete ==="
 echo "Generated files:"
-echo "  Key files: ${PREFIX}-bp*.{pub,key}, ${PREFIX}-plain*.{pub,key}"
+echo "  Key files: ${PREFIX}-{bp,plain}*.pub, ${PREFIX}-{bp,plain}*"
+if [[ "$PER_KEY_PASSWORD" == "true" ]]; then
+    echo "  Password files: ${PREFIX}-{bp,plain}*.pass"
+fi
 echo "  Configuration: runtime_config.json, runtime_config_full.json"
 echo "  Hashes: hashes.json"
 echo "  Ledger files: genesis.json, staking.json, next.json"
