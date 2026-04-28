@@ -132,6 +132,13 @@ let generateTarballsCommand =
                   }
                   spec.use_artifacts_from_buildkite_build
 
+          let genesis_timestamp_env =
+                merge
+                  { Some = \(ts : Text) -> [ "GENESIS_TIMESTAMP=" ++ ts ]
+                  , None = [] : List Text
+                  }
+                  spec.genesis_timestamp
+
           in  Command.build
                 Command.Config::{
                 , commands =
@@ -139,7 +146,12 @@ let generateTarballsCommand =
                       Toolchain.SelectionMode.ByDebianAndArch
                       codename.DebVersion
                       codename.Arch
-                      [ "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY" ]
+                      (   [ "AWS_ACCESS_KEY_ID"
+                          , "AWS_SECRET_ACCESS_KEY"
+                          , "GENESIS_TIMESTAMP"
+                          ]
+                        # genesis_timestamp_env
+                      )
                       (     "./buildkite/scripts/hardfork/release/generate-fork-config-and-ledger-tarballs.sh "
                         ++  "--network ${Network.lowerName spec.network} "
                         ++  "--config-url ${spec.config_json_gz_url} "

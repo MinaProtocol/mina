@@ -718,8 +718,8 @@ let apply_hard_fork_migration ~logger
         let addrs_and_accounts =
           List.mapi accounts ~f:(fun i acct ->
               ( Ledger.Hardfork_db.Addr.of_int_exn ~ledger_depth i
-              , Account.Hardfork.migrate_from_berkeley
-                  ~hardfork_slot:hard_fork_slot acct ) )
+              , Account.Hardfork.migrate_to_mesa ~hardfork_slot:hard_fork_slot
+                  acct ) )
         in
         create_genesis_db_and_tar ~logger ~genesis_dir ~ledger_depth
           ~populate:(fun ~directory_name ~depth ->

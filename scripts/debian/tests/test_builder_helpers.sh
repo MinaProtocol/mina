@@ -291,6 +291,10 @@ case "$*" in
         echo "1.0.0" ;;
     "rev-parse --short=8 --verify HEAD")
         echo "abcd1234" ;;
+    "rev-parse --short=8 ef01abc")
+        echo "ef01abcd" ;;
+    rev-parse\ --short=8\ *)
+        echo "fatal: ambiguous argument" >&2; exit 128 ;;
     name-rev\ --name-only*)
         echo "test-branch" ;;
     "tag --points-at HEAD")
@@ -373,6 +377,7 @@ MOCKEXE
     # hardfork scripts
     create_mock_exe "scripts/hardfork/create_runtime_config.sh" "$PROJECT_ROOT"
     create_mock_exe "scripts/hardfork/mina-verify-packaged-fork-config" "$PROJECT_ROOT"
+    create_mock_exe "scripts/hardfork/dispatcher.sh" "$PROJECT_ROOT"
 
     # archive scripts
     create_mock_exe "scripts/archive/missing-blocks-guardian.sh" "$PROJECT_ROOT"
@@ -398,6 +403,7 @@ SVCEOF
     mkdir -p "${PROJECT_ROOT}/genesis_ledgers"
     echo '{"genesis": "mainnet"}' > "${PROJECT_ROOT}/genesis_ledgers/mainnet.json"
     echo '{"genesis": "devnet"}' > "${PROJECT_ROOT}/genesis_ledgers/devnet.json"
+    echo '{"genesis": "mesa"}' > "${PROJECT_ROOT}/genesis_ledgers/mesa.json"
 
     # rosetta scripts and configs
     create_mock_exe "src/app/rosetta/scripts/run.sh" "$PROJECT_ROOT"
@@ -702,6 +708,140 @@ test_build_daemon_devnet_prefork_deb() {
 }
 
 ################################################################################
+# Tests: Postfork packages
+################################################################################
+
+test_build_daemon_devnet_postfork_deb() {
+    export PREFORK_LEGACY_VERSION="3.3.0-compatible-ef01abc"
+
+    safe_build build_daemon_postfork_deb devnet || { log_fail "build exited non-zero"; return; }
+
+    load_captured_state
+    assert_eq "deb name" "mina-devnet-postfork-mesa" "$CAPTURED_DEB_NAME"
+    assert_control_field "$CAPTURED_CONTROL" "Package" "mina-devnet-postfork-mesa"
+    assert_control_contains "$CAPTURED_CONTROL" "Depends" "libssl1.1"
+    assert_control_contains "$CAPTURED_CONTROL" "Suggests" "jq"
+
+    # Postfork binaries in mesa directory
+    assert_common_daemon_binaries "$CAPTURED_FILES" "usr/lib/mina/mesa"
+
+    # Dispatcher and symlinks in default location
+    assert_file_captured "$CAPTURED_FILES" "usr/local/bin/mina-dispatch"
+    assert_file_captured "$CAPTURED_FILES" "usr/local/bin/mina"
+
+    # Config files (config_<hash>.json, <network>.json) are provided by
+    # the mina-<network>-config package, not the postfork package
+    assert_file_not_captured "$CAPTURED_FILES" "var/lib/coda/config_${EXPECTED_GITHASH_CONFIG}.json"
+    assert_file_not_captured "$CAPTURED_FILES" "var/lib/coda/devnet.json"
+
+    # Config for prefork daemon (resolved 8-char hash from legacy version)
+    assert_file_captured "$CAPTURED_FILES" "var/lib/coda/config_ef01abcd.json"
+
+    # Prefork config should have correct content
+    assert_captured_file_contains "$CAPTURED_LAST_BUILD_DIR" \
+        "var/lib/coda/config_ef01abcd.json" "devnet"
+
+    unset PREFORK_LEGACY_VERSION
+}
+
+test_build_daemon_mainnet_postfork_deb() {
+    export PREFORK_LEGACY_VERSION="3.3.0-compatible-ef01abc"
+
+    safe_build build_daemon_postfork_deb mainnet || { log_fail "build exited non-zero"; return; }
+
+    load_captured_state
+    assert_eq "deb name" "mina-mainnet-postfork-mesa" "$CAPTURED_DEB_NAME"
+    assert_control_field "$CAPTURED_CONTROL" "Package" "mina-mainnet-postfork-mesa"
+
+    # Postfork config comes from the config package, not this one
+    assert_file_not_captured "$CAPTURED_FILES" "var/lib/coda/config_${EXPECTED_GITHASH_CONFIG}.json"
+
+    # Prefork config shipped here (different hash)
+    assert_file_captured "$CAPTURED_FILES" "var/lib/coda/config_ef01abcd.json"
+
+    unset PREFORK_LEGACY_VERSION
+}
+
+test_build_daemon_postfork_deb_without_prefork_version() {
+    # When PREFORK_LEGACY_VERSION is not set, no config files should be shipped
+    # (config comes from the mina-<network>-config package)
+    unset PREFORK_LEGACY_VERSION 2>/dev/null || true
+
+    safe_build build_daemon_postfork_deb devnet || { log_fail "build exited non-zero"; return; }
+
+    load_captured_state
+
+    # No config files at all — neither postfork nor prefork
+    local config_count
+    config_count=$(echo "$CAPTURED_FILES" | grep -c "config_" || true)
+    if [[ "$config_count" -eq 0 ]]; then
+        log_pass
+    else
+        log_fail "Expected 0 config_*.json files, got ${config_count}"
+    fi
+}
+
+test_build_daemon_postfork_deb_unresolvable_prefork_hash() {
+    # When the prefork hash can't be resolved by git, warn but don't fail
+    export PREFORK_LEGACY_VERSION="3.3.0-compatible-badhash"
+
+    safe_build build_daemon_postfork_deb devnet || { log_fail "build exited non-zero"; return; }
+
+    load_captured_state
+
+    # No config files — postfork config comes from config package,
+    # and prefork config can't be shipped because hash is unresolvable
+    local config_count
+    config_count=$(echo "$CAPTURED_FILES" | grep -c "config_" || true)
+    if [[ "$config_count" -eq 0 ]]; then
+        log_pass
+    else
+        log_fail "Expected 0 config_*.json (unresolvable prefork hash), got ${config_count}"
+    fi
+
+    unset PREFORK_LEGACY_VERSION
+}
+
+################################################################################
+# Tests: Automode metapackages
+################################################################################
+
+test_build_daemon_devnet_automode_deb() {
+    safe_build build_daemon_automode_deb devnet || { log_fail "build exited non-zero"; return; }
+
+    load_captured_state
+    assert_eq "deb name" "mina-devnet-automode" "$CAPTURED_DEB_NAME"
+    assert_control_field "$CAPTURED_CONTROL" "Package" "mina-devnet-automode"
+    assert_control_field "$CAPTURED_CONTROL" "Architecture" "amd64"
+    assert_control_contains "$CAPTURED_CONTROL" "Depends" "mina-devnet-postfork-mesa"
+    assert_control_contains "$CAPTURED_CONTROL" "Depends" "mina-devnet-prefork-mesa"
+    assert_control_contains "$CAPTURED_CONTROL" "Replaces" "mina-devnet"
+    assert_control_contains "$CAPTURED_CONTROL" "Breaks" "mina-devnet"
+    assert_control_contains "$CAPTURED_CONTROL" "Provides" "mina-devnet"
+    assert_control_contains "$CAPTURED_CONTROL" "Conflicts" "mina-devnet"
+
+    # Metapackage should have NO binaries
+    assert_file_not_captured "$CAPTURED_FILES" "usr/local/bin/mina"
+}
+
+test_build_daemon_mainnet_automode_deb() {
+    safe_build build_daemon_automode_deb mainnet || { log_fail "build exited non-zero"; return; }
+
+    load_captured_state
+    assert_eq "deb name" "mina-mainnet-automode" "$CAPTURED_DEB_NAME"
+    assert_control_field "$CAPTURED_CONTROL" "Package" "mina-mainnet-automode"
+    assert_control_field "$CAPTURED_CONTROL" "Architecture" "amd64"
+    assert_control_contains "$CAPTURED_CONTROL" "Depends" "mina-mainnet-postfork-mesa"
+    assert_control_contains "$CAPTURED_CONTROL" "Depends" "mina-mainnet-prefork-mesa"
+    assert_control_contains "$CAPTURED_CONTROL" "Replaces" "mina-mainnet"
+    assert_control_contains "$CAPTURED_CONTROL" "Breaks" "mina-mainnet"
+    assert_control_contains "$CAPTURED_CONTROL" "Provides" "mina-mainnet"
+    assert_control_contains "$CAPTURED_CONTROL" "Conflicts" "mina-mainnet"
+
+    assert_file_not_captured "$CAPTURED_FILES" "usr/local/bin/mina"
+}
+
+################################################################################
 # Tests: Generic packages
 ################################################################################
 
@@ -913,7 +1053,7 @@ test_build_delegation_verify_deb() {
 }
 
 test_build_prefork_devnet_genesis_ledger_deb() {
-    safe_build build_prefork_devnet_genesis_ledger_deb || { log_fail "build exited non-zero"; return; }
+    safe_build build_prefork_genesis_ledger_deb devnet || { log_fail "build exited non-zero"; return; }
 
     load_captured_state
     assert_eq "deb name" "mina-create-devnet-prefork-genesis-ledger" "$CAPTURED_DEB_NAME"
@@ -924,7 +1064,7 @@ test_build_prefork_devnet_genesis_ledger_deb() {
 }
 
 test_build_prefork_mainnet_genesis_ledger_deb() {
-    safe_build build_prefork_mainnet_genesis_ledger_deb || { log_fail "build exited non-zero"; return; }
+    safe_build build_prefork_genesis_ledger_deb mainnet || { log_fail "build exited non-zero"; return; }
 
     load_captured_state
     assert_eq "deb name" "mina-create-mainnet-prefork-genesis-ledger" "$CAPTURED_DEB_NAME"
@@ -1102,6 +1242,16 @@ main() {
     run_test test_build_daemon_devnet_prefork_deb
     run_test test_build_prefork_devnet_genesis_ledger_deb
     run_test test_build_prefork_mainnet_genesis_ledger_deb
+
+    # Postfork packages
+    run_test test_build_daemon_devnet_postfork_deb
+    run_test test_build_daemon_mainnet_postfork_deb
+    run_test test_build_daemon_postfork_deb_without_prefork_version
+    run_test test_build_daemon_postfork_deb_unresolvable_prefork_hash
+
+    # Automode metapackages
+    run_test test_build_daemon_devnet_automode_deb
+    run_test test_build_daemon_mainnet_automode_deb
 
     # Generic packages
     run_test test_build_daemon_devnet_generic_deb

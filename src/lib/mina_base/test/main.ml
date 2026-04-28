@@ -169,6 +169,7 @@ let () =
           ; test_case "Wire embedded in t." `Quick wire_embedded_in_t
           ; test_case "Wire embedded in graphql." `Quick
               wire_embedded_in_graphql
+          ; test_case "Latest zkApp version." `Quick latest_zkapp_version
           ; test_case "JSON roundtrip dummy." `Quick
               Test_derivers.json_roundtrip_dummy
           ; test_case "Full circuit." `Quick Test_derivers.full_circuit

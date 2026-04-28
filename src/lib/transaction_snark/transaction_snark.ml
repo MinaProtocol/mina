@@ -891,8 +891,6 @@ module Make_str (A : Wire_types.Concrete) = struct
           module Permissions = struct
             type controller = Permissions.Auth_required.Checked.t
 
-            type txn_version = Mina_numbers.Txn_version.Checked.t
-
             let edit_state : t -> controller =
              fun a -> a.data.permissions.edit_state
 
@@ -910,9 +908,6 @@ module Make_str (A : Wire_types.Concrete) = struct
 
             let set_verification_key_auth : t -> controller =
              fun a -> fst a.data.permissions.set_verification_key
-
-            let set_verification_key_txn_version : t -> txn_version =
-             fun a -> snd a.data.permissions.set_verification_key
 
             let set_zkapp_uri : t -> controller =
              fun a -> a.data.permissions.set_zkapp_uri
@@ -1064,10 +1059,25 @@ module Make_str (A : Wire_types.Concrete) = struct
           let set_voting_for voting_for ({ data = a; hash } : t) : t =
             { data = { a with voting_for }; hash }
 
+          type txn_version = Mina_numbers.Txn_version.Checked.t
+
+          let txn_version ({ data = a; _ } : t) =
+            snd a.permissions.set_verification_key
+
           let permissions (a : t) = a.data.permissions
 
-          let set_permissions permissions ({ data = a; hash } : t) : t =
+          let set_permissions (permissions : Permissions.t)
+              ({ data = a; hash } : t) : t =
             { data = { a with permissions }; hash }
+
+          let set_txn_version_to_current ({ data = a; hash } : t) : t =
+            let set_verification_key =
+              ( fst a.permissions.set_verification_key
+              , Mina_numbers.Txn_version.current_checked )
+            in
+            let permissions = { a.permissions with set_verification_key } in
+            let data = { a with permissions } in
+            { data; hash }
         end
 
         module Opt = struct
@@ -1473,6 +1483,10 @@ module Make_str (A : Wire_types.Concrete) = struct
             let verification_key_perm_fallback_to_signature_with_older_version =
               Permissions.Auth_required.Checked
               .verification_key_perm_fallback_to_signature_with_older_version
+
+            let access_perm_fallback_to_signature_with_older_version =
+              Permissions.Auth_required.Checked
+              .access_perm_fallback_to_signature_with_older_version
           end
 
           module Txn_version = struct
@@ -3368,7 +3382,7 @@ module Make_str (A : Wire_types.Concrete) = struct
     module type S = sig
       val tag : tag
 
-      val verify : (t * Sok_message.t) list -> unit Or_error.t Async.Deferred.t
+      val verify : t list -> unit Or_error.t Async.Deferred.t
 
       val id : Pickles.Verification_key.Id.t Async.Deferred.t Lazy.t
 
@@ -3551,38 +3565,14 @@ module Make_str (A : Wire_types.Concrete) = struct
           init_stack pending_coinbase_stack_state handler
 
   let verify_impl ~f ts =
-    if
-      List.for_all ts ~f:(fun ((p : Stable.Latest.t), m) ->
-          Sok_message.Digest.equal (Sok_message.digest m) p.data.sok_digest )
-    then
-      f
-        (List.map ts ~f:(fun ({ Proof_carrying_data.data; proof }, _) ->
-             (data, proof) ) )
-    else
-      Async.return
-        (Or_error.error_string
-           "Transaction_snark.verify: Mismatched sok_message" )
+    f
+      (List.map ts
+         ~f:(fun ({ Proof_carrying_data.data; proof } : Stable.Latest.t) ->
+           (data, proof) ) )
 
   let verify ~key =
     verify_impl
       ~f:(Pickles.verify (module Nat.N2) (module Statement.With_sok) key)
-
-  let constraint_system_digests ~signature_kind ~constraint_constants () =
-    let digest = Tick.R1CS_constraint_system.digest in
-    [ ( "transaction-merge"
-      , digest
-          Merge.(
-            Tick.constraint_system ~input_typ:Statement.With_sok.typ
-              ~return_typ:Tick.Typ.unit (fun x ->
-                let open Tick in
-                Checked.map ~f:ignore @@ main x )) )
-    ; ( "transaction-base"
-      , digest
-          Base.(
-            Tick.constraint_system ~input_typ:Statement.With_sok.typ
-              ~return_typ:Tick.Typ.unit
-              (main ~signature_kind ~constraint_constants)) )
-    ]
 
   (** Return the constraint system for the transaction-merge circuit. *)
   let merge_constraint_system () =
@@ -3635,6 +3625,25 @@ module Make_str (A : Wire_types.Concrete) = struct
             ~constraint_constants stmt
         in
         Checked.return () )
+
+  let constraint_system_digests ~signature_kind ~constraint_constants () =
+    let digest = Tick.R1CS_constraint_system.digest in
+    [ ("transaction-merge", digest (merge_constraint_system ()))
+    ; ( "transaction-base"
+      , digest (base_constraint_system ~signature_kind ~constraint_constants) )
+    ; ( "zkapp-opt_signed-opt_signed"
+      , digest
+          (zkapp_opt_signed_opt_signed_constraint_system ~signature_kind
+             ~constraint_constants ) )
+    ; ( "zkapp-opt_signed"
+      , digest
+          (zkapp_opt_signed_constraint_system ~signature_kind
+             ~constraint_constants ) )
+    ; ( "zkapp-proved"
+      , digest
+          (zkapp_proved_constraint_system ~signature_kind ~constraint_constants)
+      )
+    ]
 
   module Account_update_group = Zkapp_command.Make_update_group (struct
     type local_state =
