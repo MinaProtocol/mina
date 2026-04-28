@@ -14,10 +14,6 @@ let Network = ../../Constants/Network.dhall
 
 let Profiles = ../../Constants/Profiles.dhall
 
-let Expr = ../../Pipeline/Expr.dhall
-
-let MainlineBranch = ../../Pipeline/MainlineBranch.dhall
-
 in  Pipeline.build
       ( ArtifactPipelines.pipeline
           ArtifactPipelines.MinaBuildSpec::{
@@ -40,11 +36,5 @@ in  Pipeline.build
           , debVersion = DebianVersions.DebVersion.Bookworm
           , scope =
             [ PipelineScope.Type.MainlineNightly, PipelineScope.Type.Release ]
-          , includeIf =
-            [ Expr.Type.DescendantOf
-                { ancestor = MainlineBranch.Type.Mesa
-                , reason = "Only run on Mesa descendants"
-                }
-            ]
           }
       )
