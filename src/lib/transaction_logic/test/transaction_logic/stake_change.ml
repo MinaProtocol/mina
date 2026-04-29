@@ -142,6 +142,38 @@ let payment_success_receiver_staked_only () =
       check ~name:"payment success receiver staked only" ~expected:(plus amount)
         (measure_stake_change ledger txn) )
 
+(* Payment fail: receiver's receive permission rejects, so the body fails
+   with Update_not_permitted_balance. The fee_payer step (fee debit + nonce
+   bump) has already committed by then, leaving status = Failed. *)
+let payment_fail_sender_staked () =
+  Quickcheck.test ~trials
+    Quickcheck.Generator.(tuple2 gen_pair_and_fee Public_key.Compressed.gen)
+    ~f:(fun ((sender, receiver, fee), validator) ->
+      let amount = Amount.of_mina_int_exn 1 in
+      let ledger = ledger_of [ sender; receiver ] in
+      set_delegate ledger sender.pk (Some validator) ;
+      set_permissions ledger receiver.pk
+        { Permissions.user_default with
+          receive = Permissions.Auth_required.Impossible
+        } ;
+      let txn = signed_command ~sender ~fee (payment_body ~receiver ~amount) in
+      check ~name:"payment fail (receiver receive=Impossible), sender staked"
+        ~expected:(neg (fee_amt fee))
+        (measure_stake_change ledger txn) )
+
+let payment_fail_sender_unstaked () =
+  Quickcheck.test ~trials gen_pair_and_fee ~f:(fun (sender, receiver, fee) ->
+      let amount = Amount.of_mina_int_exn 1 in
+      let ledger = ledger_of [ sender; receiver ] in
+      set_permissions ledger receiver.pk
+        { Permissions.user_default with
+          receive = Permissions.Auth_required.Impossible
+        } ;
+      let txn = signed_command ~sender ~fee (payment_body ~receiver ~amount) in
+      check ~name:"payment fail (receiver receive=Impossible), sender unstaked"
+        ~expected:Amount.Signed.zero
+        (measure_stake_change ledger txn) )
+
 (* ---------------------------------------------------------------- *)
 (* Stake_delegation                                                 *)
 (* ---------------------------------------------------------------- *)
@@ -260,21 +292,6 @@ let delegation_not_permitted_sender_unstaked () =
       check ~name:"delegation not permitted, sender unstaked"
         ~expected:Amount.Signed.zero
         (measure_stake_change ledger txn) )
-
-(* ---------------------------------------------------------------- *)
-(* TODO: deferred coverage-table row                                *)
-(*                                                                  *)
-(* Payment, fail. The coverage-table row is "Payment, fail:         *)
-   (* −fee·fp". A failed payment applies (fee deducted, nonce *)
-(* incremented) but the body amount does not transfer.              *)
-(* Triggering this without having the top-level                     *)
-(* Transaction_logic.apply_transactions return Or_error.Error is    *)
-(* subtle: sub_amount underflow on the fee-deduction path           *)
-(* surfaces as an Or_error.Error, not a Failed user_command.        *)
-(* Needs a failure mode that reliably leaves the fee deducted       *)
-(* and reports a Failed status (e.g. a source-insufficient-body     *)
-(* case guaranteed to pay the fee first).                           *)
-(* ---------------------------------------------------------------- *)
 
 (* ---------------------------------------------------------------- *)
 (* Fee_transfer                                                     *)
