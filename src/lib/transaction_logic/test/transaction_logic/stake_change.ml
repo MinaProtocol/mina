@@ -228,26 +228,52 @@ let delegation_failed_sender_unstaked () =
         ~expected:Amount.Signed.zero
         (measure_stake_change ledger txn) )
 
+(* Not permitted: sender's set_delegate permission rejects signature auth.
+   Status is [Failed Update_not_permitted_delegate], fee is still deducted. *)
+let delegation_not_permitted_sender_staked () =
+  Quickcheck.test ~trials
+    Quickcheck.Generator.(tuple2 gen_pair_and_fee Public_key.Compressed.gen)
+    ~f:(fun ((sender, validator, fee), old_delegate) ->
+      let ledger = ledger_of [ sender; validator ] in
+      set_delegate ledger sender.pk (Some old_delegate) ;
+      set_permissions ledger sender.pk
+        { Permissions.user_default with
+          set_delegate = Permissions.Auth_required.Proof
+        } ;
+      let txn =
+        signed_command ~sender ~fee (delegation_body ~new_delegate:validator.pk)
+      in
+      check ~name:"delegation not permitted, sender staked"
+        ~expected:(neg (fee_amt fee))
+        (measure_stake_change ledger txn) )
+
+let delegation_not_permitted_sender_unstaked () =
+  Quickcheck.test ~trials gen_pair_and_fee ~f:(fun (sender, validator, fee) ->
+      let ledger = ledger_of [ sender; validator ] in
+      set_permissions ledger sender.pk
+        { Permissions.user_default with
+          set_delegate = Permissions.Auth_required.Proof
+        } ;
+      let txn =
+        signed_command ~sender ~fee (delegation_body ~new_delegate:validator.pk)
+      in
+      check ~name:"delegation not permitted, sender unstaked"
+        ~expected:Amount.Signed.zero
+        (measure_stake_change ledger txn) )
+
 (* ---------------------------------------------------------------- *)
-(* TODO: deferred coverage-table rows                               *)
+(* TODO: deferred coverage-table row                                *)
 (*                                                                  *)
-(* 1. Payment, fail. The coverage-table row is "Payment, fail:      *)
-   (*    −fee·fp". A failed payment applies (fee deducted, nonce *)
-(*    incremented) but the body amount does not transfer.           *)
-(*    Triggering this without having the top-level                  *)
-(*    Transaction_logic.apply_transactions return Or_error.Error is *)
-(*    subtle: sub_amount underflow on the fee-deduction path        *)
-(*    surfaces as an Or_error.Error, not a Failed user_command.     *)
-(*    Needs a failure mode that reliably leaves the fee deducted    *)
-(*    and reports a Failed status (e.g. a source-insufficient-body  *)
-(*    case guaranteed to pay the fee first).                        *)
-(*                                                                  *)
-(* 2. Stake_delegation, not permitted. Requires the delegator       *)
-(*    account to have [set_delegate = Proof] (or Both / Impossible) *)
-(*    so that a signed command can't update the delegate field.     *)
-(*    Today's test setup uses default user-account permissions      *)
-(*    (Signature). Adding this means constructing an account with   *)
-(*    a custom Permissions record before inserting into the ledger. *)
+(* Payment, fail. The coverage-table row is "Payment, fail:         *)
+   (* −fee·fp". A failed payment applies (fee deducted, nonce *)
+(* incremented) but the body amount does not transfer.              *)
+(* Triggering this without having the top-level                     *)
+(* Transaction_logic.apply_transactions return Or_error.Error is    *)
+(* subtle: sub_amount underflow on the fee-deduction path           *)
+(* surfaces as an Or_error.Error, not a Failed user_command.        *)
+(* Needs a failure mode that reliably leaves the fee deducted       *)
+(* and reports a Failed status (e.g. a source-insufficient-body     *)
+(* case guaranteed to pay the fee first).                           *)
 (* ---------------------------------------------------------------- *)
 
 (* ---------------------------------------------------------------- *)

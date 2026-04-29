@@ -51,6 +51,12 @@ let () =
               `Quick delegation_failed_sender_staked
           ; test_case "Delegation failed (unknown receiver), sender unstaked"
               `Quick delegation_failed_sender_unstaked
+          ; test_case
+              "Delegation not permitted (set_delegate=Proof), sender staked"
+              `Quick delegation_not_permitted_sender_staked
+          ; test_case
+              "Delegation not permitted (set_delegate=Proof), sender unstaked"
+              `Quick delegation_not_permitted_sender_unstaked
           ; test_case "Fee_transfer one single (staked)" `Quick
               fee_transfer_one_staked
           ; test_case "Fee_transfer one single (unstaked)" `Quick
