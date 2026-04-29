@@ -2478,6 +2478,7 @@ module Make_str (A : Wire_types.Concrete) = struct
       let fee_payer_balance_pre = ref Currency.Balance.(var_of_t zero) in
       let receiver_delegate_pre = ref Public_key.Compressed.(var_of_t empty) in
       let source_delegation_permitted = ref Boolean.false_ in
+      let payment_permitted_ref = ref Boolean.false_ in
       let%bind root_after_fee_payer_update =
         [%with_label_ "Update fee payer"] (fun () ->
             Frozen_ledger_hash.modify_account_send
@@ -2971,6 +2972,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                     ; !receiver_balance_update_permitted
                     ]
                 in
+                payment_permitted_ref := payment_permitted ;
                 let%bind update_account =
                   let%bind delegation_permitted =
                     Boolean.all
@@ -3179,8 +3181,12 @@ module Make_str (A : Wire_types.Concrete) = struct
             in
             let%bind fee_term = fp_staked' *! neg fee_amt in
             let%bind body_term =
+              (* [payment_permitted] already implies [is_payment]; combined
+                 with [¬user_command_fails] this is the gate from the doc's
+                 "Note on payment_permitted". *)
               let%bind payment_active =
-                Boolean.all [ is_payment; Boolean.not user_command_fails ]
+                Boolean.all
+                  [ !payment_permitted_ref; Boolean.not user_command_fails ]
               in
               let%bind body_plus = rcv_staked *! pos amount in
               let%bind body_minus = fp_staked *! neg amount in
