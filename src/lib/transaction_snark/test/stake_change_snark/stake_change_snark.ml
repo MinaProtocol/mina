@@ -60,6 +60,7 @@ let%test_module "stake_change in the transaction SNARK" =
     (* Payment                                                      *)
     (* ------------------------------------------------------------ *)
 
+    (* unstaking_tx_case_1.1 *)
     let%test_unit "Payment success, neither staked" =
       Test_util.with_randomness 1 (fun () ->
           with_ledger_of_wallets ~n:2 (fun ledger wallets ->
@@ -69,6 +70,7 @@ let%test_module "stake_change in the transaction SNARK" =
               in
               U.test_transaction_union ledger (Command (Signed_command txn)) ) )
 
+    (* unstaking_tx_case_1.2 *)
     let%test_unit "Payment success, both staked" =
       Test_util.with_randomness 2 (fun () ->
           with_ledger_of_wallets ~n:3 (fun ledger wallets ->
@@ -83,6 +85,7 @@ let%test_module "stake_change in the transaction SNARK" =
               in
               U.test_transaction_union ledger (Command (Signed_command txn)) ) )
 
+    (* unstaking_tx_case_1.3 *)
     let%test_unit "Payment success, sender staked only" =
       Test_util.with_randomness 3 (fun () ->
           with_ledger_of_wallets ~n:3 (fun ledger wallets ->
@@ -95,6 +98,7 @@ let%test_module "stake_change in the transaction SNARK" =
               in
               U.test_transaction_union ledger (Command (Signed_command txn)) ) )
 
+    (* unstaking_tx_case_1.4 *)
     let%test_unit "Payment success, receiver staked only" =
       Test_util.with_randomness 4 (fun () ->
           with_ledger_of_wallets ~n:3 (fun ledger wallets ->
@@ -111,6 +115,7 @@ let%test_module "stake_change in the transaction SNARK" =
        fails with Update_not_permitted_balance. The fee_payer step has
        already committed by then (fee debited, nonce bumped), leaving
        status = Failed and stake_change = −fee·fp_staked. *)
+    (* unstaking_tx_case_2 *)
     let%test_unit "Payment fail (receiver receive=Impossible), sender staked" =
       Test_util.with_randomness 14 (fun () ->
           with_ledger_of_wallets ~n:3 (fun ledger wallets ->
@@ -132,6 +137,7 @@ let%test_module "stake_change in the transaction SNARK" =
     (* Stake_delegation                                             *)
     (* ------------------------------------------------------------ *)
 
+    (* unstaking_tx_case_3 *)
     let%test_unit "Delegation Some→Some" =
       Test_util.with_randomness 5 (fun () ->
           with_ledger_of_wallets ~n:3 (fun ledger wallets ->
@@ -146,6 +152,7 @@ let%test_module "stake_change in the transaction SNARK" =
               in
               U.test_transaction_union ledger (Command (Signed_command txn)) ) )
 
+    (* unstaking_tx_case_4 *)
     let%test_unit "Delegation Some→None (opt-out)" =
       Test_util.with_randomness 6 (fun () ->
           with_ledger_of_wallets ~n:2 (fun ledger wallets ->
@@ -160,6 +167,7 @@ let%test_module "stake_change in the transaction SNARK" =
               in
               U.test_transaction_union ledger (Command (Signed_command txn)) ) )
 
+    (* unstaking_tx_case_5 *)
     let%test_unit "Delegation None→Some (opt-in)" =
       Test_util.with_randomness 7 (fun () ->
           with_ledger_of_wallets ~n:2 (fun ledger wallets ->
@@ -171,6 +179,7 @@ let%test_module "stake_change in the transaction SNARK" =
               in
               U.test_transaction_union ledger (Command (Signed_command txn)) ) )
 
+    (* unstaking_tx_case_6 *)
     let%test_unit "Delegation None→None" =
       Test_util.with_randomness 8 (fun () ->
           with_ledger_of_wallets ~n:1 (fun ledger wallets ->
@@ -182,6 +191,7 @@ let%test_module "stake_change in the transaction SNARK" =
               in
               U.test_transaction_union ledger (Command (Signed_command txn)) ) )
 
+    (* unstaking_tx_case_8 *)
     let%test_unit "Delegation failed (unknown receiver), delegator staked" =
       Test_util.with_randomness 15 (fun () ->
           with_ledger_of_wallets ~n:2 (fun ledger wallets ->
@@ -198,6 +208,7 @@ let%test_module "stake_change in the transaction SNARK" =
               in
               U.test_transaction_union ledger (Command (Signed_command txn)) ) )
 
+    (* unstaking_tx_case_7 *)
     let%test_unit "Delegation not permitted (set_delegate=Proof)" =
       Test_util.with_randomness 13 (fun () ->
           with_ledger_of_wallets ~n:3 (fun ledger wallets ->
@@ -235,6 +246,7 @@ let%test_module "stake_change in the transaction SNARK" =
       Fee_transfer.Single.create ~receiver_pk:recipient_pk ~fee
         ~fee_token:Token_id.default
 
+    (* unstaking_tx_case_9 *)
     let%test_unit "Fee_transfer one single, staked" =
       Test_util.with_randomness 9 (fun () ->
           with_ledger_of_wallets ~n:2 (fun ledger wallets ->
@@ -251,6 +263,7 @@ let%test_module "stake_change in the transaction SNARK" =
               in
               U.test_transaction_union ledger (Fee_transfer ft) ) )
 
+    (* unstaking_tx_case_10 *)
     let%test_unit "Fee_transfer two singles, only pk1 staked" =
       Test_util.with_randomness 10 (fun () ->
           with_ledger_of_wallets ~n:3 (fun ledger wallets ->
@@ -275,6 +288,7 @@ let%test_module "stake_change in the transaction SNARK" =
 
     let coinbase_amount = Amount.of_mina_int_exn 720
 
+    (* unstaking_tx_case_11 *)
     let%test_unit "Coinbase no fee_transfer, staked" =
       Test_util.with_randomness 11 (fun () ->
           with_ledger_of_wallets ~n:2 (fun ledger wallets ->
@@ -288,6 +302,7 @@ let%test_module "stake_change in the transaction SNARK" =
               in
               U.test_transaction_union ledger (Coinbase cb) ) )
 
+    (* unstaking_tx_case_12 *)
     let%test_unit "Coinbase with fee_transfer, only cb receiver staked" =
       Test_util.with_randomness 12 (fun () ->
           with_ledger_of_wallets ~n:3 (fun ledger wallets ->
