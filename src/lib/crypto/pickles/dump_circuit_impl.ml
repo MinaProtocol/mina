@@ -2166,6 +2166,42 @@ module Wrap_main_for_dump = struct
         max_proofs_verified
     in
     force_main main_lazy
+
+  (* Variant of [build] taking a per-branch [step_domains_log2 : Vector] so
+     fixtures with heterogeneous step domains (e.g. two_phase_chain whose
+     [make_zero] and [increment] step circuits compile to different
+     domain log2s) can exercise wrap_main's per-branch lagrange_with_correction
+     dispatch path (wrap_verifier.ml:429-443) rather than the shared-domain
+     fast path (wrap_verifier.ml:426-428). *)
+  let build_multi_domain
+      (type max_proofs_verified branches)
+      ~(pi_branches : (_, branches) Hlist.Length.t)
+      ~(padded :
+         ((int, branches) Vector.t, max_proofs_verified) Vector.t )
+      ~(step_widths : (int, branches) Vector.t)
+      ~(step_domains_log2 : (int, branches) Vector.t)
+      ~(max_proofs_verified :
+         (module Nat.Add.Intf with type n = max_proofs_verified) ) =
+    let module Maxes = (val Hlist.Maxes.m padded) in
+    let full_signature
+        : (max_proofs_verified, branches, Maxes.ns) Full_signature.t =
+      { Full_signature.padded; maxes = (module Maxes) }
+    in
+    let feature_flags = Kimchi_backend_common.Plonk_types.Features.Full.none in
+    let num_chunks = 1 in
+    let dummy_step_keys = dummy_step_keys (Hlist.Length.to_nat pi_branches) in
+    let step_domains =
+      Promise.return
+        (Vector.map step_domains_log2 ~f:(fun d ->
+             { Import.Domains.h = Pickles_base.Domain.Pow_2_roots_of_unity d } ) )
+    in
+    let srs = Backend.Tick.Keypair.load_urs () in
+    let _, main_lazy =
+      Wrap_main.wrap_main ~num_chunks ~feature_flags ~srs full_signature
+        pi_branches dummy_step_keys step_widths step_domains
+        max_proofs_verified
+    in
+    force_main main_lazy
 end
 
 (* The N1 and N2 fixtures are constructed inline at the dump call site (inside
@@ -4571,6 +4607,43 @@ let run ~output_dir =
     in
     let circuit x () = main_fn (conv x) in
     dump_wrap "wrap_main_tree_proof_return_circuit" circuit ~input_typ:typ
+      ~return_typ:Impls.Wrap.Typ.unit
+  in
+  (* ---- Two_phase_chain wrap circuit (multi-branch, mpvMax=1) ----
+     Two branches: [make_zero] (step_widths=0) and [increment] (step_widths=1).
+     Both share ONE wrap key (multi-branch in one [compile_promise]) — this
+     fixture is the smoking gun for any per-branch lagrange/dispatch
+     divergence between OCaml and PureScript.
+
+     Per-branch step domains: make_zero compiles to step domain 2^9 (tiny:
+     no verify_one machinery), increment to step domain 2^14 (full verify_one
+     for one prev). Sourced from b0_step / b1_step witness [d1_size] headers
+     in dump_two_phase_chain. The two domains DIFFER, so wrap_main goes
+     through the per-branch [lagrange_with_correction] dispatch path
+     (wrap_verifier.ml:429-443), NOT the shared-domain fast path. This
+     distinguishes it from N2 / TPR fixtures where all branches share a
+     single domain.
+
+     [padded] is right-aligned per branch with global max=2 slots:
+     - make_zero (width 0): [0; 0]
+     - increment (width 1): [0; 1] (slot 0 unused, slot 1 holds the prev) *)
+  let () =
+    let open Pickles_types in
+    let (Composition_types.Spec.Wrap_etyp.T (typ, conv, _conv_inv)) =
+      Impls.Wrap.input
+        ~feature_flags:Kimchi_backend_common.Plonk_types.Features.Full.none
+        ()
+    in
+    let main_fn =
+      Wrap_main_for_dump.build_multi_domain
+        ~pi_branches:(Hlist.Length.S (Hlist.Length.S Hlist.Length.Z))
+        ~padded:Vector.[ Vector.[ 0; 0 ]; Vector.[ 0; 1 ] ]
+        ~step_widths:Vector.[ 0; 1 ]
+        ~step_domains_log2:Vector.[ 9; 14 ]
+        ~max_proofs_verified:(module Nat.N2)
+    in
+    let circuit x () = main_fn (conv x) in
+    dump_wrap "wrap_main_two_phase_chain_circuit" circuit ~input_typ:typ
       ~return_typ:Impls.Wrap.Typ.unit
   in
   (* ---- Pseudo module sub-circuits ---- *)
