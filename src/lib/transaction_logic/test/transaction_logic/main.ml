@@ -41,6 +41,12 @@ let () =
               payment_success_sender_staked_only
           ; test_case "Payment success, receiver staked only" `Quick
               payment_success_receiver_staked_only
+          ; test_case
+              "Payment fail (receiver receive=Impossible), sender staked" `Quick
+              payment_fail_sender_staked
+          ; test_case
+              "Payment fail (receiver receive=Impossible), sender unstaked"
+              `Quick payment_fail_sender_unstaked
           ; test_case "Delegation Some→Some" `Quick delegation_some_to_some
           ; test_case "Delegation Some→None (opt-out)" `Quick
               delegation_some_to_none

@@ -107,6 +107,27 @@ let%test_module "stake_change in the transaction SNARK" =
               in
               U.test_transaction_union ledger (Command (Signed_command txn)) ) )
 
+    (* Payment fail: receiver's [receive] permission rejects, so the body
+       fails with Update_not_permitted_balance. The fee_payer step has
+       already committed by then (fee debited, nonce bumped), leaving
+       status = Failed and stake_change = −fee·fp_staked. *)
+    let%test_unit "Payment fail (receiver receive=Impossible), sender staked" =
+      Test_util.with_randomness 14 (fun () ->
+          with_ledger_of_wallets ~n:3 (fun ledger wallets ->
+              let sender_pk = wallets.(0).account.public_key in
+              let receiver_pk = wallets.(1).account.public_key in
+              let validator_pk = wallets.(2).account.public_key in
+              set_delegate ledger sender_pk (Some validator_pk) ;
+              set_permissions ledger receiver_pk
+                { Permissions.user_default with
+                  receive = Permissions.Auth_required.Impossible
+                } ;
+              let txn =
+                U.Wallet.user_command_with_wallet wallets ~sender:0 ~receiver:1
+                  8_000_000_000 fee Account.Nonce.zero memo
+              in
+              U.test_transaction_union ledger (Command (Signed_command txn)) ) )
+
     (* ------------------------------------------------------------ *)
     (* Stake_delegation                                             *)
     (* ------------------------------------------------------------ *)
