@@ -31,6 +31,14 @@ let%test_module "stake_change in the transaction SNARK" =
       let acc = Option.value_exn (Ledger.get ledger loc) in
       Ledger.set ledger loc { acc with delegate = new_delegate }
 
+    (* Overwrite an existing account's permissions field. Panics if the
+       account isn't in the ledger. *)
+    let set_permissions ledger pk new_permissions =
+      let acc_id = Account_id.create pk Token_id.default in
+      let loc = Option.value_exn (Ledger.location_of_account ledger acc_id) in
+      let acc = Option.value_exn (Ledger.get ledger loc) in
+      Ledger.set ledger loc { acc with permissions = new_permissions }
+
     let memo =
       Signed_command_memo.create_by_digesting_string_exn
         (Test_util.arbitrary_string
@@ -153,21 +161,33 @@ let%test_module "stake_change in the transaction SNARK" =
               in
               U.test_transaction_union ledger (Command (Signed_command txn)) ) )
 
+    let%test_unit "Delegation not permitted (set_delegate=Proof)" =
+      Test_util.with_randomness 13 (fun () ->
+          with_ledger_of_wallets ~n:3 (fun ledger wallets ->
+              let delegator = wallets.(0) in
+              let old_delegate_pk = wallets.(1).account.public_key in
+              let new_delegate_pk = wallets.(2).account.public_key in
+              set_delegate ledger delegator.account.public_key
+                (Some old_delegate_pk) ;
+              set_permissions ledger delegator.account.public_key
+                { Permissions.user_default with
+                  set_delegate = Permissions.Auth_required.Proof
+                } ;
+              let txn =
+                U.Wallet.stake_delegation ~fee_payer:delegator
+                  ~delegate_pk:new_delegate_pk fee Account.Nonce.zero memo
+              in
+              U.test_transaction_union ledger (Command (Signed_command txn)) ) )
+
     (* ------------------------------------------------------------ *)
-    (* TODO: deferred coverage-table rows                           *)
+    (* TODO: deferred coverage-table row                            *)
     (*                                                              *)
-    (* 1. Payment, fail. The row's formula is −fee·fp. A failed     *)
-    (*    payment applies (fee deducted, nonce incremented) but     *)
-    (*    body does not transfer. In the SNARK path we'd need to    *)
-    (*    construct a tx that fails via the user_command_failure    *)
-    (*    channel rather than causing apply_transactions itself to  *)
-    (*    error out — see the same TODO in the unchecked tests.     *)
-    (*                                                              *)
-    (* 2. Stake_delegation, not permitted. Requires a delegator     *)
-    (*    account with set_delegate = Proof/Both/Impossible. Today  *)
-    (*    the wallets built by U.Wallet.random_wallets use default  *)
-    (*    user permissions. Adding this means creating the account  *)
-    (*    with a custom Permissions record before inserting.        *)
+    (* Payment, fail. The row's formula is −fee·fp. A failed        *)
+    (* payment applies (fee deducted, nonce incremented) but        *)
+    (* body does not transfer. In the SNARK path we'd need to       *)
+    (* construct a tx that fails via the user_command_failure       *)
+    (* channel rather than causing apply_transactions itself to     *)
+    (* error out — see the same TODO in the unchecked tests.        *)
     (* ------------------------------------------------------------ *)
 
     (* ------------------------------------------------------------ *)
