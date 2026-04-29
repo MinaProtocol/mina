@@ -217,20 +217,25 @@ expression above (`user_cmd_delta` or `internal_delta`) specialized to that
 row's encoding — substitute the encoded values into the reduced form, drop
 zero terms, and you get the cell shown.
 
-| Tag                                    | `fee_payer` slot       | `receiver` slot        | `fee`    | `body.amount`   | `receiver_increase` | Reduced form collapses to                                     |
-|----------------------------------------|------------------------|------------------------|----------|-----------------|---------------------|---------------------------------------------------------------|
-| Payment, success                       | sender                 | payee                  | `fee`    | amount          | amount              | `−fee·fp_staked + amount·(rcv_staked − fp_staked)`            |
-| Payment, fail                          | sender                 | payee                  | `fee`    | amount          | amount              | `−fee·fp_staked`                                              |
-| Stake_delegation, Some→Some            | delegator              | new delegate           | `fee`    | `0`             | `0`                 | `−fee`                                                        |
-| Stake_delegation, Some→None (opt-out)  | delegator              | `empty_pk`             | `fee`    | `0`             | `0`                 | `−fp_bal`                                                     |
-| Stake_delegation, None→Some (opt-in)   | delegator              | new delegate           | `fee`    | `0`             | `0`                 | `fp_bal − fee`                                                |
-| Stake_delegation, None→None            | delegator              | `empty_pk`             | `fee`    | `0`             | `0`                 | `0`                                                           |
-| Stake_delegation, not permitted        | delegator              | anything               | `fee`    | `0`             | `0`                 | `−fee·fp_staked` [^delegate-fail]                             |
-| Stake_delegation, failed               | delegator              | anything               | `fee`    | `0`             | `0`                 | `−fee·fp_staked` [^delegate-fail]                             |
-| Fee_transfer, one single               | `fee_payer ≡ receiver` | `fee_payer ≡ receiver` | `0`      | `fee`           | `fee`               | `fee·rcv_staked`                                              |
-| Fee_transfer, two singles              | `pk₂` [^fp-slot]       | `pk₁`                  | `fee₂` [^fee-credit] | `fee₁`          | `fee₁`              | `fee₂·fp_staked + fee₁·rcv_staked`                            |
-| Coinbase, no fee_transfer              | block producer         | block producer         | `0`      | `full`          | `full`              | `full_coinbase · rcv_staked`                                  |
-| Coinbase, with fee_transfer            | snark worker [^fp-slot] | block producer        | `ft_fee` [^fee-credit] | `full`          | `full − ft_fee`     | `ft_fee·fp_staked + (full − ft_fee)·rcv_staked`               |
+The `#` column is the row number. Tests for each row are tagged
+`(* unstaking_tx_case_<#>[.<sub>] *)` in
+`src/lib/transaction_logic/test/transaction_logic/stake_change.ml` and
+`src/lib/transaction_snark/test/stake_change_snark/stake_change_snark.ml`.
+
+| #  | Tag                                    | `fee_payer` slot       | `receiver` slot        | `fee`    | `body.amount`   | `receiver_increase` | Reduced form collapses to                                     |
+|----|----------------------------------------|------------------------|------------------------|----------|-----------------|---------------------|---------------------------------------------------------------|
+| 1  | Payment, success                       | sender                 | payee                  | `fee`    | amount          | amount              | `−fee·fp_staked + amount·(rcv_staked − fp_staked)`            |
+| 2  | Payment, fail                          | sender                 | payee                  | `fee`    | amount          | amount              | `−fee·fp_staked`                                              |
+| 3  | Stake_delegation, Some→Some            | delegator              | new delegate           | `fee`    | `0`             | `0`                 | `−fee`                                                        |
+| 4  | Stake_delegation, Some→None (opt-out)  | delegator              | `empty_pk`             | `fee`    | `0`             | `0`                 | `−fp_bal`                                                     |
+| 5  | Stake_delegation, None→Some (opt-in)   | delegator              | new delegate           | `fee`    | `0`             | `0`                 | `fp_bal − fee`                                                |
+| 6  | Stake_delegation, None→None            | delegator              | `empty_pk`             | `fee`    | `0`             | `0`                 | `0`                                                           |
+| 7  | Stake_delegation, not permitted        | delegator              | anything               | `fee`    | `0`             | `0`                 | `−fee·fp_staked` [^delegate-fail]                             |
+| 8  | Stake_delegation, failed               | delegator              | anything               | `fee`    | `0`             | `0`                 | `−fee·fp_staked` [^delegate-fail]                             |
+| 9  | Fee_transfer, one single               | `fee_payer ≡ receiver` | `fee_payer ≡ receiver` | `0`      | `fee`           | `fee`               | `fee·rcv_staked`                                              |
+| 10 | Fee_transfer, two singles              | `pk₂` [^fp-slot]       | `pk₁`                  | `fee₂` [^fee-credit] | `fee₁`          | `fee₁`              | `fee₂·fp_staked + fee₁·rcv_staked`                            |
+| 11 | Coinbase, no fee_transfer              | block producer         | block producer         | `0`      | `full`          | `full`              | `full_coinbase · rcv_staked`                                  |
+| 12 | Coinbase, with fee_transfer            | snark worker [^fp-slot] | block producer        | `ft_fee` [^fee-credit] | `full`          | `full − ft_fee`     | `ft_fee·fp_staked + (full − ft_fee)·rcv_staked`               |
 
 [^fp-slot]: For internal commands, `Transaction_union` reuses the
     `fee_payer_pk` field as a generic account slot — it is *not* a real fee
