@@ -24,7 +24,7 @@ before the tx; `fp_bal'` is the same account's balance after the tx.
 
 ## Preconditions
 
-- **Signed command invariant**: `fee_payer == source` is unconditionally
+- **User command invariant**: `fee_payer == source` is unconditionally
   asserted by the circuit (`transaction_snark.ml:2339`). A transaction where
   they differ is rejected outright — it's not "marked failed", it simply
   fails to prove. All formulas below assume this.
@@ -46,7 +46,8 @@ delegate unchanged), so the sum over the whole ledger reduces to the sum
 over touched accounts.
 
 For non-zkApp tags, `A(tx) = {fee_payer, receiver}` (possibly identical — see
-encoding notes below).
+encoding notes below). The two-slot encoding is set up by
+`Transaction_union.of_transaction` (`transaction_union.ml:32`).
 
 ## Variables
 
@@ -75,6 +76,23 @@ reject signature-only auth — e.g. `set_delegate = Proof`, `Both`, or
 deducted, nonce incremented) but the delegate change is silently rejected.
 In-circuit check: `permitted_to_update_delegate` at
 `transaction_snark.ml:2945`.
+
+The "partial success" comes from these circuit sites running
+unconditionally for any user command, regardless of the auth check:
+
+- Fee debit: `transaction_snark.ml:2576` — sign is negative for user
+  commands.
+- Nonce increment: `transaction_snark.ml:2496` —
+  `Account.Nonce.Checked.succ_if account.nonce is_user_command`.
+
+The delegate write is gated. The auth check is computed at
+`transaction_snark.ml:2954-2957` (`permitted_to_update_delegate`) and folded
+into `update_account` at `transaction_snark.ml:2974-2988`. The actual
+delegate assignment at `transaction_snark.ml:3041-3047` only fires when
+`is_stake_delegation && update_account` is true — otherwise the new
+delegate value falls through to `account.delegate` (no-op write). Our
+`stake_change` formula tracks this via the `source_delegation_permitted`
+factor.
 
 ### Derived: `fp_staked'`
 
@@ -108,10 +126,10 @@ stake_change =
 
 Balance transitions by tag family:
 
-| Family         | `fp_bal'`                                       | `rcv_bal' − rcv_bal`               |
-|----------------|-------------------------------------------------|------------------------------------|
-| User command   | `fp_bal − fee − (is_payment ∧ ¬fails) · amount` | `(is_payment ∧ ¬fails) · amount`   |
-| Internal       | `fp_bal + fee`                                  | `receiver_increase`                |
+| Family         | `fp_bal'`                                                        | `rcv_bal' − rcv_bal`               |
+|----------------|------------------------------------------------------------------|------------------------------------|
+| User command   | `fp_bal − fee − (is_payment ∧ ¬fails) · amount`                  | `(is_payment ∧ ¬fails) · amount`   |
+| Internal       | `fp_bal + fee` [^fp-slot] [^fee-credit]                          | `receiver_increase`                |
 
 For user commands `fp_staked'` can differ from `fp_staked` (see derivation
 above). For internal commands `fp_staked' = fp_staked`.
@@ -126,13 +144,13 @@ Cancel the `fp_bal · fp_staked` terms (where applicable) and split on
 `is_user_command`.
 
 ```
-stake_change = is_user_command ? signed_cmd_delta : internal_delta
+stake_change = is_user_command ? user_cmd_delta : internal_delta
 ```
 
-### Signed command (Payment or Stake_delegation)
+### User command (Payment or Stake_delegation)
 
 ```
-signed_cmd_delta =
+user_cmd_delta =
       fp_bal · (fp_staked' − fp_staked)                                -- delegate transition
     − fee    · fp_staked'                                              -- fee always deducted
     + (is_payment ∧ ¬user_command_fails)                               -- payment body
@@ -162,8 +180,10 @@ fee_transfer), `fee = 0` and the encoding below disarms the double credit.
 
 The `fee_payer`, `receiver`, `fee`, `body.amount`, and `receiver_increase`
 columns show how each tag is encoded by `Transaction_union.of_transaction`
-(see `src/lib/transaction/transaction_union.ml`). The final column shows the
-reduced-form expression collapsed to its operative terms.
+(see `transaction_union.ml`). The final column is the reduced-form
+expression above (`user_cmd_delta` or `internal_delta`) specialized to that
+row's encoding — substitute the encoded values into the reduced form, drop
+zero terms, and you get the cell shown.
 
 | Tag                                    | `fee_payer` slot       | `receiver` slot        | `fee`    | `body.amount`   | `receiver_increase` | Reduced form collapses to                                     |
 |----------------------------------------|------------------------|------------------------|----------|-----------------|---------------------|---------------------------------------------------------------|
@@ -173,12 +193,39 @@ reduced-form expression collapsed to its operative terms.
 | Stake_delegation, Some→None (opt-out)  | delegator              | `empty_pk`             | `fee`    | `0`             | `0`                 | `−fp_bal`                                                     |
 | Stake_delegation, None→Some (opt-in)   | delegator              | new delegate           | `fee`    | `0`             | `0`                 | `fp_bal − fee`                                                |
 | Stake_delegation, None→None            | delegator              | `empty_pk`             | `fee`    | `0`             | `0`                 | `0`                                                           |
-| Stake_delegation, not permitted        | delegator              | anything               | `fee`    | `0`             | `0`                 | `−fee·fp_staked`                                              |
-| Stake_delegation, failed               | delegator              | anything               | `fee`    | `0`             | `0`                 | `−fee·fp_staked`                                              |
+| Stake_delegation, not permitted        | delegator              | anything               | `fee`    | `0`             | `0`                 | `−fee·fp_staked` [^delegate-fail]                             |
+| Stake_delegation, failed               | delegator              | anything               | `fee`    | `0`             | `0`                 | `−fee·fp_staked` [^delegate-fail]                             |
 | Fee_transfer, one single               | `fee_payer ≡ receiver` | `fee_payer ≡ receiver` | `0`      | `fee`           | `fee`               | `fee·rcv_staked`                                              |
-| Fee_transfer, two singles              | `pk₂`                  | `pk₁`                  | `fee₂`   | `fee₁`          | `fee₁`              | `fee₂·fp_staked + fee₁·rcv_staked`                            |
-| Coinbase, no fee_transfer              | `fee_payer ≡ receiver` | `fee_payer ≡ receiver` | `0`      | `full`          | `full`              | `full_coinbase · rcv_staked`                                  |
-| Coinbase, with fee_transfer            | ft recipient           | coinbase receiver      | `ft_fee` | `full`          | `full − ft_fee`     | `ft_fee·fp_staked + (full − ft_fee)·rcv_staked`               |
+| Fee_transfer, two singles              | `pk₂` [^fp-slot]       | `pk₁`                  | `fee₂` [^fee-credit] | `fee₁`          | `fee₁`              | `fee₂·fp_staked + fee₁·rcv_staked`                            |
+| Coinbase, no fee_transfer              | block producer         | block producer         | `0`      | `full`          | `full`              | `full_coinbase · rcv_staked`                                  |
+| Coinbase, with fee_transfer            | snark worker [^fp-slot] | block producer        | `ft_fee` [^fee-credit] | `full`          | `full − ft_fee`     | `ft_fee·fp_staked + (full − ft_fee)·rcv_staked`               |
+
+[^fp-slot]: For internal commands, `Transaction_union` reuses the
+    `fee_payer_pk` field as a generic account slot — it is *not* a real fee
+    payer. See `Transaction_union.of_transaction`: the Coinbase-with-ft
+    mapping at `transaction_union.ml:41-67` puts the snark worker in
+    `fee_payer_pk`/`source_pk` and the block producer in `receiver_pk`; the
+    Fee_transfer two-singles mapping at `transaction_union.ml:68-91` puts
+    `pk₂` in `fee_payer_pk` and `pk₁` in `receiver_pk`. The whole encoding
+    is documented at `transaction_union.ml:23-31`.
+
+[^fee-credit]: For internal commands the apply logic *credits* (rather than
+    debits) the fp slot by `fee`. The sign is flipped at
+    `transaction_snark.ml:2576`:
+    ```ocaml
+    let sgn = Sgn.Checked.neg_if_true is_user_command in
+    Amount.Signed.create_var ~magnitude:(Amount.Checked.of_fee fee) ~sgn
+    ```
+    With `is_user_command = false`, the sign is positive — so an
+    internal-command row's reduced form can have a `+ fee · fp_staked` term
+    despite the slot being called "fee_payer".
+
+[^delegate-fail]: For failed or not-permitted stake_delegations, the
+    delegate write is a no-op so `fp_staked' = fp_staked`. The only
+    stake_change comes from debiting `fee` from a (possibly) staked
+    `fp_bal`. Hence `−fee·fp_staked` collapses all four delegation
+    sub-cases (None→Some, Some→Some, Some→None, None→None) into a single
+    formula: `0` when fp wasn't staked to begin with, `−fee` when it was.
 
 ### Why the encoding tricks work
 
