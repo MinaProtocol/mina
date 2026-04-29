@@ -58,6 +58,7 @@ encoding notes below). The two-slot encoding is set up by
 | `is_stake_delegation`         | `1` for Stake_delegation; `0` otherwise.                                                           |
 | `user_command_fails`          | `1` if a user command failed to apply (fee is still deducted); `0` otherwise.                      |
 | `source_delegation_permitted` | `1` iff the fee_payer's `set_delegate` permission accepts signature auth. See note below.          |
+| `payment_permitted`           | `1` iff the body actually transferred funds — i.e., source's `access`/`send` and receiver's `access`/`receive` permissions all allow it. See note below. |
 | `fp_staked`  / `fp_staked'`   | Is `fee_payer.delegate` set, before / after the tx.                                                |
 | `fp_bal`     / `fp_bal'`      | `fee_payer.balance`, before / after the tx.                                                        |
 | `rcv_staked`                  | Is `receiver.delegate` set. No non-zkApp tag touches it, so pre = post.                            |
@@ -94,6 +95,34 @@ delegate value falls through to `account.delegate` (no-op write). Our
 `stake_change` formula tracks this via the `source_delegation_permitted`
 factor.
 
+### Note on `payment_permitted`
+
+Distinct from `user_command_fails`. A signed payment can fail to transfer
+funds because the source account's `send` permission rejects signature
+auth (or `access` rejects), or because the receiver account's `receive`
+permission rejects None_given auth (or `access` rejects). In any of those
+cases the unchecked status is `Failed [Update_not_permitted_balance]` —
+fee deducted, nonce incremented, body amount stays in source.
+
+The circuit handles "did the body actually transfer?" via two parallel
+mechanisms:
+
+1. **Permission gates** (catch permission rejections). Source's amount
+   debit is gated by `payment_permitted` at `transaction_snark.ml:2992`;
+   receiver's update is gated by `permitted_to_receive` at
+   `transaction_snark.ml:2870`. So when permissions reject, no balance
+   change happens at all.
+2. **Root rollback** (catch the 8 strict failures in
+   `User_command_failure.t` — e.g. `amount_insufficient_to_create`,
+   receiver overflow). Source/receiver are tentatively updated, then
+   rolled back via the `final_root` reset at `transaction_snark.ml:3213`
+   when `user_command_fails`.
+
+Consequence: `user_command_fails` does *not* mean "the unchecked status
+was Failed"; it means "one of the 8 strict failure modes fired". To
+answer "did the body amount actually move?" we need *both* gates:
+`payment_permitted ∧ ¬user_command_fails`.
+
 ### Derived: `fp_staked'`
 
 Equal to `fp_staked` unless the transaction writes the delegate field. When
@@ -126,10 +155,10 @@ stake_change =
 
 Balance transitions by tag family:
 
-| Family         | `fp_bal'`                                                        | `rcv_bal' − rcv_bal`               |
-|----------------|------------------------------------------------------------------|------------------------------------|
-| User command   | `fp_bal − fee − (is_payment ∧ ¬fails) · amount`                  | `(is_payment ∧ ¬fails) · amount`   |
-| Internal       | `fp_bal + fee` [^fp-slot] [^fee-credit]                          | `receiver_increase`                |
+| Family         | `fp_bal'`                                                                       | `rcv_bal' − rcv_bal`                                |
+|----------------|---------------------------------------------------------------------------------|-----------------------------------------------------|
+| User command   | `fp_bal − fee − (payment_permitted ∧ ¬user_command_fails) · amount`             | `(payment_permitted ∧ ¬user_command_fails) · amount` |
+| Internal       | `fp_bal + fee` [^fp-slot] [^fee-credit]                                         | `receiver_increase`                                 |
 
 For user commands `fp_staked'` can differ from `fp_staked` (see derivation
 above). For internal commands `fp_staked' = fp_staked`.
@@ -153,7 +182,7 @@ stake_change = is_user_command ? user_cmd_delta : internal_delta
 user_cmd_delta =
       fp_bal · (fp_staked' − fp_staked)                                -- delegate transition
     − fee    · fp_staked'                                              -- fee always deducted
-    + (is_payment ∧ ¬user_command_fails)                               -- payment body
+    + (payment_permitted ∧ ¬user_command_fails)                        -- payment body
         · payload.body.amount · (rcv_staked − fp_staked)
 ```
 
@@ -161,7 +190,10 @@ Three pieces: a **delegate transition** term (zero for payments and for
 failed/not-permitted delegations), a **fee deduction** term (always present
 for user commands, gated on the *post-tx* staked state so it cancels the
 transition term correctly when opting out), and a **payment body** term
-(only active when the tx is a successful payment).
+(only active when the body actually moved funds — see the note on
+`payment_permitted` for why both gates are required). Note that
+`payment_permitted` already implies `is_payment`, so we don't need a
+separate `is_payment` factor.
 
 ### Internal command (Fee_transfer or Coinbase)
 

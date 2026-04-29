@@ -27,13 +27,16 @@ module F = Snark_params.Tick.Field
 
 let n_samples = 100
 
-(** The 8 discrete spec variables, as fed to [expanded] / [reduced]. *)
+(** The 9 discrete spec variables, as fed to [expanded] / [reduced]. *)
 type bools =
   { is_user_command : bool
   ; is_payment : bool
   ; is_stake_delegation : bool
   ; user_command_fails : bool
   ; source_delegation_permitted : bool
+  ; payment_permitted : bool
+        (** [1] iff the body actually transferred funds — both source and
+            receiver permissions allowed it. Implies [is_payment]. *)
   ; fp_staked : bool
   ; rcv_staked : bool
   ; set_to_unstaked : bool
@@ -58,17 +61,19 @@ let writes_delegate_field (b : bools) =
 let fp_staked' (b : bools) =
   if writes_delegate_field b then not b.set_to_unstaked else b.fp_staked
 
+(** A payment body actually moves funds iff permissions allowed it AND none
+    of the 8 strict failure modes fired. See doc's "Note on
+    [payment_permitted]" for why both gates are required. *)
+let payment_active (b : bools) = b.payment_permitted && not b.user_command_fails
+
 let fp_bal_post (b : bools) (n : nums) =
   if b.is_user_command then
-    let payment_active = b.is_payment && not b.user_command_fails in
-    let payment_amount = if payment_active then n.body_amount else F.zero in
+    let payment_amount = if payment_active b then n.body_amount else F.zero in
     F.(n.fp_bal - n.fee - payment_amount)
   else F.(n.fp_bal + n.fee)
 
 let rcv_bal_delta (b : bools) (n : nums) =
-  if b.is_user_command then
-    let payment_active = b.is_payment && not b.user_command_fails in
-    if payment_active then n.body_amount else F.zero
+  if b.is_user_command then if payment_active b then n.body_amount else F.zero
   else n.receiver_increase
 
 let expanded (b : bools) (n : nums) =
@@ -86,9 +91,7 @@ let reduced (b : bools) (n : nums) =
     let transition = F.(n.fp_bal * (fp_s' - fp_s)) in
     let fee_term = F.(negate (n.fee * fp_s')) in
     let body_term =
-      if b.is_payment && not b.user_command_fails then
-        F.(n.body_amount * (rcv_s - fp_s))
-      else F.zero
+      if payment_active b then F.(n.body_amount * (rcv_s - fp_s)) else F.zero
     in
     F.(transition + fee_term + body_term)
   else F.((n.fee * fp_s) + (n.receiver_increase * rcv_s))
@@ -97,6 +100,7 @@ let reduced (b : bools) (n : nums) =
     combinations are unrepresentable. *)
 type scenario =
   | Payment of { success : bool; fp_staked : bool; rcv_staked : bool }
+  | Payment_not_permitted of { fp_staked : bool; rcv_staked : bool }
   | Delegation_SS of { rcv_staked : bool }
   | Delegation_SN of { rcv_staked : bool }
   | Delegation_NS of { rcv_staked : bool }
@@ -122,6 +126,7 @@ let materialize (s : scenario) (raw : nums) : concrete =
     ; is_stake_delegation = true
     ; user_command_fails = fails
     ; source_delegation_permitted = permitted
+    ; payment_permitted = false
     ; fp_staked
     ; rcv_staked
     ; set_to_unstaked
@@ -133,6 +138,7 @@ let materialize (s : scenario) (raw : nums) : concrete =
     ; is_stake_delegation = false
     ; user_command_fails = false
     ; source_delegation_permitted = false
+    ; payment_permitted = false
     ; fp_staked
     ; rcv_staked
     ; set_to_unstaked = false
@@ -143,12 +149,34 @@ let materialize (s : scenario) (raw : nums) : concrete =
   in
   match s with
   | Payment { success; fp_staked; rcv_staked } ->
+      (* [success = false] models the "8 strict failures" path
+         (e.g., amount_insufficient_to_create), where permissions are fine
+         but [user_command_fails = true] triggers the root rollback. *)
       { bools =
           { is_user_command = true
           ; is_payment = true
           ; is_stake_delegation = false
           ; user_command_fails = not success
           ; source_delegation_permitted = false
+          ; payment_permitted = true
+          ; fp_staked
+          ; rcv_staked
+          ; set_to_unstaked = false
+          }
+      ; nums = { raw with receiver_increase = raw.body_amount }
+      }
+  | Payment_not_permitted { fp_staked; rcv_staked } ->
+      (* Permission-rejection path: source/receiver permissions reject, so
+         [payment_permitted = false]. The unchecked status is
+         Failed [Update_not_permitted_balance], but [user_command_fails]
+         (the strict-failures predicate) is false. *)
+      { bools =
+          { is_user_command = true
+          ; is_payment = true
+          ; is_stake_delegation = false
+          ; user_command_fails = false
+          ; source_delegation_permitted = false
+          ; payment_permitted = false
           ; fp_staked
           ; rcv_staked
           ; set_to_unstaked = false
@@ -218,7 +246,7 @@ let materialize (s : scenario) (raw : nums) : concrete =
 let per_row_formula (s : scenario) ({ fp_bal; fee; body_amount; _ } : nums) :
     F.t =
   let scenario_fp_staked = function
-    | Payment { fp_staked; _ } ->
+    | Payment { fp_staked; _ } | Payment_not_permitted { fp_staked; _ } ->
         fp_staked
     | Delegation_SS _ | Delegation_SN _ ->
         true
@@ -234,6 +262,7 @@ let per_row_formula (s : scenario) ({ fp_bal; fee; body_amount; _ } : nums) :
   in
   let scenario_rcv_staked = function
     | Payment { rcv_staked; _ }
+    | Payment_not_permitted { rcv_staked; _ }
     | Delegation_SS { rcv_staked }
     | Delegation_SN { rcv_staked }
     | Delegation_NS { rcv_staked }
@@ -251,7 +280,7 @@ let per_row_formula (s : scenario) ({ fp_bal; fee; body_amount; _ } : nums) :
   match s with
   | Payment { success = true; _ } ->
       F.(negate (fee * fp_staked) + (body_amount * (rcv_staked - fp_staked)))
-  | Payment { success = false; _ } ->
+  | Payment { success = false; _ } | Payment_not_permitted _ ->
       F.(negate (fee * fp_staked))
   | Delegation_SS _ ->
       F.negate fee
@@ -281,6 +310,9 @@ let all_scenarios : scenario list =
           each (fun fp_staked ->
               each (fun rcv_staked ->
                   [ Payment { success; fp_staked; rcv_staked } ] ) ) )
+    ; each (fun fp_staked ->
+          each (fun rcv_staked ->
+              [ Payment_not_permitted { fp_staked; rcv_staked } ] ) )
     ; each (fun rcv_staked -> [ Delegation_SS { rcv_staked } ])
     ; each (fun rcv_staked -> [ Delegation_SN { rcv_staked } ])
     ; each (fun rcv_staked -> [ Delegation_NS { rcv_staked } ])
