@@ -182,6 +182,22 @@ let%test_module "stake_change in the transaction SNARK" =
               in
               U.test_transaction_union ledger (Command (Signed_command txn)) ) )
 
+    let%test_unit "Delegation failed (unknown receiver), delegator staked" =
+      Test_util.with_randomness 15 (fun () ->
+          with_ledger_of_wallets ~n:2 (fun ledger wallets ->
+              let delegator = wallets.(0) in
+              let old_delegate_pk = wallets.(1).account.public_key in
+              let unknown_pk =
+                Quickcheck.random_value Public_key.Compressed.gen
+              in
+              set_delegate ledger delegator.account.public_key
+                (Some old_delegate_pk) ;
+              let txn =
+                U.Wallet.stake_delegation ~fee_payer:delegator
+                  ~delegate_pk:unknown_pk fee Account.Nonce.zero memo
+              in
+              U.test_transaction_union ledger (Command (Signed_command txn)) ) )
+
     let%test_unit "Delegation not permitted (set_delegate=Proof)" =
       Test_util.with_randomness 13 (fun () ->
           with_ledger_of_wallets ~n:3 (fun ledger wallets ->
