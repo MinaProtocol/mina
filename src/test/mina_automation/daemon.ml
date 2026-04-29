@@ -200,27 +200,44 @@ let wait_for_node_init ?(initial_delay_sec = 2.) ?(poll_interval_sec = 5.)
   in
   Async.printf "Waiting initial %.0f s. before polling GraphQL for node init\n"
     initial_delay_sec ;
-  Mina_graphql_client.Client.poll_filtered_log_entries ~initial_delay_sec
-    ~poll_interval_sec ~timeout_sec
-    ~on_entries:(fun entries ->
-      if
-        Array.exists entries
-          ~f:(entry_has_event_id ~event_id:expected_init_event_id)
-      then (
-        Async.printf "Node initialization detected via GraphQL\n" ;
-        Deferred.return `Stop )
-      else (
-        if Array.length entries > 0 then
-          Async.printf
-            "Received %d log entries but none matched expected init event, \
-             continuing...\n"
-            (Array.length entries) ;
-        Deferred.return `Continue ) )
-    ~on_error:(fun e ->
-      Async.printf "GraphQL not ready (%s), retrying...\n"
-        (Error.to_string_hum e) ;
-      Deferred.return `Continue )
-    node_uri
+  let poll =
+    Mina_graphql_client.Client.poll_filtered_log_entries ~initial_delay_sec
+      ~poll_interval_sec ~timeout_sec
+      ~on_entries:(fun entries ->
+        if
+          Array.exists entries
+            ~f:(entry_has_event_id ~event_id:expected_init_event_id)
+        then (
+          Async.printf "Node initialization detected via GraphQL\n" ;
+          Deferred.return `Stop )
+        else (
+          if Array.length entries > 0 then
+            Async.printf
+              "Received %d log entries but none matched expected init event, \
+               continuing...\n"
+              (Array.length entries) ;
+          Deferred.return `Continue ) )
+      ~on_error:(fun e ->
+        Async.printf "GraphQL not ready (%s), retrying...\n"
+          (Error.to_string_hum e) ;
+        Deferred.return `Continue )
+      node_uri
+  in
+  let process_exited =
+    let%map status = Async.Process.wait process.process in
+    let exit_msg =
+      match status with
+      | Ok () ->
+          "exit code 0"
+      | Error (`Exit_non_zero code) ->
+          sprintf "exit code %d" code
+      | Error (`Signal signal) ->
+          sprintf "signal %s" (Signal.to_string signal)
+    in
+    Error (Error.of_string (sprintf "Daemon process exited (%s)" exit_msg))
+  in
+  Deferred.choose
+    [ Deferred.choice poll Fn.id; Deferred.choice process_exited Fn.id ]
 
 let archive_blocks t ~archive_address ~format blocks =
   let format_arg =
