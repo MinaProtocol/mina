@@ -174,4 +174,17 @@ let () =
   Or_error.ok_exn
     (Promise.block_on_async_exn (fun () ->
          Proof.verify_promise [ (Tick.Field.(of_int 2), b2) ] ) ) ;
-  Pickles.Pickles_trace.string "two_phase_chain.end" "increment_b2_verified"
+  Pickles.Pickles_trace.string "two_phase_chain.end" "increment_b2_verified" ;
+
+  (* === Branch 1 again: increment, with prev = b2.
+   *   public_input = 3, asserts 3 = 2 + 1 (prev = 2). === *)
+  Pickles.Pickles_trace.string "two_phase_chain.begin" "increment_b3" ;
+  let (), (), b3 =
+    Promise.block_on_async_exn (fun () ->
+        increment ~handler:(handler Tick.Field.(of_int 2) b2)
+          Tick.Field.(of_int 3) )
+  in
+  Or_error.ok_exn
+    (Promise.block_on_async_exn (fun () ->
+         Proof.verify_promise [ (Tick.Field.(of_int 3), b3) ] ) ) ;
+  Pickles.Pickles_trace.string "two_phase_chain.end" "increment_b3_verified"
