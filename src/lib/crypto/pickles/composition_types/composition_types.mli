@@ -676,52 +676,7 @@ module Step : sig
   end
 
   module Proof_state : sig
-    module Deferred_values : sig
-      module Plonk = Step_plonk_iop
-
-      (** All the scalar-field values needed to finalize the verification of a
-          proof by checking that the correct values were used in the "group
-          operations" part of the verifier.
-
-          Consists of some evaluations of PLONK polynomials (columns,
-          permutation aggregation, etc.)  and the remainder are things related
-          to the inner product argument.
-       *)
-      type ('plonk, 'scalar_challenge, 'fq, 'bulletproof_challenges) t_ =
-        { plonk : 'plonk
-        ; combined_inner_product : 'fq
-              (** combined_inner_product = sum_{i < num_evaluation_points} sum_{j < num_polys} r^i xi^j f_j(pt_i) *)
-        ; xi : 'scalar_challenge
-              (** The challenge used for combining polynomials *)
-        ; bulletproof_challenges : 'bulletproof_challenges
-              (** The challenges from the inner-product argument that was partially verified. *)
-        ; b : 'fq
-              (** b = challenge_poly plonk.zeta + r * challenge_poly (domain_generrator * plonk.zeta)
-                where challenge_poly(x) = \prod_i (1 + bulletproof_challenges.(i) * x^{2^{k - 1 - i}})
-            *)
-        }
-      [@@deriving sexp, compare, yojson]
-
-      module Minimal : sig
-        type ('challenge, 'scalar_challenge, 'fq, 'bulletproof_challenges) t =
-          ( ('challenge, 'scalar_challenge) Plonk.Minimal.Poly.t
-          , 'scalar_challenge
-          , 'fq
-          , 'bulletproof_challenges )
-          t_
-        [@@deriving sexp, compare, yojson]
-      end
-
-      module In_circuit : sig
-        type ('challenge, 'scalar_challenge, 'fq, 'bulletproof_challenges) t =
-          ( ('challenge, 'scalar_challenge, 'fq) Plonk.In_circuit.t
-          , 'scalar_challenge
-          , 'fq
-          , 'bulletproof_challenges )
-          t_
-        [@@deriving sexp, compare, yojson]
-      end
-    end
+    module Deferred_values = Step_deferred_values
 
     module Messages_for_next_wrap_proof =
       Wrap.Proof_state.Messages_for_next_wrap_proof
