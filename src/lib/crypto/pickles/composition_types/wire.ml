@@ -232,6 +232,44 @@ module Wrap = struct
       end]
     end
   end
+
+  module Statement = struct
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type ( 'plonk
+             , 'scalar_challenge
+             , 'fp
+             , 'messages_for_next_wrap_proof
+             , 'digest
+             , 'messages_for_next_step_proof
+             , 'bp_chals
+             , 'index )
+             t =
+              ( 'plonk
+              , 'scalar_challenge
+              , 'fp
+              , 'messages_for_next_wrap_proof
+              , 'digest
+              , 'messages_for_next_step_proof
+              , 'bp_chals
+              , 'index )
+              Mina_wire_types.Pickles_composition_types.Wrap.Statement.V1.t =
+          { proof_state :
+              ( 'plonk
+              , 'scalar_challenge
+              , 'fp
+              , 'messages_for_next_wrap_proof
+              , 'digest
+              , 'bp_chals
+              , 'index )
+              Proof_state.Stable.V1.t
+          ; messages_for_next_step_proof : 'messages_for_next_step_proof
+          }
+        [@@deriving compare, yojson, sexp, hash, equal]
+      end
+    end]
+  end
 end
 
 module Step = struct end
