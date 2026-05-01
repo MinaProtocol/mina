@@ -315,4 +315,25 @@ module Wrap = struct
   end
 end
 
-module Step = struct end
+module Step = struct
+  module Proof_state = struct
+    module Deferred_values = struct
+      module Plonk = struct
+        module Minimal = struct
+          [%%versioned
+          module Stable = struct
+            module V1 = struct
+              type ('challenge, 'scalar_challenge) t =
+                { alpha : 'scalar_challenge
+                ; beta : 'challenge
+                ; gamma : 'challenge
+                ; zeta : 'scalar_challenge
+                }
+              [@@deriving sexp, compare, yojson, hlist, hash, equal]
+            end
+          end]
+        end
+      end
+    end
+  end
+end
