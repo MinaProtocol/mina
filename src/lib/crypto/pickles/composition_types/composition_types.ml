@@ -854,7 +854,7 @@ module Step = struct
           include Wire.Step.Proof_state.Deferred_values.Plonk.Minimal
 
           let to_wrap ~feature_flags { alpha; beta; gamma; zeta } :
-              _ Wrap.Proof_state.Deferred_values.Plonk.Minimal.t =
+              _ Wrap.Proof_state.Deferred_values.Plonk.Minimal.Poly.t =
             { alpha; beta; gamma; zeta; joint_combiner = None; feature_flags }
 
           let of_wrap
@@ -865,7 +865,7 @@ module Step = struct
                ; joint_combiner = _
                ; feature_flags = _
                } :
-                _ Wrap.Proof_state.Deferred_values.Plonk.Minimal.t ) =
+                _ Wrap.Proof_state.Deferred_values.Plonk.Minimal.Poly.t ) =
             { alpha; beta; gamma; zeta }
         end
 
