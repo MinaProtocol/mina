@@ -1772,14 +1772,46 @@ struct
        Check that the PlonK arithmetic constraints are satisfied.
        This is a wrap proof, so no optional features need consideration. *)
     let plonk_checks_passed =
+      let plonk_wrap :
+          _ Composition_types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit
+          .t =
+        let { Composition_types.Step.Proof_state.Deferred_values.Plonk
+              .In_circuit
+              .alpha
+            ; beta
+            ; gamma
+            ; zeta
+            ; zeta_to_srs_length
+            ; zeta_to_domain_size
+            ; perm
+            } =
+          plonk
+        in
+        let false_ = Boolean.false_ in
+        { alpha
+        ; beta
+        ; gamma
+        ; zeta
+        ; zeta_to_srs_length
+        ; zeta_to_domain_size
+        ; perm
+        ; feature_flags =
+            { range_check0 = false_
+            ; range_check1 = false_
+            ; foreign_field_add = false_
+            ; foreign_field_mul = false_
+            ; xor = false_
+            ; rot = false_
+            ; lookup = false_
+            ; runtime_tables = false_
+            }
+        ; joint_combiner = Pickles_types.Opt.nothing
+        }
+      in
       with_label __LOC__ (fun () ->
           Plonk_checks.checked
             (module Impl)
-            ~env ~shift:shift2
-            (Composition_types.Step.Proof_state.Deferred_values.Plonk.In_circuit
-             .to_wrap ~opt_none:Pickles_types.Opt.nothing ~false_:Boolean.false_
-               plonk )
-            combined_evals )
+            ~env ~shift:shift2 plonk_wrap combined_evals )
     in
     (* == Step 11: Combine all checks and return == *)
     print_bool "xi_correct" xi_correct ;

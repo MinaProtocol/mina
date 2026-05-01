@@ -1284,9 +1284,39 @@ struct
         ~advice:{ b; combined_inner_product }
         ~proof
         ~plonk:
-          (Composition_types.Step.Proof_state.Deferred_values.Plonk.In_circuit
-           .to_wrap ~opt_none:Opt.nothing ~false_:Boolean.false_
-             unfinalized.deferred_values.plonk )
+          (let { Composition_types.Step.Proof_state.Deferred_values.Plonk
+                 .In_circuit
+                 .alpha
+               ; beta
+               ; gamma
+               ; zeta
+               ; zeta_to_srs_length
+               ; zeta_to_domain_size
+               ; perm
+               } =
+             unfinalized.deferred_values.plonk
+           in
+           let false_ = Boolean.false_ in
+           { Composition_types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit
+             .alpha
+           ; beta
+           ; gamma
+           ; zeta
+           ; zeta_to_srs_length
+           ; zeta_to_domain_size
+           ; perm
+           ; feature_flags =
+               { range_check0 = false_
+               ; range_check1 = false_
+               ; foreign_field_add = false_
+               ; foreign_field_mul = false_
+               ; xor = false_
+               ; rot = false_
+               ; lookup = false_
+               ; runtime_tables = false_
+               }
+           ; joint_combiner = Opt.nothing
+           } )
     in
     (* == IVC Step 4: Assert sponge digest and challenges match ==
        The sponge digest computed during incremental verification must match
