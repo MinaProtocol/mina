@@ -49,6 +49,48 @@ module Wrap = struct
           *)
           include Wire.Wrap.Proof_state.Deferred_values.Plonk.Minimal
 
+          (** Wire-format polymorphic skeleton. Concrete records below name it
+              explicitly via {!Poly} rather than [include]ing it. *)
+          module Poly = Wire.Wrap.Proof_state.Deferred_values.Plonk.Minimal
+
+          (** Wire-form (out-of-circuit) instantiation. {!to_stable} /
+              {!of_stable} bridge to the [Mina_wire_types]-constrained
+              polymorphic skeleton in {!Stable.V1.t}. *)
+          module Constant = struct
+            type t =
+              { alpha : Limb_vector.Challenge.Constant.t Scalar_challenge.t
+              ; beta : Limb_vector.Challenge.Constant.t
+              ; gamma : Limb_vector.Challenge.Constant.t
+              ; zeta : Limb_vector.Challenge.Constant.t Scalar_challenge.t
+              ; joint_combiner :
+                  Limb_vector.Challenge.Constant.t Scalar_challenge.t option
+              ; feature_flags : bool Plonk_types.Features.t
+              }
+            [@@deriving sexp, compare, yojson, hlist, hash, equal]
+
+            let to_stable
+                ({ alpha; beta; gamma; zeta; joint_combiner; feature_flags } :
+                  t ) :
+                ( Limb_vector.Challenge.Constant.t
+                , Limb_vector.Challenge.Constant.t Scalar_challenge.t
+                , bool )
+                Poly.t =
+              { alpha; beta; gamma; zeta; joint_combiner; feature_flags }
+
+            let of_stable
+                ({ alpha; beta; gamma; zeta; joint_combiner; feature_flags } :
+                  ( Limb_vector.Challenge.Constant.t
+                  , Limb_vector.Challenge.Constant.t Scalar_challenge.t
+                  , bool )
+                  Poly.t ) : t =
+              { alpha; beta; gamma; zeta; joint_combiner; feature_flags }
+          end
+
+          (** Round-trip witness anchoring {!Constant} against {!Poly} until
+              downstream consumers are migrated to the fresh record. *)
+          let _ = fun (c : Constant.t) ->
+            Constant.of_stable (Constant.to_stable c)
+
           let map_challenges t ~f ~scalar =
             { t with
               alpha = scalar t.alpha
