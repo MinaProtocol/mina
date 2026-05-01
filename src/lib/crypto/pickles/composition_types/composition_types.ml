@@ -887,6 +887,53 @@ module Step = struct
 
           let _ = fun (c : Constant.t) ->
             Constant.of_minimal (Constant.to_minimal c)
+
+          (** Step-circuit (Tick) instantiation; used when the Step verifier
+              handles step proof challenges in-circuit. *)
+          module Step = struct
+            type t =
+              { alpha : Step_impl.Field.t Scalar_challenge.t
+              ; beta : Step_impl.Field.t
+              ; gamma : Step_impl.Field.t
+              ; zeta : Step_impl.Field.t Scalar_challenge.t
+              }
+
+            let to_minimal ({ alpha; beta; gamma; zeta } : t) :
+                (Step_impl.Field.t, Step_impl.Field.t Scalar_challenge.t) Poly.t
+                =
+              { alpha; beta; gamma; zeta }
+
+            let of_minimal
+                ({ alpha; beta; gamma; zeta } :
+                  (Step_impl.Field.t, Step_impl.Field.t Scalar_challenge.t)
+                  Poly.t ) : t =
+              { alpha; beta; gamma; zeta }
+          end
+
+          let _ = fun (s : Step.t) -> Step.of_minimal (Step.to_minimal s)
+
+          (** Wrap-circuit (Tock) instantiation. *)
+          module Wrap = struct
+            type t =
+              { alpha : Wrap_impl.Field.t Scalar_challenge.t
+              ; beta : Wrap_impl.Field.t
+              ; gamma : Wrap_impl.Field.t
+              ; zeta : Wrap_impl.Field.t Scalar_challenge.t
+              }
+
+            let to_minimal ({ alpha; beta; gamma; zeta } : t) :
+                (Wrap_impl.Field.t, Wrap_impl.Field.t Scalar_challenge.t) Poly.t
+                =
+              { alpha; beta; gamma; zeta }
+
+            let of_minimal
+                ({ alpha; beta; gamma; zeta } :
+                  (Wrap_impl.Field.t, Wrap_impl.Field.t Scalar_challenge.t)
+                  Poly.t ) : t =
+              { alpha; beta; gamma; zeta }
+          end
+
+          let _ = fun (w : Wrap.t) -> Wrap.of_minimal (Wrap.to_minimal w)
         end
 
         open Pickles_types
