@@ -226,6 +226,38 @@ module Wrap = struct
           (** Round-trip witness anchoring {!Tick} against {!Poly} until
               downstream consumers are migrated to the fresh record. *)
           let _ = fun (t : Tick.t) -> Tick.of_stable (Tick.to_stable t)
+
+          (** Endo'd Tock-field counterpart of {!Tick}: the shape used when
+              the prover prepares a step proof's deferred values for
+              verification (e.g. dummy unfinalized values). {!to_stable} /
+              {!of_stable} bridge to the wire-format polymorphic skeleton. *)
+          module Tock = struct
+            type t =
+              { alpha : Backend.Tock.Field.t
+              ; beta : Backend.Tock.Field.t
+              ; gamma : Backend.Tock.Field.t
+              ; zeta : Backend.Tock.Field.t
+              ; joint_combiner : Backend.Tock.Field.t option
+              ; feature_flags : bool Plonk_types.Features.t
+              }
+            [@@deriving sexp, compare, yojson, hlist, hash, equal]
+
+            let to_stable
+                ({ alpha; beta; gamma; zeta; joint_combiner; feature_flags } :
+                  t ) :
+                (Backend.Tock.Field.t, Backend.Tock.Field.t, bool) Poly.t =
+              { alpha; beta; gamma; zeta; joint_combiner; feature_flags }
+
+            let of_stable
+                ({ alpha; beta; gamma; zeta; joint_combiner; feature_flags } :
+                  (Backend.Tock.Field.t, Backend.Tock.Field.t, bool) Poly.t ) :
+                t =
+              { alpha; beta; gamma; zeta; joint_combiner; feature_flags }
+          end
+
+          (** Round-trip witness anchoring {!Tock} against {!Poly} until
+              downstream consumers are migrated to the fresh record. *)
+          let _ = fun (t : Tock.t) -> Tock.of_stable (Tock.to_stable t)
         end
 
         open Pickles_types
