@@ -6,6 +6,10 @@ module Digest = Digest
 module Spec = Spec
 module Opt = Opt
 module Wire = Wire
+
+(* Internal alias preserving access to the local [Digest] module after the
+   file-level [open Core_kernel] below shadows the unqualified name. *)
+module Digest_ = Digest
 open Core_kernel
 module Step_impl = Kimchi_pasta_snarky_backend.Step_impl
 module Wrap_impl = Kimchi_pasta_snarky_backend.Wrap_impl
@@ -1206,6 +1210,176 @@ module Wrap = struct
       ; sponge_digest_before_evaluations
       ; messages_for_next_wrap_proof
       }
+
+    (** Wire-format polymorphic skeleton. Concrete records below name it
+        explicitly via {!Poly} rather than [include]ing it. *)
+    module Poly = Wire.Wrap.Proof_state
+
+    (** Wire-form (out-of-circuit) instantiation. Pins the digest /
+        bulletproof / branch_data slots; ['plonk] and ['fp] stay
+        polymorphic. *)
+    module Constant = struct
+      type ('plonk, 'fp) t =
+        { deferred_values : ('plonk, 'fp) Deferred_values.Constant.t
+        ; sponge_digest_before_evaluations : Digest_.Constant.t
+        ; messages_for_next_wrap_proof : Digest_.Constant.t
+        }
+
+      let to_stable
+          ({ deferred_values
+           ; sponge_digest_before_evaluations
+           ; messages_for_next_wrap_proof
+           } :
+            ('plonk, 'fp) t ) :
+          ( 'plonk
+          , Limb_vector.Challenge.Constant.t Scalar_challenge.t
+          , 'fp
+          , Digest_.Constant.t
+          , Digest_.Constant.t
+          , ( Limb_vector.Challenge.Constant.t Scalar_challenge.t
+              Bulletproof_challenge.t
+            , Backend.Tick.Rounds.n )
+            Vector.t
+          , Branch_data.t )
+          Poly.Stable.V1.t =
+        { deferred_values =
+            Deferred_values.Constant.to_deferred_values deferred_values
+        ; sponge_digest_before_evaluations
+        ; messages_for_next_wrap_proof
+        }
+
+      let of_stable
+          ({ deferred_values
+           ; sponge_digest_before_evaluations
+           ; messages_for_next_wrap_proof
+           } :
+            ( 'plonk
+            , Limb_vector.Challenge.Constant.t Scalar_challenge.t
+            , 'fp
+            , Digest_.Constant.t
+            , Digest_.Constant.t
+            , ( Limb_vector.Challenge.Constant.t Scalar_challenge.t
+                Bulletproof_challenge.t
+              , Backend.Tick.Rounds.n )
+              Vector.t
+            , Branch_data.t )
+            Poly.Stable.V1.t ) : ('plonk, 'fp) t =
+        { deferred_values =
+            Deferred_values.Constant.of_deferred_values deferred_values
+        ; sponge_digest_before_evaluations
+        ; messages_for_next_wrap_proof
+        }
+    end
+
+    let _ = fun (c : (_, _) Constant.t) -> Constant.of_stable (Constant.to_stable c)
+
+    (** Step-circuit (Tick) instantiation. *)
+    module Step = struct
+      type ('plonk, 'fp) t =
+        { deferred_values : ('plonk, 'fp) Deferred_values.Step.t
+        ; sponge_digest_before_evaluations : Step_impl.Field.t
+        ; messages_for_next_wrap_proof : Step_impl.Field.t
+        }
+
+      let to_stable
+          ({ deferred_values
+           ; sponge_digest_before_evaluations
+           ; messages_for_next_wrap_proof
+           } :
+            ('plonk, 'fp) t ) :
+          ( 'plonk
+          , Step_impl.Field.t Scalar_challenge.t
+          , 'fp
+          , Step_impl.Field.t
+          , Step_impl.Field.t
+          , ( Step_impl.Field.t Scalar_challenge.t Bulletproof_challenge.t
+            , Backend.Tick.Rounds.n )
+            Vector.t
+          , Branch_data.Checked.Step.t )
+          Poly.Stable.V1.t =
+        { deferred_values =
+            Deferred_values.Step.to_deferred_values deferred_values
+        ; sponge_digest_before_evaluations
+        ; messages_for_next_wrap_proof
+        }
+
+      let of_stable
+          ({ deferred_values
+           ; sponge_digest_before_evaluations
+           ; messages_for_next_wrap_proof
+           } :
+            ( 'plonk
+            , Step_impl.Field.t Scalar_challenge.t
+            , 'fp
+            , Step_impl.Field.t
+            , Step_impl.Field.t
+            , ( Step_impl.Field.t Scalar_challenge.t Bulletproof_challenge.t
+              , Backend.Tick.Rounds.n )
+              Vector.t
+            , Branch_data.Checked.Step.t )
+            Poly.Stable.V1.t ) : ('plonk, 'fp) t =
+        { deferred_values =
+            Deferred_values.Step.of_deferred_values deferred_values
+        ; sponge_digest_before_evaluations
+        ; messages_for_next_wrap_proof
+        }
+    end
+
+    let _ = fun (s : (_, _) Step.t) -> Step.of_stable (Step.to_stable s)
+
+    (** Wrap-circuit (Tock) instantiation. *)
+    module Wrap = struct
+      type ('plonk, 'fp) t =
+        { deferred_values : ('plonk, 'fp) Deferred_values.Wrap.t
+        ; sponge_digest_before_evaluations : Wrap_impl.Field.t
+        ; messages_for_next_wrap_proof : Wrap_impl.Field.t
+        }
+
+      let to_stable
+          ({ deferred_values
+           ; sponge_digest_before_evaluations
+           ; messages_for_next_wrap_proof
+           } :
+            ('plonk, 'fp) t ) :
+          ( 'plonk
+          , Wrap_impl.Field.t Scalar_challenge.t
+          , 'fp
+          , Wrap_impl.Field.t
+          , Wrap_impl.Field.t
+          , ( Wrap_impl.Field.t Scalar_challenge.t Bulletproof_challenge.t
+            , Backend.Tick.Rounds.n )
+            Vector.t
+          , Wrap_impl.Field.t )
+          Poly.Stable.V1.t =
+        { deferred_values =
+            Deferred_values.Wrap.to_deferred_values deferred_values
+        ; sponge_digest_before_evaluations
+        ; messages_for_next_wrap_proof
+        }
+
+      let of_stable
+          ({ deferred_values
+           ; sponge_digest_before_evaluations
+           ; messages_for_next_wrap_proof
+           } :
+            ( 'plonk
+            , Wrap_impl.Field.t Scalar_challenge.t
+            , 'fp
+            , Wrap_impl.Field.t
+            , Wrap_impl.Field.t
+            , ( Wrap_impl.Field.t Scalar_challenge.t Bulletproof_challenge.t
+              , Backend.Tick.Rounds.n )
+              Vector.t
+            , Wrap_impl.Field.t )
+            Poly.Stable.V1.t ) : ('plonk, 'fp) t =
+        { deferred_values =
+            Deferred_values.Wrap.of_deferred_values deferred_values
+        ; sponge_digest_before_evaluations
+        ; messages_for_next_wrap_proof
+        }
+    end
+
+    let _ = fun (w : (_, _) Wrap.t) -> Wrap.of_stable (Wrap.to_stable w)
   end
 
   (** The component of the proof accumulation state that is only computed on by the
