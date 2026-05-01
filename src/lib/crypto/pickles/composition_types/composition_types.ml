@@ -5,6 +5,7 @@ module Branch_data = Branch_data
 module Digest = Digest
 module Spec = Spec
 module Opt = Opt
+module Wire = Wire
 open Core_kernel
 module Step_impl = Kimchi_pasta_snarky_backend.Step_impl
 module Wrap_impl = Kimchi_pasta_snarky_backend.Wrap_impl
@@ -33,37 +34,13 @@ module Wrap = struct
     module Deferred_values = struct
       module Plonk = struct
         module Minimal = struct
-          [%%versioned
-          module Stable = struct
-            module V1 = struct
-              (** Challenges from the PLONK IOP. These, plus the evaluations that are already in the proof, are
-                  all that's needed to derive all the values in the [In_circuit] version below.
+          (** Challenges from the PLONK IOP. These, plus the evaluations that are already in the proof, are
+              all that's needed to derive all the values in the [In_circuit] version below.
 
-                  See src/lib/pickles/plonk_checks/plonk_checks.ml for the computation of the [In_circuit] value
-                  from the [Minimal] value.
-              *)
-              type ('challenge, 'scalar_challenge, 'bool) t =
-                    ( 'challenge
-                    , 'scalar_challenge
-                    , 'bool )
-                    Mina_wire_types.Pickles_composition_types.Wrap.Proof_state
-                    .Deferred_values
-                    .Plonk
-                    .Minimal
-                    .V1
-                    .t =
-                { alpha : 'scalar_challenge
-                ; beta : 'challenge
-                ; gamma : 'challenge
-                ; zeta : 'scalar_challenge
-                ; joint_combiner : 'scalar_challenge option
-                ; feature_flags : 'bool Plonk_types.Features.Stable.V1.t
-                }
-              [@@deriving sexp, compare, yojson, hlist, hash, equal]
-
-              let to_latest = Fn.id
-            end
-          end]
+              See src/lib/pickles/plonk_checks/plonk_checks.ml for the computation of the [In_circuit] value
+              from the [Minimal] value.
+          *)
+          include Wire.Wrap.Proof_state.Deferred_values.Plonk.Minimal
 
           let map_challenges t ~f ~scalar =
             { t with

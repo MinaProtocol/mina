@@ -1,0 +1,53 @@
+(** Wire-format polymorphic skeletons for {!Composition_types}.
+
+    Each [Stable.V1] sub-module here is the type that the bin_io
+    boundary serialises. The corresponding live in-memory bindings
+    (value-level helpers, in-circuit record shapes, [typ] combinators)
+    live in {!Composition_types}, which [include]s each of these
+    modules at its natural path so the [Stable] module and the
+    toplevel [type t = Stable.Latest.t = { … }] flow through with
+    their derivers attached.
+
+    Each [Stable.V1.t] is constrained [= Mina_wire_types…V1.t]
+    field-for-field, so the wire format is anchored externally and
+    cannot drift here without a corresponding Mina_wire_types
+    update. *)
+
+module Wrap = struct
+  module Proof_state = struct
+    module Deferred_values = struct
+      module Plonk = struct
+        module Minimal = struct
+          [%%versioned
+          module Stable = struct
+            module V1 = struct
+              type ('challenge, 'scalar_challenge, 'bool) t =
+                    ( 'challenge
+                    , 'scalar_challenge
+                    , 'bool )
+                    Mina_wire_types.Pickles_composition_types.Wrap.Proof_state
+                    .Deferred_values
+                    .Plonk
+                    .Minimal
+                    .V1
+                    .t =
+                { alpha : 'scalar_challenge
+                ; beta : 'challenge
+                ; gamma : 'challenge
+                ; zeta : 'scalar_challenge
+                ; joint_combiner : 'scalar_challenge option
+                ; feature_flags :
+                    'bool Pickles_types.Plonk_types.Features.Stable.V1.t
+                }
+              [@@deriving sexp, compare, yojson, hlist, hash, equal]
+
+              let to_latest = Core_kernel.Fn.id
+            end
+          end]
+        end
+      end
+    end
+  end
+end
+
+module Step = struct end
