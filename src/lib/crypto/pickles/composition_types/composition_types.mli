@@ -876,65 +876,7 @@ module Step : sig
 
   module Proof_state : sig
     module Deferred_values : sig
-      module Plonk : sig
-        module Minimal : sig
-          (** Challenges from the PLONK IOP. These, plus the evaluations
-              that are already in the proof, are all that's needed to derive
-              all the values in the {!module:In_circuit} version below.
-
-              See src/lib/pickles/plonk_checks/plonk_checks.ml for the
-              computation of the {!module:In_circuit} value from the
-              {!module:Minimal} value. *)
-          type ('challenge, 'scalar_challenge) t =
-            { alpha : 'scalar_challenge
-            ; beta : 'challenge
-            ; gamma : 'challenge
-            ; zeta : 'scalar_challenge
-            }
-          [@@deriving sexp, compare, yojson, hlist, hash, equal]
-
-          (** Wire-format polymorphic skeleton. Concrete records below name
-              it explicitly via {!Poly} rather than [include]ing it. *)
-          module Poly = Wire.Step.Proof_state.Deferred_values.Plonk.Minimal
-
-        end
-
-        module In_circuit : sig
-          (** All scalar values deferred by a verifier circuit.
-
-              The values in [vbmul], [complete_add], [endomul],
-              [endomul_scalar], [perm], and are all scalars which will have
-              been used to scale selector polynomials during the computation of
-              the linearized polynomial commitment.
-
-              Then, we expose them so the next guy (who can do scalar
-              arithmetic) can check that they were computed correctly from the
-              evaluations in the proof and the challenges.  *)
-          type ('challenge, 'scalar_challenge, 'fp) t =
-            { alpha : 'scalar_challenge
-            ; beta : 'challenge
-            ; gamma : 'challenge
-            ; zeta : 'scalar_challenge
-            ; zeta_to_srs_length : 'fp
-            ; zeta_to_domain_size : 'fp
-            ; perm : 'fp
-                  (** scalar used on one of the permutation polynomial commitments. *)
-            }
-          [@@deriving sexp, compare, yojson, hlist, hash, equal, fields]
-
-          val map_challenges :
-               ('a, 'b, 'c) t
-            -> f:('a -> 'f)
-            -> scalar:('b -> 'g)
-            -> ('f, 'g, 'c) t
-
-          val map_fields : ('a, 'b, 'c) t -> f:('c -> 'f) -> ('a, 'b, 'f) t
-        end
-
-        val to_minimal :
-             ('challenge, 'scalar_challenge, 'fp) In_circuit.t
-          -> ('challenge, 'scalar_challenge) Minimal.t
-      end
+      module Plonk = Step_plonk_iop
 
       (** All the scalar-field values needed to finalize the verification of a
           proof by checking that the correct values were used in the "group
