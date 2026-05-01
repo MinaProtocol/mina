@@ -425,6 +425,91 @@ module Wrap = struct
 
           let _ = fun (c : _ Constant.t) ->
             Constant.of_in_circuit (Constant.to_in_circuit c)
+
+          (** Out-of-circuit instantiation of {!t} with [Opt.t]-with-[bool]
+              optionality (rather than [option] as in {!Constant}). Fresh
+              record. Consumed by [Wrap.For_tests_only.deferred_values]
+              (and the main [wrap] function it underpins) — derived
+              directly from [Plonk_checks.Type1.derive_plonk]'s output,
+              which threads ['scalar_challenge_opt] as
+              [(_, 'b) Pickles_types.Opt.t] regardless of whether ['b] is
+              [bool] or a Snarky [Boolean.var]. *)
+          module Constant_opt = struct
+            type 'fp t =
+              { alpha : Limb_vector.Challenge.Constant.t Scalar_challenge.t
+              ; beta : Limb_vector.Challenge.Constant.t
+              ; gamma : Limb_vector.Challenge.Constant.t
+              ; zeta : Limb_vector.Challenge.Constant.t Scalar_challenge.t
+              ; zeta_to_srs_length : 'fp
+              ; zeta_to_domain_size : 'fp
+              ; perm : 'fp
+              ; feature_flags : bool Plonk_types.Features.t
+              ; joint_combiner :
+                  (Limb_vector.Challenge.Constant.t Scalar_challenge.t, bool) Opt.t
+              }
+
+            let to_in_circuit
+                ({ alpha
+                 ; beta
+                 ; gamma
+                 ; zeta
+                 ; zeta_to_srs_length
+                 ; zeta_to_domain_size
+                 ; perm
+                 ; feature_flags
+                 ; joint_combiner
+                 } :
+                  'fp t ) :
+                ( Limb_vector.Challenge.Constant.t
+                , Limb_vector.Challenge.Constant.t Scalar_challenge.t
+                , 'fp
+                , _
+                , (Limb_vector.Challenge.Constant.t Scalar_challenge.t, bool) Opt.t
+                , bool )
+                in_circuit_t =
+              { alpha
+              ; beta
+              ; gamma
+              ; zeta
+              ; zeta_to_srs_length
+              ; zeta_to_domain_size
+              ; perm
+              ; feature_flags
+              ; joint_combiner
+              }
+
+            let of_in_circuit
+                ({ alpha
+                 ; beta
+                 ; gamma
+                 ; zeta
+                 ; zeta_to_srs_length
+                 ; zeta_to_domain_size
+                 ; perm
+                 ; feature_flags
+                 ; joint_combiner
+                 } :
+                  ( Limb_vector.Challenge.Constant.t
+                  , Limb_vector.Challenge.Constant.t Scalar_challenge.t
+                  , 'fp
+                  , _
+                  , (Limb_vector.Challenge.Constant.t Scalar_challenge.t, bool) Opt.t
+                  , bool )
+                  in_circuit_t ) : 'fp t =
+              { alpha
+              ; beta
+              ; gamma
+              ; zeta
+              ; zeta_to_srs_length
+              ; zeta_to_domain_size
+              ; perm
+              ; feature_flags
+              ; joint_combiner
+              }
+          end
+
+          let _ = fun (c : _ Constant_opt.t) ->
+            Constant_opt.of_in_circuit (Constant_opt.to_in_circuit c)
         end
 
         let to_minimal (type challenge scalar_challenge fp fp_opt lookup_opt)
