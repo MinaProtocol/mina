@@ -500,14 +500,50 @@ struct
           include Tock.Field
         end in
         (* Wrap proof, no features *)
-        Plonk_checks.Type2.derive_plonk
-          (module Field)
-          ~env:tock_env ~shift:Shifts.tock2 tock_plonk_minimal
-          tock_combined_evals
-        |> Composition_types.Step.Proof_state.Deferred_values.Plonk.In_circuit
-           .of_wrap
-             ~assert_none:(fun x -> assert (Option.is_none (Opt.to_option x)))
-             ~assert_false:(fun x -> assert (not x))
+        let { Composition_types.Wrap.Proof_state.Deferred_values.Plonk
+              .In_circuit
+              .alpha
+            ; beta
+            ; gamma
+            ; zeta
+            ; zeta_to_srs_length
+            ; zeta_to_domain_size
+            ; perm
+            ; feature_flags =
+                { range_check0
+                ; range_check1
+                ; foreign_field_add
+                ; foreign_field_mul
+                ; xor
+                ; rot
+                ; lookup
+                ; runtime_tables
+                }
+            ; joint_combiner
+            } =
+          Plonk_checks.Type2.derive_plonk
+            (module Field)
+            ~env:tock_env ~shift:Shifts.tock2 tock_plonk_minimal
+            tock_combined_evals
+        in
+        assert (not range_check0) ;
+        assert (not range_check1) ;
+        assert (not foreign_field_add) ;
+        assert (not foreign_field_mul) ;
+        assert (not xor) ;
+        assert (not rot) ;
+        assert (not lookup) ;
+        assert (not runtime_tables) ;
+        assert (Option.is_none (Opt.to_option joint_combiner)) ;
+        { Composition_types.Step.Proof_state.Deferred_values.Plonk.In_circuit
+          .alpha
+        ; beta
+        ; gamma
+        ; zeta
+        ; zeta_to_srs_length
+        ; zeta_to_domain_size
+        ; perm
+        }
       in
       let shifted_value =
         Shifted_value.Type2.of_field (module Tock.Field) ~shift:Shifts.tock2
