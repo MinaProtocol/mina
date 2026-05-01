@@ -1832,6 +1832,130 @@ module Step = struct
           t_
         [@@deriving sexp, compare, yojson]
       end
+
+      (** Wire-form (out-of-circuit) instantiation of {!t_}; ['plonk] and
+          ['fq] are left polymorphic because callers pick from the
+          Minimal/In_circuit Plonk submodules and between Type1/Type2
+          Shifted_value forms. {!to_t_} / {!of_t_} bridge to the polymorphic
+          skeleton. *)
+      module Constant = struct
+        type ('plonk, 'fq) t =
+          { plonk : 'plonk
+          ; combined_inner_product : 'fq
+          ; xi : Limb_vector.Challenge.Constant.t Scalar_challenge.t
+          ; bulletproof_challenges :
+              ( Limb_vector.Challenge.Constant.t Scalar_challenge.t
+                Bulletproof_challenge.t
+              , Backend.Tock.Rounds.n )
+              Vector.t
+          ; b : 'fq
+          }
+
+        let to_t_
+            ({ plonk; combined_inner_product; xi; bulletproof_challenges; b } :
+              ('plonk, 'fq) t ) :
+            ( 'plonk
+            , Limb_vector.Challenge.Constant.t Scalar_challenge.t
+            , 'fq
+            , ( Limb_vector.Challenge.Constant.t Scalar_challenge.t
+                Bulletproof_challenge.t
+              , Backend.Tock.Rounds.n )
+              Vector.t )
+            t_ =
+          { plonk; combined_inner_product; xi; bulletproof_challenges; b }
+
+        let of_t_
+            ({ plonk; combined_inner_product; xi; bulletproof_challenges; b } :
+              ( 'plonk
+              , Limb_vector.Challenge.Constant.t Scalar_challenge.t
+              , 'fq
+              , ( Limb_vector.Challenge.Constant.t Scalar_challenge.t
+                  Bulletproof_challenge.t
+                , Backend.Tock.Rounds.n )
+                Vector.t )
+              t_ ) : ('plonk, 'fq) t =
+          { plonk; combined_inner_product; xi; bulletproof_challenges; b }
+      end
+
+      let _ = fun (c : (_, _) Constant.t) -> Constant.of_t_ (Constant.to_t_ c)
+
+      (** Step-circuit (Tick) instantiation of {!t_}. *)
+      module Step = struct
+        type ('plonk, 'fq) t =
+          { plonk : 'plonk
+          ; combined_inner_product : 'fq
+          ; xi : Step_impl.Field.t Scalar_challenge.t
+          ; bulletproof_challenges :
+              ( Step_impl.Field.t Scalar_challenge.t Bulletproof_challenge.t
+              , Backend.Tock.Rounds.n )
+              Vector.t
+          ; b : 'fq
+          }
+
+        let to_t_
+            ({ plonk; combined_inner_product; xi; bulletproof_challenges; b } :
+              ('plonk, 'fq) t ) :
+            ( 'plonk
+            , Step_impl.Field.t Scalar_challenge.t
+            , 'fq
+            , ( Step_impl.Field.t Scalar_challenge.t Bulletproof_challenge.t
+              , Backend.Tock.Rounds.n )
+              Vector.t )
+            t_ =
+          { plonk; combined_inner_product; xi; bulletproof_challenges; b }
+
+        let of_t_
+            ({ plonk; combined_inner_product; xi; bulletproof_challenges; b } :
+              ( 'plonk
+              , Step_impl.Field.t Scalar_challenge.t
+              , 'fq
+              , ( Step_impl.Field.t Scalar_challenge.t Bulletproof_challenge.t
+                , Backend.Tock.Rounds.n )
+                Vector.t )
+              t_ ) : ('plonk, 'fq) t =
+          { plonk; combined_inner_product; xi; bulletproof_challenges; b }
+      end
+
+      let _ = fun (s : (_, _) Step.t) -> Step.of_t_ (Step.to_t_ s)
+
+      (** Wrap-circuit (Tock) instantiation of {!t_}. *)
+      module Wrap = struct
+        type ('plonk, 'fq) t =
+          { plonk : 'plonk
+          ; combined_inner_product : 'fq
+          ; xi : Wrap_impl.Field.t Scalar_challenge.t
+          ; bulletproof_challenges :
+              ( Wrap_impl.Field.t Scalar_challenge.t Bulletproof_challenge.t
+              , Backend.Tock.Rounds.n )
+              Vector.t
+          ; b : 'fq
+          }
+
+        let to_t_
+            ({ plonk; combined_inner_product; xi; bulletproof_challenges; b } :
+              ('plonk, 'fq) t ) :
+            ( 'plonk
+            , Wrap_impl.Field.t Scalar_challenge.t
+            , 'fq
+            , ( Wrap_impl.Field.t Scalar_challenge.t Bulletproof_challenge.t
+              , Backend.Tock.Rounds.n )
+              Vector.t )
+            t_ =
+          { plonk; combined_inner_product; xi; bulletproof_challenges; b }
+
+        let of_t_
+            ({ plonk; combined_inner_product; xi; bulletproof_challenges; b } :
+              ( 'plonk
+              , Wrap_impl.Field.t Scalar_challenge.t
+              , 'fq
+              , ( Wrap_impl.Field.t Scalar_challenge.t Bulletproof_challenge.t
+                , Backend.Tock.Rounds.n )
+                Vector.t )
+              t_ ) : ('plonk, 'fq) t =
+          { plonk; combined_inner_product; xi; bulletproof_challenges; b }
+      end
+
+      let _ = fun (w : (_, _) Wrap.t) -> Wrap.of_t_ (Wrap.to_t_ w)
     end
 
     module Messages_for_next_wrap_proof =
