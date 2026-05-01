@@ -570,6 +570,84 @@ module Wrap : sig
              , 'l )
              Stable.Latest.t )
            Step_impl.Typ.t
+
+      (** Step-circuit (Tick) instantiation of {!t}. Used by the var-side
+          of [Per_proof_witness.t]. *)
+      module Step : sig
+        type t =
+          ( ( Step_impl.Field.t
+            , Step_impl.Field.t Scalar_challenge.t
+            , Step_impl.Field.t Pickles_types.Shifted_value.Type1.t
+            , ( Step_impl.Field.t Pickles_types.Shifted_value.Type1.t
+              , Step_impl.Boolean.var )
+              Opt.t
+            , (Step_impl.Field.t Scalar_challenge.t, Step_impl.Boolean.var) Opt.t
+            , Step_impl.Boolean.var )
+            Deferred_values.Plonk.In_circuit.t
+          , Step_impl.Field.t Scalar_challenge.t
+          , Step_impl.Field.t Pickles_types.Shifted_value.Type1.t
+          , unit
+          , Step_impl.Field.t
+          , ( Step_impl.Field.t Scalar_challenge.t Bulletproof_challenge.t
+            , Backend.Tick.Rounds.n )
+            Vector.vec
+          , Branch_data.Checked.Step.t )
+          Stable.Latest.t
+
+        val typ :
+             dummy_scalar_challenge:'a Scalar_challenge.t
+          -> challenge:(Step_impl.Field.t, 'b) Step_impl.Typ.t
+          -> scalar_challenge:(Step_impl.Field.t, 'a) Step_impl.Typ.t
+          -> feature_flags:Opt.Flag.t Plonk_types.Features.Full.t
+          -> ( Step_impl.Field.t Pickles_types.Shifted_value.Type1.t
+             , 'c )
+             Step_impl.Typ.t
+          -> (unit, 'd) Step_impl.Typ.t
+          -> (Step_impl.Field.t, 'e) Step_impl.Typ.t
+          -> (Branch_data.Checked.Step.t, 'f) Step_impl.Typ.t
+          -> ( t
+             , ( ( 'b
+                 , 'a Scalar_challenge.t
+                 , 'c
+                 , 'g
+                 , 'a Scalar_challenge.t option
+                 , bool )
+                 Deferred_values.Plonk.In_circuit.t
+               , 'a Scalar_challenge.t
+               , 'c
+               , 'd
+               , 'e
+               , ( 'a Scalar_challenge.t Bulletproof_challenge.t
+                 , Backend.Tick.Rounds.n )
+                 Vector.vec
+               , 'f )
+               Stable.Latest.t )
+             Step_impl.Typ.t
+      end
+
+      (** Out-of-circuit ("constant") instantiation of {!t}. Used by the
+          value-side of [Per_proof_witness.Constant.t]. *)
+      module Constant : sig
+        type t =
+          ( ( Limb_vector.Challenge.Constant.t
+            , Limb_vector.Challenge.Constant.t Scalar_challenge.t
+            , Backend.Tick.Field.t Pickles_types.Shifted_value.Type1.t
+            , Backend.Tick.Field.t Pickles_types.Shifted_value.Type1.t
+              option
+            , Limb_vector.Challenge.Constant.t Scalar_challenge.t option
+            , bool )
+            Deferred_values.Plonk.In_circuit.t
+          , Limb_vector.Challenge.Constant.t Scalar_challenge.t
+          , Backend.Tick.Field.t Pickles_types.Shifted_value.Type1.t
+          , unit
+          , Digest.Constant.t
+          , ( Limb_vector.Challenge.Constant.t Scalar_challenge.t
+              Bulletproof_challenge.t
+            , Backend.Tick.Rounds.n )
+            Vector.vec
+          , Branch_data.t )
+          Stable.Latest.t
+      end
     end
 
     val to_minimal :

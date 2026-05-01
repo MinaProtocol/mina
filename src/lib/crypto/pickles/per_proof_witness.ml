@@ -56,20 +56,7 @@ type ('app_state, 'max_proofs_verified, 'num_branches) t =
         (** The polynomial commitments, polynomial evaluations, and opening proof corresponding to
       this latest wrap proof.
   *)
-  ; proof_state :
-      ( challenge
-      , scalar_challenge
-      , Impl.Field.t Shifted_value.Type1.t
-      , ( Impl.Field.t Pickles_types.Shifted_value.Type1.t
-        , Impl.Boolean.var )
-        Opt.t
-      , (scalar_challenge, Impl.Boolean.var) Opt.t
-      , Impl.Boolean.var
-      , unit
-      , Digest.Make(Impl).t
-      , scalar_challenge Types.Bulletproof_challenge.t Types.Step_bp_vec.t
-      , Branch_data.Checked.Step.t )
-      Types.Wrap.Proof_state.In_circuit.t
+  ; proof_state : Types.Wrap.Proof_state.In_circuit.Step.t
         (** The accumulator state corresponding to the above proof. Contains
       - `deferred_values`: The values necessary for finishing the deferred "scalar field" computations.
       That is, computations which are over the "step" circuit's internal field that the
@@ -108,18 +95,7 @@ module Constant = struct
   type ('statement, 'max_proofs_verified) t =
     { app_state : 'statement
     ; wrap_proof : Wrap_proof.Constant.t
-    ; proof_state :
-        ( challenge
-        , scalar_challenge
-        , Tick.Field.t Shifted_value.Type1.t
-        , Tick.Field.t Shifted_value.Type1.t option
-        , scalar_challenge option
-        , bool
-        , unit
-        , Digest.Constant.t
-        , scalar_challenge Types.Bulletproof_challenge.t Types.Step_bp_vec.t
-        , Branch_data.t )
-        Types.Wrap.Proof_state.In_circuit.t
+    ; proof_state : Types.Wrap.Proof_state.In_circuit.Constant.t
     ; prev_proof_evals :
         (Tick.Field.t, Tick.Field.t array) Plonk_types.All_evals.t
     ; prev_challenges :
@@ -144,7 +120,7 @@ let typ (type n avar aval) ~feature_flags ~num_chunks
     ~value_to_hlist:Constant.to_hlist ~value_of_hlist:Constant.of_hlist
     [ statement
     ; Wrap_proof.typ
-    ; Types.Wrap.Proof_state.In_circuit.typ ~challenge:Challenge.typ
+    ; Types.Wrap.Proof_state.In_circuit.Step.typ ~challenge:Challenge.typ
         ~scalar_challenge:Challenge.typ ~feature_flags
         ~dummy_scalar_challenge:(Sc.create Limb_vector.Challenge.Constant.zero)
         (Shifted_value.Type1.typ Field.typ)

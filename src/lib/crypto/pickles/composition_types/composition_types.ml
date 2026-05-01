@@ -1198,6 +1198,69 @@ module Wrap = struct
           ]
           ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
           ~value_of_hlist:of_hlist
+
+      (** Step-circuit (Tick) instantiation of {!t}. Used by the var-side
+          of [Per_proof_witness.t]. The [messages_for_next_wrap_proof] slot
+          is [unit] because the per-proof witness records its mfn-wrap
+          digest separately at the outer [Statement] level. *)
+      module Step = struct
+        type t =
+          ( ( Step_impl.Field.t
+            , Step_impl.Field.t Scalar_challenge.t
+            , Step_impl.Field.t Shifted_value.Type1.t
+            , ( Step_impl.Field.t Shifted_value.Type1.t
+              , Step_impl.Boolean.var )
+              Opt.t
+            , (Step_impl.Field.t Scalar_challenge.t, Step_impl.Boolean.var) Opt.t
+            , Step_impl.Boolean.var )
+            Deferred_values.Plonk.In_circuit.t
+          , Step_impl.Field.t Scalar_challenge.t
+          , Step_impl.Field.t Shifted_value.Type1.t
+          , unit
+          , Step_impl.Field.t
+          , ( Step_impl.Field.t Scalar_challenge.t Bulletproof_challenge.t
+            , Backend.Tick.Rounds.n )
+            Vector.t
+          , Branch_data.Checked.Step.t )
+          Stable.Latest.t
+
+        let typ ~dummy_scalar_challenge ~challenge ~scalar_challenge
+            ~feature_flags fp messages_for_next_wrap_proof digest index :
+            (t, _) Step_impl.Typ.t =
+          Step_impl.Typ.of_hlistable
+            [ Deferred_values.In_circuit.typ ~dummy_scalar_challenge ~challenge
+                ~scalar_challenge ~feature_flags fp index
+            ; digest
+            ; messages_for_next_wrap_proof
+            ]
+            ~var_to_hlist:Stable.Latest.to_hlist
+            ~var_of_hlist:Stable.Latest.of_hlist
+            ~value_to_hlist:Stable.Latest.to_hlist
+            ~value_of_hlist:Stable.Latest.of_hlist
+      end
+
+      (** Out-of-circuit ("constant") instantiation of {!t}. Used by the
+          value-side of [Per_proof_witness.Constant.t]. *)
+      module Constant = struct
+        type t =
+          ( ( Limb_vector.Challenge.Constant.t
+            , Limb_vector.Challenge.Constant.t Scalar_challenge.t
+            , Backend.Tick.Field.t Shifted_value.Type1.t
+            , Backend.Tick.Field.t Shifted_value.Type1.t option
+            , Limb_vector.Challenge.Constant.t Scalar_challenge.t option
+            , bool )
+            Deferred_values.Plonk.In_circuit.t
+          , Limb_vector.Challenge.Constant.t Scalar_challenge.t
+          , Backend.Tick.Field.t Shifted_value.Type1.t
+          , unit
+          , Digest_.Constant.t
+          , ( Limb_vector.Challenge.Constant.t Scalar_challenge.t
+              Bulletproof_challenge.t
+            , Backend.Tick.Rounds.n )
+            Vector.t
+          , Branch_data.t )
+          Stable.Latest.t
+      end
     end
 
     let to_minimal
