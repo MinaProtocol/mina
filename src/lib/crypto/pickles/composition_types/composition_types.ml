@@ -1061,6 +1061,10 @@ module Wrap = struct
     module Messages_for_next_wrap_proof = struct
       include Wire.Wrap.Proof_state.Messages_for_next_wrap_proof
 
+      (** Wire-format polymorphic skeleton. Concrete records below name it
+          explicitly via {!Poly} rather than [include]ing it. *)
+      module Poly = Wire.Wrap.Proof_state.Messages_for_next_wrap_proof
+
       let to_field_elements (type g f)
           { challenge_polynomial_commitment; old_bulletproof_challenges }
           ~g1:(g1_to_field_elements : g -> f list) =
@@ -1075,6 +1079,74 @@ module Wrap = struct
           [ g1; Vector.wrap_typ chal length ]
           ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
           ~value_of_hlist:of_hlist
+
+      (** Wire-form (out-of-circuit) instantiation: the challenge polynomial
+          commitment is pinned to a [Tick.Curve.Affine.t] curve point;
+          ['bulletproof_challenges] (a vector-of-vectors) stays parametric
+          because the outer length varies per [Max_proofs_verified] and the
+          inner is the constant [Tock.Rounds.n]. *)
+      module Constant = struct
+        type 'bulletproof_challenges t =
+          { challenge_polynomial_commitment : Backend.Tick.Curve.Affine.t
+          ; old_bulletproof_challenges : 'bulletproof_challenges
+          }
+
+        let to_stable
+            ({ challenge_polynomial_commitment; old_bulletproof_challenges } :
+              'bp t ) : (Backend.Tick.Curve.Affine.t, 'bp) Poly.t =
+          { challenge_polynomial_commitment; old_bulletproof_challenges }
+
+        let of_stable
+            ({ challenge_polynomial_commitment; old_bulletproof_challenges } :
+              (Backend.Tick.Curve.Affine.t, 'bp) Poly.t ) : 'bp t =
+          { challenge_polynomial_commitment; old_bulletproof_challenges }
+      end
+
+      let _ = fun (c : _ Constant.t) ->
+        Constant.of_stable (Constant.to_stable c)
+
+      (** Step-circuit (Tick) instantiation. The commitment is witnessed
+          as a pair of Step field elements (affine coordinates). *)
+      module Step = struct
+        type 'bulletproof_challenges t =
+          { challenge_polynomial_commitment :
+              Step_impl.Field.t * Step_impl.Field.t
+          ; old_bulletproof_challenges : 'bulletproof_challenges
+          }
+
+        let to_stable
+            ({ challenge_polynomial_commitment; old_bulletproof_challenges } :
+              'bp t ) : (Step_impl.Field.t * Step_impl.Field.t, 'bp) Poly.t =
+          { challenge_polynomial_commitment; old_bulletproof_challenges }
+
+        let of_stable
+            ({ challenge_polynomial_commitment; old_bulletproof_challenges } :
+              (Step_impl.Field.t * Step_impl.Field.t, 'bp) Poly.t ) : 'bp t =
+          { challenge_polynomial_commitment; old_bulletproof_challenges }
+      end
+
+      let _ = fun (s : _ Step.t) -> Step.of_stable (Step.to_stable s)
+
+      (** Wrap-circuit (Tock) instantiation. *)
+      module Wrap = struct
+        type 'bulletproof_challenges t =
+          { challenge_polynomial_commitment :
+              Wrap_impl.Field.t * Wrap_impl.Field.t
+          ; old_bulletproof_challenges : 'bulletproof_challenges
+          }
+
+        let to_stable
+            ({ challenge_polynomial_commitment; old_bulletproof_challenges } :
+              'bp t ) : (Wrap_impl.Field.t * Wrap_impl.Field.t, 'bp) Poly.t =
+          { challenge_polynomial_commitment; old_bulletproof_challenges }
+
+        let of_stable
+            ({ challenge_polynomial_commitment; old_bulletproof_challenges } :
+              (Wrap_impl.Field.t * Wrap_impl.Field.t, 'bp) Poly.t ) : 'bp t =
+          { challenge_polynomial_commitment; old_bulletproof_challenges }
+      end
+
+      let _ = fun (w : _ Wrap.t) -> Wrap.of_stable (Wrap.to_stable w)
     end
 
     module Minimal = struct
