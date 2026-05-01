@@ -271,46 +271,7 @@ module Wrap = struct
     end
 
     module Minimal = struct
-      [%%versioned
-      module Stable = struct
-        module V1 = struct
-          type ( 'challenge
-               , 'scalar_challenge
-               , 'fp
-               , 'bool
-               , 'messages_for_next_wrap_proof
-               , 'digest
-               , 'bp_chals
-               , 'index )
-               t =
-                ( 'challenge
-                , 'scalar_challenge
-                , 'fp
-                , 'bool
-                , 'messages_for_next_wrap_proof
-                , 'digest
-                , 'bp_chals
-                , 'index )
-                Mina_wire_types.Pickles_composition_types.Wrap.Proof_state
-                .Minimal
-                .V1
-                .t =
-            { deferred_values :
-                ( 'challenge
-                , 'scalar_challenge
-                , 'fp
-                , 'bool
-                , 'bp_chals
-                , 'index )
-                Deferred_values.Minimal.Stable.V1.t
-            ; sponge_digest_before_evaluations : 'digest
-            ; messages_for_next_wrap_proof : 'messages_for_next_wrap_proof
-                  (** Parts of the statement not needed by the other circuit. Represented as a hash inside the
-              circuit which is then "unhashed". *)
-            }
-          [@@deriving sexp, compare, yojson, hash, equal]
-        end
-      end]
+      include Wire.Wrap.Proof_state.Minimal
     end
 
     module In_circuit = struct
