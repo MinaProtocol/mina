@@ -333,6 +333,98 @@ module Wrap = struct
               ]
               ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
               ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
+
+          (* A sibling alias for [t] so that the concrete submodules below
+             can name it without colliding with their own [t]; OCaml does
+             not let the [In_circuit] module reference itself by name from
+             inside its own definition. *)
+          type ('a, 'b, 'c, 'd, 'e, 'f) in_circuit_t =
+            ('a, 'b, 'c, 'd, 'e, 'f) t
+
+          (** Wire-form (out-of-circuit) instantiation of {!t}.
+
+              ['fp] left polymorphic because the constant-side scalars are
+              passed around in either [_ Shifted_value.Type1.t] or
+              [_ Shifted_value.Type2.t] depending on which curve's deferred
+              values they describe. The ['fp_opt] phantom from the
+              polymorphic {!t} is dropped (no field uses it);
+              {!to_in_circuit} can produce a value at any ['fp_opt]. *)
+          module Constant = struct
+            type 'fp t =
+              { alpha : Limb_vector.Challenge.Constant.t Scalar_challenge.t
+              ; beta : Limb_vector.Challenge.Constant.t
+              ; gamma : Limb_vector.Challenge.Constant.t
+              ; zeta : Limb_vector.Challenge.Constant.t Scalar_challenge.t
+              ; zeta_to_srs_length : 'fp
+              ; zeta_to_domain_size : 'fp
+              ; perm : 'fp
+              ; feature_flags : bool Plonk_types.Features.t
+              ; joint_combiner :
+                  Limb_vector.Challenge.Constant.t Scalar_challenge.t option
+              }
+
+            let to_in_circuit
+                ({ alpha
+                 ; beta
+                 ; gamma
+                 ; zeta
+                 ; zeta_to_srs_length
+                 ; zeta_to_domain_size
+                 ; perm
+                 ; feature_flags
+                 ; joint_combiner
+                 } :
+                  'fp t ) :
+                ( Limb_vector.Challenge.Constant.t
+                , Limb_vector.Challenge.Constant.t Scalar_challenge.t
+                , 'fp
+                , _
+                , Limb_vector.Challenge.Constant.t Scalar_challenge.t option
+                , bool )
+                in_circuit_t =
+              { alpha
+              ; beta
+              ; gamma
+              ; zeta
+              ; zeta_to_srs_length
+              ; zeta_to_domain_size
+              ; perm
+              ; feature_flags
+              ; joint_combiner
+              }
+
+            let of_in_circuit
+                ({ alpha
+                 ; beta
+                 ; gamma
+                 ; zeta
+                 ; zeta_to_srs_length
+                 ; zeta_to_domain_size
+                 ; perm
+                 ; feature_flags
+                 ; joint_combiner
+                 } :
+                  ( Limb_vector.Challenge.Constant.t
+                  , Limb_vector.Challenge.Constant.t Scalar_challenge.t
+                  , 'fp
+                  , _
+                  , Limb_vector.Challenge.Constant.t Scalar_challenge.t option
+                  , bool )
+                  in_circuit_t ) : 'fp t =
+              { alpha
+              ; beta
+              ; gamma
+              ; zeta
+              ; zeta_to_srs_length
+              ; zeta_to_domain_size
+              ; perm
+              ; feature_flags
+              ; joint_combiner
+              }
+          end
+
+          let _ = fun (c : _ Constant.t) ->
+            Constant.of_in_circuit (Constant.to_in_circuit c)
         end
 
         let to_minimal (type challenge scalar_challenge fp fp_opt lookup_opt)
@@ -344,7 +436,7 @@ module Wrap = struct
               , lookup_opt
               , 'bool )
               In_circuit.t ) ~(to_option : lookup_opt -> scalar_challenge option)
-            : (challenge, scalar_challenge, 'bool) Minimal.t =
+            : (challenge, scalar_challenge, 'bool) Minimal.Poly.t =
           { alpha = t.alpha
           ; beta = t.beta
           ; zeta = t.zeta
