@@ -74,6 +74,10 @@ module Wrap : sig
             end
           end]
 
+          (** Wire-format polymorphic skeleton. Concrete records below name it
+              explicitly via {!Poly} rather than [include]ing it. *)
+          module Poly = Wire.Wrap.Proof_state.Deferred_values.Plonk.Minimal
+
           val map_challenges :
                ('challenge, 'scalar_challenge, 'bool) t
             -> f:('challenge -> 'challenge2)
