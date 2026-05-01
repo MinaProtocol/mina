@@ -851,6 +851,140 @@ module Wrap = struct
 
       let _ = fun (c : (_, _) Constant.t) ->
         Constant.of_deferred_values (Constant.to_deferred_values c)
+
+      (** Step-circuit (Tick) instantiation. *)
+      module Step = struct
+        type ('plonk, 'fp) t =
+          { plonk : 'plonk
+          ; combined_inner_product : 'fp
+          ; b : 'fp
+          ; xi : Step_impl.Field.t Scalar_challenge.t
+          ; bulletproof_challenges :
+              ( Step_impl.Field.t Scalar_challenge.t Bulletproof_challenge.t
+              , Backend.Tick.Rounds.n )
+              Vector.t
+          ; branch_data : Branch_data.Checked.Step.t
+          }
+
+        let to_deferred_values
+            ({ plonk
+             ; combined_inner_product
+             ; b
+             ; xi
+             ; bulletproof_challenges
+             ; branch_data
+             } :
+              ('plonk, 'fp) t ) :
+            ( 'plonk
+            , Step_impl.Field.t Scalar_challenge.t
+            , 'fp
+            , ( Step_impl.Field.t Scalar_challenge.t Bulletproof_challenge.t
+              , Backend.Tick.Rounds.n )
+              Vector.t
+            , Branch_data.Checked.Step.t )
+            Poly.t =
+          { plonk
+          ; combined_inner_product
+          ; b
+          ; xi
+          ; bulletproof_challenges
+          ; branch_data
+          }
+
+        let of_deferred_values
+            ({ plonk
+             ; combined_inner_product
+             ; b
+             ; xi
+             ; bulletproof_challenges
+             ; branch_data
+             } :
+              ( 'plonk
+              , Step_impl.Field.t Scalar_challenge.t
+              , 'fp
+              , ( Step_impl.Field.t Scalar_challenge.t Bulletproof_challenge.t
+                , Backend.Tick.Rounds.n )
+                Vector.t
+              , Branch_data.Checked.Step.t )
+              Poly.t ) : ('plonk, 'fp) t =
+          { plonk
+          ; combined_inner_product
+          ; b
+          ; xi
+          ; bulletproof_challenges
+          ; branch_data
+          }
+      end
+
+      let _ = fun (s : (_, _) Step.t) ->
+        Step.of_deferred_values (Step.to_deferred_values s)
+
+      (** Wrap-circuit (Tock) instantiation. *)
+      module Wrap = struct
+        type ('plonk, 'fp) t =
+          { plonk : 'plonk
+          ; combined_inner_product : 'fp
+          ; b : 'fp
+          ; xi : Wrap_impl.Field.t Scalar_challenge.t
+          ; bulletproof_challenges :
+              ( Wrap_impl.Field.t Scalar_challenge.t Bulletproof_challenge.t
+              , Backend.Tick.Rounds.n )
+              Vector.t
+          ; branch_data : Wrap_impl.Field.t
+          }
+
+        let to_deferred_values
+            ({ plonk
+             ; combined_inner_product
+             ; b
+             ; xi
+             ; bulletproof_challenges
+             ; branch_data
+             } :
+              ('plonk, 'fp) t ) :
+            ( 'plonk
+            , Wrap_impl.Field.t Scalar_challenge.t
+            , 'fp
+            , ( Wrap_impl.Field.t Scalar_challenge.t Bulletproof_challenge.t
+              , Backend.Tick.Rounds.n )
+              Vector.t
+            , Wrap_impl.Field.t )
+            Poly.t =
+          { plonk
+          ; combined_inner_product
+          ; b
+          ; xi
+          ; bulletproof_challenges
+          ; branch_data
+          }
+
+        let of_deferred_values
+            ({ plonk
+             ; combined_inner_product
+             ; b
+             ; xi
+             ; bulletproof_challenges
+             ; branch_data
+             } :
+              ( 'plonk
+              , Wrap_impl.Field.t Scalar_challenge.t
+              , 'fp
+              , ( Wrap_impl.Field.t Scalar_challenge.t Bulletproof_challenge.t
+                , Backend.Tick.Rounds.n )
+                Vector.t
+              , Wrap_impl.Field.t )
+              Poly.t ) : ('plonk, 'fp) t =
+          { plonk
+          ; combined_inner_product
+          ; b
+          ; xi
+          ; bulletproof_challenges
+          ; branch_data
+          }
+      end
+
+      let _ = fun (w : (_, _) Wrap.t) ->
+        Wrap.of_deferred_values (Wrap.to_deferred_values w)
     end
 
     (** The component of the proof accumulation state that is only computed on by the
