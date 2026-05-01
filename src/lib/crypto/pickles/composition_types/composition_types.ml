@@ -852,6 +852,41 @@ module Step = struct
               computation of the [In_circuit] value from the [Minimal] value.
           *)
           include Wire.Step.Proof_state.Deferred_values.Plonk.Minimal
+
+          (** Wire-format polymorphic skeleton. Concrete records below name
+              it explicitly via {!Poly} rather than [include]ing it. *)
+          module Poly = Wire.Step.Proof_state.Deferred_values.Plonk.Minimal
+
+          (** Wire-form (out-of-circuit) instantiation. The
+              [Step.Proof_state] tree is for step proofs (Vesta/Tick curve),
+              whose challenges live in the Tock field; out of circuit those
+              challenges are carried in the [Limb_vector.Challenge.Constant]
+              form. *)
+          module Constant = struct
+            type t =
+              { alpha : Limb_vector.Challenge.Constant.t Scalar_challenge.t
+              ; beta : Limb_vector.Challenge.Constant.t
+              ; gamma : Limb_vector.Challenge.Constant.t
+              ; zeta : Limb_vector.Challenge.Constant.t Scalar_challenge.t
+              }
+            [@@deriving sexp, compare, yojson, hlist, hash, equal]
+
+            let to_minimal ({ alpha; beta; gamma; zeta } : t) :
+                ( Limb_vector.Challenge.Constant.t
+                , Limb_vector.Challenge.Constant.t Scalar_challenge.t )
+                Poly.t =
+              { alpha; beta; gamma; zeta }
+
+            let of_minimal
+                ({ alpha; beta; gamma; zeta } :
+                  ( Limb_vector.Challenge.Constant.t
+                  , Limb_vector.Challenge.Constant.t Scalar_challenge.t )
+                  Poly.t ) : t =
+              { alpha; beta; gamma; zeta }
+          end
+
+          let _ = fun (c : Constant.t) ->
+            Constant.of_minimal (Constant.to_minimal c)
         end
 
         open Pickles_types
