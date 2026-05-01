@@ -274,6 +274,8 @@ module Zkapp_command_info = struct
     }
   [@@deriving to_yojson]
 
+  let logger = Logger.create ()
+
   module T (M : Monad_fail.S) = struct
     module Op_build = Op.T (M)
 
@@ -340,7 +342,16 @@ module Zkapp_command_info = struct
                 base58_check |> of_base58_check_exn |> to_string_hum
               in
               if String.is_empty memo then None else Some ("memo", `String memo)
-            with _ -> None )
+            with exn ->
+              [%log warn]
+                ~metadata:
+                  [ ("memo", `String base58_check)
+                  ; ("hash", `String cmd.hash)
+                  ; ("error", `String (Exn.to_string exn))
+                  ]
+                "Failed to base58-check decode zkapp-command memo $memo for \
+                 transaction $hash; omitting memo from metadata: $error" ;
+              None )
       in
       let metadata_fields =
         match memo_field with Some m -> [ nonce; m ] | None -> [ nonce ]
