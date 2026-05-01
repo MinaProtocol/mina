@@ -110,6 +110,43 @@ module Wrap = struct
               ; feature_flags : 'bool Plonk_types.Features.t
               }
           end
+
+          (** Step-circuit (Tick) instantiation of {!In_circuit.t}: the shape
+              used when the Step verifier constructs Plonk-IOP challenges
+              in-circuit. {!to_in_circuit} bridges to the polymorphic
+              {!In_circuit.t}. *)
+          module Step = struct
+            type t =
+              { alpha : Step_impl.Field.t Scalar_challenge.t
+              ; beta : Step_impl.Field.t
+              ; gamma : Step_impl.Field.t
+              ; zeta : Step_impl.Field.t Scalar_challenge.t
+              ; joint_combiner :
+                  (Step_impl.Field.t Scalar_challenge.t, Step_impl.Boolean.var) Opt.t
+              ; feature_flags : Step_impl.Boolean.var Plonk_types.Features.t
+              }
+
+            let to_in_circuit
+                ({ alpha; beta; gamma; zeta; joint_combiner; feature_flags } :
+                  t ) :
+                ( Step_impl.Field.t
+                , Step_impl.Field.t Scalar_challenge.t
+                , Step_impl.Boolean.var )
+                In_circuit.t =
+              { alpha; beta; gamma; zeta; joint_combiner; feature_flags }
+
+            let of_in_circuit
+                ({ alpha; beta; gamma; zeta; joint_combiner; feature_flags } :
+                  ( Step_impl.Field.t
+                  , Step_impl.Field.t Scalar_challenge.t
+                  , Step_impl.Boolean.var )
+                  In_circuit.t ) : t =
+              { alpha; beta; gamma; zeta; joint_combiner; feature_flags }
+          end
+
+          (** Round-trip witness anchoring {!Step} against {!In_circuit} until
+              downstream consumers are migrated to the fresh record. *)
+          let _ = fun (s : Step.t) -> Step.of_in_circuit (Step.to_in_circuit s)
         end
 
         open Pickles_types
