@@ -269,6 +269,49 @@ module Wrap = struct
         [@@deriving compare, yojson, sexp, hash, equal]
       end
     end]
+
+    module Minimal = struct
+      [%%versioned
+      module Stable = struct
+        module V1 = struct
+          type ( 'challenge
+               , 'scalar_challenge
+               , 'fp
+               , 'bool
+               , 'messages_for_next_wrap_proof
+               , 'digest
+               , 'messages_for_next_step_proof
+               , 'bp_chals
+               , 'index )
+               t =
+                ( 'challenge
+                , 'scalar_challenge
+                , 'fp
+                , 'bool
+                , 'messages_for_next_wrap_proof
+                , 'digest
+                , 'messages_for_next_step_proof
+                , 'bp_chals
+                , 'index )
+                Mina_wire_types.Pickles_composition_types.Wrap.Statement.Minimal
+                .V1
+                .t =
+            { proof_state :
+                ( 'challenge
+                , 'scalar_challenge
+                , 'fp
+                , 'bool
+                , 'messages_for_next_wrap_proof
+                , 'digest
+                , 'bp_chals
+                , 'index )
+                Proof_state.Minimal.Stable.V1.t
+            ; messages_for_next_step_proof : 'messages_for_next_step_proof
+            }
+          [@@deriving compare, yojson, sexp, hash, equal]
+        end
+      end]
+    end
   end
 end
 
