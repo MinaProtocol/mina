@@ -1311,11 +1311,203 @@ module Step = struct
             ; zeta_to_domain_size = f t.zeta_to_domain_size
             ; perm = f t.perm
             }
+
+          (* Alias for [t] so concrete submodules below can name it
+             without colliding with their own [t]. *)
+          type ('a, 'b, 'c) in_circuit_t = ('a, 'b, 'c) t
+
+          (** Wire-form (out-of-circuit) instantiation of {!t}; ['fp] is
+              left polymorphic because the constant scalar slot may carry
+              either [_ Shifted_value.Type1.t] or [_ Shifted_value.Type2.t]
+              depending on which curve's deferred values are being described.
+              {!to_in_circuit} / {!of_in_circuit} bridge to the polymorphic
+              skeleton. *)
+          module Constant = struct
+            type 'fp t =
+              { alpha : Limb_vector.Challenge.Constant.t Scalar_challenge.t
+              ; beta : Limb_vector.Challenge.Constant.t
+              ; gamma : Limb_vector.Challenge.Constant.t
+              ; zeta : Limb_vector.Challenge.Constant.t Scalar_challenge.t
+              ; zeta_to_srs_length : 'fp
+              ; zeta_to_domain_size : 'fp
+              ; perm : 'fp
+              }
+
+            let to_in_circuit
+                ({ alpha
+                 ; beta
+                 ; gamma
+                 ; zeta
+                 ; zeta_to_srs_length
+                 ; zeta_to_domain_size
+                 ; perm
+                 } :
+                  'fp t ) :
+                ( Limb_vector.Challenge.Constant.t
+                , Limb_vector.Challenge.Constant.t Scalar_challenge.t
+                , 'fp )
+                in_circuit_t =
+              { alpha
+              ; beta
+              ; gamma
+              ; zeta
+              ; zeta_to_srs_length
+              ; zeta_to_domain_size
+              ; perm
+              }
+
+            let of_in_circuit
+                ({ alpha
+                 ; beta
+                 ; gamma
+                 ; zeta
+                 ; zeta_to_srs_length
+                 ; zeta_to_domain_size
+                 ; perm
+                 } :
+                  ( Limb_vector.Challenge.Constant.t
+                  , Limb_vector.Challenge.Constant.t Scalar_challenge.t
+                  , 'fp )
+                  in_circuit_t ) : 'fp t =
+              { alpha
+              ; beta
+              ; gamma
+              ; zeta
+              ; zeta_to_srs_length
+              ; zeta_to_domain_size
+              ; perm
+              }
+          end
+
+          let _ = fun (c : _ Constant.t) ->
+            Constant.of_in_circuit (Constant.to_in_circuit c)
+
+          (** Step-circuit (Tick) instantiation of {!t}. *)
+          module Step = struct
+            type 'fp t =
+              { alpha : Step_impl.Field.t Scalar_challenge.t
+              ; beta : Step_impl.Field.t
+              ; gamma : Step_impl.Field.t
+              ; zeta : Step_impl.Field.t Scalar_challenge.t
+              ; zeta_to_srs_length : 'fp
+              ; zeta_to_domain_size : 'fp
+              ; perm : 'fp
+              }
+
+            let to_in_circuit
+                ({ alpha
+                 ; beta
+                 ; gamma
+                 ; zeta
+                 ; zeta_to_srs_length
+                 ; zeta_to_domain_size
+                 ; perm
+                 } :
+                  'fp t ) :
+                ( Step_impl.Field.t
+                , Step_impl.Field.t Scalar_challenge.t
+                , 'fp )
+                in_circuit_t =
+              { alpha
+              ; beta
+              ; gamma
+              ; zeta
+              ; zeta_to_srs_length
+              ; zeta_to_domain_size
+              ; perm
+              }
+
+            let of_in_circuit
+                ({ alpha
+                 ; beta
+                 ; gamma
+                 ; zeta
+                 ; zeta_to_srs_length
+                 ; zeta_to_domain_size
+                 ; perm
+                 } :
+                  ( Step_impl.Field.t
+                  , Step_impl.Field.t Scalar_challenge.t
+                  , 'fp )
+                  in_circuit_t ) : 'fp t =
+              { alpha
+              ; beta
+              ; gamma
+              ; zeta
+              ; zeta_to_srs_length
+              ; zeta_to_domain_size
+              ; perm
+              }
+          end
+
+          let _ = fun (s : _ Step.t) ->
+            Step.of_in_circuit (Step.to_in_circuit s)
+
+          (** Wrap-circuit (Tock) instantiation of {!t}. *)
+          module Wrap = struct
+            type 'fp t =
+              { alpha : Wrap_impl.Field.t Scalar_challenge.t
+              ; beta : Wrap_impl.Field.t
+              ; gamma : Wrap_impl.Field.t
+              ; zeta : Wrap_impl.Field.t Scalar_challenge.t
+              ; zeta_to_srs_length : 'fp
+              ; zeta_to_domain_size : 'fp
+              ; perm : 'fp
+              }
+
+            let to_in_circuit
+                ({ alpha
+                 ; beta
+                 ; gamma
+                 ; zeta
+                 ; zeta_to_srs_length
+                 ; zeta_to_domain_size
+                 ; perm
+                 } :
+                  'fp t ) :
+                ( Wrap_impl.Field.t
+                , Wrap_impl.Field.t Scalar_challenge.t
+                , 'fp )
+                in_circuit_t =
+              { alpha
+              ; beta
+              ; gamma
+              ; zeta
+              ; zeta_to_srs_length
+              ; zeta_to_domain_size
+              ; perm
+              }
+
+            let of_in_circuit
+                ({ alpha
+                 ; beta
+                 ; gamma
+                 ; zeta
+                 ; zeta_to_srs_length
+                 ; zeta_to_domain_size
+                 ; perm
+                 } :
+                  ( Wrap_impl.Field.t
+                  , Wrap_impl.Field.t Scalar_challenge.t
+                  , 'fp )
+                  in_circuit_t ) : 'fp t =
+              { alpha
+              ; beta
+              ; gamma
+              ; zeta
+              ; zeta_to_srs_length
+              ; zeta_to_domain_size
+              ; perm
+              }
+          end
+
+          let _ = fun (w : _ Wrap.t) ->
+            Wrap.of_in_circuit (Wrap.to_in_circuit w)
         end
 
         let to_minimal (type challenge scalar_challenge fp)
             (t : (challenge, scalar_challenge, fp) In_circuit.t) :
-            (challenge, scalar_challenge) Minimal.t =
+            (challenge, scalar_challenge) Minimal.Poly.t =
           { alpha = t.alpha; beta = t.beta; zeta = t.zeta; gamma = t.gamma }
       end
 
