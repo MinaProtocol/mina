@@ -185,6 +185,47 @@ module Wrap = struct
           (** Round-trip witness anchoring {!Wrap} against {!In_circuit} until
               downstream consumers are migrated to the fresh record. *)
           let _ = fun (w : Wrap.t) -> Wrap.of_in_circuit (Wrap.to_in_circuit w)
+
+          (** Endo'd Tick-field instantiation of {!Stable.V1.t}.
+
+              The prover, after running scalar challenges through
+              {!Scalar_challenge.to_field_constant}, holds a Plonk.Minimal
+              record where every field is a plain [Tick.Field.t] — i.e.
+              both ['challenge] and ['scalar_challenge] are collapsed to
+              [Tick.Field.t]. This is the shape consumed by
+              {!Plonk_checks.scalars_env} when the prover prepares a wrap
+              proof's deferred values for verification. {!to_stable} /
+              {!of_stable} bridge to the wire-format polymorphic skeleton. *)
+          module Tick = struct
+            type t =
+              { alpha : Backend.Tick.Field.t
+              ; beta : Backend.Tick.Field.t
+              ; gamma : Backend.Tick.Field.t
+              ; zeta : Backend.Tick.Field.t
+              ; joint_combiner : Backend.Tick.Field.t option
+              ; feature_flags : bool Plonk_types.Features.t
+              }
+            [@@deriving sexp, compare, yojson, hlist, hash, equal]
+
+            (** [Poly.t] specialised to [Tick] field elements — the result
+                type of {!to_stable}, also the canonical shape consumed by
+                [Wrap.combined_inner_product]. *)
+            type poly_t = (Backend.Tick.Field.t, Backend.Tick.Field.t, bool) Poly.t
+
+            let to_stable
+                ({ alpha; beta; gamma; zeta; joint_combiner; feature_flags } :
+                  t ) : poly_t =
+              { alpha; beta; gamma; zeta; joint_combiner; feature_flags }
+
+            let of_stable
+                ({ alpha; beta; gamma; zeta; joint_combiner; feature_flags } :
+                  poly_t ) : t =
+              { alpha; beta; gamma; zeta; joint_combiner; feature_flags }
+          end
+
+          (** Round-trip witness anchoring {!Tick} against {!Poly} until
+              downstream consumers are migrated to the fresh record. *)
+          let _ = fun (t : Tick.t) -> Tick.of_stable (Tick.to_stable t)
         end
 
         open Pickles_types
