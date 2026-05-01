@@ -1080,7 +1080,7 @@ module Step = struct
 
       module Minimal = struct
         type ('challenge, 'scalar_challenge, 'fq, 'bulletproof_challenges) t =
-          ( ('challenge, 'scalar_challenge) Plonk.Minimal.t
+          ( ('challenge, 'scalar_challenge) Plonk.Minimal.Poly.t
           , 'scalar_challenge
           , 'fq
           , 'bulletproof_challenges )
@@ -1147,7 +1147,7 @@ module Step = struct
              , 'digest
              , 'bool )
              t =
-          ( ('challenge, 'scalar_challenge) Deferred_values.Plonk.Minimal.t
+          ( ('challenge, 'scalar_challenge) Deferred_values.Plonk.Minimal.Poly.t
           , 'scalar_challenge
           , 'fq
           , 'bulletproof_challenges

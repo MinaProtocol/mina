@@ -917,6 +917,10 @@ module Step : sig
             }
           [@@deriving sexp, compare, yojson, hlist, hash, equal]
 
+          (** Wire-format polymorphic skeleton. Concrete records below name
+              it explicitly via {!Poly} rather than [include]ing it. *)
+          module Poly = Wire.Step.Proof_state.Deferred_values.Plonk.Minimal
+
         end
 
         module In_circuit : sig
@@ -1005,7 +1009,7 @@ module Step : sig
 
       module Minimal : sig
         type ('challenge, 'scalar_challenge, 'fq, 'bulletproof_challenges) t =
-          ( ('challenge, 'scalar_challenge) Plonk.Minimal.t
+          ( ('challenge, 'scalar_challenge) Plonk.Minimal.Poly.t
           , 'scalar_challenge
           , 'fq
           , 'bulletproof_challenges )
@@ -1072,7 +1076,7 @@ module Step : sig
              , 'digest
              , 'bool )
              t =
-          ( ('challenge, 'scalar_challenge) Deferred_values.Plonk.Minimal.t
+          ( ('challenge, 'scalar_challenge) Deferred_values.Plonk.Minimal.Poly.t
           , 'scalar_challenge
           , 'fq
           , 'bulletproof_challenges
