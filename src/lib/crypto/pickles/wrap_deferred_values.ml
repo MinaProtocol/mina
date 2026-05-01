@@ -38,7 +38,7 @@ let expand_deferred (type n most_recent_width) ~zk_rows
   let module Tick_field = Backend.Tick.Field in
   let tick_field : _ Plonk_checks.field = (module Tick_field) in
   Timer.start __LOC__ ;
-  let open Types.Wrap.Proof_state in
+  let module Deferred_values = Types.Wrap.Proof_state.Deferred_values in
   let sc = SC.to_field_constant tick_field ~endo:Endo.Wrap_inner_curve.scalar in
   Timer.clock __LOC__ ;
   let plonk0 = proof_state.deferred_values.plonk in
