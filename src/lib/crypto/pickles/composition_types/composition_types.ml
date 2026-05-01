@@ -985,6 +985,75 @@ module Wrap = struct
 
       let _ = fun (w : (_, _) Wrap.t) ->
         Wrap.of_deferred_values (Wrap.to_deferred_values w)
+
+      (** Post-compute (out-of-circuit) instantiation. Fresh record. Differs
+          from {!Constant} in the [bulletproof_challenges] slot: this form
+          holds the field elements that come out of
+          [Ipa.Step.compute_challenges] (challenge polynomial evaluations),
+          not the {!Bulletproof_challenge.t}-wrapped scalar challenges that
+          {!Constant} carries.
+
+          Returned by [Wrap_deferred_values.expand_deferred] and consumed
+          downstream by the prover-side step / verify paths. *)
+      module Computed = struct
+        type ('plonk, 'fp, 'branch_data) t =
+          { plonk : 'plonk
+          ; combined_inner_product : 'fp
+          ; b : 'fp
+          ; xi : Limb_vector.Challenge.Constant.t Scalar_challenge.t
+          ; bulletproof_challenges :
+              (Backend.Tick.Field.t, Backend.Tick.Rounds.n) Vector.t
+          ; branch_data : 'branch_data
+          }
+
+        let to_deferred_values
+            ({ plonk
+             ; combined_inner_product
+             ; b
+             ; xi
+             ; bulletproof_challenges
+             ; branch_data
+             } :
+              ('plonk, 'fp, 'branch_data) t ) :
+            ( 'plonk
+            , Limb_vector.Challenge.Constant.t Scalar_challenge.t
+            , 'fp
+            , (Backend.Tick.Field.t, Backend.Tick.Rounds.n) Vector.t
+            , 'branch_data )
+            Poly.t =
+          { plonk
+          ; combined_inner_product
+          ; b
+          ; xi
+          ; bulletproof_challenges
+          ; branch_data
+          }
+
+        let of_deferred_values
+            ({ plonk
+             ; combined_inner_product
+             ; b
+             ; xi
+             ; bulletproof_challenges
+             ; branch_data
+             } :
+              ( 'plonk
+              , Limb_vector.Challenge.Constant.t Scalar_challenge.t
+              , 'fp
+              , (Backend.Tick.Field.t, Backend.Tick.Rounds.n) Vector.t
+              , 'branch_data )
+              Poly.t ) : ('plonk, 'fp, 'branch_data) t =
+          { plonk
+          ; combined_inner_product
+          ; b
+          ; xi
+          ; bulletproof_challenges
+          ; branch_data
+          }
+      end
+
+      let _ = fun (c : (_, _, _) Computed.t) ->
+        Computed.of_deferred_values (Computed.to_deferred_values c)
     end
 
     (** The component of the proof accumulation state that is only computed on by the
