@@ -6,6 +6,39 @@ let account_id = User_command_info.account_id
 
 module Op = User_command_info.Op
 
+let logger = Logger.create ()
+
+(* Build the metadata `Assoc returned by /block for user and zkapp commands.
+   Always includes [nonce]; appends [memo] iff the optional base58-check
+   encoded memo decodes to a non-empty plaintext. A decode failure is
+   logged at warn level and treated as an absent memo. *)
+let nonce_and_memo_metadata ~hash ~nonce ~memo : Yojson.Safe.t =
+  let nonce_field = ("nonce", `Int (Unsigned.UInt32.to_int nonce)) in
+  let memo_field =
+    Option.bind memo ~f:(fun base58_check ->
+        try
+          let memo =
+            let open Mina_base.Signed_command_memo in
+            base58_check |> of_base58_check_exn |> to_string_hum
+          in
+          if String.is_empty memo then None else Some ("memo", `String memo)
+        with exn ->
+          [%log warn]
+            ~metadata:
+              [ ("memo", `String base58_check)
+              ; ("hash", `String hash)
+              ; ("error", `String (Exn.to_string exn))
+              ]
+            "Failed to base58-check decode memo $memo for transaction $hash; \
+             omitting memo from metadata: $error" ;
+          None )
+  in
+  match memo_field with
+  | Some m ->
+      `Assoc [ nonce_field; m ]
+  | None ->
+      `Assoc [ nonce_field ]
+
 module Internal_command_info = struct
   module Kind = struct
     type t = [ `Coinbase | `Fee_transfer | `Fee_transfer_via_coinbase ]
@@ -202,24 +235,95 @@ module User_command_info = struct
         { Transaction_identifier.hash = info.hash }
     ; operations = User_command_info.to_operations' info
     ; metadata =
-        Option.bind info.memo ~f:(fun base58_check ->
-            try
-              let memo =
-                let open Mina_base.Signed_command_memo in
-                base58_check |> of_base58_check_exn |> to_string_hum
-              in
-              let nonce = ("nonce", `Int (Unsigned.UInt32.to_int info.nonce)) in
-              Some
-                (`Assoc
-                  ( if String.is_empty memo then [ nonce ]
-                  else [ nonce; ("memo", `String memo) ] ) )
-            with _ -> None )
+        Some
+          (nonce_and_memo_metadata ~hash:info.hash ~nonce:info.nonce
+             ~memo:info.memo )
     ; related_transactions = []
     }
 
   module T (M : Monad_fail.S) = struct
     let to_transaction info = M.return @@ to_transaction info
   end
+
+  let%test_module "User_command_info.to_transaction metadata" =
+    ( module struct
+      let metadata_fields info =
+        match (to_transaction info).metadata with
+        | Some (`Assoc fields) ->
+            fields
+        | Some _ ->
+            failwith "expected metadata to be Some (`Assoc _)"
+        | None ->
+            failwith "expected metadata to be Some _ but got None"
+
+      let find_field fields key = List.Assoc.find fields ~equal:String.equal key
+
+      let%test_unit "nonce is always present (memo = None)" =
+        let info = { (List.hd_exn dummies) with memo = None } in
+        let fields = metadata_fields info in
+        ( match find_field fields "nonce" with
+        | Some (`Int n) ->
+            [%test_eq: int] n (Unsigned.UInt32.to_int info.nonce)
+        | _ ->
+            failwith "expected nonce field to be Some (`Int _)" ) ;
+        [%test_eq: bool] (Option.is_some (find_field fields "memo")) false
+
+      let%test_unit "nonce is present even when memo is unparseable" =
+        (* dummies set memo to a non-base58-check string, so decoding
+           raises and the memo field is dropped while nonce remains. *)
+        let info = List.hd_exn dummies in
+        let fields = metadata_fields info in
+        ( match find_field fields "nonce" with
+        | Some (`Int n) ->
+            [%test_eq: int] n (Unsigned.UInt32.to_int info.nonce)
+        | _ ->
+            failwith "expected nonce field to be Some (`Int _)" ) ;
+        [%test_eq: bool] (Option.is_some (find_field fields "memo")) false
+
+      let%test_unit "memo included when valid base58 check string" =
+        let memo_text = "rosetta-memo-test" in
+        let memo_base58 =
+          Mina_base.Signed_command_memo.(
+            create_from_string_exn memo_text |> to_base58_check)
+        in
+        let info = { (List.hd_exn dummies) with memo = Some memo_base58 } in
+        let fields = metadata_fields info in
+        ( match find_field fields "nonce" with
+        | Some (`Int _) ->
+            ()
+        | _ ->
+            failwith "expected nonce field" ) ;
+        match find_field fields "memo" with
+        | Some (`String m) ->
+            [%test_eq: string] m memo_text
+        | _ ->
+            failwith "expected memo field to be Some (`String _)"
+
+      let%test_unit "memo omitted when valid base58 decodes to empty string" =
+        let empty_base58 =
+          Mina_base.Signed_command_memo.(to_base58_check empty)
+        in
+        let info = { (List.hd_exn dummies) with memo = Some empty_base58 } in
+        let fields = metadata_fields info in
+        ( match find_field fields "nonce" with
+        | Some (`Int _) ->
+            ()
+        | _ ->
+            failwith "expected nonce field" ) ;
+        [%test_eq: bool] (Option.is_some (find_field fields "memo")) false
+
+      (* Same regression pin as the zkapp side: metadata must never be None,
+         since nonce is mandatory. *)
+      let%test_unit "metadata is never None across all dummies" =
+        List.iter dummies ~f:(fun info ->
+            match (to_transaction info).metadata with
+            | Some _ ->
+                ()
+            | None ->
+                failwith
+                  (sprintf "metadata is None for user command with hash %s"
+                     info.hash ) )
+    end )
 end
 
 module Zkapp_account_update_info = struct
@@ -273,8 +377,6 @@ module Zkapp_command_info = struct
     ; account_updates : Zkapp_account_update_info.t list
     }
   [@@deriving to_yojson]
-
-  let logger = Logger.create ()
 
   module T (M : Monad_fail.S) = struct
     module Op_build = Op.T (M)
@@ -333,33 +435,13 @@ module Zkapp_command_info = struct
     let to_transaction cmd =
       let open M.Let_syntax in
       let%map operations = to_operations cmd in
-      let nonce = ("nonce", `Int (Unsigned.UInt32.to_int cmd.nonce)) in
-      let memo_field =
-        Option.bind cmd.memo ~f:(fun base58_check ->
-            try
-              let memo =
-                let open Mina_base.Signed_command_memo in
-                base58_check |> of_base58_check_exn |> to_string_hum
-              in
-              if String.is_empty memo then None else Some ("memo", `String memo)
-            with exn ->
-              [%log warn]
-                ~metadata:
-                  [ ("memo", `String base58_check)
-                  ; ("hash", `String cmd.hash)
-                  ; ("error", `String (Exn.to_string exn))
-                  ]
-                "Failed to base58-check decode zkapp-command memo $memo for \
-                 transaction $hash; omitting memo from metadata: $error" ;
-              None )
-      in
-      let metadata_fields =
-        match memo_field with Some m -> [ nonce; m ] | None -> [ nonce ]
-      in
       { Transaction.transaction_identifier =
           { Transaction_identifier.hash = cmd.hash }
       ; operations
-      ; metadata = Some (`Assoc metadata_fields)
+      ; metadata =
+          Some
+            (nonce_and_memo_metadata ~hash:cmd.hash ~nonce:cmd.nonce
+               ~memo:cmd.memo )
       ; related_transactions = []
       }
   end
