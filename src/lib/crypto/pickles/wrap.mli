@@ -199,7 +199,7 @@ module For_tests_only : sig
         , scalar_challenge_constant Import.Bulletproof_challenge.t
           Import.Types.Step_bp_vec.t
         , Import.Branch_data.t )
-        Import.Types.Wrap.Proof_state.Deferred_values.t
+        Import.Types.Wrap.Proof_state.Deferred_values.Poly.t
     }
 
   val deferred_values :

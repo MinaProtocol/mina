@@ -218,6 +218,10 @@ module Wrap : sig
         }
       [@@deriving sexp, compare, yojson, hlist, hash, equal]
 
+      (** Wire-format polymorphic skeleton. Concrete records below name it
+          explicitly via {!Poly} rather than [include]ing it. *)
+      module Poly = Wire.Wrap.Proof_state.Deferred_values
+
       val map_challenges :
            ('a, 'b, 'fp, 'c, 'd) t
         -> f:'e

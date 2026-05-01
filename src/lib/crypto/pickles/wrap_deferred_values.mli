@@ -35,4 +35,4 @@ val expand_deferred :
      , Pasta_bindings.Fp.t Shifted_value.Type1.t
      , (Pasta_bindings.Fp.t, Tick.Rounds.n) Vector.vec
      , Branch_data.t )
-     Types.Wrap.Proof_state.Deferred_values.t
+     Types.Wrap.Proof_state.Deferred_values.Poly.t
