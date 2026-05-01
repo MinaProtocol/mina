@@ -95,7 +95,7 @@ func main() {
 		"CODENAMES_CONFIG":                   resolvedCodenamesConfig,
 		"NETWORK":                            *network,
 		"REPO":                               *repo,
-		"GIT_LFS_SKIP_SMUDGE":               "1",
+		"GIT_LFS_SKIP_SMUDGE":                "1",
 		"MINA_LEDGER_S3_BUCKET":              *ledgerBucket,
 		"VERSION":                            *version,
 		"CONFIG_JSON_GZ_URL":                 resolvedConfigURL,

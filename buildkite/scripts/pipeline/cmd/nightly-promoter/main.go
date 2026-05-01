@@ -18,43 +18,43 @@ import (
 )
 
 const (
-	defaultPipeline   = "mina-mainline-branches-nightlies"
-	defaultOrg        = "o-1-labs-2"
+	defaultPipeline          = "mina-mainline-branches-nightlies"
+	defaultOrg               = "o-1-labs-2"
 	defaultArtifacts         = "mina-logproc,mina-daemon,mina-archive,mina-rosetta,mina-generic"
 	defaultLightnetArtifacts = "mina-logproc,mina-generic"
-	defaultNetworks   = "devnet"
-	defaultCodenames  = "noble,bookworm"
-	defaultArchs      = "amd64,arm64"
-	defaultDebianRepo = "nightly.apt.packages.minaprotocol.com"
-	defaultSignKey    = "386E9DAC378726A48ED5CE56ADB30D9ACE02F414"
-	defaultBackend    = "local"
-	defaultProfile    = "lightnet"
-	defaultSourceDockerRepo = "europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo"
-	defaultTargetDockerRepo = "gcr.io/o1labs-192920"
+	defaultNetworks          = "devnet"
+	defaultCodenames         = "noble,bookworm"
+	defaultArchs             = "amd64,arm64"
+	defaultDebianRepo        = "nightly.apt.packages.minaprotocol.com"
+	defaultSignKey           = "386E9DAC378726A48ED5CE56ADB30D9ACE02F414"
+	defaultBackend           = "local"
+	defaultProfile           = "lightnet"
+	defaultSourceDockerRepo  = "europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo"
+	defaultTargetDockerRepo  = "gcr.io/o1labs-192920"
 )
 
 func main() {
 	var (
-		branch    = flag.String("branch", "", "Target branch (required)")
-		profile   = flag.String("profile", defaultProfile, "Dune profile: lightnet|devnet")
-		channel   = flag.String("channel", "", "Debian channel (default: same as branch)")
-		org       = flag.String("org", defaultOrg, "Buildkite organization")
-		pipeline  = flag.String("pipeline", defaultPipeline, "Buildkite pipeline name")
-		dryRun    = flag.Bool("dry-run", false, "Print what would be run without executing")
-		force     = flag.Bool("force", false, "Run even if build is not from today")
-		apiToken  = flag.String("api-token", "", "Buildkite API token (default: from env)")
-		artifacts = flag.String("artifacts", defaultArtifacts, "Comma-separated artifacts to publish")
-		networks  = flag.String("networks", defaultNetworks, "Comma-separated networks")
-		codenames = flag.String("codenames", defaultCodenames, "Comma-separated codenames")
-		archs     = flag.String("archs", defaultArchs, "Comma-separated architectures")
-		debRepo   = flag.String("debian-repo", defaultDebianRepo, "Debian repository")
-		signKey   = flag.String("debian-sign-key", defaultSignKey, "Debian signing key ID")
-		backend    = flag.String("backend", defaultBackend, "Storage backend")
+		branch           = flag.String("branch", "", "Target branch (required)")
+		profile          = flag.String("profile", defaultProfile, "Dune profile: lightnet|devnet")
+		channel          = flag.String("channel", "", "Debian channel (default: same as branch)")
+		org              = flag.String("org", defaultOrg, "Buildkite organization")
+		pipeline         = flag.String("pipeline", defaultPipeline, "Buildkite pipeline name")
+		dryRun           = flag.Bool("dry-run", false, "Print what would be run without executing")
+		force            = flag.Bool("force", false, "Run even if build is not from today")
+		apiToken         = flag.String("api-token", "", "Buildkite API token (default: from env)")
+		artifacts        = flag.String("artifacts", defaultArtifacts, "Comma-separated artifacts to publish")
+		networks         = flag.String("networks", defaultNetworks, "Comma-separated networks")
+		codenames        = flag.String("codenames", defaultCodenames, "Comma-separated codenames")
+		archs            = flag.String("archs", defaultArchs, "Comma-separated architectures")
+		debRepo          = flag.String("debian-repo", defaultDebianRepo, "Debian repository")
+		signKey          = flag.String("debian-sign-key", defaultSignKey, "Debian signing key ID")
+		backend          = flag.String("backend", defaultBackend, "Storage backend")
 		sourceDockerRepo = flag.String("source-docker-repo", defaultSourceDockerRepo, "Source Docker repository where nightly builds are pushed")
 		targetDockerRepo = flag.String("target-docker-repo", defaultTargetDockerRepo, "Target Docker repository for promoted images")
-		onlyDebians = flag.Bool("only-debians", false, "Only publish Debian packages (skip Docker)")
-		onlyDockers = flag.Bool("only-dockers", false, "Only publish Docker images (skip Debians)")
-		exportEnv   = flag.String("export-env", "", "Write resolved build info to a shell-sourceable file")
+		onlyDebians      = flag.Bool("only-debians", false, "Only publish Debian packages (skip Docker)")
+		onlyDockers      = flag.Bool("only-dockers", false, "Only publish Docker images (skip Debians)")
+		exportEnv        = flag.String("export-env", "", "Write resolved build info to a shell-sourceable file")
 	)
 
 	flag.Parse()
