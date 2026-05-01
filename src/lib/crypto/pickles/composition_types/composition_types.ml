@@ -2736,6 +2736,102 @@ module Step = struct
           ; should_finalize
           ; sponge_digest_before_evaluations
           }
+
+        (* [spec] / [to_data] / [of_data] for the value side: outer
+           [Per_proof.Constant.t] with the inner Plonk pinned to
+           [Plonk.In_circuit.Constant.t]. *)
+        let spec bp_log2 = In_circuit.spec bp_log2
+
+        let[@warning "-45"] to_data
+            (t :
+              ( 'fp Deferred_values.Plonk.In_circuit.Constant.t
+              , 'fq
+              , 'digest )
+              t ) =
+          let { deferred_values
+              ; should_finalize
+              ; sponge_digest_before_evaluations
+              } =
+            t
+          in
+          let { Deferred_values.Constant.xi
+              ; bulletproof_challenges
+              ; b
+              ; combined_inner_product
+              ; plonk
+              } =
+            deferred_values
+          in
+          let ({ alpha
+               ; beta
+               ; gamma
+               ; zeta
+               ; zeta_to_srs_length
+               ; zeta_to_domain_size
+               ; perm
+               }
+                : _ Deferred_values.Plonk.In_circuit.Constant.t ) =
+            plonk
+          in
+          let open Vector in
+          let fq =
+            [ combined_inner_product
+            ; b
+            ; zeta_to_srs_length
+            ; zeta_to_domain_size
+            ; perm
+            ]
+          in
+          let challenge = [ beta; gamma ] in
+          let scalar_challenge = [ alpha; zeta; xi ] in
+          let digest = [ sponge_digest_before_evaluations ] in
+          let bool = [ should_finalize ] in
+          let open Hlist.HlistId in
+          [ fq
+          ; digest
+          ; challenge
+          ; scalar_challenge
+          ; bulletproof_challenges
+          ; bool
+          ]
+
+        let[@warning "-45"] of_data
+            Hlist.HlistId.
+              [ Vector.
+                  [ combined_inner_product
+                  ; b
+                  ; zeta_to_srs_length
+                  ; zeta_to_domain_size
+                  ; perm
+                  ]
+              ; Vector.[ sponge_digest_before_evaluations ]
+              ; Vector.[ beta; gamma ]
+              ; Vector.[ alpha; zeta; xi ]
+              ; bulletproof_challenges
+              ; Vector.[ should_finalize ]
+              ] :
+            ( 'fp Deferred_values.Plonk.In_circuit.Constant.t
+            , 'fq
+            , 'digest )
+            t =
+          { deferred_values =
+              { xi
+              ; bulletproof_challenges
+              ; b
+              ; combined_inner_product
+              ; plonk =
+                  { alpha
+                  ; beta
+                  ; gamma
+                  ; zeta
+                  ; zeta_to_srs_length
+                  ; zeta_to_domain_size
+                  ; perm
+                  }
+              }
+          ; should_finalize
+          ; sponge_digest_before_evaluations
+          }
       end
 
       let _ = fun (c : (_, _, _) Constant.t) -> Constant.of_t_ (Constant.to_t_ c)
@@ -2786,6 +2882,101 @@ module Step = struct
           ; should_finalize
           ; sponge_digest_before_evaluations
           }
+
+        let spec bp_log2 = In_circuit.spec bp_log2
+
+        let[@warning "-45"] to_data
+            (t :
+              ( 'fp Deferred_values.Plonk.In_circuit.Step.t
+              , 'fq
+              , 'digest
+              , 'bool )
+              t ) =
+          let { deferred_values
+              ; should_finalize
+              ; sponge_digest_before_evaluations
+              } =
+            t
+          in
+          let { Deferred_values.Step.xi
+              ; bulletproof_challenges
+              ; b
+              ; combined_inner_product
+              ; plonk
+              } =
+            deferred_values
+          in
+          let ({ alpha
+               ; beta
+               ; gamma
+               ; zeta
+               ; zeta_to_srs_length
+               ; zeta_to_domain_size
+               ; perm
+               }
+                : _ Deferred_values.Plonk.In_circuit.Step.t ) =
+            plonk
+          in
+          let open Vector in
+          let fq =
+            [ combined_inner_product
+            ; b
+            ; zeta_to_srs_length
+            ; zeta_to_domain_size
+            ; perm
+            ]
+          in
+          let challenge = [ beta; gamma ] in
+          let scalar_challenge = [ alpha; zeta; xi ] in
+          let digest = [ sponge_digest_before_evaluations ] in
+          let bool = [ should_finalize ] in
+          let open Hlist.HlistId in
+          [ fq
+          ; digest
+          ; challenge
+          ; scalar_challenge
+          ; bulletproof_challenges
+          ; bool
+          ]
+
+        let[@warning "-45"] of_data
+            Hlist.HlistId.
+              [ Vector.
+                  [ combined_inner_product
+                  ; b
+                  ; zeta_to_srs_length
+                  ; zeta_to_domain_size
+                  ; perm
+                  ]
+              ; Vector.[ sponge_digest_before_evaluations ]
+              ; Vector.[ beta; gamma ]
+              ; Vector.[ alpha; zeta; xi ]
+              ; bulletproof_challenges
+              ; Vector.[ should_finalize ]
+              ] :
+            ( 'fp Deferred_values.Plonk.In_circuit.Step.t
+            , 'fq
+            , 'digest
+            , 'bool )
+            t =
+          { deferred_values =
+              { xi
+              ; bulletproof_challenges
+              ; b
+              ; combined_inner_product
+              ; plonk =
+                  { alpha
+                  ; beta
+                  ; gamma
+                  ; zeta
+                  ; zeta_to_srs_length
+                  ; zeta_to_domain_size
+                  ; perm
+                  }
+              }
+          ; should_finalize
+          ; sponge_digest_before_evaluations
+          }
       end
 
       let _ = fun (s : (_, _, _, _) Step.t) -> Step.of_t_ (Step.to_t_ s)
@@ -2833,6 +3024,101 @@ module Step = struct
               , 'bool )
               t_ ) : ('plonk, 'fq, 'digest, 'bool) t =
           { deferred_values = Deferred_values.Wrap.of_t_ deferred_values
+          ; should_finalize
+          ; sponge_digest_before_evaluations
+          }
+
+        let spec bp_log2 = In_circuit.spec bp_log2
+
+        let[@warning "-45"] to_data
+            (t :
+              ( 'fp Deferred_values.Plonk.In_circuit.Wrap.t
+              , 'fq
+              , 'digest
+              , 'bool )
+              t ) =
+          let { deferred_values
+              ; should_finalize
+              ; sponge_digest_before_evaluations
+              } =
+            t
+          in
+          let { Deferred_values.Wrap.xi
+              ; bulletproof_challenges
+              ; b
+              ; combined_inner_product
+              ; plonk
+              } =
+            deferred_values
+          in
+          let ({ alpha
+               ; beta
+               ; gamma
+               ; zeta
+               ; zeta_to_srs_length
+               ; zeta_to_domain_size
+               ; perm
+               }
+                : _ Deferred_values.Plonk.In_circuit.Wrap.t ) =
+            plonk
+          in
+          let open Vector in
+          let fq =
+            [ combined_inner_product
+            ; b
+            ; zeta_to_srs_length
+            ; zeta_to_domain_size
+            ; perm
+            ]
+          in
+          let challenge = [ beta; gamma ] in
+          let scalar_challenge = [ alpha; zeta; xi ] in
+          let digest = [ sponge_digest_before_evaluations ] in
+          let bool = [ should_finalize ] in
+          let open Hlist.HlistId in
+          [ fq
+          ; digest
+          ; challenge
+          ; scalar_challenge
+          ; bulletproof_challenges
+          ; bool
+          ]
+
+        let[@warning "-45"] of_data
+            Hlist.HlistId.
+              [ Vector.
+                  [ combined_inner_product
+                  ; b
+                  ; zeta_to_srs_length
+                  ; zeta_to_domain_size
+                  ; perm
+                  ]
+              ; Vector.[ sponge_digest_before_evaluations ]
+              ; Vector.[ beta; gamma ]
+              ; Vector.[ alpha; zeta; xi ]
+              ; bulletproof_challenges
+              ; Vector.[ should_finalize ]
+              ] :
+            ( 'fp Deferred_values.Plonk.In_circuit.Wrap.t
+            , 'fq
+            , 'digest
+            , 'bool )
+            t =
+          { deferred_values =
+              { xi
+              ; bulletproof_challenges
+              ; b
+              ; combined_inner_product
+              ; plonk =
+                  { alpha
+                  ; beta
+                  ; gamma
+                  ; zeta
+                  ; zeta_to_srs_length
+                  ; zeta_to_domain_size
+                  ; perm
+                  }
+              }
           ; should_finalize
           ; sponge_digest_before_evaluations
           }
@@ -2916,6 +3202,122 @@ module Step = struct
         ; B Digest
         ; Vector (B Digest, proofs_verified)
         ]
+
+    (** [to_data] / [of_data] / [spec] for the fresh
+        [{Constant,Step,Wrap}.t] outer Statements. The flat-data output
+        matches the toplevel [Step.Statement.{to_data, of_data, spec}],
+        so [Spec]-driven typ construction stays interoperable. *)
+    module Constant = struct
+      let[@warning "-45"] to_data
+          { proof_state = { unfinalized_proofs; messages_for_next_step_proof }
+          ; messages_for_next_wrap_proof
+          } =
+        let open Hlist.HlistId in
+        [ Vector.map unfinalized_proofs
+            ~f:Proof_state.Per_proof.Constant.to_data
+        ; messages_for_next_step_proof
+        ; messages_for_next_wrap_proof
+        ]
+
+      let[@warning "-45"] of_data
+          Hlist.HlistId.
+            [ unfinalized_proofs
+            ; messages_for_next_step_proof
+            ; messages_for_next_wrap_proof
+            ] =
+        { proof_state =
+            { unfinalized_proofs =
+                Vector.map unfinalized_proofs
+                  ~f:Proof_state.Per_proof.Constant.of_data
+            ; messages_for_next_step_proof
+            }
+        ; messages_for_next_wrap_proof
+        }
+
+      let spec proofs_verified bp_log2 =
+        let per_proof = Proof_state.Per_proof.Constant.spec bp_log2 in
+        Spec.T.Struct
+          [ Vector (per_proof, proofs_verified)
+          ; B Digest
+          ; Vector (B Digest, proofs_verified)
+          ]
+    end
+
+    let _ : _ = (Constant.to_data, Constant.of_data, Constant.spec)
+
+    module Step = struct
+      let[@warning "-45"] to_data
+          { proof_state = { unfinalized_proofs; messages_for_next_step_proof }
+          ; messages_for_next_wrap_proof
+          } =
+        let open Hlist.HlistId in
+        [ Vector.map unfinalized_proofs ~f:Proof_state.Per_proof.Step.to_data
+        ; messages_for_next_step_proof
+        ; messages_for_next_wrap_proof
+        ]
+
+      let[@warning "-45"] of_data
+          Hlist.HlistId.
+            [ unfinalized_proofs
+            ; messages_for_next_step_proof
+            ; messages_for_next_wrap_proof
+            ] =
+        { proof_state =
+            { unfinalized_proofs =
+                Vector.map unfinalized_proofs
+                  ~f:Proof_state.Per_proof.Step.of_data
+            ; messages_for_next_step_proof
+            }
+        ; messages_for_next_wrap_proof
+        }
+
+      let spec proofs_verified bp_log2 =
+        let per_proof = Proof_state.Per_proof.Step.spec bp_log2 in
+        Spec.T.Struct
+          [ Vector (per_proof, proofs_verified)
+          ; B Digest
+          ; Vector (B Digest, proofs_verified)
+          ]
+    end
+
+    let _ : _ = (Step.to_data, Step.of_data, Step.spec)
+
+    module Wrap = struct
+      let[@warning "-45"] to_data
+          { proof_state = { unfinalized_proofs; messages_for_next_step_proof }
+          ; messages_for_next_wrap_proof
+          } =
+        let open Hlist.HlistId in
+        [ Vector.map unfinalized_proofs ~f:Proof_state.Per_proof.Wrap.to_data
+        ; messages_for_next_step_proof
+        ; messages_for_next_wrap_proof
+        ]
+
+      let[@warning "-45"] of_data
+          Hlist.HlistId.
+            [ unfinalized_proofs
+            ; messages_for_next_step_proof
+            ; messages_for_next_wrap_proof
+            ] =
+        { proof_state =
+            { unfinalized_proofs =
+                Vector.map unfinalized_proofs
+                  ~f:Proof_state.Per_proof.Wrap.of_data
+            ; messages_for_next_step_proof
+            }
+        ; messages_for_next_wrap_proof
+        }
+
+      let spec proofs_verified bp_log2 =
+        let per_proof = Proof_state.Per_proof.Wrap.spec bp_log2 in
+        Spec.T.Struct
+          [ Vector (per_proof, proofs_verified)
+          ; B Digest
+          ; Vector (B Digest, proofs_verified)
+          ]
+    end
+
+    let _ : _ = (Wrap.to_data, Wrap.of_data, Wrap.spec)
   end
 end
 
