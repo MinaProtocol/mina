@@ -47,6 +47,60 @@ module Wrap = struct
         end
       end
 
+      [%%versioned
+      module Stable = struct
+        [@@@no_toplevel_latest_type]
+
+        module V1 = struct
+          type ( 'plonk
+               , 'scalar_challenge
+               , 'fp
+               , 'bulletproof_challenges
+               , 'branch_data )
+               t =
+                ( 'plonk
+                , 'scalar_challenge
+                , 'fp
+                , 'bulletproof_challenges
+                , 'branch_data )
+                Mina_wire_types.Pickles_composition_types.Wrap.Proof_state
+                .Deferred_values
+                .V1
+                .t =
+            { plonk : 'plonk
+            ; combined_inner_product : 'fp
+            ; b : 'fp
+            ; xi : 'scalar_challenge
+            ; bulletproof_challenges : 'bulletproof_challenges
+            ; branch_data : 'branch_data
+            }
+          [@@deriving sexp, compare, yojson, hlist, hash, equal]
+
+          let to_latest = Core_kernel.Fn.id
+        end
+      end]
+
+      type ( 'plonk
+           , 'scalar_challenge
+           , 'fp
+           , 'bulletproof_challenges
+           , 'branch_data )
+           t =
+            ( 'plonk
+            , 'scalar_challenge
+            , 'fp
+            , 'bulletproof_challenges
+            , 'branch_data )
+            Stable.Latest.t =
+        { plonk : 'plonk
+        ; combined_inner_product : 'fp
+        ; b : 'fp
+        ; xi : 'scalar_challenge
+        ; bulletproof_challenges : 'bulletproof_challenges
+        ; branch_data : 'branch_data
+        }
+      [@@deriving sexp, compare, yojson, hlist, hash, equal]
+
       module Minimal = struct
         [%%versioned
         module Stable = struct

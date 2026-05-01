@@ -32,6 +32,11 @@ module Wrap = struct
         its own public-input, so that the next circuit can do them (since it will use the other curve on the cycle,
         and hence can efficiently perform computations in that scalar field). *)
     module Deferred_values = struct
+      (** All the deferred values needed, comprising values from the PLONK IOP
+          verification, values from the inner-product argument, and
+          [which_branch] which is needed to know the proper domain to use. *)
+      include Wire.Wrap.Proof_state.Deferred_values
+
       module Plonk = struct
         module Minimal = struct
           (** Challenges from the PLONK IOP. These, plus the evaluations that are already in the proof, are
@@ -156,70 +161,6 @@ module Wrap = struct
           ; feature_flags = t.feature_flags
           }
       end
-
-      [%%versioned
-      module Stable = struct
-        [@@@no_toplevel_latest_type]
-
-        module V1 = struct
-          (** All the deferred values needed, comprising values from the PLONK IOP verification,
-    values from the inner-product argument, and [which_branch] which is needed to know
-    the proper domain to use. *)
-          type ( 'plonk
-               , 'scalar_challenge
-               , 'fp
-               , 'bulletproof_challenges
-               , 'branch_data )
-               t =
-                ( 'plonk
-                , 'scalar_challenge
-                , 'fp
-                , 'bulletproof_challenges
-                , 'branch_data )
-                Mina_wire_types.Pickles_composition_types.Wrap.Proof_state
-                .Deferred_values
-                .V1
-                .t =
-            { plonk : 'plonk
-            ; combined_inner_product : 'fp
-                  (** combined_inner_product = sum_{i < num_evaluation_points} sum_{j < num_polys} r^i xi^j f_j(pt_i) *)
-            ; b : 'fp
-                  (** b = challenge_poly plonk.zeta + r * challenge_poly (domain_generrator * plonk.zeta)
-                where challenge_poly(x) = \prod_i (1 + bulletproof_challenges.(i) * x^{2^{k - 1 - i}})
-            *)
-            ; xi : 'scalar_challenge
-                  (** The challenge used for combining polynomials *)
-            ; bulletproof_challenges : 'bulletproof_challenges
-                  (** The challenges from the inner-product argument that was partially verified. *)
-            ; branch_data : 'branch_data
-                  (** Data specific to which step branch of the proof-system was verified *)
-            }
-          [@@deriving sexp, compare, yojson, hlist, hash, equal]
-
-          let to_latest = Fn.id
-        end
-      end]
-
-      type ( 'plonk
-           , 'scalar_challenge
-           , 'fp
-           , 'bulletproof_challenges
-           , 'branch_data )
-           t =
-            ( 'plonk
-            , 'scalar_challenge
-            , 'fp
-            , 'bulletproof_challenges
-            , 'branch_data )
-            Stable.Latest.t =
-        { plonk : 'plonk
-        ; combined_inner_product : 'fp
-        ; b : 'fp
-        ; xi : 'scalar_challenge
-        ; bulletproof_challenges : 'bulletproof_challenges
-        ; branch_data : 'branch_data
-        }
-      [@@deriving sexp, compare, yojson, hlist, hash, equal]
 
       module Minimal = struct
         include Wire.Wrap.Proof_state.Deferred_values.Minimal
