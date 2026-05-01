@@ -510,6 +510,166 @@ module Wrap = struct
 
           let _ = fun (c : _ Constant_opt.t) ->
             Constant_opt.of_in_circuit (Constant_opt.to_in_circuit c)
+
+          (** Step-circuit (Tick) instantiation of {!t}.
+
+              The Step verifier's in-circuit Plonk record; ['fp] is left
+              polymorphic for the same reason described in {!Constant}. *)
+          module Step = struct
+            type 'fp t =
+              { alpha : Step_impl.Field.t Scalar_challenge.t
+              ; beta : Step_impl.Field.t
+              ; gamma : Step_impl.Field.t
+              ; zeta : Step_impl.Field.t Scalar_challenge.t
+              ; zeta_to_srs_length : 'fp
+              ; zeta_to_domain_size : 'fp
+              ; perm : 'fp
+              ; feature_flags : Step_impl.Boolean.var Plonk_types.Features.t
+              ; joint_combiner :
+                  (Step_impl.Field.t Scalar_challenge.t, Step_impl.Boolean.var) Opt.t
+              }
+
+            let to_in_circuit
+                ({ alpha
+                 ; beta
+                 ; gamma
+                 ; zeta
+                 ; zeta_to_srs_length
+                 ; zeta_to_domain_size
+                 ; perm
+                 ; feature_flags
+                 ; joint_combiner
+                 } :
+                  'fp t ) :
+                ( Step_impl.Field.t
+                , Step_impl.Field.t Scalar_challenge.t
+                , 'fp
+                , _
+                , (Step_impl.Field.t Scalar_challenge.t, Step_impl.Boolean.var) Opt.t
+                , Step_impl.Boolean.var )
+                in_circuit_t =
+              { alpha
+              ; beta
+              ; gamma
+              ; zeta
+              ; zeta_to_srs_length
+              ; zeta_to_domain_size
+              ; perm
+              ; feature_flags
+              ; joint_combiner
+              }
+
+            let of_in_circuit
+                ({ alpha
+                 ; beta
+                 ; gamma
+                 ; zeta
+                 ; zeta_to_srs_length
+                 ; zeta_to_domain_size
+                 ; perm
+                 ; feature_flags
+                 ; joint_combiner
+                 } :
+                  ( Step_impl.Field.t
+                  , Step_impl.Field.t Scalar_challenge.t
+                  , 'fp
+                  , _
+                  , (Step_impl.Field.t Scalar_challenge.t, Step_impl.Boolean.var) Opt.t
+                  , Step_impl.Boolean.var )
+                  in_circuit_t ) : 'fp t =
+              { alpha
+              ; beta
+              ; gamma
+              ; zeta
+              ; zeta_to_srs_length
+              ; zeta_to_domain_size
+              ; perm
+              ; feature_flags
+              ; joint_combiner
+              }
+          end
+
+          let _ = fun (s : _ Step.t) ->
+            Step.of_in_circuit (Step.to_in_circuit s)
+
+          (** Wrap-circuit (Tock) instantiation of {!t}. Sibling of
+              {!Step}. *)
+          module Wrap = struct
+            type 'fp t =
+              { alpha : Wrap_impl.Field.t Scalar_challenge.t
+              ; beta : Wrap_impl.Field.t
+              ; gamma : Wrap_impl.Field.t
+              ; zeta : Wrap_impl.Field.t Scalar_challenge.t
+              ; zeta_to_srs_length : 'fp
+              ; zeta_to_domain_size : 'fp
+              ; perm : 'fp
+              ; feature_flags : Wrap_impl.Boolean.var Plonk_types.Features.t
+              ; joint_combiner :
+                  (Wrap_impl.Field.t Scalar_challenge.t, Wrap_impl.Boolean.var) Opt.t
+              }
+
+            let to_in_circuit
+                ({ alpha
+                 ; beta
+                 ; gamma
+                 ; zeta
+                 ; zeta_to_srs_length
+                 ; zeta_to_domain_size
+                 ; perm
+                 ; feature_flags
+                 ; joint_combiner
+                 } :
+                  'fp t ) :
+                ( Wrap_impl.Field.t
+                , Wrap_impl.Field.t Scalar_challenge.t
+                , 'fp
+                , _
+                , (Wrap_impl.Field.t Scalar_challenge.t, Wrap_impl.Boolean.var) Opt.t
+                , Wrap_impl.Boolean.var )
+                in_circuit_t =
+              { alpha
+              ; beta
+              ; gamma
+              ; zeta
+              ; zeta_to_srs_length
+              ; zeta_to_domain_size
+              ; perm
+              ; feature_flags
+              ; joint_combiner
+              }
+
+            let of_in_circuit
+                ({ alpha
+                 ; beta
+                 ; gamma
+                 ; zeta
+                 ; zeta_to_srs_length
+                 ; zeta_to_domain_size
+                 ; perm
+                 ; feature_flags
+                 ; joint_combiner
+                 } :
+                  ( Wrap_impl.Field.t
+                  , Wrap_impl.Field.t Scalar_challenge.t
+                  , 'fp
+                  , _
+                  , (Wrap_impl.Field.t Scalar_challenge.t, Wrap_impl.Boolean.var) Opt.t
+                  , Wrap_impl.Boolean.var )
+                  in_circuit_t ) : 'fp t =
+              { alpha
+              ; beta
+              ; gamma
+              ; zeta
+              ; zeta_to_srs_length
+              ; zeta_to_domain_size
+              ; perm
+              ; feature_flags
+              ; joint_combiner
+              }
+          end
+
+          let _ = fun (w : _ Wrap.t) ->
+            Wrap.of_in_circuit (Wrap.to_in_circuit w)
         end
 
         let to_minimal (type challenge scalar_challenge fp fp_opt lookup_opt)
