@@ -852,21 +852,6 @@ module Step = struct
               computation of the [In_circuit] value from the [Minimal] value.
           *)
           include Wire.Step.Proof_state.Deferred_values.Plonk.Minimal
-
-          let to_wrap ~feature_flags { alpha; beta; gamma; zeta } :
-              _ Wrap.Proof_state.Deferred_values.Plonk.Minimal.Poly.t =
-            { alpha; beta; gamma; zeta; joint_combiner = None; feature_flags }
-
-          let of_wrap
-              ({ alpha
-               ; beta
-               ; gamma
-               ; zeta
-               ; joint_combiner = _
-               ; feature_flags = _
-               } :
-                _ Wrap.Proof_state.Deferred_values.Plonk.Minimal.Poly.t ) =
-            { alpha; beta; gamma; zeta }
         end
 
         open Pickles_types

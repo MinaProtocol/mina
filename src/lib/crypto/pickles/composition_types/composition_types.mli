@@ -913,20 +913,6 @@ module Step : sig
             }
           [@@deriving sexp, compare, yojson, hlist, hash, equal]
 
-          val to_wrap :
-               feature_flags:'bool Plonk_types.Features.t
-            -> ('challenge, 'scalar_challenge) t
-            -> ( 'challenge
-               , 'scalar_challenge
-               , 'bool )
-               Wrap.Proof_state.Deferred_values.Plonk.Minimal.t
-
-          val of_wrap :
-               ( 'challenge
-               , 'scalar_challenge
-               , 'bool )
-               Wrap.Proof_state.Deferred_values.Plonk.Minimal.t
-            -> ('challenge, 'scalar_challenge) t
         end
 
         module In_circuit : sig
