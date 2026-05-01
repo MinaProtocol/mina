@@ -2136,6 +2136,161 @@ module Step = struct
         Spec.wrap_typ fq ~assert_16_bits (spec Backend.Tock.Rounds.n)
         |> Wrap_impl.Typ.transport ~there:to_data ~back:of_data
         |> Wrap_impl.Typ.transport_var ~there:to_data ~back:of_data
+
+      (** Wire-form (out-of-circuit) instantiation of {!t_}; the
+          [deferred_values] slot is also out-of-circuit
+          ({!Deferred_values.Constant.t}). {!to_t_} / {!of_t_} bridge
+          to the polymorphic skeleton. *)
+      module Constant = struct
+        type ('plonk, 'fq, 'digest) t =
+          { deferred_values : ('plonk, 'fq) Deferred_values.Constant.t
+          ; should_finalize : bool
+          ; sponge_digest_before_evaluations : 'digest
+          }
+
+        let to_t_
+            ({ deferred_values
+             ; should_finalize
+             ; sponge_digest_before_evaluations
+             } :
+              ('plonk, 'fq, 'digest) t ) :
+            ( 'plonk
+            , Limb_vector.Challenge.Constant.t Scalar_challenge.t
+            , 'fq
+            , ( Limb_vector.Challenge.Constant.t Scalar_challenge.t
+                Bulletproof_challenge.t
+              , Backend.Tock.Rounds.n )
+              Vector.t
+            , 'digest
+            , bool )
+            t_ =
+          { deferred_values = Deferred_values.Constant.to_t_ deferred_values
+          ; should_finalize
+          ; sponge_digest_before_evaluations
+          }
+
+        let of_t_
+            ({ deferred_values
+             ; should_finalize
+             ; sponge_digest_before_evaluations
+             } :
+              ( 'plonk
+              , Limb_vector.Challenge.Constant.t Scalar_challenge.t
+              , 'fq
+              , ( Limb_vector.Challenge.Constant.t Scalar_challenge.t
+                  Bulletproof_challenge.t
+                , Backend.Tock.Rounds.n )
+                Vector.t
+              , 'digest
+              , bool )
+              t_ ) : ('plonk, 'fq, 'digest) t =
+          { deferred_values = Deferred_values.Constant.of_t_ deferred_values
+          ; should_finalize
+          ; sponge_digest_before_evaluations
+          }
+      end
+
+      let _ = fun (c : (_, _, _) Constant.t) -> Constant.of_t_ (Constant.to_t_ c)
+
+      (** Step-circuit (Tick) instantiation of {!t_}. *)
+      module Step = struct
+        type ('plonk, 'fq, 'digest, 'bool) t =
+          { deferred_values : ('plonk, 'fq) Deferred_values.Step.t
+          ; should_finalize : 'bool
+          ; sponge_digest_before_evaluations : 'digest
+          }
+
+        let to_t_
+            ({ deferred_values
+             ; should_finalize
+             ; sponge_digest_before_evaluations
+             } :
+              ('plonk, 'fq, 'digest, 'bool) t ) :
+            ( 'plonk
+            , Step_impl.Field.t Scalar_challenge.t
+            , 'fq
+            , ( Step_impl.Field.t Scalar_challenge.t Bulletproof_challenge.t
+              , Backend.Tock.Rounds.n )
+              Vector.t
+            , 'digest
+            , 'bool )
+            t_ =
+          { deferred_values = Deferred_values.Step.to_t_ deferred_values
+          ; should_finalize
+          ; sponge_digest_before_evaluations
+          }
+
+        let of_t_
+            ({ deferred_values
+             ; should_finalize
+             ; sponge_digest_before_evaluations
+             } :
+              ( 'plonk
+              , Step_impl.Field.t Scalar_challenge.t
+              , 'fq
+              , ( Step_impl.Field.t Scalar_challenge.t Bulletproof_challenge.t
+                , Backend.Tock.Rounds.n )
+                Vector.t
+              , 'digest
+              , 'bool )
+              t_ ) : ('plonk, 'fq, 'digest, 'bool) t =
+          { deferred_values = Deferred_values.Step.of_t_ deferred_values
+          ; should_finalize
+          ; sponge_digest_before_evaluations
+          }
+      end
+
+      let _ = fun (s : (_, _, _, _) Step.t) -> Step.of_t_ (Step.to_t_ s)
+
+      (** Wrap-circuit (Tock) instantiation of {!t_}. *)
+      module Wrap = struct
+        type ('plonk, 'fq, 'digest, 'bool) t =
+          { deferred_values : ('plonk, 'fq) Deferred_values.Wrap.t
+          ; should_finalize : 'bool
+          ; sponge_digest_before_evaluations : 'digest
+          }
+
+        let to_t_
+            ({ deferred_values
+             ; should_finalize
+             ; sponge_digest_before_evaluations
+             } :
+              ('plonk, 'fq, 'digest, 'bool) t ) :
+            ( 'plonk
+            , Wrap_impl.Field.t Scalar_challenge.t
+            , 'fq
+            , ( Wrap_impl.Field.t Scalar_challenge.t Bulletproof_challenge.t
+              , Backend.Tock.Rounds.n )
+              Vector.t
+            , 'digest
+            , 'bool )
+            t_ =
+          { deferred_values = Deferred_values.Wrap.to_t_ deferred_values
+          ; should_finalize
+          ; sponge_digest_before_evaluations
+          }
+
+        let of_t_
+            ({ deferred_values
+             ; should_finalize
+             ; sponge_digest_before_evaluations
+             } :
+              ( 'plonk
+              , Wrap_impl.Field.t Scalar_challenge.t
+              , 'fq
+              , ( Wrap_impl.Field.t Scalar_challenge.t Bulletproof_challenge.t
+                , Backend.Tock.Rounds.n )
+                Vector.t
+              , 'digest
+              , 'bool )
+              t_ ) : ('plonk, 'fq, 'digest, 'bool) t =
+          { deferred_values = Deferred_values.Wrap.of_t_ deferred_values
+          ; should_finalize
+          ; sponge_digest_before_evaluations
+          }
+      end
+
+      let _ = fun (w : (_, _, _, _) Wrap.t) -> Wrap.of_t_ (Wrap.to_t_ w)
     end
 
     type ('unfinalized_proofs, 'messages_for_next_step_proof) t =
