@@ -46,6 +46,43 @@ module Wrap = struct
           end]
         end
       end
+
+      module Minimal = struct
+        [%%versioned
+        module Stable = struct
+          module V1 = struct
+            (* 'fp is unused in Minimal but kept for type compatibility with
+               In_circuit, to preserve the serialization format. *)
+            type ( 'challenge
+                 , 'scalar_challenge
+                 , 'fp
+                 , 'bool
+                 , 'bulletproof_challenges
+                 , 'branch_data )
+                 t =
+                  ( 'challenge
+                  , 'scalar_challenge
+                  , 'fp
+                  , 'bool
+                  , 'bulletproof_challenges
+                  , 'branch_data )
+                  Mina_wire_types.Pickles_composition_types.Wrap.Proof_state
+                  .Deferred_values
+                  .Minimal
+                  .V1
+                  .t =
+              { plonk :
+                  ( 'challenge
+                  , 'scalar_challenge
+                  , 'bool )
+                  Plonk.Minimal.Stable.V1.t
+              ; bulletproof_challenges : 'bulletproof_challenges
+              ; branch_data : 'branch_data
+              }
+            [@@deriving sexp, compare, yojson, hash, equal]
+          end
+        end]
+      end
     end
   end
 end
