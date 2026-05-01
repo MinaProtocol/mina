@@ -443,6 +443,10 @@ module Wrap : sig
         }
       [@@deriving sexp, compare, yojson, hlist, hash, equal]
 
+      (** Wire-format polymorphic skeleton. Concrete records below name it
+          explicitly via {!Poly} rather than [include]ing it. *)
+      module Poly = Wire.Wrap.Proof_state.Messages_for_next_wrap_proof
+
       val to_field_elements :
            ('g, (('f, 'a) Vector.t, 'b) Vector.t) t
         -> g1:('g -> 'f list)
@@ -1408,6 +1412,58 @@ module Challenges_vector : sig
 
   module Constant : sig
     type 'n t = (Wrap_impl.Field.Constant.t Wrap_bp_vec.t, 'n) Vector.t
+  end
+end
+
+(** Concrete (non-versioned) records mirroring
+    [Pickles.Reduced_messages_for_next_proof_over_same_field]. *)
+module Reduced_messages_for_next : sig
+  module Step : sig
+    type ( 'app_state
+         , 'challenge_polynomial_commitments
+         , 'bulletproof_challenges )
+         t =
+          ( 'app_state
+          , 'challenge_polynomial_commitments
+          , 'bulletproof_challenges )
+          Mina_wire_types.Pickles_reduced_messages_for_next_proof_over_same_field
+          .Step
+          .V1
+          .t =
+      { app_state : 'app_state
+      ; challenge_polynomial_commitments : 'challenge_polynomial_commitments
+      ; old_bulletproof_challenges : 'bulletproof_challenges
+      }
+
+    module Specialised : sig
+      type ('app_state, 'actual_proofs_verified, 'bp_chal_length) t =
+        ( 'app_state
+        , (Backend.Tock.Curve.Affine.t, 'actual_proofs_verified) Vector.t
+        , ( ( Limb_vector.Challenge.Constant.t Scalar_challenge.t
+              Bulletproof_challenge.t
+            , 'bp_chal_length )
+            Vector.t
+          , 'actual_proofs_verified )
+          Vector.t )
+        Mina_wire_types.Pickles_reduced_messages_for_next_proof_over_same_field
+        .Step
+        .V1
+        .t
+    end
+  end
+
+  module Wrap : sig
+    module Challenges_vector : sig
+      type t =
+        Limb_vector.Challenge.Constant.t Scalar_challenge.t
+        Bulletproof_challenge.t
+        Wrap_bp_vec.t
+    end
+
+    type 'max_local_max_proofs_verified t =
+      ( Backend.Tick.Curve.Affine.t
+      , (Challenges_vector.t, 'max_local_max_proofs_verified) Vector.t )
+      Wrap.Proof_state.Messages_for_next_wrap_proof.Poly.t
   end
 end
 
