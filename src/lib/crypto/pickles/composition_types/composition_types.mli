@@ -13,6 +13,8 @@ module Nvector = Vector.With_length
 module Wrap_bp_vec = Backend.Tock.Rounds_vector
 module Step_bp_vec = Backend.Tick.Rounds_vector
 module Scalar_challenge = Kimchi_backend_common.Scalar_challenge
+module Wire = Wire
+module Messages_for_next = Messages_for_next
 module Step_impl := Kimchi_pasta_snarky_backend.Step_impl
 module Wrap_impl := Kimchi_pasta_snarky_backend.Wrap_impl
 
@@ -105,52 +107,7 @@ module Wrap : sig
     (** The component of the proof accumulation state that is only computed on
         by the "wrapping" proof system, and that can be handled opaquely by any
         "step" circuits. *)
-    module Messages_for_next_wrap_proof : sig
-      module Stable : sig
-        module V1 : sig
-          type ('g1, 'bulletproof_challenges) t =
-                ( 'g1
-                , 'bulletproof_challenges )
-                Mina_wire_types.Pickles_composition_types.Wrap.Proof_state
-                .Messages_for_next_wrap_proof
-                .V1
-                .t =
-            { challenge_polynomial_commitment : 'g1
-            ; old_bulletproof_challenges : 'bulletproof_challenges
-            }
-          [@@deriving
-            sexp, compare, yojson, hlist, hash, equal, bin_shape, bin_io]
-
-          include Plonkish_prelude.Sigs.VERSIONED
-        end
-
-        module Latest = V1
-      end
-
-      type ('g1, 'bulletproof_challenges) t =
-            ('g1, 'bulletproof_challenges) Stable.Latest.t =
-        { challenge_polynomial_commitment : 'g1
-        ; old_bulletproof_challenges : 'bulletproof_challenges
-        }
-      [@@deriving sexp, compare, yojson, hlist, hash, equal]
-
-      (** Wire-format polymorphic skeleton. Concrete records below name it
-          explicitly via {!Poly} rather than [include]ing it. *)
-      module Poly = Wire.Wrap.Proof_state.Messages_for_next_wrap_proof
-
-      val to_field_elements :
-           ('g, (('f, 'a) Vector.t, 'b) Vector.t) t
-        -> g1:('g -> 'f list)
-        -> 'f Core_kernel.Array.t
-
-      val wrap_typ :
-           ('a, 'b) Wrap_impl.Typ.t
-        -> ('d, 'e) Wrap_impl.Typ.t
-        -> length:'f Nat.nat
-        -> ( ('a, ('d, 'f) Vector.vec) t
-           , ('b, ('e, 'f) Vector.vec) t )
-           Wrap_impl.Typ.t
-    end
+    module Messages_for_next_wrap_proof = Messages_for_next.Wrap_proof
 
     module Minimal : sig
       [%%versioned:
@@ -354,35 +311,7 @@ module Wrap : sig
   (** The component of the proof accumulation state that is only computed on by
       the "stepping" proof system, and that can be handled opaquely by any
       "wrap" circuits. *)
-  module Messages_for_next_step_proof : sig
-    type ('g, 's, 'challenge_polynomial_commitments, 'bulletproof_challenges) t =
-      { app_state : 's
-            (** The actual application-level state (e.g., for Mina, this is the
-                protocol state which contains the merkle root of the ledger,
-                state related to consensus, etc.) *)
-      ; dlog_plonk_index : 'g Plonk_verification_key_evals.t
-            (** The verification key corresponding to the wrap-circuit for this
-                recursive proof system.  It gets threaded through all the
-                circuits so that the step circuits can verify proofs against
-                it.  *)
-      ; challenge_polynomial_commitments : 'challenge_polynomial_commitments
-      ; old_bulletproof_challenges : 'bulletproof_challenges
-      }
-    [@@deriving sexp, hlist]
-
-    val to_field_elements :
-         ('a, 'b, ('g, 'c) Vector.t, (('f, 'd) Vector.t, 'c) Vector.t) t
-      -> app_state:('b -> 'f Core_kernel.Array.t)
-      -> comm:('a -> 'f Core_kernel.Array.t)
-      -> g:('g -> 'f list)
-      -> 'f Core_kernel.Array.t
-
-    val to_field_elements_without_index :
-         ('a, 'b, ('g, 'c) Vector.t, (('f, 'd) Vector.t, 'c) Vector.t) t
-      -> app_state:('b -> 'f Core_kernel.Array.t)
-      -> g:('g -> 'f list)
-      -> 'f Core_kernel.Array.t
-  end
+  module Messages_for_next_step_proof = Messages_for_next.Step_proof
 
   module Lookup_parameters : sig
     type ('chal, 'chal_var, 'fp, 'fp_var) t =
