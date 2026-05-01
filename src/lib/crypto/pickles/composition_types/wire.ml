@@ -138,6 +138,25 @@ module Wrap = struct
         end]
       end
     end
+
+    module Messages_for_next_wrap_proof = struct
+      [%%versioned
+      module Stable = struct
+        module V1 = struct
+          type ('g1, 'bulletproof_challenges) t =
+                ( 'g1
+                , 'bulletproof_challenges )
+                Mina_wire_types.Pickles_composition_types.Wrap.Proof_state
+                .Messages_for_next_wrap_proof
+                .V1
+                .t =
+            { challenge_polynomial_commitment : 'g1
+            ; old_bulletproof_challenges : 'bulletproof_challenges
+            }
+          [@@deriving sexp, compare, yojson, hlist, hash, equal]
+        end
+      end]
+    end
   end
 end
 

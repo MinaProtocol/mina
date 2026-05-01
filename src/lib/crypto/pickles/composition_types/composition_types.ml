@@ -250,22 +250,7 @@ module Wrap = struct
     (** The component of the proof accumulation state that is only computed on by the
         "wrapping" proof system, and that can be handled opaquely by any "step" circuits. *)
     module Messages_for_next_wrap_proof = struct
-      [%%versioned
-      module Stable = struct
-        module V1 = struct
-          type ('g1, 'bulletproof_challenges) t =
-                ( 'g1
-                , 'bulletproof_challenges )
-                Mina_wire_types.Pickles_composition_types.Wrap.Proof_state
-                .Messages_for_next_wrap_proof
-                .V1
-                .t =
-            { challenge_polynomial_commitment : 'g1
-            ; old_bulletproof_challenges : 'bulletproof_challenges
-            }
-          [@@deriving sexp, compare, yojson, hlist, hash, equal]
-        end
-      end]
+      include Wire.Wrap.Proof_state.Messages_for_next_wrap_proof
 
       let to_field_elements (type g f)
           { challenge_polynomial_commitment; old_bulletproof_challenges }
