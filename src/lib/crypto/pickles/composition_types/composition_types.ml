@@ -1841,6 +1841,148 @@ module Wrap = struct
       { proof_state = Proof_state.to_minimal ~to_option proof_state
       ; messages_for_next_step_proof
       }
+
+    (** Wire-format polymorphic skeleton. Concrete records below name it
+        explicitly via {!Poly} rather than [include]ing it. *)
+    module Poly = Wire.Wrap.Statement
+
+    (** Wire-form (out-of-circuit) instantiation. Pins
+        [messages_for_next_step_proof] to a digest; ['plonk] and ['fp]
+        stay polymorphic. *)
+    module Constant = struct
+      type ('plonk, 'fp) t =
+        { proof_state : ('plonk, 'fp) Proof_state.Constant.t
+        ; messages_for_next_step_proof : Digest_.Constant.t
+        }
+
+      let to_stable
+          ({ proof_state; messages_for_next_step_proof } : ('plonk, 'fp) t) :
+          ( 'plonk
+          , Limb_vector.Challenge.Constant.t Scalar_challenge.t
+          , 'fp
+          , Digest_.Constant.t
+          , Digest_.Constant.t
+          , Digest_.Constant.t
+          , ( Limb_vector.Challenge.Constant.t Scalar_challenge.t
+              Bulletproof_challenge.t
+            , Backend.Tick.Rounds.n )
+            Vector.t
+          , Branch_data.t )
+          Poly.Stable.V1.t =
+        { proof_state = Proof_state.Constant.to_stable proof_state
+        ; messages_for_next_step_proof
+        }
+
+      let of_stable
+          ({ proof_state; messages_for_next_step_proof } :
+            ( 'plonk
+            , Limb_vector.Challenge.Constant.t Scalar_challenge.t
+            , 'fp
+            , Digest_.Constant.t
+            , Digest_.Constant.t
+            , Digest_.Constant.t
+            , ( Limb_vector.Challenge.Constant.t Scalar_challenge.t
+                Bulletproof_challenge.t
+              , Backend.Tick.Rounds.n )
+              Vector.t
+            , Branch_data.t )
+            Poly.Stable.V1.t ) : ('plonk, 'fp) t =
+        { proof_state = Proof_state.Constant.of_stable proof_state
+        ; messages_for_next_step_proof
+        }
+    end
+
+    let _ = fun (c : (_, _) Constant.t) -> Constant.of_stable (Constant.to_stable c)
+
+    (** Step-circuit (Tick) instantiation. *)
+    module Step = struct
+      type ('plonk, 'fp, 'messages_for_next_step_proof) t =
+        { proof_state : ('plonk, 'fp) Proof_state.Step.t
+        ; messages_for_next_step_proof : 'messages_for_next_step_proof
+        }
+
+      let to_stable
+          ({ proof_state; messages_for_next_step_proof } :
+            ('plonk, 'fp, 'm) t ) :
+          ( 'plonk
+          , Step_impl.Field.t Scalar_challenge.t
+          , 'fp
+          , Step_impl.Field.t
+          , Step_impl.Field.t
+          , 'm
+          , ( Step_impl.Field.t Scalar_challenge.t Bulletproof_challenge.t
+            , Backend.Tick.Rounds.n )
+            Vector.t
+          , Branch_data.Checked.Step.t )
+          Poly.Stable.V1.t =
+        { proof_state = Proof_state.Step.to_stable proof_state
+        ; messages_for_next_step_proof
+        }
+
+      let of_stable
+          ({ proof_state; messages_for_next_step_proof } :
+            ( 'plonk
+            , Step_impl.Field.t Scalar_challenge.t
+            , 'fp
+            , Step_impl.Field.t
+            , Step_impl.Field.t
+            , 'm
+            , ( Step_impl.Field.t Scalar_challenge.t Bulletproof_challenge.t
+              , Backend.Tick.Rounds.n )
+              Vector.t
+            , Branch_data.Checked.Step.t )
+            Poly.Stable.V1.t ) : ('plonk, 'fp, 'm) t =
+        { proof_state = Proof_state.Step.of_stable proof_state
+        ; messages_for_next_step_proof
+        }
+    end
+
+    let _ = fun (s : (_, _, _) Step.t) -> Step.of_stable (Step.to_stable s)
+
+    (** Wrap-circuit (Tock) instantiation. *)
+    module Wrap = struct
+      type ('plonk, 'fp, 'messages_for_next_step_proof) t =
+        { proof_state : ('plonk, 'fp) Proof_state.Wrap.t
+        ; messages_for_next_step_proof : 'messages_for_next_step_proof
+        }
+
+      let to_stable
+          ({ proof_state; messages_for_next_step_proof } :
+            ('plonk, 'fp, 'm) t ) :
+          ( 'plonk
+          , Wrap_impl.Field.t Scalar_challenge.t
+          , 'fp
+          , Wrap_impl.Field.t
+          , Wrap_impl.Field.t
+          , 'm
+          , ( Wrap_impl.Field.t Scalar_challenge.t Bulletproof_challenge.t
+            , Backend.Tick.Rounds.n )
+            Vector.t
+          , Wrap_impl.Field.t )
+          Poly.Stable.V1.t =
+        { proof_state = Proof_state.Wrap.to_stable proof_state
+        ; messages_for_next_step_proof
+        }
+
+      let of_stable
+          ({ proof_state; messages_for_next_step_proof } :
+            ( 'plonk
+            , Wrap_impl.Field.t Scalar_challenge.t
+            , 'fp
+            , Wrap_impl.Field.t
+            , Wrap_impl.Field.t
+            , 'm
+            , ( Wrap_impl.Field.t Scalar_challenge.t Bulletproof_challenge.t
+              , Backend.Tick.Rounds.n )
+              Vector.t
+            , Wrap_impl.Field.t )
+            Poly.Stable.V1.t ) : ('plonk, 'fp, 'm) t =
+        { proof_state = Proof_state.Wrap.of_stable proof_state
+        ; messages_for_next_step_proof
+        }
+    end
+
+    let _ = fun (w : (_, _, _) Wrap.t) -> Wrap.of_stable (Wrap.to_stable w)
   end
 end
 
