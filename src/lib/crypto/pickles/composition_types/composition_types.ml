@@ -774,6 +774,83 @@ module Wrap = struct
         ; bulletproof_challenges
         ; branch_data
         }
+
+      (** Wire-format polymorphic skeleton. Concrete records below name it
+          explicitly via {!Poly} rather than [include]ing it. *)
+      module Poly = Wire.Wrap.Proof_state.Deferred_values
+
+      (** Wire-form (out-of-circuit) instantiation. Concretises the
+          [scalar_challenge] / [bulletproof_challenges] slots; ['plonk],
+          ['fp], ['branch_data] are left polymorphic because callers pick
+          them from {!Plonk.Minimal} vs {!Plonk.In_circuit}, between
+          [Shifted_value.Type1.t] and [Shifted_value.Type2.t], and per
+          branch_data form respectively. *)
+      module Constant = struct
+        type ('plonk, 'fp) t =
+          { plonk : 'plonk
+          ; combined_inner_product : 'fp
+          ; b : 'fp
+          ; xi : Limb_vector.Challenge.Constant.t Scalar_challenge.t
+          ; bulletproof_challenges :
+              ( Limb_vector.Challenge.Constant.t Scalar_challenge.t
+                Bulletproof_challenge.t
+              , Backend.Tick.Rounds.n )
+              Vector.t
+          ; branch_data : Branch_data.t
+          }
+
+        (** [Poly.t] specialised to the wire-form scalar_challenge /
+            bulletproof_challenges / branch_data slots used out of
+            circuit — the result type of {!to_deferred_values}, also
+            consumed by [Wrap.For_tests_only.deferred_values_and_hints]. *)
+        type ('plonk, 'fp) poly_t =
+          ( 'plonk
+          , Limb_vector.Challenge.Constant.t Scalar_challenge.t
+          , 'fp
+          , ( Limb_vector.Challenge.Constant.t Scalar_challenge.t
+              Bulletproof_challenge.t
+            , Backend.Tick.Rounds.n )
+            Vector.t
+          , Branch_data.t )
+          Poly.t
+
+        let to_deferred_values
+            ({ plonk
+             ; combined_inner_product
+             ; b
+             ; xi
+             ; bulletproof_challenges
+             ; branch_data
+             } :
+              ('plonk, 'fp) t ) : ('plonk, 'fp) poly_t =
+          { plonk
+          ; combined_inner_product
+          ; b
+          ; xi
+          ; bulletproof_challenges
+          ; branch_data
+          }
+
+        let of_deferred_values
+            ({ plonk
+             ; combined_inner_product
+             ; b
+             ; xi
+             ; bulletproof_challenges
+             ; branch_data
+             } :
+              ('plonk, 'fp) poly_t ) : ('plonk, 'fp) t =
+          { plonk
+          ; combined_inner_product
+          ; b
+          ; xi
+          ; bulletproof_challenges
+          ; branch_data
+          }
+      end
+
+      let _ = fun (c : (_, _) Constant.t) ->
+        Constant.of_deferred_values (Constant.to_deferred_values c)
     end
 
     (** The component of the proof accumulation state that is only computed on by the
