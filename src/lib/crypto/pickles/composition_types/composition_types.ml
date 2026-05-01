@@ -1273,8 +1273,6 @@ module Step = struct
           let _ = fun (w : Wrap.t) -> Wrap.of_minimal (Wrap.to_minimal w)
         end
 
-        open Pickles_types
-
         module In_circuit = struct
           (** All scalar values deferred by a verifier circuit.
               The values in [vbmul], [complete_add], [endomul], [endomul_scalar], and [perm]
@@ -1298,78 +1296,6 @@ module Step = struct
                   (** scalar used on one of the permutation polynomial commitments. *)
             }
           [@@deriving sexp, compare, yojson, hlist, hash, equal, fields]
-
-          let to_wrap ~opt_none ~false_
-              { alpha
-              ; beta
-              ; gamma
-              ; zeta
-              ; zeta_to_srs_length
-              ; zeta_to_domain_size
-              ; perm
-              } : _ Wrap.Proof_state.Deferred_values.Plonk.In_circuit.t =
-            { alpha
-            ; beta
-            ; gamma
-            ; zeta
-            ; zeta_to_srs_length
-            ; zeta_to_domain_size
-            ; perm
-            ; feature_flags =
-                { range_check0 = false_
-                ; range_check1 = false_
-                ; foreign_field_add = false_
-                ; foreign_field_mul = false_
-                ; xor = false_
-                ; rot = false_
-                ; lookup = false_
-                ; runtime_tables = false_
-                }
-            ; joint_combiner = opt_none
-            }
-
-          let of_wrap ~assert_none ~assert_false
-              ({ alpha
-               ; beta
-               ; gamma
-               ; zeta
-               ; zeta_to_srs_length
-               ; zeta_to_domain_size
-               ; perm
-               ; feature_flags
-               ; joint_combiner
-               } :
-                _ Wrap.Proof_state.Deferred_values.Plonk.In_circuit.t ) =
-            let () =
-              let { Plonk_types.Features.range_check0
-                  ; range_check1
-                  ; foreign_field_add
-                  ; foreign_field_mul
-                  ; xor
-                  ; rot
-                  ; lookup
-                  ; runtime_tables
-                  } =
-                feature_flags
-              in
-              assert_false range_check0 ;
-              assert_false range_check1 ;
-              assert_false foreign_field_add ;
-              assert_false foreign_field_mul ;
-              assert_false xor ;
-              assert_false rot ;
-              assert_false lookup ;
-              assert_false runtime_tables
-            in
-            assert_none joint_combiner ;
-            { alpha
-            ; beta
-            ; gamma
-            ; zeta
-            ; zeta_to_srs_length
-            ; zeta_to_domain_size
-            ; perm
-            }
 
           let map_challenges t ~f ~scalar =
             { t with

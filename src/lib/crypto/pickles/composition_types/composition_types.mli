@@ -946,30 +946,6 @@ module Step : sig
             }
           [@@deriving sexp, compare, yojson, hlist, hash, equal, fields]
 
-          val to_wrap :
-               opt_none:'lookup_opt
-            -> false_:'bool
-            -> ('challenge, 'scalar_challenge, 'fp) t
-            -> ( 'challenge
-               , 'scalar_challenge
-               , 'fp
-               , 'fp_opt
-               , 'lookup_opt
-               , 'bool )
-               Wrap.Proof_state.Deferred_values.Plonk.In_circuit.t
-
-          val of_wrap :
-               assert_none:('lookup_opt -> unit)
-            -> assert_false:('bool -> unit)
-            -> ( 'challenge
-               , 'scalar_challenge
-               , 'fp
-               , 'fp_opt
-               , 'lookup_opt
-               , 'bool )
-               Wrap.Proof_state.Deferred_values.Plonk.In_circuit.t
-            -> ('challenge, 'scalar_challenge, 'fp) t
-
           val map_challenges :
                ('a, 'b, 'c) t
             -> f:('a -> 'f)
