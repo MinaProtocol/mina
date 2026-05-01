@@ -31,6 +31,8 @@ module Wrap = struct
         performing them directly, it exposes the values needed for those computations as a part of
         its own public-input, so that the next circuit can do them (since it will use the other curve on the cycle,
         and hence can efficiently perform computations in that scalar field). *)
+    include Wire.Wrap.Proof_state
+
     module Deferred_values = struct
       (** All the deferred values needed, comprising values from the PLONK IOP
           verification, values from the inner-product argument, and
@@ -267,41 +269,6 @@ module Wrap = struct
           ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
           ~value_of_hlist:of_hlist
     end
-
-    [%%versioned
-    module Stable = struct
-      module V1 = struct
-        type ( 'plonk
-             , 'scalar_challenge
-             , 'fp
-             , 'messages_for_next_wrap_proof
-             , 'digest
-             , 'bp_chals
-             , 'index )
-             t =
-              ( 'plonk
-              , 'scalar_challenge
-              , 'fp
-              , 'messages_for_next_wrap_proof
-              , 'digest
-              , 'bp_chals
-              , 'index )
-              Mina_wire_types.Pickles_composition_types.Wrap.Proof_state.V1.t =
-          { deferred_values :
-              ( 'plonk
-              , 'scalar_challenge
-              , 'fp
-              , 'bp_chals
-              , 'index )
-              Deferred_values.Stable.V1.t
-          ; sponge_digest_before_evaluations : 'digest
-          ; messages_for_next_wrap_proof : 'messages_for_next_wrap_proof
-                (** Parts of the statement not needed by the other circuit. Represented as a hash inside the
-              circuit which is then "unhashed". *)
-          }
-        [@@deriving sexp, compare, yojson, hlist, hash, equal]
-      end
-    end]
 
     module Minimal = struct
       [%%versioned

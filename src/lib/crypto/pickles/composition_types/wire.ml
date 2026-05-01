@@ -157,6 +157,39 @@ module Wrap = struct
         end
       end]
     end
+
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type ( 'plonk
+             , 'scalar_challenge
+             , 'fp
+             , 'messages_for_next_wrap_proof
+             , 'digest
+             , 'bp_chals
+             , 'index )
+             t =
+              ( 'plonk
+              , 'scalar_challenge
+              , 'fp
+              , 'messages_for_next_wrap_proof
+              , 'digest
+              , 'bp_chals
+              , 'index )
+              Mina_wire_types.Pickles_composition_types.Wrap.Proof_state.V1.t =
+          { deferred_values :
+              ( 'plonk
+              , 'scalar_challenge
+              , 'fp
+              , 'bp_chals
+              , 'index )
+              Deferred_values.Stable.V1.t
+          ; sponge_digest_before_evaluations : 'digest
+          ; messages_for_next_wrap_proof : 'messages_for_next_wrap_proof
+          }
+        [@@deriving sexp, compare, yojson, hlist, hash, equal]
+      end
+    end]
   end
 end
 
