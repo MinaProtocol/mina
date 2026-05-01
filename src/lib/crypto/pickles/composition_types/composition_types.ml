@@ -147,6 +147,44 @@ module Wrap = struct
           (** Round-trip witness anchoring {!Step} against {!In_circuit} until
               downstream consumers are migrated to the fresh record. *)
           let _ = fun (s : Step.t) -> Step.of_in_circuit (Step.to_in_circuit s)
+
+          (** Wrap-circuit (Tock) instantiation of {!In_circuit.t}.
+
+              Sibling of {!Step}, used when the Wrap verifier constructs
+              Plonk-IOP challenges in-circuit. Fresh record; see {!Step} for
+              the rationale. *)
+          module Wrap = struct
+            type t =
+              { alpha : Wrap_impl.Field.t Scalar_challenge.t
+              ; beta : Wrap_impl.Field.t
+              ; gamma : Wrap_impl.Field.t
+              ; zeta : Wrap_impl.Field.t Scalar_challenge.t
+              ; joint_combiner :
+                  (Wrap_impl.Field.t Scalar_challenge.t, Wrap_impl.Boolean.var) Opt.t
+              ; feature_flags : Wrap_impl.Boolean.var Plonk_types.Features.t
+              }
+
+            let to_in_circuit
+                ({ alpha; beta; gamma; zeta; joint_combiner; feature_flags } :
+                  t ) :
+                ( Wrap_impl.Field.t
+                , Wrap_impl.Field.t Scalar_challenge.t
+                , Wrap_impl.Boolean.var )
+                In_circuit.t =
+              { alpha; beta; gamma; zeta; joint_combiner; feature_flags }
+
+            let of_in_circuit
+                ({ alpha; beta; gamma; zeta; joint_combiner; feature_flags } :
+                  ( Wrap_impl.Field.t
+                  , Wrap_impl.Field.t Scalar_challenge.t
+                  , Wrap_impl.Boolean.var )
+                  In_circuit.t ) : t =
+              { alpha; beta; gamma; zeta; joint_combiner; feature_flags }
+          end
+
+          (** Round-trip witness anchoring {!Wrap} against {!In_circuit} until
+              downstream consumers are migrated to the fresh record. *)
+          let _ = fun (w : Wrap.t) -> Wrap.of_in_circuit (Wrap.to_in_circuit w)
         end
 
         open Pickles_types
