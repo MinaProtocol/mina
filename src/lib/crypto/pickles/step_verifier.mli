@@ -379,7 +379,7 @@ val finalize_other_proof :
        Pickles_types.Vector.t
      , Import.Branch_data.Checked.Step.t
      , Impl.Boolean.var )
-     Import.Types.Wrap.Proof_state.Deferred_values.In_circuit.t
+     Import.Types.Wrap_proof_state.Deferred_values.In_circuit.t
   -> ( Impl.Field.t
      , Impl.Field.t Core_kernel.Array.t
      , Impl.Boolean.var )
@@ -422,7 +422,7 @@ val hash_messages_for_next_step_proof :
          , ( (Impl.Field.t, 'c) Pickles_types.Vector.t
            , 'b )
            Pickles_types.Vector.t )
-         Import.Types.Step.Proof_state.Messages_for_next_step_proof.t
+         Import.Types.Step_proof_state.Messages_for_next_step_proof.t
       -> Impl.Field.t )
      Core_kernel.Staged.t
 
@@ -457,7 +457,7 @@ val hash_messages_for_next_step_proof_opt :
            , ( (Impl.Field.t, 'c) Pickles_types.Vector.t
              , 'b )
              Pickles_types.Vector.t )
-           Import.Types.Step.Proof_state.Messages_for_next_step_proof.t
+           Import.Types.Step_proof_state.Messages_for_next_step_proof.t
         -> proofs_verified_mask:
              ( Impl.Field.t Snarky_backendless.Boolean.t
              , 'b )
@@ -528,7 +528,7 @@ val verify :
        , Impl.Field.t
        , 'b
        , Impl.Field.t Pickles_types.Shifted_value.Type1.t )
-       Composition_types.Wrap.Lookup_parameters.t
+       Composition_types.Wrap_lookup_parameters.t
        (* lookup arguments parameters *)
   -> feature_flags:Pickles_types.Opt.Flag.t Pickles_types.Plonk_types.Features.t
   -> proof:Wrap_proof.Checked.t
@@ -558,7 +558,7 @@ val verify :
        , Pickles_types.Nat.z Backend.Tick.Rounds.plus_n )
        Pickles_types.Vector.t
      , Composition_types.Branch_data.Checked.Step.t )
-     Import.Types.Wrap.Statement.In_circuit.t
+     Import.Types.Wrap_statement.In_circuit.t
      (* statement *)
   -> Impls.Step.unfinalized_proof_var (* unfinalized *)
   -> Impl.Boolean.var

@@ -92,7 +92,7 @@ val ft_comm :
        , 'g
        , 'f
        , 'bool )
-       Import.Types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit.t
+       Import.Types.Wrap_proof_state.Deferred_values.Plonk.In_circuit.t
   -> t_comm:'comm array
   -> 'comm
 
@@ -313,7 +313,7 @@ val hash_messages_for_next_step_proof :
        (* size of the vector *) )
        Pickles_types.Vector.t
      (* bulletproof challenges *) )
-     Import.Types.Step.Proof_state.Messages_for_next_step_proof.t
+     Import.Types.Step_proof_state.Messages_for_next_step_proof.t
   -> Import.Types.Digest.Constant.t
 
 (** {2 Public Input Conversion} *)
@@ -355,7 +355,7 @@ val tock_public_input_of_statement :
        , Pickles_types.Nat.z Backend.Tick.Rounds.plus_n )
        Pickles_types.Vector.t
      , Composition_types.Branch_data.t )
-     Import.Types.Wrap.Statement.In_circuit.t
+     Import.Types.Wrap_statement.In_circuit.t
   -> Backend.Tock.Field.Vector.elt list
 
 (** [tock_unpadded_public_input_of_statement ~feature_flags statement] converts
@@ -384,5 +384,5 @@ val tock_unpadded_public_input_of_statement :
        , Pickles_types.Nat.z Backend.Tick.Rounds.plus_n )
        Pickles_types.Vector.t
      , Composition_types.Branch_data.t )
-     Import.Types.Wrap.Statement.In_circuit.t
+     Import.Types.Wrap_statement.In_circuit.t
   -> Backend.Tock.Field.Vector.elt list

@@ -958,7 +958,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                     in
                     let x_hat = O.(p_eval_1 o, p_eval_2 o) in
                     let%bind.Promise step_vk, _ = Lazy.force step_vk in
-                    let next_statement : _ Types.Wrap.Statement.In_circuit.t =
+                    let next_statement : _ Types.Wrap_statement.In_circuit.t =
                       let scalar_chal f =
                         Scalar_challenge.map ~f:Challenge.Constant.of_tick_field
                           (f o)
@@ -967,7 +967,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                         O.digest_before_evaluations o
                       in
                       let plonk0 =
-                        { Types.Wrap.Proof_state.Deferred_values.Plonk.Minimal
+                        { Types.Wrap_proof_state.Deferred_values.Plonk.Minimal
                           .alpha = scalar_chal O.alpha
                         ; beta = O.beta o
                         ; gamma = O.gamma o
@@ -1266,7 +1266,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                     in
                     ( { proof = Wrap_wire_proof.of_kimchi_proof next_proof.proof
                       ; statement =
-                          Types.Wrap.Statement.to_minimal
+                          Types.Wrap_statement.to_minimal
                             ~to_option:Opt.to_option next_statement
                       ; prev_evals =
                           { Plonk_types.All_evals.evals =
@@ -1439,7 +1439,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
 
       let%test_module "test domain size too large" =
         ( module Compile.Make_adversarial_test (struct
-          let tweak_statement (stmt : _ Import.Types.Wrap.Statement.In_circuit.t)
+          let tweak_statement (stmt : _ Import.Types.Wrap_statement.In_circuit.t)
               =
             (* Modify the statement to use an invalid domain size. *)
             { stmt with

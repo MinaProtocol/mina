@@ -413,7 +413,7 @@ val incrementally_verify_proof :
        Pickles_types.Vector.t
   -> advice:
        Other_field.Packed.t Pickles_types.Shifted_value.Type1.t
-       Import.Types.Step.Bulletproof.Advice.t
+       Import.Types.Step_bulletproof.Advice.t
   -> messages:
        ( Wrap_main_inputs.Impl.Field.t * Wrap_main_inputs.Impl.Field.t
        , Wrap_main_inputs.Impl.Boolean.var )
@@ -434,7 +434,7 @@ val incrementally_verify_proof :
          , Wrap_main_inputs.Impl.Boolean.var )
          Pickles_types.Opt.t
        , Wrap_main_inputs.Impl.Boolean.var )
-       Import.Types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit.t
+       Import.Types.Wrap_proof_state.Deferred_values.Plonk.In_circuit.t
   -> Wrap_main_inputs.Impl.Field.t
      * ( [> `Success of Wrap_main_inputs.Impl.Boolean.var ]
        * Scalar_challenge.t Import.Bulletproof_challenge.t Core_kernel.Array.t
@@ -512,7 +512,7 @@ val finalize_other_proof :
      , ( Impl.Field.t Import.Scalar_challenge.t Import.Bulletproof_challenge.t
        , 'c )
        Pickles_types.Vector.t )
-     Import.Types.Step.Proof_state.Deferred_values.In_circuit.t
+     Import.Types.Step_proof_state.Deferred_values.In_circuit.t
   -> ( Wrap_main_inputs.Impl.Field.t
      , Wrap_main_inputs.Impl.Field.t Array.t
      , Wrap_main_inputs.Impl.Boolean.var )

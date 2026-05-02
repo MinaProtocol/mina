@@ -21,7 +21,7 @@ module Base = struct
           ( 'unfinalized_proofs
           , ('s, 'sgs, 'bp_chals) Messages_for_next_proof_over_same_field.Step.t
           , 'messages_for_next_wrap_proof )
-          Types.Step.Statement.t
+          Types.Step_statement.t
       ; index : int
       ; prev_evals : 'prev_evals
       ; proof : Tick.Proof.with_public_evals
@@ -52,7 +52,7 @@ module Base = struct
                 Bulletproof_challenge.Stable.V1.t
                 Step_bp_vec.Stable.V1.t
               , Branch_data.Stable.V1.t )
-              Types.Wrap.Statement.Minimal.Stable.V1.t
+              Types.Wrap_statement.Minimal.Stable.V1.t
           ; prev_evals :
               ( Tick.Field.Stable.V1.t
               , Tick.Field.Stable.V1.t
@@ -83,7 +83,7 @@ module Base = struct
           , Challenge.Constant.t Scalar_challenge.t Bulletproof_challenge.t
             Step_bp_vec.t
           , Branch_data.t )
-          Types.Wrap.Statement.Minimal.t
+          Types.Wrap_statement.Minimal.t
       ; prev_evals : (Tick.Field.t, Tick.Field.t array) Plonk_types.All_evals.t
       ; proof : Wrap_wire_proof.t
       }
@@ -217,7 +217,7 @@ module Make (MLMB : Nat.Intf) = struct
         , Reduced_messages_for_next_proof_over_same_field.Wrap.Challenges_vector
           .t
           MLMB_vec.t )
-        Types.Wrap.Proof_state.Messages_for_next_wrap_proof.t
+        Types.Wrap_proof_state.Messages_for_next_wrap_proof.t
       , ( unit
         , Tock.Curve.Affine.t Max_proofs_verified_at_most.t
         , Challenge.Constant.t Scalar_challenge.t Bulletproof_challenge.t
@@ -361,7 +361,7 @@ module Proofs_verified_2 = struct
               .V2
               .t
               Vector.Vector_2.Stable.V1.t )
-            Types.Wrap.Proof_state.Messages_for_next_wrap_proof.Stable.V1.t
+            Types.Wrap_proof_state.Messages_for_next_wrap_proof.Stable.V1.t
           , ( unit
             , Tock.Curve.Affine.t At_most.At_most_2.Stable.V1.t
             , Limb_vector.Constant.Hex64.Stable.V1.t Vector.Vector_2.Stable.V1.t
@@ -424,7 +424,7 @@ module Proofs_verified_max = struct
               .V2
               .t
               Side_loaded_verification_key.Width.Max_vector.Stable.V1.t )
-            Types.Wrap.Proof_state.Messages_for_next_wrap_proof.Stable.V1.t
+            Types.Wrap_proof_state.Messages_for_next_wrap_proof.Stable.V1.t
           , ( unit
             , Tock.Curve.Affine.t
               Side_loaded_verification_key.Width.Max_at_most.Stable.V1.t

@@ -35,7 +35,7 @@ type ('app_state, 'max_proofs_verified, 'num_branches) t =
       , scalar_challenge Import.Bulletproof_challenge.t
         Import.Types.Step_bp_vec.t
       , Import.Branch_data.Checked.Step.t )
-      Import.Types.Wrap.Proof_state.In_circuit.t
+      Import.Types.Wrap_proof_state.In_circuit.t
         (** The accumulator state corresponding to the above proof. Contains
       - `deferred_values`: The values necessary for finishing the deferred "scalar field" computations.
       That is, computations which are over the "step" circuit's internal field that the
@@ -90,7 +90,7 @@ module Constant : sig
         , scalar_challenge Import.Bulletproof_challenge.t
           Import.Types.Step_bp_vec.t
         , Import.Branch_data.t )
-        Import.Types.Wrap.Proof_state.In_circuit.t
+        Import.Types.Wrap_proof_state.In_circuit.t
     ; prev_proof_evals :
         ( Backend.Tick.Field.t
         , Backend.Tick.Field.t array )

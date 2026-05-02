@@ -80,13 +80,13 @@ module For_tests_only = struct
           , (shifted_tick_field, bool) Opt.t
           , (scalar_challenge_constant, bool) Opt.t
           , bool )
-          Import.Types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit.t
+          Import.Types.Wrap_proof_state.Deferred_values.Plonk.In_circuit.t
         , scalar_challenge_constant
         , shifted_tick_field
         , scalar_challenge_constant Import.Bulletproof_challenge.t
           Import.Types.Step_bp_vec.t
         , Import.Branch_data.t )
-        Import.Types.Wrap.Proof_state.Deferred_values.Poly.t
+        Import.Types.Wrap_proof_state.Deferred_values.Poly.t
     }
 
   let deferred_values (type n)
@@ -118,7 +118,7 @@ module For_tests_only = struct
       Scalar_challenge.map ~f:Challenge.Constant.of_tick_field (f o)
     in
     let plonk0 =
-      { Types.Wrap.Proof_state.Deferred_values.Plonk.Minimal.alpha =
+      { Types.Wrap_proof_state.Deferred_values.Plonk.Minimal.alpha =
           scalar_chal O.alpha
       ; beta = O.beta o
       ; gamma = O.gamma o
@@ -229,7 +229,7 @@ module For_tests_only = struct
       Shifted_value.Type1.of_field (module Tick.Field) ~shift:Shifts.tick1
     and chal = Challenge.Constant.of_tick_field in
     { deferred_values =
-        { Types.Wrap.Proof_state.Deferred_values.xi
+        { Types.Wrap_proof_state.Deferred_values.xi
         ; b = shift_value b
         ; bulletproof_challenges =
             Vector.of_array_and_length_exn new_bulletproof_challenges
@@ -315,7 +315,7 @@ let wrap
     in
     M.f prev_statement.messages_for_next_wrap_proof
   in
-  let prev_statement_with_hashes : _ Types.Step.Statement.t =
+  let prev_statement_with_hashes : _ Types.Step_statement.t =
     { proof_state =
         { prev_statement.proof_state with
           messages_for_next_step_proof =
@@ -457,7 +457,7 @@ let wrap
       ~actual_proofs_verified ~actual_feature_flags
   in
   [%log internal] "Wrap_compute_deferred_values_done" ;
-  let next_statement : _ Types.Wrap.Statement.In_circuit.t =
+  let next_statement : _ Types.Wrap_statement.In_circuit.t =
     let messages_for_next_wrap_proof :
         _ P.Base.Messages_for_next_proof_over_same_field.Wrap.t =
       { challenge_polynomial_commitment =
@@ -571,7 +571,7 @@ let wrap
   [%log internal] "Pickles_wrap_proof_done" ;
   ( { proof = Wrap_wire_proof.of_kimchi_proof next_proof.proof
     ; statement =
-        Types.Wrap.Statement.to_minimal next_statement
+        Types.Wrap_statement.to_minimal next_statement
           ~to_option:Opt.to_option_unsafe
     ; prev_evals =
         { Plonk_types.All_evals.evals =

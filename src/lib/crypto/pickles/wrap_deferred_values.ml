@@ -33,12 +33,12 @@ let expand_deferred (type n most_recent_width) ~zk_rows
        , Challenge.Constant.t Scalar_challenge.t Bulletproof_challenge.t
          Step_bp_vec.t
        , Branch_data.t )
-       Composition_types.Wrap.Proof_state.Minimal.Stable.V1.t ) :
-    _ Types.Wrap.Proof_state.Deferred_values.Poly.t =
+       Composition_types.Wrap_proof_state.Minimal.Stable.V1.t ) :
+    _ Types.Wrap_proof_state.Deferred_values.Poly.t =
   let module Tick_field = Backend.Tick.Field in
   let tick_field : _ Plonk_checks.field = (module Tick_field) in
   Timer.start __LOC__ ;
-  let module Deferred_values = Types.Wrap.Proof_state.Deferred_values in
+  let module Deferred_values = Types.Wrap_proof_state.Deferred_values in
   let sc = SC.to_field_constant tick_field ~endo:Endo.Wrap_inner_curve.scalar in
   Timer.clock __LOC__ ;
   let plonk0 = proof_state.deferred_values.plonk in
@@ -54,7 +54,7 @@ let expand_deferred (type n most_recent_width) ~zk_rows
   in
   let zetaw = Tick.Field.mul zeta w in
   let tick_plonk_minimal :
-      _ Composition_types.Wrap.Proof_state.Deferred_values.Plonk.Minimal.Poly.t =
+      _ Composition_types.Wrap_proof_state.Deferred_values.Plonk.Minimal.Poly.t =
     let chal = Challenge.Constant.to_tick_field in
     { zeta
     ; alpha

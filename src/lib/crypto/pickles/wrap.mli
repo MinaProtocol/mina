@@ -30,7 +30,7 @@ val wrap :
            , Pickles_types.Nat.z Backend.Tick.Rounds.plus_n )
            Pickles_types.Vector.t
          , Impls.Wrap.Impl.Field.t )
-         Import.Types.Wrap.Statement.In_circuit.t
+         Import.Types.Wrap_statement.In_circuit.t
       -> unit )
   -> typ:('a, 'b) Impls.Step.Typ.t
   -> step_vk:Kimchi_bindings.Protocol.VerifierIndex.Fp.t
@@ -67,7 +67,7 @@ val wrap :
              Import.Types.Bulletproof_challenge.t
              Import.Types.Step_bp_vec.t
            , Import.Types.Branch_data.t )
-           Import.Types.Wrap.Statement.In_circuit.t
+           Import.Types.Wrap_statement.In_circuit.t
         -> ( Import.Challenge.Constant.t
            , Import.Challenge.Constant.t Import.Types.Scalar_challenge.t
            , Backend.Tick.Field.t Pickles_types.Shifted_value.Type1.t
@@ -96,7 +96,7 @@ val wrap :
              Import.Types.Bulletproof_challenge.t
              Import.Types.Step_bp_vec.t
            , Import.Types.Branch_data.t )
-           Import.Types.Wrap.Statement.In_circuit.t )
+           Import.Types.Wrap_statement.In_circuit.t )
   -> Kimchi_pasta.Pallas_based_plonk.Keypair.t
   -> ( 'b
      , ( Impls.Step.unfinalized_proof
@@ -157,7 +157,7 @@ val combined_inner_product :
        ( Backend.Tick.Field.t
        , Backend.Tick.Field.t
        , bool )
-       Composition_types.Wrap.Proof_state.Deferred_values.Plonk.Minimal.Poly.t
+       Composition_types.Wrap_proof_state.Deferred_values.Plonk.Minimal.Poly.t
   -> xi:Backend.Tick.Field.t
   -> zeta:Backend.Tick.Field.t
   -> zetaw:Backend.Tick.Field.t
@@ -193,13 +193,13 @@ module For_tests_only : sig
           , (shifted_tick_field, bool) Opt.t
           , (scalar_challenge_constant, bool) Opt.t
           , bool )
-          Import.Types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit.t
+          Import.Types.Wrap_proof_state.Deferred_values.Plonk.In_circuit.t
         , scalar_challenge_constant
         , shifted_tick_field
         , scalar_challenge_constant Import.Bulletproof_challenge.t
           Import.Types.Step_bp_vec.t
         , Import.Branch_data.t )
-        Import.Types.Wrap.Proof_state.Deferred_values.Poly.t
+        Import.Types.Wrap_proof_state.Deferred_values.Poly.t
     }
 
   val deferred_values :

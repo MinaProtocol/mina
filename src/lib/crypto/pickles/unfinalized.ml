@@ -31,7 +31,7 @@ module Constant = struct
        let gamma = chal () in
        let zeta = scalar_chal () in
        let chals :
-           _ Composition_types.Wrap.Proof_state.Deferred_values.Plonk.Minimal.Poly.t
+           _ Composition_types.Wrap_proof_state.Deferred_values.Plonk.Minimal.Poly.t
            =
          { alpha = Common.Ipa.Wrap.endo_to_field alpha
          ; beta = Challenge.Constant.to_tock_field beta
@@ -86,7 +86,7 @@ module Constant = struct
          let module Field = struct
            include Tock.Field
          end in
-         let { Composition_types.Wrap.Proof_state.Deferred_values.Plonk
+         let { Composition_types.Wrap_proof_state.Deferred_values.Plonk
                .In_circuit
                .alpha
              ; beta
@@ -118,7 +118,7 @@ module Constant = struct
          assert (not lookup) ;
          assert (not runtime_tables) ;
          assert (Option.is_none (Opt.to_option joint_combiner)) ;
-         { Composition_types.Step.Proof_state.Deferred_values.Plonk.In_circuit
+         { Composition_types.Step_proof_state.Deferred_values.Plonk.In_circuit
            .alpha
          ; beta
          ; gamma
@@ -141,7 +141,7 @@ module Constant = struct
 end
 
 let typ ~wrap_rounds:_ : (t, Constant.t) Typ.t =
-  Types.Step.Proof_state.Per_proof.typ
+  Types.Step_proof_state.Per_proof.typ
     (Shifted_value.typ Other_field.typ)
     ~assert_16_bits:(Step_verifier.assert_n_bits ~n:16)
 

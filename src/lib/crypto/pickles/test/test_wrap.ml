@@ -125,7 +125,7 @@ let run_recursive_proof_test (actual_feature_flags : Plonk_types.Features.flags)
   let deferred_values_typ =
     let open Impls.Step in
     let open Step_verifier in
-    Import.Types.Wrap.Proof_state.Deferred_values.In_circuit.typ
+    Import.Types.Wrap_proof_state.Deferred_values.In_circuit.typ
       ~feature_flags:full_features ~challenge:Challenge.typ
       ~scalar_challenge:Challenge.typ
       ~dummy_scalar_challenge:

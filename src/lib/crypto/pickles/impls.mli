@@ -144,7 +144,7 @@ module Step : sig
       Vector.t
     , Digest.Constant.t
     , bool )
-    Import.Types.Step.Proof_state.Per_proof.In_circuit.t
+    Import.Types.Step_proof_state.Per_proof.In_circuit.t
 
   (** Constant (out-of-circuit) step statement type, parameterized by the
       number of proofs verified. Contains unfinalized proofs and message
@@ -153,7 +153,7 @@ module Step : sig
     ( (unfinalized_proof, 'proofs_verified) Vector.t
     , Import.Types.Digest.Constant.t
     , (Import.Types.Digest.Constant.t, 'proofs_verified) Vector.t )
-    Import.Types.Step.Statement.t
+    Import.Types.Step_statement.t
 
   (** In-circuit representation of unfinalized proof state. Uses circuit
       variables instead of constants. *)
@@ -166,7 +166,7 @@ module Step : sig
       Vector.t
     , Field.t
     , Boolean.var )
-    Import.Types.Step.Proof_state.Per_proof.In_circuit.t
+    Import.Types.Step_proof_state.Per_proof.In_circuit.t
 
   (** In-circuit step statement type. The circuit variable version of
       {!statement}. *)
@@ -174,7 +174,7 @@ module Step : sig
     ( (unfinalized_proof_var, 'proofs_verified) Vector.t
     , Impl.Field.t
     , (Impl.Field.t, 'proofs_verified) Vector.t )
-    Import.Types.Step.Statement.t
+    Import.Types.Step_statement.t
 
   (** Create the input specification for a step circuit.
       @param proofs_verified Type-level natural for number of proofs verified
@@ -304,7 +304,7 @@ module Wrap : sig
            , Pickles_types.Nat.z Backend.Tick.Rounds.plus_n )
            Pickles_types.Vector.t
          , Impl.Field.t )
-         Import.Types.Wrap.Statement.In_circuit.t
+         Import.Types.Wrap_statement.In_circuit.t
        , ( Limb_vector.Challenge.Constant.t
          , Limb_vector.Challenge.Constant.t Composition_types.Scalar_challenge.t
          , Other_field.Constant.t Pickles_types.Shifted_value.Type1.t
@@ -321,6 +321,6 @@ module Wrap : sig
            , Pickles_types.Nat.z Backend.Tick.Rounds.plus_n )
            Pickles_types.Vector.t
          , Composition_types.Branch_data.t )
-         Import.Types.Wrap.Statement.In_circuit.t )
+         Import.Types.Wrap_statement.In_circuit.t )
        Import.Spec.Wrap_etyp.t
 end

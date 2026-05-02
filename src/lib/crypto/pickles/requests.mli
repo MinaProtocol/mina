@@ -193,11 +193,11 @@ module Wrap : sig
                 Vector.t
               , Impls.Wrap.Digest.Constant.t
               , bool )
-              Import.Types.Step.Proof_state.Per_proof.In_circuit.t
+              Import.Types.Step_proof_state.Per_proof.In_circuit.t
             , max_proofs_verified )
             Vector.t
           , Impls.Wrap.Digest.Constant.t )
-          Import.Types.Step.Proof_state.t
+          Import.Types.Step_proof_state.t
           Snarky_backendless.Request.t
             (** Request for the step proof's proof state containing deferred
                 values (xi, combined inner product, etc.) and per-proof data. *)

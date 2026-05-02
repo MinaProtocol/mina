@@ -570,7 +570,7 @@ struct
   let check_bulletproof ~(sponge : Sponge.t) ~(xi : Scalar_challenge.t)
       ~(advice :
          Other_field.Packed.t Shifted_value.Type1.t
-         Types.Step.Bulletproof.Advice.t )
+         Types.Step_bulletproof.Advice.t )
       ~polynomials:(without_degree_bound, with_degree_bound)
       ~openings_proof:
         ({ lr; delta; z_1; z_2; challenge_polynomial_commitment } :
@@ -668,7 +668,7 @@ struct
     let (T max) = Nat.of_int max in
     Vector.to_array (Util.Wrap.ones_vector ~first_zero:length max)
 
-  module Plonk = Types.Wrap.Proof_state.Deferred_values.Plonk
+  module Plonk = Types.Wrap_proof_state.Deferred_values.Plonk
 
   (* Just for exhaustiveness over fields *)
   let iter2 ~chal ~scalar_chal
@@ -834,7 +834,7 @@ struct
          [ `Field of Field.t * Boolean.var | `Packed_bits of Field.t * int ]
          array ) ~(sg_old : (_, Max_proofs_verified.n) Vector.t) ~advice
       ~(messages : _ Messages.In_circuit.t) ~which_branch ~openings_proof
-      ~(plonk : _ Types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit.t) =
+      ~(plonk : _ Types.Wrap_proof_state.Deferred_values.Plonk.In_circuit.t) =
     let T = Max_proofs_verified.eq in
     (* Pair sg_old with the mask to track which proofs are real *)
     let sg_old =
@@ -1483,9 +1483,9 @@ struct
       map ~f:Field.constant (create (module Field.Constant)))
 
   let map_plonk_to_field plonk =
-    Types.Step.Proof_state.Deferred_values.Plonk.In_circuit.map_challenges
+    Types.Step_proof_state.Deferred_values.Plonk.In_circuit.map_challenges
       ~f:Util.Wrap.seal ~scalar:scalar_to_field plonk
-    |> Types.Step.Proof_state.Deferred_values.Plonk.In_circuit.map_fields
+    |> Types.Step_proof_state.Deferred_values.Plonk.In_circuit.map_fields
          ~f:(Shifted_value.Type2.map ~f:Util.Wrap.seal)
 
   module Plonk_checks = struct
@@ -1516,9 +1516,9 @@ struct
         , _
         , _ Shifted_value.Type2.t
         , _ )
-        Types.Step.Proof_state.Deferred_values.In_circuit.t )
+        Types.Step_proof_state.Deferred_values.In_circuit.t )
       { Plonk_types.All_evals.In_circuit.ft_eval1; evals } =
-    let module Plonk = Types.Step.Proof_state.Deferred_values.Plonk in
+    let module Plonk = Types.Step_proof_state.Deferred_values.Plonk in
     let T = Proofs_verified.eq in
     (* You use the NEW bulletproof challenges to check b. Not the old ones. *)
     let open Field in
@@ -1618,7 +1618,7 @@ struct
     let r = scalar_to_field (Import.Scalar_challenge.create r_actual) in
     (* == Step 6: Prepare PlonK minimal form and combined evaluations == *)
     let plonk_minimal =
-      let { Composition_types.Step.Proof_state.Deferred_values.Plonk.Minimal
+      let { Composition_types.Step_proof_state.Deferred_values.Plonk.Minimal
             .alpha
           ; beta
           ; gamma
@@ -1626,7 +1626,7 @@ struct
           } =
         Plonk.to_minimal plonk
       in
-      { Composition_types.Wrap.Proof_state.Deferred_values.Plonk.Minimal.alpha
+      { Composition_types.Wrap_proof_state.Deferred_values.Plonk.Minimal.alpha
       ; beta
       ; gamma
       ; zeta
@@ -1773,9 +1773,9 @@ struct
        This is a wrap proof, so no optional features need consideration. *)
     let plonk_checks_passed =
       let plonk_wrap :
-          _ Composition_types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit
+          _ Composition_types.Wrap_proof_state.Deferred_values.Plonk.In_circuit
           .t =
-        let { Composition_types.Step.Proof_state.Deferred_values.Plonk
+        let { Composition_types.Step_proof_state.Deferred_values.Plonk
               .In_circuit
               .alpha
             ; beta

@@ -103,7 +103,7 @@ let evals_of_split_evals field ~zeta ~zetaw (es : _ Plonk_types.Evals.t) ~rounds
   let e = Fn.flip (actual_evaluation field ~rounds) in
   Plonk_types.Evals.map es ~f:(fun (x1, x2) -> (e zeta x1, e zetaw x2))
 
-open Composition_types.Wrap.Proof_state.Deferred_values.Plonk
+open Composition_types.Wrap_proof_state.Deferred_values.Plonk
 
 type 'bool all_feature_flags = 'bool Lazy.t Plonk_types.Features.Full.t
 

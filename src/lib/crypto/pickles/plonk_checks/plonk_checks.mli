@@ -95,7 +95,7 @@ val scalars_env :
   -> ( 't
      , 't
      , 'b )
-     Composition_types.Wrap.Proof_state.Deferred_values.Plonk.Minimal.Poly.t
+     Composition_types.Wrap_proof_state.Deferred_values.Plonk.Minimal.Poly.t
   -> ('t * 't, 'a) Pickles_types.Plonk_types.Evals.In_circuit.t
   -> 't Scalars.Env.t
 
@@ -107,7 +107,7 @@ module Make (Shifted_value : Pickles_types.Shifted_value.S) (_ : Scalars.S) : si
     -> ( 't
        , 't
        , 'b )
-       Composition_types.Wrap.Proof_state.Deferred_values.Plonk.Minimal.Poly.t
+       Composition_types.Wrap_proof_state.Deferred_values.Plonk.Minimal.Poly.t
     -> ('t * 't, 'a) Pickles_types.Plonk_types.Evals.In_circuit.t
     -> 't array
     -> 't
@@ -120,7 +120,7 @@ module Make (Shifted_value : Pickles_types.Shifted_value.S) (_ : Scalars.S) : si
     -> ( 't
        , 't
        , 'b )
-       Composition_types.Wrap.Proof_state.Deferred_values.Plonk.Minimal.Poly.t
+       Composition_types.Wrap_proof_state.Deferred_values.Plonk.Minimal.Poly.t
     -> ('t * 't, 'a) Pickles_types.Plonk_types.Evals.In_circuit.t
     -> ( 't
        , 't
@@ -128,7 +128,7 @@ module Make (Shifted_value : Pickles_types.Shifted_value.S) (_ : Scalars.S) : si
        , ('t Shifted_value.t, 'b) Pickles_types.Opt.t
        , ('t, 'b) Pickles_types.Opt.t
        , 'b )
-       Composition_types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit.t
+       Composition_types.Wrap_proof_state.Deferred_values.Plonk.In_circuit.t
 
   val checked :
        (module Snarky_backendless.Snark_intf.Run
@@ -144,7 +144,7 @@ module Make (Shifted_value : Pickles_types.Shifted_value.S) (_ : Scalars.S) : si
          Pickles_types.Opt.t
        , ('v, 'v Snarky_backendless.Boolean.t) Pickles_types.Opt.t
        , 'v Snarky_backendless.Boolean.t )
-       Composition_types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit.t
+       Composition_types.Wrap_proof_state.Deferred_values.Plonk.In_circuit.t
     -> ('v * 'v, 'a) Pickles_types.Plonk_types.Evals.In_circuit.t
     -> 'v Snarky_backendless.Boolean.t
 end

@@ -6,7 +6,7 @@ module SC = Scalar_challenge
 open Import
 open Common
 open Util
-open Types.Step
+open Types.Step_proof
 open Pickles_types
 
 module Make
@@ -339,13 +339,13 @@ struct
         ( 'a
         , Inputs.Impl.Field.t Import.Scalar_challenge.t
         , _ )
-        Types.Wrap.Proof_state.Deferred_values.Plonk.Minimal.Poly.t )
+        Types.Wrap_proof_state.Deferred_values.Plonk.Minimal.Poly.t )
       (m2 :
         ( Inputs.Impl.Field.t
         , Inputs.Impl.Field.t Import.Scalar_challenge.t
         , _ )
-        Types.Wrap.Proof_state.Deferred_values.Plonk.Minimal.Poly.t ) =
-    let open Types.Wrap.Proof_state.Deferred_values.Plonk.Minimal in
+        Types.Wrap_proof_state.Deferred_values.Plonk.Minimal.Poly.t ) =
+    let open Types.Wrap_proof_state.Deferred_values.Plonk.Minimal in
     let chal c1 c2 = Field.Assert.equal c1 c2 in
     let scalar_chal
         ({ Import.Scalar_challenge.inner = t1 } : _ Import.Scalar_challenge.t)
@@ -516,7 +516,7 @@ struct
          , _
          , _
          , _ )
-         Types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit.t ) =
+         Types.Wrap_proof_state.Deferred_values.Plonk.In_circuit.t ) =
     with_label "incrementally_verify_proof" (fun () ->
         (* Helper to receive commitment from messages and absorb into sponge *)
         let receive ty f =
@@ -767,7 +767,7 @@ struct
     Shifted_value.Type1.Shift.(
       map ~f:Field.constant (create (module Field.Constant)))
 
-  module Plonk = Types.Wrap.Proof_state.Deferred_values.Plonk
+  module Plonk = Types.Wrap_proof_state.Deferred_values.Plonk
 
   module Plonk_checks = struct
     include Plonk_checks
@@ -849,7 +849,7 @@ struct
         , _
         , Branch_data.Checked.Step.t
         , _ )
-        Types.Wrap.Proof_state.Deferred_values.In_circuit.t )
+        Types.Wrap_proof_state.Deferred_values.In_circuit.t )
       { Plonk_types.All_evals.In_circuit.ft_eval1; evals } =
     (* == Step 1: Feature flag validation ==
        Validate that the evaluation structure matches the declared feature
@@ -870,7 +870,7 @@ struct
       SC.to_field_checked (module Impl) ~endo:Endo.Wrap_inner_curve.scalar
     in
     let plonk =
-      Types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit.map_challenges
+      Types.Wrap_proof_state.Deferred_values.Plonk.In_circuit.map_challenges
         ~f:Fn.id ~scalar plonk
     in
     (* == Step 3: Domain determination ==
@@ -1179,9 +1179,9 @@ struct
 
   let hash_messages_for_next_step_proof (type s) ~index
       (state_to_field_elements : s -> Field.t array) =
-    let open Types.Step.Proof_state.Messages_for_next_step_proof in
+    let open Types.Step_proof_state.Messages_for_next_step_proof in
     let after_index = sponge_after_index index in
-    stage (fun (t : _ Types.Step.Proof_state.Messages_for_next_step_proof.t) ->
+    stage (fun (t : _ Types.Step_proof_state.Messages_for_next_step_proof.t) ->
         let sponge = Sponge.copy after_index in
         Array.iter
           ~f:(fun x -> Sponge.absorb sponge (`Field x))
@@ -1191,7 +1191,7 @@ struct
 
   let hash_messages_for_next_step_proof_opt (type s) ~index
       (state_to_field_elements : s -> Field.t array) =
-    let open Types.Step.Proof_state.Messages_for_next_step_proof in
+    let open Types.Step_proof_state.Messages_for_next_step_proof in
     let after_index = sponge_after_index index in
     ( after_index
     , (* TODO: Remove proofs verified mask and always absorb in full *)
@@ -1254,10 +1254,10 @@ struct
           Spec.pack
             (module Impl)
             (module Branch_data.Checked.Step)
-            (Types.Wrap.Statement.In_circuit.spec
+            (Types.Wrap_statement.In_circuit.spec
                (module Impl)
                lookup_parameters feature_flags )
-            (Types.Wrap.Statement.In_circuit.to_data ~option_map:Opt.map
+            (Types.Wrap_statement.In_circuit.to_data ~option_map:Opt.map
                statement ) )
       |> Array.map ~f:(function
            | `Field (Shifted_value.Type1.Shifted_value x) ->
@@ -1267,7 +1267,7 @@ struct
     in
     (* == IVC Step 2: Initialize sponge and extract deferred values == *)
     let sponge = Sponge.create sponge_params in
-    let { Types.Step.Proof_state.Deferred_values.xi
+    let { Types.Step_proof_state.Deferred_values.xi
         ; combined_inner_product
         ; b
         ; _
@@ -1284,7 +1284,7 @@ struct
         ~advice:{ b; combined_inner_product }
         ~proof
         ~plonk:
-          (let { Composition_types.Step.Proof_state.Deferred_values.Plonk
+          (let { Composition_types.Step_proof_state.Deferred_values.Plonk
                  .In_circuit
                  .alpha
                ; beta
@@ -1297,7 +1297,7 @@ struct
              unfinalized.deferred_values.plonk
            in
            let false_ = Boolean.false_ in
-           { Composition_types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit
+           { Composition_types.Wrap_proof_state.Deferred_values.Plonk.In_circuit
              .alpha
            ; beta
            ; gamma

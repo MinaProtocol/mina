@@ -46,7 +46,7 @@ val wrap_main :
              , 'c )
              Pickles_types.Vector.t
            , Wrap_main_inputs.Impl.Field.t )
-           Import.Types.Wrap.Statement.In_circuit.t
+           Import.Types.Wrap_statement.In_circuit.t
         -> unit )
        Promise.t
        Lazy.t

@@ -25,9 +25,19 @@ module Zero_values : sig
     { value : ('chal, 'fp) single; var : ('chal_var, 'fp_var) single }
 end
 
-module Wrap = Wrap_proof
-
-module Step = Step_proof
+module Wrap_plonk_iop = Wrap_plonk_iop
+module Step_plonk_iop = Step_plonk_iop
+module Step_deferred_values = Step_deferred_values
+module Step_per_proof = Step_per_proof
+module Step_proof = Step_proof
+module Wrap_proof_state = Wrap_proof.Proof_state
+module Wrap_statement = Wrap_proof.Statement
+module Wrap_lookup_parameters = Wrap_proof.Lookup_parameters
+module Step_proof_state = Step_proof.Proof_state
+module Step_statement = Step_proof.Statement
+module Step_bulletproof = Step_proof.Bulletproof
+module Wrap = Wire.Wrap
+module Step = Wire.Step
 
 module Challenges_vector : sig
   type 'n t = (Wrap_impl.Field.t Wrap_bp_vec.t, 'n) Vector.t

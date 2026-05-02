@@ -88,7 +88,7 @@ let verify_heterogenous (ts : Instance.t list) =
               ~feature_flags:proof_state.deferred_values.plonk.feature_flags
               evals.evals.evals ) ;
         Timer.start __LOC__ ;
-        let open Types.Wrap.Proof_state in
+        let open Types.Wrap_proof_state in
         let step_domain =
           Branch_data.domain proof_state.deferred_values.branch_data
         in
@@ -176,7 +176,7 @@ let verify_heterogenous (ts : Instance.t list) =
              , T t ) )
            deferred_values
          ->
-        let prepared_statement : _ Types.Wrap.Statement.In_circuit.t =
+        let prepared_statement : _ Types.Wrap_statement.In_circuit.t =
           { messages_for_next_step_proof =
               Common.hash_messages_for_next_step_proof
                 ~app_state:A_value.to_field_elements

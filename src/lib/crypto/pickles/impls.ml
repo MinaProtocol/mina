@@ -118,14 +118,14 @@ module Step = struct
       Vector.t
     , Digest.Constant.t
     , bool )
-    Types.Step.Proof_state.Per_proof.In_circuit.t
+    Types.Step_proof_state.Per_proof.In_circuit.t
 
   type 'proofs_verified statement =
     ( (unfinalized_proof, 'proofs_verified) Pickles_types.Vector.t
     , Import.Types.Digest.Constant.t
     , (Import.Types.Digest.Constant.t, 'proofs_verified) Pickles_types.Vector.t
     )
-    Import.Types.Step.Statement.t
+    Import.Types.Step_statement.t
 
   type unfinalized_proof_var =
     ( Field.t
@@ -136,16 +136,16 @@ module Step = struct
       Pickles_types.Vector.t
     , Field.t
     , Boolean.var )
-    Types.Step.Proof_state.Per_proof.In_circuit.t
+    Types.Step_proof_state.Per_proof.In_circuit.t
 
   type 'proofs_verified statement_var =
     ( (unfinalized_proof_var, 'proofs_verified) Pickles_types.Vector.t
     , Impl.Field.t
     , (Impl.Field.t, 'proofs_verified) Pickles_types.Vector.t )
-    Import.Types.Step.Statement.t
+    Import.Types.Step_statement.t
 
   let input ~proofs_verified =
-    let open Types.Step.Statement in
+    let open Types.Step_statement in
     let spec = spec proofs_verified Tock.Rounds.n in
     let (T (typ, f, f_inv)) =
       Spec.packed_typ
@@ -239,7 +239,7 @@ module Wrap = struct
          high-bit separation is needed (unlike Type2 which splits into
          (high_bits, low_bit) for larger scalar fields). *)
     let lookup =
-      { Types.Wrap.Lookup_parameters.use = uses_lookups
+      { Types.Wrap_lookup_parameters.use = uses_lookups
       ; zero =
           { value =
               { challenge = Limb_vector.Challenge.Constant.zero
@@ -256,7 +256,7 @@ module Wrap = struct
     let fp : (Impl.Field.t, Other_field.Constant.t) Typ.t =
       Other_field.typ_unchecked
     in
-    let open Types.Wrap.Statement in
+    let open Types.Wrap_statement in
     let (T (typ, f, f_inv)) =
       Spec.wrap_packed_typ
         (T

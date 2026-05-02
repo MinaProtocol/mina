@@ -143,7 +143,7 @@ type ('max_proofs_verified, 'branches, 'prev_varss) wrap_main_generic =
                    , Impls.Wrap.Boolean.var )
                    Plonkish_prelude.Opt.t
                  , Impls.Wrap.Boolean.var )
-                 Composition_types.Wrap.Proof_state.Deferred_values.Plonk
+                 Composition_types.Wrap_proof_state.Deferred_values.Plonk
                  .In_circuit
                  .t
                , Wrap_verifier.Challenge.t Kimchi_types.scalar_challenge
@@ -157,7 +157,7 @@ type ('max_proofs_verified, 'branches, 'prev_varss) wrap_main_generic =
                  , Backend.Tick.Rounds.n )
                  Vector.T.t
                , Impls.Wrap.Field.t )
-               Composition_types.Wrap.Statement.t
+               Composition_types.Wrap_statement.t
             -> unit )
            Promise.t
            Lazy.t
@@ -194,7 +194,7 @@ type ('max_proofs_verified, 'branches, 'prev_varss) wrap_main_generic =
            Import.Types.Bulletproof_challenge.t
            Import.Types.Step_bp_vec.t
          , Import.Types.Branch_data.t )
-         Import.Types.Wrap.Statement.In_circuit.t
+         Import.Types.Wrap_statement.In_circuit.t
       -> ( Import.Challenge.Constant.t
          , Import.Challenge.Constant.t Import.Types.Scalar_challenge.t
          , Backend.Tick.Field.t Pickles_types.Shifted_value.Type1.t
@@ -223,7 +223,7 @@ type ('max_proofs_verified, 'branches, 'prev_varss) wrap_main_generic =
            Import.Types.Bulletproof_challenge.t
            Import.Types.Step_bp_vec.t
          , Import.Types.Branch_data.t )
-         Import.Types.Wrap.Statement.In_circuit.t
+         Import.Types.Wrap_statement.In_circuit.t
         (** A function to modify the statement passed into the wrap proof,
               which will be later passed to recursion pickles rules.
 
@@ -1265,7 +1265,7 @@ module Make_adversarial_test (M : sig
          Import.Types.Bulletproof_challenge.t
          Import.Types.Step_bp_vec.t
        , Import.Types.Branch_data.t )
-       Import.Types.Wrap.Statement.In_circuit.t
+       Import.Types.Wrap_statement.In_circuit.t
     -> ( Import.Challenge.Constant.t
        , Import.Challenge.Constant.t Import.Types.Scalar_challenge.t
        , Backend.Tick.Field.t Pickles_types.Shifted_value.Type1.t
@@ -1294,7 +1294,7 @@ module Make_adversarial_test (M : sig
          Import.Types.Bulletproof_challenge.t
          Import.Types.Step_bp_vec.t
        , Import.Types.Branch_data.t )
-       Import.Types.Wrap.Statement.In_circuit.t
+       Import.Types.Wrap_statement.In_circuit.t
 
   val check_verifier_error : Error.t -> unit
 end) =

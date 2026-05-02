@@ -74,7 +74,7 @@ module Make (Inductive_rule : Inductive_rule.Intf) = struct
       in
       (* Returns messages for the next step proof and messages for the next
          wrap proof *)
-      { Types.Wrap.Statement.messages_for_next_step_proof =
+      { Types.Wrap_statement.messages_for_next_step_proof =
           prev_messages_for_next_step_proof
       ; proof_state = { proof_state with messages_for_next_wrap_proof }
       }
@@ -172,7 +172,7 @@ module Make (Inductive_rule : Inductive_rule.Intf) = struct
           -> ( (Unfinalized.t, max_proofs_verified) Vector.t
              , Field.t
              , (Field.t, max_proofs_verified) Vector.t )
-             Types.Step.Statement.t
+             Types.Step_statement.t
              Promise.t )
          Staged.t =
    fun (module Req) max_proofs_verified ~self_branches ~local_signature
@@ -265,7 +265,7 @@ module Make (Inductive_rule : Inductive_rule.Intf) = struct
       | Input_and_output (input_typ, output_typ) ->
           (input_typ, output_typ)
     in
-    let main () : _ Types.Step.Statement.t Promise.t =
+    let main () : _ Types.Step_statement.t Promise.t =
       let open Impls.Step in
       let logger = Context_logger.get () in
       let module Max_proofs_verified = ( val max_proofs_verified : Nat.Add.Intf
@@ -578,14 +578,14 @@ module Make (Inductive_rule : Inductive_rule.Intf) = struct
             Vector.extend_front unfinalized_proofs_unextended lte
               Max_proofs_verified.n (Unfinalized.dummy ())
           in
-          ( { Types.Step.Statement.proof_state =
+          ( { Types.Step_statement.proof_state =
                 { unfinalized_proofs; messages_for_next_step_proof }
             ; messages_for_next_wrap_proof
             }
             : ( (Unfinalized.t, max_proofs_verified) Vector.t
               , Field.t
               , (Field.t, max_proofs_verified) Vector.t )
-              Types.Step.Statement.t ) )
+              Types.Step_statement.t ) )
     in
     stage main
 end

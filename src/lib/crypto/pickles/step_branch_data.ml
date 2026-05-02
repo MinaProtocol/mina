@@ -43,7 +43,7 @@ module Make (Inductive_rule : Inductive_rule.Intf) = struct
                 -> ( (Unfinalized.t, 'max_proofs_verified) Vector.t
                    , Impls.Step.Field.t
                    , (Impls.Step.Field.t, 'max_proofs_verified) Vector.t )
-                   Types.Step.Statement.t
+                   Types.Step_statement.t
                    Promise.t )
                Promise.t
         ; requests :

@@ -37,7 +37,7 @@ module Old_bulletproof_chals = struct
 end
 
 let pack_statement max_proofs_verified t =
-  let open Types.Step in
+  let module Statement = Types.Step_statement in
   Spec.pack
     (module Impl)
     (module Branch_data.Checked.Wrap)
@@ -100,7 +100,7 @@ let wrap_main
           , _
           , _
           , _ )
-          Types.Wrap.Statement.In_circuit.t
+          Types.Wrap_statement.In_circuit.t
        -> unit )
       Promise.t
       Lazy.t =
@@ -150,7 +150,7 @@ let wrap_main
           , _
           , _
           , Field.t )
-          Types.Wrap.Statement.In_circuit.t ) ->
+          Types.Wrap_statement.In_circuit.t ) ->
       let logger = Context_logger.get () in
       with_label __LOC__ (fun () ->
           let which_branch' =
@@ -190,7 +190,7 @@ let wrap_main
           in
           let prev_proof_state =
             with_label __LOC__ (fun () ->
-                let open Types.Step.Proof_state in
+                let open Types.Step_proof_state in
                 let typ =
                   wrap_typ
                     ~assert_16_bits:(Wrap_verifier.assert_n_bits ~n:16)
@@ -432,7 +432,7 @@ let wrap_main
             in
             Field.Assert.equal messages_for_next_step_proof
               prev_proof_state.messages_for_next_step_proof ;
-            { Types.Step.Statement.messages_for_next_wrap_proof =
+            { Types.Step_statement.messages_for_next_wrap_proof =
                 prev_messages_for_next_wrap_proof
             ; proof_state = prev_proof_state
             }
@@ -504,7 +504,7 @@ let wrap_main
               Field.Assert.equal messages_for_next_wrap_proof_digest
                 (Wrap_hack.Checked.hash_messages_for_next_wrap_proof
                    Max_proofs_verified.n
-                   { Types.Wrap.Proof_state.Messages_for_next_wrap_proof
+                   { Types.Wrap_proof_state.Messages_for_next_wrap_proof
                      .challenge_polynomial_commitment =
                        openings_proof.challenge_polynomial_commitment
                    ; old_bulletproof_challenges = new_bulletproof_challenges

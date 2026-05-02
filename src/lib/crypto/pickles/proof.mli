@@ -18,7 +18,7 @@ module Base : sig
           ( 'unfinalized_proofs
           , ('s, 'sgs, 'bp_chals) Messages_for_next_proof_over_same_field.Step.t
           , 'messages_for_next_wrap_proof )
-          Import.Types.Step.Statement.t
+          Import.Types.Step_statement.t
       ; index : int
       ; prev_evals : 'prev_evals
       ; proof : Backend.Tick.Proof.with_public_evals
@@ -50,7 +50,7 @@ module Base : sig
                 Import.Bulletproof_challenge.Stable.V1.t
                 Import.Step_bp_vec.Stable.V1.t
               , Import.Branch_data.Stable.V1.t )
-              Import.Types.Wrap.Statement.Minimal.Stable.V1.t
+              Import.Types.Wrap_statement.Minimal.Stable.V1.t
           ; prev_evals :
               ( Backend.Tick.Field.Stable.V1.t
               , Backend.Tick.Field.Stable.V1.t array )
@@ -81,7 +81,7 @@ module Base : sig
             Import.Bulletproof_challenge.t
             Import.Step_bp_vec.t
           , Import.Branch_data.t )
-          Import.Types.Wrap.Statement.Minimal.t
+          Import.Types.Wrap_statement.Minimal.t
       ; prev_evals :
           ( Backend.Tick.Field.t
           , Backend.Tick.Field.t array )
@@ -126,7 +126,7 @@ module Make (MLMB : Pickles_types.Nat.Intf) : sig
         , Reduced_messages_for_next_proof_over_same_field.Wrap.Challenges_vector
           .t
           MLMB_vec.t )
-        Import.Types.Wrap.Proof_state.Messages_for_next_wrap_proof.t
+        Import.Types.Wrap_proof_state.Messages_for_next_wrap_proof.t
       , ( unit
         , Backend.Tock.Curve.Affine.t Max_proofs_verified_at_most.t
         , Import.Challenge.Constant.t Import.Scalar_challenge.t

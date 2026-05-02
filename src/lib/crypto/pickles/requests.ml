@@ -33,11 +33,11 @@ module Wrap = struct
                 Vector.t
               , Digest.Constant.t
               , bool )
-              Types.Step.Proof_state.Per_proof.In_circuit.t
+              Types.Step_proof_state.Per_proof.In_circuit.t
             , max_proofs_verified )
             Vector.t
           , Digest.Constant.t )
-          Types.Step.Proof_state.t
+          Types.Step_proof_state.t
           t
       | Messages : Tock.Inner_curve.Affine.t Plonk_types.Messages.t t
       | Openings_proof :
@@ -81,11 +81,11 @@ module Wrap = struct
                   Vector.t
                 , Digest.Constant.t
                 , bool )
-                Types.Step.Proof_state.Per_proof.In_circuit.t
+                Types.Step_proof_state.Per_proof.In_circuit.t
               , max_proofs_verified )
               Vector.t
             , Digest.Constant.t )
-            Types.Step.Proof_state.t
+            Types.Step_proof_state.t
             t
         | Messages : Tock.Inner_curve.Affine.t Plonk_types.Messages.t t
         | Openings_proof :

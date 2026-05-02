@@ -59,7 +59,7 @@ module Make (Inductive_rule : Inductive_rule.Intf) : sig
            , Impls.Step.Field.t
            , (Impls.Step.Field.t, 'max_proofs_verified) Pickles_types.Vector.t
            )
-           Import.Types.Step.Statement.t
+           Import.Types.Step_statement.t
            Promise.t )
        Core_kernel.Staged.t
 end

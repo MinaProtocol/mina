@@ -114,7 +114,7 @@ struct
         , Challenge.Constant.t Scalar_challenge.t Bulletproof_challenge.t
           Step_bp_vec.t
         , Branch_data.t )
-        Wrap.Statement.In_circuit.t
+        Wrap_statement.In_circuit.t
     end in
     let challenge_polynomial =
       Wrap_verifier.challenge_polynomial (module Backend.Tock.Field)
@@ -171,7 +171,7 @@ struct
           |> Plonk_types.Evals.to_in_circuit
         in
         let plonk_minimal =
-          { Composition_types.Wrap.Proof_state.Deferred_values.Plonk.Minimal
+          { Composition_types.Wrap_proof_state.Deferred_values.Plonk.Minimal
             .zeta
           ; alpha
           ; beta = Challenge.Constant.to_tick_field plonk0.beta
@@ -251,7 +251,7 @@ struct
           , _
           , _
           , _ )
-          Wrap.Statement.In_circuit.t =
+          Wrap_statement.In_circuit.t =
         { messages_for_next_step_proof =
             (let to_field_elements =
                let (Typ typ) = data.public_input in
@@ -321,7 +321,7 @@ struct
         Scalar_challenge.map ~f:Challenge.Constant.of_tock_field (f o)
       in
       let plonk0 =
-        { Types.Wrap.Proof_state.Deferred_values.Plonk.Minimal.alpha =
+        { Types.Wrap_proof_state.Deferred_values.Plonk.Minimal.alpha =
             scalar_chal O.alpha
         ; beta = O.beta o
         ; gamma = O.gamma o
@@ -500,7 +500,7 @@ struct
           include Tock.Field
         end in
         (* Wrap proof, no features *)
-        let { Composition_types.Wrap.Proof_state.Deferred_values.Plonk
+        let { Composition_types.Wrap_proof_state.Deferred_values.Plonk
               .In_circuit
               .alpha
             ; beta
@@ -535,7 +535,7 @@ struct
         assert (not lookup) ;
         assert (not runtime_tables) ;
         assert (Option.is_none (Opt.to_option joint_combiner)) ;
-        { Composition_types.Step.Proof_state.Deferred_values.Plonk.In_circuit
+        { Composition_types.Step_proof_state.Deferred_values.Plonk.In_circuit
           .alpha
         ; beta
         ; gamma
@@ -549,7 +549,7 @@ struct
         Shifted_value.Type2.of_field (module Tock.Field) ~shift:Shifts.tock2
       in
       ( `Sg challenge_polynomial_commitment
-      , { Types.Step.Proof_state.Per_proof.deferred_values =
+      , { Types.Step_proof_state.Per_proof.deferred_values =
             { plonk =
                 { plonk with
                   zeta = plonk0.zeta
@@ -753,7 +753,7 @@ struct
         | x :: xs, _ :: ms, S n ->
             x :: pad xs ms n
         | [], _m :: ms, S n ->
-            let t : _ Types.Wrap.Proof_state.Messages_for_next_wrap_proof.t =
+            let t : _ Types.Wrap_proof_state.Messages_for_next_wrap_proof.t =
               { challenge_polynomial_commitment = Lazy.force Dummy.Ipa.Step.sg
               ; old_bulletproof_challenges =
                   Vector.init Max_proofs_verified.n ~f:(fun _ ->
@@ -910,7 +910,7 @@ struct
       in
       go (Option.value_exn !prev_proofs)
     in
-    let next_statement : _ Types.Step.Statement.t =
+    let next_statement : _ Types.Step_statement.t =
       { proof_state =
           { unfinalized_proofs = Lazy.force unfinalized_proofs_extended
           ; messages_for_next_step_proof =

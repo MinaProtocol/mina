@@ -56,7 +56,7 @@ type ('app_state, 'max_proofs_verified, 'num_branches) t =
         (** The polynomial commitments, polynomial evaluations, and opening proof corresponding to
       this latest wrap proof.
   *)
-  ; proof_state : Types.Wrap.Proof_state.In_circuit.Step.t
+  ; proof_state : Types.Wrap_proof_state.In_circuit.Step.t
         (** The accumulator state corresponding to the above proof. Contains
       - `deferred_values`: The values necessary for finishing the deferred "scalar field" computations.
       That is, computations which are over the "step" circuit's internal field that the
@@ -95,7 +95,7 @@ module Constant = struct
   type ('statement, 'max_proofs_verified) t =
     { app_state : 'statement
     ; wrap_proof : Wrap_proof.Constant.t
-    ; proof_state : Types.Wrap.Proof_state.In_circuit.Constant.t
+    ; proof_state : Types.Wrap_proof_state.In_circuit.Constant.t
     ; prev_proof_evals :
         (Tick.Field.t, Tick.Field.t array) Plonk_types.All_evals.t
     ; prev_challenges :
@@ -120,7 +120,7 @@ let typ (type n avar aval) ~feature_flags ~num_chunks
     ~value_to_hlist:Constant.to_hlist ~value_of_hlist:Constant.of_hlist
     [ statement
     ; Wrap_proof.typ
-    ; Types.Wrap.Proof_state.In_circuit.Step.typ ~challenge:Challenge.typ
+    ; Types.Wrap_proof_state.In_circuit.Step.typ ~challenge:Challenge.typ
         ~scalar_challenge:Challenge.typ ~feature_flags
         ~dummy_scalar_challenge:(Sc.create Limb_vector.Challenge.Constant.zero)
         (Shifted_value.Type1.typ Field.typ)
