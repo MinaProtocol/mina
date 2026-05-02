@@ -17,9 +17,9 @@ module Wrap_hack = Pickles__Wrap_hack
 let test_hash_messages_for_next_wrap_proof (type n) (n : n Nat.t) () =
   let open Pickles.Impls.Wrap in
   let messages_for_next_wrap_proof :
-      _ Composition_types.Wrap_proof_state.Messages_for_next_wrap_proof.t =
+      _ Composition_types.Messages_for_next.Wrap_proof.Poly.t =
     let g = Wrap_main_inputs.Inner_curve.Constant.random () in
-    { Composition_types.Wrap_proof_state.Messages_for_next_wrap_proof
+    { Composition_types.Messages_for_next.Wrap_proof.Poly
       .challenge_polynomial_commitment = g
     ; old_bulletproof_challenges =
         Vector.init n ~f:(fun _ ->
@@ -29,7 +29,7 @@ let test_hash_messages_for_next_wrap_proof (type n) (n : n Nat.t) () =
   in
   Internal_Basic.Test.test_equal ~sexp_of_t:Field.Constant.sexp_of_t
     ~equal:Field.Constant.equal
-    (Composition_types.Wrap_proof_state.Messages_for_next_wrap_proof.wrap_typ
+    (Composition_types.Messages_for_next.Wrap_proof.wrap_typ
        Wrap_main_inputs.Inner_curve.typ
        (Vector.wrap_typ Field.typ Backend.Tock.Rounds.n)
        ~length:n )

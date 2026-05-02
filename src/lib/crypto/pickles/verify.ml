@@ -88,7 +88,7 @@ let verify_heterogenous (ts : Instance.t list) =
               ~feature_flags:proof_state.deferred_values.plonk.feature_flags
               evals.evals.evals ) ;
         Timer.start __LOC__ ;
-        let open Types.Wrap_proof_state in
+        let module Deferred_values = Types.Wrap_proof_state.Deferred_values in
         let step_domain =
           Branch_data.domain proof_state.deferred_values.branch_data
         in
@@ -106,7 +106,7 @@ let verify_heterogenous (ts : Instance.t list) =
           SC.to_field_constant tick_field ~endo:Endo.Wrap_inner_curve.scalar
         in
         Timer.clock __LOC__ ;
-        let { Deferred_values.Minimal.plonk = _
+        let { Deferred_values.Minimal.Poly.plonk = _
             ; branch_data = _
             ; bulletproof_challenges
             } =
@@ -124,7 +124,25 @@ let verify_heterogenous (ts : Instance.t list) =
             ~old_bulletproof_challenges ~proof_state
         in
         Timer.clock __LOC__ ;
-        let deferred_values = { deferred_values with bulletproof_challenges } in
+        let deferred_values =
+          (* Swap the bare-field bulletproof_challenges that
+             expand_deferred computed for the original
+             Bulletproof_challenge.t-wrapped form, which the rest of
+             the verify pipeline expects. The fresh
+             [Deferred_values.Computed] record is structurally distinct
+             from the wrapped [Deferred_values.t], so this is a manual
+             reconstruction rather than a record-update. *)
+          { Composition_types.Wrap_proof_state.Deferred_values.Poly.plonk =
+              deferred_values
+                .Composition_types.Wrap_proof_state.Deferred_values.Computed
+                 .plonk
+          ; combined_inner_product = deferred_values.combined_inner_product
+          ; b = deferred_values.b
+          ; xi = deferred_values.xi
+          ; bulletproof_challenges
+          ; branch_data = deferred_values.branch_data
+          }
+        in
         let () =
           let [ Pow_2_roots_of_unity greatest_wrap_domain
               ; _
@@ -176,7 +194,7 @@ let verify_heterogenous (ts : Instance.t list) =
              , T t ) )
            deferred_values
          ->
-        let prepared_statement : _ Types.Wrap_statement.In_circuit.t =
+        let prepared_statement : _ Types.Wrap_statement.Constant.t =
           { messages_for_next_step_proof =
               Common.hash_messages_for_next_step_proof
                 ~app_state:A_value.to_field_elements
@@ -188,7 +206,9 @@ let verify_heterogenous (ts : Instance.t list) =
                    { t.statement.messages_for_next_step_proof with app_state } )
           ; proof_state =
               { deferred_values =
-                  { plonk = deferred_values.plonk
+                  { plonk =
+                      Composition_types.Wrap_plonk_iop.In_circuit.Constant
+                      .of_in_circuit deferred_values.plonk
                   ; combined_inner_product =
                       deferred_values.combined_inner_product
                   ; b = deferred_values.b

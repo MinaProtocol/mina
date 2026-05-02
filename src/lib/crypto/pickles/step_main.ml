@@ -39,7 +39,10 @@ module Make (Inductive_rule : Inductive_rule.Intf) = struct
           (* TODO: Refactor args into an "unfinalized proof" struct *)
           Step_verifier.finalize_other_proof d.max_proofs_verified
             ~step_domains:d.step_domains ~zk_rows:d.zk_rows ~sponge
-            ~prev_challenges deferred_values prev_proof_evals )
+            ~prev_challenges
+            (Composition_types.Wrap_proof_state.Deferred_values.Step
+             .of_deferred_values deferred_values )
+            prev_proof_evals )
     in
     let branch_data = deferred_values.branch_data in
     let sponge_after_index, hash_messages_for_next_step_proof =
@@ -55,7 +58,7 @@ module Make (Inductive_rule : Inductive_rule.Intf) = struct
       (sponge_after_index, unstage hash_messages_for_next_step_proof)
     in
     (* prepare the statement to be verified below *)
-    let statement =
+    let statement : _ Types.Wrap_statement.Step.t =
       let prev_messages_for_next_step_proof =
         with_label __LOC__ (fun () ->
             hash_messages_for_next_step_proof
@@ -72,11 +75,44 @@ module Make (Inductive_rule : Inductive_rule.Intf) = struct
               ; old_bulletproof_challenges = prev_challenges
               } )
       in
+      (* Lift the polymorphic [proof_state] from [Per_proof_witness.t]
+         into the fresh [Wrap_proof_state.Step.t] shape (with
+         inner Plonk pinned to [Plonk.In_circuit.Step.t]) for the
+         migrated [Step_verifier.verify] entry. *)
+      let { Types.Wrap_proof_state.Poly.deferred_values
+          ; sponge_digest_before_evaluations
+          ; messages_for_next_wrap_proof = _
+          } =
+        proof_state
+      in
+      let { Types.Wrap_proof_state.Deferred_values.Poly.xi
+          ; combined_inner_product
+          ; b
+          ; branch_data = bd
+          ; bulletproof_challenges
+          ; plonk
+          } =
+        deferred_values
+      in
+      let proof_state_concrete : _ Types.Wrap_proof_state.Step.t =
+        { deferred_values =
+            { xi
+            ; combined_inner_product
+            ; b
+            ; branch_data = bd
+            ; bulletproof_challenges
+            ; plonk =
+                Composition_types.Wrap_plonk_iop.In_circuit.Step.of_in_circuit
+                  plonk
+            }
+        ; sponge_digest_before_evaluations
+        ; messages_for_next_wrap_proof
+        }
+      in
       (* Returns messages for the next step proof and messages for the next
          wrap proof *)
-      { Types.Wrap_statement.messages_for_next_step_proof =
-          prev_messages_for_next_step_proof
-      ; proof_state = { proof_state with messages_for_next_wrap_proof }
+      { messages_for_next_step_proof = prev_messages_for_next_step_proof
+      ; proof_state = proof_state_concrete
       }
     in
     (* and when the statement is prepared, we call the step verifier with this

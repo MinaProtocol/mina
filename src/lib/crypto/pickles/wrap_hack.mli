@@ -14,7 +14,7 @@ val hash_messages_for_next_wrap_proof :
          Pickles_types.Vector.t
        , 'n )
        Pickles_types.Vector.t )
-     Composition_types.Wrap_proof_state.Messages_for_next_wrap_proof.t
+     Composition_types.Messages_for_next.Wrap_proof.Poly.t
   -> Import.Types.Digest.Constant.t
 
 val pad_proof : 'mlmb Proof.t -> Proof.Proofs_verified_max.t
@@ -63,7 +63,7 @@ module Checked : sig
            Pickles_types.Vector.t
          , 'a )
          Pickles_types.Vector.t )
-       Composition_types.Wrap_proof_state.Messages_for_next_wrap_proof.t
+       Composition_types.Messages_for_next.Wrap_proof.Poly.t
     -> Import.Types.Digest.Constant.t
 
   val hash_messages_for_next_wrap_proof :
@@ -72,6 +72,6 @@ module Checked : sig
        , ( (Impls.Wrap.Field.t, Backend.Tock.Rounds.n) Pickles_types.Vector.t
          , 'n )
          Pickles_types.Vector.t )
-       Composition_types.Wrap_proof_state.Messages_for_next_wrap_proof.t
+       Composition_types.Messages_for_next.Wrap_proof.Poly.t
     -> Wrap_main_inputs.Sponge.Permutation.Field.t
 end

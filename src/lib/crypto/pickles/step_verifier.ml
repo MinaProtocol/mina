@@ -334,18 +334,9 @@ struct
         in
         (`Success (equal_g lhs rhs), challenges) )
 
-  let assert_eq_deferred_values
-      (m1 :
-        ( 'a
-        , Inputs.Impl.Field.t Import.Scalar_challenge.t
-        , _ )
-        Types.Wrap_proof_state.Deferred_values.Plonk.Minimal.Poly.t )
-      (m2 :
-        ( Inputs.Impl.Field.t
-        , Inputs.Impl.Field.t Import.Scalar_challenge.t
-        , _ )
-        Types.Wrap_proof_state.Deferred_values.Plonk.Minimal.Poly.t ) =
-    let open Types.Wrap_proof_state.Deferred_values.Plonk.Minimal in
+  let assert_eq_deferred_values (m1 : Types.Wrap_plonk_iop.Minimal.Step.t)
+      (m2 : Types.Wrap_plonk_iop.Minimal.Step.t) =
+    let open Types.Wrap_plonk_iop.Minimal in
     let chal c1 c2 = Field.Assert.equal c1 c2 in
     let scalar_chal
         ({ Import.Scalar_challenge.inner = t1 } : _ Import.Scalar_challenge.t)
@@ -509,14 +500,8 @@ struct
          [ `Field of Field.t | `Packed_bits of Field.t * int ] array )
       ~(sg_old : (_, Proofs_verified.n) Vector.t) ~advice
       ~proof:({ messages; opening } : Wrap_proof.Checked.t)
-      ~(plonk :
-         ( _
-         , _
-         , _ Shifted_value.Type2.t
-         , _
-         , _
-         , _ )
-         Types.Wrap_proof_state.Deferred_values.Plonk.In_circuit.t ) =
+      ~(plonk : _ Shifted_value.Type2.t Types.Wrap_plonk_iop.In_circuit.Step.t)
+      =
     with_label "incrementally_verify_proof" (fun () ->
         (* Helper to receive commitment from messages and absorb into sponge *)
         let receive ty f =
@@ -626,7 +611,10 @@ struct
               Common.ft_comm
                 ~add:(Ops.add_fast ?check_finite:None)
                 ~scale:scale_fast2 ~negate:Inner_curve.negate
-                ~verification_key:m ~plonk ~t_comm )
+                ~verification_key:m
+                ~plonk:
+                  (Types.Wrap_plonk_iop.In_circuit.Step.to_in_circuit plonk)
+                ~t_comm )
         in
         (* == IVC Step 13: Bulletproof/IPA verification ==
            Verify the Inner Product Argument opening proof. This checks that
@@ -667,20 +655,19 @@ struct
         (* == IVC Step 14: Assert deferred values match sampled challenges ==
            The challenges we sampled must match the deferred values provided
            by the prover. This ensures the prover used correct challenges. *)
-        let joint_combiner = None in
         assert_eq_deferred_values
           { alpha = plonk.alpha
           ; beta = plonk.beta
           ; gamma = plonk.gamma
           ; zeta = plonk.zeta
-          ; joint_combiner
+          ; joint_combiner = Opt.Nothing
           ; feature_flags = plonk.feature_flags
           }
           { alpha
           ; beta
           ; gamma
           ; zeta
-          ; joint_combiner
+          ; joint_combiner = Opt.Nothing
           ; feature_flags = plonk.feature_flags
           } ;
         (* Return the sponge digest and bulletproof challenges for use in
@@ -767,7 +754,7 @@ struct
     Shifted_value.Type1.Shift.(
       map ~f:Field.constant (create (module Field.Constant)))
 
-  module Plonk = Types.Wrap_proof_state.Deferred_values.Plonk
+  module Plonk = Types.Wrap_plonk_iop
 
   module Plonk_checks = struct
     include Plonk_checks
@@ -841,15 +828,9 @@ struct
        ; b
        ; plonk
        } :
-        ( Field.t
-        , _
-        , Field.t Shifted_value.Type1.t
-        , _
-        , _
-        , _
-        , Branch_data.Checked.Step.t
-        , _ )
-        Types.Wrap_proof_state.Deferred_values.In_circuit.t )
+        ( _ Types.Wrap_plonk_iop.In_circuit.t
+        , Field.t Shifted_value.Type1.t )
+        Types.Wrap_proof_state.Deferred_values.Step.t )
       { Plonk_types.All_evals.In_circuit.ft_eval1; evals } =
     (* == Step 1: Feature flag validation ==
        Validate that the evaluation structure matches the declared feature
@@ -870,8 +851,7 @@ struct
       SC.to_field_checked (module Impl) ~endo:Endo.Wrap_inner_curve.scalar
     in
     let plonk =
-      Types.Wrap_proof_state.Deferred_values.Plonk.In_circuit.map_challenges
-        ~f:Fn.id ~scalar plonk
+      Types.Wrap_plonk_iop.In_circuit.map_challenges ~f:Fn.id ~scalar plonk
     in
     (* == Step 3: Domain determination ==
        Determine the evaluation domain. For compiled circuits, select from
@@ -1179,9 +1159,9 @@ struct
 
   let hash_messages_for_next_step_proof (type s) ~index
       (state_to_field_elements : s -> Field.t array) =
-    let open Types.Step_proof_state.Messages_for_next_step_proof in
+    let open Types.Messages_for_next.Step_proof in
     let after_index = sponge_after_index index in
-    stage (fun (t : _ Types.Step_proof_state.Messages_for_next_step_proof.t) ->
+    stage (fun (t : _ Types.Messages_for_next.Step_proof.t) ->
         let sponge = Sponge.copy after_index in
         Array.iter
           ~f:(fun x -> Sponge.absorb sponge (`Field x))
@@ -1191,7 +1171,7 @@ struct
 
   let hash_messages_for_next_step_proof_opt (type s) ~index
       (state_to_field_elements : s -> Field.t array) =
-    let open Types.Step_proof_state.Messages_for_next_step_proof in
+    let open Types.Messages_for_next.Step_proof in
     let after_index = sponge_after_index index in
     ( after_index
     , (* TODO: Remove proofs verified mask and always absorb in full *)
@@ -1254,11 +1234,10 @@ struct
           Spec.pack
             (module Impl)
             (module Branch_data.Checked.Step)
-            (Types.Wrap_statement.In_circuit.spec
+            (Types.Wrap_statement.Step.spec
                (module Impl)
                lookup_parameters feature_flags )
-            (Types.Wrap_statement.In_circuit.to_data ~option_map:Opt.map
-               statement ) )
+            (Types.Wrap_statement.Step.to_data ~option_map:Opt.map statement) )
       |> Array.map ~f:(function
            | `Field (Shifted_value.Type1.Shifted_value x) ->
                `Field x
@@ -1267,11 +1246,7 @@ struct
     in
     (* == IVC Step 2: Initialize sponge and extract deferred values == *)
     let sponge = Sponge.create sponge_params in
-    let { Types.Step_proof_state.Deferred_values.xi
-        ; combined_inner_product
-        ; b
-        ; _
-        } =
+    let { Types.Step_deferred_values.Step.xi; combined_inner_product; b; _ } =
       unfinalized.deferred_values
     in
     (* == IVC Step 3: Run incremental verification ==
@@ -1284,9 +1259,7 @@ struct
         ~advice:{ b; combined_inner_product }
         ~proof
         ~plonk:
-          (let { Composition_types.Step_proof_state.Deferred_values.Plonk
-                 .In_circuit
-                 .alpha
+          (let { Composition_types.Step_plonk_iop.In_circuit.Step.alpha
                ; beta
                ; gamma
                ; zeta
@@ -1297,8 +1270,7 @@ struct
              unfinalized.deferred_values.plonk
            in
            let false_ = Boolean.false_ in
-           { Composition_types.Wrap_proof_state.Deferred_values.Plonk.In_circuit
-             .alpha
+           { Composition_types.Wrap_plonk_iop.In_circuit.Step.alpha
            ; beta
            ; gamma
            ; zeta

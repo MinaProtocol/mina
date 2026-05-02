@@ -9,10 +9,10 @@ module Bulletproof_challenge = Bulletproof_challenge
 module Branch_data = Branch_data
 module Digest = Digest
 module Spec = Spec
+open Core_kernel
 module Step_impl = Kimchi_pasta_snarky_backend.Step_impl
 module Wrap_impl = Kimchi_pasta_snarky_backend.Wrap_impl
 module Per_proof = Step_per_proof
-
 module Plonk_polys = Nat.N10
 
 module Bulletproof = struct
@@ -33,10 +33,8 @@ end
 
 module Proof_state = struct
   module Deferred_values = Step_deferred_values
-
   module Messages_for_next_wrap_proof = Messages_for_next.Wrap_proof
   module Messages_for_next_step_proof = Messages_for_next.Step_proof
-
   module Per_proof = Step_per_proof
 
   type ('unfinalized_proofs, 'messages_for_next_step_proof) t =
@@ -52,7 +50,11 @@ module Proof_state = struct
   let spec unfinalized_proofs messages_for_next_step_proof =
     Spec.T.Struct [ unfinalized_proofs; messages_for_next_step_proof ]
 
-  let[@warning "-60"] wrap_typ (type n) ~assert_16_bits
+  (** Produces a Typ for the outer Step.Proof_state.t whose
+      [unfinalized_proofs] elements are the fresh {!Per_proof.Wrap.t}
+      / {!Per_proof.Constant.t} forms, threaded through
+      {!Per_proof.wrap_typ}. *)
+  let wrap_typ (type n) ~assert_16_bits
       (proofs_verified : (Opt.Flag.t Plonk_types.Features.t, n) Vector.t) fq :
       (((_, _) Vector.t, _) t, ((_, _) Vector.t, _) t) Wrap_impl.Typ.t =
     let per_proof _ = Per_proof.wrap_typ fq ~assert_16_bits in
@@ -86,8 +88,7 @@ module Statement = struct
       ; messages_for_next_wrap_proof
       } =
     let open Hlist.HlistId in
-    [ Vector.map unfinalized_proofs
-        ~f:Proof_state.Per_proof.In_circuit.to_data
+    [ Vector.map unfinalized_proofs ~f:Proof_state.Per_proof.In_circuit.to_data
     ; messages_for_next_step_proof
     ; messages_for_next_wrap_proof
     ]
@@ -116,17 +117,17 @@ module Statement = struct
       ]
 
   (** [to_data] / [of_data] / [spec] for the fresh
-      [{Constant,Step,Wrap}.t] outer Statements. The flat-data output
-      matches the toplevel [Step.Statement.{to_data, of_data, spec}],
-      so [Spec]-driven typ construction stays interoperable. *)
+      [{Constant,Step,Wrap}.t] outer Statements. The flat-data
+      output matches the toplevel [Step.Statement.{to_data,
+      of_data, spec}], so [Spec]-driven typ construction stays
+      interoperable. *)
   module Constant = struct
     let[@warning "-45"] to_data
         { proof_state = { unfinalized_proofs; messages_for_next_step_proof }
         ; messages_for_next_wrap_proof
         } =
       let open Hlist.HlistId in
-      [ Vector.map unfinalized_proofs
-          ~f:Proof_state.Per_proof.Constant.to_data
+      [ Vector.map unfinalized_proofs ~f:Proof_state.Per_proof.Constant.to_data
       ; messages_for_next_step_proof
       ; messages_for_next_wrap_proof
       ]
@@ -154,8 +155,6 @@ module Statement = struct
         ; Vector (B Digest, proofs_verified)
         ]
   end
-
-  let _ : _ = (Constant.to_data, Constant.of_data, Constant.spec)
 
   module Step = struct
     let[@warning "-45"] to_data
@@ -192,8 +191,6 @@ module Statement = struct
         ]
   end
 
-  let _ : _ = (Step.to_data, Step.of_data, Step.spec)
-
   module Wrap = struct
     let[@warning "-45"] to_data
         { proof_state = { unfinalized_proofs; messages_for_next_step_proof }
@@ -228,6 +225,4 @@ module Statement = struct
         ; Vector (B Digest, proofs_verified)
         ]
   end
-
-  let _ : _ = (Wrap.to_data, Wrap.of_data, Wrap.spec)
 end

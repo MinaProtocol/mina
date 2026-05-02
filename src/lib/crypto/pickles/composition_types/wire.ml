@@ -1,12 +1,12 @@
 (** Wire-format polymorphic skeletons for {!Composition_types}.
 
     Each [Stable.V1] sub-module here is the type that the bin_io
-    boundary serialises. The corresponding live in-memory bindings
-    (value-level helpers, in-circuit record shapes, [typ] combinators)
-    live in {!Composition_types}, which [include]s each of these
-    modules at its natural path so the [Stable] module and the
-    toplevel [type t = Stable.Latest.t = { … }] flow through with
-    their derivers attached.
+    boundary serialises. The corresponding live in-memory records
+    live in the sibling files (plonk_iop.ml, deferred_values.ml,
+    etc.) and bridge through [Constant.{to_stable, of_stable}] (or
+    the various other named-after-the-parent bridge functions:
+    {!to_minimal} / {!to_in_circuit} / {!to_t_} /
+    {!to_deferred_values} / {!to_messages_for_next_step_proof_t}).
 
     Each [Stable.V1.t] is constrained [= Mina_wire_types…V1.t]
     field-for-field, so the wire format is anchored externally and

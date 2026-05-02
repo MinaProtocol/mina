@@ -5,7 +5,12 @@
     [src/lib/crypto/pickles/reduced_messages_for_next_proof_over_same_field.ml].
     The records here are constrained equal to the corresponding
     [Mina_wire_types] skeleton so that values flow freely between the
-    two modules without conversion. *)
+    two modules without conversion.
+
+    Defining these records inside [Composition_types] lets
+    [Wrap_statement.In_circuit.t] inline the
+    [Messages_for_next_proof_over_same_field.Step] / [Wrap] shapes
+    directly instead of re-spelling them at every consumer. *)
 
 open Pickles_types
 module Scalar_challenge = Kimchi_backend_common.Scalar_challenge

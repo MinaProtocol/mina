@@ -184,16 +184,11 @@ module Wrap : sig
             (** Request for bulletproof challenges from all predecessor proofs.
                 These are absorbed into the sponge for challenge derivation. *)
       | Proof_state :
-          ( ( ( Impls.Wrap.Challenge.Constant.t
-              , Impls.Wrap.Challenge.Constant.t Import.Types.Scalar_challenge.t
+          ( ( ( Impls.Wrap.Field.Constant.t Shifted_value.Type2.t
+                Import.Types.Step_plonk_iop.In_circuit.Constant.t
               , Impls.Wrap.Field.Constant.t Shifted_value.Type2.t
-              , ( Impls.Wrap.Challenge.Constant.t Import.Types.Scalar_challenge.t
-                  Import.Types.Bulletproof_challenge.t
-                , Backend.Tock.Rounds.n )
-                Vector.t
-              , Impls.Wrap.Digest.Constant.t
-              , bool )
-              Import.Types.Step_proof_state.Per_proof.In_circuit.t
+              , Impls.Wrap.Digest.Constant.t )
+              Import.Types.Step_per_proof.Constant.t
             , max_proofs_verified )
             Vector.t
           , Impls.Wrap.Digest.Constant.t )

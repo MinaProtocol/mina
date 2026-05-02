@@ -47,16 +47,15 @@ let hash_messages_for_next_wrap_proof (type n)
     (t :
       ( Tick.Curve.Affine.t
       , (_, n) Vector.t )
-      Composition_types.Wrap_proof_state.Messages_for_next_wrap_proof.t ) =
+      Composition_types.Messages_for_next.Wrap_proof.Poly.t ) =
   let t =
     { t with
       old_bulletproof_challenges = pad_challenges t.old_bulletproof_challenges
     }
   in
   Tock_field_sponge.digest Tock_field_sponge.params
-    (Composition_types.Wrap_proof_state.Messages_for_next_wrap_proof
-     .to_field_elements t ~g1:(fun ((x, y) : Tick.Curve.Affine.t) -> [ x; y ])
-    )
+    (Composition_types.Messages_for_next.Wrap_proof.to_field_elements t
+       ~g1:(fun ((x, y) : Tick.Curve.Affine.t) -> [ x; y ]) )
 
 (* Pad the messages_for_next_wrap_proof of a proof *)
 let pad_proof (type mlmb) (T p : mlmb Proof.t) : Proof.Proofs_verified_max.t =
@@ -120,7 +119,7 @@ module Checked = struct
       (t :
         ( Wrap_main_inputs.Inner_curve.t
         , ((Impls.Wrap.Field.t, Backend.Tock.Rounds.n) Vector.t, n) Vector.t )
-        Composition_types.Wrap_proof_state.Messages_for_next_wrap_proof.t ) =
+        Composition_types.Messages_for_next.Wrap_proof.Poly.t ) =
     let open Wrap_main_inputs in
     let sponge =
       (* The sponge states we would reach if we absorbed the padding challenges *)
@@ -137,7 +136,7 @@ module Checked = struct
       }
     in
     Array.iter ~f:(Sponge.absorb sponge)
-      (Composition_types.Wrap_proof_state.Messages_for_next_wrap_proof
-       .to_field_elements ~g1:Inner_curve.to_field_elements t ) ;
+      (Composition_types.Messages_for_next.Wrap_proof.to_field_elements
+         ~g1:Inner_curve.to_field_elements t ) ;
     Sponge.squeeze_field sponge
 end

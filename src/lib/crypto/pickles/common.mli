@@ -86,13 +86,7 @@ val ft_comm :
   -> negate:('comm -> 'comm)
   -> verification_key:'comm array Pickles_types.Plonk_verification_key_evals.t
   -> plonk:
-       ( 'd
-       , 'e
-       , 'scalar
-       , 'g
-       , 'f
-       , 'bool )
-       Import.Types.Wrap_proof_state.Deferred_values.Plonk.In_circuit.t
+       ('d, 'e, 'scalar, 'g, 'f, 'bool) Import.Types.Wrap_plonk_iop.In_circuit.t
   -> t_comm:'comm array
   -> 'comm
 
@@ -313,7 +307,7 @@ val hash_messages_for_next_step_proof :
        (* size of the vector *) )
        Pickles_types.Vector.t
      (* bulletproof challenges *) )
-     Import.Types.Step_proof_state.Messages_for_next_step_proof.t
+     Import.Types.Messages_for_next.Step_proof.t
   -> Import.Types.Digest.Constant.t
 
 (** {2 Public Input Conversion} *)
@@ -338,24 +332,10 @@ val tick_public_input_of_statement :
 val tock_public_input_of_statement :
      feature_flags:
        Pickles_types.Opt.Flag.t Pickles_types.Plonk_types.Features.Full.t
-  -> ( Limb_vector.Challenge.Constant.t
-     , Limb_vector.Challenge.Constant.t Composition_types.Scalar_challenge.t
-     , Impls.Wrap.Other_field.Constant.t Pickles_types.Shifted_value.Type1.t
-     , Impls.Wrap.Other_field.Constant.t Pickles_types.Shifted_value.Type1.t
-       option
-     , Limb_vector.Challenge.Constant.t Composition_types.Scalar_challenge.t
-       option
-     , bool
-     , Import.Types.Digest.Constant.t
-     , Import.Types.Digest.Constant.t
-     , Import.Types.Digest.Constant.t
-     , ( Limb_vector.Challenge.Constant.t
-         Kimchi_backend_common.Scalar_challenge.t
-         Composition_types.Bulletproof_challenge.t
-       , Pickles_types.Nat.z Backend.Tick.Rounds.plus_n )
-       Pickles_types.Vector.t
-     , Composition_types.Branch_data.t )
-     Import.Types.Wrap_statement.In_circuit.t
+  -> ( Impls.Wrap.Other_field.Constant.t Pickles_types.Shifted_value.Type1.t
+       Import.Types.Wrap_plonk_iop.In_circuit.Constant.t
+     , Impls.Wrap.Other_field.Constant.t Pickles_types.Shifted_value.Type1.t )
+     Import.Types.Wrap_statement.Constant.t
   -> Backend.Tock.Field.Vector.elt list
 
 (** [tock_unpadded_public_input_of_statement ~feature_flags statement] converts
@@ -367,22 +347,8 @@ val tock_public_input_of_statement :
 val tock_unpadded_public_input_of_statement :
      feature_flags:
        Pickles_types.Opt.Flag.t Pickles_types.Plonk_types.Features.Full.t
-  -> ( Limb_vector.Challenge.Constant.t
-     , Limb_vector.Challenge.Constant.t Composition_types.Scalar_challenge.t
-     , Impls.Wrap.Other_field.Constant.t Pickles_types.Shifted_value.Type1.t
-     , Impls.Wrap.Other_field.Constant.t Pickles_types.Shifted_value.Type1.t
-       option
-     , Limb_vector.Challenge.Constant.t Composition_types.Scalar_challenge.t
-       option
-     , bool
-     , Import.Types.Digest.Constant.t
-     , Import.Types.Digest.Constant.t
-     , Import.Types.Digest.Constant.t
-     , ( Limb_vector.Challenge.Constant.t
-         Kimchi_backend_common.Scalar_challenge.t
-         Composition_types.Bulletproof_challenge.t
-       , Pickles_types.Nat.z Backend.Tick.Rounds.plus_n )
-       Pickles_types.Vector.t
-     , Composition_types.Branch_data.t )
-     Import.Types.Wrap_statement.In_circuit.t
+  -> ( Impls.Wrap.Other_field.Constant.t Pickles_types.Shifted_value.Type1.t
+       Import.Types.Wrap_plonk_iop.In_circuit.Constant.t
+     , Impls.Wrap.Other_field.Constant.t Pickles_types.Shifted_value.Type1.t )
+     Import.Types.Wrap_statement.Constant.t
   -> Backend.Tock.Field.Vector.elt list

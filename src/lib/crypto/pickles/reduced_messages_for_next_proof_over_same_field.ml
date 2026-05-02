@@ -34,7 +34,7 @@ module Step = struct
       ; challenge_polynomial_commitments
       ; old_bulletproof_challenges
       } =
-    { Types.Step_proof_state.Messages_for_next_step_proof.app_state
+    { Types.Messages_for_next.Step_proof.app_state
     ; challenge_polynomial_commitments
     ; dlog_plonk_index
     ; old_bulletproof_challenges =
@@ -79,20 +79,19 @@ module Wrap = struct
   type 'max_local_max_proofs_verified t =
     ( Tock.Inner_curve.Affine.t
     , (Challenges_vector.t, 'max_local_max_proofs_verified) Vector.t )
-    Types.Wrap_proof_state.Messages_for_next_wrap_proof.t
+    Types.Messages_for_next.Wrap_proof.Poly.t
 
   module Prepared = struct
     type 'max_local_max_proofs_verified t =
       ( Tock.Inner_curve.Affine.t
       , (Challenges_vector.Prepared.t, 'max_local_max_proofs_verified) Vector.t
       )
-      Types.Wrap_proof_state.Messages_for_next_wrap_proof.t
+      Types.Messages_for_next.Wrap_proof.Poly.t
   end
 
   let prepare
       ({ challenge_polynomial_commitment; old_bulletproof_challenges } : _ t) =
-    { Types.Wrap_proof_state.Messages_for_next_wrap_proof
-      .challenge_polynomial_commitment
+    { Types.Messages_for_next.Wrap_proof.Poly.challenge_polynomial_commitment
     ; old_bulletproof_challenges =
         Vector.map ~f:Ipa.Wrap.compute_challenges old_bulletproof_challenges
     }

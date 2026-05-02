@@ -23,16 +23,14 @@ val expand_deferred :
          Bulletproof_challenge.t
          Step_bp_vec.t
        , Branch_data.t )
-       Types.Wrap_proof_state.Minimal.t
+       Types.Wrap_proof_state.Minimal.Poly.t
   -> ( ( Challenge.Constant.t
        , Challenge.Constant.t Kimchi_types.scalar_challenge
        , Pasta_bindings.Fp.t Shifted_value.Type1.t
        , 'a
        , Challenge.Constant.t Kimchi_types.scalar_challenge option
        , bool )
-       Types.Wrap_proof_state.Deferred_values.Plonk.In_circuit.t
-     , Challenge.Constant.t Kimchi_types.scalar_challenge
+       Types.Wrap_plonk_iop.In_circuit.t
      , Pasta_bindings.Fp.t Shifted_value.Type1.t
-     , (Pasta_bindings.Fp.t, Tick.Rounds.n) Vector.vec
      , Branch_data.t )
-     Types.Wrap_proof_state.Deferred_values.Poly.t
+     Types.Wrap_proof_state.Deferred_values.Computed.t

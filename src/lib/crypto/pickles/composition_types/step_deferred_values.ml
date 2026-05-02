@@ -9,7 +9,6 @@ module Bulletproof_challenge = Bulletproof_challenge
 open Core_kernel
 module Step_impl = Kimchi_pasta_snarky_backend.Step_impl
 module Wrap_impl = Kimchi_pasta_snarky_backend.Wrap_impl
-
 module Plonk = Step_plonk_iop
 
 (** All the scalar-field values needed to finalize the verification of a proof
@@ -23,8 +22,7 @@ type ('plonk, 'scalar_challenge, 'fq, 'bulletproof_challenges) t_ =
   { plonk : 'plonk
   ; combined_inner_product : 'fq
         (** combined_inner_product = sum_{i < num_evaluation_points} sum_{j < num_polys} r^i xi^j f_j(pt_i) *)
-  ; xi : 'scalar_challenge
-        (** The challenge used for combining polynomials *)
+  ; xi : 'scalar_challenge  (** The challenge used for combining polynomials *)
   ; bulletproof_challenges : 'bulletproof_challenges
         (** The challenges from the inner-product argument that was partially verified. *)
   ; b : 'fq
@@ -54,11 +52,11 @@ module In_circuit = struct
   [@@deriving sexp, compare, yojson]
 end
 
-(** Wire-form (out-of-circuit) instantiation of {!t_}; ['plonk] and
-    ['fq] are left polymorphic because callers pick from the
+(** Wire-form (out-of-circuit) instantiation of {!t_}; ['plonk]
+    and ['fq] are left polymorphic because callers pick from the
     Minimal/In_circuit Plonk submodules and between Type1/Type2
-    Shifted_value forms. {!to_t_} / {!of_t_} bridge to the polymorphic
-    skeleton. *)
+    Shifted_value forms. {!to_t_} / {!of_t_} bridge to the
+    polymorphic skeleton. *)
 module Constant = struct
   type ('plonk, 'fq) t =
     { plonk : 'plonk
@@ -98,8 +96,6 @@ module Constant = struct
     { plonk; combined_inner_product; xi; bulletproof_challenges; b }
 end
 
-let _ = fun (c : (_, _) Constant.t) -> Constant.of_t_ (Constant.to_t_ c)
-
 (** Step-circuit (Tick) instantiation of {!t_}. *)
 module Step = struct
   type ('plonk, 'fq) t =
@@ -137,8 +133,6 @@ module Step = struct
     { plonk; combined_inner_product; xi; bulletproof_challenges; b }
 end
 
-let _ = fun (s : (_, _) Step.t) -> Step.of_t_ (Step.to_t_ s)
-
 (** Wrap-circuit (Tock) instantiation of {!t_}. *)
 module Wrap = struct
   type ('plonk, 'fq) t =
@@ -175,5 +169,3 @@ module Wrap = struct
         t_ ) : ('plonk, 'fq) t =
     { plonk; combined_inner_product; xi; bulletproof_challenges; b }
 end
-
-let _ = fun (w : (_, _) Wrap.t) -> Wrap.of_t_ (Wrap.to_t_ w)

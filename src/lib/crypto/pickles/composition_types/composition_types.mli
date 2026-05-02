@@ -11,9 +11,6 @@ module Nvector = Vector.With_length
 module Wrap_bp_vec = Backend.Tock.Rounds_vector
 module Step_bp_vec = Backend.Tick.Rounds_vector
 module Scalar_challenge = Kimchi_backend_common.Scalar_challenge
-module Wire = Wire
-module Messages_for_next = Messages_for_next
-module Reduced_messages_for_next = Reduced_messages_for_next
 module Wrap_impl := Kimchi_pasta_snarky_backend.Wrap_impl
 
 (** {2 Modules} *)
@@ -25,6 +22,9 @@ module Zero_values : sig
     { value : ('chal, 'fp) single; var : ('chal_var, 'fp_var) single }
 end
 
+module Wire = Wire
+module Messages_for_next = Messages_for_next
+module Reduced_messages_for_next = Reduced_messages_for_next
 module Wrap_plonk_iop = Wrap_plonk_iop
 module Step_plonk_iop = Step_plonk_iop
 module Step_deferred_values = Step_deferred_values
@@ -46,9 +46,6 @@ module Challenges_vector : sig
     type 'n t = (Wrap_impl.Field.Constant.t Wrap_bp_vec.t, 'n) Vector.t
   end
 end
-
-(** Concrete (non-versioned) records mirroring
-    [Pickles.Reduced_messages_for_next_proof_over_same_field]. *)
 
 (** Alias for
  ** {!val:Pickles_base.Side_loaded_verification_key.index_to_field_elements} *)

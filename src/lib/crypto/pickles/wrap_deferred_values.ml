@@ -33,8 +33,8 @@ let expand_deferred (type n most_recent_width) ~zk_rows
        , Challenge.Constant.t Scalar_challenge.t Bulletproof_challenge.t
          Step_bp_vec.t
        , Branch_data.t )
-       Composition_types.Wrap_proof_state.Minimal.Stable.V1.t ) :
-    _ Types.Wrap_proof_state.Deferred_values.Poly.t =
+       Composition_types.Wrap_proof_state.Minimal.Poly.Stable.V1.t ) :
+    _ Types.Wrap_proof_state.Deferred_values.Computed.t =
   let module Tick_field = Backend.Tick.Field in
   let tick_field : _ Plonk_checks.field = (module Tick_field) in
   Timer.start __LOC__ ;
@@ -42,7 +42,7 @@ let expand_deferred (type n most_recent_width) ~zk_rows
   let sc = SC.to_field_constant tick_field ~endo:Endo.Wrap_inner_curve.scalar in
   Timer.clock __LOC__ ;
   let plonk0 = proof_state.deferred_values.plonk in
-  let { Deferred_values.Minimal.branch_data; bulletproof_challenges; _ } =
+  let { Deferred_values.Minimal.Poly.branch_data; bulletproof_challenges; _ } =
     Deferred_values.Minimal.map_challenges ~f:Challenge.Constant.to_tick_field
       ~scalar:sc proof_state.deferred_values
   in
@@ -53,8 +53,7 @@ let expand_deferred (type n most_recent_width) ~zk_rows
     Tick.Field.domain_generator ~log2_size:(Domain.log2_size step_domain)
   in
   let zetaw = Tick.Field.mul zeta w in
-  let tick_plonk_minimal :
-      _ Composition_types.Wrap_proof_state.Deferred_values.Plonk.Minimal.Poly.t =
+  let tick_plonk_minimal : Composition_types.Wrap_plonk_iop.Minimal.Tick.t =
     let chal = Challenge.Constant.to_tick_field in
     { zeta
     ; alpha
@@ -105,7 +104,10 @@ let expand_deferred (type n most_recent_width) ~zk_rows
       ~field_of_hex:(fun s ->
         Kimchi_pasta.Pasta.Bigint256.of_hex_string s
         |> Kimchi_pasta.Pasta.Fp.of_bigint )
-      ~domain:tick_domain tick_plonk_minimal tick_combined_evals
+      ~domain:tick_domain
+      (Composition_types.Wrap_plonk_iop.Minimal.Tick.to_stable
+         tick_plonk_minimal )
+      tick_combined_evals
   in
   let plonk =
     let p =
@@ -114,7 +116,10 @@ let expand_deferred (type n most_recent_width) ~zk_rows
       end in
       Plonk_checks.Type1.derive_plonk
         (module Field)
-        ~shift:Shifts.tick1 ~env:tick_env tick_plonk_minimal tick_combined_evals
+        ~shift:Shifts.tick1 ~env:tick_env
+        (Composition_types.Wrap_plonk_iop.Minimal.Tick.to_stable
+           tick_plonk_minimal )
+        tick_combined_evals
     in
     { p with
       zeta = plonk0.zeta
@@ -170,7 +175,10 @@ let expand_deferred (type n most_recent_width) ~zk_rows
   let actual_proofs_verified = Vector.length old_bulletproof_challenges in
   Timer.clock __LOC__ ;
   let combined_inner_product_actual =
-    Wrap.combined_inner_product ~env:tick_env ~plonk:tick_plonk_minimal
+    Wrap.combined_inner_product ~env:tick_env
+      ~plonk:
+        (Composition_types.Wrap_plonk_iop.Minimal.Tick.to_stable
+           tick_plonk_minimal )
       ~domain:tick_domain ~ft_eval1:evals.ft_eval1
       ~actual_proofs_verified:(Nat.Add.create actual_proofs_verified)
       evals.evals ~old_bulletproof_challenges ~r ~xi ~zeta ~zetaw
@@ -190,7 +198,7 @@ let expand_deferred (type n most_recent_width) ~zk_rows
   let to_shifted =
     Shifted_value.Type1.of_field (module Tick.Field) ~shift:Shifts.tick1
   in
-  { xi = xi_chal
+  { Composition_types.Wrap_proof_state.Deferred_values.Computed.xi = xi_chal
   ; plonk
   ; combined_inner_product = to_shifted combined_inner_product_actual
   ; branch_data

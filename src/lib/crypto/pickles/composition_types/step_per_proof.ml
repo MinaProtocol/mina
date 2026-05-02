@@ -74,10 +74,7 @@ module In_circuit = struct
        , 'digest
        , 'bool )
        t =
-    ( ( 'challenge
-      , 'scalar_challenge
-      , 'fq )
-      Deferred_values.Plonk.In_circuit.t
+    ( ('challenge, 'scalar_challenge, 'fq) Deferred_values.Plonk.In_circuit.t
     , 'scalar_challenge
     , 'fq
     , 'bulletproof_challenges
@@ -132,13 +129,7 @@ module In_circuit = struct
     let digest = [ sponge_digest_before_evaluations ] in
     let bool = [ should_finalize ] in
     let open Hlist.HlistId in
-    [ fq
-    ; digest
-    ; challenge
-    ; scalar_challenge
-    ; bulletproof_challenges
-    ; bool
-    ]
+    [ fq; digest; challenge; scalar_challenge; bulletproof_challenges; bool ]
 
   let[@warning "-45"] of_data
       Hlist.HlistId.
@@ -175,18 +166,6 @@ module In_circuit = struct
     }
 end
 
-let typ fq ~assert_16_bits =
-  let open In_circuit in
-  Spec.typ fq ~assert_16_bits (spec Backend.Tock.Rounds.n)
-  |> Step_impl.Typ.transport ~there:to_data ~back:of_data
-  |> Step_impl.Typ.transport_var ~there:to_data ~back:of_data
-
-let wrap_typ fq ~assert_16_bits =
-  let open In_circuit in
-  Spec.wrap_typ fq ~assert_16_bits (spec Backend.Tock.Rounds.n)
-  |> Wrap_impl.Typ.transport ~there:to_data ~back:of_data
-  |> Wrap_impl.Typ.transport_var ~there:to_data ~back:of_data
-
 (** Wire-form (out-of-circuit) instantiation of {!t_}; the
     [deferred_values] slot is also out-of-circuit
     ({!Deferred_values.Constant.t}). {!to_t_} / {!of_t_} bridge
@@ -199,10 +178,7 @@ module Constant = struct
     }
 
   let to_t_
-      ({ deferred_values
-       ; should_finalize
-       ; sponge_digest_before_evaluations
-       } :
+      ({ deferred_values; should_finalize; sponge_digest_before_evaluations } :
         ('plonk, 'fq, 'digest) t ) :
       ( 'plonk
       , Limb_vector.Challenge.Constant.t Scalar_challenge.t
@@ -220,10 +196,7 @@ module Constant = struct
     }
 
   let of_t_
-      ({ deferred_values
-       ; should_finalize
-       ; sponge_digest_before_evaluations
-       } :
+      ({ deferred_values; should_finalize; sponge_digest_before_evaluations } :
         ( 'plonk
         , Limb_vector.Challenge.Constant.t Scalar_challenge.t
         , 'fq
@@ -245,15 +218,8 @@ module Constant = struct
   let spec bp_log2 = In_circuit.spec bp_log2
 
   let[@warning "-45"] to_data
-      (t :
-        ( 'fp Deferred_values.Plonk.In_circuit.Constant.t
-        , 'fq
-        , 'digest )
-        t ) =
-    let { deferred_values
-        ; should_finalize
-        ; sponge_digest_before_evaluations
-        } =
+      (t : ('fp Deferred_values.Plonk.In_circuit.Constant.t, 'fq, 'digest) t) =
+    let { deferred_values; should_finalize; sponge_digest_before_evaluations } =
       t
     in
     let { Deferred_values.Constant.xi
@@ -289,13 +255,7 @@ module Constant = struct
     let digest = [ sponge_digest_before_evaluations ] in
     let bool = [ should_finalize ] in
     let open Hlist.HlistId in
-    [ fq
-    ; digest
-    ; challenge
-    ; scalar_challenge
-    ; bulletproof_challenges
-    ; bool
-    ]
+    [ fq; digest; challenge; scalar_challenge; bulletproof_challenges; bool ]
 
   let[@warning "-45"] of_data
       Hlist.HlistId.
@@ -311,11 +271,7 @@ module Constant = struct
         ; Vector.[ alpha; zeta; xi ]
         ; bulletproof_challenges
         ; Vector.[ should_finalize ]
-        ] :
-      ( 'fp Deferred_values.Plonk.In_circuit.Constant.t
-      , 'fq
-      , 'digest )
-      t =
+        ] : ('fp Deferred_values.Plonk.In_circuit.Constant.t, 'fq, 'digest) t =
     { deferred_values =
         { xi
         ; bulletproof_challenges
@@ -336,22 +292,17 @@ module Constant = struct
     }
 end
 
-let _ = fun (c : (_, _, _) Constant.t) -> Constant.of_t_ (Constant.to_t_ c)
-
 (** Step-circuit (Tick) instantiation of {!t_}. *)
 module Step = struct
-  type ('plonk, 'fq, 'digest, 'bool) t =
+  type ('plonk, 'fq, 'digest) t =
     { deferred_values : ('plonk, 'fq) Deferred_values.Step.t
-    ; should_finalize : 'bool
+    ; should_finalize : Step_impl.Boolean.var
     ; sponge_digest_before_evaluations : 'digest
     }
 
   let to_t_
-      ({ deferred_values
-       ; should_finalize
-       ; sponge_digest_before_evaluations
-       } :
-        ('plonk, 'fq, 'digest, 'bool) t ) :
+      ({ deferred_values; should_finalize; sponge_digest_before_evaluations } :
+        ('plonk, 'fq, 'digest) t ) :
       ( 'plonk
       , Step_impl.Field.t Scalar_challenge.t
       , 'fq
@@ -359,7 +310,7 @@ module Step = struct
         , Backend.Tock.Rounds.n )
         Vector.t
       , 'digest
-      , 'bool )
+      , Step_impl.Boolean.var )
       t_ =
     { deferred_values = Deferred_values.Step.to_t_ deferred_values
     ; should_finalize
@@ -367,10 +318,7 @@ module Step = struct
     }
 
   let of_t_
-      ({ deferred_values
-       ; should_finalize
-       ; sponge_digest_before_evaluations
-       } :
+      ({ deferred_values; should_finalize; sponge_digest_before_evaluations } :
         ( 'plonk
         , Step_impl.Field.t Scalar_challenge.t
         , 'fq
@@ -378,26 +326,23 @@ module Step = struct
           , Backend.Tock.Rounds.n )
           Vector.t
         , 'digest
-        , 'bool )
-        t_ ) : ('plonk, 'fq, 'digest, 'bool) t =
+        , Step_impl.Boolean.var )
+        t_ ) : ('plonk, 'fq, 'digest) t =
     { deferred_values = Deferred_values.Step.of_t_ deferred_values
     ; should_finalize
     ; sponge_digest_before_evaluations
     }
 
+  (* [spec] / [to_data] / [of_data] for the Step var side: outer
+     [Per_proof.Step.t] with the inner Plonk pinned to
+     [Plonk.In_circuit.Step.t]. The flat-data output matches
+     {!In_circuit}'s, so [Spec]-driven typ construction works
+     interchangeably with either form. *)
   let spec bp_log2 = In_circuit.spec bp_log2
 
   let[@warning "-45"] to_data
-      (t :
-        ( 'fp Deferred_values.Plonk.In_circuit.Step.t
-        , 'fq
-        , 'digest
-        , 'bool )
-        t ) =
-    let { deferred_values
-        ; should_finalize
-        ; sponge_digest_before_evaluations
-        } =
+      (t : ('fp Deferred_values.Plonk.In_circuit.Step.t, 'fq, 'digest) t) =
+    let { deferred_values; should_finalize; sponge_digest_before_evaluations } =
       t
     in
     let { Deferred_values.Step.xi
@@ -433,13 +378,7 @@ module Step = struct
     let digest = [ sponge_digest_before_evaluations ] in
     let bool = [ should_finalize ] in
     let open Hlist.HlistId in
-    [ fq
-    ; digest
-    ; challenge
-    ; scalar_challenge
-    ; bulletproof_challenges
-    ; bool
-    ]
+    [ fq; digest; challenge; scalar_challenge; bulletproof_challenges; bool ]
 
   let[@warning "-45"] of_data
       Hlist.HlistId.
@@ -455,12 +394,7 @@ module Step = struct
         ; Vector.[ alpha; zeta; xi ]
         ; bulletproof_challenges
         ; Vector.[ should_finalize ]
-        ] :
-      ( 'fp Deferred_values.Plonk.In_circuit.Step.t
-      , 'fq
-      , 'digest
-      , 'bool )
-      t =
+        ] : ('fp Deferred_values.Plonk.In_circuit.Step.t, 'fq, 'digest) t =
     { deferred_values =
         { xi
         ; bulletproof_challenges
@@ -481,22 +415,17 @@ module Step = struct
     }
 end
 
-let _ = fun (s : (_, _, _, _) Step.t) -> Step.of_t_ (Step.to_t_ s)
-
 (** Wrap-circuit (Tock) instantiation of {!t_}. *)
 module Wrap = struct
-  type ('plonk, 'fq, 'digest, 'bool) t =
+  type ('plonk, 'fq, 'digest) t =
     { deferred_values : ('plonk, 'fq) Deferred_values.Wrap.t
-    ; should_finalize : 'bool
+    ; should_finalize : Wrap_impl.Boolean.var
     ; sponge_digest_before_evaluations : 'digest
     }
 
   let to_t_
-      ({ deferred_values
-       ; should_finalize
-       ; sponge_digest_before_evaluations
-       } :
-        ('plonk, 'fq, 'digest, 'bool) t ) :
+      ({ deferred_values; should_finalize; sponge_digest_before_evaluations } :
+        ('plonk, 'fq, 'digest) t ) :
       ( 'plonk
       , Wrap_impl.Field.t Scalar_challenge.t
       , 'fq
@@ -504,7 +433,7 @@ module Wrap = struct
         , Backend.Tock.Rounds.n )
         Vector.t
       , 'digest
-      , 'bool )
+      , Wrap_impl.Boolean.var )
       t_ =
     { deferred_values = Deferred_values.Wrap.to_t_ deferred_values
     ; should_finalize
@@ -512,10 +441,7 @@ module Wrap = struct
     }
 
   let of_t_
-      ({ deferred_values
-       ; should_finalize
-       ; sponge_digest_before_evaluations
-       } :
+      ({ deferred_values; should_finalize; sponge_digest_before_evaluations } :
         ( 'plonk
         , Wrap_impl.Field.t Scalar_challenge.t
         , 'fq
@@ -523,26 +449,22 @@ module Wrap = struct
           , Backend.Tock.Rounds.n )
           Vector.t
         , 'digest
-        , 'bool )
-        t_ ) : ('plonk, 'fq, 'digest, 'bool) t =
+        , Wrap_impl.Boolean.var )
+        t_ ) : ('plonk, 'fq, 'digest) t =
     { deferred_values = Deferred_values.Wrap.of_t_ deferred_values
     ; should_finalize
     ; sponge_digest_before_evaluations
     }
 
-  let spec bp_log2 = In_circuit.spec bp_log2
+  (* [spec] / [to_data] / [of_data] for the Wrap var side: outer
+     [Per_proof.Wrap.t] with the inner Plonk pinned to
+     [Plonk.In_circuit.Wrap.t]. No consumer yet — included for
+     symmetry with {!Constant} and {!Step}. *)
+  let[@warning "-32"] spec bp_log2 = In_circuit.spec bp_log2
 
-  let[@warning "-45"] to_data
-      (t :
-        ( 'fp Deferred_values.Plonk.In_circuit.Wrap.t
-        , 'fq
-        , 'digest
-        , 'bool )
-        t ) =
-    let { deferred_values
-        ; should_finalize
-        ; sponge_digest_before_evaluations
-        } =
+  let[@warning "-32-45"] to_data
+      (t : ('fp Deferred_values.Plonk.In_circuit.Wrap.t, 'fq, 'digest) t) =
+    let { deferred_values; should_finalize; sponge_digest_before_evaluations } =
       t
     in
     let { Deferred_values.Wrap.xi
@@ -578,15 +500,9 @@ module Wrap = struct
     let digest = [ sponge_digest_before_evaluations ] in
     let bool = [ should_finalize ] in
     let open Hlist.HlistId in
-    [ fq
-    ; digest
-    ; challenge
-    ; scalar_challenge
-    ; bulletproof_challenges
-    ; bool
-    ]
+    [ fq; digest; challenge; scalar_challenge; bulletproof_challenges; bool ]
 
-  let[@warning "-45"] of_data
+  let[@warning "-32-45"] of_data
       Hlist.HlistId.
         [ Vector.
             [ combined_inner_product
@@ -600,12 +516,7 @@ module Wrap = struct
         ; Vector.[ alpha; zeta; xi ]
         ; bulletproof_challenges
         ; Vector.[ should_finalize ]
-        ] :
-      ( 'fp Deferred_values.Plonk.In_circuit.Wrap.t
-      , 'fq
-      , 'digest
-      , 'bool )
-      t =
+        ] : ('fp Deferred_values.Plonk.In_circuit.Wrap.t, 'fq, 'digest) t =
     { deferred_values =
         { xi
         ; bulletproof_challenges
@@ -626,4 +537,20 @@ module Wrap = struct
     }
 end
 
-let _ = fun (w : (_, _, _, _) Wrap.t) -> Wrap.of_t_ (Wrap.to_t_ w)
+(** Step-circuit Typ producing the fresh {!Step.t} (var) and
+    {!Constant.t} (value) records, threading the [Constant.spec],
+    [Constant.to_data], [Constant.of_data] duplicates on the value
+    side and [Step.spec], [Step.to_data], [Step.of_data] on the
+    var side. *)
+let typ fq ~assert_16_bits =
+  Spec.typ fq ~assert_16_bits (Constant.spec Backend.Tock.Rounds.n)
+  |> Step_impl.Typ.transport ~there:Constant.to_data ~back:Constant.of_data
+  |> Step_impl.Typ.transport_var ~there:Step.to_data ~back:Step.of_data
+
+(** Wrap-circuit counterpart of {!typ}, threading the [Constant]
+    duplicates on the value side and the [Wrap] duplicates on the
+    var side. *)
+let wrap_typ fq ~assert_16_bits =
+  Spec.wrap_typ fq ~assert_16_bits (Constant.spec Backend.Tock.Rounds.n)
+  |> Wrap_impl.Typ.transport ~there:Constant.to_data ~back:Constant.of_data
+  |> Wrap_impl.Typ.transport_var ~there:Wrap.to_data ~back:Wrap.of_data
