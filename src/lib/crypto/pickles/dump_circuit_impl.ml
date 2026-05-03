@@ -4313,6 +4313,148 @@ let step_main_simple_chain_n2 () =
   in
   constraint_builder.finish_computation res
 
+(* ---- step_main Side_loaded_main ----
+
+   Mirrors the `Simple_chain` rule from
+   `dump_side_loaded_main/dump_side_loaded_main.ml:118-171`: main has
+   `max_proofs_verified = N1`, public input = Field, and its single
+   prev slot is a SIDE-LOADED tag with `max_proofs_verified = N2`
+   (the side-tag's compile-time upper bound; at runtime the actual
+   wrapped child has its own mpv ≤ N2). The rule body itself is
+   identical to `step_main_simple_chain`'s — `is_base_case = (self =
+   0)`, assert `(prev + 1 = self) || is_base_case`. The only
+   structural difference is the prev tag's kind: `Side_loaded`
+   instead of `Compiled`.
+
+   This is the CS-only fixture for the PureScript side-loaded
+   constraint-system equality test (Pickles.Sideload Step 2e.1).
+   Once the PureScript `StepMainSideLoadedMain` analog matches this
+   fixture byte-for-byte, β3 (pseudo step-domain dispatch) and β4
+   (max_proofs_verified runtime mask) are validated. *)
+
+let step_main_side_loaded_main () =
+  let open Impls.Step in
+  let open Pickles_types in
+  let self : (Field.t, Field.Constant.t, Nat.N1.n, Nat.N1.n) Tag.t =
+    Tag.create "side_loaded_main_dump"
+  in
+  let feature_flags = Plonk_types.Features.none_bool in
+  let feature_flags_full =
+    Kimchi_backend_common.Plonk_types.Features.Full.none
+  in
+  (* Side-loaded prev tag: registered via `Types_map.add_side_loaded`.
+     Mirrors `Side_loaded.create ~name:"foo"
+     ~max_proofs_verified:(Nat.Add.create Nat.N2.n) ...` in
+     dump_side_loaded_main.ml:118-121. The `Side_loaded.create`
+     wrapper lives inside `Pickles.Make` so we go through
+     `Types_map.add_side_loaded` directly. *)
+  let side_loaded_tag :
+      (Field.t, Field.Constant.t, Nat.N2.n, _) Tag.t =
+    Types_map.add_side_loaded ~name:"side_loaded_main_dump_child"
+      { max_proofs_verified = (module Nat.N2)
+      ; public_input = Field.typ
+      ; feature_flags = feature_flags_full
+      ; num_chunks = 1
+      ; zk_rows = 3
+      }
+  in
+  let rule : _ Inductive_rule.Kimchi.Promise.t =
+    { identifier = "main"
+    ; prevs = [ side_loaded_tag ]
+    ; feature_flags
+    ; main =
+        (fun { public_input = self_input } ->
+          let prev =
+            exists Field.typ ~compute:(fun () -> Field.Constant.zero)
+          in
+          let proof =
+            exists (Typ.prover_value ()) ~compute:(fun () ->
+                (* Dummy proof at the side-tag's mpv upper bound (N2)
+                   and a wrap_domain log2 of 14 (= mpv N1 → 14 from
+                   common.ml:25-29). Only the constraint shape
+                   matters; the actual prover_value is never read
+                   during CS dump. *)
+                Proof.dummy Nat.N2.n Nat.N2.n ~domain_log2:14 )
+          in
+          (* Allocate the side-loaded VK in-circuit and bind it to
+             the side-loaded tag. Mirrors
+             dump_side_loaded_main.ml:151-156's
+             `exists Side_loaded.Verification_key.typ ~compute:...
+              + Side_loaded.in_circuit side_loaded_tag vk`.
+             `Side_loaded.in_circuit` is just
+             `Types_map.set_ephemeral tag { index = `In_circuit vk
+             }`; we call set_ephemeral directly to avoid the Pickles
+             functor wrapper. *)
+          let vk =
+            exists Side_loaded_verification_key.typ
+              ~compute:(fun () -> Side_loaded_verification_key.dummy)
+          in
+          Types_map.set_ephemeral side_loaded_tag
+            { index = `In_circuit vk } ;
+          let is_base_case = Field.equal Field.zero self_input in
+          let proof_must_verify = Boolean.not is_base_case in
+          let self_correct = Field.(equal (one + prev) self_input) in
+          Boolean.Assert.any [ self_correct; is_base_case ] ;
+          Promise.return
+            { Inductive_rule.Kimchi.previous_proof_statements =
+                [ { public_input = prev; proof; proof_must_verify } ]
+            ; public_output = ()
+            ; auxiliary_output = ()
+            } )
+    }
+  in
+  let max_proofs_verified : (module Nat.Add.Intf with type n = Nat.N1.n) =
+    (module Nat.N1)
+  in
+  let module Step_requests = Requests.Step (Inductive_rule.Kimchi) in
+  let requests = Step_requests.create () in
+  let wrap_domains =
+    { Import.Domains.h = Pickles_base.Domain.Pow_2_roots_of_unity 14 }
+  in
+  let step_domains =
+    Vector.singleton
+      { Import.Domains.h = Pickles_base.Domain.Pow_2_roots_of_unity 14 }
+  in
+  let basic : _ Types_map.Compiled.basic =
+    { public_input = Field.typ
+    ; wrap_domains
+    ; step_domains
+    ; feature_flags = feature_flags_full
+    ; num_chunks = 1
+    ; zk_rows = 3
+    }
+  in
+  let step_main_fn =
+    Staged.unstage
+      (Step_main_for_dump.step_main requests max_proofs_verified rule
+         ~self_branches:(Nat.N1.n : Nat.N1.n Nat.t)
+         ~local_signature:([ Nat.N2.n ] : _ Hlist.H1.T(Nat).t)
+         ~local_signature_length:(Hlist.Length.S Hlist.Length.Z)
+         ~local_branches_length:(Hlist.Length.S Hlist.Length.Z)
+         ~proofs_verified:(Hlist.Length.S Hlist.Length.Z)
+         ~lte:(Nat.Lte.S Nat.Lte.Z)
+         ~public_input:(Input Field.typ)
+         ~auxiliary_typ:Typ.unit
+         ~basic
+         ~known_wrap_keys:
+           ([ None ] : _ Hlist.H1.T(Types_map.For_step.Optional_wrap_key).t)
+         ~self )
+  in
+  let etyp = Impls.Step.input ~proofs_verified:Nat.N1.n in
+  let (T (return_typ, _conv, conv_inv)) = etyp in
+  let main () () =
+    let%map.Promise res = step_main_fn () in
+    Impls.Step.with_label "conv_inv" (fun () -> conv_inv res)
+  in
+  let constraint_builder =
+    Impl.constraint_system_manual ~input_typ:Typ.unit ~return_typ
+  in
+  let res =
+    Promise.block_on_async_exn (fun () ->
+        constraint_builder.run_circuit main )
+  in
+  constraint_builder.finish_computation res
+
 (* ---- Application circuits for two_phase_chain (multi-branch fixture) ----
    Mirrors the rule bodies from `dump_two_phase_chain.ml` but emits
    ONLY the application's CS — no step_main scaffolding. Used to
@@ -4827,4 +4969,6 @@ let run ~output_dir =
   dump_step_main output_dir "step_main_no_recursion_return_circuit"
     step_main_no_recursion_return ;
   dump_step_main output_dir "step_main_tree_proof_return_circuit"
-    step_main_tree_proof_return
+    step_main_tree_proof_return ;
+  dump_step_main output_dir "step_main_side_loaded_main_circuit"
+    step_main_side_loaded_main
