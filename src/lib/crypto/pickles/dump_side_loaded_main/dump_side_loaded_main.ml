@@ -20,6 +20,21 @@
  *    - Drives one proof: `step Field.Constant.one` with handler
  *      providing (prev_input = 0, child b0 wrapped via
  *      `Side_loaded.Proof.of_proof`, child's side-loaded VK).
+ *
+ *  Optional env vars at runtime:
+ *  - [KIMCHI_DETERMINISTIC_SEED] — u64 seed for the patched
+ *    ChaCha20Rng in kimchi-stubs. Set this (e.g. to [42]) so the
+ *    witness/proof output is bit-identical across runs and
+ *    cross-implementation.
+ *  - [KIMCHI_WITNESS_DUMP] — path template like
+ *    [/tmp/witness_sl_%c.txt]. Each kimchi prover emit dumps the
+ *    full (public + advice) witness matrix. The [%c] placeholder is
+ *    substituted with a monotonically incrementing counter:
+ *      0 = child no_recursion step    (d1_size=512,   public=1)
+ *      1 = child no_recursion wrap    (d1_size=8192,  public=40)
+ *      2 = main side-loaded step      (d1_size=16384, public=34)
+ *      3 = main side-loaded wrap      (d1_size=16384, public=40)
+ *    Use [tools/witness_diff.sh] to compare against PS-side dumps.
  *)
 
 open Pickles
