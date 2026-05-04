@@ -4,6 +4,8 @@ let Pipeline = ../../Pipeline/Dsl.dhall
 
 let PipelineTag = ../../Pipeline/Tag.dhall
 
+let PipelineScope = ../../Pipeline/Scope.dhall
+
 let JobSpec = ../../Pipeline/JobSpec.dhall
 
 let Arch = ../../Constants/Arch.dhall
@@ -19,17 +21,24 @@ in  Pipeline.build
       , spec = JobSpec::{
         , dirtyWhen =
           [ S.contains "src/app/minimina"
-          , S.strictlyStart (S.contains "buildkite/src/Jobs/Release/Minimina")
+          , S.strictlyStart
+              (S.contains "buildkite/src/Jobs/Release/MiniminaArm64")
           , S.strictlyStart (S.contains "buildkite/src/Command/Minimina")
           , S.contains "scripts/debian/builder-helpers.sh"
           ]
         , path = "Release"
-        , name = "Minimina"
+        , name = "MiniminaArm64"
         , tags =
-          [ PipelineTag.Type.Fast
+          [ PipelineTag.Type.Long
           , PipelineTag.Type.Release
           , PipelineTag.Type.Stable
+          , PipelineTag.Type.Arm64
           ]
+        , scope = PipelineScope.AllButPullRequest
         }
-      , steps = [ MiniminaCommand.buildStep Arch.Type.Amd64 (None B/SoftFail) ]
+      , steps =
+        [ MiniminaCommand.buildStep
+            Arch.Type.Arm64
+            (Some (B/SoftFail.Boolean True))
+        ]
       }
