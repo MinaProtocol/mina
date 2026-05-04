@@ -243,7 +243,7 @@ let delegation_none_to_none () =
         (measure_stake_change ledger txn) )
 
 (* Failed: delegating to an unknown receiver pk. Expected: −fee·fp. *)
-(* unstaking_tx_case_8.1 *)
+(* unstaking_tx_case_7.3 *)
 let delegation_failed_sender_staked () =
   Quickcheck.test ~trials
     Quickcheck.Generator.(
@@ -259,7 +259,7 @@ let delegation_failed_sender_staked () =
         ~expected:(neg (fee_amt fee))
         (measure_stake_change ledger txn) )
 
-(* unstaking_tx_case_8.2 *)
+(* unstaking_tx_case_7.4 *)
 let delegation_failed_sender_unstaked () =
   Quickcheck.test ~trials
     Quickcheck.Generator.(tuple2 gen_pair_and_fee Public_key.Compressed.gen)
@@ -336,7 +336,7 @@ let fee_transfer_two ~recipient1 ~fee1 ~recipient2 ~fee2 :
 
 (* Fee_transfer, one single. Recipient in ledger (avoids account creation
    fee deduction). Expected: fee·rcv_staked. *)
-(* unstaking_tx_case_9.1 *)
+(* unstaking_tx_case_8.1 *)
 let fee_transfer_one_staked () =
   Quickcheck.test ~trials
     Quickcheck.Generator.(tuple2 (gen_account ()) Public_key.Compressed.gen)
@@ -349,7 +349,7 @@ let fee_transfer_one_staked () =
         ~expected:(plus (fee_amt fee))
         (measure_stake_change ledger txn) )
 
-(* unstaking_tx_case_9.2 *)
+(* unstaking_tx_case_8.2 *)
 let fee_transfer_one_unstaked () =
   Quickcheck.test ~trials (gen_account ()) ~f:(fun recipient ->
       let fee = Fee.of_mina_int_exn 1 in
@@ -359,8 +359,25 @@ let fee_transfer_one_unstaked () =
         ~expected:Amount.Signed.zero
         (measure_stake_change ledger txn) )
 
+(* unstaking_tx_case_8.3 *)
+let fee_transfer_one_rejected () =
+  Quickcheck.test ~trials
+    Quickcheck.Generator.(tuple2 (gen_account ()) Public_key.Compressed.gen)
+    ~f:(fun (recipient, validator) ->
+      let fee = Fee.of_mina_int_exn 1 in
+      let ledger = ledger_of [ recipient ] in
+      set_delegate ledger recipient.pk (Some validator) ;
+      set_permissions ledger recipient.pk
+        { Permissions.user_default with
+          receive = Permissions.Auth_required.Impossible
+        } ;
+      let txn = fee_transfer_one ~recipient ~fee in
+      check ~name:"fee_transfer one single (receive rejected)"
+        ~expected:Amount.Signed.zero
+        (measure_stake_change ledger txn) )
+
 (* Fee_transfer, two singles. Expected: fee₂·pk₂_staked + fee₁·pk₁_staked. *)
-(* unstaking_tx_case_10 *)
+(* unstaking_tx_case_9.1 *)
 let fee_transfer_two_mixed () =
   Quickcheck.test ~trials
     Quickcheck.Generator.(tuple2 (gen_account ()) (gen_account ()))
@@ -376,6 +393,69 @@ let fee_transfer_two_mixed () =
         ~expected:(plus (fee_amt fee1))
         (measure_stake_change ledger txn) )
 
+(* unstaking_tx_case_9.2 *)
+let fee_transfer_two_fp_rejected () =
+  Quickcheck.test ~trials
+    Quickcheck.Generator.(tuple2 (gen_account ()) (gen_account ()))
+    ~f:(fun (recipient1, recipient2) ->
+      let fee1 = Fee.of_mina_int_exn 1 in
+      let fee2 = Fee.of_mina_int_exn 2 in
+      let validator = Quickcheck.random_value Public_key.Compressed.gen in
+      let ledger = ledger_of [ recipient1; recipient2 ] in
+      set_delegate ledger recipient1.pk (Some validator) ;
+      set_delegate ledger recipient2.pk (Some validator) ;
+      set_permissions ledger recipient2.pk
+        { Permissions.user_default with
+          receive = Permissions.Auth_required.Impossible
+        } ;
+      let txn = fee_transfer_two ~recipient1 ~fee1 ~recipient2 ~fee2 in
+      check ~name:"fee_transfer two singles (fp slot rejected)"
+        ~expected:(plus (fee_amt fee1))
+        (measure_stake_change ledger txn) )
+
+(* unstaking_tx_case_9.3 *)
+let fee_transfer_two_rcv_rejected () =
+  Quickcheck.test ~trials
+    Quickcheck.Generator.(tuple2 (gen_account ()) (gen_account ()))
+    ~f:(fun (recipient1, recipient2) ->
+      let fee1 = Fee.of_mina_int_exn 1 in
+      let fee2 = Fee.of_mina_int_exn 2 in
+      let validator = Quickcheck.random_value Public_key.Compressed.gen in
+      let ledger = ledger_of [ recipient1; recipient2 ] in
+      set_delegate ledger recipient1.pk (Some validator) ;
+      set_delegate ledger recipient2.pk (Some validator) ;
+      set_permissions ledger recipient1.pk
+        { Permissions.user_default with
+          receive = Permissions.Auth_required.Impossible
+        } ;
+      let txn = fee_transfer_two ~recipient1 ~fee1 ~recipient2 ~fee2 in
+      check ~name:"fee_transfer two singles (rcv slot rejected)"
+        ~expected:(plus (fee_amt fee2))
+        (measure_stake_change ledger txn) )
+
+(* unstaking_tx_case_9.4 *)
+let fee_transfer_two_both_rejected () =
+  Quickcheck.test ~trials
+    Quickcheck.Generator.(tuple2 (gen_account ()) (gen_account ()))
+    ~f:(fun (recipient1, recipient2) ->
+      let fee1 = Fee.of_mina_int_exn 1 in
+      let fee2 = Fee.of_mina_int_exn 2 in
+      let validator = Quickcheck.random_value Public_key.Compressed.gen in
+      let ledger = ledger_of [ recipient1; recipient2 ] in
+      set_delegate ledger recipient1.pk (Some validator) ;
+      set_delegate ledger recipient2.pk (Some validator) ;
+      let reject =
+        { Permissions.user_default with
+          receive = Permissions.Auth_required.Impossible
+        }
+      in
+      set_permissions ledger recipient1.pk reject ;
+      set_permissions ledger recipient2.pk reject ;
+      let txn = fee_transfer_two ~recipient1 ~fee1 ~recipient2 ~fee2 in
+      check ~name:"fee_transfer two singles (both rejected)"
+        ~expected:Amount.Signed.zero
+        (measure_stake_change ledger txn) )
+
 (* ---------------------------------------------------------------- *)
 (* Coinbase                                                         *)
 (* ---------------------------------------------------------------- *)
@@ -388,7 +468,7 @@ let coinbase ~receiver ~amount ~fee_transfer : Mina_transaction.Transaction.t =
   Mina_transaction.Transaction.Coinbase cb
 
 (* Coinbase, no fee_transfer. Expected: full · rcv_staked. *)
-(* unstaking_tx_case_11.1 *)
+(* unstaking_tx_case_10.1 *)
 let coinbase_no_ft_staked () =
   Quickcheck.test ~trials
     Quickcheck.Generator.(tuple2 (gen_account ()) Public_key.Compressed.gen)
@@ -400,7 +480,7 @@ let coinbase_no_ft_staked () =
       check ~name:"coinbase no fee_transfer (staked)" ~expected:(plus amount)
         (measure_stake_change ledger txn) )
 
-(* unstaking_tx_case_11.2 *)
+(* unstaking_tx_case_10.2 *)
 let coinbase_no_ft_unstaked () =
   Quickcheck.test ~trials (gen_account ()) ~f:(fun receiver ->
       let amount = Amount.of_mina_int_exn 720 in
@@ -410,8 +490,25 @@ let coinbase_no_ft_unstaked () =
         ~expected:Amount.Signed.zero
         (measure_stake_change ledger txn) )
 
+(* unstaking_tx_case_10.3 *)
+let coinbase_no_ft_rejected () =
+  Quickcheck.test ~trials
+    Quickcheck.Generator.(tuple2 (gen_account ()) Public_key.Compressed.gen)
+    ~f:(fun (receiver, validator) ->
+      let amount = Amount.of_mina_int_exn 720 in
+      let ledger = ledger_of [ receiver ] in
+      set_delegate ledger receiver.pk (Some validator) ;
+      set_permissions ledger receiver.pk
+        { Permissions.user_default with
+          receive = Permissions.Auth_required.Impossible
+        } ;
+      let txn = coinbase ~receiver ~amount ~fee_transfer:None in
+      check ~name:"coinbase no fee_transfer (receive rejected)"
+        ~expected:Amount.Signed.zero
+        (measure_stake_change ledger txn) )
+
 (* Coinbase, with fee_transfer. Expected: ft_fee·ft_staked + (full − ft_fee)·rcv_staked. *)
-(* unstaking_tx_case_12 *)
+(* unstaking_tx_case_11.1 *)
 let coinbase_with_ft_mixed () =
   Quickcheck.test ~trials
     Quickcheck.Generator.(tuple2 (gen_account ()) (gen_account ()))
@@ -430,4 +527,78 @@ let coinbase_with_ft_mixed () =
         Option.value_exn (Amount.sub full (fee_amt ft_fee)) |> plus
       in
       check ~name:"coinbase with ft (only cb receiver staked)" ~expected
+        (measure_stake_change ledger txn) )
+
+(* unstaking_tx_case_11.2 *)
+let coinbase_with_ft_sw_rejected () =
+  Quickcheck.test ~trials
+    Quickcheck.Generator.(tuple2 (gen_account ()) (gen_account ()))
+    ~f:(fun (receiver, ft_recipient) ->
+      let full = Amount.of_mina_int_exn 720 in
+      let ft_fee = Fee.of_mina_int_exn 10 in
+      let validator = Quickcheck.random_value Public_key.Compressed.gen in
+      let ledger = ledger_of [ receiver; ft_recipient ] in
+      set_delegate ledger receiver.pk (Some validator) ;
+      set_delegate ledger ft_recipient.pk (Some validator) ;
+      set_permissions ledger ft_recipient.pk
+        { Permissions.user_default with
+          receive = Permissions.Auth_required.Impossible
+        } ;
+      let ft =
+        Coinbase_fee_transfer.create ~receiver_pk:ft_recipient.pk ~fee:ft_fee
+      in
+      let txn = coinbase ~receiver ~amount:full ~fee_transfer:(Some ft) in
+      let expected =
+        Option.value_exn (Amount.sub full (fee_amt ft_fee)) |> plus
+      in
+      check ~name:"coinbase with ft (sw rejected, both staked)" ~expected
+        (measure_stake_change ledger txn) )
+
+(* unstaking_tx_case_11.3 *)
+let coinbase_with_ft_bp_rejected () =
+  Quickcheck.test ~trials
+    Quickcheck.Generator.(tuple2 (gen_account ()) (gen_account ()))
+    ~f:(fun (receiver, ft_recipient) ->
+      let full = Amount.of_mina_int_exn 720 in
+      let ft_fee = Fee.of_mina_int_exn 10 in
+      let validator = Quickcheck.random_value Public_key.Compressed.gen in
+      let ledger = ledger_of [ receiver; ft_recipient ] in
+      set_delegate ledger receiver.pk (Some validator) ;
+      set_delegate ledger ft_recipient.pk (Some validator) ;
+      set_permissions ledger receiver.pk
+        { Permissions.user_default with
+          receive = Permissions.Auth_required.Impossible
+        } ;
+      let ft =
+        Coinbase_fee_transfer.create ~receiver_pk:ft_recipient.pk ~fee:ft_fee
+      in
+      let txn = coinbase ~receiver ~amount:full ~fee_transfer:(Some ft) in
+      check ~name:"coinbase with ft (bp rejected, both staked)"
+        ~expected:(plus (fee_amt ft_fee))
+        (measure_stake_change ledger txn) )
+
+(* unstaking_tx_case_11.4 *)
+let coinbase_with_ft_both_rejected () =
+  Quickcheck.test ~trials
+    Quickcheck.Generator.(tuple2 (gen_account ()) (gen_account ()))
+    ~f:(fun (receiver, ft_recipient) ->
+      let full = Amount.of_mina_int_exn 720 in
+      let ft_fee = Fee.of_mina_int_exn 10 in
+      let validator = Quickcheck.random_value Public_key.Compressed.gen in
+      let ledger = ledger_of [ receiver; ft_recipient ] in
+      set_delegate ledger receiver.pk (Some validator) ;
+      set_delegate ledger ft_recipient.pk (Some validator) ;
+      let reject =
+        { Permissions.user_default with
+          receive = Permissions.Auth_required.Impossible
+        }
+      in
+      set_permissions ledger receiver.pk reject ;
+      set_permissions ledger ft_recipient.pk reject ;
+      let ft =
+        Coinbase_fee_transfer.create ~receiver_pk:ft_recipient.pk ~fee:ft_fee
+      in
+      let txn = coinbase ~receiver ~amount:full ~fee_transfer:(Some ft) in
+      check ~name:"coinbase with ft (both rejected)"
+        ~expected:Amount.Signed.zero
         (measure_stake_change ledger txn) )

@@ -53,75 +53,58 @@ encoding notes below). The two-slot encoding is set up by
 
 | Symbol                        | Meaning                                                                                            |
 |-------------------------------|----------------------------------------------------------------------------------------------------|
-| `is_user_command`             | `1` for Payment / Stake_delegation; `0` for Fee_transfer / Coinbase.                               |
-| `is_payment`                  | `1` for Payment; `0` otherwise.                                                                    |
-| `is_stake_delegation`         | `1` for Stake_delegation; `0` otherwise.                                                           |
-| `user_command_fails`          | `1` if a user command failed to apply (fee is still deducted); `0` otherwise.                      |
-| `source_delegation_permitted` | `1` iff the fee_payer's `set_delegate` permission accepts signature auth. See note below.          |
-| `payment_permitted`           | `1` iff the body actually transferred funds — i.e., source's `access`/`send` and receiver's `access`/`receive` permissions all allow it. See note below. |
 | `fp_staked`  / `fp_staked'`   | Is `fee_payer.delegate` set, before / after the tx.                                                |
 | `fp_bal`     / `fp_bal'`      | `fee_payer.balance`, before / after the tx.                                                        |
+| `Δfp_bal`                     | `fp_bal' − fp_bal`, the signed balance delta the circuit actually applies to the fp slot — *after* all permission and failure gates.                                                                                                        |
 | `rcv_staked`                  | Is `receiver.delegate` set. No non-zkApp tag touches it, so pre = post.                            |
 | `rcv_bal`    / `rcv_bal'`     | `receiver.balance`, before / after the tx.                                                         |
+| `Δrcv_bal`                    | `rcv_bal' − rcv_bal`, signed; same gating story as `Δfp_bal`.                                      |
+| `is_user_command`             | `1` for Payment / Stake_delegation; `0` for Fee_transfer / Coinbase. Used only in the derived `fp_staked'` formula. |
+| `is_stake_delegation`         | `1` for Stake_delegation; `0` otherwise. Same.                                                     |
+| `user_command_fails`          | `1` if one of the 8 strict failures in `User_command_failure.t` fired; `0` otherwise. Used only in the derived `fp_staked'` formula. |
+| `source_delegation_permitted` | `1` iff the fee_payer's `set_delegate` permission accepts signature auth. Used only in the derived `fp_staked'` formula. |
 | `set_to_unstaked`             | For stake_delegation, does `payload.body.receiver_pk` equal `empty_pk`?                            |
-| `fee`                         | `payload.common.fee` (as an unsigned `Amount`).                                                    |
-| `payload.body.amount`         | The body amount field. Meaning depends on tag — see coverage table.                                |
-| `receiver_increase`           | Amount credited to `receiver`, computed earlier in the circuit. See coverage table.                |
+| `fee`                         | `payload.common.fee` (as an unsigned `Amount`).  |
+| `payload.body.amount`         | The body amount field. meaning depends on tag — see coverage table.                                |
+| `receiver_increase`           | Amount the circuit *intends* to credit to the receiver, before permission gating                   |
+| `payment_permitted`           | `1` iff the body actually transferred funds — i.e., source's `access`/`send` and receiver's `access`/`receive` permissions all allow it.                                                                                                            |
 
-### Note on `source_delegation_permitted`
+### Why `Δfp_bal` / `Δrcv_bal` already absorb permission failures
 
-Distinct from `user_command_fails`. The account's `set_delegate` permission
-may have been configured (by a prior zkApp `Update.permissions` call) to
-reject signature-only auth — e.g. `set_delegate = Proof`, `Both`, or
-`Impossible`. In that case a signed stake_delegation still "succeeds" (fee
-deducted, nonce incremented) but the delegate change is silently rejected.
-In-circuit check: `permitted_to_update_delegate` at
-`transaction_snark.ml:2945`.
+`Δfp_bal` and `Δrcv_bal` are *post-gate* — they are the signed amounts
+that actually hit the slot's balance once the circuit has finished
+applying it. Every permission and failure gate composes into these two
+numbers. The relevant gates:
 
-The "partial success" comes from these circuit sites running
-unconditionally for any user command, regardless of the auth check:
+- **fp slot, user command** — fee debit always applies. The circuit
+  hard-asserts `permitted_to_access`, `permitted_to_send`, and
+  `permitted_to_increment_nonce` for the fee_payer
+  (`transaction_snark.ml:2529-2548`), so a user command that wouldn't
+  pass these isn't merely Failed — it's *unprovable* (see "Cases that
+  never reach the SNARK" below).
+- **fp slot, internal command** — fp's *credit* is gated by
+  `permitted_to_receive` for the fp account (the fp slot of an internal
+  command is a recipient, see `[^fp-slot]` and `[^fee-credit]`). When
+  rejected, the credit is burned and `Δfp_bal = 0`
+  (`transaction_snark.ml:2556-2562`).
+- **rcv slot, user command** — gated by `payment_permitted` (source
+  `access`/`send` and receiver `access`/`receive` all allow it) and by
+  the root rollback when `user_command_fails` (one of the 8 strict
+  failures in `User_command_failure.t`). The rollback path is the
+  `final_root` reset at `transaction_snark.ml:3213`. Permission gate is
+  at `transaction_snark.ml:2992`.
+- **rcv slot, internal command** — gated by `permitted_to_receive` /
+  `update_account` at `transaction_snark.ml:2727-2738`.
 
-- Fee debit: `transaction_snark.ml:2576` — sign is negative for user
-  commands.
-- Nonce increment: `transaction_snark.ml:2496` —
-  `Account.Nonce.Checked.succ_if account.nonce is_user_command`.
+The delegate write is a separate operation from the balance updates and
+does not fold into `Δfp_bal`. Its gates determine `fp_staked'` directly
+— see "Derived: `fp_staked'`" below.
 
-The delegate write is gated. The auth check is computed at
-`transaction_snark.ml:2954-2957` (`permitted_to_update_delegate`) and folded
-into `update_account` at `transaction_snark.ml:2974-2988`. The actual
-delegate assignment at `transaction_snark.ml:3041-3047` only fires when
-`is_stake_delegation && update_account` is true — otherwise the new
-delegate value falls through to `account.delegate` (no-op write). Our
-`stake_change` formula tracks this via the `source_delegation_permitted`
-factor.
-
-### Note on `payment_permitted`
-
-Distinct from `user_command_fails`. A signed payment can fail to transfer
-funds because the source account's `send` permission rejects signature
-auth (or `access` rejects), or because the receiver account's `receive`
-permission rejects None_given auth (or `access` rejects). In any of those
-cases the unchecked status is `Failed [Update_not_permitted_balance]` —
-fee deducted, nonce incremented, body amount stays in source.
-
-The circuit handles "did the body actually transfer?" via two parallel
-mechanisms:
-
-1. **Permission gates** (catch permission rejections). Source's amount
-   debit is gated by `payment_permitted` at `transaction_snark.ml:2992`;
-   receiver's update is gated by `permitted_to_receive` at
-   `transaction_snark.ml:2870`. So when permissions reject, no balance
-   change happens at all.
-2. **Root rollback** (catch the 8 strict failures in
-   `User_command_failure.t` — e.g. `amount_insufficient_to_create`,
-   receiver overflow). Source/receiver are tentatively updated, then
-   rolled back via the `final_root` reset at `transaction_snark.ml:3213`
-   when `user_command_fails`.
-
-Consequence: `user_command_fails` does *not* mean "the unchecked status
-was Failed"; it means "one of the 8 strict failure modes fired". To
-answer "did the body amount actually move?" we need *both* gates:
-`payment_permitted ∧ ¬user_command_fails`.
+So a "Payment, body didn't transfer" with a rejecting receiver is
+`Δrcv_bal = 0`. An internal command whose recipient burns the credit is
+`Δfp_bal = 0` or `Δrcv_bal = 0`. The reduced form below doesn't need a
+case split because the case split has already happened by the time we
+consume `Δfp_bal` / `Δrcv_bal`.
 
 ### Derived: `fp_staked'`
 
@@ -169,73 +152,72 @@ form the unchecked implementation mirrors.
 
 ## Reduced form
 
-Cancel the `fp_bal · fp_staked` terms (where applicable) and split on
-`is_user_command`.
+The expanded form rearranges into a single closed-form expression that
+covers every non-zkApp tag, every success/failure mode, and every
+permission outcome:
 
 ```
-stake_change = is_user_command ? user_cmd_delta : internal_delta
+stake_change =   fp_bal  · (fp_staked' − fp_staked)     -- delegate transition
+               + Δfp_bal · fp_staked'                   -- fp slot's actual balance change
+               + Δrcv_bal · rcv_staked                  -- rcv slot's actual balance change
 ```
 
-### User command (Payment or Stake_delegation)
+### Derivation
+
+For non-zkApp tags `rcv_staked` is unchanged, so the receiver term in the
+expanded form is `Δrcv_bal · rcv_staked` directly. For the fp slot:
 
 ```
-user_cmd_delta =
-      fp_bal · (fp_staked' − fp_staked)                                -- delegate transition
-    − fee    · fp_staked'                                              -- fee always deducted
-    + (payment_permitted ∧ ¬user_command_fails)                        -- payment body
-        · payload.body.amount · (rcv_staked − fp_staked)
+fp_bal' · fp_staked' − fp_bal · fp_staked
+  = (fp_bal + Δfp_bal) · fp_staked' − fp_bal · fp_staked
+  = fp_bal · (fp_staked' − fp_staked) + Δfp_bal · fp_staked'
 ```
-
-Three pieces: a **delegate transition** term (zero for payments and for
-failed/not-permitted delegations), a **fee deduction** term (always present
-for user commands, gated on the *post-tx* staked state so it cancels the
-transition term correctly when opting out), and a **payment body** term
-(only active when the body actually moved funds — see the note on
-`payment_permitted` for why both gates are required). Note that
-`payment_permitted` already implies `is_payment`, so we don't need a
-separate `is_payment` factor.
-
-### Internal command (Fee_transfer or Coinbase)
-
-```
-internal_delta =
-      fee               · fp_staked         -- fee credited to fee_payer slot
-    + receiver_increase · rcv_staked        -- second recipient (if any)
-```
-
-Two slots `fp_staked` and `rcv_staked` correspond to the *two accounts*
-touched by any internal command. When only one account is "real"
-(Fee_transfer with a single recipient, or Coinbase with no snark-worker
-fee_transfer), `fee = 0` and the encoding below disarms the double credit.
 
 ## Coverage table
 
-The `fee_payer`, `receiver`, `fee`, `body.amount`, and `receiver_increase`
-columns show how each tag is encoded by `Transaction_union.of_transaction`
-(see `transaction_union.ml`). The final column is the reduced-form
-expression above (`user_cmd_delta` or `internal_delta`) specialized to that
-row's encoding — substitute the encoded values into the reduced form, drop
-zero terms, and you get the cell shown.
+Each row records:
+- the encoding of the tag (which account each slot points to, and what
+  goes into `fee` / `body.amount`),
+- the *post-gate* `Δfp_bal` and `Δrcv_bal` for the success case,
+- `fp_staked' − fp_staked`,
+- the resulting reduced-form expression by substitution.
 
 The `#` column is the row number. Tests for each row are tagged
 `(* unstaking_tx_case_<#>[.<sub>] *)` in
 `src/lib/transaction_logic/test/transaction_logic/stake_change.ml` and
 `src/lib/transaction_snark/test/stake_change_snark/stake_change_snark.ml`.
 
-| #  | Tag                                    | `fee_payer` slot       | `receiver` slot        | `fee`    | `body.amount`   | `receiver_increase` | Reduced form collapses to                                     |
-|----|----------------------------------------|------------------------|------------------------|----------|-----------------|---------------------|---------------------------------------------------------------|
-| 1  | Payment, success                       | sender                 | payee                  | `fee`    | amount          | amount              | `−fee·fp_staked + amount·(rcv_staked − fp_staked)`            |
-| 2  | Payment, fail                          | sender                 | payee                  | `fee`    | amount          | amount              | `−fee·fp_staked`                                              |
-| 3  | Stake_delegation, Some→Some            | delegator              | new delegate           | `fee`    | `0`             | `0`                 | `−fee`                                                        |
-| 4  | Stake_delegation, Some→None (opt-out)  | delegator              | `empty_pk`             | `fee`    | `0`             | `0`                 | `−fp_bal`                                                     |
-| 5  | Stake_delegation, None→Some (opt-in)   | delegator              | new delegate           | `fee`    | `0`             | `0`                 | `fp_bal − fee`                                                |
-| 6  | Stake_delegation, None→None            | delegator              | `empty_pk`             | `fee`    | `0`             | `0`                 | `0`                                                           |
-| 7  | Stake_delegation, not permitted        | delegator              | anything               | `fee`    | `0`             | `0`                 | `−fee·fp_staked` [^delegate-fail]                             |
-| 8  | Stake_delegation, failed               | delegator              | anything               | `fee`    | `0`             | `0`                 | `−fee·fp_staked` [^delegate-fail]                             |
-| 9  | Fee_transfer, one single               | `fee_payer ≡ receiver` | `fee_payer ≡ receiver` | `0`      | `fee`           | `fee`               | `fee·rcv_staked`                                              |
-| 10 | Fee_transfer, two singles              | `pk₂` [^fp-slot]       | `pk₁`                  | `fee₂` [^fee-credit] | `fee₁`          | `fee₁`              | `fee₂·fp_staked + fee₁·rcv_staked`                            |
-| 11 | Coinbase, no fee_transfer              | block producer         | block producer         | `0`      | `full`          | `full`              | `full_coinbase · rcv_staked`                                  |
-| 12 | Coinbase, with fee_transfer            | snark worker [^fp-slot] | block producer        | `ft_fee` [^fee-credit] | `full`          | `full − ft_fee`     | `ft_fee·fp_staked + (full − ft_fee)·rcv_staked`               |
+For any row, if a permission gate rejects, the corresponding Δ becomes
+`0` — no separate row needed. See the variants list following the table.
+
+| #  | Tag                                     | `fee_payer` slot        | `receiver` slot        | `fee`     | `body.amount` | `Δfp_bal`           | `Δrcv_bal`         | `fp_staked' − fp_staked` | Reduced form collapses to                              |
+|----|-----------------------------------------|-------------------------|------------------------|-----------|---------------|---------------------|--------------------|--------------------------|--------------------------------------------------------|
+| 1  | Payment, success                        | sender                  | payee                  | `fee`     | amount        | `−fee − amount`     | `+amount`          | `0`                      | `−fee·fp_staked + amount·(rcv_staked − fp_staked)`     |
+| 2  | Payment, body didn't transfer           | sender                  | payee                  | `fee`     | amount        | `−fee`              | `0`                | `0`                      | `−fee·fp_staked`                                       |
+| 3  | Stake_delegation, Some→Some             | delegator               | new delegate           | `fee`     | `0`           | `−fee`              | `0`                | `0`                      | `−fee`                                                 |
+| 4  | Stake_delegation, Some→None (opt-out)   | delegator               | `empty_pk`             | `fee`     | `0`           | `−fee`              | `0`                | `−1`                     | `−fp_bal`                                              |
+| 5  | Stake_delegation, None→Some (opt-in)    | delegator               | new delegate           | `fee`     | `0`           | `−fee`              | `0`                | `+1`                     | `fp_bal − fee`                                         |
+| 6  | Stake_delegation, None→None             | delegator               | `empty_pk`             | `fee`     | `0`           | `−fee`              | `0`                | `0`                      | `0`                                                    |
+| 7  | Stake_delegation, not permitted/failed  | delegator               | anything               | `fee`     | `0`           | `−fee`              | `0`                | `0` [^delegate-fail]     | `−fee·fp_staked`                                       |
+| 8  | Fee_transfer, one single                | `fee_payer ≡ receiver`  | `fee_payer ≡ receiver` | `0`       | `fee`         | `0`                 | `+fee`             | `0`                      | `fee·rcv_staked`                                       |
+| 9  | Fee_transfer, two singles               | `pk₂` [^fp-slot]        | `pk₁`                  | `fee₂` [^fee-credit] | `fee₁` | `+fee₂`             | `+fee₁`            | `0`                      | `fee₂·fp_staked + fee₁·rcv_staked`                     |
+| 10 | Coinbase, no fee_transfer               | block producer          | block producer         | `0`       | `full`        | `0`                 | `+full`            | `0`                      | `full · rcv_staked`                                    |
+| 11 | Coinbase, with fee_transfer             | snark worker [^fp-slot] | block producer         | `ft_fee` [^fee-credit] | `full` | `+ft_fee`           | `+(full − ft_fee)` | `0`                      | `ft_fee·fp_staked + (full − ft_fee)·rcv_staked`        |
+
+### Permission-rejection variants (no extra rows)
+
+For each row above, an internal-command receive rejection or a
+user-command body-transfer rejection zeroes out the corresponding Δ. A
+few representative cases:
+
+- Row 1, receiver `receive` rejects: collapses to row 2 (`Δrcv_bal = 0`).
+  (Source `send`/`access` rejections don't appear here — they reject the
+  whole txn; see "Cases that never reach the SNARK".)
+- Row 8, receiver `receive` rejects: `Δrcv_bal = 0` → stake_change `0`.
+- Row 9, fp slot's `receive` rejects: `Δfp_bal = 0` → stake_change
+  `fee₁·rcv_staked`. Symmetrically on the rcv side.
+- Row 11, snark worker's `receive` rejects: `Δfp_bal = 0` → stake_change
+  `(full − ft_fee)·rcv_staked`. Block producer side analogous.
 
 [^fp-slot]: For internal commands, `Transaction_union` reuses the
     `fee_payer_pk` field as a generic account slot — it is *not* a real fee
@@ -254,15 +236,15 @@ The `#` column is the row number. Tests for each row are tagged
     Amount.Signed.create_var ~magnitude:(Amount.Checked.of_fee fee) ~sgn
     ```
     With `is_user_command = false`, the sign is positive — so an
-    internal-command row's reduced form can have a `+ fee · fp_staked` term
-    despite the slot being called "fee_payer".
+    internal-command row's `Δfp_bal` is `+fee` (when `permitted_to_receive`
+    on the fp slot allows it).
 
 [^delegate-fail]: For failed or not-permitted stake_delegations, the
     delegate write is a no-op so `fp_staked' = fp_staked`. The only
     stake_change comes from debiting `fee` from a (possibly) staked
     `fp_bal`. Hence `−fee·fp_staked` collapses all four delegation
     sub-cases (None→Some, Some→Some, Some→None, None→None) into a single
-    formula: `0` when fp wasn't staked to begin with, `−fee` when it was.
+    formula.
 
 ### Why the encoding tricks work
 
@@ -271,13 +253,34 @@ Two tx types (Coinbase without ft, Fee_transfer with one single) have only
 and `receiver` slots. The encoding handles this by:
 
 1. Setting `fee_payer_pk = receiver_pk` (same account in both slots).
-2. Setting `fee = 0` so the `fee · fp_staked` term in `internal_delta`
-   vanishes.
-3. Putting the entire credit in `body.amount` so that `receiver_increase`
-   equals the full payment.
+2. Setting `fee = 0` so `Δfp_bal = 0` regardless of the fp slot's
+   permission.
+3. Putting the entire credit in `body.amount` so the rcv slot sees the
+   full payment.
 
 The net result is that the single account gets credited once via the
-`receiver` slot, and the `fee_payer` slot contributes nothing.
+`receiver` slot.
+
+## Cases that never reach the SNARK
+
+Some permission failures look like they should appear as Failed rows but
+actually cause the transaction to be *rejected outright* — either by the
+unchecked path's `Or_error` or by hard SNARK assertions on the
+fee_payer. These don't need coverage rows because no block ever contains
+them:
+
+- **fee_payer's `send` rejects signature auth** — `Or_error` at
+  `mina_transaction_logic.ml:565-568`; SNARK asserts `permitted_to_send`
+  for all user commands at `transaction_snark.ml:2543-2548`.
+- **fee_payer's `access` rejects** — SNARK asserts `permitted_to_access`
+  for all commands at `transaction_snark.ml:2530-2532`.
+- **fee_payer's `increment_nonce` rejects** — `Or_error` at
+  `mina_transaction_logic.ml:571-574`; SNARK asserts at lines 2534-2541.
+- **Source has insufficient balance for the fee** — `Or_error` in
+  `pay_fee` at `mina_transaction_logic.ml:488`.
+- **`fee_payer == source`** — asserted unconditionally by the circuit
+  (`transaction_snark.ml:2339`); a transaction where they differ fails
+  to prove rather than being marked Failed.
 
 ## How the circuit uses the reduced form
 
@@ -297,3 +300,11 @@ The `statement.stake_change` value is produced by
 time (`transaction_snark_scan_state.ml`). Both unchecked call sites must
 produce a value that matches the expanded form — and therefore the reduced
 form, since they are equal by construction.
+
+The unified reduced form has a concrete benefit for the circuit
+implementation: the inputs `Δfp_bal` and `Δrcv_bal` are exactly the signed
+balance changes the circuit already produces while updating each slot's
+account record. There is no need to reconstruct `fee` / `receiver_increase`
+from advice and re-apply gates manually — once the balance updates have
+been threaded through the gates, they *are* the inputs to the stake_change
+formula.

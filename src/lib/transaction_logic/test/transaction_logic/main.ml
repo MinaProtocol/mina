@@ -67,13 +67,29 @@ let () =
               fee_transfer_one_staked
           ; test_case "Fee_transfer one single (unstaked)" `Quick
               fee_transfer_one_unstaked
+          ; test_case "Fee_transfer one single (receive rejected)" `Quick
+              fee_transfer_one_rejected
           ; test_case "Fee_transfer two singles (only pk1 staked)" `Quick
               fee_transfer_two_mixed
+          ; test_case "Fee_transfer two singles (fp slot rejected)" `Quick
+              fee_transfer_two_fp_rejected
+          ; test_case "Fee_transfer two singles (rcv slot rejected)" `Quick
+              fee_transfer_two_rcv_rejected
+          ; test_case "Fee_transfer two singles (both rejected)" `Quick
+              fee_transfer_two_both_rejected
           ; test_case "Coinbase no fee_transfer (staked)" `Quick
               coinbase_no_ft_staked
           ; test_case "Coinbase no fee_transfer (unstaked)" `Quick
               coinbase_no_ft_unstaked
+          ; test_case "Coinbase no fee_transfer (receive rejected)" `Quick
+              coinbase_no_ft_rejected
           ; test_case "Coinbase with fee_transfer (only cb receiver staked)"
               `Quick coinbase_with_ft_mixed
+          ; test_case "Coinbase with fee_transfer (sw rejected)" `Quick
+              coinbase_with_ft_sw_rejected
+          ; test_case "Coinbase with fee_transfer (bp rejected)" `Quick
+              coinbase_with_ft_bp_rejected
+          ; test_case "Coinbase with fee_transfer (both rejected)" `Quick
+              coinbase_with_ft_both_rejected
           ] )
     ]
