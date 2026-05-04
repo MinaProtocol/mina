@@ -2478,7 +2478,13 @@ module Make_str (A : Wire_types.Concrete) = struct
       let fee_payer_balance_pre = ref Currency.Balance.(var_of_t zero) in
       let receiver_delegate_pre = ref Public_key.Compressed.(var_of_t empty) in
       let source_delegation_permitted = ref Boolean.false_ in
-      let payment_permitted_ref = ref Boolean.false_ in
+      let signed_zero =
+        Currency.Amount.Signed.create_var
+          ~magnitude:Currency.Amount.(var_of_t zero)
+          ~sgn:Sgn.Checked.pos
+      in
+      let delta_fp = ref signed_zero in
+      let delta_rcv = ref signed_zero in
       let%bind root_after_fee_payer_update =
         [%with_label_ "Update fee payer"] (fun () ->
             Frozen_ledger_hash.modify_account_send
@@ -2636,6 +2642,17 @@ module Make_str (A : Wire_types.Concrete) = struct
                       in
                       Balance.Checked.if_ update_account ~then_:updated_balance
                         ~else_:account.balance )
+                in
+                let%bind () =
+                  let%map d =
+                    let pos b =
+                      Amount.Signed.Checked.of_unsigned
+                        (Balance.Checked.to_amount b)
+                    in
+                    Amount.Signed.Checked.add (pos balance)
+                      (Amount.Signed.Checked.negate (pos account.balance))
+                  in
+                  delta_fp := d
                 in
                 let%map public_key =
                   Public_key.Compressed.Checked.if_ is_empty_and_writeable
@@ -2871,6 +2888,21 @@ module Make_str (A : Wire_types.Concrete) = struct
                   Balance.Checked.if_ update_account ~then_:balance
                     ~else_:account.balance
                 in
+                let%bind () =
+                  let%bind raw_delta =
+                    let pos b =
+                      Amount.Signed.Checked.of_unsigned
+                        (Balance.Checked.to_amount b)
+                    in
+                    Amount.Signed.Checked.add (pos balance)
+                      (Amount.Signed.Checked.negate (pos account.balance))
+                  in
+                  let%map d =
+                    Amount.Signed.Checked.if_ user_command_fails
+                      ~then_:signed_zero ~else_:raw_delta
+                  in
+                  delta_rcv := d
+                in
                 let%map public_key =
                   Public_key.Compressed.Checked.if_ is_empty_and_writeable
                     ~then_:(Account_id.Checked.public_key receiver)
@@ -2972,7 +3004,6 @@ module Make_str (A : Wire_types.Concrete) = struct
                     ; !receiver_balance_update_permitted
                     ]
                 in
-                payment_permitted_ref := payment_permitted ;
                 let%bind update_account =
                   let%bind delegation_permitted =
                     Boolean.all
@@ -3030,6 +3061,24 @@ module Make_str (A : Wire_types.Concrete) = struct
                 in
                 let%bind balance, `Underflow underflow =
                   Balance.Checked.sub_amount_flagged account.balance amount
+                in
+                let%bind () =
+                  let%bind raw_delta =
+                    let pos b =
+                      Amount.Signed.Checked.of_unsigned
+                        (Balance.Checked.to_amount b)
+                    in
+                    Amount.Signed.Checked.add (pos balance)
+                      (Amount.Signed.Checked.negate (pos account.balance))
+                  in
+                  let%bind contribution =
+                    Amount.Signed.Checked.if_ user_command_fails
+                      ~then_:signed_zero ~else_:raw_delta
+                  in
+                  let%map d =
+                    Amount.Signed.Checked.add !delta_fp contribution
+                  in
+                  delta_fp := d
                 in
                 let%bind () =
                   (* TODO: Remove the redundancy in balance calculation between
@@ -3122,10 +3171,7 @@ module Make_str (A : Wire_types.Concrete) = struct
             let%map () = Boolean.Assert.is_true (Boolean.not overflow) in
             amt )
       in
-      (* stake_change: the reduced form from
-         docs/unstaking-stake-change.md. The [*!] operator is
-         bit-gated multiplication: [b *! x] is [x] when the Boolean
-         [b] is true, else zero. *)
+      (* stake_change per docs/unstaking-stake-change.md *)
       let%bind stake_change =
         [%with_label_ "Calculate stake_change"] (fun () ->
             let empty_pk = Public_key.Compressed.(var_of_t empty) in
@@ -3160,57 +3206,23 @@ module Make_str (A : Wire_types.Concrete) = struct
                 ~then_:(Boolean.not set_to_unstaked)
                 ~else_:fp_staked
             in
-            let zero = Amount.Signed.Checked.constant Amount.Signed.zero in
             let pos amt = Amount.Signed.Checked.of_unsigned amt in
             let neg amt = Amount.Signed.Checked.negate (pos amt) in
             let ( *! ) b signed =
-              Amount.Signed.Checked.if_ b ~then_:signed ~else_:zero
+              Amount.Signed.Checked.if_ b ~then_:signed ~else_:signed_zero
             in
-            let fee_amt = Amount.Checked.of_fee fee in
             let fp_bal = Balance.Checked.to_amount !fee_payer_balance_pre in
-            let amount = payload.body.amount in
-            (* Signed command:
-                 fp_bal · (fp_staked' − fp_staked)
-               − fee    · fp_staked'
-               + (is_payment ∧ ¬fails) · amount · (rcv_staked − fp_staked)
-            *)
             let%bind transition_plus = fp_staked' *! pos fp_bal in
             let%bind transition_minus = fp_staked *! neg fp_bal in
             let%bind delegate_transition =
               Amount.Signed.Checked.add transition_plus transition_minus
             in
-            let%bind fee_term = fp_staked' *! neg fee_amt in
-            let%bind body_term =
-              (* [payment_permitted] already implies [is_payment]; combined
-                 with [¬user_command_fails] this is the gate from the doc's
-                 "Note on payment_permitted". *)
-              let%bind payment_active =
-                Boolean.all
-                  [ !payment_permitted_ref; Boolean.not user_command_fails ]
-              in
-              let%bind body_plus = rcv_staked *! pos amount in
-              let%bind body_minus = fp_staked *! neg amount in
-              let%bind body_sum =
-                Amount.Signed.Checked.add body_plus body_minus
-              in
-              payment_active *! body_sum
+            let%bind fp_term = fp_staked' *! !delta_fp in
+            let%bind rcv_term = rcv_staked *! !delta_rcv in
+            let%bind partial =
+              Amount.Signed.Checked.add delegate_transition fp_term
             in
-            let%bind signed_cmd_delta =
-              let%bind t1 =
-                Amount.Signed.Checked.add delegate_transition fee_term
-              in
-              Amount.Signed.Checked.add t1 body_term
-            in
-            (* Internal command:
-                 fee · fp_staked + receiver_increase · rcv_staked
-            *)
-            let%bind fp_term = fp_staked *! pos fee_amt in
-            let%bind rcv_term = rcv_staked *! pos receiver_increase in
-            let%bind internal_delta =
-              Amount.Signed.Checked.add fp_term rcv_term
-            in
-            Amount.Signed.Checked.if_ is_user_command ~then_:signed_cmd_delta
-              ~else_:internal_delta )
+            Amount.Signed.Checked.add partial rcv_term )
       in
       let%map final_root =
         (* Ensure that only the fee-payer was charged if this was an invalid user

@@ -191,7 +191,7 @@ let%test_module "stake_change in the transaction SNARK" =
               in
               U.test_transaction_union ledger (Command (Signed_command txn)) ) )
 
-    (* unstaking_tx_case_8 *)
+    (* unstaking_tx_case_7.2 *)
     let%test_unit "Delegation failed (unknown receiver), delegator staked" =
       Test_util.with_randomness 15 (fun () ->
           with_ledger_of_wallets ~n:2 (fun ledger wallets ->
@@ -208,7 +208,7 @@ let%test_module "stake_change in the transaction SNARK" =
               in
               U.test_transaction_union ledger (Command (Signed_command txn)) ) )
 
-    (* unstaking_tx_case_7 *)
+    (* unstaking_tx_case_7.1 *)
     let%test_unit "Delegation not permitted (set_delegate=Proof)" =
       Test_util.with_randomness 13 (fun () ->
           with_ledger_of_wallets ~n:3 (fun ledger wallets ->
@@ -246,7 +246,7 @@ let%test_module "stake_change in the transaction SNARK" =
       Fee_transfer.Single.create ~receiver_pk:recipient_pk ~fee
         ~fee_token:Token_id.default
 
-    (* unstaking_tx_case_9 *)
+    (* unstaking_tx_case_8 *)
     let%test_unit "Fee_transfer one single, staked" =
       Test_util.with_randomness 9 (fun () ->
           with_ledger_of_wallets ~n:2 (fun ledger wallets ->
@@ -263,7 +263,28 @@ let%test_module "stake_change in the transaction SNARK" =
               in
               U.test_transaction_union ledger (Fee_transfer ft) ) )
 
-    (* unstaking_tx_case_10 *)
+    (* unstaking_tx_case_8.3 *)
+    let%test_unit "Fee_transfer one single, receive rejected" =
+      Test_util.with_randomness 91 (fun () ->
+          with_ledger_of_wallets ~n:2 (fun ledger wallets ->
+              let recipient = wallets.(0) in
+              let validator_pk = wallets.(1).account.public_key in
+              set_delegate ledger recipient.account.public_key
+                (Some validator_pk) ;
+              set_permissions ledger recipient.account.public_key
+                { Permissions.user_default with
+                  receive = Permissions.Auth_required.Impossible
+                } ;
+              let ft =
+                Or_error.ok_exn
+                  (Fee_transfer.of_singles
+                     (`One
+                       (ft_single ~recipient_pk:recipient.account.public_key
+                          ~fee ) ) )
+              in
+              U.test_transaction_union ledger (Fee_transfer ft) ) )
+
+    (* unstaking_tx_case_9.1 *)
     let%test_unit "Fee_transfer two singles, only pk1 staked" =
       Test_util.with_randomness 10 (fun () ->
           with_ledger_of_wallets ~n:3 (fun ledger wallets ->
@@ -282,13 +303,88 @@ let%test_module "stake_change in the transaction SNARK" =
               in
               U.test_transaction_union ledger (Fee_transfer ft) ) )
 
+    (* unstaking_tx_case_9.2 *)
+    let%test_unit "Fee_transfer two singles, fp slot rejected" =
+      Test_util.with_randomness 92 (fun () ->
+          with_ledger_of_wallets ~n:3 (fun ledger wallets ->
+              let pk1 = wallets.(0).account.public_key in
+              let pk2 = wallets.(1).account.public_key in
+              let validator_pk = wallets.(2).account.public_key in
+              set_delegate ledger pk1 (Some validator_pk) ;
+              set_delegate ledger pk2 (Some validator_pk) ;
+              set_permissions ledger pk2
+                { Permissions.user_default with
+                  receive = Permissions.Auth_required.Impossible
+                } ;
+              let fee1 = Fee.of_mina_int_exn 1 in
+              let fee2 = Fee.of_mina_int_exn 2 in
+              let ft =
+                Or_error.ok_exn
+                  (Fee_transfer.of_singles
+                     (`Two
+                       ( ft_single ~recipient_pk:pk1 ~fee:fee1
+                       , ft_single ~recipient_pk:pk2 ~fee:fee2 ) ) )
+              in
+              U.test_transaction_union ledger (Fee_transfer ft) ) )
+
+    (* unstaking_tx_case_9.3 *)
+    let%test_unit "Fee_transfer two singles, rcv slot rejected" =
+      Test_util.with_randomness 93 (fun () ->
+          with_ledger_of_wallets ~n:3 (fun ledger wallets ->
+              let pk1 = wallets.(0).account.public_key in
+              let pk2 = wallets.(1).account.public_key in
+              let validator_pk = wallets.(2).account.public_key in
+              set_delegate ledger pk1 (Some validator_pk) ;
+              set_delegate ledger pk2 (Some validator_pk) ;
+              set_permissions ledger pk1
+                { Permissions.user_default with
+                  receive = Permissions.Auth_required.Impossible
+                } ;
+              let fee1 = Fee.of_mina_int_exn 1 in
+              let fee2 = Fee.of_mina_int_exn 2 in
+              let ft =
+                Or_error.ok_exn
+                  (Fee_transfer.of_singles
+                     (`Two
+                       ( ft_single ~recipient_pk:pk1 ~fee:fee1
+                       , ft_single ~recipient_pk:pk2 ~fee:fee2 ) ) )
+              in
+              U.test_transaction_union ledger (Fee_transfer ft) ) )
+
+    (* unstaking_tx_case_9.4 *)
+    let%test_unit "Fee_transfer two singles, both rejected" =
+      Test_util.with_randomness 94 (fun () ->
+          with_ledger_of_wallets ~n:3 (fun ledger wallets ->
+              let pk1 = wallets.(0).account.public_key in
+              let pk2 = wallets.(1).account.public_key in
+              let validator_pk = wallets.(2).account.public_key in
+              set_delegate ledger pk1 (Some validator_pk) ;
+              set_delegate ledger pk2 (Some validator_pk) ;
+              let reject =
+                { Permissions.user_default with
+                  receive = Permissions.Auth_required.Impossible
+                }
+              in
+              set_permissions ledger pk1 reject ;
+              set_permissions ledger pk2 reject ;
+              let fee1 = Fee.of_mina_int_exn 1 in
+              let fee2 = Fee.of_mina_int_exn 2 in
+              let ft =
+                Or_error.ok_exn
+                  (Fee_transfer.of_singles
+                     (`Two
+                       ( ft_single ~recipient_pk:pk1 ~fee:fee1
+                       , ft_single ~recipient_pk:pk2 ~fee:fee2 ) ) )
+              in
+              U.test_transaction_union ledger (Fee_transfer ft) ) )
+
     (* ------------------------------------------------------------ *)
     (* Coinbase                                                     *)
     (* ------------------------------------------------------------ *)
 
     let coinbase_amount = Amount.of_mina_int_exn 720
 
-    (* unstaking_tx_case_11 *)
+    (* unstaking_tx_case_10.1 *)
     let%test_unit "Coinbase no fee_transfer, staked" =
       Test_util.with_randomness 11 (fun () ->
           with_ledger_of_wallets ~n:2 (fun ledger wallets ->
@@ -302,7 +398,25 @@ let%test_module "stake_change in the transaction SNARK" =
               in
               U.test_transaction_union ledger (Coinbase cb) ) )
 
-    (* unstaking_tx_case_12 *)
+    (* unstaking_tx_case_10.3 *)
+    let%test_unit "Coinbase no fee_transfer, receive rejected" =
+      Test_util.with_randomness 103 (fun () ->
+          with_ledger_of_wallets ~n:2 (fun ledger wallets ->
+              let receiver = wallets.(0) in
+              let validator_pk = wallets.(1).account.public_key in
+              set_delegate ledger receiver.account.public_key (Some validator_pk) ;
+              set_permissions ledger receiver.account.public_key
+                { Permissions.user_default with
+                  receive = Permissions.Auth_required.Impossible
+                } ;
+              let cb =
+                Or_error.ok_exn
+                  (Coinbase.create ~amount:coinbase_amount
+                     ~receiver:receiver.account.public_key ~fee_transfer:None )
+              in
+              U.test_transaction_union ledger (Coinbase cb) ) )
+
+    (* unstaking_tx_case_11.1 *)
     let%test_unit "Coinbase with fee_transfer, only cb receiver staked" =
       Test_util.with_randomness 12 (fun () ->
           with_ledger_of_wallets ~n:3 (fun ledger wallets ->
@@ -310,6 +424,81 @@ let%test_module "stake_change in the transaction SNARK" =
               let ft_recipient_pk = wallets.(1).account.public_key in
               let validator_pk = wallets.(2).account.public_key in
               set_delegate ledger receiver_pk (Some validator_pk) ;
+              let ft =
+                Coinbase_fee_transfer.create ~receiver_pk:ft_recipient_pk
+                  ~fee:constraint_constants.account_creation_fee
+              in
+              let cb =
+                Or_error.ok_exn
+                  (Coinbase.create ~amount:coinbase_amount ~receiver:receiver_pk
+                     ~fee_transfer:(Some ft) )
+              in
+              U.test_transaction_union ledger (Coinbase cb) ) )
+
+    (* unstaking_tx_case_11.2 *)
+    let%test_unit "Coinbase with fee_transfer, sw rejected" =
+      Test_util.with_randomness 112 (fun () ->
+          with_ledger_of_wallets ~n:3 (fun ledger wallets ->
+              let receiver_pk = wallets.(0).account.public_key in
+              let ft_recipient_pk = wallets.(1).account.public_key in
+              let validator_pk = wallets.(2).account.public_key in
+              set_delegate ledger receiver_pk (Some validator_pk) ;
+              set_delegate ledger ft_recipient_pk (Some validator_pk) ;
+              set_permissions ledger ft_recipient_pk
+                { Permissions.user_default with
+                  receive = Permissions.Auth_required.Impossible
+                } ;
+              let ft =
+                Coinbase_fee_transfer.create ~receiver_pk:ft_recipient_pk
+                  ~fee:constraint_constants.account_creation_fee
+              in
+              let cb =
+                Or_error.ok_exn
+                  (Coinbase.create ~amount:coinbase_amount ~receiver:receiver_pk
+                     ~fee_transfer:(Some ft) )
+              in
+              U.test_transaction_union ledger (Coinbase cb) ) )
+
+    (* unstaking_tx_case_11.3 *)
+    let%test_unit "Coinbase with fee_transfer, bp rejected" =
+      Test_util.with_randomness 113 (fun () ->
+          with_ledger_of_wallets ~n:3 (fun ledger wallets ->
+              let receiver_pk = wallets.(0).account.public_key in
+              let ft_recipient_pk = wallets.(1).account.public_key in
+              let validator_pk = wallets.(2).account.public_key in
+              set_delegate ledger receiver_pk (Some validator_pk) ;
+              set_delegate ledger ft_recipient_pk (Some validator_pk) ;
+              set_permissions ledger receiver_pk
+                { Permissions.user_default with
+                  receive = Permissions.Auth_required.Impossible
+                } ;
+              let ft =
+                Coinbase_fee_transfer.create ~receiver_pk:ft_recipient_pk
+                  ~fee:constraint_constants.account_creation_fee
+              in
+              let cb =
+                Or_error.ok_exn
+                  (Coinbase.create ~amount:coinbase_amount ~receiver:receiver_pk
+                     ~fee_transfer:(Some ft) )
+              in
+              U.test_transaction_union ledger (Coinbase cb) ) )
+
+    (* unstaking_tx_case_11.4 *)
+    let%test_unit "Coinbase with fee_transfer, both rejected" =
+      Test_util.with_randomness 114 (fun () ->
+          with_ledger_of_wallets ~n:3 (fun ledger wallets ->
+              let receiver_pk = wallets.(0).account.public_key in
+              let ft_recipient_pk = wallets.(1).account.public_key in
+              let validator_pk = wallets.(2).account.public_key in
+              set_delegate ledger receiver_pk (Some validator_pk) ;
+              set_delegate ledger ft_recipient_pk (Some validator_pk) ;
+              let reject =
+                { Permissions.user_default with
+                  receive = Permissions.Auth_required.Impossible
+                }
+              in
+              set_permissions ledger receiver_pk reject ;
+              set_permissions ledger ft_recipient_pk reject ;
               let ft =
                 Coinbase_fee_transfer.create ~receiver_pk:ft_recipient_pk
                   ~fee:constraint_constants.account_creation_fee
