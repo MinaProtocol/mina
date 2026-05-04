@@ -2214,6 +2214,36 @@ end
    Both Step (Fp/Vesta) and Wrap (Fq/Pallas) variants.
    ==================================================================== *)
 
+(* Side_loaded_verification_key.typ exists check.
+   Standalone test for the PS `Pickles.Sideload.VerificationKey.Checked`
+   CheckedType instance. Allocates a Side_loaded_verification_key in
+   circuit and lets the typ check fire (boolean checks for both One_hot
+   fields + exactly_one assertions + on-curve checks for wrap_index). *)
+let sideloaded_vk_typ_step_circuit () () =
+  let open Impls.Step in
+  let _vk =
+    exists Side_loaded_verification_key.typ
+      ~compute:(fun () -> Side_loaded_verification_key.dummy)
+  in
+  ()
+
+(* Util.ones_vector with length=16 — the side-loaded ones-prefix mask
+   used by `side_loaded_domain.vanishing_polynomial` (step_verifier.ml:822).
+   Standalone test for the PS `mkSideLoadedOnesPrefixMask` analog. *)
+let utils_ones_vector_n16_step_circuit (inputs : Impl.Field.t array) () =
+  let open Impl in
+  let open Pickles_types in
+  let _v = with_label "ones_vector_n16" (fun () ->
+    Util.Step.ones_vector ~first_zero:inputs.(0) Nat.N16.n) in
+  ()
+
+let utils_ones_vector_n16_wrap_circuit (inputs : Impls.Wrap.Field.t array) () =
+  let open Impls.Wrap in
+  let open Pickles_types in
+  let _v = with_label "ones_vector_n16" (fun () ->
+    Util.Wrap.ones_vector ~first_zero:inputs.(0) Nat.N16.n) in
+  ()
+
 (* one_hot_vector: of_index with length=1 (single branch) *)
 let one_hot_n1_step_circuit (inputs : Impl.Field.t array) () =
   let open Impl in
@@ -2227,6 +2257,23 @@ let one_hot_n1_wrap_circuit (inputs : Impls.Wrap.Field.t array) () =
   let open Pickles_types in
   let _v = with_label "one_hot_n1" (fun () ->
     One_hot_vector.Wrap.of_index inputs.(0) ~length:Nat.N1.n) in
+  ()
+
+(* one_hot_vector: of_index with length=17 (side-loaded domain dispatch).
+   Mirrors `O.of_index log2_size ~length:(S max_n)` from
+   `step_verifier.ml:824` where `max_n = Domain.log2_size max_domains.h = 16`. *)
+let one_hot_n17_step_circuit (inputs : Impl.Field.t array) () =
+  let open Impl in
+  let open Pickles_types in
+  let _v = with_label "one_hot_n17" (fun () ->
+    One_hot_vector.Step.of_index inputs.(0) ~length:(Nat.S Nat.N16.n)) in
+  ()
+
+let one_hot_n17_wrap_circuit (inputs : Impls.Wrap.Field.t array) () =
+  let open Impls.Wrap in
+  let open Pickles_types in
+  let _v = with_label "one_hot_n17" (fun () ->
+    One_hot_vector.Wrap.of_index inputs.(0) ~length:(Nat.S Nat.N16.n)) in
   ()
 
 (* one_hot_vector: of_index with length=3 (wrap_domain selection) *)
@@ -2259,6 +2306,31 @@ let pseudo_mask_n1_wrap_circuit (inputs : Impls.Wrap.Field.t array) () =
   let bits = One_hot_vector.Wrap.of_index inputs.(0) ~length:Nat.N1.n in
   let _result = with_label "pseudo_mask_n1" (fun () ->
     Pseudo.Wrap.mask bits (Vector.map (Vector.[ inputs.(1) ]) ~f:Fn.id)) in
+  ()
+
+(* pseudo_mask: mask with length=17 over CONSTANT generators.
+   Mirrors the side-loaded FOP's `Pseudo.mask domainWhiches generators`
+   where `domainWhiches : Vector 17 Boolean.var` and `generators` are
+   17 constant field elements (the per-domain generators). Standalone
+   test for the PS analog used in `finalizeOtherProofCircuit`'s
+   `SideLoadedMode` branch. *)
+let pseudo_mask_n17_step_circuit (inputs : Impl.Field.t array) () =
+  let open Impl in
+  let open Pickles_types in
+  let bits = One_hot_vector.Step.of_index inputs.(0) ~length:(Nat.S Nat.N16.n) in
+  (* 17 constant generators (just use Field.of_int 0..16 as placeholders) *)
+  let gens = Vector.init (Nat.S Nat.N16.n) ~f:(fun i -> Field.of_int i) in
+  let _result = with_label "pseudo_mask_n17" (fun () ->
+    Pseudo.Step.mask bits gens) in
+  ()
+
+let pseudo_mask_n17_wrap_circuit (inputs : Impls.Wrap.Field.t array) () =
+  let open Impls.Wrap in
+  let open Pickles_types in
+  let bits = One_hot_vector.Wrap.of_index inputs.(0) ~length:(Nat.S Nat.N16.n) in
+  let gens = Vector.init (Nat.S Nat.N16.n) ~f:(fun i -> Field.of_int i) in
+  let _result = with_label "pseudo_mask_n17" (fun () ->
+    Pseudo.Wrap.mask bits gens) in
   ()
 
 (* pseudo_mask: mask with length=3 *)
@@ -4795,9 +4867,19 @@ let run ~output_dir =
   let array2_wrap_ps = Impls.Wrap.Typ.array ~length:2 Impls.Wrap.Field.typ in
   let array4_field_ps = Impl.Typ.array ~length:4 Impl.Field.typ in
   let array4_wrap_ps = Impls.Wrap.Typ.array ~length:4 Impls.Wrap.Field.typ in
+  dump_step "sideloaded_vk_typ_step_circuit" sideloaded_vk_typ_step_circuit
+    ~input_typ:Impl.Typ.unit ~return_typ:Impl.Typ.unit ;
+  dump_step "utils_ones_vector_n16_step_circuit" utils_ones_vector_n16_step_circuit
+    ~input_typ:array1_field_ps ~return_typ:Impl.Typ.unit ;
+  dump_wrap "utils_ones_vector_n16_wrap_circuit" utils_ones_vector_n16_wrap_circuit
+    ~input_typ:array1_wrap_ps ~return_typ:Impls.Wrap.Typ.unit ;
   dump_step "one_hot_n1_step_circuit" one_hot_n1_step_circuit
     ~input_typ:array1_field_ps ~return_typ:Impl.Typ.unit ;
   dump_wrap "one_hot_n1_wrap_circuit" one_hot_n1_wrap_circuit
+    ~input_typ:array1_wrap_ps ~return_typ:Impls.Wrap.Typ.unit ;
+  dump_step "one_hot_n17_step_circuit" one_hot_n17_step_circuit
+    ~input_typ:array1_field_ps ~return_typ:Impl.Typ.unit ;
+  dump_wrap "one_hot_n17_wrap_circuit" one_hot_n17_wrap_circuit
     ~input_typ:array1_wrap_ps ~return_typ:Impls.Wrap.Typ.unit ;
   dump_step "one_hot_n3_step_circuit" one_hot_n3_step_circuit
     ~input_typ:array1_field_ps ~return_typ:Impl.Typ.unit ;
@@ -4811,6 +4893,10 @@ let run ~output_dir =
     ~input_typ:array4_field_ps ~return_typ:Impl.Typ.unit ;
   dump_wrap "pseudo_mask_n3_wrap_circuit" pseudo_mask_n3_wrap_circuit
     ~input_typ:array4_wrap_ps ~return_typ:Impls.Wrap.Typ.unit ;
+  dump_step "pseudo_mask_n17_step_circuit" pseudo_mask_n17_step_circuit
+    ~input_typ:array1_field_ps ~return_typ:Impl.Typ.unit ;
+  dump_wrap "pseudo_mask_n17_wrap_circuit" pseudo_mask_n17_wrap_circuit
+    ~input_typ:array1_wrap_ps ~return_typ:Impls.Wrap.Typ.unit ;
   dump_step "pseudo_choose_n1_step_circuit" pseudo_choose_n1_step_circuit
     ~input_typ:array1_field_ps ~return_typ:Impl.Typ.unit ;
   dump_wrap "pseudo_choose_n1_wrap_circuit" pseudo_choose_n1_wrap_circuit
