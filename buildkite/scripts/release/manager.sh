@@ -184,7 +184,10 @@ function get_suffix() {
         mina-archive)
             echo "-$__network"
         ;;
-        mina-config|mina-automode|mina-prefork|mina-postfork|mina-generic|rosetta-generic|mina-postfork-mesa|mina-prefork-mesa)
+        mina-generic)
+            echo "-$__network$__profile_part"
+        ;;
+        mina-config|mina-automode|mina-prefork|mina-postfork|rosetta-generic|mina-postfork-mesa|mina-prefork-mesa)
             echo "-$__network"
         ;;
         *)
@@ -244,7 +247,14 @@ function get_artifact_with_suffix() {
             echo "mina-$__network-postfork-mesa"
         ;;
         mina-generic)
-            echo "mina-$__network-generic"
+            case $__profile in
+                lightnet)
+                    echo "mina-$__network-generic-lightnet"
+                ;;
+                *)
+                    echo "mina-$__network-generic"
+                ;;
+            esac
         ;;
         rosetta-generic)
             echo "mina-rosetta-$__network-generic"
@@ -601,11 +611,12 @@ function promote_debian() {
     local __source_channel=$5
     local __target_channel=$6
     local __network=$7
-    local __verify=$8
-    local __dry_run=$9
-    local __debian_repo=${10}
-    local __arch=${11}
-    local __debian_sign_key=${12:-""}
+    local __profile=$8
+    local __verify=$9
+    local __dry_run=${10}
+    local __debian_repo=${11}
+    local __arch=${12}
+    local __debian_sign_key=${13:-""}
     local __skip_cache_invalidation=${SKIP_CACHE_INVALIDATION:-0}
 
     if [[ $__debian_sign_key != "" ]]; then
@@ -620,7 +631,7 @@ function promote_debian() {
     echo "    📦 Target debian version: $(calculate_debian_version $__artifact $__target_version $__codename "$__network" $__arch)"
 
     local __artifact_full_name
-    __artifact_full_name=$(get_artifact_with_suffix $__artifact $__network)
+    __artifact_full_name=$(get_artifact_with_suffix $__artifact $__network "$__profile")
 
     local __new_artifact_name=$__artifact_full_name
 
@@ -1402,6 +1413,7 @@ function promote(){
                                     $__source_channel \
                                     $__target_channel \
                                     "" \
+                                    "" \
                                     $__verify \
                                     $__dry_run \
                                     $__debian_repo \
@@ -1425,6 +1437,7 @@ function promote(){
                                         $__source_channel \
                                         $__target_channel \
                                         $network \
+                                        "$__profile" \
                                         $__verify \
                                         $__dry_run \
                                         $__debian_repo \
@@ -1447,6 +1460,7 @@ function promote(){
                                             $__source_channel \
                                             $__target_channel \
                                             $network \
+                                            "$__profile" \
                                             $__verify \
                                             $__dry_run \
                                             $__debian_repo \
@@ -1469,6 +1483,7 @@ function promote(){
                                             $__source_channel \
                                             $__target_channel \
                                             $network \
+                                            "$__profile" \
                                             $__verify \
                                             $__dry_run \
                                             $__debian_repo \
@@ -1491,6 +1506,7 @@ function promote(){
                                         $__source_channel \
                                         $__target_channel \
                                         $network \
+                                        "$__profile" \
                                         $__verify \
                                         $__dry_run \
                                         $__debian_repo \
@@ -1513,6 +1529,7 @@ function promote(){
                                         $__source_channel \
                                         $__target_channel \
                                         $network \
+                                        "$__profile" \
                                         $__verify \
                                         $__dry_run \
                                         $__debian_repo \
@@ -1535,6 +1552,7 @@ function promote(){
                                         $__source_channel \
                                         $__target_channel \
                                         $network \
+                                        "$__profile" \
                                         $__verify \
                                         $__dry_run \
                                         $__debian_repo \
@@ -1557,6 +1575,7 @@ function promote(){
                                         $__source_channel \
                                         $__target_channel \
                                         $network \
+                                        "$__profile" \
                                         $__verify \
                                         $__dry_run \
                                         $__debian_repo \
@@ -1969,7 +1988,7 @@ function verify(){
                             mina-generic|rosetta-generic)
                                 for network in "${__networks_arr[@]}"; do
                                     local __artifact_full_name
-                                    __artifact_full_name=$(get_artifact_with_suffix $artifact $network)
+                                    __artifact_full_name=$(get_artifact_with_suffix $artifact $network "$__profile")
 
                                     local __docker_suffix_combined
                                     __docker_suffix_combined=$(combine_docker_suffixes "$network" "$__profile" "$__build_flag" "$__generic")
@@ -2893,6 +2912,7 @@ function progress(){
     local __only_debians=0
     local __only_dockers=0
     local __skip_mina_public=0
+    local __profile=""
 
     while [ ${#} -gt 0 ]; do
         error_message="❌ Error: a value is needed for '$1'";
@@ -2914,6 +2934,10 @@ function progress(){
             ;;
             --codenames )
                 __codenames=${2:?$error_message}
+                shift 2;
+            ;;
+            --profile )
+                __profile=${2:?$error_message}
                 shift 2;
             ;;
             --only-debians )
@@ -3046,7 +3070,7 @@ function progress(){
                                 ;;
                             mina-daemon|mina-rosetta|mina-generic|rosetta-generic|mina-postfork-mesa|mina-prefork-mesa)
                                 local package_with_suffix
-                                package_with_suffix=$(get_artifact_with_suffix "$artifact" "$__network")
+                                package_with_suffix=$(get_artifact_with_suffix "$artifact" "$__network" "$__profile")
 
                                 ((total_debian_checks=total_debian_checks+1))
                                 if echo "$available_packages" | awk '{print $1, $2, $3}' | grep -q "^${package_with_suffix} ${__version} ${arch}$"; then
