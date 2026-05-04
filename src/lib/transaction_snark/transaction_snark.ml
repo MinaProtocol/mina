@@ -2903,6 +2903,15 @@ module Make_str (A : Wire_types.Concrete) = struct
                 let permitted_to_update_delegate =
                   Account.Checked.has_permission ~to_:`Set_delegate account
                 in
+                let%bind () =
+                  [%with_label_
+                    "Stake delegation must have set_delegate permission"]
+                    (fun () ->
+                      Boolean.Assert.any
+                        [ Boolean.not is_stake_delegation
+                        ; permitted_to_update_delegate
+                        ] )
+                in
                 let permitted_to_send =
                   Account.Checked.has_permission ~to_:`Send account
                 in
