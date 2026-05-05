@@ -302,6 +302,11 @@ module type S = sig
   end
 
   module Side_loaded : sig
+    (** Alias for the outer (compiled) [Verification_key] module, so that
+        members of [Side_loaded.Verification_key] can refer to the
+        blockchain/transaction-SNARK VK type without it being shadowed. *)
+    module V = Verification_key
+
     module Verification_key : sig
       [%%versioned:
       module Stable : sig
@@ -333,6 +338,12 @@ module type S = sig
       val of_compiled_promise : _ Tag.t -> t Promise.t
 
       val of_compiled : _ Tag.t -> t Deferred.t
+
+      (** Convert a compiled-circuit verification key (e.g. the blockchain or
+          transaction SNARK VK) into the side-loaded form. [max_proofs_verified]
+          must be supplied because the compiled VK doesn't carry it. *)
+      val of_blockchain_vk :
+        max_proofs_verified:Pickles_base.Proofs_verified.t -> V.t -> t
 
       module Max_width = Nat.N2
     end
