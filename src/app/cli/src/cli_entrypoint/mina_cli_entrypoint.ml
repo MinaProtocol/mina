@@ -2173,6 +2173,14 @@ let internal_commands logger ~itn_features =
               "PATH path to a configuration file. Pass multiple times to \
                override fields from earlier config files"
             (listed string)
+        and format =
+          flag "--format" ~aliases:[ "format" ]
+            ~doc:
+              "FORMAT output format. One of \"verification-key-json\" \
+               (default; the structured Pickles.Verification_key.t JSON) or \
+               \"side-loaded-json\" (the {data, hash} object o1js consumes for \
+               zkApp account verification keys)."
+            (optional_with_default "verification-key-json" string)
         in
         fun () ->
           let open Deferred.Let_syntax in
@@ -2243,8 +2251,33 @@ let internal_commands logger ~itn_features =
                   (Genesis_constants.Proof_level.to_string proof_level) ;
                 Deferred.return (Lazy.force Pickles.Verification_key.dummy)
           in
-          Pickles.Verification_key.to_yojson vk
-          |> Yojson.Safe.to_string |> print_string) )
+          let output_json =
+            match format with
+            | "verification-key-json" ->
+                Pickles.Verification_key.to_yojson vk
+            | "side-loaded-json" ->
+                let sl_vk =
+                  Pickles.Side_loaded.Verification_key.of_blockchain_vk
+                    ~max_proofs_verified:Pickles_base.Proofs_verified.N2 vk
+                in
+                let data =
+                  Pickles.Side_loaded.Verification_key.to_base64 sl_vk
+                in
+                let hash = Mina_base.Zkapp_account.digest_vk sl_vk in
+                (* Match GraphQL's [VerificationKeyHash] scalar:
+                   decimal string via [Tick.Field.to_string]. This is the form
+                   o1js's [Field(hash)] consumes for zkApp account VKs. *)
+                `Assoc
+                  [ ("data", `String data)
+                  ; ("hash", `String (Pickles.Backend.Tick.Field.to_string hash))
+                  ]
+            | other ->
+                failwithf
+                  "Unknown --format %s; expected \"verification-key-json\" or \
+                   \"side-loaded-json\""
+                  other ()
+          in
+          Yojson.Safe.to_string output_json |> print_string) )
   ; ( "print-hard-fork-genesis-timestamp"
     , Command.async
         ~summary:
