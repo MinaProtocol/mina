@@ -2472,20 +2472,65 @@ module Make_str (A : Wire_types.Concrete) = struct
       in
       (* new account fees added for coinbases/fee transfers, when calculating receiver amounts *)
       let new_account_fees = ref zero_fee in
-      (* pre-tx state captured inside modify_account closures, used to compute
-         stake_change per docs/unstaking-stake-change.md *)
-      let fee_payer_delegate_pre = ref Public_key.Compressed.(var_of_t empty) in
-      let fee_payer_balance_pre = ref Currency.Balance.(var_of_t zero) in
-      let receiver_delegate_pre = ref Public_key.Compressed.(var_of_t empty) in
-      let source_delegation_permitted = ref Boolean.false_ in
+      (* stake_change accumulator and helpers, per docs/unstaking-stake-change.md *)
       let signed_zero =
         Currency.Amount.Signed.create_var
           ~magnitude:Currency.Amount.(var_of_t zero)
           ~sgn:Sgn.Checked.pos
       in
-      let delta_fp = ref signed_zero in
-      let delta_rcv = ref signed_zero in
-      let%bind root_after_fee_payer_update =
+      let total_stake_change = ref signed_zero in
+      let pending_stake_delta = ref signed_zero in
+      (* Compute post_stake − pre_stake for a single account transition.
+         stake(a) = balance(a) * is_staked(a), where is_staked = delegate ≠ empty. *)
+      let stake_delta ~pre_balance ~pre_delegate ~post_balance ~post_delegate =
+        let empty_pk = Public_key.Compressed.(var_of_t empty) in
+        let%bind pre_staked =
+          let%map is_empty =
+            Public_key.Compressed.Checked.equal pre_delegate empty_pk
+          in
+          Boolean.not is_empty
+        in
+        let%bind post_staked =
+          let%map is_empty =
+            Public_key.Compressed.Checked.equal post_delegate empty_pk
+          in
+          Boolean.not is_empty
+        in
+        let pre_bal =
+          Amount.Signed.Checked.of_unsigned
+            (Balance.Checked.to_amount pre_balance)
+        in
+        let%bind pre_stake =
+          Amount.Signed.Checked.if_ pre_staked ~then_:pre_bal
+            ~else_:signed_zero
+        in
+        let post_bal =
+          Amount.Signed.Checked.of_unsigned
+            (Balance.Checked.to_amount post_balance)
+        in
+        let%bind post_stake =
+          Amount.Signed.Checked.if_ post_staked ~then_:post_bal
+            ~else_:signed_zero
+        in
+        Amount.Signed.Checked.add post_stake
+          (Amount.Signed.Checked.negate pre_stake)
+      in
+      (* Commit or pass-through: if [condition], adopt [new_root] and
+         accumulate [stake_delta]; otherwise pass through [base_root] and
+         discard the stake delta. *)
+      let commit_pass ~condition ~base_root new_root =
+        let%bind root =
+          Frozen_ledger_hash.if_ condition ~then_:new_root ~else_:base_root
+        in
+        let%bind gated =
+          Amount.Signed.Checked.if_ condition ~then_:!pending_stake_delta
+            ~else_:signed_zero
+        in
+        let%map acc = Amount.Signed.Checked.add !total_stake_change gated in
+        total_stake_change := acc ;
+        root
+      in
+      let%bind root =
         [%with_label_ "Update fee payer"] (fun () ->
             Frozen_ledger_hash.modify_account_send
               ~depth:constraint_constants.ledger_depth fee_payment_root
@@ -2497,8 +2542,6 @@ module Make_str (A : Wire_types.Concrete) = struct
                    - the fee-receiver for a coinbase
                    - the second receiver for a fee transfer
                 *)
-                fee_payer_delegate_pre := account.delegate ;
-                fee_payer_balance_pre := account.balance ;
                 let%bind next_nonce =
                   Account.Nonce.Checked.succ_if account.nonce is_user_command
                 in
@@ -2645,14 +2688,11 @@ module Make_str (A : Wire_types.Concrete) = struct
                 in
                 let%bind () =
                   let%map d =
-                    let pos b =
-                      Amount.Signed.Checked.of_unsigned
-                        (Balance.Checked.to_amount b)
-                    in
-                    Amount.Signed.Checked.add (pos balance)
-                      (Amount.Signed.Checked.negate (pos account.balance))
+                    stake_delta ~pre_balance:account.balance
+                      ~pre_delegate:account.delegate ~post_balance:balance
+                      ~post_delegate:account.delegate
                   in
-                  delta_fp := d
+                  pending_stake_delta := d
                 in
                 let%map public_key =
                   Public_key.Compressed.Checked.if_ is_empty_and_writeable
@@ -2676,6 +2716,13 @@ module Make_str (A : Wire_types.Concrete) = struct
                 ; permissions = account.permissions
                 ; zkapp = account.zkapp
                 } ) )
+      in
+      (* FP pass always sticks — commit root and stake unconditionally. *)
+      let%bind () =
+        let%map acc =
+          Amount.Signed.Checked.add !total_stake_change !pending_stake_delta
+        in
+        total_stake_change := acc
       in
       let%bind receiver_increase =
         (* - payments:         payload.body.amount
@@ -2707,7 +2754,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         in
         Boolean.(is_stake_delegation &&& receiver_is_empty)
       in
-      let%bind root_after_receiver_update =
+      let%bind potential_root =
         let%bind receiver_to_query =
           (* If is_unstaking_tx, the receiver is the empty public key
              which doesn't exist in the ledger. We use the
@@ -2719,7 +2766,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         [%with_label_ "Update receiver"] (fun () ->
             Frozen_ledger_hash.modify_account_recv
               ~depth:constraint_constants.ledger_depth
-              root_after_fee_payer_update receiver_to_query
+              root receiver_to_query
               ~f:(fun ~is_empty_and_writeable account ->
                 (* this account is:
                    - the receiver for payments
@@ -2727,7 +2774,6 @@ module Make_str (A : Wire_types.Concrete) = struct
                    - the receiver for a coinbase
                    - the first receiver for a fee transfer
                 *)
-                receiver_delegate_pre := account.delegate ;
                 let permitted_to_access =
                   Account.Checked.has_permission
                     ~signature_verifies:Boolean.false_ ~to_:`Access account
@@ -2889,19 +2935,12 @@ module Make_str (A : Wire_types.Concrete) = struct
                     ~else_:account.balance
                 in
                 let%bind () =
-                  let%bind raw_delta =
-                    let pos b =
-                      Amount.Signed.Checked.of_unsigned
-                        (Balance.Checked.to_amount b)
-                    in
-                    Amount.Signed.Checked.add (pos balance)
-                      (Amount.Signed.Checked.negate (pos account.balance))
-                  in
                   let%map d =
-                    Amount.Signed.Checked.if_ user_command_fails
-                      ~then_:signed_zero ~else_:raw_delta
+                    stake_delta ~pre_balance:account.balance
+                      ~pre_delegate:account.delegate ~post_balance:balance
+                      ~post_delegate:account.delegate
                   in
-                  delta_rcv := d
+                  pending_stake_delta := d
                 in
                 let%map public_key =
                   Public_key.Compressed.Checked.if_ is_empty_and_writeable
@@ -2924,25 +2963,27 @@ module Make_str (A : Wire_types.Concrete) = struct
                 ; permissions = account.permissions
                 ; zkapp = account.zkapp
                 } ) )
-        (* If it's an unstaking tx, reset the root  *)
-        >>= fun root_if_updated ->
-        Frozen_ledger_hash.if_ is_unstaking_tx
-          ~then_:root_after_fee_payer_update ~else_:root_if_updated
       in
       let%bind user_command_fails =
         Boolean.(!receiver_overflow ||| user_command_fails)
       in
+      (* Commit receiver pass: unstaking or failure both cause pass-through. *)
+      let%bind root =
+        let%bind condition =
+          Boolean.(not is_unstaking_tx &&& not user_command_fails)
+        in
+        commit_pass ~condition ~base_root:root potential_root
+      in
       let%bind fee_payer_is_source =
         Account_id.Checked.equal fee_payer source
       in
-      let%bind root_after_source_update =
+      let%bind potential_root =
         [%with_label_ "Update source"] (fun () ->
             Frozen_ledger_hash.modify_account_send
               ~depth:constraint_constants.ledger_depth
               ~is_writeable:
                 (* [modify_account_send] does this failure check for us. *)
-                user_command_failure.source_not_present
-              root_after_receiver_update source
+                user_command_failure.source_not_present root source
               ~f:(fun ~is_empty_and_writeable account ->
                 (* this account is:
                    - the source for payments
@@ -2987,7 +3028,6 @@ module Make_str (A : Wire_types.Concrete) = struct
                 let permitted_to_update_delegate =
                   Account.Checked.has_permission ~to_:`Set_delegate account
                 in
-                source_delegation_permitted := permitted_to_update_delegate ;
                 let permitted_to_send =
                   Account.Checked.has_permission ~to_:`Send account
                 in
@@ -3063,22 +3103,20 @@ module Make_str (A : Wire_types.Concrete) = struct
                   Balance.Checked.sub_amount_flagged account.balance amount
                 in
                 let%bind () =
-                  let%bind raw_delta =
-                    let pos b =
-                      Amount.Signed.Checked.of_unsigned
-                        (Balance.Checked.to_amount b)
+                  let%bind final_delegate =
+                    let%bind may_delegate =
+                      Boolean.all [ is_stake_delegation; update_account ]
                     in
-                    Amount.Signed.Checked.add (pos balance)
-                      (Amount.Signed.Checked.negate (pos account.balance))
-                  in
-                  let%bind contribution =
-                    Amount.Signed.Checked.if_ user_command_fails
-                      ~then_:signed_zero ~else_:raw_delta
+                    Public_key.Compressed.Checked.if_ may_delegate
+                      ~then_:(Account_id.Checked.public_key receiver)
+                      ~else_:account.delegate
                   in
                   let%map d =
-                    Amount.Signed.Checked.add !delta_fp contribution
+                    stake_delta ~pre_balance:account.balance
+                      ~pre_delegate:account.delegate ~post_balance:balance
+                      ~post_delegate:final_delegate
                   in
-                  delta_fp := d
+                  pending_stake_delta := d
                 in
                 let%bind () =
                   (* TODO: Remove the redundancy in balance calculation between
@@ -3097,10 +3135,6 @@ module Make_str (A : Wire_types.Concrete) = struct
                     ~then_:(Account_id.Checked.public_key receiver)
                     ~else_:account.delegate
                 in
-                (* NOTE: Technically we update the account here even in the case
-                   of [user_command_fails], but we throw the resulting hash away
-                   in [final_root] below, so it shouldn't matter.
-                *)
                 { Account.Poly.balance
                 ; public_key = account.public_key
                 ; token_id = account.token_id
@@ -3113,6 +3147,12 @@ module Make_str (A : Wire_types.Concrete) = struct
                 ; permissions = account.permissions
                 ; zkapp = account.zkapp
                 } ) )
+      in
+      (* Commit source pass: root and stake are either both adopted or
+         both discarded, gated on the same condition. *)
+      let%bind root =
+        commit_pass ~condition:(Boolean.not user_command_fails)
+          ~base_root:root potential_root
       in
       let%bind fee_excess =
         (* - payments:         payload.common.fee
@@ -3171,67 +3211,11 @@ module Make_str (A : Wire_types.Concrete) = struct
             let%map () = Boolean.Assert.is_true (Boolean.not overflow) in
             amt )
       in
-      (* stake_change per docs/unstaking-stake-change.md *)
-      let%bind stake_change =
-        [%with_label_ "Calculate stake_change"] (fun () ->
-            let empty_pk = Public_key.Compressed.(var_of_t empty) in
-            let%bind fp_staked =
-              let%map is_empty =
-                Public_key.Compressed.Checked.equal !fee_payer_delegate_pre
-                  empty_pk
-              in
-              Boolean.not is_empty
-            in
-            let%bind rcv_staked =
-              let%map is_empty =
-                Public_key.Compressed.Checked.equal !receiver_delegate_pre
-                  empty_pk
-              in
-              Boolean.not is_empty
-            in
-            let%bind set_to_unstaked =
-              Public_key.Compressed.Checked.equal
-                (Account_id.Checked.public_key receiver)
-                empty_pk
-            in
-            let%bind writes_delegate_field =
-              Boolean.all
-                [ is_stake_delegation
-                ; Boolean.not user_command_fails
-                ; !source_delegation_permitted
-                ]
-            in
-            let%bind fp_staked' =
-              Boolean.if_ writes_delegate_field
-                ~then_:(Boolean.not set_to_unstaked)
-                ~else_:fp_staked
-            in
-            let pos amt = Amount.Signed.Checked.of_unsigned amt in
-            let neg amt = Amount.Signed.Checked.negate (pos amt) in
-            let ( *! ) b signed =
-              Amount.Signed.Checked.if_ b ~then_:signed ~else_:signed_zero
-            in
-            let fp_bal = Balance.Checked.to_amount !fee_payer_balance_pre in
-            let%bind transition_plus = fp_staked' *! pos fp_bal in
-            let%bind transition_minus = fp_staked *! neg fp_bal in
-            let%bind delegate_transition =
-              Amount.Signed.Checked.add transition_plus transition_minus
-            in
-            let%bind fp_term = fp_staked' *! !delta_fp in
-            let%bind rcv_term = rcv_staked *! !delta_rcv in
-            let%bind partial =
-              Amount.Signed.Checked.add delegate_transition fp_term
-            in
-            Amount.Signed.Checked.add partial rcv_term )
-      in
-      let%map final_root =
-        (* Ensure that only the fee-payer was charged if this was an invalid user
-           command.
-        *)
-        Frozen_ledger_hash.if_ user_command_fails
-          ~then_:root_after_fee_payer_update ~else_:root_after_source_update
-      in
-      (final_root, fee_excess, supply_increase, stake_change)
+      return
+        ( root
+        , fee_excess
+        , supply_increase
+        , !total_stake_change )
 
     (* Someday:
        write the following soundness tests:
