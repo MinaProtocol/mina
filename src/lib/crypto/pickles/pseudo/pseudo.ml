@@ -11,14 +11,15 @@ module Make (Impl : Snarky_backendless.Snark_intf.Run) = struct
   (* TODO: Use version in common. *)
   let seal (x : Impl.Field.t) : Impl.Field.t =
     let open Impl in
-    match Field.to_constant_and_terms x with
-    | None, [ (x, i) ] when Field.Constant.(equal x one) ->
-        Field.Unsafe.of_index i
-    | Some c, [] ->
-        Field.constant c
-    | _ ->
-        let y = exists Field.typ ~compute:As_prover.(fun () -> read_var x) in
-        Field.Assert.equal x y ; y
+    with_label "Pseudo.seal" (fun () ->
+      match Field.to_constant_and_terms x with
+      | None, [ (x, i) ] when Field.Constant.(equal x one) ->
+          Field.Unsafe.of_index i
+      | Some c, [] ->
+          Field.constant c
+      | _ ->
+          let y = exists Field.typ ~compute:As_prover.(fun () -> read_var x) in
+          Field.Assert.equal x y ; y )
 
   let mask (type n) (bits : n One_hot_vector.t) xs =
     with_label __LOC__ (fun () ->

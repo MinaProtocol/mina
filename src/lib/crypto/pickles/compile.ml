@@ -23,6 +23,12 @@ module Proof = P
 module Inductive_rule = Inductive_rule.Kimchi
 module Step_branch_data = Step_branch_data.Make (Inductive_rule)
 
+(* Counters and [constraint_type_name] live in [Cs_dump] now —
+   shared between the step site (this file), the wrap site (this
+   file), and the standalone sub-circuit dumps in
+   [dump_circuit_impl.ml]. Re-exported here for legacy call sites
+   that haven't been migrated to [Cs_dump.cfg]. *)
+
 type chunking_data = Verify.Instance.chunking_data =
   { num_chunks : int; domain_size : int; zk_rows : int }
 
@@ -573,6 +579,34 @@ struct
                          Impls.Step.with_label "conv_inv" (fun () ->
                              conv_inv res )
                        in
+                       let module VCS =
+                         Kimchi_pasta_snarky_backend
+                         .Vesta_based_plonk
+                         .R1CS_constraint_system
+                       in
+                       (* Step CS dump cfg, shared with the wrap site
+                          (different impl + counter, identical shape).
+                          Logger is registered BEFORE
+                          [constraint_system_manual] runs — the manual
+                          builder snapshots the [constraint_logger]
+                          ref into the run state at build time, so a
+                          later [set_constraint_logger] would be
+                          ignored. *)
+                       let dump_cfg : (_, Impl.Constraint.t) Cs_dump.cfg =
+                         { env_var = "PICKLES_STEP_CS_DUMP"
+                         ; counter = Cs_dump.step_counter
+                         ; set_constraint_logger =
+                             Impl.set_constraint_logger
+                         ; clear_constraint_logger =
+                             Impl.clear_constraint_logger
+                         ; set_gate_label_stack = VCS.set_gate_label_stack
+                         ; constraint_type_name = Cs_dump.constraint_type_name
+                         ; to_json = VCS.to_json
+                         ; dump_cached_constants = VCS.dump_cached_constants
+                         ; dump_gate_labels = VCS.dump_gate_labels
+                         }
+                       in
+                       let dump_events = Cs_dump.setup dump_cfg in
                        let constraint_builder =
                          Impl.constraint_system_manual ~input_typ:Typ.unit
                            ~return_typ:typ
@@ -580,7 +614,9 @@ struct
                        let%map.Promise res =
                          constraint_builder.run_circuit main
                        in
+                       Cs_dump.teardown dump_cfg dump_events ;
                        let cs = constraint_builder.finish_computation res in
+                       Cs_dump.emit dump_cfg dump_events cs ;
                        let cs_hash =
                          Md5.to_hex (R1CS_constraint_system.digest cs)
                        in
@@ -748,25 +784,37 @@ struct
           (let%map.Promise wrap_main = Lazy.force wrap_main in
            let (T (typ, conv, _conv_inv)) = input ~feature_flags () in
            let main x () = wrap_main (conv x) in
+           let module PCS =
+             Kimchi_pasta_snarky_backend
+             .Pallas_based_plonk
+             .R1CS_constraint_system
+           in
+           (* Wrap CS dump cfg — same shape as the step site above,
+              swapped to the Pallas-based impl. Use [with_dump]
+              instead of the [setup]/[teardown]/[emit] triple because
+              [constraint_system] is monolithic (no manual
+              run/finish split needed). *)
+           let dump_cfg :
+               (_, Impls.Wrap.Constraint.t) Cs_dump.cfg =
+             { env_var = "PICKLES_WRAP_CS_DUMP"
+             ; counter = Cs_dump.wrap_counter
+             ; set_constraint_logger =
+                 Impls.Wrap.set_constraint_logger
+             ; clear_constraint_logger =
+                 Impls.Wrap.clear_constraint_logger
+             ; set_gate_label_stack = PCS.set_gate_label_stack
+             ; constraint_type_name = Cs_dump.constraint_type_name
+             ; to_json = PCS.to_json
+             ; dump_cached_constants = PCS.dump_cached_constants
+             ; dump_gate_labels = PCS.dump_gate_labels
+             }
+           in
            let cs =
-             constraint_system ~input_typ:typ ~return_typ:Impls.Wrap.Typ.unit
-               main
+             Cs_dump.with_dump dump_cfg ~build_cs:(fun () ->
+                 constraint_system ~input_typ:typ
+                   ~return_typ:Impls.Wrap.Typ.unit main )
            in
            let cs_hash = Md5.to_hex (R1CS_constraint_system.digest cs) in
-           (* Dump the production wrap CS as JSON so PureScript can do
-              a byte-for-byte comparison via the existing circuit-diffs
-              JSON tooling. Only fires when [PICKLES_WRAP_CS_DUMP] is set. *)
-           ( match Sys.getenv_opt "PICKLES_WRAP_CS_DUMP" with
-           | None ->
-               ()
-           | Some path ->
-               let json =
-                 Kimchi_pasta_constraint_system.Pallas_constraint_system.to_json
-                   cs
-               in
-               let oc = Out_channel.create path in
-               Out_channel.output_string oc json ;
-               Out_channel.close oc ) ;
            ( self_id
            , snark_keys_header
                { type_ = "wrap-proving-key"; identifier = name }

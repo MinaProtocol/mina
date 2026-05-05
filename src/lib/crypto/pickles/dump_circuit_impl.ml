@@ -490,163 +490,93 @@ let dump_tock output_dir name circuit ~input_typ ~return_typ =
   Out_channel.write_all constants_path ~data:(constants_json ^ "\n") ;
   Printf.printf "Wrote %s\n" constants_path
 
-(* ---- Label-tracked dump for Tock circuits ----
-   Uses set_constraint_logger to record label stack and constraint type
-   for every constraint added during circuit generation. Outputs a
-   _labels.jsonl file with one JSON object per constraint event. *)
+(* ---- Label-tracked dumps for Tock and Tick circuits ----
+   Uses [Cs_dump]'s shared logger setup + fixture writer + polymorphic
+   [constraint_type_name] so the standalone fixture path emits
+   byte-equivalent dumps to the production [compile.ml] step / wrap
+   sites. *)
 
-let constraint_type_name (c : WrapImpl.Constraint.t) : string =
-  match c with
-  | Boolean _ -> "Boolean"
-  | Equal _ -> "Equal"
-  | Square _ -> "Square"
-  | R1CS _ -> "R1CS"
-  | Basic _ -> "Basic"
-  | Poseidon _ -> "Poseidon"
-  | EC_add_complete _ -> "EC_add_complete"
-  | EC_scale _ -> "EC_scale"
-  | EC_endoscale _ -> "EC_endoscale"
-  | EC_endoscalar _ -> "EC_endoscalar"
-  | Lookup _ -> "Lookup"
-  | RangeCheck0 _ -> "RangeCheck0"
-  | RangeCheck1 _ -> "RangeCheck1"
-  | ForeignFieldAdd _ -> "ForeignFieldAdd"
-  | ForeignFieldMul _ -> "ForeignFieldMul"
-  | Xor _ -> "Xor"
-  | Rot64 _ -> "Rot64"
-  | AddFixedLookupTable _ -> "AddFixedLookupTable"
-  | AddRuntimeTableCfg _ -> "AddRuntimeTableCfg"
-  | Raw _ -> "Raw"
-
-let json_escape s =
-  String.concat_map s ~f:(fun c ->
-    match c with
-    | '"' -> "\\\""
-    | '\\' -> "\\\\"
-    | '\n' -> "\\n"
-    | _ -> String.make 1 c)
+(* Disable counter substitution in the standalone path — the [name]
+   argument already names each fixture uniquely, so passing a fresh
+   ref each call keeps any future stray "%c" inert. *)
+let local_counter () = ref 0
 
 let dump_tock_with_labels output_dir name circuit ~input_typ ~return_typ =
   let module PCS = Kimchi_pasta_snarky_backend.Pallas_based_plonk.R1CS_constraint_system in
-  let events = ref [] in
-  let label_stack = ref [] in
-  WrapImpl.set_constraint_logger
-    (fun ?at_label_boundary constraint_opt ->
-       ( match at_label_boundary with
-         | Some (`Start, lab) ->
-             label_stack := lab :: !label_stack ;
-             PCS.set_gate_label_stack !label_stack
-         | Some (`End, _lab) ->
-             label_stack := (match !label_stack with _ :: rest -> rest | [] -> []) ;
-             PCS.set_gate_label_stack !label_stack
-         | None -> () ) ;
-       match constraint_opt with
-       | Some c ->
-           let path = String.concat ~sep:"/" (List.rev !label_stack) in
-           events := (path, constraint_type_name c) :: !events
-       | None -> () ) ;
-  let cs =
-    WrapImpl.constraint_system ~input_typ ~return_typ circuit
+  let stem = output_dir ^ "/" ^ name in
+  let dump_cfg : (_, WrapImpl.Constraint.t) Cs_dump.cfg =
+    { env_var = "PICKLES_DUMP_FORCE"
+    ; counter = local_counter ()
+    ; set_constraint_logger = WrapImpl.set_constraint_logger
+    ; clear_constraint_logger = WrapImpl.clear_constraint_logger
+    ; set_gate_label_stack = PCS.set_gate_label_stack
+    ; constraint_type_name = Cs_dump.constraint_type_name
+    ; to_json = PCS.to_json
+    ; dump_cached_constants = PCS.dump_cached_constants
+    ; dump_gate_labels = PCS.dump_gate_labels
+    }
   in
-  WrapImpl.clear_constraint_logger () ;
-  PCS.set_gate_label_stack [] ;
-  let json = PCS.to_json cs in
-  let path = output_dir ^ "/" ^ name ^ ".json" in
-  Out_channel.write_all path ~data:(json ^ "\n") ;
-  Printf.printf "Wrote %s\n" path ;
-  (* Write label events as JSONL *)
-  let labels_path = output_dir ^ "/" ^ name ^ "_labels.jsonl" in
-  let events_rev = List.rev !events in
-  let lines = List.map events_rev ~f:(fun (path, ctype) ->
-    Printf.sprintf "{\"label\":\"%s\",\"constraint\":\"%s\"}"
-      (json_escape path) (json_escape ctype)) in
-  Out_channel.write_all labels_path
-    ~data:(String.concat ~sep:"\n" lines ^ "\n") ;
-  Printf.printf "Wrote %s (%d constraint events)\n" labels_path (List.length events_rev) ;
-  (* Write gate-level labels as JSONL *)
-  let gate_labels_path = output_dir ^ "/" ^ name ^ "_gate_labels.jsonl" in
-  let gate_labels_data = PCS.dump_gate_labels cs in
-  Out_channel.write_all gate_labels_path ~data:(gate_labels_data ^ "\n") ;
-  Printf.printf "Wrote %s\n" gate_labels_path ;
-  (* Write cached constants *)
-  let constants_path = output_dir ^ "/" ^ name ^ "_cached_constants.json" in
-  let constants_json = PCS.dump_cached_constants cs in
-  Out_channel.write_all constants_path ~data:(constants_json ^ "\n") ;
-  Printf.printf "Wrote %s\n" constants_path
-
-(* ---- Label-tracked dump for Tick circuits ----
-   Same as dump_tock_with_labels but for Step/Tick (Vesta-based) circuits. *)
-
-let constraint_type_name_tick (c : Impl.Constraint.t) : string =
-  match c with
-  | Boolean _ -> "Boolean"
-  | Equal _ -> "Equal"
-  | Square _ -> "Square"
-  | R1CS _ -> "R1CS"
-  | Basic _ -> "Basic"
-  | Poseidon _ -> "Poseidon"
-  | EC_add_complete _ -> "EC_add_complete"
-  | EC_scale _ -> "EC_scale"
-  | EC_endoscale _ -> "EC_endoscale"
-  | EC_endoscalar _ -> "EC_endoscalar"
-  | Lookup _ -> "Lookup"
-  | RangeCheck0 _ -> "RangeCheck0"
-  | RangeCheck1 _ -> "RangeCheck1"
-  | ForeignFieldAdd _ -> "ForeignFieldAdd"
-  | ForeignFieldMul _ -> "ForeignFieldMul"
-  | Xor _ -> "Xor"
-  | Rot64 _ -> "Rot64"
-  | AddFixedLookupTable _ -> "AddFixedLookupTable"
-  | AddRuntimeTableCfg _ -> "AddRuntimeTableCfg"
-  | Raw _ -> "Raw"
+  (* The cfg's env-var gate is disabled here — the standalone driver
+     wants to ALWAYS write fixtures, regardless of env-var presence.
+     We replicate the [with_dump] dance manually so we can call
+     [write_fixture_files] unconditionally with [stem] from [name]
+     instead of from the env-var template. *)
+  let events_opt =
+    Some
+      (Cs_dump.setup_logger
+         ~set_constraint_logger:dump_cfg.set_constraint_logger
+         ~set_gate_label_stack:dump_cfg.set_gate_label_stack
+         ~constraint_type_name:dump_cfg.constraint_type_name )
+  in
+  let cs = WrapImpl.constraint_system ~input_typ ~return_typ circuit in
+  Cs_dump.teardown dump_cfg events_opt ;
+  let events =
+    match events_opt with Some r -> List.rev !r | None -> []
+  in
+  Cs_dump.write_fixture_files ~stem ~to_json:dump_cfg.to_json
+    ~dump_cached_constants:dump_cfg.dump_cached_constants
+    ~dump_gate_labels:dump_cfg.dump_gate_labels cs ~events ;
+  Printf.printf "Wrote %s.json\n" stem ;
+  Printf.printf "Wrote %s_labels.jsonl (%d constraint events)\n" stem
+    (List.length events) ;
+  Printf.printf "Wrote %s_gate_labels.jsonl\n" stem ;
+  Printf.printf "Wrote %s_cached_constants.json\n" stem
 
 let dump_tick_with_labels output_dir name circuit ~input_typ ~return_typ =
   let module VCS = Kimchi_pasta_snarky_backend.Vesta_based_plonk.R1CS_constraint_system in
-  let events = ref [] in
-  let label_stack = ref [] in
-  Impl.set_constraint_logger
-    (fun ?at_label_boundary constraint_opt ->
-       ( match at_label_boundary with
-         | Some (`Start, lab) ->
-             label_stack := lab :: !label_stack ;
-             VCS.set_gate_label_stack !label_stack
-         | Some (`End, _lab) ->
-             label_stack := (match !label_stack with _ :: rest -> rest | [] -> []) ;
-             VCS.set_gate_label_stack !label_stack
-         | None -> () ) ;
-       match constraint_opt with
-       | Some c ->
-           let path = String.concat ~sep:"/" (List.rev !label_stack) in
-           events := (path, constraint_type_name_tick c) :: !events
-       | None -> () ) ;
-  let cs =
-    Impl.constraint_system ~input_typ ~return_typ circuit
+  let stem = output_dir ^ "/" ^ name in
+  let dump_cfg : (_, Impl.Constraint.t) Cs_dump.cfg =
+    { env_var = "PICKLES_DUMP_FORCE"
+    ; counter = local_counter ()
+    ; set_constraint_logger = Impl.set_constraint_logger
+    ; clear_constraint_logger = Impl.clear_constraint_logger
+    ; set_gate_label_stack = VCS.set_gate_label_stack
+    ; constraint_type_name = Cs_dump.constraint_type_name
+    ; to_json = VCS.to_json
+    ; dump_cached_constants = VCS.dump_cached_constants
+    ; dump_gate_labels = VCS.dump_gate_labels
+    }
   in
-  Impl.clear_constraint_logger () ;
-  VCS.set_gate_label_stack [] ;
-  let json = Kimchi_pasta_constraint_system.Vesta_constraint_system.to_json cs in
-  let path = output_dir ^ "/" ^ name ^ ".json" in
-  Out_channel.write_all path ~data:(json ^ "\n") ;
-  Printf.printf "Wrote %s\n" path ;
-  (* Write label events as JSONL *)
-  let labels_path = output_dir ^ "/" ^ name ^ "_labels.jsonl" in
-  let events_rev = List.rev !events in
-  let lines = List.map events_rev ~f:(fun (path, ctype) ->
-    Printf.sprintf "{\"label\":\"%s\",\"constraint\":\"%s\"}"
-      (json_escape path) (json_escape ctype)) in
-  Out_channel.write_all labels_path
-    ~data:(String.concat ~sep:"\n" lines ^ "\n") ;
-  Printf.printf "Wrote %s (%d constraint events)\n" labels_path (List.length events_rev) ;
-  (* Write gate-level labels as JSONL *)
-  let gate_labels_path = output_dir ^ "/" ^ name ^ "_gate_labels.jsonl" in
-  let gate_labels_data = VCS.dump_gate_labels cs in
-  Out_channel.write_all gate_labels_path ~data:(gate_labels_data ^ "\n") ;
-  Printf.printf "Wrote %s\n" gate_labels_path ;
-  (* Write cached constants *)
-  let constants_path = output_dir ^ "/" ^ name ^ "_cached_constants.json" in
-  let constants_json = Kimchi_pasta_constraint_system.Vesta_constraint_system.dump_cached_constants cs in
-  Out_channel.write_all constants_path ~data:(constants_json ^ "\n") ;
-  Printf.printf "Wrote %s\n" constants_path
+  let events_opt =
+    Some
+      (Cs_dump.setup_logger
+         ~set_constraint_logger:dump_cfg.set_constraint_logger
+         ~set_gate_label_stack:dump_cfg.set_gate_label_stack
+         ~constraint_type_name:dump_cfg.constraint_type_name )
+  in
+  let cs = Impl.constraint_system ~input_typ ~return_typ circuit in
+  Cs_dump.teardown dump_cfg events_opt ;
+  let events =
+    match events_opt with Some r -> List.rev !r | None -> []
+  in
+  Cs_dump.write_fixture_files ~stem ~to_json:dump_cfg.to_json
+    ~dump_cached_constants:dump_cfg.dump_cached_constants
+    ~dump_gate_labels:dump_cfg.dump_gate_labels cs ~events ;
+  Printf.printf "Wrote %s.json\n" stem ;
+  Printf.printf "Wrote %s_labels.jsonl (%d constraint events)\n" stem
+    (List.length events) ;
+  Printf.printf "Wrote %s_gate_labels.jsonl\n" stem ;
+  Printf.printf "Wrote %s_cached_constants.json\n" stem
 
 let linearization_tock_circuit (inputs : WrapImpl.Field.t array) () =
   let open WrapImpl in
@@ -2109,100 +2039,6 @@ let wrap_verify_n2_circuit (inputs : Impls.Wrap.Field.t array) () =
    internally via its own [Req.*] requests.
    ============================================================================= *)
 
-module Wrap_main_for_dump = struct
-  open Pickles_types
-
-  (* Dummy verification key vector for [branches] step circuits. Mirrors
-     [wrap_domains.ml:dummy_step_keys]. The handler is never invoked because
-     the dump driver only builds the constraint system. *)
-  let dummy_step_keys (type n) (n : n Nat.t) =
-    lazy
-      (Promise.return
-         (Vector.init n ~f:(fun _ ->
-              let g =
-                Array.init Plonk_checks.num_chunks_by_default ~f:(fun _ ->
-                    Backend.Tock.Inner_curve.(to_affine_exn one) )
-              in
-              Verification_key.dummy_step_commitments g ) ) )
-
-  (* Force the [Lazy.t Promise.t] returned by [Wrap_main.wrap_main] to extract
-     the synchronous main function, which the dump driver can pass directly to
-     [constraint_system]. *)
-  let force_main main_lazy =
-    Promise.block_on_async_exn (fun () -> Lazy.force main_lazy)
-
-  (* Build the production wrap_main function for a single configuration.
-     Returns a [stmt -> unit] callable suitable for the dump driver. The
-     [Maxes] module derived from [padded] is locally scoped here so its
-     [ns] phantom type doesn't escape. *)
-  let build
-      (type max_proofs_verified branches)
-      ~(pi_branches : (_, branches) Hlist.Length.t)
-      ~(padded :
-         ((int, branches) Vector.t, max_proofs_verified) Vector.t )
-      ~(step_widths : (int, branches) Vector.t)
-      ~(domain_log2 : int)
-      ~(max_proofs_verified :
-         (module Nat.Add.Intf with type n = max_proofs_verified) ) =
-    let module Maxes = (val Hlist.Maxes.m padded) in
-    let full_signature
-        : (max_proofs_verified, branches, Maxes.ns) Full_signature.t =
-      { Full_signature.padded; maxes = (module Maxes) }
-    in
-    let feature_flags = Kimchi_backend_common.Plonk_types.Features.Full.none in
-    let num_chunks = 1 in
-    let dummy_step_keys = dummy_step_keys (Hlist.Length.to_nat pi_branches) in
-    let step_domains =
-      Promise.return
-        (Vector.init (Hlist.Length.to_nat pi_branches) ~f:(fun _ ->
-             { Import.Domains.h =
-                 Pickles_base.Domain.Pow_2_roots_of_unity domain_log2
-             } ) )
-    in
-    let srs = Backend.Tick.Keypair.load_urs () in
-    let _, main_lazy =
-      Wrap_main.wrap_main ~num_chunks ~feature_flags ~srs full_signature
-        pi_branches dummy_step_keys step_widths step_domains
-        max_proofs_verified
-    in
-    force_main main_lazy
-
-  (* Variant of [build] taking a per-branch [step_domains_log2 : Vector] so
-     fixtures with heterogeneous step domains (e.g. two_phase_chain whose
-     [make_zero] and [increment] step circuits compile to different
-     domain log2s) can exercise wrap_main's per-branch lagrange_with_correction
-     dispatch path (wrap_verifier.ml:429-443) rather than the shared-domain
-     fast path (wrap_verifier.ml:426-428). *)
-  let build_multi_domain
-      (type max_proofs_verified branches)
-      ~(pi_branches : (_, branches) Hlist.Length.t)
-      ~(padded :
-         ((int, branches) Vector.t, max_proofs_verified) Vector.t )
-      ~(step_widths : (int, branches) Vector.t)
-      ~(step_domains_log2 : (int, branches) Vector.t)
-      ~(max_proofs_verified :
-         (module Nat.Add.Intf with type n = max_proofs_verified) ) =
-    let module Maxes = (val Hlist.Maxes.m padded) in
-    let full_signature
-        : (max_proofs_verified, branches, Maxes.ns) Full_signature.t =
-      { Full_signature.padded; maxes = (module Maxes) }
-    in
-    let feature_flags = Kimchi_backend_common.Plonk_types.Features.Full.none in
-    let num_chunks = 1 in
-    let dummy_step_keys = dummy_step_keys (Hlist.Length.to_nat pi_branches) in
-    let step_domains =
-      Promise.return
-        (Vector.map step_domains_log2 ~f:(fun d ->
-             { Import.Domains.h = Pickles_base.Domain.Pow_2_roots_of_unity d } ) )
-    in
-    let srs = Backend.Tick.Keypair.load_urs () in
-    let _, main_lazy =
-      Wrap_main.wrap_main ~num_chunks ~feature_flags ~srs full_signature
-        pi_branches dummy_step_keys step_widths step_domains
-        max_proofs_verified
-    in
-    force_main main_lazy
-end
 
 (* The N1 and N2 fixtures are constructed inline at the dump call site (inside
    [run]) so the existential type variables produced by destructuring the
@@ -2822,7 +2658,13 @@ let step_verify_n2_circuit (inputs : Impls.Step.Field.t array) () =
      messages_for_next_wrap_proof (1 field)
      must_verify (1 field as boolean)
 *)
-module Step_main_for_dump = Step_main.Make(Inductive_rule.Kimchi)
+(* Alias used by [full_step_verify_one_*_circuit] for the
+   [Step_main.Make(Inductive_rule.Kimchi).verify_one] entry point.
+   The full [step_main] entry point (and the [step_main_*_circuit]
+   fixtures it produced) was removed — see the per-rule [dump_*.exe]
+   drivers + [tools/regen_top_level_fixtures.sh]. [verify_one] is a
+   sub-circuit primitive, legitimately exercised standalone here. *)
+module Step_main_for_dump = Step_main.Make (Inductive_rule.Kimchi)
 
 let full_step_verify_one_circuit (inputs : Impls.Step.Field.t array) () =
   let open Impls.Step in
@@ -3772,760 +3614,6 @@ let ftcomm_step_circuit (inputs : Impl.Field.t array) () =
   in
   ()
 
-(* Step_main circuit for Simple_Chain (N1, self-recursive, 1-field app state).
-   Uses the actual Step_main.step_main function with a proper InductiveRule,
-   matching the Simple_Chain rule from test_no_sideloaded.ml.
-
-   Configuration:
-     public_input = Input Field.typ (1 field)
-     max_proofs_verified = N1
-     prevs = [self] (self-referential)
-     feature_flags = none
-     num_chunks = 1
-*)
-let step_main_simple_chain () =
-  let open Impls.Step in
-  let open Pickles_types in
-  let self : (Field.t, Field.Constant.t, Nat.N1.n, Nat.N1.n) Tag.t =
-    Tag.create "simple_chain"
-  in
-  let feature_flags = Plonk_types.Features.none_bool in
-  let feature_flags_full =
-    Kimchi_backend_common.Plonk_types.Features.Full.none
-  in
-  let rule : _ Inductive_rule.Kimchi.Promise.t =
-    { identifier = "main"
-    ; prevs = [ self ]
-    ; feature_flags
-    ; main =
-        (fun { public_input = self_input } ->
-          let prev =
-            exists Field.typ ~compute:(fun () -> Field.Constant.zero)
-          in
-          let proof =
-            exists (Typ.prover_value ()) ~compute:(fun () ->
-                Proof.dummy Nat.N1.n Nat.N1.n ~domain_log2:14 )
-          in
-          let is_base_case = Field.equal Field.zero self_input in
-          let proof_must_verify = Boolean.not is_base_case in
-          let self_correct = Field.(equal (one + prev) self_input) in
-          Boolean.Assert.any [ self_correct; is_base_case ] ;
-          Promise.return
-            { Inductive_rule.Kimchi.previous_proof_statements =
-                [ { public_input = prev; proof; proof_must_verify } ]
-            ; public_output = ()
-            ; auxiliary_output = ()
-            } )
-    }
-  in
-  let max_proofs_verified : (module Nat.Add.Intf with type n = Nat.N1.n) =
-    (module Nat.N1)
-  in
-  let module Step_requests = Requests.Step (Inductive_rule.Kimchi) in
-  let requests = Step_requests.create () in
-  let wrap_domains =
-    { Import.Domains.h = Pickles_base.Domain.Pow_2_roots_of_unity 14 }
-  in
-  let step_domains =
-    (* `Fix_domains.domains` for Simple_chain N1's small inductive rule
-       returns 14 in production (verified via iter 7 trace emission at
-       compile.ml's `step_vks` site). Earlier this was hardcoded to 16
-       which produced a JSON fixture that didn't match the production
-       compile path — the synthetic-vs-production gap masked a real bug
-       in the SimpleChain end-to-end test. *)
-    Vector.singleton
-      { Import.Domains.h = Pickles_base.Domain.Pow_2_roots_of_unity 14 }
-  in
-  let basic : _ Types_map.Compiled.basic =
-    { public_input = Field.typ
-    ; wrap_domains
-    ; step_domains
-    ; feature_flags = feature_flags_full
-    ; num_chunks = 1
-    ; zk_rows = 3
-    }
-  in
-  let step_main_fn =
-    Staged.unstage
-      (Step_main_for_dump.step_main requests max_proofs_verified rule
-         ~self_branches:(Nat.N1.n : Nat.N1.n Nat.t)
-         ~local_signature:([ Nat.N1.n ] : _ Hlist.H1.T(Nat).t)
-         ~local_signature_length:(Hlist.Length.S Hlist.Length.Z)
-         ~local_branches_length:(Hlist.Length.S Hlist.Length.Z)
-         ~proofs_verified:(Hlist.Length.S Hlist.Length.Z)
-         ~lte:(Nat.Lte.S Nat.Lte.Z)
-         ~public_input:(Input Field.typ)
-         ~auxiliary_typ:Typ.unit
-         ~basic
-         ~known_wrap_keys:([ None ] : _ Hlist.H1.T(Types_map.For_step.Optional_wrap_key).t)
-         ~self )
-  in
-  let etyp = Impls.Step.input ~proofs_verified:Nat.N1.n in
-  let (T (return_typ, _conv, conv_inv)) = etyp in
-  let main () () =
-    let%map.Promise res = step_main_fn () in
-    Impls.Step.with_label "conv_inv" (fun () -> conv_inv res)
-  in
-  let constraint_builder =
-    Impl.constraint_system_manual ~input_typ:Typ.unit ~return_typ
-  in
-  let res =
-    Promise.block_on_async_exn (fun () ->
-        constraint_builder.run_circuit main )
-  in
-  constraint_builder.finish_computation res
-
-(* ---- step_main Add_one_return (N0, Input_and_output) ---- *)
-(* Verbatim Add_one_return from test_no_sideloaded.ml: N0, no previous
-   proofs, rule `output = 1 + input`. Exercises the Input_and_output
-   public-input layout with the simplest possible rule. *)
-
-let step_main_add_one_return () =
-  let open Impls.Step in
-  let open Pickles_types in
-  (* For Input_and_output mode, `basic.public_input` is
-     `Typ.(input_typ * output_typ)` — see compile.ml:1257-1264. The
-     rule's `public_input` field receives only the input var; the
-     computed `public_output` var is passed through
-     `Inductive_rule.public_output`. *)
-  let self :
-      ( Field.t * Field.t
-      , Field.Constant.t * Field.Constant.t
-      , Nat.N0.n
-      , Nat.N1.n )
-      Tag.t =
-    Tag.create "add_one_return"
-  in
-  let feature_flags = Plonk_types.Features.none_bool in
-  let feature_flags_full =
-    Kimchi_backend_common.Plonk_types.Features.Full.none
-  in
-  let rule : _ Inductive_rule.Kimchi.Promise.t =
-    { identifier = "main"
-    ; prevs = []
-    ; feature_flags
-    ; main =
-        (fun { public_input = x } ->
-          Promise.return
-            { Inductive_rule.Kimchi.previous_proof_statements = []
-            ; public_output = Field.(one + x)
-            ; auxiliary_output = ()
-            } )
-    }
-  in
-  let max_proofs_verified : (module Nat.Add.Intf with type n = Nat.N0.n) =
-    (module Nat.N0)
-  in
-  let module Step_requests = Requests.Step (Inductive_rule.Kimchi) in
-  let requests = Step_requests.create () in
-  let wrap_domains =
-    { Import.Domains.h = Pickles_base.Domain.Pow_2_roots_of_unity 13 }
-  in
-  (* step_domains is indexed by self_branches (= N1, one rule), not by
-     max_proofs_verified. A single entry for the Add_one_return rule. *)
-  let step_domains =
-    Vector.[ { Import.Domains.h = Pickles_base.Domain.Pow_2_roots_of_unity 9 } ]
-  in
-  let basic : _ Types_map.Compiled.basic =
-    { public_input = Typ.(Field.typ * Field.typ)
-    ; wrap_domains
-    ; step_domains
-    ; feature_flags = feature_flags_full
-    ; num_chunks = 1
-    ; zk_rows = 3
-    }
-  in
-  let step_main_fn =
-    Staged.unstage
-      (Step_main_for_dump.step_main requests max_proofs_verified rule
-         ~self_branches:(Nat.N1.n : Nat.N1.n Nat.t)
-         ~local_signature:([] : _ Hlist.H1.T(Nat).t)
-         ~local_signature_length:Hlist.Length.Z
-         ~local_branches_length:Hlist.Length.Z
-         ~proofs_verified:Hlist.Length.Z
-         ~lte:Nat.Lte.Z
-         ~public_input:
-           (Input_and_output (Field.typ, Field.typ))
-         ~auxiliary_typ:Typ.unit
-         ~basic
-         ~known_wrap_keys:([] : _ Hlist.H1.T(Types_map.For_step.Optional_wrap_key).t)
-         ~self )
-  in
-  let etyp = Impls.Step.input ~proofs_verified:Nat.N0.n in
-  let (T (return_typ, _conv, conv_inv)) = etyp in
-  let main () () =
-    let%map.Promise res = step_main_fn () in
-    Impls.Step.with_label "conv_inv" (fun () -> conv_inv res)
-  in
-  let constraint_builder =
-    Impl.constraint_system_manual ~input_typ:Typ.unit ~return_typ
-  in
-  let res =
-    Promise.block_on_async_exn (fun () ->
-        constraint_builder.run_circuit main )
-  in
-  constraint_builder.finish_computation res
-
-(* ---- step_main No_recursion_return (N0, Output mode) ----
-   Verbatim No_recursion_return from test_no_sideloaded.ml:89-126:
-   - public_input:(Output Field.typ) — Output mode. For Output mode,
-     basic.public_input is Field.typ (the output), input_typ is Typ.unit
-     (see compile.ml:1257-1264).
-   - max_proofs_verified: N0. No prevs, no verify_one.
-   - No override_wrap_domain → default wrap_domains for N0 gives
-     h = 2^13 (common.ml:25-29).
-   - Rule body returns `public_output = Field.zero` and no previous
-     proof statements.
-   - Dual of Add_one_return at N=0: same max_proofs_verified shape, but
-     Output-only (no input) vs. Input_and_output. *)
-let step_main_no_recursion_return () =
-  let open Impls.Step in
-  let open Pickles_types in
-  let self :
-      ( Field.t
-      , Field.Constant.t
-      , Nat.N0.n
-      , Nat.N1.n )
-      Tag.t =
-    Tag.create "no_recursion_return"
-  in
-  let feature_flags = Plonk_types.Features.none_bool in
-  let feature_flags_full =
-    Kimchi_backend_common.Plonk_types.Features.Full.none
-  in
-  let rule : _ Inductive_rule.Kimchi.Promise.t =
-    { identifier = "main"
-    ; prevs = []
-    ; feature_flags
-    ; main =
-        (fun _ ->
-          Promise.return
-            { Inductive_rule.Kimchi.previous_proof_statements = []
-            ; public_output = Field.zero
-            ; auxiliary_output = ()
-            } )
-    }
-  in
-  let max_proofs_verified : (module Nat.Add.Intf with type n = Nat.N0.n) =
-    (module Nat.N0)
-  in
-  let module Step_requests = Requests.Step (Inductive_rule.Kimchi) in
-  let requests = Step_requests.create () in
-  let wrap_domains =
-    { Import.Domains.h = Pickles_base.Domain.Pow_2_roots_of_unity 13 }
-  in
-  let step_domains =
-    Vector.[ { Import.Domains.h = Pickles_base.Domain.Pow_2_roots_of_unity 9 } ]
-  in
-  let basic : _ Types_map.Compiled.basic =
-    { public_input = Field.typ
-    ; wrap_domains
-    ; step_domains
-    ; feature_flags = feature_flags_full
-    ; num_chunks = 1
-    ; zk_rows = 3
-    }
-  in
-  let step_main_fn =
-    Staged.unstage
-      (Step_main_for_dump.step_main requests max_proofs_verified rule
-         ~self_branches:(Nat.N1.n : Nat.N1.n Nat.t)
-         ~local_signature:([] : _ Hlist.H1.T(Nat).t)
-         ~local_signature_length:Hlist.Length.Z
-         ~local_branches_length:Hlist.Length.Z
-         ~proofs_verified:Hlist.Length.Z
-         ~lte:Nat.Lte.Z
-         ~public_input:(Output Field.typ)
-         ~auxiliary_typ:Typ.unit
-         ~basic
-         ~known_wrap_keys:([] : _ Hlist.H1.T(Types_map.For_step.Optional_wrap_key).t)
-         ~self )
-  in
-  let etyp = Impls.Step.input ~proofs_verified:Nat.N0.n in
-  let (T (return_typ, _conv, conv_inv)) = etyp in
-  let main () () =
-    let%map.Promise res = step_main_fn () in
-    Impls.Step.with_label "conv_inv" (fun () -> conv_inv res)
-  in
-  let constraint_builder =
-    Impl.constraint_system_manual ~input_typ:Typ.unit ~return_typ
-  in
-  let res =
-    Promise.block_on_async_exn (fun () ->
-        constraint_builder.run_circuit main )
-  in
-  constraint_builder.finish_computation res
-
-(* ---- step_main Tree_proof_return (N2, Output mode, heterogeneous prevs) ----
-   Verbatim Tree_proof_return from test_no_sideloaded.ml:315-392:
-   - public_input:(Output Field.typ) — Output mode, input_typ = Typ.unit,
-     output_typ = Field.typ. basic.public_input is the typ for the
-     compiled Statement, which for Output mode is just Field.typ
-     (see compile.ml:1257-1264).
-   - max_proofs_verified: N2.
-   - override_wrap_domain: Proofs_verified.N1 → wrap_domains.h = 2^14
-     (common.ml:25-29).
-   - prevs = [No_recursion_return.tag; self] — heterogeneous in
-     max_proofs_verified (N0 and N2) but BOTH prev.public_input slots
-     are Field.typ (since both rules are Output mode with Field output).
-   - Rule body computes self = if is_base_case then 0 else 1 + prev,
-     returns two previous_proof_statements + public_output = self. *)
-
-let step_main_tree_proof_return () =
-  let open Impls.Step in
-  let open Pickles_types in
-  let no_rec_tag :
-      (Field.t, Field.Constant.t, Nat.N0.n, Nat.N1.n) Tag.t =
-    Tag.create "no_recursion_return"
-  in
-  let self : (Field.t, Field.Constant.t, Nat.N2.n, Nat.N1.n) Tag.t =
-    Tag.create "tree_proof_return"
-  in
-  (* step_main does a `Types_map.lookup_compiled` on each non-self prev
-     tag (step_main.ml:522) plus `feature_flags d` / `num_chunks d`
-     (line 196). Register a minimal Compiled.t entry for no_rec_tag so
-     those lookups succeed. The `wrap_key` and `step_domains` fields
-     are discarded by `of_compiled_with_known_wrap_key` (we pass a
-     real known_wrap_key via `~known_wrap_keys` below), so lazy
-     failures there never fire. `wrap_vk` is likewise unused during
-     constraint-system build. *)
-  let () =
-    let no_rec_data : _ Types_map.Compiled.t =
-      { max_proofs_verified = (module Nat.N0)
-      ; public_input = Field.typ
-      ; wrap_key = lazy (failwith "dump: wrap_key not forced")
-      ; wrap_vk = lazy (failwith "dump: wrap_vk not forced")
-      ; wrap_domains =
-          { h = Pickles_base.Domain.Pow_2_roots_of_unity 13 }
-      ; step_domains =
-          Vector.singleton
-            (Promise.return
-               { Import.Domains.h =
-                   Pickles_base.Domain.Pow_2_roots_of_unity 13 })
-      ; feature_flags = Kimchi_backend_common.Plonk_types.Features.Full.none
-      ; num_chunks = 1
-      ; zk_rows = 3
-      }
-    in
-    Types_map.add_exn no_rec_tag no_rec_data
-  in
-  let feature_flags = Plonk_types.Features.none_bool in
-  let feature_flags_full =
-    Kimchi_backend_common.Plonk_types.Features.Full.none
-  in
-  let rule : _ Inductive_rule.Kimchi.Promise.t =
-    { identifier = "main"
-    ; prevs = [ no_rec_tag; self ]
-    ; feature_flags
-    ; main =
-        (fun { public_input = () } ->
-          let no_recursive_input =
-            exists Field.typ ~compute:(fun () -> Field.Constant.zero)
-          in
-          let no_recursive_proof =
-            exists (Typ.prover_value ()) ~compute:(fun () ->
-                Proof.dummy Nat.N0.n Nat.N2.n ~domain_log2:14 )
-          in
-          let prev =
-            exists Field.typ ~compute:(fun () -> Field.Constant.zero)
-          in
-          let prev_proof =
-            exists (Typ.prover_value ()) ~compute:(fun () ->
-                Proof.dummy Nat.N2.n Nat.N2.n ~domain_log2:15 )
-          in
-          let is_base_case =
-            exists Boolean.typ ~compute:(fun () -> true)
-          in
-          let proof_must_verify = Boolean.not is_base_case in
-          let self_out =
-            Field.(if_ is_base_case ~then_:zero ~else_:(one + prev))
-          in
-          Promise.return
-            { Inductive_rule.Kimchi.previous_proof_statements =
-                [ { public_input = no_recursive_input
-                  ; proof = no_recursive_proof
-                  ; proof_must_verify = Boolean.true_
-                  }
-                ; { public_input = prev
-                  ; proof = prev_proof
-                  ; proof_must_verify
-                  }
-                ]
-            ; public_output = self_out
-            ; auxiliary_output = ()
-            } )
-    }
-  in
-  let max_proofs_verified : (module Nat.Add.Intf with type n = Nat.N2.n) =
-    (module Nat.N2)
-  in
-  let module Step_requests = Requests.Step (Inductive_rule.Kimchi) in
-  let requests = Step_requests.create () in
-  let wrap_domains =
-    (* override_wrap_domain:N1 → common.ml:25-29 gives h = 2^14. *)
-    { Import.Domains.h = Pickles_base.Domain.Pow_2_roots_of_unity 14 }
-  in
-  let step_domains =
-    (* Single rule (branches=N1); step circuit size at the same 2^16
-       Simple_chain_n2 uses, since this is also N=2 with a real
-       inductive body. *)
-    Vector.[ { Import.Domains.h = Pickles_base.Domain.Pow_2_roots_of_unity 16 } ]
-  in
-  let basic : _ Types_map.Compiled.basic =
-    { public_input = Field.typ
-    ; wrap_domains
-    ; step_domains
-    ; feature_flags = feature_flags_full
-    ; num_chunks = 1
-    ; zk_rows = 3
-    }
-  in
-  let step_main_fn =
-    Staged.unstage
-      (Step_main_for_dump.step_main requests max_proofs_verified rule
-         ~self_branches:(Nat.N1.n : Nat.N1.n Nat.t)
-         ~local_signature:([ Nat.N0.n; Nat.N2.n ] : _ Hlist.H1.T(Nat).t)
-         ~local_signature_length:(Hlist.Length.S (Hlist.Length.S Hlist.Length.Z))
-         ~local_branches_length:(Hlist.Length.S (Hlist.Length.S Hlist.Length.Z))
-         ~proofs_verified:(Hlist.Length.S (Hlist.Length.S Hlist.Length.Z))
-         ~lte:(Nat.Lte.S (Nat.Lte.S Nat.Lte.Z))
-         ~public_input:(Output Field.typ)
-         ~auxiliary_typ:Typ.unit
-         ~basic
-         ~known_wrap_keys:
-           (let no_rec_known : _ Types_map.For_step.Optional_wrap_key.known =
-              let g = Backend.Tick.Inner_curve.(to_affine_exn one) in
-              let arr = [| g |] in
-              { wrap_key =
-                  { sigma_comm = Vector.init Nat.N7.n ~f:(fun _ -> arr)
-                  ; coefficients_comm = Vector.init Nat.N15.n ~f:(fun _ -> arr)
-                  ; generic_comm = arr
-                  ; psm_comm = arr
-                  ; complete_add_comm = arr
-                  ; mul_comm = arr
-                  ; emul_comm = arr
-                  ; endomul_scalar_comm = arr
-                  }
-              ; step_domains =
-                  Vector.[ { Import.Domains.h =
-                               Pickles_base.Domain.Pow_2_roots_of_unity 13 }
-                         ]
-              }
-            in
-            ([ Some no_rec_known; None ]
-              : _ Hlist.H1.T(Types_map.For_step.Optional_wrap_key).t))
-         ~self )
-  in
-  let etyp = Impls.Step.input ~proofs_verified:Nat.N2.n in
-  let (T (return_typ, _conv, conv_inv)) = etyp in
-  let main () () =
-    let%map.Promise res = step_main_fn () in
-    Impls.Step.with_label "conv_inv" (fun () -> conv_inv res)
-  in
-  let constraint_builder =
-    Impl.constraint_system_manual ~input_typ:Typ.unit ~return_typ
-  in
-  let res =
-    Promise.block_on_async_exn (fun () ->
-        constraint_builder.run_circuit main )
-  in
-  constraint_builder.finish_computation res
-
-(* Dump a step_main constraint system with full metadata (labels, gate labels, cached constants).
-   Same output as dump_tick_with_labels but uses constraint_system_manual for Promise-based circuits. *)
-let dump_step_main output_dir name cs_fn =
-  let module VCS = Kimchi_pasta_snarky_backend.Vesta_based_plonk.R1CS_constraint_system in
-  let events = ref [] in
-  let label_stack = ref [] in
-  Impl.set_constraint_logger
-    (fun ?at_label_boundary constraint_opt ->
-       ( match at_label_boundary with
-         | Some (`Start, lab) ->
-             label_stack := lab :: !label_stack ;
-             VCS.set_gate_label_stack !label_stack
-         | Some (`End, _lab) ->
-             label_stack := (match !label_stack with _ :: rest -> rest | [] -> []) ;
-             VCS.set_gate_label_stack !label_stack
-         | None -> () ) ;
-       match constraint_opt with
-       | Some c ->
-           let path = String.concat ~sep:"/" (List.rev !label_stack) in
-           events := (path, constraint_type_name_tick c) :: !events
-       | None -> () ) ;
-  let cs = cs_fn () in
-  Impl.clear_constraint_logger () ;
-  VCS.set_gate_label_stack [] ;
-  (* Circuit JSON *)
-  let json = Kimchi_pasta_constraint_system.Vesta_constraint_system.to_json cs in
-  let path = output_dir ^ "/" ^ name ^ ".json" in
-  Out_channel.write_all path ~data:(json ^ "\n") ;
-  Printf.printf "Wrote %s\n" path ;
-  (* Label events JSONL *)
-  let labels_path = output_dir ^ "/" ^ name ^ "_labels.jsonl" in
-  let events_rev = List.rev !events in
-  let lines = List.map events_rev ~f:(fun (path, ctype) ->
-    Printf.sprintf "{\"label\":\"%s\",\"constraint\":\"%s\"}"
-      (json_escape path) (json_escape ctype)) in
-  Out_channel.write_all labels_path
-    ~data:(String.concat ~sep:"\n" lines ^ "\n") ;
-  Printf.printf "Wrote %s (%d constraint events)\n" labels_path (List.length events_rev) ;
-  (* Gate-level labels JSONL *)
-  let gate_labels_path = output_dir ^ "/" ^ name ^ "_gate_labels.jsonl" in
-  let gate_labels_data = VCS.dump_gate_labels cs in
-  Out_channel.write_all gate_labels_path ~data:(gate_labels_data ^ "\n") ;
-  Printf.printf "Wrote %s\n" gate_labels_path ;
-  (* Cached constants *)
-  let constants_path = output_dir ^ "/" ^ name ^ "_cached_constants.json" in
-  let constants_json = Kimchi_pasta_constraint_system.Vesta_constraint_system.dump_cached_constants cs in
-  Out_channel.write_all constants_path ~data:(constants_json ^ "\n") ;
-  Printf.printf "Wrote %s\n" constants_path
-
-(* ---- step_main Simple_Chain N2 ---- *)
-(* Same Simple_Chain rule but with max_proofs_verified=N2 and prevs=[self, self].
-   This avoids needing to register a separate tag in Types_map. *)
-
-let step_main_simple_chain_n2 () =
-  let open Impls.Step in
-  let open Pickles_types in
-  let self : (Field.t, Field.Constant.t, Nat.N2.n, Nat.N1.n) Tag.t =
-    Tag.create "simple_chain_n2"
-  in
-  let feature_flags = Plonk_types.Features.none_bool in
-  let feature_flags_full =
-    Kimchi_backend_common.Plonk_types.Features.Full.none
-  in
-  let rule : _ Inductive_rule.Kimchi.Promise.t =
-    { identifier = "main"
-    ; prevs = [ self; self ]
-    ; feature_flags
-    ; main =
-        (fun { public_input = self_input } ->
-          let prev1 =
-            exists Field.typ ~compute:(fun () -> Field.Constant.zero)
-          in
-          let proof1 =
-            exists (Typ.prover_value ()) ~compute:(fun () ->
-                Proof.dummy Nat.N2.n Nat.N1.n ~domain_log2:14 )
-          in
-          let prev2 =
-            exists Field.typ ~compute:(fun () -> Field.Constant.zero)
-          in
-          let proof2 =
-            exists (Typ.prover_value ()) ~compute:(fun () ->
-                Proof.dummy Nat.N2.n Nat.N1.n ~domain_log2:14 )
-          in
-          let is_base_case = Field.equal Field.zero self_input in
-          let proof_must_verify = Boolean.not is_base_case in
-          let self_correct = Field.(equal (one + prev1 + prev2) self_input) in
-          Boolean.Assert.any [ self_correct; is_base_case ] ;
-          Promise.return
-            { Inductive_rule.Kimchi.previous_proof_statements =
-                [ { public_input = prev1
-                  ; proof = proof1
-                  ; proof_must_verify
-                  }
-                ; { public_input = prev2
-                  ; proof = proof2
-                  ; proof_must_verify
-                  }
-                ]
-            ; public_output = ()
-            ; auxiliary_output = ()
-            } )
-    }
-  in
-  let max_proofs_verified : (module Nat.Add.Intf with type n = Nat.N2.n) =
-    (module Nat.N2)
-  in
-  let module Step_requests = Requests.Step (Inductive_rule.Kimchi) in
-  let requests = Step_requests.create () in
-  let wrap_domains =
-    { Import.Domains.h = Pickles_base.Domain.Pow_2_roots_of_unity 14 }
-  in
-  let step_domains =
-    Vector.[ { Import.Domains.h = Pickles_base.Domain.Pow_2_roots_of_unity 16 }
-           ]
-  in
-  let basic : _ Types_map.Compiled.basic =
-    { public_input = Field.typ
-    ; wrap_domains
-    ; step_domains
-    ; feature_flags = feature_flags_full
-    ; num_chunks = 1
-    ; zk_rows = 3
-    }
-  in
-  let step_main_fn =
-    Staged.unstage
-      (Step_main_for_dump.step_main requests max_proofs_verified rule
-         ~self_branches:(Nat.N1.n : Nat.N1.n Nat.t)
-         ~local_signature:([ Nat.N2.n; Nat.N2.n ] : _ Hlist.H1.T(Nat).t)
-         ~local_signature_length:(Hlist.Length.S (Hlist.Length.S Hlist.Length.Z))
-         ~local_branches_length:(Hlist.Length.S (Hlist.Length.S Hlist.Length.Z))
-         ~proofs_verified:(Hlist.Length.S (Hlist.Length.S Hlist.Length.Z))
-         ~lte:(Nat.Lte.S (Nat.Lte.S Nat.Lte.Z))
-         ~public_input:(Input Field.typ)
-         ~auxiliary_typ:Typ.unit
-         ~basic
-         ~known_wrap_keys:([ None; None ] : _ Hlist.H1.T(Types_map.For_step.Optional_wrap_key).t)
-         ~self )
-  in
-  let etyp = Impls.Step.input ~proofs_verified:Nat.N2.n in
-  let (T (return_typ, _conv, conv_inv)) = etyp in
-  let main () () =
-    let%map.Promise res = step_main_fn () in
-    Impls.Step.with_label "conv_inv" (fun () -> conv_inv res)
-  in
-  let constraint_builder =
-    Impl.constraint_system_manual ~input_typ:Typ.unit ~return_typ
-  in
-  let res =
-    Promise.block_on_async_exn (fun () ->
-        constraint_builder.run_circuit main )
-  in
-  constraint_builder.finish_computation res
-
-(* ---- step_main Side_loaded_main ----
-
-   Mirrors the `Simple_chain` rule from
-   `dump_side_loaded_main/dump_side_loaded_main.ml:118-171`: main has
-   `max_proofs_verified = N1`, public input = Field, and its single
-   prev slot is a SIDE-LOADED tag with `max_proofs_verified = N2`
-   (the side-tag's compile-time upper bound; at runtime the actual
-   wrapped child has its own mpv ≤ N2). The rule body itself is
-   identical to `step_main_simple_chain`'s — `is_base_case = (self =
-   0)`, assert `(prev + 1 = self) || is_base_case`. The only
-   structural difference is the prev tag's kind: `Side_loaded`
-   instead of `Compiled`.
-
-   This is the CS-only fixture for the PureScript side-loaded
-   constraint-system equality test (Pickles.Sideload Step 2e.1).
-   Once the PureScript `StepMainSideLoadedMain` analog matches this
-   fixture byte-for-byte, β3 (pseudo step-domain dispatch) and β4
-   (max_proofs_verified runtime mask) are validated. *)
-
-let step_main_side_loaded_main () =
-  let open Impls.Step in
-  let open Pickles_types in
-  let self : (Field.t, Field.Constant.t, Nat.N1.n, Nat.N1.n) Tag.t =
-    Tag.create "side_loaded_main_dump"
-  in
-  let feature_flags = Plonk_types.Features.none_bool in
-  let feature_flags_full =
-    Kimchi_backend_common.Plonk_types.Features.Full.none
-  in
-  (* Side-loaded prev tag: registered via `Types_map.add_side_loaded`.
-     Mirrors `Side_loaded.create ~name:"foo"
-     ~max_proofs_verified:(Nat.Add.create Nat.N2.n) ...` in
-     dump_side_loaded_main.ml:118-121. The `Side_loaded.create`
-     wrapper lives inside `Pickles.Make` so we go through
-     `Types_map.add_side_loaded` directly. *)
-  let side_loaded_tag :
-      (Field.t, Field.Constant.t, Nat.N2.n, _) Tag.t =
-    Types_map.add_side_loaded ~name:"side_loaded_main_dump_child"
-      { max_proofs_verified = (module Nat.N2)
-      ; public_input = Field.typ
-      ; feature_flags = feature_flags_full
-      ; num_chunks = 1
-      ; zk_rows = 3
-      }
-  in
-  let rule : _ Inductive_rule.Kimchi.Promise.t =
-    { identifier = "main"
-    ; prevs = [ side_loaded_tag ]
-    ; feature_flags
-    ; main =
-        (fun { public_input = self_input } ->
-          let prev =
-            exists Field.typ ~compute:(fun () -> Field.Constant.zero)
-          in
-          let proof =
-            exists (Typ.prover_value ()) ~compute:(fun () ->
-                (* Dummy proof at the side-tag's mpv upper bound (N2)
-                   and a wrap_domain log2 of 14 (= mpv N1 → 14 from
-                   common.ml:25-29). Only the constraint shape
-                   matters; the actual prover_value is never read
-                   during CS dump. *)
-                Proof.dummy Nat.N2.n Nat.N2.n ~domain_log2:14 )
-          in
-          (* Allocate the side-loaded VK in-circuit and bind it to
-             the side-loaded tag. Mirrors
-             dump_side_loaded_main.ml:151-156's
-             `exists Side_loaded.Verification_key.typ ~compute:...
-              + Side_loaded.in_circuit side_loaded_tag vk`.
-             `Side_loaded.in_circuit` is just
-             `Types_map.set_ephemeral tag { index = `In_circuit vk
-             }`; we call set_ephemeral directly to avoid the Pickles
-             functor wrapper. *)
-          let vk =
-            exists Side_loaded_verification_key.typ
-              ~compute:(fun () -> Side_loaded_verification_key.dummy)
-          in
-          Types_map.set_ephemeral side_loaded_tag
-            { index = `In_circuit vk } ;
-          let is_base_case = Field.equal Field.zero self_input in
-          let proof_must_verify = Boolean.not is_base_case in
-          let self_correct = Field.(equal (one + prev) self_input) in
-          Boolean.Assert.any [ self_correct; is_base_case ] ;
-          Promise.return
-            { Inductive_rule.Kimchi.previous_proof_statements =
-                [ { public_input = prev; proof; proof_must_verify } ]
-            ; public_output = ()
-            ; auxiliary_output = ()
-            } )
-    }
-  in
-  let max_proofs_verified : (module Nat.Add.Intf with type n = Nat.N1.n) =
-    (module Nat.N1)
-  in
-  let module Step_requests = Requests.Step (Inductive_rule.Kimchi) in
-  let requests = Step_requests.create () in
-  let wrap_domains =
-    { Import.Domains.h = Pickles_base.Domain.Pow_2_roots_of_unity 14 }
-  in
-  let step_domains =
-    Vector.singleton
-      { Import.Domains.h = Pickles_base.Domain.Pow_2_roots_of_unity 14 }
-  in
-  let basic : _ Types_map.Compiled.basic =
-    { public_input = Field.typ
-    ; wrap_domains
-    ; step_domains
-    ; feature_flags = feature_flags_full
-    ; num_chunks = 1
-    ; zk_rows = 3
-    }
-  in
-  let step_main_fn =
-    Staged.unstage
-      (Step_main_for_dump.step_main requests max_proofs_verified rule
-         ~self_branches:(Nat.N1.n : Nat.N1.n Nat.t)
-         ~local_signature:([ Nat.N2.n ] : _ Hlist.H1.T(Nat).t)
-         ~local_signature_length:(Hlist.Length.S Hlist.Length.Z)
-         ~local_branches_length:(Hlist.Length.S Hlist.Length.Z)
-         ~proofs_verified:(Hlist.Length.S Hlist.Length.Z)
-         ~lte:(Nat.Lte.S Nat.Lte.Z)
-         ~public_input:(Input Field.typ)
-         ~auxiliary_typ:Typ.unit
-         ~basic
-         ~known_wrap_keys:
-           ([ None ] : _ Hlist.H1.T(Types_map.For_step.Optional_wrap_key).t)
-         ~self )
-  in
-  let etyp = Impls.Step.input ~proofs_verified:Nat.N1.n in
-  let (T (return_typ, _conv, conv_inv)) = etyp in
-  let main () () =
-    let%map.Promise res = step_main_fn () in
-    Impls.Step.with_label "conv_inv" (fun () -> conv_inv res)
-  in
-  let constraint_builder =
-    Impl.constraint_system_manual ~input_typ:Typ.unit ~return_typ
-  in
-  let res =
-    Promise.block_on_async_exn (fun () ->
-        constraint_builder.run_circuit main )
-  in
-  constraint_builder.finish_computation res
 
 (* ---- Application circuits for two_phase_chain (multi-branch fixture) ----
    Mirrors the rule bodies from `dump_two_phase_chain.ml` but emits
@@ -4729,137 +3817,14 @@ let run ~output_dir =
   let array212_wrap = Impls.Wrap.Typ.array ~length:212 Impls.Wrap.Field.typ in
   dump_wrap "wrap_verify_n2_circuit" wrap_verify_n2_circuit
     ~input_typ:array212_wrap ~return_typ:Impls.Wrap.Typ.unit ;
-  (* Full wrap_main fixtures (N1 and N2) — produced by [Wrap_main_for_dump.build]
-     which calls production [Wrap_main.wrap_main] under the hood. The
-     destructure of the [Wrap_etyp] happens in the same scope as [dump_wrap]
-     so the existentials don't escape. *)
-  let () =
-    let open Pickles_types in
-    let (Composition_types.Spec.Wrap_etyp.T (typ, conv, _conv_inv)) =
-      Impls.Wrap.input
-        ~feature_flags:Kimchi_backend_common.Plonk_types.Features.Full.none
-        ()
-    in
-    let main_fn =
-      (* domain_log2:14 mirrors what production [Pickles.compile_promise]
-         passes to [Wrap_main.wrap_main] for Simple_chain N1 — confirmed
-         via [compile.wrap_domains.h.log2] trace. The earlier 16 was a
-         synthetic value that masked a divergence in PureScript's wrap
-         compile relative to OCaml production. *)
-      Wrap_main_for_dump.build
-        ~pi_branches:(Hlist.Length.S Hlist.Length.Z)
-        ~padded:Vector.[ Vector.[ 0 ]; Vector.[ 1 ] ]
-        ~step_widths:Vector.[ 1 ] ~domain_log2:14
-        ~max_proofs_verified:(module Nat.N2)
-    in
-    let circuit x () = main_fn (conv x) in
-    dump_wrap "wrap_main_circuit" circuit ~input_typ:typ
-      ~return_typ:Impls.Wrap.Typ.unit
-  in
-  let () =
-    let open Pickles_types in
-    let (Composition_types.Spec.Wrap_etyp.T (typ, conv, _conv_inv)) =
-      Impls.Wrap.input
-        ~feature_flags:Kimchi_backend_common.Plonk_types.Features.Full.none
-        ()
-    in
-    let main_fn =
-      Wrap_main_for_dump.build
-        ~pi_branches:(Hlist.Length.S (Hlist.Length.S Hlist.Length.Z))
-        ~padded:Vector.[ Vector.[ 0; 2 ]; Vector.[ 0; 2 ] ]
-        ~step_widths:Vector.[ 0; 2 ] ~domain_log2:16
-        ~max_proofs_verified:(module Nat.N2)
-    in
-    let circuit x () = main_fn (conv x) in
-    dump_wrap "wrap_main_n2_circuit" circuit ~input_typ:typ
-      ~return_typ:Impls.Wrap.Typ.unit
-  in
-  (* ---- Add_one_return wrap circuit (N=0) ----
-     Single branch, step_widths=[0] (no prev proofs), wrap domain 2^13
-     (as reported by [compile.wrap_domains.h.log2] from dump_add_one_return).
-     Pads every Max_proofs_verified slot with the zero-width value.
-
-     This is the only N=0 wrap fixture in the suite — exercises the wrap
-     circuit for a step proof whose own public input has no unfinalized_proofs
-     slots and no messages_for_next_wrap_proof entries. *)
-  let () =
-    let open Pickles_types in
-    let (Composition_types.Spec.Wrap_etyp.T (typ, conv, _conv_inv)) =
-      Impls.Wrap.input
-        ~feature_flags:Kimchi_backend_common.Plonk_types.Features.Full.none
-        ()
-    in
-    let main_fn =
-      Wrap_main_for_dump.build
-        ~pi_branches:(Hlist.Length.S Hlist.Length.Z)
-        ~padded:Vector.[ Vector.[ 0 ]; Vector.[ 0 ] ]
-        ~step_widths:Vector.[ 0 ] ~domain_log2:13
-        ~max_proofs_verified:(module Nat.N2)
-    in
-    let circuit x () = main_fn (conv x) in
-    dump_wrap "wrap_main_add_one_return_circuit" circuit ~input_typ:typ
-      ~return_typ:Impls.Wrap.Typ.unit
-  in
-  (* ---- Tree_proof_return wrap circuit (N=2) ----
-     Single branch, heterogeneous prev slots [0, 2]: slot 0 is a
-     No_recursion_return proof (width 0), slot 1 is Tree_proof_return
-     itself (width 2). Wrap domain 2^13 (from [compile.wrap_domains.h.log2]
-     in dump_tree_proof_return). *)
-  let () =
-    let open Pickles_types in
-    let (Composition_types.Spec.Wrap_etyp.T (typ, conv, _conv_inv)) =
-      Impls.Wrap.input
-        ~feature_flags:Kimchi_backend_common.Plonk_types.Features.Full.none
-        ()
-    in
-    let main_fn =
-      Wrap_main_for_dump.build
-        ~pi_branches:(Hlist.Length.S Hlist.Length.Z)
-        ~padded:Vector.[ Vector.[ 0 ]; Vector.[ 2 ] ]
-        ~step_widths:Vector.[ 2 ] ~domain_log2:13
-        ~max_proofs_verified:(module Nat.N2)
-    in
-    let circuit x () = main_fn (conv x) in
-    dump_wrap "wrap_main_tree_proof_return_circuit" circuit ~input_typ:typ
-      ~return_typ:Impls.Wrap.Typ.unit
-  in
-  (* ---- Two_phase_chain wrap circuit (multi-branch, mpvMax=1) ----
-     Two branches: [make_zero] (step_widths=0) and [increment] (step_widths=1).
-     Both share ONE wrap key (multi-branch in one [compile_promise]) — this
-     fixture is the smoking gun for any per-branch lagrange/dispatch
-     divergence between OCaml and PureScript.
-
-     Per-branch step domains: make_zero compiles to step domain 2^9 (tiny:
-     no verify_one machinery), increment to step domain 2^14 (full verify_one
-     for one prev). Sourced from b0_step / b1_step witness [d1_size] headers
-     in dump_two_phase_chain. The two domains DIFFER, so wrap_main goes
-     through the per-branch [lagrange_with_correction] dispatch path
-     (wrap_verifier.ml:429-443), NOT the shared-domain fast path. This
-     distinguishes it from N2 / TPR fixtures where all branches share a
-     single domain.
-
-     [padded] is right-aligned per branch with global max=2 slots:
-     - make_zero (width 0): [0; 0]
-     - increment (width 1): [0; 1] (slot 0 unused, slot 1 holds the prev) *)
-  let () =
-    let open Pickles_types in
-    let (Composition_types.Spec.Wrap_etyp.T (typ, conv, _conv_inv)) =
-      Impls.Wrap.input
-        ~feature_flags:Kimchi_backend_common.Plonk_types.Features.Full.none
-        ()
-    in
-    let main_fn =
-      Wrap_main_for_dump.build_multi_domain
-        ~pi_branches:(Hlist.Length.S (Hlist.Length.S Hlist.Length.Z))
-        ~padded:Vector.[ Vector.[ 0; 0 ]; Vector.[ 0; 1 ] ]
-        ~step_widths:Vector.[ 0; 1 ]
-        ~step_domains_log2:Vector.[ 9; 14 ]
-        ~max_proofs_verified:(module Nat.N2)
-    in
-    let circuit x () = main_fn (conv x) in
-    dump_wrap "wrap_main_two_phase_chain_circuit" circuit ~input_typ:typ
-      ~return_typ:Impls.Wrap.Typ.unit
-  in
+  (* Top-level [wrap_main_*_circuit] fixtures are NOT dumped here.
+     See [tools/regen_top_level_fixtures.sh] + the per-rule
+     [dump_*.exe] drivers + [PICKLES_WRAP_CS_DUMP] in [compile.ml].
+     The synthetic [Wrap_main_for_dump.build] dispatched here
+     previously produced fixtures that didn't match the production
+     [Wrap_main.wrap_main] call shape (different [step_keys] +
+     [step_widths] + [max_proofs_verified] than production), masking
+     real PS-vs-OCaml divergences. *)
   (* ---- Pseudo module sub-circuits ---- *)
   let array1_field_ps = Impl.Typ.array ~length:1 Impl.Field.typ in
   let array1_wrap_ps = Impls.Wrap.Typ.array ~length:1 Impls.Wrap.Field.typ in
@@ -5044,17 +4009,13 @@ let run ~output_dir =
     ~input_typ:Impl.Field.typ ~return_typ:Impl.Typ.unit ;
   dump_step "app_circuit_two_phase_chain_increment"
     app_circuit_two_phase_chain_increment
-    ~input_typ:Impl.Field.typ ~return_typ:Impl.Typ.unit ;
-  (* Step_main circuit for Simple_Chain *)
-  dump_step_main output_dir "step_main_simple_chain_circuit"
-    step_main_simple_chain ;
-  dump_step_main output_dir "step_main_simple_chain_n2_circuit"
-    step_main_simple_chain_n2 ;
-  dump_step_main output_dir "step_main_add_one_return_circuit"
-    step_main_add_one_return ;
-  dump_step_main output_dir "step_main_no_recursion_return_circuit"
-    step_main_no_recursion_return ;
-  dump_step_main output_dir "step_main_tree_proof_return_circuit"
-    step_main_tree_proof_return ;
-  dump_step_main output_dir "step_main_side_loaded_main_circuit"
-    step_main_side_loaded_main
+    ~input_typ:Impl.Field.typ ~return_typ:Impl.Typ.unit
+  (* Top-level [step_main_*_circuit] / [wrap_main_*_circuit] fixtures
+     are NOT dumped from this driver. They come from the per-rule
+     [dump_*.exe] drivers (one per scenario) via [PICKLES_STEP_CS_DUMP]
+     / [PICKLES_WRAP_CS_DUMP] in [compile.ml]'s production CS-build
+     blocks. See [tools/regen_top_level_fixtures.sh] in the snarky
+     repo. The synthetic [Step_main_for_dump] / [Wrap_main_for_dump]
+     path used here previously was a parallel rewrite of the
+     production circuit and produced fixtures that DIDN'T match
+     production, masking real PS-vs-OCaml divergences. *)
