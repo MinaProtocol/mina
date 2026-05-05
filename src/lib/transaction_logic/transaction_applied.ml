@@ -356,34 +356,23 @@ let stake_change_of_transaction
   let account_delta id =
     let pre = stake_contribution (get_account_pre id) in
     let post = stake_contribution (get_account_post id) in
-    Option.value_map
+    match
       Currency.Amount.Signed.(add (of_unsigned post) (negate (of_unsigned pre)))
-      ~default:
-        (Or_error.error_string "stake_change: per-account delta overflow")
-      ~f:Or_error.return
+    with
+    | None ->
+        Or_error.error_string "stake_change: per-account delta overflow"
+    | Some x ->
+        Or_error.return x
   in
   List.fold_result touched_ids ~init:Currency.Amount.Signed.zero
     ~f:(fun acc id ->
       let open Or_error.Let_syntax in
       let%bind delta = account_delta id in
-      Option.value_map
-        (Currency.Amount.Signed.add acc delta)
-        ~default:(Or_error.error_string "stake_change: aggregation overflow")
-        ~f:Or_error.return )
-
-let stake_change ~get_account_pre ~get_account_post (t : t) =
-  let txn : Transaction.t =
-    match t.varying with
-    | Command (Signed_command sc) ->
-        Command (Signed_command sc.common.user_command.data)
-    | Command (Zkapp_command zc) ->
-        Command (Zkapp_command zc.command.data)
-    | Fee_transfer { fee_transfer = { data; _ }; _ } ->
-        Fee_transfer data
-    | Coinbase { coinbase = { data; _ }; _ } ->
-        Coinbase data
-  in
-  stake_change_of_transaction ~get_account_pre ~get_account_post txn
+      match Currency.Amount.Signed.add acc delta with
+      | None ->
+          Or_error.error_string "stake_change: aggregation overflow"
+      | Some x ->
+          Or_error.return x )
 
 let transaction : t -> Transaction.t =
  fun { varying; _ } ->

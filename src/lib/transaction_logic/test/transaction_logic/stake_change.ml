@@ -52,8 +52,9 @@ let measure_stake_change ?global_slot ?txn_state_view ledger txn =
   let applied, get_account_pre =
     apply_and_snapshot ?global_slot ?txn_state_view ledger txn
   in
-  Transaction_applied.stake_change ~get_account_pre
-    ~get_account_post:(lookup ledger) applied
+  Transaction_applied.stake_change_of_transaction ~get_account_pre
+    ~get_account_post:(lookup ledger)
+    (Transaction_applied.transaction applied)
   |> Or_error.ok_exn
 
 let check ~name ~expected actual =
@@ -96,7 +97,7 @@ let trials = 20
 (* Payment                                                          *)
 (* ---------------------------------------------------------------- *)
 
-(* unstaking_tx_case_1.1 *)
+(* stake_change_row_1.1 *)
 let payment_success_neither_staked () =
   Quickcheck.test ~trials gen_pair_and_fee ~f:(fun (sender, receiver, fee) ->
       let amount = Amount.of_mina_int_exn 1 in
@@ -105,7 +106,7 @@ let payment_success_neither_staked () =
       check ~name:"payment success neither staked" ~expected:Amount.Signed.zero
         (measure_stake_change ledger txn) )
 
-(* unstaking_tx_case_1.2 *)
+(* stake_change_row_1.2 *)
 let payment_success_both_staked () =
   Quickcheck.test ~trials
     Quickcheck.Generator.(tuple2 gen_pair_and_fee Public_key.Compressed.gen)
@@ -119,7 +120,7 @@ let payment_success_both_staked () =
         ~expected:(neg (fee_amt fee))
         (measure_stake_change ledger txn) )
 
-(* unstaking_tx_case_1.3 *)
+(* stake_change_row_1.3 *)
 let payment_success_sender_staked_only () =
   Quickcheck.test ~trials
     Quickcheck.Generator.(tuple2 gen_pair_and_fee Public_key.Compressed.gen)
@@ -133,7 +134,7 @@ let payment_success_sender_staked_only () =
       check ~name:"payment success sender staked only" ~expected
         (measure_stake_change ledger txn) )
 
-(* unstaking_tx_case_1.4 *)
+(* stake_change_row_1.4 *)
 let payment_success_receiver_staked_only () =
   Quickcheck.test ~trials
     Quickcheck.Generator.(tuple2 gen_pair_and_fee Public_key.Compressed.gen)
@@ -146,10 +147,49 @@ let payment_success_receiver_staked_only () =
       check ~name:"payment success receiver staked only" ~expected:(plus amount)
         (measure_stake_change ledger txn) )
 
+(* Variant of 1.2: sender and receiver delegate to *different* validators.
+   stake_change is the same (`−fee`) — validator identity doesn't enter the
+   formula. *)
+(* stake_change_row_1.5 *)
+let payment_success_both_staked_different_validators () =
+  Quickcheck.test ~trials
+    Quickcheck.Generator.(
+      tuple3 gen_pair_and_fee Public_key.Compressed.gen
+        Public_key.Compressed.gen)
+    ~f:(fun ((sender, receiver, fee), v_sender, v_receiver) ->
+      let amount = Amount.of_mina_int_exn 1 in
+      let ledger = ledger_of [ sender; receiver ] in
+      set_delegate ledger sender.pk (Some v_sender) ;
+      set_delegate ledger receiver.pk (Some v_receiver) ;
+      let txn = signed_command ~sender ~fee (payment_body ~receiver ~amount) in
+      check
+        ~name:"payment success, both staked, different validators"
+        ~expected:(neg (fee_amt fee))
+        (measure_stake_change ledger txn) )
+
+(* Receiver does not exist in the ledger pre-tx; Payment creates it. The
+   account-creation fee comes out of the body amount, but that doesn't
+   affect stake_change because the new receiver has delegate=None
+   (unstaked). With sender staked: Δfp = −fee−amount, Δrcv contributes
+   nothing (rcv_staked=0). Expected: `−(fee + amount)`. *)
+(* stake_change_row_1.6 *)
+let payment_success_new_receiver_sender_staked () =
+  Quickcheck.test ~trials
+    Quickcheck.Generator.(tuple2 gen_pair_and_fee Public_key.Compressed.gen)
+    ~f:(fun ((sender, receiver, fee), validator) ->
+      let amount = Amount.of_mina_int_exn 5 in
+      (* Ledger contains only the sender. Receiver is created by the tx. *)
+      let ledger = ledger_of [ sender ] in
+      set_delegate ledger sender.pk (Some validator) ;
+      let txn = signed_command ~sender ~fee (payment_body ~receiver ~amount) in
+      let expected = add_signed (neg (fee_amt fee)) (neg amount) in
+      check ~name:"payment success, new receiver, sender staked" ~expected
+        (measure_stake_change ledger txn) )
+
 (* Payment fail: receiver's receive permission rejects, so the body fails
    with Update_not_permitted_balance. The fee_payer step (fee debit + nonce
    bump) has already committed by then, leaving status = Failed. *)
-(* unstaking_tx_case_2.1 *)
+(* stake_change_row_2.1 *)
 let payment_fail_sender_staked () =
   Quickcheck.test ~trials
     Quickcheck.Generator.(tuple2 gen_pair_and_fee Public_key.Compressed.gen)
@@ -166,7 +206,7 @@ let payment_fail_sender_staked () =
         ~expected:(neg (fee_amt fee))
         (measure_stake_change ledger txn) )
 
-(* unstaking_tx_case_2.2 *)
+(* stake_change_row_2.2 *)
 let payment_fail_sender_unstaked () =
   Quickcheck.test ~trials gen_pair_and_fee ~f:(fun (sender, receiver, fee) ->
       let amount = Amount.of_mina_int_exn 1 in
@@ -189,7 +229,7 @@ let payment_fail_sender_unstaked () =
    slot). Tests that want success place a [validator] account in the
    ledger and target it. *)
 
-(* unstaking_tx_case_3 *)
+(* stake_change_row_3 *)
 let delegation_some_to_some () =
   Quickcheck.test ~trials
     Quickcheck.Generator.(tuple2 gen_pair_and_fee Public_key.Compressed.gen)
@@ -203,7 +243,7 @@ let delegation_some_to_some () =
         ~expected:(neg (fee_amt fee))
         (measure_stake_change ledger txn) )
 
-(* unstaking_tx_case_4 *)
+(* stake_change_row_4 *)
 let delegation_some_to_none () =
   Quickcheck.test ~trials
     Quickcheck.Generator.(tuple2 gen_pair_and_fee Public_key.Compressed.gen)
@@ -218,7 +258,7 @@ let delegation_some_to_none () =
         ~expected:(neg (balance_amt sender.balance))
         (measure_stake_change ledger txn) )
 
-(* unstaking_tx_case_5 *)
+(* stake_change_row_5 *)
 let delegation_none_to_some () =
   Quickcheck.test ~trials gen_pair_and_fee ~f:(fun (sender, validator, fee) ->
       let ledger = ledger_of [ sender; validator ] in
@@ -231,7 +271,7 @@ let delegation_none_to_some () =
       check ~name:"delegation none→some (opt-in)" ~expected
         (measure_stake_change ledger txn) )
 
-(* unstaking_tx_case_6 *)
+(* stake_change_row_6 *)
 let delegation_none_to_none () =
   Quickcheck.test ~trials gen_pair_and_fee ~f:(fun (sender, _, fee) ->
       let ledger = ledger_of [ sender ] in
@@ -243,7 +283,7 @@ let delegation_none_to_none () =
         (measure_stake_change ledger txn) )
 
 (* Failed: delegating to an unknown receiver pk. Expected: −fee·fp. *)
-(* unstaking_tx_case_7.3 *)
+(* stake_change_row_7.1 *)
 let delegation_failed_sender_staked () =
   Quickcheck.test ~trials
     Quickcheck.Generator.(
@@ -259,7 +299,7 @@ let delegation_failed_sender_staked () =
         ~expected:(neg (fee_amt fee))
         (measure_stake_change ledger txn) )
 
-(* unstaking_tx_case_7.4 *)
+(* stake_change_row_7.2 *)
 let delegation_failed_sender_unstaked () =
   Quickcheck.test ~trials
     Quickcheck.Generator.(tuple2 gen_pair_and_fee Public_key.Compressed.gen)
@@ -274,7 +314,7 @@ let delegation_failed_sender_unstaked () =
 
 (* Not permitted: sender's set_delegate permission rejects signature auth.
    Status is [Failed Update_not_permitted_delegate], fee is still deducted. *)
-(* unstaking_tx_case_7.1 *)
+(* stake_change_row_7.3 *)
 let delegation_not_permitted_sender_staked () =
   Quickcheck.test ~trials
     Quickcheck.Generator.(tuple2 gen_pair_and_fee Public_key.Compressed.gen)
@@ -292,7 +332,7 @@ let delegation_not_permitted_sender_staked () =
         ~expected:(neg (fee_amt fee))
         (measure_stake_change ledger txn) )
 
-(* unstaking_tx_case_7.2 *)
+(* stake_change_row_7.4 *)
 let delegation_not_permitted_sender_unstaked () =
   Quickcheck.test ~trials gen_pair_and_fee ~f:(fun (sender, validator, fee) ->
       let ledger = ledger_of [ sender; validator ] in
@@ -336,7 +376,7 @@ let fee_transfer_two ~recipient1 ~fee1 ~recipient2 ~fee2 :
 
 (* Fee_transfer, one single. Recipient in ledger (avoids account creation
    fee deduction). Expected: fee·rcv_staked. *)
-(* unstaking_tx_case_8.1 *)
+(* stake_change_row_8.1 *)
 let fee_transfer_one_staked () =
   Quickcheck.test ~trials
     Quickcheck.Generator.(tuple2 (gen_account ()) Public_key.Compressed.gen)
@@ -349,7 +389,7 @@ let fee_transfer_one_staked () =
         ~expected:(plus (fee_amt fee))
         (measure_stake_change ledger txn) )
 
-(* unstaking_tx_case_8.2 *)
+(* stake_change_row_8.2 *)
 let fee_transfer_one_unstaked () =
   Quickcheck.test ~trials (gen_account ()) ~f:(fun recipient ->
       let fee = Fee.of_mina_int_exn 1 in
@@ -359,7 +399,7 @@ let fee_transfer_one_unstaked () =
         ~expected:Amount.Signed.zero
         (measure_stake_change ledger txn) )
 
-(* unstaking_tx_case_8.3 *)
+(* stake_change_row_8.3 *)
 let fee_transfer_one_rejected () =
   Quickcheck.test ~trials
     Quickcheck.Generator.(tuple2 (gen_account ()) Public_key.Compressed.gen)
@@ -377,7 +417,7 @@ let fee_transfer_one_rejected () =
         (measure_stake_change ledger txn) )
 
 (* Fee_transfer, two singles. Expected: fee₂·pk₂_staked + fee₁·pk₁_staked. *)
-(* unstaking_tx_case_9.1 *)
+(* stake_change_row_9.1 *)
 let fee_transfer_two_mixed () =
   Quickcheck.test ~trials
     Quickcheck.Generator.(tuple2 (gen_account ()) (gen_account ()))
@@ -393,7 +433,7 @@ let fee_transfer_two_mixed () =
         ~expected:(plus (fee_amt fee1))
         (measure_stake_change ledger txn) )
 
-(* unstaking_tx_case_9.2 *)
+(* stake_change_row_9.2 *)
 let fee_transfer_two_fp_rejected () =
   Quickcheck.test ~trials
     Quickcheck.Generator.(tuple2 (gen_account ()) (gen_account ()))
@@ -413,7 +453,7 @@ let fee_transfer_two_fp_rejected () =
         ~expected:(plus (fee_amt fee1))
         (measure_stake_change ledger txn) )
 
-(* unstaking_tx_case_9.3 *)
+(* stake_change_row_9.3 *)
 let fee_transfer_two_rcv_rejected () =
   Quickcheck.test ~trials
     Quickcheck.Generator.(tuple2 (gen_account ()) (gen_account ()))
@@ -433,7 +473,7 @@ let fee_transfer_two_rcv_rejected () =
         ~expected:(plus (fee_amt fee2))
         (measure_stake_change ledger txn) )
 
-(* unstaking_tx_case_9.4 *)
+(* stake_change_row_9.4 *)
 let fee_transfer_two_both_rejected () =
   Quickcheck.test ~trials
     Quickcheck.Generator.(tuple2 (gen_account ()) (gen_account ()))
@@ -468,7 +508,7 @@ let coinbase ~receiver ~amount ~fee_transfer : Mina_transaction.Transaction.t =
   Mina_transaction.Transaction.Coinbase cb
 
 (* Coinbase, no fee_transfer. Expected: full · rcv_staked. *)
-(* unstaking_tx_case_10.1 *)
+(* stake_change_row_10.1 *)
 let coinbase_no_ft_staked () =
   Quickcheck.test ~trials
     Quickcheck.Generator.(tuple2 (gen_account ()) Public_key.Compressed.gen)
@@ -480,7 +520,7 @@ let coinbase_no_ft_staked () =
       check ~name:"coinbase no fee_transfer (staked)" ~expected:(plus amount)
         (measure_stake_change ledger txn) )
 
-(* unstaking_tx_case_10.2 *)
+(* stake_change_row_10.2 *)
 let coinbase_no_ft_unstaked () =
   Quickcheck.test ~trials (gen_account ()) ~f:(fun receiver ->
       let amount = Amount.of_mina_int_exn 720 in
@@ -490,7 +530,7 @@ let coinbase_no_ft_unstaked () =
         ~expected:Amount.Signed.zero
         (measure_stake_change ledger txn) )
 
-(* unstaking_tx_case_10.3 *)
+(* stake_change_row_10.3 *)
 let coinbase_no_ft_rejected () =
   Quickcheck.test ~trials
     Quickcheck.Generator.(tuple2 (gen_account ()) Public_key.Compressed.gen)
@@ -508,7 +548,7 @@ let coinbase_no_ft_rejected () =
         (measure_stake_change ledger txn) )
 
 (* Coinbase, with fee_transfer. Expected: ft_fee·ft_staked + (full − ft_fee)·rcv_staked. *)
-(* unstaking_tx_case_11.1 *)
+(* stake_change_row_11.1 *)
 let coinbase_with_ft_mixed () =
   Quickcheck.test ~trials
     Quickcheck.Generator.(tuple2 (gen_account ()) (gen_account ()))
@@ -529,7 +569,7 @@ let coinbase_with_ft_mixed () =
       check ~name:"coinbase with ft (only cb receiver staked)" ~expected
         (measure_stake_change ledger txn) )
 
-(* unstaking_tx_case_11.2 *)
+(* stake_change_row_11.2 *)
 let coinbase_with_ft_sw_rejected () =
   Quickcheck.test ~trials
     Quickcheck.Generator.(tuple2 (gen_account ()) (gen_account ()))
@@ -554,7 +594,7 @@ let coinbase_with_ft_sw_rejected () =
       check ~name:"coinbase with ft (sw rejected, both staked)" ~expected
         (measure_stake_change ledger txn) )
 
-(* unstaking_tx_case_11.3 *)
+(* stake_change_row_11.3 *)
 let coinbase_with_ft_bp_rejected () =
   Quickcheck.test ~trials
     Quickcheck.Generator.(tuple2 (gen_account ()) (gen_account ()))
@@ -577,7 +617,7 @@ let coinbase_with_ft_bp_rejected () =
         ~expected:(plus (fee_amt ft_fee))
         (measure_stake_change ledger txn) )
 
-(* unstaking_tx_case_11.4 *)
+(* stake_change_row_11.4 *)
 let coinbase_with_ft_both_rejected () =
   Quickcheck.test ~trials
     Quickcheck.Generator.(tuple2 (gen_account ()) (gen_account ()))

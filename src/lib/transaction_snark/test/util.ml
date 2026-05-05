@@ -695,8 +695,9 @@ let test_transaction_union ?expected_failure ?txn_global_slot ledger txn =
             (Ledger.location_of_account ledger id)
             ~f:(Ledger.get ledger)
         in
-        Mina_transaction_logic.Transaction_applied.stake_change
-          ~get_account_pre:get_pre ~get_account_post:get_post applied
+        Mina_transaction_logic.Transaction_applied.stake_change_of_transaction
+          ~get_account_pre:get_pre ~get_account_post:get_post
+          (Mina_transaction_logic.Transaction_applied.transaction applied)
         |> Or_error.ok_exn )
   in
   let k () =

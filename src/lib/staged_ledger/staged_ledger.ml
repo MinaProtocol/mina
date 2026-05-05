@@ -522,10 +522,11 @@ module T = struct
           (Ledger.location_of_account ledger id)
           ~f:(Ledger.get ledger)
       in
-      to_staged_ledger_or_error
-        (Mina_transaction_logic.Transaction_applied.stake_change_of_transaction
-           ~get_account_pre:get_pre ~get_account_post:get_post txn )
+      Mina_transaction_logic.Transaction_applied.stake_change_of_transaction
+        ~get_account_pre:get_pre ~get_account_post:get_post txn
+      |> to_staged_ledger_or_error
     in
+
     ( { Pre_statement.partially_applied_transaction
       ; expected_status
       ; accounts_accessed
