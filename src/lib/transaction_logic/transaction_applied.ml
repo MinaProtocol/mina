@@ -314,6 +314,66 @@ let supply_increase :
   Option.value_map total ~default:(Or_error.error_string "overflow")
     ~f:(fun v -> Ok v)
 
+(** Compute the per-transaction [stake_change] — the change to
+    [total_stake] produced by applying this transaction.
+
+    Implemented as the expanded form from
+    [docs/unstaking-stake-change.md]: a sum of per-account deltas
+    [post - pre] where each account's contribution is
+    [balance * is_staked]. zkApp commands are out of scope and return
+    zero. *)
+let stake_change_of_transaction
+    ~(get_account_pre : Account_id.t -> Account.t option)
+    ~(get_account_post : Account_id.t -> Account.t option) (txn : Transaction.t)
+    : Currency.Amount.Signed.t Or_error.t =
+  let default_id pk = Account_id.create pk Token_id.default in
+  let touched_ids =
+    match txn with
+    | Command (Signed_command cmd) ->
+        [ default_id (UC.fee_payer_pk cmd); default_id (UC.receiver_pk cmd) ]
+    | Command (Zkapp_command _) ->
+        (* zkApp commands are out of scope in this PR; stake_change = 0. *)
+        []
+    | Fee_transfer ft ->
+        List.map (Fee_transfer.receiver_pks ft) ~f:default_id
+    | Coinbase cb ->
+        let base = [ default_id cb.receiver ] in
+        Option.value_map cb.fee_transfer ~default:base ~f:(fun ft ->
+            default_id ft.receiver_pk :: base )
+  in
+  let touched_ids =
+    List.dedup_and_sort ~compare:Account_id.compare touched_ids
+  in
+  let stake_contribution (acct : Account.t option) : Currency.Amount.t =
+    let amt =
+      let open Option.Let_syntax in
+      let%bind a = acct in
+      let%map _ = a.delegate in
+      Currency.Balance.to_amount a.balance
+    in
+    Option.value amt ~default:Currency.Amount.zero
+  in
+  let account_delta id =
+    let pre = stake_contribution (get_account_pre id) in
+    let post = stake_contribution (get_account_post id) in
+    match
+      Currency.Amount.Signed.(add (of_unsigned post) (negate (of_unsigned pre)))
+    with
+    | None ->
+        Or_error.error_string "stake_change: per-account delta overflow"
+    | Some x ->
+        Or_error.return x
+  in
+  List.fold_result touched_ids ~init:Currency.Amount.Signed.zero
+    ~f:(fun acc id ->
+      let open Or_error.Let_syntax in
+      let%bind delta = account_delta id in
+      match Currency.Amount.Signed.add acc delta with
+      | None ->
+          Or_error.error_string "stake_change: aggregation overflow"
+      | Some x ->
+          Or_error.return x )
+
 let transaction : t -> Transaction.t =
  fun { varying; _ } ->
   match varying with

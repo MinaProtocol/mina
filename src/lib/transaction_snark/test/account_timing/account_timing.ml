@@ -367,6 +367,11 @@ let%test_module "account timing check" =
           ~constraint_constants txn_applied
         |> Or_error.ok_exn
       in
+      let stake_change =
+        Mina_ledger.Sparse_ledger.stake_change_of_applied
+          ~pre:sparse_ledger_before ~post:sparse_ledger_after txn_applied
+        |> Or_error.ok_exn
+      in
       Transaction_snark.check_transaction ~constraint_constants ~sok_message
         ~source_first_pass_ledger:
           (Mina_ledger.Sparse_ledger.merkle_root sparse_ledger_before)
@@ -377,7 +382,7 @@ let%test_module "account timing check" =
           { source = Pending_coinbase.Stack.empty
           ; target = coinbase_stack_target
           }
-        ~supply_increase
+        ~supply_increase ~stake_change
         { Transaction_protocol_state.Poly.block_data = state_body
         ; transaction = validated_transaction
         ; global_slot = txn_global_slot

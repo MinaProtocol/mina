@@ -26,6 +26,7 @@ module Pre_statement = struct
     ; expected_status : Transaction_status.t
     ; accounts_accessed : Account_id.t list
     ; fee_excess : Fee_excess.t
+    ; stake_change : Currency.Amount.Signed.t
     ; first_pass_ledger_witness : Sparse_ledger.t
     ; first_pass_ledger_source_hash : Ledger_hash.t
     ; first_pass_ledger_target_hash : Ledger_hash.t
@@ -504,16 +505,33 @@ module T = struct
     let new_init_stack =
       push_coinbase pending_coinbase_stack_state.init_stack txn
     in
-    let%map partially_applied_transaction =
+    let%bind partially_applied_transaction =
       to_staged_ledger_or_error
         (Ledger.apply_transaction_first_pass ~signature_kind
            ~constraint_constants ~global_slot ~txn_state_view ledger txn )
     in
     let target_ledger_hash = Ledger.merkle_root ledger in
+    let%map stake_change =
+      let get_pre id =
+        Option.try_with (fun () ->
+            Sparse_ledger.get_exn ledger_witness
+              (Sparse_ledger.find_index_exn ledger_witness id) )
+      in
+      let get_post id =
+        Option.bind
+          (Ledger.location_of_account ledger id)
+          ~f:(Ledger.get ledger)
+      in
+      Mina_transaction_logic.Transaction_applied.stake_change_of_transaction
+        ~get_account_pre:get_pre ~get_account_post:get_post txn
+      |> to_staged_ledger_or_error
+    in
+
     ( { Pre_statement.partially_applied_transaction
       ; expected_status
       ; accounts_accessed
       ; fee_excess
+      ; stake_change
       ; first_pass_ledger_witness = ledger_witness
       ; first_pass_ledger_source_hash = source_ledger_hash
       ; first_pass_ledger_target_hash = target_ledger_hash
@@ -548,6 +566,7 @@ module T = struct
         (Mina_transaction_logic.Transaction_applied.supply_increase
            ~constraint_constants applied_txn )
     in
+    let stake_change = pre_stmt.stake_change in
     let%map () =
       let actual_status = Ledger.status_of_applied applied_txn in
       if Transaction_status.equal pre_stmt.expected_status actual_status then
@@ -580,7 +599,7 @@ module T = struct
       ; connecting_ledger_right = connecting_ledger
       ; fee_excess = pre_stmt.fee_excess
       ; supply_increase
-      ; stake_change = Currency.Amount.Signed.zero
+      ; stake_change
       ; sok_digest = ()
       }
     in

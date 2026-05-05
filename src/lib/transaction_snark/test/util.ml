@@ -682,6 +682,24 @@ let test_transaction_union ?expected_failure ?txn_global_slot ledger txn =
           ~constraint_constants txn
         |> Or_error.ok_exn )
   in
+  let stake_change =
+    Option.value_map applied_transaction ~default:Amount.Signed.zero
+      ~f:(fun applied ->
+        let get_pre id =
+          Option.try_with (fun () ->
+              Sparse_ledger.get_exn sparse_ledger
+                (Sparse_ledger.find_index_exn sparse_ledger id) )
+        in
+        let get_post id =
+          Option.bind
+            (Ledger.location_of_account ledger id)
+            ~f:(Ledger.get ledger)
+        in
+        Mina_transaction_logic.Transaction_applied.stake_change_of_transaction
+          ~get_account_pre:get_pre ~get_account_post:get_post
+          (Mina_transaction_logic.Transaction_applied.transaction applied)
+        |> Or_error.ok_exn )
+  in
   let k () =
     Transaction_snark.check_transaction ~constraint_constants ~sok_message
       ~source_first_pass_ledger ~target_first_pass_ledger
@@ -691,7 +709,7 @@ let test_transaction_union ?expected_failure ?txn_global_slot ledger txn =
             pending_coinbase_stack
         ; target = pending_coinbase_stack_target
         }
-      ~supply_increase
+      ~supply_increase ~stake_change
       { transaction = txn; block_data = state_body; global_slot }
       (unstage @@ Sparse_ledger.handler sparse_ledger)
       ~signature_kind

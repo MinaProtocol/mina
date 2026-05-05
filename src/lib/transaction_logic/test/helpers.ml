@@ -63,6 +63,22 @@ let get_account_exn ledger pk =
   |> Option.bind ~f:(Ledger.get ledger)
   |> Option.value_exn
 
+(** Overwrite the [delegate] field of an existing account on the default
+    token. Panics if the account isn't in the ledger. *)
+let set_delegate ledger pk new_delegate =
+  let acc_id = Account_id.create pk Token_id.default in
+  let location = Option.value_exn (Ledger.location_of_account ledger acc_id) in
+  let account = Option.value_exn (Ledger.get ledger location) in
+  Ledger.set ledger location { account with delegate = new_delegate }
+
+(** Overwrite the [permissions] field of an existing account on the default
+    token. Panics if the account isn't in the ledger. *)
+let set_permissions ledger pk new_permissions =
+  let acc_id = Account_id.create pk Token_id.default in
+  let location = Option.value_exn (Ledger.location_of_account ledger acc_id) in
+  let account = Option.value_exn (Ledger.get ledger location) in
+  Ledger.set ledger location { account with permissions = new_permissions }
+
 (** Apply a single transaction to [ledger] and discard the result. Panics on
     error. Defaults [global_slot] and [txn_state_view] to the values from
     [Protocol_config_examples]. *)

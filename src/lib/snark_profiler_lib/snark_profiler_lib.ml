@@ -811,6 +811,11 @@ let check_base_snarks ~genesis_constants ~constraint_constants ~logger
                  ~constraint_constants applied_txn
                |> Or_error.ok_exn
              in
+             let stake_change =
+               Sparse_ledger.stake_change_of_applied ~pre:source_ledger
+                 ~post:target_ledger applied_txn
+               |> Or_error.ok_exn
+             in
              let () =
                Transaction_snark.check_transaction ~signature_kind ?preeval
                  ~constraint_constants ~sok_message
@@ -825,7 +830,7 @@ let check_base_snarks ~genesis_constants ~constraint_constants ~logger
                        coinbase_stack_target ~genesis_constants
                          ~constraint_constants ~logger
                    }
-                 ~supply_increase
+                 ~supply_increase ~stake_change
                  { Transaction_protocol_state.Poly.block_data =
                      Lazy.force
                      @@ state_body ~genesis_constants ~constraint_constants
@@ -876,6 +881,11 @@ let generate_base_snarks_witness ~genesis_constants ~constraint_constants
                  ~constraint_constants applied_txn
                |> Or_error.ok_exn
              in
+             let stake_change =
+               Sparse_ledger.stake_change_of_applied ~pre:source_ledger
+                 ~post:target_ledger applied_txn
+               |> Or_error.ok_exn
+             in
              let () =
                Transaction_snark.generate_transaction_witness ~signature_kind
                  ?preeval ~constraint_constants ~sok_message
@@ -891,7 +901,7 @@ let generate_base_snarks_witness ~genesis_constants ~constraint_constants
                        coinbase_stack_target ~genesis_constants
                          ~constraint_constants ~logger
                    }
-                 ~supply_increase
+                 ~supply_increase ~stake_change
                  { Transaction_protocol_state.Poly.transaction = valid_txn
                  ; block_data =
                      Lazy.force
