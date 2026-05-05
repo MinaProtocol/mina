@@ -128,7 +128,7 @@ tag. The columns record:
 - the resulting `stake_change`.
 
 The `#` column is the row number. Tests for each row are tagged
-`(* unstaking_tx_case_<#>[.<sub>] *)` in
+`(* stake_change_row_<#>[.<sub>] *)` in
 `src/lib/transaction_logic/test/transaction_logic/stake_change.ml` and
 `src/lib/transaction_snark/test/stake_change_snark/stake_change_snark.ml`.
 

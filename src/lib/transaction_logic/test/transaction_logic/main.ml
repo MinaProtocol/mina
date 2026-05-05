@@ -41,6 +41,10 @@ let () =
               payment_success_sender_staked_only
           ; test_case "Payment success, receiver staked only" `Quick
               payment_success_receiver_staked_only
+          ; test_case "Payment success, both staked, different validators"
+              `Quick payment_success_both_staked_different_validators
+          ; test_case "Payment success, new receiver, sender staked" `Quick
+              payment_success_new_receiver_sender_staked
           ; test_case
               "Payment fail (receiver receive=Impossible), sender staked" `Quick
               payment_fail_sender_staked
