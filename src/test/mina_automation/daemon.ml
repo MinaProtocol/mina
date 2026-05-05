@@ -97,6 +97,11 @@ module Client = struct
         ; sprintf "http://localhost:%d/graphql" rest_port
         ]
       ()
+
+  let internal_print_blockchain_vk t ~config_file =
+    Executor.run t.executor
+      ~args:[ "internal"; "print-blockchain-vk"; "--config-file"; config_file ]
+      ()
 end
 
 module Config = struct

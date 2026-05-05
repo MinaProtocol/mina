@@ -2160,6 +2160,91 @@ let internal_commands logger ~itn_features =
                 else
                   let () = printf "%s" (Chain_id.to_string chain_id) in
                   exit 0) )
+  ; ( "print-blockchain-vk"
+    , Command.async
+        ~summary:
+          "Print the blockchain SNARK verification key as JSON, using the \
+           given config file(s) to determine constraint constants and proof \
+           level"
+        (let open Command.Let_syntax in
+        let%map_open config_files =
+          flag "--config-file" ~aliases:[ "config-file" ]
+            ~doc:
+              "PATH path to a configuration file. Pass multiple times to \
+               override fields from earlier config files"
+            (listed string)
+        in
+        fun () ->
+          let open Deferred.Let_syntax in
+          let logger = Logger.null () in
+          let genesis_constants =
+            Genesis_constants.Compiled.genesis_constants
+          in
+          let constraint_constants =
+            Genesis_constants.Compiled.constraint_constants
+          in
+          let proof_level = Genesis_constants.Compiled.proof_level in
+          let config =
+            let config_jsons =
+              List.map config_files ~f:(fun config_file ->
+                  let json =
+                    In_channel.with_file config_file ~f:(fun ic ->
+                        Yojson.Safe.from_channel ic )
+                  in
+                  (config_file, json) )
+            in
+            List.fold ~init:Runtime_config.default config_jsons
+              ~f:(fun config (config_file, config_json) ->
+                match Runtime_config.of_yojson config_json with
+                | Ok loaded_config ->
+                    Runtime_config.combine config loaded_config
+                | Error err ->
+                    failwithf "Could not parse configuration file %s: %s"
+                      config_file err () )
+          in
+          let%bind light_proof =
+            match%map
+              Genesis_ledger_helper.light_proof_from_runtime_config ~logger
+                ~cli_proof_level:None ~genesis_constants ~constraint_constants
+                ~proof_level config
+            with
+            | Ok light_proof ->
+                light_proof
+            | Error err ->
+                Error.raise err
+          in
+          let constraint_constants = light_proof.constraint_constants in
+          let proof_level = light_proof.proof_level in
+          let signature_kind = light_proof.signature_kind in
+          let%map vk =
+            match proof_level with
+            | Genesis_constants.Proof_level.Full ->
+                Format.eprintf "Generating transaction snark circuit..@." ;
+                let module T = Transaction_snark.Make (struct
+                  let signature_kind = signature_kind
+
+                  let constraint_constants = constraint_constants
+
+                  let proof_level = proof_level
+                end) in
+                Format.eprintf "Generating blockchain snark circuit..@." ;
+                let module B =
+                Blockchain_snark.Blockchain_snark_state.Make (struct
+                  let tag = T.tag
+
+                  let constraint_constants = constraint_constants
+
+                  let proof_level = proof_level
+                end) in
+                Lazy.force B.Proof.verification_key
+            | Check | No_check ->
+                Format.eprintf
+                  "Proof level is %s, returning dummy verification key@."
+                  (Genesis_constants.Proof_level.to_string proof_level) ;
+                Deferred.return (Lazy.force Pickles.Verification_key.dummy)
+          in
+          Pickles.Verification_key.to_yojson vk
+          |> Yojson.Safe.to_string |> print_string) )
   ; ( "print-hard-fork-genesis-timestamp"
     , Command.async
         ~summary:

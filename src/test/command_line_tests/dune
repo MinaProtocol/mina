@@ -21,7 +21,9 @@
   init
   mina_automation
   mina_automation.fixture
-  mina_automation.runner)
+  mina_automation.runner
+  mina_graphql_client
+  logger)
  (instrumentation
   (backend bisect_ppx))
  (preprocess
