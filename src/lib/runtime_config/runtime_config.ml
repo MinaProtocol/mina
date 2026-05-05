@@ -52,7 +52,17 @@ let result_opt ~f x =
 
 let dump_on_error yojson x =
   Result.map_error x ~f:(fun str ->
-      str ^ "\n\nCould not parse JSON:\n" ^ Yojson.Safe.pretty_to_string yojson )
+      (* Use compact to_string instead of pretty_to_string: the pretty printer
+         uses Stdlib.List.map (non-tail-recursive in OCaml 4.14) and will
+         overflow the stack on configs with hundreds of thousands of accounts.
+         Also truncate the output so large ledgers don't bloat error messages. *)
+      let json_str = Yojson.Safe.to_string yojson in
+      let json_display =
+        if String.length json_str > 2000 then
+          String.sub json_str ~pos:0 ~len:2000 ^ " ... [JSON truncated]"
+        else json_str
+      in
+      str ^ "\n\nCould not parse JSON:\n" ^ json_display )
 
 let of_yojson_generic ~fields of_yojson json =
   dump_on_error json @@ of_yojson
