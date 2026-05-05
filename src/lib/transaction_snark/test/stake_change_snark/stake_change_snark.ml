@@ -115,7 +115,7 @@ let%test_module "stake_change in the transaction SNARK" =
        fails with Update_not_permitted_balance. The fee_payer step has
        already committed by then (fee debited, nonce bumped), leaving
        status = Failed and stake_change = −fee·fp_staked. *)
-    (* unstaking_tx_case_2 *)
+    (* unstaking_tx_case_2.1 *)
     let%test_unit "Payment fail (receiver receive=Impossible), sender staked" =
       Test_util.with_randomness 14 (fun () ->
           with_ledger_of_wallets ~n:3 (fun ledger wallets ->
@@ -191,7 +191,7 @@ let%test_module "stake_change in the transaction SNARK" =
               in
               U.test_transaction_union ledger (Command (Signed_command txn)) ) )
 
-    (* unstaking_tx_case_7.2 *)
+    (* unstaking_tx_case_7.3 *)
     let%test_unit "Delegation failed (unknown receiver), delegator staked" =
       Test_util.with_randomness 15 (fun () ->
           with_ledger_of_wallets ~n:2 (fun ledger wallets ->
@@ -246,7 +246,7 @@ let%test_module "stake_change in the transaction SNARK" =
       Fee_transfer.Single.create ~receiver_pk:recipient_pk ~fee
         ~fee_token:Token_id.default
 
-    (* unstaking_tx_case_8 *)
+    (* unstaking_tx_case_8.1 *)
     let%test_unit "Fee_transfer one single, staked" =
       Test_util.with_randomness 9 (fun () ->
           with_ledger_of_wallets ~n:2 (fun ledger wallets ->
