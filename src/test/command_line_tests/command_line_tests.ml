@@ -1000,9 +1000,31 @@ module PrintBlockchainVK = struct
     let daemon = Daemon.of_config test.config in
     let%bind () = Daemon.Config.generate_keys test.config in
     let ledger_file = test.config.dirs.conf ^/ "daemon.json" in
-    let%bind () =
-      Mina_automation_fixture.Daemon.generate_random_config daemon ledger_file
+    let runtime_config = Quickcheck.random_value Runtime_config.gen_valid in
+    let runtime_config =
+      let genesis_timestamp =
+        let now_unix_ts = Unix.time () |> Float.to_int in
+        let genesis_unix_ts = now_unix_ts - (now_unix_ts mod 60) + 120 in
+        Time.of_span_since_epoch (Time.Span.of_int_sec genesis_unix_ts)
+        |> Time.to_string_iso8601_basic ~zone:Time.Zone.utc
+      in
+      let genesis =
+        match runtime_config.genesis with
+        | Some g ->
+            Some { g with genesis_state_timestamp = Some genesis_timestamp }
+        | None ->
+            Some
+              { k = None
+              ; delta = None
+              ; slots_per_epoch = None
+              ; slots_per_sub_window = None
+              ; grace_period_slots = None
+              ; genesis_state_timestamp = Some genesis_timestamp
+              }
+      in
+      { runtime_config with genesis }
     in
+    Runtime_config.to_yojson runtime_config |> Yojson.Safe.to_file ledger_file ;
     let%bind process = Daemon.start daemon in
     let%bind result = Daemon.wait_for_node_init process in
     let%bind () =
