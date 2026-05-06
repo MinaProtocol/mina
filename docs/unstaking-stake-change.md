@@ -250,15 +250,18 @@ to "successful application".
 If the same account is touched by several account_updates, only the
 *final* state of that account enters the stake-delta sum.
 
-The per-account contribution `stake'(a) − stake(a)` resolves to one of
-four shapes depending on pre/post staking status:
+**Definition (per-account shape).** Write `(p, q)` for the
+*per-account shape* of `a` under `tx`, where
+`p = is_staked(a)` (pre) and `q = is_staked(a)` (post). The per-account
+contribution `stake'(a) − stake(a)` resolves to one of four values
+indexed by this shape:
 
-| pre is_staked | post is_staked | per-account Δstake             |
-|---------------|----------------|--------------------------------|
-| `0`           | `0`            | `0`                            |
-| `0`           | `1`            | `balance'(a)`                  |
-| `1`           | `0`            | `−balance(a)`                  |
-| `1`           | `1`            | `balance'(a) − balance(a)`     |
+| shape `(p, q)` | per-account Δstake             |
+|----------------|--------------------------------|
+| `(0, 0)`       | `0`                            |
+| `(0, 1)`       | `balance'(a)`                  |
+| `(1, 0)`       | `−balance(a)`                  |
+| `(1, 1)`       | `balance'(a) − balance(a)`     |
 
 (Direct substitution of the conditional `stake(a) = if is_staked(a) then
 balance(a) else 0`.)
