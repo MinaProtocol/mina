@@ -1,14 +1,10 @@
-# `stake_change` — non-zkApp transaction spec
+# `stake_change` — transaction spec
 
-This note specifies how `stake_change` is computed for every non-zkApp
-transaction tag (Payment, Stake_delegation, Fee_transfer, Coinbase). The
-value is given by a single definition (sum of per-account stake deltas
-over touched accounts) and specialized per transaction tag in the
-coverage table below.
-
-zkApp transactions are **out of scope** for this doc — they walk a
-call-forest of per-account_update contributions and don't fit a closed form.
-See `zkapp_command_logic.ml`.
+This note specifies how `stake_change` is computed for every transaction
+kind. The value is given by a single definition (sum of per-account
+stake deltas over touched accounts), specialized per non-zkApp tag in
+the [Coverage table](#coverage-table), and applied uniformly per
+account_update for zkApp transactions ([zkApp transactions](#zkapp-transactions)).
 
 ## Notation
 
@@ -31,10 +27,16 @@ they hold.
 
 ## Definition
 
-`total_stake` is the sum over all accounts `a` of `balance(a) · is_staked(a)`,
-where `is_staked(a) = 1` iff `a.delegate` is set (≠ `empty_pk`).
+`total_stake` is the sum over all **default-token** accounts `a` of
+`balance(a) · is_staked(a)`, where `is_staked(a) = 1` iff
+`a.delegate ≠ empty_pk`.
 
-For a transaction `tx` touching some set of accounts `A(tx)`:
+By protocol invariant, non-default-token accounts cannot have a
+non-empty delegate, so restricting the sum to default-token doesn't
+hide any stake.
+
+For a transaction `tx` touching some set of default-token accounts
+`A(tx)`:
 
 ```
 stake_change(tx) = Σ_{a ∈ A(tx)}  balance'(a) · is_staked'(a)
@@ -46,8 +48,8 @@ delegate unchanged), so the sum over the whole ledger reduces to the sum
 over touched accounts.
 
 For non-zkApp tags, `A(tx) = {fee_payer, receiver}` (possibly identical — see
-encoding notes below). The two-slot encoding is set up by
-`Transaction_union.of_transaction` (`transaction_union.ml:32`).
+encoding notes below; both slots are default-token by `Transaction_union`'s
+encoding, `transaction_union.ml:32`).
 
 Equivalently, defining each account's stake contribution as
 
@@ -198,3 +200,108 @@ incremented), the rest is unwound.
     receiver_pk`) and sets `common.fee = 0`, so `Δfp_bal = 0` regardless
     of fp's permissions. The full credit lives in `body.amount` and
     flows through the rcv slot.
+
+## zkApp transactions
+
+A `Zkapp_command.t` (`zkapp_command.ml:8-13`) carries:
+
+- a **fee_payer**, a single account_update of restricted shape: a fixed
+  `−fee` balance change, no field updates, signature auth on the default
+  token (`account_update.ml:1365-1395`),
+- a **call forest of account_updates**, each able to change balance,
+  delegate, app_state, permissions, etc., subject to per-update
+  preconditions and authorization.
+
+Application proceeds in two phases:
+
+1. **First pass**: apply the fee_payer. Always sticks (assuming the tx
+   is included in a block).
+2. **Second pass**: apply the call forest. If every update is permitted,
+   all effects apply. If any update fails a check, the entire second
+   pass is cancelled — only the fee_payer's debit remains
+   (`mina_transaction_logic.ml:1828-1838`).
+
+### Definition (unchanged)
+
+The [Definition](#definition) applies as-is:
+
+```
+stake_change(tx) = Σ_{a ∈ A(tx)}  stake'(a) − stake(a)
+```
+
+`A(tx)` for a zkApp tx is `Zkapp_command.accounts_referenced` (the
+deduplicated set of accounts targeted by the fee_payer or any
+account_update; `zkapp_command.ml:309-311`), restricted to the
+default-token entries.
+
+### Per-account_update contributions
+
+For a single account_update `u` targeting account `a`:
+
+- balance: `balance'(a) ← balance(a) + u.balance_change` (if `u`
+  applies),
+- delegate: `delegate'(a) ← u.update.delegate.set_or_keep delegate(a)`
+  (if `u` applies, and only for default-token accounts).
+
+Whether `u` applies depends on its preconditions, authorization, and
+per-field permissions — the spec doesn't enumerate these, it just refers
+to "successful application".
+
+If the same account is touched by several account_updates, only the
+*final* state of that account enters the stake-delta sum.
+
+The per-account contribution `stake'(a) − stake(a)` resolves to one of
+four shapes depending on pre/post staking status:
+
+| pre is_staked | post is_staked | per-account Δstake             |
+|---------------|----------------|--------------------------------|
+| `0`           | `0`            | `0`                            |
+| `0`           | `1`            | `balance'(a)`                  |
+| `1`           | `0`            | `−balance(a)`                  |
+| `1`           | `1`            | `balance'(a) − balance(a)`     |
+
+(Direct substitution of the conditional `stake(a) = if is_staked(a) then
+balance(a) else 0`.)
+
+### Failure → fee_payer-only
+
+When the second pass fails, only the fee_payer's debit applies. Since
+the fee_payer never changes its own delegate (its `update = Update.noop`),
+its contribution is:
+
+```
+stake_change = (balance(fp) − fee) · is_staked(fp) − balance(fp) · is_staked(fp)
+            = −fee · is_staked(fp)
+```
+
+### Test case spine
+
+Unlike the non-zkApp [coverage table](#coverage-table) — which enumerates
+the finite set of `(tag, encoding)` shapes — the zkApp space is
+combinatorial in the size and shape of the call forest. The table below
+is therefore not a *combinatorial* coverage but the **minimum case
+spine** that, if all rows pass, exercises every distinct branch of the
+spec: each per-account stake transition (z3–z5), the fee-payer-only
+baseline (z1, z2), the multi-update aggregation rules (z6, z7), the
+failure path (z8), the default-token restriction in the sum (z9, z10),
+and the field-set restriction to balance + delegate (z11).
+
+Tests in `src/lib/transaction_logic/test/transaction_logic/zkapp_stake_change.ml`
+are tagged `(* zkapp_stake_change_row_z<N> *)` to map back to these
+rows, mirroring the `stake_change_row_X.Y` convention used for the
+non-zkApp table.
+
+| #   | Scenario                                              | Coverage role                                                                  | Expected `stake_change`               |
+|-----|-------------------------------------------------------|--------------------------------------------------------------------------------|---------------------------------------|
+| z1  | fee_payer staked, no other updates                    | Baseline: fp slot only, per-account shape `(1,1)`                              | `−fee`                                |
+| z2  | fee_payer unstaked, no other updates                  | Baseline: fp slot only, per-account shape `(0,0)`                              | `0`                                   |
+| z3  | One update: balance change on staked target           | Per-account shape `(1,1)` for a non-fp target                                  | `−fee·fp_staked + Δbal_t`             |
+| z4  | One update: opt-in (delegate `None → Some`)           | Per-account shape `(0,1)`                                                      | `−fee·fp_staked + balance'(t)`        |
+| z5  | One update: opt-out (delegate `Some → empty_pk`)      | Per-account shape `(1,0)`                                                      | `−fee·fp_staked − balance(t)`         |
+| z6  | Two updates on the same target                        | Telescoping: only the final state of `t` enters the sum                        | depends on final state, not interim   |
+| z7  | Two updates on two distinct targets                   | Sum-over-`A(tx)`: contributions from distinct accounts add                     | sum of per-account contributions      |
+| z8  | Second-pass check fails                               | Failure rollback: only the fee_payer's debit sticks                            | `−fee·fp_staked`                      |
+| z9  | Non-default-token update: balance change              | Default-token restriction; payment-mirror furthest from a signed_command       | `−fee·fp_staked`                      |
+| z10 | Non-default-token update: delegate Set                | Default-token restriction; delegate-mirror furthest from a signed_command      | `−fee·fp_staked`                      |
+| z11 | Default-token update: app_state / permissions only    | Field-set restriction: `stake_change` depends only on balance and delegate     | `−fee·fp_staked`                      |
+
