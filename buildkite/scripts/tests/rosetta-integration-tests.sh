@@ -284,6 +284,12 @@ rosetta-cli check:spec --all --configuration-file ${ROSETTA_CONFIGURATION_FILE}
 echo "========================= ROSETTA CLI: CHECK:CONSTRUCTION ==========================="
 rosetta-cli check:construction --configuration-file ${ROSETTA_CONFIGURATION_FILE}
 
+# shellcheck source=buildkite/scripts/tests/rosetta-offline-signer-smoke.sh
+source "$(dirname "$0")/rosetta-offline-signer-smoke.sh"
+
+echo "========================= OFFLINE SIGNER SMOKE TEST ==========================="
+offline_signer_smoke_test
+
 # wait until block height 11 is reached before starting check:data
 # so it gives enough time to vest the time-vesting accounts
 current_block_height=$(mina client status --json | jq -r '.blockchain_length')
