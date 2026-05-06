@@ -1393,6 +1393,8 @@ module Make_str (A : Wire_types.Concrete) = struct
             run_checked (Public_key.Compressed.Checked.if_ b ~then_ ~else_)
 
           let empty = Public_key.Compressed.var_of_t Public_key.Compressed.empty
+
+          let equal a b = run_checked (Public_key.Compressed.Checked.equal a b)
         end
 
         module Protocol_state_precondition = struct
@@ -2124,7 +2126,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         with_label __LOC__ (fun () ->
             run_checked
               (Amount.Signed.Checked.assert_equal statement.stake_change
-                 (Amount.Signed.Checked.constant Amount.Signed.zero) ) ) ;
+                 global.stake_change ) ) ;
         with_label __LOC__ (fun () ->
             run_checked
               (let expected = statement.fee_excess in

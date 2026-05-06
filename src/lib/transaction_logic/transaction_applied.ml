@@ -331,9 +331,8 @@ let stake_change_of_transaction
     match txn with
     | Command (Signed_command cmd) ->
         [ default_id (UC.fee_payer_pk cmd); default_id (UC.receiver_pk cmd) ]
-    | Command (Zkapp_command _) ->
-        (* zkApp commands are out of scope in this PR; stake_change = 0. *)
-        []
+    | Command (Zkapp_command zc) ->
+        Zkapp_command.accounts_referenced zc
     | Fee_transfer ft ->
         List.map (Fee_transfer.receiver_pks ft) ~f:default_id
     | Coinbase cb ->
