@@ -1,0 +1,48 @@
+services:
+  generate_libp2p_key:
+    image: '${MINA_DAEMON_IMAGE}'
+    environment:
+      MINA_LIBP2P_PASS: ${MINA_LIBP2P_PASS}
+    entrypoint: []
+    command: >
+      bash -c '
+        if [ -f /root/.mina-config/keys/libp2p-key ]; then
+          echo "libp2p key already exists, skipping generation."
+          exit 0
+        fi
+        mina libp2p generate-keypair -privkey-path /root/.mina-config/keys/libp2p-key
+        chmod -R 0700 /root/.mina-config/keys
+        chmod -R 0600 /root/.mina-config/keys/libp2p-key
+      '
+    volumes:
+      - './mina_node/.mina-config:/root/.mina-config'
+
+  mina_seed:
+    image: '${MINA_DAEMON_IMAGE}'
+    restart: always
+    environment:
+      MINA_LIBP2P_PASS: ${MINA_LIBP2P_PASS}
+      MINA_CLIENT_TRUSTLIST: "0.0.0.0/0"
+    healthcheck:
+      test: ["CMD-SHELL", "mina client status"]
+      interval: 60s
+      timeout: 10s
+      retries: 100
+    entrypoint: []
+    command: >
+      bash -c '
+        mina daemon \
+             --peer-list-url ${MINA_PEERLIST_URL} \
+             --libp2p-keypair /root/.mina-config/keys/libp2p-key \
+             --insecure-rest-server \
+             --rest-port ${MINA_REST_PORT} \
+             --seed
+      '
+    volumes:
+      - './mina_node/.mina-config:/root/.mina-config'
+    ports:
+      - '${MINA_REST_PORT}:${MINA_REST_PORT}'
+      - '${MINA_P2P_PORT}:${MINA_P2P_PORT}'
+    depends_on:
+      generate_libp2p_key:
+        condition: service_completed_successfully

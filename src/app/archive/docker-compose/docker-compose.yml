@@ -1,0 +1,94 @@
+services:
+  postgres:
+    image: postgres:17
+    restart: always
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+    healthcheck:
+      test: ["CMD-SHELL", "psql -U ${POSTGRES_USER} -d ${POSTGRES_DB} -tAc \"SELECT COUNT(*) FROM pg_database WHERE datname='${POSTGRES_DB}';\" | grep -q '^1$'"]
+      interval: 5s
+      timeout: 10s
+      retries: 10
+    volumes:
+      - './archive/postgresql/data:/var/lib/postgresql/data'
+    ports:
+      - '${POSTGRES_PORT}:5432'
+
+  bootstrap_db:
+    image: '${MINA_ARCHIVE_IMAGE}'
+    command:
+      - bash
+      - -c
+      - |
+        set -eox pipefail
+        curl -fSL -O ${ARCHIVE_DUMP_BASE_URL}/${ARCHIVE_DUMP_PREFIX}-$$(date +%F_0000).sql.tar.gz
+        tar -zxvf ${ARCHIVE_DUMP_PREFIX}-$$(date +%F_0000).sql.tar.gz
+        psql postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB} \
+          -c "ALTER SYSTEM SET max_connections = 500" \
+          -c "ALTER SYSTEM SET max_locks_per_transaction = 100" \
+          -c "ALTER SYSTEM SET max_pred_locks_per_relation = 100" \
+          -c "ALTER SYSTEM SET max_pred_locks_per_transaction = 5000"
+        psql postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB} -f ${ARCHIVE_DUMP_PREFIX}-$$(date +%F_0000).sql
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  missing_blocks_guardian:
+    image: '${MINA_ARCHIVE_IMAGE}'
+    restart: always
+    environment:
+      PRECOMPUTED_BLOCKS_URL: ${GUARDIAN_PRECOMPUTED_BLOCKS_URL}
+      MINA_NETWORK: ${MINA_NETWORK}
+      DB_USERNAME: ${POSTGRES_USER}
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_NAME: ${POSTGRES_DB}
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      TIMEOUT: "${GUARDIAN_SLEEP_INTERVAL:-600}"
+    command:
+      - mina-missing-blocks-guardian
+      - daemon
+    depends_on:
+      bootstrap_db:
+        condition: service_completed_successfully
+
+  mina_archive:
+    image: '${MINA_ARCHIVE_IMAGE}'
+    restart: always
+    command:
+      - mina-archive
+      - run
+      - --postgres-uri
+      - postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      - --server-port
+      - "${MINA_ARCHIVE_PORT}"
+    volumes:
+      - './archive/data:/data'
+    depends_on:
+      bootstrap_db:
+        condition: service_completed_successfully
+
+  mina_node:
+    image: '${MINA_DAEMON_IMAGE}'
+    restart: always
+    environment:
+      MINA_LIBP2P_PASS: ${MINA_LIBP2P_PASS}
+      MINA_CLIENT_TRUSTLIST: "0.0.0.0/0"
+    entrypoint: []
+    command: >
+      bash -c '
+        mina daemon --archive-address mina_archive:${MINA_ARCHIVE_PORT} \
+             --peer-list-url ${MINA_PEERLIST_URL} \
+             --insecure-rest-server \
+             --rest-port ${MINA_REST_PORT}
+      '
+    volumes:
+      - './mina_node/.mina-config:/root/.mina-config'
+    ports:
+      - '${MINA_REST_PORT}:${MINA_REST_PORT}'
+      - '${MINA_P2P_PORT}:${MINA_P2P_PORT}'
+    depends_on:
+      mina_archive:
+        condition: service_started
