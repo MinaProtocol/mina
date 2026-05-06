@@ -96,4 +96,9 @@ let () =
           ; test_case "Coinbase with fee_transfer (both rejected)" `Quick
               coinbase_with_ft_both_rejected
           ] )
+    ; Zkapp_stake_change.
+        ( "zkapp_stake_change"
+        , [ test_case "z1 fee_payer staked, no other updates" `Quick
+              z1_fee_payer_only_staked
+          ] )
     ]

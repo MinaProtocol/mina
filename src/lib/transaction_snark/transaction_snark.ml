@@ -1393,6 +1393,8 @@ module Make_str (A : Wire_types.Concrete) = struct
             run_checked (Public_key.Compressed.Checked.if_ b ~then_ ~else_)
 
           let empty = Public_key.Compressed.var_of_t Public_key.Compressed.empty
+
+          let equal a b = run_checked (Public_key.Compressed.Checked.equal a b)
         end
 
         module Protocol_state_precondition = struct
@@ -2124,7 +2126,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         with_label __LOC__ (fun () ->
             run_checked
               (Amount.Signed.Checked.assert_equal statement.stake_change
-                 (Amount.Signed.Checked.constant Amount.Signed.zero) ) ) ;
+                 global.stake_change ) ) ;
         with_label __LOC__ (fun () ->
             run_checked
               (let expected = statement.fee_excess in
@@ -2501,8 +2503,7 @@ module Make_str (A : Wire_types.Concrete) = struct
             (Balance.Checked.to_amount pre_balance)
         in
         let%bind pre_stake =
-          Amount.Signed.Checked.if_ pre_staked ~then_:pre_bal
-            ~else_:signed_zero
+          Amount.Signed.Checked.if_ pre_staked ~then_:pre_bal ~else_:signed_zero
         in
         let post_bal =
           Amount.Signed.Checked.of_unsigned
@@ -2765,8 +2766,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         in
         [%with_label_ "Update receiver"] (fun () ->
             Frozen_ledger_hash.modify_account_recv
-              ~depth:constraint_constants.ledger_depth
-              root receiver_to_query
+              ~depth:constraint_constants.ledger_depth root receiver_to_query
               ~f:(fun ~is_empty_and_writeable account ->
                 (* this account is:
                    - the receiver for payments
@@ -2970,7 +2970,7 @@ module Make_str (A : Wire_types.Concrete) = struct
       (* Commit receiver pass: unstaking or failure both cause pass-through. *)
       let%bind root =
         let%bind condition =
-          Boolean.(not is_unstaking_tx &&& not user_command_fails)
+          Boolean.((not is_unstaking_tx) &&& not user_command_fails)
         in
         commit_pass ~condition ~base_root:root potential_root
       in
@@ -3151,7 +3151,8 @@ module Make_str (A : Wire_types.Concrete) = struct
       (* Commit source pass: root and stake are either both adopted or
          both discarded, gated on the same condition. *)
       let%bind root =
-        commit_pass ~condition:(Boolean.not user_command_fails)
+        commit_pass
+          ~condition:(Boolean.not user_command_fails)
           ~base_root:root potential_root
       in
       let%bind fee_excess =
@@ -3211,11 +3212,7 @@ module Make_str (A : Wire_types.Concrete) = struct
             let%map () = Boolean.Assert.is_true (Boolean.not overflow) in
             amt )
       in
-      return
-        ( root
-        , fee_excess
-        , supply_increase
-        , !total_stake_change )
+      return (root, fee_excess, supply_increase, !total_stake_change)
 
     (* Someday:
        write the following soundness tests:

@@ -983,6 +983,8 @@ module Make (L : Ledger_intf.S) :
       let if_ = value_if
 
       let empty = Public_key.Compressed.empty
+
+      let equal = Public_key.Compressed.equal
     end
 
     module Controller = struct
