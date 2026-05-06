@@ -301,10 +301,21 @@ non-zkApp table.
 | z3  | One update: balance change on staked target           | Per-account shape `(1,1)` for a non-fp target                                  | `−fee·fp_staked + Δbal_t`             |
 | z4  | One update: opt-in (delegate `None → Some`)           | Per-account shape `(0,1)`                                                      | `−fee·fp_staked + balance'(t)`        |
 | z5  | One update: opt-out (delegate `Some → empty_pk`)      | Per-account shape `(1,0)`                                                      | `−fee·fp_staked − balance(t)`         |
-| z6  | Two updates on the same target                        | Telescoping: only the final state of `t` enters the sum                        | depends on final state, not interim   |
+| z6  | Two updates on the same target                        | Telescoping[^telescoping]: only the final state of `t` enters the sum          | depends on final state, not interim   |
 | z7  | Two updates on two distinct targets                   | Sum-over-`A(tx)`: contributions from distinct accounts add                     | sum of per-account contributions      |
 | z8  | Second-pass check fails                               | Failure rollback: only the fee_payer's debit sticks                            | `−fee·fp_staked`                      |
 | z9  | Non-default-token update: balance change              | Default-token restriction; payment-mirror furthest from a signed_command       | `−fee·fp_staked`                      |
 | z10 | Non-default-token update: delegate Set                | Default-token restriction; delegate-mirror furthest from a signed_command      | `−fee·fp_staked`                      |
 | z11 | Default-token update: app_state / permissions only    | Field-set restriction: `stake_change` depends only on balance and delegate     | `−fee·fp_staked`                      |
+
+[^telescoping]: When `N` account_updates touch the same account `a`,
+    the implementation accumulates a per-step delta
+    `Δ_i = stake_i(a) − stake_{i−1}(a)` at each step into
+    `local_state.stake_change`. The sum
+    `Σ_{i=1..N} Δ_i = stake_N(a) − stake_0(a) = stake'(a) − stake(a)`
+    *telescopes* — every intermediate `stake_i` cancels — so the
+    per-account contribution depends only on the pre-tx and post-tx
+    states. This is what reconciles the spec ("only the final state of
+    `a` enters the sum") with the implementation (which actually
+    computes per-step deltas).
 
