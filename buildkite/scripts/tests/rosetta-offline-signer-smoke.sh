@@ -27,6 +27,15 @@ set -euo pipefail
 : "${OFFLINE_SIGNER_SMOKE_PROGRESS_EVERY_N_POLLS:=6}"
 : "${OFFLINE_SIGNER_SMOKE_DEFAULT_TIMEOUT_SECS:=300}"
 
+# Fail with a clear message if a value is empty or the literal "null".
+# `curl -sf | jq -r` returns 0 even when the response is an error envelope,
+# so set -e doesn't catch it; gate jq-extracted values explicitly.
+_require_nonempty() {
+  local name="$1" val="$2"
+  [[ -n "${val}" && "${val}" != "null" ]] \
+    || { echo "offline-signer-smoke: ${name} was empty/null" >&2; exit 1; }
+}
+
 # Validate required env vars; exit 1 on the first missing one.
 _offline_signer_smoke_require_env() {
   local required=(
@@ -55,7 +64,7 @@ _offline_signer_smoke_init() {
 # POST a JSON body to a path on the online rosetta endpoint.
 # Args: $1 endpoint path (e.g. /construction/metadata), $2 JSON body.
 rosetta_post() {
-  curl -sf -X POST "${rosetta_online}$1" \
+  curl -sf --max-time 30 -X POST "${rosetta_online}$1" \
     -H 'Content-Type: application/json' \
     -d "$2"
 }
@@ -210,6 +219,7 @@ offline_signer_smoke_test() {
 
   local nonce
   nonce=$(fetch_nonce "${sender_addr}" "${receiver_addr}")
+  _require_nonempty "nonce" "${nonce}"
   local ops
   ops=$(payment_ops_json "${sender_addr}" "${receiver_addr}" "${amount}" "${fee}")
   local payloads
@@ -217,15 +227,19 @@ offline_signer_smoke_test() {
 
   local unsigned
   unsigned=$(echo "${payloads}" | jq -r '.unsigned_transaction')
+  _require_nonempty "unsigned" "${unsigned}"
   local sp_hex
   sp_hex=$(echo "${payloads}" | jq -r '.payloads[0].hex_bytes')
+  _require_nonempty "sp_hex" "${sp_hex}"
 
   local signature
   signature=$(signer_sign_tx "${sender_priv}" "${unsigned}")
+  _require_nonempty "signature" "${signature}"
   local signed
   signed=$(combine_signed_tx "${unsigned}" "${sp_hex}" "${sender_addr}" "${sender_pub_hex}" "${signature}")
   local tx_hash
   tx_hash=$(submit_signed_tx "${signed}")
+  _require_nonempty "tx_hash" "${tx_hash}"
 
   echo "offline-signer-smoke: submitted tx=${tx_hash}"
   wait_for_tx_in_archive "${tx_hash}" "${OFFLINE_SIGNER_SMOKE_DEFAULT_TIMEOUT_SECS}"
