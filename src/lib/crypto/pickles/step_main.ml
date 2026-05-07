@@ -395,6 +395,7 @@ module Make (Inductive_rule : Inductive_rule.Intf) = struct
           [%log internal] "Step_compute_bulletproof_challenges" ;
           let bulletproof_challenges =
             with_label "prevs_verified" (fun () ->
+                let slot_idx = ref 0 in
                 let rec go :
                     type vars vals ns1 ns2 n.
                        (vars, ns1, ns2) H3.T(Per_proof_witness).t
@@ -465,9 +466,12 @@ module Make (Inductive_rule : Inductive_rule.Intf) = struct
                         | `Side_loaded _ ->
                             ()
                       in
+                      let i = !slot_idx in
+                      incr slot_idx ;
                       let chals, v =
-                        verify_one ~srs pw d messages_for_next_wrap_proof
-                          unfinalized must_verify
+                        with_label (Printf.sprintf "slot_%d" i) (fun () ->
+                            verify_one ~srs pw d messages_for_next_wrap_proof
+                              unfinalized must_verify )
                       in
                       let chalss, vs =
                         go proof_witnesses datas messages_for_next_wrap_proofs

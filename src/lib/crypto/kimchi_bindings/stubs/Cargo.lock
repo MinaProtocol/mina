@@ -658,6 +658,7 @@ dependencies = [
  "paste",
  "poly-commitment",
  "rand",
+ "rand_chacha",
  "rayon",
  "rmp-serde",
  "serde",
