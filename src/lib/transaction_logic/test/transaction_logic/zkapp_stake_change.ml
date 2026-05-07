@@ -1,6 +1,6 @@
 (** Unit tests for [Transaction_applied.stake_change] on zkApp transactions,
-    against the case spine in [docs/unstaking-stake-change.md] §
-    "Test case spine".
+    against the representative test cases in
+    [docs/unstaking-stake-change.md] § "Representative test cases".
 
     Drives the same [apply_and_snapshot] / [measure_stake_change] pipeline
     as the non-zkApp [stake_change.ml] — these helpers operate on

@@ -1,8 +1,8 @@
 (** Transaction SNARK (full proving) tests for [stake_change] on zkApp
     transactions.
 
-    Each test mirrors a row of the case spine in
-    [docs/unstaking-stake-change.md] § "Test case spine" and the unchecked
+    Each test mirrors a row of the representative cases in
+    [docs/unstaking-stake-change.md] § "Representative test cases" and the unchecked
     counterpart in
     [src/lib/transaction_logic/test/transaction_logic/zkapp_stake_change.ml].
     The harness drives [U.check_zkapp_command_with_merges_exn], which

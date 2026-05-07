@@ -272,17 +272,16 @@ stake_change = (balance(fp) − fee) · is_staked(fp) − balance(fp) · is_stak
             = −fee · is_staked(fp)
 ```
 
-### Test case spine
+### Representative test cases
 
-Unlike the non-zkApp [coverage table](#coverage-table) — which enumerates
-the finite set of `(tag, encoding)` shapes — the zkApp space is
-combinatorial in the size and shape of the call forest. The table below
-is therefore not a *combinatorial* coverage but the **minimum case
-spine** that, if all rows pass, exercises every distinct branch of the
-spec: each per-account stake transition (z3–z5), the fee-payer-only
-baseline (z1, z2), the multi-update aggregation rules (z6, z7), the
-failure path (z8), the default-token restriction in the sum (z9, z10),
-and the field-set restriction to balance + delegate (z11).
+The zkApp space is combinatorial in the size of the call forest, so a
+finite enumeration like the non-zkApp [coverage table](#coverage-table)
+isn't possible. The table below is not a coverage proof; it picks one
+or two cases per named spec concern — fee-payer baseline (z1, z2),
+per-account stake transitions (z3–z5), multi-update aggregation (z6,
+z7), failure rollback (z8), default-token restriction (z9, z10), and
+field-set restriction (z11) — leaving combinations of concerns and
+multi-segment shapes uncovered.
 
 Tests in `src/lib/transaction_logic/test/transaction_logic/zkapp_stake_change.ml`
 are tagged `(* zkapp_stake_change_row_z<N> *)` to map back to these
