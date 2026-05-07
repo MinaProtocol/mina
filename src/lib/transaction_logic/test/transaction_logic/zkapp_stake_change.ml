@@ -72,10 +72,11 @@ let z2_fee_payer_only_unstaked () =
 (* Per-account stake transitions on a non-fp target.                *)
 (* ---------------------------------------------------------------- *)
 
-(* zkapp_stake_change_row_z3 — per-account shape (1,1). fee_payer
-   staked, [staked_target] staked, [unstaked_counterparty] unstaked.
-   Simple_txn(staked_target, unstaked_counterparty, amount) debits the
-   staked target by [amount]. Sum: −fee + (−amount) + 0 = −(fee + amount). *)
+(* zkapp_stake_change_row_z3 — staked → staked balance change on a
+   non-fp target. fee_payer staked, [staked_target] staked,
+   [unstaked_counterparty] unstaked. Simple_txn(staked_target,
+   unstaked_counterparty, amount) debits the staked target by [amount].
+   Sum: −fee + (−amount) + 0 = −(fee + amount). *)
 let z3_balance_change_staked_target () =
   Quickcheck.test ~trials
     Quickcheck.Generator.(
@@ -101,7 +102,7 @@ let z3_balance_change_staked_target () =
       check ~name:"z3 balance change on staked target" ~expected
         (measure_stake_change ledger txn) )
 
-(* zkapp_stake_change_row_z4 — per-account shape (0,1). Opt-in:
+(* zkapp_stake_change_row_z4 — opt-in (unstaked → staked).
    [opt_in_target]'s delegate goes None → Some [new_delegate]. balance
    unchanged so balance'(opt_in_target) = balance(opt_in_target). Sum:
    −fee + balance(opt_in_target). *)
@@ -129,7 +130,7 @@ let z4_opt_in_delegate () =
       check ~name:"z4 opt-in (delegate None → Some)" ~expected
         (measure_stake_change ledger txn) )
 
-(* zkapp_stake_change_row_z5 — per-account shape (1,0). Opt-out:
+(* zkapp_stake_change_row_z5 — opt-out (staked → unstaked).
    [opt_out_target]'s delegate goes Some → empty_pk. balance
    unchanged. Sum: −fee − balance(opt_out_target). *)
 let z5_opt_out_delegate () =

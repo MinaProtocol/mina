@@ -289,19 +289,19 @@ are tagged `(* zkapp_stake_change_row_z<N> *)` to map back to these
 rows, mirroring the `stake_change_row_X.Y` convention used for the
 non-zkApp table.
 
-| #   | Scenario                                              | Coverage role                                                                  | Expected `stake_change`               |
-|-----|-------------------------------------------------------|--------------------------------------------------------------------------------|---------------------------------------|
-| z1  | fee_payer staked, no other updates                    | Baseline: fp slot only, staked → staked with `−fee` balance change             | `−fee`                                |
-| z2  | fee_payer unstaked, no other updates                  | Baseline: fp slot only, unstaked → unstaked (fee debit invisible to stake)     | `0`                                   |
-| z3  | One update: balance change on staked target           | Per-account case: staked → staked with non-fee balance change on a non-fp account | `−fee·fp_staked + Δbal_t`          |
-| z4  | One update: opt-in (delegate `None → Some`)           | Per-account case: unstaked → staked (opt-in)                                   | `−fee·fp_staked + balance'(t)`        |
-| z5  | One update: opt-out (delegate `Some → empty_pk`)      | Per-account case: staked → unstaked (opt-out)                                  | `−fee·fp_staked − balance(t)`         |
-| z6  | Two updates on the same target                        | Telescoping[^telescoping]: only the final state of `t` enters the sum          | depends on final state, not interim   |
-| z7  | Two updates on two distinct targets                   | Sum-over-`A(tx)`: contributions from distinct accounts add                     | sum of per-account contributions      |
-| z8  | Second-pass check fails                               | Failure rollback: only the fee_payer's debit sticks                            | `−fee·fp_staked`                      |
-| z9  | Non-default-token update: balance change              | Default-token restriction; payment-mirror furthest from a signed_command       | `−fee·fp_staked`                      |
-| z10 | Non-default-token update: delegate Set                | Default-token restriction; delegate-mirror furthest from a signed_command      | `−fee·fp_staked`                      |
-| z11 | Default-token update: app_state / permissions only    | Field-set restriction: `stake_change` depends only on balance and delegate     | `−fee·fp_staked`                      |
+| #   | Scenario                                              | Spec property                  | Expected `stake_change`               |
+|-----|-------------------------------------------------------|--------------------------------|---------------------------------------|
+| z1  | fee_payer staked, no other updates                    | Fee-payer baseline             | `−fee`                                |
+| z2  | fee_payer unstaked, no other updates                  | Fee-payer baseline             | `0`                                   |
+| z3  | One update: balance change on staked target           | Per-account formula            | `−fee·fp_staked + Δbal_t`             |
+| z4  | One update: opt-in (delegate `None → Some`)           | Per-account formula (opt-in)   | `−fee·fp_staked + balance'(t)`        |
+| z5  | One update: opt-out (delegate `Some → empty_pk`)      | Per-account formula (opt-out)  | `−fee·fp_staked − balance(t)`         |
+| z6  | Two updates on the same target                        | Telescoping[^telescoping]      | depends on final state, not interim   |
+| z7  | Two updates on two distinct targets                   | Sum over `A(tx)`               | sum of per-account contributions      |
+| z8  | Second-pass check fails                               | Failure rollback               | `−fee·fp_staked`                      |
+| z9  | Non-default-token update: balance change              | Default-token restriction      | `−fee·fp_staked`                      |
+| z10 | Non-default-token update: delegate Set                | Default-token restriction      | `−fee·fp_staked`                      |
+| z11 | Default-token update: app_state / permissions only    | Field-set restriction          | `−fee·fp_staked`                      |
 
 [^telescoping]: When `N` account_updates touch the same account `a`,
     the implementation accumulates a per-step delta
