@@ -2181,7 +2181,7 @@ let internal_commands logger ~itn_features =
                \"side-loaded-json\" (the {data, hash} object o1js consumes for \
                zkApp account verification keys)."
             (optional_with_default "verification-key-json" string)
-        in
+        and signature_kind = Cli_lib.Flag.signature_kind in
         fun () ->
           let open Deferred.Let_syntax in
           let logger = Logger.null () in
@@ -2223,7 +2223,6 @@ let internal_commands logger ~itn_features =
           in
           let constraint_constants = light_proof.constraint_constants in
           let proof_level = light_proof.proof_level in
-          let signature_kind = light_proof.signature_kind in
           let%map vk =
             match proof_level with
             | Genesis_constants.Proof_level.Full ->
