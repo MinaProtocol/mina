@@ -31,6 +31,16 @@ Cardano-style: `axios` + thin endpoint wrappers + [`mina-signer`](https://www.np
 
 See `ts/README.md` for setup and run instructions.
 
+### Go (`go/`)
+
+Read-side examples using [`coinbase/mesh-sdk-go`](https://github.com/coinbase/mesh-sdk-go) (the canonical Go SDK). Send-transaction is intentionally not included because Pallas signing has no pure-Go implementation today — see `go/README.md` for options.
+
+| Program | What it does |
+| --- | --- |
+| `account-balance/` | Query a single account balance |
+| `scan-blocks/` | Poll for new blocks via `fetcher` |
+| `track-deposits/` | Filter `payment_receiver_inc` operations for an address |
+
 ## Adding examples in other languages
 
-Drop a sibling directory (`go/`, `py/`, etc.). Keep each language self-contained with its own `README.md` and follow the same pattern: thin client wrappers, one script per integration scenario, runnable against a live Rosetta endpoint.
+Drop a sibling directory (`py/`, `rust/`, etc.). Keep each language self-contained with its own `README.md` and follow the same pattern: thin client wrappers (or generated client over the [Mesh OpenAPI spec](https://github.com/coinbase/mesh-specifications)), one program per integration scenario, runnable against a live Rosetta endpoint.
