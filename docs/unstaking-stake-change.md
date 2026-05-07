@@ -250,21 +250,16 @@ to "successful application".
 If the same account is touched by several account_updates, only the
 *final* state of that account enters the stake-delta sum.
 
-**Definition (per-account shape).** Write `(p, q)` for the
-*per-account shape* of `a` under `tx`, where
-`p = is_staked(a)` (pre) and `q = is_staked(a)` (post). The per-account
-contribution `stake'(a) − stake(a)` resolves to one of four values
-indexed by this shape:
+By case analysis on `is_staked(a)` pre and post (substituting the
+conditional `stake(a) = if is_staked(a) then balance(a) else 0`), the
+per-account contribution `stake'(a) − stake(a)` resolves to:
 
-| shape `(p, q)` | per-account Δstake             |
-|----------------|--------------------------------|
-| `(0, 0)`       | `0`                            |
-| `(0, 1)`       | `balance'(a)`                  |
-| `(1, 0)`       | `−balance(a)`                  |
-| `(1, 1)`       | `balance'(a) − balance(a)`     |
-
-(Direct substitution of the conditional `stake(a) = if is_staked(a) then
-balance(a) else 0`.)
+| pre `is_staked(a)` | post `is_staked(a)` | per-account Δstake             |
+|--------------------|---------------------|--------------------------------|
+| `0`                | `0`                 | `0`                            |
+| `0`                | `1`                 | `balance'(a)` (opt-in)         |
+| `1`                | `0`                 | `−balance(a)` (opt-out)        |
+| `1`                | `1`                 | `balance'(a) − balance(a)`     |
 
 ### Failure → fee_payer-only
 
@@ -296,11 +291,11 @@ non-zkApp table.
 
 | #   | Scenario                                              | Coverage role                                                                  | Expected `stake_change`               |
 |-----|-------------------------------------------------------|--------------------------------------------------------------------------------|---------------------------------------|
-| z1  | fee_payer staked, no other updates                    | Baseline: fp slot only, per-account shape `(1,1)`                              | `−fee`                                |
-| z2  | fee_payer unstaked, no other updates                  | Baseline: fp slot only, per-account shape `(0,0)`                              | `0`                                   |
-| z3  | One update: balance change on staked target           | Per-account shape `(1,1)` for a non-fp target                                  | `−fee·fp_staked + Δbal_t`             |
-| z4  | One update: opt-in (delegate `None → Some`)           | Per-account shape `(0,1)`                                                      | `−fee·fp_staked + balance'(t)`        |
-| z5  | One update: opt-out (delegate `Some → empty_pk`)      | Per-account shape `(1,0)`                                                      | `−fee·fp_staked − balance(t)`         |
+| z1  | fee_payer staked, no other updates                    | Baseline: fp slot only, staked → staked with `−fee` balance change             | `−fee`                                |
+| z2  | fee_payer unstaked, no other updates                  | Baseline: fp slot only, unstaked → unstaked (fee debit invisible to stake)     | `0`                                   |
+| z3  | One update: balance change on staked target           | Per-account case: staked → staked with non-fee balance change on a non-fp account | `−fee·fp_staked + Δbal_t`          |
+| z4  | One update: opt-in (delegate `None → Some`)           | Per-account case: unstaked → staked (opt-in)                                   | `−fee·fp_staked + balance'(t)`        |
+| z5  | One update: opt-out (delegate `Some → empty_pk`)      | Per-account case: staked → unstaked (opt-out)                                  | `−fee·fp_staked − balance(t)`         |
 | z6  | Two updates on the same target                        | Telescoping[^telescoping]: only the final state of `t` enters the sum          | depends on final state, not interim   |
 | z7  | Two updates on two distinct targets                   | Sum-over-`A(tx)`: contributions from distinct accounts add                     | sum of per-account contributions      |
 | z8  | Second-pass check fails                               | Failure rollback: only the fee_payer's debit sticks                            | `−fee·fp_staked`                      |
