@@ -98,12 +98,17 @@ export class RosettaClient {
       const { data } = await this.http.post<T>(path, body);
       return data;
     } catch (err) {
-      if (axios.isAxiosError(err) && err.response) {
-        const r = err.response.data as { message?: string; details?: unknown };
+      if (axios.isAxiosError(err)) {
+        if (err.response) {
+          const r = err.response.data as { message?: string; details?: unknown };
+          throw new Error(
+            `${path} ${err.response.status}: ${r.message ?? err.message} ${
+              r.details ? JSON.stringify(r.details) : ""
+            }`,
+          );
+        }
         throw new Error(
-          `${path} ${err.response.status}: ${r.message ?? err.message} ${
-            r.details ? JSON.stringify(r.details) : ""
-          }`,
+          `${path}: ${err.message} (is Rosetta running at ${this.http.defaults.baseURL}?)`,
         );
       }
       throw err;
