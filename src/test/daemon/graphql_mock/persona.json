@@ -1,0 +1,88 @@
+{
+  "_doc": "Canonical canned world served by mina-graphql-mock. See README.md for narrative description.",
+
+  "daemon": {
+    "syncStatus": "SYNCED",
+    "blockchainLength": 4567,
+    "uptimeSecs": 8040,
+    "highestBlockLengthReceived": 4567,
+    "peers": 8,
+    "blockProducerAccount": "B62qpge4uMq4xcF13eQpa6tRJ6FBoq2QYqVjJjvvPTbQEvmtSt5dYuV"
+  },
+
+  "accounts": {
+    "B62qpge4uMq4xcF13eQpa6tRJ6FBoq2QYqVjJjvvPTbQEvmtSt5dYuV": {
+      "_label": "alice (block producer)",
+      "balance": "1000.000000000",
+      "nonce": "42",
+      "delegate": "B62qpge4uMq4xcF13eQpa6tRJ6FBoq2QYqVjJjvvPTbQEvmtSt5dYuV"
+    },
+    "B62qoBobnmxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx": {
+      "_label": "bob (payee)",
+      "balance": "10.000000000",
+      "nonce": "3",
+      "delegate": "B62qpge4uMq4xcF13eQpa6tRJ6FBoq2QYqVjJjvvPTbQEvmtSt5dYuV"
+    },
+    "B62qoCarolxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx": {
+      "_label": "carol (delegate target)",
+      "balance": "0.000000000",
+      "nonce": "0",
+      "delegate": "B62qoCarolxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+    },
+    "B62qzkappxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx": {
+      "_label": "myZkApp (sample zkapp account)",
+      "balance": "5.000000000",
+      "nonce": "1",
+      "delegate": "B62qpge4uMq4xcF13eQpa6tRJ6FBoq2QYqVjJjvvPTbQEvmtSt5dYuV",
+      "zkapp": {
+        "appState": ["1", "0", "0", "0", "0", "0", "0", "0"],
+        "verificationKey": {
+          "data": "AACGfBASrjLO9V8yGnt8/...truncated...",
+          "hash": "0x0123abcd"
+        }
+      }
+    }
+  },
+
+  "blocks": [
+    { "height": 4567, "stateHash": "3NLstateHash4567xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", "slot": 9134, "creator": "B62qpge4uMq4xcF13eQpa6tRJ6FBoq2QYqVjJjvvPTbQEvmtSt5dYuV", "transactions": ["5JuV3includedxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx1"] },
+    { "height": 4566, "stateHash": "3NLstateHash4566xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", "slot": 9132, "creator": "B62qpge4uMq4xcF13eQpa6tRJ6FBoq2QYqVjJjvvPTbQEvmtSt5dYuV", "transactions": ["5JuV3includedxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx2"] },
+    { "height": 4565, "stateHash": "3NLstateHash4565xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", "slot": 9130, "creator": "B62qpge4uMq4xcF13eQpa6tRJ6FBoq2QYqVjJjvvPTbQEvmtSt5dYuV", "transactions": [] },
+    { "height": 4564, "stateHash": "3NLstateHash4564xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", "slot": 9128, "creator": "B62qpge4uMq4xcF13eQpa6tRJ6FBoq2QYqVjJjvvPTbQEvmtSt5dYuV", "transactions": ["5JuV3includedxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx3"] },
+    { "height": 4563, "stateHash": "3NLstateHash4563xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", "slot": 9126, "creator": "B62qpge4uMq4xcF13eQpa6tRJ6FBoq2QYqVjJjvvPTbQEvmtSt5dYuV", "transactions": [] }
+  ],
+
+  "mempool": [
+    {
+      "hash": "5JuV3pendingxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "kind": "PAYMENT",
+      "from": "B62qpge4uMq4xcF13eQpa6tRJ6FBoq2QYqVjJjvvPTbQEvmtSt5dYuV",
+      "to":   "B62qoBobnmxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "amount": "1.000000000",
+      "fee":    "0.001000000",
+      "nonce":  "42",
+      "status": "PENDING"
+    }
+  ],
+
+  "transactions": {
+    "5JuV3pendingxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx": { "status": "PENDING" },
+    "5JuV3failedxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx": {
+      "status": "INCLUDED",
+      "failureReason": "Source_insufficient_balance",
+      "kind": "PAYMENT",
+      "from": "B62qoBobnmxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "to":   "B62qpge4uMq4xcF13eQpa6tRJ6FBoq2QYqVjJjvvPTbQEvmtSt5dYuV",
+      "amount": "99999.000000000"
+    },
+    "5JuV3includedxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx1": { "status": "INCLUDED" },
+    "5JuV3includedxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx2": { "status": "INCLUDED" },
+    "5JuV3includedxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx3": { "status": "INCLUDED" }
+  },
+
+  "syntheticTxHashes": {
+    "sendPayment":      "5JmoOckpaymentxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+    "sendDelegation":   "5JmoOckdelegationxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+    "sendZkappCommand": "5JmoOckzkappxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+  }
+}

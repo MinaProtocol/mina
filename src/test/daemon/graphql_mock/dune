@@ -1,0 +1,19 @@
+(executable
+ (name graphql_mock)
+ (package mina_command_line_tests)
+ (public_name mina-graphql-mock)
+ (libraries
+  ;; opam libraries
+  async
+  core
+  cohttp
+  cohttp-async
+  uri
+  yojson
+  graphql-async
+  graphql_parser
+  ppx_deriving_yojson.runtime)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_version ppx_jane ppx_deriving_yojson)))
