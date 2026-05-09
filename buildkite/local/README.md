@@ -92,9 +92,44 @@ Local execution differs from CI in several ways:
 **Local behavior:** Containers also run as `opam` (UID 1000). This allows sudo
 to work inside containers for apt operations.
 
-If your host user has a different UID than 1000, you may see permission issues
-with the `_build` directory. The script checks for this at startup and will
-show an error with instructions to fix ownership.
+If your host user has a different UID than 1000, files written by the container
+to the bind-mounted worktree appear on the host owned by UID 1000 — likely
+unreadable/unwritable from your host account.
+
+`run_job.sh` mitigates this with **automatic recovery**:
+
+- **Pre-flight scan:** Before running a job the script scans the worktree
+  (excluding `.git/` and `.claude/worktrees/`) for files not owned by you.
+  If any are found, it prompts to run `sudo chown -R` to recover them.
+  Pass `--auto-fix-perms` to skip the prompt.
+- **Exit trap:** The same scan runs on exit (success, failure, or Ctrl-C),
+  so an interrupted run still leaves the worktree usable for `git`, `dune`,
+  etc.
+
+The recovery is `sudo`-based, so passwordless sudo is the smoothest experience
+for repeated runs. If you cannot use sudo, the only path is to make your host
+user UID 1000 (or run the container as your host UID, which currently breaks
+in-container `apt` flows — tracked as a known limitation).
+
+### Toolchain image verification
+
+Each job pulls one or more pinned Docker images from the
+`europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/` registry — the
+same images CI uses, pinned by tag in
+[`buildkite/src/Constants/ContainerImages.dhall`](../src/Constants/ContainerImages.dhall).
+
+`run_job.sh` checks each image referenced by the job before running anything
+and reports one of:
+
+| State | Meaning |
+|---|---|
+| `local-cached` | Already in your local Docker daemon. No pull needed. |
+| `pull-needed` | Registry has it; first run will pull. Use `--pull-toolchain` to pull up-front. |
+| `unreachable` | Image (or registry) cannot be reached. Most often an auth issue — `gcloud auth configure-docker europe-west3-docker.pkg.dev` usually fixes it. |
+
+If any images are `unreachable` the script exits before running steps so you
+don't burn 30+ minutes only to die at the first `docker run`. Use
+`--skip-toolchain-check` to bypass this check entirely.
 
 ### Environment Variables
 
@@ -221,6 +256,9 @@ Options:
   --env-file FILE    File with KEY=VALUE pairs passed to all commands (including Docker)
   --list             List available job names and exit
   --list-steps       List steps in the job and exit (requires job name)
+  --skip-toolchain-check   Don't verify toolchain images before running
+  --pull-toolchain         docker pull each toolchain image up-front
+  --auto-fix-perms         Auto-recover container-owned files (sudo chown) without prompting
   -h, --help         Show this help
 ```
 
@@ -290,17 +328,37 @@ ERROR: Local storagebox directory is not writable: /var/storagebox
 
 Run the one-time setup commands in Prerequisites above.
 
-### _build owned by different user
+### Files owned by different user
 
 ```
-ERROR: _build directory is owned by UID 0 (you are 1000)
+WARN: Found N file(s) in /home/.../mina not owned by <you> (UID <id>)
 ```
 
-This happens when a previous Docker run created files as root. Fix with:
+This happens because containers run as `opam` (UID 1000) and write into the
+bind-mounted worktree. The script auto-recovers this on the next run (and
+on exit) via `sudo chown -R`. To skip the confirmation prompt, pass
+`--auto-fix-perms`.
+
+If you want to fix it manually:
 
 ```bash
-sudo chown -R $(id -u):$(id -g) _build
+sudo chown -R $(id -u):$(id -g) .
 ```
+
+### Toolchain image unreachable
+
+```
+ERROR: 1 image(s) unreachable.
+```
+
+The registry can't be reached — usually a missing gcloud auth. Run:
+
+```bash
+gcloud auth configure-docker europe-west3-docker.pkg.dev
+```
+
+then re-run. If you intentionally want to bypass the check (e.g. you've
+side-loaded the image), pass `--skip-toolchain-check`.
 
 ### Hetzner key not found
 
