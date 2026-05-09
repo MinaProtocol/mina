@@ -21,7 +21,10 @@ let daemon_status =
 (* TODO: account, bestChain, pooledUserCommands, transactionStatus,
    block, version *)
 
-let queries : Mock_context.t Schema.field list = [ daemon_status ]
+(* Type annotations on these lists are intentionally absent; let the compiler
+   unify each field's context with [Mock_context.t] from the resolvers. The
+   real [Mina_graphql.Queries.commands] uses the same pattern. *)
+let queries = [ daemon_status ]
 
 (* ---------- Mutations ---------- *)
 
@@ -31,7 +34,7 @@ let queries : Mock_context.t Schema.field list = [ daemon_status ]
    - return persona.synthetic_tx_hashes.send_payment as the new tx hash
    - do not mutate persona; refresh resets the world *)
 
-let mutations : Mock_context.t Schema.field list = []
+let mutations = []
 
 (* ---------- Subscriptions ---------- *)
 
@@ -40,7 +43,7 @@ let mutations : Mock_context.t Schema.field list = []
    any of these, we'll add stubs that emit a single canned event then
    close the stream. *)
 
-let subscriptions : Mock_context.t Schema.subscription_field list = []
+let subscriptions = []
 
 (* ---------- Schema ---------- *)
 
