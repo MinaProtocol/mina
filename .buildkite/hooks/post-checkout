@@ -1,0 +1,68 @@
+#!/usr/bin/env bash
+set -euox pipefail
+
+echo "--- Bootstrapping mina-build tooling"
+
+APP_DIR="${BUILDKITE_BUILD_CHECKOUT_PATH:-$PWD}"
+CI_VERSION_FILE="${APP_DIR}/.buildkite/mina-build.version"
+
+CI_REPO="https://github.com/MinaProtocol/mina-build.git"
+
+# Read pinned ref. Strip whitespace and comment lines so the file may carry
+# a lone SHA on protected branches and a branch name during PR iteration.
+CI_REF="$(grep -vE '^[[:space:]]*(#|$)' "$CI_VERSION_FILE" | tr -d '[:space:]')"
+
+if [[ -z "$CI_REF" ]]; then
+  echo "ERROR: $CI_VERSION_FILE is empty" >&2
+  exit 1
+fi
+
+echo "Using mina-build ref: ${CI_REF}"
+
+# Enforce SHA pin on protected target branches. Mirrors lockfile semantics:
+# branches are allowed during PR iteration, but the merged commit must
+# record an exact SHA so old re-runs are reproducible.
+TARGET_BRANCH="${BUILDKITE_PULL_REQUEST_BASE_BRANCH:-${BUILDKITE_BRANCH:-}}"
+PROTECTED_BRANCH_REGEX="${MINA_BUILD_PIN_PROTECTED_REGEX:-^(master|compatible|develop|release/.*)$}"
+SHA_REGEX='^[0-9a-f]{40}$'
+
+if [[ "$TARGET_BRANCH" =~ $PROTECTED_BRANCH_REGEX ]] \
+   && [[ "${BUILDKITE_PULL_REQUEST:-false}" == "false" ]] \
+   && ! [[ "$CI_REF" =~ $SHA_REGEX ]]; then
+  echo "ERROR: $CI_VERSION_FILE must contain a 40-char mina-build commit SHA" >&2
+  echo "       on protected branch '$TARGET_BRANCH', got: '$CI_REF'" >&2
+  echo "       Run 'scripts/ci/resolve-mina-build-pin.sh' to lock it." >&2
+  exit 1
+fi
+
+# Clone repo into a temporary directory.
+echo "--- Cloning mina-build"
+
+CLONE_DIR="$(mktemp -d)"
+trap 'rm -rf "$CLONE_DIR"' EXIT
+
+# Use init+fetch so the same flow accepts a branch, tag, or commit SHA.
+# `git clone --branch` only accepts named refs; fetching by SHA requires
+# uploadpack.allowReachableSHA1InWant, which GitHub enables by default.
+git init --quiet "$CLONE_DIR/mina-build"
+git -C "$CLONE_DIR/mina-build" remote add origin "$CI_REPO"
+git -C "$CLONE_DIR/mina-build" fetch --depth 1 --quiet origin "$CI_REF"
+git -C "$CLONE_DIR/mina-build" checkout --quiet FETCH_HEAD
+
+# Remove git metadata.
+echo "--- Removing git metadata"
+
+rm -rf "$CLONE_DIR/mina-build/.git"
+
+# Merge tools into app dir.
+echo "--- Merging mina-build tools into app directory"
+
+# Drop LICENSE/README from the overlay so they don't shadow the app's own.
+find "$CLONE_DIR/mina-build" -type f \( -name "LICENSE" -o -iname "README.md" \) -delete
+cp -rT --no-clobber "$CLONE_DIR/mina-build" "$APP_DIR"
+
+# Export environment.
+export APP_DIR
+export CI_DIR="$APP_DIR"
+
+echo "mina-build ready at $CI_DIR"
