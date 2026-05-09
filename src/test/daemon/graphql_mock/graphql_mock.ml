@@ -59,8 +59,8 @@ let execute ~persona (query, variables, _op_name) =
           ] )
   | Ok parsed -> (
       let%map result =
-        Graphql_async.Schema.execute Mock_schema.schema persona
-          ?variables parsed
+        Graphql_async.Schema.execute Mina_graphql_mock.Mock_schema.schema
+          persona ?variables parsed
       in
       match result with
       | Ok (`Response json) ->
@@ -122,7 +122,7 @@ let command =
          Option.value persona_path
            ~default:"src/test/daemon/graphql_mock/persona.json"
        in
-       let persona = Persona.load_exn path in
+       let persona = Mina_graphql_mock.Persona.load_exn path in
        let%bind _server =
          Cohttp_async.Server.create_expert
            ~on_handler_error:

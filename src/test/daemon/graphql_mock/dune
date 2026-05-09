@@ -1,14 +1,12 @@
-(executable
- (name graphql_mock)
- (package mina_command_line_tests)
- (public_name mina-graphql-mock)
+;; Library: schema + types + persona, shared between the server exe and
+;; the schema-dump exe.
+(library
+ (name mina_graphql_mock)
+ (modules persona mock_context mock_types mock_schema)
  (libraries
   ;; opam libraries
   async
   core
-  cohttp
-  cohttp-async
-  uri
   yojson
   graphql-async
   graphql_parser
@@ -17,3 +15,49 @@
   (backend bisect_ppx))
  (preprocess
   (pps ppx_version ppx_jane ppx_deriving_yojson)))
+
+;; Server executable: the long-running mock GraphQL HTTP server.
+;; Auto-flows into the mina-test-suite deb via mina_command_line_tests.
+(executable
+ (name graphql_mock)
+ (modules graphql_mock)
+ (package mina_command_line_tests)
+ (public_name mina-graphql-mock)
+ (libraries
+  ;; local
+  mina_graphql_mock
+  ;; opam
+  async
+  core
+  cohttp
+  cohttp-async
+  uri
+  yojson
+  graphql-async
+  graphql_parser)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_version ppx_jane)))
+
+;; Schema-dump executable: introspects [Mock_schema.schema] and prints
+;; JSON to stdout. The root [dune] file has a rule that captures this
+;; into [mock_schema.json] for drift detection in CI.
+(executable
+ (name mock_schema_dump)
+ (modules mock_schema_dump)
+ (package mina_command_line_tests)
+ (public_name mina-mock-schema-dump)
+ (libraries
+  ;; local
+  mina_graphql_mock
+  ;; opam
+  async
+  core
+  yojson
+  graphql-async
+  graphql_parser)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_version ppx_jane)))

@@ -8,4 +8,16 @@
    %{target}
    (run %{<}))))
 
+;; Sibling rule for the mock daemon's GraphQL schema introspection.
+;; See src/test/daemon/graphql_mock/README.md for the drift-detection plan.
+(rule
+ (target mock_schema.json)
+ (mode promote)
+ (deps
+  (:< src/test/daemon/graphql_mock/mock_schema_dump.exe))
+ (action
+  (with-stdout-to
+   %{target}
+   (run %{<}))))
+
 (dirs :standard \ opam_switches)
