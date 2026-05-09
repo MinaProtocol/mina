@@ -60,14 +60,23 @@ var caml_fp_srs_maybe_lagrange_commitment = function (srs, domain_size, i) {
 };
 
 // Provides: caml_fp_srs_commit_evaluations
-// Requires: kimchi_ffi, tsRustConversion
+// Requires: kimchi_ffi, tsRustConversion, tsSrs
 var caml_fp_srs_commit_evaluations = function (t, domain_size, fps) {
+    var cached = tsSrs.fp.commitEvaluationsCached(t, domain_size, fps);
+    if (cached !== undefined) return cached;
     var res = kimchi_ffi.caml_fp_srs_commit_evaluations(
         t,
         domain_size,
         tsRustConversion.fp.vectorToRust(fps)
     );
-    return tsRustConversion.fp.polyCommFromRust(res);
+    var polyComm = tsRustConversion.fp.polyCommFromRust(res);
+    tsSrs.fp.warmupCommitEvaluations({
+        srs: t,
+        domainSize: domain_size,
+        evaluations: fps,
+        expected: polyComm,
+    });
+    return polyComm;
 };
 
 // Provides: caml_fp_srs_b_poly_commitment
@@ -164,14 +173,23 @@ var caml_fq_srs_maybe_lagrange_commitment = function (srs, domain_size, i) {
 };
 
 // Provides: caml_fq_srs_commit_evaluations
-// Requires: kimchi_ffi, tsRustConversion
+// Requires: kimchi_ffi, tsRustConversion, tsSrs
 var caml_fq_srs_commit_evaluations = function (t, domain_size, fqs) {
+    var cached = tsSrs.fq.commitEvaluationsCached(t, domain_size, fqs);
+    if (cached !== undefined) return cached;
     var res = kimchi_ffi.caml_fq_srs_commit_evaluations(
         t,
         domain_size,
         tsRustConversion.fq.vectorToRust(fqs)
     );
-    return tsRustConversion.fq.polyCommFromRust(res);
+    var polyComm = tsRustConversion.fq.polyCommFromRust(res);
+    tsSrs.fq.warmupCommitEvaluations({
+        srs: t,
+        domainSize: domain_size,
+        evaluations: fqs,
+        expected: polyComm,
+    });
+    return polyComm;
 };
 
 // Provides: caml_fq_srs_b_poly_commitment
