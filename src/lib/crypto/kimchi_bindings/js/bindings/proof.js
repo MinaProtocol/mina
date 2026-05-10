@@ -1,9 +1,23 @@
 /* global kimchi_ffi, tsRustConversion 
 */
 
+// Provides: caml_o1js_with_montgomery_msm_phase
+function caml_o1js_with_montgomery_msm_phase(phase, f) {
+    var previous_phase = globalThis.O1JS_MONTGOMERY_MSM_PHASE;
+    globalThis.O1JS_MONTGOMERY_MSM_PHASE = phase;
+    try {
+        return f();
+    } finally {
+        if (previous_phase === undefined) {
+            delete globalThis.O1JS_MONTGOMERY_MSM_PHASE;
+        } else {
+            globalThis.O1JS_MONTGOMERY_MSM_PHASE = previous_phase;
+        }
+    }
+}
 
 // Provides: caml_pasta_fp_plonk_proof_create
-// Requires: kimchi_ffi, tsRustConversion
+// Requires: kimchi_ffi, tsRustConversion, caml_o1js_with_montgomery_msm_phase
 var caml_pasta_fp_plonk_proof_create = function (
     index,
     witness_cols,
@@ -20,13 +34,15 @@ var caml_pasta_fp_plonk_proof_create = function (
     var runtime_tables =
         tsRustConversion.fp.runtimeTablesToRust(caml_runtime_tables);
     prev_sgs = tsRustConversion.fp.pointsToRust(prev_sgs);
-    var proof = kimchi_ffi.caml_pasta_fp_plonk_proof_create(
-        index,
-        witness_cols,
-        runtime_tables,
-        prev_challenges,
-        prev_sgs
-    );
+    var proof = caml_o1js_with_montgomery_msm_phase("prove", function () {
+        return kimchi_ffi.caml_pasta_fp_plonk_proof_create(
+            index,
+            witness_cols,
+            runtime_tables,
+            prev_challenges,
+            prev_sgs
+        );
+    });
     return tsRustConversion.fp.proofFromRust(proof);
 };
 
@@ -71,7 +87,7 @@ var caml_pasta_fp_plonk_proof_deep_copy = function (proof) {
 };
 
 // Provides: caml_pasta_fq_plonk_proof_create
-// Requires: kimchi_ffi, tsRustConversion
+// Requires: kimchi_ffi, tsRustConversion, caml_o1js_with_montgomery_msm_phase
 var caml_pasta_fq_plonk_proof_create = function (
     index,
     witness_cols,
@@ -88,13 +104,15 @@ var caml_pasta_fq_plonk_proof_create = function (
     var runtime_tables =
         tsRustConversion.fq.runtimeTablesToRust(caml_runtime_tables);
     prev_sgs = tsRustConversion.fq.pointsToRust(prev_sgs);
-    var proof = kimchi_ffi.caml_pasta_fq_plonk_proof_create(
-        index,
-        witness_cols,
-        runtime_tables,
-        prev_challenges,
-        prev_sgs
-    );
+    var proof = caml_o1js_with_montgomery_msm_phase("prove", function () {
+        return kimchi_ffi.caml_pasta_fq_plonk_proof_create(
+            index,
+            witness_cols,
+            runtime_tables,
+            prev_challenges,
+            prev_sgs
+        );
+    });
     return tsRustConversion.fq.proofFromRust(proof);
 };
 
