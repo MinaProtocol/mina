@@ -6,30 +6,38 @@
     must match, otherwise [mock_schema.json] will diverge from
     [graphql_schema.json] and the drift CI will fail.
 
-    Convention: every [t] here is a [(Mock_context.t, _) Graphql_async.Schema.typ]. *)
+    Scope rule for v0.1: stick to scalar fields (Int, String) on the mock.
+    Object-typed fields (peers, histograms, consensusConfiguration), enums
+    (syncStatus), and lists of objects/enums require their backing types
+    to also be defined here, which we'll add incrementally as resolvers
+    need them. *)
 
 open Graphql_async
 open Schema
 
-(* TODO: actual types. Sketches below show the intended shape; resolvers in
-   mock_resolvers/ will populate fields by reading from the threaded persona
-   in [Mock_context.t]. *)
-
-(* daemon_status : matches mina_graphql/types.ml DaemonStatus.t *)
+(* DaemonStatus : matches the real Types.DaemonStatus.t structurally for
+   the fields we expose. Real has ~30 fields total; v0.1 exposes 4 scalar
+   ones the docs use most. *)
 let daemon_status : (Mock_context.t, Persona.daemon option) typ =
   obj "DaemonStatus" ~fields:(fun _info ->
-      [ field "syncStatus" ~typ:(non_null string) ~args:[]
-          ~resolve:(fun _info (d : Persona.daemon) -> d.sync_status)
-      ; field "blockchainLength" ~typ:int ~args:[]
-          ~resolve:(fun _info (d : Persona.daemon) -> Some d.blockchain_length)
-      ; field "uptimeSecs" ~typ:(non_null int) ~args:[]
-          ~resolve:(fun _info (d : Persona.daemon) -> d.uptime_secs)
-      ; field "peers" ~typ:(non_null int) ~args:[]
-          ~resolve:(fun _info (d : Persona.daemon) -> d.peers)
-      ; field "blockProducer" ~typ:string ~args:[]
+      [ field "blockchainLength" ~typ:int
+          ~args:Arg.[]
           ~resolve:(fun _info (d : Persona.daemon) ->
-            Some d.block_producer_account )
+            Some d.blockchain_length )
+      ; field "highestBlockLengthReceived" ~typ:(non_null int)
+          ~args:Arg.[]
+          ~resolve:(fun _info (d : Persona.daemon) ->
+            d.highest_block_length_received )
+      ; field "uptimeSecs" ~typ:(non_null int)
+          ~args:Arg.[]
+          ~resolve:(fun _info (d : Persona.daemon) -> d.uptime_secs)
+      ; field "chainId" ~typ:(non_null string)
+          ~args:Arg.[]
+          ~resolve:(fun _info (d : Persona.daemon) -> d.chain_id)
       ] )
 
-(* account, send_payment_payload, mempool_user_command, …
-   to be added incrementally as resolvers come online. *)
+(* TODO as resolvers come online:
+   - syncStatus → needs SyncStatus enum type definition
+   - peers → needs Peer object type
+   - account → needs Account object type (large, with nested AnnotatedBalance)
+   - send_payment_payload → needs UserCommand type and its sub-types *)

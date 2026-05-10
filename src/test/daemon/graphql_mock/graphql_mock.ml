@@ -58,9 +58,35 @@ let execute ~persona (query, variables, _op_name) =
             , `List [ `Assoc [ ("message", `String msg) ] ] )
           ] )
   | Ok parsed -> (
+      (* Yojson.Basic.t lacks the `Enum tag that Graphql_parser.const_value
+         has, so structural coercion via [:>] is finicky inside option/list/
+         tuple chains. Convert explicitly. *)
+      let rec yojson_to_const_value
+          : Yojson.Basic.t -> Graphql_parser.const_value = function
+        | `Assoc pairs ->
+            `Assoc
+              (List.map pairs ~f:(fun (k, v) ->
+                   (k, yojson_to_const_value v) ) )
+        | `Bool b ->
+            `Bool b
+        | `Float f ->
+            `Float f
+        | `Int i ->
+            `Int i
+        | `List xs ->
+            `List (List.map xs ~f:yojson_to_const_value)
+        | `Null ->
+            `Null
+        | `String s ->
+            `String s
+      in
+      let coerced_variables =
+        Option.map variables ~f:(fun pairs ->
+            List.map pairs ~f:(fun (k, v) -> (k, yojson_to_const_value v)) )
+      in
       let%map result =
         Graphql_async.Schema.execute Mina_graphql_mock.Mock_schema.schema
-          persona ?variables parsed
+          persona ?variables:coerced_variables parsed
       in
       match result with
       | Ok (`Response json) ->

@@ -1,77 +1,42 @@
 (** Typed view of the canned persona loaded from [persona.json].
 
-    Keep the record narrow: every field corresponds to something a resolver
-    in [mock_resolvers/] reads. When adding a new resolver that needs new
-    persona data, extend this record and the JSON together. *)
+    Strategy: only parse the fields v0.1 resolvers actually consume. Keep
+    everything else as raw [Yojson.Safe.t] so the persona file can carry
+    forward unparsed sections (accounts, mempool, blocks, etc.) until
+    matching resolvers come online. This avoids fighting ppx_deriving_yojson
+    over object-keyed JSON shapes that don't map cleanly to OCaml records.
+
+    When adding a resolver that needs a new persona section:
+    1. Define a typed record for that section here.
+    2. Replace the corresponding [Yojson.Safe.t] field with the typed one.
+    3. Update [persona.json] if the JSON shape needs to change. *)
 
 open Core
 
-(* TODO: ppx_deriving_yojson decoders. Sketch only — the real types here will
-   match the GraphQL output shapes more directly so resolvers can return them
-   without per-field translation. *)
-
 type daemon =
-  { sync_status : string
-  ; blockchain_length : int
-  ; uptime_secs : int
-  ; highest_block_length_received : int
+  { sync_status : string [@key "syncStatus"]
+  ; blockchain_length : int [@key "blockchainLength"]
+  ; uptime_secs : int [@key "uptimeSecs"]
+  ; highest_block_length_received : int [@key "highestBlockLengthReceived"]
   ; peers : int
-  ; block_producer_account : string
+  ; block_producer_account : string [@key "blockProducerAccount"]
+  ; chain_id : string
+        [@key "chainId"] [@default "abcd1234efgh5678"]
   }
-[@@deriving yojson]
+[@@deriving yojson { strict = false }]
 
-type account =
-  { balance : string
-  ; nonce : string
-  ; delegate : string
-  ; zkapp : Yojson.Safe.t option [@default None]
-  }
-[@@deriving yojson]
-
-type block =
-  { height : int
-  ; state_hash : string [@key "stateHash"]
-  ; slot : int
-  ; creator : string
-  ; transactions : string list
-  }
-[@@deriving yojson]
-
-type mempool_tx =
-  { hash : string
-  ; kind : string
-  ; from_pk : string [@key "from"]
-  ; to_pk : string [@key "to"]
-  ; amount : string
-  ; fee : string
-  ; nonce : string
-  ; status : string
-  }
-[@@deriving yojson]
-
-type tx_record =
-  { status : string
-  ; failure_reason : string option [@key "failureReason"] [@default None]
-  ; kind : string option [@default None]
-  }
-[@@deriving yojson]
-
-type synthetic_hashes =
-  { send_payment : string [@key "sendPayment"]
-  ; send_delegation : string [@key "sendDelegation"]
-  ; send_zkapp_command : string [@key "sendZkappCommand"]
-  }
-[@@deriving yojson]
-
+(** Top-level persona. Most fields are raw JSON for now; promote to typed
+    records as resolvers come online and need typed access. *)
 type t =
   { daemon : daemon
-  ; accounts : (string * account) list
-  ; blocks : block list
-  ; mempool : mempool_tx list
-  ; transactions : (string * tx_record) list
-  ; synthetic_tx_hashes : synthetic_hashes [@key "syntheticTxHashes"]
+  ; accounts : Yojson.Safe.t [@default `Null]
+  ; blocks : Yojson.Safe.t [@default `Null]
+  ; mempool : Yojson.Safe.t [@default `Null]
+  ; transactions : Yojson.Safe.t [@default `Null]
+  ; synthetic_tx_hashes : Yojson.Safe.t
+        [@key "syntheticTxHashes"] [@default `Null]
   }
-[@@deriving yojson]
+[@@deriving yojson { strict = false }]
 
 (** Load and parse the persona file. Fails loud on any schema mismatch
     so configuration errors surface at startup, not at first request. *)
@@ -82,9 +47,3 @@ let load_exn (path : string) : t =
       t
   | Error msg ->
       failwithf "graphql_mock: persona %s failed to parse: %s" path msg ()
-
-let find_account (t : t) ~public_key : account option =
-  List.Assoc.find t.accounts ~equal:String.equal public_key
-
-let find_tx (t : t) ~hash : tx_record option =
-  List.Assoc.find t.transactions ~equal:String.equal hash
