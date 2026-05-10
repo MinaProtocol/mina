@@ -6,9 +6,23 @@
     "blockchainLength": 4567,
     "uptimeSecs": 8040,
     "highestBlockLengthReceived": 4567,
+    "highestUnvalidatedBlockLengthReceived": 4567,
     "peers": 8,
     "blockProducerAccount": "B62qpge4uMq4xcF13eQpa6tRJ6FBoq2QYqVjJjvvPTbQEvmtSt5dYuV",
-    "chainId": "29936104443aaf264a7f0192ac64b1c7173198c1ed404c1bcff5e562e05eb7f6"
+    "chainId": "29936104443aaf264a7f0192ac64b1c7173198c1ed404c1bcff5e562e05eb7f6",
+    "numAccounts": 12345,
+    "stateHash": "3NLstateHash4567xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+    "ledgerMerkleRoot": "jwHBBgPxBfFJD5e9ujuzHhrVTzzxxxxxxxxxxxxxxxxxxxxxx",
+    "commitId": "abc123def456",
+    "confDir": "/root/.mina-config",
+    "userCommandsSent": 142,
+    "snarkWorker": null,
+    "snarkWorkFee": 100,
+    "coinbaseReceiver": "B62qpge4uMq4xcF13eQpa6tRJ6FBoq2QYqVjJjvvPTbQEvmtSt5dYuV",
+    "consensusMechanism": "proof_of_stake",
+    "globalSlotSinceGenesisBestTip": 9134,
+    "version": "0.1.0-mock",
+    "timeOffset": 0
   },
 
   "accounts": {

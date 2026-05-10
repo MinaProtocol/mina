@@ -18,10 +18,27 @@ type daemon =
   ; blockchain_length : int [@key "blockchainLength"]
   ; uptime_secs : int [@key "uptimeSecs"]
   ; highest_block_length_received : int [@key "highestBlockLengthReceived"]
+  ; highest_unvalidated_block_length_received : int
+        [@key "highestUnvalidatedBlockLengthReceived"]
   ; peers : int
   ; block_producer_account : string [@key "blockProducerAccount"]
-  ; chain_id : string
-        [@key "chainId"] [@default "abcd1234efgh5678"]
+  ; chain_id : string [@key "chainId"]
+  ; num_accounts : int option [@key "numAccounts"] [@default None]
+  ; state_hash : string option [@key "stateHash"] [@default None]
+  ; ledger_merkle_root : string option
+        [@key "ledgerMerkleRoot"] [@default None]
+  ; commit_id : string [@key "commitId"]
+  ; conf_dir : string [@key "confDir"]
+  ; user_commands_sent : int [@key "userCommandsSent"]
+  ; snark_worker : string option [@key "snarkWorker"] [@default None]
+  ; snark_work_fee : int [@key "snarkWorkFee"]
+  ; coinbase_receiver : string option
+        [@key "coinbaseReceiver"] [@default None]
+  ; consensus_mechanism : string [@key "consensusMechanism"]
+  ; global_slot_since_genesis_best_tip : int option
+        [@key "globalSlotSinceGenesisBestTip"] [@default None]
+  ; version : string [@default "0.1.0-mock"]
+  ; time_offset : int [@key "timeOffset"] [@default 0]
   }
 [@@deriving yojson { strict = false }]
 

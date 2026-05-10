@@ -13,39 +13,47 @@ open Schema
 
 let daemon_status =
   io_field "daemonStatus" ~doc:"Get running daemon status (mock)"
-    ~args:[]
+    ~args:Arg.[]
     ~typ:(non_null Mock_types.daemon_status)
     ~resolve:(fun { ctx = persona; _ } () ->
       Async.return (Ok persona.Persona.daemon) )
 
-(* TODO: account, bestChain, pooledUserCommands, transactionStatus,
-   block, version *)
+let sync_status =
+  io_field "syncStatus" ~doc:"Network sync status (mock)"
+    ~args:Arg.[]
+    ~typ:(non_null Mock_types.sync_status_typ)
+    ~resolve:(fun { ctx = persona; _ } () ->
+      Async.return
+        (Ok (Mock_types.parse_sync_status persona.Persona.daemon.sync_status))
+      )
+
+let version =
+  io_field "version" ~doc:"The version of the node (mock)"
+    ~args:Arg.[]
+    ~typ:string
+    ~resolve:(fun { ctx = persona; _ } () ->
+      Async.return (Ok (Some persona.Persona.daemon.version)) )
+
+let time_offset =
+  io_field "timeOffset"
+    ~doc:"The time offset in seconds used to convert real time to slots (mock)"
+    ~args:Arg.[]
+    ~typ:(non_null int)
+    ~resolve:(fun { ctx = persona; _ } () ->
+      Async.return (Ok persona.Persona.daemon.time_offset) )
 
 (* Type annotations on these lists are intentionally absent; let the compiler
-   unify each field's context with [Mock_context.t] from the resolvers. The
-   real [Mina_graphql.Queries.commands] uses the same pattern. *)
-let queries = [ daemon_status ]
+   unify each field's context with [Mock_context.t] from the resolvers. *)
+let queries = [ sync_status; daemon_status; version; time_offset ]
 
 (* ---------- Mutations ---------- *)
-
-(* TODO: sendPayment, sendDelegation. v0.1 sketch:
-   - parse input shape (same arg types as real schema)
-   - light validation (e.g. amount > 0, valid pk shape)
-   - return persona.synthetic_tx_hashes.send_payment as the new tx hash
-   - do not mutate persona; refresh resets the world *)
 
 let mutations = []
 
 (* ---------- Subscriptions ---------- *)
 
-(* v0.1 omits subscriptions. The real daemon exposes newBlock,
-   newSyncUpdate, chainReorganization. If the docs playground demos
-   any of these, we'll add stubs that emit a single canned event then
-   close the stream. *)
-
 let subscriptions = []
 
 (* ---------- Schema ---------- *)
 
-let schema =
-  schema queries ~mutations ~subscriptions
+let schema = schema queries ~mutations ~subscriptions
