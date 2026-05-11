@@ -57,13 +57,55 @@ let account =
         (Ok
            (Mock_types.mock_account_of_persona persona ~public_key) ) )
 
+(* The mock pretends every token is owned by the block-producer account. *)
+let token_owner =
+  io_field "tokenOwner"
+    ~doc:"Find the account that owns a given token (mock: always the block producer)"
+    ~typ:Mock_types.account
+    ~args:
+      Arg.
+        [ arg "tokenId" ~typ:(non_null Mock_types.token_id_arg)
+            ~doc:"Token id of token"
+        ]
+    ~resolve:(fun { ctx = persona; _ } () _token_id ->
+      Async.return
+        (Ok
+           (Mock_types.mock_account_of_persona persona
+              ~public_key:persona.Persona.daemon.block_producer_account ) ) )
+
+let genesis_constants =
+  io_field "genesisConstants"
+    ~doc:"Constants used to determine genesis state (mock)"
+    ~typ:(non_null Mock_types.genesis_constants)
+    ~args:Arg.[]
+    ~resolve:(fun _ () -> Async.return (Ok Mock_types.canned_genesis_constants))
+
 (* Type annotations on these lists are intentionally absent; let the compiler
    unify each field's context with [Mock_context.t] from the resolvers. *)
-let queries = [ sync_status; daemon_status; version; time_offset; account ]
+let queries =
+  [ sync_status
+  ; daemon_status
+  ; version
+  ; time_offset
+  ; account
+  ; token_owner
+  ; genesis_constants
+  ]
 
 (* ---------- Mutations ---------- *)
 
-let mutations = []
+(* startFilteredLog — the simplest mutation in the real schema (no input
+   object, no payload). Always returns true; the mock doesn't actually log. *)
+let start_filtered_log =
+  io_field "startFilteredLog"
+    ~doc:
+      "Start filtering and tracing the log of the daemon (mock: always succeeds)"
+    ~typ:(non_null bool)
+    ~args:
+      Arg.[ arg "filter" ~typ:(non_null (list (non_null string))) ]
+    ~resolve:(fun _ () _filter -> Async.return (Ok true))
+
+let mutations = [ start_filtered_log ]
 
 (* ---------- Subscriptions ---------- *)
 

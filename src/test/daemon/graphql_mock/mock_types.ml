@@ -35,6 +35,14 @@ let chain_hash : (Mock_context.t, string option) typ =
   scalar "ChainHash" ~doc:"Base58Check-encoded chain hash"
     ~coerce:(fun s -> `String s)
 
+let fee : (Mock_context.t, string option) typ =
+  scalar "Fee" ~doc:"String representation of a transaction fee"
+    ~coerce:(fun s -> `String s)
+
+let amount : (Mock_context.t, string option) typ =
+  scalar "Amount" ~doc:"String representation of a payment amount"
+    ~coerce:(fun s -> `String s)
+
 (* ---------- Custom scalars (input args) ---------- *)
 
 (* Mirrors Types.Input.PublicKey.arg_typ. Real mina uses graphql_wrapper's
@@ -274,8 +282,43 @@ let mock_account_of_persona (persona : Persona.t) ~public_key : mock_account opt
   | _ ->
       None
 
+(* ---------- GenesisConstants ---------- *)
+
+type mock_genesis_constants =
+  { mock_account_creation_fee : string
+  ; mock_coinbase : string
+  ; mock_genesis_timestamp : string
+  }
+
+let genesis_constants : (Mock_context.t, mock_genesis_constants option) typ =
+  obj "GenesisConstants"
+    ~doc:"Constants used to configure the genesis ledger (mock)"
+    ~fields:(fun _info ->
+      [ field "accountCreationFee" ~typ:(non_null fee)
+          ~args:Arg.[]
+          ~resolve:(fun _ (g : mock_genesis_constants) ->
+            g.mock_account_creation_fee )
+      ; field "coinbase" ~typ:(non_null amount)
+          ~args:Arg.[]
+          ~resolve:(fun _ (g : mock_genesis_constants) -> g.mock_coinbase)
+      ; field "genesisTimestamp" ~typ:(non_null string)
+          ~args:Arg.[]
+          ~resolve:(fun _ (g : mock_genesis_constants) ->
+            g.mock_genesis_timestamp )
+      ] )
+
+(* Static canned constants. Could be promoted to a persona field if we ever
+   want to vary them per persona. *)
+let canned_genesis_constants =
+  { mock_account_creation_fee = "1.0"
+  ; mock_coinbase = "720.0"
+  ; mock_genesis_timestamp = "2024-01-01T00:00:00Z"
+  }
+
 (* TODO as resolvers come online:
    - peers / addrs_and_ports / metrics → object types
    - histograms / consensus* → object types
    - timing/balance on Account → AccountTiming, AnnotatedBalance types
-   - send_payment_payload → UserCommand type and sub-types *)
+   - send_payment_payload → UserCommand interface + Payment/Delegation/Zkapp objects
+     + TransactionId/TransactionHash/UserCommandKind/Globalslot/UInt32/UInt64
+     + TransactionStatusFailure enum *)
