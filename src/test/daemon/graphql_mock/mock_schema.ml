@@ -514,7 +514,138 @@ let send_delegation =
       in
       Async.return (Ok user_command) )
 
-let mutations = [ start_filtered_log; send_payment; send_delegation ]
+(* Admin mutations: setSnarkWorker, setSnarkWorkFee, setCoinbaseReceiver.
+   These don't mutate any real state in the mock — they just echo back
+   what was set as if it took effect. *)
+
+let set_snark_worker =
+  io_field "setSnarkWorker"
+    ~doc:"Set key you wish to snark work with or disable snark working (mock: echo)"
+    ~typ:(non_null Mock_types.set_snark_worker_payload)
+    ~args:Arg.[ arg "input" ~typ:(non_null Mock_types.set_snark_worker_input) ]
+    ~resolve:(fun _ () input ->
+      Async.return (Ok input.Mock_types.ssw_public_key) )
+
+let set_snark_work_fee =
+  io_field "setSnarkWorkFee"
+    ~doc:"Set fee for snark workers (mock: echo)"
+    ~typ:(non_null Mock_types.set_snark_work_fee_payload)
+    ~args:Arg.[ arg "input" ~typ:(non_null Mock_types.set_snark_work_fee_input) ]
+    ~resolve:(fun _ () input ->
+      Async.return (Ok input.Mock_types.ssw_fee_fee) )
+
+let set_coinbase_receiver =
+  io_field "setCoinbaseReceiver"
+    ~doc:"Set the coinbase receiver public key (mock: echo)"
+    ~typ:(non_null Mock_types.set_coinbase_receiver_payload)
+    ~args:Arg.[ arg "input" ~typ:(non_null Mock_types.set_coinbase_receiver_input) ]
+    ~resolve:(fun { ctx = persona; _ } () input ->
+      let prev = Some persona.Persona.daemon.block_producer_account in
+      Async.return
+        (Ok
+           Mock_types.
+             { mcb_last = prev
+             ; mcb_current = input.scr_public_key
+             } ) )
+
+(* Lock/Unlock mutations — mock just looks up the account and returns it. *)
+
+let lock_account_mut =
+  io_field "lockAccount"
+    ~doc:"Lock a tracked account (mock: returns the account unchanged)"
+    ~typ:(non_null Mock_types.lock_payload)
+    ~args:Arg.[ arg "input" ~typ:(non_null Mock_types.lock_input_arg) ]
+    ~resolve:(fun { ctx = persona; _ } () input ->
+      let pk = input.Mock_types.lock_public_key in
+      let acct =
+        match Mock_types.mock_account_of_persona persona ~public_key:pk with
+        | Some a ->
+            a
+        | None ->
+            { mock_public_key = pk
+            ; mock_token_id = "1"
+            ; mock_nonce = Some "0"
+            ; mock_inferred_nonce = Some "0"
+            ; mock_delegate = None
+            ; mock_receipt_chain_hash = None
+            ; mock_voting_for = None
+            ; mock_staking_active = false
+            ; mock_private_key_path = "/dev/null"
+            ; mock_locked = None
+            ; mock_index = None
+            ; mock_zkapp_uri = None
+            ; mock_proved_state = None
+            ; mock_token_symbol = None
+            ; mock_balance =
+                { bal_total = "0.000000000"
+                ; bal_unknown = "0"
+                ; bal_liquid = Some "0.000000000"
+                ; bal_locked = Some "0"
+                ; bal_block_height =
+                    string_of_int persona.Persona.daemon.blockchain_length
+                ; bal_state_hash = persona.Persona.daemon.state_hash
+                }
+            ; mock_leaf_hash = None
+            ; mock_permissions = Mock_types.default_permissions
+            ; mock_verification_key = None
+            }
+      in
+      Async.return
+        (Ok Mock_types.{ lp_public_key = pk; lp_account = acct }) )
+
+let unlock_account_mut =
+  io_field "unlockAccount"
+    ~doc:"Allow transactions to be sent from the unlocked account (mock: returns the account)"
+    ~typ:(non_null Mock_types.unlock_payload)
+    ~args:Arg.[ arg "input" ~typ:(non_null Mock_types.unlock_input_arg) ]
+    ~resolve:(fun { ctx = persona; _ } () input ->
+      let pk = input.Mock_types.unlock_public_key in
+      let acct =
+        match Mock_types.mock_account_of_persona persona ~public_key:pk with
+        | Some a ->
+            a
+        | None ->
+            { mock_public_key = pk
+            ; mock_token_id = "1"
+            ; mock_nonce = Some "0"
+            ; mock_inferred_nonce = Some "0"
+            ; mock_delegate = None
+            ; mock_receipt_chain_hash = None
+            ; mock_voting_for = None
+            ; mock_staking_active = false
+            ; mock_private_key_path = "/dev/null"
+            ; mock_locked = None
+            ; mock_index = None
+            ; mock_zkapp_uri = None
+            ; mock_proved_state = None
+            ; mock_token_symbol = None
+            ; mock_balance =
+                { bal_total = "0.000000000"
+                ; bal_unknown = "0"
+                ; bal_liquid = Some "0.000000000"
+                ; bal_locked = Some "0"
+                ; bal_block_height =
+                    string_of_int persona.Persona.daemon.blockchain_length
+                ; bal_state_hash = persona.Persona.daemon.state_hash
+                }
+            ; mock_leaf_hash = None
+            ; mock_permissions = Mock_types.default_permissions
+            ; mock_verification_key = None
+            }
+      in
+      Async.return
+        (Ok Mock_types.{ lp_public_key = pk; lp_account = acct }) )
+
+let mutations =
+  [ start_filtered_log
+  ; send_payment
+  ; send_delegation
+  ; set_snark_worker
+  ; set_snark_work_fee
+  ; set_coinbase_receiver
+  ; lock_account_mut
+  ; unlock_account_mut
+  ]
 
 (* ---------- Subscriptions ---------- *)
 

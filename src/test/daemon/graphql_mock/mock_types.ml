@@ -1008,6 +1008,84 @@ let send_payment_payload : (Mock_context.t, mock_user_command option) typ =
           ~resolve:(fun _ (u : mock_user_command) -> mk_payment u)
       ] )
 
+(* ---------- Admin mutation inputs/payloads ---------- *)
+
+(* SetSnarkWorker *)
+type set_snark_worker_input = { ssw_public_key : string option }
+
+let set_snark_worker_input =
+  Arg.obj "SetSnarkWorkerInput"
+    ~coerce:(fun pk -> { ssw_public_key = pk })
+    ~fields:Arg.[ arg "publicKey" ~typ:public_key_arg ]
+
+let set_snark_worker_payload :
+    (Mock_context.t, string option option) typ =
+  obj "SetSnarkWorkerPayload" ~fields:(fun _info ->
+      [ field "lastSnarkWorker" ~typ:public_key ~args:Arg.[]
+          ~resolve:(fun _ (last : string option) -> last)
+      ] )
+
+(* SetSnarkWorkFee *)
+type set_snark_work_fee_input = { ssw_fee_fee : string }
+
+let set_snark_work_fee_input =
+  Arg.obj "SetSnarkWorkFee"
+    ~coerce:(fun fee -> { ssw_fee_fee = fee })
+    ~fields:Arg.[ arg "fee" ~typ:(non_null uint64_arg) ]
+
+let set_snark_work_fee_payload :
+    (Mock_context.t, string option) typ =
+  obj "SetSnarkWorkFeePayload" ~fields:(fun _info ->
+      [ field "lastFee" ~typ:(non_null fee) ~args:Arg.[]
+          ~resolve:(fun _ (last : string) -> last)
+      ] )
+
+(* SetCoinbaseReceiver *)
+type set_coinbase_receiver_input = { scr_public_key : string option }
+
+let set_coinbase_receiver_input =
+  Arg.obj "SetCoinbaseReceiverInput"
+    ~coerce:(fun pk -> { scr_public_key = pk })
+    ~fields:Arg.[ arg "publicKey" ~typ:public_key_arg ]
+
+(* Payload carries both [lastCoinbaseReceiver] and [currentCoinbaseReceiver]. *)
+type mock_coinbase_payload =
+  { mcb_last : string option
+  ; mcb_current : string option
+  }
+
+let set_coinbase_receiver_payload :
+    (Mock_context.t, mock_coinbase_payload option) typ =
+  obj "SetCoinbaseReceiverPayload" ~fields:(fun _info ->
+      [ field "lastCoinbaseReceiver" ~typ:public_key ~args:Arg.[]
+          ~resolve:(fun _ (p : mock_coinbase_payload) -> p.mcb_last)
+      ; field "currentCoinbaseReceiver" ~typ:public_key ~args:Arg.[]
+          ~resolve:(fun _ (p : mock_coinbase_payload) -> p.mcb_current)
+      ] )
+
+(* Lock / Unlock — share the same payload shape (publicKey + Account).
+   Note: input objects are intentionally minimal; the mock doesn't really
+   lock/unlock anything. *)
+type lock_input = { lock_public_key : string }
+
+let lock_input_arg =
+  Arg.obj "LockInput"
+    ~coerce:(fun pk -> { lock_public_key = pk })
+    ~fields:Arg.[ arg "publicKey" ~typ:(non_null public_key_arg) ]
+
+type unlock_input =
+  { unlock_public_key : string ; unlock_password : string }
+
+let unlock_input_arg =
+  Arg.obj "UnlockInput"
+    ~coerce:(fun pk pw ->
+      { unlock_public_key = pk; unlock_password = pw } )
+    ~fields:
+      Arg.
+        [ arg "publicKey" ~typ:(non_null public_key_arg)
+        ; arg "password" ~typ:(non_null string)
+        ]
+
 (* ---------- SendDelegationInput / Payload ---------- *)
 
 (* Same as send_payment_input minus [amount]. *)
@@ -1051,6 +1129,28 @@ let send_delegation_payload : (Mock_context.t, mock_user_command option) typ =
           ~args:Arg.[]
           ~doc:"Delegation that has been enqueued for inclusion (mock)"
           ~resolve:(fun _ (u : mock_user_command) -> mk_payment u)
+      ] )
+
+(* LockPayload / UnlockPayload — defined here, after [account] is in scope. *)
+type mock_lock_payload =
+  { lp_public_key : string
+  ; lp_account : mock_account
+  }
+
+let lock_payload : (Mock_context.t, mock_lock_payload option) typ =
+  obj "LockPayload" ~fields:(fun _info ->
+      [ field "publicKey" ~typ:(non_null public_key) ~args:Arg.[]
+          ~resolve:(fun _ (p : mock_lock_payload) -> p.lp_public_key)
+      ; field "account" ~typ:(non_null account) ~args:Arg.[]
+          ~resolve:(fun _ (p : mock_lock_payload) -> p.lp_account)
+      ] )
+
+let unlock_payload : (Mock_context.t, mock_lock_payload option) typ =
+  obj "UnlockPayload" ~fields:(fun _info ->
+      [ field "publicKey" ~typ:(non_null public_key) ~args:Arg.[]
+          ~resolve:(fun _ (p : mock_lock_payload) -> p.lp_public_key)
+      ; field "account" ~typ:(non_null account) ~args:Arg.[]
+          ~resolve:(fun _ (p : mock_lock_payload) -> p.lp_account)
       ] )
 
 (* TODO as resolvers come online:
