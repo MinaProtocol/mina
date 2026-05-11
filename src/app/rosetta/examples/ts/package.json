@@ -2,7 +2,7 @@
   "name": "mina-rosetta-examples-ts",
   "version": "0.0.0",
   "private": true,
-  "description": "Runnable TypeScript examples for integrating with Mina's Rosetta API",
+  "description": "Runnable TypeScript examples for integrating with Mina's Rosetta API via @o1-labs/mina-rosetta-sdk",
   "license": "Apache-2.0",
   "scripts": {
     "account-balance": "ts-node account-balance.ts",
@@ -13,7 +13,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "axios": "^1.7.0",
+    "@o1-labs/mina-rosetta-sdk": "^0.0.1",
     "dotenv": "^16.4.0",
     "mina-signer": "^3.0.7"
   },

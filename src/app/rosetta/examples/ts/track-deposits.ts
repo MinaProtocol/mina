@@ -1,4 +1,14 @@
-import { RosettaClient, requireEnv, sleep, Block, Operation } from "./commons";
+/**
+ * Watch a target address for incoming MINA. Filters `payment_receiver_inc`
+ * operations — the canonical exchange-deposit-monitoring pattern.
+ */
+import 'dotenv/config';
+import {
+  type Block,
+  type Operation,
+  OperationType,
+  RosettaClient,
+} from '@o1-labs/mina-rosetta-sdk';
 
 const POLL_INTERVAL_MS = 10_000;
 
@@ -28,17 +38,20 @@ function findDeposits(block: Block, address: string): Deposit[] {
 
 function isDeposit(op: Operation, address: string): boolean {
   return (
-    op.type === "payment_receiver_inc" &&
-    op.status !== "Failed" &&
+    op.type === OperationType.PaymentReceiverInc &&
+    op.status !== 'Failed' &&
     op.account?.address === address &&
     !!op.amount
   );
 }
 
 async function main() {
-  const address = requireEnv("TEST_ADDRESS");
-  const client = new RosettaClient();
-  const startEnv = parseInt(process.env.START_HEIGHT ?? "0", 10);
+  const address = requireEnv('TEST_ADDRESS');
+  const client = new RosettaClient({
+    baseUrl: process.env.ROSETTA_URL ?? 'http://localhost:3087',
+    network: process.env.NETWORK ?? 'devnet',
+  });
+  const startEnv = parseInt(process.env.START_HEIGHT ?? '0', 10);
 
   let height = startEnv;
   if (!height) {
@@ -47,6 +60,7 @@ async function main() {
   }
   console.log(`Watching ${address} for deposits starting at block ${height}`);
 
+  // eslint-disable-next-line no-constant-condition
   while (true) {
     const { block } = await client.block({ index: height });
     if (!block) {
@@ -61,6 +75,16 @@ async function main() {
     }
     height += 1;
   }
+}
+
+function requireEnv(name: string): string {
+  const v = process.env[name];
+  if (!v) throw new Error(`Missing env var: ${name}`);
+  return v;
+}
+
+function sleep(ms: number) {
+  return new Promise<void>((resolve) => setTimeout(resolve, ms));
 }
 
 main().catch((err) => {

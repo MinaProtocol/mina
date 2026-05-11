@@ -1,10 +1,18 @@
-import { RosettaClient, sleep } from "./commons";
+/**
+ * Walk forward from chain tip, printing each block as it arrives.
+ * Indexers and exchange deposit watchers follow the same pattern.
+ */
+import 'dotenv/config';
+import { RosettaClient } from '@o1-labs/mina-rosetta-sdk';
 
 const POLL_INTERVAL_MS = 10_000;
 
 async function main() {
-  const client = new RosettaClient();
-  const startEnv = parseInt(process.env.START_HEIGHT ?? "0", 10);
+  const client = new RosettaClient({
+    baseUrl: process.env.ROSETTA_URL ?? 'http://localhost:3087',
+    network: process.env.NETWORK ?? 'devnet',
+  });
+  const startEnv = parseInt(process.env.START_HEIGHT ?? '0', 10);
 
   let height = startEnv;
   if (!height) {
@@ -15,6 +23,7 @@ async function main() {
     console.log(`Starting from height: ${height}`);
   }
 
+  // eslint-disable-next-line no-constant-condition
   while (true) {
     const { block } = await client.block({ index: height });
 
@@ -33,6 +42,10 @@ async function main() {
 
     height += 1;
   }
+}
+
+function sleep(ms: number) {
+  return new Promise<void>((resolve) => setTimeout(resolve, ms));
 }
 
 main().catch((err) => {
