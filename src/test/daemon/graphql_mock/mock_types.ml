@@ -102,6 +102,10 @@ let inet_addr : (Mock_context.t, string option) typ =
   scalar "InetAddr" ~doc:"String representation of an Internet address"
     ~coerce:(fun s -> `String s)
 
+let state_hash_as_decimal : (Mock_context.t, string option) typ =
+  scalar "StateHashAsDecimal" ~doc:"State hash as a decimal string"
+    ~coerce:(fun s -> `String s)
+
 (* ---------- Custom scalars (input args) ---------- *)
 
 (* Mirrors Types.Input.PublicKey.arg_typ. Real mina uses graphql_wrapper's
@@ -796,6 +800,118 @@ let snark_worker : (Mock_context.t, mock_snark_worker option) typ =
       ; field "fee" ~typ:(non_null fee) ~args:Arg.[]
           ~resolve:(fun _ (s : mock_snark_worker) -> s.sw_fee)
       ] )
+
+(* ---------- Block (minimal) ---------- *)
+
+(* v0.1 Block omits the heavy fields: protocolState (3-deep nested object
+   tree with BlockchainState + ConsensusState + StakingEpochData etc.),
+   protocolStateProof, transactions (would pull in FeeTransfer, ZkappCommand,
+   ZkappCommandResult and their deep nesting), and snarkJobs (CompletedWork).
+   Those land in follow-up commits as their backing types come online.
+
+   What's exposed today: scalar metadata + the creator/winner accounts,
+   which is enough for "browse the latest blocks" demos against bestChain. *)
+
+type mock_block =
+  { mb_creator : string  (* public key *)
+  ; mb_creator_account : mock_account
+  ; mb_winner_account : mock_account
+  ; mb_state_hash : string
+  ; mb_state_hash_field : string
+  ; mb_command_transaction_count : int
+  }
+
+let block_typ : (Mock_context.t, mock_block option) typ =
+  obj "Block" ~fields:(fun _info ->
+      [ field "creator" ~typ:(non_null public_key) ~args:Arg.[]
+          ~resolve:(fun _ (b : mock_block) -> b.mb_creator)
+      ; field "creatorAccount" ~typ:(non_null account) ~args:Arg.[]
+          ~resolve:(fun _ (b : mock_block) -> b.mb_creator_account)
+      ; field "winnerAccount" ~typ:(non_null account) ~args:Arg.[]
+          ~resolve:(fun _ (b : mock_block) -> b.mb_winner_account)
+      ; field "stateHash" ~typ:(non_null state_hash_scalar) ~args:Arg.[]
+          ~resolve:(fun _ (b : mock_block) -> b.mb_state_hash)
+      ; field "stateHashField" ~typ:(non_null state_hash_as_decimal)
+          ~args:Arg.[]
+          ~resolve:(fun _ (b : mock_block) -> b.mb_state_hash_field)
+      ; field "commandTransactionCount" ~typ:(non_null int) ~args:Arg.[]
+          ~resolve:(fun _ (b : mock_block) -> b.mb_command_transaction_count)
+      ] )
+
+(* Convert one persona block (raw JSON) to a mock_block. Falls back to
+   the persona's block-producer account for creator/winner accounts so
+   subset-clean accounts always exist. *)
+let mock_block_of_json (persona : Persona.t) (json : Yojson.Safe.t)
+    : mock_block =
+  let open Yojson.Safe.Util in
+  let creator_pk =
+    match json |> member "creator" with
+    | `String s ->
+        s
+    | _ ->
+        persona.daemon.block_producer_account
+  in
+  let state_hash =
+    match json |> member "stateHash" with
+    | `String s ->
+        s
+    | _ ->
+        ""
+  in
+  let tx_count =
+    match json |> member "transactions" with
+    | `List xs ->
+        List.length xs
+    | _ ->
+        0
+  in
+  let bp =
+    Option.value
+      (mock_account_of_persona persona ~public_key:creator_pk)
+      ~default:
+        { mock_public_key = creator_pk
+        ; mock_token_id = "1"
+        ; mock_nonce = Some "0"
+        ; mock_inferred_nonce = Some "0"
+        ; mock_delegate = None
+        ; mock_receipt_chain_hash = None
+        ; mock_voting_for = None
+        ; mock_staking_active = false
+        ; mock_private_key_path = "/dev/null"
+        ; mock_locked = None
+        ; mock_index = None
+        ; mock_zkapp_uri = None
+        ; mock_proved_state = None
+        ; mock_token_symbol = None
+        ; mock_balance =
+            { bal_total = "0.000000000"
+            ; bal_unknown = "0"
+            ; bal_liquid = Some "0.000000000"
+            ; bal_locked = Some "0"
+            ; bal_block_height =
+                string_of_int persona.daemon.blockchain_length
+            ; bal_state_hash = persona.daemon.state_hash
+            }
+        ; mock_leaf_hash = None
+        ; mock_permissions = default_permissions
+        ; mock_verification_key = None
+        }
+  in
+  { mb_creator = creator_pk
+  ; mb_creator_account = bp
+  ; mb_winner_account = bp
+  ; mb_state_hash = state_hash
+  ; mb_state_hash_field = "0"
+  ; mb_command_transaction_count = tx_count
+  }
+
+(* All blocks from the persona, oldest-first (the JSON is newest-first
+   so we reverse). [bestChain] returns suffix of this. *)
+let mock_blocks (persona : Persona.t) : mock_block list =
+  let entries =
+    match persona.blocks with `List xs -> xs | _ -> []
+  in
+  List.rev_map (mock_block_of_json persona) entries
 
 (* ---------- GenesisConstants ---------- *)
 

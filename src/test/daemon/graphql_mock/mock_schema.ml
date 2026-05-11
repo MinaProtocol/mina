@@ -185,6 +185,107 @@ let trust_status_all =
       Async.return
         (Ok [ canned_trust_entry "192.0.2.1"; canned_trust_entry "192.0.2.2" ]) )
 
+(* bestChain — slice of the persona's blocks, ordered oldest-first.
+   Real schema: bestChain(maxLength: Int): [Block!]. Returns null if no
+   chain is known; the mock always returns the persona's blocks. *)
+let best_chain =
+  io_field "bestChain"
+    ~doc:"Retrieve a list of blocks from transition frontier's root to the current best tip (mock)"
+    ~typ:(list (non_null Mock_types.block_typ))
+    ~args:
+      Arg.[ arg "maxLength" ~typ:int ~doc:"The maximum number of blocks to return" ]
+    ~resolve:(fun { ctx = persona; _ } () max_length ->
+      let all = Mock_types.mock_blocks persona in
+      let total = List.length all in
+      let n =
+        match max_length with
+        | Some n when n > 0 && n < total ->
+            n
+        | _ ->
+            total
+      in
+      let rec drop k xs =
+        match (k, xs) with
+        | 0, xs ->
+            xs
+        | _, [] ->
+            []
+        | k, _ :: rest ->
+            drop (k - 1) rest
+      in
+      Async.return (Ok (Some (drop (total - n) all))) )
+
+(* block(height|stateHash) — look up a specific block. Returns the first
+   match for either filter, or the latest block if neither is given. *)
+let block_query =
+  io_field "block"
+    ~doc:"Retrieve a block with the given state hash or height (mock)"
+    ~typ:(non_null Mock_types.block_typ)
+    ~args:
+      Arg.
+        [ arg "height" ~typ:int ~doc:"Block height"
+        ; arg "stateHash" ~typ:string ~doc:"State hash of the desired block"
+        ]
+    ~resolve:(fun { ctx = persona; _ } () height state_hash ->
+      let blocks =
+        match persona.Persona.blocks with `List xs -> xs | _ -> []
+      in
+      let open Yojson.Safe.Util in
+      let pick =
+        List.find_opt
+          (fun b ->
+            let h =
+              match b |> member "height" with
+              | `Int n ->
+                  Some n
+              | _ ->
+                  None
+            in
+            let sh =
+              match b |> member "stateHash" with
+              | `String s ->
+                  Some s
+              | _ ->
+                  None
+            in
+            match (height, state_hash) with
+            | Some n, _ when h = Some n ->
+                true
+            | _, Some s when sh = Some s ->
+                true
+            | _ ->
+                false )
+          blocks
+      in
+      let chosen =
+        match pick with
+        | Some b ->
+            b
+        | None ->
+            (* No filter or no match → fall back to first persona block *)
+            ( match blocks with
+            | b :: _ ->
+                b
+            | [] ->
+                `Assoc [] )
+      in
+      Async.return (Ok (Mock_types.mock_block_of_json persona chosen)) )
+
+let genesis_block_query =
+  io_field "genesisBlock"
+    ~doc:"Get the genesis block (mock: returns the oldest persona block)"
+    ~typ:(non_null Mock_types.block_typ)
+    ~args:Arg.[]
+    ~resolve:(fun { ctx = persona; _ } () ->
+      let blocks = Mock_types.mock_blocks persona in
+      match blocks with
+      | b :: _ ->
+          Async.return (Ok b)
+      | [] ->
+          Async.return
+            (Ok
+               (Mock_types.mock_block_of_json persona (`Assoc []))) )
+
 (* Look up status of a transaction hash. The mock's persona.transactions
    map carries known hashes; unknown hashes return UNKNOWN. *)
 let transaction_status =
@@ -326,6 +427,9 @@ let queries =
   ; current_snark_worker
   ; trust_status
   ; trust_status_all
+  ; best_chain
+  ; block_query
+  ; genesis_block_query
   ]
 
 (* ---------- Mutations ---------- *)
