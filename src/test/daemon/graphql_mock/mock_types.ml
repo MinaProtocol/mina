@@ -150,6 +150,35 @@ let sync_status_typ : (Mock_context.t, sync_status option) typ =
       ; enum_value "CATCHUP" ~value:CATCHUP
       ]
 
+(** TransactionStatus — INCLUDED/PENDING/UNKNOWN. The persona's
+    [transactions] map carries one of these strings per tx hash. *)
+type transaction_status = INCLUDED | PENDING | UNKNOWN
+
+let parse_transaction_status : string -> transaction_status = function
+  | "INCLUDED" ->
+      INCLUDED
+  | "PENDING" ->
+      PENDING
+  | "UNKNOWN" ->
+      UNKNOWN
+  | other ->
+      failwith
+        ("persona.json: unknown transaction status " ^ other
+       ^ " (expected INCLUDED/PENDING/UNKNOWN)" )
+
+let transaction_status_typ : (Mock_context.t, transaction_status option) typ =
+  enum "TransactionStatus" ~doc:"Status of a transaction"
+    ~values:
+      [ enum_value "INCLUDED" ~value:INCLUDED
+          ~doc:"A transaction that is on the longest chain"
+      ; enum_value "PENDING" ~value:PENDING
+          ~doc:
+            "A transaction either in the transition frontier or in transaction \
+             pool but is not on the longest chain"
+      ; enum_value "UNKNOWN" ~value:UNKNOWN
+          ~doc:"The transaction has either reached finality or is unknown"
+      ]
+
 (* ---------- DaemonStatus ---------- *)
 
 (* Mirrors a subset of Types.DaemonStatus.t, scoped to scalar/enum fields.
@@ -532,6 +561,51 @@ let send_payment_payload : (Mock_context.t, mock_user_command option) typ =
       [ field "payment" ~typ:(non_null user_command_interface)
           ~args:Arg.[]
           ~doc:"Payment that has been enqueued for inclusion (mock)"
+          ~resolve:(fun _ (u : mock_user_command) -> mk_payment u)
+      ] )
+
+(* ---------- SendDelegationInput / Payload ---------- *)
+
+(* Same as send_payment_input minus [amount]. *)
+type send_delegation_input =
+  { sd_from : string
+  ; sd_to : string
+  ; sd_fee : string
+  ; sd_valid_until : string option
+  ; sd_memo : string option
+  ; sd_nonce : string option
+  }
+
+let send_delegation_input =
+  Arg.obj "SendDelegationInput"
+    ~coerce:(fun nonce memo valid_until fee to_ from_ ->
+      { sd_from = from_
+      ; sd_to = to_
+      ; sd_fee = fee
+      ; sd_valid_until = valid_until
+      ; sd_memo = memo
+      ; sd_nonce = nonce
+      } )
+    ~fields:
+      Arg.
+        [ arg "nonce" ~typ:uint32_arg
+        ; arg "memo" ~typ:string
+        ; arg "validUntil" ~typ:uint32_arg
+        ; arg "fee" ~typ:(non_null uint64_arg)
+        ; arg "to" ~typ:(non_null public_key_arg)
+        ; arg "from" ~typ:(non_null public_key_arg)
+        ]
+
+(* Mock returns delegations as UserCommandPayment objects with
+   kind="STAKE_DELEGATION", isDelegation=true. The real schema has a
+   separate UserCommandDelegation concrete impl that we don't bother
+   defining; introspection-wise our UserCommand interface still has the
+   same field shape, just one fewer possibleType. *)
+let send_delegation_payload : (Mock_context.t, mock_user_command option) typ =
+  obj "SendDelegationPayload" ~fields:(fun _ ->
+      [ field "delegation" ~typ:(non_null user_command_interface)
+          ~args:Arg.[]
+          ~doc:"Delegation that has been enqueued for inclusion (mock)"
           ~resolve:(fun _ (u : mock_user_command) -> mk_payment u)
       ] )
 

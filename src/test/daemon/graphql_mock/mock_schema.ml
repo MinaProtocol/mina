@@ -80,6 +80,117 @@ let genesis_constants =
     ~args:Arg.[]
     ~resolve:(fun _ () -> Async.return (Ok Mock_types.canned_genesis_constants))
 
+(* Look up status of a transaction hash. The mock's persona.transactions
+   map carries known hashes; unknown hashes return UNKNOWN. *)
+let transaction_status =
+  io_field "transactionStatus"
+    ~doc:"Get the status of a transaction (mock)"
+    ~typ:(non_null Mock_types.transaction_status_typ)
+    ~args:
+      Arg.
+        [ arg "payment" ~typ:guid ~doc:"Id of a Payment"
+        ; arg "zkappTransaction" ~typ:guid ~doc:"Id of a zkApp transaction"
+        ]
+    ~resolve:(fun { ctx = persona; _ } () payment_id zkapp_id ->
+      let key = match payment_id with Some k -> Some k | None -> zkapp_id in
+      let result =
+        match (key, persona.Persona.transactions) with
+        | Some key, `Assoc pairs -> (
+            match List.assoc_opt key pairs with
+            | Some json -> (
+                match Yojson.Safe.Util.member "status" json with
+                | `String s ->
+                    Mock_types.parse_transaction_status s
+                | _ ->
+                    Mock_types.UNKNOWN )
+            | None ->
+                Mock_types.UNKNOWN )
+        | _ ->
+            Mock_types.UNKNOWN
+      in
+      Async.return (Ok result) )
+
+(* pooledUserCommands returns the persona's mempool. v0.1 just returns ALL
+   mempool entries regardless of the filter args — refining by ids/hashes/
+   publicKey is incremental future work. *)
+let pooled_user_commands =
+  io_field "pooledUserCommands"
+    ~doc:"Get all the scheduled user commands for a specified sender that the current daemon sees in their mempool (mock: returns all persona mempool entries, ignores filters)"
+    ~typ:(non_null (list (non_null Mock_types.user_command_interface)))
+    ~args:
+      Arg.
+        [ arg "ids" ~typ:(list (non_null guid))
+            ~doc:"Ids of User commands"
+        ; arg "hashes" ~typ:(list (non_null string))
+            ~doc:"Hashes of User commands"
+        ; arg "publicKey" ~typ:Mock_types.public_key_arg
+            ~doc:"Public key of sender"
+        ]
+    ~resolve:(fun { ctx = persona; _ } () _ids _hashes _pk ->
+      let entries =
+        match persona.Persona.mempool with
+        | `List xs ->
+            xs
+        | _ ->
+            []
+      in
+      let placeholder_account pk : Mock_types.mock_account =
+        match Mock_types.mock_account_of_persona persona ~public_key:pk with
+        | Some a ->
+            a
+        | None ->
+            { mock_public_key = pk
+            ; mock_token_id = "1"
+            ; mock_nonce = Some "0"
+            ; mock_inferred_nonce = Some "0"
+            ; mock_delegate = None
+            ; mock_receipt_chain_hash = None
+            ; mock_voting_for = None
+            ; mock_staking_active = false
+            ; mock_private_key_path = "/dev/null"
+            ; mock_locked = None
+            ; mock_index = None
+            ; mock_zkapp_uri = None
+            ; mock_proved_state = None
+            ; mock_token_symbol = None
+            }
+      in
+      let to_user_command (json : Yojson.Safe.t) : Mock_types.mock_user_command =
+        let open Yojson.Safe.Util in
+        let s f = json |> member f |> to_string in
+        let s_opt f = json |> member f |> to_string_option in
+        let from_pk = try s "from" with _ -> "" in
+        let to_pk = try s "to" with _ -> "" in
+        { uc_id = (try s "hash" with _ -> "")
+        ; uc_hash = (try s "hash" with _ -> "")
+        ; uc_kind = (try s "kind" with _ -> "PAYMENT")
+        ; uc_nonce =
+            ( match s_opt "nonce" with
+            | Some n -> ( try int_of_string n with _ -> 0 )
+            | None -> 0 )
+        ; uc_from_pk = from_pk
+        ; uc_to_pk = to_pk
+        ; uc_amount = (try s "amount" with _ -> "0")
+        ; uc_fee = (try s "fee" with _ -> "0")
+        ; uc_memo = Option.value (s_opt "memo") ~default:""
+        ; uc_token = "1"
+        ; uc_fee_token = "1"
+        ; uc_valid_until = "4294967295"
+        ; uc_is_delegation =
+            (try s "kind" = "STAKE_DELEGATION" with _ -> false)
+        ; uc_failure_reason = s_opt "failureReason"
+        ; uc_source_account = placeholder_account from_pk
+        ; uc_receiver_account = placeholder_account to_pk
+        ; uc_fee_payer_account = placeholder_account from_pk
+        }
+      in
+      let commands = List.map to_user_command entries in
+      Async.return
+        (Ok
+           (List.map
+              (fun uc -> Mock_types.mk_payment uc)
+              commands ) ) )
+
 (* Type annotations on these lists are intentionally absent; let the compiler
    unify each field's context with [Mock_context.t] from the resolvers. *)
 let queries =
@@ -90,6 +201,8 @@ let queries =
   ; account
   ; token_owner
   ; genesis_constants
+  ; transaction_status
+  ; pooled_user_commands
   ]
 
 (* ---------- Mutations ---------- *)
@@ -183,7 +296,78 @@ let send_payment =
       in
       Async.return (Ok user_command) )
 
-let mutations = [ start_filtered_log; send_payment ]
+(* sendDelegation — same shape as sendPayment, no amount, returns
+   SendDelegationPayload { delegation: UserCommand! } *)
+let send_delegation =
+  io_field "sendDelegation"
+    ~doc:"Change your delegate by sending a transaction (mock: returns canned synthetic tx)"
+    ~typ:(non_null Mock_types.send_delegation_payload)
+    ~args:
+      Arg.
+        [ arg "signature" ~typ:Mock_types.signature_input
+        ; arg "input" ~typ:(non_null Mock_types.send_delegation_input)
+        ]
+    ~resolve:(fun { ctx = persona; _ } () _signature input ->
+      let synthetic_hash =
+        match persona.Persona.synthetic_tx_hashes with
+        | `Assoc pairs -> (
+            match List.assoc_opt "sendDelegation" pairs with
+            | Some (`String s) ->
+                s
+            | _ ->
+                "5JmoOckdelegationxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" )
+        | _ ->
+            "5JmoOckdelegationxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+      in
+      let placeholder_account pk : Mock_types.mock_account =
+        match Mock_types.mock_account_of_persona persona ~public_key:pk with
+        | Some a ->
+            a
+        | None ->
+            { mock_public_key = pk
+            ; mock_token_id = "1"
+            ; mock_nonce = Some "0"
+            ; mock_inferred_nonce = Some "0"
+            ; mock_delegate = None
+            ; mock_receipt_chain_hash = None
+            ; mock_voting_for = None
+            ; mock_staking_active = false
+            ; mock_private_key_path = "/dev/null"
+            ; mock_locked = None
+            ; mock_index = None
+            ; mock_zkapp_uri = None
+            ; mock_proved_state = None
+            ; mock_token_symbol = None
+            }
+      in
+      let from_acct = placeholder_account input.sd_from in
+      let to_acct = placeholder_account input.sd_to in
+      let user_command : Mock_types.mock_user_command =
+        { uc_id = synthetic_hash
+        ; uc_hash = synthetic_hash
+        ; uc_kind = "STAKE_DELEGATION"
+        ; uc_nonce =
+            ( match input.sd_nonce with
+            | Some n -> ( try int_of_string n with _ -> 0 )
+            | None -> 0 )
+        ; uc_from_pk = input.sd_from
+        ; uc_to_pk = input.sd_to
+        ; uc_amount = "0"
+        ; uc_fee = input.sd_fee
+        ; uc_memo = Option.value input.sd_memo ~default:""
+        ; uc_token = "1"
+        ; uc_fee_token = "1"
+        ; uc_valid_until = Option.value input.sd_valid_until ~default:"4294967295"
+        ; uc_is_delegation = true
+        ; uc_failure_reason = None
+        ; uc_source_account = from_acct
+        ; uc_receiver_account = to_acct
+        ; uc_fee_payer_account = from_acct
+        }
+      in
+      Async.return (Ok user_command) )
+
+let mutations = [ start_filtered_log; send_payment; send_delegation ]
 
 (* ---------- Subscriptions ---------- *)
 
