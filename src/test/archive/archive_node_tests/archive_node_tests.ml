@@ -49,4 +49,14 @@ let () =
                ( module Mina_automation_fixture.Archive.Make_FixtureWithBootstrap
                           (Live_upgrade_archive) ) )
         ] )
+    ; ( "fork_canonical_bug"
+      , [ test_case
+            "Reproduce update_chain_status branch-2 mis-classification when \
+             fork point equals last canonical block"
+            `Quick
+            (Runner.run_blocking
+               ( module Mina_automation_fixture.Archive
+                        .Make_FixtureWithoutBootstrap
+                          (Archive_fork_canonical_bug_test) ) )
+        ] )
     ]
