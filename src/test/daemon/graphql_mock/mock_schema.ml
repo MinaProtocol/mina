@@ -217,6 +217,8 @@ let pooled_user_commands =
                 ; bal_state_hash = persona.Persona.daemon.state_hash
                 }
             ; mock_leaf_hash = None
+            ; mock_permissions = Mock_types.default_permissions
+            ; mock_verification_key = None
             }
       in
       let to_user_command (json : Yojson.Safe.t) : Mock_types.mock_user_command =
@@ -343,6 +345,8 @@ let send_payment =
                 ; bal_state_hash = persona.Persona.daemon.state_hash
                 }
             ; mock_leaf_hash = None
+            ; mock_permissions = Mock_types.default_permissions
+            ; mock_verification_key = None
             }
       in
       let from_acct = placeholder_account input.sp_from in
@@ -425,6 +429,8 @@ let send_delegation =
                 ; bal_state_hash = persona.Persona.daemon.state_hash
                 }
             ; mock_leaf_hash = None
+            ; mock_permissions = Mock_types.default_permissions
+            ; mock_verification_key = None
             }
       in
       let from_acct = placeholder_account input.sd_from in

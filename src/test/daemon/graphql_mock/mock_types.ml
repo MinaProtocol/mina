@@ -86,6 +86,18 @@ let global_slot_span : (Mock_context.t, string option) typ =
     ~doc:"String representation of a span between two global slots"
     ~coerce:(fun s -> `String s)
 
+let time_scalar : (Mock_context.t, string option) typ =
+  scalar "Time" ~doc:"ISO-8601 timestamp"
+    ~coerce:(fun s -> `String s)
+
+let verification_key : (Mock_context.t, string option) typ =
+  scalar "VerificationKey" ~doc:"Base64-encoded verification key"
+    ~coerce:(fun s -> `String s)
+
+let verification_key_hash : (Mock_context.t, string option) typ =
+  scalar "VerificationKeyHash" ~doc:"Hash of the verification key"
+    ~coerce:(fun s -> `String s)
+
 (* ---------- Custom scalars (input args) ---------- *)
 
 (* Mirrors Types.Input.PublicKey.arg_typ. Real mina uses graphql_wrapper's
@@ -187,6 +199,25 @@ let parse_transaction_status : string -> transaction_status = function
         ("persona.json: unknown transaction status " ^ other
        ^ " (expected INCLUDED/PENDING/UNKNOWN)" )
 
+(* AccountAuthRequired enum — used for every permission field on
+   AccountPermissions. *)
+type auth_required =
+  | NoneAuth  (* "None" but avoid clashing with stdlib *)
+  | Either
+  | Proof
+  | Signature
+  | Impossible
+
+let auth_required_typ : (Mock_context.t, auth_required option) typ =
+  enum "AccountAuthRequired" ~doc:"Kind of authorization required"
+    ~values:
+      [ enum_value "None" ~value:NoneAuth
+      ; enum_value "Either" ~value:Either
+      ; enum_value "Proof" ~value:Proof
+      ; enum_value "Signature" ~value:Signature
+      ; enum_value "Impossible" ~value:Impossible
+      ]
+
 let transaction_status_typ : (Mock_context.t, transaction_status option) typ =
   enum "TransactionStatus" ~doc:"Status of a transaction"
     ~values:
@@ -199,6 +230,55 @@ let transaction_status_typ : (Mock_context.t, transaction_status option) typ =
       ; enum_value "UNKNOWN" ~value:UNKNOWN
           ~doc:"The transaction has either reached finality or is unknown"
       ]
+
+(* ---------- ConsensusConfiguration ---------- *)
+
+(* Defined before DaemonStatus so the [consensusConfiguration] field can
+   reference it. Single canned record returned regardless of persona. *)
+
+type mock_consensus_config =
+  { cc_delta : int
+  ; cc_k : int
+  ; cc_slots_per_epoch : int
+  ; cc_slot_duration : int
+  ; cc_epoch_duration : int
+  ; cc_genesis_state_timestamp : string
+  ; cc_acceptable_network_delay : int
+  }
+
+let consensus_configuration :
+    (Mock_context.t, mock_consensus_config option) typ =
+  obj "ConsensusConfiguration" ~fields:(fun _info ->
+      [ field "delta" ~typ:(non_null int) ~args:Arg.[]
+          ~resolve:(fun _ (c : mock_consensus_config) -> c.cc_delta)
+      ; field "k" ~typ:(non_null int) ~args:Arg.[]
+          ~resolve:(fun _ (c : mock_consensus_config) -> c.cc_k)
+      ; field "slotsPerEpoch" ~typ:(non_null int) ~args:Arg.[]
+          ~resolve:(fun _ (c : mock_consensus_config) -> c.cc_slots_per_epoch)
+      ; field "slotDuration" ~typ:(non_null int) ~args:Arg.[]
+          ~resolve:(fun _ (c : mock_consensus_config) -> c.cc_slot_duration)
+      ; field "epochDuration" ~typ:(non_null int) ~args:Arg.[]
+          ~resolve:(fun _ (c : mock_consensus_config) -> c.cc_epoch_duration)
+      ; field "genesisStateTimestamp" ~typ:(non_null time_scalar)
+          ~args:Arg.[]
+          ~resolve:(fun _ (c : mock_consensus_config) ->
+            c.cc_genesis_state_timestamp )
+      ; field "acceptableNetworkDelay" ~typ:(non_null int) ~args:Arg.[]
+          ~resolve:(fun _ (c : mock_consensus_config) ->
+            c.cc_acceptable_network_delay )
+      ] )
+
+(* Canned consensus configuration values. These mirror Mina's
+   actual mainnet constants for plausibility. *)
+let canned_consensus_config : mock_consensus_config =
+  { cc_delta = 0
+  ; cc_k = 290
+  ; cc_slots_per_epoch = 7140
+  ; cc_slot_duration = 180000  (* 3 minutes in ms *)
+  ; cc_epoch_duration = 1285200000  (* slot_duration × slots_per_epoch *)
+  ; cc_genesis_state_timestamp = "2024-01-01T00:00:00Z"
+  ; cc_acceptable_network_delay = 180000
+  }
 
 (* ---------- Peer / AddrsAndPorts ---------- *)
 
@@ -333,6 +413,114 @@ let daemon_status : (Mock_context.t, Persona.daemon option) typ =
             ; ap_libp2p_port = 8302
             ; ap_client_port = 8301
             } )
+      ; field "consensusConfiguration" ~typ:(non_null consensus_configuration)
+          ~args:Arg.[]
+          ~resolve:(fun _info (_d : Persona.daemon) ->
+            canned_consensus_config )
+      ] )
+
+(* ---------- VerificationKeyPermission / AccountPermissions ---------- *)
+
+type mock_vk_permission =
+  { vkp_auth : auth_required
+  ; vkp_txn_version : string
+  }
+
+let verification_key_permission :
+    (Mock_context.t, mock_vk_permission option) typ =
+  obj "VerificationKeyPermission" ~fields:(fun _info ->
+      [ field "auth" ~typ:(non_null auth_required_typ) ~args:Arg.[]
+          ~resolve:(fun _ (v : mock_vk_permission) -> v.vkp_auth)
+      ; field "txnVersion" ~typ:(non_null string) ~args:Arg.[]
+          ~resolve:(fun _ (v : mock_vk_permission) -> v.vkp_txn_version)
+      ] )
+
+(* AccountPermissions has 13 fields; 12 use AccountAuthRequired and 1
+   uses VerificationKeyPermission. The mock returns the default-ish
+   permission set for every account: send/receive/access are Signature,
+   editState/setDelegate/setPermissions/setVerificationKey/etc. are
+   Signature, setVerificationKey is {auth=Signature, txnVersion="3"}. *)
+type mock_permissions =
+  { perm_edit_state : auth_required
+  ; perm_send : auth_required
+  ; perm_receive : auth_required
+  ; perm_access : auth_required
+  ; perm_set_delegate : auth_required
+  ; perm_set_permissions : auth_required
+  ; perm_set_verification_key : mock_vk_permission
+  ; perm_set_zkapp_uri : auth_required
+  ; perm_edit_action_state : auth_required
+  ; perm_set_token_symbol : auth_required
+  ; perm_increment_nonce : auth_required
+  ; perm_set_voting_for : auth_required
+  ; perm_set_timing : auth_required
+  }
+
+let account_permissions : (Mock_context.t, mock_permissions option) typ =
+  obj "AccountPermissions" ~fields:(fun _info ->
+      [ field "editState" ~typ:(non_null auth_required_typ) ~args:Arg.[]
+          ~resolve:(fun _ (p : mock_permissions) -> p.perm_edit_state)
+      ; field "send" ~typ:(non_null auth_required_typ) ~args:Arg.[]
+          ~resolve:(fun _ (p : mock_permissions) -> p.perm_send)
+      ; field "receive" ~typ:(non_null auth_required_typ) ~args:Arg.[]
+          ~resolve:(fun _ (p : mock_permissions) -> p.perm_receive)
+      ; field "access" ~typ:(non_null auth_required_typ) ~args:Arg.[]
+          ~resolve:(fun _ (p : mock_permissions) -> p.perm_access)
+      ; field "setDelegate" ~typ:(non_null auth_required_typ) ~args:Arg.[]
+          ~resolve:(fun _ (p : mock_permissions) -> p.perm_set_delegate)
+      ; field "setPermissions" ~typ:(non_null auth_required_typ) ~args:Arg.[]
+          ~resolve:(fun _ (p : mock_permissions) -> p.perm_set_permissions)
+      ; field "setVerificationKey"
+          ~typ:(non_null verification_key_permission) ~args:Arg.[]
+          ~resolve:(fun _ (p : mock_permissions) -> p.perm_set_verification_key)
+      ; field "setZkappUri" ~typ:(non_null auth_required_typ) ~args:Arg.[]
+          ~resolve:(fun _ (p : mock_permissions) -> p.perm_set_zkapp_uri)
+      ; field "editActionState" ~typ:(non_null auth_required_typ)
+          ~args:Arg.[]
+          ~resolve:(fun _ (p : mock_permissions) -> p.perm_edit_action_state)
+      ; field "setTokenSymbol" ~typ:(non_null auth_required_typ) ~args:Arg.[]
+          ~resolve:(fun _ (p : mock_permissions) -> p.perm_set_token_symbol)
+      ; field "incrementNonce" ~typ:(non_null auth_required_typ) ~args:Arg.[]
+          ~resolve:(fun _ (p : mock_permissions) -> p.perm_increment_nonce)
+      ; field "setVotingFor" ~typ:(non_null auth_required_typ) ~args:Arg.[]
+          ~resolve:(fun _ (p : mock_permissions) -> p.perm_set_voting_for)
+      ; field "setTiming" ~typ:(non_null auth_required_typ) ~args:Arg.[]
+          ~resolve:(fun _ (p : mock_permissions) -> p.perm_set_timing)
+      ] )
+
+(* Default permission set for normal (non-zkApp) accounts. *)
+let default_permissions : mock_permissions =
+  { perm_edit_state = Signature
+  ; perm_send = Signature
+  ; perm_receive = NoneAuth
+  ; perm_access = NoneAuth
+  ; perm_set_delegate = Signature
+  ; perm_set_permissions = Signature
+  ; perm_set_verification_key =
+      { vkp_auth = Signature; vkp_txn_version = "3" }
+  ; perm_set_zkapp_uri = Signature
+  ; perm_edit_action_state = Signature
+  ; perm_set_token_symbol = Signature
+  ; perm_increment_nonce = Signature
+  ; perm_set_voting_for = Signature
+  ; perm_set_timing = Signature
+  }
+
+(* ---------- AccountVerificationKeyWithHash ---------- *)
+
+type mock_account_vk =
+  { vk_data : string
+  ; vk_hash : string
+  }
+
+let account_verification_key_with_hash :
+    (Mock_context.t, mock_account_vk option) typ =
+  obj "AccountVerificationKeyWithHash" ~fields:(fun _info ->
+      [ field "verificationKey" ~typ:(non_null verification_key)
+          ~args:Arg.[]
+          ~resolve:(fun _ (v : mock_account_vk) -> v.vk_data)
+      ; field "hash" ~typ:(non_null verification_key_hash) ~args:Arg.[]
+          ~resolve:(fun _ (v : mock_account_vk) -> v.vk_hash)
       ] )
 
 (* ---------- AccountTiming ---------- *)
@@ -421,6 +609,8 @@ type mock_account =
   ; mock_token_symbol : string option
   ; mock_balance : mock_balance
   ; mock_leaf_hash : string option
+  ; mock_permissions : mock_permissions
+  ; mock_verification_key : mock_account_vk option
   }
 
 let account : (Mock_context.t, mock_account option) typ =
@@ -477,6 +667,12 @@ let account : (Mock_context.t, mock_account option) typ =
       ; field "timing" ~typ:(non_null account_timing)
           ~args:Arg.[]
           ~resolve:(fun _ (_a : mock_account) -> untimed)
+      ; field "permissions" ~typ:account_permissions
+          ~args:Arg.[]
+          ~resolve:(fun _ (a : mock_account) -> Some a.mock_permissions)
+      ; field "verificationKey" ~typ:account_verification_key_with_hash
+          ~args:Arg.[]
+          ~resolve:(fun _ (a : mock_account) -> a.mock_verification_key)
       ; field "leafHash" ~typ:field_elem
           ~args:Arg.[]
           ~resolve:(fun _ (a : mock_account) -> a.mock_leaf_hash)
@@ -528,6 +724,29 @@ let mock_account_of_persona (persona : Persona.t) ~public_key : mock_account opt
                 ; bal_state_hash = persona.daemon.state_hash
                 }
             ; mock_leaf_hash = None
+            ; mock_permissions = default_permissions
+            ; mock_verification_key =
+                ( match Yojson.Safe.Util.member "zkapp" json with
+                | `Assoc _ as zkapp ->
+                    let open Yojson.Safe.Util in
+                    let vk = zkapp |> member "verificationKey" in
+                    let data =
+                      match vk |> member "data" with
+                      | `String s ->
+                          s
+                      | _ ->
+                          "AACGfBASrjLO9V8yGnt8mockverificationkey="
+                    in
+                    let hash =
+                      match vk |> member "hash" with
+                      | `String s ->
+                          s
+                      | _ ->
+                          "0x0123abcd"
+                    in
+                    Some { vk_data = data; vk_hash = hash }
+                | _ ->
+                    None )
             } )
   | _ ->
       None
