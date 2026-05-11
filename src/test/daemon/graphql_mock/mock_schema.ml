@@ -105,7 +105,85 @@ let start_filtered_log =
       Arg.[ arg "filter" ~typ:(non_null (list (non_null string))) ]
     ~resolve:(fun _ () _filter -> Async.return (Ok true))
 
-let mutations = [ start_filtered_log ]
+(* sendPayment — flagship demonstrative mutation. Builds a mock_user_command
+   from the SendPaymentInput, returns it via SendPaymentPayload. The synthetic
+   hash is fixed per persona (persona.syntheticTxHashes.sendPayment) so docs
+   examples always reference the same hash. *)
+let send_payment =
+  io_field "sendPayment"
+    ~doc:"Send a payment (mock: returns a canned, deterministic synthetic tx)"
+    ~typ:(non_null Mock_types.send_payment_payload)
+    ~args:
+      Arg.
+        [ arg "signature" ~typ:Mock_types.signature_input
+            ~doc:"If a signature is provided, this transaction is considered signed and will be broadcasted to the network without requiring a private key"
+        ; arg "input" ~typ:(non_null Mock_types.send_payment_input)
+        ]
+    ~resolve:(fun { ctx = persona; _ } () _signature input ->
+      let synthetic_hash =
+        match persona.Persona.synthetic_tx_hashes with
+        | `Assoc pairs -> (
+            match List.assoc_opt "sendPayment" pairs with
+            | Some (`String s) ->
+                s
+            | _ ->
+                "5JmoOcksyntheticxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" )
+        | _ ->
+            "5JmoOcksyntheticxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+      in
+      (* Construct minimal mock accounts for source/receiver/feePayer; the
+         persona may not have entries for arbitrary public keys, so we
+         synthesize them. *)
+      let placeholder_account pk : Mock_types.mock_account =
+        match Mock_types.mock_account_of_persona persona ~public_key:pk with
+        | Some a ->
+            a
+        | None ->
+            { mock_public_key = pk
+            ; mock_token_id = "1"
+            ; mock_nonce = Some "0"
+            ; mock_inferred_nonce = Some "0"
+            ; mock_delegate = None
+            ; mock_receipt_chain_hash = None
+            ; mock_voting_for = None
+            ; mock_staking_active = false
+            ; mock_private_key_path = "/dev/null"
+            ; mock_locked = None
+            ; mock_index = None
+            ; mock_zkapp_uri = None
+            ; mock_proved_state = None
+            ; mock_token_symbol = None
+            }
+      in
+      let from_acct = placeholder_account input.sp_from in
+      let to_acct = placeholder_account input.sp_to in
+      let user_command : Mock_types.mock_user_command =
+        { uc_id = synthetic_hash
+        ; uc_hash = synthetic_hash
+        ; uc_kind = "PAYMENT"
+        ; uc_nonce = (
+            match input.sp_nonce with
+            | Some n -> ( try int_of_string n with _ -> 0 )
+            | None -> 0 )
+        ; uc_from_pk = input.sp_from
+        ; uc_to_pk = input.sp_to
+        ; uc_amount = input.sp_amount
+        ; uc_fee = input.sp_fee
+        ; uc_memo = Option.value input.sp_memo ~default:""
+        ; uc_token = "1"
+        ; uc_fee_token = "1"
+        ; uc_valid_until =
+            Option.value input.sp_valid_until ~default:"4294967295"
+        ; uc_is_delegation = false
+        ; uc_failure_reason = None
+        ; uc_source_account = from_acct
+        ; uc_receiver_account = to_acct
+        ; uc_fee_payer_account = from_acct
+        }
+      in
+      Async.return (Ok user_command) )
+
+let mutations = [ start_filtered_log; send_payment ]
 
 (* ---------- Subscriptions ---------- *)
 

@@ -43,6 +43,28 @@ let amount : (Mock_context.t, string option) typ =
   scalar "Amount" ~doc:"String representation of a payment amount"
     ~coerce:(fun s -> `String s)
 
+let transaction_id : (Mock_context.t, string option) typ =
+  scalar "TransactionId" ~doc:"Base64-encoded transaction"
+    ~coerce:(fun s -> `String s)
+
+let transaction_hash : (Mock_context.t, string option) typ =
+  scalar "TransactionHash" ~doc:"Base58Check-encoded transaction hash"
+    ~coerce:(fun s -> `String s)
+
+let global_slot : (Mock_context.t, string option) typ =
+  scalar "Globalslot" ~doc:"String representation of a global slot"
+    ~coerce:(fun s -> `String s)
+
+(* UserCommandKind and TransactionStatusFailure are SCALARS in the real
+   schema (not enums), per graphql_schema.json. *)
+let user_command_kind : (Mock_context.t, string option) typ =
+  scalar "UserCommandKind" ~doc:"The kind of user command"
+    ~coerce:(fun s -> `String s)
+
+let transaction_status_failure : (Mock_context.t, string option) typ =
+  scalar "TransactionStatusFailure" ~doc:"Reason for a transaction failure"
+    ~coerce:(fun s -> `String s)
+
 (* ---------- Custom scalars (input args) ---------- *)
 
 (* Mirrors Types.Input.PublicKey.arg_typ. Real mina uses graphql_wrapper's
@@ -65,6 +87,26 @@ let token_id_arg =
           Ok s
       | _ ->
           Error "Expected token id as a string" )
+
+let uint32_arg =
+  Arg.scalar "UInt32" ~doc:"String-encoded UInt32"
+    ~coerce:(function
+      | `String s ->
+          Ok s
+      | `Int i ->
+          Ok (string_of_int i)
+      | _ ->
+          Error "Expected uint32 as string or int" )
+
+let uint64_arg =
+  Arg.scalar "UInt64" ~doc:"String-encoded UInt64"
+    ~coerce:(function
+      | `String s ->
+          Ok s
+      | `Int i ->
+          Ok (string_of_int i)
+      | _ ->
+          Error "Expected uint64 as string or int" )
 
 (* ---------- Enums ---------- *)
 
@@ -315,10 +357,187 @@ let canned_genesis_constants =
   ; mock_genesis_timestamp = "2024-01-01T00:00:00Z"
   }
 
+(* ---------- UserCommand interface + UserCommandPayment ---------- *)
+
+(* A mock user command. Holds everything the interface fields read.
+   Source/receiver/feePayer/fromAccount/toAccount are pre-resolved
+   to mock_account so resolvers can return them synchronously. *)
+type mock_user_command =
+  { uc_id : string
+  ; uc_hash : string
+  ; uc_kind : string  (* "PAYMENT" | "STAKE_DELEGATION" | "ZKAPP" *)
+  ; uc_nonce : int
+  ; uc_from_pk : string
+  ; uc_to_pk : string
+  ; uc_amount : string
+  ; uc_fee : string
+  ; uc_memo : string
+  ; uc_token : string
+  ; uc_fee_token : string
+  ; uc_valid_until : string
+  ; uc_is_delegation : bool
+  ; uc_failure_reason : string option
+  ; uc_source_account : mock_account
+  ; uc_receiver_account : mock_account
+  ; uc_fee_payer_account : mock_account
+  }
+
+(* Interface definition; abstract_field declares the shape, each
+   concrete object (currently just UserCommandPayment) provides matching
+   field implementations. Order and signatures mirror Mina_graphql.types
+   user_command_interface exactly.
+
+   Explicit annotation defeats OCaml's value restriction: [interface] returns
+   a polymorphic [abstract_typ] but it gets monomorphized when [add_type]
+   binds a concrete impl, so we must pin the abstract source type here. *)
+let user_command_interface :
+    ( Mock_context.t
+    , (Mock_context.t, mock_user_command) abstract_value option )
+    typ =
+  interface "UserCommand" ~doc:"Common interface for user commands"
+    ~fields:(fun _ ->
+      [ abstract_field "id" ~typ:(non_null transaction_id) ~args:[]
+      ; abstract_field "hash" ~typ:(non_null transaction_hash) ~args:[]
+      ; abstract_field "kind" ~typ:(non_null user_command_kind) ~args:[]
+      ; abstract_field "nonce" ~typ:(non_null int) ~args:[]
+      ; abstract_field "source" ~typ:(non_null account) ~args:[]
+      ; abstract_field "receiver" ~typ:(non_null account) ~args:[]
+      ; abstract_field "feePayer" ~typ:(non_null account) ~args:[]
+      ; abstract_field "validUntil" ~typ:(non_null global_slot) ~args:[]
+      ; abstract_field "token" ~typ:(non_null token_id) ~args:[]
+      ; abstract_field "amount" ~typ:(non_null amount) ~args:[]
+      ; abstract_field "feeToken" ~typ:(non_null token_id) ~args:[]
+      ; abstract_field "fee" ~typ:(non_null fee) ~args:[]
+      ; abstract_field "memo" ~typ:(non_null string) ~args:[]
+      ; abstract_field "isDelegation" ~typ:(non_null bool) ~args:[]
+      ; abstract_field "from" ~typ:(non_null public_key) ~args:[]
+      ; abstract_field "fromAccount" ~typ:(non_null account) ~args:[]
+      ; abstract_field "to" ~typ:(non_null public_key) ~args:[]
+      ; abstract_field "toAccount" ~typ:(non_null account) ~args:[]
+      ; abstract_field "failureReason" ~typ:transaction_status_failure
+          ~args:[]
+      ] )
+
+(* Shared field definitions, reused across all concrete UserCommand impls. *)
+let user_command_shared_fields : (Mock_context.t, mock_user_command) field list =
+  [ field "id" ~typ:(non_null transaction_id) ~args:Arg.[]
+      ~resolve:(fun _ (u : mock_user_command) -> u.uc_id)
+  ; field "hash" ~typ:(non_null transaction_hash) ~args:Arg.[]
+      ~resolve:(fun _ (u : mock_user_command) -> u.uc_hash)
+  ; field "kind" ~typ:(non_null user_command_kind) ~args:Arg.[]
+      ~resolve:(fun _ (u : mock_user_command) -> u.uc_kind)
+  ; field "nonce" ~typ:(non_null int) ~args:Arg.[]
+      ~resolve:(fun _ (u : mock_user_command) -> u.uc_nonce)
+  ; field "source" ~typ:(non_null account) ~args:Arg.[]
+      ~resolve:(fun _ (u : mock_user_command) -> u.uc_source_account)
+  ; field "receiver" ~typ:(non_null account) ~args:Arg.[]
+      ~resolve:(fun _ (u : mock_user_command) -> u.uc_receiver_account)
+  ; field "feePayer" ~typ:(non_null account) ~args:Arg.[]
+      ~resolve:(fun _ (u : mock_user_command) -> u.uc_fee_payer_account)
+  ; field "validUntil" ~typ:(non_null global_slot) ~args:Arg.[]
+      ~resolve:(fun _ (u : mock_user_command) -> u.uc_valid_until)
+  ; field "token" ~typ:(non_null token_id) ~args:Arg.[]
+      ~resolve:(fun _ (u : mock_user_command) -> u.uc_token)
+  ; field "amount" ~typ:(non_null amount) ~args:Arg.[]
+      ~resolve:(fun _ (u : mock_user_command) -> u.uc_amount)
+  ; field "feeToken" ~typ:(non_null token_id) ~args:Arg.[]
+      ~resolve:(fun _ (u : mock_user_command) -> u.uc_fee_token)
+  ; field "fee" ~typ:(non_null fee) ~args:Arg.[]
+      ~resolve:(fun _ (u : mock_user_command) -> u.uc_fee)
+  ; field "memo" ~typ:(non_null string) ~args:Arg.[]
+      ~resolve:(fun _ (u : mock_user_command) -> u.uc_memo)
+  ; field "isDelegation" ~typ:(non_null bool) ~args:Arg.[]
+      ~resolve:(fun _ (u : mock_user_command) -> u.uc_is_delegation)
+  ; field "from" ~typ:(non_null public_key) ~args:Arg.[]
+      ~resolve:(fun _ (u : mock_user_command) -> u.uc_from_pk)
+  ; field "fromAccount" ~typ:(non_null account) ~args:Arg.[]
+      ~resolve:(fun _ (u : mock_user_command) -> u.uc_source_account)
+  ; field "to" ~typ:(non_null public_key) ~args:Arg.[]
+      ~resolve:(fun _ (u : mock_user_command) -> u.uc_to_pk)
+  ; field "toAccount" ~typ:(non_null account) ~args:Arg.[]
+      ~resolve:(fun _ (u : mock_user_command) -> u.uc_receiver_account)
+  ; field "failureReason" ~typ:transaction_status_failure ~args:Arg.[]
+      ~resolve:(fun _ (u : mock_user_command) -> u.uc_failure_reason)
+  ]
+
+let user_command_payment =
+  obj "UserCommandPayment" ~fields:(fun _ -> user_command_shared_fields)
+
+(* Register UserCommandPayment as a concrete implementor of UserCommand. *)
+let mk_payment = add_type user_command_interface user_command_payment
+
+(* ---------- SignatureInput ---------- *)
+
+type mock_signature =
+  { sig_field : string option
+  ; sig_scalar : string option
+  ; sig_raw : string option
+  }
+
+let signature_input =
+  Arg.obj "SignatureInput"
+    ~doc:
+      "A cryptographic signature -- you must provide either field+scalar \
+       or rawSignature"
+    ~coerce:(fun field scalar raw ->
+      { sig_field = field; sig_scalar = scalar; sig_raw = raw } )
+    ~fields:
+      Arg.
+        [ arg "field" ~typ:string ~doc:"Field component of signature"
+        ; arg "scalar" ~typ:string ~doc:"Scalar component of signature"
+        ; arg "rawSignature" ~typ:string ~doc:"Raw encoded signature"
+        ]
+
+(* ---------- SendPaymentInput ---------- *)
+
+type send_payment_input =
+  { sp_from : string
+  ; sp_to : string
+  ; sp_amount : string
+  ; sp_fee : string
+  ; sp_valid_until : string option
+  ; sp_memo : string option
+  ; sp_nonce : string option
+  }
+
+let send_payment_input =
+  Arg.obj "SendPaymentInput"
+    ~coerce:(fun nonce memo valid_until fee amount to_ from_ ->
+      { sp_from = from_
+      ; sp_to = to_
+      ; sp_amount = amount
+      ; sp_fee = fee
+      ; sp_valid_until = valid_until
+      ; sp_memo = memo
+      ; sp_nonce = nonce
+      } )
+    ~fields:
+      Arg.
+        [ arg "nonce" ~typ:uint32_arg
+            ~doc:"Should only be set when cancelling transactions, otherwise a nonce is determined automatically"
+        ; arg "memo" ~typ:string ~doc:"Short arbitrary message provided by the sender"
+        ; arg "validUntil" ~typ:uint32_arg
+            ~doc:"The global slot since genesis after which this transaction cannot be applied"
+        ; arg "fee" ~typ:(non_null uint64_arg)
+            ~doc:"Fee amount in order to send payment"
+        ; arg "amount" ~typ:(non_null uint64_arg) ~doc:"Amount of MINA to send to receiver"
+        ; arg "to" ~typ:(non_null public_key_arg) ~doc:"Public key of recipient of payment"
+        ; arg "from" ~typ:(non_null public_key_arg) ~doc:"Public key of sender of payment"
+        ]
+
+(* ---------- SendPaymentPayload ---------- *)
+
+let send_payment_payload : (Mock_context.t, mock_user_command option) typ =
+  obj "SendPaymentPayload" ~fields:(fun _ ->
+      [ field "payment" ~typ:(non_null user_command_interface)
+          ~args:Arg.[]
+          ~doc:"Payment that has been enqueued for inclusion (mock)"
+          ~resolve:(fun _ (u : mock_user_command) -> mk_payment u)
+      ] )
+
 (* TODO as resolvers come online:
    - peers / addrs_and_ports / metrics → object types
    - histograms / consensus* → object types
    - timing/balance on Account → AccountTiming, AnnotatedBalance types
-   - send_payment_payload → UserCommand interface + Payment/Delegation/Zkapp objects
-     + TransactionId/TransactionHash/UserCommandKind/Globalslot/UInt32/UInt64
-     + TransactionStatusFailure enum *)
+   - UserCommandDelegation / UserCommandZkapp (variant impls of UserCommand)
+   - Block type (large; needed for bestChain/block/genesisBlock) *)
