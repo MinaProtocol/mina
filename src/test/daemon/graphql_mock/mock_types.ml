@@ -81,6 +81,11 @@ let field_elem : (Mock_context.t, string option) typ =
   scalar "FieldElem" ~doc:"String representation of a Field element"
     ~coerce:(fun s -> `String s)
 
+let global_slot_span : (Mock_context.t, string option) typ =
+  scalar "GlobalSlotSpan"
+    ~doc:"String representation of a span between two global slots"
+    ~coerce:(fun s -> `String s)
+
 (* ---------- Custom scalars (input args) ---------- *)
 
 (* Mirrors Types.Input.PublicKey.arg_typ. Real mina uses graphql_wrapper's
@@ -195,12 +200,51 @@ let transaction_status_typ : (Mock_context.t, transaction_status option) typ =
           ~doc:"The transaction has either reached finality or is unknown"
       ]
 
+(* ---------- Peer / AddrsAndPorts ---------- *)
+
+(* Defined here (before DaemonStatus) so daemon_status can reference them. *)
+
+type mock_peer =
+  { peer_host : string
+  ; peer_libp2p_port : int
+  ; peer_id : string
+  }
+
+let peer : (Mock_context.t, mock_peer option) typ =
+  obj "Peer" ~fields:(fun _info ->
+      [ field "host" ~typ:(non_null string) ~args:Arg.[]
+          ~resolve:(fun _ (p : mock_peer) -> p.peer_host)
+      ; field "libp2pPort" ~typ:(non_null int) ~args:Arg.[]
+          ~resolve:(fun _ (p : mock_peer) -> p.peer_libp2p_port)
+      ; field "peerId" ~typ:(non_null string) ~args:Arg.[]
+          ~resolve:(fun _ (p : mock_peer) -> p.peer_id)
+      ] )
+
+type mock_addrs_and_ports =
+  { ap_external_ip : string
+  ; ap_bind_ip : string
+  ; ap_peer : mock_peer option
+  ; ap_libp2p_port : int
+  ; ap_client_port : int
+  }
+
+let addrs_and_ports : (Mock_context.t, mock_addrs_and_ports option) typ =
+  obj "AddrsAndPorts" ~fields:(fun _info ->
+      [ field "externalIp" ~typ:(non_null string) ~args:Arg.[]
+          ~resolve:(fun _ (a : mock_addrs_and_ports) -> a.ap_external_ip)
+      ; field "bindIp" ~typ:(non_null string) ~args:Arg.[]
+          ~resolve:(fun _ (a : mock_addrs_and_ports) -> a.ap_bind_ip)
+      ; field "peer" ~typ:peer ~args:Arg.[]
+          ~resolve:(fun _ (a : mock_addrs_and_ports) -> a.ap_peer)
+      ; field "libp2pPort" ~typ:(non_null int) ~args:Arg.[]
+          ~resolve:(fun _ (a : mock_addrs_and_ports) -> a.ap_libp2p_port)
+      ; field "clientPort" ~typ:(non_null int) ~args:Arg.[]
+          ~resolve:(fun _ (a : mock_addrs_and_ports) -> a.ap_client_port)
+      ] )
+
 (* ---------- DaemonStatus ---------- *)
 
-(* Mirrors a subset of Types.DaemonStatus.t, scoped to scalar/enum fields.
-   Object-typed fields (peers, histograms, consensus*, addrs_and_ports,
-   metrics, blockProductionKeys, …) remain unimplemented until those
-   backing types come online. *)
+(* Mirrors a subset of Types.DaemonStatus.t. *)
 let daemon_status : (Mock_context.t, Persona.daemon option) typ =
   obj "DaemonStatus" ~fields:(fun _info ->
       [ field "numAccounts" ~typ:int
@@ -258,6 +302,72 @@ let daemon_status : (Mock_context.t, Persona.daemon option) typ =
       ; field "consensusMechanism" ~typ:(non_null string)
           ~args:Arg.[]
           ~resolve:(fun _ (d : Persona.daemon) -> d.consensus_mechanism)
+      ; field "peers" ~typ:(non_null (list (non_null peer)))
+          ~args:Arg.[]
+          ~resolve:(fun _info (_d : Persona.daemon) ->
+            (* Need access to the full persona to derive peers. The resolver
+               for DaemonStatus already returns the daemon record as src;
+               we don't have access to the wider persona here. Workaround:
+               return a fixed-size list matching d.peers count, with
+               synthetic per-peer data. *)
+            List.init _d.peers (fun i ->
+                { peer_host = Printf.sprintf "192.0.2.%d" (i + 1)
+                ; peer_libp2p_port = 8302
+                ; peer_id =
+                    Printf.sprintf
+                      "12D3KooWMockPeerId%dxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+                      i
+                } ) )
+      ; field "addrsAndPorts" ~typ:(non_null addrs_and_ports)
+          ~args:Arg.[]
+          ~resolve:(fun _info (_d : Persona.daemon) ->
+            { ap_external_ip = "203.0.113.42"
+            ; ap_bind_ip = "0.0.0.0"
+            ; ap_peer =
+                Some
+                  { peer_host = "127.0.0.1"
+                  ; peer_libp2p_port = 8302
+                  ; peer_id =
+                      "12D3KooWMockSelfPeerIdxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+                  }
+            ; ap_libp2p_port = 8302
+            ; ap_client_port = 8301
+            } )
+      ] )
+
+(* ---------- AccountTiming ---------- *)
+
+(* The real schema's AccountTiming has all-nullable scalar fields; an
+   "untimed" account has all None. v0.1 returns all-None for every
+   account because the persona doesn't track vesting. *)
+type mock_timing =
+  { tim_initial_minimum_balance : string option
+  ; tim_cliff_time : string option
+  ; tim_cliff_amount : string option
+  ; tim_vesting_period : string option
+  ; tim_vesting_increment : string option
+  }
+
+let untimed : mock_timing =
+  { tim_initial_minimum_balance = None
+  ; tim_cliff_time = None
+  ; tim_cliff_amount = None
+  ; tim_vesting_period = None
+  ; tim_vesting_increment = None
+  }
+
+let account_timing : (Mock_context.t, mock_timing option) typ =
+  obj "AccountTiming" ~fields:(fun _info ->
+      [ field "initialMinimumBalance" ~typ:balance_scalar ~args:Arg.[]
+          ~resolve:(fun _ (t : mock_timing) -> t.tim_initial_minimum_balance)
+      ; field "cliffTime" ~typ:global_slot ~args:Arg.[]
+          ~resolve:(fun _ (t : mock_timing) -> t.tim_cliff_time)
+      ; field "cliffAmount" ~typ:amount ~args:Arg.[]
+          ~resolve:(fun _ (t : mock_timing) -> t.tim_cliff_amount)
+      ; field "vestingPeriod" ~typ:global_slot_span ~args:Arg.[]
+          ~resolve:(fun _ (t : mock_timing) -> t.tim_vesting_period)
+      ; field "vestingIncrement" ~typ:amount ~args:Arg.[]
+          ~resolve:(fun _ (t : mock_timing) -> t.tim_vesting_increment)
       ] )
 
 (* ---------- AnnotatedBalance ---------- *)
@@ -364,6 +474,9 @@ let account : (Mock_context.t, mock_account option) typ =
       ; field "balance" ~typ:(non_null annotated_balance)
           ~args:Arg.[]
           ~resolve:(fun _ (a : mock_account) -> a.mock_balance)
+      ; field "timing" ~typ:(non_null account_timing)
+          ~args:Arg.[]
+          ~resolve:(fun _ (_a : mock_account) -> untimed)
       ; field "leafHash" ~typ:field_elem
           ~args:Arg.[]
           ~resolve:(fun _ (a : mock_account) -> a.mock_leaf_hash)
