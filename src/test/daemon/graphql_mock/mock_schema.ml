@@ -57,6 +57,60 @@ let account =
         (Ok
            (Mock_types.mock_account_of_persona persona ~public_key) ) )
 
+(* wallet, accounts, tokenAccounts — three Account-shaped queries. *)
+
+let wallet =
+  io_field "wallet"
+    ~doc:"Find any wallet via a public key (mock; alias for account)"
+    ~typ:Mock_types.account
+    ~args:Arg.[ arg "publicKey" ~typ:(non_null Mock_types.public_key_arg) ]
+    ~resolve:(fun { ctx = persona; _ } () public_key ->
+      Async.return
+        (Ok (Mock_types.mock_account_of_persona persona ~public_key)) )
+
+(* Real schema returns multiple Accounts when the same public key holds
+   accounts on multiple tokens. The mock keeps a 1:1 mapping (one
+   default-token account per pk), so we return a singleton list when the
+   pk is known, empty list otherwise. *)
+let accounts =
+  io_field "accounts"
+    ~doc:"Find all accounts for a given public key (mock; returns at most 1)"
+    ~typ:(non_null (list (non_null Mock_types.account)))
+    ~args:Arg.[ arg "publicKey" ~typ:(non_null Mock_types.public_key_arg) ]
+    ~resolve:(fun { ctx = persona; _ } () public_key ->
+      Async.return
+        (Ok
+           ( match
+               Mock_types.mock_account_of_persona persona ~public_key
+             with
+           | Some a ->
+               [ a ]
+           | None ->
+               [] ) ) )
+
+(* Mock cheat: returns every account in the persona regardless of tokenId,
+   because the persona doesn't track per-token ownership. *)
+let token_accounts =
+  io_field "tokenAccounts"
+    ~doc:"Find all accounts for a given token (mock: returns every persona account)"
+    ~typ:(non_null (list (non_null Mock_types.account)))
+    ~args:Arg.[ arg "tokenId" ~typ:(non_null Mock_types.token_id_arg) ]
+    ~resolve:(fun { ctx = persona; _ } () _token_id ->
+      let pks =
+        match persona.Persona.accounts with
+        | `Assoc pairs ->
+            List.map fst pairs
+        | _ ->
+            []
+      in
+      let accounts =
+        List.filter_map
+          (fun pk ->
+            Mock_types.mock_account_of_persona persona ~public_key:pk )
+          pks
+      in
+      Async.return (Ok accounts) )
+
 (* The mock pretends every token is owned by the block-producer account. *)
 let token_owner =
   io_field "tokenOwner"
@@ -199,7 +253,10 @@ let queries =
   ; version
   ; time_offset
   ; account
+  ; wallet
+  ; accounts
   ; token_owner
+  ; token_accounts
   ; genesis_constants
   ; transaction_status
   ; pooled_user_commands
