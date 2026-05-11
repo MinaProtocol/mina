@@ -2,7 +2,7 @@
 
 Runnable scripts integrating with Mina's [Rosetta (Mesh) API](https://docs.cdp.coinbase.com/mesh/docs/welcome).
 
-The examples use [`axios`](https://axios-http.com/) for HTTP and [`mina-signer`](https://www.npmjs.com/package/mina-signer) for Pallas-curve transaction signing. There is no Rosetta TypeScript SDK — the spec is small enough that hand-rolled wrappers in `commons.ts` are clearer than a generated client. This is the same pattern Cardano's official Rosetta examples use.
+The examples use [`@o1-labs/mina-rosetta-sdk`](https://github.com/o1-labs/mina-rosetta-sdk-js) for the typed Rosetta HTTP surface and [`mina-signer`](https://www.npmjs.com/package/mina-signer) for Pallas-curve transaction signing. The SDK is a light wrapper — it doesn't reimplement the full `mesh-sdk` typed-client stack, just the endpoints Mina actually exposes plus a few Mina-specific operation builders.
 
 ## Setup
 
@@ -40,26 +40,32 @@ npm run typecheck
 
 | File | Purpose |
 | --- | --- |
-| `commons.ts` | `RosettaClient` class wrapping the endpoints, shared types, helper to build a Mina transfer's three-operation payload |
 | `account-balance.ts` | One-shot balance query against `/account/balance` |
 | `scan-blocks.ts` | Polling loop that fetches blocks sequentially from chain tip |
 | `track-deposits.ts` | Same loop, filtering operations for `payment_receiver_inc` to a target address |
-| `send-transaction.ts` | preprocess → metadata → payloads → sign → submit (uses mina-signer's Rosetta helper, skips explicit combine) |
+| `send-transaction.ts` | preprocess → metadata → payloads → sign → combine → submit |
 | `offline-sign.ts` | Splits the same flow across hot/cold environments via on-disk handoff files |
 
 ## Mina-specific knobs
 
-These constants live in `commons.ts`:
+The SDK exports these constants:
 
 - `BLOCKCHAIN = "mina"`
 - `CURVE_TYPE = "pallas"`
-- `MINA_CURRENCY = { symbol: "MINA", decimals: 9 }` — values are in nanomina
+- `MINA_CURRENCY = { symbol: "MINA", decimals: 9 }` — amounts are in nanomina
 - `DEFAULT_TOKEN_ID` — the canonical MINA token ID; override for custom tokens
+- `OperationType.{FeePayment, PaymentSourceDec, PaymentReceiverInc, ...}` — the operation-type strings the Rosetta server uses
 
-The three-operation MINA transfer (`fee_payment` → `payment_source_dec` → `payment_receiver_inc`) is built by `buildTransferOperations()`. See `send-transaction.ts` for usage.
+The three-operation MINA transfer (`fee_payment` → `payment_source_dec` → `payment_receiver_inc`) is built by `buildTransferOperations()`; stake delegations by `buildDelegationOperations()`. See `send-transaction.ts` for usage of the transfer helper end-to-end.
 
 ## Adapting these to your codebase
 
-The intent is to copy `commons.ts` and the operation-building helper into your own integration, not to depend on this directory at runtime. Each script is small (~50 lines) — pick the closest fit and adapt.
+Install the SDK directly — no need to copy any files out of this directory:
+
+```bash
+npm install @o1-labs/mina-rosetta-sdk mina-signer
+```
+
+Then use `account-balance.ts` and `send-transaction.ts` as templates for the read-side and write-side patterns.
 
 For a deeper walkthrough of what each step does and the Mina-specific spec deltas, see the [Rosetta integration guide](https://docs.minaprotocol.com/node-operators/rosetta) on the docs portal.
