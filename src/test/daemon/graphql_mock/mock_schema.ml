@@ -207,6 +207,16 @@ let pooled_user_commands =
             ; mock_zkapp_uri = None
             ; mock_proved_state = None
             ; mock_token_symbol = None
+            ; mock_balance =
+                { bal_total = "0.000000000"
+                ; bal_unknown = "0"
+                ; bal_liquid = Some "0.000000000"
+                ; bal_locked = Some "0"
+                ; bal_block_height =
+                    string_of_int persona.Persona.daemon.blockchain_length
+                ; bal_state_hash = persona.Persona.daemon.state_hash
+                }
+            ; mock_leaf_hash = None
             }
       in
       let to_user_command (json : Yojson.Safe.t) : Mock_types.mock_user_command =
@@ -323,6 +333,16 @@ let send_payment =
             ; mock_zkapp_uri = None
             ; mock_proved_state = None
             ; mock_token_symbol = None
+            ; mock_balance =
+                { bal_total = "0.000000000"
+                ; bal_unknown = "0"
+                ; bal_liquid = Some "0.000000000"
+                ; bal_locked = Some "0"
+                ; bal_block_height =
+                    string_of_int persona.Persona.daemon.blockchain_length
+                ; bal_state_hash = persona.Persona.daemon.state_hash
+                }
+            ; mock_leaf_hash = None
             }
       in
       let from_acct = placeholder_account input.sp_from in
@@ -395,6 +415,16 @@ let send_delegation =
             ; mock_zkapp_uri = None
             ; mock_proved_state = None
             ; mock_token_symbol = None
+            ; mock_balance =
+                { bal_total = "0.000000000"
+                ; bal_unknown = "0"
+                ; bal_liquid = Some "0.000000000"
+                ; bal_locked = Some "0"
+                ; bal_block_height =
+                    string_of_int persona.Persona.daemon.blockchain_length
+                ; bal_state_hash = persona.Persona.daemon.state_hash
+                }
+            ; mock_leaf_hash = None
             }
       in
       let from_acct = placeholder_account input.sd_from in

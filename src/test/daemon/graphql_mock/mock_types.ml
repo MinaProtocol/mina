@@ -65,6 +65,22 @@ let transaction_status_failure : (Mock_context.t, string option) typ =
   scalar "TransactionStatusFailure" ~doc:"Reason for a transaction failure"
     ~coerce:(fun s -> `String s)
 
+let balance_scalar : (Mock_context.t, string option) typ =
+  scalar "Balance" ~doc:"String representation of an account balance"
+    ~coerce:(fun s -> `String s)
+
+let length_scalar : (Mock_context.t, string option) typ =
+  scalar "Length" ~doc:"String representation of a length (UInt32)"
+    ~coerce:(fun s -> `String s)
+
+let state_hash_scalar : (Mock_context.t, string option) typ =
+  scalar "StateHash" ~doc:"Base58Check-encoded state hash"
+    ~coerce:(fun s -> `String s)
+
+let field_elem : (Mock_context.t, string option) typ =
+  scalar "FieldElem" ~doc:"String representation of a Field element"
+    ~coerce:(fun s -> `String s)
+
 (* ---------- Custom scalars (input args) ---------- *)
 
 (* Mirrors Types.Input.PublicKey.arg_typ. Real mina uses graphql_wrapper's
@@ -244,10 +260,39 @@ let daemon_status : (Mock_context.t, Persona.daemon option) typ =
           ~resolve:(fun _ (d : Persona.daemon) -> d.consensus_mechanism)
       ] )
 
+(* ---------- AnnotatedBalance ---------- *)
+
+(* Used as the inner type for Account.balance. All fields are scalar
+   strings backed by the Balance/Length/StateHash scalar types. *)
+type mock_balance =
+  { bal_total : string
+  ; bal_unknown : string
+  ; bal_liquid : string option
+  ; bal_locked : string option
+  ; bal_block_height : string
+  ; bal_state_hash : string option
+  }
+
+let annotated_balance : (Mock_context.t, mock_balance option) typ =
+  obj "AnnotatedBalance" ~fields:(fun _info ->
+      [ field "total" ~typ:(non_null balance_scalar) ~args:Arg.[]
+          ~resolve:(fun _ (b : mock_balance) -> b.bal_total)
+      ; field "unknown" ~typ:(non_null balance_scalar) ~args:Arg.[]
+          ~resolve:(fun _ (b : mock_balance) -> b.bal_unknown)
+      ; field "liquid" ~typ:balance_scalar ~args:Arg.[]
+          ~resolve:(fun _ (b : mock_balance) -> b.bal_liquid)
+      ; field "locked" ~typ:balance_scalar ~args:Arg.[]
+          ~resolve:(fun _ (b : mock_balance) -> b.bal_locked)
+      ; field "blockHeight" ~typ:(non_null length_scalar) ~args:Arg.[]
+          ~resolve:(fun _ (b : mock_balance) -> b.bal_block_height)
+      ; field "stateHash" ~typ:state_hash_scalar ~args:Arg.[]
+          ~resolve:(fun _ (b : mock_balance) -> b.bal_state_hash)
+      ] )
+
 (* ---------- Account ---------- *)
 
 (* A "mock account" — the source row for the Account object type. Mirrors a
-   handful of the real fields. Future passes will add timing, balance,
+   handful of the real fields. Future passes will add timing,
    permissions, zkappState, etc. as their backing types come online. *)
 type mock_account =
   { mock_public_key : string
@@ -264,6 +309,8 @@ type mock_account =
   ; mock_zkapp_uri : string option
   ; mock_proved_state : bool option
   ; mock_token_symbol : string option
+  ; mock_balance : mock_balance
+  ; mock_leaf_hash : string option
   }
 
 let account : (Mock_context.t, mock_account option) typ =
@@ -314,6 +361,12 @@ let account : (Mock_context.t, mock_account option) typ =
       ; field "tokenSymbol" ~typ:string
           ~args:Arg.[]
           ~resolve:(fun _ (a : mock_account) -> a.mock_token_symbol)
+      ; field "balance" ~typ:(non_null annotated_balance)
+          ~args:Arg.[]
+          ~resolve:(fun _ (a : mock_account) -> a.mock_balance)
+      ; field "leafHash" ~typ:field_elem
+          ~args:Arg.[]
+          ~resolve:(fun _ (a : mock_account) -> a.mock_leaf_hash)
       ] )
 
 (** Lookup an account in the persona's [accounts] JSON object by public key.
@@ -329,6 +382,9 @@ let mock_account_of_persona (persona : Persona.t) ~public_key : mock_account opt
           let open Yojson.Safe.Util in
           let get_string_opt name = json |> member name |> to_string_option in
           let get_bool_opt name = json |> member name |> to_bool_option in
+          let balance_str =
+            Option.value (get_string_opt "balance") ~default:"0.000000000"
+          in
           Some
             { mock_public_key = public_key
             ; mock_token_id =
@@ -349,6 +405,16 @@ let mock_account_of_persona (persona : Persona.t) ~public_key : mock_account opt
             ; mock_zkapp_uri = get_string_opt "zkappUri"
             ; mock_proved_state = get_bool_opt "provedState"
             ; mock_token_symbol = get_string_opt "tokenSymbol"
+            ; mock_balance =
+                { bal_total = balance_str
+                ; bal_unknown = "0"
+                ; bal_liquid = Some balance_str
+                ; bal_locked = Some "0"
+                ; bal_block_height =
+                    string_of_int persona.daemon.blockchain_length
+                ; bal_state_hash = persona.daemon.state_hash
+                }
+            ; mock_leaf_hash = None
             } )
   | _ ->
       None
