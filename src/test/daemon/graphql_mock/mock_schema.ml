@@ -42,9 +42,24 @@ let time_offset =
     ~resolve:(fun { ctx = persona; _ } () ->
       Async.return (Ok persona.Persona.daemon.time_offset) )
 
+let account =
+  io_field "account" ~doc:"Find any account via a public key and token id (mock)"
+    ~typ:Mock_types.account
+    ~args:
+      Arg.
+        [ arg "publicKey" ~typ:(non_null Mock_types.public_key_arg)
+            ~doc:"Public key of account"
+        ; arg "token" ~typ:Mock_types.token_id_arg
+            ~doc:"Token id of account (defaults to MINA token)"
+        ]
+    ~resolve:(fun { ctx = persona; _ } () public_key _token ->
+      Async.return
+        (Ok
+           (Mock_types.mock_account_of_persona persona ~public_key) ) )
+
 (* Type annotations on these lists are intentionally absent; let the compiler
    unify each field's context with [Mock_context.t] from the resolvers. *)
-let queries = [ sync_status; daemon_status; version; time_offset ]
+let queries = [ sync_status; daemon_status; version; time_offset; account ]
 
 (* ---------- Mutations ---------- *)
 
