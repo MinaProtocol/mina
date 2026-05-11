@@ -134,6 +134,57 @@ let genesis_constants =
     ~args:Arg.[]
     ~resolve:(fun _ () -> Async.return (Ok Mock_types.canned_genesis_constants))
 
+(* currentSnarkWorker — mock returns a placeholder snark worker
+   associated with Alice (the block producer). Real daemon returns null
+   when no snark worker is configured; the mock always returns one. *)
+let current_snark_worker =
+  io_field "currentSnarkWorker"
+    ~doc:"Get information about the current snark worker (mock)"
+    ~typ:Mock_types.snark_worker
+    ~args:Arg.[]
+    ~resolve:(fun { ctx = persona; _ } () ->
+      let bp = persona.Persona.daemon.block_producer_account in
+      let account_opt =
+        Mock_types.mock_account_of_persona persona ~public_key:bp
+      in
+      Async.return
+        (Ok
+           ( match account_opt with
+           | Some a ->
+               Some
+                 { Mock_types.sw_key = bp
+                 ; sw_account = a
+                 ; sw_fee = "0.025"
+                 }
+           | None ->
+               None ) ) )
+
+(* trustStatus + trustStatusAll — peer trust scoring. Mock returns canned
+   values. *)
+let canned_trust_entry ip : Mock_types.mock_trust_status =
+  { ts_ip_addr = ip
+  ; ts_peer_id =
+      "12D3KooWMockTrustPeerIdxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+  ; ts_trust = 1.0
+  ; ts_banned_status = None
+  }
+
+let trust_status =
+  io_field "trustStatus"
+    ~doc:"Trust status for an IPv4 or IPv6 address (mock)"
+    ~typ:(list (non_null Mock_types.trust_status_payload))
+    ~args:Arg.[ arg "ipAddress" ~typ:(non_null string) ]
+    ~resolve:(fun _ () ip_addr -> Async.return (Ok (Some [ canned_trust_entry ip_addr ])))
+
+let trust_status_all =
+  io_field "trustStatusAll"
+    ~doc:"IP address and trust status for all peers (mock)"
+    ~typ:(non_null (list (non_null Mock_types.trust_status_payload)))
+    ~args:Arg.[]
+    ~resolve:(fun _ () ->
+      Async.return
+        (Ok [ canned_trust_entry "192.0.2.1"; canned_trust_entry "192.0.2.2" ]) )
+
 (* Look up status of a transaction hash. The mock's persona.transactions
    map carries known hashes; unknown hashes return UNKNOWN. *)
 let transaction_status =
@@ -272,6 +323,9 @@ let queries =
   ; genesis_constants
   ; transaction_status
   ; pooled_user_commands
+  ; current_snark_worker
+  ; trust_status
+  ; trust_status_all
   ]
 
 (* ---------- Mutations ---------- *)

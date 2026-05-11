@@ -98,6 +98,10 @@ let verification_key_hash : (Mock_context.t, string option) typ =
   scalar "VerificationKeyHash" ~doc:"Hash of the verification key"
     ~coerce:(fun s -> `String s)
 
+let inet_addr : (Mock_context.t, string option) typ =
+  scalar "InetAddr" ~doc:"String representation of an Internet address"
+    ~coerce:(fun s -> `String s)
+
 (* ---------- Custom scalars (input args) ---------- *)
 
 (* Mirrors Types.Input.PublicKey.arg_typ. Real mina uses graphql_wrapper's
@@ -506,6 +510,28 @@ let default_permissions : mock_permissions =
   ; perm_set_timing = Signature
   }
 
+(* ---------- TrustStatusPayload ---------- *)
+
+type mock_trust_status =
+  { ts_ip_addr : string
+  ; ts_peer_id : string
+  ; ts_trust : float
+  ; ts_banned_status : string option
+  }
+
+let trust_status_payload :
+    (Mock_context.t, mock_trust_status option) typ =
+  obj "TrustStatusPayload" ~fields:(fun _info ->
+      [ field "ipAddr" ~typ:(non_null inet_addr) ~args:Arg.[]
+          ~resolve:(fun _ (t : mock_trust_status) -> t.ts_ip_addr)
+      ; field "peerId" ~typ:(non_null string) ~args:Arg.[]
+          ~resolve:(fun _ (t : mock_trust_status) -> t.ts_peer_id)
+      ; field "trust" ~typ:(non_null float) ~args:Arg.[]
+          ~resolve:(fun _ (t : mock_trust_status) -> t.ts_trust)
+      ; field "bannedStatus" ~typ:time_scalar ~args:Arg.[]
+          ~resolve:(fun _ (t : mock_trust_status) -> t.ts_banned_status)
+      ] )
+
 (* ---------- AccountVerificationKeyWithHash ---------- *)
 
 type mock_account_vk =
@@ -750,6 +776,26 @@ let mock_account_of_persona (persona : Persona.t) ~public_key : mock_account opt
             } )
   | _ ->
       None
+
+(* ---------- SnarkWorker ---------- *)
+
+(* Placed after Account so [mock_account] and [account] typ are in scope. *)
+
+type mock_snark_worker =
+  { sw_key : string  (* public key *)
+  ; sw_account : mock_account
+  ; sw_fee : string
+  }
+
+let snark_worker : (Mock_context.t, mock_snark_worker option) typ =
+  obj "SnarkWorker" ~fields:(fun _info ->
+      [ field "key" ~typ:(non_null public_key) ~args:Arg.[]
+          ~resolve:(fun _ (s : mock_snark_worker) -> s.sw_key)
+      ; field "account" ~typ:(non_null account) ~args:Arg.[]
+          ~resolve:(fun _ (s : mock_snark_worker) -> s.sw_account)
+      ; field "fee" ~typ:(non_null fee) ~args:Arg.[]
+          ~resolve:(fun _ (s : mock_snark_worker) -> s.sw_fee)
+      ] )
 
 (* ---------- GenesisConstants ---------- *)
 
