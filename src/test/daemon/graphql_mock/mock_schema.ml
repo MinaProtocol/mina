@@ -286,6 +286,95 @@ let genesis_block_query =
             (Ok
                (Mock_types.mock_block_of_json persona (`Assoc []))) )
 
+(* String / JSON returning admin queries — pure echo. *)
+
+let runtime_config =
+  io_field "runtimeConfig"
+    ~doc:"The runtime configuration the daemon is running with (mock)"
+    ~typ:(non_null Mock_types.json_scalar)
+    ~args:Arg.[]
+    ~resolve:(fun _ () ->
+      Async.return
+        (Ok
+           (`Assoc
+             [ ("genesis", `Assoc [ ("k", `Int 290) ])
+             ; ("daemon", `Assoc [])
+             ; ("mock", `Bool true)
+             ] )) )
+
+let blockchain_verification_key =
+  io_field "blockchainVerificationKey"
+    ~doc:"The blockchain verification key (mock)"
+    ~typ:(non_null Mock_types.json_scalar)
+    ~args:Arg.[]
+    ~resolve:(fun _ () ->
+      Async.return
+        (Ok
+           (`Assoc
+             [ ("mock_verification_key", `String "AACGfBASrjLO9V8mock")
+             ; ("hash", `String "0x0123abcd")
+             ] )) )
+
+let thread_graph =
+  io_field "threadGraph"
+    ~doc:"A serialized representation of the daemon's thread structure (mock)"
+    ~typ:(non_null string)
+    ~args:Arg.[]
+    ~resolve:(fun _ () ->
+      Async.return
+        (Ok "digraph threads { mock_thread_root -> mock_thread_worker; }") )
+
+let network_id_query =
+  io_field "networkID"
+    ~doc:"The identifier for the current network (mock: \"mina:mock\")"
+    ~typ:(non_null string)
+    ~args:Arg.[]
+    ~resolve:(fun _ () -> Async.return (Ok "mina:mock"))
+
+let signature_kind_query =
+  io_field "signatureKind"
+    ~doc:"The signature kind used by this network (mock: \"testnet\")"
+    ~typ:(non_null string)
+    ~args:Arg.[]
+    ~resolve:(fun _ () -> Async.return (Ok "testnet"))
+
+let protocol_state_query =
+  io_field "protocolState"
+    ~doc:"The protocol state of a block as a Base64 or JSON encoded string (mock)"
+    ~typ:(non_null string)
+    ~args:
+      Arg.
+        [ arg "encoding" ~doc:"Output format — JSON or BASE64"
+            ~typ:
+              (enum "Encoding"
+                 ~values:
+                   [ enum_value "JSON" ~value:Mock_types.JSON_ENC
+                   ; enum_value "BASE64" ~value:Mock_types.BASE64_ENC
+                   ] )
+        ; arg "height" ~typ:int
+        ; arg "stateHash" ~typ:string
+        ]
+    ~resolve:(fun _ () _enc _h _sh ->
+      Async.return
+        (Ok "{\"mock\":true,\"protocol_state\":\"encoded\"}") )
+
+(* snarkPool — list of completed snark work jobs. Mock returns one
+   canned completed work, attributed to the persona's block producer. *)
+let snark_pool =
+  io_field "snarkPool"
+    ~doc:"List of completed snark works in the pool (mock: returns one entry)"
+    ~typ:(non_null (list (non_null Mock_types.completed_work)))
+    ~args:Arg.[]
+    ~resolve:(fun { ctx = persona; _ } () ->
+      Async.return
+        (Ok
+           [ Mock_types.
+               { cw_prover = persona.Persona.daemon.block_producer_account
+               ; cw_fee = "0.025"
+               ; cw_work_ids = [ 42 ]
+               }
+           ] ) )
+
 (* Look up status of a transaction hash. The mock's persona.transactions
    map carries known hashes; unknown hashes return UNKNOWN. *)
 let transaction_status =
@@ -430,6 +519,13 @@ let queries =
   ; best_chain
   ; block_query
   ; genesis_block_query
+  ; runtime_config
+  ; blockchain_verification_key
+  ; thread_graph
+  ; network_id_query
+  ; signature_kind_query
+  ; protocol_state_query
+  ; snark_pool
   ]
 
 (* ---------- Mutations ---------- *)

@@ -106,6 +106,12 @@ let state_hash_as_decimal : (Mock_context.t, string option) typ =
   scalar "StateHashAsDecimal" ~doc:"State hash as a decimal string"
     ~coerce:(fun s -> `String s)
 
+(* JSON scalar — daemon's catch-all for unstructured config payloads.
+   Mock carries values as raw [Yojson.Basic.t] so client receives proper
+   JSON, not a stringified blob. *)
+let json_scalar : (Mock_context.t, Yojson.Basic.t option) typ =
+  scalar "JSON" ~doc:"Arbitrary JSON" ~coerce:(fun s -> s)
+
 (* ---------- Custom scalars (input args) ---------- *)
 
 (* Mirrors Types.Input.PublicKey.arg_typ. Real mina uses graphql_wrapper's
@@ -225,6 +231,11 @@ let auth_required_typ : (Mock_context.t, auth_required option) typ =
       ; enum_value "Signature" ~value:Signature
       ; enum_value "Impossible" ~value:Impossible
       ]
+
+(* Encoding enum is defined inline at the [protocolState] arg site
+   in [mock_schema.ml] (same pattern as Mina_graphql; see comments there
+   for the why). *)
+type encoding = JSON_ENC | BASE64_ENC
 
 let transaction_status_typ : (Mock_context.t, transaction_status option) typ =
   enum "TransactionStatus" ~doc:"Status of a transaction"
@@ -912,6 +923,24 @@ let mock_blocks (persona : Persona.t) : mock_block list =
     match persona.blocks with `List xs -> xs | _ -> []
   in
   List.rev_map (mock_block_of_json persona) entries
+
+(* ---------- CompletedWork ---------- *)
+
+type mock_completed_work =
+  { cw_prover : string
+  ; cw_fee : string
+  ; cw_work_ids : int list
+  }
+
+let completed_work : (Mock_context.t, mock_completed_work option) typ =
+  obj "CompletedWork" ~fields:(fun _info ->
+      [ field "prover" ~typ:(non_null public_key) ~args:Arg.[]
+          ~resolve:(fun _ (w : mock_completed_work) -> w.cw_prover)
+      ; field "fee" ~typ:(non_null fee) ~args:Arg.[]
+          ~resolve:(fun _ (w : mock_completed_work) -> w.cw_fee)
+      ; field "workIds" ~typ:(non_null (list (non_null int))) ~args:Arg.[]
+          ~resolve:(fun _ (w : mock_completed_work) -> w.cw_work_ids)
+      ] )
 
 (* ---------- GenesisConstants ---------- *)
 
