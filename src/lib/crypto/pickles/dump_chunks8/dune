@@ -1,0 +1,18 @@
+(executable
+ (name dump_chunks8)
+ (flags
+  (:standard -warn-error +a)
+  -open
+  Core_kernel
+  -open
+  Pickles)
+ (preprocess
+  (pps ppx_jane))
+ (libraries
+  core_kernel
+  pickles
+  pickles.backend
+  pickles_types
+  pickles_base
+  promise
+  snarky.backendless))
