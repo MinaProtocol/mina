@@ -7,6 +7,11 @@
     "s3_data_hash": "d0f921c9db97265e5e8c25cfecbb08ae259e735c0bb5acd0912e43aaec10fced",
     "hash": "jwXMfukdwJVNpZ3wMEZbuq4zwucYS4cJnij23buAnNYo1GKKrFB"
   },
+  "daemon": {
+    "slot_tx_end": 520,
+    "slot_chain_end": 540,
+    "hard_fork_genesis_slot_delta": 40
+  },
   "epoch_data": {
     "staking": {
       "seed": "2vahsgRV5nDPmtgr2Xo2Uq2dkngfSgvg7d1TKqQbY3wUS2ZDxCC3",
