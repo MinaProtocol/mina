@@ -836,10 +836,41 @@ let unlock_account_mut =
       Async.return
         (Ok Mock_types.{ lp_public_key = pk; lp_account = acct }) )
 
+(* sendZkapp — flagship zkApp mutation. Constructs a mock
+   ZkappCommandResult from the persona's synthetic hash and returns it.
+   The mock doesn't actually inspect or apply the zkappCommand input;
+   the input is parsed (via graphql-async input validation) and then
+   discarded. *)
+let send_zkapp =
+  io_field "sendZkapp"
+    ~doc:"Send a zkApp transaction (mock: returns canned synthetic tx, ignores input details)"
+    ~typ:(non_null Mock_types.send_zkapp_payload)
+    ~args:Arg.[ arg "input" ~typ:(non_null Mock_types.send_zkapp_input) ]
+    ~resolve:(fun { ctx = persona; _ } () _input ->
+      let synthetic_hash =
+        match persona.Persona.synthetic_tx_hashes with
+        | `Assoc pairs -> (
+            match List.assoc_opt "sendZkappCommand" pairs with
+            | Some (`String s) ->
+                s
+            | _ ->
+                "5JmoOckzkappxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" )
+        | _ ->
+            "5JmoOckzkappxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+      in
+      Async.return
+        (Ok
+           Mock_types.
+             { zcr_id = synthetic_hash
+             ; zcr_hash = synthetic_hash
+             ; zcr_failure_reason = None
+             } ) )
+
 let mutations =
   [ start_filtered_log
   ; send_payment
   ; send_delegation
+  ; send_zkapp
   ; set_snark_worker
   ; set_snark_work_fee
   ; set_coinbase_receiver

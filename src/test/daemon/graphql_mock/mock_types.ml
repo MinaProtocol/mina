@@ -106,11 +106,69 @@ let state_hash_as_decimal : (Mock_context.t, string option) typ =
   scalar "StateHashAsDecimal" ~doc:"State hash as a decimal string"
     ~coerce:(fun s -> `String s)
 
+(* zkApp-related scalars. *)
+let memo_scalar : (Mock_context.t, string option) typ =
+  scalar "Memo" ~doc:"Base58Check-encoded memo (max 32 bytes)"
+    ~coerce:(fun s -> `String s)
+
+let index_scalar : (Mock_context.t, string option) typ =
+  scalar "Index" ~doc:"String-encoded UInt32 index"
+    ~coerce:(fun s -> `String s)
+
+let zkapp_proof : (Mock_context.t, string option) typ =
+  scalar "ZkappProof" ~doc:"Base64-encoded zkApp proof"
+    ~coerce:(fun s -> `String s)
+
+let signature_scalar : (Mock_context.t, string option) typ =
+  scalar "Signature" ~doc:"Base58Check-encoded signature"
+    ~coerce:(fun s -> `String s)
+
+let field_scalar : (Mock_context.t, string option) typ =
+  scalar "Field" ~doc:"String representation of a Field element"
+    ~coerce:(fun s -> `String s)
+
+let global_slot_since_genesis : (Mock_context.t, string option) typ =
+  scalar "GlobalSlotSinceGenesis"
+    ~doc:"String representation of a global slot (since genesis)"
+    ~coerce:(fun s -> `String s)
+
 (* JSON scalar — daemon's catch-all for unstructured config payloads.
    Mock carries values as raw [Yojson.Basic.t] so client receives proper
    JSON, not a stringified blob. *)
 let json_scalar : (Mock_context.t, Yojson.Basic.t option) typ =
   scalar "JSON" ~doc:"Arbitrary JSON" ~coerce:(fun s -> s)
+
+(* Argument-side variants of zkApp scalars. *)
+let memo_arg =
+  Arg.scalar "Memo" ~doc:"Base58Check-encoded memo"
+    ~coerce:(function
+      | `String s -> Ok s | _ -> Error "Expected string memo" )
+
+let signature_scalar_arg =
+  Arg.scalar "Signature" ~doc:"Base58Check-encoded signature"
+    ~coerce:(function
+      | `String s -> Ok s | _ -> Error "Expected string signature" )
+
+let zkapp_proof_arg =
+  Arg.scalar "ZkappProof" ~doc:"Base64-encoded zkApp proof"
+    ~coerce:(function
+      | `String s -> Ok s | _ -> Error "Expected string proof" )
+
+let field_arg =
+  Arg.scalar "Field" ~doc:"String representation of a Field element"
+    ~coerce:(function
+      | `String s -> Ok s | _ -> Error "Expected string field" )
+
+let global_slot_since_genesis_arg =
+  Arg.scalar "GlobalSlotSinceGenesis"
+    ~doc:"String representation of a global slot (since genesis)"
+    ~coerce:(function
+      | `String s -> Ok s | _ -> Error "Expected string global slot" )
+
+let fee_arg =
+  Arg.scalar "Fee" ~doc:"String representation of a transaction fee"
+    ~coerce:(function
+      | `String s -> Ok s | _ -> Error "Expected string fee" )
 
 (* ---------- Custom scalars (input args) ---------- *)
 
@@ -1274,6 +1332,192 @@ let send_delegation_payload : (Mock_context.t, mock_user_command option) typ =
           ~args:Arg.[]
           ~doc:"Delegation that has been enqueued for inclusion (mock)"
           ~resolve:(fun _ (u : mock_user_command) -> mk_payment u)
+      ] )
+
+(* ---------- ZkappCommand input tree (minimal) ---------- *)
+
+(* INTENTIONAL SCOPE CUT: AccountUpdateBodyInput in the real schema has
+   14 required fields, several of which reference deeply nested input
+   objects (AccountUpdateModificationInput, BalanceChangeInput,
+   PreconditionsInput, MayUseTokenInput, AuthorizationKindStructuredInput).
+   Mocking all of those is multi-day work. v0.1 declares only the simple
+   scalar fields the docs playground actually demonstrates; subset
+   semantics still holds (mock is a subset of real). Clients writing
+   against the real daemon must provide the other fields. *)
+
+type mock_fee_payer_body_input =
+  { fpb_public_key : string
+  ; fpb_fee : string
+  ; fpb_valid_until : string option
+  ; fpb_nonce : string
+  }
+
+let fee_payer_body_input =
+  Arg.obj "FeePayerBodyInput"
+    ~coerce:(fun pk fee valid_until nonce ->
+      { fpb_public_key = pk
+      ; fpb_fee = fee
+      ; fpb_valid_until = valid_until
+      ; fpb_nonce = nonce
+      } )
+    ~fields:
+      Arg.
+        [ arg "publicKey" ~typ:(non_null public_key_arg)
+        ; arg "fee" ~typ:(non_null fee_arg)
+        ; arg "validUntil" ~typ:global_slot_since_genesis_arg
+        ; arg "nonce" ~typ:(non_null uint32_arg)
+        ]
+
+type mock_account_update_body_input =
+  { aub_public_key : string
+  ; aub_token_id : string
+  ; aub_call_depth : int
+  ; aub_increment_nonce : bool
+  ; aub_use_full_commitment : bool
+  ; aub_implicit_account_creation_fee : bool
+  }
+
+(* v0.1 minimal subset: 6 of 14 real fields, all simple scalars. *)
+let account_update_body_input =
+  Arg.obj "AccountUpdateBodyInput"
+    ~coerce:(fun pk token_id call_depth inc_nonce use_full implicit_fee ->
+      { aub_public_key = pk
+      ; aub_token_id = token_id
+      ; aub_call_depth = call_depth
+      ; aub_increment_nonce = inc_nonce
+      ; aub_use_full_commitment = use_full
+      ; aub_implicit_account_creation_fee = implicit_fee
+      } )
+    ~fields:
+      Arg.
+        [ arg "publicKey" ~typ:(non_null public_key_arg)
+        ; arg "tokenId" ~typ:(non_null token_id_arg)
+        ; arg "callDepth" ~typ:(non_null int)
+        ; arg "incrementNonce" ~typ:(non_null bool)
+        ; arg "useFullCommitment" ~typ:(non_null bool)
+        ; arg "implicitAccountCreationFee" ~typ:(non_null bool)
+        ]
+
+type mock_control_input =
+  { ci_proof : string option
+  ; ci_signature : string option
+  }
+
+let control_input =
+  Arg.obj "ControlInput"
+    ~coerce:(fun proof signature -> { ci_proof = proof; ci_signature = signature })
+    ~fields:
+      Arg.
+        [ arg "proof" ~typ:zkapp_proof_arg
+        ; arg "signature" ~typ:signature_scalar_arg
+        ]
+
+type mock_zkapp_fee_payer_input =
+  { zfp_body : mock_fee_payer_body_input
+  ; zfp_authorization : string
+  }
+
+let zkapp_fee_payer_input =
+  Arg.obj "ZkappFeePayerInput"
+    ~coerce:(fun body auth -> { zfp_body = body; zfp_authorization = auth })
+    ~fields:
+      Arg.
+        [ arg "body" ~typ:(non_null fee_payer_body_input)
+        ; arg "authorization" ~typ:(non_null signature_scalar_arg)
+        ]
+
+type mock_zkapp_account_update_input =
+  { zau_body : mock_account_update_body_input
+  ; zau_authorization : mock_control_input
+  }
+
+let zkapp_account_update_input =
+  Arg.obj "ZkappAccountUpdateInput"
+    ~coerce:(fun body auth -> { zau_body = body; zau_authorization = auth })
+    ~fields:
+      Arg.
+        [ arg "body" ~typ:(non_null account_update_body_input)
+        ; arg "authorization" ~typ:(non_null control_input)
+        ]
+
+type mock_zkapp_command_input =
+  { zci_fee_payer : mock_zkapp_fee_payer_input
+  ; zci_account_updates : mock_zkapp_account_update_input list
+  ; zci_memo : string
+  }
+
+let zkapp_command_input =
+  Arg.obj "ZkappCommandInput"
+    ~coerce:(fun fp updates memo ->
+      { zci_fee_payer = fp; zci_account_updates = updates; zci_memo = memo } )
+    ~fields:
+      Arg.
+        [ arg "feePayer" ~typ:(non_null zkapp_fee_payer_input)
+        ; arg "accountUpdates"
+            ~typ:(non_null (list (non_null zkapp_account_update_input)))
+        ; arg "memo" ~typ:(non_null memo_arg)
+        ]
+
+type mock_send_zkapp_input =
+  { szi_zkapp_command : mock_zkapp_command_input }
+
+let send_zkapp_input =
+  Arg.obj "SendZkappInput"
+    ~coerce:(fun zc -> { szi_zkapp_command = zc })
+    ~fields:Arg.[ arg "zkappCommand" ~typ:(non_null zkapp_command_input) ]
+
+(* ---------- ZkappCommand output tree (minimal) ---------- *)
+
+(* ZkappCommandResult.zkappCommand returns the full ZkappCommand object,
+   which would require defining ZkappCommand + ZkappFeePayer + ZkappAccountUpdate
+   + AccountUpdateBody + FeePayerBody + 10+ nested types. v0.1 omits the
+   [zkappCommand] field from our mock ZkappCommandResult — subset semantics
+   permits, and the playground demo can query id/hash/failureReason.
+   Clients needing the full echo can query the real daemon. *)
+
+type mock_zkapp_failure =
+  { zf_index : string option
+  ; zf_failures : string list  (* TransactionStatusFailure list *)
+  }
+
+let zkapp_command_failure_reason :
+    (Mock_context.t, mock_zkapp_failure option) typ =
+  obj "ZkappCommandFailureReason" ~fields:(fun _info ->
+      [ field "index" ~typ:index_scalar ~args:Arg.[]
+          ~resolve:(fun _ (z : mock_zkapp_failure) -> z.zf_index)
+      ; field "failures"
+          ~typ:(non_null (list (non_null transaction_status_failure)))
+          ~args:Arg.[]
+          ~resolve:(fun _ (z : mock_zkapp_failure) -> z.zf_failures)
+      ] )
+
+type mock_zkapp_command_result =
+  { zcr_id : string
+  ; zcr_hash : string
+  ; zcr_failure_reason : mock_zkapp_failure list option
+  }
+
+let zkapp_command_result :
+    (Mock_context.t, mock_zkapp_command_result option) typ =
+  obj "ZkappCommandResult" ~fields:(fun _info ->
+      [ field "id" ~typ:(non_null transaction_id) ~args:Arg.[]
+          ~resolve:(fun _ (z : mock_zkapp_command_result) -> z.zcr_id)
+      ; field "hash" ~typ:(non_null transaction_hash) ~args:Arg.[]
+          ~resolve:(fun _ (z : mock_zkapp_command_result) -> z.zcr_hash)
+      ; field "failureReason"
+          ~typ:(list zkapp_command_failure_reason)
+          ~args:Arg.[]
+          ~resolve:(fun _ (z : mock_zkapp_command_result) ->
+            (* Real schema: [ZkappCommandFailureReason] — each element is
+               nullable, so we wrap entries in Some. *)
+            Option.map (List.map (fun f -> Some f)) z.zcr_failure_reason )
+      ] )
+
+let send_zkapp_payload :
+    (Mock_context.t, mock_zkapp_command_result option) typ =
+  obj "SendZkappPayload" ~fields:(fun _info ->
+      [ field "zkapp" ~typ:(non_null zkapp_command_result) ~args:Arg.[]
+          ~resolve:(fun _ (z : mock_zkapp_command_result) -> z)
       ] )
 
 (* LockPayload / UnlockPayload — defined here, after [account] is in scope. *)
