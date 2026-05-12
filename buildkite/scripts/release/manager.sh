@@ -131,6 +131,7 @@ function main_help(){
     echo " reversion - reversion all .deb packages in a folder";
     echo " progress - show progress of promoting/publishing release artifacts";
     echo " fix - fix debian package repository";
+    echo " validate - validate debian repo hashes and optionally fix + invalidate CDN";
     echo " verify - verify artifacts in target channel (registry)";
     echo " version - show version";
     echo ""
@@ -294,6 +295,24 @@ function extract_version_from_deb() {
 
 
 
+# Maps a manager.sh artifact name to the docker image name used by CI.
+# Most artifacts use their name directly, but generic builds are stored
+# under the base daemon/rosetta image name.
+function get_docker_image_name() {
+    local __artifact=$1
+    case $__artifact in
+        mina-generic)
+            echo "mina-daemon"
+        ;;
+        rosetta-generic)
+            echo "mina-rosetta"
+        ;;
+        *)
+            echo "$__artifact"
+        ;;
+    esac
+}
+
 function calculate_docker_tag() {
     local __docker_repo=$1
     local __artifact=$2
@@ -302,13 +321,16 @@ function calculate_docker_tag() {
     local __network=$5
     local __profile=$6
 
+    local __docker_name
+    __docker_name=$(get_docker_image_name $__artifact)
+
     local __network_suffix
     __network_suffix=$(get_suffix $__artifact $__network "$__profile")
 
     local __arch_suffix
     __arch_suffix=$(get_arch_suffix $__arch)
 
-    echo "$__docker_repo/$__artifact:$__target_version-$__codename$__network_suffix$__arch_suffix"
+    echo "$__docker_repo/$__docker_name:$__target_version-$__codename$__network_suffix$__arch_suffix"
 }
 
 function storage_list() {
@@ -564,6 +586,9 @@ function promote_and_verify_docker() {
     local __arch=${10}
     local __dry_run=${11}
 
+    local __docker_name
+    __docker_name=$(get_docker_image_name $__artifact)
+
     local __suffix
     __suffix=$(get_suffix $__artifact $__network $__profile)
 
@@ -576,7 +601,7 @@ function promote_and_verify_docker() {
     if [[ $__dry_run == 0 ]]; then
         prefix_cmd "$SUBCOMMAND_TAB" $SCRIPTPATH/../../../scripts/docker/promote.sh \
             -q \
-            -n "$__artifact" \
+            -n "$__docker_name" \
             -v $__artifact_full_source_version \
             -t $__artifact_full_target_version \
             -a $__arch \
@@ -591,7 +616,7 @@ function promote_and_verify_docker() {
             echo ""
 
             prefix_cmd "$SUBCOMMAND_TAB" $SCRIPTPATH/../../../scripts/docker/verify.sh \
-                -p "$__artifact" \
+                -p "$__docker_name" \
                 -v "$__target_version" \
                 -c "$__codename" \
                 -s "$__suffix" \
@@ -2147,6 +2172,253 @@ function fix(){
 }
 
 #==============
+# validate
+#==============
+function validate_help(){
+    echo "Validate debian repository: list packages, verify SHA256 hashes, and optionally fix."
+    echo ""
+    echo "     $CLI_NAME validate [-options]"
+    echo ""
+    echo "Parameters:"
+    echo ""
+    printf "  %-25s %s\n" "-h  | --help" "show help";
+    printf "  %-25s %s\n" "--codenames" "[comma separated list] list of debian codenames. Default: $DEFAULT_CODENAMES";
+    printf "  %-25s %s\n" "--channel" "[string] target debian channel (required)";
+    printf "  %-25s %s\n" "--archs" "[comma separated list] architectures. Default: $DEFAULT_ARCHITECTURES";
+    printf "  %-25s %s\n" "--debian-repo" "[string] debian repository bucket. Default: $DEBIAN_REPO";
+    printf "  %-25s %s\n" "--debian-sign-key" "[string] GPG key ID for re-signing InRelease when fixing";
+    printf "  %-25s %s\n" "--fix" "fix broken manifests + re-sign InRelease + invalidate CDN cache";
+    printf "  %-25s %s\n" "--list-only" "only list packages, skip hash verification";
+    echo ""
+    echo "Examples:"
+    echo ""
+    echo "  $CLI_NAME validate --channel develop"
+    echo "  $CLI_NAME validate --channel compatible --fix"
+    echo "  $CLI_NAME validate --channel develop --codenames noble --list-only"
+    echo ""
+}
+
+function validate(){
+    if [[ ${#} == 0 ]]; then
+        validate_help; exit 0;
+    fi
+
+    local __codenames="$DEFAULT_CODENAMES"
+    local __channel=""
+    local __archs="$DEFAULT_ARCHITECTURES"
+    local __debian_repo="$DEBIAN_REPO"
+    local __debian_sign_key=""
+    local __fix=0
+    local __list_only=0
+
+    while [ ${#} -gt 0 ]; do
+        error_message="Error: a value is needed for '$1'";
+        case $1 in
+            -h | --help )
+                validate_help; exit 0;
+            ;;
+            --codenames )
+                __codenames=${2:?$error_message}
+                shift 2;
+            ;;
+            --channel )
+                __channel=${2:?$error_message}
+                shift 2;
+            ;;
+            --archs )
+                __archs=${2:?$error_message}
+                shift 2;
+            ;;
+            --debian-repo )
+                __debian_repo=${2:?$error_message}
+                shift 2;
+            ;;
+            --debian-sign-key )
+                __debian_sign_key=${2:?$error_message}
+                shift 2;
+            ;;
+            --fix )
+                __fix=1
+                shift 1;
+            ;;
+            --list-only )
+                __list_only=1
+                shift 1;
+            ;;
+            * )
+                echo -e "${RED} !! Unknown option: $1${CLEAR}\n";
+                validate_help; exit 1;
+            ;;
+        esac
+    done
+
+    if [[ -z "$__channel" ]]; then
+        echo -e "${RED} !! --channel is required${CLEAR}"
+        validate_help; exit 1;
+    fi
+
+    echo ""
+    echo " ℹ️  Validating debian repository:"
+    echo " - Repository: $__debian_repo"
+    echo " - Channel: $__channel"
+    echo " - Codenames: $__codenames"
+    echo " - Architectures: $__archs"
+    echo " - Fix mode: $__fix"
+    echo ""
+
+    IFS=', '
+    read -r -a __codenames_arr <<< "$__codenames"
+    read -r -a __archs_arr <<< "$__archs"
+
+    local __exit_code=0
+
+    for __codename in "${__codenames_arr[@]}"; do
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        echo "  $__debian_repo / $__codename / $__channel"
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        echo ""
+
+        # List packages per arch
+        for __arch in "${__archs_arr[@]}"; do
+            echo " 📋 Packages [$__arch]:"
+            deb-s3 list \
+                --bucket="$__debian_repo" \
+                --s3-region=us-west-2 \
+                --codename "$__codename" \
+                --component "$__channel" \
+                --arch "$__arch" 2>&1 | sed 's/^/    /'
+            echo ""
+        done
+
+        if [[ $__list_only == 1 ]]; then
+            continue
+        fi
+
+        # SHA256 hash verification via HTTPS
+        for __arch in "${__archs_arr[@]}"; do
+            echo " 🔒 Verifying SHA256 hashes [$__arch]..."
+            local __packages_url="https://$__debian_repo/dists/$__codename/$__channel/binary-$__arch/Packages"
+            local __packages_content
+            __packages_content=$(curl -sf "$__packages_url" 2>/dev/null)
+
+            if [[ -z "$__packages_content" ]]; then
+                echo "    ⚠️  Could not fetch $__packages_url"
+                __exit_code=1
+                continue
+            fi
+
+            local __mismatches=0
+            local __pkg="" __ver="" __filename="" __expected_size="" __expected_sha256=""
+
+            while IFS= read -r line; do
+                case "$line" in
+                    Package:\ *)  __pkg="${line#Package: }" ;;
+                    Version:\ *)  __ver="${line#Version: }" ;;
+                    Filename:\ *) __filename="${line#Filename: }" ;;
+                    Size:\ *)     __expected_size="${line#Size: }" ;;
+                    SHA256:\ *)   __expected_sha256="${line#SHA256: }" ;;
+                    "")
+                        if [[ -n "$__filename" && -n "$__expected_sha256" ]]; then
+                            local __pkg_url="https://$__debian_repo/$__filename"
+                            local __actual_sha256
+                            __actual_sha256=$(curl -sf "$__pkg_url" 2>/dev/null | sha256sum | awk '{print $1}')
+
+                            if [[ "$__actual_sha256" != "$__expected_sha256" ]]; then
+                                echo "    ✗ $__pkg $__ver: SHA256 mismatch"
+                                echo "      manifest: $__expected_sha256"
+                                echo "      actual:   $__actual_sha256"
+                                __mismatches=$((__mismatches + 1))
+                                __exit_code=1
+                            else
+                                echo "    ✓ $__pkg $__ver OK"
+                            fi
+                        fi
+                        __pkg="" __ver="" __filename="" __expected_size="" __expected_sha256=""
+                    ;;
+                esac
+            done <<< "$__packages_content"
+
+            # Handle last entry (no trailing blank line)
+            if [[ -n "$__filename" && -n "$__expected_sha256" ]]; then
+                local __pkg_url="https://$__debian_repo/$__filename"
+                local __actual_sha256
+                __actual_sha256=$(curl -sf "$__pkg_url" 2>/dev/null | sha256sum | awk '{print $1}')
+                if [[ "$__actual_sha256" != "$__expected_sha256" ]]; then
+                    echo "    ✗ $__pkg $__ver: SHA256 mismatch"
+                    __mismatches=$((__mismatches + 1))
+                    __exit_code=1
+                else
+                    echo "    ✓ $__pkg $__ver OK"
+                fi
+            fi
+
+            if [[ $__mismatches -gt 0 ]]; then
+                echo "    ❌ $__mismatches hash mismatch(es) found"
+            else
+                echo "    ✅ All hashes valid"
+            fi
+            echo ""
+        done
+
+        # deb-s3 verify (structural check)
+        echo " 🔍 Verifying manifest structure..."
+        local __verify_args=(
+            verify
+            "--bucket=$__debian_repo"
+            "--s3-region=us-west-2"
+            "--codename=$__codename"
+            "--component=$__channel"
+        )
+        if [[ $__fix == 1 ]]; then
+            __verify_args+=("--fix-manifests")
+            if [[ -n "$__debian_sign_key" ]]; then
+                __verify_args+=("--sign" "$__debian_sign_key")
+                echo "    🔧 Fix mode: will repair manifests + re-sign InRelease"
+            else
+                echo "    🔧 Fix mode: will repair manifests (unsigned — pass --debian-sign-key to re-sign InRelease)"
+            fi
+        fi
+        deb-s3 "${__verify_args[@]}" 2>&1 | sed 's/^/    /'
+
+        # Invalidate CDN cache after fix
+        if [[ $__fix == 1 ]]; then
+            echo ""
+            echo " 🗑️  Invalidating CloudFront cache for $__codename..."
+            local __cf_domain
+            __cf_domain=$(dig +short CNAME "$__debian_repo" | sed 's/\.$//')
+            if [[ -n "$__cf_domain" ]]; then
+                local __dist_id
+                __dist_id=$(aws cloudfront list-distributions \
+                    --query "DistributionList.Items[?DomainName=='$__cf_domain'].Id" \
+                    --output text 2>/dev/null)
+                if [[ -n "$__dist_id" && "$__dist_id" != "None" ]]; then
+                    aws cloudfront create-invalidation \
+                        --distribution-id "$__dist_id" \
+                        --paths "/dists/$__codename/*" 2>&1 | sed 's/^/    /'
+                    echo "    ✅ Cache invalidation submitted"
+                else
+                    echo "    ⚠️  Could not find CloudFront distribution"
+                fi
+            else
+                echo "    ⚠️  No CNAME found for $__debian_repo — skipping CDN invalidation"
+            fi
+        fi
+
+        echo ""
+    done
+
+    if [[ $__exit_code == 0 ]]; then
+        echo " ✅  All validations passed."
+    else
+        echo " ❌  Some validations failed."
+        if [[ $__fix == 0 ]]; then
+            echo "    Run with --fix to attempt repair."
+        fi
+    fi
+    echo ""
+}
+
+#==============
 # persist
 #==============
 function persist_help(){
@@ -3251,7 +3523,7 @@ function main(){
         help )
             main_help 0;
         ;;
-        publish | promote | verify | fix | persist | pull | reversion | progress)
+        publish | promote | verify | validate | fix | persist | pull | reversion | progress)
             $1 "${@:2}";
         ;;
         * )
