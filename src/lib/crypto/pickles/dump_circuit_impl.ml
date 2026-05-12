@@ -3636,6 +3636,38 @@ let app_circuit_two_phase_chain_increment (x : Impl.Field.t) () =
   in
   Impl.Field.(Assert.equal x (one + prev))
 
+(* Application body for `chunks2.ml`'s single rule "2^16": fill 2^16
+   rows with `Field.mul (fresh_zero) (fresh_zero)` (each counts for
+   half a row, hence 2^17 iterations), then a 7-cell Raw Generic gate
+   to force the 7th permuted column's polynomial degree above 2^16.
+   This is what triggers num_chunks > 1 in kimchi's PCS.
+
+   Input/output are unit (the OCaml test uses `~public_input:(Input
+   Typ.unit)`). *)
+let app_circuit_chunks2 () () =
+  let open Impl in
+  let fresh_zero () =
+    exists Field.typ ~compute:(fun _ -> Field.Constant.zero)
+  in
+  for _ = 0 to 1 lsl 17 do
+    ignore (Field.mul (fresh_zero ()) (fresh_zero ()) : Field.t)
+  done ;
+  let fresh_zero = fresh_zero () in
+  assert_
+    (Raw
+       { kind = Generic
+       ; values =
+           [| fresh_zero
+            ; fresh_zero
+            ; fresh_zero
+            ; fresh_zero
+            ; fresh_zero
+            ; fresh_zero
+            ; fresh_zero
+           |]
+       ; coeffs = [||]
+       } )
+
 (* ---- Isolation circuits ---- *)
 
 (* Outer hash_messages_for_next_step_proof for Simple_Chain (N1):
@@ -4009,7 +4041,15 @@ let run ~output_dir =
     ~input_typ:Impl.Field.typ ~return_typ:Impl.Typ.unit ;
   dump_step "app_circuit_two_phase_chain_increment"
     app_circuit_two_phase_chain_increment
-    ~input_typ:Impl.Field.typ ~return_typ:Impl.Typ.unit
+    ~input_typ:Impl.Field.typ ~return_typ:Impl.Typ.unit ;
+  (* Application body for the chunks2 leaf rule. The 2^17 fillers
+     and the 7-cell Raw Generic gate are what force num_chunks > 1
+     in the production step+wrap CSes; isolating them as their own
+     fixture lets the PS-side circuit lock in the same gate
+     sequence before downstream step_main / wrap_main / witness
+     comparisons. *)
+  dump_step "app_circuit_chunks2" app_circuit_chunks2
+    ~input_typ:Impl.Typ.unit ~return_typ:Impl.Typ.unit
   (* Top-level [step_main_*_circuit] / [wrap_main_*_circuit] fixtures
      are NOT dumped from this driver. They come from the per-rule
      [dump_*.exe] drivers (one per scenario) via [PICKLES_STEP_CS_DUMP]
