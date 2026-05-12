@@ -1,17 +1,28 @@
 .PHONY: build install clean test fmt lint vet check
 
-BINARY_NAME=hardfork-runner
 BUILD_DIR=./bin
 
+BINARIES=hardfork-runner nightly-promoter
+
 build:
-	@echo "Building $(BINARY_NAME)..."
+	@echo "Building all binaries..."
 	@mkdir -p $(BUILD_DIR)
-	@go build -o $(BUILD_DIR)/$(BINARY_NAME) run-hardfork-pipeline.go
-	@echo "Build complete: $(BUILD_DIR)/$(BINARY_NAME)"
+	@go build -o $(BUILD_DIR)/hardfork-runner ./cmd/hardfork-runner
+	@go build -o $(BUILD_DIR)/nightly-promoter ./cmd/nightly-promoter
+	@echo "Build complete: $(BUILD_DIR)/"
+
+build-hardfork-runner:
+	@mkdir -p $(BUILD_DIR)
+	@go build -o $(BUILD_DIR)/hardfork-runner ./cmd/hardfork-runner
+
+build-nightly-promoter:
+	@mkdir -p $(BUILD_DIR)
+	@go build -buildvcs=false -o $(BUILD_DIR)/nightly-promoter ./cmd/nightly-promoter
 
 install: build
-	@echo "Installing $(BINARY_NAME) to /usr/local/bin..."
-	@sudo cp $(BUILD_DIR)/$(BINARY_NAME) /usr/local/bin/
+	@echo "Installing binaries to /usr/local/bin..."
+	@sudo cp $(BUILD_DIR)/hardfork-runner /usr/local/bin/
+	@sudo cp $(BUILD_DIR)/nightly-promoter /usr/local/bin/
 	@echo "Installed successfully"
 
 clean:
@@ -22,19 +33,16 @@ clean:
 test:
 	@go test -v ./...
 
-# Format code
 fmt:
 	@echo "Formatting Go code..."
 	@go fmt ./...
 	@echo "Format complete"
 
-# Run go vet
 vet:
 	@echo "Running go vet..."
 	@go vet ./...
 	@echo "Vet complete"
 
-# Run linter (requires golangci-lint)
 lint:
 	@echo "Running linter..."
 	@if command -v golangci-lint >/dev/null 2>&1; then \
@@ -43,16 +51,16 @@ lint:
 		echo "golangci-lint not found, skipping. Install with: go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest"; \
 	fi
 
-# Run all checks (format, vet, lint)
 check: fmt vet lint
 	@echo "All checks complete"
 
-# Build for multiple platforms
 build-all:
 	@echo "Building for multiple platforms..."
 	@mkdir -p $(BUILD_DIR)
-	GOOS=linux GOARCH=amd64 go build -o $(BUILD_DIR)/$(BINARY_NAME)-linux-amd64 run-hardfork-pipeline.go
-	GOOS=linux GOARCH=arm64 go build -o $(BUILD_DIR)/$(BINARY_NAME)-linux-arm64 run-hardfork-pipeline.go
-	GOOS=darwin GOARCH=amd64 go build -o $(BUILD_DIR)/$(BINARY_NAME)-darwin-amd64 run-hardfork-pipeline.go
-	GOOS=darwin GOARCH=arm64 go build -o $(BUILD_DIR)/$(BINARY_NAME)-darwin-arm64 run-hardfork-pipeline.go
+	@for bin in $(BINARIES); do \
+		GOOS=linux GOARCH=amd64 go build -o $(BUILD_DIR)/$$bin-linux-amd64 ./cmd/$$bin; \
+		GOOS=linux GOARCH=arm64 go build -o $(BUILD_DIR)/$$bin-linux-arm64 ./cmd/$$bin; \
+		GOOS=darwin GOARCH=amd64 go build -o $(BUILD_DIR)/$$bin-darwin-amd64 ./cmd/$$bin; \
+		GOOS=darwin GOARCH=arm64 go build -o $(BUILD_DIR)/$$bin-darwin-arm64 ./cmd/$$bin; \
+	done
 	@echo "Build complete for all platforms"
