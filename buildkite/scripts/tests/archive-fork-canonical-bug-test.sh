@@ -105,6 +105,10 @@ eval "$(opam config env)"
 
 export MINA_TEST_POSTGRES_URI="postgres://${user}:${password}@${host_port}"
 export MINA_TEST_NETWORK_DATA="$fixture_dir"
+# Opt the fork-canonical-bug case into the registration; without this the
+# test exe omits it (so the generic archive-node-test runner that uses
+# sample_db doesn't try to run it against the wrong fixture).
+export MINA_TEST_RUN_FORK_CANONICAL_BUG=1
 
 echo "Running archive fork-canonical-bug test..."
 dune build src/test/archive/archive_node_tests/archive_node_tests.exe
