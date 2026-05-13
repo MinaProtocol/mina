@@ -31,8 +31,8 @@ Say you want a new test that runs a shell script under
 2. **Edit the copy.** At minimum:
    - `name` — must be unique across all jobs. The `check_dups` make target
      enforces this.
-   - `path` — `Test`, `Release`, `Lint`, or `Bench`. Must match the
-     subdirectory under `buildkite/src/Jobs/`.
+   - `path` — must match the subdirectory under `buildkite/src/Jobs/` that
+     the job file lives in.
    - `dirtyWhen` — see [§ dirtyWhen DSL](#dirtywhen-dsl) below.
    - `tags` — see [§ Tags & scopes](#tags--scopes).
    - `steps` — at least one [Command step](#commands).
