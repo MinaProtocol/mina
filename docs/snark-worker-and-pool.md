@@ -11,7 +11,7 @@ daemon, and where to find the relevant source files.
 Mina uses a [scan state](./GLOSSARY.md#scan-state) — a tree of pending proof
 jobs — to amortize the cost of proving transactions. Whenever a new block is
 added, the block producer must supply one or two
-[completed-work](./GLOSSARY.md#completed-work) bundles to "pay" for the new
+[completed work](./GLOSSARY.md#completed-work) bundles to "pay" for the new
 transactions it includes. These proofs are produced asynchronously by *SNARK
 workers* (see [snark work](./GLOSSARY.md#snark-work)) and collected in the
 *SNARK pool*.
