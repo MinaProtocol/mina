@@ -108,11 +108,9 @@ start_daemon_and_wait_for_sync() {
 
     local sync_status=""
     while [ "$(date +%s)" -lt $deadline ]; do
-        sync_status=$( { curl -s -m 5 'http://localhost:3085/graphql' \
-            -H 'accept: application/json' \
-            -H 'content-type: application/json' \
-            --data-raw '{"query":"query { syncStatus }"}' \
-            | jq -r .data.syncStatus ; } 2>/dev/null || echo "CONNECT_ERROR" )
+        sync_status=$(timeout 5 mina-graphql-client sync-status \
+            --graphql-uri http://localhost:3085/graphql --raw \
+            2>/dev/null || echo "CONNECT_ERROR")
 
         if [[ "$sync_status" == "SYNCED" ]]; then
             break
@@ -127,11 +125,8 @@ start_daemon_and_wait_for_sync() {
     fi
 
     # Check network id via GraphQL
-    NETWORK_ID=$(curl -s 'http://localhost:3085/graphql' \
-        -H 'accept: application/json' \
-        -H 'content-type: application/json' \
-        --data-raw '{"query":"query MyQuery {\n  networkID\n}\n","variables":null,"operationName":"MyQuery"}' \
-        | jq -r .data.networkID)
+    NETWORK_ID=$(mina-graphql-client network-id \
+        --graphql-uri http://localhost:3085/graphql --raw)
 
     EXPECTED_NETWORK="mina:$NETWORK_NAME"
 
