@@ -1298,6 +1298,13 @@ module Genesis = struct
     ; grace_period_slots
     ; genesis_state_timestamp = Some genesis_state_timestamp
     }
+
+  (** Like [gen] but ensures [slots_per_epoch mod 3 = 0]: the daemon's
+      [Slot.in_seed_update_range] asserts this divisibility. *)
+  let gen_valid =
+    let open Quickcheck.Generator.Let_syntax in
+    let%map t = gen and slots_per_epoch_div_3 = Int.gen_incl 1 333_333 in
+    { t with slots_per_epoch = Some (slots_per_epoch_div_3 * 3) }
 end
 
 module Daemon = struct
@@ -1610,7 +1617,7 @@ let gen =
 let gen_valid =
   let open Quickcheck.Generator.Let_syntax in
   let%map daemon = Daemon.gen
-  and genesis = Genesis.gen
+  and genesis = Genesis.gen_valid
   and proof = Proof_keys.gen_valid
   and ledger = Ledger.gen_valid
   and epoch_data = Epoch_data.gen_valid in
