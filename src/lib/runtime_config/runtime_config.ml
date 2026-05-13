@@ -1379,6 +1379,15 @@ module Epoch_data = struct
       let%bind ledger = Ledger.gen in
       let%map seed = String.gen_nonempty in
       { ledger; seed }
+
+    (** Like [gen] but generates a base58-encoded seed: the daemon parses
+        [seed] via [Epoch_seed.of_base58_check_exn], which rejects arbitrary
+        non-empty strings. *)
+    let gen_valid =
+      let open Quickcheck.Generator.Let_syntax in
+      let%bind ledger = Ledger.gen in
+      let%map seed = Mina_base.Epoch_seed.gen in
+      { ledger; seed = Mina_base.Epoch_seed.to_base58_check seed }
   end
 
   type t =
@@ -1458,6 +1467,14 @@ module Epoch_data = struct
     let open Quickcheck.Generator.Let_syntax in
     let%bind staking = Data.gen in
     let%map next = Option.quickcheck_generator Data.gen in
+    { staking; next }
+
+  (** Like [gen] but uses [Data.gen_valid] for the staking and (optional)
+      next epoch data, generating base58-encoded seeds. *)
+  let gen_valid =
+    let open Quickcheck.Generator.Let_syntax in
+    let%bind staking = Data.gen_valid in
+    let%map next = Option.quickcheck_generator Data.gen_valid in
     { staking; next }
 end
 
@@ -1573,7 +1590,7 @@ let gen_valid =
   and genesis = Genesis.gen
   and proof = Proof_keys.gen_valid
   and ledger = Ledger.gen
-  and epoch_data = Epoch_data.gen in
+  and epoch_data = Epoch_data.gen_valid in
   { daemon = Some daemon
   ; genesis = Some genesis
   ; proof = Some proof
