@@ -36,6 +36,8 @@ let DebianInstallMode
     : Type
     = < ThroughLocalRepo | NoInstall | DownloadOnly >
 
+let ciDockerCacheMountedRoot = "/var/storagebox/docker-cache"
+
 let ReleaseSpec =
       { Type =
           { deps : List Command.TaggedKey.Type
@@ -60,6 +62,7 @@ let ReleaseSpec =
           , step_key_suffix : Text
           , docker_publish : DockerPublish.Type
           , docker_repo : DockerRepo.Type
+          , save_to_ci_cache : Bool
           , image_name : Optional Text
           , generic : Bool
           , verify : Bool
@@ -86,6 +89,7 @@ let ReleaseSpec =
           , deb_repo = DebianRepo.Type.Local
           , docker_publish = DockerPublish.Type.Essential
           , no_cache = False
+          , save_to_ci_cache = False
           , docker_repo = DockerRepo.Type.InternalEurope
           , step_key_suffix = "-docker-image"
           , verify = False
@@ -237,9 +241,18 @@ let generateStep =
 
                 else  " --load-only "
 
+          let serviceName = Artifacts.dockerServiceName spec.service
+
+          let maybeSaveToCacheArg =
+                      if spec.save_to_ci_cache
+
+                then  " --save-to-ci-cache ${ciDockerCacheMountedRoot} "
+
+                else  ""
+
           let buildDockerCmd =
                     "./scripts/docker/build.sh"
-                ++  " --service ${Artifacts.dockerServiceName spec.service}"
+                ++  " --service ${serviceName}"
                 ++  " --network ${Network.debianSuffix spec.network}"
                 ++  " --version ${spec.version}"
                 ++  " --branch ${spec.branch}"
@@ -261,6 +274,7 @@ let generateStep =
                 ++  loadOnlyArg
                 ++  customSuffix
                 ++  imageNameArg
+                ++  maybeSaveToCacheArg
 
           let remoteRepoCmds =
                 [ Cmd.run
