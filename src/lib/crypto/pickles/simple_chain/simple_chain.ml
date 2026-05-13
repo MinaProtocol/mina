@@ -83,23 +83,42 @@ let truncate_or_create path =
   Core_kernel.Out_channel.close (Core_kernel.Out_channel.create path)
 
 (* All emission helpers below are gated on [SIMPLE_CHAIN_FIXTURES_DIR].
-   When set, this directory is the single output root for every fixture:
-   wrap VI/SRS (shared across iterations), and per-iteration
-   `proof_repr_b{N}.json`. *)
+   When set, this directory is the single output root for every
+   fixture. Shared across iterations:
+     - `simple_chain_wrap_vi.serde.json` : kimchi `VerifierIndex` via
+       kimchi-stubs serde-JSON binding.
+     - `simple_chain_wrap_srs.bin`       : kimchi `SRS` via the
+       pre-existing rmp_serde msgpack binding (no serde-JSON binding
+       for SRS).
+   Per-iteration (idx = 0..3):
+     - `simple_chain_proof_b{idx}.serde.json` : kimchi `ProverProof`
+       via the kimchi-stubs serde-JSON binding. `prev_challenges` and
+       primary-input arrays are empty; consumers reconstruct them
+       from the wrapping JSON (see `emit_proof_serde_json_if_requested`).
+     - `simple_chain_wrapping_b{idx}.json`    : pickles
+       `to_yojson_full` of the wrapping data (statement, deferred
+       values, prev_evals). `messages_for_next_step_proof.app_state`
+       is `null` here because pickles fixes ['s = unit] internally;
+       the statement file below carries the real app data.
+     - `simple_chain_statement_b{idx}.json`   : the public input
+       `(initial, current)` as a 2-element JSON array. *)
 let fixtures_dir () = Sys.getenv_opt "SIMPLE_CHAIN_FIXTURES_DIR"
 
 let path_in_dir dir name = Filename.concat dir name
 
-let emit_wrap_vi_if_requested ~(pickles_vk : Pickles.Verification_key.t) =
+let emit_vk_serde_json_if_requested ~(pickles_vk : Pickles.Verification_key.t)
+    =
   match fixtures_dir () with
   | None ->
       ()
   | Some dir ->
-      let path = path_in_dir dir "simple_chain_wrap_vi.bin" in
-      truncate_or_create path ;
+      let path = path_in_dir dir "simple_chain_wrap_vi.serde.json" in
       let index = Pickles.Verification_key.index pickles_vk in
-      Kimchi_bindings.Protocol.VerifierIndex.Fq.write (Some true) index path ;
-      Format.printf "wrote wrap VI (msgpack) to %s@." path
+      let json =
+        Kimchi_bindings.Protocol.VerifierIndex.Fq.to_serde_json index
+      in
+      Core_kernel.Out_channel.write_all path ~data:json ;
+      Format.printf "wrote wrap VI (serde JSON) to %s@." path
 
 let emit_wrap_srs_if_requested ~(pickles_vk : Pickles.Verification_key.t) =
   match fixtures_dir () with
@@ -112,52 +131,95 @@ let emit_wrap_srs_if_requested ~(pickles_vk : Pickles.Verification_key.t) =
       Kimchi_bindings.Protocol.SRS.Fq.write (Some true) index.srs path ;
       Format.printf "wrote wrap SRS (msgpack) to %s@." path
 
-(* Splice [app_state] into a proof-Repr JSON at
-   [statement.messages_for_next_step_proof.app_state] (which pickles writes as
-   [null] because its stored [Proof.t] fixes ['s = unit]). The splice replaces
-   that [null] with an array of decimal strings, one per field element. *)
-let inject_app_state ~(fields : Impls.Step.Field.Constant.t array)
-    (json : Yojson.Safe.t) : Yojson.Safe.t =
-  let app_state_json : Yojson.Safe.t =
-    `List
-      (Array.to_list
-         (Array.map fields ~f:(fun f ->
-              `String (Impls.Step.Field.Constant.to_string f) ) ) )
-  in
-  let update_obj key f = function
-    | `Assoc fields ->
-        `Assoc
-          (List.map fields ~f:(fun (k, v) ->
-               if String.equal k key then (k, f v) else (k, v) ) )
-    | j ->
-        j
-  in
-  json
-  |> update_obj "statement"
-       (update_obj "messages_for_next_step_proof"
-          (update_obj "app_state" (fun _ -> app_state_json)) )
-
-(* When [SIMPLE_CHAIN_FIXTURES_DIR] is set, dump the pickles
-   [Proof.Repr.t] for [pickles_proof] as JSON at
-   `${dir}/simple_chain_proof_repr_b{idx}.json`, using pickles' own
-   ppx-derived yojson serializer, and splice the real app-state field
-   elements into [statement.messages_for_next_step_proof.app_state] in
-   place of the [null] that the raw pickles dump emits. *)
-let emit_proof_repr_json_if_requested ~idx
-    ~(pickles_proof : Pickles_types.Nat.N1.n Pickles.Proof.t)
-    ~(app_state : Impls.Step.Field.Constant.t array) =
+(* When [SIMPLE_CHAIN_FIXTURES_DIR] is set, dump the pickles wrapping
+   data for [pickles_proof] as JSON at
+   `${dir}/simple_chain_wrapping_b{idx}.json`, using pickles' own
+   ppx-derived `to_yojson_full`. The `app_state` field is `null` here
+   because pickles' stored [Proof.t] fixes ['s = unit]; consumers read
+   the application data from `simple_chain_statement_b{idx}.json`
+   instead. *)
+let emit_wrapping_json_if_requested ~idx
+    ~(pickles_proof : Pickles_types.Nat.N1.n Pickles.Proof.t) =
   match fixtures_dir () with
   | None ->
       ()
   | Some dir ->
       let path =
-        path_in_dir dir (Printf.sprintf "simple_chain_proof_repr_b%d.json" idx)
+        path_in_dir dir (Printf.sprintf "simple_chain_wrapping_b%d.json" idx)
       in
       let module Proof_N1 = Pickles.Proof.Make (Pickles_types.Nat.N1) in
       let json = Proof_N1.to_yojson_full pickles_proof in
-      let json = inject_app_state ~fields:app_state json in
       Yojson.Safe.to_file path json ;
-      Format.printf "wrote pickles proof Repr (JSON) to %s@." path
+      Format.printf "wrote pickles wrapping (JSON) to %s@." path
+
+(* When [SIMPLE_CHAIN_FIXTURES_DIR] is set, extract the inner wrap
+   kimchi proof (Pallas) from [pickles_proof] and write it as
+   kimchi-stubs serde JSON to
+   `${dir}/simple_chain_proof_b{idx}.serde.json`.
+
+   The dumped kimchi proof has empty [prev_challenges] / empty primary
+   input — populating them requires [Wrap_hack.pad_accumulator],
+   [Common.Ipa.Wrap.compute_challenges], and [Dummy.Ipa.Wrap.sg], none
+   of which are re-exported by our pickles' .mli. Consumers
+   reconstruct [prev_challenges] from the wrapping JSON's
+   `proof_state.messages_for_next_wrap_proof.old_bulletproof_challenges`
+   and `messages_for_next_step_proof.challenge_polynomial_commitments`
+   (front-padded to length 2 with the standard wrap-IPA dummy SG),
+   mirroring how the wrap circuit recomputes them in
+   `Wrap_verifier.finalize_other_proof`. *)
+let emit_proof_serde_json_if_requested ~idx
+    ~(pickles_proof : Pickles_types.Nat.N1.n Pickles.Proof.t) =
+  match fixtures_dir () with
+  | None ->
+      ()
+  | Some dir ->
+      let path =
+        path_in_dir dir
+          (Printf.sprintf "simple_chain_proof_b%d.serde.json" idx)
+      in
+      (* Pickles.Proof.t is abstract, but at runtime it's the concrete
+         with_data variant exposed in Mina_wire_types.Pickles.Concrete_. Coerce
+         through Obj.magic to reach the T constructor. *)
+      let pickles_proof_concrete :
+          Pickles_types.Nat.N1.n Mina_wire_types.Pickles.Concrete_.Proof.t =
+        Obj.magic pickles_proof
+      in
+      let (Mina_wire_types.Pickles.Concrete_.Proof.T b_inner) =
+        pickles_proof_concrete
+      in
+      let kimchi_proof = Pickles.Wrap_wire_proof.to_kimchi_proof b_inner.proof in
+      let with_pe : Pickles.Backend.Tock.Proof.with_public_evals =
+        { proof = kimchi_proof; public_evals = None }
+      in
+      let backend_proof =
+        Pickles.Backend.Tock.Proof.to_backend_with_public_evals' [] [||] with_pe
+      in
+      let json =
+        Kimchi_bindings.Protocol.Proof.Fq.to_serde_json backend_proof
+      in
+      Core_kernel.Out_channel.write_all path ~data:json ;
+      Format.printf "wrote wrap kimchi proof (serde JSON) to %s@." path
+
+(* When [SIMPLE_CHAIN_FIXTURES_DIR] is set, write the application's
+   public input `(initial, current)` as a 2-element JSON array of
+   decimal-string field elements to
+   `${dir}/simple_chain_statement_b{idx}.json`. *)
+let emit_statement_json_if_requested ~idx ~initial ~current =
+  match fixtures_dir () with
+  | None ->
+      ()
+  | Some dir ->
+      let path =
+        path_in_dir dir (Printf.sprintf "simple_chain_statement_b%d.json" idx)
+      in
+      let json : Yojson.Safe.t =
+        `List
+          [ `String (Impls.Step.Field.Constant.to_string initial)
+          ; `String (Impls.Step.Field.Constant.to_string current)
+          ]
+      in
+      Yojson.Safe.to_file path json ;
+      Format.printf "wrote statement to %s@." path
 
 (* Build a recursive step: assert prev_input matches the statement's
    carried (initial, current_minus_one) and produce a proof for
@@ -222,11 +284,12 @@ let () =
     Promise.block_on_async_exn (fun () ->
         Lazy.force Simple_chain.Proof.verification_key_promise )
   in
-  emit_wrap_vi_if_requested ~pickles_vk ;
+  emit_vk_serde_json_if_requested ~pickles_vk ;
   emit_wrap_srs_if_requested ~pickles_vk ;
   let emit ~idx ~proof ~current =
-    emit_proof_repr_json_if_requested ~idx ~pickles_proof:proof
-      ~app_state:[| initial; current |]
+    emit_wrapping_json_if_requested ~idx ~pickles_proof:proof ;
+    emit_proof_serde_json_if_requested ~idx ~pickles_proof:proof ;
+    emit_statement_json_if_requested ~idx ~initial ~current
   in
   emit ~idx:0 ~proof:b0 ~current:(f 1) ;
   emit ~idx:1 ~proof:b1 ~current:(f 2) ;
