@@ -91,16 +91,15 @@ let truncate_or_create path =
        pre-existing rmp_serde msgpack binding (no serde-JSON binding
        for SRS).
    Per-iteration (idx = 0..3):
-     - `simple_chain_proof_b{idx}.serde.json` : kimchi `ProverProof`
-       via the kimchi-stubs serde-JSON binding. `prev_challenges` and
-       primary-input arrays are empty; consumers reconstruct them
-       from the wrapping JSON (see `emit_proof_serde_json_if_requested`).
      - `simple_chain_statement_and_evals_b{idx}.json` : pickles
-       `to_yojson_full` of the proof metadata (statement, deferred
-       values, prev_evals; also redundant wire_proof bytes the
-       consumer ignores). `messages_for_next_step_proof.app_state`
-       is `null` here because pickles fixes ['s = unit] internally;
-       the statement file below carries the real app data.
+       `to_yojson_full` of the full `Proof.Repr.t` — statement,
+       prev_evals, and the wrap-wire-proof bytes. The consumer
+       converts the wire proof into a kimchi `ProverProof` on its
+       side (mirroring `Pickles.Wrap_wire_proof.to_kimchi_proof`),
+       so we don't also emit kimchi-serde-JSON for it here.
+       `messages_for_next_step_proof.app_state` is `null` because
+       pickles fixes ['s = unit] internally; the statement file
+       below carries the real app data.
      - `simple_chain_statement_b{idx}.json`   : the public input
        `(initial, current)` as a 2-element JSON array. *)
 let fixtures_dir () = Sys.getenv_opt "SIMPLE_CHAIN_FIXTURES_DIR"
@@ -156,54 +155,6 @@ let emit_statement_and_evals_json_if_requested ~idx
       let json = Proof_N1.to_yojson_full pickles_proof in
       Yojson.Safe.to_file path json ;
       Format.printf "wrote pickles statement + evals (JSON) to %s@." path
-
-(* When [SIMPLE_CHAIN_FIXTURES_DIR] is set, extract the inner wrap
-   kimchi proof (Pallas) from [pickles_proof] and write it as
-   kimchi-stubs serde JSON to
-   `${dir}/simple_chain_proof_b{idx}.serde.json`.
-
-   The dumped kimchi proof has empty [prev_challenges] / empty primary
-   input — populating them requires [Wrap_hack.pad_accumulator],
-   [Common.Ipa.Wrap.compute_challenges], and [Dummy.Ipa.Wrap.sg], none
-   of which are re-exported by our pickles' .mli. Consumers
-   reconstruct [prev_challenges] from the wrapping JSON's
-   `proof_state.messages_for_next_wrap_proof.old_bulletproof_challenges`
-   and `messages_for_next_step_proof.challenge_polynomial_commitments`
-   (front-padded to length 2 with the standard wrap-IPA dummy SG),
-   mirroring how the wrap circuit recomputes them in
-   `Wrap_verifier.finalize_other_proof`. *)
-let emit_proof_serde_json_if_requested ~idx
-    ~(pickles_proof : Pickles_types.Nat.N1.n Pickles.Proof.t) =
-  match fixtures_dir () with
-  | None ->
-      ()
-  | Some dir ->
-      let path =
-        path_in_dir dir
-          (Printf.sprintf "simple_chain_proof_b%d.serde.json" idx)
-      in
-      (* Pickles.Proof.t is abstract, but at runtime it's the concrete
-         with_data variant exposed in Mina_wire_types.Pickles.Concrete_. Coerce
-         through Obj.magic to reach the T constructor. *)
-      let pickles_proof_concrete :
-          Pickles_types.Nat.N1.n Mina_wire_types.Pickles.Concrete_.Proof.t =
-        Obj.magic pickles_proof
-      in
-      let (Mina_wire_types.Pickles.Concrete_.Proof.T b_inner) =
-        pickles_proof_concrete
-      in
-      let kimchi_proof = Pickles.Wrap_wire_proof.to_kimchi_proof b_inner.proof in
-      let with_pe : Pickles.Backend.Tock.Proof.with_public_evals =
-        { proof = kimchi_proof; public_evals = None }
-      in
-      let backend_proof =
-        Pickles.Backend.Tock.Proof.to_backend_with_public_evals' [] [||] with_pe
-      in
-      let json =
-        Kimchi_bindings.Protocol.Proof.Fq.to_serde_json backend_proof
-      in
-      Core_kernel.Out_channel.write_all path ~data:json ;
-      Format.printf "wrote wrap kimchi proof (serde JSON) to %s@." path
 
 (* When [SIMPLE_CHAIN_FIXTURES_DIR] is set, write the application's
    public input `(initial, current)` as a 2-element JSON array of
@@ -293,7 +244,6 @@ let () =
   emit_wrap_srs_if_requested ~pickles_vk ;
   let emit ~idx ~proof ~current =
     emit_statement_and_evals_json_if_requested ~idx ~pickles_proof:proof ;
-    emit_proof_serde_json_if_requested ~idx ~pickles_proof:proof ;
     emit_statement_json_if_requested ~idx ~initial ~current
   in
   emit ~idx:0 ~proof:b0 ~current:(f 1) ;
