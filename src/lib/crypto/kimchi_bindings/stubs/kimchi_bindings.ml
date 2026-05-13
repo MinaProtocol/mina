@@ -299,6 +299,12 @@ module Protocol = struct
 
       external deep_copy : t -> t
         = "caml_pasta_fp_plonk_verifier_index_deep_copy"
+
+      external to_serde_json : t -> string
+        = "caml_pasta_fp_plonk_verifier_index_to_serde_json"
+
+      external of_serde_json : SRS.Fp.t -> string -> t
+        = "caml_pasta_fp_plonk_verifier_index_of_serde_json"
     end
 
     module Fq = struct
@@ -325,6 +331,12 @@ module Protocol = struct
 
       external deep_copy : t -> t
         = "caml_pasta_fq_plonk_verifier_index_deep_copy"
+
+      external to_serde_json : t -> string
+        = "caml_pasta_fq_plonk_verifier_index_to_serde_json"
+
+      external of_serde_json : SRS.Fq.t -> string -> t
+        = "caml_pasta_fq_plonk_verifier_index_of_serde_json"
     end
   end
 
@@ -534,6 +546,20 @@ module Protocol = struct
            , Pasta_bindings.Fp.t )
            Kimchi_types.proof_with_public
         = "caml_pasta_fp_plonk_proof_deep_copy"
+
+      external to_serde_json :
+           ( Pasta_bindings.Fq.t Kimchi_types.or_infinity
+           , Pasta_bindings.Fp.t )
+           Kimchi_types.proof_with_public
+        -> string = "caml_pasta_fp_plonk_proof_to_serde_json"
+
+      external of_serde_json :
+           Pasta_bindings.Fp.t array
+        -> string
+        -> ( Pasta_bindings.Fq.t Kimchi_types.or_infinity
+           , Pasta_bindings.Fp.t )
+           Kimchi_types.proof_with_public
+        = "caml_pasta_fp_plonk_proof_of_serde_json"
     end
 
     module Fq = struct
@@ -586,19 +612,19 @@ module Protocol = struct
            Kimchi_types.proof_with_public
         = "caml_pasta_fq_plonk_proof_deep_copy"
 
-      external write :
-           bool option
+      external to_serde_json :
+           ( Pasta_bindings.Fp.t Kimchi_types.or_infinity
+           , Pasta_bindings.Fq.t )
+           Kimchi_types.proof_with_public
+        -> string = "caml_pasta_fq_plonk_proof_to_serde_json"
+
+      external of_serde_json :
+           Pasta_bindings.Fq.t array
+        -> string
         -> ( Pasta_bindings.Fp.t Kimchi_types.or_infinity
            , Pasta_bindings.Fq.t )
            Kimchi_types.proof_with_public
-        -> string
-        -> unit = "caml_pasta_fq_plonk_proof_write"
-
-      external read :
-           string
-        -> ( Pasta_bindings.Fp.t Kimchi_types.or_infinity
-           , Pasta_bindings.Fq.t )
-           Kimchi_types.proof_with_public = "caml_pasta_fq_plonk_proof_read"
+        = "caml_pasta_fq_plonk_proof_of_serde_json"
     end
   end
 end
