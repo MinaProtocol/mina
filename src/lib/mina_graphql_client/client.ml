@@ -77,6 +77,46 @@ let get_peer_id ~logger node_uri =
     (String.concat ~sep:" " peer_ids) ;
   (self_id, peer_ids)
 
+let sync_status_to_string = function
+  | `BOOTSTRAP ->
+      "BOOTSTRAP"
+  | `CATCHUP ->
+      "CATCHUP"
+  | `CONNECTING ->
+      "CONNECTING"
+  | `LISTENING ->
+      "LISTENING"
+  | `OFFLINE ->
+      "OFFLINE"
+  | `SYNCED ->
+      "SYNCED"
+
+let get_sync_status ~logger node_uri =
+  let open Deferred.Or_error.Let_syntax in
+  [%log info] "Getting sync status from daemon"
+    ~metadata:[ ("node_uri", `String (Uri.to_string node_uri)) ] ;
+  let query_obj = Queries.Query_sync_status.(make @@ makeVariables ()) in
+  let%map query_result_obj =
+    exec_graphql_request ~logger ~node_uri ~query_name:"query_sync_status"
+      query_obj
+  in
+  let res = sync_status_to_string query_result_obj.syncStatus in
+  [%log info] "sync_status, result of graphql query = %s" res ;
+  res
+
+let get_network_id ~logger node_uri =
+  let open Deferred.Or_error.Let_syntax in
+  [%log info] "Getting network ID from daemon"
+    ~metadata:[ ("node_uri", `String (Uri.to_string node_uri)) ] ;
+  let query_obj = Queries.Query_network_id.(make @@ makeVariables ()) in
+  let%map query_result_obj =
+    exec_graphql_request ~logger ~node_uri ~query_name:"query_network_id"
+      query_obj
+  in
+  let res = query_result_obj.networkID in
+  [%log info] "network_id, result of graphql query = %s" res ;
+  res
+
 let get_global_slot_since_hard_fork ~logger node_uri =
   let open Deferred.Or_error.Let_syntax in
   [%log info] "Getting global slot since hard fork from daemon status"
