@@ -193,7 +193,7 @@ of all prior history.
 Used to compose [transaction SNARKs](#ledger-proof) and the blockchain
 SNARK that wraps each block.
 
-*Source: [`src/lib/pickles/`](../src/lib/pickles/) and the
+*Source: [`src/lib/crypto/pickles/`](../src/lib/crypto/pickles/) and the
 [`proof-systems`](../src/lib/crypto/proof-systems) submodule.*
 
 ---
