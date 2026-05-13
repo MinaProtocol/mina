@@ -32,8 +32,8 @@ let account_nonce : (Mock_context.t, string option) typ =
     ~coerce:(fun s -> `String s)
 
 let chain_hash : (Mock_context.t, string option) typ =
-  scalar "ChainHash" ~doc:"Base58Check-encoded chain hash"
-    ~coerce:(fun s -> `String s)
+  scalar "ChainHash" ~doc:"Base58Check-encoded chain hash" ~coerce:(fun s ->
+      `String s )
 
 let fee : (Mock_context.t, string option) typ =
   scalar "Fee" ~doc:"String representation of a transaction fee"
@@ -44,8 +44,8 @@ let amount : (Mock_context.t, string option) typ =
     ~coerce:(fun s -> `String s)
 
 let transaction_id : (Mock_context.t, string option) typ =
-  scalar "TransactionId" ~doc:"Base64-encoded transaction"
-    ~coerce:(fun s -> `String s)
+  scalar "TransactionId" ~doc:"Base64-encoded transaction" ~coerce:(fun s ->
+      `String s )
 
 let transaction_hash : (Mock_context.t, string option) typ =
   scalar "TransactionHash" ~doc:"Base58Check-encoded transaction hash"
@@ -58,8 +58,8 @@ let global_slot : (Mock_context.t, string option) typ =
 (* UserCommandKind and TransactionStatusFailure are SCALARS in the real
    schema (not enums), per graphql_schema.json. *)
 let user_command_kind : (Mock_context.t, string option) typ =
-  scalar "UserCommandKind" ~doc:"The kind of user command"
-    ~coerce:(fun s -> `String s)
+  scalar "UserCommandKind" ~doc:"The kind of user command" ~coerce:(fun s ->
+      `String s )
 
 let transaction_status_failure : (Mock_context.t, string option) typ =
   scalar "TransactionStatusFailure" ~doc:"Reason for a transaction failure"
@@ -74,8 +74,8 @@ let length_scalar : (Mock_context.t, string option) typ =
     ~coerce:(fun s -> `String s)
 
 let state_hash_scalar : (Mock_context.t, string option) typ =
-  scalar "StateHash" ~doc:"Base58Check-encoded state hash"
-    ~coerce:(fun s -> `String s)
+  scalar "StateHash" ~doc:"Base58Check-encoded state hash" ~coerce:(fun s ->
+      `String s )
 
 let field_elem : (Mock_context.t, string option) typ =
   scalar "FieldElem" ~doc:"String representation of a Field element"
@@ -87,8 +87,7 @@ let global_slot_span : (Mock_context.t, string option) typ =
     ~coerce:(fun s -> `String s)
 
 let time_scalar : (Mock_context.t, string option) typ =
-  scalar "Time" ~doc:"ISO-8601 timestamp"
-    ~coerce:(fun s -> `String s)
+  scalar "Time" ~doc:"ISO-8601 timestamp" ~coerce:(fun s -> `String s)
 
 let verification_key : (Mock_context.t, string option) typ =
   scalar "VerificationKey" ~doc:"Base64-encoded verification key"
@@ -108,20 +107,19 @@ let state_hash_as_decimal : (Mock_context.t, string option) typ =
 
 (* zkApp-related scalars. *)
 let memo_scalar : (Mock_context.t, string option) typ =
-  scalar "Memo" ~doc:"Base58Check-encoded memo (max 32 bytes)"
-    ~coerce:(fun s -> `String s)
+  scalar "Memo" ~doc:"Base58Check-encoded memo (max 32 bytes)" ~coerce:(fun s ->
+      `String s )
 
 let index_scalar : (Mock_context.t, string option) typ =
-  scalar "Index" ~doc:"String-encoded UInt32 index"
-    ~coerce:(fun s -> `String s)
+  scalar "Index" ~doc:"String-encoded UInt32 index" ~coerce:(fun s -> `String s)
 
 let zkapp_proof : (Mock_context.t, string option) typ =
-  scalar "ZkappProof" ~doc:"Base64-encoded zkApp proof"
-    ~coerce:(fun s -> `String s)
+  scalar "ZkappProof" ~doc:"Base64-encoded zkApp proof" ~coerce:(fun s ->
+      `String s )
 
 let signature_scalar : (Mock_context.t, string option) typ =
-  scalar "Signature" ~doc:"Base58Check-encoded signature"
-    ~coerce:(fun s -> `String s)
+  scalar "Signature" ~doc:"Base58Check-encoded signature" ~coerce:(fun s ->
+      `String s )
 
 let field_scalar : (Mock_context.t, string option) typ =
   scalar "Field" ~doc:"String representation of a Field element"
@@ -140,35 +138,50 @@ let json_scalar : (Mock_context.t, Yojson.Basic.t option) typ =
 
 (* Argument-side variants of zkApp scalars. *)
 let memo_arg =
-  Arg.scalar "Memo" ~doc:"Base58Check-encoded memo"
-    ~coerce:(function
-      | `String s -> Ok s | _ -> Error "Expected string memo" )
+  Arg.scalar "Memo" ~doc:"Base58Check-encoded memo" ~coerce:(function
+    | `String s ->
+        Ok s
+    | _ ->
+        Error "Expected string memo" )
 
 let signature_scalar_arg =
-  Arg.scalar "Signature" ~doc:"Base58Check-encoded signature"
-    ~coerce:(function
-      | `String s -> Ok s | _ -> Error "Expected string signature" )
+  Arg.scalar "Signature" ~doc:"Base58Check-encoded signature" ~coerce:(function
+    | `String s ->
+        Ok s
+    | _ ->
+        Error "Expected string signature" )
 
 let zkapp_proof_arg =
-  Arg.scalar "ZkappProof" ~doc:"Base64-encoded zkApp proof"
-    ~coerce:(function
-      | `String s -> Ok s | _ -> Error "Expected string proof" )
+  Arg.scalar "ZkappProof" ~doc:"Base64-encoded zkApp proof" ~coerce:(function
+    | `String s ->
+        Ok s
+    | _ ->
+        Error "Expected string proof" )
 
 let field_arg =
   Arg.scalar "Field" ~doc:"String representation of a Field element"
     ~coerce:(function
-      | `String s -> Ok s | _ -> Error "Expected string field" )
+    | `String s ->
+        Ok s
+    | _ ->
+        Error "Expected string field" )
 
 let global_slot_since_genesis_arg =
   Arg.scalar "GlobalSlotSinceGenesis"
     ~doc:"String representation of a global slot (since genesis)"
     ~coerce:(function
-      | `String s -> Ok s | _ -> Error "Expected string global slot" )
+    | `String s ->
+        Ok s
+    | _ ->
+        Error "Expected string global slot" )
 
 let fee_arg =
   Arg.scalar "Fee" ~doc:"String representation of a transaction fee"
     ~coerce:(function
-      | `String s -> Ok s | _ -> Error "Expected string fee" )
+    | `String s ->
+        Ok s
+    | _ ->
+        Error "Expected string fee" )
 
 (* ---------- Custom scalars (input args) ---------- *)
 
@@ -180,38 +193,37 @@ let fee_arg =
 let public_key_arg =
   Arg.scalar "PublicKey" ~doc:"Public key in Base58Check format"
     ~coerce:(function
-      | `String s ->
-          Ok s
-      | _ ->
-          Error "Expected public key as a string in Base58Check format" )
+    | `String s ->
+        Ok s
+    | _ ->
+        Error "Expected public key as a string in Base58Check format" )
 
 let token_id_arg =
-  Arg.scalar "TokenId" ~doc:"String representation of a token's UInt64 identifier"
+  Arg.scalar "TokenId"
+    ~doc:"String representation of a token's UInt64 identifier"
     ~coerce:(function
-      | `String s ->
-          Ok s
-      | _ ->
-          Error "Expected token id as a string" )
+    | `String s ->
+        Ok s
+    | _ ->
+        Error "Expected token id as a string" )
 
 let uint32_arg =
-  Arg.scalar "UInt32" ~doc:"String-encoded UInt32"
-    ~coerce:(function
-      | `String s ->
-          Ok s
-      | `Int i ->
-          Ok (string_of_int i)
-      | _ ->
-          Error "Expected uint32 as string or int" )
+  Arg.scalar "UInt32" ~doc:"String-encoded UInt32" ~coerce:(function
+    | `String s ->
+        Ok s
+    | `Int i ->
+        Ok (string_of_int i)
+    | _ ->
+        Error "Expected uint32 as string or int" )
 
 let uint64_arg =
-  Arg.scalar "UInt64" ~doc:"String-encoded UInt64"
-    ~coerce:(function
-      | `String s ->
-          Ok s
-      | `Int i ->
-          Ok (string_of_int i)
-      | _ ->
-          Error "Expected uint64 as string or int" )
+  Arg.scalar "UInt64" ~doc:"String-encoded UInt64" ~coerce:(function
+    | `String s ->
+        Ok s
+    | `Int i ->
+        Ok (string_of_int i)
+    | _ ->
+        Error "Expected uint64 as string or int" )
 
 (* ---------- Enums ---------- *)
 
@@ -235,13 +247,13 @@ let parse_transaction_status : string -> transaction_status = function
       UNKNOWN
   | other ->
       failwith
-        ("persona.json: unknown transaction status " ^ other
-       ^ " (expected INCLUDED/PENDING/UNKNOWN)" )
+        ( "persona.json: unknown transaction status " ^ other
+        ^ " (expected INCLUDED/PENDING/UNKNOWN)" )
 
 (* AccountAuthRequired enum — used for every permission field on
    AccountPermissions. *)
 type auth_required =
-  | NoneAuth  (* "None" but avoid clashing with stdlib *)
+  | NoneAuth (* "None" but avoid clashing with stdlib *)
   | Either
   | Proof
   | Signature
@@ -281,17 +293,17 @@ let transaction_status_typ : (Mock_context.t, transaction_status option) typ =
 
 (* ---------- VerificationKeyPermission / AccountPermissions ---------- *)
 
-type mock_vk_permission =
-  { vkp_auth : auth_required
-  ; vkp_txn_version : string
-  }
+type mock_vk_permission = { vkp_auth : auth_required; vkp_txn_version : string }
 
 let verification_key_permission :
     (Mock_context.t, mock_vk_permission option) typ =
   obj "VerificationKeyPermission" ~fields:(fun _info ->
-      [ field "auth" ~typ:(non_null auth_required_typ) ~args:Arg.[]
+      [ field "auth"
+          ~typ:(non_null auth_required_typ)
+          ~args:Arg.[]
           ~resolve:(fun _ (v : mock_vk_permission) -> v.vkp_auth)
-      ; field "txnVersion" ~typ:(non_null string) ~args:Arg.[]
+      ; field "txnVersion" ~typ:(non_null string)
+          ~args:Arg.[]
           ~resolve:(fun _ (v : mock_vk_permission) -> v.vkp_txn_version)
       ] )
 
@@ -318,33 +330,57 @@ type mock_permissions =
 
 let account_permissions : (Mock_context.t, mock_permissions option) typ =
   obj "AccountPermissions" ~fields:(fun _info ->
-      [ field "editState" ~typ:(non_null auth_required_typ) ~args:Arg.[]
+      [ field "editState"
+          ~typ:(non_null auth_required_typ)
+          ~args:Arg.[]
           ~resolve:(fun _ (p : mock_permissions) -> p.perm_edit_state)
-      ; field "send" ~typ:(non_null auth_required_typ) ~args:Arg.[]
+      ; field "send"
+          ~typ:(non_null auth_required_typ)
+          ~args:Arg.[]
           ~resolve:(fun _ (p : mock_permissions) -> p.perm_send)
-      ; field "receive" ~typ:(non_null auth_required_typ) ~args:Arg.[]
+      ; field "receive"
+          ~typ:(non_null auth_required_typ)
+          ~args:Arg.[]
           ~resolve:(fun _ (p : mock_permissions) -> p.perm_receive)
-      ; field "access" ~typ:(non_null auth_required_typ) ~args:Arg.[]
+      ; field "access"
+          ~typ:(non_null auth_required_typ)
+          ~args:Arg.[]
           ~resolve:(fun _ (p : mock_permissions) -> p.perm_access)
-      ; field "setDelegate" ~typ:(non_null auth_required_typ) ~args:Arg.[]
+      ; field "setDelegate"
+          ~typ:(non_null auth_required_typ)
+          ~args:Arg.[]
           ~resolve:(fun _ (p : mock_permissions) -> p.perm_set_delegate)
-      ; field "setPermissions" ~typ:(non_null auth_required_typ) ~args:Arg.[]
+      ; field "setPermissions"
+          ~typ:(non_null auth_required_typ)
+          ~args:Arg.[]
           ~resolve:(fun _ (p : mock_permissions) -> p.perm_set_permissions)
       ; field "setVerificationKey"
-          ~typ:(non_null verification_key_permission) ~args:Arg.[]
+          ~typ:(non_null verification_key_permission)
+          ~args:Arg.[]
           ~resolve:(fun _ (p : mock_permissions) -> p.perm_set_verification_key)
-      ; field "setZkappUri" ~typ:(non_null auth_required_typ) ~args:Arg.[]
+      ; field "setZkappUri"
+          ~typ:(non_null auth_required_typ)
+          ~args:Arg.[]
           ~resolve:(fun _ (p : mock_permissions) -> p.perm_set_zkapp_uri)
-      ; field "editActionState" ~typ:(non_null auth_required_typ)
+      ; field "editActionState"
+          ~typ:(non_null auth_required_typ)
           ~args:Arg.[]
           ~resolve:(fun _ (p : mock_permissions) -> p.perm_edit_action_state)
-      ; field "setTokenSymbol" ~typ:(non_null auth_required_typ) ~args:Arg.[]
+      ; field "setTokenSymbol"
+          ~typ:(non_null auth_required_typ)
+          ~args:Arg.[]
           ~resolve:(fun _ (p : mock_permissions) -> p.perm_set_token_symbol)
-      ; field "incrementNonce" ~typ:(non_null auth_required_typ) ~args:Arg.[]
+      ; field "incrementNonce"
+          ~typ:(non_null auth_required_typ)
+          ~args:Arg.[]
           ~resolve:(fun _ (p : mock_permissions) -> p.perm_increment_nonce)
-      ; field "setVotingFor" ~typ:(non_null auth_required_typ) ~args:Arg.[]
+      ; field "setVotingFor"
+          ~typ:(non_null auth_required_typ)
+          ~args:Arg.[]
           ~resolve:(fun _ (p : mock_permissions) -> p.perm_set_voting_for)
-      ; field "setTiming" ~typ:(non_null auth_required_typ) ~args:Arg.[]
+      ; field "setTiming"
+          ~typ:(non_null auth_required_typ)
+          ~args:Arg.[]
           ~resolve:(fun _ (p : mock_permissions) -> p.perm_set_timing)
       ] )
 
@@ -356,8 +392,7 @@ let default_permissions : mock_permissions =
   ; perm_access = NoneAuth
   ; perm_set_delegate = Signature
   ; perm_set_permissions = Signature
-  ; perm_set_verification_key =
-      { vkp_auth = Signature; vkp_txn_version = "3" }
+  ; perm_set_verification_key = { vkp_auth = Signature; vkp_txn_version = "3" }
   ; perm_set_zkapp_uri = Signature
   ; perm_edit_action_state = Signature
   ; perm_set_token_symbol = Signature
@@ -375,33 +410,36 @@ type mock_trust_status =
   ; ts_banned_status : string option
   }
 
-let trust_status_payload :
-    (Mock_context.t, mock_trust_status option) typ =
+let trust_status_payload : (Mock_context.t, mock_trust_status option) typ =
   obj "TrustStatusPayload" ~fields:(fun _info ->
-      [ field "ipAddr" ~typ:(non_null inet_addr) ~args:Arg.[]
+      [ field "ipAddr" ~typ:(non_null inet_addr)
+          ~args:Arg.[]
           ~resolve:(fun _ (t : mock_trust_status) -> t.ts_ip_addr)
-      ; field "peerId" ~typ:(non_null string) ~args:Arg.[]
+      ; field "peerId" ~typ:(non_null string)
+          ~args:Arg.[]
           ~resolve:(fun _ (t : mock_trust_status) -> t.ts_peer_id)
-      ; field "trust" ~typ:(non_null float) ~args:Arg.[]
+      ; field "trust" ~typ:(non_null float)
+          ~args:Arg.[]
           ~resolve:(fun _ (t : mock_trust_status) -> t.ts_trust)
-      ; field "bannedStatus" ~typ:time_scalar ~args:Arg.[]
+      ; field "bannedStatus" ~typ:time_scalar
+          ~args:Arg.[]
           ~resolve:(fun _ (t : mock_trust_status) -> t.ts_banned_status)
       ] )
 
 (* ---------- AccountVerificationKeyWithHash ---------- *)
 
-type mock_account_vk =
-  { vk_data : string
-  ; vk_hash : string
-  }
+type mock_account_vk = { vk_data : string; vk_hash : string }
 
 let account_verification_key_with_hash :
     (Mock_context.t, mock_account_vk option) typ =
   obj "AccountVerificationKeyWithHash" ~fields:(fun _info ->
-      [ field "verificationKey" ~typ:(non_null verification_key)
+      [ field "verificationKey"
+          ~typ:(non_null verification_key)
           ~args:Arg.[]
           ~resolve:(fun _ (v : mock_account_vk) -> v.vk_data)
-      ; field "hash" ~typ:(non_null verification_key_hash) ~args:Arg.[]
+      ; field "hash"
+          ~typ:(non_null verification_key_hash)
+          ~args:Arg.[]
           ~resolve:(fun _ (v : mock_account_vk) -> v.vk_hash)
       ] )
 
@@ -428,15 +466,20 @@ let untimed : mock_timing =
 
 let account_timing : (Mock_context.t, mock_timing option) typ =
   obj "AccountTiming" ~fields:(fun _info ->
-      [ field "initialMinimumBalance" ~typ:balance_scalar ~args:Arg.[]
+      [ field "initialMinimumBalance" ~typ:balance_scalar
+          ~args:Arg.[]
           ~resolve:(fun _ (t : mock_timing) -> t.tim_initial_minimum_balance)
-      ; field "cliffTime" ~typ:global_slot ~args:Arg.[]
+      ; field "cliffTime" ~typ:global_slot
+          ~args:Arg.[]
           ~resolve:(fun _ (t : mock_timing) -> t.tim_cliff_time)
-      ; field "cliffAmount" ~typ:amount ~args:Arg.[]
+      ; field "cliffAmount" ~typ:amount
+          ~args:Arg.[]
           ~resolve:(fun _ (t : mock_timing) -> t.tim_cliff_amount)
-      ; field "vestingPeriod" ~typ:global_slot_span ~args:Arg.[]
+      ; field "vestingPeriod" ~typ:global_slot_span
+          ~args:Arg.[]
           ~resolve:(fun _ (t : mock_timing) -> t.tim_vesting_period)
-      ; field "vestingIncrement" ~typ:amount ~args:Arg.[]
+      ; field "vestingIncrement" ~typ:amount
+          ~args:Arg.[]
           ~resolve:(fun _ (t : mock_timing) -> t.tim_vesting_increment)
       ] )
 
@@ -455,17 +498,23 @@ type mock_balance =
 
 let annotated_balance : (Mock_context.t, mock_balance option) typ =
   obj "AnnotatedBalance" ~fields:(fun _info ->
-      [ field "total" ~typ:(non_null balance_scalar) ~args:Arg.[]
+      [ field "total" ~typ:(non_null balance_scalar)
+          ~args:Arg.[]
           ~resolve:(fun _ (b : mock_balance) -> b.bal_total)
-      ; field "unknown" ~typ:(non_null balance_scalar) ~args:Arg.[]
+      ; field "unknown" ~typ:(non_null balance_scalar)
+          ~args:Arg.[]
           ~resolve:(fun _ (b : mock_balance) -> b.bal_unknown)
-      ; field "liquid" ~typ:balance_scalar ~args:Arg.[]
+      ; field "liquid" ~typ:balance_scalar
+          ~args:Arg.[]
           ~resolve:(fun _ (b : mock_balance) -> b.bal_liquid)
-      ; field "locked" ~typ:balance_scalar ~args:Arg.[]
+      ; field "locked" ~typ:balance_scalar
+          ~args:Arg.[]
           ~resolve:(fun _ (b : mock_balance) -> b.bal_locked)
-      ; field "blockHeight" ~typ:(non_null length_scalar) ~args:Arg.[]
+      ; field "blockHeight" ~typ:(non_null length_scalar)
+          ~args:Arg.[]
           ~resolve:(fun _ (b : mock_balance) -> b.bal_block_height)
-      ; field "stateHash" ~typ:state_hash_scalar ~args:Arg.[]
+      ; field "stateHash" ~typ:state_hash_scalar
+          ~args:Arg.[]
           ~resolve:(fun _ (b : mock_balance) -> b.bal_state_hash)
       ] )
 
@@ -503,8 +552,7 @@ let account : (Mock_context.t, mock_account option) typ =
       ; field "tokenId" ~typ:(non_null token_id)
           ~args:Arg.[]
           ~resolve:(fun _ (a : mock_account) -> a.mock_token_id)
-      ; field "token" ~typ:(non_null token_id)
-          ~doc:"Alias for tokenId"
+      ; field "token" ~typ:(non_null token_id) ~doc:"Alias for tokenId"
           ~args:Arg.[]
           ~resolve:(fun _ (a : mock_account) -> a.mock_token_id)
       ; field "nonce" ~typ:account_nonce
@@ -543,7 +591,8 @@ let account : (Mock_context.t, mock_account option) typ =
       ; field "tokenSymbol" ~typ:string
           ~args:Arg.[]
           ~resolve:(fun _ (a : mock_account) -> a.mock_token_symbol)
-      ; field "balance" ~typ:(non_null annotated_balance)
+      ; field "balance"
+          ~typ:(non_null annotated_balance)
           ~args:Arg.[]
           ~resolve:(fun _ (a : mock_account) -> a.mock_balance)
       ; field "timing" ~typ:(non_null account_timing)
@@ -563,7 +612,8 @@ let account : (Mock_context.t, mock_account option) typ =
 (** Lookup an account in the persona's [accounts] JSON object by public key.
     Returns a [mock_account] populated from the persona, or None if the key
     isn't known to the canned world. *)
-let mock_account_of_persona (persona : Persona.t) ~public_key : mock_account option =
+let mock_account_of_persona (persona : Persona.t) ~public_key :
+    mock_account option =
   match persona.accounts with
   | `Assoc pairs -> (
       match List.assoc_opt public_key pairs with
@@ -638,18 +688,21 @@ let mock_account_of_persona (persona : Persona.t) ~public_key : mock_account opt
 (* Placed after Account so [mock_account] and [account] typ are in scope. *)
 
 type mock_snark_worker =
-  { sw_key : string  (* public key *)
+  { sw_key : string (* public key *)
   ; sw_account : mock_account
   ; sw_fee : string
   }
 
 let snark_worker : (Mock_context.t, mock_snark_worker option) typ =
   obj "SnarkWorker" ~fields:(fun _info ->
-      [ field "key" ~typ:(non_null public_key) ~args:Arg.[]
+      [ field "key" ~typ:(non_null public_key)
+          ~args:Arg.[]
           ~resolve:(fun _ (s : mock_snark_worker) -> s.sw_key)
-      ; field "account" ~typ:(non_null account) ~args:Arg.[]
+      ; field "account" ~typ:(non_null account)
+          ~args:Arg.[]
           ~resolve:(fun _ (s : mock_snark_worker) -> s.sw_account)
-      ; field "fee" ~typ:(non_null fee) ~args:Arg.[]
+      ; field "fee" ~typ:(non_null fee)
+          ~args:Arg.[]
           ~resolve:(fun _ (s : mock_snark_worker) -> s.sw_fee)
       ] )
 
@@ -665,7 +718,7 @@ let snark_worker : (Mock_context.t, mock_snark_worker option) typ =
    which is enough for "browse the latest blocks" demos against bestChain. *)
 
 type mock_block =
-  { mb_creator : string  (* public key *)
+  { mb_creator : string (* public key *)
   ; mb_creator_account : mock_account
   ; mb_winner_account : mock_account
   ; mb_state_hash : string
@@ -675,26 +728,33 @@ type mock_block =
 
 let block_typ : (Mock_context.t, mock_block option) typ =
   obj "Block" ~fields:(fun _info ->
-      [ field "creator" ~typ:(non_null public_key) ~args:Arg.[]
+      [ field "creator" ~typ:(non_null public_key)
+          ~args:Arg.[]
           ~resolve:(fun _ (b : mock_block) -> b.mb_creator)
-      ; field "creatorAccount" ~typ:(non_null account) ~args:Arg.[]
+      ; field "creatorAccount" ~typ:(non_null account)
+          ~args:Arg.[]
           ~resolve:(fun _ (b : mock_block) -> b.mb_creator_account)
-      ; field "winnerAccount" ~typ:(non_null account) ~args:Arg.[]
+      ; field "winnerAccount" ~typ:(non_null account)
+          ~args:Arg.[]
           ~resolve:(fun _ (b : mock_block) -> b.mb_winner_account)
-      ; field "stateHash" ~typ:(non_null state_hash_scalar) ~args:Arg.[]
+      ; field "stateHash"
+          ~typ:(non_null state_hash_scalar)
+          ~args:Arg.[]
           ~resolve:(fun _ (b : mock_block) -> b.mb_state_hash)
-      ; field "stateHashField" ~typ:(non_null state_hash_as_decimal)
+      ; field "stateHashField"
+          ~typ:(non_null state_hash_as_decimal)
           ~args:Arg.[]
           ~resolve:(fun _ (b : mock_block) -> b.mb_state_hash_field)
-      ; field "commandTransactionCount" ~typ:(non_null int) ~args:Arg.[]
+      ; field "commandTransactionCount" ~typ:(non_null int)
+          ~args:Arg.[]
           ~resolve:(fun _ (b : mock_block) -> b.mb_command_transaction_count)
       ] )
 
 (* Convert one persona block (raw JSON) to a mock_block. Falls back to
    the persona's block-producer account for creator/winner accounts so
    subset-clean accounts always exist. *)
-let mock_block_of_json (persona : Persona.t) (json : Yojson.Safe.t)
-    : mock_block =
+let mock_block_of_json (persona : Persona.t) (json : Yojson.Safe.t) : mock_block
+    =
   let open Yojson.Safe.Util in
   let creator_pk =
     match json |> member "creator" with
@@ -704,11 +764,7 @@ let mock_block_of_json (persona : Persona.t) (json : Yojson.Safe.t)
         persona.daemon.block_producer_account
   in
   let state_hash =
-    match json |> member "stateHash" with
-    | `String s ->
-        s
-    | _ ->
-        ""
+    match json |> member "stateHash" with `String s -> s | _ -> ""
   in
   let tx_count =
     match json |> member "transactions" with
@@ -740,8 +796,7 @@ let mock_block_of_json (persona : Persona.t) (json : Yojson.Safe.t)
             ; bal_unknown = "0"
             ; bal_liquid = Some "0.000000000"
             ; bal_locked = Some "0"
-            ; bal_block_height =
-                string_of_int persona.daemon.blockchain_length
+            ; bal_block_height = string_of_int persona.daemon.blockchain_length
             ; bal_state_hash = persona.daemon.state_hash
             }
         ; mock_leaf_hash = None
@@ -760,26 +815,25 @@ let mock_block_of_json (persona : Persona.t) (json : Yojson.Safe.t)
 (* All blocks from the persona, oldest-first (the JSON is newest-first
    so we reverse). [bestChain] returns suffix of this. *)
 let mock_blocks (persona : Persona.t) : mock_block list =
-  let entries =
-    match persona.blocks with `List xs -> xs | _ -> []
-  in
+  let entries = match persona.blocks with `List xs -> xs | _ -> [] in
   List.rev_map (mock_block_of_json persona) entries
 
 (* ---------- CompletedWork ---------- *)
 
 type mock_completed_work =
-  { cw_prover : string
-  ; cw_fee : string
-  ; cw_work_ids : int list
-  }
+  { cw_prover : string; cw_fee : string; cw_work_ids : int list }
 
 let completed_work : (Mock_context.t, mock_completed_work option) typ =
   obj "CompletedWork" ~fields:(fun _info ->
-      [ field "prover" ~typ:(non_null public_key) ~args:Arg.[]
+      [ field "prover" ~typ:(non_null public_key)
+          ~args:Arg.[]
           ~resolve:(fun _ (w : mock_completed_work) -> w.cw_prover)
-      ; field "fee" ~typ:(non_null fee) ~args:Arg.[]
+      ; field "fee" ~typ:(non_null fee)
+          ~args:Arg.[]
           ~resolve:(fun _ (w : mock_completed_work) -> w.cw_fee)
-      ; field "workIds" ~typ:(non_null (list (non_null int))) ~args:Arg.[]
+      ; field "workIds"
+          ~typ:(non_null (list (non_null int)))
+          ~args:Arg.[]
           ~resolve:(fun _ (w : mock_completed_work) -> w.cw_work_ids)
       ] )
 
@@ -824,7 +878,7 @@ let canned_genesis_constants =
 type mock_user_command =
   { uc_id : string
   ; uc_hash : string
-  ; uc_kind : string  (* "PAYMENT" | "STAKE_DELEGATION" | "ZKAPP" *)
+  ; uc_kind : string (* "PAYMENT" | "STAKE_DELEGATION" | "ZKAPP" *)
   ; uc_nonce : int
   ; uc_from_pk : string
   ; uc_to_pk : string
@@ -873,49 +927,70 @@ let user_command_interface :
       ; abstract_field "fromAccount" ~typ:(non_null account) ~args:[]
       ; abstract_field "to" ~typ:(non_null public_key) ~args:[]
       ; abstract_field "toAccount" ~typ:(non_null account) ~args:[]
-      ; abstract_field "failureReason" ~typ:transaction_status_failure
-          ~args:[]
+      ; abstract_field "failureReason" ~typ:transaction_status_failure ~args:[]
       ] )
 
 (* Shared field definitions, reused across all concrete UserCommand impls. *)
-let user_command_shared_fields : (Mock_context.t, mock_user_command) field list =
-  [ field "id" ~typ:(non_null transaction_id) ~args:Arg.[]
+let user_command_shared_fields : (Mock_context.t, mock_user_command) field list
+    =
+  [ field "id" ~typ:(non_null transaction_id)
+      ~args:Arg.[]
       ~resolve:(fun _ (u : mock_user_command) -> u.uc_id)
-  ; field "hash" ~typ:(non_null transaction_hash) ~args:Arg.[]
+  ; field "hash"
+      ~typ:(non_null transaction_hash)
+      ~args:Arg.[]
       ~resolve:(fun _ (u : mock_user_command) -> u.uc_hash)
-  ; field "kind" ~typ:(non_null user_command_kind) ~args:Arg.[]
+  ; field "kind"
+      ~typ:(non_null user_command_kind)
+      ~args:Arg.[]
       ~resolve:(fun _ (u : mock_user_command) -> u.uc_kind)
-  ; field "nonce" ~typ:(non_null int) ~args:Arg.[]
+  ; field "nonce" ~typ:(non_null int)
+      ~args:Arg.[]
       ~resolve:(fun _ (u : mock_user_command) -> u.uc_nonce)
-  ; field "source" ~typ:(non_null account) ~args:Arg.[]
+  ; field "source" ~typ:(non_null account)
+      ~args:Arg.[]
       ~resolve:(fun _ (u : mock_user_command) -> u.uc_source_account)
-  ; field "receiver" ~typ:(non_null account) ~args:Arg.[]
+  ; field "receiver" ~typ:(non_null account)
+      ~args:Arg.[]
       ~resolve:(fun _ (u : mock_user_command) -> u.uc_receiver_account)
-  ; field "feePayer" ~typ:(non_null account) ~args:Arg.[]
+  ; field "feePayer" ~typ:(non_null account)
+      ~args:Arg.[]
       ~resolve:(fun _ (u : mock_user_command) -> u.uc_fee_payer_account)
-  ; field "validUntil" ~typ:(non_null global_slot) ~args:Arg.[]
+  ; field "validUntil" ~typ:(non_null global_slot)
+      ~args:Arg.[]
       ~resolve:(fun _ (u : mock_user_command) -> u.uc_valid_until)
-  ; field "token" ~typ:(non_null token_id) ~args:Arg.[]
+  ; field "token" ~typ:(non_null token_id)
+      ~args:Arg.[]
       ~resolve:(fun _ (u : mock_user_command) -> u.uc_token)
-  ; field "amount" ~typ:(non_null amount) ~args:Arg.[]
+  ; field "amount" ~typ:(non_null amount)
+      ~args:Arg.[]
       ~resolve:(fun _ (u : mock_user_command) -> u.uc_amount)
-  ; field "feeToken" ~typ:(non_null token_id) ~args:Arg.[]
+  ; field "feeToken" ~typ:(non_null token_id)
+      ~args:Arg.[]
       ~resolve:(fun _ (u : mock_user_command) -> u.uc_fee_token)
-  ; field "fee" ~typ:(non_null fee) ~args:Arg.[]
+  ; field "fee" ~typ:(non_null fee)
+      ~args:Arg.[]
       ~resolve:(fun _ (u : mock_user_command) -> u.uc_fee)
-  ; field "memo" ~typ:(non_null string) ~args:Arg.[]
+  ; field "memo" ~typ:(non_null string)
+      ~args:Arg.[]
       ~resolve:(fun _ (u : mock_user_command) -> u.uc_memo)
-  ; field "isDelegation" ~typ:(non_null bool) ~args:Arg.[]
+  ; field "isDelegation" ~typ:(non_null bool)
+      ~args:Arg.[]
       ~resolve:(fun _ (u : mock_user_command) -> u.uc_is_delegation)
-  ; field "from" ~typ:(non_null public_key) ~args:Arg.[]
+  ; field "from" ~typ:(non_null public_key)
+      ~args:Arg.[]
       ~resolve:(fun _ (u : mock_user_command) -> u.uc_from_pk)
-  ; field "fromAccount" ~typ:(non_null account) ~args:Arg.[]
+  ; field "fromAccount" ~typ:(non_null account)
+      ~args:Arg.[]
       ~resolve:(fun _ (u : mock_user_command) -> u.uc_source_account)
-  ; field "to" ~typ:(non_null public_key) ~args:Arg.[]
+  ; field "to" ~typ:(non_null public_key)
+      ~args:Arg.[]
       ~resolve:(fun _ (u : mock_user_command) -> u.uc_to_pk)
-  ; field "toAccount" ~typ:(non_null account) ~args:Arg.[]
+  ; field "toAccount" ~typ:(non_null account)
+      ~args:Arg.[]
       ~resolve:(fun _ (u : mock_user_command) -> u.uc_receiver_account)
-  ; field "failureReason" ~typ:transaction_status_failure ~args:Arg.[]
+  ; field "failureReason" ~typ:transaction_status_failure
+      ~args:Arg.[]
       ~resolve:(fun _ (u : mock_user_command) -> u.uc_failure_reason)
   ]
 
@@ -936,8 +1011,8 @@ type mock_signature =
 let signature_input =
   Arg.obj "SignatureInput"
     ~doc:
-      "A cryptographic signature -- you must provide either field+scalar \
-       or rawSignature"
+      "A cryptographic signature -- you must provide either field+scalar or \
+       rawSignature"
     ~coerce:(fun field scalar raw ->
       { sig_field = field; sig_scalar = scalar; sig_raw = raw } )
     ~fields:
@@ -973,22 +1048,31 @@ let send_payment_input =
     ~fields:
       Arg.
         [ arg "nonce" ~typ:uint32_arg
-            ~doc:"Should only be set when cancelling transactions, otherwise a nonce is determined automatically"
-        ; arg "memo" ~typ:string ~doc:"Short arbitrary message provided by the sender"
+            ~doc:
+              "Should only be set when cancelling transactions, otherwise a \
+               nonce is determined automatically"
+        ; arg "memo" ~typ:string
+            ~doc:"Short arbitrary message provided by the sender"
         ; arg "validUntil" ~typ:uint32_arg
-            ~doc:"The global slot since genesis after which this transaction cannot be applied"
+            ~doc:
+              "The global slot since genesis after which this transaction \
+               cannot be applied"
         ; arg "fee" ~typ:(non_null uint64_arg)
             ~doc:"Fee amount in order to send payment"
-        ; arg "amount" ~typ:(non_null uint64_arg) ~doc:"Amount of MINA to send to receiver"
-        ; arg "to" ~typ:(non_null public_key_arg) ~doc:"Public key of recipient of payment"
-        ; arg "from" ~typ:(non_null public_key_arg) ~doc:"Public key of sender of payment"
+        ; arg "amount" ~typ:(non_null uint64_arg)
+            ~doc:"Amount of MINA to send to receiver"
+        ; arg "to" ~typ:(non_null public_key_arg)
+            ~doc:"Public key of recipient of payment"
+        ; arg "from" ~typ:(non_null public_key_arg)
+            ~doc:"Public key of sender of payment"
         ]
 
 (* ---------- SendPaymentPayload ---------- *)
 
 let send_payment_payload : (Mock_context.t, mock_user_command option) typ =
   obj "SendPaymentPayload" ~fields:(fun _ ->
-      [ field "payment" ~typ:(non_null user_command_interface)
+      [ field "payment"
+          ~typ:(non_null user_command_interface)
           ~args:Arg.[]
           ~doc:"Payment that has been enqueued for inclusion (mock)"
           ~resolve:(fun _ (u : mock_user_command) -> mk_payment u)
@@ -1004,10 +1088,10 @@ let set_snark_worker_input =
     ~coerce:(fun pk -> { ssw_public_key = pk })
     ~fields:Arg.[ arg "publicKey" ~typ:public_key_arg ]
 
-let set_snark_worker_payload :
-    (Mock_context.t, string option option) typ =
+let set_snark_worker_payload : (Mock_context.t, string option option) typ =
   obj "SetSnarkWorkerPayload" ~fields:(fun _info ->
-      [ field "lastSnarkWorker" ~typ:public_key ~args:Arg.[]
+      [ field "lastSnarkWorker" ~typ:public_key
+          ~args:Arg.[]
           ~resolve:(fun _ (last : string option) -> last)
       ] )
 
@@ -1019,10 +1103,10 @@ let set_snark_work_fee_input =
     ~coerce:(fun fee -> { ssw_fee_fee = fee })
     ~fields:Arg.[ arg "fee" ~typ:(non_null uint64_arg) ]
 
-let set_snark_work_fee_payload :
-    (Mock_context.t, string option) typ =
+let set_snark_work_fee_payload : (Mock_context.t, string option) typ =
   obj "SetSnarkWorkFeePayload" ~fields:(fun _info ->
-      [ field "lastFee" ~typ:(non_null fee) ~args:Arg.[]
+      [ field "lastFee" ~typ:(non_null fee)
+          ~args:Arg.[]
           ~resolve:(fun _ (last : string) -> last)
       ] )
 
@@ -1036,16 +1120,16 @@ let set_coinbase_receiver_input =
 
 (* Payload carries both [lastCoinbaseReceiver] and [currentCoinbaseReceiver]. *)
 type mock_coinbase_payload =
-  { mcb_last : string option
-  ; mcb_current : string option
-  }
+  { mcb_last : string option; mcb_current : string option }
 
 let set_coinbase_receiver_payload :
     (Mock_context.t, mock_coinbase_payload option) typ =
   obj "SetCoinbaseReceiverPayload" ~fields:(fun _info ->
-      [ field "lastCoinbaseReceiver" ~typ:public_key ~args:Arg.[]
+      [ field "lastCoinbaseReceiver" ~typ:public_key
+          ~args:Arg.[]
           ~resolve:(fun _ (p : mock_coinbase_payload) -> p.mcb_last)
-      ; field "currentCoinbaseReceiver" ~typ:public_key ~args:Arg.[]
+      ; field "currentCoinbaseReceiver" ~typ:public_key
+          ~args:Arg.[]
           ~resolve:(fun _ (p : mock_coinbase_payload) -> p.mcb_current)
       ] )
 
@@ -1059,13 +1143,11 @@ let lock_input_arg =
     ~coerce:(fun pk -> { lock_public_key = pk })
     ~fields:Arg.[ arg "publicKey" ~typ:(non_null public_key_arg) ]
 
-type unlock_input =
-  { unlock_public_key : string ; unlock_password : string }
+type unlock_input = { unlock_public_key : string; unlock_password : string }
 
 let unlock_input_arg =
   Arg.obj "UnlockInput"
-    ~coerce:(fun pk pw ->
-      { unlock_public_key = pk; unlock_password = pw } )
+    ~coerce:(fun pk pw -> { unlock_public_key = pk; unlock_password = pw })
     ~fields:
       Arg.
         [ arg "publicKey" ~typ:(non_null public_key_arg)
@@ -1111,7 +1193,8 @@ let send_delegation_input =
    same field shape, just one fewer possibleType. *)
 let send_delegation_payload : (Mock_context.t, mock_user_command option) typ =
   obj "SendDelegationPayload" ~fields:(fun _ ->
-      [ field "delegation" ~typ:(non_null user_command_interface)
+      [ field "delegation"
+          ~typ:(non_null user_command_interface)
           ~args:Arg.[]
           ~doc:"Delegation that has been enqueued for inclusion (mock)"
           ~resolve:(fun _ (u : mock_user_command) -> mk_payment u)
@@ -1182,13 +1265,12 @@ let account_update_body_input =
         ]
 
 type mock_control_input =
-  { ci_proof : string option
-  ; ci_signature : string option
-  }
+  { ci_proof : string option; ci_signature : string option }
 
 let control_input =
   Arg.obj "ControlInput"
-    ~coerce:(fun proof signature -> { ci_proof = proof; ci_signature = signature })
+    ~coerce:(fun proof signature ->
+      { ci_proof = proof; ci_signature = signature } )
     ~fields:
       Arg.
         [ arg "proof" ~typ:zkapp_proof_arg
@@ -1196,9 +1278,7 @@ let control_input =
         ]
 
 type mock_zkapp_fee_payer_input =
-  { zfp_body : mock_fee_payer_body_input
-  ; zfp_authorization : string
-  }
+  { zfp_body : mock_fee_payer_body_input; zfp_authorization : string }
 
 let zkapp_fee_payer_input =
   Arg.obj "ZkappFeePayerInput"
@@ -1241,8 +1321,7 @@ let zkapp_command_input =
         ; arg "memo" ~typ:(non_null memo_arg)
         ]
 
-type mock_send_zkapp_input =
-  { szi_zkapp_command : mock_zkapp_command_input }
+type mock_send_zkapp_input = { szi_zkapp_command : mock_zkapp_command_input }
 
 let send_zkapp_input =
   Arg.obj "SendZkappInput"
@@ -1260,13 +1339,14 @@ let send_zkapp_input =
 
 type mock_zkapp_failure =
   { zf_index : string option
-  ; zf_failures : string list  (* TransactionStatusFailure list *)
+  ; zf_failures : string list (* TransactionStatusFailure list *)
   }
 
 let zkapp_command_failure_reason :
     (Mock_context.t, mock_zkapp_failure option) typ =
   obj "ZkappCommandFailureReason" ~fields:(fun _info ->
-      [ field "index" ~typ:index_scalar ~args:Arg.[]
+      [ field "index" ~typ:index_scalar
+          ~args:Arg.[]
           ~resolve:(fun _ (z : mock_zkapp_failure) -> z.zf_index)
       ; field "failures"
           ~typ:(non_null (list (non_null transaction_status_failure)))
@@ -1283,9 +1363,12 @@ type mock_zkapp_command_result =
 let zkapp_command_result :
     (Mock_context.t, mock_zkapp_command_result option) typ =
   obj "ZkappCommandResult" ~fields:(fun _info ->
-      [ field "id" ~typ:(non_null transaction_id) ~args:Arg.[]
+      [ field "id" ~typ:(non_null transaction_id)
+          ~args:Arg.[]
           ~resolve:(fun _ (z : mock_zkapp_command_result) -> z.zcr_id)
-      ; field "hash" ~typ:(non_null transaction_hash) ~args:Arg.[]
+      ; field "hash"
+          ~typ:(non_null transaction_hash)
+          ~args:Arg.[]
           ~resolve:(fun _ (z : mock_zkapp_command_result) -> z.zcr_hash)
       ; field "failureReason"
           ~typ:(list zkapp_command_failure_reason)
@@ -1296,32 +1379,35 @@ let zkapp_command_result :
             Option.map (List.map (fun f -> Some f)) z.zcr_failure_reason )
       ] )
 
-let send_zkapp_payload :
-    (Mock_context.t, mock_zkapp_command_result option) typ =
+let send_zkapp_payload : (Mock_context.t, mock_zkapp_command_result option) typ
+    =
   obj "SendZkappPayload" ~fields:(fun _info ->
-      [ field "zkapp" ~typ:(non_null zkapp_command_result) ~args:Arg.[]
+      [ field "zkapp"
+          ~typ:(non_null zkapp_command_result)
+          ~args:Arg.[]
           ~resolve:(fun _ (z : mock_zkapp_command_result) -> z)
       ] )
 
 (* LockPayload / UnlockPayload — defined here, after [account] is in scope. *)
-type mock_lock_payload =
-  { lp_public_key : string
-  ; lp_account : mock_account
-  }
+type mock_lock_payload = { lp_public_key : string; lp_account : mock_account }
 
 let lock_payload : (Mock_context.t, mock_lock_payload option) typ =
   obj "LockPayload" ~fields:(fun _info ->
-      [ field "publicKey" ~typ:(non_null public_key) ~args:Arg.[]
+      [ field "publicKey" ~typ:(non_null public_key)
+          ~args:Arg.[]
           ~resolve:(fun _ (p : mock_lock_payload) -> p.lp_public_key)
-      ; field "account" ~typ:(non_null account) ~args:Arg.[]
+      ; field "account" ~typ:(non_null account)
+          ~args:Arg.[]
           ~resolve:(fun _ (p : mock_lock_payload) -> p.lp_account)
       ] )
 
 let unlock_payload : (Mock_context.t, mock_lock_payload option) typ =
   obj "UnlockPayload" ~fields:(fun _info ->
-      [ field "publicKey" ~typ:(non_null public_key) ~args:Arg.[]
+      [ field "publicKey" ~typ:(non_null public_key)
+          ~args:Arg.[]
           ~resolve:(fun _ (p : mock_lock_payload) -> p.lp_public_key)
-      ; field "account" ~typ:(non_null account) ~args:Arg.[]
+      ; field "account" ~typ:(non_null account)
+          ~args:Arg.[]
           ~resolve:(fun _ (p : mock_lock_payload) -> p.lp_account)
       ] )
 

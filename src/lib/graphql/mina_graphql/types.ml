@@ -45,8 +45,6 @@ let global_slot_span = Scalars.GlobalSlotSpan.typ ()
 
 let length = Scalars.Length.typ ()
 
-let span = Scalars.Span.typ ()
-
 let ledger_hash = Scalars.LedgerHash.typ ()
 
 let state_hash = Scalars.StateHash.typ ()
@@ -120,15 +118,12 @@ module Make_daemon_status (Ctx : DAEMON_STATUS_CTX) = struct
         ; field "startTime" ~typ:(non_null block_time)
             ~args:Arg.[]
             ~resolve:(fun { ctx; _ } global_slot ->
-              C.start_time
-                ~constants:(Ctx.consensus_constants ctx)
-                global_slot )
+              C.start_time ~constants:(Ctx.consensus_constants ctx) global_slot
+              )
         ; field "endTime" ~typ:(non_null block_time)
             ~args:Arg.[]
             ~resolve:(fun { ctx; _ } global_slot ->
-              C.end_time
-                ~constants:(Ctx.consensus_constants ctx)
-                global_slot )
+              C.end_time ~constants:(Ctx.consensus_constants ctx) global_slot )
         ] )
 
   let consensus_time_with_global_slot_since_genesis =
@@ -137,8 +132,8 @@ module Make_daemon_status (Ctx : DAEMON_STATUS_CTX) = struct
       ~fields:(fun _ ->
         [ field "consensusTime" ~typ:(non_null consensus_time)
             ~doc:
-              "Time in terms of slot number in an epoch, start and end time \
-               of the slot since UTC epoch"
+              "Time in terms of slot number in an epoch, start and end time of \
+               the slot since UTC epoch"
             ~args:Arg.[]
             ~resolve:(fun _ (time, _) -> time)
         ; field "globalSlotSinceGenesis"
@@ -192,8 +187,8 @@ module Make_daemon_status (Ctx : DAEMON_STATUS_CTX) = struct
         ; field "generatedFromConsensusAt"
             ~typ:(non_null consensus_time_with_global_slot_since_genesis)
             ~doc:
-              "Consensus time of the block that was used to determine the \
-               next block production time"
+              "Consensus time of the block that was used to determine the next \
+               block production time"
             ~args:Arg.[]
             ~resolve:(fun { ctx; _ }
                           { Daemon_rpcs.Types.Status.Next_producer_timing
@@ -293,8 +288,8 @@ module Make_daemon_status (Ctx : DAEMON_STATUS_CTX) = struct
                ~block_production_delay:nn_int_list
                ~transaction_pool_diff_received:nn_int
                ~transaction_pool_diff_broadcasted:nn_int
-               ~transactions_added_to_pool:nn_int
-               ~transaction_pool_size:nn_int ~snark_pool_diff_received:nn_int
+               ~transactions_added_to_pool:nn_int ~transaction_pool_size:nn_int
+               ~snark_pool_diff_received:nn_int
                ~snark_pool_diff_broadcasted:nn_int ~pending_snark_work:nn_int
                ~snark_pool_size:nn_int )
 

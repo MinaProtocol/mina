@@ -33,9 +33,7 @@ let parse_request ~headers ~body_str =
   | _ -> (
       try
         let json = Yojson.Safe.from_string body_str in
-        let query =
-          Yojson.Safe.Util.(json |> member "query" |> to_string)
-        in
+        let query = Yojson.Safe.Util.(json |> member "query" |> to_string) in
         let variables =
           Yojson.Safe.Util.(json |> member "variables" |> to_option to_assoc)
           |> Option.map ~f:(fun pairs ->
@@ -43,7 +41,8 @@ let parse_request ~headers ~body_str =
                      (k, Yojson.Basic.from_string (Yojson.Safe.to_string v)) ) )
         in
         let op_name =
-          Yojson.Safe.Util.(json |> member "operationName" |> to_option to_string)
+          Yojson.Safe.Util.(
+            json |> member "operationName" |> to_option to_string)
         in
         Ok (query, variables, op_name)
       with exn -> Error (Exn.to_string exn) )
@@ -53,20 +52,16 @@ let execute ~persona (query, variables, _op_name) =
   match Graphql_parser.parse query with
   | Error msg ->
       return
-        (`Assoc
-          [ ( "errors"
-            , `List [ `Assoc [ ("message", `String msg) ] ] )
-          ] )
+        (`Assoc [ ("errors", `List [ `Assoc [ ("message", `String msg) ] ]) ])
   | Ok parsed -> (
       (* Yojson.Basic.t lacks the `Enum tag that Graphql_parser.const_value
          has, so structural coercion via [:>] is finicky inside option/list/
          tuple chains. Convert explicitly. *)
-      let rec yojson_to_const_value
-          : Yojson.Basic.t -> Graphql_parser.const_value = function
+      let rec yojson_to_const_value :
+          Yojson.Basic.t -> Graphql_parser.const_value = function
         | `Assoc pairs ->
             `Assoc
-              (List.map pairs ~f:(fun (k, v) ->
-                   (k, yojson_to_const_value v) ) )
+              (List.map pairs ~f:(fun (k, v) -> (k, yojson_to_const_value v)))
         | `Bool b ->
             `Bool b
         | `Float f ->
@@ -105,38 +100,35 @@ let execute ~persona (query, variables, _op_name) =
                       ]
                   ] )
             ]
-      | Error err -> (err :> Yojson.Safe.t) )
+      | Error err ->
+          (err :> Yojson.Safe.t) )
 
-let make_handler ~persona =
-  fun ~body _sock req ->
-   let uri = Cohttp.Request.uri req in
-   let meth = Cohttp.Request.meth req in
-   let path = Uri.path uri in
-   let lift x = `Response x in
-   match (meth, path) with
-   | `GET, "/health" ->
-       Cohttp_async.Server.respond_string ~status:`OK "OK" >>| lift
-   | `POST, "/graphql" -> (
-       let%bind body_str = Cohttp_async.Body.to_string body in
-       match parse_request ~headers:(Cohttp.Request.headers req) ~body_str with
-       | Error msg ->
-           respond_json ~status:`Bad_request
-             (Yojson.Safe.to_string
-                (`Assoc
-                  [ ( "errors"
-                    , `List [ `Assoc [ ("message", `String msg) ] ] )
-                  ] ) )
-           >>| lift
-       | Ok parsed ->
-           let%bind result = execute ~persona parsed in
-           respond_json (Yojson.Safe.to_string result) >>| lift )
-   | _ ->
-       Cohttp_async.Server.respond_string ~status:`Not_found "Not found"
-       >>| lift
+let make_handler ~persona ~body _sock req =
+  let uri = Cohttp.Request.uri req in
+  let meth = Cohttp.Request.meth req in
+  let path = Uri.path uri in
+  let lift x = `Response x in
+  match (meth, path) with
+  | `GET, "/health" ->
+      Cohttp_async.Server.respond_string ~status:`OK "OK" >>| lift
+  | `POST, "/graphql" -> (
+      let%bind body_str = Cohttp_async.Body.to_string body in
+      match parse_request ~headers:(Cohttp.Request.headers req) ~body_str with
+      | Error msg ->
+          respond_json ~status:`Bad_request
+            (Yojson.Safe.to_string
+               (`Assoc
+                 [ ("errors", `List [ `Assoc [ ("message", `String msg) ] ]) ]
+                 ) )
+          >>| lift
+      | Ok parsed ->
+          let%bind result = execute ~persona parsed in
+          respond_json (Yojson.Safe.to_string result) >>| lift )
+  | _ ->
+      Cohttp_async.Server.respond_string ~status:`Not_found "Not found" >>| lift
 
 let command =
-  Command.async
-    ~summary:"Canned-persona Mina daemon GraphQL mock server"
+  Command.async ~summary:"Canned-persona Mina daemon GraphQL mock server"
     (let%map_open.Command port =
        flag "--port" (required int) ~doc:"PORT Port to listen on"
      and persona_path =

@@ -25,15 +25,13 @@ type daemon =
   ; chain_id : string [@key "chainId"]
   ; num_accounts : int option [@key "numAccounts"] [@default None]
   ; state_hash : string option [@key "stateHash"] [@default None]
-  ; ledger_merkle_root : string option
-        [@key "ledgerMerkleRoot"] [@default None]
+  ; ledger_merkle_root : string option [@key "ledgerMerkleRoot"] [@default None]
   ; commit_id : string [@key "commitId"]
   ; conf_dir : string [@key "confDir"]
   ; user_commands_sent : int [@key "userCommandsSent"]
   ; snark_worker : string option [@key "snarkWorker"] [@default None]
   ; snark_work_fee : int [@key "snarkWorkFee"]
-  ; coinbase_receiver : string option
-        [@key "coinbaseReceiver"] [@default None]
+  ; coinbase_receiver : string option [@key "coinbaseReceiver"] [@default None]
   ; consensus_mechanism : string [@key "consensusMechanism"]
   ; global_slot_since_genesis_best_tip : int option
         [@key "globalSlotSinceGenesisBestTip"] [@default None]

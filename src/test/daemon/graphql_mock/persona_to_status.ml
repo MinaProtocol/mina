@@ -60,11 +60,7 @@ let synthetic_metrics : Daemon_rpcs.Types.Status.Metrics.t =
   }
 
 let parse_sync_status (s : string) : Sync_status.t =
-  match Sync_status.of_string s with
-  | Ok status ->
-      status
-  | Error _ ->
-      `Synced
+  match Sync_status.of_string s with Ok status -> status | Error _ -> `Synced
 
 let build (p : Persona.t) : Daemon_rpcs.Types.Status.t =
   let d = p.daemon in

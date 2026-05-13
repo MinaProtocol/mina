@@ -13,12 +13,11 @@ open Schema
    mock context, so we reuse [Mina_graphql.Types.DaemonStatus.t],
    [Mina_graphql.Types.sync_status], etc. verbatim. Schema drift in this
    subtree is impossible by construction. *)
-module Daemon_status_types =
-  Mina_graphql.Types.Make_daemon_status (struct
-    type t = Mock_context.t
+module Daemon_status_types = Mina_graphql.Types.Make_daemon_status (struct
+  type t = Mock_context.t
 
-    let consensus_constants _ = Persona_to_status.mock_consensus_constants
-  end)
+  let consensus_constants _ = Persona_to_status.mock_consensus_constants
+end)
 
 (* ---------- Queries ---------- *)
 
@@ -35,8 +34,9 @@ let sync_status =
     ~typ:(non_null Daemon_status_types.sync_status)
     ~resolve:(fun { ctx = persona; _ } () ->
       Async.return
-        (Ok (Persona_to_status.parse_sync_status persona.Persona.daemon.sync_status))
-      )
+        (Ok
+           (Persona_to_status.parse_sync_status
+              persona.Persona.daemon.sync_status ) ) )
 
 let version =
   io_field "version" ~doc:"The version of the node (mock)"
@@ -54,19 +54,20 @@ let time_offset =
       Async.return (Ok persona.Persona.daemon.time_offset) )
 
 let account =
-  io_field "account" ~doc:"Find any account via a public key and token id (mock)"
+  io_field "account"
+    ~doc:"Find any account via a public key and token id (mock)"
     ~typ:Mock_types.account
     ~args:
       Arg.
-        [ arg "publicKey" ~typ:(non_null Mock_types.public_key_arg)
+        [ arg "publicKey"
+            ~typ:(non_null Mock_types.public_key_arg)
             ~doc:"Public key of account"
         ; arg "token" ~typ:Mock_types.token_id_arg
             ~doc:"Token id of account (defaults to MINA token)"
         ]
     ~resolve:(fun { ctx = persona; _ } () public_key _token ->
-      Async.return
-        (Ok
-           (Mock_types.mock_account_of_persona persona ~public_key) ) )
+      Async.return (Ok (Mock_types.mock_account_of_persona persona ~public_key))
+      )
 
 (* wallet, accounts, tokenAccounts — three Account-shaped queries. *)
 
@@ -76,8 +77,8 @@ let wallet =
     ~typ:Mock_types.account
     ~args:Arg.[ arg "publicKey" ~typ:(non_null Mock_types.public_key_arg) ]
     ~resolve:(fun { ctx = persona; _ } () public_key ->
-      Async.return
-        (Ok (Mock_types.mock_account_of_persona persona ~public_key)) )
+      Async.return (Ok (Mock_types.mock_account_of_persona persona ~public_key))
+      )
 
 (* Real schema returns multiple Accounts when the same public key holds
    accounts on multiple tokens. The mock keeps a 1:1 mapping (one
@@ -91,9 +92,7 @@ let accounts =
     ~resolve:(fun { ctx = persona; _ } () public_key ->
       Async.return
         (Ok
-           ( match
-               Mock_types.mock_account_of_persona persona ~public_key
-             with
+           ( match Mock_types.mock_account_of_persona persona ~public_key with
            | Some a ->
                [ a ]
            | None ->
@@ -103,7 +102,9 @@ let accounts =
    because the persona doesn't track per-token ownership. *)
 let token_accounts =
   io_field "tokenAccounts"
-    ~doc:"Find all accounts for a given token (mock: returns every persona account)"
+    ~doc:
+      "Find all accounts for a given token (mock: returns every persona \
+       account)"
     ~typ:(non_null (list (non_null Mock_types.account)))
     ~args:Arg.[ arg "tokenId" ~typ:(non_null Mock_types.token_id_arg) ]
     ~resolve:(fun { ctx = persona; _ } () _token_id ->
@@ -116,8 +117,7 @@ let token_accounts =
       in
       let accounts =
         List.filter_map
-          (fun pk ->
-            Mock_types.mock_account_of_persona persona ~public_key:pk )
+          (fun pk -> Mock_types.mock_account_of_persona persona ~public_key:pk)
           pks
       in
       Async.return (Ok accounts) )
@@ -125,11 +125,14 @@ let token_accounts =
 (* The mock pretends every token is owned by the block-producer account. *)
 let token_owner =
   io_field "tokenOwner"
-    ~doc:"Find the account that owns a given token (mock: always the block producer)"
+    ~doc:
+      "Find the account that owns a given token (mock: always the block \
+       producer)"
     ~typ:Mock_types.account
     ~args:
       Arg.
-        [ arg "tokenId" ~typ:(non_null Mock_types.token_id_arg)
+        [ arg "tokenId"
+            ~typ:(non_null Mock_types.token_id_arg)
             ~doc:"Token id of token"
         ]
     ~resolve:(fun { ctx = persona; _ } () _token_id ->
@@ -162,11 +165,7 @@ let current_snark_worker =
         (Ok
            ( match account_opt with
            | Some a ->
-               Some
-                 { Mock_types.sw_key = bp
-                 ; sw_account = a
-                 ; sw_fee = "0.025"
-                 }
+               Some { Mock_types.sw_key = bp; sw_account = a; sw_fee = "0.025" }
            | None ->
                None ) ) )
 
@@ -181,11 +180,11 @@ let canned_trust_entry ip : Mock_types.mock_trust_status =
   }
 
 let trust_status =
-  io_field "trustStatus"
-    ~doc:"Trust status for an IPv4 or IPv6 address (mock)"
+  io_field "trustStatus" ~doc:"Trust status for an IPv4 or IPv6 address (mock)"
     ~typ:(list (non_null Mock_types.trust_status_payload))
     ~args:Arg.[ arg "ipAddress" ~typ:(non_null string) ]
-    ~resolve:(fun _ () ip_addr -> Async.return (Ok (Some [ canned_trust_entry ip_addr ])))
+    ~resolve:(fun _ () ip_addr ->
+      Async.return (Ok (Some [ canned_trust_entry ip_addr ])) )
 
 let trust_status_all =
   io_field "trustStatusAll"
@@ -194,26 +193,27 @@ let trust_status_all =
     ~args:Arg.[]
     ~resolve:(fun _ () ->
       Async.return
-        (Ok [ canned_trust_entry "192.0.2.1"; canned_trust_entry "192.0.2.2" ]) )
+        (Ok [ canned_trust_entry "192.0.2.1"; canned_trust_entry "192.0.2.2" ])
+      )
 
 (* bestChain — slice of the persona's blocks, ordered oldest-first.
    Real schema: bestChain(maxLength: Int): [Block!]. Returns null if no
    chain is known; the mock always returns the persona's blocks. *)
 let best_chain =
   io_field "bestChain"
-    ~doc:"Retrieve a list of blocks from transition frontier's root to the current best tip (mock)"
+    ~doc:
+      "Retrieve a list of blocks from transition frontier's root to the \
+       current best tip (mock)"
     ~typ:(list (non_null Mock_types.block_typ))
     ~args:
-      Arg.[ arg "maxLength" ~typ:int ~doc:"The maximum number of blocks to return" ]
+      Arg.
+        [ arg "maxLength" ~typ:int ~doc:"The maximum number of blocks to return"
+        ]
     ~resolve:(fun { ctx = persona; _ } () max_length ->
       let all = Mock_types.mock_blocks persona in
       let total = List.length all in
       let n =
-        match max_length with
-        | Some n when n > 0 && n < total ->
-            n
-        | _ ->
-            total
+        match max_length with Some n when n > 0 && n < total -> n | _ -> total
       in
       let rec drop k xs =
         match (k, xs) with
@@ -246,11 +246,7 @@ let block_query =
         List.find_opt
           (fun b ->
             let h =
-              match b |> member "height" with
-              | `Int n ->
-                  Some n
-              | _ ->
-                  None
+              match b |> member "height" with `Int n -> Some n | _ -> None
             in
             let sh =
               match b |> member "stateHash" with
@@ -272,13 +268,9 @@ let block_query =
         match pick with
         | Some b ->
             b
-        | None ->
+        | None -> (
             (* No filter or no match → fall back to first persona block *)
-            ( match blocks with
-            | b :: _ ->
-                b
-            | [] ->
-                `Assoc [] )
+            match blocks with b :: _ -> b | [] -> `Assoc [] )
       in
       Async.return (Ok (Mock_types.mock_block_of_json persona chosen)) )
 
@@ -293,9 +285,8 @@ let genesis_block_query =
       | b :: _ ->
           Async.return (Ok b)
       | [] ->
-          Async.return
-            (Ok
-               (Mock_types.mock_block_of_json persona (`Assoc []))) )
+          Async.return (Ok (Mock_types.mock_block_of_json persona (`Assoc [])))
+      )
 
 (* String / JSON returning admin queries — pure echo. *)
 
@@ -311,7 +302,7 @@ let runtime_config =
              [ ("genesis", `Assoc [ ("k", `Int 290) ])
              ; ("daemon", `Assoc [])
              ; ("mock", `Bool true)
-             ] )) )
+             ] ) ) )
 
 let blockchain_verification_key =
   io_field "blockchainVerificationKey"
@@ -324,7 +315,7 @@ let blockchain_verification_key =
            (`Assoc
              [ ("mock_verification_key", `String "AACGfBASrjLO9V8mock")
              ; ("hash", `String "0x0123abcd")
-             ] )) )
+             ] ) ) )
 
 let thread_graph =
   io_field "threadGraph"
@@ -351,7 +342,8 @@ let signature_kind_query =
 
 let protocol_state_query =
   io_field "protocolState"
-    ~doc:"The protocol state of a block as a Base64 or JSON encoded string (mock)"
+    ~doc:
+      "The protocol state of a block as a Base64 or JSON encoded string (mock)"
     ~typ:(non_null string)
     ~args:
       Arg.
@@ -366,8 +358,7 @@ let protocol_state_query =
         ; arg "stateHash" ~typ:string
         ]
     ~resolve:(fun _ () _enc _h _sh ->
-      Async.return
-        (Ok "{\"mock\":true,\"protocol_state\":\"encoded\"}") )
+      Async.return (Ok "{\"mock\":true,\"protocol_state\":\"encoded\"}") )
 
 (* snarkPool — list of completed snark work jobs. Mock returns one
    canned completed work, attributed to the persona's block producer. *)
@@ -389,8 +380,7 @@ let snark_pool =
 (* Look up status of a transaction hash. The mock's persona.transactions
    map carries known hashes; unknown hashes return UNKNOWN. *)
 let transaction_status =
-  io_field "transactionStatus"
-    ~doc:"Get the status of a transaction (mock)"
+  io_field "transactionStatus" ~doc:"Get the status of a transaction (mock)"
     ~typ:(non_null Mock_types.transaction_status_typ)
     ~args:
       Arg.
@@ -421,24 +411,23 @@ let transaction_status =
    publicKey is incremental future work. *)
 let pooled_user_commands =
   io_field "pooledUserCommands"
-    ~doc:"Get all the scheduled user commands for a specified sender that the current daemon sees in their mempool (mock: returns all persona mempool entries, ignores filters)"
+    ~doc:
+      "Get all the scheduled user commands for a specified sender that the \
+       current daemon sees in their mempool (mock: returns all persona mempool \
+       entries, ignores filters)"
     ~typ:(non_null (list (non_null Mock_types.user_command_interface)))
     ~args:
       Arg.
-        [ arg "ids" ~typ:(list (non_null guid))
-            ~doc:"Ids of User commands"
-        ; arg "hashes" ~typ:(list (non_null string))
+        [ arg "ids" ~typ:(list (non_null guid)) ~doc:"Ids of User commands"
+        ; arg "hashes"
+            ~typ:(list (non_null string))
             ~doc:"Hashes of User commands"
         ; arg "publicKey" ~typ:Mock_types.public_key_arg
             ~doc:"Public key of sender"
         ]
     ~resolve:(fun { ctx = persona; _ } () _ids _hashes _pk ->
       let entries =
-        match persona.Persona.mempool with
-        | `List xs ->
-            xs
-        | _ ->
-            []
+        match persona.Persona.mempool with `List xs -> xs | _ -> []
       in
       let placeholder_account pk : Mock_types.mock_account =
         match Mock_types.mock_account_of_persona persona ~public_key:pk with
@@ -473,7 +462,8 @@ let pooled_user_commands =
             ; mock_verification_key = None
             }
       in
-      let to_user_command (json : Yojson.Safe.t) : Mock_types.mock_user_command =
+      let to_user_command (json : Yojson.Safe.t) : Mock_types.mock_user_command
+          =
         let open Yojson.Safe.Util in
         let s f = json |> member f |> to_string in
         let s_opt f = json |> member f |> to_string_option in
@@ -484,8 +474,10 @@ let pooled_user_commands =
         ; uc_kind = (try s "kind" with _ -> "PAYMENT")
         ; uc_nonce =
             ( match s_opt "nonce" with
-            | Some n -> ( try int_of_string n with _ -> 0 )
-            | None -> 0 )
+            | Some n -> (
+                try int_of_string n with _ -> 0 )
+            | None ->
+                0 )
         ; uc_from_pk = from_pk
         ; uc_to_pk = to_pk
         ; uc_amount = (try s "amount" with _ -> "0")
@@ -503,11 +495,8 @@ let pooled_user_commands =
         }
       in
       let commands = List.map to_user_command entries in
-      Async.return
-        (Ok
-           (List.map
-              (fun uc -> Mock_types.mk_payment uc)
-              commands ) ) )
+      Async.return (Ok (List.map (fun uc -> Mock_types.mk_payment uc) commands))
+      )
 
 (* Type annotations on these lists are intentionally absent; let the compiler
    unify each field's context with [Mock_context.t] from the resolvers. *)
@@ -546,10 +535,10 @@ let queries =
 let start_filtered_log =
   io_field "startFilteredLog"
     ~doc:
-      "Start filtering and tracing the log of the daemon (mock: always succeeds)"
+      "Start filtering and tracing the log of the daemon (mock: always \
+       succeeds)"
     ~typ:(non_null bool)
-    ~args:
-      Arg.[ arg "filter" ~typ:(non_null (list (non_null string))) ]
+    ~args:Arg.[ arg "filter" ~typ:(non_null (list (non_null string))) ]
     ~resolve:(fun _ () _filter -> Async.return (Ok true))
 
 (* sendPayment — flagship demonstrative mutation. Builds a mock_user_command
@@ -563,7 +552,10 @@ let send_payment =
     ~args:
       Arg.
         [ arg "signature" ~typ:Mock_types.signature_input
-            ~doc:"If a signature is provided, this transaction is considered signed and will be broadcasted to the network without requiring a private key"
+            ~doc:
+              "If a signature is provided, this transaction is considered \
+               signed and will be broadcasted to the network without requiring \
+               a private key"
         ; arg "input" ~typ:(non_null Mock_types.send_payment_input)
         ]
     ~resolve:(fun { ctx = persona; _ } () _signature input ->
@@ -620,10 +612,12 @@ let send_payment =
         { uc_id = synthetic_hash
         ; uc_hash = synthetic_hash
         ; uc_kind = "PAYMENT"
-        ; uc_nonce = (
-            match input.sp_nonce with
-            | Some n -> ( try int_of_string n with _ -> 0 )
-            | None -> 0 )
+        ; uc_nonce =
+            ( match input.sp_nonce with
+            | Some n -> (
+                try int_of_string n with _ -> 0 )
+            | None ->
+                0 )
         ; uc_from_pk = input.sp_from
         ; uc_to_pk = input.sp_to
         ; uc_amount = input.sp_amount
@@ -646,7 +640,9 @@ let send_payment =
    SendDelegationPayload { delegation: UserCommand! } *)
 let send_delegation =
   io_field "sendDelegation"
-    ~doc:"Change your delegate by sending a transaction (mock: returns canned synthetic tx)"
+    ~doc:
+      "Change your delegate by sending a transaction (mock: returns canned \
+       synthetic tx)"
     ~typ:(non_null Mock_types.send_delegation_payload)
     ~args:
       Arg.
@@ -706,8 +702,10 @@ let send_delegation =
         ; uc_kind = "STAKE_DELEGATION"
         ; uc_nonce =
             ( match input.sd_nonce with
-            | Some n -> ( try int_of_string n with _ -> 0 )
-            | None -> 0 )
+            | Some n -> (
+                try int_of_string n with _ -> 0 )
+            | None ->
+                0 )
         ; uc_from_pk = input.sd_from
         ; uc_to_pk = input.sd_to
         ; uc_amount = "0"
@@ -715,7 +713,8 @@ let send_delegation =
         ; uc_memo = Option.value input.sd_memo ~default:""
         ; uc_token = "1"
         ; uc_fee_token = "1"
-        ; uc_valid_until = Option.value input.sd_valid_until ~default:"4294967295"
+        ; uc_valid_until =
+            Option.value input.sd_valid_until ~default:"4294967295"
         ; uc_is_delegation = true
         ; uc_failure_reason = None
         ; uc_source_account = from_acct
@@ -731,33 +730,32 @@ let send_delegation =
 
 let set_snark_worker =
   io_field "setSnarkWorker"
-    ~doc:"Set key you wish to snark work with or disable snark working (mock: echo)"
+    ~doc:
+      "Set key you wish to snark work with or disable snark working (mock: \
+       echo)"
     ~typ:(non_null Mock_types.set_snark_worker_payload)
     ~args:Arg.[ arg "input" ~typ:(non_null Mock_types.set_snark_worker_input) ]
     ~resolve:(fun _ () input ->
       Async.return (Ok input.Mock_types.ssw_public_key) )
 
 let set_snark_work_fee =
-  io_field "setSnarkWorkFee"
-    ~doc:"Set fee for snark workers (mock: echo)"
+  io_field "setSnarkWorkFee" ~doc:"Set fee for snark workers (mock: echo)"
     ~typ:(non_null Mock_types.set_snark_work_fee_payload)
-    ~args:Arg.[ arg "input" ~typ:(non_null Mock_types.set_snark_work_fee_input) ]
-    ~resolve:(fun _ () input ->
-      Async.return (Ok input.Mock_types.ssw_fee_fee) )
+    ~args:
+      Arg.[ arg "input" ~typ:(non_null Mock_types.set_snark_work_fee_input) ]
+    ~resolve:(fun _ () input -> Async.return (Ok input.Mock_types.ssw_fee_fee))
 
 let set_coinbase_receiver =
   io_field "setCoinbaseReceiver"
     ~doc:"Set the coinbase receiver public key (mock: echo)"
     ~typ:(non_null Mock_types.set_coinbase_receiver_payload)
-    ~args:Arg.[ arg "input" ~typ:(non_null Mock_types.set_coinbase_receiver_input) ]
+    ~args:
+      Arg.[ arg "input" ~typ:(non_null Mock_types.set_coinbase_receiver_input) ]
     ~resolve:(fun { ctx = persona; _ } () input ->
       let prev = Some persona.Persona.daemon.block_producer_account in
       Async.return
-        (Ok
-           Mock_types.
-             { mcb_last = prev
-             ; mcb_current = input.scr_public_key
-             } ) )
+        (Ok Mock_types.{ mcb_last = prev; mcb_current = input.scr_public_key })
+      )
 
 (* Lock/Unlock mutations — mock just looks up the account and returns it. *)
 
@@ -801,12 +799,13 @@ let lock_account_mut =
             ; mock_verification_key = None
             }
       in
-      Async.return
-        (Ok Mock_types.{ lp_public_key = pk; lp_account = acct }) )
+      Async.return (Ok Mock_types.{ lp_public_key = pk; lp_account = acct }) )
 
 let unlock_account_mut =
   io_field "unlockAccount"
-    ~doc:"Allow transactions to be sent from the unlocked account (mock: returns the account)"
+    ~doc:
+      "Allow transactions to be sent from the unlocked account (mock: returns \
+       the account)"
     ~typ:(non_null Mock_types.unlock_payload)
     ~args:Arg.[ arg "input" ~typ:(non_null Mock_types.unlock_input_arg) ]
     ~resolve:(fun { ctx = persona; _ } () input ->
@@ -844,8 +843,7 @@ let unlock_account_mut =
             ; mock_verification_key = None
             }
       in
-      Async.return
-        (Ok Mock_types.{ lp_public_key = pk; lp_account = acct }) )
+      Async.return (Ok Mock_types.{ lp_public_key = pk; lp_account = acct }) )
 
 (* sendZkapp — flagship zkApp mutation. Constructs a mock
    ZkappCommandResult from the persona's synthetic hash and returns it.
@@ -854,7 +852,9 @@ let unlock_account_mut =
    discarded. *)
 let send_zkapp =
   io_field "sendZkapp"
-    ~doc:"Send a zkApp transaction (mock: returns canned synthetic tx, ignores input details)"
+    ~doc:
+      "Send a zkApp transaction (mock: returns canned synthetic tx, ignores \
+       input details)"
     ~typ:(non_null Mock_types.send_zkapp_payload)
     ~args:Arg.[ arg "input" ~typ:(non_null Mock_types.send_zkapp_input) ]
     ~resolve:(fun { ctx = persona; _ } () _input ->
