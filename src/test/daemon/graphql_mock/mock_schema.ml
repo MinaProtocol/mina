@@ -9,22 +9,33 @@
 open Graphql_async
 open Schema
 
+(* Option C: instantiate the real daemonStatus subtree functor with our
+   mock context, so we reuse [Mina_graphql.Types.DaemonStatus.t],
+   [Mina_graphql.Types.sync_status], etc. verbatim. Schema drift in this
+   subtree is impossible by construction. *)
+module Daemon_status_types =
+  Mina_graphql.Types.Make_daemon_status (struct
+    type t = Mock_context.t
+
+    let consensus_constants _ = Persona_to_status.mock_consensus_constants
+  end)
+
 (* ---------- Queries ---------- *)
 
 let daemon_status =
   io_field "daemonStatus" ~doc:"Get running daemon status (mock)"
     ~args:Arg.[]
-    ~typ:(non_null Mock_types.daemon_status)
+    ~typ:(non_null Daemon_status_types.DaemonStatus.t)
     ~resolve:(fun { ctx = persona; _ } () ->
-      Async.return (Ok persona.Persona.daemon) )
+      Async.return (Ok (Persona_to_status.build persona)) )
 
 let sync_status =
   io_field "syncStatus" ~doc:"Network sync status (mock)"
     ~args:Arg.[]
-    ~typ:(non_null Mock_types.sync_status_typ)
+    ~typ:(non_null Daemon_status_types.sync_status)
     ~resolve:(fun { ctx = persona; _ } () ->
       Async.return
-        (Ok (Mock_types.parse_sync_status persona.Persona.daemon.sync_status))
+        (Ok (Persona_to_status.parse_sync_status persona.Persona.daemon.sync_status))
       )
 
 let version =

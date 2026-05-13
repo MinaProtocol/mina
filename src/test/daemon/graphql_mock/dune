@@ -2,7 +2,7 @@
 ;; the schema-dump exe.
 (library
  (name mina_graphql_mock)
- (modules persona mock_context mock_types mock_schema)
+ (modules persona mock_context mock_types persona_to_status mock_schema)
  (libraries
   ;; opam libraries
   async
@@ -10,7 +10,18 @@
   yojson
   graphql-async
   graphql_parser
-  ppx_deriving_yojson.runtime)
+  ppx_deriving_yojson.runtime
+  ;; local libraries (option C: reuse real schema types via functor)
+  mina_graphql
+  daemon_rpcs
+  consensus
+  network_peer
+  node_addrs_and_ports
+  sync_status
+  genesis_constants
+  block_time
+  mina_numbers
+  perf_histograms)
  (instrumentation
   (backend bisect_ppx))
  (preprocess
