@@ -95,9 +95,10 @@ let truncate_or_create path =
        via the kimchi-stubs serde-JSON binding. `prev_challenges` and
        primary-input arrays are empty; consumers reconstruct them
        from the wrapping JSON (see `emit_proof_serde_json_if_requested`).
-     - `simple_chain_wrapping_b{idx}.json`    : pickles
-       `to_yojson_full` of the wrapping data (statement, deferred
-       values, prev_evals). `messages_for_next_step_proof.app_state`
+     - `simple_chain_statement_and_evals_b{idx}.json` : pickles
+       `to_yojson_full` of the proof metadata (statement, deferred
+       values, prev_evals; also redundant wire_proof bytes the
+       consumer ignores). `messages_for_next_step_proof.app_state`
        is `null` here because pickles fixes ['s = unit] internally;
        the statement file below carries the real app data.
      - `simple_chain_statement_b{idx}.json`   : the public input
@@ -131,26 +132,30 @@ let emit_wrap_srs_if_requested ~(pickles_vk : Pickles.Verification_key.t) =
       Kimchi_bindings.Protocol.SRS.Fq.write (Some true) index.srs path ;
       Format.printf "wrote wrap SRS (msgpack) to %s@." path
 
-(* When [SIMPLE_CHAIN_FIXTURES_DIR] is set, dump the pickles wrapping
-   data for [pickles_proof] as JSON at
-   `${dir}/simple_chain_wrapping_b{idx}.json`, using pickles' own
-   ppx-derived `to_yojson_full`. The `app_state` field is `null` here
-   because pickles' stored [Proof.t] fixes ['s = unit]; consumers read
-   the application data from `simple_chain_statement_b{idx}.json`
-   instead. *)
-let emit_wrapping_json_if_requested ~idx
+(* When [SIMPLE_CHAIN_FIXTURES_DIR] is set, dump the pickles proof
+   metadata for [pickles_proof] as JSON at
+   `${dir}/simple_chain_statement_and_evals_b{idx}.json`, using
+   pickles' own ppx-derived `to_yojson_full`. The on-disk JSON has
+   three top-level fields: `statement`, `prev_evals`, and `proof` (the
+   wrap-wire-proof bytes, redundant with `proof_b{idx}.serde.json` and
+   ignored by consumers). `messages_for_next_step_proof.app_state` is
+   `null` because pickles' stored [Proof.t] fixes ['s = unit];
+   consumers read the application data from
+   `simple_chain_statement_b{idx}.json` instead. *)
+let emit_statement_and_evals_json_if_requested ~idx
     ~(pickles_proof : Pickles_types.Nat.N1.n Pickles.Proof.t) =
   match fixtures_dir () with
   | None ->
       ()
   | Some dir ->
       let path =
-        path_in_dir dir (Printf.sprintf "simple_chain_wrapping_b%d.json" idx)
+        path_in_dir dir
+          (Printf.sprintf "simple_chain_statement_and_evals_b%d.json" idx)
       in
       let module Proof_N1 = Pickles.Proof.Make (Pickles_types.Nat.N1) in
       let json = Proof_N1.to_yojson_full pickles_proof in
       Yojson.Safe.to_file path json ;
-      Format.printf "wrote pickles wrapping (JSON) to %s@." path
+      Format.printf "wrote pickles statement + evals (JSON) to %s@." path
 
 (* When [SIMPLE_CHAIN_FIXTURES_DIR] is set, extract the inner wrap
    kimchi proof (Pallas) from [pickles_proof] and write it as
@@ -287,7 +292,7 @@ let () =
   emit_vk_serde_json_if_requested ~pickles_vk ;
   emit_wrap_srs_if_requested ~pickles_vk ;
   let emit ~idx ~proof ~current =
-    emit_wrapping_json_if_requested ~idx ~pickles_proof:proof ;
+    emit_statement_and_evals_json_if_requested ~idx ~pickles_proof:proof ;
     emit_proof_serde_json_if_requested ~idx ~pickles_proof:proof ;
     emit_statement_json_if_requested ~idx ~initial ~current
   in
