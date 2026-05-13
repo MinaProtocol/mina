@@ -20,6 +20,13 @@ eval "$(opam env)"
 
 # (1) Regeneration check: committed mock_schema.json must equal what dune produces.
 make update-mock-graphql
+
+# Upload the regenerated file as a build artifact so a maintainer can grab it
+# directly when the diff check fails (Buildkite log truncates large diffs).
+if command -v buildkite-agent >/dev/null 2>&1; then
+  buildkite-agent artifact upload mock_schema.json || true
+fi
+
 git diff --exit-code -- mock_schema.json
 
 # (2) Subset check: mock must not declare types/fields the real schema lacks.
