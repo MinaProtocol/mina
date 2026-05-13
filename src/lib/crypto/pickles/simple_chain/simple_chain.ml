@@ -85,7 +85,7 @@ let truncate_or_create path =
 (* All emission helpers below are gated on [SIMPLE_CHAIN_FIXTURES_DIR].
    When set, this directory is the single output root for every fixture:
    wrap VI/SRS (shared across iterations), and per-iteration
-   `proof_repr_b{N}.json` + `wrap_proof_b{N}.bin`. *)
+   `proof_repr_b{N}.json`. *)
 let fixtures_dir () = Sys.getenv_opt "SIMPLE_CHAIN_FIXTURES_DIR"
 
 let path_in_dir dir name = Filename.concat dir name
@@ -159,46 +159,6 @@ let emit_proof_repr_json_if_requested ~idx
       Yojson.Safe.to_file path json ;
       Format.printf "wrote pickles proof Repr (JSON) to %s@." path
 
-(* When [SIMPLE_CHAIN_FIXTURES_DIR] is set, extract the inner wrap
-   Kimchi proof (Pallas) from [pickles_proof] and write it as msgpack
-   to `${dir}/simple_chain_wrap_proof_b{idx}.bin`.
-
-   We deliberately pass empty [chal_polys] and empty [primary_input];
-   the Rust verifier reconstructs `prev_challenges` from the
-   proof_repr's statement (via `build_simple_chain_prev_challenges`)
-   and packs its own public input via `assemble_wrap_main_input`. *)
-let emit_wrap_proof_if_requested ~idx
-    ~(pickles_proof : Pickles_types.Nat.N1.n Pickles.Proof.t) =
-  match fixtures_dir () with
-  | None ->
-      ()
-  | Some dir ->
-      let path =
-        path_in_dir dir (Printf.sprintf "simple_chain_wrap_proof_b%d.bin" idx)
-      in
-      truncate_or_create path ;
-      (* Pickles.Proof.t is abstract, but at runtime it's the concrete
-         with_data variant exposed in Mina_wire_types.Pickles.Concrete_. Coerce
-         through Obj.magic to reach the T constructor. *)
-      let pickles_proof_concrete :
-          Pickles_types.Nat.N1.n Mina_wire_types.Pickles.Concrete_.Proof.t =
-        Obj.magic pickles_proof
-      in
-      let (Mina_wire_types.Pickles.Concrete_.Proof.T { proof = wire_proof; _ })
-          =
-        pickles_proof_concrete
-      in
-      let kimchi_proof = Pickles.Wrap_wire_proof.to_kimchi_proof wire_proof in
-      let with_public_evals : Pickles.Backend.Tock.Proof.with_public_evals =
-        { proof = kimchi_proof; public_evals = None }
-      in
-      let backend_proof =
-        Pickles.Backend.Tock.Proof.to_backend_with_public_evals' [] [||]
-          with_public_evals
-      in
-      Kimchi_bindings.Protocol.Proof.Fq.write (Some true) backend_proof path ;
-      Format.printf "wrote wrap Kimchi proof (msgpack) to %s@." path
-
 (* Build a recursive step: assert prev_input matches the statement's
    carried (initial, current_minus_one) and produce a proof for
    (initial, current). *)
@@ -265,7 +225,6 @@ let () =
   emit_wrap_vi_if_requested ~pickles_vk ;
   emit_wrap_srs_if_requested ~pickles_vk ;
   let emit ~idx ~proof ~current =
-    emit_wrap_proof_if_requested ~idx ~pickles_proof:proof ;
     emit_proof_repr_json_if_requested ~idx ~pickles_proof:proof
       ~app_state:[| initial; current |]
   in
