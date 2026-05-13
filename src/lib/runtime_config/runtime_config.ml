@@ -1199,6 +1199,20 @@ module Proof_keys = struct
     ; account_creation_fee = Some account_creation_fee
     ; fork
     }
+
+  (** Like [gen] but only produces [block_window_duration_ms] values that
+      satisfy the daemon's [slots_per_year mod 12 = 0] assertion, where
+      [slots_per_year = (365 * 86_400_000) / block_window_duration_ms]
+      (integer division). Roughly 1 in 12 candidates pass, so rejection
+      sample. *)
+  let gen_valid =
+    let open Quickcheck.Generator.Let_syntax in
+    let%map t = gen
+    and block_window_duration_ms =
+      Quickcheck.Generator.filter (Int.gen_incl 1_000 360_000) ~f:(fun d ->
+          365 * 86_400_000 / d mod 12 = 0 )
+    in
+    { t with block_window_duration_ms = Some block_window_duration_ms }
 end
 
 (** Parameters for protocol constants that specify slot spans, and relate slot
@@ -1557,7 +1571,7 @@ let gen_valid =
   let open Quickcheck.Generator.Let_syntax in
   let%map daemon = Daemon.gen
   and genesis = Genesis.gen
-  and proof = Proof_keys.gen
+  and proof = Proof_keys.gen_valid
   and ledger = Ledger.gen
   and epoch_data = Epoch_data.gen in
   { daemon = Some daemon
