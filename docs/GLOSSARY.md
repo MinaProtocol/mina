@@ -330,7 +330,7 @@ when a distinction is drawn, "snark work" is the *job specification* and
 "completed work" is the *result*.
 
 *Source: [`src/lib/snark_work_lib/`](../src/lib/snark_work_lib/),
-[`src/app/snark_worker/`](../src/app/snark_worker/).*
+[`src/lib/snark_worker/`](../src/lib/snark_worker/).*
 
 ---
 
