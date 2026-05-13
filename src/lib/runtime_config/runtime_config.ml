@@ -1550,6 +1550,23 @@ let gen =
   ; epoch_data = Some epoch_data
   }
 
+(** A random runtime config the daemon should accept at startup. Composes
+    per-section [gen_valid]s where they exist and falls back to [gen]
+    otherwise. *)
+let gen_valid =
+  let open Quickcheck.Generator.Let_syntax in
+  let%map daemon = Daemon.gen
+  and genesis = Genesis.gen
+  and proof = Proof_keys.gen
+  and ledger = Ledger.gen
+  and epoch_data = Epoch_data.gen in
+  { daemon = Some daemon
+  ; genesis = Some genesis
+  ; proof = Some proof
+  ; ledger = Some ledger
+  ; epoch_data = Some epoch_data
+  }
+
 let ledger_accounts (ledger : Mina_ledger.Ledger.Any_ledger.witness) =
   let open Async.Deferred.Or_error.Let_syntax in
   let yield = Async_unix.Scheduler.yield_every ~n:100 |> Staged.unstage in
