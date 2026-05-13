@@ -201,6 +201,18 @@ module Query_metrics =
   }
 |}]
 
+module Query_sync_status = [%graphql {|
+  query {
+    syncStatus
+  }
+|}]
+
+module Query_network_id = [%graphql {|
+  query {
+    networkID
+  }
+|}]
+
 module Genesis_ledger_export = [%graphql {|
   query {
     fork_config

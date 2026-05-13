@@ -277,6 +277,10 @@ copy_common_daemon_apps() {
   cp ./default/src/app/cli/src/mina_"${signature}"_signatures.exe \
     "${TARGET_ROOT_DIR}/mina"
 
+  # GraphQL client utility (used by CI scripts; replaces ad-hoc curl invocations)
+  cp ./default/src/app/mina_graphql_client/mina_graphql_client_app.exe \
+    "${TARGET_ROOT_DIR}/mina-graphql-client"
+
 }
 
 # Function to DRY copying config files into daemon packages
