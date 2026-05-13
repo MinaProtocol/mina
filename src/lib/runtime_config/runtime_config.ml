@@ -968,6 +968,29 @@ module Ledger = struct
     ; name = Some name
     ; add_genesis_winner = Some add_genesis_winner
     }
+
+  (** Like [gen] but caps each account balance to keep the ledger total in
+      range. The daemon's [genesis_ledger_total_currency] sums balances via
+      [Currency.Amount.add] and raises if the total overflows uint64
+      nanomina; [Accounts.Single.gen] produces balances spanning the full
+      uint64 range, so any non-trivial ledger overflows. *)
+  let gen_valid =
+    let open Quickcheck.Generator.Let_syntax in
+    let max_per_account = Currency.Balance.of_mina_int_exn 1_000_000 in
+    let cap b =
+      if Currency.Balance.compare b max_per_account > 0 then max_per_account
+      else b
+    in
+    let%map t = gen in
+    match t.base with
+    | Accounts accs ->
+        let accs =
+          List.map accs ~f:(fun a -> { a with balance = cap a.balance })
+        in
+        let balances = List.mapi accs ~f:(fun i a -> (i, a.balance)) in
+        { t with base = Accounts accs; balances }
+    | Named _ | Hash ->
+        t
 end
 
 module Proof_keys = struct
@@ -1380,12 +1403,12 @@ module Epoch_data = struct
       let%map seed = String.gen_nonempty in
       { ledger; seed }
 
-    (** Like [gen] but generates a base58-encoded seed: the daemon parses
-        [seed] via [Epoch_seed.of_base58_check_exn], which rejects arbitrary
-        non-empty strings. *)
+    (** Like [gen] but uses [Ledger.gen_valid] and generates a base58-encoded
+        seed: the daemon parses [seed] via [Epoch_seed.of_base58_check_exn],
+        which rejects arbitrary non-empty strings. *)
     let gen_valid =
       let open Quickcheck.Generator.Let_syntax in
-      let%bind ledger = Ledger.gen in
+      let%bind ledger = Ledger.gen_valid in
       let%map seed = Mina_base.Epoch_seed.gen in
       { ledger; seed = Mina_base.Epoch_seed.to_base58_check seed }
   end
@@ -1589,7 +1612,7 @@ let gen_valid =
   let%map daemon = Daemon.gen
   and genesis = Genesis.gen
   and proof = Proof_keys.gen_valid
-  and ledger = Ledger.gen
+  and ledger = Ledger.gen_valid
   and epoch_data = Epoch_data.gen_valid in
   { daemon = Some daemon
   ; genesis = Some genesis
