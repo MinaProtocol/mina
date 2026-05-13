@@ -306,18 +306,16 @@ BUILD_NETWORK="--allow=network.host"
 
 docker buildx build --load --network=host --progress=plain $PLATFORM $DOCKER_REPO_ARG $NO_CACHE $BUILD_NETWORK $CACHE $NETWORK $IMAGE $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $DOCKER_DEB_SUFFIX_ARG $BUILD_FLAGS_SUFFIX_ARG $DEB_REPO $APT_CACHE_ARG $BRANCH $REPO $LEGACY_VERSION $CUSTOM_SUFFIX_ARG $CUSTOM_ARG $DEB_ARCH $DEB_STORAGE_REPAIR_VERSION $IMAGE_NAME_ARG $VERSION_ARG "$DOCKER_CONTEXT" -t "$TAG" -t "$HASHTAG" -f $DOCKERFILE_PATH
 
-if [[ -n "${SAVE_TO_CI_CACHE:-}" ]]; then
+if [[ -n "${SAVE_TO_CI_CACHE_ROOT:-}" ]]; then
 
   FULL_IMAGE_PATH="${SAVE_TO_CI_CACHE_ROOT}/${SERVICE}/${TAG_VERSION_PART}.tar.zst"
 
   # Hard sanity check: fail if --load did not produce the expected local image.
   docker image inspect "$TAG"
 
-  # Save local image to Hetzner storagebox.
-  docker save "$TAG" | zstd -T0 -3 > "$ARCHIVE_TMP"
-
+  mkdir -p "$(dirname "${FULL_IMAGE_PATH}")"
   echo "Saving built image to CI cache at ${FULL_IMAGE_PATH}"
-  docker save "$HASHTAG" | gzip > "${FULL_IMAGE_PATH}"
+  docker save "$TAG" "$HASHTAG" | zstd -T0 -3 > "${FULL_IMAGE_PATH}"
 fi
 
 if [[ "$DOCKER_ACTION" == "push" ]]; then
