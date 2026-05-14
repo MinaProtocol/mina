@@ -310,6 +310,17 @@ if [[ -n "${SAVE_TO_CI_CACHE_ROOT:-}" ]]; then
 
   FULL_IMAGE_PATH="${SAVE_TO_CI_CACHE_ROOT}/${SERVICE}/${TAG_VERSION_PART}.tar.zst"
 
+  if ! command -v zstd >/dev/null 2>&1; then
+    echo "zstd not found on host; installing (required for --save-to-ci-cache)"
+    if command -v apt-get >/dev/null 2>&1; then
+      ${SUDO:-sudo} apt-get update -qq
+      ${SUDO:-sudo} apt-get install -y --no-install-recommends zstd
+    else
+      echo "ERROR: zstd missing and no apt-get available to install it"
+      exit 1
+    fi
+  fi
+
   # Hard sanity check: fail if --load did not produce the expected local image.
   docker image inspect "$TAG"
 
