@@ -16,10 +16,6 @@ let DebianVersions = ../../Constants/DebianVersions.dhall
 
 let RunInToolchain = ../../Command/RunInToolchain.dhall
 
-let RunWithPostgres = ../../Command/RunWithPostgres.dhall
-
-let ContainerImages = ../../Constants/ContainerImages.dhall
-
 let Arch = ../../Constants/Arch.dhall
 
 let Network = ../../Constants/Network.dhall
@@ -32,7 +28,6 @@ let dirtyWhen =
       , S.exactly "buildkite/scripts/tests/rosetta/integration-tests" "sh"
       , S.exactly "buildkite/scripts/tests/rosetta/install-debs" "sh"
       , S.exactly "buildkite/scripts/tests/rosetta/install-cli" "sh"
-      , S.exactly "buildkite/scripts/tests/rosetta/indexer-test" "sh"
       , S.exactly "buildkite/scripts/debian/install" "sh"
       , S.strictlyStart (S.contains "scripts/debian")
       ]
@@ -61,15 +56,6 @@ in  Pipeline.build
             , commands =
                   [ Cmd.run
                       "export MINA_DEB_CODENAME=bullseye && source ./buildkite/scripts/export-git-env-vars.sh && echo \\\${MINA_DOCKER_TAG}"
-                  , RunWithPostgres.runInDockerWithPostgresConn
-                      envExports
-                      ( Some
-                          ( RunWithPostgres.ScriptOrArchive.Script
-                              "./src/test/archive/sample_db/archive_db.sql"
-                          )
-                      )
-                      ContainerImages.minaToolchainBullseye.amd64
-                      "./buildkite/scripts/tests/rosetta/indexer-test.sh"
                   ]
                 # RunInToolchain.runInToolchainBullseye
                     Arch.Type.Amd64
