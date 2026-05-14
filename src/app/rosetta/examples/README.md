@@ -19,7 +19,7 @@ This exposes Rosetta at `http://localhost:3087`.
 
 ### TypeScript (`ts/`)
 
-Cardano-style: `axios` + thin endpoint wrappers + [`mina-signer`](https://www.npmjs.com/package/mina-signer) for transaction signing. No SDK dependency — the Rosetta spec is small enough that hand-rolled wrappers are clearer than a generated client.
+Uses [`@o1-labs/mina-rosetta-sdk`](https://www.npmjs.com/package/@o1-labs/mina-rosetta-sdk) for the typed Rosetta HTTP surface and [`mina-signer`](https://www.npmjs.com/package/mina-signer) for Pallas-curve transaction signing.
 
 | Script | What it does |
 | --- | --- |
