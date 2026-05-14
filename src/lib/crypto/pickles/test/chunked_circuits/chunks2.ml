@@ -108,6 +108,8 @@ let test () =
   in
   let module Proof = (val proof) in
   let module Recursive_proof = (val recursive_proof) in
+  let module Proof0 = Pickles.Proof.Make (Nat.N0) in
+  let module Proof1 = Pickles.Proof.Make (Nat.N1) in
   let test_prove () =
     let public_input, (), proof =
       Async.Thread_safe.block_on_async_exn (fun () -> prove ())
@@ -115,13 +117,26 @@ let test () =
     Or_error.ok_exn
       (Async.Thread_safe.block_on_async_exn (fun () ->
            Proof.verify [ (public_input, proof) ] ) ) ;
+    (* check serde of chunked proofs works *)
+    let proof_roundtrip =
+      Proof0.to_base64 proof |> Proof0.of_base64 |> Result.ok_or_failwith
+    in
+    Or_error.ok_exn
+      (Async.Thread_safe.block_on_async_exn (fun () ->
+           Proof.verify [ (public_input, proof_roundtrip) ] ) ) ;
     let public_input, (), proof =
       Async.Thread_safe.block_on_async_exn (fun () ->
           recursive_prove ~handler:(Requests.handler proof) () )
     in
     Or_error.ok_exn
       (Async.Thread_safe.block_on_async_exn (fun () ->
-           Recursive_proof.verify [ (public_input, proof) ] ) )
+           Recursive_proof.verify [ (public_input, proof) ] ) ) ;
+    let proof_roundtrip =
+      Proof1.to_base64 proof |> Proof1.of_base64 |> Result.ok_or_failwith
+    in
+    Or_error.ok_exn
+      (Async.Thread_safe.block_on_async_exn (fun () ->
+           Recursive_proof.verify [ (public_input, proof_roundtrip) ] ) )
   in
   test_prove ()
 
