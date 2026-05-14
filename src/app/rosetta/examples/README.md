@@ -2,15 +2,13 @@
 
 Runnable scripts demonstrating common integration patterns against Mina's [Rosetta (Mesh) API](https://docs.cdp.coinbase.com/mesh/docs/welcome) implementation.
 
-These examples are co-located with the Rosetta server source so they stay in sync with the daemon they target. See the docs portal for narrative and architecture context.
-
 ## Prerequisites
 
 A running Mina Rosetta endpoint. The fastest way is the Docker Compose stack in `../docker-compose/`:
 
 ```bash
 cd ../docker-compose
-make rosetta-up   # devnet by default
+make devnet
 ```
 
 This exposes Rosetta at `http://localhost:3087`.
