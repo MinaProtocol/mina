@@ -84,33 +84,6 @@
     , nix-utils, flockenzeit, nixpkgs-old, nixpkgs-unstable, ... }:
     let
       inherit (nixpkgs) lib;
-
-      # All the submodules required by .gitmodules
-      submodules = map builtins.head (builtins.filter lib.isList
-        (map (builtins.match "	path = (.*)")
-          (lib.splitString "\n" (builtins.readFile ./.gitmodules))));
-
-      # Warn about missing submodules
-      requireSubmodules = let
-        ref = r: "[34;1m${r}[31;1m";
-        command = c: "[37;1m${c}[31;1m";
-      in lib.warnIf (!builtins.all (x: x)
-        (map (x: builtins.pathExists ./${x} && builtins.readDir ./${x} != { })
-          submodules)) ''
-            Some submodules are missing, you may get errors. Consider one of the following:
-            - run ${command "nix/pin.sh"} and use "${
-              ref "mina"
-            }" flake ref, e.g. ${command "nix develop mina"} or ${
-              command "nix build mina"
-            };
-            - use "${ref "git+file://$PWD?submodules=1"}";
-            - use "${
-              ref "git+https://github.com/minaprotocol/mina?submodules=1"
-            }";
-            - use non-flake commands like ${command "nix-build"} and ${
-              command "nix-shell"
-            }.
-          '';
     in {
       overlays = {
         misc = import ./nix/misc.nix;
@@ -121,8 +94,7 @@
         go = import ./nix/go.nix;
         javascript = import ./nix/javascript.nix;
         ocaml = pkgs: prev: {
-          ocamlPackages_mina =
-            requireSubmodules (import ./nix/ocaml.nix { inherit inputs pkgs; });
+          ocamlPackages_mina = import ./nix/ocaml.nix { inherit inputs pkgs; };
         };
         # Skip tests on nodejs dep due to known issue with nixpkgs 24.11 https://github.com/NixOS/nixpkgs/issues/402079
         # this can be removed after upgrading
