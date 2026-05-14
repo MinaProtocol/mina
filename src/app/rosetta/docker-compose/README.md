@@ -7,7 +7,7 @@ Run a full Mina node stack: daemon, archive, Rosetta API, Postgres, and missing 
 | Service | Description | Default Port |
 |---------|-------------|--------------|
 | `postgres` | Archive database | 5433 (host) -> 5432 (container) |
-| `bootstrap_db` | One-shot: downloads and imports archive dump | - |
+| `bootstrap_db` | One-shot: runs [`mina-bootstrap archive`](../../bootstrap/) to download and import the daily archive dump | - |
 | `mina_archive` | Archive process connected to Postgres | 3086 |
 | `mina_node` | Mina daemon (block producer / seed) | 3085 (GraphQL), 8302 (P2P) |
 | `mina_rosetta` | Rosetta API for exchanges/wallets | 3087 |
@@ -116,5 +116,6 @@ Key differences between networks:
 |----------|--------|---------|
 | `MINA_NETWORK` | `devnet` | `mainnet` |
 | `MINA_PEERLIST_URL` | devnet seeds | mainnet bootnodes |
-| `ARCHIVE_DUMP_PREFIX` | `devnet-archive-dump` | `mainnet-archive-dump` |
 | Docker image tags | `*-devnet` | `*-mainnet` |
+
+`bootstrap_db` runs the [`mina-bootstrap`](../../bootstrap/) CLI as a one-shot init container. The archive-dump URL and prefix are baked into the CLI per `--network`, so the compose stack no longer needs `ARCHIVE_DUMP_BASE_URL` / `ARCHIVE_DUMP_PREFIX` env vars.
