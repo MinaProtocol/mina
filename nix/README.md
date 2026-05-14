@@ -11,13 +11,14 @@ encounter any problem.
 <details>
 <summary>TL;DR for those who know Nix</summary>
 
-This is a flake. It provides a lot of different packages from the monorepo. Most
-of those packages require submodules to build. To simplify your life, there's
-`nix/pin.sh` script which creates the relevant registry entry with
-`?submodules=1`, so that you can then use it like `nix build mina`, `nix develop
-mina`, etc. You can discover all the available packages as usual, by using tab
-completion or `nix eval mina#packages.x86_64-linux --apply __attrNames` or your
-favourite way.
+This is a flake. It provides a lot of different packages from the monorepo.
+Build them with `nix build .#<package>` (e.g. `nix build .` for the default
+mina derivation) or enter a dev shell with `nix develop`. Discover the
+available packages with `nix eval .#packages.x86_64-linux --apply __attrNames`.
+
+The rest of this README uses the `mina#<package>` shorthand. Run `./nix/pin.sh`
+once to register it as a flake-registry alias, or just replace `mina` with `.`
+in the commands below.
 
 </details>
 
@@ -64,18 +65,14 @@ echo 'experimental-features = nix-command flakes' > "${XDG_CONFIG_HOME-${HOME}/.
 You can check that your flake support is working by running `nix flake metadata
 github:nixos/nixpkgs` for example.
 
-## 3. Add a nix registry entry
+## 3. (Optional) Register the `mina` flake alias
 
-If you're using flakes (see previous section), **you have to run the
-`./nix/pin.sh` script** to get the `mina` registry entry, since that's the
-easiest way to enable submodules to be available to the build. This is needed
-because by default Nix will not include submodules in the source tree it builds
-dependencies from, resulting in errors.
-
-For the curious, `mina` registry entry will resolve to
-`git+file:///path/to/your/mina/checkout?submodules=1`. Should you want to hack
-on a different mina checkout, try e.g. `nix develop
-"git+file://$PWD?submodules=1"` from that checkout.
+Every command in the rest of this README can be invoked directly as
+`nix <cmd> .#<package>` from the repo root. If you prefer the shorter
+`mina#<package>` form, run `./nix/pin.sh` once to register a flake-registry
+entry pointing at your checkout. `pin.sh` also initialises the git submodules,
+which is needed if you want to run `dune build` directly (outside of any Nix
+invocation).
 
 ## 4. Use it
 
@@ -270,7 +267,7 @@ sudo nixos-container start mina
 
 TL;DR
 ```
-printf './nix/pin.sh\nuse flake mina\n' > .envrc
+echo 'use flake' > .envrc
 direnv allow
 ```
 
@@ -289,10 +286,10 @@ time you enter the Mina repo directory. One way to do this is by using
 - Configure the [`nix-direnv`](https://github.com/nix-community/nix-direnv)
   - The `Via home-manager (Recommended)` section
 - Create the `.envrc` file under the Mina repo root path with the following
-  content: `use flake mina`:
+  content: `use flake`:
   ```
   cd mina
-  touch .envrc && echo "use flake mina" >> .envrc
+  echo 'use flake' > .envrc
   ```
 - Execute the following command within the Mina repo root path, in order to
   activate the `direnv` for current directory (it will read and apply previously
@@ -348,9 +345,20 @@ expressions from `nix/`, `flake.lock` which locks the input versions, and
 
 ### Updating inputs
 
-If you wish to update all the inputs of this flake, run `nix flake update` . If
-you want to update a particular input, run `nix flake lock --update-input
-<input>` .
+If you wish to update all the inputs of this flake, run `nix flake update`. To
+update a particular input, run `nix flake update <input>`.
+
+Three of the inputs — `proof-systems`, `kimchi-stubs-vendors`, and `snarky` —
+shadow the corresponding git submodules under `src/lib/`. They must be kept in
+lock-step with the submodule SHAs in `HEAD`. To bump one of them:
+
+1. Bump the submodule in the worktree
+   (`cd <submodule path> && git checkout <new-rev> && cd -; git add <path>`).
+2. Update the rev in the corresponding `url = "github:.../<rev>";` line in
+   `flake.nix`.
+3. Run `nix flake update <input>` to refresh `flake.lock`.
+4. Run `make check-flake-submodule-sync` to verify the flake input rev and the
+   submodule SHA agree. The same check runs in the Buildkite Lint pipeline.
 
 ### Notes on the "pure" build
 
@@ -468,9 +476,8 @@ nix-repl> :u legacyPackages.x86_64-linux.regular.ocamlPackages_mina.mina-dev.ove
 ### Evaluation takes too long
 
 Evaluating any output of this flake for the first time can take a substantial
-amount of time. This is because Nix wants to ensure purity, and thus copies all
-submodules to the store and checks them out individually, even if you already
-have them checked out in your work tree.
+amount of time, because Nix copies your work tree into the store to ensure
+purity. Subsequent evaluations are much faster as the inputs are cached.
 
 This is good for reproducibility, but can be inconvenient. Here are some steps
 you can take to circumvent this:
@@ -574,21 +581,22 @@ running it with `result/bin/mina` instead.
 
 ### Submodules
 
-Nix will **not** fetch submodules for you. You have to make sure that
-you have the entire mina source code, including submodules, before you
-run any nix commands. This should make sure you have the right
-versions checked out (in most cases):
+The Nix build pulls in the `proof-systems`, `kimchi-stubs-vendors`, and
+`snarky` components as dedicated flake inputs pinned in `flake.lock`. `nix
+build .` and `nix develop` work on a fresh checkout without any explicit
+submodule setup.
+
+If you want to run `dune build` directly (outside of any Nix invocation),
+you still need the submodules initialised in your work tree:
 
 ```
 git submodule sync
 git submodule update --init --recursive
 ```
 
-If you don't do this, Nix may not always yell at you right away
-(especially if all the submodule directories are present in the tree
-somehow, but not correctly filled in). It will however fail with a
-strange error during the build, when it fails to find a
-dependency. Make sure you do this!
+Bumping a submodule also requires bumping its matching flake input — see
+[Updating inputs](#updating-inputs). The `make check-flake-submodule-sync`
+target (also enforced in the Buildkite Lint pipeline) catches drift.
 
 ### `Warning: ignoring untrusted substituter`
 
@@ -647,7 +655,7 @@ For compilation units that have no package defined, a synthetic package name is 
 
 ## Examples
 
-CLI commands below assume to be executed from a directory with Mina repository checked out and `./nix/pin.sh` executed.
+CLI commands below assume execution from the root of the Mina repository checkout, and use the `mina#` flake-alias shorthand registered by `./nix/pin.sh`. Replace `mina` with `.` to invoke them without the alias.
 
 | Description | Command |
 |--------------|-------------|
