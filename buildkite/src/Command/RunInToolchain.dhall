@@ -6,26 +6,15 @@ let Arch = ../Constants/Arch.dhall
 
 let FixPermissions = ../Command/FixPermissions.dhall
 
-let binfmtSetup
-    : Arch.Type -> List Cmd.Type
-    =     \(arch : Arch.Type)
-      ->  merge
-            { Amd64 = [] : List Cmd.Type
-            , Arm64 =
-              [ Cmd.run
-                  "docker run --privileged --rm tonistiigi/binfmt --install arm64"
-              ]
-            }
-            arch
-
 let runInToolchainImage
     : Text -> Arch.Type -> List Text -> Text -> List Cmd.Type
     =     \(image : Text)
       ->  \(arch : Arch.Type)
       ->  \(environment : List Text)
       ->  \(innerScript : Text)
-      ->    binfmtSetup arch
-          # [ FixPermissions.command arch ]
+      ->    [ FixPermissions.command arch
+            , Cmd.run "./buildkite/scripts/docker/load_from_cache.sh \$image"
+            ]
           # [ Cmd.runInDocker
                 Cmd.Docker::{
                 , image = image
@@ -36,14 +25,18 @@ let runInToolchainImage
             ]
 
 let runInToolchainNoble
-    : List Text -> Text -> List Cmd.Type
-    =     \(environment : List Text)
+    : Arch.Type -> List Text -> Text -> List Cmd.Type
+    =     \(arch : Arch.Type)
+      ->  \(environment : List Text)
       ->  \(innerScript : Text)
-      ->  runInToolchainImage
-            ContainerImages.minaToolchainNoble.amd64
-            Arch.Type.Amd64
-            environment
-            innerScript
+      ->  let image =
+                merge
+                  { Amd64 = ContainerImages.minaToolchainNoble.amd64
+                  , Arm64 = ContainerImages.minaToolchainNoble.arm64
+                  }
+                  arch
+
+          in  runInToolchainImage image arch environment innerScript
 
 let runInToolchainJammy
     : List Text -> Text -> List Cmd.Type
@@ -70,14 +63,18 @@ let runInToolchainBookworm
           in  runInToolchainImage image arch environment innerScript
 
 let runInToolchainBullseye
-    : List Text -> Text -> List Cmd.Type
-    =     \(environment : List Text)
+    : Arch.Type -> List Text -> Text -> List Cmd.Type
+    =     \(arch : Arch.Type)
+      ->  \(environment : List Text)
       ->  \(innerScript : Text)
-      ->  runInToolchainImage
-            ContainerImages.minaToolchainBullseye.amd64
-            Arch.Type.Amd64
-            environment
-            innerScript
+      ->  let image =
+                merge
+                  { Amd64 = ContainerImages.minaToolchainBullseye.amd64
+                  , Arm64 = ContainerImages.minaToolchainBullseye.arm64
+                  }
+                  arch
+
+          in  runInToolchainImage image arch environment innerScript
 
 let runInToolchain
     : List Text -> Text -> List Cmd.Type
