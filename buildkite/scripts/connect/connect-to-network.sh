@@ -78,6 +78,14 @@ source buildkite/scripts/debian/update.sh --verbose
 source buildkite/scripts/export-git-env-vars.sh
 source buildkite/scripts/debian/install.sh "mina-${MINA_DEBIAN_NETWORK},mina-daemon-storage-toolbox" 1
 
+# Stash mina-graphql-client so it survives the legacy downgrade below.
+# The official 3.3.0 mina-${MINA_DEBIAN_NETWORK} package does not ship this
+# binary; without stashing, the post-downgrade sync check would fail because
+# the helper would have been removed. The binary is self-contained except
+# for libc/libssl/libgmp which remain present across the downgrade.
+MINA_GRAPHQL_CLIENT=/tmp/mina-graphql-client.stashed
+cp "$(command -v mina-graphql-client)" "$MINA_GRAPHQL_CLIENT"
+
 # Legacy scanner installs to a separate versioned path under /usr/lib/mina/
 FORCE_VERSION="*" ROOT="legacy" ./buildkite/scripts/debian/install.sh "mina-daemon-recovery-storage-toolbox" 1
 
@@ -108,11 +116,9 @@ start_daemon_and_wait_for_sync() {
 
     local sync_status=""
     while [ "$(date +%s)" -lt $deadline ]; do
-        sync_status=$( { curl -s -m 5 'http://localhost:3085/graphql' \
-            -H 'accept: application/json' \
-            -H 'content-type: application/json' \
-            --data-raw '{"query":"query { syncStatus }"}' \
-            | jq -r .data.syncStatus ; } 2>/dev/null || echo "CONNECT_ERROR" )
+        sync_status=$(timeout 5 "$MINA_GRAPHQL_CLIENT" sync-status \
+            --graphql-uri http://localhost:3085/graphql --raw \
+            2>/dev/null || echo "CONNECT_ERROR")
 
         if [[ "$sync_status" == "SYNCED" ]]; then
             break
@@ -126,12 +132,11 @@ start_daemon_and_wait_for_sync() {
         exit 1
     fi
 
-    # Check network id via GraphQL
-    NETWORK_ID=$(curl -s 'http://localhost:3085/graphql' \
-        -H 'accept: application/json' \
-        -H 'content-type: application/json' \
-        --data-raw '{"query":"query MyQuery {\n  networkID\n}\n","variables":null,"operationName":"MyQuery"}' \
-        | jq -r .data.networkID)
+    # Check network id via GraphQL.
+    # Wrap in timeout so a hung GraphQL endpoint doesn't stall the script for
+    # the ~5 minute default retry budget inside exec_graphql_request.
+    NETWORK_ID=$(timeout 10 "$MINA_GRAPHQL_CLIENT" network-id \
+        --graphql-uri http://localhost:3085/graphql --raw)
 
     EXPECTED_NETWORK="mina:$NETWORK_NAME"
 
