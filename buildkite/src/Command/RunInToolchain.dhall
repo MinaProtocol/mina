@@ -12,7 +12,9 @@ let runInToolchainImage
       ->  \(arch : Arch.Type)
       ->  \(environment : List Text)
       ->  \(innerScript : Text)
-      ->    [ FixPermissions.command arch ]
+      ->    [ FixPermissions.command arch
+            , Cmd.run "./buildkite/scripts/docker/load_from_cache.sh \$image"
+            ]
           # [ Cmd.runInDocker
                 Cmd.Docker::{
                 , image = image
