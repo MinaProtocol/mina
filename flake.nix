@@ -53,6 +53,26 @@
 
   inputs.nix-filter.url = "github:numtide/nix-filter";
 
+  inputs.proof-systems = {
+    # Pinned to the same commit used in the proof systems git submodule
+    # If you want to hack locally with an overriden proof systems, add the
+    # argument `--override-input proof-systems "github:o1-labs/proof-systems/<commit>"`
+    # to your `nix develop` or `nix build` command. Use the URI "path:/path/to/my/proof-systems"
+    # if you want to use a local proof systems repo.
+    url = "github:o1-labs/proof-systems/ab84160fa2c22290a8506a7742ac1378879fc386";
+    flake = false;
+  };
+
+  inputs.kimchi-stubs-vendors = {
+    url = "github:MinaProtocol/kimchi-stubs-vendors/818fbf6fa38f20f976657ea1d9705b7a29bd3a38";
+    flake = false;
+  };
+
+  inputs.snarky = {
+    url = "github:o1-labs/snarky/9f55ef7c2f2570365aeb24b6ddfc713f48be3117";
+    flake = false;
+  };
+
   inputs.flake-buildkite-pipeline.url = "github:tweag/flake-buildkite-pipeline";
 
   inputs.nix-utils.url = "github:juliosueiras-nix/nix-utils";
@@ -94,7 +114,10 @@
     in {
       overlays = {
         misc = import ./nix/misc.nix;
-        rust = import ./nix/rust.nix;
+        rust = import ./nix/rust.nix {
+          proof-systems-src = inputs.proof-systems;
+          kimchi-stubs-vendors-src = inputs.kimchi-stubs-vendors;
+        };
         go = import ./nix/go.nix;
         javascript = import ./nix/javascript.nix;
         ocaml = pkgs: prev: {

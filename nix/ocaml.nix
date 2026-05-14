@@ -114,6 +114,9 @@ let
     ];
     phases = [ "unpackPhase" "buildPhase" ];
     buildPhase = ''
+      cp -r ${pkgs.lib.sources.sourceFilesBySuffices inputs.snarky [
+        "dune" "dune-project" ".inc" ".opam"
+      ]} lib/snarky
       files=$(ls)
       mkdir src
       mv $files src
@@ -310,6 +313,12 @@ let
               "opam.export"
             ];
           };
+
+        # Also add the snarky submodule from the dedicated flake input.
+        postUnpack = ''
+          chmod u+w source/src/lib
+          cp -r ${inputs.snarky} source/src/lib/snarky
+        '';
 
         withFakeOpam = false;
 
