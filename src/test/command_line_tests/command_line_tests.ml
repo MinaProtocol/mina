@@ -993,6 +993,111 @@ module NodeStatusReport = struct
             Node_status_mock_server.stop mock )
 end
 
+(** Round-trip the saved Berkeley devnet block proof through
+    [mina internal convert-proof-format] in both directions and assert
+    identity. The fixture is committed to the source tree at
+    [src/test/command_line_tests/berkeley-devnet-block-proof.json];
+    resolved relative to the cwd at test time (which [dune exec] sets
+    to the project root). [MINA_BLOCK_PROOF_FIXTURE] overrides. *)
+module ConvertProofFormatRoundtrip = struct
+  type t = Mina_automation_fixture.Daemon.before_bootstrap
+
+  let fixture_path () =
+    match Sys.getenv "MINA_BLOCK_PROOF_FIXTURE" with
+    | Some p ->
+        p
+    | None ->
+        "src/test/command_line_tests/berkeley-devnet-block-proof.json"
+
+  let convert ~mina_path ~from_format ~to_format ~stdin_input =
+    let%bind proc =
+      Async.Process.create_exn ~prog:mina_path
+        ~args:
+          [ "internal"
+          ; "convert-proof-format"
+          ; "--from"
+          ; from_format
+          ; "--to"
+          ; to_format
+          ]
+        ()
+    in
+    let stdin = Async.Process.stdin proc in
+    Async.Writer.write stdin stdin_input ;
+    let%bind () = Async.Writer.close stdin in
+    let%map output = Async.Process.collect_output_and_wait proc in
+    match output.exit_status with
+    | Ok () ->
+        Ok output.stdout
+    | Error _ ->
+        Error
+          (Error.createf
+             "convert-proof-format --from %s --to %s exited non-zero.\n\
+              stderr:\n\
+              %s"
+             from_format to_format output.stderr )
+
+  let test_case (_test : t) =
+    let path = fixture_path () in
+    match%bind Sys.file_exists path with
+    | `No | `Unknown ->
+        Deferred.return
+          (Mina_automation_fixture.Intf.Failed
+             (Error.createf
+                "Test fixture %s not found. Run from the project root, or set \
+                 MINA_BLOCK_PROOF_FIXTURE."
+                path ) )
+    | `Yes -> (
+        let%bind contents = Reader.file_contents path in
+        let json = Yojson.Safe.from_string contents in
+        let proof = Yojson.Safe.Util.member "protocolStateProof" json in
+        let bin_prot_b64 =
+          Yojson.Safe.Util.(member "base64" proof |> to_string)
+        in
+        let saved_sexp_b64 =
+          Yojson.Safe.Util.(member "sexpBase64" proof |> to_string)
+        in
+        let%bind mina_path = Daemon.path () in
+        let convert = convert ~mina_path in
+        (* bin-prot-base64 -> sexp-base64 *)
+        match%bind
+          convert ~from_format:"bin-prot-base64" ~to_format:"sexp-base64"
+            ~stdin_input:bin_prot_b64
+        with
+        | Error err ->
+            Deferred.return (Mina_automation_fixture.Intf.Failed err)
+        | Ok produced_sexp_b64 -> (
+            (* sexp-base64 -> bin-prot-base64 *)
+            let%map result =
+              convert ~from_format:"sexp-base64" ~to_format:"bin-prot-base64"
+                ~stdin_input:produced_sexp_b64
+            in
+            match result with
+            | Error err ->
+                Mina_automation_fixture.Intf.Failed err
+            | Ok roundtripped_bin_prot_b64 ->
+                let mismatches =
+                  List.filter_opt
+                    [ ( if String.equal produced_sexp_b64 saved_sexp_b64 then
+                        None
+                      else
+                        Some
+                          "bin-prot -> sexp output does not match the snapshot \
+                           in protocolStateProof.sexpBase64" )
+                    ; ( if String.equal roundtripped_bin_prot_b64 bin_prot_b64
+                      then None
+                      else
+                        Some "bin-prot -> sexp -> bin-prot is not the identity"
+                      )
+                    ]
+                in
+                if List.is_empty mismatches then
+                  Mina_automation_fixture.Intf.Passed
+                else
+                  Mina_automation_fixture.Intf.Failed
+                    (Error.of_string (String.concat ~sep:"\n" mismatches)) ) )
+end
+
 let () =
   let open Alcotest in
   run "Test commadline."
@@ -1131,5 +1236,15 @@ let () =
                ( module Mina_automation_fixture.Daemon
                         .Make_FixtureWithoutBootstrap
                           (NodeStatusReport) ) )
+        ] )
+    ; ( "convert-proof-format-roundtrip"
+      , [ test_case
+            "internal convert-proof-format round-trips the saved Berkeley \
+             devnet block proof"
+            `Quick
+            (Mina_automation_runner.Runner.run_blocking
+               ( module Mina_automation_fixture.Daemon
+                        .Make_FixtureWithoutBootstrap
+                          (ConvertProofFormatRoundtrip) ) )
         ] )
     ]
