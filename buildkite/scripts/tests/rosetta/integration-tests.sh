@@ -1,6 +1,13 @@
 #!/bin/bash
 set -eox pipefail
 
+# Install mina, mina-archive, mina-rosetta and mina-zkapp-test-transaction
+# debs onto the host (toolchain container), plus the rosetta-cli golang
+# binary. Replaces the previous setup of running this whole script inside
+# the prebuilt mina-rosetta docker image.
+source ./buildkite/scripts/tests/rosetta/install-debs.sh
+./buildkite/scripts/tests/rosetta/install-cli.sh
+
 # Function to collect logs (called on exit or at end of script)
 collect_logs() {
     # Try graceful shutdown first if daemon is still running
@@ -161,9 +168,13 @@ mina accounts import --privkey-path ${SNARK_PRODUCER_KEY} --config-directory $MI
 
 # Postgres
 echo "========================= INITIALIZING POSTGRESQL ==========================="
-pg_ctlcluster ${POSTGRES_VERSION} main start
-pg_dropcluster --stop ${POSTGRES_VERSION} main
-pg_createcluster --start -d ${POSTGRES_DATA_DIR} --createclusterconf /etc/mina/rosetta/scripts/postgresql.conf ${POSTGRES_VERSION} main
+# Cluster ops require root in the toolchain runner. The previous mina-rosetta
+# docker image ran the script as root so sudo wasn't necessary.
+sudo pg_ctlcluster ${POSTGRES_VERSION} main start || true
+sudo pg_dropcluster --stop ${POSTGRES_VERSION} main || true
+sudo mkdir -p ${POSTGRES_DATA_DIR}
+sudo chown postgres:postgres ${POSTGRES_DATA_DIR}
+sudo pg_createcluster --start -d ${POSTGRES_DATA_DIR} --createclusterconf /etc/mina/rosetta/scripts/postgresql.conf ${POSTGRES_VERSION} main
 sudo -u postgres psql --command "CREATE USER ${POSTGRES_USERNAME} WITH SUPERUSER PASSWORD '${POSTGRES_USERNAME}';"
 sudo -u postgres createdb -O ${POSTGRES_USERNAME} ${POSTGRES_DBNAME}
 psql -f "${MINA_ARCHIVE_SQL_SCHEMA_PATH}" "${PG_CONN}"
@@ -284,8 +295,8 @@ rosetta-cli check:spec --all --configuration-file ${ROSETTA_CONFIGURATION_FILE}
 echo "========================= ROSETTA CLI: CHECK:CONSTRUCTION ==========================="
 rosetta-cli check:construction --configuration-file ${ROSETTA_CONFIGURATION_FILE}
 
-# shellcheck source=buildkite/scripts/tests/rosetta-offline-signer-smoke.sh
-source "$(dirname "$0")/rosetta-offline-signer-smoke.sh"
+# shellcheck source=buildkite/scripts/tests/rosetta/offline-signer-smoke.sh
+source "$(dirname "$0")/offline-signer-smoke.sh"
 
 echo "========================= OFFLINE SIGNER SMOKE TEST ==========================="
 offline_signer_smoke_test

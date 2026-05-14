@@ -125,7 +125,7 @@ let pipeline
                       "dhall"
                   , S.exactly "scripts/tests/rosetta-connectivity" "sh"
                   , S.exactly
-                      "buildkite/scripts/tests/rosetta-integration-tests"
+                      "buildkite/scripts/tests/rosetta/integration-tests"
                       "sh"
                   ]
                 # spec.additionalDirtyWhen
