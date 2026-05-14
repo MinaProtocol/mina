@@ -215,6 +215,11 @@ module Make_str (_ : Wire_types.Concrete) = struct
     module V = Verification_key
 
     module Verification_key = struct
+      (* [include Side_loaded_verification_key] below brings in another module
+         named [V] (an alias for [Pickles_base.Side_loaded_verification_key]),
+         shadowing the outer [V] from this enclosing [Side_loaded] scope.
+         Bind the outer one to a fresh name first. *)
+      module Compiled = V
       include Side_loaded_verification_key
 
       let to_input (t : t) =
@@ -239,6 +244,27 @@ module Make_str (_ : Wire_types.Concrete) = struct
           : t )
 
       let of_compiled tag = of_compiled_promise tag |> Promise.to_deferred
+
+      (** Convert a compiled-circuit [Pickles.Verification_key.t] (e.g. the
+          blockchain or transaction SNARK VK) into the side-loaded form.
+          The input must supply [max_proofs_verified], since the compiled VK
+          does not carry it. The serialised side-loaded form (via
+          [to_base64]) only stores [(max_proofs_verified,
+          actual_wrap_domain_size, wrap_index)] — the [wrap_vk] is
+          reconstructed from the SRS at deserialisation time. *)
+      let of_blockchain_vk
+          ~(max_proofs_verified : Pickles_base.Proofs_verified.t)
+          (vk : Compiled.t) : t =
+        let actual_wrap_domain_size =
+          Common.actual_wrap_domain_size
+            ~log_2_domain_size:vk.index.domain.log_size_of_group
+        in
+        ( { wrap_vk = Some vk.index
+          ; wrap_index = vk.commitments
+          ; max_proofs_verified
+          ; actual_wrap_domain_size
+          }
+          : t )
 
       module Max_width = Width.Max
     end

@@ -993,6 +993,94 @@ module NodeStatusReport = struct
             Node_status_mock_server.stop mock )
 end
 
+module PrintBlockchainVK = struct
+  type t = Mina_automation_fixture.Daemon.before_bootstrap
+
+  let test_case (test : t) =
+    let daemon = Daemon.of_config test.config in
+    let%bind () = Daemon.Config.generate_keys test.config in
+    let ledger_file = test.config.dirs.conf ^/ "daemon.json" in
+    let runtime_config = Quickcheck.random_value Runtime_config.gen_valid in
+    let runtime_config =
+      let genesis_timestamp =
+        let now_unix_ts = Unix.time () |> Float.to_int in
+        let genesis_unix_ts = now_unix_ts - (now_unix_ts mod 60) + 120 in
+        Time.of_span_since_epoch (Time.Span.of_int_sec genesis_unix_ts)
+        |> Time.to_string_iso8601_basic ~zone:Time.Zone.utc
+      in
+      let genesis =
+        match runtime_config.genesis with
+        | Some g ->
+            Some { g with genesis_state_timestamp = Some genesis_timestamp }
+        | None ->
+            Some
+              { k = None
+              ; delta = None
+              ; slots_per_epoch = None
+              ; slots_per_sub_window = None
+              ; grace_period_slots = None
+              ; genesis_state_timestamp = Some genesis_timestamp
+              }
+      in
+      { runtime_config with genesis }
+    in
+    Runtime_config.to_yojson runtime_config |> Yojson.Safe.to_file ledger_file ;
+    let%bind process = Daemon.start daemon in
+    let%bind result = Daemon.wait_for_node_init process in
+    let%bind () =
+      match result with
+      | Ok () ->
+          Deferred.return ()
+      | Error e ->
+          let () = printf "Error:\n%s\n" (Error.to_string_hum e) in
+          let log_file = Daemon.Config.ConfigDirs.mina_log test.config.dirs in
+          let%bind logs = Reader.file_contents log_file in
+          let () = printf "Daemon logs:\n%s\n" logs in
+          Writer.flushed (Lazy.force Writer.stdout)
+    in
+    (* Query VK from daemon via GraphQL *)
+    let logger = Logger.create () in
+    let node_uri =
+      Uri.make ~scheme:"http" ~host:"localhost" ~port:test.config.rest_port
+        ~path:"/graphql" ()
+    in
+    let%bind graphql_vk_result =
+      Mina_graphql_client.Client.exec_graphql_request ~logger ~node_uri
+        ~query_name:"Blockchain_verification_key"
+        Mina_graphql_client.Queries.Blockchain_verification_key.(
+          make @@ makeVariables ())
+    in
+    let%bind () = Daemon.Client.stop_daemon process.client in
+    let graphql_vk_json =
+      match graphql_vk_result with
+      | Ok result ->
+          result.blockchainVerificationKey
+      | Error err ->
+          Error.raise err
+    in
+    (* Run CLI command to get VK *)
+    let client = Daemon.client daemon in
+    let%map cli_output =
+      Daemon.Client.internal_print_blockchain_vk client ~config_file:ledger_file
+    in
+    (* Compare: CLI outputs Yojson.Safe JSON, GraphQL returns Yojson.Basic *)
+    let cli_vk_json =
+      try
+        Yojson.Safe.from_string (String.strip cli_output)
+        |> Yojson.Safe.to_basic
+      with exn ->
+        failwithf "Failed to parse CLI VK output as JSON: %s\nOutput: %s"
+          (Exn.to_string exn) cli_output ()
+    in
+    if Yojson.Basic.equal graphql_vk_json cli_vk_json then
+      Mina_automation_fixture.Intf.Passed
+    else
+      Mina_automation_fixture.Intf.Failed
+        (Error.createf "VK mismatch.\nGraphQL: %s\nCLI: %s"
+           (Yojson.Basic.to_string graphql_vk_json)
+           (Yojson.Basic.to_string cli_vk_json) )
+end
+
 (** Smoke test for [Runtime_config.gen_valid]: start a daemon on a random
     config produced by the generator and wait for init. *)
 module RandomConfigStartup = struct
@@ -1186,6 +1274,16 @@ let () =
                ( module Mina_automation_fixture.Daemon
                         .Make_FixtureWithoutBootstrap
                           (NodeStatusReport) ) )
+        ] )
+    ; ( "internal-print-blockchain-vk"
+      , [ test_case
+            "The internal print-blockchain-vk command matches the daemon \
+             GraphQL blockchainVerificationKey"
+            `Slow
+            (Mina_automation_runner.Runner.run_blocking
+               ( module Mina_automation_fixture.Daemon
+                        .Make_FixtureWithoutBootstrap
+                          (PrintBlockchainVK) ) )
         ] )
     ; ( "random-config-startup"
       , [ test_case

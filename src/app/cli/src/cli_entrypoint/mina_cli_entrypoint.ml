@@ -2160,6 +2160,123 @@ let internal_commands logger ~itn_features =
                 else
                   let () = printf "%s" (Chain_id.to_string chain_id) in
                   exit 0) )
+  ; ( "print-blockchain-vk"
+    , Command.async
+        ~summary:
+          "Print the blockchain SNARK verification key as JSON, using the \
+           given config file(s) to determine constraint constants and proof \
+           level"
+        (let open Command.Let_syntax in
+        let%map_open config_files =
+          flag "--config-file" ~aliases:[ "config-file" ]
+            ~doc:
+              "PATH path to a configuration file. Pass multiple times to \
+               override fields from earlier config files"
+            (listed string)
+        and format =
+          flag "--format" ~aliases:[ "format" ]
+            ~doc:
+              "FORMAT output format. One of \"verification-key-json\" \
+               (default; the structured Pickles.Verification_key.t JSON) or \
+               \"side-loaded-json\" (the {data, hash} object o1js consumes for \
+               zkApp account verification keys)."
+            (optional_with_default "verification-key-json" string)
+        and signature_kind = Cli_lib.Flag.signature_kind in
+        fun () ->
+          let open Deferred.Let_syntax in
+          let logger = Logger.null () in
+          let genesis_constants =
+            Genesis_constants.Compiled.genesis_constants
+          in
+          let constraint_constants =
+            Genesis_constants.Compiled.constraint_constants
+          in
+          let proof_level = Genesis_constants.Compiled.proof_level in
+          let config =
+            let config_jsons =
+              List.map config_files ~f:(fun config_file ->
+                  let json =
+                    In_channel.with_file config_file ~f:(fun ic ->
+                        Yojson.Safe.from_channel ic )
+                  in
+                  (config_file, json) )
+            in
+            List.fold ~init:Runtime_config.default config_jsons
+              ~f:(fun config (config_file, config_json) ->
+                match Runtime_config.of_yojson config_json with
+                | Ok loaded_config ->
+                    Runtime_config.combine config loaded_config
+                | Error err ->
+                    failwithf "Could not parse configuration file %s: %s"
+                      config_file err () )
+          in
+          let%bind light_proof =
+            match%map
+              Genesis_ledger_helper.light_proof_from_runtime_config ~logger
+                ~cli_proof_level:None ~genesis_constants ~constraint_constants
+                ~proof_level config
+            with
+            | Ok light_proof ->
+                light_proof
+            | Error err ->
+                Error.raise err
+          in
+          let constraint_constants = light_proof.constraint_constants in
+          let proof_level = light_proof.proof_level in
+          let%map vk =
+            match proof_level with
+            | Genesis_constants.Proof_level.Full ->
+                Format.eprintf "Generating transaction snark circuit..@." ;
+                let module T = Transaction_snark.Make (struct
+                  let signature_kind = signature_kind
+
+                  let constraint_constants = constraint_constants
+
+                  let proof_level = proof_level
+                end) in
+                Format.eprintf "Generating blockchain snark circuit..@." ;
+                let module B =
+                Blockchain_snark.Blockchain_snark_state.Make (struct
+                  let tag = T.tag
+
+                  let constraint_constants = constraint_constants
+
+                  let proof_level = proof_level
+                end) in
+                Lazy.force B.Proof.verification_key
+            | Check | No_check ->
+                Format.eprintf
+                  "Proof level is %s, returning dummy verification key@."
+                  (Genesis_constants.Proof_level.to_string proof_level) ;
+                Deferred.return (Lazy.force Pickles.Verification_key.dummy)
+          in
+          let output_json =
+            match format with
+            | "verification-key-json" ->
+                Pickles.Verification_key.to_yojson vk
+            | "side-loaded-json" ->
+                let sl_vk =
+                  Pickles.Side_loaded.Verification_key.of_blockchain_vk
+                    ~max_proofs_verified:Pickles_base.Proofs_verified.N2 vk
+                in
+                let data =
+                  Pickles.Side_loaded.Verification_key.to_base64 sl_vk
+                in
+                let hash = Mina_base.Zkapp_account.digest_vk sl_vk in
+                (* Match GraphQL's [VerificationKeyHash] scalar:
+                   decimal string via [Tick.Field.to_string]. This is the form
+                   o1js's [Field(hash)] consumes for zkApp account VKs. *)
+                `Assoc
+                  [ ("data", `String data)
+                  ; ("hash", `String (Pickles.Backend.Tick.Field.to_string hash))
+                  ]
+            | other ->
+                failwithf
+                  "Unknown --format %s; expected \"verification-key-json\" or \
+                   \"side-loaded-json\""
+                  other ()
+          in
+          Yojson.Safe.to_string output_json |> print_string) )
   ; ( "print-hard-fork-genesis-timestamp"
     , Command.async
         ~summary:

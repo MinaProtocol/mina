@@ -272,6 +272,14 @@ module Account =
   }
 |}]
 
+module Blockchain_verification_key =
+[%graphql
+{|
+  query {
+    blockchainVerificationKey
+  }
+|}]
+
 module Best_chain_for_slot_end_test =
 [%graphql
 {|
