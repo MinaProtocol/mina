@@ -8,11 +8,15 @@
    %{target}
    (run %{<}))))
 
-;; Sibling rule for the mock daemon's GraphQL schema introspection.
-;; See src/test/daemon/graphql_mock/README.md for the drift-detection plan.
+;; Mock GraphQL schema introspection -- always written to _build, not
+;; promoted to the source tree. Under option C the daemonStatus subtree
+;; literally reuses [Mina_graphql.Types.Make_daemon_status] so drift in
+;; that subtree is compile-time impossible; for the remaining parallel
+;; types in [Mock_types], the subset check (mock ⊆ real) catches
+;; structural divergence without needing a committed introspection
+;; artifact to diff against.
 (rule
  (target mock_schema.json)
- (mode promote)
  (deps
   (:< src/test/daemon/graphql_mock/mock_schema_dump.exe))
  (action

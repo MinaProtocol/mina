@@ -377,8 +377,8 @@ update-graphql: ## Update GraphQL schema
 		--profile=$(DUNE_PROFILE) \
 		graphql_schema.json
 
-.PHONY: update-mock-graphql
-update-mock-graphql: ## Regenerate mock_schema.json from src/test/daemon/graphql_mock
+.PHONY: build-mock-graphql
+build-mock-graphql: ## Build mock_schema.json into _build (subset check reads it from there)
 	@(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && \
 	dune build \
 		--profile=$(DUNE_PROFILE) \
