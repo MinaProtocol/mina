@@ -179,6 +179,18 @@ sudo -u postgres psql --command "CREATE USER ${POSTGRES_USERNAME} WITH SUPERUSER
 sudo -u postgres createdb -O ${POSTGRES_USERNAME} ${POSTGRES_DBNAME}
 psql -f "${MINA_ARCHIVE_SQL_SCHEMA_PATH}" "${PG_CONN}"
 
+# --- Indexer smoke test ---
+# Used to live in its own RunWithPostgres step against a separate postgres
+# docker container. Now run inline against a temporary database loaded from
+# the sample archive dump shipped in src/test/archive/sample_db.
+echo "========================= ROSETTA INDEXER SMOKE TEST ==========================="
+INDEXER_DBNAME="indexer_archive"
+INDEXER_PG_CONN="postgres://${POSTGRES_USERNAME}:${POSTGRES_USERNAME}@127.0.0.1:5432/${INDEXER_DBNAME}"
+sudo -u postgres createdb -O "${POSTGRES_USERNAME}" "${INDEXER_DBNAME}"
+psql -f ./src/test/archive/sample_db/archive_db.sql "${INDEXER_PG_CONN}"
+mina-rosetta-indexer-test --archive_uri "${INDEXER_PG_CONN}"
+sudo -u postgres dropdb "${INDEXER_DBNAME}"
+
 # Mina Rosetta
 echo "=========================== STARTING ROSETTA API ONLINE AND OFFLINE INSTANCES ==========================="
 ports=("$MINA_ROSETTA_ONLINE_PORT" "$MINA_ROSETTA_OFFLINE_PORT")
