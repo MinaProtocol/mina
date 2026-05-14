@@ -423,6 +423,10 @@ check-format: ocaml_checks ## Check formatting of OCaml code
 check-snarky-submodule: ## Check the snarky submodule
 	./scripts/check-snarky-submodule.sh
 
+.PHONY: check-flake-submodule-sync
+check-flake-submodule-sync: ## Check flake input revs match git submodule SHAs
+	./scripts/check-flake-submodule-sync.sh
+
 #######################################
 ## Bash checks
 
