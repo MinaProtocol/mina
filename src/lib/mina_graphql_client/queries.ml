@@ -219,6 +219,12 @@ module Genesis_ledger_export = [%graphql {|
   }
 |}]
 
+module Query_fork_config = [%graphql {|
+  query {
+    fork_config
+  }
+|}]
+
 module StartFilteredLog =
 [%graphql
 {|
@@ -249,6 +255,7 @@ module Account =
               }
       delegate
       nonce
+      inferredNonce
       permissions { editActionState
                     editState
                     incrementNonce
