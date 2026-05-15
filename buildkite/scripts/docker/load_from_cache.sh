@@ -41,4 +41,9 @@ if [[ ! -f "$CACHE_FILE" ]]; then
 fi
 
 echo "Loading ${IMAGE} from CI cache at ${CACHE_FILE}"
+if docker image inspect "$IMAGE" >/dev/null 2>&1; then
+  echo "Image ${IMAGE} already exists locally, skipping load"
+  exit 0
+fi
+
 zstd -dc "$CACHE_FILE" | docker load
