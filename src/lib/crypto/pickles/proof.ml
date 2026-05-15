@@ -388,9 +388,23 @@ module Make (MLMB : Nat.Intf) = struct
         let of_sexpable = of_repr
       end)
 
+  let can_use_legacy_base64_repr (T { statement; prev_evals; _ }) =
+    let x1, x2 = prev_evals.evals.public_input in
+    let domain_log2 =
+      Branch_data.domain statement.proof_state.deferred_values.branch_data
+      |> Domain.log2_size
+    in
+    Array.length x1 = 1 && Array.length x2 = 1 && domain_log2 <= 15
+
   let to_base64 t =
     (* assume call to Nat.lte_exn does not raise with a valid instance of t *)
-    let sexp = Base64_repr.sexp_of_t (to_base64_repr t) in
+    let sexp =
+      (* Precomputed block JSON stores proofs as base64 and expects exact JSON
+         roundtrips. Keep the legacy representation when it can represent the
+         proof, and use the chunking-safe representation for larger domains. *)
+      if can_use_legacy_base64_repr t then sexp_of_t t
+      else Base64_repr.sexp_of_t (to_base64_repr t)
+    in
     (* raises only on invalid optional arguments *)
     Base64.encode_exn (Sexp.to_string sexp)
 
