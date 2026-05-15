@@ -10,8 +10,10 @@ source ./buildkite/scripts/tests/rosetta/install-debs.sh
 
 # Function to collect logs (called on exit or at end of script)
 collect_logs() {
-    # Try graceful shutdown first if daemon is still running
-    if [ ! -z "$DAEMON_PID" ] && kill -0 "$DAEMON_PID" 2>/dev/null; then
+    # Try graceful shutdown first if daemon is still running.
+    # `${DAEMON_PID:-}` so the trap survives `set -u` when we exit before
+    # the daemon is started.
+    if [ -n "${DAEMON_PID:-}" ] && kill -0 "$DAEMON_PID" 2>/dev/null; then
         echo "Stopping daemon gracefully..."
         mina client stop-daemon  2>/dev/null
         if [ $? -ne 0 ]; then
@@ -146,19 +148,28 @@ cat <<EOF >"$ROSETTA_CLI_INTERESTING_ACCOUNTS_FILEPATH"
   { "account_identifier": { "address": "${TIME_VESTING_ACCOUNT_2_PUB_KEY}" }, "currency": { "symbol": "MINA", "decimals": 9 } }
 ]
 EOF
-jq -r --arg file ${ROSETTA_CLI_INTERESTING_ACCOUNTS_FILENAME} '.data_directory = $file' "${ROSETTA_CONFIGURATION_INPUT_DIR}/${ROSETTA_CLI_MAIN_CONFIG_FILE}" >"${ROSETTA_CONFIGURATION_INPUT_DIR}/${ROSETTA_CLI_MAIN_CONFIG_FILE}.tmp"
-mv "${ROSETTA_CONFIGURATION_INPUT_DIR}/${ROSETTA_CLI_MAIN_CONFIG_FILE}.tmp" "${ROSETTA_CONFIGURATION_INPUT_DIR}/${ROSETTA_CLI_MAIN_CONFIG_FILE}"
+# Stage all rosetta-cli config templates into a writable temp dir before
+# applying jq/sed substitutions. The deb-installed copies under
+# /etc/mina/rosetta/rosetta-cli-config are root-owned, and this script now
+# runs as opam in the toolchain container (the previous mina-rosetta image
+# ran as root, so in-place edits worked there).
+cp "${ROSETTA_CONFIGURATION_INPUT_DIR}/"* "${ROSETTA_CONFIGURATION_OUTPUT_DIR}/"
 
-# Substitute placeholders in rosetta-cli configuration
 ROSETTA_CONFIGURATION_FILE="${ROSETTA_CONFIGURATION_OUTPUT_DIR}/${ROSETTA_CLI_MAIN_CONFIG_FILE}"
+
+jq -r --arg file ${ROSETTA_CLI_INTERESTING_ACCOUNTS_FILENAME} '.data_directory = $file' "${ROSETTA_CONFIGURATION_FILE}" >"${ROSETTA_CONFIGURATION_FILE}.tmp"
+mv "${ROSETTA_CONFIGURATION_FILE}.tmp" "${ROSETTA_CONFIGURATION_FILE}"
+
+# Substitute placeholders in rosetta-cli configuration (in place in OUTPUT_DIR).
 BLOCK_PRODUCER_PRIVKEY=$(mina-ocaml-signer hex-of-private-key-file --private-key-path "${BLOCK_PRODUCER_KEY}")
 for config_file in $ROSETTA_CLI_CONFIG_FILES; do
-  sed -e "s/PLACEHOLDER_PREFUNDED_PRIVKEY/${BLOCK_PRODUCER_PRIVKEY}/" \
+  sed -i \
+    -e "s/PLACEHOLDER_PREFUNDED_PRIVKEY/${BLOCK_PRODUCER_PRIVKEY}/" \
     -e "s/PLACEHOLDER_PREFUNDED_ADDRESS/${BLOCK_PRODUCER_PUB_KEY}/" \
     -e "s/PLACEHOLDER_ROSETTA_OFFLINE_PORT/${MINA_ROSETTA_OFFLINE_PORT}/" \
     -e "s/PLACEHOLDER_ROSETTA_ONLINE_PORT/${MINA_ROSETTA_ONLINE_PORT}/" \
     -e "s/PLACEHOLDER_NETWORK_NAME/${MINA_NETWORK}/" \
-    "$ROSETTA_CONFIGURATION_INPUT_DIR/$config_file" >"$ROSETTA_CONFIGURATION_OUTPUT_DIR/$config_file"
+    "${ROSETTA_CONFIGURATION_OUTPUT_DIR}/${config_file}"
 done
 
 # Import Genesis Accounts
