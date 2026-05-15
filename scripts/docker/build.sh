@@ -308,7 +308,7 @@ docker buildx build --load --network=host --progress=plain $PLATFORM $DOCKER_REP
 
 if [[ -n "${SAVE_TO_CI_CACHE_ROOT:-}" ]]; then
 
-  FULL_IMAGE_PATH="${SAVE_TO_CI_CACHE_ROOT}/${SERVICE}/${TAG_VERSION_PART}.tar.zst"
+  FULL_IMAGE_PATH="${SAVE_TO_CI_CACHE_ROOT}/${SERVICE}/${HASHTAG_VERSION_PART}.tar.zst"
 
   if ! command -v zstd >/dev/null 2>&1; then
     echo "zstd not found on host; installing (required for --save-to-ci-cache)"
