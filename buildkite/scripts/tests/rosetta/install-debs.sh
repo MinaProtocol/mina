@@ -26,3 +26,12 @@ DEBS_CSV="$(IFS=,; echo "${DEBS[*]}")"
 
 # Use sudo (toolchain image runs as opam user with NOPASSWD sudo).
 source ./buildkite/scripts/debian/install.sh "${DEBS_CSV}" 1
+
+# The mina-${NETWORK} deb ships /var/lib/coda/config_<commit>.json which the
+# daemon auto-loads on startup and merges with --config-file. For devnet that
+# config carries an `epoch_data` block pointing at a published epoch ledger
+# tarball that isn't present on disk here, causing the daemon to crash with
+# "Could not find a ledger tar file for hash 'jxvdSn...'". The rosetta
+# integration test supplies its own complete runtime config via --config-file,
+# so the auto-picked one is pure overhead — drop it.
+sudo rm -f /var/lib/coda/config_*.json
