@@ -15,8 +15,15 @@ set -eo pipefail
 
 NETWORK="${MINA_NETWORK_DEB:-devnet}"
 
+# Use the *-generic daemon package instead of mina-${NETWORK}. Same daemon
+# binaries (mina client/daemon/libp2p) but no dependency on
+# mina-${NETWORK}-config, so no /var/lib/coda/config_<commit>.json gets
+# installed. Without that file the daemon doesn't auto-merge the published
+# devnet runtime config (which carries epoch_data for an epoch ledger we
+# don't ship) on top of our --config-file, and starts cleanly against the
+# test's hand-rolled testnet.json.
 DEBS=(
-  "mina-${NETWORK}"
+  "mina-${NETWORK}-generic"
   "mina-archive-${NETWORK}"
   "mina-rosetta-${NETWORK}"
   "mina-zkapp-test-transaction"
@@ -26,12 +33,3 @@ DEBS_CSV="$(IFS=,; echo "${DEBS[*]}")"
 
 # Use sudo (toolchain image runs as opam user with NOPASSWD sudo).
 source ./buildkite/scripts/debian/install.sh "${DEBS_CSV}" 1
-
-# The mina-${NETWORK} deb ships /var/lib/coda/config_<commit>.json which the
-# daemon auto-loads on startup and merges with --config-file. For devnet that
-# config carries an `epoch_data` block pointing at a published epoch ledger
-# tarball that isn't present on disk here, causing the daemon to crash with
-# "Could not find a ledger tar file for hash 'jxvdSn...'". The rosetta
-# integration test supplies its own complete runtime config via --config-file,
-# so the auto-picked one is pure overhead — drop it.
-sudo rm -f /var/lib/coda/config_*.json
