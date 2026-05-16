@@ -8,6 +8,17 @@ set -eox pipefail
 source ./buildkite/scripts/tests/rosetta/install-debs.sh
 ./buildkite/scripts/tests/rosetta/install-cli.sh
 
+# install-debs.sh sources scripts/debian/aptly.sh which sets `-C` (noclobber);
+# clear it so later `> file` redirects on existing artifacts don't fail.
+set +C
+
+# `mina daemon` refuses to load the libp2p keypair if any ancestor dir is
+# group/world-readable. The toolchain image's $HOME (=/home/opam) is 0755
+# by default; the previous mina-rosetta image was already 0700. Locking it
+# down here prevents the daemon from aborting at boot with a configuration
+# error.
+chmod 700 "${HOME}"
+
 # Function to collect logs (called on exit or at end of script)
 collect_logs() {
     # Try graceful shutdown first if daemon is still running.
