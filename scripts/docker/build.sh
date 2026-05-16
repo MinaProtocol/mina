@@ -231,7 +231,6 @@ export_base_image
 
 CUSTOM_ARG=${CUSTOM_ARG:-""}
 
-
 case "${SERVICE}" in
     mina-archive)
         DOCKERFILE_PATH="dockerfiles/Dockerfile-mina-archive"
@@ -268,7 +267,6 @@ case "${SERVICE}" in
         ;;
     mina-rosetta)
         DOCKERFILE_PATH="dockerfiles/Dockerfile-mina-rosetta"
-
         ;;
     mina-rosetta-configured)
         DOCKERFILE_PATH="dockerfiles/stages/install-config"
@@ -341,7 +339,6 @@ if [[ "$DOCKER_ACTION" == "push" ]]; then
 else
   echo "Skipping push to remote registry, image loaded to local docker daemon only."
 fi
-
 
 # Clean up temp Dockerfile if one was created
 if [[ -n "${TEMP_DOCKERFILE:-}" ]]; then
