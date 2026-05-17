@@ -42,14 +42,18 @@ The recommended path for a brand-new contributor:
 2. **Pick your build environment.** Most contributors should pick
    exactly one of these:
 
-    - **[Nix](./nix/README.md)** — *recommended.* Manages the C library
-      + OCaml dependency matrix for you; the same setup that CI uses.
+    - **[Docker](./docs/setup-docker.md)** — *recommended.* Pins the
+      exact toolchain CI uses, works on Linux / macOS / Windows (WSL2),
+      no system-dependency management on the host. Comes with a VS Code
+      Dev Container path.
+    - **[Nix](./nix/README.md)** — also reproducible; manages the C
+      library + OCaml dependency matrix declaratively.
     - **[Linux native](./docs/setup-linux.md)** — Ubuntu / Debian /
-      compatible distros; you manage the system dependencies.
+      compatible distros. Best-effort instructions; you manage the
+      system dependencies and accept that the doc can drift behind the
+      canonical Dockerfile install steps.
     - **[macOS native](./docs/setup-macos.md)** — Homebrew-based; pay
       attention to the Apple Silicon caveats.
-    - **[Docker](./docs/setup-docker.md)** — works anywhere; isolates
-      the toolchain.
 
 3. **Build:** `make build` (allow ~10–20 minutes the first time; needs
    ~10 GB RAM).

@@ -1,9 +1,15 @@
 # Developer Setup (Linux)
 
-Native Linux build instructions (Ubuntu-flavoured by default). If you'd
-rather not deal with the system dependency matrix,
-[Nix](../nix/README.md) and [Docker](./setup-docker.md) are both
-supported alternatives.
+Native Linux build instructions (Ubuntu-flavoured by default).
+
+> **Consider Docker or Nix first.** The [Docker dev
+> environment](./setup-docker.md) pins the same toolchain CI uses and
+> handles the system dependency matrix for you; [Nix](../nix/README.md)
+> does the same declaratively. The native path below is a **best-effort
+> starting point** — the canonical install steps are what's run in
+> [`dockerfiles/stages/`](../dockerfiles/), and this doc can drift behind
+> them when CI adds or bumps a system dep. If you hit a missing
+> dependency, please open a PR updating this page.
 
 ## Prerequisites
 
@@ -17,11 +23,12 @@ historically been developed against Ubuntu LTS releases.
 ## System dependencies
 
 Mina has a variety of opam and system dependencies. A number of C
-libraries are expected to be available in the system; the canonical list
-is what's installed in the
-[Dockerfiles](../dockerfiles/). Most of these are installed via `apt`;
-RocksDB is installed automatically as a `dune` rule in the
-`ocaml-rocksdb` library.
+libraries are expected to be available in the system; the **canonical
+list is what's installed by
+[`dockerfiles/stages/1-build-deps`](../dockerfiles/stages/1-build-deps)**
+— if you suspect a missing dep, grep that file for the matching `apt
+install` line. Most of these are installed via `apt`; RocksDB is
+installed automatically as a `dune` rule in the `ocaml-rocksdb` library.
 
 If you need Docker for building containers later (e.g. local Docker
 images), follow the official [Docker CE for Ubuntu instructions](https://docs.docker.com/install/linux/docker-ce/ubuntu/).
