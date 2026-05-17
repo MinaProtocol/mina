@@ -416,40 +416,54 @@ let select_insert_into_cols ~(select : string * 'select Caqti_type.t)
              ~cols:(fst cols) () )
         value
 
-let sep_by_comma ?(parenthesis = false) xs =
-  List.map xs ~f:(if parenthesis then sprintf "('%s')" else sprintf "'%s'")
-  |> String.concat ~sep:", "
+(* Insert each value in [values] into [table_name] under [col], ignoring
+   conflicts, and return the (col, id) pairs for whatever ended up in the
+   table afterwards.
 
+   Values are bound via the Caqti parameter encoding for [(snd col)], so the
+   SQL string is independent of [values]. This:
+     - eliminates the sprintf-of-values pattern that previously interpolated
+       string-quoted user values directly into the query text (SQL-injection
+       shaped, and trivially broken by any value containing a single quote);
+     - lets [(snd col)]'s Caqti encoder handle textual representation
+       (e.g. Postgres array literals for [array_int_typ]) instead of asking
+       the caller to pre-format values into strings;
+     - keeps the SQL strings stable per (table_name, col_name) pair so that
+       per-batch SQL no longer pollutes the postgres backend plan cache.
+
+   We mark the requests [~oneshot:true] because the SQL strings still depend
+   on [table_name]/[col_name] arguments (i.e. they're built per call rather
+   than once at module-init time); hoisting these to module-level constants
+   would be a further follow-up.
+
+   N.B. this issues one INSERT and one SELECT per value, which is fine for
+   the small batches the archive currently produces. If batch sizes grow,
+   switch to a single ["unnest($1::...[])"] form bound as an array. *)
 let insert_multi_into_col ~(table_name : string)
     ~(col : string * 'col Caqti_type.t) (module Conn : CONNECTION)
-    (values : string list) =
+    (values : 'col list) =
   let open Deferred.Result.Let_syntax in
-  let insert =
-    sprintf
-      {sql| INSERT INTO %s (%s) VALUES %s
-            ON CONFLICT (%s)
-            DO NOTHING |sql}
-      table_name (fst col)
-      (sep_by_comma ~parenthesis:true values)
-      (fst col)
+  let col_name = fst col in
+  let col_typ = snd col in
+  let insert_req =
+    Caqti_request.Infix.(col_typ ->. Caqti_type.unit) ~oneshot:true
+      (sprintf "INSERT INTO %s (%s) VALUES (?) ON CONFLICT (%s) DO NOTHING"
+         table_name col_name col_name )
+  in
+  let select_req =
+    Caqti_request.Infix.(col_typ ->? Caqti_type.(t2 col_typ int)) ~oneshot:true
+      (sprintf "SELECT %s, id FROM %s WHERE %s = ?" col_name table_name
+         col_name )
   in
   let%bind () =
-    Conn.exec
-      (Caqti_request.Infix.(Caqti_type.unit ->. Caqti_type.unit) ~oneshot:true
-         insert )
-      ()
+    Mina_stdlib.Deferred.Result.List.iter values ~f:(fun v ->
+        Conn.exec insert_req v )
   in
-  let search =
-    sprintf
-      {sql| SELECT %s, id FROM %s
-            WHERE %s in (%s) |sql}
-      (fst col) table_name (fst col) (sep_by_comma values)
+  let%map row_opts =
+    Mina_stdlib.Deferred.Result.List.map values ~f:(fun v ->
+        Conn.find_opt select_req v )
   in
-  Conn.collect_list
-    Caqti_request.Infix.(
-      (Caqti_type.unit ->* Caqti_type.(t2 (snd col) int))
-        ~oneshot:true search )
-    ()
+  List.filter_opt row_opts
 
 let query ~f pool =
   match%bind Pool.use f pool with
