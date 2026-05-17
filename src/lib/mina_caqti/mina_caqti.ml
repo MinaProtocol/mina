@@ -389,13 +389,20 @@ let insert_into_cols ~(returning : string) ~(table_name : string)
 
 (* run `select_cols` and return the result, if found
    if not found, run `insert_into_cols` and return the result
-*)
+
+   The Caqti requests below are built freshly on every call (their SQL
+   strings depend on the [table_name]/[cols] arguments), so each one would
+   otherwise be registered as a distinct prepared statement on the server
+   and accumulate in the backend's plan cache for the lifetime of the
+   connection. Pass [~oneshot:true] to keep per-backend memory bounded; see
+   Caqti_request docs: "dynamically constructed requests should have
+   ~oneshot:true". *)
 let select_insert_into_cols ~(select : string * 'select Caqti_type.t)
     ~(table_name : string) ?tannot ~(cols : string list * 'cols Caqti_type.t)
     (module Conn : CONNECTION) (value : 'cols) =
   let open Deferred.Result.Let_syntax in
   Conn.find_opt
-    ( Caqti_request.Infix.(snd cols ->? snd select)
+    ( Caqti_request.Infix.(snd cols ->? snd select) ~oneshot:true
     @@ select_cols ~select:(fst select) ~table_name ?tannot ~cols:(fst cols) ()
     )
     value
@@ -404,7 +411,7 @@ let select_insert_into_cols ~(select : string * 'select Caqti_type.t)
       return id
   | None ->
       Conn.find
-        ( Caqti_request.Infix.(snd cols ->! snd select)
+        ( Caqti_request.Infix.(snd cols ->! snd select) ~oneshot:true
         @@ insert_into_cols ~returning:(fst select) ~table_name ?tannot
              ~cols:(fst cols) () )
         value
@@ -428,7 +435,8 @@ let insert_multi_into_col ~(table_name : string)
   in
   let%bind () =
     Conn.exec
-      (Caqti_request.Infix.(Caqti_type.unit ->. Caqti_type.unit) insert)
+      (Caqti_request.Infix.(Caqti_type.unit ->. Caqti_type.unit) ~oneshot:true
+         insert )
       ()
   in
   let search =
@@ -439,7 +447,8 @@ let insert_multi_into_col ~(table_name : string)
   in
   Conn.collect_list
     Caqti_request.Infix.(
-      (Caqti_type.unit ->* Caqti_type.(t2 (snd col) int)) search)
+      (Caqti_type.unit ->* Caqti_type.(t2 (snd col) int))
+        ~oneshot:true search )
     ()
 
 let query ~f pool =
