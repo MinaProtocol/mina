@@ -1,6 +1,6 @@
 open Core_kernel
 open Async
-module Prod = Snark_worker.Inputs
+module Impl = Snark_worker.Impl
 module Graphql_client = Graphql_lib.Client
 module Encoders = Mina_graphql.Types.Input
 module Scalars = Graphql_lib.Scalars
@@ -27,7 +27,7 @@ let submit_graphql input graphql_endpoint =
       Format.printf "Graphql error: %s\n" s ;
       exit 1
 
-let perform (s : Prod.Worker_state.t) ~fee ~public_key
+let perform (s : Impl.Worker_state.t) ~fee ~public_key
     (spec :
       ( Transaction_witness.Stable.Latest.t
       , Ledger_proof.t )
@@ -36,14 +36,14 @@ let perform (s : Prod.Worker_state.t) ~fee ~public_key
   One_or_two.Deferred_result.map spec ~f:(fun w ->
       let open Deferred.Or_error.Let_syntax in
       let%map proof, time =
-        Prod.perform_single s
+        Impl.perform_single s
           ~message:(Mina_base.Sok_message.create ~fee ~prover:public_key)
           w
       in
       ( proof
       , (time, match w with Transition _ -> `Transition | Merge _ -> `Merge) ) )
   |> Deferred.Or_error.map ~f:(fun proofs_and_time ->
-         { Snark_work_lib.Work.Result_without_metrics.proofs =
+         { Snark_work_lib.Result.Without_metrics.proofs =
              One_or_two.map proofs_and_time ~f:fst
          ; statements =
              One_or_two.map spec ~f:Snark_work_lib.Work.Single.Spec.statement
@@ -106,7 +106,7 @@ let command =
 
        let signature_kind = Mina_signature_kind.t_DEPRECATED in
        let%bind worker_state =
-         Prod.Worker_state.create ~constraint_constants ~proof_level
+         Impl.Worker_state.create ~constraint_constants ~proof_level
            ~signature_kind ()
        in
        let%bind spec =
@@ -159,7 +159,7 @@ let command =
            Caml.Format.printf
              !"@[<v>Successfully proved. Result: \n\
               \               %{sexp: Ledger_proof.t \
-               Snark_work_lib.Work.Result_without_metrics.t}@]@."
+               Snark_work_lib.Result.Without_metrics.t}@]@."
              result ;
            match proof_submission_graphql_endpoint with
            | Some endpoint ->

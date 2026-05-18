@@ -16,6 +16,7 @@ while [[ "$#" -gt 0 ]]; do case $1 in
   -r|--release) DEB_RELEASE="$2"; shift;;
   -v|--version) DEB_VERSION="$2"; shift;;
   -c|--codename) DEB_CODENAME="$2"; shift;;
+  --skip-cache-invalidation) SKIP_CACHE_INVALIDATION=1;;
   -b|--bucket) BUCKET="$2"; shift;;
   -f|--force) FORCE=1;;
   -s|--sign) SIGN="$2"; shift;;
@@ -33,7 +34,7 @@ function usage() {
   echo "  -v, --version       The Debian version"
   echo "  -c, --codename      The Debian codename"
   echo "  -s, --sign          The Debian key id used for sign"
-  echo ""
+  echo "  --skip-cache-invalidation  Skip invalidating CloudFront cache after upload"
   echo "Example: $0 --name mina-archive --release unstable --version 2.0.0-rc1-48efea4 --codename bullseye "
   exit 1
 }
@@ -109,8 +110,9 @@ for _ in {1..10}; do (
 #>> Repository is locked by another user:  at host dc7eaad3c537
 #>> Attempting to obtain a lock
 #/var/lib/gems/2.3.0/gems/deb-s3-0.10.0/lib/deb/s3/lock.rb:24:in `throw': uncaught throw #"Unable to obtain a lock after 60, giving up."
+# shellcheck disable=SC2046
 deb-s3 upload $BUCKET_ARG $S3_REGION_ARG \
-  "$([ "$FORCE" -eq 0 ] && echo "--fail-if-exists")" \
+  $(if [[ "$FORCE" -eq 0 ]]; then echo "--fail-if-exists"; fi) \
   --lock \
   --arch $ARCH \
   --preserve-versions \
@@ -122,7 +124,12 @@ deb-s3 upload $BUCKET_ARG $S3_REGION_ARG \
   "${DEB_NAMES}"
 ) && break || (MINA_DEB_BUCKET=${BUCKET} scripts/debian/clear-s3-lockfile.sh); done
 
-invalidate_cache "$BUCKET" "$DEB_CODENAME"
+if [[ -n "${SKIP_CACHE_INVALIDATION:-}" ]]; then
+  echo "⚠️  Skipping CloudFront cache invalidation as requested."
+else
+  invalidate_cache "$BUCKET" "$DEB_CODENAME"
+fi
+
 
 for deb in $DEB_NAMES
 do

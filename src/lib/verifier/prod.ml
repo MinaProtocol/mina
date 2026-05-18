@@ -13,9 +13,9 @@ let invalid_to_error = Common.invalid_to_error
 type ledger_proof = Ledger_proof.t
 
 module Processor = struct
-  let verify_commands
+  let verify_commands ~signature_kind
       (cs : User_command.Verifiable.Serializable.t With_status.t list) =
-    let results = List.map cs ~f:Common.check in
+    let results = List.map cs ~f:(Common.check ~signature_kind) in
     let to_verify =
       List.concat_map
         ~f:(function Ok (`Assuming xs) -> xs | Error _ -> [])
@@ -31,8 +31,16 @@ module Processor = struct
           (* The command is dropped here to avoid decoding it later in the caller
              which would create a duplicate.*)
           `Valid
-      | Ok (`Assuming xs) ->
-          if Or_error.is_ok all_verified then `Valid else `Valid_assuming xs
+      | Ok (`Assuming xs) -> (
+          (* NOTE: `Valid_assuming branch indicates some commands are invalid
+             and the verification failed partially. Since we're batching the
+             verification there's no way to know which particular command failed
+             to pass verification. *)
+          match all_verified with
+          | Ok () ->
+              `Valid
+          | Error err ->
+              `Valid_assuming (xs, err) )
     in
     List.map results ~f
 end
@@ -50,6 +58,7 @@ module Worker_state = struct
            * Zkapp_statement.t
            * Pickles.Side_loaded.Proof.t )
            list
+           * Error.t
          | invalid ]
          list
          Deferred.t
@@ -59,7 +68,7 @@ module Worker_state = struct
 
     val toggle_internal_tracing : bool -> unit
 
-    val set_itn_logger_data : daemon_port:int -> unit
+    val set_itn_logger_data : daemon_port:int option -> unit
   end
 
   (* bin_io required by rpc_parallel *)
@@ -72,6 +81,7 @@ module Worker_state = struct
     ; commit_id : string
     ; blockchain_verification_key : Pickles.Verification_key.Stable.Latest.t
     ; transaction_verification_key : Pickles.Verification_key.Stable.Latest.t
+    ; signature_kind : Mina_signature_kind.t
     }
   [@@deriving bin_io_unversioned]
 
@@ -83,6 +93,7 @@ module Worker_state = struct
       ; commit_id
       ; blockchain_verification_key
       ; transaction_verification_key
+      ; signature_kind
       ; _
       } : t Deferred.t =
     match proof_level with
@@ -96,7 +107,7 @@ module Worker_state = struct
                Internal_tracing.Context_call.with_call_id
                @@ fun () ->
                [%log internal] "Verifier_verify_commands" ;
-               let%map result = Processor.verify_commands cs in
+               let%map result = Processor.verify_commands ~signature_kind cs in
                [%log internal] "Verifier_verify_commands_done" ;
                result
 
@@ -157,7 +168,8 @@ module Worker_state = struct
         Deferred.return
         @@ ( module struct
              let verify_commands tagged_commands =
-               List.map tagged_commands ~f:(Fn.compose f Common.check)
+               List.map tagged_commands
+                 ~f:(Fn.compose f (Common.check ~signature_kind))
                |> Deferred.return
 
              let verify_blockchain_snarks _ = Deferred.return (Ok ())
@@ -189,11 +201,12 @@ module Worker = struct
               * Zkapp_statement.t
               * Pickles.Side_loaded.Proof.t )
               list
+              * Error.t
             | invalid ]
             list )
           F.t
       ; toggle_internal_tracing : ('w, bool, unit) F.t
-      ; set_itn_logger_data : ('w, int, unit) F.t
+      ; set_itn_logger_data : ('w, int option, unit) F.t
       }
 
     module Worker_state = Worker_state
@@ -267,6 +280,7 @@ module Worker = struct
                     * Zkapp_statement.Stable.Latest.t
                     * Pickles.Side_loaded.Proof.Stable.Latest.t )
                     list
+                    * Error.Stable.V2.t
                   | invalid ]
                   list]
               , verify_commands )
@@ -277,7 +291,7 @@ module Worker = struct
               , toggle_internal_tracing )
         ; set_itn_logger_data =
             f
-              ( [%bin_type_class: int]
+              ( [%bin_type_class: int option]
               , [%bin_type_class: unit]
               , set_itn_logger_data )
         }
@@ -292,6 +306,7 @@ module Worker = struct
             ; commit_id
             ; blockchain_verification_key
             ; transaction_verification_key
+            ; signature_kind
             } =
         if Option.is_some conf_dir then (
           let max_size = 256 * 1024 * 512 in
@@ -327,6 +342,7 @@ module Worker = struct
           ; commit_id
           ; blockchain_verification_key
           ; transaction_verification_key
+          ; signature_kind
           }
 
       let init_connection_state ~connection:_ ~worker_state:_ () = Deferred.unit
@@ -347,7 +363,7 @@ type t = { worker : worker Ivar.t ref; logger : Logger.t }
 (* TODO: investigate why conf_dir wasn't being used *)
 let create ~logger ?(enable_internal_tracing = false) ?internal_trace_filename
     ~proof_level ~pids ~conf_dir ~commit_id ~blockchain_verification_key
-    ~transaction_verification_key () : t Deferred.t =
+    ~transaction_verification_key ~signature_kind () : t Deferred.t =
   let on_failure err =
     [%log error] "Verifier process failed with error $err"
       ~metadata:[ ("err", Error_json.error_to_yojson err) ] ;
@@ -387,6 +403,7 @@ let create ~logger ?(enable_internal_tracing = false) ?internal_trace_filename
             ; commit_id
             ; blockchain_verification_key
             ; transaction_verification_key
+            ; signature_kind
             } )
       |> Deferred.Result.map_error ~f:Error.of_exn
     in
@@ -405,6 +422,9 @@ let create ~logger ?(enable_internal_tracing = false) ?internal_trace_filename
         ] ;
     Child_processes.Termination.register_process pids process
       Child_processes.Termination.Verifier ;
+    let pid = Process.pid process in
+    [%log info] "Verifier process has PID %d" (Pid.to_int pid) ;
+    Mina_metrics.Process_memory.Verifier.set_pid pid ;
     (* Always report termination as expected, and use the restart logic here
        instead.
     *)
@@ -441,6 +461,7 @@ let create ~logger ?(enable_internal_tracing = false) ?internal_trace_filename
         don't_wait_for (Process.stdin process |> Writer.close) ;
         let pid = Process.pid process in
         Child_processes.Termination.remove pids pid ;
+        Mina_metrics.Process_memory.Verifier.clear_pid () ;
         let create_worker_trigger = Ivar.create () in
         don't_wait_for
           (* If we don't hear back that the process has died after 10 seconds,
@@ -451,7 +472,9 @@ let create ~logger ?(enable_internal_tracing = false) ?internal_trace_filename
         let () =
           match e with
           | `Unexpected_termination ->
-              [%log error] "verifier terminated unexpectedly"
+              [%log error]
+                "verifier terminated unexpectedly; the verifier process will \
+                 be restarted automatically"
                 ~metadata:[ ("verifier_pid", `Int (Pid.to_int pid)) ] ;
               Ivar.fill_if_empty create_worker_trigger ()
           | `Wait_threw_an_exception _ -> (

@@ -29,7 +29,11 @@ APT_SOURCES_DIR="/etc/apt/sources.list.d"
 export DEBIAN_FRONTEND=noninteractive
 
 # Configuration
-BLACKLISTED_REPOS=()  # Uncomment to start with no blacklisted repos
+
+# Blacklist stale mina.list by default — install.sh creates it for a temporary
+# local aptly server and should clean it up, but if a previous build crashed
+# the file may persist and cause apt-get update to fail on localhost:8080.
+BLACKLISTED_REPOS=("mina.list")
 VERBOSE=false
 DRY_RUN=false
 SUDO_CMD=""
@@ -261,8 +265,11 @@ run_apt_update() {
         return 0
     fi
     
+    # Bypass any configured APT proxy for localhost
+    eval "$(./buildkite/scripts/debian/apt-proxy-bypass.sh localhost)"
+
     log "Running apt-get update..."
-    if ! ${SUDO_CMD} apt-get update; then
+    if ! ${SUDO_CMD} apt-get update $APT_PROXY_BYPASS_OPTS; then
         error "apt-get update failed"
         return 1
     fi

@@ -17,17 +17,26 @@ in  Pipeline.build
           ArtifactPipelines.MinaBuildSpec::{
           , artifacts =
             [ Artifacts.Type.Daemon
+            , Artifacts.Type.DaemonConfig
+            , Artifacts.Type.DaemonPrefork
+            , Artifacts.Type.DaemonAutoHardfork
+            , Artifacts.Type.DaemonAppsOnly
             , Artifacts.Type.LogProc
             , Artifacts.Type.Archive
             , Artifacts.Type.Rosetta
+            , Artifacts.Type.RosettaAppsOnly
             , Artifacts.Type.ZkappTestTransaction
-            , Artifacts.Type.CreateLegacyGenesis
+            , Artifacts.Type.CreatePreforkGenesis
+            , Artifacts.Type.DaemonStorageToolbox
             ]
           , network = Network.Type.Devnet
           , tags =
             [ PipelineTag.Type.Long
             , PipelineTag.Type.Release
             , PipelineTag.Type.Docker
+            , PipelineTag.Type.Devnet
+            , PipelineTag.Type.Amd64
+            , PipelineTag.Type.Jammy
             ]
           , debVersion = DebianVersions.DebVersion.Jammy
           , scope =

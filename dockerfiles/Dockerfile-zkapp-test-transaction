@@ -1,4 +1,4 @@
-ARG image=debian:bullseye-slim
+ARG image=europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/debian:bullseye-slim
 FROM ${image}
 
 # Run with `docker build --build-arg deb_version=<version>`
@@ -6,9 +6,15 @@ ARG deb_version
 ARG deb_codename=bullseye
 ARG deb_release=unstable
 ARG deb_repo="http://packages.o1test.net"
+ARG apt_cache_url=""
 
 ENV DEBIAN_FRONTEND noninteractive
 RUN echo "Building image with version $deb_codename $deb_release $deb_version"
+
+# Optional: configure APT caching proxy (bypass proxy for deb_repo)
+COPY scripts/configure-apt-proxy.sh /usr/local/bin/configure-apt-proxy.sh
+RUN chmod +x /usr/local/bin/configure-apt-proxy.sh \
+  && /usr/local/bin/configure-apt-proxy.sh "$apt_cache_url" "$deb_repo"
 
 # Install ca-certificates using HTTP
 RUN apt-get update --quiet --yes \

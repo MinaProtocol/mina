@@ -20,6 +20,8 @@ let DockerLogin = ../Command/DockerLogin/Type.dhall
 
 let DebianRepo = ../Constants/DebianRepo.dhall
 
+let DockerRepo = ../Constants/DockerRepo.dhall
+
 let DebianVersions = ../Constants/DebianVersions.dhall
 
 let Network = ../Constants/Network.dhall
@@ -28,9 +30,11 @@ let DockerPublish = ../Constants/DockerPublish.dhall
 
 let VerifyDockers = ../Command/Packages/VerifyDockers.dhall
 
-let Extensions = ../Lib/Extensions.dhall
-
 let Arch = ../Constants/Arch.dhall
+
+let DebianInstallMode
+    : Type
+    = < ThroughLocalRepo | NoInstall | DownloadOnly >
 
 let ReleaseSpec =
       { Type =
@@ -42,42 +46,53 @@ let ReleaseSpec =
           , repo : Text
           , arch : Arch.Type
           , no_cache : Bool
-          , no_debian : Bool
+          , deb_install_mode : DebianInstallMode
           , deb_codename : DebianVersions.DebVersion
           , deb_release : Text
           , deb_version : Text
+          , deb_root_folder : Text
           , deb_legacy_version : Text
+          , deb_storage_repair_version : Optional Text
           , deb_suffix : Optional Text
           , deb_profile : Profiles.Type
           , deb_repo : DebianRepo.Type
           , build_flags : BuildFlags.Type
           , step_key_suffix : Text
           , docker_publish : DockerPublish.Type
+          , docker_repo : DockerRepo.Type
+          , image_name : Optional Text
+          , generic : Bool
           , verify : Bool
-          , if : Optional B/If
+          , size : Size
+          , if_ : Optional B/If
           }
       , default =
           { deps = [] : List Command.TaggedKey.Type
-          , network = Network.Type.Berkeley
+          , network = Network.Type.Devnet
           , arch = Arch.Type.Amd64
           , version = "\\\${MINA_DOCKER_TAG}"
           , service = Artifacts.Type.Daemon
           , branch = "\\\${BUILDKITE_BRANCH}"
           , repo = "\\\${BUILDKITE_REPO}"
+          , deb_install_mode = DebianInstallMode.ThroughLocalRepo
+          , deb_root_folder = "\\\${BUILDKITE_BUILD_ID}"
           , deb_codename = DebianVersions.DebVersion.Bullseye
           , deb_release = "unstable"
           , deb_version = "\\\${MINA_DEB_VERSION}"
           , deb_legacy_version = "3.1.1-alpha1-compatible-14a8b92"
+          , deb_storage_repair_version = None Text
           , deb_profile = Profiles.Type.Devnet
           , build_flags = BuildFlags.Type.None
           , deb_repo = DebianRepo.Type.Local
           , docker_publish = DockerPublish.Type.Essential
           , no_cache = False
-          , no_debian = False
+          , docker_repo = DockerRepo.Type.InternalEurope
           , step_key_suffix = "-docker-image"
           , verify = False
           , deb_suffix = None Text
-          , if = None B/If
+          , image_name = None Text
+          , if_ = None B/If
+          , generic = False
           }
       }
 
@@ -97,53 +112,83 @@ let stepLabel =
 
 let generateStep =
           \(spec : ReleaseSpec.Type)
-      ->  let installBuildx = "./scripts/docker/setup_buildx.sh"
-
-          let exportMinaDebCmd =
+      ->  let exportMinaDebCmd =
                 "export MINA_DEB_CODENAME=${DebianVersions.lowerName
                                               spec.deb_codename}"
+
+          let exportBranchNameCmd = "export BRANCH_NAME=${spec.branch}"
 
           let maybeCacheOption = if spec.no_cache then "--no-cache" else ""
 
           let maybeStartDebianRepo =
-                      if spec.no_debian
-
-                then  " && echo Skipping local debian repo setup "
-
-                else      " && ./buildkite/scripts/debian/update.sh --verbose"
-                      ++  " && apt-get install aptly -y && ./buildkite/scripts/debian/start_local_repo.sh"
+                merge
+                  { ThroughLocalRepo =
+                      " && ./buildkite/scripts/debian/start_local_repo.sh --root ${spec.deb_root_folder} --arch ${Arch.lowerName
+                                                                                                                    spec.arch}"
+                  , DownloadOnly =
+                      " && ROOT=${spec.deb_root_folder} LOCAL_DEB_FOLDER=\"dockerfiles\" ./buildkite/scripts/debian/read_all_from_cache.sh "
+                  , NoInstall = " && echo Skipping local debian repo setup "
+                  }
+                  spec.deb_install_mode
 
           let maybeStopDebianRepo =
-                      if spec.no_debian
-
-                then  " && echo Skipping local debian repo teardown "
-
-                else  " && ./scripts/debian/aptly.sh stop"
-
-          let suffix =
-                Extensions.joinOptionals
-                  "-"
-                  [ merge
-                      { Mainnet = None Text
-                      , Devnet = None Text
-                      , Dev = None Text
-                      , Lightnet = Some
-                          "${Profiles.toSuffixLowercase spec.deb_profile}"
-                      }
-                      spec.deb_profile
-                  , merge
-                      { None = None Text
-                      , Instrumented = Some
-                          "${BuildFlags.toSuffixLowercase spec.build_flags}"
-                      }
-                      spec.build_flags
-                  , spec.deb_suffix
-                  ]
+                merge
+                  { ThroughLocalRepo = " && ./scripts/debian/aptly.sh stop"
+                  , DownloadOnly =
+                      " && echo Skipping local debian repo teardown "
+                  , NoInstall = " && echo Skipping local debian repo teardown "
+                  }
+                  spec.deb_install_mode
 
           let debSuffix =
                 merge
-                  { None = "", Some = \(s : Text) -> " --deb-suffix " ++ s }
+                  { None = if spec.generic then " --deb-suffix generic" else ""
+                  , Some = \(s : Text) -> " --deb-suffix " ++ s
+                  }
                   spec.deb_suffix
+
+          let imageNameArg =
+                merge
+                  { None = ""
+                  , Some = \(name : Text) -> " --image-name " ++ name
+                  }
+                  spec.image_name
+
+          let archCustomSuffix =
+                merge
+                  { Arm64 = " --custom-suffix arm64 ", Amd64 = "" }
+                  spec.arch
+
+          let customSuffix =
+                merge
+                  { DaemonConfig = archCustomSuffix
+                  , Daemon = ""
+                  , DaemonLegacyHardfork = ""
+                  , DaemonAppsOnly = ""
+                  , DaemonPrefork = ""
+                  , DaemonAutoHardfork = ""
+                  , LogProc = ""
+                  , Archive = ""
+                  , TestExecutive = ""
+                  , BatchTxn = ""
+                  , Rosetta = ""
+                  , RosettaAppsOnly = ""
+                  , RosettaConfig = archCustomSuffix
+                  , ZkappTestTransaction = ""
+                  , FunctionalTestSuite = ""
+                  , Toolchain = ""
+                  , CreatePreforkGenesis = ""
+                  , DelegationVerifier = ""
+                  , DaemonStorageToolbox = ""
+                  }
+                  spec.service
+
+          let storageRepairVersionSuffix =
+                merge
+                  { None = ""
+                  , Some = \(v : Text) -> " --deb-storage-repair-version ${v} "
+                  }
+                  spec.deb_storage_repair_version
 
           let maybeVerify =
                       if     spec.verify
@@ -158,19 +203,45 @@ let generateStep =
                             , networks = [ spec.network ]
                             , version = spec.deb_version
                             , codenames = [ spec.deb_codename ]
-                            , suffix = suffix
-                            , arch = spec.arch
+                            , profile = spec.deb_profile
+                            , buildFlag = spec.build_flags
+                            , archs = [ spec.arch ]
+                            , repo = spec.docker_repo
+                            , generic = spec.generic
                             }
 
                 else  ""
 
           let pruneDockerImages =
-                "docker system prune --all --force --filter until=24h"
+                    "if [ -z \"\\\${SKIP_DOCKER_PRUNE:-}\" ]; then "
+                ++  "docker system prune --all --force "
+                ++  merge
+                      { Arm64 = ""
+                      , XLarge = "--filter until=24h"
+                      , Large = "--filter until=24h"
+                      , Medium = "--filter until=24h"
+                      , Small = "--filter until=24h"
+                      , Integration = "--filter until=24h"
+                      , QA = "--filter until=24h"
+                      , Multi = "--filter until=24h"
+                      , Perf = "--filter until=24h"
+                      }
+                      spec.size
+                ++  "; else echo 'Skipping docker prune due to SKIP_DOCKER_PRUNE'; fi"
+
+          let loadOnlyArg =
+                      if DockerPublish.shouldPublish
+                           spec.docker_publish
+                           spec.service
+
+                then  ""
+
+                else  " --load-only "
 
           let buildDockerCmd =
                     "./scripts/docker/build.sh"
-                ++  " --service ${Artifacts.dockerName spec.service}"
-                ++  " --network ${Network.lowerName spec.network}"
+                ++  " --service ${Artifacts.dockerServiceName spec.service}"
+                ++  " --network ${Network.debianSuffix spec.network}"
                 ++  " --version ${spec.version}"
                 ++  " --branch ${spec.branch}"
                 ++  " ${maybeCacheOption} "
@@ -184,38 +255,22 @@ let generateStep =
                                             spec.build_flags}"
                 ++  " --deb-legacy-version ${spec.deb_legacy_version}"
                 ++  debSuffix
+                ++  storageRepairVersionSuffix
                 ++  " --repo ${spec.repo}"
                 ++  " --platform ${Arch.platform spec.arch}"
-
-          let releaseDockerCmd =
-                      if DockerPublish.shouldPublish
-                           spec.docker_publish
-                           spec.service
-
-                then      "./scripts/docker/release.sh"
-                      ++  " --service ${Artifacts.dockerName spec.service}"
-                      ++  " --version ${spec.version}"
-                      ++  " --network ${Network.lowerName spec.network}"
-                      ++  " --deb-codename ${DebianVersions.lowerName
-                                               spec.deb_codename}"
-                      ++  " --deb-version ${spec.deb_version}"
-                      ++  " --deb-profile ${Profiles.lowerName
-                                              spec.deb_profile}"
-                      ++  " --deb-build-flags ${BuildFlags.lowerName
-                                                  spec.build_flags}"
-                      ++  " --platform ${Arch.platform spec.arch}"
-
-                else  " echo In order to ensure storage optimization, skipping publishing docker as this is not essential one or publishing is disabled . Docker publish setting is set to  ${DockerPublish.show
-                                                                                                                                                                                                spec.docker_publish}."
+                ++  " --docker-registry ${DockerRepo.show spec.docker_repo}"
+                ++  loadOnlyArg
+                ++  customSuffix
+                ++  imageNameArg
 
           let remoteRepoCmds =
                 [ Cmd.run
                     (     exportMinaDebCmd
+                      ++  " && "
+                      ++  exportBranchNameCmd
                       ++  " && source ./buildkite/scripts/export-git-env-vars.sh "
                       ++  " && "
                       ++  buildDockerCmd
-                      ++  " && "
-                      ++  releaseDockerCmd
                       ++  maybeVerify
                     )
                 ]
@@ -227,17 +282,15 @@ let generateStep =
                   , Stable = remoteRepoCmds
                   , Local =
                     [ Cmd.run
-                        (     installBuildx
+                        (     exportMinaDebCmd
                           ++  " && "
-                          ++  exportMinaDebCmd
+                          ++  exportBranchNameCmd
                           ++  " && "
                           ++  pruneDockerImages
                           ++  maybeStartDebianRepo
                           ++  " && source ./buildkite/scripts/export-git-env-vars.sh "
                           ++  " && "
                           ++  buildDockerCmd
-                          ++  " && "
-                          ++  releaseDockerCmd
                           ++  maybeStopDebianRepo
                           ++  maybeVerify
                         )
@@ -245,18 +298,22 @@ let generateStep =
                   }
                   spec.deb_repo
 
+          let target =
+                merge { Arm64 = Size.Arm64, Amd64 = Size.XLarge } spec.arch
+
           in  Command.build
                 Command.Config::{
                 , commands = commands
                 , label = "${stepLabel spec}"
                 , key = "${stepKey spec}"
-                , target = Size.XLarge
+                , target = target
                 , docker_login = Some DockerLogin::{=}
                 , depends_on = spec.deps
-                , if = spec.if
+                , if_ = spec.if_
                 }
 
 in  { generateStep = generateStep
+    , DebianInstallMode = DebianInstallMode
     , ReleaseSpec = ReleaseSpec
     , stepKey = stepKey
     , stepLabel = stepLabel

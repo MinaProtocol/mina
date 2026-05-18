@@ -2,32 +2,16 @@
 # The "build-deps" stage
 # - Installs all compilers/interpreters, tools, and OS packages on the given debian or ubuntu image
 #################################################################################################
-# Supports debian:bullseye-slim, and ubuntu:focal
-ARG image=ubuntu:focal
-# Use the image argument to select the base image for this stage
-# This allows us to use the same Dockerfile for different base images
-# This arg is defined here globally and does not need to be redefined in
-# any other stages.
+# Supports europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/debian:bullseye-slim, and europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/ubuntu:focal
+ARG image=europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/ubuntu:focal
 ARG deb_codename
+ARG apt_cache_url=""
 
 FROM ${image} AS build-deps
-
-ARG TARGETPLATFORM
-ARG BUILDPLATFORM
-
-# Unfortunately we cannot use the same naming convention for all architectures
-# for all tooling, therefore we need to define couple of naming conventions
-
-# Canonical style naming convention
-# : aarch/x86_64
-ARG CANONICAL_ARCH
-# Debian style naming convention
-# : arm64/amd64
-ARG DEBIAN_ARCH
-
-# We need to define the target architecture as it is still different from CANONICAL_ARCH
-# For example: Canonical names are aarch64/x86_64 while TARGETARCH: aarch64/amd64
 ARG TARGETARCH
+
+ARG apt_cache_url
+ARG deb_repo=""
 
 # OCaml Version
 # The version must be the same as the version used in:
@@ -45,6 +29,7 @@ ARG OPAM_VERSION=2.3.0
 #   `nix flake update opam-repository`).
 # - scripts/update_opam_switch.sh
 ARG OPAM_REPOSITORY_COMMIT=08d8c16c16dc6b23a5278b06dff0ac6c7a217356
+ARG O1LABS_OPAM_REPOSITORY_COMMIT=dd90c5c72b7b7caeca3db3224b2503924deea08a
 
 # Golang version number used to detemine tarball name
 ARG GO_VERSION=1.19.11
@@ -56,7 +41,7 @@ ARG GO_CAPNP_VERSION=v3.0.0-alpha.5
 # This should stay in line with:
 # - src/lib/crypto/kimchi_bindings/stubs/rust-toolchain.toml
 # - src/lib/crypto/proof-systems/rust-toolchain.toml
-ARG RUST_VERSION=1.81.0
+ARG RUST_VERSION=1.92.0
 # Nightly Rust Version used for WebAssembly builds
 # This should stay in line with the value of the variable
 # $NIGHTLY_RUST_VERSION defined in:
@@ -66,7 +51,23 @@ ARG RUST_NIGHTLY=2024-09-05
 # --- OS package dependencies
 # Organized as two alphabetized lists, first libraries and then tools/other packages
 ENV DEBIAN_FRONTEND=noninteractive
-RUN apt-get update --quiet \
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+
+# Optional: configure APT caching proxy (bypass proxy for deb_repo)
+COPY scripts/configure-apt-proxy.sh /usr/local/bin/configure-apt-proxy.sh
+RUN chmod +x /usr/local/bin/configure-apt-proxy.sh \
+  && /usr/local/bin/configure-apt-proxy.sh "$apt_cache_url" "$deb_repo"
+
+RUN CODENAME=$(grep "VERSION_CODENAME" /etc/os-release | cut -d= -f2); \
+  case "${CODENAME}" in \
+    bookworm) LIBSSL="libssl-dev"; LIBPROCPS="libproc2-0" ;; \
+    bullseye) LIBSSL="libssl-dev"; LIBPROCPS="libprocps-dev" ;; \
+    focal) LIBSSL="libssl-dev"; LIBPROCPS="libprocps-dev" ;; \
+    jammy) LIBSSL="libssl3"; LIBPROCPS="libprocps8";; \
+    noble) LIBSSL="libssl3t64"; LIBPROCPS="libproc2-0";; \
+    *) echo "Unsupported codename: ${CODENAME}"; exit 1 ;; \
+  esac; \
+  apt-get update --quiet \
   && apt-get upgrade --quiet --yes \
   && apt-get install --no-install-recommends --quiet --yes \
   adduser \
@@ -83,6 +84,8 @@ RUN apt-get update --quiet \
   liblmdb0 \
   libpq-dev \
   libsodium-dev \
+  "$LIBSSL" \
+  "$LIBPROCPS" \
   build-essential \
   ca-certificates \
   capnproto \
@@ -91,17 +94,15 @@ RUN apt-get update --quiet \
   file \
   git \
   git-lfs \
+  lld \
   m4 \
   pkg-config \
+  rocksdb-tools \
   rsync \
   sudo \
   unzip \
   zlib1g-dev \
   && rm -rf /var/lib/apt/lists/*
-
-# Symlink image-specific lld version to a single lld executable
-RUN if command -v ld.lld-10 >/dev/null 2>&1; then ln -sf "$(which ld.lld-10)" /usr/bin/ld.lld; fi
-RUN if command -v ld.lld-11 >/dev/null 2>&1; then ln -sf "$(which ld.lld-11)" /usr/bin/ld.lld; fi
 
 # --- Create opam user (for later) and give sudo to make opam happy
 RUN adduser --uid 65533 --disabled-password --gecos '' opam \
@@ -116,8 +117,13 @@ RUN adduser --uid 65533 --disabled-password --gecos '' opam \
 RUN git config --global advice.detachedHead false
 
 # --- Opam install of a given OPAM_VERSION from github release
-RUN curl -sL \
-  "https://github.com/ocaml/opam/releases/download/${OPAM_VERSION}/opam-${OPAM_VERSION}-${DEBIAN_ARCH}-linux" \
+RUN case "${TARGETARCH}" in \
+        "amd64") OPAM_ARCH="x86_64" ;; \
+        "arm64") OPAM_ARCH="arm64" ;; \
+        *) echo "Unsupported arch: ${TARGETARCH}"; exit 1 ;; \
+    esac; \
+    curl -sL \
+  "https://github.com/ocaml/opam/releases/download/${OPAM_VERSION}/opam-${OPAM_VERSION}-${OPAM_ARCH}-linux" \
   -o /usr/bin/opam \
   && chmod +x /usr/bin/opam
 
@@ -133,9 +139,14 @@ RUN curl -s "https://dl.google.com/go/go${GO_VERSION}.linux-${TARGETARCH}.tar.gz
 # In addition to that, we also install cargo-xtask as it is used to build the
 # WebAssembly artefacts.
 USER opam
-RUN curl --proto "=https" \
+RUN case "${TARGETARCH}" in \
+        "amd64") RUSTUP_ARCH="x86_64" ;; \
+        "arm64") RUSTUP_ARCH="aarch64" ;; \
+        *) echo "Unsupported arch: ${TARGETARCH}"; exit 1 ;; \
+    esac; \
+  curl --proto "=https" \
   --tlsv1.2 -sSf -o /tmp/rustup-init \
-  https://static.rust-lang.org/rustup/dist/${CANONICAL_ARCH}-unknown-linux-gnu/rustup-init \
+  https://static.rust-lang.org/rustup/dist/${RUSTUP_ARCH}-unknown-linux-gnu/rustup-init \
   && chmod +x /tmp/rustup-init \
   && /tmp/rustup-init -y --default-toolchain \
     "${RUST_VERSION}" \
@@ -189,10 +200,12 @@ RUN opam init --disable-sandboxing \
     -k git \
     -a /home/opam/opam-repository \
     --bare
+# We pin the opam-repo SHA so this step gets 
+# cache-busted when we update the opam repo
 RUN opam repository add --yes \
     --all \
     --set-default o1-labs \
-    https://github.com/o1-labs/opam-repository.git \
+    https://github.com/o1-labs/opam-repository.git#${O1LABS_OPAM_REPOSITORY_COMMIT} \
   && opam switch create "${OCAML_VERSION}${OCAML_REVISION}" \
     "${OCAML_PACKAGE}${OCAML_VERSION}${OCAML_REVISION}${OCAML_VARIANT}" \
   && opam switch "${OCAML_VERSION}${OCAML_REVISION}"

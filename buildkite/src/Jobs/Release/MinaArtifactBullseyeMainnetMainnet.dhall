@@ -17,12 +17,17 @@ in  Pipeline.build
           ArtifactPipelines.MinaBuildSpec::{
           , artifacts =
             [ Artifacts.Type.Daemon
+            , Artifacts.Type.DaemonAppsOnly
             , Artifacts.Type.DaemonAutoHardfork
+            , Artifacts.Type.DaemonConfig
+            , Artifacts.Type.DaemonPrefork
             , Artifacts.Type.LogProc
             , Artifacts.Type.Archive
             , Artifacts.Type.Rosetta
+            , Artifacts.Type.RosettaAppsOnly
             , Artifacts.Type.ZkappTestTransaction
-            , Artifacts.Type.CreateLegacyGenesis
+            , Artifacts.Type.CreatePreforkGenesis
+            , Artifacts.Type.DaemonStorageToolbox
             ]
           , network = Network.Type.Mainnet
           , tags =
@@ -30,6 +35,9 @@ in  Pipeline.build
             , PipelineTag.Type.Release
             , PipelineTag.Type.Stable
             , PipelineTag.Type.Rosetta
+            , PipelineTag.Type.Mainnet
+            , PipelineTag.Type.Amd64
+            , PipelineTag.Type.Bullseye
             ]
           , profile = Profiles.Type.Mainnet
           , scope =

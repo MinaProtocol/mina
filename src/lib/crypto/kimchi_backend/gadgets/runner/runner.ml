@@ -1,5 +1,6 @@
-(* Step circuit Impl *)
+(** Step circuit Impl. *)
 module Tick = Kimchi_backend.Pasta.Vesta_based_plonk
+
 module Impl = Kimchi_pasta_snarky_backend.Step_impl
 
 let generate_and_verify_proof ?cs circuit =

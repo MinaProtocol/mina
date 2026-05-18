@@ -31,6 +31,7 @@ module Base = struct
            * Mina_base.Zkapp_statement.t
            * Pickles.Side_loaded.Proof.t )
            list
+           * Error.t
          | invalid ]
          list
          Deferred.Or_error.t
@@ -50,7 +51,8 @@ module Base = struct
     (* in ITN logger, sets the client port of daemon to send RPC requests to
        sets the process kind for the Itn logger to "verifier"
     *)
-    val set_itn_logger_data : t -> daemon_port:int -> unit Or_error.t Deferred.t
+    val set_itn_logger_data :
+      t -> daemon_port:int option -> unit Or_error.t Deferred.t
   end
 end
 
@@ -67,6 +69,7 @@ module type S = sig
     -> commit_id:string
     -> blockchain_verification_key:Pickles.Verification_key.t
     -> transaction_verification_key:Pickles.Verification_key.t
+    -> signature_kind:Mina_signature_kind.t
     -> unit
     -> t Deferred.t
 end

@@ -20,7 +20,7 @@ let Network = ../../Constants/Network.dhall
 
 let RunWithPostgres = ../../Command/RunWithPostgres.dhall
 
-let network = Network.Type.Berkeley
+let network = Network.Type.Devnet
 
 let dirtyWhen =
       [ S.strictlyStart (S.contains "src")
@@ -31,7 +31,10 @@ let dirtyWhen =
 
 let rosettaDocker =
       Artifacts.fullDockerTag
-        Artifacts.Tag::{ artifact = Artifacts.Type.Rosetta, network = network }
+        Artifacts.Tag::{
+        , artifact = Artifacts.Type.RosettaAppsOnly
+        , network = network
+        }
 
 in  Pipeline.build
       Pipeline.Config::{
@@ -54,7 +57,11 @@ in  Pipeline.build
                   "export MINA_DEB_CODENAME=bullseye && source ./buildkite/scripts/export-git-env-vars.sh && echo \\\${MINA_DOCKER_TAG}"
               , RunWithPostgres.runInDockerWithPostgresConn
                   ([] : List Text)
-                  "./src/test/archive/sample_db/archive_db.sql"
+                  ( Some
+                      ( RunWithPostgres.ScriptOrArchive.Script
+                          "./src/test/archive/sample_db/archive_db.sql"
+                      )
+                  )
                   rosettaDocker
                   "./buildkite/scripts/rosetta-indexer-test.sh"
               , Cmd.runInDocker
@@ -64,11 +71,12 @@ in  Pipeline.build
             , label = "Rosetta integration tests Bullseye"
             , key = "rosetta-integration-tests-bullseye"
             , target = Size.Small
+            , artifact_paths = [ S.contains "test_output/artifacts/*" ]
             , depends_on =
                 Dockers.dependsOn
                   Dockers.DepsSpec::{
                   , codename = Dockers.Type.Bullseye
-                  , artifact = Artifacts.Type.Rosetta
+                  , artifact = Artifacts.Type.RosettaAppsOnly
                   , network = network
                   }
             }

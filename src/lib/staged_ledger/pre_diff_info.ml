@@ -403,7 +403,8 @@ let compute_statuses
   let split_transaction_statuses txns_with_statuses =
     List.partition_map txns_with_statuses ~f:(fun txn_applied ->
         let { With_status.data = txn; status } =
-          Mina_ledger.Ledger.transaction_of_applied txn_applied
+          Mina_transaction_logic.Transaction_applied.transaction_with_status
+            txn_applied
         in
         match txn with
         | Transaction.Command cmd ->

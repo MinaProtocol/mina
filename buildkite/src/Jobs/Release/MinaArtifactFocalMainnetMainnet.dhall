@@ -19,12 +19,17 @@ in  Pipeline.build
           ArtifactPipelines.MinaBuildSpec::{
           , artifacts =
             [ Artifacts.Type.Daemon
+            , Artifacts.Type.DaemonAppsOnly
             , Artifacts.Type.DaemonAutoHardfork
+            , Artifacts.Type.DaemonConfig
+            , Artifacts.Type.DaemonPrefork
             , Artifacts.Type.LogProc
             , Artifacts.Type.Archive
             , Artifacts.Type.Rosetta
+            , Artifacts.Type.RosettaAppsOnly
             , Artifacts.Type.ZkappTestTransaction
-            , Artifacts.Type.CreateLegacyGenesis
+            , Artifacts.Type.CreatePreforkGenesis
+            , Artifacts.Type.DaemonStorageToolbox
             ]
           , debVersion = DebianVersions.DebVersion.Focal
           , network = Network.Type.Mainnet
@@ -32,6 +37,9 @@ in  Pipeline.build
             [ PipelineTag.Type.Long
             , PipelineTag.Type.Release
             , PipelineTag.Type.Stable
+            , PipelineTag.Type.Mainnet
+            , PipelineTag.Type.Amd64
+            , PipelineTag.Type.Focal
             ]
           , profile = Profiles.Type.Mainnet
           , scope =

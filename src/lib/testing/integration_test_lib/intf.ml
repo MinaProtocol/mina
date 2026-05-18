@@ -3,23 +3,6 @@ open Core_kernel
 open Mina_base
 open Pipe_lib
 
-type metrics_t =
-  { block_production_delay : int list
-  ; transaction_pool_diff_received : int
-  ; transaction_pool_diff_broadcasted : int
-  ; transactions_added_to_pool : int
-  ; transaction_pool_size : int
-  }
-
-type best_chain_block =
-  { state_hash : string
-  ; command_transaction_count : int
-  ; creator_pk : string
-  ; height : Mina_numbers.Length.t
-  ; global_slot_since_genesis : Mina_numbers.Global_slot_since_genesis.t
-  ; global_slot_since_hard_fork : Mina_numbers.Global_slot_since_hard_fork.t
-  }
-
 (* TODO: malleable error -> or error *)
 
 module Engine = struct
@@ -69,11 +52,15 @@ module Engine = struct
 
       val run_replayer :
            ?start_slot_since_genesis:int
+        -> ?target_state_hash:State_hash.t
         -> logger:Logger.t
         -> t
         -> string Malleable_error.t
 
       val dump_mina_logs :
+        logger:Logger.t -> t -> log_file:string -> unit Malleable_error.t
+
+      val tail_mina_logs_to_file :
         logger:Logger.t -> t -> log_file:string -> unit Malleable_error.t
 
       val dump_precomputed_blocks :
@@ -218,7 +205,9 @@ module Dsl = struct
       ; blocks_seen_by_node : State_hash.Set.t String.Map.t
       ; blocks_including_txn :
           State_hash.Set.t Mina_transaction.Transaction_hash.Map.t
+      ; proof_block_state_hashes : State_hash.t list
       }
+    [@@deriving to_yojson]
 
     val listen :
          logger:Logger.t

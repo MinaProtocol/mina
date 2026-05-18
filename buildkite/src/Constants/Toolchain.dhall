@@ -13,7 +13,7 @@ let runner =
       ->  \(arch : Arch.Type)
       ->  merge
             { Bookworm = RunInToolchain.runInToolchainBookworm arch
-            , Bullseye = RunInToolchain.runInToolchain
+            , Bullseye = RunInToolchain.runInToolchainBullseye arch
             , Jammy = RunInToolchain.runInToolchainJammy
             , Focal = RunInToolchain.runInToolchain
             , Noble = RunInToolchain.runInToolchainNoble arch
@@ -27,7 +27,7 @@ let select =
       ->  merge
             { ByDebianAndArch = runner debVersion arch
             , Custom =
-                \(image : Text) -> RunInToolchain.runInToolchainImage image
+                \(image : Text) -> RunInToolchain.runInToolchainImage image arch
             }
             mode
 

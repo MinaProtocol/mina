@@ -55,7 +55,7 @@ module Worker_state = struct
 
     val toggle_internal_tracing : bool -> unit
 
-    val set_itn_logger_data : daemon_port:int -> unit
+    val set_itn_logger_data : daemon_port:int option -> unit
 
     val get_blockchain_verification_key :
       unit -> Pickles.Verification_key.t Deferred.t
@@ -303,7 +303,7 @@ module Functions = struct
         Deferred.unit )
 
   let set_itn_logger_data =
-    create bin_int bin_unit (fun w daemon_port ->
+    create (bin_option bin_int) bin_unit (fun w daemon_port ->
         let (module M) = Worker_state.get w in
         M.set_itn_logger_data ~daemon_port ;
         Deferred.unit )
@@ -331,7 +331,7 @@ module Worker = struct
           ('w, Extend_blockchain_input.t, Blockchain.t Or_error.t) F.t
       ; verify_blockchain : ('w, Blockchain.t, unit Or_error.t) F.t
       ; toggle_internal_tracing : ('w, bool, unit) F.t
-      ; set_itn_logger_data : ('w, int, unit) F.t
+      ; set_itn_logger_data : ('w, int option, unit) F.t
       ; get_blockchain_verification_key :
           ('w, unit, Pickles.Verification_key.t) F.t
       ; get_transaction_verification_key :
@@ -453,6 +453,10 @@ let create ~logger ?(enable_internal_tracing = false) ?internal_trace_filename
       ] ;
   Child_processes.Termination.register_process pids process
     Child_processes.Termination.Prover ;
+
+  let pid = Process.pid process in
+  [%log info] "Prover process has PID %d" (Pid.to_int pid) ;
+  Mina_metrics.Process_memory.Prover.set_pid pid ;
   let exit_or_signal =
     Child_processes.Termination.wait_safe ~logger process ~module_:__MODULE__
       ~location:__LOC__ ~here:[%here]
@@ -570,8 +574,12 @@ let create_genesis_block_inputs (genesis_inputs : Genesis_proof.Inputs.t) =
   let consensus_constants = genesis_inputs.consensus_constants in
   let prev_state =
     let open Staged_ledger_diff in
-    Protocol_state.negative_one ~genesis_ledger:genesis_inputs.genesis_ledger
-      ~genesis_epoch_data:genesis_inputs.genesis_epoch_data
+    Protocol_state.negative_one
+      ~genesis_ledger:
+        (Consensus.Genesis_data.Ledger.to_hashed genesis_inputs.genesis_ledger)
+      ~genesis_epoch_data:
+        (Consensus.Genesis_data.Epoch.to_hashed
+           genesis_inputs.genesis_epoch_data )
       ~constraint_constants ~consensus_constants ~genesis_body_reference
   in
   let genesis_epoch_ledger =

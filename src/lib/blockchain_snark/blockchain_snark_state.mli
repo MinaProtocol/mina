@@ -1,3 +1,55 @@
+(** Blockchain SNARK circuits.
+
+    This code is called in:
+    - [src/lib/prover/prover.ml] - block production
+    - [src/lib/verifier/verifier.ml] - proof verification
+    - [src/lib/genesis_proof/genesis_proof.ml] - genesis proof
+
+    The blockchain SNARK has 1 circuit:
+
+    - {b blockchain-step}: Proves a single step of the blockchain state
+      transition. Each step verifies that the protocol state was correctly
+      updated from the previous state by applying a valid block (including
+      its transaction snark proof).
+
+    Constraint counts vary by profile due to different configuration parameters
+    (e.g., ledger depth).
+
+    Note: These values are measured with proof_level=Full, which generates the
+    actual constraint system used in production. See {!Genesis_constants.Proof_level}
+    for details on proof levels.
+
+    {b Dev profile:}
+    {v
+    | Circuit         | Constraints | Public Input | Auxiliary Input |
+    |-----------------|-------------|--------------|-----------------|
+    | blockchain-step | 9,168       | 1            | 31,925          |
+    v}
+
+    {b Devnet profile:}
+    {v
+    | Circuit         | Constraints | Public Input | Auxiliary Input |
+    |-----------------|-------------|--------------|-----------------|
+    | blockchain-step | 10,224      | 1            | 39,397          |
+    v}
+
+    {b Lightnet profile:}
+    {v
+    | Circuit         | Constraints | Public Input | Auxiliary Input |
+    |-----------------|-------------|--------------|-----------------|
+    | blockchain-step | 10,126      | 1            | 38,359          |
+    v}
+
+    {b Mainnet profile:}
+    {v
+    | Circuit         | Constraints | Public Input | Auxiliary Input |
+    |-----------------|-------------|--------------|-----------------|
+    | blockchain-step | 10,224      | 1            | 39,397          |
+    v}
+
+    If these values change, update the tables above and the expected values in
+    [tests/test_blockchain_snark.ml]. *)
+
 open Mina_base
 open Mina_state
 open Core_kernel
@@ -66,6 +118,12 @@ module Make (T : sig
 
   val proof_level : Genesis_constants.Proof_level.t
 end) : S
+
+(** Return the constraint system for the blockchain-step circuit. *)
+val step_constraint_system :
+     proof_level:Genesis_constants.Proof_level.t
+  -> constraint_constants:Genesis_constants.Constraint_constants.t
+  -> Snark_params.Tick.R1CS_constraint_system.t
 
 val constraint_system_digests :
      proof_level:Genesis_constants.Proof_level.t

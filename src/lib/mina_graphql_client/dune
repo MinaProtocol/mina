@@ -1,0 +1,18 @@
+(library
+ (name mina_graphql_client)
+ (public_name mina_graphql_client)
+ (instrumentation (backend bisect_ppx))
+ (preprocessor_deps
+  ../../graphql-ppx-config.inc
+  ../../../graphql_schema.json)
+ (preprocess
+  (pps ppx_base ppx_version ppx_let ppx_mina ppx_custom_printf
+   ppx_sexp_conv ppx_compare ppx_deriving.std
+   graphql_ppx -- %{read-lines:../../graphql-ppx-config.inc}))
+ (libraries
+  ;; opam libraries
+  async async_kernel core_kernel core uri integers result
+  ;; local libraries
+  graphql_lib generated_graphql_queries mina_graphql mina_base mina_base.import
+  mina_transaction mina_numbers currency signature_lib logger with_hash
+  data_hash_lib))
