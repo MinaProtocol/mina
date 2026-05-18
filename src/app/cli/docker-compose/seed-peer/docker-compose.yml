@@ -34,6 +34,7 @@ services:
         mina daemon \
              --peer-list-url ${MINA_PEERLIST_URL} \
              --libp2p-keypair /root/.mina-config/keys/libp2p-key \
+             --external-port ${MINA_P2P_PORT} \
              --insecure-rest-server \
              --rest-port ${MINA_REST_PORT} \
              --seed

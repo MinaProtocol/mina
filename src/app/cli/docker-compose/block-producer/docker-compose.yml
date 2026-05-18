@@ -35,6 +35,7 @@ services:
         mina daemon \
              --peer-list-url ${MINA_PEERLIST_URL} \
              --block-producer-key /root/.mina-config/keys/wallet-key \
+             --external-port ${MINA_P2P_PORT} \
              --insecure-rest-server \
              --rest-port ${MINA_REST_PORT}
       '
