@@ -103,24 +103,61 @@ if [[ "${host_uid}" != "${current_uid}" ]] || [[ "${host_gid}" != "${current_gid
   # in the image layer and reset to UID 65533 on every container boot — so
   # we re-chown them each time, but the cost is small (a few inodes).
   #
-  # We deliberately do NOT recurse into the heavy image-baked subdirs (.rustup,
-  # opam-repository, mina/, go/, etc.) — they hold tens of thousands of files
-  # that opam reads but never writes to, and chowning them through overlayfs
-  # copy-up costs ~1 minute per boot. Read access works fine at the original
-  # UID (755 perms), and the volumes opam *does* write to (/home/opam/.opam,
-  # /mina/_opam, /mina/_build) are handled below.
+  # We chown top-level files AND directory entries (not their contents) so
+  # that mode-700 dirs like .gnupg become accessible to the remapped opam
+  # user. We deliberately do NOT recurse into the heavy image-baked subdirs
+  # (.rustup, opam-repository, mina/, go/, etc.) — they hold tens of
+  # thousands of files that opam reads but never writes to, and chowning
+  # them through overlayfs copy-up costs ~1 minute per boot. Read access
+  # works fine at the original UID (755 perms), and the volumes opam *does*
+  # write to (/home/opam/.opam, /mina/_opam, /mina/_build) are handled below.
   if [[ -d /home/opam ]]; then
     home_owner="$(stat -c '%u' /home/opam)"
     if [[ "${home_owner}" != "${host_uid}" ]]; then
-      log "chown /home/opam (dir + top-level files; image-baked subdirs left as-is)"
+      log "chown /home/opam (dir + top-level entries; image-baked subdirs left as-is)"
       chown "${host_uid}:${host_gid}" /home/opam
-      find /home/opam -mindepth 1 -maxdepth 1 -type f \
+      # Skip .gnupg here so fix_owner below can recurse into it. The rest
+      # of the heavy image-baked subdirs (.rustup, opam-repository, mina/,
+      # go/) only need their top-level dir entry chowned — opam reads
+      # them at 755 but doesn't write inside.
+      find /home/opam -mindepth 1 -maxdepth 1 -not -name '.gnupg' \
         -exec chown "${host_uid}:${host_gid}" {} +
     fi
   fi
+  # .gnupg is mode 700 in the image AND opam needs to write inside it for
+  # GPG operations (apt key fetch, opam pin from git). Recurse so existing
+  # config files (dirmngr.conf, etc.) end up opam-owned too. Cheap — a
+  # handful of files.
+  fix_owner /home/opam/.gnupg
   fix_owner /home/opam/.opam
   fix_owner /mina/_opam
   fix_owner /mina/_build
 fi
+
+# Visible "ready" banner so users running `docker compose up` (or watching
+# VS Code's Dev Containers log) know the slow chown phase is done and can
+# `make ssh` / open an integrated terminal. Goes to stderr like every other
+# log message so it shows up in `docker compose up` output.
+# shellcheck disable=SC2016
+# (literal `$(opam config env)` in the banner below is intentional — it's
+# example output the user copies, not a command to expand here.)
+printf '%s\n' \
+  '' \
+  '[dev-uid-fixup] ============================================' \
+  "[dev-uid-fixup]   container ready — opam UID=${host_uid}" \
+  '[dev-uid-fixup]' \
+  '[dev-uid-fixup]   Get a shell in the container:' \
+  '[dev-uid-fixup]     • Terminal:  cd dev && make ssh' \
+  '[dev-uid-fixup]     • VS Code:   open a new integrated terminal' \
+  '[dev-uid-fixup]                  (Terminal → New Terminal, or Ctrl+Shift+`)' \
+  '[dev-uid-fixup]                  not in VS Code yet?  code .  then run' \
+  '[dev-uid-fixup]                  "Dev Containers: Reopen in Container"' \
+  '[dev-uid-fixup]' \
+  '[dev-uid-fixup]   Once you have a shell, build with:' \
+  '[dev-uid-fixup]     eval "$(opam config env)" && make build' \
+  '[dev-uid-fixup]' \
+  '[dev-uid-fixup]   See dev/README.md for the full workflow.' \
+  '[dev-uid-fixup] ============================================' \
+  '' >&2
 
 exec setpriv --reuid=opam --regid=opam --init-groups -- "$@"
