@@ -18,19 +18,21 @@ services:
 
   bootstrap_db:
     image: '${MINA_ARCHIVE_IMAGE}'
+    environment:
+      PGPASSWORD: ${POSTGRES_PASSWORD}
     command:
       - bash
       - -c
       - |
-        set -eox pipefail
+        set -eo pipefail
         curl -fSL -O ${ARCHIVE_DUMP_BASE_URL}/${ARCHIVE_DUMP_PREFIX}-$$(date +%F_0000).sql.tar.gz
         tar -zxvf ${ARCHIVE_DUMP_PREFIX}-$$(date +%F_0000).sql.tar.gz
-        psql postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB} \
+        psql postgres://${POSTGRES_USER}@postgres:5432/${POSTGRES_DB} \
           -c "ALTER SYSTEM SET max_connections = 500" \
           -c "ALTER SYSTEM SET max_locks_per_transaction = 100" \
           -c "ALTER SYSTEM SET max_pred_locks_per_relation = 100" \
           -c "ALTER SYSTEM SET max_pred_locks_per_transaction = 5000"
-        psql postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB} -f ${ARCHIVE_DUMP_PREFIX}-$$(date +%F_0000).sql
+        psql postgres://${POSTGRES_USER}@postgres:5432/${POSTGRES_DB} -f ${ARCHIVE_DUMP_PREFIX}-$$(date +%F_0000).sql
     depends_on:
       postgres:
         condition: service_healthy
@@ -81,6 +83,7 @@ services:
       bash -c '
         mina daemon --archive-address mina_archive:${MINA_ARCHIVE_PORT} \
              --peer-list-url ${MINA_PEERLIST_URL} \
+             --external-port ${MINA_P2P_PORT} \
              --insecure-rest-server \
              --rest-port ${MINA_REST_PORT}
       '
