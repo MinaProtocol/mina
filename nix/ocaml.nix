@@ -100,8 +100,21 @@ let
 
   dune-nix = inputs.dune-nix.lib.${pkgs.system};
 
-  base-libs = dune-nix.squashOpamNixDeps scope.ocaml.version
-    (pkgs.lib.attrVals (builtins.attrNames implicit-deps) scope);
+  base-libs =
+    (dune-nix.squashOpamNixDeps scope.ocaml.version
+      (pkgs.lib.attrVals (builtins.attrNames implicit-deps) scope)).overrideAttrs
+      (old: {
+        # Some opam packages expose the same findlib package name, for example
+        # site-lib/toplevel. The aggregate dependency env only needs one entry.
+        installPhase = builtins.replaceStrings [
+          ''ln -s "$d" "$out/lib/ocaml/${scope.ocaml.version}/site-lib/"''
+        ] [
+          ''
+            target="$out/lib/ocaml/${scope.ocaml.version}/site-lib/$(basename "$d")"
+            [ -e "$target" ] || ln -s "$d" "$target"
+          ''
+        ] old.installPhase;
+      });
 
   dune-description = pkgs.stdenv.mkDerivation {
     pname = "dune-description";
