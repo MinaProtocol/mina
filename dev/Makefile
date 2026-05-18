@@ -11,12 +11,20 @@ DEVCONTAINER_SRC := devcontainer-template
 DEVCONTAINER_DST := $(REPO_ROOT)/.devcontainer/mina
 
 all:
-	docker compose up
+	docker compose up -d
+	@sleep 1
+	@docker compose logs mina --tail=20
+	@echo
+	@echo "Container is running. Connect with: make ssh"
 
 rebuild:
 	docker compose down --volumes
 	docker compose build --no-cache
-	docker compose up
+	docker compose up -d
+	@sleep 1
+	@docker compose logs mina --tail=20
+	@echo
+	@echo "Container is running. Connect with: make ssh"
 
 ssh:
 	docker exec -u opam -it -w "/mina" mina /bin/bash

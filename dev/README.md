@@ -109,11 +109,16 @@ ownership.
 
 The default image is pulled from
 [`docker.io/minaprotocol/mina-toolchain`](https://hub.docker.com/r/minaprotocol/mina-toolchain/tags),
-the public mirror of the Mina toolchain images. The tag pinned in
-[`docker-compose.yml`](./docker-compose.yml) is a recent CI build; if it
-ever returns `manifest unknown` (tags do age out), browse the link above
-and pick another tag, then either edit `docker-compose.yml` or set
-`MINA_TOOLCHAIN_IMAGE` for a one-off run:
+the public mirror of the Mina toolchain images. CI itself pulls from an
+internal Artifact Registry (see `minaToolchain` in
+[`buildkite/src/Constants/ContainerImages.dhall`](../buildkite/src/Constants/ContainerImages.dhall))
+which isn't publicly accessible, so the dev pin tracks the latest tag
+mirrored to docker.io rather than CI's exact commit pin — close enough
+for local development, and usually within a few commits of CI.
+
+If the pinned tag ever returns `manifest unknown` (tags do age out),
+browse the link above and pick another tag, then either edit
+`docker-compose.yml` or set `MINA_TOOLCHAIN_IMAGE` for a one-off run:
 
 ```sh
 export MINA_TOOLCHAIN_IMAGE=docker.io/minaprotocol/mina-toolchain:<tag>
