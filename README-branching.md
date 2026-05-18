@@ -1,7 +1,7 @@
 # Mina Branching Policy
 
 Mina's current public release is "berkeley", version 2.X. The next hardfork
-release is "mesa" 3.X.
+release is "mesa" 3.X, staged on the `release/mesa` branch.
 
 ## Long-lived development branches
 
@@ -16,8 +16,19 @@ these:
     the current mainnet deployment. Any nodes running a version of mina based
     off of `compatible` should connect to the current mainnet.
   - It serves as the preparation ground for the next mainnet soft-fork release.
-- `develop`: changes that break mainnet compatibility, including features
-  scoped for the next hard fork.
+- `release/mesa`: next hard-fork release branch.
+  - Contains all the new features that are scheduled for the mesa hard
+    fork. It is the active hard-fork branch maintained until the mesa
+    hard fork upgrade, after which `compatible` will absorb its changes
+    (see "Hard fork transition" below).
+  - Replaces the legacy `berkeley`/`izmir` branches that were retired
+    after the berkeley hard fork.
+  - Unlike `release/<version>` branches (see below), this is a
+    development target: PRs introducing hard-fork-scoped features should
+    be opened against it.
+- `develop`: post-mesa changes — breaks mainnet compatibility and is not
+  scoped for the upcoming mesa hard fork.
+  - In other words, `develop` is the next soft-fork release candidate after mesa.
   - Contains changes which break backwards compatibility, or changes that
     depend on past compatibility-breaking changes. "Not backwards compatible"
     means that a daemon running this version of mina will not connect to
@@ -29,6 +40,11 @@ these:
     backwards-compatibility breaking, and thereby should go into `compatible`
     (unless you are doing something very special and you know what you're
     doing).
+  - The difference between `develop` and `release/mesa` is that
+    `release/mesa` will be the actual hard-fork release, while `develop`
+    is the subsequent soft-fork release candidate (soft-fork after mesa).
+    `develop` is simply not tested as rigorously, but it is soft-fork
+    compatible with `release/mesa`.
 - `o1js-main`: compatible with mainnet, but has latest `proof-systems`
   features so that they can be used in `o1js`.
   - Uses `o1js/main` and `o1js-bindings/main` as explained
@@ -39,44 +55,43 @@ these:
     `proof-systems/develop` a bit.
 
 The relationship between the long-lived branches is:
-`master ⊆ compatible ⊆ develop`.
+`master ⊆ compatible ⊆ release/mesa ⊆ develop`.
 
-- `compatible` includes all the changes in `master`, and `develop` includes
-  all the changes in `compatible`. So `develop` contains all the changes from
-  _all_ the stable branches, but also contains features that do not exist in
-  the "subsets".
+- `compatible` includes all the changes in `master`, `release/mesa` includes
+  all the changes in `compatible`, and `develop` includes all the changes in
+  `release/mesa`. So `develop` contains all the changes from _all_ the
+  upstream branches, but also contains features that do not exist in the
+  "subsets".
 - The back-merging direction is thus left-to-right: whenever a feature lands
   in this chain, it has to be periodically "back-merged" to the right.
 - The branches are merged in the other direction (upstream) only when
   released.
 - When merely a new feature is introduced, it should aim at the exact target
   branch. This place depends on the feature, e.g. `compatible` for soft-fork
-  features and `develop` for breaking / hard-fork-scoped / experimental work.
+  features, `release/mesa` for the upcoming hard fork, and `develop` for
+  post-mesa / experimental work.
 
 ![Illustration of the branching strategy](https://github.com/MinaProtocol/mina-resources/blob/main/docs/res/branching_flow_david_wong.png)
 
 ## Short-lived release branches
 
-`release/<name>` branches are **not** development targets — they are
-short-lived branches cut from a long-lived branch when it is time to actually
-ship a release. Examples:
+`release/<version>` branches (e.g. `release/3.4.0`) are **not** development
+targets — they are short-lived branches cut from `compatible` when it is
+time to ship a soft-fork release. They are tagged with alpha and beta tags
+until the code is deemed stable, then merged into `master` and given a
+stable tag.
 
-- `release/<version>` (e.g. `release/3.4.0`) — soft-fork release candidates,
-  cut from `compatible`. Tagged with alpha and beta tags until the code is
-  deemed stable, then merged into `master` and given a stable tag.
-- `release/<hardfork-name>` (e.g. `release/mesa`) — hard-fork release
-  candidate, cut when a hard fork is ready to ship.
+Whenever a `release/<version>` is tagged, if anything is missing in the
+downstream long-lived branches (`compatible`, `release/mesa`, `develop`)
+then the tagged branch is also merged back to those branches for
+consistency.
 
-Whenever code is tagged, if anything is missing in the downstream long-lived
-branches (`compatible`, `develop`) then the tagged branch is also merged back
-for consistency.
+Contributors should **not** open PRs against `release/<version>` branches
+as part of normal feature work. The release manager will pick changes into
+a release branch when ready. Hard-fork-scoped work should instead target
+the long-lived `release/mesa` branch described above.
 
-Contributors should **not** open PRs against `release/*` branches as part of
-normal feature work. If a feature is hard-fork-scoped, target `develop`; if
-it's soft-fork-scoped, target `compatible`. The release manager will pick the
-work into a release branch when ready.
-
-### Hard forks
+### Hard fork transition
 
 Whenever a hard fork happens, the code in the corresponding hard-fork release
 branch (e.g. `release/mesa`) is released to become the new `master`.
@@ -100,20 +115,28 @@ branches above to decide. Here's a quick rule:
   mainnet, then base it off of `compatible`. If you're not sure whether or
   not your changes are breaking, they probably are not and should build upon
   `compatible`.
-- If the change is breaking — for example, scoped for the next hard fork, or
-  otherwise incompatible with running public mainnet — base it off of
-  `develop`.
-- Do not target `release/*` branches; those are managed by the release
-  process.
+- If the feature is scoped for the next hard fork and is not compatible
+  with running public mainnet, base it off of the hard-fork branch
+  (currently `release/mesa`).
+- If a change is post-hard-fork (depends on mesa shipping, or is otherwise
+  cutting-edge / not yet release-scoped), base it off of `develop`.
+- Do not target `release/<version>` branches (e.g. `release/3.4.0`); those
+  are managed by the release process.
 
 ### Handling back-merging conflicts
 
 We have CI jobs named `check-merges-cleanly-into-BRANCH` that fail if a PR
 introduces changes conflicting with changes in a downstream branch `BRANCH`.
-E.g. `check-merges-cleanly-into-develop` will check that a PR aimed at
+The jobs currently cover `master`, `compatible`, and `develop`. E.g.
+`check-merges-cleanly-into-develop` will check that a PR aimed at
 `compatible` is easily back-mergable downstream up to `develop`. PR authors
 must create new PRs against those branches to resolve conflicts before
 merging the original PR.
+
+Note: `release/mesa` is **not** covered by the back-merge CI. If a PR
+against `compatible` needs to also land on `release/mesa` for the upcoming
+hard fork, the release manager will pick or back-merge it manually — there
+is no automated gate for it.
 
 If that CI job passes, then you can proceed and no further action is needed.
 
