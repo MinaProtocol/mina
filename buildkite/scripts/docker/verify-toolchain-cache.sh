@@ -79,8 +79,12 @@ for cached_file in "${files[@]}"; do
   echo "MISMATCH ${tag} (cache=${cached_id:-<unknown>} docker.io=${remote_id})"
   mismatched+=("$tag")
 
+  # Save by image ID rather than tag: load_cached_image_id above ran
+  # `docker load`, which reassigns the local tag to the cached image's
+  # content. Using $remote_id pins to the docker.io image inspected
+  # before the load, regardless of the current local tag state.
   tmp="$(mktemp "${cached_file}.new.XXXXXX")"
-  if docker save "$remote_ref" | zstd -T0 -3 > "$tmp"; then
+  if docker save "$remote_id" | zstd -T0 -3 > "$tmp"; then
     mv -f "$tmp" "$cached_file"
     echo "REPLACED ${cached_file} with copy from docker.io"
   else
