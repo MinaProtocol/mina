@@ -1,3 +1,6 @@
+export HOST_UID := $(shell id -u)
+export HOST_GID := $(shell id -g)
+
 all:
 	docker compose up
 
@@ -7,4 +10,4 @@ rebuild:
 	docker compose up
 
 ssh:
-	docker exec -it -w "/mina" mina /bin/bash
+	docker exec -u opam -it -w "/mina" mina /bin/bash
