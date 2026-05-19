@@ -13,7 +13,16 @@ stop:
 
 clean:
 	docker compose down -v
-	rm -rf ./archive ./mina_node/.mina-config
+	@echo ""
+	@echo "Containers + volumes removed."
+	@echo ""
+	@echo "The daemon, archive, and postgres write to ./archive/ and"
+	@echo "./mina_node/.mina-config/ as root inside the containers, so the"
+	@echo "leftover files are root-owned on the host and this Makefile will"
+	@echo "not rm them for you. To finish cleanup, run one of:"
+	@echo ""
+	@echo "  sudo rm -rf ./archive ./mina_node"
+	@echo "  docker run --rm -v \"\$$(pwd)\":/work alpine rm -rf /work/archive /work/mina_node"
 
 logs:
 	docker compose logs -f

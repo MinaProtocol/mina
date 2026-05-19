@@ -68,7 +68,7 @@ Submit a PR to [`MinaFoundation/seeds`](https://github.com/MinaFoundation/seeds)
 | `make devnet` | Copy devnet env and start services |
 | `make mainnet` | Copy mainnet env and start services |
 | `make stop` | Stop services |
-| `make clean` | Stop services, remove volumes and `.mina-config` |
+| `make clean` | Stop services, remove volumes, print host-side cleanup instructions for `./mina_node` (root-owned) |
 | `make logs` | Follow logs |
 | `make status` | Container status |
 | `make peer-id` | Print this seed's libp2p peer ID |

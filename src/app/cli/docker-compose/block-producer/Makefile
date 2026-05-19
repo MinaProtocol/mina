@@ -13,7 +13,18 @@ stop:
 
 clean:
 	docker compose down -v
-	rm -rf ./mina_node/.mina-config
+	@echo ""
+	@echo "Containers + volumes removed."
+	@echo ""
+	@echo "The daemon writes to ./mina_node/.mina-config/ as root inside the"
+	@echo "container, so the leftover files are root-owned on the host and this"
+	@echo "Makefile will not rm them for you. To finish cleanup, run one of:"
+	@echo ""
+	@echo "  sudo rm -rf ./mina_node"
+	@echo "  docker run --rm -v \"\$$(pwd)\":/work alpine rm -rf /work/mina_node"
+	@echo ""
+	@echo "WARNING: this removes the generated block-producer key. Back up"
+	@echo "./mina_node/.mina-config/keys/ first if you want to keep it."
 
 logs:
 	docker compose logs -f
