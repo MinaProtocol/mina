@@ -42,7 +42,7 @@ log_error() { echo -e "${RED}[ERROR]${CLEAR} $*"; }
 # CLI
 ################################################################################
 
-CODENAME="bookworm"
+CODENAME="bullseye"
 NETWORK="devnet"
 APTLY_PORT=8080
 
@@ -50,7 +50,7 @@ usage() {
     echo "Usage: $0 [OPTIONS]"
     echo ""
     echo "Options:"
-    echo "  -c, --codename    Debian codename (default: bookworm)"
+    echo "  -c, --codename    Debian codename (default: bullseye)"
     echo "  -N, --network     Network name (default: devnet)"
     echo "  -h, --help        Show this help"
 }
@@ -148,7 +148,13 @@ ORIG_AUTOMODE_DEB=$(ls "${DEB_DIR}"/${PKG_AUTOMODE}_*.deb | head -1)
 ORIG_CONFIG_DEB=$(ls "${DEB_DIR}"/${PKG_CONFIG}_*.deb | head -1)
 ORIG_POSTFORK_DEB=$(ls "${DEB_DIR}"/${PKG_POSTFORK}_*.deb | head -1)
 ORIG_LOGPROC_DEB=$(ls "${DEB_DIR}"/mina-logproc_*.deb | head -1)
-ORIG_PREFORK_DEB=$(ls "${DEB_DIR}"/${PKG_PREFORK}_*.deb | head -1)
+
+# The prefork debs come from the legacy cache at their original versions.
+# Copy all of them into the repo — no reversioning needed since the automode
+# metapackage already references the legacy version in its dependency.
+# We must include all variants so the correct one satisfying the dependency
+# constraint (>= PREFORK_LEGACY_VERSION) is available.
+cp "${DEB_DIR}"/${PKG_PREFORK}_*.deb "${REPO_DIR}/"
 
 reversion_deb() {
     local input_deb="$1"
@@ -163,18 +169,6 @@ reversion_deb() {
     rm -rf "${session_dir}"
 }
 
-# Extract the exact ('=') version a deb pins a given dependency to.
-# dpkg exposes whole control fields (dpkg-deb -f Depends) but has no built-in
-# way to pull out the version constraint of a single dependency, so we split the
-# comma-separated Depends list and read the "pkg (= version)" entry ourselves.
-dep_pinned_version() {
-    local deb="$1" pkg="$2"
-    dpkg-deb -f "${deb}" Depends \
-        | tr ',' '\n' \
-        | sed -n "s/.*${pkg} *(= *\([^)]*\)).*/\1/p" \
-        | tr -d ' '
-}
-
 V1="1.0.0-transition-test"
 V2="2.0.0-transition-test"
 V3="3.0.0-transition-test"
@@ -184,28 +178,8 @@ reversion_deb "${ORIG_DAEMON_DEB}"  "${V1}" "${REPO_DIR}/${PKG_DAEMON}_${V1}_amd
 reversion_deb "${ORIG_CONFIG_DEB}"  "${V1}" "${REPO_DIR}/${PKG_CONFIG}_${V1}_all.deb"
 reversion_deb "${ORIG_LOGPROC_DEB}" "${V1}" "${REPO_DIR}/mina-logproc_${V1}_amd64.deb"
 
-# The automode metapackage pins prefork to an EXACT version — the legacy
-# PREFORK_LEGACY_VERSION baked in at build time, which is NOT rewritten when the
-# metapackage is reversioned (deb-session-reversion only rewrites deps that
-# reference the package's own old version, i.e. postfork). The prefork deb in
-# the legacy cache may carry a different (newer) version, so we reversion it to
-# exactly the version the metapackage depends on, otherwise the '=' pin can't be
-# satisfied. Derive that version straight from the metapackage's Depends field.
-EXPECTED_PREFORK_VERSION=$(dep_pinned_version "${ORIG_AUTOMODE_DEB}" "${PKG_PREFORK}")
-if [[ -z "${EXPECTED_PREFORK_VERSION}" ]]; then
-    log_error "Could not determine pinned prefork version from ${ORIG_AUTOMODE_DEB} Depends"
-    exit 1
-fi
-
-# Report exactly which version we pin to, alongside the legacy cache deb's own
-# version, so the reversion is auditable. When the two already match the
-# reversion is a no-op; otherwise it aligns the legacy deb with the '=' pin.
-LEGACY_PREFORK_VERSION=$(dpkg-deb -f "${ORIG_PREFORK_DEB}" Version)
-log_info "Automode pins ${PKG_PREFORK} to exact version: ${EXPECTED_PREFORK_VERSION} (legacy cache deb is ${LEGACY_PREFORK_VERSION})"
-reversion_deb "${ORIG_PREFORK_DEB}" "${EXPECTED_PREFORK_VERSION}" \
-    "${REPO_DIR}/${PKG_PREFORK}_${EXPECTED_PREFORK_VERSION}_amd64.deb"
-
 # V2: automode + postfork + config + logproc (hardfork)
+# Note: prefork is already in REPO_DIR from the legacy cache (not reversioned)
 reversion_deb "${ORIG_AUTOMODE_DEB}" "${V2}" "${REPO_DIR}/${PKG_AUTOMODE}_${V2}_all.deb"
 reversion_deb "${ORIG_POSTFORK_DEB}" "${V2}" "${REPO_DIR}/${PKG_POSTFORK}_${V2}_amd64.deb"
 reversion_deb "${ORIG_CONFIG_DEB}"   "${V2}" "${REPO_DIR}/${PKG_CONFIG}_${V2}_all.deb"
@@ -236,12 +210,10 @@ log_info "=== Step 3: Start local apt repository ==="
 
 # Add local repo to apt sources
 $SUDO bash -c "echo 'deb [trusted=yes] http://localhost:${APTLY_PORT}/ ${CODENAME} unstable' > /etc/apt/sources.list.d/transition-test.list"
-# Via update.sh rather than a bare apt-get update: on --codename bullseye the
-# upstream security pocket now serves an expired Release and fails apt
-# outright. update.sh disables just that pocket and retries, and it also
-# bypasses the APT proxy for localhost, where aptly serves the debians under
-# test.
-./buildkite/scripts/debian/update.sh --verbose
+# Toolchain image ships a global apt proxy (apt-cacher-ng) that rejects port ${APTLY_PORT};
+# bypass it for localhost so `apt-get update` can read the transition packages.
+eval "$(./buildkite/scripts/debian/apt-proxy-bypass.sh localhost)"
+$SUDO apt-get update $APT_PROXY_BYPASS_OPTS
 
 log_info "Available packages:"
 apt-cache showpkg "${PKG_DAEMON}" 2>/dev/null | head -20 || true
@@ -257,7 +229,7 @@ log_info "Package dependencies for ${PKG_DAEMON}=${V1}:"
 apt-cache depends "${PKG_DAEMON}=${V1}" 2>/dev/null || true
 apt-cache policy "${PKG_DAEMON}=${V1}" 2>/dev/null || true
 
-$SUDO apt-get install -y --allow-downgrades "${PKG_DAEMON}=${V1}" "${PKG_CONFIG}=${V1}" "mina-logproc=${V1}"
+$SUDO apt-get install -y --allow-downgrades $APT_PROXY_BYPASS_OPTS "${PKG_DAEMON}=${V1}" "${PKG_CONFIG}=${V1}" "mina-logproc=${V1}"
 
 log_info "Installed ${PKG_DAEMON} v1"
 dpkg -l "${PKG_DAEMON}" 2>/dev/null | tail -1
@@ -284,7 +256,7 @@ log_info "PASS: No automode paths in v1"
 
 log_info "=== Step 5: Upgrade to ${PKG_AUTOMODE} v2 ==="
 
-$SUDO apt-get install -y --allow-downgrades "${PKG_AUTOMODE}=${V2}" "${PKG_CONFIG}=${V2}" "mina-logproc=${V2}"
+$SUDO apt-get install -y --allow-downgrades $APT_PROXY_BYPASS_OPTS "${PKG_AUTOMODE}=${V2}" "${PKG_CONFIG}=${V2}" "mina-logproc=${V2}"
 
 log_info "Package state after automode install:"
 dpkg -l "${PKG_AUTOMODE}" 2>/dev/null | tail -1 || true
@@ -319,7 +291,7 @@ log_info "PASS: /usr/local/bin/mina is a symlink (automode dispatcher)"
 
 log_info "=== Step 6: Restore ${PKG_DAEMON} v3 ==="
 
-$SUDO apt-get install -y --allow-downgrades "${PKG_DAEMON}=${V3}" "${PKG_CONFIG}=${V3}" "mina-logproc=${V3}"
+$SUDO apt-get install -y --allow-downgrades $APT_PROXY_BYPASS_OPTS "${PKG_DAEMON}=${V3}" "${PKG_CONFIG}=${V3}" "mina-logproc=${V3}"
 
 # automode metapackage conflicts with mina-devnet, so apt should remove it.
 # The prefork/postfork sub-packages were only dependencies of automode, so

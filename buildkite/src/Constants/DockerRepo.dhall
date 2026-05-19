@@ -1,6 +1,6 @@
 let Repo
     : Type
-    = < Internal | InternalEurope >
+    = < Internal | InternalEurope | Public >
 
 let show =
           \(repo : Repo)
@@ -8,6 +8,7 @@ let show =
             { Internal = "gcr.io/o1labs-192920"
             , InternalEurope =
                 "europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo"
+            , Public = "docker.io/minaprotocol"
             }
             repo
 
