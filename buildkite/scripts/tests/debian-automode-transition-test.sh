@@ -210,7 +210,10 @@ log_info "=== Step 3: Start local apt repository ==="
 
 # Add local repo to apt sources
 $SUDO bash -c "echo 'deb [trusted=yes] http://localhost:${APTLY_PORT}/ ${CODENAME} unstable' > /etc/apt/sources.list.d/transition-test.list"
-$SUDO apt-get update
+# Toolchain image ships a global apt proxy (apt-cacher-ng) that rejects port ${APTLY_PORT};
+# bypass it for localhost so `apt-get update` can read the transition packages.
+eval "$(./buildkite/scripts/debian/apt-proxy-bypass.sh localhost)"
+$SUDO apt-get update $APT_PROXY_BYPASS_OPTS
 
 log_info "Available packages:"
 apt-cache showpkg "${PKG_DAEMON}" 2>/dev/null | head -20 || true
@@ -226,7 +229,7 @@ log_info "Package dependencies for ${PKG_DAEMON}=${V1}:"
 apt-cache depends "${PKG_DAEMON}=${V1}" 2>/dev/null || true
 apt-cache policy "${PKG_DAEMON}=${V1}" 2>/dev/null || true
 
-$SUDO apt-get install -y --allow-downgrades "${PKG_DAEMON}=${V1}" "${PKG_CONFIG}=${V1}" "mina-logproc=${V1}"
+$SUDO apt-get install -y --allow-downgrades $APT_PROXY_BYPASS_OPTS "${PKG_DAEMON}=${V1}" "${PKG_CONFIG}=${V1}" "mina-logproc=${V1}"
 
 log_info "Installed ${PKG_DAEMON} v1"
 dpkg -l "${PKG_DAEMON}" 2>/dev/null | tail -1
@@ -253,7 +256,7 @@ log_info "PASS: No automode paths in v1"
 
 log_info "=== Step 5: Upgrade to ${PKG_AUTOMODE} v2 ==="
 
-$SUDO apt-get install -y --allow-downgrades "${PKG_AUTOMODE}=${V2}" "${PKG_CONFIG}=${V2}" "mina-logproc=${V2}"
+$SUDO apt-get install -y --allow-downgrades $APT_PROXY_BYPASS_OPTS "${PKG_AUTOMODE}=${V2}" "${PKG_CONFIG}=${V2}" "mina-logproc=${V2}"
 
 log_info "Package state after automode install:"
 dpkg -l "${PKG_AUTOMODE}" 2>/dev/null | tail -1 || true
@@ -288,7 +291,7 @@ log_info "PASS: /usr/local/bin/mina is a symlink (automode dispatcher)"
 
 log_info "=== Step 6: Restore ${PKG_DAEMON} v3 ==="
 
-$SUDO apt-get install -y --allow-downgrades "${PKG_DAEMON}=${V3}" "${PKG_CONFIG}=${V3}" "mina-logproc=${V3}"
+$SUDO apt-get install -y --allow-downgrades $APT_PROXY_BYPASS_OPTS "${PKG_DAEMON}=${V3}" "${PKG_CONFIG}=${V3}" "mina-logproc=${V3}"
 
 # automode metapackage conflicts with mina-devnet, so apt should remove it.
 # The prefork/postfork sub-packages were only dependencies of automode, so
