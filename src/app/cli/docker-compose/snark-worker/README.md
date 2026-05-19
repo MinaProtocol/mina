@@ -75,7 +75,7 @@ To run multiple workers against the same coordinator, duplicate the `mina_snark_
 | `make devnet` | Copy devnet env and start services |
 | `make mainnet` | Copy mainnet env and start services |
 | `make stop` | Stop services |
-| `make clean` | Stop services, remove volumes and `.mina-config` |
+| `make clean` | Stop services, remove volumes, print host-side cleanup instructions for `./mina_node` (root-owned) |
 | `make logs` | Follow logs |
 | `make status` | Container status |
 | `make health` | GraphQL + coordinator client status + container summary |

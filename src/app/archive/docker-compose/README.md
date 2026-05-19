@@ -69,7 +69,7 @@ psql postgres://postgres:postgres@postgres:5432/archive
 | `make devnet` | Copy devnet env and start services |
 | `make mainnet` | Copy mainnet env and start services |
 | `make stop` | Stop services |
-| `make clean` | Stop services, remove volumes and all archive data |
+| `make clean` | Stop services, remove volumes, print host-side cleanup instructions for `./archive` and `./mina_node` (root-owned) |
 | `make logs` | Follow logs |
 | `make status` | Container status |
 | `make health` | Postgres + GraphQL + container summary |

@@ -61,7 +61,7 @@ cat ./mina_node/.mina-config/keys/wallet-key.pub
 | `make devnet` | Copy devnet env and start services |
 | `make mainnet` | Copy mainnet env and start services |
 | `make stop` | Stop services |
-| `make clean` | Stop services, remove volumes and `.mina-config` |
+| `make clean` | Stop services, remove volumes, print host-side cleanup instructions for `./mina_node` (root-owned) |
 | `make logs` | Follow logs |
 | `make status` | Container status |
 | `make health` | GraphQL + sync status + container summary |
