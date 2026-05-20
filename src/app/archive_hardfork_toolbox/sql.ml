@@ -50,7 +50,7 @@ module Block_info = struct
       custom ~encode ~decode (t4 int int64 string Protocol_version.typ))
 end
 
-let chain_of_query_templated ~join_condition =
+let chain_of_query_templated ~start_condition ~join_condition =
   {%string|
     WITH RECURSIVE chain AS (
         SELECT
@@ -61,7 +61,7 @@ let chain_of_query_templated ~join_condition =
             b.global_slot_since_genesis AS global_slot_since_genesis,
             b.protocol_version_id AS protocol_version_id
         FROM blocks b
-        WHERE b.id = $1
+        WHERE %{start_condition}
 
         UNION ALL
 
@@ -77,10 +77,13 @@ let chain_of_query_templated ~join_condition =
     )
   |}
 
-let chain_of_query = chain_of_query_templated ~join_condition:"TRUE"
+let chain_of_query =
+  chain_of_query_templated ~start_condition:"b.state_hash = $1"
+    ~join_condition:"TRUE"
 
 let chain_of_query_until_inclusive =
-  chain_of_query_templated ~join_condition:"c.id <> $2"
+  chain_of_query_templated ~start_condition:"b.id = $1"
+    ~join_condition:"c.id <> $2"
 
 let latest_state_hash (module Conn : CONNECTION) =
   let query =
@@ -192,22 +195,14 @@ let num_of_confirmations (module Conn : CONNECTION) ~latest_state_hash
   Conn.find query (latest_state_hash, fork_slot)
 
 let number_of_commands_since_block_query block_commands_table =
-  Caqti_type.(t2 string int ->! t4 string int int int)
+  Caqti_type.(t2 string int ->! int)
     {%string|
       %{chain_of_query}
-      SELECT 
-          state_hash,
-          height,
-          global_slot_since_genesis,
-          COUNT(bc.block_id) AS command_count
+      SELECT COUNT(bc.block_id)::int AS command_count
       FROM chain
-      LEFT JOIN %{block_commands_table} bc 
+      LEFT JOIN %{block_commands_table} bc
           ON chain.id = bc.block_id
-      WHERE global_slot_since_genesis >= $2
-      GROUP BY 
-          state_hash,
-          height,
-          global_slot_since_genesis;
+      WHERE chain.global_slot_since_genesis > $2;
     |}
 
 let number_of_user_commands_since_block (module Conn : CONNECTION)
