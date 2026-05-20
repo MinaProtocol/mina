@@ -97,7 +97,7 @@ let bullseyeDirtyWhen =
         [ S.strictlyStart (S.contains "src")
         , S.strictly (S.contains "Makefile")
         , S.exactly "buildkite/scripts/connect/connect-to-network" "sh"
-        , S.exactly "buildkite/scripts/tests/rosetta-integration-tests" "sh"
+        , S.strictlyStart (S.contains "buildkite/scripts/tests/rosetta")
         , S.exactly "scripts/patch-archive-test" "sh"
         , S.strictlyStart (S.contains "buildkite/src/Jobs/Test")
         ]
