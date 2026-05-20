@@ -28,7 +28,7 @@ in  { step =
                         , buildFlags = BuildFlags.Type.Instrumented
                         }
                     )
-                    (     "./buildkite/scripts/tests/rosetta-block-race-test.sh "
+                    (     "./buildkite/scripts/tests/rosetta/block-race-test.sh "
                       ++  "&& ./buildkite/scripts/upload-partial-coverage-data.sh ${key}"
                     )
                 ]

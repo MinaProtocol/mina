@@ -1,13 +1,47 @@
 #!/bin/bash
 set -eox pipefail
 
-# Function to collect logs (called on exit or at end of script)
+# Install mina, mina-archive, mina-rosetta and mina-zkapp-test-transaction
+# debs onto the host (toolchain container), plus the rosetta-cli golang
+# binary. Replaces the previous setup of running this whole script inside
+# the prebuilt mina-rosetta docker image. Both helpers run as child
+# processes so their strict-mode flags don't leak into this shell.
+./buildkite/scripts/tests/rosetta/install-debs.sh
+./buildkite/scripts/tests/rosetta/install-cli.sh
+
+# `mina daemon` refuses to load the libp2p keypair if any ancestor dir is
+# group/world-readable. The toolchain image's $HOME (=/home/opam) is 0755
+# by default; the previous mina-rosetta image was already 0700. Locking it
+# down here prevents the daemon from aborting at boot with a configuration
+# error.
+chmod 700 "${HOME}"
+
+# Function to collect logs. Idempotent — collect_logs_done guards against
+# the EXIT trap firing it a second time after a manual end-of-script call.
+COLLECT_LOGS_DONE=0
 collect_logs() {
-    # Try graceful shutdown first if daemon is still running
-    if [ ! -z "$DAEMON_PID" ] && kill -0 "$DAEMON_PID" 2>/dev/null; then
+    [ "$COLLECT_LOGS_DONE" = "1" ] && return 0
+    COLLECT_LOGS_DONE=1
+
+    # Stop the long-running transaction senders we spawned in the background
+    # so they don't keep firing mina client commands while we're collecting
+    # logs (the daemon may already be on its way down).
+    for pid in "${TXN_SENDER_PIDS[@]:-}"; do
+        [ -n "$pid" ] && kill "$pid" 2>/dev/null || true
+    done
+
+    # Capture daemon status *before* stopping the daemon, so the artifact
+    # actually reflects the daemon's terminal state instead of a 'connection
+    # refused' message.
+    mkdir -p test_output/artifacts
+    mina client status --json >test_output/artifacts/daemon-status.json 2>/dev/null \
+        || echo "Could not get daemon status" >test_output/artifacts/daemon-status.json
+
+    # Graceful daemon shutdown if still running. `${DAEMON_PID:-}` so the
+    # trap survives `set -u` when we exit before the daemon was started.
+    if [ -n "${DAEMON_PID:-}" ] && kill -0 "$DAEMON_PID" 2>/dev/null; then
         echo "Stopping daemon gracefully..."
-        mina client stop-daemon  2>/dev/null
-        if [ $? -ne 0 ]; then
+        if ! mina client stop-daemon 2>/dev/null; then
             echo "Failed to stop daemon gracefully, using SIGTERM" >&2
             kill -TERM "$DAEMON_PID"
             sleep 2
@@ -15,19 +49,15 @@ collect_logs() {
     fi
 
     echo "========================= COLLECTING LOGS ==========================="
-    mkdir -p test_output/artifacts
-    
-    # application logs
-    cp daemon-stdout.log test_output/artifacts/ || echo "daemon-stdout.log not found"
-    # crash logs
-    cp daemon-stderr.log test_output/artifacts/ || echo "daemon-stderr.log not found"
-    # mina config
-    cp -r ${MINA_CONFIG_DIR} test_output/artifacts/mina-config || echo "mina config dir not accessible"
-    # daemon status at end of test
-    mina client status --json > test_output/artifacts/daemon-status.json 2>/dev/null || echo "Could not get daemon status" > test_output/artifacts/daemon-status.json
-    
+    cp daemon-stdout.log test_output/artifacts/ 2>/dev/null || echo "daemon-stdout.log not found"
+    cp daemon-stderr.log test_output/artifacts/ 2>/dev/null || echo "daemon-stderr.log not found"
+    cp -r "${MINA_CONFIG_DIR}" test_output/artifacts/mina-config 2>/dev/null || echo "mina config dir not accessible"
+
     echo "Logs collected in test_output/artifacts/"
 }
+
+# Track background transaction-sender PIDs so collect_logs can kill them.
+TXN_SENDER_PIDS=()
 
 # Ensure logs are collected on exit (even on failure)
 trap collect_logs EXIT
@@ -139,20 +169,34 @@ cat <<EOF >"$ROSETTA_CLI_INTERESTING_ACCOUNTS_FILEPATH"
   { "account_identifier": { "address": "${TIME_VESTING_ACCOUNT_2_PUB_KEY}" }, "currency": { "symbol": "MINA", "decimals": 9 } }
 ]
 EOF
-jq -r --arg file ${ROSETTA_CLI_INTERESTING_ACCOUNTS_FILENAME} '.data_directory = $file' "${ROSETTA_CONFIGURATION_INPUT_DIR}/${ROSETTA_CLI_MAIN_CONFIG_FILE}" >"${ROSETTA_CONFIGURATION_INPUT_DIR}/${ROSETTA_CLI_MAIN_CONFIG_FILE}.tmp"
-mv "${ROSETTA_CONFIGURATION_INPUT_DIR}/${ROSETTA_CLI_MAIN_CONFIG_FILE}.tmp" "${ROSETTA_CONFIGURATION_INPUT_DIR}/${ROSETTA_CLI_MAIN_CONFIG_FILE}"
+# Stage all rosetta-cli config templates into a writable temp dir before
+# applying jq/sed substitutions. The deb-installed copies under
+# /etc/mina/rosetta/rosetta-cli-config are root-owned, and this script now
+# runs as opam in the toolchain container (the previous mina-rosetta image
+# ran as root, so in-place edits worked there).
+cp "${ROSETTA_CONFIGURATION_INPUT_DIR}/"* "${ROSETTA_CONFIGURATION_OUTPUT_DIR}/"
 
-# Substitute placeholders in rosetta-cli configuration
 ROSETTA_CONFIGURATION_FILE="${ROSETTA_CONFIGURATION_OUTPUT_DIR}/${ROSETTA_CLI_MAIN_CONFIG_FILE}"
+
+jq -r --arg file ${ROSETTA_CLI_INTERESTING_ACCOUNTS_FILENAME} '.data_directory = $file' "${ROSETTA_CONFIGURATION_FILE}" >"${ROSETTA_CONFIGURATION_FILE}.tmp"
+mv "${ROSETTA_CONFIGURATION_FILE}.tmp" "${ROSETTA_CONFIGURATION_FILE}"
+
+# Substitute placeholders in rosetta-cli configuration (in place in OUTPUT_DIR).
+# Disable xtrace around the private-key extraction + substitution so the
+# hex-encoded key never appears in CI logs, then restore it.
+{ set +x; } 2>/dev/null
 BLOCK_PRODUCER_PRIVKEY=$(mina-ocaml-signer hex-of-private-key-file --private-key-path "${BLOCK_PRODUCER_KEY}")
 for config_file in $ROSETTA_CLI_CONFIG_FILES; do
-  sed -e "s/PLACEHOLDER_PREFUNDED_PRIVKEY/${BLOCK_PRODUCER_PRIVKEY}/" \
+  sed -i \
+    -e "s/PLACEHOLDER_PREFUNDED_PRIVKEY/${BLOCK_PRODUCER_PRIVKEY}/" \
     -e "s/PLACEHOLDER_PREFUNDED_ADDRESS/${BLOCK_PRODUCER_PUB_KEY}/" \
     -e "s/PLACEHOLDER_ROSETTA_OFFLINE_PORT/${MINA_ROSETTA_OFFLINE_PORT}/" \
     -e "s/PLACEHOLDER_ROSETTA_ONLINE_PORT/${MINA_ROSETTA_ONLINE_PORT}/" \
     -e "s/PLACEHOLDER_NETWORK_NAME/${MINA_NETWORK}/" \
-    "$ROSETTA_CONFIGURATION_INPUT_DIR/$config_file" >"$ROSETTA_CONFIGURATION_OUTPUT_DIR/$config_file"
+    "${ROSETTA_CONFIGURATION_OUTPUT_DIR}/${config_file}"
 done
+unset BLOCK_PRODUCER_PRIVKEY
+set -x
 
 # Import Genesis Accounts
 echo "==================== IMPORTING GENESIS ACCOUNTS ======================"
@@ -161,12 +205,28 @@ mina accounts import --privkey-path ${SNARK_PRODUCER_KEY} --config-directory $MI
 
 # Postgres
 echo "========================= INITIALIZING POSTGRESQL ==========================="
-pg_ctlcluster ${POSTGRES_VERSION} main start
-pg_dropcluster --stop ${POSTGRES_VERSION} main
-pg_createcluster --start -d ${POSTGRES_DATA_DIR} --createclusterconf /etc/mina/rosetta/scripts/postgresql.conf ${POSTGRES_VERSION} main
+# Cluster ops require root in the toolchain runner. The previous mina-rosetta
+# docker image ran the script as root so sudo wasn't necessary.
+sudo pg_ctlcluster ${POSTGRES_VERSION} main start || true
+sudo pg_dropcluster --stop ${POSTGRES_VERSION} main || true
+sudo mkdir -p ${POSTGRES_DATA_DIR}
+sudo chown postgres:postgres ${POSTGRES_DATA_DIR}
+sudo pg_createcluster --start -d ${POSTGRES_DATA_DIR} --createclusterconf /etc/mina/rosetta/scripts/postgresql.conf ${POSTGRES_VERSION} main
 sudo -u postgres psql --command "CREATE USER ${POSTGRES_USERNAME} WITH SUPERUSER PASSWORD '${POSTGRES_USERNAME}';"
 sudo -u postgres createdb -O ${POSTGRES_USERNAME} ${POSTGRES_DBNAME}
 psql -f "${MINA_ARCHIVE_SQL_SCHEMA_PATH}" "${PG_CONN}"
+
+# --- Indexer smoke test ---
+# Used to live in its own RunWithPostgres step against a separate postgres
+# docker container. Now run inline against a temporary database loaded from
+# the sample archive dump shipped in src/test/archive/sample_db.
+echo "========================= ROSETTA INDEXER SMOKE TEST ==========================="
+INDEXER_DBNAME="indexer_archive"
+INDEXER_PG_CONN="postgres://${POSTGRES_USERNAME}:${POSTGRES_USERNAME}@127.0.0.1:5432/${INDEXER_DBNAME}"
+sudo -u postgres createdb -O "${POSTGRES_USERNAME}" "${INDEXER_DBNAME}"
+psql -f ./src/test/archive/sample_db/archive_db.sql "${INDEXER_PG_CONN}"
+mina-rosetta-indexer-test --archive_uri "${INDEXER_PG_CONN}"
+sudo -u postgres dropdb "${INDEXER_DBNAME}"
 
 # Mina Rosetta
 echo "=========================== STARTING ROSETTA API ONLINE AND OFFLINE INSTANCES ==========================="
@@ -247,6 +307,7 @@ send_value_transfer_txns() {
   done
 }
 send_value_transfer_txns &
+TXN_SENDER_PIDS+=("$!")
 
 # Start sending zkapp transactions
 ZKAPP_FEE_PAYER_NONCE=1
@@ -268,6 +329,7 @@ send_zkapp_transactions() {
 
 # There is no point to generate transaction just for minimal mode
 send_zkapp_transactions &
+TXN_SENDER_PIDS+=("$!")
 
 next_block_time=$(mina client status --json | jq '.next_block_production.timing[1].time' | tr -d '"') curr_time=$(date +%s%N | cut -b1-13)
 sleep_time=$((($next_block_time - $curr_time) / 1000))
@@ -284,8 +346,8 @@ rosetta-cli check:spec --all --configuration-file ${ROSETTA_CONFIGURATION_FILE}
 echo "========================= ROSETTA CLI: CHECK:CONSTRUCTION ==========================="
 rosetta-cli check:construction --configuration-file ${ROSETTA_CONFIGURATION_FILE}
 
-# shellcheck source=buildkite/scripts/tests/rosetta-offline-signer-smoke.sh
-source "$(dirname "$0")/rosetta-offline-signer-smoke.sh"
+# shellcheck source=buildkite/scripts/tests/rosetta/offline-signer-smoke.sh
+source "$(dirname "$0")/offline-signer-smoke.sh"
 
 echo "========================= OFFLINE SIGNER SMOKE TEST ==========================="
 offline_signer_smoke_test
@@ -306,5 +368,4 @@ rosetta-cli check:data --configuration-file ${ROSETTA_CONFIGURATION_FILE}
 echo "========================= ROSETTA CLI: CHECK:PERF ==========================="
 echo "rosetta-cli check:perf" # Will run this command when tests are fully implemented
 
-# Call log collection function (also called automatically on exit via trap)
-collect_logs
+# EXIT trap calls collect_logs; no need to invoke it explicitly here.
