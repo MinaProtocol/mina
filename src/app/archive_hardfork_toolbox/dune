@@ -18,7 +18,6 @@
   base
   base.caml
   integers
-  yojson
   ;; local libraries
   logger
   archive_lib
@@ -42,7 +41,7 @@
   signature_lib
   unsigned_extended
   with_hash)
- (modules logic sql config)
+ (modules logic sql)
  (instrumentation
   (backend bisect_ppx))
  (preprocess
@@ -53,7 +52,6 @@
    ppx_mina
    ppx_sexp_conv
    ppx_string
-   ppx_deriving_yojson
    ppx_version)))
 
 (executable
@@ -78,7 +76,6 @@
   base.caml
   async.async_command
   integers
-  yojson
   ;; local libraries
   archive_hardfork_toolbox_lib
   logger
