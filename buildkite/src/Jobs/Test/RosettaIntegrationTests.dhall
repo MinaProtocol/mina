@@ -25,9 +25,7 @@ let network = Network.Type.Devnet
 let dirtyWhen =
       [ S.strictlyStart (S.contains "src")
       , S.exactly "buildkite/src/Jobs/Test/RosettaIntegrationTests" "dhall"
-      , S.exactly "buildkite/scripts/tests/rosetta/integration-tests" "sh"
-      , S.exactly "buildkite/scripts/tests/rosetta/install-debs" "sh"
-      , S.exactly "buildkite/scripts/tests/rosetta/install-cli" "sh"
+      , S.strictlyStart (S.contains "buildkite/scripts/tests/rosetta")
       , S.exactly "buildkite/scripts/debian/install" "sh"
       , S.strictlyStart (S.contains "scripts/debian")
       ]

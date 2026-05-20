@@ -4,13 +4,10 @@ set -eox pipefail
 # Install mina, mina-archive, mina-rosetta and mina-zkapp-test-transaction
 # debs onto the host (toolchain container), plus the rosetta-cli golang
 # binary. Replaces the previous setup of running this whole script inside
-# the prebuilt mina-rosetta docker image.
-source ./buildkite/scripts/tests/rosetta/install-debs.sh
+# the prebuilt mina-rosetta docker image. Both helpers run as child
+# processes so their strict-mode flags don't leak into this shell.
+./buildkite/scripts/tests/rosetta/install-debs.sh
 ./buildkite/scripts/tests/rosetta/install-cli.sh
-
-# install-debs.sh sources scripts/debian/aptly.sh which sets `-C` (noclobber);
-# clear it so later `> file` redirects on existing artifacts don't fail.
-set +C
 
 # `mina daemon` refuses to load the libp2p keypair if any ancestor dir is
 # group/world-readable. The toolchain image's $HOME (=/home/opam) is 0755
@@ -185,6 +182,9 @@ jq -r --arg file ${ROSETTA_CLI_INTERESTING_ACCOUNTS_FILENAME} '.data_directory =
 mv "${ROSETTA_CONFIGURATION_FILE}.tmp" "${ROSETTA_CONFIGURATION_FILE}"
 
 # Substitute placeholders in rosetta-cli configuration (in place in OUTPUT_DIR).
+# Disable xtrace around the private-key extraction + substitution so the
+# hex-encoded key never appears in CI logs, then restore it.
+{ set +x; } 2>/dev/null
 BLOCK_PRODUCER_PRIVKEY=$(mina-ocaml-signer hex-of-private-key-file --private-key-path "${BLOCK_PRODUCER_KEY}")
 for config_file in $ROSETTA_CLI_CONFIG_FILES; do
   sed -i \
@@ -195,6 +195,8 @@ for config_file in $ROSETTA_CLI_CONFIG_FILES; do
     -e "s/PLACEHOLDER_NETWORK_NAME/${MINA_NETWORK}/" \
     "${ROSETTA_CONFIGURATION_OUTPUT_DIR}/${config_file}"
 done
+unset BLOCK_PRODUCER_PRIVKEY
+set -x
 
 # Import Genesis Accounts
 echo "==================== IMPORTING GENESIS ACCOUNTS ======================"
