@@ -31,5 +31,8 @@ DEBS=(
 
 DEBS_CSV="$(IFS=,; echo "${DEBS[*]}")"
 
-# Use sudo (toolchain image runs as opam user with NOPASSWD sudo).
-source ./buildkite/scripts/debian/install.sh "${DEBS_CSV}" 1
+# Run the installer in a child process (not `source`d) so its strict-mode
+# flags (`set -u`/`set -C`, custom `PS4`) and the `set -C` from the aptly
+# helper it sources don't leak back into the calling shell. Use sudo
+# (toolchain image runs as opam user with NOPASSWD sudo).
+bash ./buildkite/scripts/debian/install.sh "${DEBS_CSV}" 1
