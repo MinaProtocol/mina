@@ -1,0 +1,38 @@
+#!/bin/bash
+
+# Installs the debian packages needed by the rosetta integration / indexer
+# tests on the host where the test script is running. Replaces the previous
+# pattern of running the tests inside the prebuilt mina-rosetta docker image.
+#
+# Pulls the freshly-built debs out of the buildkite cache (per
+# buildkite/scripts/debian/install.sh), installs them via aptly, then drops
+# the local repo. Idempotent: invoke from the top of any rosetta test script.
+#
+# Required env: MINA_DEB_CODENAME, BUILDKITE_BUILD_ID, MINA_NETWORK_DEB
+#   (network suffix that matches the rosetta deb, e.g. "devnet" -> mina-rosetta-devnet)
+
+set -eo pipefail
+
+NETWORK="${MINA_NETWORK_DEB:-devnet}"
+
+# Use the *-generic daemon package instead of mina-${NETWORK}. Same daemon
+# binaries (mina client/daemon/libp2p) but no dependency on
+# mina-${NETWORK}-config, so no /var/lib/coda/config_<commit>.json gets
+# installed. Without that file the daemon doesn't auto-merge the published
+# devnet runtime config (which carries epoch_data for an epoch ledger we
+# don't ship) on top of our --config-file, and starts cleanly against the
+# test's hand-rolled testnet.json.
+DEBS=(
+  "mina-${NETWORK}-generic"
+  "mina-archive-${NETWORK}"
+  "mina-rosetta-${NETWORK}"
+  "mina-zkapp-test-transaction"
+)
+
+DEBS_CSV="$(IFS=,; echo "${DEBS[*]}")"
+
+# Run the installer in a child process (not `source`d) so its strict-mode
+# flags (`set -u`/`set -C`, custom `PS4`) and the `set -C` from the aptly
+# helper it sources don't leak back into the calling shell. Use sudo
+# (toolchain image runs as opam user with NOPASSWD sudo).
+bash ./buildkite/scripts/debian/install.sh "${DEBS_CSV}" 1
