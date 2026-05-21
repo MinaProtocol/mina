@@ -186,6 +186,15 @@ let runInToolchainWithPostgresAndDebs
                     # environment
                   )
 
+          let gitEnvVars =
+                Text/concatMap
+                  Text
+                  (\(var : Text) -> " --env ${var}")
+                  [ "MINA_DEB_CODENAME"
+                  , "MINA_DEB_VERSION"
+                  , "MINA_DEB_RELEASE"
+                  ]
+
           let outerDir
               : Text
               = "\\\$BUILDKITE_BUILD_CHECKOUT_PATH"
@@ -227,7 +236,7 @@ let runInToolchainWithPostgresAndDebs
                     , "sleep 5"
                     ]
                   # runInitScript
-                  # [ "docker run --pid=container:postgres --network host --volume /var/storagebox:/var/storagebox --volume /var/secrets:/var/secrets --volume ${outerDir}:/workdir --workdir /workdir --entrypoint /bin/bash${bkEnvVars}${extraEnvVars} ${toolchain} -c '${installAndRun}'"
+                  # [ "docker run --pid=container:postgres --network host --volume /var/storagebox:/var/storagebox --volume /var/secrets:/var/secrets --volume ${outerDir}:/workdir --workdir /workdir --entrypoint /bin/bash${bkEnvVars}${extraEnvVars}${gitEnvVars} ${toolchain} -c '${installAndRun}'"
                     ]
                 )
 
