@@ -1,6 +1,21 @@
 #!/bin/sh
-# Configure APT caching proxy with a bypass for the Mina debian package repository,
-# AND opt into the o1Labs deb-mirror for Ubuntu base packages on supported codenames.
+# Configure APT for o1Labs CI/build environments:
+#   1. Route most apt traffic through an apt-cacher-ng caching proxy
+#      (APT_CACHE_URL) while bypassing the Mina deb repo (DEB_REPO) so
+#      package publishes don't get cached.
+#   2. Unconditionally bypass the proxy for archive.ubuntu.com /
+#      security.ubuntu.com. The o1Labs apt-cacher-ng has the local
+#      (unsigned) aptly publication first in its Remap-uburep chain — a
+#      proxied request for archive.ubuntu.com would get our unsigned
+#      Release file, which apt then rejects with "is no longer signed"
+#      (anti-downgrade — not soft-recoverable by Error-Mode "any").
+#      Sending these DIRECT keeps Canonical default sources verifiable
+#      regardless of mirror state. (See gitops-infrastructure PR #1289.)
+#   3. Opt into the o1Labs deb-mirror for Ubuntu base packages on
+#      allowlisted codenames (focal today; jammy on the roadmap as
+#      Ubuntu 22.04 standard support ends). Mirrors the Buildkite ARC
+#      agent's [trusted=yes] mirror-ubuntu.list + Pin-Priority 900
+#      pattern. (See gitops-infrastructure PR #1287.)
 #
 # Usage: configure-apt-proxy.sh [APT_CACHE_URL] [DEB_REPO] [APT_MIRROR_URL]
 #   APT_CACHE_URL   - apt-cacher-ng or similar caching proxy URL
@@ -16,32 +31,40 @@
 # If APT_CACHE_URL is empty the script exits cleanly without writing anything,
 # so it remains safe to call unconditionally.
 #
-# When APT_MIRROR_URL is set (or derivable) and the running OS codename is a
-# distribution we mirror today (focal), this script ALSO:
+# When APT_MIRROR_URL is set (or derivable) AND the running OS codename is in
+# the allowlist (focal|jammy), this script also:
 #   - writes /etc/apt/sources.list.d/mirror-ubuntu.list pointing at the local
-#     mirror with [trusted=yes] for main+universe across {focal, focal-security,
-#     focal-updates}, mirroring the Buildkite ARC agent's existing pattern for
-#     docker/postgresql/yarn/buildkite-agent/nodesource.
-#   - writes /etc/apt/preferences.d/99-local-mirror with Pin-Priority 900 so the
-#     local copy wins over Canonical when both have a package.
-#   - writes /etc/apt/apt.conf.d/99error-mode with `Error-Mode "any"` so the
-#     broken apt-cacher-ng + Canonical-signed pass-through path (where our
-#     unsigned local Release is currently authoritative on the proxy) warns
-#     rather than failing apt-get update.
+#     mirror with [trusted=yes] for main+universe across {CODENAME,
+#     CODENAME-security, CODENAME-updates}, mirroring the Buildkite ARC
+#     agent's existing pattern for docker/postgresql/yarn/buildkite-agent/
+#     nodesource.
+#   - writes /etc/apt/preferences.d/99-local-mirror with Pin-Priority 900 so
+#     the local copy wins over Canonical when both have a package.
+#   - writes /etc/apt/apt.conf.d/99error-mode with `Error-Mode "any"` so
+#     transient per-source failures (mirror unreachable, codename not yet
+#     mirrored, etc.) degrade to warnings rather than failing apt-get update.
 #   - bypasses the apt-cacher-ng proxy for the deb-mirror-ingress hostname so
 #     direct mirror requests don't take an extra hop and aren't rewritten by
 #     apt-cacher-ng's Remap rules.
 #
-# Fallback behaviour when the local mirror is unreachable:
-#   - mirror-ubuntu.list connections fail; Error-Mode "any" warns and continues.
-#   - apt then falls back to the default Canonical sources via apt-cacher-ng.
-#   - apt-cacher-ng's Remap-uburep chain has `localhost:8080/ubuntu` first;
-#     when aptly-serve is down it connection-refuses and apt-cacher-ng falls
-#     through to `archive.ubuntu.com`, which serves canonically-signed
-#     InRelease. Package installs succeed via the upstream path.
-#   - When both deb-mirror-ingress and apt-cacher-ng are unreachable, the
-#     Mina build script's pre-flight curl probe drops apt_cache_url and this
-#     script exits early — apt uses the default Canonical sources direct.
+# Graceful degradation matrix:
+#   * Codename mirrored + mirror up        -> all packages from local mirror
+#   * Codename mirrored + mirror down      -> Error-Mode "any" warns on the
+#                                             mirror sources; Canonical
+#                                             defaults (DIRECT) satisfy the
+#                                             install.
+#   * Codename allowlisted but not yet
+#     mirrored (e.g. jammy today)          -> mirror sources 404; Error-Mode
+#                                             "any" warns; Canonical defaults
+#                                             (DIRECT) satisfy the install.
+#   * Codename not allowlisted             -> mirror setup skipped entirely;
+#                                             default Ubuntu sources stand.
+#   * Both deb-mirror and apt-cacher-ng
+#     unreachable                          -> Mina build script's pre-flight
+#                                             curl probe drops APT_CACHE_URL
+#                                             and this script exits early —
+#                                             apt uses default Canonical
+#                                             sources direct.
 #
 # Codename detection uses /etc/os-release VERSION_CODENAME — no curl/wget
 # dependency on slim base images.
@@ -60,7 +83,7 @@ APT_MIRROR_URL="${3:-}"
 [ -n "$APT_CACHE_URL" ] || exit 0
 
 # -----------------------------------------------------------------------------
-# 1. Original proxy config.
+# 1. Caching proxy + DIRECT bypasses.
 # -----------------------------------------------------------------------------
 conf=/etc/apt/apt.conf.d/01proxy
 {
@@ -72,6 +95,16 @@ conf=/etc/apt/apt.conf.d/01proxy
     echo "Acquire::http::Proxy::${host} \"DIRECT\";"
     echo "Acquire::https::Proxy::${host} \"DIRECT\";"
   fi
+  # Ubuntu Canonical archives ALWAYS go DIRECT (see header note 2):
+  # the o1Labs apt-cacher-ng's Remap-uburep chain has the local unsigned
+  # aptly publication first, so a proxied request for archive.ubuntu.com
+  # would resolve to our unsigned Release and apt would refuse it as
+  # "is no longer signed". Bypassing the proxy for these two hosts keeps
+  # Canonical defaults verifiable regardless of mirror state.
+  echo "Acquire::http::Proxy::archive.ubuntu.com \"DIRECT\";"
+  echo "Acquire::https::Proxy::archive.ubuntu.com \"DIRECT\";"
+  echo "Acquire::http::Proxy::security.ubuntu.com \"DIRECT\";"
+  echo "Acquire::https::Proxy::security.ubuntu.com \"DIRECT\";"
 } > "$conf"
 
 echo "--- APT proxy config ---"
@@ -107,11 +140,15 @@ if [ -r /etc/os-release ]; then
     CODENAME="${VERSION_CODENAME:-}"
 fi
 
-# Today the deb-mirror only publishes Ubuntu focal main+universe (with
-# -security and -updates). When mirrors.yaml grows ubuntu-jammy* /
-# ubuntu-noble* entries, add the matching codename(s) here.
+# Codename allowlist. Today the deb-mirror only publishes Ubuntu focal
+# main+universe (with -security and -updates); jammy is on the near-term
+# roadmap as Ubuntu 22.04 standard support ends. With Error-Mode "any" plus
+# the Canonical-DIRECT bypass written above, listing a codename here BEFORE
+# the deb-mirror serves it is safe: mirror-ubuntu.list 404s with a warning,
+# apt continues, and the install completes from Canonical defaults. Add
+# noble (or other future codenames) the same way.
 case "$CODENAME" in
-    focal)
+    focal|jammy)
         ;;
     "")
         echo "--- /etc/os-release has no VERSION_CODENAME; skipping deb-mirror Ubuntu setup ---"
@@ -141,18 +178,14 @@ Pin: origin ${mirror_host}
 Pin-Priority: 900
 EOF
 
-# Tolerate per-source failures during apt-get update. Two failure modes this
-# saves us from:
-#   1. mirror-ubuntu.list unreachable (deb-mirror VM / aptly-serve down) →
-#      apt logs the connection error and continues; default Canonical sources
-#      via apt-cacher-ng still satisfy the install.
-#   2. apt-cacher-ng + Canonical-via-proxy returns the unsigned local Release
-#      (because acng.conf's Remap-uburep has localhost:8080 first today —
-#      gitops-infrastructure tasks/todo.md Bucket 0) → apt warns "is not
-#      signed" on the Canonical sources, continues, and the pin above directs
-#      installs to mirror-ubuntu.list which IS [trusted=yes].
-# Without Error-Mode "any", either warning escalates to a fatal error on
-# apt 2.3.15+.
+# Tolerate per-source failures during apt-get update. Without Error-Mode
+# "any", these escalate to a fatal apt-get update on apt 2.3.15+:
+#   1. mirror-ubuntu.list unreachable (deb-mirror VM / aptly-serve down).
+#   2. Codename allowlisted here but not yet mirrored (e.g. jammy today) —
+#      the mirror's Release endpoint returns 404 for the configured pocket.
+# In both cases the apt-cacher-ng + Canonical-DIRECT bypass from Section 1
+# means archive.ubuntu.com / security.ubuntu.com are still reachable with
+# valid signatures, so the install completes from Canonical defaults.
 echo 'APT::Update::Error-Mode "any";' > /etc/apt/apt.conf.d/99error-mode
 
 # Tell apt to fetch from the deb-mirror-ingress host DIRECTLY, not through
