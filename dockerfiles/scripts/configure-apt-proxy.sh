@@ -52,8 +52,13 @@
 #     CODENAME-security, CODENAME-updates}, mirroring the Buildkite ARC
 #     agent's existing pattern for docker/postgresql/yarn/buildkite-agent/
 #     nodesource.
-#   - writes /etc/apt/preferences.d/99-local-mirror with Pin-Priority 900 so
-#     the local copy wins over Canonical when both have a package.
+#   - does NOT pin the mirror with Pin-Priority. Pinning at >500 over-broadens:
+#     it would force apt to prefer OUR Ubuntu-version of a package even when a
+#     third-party repo (e.g. postgresql.org → postgresql-15) needs a strictly-
+#     newer version of an Ubuntu base library (libpq5 12.22 vs 15.x). The
+#     local mirror is still used when apt picks it on its own (versions equal
+#     to Canonical), and traffic still goes through it; it just doesn't
+#     override version-driven dependency resolution.
 #   - writes /etc/apt/apt.conf.d/99error-mode with `Error-Mode "any"` — apt's
 #     default and explicit-strict mode. Kept as-is for parity with the agent
 #     entrypoint; it does not soften 404 errors but documents intent.
@@ -164,7 +169,8 @@ esac
 
 echo "--- Configuring deb-mirror Ubuntu sources (codename: ${CODENAME}) ---"
 
-# Pin: derive the host from APT_MIRROR_URL (strip scheme and any port).
+# Derive host from APT_MIRROR_URL (strip scheme and any port) for the proxy
+# bypass below.
 mirror_host="${APT_MIRROR_URL#*://}"
 mirror_host="${mirror_host%%[:/]*}"
 
@@ -174,11 +180,17 @@ deb [trusted=yes] ${APT_MIRROR_URL}/ubuntu ${CODENAME}-security main universe
 deb [trusted=yes] ${APT_MIRROR_URL}/ubuntu ${CODENAME}-updates main universe
 EOF
 
-cat > /etc/apt/preferences.d/99-local-mirror <<EOF
-Package: *
-Pin: origin ${mirror_host}
-Pin-Priority: 900
-EOF
+# No Pin-Priority file. Earlier versions of this script wrote
+# /etc/apt/preferences.d/99-local-mirror with Pin-Priority 900 to "prefer the
+# local mirror over Canonical". That over-broadened: apt would prefer
+# OUR Ubuntu-version libpq5 (12.22 from focal/main) at priority 900 over the
+# postgresql.org repo's libpq5 15.x (priority 500) needed transitively by
+# postgresql-15 — breaking the rosetta-focal build with "Unable to correct
+# problems, you have held broken packages". Letting the mirror sit at the
+# default priority (500) gives the right behavior: same Ubuntu-base versions
+# in both Canonical and our mirror → apt picks one (we still serve the
+# traffic), but third-party repos with a strictly-newer required version
+# still win dependency resolution.
 
 # `Error-Mode "any"` is apt's default-and-strict mode. It demotes one
 # specific class of error — "is no longer signed" anti-downgrade — to a
@@ -199,8 +211,6 @@ EOF
 
 echo "--- /etc/apt/sources.list.d/mirror-ubuntu.list ---"
 cat /etc/apt/sources.list.d/mirror-ubuntu.list
-echo "--- /etc/apt/preferences.d/99-local-mirror ---"
-cat /etc/apt/preferences.d/99-local-mirror
 echo "--- /etc/apt/apt.conf.d/02proxy-bypass-mirror ---"
 cat /etc/apt/apt.conf.d/02proxy-bypass-mirror
 echo "------------------------"
