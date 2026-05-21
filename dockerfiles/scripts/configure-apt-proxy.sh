@@ -8,14 +8,28 @@
 #      (unsigned) aptly publication first in its Remap-uburep chain — a
 #      proxied request for archive.ubuntu.com would get our unsigned
 #      Release file, which apt then rejects with "is no longer signed"
-#      (anti-downgrade — not soft-recoverable by Error-Mode "any").
-#      Sending these DIRECT keeps Canonical default sources verifiable
-#      regardless of mirror state. (See gitops-infrastructure PR #1289.)
+#      (anti-downgrade). Sending these DIRECT keeps Canonical default
+#      sources verifiable regardless of mirror state. (See gitops-
+#      infrastructure PR #1289.)
 #   3. Opt into the o1Labs deb-mirror for Ubuntu base packages on
-#      allowlisted codenames (focal today; jammy on the roadmap as
-#      Ubuntu 22.04 standard support ends). Mirrors the Buildkite ARC
-#      agent's [trusted=yes] mirror-ubuntu.list + Pin-Priority 900
-#      pattern. (See gitops-infrastructure PR #1287.)
+#      allowlisted codenames. ONLY codenames the deb-mirror actually
+#      serves today belong in the allowlist — apt-get update fails
+#      fatally on 404s for an allowlisted-but-unmirrored codename
+#      (Error-Mode "any" is the strict default; it does NOT demote
+#      fetch failures to warnings, only "is no longer signed" downgrades).
+#      Today: focal only. Extension procedure when adding a new
+#      codename (jammy, bullseye, …):
+#        a. gitops-infrastructure PR: add mirror entries to
+#           platform/hetzner-cloud/deb-mirror/mirrors.yaml, sync via
+#           `./mirror-ctl.sh sync-running deb-mirror-1`, verify
+#           `curl /ubuntu/dists/<codename>/Release` returns 200 with
+#           `Components: main universe`.
+#        b. gitops-infrastructure PR: extend mirror-ubuntu.list in
+#           platform/hetzner-rivendell-1/applications/buildkite-agents/
+#           entrypoint{,-development}.yaml.gotmpl.
+#        c. ONLY THEN, this allowlist (mirrors the Buildkite ARC agent's
+#           [trusted=yes] mirror-ubuntu.list + Pin-Priority 900 pattern,
+#           see gitops-infrastructure PR #1287).
 #
 # Usage: configure-apt-proxy.sh [APT_CACHE_URL] [DEB_REPO] [APT_MIRROR_URL]
 #   APT_CACHE_URL   - apt-cacher-ng or similar caching proxy URL
@@ -32,7 +46,7 @@
 # so it remains safe to call unconditionally.
 #
 # When APT_MIRROR_URL is set (or derivable) AND the running OS codename is in
-# the allowlist (focal|jammy), this script also:
+# the allowlist (focal today), this script also:
 #   - writes /etc/apt/sources.list.d/mirror-ubuntu.list pointing at the local
 #     mirror with [trusted=yes] for main+universe across {CODENAME,
 #     CODENAME-security, CODENAME-updates}, mirroring the Buildkite ARC
@@ -40,31 +54,12 @@
 #     nodesource.
 #   - writes /etc/apt/preferences.d/99-local-mirror with Pin-Priority 900 so
 #     the local copy wins over Canonical when both have a package.
-#   - writes /etc/apt/apt.conf.d/99error-mode with `Error-Mode "any"` so
-#     transient per-source failures (mirror unreachable, codename not yet
-#     mirrored, etc.) degrade to warnings rather than failing apt-get update.
+#   - writes /etc/apt/apt.conf.d/99error-mode with `Error-Mode "any"` — apt's
+#     default and explicit-strict mode. Kept as-is for parity with the agent
+#     entrypoint; it does not soften 404 errors but documents intent.
 #   - bypasses the apt-cacher-ng proxy for the deb-mirror-ingress hostname so
 #     direct mirror requests don't take an extra hop and aren't rewritten by
 #     apt-cacher-ng's Remap rules.
-#
-# Graceful degradation matrix:
-#   * Codename mirrored + mirror up        -> all packages from local mirror
-#   * Codename mirrored + mirror down      -> Error-Mode "any" warns on the
-#                                             mirror sources; Canonical
-#                                             defaults (DIRECT) satisfy the
-#                                             install.
-#   * Codename allowlisted but not yet
-#     mirrored (e.g. jammy today)          -> mirror sources 404; Error-Mode
-#                                             "any" warns; Canonical defaults
-#                                             (DIRECT) satisfy the install.
-#   * Codename not allowlisted             -> mirror setup skipped entirely;
-#                                             default Ubuntu sources stand.
-#   * Both deb-mirror and apt-cacher-ng
-#     unreachable                          -> Mina build script's pre-flight
-#                                             curl probe drops APT_CACHE_URL
-#                                             and this script exits early —
-#                                             apt uses default Canonical
-#                                             sources direct.
 #
 # Codename detection uses /etc/os-release VERSION_CODENAME — no curl/wget
 # dependency on slim base images.
@@ -140,15 +135,22 @@ if [ -r /etc/os-release ]; then
     CODENAME="${VERSION_CODENAME:-}"
 fi
 
-# Codename allowlist. Today the deb-mirror only publishes Ubuntu focal
-# main+universe (with -security and -updates); jammy is on the near-term
-# roadmap as Ubuntu 22.04 standard support ends. With Error-Mode "any" plus
-# the Canonical-DIRECT bypass written above, listing a codename here BEFORE
-# the deb-mirror serves it is safe: mirror-ubuntu.list 404s with a warning,
-# apt continues, and the install completes from Canonical defaults. Add
-# noble (or other future codenames) the same way.
+# Codename allowlist. ONLY codenames the deb-mirror actually serves belong
+# here — apt-get update fails fatally on 404s for an allowlisted-but-
+# unmirrored codename. Today: focal only.
+#
+# Procedure for adding jammy / bullseye / noble / future codenames:
+#   1. gitops-infrastructure PR — add ubuntu-<codename>* mirror entries to
+#      platform/hetzner-cloud/deb-mirror/mirrors.yaml. Sync via
+#      `./mirror-ctl.sh sync-running deb-mirror-1`. Verify with
+#      `curl http://deb-mirror-ingress.mirror-ingress/ubuntu/dists/<codename>/Release`
+#      that Components includes "main universe".
+#   2. gitops-infrastructure PR — extend mirror-ubuntu.list in
+#      platform/hetzner-rivendell-1/applications/buildkite-agents/
+#      entrypoint{,-development}.yaml.gotmpl with the new codename triple.
+#   3. ONLY THEN, this allowlist.
 case "$CODENAME" in
-    focal|jammy)
+    focal)
         ;;
     "")
         echo "--- /etc/os-release has no VERSION_CODENAME; skipping deb-mirror Ubuntu setup ---"
@@ -178,14 +180,11 @@ Pin: origin ${mirror_host}
 Pin-Priority: 900
 EOF
 
-# Tolerate per-source failures during apt-get update. Without Error-Mode
-# "any", these escalate to a fatal apt-get update on apt 2.3.15+:
-#   1. mirror-ubuntu.list unreachable (deb-mirror VM / aptly-serve down).
-#   2. Codename allowlisted here but not yet mirrored (e.g. jammy today) —
-#      the mirror's Release endpoint returns 404 for the configured pocket.
-# In both cases the apt-cacher-ng + Canonical-DIRECT bypass from Section 1
-# means archive.ubuntu.com / security.ubuntu.com are still reachable with
-# valid signatures, so the install completes from Canonical defaults.
+# `Error-Mode "any"` is apt's default-and-strict mode. It demotes one
+# specific class of error — "is no longer signed" anti-downgrade — to a
+# warning. It does NOT soften per-source 404s or connection failures;
+# those still fail apt-get update fatally. Mirrors the agent entrypoint;
+# kept for parity and explicit intent.
 echo 'APT::Update::Error-Mode "any";' > /etc/apt/apt.conf.d/99error-mode
 
 # Tell apt to fetch from the deb-mirror-ingress host DIRECTLY, not through
