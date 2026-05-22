@@ -34,6 +34,9 @@ NORM=${NORM:-}
 # Replace top N delegate keys with the specified keys
 REPLACE_TOP=${REPLACE_TOP:-}
 
+# Native MINA token identifier (non-native custom token accounts are excluded)
+NATIVE_TOKEN_ID='wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf'
+
 # Mainnet configuration constants
 MAINNET_START='2024-06-05T00:00:00Z'
 SLOTS_PER_EPOCH=7140
@@ -158,8 +161,8 @@ keys_="${keys_:0:-1}"
 
 tmpfile=$(mktemp)
 
-# jq filter to exclude PKs from the ledger
-if ! <"$ledger_file" jq "[.[] | select(.pk | IN($keys_) | not)]" >"$tmpfile"; then
+# jq filter to native MINA token accounts only, excluding our new PKs
+if ! <"$ledger_file" jq "[.[] | select(.token == \"$NATIVE_TOKEN_ID\") | select(.pk | IN($keys_) | not)]" >"$tmpfile"; then
   echo "Error: Failed to filter ledger with jq" >&2
   rm "$tmpfile"
   exit 1
