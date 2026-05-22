@@ -343,26 +343,33 @@ module Make (Inductive_rule : Inductive_rule.Intf) = struct
                 Req.Compute_prev_proof_parts previous_proof_statements )
           in
           let dlog_plonk_index =
+            with_label "exists_wrap_index" (fun () ->
             let num_chunks = (* TODO *) Plonk_checks.num_chunks_by_default in
             exists
               ~request:(fun () -> Req.Wrap_index)
               (Plonk_verification_key_evals.typ
-                 (Typ.array ~length:num_chunks Step_verifier.Inner_curve.typ) )
-          and prevs =
+                 (Typ.array ~length:num_chunks Step_verifier.Inner_curve.typ) ))
+          in
+          let prevs =
+            with_label "exists_prevs" (fun () ->
             exists (Prev_typ.f prev_proof_typs) ~request:(fun () ->
-                Req.Proof_with_datas )
-          and unfinalized_proofs_unextended =
+                Req.Proof_with_datas ))
+          in
+          let unfinalized_proofs_unextended =
+            with_label "exists_unfinalized" (fun () ->
             exists
               (Vector.typ'
                  (Vector.map
                     ~f:(fun _feature_flags ->
                       Unfinalized.typ ~wrap_rounds:Backend.Tock.Rounds.n )
                     feature_flags_and_num_chunks ) )
-              ~request:(fun () -> Req.Unfinalized_proofs)
-          and messages_for_next_wrap_proof =
+              ~request:(fun () -> Req.Unfinalized_proofs))
+          in
+          let messages_for_next_wrap_proof =
             exists (Vector.typ Digest.typ Max_proofs_verified.n)
               ~request:(fun () -> Req.Messages_for_next_wrap_proof)
-          and actual_wrap_domains =
+          in
+          let actual_wrap_domains =
             exists
               (Vector.typ (Typ.prover_value ()) (Length.to_nat proofs_verified))
               ~request:(fun () -> Req.Wrap_domain_indices)
@@ -388,6 +395,7 @@ module Make (Inductive_rule : Inductive_rule.Intf) = struct
           [%log internal] "Step_compute_bulletproof_challenges" ;
           let bulletproof_challenges =
             with_label "prevs_verified" (fun () ->
+                let slot_idx = ref 0 in
                 let rec go :
                     type vars vals ns1 ns2 n.
                        (vars, ns1, ns2) H3.T(Per_proof_witness).t
@@ -458,9 +466,12 @@ module Make (Inductive_rule : Inductive_rule.Intf) = struct
                         | `Side_loaded _ ->
                             ()
                       in
+                      let i = !slot_idx in
+                      incr slot_idx ;
                       let chals, v =
-                        verify_one ~srs pw d messages_for_next_wrap_proof
-                          unfinalized must_verify
+                        with_label (Printf.sprintf "slot_%d" i) (fun () ->
+                            verify_one ~srs pw d messages_for_next_wrap_proof
+                              unfinalized must_verify )
                       in
                       let chalss, vs =
                         go proof_witnesses datas messages_for_next_wrap_proofs
@@ -547,11 +558,11 @@ module Make (Inductive_rule : Inductive_rule.Intf) = struct
               V.f proofs_verified (M.f proof_witnesses)
             in
             with_label "hash_messages_for_next_step_proof" (fun () ->
+                let to_field_elements =
+                  let (Typ typ) = basic.public_input in
+                  fun x -> fst (typ.var_to_fields x)
+                in
                 let hash_messages_for_next_step_proof =
-                  let to_field_elements =
-                    let (Typ typ) = basic.public_input in
-                    fun x -> fst (typ.var_to_fields x)
-                  in
                   unstage
                     (Step_verifier.hash_messages_for_next_step_proof
                        ~index:dlog_plonk_index to_field_elements )
@@ -565,14 +576,91 @@ module Make (Inductive_rule : Inductive_rule.Intf) = struct
                   | Input_and_output _ ->
                       (app_state, ret_var)
                 in
-                hash_messages_for_next_step_proof
-                  { app_state
-                  ; dlog_plonk_index
-                  ; challenge_polynomial_commitments
-                  ; old_bulletproof_challenges =
-                      (* Note: the bulletproof_challenges here are unpadded! *)
-                      bulletproof_challenges
-                  } )
+                (* === TRACE: outer hash inputs (NEW step proof's
+                   msgForNextStep). PI[32] is the digest of these
+                   inputs; any divergence in PI[32] is a diff in one of
+                   them. *)
+                as_prover (fun () ->
+                    let read_field x =
+                      As_prover.read Impls.Step.Field.typ x
+                    in
+                    let read_pt (x, y) = (read_field x, read_field y) in
+                    let i = ref 0 in
+                    Vector.iter dlog_plonk_index.sigma_comm ~f:(fun pts ->
+                        let cx, cy = read_pt pts.(0) in
+                        Pickles_trace.tick_field
+                          (Printf.sprintf "step_main_outer.vk.sigma.%d.x" !i)
+                          cx ;
+                        Pickles_trace.tick_field
+                          (Printf.sprintf "step_main_outer.vk.sigma.%d.y" !i)
+                          cy ;
+                        incr i) ;
+                    let i = ref 0 in
+                    Vector.iter dlog_plonk_index.coefficients_comm
+                      ~f:(fun pts ->
+                        let cx, cy = read_pt pts.(0) in
+                        Pickles_trace.tick_field
+                          (Printf.sprintf "step_main_outer.vk.coeff.%d.x" !i)
+                          cx ;
+                        Pickles_trace.tick_field
+                          (Printf.sprintf "step_main_outer.vk.coeff.%d.y" !i)
+                          cy ;
+                        incr i) ;
+                    let idx_pts =
+                      [ ("generic", dlog_plonk_index.generic_comm)
+                      ; ("psm", dlog_plonk_index.psm_comm)
+                      ; ("complete_add", dlog_plonk_index.complete_add_comm)
+                      ; ("mul", dlog_plonk_index.mul_comm)
+                      ; ("emul", dlog_plonk_index.emul_comm)
+                      ; ("endomul_scalar", dlog_plonk_index.endomul_scalar_comm)
+                      ]
+                    in
+                    List.iter idx_pts ~f:(fun (name, pts) ->
+                        let cx, cy = read_pt pts.(0) in
+                        Pickles_trace.tick_field
+                          (Printf.sprintf "step_main_outer.vk.idx.%s.x" name) cx ;
+                        Pickles_trace.tick_field
+                          (Printf.sprintf "step_main_outer.vk.idx.%s.y" name) cy) ;
+                    let app_fields = to_field_elements app_state in
+                    Array.iteri app_fields ~f:(fun i v ->
+                        Pickles_trace.tick_field
+                          (Printf.sprintf "step_main_outer.app_state.%d" i)
+                          (read_field v)) ;
+                    let i = ref 0 in
+                    Vector.iter challenge_polynomial_commitments
+                      ~f:(fun (sx, sy) ->
+                        let cx, cy = read_pt (sx, sy) in
+                        Pickles_trace.tick_field
+                          (Printf.sprintf "step_main_outer.proof.%d.sg.x" !i)
+                          cx ;
+                        Pickles_trace.tick_field
+                          (Printf.sprintf "step_main_outer.proof.%d.sg.y" !i)
+                          cy ;
+                        incr i) ;
+                    let i = ref 0 in
+                    Vector.iter bulletproof_challenges ~f:(fun chals ->
+                        let j = ref 0 in
+                        Vector.iter chals ~f:(fun c ->
+                            Pickles_trace.tick_field
+                              (Printf.sprintf
+                                 "step_main_outer.proof.%d.bp_chal.%d" !i !j )
+                              (read_field c) ;
+                            incr j ) ;
+                        incr i ) ) ;
+                let result =
+                  hash_messages_for_next_step_proof
+                    { app_state
+                    ; dlog_plonk_index
+                    ; challenge_polynomial_commitments
+                    ; old_bulletproof_challenges =
+                        (* Note: the bulletproof_challenges here are unpadded! *)
+                        bulletproof_challenges
+                    }
+                in
+                as_prover (fun () ->
+                    Pickles_trace.tick_field "step_main_outer.digest"
+                      (As_prover.read Impls.Step.Field.typ result) ) ;
+                result )
           in
           let unfinalized_proofs =
             Vector.extend_front unfinalized_proofs_unextended lte

@@ -1,6 +1,9 @@
 module type S = sig
   module Scalar_challenge = Scalar_challenge
   module Endo = Endo
+  module Wrap_hack = Wrap_hack
+  module Wrap_wire_proof = Wrap_wire_proof
+  module Dummy = Dummy
   open Core_kernel
   open Async_kernel
   open Pickles_types
@@ -89,6 +92,8 @@ module type S = sig
       val to_base64 : t -> string
 
       val of_base64 : string -> (t, string) Result.t
+
+      val to_yojson_full : t -> Yojson.Safe.t
     end
 
     module Proofs_verified_2 : sig

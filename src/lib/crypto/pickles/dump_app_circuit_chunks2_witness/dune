@@ -1,0 +1,10 @@
+(executable
+ (name dump_app_circuit_chunks2_witness)
+ (libraries
+  core_kernel
+  promise
+  pickles
+  pickles.backend
+  snarky.backendless
+  kimchi_pasta_snarky_backend
+  kimchi_backend))

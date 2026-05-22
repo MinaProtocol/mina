@@ -153,3 +153,8 @@ end
 module Domain = Pickles_base.Domain
 
 module Scalars = Scalars
+
+module Scalars_tokens_interpreter : sig
+  module Tick : Scalars.S
+  module Tock : Scalars.S
+end

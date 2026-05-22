@@ -66,14 +66,15 @@ module Make (Impl : Kimchi_pasta_snarky_backend.Snark_intf) = struct
     go Boolean.true_ 0 n
 
   let seal (x : Impl.Field.t) : Impl.Field.t =
-    match Field.to_constant_and_terms x with
-    | None, [ (x, i) ] when Field.Constant.(equal x one) ->
-        Snarky_backendless.Cvar.Var i
-    | Some c, [] ->
-        Field.constant c
-    | _ ->
-        let y = exists Field.typ ~compute:As_prover.(fun () -> read_var x) in
-        Field.Assert.equal x y ; y
+    with_label "Util.seal" (fun () ->
+      match Field.to_constant_and_terms x with
+      | None, [ (x, i) ] when Field.Constant.(equal x one) ->
+          Snarky_backendless.Cvar.Var i
+      | Some c, [] ->
+          Field.constant c
+      | _ ->
+          let y = exists Field.typ ~compute:As_prover.(fun () -> read_var x) in
+          Field.Assert.equal x y ; y )
 
   let lowest_128_bits ~constrain_low_bits ~assert_128_bits x =
     let pow2 =

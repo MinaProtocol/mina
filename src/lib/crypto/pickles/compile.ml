@@ -23,6 +23,12 @@ module Proof = P
 module Inductive_rule = Inductive_rule.Kimchi
 module Step_branch_data = Step_branch_data.Make (Inductive_rule)
 
+(* Counters and [constraint_type_name] live in [Cs_dump] now —
+   shared between the step site (this file), the wrap site (this
+   file), and the standalone sub-circuit dumps in
+   [dump_circuit_impl.ml]. Re-exported here for legacy call sites
+   that haven't been migrated to [Cs_dump.cfg]. *)
+
 type chunking_data = Verify.Instance.chunking_data =
   { num_chunks : int; domain_size : int; zk_rows : int }
 
@@ -573,6 +579,34 @@ struct
                          Impls.Step.with_label "conv_inv" (fun () ->
                              conv_inv res )
                        in
+                       let module VCS =
+                         Kimchi_pasta_snarky_backend
+                         .Vesta_based_plonk
+                         .R1CS_constraint_system
+                       in
+                       (* Step CS dump cfg, shared with the wrap site
+                          (different impl + counter, identical shape).
+                          Logger is registered BEFORE
+                          [constraint_system_manual] runs — the manual
+                          builder snapshots the [constraint_logger]
+                          ref into the run state at build time, so a
+                          later [set_constraint_logger] would be
+                          ignored. *)
+                       let dump_cfg : (_, Impl.Constraint.t) Cs_dump.cfg =
+                         { env_var = "PICKLES_STEP_CS_DUMP"
+                         ; counter = Cs_dump.step_counter
+                         ; set_constraint_logger =
+                             Impl.set_constraint_logger
+                         ; clear_constraint_logger =
+                             Impl.clear_constraint_logger
+                         ; set_gate_label_stack = VCS.set_gate_label_stack
+                         ; constraint_type_name = Cs_dump.constraint_type_name
+                         ; to_json = VCS.to_json
+                         ; dump_cached_constants = VCS.dump_cached_constants
+                         ; dump_gate_labels = VCS.dump_gate_labels
+                         }
+                       in
+                       let dump_events = Cs_dump.setup dump_cfg in
                        let constraint_builder =
                          Impl.constraint_system_manual ~input_typ:Typ.unit
                            ~return_typ:typ
@@ -580,7 +614,9 @@ struct
                        let%map.Promise res =
                          constraint_builder.run_circuit main
                        in
+                       Cs_dump.teardown dump_cfg dump_events ;
                        let cs = constraint_builder.finish_computation res in
+                       Cs_dump.emit dump_cfg dump_events cs ;
                        let cs_hash =
                          Md5.to_hex (R1CS_constraint_system.digest cs)
                        in
@@ -631,16 +667,93 @@ struct
       let module V = H4.To_vector (Lazy_keys) in
       lazy
         (let step_keypairs = V.f prev_varss_length step_keypairs in
-         let%map.Promise () =
+         let%bind.Promise () =
            (* Wait for keypair promises to resolve. *)
            Vector.fold ~init:(Promise.return ()) step_keypairs
              ~f:(fun acc (_, vk) ->
                let%bind.Promise _ = Lazy.force vk in
                acc )
          in
-         Vector.map step_keypairs ~f:(fun (_, vk) ->
-             Tick.Keypair.full_vk_commitments
-               (fst (Option.value_exn @@ Promise.peek @@ Lazy.force vk)) ) )
+         let vks =
+           Vector.map step_keypairs ~f:(fun (_, vk) ->
+               Tick.Keypair.full_vk_commitments
+                 (fst (Option.value_exn @@ Promise.peek @@ Lazy.force vk)) )
+         in
+         (* === TRACE iter 7 (a): compiled step VK domain log_size_of_group ===
+            The actual kimchi domain the step circuit was compiled to (= output
+            of Fix_domains.domains for the step rule). For Simple_chain this is
+            what `branch_data.domain_log2` should equal at solve time per
+            wrap.ml:257-259 (`step_vk.domain.log_size_of_group`). *)
+         List.iteri (Vector.to_list step_keypairs) ~f:(fun i (_, vk_lazy) ->
+             let vi =
+               fst (Option.value_exn @@ Promise.peek @@ Lazy.force vk_lazy)
+             in
+             Pickles_trace.int
+               ("compile.stepVK." ^ Int.to_string i ^ ".log_size_of_group")
+               vi.domain.log_size_of_group ) ;
+         (* === TRACE iter 7 (b): step_domains.h log2 from the basic record ===
+            This is what `Fix_domains.domains` returned for each branch of the
+            step rule. It feeds into Types_map.For_step.t.step_domains and
+            (eventually) into step_verifier.domain_for_compiled. Should match
+            (a) byte-for-byte; if not, there's a divergence between the
+            compiled VK's domain and the metadata Pickles carries about it. *)
+         let%map.Promise step_domains_resolved = all_step_domains in
+         List.iteri
+           (Vector.to_list step_domains_resolved)
+           ~f:(fun i { Import.Domains.h } ->
+             Pickles_trace.int
+               ("compile.step_domains." ^ Int.to_string i ^ ".h.log2")
+               (Pickles_base.Domain.log2_size h) ) ;
+         (* Wrap eval domain that production passes to Wrap_main.wrap_main
+            via [wrap_domains]. PS hardcodes 14 in SimpleChain.purs; this
+            trace lets us confirm OCaml uses the same number, AND lets us
+            pin the right [~domain_log2] when we re-target the
+            wrap_main_circuit fixture. *)
+         Pickles_trace.int "compile.wrap_domains.h.log2"
+           (Pickles_base.Domain.log2_size wrap_domains.h) ;
+         (* === TRACE iter 6: compiled step VK commitments, dumped at the
+            point where they're consumed by Wrap_main.wrap_main. First
+            branch only (Simple_chain has a single branch); mirrors the
+            PS side's `extractStepVKComms stepCR.verifierIndex` emission
+            in `Test.Pickles.Prove.SimpleChain`. Step proofs commit on
+            Vesta, so step VK commitments are Vesta points with Fq
+            (Tock) coordinates — hence `tock_field`. *)
+         ( match Vector.to_list vks with
+         | [] ->
+             ()
+         | first_vk :: _ ->
+             let trace_point_arr label (arr : Backend.Tock.Inner_curve.Affine.t array) =
+               match arr with
+               | [| (x, y) |] ->
+                   Pickles_trace.tock_field (label ^ ".x") x ;
+                   Pickles_trace.tock_field (label ^ ".y") y
+               | _ ->
+                   Array.iteri arr ~f:(fun i (x, y) ->
+                       let ix = label ^ "." ^ Int.to_string i in
+                       Pickles_trace.tock_field (ix ^ ".x") x ;
+                       Pickles_trace.tock_field (ix ^ ".y") y )
+             in
+             List.iteri
+               (Pickles_types.Vector.to_list first_vk.sigma_comm)
+               ~f:(fun i pt ->
+                 trace_point_arr
+                   ("compile.stepVK.sigma." ^ Int.to_string i)
+                   pt ) ;
+             List.iteri
+               (Pickles_types.Vector.to_list first_vk.coefficients_comm)
+               ~f:(fun i pt ->
+                 trace_point_arr
+                   ("compile.stepVK.coeff." ^ Int.to_string i)
+                   pt ) ;
+             trace_point_arr "compile.stepVK.generic" first_vk.generic_comm ;
+             trace_point_arr "compile.stepVK.psm" first_vk.psm_comm ;
+             trace_point_arr "compile.stepVK.complete_add"
+               first_vk.complete_add_comm ;
+             trace_point_arr "compile.stepVK.mul" first_vk.mul_comm ;
+             trace_point_arr "compile.stepVK.emul" first_vk.emul_comm ;
+             trace_point_arr "compile.stepVK.endomul_scalar"
+               first_vk.endomul_scalar_comm ) ;
+         vks )
     in
     Timer.clock __LOC__ ;
     let wrap_requests, wrap_main =
@@ -671,9 +784,35 @@ struct
           (let%map.Promise wrap_main = Lazy.force wrap_main in
            let (T (typ, conv, _conv_inv)) = input ~feature_flags () in
            let main x () = wrap_main (conv x) in
+           let module PCS =
+             Kimchi_pasta_snarky_backend
+             .Pallas_based_plonk
+             .R1CS_constraint_system
+           in
+           (* Wrap CS dump cfg — same shape as the step site above,
+              swapped to the Pallas-based impl. Use [with_dump]
+              instead of the [setup]/[teardown]/[emit] triple because
+              [constraint_system] is monolithic (no manual
+              run/finish split needed). *)
+           let dump_cfg :
+               (_, Impls.Wrap.Constraint.t) Cs_dump.cfg =
+             { env_var = "PICKLES_WRAP_CS_DUMP"
+             ; counter = Cs_dump.wrap_counter
+             ; set_constraint_logger =
+                 Impls.Wrap.set_constraint_logger
+             ; clear_constraint_logger =
+                 Impls.Wrap.clear_constraint_logger
+             ; set_gate_label_stack = PCS.set_gate_label_stack
+             ; constraint_type_name = Cs_dump.constraint_type_name
+             ; to_json = PCS.to_json
+             ; dump_cached_constants = PCS.dump_cached_constants
+             ; dump_gate_labels = PCS.dump_gate_labels
+             }
+           in
            let cs =
-             constraint_system ~input_typ:typ ~return_typ:Impls.Wrap.Typ.unit
-               main
+             Cs_dump.with_dump dump_cfg ~build_cs:(fun () ->
+                 constraint_system ~input_typ:typ
+                   ~return_typ:Impls.Wrap.Typ.unit main )
            in
            let cs_hash = Md5.to_hex (R1CS_constraint_system.digest cs) in
            ( self_id
@@ -723,6 +862,49 @@ struct
                     ~override_wrap_domain argument to set the correct domain \
                     size."
                    proposed_domain_size computed_domain_size () ;
+               (* === Diagnostic: wrap CS shape ===
+                  Domain log2 size + public input width of the compiled
+                  wrap circuit. Diffing against PS's [compile.wrapCS.*]
+                  emissions tells us whether the two sides agree on the
+                  shape of the constraint system, before we dig into the
+                  actual VK commitment values. *)
+               Pickles_trace.int "compile.wrapCS.domain_log2"
+                 wrap_vk.Verification_key.index.domain.log_size_of_group ;
+               Pickles_trace.int "compile.wrapCS.public_input_size"
+                 wrap_vk.Verification_key.index.public ;
+               (* === TRACE: compiled wrap VK commitments ===
+                  Mirrors the iter 6 step VK trace above. PureScript
+                  emits the same labels via [extractWrapVKForStepHash
+                  wrapCR.verifierIndex] in [SimpleChain.purs]. Diffing
+                  these isolates whether the wrap VK divergence is in
+                  the wrap compile itself or in downstream extraction.
+                  Tock.Curve = Pallas; commitments live in Fp = Tick.Field,
+                  so we use [tick_field]. *)
+               let wrap_commits = wrap_vk.Verification_key.commitments in
+               let trace_pt label (x, y) =
+                 Pickles_trace.tick_field (label ^ ".x") x ;
+                 Pickles_trace.tick_field (label ^ ".y") y
+               in
+               List.iteri
+                 (Pickles_types.Vector.to_list wrap_commits.sigma_comm)
+                 ~f:(fun i pt ->
+                   trace_pt
+                     ("compile.wrapVK.sigma." ^ Int.to_string i)
+                     pt ) ;
+               List.iteri
+                 (Pickles_types.Vector.to_list wrap_commits.coefficients_comm)
+                 ~f:(fun i pt ->
+                   trace_pt
+                     ("compile.wrapVK.coeff." ^ Int.to_string i)
+                     pt ) ;
+               trace_pt "compile.wrapVK.generic" wrap_commits.generic_comm ;
+               trace_pt "compile.wrapVK.psm" wrap_commits.psm_comm ;
+               trace_pt "compile.wrapVK.complete_add"
+                 wrap_commits.complete_add_comm ;
+               trace_pt "compile.wrapVK.mul" wrap_commits.mul_comm ;
+               trace_pt "compile.wrapVK.emul" wrap_commits.emul_comm ;
+               trace_pt "compile.wrapVK.endomul_scalar"
+                 wrap_commits.endomul_scalar_comm ;
                res ) )
     in
     accum_dirty (Lazy.map wrap_pk ~f:(Promise.map ~f:snd)) ;

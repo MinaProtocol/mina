@@ -586,10 +586,64 @@ module For_tests_only : sig
       - [shifts]: Coset shifts for the PlonK protocol
       - [vanishing_polynomial]: Function computing Z_H(x) = x^n - 1
   *)
+  val multiscale_known :
+       ([ `Field of field | `Packed_bits of field * int ]
+        * Step_main_inputs.Inner_curve.Constant.t)
+       array
+    -> Step_main_inputs.Inner_curve.t
+
   val side_loaded_domain :
        log2_size:field
     -> < generator : field
        ; log2_size : field
        ; shifts : field Pickles_types.Plonk_types.Shifts.t
        ; vanishing_polynomial : field -> field >
+
+  (** [sponge_after_index vk] creates a sponge with the verification key
+      field elements pre-absorbed, for use with [incrementally_verify_proof]. *)
+  val sponge_after_index :
+       Step_main_inputs.Inner_curve.t array
+       Pickles_types.Plonk_verification_key_evals.t
+    -> Step_main_inputs.Sponge.t
+
+  (** [incrementally_verify_proof] — the core Step IVP, exposed for
+      circuit-dump testing.  See {!val:verify} for the higher-level wrapper. *)
+  val incrementally_verify_proof :
+       (module Pickles_types.Nat.Add.Intf with type n = 'b)
+    -> srs:Kimchi_bindings.Protocol.SRS.Fq.t
+    -> domain:
+         [ `Known of Pickles_base.Domain.t
+         | `Side_loaded of
+           Composition_types.Branch_data.Proofs_verified.One_hot.Checked.t ]
+    -> srs:Kimchi_bindings.Protocol.SRS.Fq.t
+    -> verification_key:
+         Step_main_inputs.Inner_curve.t array
+         Pickles_types.Plonk_verification_key_evals.t
+    -> xi:field Kimchi_backend_common.Scalar_challenge.t
+    -> sponge:Step_main_inputs.Sponge.t
+    -> sponge_after_index:Step_main_inputs.Sponge.t
+    -> public_input:
+         [ `Field of field | `Packed_bits of field * int ] array
+    -> sg_old:(Step_main_inputs.Inner_curve.t, 'b) Pickles_types.Vector.t
+    -> advice:
+         Impls.Step.Other_field.t Pickles_types.Shifted_value.Type2.t
+         Composition_types.Step.Bulletproof.Advice.t
+    -> proof:Wrap_proof.Checked.t
+    -> plonk:
+         ( field
+         , field Composition_types.Scalar_challenge.t
+         , Impls.Step.Other_field.t Pickles_types.Shifted_value.Type2.t
+         , ( Impls.Step.Other_field.t Pickles_types.Shifted_value.Type2.t
+           , Impl.Boolean.var )
+           Pickles_types.Opt.t
+         , ( field Composition_types.Scalar_challenge.t
+           , Impl.Boolean.var )
+           Pickles_types.Opt.t
+         , Impl.Boolean.var )
+         Composition_types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit.t
+    -> field
+       * ( [> `Success of Impl.Boolean.var ]
+         * field Kimchi_backend_common.Scalar_challenge.t
+           Composition_types.Bulletproof_challenge.t
+           array )
 end

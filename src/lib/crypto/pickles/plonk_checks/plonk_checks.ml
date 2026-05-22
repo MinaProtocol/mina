@@ -2,6 +2,7 @@ open Core_kernel
 open Pickles_types
 open Pickles_base
 module Scalars = Scalars
+module Scalars_tokens_interpreter = Scalars_tokens_interpreter
 module Domain = Domain
 module Opt = Opt
 

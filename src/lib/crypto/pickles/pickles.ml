@@ -13,6 +13,9 @@ end
 
 module Make_str (_ : Wire_types.Concrete) = struct
   module Endo = Endo
+  module Wrap_hack = Wrap_hack
+  module Wrap_wire_proof = Wrap_wire_proof
+  module Dummy = Dummy
   module P = Proof
 
   module type Statement_intf = Intf.Statement
@@ -2076,3 +2079,6 @@ module Make_str (_ : Wire_types.Concrete) = struct
 end
 
 include Wire_types.Make (Make_sig) (Make_str)
+
+module Dump_circuit_impl = Dump_circuit_impl
+module Pickles_trace = Pickles_trace

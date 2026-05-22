@@ -15,9 +15,7 @@ let challenge_polynomial =
 module Type1 =
   Plonk_checks.Make
     (Shifted_value.Type1)
-    (struct
-      let constant_term = Plonk_checks.Scalars.Tick.constant_term
-    end)
+    (Plonk_checks.Scalars_tokens_interpreter.Tick)
 
 let tick_rounds = Nat.to_int Tick.Rounds.n
 
@@ -515,6 +513,17 @@ let wrap
         Impls.Wrap.generate_witness_conv
           ~f:(fun { Impls.Wrap.Proof_inputs.auxiliary_inputs; public_inputs } () ->
             [%log internal] "Backend_tock_proof_create_async" ;
+            (* Dump witness first 50 auxiliary values + PI for byte-identity check *)
+            let aux_len = Tock.Field.Vector.length auxiliary_inputs in
+            for i = 0 to min 49 (aux_len - 1) do
+              Pickles_trace.tock_field (Printf.sprintf "wrap.witness.col0.%d" i)
+                (Tock.Field.Vector.get auxiliary_inputs i)
+            done ;
+            let pi_len = Tock.Field.Vector.length public_inputs in
+            for i = 0 to pi_len - 1 do
+              Pickles_trace.tock_field (Printf.sprintf "wrap.witness.pi.%d" i)
+                (Tock.Field.Vector.get public_inputs i)
+            done ;
             let create_proof () =
               Backend.Tock.Proof.create_async ~primary:public_inputs
                 ~auxiliary:auxiliary_inputs pk ~message:next_accumulator
@@ -569,6 +578,12 @@ let wrap
           } )
   in
   [%log internal] "Pickles_wrap_proof_done" ;
+  (* === TRACE: wrap proof opening values for byte-identity check === *)
+  let wp_sg_x, wp_sg_y = next_proof.proof.openings.proof.challenge_polynomial_commitment in
+  Pickles_trace.tick_field "wrap.proof.opening.sg.x" wp_sg_x ;
+  Pickles_trace.tick_field "wrap.proof.opening.sg.y" wp_sg_y ;
+  Pickles_trace.tock_field "wrap.proof.opening.z1" next_proof.proof.openings.proof.z_1 ;
+  Pickles_trace.tock_field "wrap.proof.opening.z2" next_proof.proof.openings.proof.z_2 ;
   ( { proof = Wrap_wire_proof.of_kimchi_proof next_proof.proof
     ; statement =
         Types.Wrap.Statement.to_minimal next_statement

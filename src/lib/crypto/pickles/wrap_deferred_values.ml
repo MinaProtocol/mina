@@ -9,7 +9,7 @@ open Backend
 module Plonk_checks = struct
   include Plonk_checks
   module Type1 =
-    Plonk_checks.Make (Shifted_value.Type1) (Plonk_checks.Scalars.Tick)
+    Plonk_checks.Make (Shifted_value.Type1) (Plonk_checks.Scalars_tokens_interpreter.Tick)
 end
 
 let expand_deferred (type n most_recent_width) ~zk_rows

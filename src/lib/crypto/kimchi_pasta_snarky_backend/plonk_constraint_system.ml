@@ -855,6 +855,7 @@ type ('f, 'rust_gates) t =
            single equivalence class, so that the permutation argument enforces
            these desired equalities as well. *)
   ; union_finds : V.t Core_kernel.Union_find.t V.Table.t
+  ; mutable gate_labels_rev : string list list
   }
 
 let get_public_input_size sys = sys.public_input_size
@@ -1009,7 +1010,15 @@ module Make
 
   val to_json : t -> string
 
+  val dump_cached_constants : t -> string
+
   val dump_extra_circuit_data : t -> string -> unit
+
+  val dump_gate_labels : t -> string
+
+  val gate_label_stack : string list ref
+
+  val set_gate_label_stack : string list -> unit
 end = struct
   open Core_kernel
   module Constraint = Plonk_constraint.Make (Fp)
@@ -1198,6 +1207,7 @@ end = struct
     ; pending_generic_gate = None
     ; cached_constants = Hashtbl.create (module Fp)
     ; union_finds = V.Table.create ()
+    ; gate_labels_rev = []
     }
 
   (** Returns the number of auxiliary inputs. *)
@@ -1255,6 +1265,10 @@ end = struct
       the public-input rows. *)
   let wire sys key row col = wire' sys key (Row.After_public_input row) col
 
+  let gate_label_stack : string list ref = ref []
+
+  let set_gate_label_stack labels = gate_label_stack := labels
+
   (** Adds a row/gate/constraint to a constraint system `sys`. *)
   let add_row sys (vars : V.t option array) kind coeffs =
     match sys.gates with
@@ -1272,6 +1286,8 @@ end = struct
         (* Add to gates. *)
         let open Position in
         sys.gates <- Unfinalized_rev ({ kind; wired_to = [||]; coeffs } :: gates) ;
+        (* Capture label context for this gate. *)
+        sys.gate_labels_rev <- !gate_label_stack :: sys.gate_labels_rev ;
         (* Increment row. *)
         sys.next_row <- sys.next_row + 1 ;
         (* Add to row. *)
@@ -1398,6 +1414,38 @@ end = struct
     let gates, _, _ = finalize_and_get_gates sys in
     let public_input_size = Set_once.get_exn sys.public_input_size [%here] in
     Gates.to_json public_input_size gates
+
+  let dump_gate_labels (sys : t) : string =
+    let json_escape s =
+      String.concat_map s ~f:(fun c ->
+        match c with
+        | '"' -> "\\\""
+        | '\\' -> "\\\\"
+        | '\n' -> "\\n"
+        | _ -> String.make 1 c)
+    in
+    let public_input_size = Set_once.get_exn sys.public_input_size [%here] in
+    let pi_labels = List.init public_input_size ~f:(fun _ -> []) in
+    let gate_labels = List.rev sys.gate_labels_rev in
+    let all_labels = pi_labels @ gate_labels in
+    let lines = List.mapi all_labels ~f:(fun row labels ->
+      let context_json = "[" ^ String.concat ~sep:","
+        (List.rev_map labels ~f:(fun s ->
+          Printf.sprintf "\"%s\"" (json_escape s))) ^ "]" in
+      Printf.sprintf "{\"row\":%d,\"context\":%s}" row context_json)
+    in
+    String.concat ~sep:"\n" lines
+
+  let dump_cached_constants (sys : t) : string =
+    let var_to_string v = Sexp.to_string (V.sexp_of_t v) in
+    let entries =
+      Hashtbl.to_alist sys.cached_constants
+    in
+    let lines = List.map entries ~f:(fun (fp, var) ->
+      Printf.sprintf "{\"var\":\"%s\",\"value\":\"%s\"}"
+        (var_to_string var) (Fp.to_string fp))
+    in
+    "[" ^ String.concat ~sep:",\n " lines ^ "]"
 
   (* Returns a hash of the circuit. *)
   let rec digest (sys : t) =

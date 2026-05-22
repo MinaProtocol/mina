@@ -14,7 +14,7 @@ type t = Impls.Step.unfinalized_proof_var
 
 module Plonk_checks = struct
   include Plonk_checks
-  include Plonk_checks.Make (Shifted_value) (Plonk_checks.Scalars.Tock)
+  include Plonk_checks.Make (Shifted_value) (Plonk_checks.Scalars_tokens_interpreter.Tock)
 end
 
 module Constant = struct

@@ -160,6 +160,9 @@ module type Full = sig
       Useful for debugging and external analysis. *)
   val to_json : t -> string
 
+  (** Dump cached constants as JSON for debugging seal gate generation. *)
+  val dump_cached_constants : t -> string
+
   (** Dump extra circuit data to a file for use by external systems.
 
       This function exports additional circuit metadata and configuration
@@ -169,4 +172,14 @@ module type Full = sig
       @param t The constraint system
       @param string The file path where the circuit data should be written *)
   val dump_extra_circuit_data : t -> string -> unit
+
+  (** Dump per-gate context labels as JSONL.
+      Each line is a JSON object with row number and context label stack. *)
+  val dump_gate_labels : t -> string
+
+  (** Global label stack ref, set by the constraint logger to tag gates. *)
+  val gate_label_stack : string list ref
+
+  (** Set the global gate label stack. *)
+  val set_gate_label_stack : string list -> unit
 end

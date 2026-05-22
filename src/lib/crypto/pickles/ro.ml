@@ -2,6 +2,10 @@ open Core_kernel
 open Backend
 open Import
 
+let trace_enabled = ref false
+
+let enable_trace () = trace_enabled := true
+
 let bits_random_oracle =
   let h = Digestif.blake2s 32 in
   fun ~length s ->
@@ -15,7 +19,11 @@ let ro lab length f =
   let r = ref 0 in
   fun () ->
     incr r ;
-    f (bits_random_oracle ~length (sprintf "%s_%d" lab !r))
+    let key = sprintf "%s_%d" lab !r in
+    let v = f (bits_random_oracle ~length key) in
+    if !trace_enabled then
+      Format.eprintf "RO %s@." key ;
+    v
 
 let tock = ro "fq" Tock.Field.size_in_bits Tock.Field.of_bits
 

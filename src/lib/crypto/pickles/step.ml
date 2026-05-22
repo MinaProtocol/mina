@@ -25,8 +25,8 @@ struct
 
   module Plonk_checks = struct
     include Plonk_checks
-    module Type1 = Plonk_checks.Make (Shifted_value.Type1) (Scalars.Tick)
-    module Type2 = Plonk_checks.Make (Shifted_value.Type2) (Scalars.Tock)
+    module Type1 = Plonk_checks.Make (Shifted_value.Type1) (Scalars_tokens_interpreter.Tick)
+    module Type2 = Plonk_checks.Make (Shifted_value.Type2) (Scalars_tokens_interpreter.Tock)
   end
 
   (* The prover corresponding to the given inductive rule. *)
@@ -148,6 +148,15 @@ struct
       in
       let proof = Wrap_wire_proof.to_kimchi_proof t.proof in
       let plonk0 = t.statement.proof_state.deferred_values.plonk in
+      (* === TRACE Stage 1: Ro-derived dummy plonk0 === *)
+      Pickles_trace.tick_field "expand_proof.plonk0.alpha.raw"
+        (Challenge.Constant.to_tick_field plonk0.alpha.inner) ;
+      Pickles_trace.tick_field "expand_proof.plonk0.beta"
+        (Challenge.Constant.to_tick_field plonk0.beta) ;
+      Pickles_trace.tick_field "expand_proof.plonk0.gamma"
+        (Challenge.Constant.to_tick_field plonk0.gamma) ;
+      Pickles_trace.tick_field "expand_proof.plonk0.zeta.raw"
+        (Challenge.Constant.to_tick_field plonk0.zeta.inner) ;
       let plonk =
         let domain =
           Branch_data.domain t.statement.proof_state.deferred_values.branch_data
@@ -239,6 +248,35 @@ struct
             statement.messages_for_next_step_proof.old_bulletproof_challenges
           ~zk_rows:data.zk_rows ~proof_state:statement.proof_state
       in
+      (* === TRACE Stage 2: expand_deferred outputs (Type1 shifted values) === *)
+      ( let dvc = deferred_values_computed in
+        let (Shifted_value.Type1.Shifted_value cip) =
+          dvc.combined_inner_product
+        in
+        let (Shifted_value.Type1.Shifted_value b_v) = dvc.b in
+        let (Shifted_value.Type1.Shifted_value perm_v) = dvc.plonk.perm in
+        let (Shifted_value.Type1.Shifted_value zsrs_v) =
+          dvc.plonk.zeta_to_srs_length
+        in
+        let (Shifted_value.Type1.Shifted_value zds_v) =
+          dvc.plonk.zeta_to_domain_size
+        in
+        Pickles_trace.tick_field "expand_proof.deferred.combined_inner_product"
+          cip ;
+        Pickles_trace.tick_field "expand_proof.deferred.b" b_v ;
+        let sc =
+          SC.to_field_constant
+            (module Tick.Field)
+            ~endo:Endo.Wrap_inner_curve.scalar
+        in
+        Pickles_trace.tick_field "expand_proof.deferred.xi" (sc dvc.xi) ;
+        Pickles_trace.tick_field "expand_proof.deferred.plonk.perm" perm_v ;
+        Pickles_trace.tick_field
+          "expand_proof.deferred.plonk.zetaToSrsLength" zsrs_v ;
+        Pickles_trace.tick_field
+          "expand_proof.deferred.plonk.zetaToDomainSize" zds_v ;
+        Pickles_trace.int "expand_proof.deferred.branch_data.domain_log2"
+          (Domain.log2_size (Branch_data.domain dvc.branch_data)) ) ;
       let prev_statement_with_hashes :
           ( _
           , _
@@ -258,7 +296,11 @@ struct
                fun x -> fst (typ.value_to_fields x)
              in
              (* TODO: Only do this hashing when necessary *)
-             Common.hash_messages_for_next_step_proof
+             (* Simple_chain trace-diff instrumentation: use the
+                traced variant here so per-input trace lines land in
+                the trace file. Other call sites keep the non-traced
+                version. *)
+             Common.hash_messages_for_next_step_proof_traced
                (Reduced_messages_for_next_proof_over_same_field.Step.prepare
                   ~dlog_plonk_index:dlog_index
                   statement.messages_for_next_step_proof )
@@ -295,27 +337,68 @@ struct
             }
         }
       in
+      (* === TRACE Stage 3: msgForNextStep + msgForNextWrap digests === *)
+      Pickles_trace.tick_field "expand_proof.msgForNextStep"
+        (Digest.Constant.to_tick_field
+           prev_statement_with_hashes.messages_for_next_step_proof) ;
+      Pickles_trace.tock_field "expand_proof.msgForNextWrap"
+        (Digest.Constant.to_tock_field
+           prev_statement_with_hashes.proof_state
+             .messages_for_next_wrap_proof) ;
       let module O = Tock.Oracles in
       let o =
         let public_input =
           tock_public_input_of_statement ~feature_flags
             prev_statement_with_hashes
         in
-        O.create dlog_vk
-          ( Vector.map2
-              (Vector.extend_front_exn
-                 statement.messages_for_next_step_proof
-                   .challenge_polynomial_commitments Local_max_proofs_verified.n
-                 (Lazy.force Dummy.Ipa.Wrap.sg) )
-              (* This should indeed have length Max_proofs_verified... No! It should have type Max_proofs_verified_a. That is, the max_proofs_verified specific to a proof of this type...*)
-              prev_challenges
-              ~f:(fun commitment chals ->
-                { Tock.Proof.Challenge_polynomial.commitment
-                ; challenges = Vector.to_array chals
-                } )
-          |> Wrap_hack.pad_accumulator )
-          public_input proof
+        (* === TRACE Stage 4: full tock_public_input === *)
+        List.iteri public_input ~f:(fun i v ->
+            Pickles_trace.tock_field
+              (Printf.sprintf "tock_pi.%d" i)
+              v ) ;
+        let chal_polys_padded =
+          Vector.map2
+            (Vector.extend_front_exn
+               statement.messages_for_next_step_proof
+                 .challenge_polynomial_commitments Local_max_proofs_verified.n
+               (Lazy.force Dummy.Ipa.Wrap.sg) )
+            (* This should indeed have length Max_proofs_verified... No! It should have type Max_proofs_verified_a. That is, the max_proofs_verified specific to a proof of this type...*)
+            prev_challenges
+            ~f:(fun commitment chals ->
+              { Tock.Proof.Challenge_polynomial.commitment
+              ; challenges = Vector.to_array chals
+              } )
+          |> Wrap_hack.pad_accumulator
+        in
+        (* === TRACE: chal_polys passed to O.create ===
+           Trace each entry's commitment x and first challenge so PS can
+           compare against the [dummyChalEntry; dummyChalEntry] it sends
+           to vestaProofOpeningPrechallenges. *)
+        List.iteri chal_polys_padded ~f:(fun i cp ->
+            let cx, cy = cp.commitment in
+            Pickles_trace.tick_field
+              (Printf.sprintf "expand_proof.chal_polys.%d.comm.x" i)
+              cx ;
+            Pickles_trace.tick_field
+              (Printf.sprintf "expand_proof.chal_polys.%d.comm.y" i)
+              cy ;
+            if Array.length cp.challenges > 0 then
+              Pickles_trace.tock_field
+                (Printf.sprintf "expand_proof.chal_polys.%d.chal.0" i)
+                cp.challenges.(0)) ;
+        O.create dlog_vk chal_polys_padded public_input proof
       in
+      (* === TRACE Stage 5: oracle outputs === *)
+      ( let alpha_sc : Tock.Field.t Kimchi_types.scalar_challenge = O.alpha o in
+        let zeta_sc : Tock.Field.t Kimchi_types.scalar_challenge = O.zeta o in
+        Pickles_trace.tock_field "expand_proof.oracles.beta" (O.beta o) ;
+        Pickles_trace.tock_field "expand_proof.oracles.gamma" (O.gamma o) ;
+        Pickles_trace.tock_field "expand_proof.oracles.alpha_chal"
+          alpha_sc.inner ;
+        Pickles_trace.tock_field "expand_proof.oracles.zeta_chal"
+          zeta_sc.inner ;
+        Pickles_trace.tock_field "expand_proof.oracles.fq_digest"
+          (O.digest_before_evaluations o) ) ;
       let ((x_hat_1, _x_hat_2) as x_hat) = O.(p_eval_1 o, p_eval_2 o) in
       let scalar_chal f =
         Scalar_challenge.map ~f:Challenge.Constant.of_tock_field (f o)
@@ -361,6 +444,45 @@ struct
           Array.map (O.opening_prechallenges o) ~f:(fun x ->
               Scalar_challenge.map ~f:Challenge.Constant.of_tock_field x )
         in
+        Array.iteri prechals ~f:(fun i pc ->
+            Pickles_trace.tock_field
+              (Printf.sprintf "expand_proof.bp_prechal.%d" i)
+              (Challenge.Constant.to_tock_field pc.inner) ) ;
+        (* === TRACE: dummy proof lr coordinates ===
+           If dummyWrapProof in PS uses different point coordinates than
+           OCaml's Proof.dummy, the IPA prechallenges loop will diverge
+           even with identical sponge state. Trace the first lr pair to
+           detect the mismatch. *)
+        ( let lr = proof.openings.proof.lr in
+          if Array.length lr > 0 then begin
+            let (lx, ly), (rx, ry) = lr.(0) in
+            Pickles_trace.tick_field "expand_proof.dummy_proof.lr.0.l.x" lx ;
+            Pickles_trace.tick_field "expand_proof.dummy_proof.lr.0.l.y" ly ;
+            Pickles_trace.tick_field "expand_proof.dummy_proof.lr.0.r.x" rx ;
+            Pickles_trace.tick_field "expand_proof.dummy_proof.lr.0.r.y" ry
+          end ;
+          (* Trace ft_eval1 + evals.z.{zeta,zeta_omega} — these flow
+             into kimchi's combined_inner_product computation. If PS's
+             dummyWrapProof has different evals than OCaml's Proof.dummy
+             (e.g. Ro counter divergence), kimchi's cip will diverge,
+             then prechals will diverge. *)
+          Pickles_trace.tock_field "expand_proof.dummy_proof.z1"
+            proof.openings.proof.z_1 ;
+          Pickles_trace.tock_field "expand_proof.dummy_proof.z2"
+            proof.openings.proof.z_2 ;
+          Pickles_trace.tock_field "expand_proof.dummy_proof.ft_eval1"
+            proof.openings.ft_eval1 ;
+          let ev = proof.openings.evals in
+          let zz, zo = ev.z in
+          Pickles_trace.tock_field "expand_proof.dummy_proof.evals.z.zeta"
+            zz.(0) ;
+          Pickles_trace.tock_field "expand_proof.dummy_proof.evals.z.zeta_omega"
+            zo.(0) ;
+          let gz, go = ev.generic_selector in
+          Pickles_trace.tock_field "expand_proof.dummy_proof.evals.gen.zeta"
+            gz.(0) ;
+          Pickles_trace.tock_field "expand_proof.dummy_proof.evals.gen.zeta_omega"
+            go.(0) ) ;
         let chals =
           Array.map prechals ~f:(fun x -> Ipa.Wrap.compute_challenge x)
         in
@@ -512,6 +634,32 @@ struct
       let shifted_value =
         Shifted_value.Type2.of_field (module Tock.Field) ~shift:Shifts.tock2
       in
+      (* === TRACE: wrap-side (Tock.Field) Type2 deferred values ===
+       * These are what OCaml stores into
+       * `Types.Step.Proof_state.Per_proof.deferred_values` and are what
+       * the step circuit's `publicUnfinalizedProofs` allocates via
+       * `exists` of `Per_proof.typ` (which uses `Shifted_value.Type2.typ
+       * Other_field.typ_unchecked`). PS emits the parallel
+       * `expand_proof.wrap_deferred.*` labels. *)
+      ( let (Shifted_value.Type2.Shifted_value cip2) =
+          shifted_value combined_inner_product
+        in
+        let (Shifted_value.Type2.Shifted_value b2) = shifted_value b in
+        let (Shifted_value.Type2.Shifted_value perm2) = plonk.perm in
+        let (Shifted_value.Type2.Shifted_value zsrs2) =
+          plonk.zeta_to_srs_length
+        in
+        let (Shifted_value.Type2.Shifted_value zds2) =
+          plonk.zeta_to_domain_size
+        in
+        Pickles_trace.tock_field "expand_proof.wrap_deferred.combined_inner_product"
+          cip2 ;
+        Pickles_trace.tock_field "expand_proof.wrap_deferred.b" b2 ;
+        Pickles_trace.tock_field "expand_proof.wrap_deferred.plonk.perm" perm2 ;
+        Pickles_trace.tock_field "expand_proof.wrap_deferred.plonk.zetaToSrsLength"
+          zsrs2 ;
+        Pickles_trace.tock_field "expand_proof.wrap_deferred.plonk.zetaToDomainSize"
+          zds2 ) ;
       ( `Sg challenge_polynomial_commitment
       , { Types.Step.Proof_state.Per_proof.deferred_values =
             { plonk =
@@ -820,6 +968,17 @@ struct
               , next_statement_hashed ) =
             builder.finish_computation res
           in
+          (* Trace: dump the kimchi-level public input array of the step
+           * proof. This is the serialized Step.Statement at
+           * Max_proofs_verified.n length — the same vector kimchi will
+           * commit to for x_hat. PureScript's Simple_chain analog must
+           * produce the same labels and values for byte-identical match. *)
+          let n_pub = Backend.Tick.Field.Vector.length public_inputs in
+          for i = 0 to n_pub - 1 do
+            Pickles_trace.tick_field
+              (Printf.sprintf "step.proof.public_input.%d" i)
+              (Backend.Tick.Field.Vector.get public_inputs i)
+          done ;
           [%log internal] "Backend_tick_proof_create_async" ;
           let create_proof () =
             Backend.Tick.Proof.create_async ~primary:public_inputs
