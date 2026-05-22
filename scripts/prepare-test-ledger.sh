@@ -220,7 +220,9 @@ if [[ "$REPLACE_TOP" != "" ]] && [[ ${#TOP_KEYS[@]} -gt 0 ]]; then
   done
   old_bal_expr=$(IFS=,; echo "${old_bal_exprs[*]}")
   if ! <"$tmpfile" jq --argjson total "$old_total_balance" \
-    "{$old_bal_expr} | to_entries | sort_by(.value) | reverse | from_entries | map_values((. / \$total * 10000 | round / 100 | tostring) + \"%\")" 1>&2; then
+    "{$old_bal_expr} | to_entries | sort_by(.value) | reverse |
+     map({key, value: (.value | tostring) + \" MINA (\" + (.value / \$total * 10000 | round / 100 | tostring) + \"%)\"}) |
+     from_entries + {\"__total\": (\$total | tostring) + \" MINA\"}" 1>&2; then
     echo "Error: Failed to display old stake distribution with jq" >&2
     rm "$tmpfile"
     exit 1
