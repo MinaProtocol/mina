@@ -89,6 +89,7 @@ MINA_BINARY=""
 RUNTIME_GENESIS_LEDGER_BINARY=""
 PAD_APP_STATE=""
 PER_KEY_PASSWORD=false
+REPLACE_TOP=false
 
 export MINA_PRIVKEY_PASS="${MINA_PRIVKEY_PASS:-}"
 
@@ -152,6 +153,10 @@ OPTIONS:
 
   --pad-app-state             Pad app state when generating ledger hashes
                                (passed to runtime_genesis_ledger)
+
+  -r, --replace-top           Replace top N delegate keys with the specified
+                               keys instead of distributing evenly
+                               (passed to prepare-test-ledger-hf-dryrun.sh)
 
   -h, --help                  Show this help message
 
@@ -329,6 +334,10 @@ while [[ $# -gt 0 ]]; do
             PAD_APP_STATE="--pad-app-state"
             shift
             ;;
+        -r|--replace-top)
+            REPLACE_TOP=true
+            shift
+            ;;
         --per-key-password)
             PER_KEY_PASSWORD=true
             shift
@@ -380,6 +389,7 @@ echo "  Output Directory: $OUTPUT_DIR"
 echo "  Mina Binary: ${MINA_BINARY:-"(will build if needed)"}"
 echo "  Runtime Genesis Ledger Binary: ${RUNTIME_GENESIS_LEDGER_BINARY:-"(will build if needed)"}"
 echo "  Per-Key Password: $PER_KEY_PASSWORD"
+echo "  Replace Top: $REPLACE_TOP"
 echo "  Pad App State: ${PAD_APP_STATE:-"disabled"}"
 echo
 
@@ -505,7 +515,11 @@ if [[ ${#KEY_ARGS[@]} -gt 0 ]]; then
     echo "  Target stake ownership by inactive stake (plain keys): $PERCENTAGE_EXTRA_KEYS_DISPLAY%"
 fi
 
-"$SCRIPT_DIR/prepare-test-ledger-hf-dryrun.sh" -e "$EXTRA_KEYS" -b "$EXTRA_BALANCE" "${KEY_ARGS[@]}"
+PREPARE_ARGS=(-e "$EXTRA_KEYS" -b "$EXTRA_BALANCE")
+if [[ "$REPLACE_TOP" == "true" ]]; then
+    PREPARE_ARGS+=(-r)
+fi
+"$SCRIPT_DIR/prepare-test-ledger-hf-dryrun.sh" "${PREPARE_ARGS[@]}" "${KEY_ARGS[@]}"
 
 # Verify expected output files were generated
 if [[ ! -f "genesis.json" ]]; then
