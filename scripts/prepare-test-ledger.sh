@@ -206,6 +206,31 @@ expr=$(for i in "${!KEYS[@]}"; do make_expr $i; done | tr "\n" "|" | head -c -1)
 expr="$expr | [.[] | select(.delegate | IN($keys_)) |= del(.receipt_chain_hash)]"
 
 
+##########################################################
+# Print old keys stake distribution (before transformation)
+##########################################################
+
+old_total_balance=$(<"$tmpfile" jq "[.[].balance | tonumber] | add | round")
+
+if [[ "$REPLACE_TOP" != "" ]] && [[ ${#TOP_KEYS[@]} -gt 0 ]]; then
+  echo "Old keys stake distribution (before replacement):" >&2
+  old_bal_exprs=()
+  for i in "${!TOP_KEYS[@]}"; do
+    old_bal_exprs+=("\"${TOP_KEYS[$i]}\": ([.[] | select(.delegate == \"${TOP_KEYS[$i]}\") | .balance | tonumber] | add // 0)")
+  done
+  old_bal_expr=$(IFS=,; echo "${old_bal_exprs[*]}")
+  if ! <"$tmpfile" jq --argjson total "$old_total_balance" \
+    "{$old_bal_expr} | to_entries | sort_by(.value) | reverse | from_entries | map_values((. / \$total * 10000 | round / 100 | tostring) + \"%\")" 1>&2; then
+    echo "Error: Failed to display old stake distribution with jq" >&2
+    rm "$tmpfile"
+    exit 1
+  fi
+  echo "Key mapping (old -> new):" >&2
+  for i in "${!TOP_KEYS[@]}"; do
+    echo "  ${TOP_KEYS[$i]} -> ${KEYS[$i]}" >&2
+  done
+fi
+
 tmpfile2=$(mktemp)
 if ! <"$tmpfile" jq "$expr" >"$tmpfile2"; then
   echo "Error: Failed to apply ledger transformations with jq" >&2
