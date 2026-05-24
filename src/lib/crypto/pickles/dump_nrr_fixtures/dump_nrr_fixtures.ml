@@ -7,11 +7,11 @@
  *                           loader reads this directly via the existing
  *                           `vestaProofFromSerdeJson` FFI — same Rust
  *                           codec on both sides, no reconstruction.
- *    - [wrapping.json]    : Pickles `{ statement; prev_evals }` via
+ *    - [public_input_skeleton.json]    : Pickles `{ statement; prev_evals }` via
  *                           OCaml-yojson (`to_yojson_full`). Carries
  *                           the deferred-work data the kimchi proof
  *                           codec doesn't.
- *    - [statement.json]   : the application's public output.
+ *    - [app_statement.json]   : the application's public output.
  *)
 
 open Pickles_types
@@ -95,14 +95,21 @@ let main output_dir =
   in
   Out_channel.write_all (output_dir ^ "/proof.serde.json") ~data:proof_json ;
 
-  (* Pickles wrapping (statement + prev_evals + redundant wire_proof
-     bytes) via yojson. PS reads only the wrapping fields; the kimchi
-     proof comes from `proof.serde.json`. *)
-  let wrapping_json = ProofM.to_yojson_full b0 in
-  Out_channel.write_all (output_dir ^ "/wrapping.json")
+  (* Pickles wrapping (statement + prev_evals) via yojson. `to_yojson_full`
+     also emits a redundant `proof` key (the wire-proof bytes), which we drop:
+     PS reads only `statement` + `prev_evals` here, and the kimchi proof comes
+     from `proof.serde.json`. *)
+  let wrapping_json =
+    match ProofM.to_yojson_full b0 with
+    | `Assoc kvs ->
+        `Assoc (List.filter kvs ~f:(fun (k, _) -> not (String.equal k "proof")))
+    | other ->
+        other
+  in
+  Out_channel.write_all (output_dir ^ "/public_input_skeleton.json")
     ~data:(Yojson.Safe.to_string wrapping_json) ;
   let stmt_json = Pickles.Backend.Tick.Field.to_yojson s0 in
-  Out_channel.write_all (output_dir ^ "/statement.json")
+  Out_channel.write_all (output_dir ^ "/app_statement.json")
     ~data:(Yojson.Safe.to_string stmt_json)
 
 let () =
