@@ -427,6 +427,8 @@ fn generate_kimchi_bindings(mut w: impl std::io::Write, env: &mut Env) {
                 decl_func!(w, env, caml_pasta_fp_plonk_verifier_index_shifts => "shifts");
                 decl_func!(w, env, caml_pasta_fp_plonk_verifier_index_dummy => "dummy");
                 decl_func!(w, env, caml_pasta_fp_plonk_verifier_index_deep_copy => "deep_copy");
+                decl_func!(w, env, caml_pasta_fp_plonk_verifier_index_to_serde_json => "to_serde_json");
+                decl_func!(w, env, caml_pasta_fp_plonk_verifier_index_of_serde_json => "of_serde_json");
             });
 
             decl_module!(w, env, "Fq", {
@@ -438,6 +440,8 @@ fn generate_kimchi_bindings(mut w: impl std::io::Write, env: &mut Env) {
                 decl_func!(w, env, caml_pasta_fq_plonk_verifier_index_shifts => "shifts");
                 decl_func!(w, env, caml_pasta_fq_plonk_verifier_index_dummy => "dummy");
                 decl_func!(w, env, caml_pasta_fq_plonk_verifier_index_deep_copy => "deep_copy");
+                decl_func!(w, env, caml_pasta_fq_plonk_verifier_index_to_serde_json => "to_serde_json");
+                decl_func!(w, env, caml_pasta_fq_plonk_verifier_index_of_serde_json => "of_serde_json");
             });
         });
 
@@ -476,6 +480,8 @@ fn generate_kimchi_bindings(mut w: impl std::io::Write, env: &mut Env) {
                 decl_func!(w, env, caml_pasta_fp_plonk_proof_batch_verify => "batch_verify");
                 decl_func!(w, env, caml_pasta_fp_plonk_proof_dummy => "dummy");
                 decl_func!(w, env, caml_pasta_fp_plonk_proof_deep_copy => "deep_copy");
+                decl_func!(w, env, caml_pasta_fp_plonk_proof_to_serde_json => "to_serde_json");
+                decl_func!(w, env, caml_pasta_fp_plonk_proof_of_serde_json => "of_serde_json");
             });
 
             decl_module!(w, env, "Fq", {
@@ -484,6 +490,8 @@ fn generate_kimchi_bindings(mut w: impl std::io::Write, env: &mut Env) {
                 decl_func!(w, env, caml_pasta_fq_plonk_proof_batch_verify => "batch_verify");
                 decl_func!(w, env, caml_pasta_fq_plonk_proof_dummy => "dummy");
                 decl_func!(w, env, caml_pasta_fq_plonk_proof_deep_copy => "deep_copy");
+                decl_func!(w, env, caml_pasta_fq_plonk_proof_to_serde_json => "to_serde_json");
+                decl_func!(w, env, caml_pasta_fq_plonk_proof_of_serde_json => "of_serde_json");
             });
         });
     });

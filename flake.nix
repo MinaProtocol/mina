@@ -419,6 +419,14 @@
         # Pure dev shell, from which you can build Mina yourself manually, or hack on it.
         devShell = ocamlPackages.mina-dev.overrideAttrs (oa: {
           buildInputs = oa.buildInputs ++ devShellPackages;
+          # Drop the kimchi_wasm (JS/wasm bindings) dependency. It's only used by
+          # the kimchi_bindings/js dune rules via these env vars, which the native
+          # OCaml build path never touches. With the SP1 precompile work pinned in
+          # proof-systems, the shared Cargo.lock pulls edition2024 crates that the
+          # wasm nightly toolchain can't parse, so building kimchi_wasm fails.
+          # Emptying the vars stops the devshell from forcing that build.
+          KIMCHI_WASM_NODEJS = "";
+          KIMCHI_WASM_WEB = "";
           shellHook = ''
             ${oa.shellHook}
             unset MINA_COMMIT_DATE MINA_COMMIT_SHA1 MINA_BRANCH
