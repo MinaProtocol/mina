@@ -185,6 +185,26 @@ module Best_chain =
   }
 |}]
 
+(* Blockchain SNARK verification key + the latest proof + its public input
+   (protocol state hash), for the pickles-verifier fixture tool. The result is
+   parsed from raw JSON by the caller, so the @ppxCustom decoders only matter
+   for build-time typechecking; the base64 proof is fed to
+   Mina_block.Precomputed.Proof.of_bin_string and the VK to
+   Pickles.Verification_key.of_yojson. *)
+module Block_proof =
+[%graphql
+{|
+  query ($max_length: Int) {
+    blockchainVerificationKey @ppxCustom(module: "Graphql_lib.Scalars.JSON")
+    bestChain (maxLength: $max_length) {
+      stateHashField @ppxCustom(module: "Graphql_lib.Scalars.String_json")
+      protocolStateProof {
+        base64 @ppxCustom(module: "Graphql_lib.Scalars.String_json")
+      }
+    }
+  }
+|}]
+
 module Query_metrics =
 [%graphql
 {|
