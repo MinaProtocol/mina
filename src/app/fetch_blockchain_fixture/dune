@@ -1,0 +1,25 @@
+(executable
+ (name fetch_blockchain_fixture)
+ (libraries
+  ;; opam libraries
+  core
+  core_unix
+  async
+  async_unix
+  uri
+  yojson
+  ;; mina: graphql client (reuses the existing typed client + queries)
+  graphql_lib
+  mina_graphql_client
+  ;; mina: proof / vk codecs + serde projection (mirrors dump_*_fixtures)
+  mina_block
+  pickles
+  pickles.backend
+  pickles_types
+  kimchi_bindings
+  mina_wire_types
+  snark_params)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_version ppx_jane)))
