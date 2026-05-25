@@ -78,7 +78,16 @@ struct
 
        q * y = x - r
     *)
-    let%map () = assert_r1cs q y (Field.Var.sub x r) in
+    let%bind () = assert_r1cs q y (Field.Var.sub x r) in
+    (* Enforce canonical Euclidean division: x = q * y + r, y != 0, r < y *)
+    let%bind y_nonzero =
+      Checked.map
+        (Field.Checked.equal y (Field.Var.constant Field.zero))
+        ~f:Boolean.not
+    in
+    let%bind () = Boolean.Assert.is_true y_nonzero in
+    let%bind r_lt_y = r < y in
+    let%map () = Boolean.Assert.is_true r_lt_y in
     (q, r)
 
   type t = var
