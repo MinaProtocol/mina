@@ -331,7 +331,7 @@ the submodule's repository, it is automatically re-pinned in CI.
 
 If you add a new package in the Mina repository or as a submodule, you must do all of the following:
 
-2. Update [`dockerfiles/stages/`](dockerfiles/stages) with the required packages
+2. Update [`dockerfiles/toolchain/`](dockerfiles/toolchain) with the required packages
 
 ## Tests
 

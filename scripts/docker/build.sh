@@ -233,7 +233,7 @@ case "${SERVICE}" in
         DOCKERFILE_PATH="dockerfiles/Dockerfile-mina-daemon"
         ;;
     mina-daemon-configured)
-        DOCKERFILE_PATH="dockerfiles/stages/install-config"
+        DOCKERFILE_PATH="dockerfiles/Dockerfile-install-config"
         SERVICE="mina-daemon"
         # The --version arg points to the base generic image for the Dockerfile FROM.
         # Override VERSION_ARG to keep it, then set VERSION to current commit for output tags.
@@ -253,7 +253,7 @@ case "${SERVICE}" in
     mina-toolchain)
         # Create temp combined Dockerfile so we can use a build context (needed for COPY)
         TEMP_DOCKERFILE=$(mktemp /tmp/Dockerfile-toolchain.XXXXXX)
-        cat dockerfiles/stages/1-build-deps dockerfiles/stages/2-opam-deps dockerfiles/stages/3-toolchain > "$TEMP_DOCKERFILE"
+        cat dockerfiles/toolchain/1-build-deps dockerfiles/toolchain/2-opam-deps dockerfiles/toolchain/3-toolchain > "$TEMP_DOCKERFILE"
         DOCKERFILE_PATH="$TEMP_DOCKERFILE"
         ;;
     mina-batch-txn)
@@ -263,7 +263,7 @@ case "${SERVICE}" in
         DOCKERFILE_PATH="dockerfiles/Dockerfile-mina-rosetta"
         ;;
     mina-rosetta-configured)
-        DOCKERFILE_PATH="dockerfiles/stages/install-config"
+        DOCKERFILE_PATH="dockerfiles/Dockerfile-install-config"
         SERVICE="mina-rosetta"
         VERSION_ARG_OVERRIDE="--build-arg version=$VERSION"
         ;;
