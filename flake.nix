@@ -34,7 +34,7 @@
   inputs.o1-opam-repository.flake = false;
 
   # The version must be the same as the version used in:
-  # - dockerfiles/1-build-deps
+  # - dockerfiles/toolchain/1-build-deps
   # - flake.nix (and flake.lock after running
   #   `nix flake update opam-repository`).
   # - scripts/update-opam-switch.sh
