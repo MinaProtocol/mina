@@ -118,11 +118,11 @@ OPTIONS:
 
   -p, --bp-keys NUM           Number of block producer keys to generate
                                Default: $DEFAULT_BP_KEYS
-                               Range: 1-50 (recommended: 2-10)
+                               Range: 1-200 (recommended: 2-10)
 
   -k, --plain-keys NUM        Number of plain keys to generate
                                Default: $DEFAULT_PLAIN_KEYS
-                               Range: 1-100 (recommended: 4-20)
+                               Range: 1-500 (recommended: 4-20)
 
   -b, --balance AMOUNT        Balance in MINA for each of extra keys
                                Default: $DEFAULT_EXTRA_BALANCE ($((DEFAULT_EXTRA_BALANCE / 1000000)) million MINA)
@@ -283,12 +283,12 @@ while [[ $# -gt 0 ]]; do
             ;;
         -p|--bp-keys)
             BP_KEYS="$2"
-            validate_positive_integer "$BP_KEYS" "BP keys" 50
+            validate_positive_integer "$BP_KEYS" "BP keys" 200
             shift 2
             ;;
         -k|--plain-keys)
             PLAIN_KEYS="$2"
-            validate_positive_integer "$PLAIN_KEYS" "Plain keys" 100
+            validate_positive_integer "$PLAIN_KEYS" "Plain keys" 500
             shift 2
             ;;
         -b|--balance)
@@ -298,7 +298,7 @@ while [[ $# -gt 0 ]]; do
             ;;
         -e|--extra-keys)
             EXTRA_KEYS="$2"
-            validate_non_negative_integer "$EXTRA_KEYS" "Extra keys" 50
+            validate_non_negative_integer "$EXTRA_KEYS" "Extra keys" 200
             shift 2
             ;;
         --plain-balance)
