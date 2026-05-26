@@ -4,37 +4,31 @@ let List/any = Prelude.List.any
 
 let Network
     : Type
-    = < Devnet | Mainnet | PreMesa1 >
+    = < Devnet | Mainnet | MesaMut >
 
 let capitalName =
           \(network : Network)
       ->  merge
-            { Devnet = "Devnet", Mainnet = "Mainnet", PreMesa1 = "PreMesa1" }
+            { Devnet = "Devnet", Mainnet = "Mainnet", MesaMut = "MesaMut" }
             network
 
 let lowerName =
           \(network : Network)
       ->  merge
-            { Devnet = "devnet"
-            , Mainnet = "mainnet"
-            , PreMesa1 = "hetzner-pre-mesa-1"
-            }
+            { Devnet = "devnet", Mainnet = "mainnet", MesaMut = "mesa-mut" }
             network
 
 let debianSuffix =
           \(network : Network)
       ->  merge
-            { Devnet = "devnet"
-            , Mainnet = "mainnet"
-            , PreMesa1 = "hetzner-pre-mesa-1"
-            }
+            { Devnet = "devnet", Mainnet = "mainnet", MesaMut = "mesa-mut" }
             network
 
 let toLabelSegment = \(network : Network) -> "-${debianSuffix network}"
 
 let requiresMainnetBuild =
           \(network : Network)
-      ->  merge { Devnet = False, Mainnet = True, PreMesa1 = False } network
+      ->  merge { Devnet = False, Mainnet = True, MesaMut = False } network
 
 let buildMainnetEnv =
           \(network : Network)

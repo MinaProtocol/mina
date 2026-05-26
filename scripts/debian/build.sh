@@ -26,20 +26,29 @@ BUILD_DIR="${BUILD_DIR}" source "${SCRIPTPATH}/builder-helpers.sh"
 resolve_and_build_package() {
   local package="$1"
 
-  # TODO: consider further refactor on dhall's side so we can remove the name 
+  # Bash function names can't contain hyphens; normalize hyphenated network
+  # names so downstream regex matches and function calls work uniformly.
+  package="${package//mesa-mut/mesa_mut}"
+
+  # TODO: consider further refactor on dhall's side so we can remove the name
   # resolving logic
   if [[ $(type -t "build_${package}_deb") == function ]]; then
     "build_${package}_deb"
     return
   fi
 
-  if [[ "$package" =~ ^(archive|daemon|rosetta)_(mainnet|devnet)$ ]]; then
+  if [[ "$package" =~ ^(archive|daemon|rosetta)_(mainnet|devnet|mesa_mut)$ ]]; then
     "build_${BASH_REMATCH[1]}_deb" "${BASH_REMATCH[2]}"
     return
   fi
 
-  if [[ "$package" =~ ^daemon_(mainnet|devnet)_(config|generic|hardfork_config|prefork)$ ]]; then
+  if [[ "$package" =~ ^daemon_(mainnet|devnet|mesa_mut)_(config|generic|hardfork_config|prefork)$ ]]; then
     "build_daemon_${BASH_REMATCH[2]}_deb" "${BASH_REMATCH[1]}"
+    return
+  fi
+
+  if [[ "$package" =~ ^prefork_(mainnet|devnet|mesa_mut)_genesis_ledger$ ]]; then
+    "build_prefork_${BASH_REMATCH[1]}_genesis_ledger_deb"
     return
   fi
 

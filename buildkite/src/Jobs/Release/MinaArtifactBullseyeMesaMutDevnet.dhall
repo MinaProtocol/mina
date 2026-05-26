@@ -1,29 +1,20 @@
 let ArtifactPipelines = ../../Command/MinaArtifact.dhall
 
-let DebianVersions = ../../Constants/DebianVersions.dhall
-
-let Network = ../../Constants/Network.dhall
-
 let Artifacts = ../../Constants/Artifacts.dhall
 
 let Pipeline = ../../Pipeline/Dsl.dhall
 
-let PipelineScope = ../../Pipeline/Scope.dhall
-
 let PipelineTag = ../../Pipeline/Tag.dhall
 
-let Profiles = ../../Constants/Profiles.dhall
-
-let Arch = ../../Constants/Arch.dhall
+let Network = ../../Constants/Network.dhall
 
 in  Pipeline.build
       ( ArtifactPipelines.pipeline
           ArtifactPipelines.MinaBuildSpec::{
           , artifacts =
             [ Artifacts.Type.Daemon
-            , Artifacts.Type.DaemonAppsOnly
             , Artifacts.Type.DaemonConfig
-            , Artifacts.Type.DaemonPrefork
+            , Artifacts.Type.DaemonAppsOnly
             , Artifacts.Type.LogProc
             , Artifacts.Type.Archive
             , Artifacts.Type.Rosetta
@@ -31,20 +22,15 @@ in  Pipeline.build
             , Artifacts.Type.CreatePreforkGenesis
             , Artifacts.Type.DaemonStorageToolbox
             ]
-          , debVersion = DebianVersions.DebVersion.Bookworm
-          , network = Network.Type.Mainnet
+          , network = Network.Type.MesaMut
           , tags =
             [ PipelineTag.Type.Long
             , PipelineTag.Type.Release
             , PipelineTag.Type.Docker
-            , PipelineTag.Type.Stable
-            , PipelineTag.Type.Mainnet
-            , PipelineTag.Type.Arm64
-            , PipelineTag.Type.Bookworm
+            , PipelineTag.Type.Rosetta
+            , PipelineTag.Type.Devnet
+            , PipelineTag.Type.Amd64
+            , PipelineTag.Type.Bullseye
             ]
-          , profile = Profiles.Type.Mainnet
-          , arch = Arch.Type.Arm64
-          , scope =
-            [ PipelineScope.Type.MainlineNightly, PipelineScope.Type.Release ]
           }
       )
