@@ -535,14 +535,29 @@ test_build_test_executive_deb() {
 }
 
 test_build_batch_txn_deb() {
+    # Now a transitional metapackage that depends on mina-tx-tools.
     safe_build build_batch_txn_deb || { log_fail "build exited non-zero"; return; }
 
     load_captured_state
     assert_eq "deb name" "mina-batch-txn" "$CAPTURED_DEB_NAME"
     assert_control_field "$CAPTURED_CONTROL" "Package" "mina-batch-txn"
+    assert_control_contains "$CAPTURED_CONTROL" "Depends" "mina-tx-tools"
+
+    # Metapackage: must NOT ship the binary itself.
+    assert_file_not_captured "$CAPTURED_FILES" "usr/local/bin/mina-batch-txn"
+}
+
+test_build_tx_tools_deb() {
+    # Real package containing both tx-tooling binaries.
+    safe_build build_tx_tools_deb || { log_fail "build exited non-zero"; return; }
+
+    load_captured_state
+    assert_eq "deb name" "mina-tx-tools" "$CAPTURED_DEB_NAME"
+    assert_control_field "$CAPTURED_CONTROL" "Package" "mina-tx-tools"
     assert_control_contains "$CAPTURED_CONTROL" "Depends" "libssl1.1"
 
     assert_file_captured "$CAPTURED_FILES" "usr/local/bin/mina-batch-txn"
+    assert_file_captured "$CAPTURED_FILES" "usr/local/bin/mina-zkapp-test-transaction"
 }
 
 ################################################################################
@@ -1091,16 +1106,17 @@ test_hardfork_config_deb_restores_architecture() {
 ################################################################################
 
 test_build_zkapp_test_transaction_deb() {
+    # Now a transitional metapackage that depends on mina-tx-tools.
     safe_build build_zkapp_test_transaction_deb || { log_fail "build exited non-zero"; return; }
 
     load_captured_state
     assert_eq "deb name" "mina-zkapp-test-transaction" "$CAPTURED_DEB_NAME"
     assert_control_field "$CAPTURED_CONTROL" "Package" "mina-zkapp-test-transaction"
-    assert_control_contains "$CAPTURED_CONTROL" "Depends" "libssl1.1"
-    assert_control_contains "$CAPTURED_CONTROL" "Depends" "libffi7"
+    assert_control_contains "$CAPTURED_CONTROL" "Depends" "mina-tx-tools"
     assert_control_no_field "$CAPTURED_CONTROL" "Suggests"
 
-    assert_file_captured "$CAPTURED_FILES" "usr/local/bin/mina-zkapp-test-transaction"
+    # Metapackage: must NOT ship the binary itself.
+    assert_file_not_captured "$CAPTURED_FILES" "usr/local/bin/mina-zkapp-test-transaction"
 }
 
 test_build_delegation_verify_deb() {
@@ -1287,6 +1303,7 @@ main() {
     run_test test_build_daemon_storage_toolbox_deb
     run_test test_build_test_executive_deb
     run_test test_build_batch_txn_deb
+    run_test test_build_tx_tools_deb
 
     # Multi-binary packages
     run_test test_build_functional_test_suite_deb

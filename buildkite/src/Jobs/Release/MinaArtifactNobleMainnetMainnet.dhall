@@ -27,7 +27,6 @@ in  Pipeline.build
             , Artifacts.Type.DaemonAutoHardfork
             , Artifacts.Type.DaemonAutomode
             , Artifacts.Type.DaemonAppsOnly
-            , Artifacts.Type.ZkappTestTransaction
             , Artifacts.Type.CreatePreforkGenesis
             , Artifacts.Type.DaemonStorageToolbox
             ]

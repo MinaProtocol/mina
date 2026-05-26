@@ -283,10 +283,10 @@ let docker_step
                 , CreatePreforkGenesis = [] : List DockerImage.ReleaseSpec.Type
                 , DaemonPrefork = [] : List DockerImage.ReleaseSpec.Type
                 , DaemonAutomode = [] : List DockerImage.ReleaseSpec.Type
-                , BatchTxn =
+                , TxTools =
                   [ DockerImage.ReleaseSpec::{
                     , deps = deps
-                    , service = Artifacts.Type.BatchTxn
+                    , service = Artifacts.Type.TxTools
                     , network = spec.network
                     , deb_codename = spec.debVersion
                     , deb_profile = spec.profile
@@ -374,22 +374,7 @@ let docker_step
                     , size = size
                     }
                   ]
-                , ZkappTestTransaction =
-                  [ DockerImage.ReleaseSpec::{
-                    , deps = deps
-                    , service = Artifacts.Type.ZkappTestTransaction
-                    , build_flags = spec.buildFlags
-                    , docker_publish = spec.docker_publish
-                    , deb_repo = DebianRepo.Type.Local
-                    , deb_profile = spec.profile
-                    , deb_codename = spec.debVersion
-                    , deb_legacy_version = spec.deb_legacy_version
-                    , arch = spec.arch
-                    , if_ = spec.if_
-                    , size = size
-                    }
-                  ]
-                , FunctionalTestSuite = [] : List DockerImage.ReleaseSpec.Type
+  				, FunctionalTestSuite = [] : List DockerImage.ReleaseSpec.Type
                 , Toolchain = [] : List DockerImage.ReleaseSpec.Type
                 }
                 artifact

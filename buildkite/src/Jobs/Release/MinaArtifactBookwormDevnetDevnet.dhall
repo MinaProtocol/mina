@@ -25,7 +25,6 @@ in  Pipeline.build
             , Artifacts.Type.Archive
             , Artifacts.Type.RosettaConfig
             , Artifacts.Type.RosettaAppsOnly
-            , Artifacts.Type.ZkappTestTransaction
             , Artifacts.Type.CreatePreforkGenesis
             , Artifacts.Type.DelegationVerifier
             , Artifacts.Type.DaemonStorageToolbox
