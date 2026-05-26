@@ -117,11 +117,6 @@ let nameSuffix
                                                                      spec.buildFlags}${Arch.nameSuffix
                                                                                          spec.arch}"
 
-let sizeFromArch
-    : Arch.Type -> Size
-    =     \(arch : Arch.Type)
-      ->  merge { Arm64 = Size.Arm64, Amd64 = Size.XLarge } arch
-
 let build_artifacts
     : MinaBuildSpec.Type -> Command.Type
     =     \(spec : MinaBuildSpec.Type)
@@ -159,8 +154,7 @@ let build_artifacts
                   ]
             , label = "Debian: Build ${labelSuffix spec}"
             , key = "build-deb-pkg${Optional/default Text "" spec.suffix}"
-            , target =
-                merge { Amd64 = Size.Multi, Arm64 = Size.Arm64 } spec.arch
+            , target = Size.Multi
             , if_ = spec.if_
             , retries =
               [ Command.Retry::{
@@ -188,7 +182,7 @@ let docker_step
                   , arch = spec.arch
                   }
 
-          let size = sizeFromArch spec.arch
+          let size = Size.XLarge
 
           in  merge
                 { Daemon =

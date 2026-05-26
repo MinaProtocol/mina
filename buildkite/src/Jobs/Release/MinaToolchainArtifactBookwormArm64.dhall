@@ -21,5 +21,5 @@ in  MinaArtifactToolchain.pipeline
       , docker_repo = DockerRepo.Type.Public
       , save_to_ci_cache = True
       , arch = Arch.Type.Arm64
-      , size = Size.Arm64
+      , size = Size.XLarge
       }

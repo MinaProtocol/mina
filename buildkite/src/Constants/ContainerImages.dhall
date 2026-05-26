@@ -9,15 +9,10 @@
     , arm64 =
         "docker.io/minaprotocol/mina-toolchain:169fd52-bookworm-devnet-arm64"
     }
-, minaToolchainBullseye =
-    { amd64 = "docker.io/minaprotocol/mina-toolchain:169fd52-bullseye-devnet"
-    , arm64 =
-        "docker.io/minaprotocol/mina-toolchain:169fd52-bullseye-devnet-arm64"
-    }
-, minaToolchainNoble =
-    { amd64 = "docker.io/minaprotocol/mina-toolchain:169fd52-noble-devnet"
-    , arm64 = "docker.io/minaprotocol/mina-toolchain:169fd52-noble-devnet-arm64"
-    }
+, minaToolchainBullseye.amd64 =
+    "docker.io/minaprotocol/mina-toolchain:169fd52-bullseye-devnet"
+, minaToolchainNoble.amd64 =
+    "docker.io/minaprotocol/mina-toolchain:169fd52-noble-devnet"
 , minaToolchainJammy.amd64 =
     "docker.io/minaprotocol/mina-toolchain:169fd52-jammy-devnet"
 , minaToolchain =
