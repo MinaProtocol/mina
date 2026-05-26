@@ -2,12 +2,18 @@
 
 set -u
 
+# When invoked inside the toolchain container, the bind-mounted /workdir is
+# owned by the host buildkite-agent user, which trips git's "dubious ownership"
+# guard. export-git-env-vars.sh below runs git, so mark the cwd as safe first.
+# Harmless on hosts (the entry just lists a trusted path).
+git config --global --add safe.directory "$(pwd)"
+
 if [[ $# -gt 2 ]] || [[ $# -lt 1 ]]; then
     echo "Usage: $0 '<debians>' '[use-sudo]'"
     exit 1
 fi
 
-if [ -z "${MINA_DEB_CODENAME:-}" ]; then 
+if [ -z "${MINA_DEB_CODENAME:-}" ]; then
     echo "MINA_DEB_CODENAME env var is not defined"
     exit 1
 fi
