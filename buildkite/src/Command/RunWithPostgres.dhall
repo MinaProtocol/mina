@@ -227,7 +227,7 @@ let runInToolchainWithPostgresAndDebs
                   initScript
 
           let installAndRun =
-                "./buildkite/scripts/debian/install.sh ${debs} 1 && ${innerScript}"
+                "sudo chown -R opam . && ./buildkite/scripts/debian/install.sh ${debs} 1 && ${innerScript}"
 
           in  Cmd.chain
                 (   [ "( docker stop ${postgresDockerName} && docker rm ${postgresDockerName} ) || true"
