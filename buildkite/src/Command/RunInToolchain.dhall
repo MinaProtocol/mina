@@ -23,18 +23,14 @@ let runInToolchainImage
             ]
 
 let runInToolchainNoble
-    : Arch.Type -> List Text -> Text -> List Cmd.Type
-    =     \(arch : Arch.Type)
-      ->  \(environment : List Text)
+    : List Text -> Text -> List Cmd.Type
+    =     \(environment : List Text)
       ->  \(innerScript : Text)
-      ->  let image =
-                merge
-                  { Amd64 = ContainerImages.minaToolchainNoble.amd64
-                  , Arm64 = ContainerImages.minaToolchainNoble.arm64
-                  }
-                  arch
-
-          in  runInToolchainImage image arch environment innerScript
+      ->  runInToolchainImage
+            ContainerImages.minaToolchainNoble.amd64
+            Arch.Type.Amd64
+            environment
+            innerScript
 
 let runInToolchainJammy
     : List Text -> Text -> List Cmd.Type
@@ -61,18 +57,14 @@ let runInToolchainBookworm
           in  runInToolchainImage image arch environment innerScript
 
 let runInToolchainBullseye
-    : Arch.Type -> List Text -> Text -> List Cmd.Type
-    =     \(arch : Arch.Type)
-      ->  \(environment : List Text)
+    : List Text -> Text -> List Cmd.Type
+    =     \(environment : List Text)
       ->  \(innerScript : Text)
-      ->  let image =
-                merge
-                  { Amd64 = ContainerImages.minaToolchainBullseye.amd64
-                  , Arm64 = ContainerImages.minaToolchainBullseye.arm64
-                  }
-                  arch
-
-          in  runInToolchainImage image arch environment innerScript
+      ->  runInToolchainImage
+            ContainerImages.minaToolchainBullseye.amd64
+            Arch.Type.Amd64
+            environment
+            innerScript
 
 let runInToolchain
     : List Text -> Text -> List Cmd.Type
