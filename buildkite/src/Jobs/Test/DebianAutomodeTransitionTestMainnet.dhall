@@ -22,12 +22,10 @@ let Size = ../../Command/Size.dhall
 
 let Profiles = ../../Constants/Profiles.dhall
 
-let Arch = ../../Constants/Arch.dhall
-
 let dependsOnMainnet =
       DebianVersions.dependsOn
         DebianVersions.DepsSpec::{
-        , deb_version = DebianVersions.DebVersion.Bookworm
+        , deb_version = DebianVersions.DebVersion.Bullseye
         , network = Network.Type.Mainnet
         , profile = Profiles.Type.Mainnet
         }
@@ -60,15 +58,14 @@ in  Pipeline.build
         [ Command.build
             Command.Config::{
             , commands =
-                RunInToolchain.runInToolchainBookworm
-                  Arch.Type.Amd64
+                RunInToolchain.runInToolchainBullseye
                   ([] : List Text)
                   ''
                   ./buildkite/scripts/tests/debian-automode-transition-test.sh \
-                    --codename bookworm \
+                    --codename bullseye \
                     --network mainnet
                   ''
-            , label = "Debian automode transition test (bookworm, mainnet)"
+            , label = "Debian automode transition test (bullseye, mainnet)"
             , key = "debian-automode-transition-test-mainnet"
             , target = Size.Large
             , docker = None Docker.Type

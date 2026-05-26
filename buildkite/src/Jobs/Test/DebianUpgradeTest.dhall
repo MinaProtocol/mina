@@ -18,12 +18,10 @@ let Docker = ../../Command/Docker/Type.dhall
 
 let Size = ../../Command/Size.dhall
 
-let Arch = ../../Constants/Arch.dhall
-
 let dependsOn =
       DebianVersions.dependsOn
         DebianVersions.DepsSpec::{
-        , deb_version = DebianVersions.DebVersion.Bookworm
+        , deb_version = DebianVersions.DebVersion.Bullseye
         , network = Network.Type.Devnet
         }
 
@@ -35,17 +33,16 @@ let buildTestCmd
           in  Command.build
                 Command.Config::{
                 , commands =
-                    RunInToolchain.runInToolchainBookworm
-                      Arch.Type.Amd64
+                    RunInToolchain.runInToolchainBullseye
                       ([] : List Text)
                       ''
                       ./buildkite/scripts/tests/debian-upgrade-test.sh \
-                        --codename bookworm \
+                        --codename bullseye \
                         --channel alpha \
                         --package mina-devnet \
-                        --new-debian "debians/bookworm/mina-devnet_*.deb"
+                        --new-debian "debians/bullseye/mina-devnet_*.deb"
                       ''
-                , label = "Debian upgrade test (bookworm)"
+                , label = "Debian upgrade test (bullseye)"
                 , key = key
                 , target = cmd_target
                 , docker = None Docker.Type
