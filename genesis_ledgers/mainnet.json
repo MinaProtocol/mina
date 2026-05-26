@@ -1,33 +1,22 @@
 {
   "genesis": {
-    "genesis_state_timestamp": "2024-06-05T00:00:00Z"
-  },
-  "proof": {
-    "fork": {
-      "state_hash": "3NLRTfY4kZyJtvaP4dFenDcxfoMfT3uEpkWS913KkeXLtziyVd15",
-      "blockchain_length": 359604,
-      "global_slot_since_genesis": 564480
-    }
+    "genesis_state_timestamp": "2026-05-26T13:00:00Z"
   },
   "ledger": {
     "add_genesis_winner": false,
-    "hash": "jwNw4qb6tnNhpQNxiMLem9WumxZTwmbSx3fYXW4FP3hZRkoQJSE",
-    "s3_data_hash": "1b3c34283e6880a9dfdb7d5dc351e1c063f5865a13012d81acc8d55601d2c8f3"
+    "s3_data_hash": "d0f921c9db97265e5e8c25cfecbb08ae259e735c0bb5acd0912e43aaec10fced",
+    "hash": "jwXMfukdwJVNpZ3wMEZbuq4zwucYS4cJnij23buAnNYo1GKKrFB"
   },
   "epoch_data": {
     "staking": {
       "seed": "2vahsgRV5nDPmtgr2Xo2Uq2dkngfSgvg7d1TKqQbY3wUS2ZDxCC3",
-      "hash": "jxsAidvKvEQJMC7Z2wkLrFGzCqUxpFMRhAj4K5o49eiFLhKSyXL",
-      "s3_data_hash": "ab6bec51c8523c0d041fab66cb9ca12b03842d3d77b1b06254d7a9c8dc33cbfc"
+      "s3_data_hash": "8053060205998762d7eb07804edda4723fcc31aac9c819142acac4aed80282d5",
+      "hash": "jwkUfFHU5xnAYNZzHPWGRNuZCve2SkbwuuXXETZuH6hdBup77D7"
     },
     "next": {
       "seed": "2vbH4D8B76WMYPRFgeuVvdWVhv6tAFoCJtg83yuJT1dud3QVSiZn",
-      "hash": "jwgzfxD5rEnSP3k4UiZu2569FfhJ1SRUvabfTz21e4btwBHg3jq",
-      "s3_data_hash": "61323d7565130cfa4768c0333f32b2a8ea7fdfbf17065adfa48b4e9956619b44"
+      "s3_data_hash": "7554a3b0333018e2e7d1dacebb3f5b114c85fddb65b3ae6f8e295f28a7cd75d4",
+      "hash": "jxqJ5NT4txXQKLnxJyDBwAAHysWAiAezV8agV7Qg5Md2yRGaAWq"
     }
-  },
-  "daemon": {
-    "network_id": "mainnet",
-    "peer_list_url": "https://bootnodes.minaprotocol.com/networks/mainnet.txt"
   }
 }
