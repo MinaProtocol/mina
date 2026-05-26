@@ -421,8 +421,13 @@ build_tx_tools_deb() {
   echo "------------------------------------------------------------"
   echo "--- Building mina-tx-tools (batch-txn + zkapp-test-transaction):"
 
+  # Replaces/Breaks lets apt cleanly take over /usr/local/bin/mina-batch-txn
+  # and /usr/local/bin/mina-zkapp-test-transaction from the older standalone
+  # packages of those names (now transitional metapackages with no payload).
   create_control_file mina-tx-tools "${SHARED_DEPS}${DAEMON_DEPS}" \
-    'Mina transaction testing tools: load-test (batch-txn) and zkApp transaction generator.'
+    'Mina transaction testing tools: load-test (batch-txn) and zkApp transaction generator.' \
+    "" \
+    "mina-batch-txn (<< ${MINA_DEB_VERSION}), mina-zkapp-test-transaction (<< ${MINA_DEB_VERSION})"
 
   mkdir -p "${BUILDDIR}/usr/local/bin"
 

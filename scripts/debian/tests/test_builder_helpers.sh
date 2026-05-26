@@ -558,6 +558,13 @@ test_build_tx_tools_deb() {
 
     assert_file_captured "$CAPTURED_FILES" "usr/local/bin/mina-batch-txn"
     assert_file_captured "$CAPTURED_FILES" "usr/local/bin/mina-zkapp-test-transaction"
+
+    # Must Replaces/Breaks the older standalone mina-batch-txn and
+    # mina-zkapp-test-transaction so apt can take over their binaries on upgrade.
+    assert_control_contains "$CAPTURED_CONTROL" "Replaces" "mina-batch-txn"
+    assert_control_contains "$CAPTURED_CONTROL" "Replaces" "mina-zkapp-test-transaction"
+    assert_control_contains "$CAPTURED_CONTROL" "Breaks" "mina-batch-txn"
+    assert_control_contains "$CAPTURED_CONTROL" "Breaks" "mina-zkapp-test-transaction"
 }
 
 ################################################################################
