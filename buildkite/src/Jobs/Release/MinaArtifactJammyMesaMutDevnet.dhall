@@ -2,48 +2,52 @@ let ArtifactPipelines = ../../Command/MinaArtifact.dhall
 
 let DebianVersions = ../../Constants/DebianVersions.dhall
 
-let Network = ../../Constants/Network.dhall
-
 let Artifacts = ../../Constants/Artifacts.dhall
 
 let Pipeline = ../../Pipeline/Dsl.dhall
 
-let PipelineScope = ../../Pipeline/Scope.dhall
-
 let PipelineTag = ../../Pipeline/Tag.dhall
 
-let Profiles = ../../Constants/Profiles.dhall
+let PipelineScope = ../../Pipeline/Scope.dhall
+
+let Network = ../../Constants/Network.dhall
+
+let Expr = ../../Pipeline/Expr.dhall
+
+let MainlineBranch = ../../Pipeline/MainlineBranch.dhall
 
 in  Pipeline.build
       ( ArtifactPipelines.pipeline
           ArtifactPipelines.MinaBuildSpec::{
           , artifacts =
             [ Artifacts.Type.Daemon
+            , Artifacts.Type.DaemonConfig
             , Artifacts.Type.DaemonAppsOnly
             , Artifacts.Type.DaemonAutoHardfork
             , Artifacts.Type.DaemonAutomode
-            , Artifacts.Type.DaemonConfig
-            , Artifacts.Type.DaemonPrefork
             , Artifacts.Type.LogProc
             , Artifacts.Type.Archive
             , Artifacts.Type.Rosetta
-            , Artifacts.Type.RosettaAppsOnly
             , Artifacts.Type.ZkappTestTransaction
             , Artifacts.Type.CreatePreforkGenesis
-            , Artifacts.Type.DaemonStorageToolbox
             ]
-          , debVersion = DebianVersions.DebVersion.Jammy
-          , network = Network.Type.Mainnet
+          , network = Network.Type.MesaMut
           , tags =
             [ PipelineTag.Type.Long
             , PipelineTag.Type.Release
-            , PipelineTag.Type.Stable
-            , PipelineTag.Type.Mainnet
+            , PipelineTag.Type.Docker
+            , PipelineTag.Type.Mesa
             , PipelineTag.Type.Amd64
             , PipelineTag.Type.Jammy
             ]
-          , profile = Profiles.Type.Mainnet
+          , debVersion = DebianVersions.DebVersion.Jammy
           , scope =
             [ PipelineScope.Type.MainlineNightly, PipelineScope.Type.Release ]
+          , includeIf =
+            [ Expr.Type.DescendantOf
+                { ancestor = MainlineBranch.Type.Mesa
+                , reason = "Only run on Mesa descendants"
+                }
+            ]
           }
       )

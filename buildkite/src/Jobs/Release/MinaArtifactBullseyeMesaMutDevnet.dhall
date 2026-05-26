@@ -24,12 +24,13 @@ in  Pipeline.build
             , Artifacts.Type.CreatePreforkGenesis
             , Artifacts.Type.DaemonStorageToolbox
             ]
-          , network = Network.Type.Mesa
+          , network = Network.Type.MesaMut
           , tags =
             [ PipelineTag.Type.Long
             , PipelineTag.Type.Release
             , PipelineTag.Type.Docker
             , PipelineTag.Type.Rosetta
+            , PipelineTag.Type.Devnet
             , PipelineTag.Type.Amd64
             , PipelineTag.Type.Bullseye
             ]
