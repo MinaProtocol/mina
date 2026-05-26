@@ -8,12 +8,38 @@ CI_VERSION_FILE="${APP_DIR}/.buildkite/mina-build.version"
 
 CI_REPO="https://github.com/MinaProtocol/mina-build.git"
 
-# Read pinned ref. Strip whitespace and comment lines so the file may carry
-# a lone SHA on protected branches and a branch name during PR iteration.
-CI_REF="$(grep -vE '^[[:space:]]*(#|$)' "$CI_VERSION_FILE" | tr -d '[:space:]')"
+# Read the single payload line. The file may carry blank/comment lines but
+# it must contain exactly one non-comment value — multiple lines would
+# silently concatenate into an invalid ref.
+mapfile -t CI_REF_LINES < <(grep -vE '^[[:space:]]*(#|$)' "$CI_VERSION_FILE" || true)
+
+if [[ "${#CI_REF_LINES[@]}" -eq 0 ]]; then
+  echo "ERROR: $CI_VERSION_FILE is empty" >&2
+  exit 1
+fi
+
+if [[ "${#CI_REF_LINES[@]}" -gt 1 ]]; then
+  echo "ERROR: $CI_VERSION_FILE must contain exactly one non-comment line, got ${#CI_REF_LINES[@]}" >&2
+  printf '  %s\n' "${CI_REF_LINES[@]}" >&2
+  exit 1
+fi
+
+CI_REF="${CI_REF_LINES[0]}"
+CI_REF="${CI_REF#"${CI_REF%%[![:space:]]*}"}"
+CI_REF="${CI_REF%"${CI_REF##*[![:space:]]}"}"
 
 if [[ -z "$CI_REF" ]]; then
   echo "ERROR: $CI_VERSION_FILE is empty" >&2
+  exit 1
+fi
+
+# The ref ultimately flows into `git fetch` below and is read from a file
+# that can be modified in PRs. Validate against an allowlist (SHA, or a
+# conservative branch/tag name shape) to block option injection and weird
+# refspec syntax before passing it to git.
+if ! [[ "$CI_REF" =~ ^[0-9a-zA-Z._/-]+$ ]] || [[ "$CI_REF" == -* ]]; then
+  echo "ERROR: refusing to use suspicious mina-build ref '$CI_REF'" >&2
+  echo "       Refs must match [0-9a-zA-Z._/-]+ and not start with '-'." >&2
   exit 1
 fi
 
@@ -46,7 +72,7 @@ trap 'rm -rf "$CLONE_DIR"' EXIT
 # uploadpack.allowReachableSHA1InWant, which GitHub enables by default.
 git init --quiet "$CLONE_DIR/mina-build"
 git -C "$CLONE_DIR/mina-build" remote add origin "$CI_REPO"
-git -C "$CLONE_DIR/mina-build" fetch --depth 1 --quiet origin "$CI_REF"
+git -C "$CLONE_DIR/mina-build" fetch --depth 1 --quiet origin -- "$CI_REF"
 git -C "$CLONE_DIR/mina-build" checkout --quiet FETCH_HEAD
 
 # Remove git metadata.
