@@ -27,6 +27,7 @@ let Artifact
       | RosettaAppsOnly
       | RosettaConfig
       | ZkappTestTransaction
+      | FunctionalTestSuite
       | Toolchain
       | CreatePreforkGenesis
       | DelegationVerifier
@@ -53,6 +54,7 @@ let All =
       , Artifact.CreatePreforkGenesis
       , Artifact.DelegationVerifier
       , Artifact.DaemonStorageToolbox
+      , Artifact.FunctionalTestSuite
       ]
 
 let Main =
@@ -82,6 +84,7 @@ let capitalName =
             , RosettaConfig = "RosettaConfig"
             , ZkappTestTransaction = "ZkappTestTransaction"
             , DelegationVerifier = "DelegationVerifier"
+            , FunctionalTestSuite = "FunctionalTestSuite"
             , Toolchain = "Toolchain"
             , CreatePreforkGenesis = "CreatePreforkGenesis"
             , DaemonStorageToolbox = "DaemonStorageToolbox"
@@ -106,6 +109,7 @@ let lowerName =
             , RosettaAppsOnly = "rosetta_apps_only"
             , RosettaConfig = "rosetta_config"
             , ZkappTestTransaction = "zkapp_test_transaction"
+            , FunctionalTestSuite = "functional_test_suite"
             , CreatePreforkGenesis = "create_prefork_genesis"
             , DaemonStorageToolbox = "daemon_storage_toolbox"
             , Toolchain = "toolchain"
@@ -130,6 +134,7 @@ let dockerServiceName =
             , RosettaAppsOnly = "mina-rosetta"
             , RosettaConfig = "mina-rosetta-configured"
             , ZkappTestTransaction = "mina-zkapp-test-transaction"
+            , FunctionalTestSuite = "mina-test-suite"
             , Toolchain = "mina-toolchain"
             , CreatePreforkGenesis = ""
             , DelegationVerifier = "mina-delegation-verifier"
@@ -156,6 +161,7 @@ let dockerName =
             , RosettaAppsOnly = dockerServiceName artifact
             , RosettaConfig = "mina-rosetta"
             , ZkappTestTransaction = dockerServiceName artifact
+            , FunctionalTestSuite = dockerServiceName artifact
             , Toolchain = dockerServiceName artifact
             , CreatePreforkGenesis = dockerServiceName artifact
             , DelegationVerifier = dockerServiceName artifact
@@ -191,6 +197,7 @@ let toDebianName =
             , RosettaAppsOnly = ""
             , RosettaConfig = ""
             , ZkappTestTransaction = "zkapp_test_transaction"
+            , FunctionalTestSuite = "functional_test_suite"
             , Toolchain = ""
             , DelegationVerifier = "delegation_verifier"
             , CreatePreforkGenesis =
@@ -224,6 +231,7 @@ let toDebianNames =
                           , RosettaAppsOnly = [ toDebianName a network ]
                           , RosettaConfig = [ toDebianName a network ]
                           , ZkappTestTransaction = [ "zkapp_test_transaction" ]
+                          , FunctionalTestSuite = [ "functional_test_suite" ]
                           , CreatePreforkGenesis = [ toDebianName a network ]
                           , DelegationVerifier = [ "delegation_verify" ]
                           , DaemonStorageToolbox = [ "daemon_storage_toolbox" ]
@@ -305,6 +313,8 @@ let dockerTag =
                 , RosettaAppsOnly =
                     "${spec.version}${network_part}-generic${extraordinary_profile_part}${extra_build_flags_part}"
                 , ZkappTestTransaction = "${spec.version}"
+                , FunctionalTestSuite =
+                    "${spec.version}${extra_build_flags_part}"
                 , Toolchain = "${spec.version}"
                 , DelegationVerifier = "${spec.version}"
                 , CreatePreforkGenesis = "${spec.version}"

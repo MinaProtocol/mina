@@ -19,6 +19,7 @@ let isEssential =
             , RosettaAppsOnly = True
             , RosettaConfig = True
             , ZkappTestTransaction = False
+            , FunctionalTestSuite = True
             , Toolchain = True
             , DaemonAutoHardfork = True
             , DaemonAutomode = False
