@@ -21,10 +21,10 @@ let Artifact
       | LogProc
       | Archive
       | TestExecutive
-      | BatchTxn
+      | TxTools
+
       | RosettaAppsOnly
       | RosettaConfig
-      | ZkappTestTransaction
       | FunctionalTestSuite
       | Toolchain
       | CreatePreforkGenesis
@@ -41,9 +41,8 @@ let All =
       , Artifact.DaemonConfig
       , Artifact.LogProc
       , Artifact.Archive
-      , Artifact.BatchTxn
+      , Artifact.TxTools
       , Artifact.TestExecutive
-      , Artifact.ZkappTestTransaction
       , Artifact.RosettaAppsOnly
       , Artifact.RosettaConfig
       , Artifact.Toolchain
@@ -72,10 +71,9 @@ let capitalName =
             , LogProc = "LogProc"
             , Archive = "Archive"
             , TestExecutive = "TestExecutive"
-            , BatchTxn = "BatchTxn"
+            , TxTools = "TxTools"
             , RosettaAppsOnly = "RosettaAppsOnly"
             , RosettaConfig = "RosettaConfig"
-            , ZkappTestTransaction = "ZkappTestTransaction"
             , DelegationVerifier = "DelegationVerifier"
             , FunctionalTestSuite = "FunctionalTestSuite"
             , Toolchain = "Toolchain"
@@ -96,10 +94,9 @@ let lowerName =
             , LogProc = "logproc"
             , Archive = "archive"
             , TestExecutive = "test_executive"
-            , BatchTxn = "batch_txn"
+            , TxTools = "tx_tools"
             , RosettaAppsOnly = "rosetta_apps_only"
             , RosettaConfig = "rosetta_config"
-            , ZkappTestTransaction = "zkapp_test_transaction"
             , FunctionalTestSuite = "functional_test_suite"
             , CreatePreforkGenesis = "create_prefork_genesis"
             , DaemonStorageToolbox = "daemon_storage_toolbox"
@@ -119,10 +116,9 @@ let dockerServiceName =
             , Archive = "mina-archive"
             , TestExecutive = "mina-test-executive"
             , LogProc = "mina-logproc"
-            , BatchTxn = "mina-batch-txn"
+            , TxTools = "mina-tx-tools"
             , RosettaAppsOnly = "mina-rosetta"
             , RosettaConfig = "mina-rosetta-configured"
-            , ZkappTestTransaction = "mina-zkapp-test-transaction"
             , FunctionalTestSuite = "mina-test-suite"
             , Toolchain = "mina-toolchain"
             , CreatePreforkGenesis = ""
@@ -144,10 +140,9 @@ let dockerName =
             , Archive = dockerServiceName artifact
             , TestExecutive = dockerServiceName artifact
             , LogProc = dockerServiceName artifact
-            , BatchTxn = dockerServiceName artifact
+            , TxTools = dockerServiceName artifact
             , RosettaAppsOnly = dockerServiceName artifact
             , RosettaConfig = "mina-rosetta"
-            , ZkappTestTransaction = dockerServiceName artifact
             , FunctionalTestSuite = dockerServiceName artifact
             , Toolchain = dockerServiceName artifact
             , CreatePreforkGenesis = dockerServiceName artifact
@@ -178,10 +173,9 @@ let toDebianName =
             , LogProc = "logproc"
             , Archive = "archive_${Network.lowerName network}"
             , TestExecutive = "test_executive"
-            , BatchTxn = "batch_txn"
-            , RosettaAppsOnly = "rosetta_${Network.lowerName network}"
+            , TxTools = "tx_tools"
+            , RosettaAppsOnly = ""
             , RosettaConfig = ""
-            , ZkappTestTransaction = "zkapp_test_transaction"
             , FunctionalTestSuite = "functional_test_suite"
             , Toolchain = ""
             , DelegationVerifier = "delegation_verifier"
@@ -210,10 +204,13 @@ let toDebianNames =
                           , Archive = [ toDebianName a network ]
                           , LogProc = [ "logproc" ]
                           , TestExecutive = [ "test_executive" ]
-                          , BatchTxn = [ "batch_txn" ]
+                          , TxTools =
+                            [ "tx_tools"
+                            , "batch_txn"
+                            , "zkapp_test_transaction"
+                            ]
                           , RosettaAppsOnly = [ toDebianName a network ]
                           , RosettaConfig = [ toDebianName a network ]
-                          , ZkappTestTransaction = [ "zkapp_test_transaction" ]
                           , FunctionalTestSuite = [ "functional_test_suite" ]
                           , CreatePreforkGenesis = [ toDebianName a network ]
                           , DelegationVerifier = [ "delegation_verify" ]
@@ -286,12 +283,11 @@ let dockerTag =
                     "${spec.version}${network_part}-generic${extraordinary_profile_part}${extra_build_flags_part}"
                 , LogProc = "${spec.version}"
                 , TestExecutive = "${spec.version}"
-                , BatchTxn = "${spec.version}"
+                , TxTools = "${spec.version}"
                 , RosettaConfig =
                     "${spec.version}${network_part}${extraordinary_profile_part}${extra_build_flags_part}"
                 , RosettaAppsOnly =
                     "${spec.version}${network_part}-generic${extraordinary_profile_part}${extra_build_flags_part}"
-                , ZkappTestTransaction = "${spec.version}"
                 , FunctionalTestSuite =
                     "${spec.version}${extra_build_flags_part}"
                 , Toolchain = "${spec.version}"

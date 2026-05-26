@@ -406,30 +406,56 @@ build_test_executive_deb () {
 }
 ## END TEST_EXECUTIVE PACKAGE ##
 
-## GENERATE BATCH TXN TOOL PACKAGE ##
+## GENERATE TX TOOLS PACKAGE ##
 
 #
-# Builds mina-batch-txn package for transaction load testing
+# Builds mina-tx-tools package containing both transaction-testing binaries
 #
-# Output: mina-batch-txn_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
-# Dependencies: ${SHARED_DEPS}
+# Output: mina-tx-tools_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
+# Dependencies: ${SHARED_DEPS}${DAEMON_DEPS} (zkapp tool needs daemon deps)
 #
-# Tool for generating transaction load against mina nodes.
+# Ships both binaries that previously lived in mina-batch-txn and
+# mina-zkapp-test-transaction; those names are now transitional metapackages.
 #
-build_batch_txn_deb() {
+build_tx_tools_deb() {
+  echo "------------------------------------------------------------"
+  echo "--- Building mina-tx-tools (batch-txn + zkapp-test-transaction):"
 
-  create_control_file mina-batch-txn "${SHARED_DEPS}" \
-    'Load transaction tool against a mina node.'
+  create_control_file mina-tx-tools "${SHARED_DEPS}${DAEMON_DEPS}" \
+    'Mina transaction testing tools: load-test (batch-txn) and zkApp transaction generator.'
 
   mkdir -p "${BUILDDIR}/usr/local/bin"
 
   # Binaries
   cp ./default/src/app/batch_txn_tool/batch_txn_tool.exe \
     "${BUILDDIR}/usr/local/bin/mina-batch-txn"
+  cp ./default/src/app/zkapp_test_transaction/zkapp_test_transaction.exe \
+    "${BUILDDIR}/usr/local/bin/mina-zkapp-test-transaction"
+
+  build_deb mina-tx-tools
+}
+## END TX TOOLS PACKAGE ##
+
+## GENERATE BATCH TXN METAPACKAGE ##
+
+#
+# Builds mina-batch-txn transitional metapackage for backward compatibility.
+# The actual mina-batch-txn binary now ships in mina-tx-tools.
+#
+# Output: mina-batch-txn_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb (no payload)
+# Dependencies: mina-tx-tools (= ${MINA_DEB_VERSION})
+#
+build_batch_txn_deb() {
+  echo "------------------------------------------------------------"
+  echo "--- Building mina-batch-txn transitional metapackage:"
+
+  create_control_file mina-batch-txn \
+    "mina-tx-tools (= ${MINA_DEB_VERSION})" \
+    'Transitional metapackage. Installs mina-tx-tools which contains mina-batch-txn.'
 
   build_deb mina-batch-txn
 }
-## END BATCH TXN TOOL PACKAGE ##
+## END BATCH TXN METAPACKAGE ##
 
 ## GENERATE TEST SUITE PACKAGE ##
 
@@ -1002,33 +1028,26 @@ build_archive_deb () {
 }
 ## END ARCHIVE PACKAGE ##
 
-## ZKAPP TEST TXN ##
+## ZKAPP TEST TXN METAPACKAGE ##
 
 #
-# Builds mina-zkapp-test-transaction package for zkApp testing
+# Builds mina-zkapp-test-transaction transitional metapackage for backward
+# compatibility. The actual binary now ships in mina-tx-tools.
 #
-# Output: mina-zkapp-test-transaction_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
-# Dependencies: ${SHARED_DEPS}${DAEMON_DEPS}
-#
-# Utility for generating zkApp transactions in Mina GraphQL format for testing.
+# Output: mina-zkapp-test-transaction_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb (no payload)
+# Dependencies: mina-tx-tools (= ${MINA_DEB_VERSION})
 #
 build_zkapp_test_transaction_deb () {
   echo "------------------------------------------------------------"
-  echo "--- Building Mina Generic testnet ZkApp test transaction tool:"
+  echo "--- Building mina-zkapp-test-transaction transitional metapackage:"
 
   create_control_file mina-zkapp-test-transaction \
-    "${SHARED_DEPS}${DAEMON_DEPS}" \
-    'Utility to generate ZkApp transactions in Mina GraphQL format'
-
-  mkdir -p "${BUILDDIR}/usr/local/bin"
-
-  # Binaries
-  cp ./default/src/app/zkapp_test_transaction/zkapp_test_transaction.exe \
-    "${BUILDDIR}/usr/local/bin/mina-zkapp-test-transaction"
+    "mina-tx-tools (= ${MINA_DEB_VERSION})" \
+    'Transitional metapackage. Installs mina-tx-tools which contains mina-zkapp-test-transaction.'
 
   build_deb mina-zkapp-test-transaction
 }
-## END ZKAPP TEST TXN PACKAGE ##
+## END ZKAPP TEST TXN METAPACKAGE ##
 
 #
 # Builds mina-delegation-verify package for delegation verification

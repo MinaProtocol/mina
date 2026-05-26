@@ -56,6 +56,7 @@ default_targets=(
   logproc
   archive_devnet
   archive_mainnet
+  tx_tools
   batch_txn
   daemon_mainnet
   daemon_mainnet_config

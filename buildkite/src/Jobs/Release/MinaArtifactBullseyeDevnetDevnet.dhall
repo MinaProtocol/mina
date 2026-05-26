@@ -23,7 +23,6 @@ in  Pipeline.build
             , Artifacts.Type.RosettaConfig
             , Artifacts.Type.TestExecutive
             , Artifacts.Type.RosettaAppsOnly
-            , Artifacts.Type.ZkappTestTransaction
             , Artifacts.Type.DaemonStorageToolbox
             ]
           , network = Network.Type.Devnet

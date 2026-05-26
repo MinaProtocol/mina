@@ -230,7 +230,6 @@ let generateDockerForCodename =
                           , Artifacts.Type.Archive
                           , Artifacts.Type.RosettaAppsOnly
                           , Artifacts.Type.RosettaConfig
-                          , Artifacts.Type.ZkappTestTransaction
                           , Artifacts.Type.DaemonStorageToolbox
                           ]
                         , debVersion = codename.DebVersion
