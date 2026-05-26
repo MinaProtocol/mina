@@ -20,6 +20,7 @@ in  Pipeline.build
             , Artifacts.Type.Rosetta
             , Artifacts.Type.RosettaAppsOnly
             , Artifacts.Type.ZkappTestTransaction
+            , Artifacts.Type.FunctionalTestSuite
             , Artifacts.Type.CreatePreforkGenesis
             , Artifacts.Type.DaemonStorageToolbox
             ]

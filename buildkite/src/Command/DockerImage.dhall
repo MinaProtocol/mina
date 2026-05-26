@@ -180,6 +180,7 @@ let generateStep =
                   , RosettaAppsOnly = ""
                   , RosettaConfig = archCustomSuffix
                   , ZkappTestTransaction = ""
+                  , FunctionalTestSuite = ""
                   , Toolchain = ""
                   , CreatePreforkGenesis = ""
                   , DelegationVerifier = ""
