@@ -228,7 +228,74 @@ module Make (MLMB : Nat.Intf) = struct
     [@@deriving compare, sexp, yojson, hash, equal]
   end
 
+  module Chunked_repr = struct
+    type t =
+      ( ( Tock.Inner_curve.Affine.t
+        , Reduced_messages_for_next_proof_over_same_field.Wrap.Challenges_vector
+          .t
+          MLMB_vec.t )
+        Types.Wrap.Proof_state.Messages_for_next_wrap_proof.t
+      , ( unit
+        , Tock.Curve.Affine.t Max_proofs_verified_at_most.t
+        , Challenge.Constant.t Scalar_challenge.t Bulletproof_challenge.t
+          Step_bp_vec.t
+          Max_proofs_verified_at_most.t )
+        Base.Messages_for_next_proof_over_same_field.Step.t )
+      Base.Wrap.t
+    [@@deriving sexp]
+  end
+
   type nonrec t = MLMB.n t
+
+  let to_chunked_repr (T { statement; prev_evals; proof }) : Chunked_repr.t =
+    let lte =
+      Nat.lte_exn
+        (Vector.length
+           statement.messages_for_next_step_proof
+             .challenge_polynomial_commitments )
+        MLMB.n
+    in
+    let statement =
+      { statement with
+        messages_for_next_step_proof =
+          { statement.messages_for_next_step_proof with
+            challenge_polynomial_commitments =
+              At_most.of_vector
+                statement.messages_for_next_step_proof
+                  .challenge_polynomial_commitments lte
+          ; old_bulletproof_challenges =
+              At_most.of_vector
+                statement.messages_for_next_step_proof
+                  .old_bulletproof_challenges lte
+          }
+      }
+    in
+    { statement; prev_evals; proof }
+
+  let of_chunked_repr ({ statement; prev_evals; proof } : Chunked_repr.t) : t =
+    let (Vector.T challenge_polynomial_commitments) =
+      At_most.to_vector
+        statement.messages_for_next_step_proof.challenge_polynomial_commitments
+    in
+    let (Vector.T old_bulletproof_challenges) =
+      At_most.to_vector
+        statement.messages_for_next_step_proof.old_bulletproof_challenges
+    in
+    let T =
+      Nat.eq_exn
+        (Vector.length challenge_polynomial_commitments)
+        (Vector.length old_bulletproof_challenges)
+    in
+    let statement =
+      { statement with
+        messages_for_next_step_proof =
+          { statement.messages_for_next_step_proof with
+            challenge_polynomial_commitments
+          ; old_bulletproof_challenges
+          }
+      }
+    in
+    T { statement; prev_evals; proof }
 
   let to_repr (T { statement; prev_evals; proof }) : Repr.t =
     let lte =
@@ -330,6 +397,27 @@ module Make (MLMB : Nat.Intf) = struct
     | Ok t -> (
         try Ok (t_of_sexp (Sexp.of_string t))
         with exn -> Error (Exn.to_string exn) )
+    | Error (`Msg s) ->
+        Error s
+
+  let has_single_chunk_public_input (T { prev_evals; _ }) =
+    let x1, x2 = prev_evals.evals.public_input in
+    Array.length x1 = 1 && Array.length x2 = 1
+
+  let to_base64_chunked t =
+    let sexp =
+      if has_single_chunk_public_input t then sexp_of_t t
+      else Chunked_repr.sexp_of_t (to_chunked_repr t)
+    in
+    Base64.encode_exn (Sexp.to_string sexp)
+
+  let of_base64_chunked b64 =
+    match Base64.decode b64 with
+    | Ok t -> (
+        try Ok (t_of_sexp (Sexp.of_string t))
+        with _legacy_repr_exn -> (
+          try Ok (of_chunked_repr (Chunked_repr.t_of_sexp (Sexp.of_string t)))
+          with exn -> Error (Exn.to_string exn) ) )
     | Error (`Msg s) ->
         Error s
 
