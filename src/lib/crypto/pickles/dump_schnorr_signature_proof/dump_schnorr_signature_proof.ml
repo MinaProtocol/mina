@@ -1,0 +1,239 @@
+(** Standalone kimchi prover for the in-circuit Schnorr verifier.
+ *
+ *  Mirrors `Pickles.Dump_circuit_impl.schnorr_verify_circuit` (which the
+ *  PS-side `Snarky.Circuit.Schnorr.verifies` byte-matches) and produces:
+ *    - `vk.serde.json`            — kimchi `VerifierIndex<Vesta>` serde
+ *    - `proof.serde.json`         — kimchi `ProverProof<Vesta>` serde
+ *    - `public_input.json`        — 6-element JSON array of hex Tick.Field
+ *                                   values: pk_x, pk_y, r, s, message[0],
+ *                                   plus the boolean output (`1`).
+ *
+ *  Sign convention (matches the circuit's `scaleFast2'` semantics where
+ *  `scale_fast_unpack` shifts by `2^255 = 2^actual_bits_used`):
+ *    1. Sample `d, k <- Pallas_scalar.random()`.
+ *    2. Compute `pk = d·G`, `R = k·G`, reject if `R.y` is odd.
+ *    3. `e_tick = Poseidon(pk.x, pk.y, R.x, message...)` (zero seed).
+ *    4. Reject if `to_bigint(e_tick) >= 2^254`.
+ *    5. Cross-field: `e_pallas = Pallas_scalar.of_bits (Tick.to_bits e_tick)`.
+ *    6. `e_eff = e_pallas + 2^255`, `s_eff = k + d * e_eff`.
+ *    7. `s_pallas = s_eff - 2^255`. Reject if `s_bigint >= 2^254`.
+ *    8. `s_tick = Tick.of_bits (Pallas_scalar.to_bits s_pallas)`.
+ *
+ *  Usage:
+ *    dune exec src/lib/crypto/pickles/dump_schnorr_signature_proof/
+ *              dump_schnorr_signature_proof.exe -- <output_dir>
+ *)
+
+open Core_kernel
+
+module Tick = Pickles.Backend.Tick
+
+(* Pallas curve module. *)
+module Inner_curve = Pickles.Backend.Tick.Inner_curve
+
+(* Pallas scalar field (Fq = Tock.Field). Has `to_bits`, `of_bits`,
+   `random`, `to_bigint`, arithmetic. *)
+module Pallas_scalar = Kimchi_pasta_snarky_backend.Pallas_based_plonk.Field
+
+(* Tick.Field directly, for `to_bigint` / `of_bits` / `unpack`. *)
+module Tick_field = Kimchi_pasta_snarky_backend.Vesta_based_plonk.Field
+
+(* Step_impl = Tick on the snarky side; matches the `Impl` used by
+   `Pickles.Dump_circuit_impl.schnorr_verify_circuit`. *)
+module Impl = Kimchi_pasta_snarky_backend.Step_impl
+
+let () = Pickles.Backend.Tick.Keypair.set_urs_info []
+
+let () = Pickles.Backend.Tock.Keypair.set_urs_info []
+
+(* 2^255 in Pallas scalar; used for the circuit's `2^actual_bits_used`
+   shift compensation. *)
+let two_to_255_scalar : Pallas_scalar.t =
+  let two = Pallas_scalar.of_int 2 in
+  let rec pow n acc =
+    if Int.equal n 0 then acc else pow (n - 1) Pallas_scalar.(acc * two)
+  in
+  pow 255 Pallas_scalar.one
+
+(* Zero-seed Poseidon hash over `Tick_field_sponge.params`. Identical
+   to the in-circuit `Step_main_inputs.Sponge` shape used by
+   `schnorr_verify_circuit`. *)
+let poseidon_hash (inputs : Tick_field.t array) : Tick_field.t =
+  let open Pickles__Tick_field_sponge.Field in
+  let sponge = create Pickles__Tick_field_sponge.params in
+  Array.iter inputs ~f:(absorb sponge) ;
+  squeeze sponge
+
+(* Convert Tick.Field <-> Pallas.Scalar via bits. Safe when value <
+   2^254 (both fields are 254-bit primes; bit list is size_in_bits). *)
+let tick_to_pallas_scalar (x : Tick_field.t) : Pallas_scalar.t =
+  Pallas_scalar.of_bits (Tick_field.to_bits x)
+
+let pallas_scalar_to_tick (x : Pallas_scalar.t) : Tick_field.t =
+  Tick_field.of_bits (Pallas_scalar.to_bits x)
+
+(* Test bit 254 (top bit) — value >= 2^254 iff bit 254 is set. *)
+let tick_field_ge_2_254 (x : Tick_field.t) : bool =
+  let bits = Tick_field.to_bits x in
+  match List.nth bits 254 with Some b -> b | None -> false
+
+let pallas_scalar_ge_2_254 (x : Pallas_scalar.t) : bool =
+  let bits = Pallas_scalar.to_bits x in
+  match List.nth bits 254 with Some b -> b | None -> false
+
+(* Returns `Some (rx, s_tick)` on success, `None` on rejection. *)
+let try_sign ~(d : Pallas_scalar.t) ~(k : Pallas_scalar.t)
+    ~(pk_x : Tick_field.t) ~(pk_y : Tick_field.t)
+    ~(message : Tick_field.t array) :
+    (Tick_field.t * Tick_field.t) option =
+  let r_pt = Inner_curve.scale Inner_curve.one k in
+  let rx, ry = Inner_curve.to_affine_exn r_pt in
+  let ry_bits = Tick_field.to_bits ry in
+  let ry_even = match List.hd ry_bits with Some b -> not b | None -> true in
+  if not ry_even then None
+  else
+    let hash_inputs = Array.concat [ [| pk_x; pk_y; rx |]; message ] in
+    let e_tick = poseidon_hash hash_inputs in
+    if tick_field_ge_2_254 e_tick then None
+    else
+      let e_pallas = tick_to_pallas_scalar e_tick in
+      let e_eff = Pallas_scalar.(e_pallas + two_to_255_scalar) in
+      let s_eff = Pallas_scalar.(k + (d * e_eff)) in
+      let s_pallas = Pallas_scalar.(s_eff - two_to_255_scalar) in
+      if pallas_scalar_ge_2_254 s_pallas then None
+      else
+        let s_tick = pallas_scalar_to_tick s_pallas in
+        Some (rx, s_tick)
+
+let sign ~(d : Pallas_scalar.t) ~(pk_x : Tick_field.t) ~(pk_y : Tick_field.t)
+    ~(message : Tick_field.t array) : Tick_field.t * Tick_field.t =
+  let rec loop attempt =
+    if attempt > 200 then
+      failwith "sign: exhausted rejection-sample budget (200 attempts)"
+    else
+      let k = Pallas_scalar.random () in
+      match try_sign ~d ~k ~pk_x ~pk_y ~message with
+      | Some result -> result
+      | None -> loop (attempt + 1)
+  in
+  loop 0
+
+(* Emit hex in LE byte order (no `~reverse`) so PS's `fromHexLe` parser
+   reads it as little-endian, matching the kimchi-stubs/snarky-kimchi
+   `_pallasScalarFieldFromHexLe` convention used elsewhere in the
+   pipeline. OCaml's `Bigint.to_hex_string` uses `~reverse:true`
+   (BE-ordered hex), which is incompatible with PS `fromHexLE`. *)
+let field_to_hex_le (x : Tick_field.t) : string =
+  let bytes = Tick_field.to_bigint x |> Kimchi_pasta_basic.Bigint256.to_bytes in
+  let n = Bytes.length bytes in
+  let buf = Buffer.create (2 * n) in
+  for i = 0 to n - 1 do
+    Buffer.add_string buf (Printf.sprintf "%02x" (Char.to_int (Bytes.get bytes i)))
+  done ;
+  Buffer.contents buf
+
+let field_to_hex = field_to_hex_le
+
+let write_public_input_json path (fields : Tick_field.t array) =
+  let entries =
+    Array.to_list fields
+    |> List.map ~f:(fun f -> `String (field_to_hex f))
+  in
+  let json = `List entries in
+  Out_channel.write_all path ~data:(Yojson.Safe.to_string json ^ "\n")
+
+let () =
+  let output_dir =
+    if Array.length Sys.argv > 1 then Sys.argv.(1)
+    else "../packages/schnorr/test/fixtures/schnorr_signature_proof"
+  in
+  Printf.printf "dump_schnorr_signature_proof: output_dir = %s\n" output_dir ;
+
+  (* 1. Sample keypair + message and run the rejection-sampling signer. *)
+  let d = Pallas_scalar.random () in
+  let pk = Inner_curve.scale Inner_curve.one d in
+  let pk_x, pk_y = Inner_curve.to_affine_exn pk in
+  let message = [| Tick_field.random () |] in
+  let r, s = sign ~d ~pk_x ~pk_y ~message in
+  Printf.printf "schnorr: signed message; pk.x (hex LE) = %s\n"
+    (field_to_hex pk_x) ;
+  Printf.printf "schnorr: r (hex LE) = %s\n  s (hex LE) = %s\n"
+    (field_to_hex r) (field_to_hex s) ;
+
+  (* 2. Compile the constraint system for the schnorr verifier. The
+     typ is `(((Field*Field) * Field) * Field) * Field array (length 1)`,
+     matching `Pickles.Dump_circuit_impl.schnorr_verify_circuit`'s
+     function pattern. *)
+  let schnorr_input_typ =
+    let open Impl.Typ in
+    let point = Impl.Field.typ * Impl.Field.typ in
+    let msg = array ~length:1 Impl.Field.typ in
+    point * Impl.Field.typ * Impl.Field.typ * msg
+  in
+  let constraint_system =
+    Impl.constraint_system ~input_typ:schnorr_input_typ
+      ~return_typ:Impl.Boolean.typ
+      Pickles.Dump_circuit_impl.schnorr_verify_circuit
+  in
+  let proof_keypair =
+    Tick.Keypair.create ~prev_challenges:0 constraint_system
+  in
+  let prover_index = Tick.Keypair.pk proof_keypair in
+  let verifier_index = Tick.Keypair.vk proof_keypair in
+
+  (* 3. Run the prover. `generate_witness_conv` threads inputs through
+     the circuit to populate the public + auxiliary witnesses;
+     `Tick.Proof.create_async` then produces the kimchi proof. *)
+  let inputs :
+      ( ( ( (Tick_field.t * Tick_field.t) * Tick_field.t)
+        * Tick_field.t )
+      * Tick_field.t array ) =
+    ((((pk_x, pk_y), r), s), message)
+  in
+  let proof_high_level, bool_output =
+    Impl.generate_witness_conv
+      ~f:(fun { Impl.Proof_inputs.auxiliary_inputs; public_inputs } b_out ->
+        let proof =
+          Promise.block_on_async_exn (fun () ->
+              Tick.Proof.create_async ~message:[] ~primary:public_inputs
+                ~auxiliary:auxiliary_inputs prover_index )
+        in
+        (proof, b_out) )
+      ~input_typ:schnorr_input_typ ~return_typ:Impl.Boolean.typ
+      Pickles.Dump_circuit_impl.schnorr_verify_circuit
+      inputs
+  in
+  Printf.printf "schnorr: generated kimchi proof (output=%b); serializing...\n"
+    bool_output ;
+
+  (* 4. Convert from the OCaml-side `with_public_evals` (which wraps
+     `Plonk_types.Proof.t`) to the kimchi-protocol-level
+     `Kimchi_types.proof_with_public` form that `to_serde_json`
+     consumes. `primary_input` is left empty: serde skips the `public`
+     field, and the PS verifier injects the 6-element public input via
+     `set_public_` before calling `caml_pasta_fp_plonk_proof_verify`. *)
+  let backend_proof =
+    Tick.Proof.to_backend_with_public_evals' [] [||] proof_high_level
+  in
+
+  let vk_json =
+    Kimchi_bindings.Protocol.VerifierIndex.Fp.to_serde_json verifier_index
+  in
+  Out_channel.write_all (output_dir ^ "/vk.serde.json") ~data:vk_json ;
+
+  let proof_json =
+    Kimchi_bindings.Protocol.Proof.Fp.to_serde_json backend_proof
+  in
+  Out_channel.write_all (output_dir ^ "/proof.serde.json") ~data:proof_json ;
+
+  (* Public input = 6 field elements: the 5 verifier inputs in flat
+     order plus the boolean output (`true` ⇒ `1`). Matches the kimchi
+     fixture's `public_input_size = 6`. *)
+  let bool_field =
+    if bool_output then Tick_field.one else Tick_field.zero
+  in
+  write_public_input_json (output_dir ^ "/public_input.json")
+    [| pk_x; pk_y; r; s; message.(0); bool_field |] ;
+
+  Printf.printf
+    "schnorr: wrote vk.serde.json + proof.serde.json + public_input.json\n"

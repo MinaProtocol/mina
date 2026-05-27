@@ -3737,6 +3737,76 @@ let per_proof_witness_typ_check_circuit () () =
             ~request:(fun () -> failwith "per_proof_witness: never called") in
   ()
 
+(* ============================================================================
+ * Schnorr signature verifier circuit (kimchi-gate variant).
+ *
+ * Mirrors the PS-side `Snarky.Circuit.Schnorr.verifies` with
+ * `pallasScalarOps`. Used to drive a circuit-system equivalence test in
+ * `packages/pickles-circuit-diffs`.
+ *
+ * Algorithm:
+ *   e            = Poseidon(pk_x, pk_y, r, ...message)
+ *   e_pk         = (-pk) * e_bits     -- via scale_fast2' (cross-field, 254 bits)
+ *   s_g          = G * s_bits         -- via scale_fast2' (cross-field, 254 bits)
+ *   (rx, ry)     = s_g + e_pk         -- via Add.add_fast
+ *   accept iff is_even(ry) AND rx == r
+ *
+ * Iteration 1 (this commit): sponge starts at the all-zero state,
+ * matching PS `Snarky.Circuit.RandomOracle.hashVec`. NOT yet bit-compatible
+ * with Mina's deployed Chunked Schnorr — that requires seeding the sponge
+ * with `Hash_prefix_states.signature ~signature_kind` on both sides (next
+ * iteration, once the circuit shape matches).
+ *
+ * Input layout (4 + N fields):
+ *   0,1: public key (pk_x, pk_y)        — Pallas affine
+ *   2:   signature r component          — Fp x-coordinate of R = k·G
+ *   3:   signature s component          — Fp value, interpreted mod q (Fq)
+ *                                         via the cross-field scale_fast2'
+ *   4+:  message[N]                     — N-element field array
+ *
+ * For the first comparison we use N=1 (shortest interesting case).
+ * ============================================================================ *)
+
+let schnorr_verify_circuit
+    ( ((((pk_x, pk_y), r), s), (message : Impl.Field.t array))
+      : ((((Impl.Field.t * Impl.Field.t) * Impl.Field.t) * Impl.Field.t)
+        * Impl.Field.t array) )
+    () =
+  (* 1. Hash: e = Poseidon(pk_x, pk_y, r, ...message). *)
+  let params =
+    Sponge.Params.map Tick_field_sponge.params ~f:Impl.Field.constant
+  in
+  let sponge = Step_main_inputs.Sponge.create params in
+  Step_main_inputs.Sponge.absorb sponge (`Field pk_x) ;
+  Step_main_inputs.Sponge.absorb sponge (`Field pk_y) ;
+  Step_main_inputs.Sponge.absorb sponge (`Field r) ;
+  Array.iter message ~f:(fun m ->
+      Step_main_inputs.Sponge.absorb sponge (`Field m) ) ;
+  let e = Step_main_inputs.Sponge.squeeze sponge in
+  (* 2. e_pk = (-pk) * e via cross-field scale_fast2'. *)
+  let neg_pk = Step_main_inputs.Inner_curve.negate (pk_x, pk_y) in
+  let e_pk =
+    Ops.scale_fast2' (module Public_input_scalar) neg_pk e ~num_bits:254
+  in
+  (* 3. s_g = G * s. The constant generator is already an Inner_curve.t. *)
+  let s_g =
+    Ops.scale_fast2' (module Public_input_scalar)
+      Step_main_inputs.Inner_curve.one s ~num_bits:254
+  in
+  (* 4. r_pt = s_g + e_pk. *)
+  let rx, ry = Add.add_fast ~check_finite:false s_g e_pk in
+  (* 5. is_even ry: the LSB of ry must be 0. Uses size_in_bits - 1 to
+       match the existing `unpack_circuit` convention (avoids the edge
+       case where the top bit would force value >= 2^(n-1)). *)
+  let y_bits =
+    Impl.Field.unpack ry ~length:(Impl.Field.size_in_bits - 1)
+  in
+  let y_even = Impl.Boolean.not (List.hd_exn y_bits) in
+  (* 6. r_correct = (rx == r). *)
+  let r_correct = Impl.Field.equal rx r in
+  (* 7. Accept iff both conditions hold. *)
+  Impl.Boolean.(r_correct &&& y_even)
+
 (* ---- Entry point ---- *)
 
 let run ~output_dir =
@@ -4049,7 +4119,18 @@ let run ~output_dir =
      sequence before downstream step_main / wrap_main / witness
      comparisons. *)
   dump_step "app_circuit_chunks2" app_circuit_chunks2
-    ~input_typ:Impl.Typ.unit ~return_typ:Impl.Typ.unit
+    ~input_typ:Impl.Typ.unit ~return_typ:Impl.Typ.unit ;
+  (* Schnorr signature verifier (iteration 1: no prefix state, single-field
+     message). Mirrors PS `Snarky.Circuit.Schnorr.verifies` with
+     `pallasScalarOps` for the comparison test in pickles-circuit-diffs. *)
+  let schnorr_input_typ =
+    let open Impl.Typ in
+    let point = Impl.Field.typ * Impl.Field.typ in
+    let msg = array ~length:1 Impl.Field.typ in
+    point * Impl.Field.typ * Impl.Field.typ * msg
+  in
+  dump_step "schnorr_verify_step_circuit" schnorr_verify_circuit
+    ~input_typ:schnorr_input_typ ~return_typ:Impl.Boolean.typ
   (* Top-level [step_main_*_circuit] / [wrap_main_*_circuit] fixtures
      are NOT dumped from this driver. They come from the per-rule
      [dump_*.exe] drivers (one per scenario) via [PICKLES_STEP_CS_DUMP]

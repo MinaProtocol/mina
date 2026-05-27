@@ -581,7 +581,21 @@ include
      and type 'a Proof.t = 'a Mina_wire_types.Pickles.Proof.t
 
 module Dump_circuit_impl : sig
+  module Impl : module type of Kimchi_pasta_snarky_backend.Step_impl
+
   val run : output_dir:string -> unit
+
+  (** Schnorr signature verifier circuit (iteration 1: zero-seed sponge).
+   *  Exposed so the matching proof-dump executable
+   *  ([dump_schnorr_signature_proof.exe]) can compile the same shape
+   *  into a kimchi keypair + proof without duplicating the circuit. *)
+  val schnorr_verify_circuit :
+       ( ( ( (Impl.Field.t * Impl.Field.t)
+           * Impl.Field.t )
+         * Impl.Field.t )
+       * Impl.Field.t array )
+    -> unit
+    -> Impl.Boolean.var
 end
 
 (** Trace logger for byte-identical pickles transcript reproduction tests.

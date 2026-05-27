@@ -1,0 +1,12 @@
+(executable
+ (name dump_schnorr_signature_proof)
+ (libraries
+  core_kernel
+  promise
+  pickles
+  pickles.backend
+  snarky.backendless
+  kimchi_pasta.basic
+  kimchi_pasta_snarky_backend
+  kimchi_backend
+  kimchi_bindings))
