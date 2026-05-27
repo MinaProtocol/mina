@@ -6,13 +6,26 @@ let Arch = ../Constants/Arch.dhall
 
 let FixPermissions = ../Command/FixPermissions.dhall
 
+let binfmtSetup
+    : Arch.Type -> List Cmd.Type
+    =     \(arch : Arch.Type)
+      ->  merge
+            { Amd64 = [] : List Cmd.Type
+            , Arm64 =
+              [ Cmd.run
+                  "docker run --privileged --rm tonistiigi/binfmt --install arm64"
+              ]
+            }
+            arch
+
 let runInToolchainImage
     : Text -> Arch.Type -> List Text -> Text -> List Cmd.Type
     =     \(image : Text)
       ->  \(arch : Arch.Type)
       ->  \(environment : List Text)
       ->  \(innerScript : Text)
-      ->    [ FixPermissions.command arch ]
+      ->    binfmtSetup arch
+          # [ FixPermissions.command arch ]
           # [ Cmd.runInDocker
                 Cmd.Docker::{
                 , image = image
