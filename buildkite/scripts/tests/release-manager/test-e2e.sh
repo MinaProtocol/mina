@@ -14,7 +14,7 @@ source "${SCRIPT_DIR}/lib.sh"
 # Docker configuration (E2E only)
 DOCKER_SOURCE_REGISTRY="minaprotocol"
 DOCKER_SOURCE_IMAGE="mina-daemon"
-DOCKER_SOURCE_TAG="3.3.0-8c0c2e6-bookworm-mainnet-arm64"
+DOCKER_SOURCE_TAG="3.3.0-8c0c2e6-bookworm-mainnet"
 DOCKER_TARGET_REGISTRY="europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo"
 DOCKER_TARGET_IMAGE="mina-daemon"
 
