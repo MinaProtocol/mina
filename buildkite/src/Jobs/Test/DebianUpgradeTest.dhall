@@ -37,7 +37,7 @@ let buildTestCmd
                 , commands =
                     RunInToolchain.runInToolchainBullseye
                       Arch.Type.Amd64
-                      ([] : List Text)
+                      DebianVersions.overrideEnvs
                       ''
                       ./buildkite/scripts/tests/debian-upgrade-test.sh \
                         --codename bullseye \

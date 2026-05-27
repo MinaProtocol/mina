@@ -14,6 +14,8 @@ let RunInToolchain = ../Command/RunInToolchain.dhall
 
 let Size = ../Command/Size.dhall
 
+let DebianVersions = ../Constants/DebianVersions.dhall
+
 let Network = ../Constants/Network.dhall
 
 let DebianVersions = ../Constants/DebianVersions.dhall
