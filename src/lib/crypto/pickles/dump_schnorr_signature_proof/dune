@@ -6,6 +6,9 @@
   pickles
   pickles.backend
   snarky.backendless
+  hash_prefix_states
+  random_oracle
+  mina_signature_kind
   kimchi_pasta.basic
   kimchi_pasta_snarky_backend
   kimchi_backend

@@ -1,0 +1,8 @@
+(executable
+ (name dump_schnorr_prefix_states)
+ (libraries
+  core_kernel
+  hash_prefix_states
+  kimchi_pasta.basic
+  kimchi_pasta_snarky_backend
+  random_oracle))

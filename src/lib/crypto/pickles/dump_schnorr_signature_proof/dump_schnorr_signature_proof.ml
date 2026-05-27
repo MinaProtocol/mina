@@ -42,9 +42,11 @@ module Tick_field = Kimchi_pasta_snarky_backend.Vesta_based_plonk.Field
    `Pickles.Dump_circuit_impl.schnorr_verify_circuit`. *)
 module Impl = Kimchi_pasta_snarky_backend.Step_impl
 
-let () = Pickles.Backend.Tick.Keypair.set_urs_info []
+(* `hash_prefix_states` transitively pulls in `crypto_params`, which
+   sets the URS info at module init via `Cache_dir.cache`. Re-setting
+   here would trip `Set_once.set_exn`, so we just let the
+   crypto_params-driven init stand. *)
 
-let () = Pickles.Backend.Tock.Keypair.set_urs_info []
 
 (* 2^255 in Pallas scalar; used for the circuit's `2^actual_bits_used`
    shift compensation. *)
@@ -55,14 +57,18 @@ let two_to_255_scalar : Pallas_scalar.t =
   in
   pow 255 Pallas_scalar.one
 
-(* Zero-seed Poseidon hash over `Tick_field_sponge.params`. Identical
-   to the in-circuit `Step_main_inputs.Sponge` shape used by
-   `schnorr_verify_circuit`. *)
+(* Mainnet-prefixed Poseidon hash matching Mina's
+   `Schnorr.Chunked.Message.hash` and the in-circuit
+   `schnorr_verify_circuit`: seed sponge with
+   `Hash_prefix_states.signature ~signature_kind:Mainnet`, absorb the
+   inputs in order (message field-elements first on the caller side,
+   then pk_x, pk_y, r — see `try_sign` below), squeeze. *)
 let poseidon_hash (inputs : Tick_field.t array) : Tick_field.t =
-  let open Pickles__Tick_field_sponge.Field in
-  let sponge = create Pickles__Tick_field_sponge.params in
-  Array.iter inputs ~f:(absorb sponge) ;
-  squeeze sponge
+  let init =
+    Hash_prefix_states.signature ~signature_kind:Mina_signature_kind.Mainnet
+  in
+  let s = Random_oracle.update ~state:init inputs in
+  Random_oracle.State.to_array s |> fun a -> a.(0)
 
 (* Convert Tick.Field <-> Pallas.Scalar via bits. Safe when value <
    2^254 (both fields are 254-bit primes; bit list is size_in_bits). *)
@@ -92,7 +98,10 @@ let try_sign ~(d : Pallas_scalar.t) ~(k : Pallas_scalar.t)
   let ry_even = match List.hd ry_bits with Some b -> not b | None -> true in
   if not ry_even then None
   else
-    let hash_inputs = Array.concat [ [| pk_x; pk_y; rx |]; message ] in
+    (* Mina's `Schnorr.Chunked.Message.hash` order:
+       `Input.Chunked.append message {pk; r}` — message field-elements
+       first, then pk_x, pk_y, r. *)
+    let hash_inputs = Array.concat [ message; [| pk_x; pk_y; rx |] ] in
     let e_tick = poseidon_hash hash_inputs in
     if tick_field_ge_2_254 e_tick then None
     else
