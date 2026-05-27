@@ -59,6 +59,13 @@ else
           ./buildkite/scripts/cache/manager.sh read --root "$ROOT" "debians/$MINA_DEB_CODENAME/mina-logproc*" $LOCAL_DEB_FOLDER
           ./buildkite/scripts/cache/manager.sh read --root "$ROOT" "debians/$MINA_DEB_CODENAME/${i}-config*" $LOCAL_DEB_FOLDER
       ;;
+      mina-devnet-instrumented|mina-mainnet-instrumented|mina-mesa-instrumented)
+        # Instrumented daemon depends on mina-logproc and the non-instrumented
+        # network-config deb (config files are the same for both flavors).
+          network_pkg=${i%-instrumented}
+          ./buildkite/scripts/cache/manager.sh read --root "$ROOT" "debians/$MINA_DEB_CODENAME/mina-logproc*" $LOCAL_DEB_FOLDER
+          ./buildkite/scripts/cache/manager.sh read --root "$ROOT" "debians/$MINA_DEB_CODENAME/${network_pkg}-config*" $LOCAL_DEB_FOLDER
+      ;;
       mina-*-prefork*)
         # Download mina-logproc legacy too
         ./buildkite/scripts/cache/manager.sh read --root "legacy" "debians/$MINA_DEB_CODENAME/${i}*" $LOCAL_DEB_FOLDER
