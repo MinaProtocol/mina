@@ -18,6 +18,8 @@ in  Pipeline.build
             , Artifacts.Type.LogProc
             , Artifacts.Type.Archive
             , Artifacts.Type.Rosetta
+            , Artifacts.Type.RosettaConfig
+            , Artifacts.Type.RosettaAppsOnly
             , Artifacts.Type.ZkappTestTransaction
             , Artifacts.Type.CreatePreforkGenesis
             , Artifacts.Type.DaemonStorageToolbox
