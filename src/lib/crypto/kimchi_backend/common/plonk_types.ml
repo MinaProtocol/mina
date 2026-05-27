@@ -1359,7 +1359,10 @@ module All_evals = struct
 
     module V1 = struct
       type ('f, 'f_multi) t =
-        { evals : ('f * 'f, 'f_multi * 'f_multi) With_public_input.Stable.V1.t
+        { evals :
+            ( 'f_multi * 'f_multi
+            , 'f_multi * 'f_multi )
+            With_public_input.Stable.V1.t
         ; ft_eval1 : 'f
         }
       [@@deriving sexp, compare, yojson, hash, equal, hlist]

@@ -421,7 +421,7 @@ module All_evals : sig
   module Stable : sig
     module V1 : sig
       type ('f, 'f_multi) t =
-        { evals : ('f * 'f, 'f_multi * 'f_multi) With_public_input.t
+        { evals : ('f_multi * 'f_multi, 'f_multi * 'f_multi) With_public_input.t
         ; ft_eval1 : 'f
         }
 

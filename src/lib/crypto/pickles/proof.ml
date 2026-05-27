@@ -254,14 +254,7 @@ module Make (MLMB : Nat.Intf) = struct
       }
     in
     let prev_evals : _ Plonk_types.All_evals.Stable.V1.t =
-      { evals =
-          { prev_evals.evals with
-            public_input =
-              (let x1, x2 = prev_evals.evals.public_input in
-               (x1.(0), x2.(0)) )
-          }
-      ; ft_eval1 = prev_evals.ft_eval1
-      }
+      { evals = prev_evals.evals; ft_eval1 = prev_evals.ft_eval1 }
     in
     { statement; prev_evals; proof }
 
@@ -289,14 +282,7 @@ module Make (MLMB : Nat.Intf) = struct
       }
     in
     let prev_evals : _ Plonk_types.All_evals.t =
-      { evals =
-          { public_input =
-              (let x1, x2 = prev_evals.evals.public_input in
-               ([| x1 |], [| x2 |]) )
-          ; evals = prev_evals.evals.evals
-          }
-      ; ft_eval1 = prev_evals.ft_eval1
-      }
+      { evals = prev_evals.evals; ft_eval1 = prev_evals.ft_eval1 }
     in
     T { statement; prev_evals; proof }
 
