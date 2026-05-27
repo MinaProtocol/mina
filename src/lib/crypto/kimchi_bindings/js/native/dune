@@ -10,6 +10,8 @@
 
 (rule
  (targets kimchi_napi.node index.d.ts)
+ (enabled_if
+  (= %{env:SKIP_KIMCHI_NAPI_NATIVE=0} 0))
  (mode
   (promote
    (into ./artifacts)))
