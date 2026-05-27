@@ -157,9 +157,12 @@ test_docker_promote_to_gcp() {
         return 0
     fi
 
-    # Pull source image from Docker Hub
+    # Pull source image from Docker Hub.
+    # The source tag is an arch-suffixed single-arch image, so --platform is
+    # redundant; passing it triggers a docker/containerd parser bug on some
+    # agents that treats the whole image ref as a platform specifier.
     log_info "Pulling source image from Docker Hub..."
-    if ! docker pull --platform linux/arm64 "${source_image}" 2>&1 | tee "${TEST_TEMP_DIR}/docker_pull.log"; then
+    if ! docker pull "${source_image}" 2>&1 | tee "${TEST_TEMP_DIR}/docker_pull.log"; then
         log_error "Failed to pull source image"
         assert_success "Docker promote to GCP Artifact Registry" 1
         return 1
