@@ -1292,10 +1292,7 @@ module Make (Inputs : Inputs_intf) = struct
       { local_state with stack_frame = remaining; call_stack }
     in
     let local_state = Local_state.add_new_failure_status_bucket local_state in
-    (* Capture this account's pre-step stake — [balance] if [delegate] is
-       non-empty, else 0 — for the stake_delta computation at the end of
-       this apply step, before any modifications to [a]. *)
-    let pre_stake =
+    let stake_of_account a =
       let is_staked =
         Bool.not (Public_key.equal (Account.delegate a) Public_key.empty)
       in
@@ -1303,6 +1300,7 @@ module Make (Inputs : Inputs_intf) = struct
         ~then_:(Balance.to_amount (Account.balance a))
         ~else_:Amount.zero
     in
+    let pre_stake = stake_of_account a in
     (* Register verification key, in case it needs to be 'side-loaded' to
        verify a zkapp proof.
     *)
@@ -1882,14 +1880,7 @@ module Make (Inputs : Inputs_intf) = struct
        where stake = (if is_staked then balance else 0) per the
        Definition section of docs/unstaking-stake-change.md. *)
     let step_stake_delta, stake_overflow =
-      let post_is_staked =
-        Bool.not (Public_key.equal (Account.delegate a) Public_key.empty)
-      in
-      let post_stake =
-        Amount.if_ post_is_staked
-          ~then_:(Balance.to_amount (Account.balance a))
-          ~else_:Amount.zero
-      in
+      let post_stake = stake_of_account a in
       let delta, `Overflow overflow =
         Amount.Signed.add_flagged
           (Amount.Signed.of_unsigned post_stake)
@@ -2049,7 +2040,8 @@ module Make (Inputs : Inputs_intf) = struct
     (* If this is the last party and there were no failures, update the second
        pass ledger and the supply increase.
     *)
-    let new_global_stake_change_after_lup, lup_stake_overflow =
+    let new_global_stake_change_after_local_update, local_update_stake_overflow
+        =
       let res, `Overflow overflow =
         Amount.Signed.add_flagged
           (Global_state.stake_change global_state)
@@ -2059,7 +2051,7 @@ module Make (Inputs : Inputs_intf) = struct
     in
     let local_state =
       Local_state.add_check local_state Overflow
-        Bool.(not (is_last_account_update &&& lup_stake_overflow))
+        Bool.(not (is_last_account_update &&& local_update_stake_overflow))
     in
     let global_state =
       let is_successful_last_party =
@@ -2074,7 +2066,7 @@ module Make (Inputs : Inputs_intf) = struct
       let global_state =
         Global_state.set_stake_change global_state
           (Amount.Signed.if_ is_successful_last_party
-             ~then_:new_global_stake_change_after_lup
+             ~then_:new_global_stake_change_after_local_update
              ~else_:(Global_state.stake_change global_state) )
       in
       Global_state.set_second_pass_ledger
