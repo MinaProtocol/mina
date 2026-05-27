@@ -39,8 +39,20 @@ let%test_module "zkApp stake_change in the transaction SNARK" =
        the account isn't in the ledger. *)
     let set_delegate ledger pk new_delegate =
       let acc_id = Account_id.create pk Token_id.default in
-      let loc = Option.value_exn (Ledger.location_of_account ledger acc_id) in
-      let acc = Option.value_exn (Ledger.get ledger loc) in
+      let loc =
+        Option.value_exn
+          ~message:
+            (sprintf "Location of %s not found in ledger"
+               (Account_id.sexp_of_t acc_id |> string_of_sexp) )
+          (Ledger.location_of_account ledger acc_id)
+      in
+      let acc =
+        Option.value_exn
+          ~message:
+            (sprintf "Empty location %s in ledger"
+               (Ledger.Location.sexp_of_t loc |> string_of_sexp) )
+          (Ledger.get ledger loc)
+      in
       Ledger.set ledger loc { acc with delegate = new_delegate }
 
     let memo =
@@ -108,8 +120,7 @@ let%test_module "zkApp stake_change in the transaction SNARK" =
     let () =
       match Sys.getenv "PROOF_CACHE_OUT" with
       | Some path ->
-          Yojson.Safe.to_file path
-          @@ Pickles.Proof_cache.to_yojson proof_cache
+          Yojson.Safe.to_file path @@ Pickles.Proof_cache.to_yojson proof_cache
       | None ->
           ()
   end )

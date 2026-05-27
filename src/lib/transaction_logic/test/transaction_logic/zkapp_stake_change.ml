@@ -21,6 +21,11 @@ module Transaction = Mina_transaction.Transaction
 
 let fee_gen = Fee.gen_incl Fee.one (Fee.of_mina_int_exn 1)
 
+(* [accounts] feeds [Ledger_helpers.noncemap] and must contain every account
+   that issues an account_update in the command (the fee_payer and any
+   update target), so its nonce can be resolved. Pubkeys referenced only as
+   delegatees (via [set_delegate_update]) are not account_update issuers and
+   need not appear here. *)
 let zkapp_txn ~fee_payer ~fee ?(transactions = []) accounts : Transaction.t =
   let cmd =
     zkapp_cmd
@@ -30,9 +35,9 @@ let zkapp_txn ~fee_payer ~fee ?(transactions = []) accounts : Transaction.t =
   in
   Command (User_command.Zkapp_command cmd)
 
-let set_delegate_update new_delegate =
+let set_delegate_update new_delegatee =
   { Account_update.Update.noop with
-    delegate = Zkapp_basic.Set_or_keep.Set new_delegate.Test_account.pk
+    delegate = Zkapp_basic.Set_or_keep.Set new_delegatee.Test_account.pk
   }
 
 let set_delegate_to_empty =
@@ -103,7 +108,7 @@ let z3_balance_change_staked_target () =
         (measure_stake_change ledger txn) )
 
 (* zkapp_stake_change_row_z4 — opt-in (unstaked → staked).
-   [opt_in_target]'s delegate goes None → Some [new_delegate]. balance
+   [opt_in_target]'s delegate goes None → Some [new_delegatee]. balance
    unchanged so balance'(opt_in_target) = balance(opt_in_target). Sum:
    −fee + balance(opt_in_target). *)
 let z4_opt_in_delegate () =
@@ -111,16 +116,17 @@ let z4_opt_in_delegate () =
     Quickcheck.Generator.(
       tuple4 (gen_account ()) (gen_account ()) (gen_account ())
         (tuple2 Public_key.Compressed.gen fee_gen))
-    ~f:(fun (fee_payer, opt_in_target, new_delegate, (fee_payer_validator, fee)) ->
-      let ledger = ledger_of [ fee_payer; opt_in_target; new_delegate ] in
+    ~f:(fun (fee_payer, opt_in_target, new_delegatee, (fee_payer_validator, fee))
+            ->
+      let ledger = ledger_of [ fee_payer; opt_in_target; new_delegatee ] in
       set_delegate ledger fee_payer.pk (Some fee_payer_validator) ;
       let opt_in_update =
         Alter_account.make ~account:opt_in_target
-          (set_delegate_update new_delegate)
+          (set_delegate_update new_delegatee)
       in
       let txn =
         zkapp_txn ~fee_payer ~fee ~transactions:[ opt_in_update ]
-          [ fee_payer; opt_in_target; new_delegate ]
+          [ fee_payer; opt_in_target; new_delegatee ]
       in
       let expected =
         add_signed
@@ -205,16 +211,16 @@ let z7_distinct_targets () =
         (gen_account ())
         (tuple3 Public_key.Compressed.gen Public_key.Compressed.gen fee_gen))
     ~f:(fun ( (fee_payer, opt_in_target, opt_out_target)
-            , new_delegate
+            , new_delegatee
             , (fee_payer_validator, opt_out_target_validator, fee) ) ->
       let ledger =
-        ledger_of [ fee_payer; opt_in_target; opt_out_target; new_delegate ]
+        ledger_of [ fee_payer; opt_in_target; opt_out_target; new_delegatee ]
       in
       set_delegate ledger fee_payer.pk (Some fee_payer_validator) ;
       set_delegate ledger opt_out_target.pk (Some opt_out_target_validator) ;
       let opt_in_update =
         Alter_account.make ~account:opt_in_target
-          (set_delegate_update new_delegate)
+          (set_delegate_update new_delegatee)
       in
       let opt_out_update =
         Alter_account.make ~account:opt_out_target set_delegate_to_empty
@@ -222,7 +228,7 @@ let z7_distinct_targets () =
       let txn =
         zkapp_txn ~fee_payer ~fee
           ~transactions:[ opt_in_update; opt_out_update ]
-          [ fee_payer; opt_in_target; opt_out_target; new_delegate ]
+          [ fee_payer; opt_in_target; opt_out_target; new_delegatee ]
       in
       let expected =
         add_signed
