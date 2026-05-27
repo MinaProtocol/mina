@@ -188,8 +188,8 @@ let num_of_confirmations (module Conn : CONNECTION) ~latest_state_hash
     Caqti_type.(t2 string int ->! int)
       {%string|
         %{chain_of_query}
-        SELECT COUNT(*) FROM chain 
-        WHERE global_slot_since_genesis >= $2;
+        SELECT COUNT(*) FROM chain
+        WHERE global_slot_since_genesis > $2;
       |}
   in
   Conn.find query (latest_state_hash, fork_slot)

@@ -97,40 +97,58 @@ let confirmations_check ~postgres_uri ~latest_state_hash ~fork_slot
 let no_commands_after ~postgres_uri ~fork_state_hash ~fork_slot () =
   let pool = connect postgres_uri in
   let query_db = Mina_caqti.query pool in
-  let%bind user_commands_count =
-    query_db
-      ~f:(Sql.number_of_user_commands_since_block ~fork_state_hash ~fork_slot)
+  let%bind block_info =
+    query_db ~f:(Sql.block_info_by_state_hash ~state_hash:fork_state_hash)
   in
-  let%bind internal_commands_count =
-    query_db
-      ~f:
-        (Sql.number_of_internal_commands_since_block ~fork_state_hash ~fork_slot)
-  in
+  match block_info with
+  | None ->
+      Deferred.return
+        [ { id = "3.N"
+          ; name = "No commands after fork check"
+          ; result =
+              Failure
+                (sprintf "Fork block %s not found in archive" fork_state_hash)
+          }
+        ]
+  | Some _ ->
+      let%bind user_commands_count =
+        query_db
+          ~f:
+            (Sql.number_of_user_commands_since_block ~fork_state_hash ~fork_slot)
+      in
+      let%bind internal_commands_count =
+        query_db
+          ~f:
+            (Sql.number_of_internal_commands_since_block ~fork_state_hash
+               ~fork_slot )
+      in
 
-  let%map zkapps_commands_count =
-    query_db
-      ~f:(Sql.number_of_zkapps_commands_since_block ~fork_state_hash ~fork_slot)
-  in
+      let%map zkapps_commands_count =
+        query_db
+          ~f:
+            (Sql.number_of_zkapps_commands_since_block ~fork_state_hash
+               ~fork_slot )
+      in
 
-  let result =
-    if
-      user_commands_count = 0
-      && internal_commands_count = 0
-      && zkapps_commands_count = 0
-    then Success
-    else
-      Failure
-        (sprintf
-           "Expected no user, internal or zkapps commands after the fork block \
-            %s at slot %d, however got %d user commands and %d internal \
-            commands and %d zkapps commands"
-           fork_state_hash fork_slot user_commands_count internal_commands_count
-           zkapps_commands_count )
-  in
-  let check_result =
-    { id = "3.N"; name = "No commands after fork check"; result }
-  in
-  [ check_result ]
+      let result =
+        if
+          user_commands_count = 0
+          && internal_commands_count = 0
+          && zkapps_commands_count = 0
+        then Success
+        else
+          Failure
+            (sprintf
+               "Expected no user, internal or zkapps commands after the fork \
+                block %s at slot %d, however got %d user commands and %d \
+                internal commands and %d zkapps commands"
+               fork_state_hash fork_slot user_commands_count
+               internal_commands_count zkapps_commands_count )
+      in
+      let check_result =
+        { id = "3.N"; name = "No commands after fork check"; result }
+      in
+      [ check_result ]
 
 let verify_upgrade ~postgres_uri ~expected_protocol_version
     ~expected_migration_version () =
