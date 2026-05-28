@@ -732,7 +732,8 @@ copy_common_daemon_post_automode_apps_and_configs() {
 
 build_daemon_postfork_deb() {
   local prefork_network="$1"
-  local package_name="mina-${prefork_network}-postfork-${POSTFORK_CODENAME}"
+
+  local package_name="mina-${prefork_network//_/-}-postfork-${POSTFORK_CODENAME}"
 
 
   echo "------------------------------------------------------------"
