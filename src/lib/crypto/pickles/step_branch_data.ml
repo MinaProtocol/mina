@@ -195,13 +195,7 @@ module Make (Inductive_rule : Inductive_rule.Intf) = struct
           ; step_domains
           ; feature_flags
           ; num_chunks
-          ; zk_rows =
-              ( match num_chunks with
-              | 1 (* cannot match with Plonk_checks.num_chunks_by_default *) ->
-                  Plonk_checks.zk_rows_by_default
-              | num_chunks ->
-                  let permuts = 7 in
-                  ((2 * (permuts + 1) * num_chunks) - 2 + permuts) / permuts )
+          ; zk_rows = Plonk_checks.zk_rows_for_num_chunks num_chunks
           }
         ~public_input ~auxiliary_typ ~self_branches:branches ~proofs_verified
         ~local_signature:widths ~local_signature_length ~local_branches_length
