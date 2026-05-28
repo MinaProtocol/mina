@@ -1,0 +1,19 @@
+(library
+ (name itn_graphql_client)
+ (public_name itn_graphql_client)
+ (libraries
+  ;; opam libraries
+  core
+  core_kernel
+  async
+  async_kernel
+  cohttp
+  cohttp-async
+  uri
+  yojson
+  ;; local libraries
+  itn_crypto)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_jane ppx_version)))

@@ -1110,6 +1110,174 @@ module HealthcheckUnreachable = struct
         Mina_automation_fixture.Intf.Passed
 end
 
+(** Verify that the daemon's ITN GraphQL server enforces Ed25519-signed auth.
+
+    Boots a single daemon with [--itn-keys <permitted-pubkey>] and
+    [--itn-graphql-port <port>] (ITN_FEATURES=1 is injected by Daemon.start).
+    Then:
+    1. Posts the [auth] query to the ITN port signed with the permitted key,
+       parses the returned UUID + sequence number.
+    2. Posts a sequenced [internalLogs] query using that UUID/seq-no.
+    3. Posts the [auth] query signed with a DIFFERENT Ed25519 key and asserts
+       the daemon rejects the request with a 4xx.
+    4. Posts a sequenced [internalLogs] signed with the foreign key and asserts
+       the daemon rejects it too (the sequenced rejection path is distinct from
+       the unsequenced one inside [graphql_internal.ml]).
+
+    Wire-level signing and posting live in [Itn_graphql_client] so the same
+    helpers can be reused by other automation. *)
+module ItnGraphqlAuth = struct
+  type t = Mina_automation_fixture.Daemon.before_bootstrap
+
+  (* All ports are non-default so the test can run alongside other mina
+     daemons on the same host (CI runners and local dev boxes often have one
+     running on 8031/3085/8302). *)
+  let client_port = 18031
+
+  let rest_port = 13085
+
+  let itn_port = 13086
+
+  let libp2p_port = 18302
+
+  let itn_uri = Itn_graphql_client.make_uri ~port:itn_port ()
+
+  (* Use [internalLogs] for the sequenced query: it works on any node (no
+     block-producer requirement, unlike [internalLogs]) and only reads daemon
+     state. *)
+  let sequenced_query =
+    {|{"query":"{ internalLogs(startLogId: 0) { id } }","variables":null}|}
+
+  let or_error_result_of d =
+    match%map d with
+    | Ok _ ->
+        Mina_automation_fixture.Intf.Passed
+    | Error err ->
+        Mina_automation_fixture.Intf.Failed err
+
+  let happy_path ~permitted_priv ~permitted_pub_b64 =
+    let open Deferred.Or_error.Let_syntax in
+    (* Step 1: auth handshake with the permitted key. *)
+    let%bind uuid, seq_no =
+      Itn_graphql_client.send_auth ~uri:itn_uri ~privkey:permitted_priv
+        ~pubkey_b64:permitted_pub_b64
+    in
+    (* Step 2: sequenced internalLogs query using the daemon-issued seq_no.  The
+       client checks status code AND graphql `errors` body for us. *)
+    let%map _ =
+      Itn_graphql_client.send_sequenced ~uri:itn_uri ~privkey:permitted_priv
+        ~pubkey_b64:permitted_pub_b64 ~uuid ~seq_no ~body:sequenced_query
+    in
+    ()
+
+  let expect_rejection ~description response =
+    match response with
+    | Ok (status, _body) when status >= 400 && status < 500 ->
+        Ok ()
+    | Ok (status, body) ->
+        Or_error.errorf "%s: expected 4xx, got %d.  Body: %s" description status
+          body
+    | Error err ->
+        (* Network/timeout failures are not what we're asserting here. *)
+        Error (Error.tag err ~tag:description)
+
+  let negative_path ~foreign_priv ~foreign_pub_b64 =
+    let open Deferred.Or_error.Let_syntax in
+    (* Step 3: unsequenced auth signed with a foreign key. *)
+    let foreign_unseq_header =
+      Itn_graphql_client.unsequenced_auth_header ~privkey:foreign_priv
+        ~pubkey_b64:foreign_pub_b64 ~body:Itn_graphql_client.auth_query
+    in
+    let%bind () =
+      Itn_graphql_client.post ~uri:itn_uri ~auth_header:foreign_unseq_header
+        ~body:Itn_graphql_client.auth_query ()
+      |> Deferred.map
+           ~f:(expect_rejection ~description:"unsequenced foreign auth")
+    in
+    (* Step 4: sequenced internalLogs signed with the foreign key.  UUID and seq_no
+       are arbitrary — the daemon must reject before validating them. *)
+    let foreign_seq_header =
+      Itn_graphql_client.sequenced_auth_header ~privkey:foreign_priv
+        ~pubkey_b64:foreign_pub_b64 ~uuid:"deadbeef" ~seq_no:0
+        ~body:sequenced_query
+    in
+    Itn_graphql_client.post ~uri:itn_uri ~auth_header:foreign_seq_header
+      ~body:sequenced_query ()
+    |> Deferred.map
+         ~f:(expect_rejection ~description:"sequenced foreign internalLogs")
+
+  let cleanup ~process =
+    let%bind _ =
+      Monitor.try_with (fun () ->
+          Daemon.Client.stop_daemon process.Daemon.Process.client )
+    in
+    (* `stop-daemon` returns exit code 0 whether or not the daemon was actually
+       reachable, so wait for the OS process to exit and SIGKILL if it doesn't.
+       This is what closes the ports for the next test. *)
+    match%bind
+      Async.Clock.with_timeout (Time.Span.of_sec 10.)
+        (Process.wait process.Daemon.Process.process)
+    with
+    | `Result _ ->
+        Deferred.unit
+    | `Timeout ->
+        let%bind kill_result =
+          Monitor.try_with (fun () -> Daemon.Process.force_kill process)
+        in
+        ( match kill_result with
+        | Ok _ ->
+            ()
+        | Error exn ->
+            eprintf "ITN test cleanup: force_kill failed: %s\n"
+              (Exn.to_string exn) ) ;
+        Deferred.unit
+
+  let test_case (test : t) =
+    let config = { test.config with client_port; rest_port } in
+    let daemon = Daemon.of_config config in
+    let%bind () = Daemon.Config.generate_keys config in
+    let ledger_file = config.dirs.conf ^/ "daemon.json" in
+    let%bind () =
+      Mina_automation_fixture.Daemon.generate_random_config daemon ledger_file
+    in
+    let permitted_priv, permitted_pub = Itn_crypto.generate_keypair () in
+    let foreign_priv, foreign_pub = Itn_crypto.generate_keypair () in
+    let permitted_pub_b64 = Itn_crypto.pubkey_to_base64 permitted_pub in
+    let foreign_pub_b64 = Itn_crypto.pubkey_to_base64 foreign_pub in
+    let%bind process =
+      Daemon.start ~itn_keys:permitted_pub_b64 ~itn_graphql_port:itn_port
+        ~libp2p_port daemon
+    in
+    Monitor.protect
+      ~finally:(fun () -> cleanup ~process)
+      (fun () ->
+        let%bind bootstrap_result = Daemon.wait_for_node_init process in
+        match bootstrap_result with
+        | Error e ->
+            let log_file = Daemon.Config.ConfigDirs.mina_log config.dirs in
+            let%bind logs = Reader.file_contents log_file in
+            printf "Bootstrap error: %s\nDaemon logs:\n%s\n"
+              (Error.to_string_hum e) logs ;
+            Deferred.return
+              (Mina_automation_fixture.Intf.Failed
+                 (Error.tag e ~tag:"Bootstrap failed") )
+        | Ok () -> (
+            match%bind Itn_graphql_client.probe ~uri:itn_uri () with
+            | `Timeout ->
+                Deferred.return
+                  (Mina_automation_fixture.Intf.Failed
+                     (Error.of_string
+                        "ITN graphql port did not start accepting connections" )
+                  )
+            | `Ready ->
+                let run =
+                  let open Deferred.Or_error.Let_syntax in
+                  let%bind () = happy_path ~permitted_priv ~permitted_pub_b64 in
+                  negative_path ~foreign_priv ~foreign_pub_b64
+                in
+                or_error_result_of run ) )
+end
+
 let () =
   let open Alcotest in
   run "Test commadline."
@@ -1263,5 +1431,15 @@ let () =
                ( module Mina_automation_fixture.Daemon
                         .Make_FixtureWithoutBootstrap
                           (HealthcheckUnreachable) ) )
+        ] )
+    ; ( "itn-graphql-auth"
+      , [ test_case
+            "The mina daemon authenticates ITN GraphQL requests with Ed25519 \
+             signatures"
+            `Slow
+            (Mina_automation_runner.Runner.run_blocking
+               ( module Mina_automation_fixture.Daemon
+                        .Make_FixtureWithoutBootstrap
+                          (ItnGraphqlAuth) ) )
         ] )
     ]

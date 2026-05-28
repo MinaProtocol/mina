@@ -19,6 +19,8 @@
   yojson
   ;; mina libraries
   init
+  itn_crypto
+  itn_graphql_client
   logger
   mina_automation
   mina_automation.fixture
