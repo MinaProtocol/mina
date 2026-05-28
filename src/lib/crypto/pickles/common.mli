@@ -123,6 +123,9 @@ module Max_degree : sig
 
   (** Log base 2 of the maximum degree for step circuits. *)
   val step_log2 : int
+
+  (** Maximum supported step domain log size for a chunked proof. *)
+  val step_domain_log2_for_num_chunks : int -> int
 end
 
 (** {2 Field Shifts} *)
