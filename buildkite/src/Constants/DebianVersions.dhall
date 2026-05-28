@@ -41,6 +41,7 @@ let DepsSpec =
           , step : Text
           , prefix : Text
           , arch : Arch.Type
+          , suffix : Text
           }
       , default =
           { deb_version = DebVersion.Bullseye
@@ -50,6 +51,7 @@ let DepsSpec =
           , step = "build"
           , prefix = "MinaArtifact"
           , arch = Arch.Type.Amd64
+          , suffix = ""
           }
       }
 
@@ -64,7 +66,7 @@ let dependsOn =
                                                                                          spec.build_flag}${Arch.nameSuffix
                                                                                                              spec.arch}"
 
-          in  [ { name = name, key = "${spec.step}-deb-pkg" } ]
+          in  [ { name = name, key = "${spec.step}-deb-pkg${spec.suffix}" } ]
 
 let minimalDirtyWhen =
       [ S.exactly "buildkite/src/Constants/DebianVersions" "dhall"

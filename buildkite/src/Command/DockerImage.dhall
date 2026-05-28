@@ -60,6 +60,7 @@ let ReleaseSpec =
           , deb_repo : DebianRepo.Type
           , build_flags : BuildFlags.Type
           , step_key_suffix : Text
+          , label_suffix : Text
           , docker_publish : DockerPublish.Type
           , docker_repo : DockerRepo.Type
           , save_to_ci_cache : Bool
@@ -92,6 +93,7 @@ let ReleaseSpec =
           , save_to_ci_cache = False
           , docker_repo = DockerRepo.Type.InternalEurope
           , step_key_suffix = "-docker-image"
+          , label_suffix = ""
           , verify = False
           , deb_suffix = None Text
           , image_name = None Text
@@ -112,7 +114,7 @@ let stepLabel =
                                                            spec.deb_codename} ${Profiles.toSuffixUppercase
                                                                                   spec.deb_profile} ${BuildFlags.toSuffixUppercase
                                                                                                         spec.build_flags} ${Arch.capitalName
-                                                                                                                              spec.arch}"
+                                                                                                                              spec.arch}${spec.label_suffix}"
 
 let generateStep =
           \(spec : ReleaseSpec.Type)

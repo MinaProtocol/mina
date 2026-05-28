@@ -117,6 +117,10 @@ let nameSuffix
                                                                      spec.buildFlags}${Arch.nameSuffix
                                                                                          spec.arch}"
 
+let stepKeySuffix
+    : MinaBuildSpec.Type -> Text
+    = \(spec : MinaBuildSpec.Type) -> Optional/default Text "" spec.suffix
+
 let build_artifacts
     : MinaBuildSpec.Type -> Command.Type
     =     \(spec : MinaBuildSpec.Type)
@@ -152,8 +156,8 @@ let build_artifacts
                       "./buildkite/scripts/apps/write_to_cache.sh ${DebianVersions.lowerName
                                                                       spec.debVersion}"
                   ]
-            , label = "Debian: Build ${labelSuffix spec}"
-            , key = "build-deb-pkg${Optional/default Text "" spec.suffix}"
+            , label = "Debian: Build ${labelSuffix spec}${stepKeySuffix spec}"
+            , key = "build-deb-pkg${stepKeySuffix spec}"
             , target = Size.Multi
             , if_ = spec.if_
             , retries =
@@ -180,6 +184,7 @@ let docker_step
                   , step = step_dep_name
                   , prefix = spec.prefix
                   , arch = spec.arch
+                  , suffix = stepKeySuffix spec
                   }
 
           let size = Size.XLarge
@@ -191,6 +196,8 @@ let docker_step
                     , service = Artifacts.Type.Daemon
                     , network = spec.network
                     , deb_codename = spec.debVersion
+                    , step_key_suffix = "-docker-image${stepKeySuffix spec}"
+                    , label_suffix = stepKeySuffix spec
                     , deb_profile = spec.profile
                     , build_flags = spec.buildFlags
                     , docker_publish = spec.docker_publish
@@ -211,13 +218,17 @@ let docker_step
                         # DockerVersion.dependsOn
                             DockerVersion.DepsSpec::{
                             , codename = DockerVersion.ofDebian spec.debVersion
+                            , prefix = spec.prefix
                             , network = spec.network
                             , profile = spec.profile
                             , artifact = Artifacts.Type.Daemon
+                            , suffix = "docker-image${stepKeySuffix spec}"
                             }
                     , service = Artifacts.Type.DaemonAutoHardfork
                     , network = spec.network
                     , deb_codename = spec.debVersion
+                    , step_key_suffix = "-docker-image${stepKeySuffix spec}"
+                    , label_suffix = stepKeySuffix spec
                     , deb_profile = spec.profile
                     , build_flags = spec.buildFlags
                     , docker_publish = spec.docker_publish
@@ -233,13 +244,17 @@ let docker_step
                         # DockerVersion.dependsOn
                             DockerVersion.DepsSpec::{
                             , codename = DockerVersion.ofDebian spec.debVersion
+                            , prefix = spec.prefix
                             , network = spec.network
                             , profile = spec.profile
                             , artifact = Artifacts.Type.DaemonLegacyHardfork
+                            , suffix = "docker-image${stepKeySuffix spec}"
                             }
                     , service = Artifacts.Type.DaemonLegacyHardfork
                     , network = spec.network
                     , deb_codename = spec.debVersion
+                    , step_key_suffix = "-docker-image${stepKeySuffix spec}"
+                    , label_suffix = stepKeySuffix spec
                     , deb_profile = spec.profile
                     , build_flags = spec.buildFlags
                     , docker_publish = spec.docker_publish
@@ -255,6 +270,8 @@ let docker_step
                     , service = Artifacts.Type.DaemonAppsOnly
                     , network = spec.network
                     , deb_codename = spec.debVersion
+                    , step_key_suffix = "-docker-image${stepKeySuffix spec}"
+                    , label_suffix = stepKeySuffix spec
                     , deb_profile = spec.profile
                     , build_flags = spec.buildFlags
                     , docker_publish = spec.docker_publish
@@ -275,15 +292,19 @@ let docker_step
                         # DockerVersion.dependsOn
                             DockerVersion.DepsSpec::{
                             , codename = DockerVersion.ofDebian spec.debVersion
+                            , prefix = spec.prefix
                             , network = spec.network
                             , profile = spec.profile
                             , artifact = Artifacts.Type.DaemonAppsOnly
                             , arch = spec.arch
                             , buildFlags = spec.buildFlags
+                            , suffix = "docker-image${stepKeySuffix spec}"
                             }
                     , service = Artifacts.Type.DaemonConfig
                     , network = spec.network
                     , deb_codename = spec.debVersion
+                    , step_key_suffix = "-docker-image${stepKeySuffix spec}"
+                    , label_suffix = stepKeySuffix spec
                     , docker_publish = spec.docker_publish
                     , deb_profile = spec.profile
                     , build_flags = spec.buildFlags
@@ -304,6 +325,8 @@ let docker_step
                     , service = Artifacts.Type.BatchTxn
                     , network = spec.network
                     , deb_codename = spec.debVersion
+                    , step_key_suffix = "-docker-image${stepKeySuffix spec}"
+                    , label_suffix = stepKeySuffix spec
                     , deb_profile = spec.profile
                     , build_flags = spec.buildFlags
                     , docker_publish = spec.docker_publish
@@ -320,6 +343,8 @@ let docker_step
                     , service = Artifacts.Type.DelegationVerifier
                     , network = spec.network
                     , deb_codename = spec.debVersion
+                    , step_key_suffix = "-docker-image${stepKeySuffix spec}"
+                    , label_suffix = stepKeySuffix spec
                     , deb_profile = spec.profile
                     , build_flags = spec.buildFlags
                     , docker_publish = spec.docker_publish
@@ -337,6 +362,8 @@ let docker_step
                     , service = Artifacts.Type.Archive
                     , network = spec.network
                     , deb_codename = spec.debVersion
+                    , step_key_suffix = "-docker-image${stepKeySuffix spec}"
+                    , label_suffix = stepKeySuffix spec
                     , deb_profile = spec.profile
                     , build_flags = spec.buildFlags
                     , docker_publish = spec.docker_publish
@@ -354,6 +381,8 @@ let docker_step
                     , service = Artifacts.Type.Rosetta
                     , network = spec.network
                     , deb_codename = spec.debVersion
+                    , step_key_suffix = "-docker-image${stepKeySuffix spec}"
+                    , label_suffix = stepKeySuffix spec
                     , deb_profile = spec.profile
                     , build_flags = spec.buildFlags
                     , docker_publish = spec.docker_publish
@@ -371,6 +400,8 @@ let docker_step
                     , service = Artifacts.Type.RosettaAppsOnly
                     , network = spec.network
                     , deb_codename = spec.debVersion
+                    , step_key_suffix = "-docker-image${stepKeySuffix spec}"
+                    , label_suffix = stepKeySuffix spec
                     , deb_profile = spec.profile
                     , build_flags = spec.buildFlags
                     , docker_publish = spec.docker_publish
@@ -390,15 +421,19 @@ let docker_step
                         # DockerVersion.dependsOn
                             DockerVersion.DepsSpec::{
                             , codename = DockerVersion.ofDebian spec.debVersion
+                            , prefix = spec.prefix
                             , network = spec.network
                             , profile = spec.profile
                             , artifact = Artifacts.Type.RosettaAppsOnly
+                            , suffix = "docker-image${stepKeySuffix spec}"
                             }
                     , service = Artifacts.Type.RosettaConfig
                     , network = spec.network
                     , image_name = Some
                         (Artifacts.dockerName Artifacts.Type.Rosetta)
                     , deb_codename = spec.debVersion
+                    , step_key_suffix = "-docker-image${stepKeySuffix spec}"
+                    , label_suffix = stepKeySuffix spec
                     , docker_publish = spec.docker_publish
                     , deb_install_mode =
                         DockerImage.DebianInstallMode.DownloadOnly
@@ -415,6 +450,8 @@ let docker_step
                     , deb_repo = DebianRepo.Type.Local
                     , deb_profile = spec.profile
                     , deb_codename = spec.debVersion
+                    , step_key_suffix = "-docker-image${stepKeySuffix spec}"
+                    , label_suffix = stepKeySuffix spec
                     , deb_legacy_version = spec.deb_legacy_version
                     , arch = spec.arch
                     , if_ = spec.if_
@@ -427,6 +464,8 @@ let docker_step
                     , service = Artifacts.Type.FunctionalTestSuite
                     , network = Network.Type.Devnet
                     , deb_codename = spec.debVersion
+                    , step_key_suffix = "-docker-image${stepKeySuffix spec}"
+                    , label_suffix = stepKeySuffix spec
                     , build_flags = spec.buildFlags
                     , docker_publish = spec.docker_publish
                     , deb_repo = DebianRepo.Type.Local
