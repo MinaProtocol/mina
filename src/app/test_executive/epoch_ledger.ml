@@ -63,6 +63,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   let run ~config:_ network t =
     let open Malleable_error.Let_syntax in
+    let logger = Logger.create () in
     let all_mina_nodes = Network.all_mina_nodes network in
     let%bind () =
       wait_for t
@@ -72,6 +73,37 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     (* Since I made the balances of block producers in genesis ledger and next
        epoch ledgers to be 0, then blocks would only be produced, if the
        consensus selects the staking epoch *)
-    section "wait for 3 block to be produced"
-      (wait_for t (Wait_condition.blocks_to_be_produced 3))
+    let%bind () =
+      section "wait for 3 block to be produced"
+        (wait_for t (Wait_condition.blocks_to_be_produced 3))
+    in
+    section
+      "GraphQL exposes total_stake on staking epoch ledger and total_stake <= \
+       total_currency (MIP-0010)"
+      (let any_node = Core.List.hd_exn (Core.String.Map.data all_mina_nodes) in
+       let%bind blocks =
+         Integration_test_lib.Graphql_requests.must_get_best_chain_stake_totals
+           ~max_length:1 ~logger
+           (Network.Node.get_ingress_uri any_node)
+       in
+       let block =
+         match blocks with
+         | b :: _ ->
+             b
+         | [] ->
+             failwith "expected at least one best-chain block"
+       in
+       let { Mina_graphql_client.Types.total_currency; total_stake } =
+         block.staking
+       in
+       [%log info] "staking epoch ledger: total_currency=%s total_stake=%s"
+         (Currency.Amount.to_mina_string total_currency)
+         (Currency.Amount.to_mina_string total_stake) ;
+       if Currency.Amount.(total_stake <= total_currency) then
+         Malleable_error.return ()
+       else
+         Malleable_error.hard_error_format
+           "staking epoch ledger: total_stake (%s) > total_currency (%s)"
+           (Currency.Amount.to_mina_string total_stake)
+           (Currency.Amount.to_mina_string total_currency) )
 end

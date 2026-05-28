@@ -10786,6 +10786,23 @@
               "deprecationReason": null
             },
             {
+              "name": "totalStake",
+              "description":
+                "Total participating stake at this block (default-token balances of accounts with non-empty delegate, per MIP-0010)",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Amount",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
               "name": "stakingEpochData",
               "description": null,
               "args": [],

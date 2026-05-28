@@ -165,8 +165,35 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ~new_delegate:(fresh_unknown_pk ()) ~expected_delegate:(Some node_b_pk)
         ~has_failures:true
     in
-    delegate_and_assert
-      ~section_name:"delegation to empty pk clears the delegate (unstake)"
-      ~new_delegate:Signature_lib.Public_key.Compressed.empty
-      ~expected_delegate:None ~has_failures:false
+    let%bind () =
+      delegate_and_assert
+        ~section_name:"delegation to empty pk clears the delegate (unstake)"
+        ~new_delegate:Signature_lib.Public_key.Compressed.empty
+        ~expected_delegate:None ~has_failures:false
+    in
+    section
+      "GraphQL exposes total_stake and total_stake <= total_currency (MIP-0010)"
+      (let%bind blocks =
+         Integration_test_lib.Graphql_requests.must_get_best_chain_stake_totals
+           ~max_length:1 ~logger node_a_uri
+       in
+       let block =
+         match blocks with
+         | b :: _ ->
+             b
+         | [] ->
+             failwith "expected at least one best-chain block"
+       in
+       let total_currency = block.rolling_total_currency in
+       let total_stake = block.rolling_total_stake in
+       [%log info] "rolling totals: total_currency=%s total_stake=%s"
+         (Currency.Amount.to_mina_string total_currency)
+         (Currency.Amount.to_mina_string total_stake) ;
+       if Currency.Amount.(total_stake <= total_currency) then
+         Malleable_error.return ()
+       else
+         Malleable_error.hard_error_format
+           "total_stake (%s) > total_currency (%s)"
+           (Currency.Amount.to_mina_string total_stake)
+           (Currency.Amount.to_mina_string total_currency) )
 end

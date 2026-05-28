@@ -18,6 +18,9 @@ let must_get_global_slot_since_hard_fork ~logger node_uri =
 let must_get_best_chain ?max_length ~logger node_uri =
   get_best_chain ?max_length ~logger node_uri |> lift
 
+let must_get_best_chain_stake_totals ?max_length ~logger node_uri =
+  get_best_chain_stake_totals ?max_length ~logger node_uri |> lift
+
 let must_get_account_data ~logger node_uri ~account_id =
   get_account_data ~logger node_uri ~account_id |> lift
 

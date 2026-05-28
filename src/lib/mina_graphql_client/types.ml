@@ -37,3 +37,14 @@ type detailed_chain_block =
   ; slot : Mina_numbers.Global_slot_since_hard_fork.t
   ; slot_since_genesis : Mina_numbers.Global_slot_since_genesis.t
   }
+
+type epoch_ledger_totals =
+  { total_currency : Currency.Amount.t; total_stake : Currency.Amount.t }
+
+type best_chain_stake_totals =
+  { state_hash : string
+  ; rolling_total_currency : Currency.Amount.t
+  ; rolling_total_stake : Currency.Amount.t
+  ; staking : epoch_ledger_totals
+  ; next : epoch_ledger_totals
+  }

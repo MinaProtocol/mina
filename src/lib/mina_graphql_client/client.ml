@@ -126,6 +126,40 @@ let get_best_chain ?max_length ~logger node_uri =
                } )
            (Array.to_list chain)
 
+let get_best_chain_stake_totals ?max_length ~logger node_uri =
+  let open Deferred.Or_error.Let_syntax in
+  let query =
+    Queries.Best_chain_stake_totals.(make @@ makeVariables ?max_length ())
+  in
+  let%bind result =
+    exec_graphql_request ~logger ~node_uri ~query_name:"best_chain_stake_totals"
+      query
+  in
+  match result.bestChain with
+  | None | Some [||] ->
+      Deferred.Or_error.error_string "failed to get best chains"
+  | Some chain ->
+      return
+      @@ List.map
+           ~f:(fun block ->
+             let cs = block.protocolState.consensusState in
+             let staking = cs.stakingEpochData.ledger in
+             let next = cs.nextEpochData.ledger in
+             Types.
+               { state_hash = block.stateHash
+               ; rolling_total_currency = cs.totalCurrency
+               ; rolling_total_stake = cs.totalStake
+               ; staking =
+                   { total_currency = staking.totalCurrency
+                   ; total_stake = staking.totalStake
+                   }
+               ; next =
+                   { total_currency = next.totalCurrency
+                   ; total_stake = next.totalStake
+                   }
+               } )
+           (Array.to_list chain)
+
 let get_account ~logger node_uri ~account_id =
   let pk = Mina_base.Account_id.public_key account_id in
   let token = Mina_base.Account_id.token_id account_id in

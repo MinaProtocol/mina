@@ -294,6 +294,34 @@ module Account =
   }
 |}]
 
+module Best_chain_stake_totals =
+[%graphql
+{|
+    query ($max_length: Int) @encoders(module: "Encoders") {
+      bestChain (maxLength: $max_length) {
+        stateHash @ppxCustom(module: "Graphql_lib.Scalars.String_json")
+        protocolState {
+          consensusState {
+            totalCurrency @ppxCustom(module: "Scalars.Amount")
+            totalStake @ppxCustom(module: "Scalars.Amount")
+            stakingEpochData {
+              ledger {
+                totalCurrency @ppxCustom(module: "Scalars.Amount")
+                totalStake @ppxCustom(module: "Scalars.Amount")
+              }
+            }
+            nextEpochData {
+              ledger {
+                totalCurrency @ppxCustom(module: "Scalars.Amount")
+                totalStake @ppxCustom(module: "Scalars.Amount")
+              }
+            }
+          }
+        }
+      }
+    }
+  |}]
+
 module Best_chain_for_slot_end_test =
 [%graphql
 {|

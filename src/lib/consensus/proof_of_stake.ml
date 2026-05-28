@@ -2382,6 +2382,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         , min_window_density
         , sub_window_densities
         , total_currency
+        , total_stake
         , global_slot_since_genesis
         , block_stake_winner
         , last_vrf_output

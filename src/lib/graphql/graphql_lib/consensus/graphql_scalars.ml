@@ -158,6 +158,13 @@ module Consensus_state = struct
             ~typ:(non_null amount)
             ~args:Arg.[]
             ~resolve:(const total_currency)
+        ; field "totalStake"
+            ~doc:
+              "Total participating stake at this block (default-token balances \
+               of accounts with non-empty delegate, per MIP-0010)"
+            ~typ:(non_null amount)
+            ~args:Arg.[]
+            ~resolve:(const total_stake)
         ; field "stakingEpochData"
             ~typ:(non_null @@ Epoch_data.typ "StakingEpochData")
             ~args:Arg.[]

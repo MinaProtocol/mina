@@ -613,6 +613,8 @@ module type S = sig
 
       val total_currency : Value.t -> Amount.t
 
+      val total_stake : Value.t -> Amount.t
+
       val global_slot_since_genesis :
         Value.t -> Mina_numbers.Global_slot_since_genesis.t
 
