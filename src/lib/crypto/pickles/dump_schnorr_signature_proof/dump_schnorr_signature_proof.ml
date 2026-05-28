@@ -8,16 +8,23 @@
  *                                   values: pk_x, pk_y, r, s, message[0],
  *                                   plus the boolean output (`1`).
  *
- *  Sign convention (matches the circuit's `scaleFast2'` semantics where
- *  `scale_fast_unpack` shifts by `2^255 = 2^actual_bits_used`):
- *    1. Sample `d, k <- Pallas_scalar.random()`.
- *    2. Compute `pk = d·G`, `R = k·G`, reject if `R.y` is odd.
- *    3. `e_tick = Poseidon(pk.x, pk.y, R.x, message...)` (zero seed).
- *    4. Reject if `to_bigint(e_tick) >= 2^254`.
- *    5. Cross-field: `e_pallas = Pallas_scalar.of_bits (Tick.to_bits e_tick)`.
- *    6. `e_eff = e_pallas + 2^255`, `s_eff = k + d * e_eff`.
- *    7. `s_pallas = s_eff - 2^255`. Reject if `s_bigint >= 2^254`.
- *    8. `s_tick = Tick.of_bits (Pallas_scalar.to_bits s_pallas)`.
+ *  Iter-2b sign convention (matches `Data.Schnorr.sign` post-deterministic
+ *  nonce + negate-k):
+ *    1. Sample `d <- Pallas_scalar.random()`.
+ *    2. Compute `pk = d·G`.
+ *    3. `k' = Schnorr.Chunked.Message.derive ~signature_kind:Mainnet`
+ *       — deterministic nonce from `(networkId, sk, pk, message)`.
+ *    4. `R = k'·G`. If `R.y` is odd, set `k = -k'` (flips R.y's sign);
+ *       else `k = k'`. Either way, the effective `R.y` is even, so the
+ *       circuit's `y_even` assertion holds.
+ *    5. `e_tick = Poseidon(pk.x, pk.y, R.x, message...)` (Mainnet-prefixed).
+ *    6. Reject if `to_bigint(e_tick) >= 2^254` (scaleFast2' bound).
+ *    7. `e_eff = e_pallas + 2^255`, `s_eff = k + d * e_eff`.
+ *    8. `s_pallas = s_eff - 2^255`. Reject if `s_bigint >= 2^254`.
+ *    9. Iter 2c lifts both 2^254 caps once `Snarky_curves.scale` lands.
+ *
+ *  On reject we re-sample `d` (the nonce is a deterministic function
+ *  of `(sk, pk, message)`, so rotating `sk` is the only escape route).
  *
  *  Usage:
  *    dune exec src/lib/crypto/pickles/dump_schnorr_signature_proof/
@@ -87,42 +94,55 @@ let pallas_scalar_ge_2_254 (x : Pallas_scalar.t) : bool =
   let bits = Pallas_scalar.to_bits x in
   match List.nth bits 254 with Some b -> b | None -> false
 
-(* Returns `Some (rx, s_tick)` on success, `None` on rejection. *)
-let try_sign ~(d : Pallas_scalar.t) ~(k : Pallas_scalar.t)
+(* Returns `Some (rx, s_tick)` on success, `None` if the deterministic
+   nonce hits the still-present `e >= 2^254` / `s >= 2^254` rejection
+   branches. Caller resamples `d` (and re-derives the nonce) on `None`. *)
+let try_sign ~(d : Pallas_scalar.t) ~(pk_point : Inner_curve.t)
     ~(pk_x : Tick_field.t) ~(pk_y : Tick_field.t)
     ~(message : Tick_field.t array) :
     (Tick_field.t * Tick_field.t) option =
-  let r_pt = Inner_curve.scale Inner_curve.one k in
+  let t = Random_oracle.Input.Chunked.field_elements message in
+  let k_prime =
+    Signature_lib.Schnorr.Message.Chunked.derive
+      ~signature_kind:Mina_signature_kind.Mainnet t ~private_key:d
+      ~public_key:pk_point
+  in
+  let r_pt = Inner_curve.scale Inner_curve.one k_prime in
   let rx, ry = Inner_curve.to_affine_exn r_pt in
   let ry_bits = Tick_field.to_bits ry in
   let ry_even = match List.hd ry_bits with Some b -> not b | None -> true in
-  if not ry_even then None
+  (* Flip k's sign on ry-odd: `(-k)·G = (R.x, -R.y)`, and in a
+     prime field of odd characteristic `-y` has the opposite parity. *)
+  let k = if ry_even then k_prime else Pallas_scalar.(zero - k_prime) in
+  (* Mina's `Schnorr.Chunked.Message.hash` order:
+     `Input.Chunked.append message {pk; r}` — message field-elements
+     first, then pk_x, pk_y, r. *)
+  let hash_inputs = Array.concat [ message; [| pk_x; pk_y; rx |] ] in
+  let e_tick = poseidon_hash hash_inputs in
+  if tick_field_ge_2_254 e_tick then None
   else
-    (* Mina's `Schnorr.Chunked.Message.hash` order:
-       `Input.Chunked.append message {pk; r}` — message field-elements
-       first, then pk_x, pk_y, r. *)
-    let hash_inputs = Array.concat [ message; [| pk_x; pk_y; rx |] ] in
-    let e_tick = poseidon_hash hash_inputs in
-    if tick_field_ge_2_254 e_tick then None
+    let e_pallas = tick_to_pallas_scalar e_tick in
+    let e_eff = Pallas_scalar.(e_pallas + two_to_255_scalar) in
+    let s_eff = Pallas_scalar.(k + (d * e_eff)) in
+    let s_pallas = Pallas_scalar.(s_eff - two_to_255_scalar) in
+    if pallas_scalar_ge_2_254 s_pallas then None
     else
-      let e_pallas = tick_to_pallas_scalar e_tick in
-      let e_eff = Pallas_scalar.(e_pallas + two_to_255_scalar) in
-      let s_eff = Pallas_scalar.(k + (d * e_eff)) in
-      let s_pallas = Pallas_scalar.(s_eff - two_to_255_scalar) in
-      if pallas_scalar_ge_2_254 s_pallas then None
-      else
-        let s_tick = pallas_scalar_to_tick s_pallas in
-        Some (rx, s_tick)
+      let s_tick = pallas_scalar_to_tick s_pallas in
+      Some (rx, s_tick)
 
-let sign ~(d : Pallas_scalar.t) ~(pk_x : Tick_field.t) ~(pk_y : Tick_field.t)
-    ~(message : Tick_field.t array) : Tick_field.t * Tick_field.t =
+(* Iter-2b signer: derive is deterministic, so we vary `d` on rejection. *)
+let sign_with_resample ~(message : Tick_field.t array) :
+    Pallas_scalar.t * Tick_field.t * Tick_field.t * Tick_field.t * Tick_field.t
+    =
   let rec loop attempt =
     if attempt > 200 then
       failwith "sign: exhausted rejection-sample budget (200 attempts)"
     else
-      let k = Pallas_scalar.random () in
-      match try_sign ~d ~k ~pk_x ~pk_y ~message with
-      | Some result -> result
+      let d = Pallas_scalar.random () in
+      let pk_point = Inner_curve.scale Inner_curve.one d in
+      let pk_x, pk_y = Inner_curve.to_affine_exn pk_point in
+      match try_sign ~d ~pk_point ~pk_x ~pk_y ~message with
+      | Some (rx, s_tick) -> (d, pk_x, pk_y, rx, s_tick)
       | None -> loop (attempt + 1)
   in
   loop 0
@@ -158,12 +178,11 @@ let () =
   in
   Printf.printf "dump_schnorr_signature_proof: output_dir = %s\n" output_dir ;
 
-  (* 1. Sample keypair + message and run the rejection-sampling signer. *)
-  let d = Pallas_scalar.random () in
-  let pk = Inner_curve.scale Inner_curve.one d in
-  let pk_x, pk_y = Inner_curve.to_affine_exn pk in
+  (* 1. Sample a fresh message and run the deterministic-nonce signer.
+     The signer rotates `d` (and re-derives the nonce) on the still-
+     present `e/s >= 2^254` rejections. *)
   let message = [| Tick_field.random () |] in
-  let r, s = sign ~d ~pk_x ~pk_y ~message in
+  let _d, pk_x, pk_y, r, s = sign_with_resample ~message in
   Printf.printf "schnorr: signed message; pk.x (hex LE) = %s\n"
     (field_to_hex pk_x) ;
   Printf.printf "schnorr: r (hex LE) = %s\n  s (hex LE) = %s\n"

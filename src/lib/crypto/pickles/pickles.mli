@@ -596,6 +596,20 @@ module Dump_circuit_impl : sig
        * Impl.Field.t array )
     -> unit
     -> Impl.Boolean.var
+
+  (** Re-export of the constraint-system dump helper used internally
+   *  for the per-circuit fixtures consumed by
+   *  [packages/pickles-circuit-diffs]. Exposed so out-of-pickles
+   *  exes (e.g. [dump_schnorr_verify_circuit]) that need to dump a
+   *  circuit they construct from libraries pickles can't depend on
+   *  (signature_lib etc) can reuse the same fixture-file format. *)
+  val dump_tick_with_labels :
+       string
+    -> string
+    -> ('a -> unit -> 'b)
+    -> input_typ:('a, _) Impl.Typ.t
+    -> return_typ:('b, _) Impl.Typ.t
+    -> unit
 end
 
 (** Trace logger for byte-identical pickles transcript reproduction tests.
