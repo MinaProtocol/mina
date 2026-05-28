@@ -12,22 +12,13 @@ let default_required_confirmations = 290
    it in sync with that file when the schema changes. *)
 let default_migration_version = "0.0.5"
 
-(* Hard fork parameters live in a Mina runtime config under proof.fork. We only
-   model the proof.fork subtree and ignore every other section (genesis, ledger,
-   epoch_data, ...) thanks to [strict = false]. The fork record itself is the
-   canonical Runtime_config.Fork_config.t. *)
 module Runtime = struct
-  module Proof = struct
-    type t = { fork : Runtime_config.Fork_config.t }
-    [@@deriving yojson { strict = false }]
-  end
-
-  type t = { proof : Proof.t } [@@deriving yojson { strict = false }]
-
   let load path : Runtime_config.Fork_config.t =
-    match of_yojson (Yojson.Safe.from_file path) with
-    | Ok t ->
-        t.proof.fork
+    match Runtime_config.of_yojson (Yojson.Safe.from_file path) with
+    | Ok { proof = Some { fork = Some fork; _ }; _ } ->
+        fork
+    | Ok _ ->
+        failwithf "Runtime config %s has no proof.fork section" path ()
     | Error e ->
         failwithf "Failed to parse runtime config %s: %s" path e ()
 end
