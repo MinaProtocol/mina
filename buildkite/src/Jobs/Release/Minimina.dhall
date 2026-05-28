@@ -6,8 +6,6 @@ let PipelineTag = ../../Pipeline/Tag.dhall
 
 let JobSpec = ../../Pipeline/JobSpec.dhall
 
-let Arch = ../../Constants/Arch.dhall
-
 let MiniminaCommand = ../../Command/Minimina.dhall
 
 let B = ../../External/Buildkite.dhall
@@ -31,5 +29,5 @@ in  Pipeline.build
           , PipelineTag.Type.Stable
           ]
         }
-      , steps = [ MiniminaCommand.buildStep Arch.Type.Amd64 (None B/SoftFail) ]
+      , steps = [ MiniminaCommand.buildStep (None B/SoftFail) ]
       }
