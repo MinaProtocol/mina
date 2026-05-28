@@ -5,8 +5,7 @@
   promise
   pickles
   pickles.backend
-  snarky.backendless
-  hash_prefix_states
+  dump_schnorr_circuit_lib
   random_oracle
   random_oracle_input
   signature_lib

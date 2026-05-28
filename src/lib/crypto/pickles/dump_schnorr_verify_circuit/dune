@@ -2,11 +2,4 @@
  (name dump_schnorr_verify_circuit)
  (preprocess
   (pps ppx_jane))
- (libraries
-  core_kernel
-  pickles
-  pickles.backend
-  signature_lib
-  snark_params
-  random_oracle_input
-  mina_signature_kind))
+ (libraries core_kernel pickles dump_schnorr_circuit_lib snark_params))

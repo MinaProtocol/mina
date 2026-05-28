@@ -585,18 +585,6 @@ module Dump_circuit_impl : sig
 
   val run : output_dir:string -> unit
 
-  (** Schnorr signature verifier circuit (iteration 1: zero-seed sponge).
-   *  Exposed so the matching proof-dump executable
-   *  ([dump_schnorr_signature_proof.exe]) can compile the same shape
-   *  into a kimchi keypair + proof without duplicating the circuit. *)
-  val schnorr_verify_circuit :
-       ( ( ( (Impl.Field.t * Impl.Field.t)
-           * Impl.Field.t )
-         * Impl.Field.t )
-       * Impl.Field.t array )
-    -> unit
-    -> Impl.Boolean.var
-
   (** Re-export of the constraint-system dump helper used internally
    *  for the per-circuit fixtures consumed by
    *  [packages/pickles-circuit-diffs]. Exposed so out-of-pickles

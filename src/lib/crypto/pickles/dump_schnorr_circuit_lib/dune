@@ -1,0 +1,10 @@
+(library
+ (name dump_schnorr_circuit_lib)
+ (preprocess
+  (pps ppx_jane))
+ (libraries
+  pickles
+  signature_lib
+  snark_params
+  random_oracle_input
+  mina_signature_kind))
