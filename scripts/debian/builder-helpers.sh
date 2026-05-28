@@ -84,7 +84,7 @@ signature_of_network() {
     mainnet)
       printf "mainnet"
       ;;
-    devnet|mesa|mesa_mut)
+    devnet|mesa*)
       printf "testnet"
       ;;
     *)
@@ -752,13 +752,16 @@ build_daemon_postfork_deb() {
     mesa)
       seed_list_url='o1labs-gitops-infrastructure/mina-mesa-network/mina-mesa-network-seeds.txt'
       ;;
+    mesa_mut)
+      seed_list_url="o1labs-gitops-infrastructure/mina-mesa-mut/mina-mesa-mut-peer-list-url.txt"
+      ;;
     *)
       echo "Unknown network name provided: ${prefork_network}"; exit 1
       ;;
   esac
 
   copy_common_daemon_post_automode_apps_and_configs \
-    "${prefork_network}" \
+    "${prefork_network//_/-}" \
     "${seed_list_url}"
 
   build_deb "$package_name"
@@ -781,14 +784,15 @@ build_daemon_postfork_deb() {
 build_daemon_automode_deb() {
 
   local network="$1"
+  local network_deb="${network//_/-}"
 
   echo "------------------------------------------------------------"
   echo "--- Building ${network} automode transitional metapackage:"
 
-  local package_name="mina-${network}-automode"
+  local package_name="mina-${network_deb}-automode"
 
-  local prefork_pkg="mina-${network}-prefork-${POSTFORK_CODENAME}"
-  local postfork_pkg="mina-${network}-postfork-${POSTFORK_CODENAME}"
+  local prefork_pkg="mina-${network_deb}-prefork-${POSTFORK_CODENAME}"
+  local postfork_pkg="mina-${network_deb}-postfork-${POSTFORK_CODENAME}"
   local prefork_version="${PREFORK_LEGACY_VERSION:-${MINA_DEB_VERSION}}"
   local depends="${postfork_pkg} (=${MINA_DEB_VERSION}), ${prefork_pkg} (=${prefork_version})"
 
@@ -1079,6 +1083,35 @@ build_prefork_devnet_genesis_ledger_deb() {
 
   build_deb "$DEB_NAME"
 }
+
+#
+# Builds mina-create-mesa-mut-prefork-genesis package for prefork genesis creation
+#
+# Output: mina-create-mesa-mut-prefork-genesis_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
+# Dependencies: ${SHARED_DEPS}${DAEMON_DEPS}
+#
+# Utility for creating prefork genesis ledgers for post-hardfork verification.
+# Contains the runtime_genesis_ledger tool for Mina protocol.
+#
+build_prefork_mesa_mut_genesis_ledger_deb() {
+  echo "------------------------------------------------------------"
+  echo "--- Building Mina Generic mesa-mut create prefork genesis tool:"
+
+  DEB_NAME="mina-create-mesa-mut-prefork-genesis-ledger"
+
+  create_control_file "$DEB_NAME" \
+    "${SHARED_DEPS}${DAEMON_DEPS}" \
+    'Utility to verify post hardfork ledger for Mina'
+
+  mkdir -p "${BUILDDIR}/usr/local/bin"
+
+  # Binaries
+  cp ./default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe \
+    "${BUILDDIR}/usr/local/bin/mina-create-prefork-genesis"
+
+  build_deb "$DEB_NAME"
+}
+
 
 #
 # Builds mina-create-mainnet-prefork-genesis package for prefork genesis creation
