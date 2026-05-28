@@ -143,6 +143,12 @@ fi
 
 PLATFORM="--platform ${INPUT_PLATFORM}"
 
+HOST_PLATFORM="linux/$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')"
+if [[ "${INPUT_PLATFORM}" != "${HOST_PLATFORM}" ]]; then
+  echo "Cross-building ${INPUT_PLATFORM} on host ${HOST_PLATFORM}; setting up buildx + QEMU"
+  ARCHS="${INPUT_PLATFORM##*/}" "${SCRIPTPATH}/setup_buildx.sh"
+fi
+
 if [[ -z "${DOCKER_REGISTRY:-}" ]]; then
   echo "Docker registry is not set. Using the default ($USER/mina-protocol)"
   DOCKER_REGISTRY="$USER/mina-protocol"

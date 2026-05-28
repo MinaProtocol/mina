@@ -14,8 +14,6 @@ let DebianVersions = ../../Constants/DebianVersions.dhall
 
 let Network = ../../Constants/Network.dhall
 
-let Arch = ../../Constants/Arch.dhall
-
 let Docker = ../../Command/Docker/Type.dhall
 
 let Size = ../../Command/Size.dhall
@@ -36,7 +34,6 @@ let buildTestCmd
                 Command.Config::{
                 , commands =
                     RunInToolchain.runInToolchainBullseye
-                      Arch.Type.Amd64
                       ([] : List Text)
                       ''
                       ./buildkite/scripts/tests/debian-upgrade-test.sh \
