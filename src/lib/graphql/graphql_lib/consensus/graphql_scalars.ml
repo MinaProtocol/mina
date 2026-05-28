@@ -85,6 +85,10 @@ module Epoch_ledger = struct
             ~typ:(non_null @@ Currency_graphql.Graphql_scalars.Amount.typ ())
             ~args:Arg.[]
             ~resolve:(fun _ { Poly.total_currency; _ } -> total_currency)
+        ; field "totalStake"
+            ~typ:(non_null @@ Currency_graphql.Graphql_scalars.Amount.typ ())
+            ~args:Arg.[]
+            ~resolve:(fun _ { Poly.total_stake; _ } -> total_stake)
         ] )
 end
 

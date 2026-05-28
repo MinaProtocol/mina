@@ -1326,12 +1326,16 @@ module Snarked_ledger_hash = struct
 end
 
 module Zkapp_epoch_ledger = struct
-  type t = { hash_id : int option; total_currency_id : int option }
+  type t =
+    { hash_id : int option
+    ; total_currency_id : int option
+    ; total_stake_id : int option
+    }
   [@@deriving fields, hlist]
 
   let typ =
     Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
-      Caqti_type.[ option int; option int ]
+      Caqti_type.[ option int; option int; option int ]
 
   let table_name = "zkapp_epoch_ledger"
 
@@ -1348,7 +1352,12 @@ module Zkapp_epoch_ledger = struct
         (Zkapp_amount_bounds.add_if_doesn't_exist (module Conn))
         epoch_ledger.total_currency
     in
-    let value = { hash_id; total_currency_id } in
+    let%bind total_stake_id =
+      Mina_caqti.add_if_zkapp_check
+        (Zkapp_amount_bounds.add_if_doesn't_exist (module Conn))
+        epoch_ledger.total_stake
+    in
+    let value = { hash_id; total_currency_id; total_stake_id } in
     Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
       ~table_name ~cols:(Fields.names, typ)
       (module Conn)
@@ -1821,6 +1830,7 @@ module Epoch_data = struct
       { seed : string
       ; ledger_hash_id : int
       ; total_currency : string
+      ; total_stake : string
       ; start_checkpoint : string
       ; lock_checkpoint : string
       ; epoch_length : int64
@@ -1833,14 +1843,14 @@ module Epoch_data = struct
 
   let typ =
     Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
-      Caqti_type.[ string; int; string; string; string; int64 ]
+      Caqti_type.[ string; int; string; string; string; string; int64 ]
 
   let table_name = "epoch_data"
 
   let add_if_doesn't_exist (module Conn : Mina_caqti.CONNECTION)
       (t : Mina_base.Epoch_data.Value.t) =
     let open Deferred.Result.Let_syntax in
-    let Mina_base.Epoch_ledger.Poly.{ hash; total_currency } =
+    let Mina_base.Epoch_ledger.Poly.{ hash; total_currency; total_stake } =
       Mina_base.Epoch_data.Poly.ledger t
     in
     let%bind ledger_hash_id =
@@ -1848,6 +1858,7 @@ module Epoch_data = struct
     in
     let seed = t.seed |> Epoch_seed.to_base58_check in
     let total_currency = Currency.Amount.to_string total_currency in
+    let total_stake = Currency.Amount.to_string total_stake in
     let start_checkpoint = t.start_checkpoint |> State_hash.to_base58_check in
     let lock_checkpoint = t.lock_checkpoint |> State_hash.to_base58_check in
     let epoch_length =
@@ -1860,6 +1871,7 @@ module Epoch_data = struct
       { seed
       ; ledger_hash_id
       ; total_currency
+      ; total_stake
       ; start_checkpoint
       ; lock_checkpoint
       ; epoch_length
@@ -3348,6 +3360,7 @@ module Block = struct
       { seed = Epoch_seed.to_base58_check e.seed
       ; ledger_hash_id = find_ledger_hash_id e.ledger.hash
       ; total_currency = Currency.Amount.to_string e.ledger.total_currency
+      ; total_stake = Currency.Amount.to_string e.ledger.total_stake
       ; start_checkpoint = State_hash.to_base58_check e.start_checkpoint
       ; lock_checkpoint = State_hash.to_base58_check e.lock_checkpoint
       ; epoch_length =

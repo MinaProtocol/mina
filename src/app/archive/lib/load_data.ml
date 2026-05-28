@@ -285,7 +285,7 @@ let staking_data_of_id pool id =
     query_db ~f:(fun db -> Processor.Zkapp_epoch_data.load db id)
   in
   let%bind ledger =
-    let%bind { hash_id; total_currency_id } =
+    let%bind { hash_id; total_currency_id; total_stake_id } =
       query_db ~f:(fun db ->
           Processor.Zkapp_epoch_ledger.load db epoch_ledger_id )
     in
@@ -300,8 +300,9 @@ let staking_data_of_id pool id =
       Or_ignore.of_option hash_opt
     in
     let%bind total_currency = get_amount_bounds pool total_currency_id in
+    let%bind total_stake = get_amount_bounds pool total_stake_id in
     return
-      ( { hash; total_currency }
+      ( { hash; total_currency; total_stake }
         : ( Frozen_ledger_hash.t Or_ignore.t
           , Currency.Amount.t Zkapp_precondition.Numeric.t )
           Epoch_ledger.Poly.t )

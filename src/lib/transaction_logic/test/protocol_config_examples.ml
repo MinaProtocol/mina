@@ -10,6 +10,7 @@ let epoch_data =
         Epoch_ledger.Poly.
           { hash = Frozen_ledger_hash.empty_hash
           ; total_currency = Amount.of_mina_int_exn 10_000_000
+          ; total_stake = Amount.of_mina_int_exn 10_000_000
           }
     ; seed = epoch_seed
     ; start_checkpoint = State_hash.dummy

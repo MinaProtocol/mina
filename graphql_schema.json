@@ -1952,6 +1952,18 @@
               },
               "isDeprecated": false,
               "deprecationReason": null
+            },
+            {
+              "name": "totalStake",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "INPUT_OBJECT",
+                "name": "CurrencyAmountIntervalInput",
+                "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
             }
           ],
           "inputFields": [
@@ -1963,6 +1975,16 @@
             },
             {
               "name": "totalCurrency",
+              "description": null,
+              "type": {
+                "kind": "INPUT_OBJECT",
+                "name": "CurrencyAmountIntervalInput",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "totalStake",
               "description": null,
               "type": {
                 "kind": "INPUT_OBJECT",
@@ -7731,6 +7753,18 @@
               },
               "isDeprecated": false,
               "deprecationReason": null
+            },
+            {
+              "name": "totalStake",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "OBJECT",
+                "name": "CurrencyAmountInterval",
+                "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
             }
           ],
           "inputFields": null,
@@ -10523,6 +10557,22 @@
             },
             {
               "name": "totalCurrency",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Amount",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "totalStake",
               "description": null,
               "args": [],
               "type": {

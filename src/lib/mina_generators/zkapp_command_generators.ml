@@ -357,11 +357,15 @@ let gen_epoch_data_predicate
     let%bind hash =
       Zkapp_basic.Or_ignore.gen @@ return epoch_data.ledger.hash
     in
-    let%map total_currency =
+    let%bind total_currency =
       closed_interval_exact epoch_data.ledger.total_currency
       |> return |> Zkapp_basic.Or_ignore.gen
     in
-    { Epoch_ledger.Poly.hash; total_currency }
+    let%map total_stake =
+      closed_interval_exact epoch_data.ledger.total_stake
+      |> return |> Zkapp_basic.Or_ignore.gen
+    in
+    { Epoch_ledger.Poly.hash; total_currency; total_stake }
   in
   let%bind seed = Zkapp_basic.Or_ignore.gen @@ return epoch_data.seed in
   let%bind start_checkpoint =

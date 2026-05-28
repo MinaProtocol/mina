@@ -358,6 +358,7 @@ CREATE TABLE zkapp_epoch_ledger
 ( id                       serial          PRIMARY KEY
 , hash_id                  int             REFERENCES snarked_ledger_hashes(id)
 , total_currency_id        int             REFERENCES zkapp_amount_bounds(id)
+, total_stake_id           int             REFERENCES zkapp_amount_bounds(id)
 );
 
 /* NULL convention */
@@ -457,10 +458,11 @@ CREATE TABLE epoch_data
 , seed             text   NOT NULL
 , ledger_hash_id   int    NOT NULL REFERENCES snarked_ledger_hashes(id)
 , total_currency   text   NOT NULL
+, total_stake      text   NOT NULL
 , start_checkpoint text   NOT NULL
 , lock_checkpoint  text   NOT NULL
 , epoch_length     bigint NOT NULL
-, UNIQUE (seed, ledger_hash_id, total_currency, start_checkpoint, lock_checkpoint, epoch_length)
+, UNIQUE (seed, ledger_hash_id, total_currency, total_stake, start_checkpoint, lock_checkpoint, epoch_length)
 );
 
 CREATE TABLE protocol_versions

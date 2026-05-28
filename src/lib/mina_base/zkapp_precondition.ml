@@ -806,6 +806,7 @@ module Protocol_state = struct
         Epoch_ledger.Poly.Fields.make_creator obj'
           ~hash:!.(Or_ignore.deriver field)
           ~total_currency:!.Numeric.Derivers.amount
+          ~total_stake:!.Numeric.Derivers.amount
         |> finish "EpochLedgerPrecondition"
              ~t_toplevel_annots:Epoch_ledger.Poly.t_toplevel_annots
       in
@@ -827,6 +828,8 @@ module Protocol_state = struct
             { Epoch_ledger.Poly.hash = f
             ; total_currency =
                 Or_ignore.Check { Closed_interval.lower = a; upper = a }
+            ; total_stake =
+                Or_ignore.Check { Closed_interval.lower = a; upper = a }
             }
         ; seed = f
         ; start_checkpoint = f
@@ -843,8 +846,9 @@ module Protocol_state = struct
       let open Quickcheck.Let_syntax in
       let%bind ledger =
         let%bind hash = Hash.gen Frozen_ledger_hash0.gen in
-        let%map total_currency = Numeric.gen Amount.gen Amount.compare in
-        { Epoch_ledger.Poly.hash; total_currency }
+        let%bind total_currency = Numeric.gen Amount.gen Amount.compare in
+        let%map total_stake = Numeric.gen Amount.gen Amount.compare in
+        { Epoch_ledger.Poly.hash; total_currency; total_stake }
       in
       let%bind seed = Hash.gen Epoch_seed.gen in
       let%bind start_checkpoint = Hash.gen State_hash.gen in
@@ -861,7 +865,7 @@ module Protocol_state = struct
       { Poly.ledger; seed; start_checkpoint; lock_checkpoint; epoch_length }
 
     let to_input
-        ({ ledger = { hash; total_currency }
+        ({ ledger = { hash; total_currency; total_stake }
          ; seed
          ; start_checkpoint
          ; lock_checkpoint
@@ -872,6 +876,7 @@ module Protocol_state = struct
       List.reduce_exn ~f:append
         [ Hash.(to_input Tc.frozen_ledger_hash hash)
         ; Numeric.(to_input Tc.amount total_currency)
+        ; Numeric.(to_input Tc.amount total_stake)
         ; Hash.(to_input Tc.epoch_seed seed)
         ; Hash.(to_input Tc.state_hash start_checkpoint)
         ; Hash.(to_input Tc.state_hash lock_checkpoint)
@@ -890,7 +895,7 @@ module Protocol_state = struct
         Poly.t
 
       let to_input
-          ({ ledger = { hash; total_currency }
+          ({ ledger = { hash; total_currency; total_stake }
            ; seed
            ; start_checkpoint
            ; lock_checkpoint
@@ -901,6 +906,7 @@ module Protocol_state = struct
         List.reduce_exn ~f:append
           [ Hash.(to_input_checked Tc.frozen_ledger_hash hash)
           ; Numeric.(Checked.to_input Tc.amount total_currency)
+          ; Numeric.(Checked.to_input Tc.amount total_stake)
           ; Hash.(to_input_checked Tc.epoch_seed seed)
           ; Hash.(to_input_checked Tc.state_hash start_checkpoint)
           ; Hash.(to_input_checked Tc.state_hash lock_checkpoint)
@@ -1093,7 +1099,7 @@ module Protocol_state = struct
           ( !. ) ~t_fields_annots:Epoch_ledger.Poly.t_fields_annots
         in
         Epoch_ledger.Poly.Fields.make_creator obj' ~hash:!.field
-          ~total_currency:!.amount
+          ~total_currency:!.amount ~total_stake:!.amount
         |> finish "EpochLedger"
              ~t_toplevel_annots:Epoch_ledger.Poly.t_toplevel_annots
       in
@@ -1165,10 +1171,12 @@ module Protocol_state = struct
            } :
             t ) (s : View.Checked.t) =
       let open Impl in
-      let epoch_ledger ({ hash; total_currency } : _ Epoch_ledger.Poly.t)
+      let epoch_ledger
+          ({ hash; total_currency; total_stake } : _ Epoch_ledger.Poly.t)
           (t : Epoch_ledger.var) =
         [ Hash.(check_checked Tc.frozen_ledger_hash) hash t.hash
         ; Numeric.(Checked.check Tc.amount) total_currency t.total_currency
+        ; Numeric.(Checked.check Tc.amount) total_stake t.total_stake
         ]
       in
       let epoch_data
@@ -1209,7 +1217,7 @@ module Protocol_state = struct
       let epoch_ledger =
         let open Epoch_ledger.Poly in
         Typ.of_hlistable
-          [ frozen_ledger_hash; amount ]
+          [ frozen_ledger_hash; amount; amount ]
           ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
           ~value_of_hlist:of_hlist
       in
@@ -1232,7 +1240,7 @@ module Protocol_state = struct
       ~value_of_hlist:of_hlist
 
   let epoch_data : Epoch_data.t =
-    { ledger = { hash = Ignore; total_currency = Ignore }
+    { ledger = { hash = Ignore; total_currency = Ignore; total_stake = Ignore }
     ; seed = Ignore
     ; start_checkpoint = Ignore
     ; lock_checkpoint = Ignore
@@ -1277,15 +1285,20 @@ module Protocol_state = struct
          } :
           t ) (s : View.t) =
     let open Or_error.Let_syntax in
-    let epoch_ledger ({ hash; total_currency } : _ Epoch_ledger.Poly.t)
+    let epoch_ledger
+        ({ hash; total_currency; total_stake } : _ Epoch_ledger.Poly.t)
         (t : Epoch_ledger.Value.t) =
       let%bind () =
         Hash.(check ~label:"epoch_ledger_hash" Tc.frozen_ledger_hash)
           hash t.hash
       in
-      let%map () =
+      let%bind () =
         Numeric.(check ~label:"epoch_ledger_total_currency" Tc.amount)
           total_currency t.total_currency
+      in
+      let%map () =
+        Numeric.(check ~label:"epoch_ledger_total_stake" Tc.amount)
+          total_stake t.total_stake
       in
       ()
     in

@@ -20,7 +20,10 @@ let epoch_data_of_raw_epoch_data ~pool (raw_epoch_data : Processor.Epoch_data.t)
   let total_currency =
     Currency.Amount.of_string raw_epoch_data.total_currency
   in
-  let ledger = { Mina_base.Epoch_ledger.Poly.hash; total_currency } in
+  let total_stake = Currency.Amount.of_string raw_epoch_data.total_stake in
+  let ledger =
+    { Mina_base.Epoch_ledger.Poly.hash; total_currency; total_stake }
+  in
   let seed = raw_epoch_data.seed |> Epoch_seed.of_base58_check_exn in
   let start_checkpoint =
     raw_epoch_data.start_checkpoint |> State_hash.of_base58_check_exn

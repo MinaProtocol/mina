@@ -680,7 +680,10 @@ module Make_str (A : Wire_types.Concrete) = struct
       include Mina_base.Epoch_ledger
 
       let genesis ~(ledger : Genesis_data.Hashed.t) =
-        { Poly.hash = ledger.hash; total_currency = ledger.total_currency }
+        { Poly.hash = ledger.hash
+        ; total_currency = ledger.total_currency
+        ; total_stake = ledger.total_stake
+        }
     end
 
     module Vrf = struct
@@ -759,7 +762,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           let%bind truncated_result = Output.Checked.truncate result in
           let%map satisifed =
             Threshold.Checked.is_satisfied ~my_stake
-              ~total_stake:epoch_ledger.total_currency truncated_result
+              ~total_stake:epoch_ledger.total_stake truncated_result
           in
           (satisifed, result, truncated_result, winner_account)
       end
@@ -1063,14 +1066,19 @@ module Make_str (A : Wire_types.Concrete) = struct
           ((staking_data, next_data) : Staking.Value.t * Next.Value.t)
           epoch_count ~prev_epoch ~next_epoch ~next_slot
           ~prev_protocol_state_hash ~producer_vrf_result ~snarked_ledger_hash
-          ~genesis_ledger_hash ~total_currency ~(constants : Constants.t) =
+          ~genesis_ledger_hash ~total_currency ~total_stake
+          ~(constants : Constants.t) =
         let next_staking_ledger =
           (*If snarked ledger hash is still the genesis ledger hash then the epoch ledger should continue to be `next_data.ledger`. This is because the epoch ledgers at genesis can be different from the genesis ledger*)
           if
             Mina_base.Frozen_ledger_hash.equal snarked_ledger_hash
               genesis_ledger_hash
           then next_data.ledger
-          else { Epoch_ledger.Poly.hash = snarked_ledger_hash; total_currency }
+          else
+            { Epoch_ledger.Poly.hash = snarked_ledger_hash
+            ; total_currency
+            ; total_stake
+            }
         in
         let staking_data', next_data', epoch_count' =
           if Epoch.(next_epoch > prev_epoch) then
@@ -1937,7 +1945,7 @@ module Make_str (A : Wire_types.Concrete) = struct
             previous_consensus_state.epoch_count ~prev_epoch ~next_epoch
             ~next_slot ~prev_protocol_state_hash:previous_protocol_state_hash
             ~producer_vrf_result ~snarked_ledger_hash ~genesis_ledger_hash
-            ~total_currency
+            ~total_currency ~total_stake
         in
         let min_window_density, sub_window_densities =
           Min_window_density.update_min_window_density ~constants
@@ -2249,6 +2257,7 @@ module Make_str (A : Wire_types.Concrete) = struct
             Epoch_ledger.if_ update_next_epoch_ledger
               ~then_:
                 { total_currency = new_total_currency
+                ; total_stake = new_total_stake
                 ; hash = previous_blockchain_state_ledger_hash
                 }
               ~else_:previous_state.next_epoch_data.ledger
@@ -3402,7 +3411,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                   (Mina_base.State_hash.With_state_hashes.state_hash
                      previous_protocol_state )
                 ~producer_vrf_result ~snarked_ledger_hash ~genesis_ledger_hash
-                ~total_currency
+                ~total_currency ~total_stake:prev.total_stake
             in
             let min_window_density, sub_window_densities =
               Min_window_density.update_min_window_density ~constants
@@ -3867,11 +3876,11 @@ module Make_str (A : Wire_types.Concrete) = struct
         in
         let%map lock_checkpoint = opt_gen lock_checkpoint ~gen:State_hash.gen in
         let ledger : Epoch_ledger.Value.t =
-          { hash = ledger_hash
-          ; total_currency =
-              currency_at_height ~genesis_currency
-                (Length.to_int height_at_end_of_epoch)
-          }
+          let total_currency =
+            currency_at_height ~genesis_currency
+              (Length.to_int height_at_end_of_epoch)
+          in
+          { hash = ledger_hash; total_currency; total_stake = total_currency }
         in
         { Epoch_data.Poly.ledger
         ; seed

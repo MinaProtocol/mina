@@ -2629,7 +2629,7 @@ module For_tests = struct
     let a = Currency.Amount.zero in
     let epoch_data =
       { Epoch_data.Poly.ledger =
-          { Epoch_ledger.Poly.hash = h; total_currency = a }
+          { Epoch_ledger.Poly.hash = h; total_currency = a; total_stake = a }
       ; seed = h
       ; start_checkpoint = h
       ; lock_checkpoint = h

@@ -146,6 +146,7 @@ module Values (S : Sample) = struct
             { ledger =
                 { hash = precondition_hash field
                 ; total_currency = precondition_numeric amount
+                ; total_stake = precondition_numeric amount
                 }
             ; seed = precondition_hash field
             ; start_checkpoint = precondition_hash field
@@ -156,6 +157,7 @@ module Values (S : Sample) = struct
             { ledger =
                 { hash = precondition_hash field
                 ; total_currency = precondition_numeric amount
+                ; total_stake = precondition_numeric amount
                 }
             ; seed = precondition_hash field
             ; start_checkpoint = precondition_hash field

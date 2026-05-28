@@ -143,6 +143,7 @@ let%test_module "Protocol state precondition tests" =
             { Mina_base.Epoch_ledger.Poly.hash =
                 Check e.ledger.Epoch_ledger.Poly.hash
             ; total_currency = Check (interval e.ledger.total_currency)
+            ; total_stake = Check (interval e.ledger.total_stake)
             }
         ; seed = Check e.seed
         ; start_checkpoint = Check e.start_checkpoint

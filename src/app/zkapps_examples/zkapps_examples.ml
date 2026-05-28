@@ -239,6 +239,7 @@ module Account_update_under_construction = struct
                       { ledger =
                           { Epoch_ledger.Poly.hash = Ignore
                           ; total_currency = Ignore
+                          ; total_stake = Ignore
                           }
                       ; seed = Ignore
                       ; start_checkpoint = Ignore
@@ -249,6 +250,7 @@ module Account_update_under_construction = struct
                       { ledger =
                           { Epoch_ledger.Poly.hash = Ignore
                           ; total_currency = Ignore
+                          ; total_stake = Ignore
                           }
                       ; seed = Ignore
                       ; start_checkpoint = Ignore

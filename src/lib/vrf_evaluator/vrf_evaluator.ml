@@ -172,7 +172,7 @@ module Worker_state = struct
           Consensus.Data.Consensus_time.(
             of_global_slot ~constants:consensus_constants start_global_slot)
         in
-        let total_stake = epoch_data.epoch_ledger.total_currency in
+        let total_stake = epoch_data.epoch_ledger.total_stake in
         let evaluate_vrf ~consensus_time =
           (* Try vrfs for all keypairs that are unseen within this slot until one wins or all lose *)
           (* TODO: Don't do this, and instead pick the one that has the highest chance of winning. See #2573 *)

@@ -240,7 +240,7 @@ let find_winning_slots ~context:(module Context : Consensus.Intf.CONTEXT)
         ~get_delegators:(Public_key.Compressed.Table.find delegatee_table)
         ~producer_private_key:keypair.private_key
         ~producer_public_key:public_key_compressed
-        ~total_stake:epoch_ledger.total_currency
+        ~total_stake:epoch_ledger.total_stake
       |> Interruptible.force
     with
     | Error _ ->
