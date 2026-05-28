@@ -261,7 +261,8 @@ let client t = Client.create ~port:t.config.client_port ~executor:t.executor ()
 
 let start ?hardfork_handling ?block_producer_key ?config_files ?env
     ?peer_list_url ?node_status_url ?node_error_url ?simplified_node_stats
-    ?(start_filtered_logs = default_init_log_filters) t =
+    ?(start_filtered_logs = default_init_log_filters) ?itn_keys
+    ?itn_graphql_port ?libp2p_port t =
   let open Deferred.Let_syntax in
   let base_args =
     [ "daemon"
@@ -286,6 +287,9 @@ let start ?hardfork_handling ?block_producer_key ?config_files ?env
   in
   let opt_arg key value_opt =
     match value_opt with None -> [] | Some value -> [ key; value ]
+  in
+  let int_opt_arg key value_opt =
+    opt_arg key (Option.map value_opt ~f:string_of_int)
   in
   let bool_flag key value_opt =
     match value_opt with
@@ -317,6 +321,29 @@ let start ?hardfork_handling ?block_producer_key ?config_files ?env
     @ config_file_args
     @ opt_arg "--peer-list-url" peer_list_url
     @ start_filtered_log_args
+    @ opt_arg "--itn-keys" itn_keys
+    @ int_opt_arg "--itn-graphql-port" itn_graphql_port
+    @ int_opt_arg "--external-port" libp2p_port
+  in
+  (* The --itn-keys / --itn-graphql-port flags are only recognised by the daemon
+     when ITN_FEATURES is set in the environment.  Inject it transparently for
+     every env-shape so callers don't need to thread the env var through. *)
+  let env =
+    if Option.is_none itn_keys && Option.is_none itn_graphql_port then env
+    else
+      let itn_kv = ("ITN_FEATURES", "1") in
+      let itn_raw = "ITN_FEATURES=1" in
+      match env with
+      | None ->
+          Some (`Extend [ itn_kv ])
+      | Some (`Extend xs) ->
+          Some (`Extend (itn_kv :: xs))
+      | Some (`Replace xs) ->
+          Some (`Replace (itn_kv :: xs))
+      | Some (`Replace_raw xs) ->
+          Some (`Replace_raw (itn_raw :: xs))
+      | Some (`Override xs) ->
+          Some (`Override ((fst itn_kv, Some (snd itn_kv)) :: xs))
   in
   [%log debug] "Starting daemon" ;
 
