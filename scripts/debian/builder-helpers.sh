@@ -557,7 +557,7 @@ build_daemon_deb() {
       ;;
     mesa_mut)
       package_name="mina-mesa-mut"
-      seed_list_url="o1labs-gitops-infrastructure/mina-mesa-network/mina-mesa-network-seeds.txt"
+      seed_list_url="o1labs-gitops-infrastructure/mina-mesa-mut/mina-mesa-mut-peer-list-url.txt"
       ;;
     *)
       echo "Unknown network name provided: ${network}"; exit 1
