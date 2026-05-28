@@ -16,8 +16,6 @@ let DebianVersions = ../../Constants/DebianVersions.dhall
 
 let RunInToolchain = ../../Command/RunInToolchain.dhall
 
-let Arch = ../../Constants/Arch.dhall
-
 let Network = ../../Constants/Network.dhall
 
 let network = Network.Type.Devnet
@@ -56,7 +54,6 @@ in  Pipeline.build
                       "export MINA_DEB_CODENAME=bullseye && source ./buildkite/scripts/export-git-env-vars.sh && echo \\\${MINA_DOCKER_TAG}"
                   ]
                 # RunInToolchain.runInToolchainBullseye
-                    Arch.Type.Amd64
                     envExports
                     "buildkite/scripts/tests/rosetta/integration-tests.sh"
             , label = "Rosetta integration tests Bullseye"

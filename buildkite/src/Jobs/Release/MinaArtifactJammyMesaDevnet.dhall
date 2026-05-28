@@ -1,37 +1,52 @@
 let ArtifactPipelines = ../../Command/MinaArtifact.dhall
 
-let Artifacts = ../../Constants/Artifacts.dhall
+let DebianVersions = ../../Constants/DebianVersions.dhall
 
-let BuildFlags = ../../Constants/BuildFlags.dhall
+let Artifacts = ../../Constants/Artifacts.dhall
 
 let Pipeline = ../../Pipeline/Dsl.dhall
 
 let PipelineTag = ../../Pipeline/Tag.dhall
+
+let PipelineScope = ../../Pipeline/Scope.dhall
+
+let Network = ../../Constants/Network.dhall
+
+let Expr = ../../Pipeline/Expr.dhall
+
+let MainlineBranch = ../../Pipeline/MainlineBranch.dhall
 
 in  Pipeline.build
       ( ArtifactPipelines.pipeline
           ArtifactPipelines.MinaBuildSpec::{
           , artifacts =
             [ Artifacts.Type.Daemon
-            , Artifacts.Type.DaemonAppsOnly
             , Artifacts.Type.DaemonConfig
+            , Artifacts.Type.DaemonAppsOnly
             , Artifacts.Type.LogProc
             , Artifacts.Type.Archive
             , Artifacts.Type.Rosetta
-            , Artifacts.Type.RosettaAppsOnly
             , Artifacts.Type.ZkappTestTransaction
-            , Artifacts.Type.FunctionalTestSuite
             , Artifacts.Type.CreatePreforkGenesis
             , Artifacts.Type.DaemonStorageToolbox
             ]
-          , buildFlags = BuildFlags.Type.Instrumented
+          , network = Network.Type.Mesa
           , tags =
             [ PipelineTag.Type.Long
             , PipelineTag.Type.Release
             , PipelineTag.Type.Docker
-            , PipelineTag.Type.Devnet
+            , PipelineTag.Type.Mesa
             , PipelineTag.Type.Amd64
-            , PipelineTag.Type.Bookworm
+            , PipelineTag.Type.Jammy
+            ]
+          , debVersion = DebianVersions.DebVersion.Jammy
+          , scope =
+            [ PipelineScope.Type.MainlineNightly, PipelineScope.Type.Release ]
+          , includeIf =
+            [ Expr.Type.DescendantOf
+                { ancestor = MainlineBranch.Type.Mesa
+                , reason = "Only run on Mesa descendants"
+                }
             ]
           }
       )
