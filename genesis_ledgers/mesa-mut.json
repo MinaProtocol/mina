@@ -1,6 +1,6 @@
 {
   "genesis": {
-    "genesis_state_timestamp": "2026-05-26T23:00:00Z"
+    "genesis_state_timestamp": "2026-05-28T20:00:00Z"
   },
   "proof": {
     "fork": {
@@ -8,6 +8,11 @@
       "blockchain_length": 296371,
       "global_slot_since_genesis": 445860
     }
+  },
+  "daemon": {
+    "slot_tx_end": 2680,
+    "slot_chain_end": 2780,
+    "hard_fork_genesis_slot_delta": 60
   },
   "ledger": {
     "add_genesis_winner": false,
