@@ -863,9 +863,38 @@ module Network_manager = struct
       (nodes_to_string (Core.String.Map.data network.archive_nodes)) ;
     network
 
+  (* Dump per-container logs and docker state to [test_artifacts/] in the
+     test_executive process's CWD before the stack is torn down. Failures
+     here are non-fatal: artifact capture must not block cleanup. *)
+  let capture_artifacts t =
+    let%bind cwd = Unix.getcwd () in
+    let cmd =
+      Printf.sprintf
+        {|
+mkdir -p test_artifacts
+docker ps -a > test_artifacts/docker_ps.txt 2>&1 || true
+docker stats --no-stream > test_artifacts/docker_stats.txt 2>&1 || true
+for c in $(docker ps -a --filter "label=com.docker.stack.namespace=%s" --format '{{.Names}}'); do
+  docker logs --timestamps "$c" > "test_artifacts/${c}.log" 2>&1 || true
+done
+|}
+        t.stack_name
+    in
+    match%map
+      Deferred.Or_error.try_with ~here:[%here] (fun () ->
+          Util.run_cmd_exn cwd "bash" [ "-c"; cmd ] )
+    with
+    | Ok _ ->
+        [%log' info t.logger]
+          "captured container artifacts to test_artifacts/ in %s" cwd
+    | Error err ->
+        [%log' warn t.logger] "failed to capture container artifacts: $err"
+          ~metadata:[ ("err", `String (Error.to_string_hum err)) ]
+
   let destroy t =
     [%log' info t.logger] "Destroying network" ;
     if not t.deployed then failwith "network not deployed" ;
+    let%bind () = capture_artifacts t in
     let%bind _ =
       Util.run_cmd_exn "/" "docker" [ "stack"; "rm"; t.stack_name ]
     in
