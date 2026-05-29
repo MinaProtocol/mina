@@ -7,6 +7,85 @@ source "$(dirname "$0")/../export-git-env-vars.sh"
 # Array of valid service names
 export VALID_SERVICES=('mina-archive' 'mina-daemon' 'mina-daemon-generic' 'mina-daemon-configured' 'mina-daemon-legacy-hardfork' 'mina-daemon-auto-hardfork' 'mina-rosetta' 'mina-rosetta-generic' 'mina-rosetta-configured' 'mina-test-suite' 'mina-batch-txn' 'mina-zkapp-test-transaction' 'mina-toolchain' 'leaderboard' 'delegation-backend' 'mina-delegation-verifier' 'delegation-backend-toolchain')
 
+# ------------------------------------------------------------------
+# gar-cache pull-through (Phase 2 — Mina-side coverage for buildx)
+#
+# Buildkite agents run a `docker pull` PATH shim that rewrites image
+# references under europe-west3-docker.pkg.dev/o1labs-192920/* and
+# gcr.io/o1labs-192920/* to go through the in-cluster gar-cache
+# (https://gar-cache.gcp.o1test.net externally,
+#  http://gar-cache-ingress.mirror-ingress in-cluster on rivendell-1).
+# That shim only intercepts standalone `docker pull` — it does NOT
+# cover `docker buildx build`, which is how all our images are built.
+# Evidence: see build 1407 of mina-mainline-branches-nightlies — the
+# buildx step pulled FROM/COPY base layers direct from GAR, only the
+# verify step's `docker pull` hit the cache.
+#
+# These helpers rewrite the `image` and `docker_repo` build-args at
+# the build.sh call-site so the buildx-driven FROM lines and the
+# Dockerfile-install-config base resolve via the cache when up. They
+# fall through to the upstream value when the cache is unreachable
+# or when GAR_CACHE_DISABLED=true is set.
+#
+# Env vars (consistent with the agent-side shim hook):
+#   DOCKER_CACHE_ENDPOINT  - cache base URL; defaults to
+#                            http://gar-cache-ingress.mirror-ingress
+#   GAR_CACHE_DISABLED     - set to "true" to opt out
+# ------------------------------------------------------------------
+
+function gar_cache_probe () {
+    # Memoize within the current shell so repeated rewrite calls do
+    # not re-probe. Sets GAR_CACHE_STATE to UP, DOWN, or DISABLED.
+    if [[ -n "${GAR_CACHE_STATE:-}" ]]; then
+        [[ "$GAR_CACHE_STATE" == "UP" ]]
+        return $?
+    fi
+    if [[ "${GAR_CACHE_DISABLED:-false}" == "true" ]]; then
+        echo "[gar-cache] disabled via GAR_CACHE_DISABLED=true" >&2
+        export GAR_CACHE_STATE="DISABLED"
+        return 1
+    fi
+    local cache_url="${DOCKER_CACHE_ENDPOINT:-http://gar-cache-ingress.mirror-ingress}"
+    if curl -fso /dev/null --connect-timeout 1 --max-time 2 "${cache_url}/v2/" 2>/dev/null; then
+        echo "[gar-cache] probe UP at ${cache_url}/v2/" >&2
+        export GAR_CACHE_STATE="UP"
+        return 0
+    fi
+    echo "[gar-cache] probe DOWN at ${cache_url}/v2/ — falling back to direct upstream" >&2
+    export GAR_CACHE_STATE="DOWN"
+    return 1
+}
+
+function rewrite_via_gar_cache () {
+    # Rewrite a registry-prefixed reference to use the in-cluster
+    # gar-cache hostname IFF the probe says UP and the ref is in
+    # the cache's sync scope (o1labs-192920/* under either upstream).
+    local ref="$1"
+    if ! gar_cache_probe; then
+        echo "$ref"
+        return 0
+    fi
+    local cache_url="${DOCKER_CACHE_ENDPOINT:-http://gar-cache-ingress.mirror-ingress}"
+    local cache_host="${cache_url#*://}"
+    local rewritten=""
+    case "$ref" in
+        europe-west3-docker.pkg.dev/o1labs-192920/*)
+            rewritten="${ref/europe-west3-docker.pkg.dev/$cache_host}" ;;
+        europe-west3-docker.pkg.dev/o1labs-192920)
+            rewritten="${ref/europe-west3-docker.pkg.dev/$cache_host}" ;;
+        gcr.io/o1labs-192920/*)
+            rewritten="${ref/gcr.io/$cache_host}" ;;
+        gcr.io/o1labs-192920)
+            rewritten="${ref/gcr.io/$cache_host}" ;;
+    esac
+    if [[ -n "$rewritten" ]]; then
+        echo "[gar-cache] rewriting ${ref} -> ${rewritten}" >&2
+        echo "$rewritten"
+    else
+        echo "$ref"
+    fi
+}
+
 function export_base_image () {
     # Determine the proper image for ubuntu or debian
     case "${DEB_CODENAME##*=}" in
@@ -20,6 +99,10 @@ function export_base_image () {
         IMAGE="europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/debian:bookworm"
     ;;
     esac
+    # Route GAR-prefixed bases (today: bookworm) through the gar-cache
+    # pull-through when reachable. focal/jammy/noble/bullseye fall through
+    # to docker.io unchanged because they're outside the cache's scope.
+    IMAGE="$(rewrite_via_gar_cache "${IMAGE}")"
     export IMAGE="--build-arg image=${IMAGE}"
 }
 
