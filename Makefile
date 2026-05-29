@@ -245,6 +245,7 @@ build-archive-utils: ocaml_checks reformat-diff ## Build archive node and relate
 		src/app/missing_blocks_auditor/missing_blocks_auditor.exe \
 		src/app/archive_hardfork_toolbox/archive_hardfork_toolbox.exe \
 		src/app/dump_slot_ledger/dump_slot_ledger.exe \
+		src/app/mina_archive_healthcheck/mina_archive_healthcheck.exe \
 		--profile=$(DUNE_PROFILE)  \
 		&& echo "✅ Build complete"
 

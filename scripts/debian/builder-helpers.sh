@@ -961,6 +961,8 @@ copy_common_archive_configs() {
     "${BUILDDIR}/usr/local/bin/mina-replayer"
   cp ./default/src/app/dump_slot_ledger/dump_slot_ledger.exe \
     "${BUILDDIR}/usr/local/bin/mina-dump-slot-ledger"
+  cp ./default/src/app/mina_archive_healthcheck/mina_archive_healthcheck.exe \
+    "${BUILDDIR}/usr/local/bin/mina-archive-healthcheck"
 
   rsync -Huav ../src/app/archive/*.sql "${BUILDDIR}/etc/mina/archive"
 
