@@ -132,7 +132,7 @@ if [[ "$MODE" == "pre-fork" ]]; then
 fi
 
 if [[ "$MODE" == "upgrade" ]]; then
-    "$TOOLBOX_PATH" verify-upgrade --postgres-uri "$POSTGRES_URI" --version 4.0.0
+    "$TOOLBOX_PATH" verify-upgrade --postgres-uri "$POSTGRES_URI" --protocol-version 4.0.0 --migration-version 0.0.4
 fi
 
 if [[ "$MODE" == "post-fork" ]]; then
