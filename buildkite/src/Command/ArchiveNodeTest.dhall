@@ -1,4 +1,4 @@
-let Artifacts = ../Constants/Artifacts.dhall
+let Cmd = ../Lib/Cmds.dhall
 
 let Command = ./Base.dhall
 
@@ -6,7 +6,7 @@ let Size = ./Size.dhall
 
 let RunWithPostgres = ./RunWithPostgres.dhall
 
-let BuildFlags = ../Constants/BuildFlags.dhall
+let ContainerImages = ../Constants/ContainerImages.dhall
 
 let key = "archive-node-test"
 
@@ -15,7 +15,7 @@ in  { step =
         ->  Command.build
               Command.Config::{
               , commands =
-                [ RunWithPostgres.runInDockerWithPostgresConn
+                [ RunWithPostgres.runInToolchainWithPostgresAndDebs
                     [ "ARCHIVE_TEST_APP=mina-archive-node-test"
                     , "MINA_TEST_NETWORK_DATA=/etc/mina/test/archive/sample_db"
                     ]
@@ -24,13 +24,13 @@ in  { step =
                             "src/test/archive/sample_db/archive_db.sql"
                         )
                     )
-                    ( Artifacts.fullDockerTag
-                        Artifacts.Tag::{
-                        , artifact = Artifacts.Type.FunctionalTestSuite
-                        , buildFlags = BuildFlags.Type.Instrumented
-                        }
-                    )
-                    "./scripts/tests/archive-node-test.sh && buildkite/scripts/upload-partial-coverage-data.sh ${key} && ls -al && ./buildkite/scripts/cache/manager.sh write-to-dir archive.perf archive-node-test"
+                    ContainerImages.minaToolchainBullseye.amd64
+                    "mina-test-suite,mina-devnet-instrumented,mina-archive-devnet-instrumented"
+                    "./scripts/tests/archive-node-test.sh"
+                , Cmd.run
+                    "buildkite/scripts/upload-partial-coverage-data.sh ${key}"
+                , Cmd.run
+                    "./buildkite/scripts/cache/manager.sh write-to-dir archive.perf archive-node-test"
                 ]
               , label = "Archive: Node Test"
               , key = key

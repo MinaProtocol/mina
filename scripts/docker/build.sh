@@ -295,10 +295,6 @@ case "${SERVICE}" in
         DOCKERFILE_PATH="dockerfiles/Dockerfile-delegation-backend-toolchain"
         DOCKER_CONTEXT="src/app/delegation_backend"
         ;;
-    mina-test-suite)
-        DOCKERFILE_PATH="dockerfiles/Dockerfile-mina-test-suite"
-        DOCKER_CONTEXT="dockerfiles/"
-        ;;
     *)
         echo "Unsupported service: $SERVICE"
         exit 1
