@@ -24,6 +24,7 @@
   sexplib0
   uri
   ;;local libraries
+  archive_health_queries
   block_time
   mina_stdlib
   child_processes
