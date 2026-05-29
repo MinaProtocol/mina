@@ -15,7 +15,13 @@
    mina_automation
    mina_automation.fixture
    mina_automation.runner)
- 
+ ;; The tests shell out to mina-archive-healthcheck via
+ ;; [Mina_automation.Healthcheck], so make sure the binary is built
+ ;; before the tests run.  At runtime the path is resolved via
+ ;; [Executor.PathFinder] (look in [_build/default] first, fall back
+ ;; to PATH for deb-installed packages), so this dep is purely a
+ ;; build-ordering constraint.
+ (deps ../../../app/mina_archive_healthcheck/mina_archive_healthcheck.exe)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version ppx_jane ppx_mina ppx_compare)))
 
