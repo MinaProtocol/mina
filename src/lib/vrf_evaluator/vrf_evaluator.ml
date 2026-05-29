@@ -471,6 +471,7 @@ module Single_process = struct
         ; commit_id
         }
     in
+    don't_wait_for (Worker_state.run_loop t) ;
     let%map () =
       let _, _, f = Functions.update_block_producer_keys in
       f t (Keypair.And_compressed_pk.Set.to_list keypairs)
