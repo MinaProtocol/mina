@@ -347,6 +347,16 @@ module Functions = struct
         Deferred.unit )
 end
 
+let register_file_logger ~conf_dir ~commit_id ~log_filename =
+  let max_size = 200 * 1024 * 1024 in
+  let num_rotate = 1 in
+  Logger.Consumer_registry.register ~id:"default" ~commit_id
+    ~processor:(Logger.Processor.raw ())
+    ~transport:
+      (Logger_file_system.dumb_logrotate ~directory:conf_dir ~log_filename
+         ~max_size ~num_rotate )
+    ()
+
 module Worker = struct
   module T = struct
     type 'worker functions =
@@ -388,14 +398,8 @@ module Worker = struct
 
       let init_worker_state (init_arg : Worker_state.init_arg) =
         let logger = init_arg.logger in
-        let max_size = 200 * 1024 * 1024 in
-        let num_rotate = 1 in
-        Logger.Consumer_registry.register ~id:"default"
-          ~commit_id:init_arg.commit_id ~processor:(Logger.Processor.raw ())
-          ~transport:
-            (Logger_file_system.dumb_logrotate ~directory:init_arg.conf_dir
-               ~log_filename:"mina-vrf-evaluator.log" ~max_size ~num_rotate )
-          () ;
+        register_file_logger ~conf_dir:init_arg.conf_dir
+          ~commit_id:init_arg.commit_id ~log_filename:"mina-vrf-evaluator.log" ;
         [%log info] "Vrf_evaluator started" ;
         return (Worker_state.create init_arg)
 
