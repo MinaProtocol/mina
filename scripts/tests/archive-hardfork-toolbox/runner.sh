@@ -70,7 +70,7 @@ validate_last_filled_block() {
     local expected_global_slot="$5"
 
     local lfb_json lfb_height lfb_state_hash lfb_global_slot
-    lfb_json="$("$toolbox" last-filled-block --postgres-uri "$postgres_uri")"
+    lfb_json="$("$toolbox" fork-candidate last-filled-block --postgres-uri "$postgres_uri")"
     lfb_height="$(jq -r '.height' <<<"$lfb_json")"
     lfb_state_hash="$(jq -r '.state_hash' <<<"$lfb_json")"
     lfb_global_slot="$(jq -r '.slot_since_genesis' <<<"$lfb_json")"
