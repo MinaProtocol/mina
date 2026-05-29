@@ -1146,15 +1146,15 @@ let iteration ~schedule_next_vrf_check ~produce_block_now
         Consensus.Data.Consensus_time.(
           of_time_exn ~constants:consensus_constants now |> to_global_slot)
       in
-      let winner_pk = fst slot_won.delegator in
-      let data =
-        Consensus.Hooks.get_block_data ~slot_won ~ledger_snapshot
-          ~coinbase_receiver:!coinbase_receiver
-      in
       if
         Mina_numbers.Global_slot_since_hard_fork.(
           curr_global_slot = winning_global_slot)
       then (
+        let winner_pk = fst slot_won.delegator in
+        let data =
+          Consensus.Hooks.get_block_data ~slot_won ~ledger_snapshot
+            ~coinbase_receiver:!coinbase_receiver
+        in
         (*produce now*)
         [%log info] "Producing a block now" ;
         set_next_producer_timing
@@ -1185,6 +1185,11 @@ let iteration ~schedule_next_vrf_check ~produce_block_now
                 ] ;
             next_vrf_check_now ()
         | Some slot_diff ->
+            let winner_pk = fst slot_won.delegator in
+            let data =
+              Consensus.Hooks.get_block_data ~slot_won ~ledger_snapshot
+                ~coinbase_receiver:!coinbase_receiver
+            in
             [%log info] "Producing a block in $slots slots"
               ~metadata:
                 [ ("slots", Mina_numbers.Global_slot_span.to_yojson slot_diff) ] ;

@@ -241,15 +241,15 @@ let find_winning_slots ~context:(module Context : Consensus.Intf.CONTEXT)
         ~producer_private_key:keypair.private_key
         ~producer_public_key:public_key_compressed
         ~total_stake:epoch_ledger.total_currency
-      |> Interruptible.force
+        ~should_abort:(fun () -> false)
     with
-    | Error _ ->
+    | `Stale ->
         [%log fatal] "VRF check failed" ;
         failwith "VRF check failed"
-    | Ok None ->
+    | `Finished None ->
         (* Not a winning slot, try next one *)
         `Repeat (current_slot + 1, found_slots, attempts_left - 1)
-    | Ok
+    | `Finished
         (Some
           (`Vrf_eval _vrf_eval, `Vrf_output vrf_result, `Delegator delegator) )
       ->

@@ -416,14 +416,16 @@ module type S = sig
         -> get_delegators:
              (   Public_key.Compressed.t
               -> Mina_base.Account.t Mina_base.Account.Index.Table.t option )
-        -> ( ( [ `Vrf_eval of string ]
+        -> should_abort:(unit -> bool)
+        -> [ `Finished of
+             ( [ `Vrf_eval of string ]
              * [> `Vrf_output of Consensus_vrf.Output_hash.t ]
              * [> `Delegator of
                   Signature_lib.Public_key.Compressed.t
                   * Mina_base.Account.Index.t ] )
              option
-           , unit )
-           Interruptible.t
+           | `Stale ]
+           Deferred.t
     end
 
     module Prover_state : sig
