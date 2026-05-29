@@ -160,7 +160,12 @@ if [[ -z "${DOCKER_REGISTRY:-}" ]]; then
   DOCKER_REGISTRY="$USER/mina-protocol"
 fi
 
-DOCKER_REPO_ARG="--build-arg docker_repo=$DOCKER_REGISTRY"
+# `docker_repo` is consumed by Dockerfile-install-config's `FROM ${docker_repo}/...`
+# (the multi-stage base — a previously-built mina-daemon image, which is HEAVY).
+# Route it through the gar-cache when reachable; output TAGs further below
+# keep using the upstream $DOCKER_REGISTRY so push lands on the real registry.
+DOCKER_REPO_BUILD_ARG="$(rewrite_via_gar_cache "$DOCKER_REGISTRY")"
+DOCKER_REPO_ARG="--build-arg docker_repo=$DOCKER_REPO_BUILD_ARG"
 
 if [[ -z "${INPUT_RELEASE:-}" ]]; then
   echo "Debian release is not set. Using the default (unstable)"
