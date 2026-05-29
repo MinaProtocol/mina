@@ -33,7 +33,9 @@ let main ~archive_uri () =
       [%log info] "Querying missing blocks" ;
       let%bind missing_blocks_raw =
         match%bind
-          Mina_caqti.Pool.use (fun db -> Sql.Unparented_blocks.run db ()) pool
+          Mina_caqti.Pool.use
+            (fun db -> Sql.Unparented_blocks_detail.run db ())
+            pool
         with
         | Ok blocks ->
             return blocks
@@ -103,6 +105,17 @@ let main ~archive_uri () =
               ~metadata:[ ("error", `String (Caqti_error.show msg)) ] ;
             exit 1
       in
+      (* The shared [Archive_health_queries.Highest_canonical_height] query
+         coalesces a NULL max height to 0 so the healthcheck CLI can run
+         against a fresh / empty archive. The auditor, however, must not
+         silently succeed on an empty canonical chain — preserve the
+         pre-refactor behavior of failing loudly in that case. *)
+      if Int64.equal highest_canonical Int64.zero then (
+        [%log error] "Error getting greatest height of canonical blocks"
+          ~metadata:
+            [ ("error", `String "no canonical blocks found in archive database")
+            ] ;
+        Core.exit 1 ) ;
       let%bind pending_below =
         match%bind
           Mina_caqti.Pool.use

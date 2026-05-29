@@ -3,8 +3,9 @@
 
 (package (name allocation_functor))
 (package (name archive))
-(package (name archive_hardfork_toolbox))
 (package (name archive_blocks))
+(package (name archive_hardfork_toolbox))
+(package (name archive_health_queries))
 (package (name archive_lib))
 (package (name base58_check))
 (package (name best_tip_merger))
@@ -85,6 +86,7 @@
 (package (name merkle_list_prover))
 (package (name merkle_list_verifier))
 (package (name merkle_mask))
+(package (name mina_archive_healthcheck))
 (package (name mina_automation))
 (package (name mina_base))
 (package (name mina_batch_txn))
