@@ -106,6 +106,14 @@ FORK_CANDIDATE_GENESIS_SLOT=448610
 FORK_CANDIDATE_STATE_HASH="3NKJ8d6ncwhLGv3B28xCuTQfXxa3MyEShSWasVFYjtnm8sFZrhF6"
 LATEST_STATE_HASH="3NKX1QQ5bSjPwE5HLxLZ6dj2Abe9uk4tqWsjGisxittxLEd8rrLK"
 
+# Last *filled* block = highest block containing an internal command.
+# This differs from the fork candidate: the fork candidate (297884) is an empty
+# confirmation block produced after the stop-transaction slot, so the last block
+# that actually carries internal commands is one lower.
+LAST_FILLED_BLOCK_HEIGHT=297883
+LAST_FILLED_BLOCK_GENESIS_SLOT=448609
+LAST_FILLED_BLOCK_STATE_HASH="3NLpeLK5b5DySyhY3Ng14cfoxqEzDokTzUKJmhNp5gsw7YataLxa"
+
 # Post-fork test parameters
 # these values correspond to the fork defined in scripts/tests/archive-hardfork-toolbox/hf_archive.tar.gz
 # that data can be different from the pre-fork test data. They are independent tests.
@@ -119,8 +127,8 @@ if [[ "$MODE" == "pre-fork" ]]; then
 
     "$TOOLBOX_PATH" fork-candidate no-commands-after --postgres-uri "$POSTGRES_URI" --fork-state-hash "$FORK_CANDIDATE_STATE_HASH" --fork-slot "$FORK_CANDIDATE_GENESIS_SLOT"
 
-    # Validate last-filled-block against the fork candidate
-    validate_last_filled_block "$TOOLBOX_PATH" "$POSTGRES_URI" "$FORK_CANDIDATE_HEIGHT" "$FORK_CANDIDATE_STATE_HASH" "$FORK_CANDIDATE_GENESIS_SLOT"
+    # Validate last-filled-block (highest block with an internal command)
+    validate_last_filled_block "$TOOLBOX_PATH" "$POSTGRES_URI" "$LAST_FILLED_BLOCK_HEIGHT" "$LAST_FILLED_BLOCK_STATE_HASH" "$LAST_FILLED_BLOCK_GENESIS_SLOT"
 fi
 
 if [[ "$MODE" == "upgrade" ]]; then
