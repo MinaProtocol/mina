@@ -59,24 +59,42 @@ let write_public_input_json path (fields : Tick_field.t array) =
   let json = `List entries in
   Out_channel.write_all path ~data:(Yojson.Safe.to_string json ^ "\n")
 
-let () =
-  let output_dir =
-    if Array.length Sys.argv > 1 then Sys.argv.(1)
-    else "../packages/schnorr/test/fixtures/schnorr_signature_proof"
-  in
-  Printf.printf "dump_schnorr_signature_proof: output_dir = %s\n" output_dir ;
+(* Compile + keypair for the flat-typ wrapper around the production
+   verifier. The VK is input-independent (a function of the circuit
+   only), so we compile ONCE and reuse it for every (sk, msg) case.
+   Using the production typ tuple3 directly (with `Inner_curve.typ` etc.)
+   trips a snarky-backendless asymmetry where `Impl.constraint_system`
+   runs the input typ's `check` but `generate_witness_conv` does NOT —
+   leading to a CS-vs-witness var count mismatch and an OOB in
+   `compute_witness`. The flat-typ wrapper re-runs the same
+   `assert_on_curve` + 255 boolean checks inside the body, so both
+   compile and witness see them. *)
+let constraint_system =
+  Impl.constraint_system ~input_typ:Dump_schnorr_circuit_lib.input_typ
+    ~return_typ:Dump_schnorr_circuit_lib.return_typ
+    Dump_schnorr_circuit_lib.schnorr_verify_circuit
 
-  (* 1. Derive sk + message from FIXED constants (not `random ()`) so the
-     emitted fixtures (vk/proof/public_input) and the resulting kimchi
-     witness are reproducible run-to-run. This is what makes the
-     OCaml<->PS witness byte-equality diff (`tools/witness_diff.sh
-     schnorr`) deterministic: both sides prove the same (pk, r, s, msg).
-     The signer itself is the production deterministic-nonce
-     `Schnorr.Chunked.sign`. *)
-  let sk = Pallas_scalar.of_int 42 in
+let proof_keypair = Tick.Keypair.create ~prev_challenges:0 constraint_system
+
+let prover_index = Tick.Keypair.pk proof_keypair
+
+let verifier_index = Tick.Keypair.vk proof_keypair
+
+let vk_json =
+  Kimchi_bindings.Protocol.VerifierIndex.Fp.to_serde_json verifier_index
+
+(* Sign (sk, msg) with the production deterministic-nonce signer, prove
+   the verifier circuit on it, and write vk/proof/public_input to
+   [output_dir]. Inputs are FIXED constants (not `random ()`) so the VK,
+   public input, and the kimchi WITNESS are reproducible run-to-run —
+   what makes the OCaml<->PS witness diff (`tools/witness_diff.sh
+   schnorr`) deterministic. The PROOF itself is not: its
+   commitment blinders are unseeded, so each run emits a different (but
+   valid) proof. That's fine — the PS verify test accepts any valid
+   proof for the (vk, public_input) pair. *)
+let dump_case ~sk ~msg_field ~output_dir =
   let pk_point = Inner_curve.scale Inner_curve.one sk in
   let pk_x, pk_y = Inner_curve.to_affine_exn pk_point in
-  let msg_field = Tick_field.of_int 7 in
   let message_chunked =
     Random_oracle.Input.Chunked.field_elements [| msg_field |]
   in
@@ -84,51 +102,24 @@ let () =
     Signature_lib.Schnorr.Chunked.sign
       ~signature_kind:Mina_signature_kind.Mainnet sk message_chunked
   in
-  Printf.printf "schnorr: signed; pk.x (hex LE) = %s\n" (field_to_hex_le pk_x) ;
-  Printf.printf "  r (hex LE) = %s\n" (field_to_hex_le r) ;
   (* Sanity: production unchecked verifier accepts. *)
-  let ok_unchecked =
+  assert (
     Signature_lib.Schnorr.Chunked.verify
       ~signature_kind:Mina_signature_kind.Mainnet (r, s) pk_point
-      message_chunked
-  in
-  assert ok_unchecked ;
-
-  (* 2. Compile + keypair for the flat-typ wrapper around the
-     production verifier. Using the production typ tuple3 directly
-     (with `Inner_curve.typ` etc.) trips a snarky-backendless asymmetry
-     where `Impl.constraint_system` runs the input typ's `check` but
-     `generate_witness_conv` does NOT — leading to a CS-vs-witness var
-     count mismatch and an OOB in `compute_witness`. The flat-typ
-     wrapper re-runs the same `assert_on_curve` + 255 boolean checks
-     inside the body, so both compile and witness see them. *)
-  let constraint_system =
-    Impl.constraint_system ~input_typ:Dump_schnorr_circuit_lib.input_typ
-      ~return_typ:Dump_schnorr_circuit_lib.return_typ
-      Dump_schnorr_circuit_lib.schnorr_verify_circuit
-  in
-  let proof_keypair =
-    Tick.Keypair.create ~prev_challenges:0 constraint_system
-  in
-  let prover_index = Tick.Keypair.pk proof_keypair in
-  let verifier_index = Tick.Keypair.vk proof_keypair in
-
-  (* 3. Build the flat 259-field input array in the same order the
-     circuit expects: [pk.x; pk.y; r; s_bit_0..s_bit_254; msg]. Take
-     the first 255 bits of [Pallas_scalar.to_bits s] (255 = scalar
-     size_in_bits). *)
-  let s_bits =
-    let bits = Pallas_scalar.to_bits s in
-    Core_kernel.List.take bits 255
-  in
+      message_chunked ) ;
+  (* Flat 259-field input: [pk.x; pk.y; r; s_bit_0..s_bit_254; msg].
+     Take the first 255 bits of [Pallas_scalar.to_bits s]. *)
   let s_bit_fields =
-    Core_kernel.List.map s_bits ~f:(fun b ->
-        if b then Tick_field.one else Tick_field.zero )
+    Pallas_scalar.to_bits s
+    |> fun bits ->
+    Core_kernel.List.take bits 255
+    |> Core_kernel.List.map ~f:(fun b ->
+           if b then Tick_field.one else Tick_field.zero )
   in
   let inputs : Tick_field.t array =
     Array.of_list ([ pk_x; pk_y; r ] @ s_bit_fields @ [ msg_field ])
   in
-  let proof_high_level, bool_output, public_inputs =
+  let proof_high_level, _bool_output, public_inputs =
     Impl.generate_witness_conv
       ~f:(fun { Impl.Proof_inputs.auxiliary_inputs; public_inputs } b_out ->
         let proof =
@@ -141,36 +132,42 @@ let () =
       ~return_typ:Dump_schnorr_circuit_lib.return_typ
       Dump_schnorr_circuit_lib.schnorr_verify_circuit inputs
   in
-  Printf.printf "schnorr: generated kimchi proof (output=%b); serializing...\n"
-    bool_output ;
-
-  (* 4. `to_backend_with_public_evals'` converts the OCaml-side
-     `with_public_evals` (which wraps `Plonk_types.Proof.t`) to the
-     kimchi-protocol-level `Kimchi_types.proof_with_public` that
-     `Kimchi_bindings.Protocol.Proof.Fp.to_serde_json` expects.
-     `primary_input` is passed empty: serde skips the `public` field,
-     and PS reinjects it via `set_public_` before verifying. *)
+  (* `to_backend_with_public_evals'` converts the OCaml-side
+     `with_public_evals` to the kimchi-protocol-level proof that
+     `Proof.Fp.to_serde_json` expects. `primary_input` is passed empty:
+     serde skips the `public` field, and PS reinjects it via
+     `set_public_` before verifying. *)
   let backend_proof =
     Tick.Proof.to_backend_with_public_evals' [] [||] proof_high_level
   in
-
-  let vk_json =
-    Kimchi_bindings.Protocol.VerifierIndex.Fp.to_serde_json verifier_index
-  in
   Out_channel.write_all (output_dir ^ "/vk.serde.json") ~data:vk_json ;
-
-  let proof_json =
-    Kimchi_bindings.Protocol.Proof.Fp.to_serde_json backend_proof
-  in
-  Out_channel.write_all (output_dir ^ "/proof.serde.json") ~data:proof_json ;
-
-  (* `public_inputs` from `generate_witness_conv` already contains all
-     260 fields in the typ-flattening order (pk_x, pk_y, r, s_bits[0..254],
-     msg, output_bool) — exactly what the PS verifier injects. *)
+  Out_channel.write_all
+    (output_dir ^ "/proof.serde.json")
+    ~data:(Kimchi_bindings.Protocol.Proof.Fp.to_serde_json backend_proof) ;
+  (* `public_inputs` already contains all 260 fields in typ-flattening
+     order (pk_x, pk_y, r, s_bits[0..254], msg, output_bool). *)
   let pi_array = public_inputs_to_array public_inputs in
   write_public_input_json (output_dir ^ "/public_input.json") pi_array ;
+  Printf.printf "schnorr: wrote %s (pk.x=%s, %d fields)\n" output_dir
+    (field_to_hex_le pk_x) (Array.length pi_array)
 
-  Printf.printf
-    "schnorr: wrote vk.serde.json + proof.serde.json + public_input.json (%d \
-     fields)\n"
-    (Array.length pi_array)
+let () =
+  let base_dir =
+    if Array.length Sys.argv > 1 then Sys.argv.(1)
+    else "../packages/schnorr/test/fixtures/schnorr_signature_proof"
+  in
+  Printf.printf "dump_schnorr_signature_proof: base_dir = %s\n" base_dir ;
+  (* Three deterministic (sk, msg) cases. Case 0 keeps (42, 7) so the
+     existing `schnorr_signature_proof/` fixture's VK/public-input (and
+     the witness-diff baseline) stay stable; cases 1,2 land in sibling
+     `_2`/`_3` dirs (the caller creates them). The proof bytes differ each
+     run (see `dump_case`), so re-running replaces each proof with another
+     valid one. *)
+  let cases =
+    [ (Pallas_scalar.of_int 42, Tick_field.of_int 7, base_dir)
+    ; (Pallas_scalar.of_int 43, Tick_field.of_int 11, base_dir ^ "_2")
+    ; (Pallas_scalar.of_int 44, Tick_field.of_int 13, base_dir ^ "_3")
+    ]
+  in
+  Core_kernel.List.iter cases ~f:(fun (sk, msg_field, output_dir) ->
+      dump_case ~sk ~msg_field ~output_dir )

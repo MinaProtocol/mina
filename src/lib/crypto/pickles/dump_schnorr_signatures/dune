@@ -1,0 +1,13 @@
+(executable
+ (name dump_schnorr_signatures)
+ (libraries
+  core_kernel
+  yojson
+  pickles
+  pickles.backend
+  signature_lib
+  random_oracle
+  random_oracle_input
+  mina_signature_kind
+  kimchi_pasta.basic
+  kimchi_pasta_snarky_backend))
