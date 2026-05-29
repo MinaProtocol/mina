@@ -72,6 +72,8 @@ module Vrf_evaluation_result = struct
 end
 
 module Worker_state = struct
+  let max_slots_won_queue_length = 100
+
   type init_arg =
     { constraint_constants : Genesis_constants.Constraint_constants.t
     ; consensus_constants : Consensus.Constants.Stable.Latest.t
@@ -107,6 +109,7 @@ module Worker_state = struct
     ; mutable epoch_data :
         unit Ivar.t * Consensus.Data.Epoch_data_for_vrf.t option
     ; mutable block_producer_keys : Block_producer_keys.t
+    ; mutable slots_won_capacity_available : unit Ivar.t
     }
 
   let make_last_checked_slot_and_epoch_table old_table new_keys ~default =
@@ -117,6 +120,24 @@ module Worker_state = struct
         let data = Option.value (Table.find old_table pk) ~default in
         Table.add_exn last_checked_slot_and_epoch ~key:pk ~data ) ;
     last_checked_slot_and_epoch
+
+  let slots_won_queue_full t =
+    Queue.length t.slots_won >= max_slots_won_queue_length
+
+  let notify_slots_won_capacity_available t =
+    Ivar.fill_if_empty t.slots_won_capacity_available () ;
+    t.slots_won_capacity_available <- Ivar.create ()
+
+  let wait_for_slots_won_capacity t interrupt_ivar =
+    if not (slots_won_queue_full t) then Interruptible.return ()
+    else (
+      [%log' warn t.config.logger]
+        "Pausing VRF evaluation because $num_slots_won slots are waiting to be \
+         polled"
+        ~metadata:[ ("num_slots_won", `Int (Queue.length t.slots_won)) ] ;
+      Interruptible.lift
+        (Ivar.read t.slots_won_capacity_available)
+        (Ivar.read interrupt_ivar) )
 
   let seen_slot last_checked_slot_and_epoch epoch slot =
     let module Table = Public_key.Compressed.Table in
@@ -243,6 +264,7 @@ module Worker_state = struct
           go keypairs
         in
         let rec find_winning_slot (consensus_time : Consensus_time.t) =
+          let%bind () = wait_for_slots_won_capacity t interrupt_ivar in
           let slot = Slot.of_uint32 @@ Consensus_time.slot consensus_time in
           t.current_slot <-
             Some
@@ -284,6 +306,7 @@ module Worker_state = struct
     ; current_slot = None
     ; epoch_data = (Ivar.create (), None)
     ; block_producer_keys = []
+    ; slots_won_capacity_available = Ivar.create ()
     }
 end
 
@@ -306,6 +329,7 @@ module Functions = struct
           let interrupt_ivar, _ = w.epoch_data in
           Ivar.fill_if_empty interrupt_ivar () ;
           Queue.clear w.slots_won ;
+          Worker_state.notify_slots_won_capacity_available w ;
           w.current_slot <- None ;
           w.epoch_data <- (Ivar.create (), Some e) ;
           Interruptible.don't_wait_for (Worker_state.evaluate w) ;
@@ -329,6 +353,7 @@ module Functions = struct
           !"Slots won evaluator: %{sexp: Consensus.Data.Slot_won.t list}"
           slots_won ;
         Queue.clear w.slots_won ;
+        Worker_state.notify_slots_won_capacity_available w ;
         let evaluator_status =
           match w.current_slot with
           | Some slot ->
