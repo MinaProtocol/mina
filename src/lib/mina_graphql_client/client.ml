@@ -121,7 +121,7 @@ let get_fork_config ~logger node_uri =
   let open Deferred.Or_error.Let_syntax in
   [%log info] "Getting fork_config from daemon"
     ~metadata:[ ("node_uri", `String (Uri.to_string node_uri)) ] ;
-  let query_obj = Queries.Query_fork_config.(make @@ makeVariables ()) in
+  let query_obj = Queries.Genesis_ledger_export.(make @@ makeVariables ()) in
   let%map query_result_obj =
     exec_graphql_request ~logger ~node_uri ~query_name:"query_fork_config"
       query_obj
