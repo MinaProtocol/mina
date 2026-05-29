@@ -70,7 +70,7 @@ let output_slot_won_json ~consensus_constants
 
 let wait_until_epoch_complete ~max_rss_kb ~poll_interval ~consensus_constants
     evaluator =
-  let rec loop () =
+  let rec loop ~saw_running () =
     ensure_rss_within_limit ~max_rss_kb ;
     let%bind { Vrf_evaluator.Vrf_evaluation_result.slots_won; evaluator_status }
         =
@@ -79,12 +79,15 @@ let wait_until_epoch_complete ~max_rss_kb ~poll_interval ~consensus_constants
     List.iter slots_won ~f:(output_slot_won_json ~consensus_constants) ;
     match evaluator_status with
     | Vrf_evaluator.Evaluator_status.Completed ->
-        Deferred.unit
+        if saw_running then Deferred.unit
+        else
+          let%bind () = after poll_interval in
+          loop ~saw_running ()
     | Vrf_evaluator.Evaluator_status.At _ ->
         let%bind () = after poll_interval in
-        loop ()
+        loop ~saw_running:true ()
   in
-  loop ()
+  loop ~saw_running:false ()
 
 let config_from_file ~logger config_file =
   let open Deferred.Or_error.Let_syntax in
@@ -165,7 +168,7 @@ let run ~config_file ~block_producer_key ~config_directory ~log_file ~max_rss_gb
   let logger = Logger.create () in
   let max_rss_kb = max_rss_gb *. 1024. *. 1024. in
   let poll_interval = Time.Span.of_ms 100. in
-  let genesis_dir = conf_dir in
+  let genesis_dir = Filename.dirname config_file in
   let%bind precomputed_values, _runtime_config =
     load_precomputed_values ~logger ~config_file ~genesis_dir
     >>| Or_error.ok_exn
