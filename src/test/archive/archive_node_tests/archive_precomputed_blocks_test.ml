@@ -123,7 +123,7 @@ let test_case (test_data : t) =
   in
   let log_file = output ^/ "precomputed_blocks_test.log" in
   Archive.Process.start_logging test_data.archive ~log_file ;
-  match%bind Archive.wait_until_ready ~log_file with
+  match%bind Archive_healthcheck.wait_db_ready ~postgres_uri:archive_uri () with
   | Ok () ->
       let%bind () =
         Daemon.archive_blocks_from_files daemon.executor
