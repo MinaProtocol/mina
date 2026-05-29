@@ -357,6 +357,43 @@ let register_file_logger ~conf_dir ~commit_id ~log_filename =
          ~max_size ~num_rotate )
     ()
 
+module Single_process = struct
+  type nonrec t = Worker_state.t
+
+  let create ?(register_logger = true) ~constraint_constants
+      ~consensus_constants ~conf_dir ~logger ~keypairs ~commit_id =
+    if register_logger then
+      register_file_logger ~conf_dir ~commit_id
+        ~log_filename:"mina-vrf-evaluator.log" ;
+    [%log info] "Vrf_evaluator started" ;
+    let t =
+      Worker_state.create
+        { constraint_constants
+        ; consensus_constants
+        ; conf_dir
+        ; logger
+        ; commit_id
+        }
+    in
+    let%map () =
+      let _, _, f = Functions.update_block_producer_keys in
+      f t (Keypair.And_compressed_pk.Set.to_list keypairs)
+    in
+    t
+
+  let set_new_epoch_state t ~epoch_data_for_vrf =
+    let _, _, f = Functions.set_new_epoch_state in
+    f t epoch_data_for_vrf
+
+  let slots_won_so_far t =
+    let _, _, f = Functions.slots_won_so_far in
+    f t ()
+
+  let update_block_producer_keys t ~keypairs =
+    let _, _, f = Functions.update_block_producer_keys in
+    f t (Keypair.And_compressed_pk.Set.to_list keypairs)
+end
+
 module Worker = struct
   module T = struct
     type 'worker functions =
