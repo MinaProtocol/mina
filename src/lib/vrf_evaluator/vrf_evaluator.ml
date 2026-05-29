@@ -101,8 +101,6 @@ module Worker_state = struct
 
   type t =
     { config : init_arg
-    ; mutable last_checked_slot_and_epoch :
-        (Epoch.t * Slot.t) Public_key.Compressed.Table.t
     ; slots_won : Consensus.Data.Slot_won.t Queue.t
           (*possibly multiple producers per slot*)
     ; mutable current_slot : Global_slot_since_hard_fork.t option
@@ -113,15 +111,6 @@ module Worker_state = struct
     ; mutable epoch_generation : int
     ; mutable state_version : int
     }
-
-  let make_last_checked_slot_and_epoch_table old_table new_keys ~default =
-    let module Set = Public_key.Compressed.Set in
-    let module Table = Public_key.Compressed.Table in
-    let last_checked_slot_and_epoch = Table.create () in
-    List.iter new_keys ~f:(fun (_, pk) ->
-        let data = Option.value (Table.find old_table pk) ~default in
-        Table.add_exn last_checked_slot_and_epoch ~key:pk ~data ) ;
-    last_checked_slot_and_epoch
 
   let slots_won_queue_full t =
     Queue.length t.slots_won >= max_slots_won_queue_length
@@ -146,29 +135,6 @@ module Worker_state = struct
       [ Deferred.choice (Ivar.read t.state_changed) Fn.id
       ; Deferred.choice (Ivar.read t.slots_won_capacity_available) Fn.id
       ]
-
-  let seen_slot last_checked_slot_and_epoch epoch slot =
-    let module Table = Public_key.Compressed.Table in
-    let unseens =
-      Table.to_alist last_checked_slot_and_epoch
-      |> List.filter_map ~f:(fun (pk, last_checked_epoch_and_slot) ->
-             let i =
-               Tuple2.compare ~cmp1:Epoch.compare ~cmp2:Slot.compare
-                 last_checked_epoch_and_slot (epoch, slot)
-             in
-             if i > 0 then None
-             else if i = 0 then
-               (*vrf evaluation was stopped at this point because it was either the end of the epoch or the key won this slot; re-check this slot when staking keys are reset so that we don't skip producing block. This will not occur in the normal flow because [slot] will be greater than the last-checked-slot*)
-               Some pk
-             else (
-               Table.set last_checked_slot_and_epoch ~key:pk ~data:(epoch, slot) ;
-               Some pk ) )
-    in
-    match unseens with
-    | [] ->
-        `All_seen
-    | nel ->
-        `Unseen (Public_key.Compressed.Set.of_list nel)
 
   let evaluate_vrf ~context:(module Context : CONTEXT)
       ~(epoch_data : Consensus.Data.Epoch_data_for_vrf.t) ~keypairs
@@ -339,7 +305,6 @@ module Worker_state = struct
 
   let create config =
     { config
-    ; last_checked_slot_and_epoch = Public_key.Compressed.Table.create ()
     ; slots_won = Queue.create ~capacity:max_slots_won_queue_length ()
     ; current_slot = None
     ; epoch_data = None
