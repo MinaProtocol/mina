@@ -12,8 +12,8 @@
 # files on the pod are preserved between runs to support this.
 #
 # Steps:
-#   1. Fetch raw fork config via GraphQL (curl on pod)
-#   2. Extract .data.fork_config and gzip (jq + gzip on pod)
+#   1. Fetch fork config via GraphQL (mina-graphql-client on pod)
+#   2. Validate JSON and gzip (jq + gzip on pod)
 #   3. Copy compressed file locally (with md5 verification and retries)
 #   4. Validate JSON, rename to mesa-<block_length>-<state_hash>.json
 #   5. Upload to GCS
@@ -23,7 +23,8 @@
 #   - KUBECONFIG env variable set (e.g. export KUBECONFIG=mesa_hf.json)
 #   - jq, gzip, md5sum available locally
 #   - gsutil configured for GCS access (step 5 only)
-#   - The target pod must have curl, jq, and gzip installed
+#   - The target pod must have mina-graphql-client (from the mina daemon
+#     debian package), jq, and gzip installed
 #
 # Examples:
 #   # Full run
@@ -85,8 +86,8 @@ Environment:
   -h, --help           Show this help
 
 Steps:
-  1  Fetch raw fork config (curl on pod)
-  2  Extract & compress on pod (jq + gzip on pod)
+  1  Fetch fork config (mina-graphql-client on pod)
+  2  Validate & compress on pod (jq + gzip on pod)
   3  Copy compressed file locally
   4  Validate & rename
   5  Upload to GCS
@@ -115,22 +116,21 @@ info "Kubeconfig: $KUBECONFIG"
 info "Start from: step $START_FROM"
 printf "\n"
 
-# ── Step 1: Fetch raw fork config on pod ───────────────────────────
-if step "Fetch raw fork config on pod"; then
-  kubectl exec "$POD" -- curl --silent --max-time "$GRAPHQL_TIMEOUT" --location \
-    "http://localhost:3085/graphql" \
-    --header "Content-Type: application/json" \
-    --data '{"query":"query MyQuery { fork_config }","variables":{}}' \
-    -o /tmp/raw_response.json \
-    || fail "curl failed on pod"
-  ok "Raw response saved to pod:/tmp/raw_response.json"
+# ── Step 1: Fetch fork config on pod ───────────────────────────────
+# mina-graphql-client ships with the daemon debian package so it is
+# available on the pod. Its `fork-config` subcommand returns the
+# fork_config JSON directly (no `.data` wrapper), so step 2 only needs
+# to validate and compress.
+if step "Fetch fork config on pod"; then
+  kubectl exec "$POD" -- sh -c "timeout ${GRAPHQL_TIMEOUT} mina-graphql-client fork-config --graphql-uri http://localhost:3085/graphql > /tmp/fork_config.json" \
+    || fail "mina-graphql-client fork-config failed on pod"
+  ok "Fork config saved to pod:/tmp/fork_config.json"
 fi
 
-# ── Step 2: Extract fork_config & compress on pod ──────────────────
-if step "Extract & compress fork config on pod"; then
+# ── Step 2: Validate & compress on pod ─────────────────────────────
+if step "Validate & compress fork config on pod"; then
   kubectl exec "$POD" -- sh -c '
-    jq -r ".data.fork_config" /tmp/raw_response.json > /tmp/fork_config.json \
-      && jq empty /tmp/fork_config.json \
+    jq empty /tmp/fork_config.json \
       && gzip -f /tmp/fork_config.json
   ' || fail "jq/gzip failed on pod"
 
