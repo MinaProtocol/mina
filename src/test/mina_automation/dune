@@ -18,6 +18,7 @@
   cohttp-async
   ;; mina libraries
   init
+  mina_healthcheck_lib
   logger
   currency
   integration_test_lib

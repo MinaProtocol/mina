@@ -144,6 +144,7 @@ assert_common_daemon_binaries() {
     assert_file_captured "$captured_files" "${root}/mina-validate-keypair"
     assert_file_captured "$captured_files" "${root}/mina-standalone-snark-worker"
     assert_file_captured "$captured_files" "${root}/mina-rocksdb-scanner"
+    assert_file_captured "$captured_files" "${root}/mina-healthcheck"
     assert_file_captured "$captured_files" "${root}/mina"
 }
 
@@ -355,6 +356,7 @@ MOCKEXE
     create_mock_exe "default/src/app/validate_keypair/validate_keypair.exe"
     create_mock_exe "default/src/lib/snark_worker/standalone/run_snark_worker.exe"
     create_mock_exe "default/src/app/rocksdb-scanner/rocksdb_scanner.exe"
+    create_mock_exe "default/src/app/mina_healthcheck/mina_healthcheck.exe"
     create_mock_exe "default/src/app/cli/src/mina_mainnet_signatures.exe"
     create_mock_exe "default/src/app/cli/src/mina_testnet_signatures.exe"
     create_mock_exe "default/src/app/archive/archive.exe"
