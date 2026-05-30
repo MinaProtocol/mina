@@ -30,6 +30,30 @@ type signed_command_result =
   ; nonce : Mina_numbers.Account_nonce.t
   }
 
+type peer_info = { peer_id : string; host : string; port : int }
+[@@deriving yojson]
+
+type daemon_status =
+  { sync_status : Sync_status.t
+  ; blockchain_length : int option [@yojson.option]
+  ; highest_block_length_received : int option [@yojson.option]
+  ; uptime_secs : int option [@yojson.option]
+  ; state_hash : string option [@yojson.option]
+  ; commit_id : string option [@yojson.option]
+  ; peer_count : int
+  ; peers : peer_info list
+  }
+[@@deriving yojson]
+
+type readiness =
+  { ready : bool
+  ; sync_status : Sync_status.t
+  ; peer_count : int
+  ; blockchain_length : int option [@yojson.option]
+  ; highest_block_length_received : int option [@yojson.option]
+  }
+[@@deriving yojson]
+
 type detailed_chain_block =
   { state_hash : string
   ; command_transaction_count : int

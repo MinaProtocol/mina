@@ -7,13 +7,13 @@
   ../../../graphql_schema.json)
  (preprocess
   (pps ppx_base ppx_version ppx_let ppx_mina ppx_custom_printf
-   ppx_sexp_conv ppx_compare ppx_deriving.std
+   ppx_sexp_conv ppx_compare ppx_deriving.std ppx_deriving_yojson
    graphql_ppx -- %{read-lines:../../graphql-ppx-config.inc}))
  (libraries
   ;; opam libraries
   async async_kernel core_kernel core uri integers result
-  cohttp cohttp-async yojson
+  cohttp cohttp-async yojson ppx_deriving_yojson.runtime
   ;; local libraries
   graphql_lib generated_graphql_queries mina_graphql mina_base mina_base.import
   mina_transaction mina_numbers currency signature_lib logger with_hash
-  data_hash_lib))
+  data_hash_lib sync_status))

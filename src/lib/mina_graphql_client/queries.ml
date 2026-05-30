@@ -285,6 +285,47 @@ module Account =
   }
 |}]
 
+module Sync_status = [%graphql {|
+  query {
+    syncStatus
+  }
+|}]
+
+module Daemon_status =
+[%graphql
+{|
+  query {
+    daemonStatus {
+      syncStatus
+      blockchainLength
+      highestBlockLengthReceived
+      uptimeSecs
+      stateHash
+      commitId
+      peers {
+        peerId
+        host
+        libp2pPort
+      }
+    }
+  }
+|}]
+
+module Daemon_readiness =
+[%graphql
+{|
+  query {
+    daemonStatus {
+      syncStatus
+      blockchainLength
+      highestBlockLengthReceived
+      peers {
+        peerId
+      }
+    }
+  }
+|}]
+
 module Best_chain_for_slot_end_test =
 [%graphql
 {|
