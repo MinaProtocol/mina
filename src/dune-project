@@ -99,6 +99,16 @@
 (package (name mina_graphql))
 (package (name mina_graphql_client))
 (package (name mina_graphql_client_app))
+(package
+ (name mina_healthcheck)
+ (synopsis "CLI for probing Mina daemon health via GraphQL")
+ (description
+  "mina-healthcheck is a lightweight executable for checking the health of a running Mina daemon. It exposes a small set of subcommands suitable for Kubernetes liveness/readiness probes, Docker HEALTHCHECK, and CI gates: sync-status, daemon-status, peer-count, chain-length, ready (composite of all of the above), and wait (block until ready or timeout).  Each subcommand supports text and --json output and translates a daemon's GraphQL response into stable exit codes.  Talks to the daemon via mina_graphql_client; logs go to stderr so stdout stays a clean JSON stream for jq pipelines."))
+(package
+ (name mina_healthcheck_lib)
+ (synopsis "Daemon healthcheck logic shared between the CLI and integration tests")
+ (description
+  "mina_healthcheck_lib contains the readiness-evaluation logic used by the mina-healthcheck binary and re-used by integration tests under src/test/command_line_tests.  It wraps mina_graphql_client with helpers that compute peer-count, chain-length, and composite readiness; it also provides poll_until / wait_for_graphql / wait_for_ready primitives that thread an absolute wall-clock deadline through every retry — so caller-supplied --timeout values are actually honored even when the inner GraphQL retry loop would otherwise burn 10 attempts × 30s sleep before giving up."))
 (package (name mina_incremental))
 (package (name mina_intf))
 (package (name mina_ledger))
