@@ -712,7 +712,8 @@ copy_common_daemon_post_automode_apps_and_configs() {
       else
         echo "Copying config for prefork daemon as config_${prefork_githash_config}.json"
         mkdir -p "${BUILDDIR}/var/lib/coda"
-        cp "../genesis_ledgers/${prefork_network}.json" \
+        # Genesis ledger files use hyphens, network names use underscores; convert before lookup.
+        cp "../genesis_ledgers/${prefork_network//_/-}.json" \
            "${BUILDDIR}/var/lib/coda/config_${prefork_githash_config}.json"
       fi
     else
@@ -848,6 +849,8 @@ build_daemon_generic_deb() {
 
 copy_common_daemon_hardfork_configs() {
   local NETWORK_NAME="${1}"
+  # Genesis ledger files use hyphens, network names use underscores; convert before lookup.
+  local ledger_name="${NETWORK_NAME//_/-}"
 
   # Copy build config and ledgers
   copy_common_daemon_configs ${NETWORK_NAME}
@@ -862,9 +865,9 @@ copy_common_daemon_hardfork_configs() {
   done
 
   # Copy older genesis ledger as .old.json for backwards compatibility
-  cp "../genesis_ledgers/${NETWORK_NAME}.json" "${BUILDDIR}/var/lib/coda/${NETWORK_NAME}.old.json"
+  cp "../genesis_ledgers/${ledger_name}.json" "${BUILDDIR}/var/lib/coda/${ledger_name}.old.json"
 
-  cp "${RUNTIME_CONFIG_JSON}" "${BUILDDIR}/var/lib/coda/${NETWORK_NAME}.json"
+  cp "${RUNTIME_CONFIG_JSON}" "${BUILDDIR}/var/lib/coda/${ledger_name}.json"
 }
 
 
