@@ -44,8 +44,10 @@ source buildkite/scripts/debian/update.sh --verbose
 
 source buildkite/scripts/debian/install.sh "mina-test-executive"
 
+mkdir -p test_output/artifacts
+
 mina-test-executive local "$TEST_NAME" \
   --mina-image "$MINA_IMAGE" \
   --archive-image "$ARCHIVE_IMAGE" \
-  | tee "$TEST_NAME.local.test.log" \
+  | tee "test_output/artifacts/$TEST_NAME.local.test.log" \
   | mina-logproc -i inline -f '!(.level in ["Debug", "Spam"])'

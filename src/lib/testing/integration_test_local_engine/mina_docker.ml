@@ -863,19 +863,22 @@ module Network_manager = struct
       (nodes_to_string (Core.String.Map.data network.archive_nodes)) ;
     network
 
-  (* Dump per-container logs and docker state to [test_artifacts/] in the
-     test_executive process's CWD before the stack is torn down. Failures
-     here are non-fatal: artifact capture must not block cleanup. *)
+  (* Dump per-container logs and docker state to [test_output/artifacts/] in
+     the test_executive process's CWD before the stack is torn down. The
+     directory name matches the convention used by other buildkite jobs
+     (AutoHardforkTest, RosettaIntegrationTests, ArchiveNodeUnitTest). The
+     test_executive log is also placed here by the shell wrapper.
+     Failures here are non-fatal: artifact capture must not block cleanup. *)
   let capture_artifacts t =
     let%bind cwd = Unix.getcwd () in
     let cmd =
       Printf.sprintf
         {|
-mkdir -p test_artifacts
-docker ps -a > test_artifacts/docker_ps.txt 2>&1 || true
-docker stats --no-stream > test_artifacts/docker_stats.txt 2>&1 || true
+mkdir -p test_output/artifacts
+docker ps -a > test_output/artifacts/docker_ps.txt 2>&1 || true
+docker stats --no-stream > test_output/artifacts/docker_stats.txt 2>&1 || true
 for c in $(docker ps -a --filter "label=com.docker.stack.namespace=%s" --format '{{.Names}}'); do
-  docker logs --timestamps "$c" > "test_artifacts/${c}.log" 2>&1 || true
+  docker logs --timestamps "$c" > "test_output/artifacts/${c}.log" 2>&1 || true
 done
 |}
         t.stack_name
@@ -886,7 +889,7 @@ done
     with
     | Ok _ ->
         [%log' info t.logger]
-          "captured container artifacts to test_artifacts/ in %s" cwd
+          "captured container artifacts to test_output/artifacts/ in %s" cwd
     | Error err ->
         [%log' warn t.logger] "failed to capture container artifacts: $err"
           ~metadata:[ ("err", `String (Error.to_string_hum err)) ]
