@@ -27,6 +27,7 @@ let buildTestCmd
                     RunInToolchain.runInToolchain
                       [ "DUNE_INSTRUMENT_WITH=bisect_ppx", "COVERALLS_TOKEN" ]
                       (     "buildkite/scripts/unit-test.sh ${profile} ${path}"
+                        ++  " && dune runtest src/app/mina_healthcheck"
                         ++  " && buildkite/scripts/upload-partial-coverage-data.sh ${command_key} dev"
                         ++  " && buildkite/scripts/profile-dependent-tests.sh devnet"
                         ++  " && buildkite/scripts/profile-dependent-tests.sh mainnet"
