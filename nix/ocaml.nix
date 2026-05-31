@@ -100,7 +100,34 @@ let
 
   dune-nix = inputs.dune-nix.lib.${pkgs.system};
 
-  base-libs = dune-nix.squashOpamNixDeps scope.ocaml.version
+  squashOpamNixDepsAllowDuplicateDirs = ocamlVersion: buildInputs:
+    (dune-nix.squashOpamNixDeps ocamlVersion buildInputs).overrideAttrs (_: {
+      installPhase = ''
+        mkdir -p $out/lib/ocaml/${ocamlVersion}/site-lib/stublibs $out/nix-support $out/bin
+        printf '%s\n' \
+          'export OCAMLPATH=''${OCAMLPATH-}''${OCAMLPATH:+:}'"$out/lib/ocaml/${ocamlVersion}/site-lib" \
+          'export CAML_LD_LIBRARY_PATH=''${CAML_LD_LIBRARY_PATH-}''${CAML_LD_LIBRARY_PATH:+:}'"$out/lib/ocaml/${ocamlVersion}/site-lib/stublibs" \
+          > $out/nix-support/setup-hook
+        for input in $buildInputs; do
+          [ ! -d "$input/lib/ocaml/${ocamlVersion}/site-lib" ] || {
+            find "$input/lib/ocaml/${ocamlVersion}/site-lib" -maxdepth 1 -mindepth 1 -not -name stublibs | while read d; do
+              target="$out/lib/ocaml/${ocamlVersion}/site-lib/$(basename "$d")"
+              [ -e "$target" ] || ln -s "$d" "$target"
+            done
+          }
+          [ ! -d "$input/lib/ocaml/${ocamlVersion}/site-lib/stublibs" ] || cp -Rs "$input/lib/ocaml/${ocamlVersion}/site-lib/stublibs"/* "$out/lib/ocaml/${ocamlVersion}/site-lib/stublibs/"
+          [ ! -d "$input/bin" ] || cp -Rs $input/bin/* $out/bin
+          [ ! -f "$input/nix-support/propagated-build-inputs" ] || { cat "$input/nix-support/propagated-build-inputs" | sed -r 's/\s//g'; echo ""; } >> $out/nix-support/propagated-build-inputs.draft
+          echo $input >> $out/nix-support/propagated-build-inputs.ref
+        done
+        sort $out/nix-support/propagated-build-inputs.draft | uniq | grep -vE '^$' > $out/nix-support/propagated-build-inputs.draft.unique
+        sort $out/nix-support/propagated-build-inputs.ref | uniq | grep -vE '^$' > $out/nix-support/propagated-build-inputs.ref.unique
+        comm -2 -3 $out/nix-support/propagated-build-inputs.{draft,ref}.unique > $out/nix-support/propagated-build-inputs
+        rm $out/nix-support/propagated-build-inputs.*
+      '';
+    });
+
+  base-libs = squashOpamNixDepsAllowDuplicateDirs scope.ocaml.version
     (pkgs.lib.attrVals (builtins.attrNames implicit-deps) scope);
 
   dune-description = pkgs.stdenv.mkDerivation {
