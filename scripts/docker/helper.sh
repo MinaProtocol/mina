@@ -36,6 +36,10 @@ export VALID_SERVICES=('mina-archive' 'mina-daemon' 'mina-daemon-generic' 'mina-
 function gar_cache_probe () {
     # Memoize within the current shell so repeated rewrite calls do
     # not re-probe. Sets GAR_CACHE_STATE to UP, DOWN, or DISABLED.
+    # NOTE: This only verifies zot is responding on /v2/. It does NOT
+    # verify that any given image is actually servable from the cache.
+    # Disk-full / on-demand-sync-failure cases will still let /v2/ pass
+    # but fail real manifest fetches — see gar_cache_has_manifest.
     if [[ -n "${GAR_CACHE_STATE:-}" ]]; then
         [[ "$GAR_CACHE_STATE" == "UP" ]]
         return $?
@@ -56,12 +60,49 @@ function gar_cache_probe () {
     return 1
 }
 
-function rewrite_via_gar_cache () {
-    # Rewrite a registry-prefixed reference to use the in-cluster
-    # gar-cache hostname IFF the probe says UP and the ref is in
-    # the cache's sync scope (o1labs-192920/* under either upstream).
-    local ref="$1"
+function gar_cache_has_manifest () {
+    # Returns 0 iff the cache can serve the manifest for the given full ref.
+    # Triggers zot's on-demand sync if the manifest is not yet cached, so a
+    # 200 here means "either already cached OR successfully fetched just now".
+    # A 404 (or any non-200) means the cache is unwilling/unable to serve it
+    # — could be: image doesn't exist upstream, sync failed, zot disk full.
+    # Either way: caller MUST NOT rewrite if this returns non-zero.
     if ! gar_cache_probe; then
+        return 1
+    fi
+    local full_ref="$1"
+    local cache_url="${DOCKER_CACHE_ENDPOINT:-http://gar-cache-ingress.mirror-ingress}"
+    local repo_with_tag=""
+    case "$full_ref" in
+        europe-west3-docker.pkg.dev/o1labs-192920/*) repo_with_tag="${full_ref#europe-west3-docker.pkg.dev/}" ;;
+        gcr.io/o1labs-192920/*) repo_with_tag="${full_ref#gcr.io/}" ;;
+        *) return 1 ;;  # out of cache scope
+    esac
+    local tag="${repo_with_tag##*:}"
+    local repo_path="${repo_with_tag%:*}"
+    # Manifest endpoints honor the standard OCI/Docker Accept headers; pass
+    # all three so we get a 200 regardless of whether the upstream stores
+    # a manifest, an OCI image manifest, or an OCI image index.
+    if curl -fsI -o /dev/null --max-time 20 \
+        -H 'Accept: application/vnd.docker.distribution.manifest.v2+json' \
+        -H 'Accept: application/vnd.oci.image.manifest.v1+json' \
+        -H 'Accept: application/vnd.oci.image.index.v1+json' \
+        "${cache_url}/v2/${repo_path}/manifests/${tag}" 2>/dev/null; then
+        echo "[gar-cache] manifest present in cache: ${repo_path}:${tag}" >&2
+        return 0
+    fi
+    echo "[gar-cache] manifest NOT in cache (will pass through to upstream): ${repo_path}:${tag}" >&2
+    return 1
+}
+
+function rewrite_via_gar_cache () {
+    # Rewrite a full image:tag reference to use the in-cluster gar-cache
+    # hostname IFF the cache currently serves that exact manifest. The
+    # manifest probe (gar_cache_has_manifest) avoids the buildx-no-fallback
+    # failure mode: if buildx asks the cache for an image and gets 404,
+    # it errors out — there's no exec-fallback like the agent-side shim has.
+    local ref="$1"
+    if ! gar_cache_has_manifest "$ref"; then
         echo "$ref"
         return 0
     fi
@@ -71,11 +112,7 @@ function rewrite_via_gar_cache () {
     case "$ref" in
         europe-west3-docker.pkg.dev/o1labs-192920/*)
             rewritten="${ref/europe-west3-docker.pkg.dev/$cache_host}" ;;
-        europe-west3-docker.pkg.dev/o1labs-192920)
-            rewritten="${ref/europe-west3-docker.pkg.dev/$cache_host}" ;;
         gcr.io/o1labs-192920/*)
-            rewritten="${ref/gcr.io/$cache_host}" ;;
-        gcr.io/o1labs-192920)
             rewritten="${ref/gcr.io/$cache_host}" ;;
     esac
     if [[ -n "$rewritten" ]]; then
@@ -83,6 +120,37 @@ function rewrite_via_gar_cache () {
         echo "$rewritten"
     else
         echo "$ref"
+    fi
+}
+
+function rewrite_docker_repo_via_gar_cache () {
+    # Rewrite the `docker_repo` build-arg prefix to use the cache hostname
+    # IFF the dependency image (constructed as ${prefix}/${image_name}:${tag})
+    # is currently servable from the cache. Used by Dockerfile-install-config
+    # which has `FROM ${docker_repo}/${image_name}:${version}-...-generic...`
+    # The probe constructs that exact FROM ref before deciding to rewrite.
+    local registry_prefix="$1"   # e.g., europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo
+    local dep_image_name="$2"     # e.g., mina-daemon
+    local dep_tag="$3"            # e.g., 4.0.0-rc1-...-bullseye-devnet-generic-instrumented
+    local full_ref="${registry_prefix}/${dep_image_name}:${dep_tag}"
+    if ! gar_cache_has_manifest "$full_ref"; then
+        echo "$registry_prefix"
+        return 0
+    fi
+    local cache_url="${DOCKER_CACHE_ENDPOINT:-http://gar-cache-ingress.mirror-ingress}"
+    local cache_host="${cache_url#*://}"
+    local rewritten=""
+    case "$registry_prefix" in
+        europe-west3-docker.pkg.dev/o1labs-192920/*|europe-west3-docker.pkg.dev/o1labs-192920)
+            rewritten="${registry_prefix/europe-west3-docker.pkg.dev/$cache_host}" ;;
+        gcr.io/o1labs-192920/*|gcr.io/o1labs-192920)
+            rewritten="${registry_prefix/gcr.io/$cache_host}" ;;
+    esac
+    if [[ -n "$rewritten" ]]; then
+        echo "[gar-cache] rewriting docker_repo ${registry_prefix} -> ${rewritten} (probe: ${dep_image_name}:${dep_tag})" >&2
+        echo "$rewritten"
+    else
+        echo "$registry_prefix"
     fi
 }
 

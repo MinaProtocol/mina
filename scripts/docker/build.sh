@@ -160,12 +160,12 @@ if [[ -z "${DOCKER_REGISTRY:-}" ]]; then
   DOCKER_REGISTRY="$USER/mina-protocol"
 fi
 
-# `docker_repo` is consumed by Dockerfile-install-config's `FROM ${docker_repo}/...`
-# (the multi-stage base — a previously-built mina-daemon image, which is HEAVY).
-# Route it through the gar-cache when reachable; output TAGs further below
-# keep using the upstream $DOCKER_REGISTRY so push lands on the real registry.
-DOCKER_REPO_BUILD_ARG="$(rewrite_via_gar_cache "$DOCKER_REGISTRY")"
-DOCKER_REPO_ARG="--build-arg docker_repo=$DOCKER_REPO_BUILD_ARG"
+# Set the upstream prefix here; for services that use Dockerfile-install-config
+# (mina-daemon-configured / mina-rosetta-configured) we may re-set this AFTER
+# export_docker_tag below, once the dependency tag is fully resolved and we can
+# probe the cache for its specific manifest. Output TAGs are always built from
+# the upstream $DOCKER_REGISTRY so push lands on the real registry.
+DOCKER_REPO_ARG="--build-arg docker_repo=$DOCKER_REGISTRY"
 
 if [[ -z "${INPUT_RELEASE:-}" ]]; then
   echo "Debian release is not set. Using the default (unstable)"
@@ -310,6 +310,29 @@ fi
 
 export_version
 export_docker_tag
+
+# gar-cache (Phase 2): for Dockerfile-install-config services, probe the
+# cache for the specific dependency manifest the FROM line will pull, and
+# only rewrite docker_repo to use the cache when that manifest is present.
+# Without this probe, a cache miss on the dep image fails the entire build
+# (buildx doesn't fall back like the agent-side docker-pull shim does).
+#
+# Dockerfile-install-config:16 is
+#   FROM ${docker_repo}/${image_name}:${version}-${network}-generic${build_flags_suffix}${custom_suffix}
+# so we reconstruct that ref from build-args available here.
+if [[ "${DOCKERFILE_PATH}" == "dockerfiles/Dockerfile-install-config" ]]; then
+    _dep_image_name="${IMAGE_NAME:-mina-daemon}"
+    _dep_version="${VERSION_ARG#--build-arg version=}"
+    _dep_network="${INPUT_NETWORK:-devnet}"
+    # BUILD_FLAGS_SUFFIX_ARG is set by export_suffixes (called inside
+    # export_docker_tag) and looks like "--build-arg build_flags_suffix=-instrumented".
+    _dep_build_flags="${BUILD_FLAGS_SUFFIX_ARG#--build-arg build_flags_suffix=}"
+    _dep_custom="${CUSTOM_SUFFIX_ARG#--build-arg custom_suffix=}"
+    _dep_tag="${_dep_version}-${_dep_network}-generic${_dep_build_flags}${_dep_custom}"
+    _rewritten_repo="$(rewrite_docker_repo_via_gar_cache "${DOCKER_REGISTRY}" "${_dep_image_name}" "${_dep_tag}")"
+    DOCKER_REPO_ARG="--build-arg docker_repo=${_rewritten_repo}"
+    unset _dep_image_name _dep_version _dep_network _dep_build_flags _dep_custom _dep_tag _rewritten_repo
+fi
 
 BUILD_NETWORK="--allow=network.host"
 
