@@ -45,10 +45,11 @@ fi
 
 # Note: By attempting a re-run on failure here, we can avoid rebuilding and
 # skip running all of the tests that have already succeeded, since dune will
-# only retry those tests that failed.
+# only retry those tests that failed. Do not pass --force to the retry: it
+# forces Dune to rerun the whole test suite, including tests that already passed.
 echo "--- Run unit tests"
 time dune runtest ${FORCE_FLAG} "${path}" || \
 (./scripts/link-coredumps.sh && \
  echo "--- Retrying failed unit tests" && \
- time dune runtest ${FORCE_FLAG} "${path}" || \
+ time dune runtest "${path}" || \
  (./scripts/link-coredumps.sh && false))
