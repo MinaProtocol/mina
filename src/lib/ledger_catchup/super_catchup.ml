@@ -1026,9 +1026,10 @@ let setup_state_machine_runner ~context:(module Context : CONTEXT) ~t ~verifier
                  Option.value_map valid_cb ~default:ignore
                    ~f:Mina_net2.Validation_callback.fire_if_not_already_fired
                    `Ignore ;
-                 ignore
-                   ( Cached.invalidate_with_failure av
-                     : Mina_block.almost_valid_block Envelope.Incoming.t ) ;
+                 if not (Cached.was_consumed av) then
+                   ignore
+                     ( Cached.invalidate_with_failure av
+                       : Mina_block.almost_valid_block Envelope.Incoming.t ) ;
                  finish t node ~is_error:true ;
                  Error `Finished )
         in
