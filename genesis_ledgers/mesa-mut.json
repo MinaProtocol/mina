@@ -9,11 +9,6 @@
       "global_slot_since_genesis": 445860
     }
   },
-  "daemon": {
-    "slot_tx_end": 2680,
-    "slot_chain_end": 2780,
-    "hard_fork_genesis_slot_delta": 60
-  },
   "ledger": {
     "add_genesis_winner": false,
     "s3_data_hash": "c26d9e43dfc1a0435b64e44dccfe31dc1b8b2efb46fc49aacdba6e8656f30e5f",
