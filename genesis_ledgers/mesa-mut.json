@@ -10,9 +10,9 @@
     }
   },
   "daemon": {
-    "slot_tx_end": 2680,
-    "slot_chain_end": 2780,
-    "hard_fork_genesis_slot_delta": 60
+    "slot_tx_end": 2880,
+    "slot_chain_end": 2885,
+    "hard_fork_genesis_slot_delta": 5
   },
   "ledger": {
     "add_genesis_winner": false,
