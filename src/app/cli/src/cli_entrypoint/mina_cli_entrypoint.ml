@@ -100,10 +100,6 @@ let load_config_files ~logger ~genesis_constants ~constraint_constants ~conf_dir
                 ] ;
             failwithf "Could not parse configuration file: %s" err () )
   in
-  let ledger_backing =
-    make_ledger_backing ~constraint_constants ~runtime_config:config
-      ~hardfork_handling
-  in
   let chain_state_locations =
     Init.Chain_state_locations.of_config ~conf_dir config
   in
@@ -147,6 +143,11 @@ let load_config_files ~logger ~genesis_constants ~constraint_constants ~conf_dir
           "Initializing with runtime configuration. Ledger source: $name"
           ~metadata ;
         Error.raise err
+  in
+  let ledger_backing =
+    make_ledger_backing
+      ~constraint_constants:precomputed_values.constraint_constants
+      ~runtime_config:config ~hardfork_handling
   in
   ( precomputed_values
   , config_jsons
