@@ -703,19 +703,15 @@ cache-put-debian: ## Upload debian packages for prefork genesis creation
 # Docker images
 
 .PHONY: start-local-debian-repo
-start-local-debian-repo: ## Start a local Debian repository
-	$(info 📦 Starting local Debian repository with codename $(CODENAME))
+start-local-debian-repo: ## Stage locally-built debians into the docker build context
+	$(info 📦 Staging local debians from _build into the dockerfiles/ build context)
 
-	@./scripts/debian/aptly.sh stop || true
-
-	@./scripts/debian/aptly.sh start \
-		--codename $(CODENAME) \
-		--debians _build \
-		--component unstable \
-		--clean \
-		--background \
-		--wait \
-		&& echo "✅ Build complete"
+	@# scripts/docker/build.sh stages any .deb files found in the docker build
+	@# context (dockerfiles/) into dockerfiles/_debs and generates an apt index
+	@# there, which the Dockerfiles install from. Make the locally-built debians
+	@# available by copying them into the context.
+	@cp -f _build/*.deb dockerfiles/ \
+		&& echo "✅ Local debians staged"
 
 # General function for building Docker images
 define build_docker_image
@@ -739,8 +735,8 @@ define build_docker_image
 		--network $(2) \
 		--no-cache
 
-	$(info 📦 stopping local Debian repository)
-	@./scripts/debian/aptly.sh stop
+	$(info 📦 cleaning up staged local debians)
+	@rm -f dockerfiles/*.deb
 endef
 
 
@@ -868,8 +864,8 @@ docker-build-daemon-hardfork-docker: ## Generate hardfork packages
 		--no-cache \
 		--load-only
 
-	$(info 📦 stopping local Debian repository)
-	@./scripts/debian/aptly.sh stop
+	$(info 📦 cleaning up staged local debians)
+	@rm -f dockerfiles/*.deb
 
 .PHONY: docker-build-hardfork-rosetta-docker
 docker-build-hardfork-rosetta-docker: SHELL := /bin/bash
@@ -917,8 +913,8 @@ docker-build-hardfork-rosetta-docker: ## Generate hardfork packages
 		--load-only
 
 
-	$(info 📦 stopping local Debian repository)
-	@./scripts/debian/aptly.sh stop
+	$(info 📦 cleaning up staged local debians)
+	@rm -f dockerfiles/*.deb
 
 ########################################
 # Generate odoc documentation
