@@ -130,12 +130,24 @@ RUN mkdir -p ${MINA_CONFIG_DIR}/wallets/store/ \
 
 
 # Mina daemon package
-# jemalloc is also installed automatically here to match the package dependencies for this $deb_codename
+# jemalloc is also installed automatically here to match the package dependencies for this $deb_codename.
+# Installed DIRECTLY from the local build context: scripts/docker/build.sh stages
+# the freshly-built .deb files under _debs, which we COPY to /opt/mina-local-debs,
+# and install-mina-debs.sh installs the resolved .deb files with a single apt-get
+# call (no apt repo / no apt index). Since there is no repo to resolve the mina
+# dependency closure, the daemon metapackage's dependencies (mina-logproc and
+# mina-${network}-config) are requested explicitly as local files too.
+COPY scripts/install-mina-debs.sh /usr/local/bin/install-mina-debs.sh
+COPY _debs /opt/mina-local-debs
 RUN echo "Building image with version $deb_version from repo $deb_release $deb_codename for network $network" \
-    && echo "deb [trusted=yes] ${deb_repo} $deb_codename $deb_release" > /etc/apt/sources.list.d/o1.list \
-    && apt-get update --quiet --yes \
-    && apt-get install --no-install-recommends --quiet --yes --allow-downgrades "${MINA_DEB}=$deb_version" "${MINA_ARCHIVE_DEB}=$deb_version" "${MINA_ROSETTA_DEB}=$deb_version" "mina-zkapp-test-transaction=$deb_version" \
-    && rm -rf /var/lib/apt/lists/*
+    && chmod +x /usr/local/bin/install-mina-debs.sh \
+    && /usr/local/bin/install-mina-debs.sh \
+         "${MINA_DEB}=$deb_version" \
+         "mina-logproc=$deb_version" \
+         "mina-${network}-config=$deb_version" \
+         "${MINA_ARCHIVE_DEB}=$deb_version" \
+         "${MINA_ROSETTA_DEB}=$deb_version" \
+         "mina-zkapp-test-transaction=$deb_version"
 
 # --- Set up postgres
 USER postgres

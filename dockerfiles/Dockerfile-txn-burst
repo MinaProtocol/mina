@@ -50,12 +50,21 @@ RUN apt-get -y update \
     && rm -rf /var/lib/apt/lists/*
 
 #install mina and txn burst tool
+# Installed DIRECTLY from the local build context: scripts/docker/build.sh stages
+# the freshly-built .deb files under _debs, which we COPY to /opt/mina-local-debs,
+# and install-mina-debs.sh installs the resolved .deb files with apt-get (no apt
+# repo / no apt index). Since there is no repo to resolve the mina dependency
+# closure, the daemon metapackage's dependencies (mina-logproc and
+# mina-${network}-config) are requested explicitly as local files too.
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
-RUN echo "deb [trusted=yes] ${deb_repo} $deb_codename $deb_release" | tee /etc/apt/sources.list.d/mina.list \
-  && apt-get update\
-  && apt-get install --quiet --yes --no-install-recommends --allow-downgrades "mina-$network=$deb_version" \
-  && apt-get install --quiet --yes --no-install-recommends --allow-downgrades "mina-batch-txn=$deb_version" \
-  && rm -rf /var/lib/apt/lists/*
+COPY scripts/install-mina-debs.sh /usr/local/bin/install-mina-debs.sh
+COPY _debs /opt/mina-local-debs
+RUN chmod +x /usr/local/bin/install-mina-debs.sh \
+  && /usr/local/bin/install-mina-debs.sh \
+       "mina-$network=$deb_version" \
+       "mina-logproc=$deb_version" \
+       "mina-${network}-config=$deb_version" \
+       "mina-batch-txn=$deb_version"
 
 USER root
 # prepare the key directories
