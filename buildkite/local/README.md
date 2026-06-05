@@ -37,10 +37,7 @@ EOF
 | `dhall-to-yaml` | Pipeline generation | https://github.com/dhall-lang/dhall-haskell |
 | `docker` | Container execution | https://docs.docker.com/get-docker/ |
 | `rsync` | Cache sync from Hetzner | Usually pre-installed |
-| `aptly` | Local Debian repository (inside container) | Pre-installed in mina-toolchain image |
-
-**Port requirement:** Port `8080` must be available. Aptly starts a local Debian
-repository server on this port during hardfork package generation.
+| `dpkg-dev` | Local Debian apt index generation (inside container) | Pre-installed in mina-toolchain image |
 
 ### Required Directories (Permissions)
 
@@ -178,7 +175,6 @@ These are derived from your local git state:
 |----------|---------|-------------|
 | `LOCAL_BK_RUN` | `1` | Indicates local execution (scripts can check this) |
 | `SKIP_DOCKER_PRUNE` | `1` | Prevents docker system prune |
-| `APTLY_ROOT` | `/tmp/aptly` | Writable directory for aptly database (avoids ~/.aptly permission issues) |
 
 ### Cache Configuration
 
