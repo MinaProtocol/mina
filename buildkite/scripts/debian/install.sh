@@ -74,36 +74,37 @@ else
   done
 fi
 
-debs_with_version=()
-for i in "${debs[@]}"; do
-   debs_with_version+=("${i}=${VERSION}")
-done
+# Enumerate the concrete .deb files that were downloaded into the local folder
+# and install them directly with apt-get (local-file install). apt-get still
+# resolves any non-mina dependencies from the system's normal apt sources, and
+# installing local .deb files upgrades/downgrades the mina packages in place.
+#
+# Use absolute paths: apt-get only treats an argument as a local .deb file when
+# it starts with '/' or './'. A bare relative path like 'debs/foo.deb' is
+# instead parsed as the 'package/release' selector syntax (package "debs" from
+# release "foo.deb"), which fails with "Unable to locate package debs".
+ABS_DEB_FOLDER="$(cd "$LOCAL_DEB_FOLDER" && pwd)"
+deb_files=()
+while IFS= read -r -d '' f; do
+  deb_files+=("$f")
+done < <(find "$ABS_DEB_FOLDER" -maxdepth 1 -name '*.deb' -print0)
 
-# Start aptly
-source ./scripts/debian/aptly.sh start --codename $MINA_DEB_CODENAME --debians $LOCAL_DEB_FOLDER --component unstable --clean --background --wait
+if [ "${#deb_files[@]}" -eq 0 ]; then
+  echo "No .deb files were downloaded into '$LOCAL_DEB_FOLDER'. Nothing to install."
+  exit 1
+fi
 
 # Install debians
 echo "Installing mina packages: $DEBS"
-echo "deb [trusted=yes] http://localhost:8080 $MINA_DEB_CODENAME unstable" | $SUDO tee /etc/apt/sources.list.d/mina.list
+echo "Installing the following local .deb files:"
+printf '  %s\n' "${deb_files[@]}"
 
-# Bypass any configured APT proxy for localhost (where aptly serves packages)
-eval "$(./buildkite/scripts/debian/apt-proxy-bypass.sh localhost)"
-
-# Update apt packages for the new repo, preserving all others
-$SUDO apt-get update --yes \
-  -o Dir::Etc::sourcelist="sources.list.d/mina.list" \
-  -o Dir::Etc::sourceparts="-" \
-  -o APT::Get::List-Cleanup="0" \
-  $APT_PROXY_BYPASS_OPTS
-$SUDO apt-get remove --yes "${debs[@]}"
-$SUDO apt-get install --yes --allow-downgrades \
-  $APT_PROXY_BYPASS_OPTS \
-  "${debs_with_version[@]}"
-
-
+# Installing the local .deb files already replaces (upgrades/downgrades) any
+# currently-installed version of the same packages, so no explicit pre-remove
+# step is needed. --allow-downgrades permits installing an older version when
+# the upgrade tests require it; non-mina dependencies are pulled from the
+# system's normal apt sources in a single resolution pass.
+$SUDO apt-get install -y --allow-downgrades --no-install-recommends "${deb_files[@]}"
 
 # Cleaning up
-source ./scripts/debian/aptly.sh stop  --clean
-$SUDO rm -f /etc/apt/sources.list.d/mina.list
-
 rm -rf $LOCAL_DEB_FOLDER

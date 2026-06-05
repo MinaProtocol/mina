@@ -11,7 +11,7 @@
 #
 # Prerequisites:
 #   - Built debs available in cache (depends on debian build CI step)
-#   - Running inside a toolchain container with apt/dpkg/fakeroot/aptly
+#   - Running inside a toolchain container with apt/dpkg/fakeroot
 #
 # Usage:
 #   debian-automode-transition-test.sh --codename <codename> --network <network>
@@ -44,7 +44,6 @@ log_error() { echo -e "${RED}[ERROR]${CLEAR} $*"; }
 
 CODENAME="bullseye"
 NETWORK="devnet"
-APTLY_PORT=8080
 
 usage() {
     echo "Usage: $0 [OPTIONS]"
@@ -82,7 +81,6 @@ mkdir -p "${DEB_DIR}" "${REPO_DIR}" "${VERSIONED_DIR}"
 
 cleanup() {
     log_info "Cleaning up..."
-    ./scripts/debian/aptly.sh stop --clean 2>/dev/null || true
     rm -rf "${WORKDIR}"
 }
 trap cleanup EXIT
@@ -194,30 +192,45 @@ log_info "Versioned packages:"
 ls -la "${REPO_DIR}"/*.deb
 
 ################################################################################
-# Step 3: Start local apt repo
+# Step 3: Resolve the local .deb files for each transition stage
 ################################################################################
+#
+# Rather than serving the reversioned debs from a local package repository and
+# letting apt resolve everything by name, we install the concrete .deb files
+# directly.
+# apt-get still does full dependency resolution (Conflicts/Replaces, downgrades,
+# and pulling any non-mina deps from the system apt sources) when handed local
+# .deb files in a single invocation.
 
-log_info "=== Step 3: Start local apt repository ==="
+log_info "=== Step 3: Resolve local .deb files per stage ==="
 
-./scripts/debian/aptly.sh start \
-    --codename "${CODENAME}" \
-    --debians "${REPO_DIR}" \
-    --component unstable \
-    --clean \
-    --background \
-    --wait \
-    --port "${APTLY_PORT}"
+# Prefork debs come straight from the legacy cache (their original version) and
+# satisfy the automode metapackage's prefork dependency. Pass all of them so the
+# correct one matching the dependency constraint is available to apt.
+mapfile -t PREFORK_DEBS < <(ls "${REPO_DIR}"/"${PKG_PREFORK}"_*.deb)
 
-# Add local repo to apt sources
-$SUDO bash -c "echo 'deb [trusted=yes] http://localhost:${APTLY_PORT}/ ${CODENAME} unstable' > /etc/apt/sources.list.d/transition-test.list"
-# Toolchain image ships a global apt proxy (apt-cacher-ng) that rejects port ${APTLY_PORT};
-# bypass it for localhost so `apt-get update` can read the transition packages.
-eval "$(./buildkite/scripts/debian/apt-proxy-bypass.sh localhost)"
-$SUDO apt-get update $APT_PROXY_BYPASS_OPTS
+# V1: mina-devnet + config + logproc (pre-hardfork)
+V1_DEBS=(
+    "${REPO_DIR}/${PKG_DAEMON}_${V1}_amd64.deb"
+    "${REPO_DIR}/${PKG_CONFIG}_${V1}_all.deb"
+    "${REPO_DIR}/mina-logproc_${V1}_amd64.deb"
+)
 
-log_info "Available packages:"
-apt-cache showpkg "${PKG_DAEMON}" 2>/dev/null | head -20 || true
-apt-cache showpkg "${PKG_AUTOMODE}" 2>/dev/null | head -20 || true
+# V2: automode + postfork + config + logproc (+ prefork files) (hardfork)
+V2_DEBS=(
+    "${REPO_DIR}/${PKG_AUTOMODE}_${V2}_all.deb"
+    "${REPO_DIR}/${PKG_POSTFORK}_${V2}_amd64.deb"
+    "${REPO_DIR}/${PKG_CONFIG}_${V2}_all.deb"
+    "${REPO_DIR}/mina-logproc_${V2}_amd64.deb"
+    "${PREFORK_DEBS[@]}"
+)
+
+# V3: mina-devnet + config + logproc (post-hardfork, back to normal)
+V3_DEBS=(
+    "${REPO_DIR}/${PKG_DAEMON}_${V3}_amd64.deb"
+    "${REPO_DIR}/${PKG_CONFIG}_${V3}_all.deb"
+    "${REPO_DIR}/mina-logproc_${V3}_amd64.deb"
+)
 
 ################################################################################
 # Step 4: Install mina-devnet v1 (pre-hardfork state)
@@ -225,11 +238,10 @@ apt-cache showpkg "${PKG_AUTOMODE}" 2>/dev/null | head -20 || true
 
 log_info "=== Step 4: Install ${PKG_DAEMON} v1 ==="
 
-log_info "Package dependencies for ${PKG_DAEMON}=${V1}:"
-apt-cache depends "${PKG_DAEMON}=${V1}" 2>/dev/null || true
-apt-cache policy "${PKG_DAEMON}=${V1}" 2>/dev/null || true
+log_info "Installing local .deb files for v1:"
+printf '  %s\n' "${V1_DEBS[@]}"
 
-$SUDO apt-get install -y --allow-downgrades $APT_PROXY_BYPASS_OPTS "${PKG_DAEMON}=${V1}" "${PKG_CONFIG}=${V1}" "mina-logproc=${V1}"
+$SUDO apt-get install -y --allow-downgrades --no-install-recommends "${V1_DEBS[@]}"
 
 log_info "Installed ${PKG_DAEMON} v1"
 dpkg -l "${PKG_DAEMON}" 2>/dev/null | tail -1
@@ -256,7 +268,18 @@ log_info "PASS: No automode paths in v1"
 
 log_info "=== Step 5: Upgrade to ${PKG_AUTOMODE} v2 ==="
 
-$SUDO apt-get install -y --allow-downgrades $APT_PROXY_BYPASS_OPTS "${PKG_AUTOMODE}=${V2}" "${PKG_CONFIG}=${V2}" "mina-logproc=${V2}"
+log_info "Installing local .deb files for v2:"
+printf '  %s\n' "${V2_DEBS[@]}"
+
+$SUDO apt-get install -y --allow-downgrades --no-install-recommends "${V2_DEBS[@]}"
+
+# When automode is installed from an apt repo, its prefork/postfork sub-packages
+# are pulled in as automatically-installed dependencies, so a later `apt-get
+# autoremove` reclaims them once automode is gone. Installing the .deb files
+# directly (no repo) marks every explicitly-named file as manually installed,
+# which would defeat autoremove. Re-mark the sub-packages as auto so the orphan
+# cleanup in Step 6 mirrors the real repo-based transition.
+$SUDO apt-mark auto "${PKG_PREFORK}" "${PKG_POSTFORK}" || true
 
 log_info "Package state after automode install:"
 dpkg -l "${PKG_AUTOMODE}" 2>/dev/null | tail -1 || true
@@ -291,7 +314,10 @@ log_info "PASS: /usr/local/bin/mina is a symlink (automode dispatcher)"
 
 log_info "=== Step 6: Restore ${PKG_DAEMON} v3 ==="
 
-$SUDO apt-get install -y --allow-downgrades $APT_PROXY_BYPASS_OPTS "${PKG_DAEMON}=${V3}" "${PKG_CONFIG}=${V3}" "mina-logproc=${V3}"
+log_info "Installing local .deb files for v3:"
+printf '  %s\n' "${V3_DEBS[@]}"
+
+$SUDO apt-get install -y --allow-downgrades --no-install-recommends "${V3_DEBS[@]}"
 
 # automode metapackage conflicts with mina-devnet, so apt should remove it.
 # The prefork/postfork sub-packages were only dependencies of automode, so
