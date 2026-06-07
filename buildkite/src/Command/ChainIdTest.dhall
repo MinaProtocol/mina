@@ -16,8 +16,6 @@ let Size = ../Command/Size.dhall
 
 let Network = ../Constants/Network.dhall
 
-let MainlineBranch = ../Pipeline/MainlineBranch.dhall
-
 let Expr = ../Pipeline/Expr.dhall
 
 let DebianVersions = ../Constants/DebianVersions.dhall
@@ -64,12 +62,7 @@ let makeTest =
                 , PipelineTag.Type.Stable
                 ]
               , scope = scope
-              , excludeIf =
-                [ Expr.Type.DescendantOf
-                    { ancestor = MainlineBranch.Type.Mesa
-                    , reason = "Mesa does not support this test yet"
-                    }
-                ]
+              , excludeIf = [] : List Expr.Type
               }
             , steps = [ buildTestStep network expectedChainId deps ]
             }
