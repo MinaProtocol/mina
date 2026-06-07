@@ -27,10 +27,18 @@ release_branch=origin/$1
 echo "--- Run Python version linter with branches: ${pr_branch} ${base_branch} ${release_branch}"
 ./scripts/version-linter.py ${pr_branch} ${base_branch} ${release_branch}
 
-echo "--- Install Mina"
+echo "--- Audit type shapes"
 source buildkite/scripts/export-git-env-vars.sh
 
-source buildkite/scripts/debian/install.sh "mina-${TESTNET_NAME}" 1
-
-echo "--- Audit type shapes"
-mina internal audit-type-shapes
+# audit-type-shapes only inspects the binary's compiled-in type registry, so the
+# freshly-built bare binary from the apps cache is sufficient; no debian package
+# is required. Fall back to the .deb when the bare binary is unavailable.
+CODENAME="${MINA_DEB_CODENAME:-bullseye}"
+if MINA_BIN=$(./buildkite/scripts/apps/restore_binary.sh "$CODENAME" devnet-devnet mina_testnet_signatures.exe ./_apps_bin); then
+  echo "Using bare binary from apps cache: $MINA_BIN"
+  "$MINA_BIN" internal audit-type-shapes
+else
+  echo "Falling back to debian-installed mina"
+  source buildkite/scripts/debian/install.sh "mina-${TESTNET_NAME}" 1
+  mina internal audit-type-shapes
+fi
