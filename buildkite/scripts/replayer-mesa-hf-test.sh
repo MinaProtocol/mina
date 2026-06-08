@@ -21,7 +21,7 @@ if [[ -z "$CONFIG_DEB" ]]; then
   echo "ERROR: mina-devnet-config deb not found in src/test/archive/sample_mesa_hf_db/"
   exit 1
 fi
-dpkg -i "$CONFIG_DEB"
+sudo dpkg -i "$CONFIG_DEB"
 
 echo "Running replayer from mesa hard fork checkpoint"
 
