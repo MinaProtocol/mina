@@ -150,7 +150,11 @@ let build_artifacts
                                                                         spec.debVersion}"
                   , Cmd.run
                       "./buildkite/scripts/apps/write_to_cache.sh ${DebianVersions.lowerName
-                                                                      spec.debVersion}"
+                                                                      spec.debVersion} ${Network.lowerName
+                                                                                           spec.network}-${Profiles.toSuffixLowercase
+                                                                                                             spec.profile}${BuildFlags.toLabelSegment
+                                                                                                                              spec.buildFlags}${Arch.toSuffixLowercase
+                                                                                                                                                  spec.arch}"
                   ]
             , label = "Debian: Build ${labelSuffix spec}"
             , key = "build-deb-pkg${Optional/default Text "" spec.suffix}"
