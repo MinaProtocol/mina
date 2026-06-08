@@ -32,13 +32,13 @@ source buildkite/scripts/export-git-env-vars.sh
 
 # audit-type-shapes only inspects the binary's compiled-in type registry, so the
 # freshly-built bare binary from the apps cache is sufficient; no debian package
-# is required. Fall back to the .deb when the bare binary is unavailable.
-CODENAME="${MINA_DEB_CODENAME:-bullseye}"
-if MINA_BIN=$(./buildkite/scripts/apps/restore_binary.sh "$CODENAME" devnet-devnet mina_testnet_signatures.exe ./_apps_bin); then
-  echo "Using bare binary from apps cache: $MINA_BIN"
-  "$MINA_BIN" internal audit-type-shapes
+# is required. Fall back to the .deb when the bare binary is unavailable. Either
+# way `mina` ends up on PATH.
+if ./buildkite/scripts/apps/restore_binary.sh devnet; then
+  echo "Using bare mina from apps cache"
 else
   echo "Falling back to debian-installed mina"
   source buildkite/scripts/debian/install.sh "mina-${TESTNET_NAME}" 1
-  mina internal audit-type-shapes
 fi
+
+mina internal audit-type-shapes
