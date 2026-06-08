@@ -55,5 +55,6 @@ in  Pipeline.build
         , TestExecutive.executeLocal "zkapps" dependsOn
         , TestExecutive.executeLocal "zkapps-timing" dependsOn
         , TestExecutive.executeLocal "zkapps-nonce" dependsOn
+        , TestExecutive.executeLocal "zkapps-epoch-seed-precondition" dependsOn
         ]
       }
