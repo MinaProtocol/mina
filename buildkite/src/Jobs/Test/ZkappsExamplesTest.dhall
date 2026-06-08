@@ -23,7 +23,7 @@ let buildTestCmd
           in  Command.build
                 Command.Config::{
                 , commands =
-                    RunInToolchain.runInToolchain
+                    RunInToolchain.runInToolchainWithSubmodules
                       [ "DUNE_INSTRUMENT_WITH=bisect_ppx", "COVERALLS_TOKEN" ]
                       "buildkite/scripts/zkapps-examples-unit-tests.sh ${profile} && buildkite/scripts/upload-partial-coverage-data.sh ${command_key} dev"
                 , label = "${profile} zkApps examples tests"

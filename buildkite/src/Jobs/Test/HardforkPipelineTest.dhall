@@ -38,7 +38,7 @@ in  Pipeline.build
         [ Command.build
             Command.Config::{
             , commands =
-                RunInToolchain.runInToolchain
+                RunInToolchain.runInToolchainWithSubmodules
                   [ "BUILDKITE_AGENT_WRITE_TOKEN" ]
                   "./buildkite/scripts/pipeline/run_for_newest_devnet.sh"
             , label = "Hardfork: pipeline test"
