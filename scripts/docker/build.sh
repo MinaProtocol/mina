@@ -15,6 +15,11 @@ RED='\033[0;31m'
 SCRIPTPATH="$( cd "$(dirname "$0")" || exit ; pwd -P )"
 # shellcheck disable=SC1090
 source "${SCRIPTPATH}"/helper.sh
+# gar-cache rewriting helpers live in buildkite/scripts/docker/ so that
+# scripts/docker/helper.sh stays infra-free; build.sh is the boundary
+# where o1labs CI infra (the in-cluster pull-through cache) is wired in.
+# shellcheck disable=SC1090,SC1091
+source "${SCRIPTPATH}"/../../buildkite/scripts/docker/gar-cache.sh
 
 function usage() {
   if [[ -n "$1" ]]; then
@@ -233,6 +238,11 @@ fi
 if [[ $(echo "${VALID_SERVICES[@]}" | grep -o "$SERVICE" - | wc -w) -eq 0 ]]; then usage "Invalid service!"; fi
 
 export_base_image
+# Route GAR-prefixed bases (today: bookworm) through the gar-cache
+# pull-through when reachable. focal/jammy/noble/bullseye fall through
+# to docker.io unchanged because they're outside the cache's scope.
+IMAGE="$(rewrite_via_gar_cache "${IMAGE}")"
+export IMAGE="--build-arg image=${IMAGE}"
 
 CUSTOM_ARG=${CUSTOM_ARG:-""}
 
