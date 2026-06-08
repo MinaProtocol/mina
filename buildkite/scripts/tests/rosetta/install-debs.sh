@@ -5,8 +5,9 @@
 # pattern of running the tests inside the prebuilt mina-rosetta docker image.
 #
 # Pulls the freshly-built debs out of the buildkite cache (per
-# buildkite/scripts/debian/install.sh), installs them via aptly, then drops
-# the local repo. Idempotent: invoke from the top of any rosetta test script.
+# buildkite/scripts/debian/install.sh) and installs them directly as local
+# .deb files via apt-get. Idempotent: invoke from the top of any rosetta test
+# script.
 #
 # Required env: MINA_DEB_CODENAME, BUILDKITE_BUILD_ID, MINA_NETWORK_DEB
 #   (network suffix that matches the rosetta deb, e.g. "devnet" -> mina-rosetta-devnet)
@@ -32,7 +33,6 @@ DEBS=(
 DEBS_CSV="$(IFS=,; echo "${DEBS[*]}")"
 
 # Run the installer in a child process (not `source`d) so its strict-mode
-# flags (`set -u`/`set -C`, custom `PS4`) and the `set -C` from the aptly
-# helper it sources don't leak back into the calling shell. Use sudo
-# (toolchain image runs as opam user with NOPASSWD sudo).
+# flags (`set -u`, custom `PS4`) don't leak back into the calling shell. Use
+# sudo (toolchain image runs as opam user with NOPASSWD sudo).
 bash ./buildkite/scripts/debian/install.sh "${DEBS_CSV}" 1

@@ -30,9 +30,11 @@ export DEBIAN_FRONTEND=noninteractive
 
 # Configuration
 
-# Blacklist stale mina.list by default — install.sh creates it for a temporary
-# local aptly server and should clean it up, but if a previous build crashed
-# the file may persist and cause apt-get update to fail on localhost:8080.
+# Blacklist stale mina.list by default. Older versions of install.sh created
+# this file to point apt at a temporary local package repository on
+# localhost:8080. install.sh no longer does this, but a leftover mina.list from
+# an older build that crashed mid-run could still make apt-get update fail on
+# localhost:8080.
 BLACKLISTED_REPOS=("mina.list")
 VERBOSE=false
 DRY_RUN=false
