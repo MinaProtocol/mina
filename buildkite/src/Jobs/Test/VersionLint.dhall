@@ -31,13 +31,13 @@ let buildTestCmd
       ->  Command.build
             Command.Config::{
             , commands =
-                  RunInToolchain.runInToolchain
+                  RunInToolchain.runInToolchainWithSubmodules
                     DebianVersions.overrideEnvs
                     "buildkite/scripts/dump-mina-type-shapes.sh"
-                # RunInToolchain.runInToolchain
+                # RunInToolchain.runInToolchainWithSubmodules
                     DebianVersions.overrideEnvs
                     "buildkite/scripts/version-linter-patch-missing-type-shapes.sh ${release_branch}"
-                # RunInToolchain.runInToolchain
+                # RunInToolchain.runInToolchainWithSubmodules
                     DebianVersions.overrideEnvs
                     "buildkite/scripts/version-linter.sh ${release_branch}"
             , label = "Versioned type linter for ${release_branch}"

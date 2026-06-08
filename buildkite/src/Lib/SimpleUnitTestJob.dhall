@@ -23,6 +23,7 @@ let Config
       , testPath : Text
       , tags : List PipelineTag.Type
       , cmdTarget : Size
+      , submodules : Bool
       }
 
 let build
@@ -30,13 +31,20 @@ let build
     =     \(c : Config)
       ->  let key = "${c.keyPrefix}-unit-test-${c.testProfile}"
 
+          let runInToolchain =
+                      if c.submodules
+
+                then  RunInToolchain.runInToolchainWithSubmodules
+
+                else  RunInToolchain.runInToolchain
+
           let buildTestCmd
               : Size -> Command.Type
               =     \(cmd_target : Size)
                 ->  Command.build
                       Command.Config::{
                       , commands =
-                          RunInToolchain.runInToolchain
+                          runInToolchain
                             [ "DUNE_INSTRUMENT_WITH=bisect_ppx"
                             , "COVERALLS_TOKEN"
                             ]

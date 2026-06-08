@@ -102,9 +102,11 @@ let generateReferenceTarballsCommand =
                 Command.Config::{
                 , commands =
                     Toolchain.select
-                      Toolchain.SelectionMode.ByDebianAndArch
-                      codename.DebVersion
-                      codename.Arch
+                      Toolchain.Spec::{
+                      , debVersion = codename.DebVersion
+                      , arch = codename.Arch
+                      , submodules = True
+                      }
                       [ "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY" ]
                       "./buildkite/scripts/hardfork/release/generate-fork-config-and-ledger-tarballs-using-legacy-app.sh --network ${Network.lowerName
                                                                                                                                        spec.network} --version ${spec.deb_legacy_version}  --codename ${DebianVersions.lowerName
@@ -142,9 +144,11 @@ let generateTarballsCommand =
                 Command.Config::{
                 , commands =
                     Toolchain.select
-                      Toolchain.SelectionMode.ByDebianAndArch
-                      codename.DebVersion
-                      codename.Arch
+                      Toolchain.Spec::{
+                      , debVersion = codename.DebVersion
+                      , arch = codename.Arch
+                      , submodules = True
+                      }
                       (   [ "AWS_ACCESS_KEY_ID"
                           , "AWS_SECRET_ACCESS_KEY"
                           , "GENESIS_TIMESTAMP"
@@ -199,9 +203,11 @@ let generateDockerForCodename =
                               Command.Config::{
                               , commands =
                                   Toolchain.select
-                                    Toolchain.SelectionMode.ByDebianAndArch
-                                    codename.DebVersion
-                                    codename.Arch
+                                    Toolchain.Spec::{
+                                    , debVersion = codename.DebVersion
+                                    , arch = codename.Arch
+                                    , submodules = True
+                                    }
                                     ([] : List Text)
                                     (     "./buildkite/scripts/release/manager.sh persist "
                                       ++  " --backend local --artifacts mina-logproc,mina-${Network.lowerName
@@ -493,9 +499,11 @@ let generateHfRelatedStepsForCodename =
                     Command.Config::{
                     , commands =
                         Toolchain.select
-                          Toolchain.SelectionMode.ByDebianAndArch
-                          codename.DebVersion
-                          codename.Arch
+                          Toolchain.Spec::{
+                          , debVersion = codename.DebVersion
+                          , arch = codename.Arch
+                          , submodules = True
+                          }
                           (   [ "NETWORK_NAME=${Network.lowerName spec.network}"
                               , "MINA_DEB_CODENAME=${lowerNameCodename}"
                               ]
@@ -552,9 +560,11 @@ let generateHfRelatedStepsForCodename =
                     Command.Config::{
                     , commands =
                           Toolchain.select
-                            Toolchain.SelectionMode.ByDebianAndArch
-                            codename.DebVersion
-                            codename.Arch
+                            Toolchain.Spec::{
+                            , debVersion = codename.DebVersion
+                            , arch = codename.Arch
+                            , submodules = True
+                            }
                             ([] : List Text)
                             "./buildkite/scripts/cache/manager.sh read hardfork . && ls -al ./hardfork"
                         # [ Cmd.run
