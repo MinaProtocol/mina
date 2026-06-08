@@ -17,7 +17,6 @@ USER root
 # OS package dependencies
 RUN apt-get update --yes \
   && apt-get install --yes --no-install-recommends \
-    aptly \
     apt-transport-https \
     apt-utils \
     dnsutils \

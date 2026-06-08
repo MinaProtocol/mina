@@ -302,9 +302,6 @@ case "${SERVICE}" in
         DOCKERFILE_PATH="dockerfiles/Dockerfile-delegation-backend-toolchain"
         DOCKER_CONTEXT="src/app/delegation_backend"
         ;;
-    mina-test-suite)
-        DOCKERFILE_PATH="dockerfiles/Dockerfile-mina-test-suite"
-        ;;
     *)
         echo "Unsupported service: $SERVICE"
         exit 1
@@ -316,6 +313,27 @@ if [[ -n "${VERSION_ARG_OVERRIDE:-}" ]]; then
   # differs from the output tag version (current commit).
   VERSION_ARG="$VERSION_ARG_OVERRIDE"
   VERSION="$MINA_DOCKER_TAG"
+fi
+
+# Stage the .deb files from the build context so the Dockerfiles can COPY them
+# and install the mina packages directly from the local filesystem (no apt repo
+# / no apt index). The CI step (DownloadOnly install mode) drops the
+# freshly-built .deb files flat into the "dockerfiles/" docker build context via
+# read_all_from_cache.sh; we move them under "${DOCKER_CONTEXT}/_debs/" which the
+# Dockerfiles COPY to /opt/mina-local-debs and then install via
+# install-mina-debs.sh. The _debs directory is always created (possibly empty)
+# so the Dockerfiles' "COPY _debs ..." never fails.
+LOCAL_DEB_STAGE="${DOCKER_CONTEXT%/}/_debs"
+mkdir -p "${LOCAL_DEB_STAGE}"
+rm -f "${LOCAL_DEB_STAGE}"/*.deb
+shopt -s nullglob
+context_debs=("${DOCKER_CONTEXT%/}"/*.deb)
+shopt -u nullglob
+if [[ "${#context_debs[@]}" -gt 0 ]]; then
+  echo "Staging ${#context_debs[@]} .deb file(s) from build context into ${LOCAL_DEB_STAGE}"
+  cp "${context_debs[@]}" "${LOCAL_DEB_STAGE}/"
+else
+  echo "No .deb files in build context to stage into ${LOCAL_DEB_STAGE}"
 fi
 
 export_version

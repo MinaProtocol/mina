@@ -17,6 +17,7 @@ type best_chain_block =
 
 type account_data =
   { nonce : Mina_numbers.Account_nonce.t
+  ; inferred_nonce : Mina_numbers.Account_nonce.t option
   ; total_balance : Currency.Balance.t
   ; delegate : Signature_lib.Public_key.Compressed.t option
   ; liquid_balance_opt : Currency.Balance.t option

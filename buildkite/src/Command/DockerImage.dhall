@@ -34,7 +34,7 @@ let Arch = ../Constants/Arch.dhall
 
 let DebianInstallMode
     : Type
-    = < ThroughLocalRepo | NoInstall | DownloadOnly >
+    = < NoInstall | DownloadOnly >
 
 let ciDockerCacheMountedRoot = "/var/storagebox/docker-cache"
 
@@ -77,7 +77,7 @@ let ReleaseSpec =
           , service = Artifacts.Type.Daemon
           , branch = "\\\${BUILDKITE_BRANCH}"
           , repo = "\\\${BUILDKITE_REPO}"
-          , deb_install_mode = DebianInstallMode.ThroughLocalRepo
+          , deb_install_mode = DebianInstallMode.DownloadOnly
           , deb_root_folder = "\\\${BUILDKITE_BUILD_ID}"
           , deb_codename = DebianVersions.DebVersion.Bullseye
           , deb_release = "unstable"
@@ -126,10 +126,7 @@ let generateStep =
 
           let maybeStartDebianRepo =
                 merge
-                  { ThroughLocalRepo =
-                      " && ./buildkite/scripts/debian/start_local_repo.sh --root ${spec.deb_root_folder} --arch ${Arch.lowerName
-                                                                                                                    spec.arch}"
-                  , DownloadOnly =
+                  { DownloadOnly =
                       " && ROOT=${spec.deb_root_folder} LOCAL_DEB_FOLDER=\"dockerfiles\" ./buildkite/scripts/debian/read_all_from_cache.sh "
                   , NoInstall = " && echo Skipping local debian repo setup "
                   }
@@ -137,8 +134,7 @@ let generateStep =
 
           let maybeStopDebianRepo =
                 merge
-                  { ThroughLocalRepo = " && ./scripts/debian/aptly.sh stop"
-                  , DownloadOnly =
+                  { DownloadOnly =
                       " && echo Skipping local debian repo teardown "
                   , NoInstall = " && echo Skipping local debian repo teardown "
                   }

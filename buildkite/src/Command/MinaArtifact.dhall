@@ -74,7 +74,7 @@ let MinaBuildSpec =
           }
       , default =
           { prefix = "MinaArtifact"
-          , artifacts = Artifacts.AllButTests
+          , artifacts = Artifacts.All
           , buildScript = "./buildkite/scripts/build-release.sh"
           , debVersion = DebianVersions.DebVersion.Bullseye
           , profile = Profiles.Type.Devnet
@@ -150,7 +150,11 @@ let build_artifacts
                                                                         spec.debVersion}"
                   , Cmd.run
                       "./buildkite/scripts/apps/write_to_cache.sh ${DebianVersions.lowerName
-                                                                      spec.debVersion}"
+                                                                      spec.debVersion} ${Network.lowerName
+                                                                                           spec.network}-${Profiles.toSuffixLowercase
+                                                                                                             spec.profile}${BuildFlags.toLabelSegment
+                                                                                                                              spec.buildFlags}${Arch.toSuffixLowercase
+                                                                                                                                                  spec.arch}"
                   ]
             , label = "Debian: Build ${labelSuffix spec}"
             , key = "build-deb-pkg${Optional/default Text "" spec.suffix}"
@@ -421,22 +425,7 @@ let docker_step
                     , size = size
                     }
                   ]
-                , FunctionalTestSuite =
-                  [ DockerImage.ReleaseSpec::{
-                    , deps = deps
-                    , service = Artifacts.Type.FunctionalTestSuite
-                    , network = Network.Type.Devnet
-                    , deb_codename = spec.debVersion
-                    , build_flags = spec.buildFlags
-                    , docker_publish = spec.docker_publish
-                    , deb_repo = DebianRepo.Type.Local
-                    , deb_profile = spec.profile
-                    , deb_legacy_version = spec.deb_legacy_version
-                    , arch = spec.arch
-                    , size = size
-                    , if_ = spec.if_
-                    }
-                  ]
+                , FunctionalTestSuite = [] : List DockerImage.ReleaseSpec.Type
                 , Toolchain = [] : List DockerImage.ReleaseSpec.Type
                 }
                 artifact

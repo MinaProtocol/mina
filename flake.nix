@@ -395,7 +395,7 @@
         packages = (rec {
           inherit (ocamlPackages)
             mina devnet mainnet mina_tests mina-ocaml-format mina_client_sdk
-            test_executive with-instrumentation;
+            test_executive with-instrumentation mina-graphql-client;
           # Granular nix
           inherit (ocamlPackages)
             src exes all all-tested all-exes files tested info dune-description

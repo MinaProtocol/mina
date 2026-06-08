@@ -87,9 +87,15 @@ ENV USE_GKE_GCLOUD_AUTH_PLUGIN=True
 
 
 # archive-node package
-RUN echo "deb [trusted=yes] ${deb_repo} $deb_codename $deb_release" > /etc/apt/sources.list.d/o1.list \
-  && apt-get update --quiet --yes \
-  && apt-get install --no-install-recommends --quiet --yes "${MINA_DEB}=$deb_version" \
-  && rm -rf /var/lib/apt/lists/*
+# Installed DIRECTLY from the local build context: scripts/docker/build.sh stages
+# the freshly-built .deb files under _debs, which we COPY to /opt/mina-local-debs,
+# and install-mina-debs.sh installs the resolved .deb file with a single apt-get
+# call (no apt repo / no apt index). The archive package only depends on system
+# libraries (no mina-logproc / config), so no additional mina debs are needed.
+COPY scripts/install-mina-debs.sh /usr/local/bin/install-mina-debs.sh
+COPY _debs /opt/mina-local-debs
+RUN chmod +x /usr/local/bin/install-mina-debs.sh \
+  && APT_NO_DOWNGRADE=1 \
+     /usr/local/bin/install-mina-debs.sh "${MINA_DEB}=$deb_version"
 
 ENTRYPOINT ["/usr/bin/dumb-init", "/entrypoint.sh"]
