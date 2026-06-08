@@ -46,7 +46,7 @@ in  Pipeline.build
         [ Command.build
             Command.Config::{
             , commands =
-                RunInToolchain.runInToolchain
+                RunInToolchain.runInToolchainWithSubmodules
                   [ "POSTGRES_PASSWORD=${password}"
                   , "POSTGRES_USER=${user}"
                   , "POSTGRES_DB=${db}"

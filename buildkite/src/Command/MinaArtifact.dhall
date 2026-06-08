@@ -224,9 +224,12 @@ let build_artifacts
                 Command.Config::{
                 , commands =
                       Toolchain.select
-                        spec.toolchainSelectMode
-                        spec.debVersion
-                        spec.arch
+                        Toolchain.Spec::{
+                        , mode = spec.toolchainSelectMode
+                        , debVersion = spec.debVersion
+                        , arch = spec.arch
+                        , submodules = True
+                        }
                         (   [ "AWS_ACCESS_KEY_ID"
                             , "AWS_SECRET_ACCESS_KEY"
                             , "MINA_BRANCH=\$BUILDKITE_BRANCH"
@@ -330,9 +333,12 @@ let build_apps
                 Command.Config::{
                 , commands =
                       Toolchain.select
-                        spec.toolchainSelectMode
-                        spec.debVersion
-                        spec.arch
+                        Toolchain.Spec::{
+                        , mode = spec.toolchainSelectMode
+                        , debVersion = spec.debVersion
+                        , arch = spec.arch
+                        , submodules = True
+                        }
                         (commonBuildEnvs spec)
                         "./buildkite/scripts/build-artifact.sh"
                     # appsCacheWrites
@@ -370,9 +376,12 @@ let build_debian
                 Command.Config::{
                 , commands =
                       Toolchain.select
-                        spec.toolchainSelectMode
-                        spec.debVersion
-                        spec.arch
+                        Toolchain.Spec::{
+                        , mode = spec.toolchainSelectMode
+                        , debVersion = spec.debVersion
+                        , arch = spec.arch
+                        , submodules = False
+                        }
                         (commonBuildEnvs spec)
                         "./buildkite/scripts/debian/build-from-cache.sh ${primaryAppsVariant
                                                                             spec} ${treeVariant
