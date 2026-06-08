@@ -582,7 +582,7 @@ patch_docker_command() {
   # Note: We intentionally do NOT use --user flag. The container runs as opam
   # (UID 1000) which typically matches the host user's UID, allowing sudo to
   # work inside the container for apt operations.
-  local docker_flags="--env APTLY_ROOT=/tmp/aptly --env LOCAL_BK_RUN=${LOCAL_BK_RUN}${USER_ENV_DOCKER_FLAGS}"
+  local docker_flags="--env LOCAL_BK_RUN=${LOCAL_BK_RUN}${USER_ENV_DOCKER_FLAGS}"
   [[ -n "${OVERRIDE_GITHASH:-}" ]] && docker_flags+=" --env OVERRIDE_GITHASH=${OVERRIDE_GITHASH}"
   cmd=$(printf '%s\n' "$cmd" | sed "s|docker run -it|docker run -it ${docker_flags}|g")
 

@@ -5,7 +5,7 @@
 #      package publishes don't get cached.
 #   2. Unconditionally bypass the proxy for archive.ubuntu.com /
 #      security.ubuntu.com. The o1Labs apt-cacher-ng has the local
-#      (unsigned) aptly publication first in its Remap-uburep chain — a
+#      (unsigned) apt repository publication first in its Remap-uburep chain — a
 #      proxied request for archive.ubuntu.com would get our unsigned
 #      Release file, which apt then rejects with "is no longer signed"
 #      (anti-downgrade). Sending these DIRECT keeps Canonical default
@@ -36,7 +36,7 @@
 #                     (e.g. http://apt-cache-ingress.mirror-ingress:3142)
 #   DEB_REPO        - URL of the Mina deb repo that must bypass the proxy
 #                     (e.g. http://packages.o1test.net)
-#   APT_MIRROR_URL  - Base URL of the o1Labs deb-mirror's aptly publication
+#   APT_MIRROR_URL  - Base URL of the o1Labs deb-mirror's apt repository publication
 #                     (e.g. http://deb-mirror-ingress.mirror-ingress). When
 #                     omitted but APT_CACHE_URL looks like an in-cluster
 #                     apt-cache-ingress URL, this script derives it by
@@ -97,7 +97,7 @@ conf=/etc/apt/apt.conf.d/01proxy
   fi
   # Ubuntu Canonical archives ALWAYS go DIRECT (see header note 2):
   # the o1Labs apt-cacher-ng's Remap-uburep chain has the local unsigned
-  # aptly publication first, so a proxied request for archive.ubuntu.com
+  # apt repository publication first, so a proxied request for archive.ubuntu.com
   # would resolve to our unsigned Release and apt would refuse it as
   # "is no longer signed". Bypassing the proxy for these two hosts keeps
   # Canonical defaults verifiable regardless of mirror state.
