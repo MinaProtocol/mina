@@ -82,13 +82,13 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       Signature_lib.Public_key.Compressed.Map.singleton fish1_pk
         fish1_kp.private_key
     in
-    let wait_for_zkapp_applied zkapp_command =
+    let wait_for_zkapp_rejected zkapp_command =
       let with_timeout =
         Wait_condition.with_timeouts ~soft_timeout:(Network_time_span.Slots 4)
           ~hard_timeout:(Network_time_span.Slots 8)
       in
       wait_for t @@ with_timeout
-      @@ Wait_condition.zkapp_to_be_included_in_frontier ~has_failures:false
+      @@ Wait_condition.zkapp_to_be_included_in_frontier ~has_failures:true
            ~zkapp_command
     in
     let rec wait_until_epoch ~target_epoch ~remaining_blocks =
@@ -137,6 +137,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         (send_zkapp ~logger node_uri zkapp_command)
     in
     section_hard
-      "Confirm cross-epoch stale seed precondition is incorrectly applied"
-      (wait_for_zkapp_applied zkapp_command)
+      "Confirm cross-epoch stale seed precondition is correctly rejected"
+      (wait_for_zkapp_rejected zkapp_command)
 end
