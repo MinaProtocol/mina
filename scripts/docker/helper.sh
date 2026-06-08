@@ -14,7 +14,7 @@ export VALID_SERVICES=('mina-archive' 'mina-daemon' 'mina-daemon-generic' 'mina-
 # references under europe-west3-docker.pkg.dev/o1labs-192920/* and
 # gcr.io/o1labs-192920/* to go through the in-cluster gar-cache
 # (https://gar-cache.gcp.o1test.net externally,
-#  http://gar-cache-ingress.mirror-ingress in-cluster on rivendell-1).
+#  http://gar-cache-ingress.zot-gar-cache in-cluster on rivendell-1).
 # That shim only intercepts standalone `docker pull` — it does NOT
 # cover `docker buildx build`, which is how all our images are built.
 # Evidence: see build 1407 of mina-mainline-branches-nightlies — the
@@ -29,7 +29,7 @@ export VALID_SERVICES=('mina-archive' 'mina-daemon' 'mina-daemon-generic' 'mina-
 #
 # Env vars (consistent with the agent-side shim hook):
 #   DOCKER_CACHE_ENDPOINT  - cache base URL; defaults to
-#                            http://gar-cache-ingress.mirror-ingress
+#                            http://gar-cache-ingress.zot-gar-cache
 #   GAR_CACHE_DISABLED     - set to "true" to opt out
 # ------------------------------------------------------------------
 
@@ -49,7 +49,7 @@ function gar_cache_probe () {
         export GAR_CACHE_STATE="DISABLED"
         return 1
     fi
-    local cache_url="${DOCKER_CACHE_ENDPOINT:-http://gar-cache-ingress.mirror-ingress}"
+    local cache_url="${DOCKER_CACHE_ENDPOINT:-http://gar-cache-ingress.zot-gar-cache}"
     if curl -fso /dev/null --connect-timeout 1 --max-time 2 "${cache_url}/v2/" 2>/dev/null; then
         echo "[gar-cache] probe UP at ${cache_url}/v2/" >&2
         export GAR_CACHE_STATE="UP"
@@ -71,7 +71,7 @@ function gar_cache_has_manifest () {
         return 1
     fi
     local full_ref="$1"
-    local cache_url="${DOCKER_CACHE_ENDPOINT:-http://gar-cache-ingress.mirror-ingress}"
+    local cache_url="${DOCKER_CACHE_ENDPOINT:-http://gar-cache-ingress.zot-gar-cache}"
     local repo_with_tag=""
     case "$full_ref" in
         europe-west3-docker.pkg.dev/o1labs-192920/*) repo_with_tag="${full_ref#europe-west3-docker.pkg.dev/}" ;;
@@ -106,7 +106,7 @@ function rewrite_via_gar_cache () {
         echo "$ref"
         return 0
     fi
-    local cache_url="${DOCKER_CACHE_ENDPOINT:-http://gar-cache-ingress.mirror-ingress}"
+    local cache_url="${DOCKER_CACHE_ENDPOINT:-http://gar-cache-ingress.zot-gar-cache}"
     local cache_host="${cache_url#*://}"
     local rewritten=""
     case "$ref" in
@@ -137,7 +137,7 @@ function rewrite_docker_repo_via_gar_cache () {
         echo "$registry_prefix"
         return 0
     fi
-    local cache_url="${DOCKER_CACHE_ENDPOINT:-http://gar-cache-ingress.mirror-ingress}"
+    local cache_url="${DOCKER_CACHE_ENDPOINT:-http://gar-cache-ingress.zot-gar-cache}"
     local cache_host="${cache_url#*://}"
     local rewritten=""
     case "$registry_prefix" in
