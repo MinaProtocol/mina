@@ -27,7 +27,7 @@ For other paths see the top-level [`README-dev.md`](../README-dev.md).
 
 ```sh
 cd dev
-make            # pulls the toolchain image, boots the container
+make start      # pulls the toolchain image, boots the container
 
 # in a second terminal:
 make ssh        # drops you into the container as `opam`, in /mina
@@ -41,9 +41,26 @@ That's it. Files you edit on the host are live in the container at `/mina`,
 and files you create inside the container land back on the host with your
 own UID/GID — no `sudo chown` step.
 
-`make rebuild` wipes the named volumes and rebuilds from scratch — use it
-after a major toolchain bump or when the opam switch gets into a weird
-state.
+The container also bind-mounts the host Docker socket at
+`/var/run/docker.sock`, so Docker-backed local integration tests such as
+`mina-test-executive local ...` use the host Docker daemon rather than a
+nested Docker daemon. This is Docker-outside-of-Docker, not DinD. It avoids
+privileged nested containers and lets the test executive manage the same
+Docker Swarm/stack resources you would see from the host with `docker stack
+ls`. The VS Code devcontainer init script auto-detects `DOCKER_SOCKET`,
+`DOCKER_HOST=unix://...`, `/var/run/docker.sock`, and
+`$XDG_RUNTIME_DIR/docker.sock`. For terminal-only use, if your Docker socket
+lives somewhere else, set `DOCKER_SOCKET` before starting the dev environment:
+
+```sh
+export DOCKER_SOCKET="$XDG_RUNTIME_DIR/docker.sock"
+cd dev
+make start
+```
+
+`make` prints the available commands. `make stop` stops the Compose service.
+`make rebuild` wipes the named volumes and rebuilds from scratch — use it after
+a major toolchain bump or when the opam switch gets into a weird state.
 
 ## Quick start — VS Code
 
