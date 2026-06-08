@@ -1174,9 +1174,9 @@ module Protocol_state = struct
       let epoch_data
           ({ ledger; seed; start_checkpoint; lock_checkpoint; epoch_length } :
             _ Epoch_data.Poly.t ) (t : _ Epoch_data.Poly.t) =
-        ignore seed ;
         epoch_ledger ledger t.ledger
-        @ [ Hash.(check_checked Tc.state_hash)
+        @ [ Hash.(check_checked Tc.epoch_seed) seed t.seed
+          ; Hash.(check_checked Tc.state_hash)
               start_checkpoint t.start_checkpoint
           ; Hash.(check_checked Tc.state_hash) lock_checkpoint t.lock_checkpoint
           ; Numeric.(Checked.check Tc.length) epoch_length t.epoch_length
@@ -1294,7 +1294,9 @@ module Protocol_state = struct
           _ Epoch_data.Poly.t ) (t : _ Epoch_data.Poly.t) =
       let l s = sprintf "%s_%s" label s in
       let%bind () = epoch_ledger ledger t.ledger in
-      ignore seed ;
+      let%bind () =
+        Hash.(check ~label:(l "seed") Tc.epoch_seed) seed t.seed
+      in
       let%bind () =
         Hash.(check ~label:(l "start_check_point") Tc.state_hash)
           start_checkpoint t.start_checkpoint
