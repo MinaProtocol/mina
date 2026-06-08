@@ -118,9 +118,12 @@ let build_artifacts
             Command.Config::{
             , commands =
                   Toolchain.select
-                    spec.toolchainSelectMode
-                    spec.debVersion
-                    spec.arch
+                    Toolchain.Spec::{
+                    , mode = spec.toolchainSelectMode
+                    , debVersion = spec.debVersion
+                    , arch = spec.arch
+                    , submodules = True
+                    }
                     (   [ "DUNE_PROFILE=${Profiles.duneProfile spec.profile}"
                         , "AWS_ACCESS_KEY_ID"
                         , "AWS_SECRET_ACCESS_KEY"
