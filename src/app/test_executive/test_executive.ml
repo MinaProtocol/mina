@@ -69,6 +69,8 @@ let tests : test list =
   ; ( "verification-key"
     , (module Verification_key_update.Make : Intf.Test.Functor_intf) )
   ; ("zkapps", (module Zkapps.Make : Intf.Test.Functor_intf))
+  ; ( "zkapps-epoch-seed-precondition"
+    , (module Zkapps_epoch_seed_precondition.Make : Intf.Test.Functor_intf) )
   ; ("zkapps-timing", (module Zkapps_timing.Make : Intf.Test.Functor_intf))
   ; ("zkapps-nonce", (module Zkapps_nonce_test.Make : Intf.Test.Functor_intf))
   ]
