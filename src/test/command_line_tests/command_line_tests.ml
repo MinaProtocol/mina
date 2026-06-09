@@ -54,6 +54,26 @@ end
 let contain_log_output output =
   String.is_substring ~substring:"{\"timestamp\":" output
 
+let log_contains_structured_async_exception logs =
+  String.split_lines logs
+  |> List.exists ~f:(fun line ->
+         match Yojson.Safe.from_string line with
+         | exception _ ->
+             false
+         | json -> (
+             match Yojson.Safe.Util.member "message" json with
+             | `String "Unhandled Async exception: $exn" -> (
+                 match
+                   Yojson.Safe.Util.member "metadata" json
+                   |> Yojson.Safe.Util.member "exn"
+                 with
+                 | `Null ->
+                     false
+                 | _ ->
+                     true )
+             | _ ->
+                 false ) )
+
 module LedgerHash = struct
   type t = Mina_automation_fixture.Daemon.before_bootstrap
 
@@ -533,6 +553,59 @@ module HardforkStateDirMismatch = struct
           (Mina_automation_fixture.Intf.Failed
              (Error.createf "Daemon terminated by signal: %s"
                 (Core.Signal.to_string signal) ) )
+end
+
+module MisconfiguredWalletCrashLog = struct
+  type t = Mina_automation_fixture.Daemon.before_bootstrap
+
+  let test_case (test : t) =
+    let daemon = Daemon.of_config test.config in
+    let%bind () = Daemon.Config.generate_keys test.config in
+    let ledger_file = test.config.dirs.conf ^/ "daemon.json" in
+    let%bind () =
+      Mina_automation_fixture.Daemon.generate_random_config daemon ledger_file
+    in
+    let wallets_dir = test.config.dirs.conf ^/ "wallets" in
+    Core.Unix.mkdir_p wallets_dir ;
+    Out_channel.write_all (wallets_dir ^/ "store") ~data:"not a directory" ;
+    let%bind process = Daemon.start daemon in
+    match%bind
+      Async.Clock.with_timeout
+        (Core.Time.Span.of_sec 15.)
+        (Process.wait process.process)
+    with
+    | `Timeout ->
+        let%map _ = Daemon.Process.force_kill process in
+        Mina_automation_fixture.Intf.Failed
+          (Error.of_string "Daemon did not exit within 15 seconds")
+    | `Result (Ok ()) ->
+        Deferred.return
+          (Mina_automation_fixture.Intf.Failed
+             (Error.of_string "Daemon exited with code 0, expected non-zero") )
+    | `Result (Error (`Signal signal)) ->
+        Deferred.return
+          (Mina_automation_fixture.Intf.Failed
+             (Error.createf "Daemon terminated by signal: %s"
+                (Core.Signal.to_string signal) ) )
+    | `Result (Error (`Exit_non_zero _)) -> (
+        let log_file = Daemon.Config.ConfigDirs.mina_log test.config.dirs in
+        match%map
+          Monitor.try_with (fun () -> Reader.file_contents log_file)
+        with
+        | Error exn ->
+            Mina_automation_fixture.Intf.Failed
+              (Error.createf "Could not read daemon log %s: %s" log_file
+                 (Exn.to_string exn) )
+        | Ok logs ->
+            if log_contains_structured_async_exception logs then
+              Mina_automation_fixture.Intf.Passed
+            else
+              Failed
+                (Error.createf
+                   "Daemon log did not contain structured unhandled async \
+                    exception metadata. Logs:\n\
+                    %s"
+                   logs ) )
 end
 
 module ConfigFileOverride = struct
@@ -1195,6 +1268,16 @@ let () =
                ( module Mina_automation_fixture.Daemon
                         .Make_FixtureWithoutBootstrap
                           (HardforkStateDirMismatch) ) )
+        ] )
+    ; ( "misconfigured-wallet-crash-log"
+      , [ test_case
+            "The mina daemon logs structured metadata for a misconfigured \
+             wallet"
+            `Quick
+            (Mina_automation_runner.Runner.run_blocking
+               ( module Mina_automation_fixture.Daemon
+                        .Make_FixtureWithoutBootstrap
+                          (MisconfiguredWalletCrashLog) ) )
         ] )
     ; ( "config-file-override"
       , [ test_case "Multiple --config-file flags merge/override configs" `Slow
