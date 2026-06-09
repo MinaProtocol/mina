@@ -1,12 +1,15 @@
 #!/usr/bin/env bash
 
 # Integration test for the full automode transition lifecycle:
-#   mina-devnet (v1) → mina-devnet-automode (v2) → mina-devnet (v3)
+#   mina-devnet-generic (v1) → mina-devnet-automode (v2) → mina-devnet-generic (v3)
+#
+# In the split package layout the "normal" daemon is mina-NETWORK-generic
+# (binaries, owns /usr/local/bin/mina) + mina-NETWORK-config (config + service).
 #
 # Validates that:
-# - mina-devnet installs cleanly
-# - mina-devnet-automode replaces mina-devnet via apt
-# - mina-devnet (higher version) replaces automode and restores normal layout
+# - mina-NETWORK-generic + -config install cleanly
+# - mina-NETWORK-automode replaces the generic daemon via apt
+# - mina-NETWORK-generic (higher version) replaces automode and restores layout
 # - No automode-specific files remain after the final transition
 #
 # Prerequisites:
@@ -92,13 +95,16 @@ else
     SUDO="sudo"
 fi
 
-PKG_DAEMON="mina-${NETWORK}"
+# In the split layout the normal daemon binaries live in mina-NETWORK-generic
+# (not the legacy monolithic mina-NETWORK), so that is the package we install,
+# reversion and assert on for the v1/v3 "normal" states.
+PKG_DAEMON="mina-${NETWORK}-generic"
 PKG_AUTOMODE="mina-${NETWORK}-automode"
 PKG_CONFIG="mina-${NETWORK}-config"
 PKG_POSTFORK="mina-${NETWORK}-postfork-mesa"
 PKG_PREFORK="mina-${NETWORK}-prefork-mesa"
 
-# Automode-specific paths that should NOT exist after restoring mina-devnet
+# Automode-specific paths that should NOT exist after restoring the generic daemon
 AUTOMODE_PATHS=(
     "/usr/local/bin/mina-dispatch"
     "/etc/default/mina-dispatch"
@@ -106,7 +112,7 @@ AUTOMODE_PATHS=(
     "/usr/lib/mina/berkeley"
 )
 
-# Normal mina-devnet paths that SHOULD exist after restore
+# Normal daemon paths (shipped by mina-NETWORK-generic) that SHOULD exist after restore
 DAEMON_PATHS=(
     "/usr/local/bin/mina"
     "/usr/local/bin/coda-libp2p_helper"
@@ -171,7 +177,7 @@ V1="1.0.0-transition-test"
 V2="2.0.0-transition-test"
 V3="3.0.0-transition-test"
 
-# V1: mina-devnet + config + logproc (pre-hardfork)
+# V1: generic daemon + config + logproc (pre-hardfork)
 reversion_deb "${ORIG_DAEMON_DEB}"  "${V1}" "${REPO_DIR}/${PKG_DAEMON}_${V1}_amd64.deb"
 reversion_deb "${ORIG_CONFIG_DEB}"  "${V1}" "${REPO_DIR}/${PKG_CONFIG}_${V1}_all.deb"
 reversion_deb "${ORIG_LOGPROC_DEB}" "${V1}" "${REPO_DIR}/mina-logproc_${V1}_amd64.deb"
@@ -183,7 +189,7 @@ reversion_deb "${ORIG_POSTFORK_DEB}" "${V2}" "${REPO_DIR}/${PKG_POSTFORK}_${V2}_
 reversion_deb "${ORIG_CONFIG_DEB}"   "${V2}" "${REPO_DIR}/${PKG_CONFIG}_${V2}_all.deb"
 reversion_deb "${ORIG_LOGPROC_DEB}"  "${V2}" "${REPO_DIR}/mina-logproc_${V2}_amd64.deb"
 
-# V3: mina-devnet + config + logproc (post-hardfork, back to normal)
+# V3: generic daemon + config + logproc (post-hardfork, back to normal)
 reversion_deb "${ORIG_DAEMON_DEB}"  "${V3}" "${REPO_DIR}/${PKG_DAEMON}_${V3}_amd64.deb"
 reversion_deb "${ORIG_CONFIG_DEB}"  "${V3}" "${REPO_DIR}/${PKG_CONFIG}_${V3}_all.deb"
 reversion_deb "${ORIG_LOGPROC_DEB}" "${V3}" "${REPO_DIR}/mina-logproc_${V3}_amd64.deb"
@@ -233,7 +239,7 @@ V3_DEBS=(
 )
 
 ################################################################################
-# Step 4: Install mina-devnet v1 (pre-hardfork state)
+# Step 4: Install generic daemon v1 (pre-hardfork state)
 ################################################################################
 
 log_info "=== Step 4: Install ${PKG_DAEMON} v1 ==="
@@ -287,7 +293,7 @@ dpkg -l "${PKG_POSTFORK}" 2>/dev/null | tail -1 || true
 dpkg -l "${PKG_PREFORK}" 2>/dev/null | tail -1 || true
 dpkg -l "${PKG_DAEMON}" 2>/dev/null | tail -1 || true
 
-# mina-devnet should be removed (replaced by automode)
+# the generic daemon should be removed (replaced by automode)
 if dpkg -l "${PKG_DAEMON}" 2>/dev/null | grep -q "^ii"; then
     log_error "${PKG_DAEMON} should have been replaced by ${PKG_AUTOMODE}"
     exit 1
@@ -309,7 +315,7 @@ fi
 log_info "PASS: /usr/local/bin/mina is a symlink (automode dispatcher)"
 
 ################################################################################
-# Step 6: Restore mina-devnet v3 (post-hardfork, back to normal)
+# Step 6: Restore generic daemon v3 (post-hardfork, back to normal)
 ################################################################################
 
 log_info "=== Step 6: Restore ${PKG_DAEMON} v3 ==="
@@ -319,7 +325,7 @@ printf '  %s\n' "${V3_DEBS[@]}"
 
 $SUDO apt-get install -y --allow-downgrades --no-install-recommends "${V3_DEBS[@]}"
 
-# automode metapackage conflicts with mina-devnet, so apt should remove it.
+# automode metapackage conflicts with the generic daemon, so apt should remove it.
 # The prefork/postfork sub-packages were only dependencies of automode, so
 # they become orphans. Run autoremove to clean them up (simulates operator
 # running apt autoremove after a transition).
@@ -331,7 +337,7 @@ dpkg -l "${PKG_AUTOMODE}" 2>/dev/null | tail -1 || true
 dpkg -l "${PKG_POSTFORK}" 2>/dev/null | tail -1 || true
 dpkg -l "${PKG_PREFORK}" 2>/dev/null | tail -1 || true
 
-# mina-devnet v3 should be installed
+# generic daemon v3 should be installed
 if ! dpkg -l "${PKG_DAEMON}" 2>/dev/null | grep -q "^ii"; then
     log_error "${PKG_DAEMON} v3 should be installed"
     exit 1
