@@ -1231,6 +1231,19 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
     ~block_reward_threshold ~block_produced_bvar ~vrf_evaluation_state ~net
     ~zkapp_cmd_limit_hardcap =
   let open Context in
+  Option.iter block_reward_threshold ~f:(fun threshold ->
+      if Currency.Amount.(threshold > constraint_constants.coinbase_amount) then
+        [%log warn]
+          "Minimum block reward threshold $threshold is greater than the \
+           coinbase amount $coinbase_amount. This node may produce empty \
+           blocks unless transaction fees or supercharged coinbase raise the \
+           block reward above the threshold"
+          ~metadata:
+            [ ("threshold", Currency.Amount.to_yojson threshold)
+            ; ( "coinbase_amount"
+              , Currency.Amount.to_yojson constraint_constants.coinbase_amount
+              )
+            ] ) ;
   O1trace.sync_thread "produce_blocks" (fun () ->
       let genesis_breadcrumb =
         genesis_breadcrumb_creator ~context:(module Context) prover
