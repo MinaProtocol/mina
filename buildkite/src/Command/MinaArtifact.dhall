@@ -189,26 +189,7 @@ let docker_step
           let size = Size.XLarge
 
           in  merge
-                { Daemon =
-                  [ DockerImage.ReleaseSpec::{
-                    , deps = deps
-                    , service = Artifacts.Type.Daemon
-                    , network = spec.network
-                    , deb_codename = spec.debVersion
-                    , deb_profile = spec.profile
-                    , build_flags = spec.buildFlags
-                    , docker_publish = spec.docker_publish
-                    , deb_repo = DebianRepo.Type.Local
-                    , deb_legacy_version = spec.deb_legacy_version
-                    , deb_storage_repair_version = Some
-                        spec.deb_storage_repair_version
-                    , verify = True
-                    , arch = spec.arch
-                    , size = size
-                    , if_ = spec.if_
-                    }
-                  ]
-                , DaemonAutoHardfork =
+                { DaemonAutoHardfork =
                   [ DockerImage.ReleaseSpec::{
                     , deps =
                           deps
@@ -217,7 +198,7 @@ let docker_step
                             , codename = DockerVersion.ofDebian spec.debVersion
                             , network = spec.network
                             , profile = spec.profile
-                            , artifact = Artifacts.Type.Daemon
+                            , artifact = Artifacts.Type.DaemonConfig
                             }
                     , service = Artifacts.Type.DaemonAutoHardfork
                     , network = spec.network
