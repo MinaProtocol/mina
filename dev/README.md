@@ -42,15 +42,15 @@ and files you create inside the container land back on the host with your
 own UID/GID — no `sudo chown` step.
 
 The container also bind-mounts the host Docker socket at
-`/var/run/docker.sock`, so Docker-backed local integration tests such as
-`mina-test-executive local ...` use the host Docker daemon rather than a
-nested Docker daemon. This is Docker-outside-of-Docker, not DinD. It avoids
-privileged nested containers and lets the test executive manage the same
-Docker Swarm/stack resources you would see from the host with `docker stack
-ls`. The VS Code devcontainer init script auto-detects `DOCKER_SOCKET`,
-`DOCKER_HOST=unix://...`, `/var/run/docker.sock`, and
-`$XDG_RUNTIME_DIR/docker.sock`. For terminal-only use, if your Docker socket
-lives somewhere else, set `DOCKER_SOCKET` before starting the dev environment:
+`/var/run/docker.sock`, so Docker commands inside the container use the host
+Docker daemon rather than a nested Docker daemon. This is
+Docker-outside-of-Docker, not DinD. It avoids privileged nested containers and
+lets container workloads manage the same Docker Swarm/stack resources you
+would see from the host with `docker stack ls`. The VS Code devcontainer init
+script auto-detects `DOCKER_SOCKET`, `DOCKER_HOST=unix://...`,
+`/var/run/docker.sock`, and `$XDG_RUNTIME_DIR/docker.sock`. For terminal-only
+use, if your Docker socket lives somewhere else, set `DOCKER_SOCKET` before
+starting the dev environment:
 
 ```sh
 export DOCKER_SOCKET="$XDG_RUNTIME_DIR/docker.sock"
