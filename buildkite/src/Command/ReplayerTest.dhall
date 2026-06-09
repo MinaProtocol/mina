@@ -10,8 +10,7 @@ let ContainerImages = ../Constants/ContainerImages.dhall
 
 let key = "replayer-test"
 
-let debs =
-      "mina-devnet-generic-instrumented,mina-archive-devnet-instrumented"
+let debs = "mina-devnet-generic-instrumented,mina-archive-devnet-instrumented"
 
 in  { step =
             \(dependsOn : List Command.TaggedKey.Type)
