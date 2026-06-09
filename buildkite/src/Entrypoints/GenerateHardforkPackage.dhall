@@ -183,7 +183,7 @@ let generateDockerForCodename =
           let dependsOnDaemonOnly =
                 [ { name = pipelineName
                   , key = "daemon_apps_only-${lowerNameCodename}-docker-image"
-                }
+                  }
                 ]
 
           let buildOrGetArtifacts =
@@ -301,9 +301,7 @@ let generateDockerForCodename =
                                 codename.DebVersion}-docker-image"
                       }
                     , DockerImage.ReleaseSpec::{
-                      , deps =
-                            dependsOnBuildHfDebian
-                          # dependsOnDaemonOnly
+                      , deps = dependsOnBuildHfDebian # dependsOnDaemonOnly
                       , service = Artifacts.Type.DaemonConfig
                       , network = spec.network
                       , deb_codename = codename.DebVersion
