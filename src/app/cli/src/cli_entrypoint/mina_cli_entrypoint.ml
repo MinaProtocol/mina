@@ -1557,7 +1557,11 @@ let daemon logger ~itn_features =
          | Ok _ ->
              Async.never ()
          | Error exn ->
-             [%log fatal] "Unhandled Async exception %s" (Exn.to_string exn) ;
+             let exn_json =
+               Error_json.error_to_yojson (Error.of_exn ~backtrace:`Get exn)
+             in
+             [%log fatal] "Unhandled Async exception: $exn"
+               ~metadata:[ ("exn", exn_json) ] ;
              exit 1 ) )
 
 let replay_blocks logger ~itn_features =
@@ -2285,6 +2289,10 @@ let () =
     Core.exit 0
   with exn ->
     let logger = Logger.create () in
-    [%log fatal] "Unhandled top level exception: %s" (Exn.to_string exn)
+    let exn_json =
+      Error_json.error_to_yojson (Error.of_exn ~backtrace:`Get exn)
+    in
+    [%log fatal] "Unhandled top level exception: $exn"
+      ~metadata:[ ("exn", exn_json) ]
 
 let linkme = ()
