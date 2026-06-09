@@ -15,6 +15,11 @@ RED='\033[0;31m'
 SCRIPTPATH="$( cd "$(dirname "$0")" || exit ; pwd -P )"
 # shellcheck disable=SC1090
 source "${SCRIPTPATH}"/helper.sh
+# gar-cache rewriting helpers live in buildkite/scripts/docker/ so that
+# scripts/docker/helper.sh stays infra-free; build.sh is the boundary
+# where o1labs CI infra (the in-cluster pull-through cache) is wired in.
+# shellcheck disable=SC1090,SC1091
+source "${SCRIPTPATH}"/../../buildkite/scripts/docker/gar-cache.sh
 
 function usage() {
   if [[ -n "$1" ]]; then
@@ -160,6 +165,11 @@ if [[ -z "${DOCKER_REGISTRY:-}" ]]; then
   DOCKER_REGISTRY="$USER/mina-protocol"
 fi
 
+# Set the upstream prefix here; for services that use Dockerfile-install-config
+# (mina-daemon-configured / mina-rosetta-configured) we may re-set this AFTER
+# export_docker_tag below, once the dependency tag is fully resolved and we can
+# probe the cache for its specific manifest. Output TAGs are always built from
+# the upstream $DOCKER_REGISTRY so push lands on the real registry.
 DOCKER_REPO_ARG="--build-arg docker_repo=$DOCKER_REGISTRY"
 
 if [[ -z "${INPUT_RELEASE:-}" ]]; then
@@ -228,6 +238,11 @@ fi
 if [[ $(echo "${VALID_SERVICES[@]}" | grep -o "$SERVICE" - | wc -w) -eq 0 ]]; then usage "Invalid service!"; fi
 
 export_base_image
+# Route GAR-prefixed bases (today: bookworm) through the gar-cache
+# pull-through when reachable. focal/jammy/noble/bullseye fall through
+# to docker.io unchanged because they're outside the cache's scope.
+IMAGE="$(rewrite_via_gar_cache "${IMAGE}")"
+export IMAGE="--build-arg image=${IMAGE}"
 
 CUSTOM_ARG=${CUSTOM_ARG:-""}
 
@@ -323,6 +338,29 @@ fi
 
 export_version
 export_docker_tag
+
+# gar-cache (Phase 2): for Dockerfile-install-config services, probe the
+# cache for the specific dependency manifest the FROM line will pull, and
+# only rewrite docker_repo to use the cache when that manifest is present.
+# Without this probe, a cache miss on the dep image fails the entire build
+# (buildx doesn't fall back like the agent-side docker-pull shim does).
+#
+# Dockerfile-install-config:16 is
+#   FROM ${docker_repo}/${image_name}:${version}-${network}-generic${build_flags_suffix}${custom_suffix}
+# so we reconstruct that ref from build-args available here.
+if [[ "${DOCKERFILE_PATH}" == "dockerfiles/Dockerfile-install-config" ]]; then
+    _dep_image_name="${IMAGE_NAME:-mina-daemon}"
+    _dep_version="${VERSION_ARG#--build-arg version=}"
+    _dep_network="${INPUT_NETWORK:-devnet}"
+    # BUILD_FLAGS_SUFFIX_ARG is set by export_suffixes (called inside
+    # export_docker_tag) and looks like "--build-arg build_flags_suffix=-instrumented".
+    _dep_build_flags="${BUILD_FLAGS_SUFFIX_ARG#--build-arg build_flags_suffix=}"
+    _dep_custom="${CUSTOM_SUFFIX_ARG#--build-arg custom_suffix=}"
+    _dep_tag="${_dep_version}-${_dep_network}-generic${_dep_build_flags}${_dep_custom}"
+    _rewritten_repo="$(rewrite_docker_repo_via_gar_cache "${DOCKER_REGISTRY}" "${_dep_image_name}" "${_dep_tag}")"
+    DOCKER_REPO_ARG="--build-arg docker_repo=${_rewritten_repo}"
+    unset _dep_image_name _dep_version _dep_network _dep_build_flags _dep_custom _dep_tag _rewritten_repo
+fi
 
 BUILD_NETWORK="--allow=network.host"
 
