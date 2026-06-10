@@ -374,7 +374,7 @@ let docker_step
                     , size = size
                     }
                   ]
-  				, FunctionalTestSuite = [] : List DockerImage.ReleaseSpec.Type
+                , FunctionalTestSuite = [] : List DockerImage.ReleaseSpec.Type
                 , Toolchain = [] : List DockerImage.ReleaseSpec.Type
                 }
                 artifact

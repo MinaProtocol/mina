@@ -22,7 +22,6 @@ let Artifact
       | Archive
       | TestExecutive
       | TxTools
-
       | RosettaAppsOnly
       | RosettaConfig
       | FunctionalTestSuite
