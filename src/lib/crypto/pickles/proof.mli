@@ -144,6 +144,10 @@ module Make (MLMB : Pickles_types.Nat.Intf) : sig
 
   val of_base64 : string -> (t, string) result
 
+  val to_base64_chunked : t -> string
+
+  val of_base64_chunked : string -> (t, string) result
+
   val to_yojson : t -> [> `String of string ]
 
   val to_yojson_full : t Plonkish_prelude.Sigs.jsonable

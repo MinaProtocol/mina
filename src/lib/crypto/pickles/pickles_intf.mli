@@ -89,6 +89,10 @@ module type S = sig
       val to_base64 : t -> string
 
       val of_base64 : string -> (t, string) Result.t
+
+      val to_base64_chunked : t -> string
+
+      val of_base64_chunked : string -> (t, string) Result.t
     end
 
     module Proofs_verified_2 : sig
