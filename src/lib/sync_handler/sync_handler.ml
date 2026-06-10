@@ -327,11 +327,20 @@ let%test_module "Sync_handler" =
                        [(peer.host, frontier)])
                   ~peers:(Hash_set.of_list (module Network_peer.Peer) [peer])
               in
-              Network.glue_sync_ledger network query_reader answer_writer ;
-              match%map
+              let glue_stopped =
+                Network.glue_sync_ledger network
+                  (Sync_ledger.Mask.target_state sync_ledger)
+                  query_reader answer_writer
+              in
+              let%bind result =
                 Sync_ledger.Mask.fetch sync_ledger desired_root ~data:()
                   ~equal:(fun () () -> true)
-              with
+              in
+              let%map () =
+                let%bind () = Sync_ledger.Mask.destroy sync_ledger in
+                glue_stopped
+              in
+              match result with
               | `Ok synced_ledger ->
                   heartbeat_flag := false ;
                   Ledger_hash.equal
@@ -342,7 +351,10 @@ let%test_module "Sync_handler" =
                        (Ledger.merkle_root source_ledger)
               | `Target_changed _ ->
                   heartbeat_flag := false ;
-                  failwith "target of sync_ledger should not change" ) )
+                  failwith "target of sync_ledger should not change"
+              | `Destroyed ->
+                  heartbeat_flag := false ;
+                  failwith "sync_ledger should not be destroyed" ) )
 
     let to_external_transition breadcrumb =
       Transition_frontier.Breadcrumb.validated_transition breadcrumb

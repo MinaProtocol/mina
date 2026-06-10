@@ -256,15 +256,17 @@ val broadcast_transaction_pool_diff :
 val glue_sync_ledger :
      t
   -> preferred:Peer.t list
+  -> Mina_ledger.Sync_ledger.Root.Target_state.t
   -> (Ledger_hash.t * Mina_ledger.Sync_ledger.Query.t) Linear_pipe.Reader.t
   -> ( Ledger_hash.t
      * Mina_ledger.Sync_ledger.Query.t
      * Mina_ledger.Sync_ledger.Answer.t Envelope.Incoming.t )
      Linear_pipe.Writer.t
-  -> unit
+  -> unit Deferred.t
 
 val query_peer :
-     ?heartbeat_timeout:Time_ns.Span.t
+     ?stop:unit Deferred.t
+  -> ?heartbeat_timeout:Time_ns.Span.t
   -> ?timeout:Time.Span.t
   -> t
   -> Network_peer.Peer.Id.t

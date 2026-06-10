@@ -1181,7 +1181,7 @@ let run_catchup ~context:(module Context : CONTEXT) ~trust_system ~verifier
     in
     Downloader.create ~stop ~trust_system ~logger ~preferred:[]
       ~max_batch_size:5
-      ~get:(fun peer hs ->
+      ~get:(fun ~stop:_ peer hs ->
         let sec =
           let sec_per_block =
             Option.value_map

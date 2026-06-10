@@ -201,8 +201,10 @@ let sync_ledger ({ context = (module Context); _ } as t) ~preferred
   let open Context in
   let query_reader = Sync_ledger.Root.query_reader root_sync_ledger in
   let response_writer = Sync_ledger.Root.answer_writer root_sync_ledger in
-  Mina_networking.glue_sync_ledger ~preferred t.network query_reader
-    response_writer ;
+  don't_wait_for
+    (Mina_networking.glue_sync_ledger ~preferred t.network
+       (Sync_ledger.Root.target_state root_sync_ledger)
+       query_reader response_writer ) ;
   Pipe_lib.Choosable_synchronous_pipe.iter sync_ledger_reader
     ~f:(fun (b_or_h, `Valid_cb vc) ->
       let header_with_hash, sender, transition_cache_element =
@@ -275,9 +277,13 @@ let download_snarked_ledger ~trust_system ~preferred_peers ~transition_graph
      (* We ignore the resulting ledger returned here since it will always
         * be the same as the ledger we started with because we are syncing
         * a db ledger. *)
-     let%map _, data = Sync_ledger.Root.valid_tree root_sync_ledger in
-     Sync_ledger.Root.destroy root_sync_ledger ;
-     data )
+     let%bind result = Sync_ledger.Root.valid_tree root_sync_ledger in
+     let%map () = Sync_ledger.Root.destroy root_sync_ledger in
+     match result with
+     | `Ok (_, data) ->
+         data
+     | `Destroyed ->
+         failwith "root sync ledger was destroyed before becoming valid" )
 
 let handle_scan_state_and_aux ~logger ~expected_staged_ledger_hash
     ~temp_snarked_ledger ~verifier ~constraint_constants ~signature_kind

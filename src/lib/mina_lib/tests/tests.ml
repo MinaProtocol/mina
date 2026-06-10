@@ -483,9 +483,11 @@ let%test_module "Epoch ledger sync tests" =
             )
             Linear_pipe.write proxy_response_writer response)
         *)
-        Mina_networking.glue_sync_ledger test.network_info2.networking
-          ~preferred:[ test.network_info1.network_peer ]
-          query_reader answer_writer ;
+        don't_wait_for
+          (Mina_networking.glue_sync_ledger test.network_info2.networking
+             ~preferred:[ test.network_info1.network_peer ]
+             (Mina_ledger.Sync_ledger.Root.target_state sync_ledger)
+             query_reader answer_writer ) ;
         sync_ledger
       in
       let staking_ledger_root =
@@ -513,6 +515,8 @@ let%test_module "Epoch ledger sync tests" =
             [%log debug] "Synced current epoch ledger successfully"
         | `Target_changed _ ->
             failwith "Target changed when getting staking ledger"
+        | `Destroyed ->
+            failwith "Sync ledger destroyed when getting staking ledger"
       in
       (* sync next staking ledger *)
       let sync_ledger2_tm0 = Unix.gettimeofday () in
@@ -533,6 +537,9 @@ let%test_module "Epoch ledger sync tests" =
       | `Target_changed _ ->
           test.cleanup () ;
           failwith "Target changed when getting next epoch ledger"
+      | `Destroyed ->
+          test.cleanup () ;
+          failwith "Sync ledger destroyed when getting next epoch ledger"
 
     let cannot_sync_staking_ledger (test : test_state) =
       let staking_ledger_root =

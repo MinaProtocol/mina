@@ -3,6 +3,16 @@ open Async_kernel
 open Pipe_lib
 open Network_peer
 
+let alcotest_suites = ref []
+
+let suite_counter = ref 0
+
+let register suite cases = alcotest_suites := (suite, cases) :: !alcotest_suites
+
+let next_suite_name prefix =
+  incr suite_counter ;
+  sprintf "%s-%d" prefix !suite_counter
+
 module type Ledger_intf = sig
   include Merkle_ledger.Intf.SYNCABLE
 
@@ -111,7 +121,7 @@ struct
     Async.Scheduler.set_record_backtraces true ;
     Core.Backtrace.elide := false
 
-  let%test "full_sync_entirely_different" =
+  let test_full_sync_entirely_different () =
     let l1, _k1 = Ledger.load_ledger 1 1 in
     let l2, _k2 = Ledger.load_ledger num_accts 2 in
     let desired_root = Ledger.merkle_root l2 in
@@ -141,18 +151,20 @@ struct
            in
            Linear_pipe.write aw (root_hash, query, Envelope.Incoming.local answ) )
       ) ;
-    match
-      Async.Thread_safe.block_on_async_exn (fun () ->
-          Sync_ledger.fetch lsync desired_root ~data:() ~equal:(fun () () ->
-              true ) )
+    match%map
+      Sync_ledger.fetch lsync desired_root ~data:() ~equal:(fun () () -> true)
     with
     | `Ok mt ->
         total_queries := Some (List.length !seen_queries) ;
-        Root_hash.equal desired_root (Ledger.merkle_root mt)
+        Alcotest.(check bool)
+          "synced root" true
+          (Root_hash.equal desired_root (Ledger.merkle_root mt))
     | `Target_changed _ ->
-        false
+        Alcotest.fail "target changed"
+    | `Destroyed ->
+        Alcotest.fail "sync ledger destroyed"
 
-  let%test_unit "new_goal_soon" =
+  let test_new_goal_soon () =
     let l1, _k1 = Ledger.load_ledger num_accts 1 in
     let l2, _k2 = Ledger.load_ledger num_accts 2 in
     let l3, _k3 = Ledger.load_ledger num_accts 3 in
@@ -197,23 +209,69 @@ struct
              in
              ctr := !ctr + 1 ;
              res ) ) ;
-    match
-      Async.Thread_safe.block_on_async_exn (fun () ->
-          Sync_ledger.fetch lsync !desired_root ~data:() ~equal:(fun () () ->
-              true ) )
+    match%bind
+      Sync_ledger.fetch lsync !desired_root ~data:() ~equal:(fun () () -> true)
     with
     | `Ok _ ->
         failwith "shouldn't happen"
     | `Target_changed _ -> (
-        match
-          Async.Thread_safe.block_on_async_exn (fun () ->
-              Sync_ledger.wait_until_valid lsync !desired_root )
-        with
+        match%map Sync_ledger.wait_until_valid lsync !desired_root with
         | `Ok mt ->
-            [%test_result: Root_hash.t] ~expect:(Ledger.merkle_root l3)
-              (Ledger.merkle_root mt)
+            Alcotest.(check bool)
+              "synced retargeted root" true
+              (Root_hash.equal (Ledger.merkle_root l3) (Ledger.merkle_root mt))
         | `Target_changed _ ->
-            failwith "the target changed again" )
+            Alcotest.fail "the target changed again"
+        | `Destroyed ->
+            Alcotest.fail "sync ledger destroyed" )
+    | `Destroyed ->
+        Alcotest.fail "sync ledger destroyed"
+
+  let test_destroy_unblocks_fetch () =
+    let l1, _k1 = Ledger.load_ledger 1 1 in
+    let l2, _k2 = Ledger.load_ledger num_accts 2 in
+    let desired_root = Ledger.merkle_root l2 in
+    let lsync = Sync_ledger.create l1 ~context:(module Context) ~trust_system in
+    let result =
+      Sync_ledger.fetch lsync desired_root ~data:() ~equal:(fun () () -> true)
+    in
+    let%bind () = Sync_ledger.destroy lsync in
+    match%map result with
+    | `Destroyed ->
+        ()
+    | `Ok _ | `Target_changed _ ->
+        Alcotest.fail "fetch should resolve as destroyed"
+
+  let test_destroy_unblocks_valid_tree () =
+    let l1, _k1 = Ledger.load_ledger 1 1 in
+    let lsync = Sync_ledger.create l1 ~context:(module Context) ~trust_system in
+    let result = Sync_ledger.valid_tree lsync in
+    let%bind () = Sync_ledger.destroy lsync in
+    match%map result with
+    | `Destroyed ->
+        ()
+    | `Ok _ ->
+        Alcotest.fail "valid_tree should resolve as destroyed"
+
+  let test_destroy_is_idempotent () =
+    let l1, _k1 = Ledger.load_ledger 1 1 in
+    let lsync = Sync_ledger.create l1 ~context:(module Context) ~trust_system in
+    let%bind () = Sync_ledger.destroy lsync in
+    Sync_ledger.destroy lsync
+
+  let () =
+    register
+      (next_suite_name (sprintf "syncable_ledger-%d_accounts" num_accts))
+      [ Alcotest_async.test_case "full sync entirely different" `Quick
+          test_full_sync_entirely_different
+      ; Alcotest_async.test_case "new goal soon" `Quick test_new_goal_soon
+      ; Alcotest_async.test_case "destroy unblocks fetch" `Quick
+          test_destroy_unblocks_fetch
+      ; Alcotest_async.test_case "destroy unblocks valid_tree" `Quick
+          test_destroy_unblocks_valid_tree
+      ; Alcotest_async.test_case "destroy is idempotent" `Quick
+          test_destroy_is_idempotent
+      ]
 end
 
 module Make_test_edge_cases (Input : Input_intf) = struct
@@ -253,7 +311,7 @@ module Make_test_edge_cases (Input : Input_intf) = struct
     | _ ->
         `Answer (Or_error.ok_exn answer)
 
-  let%test "try full_sync_entirely_different with failures" =
+  let test_full_sync_entirely_different_with_failures () =
     let l1, _k1 = Ledger.load_ledger 1 1 in
     let l2, _k2 = Ledger.load_ledger num_accts 2 in
     let desired_root = Ledger.merkle_root l2 in
@@ -285,18 +343,26 @@ module Make_test_edge_cases (Input : Input_intf) = struct
            | `Failure_as_expected ->
                Ivar.fill got_failure_ivar true ;
                Deferred.unit ) ) ;
-    Async.Thread_safe.block_on_async_exn (fun () ->
-        let deferred_res =
-          match%map
-            Sync_ledger.fetch lsync desired_root ~data:() ~equal:(fun () () ->
-                true )
-          with
-          | `Ok mt ->
-              Root_hash.equal desired_root (Ledger.merkle_root mt)
-          | `Target_changed _ ->
-              false
-        in
-        Deferred.any [ deferred_res; Ivar.read got_failure_ivar ] )
+    let deferred_res =
+      match%map
+        Sync_ledger.fetch lsync desired_root ~data:() ~equal:(fun () () -> true)
+      with
+      | `Ok mt ->
+          Root_hash.equal desired_root (Ledger.merkle_root mt)
+      | `Target_changed _ | `Destroyed ->
+          false
+    in
+    let%map result =
+      Deferred.any [ deferred_res; Ivar.read got_failure_ivar ]
+    in
+    Alcotest.(check bool) "sync recovered after failure" true result
+
+  let () =
+    register
+      (next_suite_name "syncable_ledger-edge_cases")
+      [ Alcotest_async.test_case "full sync with invalid-depth failures" `Quick
+          test_full_sync_entirely_different_with_failures
+      ]
 end
 
 module Root_hash = struct
@@ -749,3 +815,7 @@ module Mask = struct
   module TestMask16_Edge_Cases_Depth80 =
     Make_test_edge_cases (Mask16_Layer2_Depth80)
 end
+
+let () =
+  Async.Thread_safe.block_on_async_exn (fun () ->
+      Alcotest_async.run "Syncable ledger" (List.rev !alcotest_suites) )

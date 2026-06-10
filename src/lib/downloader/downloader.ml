@@ -79,12 +79,20 @@ end) : sig
 
   val cancel : t -> Key.t -> unit
 
+  val cancel_if : t -> f:(Key.t -> bool) -> unit
+
+  val closed : t -> unit Deferred.t
+
   val create :
        max_batch_size:int
     -> stop:unit Deferred.t
     -> logger:Logger.t
     -> trust_system:Trust_system.t
-    -> get:(Peer.t -> Key.t list -> Result.t list Deferred.Or_error.t)
+    -> get:
+         (   stop:unit Deferred.t
+          -> Peer.t
+          -> Key.t list
+          -> Result.t list Deferred.Or_error.t )
     -> knowledge_context:Knowledge_context.t Broadcast_pipe.Reader.t
     -> knowledge:
          (Knowledge_context.t -> Peer.t -> Key.t Claimed_knowledge.t Deferred.t)
@@ -599,11 +607,21 @@ end = struct
         Strict_pipe.Writer.write t.w ()
   end
 
+  type active_download =
+    { peer : Peer.t
+    ; job : Job.t
+    ; started_at : Time.t
+    ; batch_id : int
+    ; batch_stop : unit Ivar.t
+    }
+
   type t =
     { mutable next_flush : (unit, unit) Clock.Event.t option
+    ; mutable next_batch_id : int
+    ; mutable torn_down : bool
     ; mutable all_peers : Peer.Set.t
     ; pending : Job.t Q.t
-    ; downloading : (Peer.t * Job.t * Time.t) Key.Table.t
+    ; downloading : active_download Key.Table.t
     ; useful_peers : Useful_peers.t
     ; flush_r : unit Strict_pipe.Reader.t (* Single reader *)
     ; flush_w :
@@ -613,7 +631,11 @@ end = struct
         Strict_pipe.Writer.t
           (* buffer of length 0 *)
     ; jobs_added_bvar : (unit, read_write) Bvar.t
-    ; get : Peer.t -> Key.t list -> Result.t list Deferred.Or_error.t
+    ; get :
+           stop:unit Deferred.t
+        -> Peer.t
+        -> Key.t list
+        -> Result.t list Deferred.Or_error.t
     ; max_batch_size : int
           (* A peer is useful if there is a job in the pending queue which has not
              been attempted with that peer. *)
@@ -627,9 +649,12 @@ end = struct
     ; logger : Logger.t
     ; trust_system : Trust_system.t
     ; stop : unit Deferred.t
+    ; closed : unit Ivar.t
     }
 
   let logger t = t.logger
+
+  let closed t = Ivar.read t.closed
 
   let jobs_added t = Bvar.broadcast t.jobs_added_bvar ()
 
@@ -676,8 +701,7 @@ end = struct
     let job =
       List.find_map ~f:Lazy.force
         [ lazy (Q.lookup t.pending h)
-        ; lazy
-            (Option.map ~f:(fun (_, j, _) -> j) (Hashtbl.find t.downloading h))
+        ; lazy (Option.map ~f:(fun d -> d.job) (Hashtbl.find t.downloading h))
         ]
     in
     Q.remove t.pending h ;
@@ -688,6 +712,34 @@ end = struct
     | Some j ->
         kill_job t j ;
         Useful_peers.update t.useful_peers (Job_cancelled h)
+
+  let cancel_if t ~f =
+    let cancelled_batches = Int.Table.create () in
+    let cancel_key key =
+      if f key then
+        match Q.lookup t.pending key with
+        | Some j ->
+            Q.remove t.pending key ;
+            kill_job t j ;
+            Useful_peers.update t.useful_peers (Job_cancelled key)
+        | None -> (
+            match Hashtbl.find t.downloading key with
+            | None ->
+                ()
+            | Some d ->
+                Hashtbl.remove t.downloading key ;
+                Hashtbl.set cancelled_batches ~key:d.batch_id ~data:d.batch_stop ;
+                kill_job t d.job ;
+                Useful_peers.update t.useful_peers (Job_cancelled key) )
+    in
+    Q.to_list t.pending |> List.iter ~f:(fun j -> cancel_key j.key) ;
+    Hashtbl.keys t.downloading |> List.iter ~f:cancel_key ;
+    Hashtbl.iteri cancelled_batches ~f:(fun ~key:batch_id ~data:batch_stop ->
+        let batch_still_live =
+          Hashtbl.exists t.downloading ~f:(fun d -> d.batch_id = batch_id)
+        in
+        if not batch_still_live then Ivar.fill_if_empty batch_stop () ) ;
+    jobs_added t
 
   let enqueue t e =
     match Q.enqueue t.pending e with
@@ -701,7 +753,7 @@ end = struct
 
   let active_jobs t =
     Q.to_list t.pending
-    @ List.map (Hashtbl.data t.downloading) ~f:(fun (_, j, _) -> j)
+    @ List.map (Hashtbl.data t.downloading) ~f:(fun d -> d.job)
 
   let refresh_peers t peers =
     Broadcast_pipe.Reader.iter peers ~f:(fun peers ->
@@ -720,6 +772,8 @@ end = struct
 
   let tear_down
       ( { next_flush
+        ; next_batch_id = _
+        ; torn_down = _
         ; all_peers = _
         ; flush_w
         ; get = _
@@ -734,21 +788,27 @@ end = struct
         ; logger = _
         ; trust_system = _
         ; stop = _
+        ; closed
         } as t ) =
-    let rec clear_queue q =
-      match Q.dequeue q with
-      | None ->
-          ()
-      | Some j ->
-          kill_job t j ; clear_queue q
-    in
-    Option.iter next_flush ~f:(fun e -> Clock.Event.abort_if_possible e ()) ;
-    Strict_pipe.Writer.close flush_w ;
-    Useful_peers.tear_down useful_peers ;
-    Strict_pipe.Writer.close got_new_peers_w ;
-    Hashtbl.iter downloading ~f:(fun (_, j, _) -> kill_job t j) ;
-    Hashtbl.clear downloading ;
-    clear_queue pending
+    if not t.torn_down then (
+      t.torn_down <- true ;
+      let rec clear_queue q =
+        match Q.dequeue q with
+        | None ->
+            ()
+        | Some j ->
+            kill_job t j ; clear_queue q
+      in
+      Option.iter next_flush ~f:(fun e -> Clock.Event.abort_if_possible e ()) ;
+      Strict_pipe.Writer.close flush_w ;
+      Useful_peers.tear_down useful_peers ;
+      Strict_pipe.Writer.close got_new_peers_w ;
+      Hashtbl.iter downloading ~f:(fun d ->
+          Ivar.fill_if_empty d.batch_stop () ;
+          kill_job t d.job ) ;
+      Hashtbl.clear downloading ;
+      clear_queue pending ;
+      Ivar.fill_if_empty closed () )
 
   let download t peer xs =
     O1trace.thread "download" (fun () ->
@@ -763,7 +823,10 @@ end = struct
               ] ) )
         in
         let keys = List.map xs ~f:(fun x -> x.J.key) in
-        let fail (e : Error.t) =
+        let live_jobs () =
+          List.filter xs ~f:(fun x -> Hashtbl.mem t.downloading x.key)
+        in
+        let fail xs (e : Error.t) =
           let e = Error.to_string_hum e in
           [%log' debug t.logger]
             "Downloading from $peer failed ($error) on $keys"
@@ -779,11 +842,16 @@ end = struct
                 } ) ;
           flush_soon t
         in
+        let batch_stop = Ivar.create () in
+        let batch_id = t.next_batch_id in
+        t.next_batch_id <- t.next_batch_id + 1 ;
+        let started_at = Time.now () in
         List.iter xs ~f:(fun x ->
-            Hashtbl.set t.downloading ~key:x.key ~data:(peer, x, Time.now ()) ) ;
+            Hashtbl.set t.downloading ~key:x.key
+              ~data:{ peer; job = x; started_at; batch_id; batch_stop } ) ;
         jobs_added t ;
         Useful_peers.update t.useful_peers (Download_starting peer) ;
-        let download_deferred = t.get peer keys in
+        let download_deferred = t.get ~stop:(Ivar.read batch_stop) peer keys in
         upon download_deferred (fun res ->
             let succs, unsuccs =
               match res with
@@ -806,12 +874,14 @@ end = struct
           Deferred.choose
             [ Deferred.choice download_deferred (fun x -> `Not_stopped x)
             ; Deferred.choice t.stop (fun () -> `Stopped)
+            ; Deferred.choice (Ivar.read batch_stop) (fun () -> `Stopped)
             ; Deferred.choice
                 (* This happens if all the jobs are cancelled. *)
                 (Deferred.List.map xs ~f:(fun x -> Ivar.read x.res))
                 (fun _ -> `Stopped)
             ]
         in
+        let live_xs = live_jobs () in
         List.iter xs ~f:(fun j -> Hashtbl.remove t.downloading j.key) ;
         match res with
         | `Stopped ->
@@ -819,7 +889,7 @@ end = struct
         | `Not_stopped r -> (
             match r with
             | Error e ->
-                fail e
+                fail live_xs e
             | Ok rs ->
                 [%log' debug t.logger] "result is $result"
                   ~metadata:
@@ -828,7 +898,8 @@ end = struct
                     ] ;
                 let received_at = Time.now () in
                 let jobs =
-                  Key.Table.of_alist_exn (List.map xs ~f:(fun x -> (x.key, x)))
+                  Key.Table.of_alist_exn
+                    (List.map live_xs ~f:(fun x -> (x.key, x)))
                 in
                 List.iter rs ~f:(fun r ->
                     match Hashtbl.find jobs (Result.key r) with
@@ -870,15 +941,15 @@ end = struct
       ; ("pending", f t.pending)
       ; ( "downloading"
         , list
-            (List.map (Hashtbl.to_alist t.downloading)
-               ~f:(fun (h, (p, _, start)) ->
+            (List.map (Hashtbl.to_alist t.downloading) ~f:(fun (h, d) ->
                  `Assoc
                    [ ("hash", Key.to_yojson h)
-                   ; ("start", `String (Time.to_string start))
+                   ; ("start", `String (Time.to_string d.started_at))
                    ; ( "time_since_start"
-                     , `String (Time.Span.to_string_hum (Time.diff now start))
+                     , `String
+                         (Time.Span.to_string_hum (Time.diff now d.started_at))
                      )
-                   ; ("peer", `String (Peer.to_multiaddr_string p))
+                   ; ("peer", `String (Peer.to_multiaddr_string d.peer))
                    ] ) ) )
       ]
 
@@ -967,6 +1038,8 @@ end = struct
     let got_new_peers_r, got_new_peers_w = pipe ~name:"got_new_peers" 0 in
     let t =
       { all_peers = Peer.Set.of_list all_peers
+      ; next_batch_id = 0
+      ; torn_down = false
       ; pending = Q.create ()
       ; next_flush = None
       ; flush_r
@@ -981,6 +1054,7 @@ end = struct
       ; trust_system
       ; downloading = Key.Table.create ()
       ; stop
+      ; closed = Ivar.create ()
       }
     in
     let peers =
@@ -1087,8 +1161,10 @@ end = struct
     match (Q.lookup t.pending key, Hashtbl.find t.downloading key) with
     | Some _, Some _ ->
         assert false
-    | Some x, None | None, Some (_, x, _) ->
+    | Some x, None ->
         x
+    | None, Some d ->
+        d.job
     | None, None ->
         flush_soon t ;
         let e = { J.key; attempts; res = Ivar.create () } in

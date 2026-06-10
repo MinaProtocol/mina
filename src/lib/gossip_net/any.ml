@@ -53,11 +53,11 @@ module Make (Rpc_interface : RPC_INTERFACE) :
 
   let random_peers_except (Any ((module M), t)) = M.random_peers_except t
 
-  let query_peer ?heartbeat_timeout ?timeout (Any ((module M), t)) =
-    M.query_peer ?heartbeat_timeout ?timeout t
+  let query_peer ?stop ?heartbeat_timeout ?timeout (Any ((module M), t)) =
+    M.query_peer ?stop ?heartbeat_timeout ?timeout t
 
-  let query_peer' ?how ?heartbeat_timeout ?timeout (Any ((module M), t)) =
-    M.query_peer' ?how ?heartbeat_timeout ?timeout t
+  let query_peer' ?how ?stop ?heartbeat_timeout ?timeout (Any ((module M), t)) =
+    M.query_peer' ?how ?stop ?heartbeat_timeout ?timeout t
 
   let query_random_peers (Any ((module M), t)) = M.query_random_peers t
 

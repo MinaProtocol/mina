@@ -140,6 +140,16 @@ module type S = sig
 
   type answer
 
+  module Target_state : sig
+    type t
+
+    val current : t -> root_hash option
+
+    val changed : t -> unit Deferred.t
+
+    val closed : t -> unit Deferred.t
+  end
+
   module Responder : sig
     type t
 
@@ -166,7 +176,9 @@ module type S = sig
 
   val query_reader : 'a t -> (root_hash * query) Linear_pipe.Reader.t
 
-  val destroy : 'a t -> unit
+  val target_state : 'a t -> Target_state.t
+
+  val destroy : 'a t -> unit Deferred.t
 
   val new_goal :
        'a t
@@ -177,12 +189,14 @@ module type S = sig
 
   val peek_valid_tree : 'a t -> merkle_tree option
 
-  val valid_tree : 'a t -> (merkle_tree * 'a) Deferred.t
+  val valid_tree : 'a t -> [ `Ok of merkle_tree * 'a | `Destroyed ] Deferred.t
 
   val wait_until_valid :
        'a t
     -> root_hash
-    -> [ `Ok of merkle_tree | `Target_changed of root_hash option * root_hash ]
+    -> [ `Ok of merkle_tree
+       | `Target_changed of root_hash option * root_hash
+       | `Destroyed ]
        Deferred.t
 
   val fetch :
@@ -190,7 +204,9 @@ module type S = sig
     -> root_hash
     -> data:'a
     -> equal:('a -> 'a -> bool)
-    -> [ `Ok of merkle_tree | `Target_changed of root_hash option * root_hash ]
+    -> [ `Ok of merkle_tree
+       | `Target_changed of root_hash option * root_hash
+       | `Destroyed ]
        Deferred.t
 
   val apply_or_queue_diff : 'a t -> diff -> unit
@@ -418,9 +434,26 @@ end = struct
           Or_error.error_string err
   end
 
+  type target_state =
+    { current_root : Root_hash.t option ref
+    ; changed_bvar : (unit, read_write) Bvar.t
+    ; closed : unit Ivar.t
+    }
+
+  module Target_state = struct
+    type t = target_state
+
+    let current t = !(t.current_root)
+
+    let changed t = Bvar.wait t.changed_bvar
+
+    let closed t = Ivar.read t.closed
+  end
+
   type 'a t =
     { mutable desired_root : Root_hash.t option
     ; mutable auxiliary_data : 'a option
+    ; mutable destroyed : bool
     ; tree : MT.t
     ; trust_system : Trust_system.t
     ; answers :
@@ -434,7 +467,12 @@ end = struct
               hash of the node with the address. *)
     ; waiting_content : Hash.t Addr.Table.t
     ; mutable validity_listener :
-        [ `Ok | `Target_changed of Root_hash.t option * Root_hash.t ] Ivar.t
+        [ `Ok
+        | `Target_changed of Root_hash.t option * Root_hash.t
+        | `Destroyed ]
+        Ivar.t
+    ; stopped : unit Ivar.t
+    ; target_state : target_state
     ; context : (module CONTEXT)
     }
 
@@ -444,9 +482,19 @@ end = struct
 
   let desired_root_exn { desired_root; _ } = desired_root |> Option.value_exn
 
+  let target_state t = t.target_state
+
   let destroy t =
+    if not t.destroyed then (
+      t.destroyed <- true ;
+      Ivar.fill_if_empty t.validity_listener `Destroyed ;
+      Ivar.fill_if_empty t.target_state.closed () ;
+      Bvar.broadcast t.target_state.changed_bvar () ;
+      Linear_pipe.close t.answer_writer ;
+      Linear_pipe.close t.queries ) ;
     Linear_pipe.close_read t.answers ;
-    Linear_pipe.close_read t.query_reader
+    Linear_pipe.close_read t.query_reader ;
+    Ivar.read t.stopped
 
   let answer_writer t = t.answer_writer
 
@@ -461,7 +509,7 @@ end = struct
         ; ("hash", Hash.to_yojson expected)
         ]
       "Expecting children parent $parent_address, expected: $hash" ;
-    Addr.Table.add_exn t.waiting_parents ~key:parent_addr ~data:expected
+    Hashtbl.set t.waiting_parents ~key:parent_addr ~data:expected
 
   let expect_content : 'a t -> Addr.t -> Hash.t -> unit =
    fun t addr expected ->
@@ -470,7 +518,7 @@ end = struct
       ~metadata:
         [ ("address", Addr.to_yojson addr); ("hash", Hash.to_yojson expected) ]
       "Expecting content addr $address, expected: $hash" ;
-    Addr.Table.add_exn t.waiting_content ~key:addr ~data:expected
+    Hashtbl.set t.waiting_content ~key:addr ~data:expected
 
   (** Given an address and the accounts below that address, fill in the tree
       with them. *)
@@ -574,7 +622,15 @@ end = struct
     else (
       if Ivar.is_full t.validity_listener then
         [%log error] "Ivar.fill bug is here!" ;
-      Ivar.fill t.validity_listener `Ok )
+      Ivar.fill_if_empty t.validity_listener `Ok )
+
+  let enqueue_query t root_hash query =
+    if
+      (not t.destroyed)
+      && Option.equal Root_hash.equal
+           !(t.target_state.current_root)
+           (Some root_hash)
+    then Linear_pipe.write_without_pushback_if_open t.queries (root_hash, query)
 
   (** Compute the hash of an empty tree of the specified height. *)
   let empty_hash_at_height h =
@@ -603,13 +659,13 @@ end = struct
     let open (val t.context) in
     if Addr.depth addr >= MT.depth t.tree - account_subtree_height then (
       expect_content t addr exp_hash ;
-      Linear_pipe.write_without_pushback_if_open t.queries
-        (desired_root_exn t, What_contents addr) )
+      let root_hash = desired_root_exn t in
+      enqueue_query t root_hash (What_contents addr) )
     else (
       expect_children t addr exp_hash ;
-      Linear_pipe.write_without_pushback_if_open t.queries
-        ( desired_root_exn t
-        , What_child_hashes (addr, ledger_sync_config.default_subtree_depth) ) )
+      let root_hash = desired_root_exn t in
+      enqueue_query t root_hash
+        (What_child_hashes (addr, ledger_sync_config.default_subtree_depth)) )
 
   (** Handle the initial Num_accounts message, starting the main syncing
       process. *)
@@ -652,10 +708,12 @@ end = struct
           ; ("query", Query.to_yojson Addr.to_yojson query)
           ]
         "Handle answer for $root_hash" ;
-      if not (Root_hash.equal root_hash (desired_root_exn t)) then (
+      if t.destroyed then Deferred.unit
+      else if not (Option.equal Root_hash.equal (Some root_hash) t.desired_root)
+      then (
         [%log trace]
           ~metadata:
-            [ ("desired_hash", Root_hash.to_yojson (desired_root_exn t))
+            [ ("desired_hash", [%to_yojson: Root_hash.t option] t.desired_root)
             ; ("ignored_hash", Root_hash.to_yojson root_hash)
             ]
           "My desired root was $desired_hash, so I'm ignoring $ignored_hash" ;
@@ -669,9 +727,7 @@ end = struct
         let open Trust_system in
         (* If a peer misbehaves we still need the information we asked them for,
            so requeue in that case. *)
-        let requeue_query () =
-          Linear_pipe.write_without_pushback_if_open t.queries (root_hash, query)
-        in
+        let requeue_query () = enqueue_query t root_hash query in
         let credit_fulfilled_request () =
           record_envelope_sender t.trust_system logger sender
             ( Actions.Fulfilled_request
@@ -785,7 +841,8 @@ end = struct
       | Some h' ->
           Root_hash.equal h h'
     in
-    if not should_skip then (
+    if t.destroyed then `Repeat
+    else if not should_skip then (
       Option.iter t.desired_root ~f:(fun root_hash ->
           [%log debug]
             ~metadata:
@@ -797,8 +854,10 @@ end = struct
         (`Target_changed (t.desired_root, h)) ;
       t.validity_listener <- Ivar.create () ;
       t.desired_root <- Some h ;
+      t.target_state.current_root := Some h ;
+      Bvar.broadcast t.target_state.changed_bvar () ;
       t.auxiliary_data <- Some data ;
-      Linear_pipe.write_without_pushback_if_open t.queries (h, Num_accounts) ;
+      enqueue_query t h Num_accounts ;
       `New )
     else if
       Option.fold t.auxiliary_data ~init:false ~f:(fun _ saved_data ->
@@ -813,26 +872,31 @@ end = struct
   let rec valid_tree t =
     match%bind Ivar.read t.validity_listener with
     | `Ok ->
-        return (t.tree, Option.value_exn t.auxiliary_data)
+        return (`Ok (t.tree, Option.value_exn t.auxiliary_data))
     | `Target_changed _ ->
         valid_tree t
+    | `Destroyed ->
+        return `Destroyed
 
   let peek_valid_tree t =
     Option.bind (Ivar.peek t.validity_listener) ~f:(function
       | `Ok ->
           Some t.tree
-      | `Target_changed _ ->
+      | `Target_changed _ | `Destroyed ->
           None )
 
   let wait_until_valid t h =
-    if not (Root_hash.equal h (desired_root_exn t)) then
+    if t.destroyed then return `Destroyed
+    else if not (Option.equal Root_hash.equal (Some h) t.desired_root) then
       return (`Target_changed (t.desired_root, h))
     else
       Deferred.map (Ivar.read t.validity_listener) ~f:(function
         | `Target_changed payload ->
             `Target_changed payload
         | `Ok ->
-            `Ok t.tree )
+            `Ok t.tree
+        | `Destroyed ->
+            `Destroyed )
 
   let fetch t rh ~data ~equal =
     ignore (new_goal t rh ~data ~equal : [ `New | `Repeat | `Update_data ]) ;
@@ -844,6 +908,7 @@ end = struct
     let t =
       { desired_root = None
       ; auxiliary_data = None
+      ; destroyed = false
       ; tree = mt
       ; trust_system
       ; answers = ar
@@ -853,10 +918,18 @@ end = struct
       ; waiting_parents = Addr.Table.create ()
       ; waiting_content = Addr.Table.create ()
       ; validity_listener = Ivar.create ()
+      ; stopped = Ivar.create ()
+      ; target_state =
+          { current_root = ref None
+          ; changed_bvar = Bvar.create ()
+          ; closed = Ivar.create ()
+          }
       ; context
       }
     in
-    don't_wait_for (main_loop t) ;
+    don't_wait_for
+      (let%map () = main_loop t in
+       Ivar.fill_if_empty t.stopped () ) ;
     t
 
   let apply_or_queue_diff _ _ =

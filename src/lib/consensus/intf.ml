@@ -810,6 +810,7 @@ module type S = sig
       -> local_state:Local_state.t
       -> glue_sync_ledger:
            (   preferred:Network_peer.Peer.t list
+            -> Mina_ledger.Sync_ledger.Root.Target_state.t
             -> (Frozen_ledger_hash.t * Mina_ledger.Sync_ledger.Query.t)
                Pipe_lib.Linear_pipe.Reader.t
             -> ( Frozen_ledger_hash.t
@@ -817,7 +818,7 @@ module type S = sig
                * Mina_ledger.Sync_ledger.Answer.t
                  Network_peer.Envelope.Incoming.t )
                Pipe.Writer.t
-            -> unit )
+            -> unit Deferred.t )
       -> local_state_sync
       -> unit Deferred.Or_error.t
 
