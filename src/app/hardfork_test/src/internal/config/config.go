@@ -49,6 +49,13 @@ type Config struct {
 	NumFish   int
 	NumNodes  int
 
+	// When set, the seed and/or snark coordinator daemons also run as whale block
+	// producers (consuming the leading whale accounts) instead of those whales
+	// being spawned as standalone daemons. With both enabled and NumWhales=2 this
+	// collapses the topology to 2 Mina nodes (seed+whale, snark-coordinator+whale).
+	SeedIsWhale             bool
+	SnarkCoordinatorIsWhale bool
+
 	// Interval of sending payments in second
 	PaymentInterval int
 
@@ -133,6 +140,8 @@ func DefaultConfig() *Config {
 		NumWhales:                     2,
 		NumFish:                       0,
 		NumNodes:                      0,
+		SeedIsWhale:                   true,
+		SnarkCoordinatorIsWhale:       true,
 		PaymentInterval:               20,
 		ShutdownTimeoutMinutes:        10,
 		PollingIntervalSeconds:        8,
@@ -198,7 +207,18 @@ func (c *Config) InitDaemonInfos() {
 		},
 	}
 
-	for whale_id := 0; whale_id < c.NumWhales; whale_id++ {
+	// Whale accounts consumed by the seed / snark coordinator (when they double as
+	// block producers) are not spawned as standalone whale daemons; mirror the
+	// WHALE_STANDALONE_START logic in mina-local-network.sh.
+	standaloneWhaleStart := 0
+	if c.SeedIsWhale && standaloneWhaleStart < c.NumWhales {
+		standaloneWhaleStart++
+	}
+	if c.SnarkCoordinatorIsWhale && standaloneWhaleStart < c.NumWhales {
+		standaloneWhaleStart++
+	}
+
+	for whale_id := standaloneWhaleStart; whale_id < c.NumWhales; whale_id++ {
 		result = append(result, DaemonInfo{
 			StartPort:  c.WhaleStartPort + whale_id*PORT_PER_NODE,
 			Name:       fmt.Sprintf("whale_%d", whale_id),

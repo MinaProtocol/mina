@@ -4,6 +4,14 @@ A Go application for testing hardfork functionality in the Mina Protocol. This t
 
 ## Overview
 
+### Network Topology
+
+By default the test runs a compact network of **2 Mina nodes and 2 snark
+workers**: the seed node and the snark coordinator each double as a whale block
+producer (via the `--seed-is-whale` / `--snark-coordinator-is-whale` options of
+`mina-local-network.sh`), so no standalone whale daemons are spawned. This keeps
+two block producers (for healthy slot occupancy) while halving the daemon count.
+
 ### High-Level Test Sequence
 
 The hardfork test simulates a complete protocol upgrade by running two sequential networks:
