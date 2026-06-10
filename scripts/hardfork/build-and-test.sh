@@ -89,7 +89,10 @@ if [ -n "${BUILDKITE:-}" ]; then
   git config --global --add safe.directory /workdir
 fi
 
-TEST_COMMIT="$(git rev-parse HEAD)"
+# Prefer the symbolic branch name so checkouts below leave the working tree on a
+# named branch; a detached HEAD (plain `git checkout <sha>`) can confuse nix
+# flake evaluation. Fall back to the commit SHA when already detached (e.g. CI).
+TEST_REF="$(git symbolic-ref --quiet --short HEAD || git rev-parse HEAD)"
 
 
 if [ -n "${BUILDKITE:-}" ]; then
@@ -125,7 +128,7 @@ nix "${NIX_OPTS[@]}" build "$PWD?submodules=1#devnet" --out-link "prefork-devnet
 # 2. Build the current (test) branch as a postfork build. The Mesa hardfork code
 # (migrate_to_mesa, slot-reduction vesting update, --pad-app-state, ...) lives on
 # this branch, not on develop, so the postfork binary must come from here.
-git checkout "$TEST_COMMIT"
+git checkout "$TEST_REF"
 git submodule update --init --recursive --depth 1
 nix "${NIX_OPTS[@]}" build "$PWD?submodules=1#devnet" --out-link "postfork-devnet"
 
@@ -145,7 +148,7 @@ EOF
 fi
 
 # 4. Build hardfork_test on current branch;
-git checkout "$TEST_COMMIT"
+git checkout "$TEST_REF"
 git submodule update --init --recursive --depth 1
 nix "${NIX_OPTS[@]}" build "$PWD?submodules=1#hardfork_test" --out-link "hardfork_test"
 
