@@ -251,6 +251,67 @@ func (c *Client) ForkConfig(port int) (gjson.Result, error) {
 	return result.Get("data.fork_config"), nil
 }
 
+// AccountTimingData holds the timing parameters and balances of an account as
+// reported by GraphQL. All numeric fields are decoded from the stringified
+// integers GraphQL returns: amounts/balances are in nanomina and times are
+// global-slot numbers.
+type AccountTimingData struct {
+	// Timed reports whether the account has a timing schedule at all. When false,
+	// all the timing fields below are zero and should be ignored.
+	Timed                 bool
+	InitialMinimumBalance int64
+	CliffTime             int64
+	CliffAmount           int64
+	VestingPeriod         int64
+	VestingIncrement      int64
+	TotalBalance          int64
+	LiquidBalance         int64
+}
+
+const accountTimingQuery = `
+account(publicKey: "%s") {
+  timing {
+    initialMinimumBalance
+    cliffTime
+    cliffAmount
+    vestingPeriod
+    vestingIncrement
+  }
+  balance {
+    total
+    liquid
+  }
+}
+`
+
+// AccountTiming queries the timing parameters and balances of the account with
+// the given public key.
+func (c *Client) AccountTiming(port int, pubKey string) (*AccountTimingData, error) {
+	result, err := c.query(port, fmt.Sprintf(accountTimingQuery, pubKey))
+	if err != nil {
+		return nil, err
+	}
+
+	account := result.Get("data.account")
+	if account.Type == gjson.Null || !account.IsObject() {
+		return nil, fmt.Errorf("account %s not found at port %d", pubKey, port)
+	}
+
+	timing := account.Get("timing")
+	data := &AccountTimingData{
+		Timed:                 timing.Get("cliffTime").Exists(),
+		InitialMinimumBalance: timing.Get("initialMinimumBalance").Int(),
+		CliffTime:             timing.Get("cliffTime").Int(),
+		CliffAmount:           timing.Get("cliffAmount").Int(),
+		VestingPeriod:         timing.Get("vestingPeriod").Int(),
+		VestingIncrement:      timing.Get("vestingIncrement").Int(),
+		TotalBalance:          account.Get("balance.total").Int(),
+		LiquidBalance:         account.Get("balance.liquid").Int(),
+	}
+
+	return data, nil
+}
+
 func (c *Client) NumUserCommandsInBestChain(port int) (int, error) {
 	result, err := c.query(port, "bestChain { commandTransactionCount }")
 	if err != nil {

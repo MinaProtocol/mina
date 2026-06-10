@@ -71,6 +71,52 @@ type Config struct {
 	ForkMethods ForkMethodSet
 
 	DaemonInfos []DaemonInfo
+
+	// Vesting-account test (see vesting.go). When enabled, a timed account that
+	// only starts vesting *after* the hardfork slot is injected into the pre-fork
+	// genesis ledger, and its timing is checked after the fork to ensure the Mesa
+	// slot-reduction update was applied correctly.
+	VestingTestEnabled bool
+	// Public key of the injected vesting account (filled in at runtime by
+	// SetupVestingAccount).
+	VestingAccountPubKey string
+	// Path to the temporary JSON file holding the extra genesis account that is
+	// passed to mina-local-network.sh (filled in at runtime).
+	VestingExtraAccountFile string
+}
+
+// Vesting-account test parameters. All amounts are in nanomina.
+//
+// The account is "not yet vesting" at the hardfork slot (its cliff is
+// VestingCliffOffsetSlots slots *after* the hardfork slot) and fully unlocks at
+// its cliff (cliff_amount == initial_minimum_balance). The Mesa slot-reduction
+// update therefore must double the vesting period and push the cliff out to
+// hardfork_slot + 2*VestingCliffOffsetSlots. See
+// src/lib/mina_base/account_timing.ml:actively_vesting_hardfork_adjustment.
+//
+// VestingCliffOffsetSlots is chosen so that the *buggy* (un-migrated) cliff
+// (hardfork_slot + offset) falls before, and the *correct* migrated cliff
+// (hardfork_slot + 2*offset) falls after, the slot at which the fork network
+// becomes queryable (BestChainQueryFrom + genesisSlot, default 25 + 68 = 93).
+// This lets the liquid-balance check observe the account still locked under
+// correct migration while it would already be unlocked under the bug.
+const (
+	VestingBalanceNanomina  = 100 * 1_000_000_000
+	VestingCliffOffsetSlots = 15
+	VestingPreForkPeriod    = 1
+)
+
+// HardforkSlot is the global slot since genesis at which the fork network's
+// genesis is set; this is the slot used by the migration to adjust vesting
+// parameters. It matches expectedGenesisSlot computed in RunForkNetworkPhase.
+func (c *Config) HardforkSlot() int {
+	return c.SlotChainEnd + c.HfSlotDelta
+}
+
+// VestingPreForkCliffTime is the cliff_time configured for the injected account
+// in the pre-fork ledger (before any migration adjustment).
+func (c *Config) VestingPreForkCliffTime() int {
+	return c.HardforkSlot() + VestingCliffOffsetSlots
 }
 
 // DefaultConfig returns the default configuration with values
@@ -106,6 +152,8 @@ func DefaultConfig() *Config {
 		NodeStartPort:        6000,
 
 		ForkMethods: make(ForkMethodSet),
+
+		VestingTestEnabled: true,
 	}
 }
 

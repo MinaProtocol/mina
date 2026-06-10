@@ -120,6 +120,13 @@ func (t *HardforkTest) Run() error {
 
 	t.Logger.Info("===== Starting Hardfork Test =====")
 
+	// Seed a timed/vesting account into the pre-fork genesis ledger so we can
+	// verify the Mesa slot-reduction vesting update after the fork (see vesting.go).
+	if err := t.SetupVestingAccount(); err != nil {
+		return err
+	}
+	defer t.CleanupVestingAccount()
+
 	// Calculate main network genesis timestamp
 	mainGenesisTs := time.Now().Unix() + int64(t.Config.MainDelayMin*60)
 
