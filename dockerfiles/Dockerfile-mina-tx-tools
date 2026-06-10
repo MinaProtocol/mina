@@ -58,22 +58,12 @@ RUN apt-get -y update \
         man \
     && rm -rf /var/lib/apt/lists/*
 
-# Install mina daemon (needed for `mina client send-payment`) and mina-tx-tools
-# (contains mina-batch-txn and mina-zkapp-test-transaction).
-# Installed DIRECTLY from the local build context: scripts/docker/build.sh stages
-# the freshly-built .deb files under _debs, which we COPY to /opt/mina-local-debs,
-# and install-mina-debs.sh installs the resolved .deb files with apt-get (no apt
-# repo / no apt index). Since there is no repo to resolve the mina dependency
-# closure, the daemon metapackage's dependencies (mina-logproc and
-# mina-${network}-config) are requested explicitly as local files too.
+# Install mina-tx-tools (contains mina-batch-txn and mina-zkapp-test-transaction).
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 COPY scripts/install-mina-debs.sh /usr/local/bin/install-mina-debs.sh
 COPY _debs /opt/mina-local-debs
 RUN chmod +x /usr/local/bin/install-mina-debs.sh \
   && /usr/local/bin/install-mina-debs.sh \
-       "mina-$network=$deb_version" \
-       "mina-logproc=$deb_version" \
-       "mina-${network}-config=$deb_version" \
        "mina-tx-tools=$deb_version"
 
 USER root

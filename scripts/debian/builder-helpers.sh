@@ -1033,27 +1033,6 @@ build_archive_deb () {
 }
 ## END ARCHIVE PACKAGE ##
 
-## ZKAPP TEST TXN METAPACKAGE ##
-
-#
-# Builds mina-zkapp-test-transaction transitional metapackage for backward
-# compatibility. The actual binary now ships in mina-tx-tools.
-#
-# Output: mina-zkapp-test-transaction_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb (no payload)
-# Dependencies: mina-tx-tools (= ${MINA_DEB_VERSION})
-#
-build_zkapp_test_transaction_deb () {
-  echo "------------------------------------------------------------"
-  echo "--- Building mina-zkapp-test-transaction transitional metapackage:"
-
-  create_control_file mina-zkapp-test-transaction \
-    "mina-tx-tools (= ${MINA_DEB_VERSION})" \
-    'Transitional metapackage. Installs mina-tx-tools which contains mina-zkapp-test-transaction.'
-
-  build_deb mina-zkapp-test-transaction
-}
-## END ZKAPP TEST TXN METAPACKAGE ##
-
 #
 # Builds mina-delegation-verify package for delegation verification
 #
