@@ -26,6 +26,7 @@ in  Pipeline.build
             , Artifacts.Type.Archive
             , Artifacts.Type.RosettaAppsOnly
             , Artifacts.Type.RosettaConfig
+            , Artifacts.Type.TxTools
             , Artifacts.Type.CreatePreforkGenesis
             , Artifacts.Type.DaemonStorageToolbox
             ]

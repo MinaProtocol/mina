@@ -23,6 +23,7 @@ in  Pipeline.build
             , Artifacts.Type.LogProc
             , Artifacts.Type.Archive
             , Artifacts.Type.RosettaConfig
+            , Artifacts.Type.TxTools
             , Artifacts.Type.RosettaAppsOnly
             , Artifacts.Type.DaemonAutoHardfork
             , Artifacts.Type.DaemonAutomode
