@@ -186,6 +186,12 @@ let generateDockerForCodename =
                   }
                 ]
 
+          let dependsOnRosettaAppsOnly =
+                [ { name = pipelineName
+                  , key = "rosetta_apps_only-${lowerNameCodename}-docker-image"
+                  }
+                ]
+
           let buildOrGetArtifacts =
                 merge
                   { Some =
@@ -224,7 +230,6 @@ let generateDockerForCodename =
                           , Artifacts.Type.Archive
                           , Artifacts.Type.RosettaAppsOnly
                           , Artifacts.Type.RosettaConfig
-                          , Artifacts.Type.Rosetta
                           , Artifacts.Type.ZkappTestTransaction
                           , Artifacts.Type.DaemonStorageToolbox
                           ]
@@ -271,7 +276,9 @@ let generateDockerForCodename =
                                 DockerImage.DebianInstallMode.DownloadOnly
                             , deb_legacy_version = spec.deb_legacy_version
                             , image_name = Some
-                                (Artifacts.dockerName Artifacts.Type.Rosetta)
+                                ( Artifacts.dockerName
+                                    Artifacts.Type.RosettaConfig
+                                )
                             , size = spec.size
                             , verify = True
                             , version =
@@ -333,20 +340,6 @@ let generateDockerForCodename =
                       }
                     , DockerImage.ReleaseSpec::{
                       , deps = dependsOnBuildHfDebian
-                      , service = Artifacts.Type.Rosetta
-                      , network = spec.network
-                      , deb_codename = codename.DebVersion
-                      , deb_profile = profile
-                      , deb_legacy_version = spec.deb_legacy_version
-                      , size = spec.size
-                      , verify = True
-                      , deb_version = spec.version
-                      , step_key_suffix =
-                          "-${DebianVersions.lowerName
-                                codename.DebVersion}-docker-image"
-                      }
-                    , DockerImage.ReleaseSpec::{
-                      , deps = dependsOnBuildHfDebian
                       , service = Artifacts.Type.RosettaAppsOnly
                       , network = spec.network
                       , deb_codename = codename.DebVersion
@@ -355,6 +348,24 @@ let generateDockerForCodename =
                       , size = spec.size
                       , deb_version = spec.version
                       , generic = True
+                      , step_key_suffix =
+                          "-${DebianVersions.lowerName
+                                codename.DebVersion}-docker-image"
+                      }
+                    , DockerImage.ReleaseSpec::{
+                      , deps = dependsOnBuildHfDebian # dependsOnRosettaAppsOnly
+                      , service = Artifacts.Type.RosettaConfig
+                      , network = spec.network
+                      , deb_codename = codename.DebVersion
+                      , deb_profile = profile
+                      , deb_install_mode =
+                          DockerImage.DebianInstallMode.DownloadOnly
+                      , deb_legacy_version = spec.deb_legacy_version
+                      , image_name = Some
+                          (Artifacts.dockerName Artifacts.Type.RosettaConfig)
+                      , size = spec.size
+                      , verify = True
+                      , deb_version = spec.version
                       , step_key_suffix =
                           "-${DebianVersions.lowerName
                                 codename.DebVersion}-docker-image"

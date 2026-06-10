@@ -20,7 +20,7 @@ in  Pipeline.build
             , Artifacts.Type.CreatePreforkGenesis
             , Artifacts.Type.LogProc
             , Artifacts.Type.Archive
-            , Artifacts.Type.Rosetta
+            , Artifacts.Type.RosettaConfig
             , Artifacts.Type.TestExecutive
             , Artifacts.Type.RosettaAppsOnly
             , Artifacts.Type.ZkappTestTransaction
