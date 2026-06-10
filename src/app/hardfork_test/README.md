@@ -27,6 +27,29 @@ This validates the critical hardfork mechanism:
 - **Protocol Compatibility**: The fork configuration and ledger format are compatible between versions
 - **Network Functionality**: Both pre-fork and post-fork networks operate correctly (block production, transaction processing)
 - **Hardfork Tooling**: The `runtime_genesis_ledger` tool correctly generates hardfork genesis ledgers from the extracted state
+- **Vesting Slot-Reduction Update**: A timed (vesting) account is seeded into the pre-fork genesis ledger, and after the fork its timing is checked to confirm the Mesa slot-reduction update was applied (vesting period doubled, cliff advanced) — see "Vesting account test" below
+
+### Vesting account test
+
+Before the fork, the harness injects a timed account into the pre-fork genesis
+ledger (via the `--extra-genesis-account-file` option of
+`mina-local-network.sh`). The account is "not yet vesting" at the hardfork slot
+and fully unlocks at its cliff, which is placed `2 * offset` slots after the
+hardfork under correct migration (`offset` slots without it).
+
+After the fork the harness:
+1. Asserts the migrated `timingInfo` (queried via GraphQL) equals the expected
+   slot-reduction-updated values — i.e. `vesting_period` doubled and
+   `cliff_time` advanced to `hardfork_slot + 2*(cliff_time - hardfork_slot)`.
+2. Watches the account's `liquid` balance and fails if it unlocks before the
+   correct (migrated) cliff slot.
+
+This specifically targets the `Account.Hardfork.migrate_to_mesa` migration path
+(`src/lib/mina_base/account.ml`). That path is exercised by the live daemon
+during migration, so to test the bug end-to-end run with the `auto` (or
+`advanced`) fork method; with `legacy` the account is migrated via
+`runtime_genesis_ledger` instead, and the same assertions validate that path.
+The test is always on and requires no extra flags.
 
 ## Usage
 

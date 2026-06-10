@@ -59,6 +59,7 @@ SLOT_TX_END=
 SLOT_CHAIN_END=
 HARDFORK_GENESIS_SLOT_DELTA=
 EXTRA_FILES_ROOT=
+EXTRA_GENESIS_ACCOUNT_FILE=
 
 # ================================================
 # Globals (assigned during execution of script)
@@ -165,7 +166,9 @@ help() {
                                          |   Default: ${ON_EXIT}
 --node-status-url <url>                  | Url of the node status collection service 
                                          |   Default: not set
---extra-files-root <path>                | Directory of file tree need to be overlayed on a prepared network folder, useful when initializing from fresh but need some files set. 
+--extra-files-root <path>                | Directory of file tree need to be overlayed on a prepared network folder, useful when initializing from fresh but need some files set.
+                                         |   Default: None
+--extra-genesis-account-file <path>      | Path to a JSON file holding an array of extra genesis-ledger accounts to merge into the freshly generated ledger (only used with '--config reset'). Useful for seeding e.g. timed/vesting accounts.
                                          |   Default: None
 -h   |--help                             | Displays this help message
 
@@ -660,6 +663,10 @@ while [[ "$#" -gt 0 ]]; do
     EXTRA_FILES_ROOT="${2}"
     shift
     ;;
+  --extra-genesis-account-file)
+    EXTRA_GENESIS_ACCOUNT_FILE="${2}"
+    shift
+    ;;
   *)
     echo "Unknown parameter passed: ${1}"
 
@@ -884,6 +891,19 @@ load_config() {
         --online-fish-accounts-directory "${ROOT}"/online_fish_keys \
         --snark-coordinator-accounts-directory "${ROOT}"/snark_coordinator_keys \
         --out-genesis-ledger-file "${ROOT}"/genesis_ledger.json
+
+      if [[ -n "${EXTRA_GENESIS_ACCOUNT_FILE}" ]]; then
+        if [[ ! -f "${EXTRA_GENESIS_ACCOUNT_FILE}" ]]; then
+          echo "Error: extra genesis account file '${EXTRA_GENESIS_ACCOUNT_FILE}' does not exist." >&2
+          exit 1
+        fi
+        echo "Merging extra genesis accounts from ${EXTRA_GENESIS_ACCOUNT_FILE} into the ledger..."
+        merged_ledger=$(mktemp)
+        jq --slurpfile extra "${EXTRA_GENESIS_ACCOUNT_FILE}" \
+          '.accounts += $extra[0]' \
+          "${ROOT}"/genesis_ledger.json > "${merged_ledger}"
+        mv -f "${merged_ledger}" "${ROOT}"/genesis_ledger.json
+      fi
 
       reset-genesis-ledger "${ROOT}" "${config_file}"
       echo "Using freshly generated config file ${config_file}:"

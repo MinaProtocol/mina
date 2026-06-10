@@ -148,6 +148,18 @@ func (t *HardforkTest) RunForkNetworkPhase(latestPreForkHeight int, mainGenesisT
 		return err
 	}
 
+	// Validate the injected vesting account had its timing correctly adjusted by
+	// the Mesa slot-reduction update. The timing-parameter assertion is run first
+	// (deterministic), then the liquid-balance watch is started before the slots
+	// past the cliff have elapsed, so it can observe the account still locked.
+	vestingPort := t.Config.AnyDaemon().Port(config.PORT_REST)
+	if err := t.ValidateVestingAfterFork(vestingPort, int(expectedGenesisSlot)); err != nil {
+		return err
+	}
+	if err := t.ValidateVestingLiquidUnlock(vestingPort, int(expectedGenesisSlot)); err != nil {
+		return err
+	}
+
 	// Validate user commands in blocks
 	if err := t.ValidateBlockWithUserCommandCreatedForkNetwork(t.Config.AnyDaemon().Port(config.PORT_REST)); err != nil {
 		return err
