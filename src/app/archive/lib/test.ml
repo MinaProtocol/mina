@@ -418,6 +418,34 @@ let%test_module "Archive node unit tests" =
       | Error e ->
           failwith @@ Caqti_error.show e
 
+    (* Regression for the zkapp_events btree overflow. zkapp_events.element_ids
+       used to carry a UNIQUE btree index (and a matching plain index). A
+       max-cost zkApp emitting ~1030 events serializes to a ~4128-byte int[],
+       which overflows Postgres' 2704-byte btree key limit and rolls back the
+       block. The constraint/index were dropped (dedup is handled in code via
+       SELECT-before-INSERT), so a large event list must now insert, and
+       repeated inserts of the same list must still resolve to one row. *)
+    let%test_unit "Zkapp_events: large event list inserts and dedups" =
+      let conn = Lazy.force conn_lazy in
+      Thread_safe.block_on_async_exn
+      @@ fun () ->
+      let events =
+        List.init 1030 ~f:(fun i ->
+            [| Pickles.Backend.Tick.Field.of_string (Int.to_string i) |] )
+      in
+      match%map
+        let open Deferred.Result.Let_syntax in
+        let%bind id1 =
+          Processor.Zkapp_events.add_if_doesn't_exist conn events
+        in
+        let%map id2 = Processor.Zkapp_events.add_if_doesn't_exist conn events in
+        [%test_eq: int] id1 id2
+      with
+      | Ok () ->
+          ()
+      | Error e ->
+          failwith @@ Caqti_error.show e
+
     (*
     let%test_unit "Block: read and write with pruning" =
       let conn = Lazy.force conn_lazy in
