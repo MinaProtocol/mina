@@ -15,7 +15,8 @@ let Dockers = ../../Constants/DockerVersions.dhall
 let Artifacts = ../../Constants/Artifacts.dhall
 
 let dependsOn =
-        Dockers.dependsOn Dockers.DepsSpec::{ artifact = Artifacts.Type.Daemon }
+        Dockers.dependsOn
+          Dockers.DepsSpec::{ artifact = Artifacts.Type.DaemonAppsOnly }
       # Dockers.dependsOn
           Dockers.DepsSpec::{ artifact = Artifacts.Type.Archive }
 

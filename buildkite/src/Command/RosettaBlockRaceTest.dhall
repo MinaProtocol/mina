@@ -11,7 +11,7 @@ let ContainerImages = ../Constants/ContainerImages.dhall
 let key = "rosetta-block-race-test"
 
 let debs =
-      "mina-devnet-instrumented,mina-archive-devnet-instrumented,mina-rosetta-devnet"
+      "mina-mainnet-generic-instrumented,mina-archive-mainnet-instrumented,mina-rosetta-mainnet-generic"
 
 in  { step =
             \(dependsOn : List Command.TaggedKey.Type)
