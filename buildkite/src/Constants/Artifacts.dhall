@@ -12,8 +12,7 @@ let Repo = ./DockerRepo.dhall
 
 let Artifact
     : Type
-    = < Daemon
-      | DaemonLegacyHardfork
+    = < DaemonLegacyHardfork
       | DaemonAppsOnly
       | DaemonPrefork
       | DaemonAutoHardfork
@@ -35,8 +34,7 @@ let Artifact
       >
 
 let All =
-      [ Artifact.Daemon
-      , Artifact.DaemonLegacyHardfork
+      [ Artifact.DaemonLegacyHardfork
       , Artifact.DaemonPrefork
       , Artifact.DaemonAutoHardfork
       , Artifact.DaemonAutomode
@@ -58,8 +56,7 @@ let All =
       ]
 
 let Main =
-      [ Artifact.Daemon
-      , Artifact.DaemonConfig
+      [ Artifact.DaemonConfig
       , Artifact.LogProc
       , Artifact.Archive
       , Artifact.Rosetta
@@ -68,8 +65,7 @@ let Main =
 let capitalName =
           \(artifact : Artifact)
       ->  merge
-            { Daemon = "Daemon"
-            , DaemonPrefork = "DaemonPrefork"
+            { DaemonPrefork = "DaemonPrefork"
             , DaemonLegacyHardfork = "DaemonLegacyHardfork"
             , DaemonAutoHardfork = "DaemonAutoHardfork"
             , DaemonAutomode = "DaemonAutomode"
@@ -94,8 +90,7 @@ let capitalName =
 let lowerName =
           \(artifact : Artifact)
       ->  merge
-            { Daemon = "daemon"
-            , DaemonPrefork = "daemon_prefork"
+            { DaemonPrefork = "daemon_prefork"
             , DaemonLegacyHardfork = "daemon_hardfork"
             , DaemonAutoHardfork = "daemon_auto_hardfork"
             , DaemonAutomode = "daemon_automode"
@@ -120,8 +115,7 @@ let lowerName =
 let dockerServiceName =
           \(artifact : Artifact)
       ->  merge
-            { Daemon = "mina-daemon"
-            , DaemonPrefork = ""
+            { DaemonPrefork = ""
             , DaemonLegacyHardfork = "mina-daemon-legacy-hardfork"
             , DaemonAutoHardfork = "mina-daemon-auto-hardfork"
             , DaemonAutomode = ""
@@ -147,7 +141,6 @@ let dockerName =
           \(artifact : Artifact)
       ->  merge
             { DaemonConfig = "mina-daemon"
-            , Daemon = dockerServiceName artifact
             , DaemonPrefork = dockerServiceName artifact
             , DaemonLegacyHardfork = dockerServiceName artifact
             , DaemonAutoHardfork = dockerServiceName artifact
@@ -181,8 +174,7 @@ let toDebianName =
           \(artifact : Artifact)
       ->  \(network : Network.Type)
       ->  merge
-            { Daemon = "daemon_${Network.lowerName network}"
-            , DaemonPrefork = "daemon_${Network.lowerName network}_prefork"
+            { DaemonPrefork = "daemon_${Network.lowerName network}_prefork"
             , DaemonLegacyHardfork =
                 "daemon_${Network.lowerName network}_hardfork_config"
             , DaemonAutoHardfork =
@@ -216,8 +208,7 @@ let toDebianNames =
                   (List Text)
                   (     \(a : Artifact)
                     ->  merge
-                          { Daemon = [ toDebianName a network ]
-                          , DaemonPrefork = [ toDebianName a network ]
+                          { DaemonPrefork = [ toDebianName a network ]
                           , DaemonLegacyHardfork = [ toDebianName a network ]
                           , DaemonAutoHardfork = [ toDebianName a network ]
                           , DaemonAutomode = [ toDebianName a network ]
@@ -261,7 +252,7 @@ let Tag =
           , remove_profile_from_name : Bool
           }
       , default =
-          { artifact = Artifact.Daemon
+          { artifact = Artifact.DaemonConfig
           , version = "\\\${MINA_DOCKER_TAG}"
           , profile = Profiles.Type.Devnet
           , buildFlags = BuildFlags.Type.None
@@ -291,9 +282,7 @@ let dockerTag =
           let extra_build_flags_part = BuildFlags.toLabelSegment spec.buildFlags
 
           in  merge
-                { Daemon =
-                    "${spec.version}${network_part}${extraordinary_profile_part}${extra_build_flags_part}"
-                , DaemonPrefork = ""
+                { DaemonPrefork = ""
                 , DaemonAutomode = ""
                 , DaemonLegacyHardfork =
                     "${spec.version}${network_part}${extraordinary_profile_part}"
@@ -318,7 +307,8 @@ let dockerTag =
                 , Toolchain = "${spec.version}"
                 , DelegationVerifier = "${spec.version}"
                 , CreatePreforkGenesis = "${spec.version}"
-                , DaemonConfig = "${spec.version}"
+                , DaemonConfig =
+                    "${spec.version}${network_part}${extraordinary_profile_part}${extra_build_flags_part}"
                 , DaemonStorageToolbox = "${spec.version}"
                 }
                 spec.artifact
@@ -333,7 +323,7 @@ let test_daemon_testnet_devnet =
         assert
       :     "1.0.0-devnet"
         ===  dockerTag
-               { artifact = Artifact.Daemon
+               { artifact = Artifact.DaemonConfig
                , version = "1.0.0"
                , profile = Profiles.Type.Devnet
                , network = Network.Type.Devnet
@@ -345,7 +335,7 @@ let test_daemon_mainnet_mainnet =
         assert
       :     "1.0.0-mainnet"
         ===  dockerTag
-               { artifact = Artifact.Daemon
+               { artifact = Artifact.DaemonConfig
                , version = "1.0.0"
                , profile = Profiles.Type.Mainnet
                , network = Network.Type.Mainnet
@@ -357,7 +347,7 @@ let test_daemon_instrumented =
         assert
       :     "1.0.0-devnet-instrumented"
         ===  dockerTag
-               { artifact = Artifact.Daemon
+               { artifact = Artifact.DaemonConfig
                , version = "1.0.0"
                , profile = Profiles.Type.Devnet
                , network = Network.Type.Devnet
@@ -465,7 +455,7 @@ let test_lightnet_instrumented =
         assert
       :     "1.0.0-lightnet-instrumented"
         ===  dockerTag
-               { artifact = Artifact.Daemon
+               { artifact = Artifact.DaemonConfig
                , version = "1.0.0"
                , profile = Profiles.Type.Lightnet
                , network = Network.Type.Devnet

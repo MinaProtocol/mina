@@ -180,6 +180,12 @@ let generateDockerForCodename =
           let dependsOnBuildHfDebian =
                 [ { name = pipelineName, key = buildHfDebian } ]
 
+          let dependsOnDaemonOnly =
+                [ { name = pipelineName
+                  , key = "daemon_apps_only-${lowerNameCodename}-docker-image"
+                  }
+                ]
+
           let buildOrGetArtifacts =
                 merge
                   { Some =
@@ -214,7 +220,6 @@ let generateDockerForCodename =
                         , artifacts =
                           [ Artifacts.Type.LogProc
                           , Artifacts.Type.DaemonAppsOnly
-                          , Artifacts.Type.Daemon
                           , Artifacts.Type.DaemonConfig
                           , Artifacts.Type.Archive
                           , Artifacts.Type.RosettaAppsOnly
@@ -296,14 +301,14 @@ let generateDockerForCodename =
                                 codename.DebVersion}-docker-image"
                       }
                     , DockerImage.ReleaseSpec::{
-                      , deps = dependsOnBuildHfDebian
-                      , service = Artifacts.Type.Daemon
+                      , deps = dependsOnBuildHfDebian # dependsOnDaemonOnly
+                      , service = Artifacts.Type.DaemonConfig
                       , network = spec.network
                       , deb_codename = codename.DebVersion
                       , deb_profile = profile
+                      , deb_install_mode =
+                          DockerImage.DebianInstallMode.DownloadOnly
                       , deb_legacy_version = spec.deb_legacy_version
-                      , deb_storage_repair_version = Some
-                          spec.deb_storage_repair_version
                       , size = spec.size
                       , verify = True
                       , deb_version = spec.version
@@ -404,12 +409,7 @@ let generateHfRelatedStepsForCodename =
           let dependsOnArtifacts =
                 [ { name = pipelineName, key = artifactsGenKey } ]
 
-          let service =
-                merge
-                  { Some = \(v : Text) -> Artifacts.Type.DaemonConfig
-                  , None = Artifacts.Type.Daemon
-                  }
-                  spec.use_generic_dockers_from_version
+          let service = Artifacts.Type.DaemonConfig
 
           let dockerDaemonSpec =
                 DockerImage.ReleaseSpec::{
