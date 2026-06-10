@@ -29,11 +29,15 @@
 #   - MINA_HARDFORK_STATE_DIR present -> mesa runtime (post-hardfork)
 #
 # ARGUMENT PROCESSING (mesa runtime only):
-#   - "-config-file <path>" is KEPT and MESA_CONFIG is appended as the last -config-file
+#   - "-config-file <path>" is replaced with a sanitized temporary copy when jq is available
+#   - MINA_CONFIG_FILE is replaced with a sanitized temporary copy when jq is available
 #   - "--genesis-ledger-dir <path>" is rewritten to use MESA_LEDGERS_DIR
 #   - "--hardfork-handling <value>" is REMOVED (not supported in mesa)
 #   - If --genesis-ledger-dir is not provided, it is appended with MESA_LEDGERS_DIR
 #   - Auto-hardfork daemon config (-config-file MESA_CONFIG) is always appended last
+#   - daemon.{slot_tx_end,slot_chain_end,hard_fork_genesis_slot_delta} are removed
+#     from sanitized config files because the post-fork daemon must not inherit
+#     pre-fork hardfork stop slots
 #
 # REQUIRED ENVIRONMENT (via SOURCE_FILE):
 #   MINA_NETWORK          - Network identifier (e.g., mainnet, devnet)
@@ -240,6 +244,99 @@ function print_argument_warning() {
   echo "  If you want to call others utility daemon apps using specific version need to be called by full path /usr/lib/mina/berkeley/... or /usr/lib/mina/mesa/..." >&2
 }
 
+function jq_available() {
+  command -v jq >/dev/null 2>&1
+}
+
+function config_has_postfork_forbidden_fields() {
+  local config_file="$1"
+
+  jq -e '
+    (.daemon // {}) as $daemon
+    | any(["slot_tx_end", "slot_chain_end", "hard_fork_genesis_slot_delta"][]; $daemon[.] != null)
+  ' "$config_file" >/dev/null 2>&1
+}
+
+function describe_postfork_forbidden_fields() {
+  local config_file="$1"
+
+  jq -r '
+    (.daemon // {}) as $daemon
+    | ["slot_tx_end", "slot_chain_end", "hard_fork_genesis_slot_delta"]
+    | map(select($daemon[.] != null))
+    | join(", ")
+  ' "$config_file"
+}
+
+function warn_postfork_forbidden_fields() {
+  local config_file="$1"
+  local source_name="$2"
+  local mode="$3"
+
+  if [[ ! -f "$config_file" ]]; then
+    return 0
+  fi
+
+  if jq_available; then
+    if config_has_postfork_forbidden_fields "$config_file"; then
+      local fields
+      fields=$(describe_postfork_forbidden_fields "$config_file")
+      echo "mina-dispatch WARNING: $source_name contains pre-fork daemon hardfork fields: $fields" >&2
+      if [[ "$mode" == "cannot-sanitize" ]]; then
+        echo "  These fields cannot be unset by appending another runtime config because Mina treats missing/null optional fields as fallthrough." >&2
+        echo "  Remove these fields from $config_file before running the post-fork daemon." >&2
+      else
+        echo "  A sanitized temporary copy will be used for the post-fork daemon." >&2
+      fi
+    fi
+  else
+    if grep -Eq '"(slot_tx_end|slot_chain_end|hard_fork_genesis_slot_delta)"[[:space:]]*:' "$config_file"; then
+      echo "mina-dispatch WARNING: $source_name appears to contain pre-fork daemon hardfork fields" >&2
+      echo "  Install jq to let mina-dispatch sanitize explicit config files automatically." >&2
+      echo "  Remove daemon.slot_tx_end, daemon.slot_chain_end, and daemon.hard_fork_genesis_slot_delta from $config_file before running the post-fork daemon." >&2
+    fi
+  fi
+}
+
+function sanitize_postfork_config_file() {
+  local config_file="$1"
+  local source_name="$2"
+
+  if [[ ! -f "$config_file" ]]; then
+    echo "$config_file"
+    return 0
+  fi
+
+  if ! jq_available; then
+    warn_postfork_forbidden_fields "$config_file" "$source_name" "cannot-sanitize"
+    echo "$config_file"
+    return 0
+  fi
+
+  if ! config_has_postfork_forbidden_fields "$config_file"; then
+    echo "$config_file"
+    return 0
+  fi
+
+  warn_postfork_forbidden_fields "$config_file" "$source_name" "will-sanitize"
+
+  local sanitized_file
+  sanitized_file=$(mktemp "${TMPDIR:-/tmp}/mina-dispatch-postfork-config.XXXXXX.json")
+  if jq '
+    if (.daemon | type) == "object" then
+      .daemon |= del(.slot_tx_end, .slot_chain_end, .hard_fork_genesis_slot_delta)
+    else
+      .
+    end
+  ' "$config_file" > "$sanitized_file"; then
+    echo "$sanitized_file"
+  else
+    echo "mina-dispatch WARNING: failed to sanitize $source_name; using original config: $config_file" >&2
+    rm -f "$sanitized_file"
+    echo "$config_file"
+  fi
+}
+
 
 
 first_arg=""
@@ -290,6 +387,16 @@ if [[ "$first_arg" != "daemon" ]]; then
 fi
 
 if [[ "$runtime" == "mesa" ]]; then
+  if [[ -n "${MINA_CONFIG_FILE:-}" ]]; then
+    MINA_CONFIG_FILE=$(sanitize_postfork_config_file "$MINA_CONFIG_FILE" "MINA_CONFIG_FILE")
+    export MINA_CONFIG_FILE
+  fi
+
+  warn_postfork_forbidden_fields \
+    "$MINA_HARDFORK_STATE_DIR/daemon.json" \
+    "implicit config-directory daemon.json" \
+    "cannot-sanitize"
+
   # Build a new argument array to ensure continuous indices
   # This is safer than unsetting elements which creates sparse arrays
   new_args=()
@@ -322,9 +429,10 @@ if [[ "$runtime" == "mesa" ]]; then
         # Keep user-provided config file, auto-hardfork config will be appended last
         if [[ "$has_next_arg" == true ]]; then
           config_file_arg_used=true
+          config_file=$(sanitize_postfork_config_file "${args[$next_i]}" "user-provided config file")
           echo "mina-dispatch INFO: User-provided config file detected: ${args[$next_i]}" >&2
           echo "  Auto-hardfork daemon config ($MESA_CONFIG) will be appended as the last -config-file argument." >&2
-          new_args+=("$arg" "${args[$next_i]}")
+          new_args+=("$arg" "$config_file")
           skip_next=true
         else
           # No value provided, pass through as-is (will error at runtime)
@@ -391,7 +499,8 @@ if [[ "$runtime" == "mesa" ]]; then
     if [[ "$config_file_arg_used" == true ]]; then
       echo "mina-dispatch INFO: Appending auto-hardfork config as last -config-file argument" >&2
     fi
-    new_args+=("-config-file" "$MESA_CONFIG")
+    mesa_config=$(sanitize_postfork_config_file "$MESA_CONFIG" "auto-hardfork daemon config")
+    new_args+=("-config-file" "$mesa_config")
   fi
   # Replace args with the processed continuous array
   args=("${new_args[@]}")
