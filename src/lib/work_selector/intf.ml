@@ -72,15 +72,34 @@ module type Inputs_intf = sig
   module Staged_ledger : sig
     type t
 
-    val all_work_pairs :
-         t
-      -> get_state:
+    (** A unit of pending work. Selection needs only its statement; the
+        witness-bearing proving spec is built separately. *)
+    module Available_job : sig
+      type t
+    end
+
+    (** Enumerate the pending work as raw jobs; selection reads only their
+        statements. *)
+    val all_work_jobs : t -> Available_job.t One_or_two.t list
+
+    (** The statement of a job (all selection/dedup needs); [None] only if a
+        merge job's sub-statements fail to merge. *)
+    val statement_of_job :
+      Available_job.t -> Transaction_snark.Statement.t option
+
+    (** The transaction of a base job (for log summaries); [None] for merge. *)
+    val job_transaction : Available_job.t -> Transaction.t option
+
+    (** Build the full proving spec (statement and witness) for one job — the
+        witness is needed only to prove, so this is called when a job is
+        dispatched to a worker. *)
+    val single_spec_of_job :
+         get_state:
            (Mina_base.State_hash.t -> Mina_state.Protocol_state.value Or_error.t)
+      -> Available_job.t
       -> ( Transaction_witness.t
          , Ledger_proof.Cached.t )
          Snark_work_lib.Work.Single.Spec.t
-         One_or_two.t
-         list
          Or_error.t
   end
 
@@ -119,29 +138,30 @@ module type Lib_intf = sig
     include
       State_intf with type transition_frontier := Inputs.Transition_frontier.t
 
-    (** [mark_scheduled t work] Mark [work] as scheduled in [t] *)
-    val mark_scheduled :
+    (** A selectable unit of work: its statement (all the selector needs) plus
+        the job(s) to build a proving spec from if it is dispatched. Opaque to
+        the selection methods, which pick one and hand it to
+        [schedule_and_build_spec]. *)
+    type candidate
+
+    (** [all_unscheduled_expensive_works ~snark_pool ~fee t] returns the
+        candidates that are not scheduled yet and whose statement is not already
+        proved more cheaply in the pool (see [does_not_have_better_fee]). *)
+    val all_unscheduled_expensive_works :
+      snark_pool:Snark_pool.t -> fee:Fee.t -> t -> candidate list
+
+    (** Mark the chosen [candidate] scheduled and build its proving spec — the
+        one point a job's witness is needed. [None] if the spec cannot be
+        built. *)
+    val schedule_and_build_spec :
          logger:Logger.t
       -> t
+      -> candidate
       -> ( Transaction_witness.t
          , Ledger_proof.Cached.t )
          Snark_work_lib.Work.Single.Spec.t
          One_or_two.t
-      -> unit
-
-    (** [all_unscheduled_expensive_works ~snark_pool ~fee t] filters out all
-        works in the list that satisfy the predicate
-        [does_not_have_better_fee ~snark_pool ~fee], and are not scheduled yet
-        *)
-    val all_unscheduled_expensive_works :
-         snark_pool:Snark_pool.t
-      -> fee:Fee.t
-      -> t
-      -> ( Transaction_witness.t
-         , Ledger_proof.Cached.t )
-         Snark_work_lib.Work.Single.Spec.t
-         One_or_two.t
-         list
+         option
   end
 
   (**jobs that are not in the snark pool yet*)
