@@ -118,6 +118,70 @@ let simple_payment_signer_different_from_fee_payer () =
         (Transaction_logic.apply_transactions ~signature_kind
            ~constraint_constants ~global_slot ~txn_state_view ledger [ txn ] ) )
 
+(* Regression test for the issue "Signed-Command Fee-Payer with Proof-Gated
+   Permission Causes Block Rejection Instead of Failed-Status Transaction".
+
+   In [apply_user_command_unchecked] (mina_transaction_logic.ml:563-580) the
+   [has_permission_to_send]/[has_permission_to_increment_nonce] checks run
+   before the fee is written to the ledger and, on failure, return
+   [Or_error.Error] rather than a [Transaction_applied.t] with
+   [status = Failed]. The staged ledger wraps any such [Error] as
+   [Staged_ledger_error.Unexpected] (staged_ledger.ml:105-109), rejecting the
+   entire block.
+
+   A plain Signed_command is authorised by a signature, not a proof, so a
+   fee-payer whose [send] permission is [Proof] does not satisfy the check.
+   Applying such a command must therefore FAIL gracefully -- succeed at the
+   [Or_error] level with [status = Failed] and the fee charged -- not return
+   [Or_error.Error]. This test fails before the fix (the application returns
+   [Error]) and passes afterwards. *)
+let payment_fee_payer_send_proof_is_failed_not_error () =
+  Quickcheck.test ~trials:100 setup
+    ~f:(fun (global_slot, sender, receiver, amount, fee) ->
+      let accounts = [ sender; receiver ] in
+      let txn = signed_command ~fee ~sender ~receiver amount in
+      let txn_state_view = protocol_state in
+      let ledger =
+        match Ledger_helpers.ledger_of_accounts accounts with
+        | Ok l ->
+            l
+        | Error _ ->
+            assert false
+      in
+      (* Force the fee-payer's [send] permission to [Proof] directly in the
+         ledger (Test_account has no permissions field). *)
+      let sender_loc =
+        Ledger.location_of_account ledger (Test_account.account_id sender)
+        |> Option.value_exn
+      in
+      let sender_account = Ledger.get ledger sender_loc |> Option.value_exn in
+      Ledger.set ledger sender_loc
+        { sender_account with
+          permissions =
+            { sender_account.permissions with
+              send = Permissions.Auth_required.Proof
+            }
+        } ;
+      match
+        Transaction_logic.apply_transactions ~signature_kind
+          ~constraint_constants ~global_slot ~txn_state_view ledger [ txn ]
+      with
+      | Error e ->
+          failwithf
+            "apply_transactions returned Or_error.Error %S; expected Ok with a \
+             Failed-status transaction. A signed command from a fee-payer with \
+             send=Proof must not cause whole-block rejection."
+            (Error.to_string_hum e) ()
+      | Ok applied ->
+          List.iter applied ~f:(fun a ->
+              match Transaction_logic.status_of_applied a with
+              | Failed _ ->
+                  ()
+              | Applied ->
+                  failwith
+                    "Expected Failed status for a signed command from a \
+                     send=Proof fee-payer, got Applied." ) )
+
 let coinbase_order_of_created_accounts_is_correct ~with_fee_transfer () =
   let amount = Amount.of_mina_int_exn 720 in
   let make_nondeterministic_pk () =
