@@ -228,6 +228,21 @@ module Make (MLMB : Nat.Intf) = struct
     [@@deriving compare, sexp, yojson, hash, equal]
   end
 
+  (* This representation exists for bindings that need to serialize proofs
+     without losing chunked public evaluations.
+
+     The stable [Repr] above intentionally mirrors the proof shape used by the
+     node's existing sexp/json serializers. Those serializers predate chunked
+     proofs and only round-trip the single public-evaluation pair that was
+     sufficient for unchunked proofs. For proofs whose public input is split
+     across multiple chunks, that representation is lossy: deserializing it
+     cannot reconstruct the full set of chunked public evaluations.
+
+     We cannot change the node-facing stable serialization format here without
+     making a hard-fork-level data format change. [Chunked_repr] therefore keeps
+     the non-stable [Base.Wrap.t] shape, which preserves chunked proof data, and
+     is exposed for o1js bindings that need a lossless serialization path for
+     chunked proofs. *)
   module Chunked_repr = struct
     type t =
       ( ( Tock.Inner_curve.Affine.t
