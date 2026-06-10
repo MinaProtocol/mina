@@ -239,7 +239,22 @@ SELECT pg_temp.add_zkapp_states_element(29);
 SELECT pg_temp.add_zkapp_states_element(30);
 SELECT pg_temp.add_zkapp_states_element(31);
 
--- 4. Update schema_history
+
+-- 4. `zkapp_events`: Drop the element_ids unique constraint/index. A btree key
+--    over an unbounded int[] overflows the 2704-byte limit once a zkApp emits a
+--    large event list (~1030 events). The final zkapp_events insert dedups in
+--    code via SELECT-before-INSERT, so the constraint is not needed here.
+--
+--    NOTE: zkapp_field_array.element_ids has the same latent flaw, but its
+--    UNIQUE constraint MUST stay: the batched event-insert path
+--    (Mina_caqti.insert_multi_into_col) dedups zkapp_field_array rows via
+--    `ON CONFLICT (element_ids) DO NOTHING`, which requires that constraint.
+--    Fixing the field_array overflow needs a code change, not a schema drop.
+
+ALTER TABLE zkapp_events DROP CONSTRAINT IF EXISTS zkapp_events_element_ids_key;
+DROP INDEX IF EXISTS idx_zkapp_events_element_ids;
+
+-- 5. Update schema_history
 
 DO $$
 BEGIN
