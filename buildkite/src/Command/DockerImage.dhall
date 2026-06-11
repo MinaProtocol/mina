@@ -171,7 +171,6 @@ let generateStep =
                   , Archive = ""
                   , TestExecutive = ""
                   , BatchTxn = ""
-                  , Rosetta = ""
                   , RosettaAppsOnly = ""
                   , RosettaConfig = archCustomSuffix
                   , ZkappTestTransaction = ""

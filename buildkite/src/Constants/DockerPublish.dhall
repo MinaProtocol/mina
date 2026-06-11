@@ -14,7 +14,6 @@ let isEssential =
             , Archive = True
             , TestExecutive = False
             , BatchTxn = False
-            , Rosetta = True
             , RosettaAppsOnly = True
             , RosettaConfig = True
             , ZkappTestTransaction = False

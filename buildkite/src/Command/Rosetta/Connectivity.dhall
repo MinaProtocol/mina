@@ -101,7 +101,7 @@ let command
                   Dockers.DepsSpec::{
                   , codename = spec.dockerType
                   , network = spec.network
-                  , artifact = Artifacts.Type.Rosetta
+                  , artifact = Artifacts.Type.RosettaConfig
                   , profile = spec.profile
                   }
             }
