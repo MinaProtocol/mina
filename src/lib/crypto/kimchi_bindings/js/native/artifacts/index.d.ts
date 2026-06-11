@@ -62,10 +62,10 @@ export type NapiFpOpeningProof = WasmFpOpeningProof
 
 export declare class WasmFpOracles {
   o: WasmFpRandomOracles
-  p_eval0: NapiPastaFp
-  p_eval1: NapiPastaFp
+  p_eval0: NapiFlatVector<NapiPastaFp>
+  p_eval1: NapiFlatVector<NapiPastaFp>
   digest_before_evaluations: NapiPastaFp
-  constructor(o: NapiRandomOracles, pEval0: NapiPastaFp, pEval1: NapiPastaFp, openingPrechallenges: NapiFlatVector<NapiPastaFp>, digestBeforeEvaluations: NapiPastaFp)
+  constructor(o: NapiRandomOracles, pEval0: NapiFlatVector<NapiPastaFp>, pEval1: NapiFlatVector<NapiPastaFp>, openingPrechallenges: NapiFlatVector<NapiPastaFp>, digestBeforeEvaluations: NapiPastaFp)
   get opening_prechallenges(): NapiFlatVector<NapiPastaFp>
   set set_opening_prechallenges(x: NapiFlatVector<NapiPastaFp>)
 }
@@ -171,10 +171,10 @@ export type NapiFqOpeningProof = WasmFqOpeningProof
 
 export declare class WasmFqOracles {
   o: WasmFqRandomOracles
-  p_eval0: NapiPastaFq
-  p_eval1: NapiPastaFq
+  p_eval0: NapiFlatVector<NapiPastaFq>
+  p_eval1: NapiFlatVector<NapiPastaFq>
   digest_before_evaluations: NapiPastaFq
-  constructor(o: NapiRandomOracles, pEval0: NapiPastaFq, pEval1: NapiPastaFq, openingPrechallenges: NapiFlatVector<NapiPastaFq>, digestBeforeEvaluations: NapiPastaFq)
+  constructor(o: NapiRandomOracles, pEval0: NapiFlatVector<NapiPastaFq>, pEval1: NapiFlatVector<NapiPastaFq>, openingPrechallenges: NapiFlatVector<NapiPastaFq>, digestBeforeEvaluations: NapiPastaFq)
   get opening_prechallenges(): NapiFlatVector<NapiPastaFq>
   set set_opening_prechallenges(x: NapiFlatVector<NapiPastaFq>)
 }
