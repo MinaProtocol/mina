@@ -178,11 +178,13 @@ module Port = struct
 end
 
 module Host = struct
-  let localhost = Core.Unix.Host.getbyname_exn "localhost"
+  (* Lazy so that merely loading this module performs no DNS lookup; resolved
+     the first time [is_localhost] actually runs. *)
+  let localhost = lazy (Core.Unix.Host.getbyname_exn "localhost")
 
   let is_localhost host =
     Option.value_map ~default:false (Unix.Host.getbyname host) ~f:(fun host ->
-        Core.Unix.Host.have_address_in_common host localhost )
+        Core.Unix.Host.have_address_in_common host (Lazy.force localhost) )
 end
 
 let example_host = "154.97.53.97"
@@ -282,20 +284,29 @@ module Uri = struct
   end
 
   module Archive = struct
+    (* Lazy: constructing this flag renders its doc string, which runs the
+       [display] over the example/default URI whose host is "postgres" — an
+       unresolvable name that blocks ~20s on a DNS timeout. Deferring it until a
+       command that actually uses the archive DB forces the flag keeps that cost
+       out of every other Mina executable's startup. Consumers must
+       [Lazy.force] it. *)
     let postgres =
-      let doc_builder =
-        Doc_builder.create ~display:to_string
-          ~examples:
-            [ Uri.of_string "postgres://admin:codarules@postgres:5432/archiver"
-            ]
-          "URI" "URI for postgresql database"
-      in
-      create ~name:"--postgres-uri" ~aliases:[ "postgres-uri" ]
-        ~arg_type:(Command.Arg_type.map Command.Param.string ~f:Uri.of_string)
-        doc_builder
-        (Resolve_with_default
-           (Uri.of_string "postgres://admin:codarules@postgres:5432/archiver")
-        )
+      lazy
+        (let doc_builder =
+           Doc_builder.create ~display:to_string
+             ~examples:
+               [ Uri.of_string
+                   "postgres://admin:codarules@postgres:5432/archiver"
+               ]
+             "URI" "URI for postgresql database"
+         in
+         create ~name:"--postgres-uri" ~aliases:[ "postgres-uri" ]
+           ~arg_type:
+             (Command.Arg_type.map Command.Param.string ~f:Uri.of_string)
+           doc_builder
+           (Resolve_with_default
+              (Uri.of_string
+                 "postgres://admin:codarules@postgres:5432/archiver" ) ) )
   end
 end
 
