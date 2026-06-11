@@ -106,17 +106,21 @@ ENV USE_GKE_GCLOUD_AUTH_PLUGIN=True
 # /opt/mina-local-debs, and install-mina-debs.sh resolves each requested package
 # to its concrete .deb file and installs them with a single apt-get call (no apt
 # repo / no apt index). Since there is no repo to resolve the mina dependency
-# closure, every mina dependency is requested explicitly here: mina-logproc and
-# mina-${network}-config are dependencies of the daemon (and of the storage /
-# create-genesis / recovery toolboxes) and must be present as local files too.
+# closure, every mina dependency is requested explicitly here: mina-logproc is a
+# dependency of the daemon (and of the storage / create-genesis / recovery
+# toolboxes) and must be present as a local file too. The network config package
+# (mina-${network}-config) is intentionally NOT installed here -- see the note on
+# the install RUN below.
 COPY scripts/install-mina-debs.sh /usr/local/bin/install-mina-debs.sh
 COPY _debs /opt/mina-local-debs
-# The lightnet daemon ships as the self-contained mina-${network}-generic-lightnet
-# package: it has no separate network-config dependency, and no mina-${network}-config
-# deb is built for the lightnet profile. Only the non-lightnet daemon pulls in config,
-# so request it conditionally on the (suffix-derived) lightnet signal. (Keep the comment
-# out of the RUN body: line-continued RUN lines are joined before the shell sees them,
-# so an inline '#' would comment out the rest of the command.)
+# This Dockerfile builds the CONFIGLESS daemon image (the generic/apps-only
+# variant, MINA_DEB=mina-${network}-generic). It deliberately does NOT install
+# mina-${network}-config: baking a network config (config_<githash>.json with
+# hash-only epoch_data, ledger tarballs, etc.) into the generic base would
+# override any runtime config injected later (e.g. by test_executive), so the
+# generic image must stay free of /var/lib/coda/* configs. The configured image
+# is produced separately by Dockerfile-install-config, which is FROM this generic
+# image and layers mina-${network}-config on top.
 RUN echo "Building image with version $deb_version from repo $deb_release $deb_codename for network $network" \
   && chmod +x /usr/local/bin/install-mina-debs.sh \
   && mina_debs=( \
@@ -126,9 +130,6 @@ RUN echo "Building image with version $deb_version from repo $deb_release $deb_c
        "${MINA_CREATE_GENESIS_DEB}=${deb_legacy_version}" \
        "${MINA_STORAGE_REPAIR_DEB}=${deb_storage_repair_version}" \
      ) \
-  && if [[ "${deb_suffix}" != *lightnet* ]]; then \
-       mina_debs+=("mina-${network}-config=$deb_version"); \
-     fi \
   && /usr/local/bin/install-mina-debs.sh "${mina_debs[@]}"
 
 

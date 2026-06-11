@@ -19,7 +19,7 @@ in  Pipeline.build
             , Artifacts.Type.Archive
             , Artifacts.Type.BatchTxn
             , Artifacts.Type.TestExecutive
-            , Artifacts.Type.Rosetta
+            , Artifacts.Type.RosettaAppsOnly
             ]
           , tags = [ PipelineTag.Type.Docker ]
           , network = Network.Type.Devnet

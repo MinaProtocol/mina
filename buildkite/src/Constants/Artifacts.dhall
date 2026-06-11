@@ -22,7 +22,6 @@ let Artifact
       | Archive
       | TestExecutive
       | BatchTxn
-      | Rosetta
       | RosettaAppsOnly
       | RosettaConfig
       | ZkappTestTransaction
@@ -44,7 +43,6 @@ let All =
       , Artifact.Archive
       , Artifact.BatchTxn
       , Artifact.TestExecutive
-      , Artifact.Rosetta
       , Artifact.ZkappTestTransaction
       , Artifact.RosettaAppsOnly
       , Artifact.RosettaConfig
@@ -59,7 +57,7 @@ let Main =
       [ Artifact.DaemonConfig
       , Artifact.LogProc
       , Artifact.Archive
-      , Artifact.Rosetta
+      , Artifact.RosettaConfig
       ]
 
 let capitalName =
@@ -75,7 +73,6 @@ let capitalName =
             , Archive = "Archive"
             , TestExecutive = "TestExecutive"
             , BatchTxn = "BatchTxn"
-            , Rosetta = "Rosetta"
             , RosettaAppsOnly = "RosettaAppsOnly"
             , RosettaConfig = "RosettaConfig"
             , ZkappTestTransaction = "ZkappTestTransaction"
@@ -100,7 +97,6 @@ let lowerName =
             , Archive = "archive"
             , TestExecutive = "test_executive"
             , BatchTxn = "batch_txn"
-            , Rosetta = "rosetta"
             , RosettaAppsOnly = "rosetta_apps_only"
             , RosettaConfig = "rosetta_config"
             , ZkappTestTransaction = "zkapp_test_transaction"
@@ -124,7 +120,6 @@ let dockerServiceName =
             , TestExecutive = "mina-test-executive"
             , LogProc = "mina-logproc"
             , BatchTxn = "mina-batch-txn"
-            , Rosetta = "mina-rosetta"
             , RosettaAppsOnly = "mina-rosetta"
             , RosettaConfig = "mina-rosetta-configured"
             , ZkappTestTransaction = "mina-zkapp-test-transaction"
@@ -150,7 +145,6 @@ let dockerName =
             , TestExecutive = dockerServiceName artifact
             , LogProc = dockerServiceName artifact
             , BatchTxn = dockerServiceName artifact
-            , Rosetta = dockerServiceName artifact
             , RosettaAppsOnly = dockerServiceName artifact
             , RosettaConfig = "mina-rosetta"
             , ZkappTestTransaction = dockerServiceName artifact
@@ -185,8 +179,7 @@ let toDebianName =
             , Archive = "archive_${Network.lowerName network}"
             , TestExecutive = "test_executive"
             , BatchTxn = "batch_txn"
-            , Rosetta = "rosetta_${Network.lowerName network}"
-            , RosettaAppsOnly = ""
+            , RosettaAppsOnly = "rosetta_${Network.lowerName network}"
             , RosettaConfig = ""
             , ZkappTestTransaction = "zkapp_test_transaction"
             , FunctionalTestSuite = "functional_test_suite"
@@ -218,7 +211,6 @@ let toDebianNames =
                           , LogProc = [ "logproc" ]
                           , TestExecutive = [ "test_executive" ]
                           , BatchTxn = [ "batch_txn" ]
-                          , Rosetta = [ toDebianName a network ]
                           , RosettaAppsOnly = [ toDebianName a network ]
                           , RosettaConfig = [ toDebianName a network ]
                           , ZkappTestTransaction = [ "zkapp_test_transaction" ]
@@ -295,8 +287,6 @@ let dockerTag =
                 , LogProc = "${spec.version}"
                 , TestExecutive = "${spec.version}"
                 , BatchTxn = "${spec.version}"
-                , Rosetta =
-                    "${spec.version}${network_part}${extraordinary_profile_part}${extra_build_flags_part}"
                 , RosettaConfig =
                     "${spec.version}${network_part}${extraordinary_profile_part}${extra_build_flags_part}"
                 , RosettaAppsOnly =
@@ -383,7 +373,7 @@ let test_rosetta_testnet =
         assert
       :     "1.0.0-devnet"
         ===  dockerTag
-               { artifact = Artifact.Rosetta
+               { artifact = Artifact.RosettaConfig
                , version = "1.0.0"
                , profile = Profiles.Type.Devnet
                , network = Network.Type.Devnet
@@ -395,7 +385,7 @@ let test_rosetta_mainnet =
         assert
       :     "1.0.0-mainnet"
         ===  dockerTag
-               { artifact = Artifact.Rosetta
+               { artifact = Artifact.RosettaConfig
                , version = "1.0.0"
                , profile = Profiles.Type.Mainnet
                , network = Network.Type.Mainnet

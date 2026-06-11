@@ -333,23 +333,6 @@ let docker_step
                     , size = size
                     }
                   ]
-                , Rosetta =
-                  [ DockerImage.ReleaseSpec::{
-                    , deps = deps
-                    , service = Artifacts.Type.Rosetta
-                    , network = spec.network
-                    , deb_codename = spec.debVersion
-                    , deb_profile = spec.profile
-                    , build_flags = spec.buildFlags
-                    , docker_publish = spec.docker_publish
-                    , deb_repo = DebianRepo.Type.Local
-                    , deb_legacy_version = spec.deb_legacy_version
-                    , verify = True
-                    , arch = spec.arch
-                    , if_ = spec.if_
-                    , size = size
-                    }
-                  ]
                 , RosettaAppsOnly =
                   [ DockerImage.ReleaseSpec::{
                     , deps = deps
@@ -382,7 +365,7 @@ let docker_step
                     , service = Artifacts.Type.RosettaConfig
                     , network = spec.network
                     , image_name = Some
-                        (Artifacts.dockerName Artifacts.Type.Rosetta)
+                        (Artifacts.dockerName Artifacts.Type.RosettaConfig)
                     , deb_codename = spec.debVersion
                     , docker_publish = spec.docker_publish
                     , deb_install_mode =
