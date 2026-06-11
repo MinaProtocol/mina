@@ -364,9 +364,23 @@ let create_expected_statement ~constraint_constants
       Mina_transaction_logic.Transaction_applied.supply_increase
         ~constraint_constants applied_transaction
     in
-    let%map stake_change =
+    let%bind stake_change_first_pass =
       Sparse_ledger.stake_change_of_applied ~pre:first_pass_ledger_witness
         ~post:first_pass_ledger_after_apply applied_transaction
+    in
+    let%bind stake_change_second_pass =
+      Sparse_ledger.stake_change_of_applied ~pre:second_pass_ledger_witness
+        ~post:second_pass_ledger_after_apply applied_transaction
+    in
+    let%map stake_change =
+      Option.value_map
+        (Currency.Amount.Signed.add stake_change_first_pass
+           stake_change_second_pass )
+        ~default:
+          (Or_error.error_string
+             "create_expected_statement: stake_change overflow combining \
+              first- and second-pass deltas" )
+        ~f:Or_error.return
     in
     ( target_first_pass_merkle_root
     , target_second_pass_merkle_root

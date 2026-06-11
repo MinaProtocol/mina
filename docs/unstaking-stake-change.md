@@ -313,3 +313,78 @@ non-zkApp table.
     `a` enters the sum") with the implementation (which actually
     computes per-step deltas).
 
+## Implementation: per-pass snapshot pairs
+
+Each transaction's effect on the ledger (balance changes, delegate
+changes, nonce changes, new accounts created) is delivered in two
+passes: `Ledger.apply_transaction_first_pass` followed by
+`Ledger.apply_transaction_second_pass`. For a zkApp this is the split
+defined in [zkApp transactions](#zkapp-transactions) — the fee_payer
+debit happens in the first pass and the call-forest updates happen
+in the second. For non-zkApp tags every update the transaction makes
+happens in the first pass; the second pass is a no-op. The list of
+transactions a block proposes to include is a `Staged_ledger_diff`,
+and the staged ledger walks it twice — first calling
+`apply_transaction_first_pass` on every transaction, then calling
+`apply_transaction_second_pass` on every transaction — so every
+transaction's first pass runs before any transaction's second pass.
+
+For each transaction `tx` in the block, the staged ledger samples
+four snapshots of the live ledger:
+
+- `pre_first_pass` / `post_first_pass` — right before / right after
+  `tx`'s first-pass apply, inside the first-pass loop.
+- `pre_second_pass` / `post_second_pass` — right before / right after
+  `tx`'s second-pass apply, inside the second-pass loop.
+
+Let `stake_S(a) = balance(a) · is_staked(a)` read from snapshot `S`.
+The stored `Transaction_snark.Statement.stake_change` is
+
+```
+stake_change(tx) =
+    Σ_{a ∈ A(tx)} (stake_{post_first_pass}(a)  − stake_{pre_first_pass}(a))
+  + Σ_{a ∈ A(tx)} (stake_{post_second_pass}(a) − stake_{pre_second_pass}(a))
+```
+
+### Why this equals the spec's `stake_change(tx)`
+
+The first-pass and second-pass loops are each sequential. Between
+`pre_first_pass` and `post_first_pass` the only operation is `tx`'s
+first-pass apply, so the first delta is `tx`'s first-pass effect on
+its accounts. Between `pre_second_pass` and `post_second_pass` the
+only operation is `tx`'s second-pass apply, so the second delta is
+`tx`'s second-pass effect. The two sum to `tx`'s total effect on
+`A(tx)`, which is `stake'(a) − stake(a)` in the spec's notation.
+
+Other transactions in the same block can mutate accounts in `A(tx)` between
+`post_first_pass` and `pre_second_pass` — e.g. when a sequence of
+zkApps from the same sender all touch that sender's `fee_payer` slot,
+every later transaction's first-pass debits the shared `fee_payer`.
+Those mutations are present in both `pre_second_pass` and
+`post_second_pass` (`tx`'s second-pass only writes `tx`'s own
+account updates), so they contribute the same amount to each snapshot
+and cancel when one is subtracted from the other.
+
+### Relation to the in-circuit accumulator
+
+The SNARK's `global_state.stake_change` is folded from
+`local_state.stake_change` at the end of every segment. For a zkApp
+transaction, the fee_payer segment lands first; the call-forest
+segments land after. The post-fee-payer-segment value of
+`global_state.stake_change` is `tx`'s first-pass effect; the
+post-final-segment value is `tx`'s total effect. So the SNARK
+computes the same telescoping sum: fee-payer contribution +
+call-forest contribution. The unchecked first-pass and second-pass
+deltas are the unchecked analogue of those two segment groups, and
+the SNARK's final
+`assert_equal statement.stake_change global_state.stake_change`
+holds.
+
+### Non-zkApp tags
+
+`Ledger.apply_transaction_second_pass` is a no-op for non-zkApp tags,
+so `pre_second_pass = post_second_pass` and the second delta is `0`.
+The first delta reduces to a single-pass `pre → post` over the row's
+slot updates, which is exactly the [coverage-table](#coverage-table)
+formula.
+
