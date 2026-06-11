@@ -152,7 +152,8 @@ let command =
     ~summary:
       "Prints out the ledger for a given slot for debugging purposes. \n\
       \  It requires an archive db url and a slot number"
-    (let%map_open.Command postgres = Lazy.force Cli_lib.Flag.Uri.Archive.postgres
+    (let%map_open.Command postgres =
+       Lazy.force Cli_lib.Flag.Uri.Archive.postgres
      and slot =
        flag "--slot" ~aliases:[ "slot" ]
          ~doc:"the global slot since genesis that you would like to dump"
