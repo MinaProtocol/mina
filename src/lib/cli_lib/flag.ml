@@ -305,8 +305,8 @@ module Uri = struct
              (Command.Arg_type.map Command.Param.string ~f:Uri.of_string)
            doc_builder
            (Resolve_with_default
-              (Uri.of_string
-                 "postgres://admin:codarules@postgres:5432/archiver" ) ) )
+              (Uri.of_string "postgres://admin:codarules@postgres:5432/archiver")
+           ) )
   end
 end
 
