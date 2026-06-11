@@ -968,6 +968,29 @@ module Ledger = struct
     ; name = Some name
     ; add_genesis_winner = Some add_genesis_winner
     }
+
+  (** Like [gen] but caps each account balance to keep the ledger total in
+      range. The daemon's [genesis_ledger_total_currency] sums balances via
+      [Currency.Amount.add] and raises if the total overflows uint64
+      nanomina; [Accounts.Single.gen] produces balances spanning the full
+      uint64 range, so any non-trivial ledger overflows. *)
+  let gen_valid =
+    let open Quickcheck.Generator.Let_syntax in
+    let max_per_account = Currency.Balance.of_mina_int_exn 1_000_000 in
+    let cap b =
+      if Currency.Balance.compare b max_per_account > 0 then max_per_account
+      else b
+    in
+    let%map t = gen in
+    match t.base with
+    | Accounts accs ->
+        let accs =
+          List.map accs ~f:(fun a -> { a with balance = cap a.balance })
+        in
+        let balances = List.mapi accs ~f:(fun i a -> (i, a.balance)) in
+        { t with base = Accounts accs; balances }
+    | Named _ | Hash ->
+        t
 end
 
 module Proof_keys = struct
@@ -1199,6 +1222,20 @@ module Proof_keys = struct
     ; account_creation_fee = Some account_creation_fee
     ; fork
     }
+
+  (** Like [gen] but only produces [block_window_duration_ms] values that
+      satisfy the daemon's [slots_per_year mod 12 = 0] assertion, where
+      [slots_per_year = (365 * 86_400_000) / block_window_duration_ms]
+      (integer division). Roughly 1 in 12 candidates pass, so rejection
+      sample. *)
+  let gen_valid =
+    let open Quickcheck.Generator.Let_syntax in
+    let%map t = gen
+    and block_window_duration_ms =
+      Quickcheck.Generator.filter (Int.gen_incl 1_000 360_000) ~f:(fun d ->
+          365 * 86_400_000 / d mod 12 = 0 )
+    in
+    { t with block_window_duration_ms = Some block_window_duration_ms }
 end
 
 (** Parameters for protocol constants that specify slot spans, and relate slot
@@ -1261,6 +1298,13 @@ module Genesis = struct
     ; grace_period_slots
     ; genesis_state_timestamp = Some genesis_state_timestamp
     }
+
+  (** Like [gen] but ensures [slots_per_epoch mod 3 = 0]: the daemon's
+      [Slot.in_seed_update_range] asserts this divisibility. *)
+  let gen_valid =
+    let open Quickcheck.Generator.Let_syntax in
+    let%map t = gen and slots_per_epoch_div_3 = Int.gen_incl 1 333_333 in
+    { t with slots_per_epoch = Some (slots_per_epoch_div_3 * 3) }
 end
 
 module Daemon = struct
@@ -1365,6 +1409,15 @@ module Epoch_data = struct
       let%bind ledger = Ledger.gen in
       let%map seed = String.gen_nonempty in
       { ledger; seed }
+
+    (** Like [gen] but uses [Ledger.gen_valid] and generates a base58-encoded
+        seed: the daemon parses [seed] via [Epoch_seed.of_base58_check_exn],
+        which rejects arbitrary non-empty strings. *)
+    let gen_valid =
+      let open Quickcheck.Generator.Let_syntax in
+      let%bind ledger = Ledger.gen_valid in
+      let%map seed = Mina_base.Epoch_seed.gen in
+      { ledger; seed = Mina_base.Epoch_seed.to_base58_check seed }
   end
 
   type t =
@@ -1444,6 +1497,14 @@ module Epoch_data = struct
     let open Quickcheck.Generator.Let_syntax in
     let%bind staking = Data.gen in
     let%map next = Option.quickcheck_generator Data.gen in
+    { staking; next }
+
+  (** Like [gen] but uses [Data.gen_valid] for the staking and (optional)
+      next epoch data, generating base58-encoded seeds. *)
+  let gen_valid =
+    let open Quickcheck.Generator.Let_syntax in
+    let%bind staking = Data.gen_valid in
+    let%map next = Option.quickcheck_generator Data.gen_valid in
     { staking; next }
 end
 
@@ -1543,6 +1604,23 @@ let gen =
   and proof = Proof_keys.gen
   and ledger = Ledger.gen
   and epoch_data = Epoch_data.gen in
+  { daemon = Some daemon
+  ; genesis = Some genesis
+  ; proof = Some proof
+  ; ledger = Some ledger
+  ; epoch_data = Some epoch_data
+  }
+
+(** A random runtime config the daemon should accept at startup. Composes
+    per-section [gen_valid]s where they exist and falls back to [gen]
+    otherwise. *)
+let gen_valid =
+  let open Quickcheck.Generator.Let_syntax in
+  let%map daemon = Daemon.gen
+  and genesis = Genesis.gen_valid
+  and proof = Proof_keys.gen_valid
+  and ledger = Ledger.gen_valid
+  and epoch_data = Epoch_data.gen_valid in
   { daemon = Some daemon
   ; genesis = Some genesis
   ; proof = Some proof
