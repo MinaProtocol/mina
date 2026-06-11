@@ -41,29 +41,31 @@ module Shorthand = struct
       a x
 
   let nn_catchup_status a x =
-    reflect
-      (fun o ->
-        Option.map o
-          ~f:
-            (List.map ~f:(function
-              | ( Transition_frontier.Full_catchup_tree.Node.State.Enum.Finished
-                , _ ) ->
-                  "finished"
-              | Failed, _ ->
-                  "failed"
-              | To_download, _ ->
-                  "to_download"
-              | To_initial_validate, _ ->
-                  "to_initial_validate"
-              | To_verify, _ ->
-                  "to_verify"
-              | Wait_for_parent, _ ->
-                  "wait_for_parent"
-              | To_build_breadcrumb, _ ->
-                  "to_build_breadcrumb"
-              | Root, _ ->
-                  "root" ) ) )
-      ~typ:(list (non_null string))
+    let module Enum = Transition_frontier.Full_catchup_tree.Node.State.Enum in
+    (* The catchup status carries a count per job state. Expose those counts as
+       a structured object so callers can read how many blocks sit in each stage
+       of the pipeline, rather than just the list of stage names. *)
+    let count_field name enum =
+      field name ~typ:(non_null Schema.int)
+        ~args:Arg.[]
+        ~resolve:(fun _ states ->
+          Option.value ~default:0
+            (List.Assoc.find states enum ~equal:Enum.equal) )
+    in
+    reflect Fn.id
+      ~typ:
+        (obj "CatchupStatus"
+           ~doc:"Number of blocks in the ledger-catchup pipeline, by job state"
+           ~fields:(fun _ ->
+             [ count_field "finished" Enum.Finished
+             ; count_field "failed" Enum.Failed
+             ; count_field "toDownload" Enum.To_download
+             ; count_field "toInitialValidate" Enum.To_initial_validate
+             ; count_field "toVerify" Enum.To_verify
+             ; count_field "waitForParent" Enum.Wait_for_parent
+             ; count_field "toBuildBreadcrumb" Enum.To_build_breadcrumb
+             ; count_field "root" Enum.Root
+             ] ) )
       a x
 
   let string a x = id ~typ:string a x
