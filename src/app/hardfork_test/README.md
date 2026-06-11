@@ -59,6 +59,39 @@ during migration, so to test the bug end-to-end run with the `auto` (or
 `runtime_genesis_ledger` instead, and the same assertions validate that path.
 The test is always on and requires no extra flags.
 
+### Fork methods
+
+One or more fork methods are requested via `--allow-fork-method` (repeatable);
+valid values are `legacy`, `advanced`, and `auto`:
+
+- **legacy** — migrates the ledger via `runtime_genesis_ledger` (applies the
+  slot-reduction update correctly).
+- **advanced** — `mina advanced generate-hardfork-config` against the live
+  daemon; uses the converting ledger / `migrate_to_mesa`.
+- **auto** — daemon self-generates its hardfork config at slot-chain-end under
+  `--hardfork-handling migrate-exit`; also uses `migrate_to_mesa`. Auto daemons
+  **exit** at slot-chain-end.
+
+Each requested method is assigned to **at least one** daemon (remaining daemons
+get a random method from the set), so:
+
+- Requesting more methods than there are daemons fails with an error — request
+  fewer methods or grow the network with `--num-whales` / `--num-fish` /
+  `--num-nodes`.
+- At least one **non-auto** method is required, because auto daemons exit at
+  slot-chain-end and the post-fork checks need a still-running daemon. Use
+  `advanced` for an auto-equivalent migration path that keeps the daemon alive.
+
+**Caveat — do not mix `legacy` with `auto`/`advanced` while the vesting test is
+on.** Because of the `migrate_to_mesa` bug, `legacy` (correct) and
+`auto`/`advanced` (buggy) migrate the injected timed account differently,
+producing different post-fork genesis ledger hashes; the nodes then compute
+different chain IDs and cannot peer, so the network fails to form instead of the
+vesting assertion firing. For a clean single-path signal use **`--allow-fork-method advanced`**
+(all daemons hit the buggy `migrate_to_mesa` path, the network forms, and
+`ValidateVestingAfterFork` fails as designed); use `--allow-fork-method legacy`
+as the green control.
+
 ## Usage
 
 ```
@@ -76,6 +109,16 @@ The test is always on and requires no extra flags.
 - `--fork-runtime-genesis-ledger`: Path to the fork runtime genesis ledger executable
 
 ### Optional Arguments
+
+#### Network Size
+- `--num-whales`: Number of whale (block-producer) accounts (default: 2). Whales
+  beyond those absorbed by the seed/snark-coordinator run as standalone daemons.
+- `--num-fish`: Number of fish (smaller block-producer) daemons (default: 0)
+- `--num-nodes`: Number of plain (non-block-producing) daemons (default: 0)
+
+The number of daemons bounds how many fork methods can be requested: every
+`--allow-fork-method` value is assigned to at least one daemon (see "Fork
+methods" below), so requesting more methods than there are daemons is an error.
 
 #### Test Configuration
 - `--slot-tx-end`: Slot at which transactions should end (default: 30)
