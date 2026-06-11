@@ -22,7 +22,7 @@ let fork_slot =
 
 let is_in_best_chain_command =
   Async.Command.async ~summary:"Verify fork block is in best chain"
-    (let%map_open.Command { value = postgres_uri; _ } = Uri.Archive.postgres
+    (let%map_open.Command { value = postgres_uri; _ } = Lazy.force Uri.Archive.postgres
      and fork_state_hash = fork_state_hash
      and fork_height =
        Command.Param.(flag "--fork-height" (required int))
@@ -36,7 +36,7 @@ let is_in_best_chain_command =
 let confirmations_command =
   Async.Command.async
     ~summary:"Verify number of confirmations for the fork block"
-    (let%map_open.Command { value = postgres_uri; _ } = Uri.Archive.postgres
+    (let%map_open.Command { value = postgres_uri; _ } = Lazy.force Uri.Archive.postgres
      and latest_state_hash =
        Command.Param.(flag "--latest-state-hash" (required string))
          ~doc:"String Hash of the latest state"
@@ -52,7 +52,7 @@ let confirmations_command =
 
 let no_commands_after_command =
   Async.Command.async ~summary:"Verify no commands after the fork block"
-    (let%map_open.Command { value = postgres_uri; _ } = Uri.Archive.postgres
+    (let%map_open.Command { value = postgres_uri; _ } = Lazy.force Uri.Archive.postgres
      and fork_state_hash = fork_state_hash
      and fork_slot = fork_slot in
 
@@ -62,7 +62,7 @@ let no_commands_after_command =
 let verify_upgrade_command =
   Async.Command.async
     ~summary:"Verify upgrade from pre-fork to post-fork schema"
-    (let%map_open.Command { value = postgres_uri; _ } = Uri.Archive.postgres
+    (let%map_open.Command { value = postgres_uri; _ } = Lazy.force Uri.Archive.postgres
      and expected_protocol_version =
        Command.Param.(flag "--protocol-version" (required string))
          ~doc:"String Protocol Version to upgrade to (e.g. 3.2.0 etc)"
@@ -76,7 +76,7 @@ let verify_upgrade_command =
 
 let validate_fork_command =
   Async.Command.async ~summary:"Validate fork block and its ancestors"
-    (let%map_open.Command { value = postgres_uri; _ } = Uri.Archive.postgres
+    (let%map_open.Command { value = postgres_uri; _ } = Lazy.force Uri.Archive.postgres
      and fork_state_hash = fork_state_hash
      and fork_slot = fork_slot in
      run_check_and_exit
@@ -87,7 +87,7 @@ let convert_chain_to_canonical_command =
     ~summary:
       "Mark the chain leading to the target block as canonical for a protocol \
        version"
-    (let%map_open.Command { value = postgres_uri; _ } = Uri.Archive.postgres
+    (let%map_open.Command { value = postgres_uri; _ } = Lazy.force Uri.Archive.postgres
      and latest_block_state_hash =
        Command.Param.(flag "--target-block-hash" (required string))
          ~doc:"String State hash of block that should remain canonical"
@@ -106,7 +106,7 @@ let convert_chain_to_canonical_command =
 
 let fetch_last_filled_block_command =
   Async.Command.async ~summary:"Select last filled block"
-    (let%map_open.Command { value = postgres_uri; _ } = Uri.Archive.postgres in
+    (let%map_open.Command { value = postgres_uri; _ } = Lazy.force Uri.Archive.postgres in
      fetch_last_filled_block ~postgres_uri )
 
 let run_all_verifications_command =
@@ -119,7 +119,7 @@ let run_all_verifications_command =
        protocol_version, required_confirmations (default 290), \
        migration_version (default 0.0.5). Individual CLI flags override config \
        values."
-    (let%map_open.Command { value = postgres_uri; _ } = Uri.Archive.postgres
+    (let%map_open.Command { value = postgres_uri; _ } = Lazy.force Uri.Archive.postgres
      and runtime_config_path =
        Command.Param.(flag "--runtime-config" (required string))
          ~doc:
