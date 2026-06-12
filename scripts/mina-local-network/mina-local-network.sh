@@ -33,6 +33,8 @@ CONFIG_MODE=inherit
 UPDATE_GENESIS_TIMESTAMP=no
 OVERRIDE_SLOT_TIME_MS=""
 PROOF_LEVEL="full"
+WORK_DELAY=1
+TRANSACTION_CAPACITY_LOG2=2
 LOG_PRECOMPUTED_BLOCKS=false
 
 SNARK_WORKER_FEE=0.001
@@ -61,6 +63,7 @@ HARDFORK_GENESIS_SLOT_DELTA=
 EXTRA_FILES_ROOT=
 EXTRA_GENESIS_ACCOUNT_FILE=
 SEED_IS_WHALE=false
+SEED_IS_COORDINATOR=false
 SNARK_COORDINATOR_IS_WHALE=false
 
 # ================================================
@@ -160,6 +163,10 @@ help() {
                                          |   Default: ${LOG_PRECOMPUTED_BLOCKS}
 -pl  |--proof-level <proof-level>        | Proof level
                                          |   Default: ${PROOF_LEVEL}
+-wd  |--work-delay <#>                   | Scan state work delay, in blocks (only used with '--config reset'). WARN: with proof level 'full', changing this changes the circuits and forces (re)generation of proving keys on first start.
+                                         |   Default: ${WORK_DELAY}
+-tc  |--transaction-capacity-log2 <#>    | Log2 of the scan state transaction capacity, i.e. depth of a scan state tree (only used with '--config reset'). WARN: with proof level 'full', changing this changes the circuits and forces (re)generation of proving keys on first start.
+                                         |   Default: ${TRANSACTION_CAPACITY_LOG2}
 -c   |--config <mode>                    | Config to use. Set to 'reset' to generate a new config, new keypairs and new ledgers, 'inherit' to reuse the one found in previously deployed networks
                                          |   Default: ${CONFIG_MODE}
 -u   |--update-genesis-timestamp <mode>  | Whether to update the Genesis Ledger timestamp (presence of argument). Set to 'fixed:TIMESTAMP' to be a fixed time, 'delay_sec:SECONDS' to be set genesis to be SECONDS in the future, or 'no' to do nothing.
@@ -189,6 +196,8 @@ help() {
                                          |   Default: None
 --seed-is-whale                          | When set, the seed node also runs as a whale block producer (presence of argument), consuming the first whale account instead of spawning it as a standalone whale daemon.
                                          |   Default: ${SEED_IS_WHALE}
+--seed-is-coordinator                    | When set, the seed node also runs as the snark coordinator (presence of argument); no standalone coordinator daemon is spawned and snark workers attach to the seed. Requires the seed to be spawned by this script.
+                                         |   Default: ${SEED_IS_COORDINATOR}
 --snark-coordinator-is-whale             | When set, the snark coordinator node also runs as a whale block producer (presence of argument), consuming the next whale account instead of spawning it as a standalone whale daemon.
                                          |   Default: ${SNARK_COORDINATOR_IS_WHALE}
 -h   |--help                             | Displays this help message
@@ -485,6 +494,8 @@ reset-genesis-ledger() {
   # WARN: ensure we're always using the same consensus param here and in hard fork test!
   jq --arg timestamp "$(date +"%Y-%m-%dT%H:%M:%S%z")" \
      --arg proof_level "$PROOF_LEVEL" \
+     --argjson work_delay "$WORK_DELAY" \
+     --argjson transaction_capacity_log2 "$TRANSACTION_CAPACITY_LOG2" \
   '
   {
     genesis: {
@@ -494,10 +505,10 @@ reset-genesis-ledger() {
       genesis_state_timestamp: $timestamp
     },
     proof: {
-      work_delay: 1,
+      work_delay: $work_delay,
       level: $proof_level,
-      transaction_capacity: { 
-        "2_to_the": 2 
+      transaction_capacity: {
+        "2_to_the": $transaction_capacity_log2
       },
     },
     ledger: .
@@ -649,6 +660,14 @@ while [[ "$#" -gt 0 ]]; do
     PROOF_LEVEL="${2}"
     shift
     ;;
+  -wd | --work-delay)
+    WORK_DELAY="${2}"
+    shift
+    ;;
+  -tc | --transaction-capacity-log2)
+    TRANSACTION_CAPACITY_LOG2="${2}"
+    shift
+    ;;
   -c | --config)
     CONFIG_MODE="${2}"
     shift
@@ -702,6 +721,9 @@ while [[ "$#" -gt 0 ]]; do
     ;;
   --seed-is-whale)
     SEED_IS_WHALE=true
+    ;;
+  --seed-is-coordinator)
+    SEED_IS_COORDINATOR=true
     ;;
   --snark-coordinator-is-whale)
     SNARK_COORDINATOR_IS_WHALE=true
@@ -1088,11 +1110,46 @@ if [[ "${SEED_IS_WHALE}" == "true" ]] && ! ${DEMO_MODE}; then
   WHALE_STANDALONE_START=$((WHALE_STANDALONE_START + 1))
 fi
 
+# Optionally let the seed node double as the snark coordinator, so no
+# standalone coordinator daemon is spawned and snark workers attach to the
+# seed's client port instead.
+SEED_COORDINATOR_ARGS=()
+if [[ "${SEED_IS_COORDINATOR}" == "true" ]] && ! ${DEMO_MODE}; then
+  if [[ "${SNARK_COORDINATOR_IS_WHALE}" == "true" ]]; then
+    echo "Error: --seed-is-coordinator and --snark-coordinator-is-whale are mutually exclusive." >&2
+    exit 1
+  fi
+  if [[ "${SEED}" != spawn:* ]]; then
+    echo "Error: --seed-is-coordinator requires the seed to be spawned by this script (--seed spawn:PORT)." >&2
+    exit 1
+  fi
+  if [ "${SNARK_WORKERS_COUNT}" -gt 0 ]; then
+    SEED_COORDINATOR_ARGS=(-snark-worker-fee "${SNARK_WORKER_FEE}" -run-snark-coordinator "${SNARK_COORDINATOR_PUBKEY}" -work-selection seq)
+    echo "Seed node will also act as the snark coordinator (${SNARK_COORDINATOR_PUBKEY})"
+  fi
+  # Make sure no standalone coordinator daemon is spawned, stopped on exit, or
+  # reported in the summary.
+  SNARK_COORDINATOR_PORT=""
+fi
+
 SEED_PEER_ID=
 case "${SEED}" in
   spawn:*)
     SEED_START_PORT="${SEED#spawn:}"
     SEED_PEER_ID="/ip4/127.0.0.1/tcp/$((SEED_START_PORT + 2))/p2p/12D3KooWAFFq2yEQFFzhU5dt64AWqawRuomG9hL8rSmm5vxhAsgr"
+
+    # When the seed ends up being the only daemon in the network there are no
+    # peers to gossip with, so it would never report itself as synced and
+    # neither the transaction loop below nor external clients could use it.
+    # The daemon's --demo-mode flag exists for exactly this setup: assume
+    # synced without expecting peers.
+    SEED_SINGLE_NODE_ARGS=()
+    if ! ${DEMO_MODE} && [ "${FISH}" -eq 0 ] && [ "${NODES}" -eq 0 ] \
+       && [ "${WHALE_STANDALONE_START}" -ge "${WHALES}" ] \
+       && { [ -z "${SNARK_COORDINATOR_PORT}" ] || [ "${SNARK_WORKERS_COUNT}" -eq 0 ]; }; then
+      echo "Seed is the only daemon in the network; passing --demo-mode to it so it reports synced without peers"
+      SEED_SINGLE_NODE_ARGS=(--demo-mode)
+    fi
     if ${DEMO_MODE}; then
       echo "Running in demo mode, an amalgamation node is going to be started."
       printf "\n"
@@ -1105,7 +1162,7 @@ case "${SEED}" in
         --seed \
         ${ARCHIVE_ADDRESS_CLI_ARG}
     else
-      spawn-daemon seed "${NODES_FOLDER}"/seed "${SEED_START_PORT}" -seed -libp2p-keypair ${SEED_PEER_KEY} "${SEED_BLOCK_PRODUCER_ARGS[@]}" "${ARCHIVE_ADDRESS_CLI_ARG}"
+      spawn-daemon seed "${NODES_FOLDER}"/seed "${SEED_START_PORT}" -seed -libp2p-keypair ${SEED_PEER_KEY} "${SEED_BLOCK_PRODUCER_ARGS[@]}" "${SEED_COORDINATOR_ARGS[@]}" "${SEED_SINGLE_NODE_ARGS[@]}" "${ARCHIVE_ADDRESS_CLI_ARG}"
     fi
     SEED_PID=$!
 
@@ -1138,7 +1195,9 @@ fi
 #---------- Starting snark coordinator
 
 
-if [[ -z "${SNARK_COORDINATOR_PORT}" ]]; then
+if [[ "${SEED_IS_COORDINATOR}" == "true" ]]; then
+  echo "Skipping standalone snark coordinator because the seed acts as the coordinator"
+elif [[ -z "${SNARK_COORDINATOR_PORT}" ]]; then
   echo "Skipping snark coordinator because no SNARK_COORDINATOR_PORT is provided"
 elif [ "${SNARK_WORKERS_COUNT}" -eq "0" ]; then
   echo "Skipping snark coordinator because SNARK_WORKERS_COUNT is 0"
@@ -1207,18 +1266,27 @@ done
 #---------- Starting snark workers
 
 
-if [[ -n "${SNARK_COORDINATOR_PORT}" ]]; then
-  echo 'Waiting for snark coordinator to go up before spawning snark workers...'
+WORKER_COORDINATOR_PORT=""
+if [ "${SNARK_WORKERS_COUNT}" -gt 0 ]; then
+  if [[ "${SEED_IS_COORDINATOR}" == "true" ]]; then
+    WORKER_COORDINATOR_PORT="${SEED_START_PORT}"
+  else
+    WORKER_COORDINATOR_PORT="${SNARK_COORDINATOR_PORT}"
+  fi
+fi
+
+if [[ -n "${WORKER_COORDINATOR_PORT}" ]]; then
+  echo "Waiting for snark coordinator (daemon port ${WORKER_COORDINATOR_PORT}) to go up before spawning snark workers..."
   printf "\n"
 
-  until ${MINA_EXE} client status -daemon-port "${SNARK_COORDINATOR_PORT}" &>/dev/null; do
+  until ${MINA_EXE} client status -daemon-port "${WORKER_COORDINATOR_PORT}" &>/dev/null; do
     sleep ${POLL_INTERVAL}
   done
 
   for ((i = 0; i < SNARK_WORKERS_COUNT; i++)); do
     FOLDER=${NODES_FOLDER}/snark_workers/worker_${i}
     mkdir -p "${FOLDER}"
-    spawn-snark-worker "snark_worker_${i}" "${FOLDER}" "${SNARK_COORDINATOR_PORT}"
+    spawn-snark-worker "snark_worker_${i}" "${FOLDER}" "${WORKER_COORDINATOR_PORT}"
     SNARK_WORKERS_PIDS[${i}]=$!
   done
 fi
@@ -1239,14 +1307,22 @@ if [[ -n "${SEED_PID}" ]]; then
 EOF
 fi
 
-if [ "${SNARK_WORKERS_COUNT}" -gt 0 ]; then
+if [[ -n "${SNARK_COORDINATOR_PID}" ]]; then
   cat <<EOF
 	Snark Coordinator:
 		Instance #0:
 		  pid ${SNARK_COORDINATOR_PID}
 		  status: ${MINA_EXE} client status -daemon-port ${SNARK_COORDINATOR_PORT}
 		  data dir: ${NODES_FOLDER}/snark_coordinator
+EOF
+elif [[ "${SEED_IS_COORDINATOR}" == "true" && "${SNARK_WORKERS_COUNT}" -gt 0 ]]; then
+  cat <<EOF
+	Snark Coordinator: runs inside the seed daemon (port ${SEED_START_PORT})
+EOF
+fi
 
+if [ "${SNARK_WORKERS_COUNT}" -gt 0 ]; then
+  cat <<EOF
 	Snark Workers:
 EOF
 
