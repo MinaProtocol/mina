@@ -8,10 +8,15 @@
 # full proofs, transaction capacity 2^2 and work_delay 0 (4 scan-state trees,
 # ledger proof emitted 3 blocks after a transaction is included):
 #
-#   default : 3 snark workers, 135s slots  (txn -> snarked ledger ~405s)
+#   default : 3 snark workers, 131.4s slots (txn -> snarked ledger ~395s)
 #             throughput-bound; zkApp transactions must stay <= 8 segments
 #   --fast  : 7 snark workers,  75s slots  (txn -> snarked ledger ~225s)
 #             latency-bound; zkApp transactions may go up to 10 segments
+#
+# NOTE on slot times: consensus requires floor(365days_ms / slot_ms) to be
+# divisible by 12 (checkpoint window sizing, src/lib/consensus/constants.ml),
+# i.e. pick slot times dividing 2628000000 ms. 75000 and 131400 both qualify;
+# a round 135000 does not and crashes the daemon at startup.
 #
 # Sizing assumes ~10s per proof task (segment / merge / simple base) and a
 # block shape of: coinbase + fee transfer + 2 zkApp commands. The block
@@ -32,7 +37,7 @@ help() {
 Usage: $(basename "$0") [--fast] [--mina-exe <path>] [-- <extra mina-local-network.sh args>]
 
 --fast            | Use the fast preset: 7 snark workers, 75s slots (~225s txn -> snarked ledger).
-                  | Default preset: 3 snark workers, 135s slots (~405s txn -> snarked ledger).
+                  | Default preset: 3 snark workers, 131.4s slots (~395s txn -> snarked ledger).
 --mina-exe <path> | Path to a mina executable to run the network with.
                   | When not provided, mina is built with nix (flake package
                   | '#devnet', as in scripts/hardfork/build-and-test.sh) and the
@@ -90,9 +95,9 @@ if ${FAST}; then
   SLOT_TIME_MS=75000
   TRANSACTION_INTERVAL=15
 else
-  PRESET="default (#5: 3 workers, 135s slots, zkApps up to 8 segments)"
+  PRESET="default (#5: 3 workers, 131.4s slots, zkApps up to 8 segments)"
   SNARK_WORKERS=3
-  SLOT_TIME_MS=135000
+  SLOT_TIME_MS=131400
   TRANSACTION_INTERVAL=25
 fi
 
