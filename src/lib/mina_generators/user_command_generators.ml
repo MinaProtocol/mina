@@ -88,7 +88,7 @@ let zkapp_command_with_ledger ?(ledger_init_state : Ledger.init_state option)
     in
     (* max balance to avoid overflow when adding deltas *)
     let max_balance =
-      let max_bal = Currency.Balance.of_mina_string_exn "2000000000.0" in
+      let max_bal = Currency.Balance.of_mina_string_exn "500000000.0" in
       match
         Currency.Balance.add_amount min_balance
           (Currency.Balance.to_amount max_bal)

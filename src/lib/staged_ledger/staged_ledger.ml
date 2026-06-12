@@ -26,7 +26,7 @@ module Pre_statement = struct
     ; expected_status : Transaction_status.t
     ; accounts_accessed : Account_id.t list
     ; fee_excess : Fee_excess.t
-    ; stake_change : Currency.Amount.Signed.t
+    ; stake_change_first_pass : Currency.Amount.Signed.t
     ; first_pass_ledger_witness : Sparse_ledger.t
     ; first_pass_ledger_source_hash : Ledger_hash.t
     ; first_pass_ledger_target_hash : Ledger_hash.t
@@ -511,27 +511,30 @@ module T = struct
            ~constraint_constants ~global_slot ~txn_state_view ledger txn )
     in
     let target_ledger_hash = Ledger.merkle_root ledger in
-    let%map stake_change =
+    let after_first_pass_witness =
+      O1trace.sync_thread "create_ledger_witness" (fun () ->
+          Sparse_ledger.of_ledger_subset_exn ledger accounts_accessed )
+    in
+    let%map stake_change_first_pass =
       let get_pre id =
         Option.try_with (fun () ->
             Sparse_ledger.get_exn ledger_witness
               (Sparse_ledger.find_index_exn ledger_witness id) )
       in
       let get_post id =
-        Option.bind
-          (Ledger.location_of_account ledger id)
-          ~f:(Ledger.get ledger)
+        Option.try_with (fun () ->
+            Sparse_ledger.get_exn after_first_pass_witness
+              (Sparse_ledger.find_index_exn after_first_pass_witness id) )
       in
       Mina_transaction_logic.Transaction_applied.stake_change_of_transaction
         ~get_account_pre:get_pre ~get_account_post:get_post txn
       |> to_staged_ledger_or_error
     in
-
     ( { Pre_statement.partially_applied_transaction
       ; expected_status
       ; accounts_accessed
       ; fee_excess
-      ; stake_change
+      ; stake_change_first_pass
       ; first_pass_ledger_witness = ledger_witness
       ; first_pass_ledger_source_hash = source_ledger_hash
       ; first_pass_ledger_target_hash = target_ledger_hash
@@ -555,6 +558,10 @@ module T = struct
           (* TODO: for zkapps, we should actually narrow this by segments *)
           Sparse_ledger.of_ledger_subset_exn ledger pre_stmt.accounts_accessed )
     in
+    let before_second_pass_witness =
+      O1trace.sync_thread "create_ledger_witness" (fun () ->
+          Sparse_ledger.of_ledger_subset_exn ledger pre_stmt.accounts_accessed )
+    in
     let%bind applied_txn =
       to_staged_ledger_or_error
         (Ledger.apply_transaction_second_pass ledger
@@ -566,7 +573,35 @@ module T = struct
         (Mina_transaction_logic.Transaction_applied.supply_increase
            ~constraint_constants applied_txn )
     in
-    let stake_change = pre_stmt.stake_change in
+    let%bind stake_change_second_pass =
+      let get_pre id =
+        Option.try_with (fun () ->
+            Sparse_ledger.get_exn before_second_pass_witness
+              (Sparse_ledger.find_index_exn before_second_pass_witness id) )
+      in
+      let get_post id =
+        Option.bind
+          (Ledger.location_of_account ledger id)
+          ~f:(Ledger.get ledger)
+      in
+      Mina_transaction_logic.Transaction_applied.stake_change_of_transaction
+        ~get_account_pre:get_pre ~get_account_post:get_post
+        (Mina_transaction_logic.Transaction_applied.transaction applied_txn)
+      |> to_staged_ledger_or_error
+    in
+    let%bind stake_change =
+      to_staged_ledger_or_error
+        ( match
+            Currency.Amount.Signed.add pre_stmt.stake_change_first_pass
+              stake_change_second_pass
+          with
+        | Some x ->
+            Or_error.return x
+        | None ->
+            Or_error.error_string
+              "stake_change: overflow combining first- and second-pass deltas"
+        )
+    in
     let%map () =
       let actual_status = Ledger.status_of_applied applied_txn in
       if Transaction_status.equal pre_stmt.expected_status actual_status then
@@ -5182,4 +5217,119 @@ let%test_module "staged ledger tests" =
                             failwith
                               "block should be rejected because batch \
                                verification failed" ) ) ) )
+
+    let%test_unit "stake_change in Pre_statement reflects second-pass apply" =
+      let signature_kind = Mina_signature_kind.Testnet in
+      Quickcheck.test ~trials:1 gen_spec_keypair_and_global_slot
+        ~f:(fun ({ init_ledger; specs }, new_kp, _global_slot_int) ->
+          Ledger.with_ledger ~depth:constraint_constants.ledger_depth
+            ~f:(fun ledger ->
+              Async.Thread_safe.block_on_async_exn (fun () ->
+                  let open Async.Deferred.Let_syntax in
+                  let global_slot =
+                    Mina_numbers.Global_slot_since_genesis.zero
+                  in
+                  let spec = List.hd_exn specs in
+                  let fee = Fee.of_nanomina_int_exn 20_000_000 in
+                  let amount = Amount.of_mina_int_exn 10 in
+                  let test_spec :
+                      Transaction_snark.For_tests.Deploy_snapp_spec.t =
+                    { sender = spec.sender
+                    ; fee
+                    ; fee_payer = None
+                    ; amount
+                    ; zkapp_account_keypairs = [ new_kp ]
+                    ; memo = Signed_command_memo.dummy
+                    ; new_zkapp_account = true
+                    ; snapp_update = Account_update.Update.dummy
+                    ; preconditions = None
+                    ; authorization_kind = Signature
+                    }
+                  in
+                  let%bind zkapp_command =
+                    Transaction_snark.For_tests.deploy_snapp ~signature_kind
+                      ~constraint_constants test_spec
+                  in
+                  Mina_transaction_logic.For_tests.Init_ledger.init
+                    (module Ledger.Ledger_inner)
+                    init_ledger ledger ;
+                  let fee_payer_pk =
+                    Signature_lib.Public_key.compress
+                      (fst spec.sender).public_key
+                  in
+                  let fee_payer_acc_id =
+                    Account_id.create fee_payer_pk Token_id.default
+                  in
+                  let fee_payer_loc =
+                    Option.value_exn
+                      (Ledger.location_of_account ledger fee_payer_acc_id)
+                  in
+                  let fee_payer_account =
+                    Option.value_exn (Ledger.get ledger fee_payer_loc)
+                  in
+                  Ledger.set ledger fee_payer_loc
+                    { fee_payer_account with delegate = Some fee_payer_pk } ;
+                  let valid_zkapp =
+                    Zkapp_command.Valid.For_tests.to_valid ~failed:false
+                      ~find_vk:(find_vk ledger) zkapp_command
+                    |> Or_error.ok_exn
+                  in
+                  let txn_with_status : Transaction.t With_status.t =
+                    { With_status.data =
+                        Transaction.Command
+                          (User_command.Zkapp_command
+                             (Zkapp_command.Valid.forget valid_zkapp) )
+                    ; status = Transaction_status.Applied
+                    }
+                  in
+                  let current_state, current_state_view =
+                    dummy_state_and_view ~global_slot ()
+                  in
+                  let state_and_body_hash =
+                    let state_hashes =
+                      Mina_state.Protocol_state.hashes current_state
+                    in
+                    ( state_hashes.state_hash
+                    , state_hashes.state_body_hash |> Option.value_exn )
+                  in
+                  let init_stack = Pending_coinbase.Stack.empty in
+                  let stack_state : Stack_state_with_init_stack.t =
+                    { pc = { source = init_stack; target = init_stack }
+                    ; init_stack
+                    }
+                  in
+                  let pre_stmt, _ =
+                    match
+                      apply_single_transaction_first_pass ~constraint_constants
+                        ~global_slot ~signature_kind ledger stack_state
+                        txn_with_status current_state_view
+                    with
+                    | Ok x ->
+                        x
+                    | Error e ->
+                        Error.raise (Staged_ledger_error.to_error e)
+                  in
+                  let connecting_ledger = Ledger.merkle_root ledger in
+                  let twn, _new_accounts =
+                    match
+                      apply_single_transaction_second_pass ~constraint_constants
+                        ~connecting_ledger ledger state_and_body_hash
+                        ~global_slot pre_stmt
+                    with
+                    | Ok x ->
+                        x
+                    | Error e ->
+                        Error.raise (Staged_ledger_error.to_error e)
+                  in
+                  let actual_stake_change = twn.statement.stake_change in
+                  let total_debit =
+                    Amount.add (Amount.of_fee fee) amount
+                    |> Option.value_exn ~message:"fee + amount overflow"
+                  in
+                  let expected_stake_change =
+                    Amount.Signed.negate (Amount.Signed.of_unsigned total_debit)
+                  in
+                  [%test_eq: Amount.Signed.t] expected_stake_change
+                    actual_stake_change ;
+                  return () ) ) )
   end )

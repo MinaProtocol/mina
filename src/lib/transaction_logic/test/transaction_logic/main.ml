@@ -96,4 +96,29 @@ let () =
           ; test_case "Coinbase with fee_transfer (both rejected)" `Quick
               coinbase_with_ft_both_rejected
           ] )
+    ; Zkapp_stake_change.
+        ( "zkapp_stake_change"
+        , [ test_case "z1 fee_payer staked, no other updates" `Quick
+              z1_fee_payer_only_staked
+          ; test_case "z2 fee_payer unstaked, no other updates" `Quick
+              z2_fee_payer_only_unstaked
+          ; test_case "z3 balance change on staked target" `Quick
+              z3_balance_change_staked_target
+          ; test_case "z4 opt-in (delegate None → Some)" `Quick
+              z4_opt_in_delegate
+          ; test_case "z5 opt-out (delegate Some → empty_pk)" `Quick
+              z5_opt_out_delegate
+          ; test_case "z6 telescoping on same target" `Quick
+              z6_telescoping_same_target
+          ; test_case "z7 sum across distinct targets" `Quick
+              z7_distinct_targets
+          ; test_case "z8 second-pass failure → fee_payer only" `Quick
+              z8_second_pass_fail
+          ; test_case "z9 non-default-token balance change" `Quick
+              z9_non_default_token_balance_change
+          ; test_case "z10 non-default-token delegate Set" `Quick
+              z10_non_default_token_delegate_set
+          ; test_case "z11 permissions-only update on default-token target"
+              `Quick z11_default_token_permissions_only
+          ] )
     ]

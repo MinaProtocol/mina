@@ -1,14 +1,10 @@
-# `stake_change` — non-zkApp transaction spec
+# `stake_change` — transaction spec
 
-This note specifies how `stake_change` is computed for every non-zkApp
-transaction tag (Payment, Stake_delegation, Fee_transfer, Coinbase). The
-value is given by a single definition (sum of per-account stake deltas
-over touched accounts) and specialized per transaction tag in the
-coverage table below.
-
-zkApp transactions are **out of scope** for this doc — they walk a
-call-forest of per-account_update contributions and don't fit a closed form.
-See `zkapp_command_logic.ml`.
+This note specifies how `stake_change` is computed for every transaction
+kind. The value is given by a single definition (sum of per-account
+stake deltas over touched accounts), specialized per non-zkApp tag in
+the [Coverage table](#coverage-table), and applied uniformly per
+account_update for zkApp transactions ([zkApp transactions](#zkapp-transactions)).
 
 ## Notation
 
@@ -31,10 +27,16 @@ they hold.
 
 ## Definition
 
-`total_stake` is the sum over all accounts `a` of `balance(a) · is_staked(a)`,
-where `is_staked(a) = 1` iff `a.delegate` is set (≠ `empty_pk`).
+`total_stake` is the sum over all **default-token** accounts `a` of
+`balance(a) · is_staked(a)`, where `is_staked(a) = 1` iff
+`a.delegate ≠ empty_pk`.
 
-For a transaction `tx` touching some set of accounts `A(tx)`:
+By protocol invariant, non-default-token accounts cannot have a
+non-empty delegate, so restricting the sum to default-token doesn't
+hide any stake.
+
+For a transaction `tx` touching some set of default-token accounts
+`A(tx)`:
 
 ```
 stake_change(tx) = Σ_{a ∈ A(tx)}  balance'(a) · is_staked'(a)
@@ -46,8 +48,8 @@ delegate unchanged), so the sum over the whole ledger reduces to the sum
 over touched accounts.
 
 For non-zkApp tags, `A(tx) = {fee_payer, receiver}` (possibly identical — see
-encoding notes below). The two-slot encoding is set up by
-`Transaction_union.of_transaction` (`transaction_union.ml:32`).
+encoding notes below; both slots are default-token by `Transaction_union`'s
+encoding, `transaction_union.ml:32`).
 
 Equivalently, defining each account's stake contribution as
 
@@ -198,3 +200,191 @@ incremented), the rest is unwound.
     receiver_pk`) and sets `common.fee = 0`, so `Δfp_bal = 0` regardless
     of fp's permissions. The full credit lives in `body.amount` and
     flows through the rcv slot.
+
+## zkApp transactions
+
+A `Zkapp_command.t` (`zkapp_command.ml:8-13`) carries:
+
+- a **fee_payer**, a single account_update of restricted shape: a fixed
+  `−fee` balance change, no field updates, signature auth on the default
+  token (`account_update.ml:1365-1395`),
+- a **call forest of account_updates**, each able to change balance,
+  delegate, app_state, permissions, etc., subject to per-update
+  preconditions and authorization.
+
+Application proceeds in two phases:
+
+1. **First pass**: apply the fee_payer. Always sticks (assuming the tx
+   is included in a block).
+2. **Second pass**: apply the call forest. If every update is permitted,
+   all effects apply. If any update fails a check, the entire second
+   pass is cancelled — only the fee_payer's debit remains
+   (`mina_transaction_logic.ml:1828-1838`).
+
+### Definition (unchanged)
+
+The [Definition](#definition) applies as-is:
+
+```
+stake_change(tx) = Σ_{a ∈ A(tx)}  stake'(a) − stake(a)
+```
+
+`A(tx)` for a zkApp tx is `Zkapp_command.accounts_referenced` (the
+deduplicated set of accounts targeted by the fee_payer or any
+account_update; `zkapp_command.ml:309-311`), restricted to the
+default-token entries.
+
+### Per-account_update contributions
+
+For a single account_update `u` targeting account `a`:
+
+- balance: `balance'(a) ← balance(a) + u.balance_change` (if `u`
+  applies),
+- delegate: `delegate'(a) ← u.update.delegate.set_or_keep delegate(a)`
+  (if `u` applies, and only for default-token accounts).
+
+Whether `u` applies depends on its preconditions, authorization, and
+per-field permissions — the spec doesn't enumerate these, it just refers
+to "successful application".
+
+If the same account is touched by several account_updates, only the
+*final* state of that account enters the stake-delta sum.
+
+By case analysis on `is_staked(a)` pre and post (substituting the
+conditional `stake(a) = if is_staked(a) then balance(a) else 0`), the
+per-account contribution `stake'(a) − stake(a)` resolves to:
+
+| pre `is_staked(a)` | post `is_staked(a)` | per-account Δstake             |
+|--------------------|---------------------|--------------------------------|
+| `0`                | `0`                 | `0`                            |
+| `0`                | `1`                 | `balance'(a)` (opt-in)         |
+| `1`                | `0`                 | `−balance(a)` (opt-out)        |
+| `1`                | `1`                 | `balance'(a) − balance(a)`     |
+
+### Failure → fee_payer-only
+
+When the second pass fails, only the fee_payer's debit applies. Since
+the fee_payer never changes its own delegate (its `update = Update.noop`),
+its contribution is:
+
+```
+stake_change = (balance(fp) − fee) · is_staked(fp) − balance(fp) · is_staked(fp)
+            = −fee · is_staked(fp)
+```
+
+### Representative test cases
+
+The zkApp space is combinatorial in the size of the call forest, so a
+finite enumeration like the non-zkApp [coverage table](#coverage-table)
+isn't possible. The table below is not a coverage proof; it picks one
+or two cases per named spec concern — fee-payer baseline (z1, z2),
+per-account stake transitions (z3–z5), multi-update aggregation (z6,
+z7), failure rollback (z8), default-token restriction (z9, z10), and
+field-set restriction (z11) — leaving combinations of concerns and
+multi-segment shapes uncovered.
+
+Tests in `src/lib/transaction_logic/test/transaction_logic/zkapp_stake_change.ml`
+are tagged `(* zkapp_stake_change_row_z<N> *)` to map back to these
+rows, mirroring the `stake_change_row_X.Y` convention used for the
+non-zkApp table.
+
+| #   | Scenario                                              | Spec property                  | Expected `stake_change`               |
+|-----|-------------------------------------------------------|--------------------------------|---------------------------------------|
+| z1  | fee_payer staked, no other updates                    | Fee-payer baseline             | `−fee`                                |
+| z2  | fee_payer unstaked, no other updates                  | Fee-payer baseline             | `0`                                   |
+| z3  | One update: balance change on staked target           | Per-account formula            | `−fee·fp_staked + Δbal_t`             |
+| z4  | One update: opt-in (delegate `None → Some`)           | Per-account formula (opt-in)   | `−fee·fp_staked + balance'(t)`        |
+| z5  | One update: opt-out (delegate `Some → empty_pk`)      | Per-account formula (opt-out)  | `−fee·fp_staked − balance(t)`         |
+| z6  | Two updates on the same target                        | Telescoping[^telescoping]      | depends on final state, not interim   |
+| z7  | Two updates on two distinct targets                   | Sum over `A(tx)`               | sum of per-account contributions      |
+| z8  | Second-pass check fails                               | Failure rollback               | `−fee·fp_staked`                      |
+| z9  | Non-default-token update: balance change              | Default-token restriction      | `−fee·fp_staked`                      |
+| z10 | Non-default-token update: delegate Set                | Default-token restriction      | `−fee·fp_staked`                      |
+| z11 | Default-token update: app_state / permissions only    | Field-set restriction          | `−fee·fp_staked`                      |
+
+[^telescoping]: When `N` account_updates touch the same account `a`,
+    the implementation accumulates a per-step delta
+    `Δ_i = stake_i(a) − stake_{i−1}(a)` at each step into
+    `local_state.stake_change`. The sum
+    `Σ_{i=1..N} Δ_i = stake_N(a) − stake_0(a) = stake'(a) − stake(a)`
+    *telescopes* — every intermediate `stake_i` cancels — so the
+    per-account contribution depends only on the pre-tx and post-tx
+    states. This is what reconciles the spec ("only the final state of
+    `a` enters the sum") with the implementation (which actually
+    computes per-step deltas).
+
+## Implementation: per-pass snapshot pairs
+
+Each transaction's effect on the ledger (balance changes, delegate
+changes, nonce changes, new accounts created) is delivered in two
+passes: `Ledger.apply_transaction_first_pass` followed by
+`Ledger.apply_transaction_second_pass`. For a zkApp this is the split
+defined in [zkApp transactions](#zkapp-transactions) — the fee_payer
+debit happens in the first pass and the call-forest updates happen
+in the second. For non-zkApp tags every update the transaction makes
+happens in the first pass; the second pass is a no-op. The list of
+transactions a block proposes to include is a `Staged_ledger_diff`,
+and the staged ledger walks it twice — first calling
+`apply_transaction_first_pass` on every transaction, then calling
+`apply_transaction_second_pass` on every transaction — so every
+transaction's first pass runs before any transaction's second pass.
+
+For each transaction `tx` in the block, the staged ledger samples
+four snapshots of the live ledger:
+
+- `pre_first_pass` / `post_first_pass` — right before / right after
+  `tx`'s first-pass apply, inside the first-pass loop.
+- `pre_second_pass` / `post_second_pass` — right before / right after
+  `tx`'s second-pass apply, inside the second-pass loop.
+
+Let `stake_S(a) = balance(a) · is_staked(a)` read from snapshot `S`.
+The stored `Transaction_snark.Statement.stake_change` is
+
+```
+stake_change(tx) =
+    Σ_{a ∈ A(tx)} (stake_{post_first_pass}(a)  − stake_{pre_first_pass}(a))
+  + Σ_{a ∈ A(tx)} (stake_{post_second_pass}(a) − stake_{pre_second_pass}(a))
+```
+
+### Why this equals the spec's `stake_change(tx)`
+
+The first-pass and second-pass loops are each sequential. Between
+`pre_first_pass` and `post_first_pass` the only operation is `tx`'s
+first-pass apply, so the first delta is `tx`'s first-pass effect on
+its accounts. Between `pre_second_pass` and `post_second_pass` the
+only operation is `tx`'s second-pass apply, so the second delta is
+`tx`'s second-pass effect. The two sum to `tx`'s total effect on
+`A(tx)`, which is `stake'(a) − stake(a)` in the spec's notation.
+
+Other transactions in the same block can mutate accounts in `A(tx)` between
+`post_first_pass` and `pre_second_pass` — e.g. when a sequence of
+zkApps from the same sender all touch that sender's `fee_payer` slot,
+every later transaction's first-pass debits the shared `fee_payer`.
+Those mutations are present in both `pre_second_pass` and
+`post_second_pass` (`tx`'s second-pass only writes `tx`'s own
+account updates), so they contribute the same amount to each snapshot
+and cancel when one is subtracted from the other.
+
+### Relation to the in-circuit accumulator
+
+The SNARK's `global_state.stake_change` is folded from
+`local_state.stake_change` at the end of every segment. For a zkApp
+transaction, the fee_payer segment lands first; the call-forest
+segments land after. The post-fee-payer-segment value of
+`global_state.stake_change` is `tx`'s first-pass effect; the
+post-final-segment value is `tx`'s total effect. So the SNARK
+computes the same telescoping sum: fee-payer contribution +
+call-forest contribution. The unchecked first-pass and second-pass
+deltas are the unchecked analogue of those two segment groups, and
+the SNARK's final
+`assert_equal statement.stake_change global_state.stake_change`
+holds.
+
+### Non-zkApp tags
+
+`Ledger.apply_transaction_second_pass` is a no-op for non-zkApp tags,
+so `pre_second_pass = post_second_pass` and the second delta is `0`.
+The first delta reduces to a single-pass `pre → post` over the row's
+slot updates, which is exactly the [coverage-table](#coverage-table)
+formula.
+
