@@ -117,6 +117,26 @@ echo "Using mina executable: ${MINA_EXE}"
 
 echo "Starting single-node network with preset: ${PRESET}"
 
+# mina-local-network.sh generates the genesis ledger (and optionally sends
+# GraphQL queries) with python helpers that need the 'click' and 'requests'
+# packages. If the ambient python3 lacks them, materialize a suitable
+# interpreter with nix-shell and put it in front of PATH.
+if ! python3 -c 'import click, requests' 2>/dev/null; then
+  if command -v nix-shell >/dev/null; then
+    echo "python3 lacks click/requests; getting an interpreter via nix-shell..."
+    PYTHON3_WITH_PKGS=$(nix-shell \
+      --packages "python3.withPackages (ps: [ ps.click ps.requests ])" \
+      --run 'command -v python3')
+    PATH="$(dirname "${PYTHON3_WITH_PKGS}"):${PATH}"
+    export PATH
+  else
+    echo "Error: python3 lacks the 'click'/'requests' packages and nix-shell is unavailable." >&2
+    echo "Install them, e.g.: pip install -r scripts/mina-local-network/requirements.txt" >&2
+    echo "or run inside: nix-shell -p \"python3.withPackages (ps: [ ps.click ps.requests ])\"" >&2
+    exit 1
+  fi
+fi
+
 # mina-local-network.sh refers to its helper scripts relative to the repo root.
 cd "${REPO_ROOT}"
 
