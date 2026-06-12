@@ -111,6 +111,8 @@ in {
     in {
       lockFileContents =
         fixupLockFile ../src/lib/crypto/proof-systems/Cargo.lock;
+      outputHashes =
+        narHashesFromCargoLock ../src/lib/crypto/proof-systems/Cargo.lock;
     };
     buildPhase = ''
       cargo build -p kimchi-stubs --release --lib
@@ -159,10 +161,10 @@ in {
       version = deps.wasm-bindgen.version;
       src = final.fetchCrate {
         inherit pname version;
-        sha256 = "sha256-3RJzK7mkYFrs7C/WkhW9Rr4LdP5ofb2FdYGz1P7Uxog=";
+        sha256 = "sha256-M6WuGl7EruNopHZbqBpucu4RWz44/MSdv6f0zkYw+44=";
       };
 
-      cargoHash = "sha256-tD0OY2PounRqsRiFh8Js5nyknQ809ZcHMvCOLrvYHRE=";
+      cargoHash = "sha256-/zJzxtzOZuGyvDLdJNEQFPzFHC6IbEiWOeZYrKgGxEk=";
       nativeBuildInputs = [ final.pkg-config ];
 
       buildInputs = with final;
@@ -218,17 +220,10 @@ in {
       runHook preBuild
       (
       set -x
-      export RUSTFLAGS="\
-      -C target-feature=+atomics,+bulk-memory,+mutable-globals \
-      -C link-arg=--import-memory \
-      -C link-arg=--shared-memory \
-      -C link-arg=--export=__wasm_init_tls \
-      -C link-arg=--export=__tls_base \
-      -C link-arg=--export=__tls_size \
-      -C link-arg=--export=__tls_align \
-      -C link-arg=--max-memory=4294967296"
-      wasm-pack build --mode no-install --target nodejs --out-dir $out/nodejs plonk-wasm -- --features nodejs -Z build-std=panic_abort,std
-      wasm-pack build --mode no-install --target web --out-dir $out/web plonk-wasm -Z build-std=panic_abort,std
+      # wasm rustflags (atomics, shared memory, exports) come from
+      # proof-systems/.cargo/config.toml ([target.wasm32-unknown-unknown])
+      wasm-pack build --mode no-install --target nodejs --out-dir $out/nodejs --out-name plonk_wasm kimchi-wasm -- --features nodejs -Z build-std=panic_abort,std
+      wasm-pack build --mode no-install --target web --out-dir $out/web --out-name plonk_wasm kimchi-wasm -Z build-std=panic_abort,std
       )
       runHook postBuild
     '';
