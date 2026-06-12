@@ -419,7 +419,7 @@ module All_evals : sig
   end
 
   module Stable : sig
-    module V1 : sig
+    module V2 : sig
       type ('f, 'f_multi) t =
         { evals : ('f_multi * 'f_multi, 'f_multi * 'f_multi) With_public_input.t
         ; ft_eval1 : 'f
@@ -428,7 +428,7 @@ module All_evals : sig
       include Plonkish_prelude.Sigs.Full.S2 with type ('a, 'b) t := ('a, 'b) t
     end
 
-    module Latest = V1
+    module Latest = V2
   end
 
   module In_circuit : sig
@@ -443,7 +443,7 @@ module All_evals : sig
   end
 
   type ('f, 'f_multi) t =
-        ('f, 'f_multi) Mina_wire_types.Pickles_types.Plonk_types.All_evals.V1.t =
+        ('f, 'f_multi) Mina_wire_types.Pickles_types.Plonk_types.All_evals.V2.t =
     { evals : ('f_multi * 'f_multi, 'f_multi * 'f_multi) With_public_input.t
     ; ft_eval1 : 'f
     }

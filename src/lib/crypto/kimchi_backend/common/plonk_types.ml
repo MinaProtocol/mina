@@ -1357,7 +1357,7 @@ module All_evals = struct
   module Stable = struct
     [@@@no_toplevel_latest_type]
 
-    module V1 = struct
+    module V2 = struct
       type ('f, 'f_multi) t =
         { evals :
             ( 'f_multi * 'f_multi
@@ -1370,7 +1370,7 @@ module All_evals = struct
   end]
 
   type ('f, 'f_multi) t =
-        ('f, 'f_multi) Mina_wire_types.Pickles_types.Plonk_types.All_evals.V1.t =
+        ('f, 'f_multi) Mina_wire_types.Pickles_types.Plonk_types.All_evals.V2.t =
     { evals : ('f_multi * 'f_multi, 'f_multi * 'f_multi) With_public_input.t
     ; ft_eval1 : 'f
     }

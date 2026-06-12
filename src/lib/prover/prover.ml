@@ -17,7 +17,7 @@ module Extend_blockchain_input = struct
         { chain : Blockchain.Stable.V3.t
         ; next_state : Protocol_state.Value.Stable.V3.t
         ; block : Snark_transition.Value.Stable.V2.t
-        ; ledger_proof : Ledger_proof.Stable.V2.t option
+        ; ledger_proof : Ledger_proof.Stable.V3.t option
         ; prover_state : Consensus.Data.Prover_state.Stable.V3.t
         ; pending_coinbase : Pending_coinbase_witness.Stable.V2.t
         }

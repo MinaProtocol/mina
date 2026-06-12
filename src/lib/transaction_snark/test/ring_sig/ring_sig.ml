@@ -330,7 +330,7 @@ let%test_unit "ring-signature zkapp tx with 3 zkapp_command" =
                 |> printf "other_account_update #%d body:\n%s\n\n" idx )
             |> fun () ->
             (* print other_account_update proof *)
-            Pickles.Side_loaded.Proof.Stable.V2.sexp_of_t pi
+            Pickles.Side_loaded.Proof.Stable.V3.sexp_of_t pi
             |> Sexp.to_string |> Base64.encode_exn
             |> printf "other_account_update_proof:\n%s\n\n"
             |> fun () ->
