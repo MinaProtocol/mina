@@ -26,6 +26,12 @@ FISH=1
 NODES=1
 LOG_LEVEL="Trace"
 FILE_LOG_LEVEL=${LOG_LEVEL}
+# Console log level for snark workers only; their file logging
+# (mina-snark-worker.log in each worker's config directory, governed by
+# FILE_LOG_LEVEL) is unaffected.
+WORKER_LOG_LEVEL="Warn"
+# How long (seconds) a snark worker naps when the coordinator has no work.
+SNARK_WORKER_NAP_SEC=1
 VALUE_TRANSFERS=false
 SNARK_WORKERS_COUNT=2
 ZKAPP_TRANSACTIONS=false
@@ -141,6 +147,10 @@ help() {
                                          |   Default: ${LOG_LEVEL}
 -fll |--file-log-level <level>           | File output logging level
                                          |   Default: ${FILE_LOG_LEVEL}
+-wll |--worker-log-level <level>         | Console output logging level for snark workers (their file logging follows --file-log-level)
+                                         |   Default: ${WORKER_LOG_LEVEL}
+--snark-worker-nap-sec <#>               | How long (seconds) a snark worker naps when no work is available
+                                         |   Default: ${SNARK_WORKER_NAP_SEC}
 -ph  |--pg-host <host>                   | PostgreSQL host
                                          |   Default: ${PG_HOST}
 -pp  |--pg-port <#>                      | PostgreSQL port
@@ -376,10 +386,11 @@ exec-snark-worker() {
   COORDINATOR_HOST_AND_PORT="localhost:${COORDINATOR_PORT}"
 
   # shellcheck disable=SC2068
+  MINA_SNARK_WORKER_NAP_SEC="${SNARK_WORKER_NAP_SEC}" \
   exec ${MINA_EXE} internal snark-worker \
     --proof-level "${PROOF_LEVEL}" \
     --shutdown-on-disconnect false \
-    --log-level "${LOG_LEVEL}" \
+    --log-level "${WORKER_LOG_LEVEL}" \
     --file-log-level "${FILE_LOG_LEVEL}" \
     --daemon-address "${COORDINATOR_HOST_AND_PORT}" \
     $@
@@ -611,6 +622,14 @@ while [[ "$#" -gt 0 ]]; do
     ;;
   -fll | --file-log-level)
     FILE_LOG_LEVEL="${2}"
+    shift
+    ;;
+  -wll | --worker-log-level)
+    WORKER_LOG_LEVEL="${2}"
+    shift
+    ;;
+  --snark-worker-nap-sec)
+    SNARK_WORKER_NAP_SEC="${2}"
     shift
     ;;
   -ph | --pg-host)
