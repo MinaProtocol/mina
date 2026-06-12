@@ -24,6 +24,7 @@ REPO_ROOT="$(git -C "${SCRIPT_DIR}" rev-parse --show-toplevel)"
 
 FAST=false
 MINA_EXE_ARG=""
+VALUE_TRANSFERS=true
 EXTRA_ARGS=()
 
 help() {
@@ -36,6 +37,9 @@ Usage: $(basename "$0") [--fast] [--mina-exe <path>] [-- <extra mina-local-netwo
                   | When not provided, mina is built with nix (flake package
                   | '#devnet', as in scripts/hardfork/build-and-test.sh) and the
                   | resulting binary is used.
+--no-value-transfers | Do not send periodic value-transfer transactions. Useful
+                  | when an external load (e.g. ITN zkApp scheduler) keeps the
+                  | blocks full instead.
 -h                | Show this help.
 
 Any other argument is forwarded verbatim to mina-local-network.sh *after* the
@@ -61,6 +65,9 @@ while [[ "$#" -gt 0 ]]; do
     fi
     MINA_EXE_ARG="${2}"
     shift
+    ;;
+  --no-value-transfers)
+    VALUE_TRANSFERS=false
     ;;
   -h | --help)
     help
@@ -113,6 +120,11 @@ echo "Starting single-node network with preset: ${PRESET}"
 # mina-local-network.sh refers to its helper scripts relative to the repo root.
 cd "${REPO_ROOT}"
 
+VALUE_TRANSFER_ARGS=()
+if ${VALUE_TRANSFERS}; then
+  VALUE_TRANSFER_ARGS=(-vt -ti "${TRANSACTION_INTERVAL}")
+fi
+
 exec "${SCRIPT_DIR}/mina-local-network.sh" \
   -c reset \
   -u delay_sec:120 \
@@ -122,7 +134,7 @@ exec "${SCRIPT_DIR}/mina-local-network.sh" \
   -st "${SLOT_TIME_MS}" \
   -swc "${SNARK_WORKERS}" \
   -sf 0.001 \
-  -vt -ti "${TRANSACTION_INTERVAL}" \
+  "${VALUE_TRANSFER_ARGS[@]}" \
   -w 1 -f 0 -n 0 \
   --seed-is-whale \
   --seed-is-coordinator \
