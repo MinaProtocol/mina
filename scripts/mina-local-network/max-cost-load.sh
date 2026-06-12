@@ -51,7 +51,7 @@ Usage: $(basename "$0") --duration-min <#> [options] [-- <extra single-node-netw
 -d | --duration-min <#> | How many minutes of transaction sending to attempt
                         | (includes the initial zkApp account deployment phase).
 --fast                  | Use the fast single-node preset (7 workers, 75s slots).
-                        | Default preset: 3 workers, 135s slots.
+                        | Default preset: 3 workers, 131.4s slots.
 --num-updates <#>       | Proof-authorized account updates per max-cost zkApp
                         | command; a command equals num-updates+1 SNARK segments.
                         |   Default: ${NUM_UPDATES} (i.e. 8 segments)
@@ -121,7 +121,7 @@ for tool in openssl python3; do
 done
 
 # Slot times must match the presets in single-node-network.sh.
-if ${FAST}; then SLOT_TIME_S=75; else SLOT_TIME_S=135; fi
+if ${FAST}; then SLOT_TIME_S=75; else SLOT_TIME_S=131.4; fi
 TPS=$(python3 -c "print(2 / (${SLOT_TIME_S} / 0.75))")
 
 # ================================================
