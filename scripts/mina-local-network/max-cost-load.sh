@@ -281,14 +281,20 @@ network_died() {
 REST_URL="http://127.0.0.1:$((SEED_BASE_PORT + 1))/graphql"
 ITN_URL="http://127.0.0.1:$((SEED_BASE_PORT + 5))/graphql"
 
-echo "Waiting for the daemon at ${REST_URL} to be SYNCED..."
+echo "Waiting for the daemon at ${REST_URL} to be SYNCED (this includes the nix build / proving-key generation on first runs)..."
 until python3 - "${REST_URL}" <<'PYEOF'
 import json, sys, urllib.request
-req = urllib.request.Request(
-    sys.argv[1], data=json.dumps({"query": "query { syncStatus }"}).encode(),
-    headers={"Content-Type": "application/json"})
-with urllib.request.urlopen(req, timeout=10) as resp:
-    sys.exit(0 if json.load(resp)["data"]["syncStatus"] == "SYNCED" else 1)
+# Quietly report "not ready yet" on any failure (connection refused while the
+# daemon is still building/booting, GraphQL not serving yet, ...); the shell
+# loop keeps polling.
+try:
+    req = urllib.request.Request(
+        sys.argv[1], data=json.dumps({"query": "query { syncStatus }"}).encode(),
+        headers={"Content-Type": "application/json"})
+    with urllib.request.urlopen(req, timeout=10) as resp:
+        sys.exit(0 if json.load(resp)["data"]["syncStatus"] == "SYNCED" else 1)
+except Exception:
+    sys.exit(1)
 PYEOF
 do
   network_died
