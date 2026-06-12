@@ -48,7 +48,12 @@ module Impl = struct
         ; signature_kind
         }
 
-    let worker_wait_time = 5.
+    (* How long (in seconds) the worker naps when the coordinator has no work
+       for it. Overridable for low-latency setups (e.g. local networks with
+       short slots) where a multi-second nap delays work pickup noticeably. *)
+    let worker_wait_time =
+      Sys.getenv "MINA_SNARK_WORKER_NAP_SEC"
+      |> Option.value_map ~default:5. ~f:Float.of_string
   end
 
   (* NOTE: the reason witnesses_specs_stmts is optional in
