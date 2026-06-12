@@ -240,6 +240,7 @@ let send_zkapps ~(genesis_constants : Genesis_constants.t)
                ( if zkapp_command_details.max_cost then
                  Mina_generators.Zkapp_command_generators
                  .gen_max_cost_zkapp_command_from ~memo
+                   ?n_updates:zkapp_command_details.max_cost_num_updates
                    ~fee_range:
                      ( zkapp_command_details.min_fee
                      , zkapp_command_details.max_fee )
