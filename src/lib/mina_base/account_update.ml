@@ -1741,7 +1741,7 @@ module T = struct
       module V2 = struct
         type t =
           ( Body.Graphql_repr.Stable.V2.t
-          , Control.Stable.V2.t )
+          , Control.Stable.V3.t )
           Without_aux.Stable.V1.t
         [@@deriving sexp, equal, yojson, hash, compare]
 
@@ -1765,7 +1765,7 @@ module T = struct
     module Stable = struct
       module V2 = struct
         type t =
-          (Body.Simple.Stable.V2.t, Control.Stable.V2.t) Without_aux.Stable.V1.t
+          (Body.Simple.Stable.V2.t, Control.Stable.V3.t) Without_aux.Stable.V1.t
         [@@deriving sexp, equal, yojson, hash, compare]
 
         let to_latest = Fn.id
@@ -1779,7 +1779,7 @@ module T = struct
 
     module V2 = struct
       (** A account_update to a zkApp transaction *)
-      type t = (Body.Stable.V2.t, Control.Stable.V2.t) Without_aux.Stable.V1.t
+      type t = (Body.Stable.V2.t, Control.Stable.V3.t) Without_aux.Stable.V1.t
       [@@deriving sexp, equal, yojson, hash, compare]
 
       let to_latest = Fn.id

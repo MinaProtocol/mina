@@ -149,7 +149,7 @@ module Pickles = struct
   include Assert_equal0V1 (O.Backend.Tick.Field.Stable) (W.Backend.Tick.Field)
   include Assert_equal1 (O.Proof) (W.Proof)
   include
-    Assert_equal0V2
+    Assert_equal0V3
       (O.Proof.Proofs_verified_2.Stable)
       (W.Proof.Proofs_verified_2)
 end
@@ -253,7 +253,7 @@ module Mina_base = struct
     Assert_equal3V1
       (O.Zkapp_command.Call_forest.Stable)
       (W.Zkapp_command.Call_forest)
-  include Assert_equal0V2 (O.Control.Stable) (W.Control)
+  include Assert_equal0V3 (O.Control.Stable) (W.Control)
   include
     Assert_equal0V1
       (O.Pending_coinbase.State_stack.Stable)
@@ -306,7 +306,7 @@ module Mina_base = struct
       (O.Protocol_constants_checked.Value.Stable)
       (W.Protocol_constants_checked.Value)
   include Assert_equal0V1 (O.State_hash.Stable) (W.State_hash)
-  include Assert_equal0V2 (O.Proof.Stable) (W.Proof)
+  include Assert_equal0V3 (O.Proof.Stable) (W.Proof)
 end
 
 module One_or_two = struct
@@ -363,20 +363,20 @@ end
 module Transaction_snark = struct
   module O = Transaction_snark
   module W = WT.Transaction_snark
-  include Assert_equal0V2 (O.Stable) (W)
+  include Assert_equal0V3 (O.Stable) (W)
 end
 
 module Transaction_snark_work = struct
   module O = Transaction_snark_work
   module W = WT.Transaction_snark_work
   include Assert_equal0V2 (O.Statement.Stable) (W.Statement)
-  include Assert_equal0V2 (O.Stable) (W)
+  include Assert_equal0V3 (O.Stable) (W)
 end
 
 module Ledger_proof = struct
   module O = Ledger_proof
   module W = WT.Ledger_proof
-  include Assert_equal0V2 (O.Stable) (W)
+  include Assert_equal0V3 (O.Stable) (W)
 end
 
 module Protocol_version = struct
@@ -390,7 +390,7 @@ module Network_pool = struct
   module W = WT.Network_pool
   include Assert_equal1V1 (O.Priced_proof.Stable) (W.Priced_proof)
   include
-    Assert_equal0V2
+    Assert_equal0V3
       (O.Snark_pool.Diff_versioned.Stable)
       (W.Snark_pool.Diff_versioned)
 end
