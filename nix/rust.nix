@@ -99,6 +99,7 @@ in {
       # Using the same toolchain which is used by the local stubs crate
       ../src/lib/crypto/kimchi_bindings/stubs/rust-toolchain.toml;
     rust_platform = rustPlatformFor toolchain.rust;
+    lock = ../src/lib/crypto/proof-systems/Cargo.lock;
   in rust_platform.buildRustPackage {
     pname = "kimchi_stubs_static_lib";
     version = "0.1.0";
@@ -109,10 +110,8 @@ in {
     buildInputs = with final; lib.optional stdenv.isDarwin libiconv;
     cargoLock = let fixupLockFile = path: builtins.readFile path;
     in {
-      lockFileContents =
-        fixupLockFile ../src/lib/crypto/proof-systems/Cargo.lock;
-      outputHashes =
-        narHashesFromCargoLock ../src/lib/crypto/proof-systems/Cargo.lock;
+      lockFileContents = fixupLockFile lock;
+      outputHashes = narHashesFromCargoLock lock;
     };
     buildPhase = ''
       cargo build -p kimchi-stubs --release --lib
@@ -220,10 +219,17 @@ in {
       runHook preBuild
       (
       set -x
-      # wasm rustflags (atomics, shared memory, exports) come from
-      # proof-systems/.cargo/config.toml ([target.wasm32-unknown-unknown])
-      wasm-pack build --mode no-install --target nodejs --out-dir $out/nodejs --out-name plonk_wasm kimchi-wasm -- --features nodejs -Z build-std=panic_abort,std
-      wasm-pack build --mode no-install --target web --out-dir $out/web --out-name plonk_wasm kimchi-wasm -Z build-std=panic_abort,std
+      export RUSTFLAGS="\
+      -C target-feature=+atomics,+bulk-memory,+mutable-globals \
+      -C link-arg=--import-memory \
+      -C link-arg=--shared-memory \
+      -C link-arg=--export=__wasm_init_tls \
+      -C link-arg=--export=__tls_base \
+      -C link-arg=--export=__tls_size \
+      -C link-arg=--export=__tls_align \
+      -C link-arg=--max-memory=4294967296"
+      wasm-pack build --mode no-install --target nodejs --out-dir $out/nodejs kimchi-wasm -- -Z build-std=panic_abort,std --features nodejs
+      wasm-pack build --mode no-install --target web --out-dir $out/web kimchi-wasm -- -Z build-std=panic_abort,std
       )
       runHook postBuild
     '';
@@ -233,11 +239,27 @@ in {
     cargoBuildFeatures = [ "nodejs" ];
   };
 
+  # Keep the historical package name expected by ocaml/javascript Nix code.
+  kimchi_wasm = final.plonk_wasm;
+
   # Jobs/Lint/Rust.dhall
   trace-tool = final.rustPlatform.buildRustPackage rec {
     pname = "trace-tool";
     version = "0.1.0";
     src = ../src/app/trace-tool;
     cargoLock.lockFile = ../src/app/trace-tool/Cargo.lock;
+  };
+
+  minimina = final.rustPlatform.buildRustPackage rec {
+    pname = "minimina";
+    version = "0.2.0";
+    src = ../src/app/minimina;
+    cargoLock.lockFile = ../src/app/minimina/Cargo.lock;
+    nativeBuildInputs = [ final.pkg-config ];
+    buildInputs = with final;
+      [ openssl ] ++ lib.optionals stdenv.isDarwin [
+        darwin.apple_sdk.frameworks.Security
+        libiconv
+      ];
   };
 }

@@ -97,40 +97,58 @@ let confirmations_check ~postgres_uri ~latest_state_hash ~fork_slot
 let no_commands_after ~postgres_uri ~fork_state_hash ~fork_slot () =
   let pool = connect postgres_uri in
   let query_db = Mina_caqti.query pool in
-  let%bind _, _, _, user_commands_count =
-    query_db
-      ~f:(Sql.number_of_user_commands_since_block ~fork_state_hash ~fork_slot)
+  let%bind block_info =
+    query_db ~f:(Sql.block_info_by_state_hash ~state_hash:fork_state_hash)
   in
-  let%bind _, _, _, internal_commands_count =
-    query_db
-      ~f:
-        (Sql.number_of_internal_commands_since_block ~fork_state_hash ~fork_slot)
-  in
+  match block_info with
+  | None ->
+      Deferred.return
+        [ { id = "3.N"
+          ; name = "No commands after fork check"
+          ; result =
+              Failure
+                (sprintf "Fork block %s not found in archive" fork_state_hash)
+          }
+        ]
+  | Some _ ->
+      let%bind user_commands_count =
+        query_db
+          ~f:
+            (Sql.number_of_user_commands_since_block ~fork_state_hash ~fork_slot)
+      in
+      let%bind internal_commands_count =
+        query_db
+          ~f:
+            (Sql.number_of_internal_commands_since_block ~fork_state_hash
+               ~fork_slot )
+      in
 
-  let%map _, _, _, zkapps_commands_count =
-    query_db
-      ~f:(Sql.number_of_zkapps_commands_since_block ~fork_state_hash ~fork_slot)
-  in
+      let%map zkapps_commands_count =
+        query_db
+          ~f:
+            (Sql.number_of_zkapps_commands_since_block ~fork_state_hash
+               ~fork_slot )
+      in
 
-  let result =
-    if
-      user_commands_count = 0
-      && internal_commands_count = 0
-      && zkapps_commands_count = 0
-    then Success
-    else
-      Failure
-        (sprintf
-           "Expected no user, internal or zkapps commands after the fork block \
-            %s at slot %d, however got %d user commands and %d internal \
-            commands and %d zkapps commands"
-           fork_state_hash fork_slot user_commands_count internal_commands_count
-           zkapps_commands_count )
-  in
-  let check_result =
-    { id = "3.N"; name = "No commands after fork check"; result }
-  in
-  [ check_result ]
+      let result =
+        if
+          user_commands_count = 0
+          && internal_commands_count = 0
+          && zkapps_commands_count = 0
+        then Success
+        else
+          Failure
+            (sprintf
+               "Expected no user, internal or zkapps commands after the fork \
+                block %s at slot %d, however got %d user commands and %d \
+                internal commands and %d zkapps commands"
+               fork_state_hash fork_slot user_commands_count
+               internal_commands_count zkapps_commands_count )
+      in
+      let check_result =
+        { id = "3.N"; name = "No commands after fork check"; result }
+      in
+      [ check_result ]
 
 let verify_upgrade ~postgres_uri ~expected_protocol_version
     ~expected_migration_version () =
@@ -198,6 +216,50 @@ let validate_fork ~postgres_uri ~fork_state_hash ~fork_slot () =
   in
   let check_result = { id = "8.F"; name = "Fork validation"; result } in
   [ check_result ]
+
+(* Runs a single check, capturing any exception (e.g. a missing table or a
+   failed DB query) as a Failure result so that one broken check does not abort
+   the whole verification run. *)
+let run_check_safely ~id ~name check =
+  match%map Monitor.try_with ~extract_exn:true check with
+  | Ok results ->
+      results
+  | Error exn ->
+      [ { id; name; result = Failure (Exn.to_string exn) } ]
+
+let run_all_verifications ~postgres_uri ~fork_state_hash ~fork_height ~fork_slot
+    ~latest_state_hash ~required_confirmations ~expected_protocol_version
+    ~expected_migration_version () =
+  let%bind best_chain_results =
+    run_check_safely ~id:"1.B" ~name:"Best chain validation" (fun () ->
+        is_in_best_chain ~postgres_uri ~fork_state_hash ~fork_height ~fork_slot
+          () )
+  in
+  let%bind confirmations_results =
+    run_check_safely ~id:"2.C" ~name:"Confirmation count check" (fun () ->
+        confirmations_check ~postgres_uri ~latest_state_hash ~fork_slot
+          ~required_confirmations () )
+  in
+  let%bind no_commands_results =
+    run_check_safely ~id:"3.N" ~name:"No commands after fork check" (fun () ->
+        no_commands_after ~postgres_uri ~fork_state_hash ~fork_slot () )
+  in
+  let%bind verify_upgrade_results =
+    run_check_safely ~id:"4.S" ~name:"Schema migration" (fun () ->
+        verify_upgrade ~postgres_uri ~expected_protocol_version
+          ~expected_migration_version () )
+  in
+  let%map validate_fork_results =
+    run_check_safely ~id:"8.F" ~name:"Fork validation" (fun () ->
+        validate_fork ~postgres_uri ~fork_state_hash ~fork_slot () )
+  in
+  List.concat
+    [ best_chain_results
+    ; confirmations_results
+    ; no_commands_results
+    ; verify_upgrade_results
+    ; validate_fork_results
+    ]
 
 let fetch_last_filled_block ~postgres_uri () =
   let open Deferred.Let_syntax in

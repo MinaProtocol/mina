@@ -35,14 +35,18 @@ let invalid_to_error (invalid : invalid) : Error.t =
       Error.tag ~tag:"Invalid_proof" err
 
 let check_signed_command ~signature_kind c =
-  if not (Signed_command.check_valid_keys c) then
-    Result.Error (`Invalid_keys (Signed_command.public_keys c))
-  else
-    match Signed_command.check_only_for_signature ~signature_kind c with
-    | Some _ ->
-        Result.Ok (`Assuming [])
-    | None ->
-        Result.Error (`Invalid_signature (Signed_command.public_keys c))
+  let public_keys = Signed_command.public_keys c in
+  let invalid_keys =
+    List.filter public_keys ~f:(fun pk ->
+        Option.is_none (Signature_lib.Public_key.decompress pk) )
+  in
+  match (invalid_keys, Signed_command.check_signature ~signature_kind c) with
+  | [], true ->
+      Result.Ok (`Assuming [])
+  | (_ :: _ as invalid_keys), _ ->
+      Error (`Invalid_keys invalid_keys)
+  | _, false ->
+      Error (`Invalid_signature (Signed_command.public_keys c))
 
 let collect_vk_assumption
     ( (p : (Account_update.Body.t, _ Control.Poly.t, _) Account_update.Poly.t)

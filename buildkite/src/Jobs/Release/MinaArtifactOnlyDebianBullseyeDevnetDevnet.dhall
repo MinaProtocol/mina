@@ -14,13 +14,12 @@ in  Pipeline.build
       ( ArtifactPipelines.onlyDebianPipeline
           ArtifactPipelines.MinaBuildSpec::{
           , artifacts =
-            [ Artifacts.Type.Daemon
-            , Artifacts.Type.DaemonConfig
+            [ Artifacts.Type.DaemonConfig
             , Artifacts.Type.LogProc
             , Artifacts.Type.Archive
             , Artifacts.Type.BatchTxn
             , Artifacts.Type.TestExecutive
-            , Artifacts.Type.Rosetta
+            , Artifacts.Type.RosettaAppsOnly
             ]
           , tags = [ PipelineTag.Type.Docker ]
           , network = Network.Type.Devnet

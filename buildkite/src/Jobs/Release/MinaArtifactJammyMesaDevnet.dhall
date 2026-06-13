@@ -20,14 +20,15 @@ in  Pipeline.build
       ( ArtifactPipelines.pipeline
           ArtifactPipelines.MinaBuildSpec::{
           , artifacts =
-            [ Artifacts.Type.Daemon
-            , Artifacts.Type.DaemonConfig
+            [ Artifacts.Type.DaemonConfig
             , Artifacts.Type.DaemonAppsOnly
             , Artifacts.Type.LogProc
             , Artifacts.Type.Archive
-            , Artifacts.Type.Rosetta
+            , Artifacts.Type.RosettaAppsOnly
+            , Artifacts.Type.RosettaConfig
             , Artifacts.Type.ZkappTestTransaction
             , Artifacts.Type.CreatePreforkGenesis
+            , Artifacts.Type.DaemonStorageToolbox
             ]
           , network = Network.Type.Mesa
           , tags =

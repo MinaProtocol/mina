@@ -7,7 +7,7 @@ MINA_DEBIAN_NETWORK=""
 NETWORK_NAME=""
 WAIT_BETWEEN_POLLING_GRAPHQL=""
 SYNC_TIMEOUT=""
-STABLE_VERSION="3.3.0*"
+STABLE_VERSION="3.3.0"
 
 usage() {
     cat << EOF
@@ -18,6 +18,7 @@ All arguments are mandatory:
   --network-name <val>               Testnet name (used for seeds URL and validation)
   --wait-between-polling <val>       Duration to wait between GraphQL polling
   --sync-timeout <val>               Duration to wait before considering the sync is failed
+  --peer-list-url <val>              Peer list URL
   --help                             Display this help message
 
 Example:
@@ -35,6 +36,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         --network-name)
             NETWORK_NAME="$2"
+            shift 2
+            ;;
+        --peer-list-url)
+            PEER_LIST_URL="$2"
             shift 2
             ;;
         --wait-between-polling)
@@ -60,8 +65,8 @@ while [[ $# -gt 0 ]]; do
 done
 
 # --- Validation ---
-if [[ -z "$MINA_DEBIAN_NETWORK" || -z "$NETWORK_NAME" || -z "$WAIT_BETWEEN_POLLING_GRAPHQL" || -z "$SYNC_TIMEOUT" ]]; then
-    echo "Error: All four required arguments must be provided."
+if [[ -z "$MINA_DEBIAN_NETWORK" || -z "$NETWORK_NAME" || -z "$WAIT_BETWEEN_POLLING_GRAPHQL" || -z "$SYNC_TIMEOUT" || -z "$PEER_LIST_URL" ]]; then
+    echo "Error: All required arguments must be provided."
     usage
 fi
 
@@ -72,6 +77,14 @@ git config --global --add safe.directory /workdir
 source buildkite/scripts/debian/update.sh --verbose
 source buildkite/scripts/export-git-env-vars.sh
 source buildkite/scripts/debian/install.sh "mina-${MINA_DEBIAN_NETWORK},mina-daemon-storage-toolbox" 1
+
+# Stash mina-graphql-client so it survives the legacy downgrade below.
+# The official 3.3.0 mina-${MINA_DEBIAN_NETWORK} package does not ship this
+# binary; without stashing, the post-downgrade sync check would fail because
+# the helper would have been removed. The binary is self-contained except
+# for libc/libssl/libgmp which remain present across the downgrade.
+MINA_GRAPHQL_CLIENT=/tmp/mina-graphql-client.stashed
+cp "$(command -v mina-graphql-client)" "$MINA_GRAPHQL_CLIENT"
 
 # Legacy scanner installs to a separate versioned path under /usr/lib/mina/
 FORCE_VERSION="*" ROOT="legacy" ./buildkite/scripts/debian/install.sh "mina-daemon-recovery-storage-toolbox" 1
@@ -92,22 +105,20 @@ start_daemon_and_wait_for_sync() {
 
     # Start the daemon in the background
     "$MINA" daemon \
-      --peer-list-url "https://storage.googleapis.com/seed-lists/${NETWORK_NAME}_seeds.txt" \
+      --peer-list-url "$PEER_LIST_URL" \
       --libp2p-keypair "/home/opam/libp2p-keys/key" \
     &
 
     DAEMON_PID="$!"
 
     local deadline
-    deadline=$(date -d "+ $SYNC_TIMEOUT" +%s)
+    deadline=$(date -d "+$SYNC_TIMEOUT" +%s)
 
     local sync_status=""
     while [ "$(date +%s)" -lt $deadline ]; do
-        sync_status=$( { curl -s -m 5 'http://localhost:3085/graphql' \
-            -H 'accept: application/json' \
-            -H 'content-type: application/json' \
-            --data-raw '{"query":"query { syncStatus }"}' \
-            | jq -r .data.syncStatus ; } 2>/dev/null || echo "CONNECT_ERROR" )
+        sync_status=$(timeout 5 "$MINA_GRAPHQL_CLIENT" sync-status \
+            --graphql-uri http://localhost:3085/graphql --raw \
+            2>/dev/null || echo "CONNECT_ERROR")
 
         if [[ "$sync_status" == "SYNCED" ]]; then
             break
@@ -121,12 +132,11 @@ start_daemon_and_wait_for_sync() {
         exit 1
     fi
 
-    # Check network id via GraphQL
-    NETWORK_ID=$(curl -s 'http://localhost:3085/graphql' \
-        -H 'accept: application/json' \
-        -H 'content-type: application/json' \
-        --data-raw '{"query":"query MyQuery {\n  networkID\n}\n","variables":null,"operationName":"MyQuery"}' \
-        | jq -r .data.networkID)
+    # Check network id via GraphQL.
+    # Wrap in timeout so a hung GraphQL endpoint doesn't stall the script for
+    # the ~5 minute default retry budget inside exec_graphql_request.
+    NETWORK_ID=$(timeout 10 "$MINA_GRAPHQL_CLIENT" network-id \
+        --graphql-uri http://localhost:3085/graphql --raw)
 
     EXPECTED_NETWORK="mina:$NETWORK_NAME"
 
@@ -146,17 +156,26 @@ mina client stop-daemon
 wait "$DAEMON_PID"
 
 # --- Step 3: Convert RocksDB to legacy format ---
+
 mina-storage-converter \
     --node-dir /home/opam/.mina-config \
-    --current-scanner /usr/lib/mina/storage/10.5.2/3.3.0/mina-rocksdb-scanner \
-    --stable-scanner /usr/lib/mina/storage/5.7.12/3.3.0/mina-rocksdb-scanner \
+    --current-scanner /usr/lib/mina/storage/10.5.2/${GITTAG}/mina-rocksdb-scanner \
+    --stable-scanner /usr/lib/mina/storage/5.7.12/${STABLE_VERSION}/mina-rocksdb-scanner \
     --yes --verbose
 
 if [[ "$MINA_DEBIAN_NETWORK" == "mainnet" ]]; then
-    source buildkite/scripts/debian/install_official.sh --package "mina-mainnet" --channel stable --version "$STABLE_VERSION"
+    source buildkite/scripts/debian/install_official.sh --package "mina-mainnet" --channel stable --version "$STABLE_VERSION*"
 else
-    source buildkite/scripts/debian/install_official.sh --package "mina-${MINA_DEBIAN_NETWORK}" --version "$STABLE_VERSION"
+    source buildkite/scripts/debian/install_official.sh --package "mina-${MINA_DEBIAN_NETWORK}" --version "$STABLE_VERSION*"
 fi
 
-# --- Step 4: Test with legacy mina ---
+# --- Step 4: Check sync with legacy mina and shutdown ---
+start_daemon_and_wait_for_sync mina
+mina client stop-daemon
+wait "$DAEMON_PID"
+
+# --- Step 5: Upgrade mina to current ---
+source buildkite/scripts/debian/install.sh "mina-${MINA_DEBIAN_NETWORK}" 1
+
+# --- Step 6: Check sync with current mina ---
 start_daemon_and_wait_for_sync mina

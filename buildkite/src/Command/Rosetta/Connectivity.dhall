@@ -101,7 +101,7 @@ let command
                   Dockers.DepsSpec::{
                   , codename = spec.dockerType
                   , network = spec.network
-                  , artifact = Artifacts.Type.Rosetta
+                  , artifact = Artifacts.Type.RosettaConfig
                   , profile = spec.profile
                   }
             }
@@ -125,7 +125,7 @@ let pipeline
                       "dhall"
                   , S.exactly "scripts/tests/rosetta-connectivity" "sh"
                   , S.exactly
-                      "buildkite/scripts/tests/rosetta-integration-tests"
+                      "buildkite/scripts/tests/rosetta/integration-tests"
                       "sh"
                   ]
                 # spec.additionalDirtyWhen

@@ -5,27 +5,18 @@
 { toolchainBase =
     "europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/ci-toolchain-base:v4"
 , minaToolchainBookworm =
-    { amd64 =
-        "europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/mina-toolchain:9e6535f-bookworm-testnet-generic"
+    { amd64 = "docker.io/minaprotocol/mina-toolchain:169fd52-bookworm-devnet"
     , arm64 =
-        "europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/mina-toolchain:9e6535f-bookworm-testnet-generic-arm64"
+        "docker.io/minaprotocol/mina-toolchain:169fd52-bookworm-devnet-arm64"
     }
-, minaToolchainBullseye =
-    { amd64 =
-        "europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/mina-toolchain:9e6535f-bullseye-testnet-generic"
-    , arm64 =
-        "europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/mina-toolchain:9e6535f-bullseye-testnet-generic-arm64"
-    }
-, minaToolchainNoble =
-    { amd64 =
-        "europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/mina-toolchain:9e6535f-noble-testnet-generic"
-    , arm64 =
-        "europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/mina-toolchain:9e6535f-noble-testnet-generic-arm64"
-    }
+, minaToolchainBullseye.amd64 =
+    "docker.io/minaprotocol/mina-toolchain:169fd52-bullseye-devnet"
+, minaToolchainNoble.amd64 =
+    "docker.io/minaprotocol/mina-toolchain:169fd52-noble-devnet"
 , minaToolchainJammy.amd64 =
-    "europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/mina-toolchain:9e6535f-jammy-testnet-generic"
+    "docker.io/minaprotocol/mina-toolchain:169fd52-jammy-devnet"
 , minaToolchain =
-    "europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/mina-toolchain:9e6535f-bullseye-testnet-generic"
+    "docker.io/minaprotocol/mina-toolchain:169fd52-bullseye-devnet"
 , postgres =
     "europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/postgres:12.4-alpine"
 , xrefcheck =

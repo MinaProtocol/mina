@@ -77,6 +77,112 @@ let get_peer_id ~logger node_uri =
     (String.concat ~sep:" " peer_ids) ;
   (self_id, peer_ids)
 
+let sync_status_to_string = function
+  | `BOOTSTRAP ->
+      "BOOTSTRAP"
+  | `CATCHUP ->
+      "CATCHUP"
+  | `CONNECTING ->
+      "CONNECTING"
+  | `LISTENING ->
+      "LISTENING"
+  | `OFFLINE ->
+      "OFFLINE"
+  | `SYNCED ->
+      "SYNCED"
+
+let get_sync_status ~logger node_uri =
+  let open Deferred.Or_error.Let_syntax in
+  [%log info] "Getting sync status from daemon"
+    ~metadata:[ ("node_uri", `String (Uri.to_string node_uri)) ] ;
+  let query_obj = Queries.Query_sync_status.(make @@ makeVariables ()) in
+  let%map query_result_obj =
+    exec_graphql_request ~logger ~node_uri ~query_name:"query_sync_status"
+      query_obj
+  in
+  let res = sync_status_to_string query_result_obj.syncStatus in
+  [%log info] "sync_status, result of graphql query = %s" res ;
+  res
+
+let get_network_id ~logger node_uri =
+  let open Deferred.Or_error.Let_syntax in
+  [%log info] "Getting network ID from daemon"
+    ~metadata:[ ("node_uri", `String (Uri.to_string node_uri)) ] ;
+  let query_obj = Queries.Query_network_id.(make @@ makeVariables ()) in
+  let%map query_result_obj =
+    exec_graphql_request ~logger ~node_uri ~query_name:"query_network_id"
+      query_obj
+  in
+  let res = query_result_obj.networkID in
+  [%log info] "network_id, result of graphql query = %s" res ;
+  res
+
+let get_fork_config ~logger node_uri =
+  let open Deferred.Or_error.Let_syntax in
+  [%log info] "Getting fork_config from daemon"
+    ~metadata:[ ("node_uri", `String (Uri.to_string node_uri)) ] ;
+  let query_obj = Queries.Genesis_ledger_export.(make @@ makeVariables ()) in
+  let%map query_result_obj =
+    exec_graphql_request ~logger ~node_uri ~query_name:"query_fork_config"
+      query_obj
+  in
+  (* fork_config is declared as a JSON scalar; return it as Yojson.Safe.t *)
+  (query_result_obj.fork_config :> Yojson.Safe.t)
+
+(** Submit an arbitrary GraphQL document (no typed parsing).
+
+    Returns the raw JSON response body as [Yojson.Safe.t] on success. Treats
+    HTTP non-2xx and responses containing an [errors] field as errors so
+    callers (and `set -e` bash) can detect GraphQL failures. *)
+let send_raw_query ~logger node_uri ~query =
+  let open Deferred.Let_syntax in
+  [%log info] "Sending raw GraphQL query"
+    ~metadata:
+      [ ("node_uri", `String (Uri.to_string node_uri))
+      ; ("query", `String query)
+      ] ;
+  let body_string =
+    Yojson.Safe.to_string (`Assoc [ ("query", `String query) ])
+  in
+  let headers =
+    Cohttp.Header.of_list
+      [ ("Accept", "application/json"); ("Content-Type", "application/json") ]
+  in
+  match%bind
+    Deferred.Or_error.try_with ~extract_exn:true (fun () ->
+        Cohttp_async.Client.post ~headers
+          ~body:(Cohttp_async.Body.of_string body_string)
+          node_uri )
+  with
+  | Error e ->
+      Deferred.return (Error e)
+  | Ok (response, body) ->
+      let%bind body_str = Cohttp_async.Body.to_string body in
+      let status_code =
+        Cohttp.Code.code_of_status (Cohttp_async.Response.status response)
+      in
+      if status_code < 200 || status_code >= 300 then
+        Deferred.Or_error.errorf "Status code %d -- %s" status_code body_str
+      else
+        let parsed =
+          try Ok (Yojson.Safe.from_string body_str)
+          with exn ->
+            Or_error.errorf "Failed to parse response as JSON: %s -- body: %s"
+              (Exn.to_string exn) body_str
+        in
+        Deferred.return
+          (Or_error.bind parsed ~f:(fun json ->
+               match json with
+               | `Assoc kvs when List.Assoc.mem kvs ~equal:String.equal "errors"
+                 ->
+                   let errors =
+                     List.Assoc.find_exn kvs ~equal:String.equal "errors"
+                   in
+                   Or_error.errorf "GraphQL errors: %s"
+                     (Yojson.Safe.to_string errors)
+               | _ ->
+                   Ok json ) )
+
 let get_global_slot_since_hard_fork ~logger node_uri =
   let open Deferred.Or_error.Let_syntax in
   [%log info] "Getting global slot since hard fork from daemon status"
@@ -167,6 +273,7 @@ let get_account_data ~logger node_uri ~account_id =
                   "the nonce from get_balance is None, which should be \
                    impossible"
                 acc.nonce
+          ; inferred_nonce = acc.inferredNonce
           ; total_balance = acc.balance.total
           ; delegate = acc.delegate
           ; liquid_balance_opt = acc.balance.liquid
@@ -788,6 +895,45 @@ let get_filtered_log_entries ~last_log_index_seen node_uri =
   else
     Deferred.Or_error.error_string
       "Node is not currently capturing structured log messages"
+
+let poll_filtered_log_entries ?(initial_delay_sec = 0.) ~poll_interval_sec
+    ?timeout_sec ~on_entries ~on_error node_uri =
+  let open Deferred.Let_syntax in
+  let%bind () = after (Time.Span.of_sec initial_delay_sec) in
+  let deadline =
+    Option.map timeout_sec ~f:(fun t ->
+        Time.add (Time.now ()) (Time.Span.of_sec t) )
+  in
+  let rec loop ~last_log_index_seen =
+    match deadline with
+    | Some d when Time.( >= ) (Time.now ()) d ->
+        Deferred.Or_error.error_string
+          "Timed out polling for filtered log entries"
+    | _ -> (
+        let%bind () = after (Time.Span.of_sec poll_interval_sec) in
+        let%bind result =
+          get_filtered_log_entries ~last_log_index_seen node_uri
+        in
+        match result with
+        | Ok entries -> (
+            let last_log_index_seen =
+              Array.length entries + last_log_index_seen
+            in
+            let%bind action = on_entries entries in
+            match action with
+            | `Continue ->
+                loop ~last_log_index_seen
+            | `Stop ->
+                Deferred.Or_error.ok_unit )
+        | Error e -> (
+            let%bind action = on_error e in
+            match action with
+            | `Continue ->
+                loop ~last_log_index_seen
+            | `Stop ->
+                Deferred.Or_error.ok_unit ) )
+  in
+  loop ~last_log_index_seen:0
 
 let get_detailed_best_chain ?max_length ~logger node_uri =
   let open Deferred.Or_error.Let_syntax in

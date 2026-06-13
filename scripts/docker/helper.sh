@@ -5,10 +5,13 @@ set -eox pipefail
 source "$(dirname "$0")/../export-git-env-vars.sh"
 
 # Array of valid service names
-export VALID_SERVICES=('mina-archive' 'mina-daemon' 'mina-daemon-generic' 'mina-daemon-configured' 'mina-daemon-legacy-hardfork' 'mina-daemon-auto-hardfork' 'mina-rosetta' 'mina-rosetta-generic' 'mina-rosetta-configured' 'mina-test-suite' 'mina-batch-txn' 'mina-zkapp-test-transaction' 'mina-toolchain' 'leaderboard' 'delegation-backend' 'mina-delegation-verifier' 'delegation-backend-toolchain')
+export VALID_SERVICES=('mina-archive' 'mina-daemon' 'mina-daemon-generic' 'mina-daemon-configured' 'mina-daemon-legacy-hardfork' 'mina-daemon-auto-hardfork' 'mina-rosetta' 'mina-rosetta-generic' 'mina-rosetta-configured' 'mina-batch-txn' 'mina-zkapp-test-transaction' 'mina-toolchain' 'leaderboard' 'delegation-backend' 'mina-delegation-verifier' 'delegation-backend-toolchain')
 
 function export_base_image () {
-    # Determine the proper image for ubuntu or debian
+    # Determine the proper image for ubuntu or debian.
+    # gar-cache rewriting is intentionally NOT done here — this file is
+    # meant to stay infra-free. The caller (see scripts/docker/build.sh)
+    # applies rewrite_via_gar_cache to ${IMAGE} after this returns.
     case "${DEB_CODENAME##*=}" in
     focal|jammy|noble)
         IMAGE="ubuntu:${DEB_CODENAME##*=}"
@@ -20,7 +23,7 @@ function export_base_image () {
         IMAGE="europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/debian:bookworm"
     ;;
     esac
-    export IMAGE="--build-arg image=${IMAGE}"
+    export IMAGE
 }
 
 function export_version () {
@@ -119,8 +122,10 @@ function export_docker_tag() {
 
     PLATFORM_SUFFIX="$(get_platform_suffix)"
     export CUSTOM_SUFFIX_ARG
-    export TAG="${DOCKER_REGISTRY}/${SERVICE}:${VERSION}${COMBINED_SUFFIX}${PLATFORM_SUFFIX}${CUSTOM_SUFFIX}"
+    export TAG_VERSION_PART="${VERSION}${COMBINED_SUFFIX}${PLATFORM_SUFFIX}${CUSTOM_SUFFIX}"
+    export TAG="${DOCKER_REGISTRY}/${SERVICE}:${TAG_VERSION_PART}"
     export PLATFORM_SUFFIX
-    export HASHTAG="${DOCKER_REGISTRY}/${SERVICE}:${GITHASH}-${DEB_CODENAME##*=}-${NETWORK##*=}${COMBINED_SUFFIX}${PLATFORM_SUFFIX}${CUSTOM_SUFFIX}"
+    export HASHTAG_VERSION_PART="${GITHASH}-${DEB_CODENAME##*=}-${NETWORK##*=}${COMBINED_SUFFIX}${PLATFORM_SUFFIX}${CUSTOM_SUFFIX}"
+    export HASHTAG="${DOCKER_REGISTRY}/${SERVICE}:${HASHTAG_VERSION_PART}"
 
 }

@@ -168,6 +168,7 @@ build: ocaml_checks reformat-diff libp2p_helper ## Build the main project execut
 		src/app/validate_keypair/validate_keypair.exe \
 		src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe \
 		src/lib/snark_worker/standalone/run_snark_worker.exe \
+		src/app/mina_graphql_client/mina_graphql_client_app.exe \
 		--profile=$(DUNE_PROFILE) \
 		&& echo "✅ Build complete"
 
@@ -182,6 +183,7 @@ build-daemon-utils: ocaml_checks reformat-diff libp2p_helper ## Build daemon uti
 		src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe \
 		src/lib/snark_worker/standalone/run_snark_worker.exe \
 		src/app/rocksdb-scanner/rocksdb_scanner.exe \
+		src/app/mina_graphql_client/mina_graphql_client_app.exe \
 		--profile=$(DUNE_PROFILE) \
 		&& echo "✅ Build complete"
 
@@ -262,6 +264,7 @@ build-test-utils: ocaml_checks reformat-diff ## Build test utilities
 		src/test/command_line_tests/command_line_tests.exe \
 		src/test/archive/patch_archive_test/patch_archive_test.exe \
 		src/test/archive/archive_node_tests/archive_node_tests.exe \
+		src/test/node_status_mock_server/node_status_mock_server.exe \
 		--profile=$(DUNE_PROFILE) \
 		&& echo "✅ Build complete"
 
@@ -433,7 +436,7 @@ check-bash: ## Run shellcheck on bash scripts
 .PHONY: check-docker
 check-docker: ## Run hadolint on Docker files
 ifdef BUILDKITE
-	hadolint --ignore DL3008 --ignore DL3002 --ignore DL3013 --ignore DL3007 --ignore DL3006 --ignore DL3028 dockerfiles/Dockerfile-* dockerfiles/stages/*
+	hadolint --ignore DL3008 --ignore DL3002 --ignore DL3013 --ignore DL3007 --ignore DL3006 --ignore DL3028 dockerfiles/Dockerfile-* dockerfiles/toolchain/*
 else
 	docker run --rm -v $(PWD):/workspace -w /workspace \
 		hadolint/hadolint hadolint \
@@ -444,7 +447,7 @@ else
 		--ignore DL3006 \
 		--ignore DL3028 \
 		dockerfiles/Dockerfile-* \
-		dockerfiles/stages/*
+		dockerfiles/toolchain/*
 endif
 
 ########################################
@@ -700,19 +703,15 @@ cache-put-debian: ## Upload debian packages for prefork genesis creation
 # Docker images
 
 .PHONY: start-local-debian-repo
-start-local-debian-repo: ## Start a local Debian repository
-	$(info 📦 Starting local Debian repository with codename $(CODENAME))
+start-local-debian-repo: ## Stage locally-built debians into the docker build context
+	$(info 📦 Staging local debians from _build into the dockerfiles/ build context)
 
-	@./scripts/debian/aptly.sh stop || true
-
-	@./scripts/debian/aptly.sh start \
-		--codename $(CODENAME) \
-		--debians _build \
-		--component unstable \
-		--clean \
-		--background \
-		--wait \
-		&& echo "✅ Build complete"
+	@# scripts/docker/build.sh stages any .deb files found in the docker build
+	@# context (dockerfiles/) into dockerfiles/_debs and generates an apt index
+	@# there, which the Dockerfiles install from. Make the locally-built debians
+	@# available by copying them into the context.
+	@cp -f _build/*.deb dockerfiles/ \
+		&& echo "✅ Local debians staged"
 
 # General function for building Docker images
 define build_docker_image
@@ -736,8 +735,8 @@ define build_docker_image
 		--network $(2) \
 		--no-cache
 
-	$(info 📦 stopping local Debian repository)
-	@./scripts/debian/aptly.sh stop
+	$(info 📦 cleaning up staged local debians)
+	@rm -f dockerfiles/*.deb
 endef
 
 
@@ -865,8 +864,8 @@ docker-build-daemon-hardfork-docker: ## Generate hardfork packages
 		--no-cache \
 		--load-only
 
-	$(info 📦 stopping local Debian repository)
-	@./scripts/debian/aptly.sh stop
+	$(info 📦 cleaning up staged local debians)
+	@rm -f dockerfiles/*.deb
 
 .PHONY: docker-build-hardfork-rosetta-docker
 docker-build-hardfork-rosetta-docker: SHELL := /bin/bash
@@ -914,8 +913,8 @@ docker-build-hardfork-rosetta-docker: ## Generate hardfork packages
 		--load-only
 
 
-	$(info 📦 stopping local Debian repository)
-	@./scripts/debian/aptly.sh stop
+	$(info 📦 cleaning up staged local debians)
+	@rm -f dockerfiles/*.deb
 
 ########################################
 # Generate odoc documentation

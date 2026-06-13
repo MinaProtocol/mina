@@ -12,8 +12,7 @@ in  Pipeline.build
       ( ArtifactPipelines.pipeline
           ArtifactPipelines.MinaBuildSpec::{
           , artifacts =
-            [ Artifacts.Type.Daemon
-            , Artifacts.Type.DaemonAppsOnly
+            [ Artifacts.Type.DaemonAppsOnly
             , Artifacts.Type.DaemonConfig
             , Artifacts.Type.DaemonAutoHardfork
             , Artifacts.Type.DaemonAutomode
@@ -21,7 +20,7 @@ in  Pipeline.build
             , Artifacts.Type.CreatePreforkGenesis
             , Artifacts.Type.LogProc
             , Artifacts.Type.Archive
-            , Artifacts.Type.Rosetta
+            , Artifacts.Type.RosettaConfig
             , Artifacts.Type.TestExecutive
             , Artifacts.Type.RosettaAppsOnly
             , Artifacts.Type.ZkappTestTransaction

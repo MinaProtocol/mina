@@ -74,7 +74,7 @@ let MinaBuildSpec =
           }
       , default =
           { prefix = "MinaArtifact"
-          , artifacts = Artifacts.AllButTests
+          , artifacts = Artifacts.All
           , buildScript = "./buildkite/scripts/build-release.sh"
           , debVersion = DebianVersions.DebVersion.Bullseye
           , profile = Profiles.Type.Devnet
@@ -117,11 +117,6 @@ let nameSuffix
                                                                      spec.buildFlags}${Arch.nameSuffix
                                                                                          spec.arch}"
 
-let sizeFromArch
-    : Arch.Type -> Size
-    =     \(arch : Arch.Type)
-      ->  merge { Arm64 = Size.Arm64, Amd64 = Size.XLarge } arch
-
 let build_artifacts
     : MinaBuildSpec.Type -> Command.Type
     =     \(spec : MinaBuildSpec.Type)
@@ -155,12 +150,15 @@ let build_artifacts
                                                                         spec.debVersion}"
                   , Cmd.run
                       "./buildkite/scripts/apps/write_to_cache.sh ${DebianVersions.lowerName
-                                                                      spec.debVersion}"
+                                                                      spec.debVersion} ${Network.lowerName
+                                                                                           spec.network}-${Profiles.toSuffixLowercase
+                                                                                                             spec.profile}${BuildFlags.toLabelSegment
+                                                                                                                              spec.buildFlags}${Arch.toSuffixLowercase
+                                                                                                                                                  spec.arch}"
                   ]
             , label = "Debian: Build ${labelSuffix spec}"
             , key = "build-deb-pkg${Optional/default Text "" spec.suffix}"
-            , target =
-                merge { Amd64 = Size.Multi, Arm64 = Size.Arm64 } spec.arch
+            , target = Size.Multi
             , if_ = spec.if_
             , retries =
               [ Command.Retry::{
@@ -188,29 +186,10 @@ let docker_step
                   , arch = spec.arch
                   }
 
-          let size = sizeFromArch spec.arch
+          let size = Size.XLarge
 
           in  merge
-                { Daemon =
-                  [ DockerImage.ReleaseSpec::{
-                    , deps = deps
-                    , service = Artifacts.Type.Daemon
-                    , network = spec.network
-                    , deb_codename = spec.debVersion
-                    , deb_profile = spec.profile
-                    , build_flags = spec.buildFlags
-                    , docker_publish = spec.docker_publish
-                    , deb_repo = DebianRepo.Type.Local
-                    , deb_legacy_version = spec.deb_legacy_version
-                    , deb_storage_repair_version = Some
-                        spec.deb_storage_repair_version
-                    , verify = True
-                    , arch = spec.arch
-                    , size = size
-                    , if_ = spec.if_
-                    }
-                  ]
-                , DaemonAutoHardfork =
+                { DaemonAutoHardfork =
                   [ DockerImage.ReleaseSpec::{
                     , deps =
                           deps
@@ -219,7 +198,7 @@ let docker_step
                             , codename = DockerVersion.ofDebian spec.debVersion
                             , network = spec.network
                             , profile = spec.profile
-                            , artifact = Artifacts.Type.Daemon
+                            , artifact = Artifacts.Type.DaemonConfig
                             }
                     , service = Artifacts.Type.DaemonAutoHardfork
                     , network = spec.network
@@ -354,23 +333,6 @@ let docker_step
                     , size = size
                     }
                   ]
-                , Rosetta =
-                  [ DockerImage.ReleaseSpec::{
-                    , deps = deps
-                    , service = Artifacts.Type.Rosetta
-                    , network = spec.network
-                    , deb_codename = spec.debVersion
-                    , deb_profile = spec.profile
-                    , build_flags = spec.buildFlags
-                    , docker_publish = spec.docker_publish
-                    , deb_repo = DebianRepo.Type.Local
-                    , deb_legacy_version = spec.deb_legacy_version
-                    , verify = True
-                    , arch = spec.arch
-                    , if_ = spec.if_
-                    , size = size
-                    }
-                  ]
                 , RosettaAppsOnly =
                   [ DockerImage.ReleaseSpec::{
                     , deps = deps
@@ -403,7 +365,7 @@ let docker_step
                     , service = Artifacts.Type.RosettaConfig
                     , network = spec.network
                     , image_name = Some
-                        (Artifacts.dockerName Artifacts.Type.Rosetta)
+                        (Artifacts.dockerName Artifacts.Type.RosettaConfig)
                     , deb_codename = spec.debVersion
                     , docker_publish = spec.docker_publish
                     , deb_install_mode =
@@ -427,22 +389,7 @@ let docker_step
                     , size = size
                     }
                   ]
-                , FunctionalTestSuite =
-                  [ DockerImage.ReleaseSpec::{
-                    , deps = deps
-                    , service = Artifacts.Type.FunctionalTestSuite
-                    , network = Network.Type.Devnet
-                    , deb_codename = spec.debVersion
-                    , build_flags = spec.buildFlags
-                    , docker_publish = spec.docker_publish
-                    , deb_repo = DebianRepo.Type.Local
-                    , deb_profile = spec.profile
-                    , deb_legacy_version = spec.deb_legacy_version
-                    , arch = spec.arch
-                    , size = size
-                    , if_ = spec.if_
-                    }
-                  ]
+                , FunctionalTestSuite = [] : List DockerImage.ReleaseSpec.Type
                 , Toolchain = [] : List DockerImage.ReleaseSpec.Type
                 }
                 artifact

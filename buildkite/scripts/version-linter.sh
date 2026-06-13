@@ -16,7 +16,7 @@ source buildkite/scripts/debian/update.sh --verbose
 source buildkite/scripts/handle-fork.sh
 source buildkite/scripts/export-git-env-vars.sh
 
-pip3 install sexpdata==1.0.0
+pip3 install sexpdata==1.0.0 requests
 
 source ./buildkite/scripts/refresh_code.sh
 
@@ -27,10 +27,18 @@ release_branch=origin/$1
 echo "--- Run Python version linter with branches: ${pr_branch} ${base_branch} ${release_branch}"
 ./scripts/version-linter.py ${pr_branch} ${base_branch} ${release_branch}
 
-echo "--- Install Mina"
+echo "--- Audit type shapes"
 source buildkite/scripts/export-git-env-vars.sh
 
-source buildkite/scripts/debian/install.sh "mina-${TESTNET_NAME}" 1
+# audit-type-shapes only inspects the binary's compiled-in type registry, so the
+# freshly-built bare binary from the apps cache is sufficient; no debian package
+# is required. Fall back to the .deb when the bare binary is unavailable. Either
+# way `mina` ends up on PATH.
+if ./buildkite/scripts/apps/restore_binary.sh devnet; then
+  echo "Using bare mina from apps cache"
+else
+  echo "Falling back to debian-installed mina"
+  source buildkite/scripts/debian/install.sh "mina-${TESTNET_NAME}" 1
+fi
 
-echo "--- Audit type shapes"
 mina internal audit-type-shapes

@@ -8,22 +8,18 @@ let PipelineTag = ../../Pipeline/Tag.dhall
 
 let Network = ../../Constants/Network.dhall
 
-let Expr = ../../Pipeline/Expr.dhall
-
-let MainlineBranch = ../../Pipeline/MainlineBranch.dhall
-
 in  Pipeline.build
       ( ArtifactPipelines.pipeline
           ArtifactPipelines.MinaBuildSpec::{
           , artifacts =
-            [ Artifacts.Type.Daemon
-            , Artifacts.Type.DaemonConfig
+            [ Artifacts.Type.DaemonConfig
             , Artifacts.Type.DaemonAppsOnly
             , Artifacts.Type.DaemonAutoHardfork
             , Artifacts.Type.DaemonAutomode
             , Artifacts.Type.LogProc
             , Artifacts.Type.Archive
-            , Artifacts.Type.Rosetta
+            , Artifacts.Type.RosettaAppsOnly
+            , Artifacts.Type.RosettaConfig
             , Artifacts.Type.ZkappTestTransaction
             , Artifacts.Type.CreatePreforkGenesis
             , Artifacts.Type.DaemonStorageToolbox
@@ -36,12 +32,6 @@ in  Pipeline.build
             , PipelineTag.Type.Rosetta
             , PipelineTag.Type.Amd64
             , PipelineTag.Type.Bullseye
-            ]
-          , includeIf =
-            [ Expr.Type.DescendantOf
-                { ancestor = MainlineBranch.Type.Mesa
-                , reason = "Only run on Mesa descendants"
-                }
             ]
           }
       )

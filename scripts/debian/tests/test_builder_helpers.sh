@@ -151,7 +151,6 @@ assert_daemon_utils() {
     local captured_files="$1"
     assert_file_captured "$captured_files" "usr/local/bin/mina-hf-create-runtime-config"
     assert_file_captured "$captured_files" "usr/local/bin/mina-verify-packaged-fork-config"
-    assert_file_captured "$captured_files" "usr/lib/systemd/user/mina.service"
     assert_file_captured "$captured_files" "etc/bash_completion.d/mina"
 }
 
@@ -366,6 +365,7 @@ MOCKEXE
     create_mock_exe "default/src/app/zkapp_test_transaction/zkapp_test_transaction.exe"
     create_mock_exe "default/src/app/delegation_verify/delegation_verify.exe"
     create_mock_exe "default/src/app/dump_slot_ledger/dump_slot_ledger.exe"
+    create_mock_exe "default/src/app/mina_graphql_client/mina_graphql_client_app.exe"
 
     #---------------------------------------------------------------------------
     # Source files under PROJECT_ROOT (referenced via ../ from BUILD_DIR)
@@ -600,10 +600,8 @@ test_build_daemon_mainnet_deb() {
     # Daemon utils
     assert_daemon_utils "$CAPTURED_FILES"
 
-    # Verify service file has mainnet seed URL
-    assert_captured_file_contains "$CAPTURED_LAST_BUILD_DIR" \
-        "usr/lib/systemd/user/mina.service" \
-        "https://storage.googleapis.com/mina-seed-lists/mainnet_seeds.txt"
+    # mina.service is shipped by mina-mainnet-config, not the daemon package
+    assert_file_not_captured "$CAPTURED_FILES" "usr/lib/systemd/user/mina.service"
 
     # Bash completion was generated
     assert_captured_file_contains "$CAPTURED_LAST_BUILD_DIR" "etc/bash_completion.d/mina" "mock bash completion"
@@ -632,6 +630,12 @@ test_build_daemon_mainnet_config_deb() {
 
     # Verify genesis content
     assert_captured_file_contains "$CAPTURED_LAST_BUILD_DIR" "var/lib/coda/mainnet.json" "mainnet"
+
+    # Config package owns mina.service with the correct mainnet seed URL
+    assert_file_captured "$CAPTURED_FILES" "usr/lib/systemd/user/mina.service"
+    assert_captured_file_contains "$CAPTURED_LAST_BUILD_DIR" \
+        "usr/lib/systemd/user/mina.service" \
+        "https://storage.googleapis.com/mina-seed-lists/mainnet_seeds.txt"
 }
 
 test_build_daemon_devnet_deb() {
@@ -648,10 +652,8 @@ test_build_daemon_devnet_deb() {
     assert_common_daemon_binaries "$CAPTURED_FILES"
     assert_daemon_utils "$CAPTURED_FILES"
 
-    # Verify devnet seed URL in service file
-    assert_captured_file_contains "$CAPTURED_LAST_BUILD_DIR" \
-        "usr/lib/systemd/user/mina.service" \
-        "https://storage.googleapis.com/seed-lists/devnet_seeds.txt"
+    # mina.service is shipped by mina-devnet-config, not the daemon package
+    assert_file_not_captured "$CAPTURED_FILES" "usr/lib/systemd/user/mina.service"
 }
 
 test_build_daemon_devnet_config_deb() {
@@ -668,6 +670,12 @@ test_build_daemon_devnet_config_deb() {
     assert_file_not_captured "$CAPTURED_FILES" "usr/local/bin/mina"
 
     assert_captured_file_contains "$CAPTURED_LAST_BUILD_DIR" "var/lib/coda/devnet.json" "devnet"
+
+    # Config package owns mina.service with the correct devnet seed URL
+    assert_file_captured "$CAPTURED_FILES" "usr/lib/systemd/user/mina.service"
+    assert_captured_file_contains "$CAPTURED_LAST_BUILD_DIR" \
+        "usr/lib/systemd/user/mina.service" \
+        "https://storage.googleapis.com/seed-lists/devnet_seeds.txt"
 }
 
 ################################################################################
@@ -815,6 +823,8 @@ test_build_daemon_devnet_automode_deb() {
     assert_control_field "$CAPTURED_CONTROL" "Architecture" "amd64"
     assert_control_contains "$CAPTURED_CONTROL" "Depends" "mina-devnet-postfork-mesa"
     assert_control_contains "$CAPTURED_CONTROL" "Depends" "mina-devnet-prefork-mesa"
+    # Pulls the config package so a standalone automode install gets mina.service
+    assert_control_contains "$CAPTURED_CONTROL" "Depends" "mina-devnet-config"
     assert_control_contains "$CAPTURED_CONTROL" "Replaces" "mina-devnet"
     assert_control_contains "$CAPTURED_CONTROL" "Breaks" "mina-devnet"
     assert_control_contains "$CAPTURED_CONTROL" "Provides" "mina-devnet"
@@ -833,6 +843,8 @@ test_build_daemon_mainnet_automode_deb() {
     assert_control_field "$CAPTURED_CONTROL" "Architecture" "amd64"
     assert_control_contains "$CAPTURED_CONTROL" "Depends" "mina-mainnet-postfork-mesa"
     assert_control_contains "$CAPTURED_CONTROL" "Depends" "mina-mainnet-prefork-mesa"
+    # Pulls the config package so a standalone automode install gets mina.service
+    assert_control_contains "$CAPTURED_CONTROL" "Depends" "mina-mainnet-config"
     assert_control_contains "$CAPTURED_CONTROL" "Replaces" "mina-mainnet"
     assert_control_contains "$CAPTURED_CONTROL" "Breaks" "mina-mainnet"
     assert_control_contains "$CAPTURED_CONTROL" "Provides" "mina-mainnet"
@@ -855,6 +867,9 @@ test_build_daemon_devnet_generic_deb() {
     assert_control_contains "$CAPTURED_CONTROL" "Depends" "mina-logproc"
     assert_control_contains "$CAPTURED_CONTROL" "Suggests" "jq"
     assert_control_contains "$CAPTURED_CONTROL" "Replaces" "mina-devnet"
+    # Shares /usr/local/bin/mina and bash completion with the postfork package
+    assert_control_contains "$CAPTURED_CONTROL" "Replaces" "mina-devnet-postfork-mesa"
+    assert_control_contains "$CAPTURED_CONTROL" "Breaks" "mina-devnet-postfork-mesa"
 
     assert_common_daemon_binaries "$CAPTURED_FILES"
     assert_daemon_utils "$CAPTURED_FILES"
@@ -862,6 +877,9 @@ test_build_daemon_devnet_generic_deb() {
     # Generic packages have no config files
     assert_file_not_captured "$CAPTURED_FILES" "var/lib/coda/devnet.json"
     assert_file_not_captured "$CAPTURED_FILES" "var/lib/coda/config_${EXPECTED_GITHASH_CONFIG}.json"
+
+    # Generic package must NOT ship mina.service (config package owns it)
+    assert_file_not_captured "$CAPTURED_FILES" "usr/lib/systemd/user/mina.service"
 }
 
 test_build_daemon_mainnet_generic_deb() {
@@ -874,6 +892,9 @@ test_build_daemon_mainnet_generic_deb() {
     assert_control_contains "$CAPTURED_CONTROL" "Depends" "mina-logproc"
     assert_control_contains "$CAPTURED_CONTROL" "Suggests" "jq"
     assert_control_contains "$CAPTURED_CONTROL" "Replaces" "mina-mainnet"
+    # Shares /usr/local/bin/mina and bash completion with the postfork package
+    assert_control_contains "$CAPTURED_CONTROL" "Replaces" "mina-mainnet-postfork-mesa"
+    assert_control_contains "$CAPTURED_CONTROL" "Breaks" "mina-mainnet-postfork-mesa"
 
     assert_common_daemon_binaries "$CAPTURED_FILES"
     assert_daemon_utils "$CAPTURED_FILES"
@@ -881,6 +902,9 @@ test_build_daemon_mainnet_generic_deb() {
     # Generic packages have no config files
     assert_file_not_captured "$CAPTURED_FILES" "var/lib/coda/mainnet.json"
     assert_file_not_captured "$CAPTURED_FILES" "var/lib/coda/config_${EXPECTED_GITHASH_CONFIG}.json"
+
+    # Generic package must NOT ship mina.service (config package owns it)
+    assert_file_not_captured "$CAPTURED_FILES" "usr/lib/systemd/user/mina.service"
 }
 
 ################################################################################
@@ -952,6 +976,12 @@ test_build_daemon_devnet_hardfork_config_deb() {
     assert_file_captured "$CAPTURED_FILES" "var/lib/coda/devnet.json"
     assert_captured_file_contains "$CAPTURED_LAST_BUILD_DIR" "var/lib/coda/devnet.json" '{"fork": true}'
 
+    # Hardfork config package owns mina.service with the correct devnet seed URL
+    assert_file_captured "$CAPTURED_FILES" "usr/lib/systemd/user/mina.service"
+    assert_captured_file_contains "$CAPTURED_LAST_BUILD_DIR" \
+        "usr/lib/systemd/user/mina.service" \
+        "https://storage.googleapis.com/seed-lists/devnet_seeds.txt"
+
     unset RUNTIME_CONFIG_JSON LEDGER_TARBALLS
 }
 
@@ -980,6 +1010,12 @@ test_build_daemon_mainnet_hardfork_config_deb() {
 
     assert_file_captured "$CAPTURED_FILES" "var/lib/coda/mainnet.json"
     assert_captured_file_contains "$CAPTURED_LAST_BUILD_DIR" "var/lib/coda/mainnet.json" '{"fork": true}'
+
+    # Hardfork config package owns mina.service with the correct mainnet seed URL
+    assert_file_captured "$CAPTURED_FILES" "usr/lib/systemd/user/mina.service"
+    assert_captured_file_contains "$CAPTURED_LAST_BUILD_DIR" \
+        "usr/lib/systemd/user/mina.service" \
+        "https://storage.googleapis.com/mina-seed-lists/mainnet_seeds.txt"
 
     unset RUNTIME_CONFIG_JSON LEDGER_TARBALLS
 }

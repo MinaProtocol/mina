@@ -77,7 +77,7 @@ let minimalDirtyWhen =
       , S.strictlyStart (S.contains "buildkite/scripts/bench")
       , S.exactly "buildkite/src/Command/ReplayerTest" "dhall"
       , S.strictlyStart (S.contains "buildkite/src/Jobs/Release/MinaArtifact")
-      , S.strictlyStart (S.contains "dockerfiles/stages")
+      , S.strictlyStart (S.contains "dockerfiles/toolchain")
       , S.strictlyStart (S.contains "dockerfiles")
       , S.strictlyStart (S.contains "scripts/debian")
       , S.strictlyStart (S.contains "scripts/docker")
@@ -87,6 +87,7 @@ let minimalDirtyWhen =
       , S.strictlyStart (S.contains "scripts/rosetta")
       , S.exactly "scripts/rosetta/test-block-race" "sh"
       , S.exactly "scripts/version-linter" "py"
+      , S.strictlyStart (S.contains "src/test")
       , S.exactly
           "buildkite/scripts/version-linter-patch-missing-type-shapes"
           "sh"
@@ -96,7 +97,7 @@ let bullseyeDirtyWhen =
         [ S.strictlyStart (S.contains "src")
         , S.strictly (S.contains "Makefile")
         , S.exactly "buildkite/scripts/connect/connect-to-network" "sh"
-        , S.exactly "buildkite/scripts/tests/rosetta-integration-tests" "sh"
+        , S.strictlyStart (S.contains "buildkite/scripts/tests/rosetta")
         , S.exactly "scripts/patch-archive-test" "sh"
         , S.strictlyStart (S.contains "buildkite/src/Jobs/Test")
         ]

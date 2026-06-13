@@ -1,9 +1,5 @@
 let S = ../../Lib/SelectFiles.dhall
 
-let B = ../../External/Buildkite.dhall
-
-let B/SoftFail = B.definitions/commandStep/properties/soft_fail/Type
-
 let JobSpec = ../../Pipeline/JobSpec.dhall
 
 let Pipeline = ../../Pipeline/Dsl.dhall
@@ -16,11 +12,11 @@ let Network = ../../Constants/Network.dhall
 
 let Dockers = ../../Constants/DockerVersions.dhall
 
+let network = Network.Type.Mesa
+
 let Expr = ../../Pipeline/Expr.dhall
 
 let MainlineBranch = ../../Pipeline/MainlineBranch.dhall
-
-let network = Network.Type.Mesa
 
 let dependsOn =
       Dockers.dependsOn Dockers.DepsSpec::{ network = Network.Type.Mesa }
@@ -44,19 +40,23 @@ in  Pipeline.build
           ]
         , excludeIf =
           [ Expr.Type.DescendantOf
-              { ancestor = MainlineBranch.Type.Mesa
+              { ancestor = MainlineBranch.Type.Develop
               , reason =
-                  "Cannot connect to Canary network on Mesa until redeploy"
+                  "Develop branch is incompatible with current mesa network"
+              }
+          , Expr.Type.DescendantOf
+              { ancestor = MainlineBranch.Type.Mesa
+              , reason = "Mesa branch is incompatible with current mesa network"
               }
           ]
         }
       , steps =
         [ ConnectToNetwork.step
-            dependsOn
-            "${Network.lowerName network}"
-            "testnet"
-            "40s"
-            "2m"
-            (B/SoftFail.Boolean False)
+            ConnectToNetwork.Spec::{
+            , dependsOn = dependsOn
+            , mina_suffix = "${Network.lowerName network}"
+            , testnet = "testnet"
+            , peer_list_url = Network.peerListUrl network
+            }
         ]
       }

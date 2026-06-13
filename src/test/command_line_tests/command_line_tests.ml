@@ -14,7 +14,7 @@ module BackgroundMode = struct
       Mina_automation_fixture.Daemon.generate_random_config daemon ledger_file
     in
     let%bind process = Daemon.start daemon in
-    let%bind result = Daemon.Client.wait_for_bootstrap process.client () in
+    let%bind result = Daemon.wait_for_node_init process in
     let%bind () =
       match result with
       | Ok () ->
@@ -41,14 +41,10 @@ module DaemonRecover = struct
        Mina_automation_fixture.Daemon.generate_random_config daemon ledger_file
      in
      let%bind process = Daemon.start daemon in
-     let%bind.Deferred.Result () =
-       Daemon.Client.wait_for_bootstrap process.client ()
-     in
+     let%bind.Deferred.Result () = Daemon.wait_for_node_init process in
      let%bind.Deferred.Result _ = Daemon.Process.force_kill process in
      let%bind process = Daemon.start daemon in
-     let%bind.Deferred.Result () =
-       Daemon.Client.wait_for_bootstrap process.client ()
-     in
+     let%bind.Deferred.Result () = Daemon.wait_for_node_init process in
      let%map () = Daemon.Client.stop_daemon process.client in
      Ok () )
     >>| function
@@ -130,9 +126,7 @@ module ExportSnarkedLedger = struct
       Mina_automation_fixture.Daemon.generate_random_config daemon ledger_file
     in
     let%bind process = Daemon.start daemon in
-    let%bind bootstrap_result =
-      Daemon.Client.wait_for_bootstrap process.client ()
-    in
+    let%bind bootstrap_result = Daemon.wait_for_node_init process in
     let%bind bootstrap_ok =
       match bootstrap_result with
       | Ok () ->
@@ -142,8 +136,8 @@ module ExportSnarkedLedger = struct
           let log_file = Daemon.Config.ConfigDirs.mina_log test.config.dirs in
           let%bind logs = Reader.file_contents log_file in
           let () = printf "Daemon logs:\n%s\n" logs in
-          let%bind () = Daemon.Client.stop_daemon process.client in
-          Deferred.return false
+          let%map () = Daemon.Client.stop_daemon process.client in
+          false
     in
     if not bootstrap_ok then
       Deferred.return
@@ -432,7 +426,7 @@ module AutoHardforkConfigGeneration = struct
         ~block_producer_key:bp_key_path daemon
     in
     (* Wait for daemon to bootstrap *)
-    let%bind result = Daemon.Client.wait_for_bootstrap process.client () in
+    let%bind result = Daemon.wait_for_node_init process in
     let%bind () =
       match result with
       | Ok () ->
@@ -609,7 +603,7 @@ module ConfigFileOverride = struct
     |> Yojson.Safe.to_file override_file ;
     (* Start daemon with override config file *)
     let%bind process = Daemon.start ~config_files:[ override_file ] daemon in
-    let%bind result = Daemon.Client.wait_for_bootstrap process.client () in
+    let%bind result = Daemon.wait_for_node_init process in
     let%bind () =
       match result with
       | Ok () ->
@@ -628,10 +622,10 @@ module ConfigFileOverride = struct
     in
     let%bind () = Daemon.Client.stop_daemon process.client in
     (* Parse and verify the merged config *)
-    let of_option opt ~error =
-      Result.of_option opt ~error:(Error.of_string error) |> Deferred.return
-    in
-    let verification =
+    let validate () =
+      let of_option opt ~error =
+        Result.of_option opt ~error:(Error.of_string error) |> Deferred.return
+      in
       let open Deferred.Or_error.Let_syntax in
       let%bind merged_config =
         Yojson.Safe.from_string output
@@ -683,9 +677,12 @@ module ConfigFileOverride = struct
       in
       Deferred.Or_error.return ()
     in
-    verification
+    validate ()
     >>| function
-    | Ok () -> Mina_automation_fixture.Intf.Passed | Error err -> Failed err
+    | Ok () ->
+        Mina_automation_fixture.Intf.Passed
+    | Error err ->
+        Mina_automation_fixture.Intf.Failed err
 end
 
 module PeerListUrlInvalidScheme = struct
@@ -879,6 +876,123 @@ module PeerListUrlValidHttps = struct
                    (Core.Signal.to_string signal) ) ) )
 end
 
+(** Verify the daemon sends node-status reports to the configured URL.
+
+    Starts a mock HTTP server, boots the daemon with [--node-status-url]
+    pointing at it, waits for bootstrap, then polls the mock for collected
+    payloads and validates expected JSON fields are present. *)
+module NodeStatusReport = struct
+  type t = Mina_automation_fixture.Daemon.before_bootstrap
+
+  let default_mock_server_port = 19876
+
+  let mock_server_port =
+    Sys.getenv "MINA_NODE_STATUS_MOCK_PORT"
+    |> Option.bind ~f:(fun s -> Option.try_with (fun () -> Int.of_string s))
+    |> Option.value ~default:default_mock_server_port
+
+  (** Poll [/collected-status] until at least one payload arrives. *)
+  let poll_for_status ~port ~timeout_min =
+    let start_time = Core.Time.now () in
+    let timeout = Core.Time.Span.of_min timeout_min in
+    let rec go () =
+      let%bind statuses_result =
+        Node_status_mock_server.collected_status ~port
+      in
+      match statuses_result with
+      | Error (raw, msg) ->
+          Deferred.return
+            (Error
+               (sprintf "Failed to parse status payload: %s\nRaw: %s" msg raw)
+            )
+      | Ok [] ->
+          if
+            Core.Time.Span.( > )
+              (Core.Time.diff (Core.Time.now ()) start_time)
+              timeout
+          then
+            Deferred.return (Error "Timed out waiting for node status reports")
+          else
+            let%bind () = after (Core.Time.Span.of_sec 5.) in
+            go ()
+      | Ok (hd :: rest) ->
+          Deferred.return (Ok (Mina_stdlib.Nonempty_list.init hd rest))
+    in
+    go ()
+
+  let test_case (test : t) =
+    let port = mock_server_port in
+    let mock_ref = ref None in
+    let process_ref = ref None in
+    Monitor.protect
+      (fun () ->
+        (* 1. Start mock server *)
+        let%bind mock = Node_status_mock_server.start ~port in
+        mock_ref := Some mock ;
+        let%bind () = Node_status_mock_server.health_check ~port () in
+        (* 2. Setup and start daemon *)
+        let daemon = Daemon.of_config test.config in
+        let%bind () = Daemon.Config.generate_keys test.config in
+        let ledger_file = test.config.dirs.conf ^/ "daemon.json" in
+        let%bind () =
+          Mina_automation_fixture.Daemon.generate_random_config daemon
+            ledger_file
+        in
+        let status_url = sprintf "http://localhost:%d/node-status" port in
+        let%bind process =
+          Daemon.start ~node_status_url:status_url ~simplified_node_stats:false
+            daemon
+        in
+        process_ref := Some process ;
+        (* 3. Wait for bootstrap *)
+        let%bind result = Daemon.wait_for_node_init process in
+        match result with
+        | Error e ->
+            let () = printf "Error:\n%s\n" (Error.to_string_hum e) in
+            let log_file = Daemon.Config.ConfigDirs.mina_log test.config.dirs in
+            let%bind logs = Reader.file_contents log_file in
+            let () = printf "Daemon logs:\n%s\n" logs in
+            let%bind () = Writer.flushed (Lazy.force Writer.stdout) in
+            Deferred.return
+              (Mina_automation_fixture.Intf.Failed
+                 (Error.tag e ~tag:"Bootstrap failed") )
+        | Ok () -> (
+            (* 4. Poll for status reports *)
+            let%map status_result = poll_for_status ~port ~timeout_min:3. in
+            (* 5. Validate - if we got statuses, they're already validated by parsing *)
+            match status_result with
+            | Error msg ->
+                Mina_automation_fixture.Intf.Failed (Error.of_string msg)
+            | Ok _statuses ->
+                Mina_automation_fixture.Intf.Passed ) )
+      ~finally:(fun () ->
+        let%bind () =
+          match !process_ref with
+          | None ->
+              Deferred.unit
+          | Some process -> (
+              let%bind stop_result =
+                Monitor.try_with (fun () ->
+                    Daemon.Client.stop_daemon process.client )
+              in
+              match stop_result with
+              | Ok () ->
+                  Deferred.unit
+              | Error _exn ->
+                  (* Fall back to forcefully killing the daemon; ignore any errors *)
+                  let%map _ =
+                    Monitor.try_with (fun () ->
+                        Daemon.Process.force_kill process )
+                  in
+                  () )
+        in
+        match !mock_ref with
+        | None ->
+            Deferred.unit
+        | Some mock ->
+            Node_status_mock_server.stop mock )
+end
+
 let () =
   let open Alcotest in
   run "Test commadline."
@@ -1009,5 +1123,13 @@ let () =
                ( module Mina_automation_fixture.Daemon
                         .Make_FixtureWithoutBootstrap
                           (PeerListUrlHttpWarning) ) )
+        ] )
+    ; ( "node-status-report"
+      , [ test_case
+            "The mina daemon sends node status reports to configured URL" `Slow
+            (Mina_automation_runner.Runner.run_blocking
+               ( module Mina_automation_fixture.Daemon
+                        .Make_FixtureWithoutBootstrap
+                          (NodeStatusReport) ) )
         ] )
     ]

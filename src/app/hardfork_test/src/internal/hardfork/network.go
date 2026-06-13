@@ -26,7 +26,7 @@ func (t *HardforkTest) startLocalNetwork(minaExecutable string, profile string, 
 		"--whales", strconv.Itoa(t.Config.NumWhales),
 		"--fish", strconv.Itoa(t.Config.NumFish),
 		"--nodes", strconv.Itoa(t.Config.NumNodes),
-		"--log-level", "Error",
+		"--log-level", "Info",
 		"--file-log-level", "Trace",
 		"--value-transfer-txns",
 		"--transaction-interval", strconv.Itoa(t.Config.PaymentInterval),
@@ -34,7 +34,11 @@ func (t *HardforkTest) startLocalNetwork(minaExecutable string, profile string, 
 	)
 
 	cmd.Args = append(cmd.Args, extraArgs...)
-	cmd.Env = append(os.Environ(), "MINA_EXE="+minaExecutable)
+	cmd.Env = append(
+		os.Environ(),
+		"MINA_EXE="+minaExecutable,
+		"MINA_GRAPHQL_CLIENT_EXE="+t.Config.MinaGraphqlClientExe,
+	)
 
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
