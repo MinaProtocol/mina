@@ -37,17 +37,21 @@ dune build \
      src/app/logproc/logproc.exe
 
 # start mina-local-network
-./scripts/mina-local-network/mina-local-network.sh -a -r \
+# NOTE: archive is enabled via -ap <port> (empty by default) and a fresh
+# config/keypairs/ledger via -c reset. The older -a/-r/-tf flags no longer exist
+# in mina-local-network.sh.
+./scripts/mina-local-network/mina-local-network.sh -ap 3086 -c reset \
+    -ph "${PG_HOST}" \
+    -pp "${PG_PORT}" \
     -pu "${PG_USER}" \
     -pd "${PG_DB}" \
     -ppw "${PG_PW}" \
-    -tf 1 \
     --override-slot-time 30000 \
     -zt \
     -vt \
     -lp &
 
-LOCAL_NETWORK_DATA_FOLDER="${HOME}"/.mina-network/mina-local-network-2-1-1
+LOCAL_NETWORK_DATA_FOLDER="${HOME}"/.mina-network
 
 trap "pkill -f mina-local-network" EXIT
 
@@ -93,15 +97,15 @@ echo '{ "genesis_ledger": { "accounts": '"$(cat _tmp.json | jq '.accounts')"', "
   | jq -c > ./src/test/archive/sample_db/replayer_input_file.json
 rm _tmp.json
 
-echo "Regenerating genesis_ledger"
-cat src/test/archive/sample_db/genesis.json | jq ".ledger=$(cat $LOCAL_NETWORK_DATA_FOLDER/genesis_ledger.json | jq -c)"  > _tmp.json
-#update genesis_state_timestamp to the one from daemon.json
-jq --arg timestamp \
-   "$(cat $LOCAL_NETWORK_DATA_FOLDER/daemon.json | jq -r '.genesis.genesis_state_timestamp')" \
-   '.genesis.genesis_state_timestamp = $timestamp' \
-   _tmp.json > _tmp2.json && mv _tmp2.json _tmp.json
-
-mv _tmp.json src/test/archive/sample_db/genesis.json
+echo "Regenerating genesis config"
+# The archive node is started with this file as its config and recomputes the
+# genesis block from it. It must therefore carry the SAME genesis ledger AND the
+# SAME genesis/proof constants the network ran with (k, slots_per_epoch,
+# grace_period_slots, block_window_duration_ms, transaction_capacity, ...),
+# otherwise the recomputed genesis state hash won't match the produced blocks and
+# the replayer can't find the genesis block. daemon.json is the network's full
+# runtime config, so use it verbatim.
+cp "$LOCAL_NETWORK_DATA_FOLDER/daemon.json" src/test/archive/sample_db/genesis.json
 
 echo "Finished regenerate testing replay"
 

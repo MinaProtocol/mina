@@ -2,8 +2,8 @@
 -- PostgreSQL database dump
 --
 
--- Dumped from database version 12.22 (Ubuntu 12.22-0ubuntu0.20.04.4)
--- Dumped by pg_dump version 12.22 (Ubuntu 12.22-0ubuntu0.20.04.4)
+-- Dumped from database version 16.8
+-- Dumped by pg_dump version 16.8
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -138,7 +138,7 @@ CREATE SEQUENCE public.account_identifiers_id_seq
     CACHE 1;
 
 
-ALTER TABLE public.account_identifiers_id_seq OWNER TO postgres;
+ALTER SEQUENCE public.account_identifiers_id_seq OWNER TO postgres;
 
 --
 -- Name: account_identifiers_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
@@ -226,7 +226,7 @@ CREATE SEQUENCE public.blocks_id_seq
     CACHE 1;
 
 
-ALTER TABLE public.blocks_id_seq OWNER TO postgres;
+ALTER SEQUENCE public.blocks_id_seq OWNER TO postgres;
 
 --
 -- Name: blocks_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
@@ -311,7 +311,7 @@ CREATE SEQUENCE public.epoch_data_id_seq
     CACHE 1;
 
 
-ALTER TABLE public.epoch_data_id_seq OWNER TO postgres;
+ALTER SEQUENCE public.epoch_data_id_seq OWNER TO postgres;
 
 --
 -- Name: epoch_data_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
@@ -348,7 +348,7 @@ CREATE SEQUENCE public.internal_commands_id_seq
     CACHE 1;
 
 
-ALTER TABLE public.internal_commands_id_seq OWNER TO postgres;
+ALTER SEQUENCE public.internal_commands_id_seq OWNER TO postgres;
 
 --
 -- Name: internal_commands_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
@@ -384,7 +384,7 @@ CREATE SEQUENCE public.protocol_versions_id_seq
     CACHE 1;
 
 
-ALTER TABLE public.protocol_versions_id_seq OWNER TO postgres;
+ALTER SEQUENCE public.protocol_versions_id_seq OWNER TO postgres;
 
 --
 -- Name: protocol_versions_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
@@ -418,7 +418,7 @@ CREATE SEQUENCE public.public_keys_id_seq
     CACHE 1;
 
 
-ALTER TABLE public.public_keys_id_seq OWNER TO postgres;
+ALTER SEQUENCE public.public_keys_id_seq OWNER TO postgres;
 
 --
 -- Name: public_keys_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
@@ -452,7 +452,7 @@ CREATE SEQUENCE public.snarked_ledger_hashes_id_seq
     CACHE 1;
 
 
-ALTER TABLE public.snarked_ledger_hashes_id_seq OWNER TO postgres;
+ALTER SEQUENCE public.snarked_ledger_hashes_id_seq OWNER TO postgres;
 
 --
 -- Name: snarked_ledger_hashes_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
@@ -491,7 +491,7 @@ CREATE SEQUENCE public.timing_info_id_seq
     CACHE 1;
 
 
-ALTER TABLE public.timing_info_id_seq OWNER TO postgres;
+ALTER SEQUENCE public.timing_info_id_seq OWNER TO postgres;
 
 --
 -- Name: timing_info_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
@@ -525,7 +525,7 @@ CREATE SEQUENCE public.token_symbols_id_seq
     CACHE 1;
 
 
-ALTER TABLE public.token_symbols_id_seq OWNER TO postgres;
+ALTER SEQUENCE public.token_symbols_id_seq OWNER TO postgres;
 
 --
 -- Name: token_symbols_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
@@ -561,7 +561,7 @@ CREATE SEQUENCE public.tokens_id_seq
     CACHE 1;
 
 
-ALTER TABLE public.tokens_id_seq OWNER TO postgres;
+ALTER SEQUENCE public.tokens_id_seq OWNER TO postgres;
 
 --
 -- Name: tokens_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
@@ -604,7 +604,7 @@ CREATE SEQUENCE public.user_commands_id_seq
     CACHE 1;
 
 
-ALTER TABLE public.user_commands_id_seq OWNER TO postgres;
+ALTER SEQUENCE public.user_commands_id_seq OWNER TO postgres;
 
 --
 -- Name: user_commands_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
@@ -638,7 +638,7 @@ CREATE SEQUENCE public.voting_for_id_seq
     CACHE 1;
 
 
-ALTER TABLE public.voting_for_id_seq OWNER TO postgres;
+ALTER SEQUENCE public.voting_for_id_seq OWNER TO postgres;
 
 --
 -- Name: voting_for_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
@@ -679,7 +679,7 @@ CREATE SEQUENCE public.zkapp_account_precondition_id_seq
     CACHE 1;
 
 
-ALTER TABLE public.zkapp_account_precondition_id_seq OWNER TO postgres;
+ALTER SEQUENCE public.zkapp_account_precondition_id_seq OWNER TO postgres;
 
 --
 -- Name: zkapp_account_precondition_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
@@ -740,7 +740,7 @@ CREATE SEQUENCE public.zkapp_account_update_body_id_seq
     CACHE 1;
 
 
-ALTER TABLE public.zkapp_account_update_body_id_seq OWNER TO postgres;
+ALTER SEQUENCE public.zkapp_account_update_body_id_seq OWNER TO postgres;
 
 --
 -- Name: zkapp_account_update_body_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
@@ -775,7 +775,7 @@ CREATE SEQUENCE public.zkapp_account_update_failures_id_seq
     CACHE 1;
 
 
-ALTER TABLE public.zkapp_account_update_failures_id_seq OWNER TO postgres;
+ALTER SEQUENCE public.zkapp_account_update_failures_id_seq OWNER TO postgres;
 
 --
 -- Name: zkapp_account_update_failures_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
@@ -797,7 +797,7 @@ CREATE SEQUENCE public.zkapp_account_update_id_seq
     CACHE 1;
 
 
-ALTER TABLE public.zkapp_account_update_id_seq OWNER TO postgres;
+ALTER SEQUENCE public.zkapp_account_update_id_seq OWNER TO postgres;
 
 --
 -- Name: zkapp_account_update_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
@@ -837,7 +837,7 @@ CREATE SEQUENCE public.zkapp_accounts_id_seq
     CACHE 1;
 
 
-ALTER TABLE public.zkapp_accounts_id_seq OWNER TO postgres;
+ALTER SEQUENCE public.zkapp_accounts_id_seq OWNER TO postgres;
 
 --
 -- Name: zkapp_accounts_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
@@ -875,7 +875,7 @@ CREATE SEQUENCE public.zkapp_action_states_id_seq
     CACHE 1;
 
 
-ALTER TABLE public.zkapp_action_states_id_seq OWNER TO postgres;
+ALTER SEQUENCE public.zkapp_action_states_id_seq OWNER TO postgres;
 
 --
 -- Name: zkapp_action_states_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
@@ -910,7 +910,7 @@ CREATE SEQUENCE public.zkapp_amount_bounds_id_seq
     CACHE 1;
 
 
-ALTER TABLE public.zkapp_amount_bounds_id_seq OWNER TO postgres;
+ALTER SEQUENCE public.zkapp_amount_bounds_id_seq OWNER TO postgres;
 
 --
 -- Name: zkapp_amount_bounds_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
@@ -945,7 +945,7 @@ CREATE SEQUENCE public.zkapp_balance_bounds_id_seq
     CACHE 1;
 
 
-ALTER TABLE public.zkapp_balance_bounds_id_seq OWNER TO postgres;
+ALTER SEQUENCE public.zkapp_balance_bounds_id_seq OWNER TO postgres;
 
 --
 -- Name: zkapp_balance_bounds_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
@@ -982,7 +982,7 @@ CREATE SEQUENCE public.zkapp_commands_id_seq
     CACHE 1;
 
 
-ALTER TABLE public.zkapp_commands_id_seq OWNER TO postgres;
+ALTER SEQUENCE public.zkapp_commands_id_seq OWNER TO postgres;
 
 --
 -- Name: zkapp_commands_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
@@ -1020,7 +1020,7 @@ CREATE SEQUENCE public.zkapp_epoch_data_id_seq
     CACHE 1;
 
 
-ALTER TABLE public.zkapp_epoch_data_id_seq OWNER TO postgres;
+ALTER SEQUENCE public.zkapp_epoch_data_id_seq OWNER TO postgres;
 
 --
 -- Name: zkapp_epoch_data_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
@@ -1055,7 +1055,7 @@ CREATE SEQUENCE public.zkapp_epoch_ledger_id_seq
     CACHE 1;
 
 
-ALTER TABLE public.zkapp_epoch_ledger_id_seq OWNER TO postgres;
+ALTER SEQUENCE public.zkapp_epoch_ledger_id_seq OWNER TO postgres;
 
 --
 -- Name: zkapp_epoch_ledger_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
@@ -1089,7 +1089,7 @@ CREATE SEQUENCE public.zkapp_events_id_seq
     CACHE 1;
 
 
-ALTER TABLE public.zkapp_events_id_seq OWNER TO postgres;
+ALTER SEQUENCE public.zkapp_events_id_seq OWNER TO postgres;
 
 --
 -- Name: zkapp_events_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
@@ -1126,7 +1126,7 @@ CREATE SEQUENCE public.zkapp_fee_payer_body_id_seq
     CACHE 1;
 
 
-ALTER TABLE public.zkapp_fee_payer_body_id_seq OWNER TO postgres;
+ALTER SEQUENCE public.zkapp_fee_payer_body_id_seq OWNER TO postgres;
 
 --
 -- Name: zkapp_fee_payer_body_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
@@ -1172,7 +1172,7 @@ CREATE SEQUENCE public.zkapp_field_array_id_seq
     CACHE 1;
 
 
-ALTER TABLE public.zkapp_field_array_id_seq OWNER TO postgres;
+ALTER SEQUENCE public.zkapp_field_array_id_seq OWNER TO postgres;
 
 --
 -- Name: zkapp_field_array_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
@@ -1194,7 +1194,7 @@ CREATE SEQUENCE public.zkapp_field_id_seq
     CACHE 1;
 
 
-ALTER TABLE public.zkapp_field_id_seq OWNER TO postgres;
+ALTER SEQUENCE public.zkapp_field_id_seq OWNER TO postgres;
 
 --
 -- Name: zkapp_field_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
@@ -1229,7 +1229,7 @@ CREATE SEQUENCE public.zkapp_global_slot_bounds_id_seq
     CACHE 1;
 
 
-ALTER TABLE public.zkapp_global_slot_bounds_id_seq OWNER TO postgres;
+ALTER SEQUENCE public.zkapp_global_slot_bounds_id_seq OWNER TO postgres;
 
 --
 -- Name: zkapp_global_slot_bounds_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
@@ -1264,7 +1264,7 @@ CREATE SEQUENCE public.zkapp_length_bounds_id_seq
     CACHE 1;
 
 
-ALTER TABLE public.zkapp_length_bounds_id_seq OWNER TO postgres;
+ALTER SEQUENCE public.zkapp_length_bounds_id_seq OWNER TO postgres;
 
 --
 -- Name: zkapp_length_bounds_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
@@ -1304,7 +1304,7 @@ CREATE SEQUENCE public.zkapp_network_precondition_id_seq
     CACHE 1;
 
 
-ALTER TABLE public.zkapp_network_precondition_id_seq OWNER TO postgres;
+ALTER SEQUENCE public.zkapp_network_precondition_id_seq OWNER TO postgres;
 
 --
 -- Name: zkapp_network_precondition_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
@@ -1339,7 +1339,7 @@ CREATE SEQUENCE public.zkapp_nonce_bounds_id_seq
     CACHE 1;
 
 
-ALTER TABLE public.zkapp_nonce_bounds_id_seq OWNER TO postgres;
+ALTER SEQUENCE public.zkapp_nonce_bounds_id_seq OWNER TO postgres;
 
 --
 -- Name: zkapp_nonce_bounds_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
@@ -1386,7 +1386,7 @@ CREATE SEQUENCE public.zkapp_permissions_id_seq
     CACHE 1;
 
 
-ALTER TABLE public.zkapp_permissions_id_seq OWNER TO postgres;
+ALTER SEQUENCE public.zkapp_permissions_id_seq OWNER TO postgres;
 
 --
 -- Name: zkapp_permissions_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
@@ -1451,7 +1451,7 @@ CREATE SEQUENCE public.zkapp_states_id_seq
     CACHE 1;
 
 
-ALTER TABLE public.zkapp_states_id_seq OWNER TO postgres;
+ALTER SEQUENCE public.zkapp_states_id_seq OWNER TO postgres;
 
 --
 -- Name: zkapp_states_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
@@ -1516,7 +1516,7 @@ CREATE SEQUENCE public.zkapp_states_nullable_id_seq
     CACHE 1;
 
 
-ALTER TABLE public.zkapp_states_nullable_id_seq OWNER TO postgres;
+ALTER SEQUENCE public.zkapp_states_nullable_id_seq OWNER TO postgres;
 
 --
 -- Name: zkapp_states_nullable_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
@@ -1554,7 +1554,7 @@ CREATE SEQUENCE public.zkapp_timing_info_id_seq
     CACHE 1;
 
 
-ALTER TABLE public.zkapp_timing_info_id_seq OWNER TO postgres;
+ALTER SEQUENCE public.zkapp_timing_info_id_seq OWNER TO postgres;
 
 --
 -- Name: zkapp_timing_info_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
@@ -1589,7 +1589,7 @@ CREATE SEQUENCE public.zkapp_token_id_bounds_id_seq
     CACHE 1;
 
 
-ALTER TABLE public.zkapp_token_id_bounds_id_seq OWNER TO postgres;
+ALTER SEQUENCE public.zkapp_token_id_bounds_id_seq OWNER TO postgres;
 
 --
 -- Name: zkapp_token_id_bounds_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
@@ -1630,7 +1630,7 @@ CREATE SEQUENCE public.zkapp_updates_id_seq
     CACHE 1;
 
 
-ALTER TABLE public.zkapp_updates_id_seq OWNER TO postgres;
+ALTER SEQUENCE public.zkapp_updates_id_seq OWNER TO postgres;
 
 --
 -- Name: zkapp_updates_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
@@ -1664,7 +1664,7 @@ CREATE SEQUENCE public.zkapp_uris_id_seq
     CACHE 1;
 
 
-ALTER TABLE public.zkapp_uris_id_seq OWNER TO postgres;
+ALTER SEQUENCE public.zkapp_uris_id_seq OWNER TO postgres;
 
 --
 -- Name: zkapp_uris_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
@@ -1698,7 +1698,7 @@ CREATE SEQUENCE public.zkapp_verification_key_hashes_id_seq
     CACHE 1;
 
 
-ALTER TABLE public.zkapp_verification_key_hashes_id_seq OWNER TO postgres;
+ALTER SEQUENCE public.zkapp_verification_key_hashes_id_seq OWNER TO postgres;
 
 --
 -- Name: zkapp_verification_key_hashes_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
@@ -1733,7 +1733,7 @@ CREATE SEQUENCE public.zkapp_verification_keys_id_seq
     CACHE 1;
 
 
-ALTER TABLE public.zkapp_verification_keys_id_seq OWNER TO postgres;
+ALTER SEQUENCE public.zkapp_verification_keys_id_seq OWNER TO postgres;
 
 --
 -- Name: zkapp_verification_keys_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
@@ -2044,127 +2044,127 @@ COPY public.account_identifiers (id, public_key_id, token_id) FROM stdin;
 15	16	1
 16	17	1
 17	18	1
-18	19	1
-19	20	1
-20	21	1
-21	22	1
-22	23	1
-23	24	1
-24	25	1
-25	26	1
-26	27	1
-27	28	1
-28	29	1
-29	30	1
-30	31	1
-31	32	1
-32	33	1
-33	34	1
-34	35	1
-35	36	1
-36	37	1
-37	38	1
-38	39	1
-39	40	1
-40	41	1
-41	42	1
-42	43	1
-43	44	1
-44	45	1
-45	46	1
-46	47	1
-47	48	1
-48	49	1
-49	50	1
-50	51	1
-51	52	1
-52	53	1
-53	54	1
-54	55	1
-55	56	1
-56	57	1
-57	58	1
-58	59	1
-59	60	1
-60	61	1
-61	62	1
-62	63	1
-63	64	1
-64	65	1
-65	66	1
-66	67	1
-67	68	1
-68	69	1
-69	70	1
-70	71	1
-71	72	1
-72	73	1
-73	74	1
-74	75	1
-75	76	1
-76	77	1
-77	78	1
-78	79	1
-79	80	1
-80	81	1
-81	82	1
-82	83	1
-83	84	1
-84	85	1
-85	86	1
-86	87	1
-87	88	1
-88	89	1
-89	90	1
-90	91	1
-91	92	1
-92	93	1
-93	94	1
-94	95	1
-95	96	1
-96	97	1
-97	98	1
-98	99	1
-99	100	1
-100	101	1
-101	102	1
-102	103	1
-103	104	1
-104	105	1
-105	106	1
-106	107	1
-107	108	1
-108	109	1
-109	110	1
-110	111	1
-111	112	1
-112	113	1
-113	114	1
-114	115	1
-115	116	1
-116	117	1
-117	118	1
-118	119	1
-119	120	1
-120	121	1
-121	122	1
-122	123	1
-123	124	1
-124	125	1
-125	126	1
-126	127	1
-127	128	1
-128	129	1
-129	130	1
-130	131	1
-131	132	1
+18	20	1
+19	21	1
+20	22	1
+21	23	1
+22	24	1
+23	25	1
+24	26	1
+25	27	1
+26	28	1
+27	29	1
+28	30	1
+29	31	1
+30	32	1
+31	33	1
+32	34	1
+33	35	1
+34	36	1
+35	37	1
+36	38	1
+37	39	1
+38	40	1
+39	41	1
+40	42	1
+41	43	1
+42	44	1
+43	45	1
+44	46	1
+45	47	1
+46	48	1
+47	49	1
+48	50	1
+49	51	1
+50	52	1
+51	53	1
+52	54	1
+53	55	1
+54	56	1
+55	57	1
+56	58	1
+57	59	1
+58	60	1
+59	61	1
+60	62	1
+61	63	1
+62	64	1
+63	65	1
+64	66	1
+65	67	1
+66	68	1
+67	69	1
+68	70	1
+69	71	1
+70	72	1
+71	73	1
+72	74	1
+73	75	1
+74	76	1
+75	77	1
+76	78	1
+77	79	1
+78	80	1
+79	81	1
+80	82	1
+81	83	1
+82	84	1
+83	85	1
+84	86	1
+85	87	1
+86	88	1
+87	89	1
+88	90	1
+89	91	1
+90	92	1
+91	93	1
+92	94	1
+93	95	1
+94	96	1
+95	97	1
+96	98	1
+97	99	1
+98	100	1
+99	101	1
+100	102	1
+101	103	1
+102	104	1
+103	105	1
+104	106	1
+105	107	1
+106	108	1
+107	109	1
+108	110	1
+109	111	1
+110	112	1
+111	113	1
+112	114	1
+113	115	1
+114	116	1
+115	117	1
+116	118	1
+117	119	1
+118	120	1
+119	121	1
+120	122	1
+121	123	1
+122	124	1
+123	125	1
+124	126	1
+125	127	1
+126	128	1
+127	129	1
+128	130	1
+129	131	1
+130	132	1
+131	19	1
 132	133	1
 133	134	1
 134	135	1
-135	136	1
-136	137	1
-137	138	1
-138	139	1
+135	137	1
+136	138	1
+137	139	1
+138	136	1
 139	140	1
 140	141	1
 141	142	1
@@ -2294,162 +2294,162 @@ COPY public.accounts_accessed (ledger_index, block_id, account_identifier_id, to
 153	1	14	1	79	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	15	1	14	1	\N
 166	1	15	1	206	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	16	1	15	1	\N
 137	1	16	1	340	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	17	1	16	1	\N
-105	1	17	1	382	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	18	1	17	1	\N
-70	1	18	1	488	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	19	1	18	1	\N
-27	1	19	1	135	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	20	1	19	1	\N
-46	1	20	1	126	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	21	1	20	1	\N
-43	1	21	1	10	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	22	1	21	1	\N
-117	1	22	1	278	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	23	1	22	1	\N
-204	1	23	1	46	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	24	1	23	1	\N
-187	1	24	1	104	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	25	1	24	1	\N
-72	1	25	1	10	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	26	1	25	1	\N
-216	1	26	1	271	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	27	1	26	1	\N
-210	1	27	1	315	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	28	1	27	1	\N
-79	1	28	1	162	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	29	1	28	1	\N
-167	1	29	1	86	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	30	1	29	1	\N
-181	1	30	1	409	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	31	1	30	1	\N
-156	1	31	1	500	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	32	1	31	1	\N
-96	1	32	1	57	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	33	1	32	1	\N
-191	1	33	1	204	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	34	1	33	1	\N
-132	1	34	1	262	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	35	1	34	1	\N
-111	1	35	1	10	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	36	1	35	1	\N
-5	1	36	1	0	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	37	1	36	1	\N
-171	1	37	1	156	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	38	1	37	1	\N
-64	1	38	1	417	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	39	1	38	1	\N
-68	1	39	1	10	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	40	1	39	1	\N
-51	1	40	1	85	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	41	1	40	1	\N
-227	1	41	1	103	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	42	1	41	1	\N
-141	1	42	1	67	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	43	1	42	1	\N
-42	1	43	1	10	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	44	1	43	1	\N
-133	1	44	1	500	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	45	1	44	1	\N
-82	1	45	1	198	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	46	1	45	1	\N
-95	1	46	1	489	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	47	1	46	1	\N
-188	1	47	1	298	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	48	1	47	1	\N
-30	1	48	1	36	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	49	1	48	1	\N
-90	1	49	1	334	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	50	1	49	1	\N
-14	1	50	1	344	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	51	1	50	1	\N
-35	1	51	1	451	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	52	1	51	1	\N
-85	1	52	1	371	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	53	1	52	1	\N
-127	1	53	1	234	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	54	1	53	1	\N
-222	1	54	1	345	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	55	1	54	1	\N
-76	1	55	1	282	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	56	1	55	1	\N
-231	1	56	1	339	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	57	1	56	1	\N
-15	1	57	1	215	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	58	1	57	1	\N
-220	1	58	1	193	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	59	1	58	1	\N
-16	1	59	1	60	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	60	1	59	1	\N
-58	1	60	1	350	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	61	1	60	1	\N
-146	1	61	1	223	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	62	1	61	1	\N
-62	1	62	1	449	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	63	1	62	1	\N
-185	1	63	1	142	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	64	1	63	1	\N
-151	1	64	1	300	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	65	1	64	1	\N
-3	1	65	1	500000000000	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	66	1	65	1	\N
-165	1	66	1	256	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	67	1	66	1	\N
-103	1	67	1	125	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	68	1	67	1	\N
-41	1	68	1	236	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	69	1	68	1	\N
-239	1	69	1	10	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	70	1	69	1	\N
-110	1	70	1	179	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	71	1	70	1	\N
-13	1	71	1	194	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	72	1	71	1	\N
-26	1	72	1	185	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	73	1	72	1	\N
-98	1	73	1	342	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	74	1	73	1	\N
-215	1	74	1	157	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	75	1	74	1	\N
-91	1	75	1	135	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	76	1	75	1	\N
-159	1	76	1	456	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	77	1	76	1	\N
-208	1	77	1	336	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	78	1	77	1	\N
-207	1	78	1	280	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	79	1	78	1	\N
-182	1	79	1	187	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	80	1	79	1	\N
-157	1	80	1	387	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	81	1	80	1	\N
-33	1	81	1	500	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	82	1	81	1	\N
-201	1	82	1	151	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	83	1	82	1	\N
-9	1	83	1	356	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	84	1	83	1	\N
-234	1	84	1	24	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	85	1	84	1	\N
-40	1	85	1	152	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	86	1	85	1	\N
-18	1	86	1	10	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	87	1	86	1	\N
-229	1	87	1	500	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	88	1	87	1	\N
-20	1	88	1	186	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	89	1	88	1	\N
-184	1	89	1	266	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	90	1	89	1	\N
-1	1	90	1	5000000000	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	91	1	90	1	\N
-139	1	91	1	81	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	92	1	91	1	\N
-164	1	92	1	10	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	93	1	92	1	\N
-199	1	93	1	379	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	94	1	93	1	\N
-109	1	94	1	315	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	95	1	94	1	\N
-47	1	95	1	226	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	96	1	95	1	\N
-214	1	96	1	166	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	97	1	96	1	\N
-112	1	97	1	302	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	98	1	97	1	\N
-144	1	98	1	269	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	99	1	98	1	\N
-178	1	99	1	172	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	100	1	99	1	\N
-155	1	100	1	195	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	101	1	100	1	\N
-38	1	101	1	243	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	102	1	101	1	\N
-80	1	102	1	128	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	103	1	102	1	\N
-147	1	103	1	349	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	104	1	103	1	\N
-24	1	104	1	87	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	105	1	104	1	\N
-126	1	105	1	424	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	106	1	105	1	\N
-89	1	106	1	239	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	107	1	106	1	\N
-135	1	107	1	316	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	108	1	107	1	\N
-194	1	108	1	492	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	109	1	108	1	\N
-190	1	109	1	294	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	110	1	109	1	\N
-218	1	110	1	191	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	111	1	110	1	\N
-93	1	111	1	380	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	112	1	111	1	\N
-162	1	112	1	331	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	113	1	112	1	\N
-221	1	113	1	459	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	114	1	113	1	\N
-205	1	114	1	28	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	115	1	114	1	\N
-195	1	115	1	472	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	116	1	115	1	\N
-34	1	116	1	119	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	117	1	116	1	\N
-213	1	117	1	10	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	118	1	117	1	\N
-196	1	118	1	41	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	119	1	118	1	\N
-104	1	119	1	27	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	120	1	119	1	\N
-44	1	120	1	70	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	121	1	120	1	\N
-52	1	121	1	337	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	122	1	121	1	\N
-114	1	122	1	210	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	123	1	122	1	\N
-177	1	123	1	495	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	124	1	123	1	\N
-148	1	124	1	144	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	125	1	124	1	\N
-100	1	125	1	148	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	126	1	125	1	\N
-206	1	126	1	376	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	127	1	126	1	\N
-28	1	127	1	329	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	128	1	127	1	\N
-173	1	128	1	500	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	129	1	128	1	\N
-130	1	129	1	500	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	130	1	129	1	\N
-39	1	130	1	181	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	131	1	130	1	\N
-212	1	131	1	200	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	132	1	131	1	\N
+4	1	17	1	11550000000000000	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	19	1	17	1	\N
+105	1	18	1	382	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	20	1	18	1	\N
+70	1	19	1	488	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	21	1	19	1	\N
+27	1	20	1	135	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	22	1	20	1	\N
+46	1	21	1	126	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	23	1	21	1	\N
+43	1	22	1	10	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	24	1	22	1	\N
+117	1	23	1	278	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	25	1	23	1	\N
+204	1	24	1	46	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	26	1	24	1	\N
+187	1	25	1	104	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	27	1	25	1	\N
+72	1	26	1	10	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	28	1	26	1	\N
+216	1	27	1	271	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	29	1	27	1	\N
+210	1	28	1	315	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	30	1	28	1	\N
+79	1	29	1	162	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	31	1	29	1	\N
+167	1	30	1	86	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	32	1	30	1	\N
+181	1	31	1	409	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	33	1	31	1	\N
+156	1	32	1	500	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	34	1	32	1	\N
+96	1	33	1	57	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	35	1	33	1	\N
+191	1	34	1	204	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	36	1	34	1	\N
+132	1	35	1	262	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	37	1	35	1	\N
+111	1	36	1	10	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	38	1	36	1	\N
+171	1	37	1	156	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	39	1	37	1	\N
+64	1	38	1	417	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	40	1	38	1	\N
+68	1	39	1	10	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	41	1	39	1	\N
+51	1	40	1	85	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	42	1	40	1	\N
+227	1	41	1	103	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	43	1	41	1	\N
+141	1	42	1	67	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	44	1	42	1	\N
+42	1	43	1	10	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	45	1	43	1	\N
+133	1	44	1	500	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	46	1	44	1	\N
+82	1	45	1	198	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	47	1	45	1	\N
+95	1	46	1	489	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	48	1	46	1	\N
+188	1	47	1	298	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	49	1	47	1	\N
+30	1	48	1	36	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	50	1	48	1	\N
+90	1	49	1	334	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	51	1	49	1	\N
+14	1	50	1	344	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	52	1	50	1	\N
+35	1	51	1	451	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	53	1	51	1	\N
+85	1	52	1	371	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	54	1	52	1	\N
+127	1	53	1	234	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	55	1	53	1	\N
+222	1	54	1	345	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	56	1	54	1	\N
+76	1	55	1	282	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	57	1	55	1	\N
+231	1	56	1	339	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	58	1	56	1	\N
+15	1	57	1	215	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	59	1	57	1	\N
+220	1	58	1	193	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	60	1	58	1	\N
+16	1	59	1	60	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	61	1	59	1	\N
+58	1	60	1	350	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	62	1	60	1	\N
+146	1	61	1	223	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	63	1	61	1	\N
+62	1	62	1	449	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	64	1	62	1	\N
+185	1	63	1	142	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	65	1	63	1	\N
+151	1	64	1	300	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	66	1	64	1	\N
+165	1	65	1	256	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	67	1	65	1	\N
+103	1	66	1	125	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	68	1	66	1	\N
+41	1	67	1	236	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	69	1	67	1	\N
+239	1	68	1	10	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	70	1	68	1	\N
+110	1	69	1	179	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	71	1	69	1	\N
+13	1	70	1	194	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	72	1	70	1	\N
+26	1	71	1	185	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	73	1	71	1	\N
+98	1	72	1	342	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	74	1	72	1	\N
+215	1	73	1	157	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	75	1	73	1	\N
+91	1	74	1	135	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	76	1	74	1	\N
+159	1	75	1	456	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	77	1	75	1	\N
+208	1	76	1	336	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	78	1	76	1	\N
+207	1	77	1	280	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	79	1	77	1	\N
+182	1	78	1	187	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	80	1	78	1	\N
+157	1	79	1	387	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	81	1	79	1	\N
+33	1	80	1	500	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	82	1	80	1	\N
+201	1	81	1	151	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	83	1	81	1	\N
+9	1	82	1	356	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	84	1	82	1	\N
+234	1	83	1	24	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	85	1	83	1	\N
+40	1	84	1	152	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	86	1	84	1	\N
+18	1	85	1	10	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	87	1	85	1	\N
+229	1	86	1	500	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	88	1	86	1	\N
+20	1	87	1	186	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	89	1	87	1	\N
+184	1	88	1	266	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	90	1	88	1	\N
+139	1	89	1	81	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	91	1	89	1	\N
+164	1	90	1	10	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	92	1	90	1	\N
+199	1	91	1	379	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	93	1	91	1	\N
+109	1	92	1	315	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	94	1	92	1	\N
+47	1	93	1	226	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	95	1	93	1	\N
+214	1	94	1	166	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	96	1	94	1	\N
+112	1	95	1	302	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	97	1	95	1	\N
+144	1	96	1	269	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	98	1	96	1	\N
+178	1	97	1	172	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	99	1	97	1	\N
+155	1	98	1	195	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	100	1	98	1	\N
+38	1	99	1	243	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	101	1	99	1	\N
+80	1	100	1	128	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	102	1	100	1	\N
+147	1	101	1	349	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	103	1	101	1	\N
+24	1	102	1	87	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	104	1	102	1	\N
+126	1	103	1	424	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	105	1	103	1	\N
+89	1	104	1	239	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	106	1	104	1	\N
+135	1	105	1	316	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	107	1	105	1	\N
+194	1	106	1	492	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	108	1	106	1	\N
+190	1	107	1	294	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	109	1	107	1	\N
+1	1	108	1	5000000000	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	110	1	108	1	\N
+218	1	109	1	191	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	111	1	109	1	\N
+93	1	110	1	380	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	112	1	110	1	\N
+162	1	111	1	331	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	113	1	111	1	\N
+221	1	112	1	459	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	114	1	112	1	\N
+205	1	113	1	28	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	115	1	113	1	\N
+195	1	114	1	472	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	116	1	114	1	\N
+34	1	115	1	119	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	117	1	115	1	\N
+213	1	116	1	10	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	118	1	116	1	\N
+196	1	117	1	41	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	119	1	117	1	\N
+104	1	118	1	27	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	120	1	118	1	\N
+44	1	119	1	70	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	121	1	119	1	\N
+52	1	120	1	337	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	122	1	120	1	\N
+114	1	121	1	210	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	123	1	121	1	\N
+177	1	122	1	495	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	124	1	122	1	\N
+148	1	123	1	144	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	125	1	123	1	\N
+100	1	124	1	148	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	126	1	124	1	\N
+206	1	125	1	376	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	127	1	125	1	\N
+28	1	126	1	329	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	128	1	126	1	\N
+173	1	127	1	500	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	129	1	127	1	\N
+130	1	128	1	500	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	130	1	128	1	\N
+39	1	129	1	181	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	131	1	129	1	\N
+212	1	130	1	200	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	132	1	130	1	\N
+5	1	131	1	499000000000	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	19	1	131	1	\N
 116	1	132	1	159	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	133	1	132	1	\N
 48	1	133	1	319	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	134	1	133	1	\N
-101	1	134	1	10	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	135	1	134	1	\N
-203	1	135	1	365	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	136	1	135	1	\N
-50	1	136	1	342	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	137	1	136	1	\N
-59	1	137	1	237	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	138	1	137	1	\N
-150	1	138	1	427	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	139	1	138	1	\N
-180	1	139	1	315	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	140	1	139	1	\N
-142	1	140	1	10	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	141	1	140	1	\N
-23	1	141	1	378	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	142	1	141	1	\N
-122	1	142	1	420	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	143	1	142	1	\N
-115	1	143	1	411	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	144	1	143	1	\N
-7	1	144	1	0	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	145	1	144	1	\N
-75	1	145	1	172	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	146	1	145	1	\N
-77	1	146	1	309	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	147	1	146	1	\N
-152	1	147	1	10	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	148	1	147	1	\N
-120	1	148	1	154	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	149	1	148	1	\N
-118	1	149	1	153	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	150	1	149	1	\N
-37	1	150	1	47	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	151	1	150	1	\N
-168	1	151	1	87	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	152	1	151	1	\N
-149	1	152	1	398	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	153	1	152	1	\N
-29	1	153	1	452	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	154	1	153	1	\N
-8	1	154	1	283	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	155	1	154	1	\N
-88	1	155	1	291	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	156	1	155	1	\N
-233	1	156	1	367	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	157	1	156	1	\N
-83	1	157	1	500	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	158	1	157	1	\N
-154	1	158	1	311	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	159	1	158	1	\N
-175	1	159	1	258	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	160	1	159	1	\N
-69	1	160	1	323	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	161	1	160	1	\N
-63	1	161	1	405	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	162	1	161	1	\N
-189	1	162	1	32	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	163	1	162	1	\N
-92	1	163	1	130	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	164	1	163	1	\N
-140	1	164	1	234	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	165	1	164	1	\N
-17	1	165	1	500	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	166	1	165	1	\N
-87	1	166	1	481	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	167	1	166	1	\N
-183	1	167	1	240	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	168	1	167	1	\N
-129	1	168	1	314	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	169	1	168	1	\N
-2	1	169	1	65500000000000	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	66	1	169	1	\N
-193	1	170	1	183	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	171	1	170	1	\N
-174	1	171	1	486	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	172	1	171	1	\N
-6	1	172	1	11550000000000000	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	145	1	172	1	\N
+6	1	134	1	11550000000000000	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	136	1	134	1	\N
+101	1	135	1	10	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	137	1	135	1	\N
+203	1	136	1	365	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	138	1	136	1	\N
+50	1	137	1	342	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	139	1	137	1	\N
+7	1	138	1	499000000000	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	136	1	138	1	\N
+59	1	139	1	237	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	140	1	139	1	\N
+150	1	140	1	427	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	141	1	140	1	\N
+180	1	141	1	315	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	142	1	141	1	\N
+142	1	142	1	10	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	143	1	142	1	\N
+23	1	143	1	378	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	144	1	143	1	\N
+122	1	144	1	420	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	145	1	144	1	\N
+115	1	145	1	411	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	146	1	145	1	\N
+75	1	146	1	172	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	147	1	146	1	\N
+77	1	147	1	309	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	148	1	147	1	\N
+152	1	148	1	10	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	149	1	148	1	\N
+120	1	149	1	154	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	150	1	149	1	\N
+118	1	150	1	153	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	151	1	150	1	\N
+37	1	151	1	47	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	152	1	151	1	\N
+168	1	152	1	87	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	153	1	152	1	\N
+149	1	153	1	398	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	154	1	153	1	\N
+29	1	154	1	452	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	155	1	154	1	\N
+8	1	155	1	283	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	156	1	155	1	\N
+88	1	156	1	291	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	157	1	156	1	\N
+233	1	157	1	367	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	158	1	157	1	\N
+83	1	158	1	500	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	159	1	158	1	\N
+154	1	159	1	311	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	160	1	159	1	\N
+175	1	160	1	258	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	161	1	160	1	\N
+69	1	161	1	323	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	162	1	161	1	\N
+63	1	162	1	405	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	163	1	162	1	\N
+189	1	163	1	32	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	164	1	163	1	\N
+3	1	164	1	500000000000	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	165	1	164	1	\N
+92	1	165	1	130	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	166	1	165	1	\N
+140	1	166	1	234	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	167	1	166	1	\N
+17	1	167	1	500	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	168	1	167	1	\N
+87	1	168	1	481	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	169	1	168	1	\N
+183	1	169	1	240	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	170	1	169	1	\N
+129	1	170	1	314	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	171	1	170	1	\N
+193	1	171	1	183	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	172	1	171	1	\N
+174	1	172	1	486	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	173	1	172	1	\N
 57	1	173	1	178	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	174	1	173	1	\N
 224	1	174	1	65	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	175	1	174	1	\N
 232	1	175	1	277	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	176	1	175	1	\N
@@ -2497,13 +2497,13 @@ COPY public.accounts_accessed (ledger_index, block_id, account_identifier_id, to
 25	1	217	1	444	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	217	1	217	1	\N
 240	1	218	1	479	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	218	1	218	1	\N
 211	1	219	1	344	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	219	1	219	1	\N
-241	1	220	1	113	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	220	1	220	1	\N
-197	1	221	1	236	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	221	1	221	1	\N
-170	1	222	1	480	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	222	1	222	1	\N
-31	1	223	1	160	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	223	1	223	1	\N
-160	1	224	1	318	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	224	1	224	1	\N
-21	1	225	1	214	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	225	1	225	1	\N
-4	1	226	1	11550000000000000	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	37	1	226	1	\N
+2	1	220	1	65500000000000	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	165	1	220	1	\N
+241	1	221	1	113	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	221	1	221	1	\N
+197	1	222	1	236	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	222	1	222	1	\N
+170	1	223	1	480	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	223	1	223	1	\N
+31	1	224	1	160	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	224	1	224	1	\N
+160	1	225	1	318	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	225	1	225	1	\N
+21	1	226	1	214	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	226	1	226	1	\N
 67	1	227	1	163	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	227	1	227	1	\N
 66	1	228	1	500	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	228	1	228	1	\N
 108	1	229	1	366	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	229	1	229	1	\N
@@ -2520,113 +2520,23 @@ COPY public.accounts_accessed (ledger_index, block_id, account_identifier_id, to
 223	1	240	1	387	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	240	1	240	1	\N
 209	1	241	1	265	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	241	1	241	1	\N
 11	1	242	1	269	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	242	1	242	1	\N
-7	2	144	1	360000000000	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	145	1	144	1	\N
-5	3	36	1	360000000000	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	37	1	36	1	\N
-3	4	65	1	499500000000	2	2n1YzYdgpSKsHUemqXTjquRRAoDyeXKHPd4Axk7t7ZafcvmQws5T	66	1	65	1	\N
-7	4	144	1	735500000000	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	145	1	144	1	\N
-4	4	226	1	11549985000000000	3	2n15kp4TN2U6popyTBaHLTr2Jfq8LtYDeKJsBVWnQNkF7xQ14RSV	37	1	226	1	\N
-5	5	36	1	735750000000	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	37	1	36	1	\N
-3	5	65	1	499250000000	3	2n27A2y97ntr9sdECG7ZW2fwWCa19PeYD4D8PmZF6E89moXk8PVH	66	1	65	1	\N
-4	5	226	1	11549985000000000	3	2n15kp4TN2U6popyTBaHLTr2Jfq8LtYDeKJsBVWnQNkF7xQ14RSV	37	1	226	1	\N
-3	6	65	1	498250000000	7	2n2NViyb1VFLjM5piUG1SzfkURQBFpqMKfF5FsoFRGZ21je7pfQX	66	1	65	1	\N
-7	6	144	1	401000000000	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	145	1	144	1	\N
-4	6	226	1	11549945000000000	11	2n1coa1PUrX4MBu6iBbs3J1J4jnYgb5Do7SrsiSdpnFPQ3Dw6hJu	37	1	226	1	\N
-5	7	36	1	1136750000000	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	37	1	36	1	\N
-3	7	65	1	498250000000	7	2n2NViyb1VFLjM5piUG1SzfkURQBFpqMKfF5FsoFRGZ21je7pfQX	66	1	65	1	\N
-4	7	226	1	11549945000000000	11	2n1coa1PUrX4MBu6iBbs3J1J4jnYgb5Do7SrsiSdpnFPQ3Dw6hJu	37	1	226	1	\N
-3	8	65	1	498000000000	8	2n14vkQGfN4tGEvxFhjDqEegg78tgQn2CCLkQ51XykVCEQrxN8Te	66	1	65	1	\N
-7	8	144	1	781250000000	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	145	1	144	1	\N
-4	8	226	1	11549925000000000	15	2n1Yo6ykydmghCVZQvyhoKWNRH41wWStFqTmWHY3Gi13DMpoStxn	37	1	226	1	\N
-5	9	36	1	1532500000000	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	37	1	36	1	\N
-3	9	65	1	497500000000	10	2n1TnjzN3Q19fJbHn8CF3pEmXHQphReea9kziuLdYLR97pEBqgdM	66	1	65	1	\N
-4	9	226	1	11549910000000000	18	2mzdV8wswvW36FxyrKRaxxzJ34B7Vp7bV8XZaN4cmFhQ2sP59NaH	37	1	226	1	\N
-5	10	36	1	1908000000000	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	37	1	36	1	\N
-3	10	65	1	497000000000	12	2n17vxw5GmeMb8UUDupCtaRtwN7swHB5GLSpmj9kLdWMKLMZVfPe	66	1	65	1	\N
-4	10	226	1	11549895000000000	21	2n22ibbot27YqaqXS2z7Jc7q9LFpfBRFvesv9kjBx97ENPbA84V2	37	1	226	1	\N
-5	11	36	1	2309000000000	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	37	1	36	1	\N
-3	11	65	1	496000000000	16	2mzb6Jd646nr5hoCDVnRfGbwFxRdoX6FnnPHbRnDNm6vrEAz8k6n	66	1	65	1	\N
-4	11	226	1	11549855000000000	29	2n1HmxnokKvWwQuTjcv6sWUgrRbFkqmj8NPwy5geET6sUk9DP5zu	37	1	226	1	\N
-5	12	36	1	2684250000000	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	37	1	36	1	\N
-3	12	65	1	495750000000	17	2n2NJ62fqDkqC2BoevpGsisSExy8MBcdy7KiWXgEnmyCudwsCgPt	66	1	65	1	\N
-4	12	226	1	11549840000000000	32	2n24eUFx9xjfKZWMYNZX13v6EQhYuDn4wveCqCTE916RAvoH8SgS	37	1	226	1	\N
-3	13	65	1	495750000000	17	2n2NJ62fqDkqC2BoevpGsisSExy8MBcdy7KiWXgEnmyCudwsCgPt	66	1	65	1	\N
-7	13	144	1	416250000000	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	145	1	144	1	\N
-4	13	226	1	11549840000000000	32	2n24eUFx9xjfKZWMYNZX13v6EQhYuDn4wveCqCTE916RAvoH8SgS	37	1	226	1	\N
-5	14	36	1	3105750000000	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	37	1	36	1	\N
-3	14	65	1	494250000000	23	2n1KZXQkiUMKsVNVKXbmX9hFSARH1ToECvHJBWhzWZ9i5acXkosC	66	1	65	1	\N
-4	14	226	1	11549780000000000	44	2n1Mx3Ggr2Kf74PX21jv8iUE8zkmvtzu73BPC7t78693AAoy9Pn9	37	1	226	1	\N
-5	15	36	1	3486250000000	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	37	1	36	1	\N
-3	15	65	1	493750000000	25	2n1eXNXRcVd3WgaNLX2Ljdyv1peafJWGWxhAV1NRTLrPVK7Ks5jf	66	1	65	1	\N
-4	15	226	1	11549760000000000	48	2n1V9mgWhwvqYbfdaunC2iQfyG59XqjxznhJxDFD7xs8Htm8nL8J	37	1	226	1	\N
-5	16	36	1	3856500000000	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	37	1	36	1	\N
-3	16	65	1	493500000000	26	2mzdbb4wDVKqqjAJV6V43nkoWndKhgmV3UragCvoaqd8JH7tVtfR	66	1	65	1	\N
-4	16	226	1	11549750000000000	50	2n2GohH1AjdMmXffGBuG8nb7wadVSF7sF68YuweC7CXVkt4LN2r1	37	1	226	1	\N
-3	17	65	1	493500000000	26	2mzdbb4wDVKqqjAJV6V43nkoWndKhgmV3UragCvoaqd8JH7tVtfR	66	1	65	1	\N
-7	17	144	1	390750000000	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	145	1	144	1	\N
-4	17	226	1	11549750000000000	50	2n2GohH1AjdMmXffGBuG8nb7wadVSF7sF68YuweC7CXVkt4LN2r1	37	1	226	1	\N
-3	18	65	1	493000000000	28	2mzrRYifZiTVWyNfhnzGY6X9u3zf5UkA1TpU4YXp6L63xjNBGPNp	66	1	65	1	\N
-7	18	144	1	766250000000	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	145	1	144	1	\N
-4	18	226	1	11549735000000000	53	2n1J1uNHhhRJzWxDfPt7s7GKXeT3s2Ma4iiJdkWTJKRvhCnaSC5m	37	1	226	1	\N
-3	20	65	1	492750000000	29	2n13tKF5D6TBYcVQreL4vqCRX6kqDdLaba8P5HU9Qcp2eg8obHRb	66	1	65	1	\N
-7	20	144	1	1141500000000	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	145	1	144	1	\N
-4	20	226	1	11549720000000000	56	2mzmQ3m84CeAFfH3NAQoSYKBBy3raJzjoLg1eQ5P1M6NsqZe9Mho	37	1	226	1	\N
-3	22	65	1	491500000000	34	2n1Tm5QAb4LbwaKWYk6GNF4EerQYwQZsDHLpWf44TcaBMybCi2k4	66	1	65	1	\N
-7	22	144	1	1912750000000	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	145	1	144	1	\N
-4	22	226	1	11549670000000000	66	2n1Z5RJG9dLr2ytxAZfyuh4VwL4eq3xJDxbRVyp6rzWM7ZijrcQy	37	1	226	1	\N
-5	19	36	1	4247250000000	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	37	1	36	1	\N
-3	19	65	1	492750000000	29	2n13tKF5D6TBYcVQreL4vqCRX6kqDdLaba8P5HU9Qcp2eg8obHRb	66	1	65	1	\N
-4	19	226	1	11549720000000000	56	2mzmQ3m84CeAFfH3NAQoSYKBBy3raJzjoLg1eQ5P1M6NsqZe9Mho	37	1	226	1	\N
-3	21	65	1	492250000000	31	2n249pvQzvrKUYstA3J93uMmuv4xT8mCN4uEMHN2cKTn7Z8qJq9D	66	1	65	1	\N
-7	21	144	1	1522000000000	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	145	1	144	1	\N
-4	21	226	1	11549700000000000	60	2n17Tnf2ex9G7qR91i4RaT6ThUxrHiMSEEDieckJxaLiSTg4WrAm	37	1	226	1	\N
-5	23	36	1	4699500000000	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	37	1	36	1	\N
-3	23	65	1	490500000000	38	2n1Z7JzEnzWBW5NorDhHpydWyLggfnga94CjAPvtev7xiiDmpQ9f	66	1	65	1	\N
-4	23	226	1	11549630000000000	74	2n1UzTGLyBd9yNYAs9TufFAtk31N7NbVxeRseKiFB5DcR6oM3Dpv	37	1	226	1	\N
-3	24	65	1	490500000000	38	2n1Z7JzEnzWBW5NorDhHpydWyLggfnga94CjAPvtev7xiiDmpQ9f	66	1	65	1	\N
-7	24	144	1	2313750000000	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	145	1	144	1	\N
-4	24	226	1	11549630000000000	74	2n1UzTGLyBd9yNYAs9TufFAtk31N7NbVxeRseKiFB5DcR6oM3Dpv	37	1	226	1	\N
-3	25	65	1	489750000000	41	2n1NZbjhp8fe3hpkCf7raFFHCKXYEZeNy7BcVupiv9zVTTK5h4Uk	66	1	65	1	\N
-7	25	144	1	2709500000000	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	145	1	144	1	\N
-4	25	226	1	11549595000000000	81	2mzw3D868xBUFXpsngWxHyGWmtamC9zVQxtubD1cBXn8jA7kwTQH	37	1	226	1	\N
-5	26	36	1	3542500000000	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	37	1	36	1	\N
-3	26	65	1	489750000000	41	2n1NZbjhp8fe3hpkCf7raFFHCKXYEZeNy7BcVupiv9zVTTK5h4Uk	66	1	65	1	\N
-4	26	226	1	11549595000000000	81	2mzw3D868xBUFXpsngWxHyGWmtamC9zVQxtubD1cBXn8jA7kwTQH	37	1	226	1	\N
-3	27	65	1	488750000000	45	2n1ZU3gZWsf4MhpAbm94AikG5azmrpCDtp5cjXStuZ6eJMyRMP7a	66	1	65	1	\N
-7	27	144	1	3105500000000	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	145	1	144	1	\N
-4	27	226	1	11549560000000000	88	2n1c5Zu183c4bSnaYHun5GPLncS4mtmUJsQ4dczWGPJm146qxLsk	37	1	226	1	\N
-5	28	36	1	3938500000000	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	37	1	36	1	\N
-3	28	65	1	488750000000	45	2n1ZU3gZWsf4MhpAbm94AikG5azmrpCDtp5cjXStuZ6eJMyRMP7a	66	1	65	1	\N
-4	28	226	1	11549560000000000	88	2n1c5Zu183c4bSnaYHun5GPLncS4mtmUJsQ4dczWGPJm146qxLsk	37	1	226	1	\N
-5	29	36	1	4319000000000	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	37	1	36	1	\N
-3	29	65	1	488250000000	47	2n2PrJzAjpbWWCnn1JjSz7KfpiatT7nLVan3XqaVKjm1UtkgeaYU	66	1	65	1	\N
-4	29	226	1	11549540000000000	92	2mzmsTQzBvvL6GPLmwsoA2rU56377YaQ43hQyRXuMpT8yc868fzS	37	1	226	1	\N
-3	30	65	1	487500000000	50	2n14iWGxyFfAXieVzJsk4Qo9JnGe6nfC1kxykaFgsYqhjr4mmD7Z	66	1	65	1	\N
-7	30	144	1	3516750000000	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	145	1	144	1	\N
-4	30	226	1	11549510000000000	98	2n1kUu2p1gEceE2NYBEgbH1krS9cgdzwcdRBj3iKUatQsjPxzdUq	37	1	226	1	\N
-3	31	65	1	487000000000	52	2n1abtRrTHWAxA6hmjtBjzepQPgqmwKjvDj5noiMooXR2ZPLeX1n	66	1	65	1	\N
-7	31	144	1	3897250000000	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	145	1	144	1	\N
-4	31	226	1	11549490000000000	102	2n1tsdtUxviNXJC4LtsiPLViyXAD94Ev39PQJvthNXSpzDcmkwzH	37	1	226	1	\N
-7	32	144	1	4257250000000	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	145	1	144	1	\N
-3	33	65	1	485500000000	58	2n1NJRdKuZnSnpM8yM5fmoKBWSuPkrZ4m6SqXztmbSqDya7HqL8s	66	1	65	1	\N
-1	33	90	1	5013000000	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	91	1	90	1	\N
-7	33	144	1	4673737000000	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	145	1	144	1	\N
-4	33	226	1	11549435000000000	113	2n17bmyBz4RDs46zCwP7P2XzTp8eEMKu6ANmaemX96ZrSpwUwS6X	37	1	226	1	\N
-3	34	65	1	484750000000	61	2n2QoMTxEX849Hyq7HBBYq8Tw8ukWk3qXpt2oA1K7QHHA8TyMSRv	66	1	65	1	\N
-1	34	90	1	5014000000	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	91	1	90	1	\N
-7	34	144	1	5074486000000	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	145	1	144	1	\N
-4	34	226	1	11549395000000000	121	2mzozpBjQs2HFHZWnRJqEa3JZCw2syjkA3ukg1HXrGUK4jXtcJho	37	1	226	1	\N
-5	35	36	1	3525748000000	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	37	1	36	1	\N
-1	35	90	1	5016000000	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	91	1	90	1	\N
-4	35	226	1	11549335000000000	133	2n1cG3qV4sTha8Yw79XLHovosVRXTsU4iCgGa5LGmUqq3mYgiTRZ	37	1	226	1	\N
-5	36	36	1	3885747000000	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	37	1	36	1	\N
-1	36	90	1	5017000000	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	91	1	90	1	\N
-1	37	90	1	5017000000	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	91	1	90	1	\N
-7	37	144	1	5494483000000	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	145	1	144	1	\N
-4	37	226	1	11549335000000000	133	2n1cG3qV4sTha8Yw79XLHovosVRXTsU4iCgGa5LGmUqq3mYgiTRZ	37	1	226	1	\N
-1	38	90	1	5017000000	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	91	1	90	1	\N
-7	38	144	1	5434485000000	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	145	1	144	1	\N
-5	39	36	1	4245746000000	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	37	1	36	1	\N
-1	39	90	1	5018000000	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	91	1	90	1	\N
+7	2	138	1	859000000000	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	136	1	138	1	\N
+5	3	131	1	859000000000	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	19	1	131	1	\N
+4	4	17	1	11549995000000000	1	2mzZmLcFTxXRoU9hsbRppPkrMdXKQtBYzv9PxNBUK3m7a3aregXA	19	1	17	1	\N
+7	4	138	1	1224000000000	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	136	1	138	1	\N
+4	5	17	1	11549995000000000	1	2mzZmLcFTxXRoU9hsbRppPkrMdXKQtBYzv9PxNBUK3m7a3aregXA	19	1	17	1	\N
+5	5	131	1	1224000000000	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	19	1	131	1	\N
+7	6	138	1	1584000000000	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	136	1	138	1	\N
+5	7	131	1	1584000000000	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	19	1	131	1	\N
+7	8	138	1	1944000000000	1	2n1ZuVW4a3v4xgkhSBzhzZZTJdd1D23BrphYzbuJErkEXgW5H42b	136	1	138	1	\N
+5	9	131	1	1944250000000	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	19	1	131	1	\N
+7	9	138	1	498750000000	1	2n1ZuVW4a3v4xgkhSBzhzZZTJdd1D23BrphYzbuJErkEXgW5H42b	136	1	138	1	\N
+7	10	138	1	2304000000000	1	2n1ZuVW4a3v4xgkhSBzhzZZTJdd1D23BrphYzbuJErkEXgW5H42b	136	1	138	1	\N
+5	11	131	1	2304250000000	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	19	1	131	1	\N
+5	12	131	1	2664250000000	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	19	1	131	1	\N
+7	14	138	1	2664000000000	1	2n1ZuVW4a3v4xgkhSBzhzZZTJdd1D23BrphYzbuJErkEXgW5H42b	136	1	138	1	\N
+4	30	17	1	11549990000000000	2	2n18g9F7XLmbn3uGdp51YSAHoQdycvzggi2sx6ZSJb3YEKkWiXCn	19	1	17	1	\N
+3	30	164	1	870000000000	0	2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe	165	1	164	1	\N
 \.
 
 
@@ -2643,45 +2553,55 @@ COPY public.accounts_created (block_id, account_identifier_id, creation_fee) FRO
 --
 
 COPY public.blocks (id, state_hash, parent_id, parent_hash, creator_id, block_winner_id, last_vrf_output, snarked_ledger_hash_id, staking_epoch_data_id, next_epoch_data_id, min_window_density, sub_window_densities, total_currency, ledger_hash, height, global_slot_since_hard_fork, global_slot_since_genesis, protocol_version_id, proposed_protocol_version_id, "timestamp", chain_status) FROM stdin;
-22	3NLEygSkSPuXnrZXpp1tdxQBW1syhqrdoAi2ixFDwkMp86pxJFQc	21	3NLgJ6juekbUcC8mA4BgWigmij97HR74jRPvkBg3kqN93CHVjsQ6	145	173	e_-wAnqfw74DfJ-eNL6zqV-sXyGJuAmhGbyJULML-QA=	1	1	23	77	{1,0,1,4,4,4,7,7,7,7,7}	23166005000061388	jx8NyNHeRWTTz19R2J21NTPNVXTNHLdyxVn77o1U7r7YAFy2eAa	14	39	39	1	\N	1763913788000	canonical
-20	3NLsfFUAJvk8mZ6JS3q3tGbLjgLVzq1T8hMyMdoHJtwbbFPhzcez	18	3NLV4df2K8sUbF5MXtTSWtFHXAiG3gSwKJj18sF2RetffvKD48WL	145	173	1rFb8r0sB3KIu8uzmoWXYJnimoaHhpQMSLtuiXfeIwg=	1	1	21	77	{1,0,1,4,4,2,7,7,7,7,7}	23166005000061388	jxgNLaxjZp5pSRFeyM59YmnhCmGd1tU9Nwe1kctpHkVGoyDC9w7	12	36	36	1	\N	1763913700178	canonical
-18	3NLV4df2K8sUbF5MXtTSWtFHXAiG3gSwKJj18sF2RetffvKD48WL	17	3NLJmt5sVy4JeRqfDt8HKmww4DVjw7DZ7ykbGBt3YbkkHDAxLgwR	145	173	gK-M9kn-QEyzINdXSqs0asoLZ0uEjp1TGDOXOEeSxws=	1	1	19	77	{1,0,1,4,4,1,7,7,7,7,7}	23166005000061388	jwktZ6QU8b3zC9ouEFxiBfe3zV6rMyymd65CeRZaq7b21852oih	11	35	35	1	\N	1763913674549	canonical
-2	3NLhvGF3SpUTUBDrb1U8EmVAYY6x1X1PgCjnEDTnXRWxFJjgRhfy	1	3NKTWvnmtKkRFwkfvPrHrKKbGWsiaw4FcQUiG2ZUNJd7NEaGKYvx	145	173	kXhw2nkIp_kdA2qmJjSyIifyexvbTuWhxGDU75-Jlwc=	1	1	3	77	{1,0,1,7,7,7,7,7,7,7,7}	23166005000061388	jxP7NAcepT7Jt1xud389Mk1FJQwkKjPF1zDe1PsBKT9dw8aHvYd	2	19	19	1	\N	1763913188520	orphaned
-4	3NK3briV2aPDMjK7iKPGnqqW3KdAKRKAt3f5mfFyZULnXX4UBxA8	2	3NLhvGF3SpUTUBDrb1U8EmVAYY6x1X1PgCjnEDTnXRWxFJjgRhfy	145	173	2l9FTXW-8gFmvwAOdhIUD_fN7IC17SRxAWLKZqmshwk=	1	1	5	77	{1,0,2,7,7,7,7,7,7,7,7}	23166005000061388	jwbi1XaHU26XsvZJpFikTams7Lc8rtLz8yJPPePXbUyLBMuS1JP	3	20	20	1	\N	1763913246729	orphaned
-6	3NKUeXXioyFdtUfQh1n6rRHR3fSWpQTLPLoQXcs4mrfTo4qW832W	5	3NKFcqKHq1WYdH43dWSYcBfrQBaJFjxh56Hs573cSzia5B6UPfCy	145	173	nXPDo5exeoukA42WGvgTNA0BQ83zP1hXuNrY24a4pAY=	1	1	7	77	{1,0,1,2,7,7,7,7,7,7,7}	23166005000061388	jxnqmbzyUHp94MaaRnAdSqTfiuT9tqcrS3YpFm7JrCRXtTnCFsD	4	23	23	1	\N	1763913308000	orphaned
-8	3NLAQ4dxpno3MFSB4u5Aqxx9L2Ug2v9YXZqRU3SqXf9XuGWGE6rV	6	3NKUeXXioyFdtUfQh1n6rRHR3fSWpQTLPLoQXcs4mrfTo4qW832W	145	173	4OiFtEBe7RWpeOlACC59CdhSAeGuS0MUo5dgN-C_8Ag=	1	1	9	77	{1,0,1,3,7,7,7,7,7,7,7}	23166005000061388	jwwKCjUaGxfyV4Dx7LRYhgcbexF85g1qYBhBKoG44qznAiesp8H	5	24	24	1	\N	1763913346090	orphaned
-13	3NLaazZ8nsr7cdfe15pVpZ2AcZ5oSK7cXBeQMSKanb8vwMPq29g2	10	3NLKJaXsPVVuXXogeu5LDw7XeMJNiV5JjyNzcpJp82RaTTzNLrwN	145	173	cBp7-22pYQpzKpGXL9XzgcBXiSjt9ViAxdsFwl7-_A0=	1	1	14	77	{1,0,1,4,1,7,7,7,7,7,7}	23166005000061388	jxXoQBv4yUxmngUyjVYvGSFcVMBosRuU1cF1C2h7Q8wK3zbtkAW	7	29	29	1	\N	1763913488000	orphaned
-15	3NK4WL1MxGbG5tWbVrRbcgDqxcrUo7N9UXKvfrHswM5fnDgSSe1E	14	3NK7zMd8uE8zffrcfM4iZpuxE2SPL6dnYaZ5STU92Rp68JATKWCw	37	226	hStM4FH6XXZsLI9cUcBsTFvyMoTXRX28gRA6_ncRfgU=	1	1	16	77	{1,0,1,4,4,7,7,7,7,7,7}	23166005000061388	jxpHkgV48kHCBKAeDj5Enf2mgDm9FFPKemWJ6tqXRynJbUMX1Ff	10	33	33	1	\N	1763913608000	orphaned
-14	3NK7zMd8uE8zffrcfM4iZpuxE2SPL6dnYaZ5STU92Rp68JATKWCw	12	3NKwPcss997SNgMWkx3WSEaqqcs1d6x8dKC3DjSKpQstNAEHPCaz	37	226	J_b9UiBX0NwcjLZM6fBGe-Qp9-h_nUuhkJ5bGQp-Tww=	1	1	15	77	{1,0,1,4,3,7,7,7,7,7,7}	23166005000061388	jwQjoJKUdZ5eBmUUuFjbUMY5p2YbradopB9uuTAa3ZTCixbmW5o	9	32	32	1	\N	1763913578000	canonical
-12	3NKwPcss997SNgMWkx3WSEaqqcs1d6x8dKC3DjSKpQstNAEHPCaz	11	3NLUPJn3fFzp8XHZBNc2TWbNEgvNfnyyaoJVRStBUW8ovXJZoqqz	37	226	-xnpiKvu2IV-8job8Qkb7msBcnz1sEhInfWuFZinTAM=	1	1	13	77	{1,0,1,4,2,7,7,7,7,7,7}	23166005000061388	jxfHP16VPxZu4yzwpoDU5BH2X2y8nixojtVxf9GoTAUtUKkioqd	8	29	29	1	\N	1763913488000	canonical
-11	3NLUPJn3fFzp8XHZBNc2TWbNEgvNfnyyaoJVRStBUW8ovXJZoqqz	10	3NLKJaXsPVVuXXogeu5LDw7XeMJNiV5JjyNzcpJp82RaTTzNLrwN	37	226	otMGXKrW7JpDZNDBMK1ARf6w__RNmsnH6MnnBSHAcQA=	1	1	12	77	{1,0,1,4,1,7,7,7,7,7,7}	23166005000061388	jxEeqbiqWH3sQgCwFaQFbdZFYdVUJSmtbsDpaBBDzxKExz69xUM	7	28	28	1	\N	1763913458000	canonical
-10	3NLKJaXsPVVuXXogeu5LDw7XeMJNiV5JjyNzcpJp82RaTTzNLrwN	9	3NKYwiNGdrSFWhm7zc3uYYywegGmD2k8kHuzVNKs3WpFCDfXS6C6	37	226	eG_hRSYIpqU4RZ-OMP6-NdkGsolEFV1Ws00s2e8nFwE=	1	1	11	77	{1,0,1,4,7,7,7,7,7,7,7}	23166005000061388	jwRdZj3xisSygkJfSc2Sd9V894nWVkUeEdaJrv9QDb5W4X1dECC	6	26	26	1	\N	1763913398000	canonical
-9	3NKYwiNGdrSFWhm7zc3uYYywegGmD2k8kHuzVNKs3WpFCDfXS6C6	7	3NKvhxKRJF1bPVWm4jUgSk3visRxVFNHE64b7yqRrjTmeXMzncUc	37	226	dTt8LG4nf5oAd6xLoQZU_vpF7Pt9JXUKJCcrlYBTSgA=	1	1	10	77	{1,0,1,3,7,7,7,7,7,7,7}	23166005000061388	jwuroSgY7fMEKvohJ8896QwWR4AMC71sojJFZgphsUyWzWsJqLf	5	25	25	1	\N	1763913368000	canonical
-7	3NKvhxKRJF1bPVWm4jUgSk3visRxVFNHE64b7yqRrjTmeXMzncUc	5	3NKFcqKHq1WYdH43dWSYcBfrQBaJFjxh56Hs573cSzia5B6UPfCy	37	226	bV1PJOfx8w_mcN28nTY8q4mPk4vigR52UbS1wPAeIAI=	1	1	8	77	{1,0,1,2,7,7,7,7,7,7,7}	23166005000061388	jxtYEfs879EtDbuWJ66ZbUqrHgoLurDBZPhTeUiADKzExuuxYiB	4	23	23	1	\N	1763913308000	canonical
-5	3NKFcqKHq1WYdH43dWSYcBfrQBaJFjxh56Hs573cSzia5B6UPfCy	3	3NKaTb2EEadeFbv9MyCbHZckWvroG9SdtMBdoMB4asExPEy4Vhw3	37	226	tVJ38rRk_BDhE-KjV7PJOiJejz0X_Ckmdsi384BgUgs=	1	1	6	77	{1,0,1,1,7,7,7,7,7,7,7}	23166005000061388	jxmNKD4nzrEs5GMUt3P9zP9NPyoS2AneX3ndjFr8dHNJpUBZWM6	3	21	21	1	\N	1763913248000	canonical
-3	3NKaTb2EEadeFbv9MyCbHZckWvroG9SdtMBdoMB4asExPEy4Vhw3	1	3NKTWvnmtKkRFwkfvPrHrKKbGWsiaw4FcQUiG2ZUNJd7NEaGKYvx	37	226	wGDOr5VbJtsFXA_RC6nzIBdi5hquV3ec6C-lWhG5FQo=	1	1	4	77	{1,0,1,7,7,7,7,7,7,7,7}	23166005000061388	jxD3tC4BQ1Kt6gtzEZVrnTyoLrvqjnfMRwM9wmULyGPV372C4bC	2	19	19	1	\N	1763913188357	canonical
-1	3NKTWvnmtKkRFwkfvPrHrKKbGWsiaw4FcQUiG2ZUNJd7NEaGKYvx	\N	3NLfcWNw4jG14R7S9VjvvcR6tQupRoUwWY3QHSvDPVMNr3hFx54p	1	1	39cyg4ZmMtnb_aFUIerNAoAJV8qtkfOpq0zFzPspjgM=	1	1	2	77	{1,7,7,7,7,7,7,7,7,7,7}	23166005000061388	jx8Z1HuU1gWjC9rAdvvYfZnVX1F6BsLJfh8yLCgT6sA9driPpCm	1	0	0	1	\N	1763912618000	canonical
-16	3NKVZcPMxq7EVhvQzWzX7NiuPdn1qEuE82HfPQBMSQkkR6dd1Z5e	15	3NK4WL1MxGbG5tWbVrRbcgDqxcrUo7N9UXKvfrHswM5fnDgSSe1E	37	226	bo7kPcFDl3hWsmg_3_UQg6J9ytt4tBKtJhJGgz2kigw=	1	1	17	77	{1,0,1,4,5,7,7,7,7,7,7}	23166005000061388	jwUs7hXAi1Hkdo4ABmAURVUU9yHQ1NgCojMDyxyMsRnEbhoSViZ	11	34	34	1	\N	1763913638000	orphaned
-19	3NLyCvyHH9bc6N7PRnG21LfMbKouhWXMht9qNniwkQUGPVCT4WzN	16	3NKVZcPMxq7EVhvQzWzX7NiuPdn1qEuE82HfPQBMSQkkR6dd1Z5e	37	226	x2ck3e_gcGtVr-ELNZVo1G2AdCbYA5Peh3xtGZPYNAU=	1	1	20	77	{1,0,1,4,5,1,7,7,7,7,7}	23166005000061388	jwPZ2wenxncvTvUCRnHJTQaJ8rWr9txH5kBY5NZDWqB8F65xwau	12	36	36	1	\N	1763913698000	orphaned
-23	3NLBJuY1PHXkmPXavFSArSu7R2hRxjo1nB1RXpuPd92QMrTWbza2	19	3NLyCvyHH9bc6N7PRnG21LfMbKouhWXMht9qNniwkQUGPVCT4WzN	37	226	pXb_7IBBBChnap7JUA3r0LMgby6JmednEgov3j1ehgg=	1	1	24	77	{1,0,1,4,5,2,7,7,7,7,7}	23166005000061388	jxnhL6x3LfsbVrZirtz2qm4VPueguhyC86usfC4wnTt96LsGdmy	13	41	41	1	\N	1763913848000	orphaned
-26	3NKEDV2kuqgRRtZuyyyLiUVizwKqQbphbdTzRhX8C2wNKdGEVUou	22	3NLEygSkSPuXnrZXpp1tdxQBW1syhqrdoAi2ixFDwkMp86pxJFQc	37	226	HZaRXbbz1wLcW91r0sASdVq6wSYfhIma446G_8OpiQM=	1	1	27	77	{1,0,1,4,4,4,1,7,7,7,7}	23166005000061388	jxny9DShp1paQ5fKJARhyYHuvS9jswRu2xPReHanShK2t1J4GgZ	15	43	43	1	\N	1763913908000	orphaned
-28	3NLF8ftXJP5cPuTkk4YWvKCLoZ48W1pTBTSBPW5jgfgnSsscxAFE	26	3NKEDV2kuqgRRtZuyyyLiUVizwKqQbphbdTzRhX8C2wNKdGEVUou	37	226	VAufdoM46a3GKldWQ999y7KXZY_T1T1G3QbiJ2QEjgg=	1	1	29	77	{1,0,1,4,4,4,2,7,7,7,7}	23166005000061388	jxQ2WZs6Z4L6jZYncVr1ezq4CgmT4zEgJn4RzYmturkiDiN6SYX	16	45	45	1	\N	1763913968000	orphaned
-29	3NLbdywzHkJdm5C4PgNX1MCbTgbck7CkEKcRhrndMBZrbXiAiZyL	28	3NLF8ftXJP5cPuTkk4YWvKCLoZ48W1pTBTSBPW5jgfgnSsscxAFE	37	226	bOfY_6A7WW0zhg8hjwpYzYuuUXAKIfv-gowuTqPtdQ4=	1	1	30	77	{1,0,1,4,4,4,3,7,7,7,7}	23166005000061388	jwhcuxcyqaf4BvSTxMmTWXdpmwGmyM7o7ssZGTBBcx1yhgsnZg4	17	46	46	1	\N	1763914007836	orphaned
-34	3NLDs1gcbvS7CTreCh546UnA7DS9e7ojj8vqooEBAV7VSyb8nUDU	33	3NLuQRUVtDvN3s7bFpwbcxsrzUUb7hC3sUPHh4pAKp7T9xVWJ1vB	145	173	Ts3zzm4pi_pdpkGsbStZXLbLgr9axFmRT0-ykv9OkgM=	1	1	35	77	{1,0,1,4,4,5,3,4,7,7,7}	23166005000061388	jwL3bXWxt4HSbG6n9hV9dj66EW8XjLKNuTxwmqP51pBHpCChz3T	22	54	54	1	\N	1763914238000	canonical
-33	3NLuQRUVtDvN3s7bFpwbcxsrzUUb7hC3sUPHh4pAKp7T9xVWJ1vB	32	3NL4zrGVDVde42ALRpM4RDJ2RJp9q51dt8v9K6pns1TNd3ypFEre	145	173	i5Y7GYTKPyfCS1L7ZyOentJzHzBl7V3cXe1AJIwMQAY=	1	1	34	77	{1,0,1,4,4,5,3,3,7,7,7}	23166005000061388	jwwEcVUMiSDmoZoFh8hQsA8shUN54MtZpnaf9KMucJ2tsjwyC2f	21	52	52	1	\N	1763914178000	canonical
-32	3NL4zrGVDVde42ALRpM4RDJ2RJp9q51dt8v9K6pns1TNd3ypFEre	31	3NK63JEKx6SXBXokXt2aevw1yHCPx9krfdc9uCZsSMf4tBxtj7W8	145	173	iYcJXyb0jqSZiERxlAR9srdBIylYoBnqoiuQPb8t-AY=	1	1	33	77	{1,0,1,4,4,5,3,2,7,7,7}	23166005000061388	jwPB9sw7PB3DZVrE6DqjPd3uv4KN8aLfppFFhd2UYCsPMyZ6NbC	20	50	50	1	\N	1763914118000	canonical
-31	3NK63JEKx6SXBXokXt2aevw1yHCPx9krfdc9uCZsSMf4tBxtj7W8	30	3NL1NHkcyUpTpTLSg89Fg7Y74kCsYY5Zp8BsLnjBrCSbu1aEDb5Z	145	173	WHf29NONa2iWs8QaYYYxal0qY_ehMgvHiEMACjstpQ4=	1	1	32	77	{1,0,1,4,4,5,3,1,7,7,7}	23166005000061388	jxBowVh9bYFpJV15wVt9WMxx4R5ETahpEodVBCuzhqQc3baDQBz	19	49	49	1	\N	1763914088000	canonical
-30	3NL1NHkcyUpTpTLSg89Fg7Y74kCsYY5Zp8BsLnjBrCSbu1aEDb5Z	27	3NKkZf5Y3voo7JDbtrgFVhUdi5kY3EX1jDAKnKHNAJerQm4VG7K6	145	173	WcP8UJxs-WyRxFqWmH_a9OkFfclBemvTFU7EKFBVRAs=	1	1	31	77	{1,0,1,4,4,5,3,7,7,7,7}	23166005000061388	jwTHgUeATSTodHwHb85sDePgQ8rhojjo2B9m7wdDSxe1VMvXS7q	18	48	48	1	\N	1763914058000	canonical
-27	3NKkZf5Y3voo7JDbtrgFVhUdi5kY3EX1jDAKnKHNAJerQm4VG7K6	25	3NKKZ2pdhtzwwHxJx2RXEkNH9oumF3BMGrmdqEKLV3rkqJdVU1Po	145	173	Iib6zfC__E5cZh3DLqO6u3iNLTqBnzbrKy_i8QTfuQ4=	1	1	28	77	{1,0,1,4,4,5,2,7,7,7,7}	23166005000061388	jxEEAX7qB6zbXRV3jS1QLNRvKeR2Kobbck1WT8pfwmqKUw1F8Xv	17	45	45	1	\N	1763913968000	canonical
-25	3NKKZ2pdhtzwwHxJx2RXEkNH9oumF3BMGrmdqEKLV3rkqJdVU1Po	24	3NLx1M28R8QYovrkucPyvmiLywPj6ytCreaZTAkuW8N18L5wYkNN	145	173	SrJ6lUle0aG3fwRG8mAOIUIeeTkxL5K9k2YqaMXEgg4=	1	1	26	77	{1,0,1,4,4,5,1,7,7,7,7}	23166005000061388	jxw57zQR6ZK9SrD8ci9THL2PC64dQQA6LFwTSQnQopsdBd4u9wp	16	43	43	1	\N	1763913908000	canonical
-24	3NLx1M28R8QYovrkucPyvmiLywPj6ytCreaZTAkuW8N18L5wYkNN	22	3NLEygSkSPuXnrZXpp1tdxQBW1syhqrdoAi2ixFDwkMp86pxJFQc	145	173	GuvBBagEqpBEDh_Vl70E9TSKjxg4cMPMJAdSCQTDWgY=	1	1	25	77	{1,0,1,4,4,5,7,7,7,7,7}	23166005000061388	jwpHH7P83BmN1MEoiHMcf6ugWGe9o5vQnFtJzhNjgfKkH8zYScZ	15	41	41	1	\N	1763913848000	canonical
-21	3NLgJ6juekbUcC8mA4BgWigmij97HR74jRPvkBg3kqN93CHVjsQ6	20	3NLsfFUAJvk8mZ6JS3q3tGbLjgLVzq1T8hMyMdoHJtwbbFPhzcez	145	173	HQed6wybJRNuo9kqDoe1P1r_l-672RBvwdwRXZGrXAE=	1	1	22	77	{1,0,1,4,4,3,7,7,7,7,7}	23166005000061388	jxZigX2RjBaRaVzuYzjjcHWbxvJRNuMcqyT2ZYmxDcsLN8NpZRw	13	37	37	1	\N	1763913738928	canonical
-17	3NLJmt5sVy4JeRqfDt8HKmww4DVjw7DZ7ykbGBt3YbkkHDAxLgwR	14	3NK7zMd8uE8zffrcfM4iZpuxE2SPL6dnYaZ5STU92Rp68JATKWCw	145	173	8UpW0tejn6tvBXoU6kzEsGHYZjxgB20K0BGZHvfNAgA=	1	1	18	77	{1,0,1,4,4,7,7,7,7,7,7}	23166005000061388	jwJFq95xie6Ff7tX3cd221EJSzWrEdpyD4UmxcH5Myy7MLyxuE1	10	34	34	1	\N	1763913638000	canonical
-36	3NK56TD3efj9BU3DsXeRYV6vAUrNkkw2iFv2FoWet1oyFfTRmBAc	35	3NL92EouWZR34WcaC2BRZq5778NwCLZ4u8EVBSXdni3gBY4H7dj6	37	226	dQln7L5fnhANiwyVkI2cWOe2cW_ho8sJ80Kwgk2VIA4=	1	1	37	77	{1,0,1,4,4,5,3,4,2,7,7}	23166005000061388	jxPKZeJtMpxEmDEh8iTwi3GA9cmKjyj4HNB5cjsJQ4gvvG1b29L	24	58	58	1	\N	1763914358000	orphaned
-37	3NKmjzoDotXj1AnwRjJ9AGKJnDaN8sQ3y45f6rrja8rmmwy5a1TQ	34	3NLDs1gcbvS7CTreCh546UnA7DS9e7ojj8vqooEBAV7VSyb8nUDU	145	173	P74OT0zpKKUbkWRahpAjBgdtnCswc7jqGXPLDVATHw4=	1	1	38	77	{1,0,1,4,4,5,3,4,1,7,7}	23166005000061388	jwJ9P7wxT2AbMdHn4tsYYgpqiVgDFHstTrEoEpqbMXXsgXbGV8S	23	58	58	1	\N	1763914358000	orphaned
-38	3NLTz4T69ojuBBmmAmqYGBnXgNBR4MQwbq2bkqhQJZjRr9SM8TEt	35	3NL92EouWZR34WcaC2BRZq5778NwCLZ4u8EVBSXdni3gBY4H7dj6	145	173	aY4DqAOSxnoli3anFZ5IOcytZ79dKowU0XWAkSmQzAM=	1	1	39	77	{1,0,1,4,4,5,3,4,2,7,7}	23166005000061388	jwVeArimK7JdutW1UFPP4Yda6Uc3spvTrNg1jwzffv9bcknpD2d	24	59	59	1	\N	1763914398709	orphaned
-39	3NKngPyEaCp1bSk6sT5xBME3YbkhPtLF1XBhbzxaPf2Z6hAp1zUk	36	3NK56TD3efj9BU3DsXeRYV6vAUrNkkw2iFv2FoWet1oyFfTRmBAc	37	226	KWSMmRA1nXsl91nPlyze8e2PKdTaZY0BqHGHzG_flAs=	1	1	40	77	{1,0,1,4,4,5,3,4,3,7,7}	23166005000061388	jxxbaTQntP6QZoJr3GJrHtntphzxdJV3Pw2xUJbRtSCyUgD56Ga	25	60	60	1	\N	1763914418000	canonical
-35	3NL92EouWZR34WcaC2BRZq5778NwCLZ4u8EVBSXdni3gBY4H7dj6	34	3NLDs1gcbvS7CTreCh546UnA7DS9e7ojj8vqooEBAV7VSyb8nUDU	37	226	GwJ3Y5FWtzD2OatO9HNQFFlGd3Oly6v5IklabiBKFQo=	1	1	36	77	{1,0,1,4,4,5,3,4,1,7,7}	23166005000061388	jwgrCvMPbv8cEokLLPHrQn8uCpixTytEXBL4F6iQSTiU5g3ASi3	23	57	57	1	\N	1763914328000	canonical
+3	3NLruUCeF8R2fdop1N5MFU6Uk3Far59zWMLZjFCR4q3MV5NzYWok	1	3NLYxsnzZKTGYadgaZqx1GrEnJzWUJKtagT1CZaffaaFtJwN3TAb	19	18	vO6yOXEgIJZi6NA7LBfQBrdDb37WREF10oMGgL6PwwQ=	1	1	4	77	{1,0,1,7,7,7,7,7,7,7,7}	23167003000061388	jxeirgqH43RvHRJAAeey229T7dLWJ78EpMkVARFdf44EuCFpnBY	2	14	14	1	\N	1781434362360	orphaned
+2	3NKeiz7nGFbz9ejAKt3Tp49FfMma2aL6YjUtbazQMSV3gRi2qVD8	1	3NLYxsnzZKTGYadgaZqx1GrEnJzWUJKtagT1CZaffaaFtJwN3TAb	136	135	xwog2MlU-4Cj00g-JzmTTE7sS4PBUT-6k5fffvR_Jgo=	1	1	3	77	{1,0,1,7,7,7,7,7,7,7,7}	23167003000061388	jwp4h8uYEDsfRQ9CsXUnpUhNenEMoZ1wqGF9MsRW8jXPFqmjb4v	2	14	14	1	\N	1781434361255	canonical
+1	3NLYxsnzZKTGYadgaZqx1GrEnJzWUJKtagT1CZaffaaFtJwN3TAb	\N	3NKVgGUqcN9YLoqwXo8KezJ9NtCnmTFFAsJmUMZ4DvGmjgRvVAwc	1	1	39cyg4ZmMtnb_aFUIerNAoAJV8qtkfOpq0zFzPspjgM=	1	1	2	77	{1,7,7,7,7,7,7,7,7,7,7}	23167003000061388	jwTF16i69daX8zK6cfbZC1gmJ6tpFBGjnwnZi3dVpmD8aFsp8jk	1	0	0	1	\N	1781433927000	canonical
+49	3NLkNNt2Q5ZCCUN7hGSv69rFjw7p1nAYnGzcFrJtgpU21TFTrvMf	47	3NLGUqPzrPki14Wdjs2ZGYUr99NZZnnrbhjxRDS5GErSTkdmB5t6	19	18	TSBdrfFfYu9nlu-dmZcsw4pugOPA0Ju3U3wzOUZ8Ug0=	1	38	50	77	{1,0,4,3,4,2,5,4,1,7,7}	23167003000061388	jwDHS8PJV3jJEDrANihKkHPQ2UfNiM9MF6EuguNwz8pNsj7dANm	24	56	56	1	\N	1781435614632	orphaned
+5	3NLQWDAJRH22zNK5XJDKSsMvFSkpq7mR1pjPyrjhazYxkudfpRNC	3	3NLruUCeF8R2fdop1N5MFU6Uk3Far59zWMLZjFCR4q3MV5NzYWok	19	18	A4yOp9f4Jl58ogoLTp-cdX7KwrMDb9FXJ8RcwXcFags=	1	1	6	77	{1,0,2,7,7,7,7,7,7,7,7}	23167003000061388	jxWXeKLRJdR4VZWCkWQ4AXo4L8wVcTzfwmERVbvDo6orQ7nAQf1	3	16	16	1	\N	1781434424748	orphaned
+7	3NLcGMHXVhRc6ShfPgyQyGgL49ZZbWsMtzSuPwGdeTsFSGhsRCg9	5	3NLQWDAJRH22zNK5XJDKSsMvFSkpq7mR1pjPyrjhazYxkudfpRNC	19	18	NJl4hd6_ImRIvlTpFPiZ-sDE5Re0T6Y55ahcgT3UTgQ=	1	1	8	77	{1,0,3,7,7,7,7,7,7,7,7}	23167003000061388	jwYAqNx58zznxnK1ymp5hcnppdjdhBbGDu51widqGKiy2fiNn7H	4	18	18	1	\N	1781434467000	orphaned
+9	3NKsJvrmwhqb3LsxSQb5HGyq8WW1dR95xUiZJzWQA9r66SCNEUJX	7	3NLcGMHXVhRc6ShfPgyQyGgL49ZZbWsMtzSuPwGdeTsFSGhsRCg9	19	18	5Gsn75hVml04lpSxH7DW1KvVFkUwlUBAhb7Rf-YqgQo=	1	1	10	77	{1,0,4,7,7,7,7,7,7,7,7}	23167003000061388	jwPwDqHP1wdKyzDVb7qPX8YiJpmZDW8pEwQPdn2xx2Eorh5A3q8	5	20	20	1	\N	1781434527000	orphaned
+11	3NLRYdG7BkAYDwFUJK1v49sBgVhoCvNronWw6utr9fngMxh6XhWd	9	3NKsJvrmwhqb3LsxSQb5HGyq8WW1dR95xUiZJzWQA9r66SCNEUJX	19	18	xawcbFKMTodtcW0tuRZsdPlRQOoiIB430K78ziyw-AY=	1	1	12	77	{1,0,4,1,7,7,7,7,7,7,7}	23167003000061388	jxjmx3dByNdKbcHAHeLUsjz8SHKBRFAfpdcJ5ZPSVxxDF2KsTZX	6	22	22	1	\N	1781434587000	orphaned
+12	3NKYYvjzEhRDHzZKeCdB4Lh9zzSS7BHtun2ta3DxeCLPXfg6ZuB2	11	3NLRYdG7BkAYDwFUJK1v49sBgVhoCvNronWw6utr9fngMxh6XhWd	19	18	5yPHI_AUWY8EJRwCfQ-_pf0tNhlFCEb7c-UStixRTQw=	1	1	13	77	{1,0,4,2,7,7,7,7,7,7,7}	23167003000061388	jwDHS8PJV3jJEDrANihKkHPQ2UfNiM9MF6EuguNwz8pNsj7dANm	7	23	23	1	\N	1781434621685	orphaned
+13	3NLBiJmvx7QXgaqbw6pG34TNtBvmbz4FWjL1qT5AYTiqH6k1JBsp	12	3NKYYvjzEhRDHzZKeCdB4Lh9zzSS7BHtun2ta3DxeCLPXfg6ZuB2	19	18	_Gqat-9oOwejQhRnJ20PbAb3zNQ0BVyABzZtw1EUJg4=	1	1	14	77	{1,0,4,3,7,7,7,7,7,7,7}	23167003000061388	jwDHS8PJV3jJEDrANihKkHPQ2UfNiM9MF6EuguNwz8pNsj7dANm	8	25	25	1	\N	1781434677000	orphaned
+16	3NKMzd2ZrgwoEgcvRwTcNVk8eatQ2qt62amgXfaNNjMomSJhQtrU	13	3NLBiJmvx7QXgaqbw6pG34TNtBvmbz4FWjL1qT5AYTiqH6k1JBsp	19	18	6dESxAtd77hzR-ewh7JHKoF63l2YwmEJ2t2xMcuqAQ0=	1	1	17	77	{1,0,4,3,1,7,7,7,7,7,7}	23167003000061388	jwDHS8PJV3jJEDrANihKkHPQ2UfNiM9MF6EuguNwz8pNsj7dANm	9	29	29	1	\N	1781434797000	orphaned
+18	3NKdbBgnNxM6BswKV3Y5ESBSdQGAxzntuUyrQAkzLzAassZcqLkC	16	3NKMzd2ZrgwoEgcvRwTcNVk8eatQ2qt62amgXfaNNjMomSJhQtrU	19	18	ExcmnbcEhDXPfCDSGKkCuqlww6ATwZTEtlV3h33m5QA=	1	1	19	77	{1,0,4,3,2,7,7,7,7,7,7}	23167003000061388	jwDHS8PJV3jJEDrANihKkHPQ2UfNiM9MF6EuguNwz8pNsj7dANm	10	30	30	1	\N	1781434833455	orphaned
+20	3NLRRGiropxbmoPN9fEDzt95qvscEkxrzY1Lt4wtrFC4iNDRUd46	18	3NKdbBgnNxM6BswKV3Y5ESBSdQGAxzntuUyrQAkzLzAassZcqLkC	19	18	-ZkcLvFdDpapCKNNLO4LQssZ28HRtvHUJFPDGQS-ZAc=	1	1	21	77	{1,0,4,3,3,7,7,7,7,7,7}	23167003000061388	jwDHS8PJV3jJEDrANihKkHPQ2UfNiM9MF6EuguNwz8pNsj7dANm	11	31	31	1	\N	1781434867211	orphaned
+17	3NKZf4QcQLuasHCc3aLSfvUKT7g8bqQciJxyK3HZ6scDeYVXNp61	15	3NKF6qTX3gu6yagXRE6RhRYKUwvPzXfwud2pxbdkSrT9popAHD1a	136	135	hp4HvHvs7ha-TwWgzN91aYrDqeI9cOBztKG3yDIXlwo=	1	1	18	77	{1,0,5,1,2,7,7,7,7,7,7}	23167003000061388	jwUkBGeAMhqpmYKBxfRUuh5mgdD5KQPy6bPdNbCXHU7ZuTTVuud	9	29	29	1	\N	1781434799292	canonical
+15	3NKF6qTX3gu6yagXRE6RhRYKUwvPzXfwud2pxbdkSrT9popAHD1a	14	3NLdBtk4vrorhEJyj4REpU7oHtMrbYdcuCWvgnpuc1CTcVuKUFH3	136	135	l4JIL5PMQZOk9rUDI7hkz5z-XBLObvY4vw2r13lMXwc=	1	1	16	77	{1,0,5,1,1,7,7,7,7,7,7}	23167003000061388	jwUkBGeAMhqpmYKBxfRUuh5mgdD5KQPy6bPdNbCXHU7ZuTTVuud	8	28	28	1	\N	1781434769006	canonical
+14	3NLdBtk4vrorhEJyj4REpU7oHtMrbYdcuCWvgnpuc1CTcVuKUFH3	10	3NLDNwxhgxBqiVMWdnLcmE91qNBrWTMTMPLfuyCLMTmzLgjotdad	136	135	PTnqFLHxcjfhqHQisWJ6BqFuqBPIqNvh_YecV2j12QU=	1	1	15	77	{1,0,5,1,7,7,7,7,7,7,7}	23167003000061388	jwUkBGeAMhqpmYKBxfRUuh5mgdD5KQPy6bPdNbCXHU7ZuTTVuud	7	27	27	1	\N	1781434737000	canonical
+10	3NLDNwxhgxBqiVMWdnLcmE91qNBrWTMTMPLfuyCLMTmzLgjotdad	8	3NLZVe9dA1Dm9QV9GbNMPvZ186jRmNX7Va12wysf93xAPB8np9id	136	135	D2pclqTahZ_IIy-9W4zA3GEbFsJYe3QdFB0KJYcmHwI=	1	1	11	77	{1,0,5,7,7,7,7,7,7,7,7}	23167003000061388	jxyzqXrgLPo3KvZgzTkiJzDsDMDM6s7bErfBbAbRA11HH4BNtyJ	6	20	20	1	\N	1781434550856	canonical
+8	3NLZVe9dA1Dm9QV9GbNMPvZ186jRmNX7Va12wysf93xAPB8np9id	6	3NKCCdETXXKsMvDu9FCWLoHhcNa1fh2gTJ6Q1A1oQ2HgAC6ktqSo	136	135	jzFVANxGWC0gDGBXVN6ouaJkKjw5q62AwDJBN79FFwg=	1	1	9	77	{1,0,4,7,7,7,7,7,7,7,7}	23167003000061388	jxAmNuwkTymusKbavif38mAy3G6zWoLme1qPVviWv3gQCBpEF7B	5	19	19	1	\N	1781434508880	canonical
+6	3NKCCdETXXKsMvDu9FCWLoHhcNa1fh2gTJ6Q1A1oQ2HgAC6ktqSo	4	3NLe251A1d1C6iUVanN9sCJvvTvZnDHtHZmZi1xU4ory7TASdjJq	136	135	00KhGzSZMBtzKccNTAwFxYJGEBR5B-uscIX_sVdXlAQ=	1	1	7	77	{1,0,3,7,7,7,7,7,7,7,7}	23167003000061388	jxUHAKT6WmR76pPeRsx4NtqwKg29ZqmFQ2JN4K7x8JJkgbkqaZX	4	18	18	1	\N	1781434467000	canonical
+4	3NLe251A1d1C6iUVanN9sCJvvTvZnDHtHZmZi1xU4ory7TASdjJq	2	3NKeiz7nGFbz9ejAKt3Tp49FfMma2aL6YjUtbazQMSV3gRi2qVD8	136	135	rFQiA4qcgkjsn66Sa_6yi-xKWWmOAxhvmL9HtGuN3gA=	1	1	5	77	{1,0,2,7,7,7,7,7,7,7,7}	23167003000061388	jweNtoC7yGdEzXsSryEDUdwSVwibhGPg9Th7BCiyj8RT6ttj839	3	16	16	1	\N	1781434423482	canonical
+23	3NLf36AtKhCttBuuRfkqBNo7RppTk1wfNQqjtu4VWvxgDd9KYDAq	20	3NLRRGiropxbmoPN9fEDzt95qvscEkxrzY1Lt4wtrFC4iNDRUd46	19	18	BZ0UtErje0vsSSS6VDJ5dugUQZByfeNOaxppN6hc_QE=	1	1	24	77	{1,0,4,3,4,7,7,7,7,7,7}	23167003000061388	jwDHS8PJV3jJEDrANihKkHPQ2UfNiM9MF6EuguNwz8pNsj7dANm	12	34	34	1	\N	1781434947000	orphaned
+24	3NKkX738sNEj8dUJKMS2aKrBhjRTgcpT2ZrrxNj2oUExt6hkXfHN	23	3NLf36AtKhCttBuuRfkqBNo7RppTk1wfNQqjtu4VWvxgDd9KYDAq	19	18	lM88-Q8vHY-WoJgIgw4u1J3jONfANz0kBGbAsgilFQw=	1	1	25	77	{1,0,4,3,4,1,7,7,7,7,7}	23167003000061388	jwDHS8PJV3jJEDrANihKkHPQ2UfNiM9MF6EuguNwz8pNsj7dANm	13	35	35	1	\N	1781434977628	orphaned
+27	3NKCUddUM5Kki5btcZVfNcHwHEz2v1MTkNhXi11QT31EKL6ZbtsN	24	3NKkX738sNEj8dUJKMS2aKrBhjRTgcpT2ZrrxNj2oUExt6hkXfHN	19	18	MK-0Qn_rLV9yKVzJXHaSUHRRyZUlxb63wl90GnNpYQ0=	1	1	28	77	{1,0,4,3,4,2,7,7,7,7,7}	23167003000061388	jwDHS8PJV3jJEDrANihKkHPQ2UfNiM9MF6EuguNwz8pNsj7dANm	14	38	38	1	\N	1781435067000	orphaned
+30	3NKnaoPmf22fBzgGpyZnG7dKeNQdusCFyhnBWDGus9Liv1kPZngM	1	3NLYxsnzZKTGYadgaZqx1GrEnJzWUJKtagT1CZaffaaFtJwN3TAb	165	220	DFQ-5sXA9DEkIt-SBIeHN55E-Yqhac9h4ElGYliMGwA=	1	1	31	77	{1,0,0,0,0,1,7,7,7,7,7}	23167003000061388	jwFntsVf14kvPDptf7dhwenkLNwRJkVkbyRW9WnMEP2Wqt2eEF3	2	40	40	1	\N	1781435127000	orphaned
+32	3NLvtLSXHcT3bpieZVwHogLKq7dhEjynD86kY7aVnoiZdaYZ7gZH	27	3NKCUddUM5Kki5btcZVfNcHwHEz2v1MTkNhXi11QT31EKL6ZbtsN	19	18	YXon_hhBKx23ZaFAW_eYko6i8_jUPk5uJvnEOFiSCw4=	1	1	33	77	{1,0,4,3,4,2,1,7,7,7,7}	23167003000061388	jwDHS8PJV3jJEDrANihKkHPQ2UfNiM9MF6EuguNwz8pNsj7dANm	15	42	42	1	\N	1781435187000	orphaned
+34	3NKiqVY7szu3dD78iQYNRRGiRGZELyrkmNf9QKHKNJYYX8tZS5pB	32	3NLvtLSXHcT3bpieZVwHogLKq7dhEjynD86kY7aVnoiZdaYZ7gZH	19	18	pcqUQYf6EsrvP-pvH_f9Oun6DXAhHgrrRiuw8LjZBgY=	1	1	35	77	{1,0,4,3,4,2,2,7,7,7,7}	23167003000061388	jwDHS8PJV3jJEDrANihKkHPQ2UfNiM9MF6EuguNwz8pNsj7dANm	16	44	44	1	\N	1781435247000	orphaned
+35	3NLeaXJqZGV4x1VcCqcDU4obR92eB3GdJzTZvuPSZasuQudhsviN	34	3NKiqVY7szu3dD78iQYNRRGiRGZELyrkmNf9QKHKNJYYX8tZS5pB	19	18	vH-HgYyiyt9xL_79G4hVGv2DQygvPPZpfmV--T4b0Qk=	1	1	36	77	{1,0,4,3,4,2,3,7,7,7,7}	23167003000061388	jwDHS8PJV3jJEDrANihKkHPQ2UfNiM9MF6EuguNwz8pNsj7dANm	17	45	45	1	\N	1781435284897	orphaned
+37	3NLTHTYjXsLFXwwHnwcAA6Vz7nWfzTw3dyfcgNJREqP8DDXmG9ok	35	3NLeaXJqZGV4x1VcCqcDU4obR92eB3GdJzTZvuPSZasuQudhsviN	19	18	b89KnwNZcXG70jZXqG91uIC4tO6Bytg6j7b7B2_5sAg=	1	1	38	77	{1,0,4,3,4,2,4,7,7,7,7}	23167003000061388	jwDHS8PJV3jJEDrANihKkHPQ2UfNiM9MF6EuguNwz8pNsj7dANm	18	47	47	1	\N	1781435337000	orphaned
+33	3NKrVe5WR3k7jErjXuK16FpfeSTFyDP3NvhQkJjP9urRdvaVTudU	31	3NLXbtp3S6axjfvQNHTZo9iR61AsYzUj4Be3YqPZV7k83Q2bq2Mk	136	135	1x83iH90es7WEJT6Zn2Z0RXtG9Q_MIEJaSvRbEP-3wQ=	1	1	34	77	{1,0,5,1,5,4,2,7,7,7,7}	23167003000061388	jwUkBGeAMhqpmYKBxfRUuh5mgdD5KQPy6bPdNbCXHU7ZuTTVuud	18	43	43	1	\N	1781435219961	canonical
+31	3NLXbtp3S6axjfvQNHTZo9iR61AsYzUj4Be3YqPZV7k83Q2bq2Mk	29	3NLaLdkSLuWHXknPfQozD6pb1yMAmna9LtpHFsu5xTRnhvPBRMUp	136	135	2NU_4uzeWe4lpbUJGb7aI1hbtuXmJQB03-8p53YcyAs=	1	1	32	77	{1,0,5,1,5,4,1,7,7,7,7}	23167003000061388	jwUkBGeAMhqpmYKBxfRUuh5mgdD5KQPy6bPdNbCXHU7ZuTTVuud	17	42	42	1	\N	1781435187000	canonical
+29	3NLaLdkSLuWHXknPfQozD6pb1yMAmna9LtpHFsu5xTRnhvPBRMUp	28	3NKtbFhvoRwWkJZXmdsCtuwU1h9sMQmka1iyZXdF4EQU2s35hcLi	136	135	epfZtxnplEnlasgmuXHEK39h0ILwQAivi5-H9VAUEAQ=	1	1	30	77	{1,0,5,1,5,4,7,7,7,7,7}	23167003000061388	jwUkBGeAMhqpmYKBxfRUuh5mgdD5KQPy6bPdNbCXHU7ZuTTVuud	16	40	40	1	\N	1781435127000	canonical
+28	3NKtbFhvoRwWkJZXmdsCtuwU1h9sMQmka1iyZXdF4EQU2s35hcLi	26	3NK8TYpcynzS1FwvGAN7FUZM6mgLzXj1KRAVUTZ5ZT1wSsToLRoa	136	135	EHyVS8VmoGf-7aeOl_9pIBRkgL2oDj2VNILqBUUs7wg=	1	1	29	77	{1,0,5,1,5,3,7,7,7,7,7}	23167003000061388	jwUkBGeAMhqpmYKBxfRUuh5mgdD5KQPy6bPdNbCXHU7ZuTTVuud	15	38	38	1	\N	1781435072502	canonical
+26	3NK8TYpcynzS1FwvGAN7FUZM6mgLzXj1KRAVUTZ5ZT1wSsToLRoa	25	3NKR3i6M321F74GUYxoNB19AKiVWe7wTjXWWFVLfpmA3FfPFruQG	136	135	pyhPZOu00uiy6xEBUoQ_LMJoxQXPsi57oyh0RL1p0gg=	1	1	27	77	{1,0,5,1,5,2,7,7,7,7,7}	23167003000061388	jwUkBGeAMhqpmYKBxfRUuh5mgdD5KQPy6bPdNbCXHU7ZuTTVuud	14	37	37	1	\N	1781435040565	canonical
+25	3NKR3i6M321F74GUYxoNB19AKiVWe7wTjXWWFVLfpmA3FfPFruQG	22	3NKCK1SYysXNCULYdtH6auYaVPsSTHZrWKHtehtKBCw4zKEPnqhu	136	135	D8IxCFzM7gcoxC-pH4Qz_RJS9Rguu5h-DUaJs5UI3gQ=	1	1	26	77	{1,0,5,1,5,1,7,7,7,7,7}	23167003000061388	jwUkBGeAMhqpmYKBxfRUuh5mgdD5KQPy6bPdNbCXHU7ZuTTVuud	13	36	36	1	\N	1781435007000	canonical
+22	3NKCK1SYysXNCULYdtH6auYaVPsSTHZrWKHtehtKBCw4zKEPnqhu	21	3NLwuibZqA75rgSkEXoQ6Xa3tiWnWH2W5dDxmscSy7ufQkNpcaNb	136	135	9e0SWes3zBPgmaZ7UIbaSwX0xmHVK87wqGzH91XZtwA=	1	1	23	77	{1,0,5,1,5,7,7,7,7,7,7}	23167003000061388	jwUkBGeAMhqpmYKBxfRUuh5mgdD5KQPy6bPdNbCXHU7ZuTTVuud	12	33	33	1	\N	1781434937437	canonical
+21	3NLwuibZqA75rgSkEXoQ6Xa3tiWnWH2W5dDxmscSy7ufQkNpcaNb	19	3NLfqFaah3Yqa95QvCj4kpvekzuDwrxDZAyV3A7QjWS9siRvvQMx	136	135	L-jcPv9aEMH1bVNFUxoUCsGrBWF-c5o5HxaTLRyVfQA=	1	1	22	77	{1,0,5,1,4,7,7,7,7,7,7}	23167003000061388	jwUkBGeAMhqpmYKBxfRUuh5mgdD5KQPy6bPdNbCXHU7ZuTTVuud	11	32	32	1	\N	1781434895489	canonical
+39	3NKRxbLWmKa63sHwL8GNSQzJsQZh1BfxdeZnYrNiL5PYpNzUP6CW	37	3NLTHTYjXsLFXwwHnwcAA6Vz7nWfzTw3dyfcgNJREqP8DDXmG9ok	19	18	0qhEixIYg2J0JckGRGATG3V4IzlxWuYO3D3TvCmnjQg=	1	38	40	77	{1,0,4,3,4,2,5,7,7,7,7}	23167003000061388	jwDHS8PJV3jJEDrANihKkHPQ2UfNiM9MF6EuguNwz8pNsj7dANm	19	48	48	1	\N	1781435370147	orphaned
+41	3NK6j9YHkgmVkpWf2xtPLThzyy7dVXdB6KAAJVtUzatdQd74jtqc	39	3NKRxbLWmKa63sHwL8GNSQzJsQZh1BfxdeZnYrNiL5PYpNzUP6CW	19	18	-f6RvpkcqYIb622VaXH0Qt_DDG3H34a6h718408ciAQ=	1	38	42	77	{1,0,4,3,4,2,5,1,7,7,7}	23167003000061388	jwDHS8PJV3jJEDrANihKkHPQ2UfNiM9MF6EuguNwz8pNsj7dANm	20	49	49	1	\N	1781435403919	orphaned
+44	3NLaDh6Pp2sE3taz3uN3TNezZwwMoKkBfchfBvYbwujejMQRPt6W	41	3NK6j9YHkgmVkpWf2xtPLThzyy7dVXdB6KAAJVtUzatdQd74jtqc	19	18	yQ_1h5EXfwm2d412pkFXzXOABKMRQeCRMfTaiGrFEgY=	1	38	45	77	{1,0,4,3,4,2,5,2,7,7,7}	23167003000061388	jwDHS8PJV3jJEDrANihKkHPQ2UfNiM9MF6EuguNwz8pNsj7dANm	21	53	53	1	\N	1781435517000	orphaned
+45	3NL3L1GMhXim69m7wCNu1TPjABxDZzu8MiGMqEBDYUoom9tG767c	44	3NLaDh6Pp2sE3taz3uN3TNezZwwMoKkBfchfBvYbwujejMQRPt6W	19	18	hpa66zCdQMzNT3D6WvTWUj3vvBcMeVcWjkeeG47OFgw=	1	38	46	77	{1,0,4,3,4,2,5,3,7,7,7}	23167003000061388	jwDHS8PJV3jJEDrANihKkHPQ2UfNiM9MF6EuguNwz8pNsj7dANm	22	54	54	1	\N	1781435550914	orphaned
+42	3NLSUUXUA8WDsyFkpGmtACjRLMNya74xs2mPesFFeoUHnZ8Y8FyW	40	3NLBcre2WQGFkcnaui1Ym91B15E49n2456NFSBwfphzkAn1Cgcu5	136	135	cUXy0seDJbvUV8C0hkW3NlfVm_TwfnurAhQYTV7aGAA=	1	39	43	77	{1,0,5,1,5,4,5,1,7,7,7}	23167003000061388	jwUkBGeAMhqpmYKBxfRUuh5mgdD5KQPy6bPdNbCXHU7ZuTTVuud	22	49	49	1	\N	1781435415121	canonical
+40	3NLBcre2WQGFkcnaui1Ym91B15E49n2456NFSBwfphzkAn1Cgcu5	38	3NLHapeyiCJW7heD2o22Uu7MLVkcoCivCMvGnCE3yEGhDPLMk3AV	136	135	0sc2IPNz0l48V0ZNqK7vS8NG-kgTtMd2xYLqkGKHtw4=	1	39	41	77	{1,0,5,1,5,4,5,7,7,7,7}	23167003000061388	jwUkBGeAMhqpmYKBxfRUuh5mgdD5KQPy6bPdNbCXHU7ZuTTVuud	21	48	48	1	\N	1781435380419	canonical
+38	3NLHapeyiCJW7heD2o22Uu7MLVkcoCivCMvGnCE3yEGhDPLMk3AV	36	3NKrvgbB4wE7BhWjSkEN1x4PK3z6mEgZf4uJNkYKPuC7v7khByfk	136	135	1eXRpunZzEvCAFn0GR9vsMr2OV11nyIAbdybjfEbWA4=	1	1	39	77	{1,0,5,1,5,4,4,7,7,7,7}	23167003000061388	jwUkBGeAMhqpmYKBxfRUuh5mgdD5KQPy6bPdNbCXHU7ZuTTVuud	20	47	47	1	\N	1781435347977	canonical
+36	3NKrvgbB4wE7BhWjSkEN1x4PK3z6mEgZf4uJNkYKPuC7v7khByfk	33	3NKrVe5WR3k7jErjXuK16FpfeSTFyDP3NvhQkJjP9urRdvaVTudU	136	135	Nig0G2naSlD_2aU222dGfK9D76g5nMrTqPYnBJJaZgQ=	1	1	37	77	{1,0,5,1,5,4,3,7,7,7,7}	23167003000061388	jwUkBGeAMhqpmYKBxfRUuh5mgdD5KQPy6bPdNbCXHU7ZuTTVuud	19	46	46	1	\N	1781435307000	canonical
+43	3NKVJpNeANQPDy7GVCefPQtBRGVS6Ga3ZX6aXCTrcKMEmeRbTL8h	42	3NLSUUXUA8WDsyFkpGmtACjRLMNya74xs2mPesFFeoUHnZ8Y8FyW	136	135	Jx3cSJFRTi8GhARcHfsrM1jKgernwbAc01pJifGeHQQ=	1	39	44	77	{1,0,5,1,5,4,5,2,7,7,7}	23167003000061388	jwUkBGeAMhqpmYKBxfRUuh5mgdD5KQPy6bPdNbCXHU7ZuTTVuud	23	51	51	1	\N	1781435457000	canonical
+47	3NLGUqPzrPki14Wdjs2ZGYUr99NZZnnrbhjxRDS5GErSTkdmB5t6	45	3NL3L1GMhXim69m7wCNu1TPjABxDZzu8MiGMqEBDYUoom9tG767c	19	18	ew1SEAQPcJZRyP6OBSYlzL48oiNqvlz_VqrmJBs9UwM=	1	38	48	77	{1,0,4,3,4,2,5,4,7,7,7}	23167003000061388	jwDHS8PJV3jJEDrANihKkHPQ2UfNiM9MF6EuguNwz8pNsj7dANm	23	55	55	1	\N	1781435579224	orphaned
+46	3NKRqGdezvSVzb89dkZ7J4uraeGK3yas2J2zgqLhpCtkQRzj5RBR	43	3NKVJpNeANQPDy7GVCefPQtBRGVS6Ga3ZX6aXCTrcKMEmeRbTL8h	136	135	9jL6zvjVliJaKrRjlq_0MkPez8e2sd0RB2NkV8o9-wM=	1	39	47	77	{1,0,5,1,5,4,5,3,7,7,7}	23167003000061388	jwUkBGeAMhqpmYKBxfRUuh5mgdD5KQPy6bPdNbCXHU7ZuTTVuud	24	55	55	1	\N	1781435577000	canonical
+48	3NKu9EySCeXqD1uEorVrmFXtr3iszymByKCL8t6V37QrJPeRA1kJ	46	3NKRqGdezvSVzb89dkZ7J4uraeGK3yas2J2zgqLhpCtkQRzj5RBR	136	135	g0K0zFCYoRCWpMa8Xj5HlypfwkFjkMZxdI54qNTNhA8=	1	39	49	77	{1,0,5,1,5,4,5,3,1,7,7}	23167003000061388	jwUkBGeAMhqpmYKBxfRUuh5mgdD5KQPy6bPdNbCXHU7ZuTTVuud	25	56	56	1	\N	1781435612440	canonical
+19	3NLfqFaah3Yqa95QvCj4kpvekzuDwrxDZAyV3A7QjWS9siRvvQMx	17	3NKZf4QcQLuasHCc3aLSfvUKT7g8bqQciJxyK3HZ6scDeYVXNp61	136	135	7o3yQ6GzxrEVbgIM2rwhNwTsoFdzt9dnlIGASjdzYQs=	1	1	20	77	{1,0,5,1,3,7,7,7,7,7,7}	23167003000061388	jwUkBGeAMhqpmYKBxfRUuh5mgdD5KQPy6bPdNbCXHU7ZuTTVuud	10	31	31	1	\N	1781434857000	canonical
 \.
 
 
@@ -2692,88 +2612,22 @@ COPY public.blocks (id, state_hash, parent_id, parent_hash, creator_id, block_wi
 COPY public.blocks_internal_commands (block_id, internal_command_id, sequence_no, secondary_sequence_no, status, failure_reason) FROM stdin;
 2	1	0	0	applied	\N
 3	2	0	0	applied	\N
-4	1	5	0	applied	\N
-4	3	6	0	applied	\N
-5	2	6	0	applied	\N
-5	4	7	0	applied	\N
-6	1	12	0	applied	\N
-6	5	13	0	applied	\N
-7	2	12	0	applied	\N
-7	6	13	0	applied	\N
-8	1	5	0	applied	\N
-8	7	6	0	applied	\N
-9	2	10	0	applied	\N
-9	8	11	0	applied	\N
-10	2	5	0	applied	\N
-10	9	6	0	applied	\N
-11	2	12	0	applied	\N
-11	6	13	0	applied	\N
-12	2	4	0	applied	\N
-12	10	5	0	applied	\N
-13	1	16	0	applied	\N
-13	11	17	0	applied	\N
-14	12	1	0	applied	\N
-14	2	19	0	applied	\N
-14	13	20	0	applied	\N
-15	2	6	0	applied	\N
-15	14	7	0	applied	\N
-16	2	3	0	applied	\N
-16	15	4	0	applied	\N
-17	1	9	0	applied	\N
-17	16	10	0	applied	\N
-18	1	5	0	applied	\N
-18	3	6	0	applied	\N
-19	2	9	0	applied	\N
-19	17	10	0	applied	\N
-20	1	4	0	applied	\N
-20	18	5	0	applied	\N
-21	1	6	0	applied	\N
-21	19	7	0	applied	\N
-22	1	9	0	applied	\N
-22	16	10	0	applied	\N
-23	20	20	0	applied	\N
-23	2	28	0	applied	\N
-23	21	29	0	applied	\N
-24	22	1	0	applied	\N
-24	1	13	0	applied	\N
-24	23	14	0	applied	\N
-25	1	10	0	applied	\N
-25	24	11	0	applied	\N
-26	12	1	0	applied	\N
-26	2	23	0	applied	\N
-26	25	24	0	applied	\N
-27	1	11	0	applied	\N
-27	23	12	0	applied	\N
-28	2	11	0	applied	\N
-28	26	12	0	applied	\N
-29	2	6	0	applied	\N
-29	14	7	0	applied	\N
-30	1	15	0	applied	\N
-30	27	16	0	applied	\N
-31	1	6	0	applied	\N
-31	19	7	0	applied	\N
-32	1	0	0	applied	\N
-33	28	17	0	applied	\N
-33	29	17	0	applied	\N
-33	30	18	0	applied	\N
-33	31	18	1	applied	\N
-34	28	11	0	applied	\N
-34	29	11	0	applied	\N
-34	32	12	0	applied	\N
-35	28	12	0	applied	\N
-35	33	12	0	applied	\N
-35	34	13	0	applied	\N
-35	35	13	1	applied	\N
-36	28	0	0	applied	\N
-36	33	0	0	applied	\N
-37	28	12	0	applied	\N
-37	29	12	0	applied	\N
-37	36	13	0	applied	\N
-37	37	13	1	applied	\N
-38	28	0	0	applied	\N
-38	29	0	0	applied	\N
-39	28	0	0	applied	\N
-39	33	0	0	applied	\N
+4	1	1	0	applied	\N
+4	3	2	0	applied	\N
+5	2	1	0	applied	\N
+5	4	2	0	applied	\N
+6	1	0	0	applied	\N
+7	2	0	0	applied	\N
+8	1	1	0	applied	\N
+8	5	2	0	applied	\N
+9	2	1	0	applied	\N
+9	6	2	0	applied	\N
+10	1	0	0	applied	\N
+11	2	0	0	applied	\N
+12	2	0	0	applied	\N
+14	1	0	0	applied	\N
+30	7	2	0	applied	\N
+30	8	3	0	applied	\N
 \.
 
 
@@ -2782,107 +2636,8 @@ COPY public.blocks_internal_commands (block_id, internal_command_id, sequence_no
 --
 
 COPY public.blocks_user_commands (block_id, user_command_id, sequence_no, status, failure_reason) FROM stdin;
-4	1	3	applied	\N
-4	2	4	applied	\N
-5	1	3	applied	\N
-5	2	4	applied	\N
-5	3	5	applied	\N
-6	4	8	applied	\N
-6	5	9	applied	\N
-6	6	10	applied	\N
-6	7	11	applied	\N
-7	4	8	applied	\N
-7	5	9	applied	\N
-7	6	10	applied	\N
-7	7	11	applied	\N
-8	8	4	applied	\N
-9	8	7	applied	\N
-9	9	8	applied	\N
-9	10	9	applied	\N
-10	11	3	applied	\N
-10	12	4	applied	\N
-11	13	8	applied	\N
-11	14	9	applied	\N
-11	15	10	applied	\N
-11	16	11	applied	\N
-12	17	3	applied	\N
-13	13	11	applied	\N
-13	14	12	applied	\N
-13	15	13	applied	\N
-13	16	14	applied	\N
-13	17	15	applied	\N
-14	18	13	applied	\N
-14	19	14	applied	\N
-14	20	15	applied	\N
-14	21	16	applied	\N
-14	22	17	applied	\N
-14	23	18	applied	\N
-15	24	4	applied	\N
-15	25	5	applied	\N
-16	26	2	applied	\N
-17	24	6	applied	\N
-17	25	7	applied	\N
-17	26	8	applied	\N
-18	27	3	applied	\N
-18	28	4	applied	\N
-19	27	6	applied	\N
-19	28	7	applied	\N
-19	29	8	applied	\N
-20	29	3	applied	\N
-21	30	4	applied	\N
-21	31	5	applied	\N
-22	32	6	applied	\N
-22	33	7	applied	\N
-22	34	8	applied	\N
-23	30	18	applied	\N
-23	31	19	applied	\N
-23	32	21	applied	\N
-23	33	22	applied	\N
-23	34	23	applied	\N
-23	35	24	applied	\N
-23	36	25	applied	\N
-23	37	26	applied	\N
-23	38	27	applied	\N
-24	35	9	applied	\N
-24	36	10	applied	\N
-24	37	11	applied	\N
-24	38	12	applied	\N
-25	39	7	applied	\N
-25	40	8	applied	\N
-25	41	9	applied	\N
-26	35	16	applied	\N
-26	36	17	applied	\N
-26	37	18	applied	\N
-26	38	19	applied	\N
-26	39	20	applied	\N
-26	40	21	applied	\N
-26	41	22	applied	\N
-27	42	7	applied	\N
-27	43	8	applied	\N
-27	44	9	applied	\N
-27	45	10	applied	\N
-28	42	7	applied	\N
-28	43	8	applied	\N
-28	44	9	applied	\N
-28	45	10	applied	\N
-29	46	4	applied	\N
-29	47	5	applied	\N
-30	46	10	applied	\N
-30	47	11	applied	\N
-30	48	12	applied	\N
-30	49	13	applied	\N
-30	50	14	applied	\N
-31	51	4	applied	\N
-31	52	5	applied	\N
-33	53	11	applied	\N
-33	54	12	applied	\N
-33	55	13	applied	\N
-33	56	14	applied	\N
-33	57	15	applied	\N
-33	58	16	applied	\N
-34	59	8	applied	\N
-34	60	9	applied	\N
-34	61	10	applied	\N
+8	1	0	applied	\N
+9	1	0	applied	\N
 \.
 
 
@@ -2892,232 +2647,9 @@ COPY public.blocks_user_commands (block_id, user_command_id, sequence_no, status
 
 COPY public.blocks_zkapp_commands (block_id, zkapp_command_id, sequence_no, status, failure_reasons_ids) FROM stdin;
 4	1	0	failed	{1,2}
-4	2	1	failed	{3,2}
-4	3	2	failed	{4}
 5	1	0	failed	{1,2}
-5	2	1	failed	{3,2}
-5	3	2	failed	{4}
-6	4	0	failed	{3,2}
-6	5	1	failed	{4}
-6	6	2	failed	{3,2}
-6	7	3	failed	{4}
-6	8	4	failed	{3,2}
-6	9	5	failed	{4}
-6	10	6	failed	{3,2}
-6	11	7	failed	{4}
-7	4	0	failed	{3,2}
-7	5	1	failed	{4}
-7	6	2	failed	{3,2}
-7	7	3	failed	{4}
-7	8	4	failed	{3,2}
-7	9	5	failed	{4}
-7	10	6	failed	{3,2}
-7	11	7	failed	{4}
-8	12	0	failed	{3,2}
-8	13	1	failed	{4}
-8	14	2	failed	{3,2}
-8	15	3	failed	{4}
-9	12	0	failed	{3,2}
-9	13	1	failed	{4}
-9	14	2	failed	{3,2}
-9	15	3	failed	{4}
-9	16	4	failed	{3,2}
-9	17	5	failed	{4}
-9	18	6	failed	{3,2}
-10	19	0	failed	{4}
-10	20	1	failed	{3,2}
-10	21	2	failed	{4}
-11	22	0	failed	{3,2}
-11	23	1	failed	{4}
-11	24	2	failed	{3,2}
-11	25	3	failed	{4}
-11	26	4	failed	{3,2}
-11	27	5	failed	{4}
-11	28	6	failed	{3,2}
-11	29	7	failed	{4}
-12	30	0	failed	{3,2}
-12	31	1	failed	{4}
-12	32	2	failed	{3,2}
-13	22	0	failed	{3,2}
-13	23	1	failed	{4}
-13	24	2	failed	{3,2}
-13	25	3	failed	{4}
-13	26	4	failed	{3,2}
-13	27	5	failed	{4}
-13	28	6	failed	{3,2}
-13	29	7	failed	{4}
-13	30	8	failed	{3,2}
-13	31	9	failed	{4}
-13	32	10	failed	{3,2}
-14	33	0	failed	{4}
-14	34	2	failed	{3,2}
-14	35	3	failed	{4}
-14	36	4	failed	{3,2}
-14	37	5	failed	{4}
-14	38	6	failed	{3,2}
-14	39	7	failed	{4}
-14	40	8	failed	{3,2}
-14	41	9	failed	{4}
-14	42	10	failed	{3,2}
-14	43	11	failed	{4}
-14	44	12	failed	{3,2}
-15	45	0	failed	{4}
-15	46	1	failed	{3,2}
-15	47	2	failed	{4}
-15	48	3	failed	{3,2}
-16	49	0	failed	{4}
-16	50	1	failed	{3,2}
-17	45	0	failed	{4}
-17	46	1	failed	{3,2}
-17	47	2	failed	{4}
-17	48	3	failed	{3,2}
-17	49	4	failed	{4}
-17	50	5	failed	{3,2}
-18	51	0	failed	{4}
-18	52	1	failed	{3,2}
-18	53	2	failed	{4}
-19	51	0	failed	{4}
-19	52	1	failed	{3,2}
-19	53	2	failed	{4}
-19	54	3	failed	{3,2}
-19	55	4	failed	{4}
-19	56	5	failed	{3,2}
-20	54	0	failed	{3,2}
-20	55	1	failed	{4}
-20	56	2	failed	{3,2}
-21	57	0	failed	{4}
-21	58	1	failed	{3,2}
-21	59	2	failed	{4}
-21	60	3	failed	{3,2}
-22	61	0	failed	{4}
-22	62	1	failed	{3,2}
-22	63	2	failed	{4}
-22	64	3	failed	{3,2}
-22	65	4	failed	{4}
-22	66	5	failed	{3,2}
-23	57	0	failed	{4}
-23	58	1	failed	{3,2}
-23	59	2	failed	{4}
-23	60	3	failed	{3,2}
-23	61	4	failed	{4}
-23	62	5	failed	{3,2}
-23	63	6	failed	{4}
-23	64	7	failed	{3,2}
-23	65	8	failed	{4}
-23	66	9	failed	{3,2}
-23	67	10	failed	{4}
-23	68	11	failed	{3,2}
-23	69	12	failed	{4}
-23	70	13	failed	{3,2}
-23	71	14	failed	{4}
-23	72	15	failed	{3,2}
-23	73	16	failed	{4}
-23	74	17	failed	{3,2}
-24	67	0	failed	{4}
-24	68	2	failed	{3,2}
-24	69	3	failed	{4}
-24	70	4	failed	{3,2}
-24	71	5	failed	{4}
-24	72	6	failed	{3,2}
-24	73	7	failed	{4}
-24	74	8	failed	{3,2}
-25	75	0	failed	{4}
-25	76	1	failed	{3,2}
-25	77	2	failed	{4}
-25	78	3	failed	{3,2}
-25	79	4	failed	{4}
-25	80	5	failed	{3,2}
-25	81	6	failed	{4}
-26	67	0	failed	{4}
-26	68	2	failed	{3,2}
-26	69	3	failed	{4}
-26	70	4	failed	{3,2}
-26	71	5	failed	{4}
-26	72	6	failed	{3,2}
-26	73	7	failed	{4}
-26	74	8	failed	{3,2}
-26	75	9	failed	{4}
-26	76	10	failed	{3,2}
-26	77	11	failed	{4}
-26	78	12	failed	{3,2}
-26	79	13	failed	{4}
-26	80	14	failed	{3,2}
-26	81	15	failed	{4}
-27	82	0	failed	{3,2}
-27	83	1	failed	{4}
-27	84	2	failed	{3,2}
-27	85	3	failed	{4}
-27	86	4	failed	{3,2}
-27	87	5	failed	{4}
-27	88	6	failed	{3,2}
-28	82	0	failed	{3,2}
-28	83	1	failed	{4}
-28	84	2	failed	{3,2}
-28	85	3	failed	{4}
-28	86	4	failed	{3,2}
-28	87	5	failed	{4}
-28	88	6	failed	{3,2}
-29	89	0	failed	{4}
-29	90	1	failed	{3,2}
-29	91	2	failed	{4}
-29	92	3	failed	{3,2}
-30	89	0	failed	{4}
-30	90	1	failed	{3,2}
-30	91	2	failed	{4}
-30	92	3	failed	{3,2}
-30	93	4	failed	{4}
-30	94	5	failed	{3,2}
-30	95	6	failed	{4}
-30	96	7	failed	{3,2}
-30	97	8	failed	{4}
-30	98	9	failed	{3,2}
-31	99	0	failed	{4}
-31	100	1	failed	{3,2}
-31	101	2	failed	{4}
-31	102	3	failed	{3,2}
-33	103	0	failed	{4}
-33	104	1	failed	{3,2}
-33	105	2	failed	{4}
-33	106	3	failed	{3,2}
-33	107	4	failed	{4}
-33	108	5	failed	{3,2}
-33	109	6	failed	{4}
-33	110	7	failed	{3,2}
-33	111	8	failed	{4}
-33	112	9	failed	{3,2}
-33	113	10	failed	{4}
-34	114	0	failed	{3,2}
-34	115	1	failed	{4}
-34	116	2	failed	{3,2}
-34	117	3	failed	{4}
-34	118	4	failed	{3,2}
-34	119	5	failed	{4}
-34	120	6	failed	{3,2}
-34	121	7	failed	{4}
-35	122	0	failed	{3,2}
-35	123	1	failed	{4}
-35	124	2	failed	{3,2}
-35	125	3	failed	{4}
-35	126	4	failed	{3,2}
-35	127	5	failed	{4}
-35	128	6	failed	{3,2}
-35	129	7	failed	{4}
-35	130	8	failed	{3,2}
-35	131	9	failed	{4}
-35	132	10	failed	{3,2}
-35	133	11	failed	{4}
-37	122	0	failed	{3,2}
-37	123	1	failed	{4}
-37	124	2	failed	{3,2}
-37	125	3	failed	{4}
-37	126	4	failed	{3,2}
-37	127	5	failed	{4}
-37	128	6	failed	{3,2}
-37	129	7	failed	{4}
-37	130	8	failed	{3,2}
-37	131	9	failed	{4}
-37	132	10	failed	{3,2}
-37	133	11	failed	{4}
+30	1	0	failed	{1,2}
+30	2	1	failed	{3,2}
 \.
 
 
@@ -3126,46 +2658,56 @@ COPY public.blocks_zkapp_commands (block_id, zkapp_command_id, sequence_no, stat
 --
 
 COPY public.epoch_data (id, seed, ledger_hash_id, total_currency, start_checkpoint, lock_checkpoint, epoch_length) FROM stdin;
-1	2va9BGv9JrLTtrzZttiEMDYw1Zj6a6EHzXjmP9evHDTG3oEquURA	1	23166005000061388	3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x	3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x	1
-2	2vafPBQ3zQdHUEDDnFGuiNvJz7s2MhTLJgSzQSnu5fnZavT27cms	1	23166005000061388	3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x	3NLfcWNw4jG14R7S9VjvvcR6tQupRoUwWY3QHSvDPVMNr3hFx54p	2
-3	2vaFCA2MacowMVur1B9rr2g79n42ZiN748Lfpv1Bwt1mT8DK91U3	1	23166005000061388	3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x	3NKTWvnmtKkRFwkfvPrHrKKbGWsiaw4FcQUiG2ZUNJd7NEaGKYvx	3
-4	2vbvF9BocNJMwv729NaPuzsarbVRBP4d7vw2j3xJx4JU5WSHZH2Q	1	23166005000061388	3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x	3NKTWvnmtKkRFwkfvPrHrKKbGWsiaw4FcQUiG2ZUNJd7NEaGKYvx	3
-5	2vbcDhsAe8yWZRUaJm489gKNtpWSoZ3VKnZWX83ieCjxQFiBjAjy	1	23166005000061388	3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x	3NLhvGF3SpUTUBDrb1U8EmVAYY6x1X1PgCjnEDTnXRWxFJjgRhfy	4
-6	2vaAcy96ghFTS4h3mr8WyusWTdXtecQCEVMzGpCGTUEnzqatx2eg	1	23166005000061388	3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x	3NKaTb2EEadeFbv9MyCbHZckWvroG9SdtMBdoMB4asExPEy4Vhw3	4
-7	2vaJXxySGkkt4D1z8f4DnKk6rpQ37NwpGHYp19vpDT677M4pm5mf	1	23166005000061388	3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x	3NKFcqKHq1WYdH43dWSYcBfrQBaJFjxh56Hs573cSzia5B6UPfCy	5
-8	2vad93Xcee2QmUiSLRzuNyE4qmvM39Yw2qV91RVhfe2eVN6AEUP9	1	23166005000061388	3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x	3NKFcqKHq1WYdH43dWSYcBfrQBaJFjxh56Hs573cSzia5B6UPfCy	5
-9	2vaUxAAuQut687cEfrWqUeQLtepEFHcMSE4tgRWTLovJ3aYEhdEF	1	23166005000061388	3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x	3NKUeXXioyFdtUfQh1n6rRHR3fSWpQTLPLoQXcs4mrfTo4qW832W	6
-10	2vai4rNuFJF1wCJQPDmymf9LzTJ9P5tnsdfbnco4p8hmeSJWUD3U	1	23166005000061388	3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x	3NKvhxKRJF1bPVWm4jUgSk3visRxVFNHE64b7yqRrjTmeXMzncUc	6
-11	2vaHEiXB8yj6B5C2d9rmKaVkc6Tmsc4UxXAxqpK6PmdJbeTx1fs7	1	23166005000061388	3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x	3NKYwiNGdrSFWhm7zc3uYYywegGmD2k8kHuzVNKs3WpFCDfXS6C6	7
-12	2vahR8Yugh1Y8qX3XYB8XNXxPbTKHTNqa6dTrjE6ybts5rgsFP2x	1	23166005000061388	3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x	3NLKJaXsPVVuXXogeu5LDw7XeMJNiV5JjyNzcpJp82RaTTzNLrwN	8
-13	2vb8W3UMAN9zPBBD24fzNVMFgUrjnzCJJmRNGH8R2qDfLyExEf6M	1	23166005000061388	3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x	3NLUPJn3fFzp8XHZBNc2TWbNEgvNfnyyaoJVRStBUW8ovXJZoqqz	9
-14	2vasPAv8Ai7SZWoCcemuWtxZBMU2H9ZJsia9pG9q5Ut6EV5LC8VN	1	23166005000061388	3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x	3NLKJaXsPVVuXXogeu5LDw7XeMJNiV5JjyNzcpJp82RaTTzNLrwN	8
-15	2va9T55DKxpD9JduGf3tG5Un93x1yJ3hPSmB84LaLpFJzJwMiz3S	1	23166005000061388	3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x	3NKwPcss997SNgMWkx3WSEaqqcs1d6x8dKC3DjSKpQstNAEHPCaz	10
-16	2vbJCWffe2fnoHqXTWVkPvqgVat4hYJiiAgsnAJry3FmRRowLCBm	1	23166005000061388	3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x	3NK7zMd8uE8zffrcfM4iZpuxE2SPL6dnYaZ5STU92Rp68JATKWCw	11
-17	2vbcmbZJpWJfPRLgBiqvn9MT4cFHxd1EMghDMJR3hgzULd2cgVtj	1	23166005000061388	3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x	3NK4WL1MxGbG5tWbVrRbcgDqxcrUo7N9UXKvfrHswM5fnDgSSe1E	12
-18	2vaWAkpWpwNqJGCr8qW3aEAQxbcWwT2ZERqm3jHFMNoSxaFgup7m	1	23166005000061388	3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x	3NK7zMd8uE8zffrcfM4iZpuxE2SPL6dnYaZ5STU92Rp68JATKWCw	11
-19	2vbJ2iG3imNSLvVzct8xpJ77RsoTfNnTK2VmVxGq32mH252WYdqf	1	23166005000061388	3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x	3NLJmt5sVy4JeRqfDt8HKmww4DVjw7DZ7ykbGBt3YbkkHDAxLgwR	12
-20	2vb4E1rXKEWUsFrtSdktQDsA8YuwjqCKmsNFyELH5Mpqp64PEE5C	1	23166005000061388	3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x	3NKVZcPMxq7EVhvQzWzX7NiuPdn1qEuE82HfPQBMSQkkR6dd1Z5e	13
-21	2vaP2m4EwWy74jHHoAPLFoNZuyCxo9Wo3b5XseQo4tbb4XDbd8st	1	23166005000061388	3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x	3NLV4df2K8sUbF5MXtTSWtFHXAiG3gSwKJj18sF2RetffvKD48WL	13
-22	2vbz3QuZjBAhKGbEtd7qLTBJwULa77qRaFZBDgcC2GTwF3dJFy74	1	23166005000061388	3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x	3NLsfFUAJvk8mZ6JS3q3tGbLjgLVzq1T8hMyMdoHJtwbbFPhzcez	14
-23	2vaXXz5MY99MUZm9iVynQPgq5ztXx552EutrEHvxqKrPbFeMYt9j	1	23166005000061388	3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x	3NLgJ6juekbUcC8mA4BgWigmij97HR74jRPvkBg3kqN93CHVjsQ6	15
-24	2vbFZbAH3iqYBeQt9J3cNdLL5Ri5TZpoM4xCMxSQko1jFzZVEcEJ	1	23166005000061388	3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x	3NLyCvyHH9bc6N7PRnG21LfMbKouhWXMht9qNniwkQUGPVCT4WzN	14
-25	2vaTzudyLDD8spb5MFREuHEgVmEx2FG9RZujKHc7NhVeiX55gAzD	1	23166005000061388	3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x	3NLEygSkSPuXnrZXpp1tdxQBW1syhqrdoAi2ixFDwkMp86pxJFQc	16
-26	2vahFC1fJRT9SzVbdHmCAWobRTbrgea4vA8DU2S6bMqgSrCQs8b8	1	23166005000061388	3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x	3NLx1M28R8QYovrkucPyvmiLywPj6ytCreaZTAkuW8N18L5wYkNN	17
-27	2vbiNWuPrwXcX3PzXw6WinPWD16E75f5Fd11f8bWg4g5fGLoTxxR	1	23166005000061388	3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x	3NLEygSkSPuXnrZXpp1tdxQBW1syhqrdoAi2ixFDwkMp86pxJFQc	16
-28	2vai2TTn8BJj2quebjTAh4nj1AggFifTPhgkidfZRVX4MFy7itrp	1	23166005000061388	3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x	3NKKZ2pdhtzwwHxJx2RXEkNH9oumF3BMGrmdqEKLV3rkqJdVU1Po	18
-29	2vbETqtVpGbKH5QcEUeHubcgDFDG8ZU92pRKs7jxunkjC1FCxJsF	1	23166005000061388	3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x	3NKEDV2kuqgRRtZuyyyLiUVizwKqQbphbdTzRhX8C2wNKdGEVUou	17
-30	2vaw4fLUuTfMWgGM5atGoqz5Xzu2aVnwQmMYKQf3zk7uN6B3hKk6	1	23166005000061388	3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x	3NLF8ftXJP5cPuTkk4YWvKCLoZ48W1pTBTSBPW5jgfgnSsscxAFE	18
-31	2vaFtQetYZWV2oizJw3fPzF7UqdZa2Wv5o6goTthyaZkEnqLReJX	1	23166005000061388	3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x	3NKkZf5Y3voo7JDbtrgFVhUdi5kY3EX1jDAKnKHNAJerQm4VG7K6	19
-32	2vbA5g6wk7Vf6aZoj2Mknwz7MvTMzWYrtfzzrN9fpLbfS5jkArD4	1	23166005000061388	3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x	3NL1NHkcyUpTpTLSg89Fg7Y74kCsYY5Zp8BsLnjBrCSbu1aEDb5Z	20
-33	2vapyRT1ZSnUr4vYCs7t1n1XpaqT6Pt6jE18sBVjiU9ycKX1jXNa	1	23166005000061388	3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x	3NK63JEKx6SXBXokXt2aevw1yHCPx9krfdc9uCZsSMf4tBxtj7W8	21
-34	2vaoAzigAkQFrRTDKPEarYL96G28ddNp9SizXkv5m6y9JEcVTTa3	1	23166005000061388	3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x	3NL4zrGVDVde42ALRpM4RDJ2RJp9q51dt8v9K6pns1TNd3ypFEre	22
-35	2vaEJbEwJgcL9jvJ2EbBsSd3LuKh9VEoJF6NR1xvQoc9r99dLoy7	1	23166005000061388	3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x	3NLuQRUVtDvN3s7bFpwbcxsrzUUb7hC3sUPHh4pAKp7T9xVWJ1vB	23
-36	2vaNCyhPb9nDUPQhxMK2zEkwegaejXLAFpoeGojUeBj8punJfZ9X	1	23166005000061388	3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x	3NLDs1gcbvS7CTreCh546UnA7DS9e7ojj8vqooEBAV7VSyb8nUDU	24
-37	2varsu7QTC2aWwyj5yMffYWg9RPYpX848NikF9T6GC6Qpxp8PtDV	1	23166005000061388	3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x	3NL92EouWZR34WcaC2BRZq5778NwCLZ4u8EVBSXdni3gBY4H7dj6	25
-38	2vbozxNHWHLfZYkfCg4ZmSr7fvnrLiE8qa4CLJqgpG8NzmNzHD7a	1	23166005000061388	3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x	3NLDs1gcbvS7CTreCh546UnA7DS9e7ojj8vqooEBAV7VSyb8nUDU	24
-39	2vbWBABUMCompB43Uf9E7GDpttuNUXPC6drCQ8R1zp5XcaEpZrRn	1	23166005000061388	3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x	3NL92EouWZR34WcaC2BRZq5778NwCLZ4u8EVBSXdni3gBY4H7dj6	25
-40	2vaK9bk1AuJv59XHhM7BcFexWQpKHUAh9ntqhyHGMRgvSnDbzYdE	1	23166005000061388	3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x	3NK56TD3efj9BU3DsXeRYV6vAUrNkkw2iFv2FoWet1oyFfTRmBAc	26
+1	2va9BGv9JrLTtrzZttiEMDYw1Zj6a6EHzXjmP9evHDTG3oEquURA	1	23167003000061388	3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x	3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x	1
+2	2vafPBQ3zQdHUEDDnFGuiNvJz7s2MhTLJgSzQSnu5fnZavT27cms	1	23167003000061388	3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x	3NKVgGUqcN9YLoqwXo8KezJ9NtCnmTFFAsJmUMZ4DvGmjgRvVAwc	2
+3	2vbwMBfFXNWYgczA35UESFS1ygJQRBiwS1V3Df8cDXHcyPeDSfdq	1	23167003000061388	3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x	3NLYxsnzZKTGYadgaZqx1GrEnJzWUJKtagT1CZaffaaFtJwN3TAb	3
+4	2vb2Bhmd3wo9joypP33C9YsjREW4TvgmyzawypFwaAfnWrJAhXws	1	23167003000061388	3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x	3NLYxsnzZKTGYadgaZqx1GrEnJzWUJKtagT1CZaffaaFtJwN3TAb	3
+5	2vb3qRUEhxEBcQD1megQqPz6dY86kWZD7kCbP8mkYLDsHxq4suJi	1	23167003000061388	3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x	3NKeiz7nGFbz9ejAKt3Tp49FfMma2aL6YjUtbazQMSV3gRi2qVD8	4
+6	2vaDC7PxM2Liq8t55cmVCGgpsEA7egA6Pyr4sWJciHmHEhRZ9AZB	1	23167003000061388	3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x	3NLruUCeF8R2fdop1N5MFU6Uk3Far59zWMLZjFCR4q3MV5NzYWok	4
+7	2vbV1W7gxQug6AzVjvxeG9nwbenX83TbAwBG43KxaTfKsn5x9Bzd	1	23167003000061388	3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x	3NLe251A1d1C6iUVanN9sCJvvTvZnDHtHZmZi1xU4ory7TASdjJq	5
+8	2vbLHEJGzFXV52YFozMEMHLdiD5fEoYdvjVE2YNJZuvaqNqvtNdg	1	23167003000061388	3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x	3NLQWDAJRH22zNK5XJDKSsMvFSkpq7mR1pjPyrjhazYxkudfpRNC	5
+9	2vbrHZctAfFWPAMPcMqEVap3z17VrquoSjxmm4JEJ92Y8MB232RQ	1	23167003000061388	3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x	3NKCCdETXXKsMvDu9FCWLoHhcNa1fh2gTJ6Q1A1oQ2HgAC6ktqSo	6
+10	2vaCes1okUQ8SSd6ih9ebizWdkT5gaByP7d9rsGZDWqH4VW9yP8D	1	23167003000061388	3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x	3NLcGMHXVhRc6ShfPgyQyGgL49ZZbWsMtzSuPwGdeTsFSGhsRCg9	6
+11	2vaTkRpFK3hY5BkdMy5oQ3oMjQ7DxHqJVoBjo5M4Gdp8AYM7gnXD	1	23167003000061388	3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x	3NLZVe9dA1Dm9QV9GbNMPvZ186jRmNX7Va12wysf93xAPB8np9id	7
+12	2vbYdJbUu7qbCK5FBoC9bin9xa8NhwAUqyS84oTFwEX2VtSZwiMq	1	23167003000061388	3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x	3NKsJvrmwhqb3LsxSQb5HGyq8WW1dR95xUiZJzWQA9r66SCNEUJX	7
+13	2vc5DvbkJfurGU2waxyuX7g2C62rQTw9wwYBqkzULDuQCGhceS3i	1	23167003000061388	3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x	3NLRYdG7BkAYDwFUJK1v49sBgVhoCvNronWw6utr9fngMxh6XhWd	8
+14	2vbARxydCP5HyHXU5iKovnDUTYGKYvhacs3z38pJz6um6L7iRKgi	1	23167003000061388	3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x	3NKYYvjzEhRDHzZKeCdB4Lh9zzSS7BHtun2ta3DxeCLPXfg6ZuB2	9
+15	2vaxBJ8tVE3VAspPytvr3RekNsTfZ6K3jyV6VD1R23GrpuDoo98m	1	23167003000061388	3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x	3NLDNwxhgxBqiVMWdnLcmE91qNBrWTMTMPLfuyCLMTmzLgjotdad	8
+16	2vbsvXRCjRdaoXk27iAjhGUY6XnhKEgkZ4B6d7hiSyZSRdjJRf8D	1	23167003000061388	3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x	3NLdBtk4vrorhEJyj4REpU7oHtMrbYdcuCWvgnpuc1CTcVuKUFH3	9
+17	2vapfvuoxbBy2A1Dypna41SyYKmr8u8B9914uBEM7RN819mwpKG8	1	23167003000061388	3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x	3NLBiJmvx7QXgaqbw6pG34TNtBvmbz4FWjL1qT5AYTiqH6k1JBsp	10
+18	2vc4uWK8sgrhdFiXyrKcpacEP2jtpUJuJveQFTWxVUot1Pyim4qF	1	23167003000061388	3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x	3NKF6qTX3gu6yagXRE6RhRYKUwvPzXfwud2pxbdkSrT9popAHD1a	10
+19	2vaNBA463fSFW73qpMhG726FTDUrti4fu68v7xtGYHybQquRhBqs	1	23167003000061388	3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x	3NKMzd2ZrgwoEgcvRwTcNVk8eatQ2qt62amgXfaNNjMomSJhQtrU	11
+20	2vc3JGfgnaoGv8FFfyBnQkxG5UKZECKDbifpUPCvEnvxUgFBHnib	1	23167003000061388	3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x	3NKZf4QcQLuasHCc3aLSfvUKT7g8bqQciJxyK3HZ6scDeYVXNp61	11
+21	2vavd5r7fQer9qRibUTgLcUjwXym3h2BMonVXTc6UMwB6J2SPLqr	1	23167003000061388	3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x	3NKdbBgnNxM6BswKV3Y5ESBSdQGAxzntuUyrQAkzLzAassZcqLkC	12
+22	2vc3JGfgnaoGv8FFfyBnQkxG5UKZECKDbifpUPCvEnvxUgFBHnib	1	23167003000061388	3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x	3NKZf4QcQLuasHCc3aLSfvUKT7g8bqQciJxyK3HZ6scDeYVXNp61	12
+23	2vc3JGfgnaoGv8FFfyBnQkxG5UKZECKDbifpUPCvEnvxUgFBHnib	1	23167003000061388	3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x	3NKZf4QcQLuasHCc3aLSfvUKT7g8bqQciJxyK3HZ6scDeYVXNp61	13
+24	2vavd5r7fQer9qRibUTgLcUjwXym3h2BMonVXTc6UMwB6J2SPLqr	1	23167003000061388	3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x	3NKdbBgnNxM6BswKV3Y5ESBSdQGAxzntuUyrQAkzLzAassZcqLkC	13
+25	2vavd5r7fQer9qRibUTgLcUjwXym3h2BMonVXTc6UMwB6J2SPLqr	1	23167003000061388	3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x	3NKdbBgnNxM6BswKV3Y5ESBSdQGAxzntuUyrQAkzLzAassZcqLkC	14
+26	2vc3JGfgnaoGv8FFfyBnQkxG5UKZECKDbifpUPCvEnvxUgFBHnib	1	23167003000061388	3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x	3NKZf4QcQLuasHCc3aLSfvUKT7g8bqQciJxyK3HZ6scDeYVXNp61	14
+27	2vc3JGfgnaoGv8FFfyBnQkxG5UKZECKDbifpUPCvEnvxUgFBHnib	1	23167003000061388	3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x	3NKZf4QcQLuasHCc3aLSfvUKT7g8bqQciJxyK3HZ6scDeYVXNp61	15
+28	2vavd5r7fQer9qRibUTgLcUjwXym3h2BMonVXTc6UMwB6J2SPLqr	1	23167003000061388	3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x	3NKdbBgnNxM6BswKV3Y5ESBSdQGAxzntuUyrQAkzLzAassZcqLkC	15
+29	2vc3JGfgnaoGv8FFfyBnQkxG5UKZECKDbifpUPCvEnvxUgFBHnib	1	23167003000061388	3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x	3NKZf4QcQLuasHCc3aLSfvUKT7g8bqQciJxyK3HZ6scDeYVXNp61	16
+30	2vc3JGfgnaoGv8FFfyBnQkxG5UKZECKDbifpUPCvEnvxUgFBHnib	1	23167003000061388	3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x	3NKZf4QcQLuasHCc3aLSfvUKT7g8bqQciJxyK3HZ6scDeYVXNp61	17
+31	2vafPBQ3zQdHUEDDnFGuiNvJz7s2MhTLJgSzQSnu5fnZavT27cms	1	23167003000061388	3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x	3NKVgGUqcN9YLoqwXo8KezJ9NtCnmTFFAsJmUMZ4DvGmjgRvVAwc	3
+32	2vc3JGfgnaoGv8FFfyBnQkxG5UKZECKDbifpUPCvEnvxUgFBHnib	1	23167003000061388	3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x	3NKZf4QcQLuasHCc3aLSfvUKT7g8bqQciJxyK3HZ6scDeYVXNp61	18
+33	2vavd5r7fQer9qRibUTgLcUjwXym3h2BMonVXTc6UMwB6J2SPLqr	1	23167003000061388	3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x	3NKdbBgnNxM6BswKV3Y5ESBSdQGAxzntuUyrQAkzLzAassZcqLkC	16
+34	2vc3JGfgnaoGv8FFfyBnQkxG5UKZECKDbifpUPCvEnvxUgFBHnib	1	23167003000061388	3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x	3NKZf4QcQLuasHCc3aLSfvUKT7g8bqQciJxyK3HZ6scDeYVXNp61	19
+35	2vavd5r7fQer9qRibUTgLcUjwXym3h2BMonVXTc6UMwB6J2SPLqr	1	23167003000061388	3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x	3NKdbBgnNxM6BswKV3Y5ESBSdQGAxzntuUyrQAkzLzAassZcqLkC	17
+36	2vavd5r7fQer9qRibUTgLcUjwXym3h2BMonVXTc6UMwB6J2SPLqr	1	23167003000061388	3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x	3NKdbBgnNxM6BswKV3Y5ESBSdQGAxzntuUyrQAkzLzAassZcqLkC	18
+37	2vc3JGfgnaoGv8FFfyBnQkxG5UKZECKDbifpUPCvEnvxUgFBHnib	1	23167003000061388	3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x	3NKZf4QcQLuasHCc3aLSfvUKT7g8bqQciJxyK3HZ6scDeYVXNp61	20
+38	2vavd5r7fQer9qRibUTgLcUjwXym3h2BMonVXTc6UMwB6J2SPLqr	1	23167003000061388	3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x	3NKdbBgnNxM6BswKV3Y5ESBSdQGAxzntuUyrQAkzLzAassZcqLkC	19
+39	2vc3JGfgnaoGv8FFfyBnQkxG5UKZECKDbifpUPCvEnvxUgFBHnib	1	23167003000061388	3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x	3NKZf4QcQLuasHCc3aLSfvUKT7g8bqQciJxyK3HZ6scDeYVXNp61	21
+40	2vaXi1LCSzEW7hHLmwNxCJ58auM2pkfuJX3JMWgyGkvx4ot1Rszi	1	23167003000061388	3NLTHTYjXsLFXwwHnwcAA6Vz7nWfzTw3dyfcgNJREqP8DDXmG9ok	3NLTHTYjXsLFXwwHnwcAA6Vz7nWfzTw3dyfcgNJREqP8DDXmG9ok	1
+41	2vai2eoCDTb4Cz4PXShnjsHwyf6bXuDMksGsiD9n9Dn8SUL8X6yG	1	23167003000061388	3NLHapeyiCJW7heD2o22Uu7MLVkcoCivCMvGnCE3yEGhDPLMk3AV	3NLHapeyiCJW7heD2o22Uu7MLVkcoCivCMvGnCE3yEGhDPLMk3AV	1
+42	2vaK4DPU5FdUi6XzzisP3yCEM9nRMez57kSHZgzTcDfYJDizWTJP	1	23167003000061388	3NLTHTYjXsLFXwwHnwcAA6Vz7nWfzTw3dyfcgNJREqP8DDXmG9ok	3NKRxbLWmKa63sHwL8GNSQzJsQZh1BfxdeZnYrNiL5PYpNzUP6CW	2
+43	2vae9BWxGZXvc9S6wUn6eo5ixvhp5CgJrGFaVcPwm9abMG9wANaU	1	23167003000061388	3NLHapeyiCJW7heD2o22Uu7MLVkcoCivCMvGnCE3yEGhDPLMk3AV	3NLBcre2WQGFkcnaui1Ym91B15E49n2456NFSBwfphzkAn1Cgcu5	2
+44	2vatCgkpfN5qh3USHnmCtD63v95Phu2wMrUbskmVuYzcvJKq5a3H	1	23167003000061388	3NLHapeyiCJW7heD2o22Uu7MLVkcoCivCMvGnCE3yEGhDPLMk3AV	3NLSUUXUA8WDsyFkpGmtACjRLMNya74xs2mPesFFeoUHnZ8Y8FyW	3
+45	2vajsBn647U1qcZEQe29eRqyF9F7t1mKXksHj1CJR8Kzv1UViT7v	1	23167003000061388	3NLTHTYjXsLFXwwHnwcAA6Vz7nWfzTw3dyfcgNJREqP8DDXmG9ok	3NK6j9YHkgmVkpWf2xtPLThzyy7dVXdB6KAAJVtUzatdQd74jtqc	3
+46	2vbqKF97yntCD1PZ6KBcTJyue8jch2wGUFs17FGpcXwyz5ywZCef	1	23167003000061388	3NLTHTYjXsLFXwwHnwcAA6Vz7nWfzTw3dyfcgNJREqP8DDXmG9ok	3NLaDh6Pp2sE3taz3uN3TNezZwwMoKkBfchfBvYbwujejMQRPt6W	4
+47	2vaSCRxV8xpKN4rBD63r8B8hQGvQKz3z4TYSR1bjCMrv3HcFNqkZ	1	23167003000061388	3NLHapeyiCJW7heD2o22Uu7MLVkcoCivCMvGnCE3yEGhDPLMk3AV	3NKVJpNeANQPDy7GVCefPQtBRGVS6Ga3ZX6aXCTrcKMEmeRbTL8h	4
+48	2vaiddbU2CYZjHU4Qf9fUeB1gzWbcBNn392mVacLCr28n2higUQC	1	23167003000061388	3NLTHTYjXsLFXwwHnwcAA6Vz7nWfzTw3dyfcgNJREqP8DDXmG9ok	3NL3L1GMhXim69m7wCNu1TPjABxDZzu8MiGMqEBDYUoom9tG767c	5
+49	2vaDbqnN2FUPxfojJKYTLzdrqucc948NTbDBn5QreCqGmVLiQvbJ	1	23167003000061388	3NLHapeyiCJW7heD2o22Uu7MLVkcoCivCMvGnCE3yEGhDPLMk3AV	3NKRqGdezvSVzb89dkZ7J4uraeGK3yas2J2zgqLhpCtkQRzj5RBR	5
+50	2vbC9bh2EF5H6yWwVWwmpcFEEJYa2RRCyLj2zm7QzWqBr3Yx47oG	1	23167003000061388	3NLTHTYjXsLFXwwHnwcAA6Vz7nWfzTw3dyfcgNJREqP8DDXmG9ok	3NLGUqPzrPki14Wdjs2ZGYUr99NZZnnrbhjxRDS5GErSTkdmB5t6	6
 \.
 
 
@@ -3174,43 +2716,14 @@ COPY public.epoch_data (id, seed, ledger_hash_id, total_currency, start_checkpoi
 --
 
 COPY public.internal_commands (id, command_type, receiver_id, fee, hash) FROM stdin;
-1	coinbase	145	360000000000	5Ju8oSug8nUtH8uUHPN5vWKJYBm1ctpxgwzzEgZQu2vDafxfktAD
-2	coinbase	37	360000000000	5JtpyH8BDr9VYkeFSeiHPsRGqFvqheHiTpAi4KZHZXNHK8jrMsmG
-3	fee_transfer	145	15500000000	5JuHHBavUQ97ooLWWoaRqSGeNwnQcymJLvinFducBx7RxzrdYQj1
-4	fee_transfer	37	15750000000	5JttvhRYyR4gizuhPXryMQpsXWrAd16pwaLPcakAHxeGmPtHWrEx
-5	fee_transfer	145	41000000000	5JvCGCJX5jDiyuyRtsGSXvsSUQ7tygc6vWKrMF1KKoAoPawQwf82
-6	fee_transfer	37	41000000000	5JvEGaYf3N5ds3N1uBdEBC6LKJB4fSR6EExKdUJ888xem1qXy6f4
-7	fee_transfer	145	20250000000	5JuVVjJibtTZFHhm67xdvWXx4G5zLLVMTJAWVUnsPgxwuF5Nd1qr
-8	fee_transfer	37	35750000000	5JuXdhCCVBgmGnmwR158o4RcKKJXdGYxgLT1V3WWptXe77PKNG94
-9	fee_transfer	37	15500000000	5JujEDfu5HTMcfqDbWXH134oyR8YJAnqddQT8eSXxNiKEm3YR6JN
-10	fee_transfer	37	15250000000	5JtcwZnsrH8xsn7wVuhTTcBuYZkdnfVAHNQcChfZvzxy4pLwPLQn
-11	fee_transfer	145	56250000000	5Jtg3YsX6Y7QeidNUGiztQbmCnFTt4ZFLN9bx6AngvS3CGJ2ZXuV
-12	fee_transfer	37	5000000000	5JvACcxN2N7Jt2jUJ5oxZGhFMFtJ8LbtbAg8ohtqtU64bjN3owhn
-13	fee_transfer	37	56500000000	5JujdUcrP49YNciJyfAFLo9miJFgmuEh9unQe7RqenympPs9WsLL
-14	fee_transfer	37	20500000000	5JtzAySS8d8SHDND2w9jGbX7AYqZqEh4xFuEoGjTF7NvabMY8KEw
-15	fee_transfer	37	10250000000	5Jv4w9hvH4YQvXpC77upcebjsJsH5vXBzheHwGqPWVv8yFreyPV1
-16	fee_transfer	145	30750000000	5JtvaFk4hMLWQdStJcR1qK8fpusD1mTC8UNBozXV8rQtoFpsx258
-17	fee_transfer	37	30750000000	5Jv2ePNMyAfwBgoKJnLAUc3ruNfDoSM9wtE1QiU4a5fLxWa72452
-18	fee_transfer	145	15250000000	5JvALMvYtfq98L5xzx4pXZYxcHmteF5cMpM9CRLtnXptAJtcqXJE
-19	fee_transfer	145	20500000000	5JuQZW3PSyPVeoH94Y84hwynoPK3EYm2kDwJcL7G2THhY93phjt2
-20	fee_transfer	37	90500000000	5JtkhHLMD8gwMK6c5E1o1iC8LGayRgudv97TX8weiHeWLnc8xWSA
-21	fee_transfer	37	1750000000	5JuepprP3R3hsFHWYYTqxkRuLDoNBrFj5Kf28UtwZYL8biTkZJpT
-22	fee_transfer	145	5000000000	5JvGNCQudBSWQxG2bQ3kiiAiUoTnsiVrAGZNYk489RYKGTQHfgYB
-23	fee_transfer	145	36000000000	5Jv8x4sDT5yBov3VDYPFm7tvPb6FgBFbk32DSQABGiLcYzZUiGZb
-24	fee_transfer	145	35750000000	5Jtnket3Ay6MM386j6hNs4rhVni1LYPdHzNZh3JgqjFCABaj8zTS
-25	fee_transfer	37	71750000000	5JuMyA3LXJC4PB9cbbjnhw3cBkmzC1gt7vQfaxcfNrvCNn2FvHcC
-26	fee_transfer	37	36000000000	5JuvZtRjhNhiYiepwaKoxDA2yQhQxRhbYk75xU4HtDaUKBdERnLK
-27	fee_transfer	145	51250000000	5Jtjfmq3F1N7PdhCH9tcAaTb64ktBReGZsFMEuwM7MXKRo6PfKEz
-28	fee_transfer_via_coinbase	91	1000000	5JuKeZgLXQcYjQNSR6Crr91LfnT515sXZ3bYUPaF3sNwDVu2CVti
-29	coinbase	145	360000000000	5JuPNBCxCjMBkpkEsqbu7r2pa4e14wxegBqWqeeTUkuBXMHeRQDc
-30	fee_transfer	91	12000000	5Jv1LTtvHEAh4txJHMDuWPVPNLeaQDXzLud9z9yJykaGrE1JPnqU
-31	fee_transfer	145	56488000000	5JuQ6ityorkeKnBVTFZZ4YJiyku5g8dp3uAMYt4tWHQeCpjoT2HV
-32	fee_transfer	145	40750000000	5JvG9QPfyJvPTEu4QFUZD1u1TLtUZFPhur17dtPzR5eP7rMABuG6
-33	coinbase	37	360000000000	5JtbLEma7wxwU8Z66ZTWHRG9W7KYwy47BGazvhMKeX4WeAods2Fk
-34	fee_transfer	37	59999000000	5Jtamwj7V51fNWUgLHz9RPqULHv6CmgmyrWrapxSNSBo8KJwBgXh
-35	fee_transfer	91	1000000	5JuKeZgLXQcYjQNSR6Crr91LfnT515sXZ3bYUPaF3sNwDVu2CVti
-36	fee_transfer	91	2000000	5JudybnQQMYxwgBGXn8ZndgVMMvtViW4SsbxZp73eAModNUHMMVD
-37	fee_transfer	145	59998000000	5JuQ9yoPxM8NN8z5Ntyi16RGJkjeoUc1VgZem6psfq5PX26Jtng3
+1	coinbase	136	360000000000	5JutfkYXvMdx71PXZPcwykhes8Bn7nhtPMkCAb3hQKDPaePe1R4f
+2	coinbase	19	360000000000	5Jv6zrPkJaqACWJf2CvHCqmPeJiRsjWeRAhK7hjabhTyvz112mfM
+3	fee_transfer	136	5000000000	5Jv945LB6oZZoUnHAZ8Gako3KHs4cwGzUuSDdaM2jomCEhy9GGhV
+4	fee_transfer	19	5000000000	5JuBGGf7rNms665KGgF5oh2hqKVEEWzUiMbmDvD1KhLBakC5XUKi
+5	fee_transfer	136	250000000	5JtdQg6RTvvGKAeqvnp6NrA4Q9Z3fULTx25bzj3jQcsAtMA79XNh
+6	fee_transfer	19	250000000	5JuLFUTepPsoszKaPN9BotLYQcvMP1WDotUhLmVtG3VtU9fDnnEB
+7	coinbase	165	360000000000	5JtWdsewH8MJg9wqR4o1RbVbgazQL3cbFumreY15MP5xTD2snAx4
+8	fee_transfer	165	10000000000	5JtxcW3Atv8zQpgdpQ11p1PzzsJSWtAyaZwtnXMwy6QXDePppsTn
 \.
 
 
@@ -3245,55 +2758,55 @@ COPY public.public_keys (id, value) FROM stdin;
 15	B62qkaFHyAx1TMzuez3APX1hG33j2ZXCTXJFFzeSxgt8fA3henaeT84
 16	B62qkCd6ftXqh39xPVb7qyJkSWZYa12QCsxFCaCmDrvfZoTNYmKQtkC
 17	B62qrEWSxSXzp8QLDpvuJKeHWxybsE2iwaMPViMpdjptmUxQbtDV178
-18	B62qnUCyUPAGE9ZXcu2TpkqUPaU3fhgzxRSEiyt5C8V7mcgNNvj1oc9
-19	B62qiquMTUSJa6qqyd3hY2PjkxiUqgPEN2NXYhP56SqwhJoBsFfEF5T
-20	B62qm174LzHrFzjwo3jRXst9LGSYjY3gLiCzniUkVDMW912gLBw63iZ
-21	B62qrrLFhpise34oGcCsDZMSqZJmy9X6q7DsJ4gSAFSEAJakdwvPbVe
-22	B62qo11BPUzNFEuVeskPRhXHYa3yzf2WoGjdZ2hmeBT9RmgFoaLE34A
-23	B62qmSTojN3aDbB311Vxc1MwbkdLJ4NCau8d6ZURTuX9Z57RyBxWgZX
-24	B62qiaEMrWiYdK7LcJ2ScdMyG8LzUxi7yaw17XvBD34on7UKfhAkRML
-25	B62qoGEe4SECC5FouayhJM3BG1qP6kQLzp3W9Q2eYWQyKu5Y1CcSAy1
-26	B62qn8rXK3r2GRDEnRQEgyQY6pax17ZZ9kiFNbQoNncMdtmiVGnNc8Y
-27	B62qnjQ1xe7MS6R51vWE1qbG6QXi2xQtbEQxD3JQ4wQHXw3H9aKRPsA
-28	B62qmzatbnJ4ErusAasA4c7jcuqoSHyte5ZDiLvkxnmB1sZDkabKua3
-29	B62qrS1Ry5qJ6bQm2x7zk7WLidjWpShRig9KDAViM1A3viuv1GyH2q3
-30	B62qqSTnNqUFqyXzH2SUzHrW3rt5sJKLv1JH1sgPnMM6mpePtfu7tTg
-31	B62qkLh5vbFwcq4zs8d2tYynGYoxLVK5iP39WZHbTsqZCJdwMsme1nr
-32	B62qiqUe1zktgV9SEmseUCL3tkf7aosu8F8HPZPQq8KDjqt3yc7yet8
-33	B62qkNP2GF9j8DQUbpLoGKQXBYnBiP7jqNLoiNUguvebfCGSyCZWXrq
-34	B62qr4z6pyzZvdfrDi33Ck7PnPe3wddZVaa7DYzWHUGivigyy9zEfPh
-35	B62qiWZKC4ff7RKQggVKcxAy9xrc1yHaXPLJjxcUtjiaDKY4GDmAtCP
-36	B62qqCpCJ7Lx7WuKCDSPQWYZzRWdVGHndW4jNARZ8C9JB4M5osqYnvw
-37	B62qrhZ9j56NuJefZeGADuBsMvLNkyiJC6u2G88SUUz8uEbqNW3AEDv
-38	B62qo9mUWwGSjKLpEpgm5Yuw5qTXRi9YNvo5prdB7PXMhGN6jeVmuKS
-39	B62qpRvBE7SFJWG38WhDrSHsm3LXMAhdiXXeLkDqtGxhfexCNh4RPqZ
-40	B62qoScK9pW5SBdJeMZagwkfqWfvKAKc6pgPFrP72CNktbGKzVUdRs3
-41	B62qkT8tFTiFfZqPmehQMCT1SRRGon6MyUBVXYS3q9hPPJhusxHLi9L
-42	B62qiw7Qam1FnvUHV4JYwffCf2mjcuz2s5F3LK9TBa5e4Vhh7gq2um1
-43	B62qrncSq9df3SnHmSjFsk13W7PmQE5ujZb7TGnXggawp3SLb1zbuRR
-44	B62qip9dMNE7fjTVpB7n2MCJhDw89YYKd9hMsXmKZ5cYuVzLrsS46ZG
-45	B62qmMc2ec1D4V78sHZzhdfBA979SxUFGKTqHyYcKexgv2zJn6MUghv
-46	B62qqmQhJaEqxcggMG9GepiXrY1j4WgerXXb2NwkmABwrkhRK671sSn
-47	B62qp7yamrqYvcAv3jJ4RuwdvWnb8zFGfXchbfqR4BCkeub998mVJ3j
-48	B62qk7NGhMEpPAwdwfqnxCbAuCm1qawX4YXh956nanhkfDdzZ4vZ91g
-49	B62qnUPwKuUQZcNFnr5L5S5mpH9zcKDdi2FsKnAGQ1Vrd3F4HcH724A
-50	B62qqMV93QdKFLmPnqvzaBE8T2jY38HVch4JW5xZr4kNHNYr1VtSUn8
-51	B62qmtQmCLX8msSHASDTzNtXq81XQoNtLz6CUMhFeueMbJoQaYbyPCi
-52	B62qp2Jgs8ChRsQSh93cL2SuDN8Umqp6GtDd9Ng7gpkxgw3Z9WXduAw
-53	B62qo131ZAwzBd3mhd2GjTf3SjuNqdieDifuYqnCGkwRrD3VvHLM2N1
-54	B62qo9XsygkAARYLKi5jHwXjPNxZaf537CVp88npjrUpaEHypF6TGLj
-55	B62qnG8dAvhGtPGuAQkwUqcwpiAT9pNjQ7iCjpYw5k2UT3UZTFgDJW1
-56	B62qj3u5Ensdc611cJpcmNKq1ddiQ63Xa8L2DnFqEBgNqBCAqVALeAK
-57	B62qjw1BdYXp74JQGoeyZ7bWtnsPPd4iCxBzfUsiVjmQPLk8984dV9D
-58	B62qpP2xUscwDA5TaQee71MGvU7dYXiTHffdL4ndRGktHBcj6fwqDcE
-59	B62qo1he9m5vqVfbU26ZRqSdyWvkVURLxJZLLwPdu1oRAp3E7rCvyxk
-60	B62qjzHRw1dhwS1NCWDH64yzovyxsbrvqBW846BRCaWmyJyoufddBSA
-61	B62qkoANXg95uVHwpLAiQsT1PaGxuXBcrBzdjMgN3mP5WJxiE1uYcG9
-62	B62qnzk698yW9rmyeC8mLCKhdmQZa2TRCG5hN3Z5NovZZqE1oou7Upc
-63	B62qrQDYA9DvUNdgU87xp64MsQm3MxBeDRNuhuwwQ3hfS5sJhchipzu
-64	B62qnSKLuJiF1gNnCEDHJeWFKPbYLKjXqz18pnLGE2pUq7PBYnU4h95
-65	B62qk8onaP8h1VYVbJkQQ8kKtHszsA12Haw3ts5jm4AkpvNDkhUtKBH
-66	B62qrCV2xfWipHVW7KvdKSqXVqbTJLs4oNGhuDp8Ag34vy57mN4pcEi
+18	B62qktbaCjtgzjG86xb7unrPB9s92kUNvtYpCc12WdjLm1JZBDcxVu7
+19	B62qju2563j9VwB2s1a1yQ9zmYKe75Le57wtNq87kCyMwEZPk8RbsTg
+20	B62qnUCyUPAGE9ZXcu2TpkqUPaU3fhgzxRSEiyt5C8V7mcgNNvj1oc9
+21	B62qiquMTUSJa6qqyd3hY2PjkxiUqgPEN2NXYhP56SqwhJoBsFfEF5T
+22	B62qm174LzHrFzjwo3jRXst9LGSYjY3gLiCzniUkVDMW912gLBw63iZ
+23	B62qrrLFhpise34oGcCsDZMSqZJmy9X6q7DsJ4gSAFSEAJakdwvPbVe
+24	B62qo11BPUzNFEuVeskPRhXHYa3yzf2WoGjdZ2hmeBT9RmgFoaLE34A
+25	B62qmSTojN3aDbB311Vxc1MwbkdLJ4NCau8d6ZURTuX9Z57RyBxWgZX
+26	B62qiaEMrWiYdK7LcJ2ScdMyG8LzUxi7yaw17XvBD34on7UKfhAkRML
+27	B62qoGEe4SECC5FouayhJM3BG1qP6kQLzp3W9Q2eYWQyKu5Y1CcSAy1
+28	B62qn8rXK3r2GRDEnRQEgyQY6pax17ZZ9kiFNbQoNncMdtmiVGnNc8Y
+29	B62qnjQ1xe7MS6R51vWE1qbG6QXi2xQtbEQxD3JQ4wQHXw3H9aKRPsA
+30	B62qmzatbnJ4ErusAasA4c7jcuqoSHyte5ZDiLvkxnmB1sZDkabKua3
+31	B62qrS1Ry5qJ6bQm2x7zk7WLidjWpShRig9KDAViM1A3viuv1GyH2q3
+32	B62qqSTnNqUFqyXzH2SUzHrW3rt5sJKLv1JH1sgPnMM6mpePtfu7tTg
+33	B62qkLh5vbFwcq4zs8d2tYynGYoxLVK5iP39WZHbTsqZCJdwMsme1nr
+34	B62qiqUe1zktgV9SEmseUCL3tkf7aosu8F8HPZPQq8KDjqt3yc7yet8
+35	B62qkNP2GF9j8DQUbpLoGKQXBYnBiP7jqNLoiNUguvebfCGSyCZWXrq
+36	B62qr4z6pyzZvdfrDi33Ck7PnPe3wddZVaa7DYzWHUGivigyy9zEfPh
+37	B62qiWZKC4ff7RKQggVKcxAy9xrc1yHaXPLJjxcUtjiaDKY4GDmAtCP
+38	B62qqCpCJ7Lx7WuKCDSPQWYZzRWdVGHndW4jNARZ8C9JB4M5osqYnvw
+39	B62qo9mUWwGSjKLpEpgm5Yuw5qTXRi9YNvo5prdB7PXMhGN6jeVmuKS
+40	B62qpRvBE7SFJWG38WhDrSHsm3LXMAhdiXXeLkDqtGxhfexCNh4RPqZ
+41	B62qoScK9pW5SBdJeMZagwkfqWfvKAKc6pgPFrP72CNktbGKzVUdRs3
+42	B62qkT8tFTiFfZqPmehQMCT1SRRGon6MyUBVXYS3q9hPPJhusxHLi9L
+43	B62qiw7Qam1FnvUHV4JYwffCf2mjcuz2s5F3LK9TBa5e4Vhh7gq2um1
+44	B62qrncSq9df3SnHmSjFsk13W7PmQE5ujZb7TGnXggawp3SLb1zbuRR
+45	B62qip9dMNE7fjTVpB7n2MCJhDw89YYKd9hMsXmKZ5cYuVzLrsS46ZG
+46	B62qmMc2ec1D4V78sHZzhdfBA979SxUFGKTqHyYcKexgv2zJn6MUghv
+47	B62qqmQhJaEqxcggMG9GepiXrY1j4WgerXXb2NwkmABwrkhRK671sSn
+48	B62qp7yamrqYvcAv3jJ4RuwdvWnb8zFGfXchbfqR4BCkeub998mVJ3j
+49	B62qk7NGhMEpPAwdwfqnxCbAuCm1qawX4YXh956nanhkfDdzZ4vZ91g
+50	B62qnUPwKuUQZcNFnr5L5S5mpH9zcKDdi2FsKnAGQ1Vrd3F4HcH724A
+51	B62qqMV93QdKFLmPnqvzaBE8T2jY38HVch4JW5xZr4kNHNYr1VtSUn8
+52	B62qmtQmCLX8msSHASDTzNtXq81XQoNtLz6CUMhFeueMbJoQaYbyPCi
+53	B62qp2Jgs8ChRsQSh93cL2SuDN8Umqp6GtDd9Ng7gpkxgw3Z9WXduAw
+54	B62qo131ZAwzBd3mhd2GjTf3SjuNqdieDifuYqnCGkwRrD3VvHLM2N1
+55	B62qo9XsygkAARYLKi5jHwXjPNxZaf537CVp88npjrUpaEHypF6TGLj
+56	B62qnG8dAvhGtPGuAQkwUqcwpiAT9pNjQ7iCjpYw5k2UT3UZTFgDJW1
+57	B62qj3u5Ensdc611cJpcmNKq1ddiQ63Xa8L2DnFqEBgNqBCAqVALeAK
+58	B62qjw1BdYXp74JQGoeyZ7bWtnsPPd4iCxBzfUsiVjmQPLk8984dV9D
+59	B62qpP2xUscwDA5TaQee71MGvU7dYXiTHffdL4ndRGktHBcj6fwqDcE
+60	B62qo1he9m5vqVfbU26ZRqSdyWvkVURLxJZLLwPdu1oRAp3E7rCvyxk
+61	B62qjzHRw1dhwS1NCWDH64yzovyxsbrvqBW846BRCaWmyJyoufddBSA
+62	B62qkoANXg95uVHwpLAiQsT1PaGxuXBcrBzdjMgN3mP5WJxiE1uYcG9
+63	B62qnzk698yW9rmyeC8mLCKhdmQZa2TRCG5hN3Z5NovZZqE1oou7Upc
+64	B62qrQDYA9DvUNdgU87xp64MsQm3MxBeDRNuhuwwQ3hfS5sJhchipzu
+65	B62qnSKLuJiF1gNnCEDHJeWFKPbYLKjXqz18pnLGE2pUq7PBYnU4h95
+66	B62qk8onaP8h1VYVbJkQQ8kKtHszsA12Haw3ts5jm4AkpvNDkhUtKBH
 67	B62qnbQoJyaGKvgRDthSPwWZPrYiYCpqeYoHhJ9415r1ws6DecWa8h9
 68	B62qmpV1DwQvBMUmBxyDV6jJwSpS1zFWHHEZYuXYhPja4RWCbYG3Hv1
 69	B62qiYSHjqf77rS6eBiBSiDwgqpsZEUf8KZZNmpxzULpxqm58u49m7M
@@ -3318,26 +2831,26 @@ COPY public.public_keys (id, value) FROM stdin;
 88	B62qoKioA9hueF4xhZszsACn6GT7o69wZZJUoErVyvgP7WPrj92e9Tv
 89	B62qkoTczRzwCUr6AmSiNcr3UWwkgbWeihVZphwP8CEuiDzrNHvunTX
 90	B62qpGkYNpBS3MBgortSQuwV1aXcK6bRRQyYz3wGW5tCpCLdvxk8J6q
-91	B62qqaES4tiDsvzRW4sZ89M3JSuTG3Qk2WpRMhS78w6ToDDAVJrRCZq
-92	B62qnYfsf8P7B7UYcjN9bwL7HPpNrAJh7fG5zqWvZnSsaQJP2Z1qD84
-93	B62qpAwcFY3oTy2oFUEc3gB4x879CvPqHUqHqjT3PiGxggroaUYHxkm
-94	B62qib1VQVfLQeCW6oAKEX2GRuvXjYaX2Lw9qqjkBPAvdshHPyJXVMv
-95	B62qm5TQe1nz3gfHqb6S4FE7FWV92AaKzUuAyNSDNeNJYgND35JaK8w
-96	B62qrmfQsKRd5pwg1EZNYXSmcbsgCekCkJAxxJcZhWyX7ChfExZtFAj
-97	B62qitvFhawB29DGkGv9NEfGZ8d9hECEKnKMHAvtULVATdw5epPS2s6
-98	B62qo81kkuqxFZw9cZAcoYb4ZeCjY9HodT3yDkh8Zxhg9omfRexyNAz
-99	B62qmeDPPUDtPVVHqesiKD7ecz6YZvGDHzVw2swBa84EGs5NBKpGK4H
-100	B62qqwLQXBrhJmfAtF7GUf7FNVS2xoTPrkyw7d4Pj9W431bpysAdr3V
-101	B62qkgcEQJ9qhjwQgt2XeN3RJpPTfjCrqFUUAW2NsVpzmyQwFbekNMM
-102	B62qnAotEqbcE8sjbdyJkkvKnTzW3BCPaL5HrMEdHa4pVnfPBXWGXXW
-103	B62qquzjE4bbK3mhk6jtFMnkm9BdzasTHuvMxx6JmhXeYKZkPbyZUry
-104	B62qrj3VHfVadkyJCvmu7SvczS7QZy1Yk1uQjcjwkS4QqDt9oqi4eWf
-105	B62qn6fTLLatKHi4aCX7p6Lg5rzZSq6VK2vrFVgX14gjaQqay8zHfsJ
-106	B62qjrBApNy5mx6biRzL5AfRrDEarq3kv9Zcf5LcUR6iKAX9ve5vvud
-107	B62qkdysBPreF3ef7bFEwCghYjbywFgumUHXYKDrBkUB89KgisAFGSV
-108	B62qmRjcL489UysBEnabin5be824q7ok4VjyssKNutPq3YceMRSW4gi
-109	B62qo3TjT6pu6i7UT8w39UVQc2Ljg8K69eng55vu5itof3Ma3qwcgZF
-110	B62qpXFq7VJG6Spy7BSYjqSC1GBwKLCzfU8bcrUrALEFEXphpvjn3bG
+91	B62qnYfsf8P7B7UYcjN9bwL7HPpNrAJh7fG5zqWvZnSsaQJP2Z1qD84
+92	B62qpAwcFY3oTy2oFUEc3gB4x879CvPqHUqHqjT3PiGxggroaUYHxkm
+93	B62qib1VQVfLQeCW6oAKEX2GRuvXjYaX2Lw9qqjkBPAvdshHPyJXVMv
+94	B62qm5TQe1nz3gfHqb6S4FE7FWV92AaKzUuAyNSDNeNJYgND35JaK8w
+95	B62qrmfQsKRd5pwg1EZNYXSmcbsgCekCkJAxxJcZhWyX7ChfExZtFAj
+96	B62qitvFhawB29DGkGv9NEfGZ8d9hECEKnKMHAvtULVATdw5epPS2s6
+97	B62qo81kkuqxFZw9cZAcoYb4ZeCjY9HodT3yDkh8Zxhg9omfRexyNAz
+98	B62qmeDPPUDtPVVHqesiKD7ecz6YZvGDHzVw2swBa84EGs5NBKpGK4H
+99	B62qqwLQXBrhJmfAtF7GUf7FNVS2xoTPrkyw7d4Pj9W431bpysAdr3V
+100	B62qkgcEQJ9qhjwQgt2XeN3RJpPTfjCrqFUUAW2NsVpzmyQwFbekNMM
+101	B62qnAotEqbcE8sjbdyJkkvKnTzW3BCPaL5HrMEdHa4pVnfPBXWGXXW
+102	B62qquzjE4bbK3mhk6jtFMnkm9BdzasTHuvMxx6JmhXeYKZkPbyZUry
+103	B62qrj3VHfVadkyJCvmu7SvczS7QZy1Yk1uQjcjwkS4QqDt9oqi4eWf
+104	B62qn6fTLLatKHi4aCX7p6Lg5rzZSq6VK2vrFVgX14gjaQqay8zHfsJ
+105	B62qjrBApNy5mx6biRzL5AfRrDEarq3kv9Zcf5LcUR6iKAX9ve5vvud
+106	B62qkdysBPreF3ef7bFEwCghYjbywFgumUHXYKDrBkUB89KgisAFGSV
+107	B62qmRjcL489UysBEnabin5be824q7ok4VjyssKNutPq3YceMRSW4gi
+108	B62qo3TjT6pu6i7UT8w39UVQc2Ljg8K69eng55vu5itof3Ma3qwcgZF
+109	B62qpXFq7VJG6Spy7BSYjqSC1GBwKLCzfU8bcrUrALEFEXphpvjn3bG
+110	B62qm3Dnu5gYrJyQciZTiasCdhBMcdStopffLww5ba3LKeDrzGfmd8r
 111	B62qmp2xXJyj9LegRQUtFMCCGV3DQu337n6s6BK8a2kaYrMf1MmZHkT
 112	B62qpjkSafKdAeCBh6PV6ZizJjtfs3v1DuXu1WowkYq2Bcr5X7bmk7G
 113	B62qnjhGUFX636v8HyJsYKUkAS5ms58q9C9GtwNvPbMzMVy7FmRNhLG
@@ -3362,45 +2875,45 @@ COPY public.public_keys (id, value) FROM stdin;
 132	B62qm4jN36Cwbtyd8j3BLevPK7Yhpv8KtWTia5fuwMAyvcHLCosU4PN
 133	B62qk9Dk1rwSVtSLCYdWNfPTXRPDWPPu3rR5sqvrawP82m9P1LhBZ94
 134	B62qnR8RErysAmsLHk6E7teSg56Dr3RyF6qWycyVjQhoQCVC9GfQqhD
-135	B62qo7XmFPKML7WfgUe9FvCMUrMihfapBPeCJh9Yxfka7zUwy1nNDCY
-136	B62qqZw4bXrb8PCxvEvRJ9DPASPPaHyoAWXw1avG7mEjnkFy7jGLz1i
-137	B62qkFKcfRwVgdQ1UDhhCoExwsMPNWFJStxnDtJ1hNVmLzzGsyCRLuo
-138	B62qofSbCaTfL61ZybYEpAeGe14TK8wNN8VFDV8uUEVBGpqVDAxYePK
-139	B62qn8Vo7WTK4mwQJ8sjiQvbWDavetBS4f3Gdi42KzQZmL3sri25rFp
-140	B62qo6pZqSTym2umKYeZ53F1woYCuX3qHrUtTezBoztURNRDAiNbq5Q
-141	B62qo8AvB3EoCWAogvUg6wezt5GkNRTZmYXCw5Gutj8tAg6cdffX3kr
-142	B62qqF7gk2yFsigWL7JyW1R8sdUcQjAPkp32i9B6f9GRYMzFoLPdBqJ
-143	B62qjdhhu4bsmbMFxykEgbhf4atVvgQWB4dizqsMEBbmQPe9GeXZ42N
-144	B62qmCsUFPNLpExtzt6NUeosa8L5qb7cEKi9btkMdAQS2GnQzTMjUGM
-145	B62qrtTgyssCJFm7Z44Hs99vDuLCmm7xZF6jbGf7xkmMg8mx4cXHZGA
-146	B62qneAWh9zy9ufLxKJfgrccdGfbgeoswyjPJp2WLhBpWKM7wMJtLZM
-147	B62qoqu7NDPVJAdZPJWjia4gW3MHk9Cy3JtpACiVbvBLPYw7pWyn2vL
-148	B62qmwfTv4co8uACHkz9hJuUND9ubZfpP2FsAwvru9hSg5Hb8rtLbFS
-149	B62qkhxmcB6vwRxLxKZV2R4ifFLfTSCdtxJ8nt94pKVbwWd9MshJadp
-150	B62qjYRWXeQ52Y9ADFTp55p829ZE7DE4zn9Nd8puJc2QVyuiooBDTJ3
-151	B62qo3b6pfzKVWNFgetepK6rXRekLgAYdfEAMHT6WwaSn2Ux8frnbmP
-152	B62qncxbMSrL1mKqCSc6huUwDffg5qNDDD8FHtUob9d3CE9ZC2EFPhw
-153	B62qpzLLC49Cb6rcpFyCroFiAtGtBCXny9xRbuMKi64vsU5QLoWDoaL
-154	B62qj7bnmz2VYRtJMna4bKfUYX8DyQeqxKEmHaKSzE9L6v7fjfrMbjF
-155	B62qnEQ9eQ94BxdECbFJjbkqCrPYH9wJd7B9rzKL7EeNqvYzAUCNxCT
-156	B62qokmEKEJs6VUV7QwFaHHfEr6rRnFXQe9jbodnaDuWzfUK6YoXt2w
-157	B62qpPJfgTfiSghnXisMvgTCNmyt7dA5MxXnpHfMaDGYGs8C3UdGWm7
-158	B62qkzi5Dxf6oUaiJYzb5Kq78UG8fEKnnGuytPN78gJRdSK7qvkDK6A
-159	B62qs2sRxQrpkcJSkzNF1WKiRTbvhTeh2X8LJxB9ydXbBNXimCgDQ8k
-160	B62qoayMYNMJvSh27WJog3K74996uSEFDCmHs7AwkBX6sXiEdzXn9SQ
-161	B62qibjCrFmXT3RrSbHgjtLHQyb63Q89gBLUZgRj7KMCeesF9zEymPP
-162	B62qrw63RAyz2QfqhHk8pttD2ussturr1rvneUWjAGuhsrGgzxr2ZRo
-163	B62qmNVzYukv4VxXoukakohrGNK7yq1Tgjv5SuX1TTWmpvVwD5Xnu2L
-164	B62qoucdKZheVHX8udLGmo3vieCnyje5dvAayiLm8trYEp3op9jxCMa
-165	B62qo51F51yp7PcqmHd6G1hpNBAj3kwRSQvKmy5ybd675xVJJVtMBh8
-166	B62qjHbDMJGPUz3M6JK2uC3tm6VPLaEtv4sMCcrMBz6hnD5hrET4RJM
-167	B62qnyxTMk4JbYsaMx8EN2KmoZUsb9Zd3nvjwyrZr2GdAHC9nKF16PY
-168	B62qrPo6f9vRwqDmgfNYzaFd9J3wTwQ1SC72yMAxwaGpjt2vJrxo4ri
-169	B62qoZXUxxowQuERSJWb6EkoyciRthxycW5csa4cQkZUfm151sn8BSa
-170	B62qmmBab8MbaqgM8oXzzuda4weFpfjV9scHBDWnehdxngkqCpoTfch
-171	B62qr7QqCysRpMbJGKpAw1JsrZyQfSyT4iYoP4MsTYungBDJgwx8vXg
-172	B62qo3JqbYXcuW75ZHMSMnJX7qbU8QF3N9k9DhQGbw8RKNP6tNQsePE
-173	B62qn1f2PoDgffHMTMohmM22GZPHBDqy9BENuVKRP3T7MedVqK5PRHG
+135	B62qnvLiXeH1AyarwudyQu3dDcehdKcMX9SvdcmdGW1mGoVmckYgpwT
+136	B62qnWzoGN63bdpeZLiXu2Tjwg8FTXPeDVb2CWpdrPya99xgAckoC72
+137	B62qo7XmFPKML7WfgUe9FvCMUrMihfapBPeCJh9Yxfka7zUwy1nNDCY
+138	B62qqZw4bXrb8PCxvEvRJ9DPASPPaHyoAWXw1avG7mEjnkFy7jGLz1i
+139	B62qkFKcfRwVgdQ1UDhhCoExwsMPNWFJStxnDtJ1hNVmLzzGsyCRLuo
+140	B62qofSbCaTfL61ZybYEpAeGe14TK8wNN8VFDV8uUEVBGpqVDAxYePK
+141	B62qn8Vo7WTK4mwQJ8sjiQvbWDavetBS4f3Gdi42KzQZmL3sri25rFp
+142	B62qo6pZqSTym2umKYeZ53F1woYCuX3qHrUtTezBoztURNRDAiNbq5Q
+143	B62qo8AvB3EoCWAogvUg6wezt5GkNRTZmYXCw5Gutj8tAg6cdffX3kr
+144	B62qqF7gk2yFsigWL7JyW1R8sdUcQjAPkp32i9B6f9GRYMzFoLPdBqJ
+145	B62qjdhhu4bsmbMFxykEgbhf4atVvgQWB4dizqsMEBbmQPe9GeXZ42N
+146	B62qmCsUFPNLpExtzt6NUeosa8L5qb7cEKi9btkMdAQS2GnQzTMjUGM
+147	B62qneAWh9zy9ufLxKJfgrccdGfbgeoswyjPJp2WLhBpWKM7wMJtLZM
+148	B62qoqu7NDPVJAdZPJWjia4gW3MHk9Cy3JtpACiVbvBLPYw7pWyn2vL
+149	B62qmwfTv4co8uACHkz9hJuUND9ubZfpP2FsAwvru9hSg5Hb8rtLbFS
+150	B62qkhxmcB6vwRxLxKZV2R4ifFLfTSCdtxJ8nt94pKVbwWd9MshJadp
+151	B62qjYRWXeQ52Y9ADFTp55p829ZE7DE4zn9Nd8puJc2QVyuiooBDTJ3
+152	B62qo3b6pfzKVWNFgetepK6rXRekLgAYdfEAMHT6WwaSn2Ux8frnbmP
+153	B62qncxbMSrL1mKqCSc6huUwDffg5qNDDD8FHtUob9d3CE9ZC2EFPhw
+154	B62qpzLLC49Cb6rcpFyCroFiAtGtBCXny9xRbuMKi64vsU5QLoWDoaL
+155	B62qj7bnmz2VYRtJMna4bKfUYX8DyQeqxKEmHaKSzE9L6v7fjfrMbjF
+156	B62qnEQ9eQ94BxdECbFJjbkqCrPYH9wJd7B9rzKL7EeNqvYzAUCNxCT
+157	B62qokmEKEJs6VUV7QwFaHHfEr6rRnFXQe9jbodnaDuWzfUK6YoXt2w
+158	B62qpPJfgTfiSghnXisMvgTCNmyt7dA5MxXnpHfMaDGYGs8C3UdGWm7
+159	B62qkzi5Dxf6oUaiJYzb5Kq78UG8fEKnnGuytPN78gJRdSK7qvkDK6A
+160	B62qs2sRxQrpkcJSkzNF1WKiRTbvhTeh2X8LJxB9ydXbBNXimCgDQ8k
+161	B62qoayMYNMJvSh27WJog3K74996uSEFDCmHs7AwkBX6sXiEdzXn9SQ
+162	B62qibjCrFmXT3RrSbHgjtLHQyb63Q89gBLUZgRj7KMCeesF9zEymPP
+163	B62qrw63RAyz2QfqhHk8pttD2ussturr1rvneUWjAGuhsrGgzxr2ZRo
+164	B62qmNVzYukv4VxXoukakohrGNK7yq1Tgjv5SuX1TTWmpvVwD5Xnu2L
+165	B62qp8roqnuaR9nMKmAq8ckmvpa23bAPS3zaH7yp9wU7CqMSmmtNwKh
+166	B62qoucdKZheVHX8udLGmo3vieCnyje5dvAayiLm8trYEp3op9jxCMa
+167	B62qo51F51yp7PcqmHd6G1hpNBAj3kwRSQvKmy5ybd675xVJJVtMBh8
+168	B62qjHbDMJGPUz3M6JK2uC3tm6VPLaEtv4sMCcrMBz6hnD5hrET4RJM
+169	B62qnyxTMk4JbYsaMx8EN2KmoZUsb9Zd3nvjwyrZr2GdAHC9nKF16PY
+170	B62qrPo6f9vRwqDmgfNYzaFd9J3wTwQ1SC72yMAxwaGpjt2vJrxo4ri
+171	B62qoZXUxxowQuERSJWb6EkoyciRthxycW5csa4cQkZUfm151sn8BSa
+172	B62qr7QqCysRpMbJGKpAw1JsrZyQfSyT4iYoP4MsTYungBDJgwx8vXg
+173	B62qo3JqbYXcuW75ZHMSMnJX7qbU8QF3N9k9DhQGbw8RKNP6tNQsePE
 174	B62qjCC8yevoQ4ucM7fw4pDUSvg3PDGAhvWxhdM3qrKsnXW5prfjo1o
 175	B62qnAcTRHehWDEuKmERBqSakPM1dg8L3JPSZd5yKfg4UNaHdRhiwdd
 176	B62qruGMQFShgABruLG24bvCPhF2yHw83eboSqhMFYA3HAZH9aR3am3
@@ -3447,13 +2960,13 @@ COPY public.public_keys (id, value) FROM stdin;
 217	B62qnt6Lu7cqkAiHg9qF6qcj9uFcqDCz3J6pTcLTbwrNde97KbR6rf6
 218	B62qoTmf1JEAZTWPqWvMq66xAonpPVAhMtSR8UbbX3t8FhRKrdyTFbr
 219	B62qiqiPtbo7ppvjDJ536Nf968zQM3BrYxQXoWeistF8J12BovP5e1F
-220	B62qpP5T35yJUz1U25Eqi5VtLVkjbDyMMXaTa87FE9bhoEbtz7bzAXz
-221	B62qqdtmbGF5LwL47qj7hMWjt6XYcwJnft3YgD8ydLgf1M59PFCHv44
-222	B62qm8TrWwzu2px1bZG38QkpXC5JgU7RnCyqbVyiy2Fmh63N5d9cbA6
-223	B62qnZXs2RGudz1q9eAgxxtZQnNNHi6P5RAzoznCKNdqvSyyWghmYX6
-224	B62qo7dRx2VHmDKXZ8XffNNeUK1j4znWxFUvg48hrxrNChqwUrDBgiA
-225	B62qke1AAPWuurJQ5p1zQ34uRbtogxsfHEdzfqufAHrqKKHba7ZYC2G
-226	B62qrrop16eMgHfQYSjryYvqW8EPDttxG7HVjHMBy1j14s2GnK6Gw8q
+220	B62qp9EL5wfkKm4P1R2WMJKCByQQfa2xmLyEk7y96zJntvfDzyoyPeN
+221	B62qpP5T35yJUz1U25Eqi5VtLVkjbDyMMXaTa87FE9bhoEbtz7bzAXz
+222	B62qqdtmbGF5LwL47qj7hMWjt6XYcwJnft3YgD8ydLgf1M59PFCHv44
+223	B62qm8TrWwzu2px1bZG38QkpXC5JgU7RnCyqbVyiy2Fmh63N5d9cbA6
+224	B62qnZXs2RGudz1q9eAgxxtZQnNNHi6P5RAzoznCKNdqvSyyWghmYX6
+225	B62qo7dRx2VHmDKXZ8XffNNeUK1j4znWxFUvg48hrxrNChqwUrDBgiA
+226	B62qke1AAPWuurJQ5p1zQ34uRbtogxsfHEdzfqufAHrqKKHba7ZYC2G
 227	B62qjy64ysP1cHmvHqyrZ899gdUy48PvBCnAYRykM5EMpjHccdVZ4Fy
 228	B62qjDFzBEMSsJX6i6ta6baPjCAoJmHY4a4xXUmgCJQv4sAXhQAAbpt
 229	B62qrV4S63yeVPjcEUmCkAx1bKA5aSfzCLTgh3b8D5uPr7UrJoVxA6S
@@ -3470,7 +2983,7 @@ COPY public.public_keys (id, value) FROM stdin;
 240	B62qjkjpZtKLrVFyUE4i4hAhYEqaTQYYuJDoQrhisdFbpm61TEm1tE5
 241	B62qrqndewerFzXSvc2JzDbFYNvoFTrbLsya4hTsy5bLTXmb9owUzcd
 242	B62qrGPBCRyP4xiGWn8FNVveFbYuHWxKL677VZWteikeJJjWzHGzczB
-243	B62qqXCNwhXXxkrAqvYBifYeS12FEYtZVGCg8rijWkroy9XBJairWDM
+243	B62qkLa4RvyGGxJHrf1e3HaEVhJbe5ZtRQKUZQGZECuHdMu1me7rkzM
 \.
 
 
@@ -3479,7 +2992,7 @@ COPY public.public_keys (id, value) FROM stdin;
 --
 
 COPY public.snarked_ledger_hashes (id, value) FROM stdin;
-1	jx8Z1HuU1gWjC9rAdvvYfZnVX1F6BsLJfh8yLCgT6sA9driPpCm
+1	jwTF16i69daX8zK6cfbZC1gmJ6tpFBGjnwnZi3dVpmD8aFsp8jk
 \.
 
 
@@ -3756,67 +3269,7 @@ COPY public.tokens (id, value, owner_public_key_id, owner_token_id) FROM stdin;
 --
 
 COPY public.user_commands (id, command_type, fee_payer_id, source_id, receiver_id, nonce, amount, fee, valid_until, memo, hash) FROM stdin;
-1	payment	66	66	66	0	1000000000	250000000	\N	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5Jtv7W41Kj1SKvxhBM53NfFyTNgnn3nxcwnnBsEpDHSPKaSujHa2
-2	payment	66	66	66	1	1000000000	250000000	\N	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5JteFihNB5HDuQTKEPYqfM6giAFETqNuJkJiasQKbiEAMWrG1C3X
-3	payment	66	66	66	2	1000000000	250000000	\N	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5JuvVd4pCgBv5tVccrGPyhZPJA46aFiChZNDQXkeympXNWnwMecF
-4	payment	66	66	66	3	1000000000	250000000	\N	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5JuyoiKsPjpDicPPL2N2odHfhFwQUYEjD5JzsB51CWaR2CbkBxJi
-5	payment	66	66	66	4	1000000000	250000000	\N	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5Jv6orEaj6BYjYPFA94yY4CnvcWrhhyfgstsCmE4gzdMDX7BaBTT
-6	payment	66	66	66	5	1000000000	250000000	\N	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5JuvQvinadsuPJAY8aBemqVLNZEH9NPiiWbcPpGqZ6g7QKsXPzev
-7	payment	66	66	66	6	1000000000	250000000	\N	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5JtuGTQmq3qJTNLJ1nbDwaNgucyGrUnvUiYvAWTuwDBoRignbnKT
-8	payment	66	66	66	7	1000000000	250000000	\N	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5JuMTUMJYGdVHNPdNZcKdTgcS1mHEBAu9HYPTkPvYZcHnBmd2d4w
-9	payment	66	66	66	8	1000000000	250000000	\N	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5JupjJuGVDpzNGkyFmTPqSZCpgW7akiyPukQqLa8o2GddWB6yd4C
-10	payment	66	66	66	9	1000000000	250000000	\N	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5JuYDaqsr5pLq2V2P4Cq6RS8h7fWw4JLbpbCd2x566jjwPg7wPby
-11	payment	66	66	66	10	1000000000	250000000	\N	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5JuV3JDBR2kyZanCna7Ug1quLYx14Lz2bRMq1m8k65mQkDV3e2xU
-12	payment	66	66	66	11	1000000000	250000000	\N	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5Jv5iXyW2odabVZ1qdJippi2Yhrm55R8cmYmDagUyBJWgwrdxJwy
-13	payment	66	66	66	12	1000000000	250000000	\N	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5JuAZR3xvrhQCkff4HDKpmbg4EHQZGK6ehVeATiNNgg6uJJHaMV9
-14	payment	66	66	66	13	1000000000	250000000	\N	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5JuwaB4viq5F3SupAXrRQwb4vYe3LK9C8iALDR2HbbEi9ttugvgd
-15	payment	66	66	66	14	1000000000	250000000	\N	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5JuzF2HtpxuH5JCVUzaiGd5xKFPst7eakDJjh1zQzhzJi6k5oc8o
-16	payment	66	66	66	15	1000000000	250000000	\N	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5Jtx7WzT76LX2uvNRpyzMCC6ZrqQXsgNtboYX66fwd5dmqFnAiGg
-17	payment	66	66	66	16	1000000000	250000000	\N	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5Jv5kBWqQzrchgxx3ahtj5XuzFCjVqGQ77UwGSqRDHRShXwaCRrW
-18	payment	66	66	66	17	1000000000	250000000	\N	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5JufC8e9am73KEpsWZwtRde5sZiknvbYAZS2Edi5Z3mQTayaJXyZ
-19	payment	66	66	66	18	1000000000	250000000	\N	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5JtnjaTLeD4vdHFFmYU743D2JBZZjVdeU7DKzxbPcLdqkAxJYbMb
-20	payment	66	66	66	19	1000000000	250000000	\N	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5JtuxNorvvrwZn287Eypdnfruq2RNrTG1ABjt6dmY4yaBNG9Anje
-21	payment	66	66	66	20	1000000000	250000000	\N	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5JutM9n7ucon7ZPTBzdSzAM5AhSyAppddB3fgWW3QMoabSaTvTrS
-22	payment	66	66	66	21	1000000000	250000000	\N	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5JvPiKbwaibRQG9fR24Zb6hE4FoevaYtSKtr7Z1QiXKwuE8pzsrF
-23	payment	66	66	66	22	1000000000	250000000	\N	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5Juf9yi8HG3kXU1zkW1DeyKp6zyzB7SbW7oswfocpZ1JUyRn6L67
-24	payment	66	66	66	23	1000000000	250000000	\N	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5Jup69XrsuHVjwNHHRPoGDfBwbh36wgAtxLDwHLqdqeyj33nVndo
-25	payment	66	66	66	24	1000000000	250000000	\N	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5JtrkrbNaGPFKKk2yDUMwrCg4KxWa3haFTfo7U2pQ1C9DTYRt1Q5
-26	payment	66	66	66	25	1000000000	250000000	\N	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5JvEuCc9gLdAA8Mh8yv3REheQXF7jB4voX2XaYPfjw1kqs73V9QH
-27	payment	66	66	66	26	1000000000	250000000	\N	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5Jv8DeGkuYrmKiMnd3gQrp9ME3VyeVvYVJMnDxZZh2d7kh2kWvef
-28	payment	66	66	66	27	1000000000	250000000	\N	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5JteENxG2mTraxN9vwcrRnFFWdoqsdpeVuGtWCy6czrk2Q6inWZ8
-29	payment	66	66	66	28	1000000000	250000000	\N	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5JvGfKGio3CdZmG2YhZ8QdxKqYiRFv98myRV3ms6WzAPwC2zzhc4
-30	payment	66	66	66	29	1000000000	250000000	\N	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5JvHXzk5MmAS2ZZvx3GwDeTbxHhQErYSKQEPg9xiTh3aPr1oeqFa
-31	payment	66	66	66	30	1000000000	250000000	\N	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5JuhWqVaf3r8V2EB4hrR5KPN3kNpv3bVpD425LWKvNuXr1QdcbRR
-32	payment	66	66	66	31	1000000000	250000000	\N	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5JttRVYSJ4kQFcvCkbiyeVUDgTCg61Bumik7Y81fQc4a15RyevDy
-33	payment	66	66	66	32	1000000000	250000000	\N	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5JvPgFYGqgCKjVSGD9cYma1e1taAPEXGKp4Z8s2jG4BjmdWgyxfY
-34	payment	66	66	66	33	1000000000	250000000	\N	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5JvPmyZ4o5fGDH8RjFaqkYeRXCm7z8gjoG7XtNaE1abuVvAKnAg8
-35	payment	66	66	66	34	1000000000	250000000	\N	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5Ju924qQCjDRrGdgaTi5kZLKg55M868QsxLkvniZ1AxUHvXMc6yt
-36	payment	66	66	66	35	1000000000	250000000	\N	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5JusQntBMGbxcxfU5T6AA8wMbNbwkUM1EcW7ypULXbs4jNqKC8n3
-37	payment	66	66	66	36	1000000000	250000000	\N	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5JucGKi9EaKYWby3HxBD1EvTMuvAYY8baeRmpt9gefZmyPwXaK3w
-38	payment	66	66	66	37	1000000000	250000000	\N	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5Jv12wqHtmgpf45dav6c3NdLCQntDUEGgmqxmvfqhVpZ6QFSJa7E
-39	payment	66	66	66	38	1000000000	250000000	\N	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5JuB4SNjYvHxMy6wJMUEbWC2ksB5rR6LUp4AmsjyhevzXd7GYdnN
-40	payment	66	66	66	39	1000000000	250000000	\N	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5JuNPGQJWPkqFapS5rxacEvZpgmB138Y7dhYgkADZbP4jgaGNSTp
-41	payment	66	66	66	40	1000000000	250000000	\N	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5JtbcfLGvao3u29NDC3XU2jy1VZVVFBga2ZcjAG97RmCvc5eGTJc
-42	payment	66	66	66	41	1000000000	250000000	\N	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5Ju1ENuqE2VP4NXF54U6BZEDQeZcAHVviRgP9cTFK2ESye6sPPUw
-43	payment	66	66	66	42	1000000000	250000000	\N	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5Ju46ED6USUFz2yiQwRPuxS21ZuWj2JD6AEGqW6mH7n91Gy8Z3JX
-44	payment	66	66	66	43	1000000000	250000000	\N	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5JuBxMABdfBYT31dbdQe2VpDXky3YqgLW87yVui1x7Zbj8hkDkzx
-45	payment	66	66	66	44	1000000000	250000000	\N	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5JtdMVdTPUc82JWKNQeQsY3YS1dPKCB7ZLb3acZWVMsPSWcfuzGQ
-46	payment	66	66	66	45	1000000000	250000000	\N	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5Jug77rhsFcCQp734SN1vmM3aXmZWjSSp4Rxp9axVj3rZCqDtCVw
-47	payment	66	66	66	46	1000000000	250000000	\N	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5JuD2CYsAuVUPUEXCDretdhJ3pdv4xTH4MqmyR5Gn3FZboMNmnN5
-48	payment	66	66	66	47	1000000000	250000000	\N	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5JvGYRWV2XArDY8fD2WRCZK9af2pRNnic7GMwHBuimE6ah1TvWsL
-49	payment	66	66	66	48	1000000000	250000000	\N	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5JtvQtPeQkbkn5yNt2H8qpehNK3QFD4pcFe9y5PXkimbWP6FNuFb
-50	payment	66	66	66	49	1000000000	250000000	\N	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5JubLCNePrTZK3vNwVXo63DCkEWTnJddhYFFjHX3q2etPQef1yJd
-51	payment	66	66	66	50	1000000000	250000000	\N	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5Jv8DeHANBgxiNa6hoPZGA55H7jhHnW6irMc8iFo8tBfXs29THng
-52	payment	66	66	66	51	1000000000	250000000	\N	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5Jug2zXD1HkmYQGhG9byCMyYdAQ76pzamGpWvNmirTciHDzUrQJb
-53	payment	66	66	66	52	1000000000	250000000	\N	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5JuRKFYaikY9CHsRaEFKbioa1zpR7Xe9T7WujGhx2KZ4pDZdiBBo
-54	payment	66	66	66	53	1000000000	250000000	\N	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5JtoaxFiiNHaPSasVqBZjdLzEpd52165iJ6EKBsLgGuenpp1epfH
-55	payment	66	66	66	54	1000000000	250000000	\N	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5JvNEtD21tycr6q2GZubBR6qAerhMonppw4hafxNrKgMFZoTWzNL
-56	payment	66	66	66	55	1000000000	250000000	\N	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5Ju2ahyFLq8fvLhCUyVNv9se3JWCPRPEXj51zH1njNS179ysnTV9
-57	payment	66	66	66	56	1000000000	250000000	\N	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5Juyf4PPd8ViteJV2VmPrw5G8je2mWRh7LK2cAKVeJSoHErKzf5R
-58	payment	66	66	66	57	1000000000	250000000	\N	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5Ju2ksCZ9FnsLm4HaRHGRUFrsmxofPC2N9hocAU5WQnUZajPd7ri
-59	payment	66	66	66	58	1000000000	250000000	\N	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5JtzqHxo8GgCMEnwzhBxwZSmECesT2sBCrm3QvR2CEjrFHrFVCiS
-60	payment	66	66	66	59	1000000000	250000000	\N	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5Jtrv8aV7bs5ngLRmu9g2sckhCW7c6qNwUYiX2JjfXMZPFmDLFRF
-61	payment	66	66	66	60	1000000000	250000000	\N	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5JtoKoRSm6XT3wJCHvnuprwnWnmkGR9bSKotnohuA41gwx8iPLK8
+1	payment	136	136	136	0	1000000000	250000000	\N	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5Jv5C2d1sb2pNyC19gW6hKzKUMo1ECZnjyHJSdvwNuBdAkQybyEv
 \.
 
 
@@ -3836,72 +3289,6 @@ COPY public.voting_for (id, value) FROM stdin;
 COPY public.zkapp_account_precondition (id, balance_id, nonce_id, receipt_chain_hash, delegate_id, state_id, action_state_id, proved_state, is_new) FROM stdin;
 1	\N	1	\N	\N	1	\N	\N	\N
 2	\N	\N	\N	\N	1	\N	\N	\N
-3	\N	2	\N	\N	1	\N	\N	\N
-4	\N	3	\N	\N	1	\N	\N	\N
-5	\N	4	\N	\N	1	\N	\N	\N
-6	\N	5	\N	\N	1	\N	\N	\N
-7	\N	6	\N	\N	1	\N	\N	\N
-8	\N	7	\N	\N	1	\N	\N	\N
-9	\N	8	\N	\N	1	\N	\N	\N
-10	\N	9	\N	\N	1	\N	\N	\N
-11	\N	10	\N	\N	1	\N	\N	\N
-12	\N	11	\N	\N	1	\N	\N	\N
-13	\N	12	\N	\N	1	\N	\N	\N
-14	\N	13	\N	\N	1	\N	\N	\N
-15	\N	14	\N	\N	1	\N	\N	\N
-16	\N	15	\N	\N	1	\N	\N	\N
-17	\N	16	\N	\N	1	\N	\N	\N
-18	\N	17	\N	\N	1	\N	\N	\N
-19	\N	18	\N	\N	1	\N	\N	\N
-20	\N	19	\N	\N	1	\N	\N	\N
-21	\N	20	\N	\N	1	\N	\N	\N
-22	\N	21	\N	\N	1	\N	\N	\N
-23	\N	22	\N	\N	1	\N	\N	\N
-24	\N	23	\N	\N	1	\N	\N	\N
-25	\N	24	\N	\N	1	\N	\N	\N
-26	\N	25	\N	\N	1	\N	\N	\N
-27	\N	26	\N	\N	1	\N	\N	\N
-28	\N	27	\N	\N	1	\N	\N	\N
-29	\N	28	\N	\N	1	\N	\N	\N
-30	\N	29	\N	\N	1	\N	\N	\N
-31	\N	30	\N	\N	1	\N	\N	\N
-32	\N	31	\N	\N	1	\N	\N	\N
-33	\N	32	\N	\N	1	\N	\N	\N
-34	\N	33	\N	\N	1	\N	\N	\N
-35	\N	34	\N	\N	1	\N	\N	\N
-36	\N	35	\N	\N	1	\N	\N	\N
-37	\N	36	\N	\N	1	\N	\N	\N
-38	\N	37	\N	\N	1	\N	\N	\N
-39	\N	38	\N	\N	1	\N	\N	\N
-40	\N	39	\N	\N	1	\N	\N	\N
-41	\N	40	\N	\N	1	\N	\N	\N
-42	\N	41	\N	\N	1	\N	\N	\N
-43	\N	42	\N	\N	1	\N	\N	\N
-44	\N	43	\N	\N	1	\N	\N	\N
-45	\N	44	\N	\N	1	\N	\N	\N
-46	\N	45	\N	\N	1	\N	\N	\N
-47	\N	46	\N	\N	1	\N	\N	\N
-48	\N	47	\N	\N	1	\N	\N	\N
-49	\N	48	\N	\N	1	\N	\N	\N
-50	\N	49	\N	\N	1	\N	\N	\N
-51	\N	50	\N	\N	1	\N	\N	\N
-52	\N	51	\N	\N	1	\N	\N	\N
-53	\N	52	\N	\N	1	\N	\N	\N
-54	\N	53	\N	\N	1	\N	\N	\N
-55	\N	54	\N	\N	1	\N	\N	\N
-56	\N	55	\N	\N	1	\N	\N	\N
-57	\N	56	\N	\N	1	\N	\N	\N
-58	\N	57	\N	\N	1	\N	\N	\N
-59	\N	58	\N	\N	1	\N	\N	\N
-60	\N	59	\N	\N	1	\N	\N	\N
-61	\N	60	\N	\N	1	\N	\N	\N
-62	\N	61	\N	\N	1	\N	\N	\N
-63	\N	62	\N	\N	1	\N	\N	\N
-64	\N	63	\N	\N	1	\N	\N	\N
-65	\N	64	\N	\N	1	\N	\N	\N
-66	\N	65	\N	\N	1	\N	\N	\N
-67	\N	66	\N	\N	1	\N	\N	\N
-68	\N	67	\N	\N	1	\N	\N	\N
 \.
 
 
@@ -3914,137 +3301,6 @@ COPY public.zkapp_account_update (id, body_id) FROM stdin;
 2	2
 3	3
 4	4
-5	5
-6	6
-7	7
-8	8
-9	9
-10	10
-11	11
-12	12
-13	13
-14	14
-15	15
-16	16
-17	17
-18	18
-19	19
-20	20
-21	21
-22	22
-23	23
-24	24
-25	25
-26	26
-27	27
-28	28
-29	29
-30	30
-31	31
-32	32
-33	33
-34	34
-35	35
-36	36
-37	37
-38	38
-39	39
-40	40
-41	41
-42	42
-43	43
-44	44
-45	45
-46	46
-47	47
-48	48
-49	49
-50	50
-51	51
-52	52
-53	53
-54	54
-55	55
-56	56
-57	57
-58	58
-59	59
-60	60
-61	61
-62	62
-63	63
-64	64
-65	65
-66	66
-67	67
-68	68
-69	69
-70	70
-71	71
-72	72
-73	73
-74	74
-75	75
-76	76
-77	77
-78	78
-79	79
-80	80
-81	81
-82	82
-83	83
-84	84
-85	85
-86	86
-87	87
-88	88
-89	89
-90	90
-91	91
-92	92
-93	93
-94	94
-95	95
-96	96
-97	97
-98	98
-99	99
-100	100
-101	101
-102	102
-103	103
-104	104
-105	105
-106	106
-107	107
-108	108
-109	109
-110	110
-111	111
-112	112
-113	113
-114	114
-115	115
-116	116
-117	117
-118	118
-119	119
-120	120
-121	121
-122	122
-123	123
-124	124
-125	125
-126	126
-127	127
-128	128
-129	129
-130	130
-131	131
-132	132
-133	133
-134	134
-135	135
 \.
 
 
@@ -4053,141 +3309,10 @@ COPY public.zkapp_account_update (id, body_id) FROM stdin;
 --
 
 COPY public.zkapp_account_update_body (id, account_identifier_id, update_id, balance_change, increment_nonce, events_id, actions_id, call_data_id, call_depth, zkapp_network_precondition_id, zkapp_account_precondition_id, zkapp_valid_while_precondition_id, use_full_commitment, implicit_account_creation_fee, may_use_token, authorization_kind, verification_key_hash_id) FROM stdin;
-1	172	1	-1000000000000	t	1	1	1	0	1	1	\N	f	f	No	Signature	\N
+1	134	1	-1000000000000	t	1	1	1	0	1	1	\N	f	f	No	Signature	\N
 2	243	2	999000000000	f	1	1	1	0	1	2	\N	t	f	No	Signature	\N
-3	172	1	-1000000000	t	1	1	1	0	1	3	\N	f	f	No	Signature	\N
+3	134	1	-1000000000	t	1	1	1	0	1	1	\N	f	f	No	Signature	\N
 4	243	1	1000000000	f	1	1	1	0	1	2	\N	f	f	No	None_given	\N
-5	243	3	0	f	1	1	1	0	1	2	\N	t	f	No	Signature	\N
-6	172	1	-1000000000	t	1	1	1	0	1	4	\N	f	f	No	Signature	\N
-7	243	4	0	f	1	1	1	0	1	2	\N	t	f	No	Signature	\N
-8	172	1	-1000000000	t	1	1	1	0	1	5	\N	f	f	No	Signature	\N
-9	243	5	0	f	1	1	1	0	1	2	\N	t	f	No	Signature	\N
-10	172	1	-1000000000	t	1	1	1	0	1	6	\N	f	f	No	Signature	\N
-11	243	6	0	f	1	1	1	0	1	2	\N	t	f	No	Signature	\N
-12	172	1	-1000000000	t	1	1	1	0	1	7	\N	f	f	No	Signature	\N
-13	243	7	0	f	1	1	1	0	1	2	\N	t	f	No	Signature	\N
-14	172	1	-1000000000	t	1	1	1	0	1	8	\N	f	f	No	Signature	\N
-15	243	8	0	f	1	1	1	0	1	2	\N	t	f	No	Signature	\N
-16	172	1	-1000000000	t	1	1	1	0	1	9	\N	f	f	No	Signature	\N
-17	243	9	0	f	1	1	1	0	1	2	\N	t	f	No	Signature	\N
-18	172	1	-1000000000	t	1	1	1	0	1	10	\N	f	f	No	Signature	\N
-19	243	10	0	f	1	1	1	0	1	2	\N	t	f	No	Signature	\N
-20	172	1	-1000000000	t	1	1	1	0	1	11	\N	f	f	No	Signature	\N
-21	243	11	0	f	1	1	1	0	1	2	\N	t	f	No	Signature	\N
-22	172	1	-1000000000	t	1	1	1	0	1	12	\N	f	f	No	Signature	\N
-23	243	12	0	f	1	1	1	0	1	2	\N	t	f	No	Signature	\N
-24	172	1	-1000000000	t	1	1	1	0	1	13	\N	f	f	No	Signature	\N
-25	243	13	0	f	1	1	1	0	1	2	\N	t	f	No	Signature	\N
-26	172	1	-1000000000	t	1	1	1	0	1	14	\N	f	f	No	Signature	\N
-27	243	14	0	f	1	1	1	0	1	2	\N	t	f	No	Signature	\N
-28	172	1	-1000000000	t	1	1	1	0	1	15	\N	f	f	No	Signature	\N
-29	243	15	0	f	1	1	1	0	1	2	\N	t	f	No	Signature	\N
-30	172	1	-1000000000	t	1	1	1	0	1	16	\N	f	f	No	Signature	\N
-31	243	16	0	f	1	1	1	0	1	2	\N	t	f	No	Signature	\N
-32	172	1	-1000000000	t	1	1	1	0	1	17	\N	f	f	No	Signature	\N
-33	243	17	0	f	1	1	1	0	1	2	\N	t	f	No	Signature	\N
-34	172	1	-1000000000	t	1	1	1	0	1	18	\N	f	f	No	Signature	\N
-35	243	18	0	f	1	1	1	0	1	2	\N	t	f	No	Signature	\N
-36	172	1	-1000000000	t	1	1	1	0	1	19	\N	f	f	No	Signature	\N
-37	243	19	0	f	1	1	1	0	1	2	\N	t	f	No	Signature	\N
-38	172	1	-1000000000	t	1	1	1	0	1	20	\N	f	f	No	Signature	\N
-39	243	20	0	f	1	1	1	0	1	2	\N	t	f	No	Signature	\N
-40	172	1	-1000000000	t	1	1	1	0	1	21	\N	f	f	No	Signature	\N
-41	243	21	0	f	1	1	1	0	1	2	\N	t	f	No	Signature	\N
-42	172	1	-1000000000	t	1	1	1	0	1	22	\N	f	f	No	Signature	\N
-43	243	22	0	f	1	1	1	0	1	2	\N	t	f	No	Signature	\N
-44	172	1	-1000000000	t	1	1	1	0	1	23	\N	f	f	No	Signature	\N
-45	243	23	0	f	1	1	1	0	1	2	\N	t	f	No	Signature	\N
-46	172	1	-1000000000	t	1	1	1	0	1	24	\N	f	f	No	Signature	\N
-47	243	24	0	f	1	1	1	0	1	2	\N	t	f	No	Signature	\N
-48	172	1	-1000000000	t	1	1	1	0	1	25	\N	f	f	No	Signature	\N
-49	243	25	0	f	1	1	1	0	1	2	\N	t	f	No	Signature	\N
-50	172	1	-1000000000	t	1	1	1	0	1	26	\N	f	f	No	Signature	\N
-51	243	26	0	f	1	1	1	0	1	2	\N	t	f	No	Signature	\N
-52	172	1	-1000000000	t	1	1	1	0	1	27	\N	f	f	No	Signature	\N
-53	243	27	0	f	1	1	1	0	1	2	\N	t	f	No	Signature	\N
-54	172	1	-1000000000	t	1	1	1	0	1	28	\N	f	f	No	Signature	\N
-55	243	28	0	f	1	1	1	0	1	2	\N	t	f	No	Signature	\N
-56	172	1	-1000000000	t	1	1	1	0	1	29	\N	f	f	No	Signature	\N
-57	243	29	0	f	1	1	1	0	1	2	\N	t	f	No	Signature	\N
-58	172	1	-1000000000	t	1	1	1	0	1	30	\N	f	f	No	Signature	\N
-59	243	30	0	f	1	1	1	0	1	2	\N	t	f	No	Signature	\N
-60	172	1	-1000000000	t	1	1	1	0	1	31	\N	f	f	No	Signature	\N
-61	243	31	0	f	1	1	1	0	1	2	\N	t	f	No	Signature	\N
-62	172	1	-1000000000	t	1	1	1	0	1	32	\N	f	f	No	Signature	\N
-63	243	32	0	f	1	1	1	0	1	2	\N	t	f	No	Signature	\N
-64	172	1	-1000000000	t	1	1	1	0	1	33	\N	f	f	No	Signature	\N
-65	243	33	0	f	1	1	1	0	1	2	\N	t	f	No	Signature	\N
-66	172	1	-1000000000	t	1	1	1	0	1	34	\N	f	f	No	Signature	\N
-67	243	34	0	f	1	1	1	0	1	2	\N	t	f	No	Signature	\N
-68	172	1	-1000000000	t	1	1	1	0	1	35	\N	f	f	No	Signature	\N
-69	243	35	0	f	1	1	1	0	1	2	\N	t	f	No	Signature	\N
-70	172	1	-1000000000	t	1	1	1	0	1	36	\N	f	f	No	Signature	\N
-71	243	36	0	f	1	1	1	0	1	2	\N	t	f	No	Signature	\N
-72	172	1	-1000000000	t	1	1	1	0	1	37	\N	f	f	No	Signature	\N
-73	243	37	0	f	1	1	1	0	1	2	\N	t	f	No	Signature	\N
-74	172	1	-1000000000	t	1	1	1	0	1	38	\N	f	f	No	Signature	\N
-75	243	38	0	f	1	1	1	0	1	2	\N	t	f	No	Signature	\N
-76	172	1	-1000000000	t	1	1	1	0	1	39	\N	f	f	No	Signature	\N
-77	243	39	0	f	1	1	1	0	1	2	\N	t	f	No	Signature	\N
-78	172	1	-1000000000	t	1	1	1	0	1	40	\N	f	f	No	Signature	\N
-79	243	40	0	f	1	1	1	0	1	2	\N	t	f	No	Signature	\N
-80	172	1	-1000000000	t	1	1	1	0	1	41	\N	f	f	No	Signature	\N
-81	243	41	0	f	1	1	1	0	1	2	\N	t	f	No	Signature	\N
-82	172	1	-1000000000	t	1	1	1	0	1	42	\N	f	f	No	Signature	\N
-83	243	42	0	f	1	1	1	0	1	2	\N	t	f	No	Signature	\N
-84	172	1	-1000000000	t	1	1	1	0	1	43	\N	f	f	No	Signature	\N
-85	243	43	0	f	1	1	1	0	1	2	\N	t	f	No	Signature	\N
-86	172	1	-1000000000	t	1	1	1	0	1	44	\N	f	f	No	Signature	\N
-87	243	44	0	f	1	1	1	0	1	2	\N	t	f	No	Signature	\N
-88	172	1	-1000000000	t	1	1	1	0	1	45	\N	f	f	No	Signature	\N
-89	243	45	0	f	1	1	1	0	1	2	\N	t	f	No	Signature	\N
-90	172	1	-1000000000	t	1	1	1	0	1	46	\N	f	f	No	Signature	\N
-91	243	46	0	f	1	1	1	0	1	2	\N	t	f	No	Signature	\N
-92	172	1	-1000000000	t	1	1	1	0	1	47	\N	f	f	No	Signature	\N
-93	243	47	0	f	1	1	1	0	1	2	\N	t	f	No	Signature	\N
-94	172	1	-1000000000	t	1	1	1	0	1	48	\N	f	f	No	Signature	\N
-95	243	48	0	f	1	1	1	0	1	2	\N	t	f	No	Signature	\N
-96	172	1	-1000000000	t	1	1	1	0	1	49	\N	f	f	No	Signature	\N
-97	243	49	0	f	1	1	1	0	1	2	\N	t	f	No	Signature	\N
-98	172	1	-1000000000	t	1	1	1	0	1	50	\N	f	f	No	Signature	\N
-99	243	50	0	f	1	1	1	0	1	2	\N	t	f	No	Signature	\N
-100	172	1	-1000000000	t	1	1	1	0	1	51	\N	f	f	No	Signature	\N
-101	243	51	0	f	1	1	1	0	1	2	\N	t	f	No	Signature	\N
-102	172	1	-1000000000	t	1	1	1	0	1	52	\N	f	f	No	Signature	\N
-103	243	52	0	f	1	1	1	0	1	2	\N	t	f	No	Signature	\N
-104	172	1	-1000000000	t	1	1	1	0	1	53	\N	f	f	No	Signature	\N
-105	243	53	0	f	1	1	1	0	1	2	\N	t	f	No	Signature	\N
-106	172	1	-1000000000	t	1	1	1	0	1	54	\N	f	f	No	Signature	\N
-107	243	54	0	f	1	1	1	0	1	2	\N	t	f	No	Signature	\N
-108	172	1	-1000000000	t	1	1	1	0	1	55	\N	f	f	No	Signature	\N
-109	243	55	0	f	1	1	1	0	1	2	\N	t	f	No	Signature	\N
-110	172	1	-1000000000	t	1	1	1	0	1	56	\N	f	f	No	Signature	\N
-111	243	56	0	f	1	1	1	0	1	2	\N	t	f	No	Signature	\N
-112	172	1	-1000000000	t	1	1	1	0	1	57	\N	f	f	No	Signature	\N
-113	243	57	0	f	1	1	1	0	1	2	\N	t	f	No	Signature	\N
-114	172	1	-1000000000	t	1	1	1	0	1	58	\N	f	f	No	Signature	\N
-115	243	58	0	f	1	1	1	0	1	2	\N	t	f	No	Signature	\N
-116	172	1	-1000000000	t	1	1	1	0	1	59	\N	f	f	No	Signature	\N
-117	243	59	0	f	1	1	1	0	1	2	\N	t	f	No	Signature	\N
-118	172	1	-1000000000	t	1	1	1	0	1	60	\N	f	f	No	Signature	\N
-119	243	60	0	f	1	1	1	0	1	2	\N	t	f	No	Signature	\N
-120	172	1	-1000000000	t	1	1	1	0	1	61	\N	f	f	No	Signature	\N
-121	243	61	0	f	1	1	1	0	1	2	\N	t	f	No	Signature	\N
-122	172	1	-1000000000	t	1	1	1	0	1	62	\N	f	f	No	Signature	\N
-123	243	62	0	f	1	1	1	0	1	2	\N	t	f	No	Signature	\N
-124	172	1	-1000000000	t	1	1	1	0	1	63	\N	f	f	No	Signature	\N
-125	243	63	0	f	1	1	1	0	1	2	\N	t	f	No	Signature	\N
-126	172	1	-1000000000	t	1	1	1	0	1	64	\N	f	f	No	Signature	\N
-127	243	64	0	f	1	1	1	0	1	2	\N	t	f	No	Signature	\N
-128	172	1	-1000000000	t	1	1	1	0	1	65	\N	f	f	No	Signature	\N
-129	243	65	0	f	1	1	1	0	1	2	\N	t	f	No	Signature	\N
-130	172	1	-1000000000	t	1	1	1	0	1	66	\N	f	f	No	Signature	\N
-131	243	66	0	f	1	1	1	0	1	2	\N	t	f	No	Signature	\N
-132	172	1	-1000000000	t	1	1	1	0	1	67	\N	f	f	No	Signature	\N
-133	243	67	0	f	1	1	1	0	1	2	\N	t	f	No	Signature	\N
-134	172	1	-1000000000	t	1	1	1	0	1	68	\N	f	f	No	Signature	\N
-135	243	68	0	f	1	1	1	0	1	2	\N	t	f	No	Signature	\N
 \.
 
 
@@ -4199,7 +3324,6 @@ COPY public.zkapp_account_update_failures (id, index, failures) FROM stdin;
 1	2	{Cancelled}
 2	1	{Account_nonce_precondition_unsatisfied}
 3	2	{Invalid_fee_excess}
-4	1	{Invalid_fee_excess}
 \.
 
 
@@ -4240,139 +3364,8 @@ COPY public.zkapp_balance_bounds (id, balance_lower_bound, balance_upper_bound) 
 --
 
 COPY public.zkapp_commands (id, zkapp_fee_payer_body_id, zkapp_account_updates_ids, memo, hash) FROM stdin;
-1	1	{1,2}	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5JttZt8FaPfDGG1yFoamb3bRVAFjt3nXABWH4ewvtJWsiXSLXpeP
-2	2	{3,4}	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5Juqgvm5yFXLhuKxRWXUW1YxKQKtrBLmqzyuhLGQSbcePraxuW1a
-3	3	{5}	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5JuXBoGh4YABngYF9idL11FzqvxmFJ2pkj6DCLg8q6pNFcB4hMn8
-4	4	{6,4}	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5JuDiaiMvxGLcgoc32m7kxWf67uiAyW7ZNngUZRwjeVajturhhhd
-5	5	{7}	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5JtWGtehL3S1D2hqUx66qosNhng1xmh5MHojc1MArurLceKb96HU
-6	6	{8,4}	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5JvMpuEArReJvDvUWt4k26pcjYyN3AUXLAYXWAnc7mPSAvja8CSi
-7	7	{9}	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5JuhqD51i16JfvgkJWb8fmv9peDqM46kDR65ySLcwbpjhjtM8C2L
-8	8	{10,4}	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5JvR1ZUNHSsxgEy1kWkYJ8Rr4bGTVMSPoNfBDgSCpg7vk56CEqB7
-9	9	{11}	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5Juztowrky1onw9CoehEJQcCeVTiPdRYHBbrW8mro3YmApTAUUcL
-10	10	{12,4}	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5JuD5TZ9zkTSqpLWLREYE48XK9o87c9y8BbHWiHSCNMs75zAQYZZ
-11	11	{13}	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5JuUEZ8p6HGmas1xc84QFx4mPWM1ppFTeVcZwmbf99mzFciTTuZh
-12	12	{14,4}	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5JuNcun4kwpPmmmMKbDKbsqsYcERx4LU8nkMhKWJdZSwzxAVJNYp
-13	13	{15}	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5Ju2vfPJDYGzSRNKC5r4YiN6ytCfArHSZMxoKEyoPaRyZLpGrxCp
-14	14	{16,4}	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5JtbPZxHBpm3ArDJJHWAb6dHzPNboWo7TaN2i2UQUGgz4nGtpALG
-15	15	{17}	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5Jtj4ZqXuxMu1iFJBHbqZjy3nR56QJ579Ks1txnAZrFBbwvHyteh
-16	16	{18,4}	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5JvJmXmnazwz75WqqGcdBf24Y3SsHCGfiynJHhVkHYVLcAPA3aWC
-17	17	{19}	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5JutnQmKADY6t6vsPdf7Ja3AiSme7dZMCUL8rQVCKTUUWJH8mb6q
-18	18	{20,4}	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5Ju5QoHwFfoLwvREtNQXfQhh9JgxKReSAXyrHvafG9MHfBZ1gE5E
-19	19	{21}	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5Jv9cYzBJTQAyYushpRYsoVoLUvjptYfHNHui6Y44ez1L85asVpB
-20	20	{22,4}	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5JvNxKmCHxbnajbAqpSft4amBh9uPWh64oiRKpBQgnaa9djoUR7N
-21	21	{23}	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5JuVF2kuG5eiQCZQo9CAqu2k5fNNqn28WHn5bScsXw1RPcVQUxbD
-22	22	{24,4}	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5JtqY5j8nxvZVW2rLNGJt4RAxztW2EriMk5CRzb5rLjvHw73dyw6
-23	23	{25}	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5JuEJhR9ENRukxkGXmb311DmNtSditTJoJEBCdQ28zfJm7UtFJYA
-24	24	{26,4}	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5JtyEgcN1BE2vL3cH3QrxFUDbLegBBAWDrwsi6Hz1Lv9zEbWJjVL
-25	25	{27}	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5Jv1gXk9LUqRefCAgLo2Y9osjhdS4H3gzxn5krPa6hH4mcwMNKWG
-26	26	{28,4}	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5JtwgCsPWoBzgjSabA8gyLhRdzwCoRSNefxipGf5dagVoasHZPYf
-27	27	{29}	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5JtmovUuSBhMC4hP7g8kiSMeqRjFdCiDNhwbVS66vBZ49MLwKhw8
-28	28	{30,4}	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5JtnGX92EppZLAudzJbbuMFvqS2rzcfipkAitxqMym1EaDYtYFAp
-29	29	{31}	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5JutxaHd1iYX5JG9cjBfe7KTVZRfJErFyPSwjZL9Zh88aid2WzTU
-30	30	{32,4}	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5JuW5auuHAvWe7VZWABtbpJZ1iCqYdxABH39U2gkArEsrzy7hA1W
-31	31	{33}	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5JtpukH88qc1bDGkBnedMwdAU5kkxBhWmqMyLfTMyPx6VQPw3i7q
-32	32	{34,4}	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5JvJCjanN4oPUyz2J4wquokBtSbsZJipukWK4fe2FGe4tSzhvb2M
-33	33	{35}	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5Juc2ga2CAXTNuXRLz3qdsycZvPGFkcKy1DyRWDcTrk5AHn4SKkM
-34	34	{36,4}	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5JtYgQMZQvG3JPrmgvSiZN5F1iGHcCGv1H2wgros9L7ZwYeperPo
-35	35	{37}	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5Jv359Q6QndxgL4bU8UeTH6VZF8En64bJTmT4NU1jLiUijczvcwg
-36	36	{38,4}	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5JtYMWwqyCenkhH2RRwm94E28YHhGaDBymL4qivjYGtokei27m6q
-37	37	{39}	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5JuwwM5UZCvsjkaPoSvH2QsdzFn95iDYSEeoAjWj52hL7v1vqfjJ
-38	38	{40,4}	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5JuLkKV3joz816dRNBCTvtQby57m9kAwTr8swPfLBjB3UnRLznVZ
-39	39	{41}	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5JuUuSCFyvKG3Z5YnZG2ke152n6wsbHSEHdcStjujox7pzHhE6wN
-40	40	{42,4}	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5JvBRMJgbqFugTfaviKFq6hJXYBUkTXDpipYP7Zz6imcMM87WyJB
-41	41	{43}	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5JucD2avgM29KbCMkBxB9KWMHHFW4Qj3EHFLkqQsiAnkm8a9KVr2
-42	42	{44,4}	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5JteknYooLkNCBzmv4a971bxiZ6D4c97nCeoPYtggRsMWCSzp8iP
-43	43	{45}	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5JvCAjSTbLfUv6HqXAqSyBLVQ4zacLSxjMeu6j6AHGquHhei822g
-44	44	{46,4}	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5Jueq4ZV7Hz6UrTSeiLUcVgrkhVYkFTFkATfU6kXFWakyuB58Ecw
-45	45	{47}	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5JuujMqLGbMfUJxAUhRQ8UHY6YroZ2aALS6J1UABH2oHdEDTRfAo
-46	46	{48,4}	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5JvP1eECj2QZxVBBZk5SHSB4otFe2pfBuCryFtqgmP245FHTDjAE
-47	47	{49}	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5JtoNMXNRUU4PW5uBjstKJ3fZW3mvfSetNkZ1ofEFB69752XAYa5
-48	48	{50,4}	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5JvAGmAcydzKE9mtZrb41mny2o77msGxtKV5gryRj2QByZ2W4NUn
-49	49	{51}	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5Ju6VyoHYqmZjFKUhnv16udCoQcTHAM6prYr5XLa2SnzJUpxe4uZ
-50	50	{52,4}	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5JvCCy3WhVDamjygcGrFwatkxpsa5HhgPJzrAX8yuuQnqbGm6i34
-51	51	{53}	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5Ju7noZVxpbvbtLLeRGgapc8swCTS4yWJYM69VbJ68pc1zP58WXc
-52	52	{54,4}	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5JubxF5dSGVivtReM2yJeCs4A4F2YyNL2inrbh4XFcA1jVAtL5Ci
-53	53	{55}	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5JtuAMbtpcASSEPu5b5rr1Ji9fJsqv8tnVSmAdgGpxJgsLUUs7yu
-54	54	{56,4}	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5Ju3DydG3taHmqdimMaq3tTCR6G1P2jpDmEjzDKtykdSgYWxPFWT
-55	55	{57}	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5JuJVqQPAkouEptho6tkWvZaQsaqGepXqJf444CWizC6KWRZNXzA
-56	56	{58,4}	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5JuQwjZ2jZfcDac3NEijo4vTc44ZnrArabuHzobkiWb4gEUN2z6N
-57	57	{59}	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5Ju2QAX71n4QoKfFzYzBAFk1ysWcUCXgGkYc2yMapLDrgpCWWJrh
-58	58	{60,4}	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5JuYLbUAagkwqUN1rFJM8HDxdEk6u2pZGKkhNTG4r6N7McLrHzh9
-59	59	{61}	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5JuaWHq3qJ3SYBi9bt7w5DETJMTJat5EK5MUiFoEgGZLHXAeutPy
-60	60	{62,4}	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5JvCyiERP2y7N6hxm4nVuUWca5Z12WeMAxrdyAynzBceB3PoVG95
-61	61	{63}	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5JuLN3Vd8mgvwyAxWgGYY5cNx1ufWooqeET5qDtFaZjTTDGWPvCj
-62	62	{64,4}	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5JuqxpAx84f5pKhHUWtQx2dLSKF6qxkt1R3Vt1ahKgHVT45uehCj
-63	63	{65}	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5JuFFwuBBXVxYrcWzEsUrD5MvfxoW6FYp7oZzYM7PGWLG7YqA9T9
-64	64	{66,4}	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5JuoszeLsySmEuX4NUKi7cb38J4a7dULRtNatJseX23HJaEFFXsV
-65	65	{67}	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5JtuR4ZW7NmSsd2dFJFFycQuFAKcdeYrHdQoYzUnqWqcGBCJoa5w
-66	66	{68,4}	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5JuYEB5vNrxBpcsZUme52SkoC33H71tqL2WufWSakcPBuAQcWKda
-67	67	{69}	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5JubgKjGagAX4FWUMNS8EbGYNefEyq6mRzegBCeSfRYc5njTUJNM
-68	68	{70,4}	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5JtuzC7jQT4v61GSTNCcVGFg9CgfhwUi8a3CCSYxkJF2oBqnBVqr
-69	69	{71}	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5JuvVJDz5E2HE9mQdpX94b8E8YhuFVFK6ooLhiTkgTZZ1BAoXkzH
-70	70	{72,4}	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5JuVneEwAdY1hXEt7FYqRPvTfqfRnVesvR3F1t5zQEaVv5z7ub7f
-71	71	{73}	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5JtY1UpGgcsrRLLEkGgZdeRShZVe1HZ72HR7pt18U2fJX98MAk3v
-72	72	{74,4}	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5JvNtDTpDLvgjX4LTyf5xSm6WStmg466FWZJHoNHLvQenpE3KH4U
-73	73	{75}	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5JuR61Crg5K2SyzLtJfu1AXyGJ5eqSPyeSiyfF3Uf9aytWPmae7M
-74	74	{76,4}	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5JtwMH43RkHnG7kjeWAJrSKrMB9ZWg4UzAmfNuC5UBYiv3w9FCM2
-75	75	{77}	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5JvPcYpmW1U7tXW7YoMGHni7B9sX7H8d9ATV61XY1QAxBUxnYvc8
-76	76	{78,4}	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5JuPC5gLwKM5nyoxHBtrBxMuHMkrUHD4HAL7sWHkBEc1GWEAtRju
-77	77	{79}	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5JuUAd1SiH5PBnRR1xy48NyLcMPqEQyLeh3GUpFo3DZyKUMGXDcV
-78	78	{80,4}	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5Jtjepy41bFJRP8zXe8MF435PmYEFdspLSMJw9haJmDtQcf7ngVi
-79	79	{81}	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5JuvCxxmAGfw4AATYm5AGbM6ztDmCPjQef4LXLPKUPYFHQvHRj4D
-80	80	{82,4}	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5JvS6nrp4mUiNHt9TxAmiku7GZGZ7r4tznT4t9iieokG48dyU2iA
-81	81	{83}	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5JuhmvrcBgUptyegVs9az1kwoaZVeyXvGe36u4eWr89ZZAVG3byz
-82	82	{84,4}	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5JuDntg88Djnv9ziHbo4BgYLznCwhuReABoChX2szzwWvCHHR36Y
-83	83	{85}	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5JuT4x5H6uR4PjMQ36CDTdeSCnsZcFYhLEuitEAe9w7S8SWHCaTS
-84	84	{86,4}	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5JvPCDUD96xDy9Nk7n2wuaowgGzLbnsfBL6Y4fTWWhyN8XTMzv5Z
-85	85	{87}	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5JvC1C75Aqibitv2T1scWihM9Jx6EGXo1KTqcRE9BjU583pT3NMx
-86	86	{88,4}	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5Jte2CS3Jod6MEhRoydLSrTN5ynBAkxBNQyraHct6UX8NkGWV3EJ
-87	87	{89}	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5JvE3QZG9wiGgXqm9pHmt6Xot3b4xJS3EAnUzT1VKEZmfwJz2fCK
-88	88	{90,4}	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5Ju7iV6xJfUTHGuBJWFRjHYjMWpFV4LxtSYoDQQtH4g84JQSU3SY
-89	89	{91}	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5Jtg1VbMjGwN8F3v9TES7ashRUKMDRV9GguboNFA3yViAH6db7sf
-90	90	{92,4}	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5Ju8ZzuExb687H87SDQRjwKs95SgYAsP6T3ZGHES8qLfBC5tATqc
-91	91	{93}	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5Ju2pergF2gX8b5ap8ru9ftAQMN8aZr6cAsAqM1hgkZ1zt9P5SbH
-92	92	{94,4}	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5JuPYvcjq1jj6bjuVr7DsG6EhLtKD6AKE6p8g4m8Fqo8ipsSWSsW
-93	93	{95}	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5JusQMq2BpkpoqzXLE2FSFLYDWYd24JbH9ypbr5A6hRB5dXxqDqV
-94	94	{96,4}	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5Jux8UMZUYNkEDagQiK4dUB61njcWZMmXTc92ZumATtukrPPtS7a
-95	95	{97}	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5Jv79ng65kYxPVYFv5NJh8CVZV8UXkv1S21HTfnrLZv2nfEdw5Sx
-96	96	{98,4}	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5Jv6oqWiB6zLSY8H8MQTeTcvyKCbvuE5wCz9XHBwAiQLG9N5xLF5
-97	97	{99}	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5Ju3ZFbNTA3YdkP3CPtJYQo95TJUXxVyNuPGgRGJCQrbaXju7aHe
-98	98	{100,4}	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5JuMVp3Hbr3V5GHBUAnKqCQDFyk1xW2KZTX6adjEvbt5tzRt2vBT
-99	99	{101}	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5JuwNE3JyKbyU7Xoji3v34Rq1aZi3BpcBpd9Fi9W5evdpEusnDfa
-100	100	{102,4}	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5JvKLRoh84mPCV7opwq7qPPCYV7g6nCguA1L1rojQUKX9vswfSfU
-101	101	{103}	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5JtX7o2dqiePb5WhkQygGeW8Kue9HmPGEVf8YLLNqsdTgww1Ud6f
-102	102	{104,4}	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5Ju9K5iZPe7WPwxSmprVuhFEbx6MqRyHiomuPW67ZkkJ79gWJVJn
-103	103	{105}	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5Jtz5Hpisxfizer5AenvHgWrVxwhgyzQ6qjM3mCwAVsvLurcXqob
-104	104	{106,4}	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5JuX3oaQ9hzZRrf8sqLaxwdd98Jz4xSUa56h816jJoNoBkYytgng
-105	105	{107}	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5JvQCNxxn4dCiYBb87uwigGDfwCQDH5D49WwagXEZEGwtVZTRS2d
-106	106	{108,4}	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5JvRpUJsS5e7B7H2YEVouYoieYq1BKGRszPr8NZPfNwyKNbzfMXx
-107	107	{109}	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5JuPRt6TeheB3VHkqTQViqzpNnj5hY1CDmC2UAgcjuVsJjJdVbms
-108	108	{110,4}	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5JuXknQZYGY9ekJxWy7C7gEWChsr3EfqDrbhZFkNFch97WX7x9i2
-109	109	{111}	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5JuvzCEGLDRzP1Y8ry75eF9pffevkR4nKyvJLJCewZnnRkH88rPt
-110	110	{112,4}	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5Ju2YVmBCwHRD58nGPzcF3TdKQY5YkGoDATCAqm5aTHRJdVpK8Uf
-111	111	{113}	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5Jv7Ds6jXTjFeYJ1MbWn7rTejiE6oUke6BNRuy3sr4uJrCJdi5kJ
-112	112	{114,4}	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5JvNmQFLLhEQBrS91hiWqEStYYxxjJVAyYbwewN95cDeLo8s5S1W
-113	113	{115}	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5JvL5Jbr2GZnHigHRRpFyXTz2rVHhRdQc273wfvanhkXi2zoKUd6
-114	114	{116,4}	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5JtfQbnpgmi4NT2VH2XDTWcZ1eWzia6R3zZQAA9aDT1357HmeMVQ
-115	115	{117}	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5JupXw6ErpYDS9qjbau54m6GZNhNu3BQFU3DDBCQTTxVPoFKDdQn
-116	116	{118,4}	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5JuLz1WA1HUCwHyK3hriXZmRJygMX24gLLozGDCzbDxtESdQHJpB
-117	117	{119}	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5JvLoav9GucUHawqJgQ8gGxKFAJgCA7xvpQDQhUZYFX8rrm4CixP
-118	118	{120,4}	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5JumAw8yQaU9QqBmQ8cBM8MuqsRxEjbh1cjnGL4uHc2qkcgautez
-119	119	{121}	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5Jv65F8ptoPt2LwAvfY15ixeu62R7LsP3gSJfiZNKmDn42irhyym
-120	120	{122,4}	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5JufbNPC1uGbNJoLTG5oMmDbe4dpG9U6oCM2ptZwoGXRHMxqUtwV
-121	121	{123}	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5JvQvezE3kG1kD67sUoNC2hyFJYA5Vp1KZtcGE87FiQVvRvehDDb
-122	122	{124,4}	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5JuUVGMDZuphagtggQuhWGBXiqYVks8iAG82QJDL7x8GqhRQvDHS
-123	123	{125}	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5JuUxADrSwFsjAcT7aJhJmGVmDQD9jLaSaJPKKsMWYvfd4f2SUL7
-124	124	{126,4}	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5JueQtW817hzpnCw5kJx9LGXU8i1wLnyhgCBXn8MQ1vJZmvYTVjb
-125	125	{127}	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5JuMpqg9ZcBeubyy87qxVugiqtP5pssG3BfAwEwXDsQUB2bxYJWs
-126	126	{128,4}	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5JtWyPeXcxwUBSrNqp9Zs7arnbLEmfcY9PY8h8m1hC5Ne5ea1eAj
-127	127	{129}	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5Juheg8PMs7Dh9qBjo8MDLeLwknjGPiJHMy41u8pNgRsrLeYPVfW
-128	128	{130,4}	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5JvHV1Xm5u2fznCdz93fLhU1mPzGS3jqq4SGXeArzq7Emwg9atgF
-129	129	{131}	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5JtwTS9VmBJeqo9T5HU98sWhWsehes2rYNhK6UvTvgYp88SrsaG5
-130	130	{132,4}	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5Jtn9mauPtvDUvftRQg5c5yukLAZ8tXtLa3dH4jVATTrgUH4TLiX
-131	131	{133}	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5JvPeq2VKxVJDAfUps19JKb8LVuDbCbq36EJSaDMGHF6ZZXuxXeD
-132	132	{134,4}	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5JtjzdSzww3VnJBG7HprVpeBQXjt7x1uWrTF2noF1BQs3QKKCTgK
-133	133	{135}	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5Junaiy8aGZ6nuYyZ8rCnUz3EMb6UG9UdvGMmVqQNB9dDrSWsgZA
+1	1	{1,2}	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5JvHx3CkSZRURnDeh1S6ahi7HXzZJfuprYmvMXHVxKcXNSujRKvE
+2	2	{3,4}	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	5JtnCkDDHSi3dJfsygxLYVfELA2rDc9NJjL3MY8Nb2tPSBd2qDM7
 \.
 
 
@@ -4408,139 +3401,8 @@ COPY public.zkapp_events (id, element_ids) FROM stdin;
 --
 
 COPY public.zkapp_fee_payer_body (id, public_key_id, fee, valid_until, nonce) FROM stdin;
-1	226	5000000000	\N	0
-2	226	5000000000	\N	1
-3	226	5000000000	\N	2
-4	226	5000000000	\N	3
-5	226	5000000000	\N	4
-6	226	5000000000	\N	5
-7	226	5000000000	\N	6
-8	226	5000000000	\N	7
-9	226	5000000000	\N	8
-10	226	5000000000	\N	9
-11	226	5000000000	\N	10
-12	226	5000000000	\N	11
-13	226	5000000000	\N	12
-14	226	5000000000	\N	13
-15	226	5000000000	\N	14
-16	226	5000000000	\N	15
-17	226	5000000000	\N	16
-18	226	5000000000	\N	17
-19	226	5000000000	\N	18
-20	226	5000000000	\N	19
-21	226	5000000000	\N	20
-22	226	5000000000	\N	21
-23	226	5000000000	\N	22
-24	226	5000000000	\N	23
-25	226	5000000000	\N	24
-26	226	5000000000	\N	25
-27	226	5000000000	\N	26
-28	226	5000000000	\N	27
-29	226	5000000000	\N	28
-30	226	5000000000	\N	29
-31	226	5000000000	\N	30
-32	226	5000000000	\N	31
-33	226	5000000000	\N	32
-34	226	5000000000	\N	33
-35	226	5000000000	\N	34
-36	226	5000000000	\N	35
-37	226	5000000000	\N	36
-38	226	5000000000	\N	37
-39	226	5000000000	\N	38
-40	226	5000000000	\N	39
-41	226	5000000000	\N	40
-42	226	5000000000	\N	41
-43	226	5000000000	\N	42
-44	226	5000000000	\N	43
-45	226	5000000000	\N	44
-46	226	5000000000	\N	45
-47	226	5000000000	\N	46
-48	226	5000000000	\N	47
-49	226	5000000000	\N	48
-50	226	5000000000	\N	49
-51	226	5000000000	\N	50
-52	226	5000000000	\N	51
-53	226	5000000000	\N	52
-54	226	5000000000	\N	53
-55	226	5000000000	\N	54
-56	226	5000000000	\N	55
-57	226	5000000000	\N	56
-58	226	5000000000	\N	57
-59	226	5000000000	\N	58
-60	226	5000000000	\N	59
-61	226	5000000000	\N	60
-62	226	5000000000	\N	61
-63	226	5000000000	\N	62
-64	226	5000000000	\N	63
-65	226	5000000000	\N	64
-66	226	5000000000	\N	65
-67	226	5000000000	\N	66
-68	226	5000000000	\N	67
-69	226	5000000000	\N	68
-70	226	5000000000	\N	69
-71	226	5000000000	\N	70
-72	226	5000000000	\N	71
-73	226	5000000000	\N	72
-74	226	5000000000	\N	73
-75	226	5000000000	\N	74
-76	226	5000000000	\N	75
-77	226	5000000000	\N	76
-78	226	5000000000	\N	77
-79	226	5000000000	\N	78
-80	226	5000000000	\N	79
-81	226	5000000000	\N	80
-82	226	5000000000	\N	81
-83	226	5000000000	\N	82
-84	226	5000000000	\N	83
-85	226	5000000000	\N	84
-86	226	5000000000	\N	85
-87	226	5000000000	\N	86
-88	226	5000000000	\N	87
-89	226	5000000000	\N	88
-90	226	5000000000	\N	89
-91	226	5000000000	\N	90
-92	226	5000000000	\N	91
-93	226	5000000000	\N	92
-94	226	5000000000	\N	93
-95	226	5000000000	\N	94
-96	226	5000000000	\N	95
-97	226	5000000000	\N	96
-98	226	5000000000	\N	97
-99	226	5000000000	\N	98
-100	226	5000000000	\N	99
-101	226	5000000000	\N	100
-102	226	5000000000	\N	101
-103	226	5000000000	\N	102
-104	226	5000000000	\N	103
-105	226	5000000000	\N	104
-106	226	5000000000	\N	105
-107	226	5000000000	\N	106
-108	226	5000000000	\N	107
-109	226	5000000000	\N	108
-110	226	5000000000	\N	109
-111	226	5000000000	\N	110
-112	226	5000000000	\N	111
-113	226	5000000000	\N	112
-114	226	5000000000	\N	113
-115	226	5000000000	\N	114
-116	226	5000000000	\N	115
-117	226	5000000000	\N	116
-118	226	5000000000	\N	117
-119	226	5000000000	\N	118
-120	226	5000000000	\N	119
-121	226	5000000000	\N	120
-122	226	5000000000	\N	121
-123	226	5000000000	\N	122
-124	226	5000000000	\N	123
-125	226	5000000000	\N	124
-126	226	5000000000	\N	125
-127	226	5000000000	\N	126
-128	226	5000000000	\N	127
-129	226	5000000000	\N	128
-130	226	5000000000	\N	129
-131	226	5000000000	\N	130
-132	226	5000000000	\N	131
-133	226	5000000000	\N	132
+1	18	5000000000	\N	0
+2	18	5000000000	\N	1
 \.
 
 
@@ -4550,71 +3412,6 @@ COPY public.zkapp_fee_payer_body (id, public_key_id, fee, valid_until, nonce) FR
 
 COPY public.zkapp_field (id, field) FROM stdin;
 1	0
-2	1
-3	2
-4	3
-5	4
-6	5
-7	6
-8	7
-9	8
-10	9
-11	10
-12	11
-13	12
-14	13
-15	14
-16	15
-17	16
-18	17
-19	18
-20	19
-21	20
-22	21
-23	22
-24	23
-25	24
-26	25
-27	26
-28	27
-29	28
-30	29
-31	30
-32	31
-33	32
-34	33
-35	34
-36	35
-37	36
-38	37
-39	38
-40	39
-41	40
-42	41
-43	42
-44	43
-45	44
-46	45
-47	46
-48	47
-49	48
-50	49
-51	50
-52	51
-53	52
-54	53
-55	54
-56	55
-57	56
-58	57
-59	58
-60	59
-61	60
-62	61
-63	62
-64	63
-65	64
-66	65
 \.
 
 
@@ -4657,72 +3454,6 @@ COPY public.zkapp_network_precondition (id, snarked_ledger_hash_id, blockchain_l
 
 COPY public.zkapp_nonce_bounds (id, nonce_lower_bound, nonce_upper_bound) FROM stdin;
 1	1	1
-2	2	2
-3	3	3
-4	4	4
-5	5	5
-6	6	6
-7	7	7
-8	8	8
-9	9	9
-10	10	10
-11	11	11
-12	12	12
-13	13	13
-14	14	14
-15	15	15
-16	16	16
-17	17	17
-18	18	18
-19	19	19
-20	20	20
-21	21	21
-22	22	22
-23	23	23
-24	24	24
-25	25	25
-26	26	26
-27	27	27
-28	28	28
-29	29	29
-30	30	30
-31	31	31
-32	32	32
-33	33	33
-34	34	34
-35	35	35
-36	36	36
-37	37	37
-38	38	38
-39	39	39
-40	40	40
-41	41	41
-42	42	42
-43	43	43
-44	44	44
-45	45	45
-46	46	46
-47	47	47
-48	48	48
-49	49	49
-50	50	50
-51	51	51
-52	52	52
-53	53	53
-54	54	54
-55	55	55
-56	56	56
-57	57	57
-58	58	58
-59	59	59
-60	60	60
-61	61	61
-62	62	62
-63	63	63
-64	64	64
-65	65	65
-66	66	66
-67	67	67
 \.
 
 
@@ -4749,72 +3480,6 @@ COPY public.zkapp_states (id, element0, element1, element2, element3, element4, 
 
 COPY public.zkapp_states_nullable (id, element0, element1, element2, element3, element4, element5, element6, element7, element8, element9, element10, element11, element12, element13, element14, element15, element16, element17, element18, element19, element20, element21, element22, element23, element24, element25, element26, element27, element28, element29, element30, element31) FROM stdin;
 1	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
-2	1	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
-3	2	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
-4	3	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
-5	4	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
-6	5	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
-7	6	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
-8	7	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
-9	8	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
-10	9	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
-11	10	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
-12	11	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
-13	12	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
-14	13	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
-15	14	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
-16	15	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
-17	16	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
-18	17	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
-19	18	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
-20	19	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
-21	20	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
-22	21	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
-23	22	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
-24	23	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
-25	24	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
-26	25	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
-27	26	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
-28	27	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
-29	28	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
-30	29	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
-31	30	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
-32	31	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
-33	32	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
-34	33	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
-35	34	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
-36	35	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
-37	36	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
-38	37	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
-39	38	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
-40	39	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
-41	40	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
-42	41	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
-43	42	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
-44	43	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
-45	44	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
-46	45	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
-47	46	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
-48	47	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
-49	48	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
-50	49	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
-51	50	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
-52	51	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
-53	52	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
-54	53	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
-55	54	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
-56	55	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
-57	56	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
-58	57	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
-59	58	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
-60	59	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
-61	60	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
-62	61	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
-63	62	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
-64	63	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
-65	64	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
-66	65	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
-67	66	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
 \.
 
 
@@ -4841,72 +3506,6 @@ COPY public.zkapp_token_id_bounds (id, token_id_lower_bound, token_id_upper_boun
 COPY public.zkapp_updates (id, app_state_id, delegate_id, verification_key_id, permissions_id, zkapp_uri_id, token_symbol_id, timing_id, voting_for_id) FROM stdin;
 1	1	\N	\N	\N	\N	\N	\N	\N
 2	1	\N	1	1	\N	\N	\N	\N
-3	2	\N	\N	\N	\N	\N	\N	\N
-4	3	\N	\N	\N	\N	\N	\N	\N
-5	4	\N	\N	\N	\N	\N	\N	\N
-6	5	\N	\N	\N	\N	\N	\N	\N
-7	6	\N	\N	\N	\N	\N	\N	\N
-8	7	\N	\N	\N	\N	\N	\N	\N
-9	8	\N	\N	\N	\N	\N	\N	\N
-10	9	\N	\N	\N	\N	\N	\N	\N
-11	10	\N	\N	\N	\N	\N	\N	\N
-12	11	\N	\N	\N	\N	\N	\N	\N
-13	12	\N	\N	\N	\N	\N	\N	\N
-14	13	\N	\N	\N	\N	\N	\N	\N
-15	14	\N	\N	\N	\N	\N	\N	\N
-16	15	\N	\N	\N	\N	\N	\N	\N
-17	16	\N	\N	\N	\N	\N	\N	\N
-18	17	\N	\N	\N	\N	\N	\N	\N
-19	18	\N	\N	\N	\N	\N	\N	\N
-20	19	\N	\N	\N	\N	\N	\N	\N
-21	20	\N	\N	\N	\N	\N	\N	\N
-22	21	\N	\N	\N	\N	\N	\N	\N
-23	22	\N	\N	\N	\N	\N	\N	\N
-24	23	\N	\N	\N	\N	\N	\N	\N
-25	24	\N	\N	\N	\N	\N	\N	\N
-26	25	\N	\N	\N	\N	\N	\N	\N
-27	26	\N	\N	\N	\N	\N	\N	\N
-28	27	\N	\N	\N	\N	\N	\N	\N
-29	28	\N	\N	\N	\N	\N	\N	\N
-30	29	\N	\N	\N	\N	\N	\N	\N
-31	30	\N	\N	\N	\N	\N	\N	\N
-32	31	\N	\N	\N	\N	\N	\N	\N
-33	32	\N	\N	\N	\N	\N	\N	\N
-34	33	\N	\N	\N	\N	\N	\N	\N
-35	34	\N	\N	\N	\N	\N	\N	\N
-36	35	\N	\N	\N	\N	\N	\N	\N
-37	36	\N	\N	\N	\N	\N	\N	\N
-38	37	\N	\N	\N	\N	\N	\N	\N
-39	38	\N	\N	\N	\N	\N	\N	\N
-40	39	\N	\N	\N	\N	\N	\N	\N
-41	40	\N	\N	\N	\N	\N	\N	\N
-42	41	\N	\N	\N	\N	\N	\N	\N
-43	42	\N	\N	\N	\N	\N	\N	\N
-44	43	\N	\N	\N	\N	\N	\N	\N
-45	44	\N	\N	\N	\N	\N	\N	\N
-46	45	\N	\N	\N	\N	\N	\N	\N
-47	46	\N	\N	\N	\N	\N	\N	\N
-48	47	\N	\N	\N	\N	\N	\N	\N
-49	48	\N	\N	\N	\N	\N	\N	\N
-50	49	\N	\N	\N	\N	\N	\N	\N
-51	50	\N	\N	\N	\N	\N	\N	\N
-52	51	\N	\N	\N	\N	\N	\N	\N
-53	52	\N	\N	\N	\N	\N	\N	\N
-54	53	\N	\N	\N	\N	\N	\N	\N
-55	54	\N	\N	\N	\N	\N	\N	\N
-56	55	\N	\N	\N	\N	\N	\N	\N
-57	56	\N	\N	\N	\N	\N	\N	\N
-58	57	\N	\N	\N	\N	\N	\N	\N
-59	58	\N	\N	\N	\N	\N	\N	\N
-60	59	\N	\N	\N	\N	\N	\N	\N
-61	60	\N	\N	\N	\N	\N	\N	\N
-62	61	\N	\N	\N	\N	\N	\N	\N
-63	62	\N	\N	\N	\N	\N	\N	\N
-64	63	\N	\N	\N	\N	\N	\N	\N
-65	64	\N	\N	\N	\N	\N	\N	\N
-66	65	\N	\N	\N	\N	\N	\N	\N
-67	66	\N	\N	\N	\N	\N	\N	\N
-68	67	\N	\N	\N	\N	\N	\N	\N
 \.
 
 
@@ -4947,21 +3546,21 @@ SELECT pg_catalog.setval('public.account_identifiers_id_seq', 243, true);
 -- Name: blocks_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.blocks_id_seq', 39, true);
+SELECT pg_catalog.setval('public.blocks_id_seq', 49, true);
 
 
 --
 -- Name: epoch_data_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.epoch_data_id_seq', 40, true);
+SELECT pg_catalog.setval('public.epoch_data_id_seq', 50, true);
 
 
 --
 -- Name: internal_commands_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.internal_commands_id_seq', 37, true);
+SELECT pg_catalog.setval('public.internal_commands_id_seq', 8, true);
 
 
 --
@@ -5010,7 +3609,7 @@ SELECT pg_catalog.setval('public.tokens_id_seq', 1, true);
 -- Name: user_commands_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.user_commands_id_seq', 61, true);
+SELECT pg_catalog.setval('public.user_commands_id_seq', 1, true);
 
 
 --
@@ -5024,28 +3623,28 @@ SELECT pg_catalog.setval('public.voting_for_id_seq', 1, true);
 -- Name: zkapp_account_precondition_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.zkapp_account_precondition_id_seq', 68, true);
+SELECT pg_catalog.setval('public.zkapp_account_precondition_id_seq', 2, true);
 
 
 --
 -- Name: zkapp_account_update_body_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.zkapp_account_update_body_id_seq', 135, true);
+SELECT pg_catalog.setval('public.zkapp_account_update_body_id_seq', 4, true);
 
 
 --
 -- Name: zkapp_account_update_failures_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.zkapp_account_update_failures_id_seq', 4, true);
+SELECT pg_catalog.setval('public.zkapp_account_update_failures_id_seq', 3, true);
 
 
 --
 -- Name: zkapp_account_update_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.zkapp_account_update_id_seq', 135, true);
+SELECT pg_catalog.setval('public.zkapp_account_update_id_seq', 4, true);
 
 
 --
@@ -5080,7 +3679,7 @@ SELECT pg_catalog.setval('public.zkapp_balance_bounds_id_seq', 1, false);
 -- Name: zkapp_commands_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.zkapp_commands_id_seq', 133, true);
+SELECT pg_catalog.setval('public.zkapp_commands_id_seq', 2, true);
 
 
 --
@@ -5108,7 +3707,7 @@ SELECT pg_catalog.setval('public.zkapp_events_id_seq', 1, true);
 -- Name: zkapp_fee_payer_body_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.zkapp_fee_payer_body_id_seq', 133, true);
+SELECT pg_catalog.setval('public.zkapp_fee_payer_body_id_seq', 2, true);
 
 
 --
@@ -5122,7 +3721,7 @@ SELECT pg_catalog.setval('public.zkapp_field_array_id_seq', 1, false);
 -- Name: zkapp_field_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.zkapp_field_id_seq', 66, true);
+SELECT pg_catalog.setval('public.zkapp_field_id_seq', 1, true);
 
 
 --
@@ -5150,7 +3749,7 @@ SELECT pg_catalog.setval('public.zkapp_network_precondition_id_seq', 1, true);
 -- Name: zkapp_nonce_bounds_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.zkapp_nonce_bounds_id_seq', 67, true);
+SELECT pg_catalog.setval('public.zkapp_nonce_bounds_id_seq', 1, true);
 
 
 --
@@ -5171,7 +3770,7 @@ SELECT pg_catalog.setval('public.zkapp_states_id_seq', 1, false);
 -- Name: zkapp_states_nullable_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.zkapp_states_nullable_id_seq', 67, true);
+SELECT pg_catalog.setval('public.zkapp_states_nullable_id_seq', 1, true);
 
 
 --
@@ -5192,7 +3791,7 @@ SELECT pg_catalog.setval('public.zkapp_token_id_bounds_id_seq', 1, false);
 -- Name: zkapp_updates_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.zkapp_updates_id_seq', 68, true);
+SELECT pg_catalog.setval('public.zkapp_updates_id_seq', 2, true);
 
 
 --
