@@ -1,0 +1,29 @@
+{
+  "genesis": {
+    "genesis_state_timestamp": "2026-06-03T18:00:00Z"
+  },
+  "proof": {
+    "fork": {
+      "state_hash": "3NLZL2iZhnigxM2e9nDgN8YPD3pLVcN45EY2BXPWDYFUn3vUfqVF",
+      "blockchain_length": 297422,
+      "global_slot_since_genesis": 448700
+    }
+  },
+  "ledger": {
+    "add_genesis_winner": false,
+    "hash": "jwCMkjwcxXEmw7fTcMLSDRCiAie4mKoSQF8baL3gPPag2wJhGf8",
+    "s3_data_hash": "4a386bb9e6975912dd4bbccf391cf4b66f3ece19488d73dad15b7550f534e785"
+  },
+  "epoch_data": {
+    "staking": {
+      "seed": "2vahsgRV5nDPmtgr2Xo2Uq2dkngfSgvg7d1TKqQbY3wUS2ZDxCC3",
+      "hash": "jxfm4hJoouw5EKJXQhum33LrAmFAGAxiBs1hzZDsVRfjwqwpxpn",
+      "s3_data_hash": "e5be27917624c08af725bfff8620fea624c53aae07e21ba69eb6d34287856b0f"
+    },
+    "next": {
+      "seed": "2vbwXLqGNpqUhxGT7VVuiTNQTNQhaB1Z155NC5BJJGqYCi8ggudt",
+      "hash": "jxQVkScDDd4pAbhLdT2jDwHAEijhoNZadvngST96Tf4kCBKytF2",
+      "s3_data_hash": "a4a7b36dbd4c292f506cef9e6a4a5e01e4d4fbb41bb57d7678f18f832d184eb1"
+    }
+  }
+}

@@ -1,6 +1,7 @@
 (executable
  (name print_blockchain_snark_vk)
- (libraries blockchain_snark genesis_constants mina_node_config)
+ (libraries blockchain_snark genesis_constants mina_node_config
+   mina_runtime_config genesis_ledger_helper yojson)
  (instrumentation
   (backend bisect_ppx))
  (preprocess
