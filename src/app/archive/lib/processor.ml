@@ -389,6 +389,12 @@ end
 module Zkapp_field_array = struct
   let table_name = "zkapp_field_array"
 
+  (* Render an int array as a Postgres array literal, e.g. [| 1; 2 |] -> '{1,2}'.
+     The elements are integers, so this is injection-safe. *)
+  let to_sql_literal (element_ids : int array) =
+    Array.to_list element_ids |> List.map ~f:Int.to_string
+    |> String.concat ~sep:"," |> sprintf "{%s}"
+
   let add_if_doesn't_exist (module Conn : Mina_caqti.CONNECTION)
       (fps : Pickles.Backend.Tick.Field.t array) =
     let open Deferred.Result.Let_syntax in
@@ -403,6 +409,35 @@ module Zkapp_field_array = struct
       ~tannot:(function "element_ids" -> Some "int[]" | _ -> None)
       (module Conn)
       element_ids
+
+  (* Batched insert of a list of element_ids arrays, returning the new ids in
+     input order.
+
+     We do NOT deduplicate these rows: [element_ids] is an unbounded int[], and
+     a btree index over it (which content-deduplication would require) overflows
+     Postgres' 2704-byte key limit once a single event carries enough fields (up
+     to [Node_config.max_event_elements]). Identical arrays simply yield
+     distinct rows. A single multi-row INSERT keeps the batched fast path used
+     for max-cost zkApps; we rely on PostgreSQL emitting RETURNING rows in VALUES
+     order for a plain INSERT, so the ids line up with [element_ids_list]. *)
+  let add_multi (module Conn : Mina_caqti.CONNECTION)
+      (element_ids_list : int array list) =
+    let open Deferred.Result.Let_syntax in
+    match element_ids_list with
+    | [] ->
+        return []
+    | _ ->
+        let values =
+          List.map element_ids_list ~f:(fun a ->
+              sprintf "('%s')" (to_sql_literal a) )
+          |> String.concat ~sep:", "
+        in
+        Conn.collect_list
+          (collect_req Caqti_type.unit Caqti_type.int
+             (sprintf
+                "INSERT INTO %s (element_ids) VALUES %s RETURNING id" table_name
+                values ) )
+          ()
 
   let load (module Conn : Mina_caqti.CONNECTION) id =
     Conn.find
@@ -1515,28 +1550,24 @@ module Zkapp_events = struct
 
   let table_name = "zkapp_events"
 
-  module Field_array_map = Map.Make (struct
-    type t = int array [@@deriving sexp]
-
-    let compare = Array.compare Int.compare
-  end)
-
   (* Account_update.Body.Events'.t is defined as `field array list`,
      which is ismorphic to a list of list of fields.
 
-     We are batching the insertion of field and field_array to optimize
-     the speed of archiving max-cost zkapps.
+     We batch the insertion of field and field_array to optimize the speed of
+     archiving max-cost zkapps:
 
-     1. we flatten the list of list of fields to get all the field elements
-     2. insert all the field elements in one query
-     3. construct a map "M" from `field_id` to `field` by querying against the zkapp_field table
-     4. use "M" and the list of list of fields to compute the list of list of field_ids
-     5. insert all list of `list of field_ids` in one query
-     6. construct a map "M'" from `field_array_id` to `field_id array` by querying against
-        the zkapp_field_array table
-     7. use "M'" and the list of list of field_ids to compute the list of field_array_ids
-     8. insert the list of field_arrays
-  *)
+     1. flatten the list of list of fields to get all the field elements
+     2. insert all the field elements in one query (zkapp_field; deduplicated
+        via ON CONFLICT, since `field` is a bounded text column)
+     3. build a map from `field` to `field_id` and recover the list of list of
+        field_ids
+     4. insert all the field-id arrays in one query (zkapp_field_array), keeping
+        the returned ids in order
+     5. insert the resulting field_array_id array as a single zkapp_events row
+
+     Steps 4 and 5 are NOT deduplicated: element_ids is an unbounded int[] whose
+     btree index (needed for content-deduplication) overflows Postgres' key-size
+     limit. Identical event lists therefore produce distinct rows. *)
   let add_if_doesn't_exist (module Conn : Mina_caqti.CONNECTION)
       (events : Account_update.Body.Events'.t) =
     let open Deferred.Result.Let_syntax in
@@ -1565,32 +1596,17 @@ module Zkapp_events = struct
             (* if there's no fields, then we must have some list of empty lists *)
             return @@ List.map field_list_list ~f:(fun _ -> [])
         in
-        (* this conversion should be done by caqti using `typ`, FIX this in the future *)
-        let field_array_list =
-          List.map field_id_list_list ~f:(fun id_list ->
-              List.map id_list ~f:Int.to_string
-              |> String.concat ~sep:", " |> sprintf "{%s}" )
+        let field_arrays = List.map field_id_list_list ~f:Array.of_list in
+        let%map field_array_ids =
+          Zkapp_field_array.add_multi (module Conn) field_arrays
         in
-        let%map field_array_map =
-          Mina_caqti.insert_multi_into_col ~table_name:"zkapp_field_array"
-            ~col:("element_ids", Mina_caqti.array_int_typ)
-            (module Conn)
-            field_array_list
-          >>| Field_array_map.of_alist_exn
-        in
-        let field_array_id_list =
-          List.map field_id_list_list ~f:(fun field_id_list ->
-              Map.find_exn field_array_map (Array.of_list field_id_list) )
-          |> Array.of_list
-        in
-        field_array_id_list
+        Array.of_list field_array_ids
       else return @@ Array.of_list []
     in
-    Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
-      ~table_name
-      ~cols:([ "element_ids" ], Mina_caqti.array_int_typ)
-      ~tannot:(function "element_ids" -> Some "int[]" | _ -> None)
-      (module Conn)
+    Conn.find
+      (find_req Mina_caqti.array_int_typ Caqti_type.int
+         (sprintf "INSERT INTO %s (element_ids) VALUES (?::int[]) RETURNING id"
+            table_name ) )
       field_array_id_list
 
   let load (module Conn : Mina_caqti.CONNECTION) id =

@@ -130,10 +130,8 @@ CREATE TABLE zkapp_field
 */
 CREATE TABLE zkapp_field_array
 ( id                       serial  PRIMARY KEY
-, element_ids              int[]   NOT NULL UNIQUE
+, element_ids              int[]   NOT NULL
 );
-
-CREATE INDEX idx_zkapp_field_array_element_ids ON zkapp_field_array(element_ids);
 
 /* Fixed-width arrays of algebraic fields, given as id's from
    zkapp_field
@@ -228,10 +226,8 @@ CREATE TABLE zkapp_action_states
 */
 CREATE TABLE zkapp_events
 ( id                       serial           PRIMARY KEY
-, element_ids              int[]            NOT NULL UNIQUE
+, element_ids              int[]            NOT NULL
 );
-
-CREATE INDEX idx_zkapp_events_element_ids ON zkapp_events(element_ids);
 
 /* field elements derived from verification keys */
 CREATE TABLE zkapp_verification_key_hashes

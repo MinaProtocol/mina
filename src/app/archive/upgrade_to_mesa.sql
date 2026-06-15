@@ -239,7 +239,27 @@ SELECT pg_temp.add_zkapp_states_element(29);
 SELECT pg_temp.add_zkapp_states_element(30);
 SELECT pg_temp.add_zkapp_states_element(31);
 
--- 4. Update schema_history
+
+-- 4. Drop the element_ids UNIQUE constraints/indexes on `zkapp_events` and
+--    `zkapp_field_array`. Both columns are unbounded int[], and a btree key over
+--    a large array overflows Postgres' 2704-byte limit, so index maintenance on
+--    INSERT fails and the block rolls back. This is reachable on both columns:
+--      * zkapp_events.element_ids:       one entry per event in an account
+--        update, so a large event list (~1030 events) overflows.
+--      * zkapp_field_array.element_ids:  one entry per field in a single event,
+--        so one event carrying up to max_event_elements (1024) fields overflows.
+--    These rows are no longer content-deduplicated (identical arrays simply
+--    produce distinct rows); the insert paths read the new ids back via
+--    RETURNING instead of relying on `ON CONFLICT`, so no UNIQUE constraint --
+--    and therefore no btree over the array -- is required.
+
+ALTER TABLE zkapp_events DROP CONSTRAINT IF EXISTS zkapp_events_element_ids_key;
+DROP INDEX IF EXISTS idx_zkapp_events_element_ids;
+
+ALTER TABLE zkapp_field_array DROP CONSTRAINT IF EXISTS zkapp_field_array_element_ids_key;
+DROP INDEX IF EXISTS idx_zkapp_field_array_element_ids;
+
+-- 5. Update schema_history
 
 DO $$
 BEGIN
