@@ -447,8 +447,12 @@ reset-genesis-ledger() {
   printf "\n"
 
   # WARN: ensure we're always using the same consensus param here and in hard fork test!
+  # TXN_CAPACITY_LOG2 (default 2) controls proof.transaction_capacity."2_to_the".
+  # A larger value lets each block include more transactions, which is useful when
+  # generating fixtures that need a densely-populated archive (e.g. sample_db).
   jq --arg timestamp "$(date +"%Y-%m-%dT%H:%M:%S%z")" \
      --arg proof_level "$PROOF_LEVEL" \
+     --argjson txn_capacity_log2 "${TXN_CAPACITY_LOG2:-2}" \
   '
   {
     genesis: {
@@ -460,8 +464,8 @@ reset-genesis-ledger() {
     proof: {
       work_delay: 1,
       level: $proof_level,
-      transaction_capacity: { 
-        "2_to_the": 2 
+      transaction_capacity: {
+        "2_to_the": $txn_capacity_log2
       },
     },
     ledger: .
