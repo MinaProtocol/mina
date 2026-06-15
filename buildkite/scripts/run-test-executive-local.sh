@@ -44,7 +44,7 @@ source buildkite/scripts/debian/update.sh --verbose
 
 source buildkite/scripts/debian/install.sh "mina-test-executive"
 
-mina-test-executive local "$TEST_NAME" \
+mina-test-executive docker "$TEST_NAME" \
   --mina-image "$MINA_IMAGE" \
   --archive-image "$ARCHIVE_IMAGE" \
   | tee "$TEST_NAME.local.test.log" \
