@@ -418,6 +418,33 @@ let%test_module "Archive node unit tests" =
       | Error e ->
           failwith @@ Caqti_error.show e
 
+    (* Adding a fresh ownerless token through the no-owner branch of
+       [Token.add_if_doesn't_exist] must be idempotent. This exercises both
+       sub-paths of that branch back-to-back: the first call inserts (find_opt
+       returns None -> plain INSERT) and the second reuses the row (find_opt
+       returns Some). A non-idempotent insert would re-INSERT and violate
+       [tokens_value_key]. *)
+    let%test_unit "Token: re-adding a fresh ownerless token reuses the \
+                   inserted row" =
+      let conn = Lazy.force conn_lazy in
+      Thread_safe.block_on_async_exn
+      @@ fun () ->
+      let token_id = Quickcheck.random_value Token_id.gen_non_default in
+      match%map
+        let open Deferred.Result.Let_syntax in
+        let%bind inserted_id =
+          Processor.Token.add_if_doesn't_exist conn token_id
+        in
+        let%map reused_id =
+          Processor.Token.add_if_doesn't_exist conn token_id
+        in
+        [%test_result: int] ~expect:inserted_id reused_id
+      with
+      | Ok () ->
+          ()
+      | Error e ->
+          failwith @@ Caqti_error.show e
+
     (*
     let%test_unit "Block: read and write with pruning" =
       let conn = Lazy.force conn_lazy in

@@ -209,9 +209,17 @@ module Token = struct
         | Some id ->
             return id
         | None ->
-            Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
-              ~table_name ~cols:(Fields.names, typ)
-              (module Conn)
+            (* [find_opt] above already established that no row with this value
+               exists (the value-only check matches the UNIQUE [tokens_value_key]
+               constraint), so a plain INSERT suffices. Using
+               [select_insert_into_cols] here would re-run its internal
+               {value; NULL; NULL} SELECT, which is the mis-scoped
+               owner-IS-NULL predicate that caused this bug; it is guaranteed to
+               miss and always falls through to the INSERT anyway. *)
+            Conn.find
+              (find_req typ Caqti_type.int
+                 (Mina_caqti.insert_into_cols ~returning:"id" ~table_name
+                    ~cols:Fields.names () ) )
               { value; owner_public_key_id = None; owner_token_id = None } )
     | Some acct_id -> (
         assert (not @@ Token_id.(equal default) token_id) ;
