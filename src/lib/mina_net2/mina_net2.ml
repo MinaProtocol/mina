@@ -499,16 +499,18 @@ let handle_push_message t push_message =
                              if Or_error.is_ok result then
                                Hashtbl.remove t.protocol_handlers protocol ) ;
                           raise handler_exn ) ) )
-              else
+              else (
                 (* silently ignore new streams for closed protocol handlers.
                    these are buffered stream open RPCs that were enqueued before
                    our close went into effect. *)
-                (* TODO: we leak the new pipes here*)
+                Libp2p_stream.release_buffers stream
+                  ~reason:`Shutdown_or_release ;
                 [%log' warn t.logger]
                   "incoming stream for protocol that is being closed after \
-                   error"
+                   error" )
           | None ->
               (* TODO: punish *)
+              Libp2p_stream.release_buffers stream ~reason:`Shutdown_or_release ;
               [%log' error t.logger]
                 "incoming stream for protocol we don't know about?" )
   (* Received a message on some stream *)
