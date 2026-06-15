@@ -2,7 +2,7 @@ module Z = Block_producer.Zero_coinbase_logging
 
 let check_reason label expected source
     ?(coinbase_amount = Some Currency.Amount.zero) ?(coinbase_parts = 0) () =
-  Alcotest.(check string)
+  Alcotest.(check (list string))
     label expected
     (Z.zero_reason ~coinbase_amount ~coinbase_parts
        { Z.supercharge_coinbase = false; source } )
@@ -34,42 +34,46 @@ let test_diagnostics ?(insufficient_work = 0) ?(insufficient_space = 0)
   }
 
 let test_explicit_slot_tx_end () =
-  check_reason "slot tx end" "slot_tx_end_reached"
+  check_reason "slot tx end" [ "slot_tx_end_reached" ]
     (Z.Slot_tx_end_reached Mina_numbers.Global_slot_since_hard_fork.zero) ()
 
 let test_explicit_min_reward_threshold () =
-  check_reason "min reward" "below_min_block_reward"
+  check_reason "min reward" [ "below_min_block_reward" ]
     (Z.Below_min_block_reward
        { threshold = Currency.Amount.zero; reward = Currency.Amount.zero } )
     ()
 
 let test_unavailable_amount () =
-  check_reason "unavailable amount" "coinbase_amount_unavailable"
+  check_reason "unavailable amount"
+    [ "coinbase_amount_unavailable"; "empty_diff_no_resources" ]
     (Z.Generated_diff (test_diagnostics ()))
     ~coinbase_amount:None ~coinbase_parts:1 ()
 
 let test_insufficient_work () =
-  check_reason "insufficient work" "insufficient_work"
+  check_reason "insufficient work"
+    [ "empty_diff_no_resources"; "insufficient_work" ]
     (Z.Generated_diff (test_diagnostics ~insufficient_work:1 ()))
     ()
 
 let test_insufficient_fees () =
-  check_reason "insufficient fees" "insufficient_fees"
+  check_reason "insufficient fees"
+    [ "empty_diff_no_resources"; "insufficient_fees" ]
     (Z.Generated_diff (test_diagnostics ~insufficient_fees:1 ()))
     ()
 
 let test_insufficient_space () =
-  check_reason "insufficient space" "insufficient_space"
+  check_reason "insufficient space"
+    [ "empty_diff_no_resources"; "insufficient_space" ]
     (Z.Generated_diff (test_diagnostics ~insufficient_space:1 ()))
     ()
 
 let test_empty_resources () =
-  check_reason "empty resources" "empty_diff_no_resources"
+  check_reason "empty resources" [ "empty_diff_no_resources" ]
     (Z.Generated_diff (test_diagnostics ()))
     ()
 
 let test_precomputed () =
-  check_reason "precomputed" "precomputed_zero_coinbase" Z.Precomputed ()
+  check_reason "precomputed" [ "precomputed_zero_coinbase" ] Z.Precomputed ()
 
 let () =
   Alcotest.run "zero coinbase logging"

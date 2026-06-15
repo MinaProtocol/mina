@@ -95,27 +95,42 @@ module Zero_coinbase_logging = struct
     let end_coinbase_parts =
       sum_partitions diagnostics ~f:(fun p -> p.end_coinbase_parts)
     in
-    if insufficient_work > 0 then "insufficient_work"
-    else if insufficient_fees > 0 then "insufficient_fees"
-    else if insufficient_space > 0 then "insufficient_space"
-    else if
+    let no_resources =
       start_commands = 0 && start_completed_work = 0 && end_commands = 0
       && end_completed_work = 0 && end_coinbase_parts = 0
-    then "empty_diff_no_resources"
-    else "generated_diff_without_coinbase"
+    in
+    let reasons = [] in
+    let reasons =
+      if insufficient_work > 0 then "insufficient_work" :: reasons else reasons
+    in
+    let reasons =
+      if insufficient_fees > 0 then "insufficient_fees" :: reasons else reasons
+    in
+    let reasons =
+      if insufficient_space > 0 then "insufficient_space" :: reasons
+      else reasons
+    in
+    let reasons =
+      if no_resources then "empty_diff_no_resources" :: reasons else reasons
+    in
+    if List.is_empty reasons then [ "generated_diff_without_coinbase" ]
+    else reasons
 
   let zero_reason ~coinbase_amount ~coinbase_parts { source; _ } =
     match source with
     | Slot_tx_end_reached _ ->
-        "slot_tx_end_reached"
+        [ "slot_tx_end_reached" ]
     | Below_min_block_reward _ ->
-        "below_min_block_reward"
+        [ "below_min_block_reward" ]
     | Precomputed ->
-        "precomputed_zero_coinbase"
+        [ "precomputed_zero_coinbase" ]
     | Generated_diff diagnostics ->
-        if Option.is_none coinbase_amount && coinbase_parts > 0 then
-          "coinbase_amount_unavailable"
-        else generated_reason diagnostics
+        let reasons =
+          if Option.is_none coinbase_amount && coinbase_parts > 0 then
+            [ "coinbase_amount_unavailable" ]
+          else []
+        in
+        reasons @ generated_reason diagnostics
 
   let source_diagnostics_json = function
     | Slot_tx_end_reached slot_tx_end ->
@@ -153,7 +168,9 @@ module Zero_coinbase_logging = struct
         , Option.value_map coinbase_amount ~default:(`String "unavailable")
             ~f:Currency.Amount.to_yojson )
       ; ( "zero_coinbase_reason"
-        , `String (zero_reason ~coinbase_amount ~coinbase_parts t) )
+        , `List
+            (List.map (zero_reason ~coinbase_amount ~coinbase_parts t)
+               ~f:(fun r -> `String r) ) )
       ; ("zero_coinbase_diagnostics", source_diagnostics_json source)
       ]
     else []
