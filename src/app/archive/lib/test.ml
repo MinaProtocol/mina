@@ -448,6 +448,37 @@ let%test_module "Archive node unit tests" =
       | Error e ->
           failwith @@ Caqti_error.show e
 
+    (* Regression test for the [tokens_value_key] (UNIQUE on [tokens.value])
+       violation. A custom token can already be present in [tokens] with an
+       owner set (inserted while processing a block). A later code path that
+       does not populate [Token_owners] -- notably [add_genesis_accounts] at
+       archive startup with --config-file -- re-adds the same token as
+       ownerless. The no-owner branch of [Token.add_if_doesn't_exist] must
+       reuse the existing row; before the fix it selected by the full
+       {value; NULL; NULL} tuple, missed the owned row, and the subsequent
+       INSERT violated [tokens_value_key]. *)
+    let%test_unit "Token: re-adding an owned token as ownerless reuses the \
+                   existing row" =
+      let conn = Lazy.force conn_lazy in
+      Thread_safe.block_on_async_exn
+      @@ fun () ->
+      let tree = Quickcheck.random_value (Token_id.gen_token_tree ~length:1) in
+      let owned_token_id, _owner = List.last_exn tree in
+      match%map
+        let open Deferred.Result.Let_syntax in
+        let%bind () = Processor.Token.add_all_if_don't_exist conn tree in
+        let%bind owned_id = Processor.Token.find conn owned_token_id in
+        Token_id.Table.clear Processor.Token_owners.owner_tbl ;
+        let%map reused_id =
+          Processor.Token.add_if_doesn't_exist conn owned_token_id
+        in
+        [%test_result: int] ~expect:owned_id reused_id
+      with
+      | Ok () ->
+          ()
+      | Error e ->
+          failwith @@ Caqti_error.show e
+
     (*
     let%test_unit "Block: read and write with pruning" =
       let conn = Lazy.force conn_lazy in
