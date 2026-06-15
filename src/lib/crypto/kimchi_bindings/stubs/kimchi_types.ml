@@ -191,6 +191,42 @@ type nonrec 'f circuit_gate =
 
 type nonrec curr_or_next = Curr | Next
 
+type nonrec column =
+  | Witness of int
+  | Z
+  | LookupSorted of int
+  | LookupAggreg
+  | LookupTable
+  | LookupKindIndex of lookup_pattern
+  | LookupRuntimeSelector
+  | LookupRuntimeTable
+  | Index of gate_type
+  | Coefficient of int
+  | Permutation of int
+
+type nonrec challenge_term = Alpha | Beta | Gamma | JointCombiner
+
+type nonrec constant_term =
+  | EndoCoefficient
+  | Mds of int * int
+  | Literal of string
+
+type nonrec polish_token =
+  | Constant of constant_term
+  | Challenge of challenge_term
+  | Cell of column * curr_or_next
+  | Dup
+  | Pow of int
+  | Add
+  | Mul
+  | Sub
+  | VanishesOnZeroKnowledgeAndPreviousRows
+  | UnnormalizedLagrangeBasis of bool * int
+  | Store
+  | Load of int
+  | SkipIf of feature_flag * int
+  | SkipIfNot of feature_flag * int
+
 type nonrec 'f oracles =
   { o : 'f random_oracles
   ; p_eval : 'f * 'f
