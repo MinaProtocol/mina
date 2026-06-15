@@ -391,10 +391,10 @@ let%test_module "Archive node unit tests" =
        used to carry a UNIQUE btree index (and a matching plain index). A
        max-cost zkApp emitting ~1030 events serializes to a ~4128-byte int[],
        which overflows Postgres' 2704-byte btree key limit and rolls back the
-       block. The constraint/index were dropped (dedup is handled in code via
-       SELECT-before-INSERT), so a large event list must now insert, and
-       repeated inserts of the same list must still resolve to one row. *)
-    let%test_unit "Zkapp_events: large event list inserts and dedups" =
+       block. The constraint/index were dropped and the rows are no longer
+       deduplicated, so a large event list must now insert (twice, since
+       identical lists yield distinct rows). *)
+    let%test_unit "Zkapp_events: large event list inserts" =
       let conn = Lazy.force conn_lazy in
       Thread_safe.block_on_async_exn
       @@ fun () ->
@@ -404,11 +404,44 @@ let%test_module "Archive node unit tests" =
       in
       match%map
         let open Deferred.Result.Let_syntax in
-        let%bind id1 =
+        let%bind (_id1 : int) =
           Processor.Zkapp_events.add_if_doesn't_exist conn events
         in
-        let%map id2 = Processor.Zkapp_events.add_if_doesn't_exist conn events in
-        [%test_eq: int] id1 id2
+        let%map (_id2 : int) =
+          Processor.Zkapp_events.add_if_doesn't_exist conn events
+        in
+        ()
+      with
+      | Ok () ->
+          ()
+      | Error e ->
+          failwith @@ Caqti_error.show e
+
+    (* Regression for the zkapp_field_array btree overflow. A single zkApp event
+       may carry up to max_event_elements (1024) fields, and those field ids are
+       stored as one zkapp_field_array.element_ids int[] row. A UNIQUE/btree
+       index over that array overflows Postgres' 2704-byte key limit, so the
+       constraint was dropped and the rows are no longer deduplicated. A single
+       large event must now insert (twice, since identical events yield distinct
+       rows). *)
+    let%test_unit "Zkapp_events: single large event inserts" =
+      let conn = Lazy.force conn_lazy in
+      Thread_safe.block_on_async_exn
+      @@ fun () ->
+      let events =
+        [ Array.init 1030 ~f:(fun i ->
+              Pickles.Backend.Tick.Field.of_string (Int.to_string i) )
+        ]
+      in
+      match%map
+        let open Deferred.Result.Let_syntax in
+        let%bind (_id1 : int) =
+          Processor.Zkapp_events.add_if_doesn't_exist conn events
+        in
+        let%map (_id2 : int) =
+          Processor.Zkapp_events.add_if_doesn't_exist conn events
+        in
+        ()
       with
       | Ok () ->
           ()
