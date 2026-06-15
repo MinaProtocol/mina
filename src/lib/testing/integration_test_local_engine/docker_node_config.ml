@@ -144,10 +144,6 @@ module Base_node_config = struct
     ; ("DAEMON_CLIENT_PORT", t.client_port)
     ; ("DAEMON_METRICS_PORT", t.metrics_port)
     ; ("DAEMON_EXTERNAL_PORT", t.external_port)
-    ; ("RAYON_NUM_THREADS", "8")
-    ; ("MINA_PRIVKEY_PASS", "naughty blue worm")
-    ; ("MINA_LIBP2P_PASS", "")
-    ; ("LIBP2P_ENABLE_MDNS", "true")
       (* The engine runs with full proofs (proof.level = Full in the injected
          runtime config). Node_config resolves the "compile-time" proof level at
          runtime from MINA_PROFILE (highest priority) ->
@@ -158,6 +154,8 @@ module Base_node_config = struct
          compatible with compile-time proof level check" crash. *)
     ; ("MINA_PROFILE", "devnet")
     ]
+    @ Local_engine_common.node_env_vars
+    @ [ ("LIBP2P_ENABLE_MDNS", "true") ]
 
   let to_list t =
     let base_args =
@@ -256,10 +254,9 @@ module Block_producer_config = struct
 end
 
 module Seed_config = struct
-  let peer_id = "12D3KooWMg66eGtSEx5UZ9EAqEp3W7JaGd6WTxdRFuqhskRN55dT"
+  let peer_id = Local_engine_common.Seed.peer_id
 
-  let libp2p_keypair =
-    {|{"box_primitive":"xsalsa20poly1305","pw_primitive":"argon2i","nonce":"7Bbvv2wZ6iCeqVyooU9WR81aygshMrLdXKieaHT","pwsalt":"Bh1WborqSwdzBi7m95iZdrCGspSf","pwdiff":[134217728,6],"ciphertext":"8fgvt4eKSzF5HMr1uEZARVHBoMgDKTx17zV7STVQyhyyEz1SqdH4RrU51MFGMPZJXNznLfz8RnSPsjrVqhc1CenfSLLWP5h7tTn86NbGmzkshCNvUiGEoSb2CrSLsvJsdn13ey9ibbZfdeXyDp9y6mKWYVmefAQLWUC1Kydj4f4yFwCJySEttAhB57647ewBRicTjdpv948MjdAVNf1tTxms4VYg4Jb3pLVeGAPaRtW5QHUkA8LwN5fh3fmaFk1mRudMd67UzGdzrVBeEHAp4zCnN7g2iVdWNmwN3"}|}
+  let libp2p_keypair = Local_engine_common.Seed.libp2p_keypair
 
   let create_libp2p_peer ~peer_name ~external_port =
     Printf.sprintf "/dns4/%s/tcp/%d/p2p/%s" peer_name external_port peer_id
