@@ -4,19 +4,23 @@
 # coordinator in one process, holding >99.99% of stake) tuned so that, with
 # enough transactions, every block emits a freshly snarked ledger.
 #
-# Two presets over scripts/mina-local-network/mina-local-network.sh, both with
-# full proofs, transaction capacity 2^2 and work_delay 0 (4 scan-state trees,
-# ledger proof emitted 3 blocks after a transaction is included):
+# Three presets over scripts/mina-local-network/mina-local-network.sh, all with
+# transaction capacity 2^2 and work_delay 0 (4 scan-state trees, ledger proof
+# emitted 3 blocks after a transaction is included):
 #
-#   default : 3 snark workers, 131.4s slots (txn -> snarked ledger ~395s)
-#             throughput-bound; zkApp transactions must stay <= 8 segments
-#   --fast  : 7 snark workers,  75s slots  (txn -> snarked ledger ~225s)
-#             latency-bound; zkApp transactions may go up to 10 segments
+#   default     : full proofs, 3 snark workers, 131.4s slots (txn -> snarked
+#                 ledger ~395s); throughput-bound, zkApp txns must stay <= 8 segs
+#   --fast      : full proofs, 7 snark workers, 75s slots (txn -> snarked ledger
+#                 ~225s); latency-bound, zkApp txns may go up to 10 segments
+#   --no-proofs : proof_level=none, 1 snark worker, 2s slots. No snarked-ledger
+#                 proving on the node, so throughput is not proving-bound and the
+#                 turnaround is fast -- meant for quick iteration on local boxes.
 #
 # NOTE on slot times: consensus requires floor(365days_ms / slot_ms) to be
 # divisible by 12 (checkpoint window sizing, src/lib/consensus/constants.ml),
-# i.e. pick slot times dividing 2628000000 ms. 75000 and 131400 both qualify;
-# a round 135000 does not and crashes the daemon at startup.
+# i.e. pick slot times dividing 2628000000 ms. 2000, 75000 and 131400 all
+# qualify; a round 135000 does not and crashes the daemon at startup. With
+# --epoch-min the derived slot time is snapped to a valid divisor automatically.
 #
 # Sizing assumes ~10s per proof task (segment / merge / simple base) and a
 # block shape of: coinbase + fee transfer + 2 zkApp commands. The block
@@ -28,23 +32,36 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(git -C "${SCRIPT_DIR}" rev-parse --show-toplevel)"
 
 FAST=false
+NO_PROOFS=false
+EPOCH_MIN=""
+PRINT_SLOT_MS=false
 MINA_EXE_ARG=""
 VALUE_TRANSFERS=true
 EXTRA_ARGS=()
 
 help() {
   cat <<EOF
-Usage: $(basename "$0") [--fast] [--mina-exe <path>] [-- <extra mina-local-network.sh args>]
+Usage: $(basename "$0") [--fast | --no-proofs] [--epoch-min <#>] [--mina-exe <path>] [-- <extra mina-local-network.sh args>]
 
 --fast            | Use the fast preset: 7 snark workers, 75s slots (~225s txn -> snarked ledger).
                   | Default preset: 3 snark workers, 131.4s slots (~395s txn -> snarked ledger).
+--no-proofs       | Fast-iteration preset: proof_level=none, a single snark
+                  | worker (no real work to do), and a minimal 2s slot. No
+                  | snarked-ledger proving on the node. Mutually exclusive with --fast.
+--epoch-min <#>   | Target epoch length in minutes. There are always 48 slots
+                  | per epoch, so the slot time is derived as epoch/48 and then
+                  | snapped to the nearest value dividing 2_628_000_000 ms (a
+                  | consensus checkpoint-window requirement) and floored to the
+                  | preset's minimum slot. Without it the preset slot is used.
 --mina-exe <path> | Path to a mina executable to run the network with.
                   | When not provided, mina is built with nix (flake package
                   | '#devnet', as in scripts/hardfork/build-and-test.sh) and the
                   | resulting binary is used.
 --no-value-transfers | Do not send periodic value-transfer transactions. Useful
-                  | when an external load (e.g. ITN zkApp scheduler) keeps the
+                  | when an external load (e.g. ITN scheduler) keeps the
                   | blocks full instead.
+--print-slot-ms   | Resolve the slot time for the given flags, print it (ms) and
+                  | exit. Used by single-node-load.sh to compute its send rate.
 -h                | Show this help.
 
 Any other argument is forwarded verbatim to mina-local-network.sh *after* the
@@ -62,6 +79,20 @@ while [[ "$#" -gt 0 ]]; do
   case "${1}" in
   --fast)
     FAST=true
+    ;;
+  --no-proofs)
+    NO_PROOFS=true
+    ;;
+  --epoch-min)
+    if [[ "$#" -lt 2 ]]; then
+      echo "Error: --epoch-min requires an argument." >&2
+      exit 1
+    fi
+    EPOCH_MIN="${2}"
+    shift
+    ;;
+  --print-slot-ms)
+    PRINT_SLOT_MS=true
     ;;
   --mina-exe)
     if [[ "$#" -lt 2 ]]; then
@@ -89,17 +120,74 @@ while [[ "$#" -gt 0 ]]; do
   shift
 done
 
-if ${FAST}; then
+if ${FAST} && ${NO_PROOFS}; then
+  echo "Error: --fast and --no-proofs are mutually exclusive." >&2
+  exit 1
+fi
+
+# Each preset fixes the proof level, the snark worker count and a default /
+# minimum slot time. --epoch-min may lengthen the slot beyond the floor but
+# never shorten it below the per-preset minimum.
+PROOF_LEVEL=full
+if ${NO_PROOFS}; then
+  PRESET="no-proofs (proof_level=none, 1 worker, 2s min slot)"
+  PROOF_LEVEL=none
+  SNARK_WORKERS=1
+  DEFAULT_SLOT_TIME_MS=2000
+  SLOT_FLOOR_MS=2000
+  TRANSACTION_INTERVAL=4
+elif ${FAST}; then
   PRESET="fast (#2: 7 workers, 75s slots, zkApps up to 10 segments)"
   SNARK_WORKERS=7
-  SLOT_TIME_MS=75000
+  DEFAULT_SLOT_TIME_MS=75000
+  SLOT_FLOOR_MS=75000
   TRANSACTION_INTERVAL=15
 else
   PRESET="default (#5: 3 workers, 131.4s slots, zkApps up to 8 segments)"
   SNARK_WORKERS=3
-  SLOT_TIME_MS=131400
+  DEFAULT_SLOT_TIME_MS=131400
+  SLOT_FLOOR_MS=131400
   TRANSACTION_INTERVAL=25
 fi
+
+# slots per epoch is fixed at 48 (see reset-genesis-ledger in
+# mina-local-network.sh); --epoch-min trades off against the slot time.
+if [[ -n "${EPOCH_MIN}" ]]; then
+  SLOT_TIME_MS=$(python3 - "${EPOCH_MIN}" "${SLOT_FLOOR_MS}" <<'PYEOF'
+import sys
+epoch_min = float(sys.argv[1])
+floor_ms = int(sys.argv[2])
+SLOTS_PER_EPOCH = 48
+# slot_ms must divide 2_628_000_000 so floor(365days_ms / slot_ms) stays a
+# multiple of 12 (src/lib/consensus/constants.ml checkpoint windows).
+N = 2628000000
+ideal = epoch_min * 60000.0 / SLOTS_PER_EPOCH
+divisors = set()
+i = 1
+while i * i <= N:
+    if N % i == 0:
+        divisors.add(i)
+        divisors.add(N // i)
+    i += 1
+candidates = [d for d in divisors if d >= floor_ms]
+# closest to the ideal; ties broken towards the larger (slower, safer) slot.
+slot = min(candidates, key=lambda d: (abs(d - ideal), -d))
+print(int(slot))
+PYEOF
+)
+else
+  SLOT_TIME_MS=${DEFAULT_SLOT_TIME_MS}
+fi
+
+if ${PRINT_SLOT_MS}; then
+  echo "${SLOT_TIME_MS}"
+  exit 0
+fi
+
+# 48 slots/epoch; epoch minutes = 48*slot_ms/60000, kept to 2 decimals in pure
+# bash (48*slot/600 = slot*2/25 centi-minutes) to avoid needing python here.
+EPOCH_CENTIMIN=$(( SLOT_TIME_MS * 2 / 25 ))
+EPOCH_ACTUAL_MIN="$(( EPOCH_CENTIMIN / 100 )).$(printf '%02d' "$(( EPOCH_CENTIMIN % 100 ))")"
 
 # Resolve the mina executable: use the one provided via --mina-exe, otherwise
 # build it with nix the same way scripts/hardfork/build-and-test.sh does.
@@ -121,6 +209,7 @@ export MINA_EXE
 echo "Using mina executable: ${MINA_EXE}"
 
 echo "Starting single-node network with preset: ${PRESET}"
+echo "Slot time: ${SLOT_TIME_MS}ms (48 slots/epoch -> epoch ~${EPOCH_ACTUAL_MIN} min)"
 
 # mina-local-network.sh generates the genesis ledger (and optionally sends
 # GraphQL queries) with python helpers that need the 'click' and 'requests'
@@ -153,7 +242,7 @@ fi
 exec "${SCRIPT_DIR}/mina-local-network.sh" \
   -c reset \
   -u delay_sec:120 \
-  -pl full \
+  -pl "${PROOF_LEVEL}" \
   -tc 2 \
   -wd 0 \
   -st "${SLOT_TIME_MS}" \
