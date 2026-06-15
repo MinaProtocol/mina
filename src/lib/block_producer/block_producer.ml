@@ -55,7 +55,7 @@ module Zero_coinbase_logging = struct
     | One _ ->
         1
 
-  let diff_coinbase_parts (diff : Staged_ledger_diff.t) =
+  let n_diff_coinbase_parts (diff : Staged_ledger_diff.t) =
     let first, second_opt = diff.diff in
     first_coinbase_parts first.coinbase
     + Option.value_map second_opt ~default:0 ~f:(fun second ->
@@ -148,7 +148,7 @@ module Zero_coinbase_logging = struct
           amount_is_zero amount
     in
     if should_log then
-      let coinbase_parts = diff_coinbase_parts diff in
+      let coinbase_parts = n_diff_coinbase_parts diff in
       [ ( "coinbase_amount"
         , Option.value_map coinbase_amount ~default:(`String "unavailable")
             ~f:Currency.Amount.to_yojson )
