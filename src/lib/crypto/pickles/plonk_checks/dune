@@ -24,13 +24,3 @@
   kimchi_types
   snarky.backendless
   tuple_lib))
-
-(rule
- (target scalars.ml)
- (mode promote)
- (deps
-  (:< gen_scalars/gen_scalars.exe))
- (action
-  (progn
-   (run %{<} %{target})
-   (run ocamlformat -i scalars.ml))))
