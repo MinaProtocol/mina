@@ -318,13 +318,13 @@ let sync_status_command =
        in
        match (result, raw) with
        | Ok status, true ->
-           print_endline status
+           print_endline (Sync_status.to_string status)
        | Error e, true ->
            prerr_endline (Yojson.Safe.to_string (Error_json.error_to_yojson e)) ;
            Core.exit 1
        | Ok status, false ->
            Yojson.Safe.pretty_to_channel Out_channel.stdout
-             (`Assoc [ ("sync_status", `String status) ])
+             (`Assoc [ ("sync_status", Sync_status.to_yojson status) ])
        | Error e, false ->
            Yojson.Safe.pretty_to_channel Out_channel.stdout
              (`Assoc [ ("error", Error_json.error_to_yojson e) ]) )
