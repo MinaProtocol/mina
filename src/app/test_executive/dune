@@ -26,6 +26,7 @@
   integers
   integration_test_lib
   integration_test_local_engine
+  integration_test_local_apps_engine
   key_gen
   kimchi_backend
   kimchi_pasta
@@ -63,4 +64,4 @@
  (instrumentation
   (backend bisect_ppx))
  (preprocess
-  (pps ppx_mina ppx_jane ppx_deriving_yojson ppx_mina ppx_version)))
+  (pps ppx_mina ppx_jane ppx_deriving_yojson ppx_version)))
