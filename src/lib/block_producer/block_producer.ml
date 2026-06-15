@@ -41,14 +41,6 @@ module Zero_coinbase_logging = struct
 
   let amount_is_zero = Currency.Amount.equal Currency.Amount.zero
 
-  let first_coinbase_parts = function
-    | Staged_ledger_diff.At_most_two.Zero ->
-        0
-    | One _ ->
-        1
-    | Two _ ->
-        2
-
   let second_coinbase_parts = function
     | Staged_ledger_diff.At_most_one.Zero ->
         0
@@ -57,7 +49,7 @@ module Zero_coinbase_logging = struct
 
   let n_diff_coinbase_parts (diff : Staged_ledger_diff.t) =
     let first, second_opt = diff.diff in
-    first_coinbase_parts first.coinbase
+    Staged_ledger.Diff_creation_diagnostics.coinbase_parts first.coinbase
     + Option.value_map second_opt ~default:0 ~f:(fun second ->
           second_coinbase_parts second.coinbase )
 
@@ -148,7 +140,7 @@ module Zero_coinbase_logging = struct
     | Precomputed ->
         `Assoc []
 
-  let metadata_if_zero ~constraint_constants ~diff
+  let metadata_if_coinbase_zero ~constraint_constants ~diff
       ({ supercharge_coinbase; source } as t) =
     let coinbase_amount =
       Staged_ledger_diff.Diff.coinbase ~constraint_constants
@@ -1151,7 +1143,7 @@ let produce ~genesis_breadcrumb ~context:(module Context : CONTEXT) ~prover
                   ; ("transactions", `List txs)
                   ] ;
               let zero_coinbase_metadata =
-                Zero_coinbase_logging.metadata_if_zero ~constraint_constants
+                Zero_coinbase_logging.metadata_if_coinbase_zero ~constraint_constants
                   ~diff:staged_ledger_diff coinbase_logging
               in
               if not (List.is_empty zero_coinbase_metadata) then
@@ -1718,7 +1710,7 @@ let run_precomputed ~context:(module Context : CONTEXT) ~verifier ~trust_system
                          err ) )
           in
           let zero_coinbase_metadata =
-            Zero_coinbase_logging.metadata_if_zero ~constraint_constants
+            Zero_coinbase_logging.metadata_if_coinbase_zero ~constraint_constants
               ~diff:staged_ledger_diff_for_block coinbase_logging
           in
           if not (List.is_empty zero_coinbase_metadata) then

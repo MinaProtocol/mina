@@ -163,6 +163,9 @@ module Diff_creation_diagnostics : sig
     ; partitions : partition list
     }
   [@@deriving to_yojson]
+
+  val coinbase_parts :
+    Coinbase.Fee_transfer.t Staged_ledger_diff.At_most_two.t -> int
 end
 
 module Staged_ledger_error : sig
