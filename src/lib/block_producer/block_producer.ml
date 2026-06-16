@@ -1143,8 +1143,9 @@ let produce ~genesis_breadcrumb ~context:(module Context : CONTEXT) ~prover
                   ; ("transactions", `List txs)
                   ] ;
               let zero_coinbase_metadata =
-                Zero_coinbase_logging.metadata_if_coinbase_zero ~constraint_constants
-                  ~diff:staged_ledger_diff coinbase_logging
+                Zero_coinbase_logging.metadata_if_coinbase_zero
+                  ~constraint_constants ~diff:staged_ledger_diff
+                  coinbase_logging
               in
               if not (List.is_empty zero_coinbase_metadata) then
                 [%log warn] ~metadata:zero_coinbase_metadata
@@ -1710,8 +1711,9 @@ let run_precomputed ~context:(module Context : CONTEXT) ~verifier ~trust_system
                          err ) )
           in
           let zero_coinbase_metadata =
-            Zero_coinbase_logging.metadata_if_coinbase_zero ~constraint_constants
-              ~diff:staged_ledger_diff_for_block coinbase_logging
+            Zero_coinbase_logging.metadata_if_coinbase_zero
+              ~constraint_constants ~diff:staged_ledger_diff_for_block
+              coinbase_logging
           in
           if not (List.is_empty zero_coinbase_metadata) then
             [%log warn] ~metadata:zero_coinbase_metadata
