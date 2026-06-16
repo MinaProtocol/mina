@@ -376,9 +376,9 @@ func (msg ConfigureReq) handle(app *app, seqno uint64) (*capnp.Message, func()) 
 	if err != nil {
 		return mkRpcRespError(seqno, badRPC(err))
 	}
-	if gc.CleanAddedPeers() {
-		app.ResetAddedPeers()
-	}
+	// Always reset after consumption: _addedPeers is a staging buffer and
+	// the OCaml daemon sends authoritative lists on every call.
+	app.ResetAddedPeers()
 
 	stateDir, err := m.Statedir()
 	if err != nil {
@@ -598,9 +598,7 @@ func (m SetGatingConfigReq) handle(app *app, seqno uint64) (*capnp.Message, func
 	if err != nil {
 		return mkRpcRespError(seqno, badRPC(err))
 	}
-	if gc.CleanAddedPeers() {
-		app.ResetAddedPeers()
-	}
+	app.ResetAddedPeers()
 	app.P2p.SetGatingState(gatingConfig)
 
 	return mkRpcRespSuccess(seqno, func(m *ipc.Libp2pHelperInterface_RpcResponseSuccess) {
