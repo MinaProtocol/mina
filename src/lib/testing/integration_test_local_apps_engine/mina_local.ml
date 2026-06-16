@@ -173,7 +173,7 @@ module Network_manager = struct
         (* Only ever remove directories that live under our dedicated temp
            prefix, so a misconfigured [test_name] can never delete sibling
            directories (e.g. when run from the repo root). *)
-        let temp_root = Filename.get_temp_dir_name () in
+        let temp_root = Filename.temp_dir_name in
         let safe_prefix = temp_root ^/ "mina-it" in
         if String.is_prefix working_dir ~prefix:safe_prefix then (
           [%log info] "Old working directory found; removing to start clean"
@@ -239,7 +239,7 @@ module Network_manager = struct
        prefix and lets concurrent runs of different tests coexist. The leaf
        name is sanitised so an absolute or nested [test_name] cannot escape
        the temp root. *)
-    let temp_root = Filename.get_temp_dir_name () in
+    let temp_root = Filename.temp_dir_name in
     let safe_test_name = Filename.basename network_config.local.test_name in
     let working_dir = temp_root ^/ "mina-it" ^/ safe_test_name in
     let%bind.Deferred () =
@@ -336,7 +336,7 @@ module Network_manager = struct
         { network_keypair = None
         ; service_name
         ; postgres_connection_uri = Some postgres_connection_uri
-        ; graphql_port = ports.rest_port
+        ; graphql_port = ports.Local_node_config.Node_ports.rest_port
         ; ports
         ; config_dir
         ; libp2p_key_path
@@ -392,11 +392,16 @@ module Network_manager = struct
       @ Option.to_list sc_node_name
       @ snark_worker_names
     in
-    (* Create all node directories upfront *)
+    (* Create all node directories upfront. The per-node directory holds the
+       node's generated libp2p keypair, and the daemon refuses to load that key
+       unless its containing directory is mode 0700 (it rejects group/other
+       permissions as insecure). Create them with restrictive permissions so
+       non-seed nodes can start. *)
     let%bind.Deferred () = Unix.mkdir ~p:() (working_dir ^/ "nodes") in
     let%bind.Deferred () =
       Deferred.List.iter all_node_names ~f:(fun name ->
-          Unix.mkdir ~p:() (create_node_config_dir ~working_dir ~node_name:name) )
+          Unix.mkdir ~perm:0o700
+            (create_node_config_dir ~working_dir ~node_name:name) )
     in
     (* Build seed node *)
     let seed_base_config =
