@@ -10,7 +10,7 @@ let PipelineScope = ../../Pipeline/Scope.dhall
 
 let scopes = [ PipelineScope.Type.MainlineNightly, PipelineScope.Type.Release ]
 
-let network = Network.Type.Mesa
+let network = Network.Type.MesaPreflight
 
 let deps =
       Dockers.dependsOn
