@@ -2160,6 +2160,75 @@ let internal_commands logger ~itn_features =
                 else
                   let () = printf "%s" (Chain_id.to_string chain_id) in
                   exit 0) )
+  ; ( "convert-proof-format"
+    , Command.async
+        ~summary:
+          "Re-encode a standard Pickles proof (N=2 wrap proof). Reads proof \
+           from stdin and emits the converted form on stdout. Supported \
+           formats are \"sexp-base64\" (the standard o1js encoding) and \
+           \"bin-prot-base64\" (compact precomputed block format)."
+        (let open Command.Let_syntax in
+        let%map_open from_format =
+          flag "--from" ~aliases:[ "from" ]
+            ~doc:
+              "FORMAT input proof format. One of \"bin-prot-base64\" or \
+               \"sexp-base64\". Default: bin-prot-base64."
+            (optional_with_default "bin-prot-base64" string)
+        and to_format =
+          flag "--to" ~aliases:[ "to" ]
+            ~doc:
+              "FORMAT output proof format. One of \"bin-prot-base64\" or \
+               \"sexp-base64\". Default: sexp-base64."
+            (optional_with_default "sexp-base64" string)
+        in
+        fun () ->
+          let decode_proof : string -> Mina_base.Proof.t = function
+            | s when String.equal from_format "bin-prot-base64" -> (
+                (* Both [Base64.decode_exn] and [Binable.of_string] raise on
+                   malformed input; convert to a friendly error. *)
+                match
+                  Or_error.try_with (fun () ->
+                      Mina_block.Precomputed.Proof.of_bin_string s )
+                with
+                | Ok proof ->
+                    proof
+                | Error err ->
+                    failwithf "Could not decode bin-prot-base64 proof: %s"
+                      (Error.to_string_hum err) () )
+            | s when String.equal from_format "sexp-base64" -> (
+                match Mina_base.Proof.of_yojson (`String s) with
+                | Ok proof ->
+                    proof
+                | Error err ->
+                    failwithf "Could not decode sexp-base64 proof: %s" err () )
+            | _ ->
+                failwithf
+                  "Unknown --from %s; expected \"bin-prot-base64\" or \
+                   \"sexp-base64\""
+                  from_format ()
+          in
+          let encode_proof (proof : Mina_base.Proof.t) =
+            match to_format with
+            | "bin-prot-base64" ->
+                Mina_block.Precomputed.Proof.to_bin_string proof
+            | "sexp-base64" -> (
+                match Mina_base.Proof.to_yojson proof with
+                | `String s ->
+                    s
+                | _ ->
+                    failwith
+                      "Mina_base.Proof.to_yojson produced unexpected \
+                       non-string JSON" )
+            | _ ->
+                failwithf
+                  "Unknown --to %s; expected \"bin-prot-base64\" or \
+                   \"sexp-base64\""
+                  to_format ()
+          in
+          let input = In_channel.input_all In_channel.stdin |> String.strip in
+          let proof = decode_proof input in
+          print_string (encode_proof proof) ;
+          Deferred.return ()) )
   ; ( "print-hard-fork-genesis-timestamp"
     , Command.async
         ~summary:
