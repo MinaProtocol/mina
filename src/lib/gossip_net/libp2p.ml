@@ -891,7 +891,7 @@ module Make (Rpc_interface : RPC_INTERFACE) :
         ~rpc_failed_counter:Impl.failed_request_counter ~rpc_name:Impl.name t
         peer transport Impl.dispatch_multi query
 
-    let query_peer ?heartbeat_timeout ?timeout t (peer_id : Peer.Id.t) rpc
+    let query_peer ?stop ?heartbeat_timeout ?timeout t (peer_id : Peer.Id.t) rpc
         rpc_input =
       let%bind net2 = !(t.net2) in
       match%bind
@@ -900,15 +900,29 @@ module Make (Rpc_interface : RPC_INTERFACE) :
       | Ok stream ->
           let peer = Mina_net2.Libp2p_stream.remote_peer stream in
           let transport = prepare_stream_transport stream in
-          try_call_rpc ?heartbeat_timeout ?timeout t peer transport rpc
-            rpc_input
-          >>| fun data ->
+          let call =
+            try_call_rpc ?heartbeat_timeout ?timeout t peer transport rpc
+              rpc_input
+          in
+          let%map data =
+            match stop with
+            | None ->
+                call
+            | Some stop ->
+                Deferred.choose
+                  [ Deferred.choice call Fn.id
+                  ; Deferred.choice stop (fun () ->
+                        don't_wait_for
+                          (Mina_net2.reset_stream net2 stream >>| ignore) ;
+                        Or_error.error_string "rpc aborted" )
+                  ]
+          in
           Connected (Envelope.Incoming.wrap_peer ~data ~sender:peer)
       | Error e ->
           Mina_metrics.(Counter.inc_one Network.rpc_connections_failed) ;
           return (Failed_to_connect e)
 
-    let query_peer' (type q r) ?how ?heartbeat_timeout ?timeout t
+    let query_peer' (type q r) ?how ?stop ?heartbeat_timeout ?timeout t
         (peer_id : Peer.Id.t) (rpc : (q, r) Rpc_interface.rpc) (qs : q list) =
       let%bind net2 = !(t.net2) in
       match%bind
@@ -918,15 +932,29 @@ module Make (Rpc_interface : RPC_INTERFACE) :
           let peer = Mina_net2.Libp2p_stream.remote_peer stream in
           let transport = prepare_stream_transport stream in
           let (module Impl) = Rpc_interface.implementation rpc in
-          try_call_rpc_with_dispatch ?heartbeat_timeout ?timeout
-            ~rpc_counter:Impl.sent_counter
-            ~rpc_failed_counter:Impl.failed_request_counter ~rpc_name:Impl.name
-            t peer transport
-            (fun conn qs ->
-              Deferred.Or_error.List.map ?how qs ~f:(fun q ->
-                  Impl.dispatch_multi conn q ) )
-            qs
-          >>| fun data ->
+          let call =
+            try_call_rpc_with_dispatch ?heartbeat_timeout ?timeout
+              ~rpc_counter:Impl.sent_counter
+              ~rpc_failed_counter:Impl.failed_request_counter
+              ~rpc_name:Impl.name t peer transport
+              (fun conn qs ->
+                Deferred.Or_error.List.map ?how qs ~f:(fun q ->
+                    Impl.dispatch_multi conn q ) )
+              qs
+          in
+          let%map data =
+            match stop with
+            | None ->
+                call
+            | Some stop ->
+                Deferred.choose
+                  [ Deferred.choice call Fn.id
+                  ; Deferred.choice stop (fun () ->
+                        don't_wait_for
+                          (Mina_net2.reset_stream net2 stream >>| ignore) ;
+                        Or_error.error_string "rpc aborted" )
+                  ]
+          in
           Connected (Envelope.Incoming.wrap_peer ~data ~sender:peer)
       | Error e ->
           Mina_metrics.(Counter.inc_one Network.rpc_connections_failed) ;

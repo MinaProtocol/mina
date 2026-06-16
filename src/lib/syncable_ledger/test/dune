@@ -1,10 +1,12 @@
-(library
+(test
  (name test)
- (inline_tests
-  (flags -verbose -show-counts))
+ (flags
+  (:standard -w -32))
  (libraries
   ;; opam libraries
-  result
+   result
+   alcotest
+   alcotest-async
   base.base_internalhash_types
   bin_prot.shape
   async_unix

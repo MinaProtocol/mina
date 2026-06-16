@@ -115,6 +115,7 @@ module type GOSSIP_NET = sig
 
   val query_peer' :
        ?how:Monad_sequence.how
+    -> ?stop:unit Deferred.t
     -> ?heartbeat_timeout:Time_ns.Span.t
     -> ?timeout:Time.Span.t
     -> t
@@ -124,7 +125,8 @@ module type GOSSIP_NET = sig
     -> 'r list rpc_response Deferred.t
 
   val query_peer :
-       ?heartbeat_timeout:Time_ns.Span.t
+       ?stop:unit Deferred.t
+    -> ?heartbeat_timeout:Time_ns.Span.t
     -> ?timeout:Time.Span.t
     -> t
     -> Peer.Id.t

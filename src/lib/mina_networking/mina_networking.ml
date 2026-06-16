@@ -167,11 +167,11 @@ include struct
 
   let random_peers = lift random_peers
 
-  let query_peer ?heartbeat_timeout ?timeout { gossip_net; _ } =
-    query_peer ?heartbeat_timeout ?timeout gossip_net
+  let query_peer ?stop ?heartbeat_timeout ?timeout { gossip_net; _ } =
+    query_peer ?stop ?heartbeat_timeout ?timeout gossip_net
 
-  let query_peer' ?how ?heartbeat_timeout ?timeout { gossip_net; _ } =
-    query_peer' ?how ?heartbeat_timeout ?timeout gossip_net
+  let query_peer' ?how ?stop ?heartbeat_timeout ?timeout { gossip_net; _ } =
+    query_peer' ?how ?stop ?heartbeat_timeout ?timeout gossip_net
 
   let restart_helper { gossip_net; _ } = restart_helper gossip_net
 
@@ -406,72 +406,122 @@ end
 let glue_sync_ledger :
        t
     -> preferred:Peer.t list
+    -> Mina_ledger.Sync_ledger.Root.Target_state.t
     -> (Mina_base.Ledger_hash.t * Sync_ledger.Query.t)
        Pipe_lib.Linear_pipe.Reader.t
     -> ( Mina_base.Ledger_hash.t
        * Sync_ledger.Query.t
        * Sync_ledger.Answer.t Network_peer.Envelope.Incoming.t )
        Pipe_lib.Linear_pipe.Writer.t
-    -> unit =
- fun t ~preferred query_reader response_writer ->
-  let downloader =
-    let heartbeat_timeout = Time_ns.Span.of_sec 20. in
-    let global_stop = Pipe_lib.Linear_pipe.closed query_reader in
-    let knowledge h peer =
-      match%map
-        query_peer ~heartbeat_timeout ~timeout:(Time.Span.of_sec 10.) t
-          peer.Peer.peer_id Rpcs.Answer_sync_ledger_query (h, Num_accounts)
-      with
-      | Connected { data = Ok _; _ } ->
-          `Call (fun (h', _) -> Ledger_hash.equal h' h)
-      | Failed_to_connect _ | Connected { data = Error _; _ } ->
-          `Some []
-    in
-    let%bind _ = Linear_pipe.values_available query_reader in
-    let root_hash_r, root_hash_w =
-      Broadcast_pipe.create
-        (Option.value_exn (Linear_pipe.peek query_reader) |> fst)
-    in
-    Sl_downloader.create ~preferred ~max_batch_size:100
-      ~peers:(fun () -> peers t)
-      ~knowledge_context:root_hash_r ~knowledge ~stop:global_stop
-      ~logger:t.logger ~trust_system:t.trust_system
-      ~get:(fun (peer : Peer.t) qs ->
-        List.iter qs ~f:(fun (h, _) ->
-            if
-              not (Ledger_hash.equal h (Broadcast_pipe.Reader.peek root_hash_r))
-            then don't_wait_for (Broadcast_pipe.Writer.write root_hash_w h) ) ;
-        let%map rs =
-          query_peer' ~how:`Parallel ~heartbeat_timeout
-            ~timeout:(Time.Span.of_sec (Float.of_int (List.length qs) *. 2.))
-            t peer.peer_id Rpcs.Answer_sync_ledger_query qs
-        in
-        match rs with
-        | Failed_to_connect e ->
-            Error e
-        | Connected res -> (
-            match res.data with
-            | Error e ->
-                Error e
-            | Ok rs -> (
-                match List.zip qs rs with
-                | Unequal_lengths ->
-                    Or_error.error_string "mismatched lengths"
-                | Ok ps ->
-                    Ok
-                      (List.filter_map ps ~f:(fun (q, r) ->
-                           match r with Ok r -> Some (q, r) | Error _ -> None )
-                      ) ) ) )
+    -> unit Deferred.t =
+ fun t ~preferred target_state query_reader response_writer ->
+  let heartbeat_timeout = Time_ns.Span.of_sec 20. in
+  let global_stop =
+    Deferred.any
+      [ Pipe_lib.Linear_pipe.closed query_reader
+      ; Mina_ledger.Sync_ledger.Root.Target_state.closed target_state
+      ]
   in
-  don't_wait_for
-    (let%bind downloader = downloader in
-     Linear_pipe.iter_unordered ~max_concurrency:400 query_reader ~f:(fun q ->
-         match%bind
-           Sl_downloader.Job.result
-             (Sl_downloader.download downloader ~key:q ~attempts:Peer.Map.empty)
-         with
-         | Error _ ->
-             Deferred.unit
-         | Ok (a, _) ->
-             Linear_pipe.write_if_open response_writer
-               (fst q, snd q, { a with data = snd a.data }) ) )
+  match%bind Linear_pipe.values_available query_reader with
+  | `Eof ->
+      Deferred.unit
+  | `Ok ->
+      let current_root () =
+        Mina_ledger.Sync_ledger.Root.Target_state.current target_state
+      in
+      let initial_root =
+        Option.value (current_root ())
+          ~default:(Option.value_exn (Linear_pipe.peek query_reader) |> fst)
+      in
+      let root_hash_r, root_hash_w = Broadcast_pipe.create initial_root in
+      let knowledge h peer =
+        match%map
+          query_peer ~heartbeat_timeout ~timeout:(Time.Span.of_sec 10.) t
+            peer.Peer.peer_id Rpcs.Answer_sync_ledger_query (h, Num_accounts)
+        with
+        | Connected { data = Ok _; _ } ->
+            `Call (fun (h', _) -> Ledger_hash.equal h' h)
+        | Failed_to_connect _ | Connected { data = Error _; _ } ->
+            `Some []
+      in
+      let%bind downloader =
+        Sl_downloader.create ~preferred ~max_batch_size:100
+          ~peers:(fun () -> peers t)
+          ~knowledge_context:root_hash_r ~knowledge ~stop:global_stop
+          ~logger:t.logger ~trust_system:t.trust_system
+          ~get:(fun ~stop (peer : Peer.t) qs ->
+            let%map rs =
+              query_peer' ~how:`Parallel ~stop ~heartbeat_timeout
+                ~timeout:
+                  (Time.Span.of_sec (Float.of_int (List.length qs) *. 2.))
+                t peer.peer_id Rpcs.Answer_sync_ledger_query qs
+            in
+            match rs with
+            | Failed_to_connect e ->
+                Error e
+            | Connected res -> (
+                match res.data with
+                | Error e ->
+                    Error e
+                | Ok rs -> (
+                    match List.zip qs rs with
+                    | Unequal_lengths ->
+                        Or_error.error_string "mismatched lengths"
+                    | Ok ps ->
+                        Ok
+                          (List.filter_map ps ~f:(fun (q, r) ->
+                               match r with
+                               | Ok r ->
+                                   Some (q, r)
+                               | Error _ ->
+                                   None ) ) ) ) )
+      in
+      let cancel_stale_work () =
+        let root = current_root () in
+        Sl_downloader.cancel_if downloader ~f:(fun (h, _) ->
+            not (Option.equal Ledger_hash.equal (Some h) root) ) ;
+        Option.iter root ~f:(fun h ->
+            don't_wait_for (Broadcast_pipe.Writer.write root_hash_w h) )
+      in
+      let rec watch_target_state () =
+        match%bind
+          Deferred.choose
+            [ Deferred.choice
+                (Mina_ledger.Sync_ledger.Root.Target_state.closed target_state)
+                (fun () -> `Closed)
+            ; Deferred.choice
+                (Mina_ledger.Sync_ledger.Root.Target_state.changed target_state)
+                (fun () -> `Changed)
+            ]
+        with
+        | `Closed ->
+            Broadcast_pipe.Writer.close root_hash_w ;
+            Deferred.unit
+        | `Changed ->
+            cancel_stale_work () ; watch_target_state ()
+      in
+      don't_wait_for (watch_target_state ()) ;
+      cancel_stale_work () ;
+      let%bind () =
+        Linear_pipe.iter_unordered ~max_concurrency:400 query_reader
+          ~f:(fun q ->
+            if
+              not
+                (Option.equal Ledger_hash.equal
+                   (Some (fst q))
+                   (current_root ()) )
+            then Deferred.unit
+            else
+              match%bind
+                Sl_downloader.Job.result
+                  (Sl_downloader.download downloader ~key:q
+                     ~attempts:Peer.Map.empty )
+              with
+              | Error _ ->
+                  Deferred.unit
+              | Ok (a, _) ->
+                  Linear_pipe.write_if_open response_writer
+                    (fst q, snd q, { a with data = snd a.data }) )
+      in
+      let%map () = Sl_downloader.closed downloader in
+      Broadcast_pipe.Writer.close root_hash_w

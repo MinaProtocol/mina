@@ -2687,11 +2687,23 @@ module Make_str (A : Wire_types.Concrete) = struct
               let response_writer =
                 Mina_ledger.Sync_ledger.Root.answer_writer sync_ledger
               in
-              glue_sync_ledger ~preferred:[] query_reader response_writer ;
-              match%bind
-                Mina_ledger.Sync_ledger.Root.fetch sync_ledger
-                  target_ledger_hash ~data:() ~equal:(fun () () -> true)
-              with
+              let glue_stopped =
+                glue_sync_ledger ~preferred:[]
+                  (Mina_ledger.Sync_ledger.Root.target_state sync_ledger)
+                  query_reader response_writer
+              in
+              let%bind result =
+                Monitor.protect
+                  ~finally:(fun () ->
+                    let%bind () =
+                      Mina_ledger.Sync_ledger.Root.destroy sync_ledger
+                    in
+                    glue_stopped )
+                  (fun () ->
+                    Mina_ledger.Sync_ledger.Root.fetch sync_ledger
+                      target_ledger_hash ~data:() ~equal:(fun () () -> true) )
+              in
+              match result with
               | `Ok ledger ->
                   [%log info]
                     "Succeeded in syncing epoch ledger with hash \
@@ -2705,6 +2717,10 @@ module Make_str (A : Wire_types.Concrete) = struct
               | `Target_changed _ ->
                   [%log error] "Target changed when syncing epoch ledger" ;
                   return (Or_error.error_string "Epoch ledger target changed")
+              | `Destroyed ->
+                  [%log error] "Sync ledger destroyed when syncing epoch ledger" ;
+                  return
+                    (Or_error.error_string "Epoch ledger sync ledger destroyed")
           in
           match requested_syncs with
           | One required_sync ->
