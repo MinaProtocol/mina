@@ -622,7 +622,10 @@ func (m SetNodeStatusReq) handle(app *app, seqno uint64) (*capnp.Message, func()
 		return mkRpcRespError(seqno, badRPC(err))
 	}
 	app.P2p.NodeStatusMutex.Lock()
-	app.P2p.NodeStatus = status
+	// Copy status bytes to decouple from the capnp message arena.
+	// Otherwise Go GC keeps the entire arena (56MB+) alive as long as
+	// NodeStatus references it, causing OOM under concurrent load.
+	app.P2p.NodeStatus = append([]byte(nil), status...)
 	app.P2p.NodeStatusMutex.Unlock()
 	return mkRpcRespSuccess(seqno, func(m *ipc.Libp2pHelperInterface_RpcResponseSuccess) {
 		_, err := m.NewSetNodeStatus()
