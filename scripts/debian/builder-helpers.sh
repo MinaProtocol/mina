@@ -291,6 +291,8 @@ copy_common_daemon_apps() {
     "${TARGET_ROOT_DIR}/mina-standalone-snark-worker"
   cp ./default/src/app/rocksdb-scanner/rocksdb_scanner.exe \
     "${TARGET_ROOT_DIR}/mina-rocksdb-scanner"
+  cp ./default/src/app/mina_healthcheck/mina_healthcheck.exe \
+    "${TARGET_ROOT_DIR}/mina-healthcheck"
 
   # Copy signature-based Binaries
   cp ./default/src/app/cli/src/mina_"${signature}"_signatures.exe \
