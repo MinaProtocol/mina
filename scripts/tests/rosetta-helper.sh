@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# Helper functions for Rosetta API sanity and load tests
+# Helper functions for Rosetta API sanity and load tests.
 
 readonly BLOCKCHAIN="mina"
 
@@ -118,7 +118,11 @@ function wait_for_sync() {
 
 function test_network_status() {
     declare -n __test_data=$1
-    assert "$(curl --no-progress-meter --request POST "${__test_data[address]}/network/status" "${DEFAULT_HEADERS[@]}" --data-raw "{\"network_identifier\":{\"blockchain\":\"$BLOCKCHAIN\",\"network\":\"${__test_data[id]}\"}}" | jq)" \
+    assert "$(rosetta-client network status \
+        --rosetta-uri "${__test_data[address]}" \
+        --blockchain "${BLOCKCHAIN}" \
+        --network "${__test_data[id]}" \
+        --compact)" \
         '.sync_status.stage == "Synced"' \
         "   ✅  Rosetta is synced" \
         "   ❌  Rosetta is not synced"
@@ -126,7 +130,11 @@ function test_network_status() {
 
 function test_network_options() {
     declare -n __test_data=$1
-    assert "$(curl --no-progress-meter --request POST "${__test_data[address]}/network/options" "${DEFAULT_HEADERS[@]}" --data-raw "{\"network_identifier\":{\"blockchain\":\"$BLOCKCHAIN\",\"network\":\"${__test_data[id]}\"}}" | jq)" \
+    assert "$(rosetta-client network options \
+        --rosetta-uri "${__test_data[address]}" \
+        --blockchain "${BLOCKCHAIN}" \
+        --network "${__test_data[id]}" \
+        --compact)" \
         '.version.rosetta_version == "1.4.9"' \
         "   ✅  Rosetta Version is correct" \
         "   ❌  Invalid Rosetta Version (expected 1.4.9)"
@@ -134,7 +142,12 @@ function test_network_options() {
 
 function test_block() {
     declare -n __test_data=$1
-    assert "$(curl --no-progress-meter --request POST "${__test_data[address]}/block" "${DEFAULT_HEADERS[@]}" --data-raw "{\"network_identifier\":{\"blockchain\":\"$BLOCKCHAIN\",\"network\":\"${__test_data[id]}\"},\"block_identifier\":{\"hash\":\"${__test_data[block]}\"}}" | jq)" \
+    assert "$(rosetta-client block get \
+        --rosetta-uri "${__test_data[address]}" \
+        --blockchain "${BLOCKCHAIN}" \
+        --network "${__test_data[id]}" \
+        --hash "${__test_data[block]}" \
+        --compact)" \
         ".block.block_identifier.hash == \"${__test_data[block]}\" " \
         "   ✅  Block hash correct" \
         "   ❌  Block hash incorrect or not found (expected ${__test_data[block]})"
@@ -142,7 +155,12 @@ function test_block() {
 
 function test_account_balance() {
     declare -n __test_data=$1
-    assert "$(curl --no-progress-meter --request POST "${__test_data[address]}/account/balance" "${DEFAULT_HEADERS[@]}" --data-raw "{\"network_identifier\":{\"blockchain\":\"$BLOCKCHAIN\",\"network\":\"${__test_data[id]}\"},\"account_identifier\":{\"address\":\"${__test_data[account]}\"}}" | jq)" \
+    assert "$(rosetta-client account balance \
+        --rosetta-uri "${__test_data[address]}" \
+        --blockchain "${BLOCKCHAIN}" \
+        --network "${__test_data[id]}" \
+        --address "${__test_data[account]}" \
+        --compact)" \
         '.balances[0].currency.symbol == "MINA"' \
         "   ✅  Account: Balance ok" \
         "   ❌  Account: Invalid balance structure or balance not found"
@@ -150,15 +168,12 @@ function test_account_balance() {
 
 function test_payment_transaction() {
     declare -n __test_data=$1
-    assert "$(curl --no-progress-meter --location "${__test_data[address]}/search/transactions" --header 'Content-Type: application/json' --data "{
-        \"network_identifier\": {
-            \"blockchain\": \"$BLOCKCHAIN\",
-            \"network\": \"${__test_data[id]}\"
-        },
-        \"transaction_identifier\": {
-            \"hash\": \"${__test_data[payment_transaction]}\"
-        }
-    }" | jq)" \
+    assert "$(rosetta-client search transactions \
+        --rosetta-uri "${__test_data[address]}" \
+        --blockchain "${BLOCKCHAIN}" \
+        --network "${__test_data[id]}" \
+        --tx-hash "${__test_data[payment_transaction]}" \
+        --compact)" \
         ".transactions[0].transaction.transaction_identifier.hash == \"${__test_data[payment_transaction]}\" " \
         "   ✅  Payment transaction found" \
         "   ❌  Payment transaction not found (expected ${__test_data[payment_transaction]})"
@@ -166,15 +181,12 @@ function test_payment_transaction() {
 
 function test_zkapp_transaction() {
     declare -n __test_data=$1
-    assert "$(curl --no-progress-meter --location "${__test_data[address]}/search/transactions" --header 'Content-Type: application/json' --data "{
-        \"network_identifier\": {
-            \"blockchain\": \"$BLOCKCHAIN\",
-            \"network\": \"${__test_data[id]}\"
-        },
-        \"transaction_identifier\": {
-            \"hash\": \"${__test_data[zkapp_transaction]}\"
-        }
-    }" | jq)" \
+    assert "$(rosetta-client search transactions \
+        --rosetta-uri "${__test_data[address]}" \
+        --blockchain "${BLOCKCHAIN}" \
+        --network "${__test_data[id]}" \
+        --tx-hash "${__test_data[zkapp_transaction]}" \
+        --compact)" \
         ".transactions[0].transaction.transaction_identifier.hash == \"${__test_data[zkapp_transaction]}\" " \
         "   ✅  Zkapp transaction found" \
         "   ❌  Zkapp transaction not found (expected ${__test_data[zkapp_transaction]})"
