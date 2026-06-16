@@ -24,6 +24,7 @@ import (
 
 var ValidatorCleanupInterval = initDurationEnv("LIBP2P_VALIDATOR_CLEANUP_INTERVAL_DURATION", 30*time.Second)
 var ValidatorCleanupGrace = initDurationEnv("LIBP2P_VALIDATOR_CLEANUP_GRACE_DURATION", 1*time.Hour)
+var WorkerPoolSize = initIntEnv("LIBP2P_WORKER_POOL_SIZE", 256)
 
 func initDurationEnv(envVar string, defaultVal time.Duration) time.Duration {
 	if s := os.Getenv(envVar); s != "" {
@@ -32,6 +33,17 @@ func initDurationEnv(envVar string, defaultVal time.Duration) time.Duration {
 			return d
 		}
 		fmt.Fprintf(os.Stderr, "WARNING: failed to parse %s=%q as duration, using default %s: %v\n", envVar, s, defaultVal, err)
+	}
+	return defaultVal
+}
+
+func initIntEnv(envVar string, defaultVal int) int {
+	if s := os.Getenv(envVar); s != "" {
+		v, err := strconv.Atoi(s)
+		if err == nil {
+			return v
+		}
+		fmt.Fprintf(os.Stderr, "WARNING: failed to parse %s=%q as integer, using default %d: %v\n", envVar, s, defaultVal, err)
 	}
 	return defaultVal
 }
@@ -53,6 +65,7 @@ func newApp() *app {
 		metricsCollectionStarted: false,
 		metricsServer:            nil,
 		bitswapCtx:               NewBitswapCtx(ctx, outChan),
+		workerSem:                make(chan struct{}, WorkerPoolSize),
 	}
 	go app.startValidatorCleanup()
 	return app
