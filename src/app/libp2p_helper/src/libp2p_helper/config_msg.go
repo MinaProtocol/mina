@@ -621,7 +621,9 @@ func (m SetNodeStatusReq) handle(app *app, seqno uint64) (*capnp.Message, func()
 	if err != nil {
 		return mkRpcRespError(seqno, badRPC(err))
 	}
+	app.P2p.NodeStatusMutex.Lock()
 	app.P2p.NodeStatus = status
+	app.P2p.NodeStatusMutex.Unlock()
 	return mkRpcRespSuccess(seqno, func(m *ipc.Libp2pHelperInterface_RpcResponseSuccess) {
 		_, err := m.NewSetNodeStatus()
 		panicOnErr(err)
