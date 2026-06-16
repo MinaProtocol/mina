@@ -512,6 +512,10 @@ build_rosetta_deb() {
     "${BUILDDIR}/usr/local/bin/mina-rosetta"
   cp "./default/src/app/rosetta/ocaml-signer/signer_${signature}_signatures.exe" \
     "${BUILDDIR}/usr/local/bin/mina-ocaml-signer"
+  cp ./default/src/app/rosetta/healthcheck/rosetta_healthcheck.exe \
+    "${BUILDDIR}/usr/local/bin/rosetta-healthcheck"
+  cp ./default/src/app/rosetta/client/rosetta_client_cli.exe \
+    "${BUILDDIR}/usr/local/bin/rosetta-client"
 
   mkdir -p "${BUILDDIR}/etc/mina/rosetta/"{rosetta-cli-config,scripts}
 
