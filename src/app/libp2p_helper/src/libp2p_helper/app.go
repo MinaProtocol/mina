@@ -22,10 +22,24 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
+var ValidatorCleanupInterval = initDurationEnv("LIBP2P_VALIDATOR_CLEANUP_INTERVAL_DURATION", 30*time.Second)
+var ValidatorCleanupGrace = initDurationEnv("LIBP2P_VALIDATOR_CLEANUP_GRACE_DURATION", 1*time.Hour)
+
+func initDurationEnv(envVar string, defaultVal time.Duration) time.Duration {
+	if s := os.Getenv(envVar); s != "" {
+		d, err := time.ParseDuration(s)
+		if err == nil {
+			return d
+		}
+		fmt.Fprintf(os.Stderr, "WARNING: failed to parse %s=%q as duration, using default %s: %v\n", envVar, s, defaultVal, err)
+	}
+	return defaultVal
+}
+
 func newApp() *app {
 	outChan := make(chan *capnp.Message, 1<<12) // 4096 messages stacked
 	ctx := context.Background()
-	return &app{
+	app := &app{
 		P2p:                      nil,
 		Ctx:                      ctx,
 		_subs:                    make(map[uint64]subscription),
@@ -40,6 +54,8 @@ func newApp() *app {
 		metricsServer:            nil,
 		bitswapCtx:               NewBitswapCtx(ctx, outChan),
 	}
+	go app.startValidatorCleanup()
+	return app
 }
 
 func (app *app) SetConnectionHandlers() {
@@ -144,6 +160,38 @@ func (app *app) TimeoutValidator(seqno uint64) {
 	app.validatorMutex.Lock()
 	defer app.validatorMutex.Unlock()
 	app._validators[seqno].TimedOutAt = &now
+}
+
+// cleanupTimedOutValidators removes validator entries that have been
+// timed out for longer than ValidatorCleanupGrace. Validators time out
+// after 5min from libp2p; this sweep runs after an additional 1-hour
+// grace period to give OCaml time to respond with a Validation push.
+func (app *app) cleanupTimedOutValidators() {
+	app.validatorMutex.Lock()
+	defer app.validatorMutex.Unlock()
+
+	now := time.Now()
+	removed := 0
+	for seqno, st := range app._validators {
+		if st.TimedOutAt != nil && now.Sub(*st.TimedOutAt) > ValidatorCleanupGrace {
+			delete(app._validators, seqno)
+			removed++
+			if app.P2p != nil {
+				app.P2p.Logger.Debugf("validator cleanup: removed timed-out validator seqno=%d age=%s", seqno, now.Sub(*st.TimedOutAt))
+			}
+		}
+	}
+	if removed > 0 && app.P2p != nil {
+		app.P2p.Logger.Infof("validator cleanup: removed %d stale validators (timed out >%s), remaining=%d", removed, ValidatorCleanupGrace, len(app._validators))
+	}
+}
+
+func (app *app) startValidatorCleanup() {
+	ticker := time.NewTicker(ValidatorCleanupInterval)
+	defer ticker.Stop()
+	for range ticker.C {
+		app.cleanupTimedOutValidators()
+	}
 }
 
 func (app *app) RemoveValidator(seqno uint64) (*validationStatus, bool) {
