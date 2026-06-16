@@ -194,6 +194,23 @@ struct
   type ('comm, 'comm_opt) index' =
     ('comm, 'comm_opt) Plonk_verification_key_evals.Step.t
 
+  let zero_inner_curve = Double.map Inner_curve.one ~f:(fun _ -> Field.zero)
+
+  let add_arrays_pad ~zero ~add xs ys =
+    let length = Int.max (Array.length xs) (Array.length ys) in
+    Array.init length ~f:(fun i ->
+        let x = if i < Array.length xs then xs.(i) else zero in
+        let y = if i < Array.length ys then ys.(i) else zero in
+        add x y )
+
+  let add_chunk_arrays =
+    add_arrays_pad ~zero:zero_inner_curve ~add:(Double.map2 ~f:Field.( + ))
+
+  let add_chunk_pair_arrays =
+    add_arrays_pad
+      ~zero:(zero_inner_curve, zero_inner_curve)
+      ~add:(Double.map2 ~f:(Double.map2 ~f:Field.( + )))
+
   (** Select a verification key from a vector based on a one-hot branch.
 
       This function masks the given vector of verification keys with the one-hot
@@ -244,8 +261,7 @@ struct
                   ([ (b, x) ], [], []) ) )
       |> Vector.reduce_exn
            ~f:
-             (Plonk_verification_key_evals.Step.map2
-                ~f:(Array.map2_exn ~f:(Double.map2 ~f:( + )))
+             (Plonk_verification_key_evals.Step.map2 ~f:add_chunk_arrays
                 ~f_opt:(fun (yes_1, maybe_1, no_1) (yes_2, maybe_2, no_2) ->
                   (yes_1 @ yes_2, maybe_1 @ maybe_2, no_1 @ no_2) ) )
       |> Plonk_verification_key_evals.Step.map ~f:Fn.id ~f_opt:(function
@@ -262,8 +278,7 @@ struct
                  justs
                  |> List.map ~f:(fun ((b : Boolean.var), g) ->
                         Array.map g ~f:(Double.map ~f:(( * ) (b :> t))) )
-                 |> List.reduce_exn
-                      ~f:(Array.map2_exn ~f:(Double.map2 ~f:( + )))
+                 |> List.reduce_exn ~f:add_chunk_arrays
                in
                Opt.just sum
            | justs, maybes, nones ->
@@ -288,7 +303,7 @@ struct
                       ~f:(fun ((b1 : Boolean.var), g1) ((b2 : Boolean.var), g2)
                          ->
                         ( Boolean.Unsafe.of_cvar Field.(add (b1 :> t) (b2 :> t))
-                        , Array.map2_exn ~f:(Double.map2 ~f:( + )) g1 g2 ) )
+                        , add_chunk_arrays g1 g2 ) )
                  |> fun x -> (Option.map ~f:fst x, Option.map ~f:snd x)
                in
                let maybe_is_yes, maybe_sum =
@@ -301,7 +316,7 @@ struct
                       ~f:(fun ((b1 : Boolean.var), g1) ((b2 : Boolean.var), g2)
                          ->
                         ( Boolean.Unsafe.of_cvar Field.(add (b1 :> t) (b2 :> t))
-                        , Array.map2_exn ~f:(Double.map2 ~f:( + )) g1 g2 ) )
+                        , add_chunk_arrays g1 g2 ) )
                  |> fun x -> (Option.map ~f:fst x, Option.map ~f:snd x)
                in
                let is_yes =
@@ -314,8 +329,7 @@ struct
                let sum =
                  [| none_sum; maybe_sum; just_sum |]
                  |> Array.filter_map ~f:Fn.id
-                 |> Array.reduce_exn
-                      ~f:(Array.map2_exn ~f:(Double.map2 ~f:( + )))
+                 |> Array.reduce_exn ~f:add_chunk_arrays
                in
                Opt.Maybe (is_yes, sum) )
       |> Plonk_verification_key_evals.Step.map
@@ -353,7 +367,7 @@ struct
          ~f:(fun b pts ->
            Array.map pts ~f:(fun (x, y) -> Field.((b :> t) * x, (b :> t) * y))
            )
-    |> Vector.reduce_exn ~f:(Array.map2_exn ~f:(Double.map2 ~f:Field.( + )))
+    |> Vector.reduce_exn ~f:add_chunk_arrays
 
   let scaled_lagrange (type n) c
       ~domain:
@@ -377,7 +391,7 @@ struct
          ~f:(fun b pts ->
            Array.map pts ~f:(fun (x, y) -> Field.((b :> t) * x, (b :> t) * y))
            )
-    |> Vector.reduce_exn ~f:(Array.map2_exn ~f:(Double.map2 ~f:Field.( + )))
+    |> Vector.reduce_exn ~f:add_chunk_arrays
 
   let lagrange_with_correction (type n) ~input_length
       ~domain:
@@ -436,10 +450,7 @@ struct
                        ~f:
                          (Double.map ~f:(fun (x, y) ->
                               Field.((b :> t) * x, (b :> t) * y) ) ) )
-              |> Vector.reduce_exn
-                   ~f:
-                     (Array.map2_exn
-                        ~f:(Double.map2 ~f:(Double.map2 ~f:Field.( + ))) )
+              |> Vector.reduce_exn ~f:add_chunk_pair_arrays
               |> Array.map ~f:(Double.map ~f:(Double.map ~f:Util.Wrap.seal)) )
 
   let group_map =
