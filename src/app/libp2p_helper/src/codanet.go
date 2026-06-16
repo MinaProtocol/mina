@@ -244,6 +244,7 @@ type Helper struct {
 	BandwidthCounter  *metrics.BandwidthCounter
 	MsgStats          *MessageStats
 	NodeStatus        []byte
+	NodeStatusMutex   sync.RWMutex // protects NodeStatus: written by SetNodeStatus handler, read by handleNodeStatusStreams
 	HeartbeatPeer     func(peer.ID)
 }
 
@@ -638,7 +639,11 @@ func (h *Helper) handleNodeStatusStreams(s network.Stream) {
 		}
 	}()
 
+	// Take read lock: handleNodeStatusStreams goroutines race with
+	// SetNodeStatus handler goroutine writing NodeStatus.
+	h.NodeStatusMutex.RLock()
 	n, err := s.Write(h.NodeStatus)
+	h.NodeStatusMutex.RUnlock()
 	if err != nil {
 		logger.Error("failed to write to stream", err)
 		return
