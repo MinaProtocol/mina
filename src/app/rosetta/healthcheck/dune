@@ -1,0 +1,20 @@
+(executable
+ (package rosetta)
+ (name rosetta_healthcheck)
+ (public_name rosetta-healthcheck)
+ (libraries
+  ;; opam libraries
+  core_kernel
+  async
+  async_kernel
+  async.async_command
+  cohttp
+  cohttp-async
+  uri
+  yojson
+  ;; local libraries
+  rosetta_client)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_version ppx_let ppx_here)))
