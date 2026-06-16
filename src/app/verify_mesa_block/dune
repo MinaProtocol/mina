@@ -1,0 +1,22 @@
+(executable
+ (name verify_mesa_block)
+ (libraries
+  core_kernel
+  async
+  async_kernel
+  yojson
+  blockchain_snark
+  transaction_snark
+  genesis_constants
+  mina_node_config
+  mina_runtime_config
+  genesis_ledger_helper
+  mina_block
+  mina_state
+  mina_base
+  mina_signature_kind
+  pickles)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_version)))
