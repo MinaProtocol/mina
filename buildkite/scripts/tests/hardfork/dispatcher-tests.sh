@@ -450,6 +450,91 @@ fi
 echo "PASSED: user-provided hardfork-handling left untouched"
 
 # =============================================================================
+# Test 12: Config Directory Path Comparison (equivalent spellings accepted)
+# =============================================================================
+
+echo ""
+echo "=== Test 12: Config Directory Path Comparison ==="
+echo "Verifying that --config-directory equal to the hardfork state dir is accepted"
+echo "even when written with a trailing slash or '.'/'..' segments"
+
+# The hardfork state directory in the image (MINA_HARDFORK_STATE_DIR).
+HARDFORK_STATE_DIR="/root/.mina-config"
+
+# Each of these refers to the same directory as $HARDFORK_STATE_DIR and must
+# therefore be accepted (no discrepancy error, dispatcher proceeds normally).
+EQUIVALENT_DIRS=(
+  "${HARDFORK_STATE_DIR}/"
+  "${HARDFORK_STATE_DIR}/."
+  "/root/../root/.mina-config"
+)
+
+for equivalent_dir in "${EQUIVALENT_DIRS[@]}"; do
+  echo "--- Checking equivalent path: ${equivalent_dir}"
+
+  set +e
+  MINA_EXEC_COMMAND=$(docker run --env MINA_DISPATCHER_DRYRUN=1 --entrypoint bash "$DOCKER_IMAGE" \
+    -c "$(create_activation_marker) && mina daemon --config-directory ${equivalent_dir}" 2>&1)
+  STATUS=$?
+  set -e
+
+  if [[ "$MINA_EXEC_COMMAND" == *"mina-dispatch ERROR: Discrepancy between provided --config-directory"* ]]; then
+    echo "FAILED: Equivalent path was incorrectly rejected as a discrepancy"
+    echo "  Provided: ${equivalent_dir}"
+    echo "  Expected (normalized): ${HARDFORK_STATE_DIR}"
+    echo "  Actual output: $MINA_EXEC_COMMAND"
+    exit 1
+  fi
+
+  if [[ "$STATUS" -ne 0 ]]; then
+    echo "FAILED: Dispatcher exited non-zero for an equivalent --config-directory"
+    echo "  Provided: ${equivalent_dir}"
+    echo "  Actual output: $MINA_EXEC_COMMAND"
+    exit 1
+  fi
+
+  # The original (un-normalized) argument should be passed through untouched.
+  if [[ "$MINA_EXEC_COMMAND" != *"--config-directory ${equivalent_dir}"* ]]; then
+    echo "FAILED: --config-directory argument was not passed through unchanged"
+    echo "  Expected substring: --config-directory ${equivalent_dir}"
+    echo "  Actual output: $MINA_EXEC_COMMAND"
+    exit 1
+  fi
+done
+
+echo "PASSED: Equivalent --config-directory spellings are accepted via path comparison"
+
+# =============================================================================
+# Test 13: Config Directory Path Comparison (genuine mismatch still rejected)
+# =============================================================================
+
+echo ""
+echo "=== Test 13: Config Directory Genuine Mismatch ==="
+echo "Verifying that a path resolving to a different directory is still rejected"
+
+# This contains '..' but normalizes to a different directory, so it must error.
+set +e
+MINA_EXEC_COMMAND=$(docker run --env MINA_DISPATCHER_DRYRUN=1 --entrypoint bash "$DOCKER_IMAGE" \
+  -c "$(create_activation_marker) && mina daemon --config-directory /root/.mina-config/../other" 2>&1)
+STATUS=$?
+set -e
+
+EXPECTED_ERROR="mina-dispatch ERROR: Discrepancy between provided --config-directory"
+if [[ "$MINA_EXEC_COMMAND" != *"$EXPECTED_ERROR"* ]]; then
+  echo "FAILED: Expected discrepancy error for a path resolving elsewhere"
+  echo "  Expected substring: $EXPECTED_ERROR"
+  echo "  Actual output: $MINA_EXEC_COMMAND"
+  exit 1
+fi
+
+if [[ "$STATUS" -eq 0 ]]; then
+  echo "FAILED: Expected non-zero exit for a genuinely mismatched --config-directory"
+  exit 1
+fi
+
+echo "PASSED: Genuine path mismatch is still rejected"
+
+# =============================================================================
 # Summary
 # =============================================================================
 
