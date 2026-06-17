@@ -88,7 +88,7 @@ module Process = struct
     let logger = Logger.create () in
     don't_wait_for
     @@ Pipe.iter
-         (Process.stdout t.process |> Reader.pipe)
+         (Process.stdout t.process |> Reader.lines)
          ~f:(fun stdout ->
            let%bind () =
              Writer.with_file log_file ~append:true ~f:(fun writer ->

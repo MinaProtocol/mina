@@ -27,23 +27,22 @@ let test_case (test_data : t) =
   in
   let logger = Logger.create () in
   let log_file = test_data.temp_dir ^/ "archive.load_genesis_ledger.log" in
-  (* Sanity: before the archive process has started, [db-ready] must
-     report failure.  The fixture has created an empty random database
-     but no [blocks] table yet, so [SELECT MAX(height) FROM blocks]
-     returns a Caqti error which the healthcheck surfaces as a
-     non-zero exit.  This is the "before bootstrap → false" half of
-     the assertion the integration suite owes the healthcheck binary. *)
+  (* Sanity: before the archive process has started, [db-ready] should
+     already pass.  The fixture creates an empty random archive DB with
+     the schema loaded, so [SELECT COALESCE(MAX(height), 0) FROM blocks]
+     is queryable even before the archive process bootstraps genesis. *)
   let%bind () =
     match%map
       Archive_healthcheck.db_ready ~postgres_uri:config.postgres_uri ()
     with
     | Ok () ->
-        failwith
-          "Archive_healthcheck.db_ready unexpectedly succeeded against a fresh \
-           archive DB before Archive.start — the test's before/after invariant \
-           is broken."
-    | Error _ ->
         ()
+    | Error e ->
+        failwithf
+          "Archive_healthcheck.db_ready failed against a schema-only archive \
+           DB before Archive.start; expected the healthcheck to verify schema \
+           reachability independently of block ingestion: %s"
+          (Error.to_string_hum e) ()
   in
   let%bind process = Archive.of_config config |> Archive.start in
   Archive.Process.start_logging process ~log_file ;
