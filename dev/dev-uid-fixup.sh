@@ -134,6 +134,42 @@ if [[ "${host_uid}" != "${current_uid}" ]] || [[ "${host_gid}" != "${current_gid
   fix_owner /mina/_build
 fi
 
+grant_docker_socket_access() {
+  local socket=/var/run/docker.sock
+  [[ -S "${socket}" ]] || return 0
+
+  local docker_gid
+  docker_gid="$(stat -c '%g' "${socket}")"
+
+  local group_name
+  group_name="$(getent group "${docker_gid}" | cut -d: -f1 || true)"
+
+  if [[ -z "${group_name}" ]]; then
+    group_name="docker-host"
+    if getent group "${group_name}" >/dev/null; then
+      group_name="docker-host-${docker_gid}"
+    fi
+    log "adding opam to docker socket group ${group_name} (${docker_gid})"
+    printf '%s:x:%s:opam\n' "${group_name}" "${docker_gid}" >> /etc/group
+    return 0
+  fi
+
+  local members
+  members="$(getent group "${group_name}" | cut -d: -f4)"
+  if [[ ",${members}," == *",opam,"* ]]; then
+    return 0
+  fi
+
+  log "adding opam to existing docker socket group ${group_name} (${docker_gid})"
+  if [[ -z "${members}" ]]; then
+    sed -i -E "s|^(${group_name}:x:${docker_gid}:).*|\\1opam|" /etc/group
+  else
+    sed -i -E "s|^(${group_name}:x:${docker_gid}:).*|\\1${members},opam|" /etc/group
+  fi
+}
+
+grant_docker_socket_access
+
 # Visible "ready" banner so users running `docker compose up` (or watching
 # VS Code's Dev Containers log) know the slow chown phase is done and can
 # `make ssh` / open an integrated terminal. Goes to stderr like every other
