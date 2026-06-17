@@ -32,6 +32,7 @@ services:
       - "_opam:/mina/_opam" # exclude any existing local switch
       - "_build:/mina/_build" # exclude any existing local build
       - "opam:/home/opam/.opam" # cache opam stuff
+      - "${DOCKER_SOCKET:-/var/run/docker.sock}:/var/run/docker.sock" # let Docker commands use the host Docker daemon
     stdin_open: true # docker run -i
     tty: true # docker run -t
 

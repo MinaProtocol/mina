@@ -1,5 +1,17 @@
 export HOST_UID := $(shell id -u)
 export HOST_GID := $(shell id -g)
+export DOCKER_SOCKET ?= $(shell \
+	if [ -n "$$DOCKER_SOCKET" ]; then \
+		printf '%s' "$$DOCKER_SOCKET"; \
+	elif [ "$${DOCKER_HOST%%://*}" = unix ]; then \
+		printf '%s' "$$DOCKER_HOST" | sed 's|^unix://||'; \
+	elif [ -S /var/run/docker.sock ]; then \
+		printf '%s' /var/run/docker.sock; \
+	elif [ -n "$$XDG_RUNTIME_DIR" ] && [ -S "$$XDG_RUNTIME_DIR/docker.sock" ]; then \
+		printf '%s' "$$XDG_RUNTIME_DIR/docker.sock"; \
+	else \
+		printf '%s' /var/run/docker.sock; \
+	fi)
 
 REPO_ROOT := $(realpath $(dir $(lastword $(MAKEFILE_LIST)))/..)
 DEVCONTAINER_SRC := devcontainer-template
@@ -10,12 +22,32 @@ DEVCONTAINER_SRC := devcontainer-template
 # labeled options in "Reopen in Container".
 DEVCONTAINER_DST := $(REPO_ROOT)/.devcontainer/mina
 
-all:
+all: help
+
+help:
+	@printf '%s\n' \
+		'Mina Docker dev environment' \
+		'' \
+		'Usage:' \
+		'  make start         Start the dev container' \
+		'  make ssh           Open a shell in the running dev container' \
+		'  make stop          Stop the dev container' \
+		'  make rebuild       Recreate the dev container and named volumes' \
+		'  make devcontainer  Generate the local VS Code Dev Container scaffold' \
+		'' \
+		'Environment:' \
+		'  MINA_TOOLCHAIN_IMAGE  Override the pinned toolchain image' \
+		'  DOCKER_SOCKET         Override the host Docker socket path'
+
+start:
 	docker compose up -d
 	@sleep 1
 	@docker compose logs mina --tail=20
 	@echo
 	@echo "Container is running. Connect with: make ssh"
+
+stop:
+	docker compose stop
 
 rebuild:
 	docker compose down --volumes
@@ -47,4 +79,4 @@ devcontainer:
 	@echo "Created $(DEVCONTAINER_DST) from dev/$(DEVCONTAINER_SRC)/."
 	@echo "Open the repo in VS Code and run 'Dev Containers: Reopen in Container'."
 
-.PHONY: all rebuild ssh devcontainer
+.PHONY: all help start stop rebuild ssh devcontainer
