@@ -37,7 +37,7 @@ ENV BUILD_FLAGS_SUFFIX=${build_flags_suffix}
 # - mina-devnet-generic / mina-devnet-generic-instrumented (apps-only, no config)
 ENV MINA_CONFIG_DEB=mina-${network}-config
 ENV MINA_ARCHIVE_DEB=mina-archive-${network}${BUILD_FLAGS_SUFFIX}
-ENV MINA_ROSETTA_DEB=mina-rosetta-${network}
+ENV MINA_ROSETTA_DEB=mina-rosetta-${network}${BUILD_FLAGS_SUFFIX}
 
 
 # We do not install the below platform-specific dependencies,
@@ -122,13 +122,13 @@ RUN echo "Building image with version $deb_version from repo $deb_release $deb_c
     && chmod +x /usr/local/bin/install-mina-debs.sh \
     && if echo "${SUFFIX}" | grep -q -- '-generic'; then \
          /usr/local/bin/install-mina-debs.sh \
-           "mina-${network}${SUFFIX}=$deb_version" \
+           "mina${SUFFIX}=$deb_version" \
            "mina-logproc=$deb_version" \
            "${MINA_ARCHIVE_DEB}=$deb_version" \
            "${MINA_ROSETTA_DEB}=$deb_version" ; \
        else \
          /usr/local/bin/install-mina-debs.sh \
-           "mina-${network}-generic${SUFFIX}=$deb_version" \
+           "mina-generic${SUFFIX}=$deb_version" \
            "mina-logproc=$deb_version" \
            "${MINA_CONFIG_DEB}=$deb_version" \
            "${MINA_ARCHIVE_DEB}=$deb_version" \

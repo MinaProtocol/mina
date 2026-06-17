@@ -248,14 +248,9 @@ function get_artifact_with_suffix() {
             echo "mina-$__network-postfork-mesa"
         ;;
         mina-generic)
-            case $__profile in
-                lightnet)
-                    echo "mina-$__network-generic-lightnet"
-                ;;
-                *)
-                    echo "mina-$__network-generic"
-                ;;
-            esac
+            # Single network/profile-agnostic daemon package; the profile
+            # (incl. lightnet) is selected at runtime via MINA_PROFILE.
+            echo "mina-generic"
         ;;
         rosetta-generic)
             echo "mina-rosetta-$__network-generic"
@@ -1666,8 +1661,14 @@ function combine_docker_suffixes() {
     local __profile=$2
     local __build_flag=$3
     local __generic=${4:-0}
+    # When set, omit the network segment. Used for the single network-free
+    # generic daemon image whose tag is "<version>-generic" (no network).
+    local __networkless=${5:-0}
 
-    local __parts=("${network}")
+    local __parts=()
+    if [[ "$__networkless" != "1" ]]; then
+        __parts+=("${network}")
+    fi
 
     if [[ "$__generic" == "1" ]]; then
         __parts+=("generic")
@@ -1926,7 +1927,11 @@ function verify(){
                                     __artifact_full_name=$(get_artifact_with_suffix $artifact $network $__profile)
 
                                     local __docker_suffix_combined
-                                    __docker_suffix_combined=$(combine_docker_suffixes "$network" "$__profile" "$__build_flag" "$__generic")
+                                    # The generic daemon image is network-free
+                                    # ("<version>-generic"); pass networkless so the
+                                    # verify tag matches. Configured daemon (non-generic)
+                                    # keeps its network segment.
+                                    __docker_suffix_combined=$(combine_docker_suffixes "$network" "$__profile" "$__build_flag" "$__generic" "$__generic")
 
 
                                 if [[ $__only_dockers == 0 ]]; then

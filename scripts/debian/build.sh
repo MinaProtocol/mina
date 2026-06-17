@@ -33,22 +33,22 @@ resolve_and_build_package() {
     return
   fi
 
-  if [[ "$package" =~ ^(archive|daemon|rosetta)_(mainnet|devnet|mesa)$ ]]; then
+  if [[ "$package" =~ ^(archive|rosetta)_(mainnet|devnet|mesa-mut|mesa)$ ]]; then
     "build_${BASH_REMATCH[1]}_deb" "${BASH_REMATCH[2]}"
     return
   fi
 
-  if [[ "$package" =~ ^daemon_(mainnet|devnet|mesa)_(config|generic|hardfork_config|prefork|postfork|automode)$ ]]; then
+  if [[ "$package" =~ ^daemon_(mainnet|devnet|mesa-mut|mesa)_(config|generic|hardfork_config|prefork|postfork|automode)$ ]]; then
     "build_daemon_${BASH_REMATCH[2]}_deb" "${BASH_REMATCH[1]}"
     return
   fi
 
-  if [[ "$package" =~ ^prefork_(mainnet|devnet|mesa)_genesis_ledger$ ]]; then
+  if [[ "$package" =~ ^prefork_(mainnet|devnet|mesa-mut|mesa)_genesis_ledger$ ]]; then
     build_prefork_genesis_ledger_deb "${BASH_REMATCH[1]}"
     return
   fi
 
-  if [[ "$package" =~ ^profile_(mainnet|devnet)$ ]]; then
+  if [[ "$package" =~ ^profile_(mainnet|devnet|lightnet|dev)$ ]]; then
     "build_profile_deb" "${BASH_REMATCH[1]}"
     return
   fi
@@ -60,14 +60,13 @@ resolve_and_build_package() {
 default_targets=(
   profile_devnet
   profile_mainnet
+  profile_lightnet
   logproc
   archive_devnet
   archive_mainnet
   tx_tools
-  daemon_mainnet
   daemon_mainnet_config
   daemon_mainnet_generic
-  daemon_devnet
   daemon_devnet_config
   daemon_devnet_generic
   rosetta_mainnet

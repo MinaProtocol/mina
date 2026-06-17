@@ -246,12 +246,20 @@ export IMAGE="--build-arg image=${IMAGE}"
 
 CUSTOM_ARG=${CUSTOM_ARG:-""}
 
+# Network segment of the generic base image that the install-config FROM line
+# pulls. Empty for the daemon (network-free generic), "-<network>" for rosetta
+# (per-network generic). Set per-service below.
+GENERIC_NETWORK_SEG=""
+
 case "${SERVICE}" in
     mina-archive)
         DOCKERFILE_PATH="dockerfiles/Dockerfile-mina-archive"
         ;;
     mina-daemon)
         DOCKERFILE_PATH="dockerfiles/Dockerfile-mina-daemon"
+        # The generic daemon is network-agnostic: publish it as a SINGLE image
+        # tagged "<version>-generic" with no network segment.
+        export NETWORKLESS_TAG=1
         ;;
     mina-daemon-configured)
         DOCKERFILE_PATH="dockerfiles/Dockerfile-install-config"
@@ -259,6 +267,17 @@ case "${SERVICE}" in
         # The --version arg points to the base generic image for the Dockerfile FROM.
         # Override VERSION_ARG to keep it, then set VERSION to current commit for output tags.
         VERSION_ARG_OVERRIDE="--build-arg version=$VERSION"
+        ;;
+    mina-daemon-profiled)
+        # Profiled image = the network-free generic base + a baked profile hint
+        # package (mina-${profile}-profile). Layered like the configured image.
+        DOCKERFILE_PATH="dockerfiles/Dockerfile-install-profile"
+        SERVICE="mina-daemon"
+        VERSION_ARG_OVERRIDE="--build-arg version=$VERSION"
+        # Tag is "<version>-<profile>-generic" (devnet/mainnet) or "<version>-lightnet"
+        # (lightnet); no network segment.
+        export NETWORKLESS_TAG=1
+        export PROFILED_TAG=1
         ;;
     mina-daemon-legacy-hardfork)
         DOCKERFILE_PATH="dockerfiles/Dockerfile-mina-daemon"
@@ -284,6 +303,8 @@ case "${SERVICE}" in
         DOCKERFILE_PATH="dockerfiles/Dockerfile-install-config"
         SERVICE="mina-rosetta"
         VERSION_ARG_OVERRIDE="--build-arg version=$VERSION"
+        # The rosetta generic base image is still per-network ("<version>-<network>-generic").
+        GENERIC_NETWORK_SEG="-${INPUT_NETWORK}"
         ;;
     delegation-backend)
         DOCKERFILE_PATH="dockerfiles/Dockerfile-delegation-backend"
@@ -342,23 +363,25 @@ export_docker_tag
 # Dockerfile-install-config:16 is
 #   FROM ${docker_repo}/${image_name}:${version}-${network}-generic${build_flags_suffix}${custom_suffix}
 # so we reconstruct that ref from build-args available here.
-if [[ "${DOCKERFILE_PATH}" == "dockerfiles/Dockerfile-install-config" ]]; then
+if [[ "${DOCKERFILE_PATH}" == "dockerfiles/Dockerfile-install-config" || "${DOCKERFILE_PATH}" == "dockerfiles/Dockerfile-install-profile" ]]; then
     _dep_image_name="${IMAGE_NAME:-mina-daemon}"
     _dep_version="${VERSION_ARG#--build-arg version=}"
-    _dep_network="${INPUT_NETWORK:-devnet}"
     # BUILD_FLAGS_SUFFIX_ARG is set by export_suffixes (called inside
     # export_docker_tag) and looks like "--build-arg build_flags_suffix=-instrumented".
     _dep_build_flags="${BUILD_FLAGS_SUFFIX_ARG#--build-arg build_flags_suffix=}"
     _dep_custom="${CUSTOM_SUFFIX_ARG#--build-arg custom_suffix=}"
-    _dep_tag="${_dep_version}-${_dep_network}-generic${_dep_build_flags}${_dep_custom}"
+    # The daemon generic base is network-free ("<version>-generic"); the rosetta
+    # generic base is per-network ("<version>-<network>-generic"). GENERIC_NETWORK_SEG
+    # is "" for daemon and "-<network>" for rosetta.
+    _dep_tag="${_dep_version}${GENERIC_NETWORK_SEG}-generic${_dep_build_flags}${_dep_custom}"
     _rewritten_repo="$(rewrite_docker_repo_via_gar_cache "${DOCKER_REGISTRY}" "${_dep_image_name}" "${_dep_tag}")"
     DOCKER_REPO_ARG="--build-arg docker_repo=${_rewritten_repo}"
-    unset _dep_image_name _dep_version _dep_network _dep_build_flags _dep_custom _dep_tag _rewritten_repo
+    unset _dep_image_name _dep_version _dep_build_flags _dep_custom _dep_tag _rewritten_repo
 fi
 
 BUILD_NETWORK="--allow=network.host"
 
-docker buildx build --load --network=host --progress=plain $PLATFORM $DOCKER_REPO_ARG $NO_CACHE $BUILD_NETWORK $CACHE $NETWORK $IMAGE $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $DOCKER_DEB_SUFFIX_ARG $BUILD_FLAGS_SUFFIX_ARG $DEB_REPO $APT_CACHE_ARG $BRANCH $REPO $LEGACY_VERSION $CUSTOM_SUFFIX_ARG $CUSTOM_ARG $DEB_ARCH $DEB_STORAGE_REPAIR_VERSION $IMAGE_NAME_ARG $VERSION_ARG "$DOCKER_CONTEXT" -t "$TAG" -t "$HASHTAG" -f $DOCKERFILE_PATH
+docker buildx build --load --network=host --progress=plain $PLATFORM $DOCKER_REPO_ARG $NO_CACHE $BUILD_NETWORK $CACHE $NETWORK $IMAGE $DEB_CODENAME $DEB_RELEASE $DEB_VERSION --build-arg deb_profile="$DEB_PROFILE" --build-arg generic_network="$GENERIC_NETWORK_SEG" $DOCKER_DEB_SUFFIX_ARG $BUILD_FLAGS_SUFFIX_ARG $DEB_REPO $APT_CACHE_ARG $BRANCH $REPO $LEGACY_VERSION $CUSTOM_SUFFIX_ARG $CUSTOM_ARG $DEB_ARCH $DEB_STORAGE_REPAIR_VERSION $IMAGE_NAME_ARG $VERSION_ARG "$DOCKER_CONTEXT" -t "$TAG" -t "$HASHTAG" -f $DOCKERFILE_PATH
 
 if [[ -n "${SAVE_TO_CI_CACHE_ROOT:-}" ]]; then
 
