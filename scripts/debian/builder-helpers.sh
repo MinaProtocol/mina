@@ -217,21 +217,40 @@ copy_hf_related_scripts() {
 
 }
 
-# Copies scripts and build utilities to debian package
+# Installs the mina.service systemd unit with the network-specific seed peer URL.
+install_mina_service() {
+  local network="$1"
+
+  case "${network}" in
+    mainnet)
+      local seed_list_url='mina-seed-lists/mainnet_seeds.txt'
+      ;;
+    devnet)
+      local seed_list_url='seed-lists/devnet_seeds.txt'
+      ;;
+    mesa)
+      local seed_list_url='o1labs-gitops-infrastructure/mina-mesa-network/mina-mesa-network-seeds.txt'
+      ;;
+    *)
+      echo "Unknown network name provided: ${network}"; exit 1
+      ;;
+  esac
+
+  mkdir -p "${BUILDDIR}/usr/lib/systemd/user/"
+  sed "s%PEERS_LIST_URL_PLACEHOLDER%https://storage.googleapis.com/${seed_list_url}%" \
+    ../scripts/mina.service > "${BUILDDIR}/usr/lib/systemd/user/mina.service"
+}
+
+# Copies hardfork scripts and generates bash completion into a debian package.
+# Does NOT install mina.service (the config package owns it, see
+# install_mina_service).
 copy_common_daemon_utils() {
   echo "------------------------------------------------------------"
   echo "copy_common_daemon_utils inputs:"
-  echo "Seed List URL path: ${1} (like seed-lists/berkeley_seeds.txt)"
 
-  local MINA_BIN="${2:-${BUILDDIR}/usr/local/bin/mina}"
+  local MINA_BIN="${1:-${BUILDDIR}/usr/local/bin/mina}"
 
   copy_hf_related_scripts
-
-  # Update the mina.service with a new default PEERS_URL based on Seed List \
-  # URL $1
-  mkdir -p "${BUILDDIR}/usr/lib/systemd/user/"
-  sed "s%PEERS_LIST_URL_PLACEHOLDER%https://storage.googleapis.com/${1}%" \
-    ../scripts/mina.service > "${BUILDDIR}/usr/lib/systemd/user/mina.service"
 
   # Support bash completion
   # NOTE: We do not list bash-completion as a required package,
@@ -272,6 +291,8 @@ copy_common_daemon_apps() {
     "${TARGET_ROOT_DIR}/mina-standalone-snark-worker"
   cp ./default/src/app/rocksdb-scanner/rocksdb_scanner.exe \
     "${TARGET_ROOT_DIR}/mina-rocksdb-scanner"
+  cp ./default/src/app/mina_healthcheck/mina_healthcheck.exe \
+    "${TARGET_ROOT_DIR}/mina-healthcheck"
 
   # Copy signature-based Binaries
   cp ./default/src/app/cli/src/mina_"${signature}"_signatures.exe \
@@ -531,6 +552,10 @@ build_daemon_config_deb() {
 
   copy_common_daemon_configs "${network}"
 
+  # The config package owns mina.service so that exactly one co-installed
+  # package ships it, with the correct per-network seed peer URL.
+  install_mina_service "${network}"
+
   build_deb "${package_name}"
   ARCHITECTURE="${saved_arch}"
 }
@@ -560,19 +585,16 @@ build_daemon_deb() {
   echo "------------------------------------------------------------"
   echo "--- Building ${network} daemon deb without keys:"
 
-  local package_name seed_list_url
+  local package_name
   case "${network}" in
     mainnet)
       package_name="mina-mainnet"
-      seed_list_url='mina-seed-lists/mainnet_seeds.txt'
       ;;
     devnet)
       package_name="${MINA_DEB_NAME}"
-      seed_list_url='seed-lists/devnet_seeds.txt'
       ;;
     mesa)
       package_name="mina-mesa"
-      seed_list_url='o1labs-gitops-infrastructure/mina-mesa-network/mina-mesa-network-seeds.txt'
       ;;
     *)
       echo "Unknown network name provided: ${network}"; exit 1
@@ -584,7 +606,7 @@ build_daemon_deb() {
 
   copy_common_daemon_apps "${network}"
 
-  copy_common_daemon_utils "${seed_list_url}"
+  copy_common_daemon_utils
 
   build_deb "${package_name}"
 }
@@ -678,12 +700,10 @@ EOF
 copy_common_daemon_post_automode_apps_and_configs() {
 
   local prefork_network="${1}"
-  local seed_list_url="${2}"
 
   echo "------------------------------------------------------------"
   echo "copy_common_daemon_post_automode_configs inputs:"
   echo "Network Name: ${prefork_network} (like mainnet, devnet, berkeley)"
-  echo "Seed List URL path: ${seed_list_url} (like seed-lists/berkeley_seeds.txt)"
 
   # Copy binaries to separate directory as we need both berkeley and mesa binaries for automode packages
   # and they share the same dispatcher and some common apps,
@@ -716,9 +736,9 @@ copy_common_daemon_post_automode_apps_and_configs() {
     fi
   fi
 
-  # Copy seed list with correct URL for postfork runtime and
-  # bash completion that points to the correct seed list URL
-  copy_common_daemon_utils "${seed_list_url}" "${AUTOMODE_POSTFORK_DIR}/mina"
+  # Generate bash completion for the postfork runtime. mina.service is shipped
+  # by the mina-<network>-config package, not here, to avoid dpkg conflicts.
+  copy_common_daemon_utils "${AUTOMODE_POSTFORK_DIR}/mina"
 
 }
 
@@ -736,25 +756,7 @@ build_daemon_postfork_deb() {
   create_control_file "$package_name" "${SHARED_DEPS}${DAEMON_DEPS}" \
     'Mina Protocol Client and Daemon' "${SUGGESTED_DEPS}"
 
-  local seed_list_url
-  case "${prefork_network}" in
-    mainnet)
-      seed_list_url='mina-seed-lists/mainnet_seeds.txt'
-      ;;
-    devnet)
-      seed_list_url='seed-lists/devnet_seeds.txt'
-      ;;
-    mesa)
-      seed_list_url='o1labs-gitops-infrastructure/mina-mesa-network/mina-mesa-network-seeds.txt'
-      ;;
-    *)
-      echo "Unknown network name provided: ${prefork_network}"; exit 1
-      ;;
-  esac
-
-  copy_common_daemon_post_automode_apps_and_configs \
-    "${prefork_network}" \
-    "${seed_list_url}"
+  copy_common_daemon_post_automode_apps_and_configs "${prefork_network}"
 
   build_deb "$package_name"
 
@@ -768,9 +770,19 @@ build_daemon_postfork_deb() {
 # Output: mina-${NETWORK}-automode_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
 #
 # This is an empty metapackage that depends on both prefork and postfork
-# automode packages. It Conflicts/Replaces/Provides mina-${NETWORK} so that
-# running `apt-get install mina-${NETWORK}-automode` will automatically
-# remove mina-${NETWORK} and pull in both automode runtimes.
+# automode packages. It Conflicts/Replaces mina-${NETWORK} (the legacy
+# monolithic package) AND mina-${NETWORK}-generic (the daemon-binary package in
+# the split layout, which owns /usr/local/bin/mina) so that running
+# `apt-get install mina-${NETWORK}-automode` removes whichever normal daemon is
+# present and pulls in both automode runtimes — and, symmetrically, so that
+# reinstalling mina-${NETWORK}-generic later removes the automode metapackage.
+# Provides mina-${NETWORK} for anything still depending on the legacy name.
+#
+# It also depends on mina-${NETWORK}-config: in the split layout that package
+# owns mina.service (and the genesis config), which the prefork/postfork runtime
+# packages no longer ship, so the dependency keeps a standalone
+# `apt-get install mina-${NETWORK}-automode` self-sufficient — matching the old
+# monolithic mina-${NETWORK}, which depended on the config package too.
 #
 
 build_daemon_automode_deb() {
@@ -785,11 +797,12 @@ build_daemon_automode_deb() {
   local prefork_pkg="mina-${network}-prefork-${POSTFORK_CODENAME}"
   local postfork_pkg="mina-${network}-postfork-${POSTFORK_CODENAME}"
   local prefork_version="${PREFORK_LEGACY_VERSION:-${MINA_DEB_VERSION}}"
-  local depends="${postfork_pkg} (>= ${MINA_DEB_VERSION}), ${prefork_pkg} (>= ${prefork_version})"
+  local depends="${postfork_pkg} (>= ${MINA_DEB_VERSION}), ${prefork_pkg} (>= ${prefork_version}), mina-${network}-config (>= ${MINA_DEB_VERSION})"
 
   create_control_file "${package_name}" "${depends}" \
     "Transitional metapackage for Mina ${network} automode (installs both prefork and postfork runtimes)" \
-    "" "mina-${network}" "mina-${network}" "mina-${network}"
+    "" "mina-${network}, mina-${network}-generic" "mina-${network}" \
+    "mina-${network}, mina-${network}-generic"
 
   build_deb "${package_name}"
 }
@@ -822,13 +835,18 @@ build_daemon_generic_deb() {
   local _suffix="${DEB_SUFFIX#-}"
   MINA_GENERIC_DEB_NAME="mina-${network}-generic${_suffix:+-${_suffix}}"
 
+  # The generic package owns /usr/local/bin/mina and /etc/bash_completion.d/mina,
+  # which are also shipped by the postfork automode package. Declare
+  # Replaces/Breaks against it (as the full daemon does) so that transitioning
+  # from automode back to the normal split layout does not trip a dpkg file
+  # conflict on those shared paths.
   create_control_file "${MINA_GENERIC_DEB_NAME}" "${SHARED_DEPS}${DAEMON_DEPS}" \
     "Mina Protocol Client and Daemon for the Generic ${network} Network" \
-    "${SUGGESTED_DEPS}" "mina-${network} (<< ${MINA_DEB_VERSION})"
+    "${SUGGESTED_DEPS}" "mina-${network} (<< ${MINA_DEB_VERSION}), mina-${network}-postfork-${POSTFORK_CODENAME}"
 
   copy_common_daemon_apps "${network}"
 
-  copy_common_daemon_utils "seed-lists/${network}_seeds.txt"
+  copy_common_daemon_utils
 
   build_deb "${MINA_GENERIC_DEB_NAME}"
 
@@ -889,6 +907,10 @@ build_daemon_hardfork_config_deb() {
     "Mina Protocol hardfork config for the ${network} Network" "" "mina-${network} (<< ${MINA_DEB_VERSION})"
 
   copy_common_daemon_hardfork_configs "${network}"
+
+  # The hardfork config package owns mina.service, consistent with the regular
+  # config package, with the correct per-network seed peer URL.
+  install_mina_service "${network}"
 
   build_deb "${package_name}"
   ARCHITECTURE="${saved_arch}"

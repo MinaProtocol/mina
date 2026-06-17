@@ -1012,7 +1012,8 @@ end = struct
       Strict_pipe.create ~name:"knowledge-requests" Strict_pipe.Synchronous
     in
     upon stop (fun () -> Strict_pipe.Writer.close request_w) ;
-    let refresh_knowledge stop peer =
+    let refresh_knowledge forgot_peer peer =
+      let stop = Deferred.any [ forgot_peer; stop ] in
       Clock.every' (Time.Span.of_min 7.) ~stop (fun () ->
           match%bind jobs_to_download stop with
           | `Finished ->

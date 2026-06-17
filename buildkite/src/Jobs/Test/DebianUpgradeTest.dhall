@@ -40,7 +40,8 @@ let buildTestCmd
                         --codename bullseye \
                         --channel alpha \
                         --package mina-devnet \
-                        --new-debian "debians/bullseye/mina-devnet_*.deb"
+                        --install-packages mina-devnet-generic,mina-devnet-config \
+                        --new-debian "debians/bullseye/mina-devnet-generic_*.deb"
                       ''
                 , label = "Debian upgrade test (bullseye)"
                 , key = key

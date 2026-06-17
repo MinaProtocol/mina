@@ -12,8 +12,7 @@ let Repo = ./DockerRepo.dhall
 
 let Artifact
     : Type
-    = < Daemon
-      | DaemonLegacyHardfork
+    = < DaemonLegacyHardfork
       | DaemonAppsOnly
       | DaemonPrefork
       | DaemonAutoHardfork
@@ -23,7 +22,6 @@ let Artifact
       | Archive
       | TestExecutive
       | BatchTxn
-      | Rosetta
       | RosettaAppsOnly
       | RosettaConfig
       | ZkappTestTransaction
@@ -35,8 +33,7 @@ let Artifact
       >
 
 let All =
-      [ Artifact.Daemon
-      , Artifact.DaemonLegacyHardfork
+      [ Artifact.DaemonLegacyHardfork
       , Artifact.DaemonPrefork
       , Artifact.DaemonAutoHardfork
       , Artifact.DaemonAutomode
@@ -46,7 +43,6 @@ let All =
       , Artifact.Archive
       , Artifact.BatchTxn
       , Artifact.TestExecutive
-      , Artifact.Rosetta
       , Artifact.ZkappTestTransaction
       , Artifact.RosettaAppsOnly
       , Artifact.RosettaConfig
@@ -58,18 +54,16 @@ let All =
       ]
 
 let Main =
-      [ Artifact.Daemon
-      , Artifact.DaemonConfig
+      [ Artifact.DaemonConfig
       , Artifact.LogProc
       , Artifact.Archive
-      , Artifact.Rosetta
+      , Artifact.RosettaConfig
       ]
 
 let capitalName =
           \(artifact : Artifact)
       ->  merge
-            { Daemon = "Daemon"
-            , DaemonPrefork = "DaemonPrefork"
+            { DaemonPrefork = "DaemonPrefork"
             , DaemonLegacyHardfork = "DaemonLegacyHardfork"
             , DaemonAutoHardfork = "DaemonAutoHardfork"
             , DaemonAutomode = "DaemonAutomode"
@@ -79,7 +73,6 @@ let capitalName =
             , Archive = "Archive"
             , TestExecutive = "TestExecutive"
             , BatchTxn = "BatchTxn"
-            , Rosetta = "Rosetta"
             , RosettaAppsOnly = "RosettaAppsOnly"
             , RosettaConfig = "RosettaConfig"
             , ZkappTestTransaction = "ZkappTestTransaction"
@@ -94,8 +87,7 @@ let capitalName =
 let lowerName =
           \(artifact : Artifact)
       ->  merge
-            { Daemon = "daemon"
-            , DaemonPrefork = "daemon_prefork"
+            { DaemonPrefork = "daemon_prefork"
             , DaemonLegacyHardfork = "daemon_hardfork"
             , DaemonAutoHardfork = "daemon_auto_hardfork"
             , DaemonAutomode = "daemon_automode"
@@ -105,7 +97,6 @@ let lowerName =
             , Archive = "archive"
             , TestExecutive = "test_executive"
             , BatchTxn = "batch_txn"
-            , Rosetta = "rosetta"
             , RosettaAppsOnly = "rosetta_apps_only"
             , RosettaConfig = "rosetta_config"
             , ZkappTestTransaction = "zkapp_test_transaction"
@@ -120,8 +111,7 @@ let lowerName =
 let dockerServiceName =
           \(artifact : Artifact)
       ->  merge
-            { Daemon = "mina-daemon"
-            , DaemonPrefork = ""
+            { DaemonPrefork = ""
             , DaemonLegacyHardfork = "mina-daemon-legacy-hardfork"
             , DaemonAutoHardfork = "mina-daemon-auto-hardfork"
             , DaemonAutomode = ""
@@ -130,7 +120,6 @@ let dockerServiceName =
             , TestExecutive = "mina-test-executive"
             , LogProc = "mina-logproc"
             , BatchTxn = "mina-batch-txn"
-            , Rosetta = "mina-rosetta"
             , RosettaAppsOnly = "mina-rosetta"
             , RosettaConfig = "mina-rosetta-configured"
             , ZkappTestTransaction = "mina-zkapp-test-transaction"
@@ -147,7 +136,6 @@ let dockerName =
           \(artifact : Artifact)
       ->  merge
             { DaemonConfig = "mina-daemon"
-            , Daemon = dockerServiceName artifact
             , DaemonPrefork = dockerServiceName artifact
             , DaemonLegacyHardfork = dockerServiceName artifact
             , DaemonAutoHardfork = dockerServiceName artifact
@@ -157,7 +145,6 @@ let dockerName =
             , TestExecutive = dockerServiceName artifact
             , LogProc = dockerServiceName artifact
             , BatchTxn = dockerServiceName artifact
-            , Rosetta = dockerServiceName artifact
             , RosettaAppsOnly = dockerServiceName artifact
             , RosettaConfig = "mina-rosetta"
             , ZkappTestTransaction = dockerServiceName artifact
@@ -181,8 +168,7 @@ let toDebianName =
           \(artifact : Artifact)
       ->  \(network : Network.Type)
       ->  merge
-            { Daemon = "daemon_${Network.lowerName network}"
-            , DaemonPrefork = "daemon_${Network.lowerName network}_prefork"
+            { DaemonPrefork = "daemon_${Network.lowerName network}_prefork"
             , DaemonLegacyHardfork =
                 "daemon_${Network.lowerName network}_hardfork_config"
             , DaemonAutoHardfork =
@@ -193,8 +179,7 @@ let toDebianName =
             , Archive = "archive_${Network.lowerName network}"
             , TestExecutive = "test_executive"
             , BatchTxn = "batch_txn"
-            , Rosetta = "rosetta_${Network.lowerName network}"
-            , RosettaAppsOnly = ""
+            , RosettaAppsOnly = "rosetta_${Network.lowerName network}"
             , RosettaConfig = ""
             , ZkappTestTransaction = "zkapp_test_transaction"
             , FunctionalTestSuite = "functional_test_suite"
@@ -216,8 +201,7 @@ let toDebianNames =
                   (List Text)
                   (     \(a : Artifact)
                     ->  merge
-                          { Daemon = [ toDebianName a network ]
-                          , DaemonPrefork = [ toDebianName a network ]
+                          { DaemonPrefork = [ toDebianName a network ]
                           , DaemonLegacyHardfork = [ toDebianName a network ]
                           , DaemonAutoHardfork = [ toDebianName a network ]
                           , DaemonAutomode = [ toDebianName a network ]
@@ -227,7 +211,6 @@ let toDebianNames =
                           , LogProc = [ "logproc" ]
                           , TestExecutive = [ "test_executive" ]
                           , BatchTxn = [ "batch_txn" ]
-                          , Rosetta = [ toDebianName a network ]
                           , RosettaAppsOnly = [ toDebianName a network ]
                           , RosettaConfig = [ toDebianName a network ]
                           , ZkappTestTransaction = [ "zkapp_test_transaction" ]
@@ -261,7 +244,7 @@ let Tag =
           , remove_profile_from_name : Bool
           }
       , default =
-          { artifact = Artifact.Daemon
+          { artifact = Artifact.DaemonConfig
           , version = "\\\${MINA_DOCKER_TAG}"
           , profile = Profiles.Type.Devnet
           , buildFlags = BuildFlags.Type.None
@@ -291,9 +274,7 @@ let dockerTag =
           let extra_build_flags_part = BuildFlags.toLabelSegment spec.buildFlags
 
           in  merge
-                { Daemon =
-                    "${spec.version}${network_part}${extraordinary_profile_part}${extra_build_flags_part}"
-                , DaemonPrefork = ""
+                { DaemonPrefork = ""
                 , DaemonAutomode = ""
                 , DaemonLegacyHardfork =
                     "${spec.version}${network_part}${extraordinary_profile_part}"
@@ -306,8 +287,6 @@ let dockerTag =
                 , LogProc = "${spec.version}"
                 , TestExecutive = "${spec.version}"
                 , BatchTxn = "${spec.version}"
-                , Rosetta =
-                    "${spec.version}${network_part}${extraordinary_profile_part}${extra_build_flags_part}"
                 , RosettaConfig =
                     "${spec.version}${network_part}${extraordinary_profile_part}${extra_build_flags_part}"
                 , RosettaAppsOnly =
@@ -318,7 +297,8 @@ let dockerTag =
                 , Toolchain = "${spec.version}"
                 , DelegationVerifier = "${spec.version}"
                 , CreatePreforkGenesis = "${spec.version}"
-                , DaemonConfig = "${spec.version}"
+                , DaemonConfig =
+                    "${spec.version}${network_part}${extraordinary_profile_part}${extra_build_flags_part}"
                 , DaemonStorageToolbox = "${spec.version}"
                 }
                 spec.artifact
@@ -333,7 +313,7 @@ let test_daemon_testnet_devnet =
         assert
       :     "1.0.0-devnet"
         ===  dockerTag
-               { artifact = Artifact.Daemon
+               { artifact = Artifact.DaemonConfig
                , version = "1.0.0"
                , profile = Profiles.Type.Devnet
                , network = Network.Type.Devnet
@@ -345,7 +325,7 @@ let test_daemon_mainnet_mainnet =
         assert
       :     "1.0.0-mainnet"
         ===  dockerTag
-               { artifact = Artifact.Daemon
+               { artifact = Artifact.DaemonConfig
                , version = "1.0.0"
                , profile = Profiles.Type.Mainnet
                , network = Network.Type.Mainnet
@@ -357,7 +337,7 @@ let test_daemon_instrumented =
         assert
       :     "1.0.0-devnet-instrumented"
         ===  dockerTag
-               { artifact = Artifact.Daemon
+               { artifact = Artifact.DaemonConfig
                , version = "1.0.0"
                , profile = Profiles.Type.Devnet
                , network = Network.Type.Devnet
@@ -393,7 +373,7 @@ let test_rosetta_testnet =
         assert
       :     "1.0.0-devnet"
         ===  dockerTag
-               { artifact = Artifact.Rosetta
+               { artifact = Artifact.RosettaConfig
                , version = "1.0.0"
                , profile = Profiles.Type.Devnet
                , network = Network.Type.Devnet
@@ -405,7 +385,7 @@ let test_rosetta_mainnet =
         assert
       :     "1.0.0-mainnet"
         ===  dockerTag
-               { artifact = Artifact.Rosetta
+               { artifact = Artifact.RosettaConfig
                , version = "1.0.0"
                , profile = Profiles.Type.Mainnet
                , network = Network.Type.Mainnet
@@ -465,7 +445,7 @@ let test_lightnet_instrumented =
         assert
       :     "1.0.0-lightnet-instrumented"
         ===  dockerTag
-               { artifact = Artifact.Daemon
+               { artifact = Artifact.DaemonConfig
                , version = "1.0.0"
                , profile = Profiles.Type.Lightnet
                , network = Network.Type.Devnet

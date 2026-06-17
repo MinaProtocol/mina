@@ -26,8 +26,7 @@ let dependsOn =
 
 let key = "archive-hardfork-toolbox-test"
 
-let debs =
-      "mina-devnet-instrumented,mina-archive-devnet-instrumented,mina-rosetta-devnet"
+let debs = "mina-archive-devnet-instrumented"
 
 in  Pipeline.build
       Pipeline.Config::{
