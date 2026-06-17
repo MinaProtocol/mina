@@ -5,16 +5,15 @@ let PipelineTag = ../../Pipeline/Tag.dhall
 let Size = ../../Command/Size.dhall
 
 in  SimpleUnitTestJob.build
-      { name = "RosettaUnitTest"
-      , keyPrefix = "rosetta"
-      , label = "Rosetta unit tests"
+      { name = "MinaHealthcheckUnitTest"
+      , keyPrefix = "mina-healthcheck"
+      , label = "Mina healthcheck unit tests"
       , testProfile = "dev"
-      , testPath = "src/app/rosetta"
+      , testPath = "src/app/mina_healthcheck"
       , tags =
-        [ PipelineTag.Type.Long
+        [ PipelineTag.Type.Fast
         , PipelineTag.Type.Test
         , PipelineTag.Type.Stable
-        , PipelineTag.Type.Rosetta
         ]
       , cmdTarget = Size.Small
       }
