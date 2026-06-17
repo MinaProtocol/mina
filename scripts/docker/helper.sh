@@ -5,7 +5,7 @@ set -eox pipefail
 source "$(dirname "$0")/../export-git-env-vars.sh"
 
 # Array of valid service names
-export VALID_SERVICES=('mina-archive' 'mina-daemon' 'mina-daemon-generic' 'mina-daemon-configured' 'mina-daemon-legacy-hardfork' 'mina-daemon-auto-hardfork' 'mina-rosetta' 'mina-rosetta-generic' 'mina-rosetta-configured' 'mina-toolchain' 'leaderboard' 'delegation-backend' 'mina-delegation-verifier' 'delegation-backend-toolchain')
+export VALID_SERVICES=('mina-archive' 'mina-daemon' 'mina-daemon-generic' 'mina-daemon-profiled' 'mina-daemon-configured' 'mina-daemon-legacy-hardfork' 'mina-daemon-auto-hardfork' 'mina-rosetta' 'mina-rosetta-generic' 'mina-rosetta-configured' 'mina-toolchain' 'leaderboard' 'delegation-backend' 'mina-delegation-verifier' 'delegation-backend-toolchain')
 
 function export_base_image () {
     # Determine the proper image for ubuntu or debian.
@@ -27,6 +27,11 @@ function export_base_image () {
 }
 
 function export_version () {
+    # Network-free images (the single generic daemon and the per-profile
+    # profiled daemons) must NOT carry a network segment in their semantic tag.
+    if [[ "${NETWORKLESS_TAG:-0}" == "1" ]]; then
+        return
+    fi
     case "${SERVICE}" in
         mina-daemon|mina-archive|mina-rosetta|mina-daemon-auto-hardfork) export VERSION="${VERSION}-${NETWORK##*=}" ;;
         *)  ;;
@@ -47,14 +52,25 @@ function export_suffixes () {
     local __raw_suffix=""
     local __sep=""
 
-    if [[ -n "${DOCKER_DEB_SUFFIX:-}" ]]; then
-        __raw_suffix="${DOCKER_DEB_SUFFIX}"
+    if [[ "${PROFILED_TAG:-0}" == "1" ]]; then
+        # Profiled daemon images: tag suffix is "${profile}-generic" for
+        # devnet/mainnet, or just "lightnet" for lightnet (no -generic).
+        if [[ "${DEB_PROFILE:-}" == "lightnet" ]]; then
+            __raw_suffix="lightnet"
+        else
+            __raw_suffix="${DEB_PROFILE}-generic"
+        fi
         __sep="-"
-    fi
+    else
+        if [[ -n "${DOCKER_DEB_SUFFIX:-}" ]]; then
+            __raw_suffix="${DOCKER_DEB_SUFFIX}"
+            __sep="-"
+        fi
 
-    if [[ "${DEB_PROFILE:-}" == "lightnet" ]]; then
-        __raw_suffix="${__raw_suffix}${__sep}lightnet"
-        __sep="-"
+        if [[ "${DEB_PROFILE:-}" == "lightnet" ]]; then
+            __raw_suffix="${__raw_suffix}${__sep}lightnet"
+            __sep="-"
+        fi
     fi
 
     if [[ "${DEB_BUILD_FLAGS:-}" == *instrumented* ]]; then

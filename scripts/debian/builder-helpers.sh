@@ -55,23 +55,6 @@ MINA_ARCHIVE_DEB_NAME="mina-archive-devnet"
 DUNE_PROFILE="${DUNE_PROFILE:-dev}"
 DEB_SUFFIX=""
 
-profile_package_network() {
-  case "${DUNE_PROFILE}" in
-    mainnet)
-      printf "mainnet"
-      ;;
-    dev|devnet|lightnet)
-      printf "devnet"
-      ;;
-    *)
-      echo "Unknown DUNE_PROFILE provided: ${DUNE_PROFILE}" >&2
-      exit 1
-      ;;
-  esac
-}
-
-PROFILE_DEB_NETWORK="$(profile_package_network)"
-PROFILE_DEB_NAME="mina-${PROFILE_DEB_NETWORK}-profile"
 
 # Add suffix to debian to distinguish different profiles
 # (mainnet/devnet/lightnet)
@@ -96,21 +79,6 @@ if [[ -v DUNE_INSTRUMENT_WITH ]]; then
 fi
 
 BUILDDIR="deb_build"
-
-signature_of_network() {
-  case "${network}" in
-    mainnet)
-      printf "mainnet"
-      ;;
-    devnet|mesa)
-      printf "testnet"
-      ;;
-    *)
-      echo "Unknown network name provided: ${network}" >&2
-      exit 1
-      ;;
-  esac
-}
 
 # Function to ease creation of Debian package control files
 create_control_file() {
@@ -282,16 +250,10 @@ copy_common_daemon_utils() {
 # Copies common daemon binaries only to debian package
 copy_common_daemon_apps() {
 
-  local network="${1}"
-
   echo "------------------------------------------------------------"
   echo "copy_common_daemon_apps inputs:"
-  echo "Signature Type: ${network} (mainnet or testnet)"
 
-  local TARGET_ROOT_DIR="${2:-${BUILDDIR}/usr/local/bin}"
-
-  local signature
-  signature=$(signature_of_network "$network")
+  local TARGET_ROOT_DIR="${1:-${BUILDDIR}/usr/local/bin}"
 
   echo "Target Root Dir: ${TARGET_ROOT_DIR}"
 
@@ -312,8 +274,7 @@ copy_common_daemon_apps() {
   cp ./default/src/app/mina_healthcheck/mina_healthcheck.exe \
     "${TARGET_ROOT_DIR}/mina-healthcheck"
 
-  # Copy signature-based Binaries
-  cp ./default/src/app/cli/src/mina_"${signature}"_signatures.exe \
+  cp ./default/src/app/cli/src/mina.exe \
     "${TARGET_ROOT_DIR}/mina"
 
   # GraphQL client utility (used by CI scripts; replaces ad-hoc curl invocations)
@@ -508,6 +469,50 @@ build_functional_test_suite_deb() {
 }
 ## END TEST SUITE PACKAGE ##
 
+## ROSETTA GENERIC PACKAGE ##
+
+#
+# Builds mina-rosetta-generic package for Rosetta API without network awareness
+#
+# Output: mina-rosetta-generic_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
+# Dependencies: ${SHARED_DEPS}
+#
+# Rosetta API implementation
+#
+build_rosetta_generic_deb() {
+
+  echo "------------------------------------------------------------"
+  echo "--- Building rosetta generic deb"
+
+  local package_name="mina-rosetta-generic${DEB_SUFFIX}"
+
+  create_control_file "${package_name}" "${SHARED_DEPS}" \
+    'Mina Protocol Rosetta Generic' "${SUGGESTED_DEPS}"
+
+  mkdir -p "${BUILDDIR}/usr/local/bin"
+
+
+  # Copy rosetta-based Binaries
+  cp "./default/src/app/rosetta/rosetta.exe" \
+    "${BUILDDIR}/usr/local/bin/mina-rosetta"
+  cp "./default/src/app/rosetta/ocaml-signer/signer.exe" \
+    "${BUILDDIR}/usr/local/bin/mina-ocaml-signer"
+
+  mkdir -p "${BUILDDIR}/etc/mina/rosetta/"{rosetta-cli-config,scripts}
+
+  # --- Copy artifacts
+  cp ../src/app/rosetta/scripts/* "${BUILDDIR}/etc/mina/rosetta/scripts"
+  cp ../src/app/rosetta/rosetta-cli-config/*.json \
+    "${BUILDDIR}/etc/mina/rosetta/rosetta-cli-config"
+  cp ../src/app/rosetta/rosetta-cli-config/*.ros \
+    "${BUILDDIR}/etc/mina/rosetta/rosetta-cli-config"
+  cp ./default/src/app/rosetta/indexer_test/indexer_test.exe \
+    "${BUILDDIR}/usr/local/bin/mina-rosetta-indexer-test"
+
+  build_deb "${package_name}"
+}
+## END ROSETTA GENERIC PACKAGE ##
+
 ## ROSETTA PACKAGE ##
 
 #
@@ -525,20 +530,17 @@ build_rosetta_deb() {
   echo "------------------------------------------------------------"
   echo "--- Building ${network} rosetta deb"
 
-  local package_name="mina-rosetta-${network}"
+  local package_name="mina-rosetta-${network}${DEB_SUFFIX}"
 
-  create_control_file "${package_name}" "${SHARED_DEPS}, ${PROFILE_DEB_NAME} (>= ${MINA_DEB_VERSION})" \
+  create_control_file "${package_name}" "${SHARED_DEPS}" \
     'Mina Protocol Rosetta Client' "${SUGGESTED_DEPS}"
 
   mkdir -p "${BUILDDIR}/usr/local/bin"
 
-  local signature
-  signature=$(signature_of_network "$network")
-
-  # Copy rosetta-based Binaries
-  cp "./default/src/app/rosetta/rosetta_${signature}_signatures.exe" \
+  # Rosetta binaries (self-contained network package).
+  cp "./default/src/app/rosetta/rosetta.exe" \
     "${BUILDDIR}/usr/local/bin/mina-rosetta"
-  cp "./default/src/app/rosetta/ocaml-signer/signer_${signature}_signatures.exe" \
+  cp "./default/src/app/rosetta/ocaml-signer/signer.exe" \
     "${BUILDDIR}/usr/local/bin/mina-ocaml-signer"
 
   mkdir -p "${BUILDDIR}/etc/mina/rosetta/"{rosetta-cli-config,scripts}
@@ -559,26 +561,26 @@ build_rosetta_deb() {
 ## PROFILE PACKAGE ##
 build_profile_deb() {
 
-  local network="${1}"
+  local profile="${1}"
 
-  local package_name="mina-${network}-profile"
+  local package_name="mina-${profile}-profile"
 
   echo "--- Building package ${package_name}"
   echo "------------------------------------------------------------"
   echo "build_profile_deb inputs:"
-  echo "Network Name: ${1} (like mainnet, devnet, testnet-generic)"
+  echo "Profile Name: ${1} (like mainnet, devnet, lightnet, dev)"
 
   create_control_file "${package_name}" "" \
-    "Mina profile for network ${network}" "" "mina-${network} (<< ${MINA_DEB_VERSION})"
+    "Mina profile for network ${profile}" "" "mina-${profile} (<< ${MINA_DEB_VERSION})"
 
-  # Store node config hint (based on NETWORK_NAME)
+  # Store node config hint (based on DUNE_PROFILE)
   mkdir -p "${BUILDDIR}/etc/coda/build_config"
-  case "${network}" in
-    mainnet|devnet)
-      printf "${network}" > "${BUILDDIR}/etc/coda/build_config/PROFILE"
+  case "${profile}" in
+    mainnet|lightnet|dev|devnet)
+      printf "${profile}" > "${BUILDDIR}/etc/coda/build_config/PROFILE"
       ;;
     *)
-      printf "Unknown network ${network} provided for profile deb" >&2
+      printf "Unknown profile ${profile} provided for profile deb" >&2
       exit 1
       ;;
   esac
@@ -620,58 +622,6 @@ build_daemon_config_deb() {
 }
 ## END CONFIG PACKAGE ##
 
-## DAEMON PACKAGE ##
-
-#
-# Builds mina-NETWORK package for specified network
-#
-# Output: 
-# - If we're building for mainnet: mina-${NETWORK}_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
-# - If we're building for devnet: ${MINA_DEB_NAME}_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
-#   Where MINA_DEB_NAME can be:
-#     - "mina-devnet" (default)
-#     - "mina-devnet-lightnet" (if DUNE_PROFILE=lightnet)
-#     - "mina-devnet-instrumented" (if DUNE_INSTRUMENT_WITH is set)
-#     - "mina-devnet-lightnet-instrumented" (both conditions)
-# Dependencies: ${SHARED_DEPS}${DAEMON_DEPS} (includes libpq-dev, jemalloc, logproc)
-#
-# Full daemon package with signature, genesis ledger and seed list for specified network.
-#
-build_daemon_deb() {
-
-  local network="$1"
-
-  echo "------------------------------------------------------------"
-  echo "--- Building ${network} daemon deb without keys:"
-
-  local package_name
-  case "${network}" in
-    mainnet)
-      package_name="mina-mainnet"
-      ;;
-    devnet)
-      package_name="${MINA_DEB_NAME}"
-      ;;
-    mesa)
-      package_name="mina-mesa"
-      ;;
-    *)
-      echo "Unknown network name provided: ${network}"; exit 1
-      ;;
-  esac
-
-  create_control_file "${package_name}" "${SHARED_DEPS}${DAEMON_DEPS}, mina-${network}-config (>=${MINA_DEB_VERSION}), ${PROFILE_DEB_NAME} (>= ${MINA_DEB_VERSION})" \
-    'Mina Protocol Client and Daemon' "${SUGGESTED_DEPS}" "mina-${network} (<< ${MINA_DEB_VERSION}), mina-${network}-postfork-${POSTFORK_CODENAME}"
-
-  copy_common_daemon_apps "${network}"
-
-  copy_common_daemon_utils
-
-  build_deb "${package_name}"
-}
-
-## END DAEMON PACKAGE ##
-
 ## PREFORK PACKAGE ##
 
 # For automode purpose. We need to control location for both runtimes
@@ -703,7 +653,7 @@ build_daemon_prefork_deb() {
   create_control_file "${package_name}" "${SHARED_DEPS}${DAEMON_DEPS}" \
     "Mina Protocol Client and Daemon for prefork under network ${network}" "${SUGGESTED_DEPS}"
 
-  copy_common_daemon_apps "${network}" "$AUTOMODE_CURRENT_DIR"
+  copy_common_daemon_apps "$AUTOMODE_CURRENT_DIR"
 
   build_deb "${package_name}"
 }
@@ -713,6 +663,24 @@ build_daemon_prefork_deb() {
 # for automode runtimes that share the same dispatcher but different runtimes
 create_symlinks_for_shared_apps() {
   local NETWORK_NAME=${1}
+
+  # The dispatcher resolves the hardfork activation marker from
+  # auto-fork-${MINA_NETWORK}-${MINA_PROFILE}, so MINA_PROFILE must be the
+  # deployment profile of this network (devnet/mainnet), NOT the build-time
+  # DUNE_PROFILE (which is "dev" for the regular build and would never match the
+  # devnet/mainnet activation markers).
+  local dispatch_profile
+  case "${NETWORK_NAME}" in
+    mainnet)
+      dispatch_profile="mainnet"
+      ;;
+    devnet)
+      dispatch_profile="devnet"
+      ;;
+    *)
+      echo "Not supported network name provided for post fork deb: ${NETWORK_NAME}"; exit 1
+      ;;
+  esac
 
   mkdir -p "${BUILDDIR}/usr/local/bin"
 
@@ -725,7 +693,7 @@ create_symlinks_for_shared_apps() {
   # MINA_NETWORK is hardcoded as ocaml generation code in mina_run.ml
     cat << EOF > "${BUILDDIR}/etc/default/mina-dispatch"
 MINA_NETWORK=mesa
-MINA_PROFILE=${DUNE_PROFILE}
+MINA_PROFILE=${dispatch_profile}
 RUNTIMES_BASE_PATH="/usr/lib/mina"
 MINA_LIBP2P_ENVVAR_NAME="MINA_LIBP2P_HELPER_PATH"
 EOF
@@ -767,7 +735,7 @@ copy_common_daemon_post_automode_apps_and_configs() {
   # Copy binaries to separate directory as we need both berkeley and mesa binaries for automode packages
   # and they share the same dispatcher and some common apps,
   mkdir -p "${AUTOMODE_POSTFORK_DIR}"
-  copy_common_daemon_apps "${prefork_network}" "${AUTOMODE_POSTFORK_DIR}"
+  copy_common_daemon_apps "${AUTOMODE_POSTFORK_DIR}"
 
   # Create symlinks for shared apps in the main bin directory that
   # dispatch to the correct runtime based on env var set in /etc/default/mina-dispatch
@@ -805,17 +773,22 @@ copy_common_daemon_post_automode_apps_and_configs() {
 ## POSTFORK PACKAGE ##
 
 build_daemon_postfork_deb() {
-  local prefork_network="$1"
-  local package_name="mina-${prefork_network}-postfork-${POSTFORK_CODENAME}"
+  local network="$1"
+  local package_name="mina-${network}-postfork-${POSTFORK_CODENAME}"
 
 
   echo "------------------------------------------------------------"
-  echo "--- Building ${prefork_network} postfork deb for hardfork automode:"
+  echo "--- Building ${network} postfork deb for hardfork automode:"
 
+  # The postfork runtime ships /etc/bash_completion.d/mina (and shares the
+  # /usr/local/bin/mina dispatcher), which also lives in the network-free
+  # mina-generic package. Declare Replaces/Breaks on mina-generic so the two are
+  # mutually exclusive and the automode<->generic transition resolves cleanly
+  # instead of failing with a dpkg "trying to overwrite" file conflict.
   create_control_file "$package_name" "${SHARED_DEPS}${DAEMON_DEPS}" \
-    'Mina Protocol Client and Daemon' "${SUGGESTED_DEPS}"
+    'Mina Protocol Client and Daemon' "${SUGGESTED_DEPS}" "mina-generic"
 
-  copy_common_daemon_post_automode_apps_and_configs "${prefork_network}"
+  copy_common_daemon_post_automode_apps_and_configs "${network}"
 
   build_deb "$package_name"
 
@@ -830,11 +803,11 @@ build_daemon_postfork_deb() {
 #
 # This is an empty metapackage that depends on both prefork and postfork
 # automode packages. It Conflicts/Replaces mina-${NETWORK} (the legacy
-# monolithic package) AND mina-${NETWORK}-generic (the daemon-binary package in
+# monolithic package) AND mina-generic (the daemon-binary package in
 # the split layout, which owns /usr/local/bin/mina) so that running
 # `apt-get install mina-${NETWORK}-automode` removes whichever normal daemon is
 # present and pulls in both automode runtimes — and, symmetrically, so that
-# reinstalling mina-${NETWORK}-generic later removes the automode metapackage.
+# reinstalling mina-generic later removes the automode metapackage.
 # Provides mina-${NETWORK} for anything still depending on the legacy name.
 #
 # It also depends on mina-${NETWORK}-config: in the split layout that package
@@ -860,8 +833,8 @@ build_daemon_automode_deb() {
 
   create_control_file "${package_name}" "${depends}" \
     "Transitional metapackage for Mina ${network} automode (installs both prefork and postfork runtimes)" \
-    "" "mina-${network}, mina-${network}-generic" "mina-${network}" \
-    "mina-${network}, mina-${network}-generic"
+    "" "mina-${network}, mina-generic" "mina-${network}" \
+    "mina-${network}, mina-generic"
 
   build_deb "${package_name}"
 }
@@ -870,35 +843,29 @@ build_daemon_automode_deb() {
 ## GENERIC PACKAGE ##
 
 #
-# Builds Generic daemon package with profile-aware naming
+# Builds Generic daemon package with no profile nor network awareness.
 #
 # Output: ${MINA_GENERIC_DEB_NAME}_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
 # Where MINA_GENERIC_DEB_NAME can be:
-#   - "mina-NETWORK-generic" (default)
-#   - "mina-NETWORK-generic-lightnet" (if DUNE_PROFILE=lightnet)
-#   - "mina-NETWORK-generic-instrumented" (if DUNE_INSTRUMENT_WITH is set)
-#   - "mina-NETWORK-generic-lightnet-instrumented" (both conditions)
+#   - "mina-generic" (default)
 #
 # Dependencies: ${SHARED_DEPS}${DAEMON_DEPS}
 #
-# Generic daemon with specified signatures, without any configs (like ledgers etc.).
-# Package name includes suffixes for different profiles.
+# Generic daemon without specified signatures or configs (like ledgers etc.).
 #
 build_daemon_generic_deb() {
 
-  local network="$1"
-
   echo "------------------------------------------------------------"
-  echo "--- Building Mina Generic package for specified network without keys:"
+  echo "--- Building Mina Generic package"
 
   local _suffix="${DEB_SUFFIX#-}"
-  MINA_GENERIC_DEB_NAME="mina-${network}-generic${_suffix:+-${_suffix}}"
+  MINA_GENERIC_DEB_NAME="mina-generic${_suffix:+-${_suffix}}"
 
-  create_control_file "${MINA_GENERIC_DEB_NAME}" "${SHARED_DEPS}${DAEMON_DEPS}, ${PROFILE_DEB_NAME} (>= ${MINA_DEB_VERSION})" \
-    "Mina Protocol Client and Daemon for the Generic ${network} Network" \
-    "${SUGGESTED_DEPS}" "mina-${network} (<< ${MINA_DEB_VERSION}), mina-${network}-postfork-${POSTFORK_CODENAME}"
+  create_control_file "${MINA_GENERIC_DEB_NAME}" "${SHARED_DEPS}${DAEMON_DEPS}" \
+    "Mina Protocol Client and Daemon for the Generic usage" \
+    "${SUGGESTED_DEPS}"
 
-  copy_common_daemon_apps "${network}"
+  copy_common_daemon_apps
 
   copy_common_daemon_utils
 
@@ -1016,7 +983,7 @@ copy_common_archive_configs() {
 #
 # Builds mina-archive-devnet package for devnet archive node
 #
-# Output: 
+# Output:
 # - If network is one of mainnet: mina-archive-${NETWORK}_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
 # - O.w. if network is devnet: mina-archive-devnet-generic${DEB_SUFFIX}_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
 #   Where DEB_SUFFIX can be:
@@ -1032,13 +999,13 @@ build_archive_deb () {
   local package_name
   case "${network}" in
     mainnet)
-      package_name="mina-archive-mainnet"
+      package_name="mina-archive-mainnet${DEB_SUFFIX}"
       ;;
     devnet)
       package_name="$MINA_ARCHIVE_DEB_NAME"
       ;;
     mesa)
-      package_name="mina-archive-mesa${DEB_SUFFIX}"
+      package_name="mina-archive-${network}${DEB_SUFFIX}"
       ;;
     *)
       echo "Unknown network name provided: ${network}" >&2
@@ -1049,7 +1016,33 @@ build_archive_deb () {
   echo "------------------------------------------------------------"
   echo "--- Building archive ${network} deb"
 
-  create_control_file "${package_name}" "${ARCHIVE_DEPS}, ${PROFILE_DEB_NAME} (>= ${MINA_DEB_VERSION})" "Mina Archive Node for network ${network}"
+  create_control_file "${package_name}" "${ARCHIVE_DEPS}" "Mina Archive Node for network ${network}"
+
+  copy_common_archive_configs "${package_name}"
+
+}
+## END ARCHIVE PACKAGE ##
+
+
+#
+# Builds mina-archive-generic package for archive node. No profile nor network awareness, relies on
+# generic configuration from config package and profile package.
+#
+# Output:
+# - mina-archive-generic${DEB_SUFFIX}_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
+#   Where DEB_SUFFIX can be:
+#     - "" (empty, default)
+#     - "-instrumented" (if DUNE_INSTRUMENT_WITH is set)
+# Dependencies: ${ARCHIVE_DEPS} (libssl, libgomp, libpq-dev, libjemalloc)
+# Archive node package for devnet with all archive utilities and SQL scripts.
+build_archive_generic_deb () {
+
+  local package_name="mina-archive-generic${DEB_SUFFIX}"
+
+  echo "------------------------------------------------------------"
+  echo "--- Building archive generic deb"
+
+  create_control_file "${package_name}" "${ARCHIVE_DEPS}" "Mina Archive Node for generic usage"
 
   copy_common_archive_configs "${package_name}"
 

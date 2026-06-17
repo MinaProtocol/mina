@@ -200,28 +200,15 @@ build-logproc: ocaml_checks reformat-diff libp2p_helper ## Build the logproc exe
 		--profile=$(DUNE_PROFILE) \
 		&& echo "✅ Build complete"
 
-.PHONY: build-mainnet-sigs
-build-mainnet-sigs: ocaml_checks reformat-diff libp2p_helper build ## Build mainnet signature variants of the daemon
-	$(info 🏗️  Building mainnet signature variants with profile $(DUNE_PROFILE) and commit $(GITLONGHASH))
+.PHONY: build-mina
+build-mina: ocaml_checks reformat-diff libp2p_helper build ## Build mina apps
+	$(info 🏗️  Building on commit $(GITLONGHASH))
 	@(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && \
 	env MINA_COMMIT_SHA1=$(GITLONGHASH) \
 	dune build \
-		src/app/cli/src/mina_mainnet_signatures.exe \
-		src/app/rosetta/rosetta_mainnet_signatures.exe \
-		src/app/rosetta/ocaml-signer/signer_mainnet_signatures.exe \
-		--profile=mainnet \
-		&& echo "✅ Build complete"
-
-.PHONY: build-devnet-sigs
-build-devnet-sigs: ocaml_checks reformat-diff libp2p_helper build ## Build devnet signature variants of the daemon
-	$(info 🏗️  Building devnet signature variants with profile $(DUNE_PROFILE) and commit $(GITLONGHASH))
-	@(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && \
-	env MINA_COMMIT_SHA1=$(GITLONGHASH) \
-	dune build \
-		src/app/cli/src/mina_testnet_signatures.exe \
-		src/app/rosetta/rosetta_testnet_signatures.exe \
-		src/app/rosetta/ocaml-signer/signer_testnet_signatures.exe \
-		--profile=devnet \
+		src/app/cli/src/mina.exe \
+		src/app/rosetta/rosetta.exe \
+		src/app/rosetta/ocaml-signer/signer.exe \
 		&& echo "✅ Build complete"
 
 .PHONY: build-archive
@@ -299,13 +286,12 @@ build-intgtest: ocaml_checks ## Build integration test tools
 		src/app/logproc/logproc.exe \
 		&& echo "✅ Build complete"
 
-.PHONY: build-rosetta-mainnet-lib-encodings
-build-rosetta-mainnet-lib-encodings: ocaml_checks ## Test Rosetta library encodings
+.PHONY: build-rosetta-lib-encodings
+build-rosetta-lib-encodings: ocaml_checks ## Test Rosetta library encodings
 	$(info 🏗️  Building Rosetta library encodings with profile $(DUNE_PROFILE) and commit $(GITLONGHASH))
 	@(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && \
 	dune build \
 	  src/lib/rosetta_lib/test/test_encodings.exe \
-	  --profile=mainnet \
 		&& echo "✅ Build complete"
 
 .PHONY: build-replayer
@@ -576,8 +562,8 @@ endef
 debian-build-archive-devnet: ## Build the Debian archive package for devnet
 	$(call build_debian_package,archive_devnet)
 
-.PHONY: debian-build-archive-mainnet
-debian-build-archive-mainnet: ## Build the Debian archive package for mainnet
+.PHONY: debian-build-archive
+debian-build-archive: ## Build the Debian archive package for mainnet
 	$(call build_debian_package,archive_mainnet)
 
 .PHONY: debian-build-daemon-devnet-generic

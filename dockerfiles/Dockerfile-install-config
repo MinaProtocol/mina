@@ -10,10 +10,14 @@ ARG build_flags_suffix=""
 ARG deb_suffix=""
 ARG deb_arch="all"
 ARG version=latest
+# Network segment of the generic base image tag. Empty for the daemon (its
+# generic image is network-free: "<version>-generic"); "-<network>" for rosetta
+# (its generic image is still per-network: "<version>-<network>-generic").
+ARG generic_network=""
 
 # This Dockerfile is used to build a Docker image that contains only the Mina daemon configuration package.
 # It is intended to be used as a base image for other images that require the Mina daemon configuration, without including the full Mina daemon package and its dependencies.
-FROM ${docker_repo}/${image_name}:${version}-${network}-generic${build_flags_suffix}${custom_suffix}
+FROM ${docker_repo}/${image_name}:${version}${generic_network}-generic${build_flags_suffix}${custom_suffix}
 
 # In multi-stage builds, Docker requires to re-declare ARG variables after each FROM 
 # to make them available in that stage. 

@@ -48,10 +48,16 @@ if [ -z "$DEBS" ]; then
 else
   # shellcheck disable=SC2206
   debs=(${DEBS//,/ })
-  ./buildkite/scripts/cache/manager.sh read --root "$ROOT" "debians/$MINA_DEB_CODENAME/mina-*-profile*" $LOCAL_DEB_FOLDER
+  # Install a single profile package (devnet) as the on-disk default profile.
+  # The three mina-<profile>-profile packages all ship /etc/coda/build_config/PROFILE
+  # and are therefore mutually exclusive (installing all of them collides in dpkg).
+  # The daemon resolves its profile from MINA_PROFILE first and only falls back to
+  # this file, so tests needing a different profile (e.g. single-node-tests) set
+  # MINA_PROFILE themselves and override the devnet default.
+  ./buildkite/scripts/cache/manager.sh read --root "$ROOT" "debians/$MINA_DEB_CODENAME/mina-devnet-profile_*" $LOCAL_DEB_FOLDER
   for i in "${debs[@]}"; do
     case $i in
-      mina-devnet-generic*)
+      mina-generic*)
         # Download mina-logproc too
           ./buildkite/scripts/cache/manager.sh read --root "$ROOT" "debians/$MINA_DEB_CODENAME/mina-logproc*" $LOCAL_DEB_FOLDER
       ;;
