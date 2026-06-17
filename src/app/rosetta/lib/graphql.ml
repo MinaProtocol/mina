@@ -2,6 +2,22 @@ open Core_kernel
 open Async
 open Rosetta_lib
 
+let parse_response_body ~status_code body_str =
+  match status_code with
+  | 200 -> (
+      try Ok (Yojson.Basic.from_string body_str)
+      with _ ->
+        Error
+          (Errors.create
+             ~context:"Can't parse mina daemon's GraphQL response as json"
+             (`Graphql_mina_query
+               (Printf.sprintf "Can't parse as json: %s" body_str) ) ) )
+  | code ->
+      Error
+        (Errors.create ~context:"Response from Mina Daemon is not a 200"
+           (`Graphql_mina_query
+             (Printf.sprintf "Status code %d -- %s" code body_str) ) )
+
 let graphql_error_to_string e =
   let error_obj_to_string obj =
     let open Yojson.Basic in
@@ -49,25 +65,10 @@ let query ~minimum_user_command_fee query_obj uri =
   in
   let%bind body_json =
     Deferred.return
-    @@
-    match
-      Cohttp.Code.code_of_status (Cohttp_async.Response.status response)
-    with
-    | 200 -> (
-        try
-          let parsed = Yojson.Basic.from_string body_str in
-          Ok parsed
-        with _ ->
-          Error
-            (Errors.create
-               ~context:"Can't parse mina daemon's GraphQL response as json"
-               (`Graphql_mina_query
-                 (Printf.sprintf "Can't parse as json: %s" body_str) ) ) )
-    | code ->
-        Error
-          (Errors.create ~context:"Response from Mina Daemon is not a 200"
-             (`Graphql_mina_query
-               (Printf.sprintf "Status code %d -- %s" code body_str) ) )
+    @@ parse_response_body
+         ~status_code:
+           (Cohttp.Code.code_of_status (Cohttp_async.Response.status response))
+         body_str
   in
   let open Yojson.Basic.Util in
   ( match (member "errors" body_json, member "data" body_json) with
@@ -97,3 +98,44 @@ let query_and_catch ~minimum_user_command_fee query_obj uri =
   let open Deferred.Let_syntax in
   let%map res = query ~minimum_user_command_fee query_obj uri in
   match res with Ok r -> Ok (`Successful r) | Error e -> Ok (`Failed e)
+
+let%test_module "parse_response_body" =
+  ( module struct
+    let%test_unit "200 with valid JSON returns Ok" =
+      match parse_response_body ~status_code:200 "{\"key\":true}" with
+      | Ok _ ->
+          ()
+      | Error _ ->
+          failwith "expected Ok"
+
+    let%test_unit "200 with invalid JSON returns Error" =
+      match parse_response_body ~status_code:200 "not valid json" with
+      | Ok _ ->
+          failwith "expected Error"
+      | Error e ->
+          let expected =
+            Errors.create
+              ~context:"Can't parse mina daemon's GraphQL response as json"
+              (`Graphql_mina_query "Can't parse as json: not valid json")
+          in
+          assert (Errors.equal e expected)
+
+    let%test_unit "non-200 returns Error with status code" =
+      match parse_response_body ~status_code:500 "server error" with
+      | Ok _ ->
+          failwith "expected Error"
+      | Error e ->
+          let expected =
+            Errors.create
+              ~context:"Response from Mina Daemon is not a 200"
+              (`Graphql_mina_query "Status code 500 -- server error")
+          in
+          assert (Errors.equal e expected)
+
+    let%test_unit "200 with empty JSON object returns Ok" =
+      match parse_response_body ~status_code:200 "{}" with
+      | Ok _ ->
+          ()
+      | Error _ ->
+          failwith "expected Ok"
+  end )
