@@ -232,6 +232,17 @@ fi
 # Argument Processing
 # =============================================================================
 
+# Normalize a filesystem path for comparison purposes.
+# Collapses trailing slashes, "." / ".." segments and (for any existing
+# prefix) symlinks, so that paths that point to the same location compare
+# equal even when written differently (e.g. "/a/b", "/a/b/", "/a/./b").
+# The path does NOT need to exist (realpath -m is purely lexical for the
+# non-existent tail). Falls back to the raw value if realpath is unavailable.
+function normalize_path() {
+  local path="$1"
+  realpath -m -- "$path" 2>/dev/null || echo "$path"
+}
+
 # Detailed explanation of the argument processing logic
 function print_argument_warning() {
   echo "  Automatic argument adjustments are only implemented for the 'daemon' subcommand." >&2
@@ -336,7 +347,9 @@ if [[ "$runtime" == "mesa" ]]; then
         # Check config directory provided as next arg is equal to MINA_HARDFORK_STATE_PARENT_FOLDER
         if [[ "$has_next_arg" == true ]]; then
           provided_dir="${args[$next_i]}"
-          if [[ "$provided_dir" != "$MINA_HARDFORK_STATE_DIR" ]]; then
+          # Compare as normalized paths, not raw strings, so that equivalent
+          # spellings (trailing slash, "." / ".." segments) are accepted.
+          if [[ "$(normalize_path "$provided_dir")" != "$(normalize_path "$MINA_HARDFORK_STATE_DIR")" ]]; then
             echo "mina-dispatch ERROR: Discrepancy between provided --config-directory ($provided_dir) and expected ($MINA_HARDFORK_STATE_DIR)" >&2
             echo " Those must match for auto hardfork mode correct behavior." >&2
             echo " Please adjust your invocation accordingly." >&2
