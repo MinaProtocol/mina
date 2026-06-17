@@ -29,6 +29,154 @@ end
 type Structured_log_events.t += Block_produced
   [@@deriving register_event { msg = "Successfully produced a new block" }]
 
+module Zero_coinbase_logging = struct
+  type zero_coinbase_source =
+    | Slot_tx_end_reached of Mina_numbers.Global_slot_since_hard_fork.t
+    | Below_min_block_reward of
+        { threshold : Currency.Amount.t; reward : Currency.Amount.t }
+    | Generated_diff of Staged_ledger.Diff_creation_diagnostics.t
+    | Precomputed
+
+  type t = { supercharge_coinbase : bool; source : zero_coinbase_source }
+
+  let amount_is_zero = Currency.Amount.equal Currency.Amount.zero
+
+  let second_coinbase_parts = function
+    | Staged_ledger_diff.At_most_one.Zero ->
+        0
+    | One _ ->
+        1
+
+  let n_diff_coinbase_parts (diff : Staged_ledger_diff.t) =
+    let first, second_opt = diff.diff in
+    Staged_ledger.Diff_creation_diagnostics.coinbase_parts first.coinbase
+    + Option.value_map second_opt ~default:0 ~f:(fun second ->
+          second_coinbase_parts second.coinbase )
+
+  let sum_partitions diagnostics ~f =
+    List.sum
+      (module Int)
+      diagnostics.Staged_ledger.Diff_creation_diagnostics.partitions ~f
+
+  let generated_reason diagnostics =
+    let open Staged_ledger.Diff_creation_diagnostics in
+    let insufficient_work =
+      sum_partitions diagnostics ~f:(fun p ->
+          p.discard_counters.insufficient_work )
+    in
+    let insufficient_fees =
+      sum_partitions diagnostics ~f:(fun p ->
+          p.discard_counters.insufficient_fees )
+    in
+    let insufficient_space =
+      sum_partitions diagnostics ~f:(fun p ->
+          p.discard_counters.insufficient_space )
+    in
+    let start_commands =
+      sum_partitions diagnostics ~f:(fun p -> p.start_commands)
+    in
+    let start_completed_work =
+      sum_partitions diagnostics ~f:(fun p -> p.start_completed_work)
+    in
+    let end_commands =
+      sum_partitions diagnostics ~f:(fun p -> p.end_commands)
+    in
+    let end_completed_work =
+      sum_partitions diagnostics ~f:(fun p -> p.end_completed_work)
+    in
+    let end_coinbase_parts =
+      sum_partitions diagnostics ~f:(fun p -> p.end_coinbase_parts)
+    in
+    let no_resources =
+      start_commands = 0 && start_completed_work = 0 && end_commands = 0
+      && end_completed_work = 0 && end_coinbase_parts = 0
+    in
+    let reasons = [] in
+    let reasons =
+      if insufficient_work > 0 then "insufficient_work" :: reasons else reasons
+    in
+    let reasons =
+      if insufficient_fees > 0 then "insufficient_fees" :: reasons else reasons
+    in
+    let reasons =
+      if insufficient_space > 0 then "insufficient_space" :: reasons
+      else reasons
+    in
+    let reasons =
+      if no_resources then "empty_diff_no_resources" :: reasons else reasons
+    in
+    if List.is_empty reasons then [ "generated_diff_without_coinbase" ]
+    else reasons
+
+  let zero_reason ~coinbase_amount ~coinbase_parts { source; _ } =
+    match source with
+    | Slot_tx_end_reached _ ->
+        [ "slot_tx_end_reached" ]
+    | Below_min_block_reward _ ->
+        [ "below_min_block_reward" ]
+    | Precomputed ->
+        [ "precomputed_zero_coinbase" ]
+    | Generated_diff diagnostics ->
+        let reasons =
+          if Option.is_none coinbase_amount && coinbase_parts > 0 then
+            [ "coinbase_amount_unavailable" ]
+          else []
+        in
+        reasons @ generated_reason diagnostics
+
+  let source_diagnostics_json = function
+    | Slot_tx_end_reached slot_tx_end ->
+        `Assoc
+          [ ( "slot_tx_end"
+            , Mina_numbers.Global_slot_since_hard_fork.to_yojson slot_tx_end )
+          ]
+    | Below_min_block_reward { threshold; reward } ->
+        `Assoc
+          [ ("threshold", Currency.Amount.to_yojson threshold)
+          ; ("reward", Currency.Amount.to_yojson reward)
+          ]
+    | Generated_diff diagnostics ->
+        Staged_ledger.Diff_creation_diagnostics.to_yojson diagnostics
+    | Precomputed ->
+        `Assoc []
+
+  let metadata_if_coinbase_zero ~constraint_constants ~diff
+      ({ supercharge_coinbase; source } as t) =
+    let coinbase_amount =
+      Staged_ledger_diff.Diff.coinbase ~constraint_constants
+        ~supercharge_coinbase
+        (Staged_ledger_diff.diff diff)
+    in
+    let should_log =
+      match coinbase_amount with
+      | None ->
+          true
+      | Some amount ->
+          amount_is_zero amount
+    in
+    if should_log then
+      let coinbase_parts = n_diff_coinbase_parts diff in
+      [ ( "coinbase_amount"
+        , Option.value_map coinbase_amount ~default:(`String "unavailable")
+            ~f:Currency.Amount.to_yojson )
+      ; ( "zero_coinbase_reason"
+        , `List
+            (List.map (zero_reason ~coinbase_amount ~coinbase_parts t)
+               ~f:(fun r -> `String r) ) )
+      ; ("zero_coinbase_diagnostics", source_diagnostics_json source)
+      ]
+    else []
+end
+
+type generated_staged_ledger_diff =
+  { diff : Staged_ledger_diff.With_valid_signatures_and_proofs.t
+  ; next_staged_ledger_hash : Staged_ledger_hash.t
+  ; ledger_proof_opt : Ledger_proof.Cached.t option
+  ; is_new_stack : bool
+  ; pending_coinbase_update : Pending_coinbase.Update.t
+  ; coinbase_logging_source : Zero_coinbase_logging.zero_coinbase_source
+  }
+
 module Singleton_supervisor : sig
   type ('data, 'a) t
 
@@ -217,7 +365,7 @@ let generate_next_state ~commit_id ~zkapp_cmd_limit ~constraint_constants
           let coinbase_receiver =
             Consensus.Data.Block_data.coinbase_receiver block_data
           in
-          let diff =
+          let diff_with_logging =
             match slot_tx_end with
             | Some slot_tx_end
               when Mina_numbers.Global_slot_since_hard_fork.(
@@ -230,30 +378,35 @@ let generate_next_state ~commit_id ~zkapp_cmd_limit ~constraint_constants
                           slot_tx_end )
                     ] ;
                 Result.return
-                  Staged_ledger_diff.With_valid_signatures_and_proofs.empty_diff
+                  ( Staged_ledger_diff.With_valid_signatures_and_proofs
+                    .empty_diff
+                  , Zero_coinbase_logging.Slot_tx_end_reached slot_tx_end )
             | Some _ | None ->
                 O1trace.sync_thread "create_staged_ledger_diff" (fun () ->
                     [%log internal] "Create_staged_ledger_diff" ;
                     (* TODO: handle transaction inclusion failures here *)
                     let diff_result =
-                      Staged_ledger.create_diff ~constraint_constants
-                        ~global_slot staged_ledger ~coinbase_receiver ~logger
+                      Staged_ledger.create_diff_with_diagnostics
+                        ~constraint_constants ~global_slot staged_ledger
+                        ~coinbase_receiver ~logger
                         ~current_state_view:previous_state_view
                         ~transactions_by_fee:transactions ~get_completed_work
                         ~log_block_creation ~supercharge_coinbase
                         ~zkapp_cmd_limit
-                      |> Result.map ~f:(fun (diff, failed_txns) ->
+                      |> Result.map ~f:(fun (diff, failed_txns, diagnostics) ->
                              if not (List.is_empty failed_txns) then
                                don't_wait_for
                                  (report_transaction_inclusion_failures ~logger
                                     ~commit_id failed_txns ) ;
-                             diff )
+                             ( diff
+                             , Zero_coinbase_logging.Generated_diff diagnostics
+                             ) )
                       |> Result.map_error ~f:(fun err ->
                              Staged_ledger.Staged_ledger_error.Pre_diff err )
                     in
                     [%log internal] "Create_staged_ledger_diff_done" ;
                     match (diff_result, block_reward_threshold) with
-                    | Ok diff, Some threshold ->
+                    | Ok (diff, _), Some threshold ->
                         let net_return =
                           Option.value ~default:Currency.Amount.zero
                             (Staged_ledger_diff.net_return ~constraint_constants
@@ -272,28 +425,39 @@ let generate_next_state ~commit_id ~zkapp_cmd_limit ~constraint_constants
                               ; ("reward", Currency.Amount.to_yojson net_return)
                               ] ;
                           Ok
-                            Staged_ledger_diff.With_valid_signatures_and_proofs
-                            .empty_diff )
+                            ( Staged_ledger_diff.With_valid_signatures_and_proofs
+                              .empty_diff
+                            , Zero_coinbase_logging.Below_min_block_reward
+                                { threshold; reward = net_return } ) )
                     | _ ->
                         diff_result )
           in
           [%log internal] "Apply_staged_ledger_diff" ;
           match%map
-            let%bind.Deferred.Result diff = return diff in
-            Staged_ledger.apply_diff_unchecked staged_ledger
-              ~constraint_constants ~global_slot diff ~logger
-              ~current_state_view:previous_state_view
-              ~state_and_body_hash:
-                (previous_protocol_state_hash, previous_protocol_state_body_hash)
-              ~coinbase_receiver ~supercharge_coinbase ~zkapp_cmd_limit_hardcap
-              ~signature_kind
+            let%bind.Deferred.Result diff_with_logging =
+              return diff_with_logging
+            in
+            let diff, coinbase_logging_source = diff_with_logging in
+            let%map.Deferred.Result apply_diff_result =
+              Staged_ledger.apply_diff_unchecked staged_ledger
+                ~constraint_constants ~global_slot diff ~logger
+                ~current_state_view:previous_state_view
+                ~state_and_body_hash:
+                  ( previous_protocol_state_hash
+                  , previous_protocol_state_body_hash )
+                ~coinbase_receiver ~supercharge_coinbase
+                ~zkapp_cmd_limit_hardcap ~signature_kind
+            in
+            (diff, coinbase_logging_source, apply_diff_result)
           with
           | Ok
-              ( `Ledger_proof ledger_proof_opt
-              , `Staged_ledger transitioned_staged_ledger
-              , `Accounts_created _
-              , `Pending_coinbase_update (is_new_stack, pending_coinbase_update)
-              ) ->
+              ( diff
+              , coinbase_logging_source
+              , ( `Ledger_proof ledger_proof_opt
+                , `Staged_ledger transitioned_staged_ledger
+                , `Accounts_created _
+                , `Pending_coinbase_update
+                    (is_new_stack, pending_coinbase_update) ) ) ->
               [%log internal] "Hash_new_staged_ledger" ;
               let staged_ledger_hash =
                 Staged_ledger.hash transitioned_staged_ledger
@@ -304,18 +468,20 @@ let generate_next_state ~commit_id ~zkapp_cmd_limit ~constraint_constants
               @@ Mina_ledger.Ledger.unregister_mask_exn ~loc:__LOC__
                    (Staged_ledger.ledger transitioned_staged_ledger) ;
               Some
-                ( (match diff with Ok diff -> diff | Error _ -> assert false)
-                , staged_ledger_hash
-                , ledger_proof_opt
-                , is_new_stack
-                , pending_coinbase_update )
+                { diff
+                ; next_staged_ledger_hash = staged_ledger_hash
+                ; ledger_proof_opt
+                ; is_new_stack
+                ; pending_coinbase_update
+                ; coinbase_logging_source
+                }
           | Error (Staged_ledger.Staged_ledger_error.Unexpected e) ->
               [%log error] "Failed to apply the diff: $error"
                 ~metadata:[ ("error", Error_json.error_to_yojson e) ] ;
               None
           | Error e ->
-              ( match diff with
-              | Ok diff ->
+              ( match diff_with_logging with
+              | Ok (diff, _) ->
                   [%log error]
                     ~metadata:
                       [ ( "error"
@@ -341,11 +507,13 @@ let generate_next_state ~commit_id ~zkapp_cmd_limit ~constraint_constants
       | None ->
           Interruptible.return None
       | Some
-          ( diff
-          , next_staged_ledger_hash
-          , ledger_proof_opt
-          , is_new_stack
-          , pending_coinbase_update ) ->
+          { diff
+          ; next_staged_ledger_hash
+          ; ledger_proof_opt
+          ; is_new_stack
+          ; pending_coinbase_update
+          ; coinbase_logging_source
+          } ->
           let diff_unwrapped =
             Staged_ledger_diff.read_all_proofs_from_disk
             @@ Staged_ledger_diff.forget diff
@@ -433,7 +601,14 @@ let generate_next_state ~commit_id ~zkapp_cmd_limit ~constraint_constants
                 ; is_new_stack
                 }
               in
-              Some (protocol_state, internal_transition, witness) ) )
+              let coinbase_logging =
+                { Zero_coinbase_logging.supercharge_coinbase
+                ; source = coinbase_logging_source
+                }
+              in
+              Some
+                (protocol_state, internal_transition, witness, coinbase_logging) )
+      )
 
 let handle_block_production_errors ~logger ~rejected_blocks_logger
     ~time_taken:span ~previous_protocol_state ~protocol_state x =
@@ -802,7 +977,11 @@ let produce ~genesis_breadcrumb ~context:(module Context : CONTEXT) ~prover
       match next_state_opt with
       | None ->
           Interruptible.return ()
-      | Some (protocol_state, internal_transition, pending_coinbase_witness) ->
+      | Some
+          ( protocol_state
+          , internal_transition
+          , pending_coinbase_witness
+          , coinbase_logging ) ->
           let diff =
             Internal_transition.staged_ledger_diff internal_transition
           in
@@ -963,6 +1142,14 @@ let produce ~genesis_breadcrumb ~context:(module Context : CONTEXT) ~prover
                       @@ Breadcrumb.block breadcrumb )
                   ; ("transactions", `List txs)
                   ] ;
+              let zero_coinbase_metadata =
+                Zero_coinbase_logging.metadata_if_coinbase_zero
+                  ~constraint_constants ~diff:staged_ledger_diff
+                  coinbase_logging
+              in
+              if not (List.is_empty zero_coinbase_metadata) then
+                [%log warn] ~metadata:zero_coinbase_metadata
+                  "Produced block with zero coinbase: $zero_coinbase_reason" ;
               [%str_log info]
                 ~metadata:[ ("breadcrumb", Breadcrumb.to_yojson breadcrumb) ]
                 Block_produced ;
@@ -1457,15 +1644,24 @@ let run_precomputed ~context:(module Context : CONTEXT) ~verifier ~trust_system
           let previous_protocol_state_hash =
             State_hash.With_state_hashes.state_hash previous_transition
           in
+          let supercharge_coinbase =
+            Protocol_state.consensus_state protocol_state
+            |> Consensus.Data.Consensus_state.supercharge_coinbase
+          in
+          let coinbase_logging =
+            { Zero_coinbase_logging.supercharge_coinbase
+            ; source = Zero_coinbase_logging.Precomputed
+            }
+          in
           let header =
             Header.create ~protocol_state ~protocol_state_proof
               ~delta_block_chain_proof ()
           in
-          let body =
-            Body.create
-              (Staged_ledger_diff.write_all_proofs_to_disk ~signature_kind
-                 ~proof_cache_db staged_ledger_diff )
+          let staged_ledger_diff_for_block =
+            Staged_ledger_diff.write_all_proofs_to_disk ~signature_kind
+              ~proof_cache_db staged_ledger_diff
           in
+          let body = Body.create staged_ledger_diff_for_block in
           let%bind transition =
             let open Result.Let_syntax in
             Validation.wrap_header
@@ -1514,6 +1710,14 @@ let run_precomputed ~context:(module Context : CONTEXT) ~verifier ~trust_system
                        | `Parent_missing_from_frontier ) as err ->
                          err ) )
           in
+          let zero_coinbase_metadata =
+            Zero_coinbase_logging.metadata_if_coinbase_zero
+              ~constraint_constants ~diff:staged_ledger_diff_for_block
+              coinbase_logging
+          in
+          if not (List.is_empty zero_coinbase_metadata) then
+            [%log warn] ~metadata:zero_coinbase_metadata
+              "Produced block with zero coinbase: $zero_coinbase_reason" ;
           [%str_log trace]
             ~metadata:[ ("breadcrumb", Breadcrumb.to_yojson breadcrumb) ]
             Block_produced ;
