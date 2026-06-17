@@ -39,6 +39,73 @@ module T = struct
   module Scan_state = Transaction_snark_scan_state
   module Pre_diff_info = Pre_diff_info
 
+  module Diff_creation_diagnostics = struct
+    type discard_counters =
+      { insufficient_work : int
+      ; insufficient_space : int
+      ; insufficient_fees : int
+      ; extra_work : int
+      }
+    [@@deriving to_yojson]
+
+    type partition =
+      { partition : [ `First | `Second ]
+      ; start_commands : int
+      ; start_completed_work : int
+      ; available_slots : int
+      ; required_work_count : int
+      ; end_commands : int
+      ; end_completed_work : int
+      ; end_coinbase_parts : int
+      ; discard_counters : discard_counters
+      }
+    [@@deriving to_yojson]
+
+    type t =
+      { proof_count : int
+      ; valid_user_command_count : int
+      ; partitions : partition list
+      }
+    [@@deriving to_yojson]
+
+    let coinbase_parts = function
+      | Staged_ledger_diff.At_most_two.Zero ->
+          0
+      | One _ ->
+          1
+      | Two _ ->
+          2
+
+    let partition_of_summary (summary : Diff_creation_log.Summary.t) =
+      let start_commands, _ = summary.start_resources.commands in
+      let start_completed_work, _ = summary.start_resources.completed_work in
+      let end_commands, _ = summary.end_resources.commands in
+      let end_completed_work, _ = summary.end_resources.completed_work in
+      { partition = summary.partition
+      ; start_commands
+      ; start_completed_work
+      ; available_slots = summary.available_slots
+      ; required_work_count = summary.required_work_count
+      ; end_commands
+      ; end_completed_work
+      ; end_coinbase_parts =
+          coinbase_parts summary.end_resources.coinbase_work_fees
+      ; discard_counters =
+          { insufficient_work = summary.discarded_commands.insufficient_work
+          ; insufficient_space = summary.discarded_commands.insufficient_space
+          ; insufficient_fees =
+              summary.discarded_completed_work.insufficient_fees
+          ; extra_work = summary.discarded_completed_work.extra_work
+          }
+      }
+
+    let create ~proof_count ~valid_user_command_count summaries =
+      { proof_count
+      ; valid_user_command_count
+      ; partitions = List.map summaries ~f:partition_of_summary
+      }
+  end
+
   module Staged_ledger_error = struct
     type t =
       | Non_zero_fee_excess of
@@ -2019,7 +2086,7 @@ module T = struct
         : Ledger.unattached_mask ) ;
     r
 
-  let create_diff
+  let create_diff_with_diagnostics
       ~(constraint_constants : Genesis_constants.Constraint_constants.t)
       ~(global_slot : Mina_numbers.Global_slot_since_genesis.t)
       ?(log_block_creation = false) t ~coinbase_receiver ~logger
@@ -2153,10 +2220,17 @@ module T = struct
                     ~is_coinbase_receiver_new ~supercharge_coinbase partitions )
             in
             let summaries = List.map ~f:fst log in
+            let valid_user_command_count =
+              Sequence.length valid_on_this_ledger
+            in
+            let diagnostics =
+              Diff_creation_diagnostics.create ~proof_count
+                ~valid_user_command_count summaries
+            in
             [%log internal] "@block_metadata"
               ~metadata:
                 [ ("proof_count", `Int proof_count)
-                ; ("txn_count", `Int (Sequence.length valid_on_this_ledger))
+                ; ("txn_count", `Int valid_user_command_count)
                 ; ( "diff_log"
                   , Diff_creation_log.summary_list_to_yojson summaries )
                 ] ;
@@ -2179,7 +2253,7 @@ module T = struct
                log: $diff_log"
               ~metadata:
                 [ ("proof_count", `Int proof_count)
-                ; ("txn_count", `Int (Sequence.length valid_on_this_ledger))
+                ; ("txn_count", `Int valid_user_command_count)
                 ; ( "diff_log"
                   , Diff_creation_log.summary_list_to_yojson summaries )
                 ] ;
@@ -2191,7 +2265,17 @@ module T = struct
                         (List.map ~f:List.rev detailed) )
                   ] ;
             ( { Staged_ledger_diff.With_valid_signatures_and_proofs.diff }
-            , invalid_on_this_ledger ) ) )
+            , invalid_on_this_ledger
+            , diagnostics ) ) )
+
+  let create_diff ~constraint_constants ~global_slot ?log_block_creation t
+      ~coinbase_receiver ~logger ~current_state_view ~zkapp_cmd_limit
+      ~transactions_by_fee ~get_completed_work ~supercharge_coinbase =
+    create_diff_with_diagnostics ~constraint_constants ~global_slot
+      ?log_block_creation t ~coinbase_receiver ~logger ~current_state_view
+      ~zkapp_cmd_limit ~transactions_by_fee ~get_completed_work
+      ~supercharge_coinbase
+    |> Result.map ~f:(fun (diff, invalid_txns, _) -> (diff, invalid_txns))
 end
 
 include T

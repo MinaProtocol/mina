@@ -307,7 +307,7 @@ let build_breadcrumb ~transactions ~context ~precomputed_values ~verifier
   let winner_pk = fst slot_won.delegator in
   (* Copied from block producer, creates inputs for
      generating a new block's proof, header and body. *)
-  let%bind protocol_state, internal_transition, pending_coinbase_witness =
+  let%bind protocol_state, internal_transition, pending_coinbase_witness, _ =
     Block_producer.generate_next_state ~commit_id:"" ~constraint_constants
       ~scheduled_time ~block_data ~previous_protocol_state ~time_controller
       ~staged_ledger:previous.staged_ledger ~transactions
