@@ -367,6 +367,38 @@ fi
 echo "PASSED: client subcommand uses mesa runtime"
 
 # =============================================================================
+# Test 9: libp2p Subcommand Passes Through To Selected Runtime
+# =============================================================================
+
+echo ""
+echo "=== Test 9: libp2p Subcommand Pass-Through ==="
+echo "Verifying that 'libp2p' is forwarded verbatim to the selected runtime"
+
+# Without activation marker -> berkeley runtime
+MINA_EXEC_COMMAND=$(docker run --env MINA_DISPATCHER_DRYRUN=1 --entrypoint bash "$DOCKER_IMAGE" \
+  -c "mina libp2p generate-keypair -privkey-path /tmp/k" 2>&1)
+
+if [[ "$MINA_EXEC_COMMAND" != *"/berkeley/mina libp2p generate-keypair"* ]]; then
+  echo "FAILED: libp2p subcommand should pass through to berkeley runtime without activation marker"
+  echo "  Expected substring: /berkeley/mina libp2p generate-keypair"
+  echo "  Actual output: $MINA_EXEC_COMMAND"
+  exit 1
+fi
+
+# With activation marker -> mesa runtime
+MINA_EXEC_COMMAND=$(docker run --env MINA_DISPATCHER_DRYRUN=1 --entrypoint bash "$DOCKER_IMAGE" \
+  -c "$(create_activation_marker) && mina libp2p generate-keypair -privkey-path /tmp/k" 2>&1)
+
+if [[ "$MINA_EXEC_COMMAND" != *"/mesa/mina libp2p generate-keypair"* ]]; then
+  echo "FAILED: libp2p subcommand should pass through to mesa runtime with activation marker"
+  echo "  Expected substring: /mesa/mina libp2p generate-keypair"
+  echo "  Actual output: $MINA_EXEC_COMMAND"
+  exit 1
+fi
+
+echo "PASSED: libp2p subcommand passes through to the selected runtime"
+
+# =============================================================================
 # Summary
 # =============================================================================
 
