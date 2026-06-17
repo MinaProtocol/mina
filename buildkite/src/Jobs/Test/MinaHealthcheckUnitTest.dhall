@@ -19,20 +19,16 @@ let buildTestCmd
     =     \(profile : Text)
       ->  \(path : Text)
       ->  \(cmd_target : Size)
-      ->  let command_key = "unit-test-${profile}"
+      ->  let key = "mina-healthcheck-unit-test-${profile}"
 
           in  Command.build
                 Command.Config::{
                 , commands =
                     RunInToolchain.runInToolchain
                       [ "DUNE_INSTRUMENT_WITH=bisect_ppx", "COVERALLS_TOKEN" ]
-                      (     "buildkite/scripts/unit-test.sh ${profile} ${path}"
-                        ++  " && buildkite/scripts/upload-partial-coverage-data.sh ${command_key} dev"
-                        ++  " && buildkite/scripts/profile-dependent-tests.sh devnet"
-                        ++  " && buildkite/scripts/profile-dependent-tests.sh mainnet"
-                      )
-                , label = "${profile} unit-tests"
-                , key = command_key
+                      "buildkite/scripts/unit-test.sh ${profile} ${path} && buildkite/scripts/upload-partial-coverage-data.sh ${key} dev"
+                , label = "Mina healthcheck unit tests"
+                , key = key
                 , target = cmd_target
                 , docker = None Docker.Type
                 , artifact_paths = [ S.contains "core_dumps/*" ]
@@ -43,23 +39,22 @@ in  Pipeline.build
       , spec =
           let unitDirtyWhen =
                 [ S.strictlyStart (S.contains "src")
-                , S.strictly (S.contains "Makefile")
-                , S.exactly "buildkite/src/Jobs/Test/DaemonUnitTest" "dhall"
-                , S.exactly "buildkite/src/Constants/ContainerImages" "dhall"
-                , S.exactly "scripts/link-coredumps" "sh"
-                , S.exactly "buildkite/scripts/profile-dependent-tests" "sh"
+                , S.exactly
+                    "buildkite/src/Jobs/Test/MinaHealthcheckUnitTest"
+                    "dhall"
                 , S.exactly "buildkite/scripts/unit-test" "sh"
                 ]
 
           in  JobSpec::{
               , dirtyWhen = unitDirtyWhen
               , path = "Test"
-              , name = "DaemonUnitTest"
+              , name = "MinaHealthcheckUnitTest"
               , tags =
-                [ PipelineTag.Type.VeryLong
+                [ PipelineTag.Type.Fast
                 , PipelineTag.Type.Test
                 , PipelineTag.Type.Stable
                 ]
               }
-      , steps = [ buildTestCmd "dev" "src/lib" Size.XLarge ]
+      , steps =
+        [ buildTestCmd "dev" "src/app/mina_healthcheck" Size.Small ]
       }
