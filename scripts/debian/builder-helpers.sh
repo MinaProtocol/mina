@@ -584,8 +584,8 @@ build_daemon_deb() {
   esac
 
   local network_deb="${network//_/-}"
-  create_control_file "${package_name}" "${SHARED_DEPS}${DAEMON_DEPS}, mina-${network_deb}-config (>=${MINA_DEB_VERSION})" \
-    'Mina Protocol Client and Daemon' "${SUGGESTED_DEPS}" "mina-${network_deb} (<< ${MINA_DEB_VERSION})"
+  create_control_file "${package_name}" "${SHARED_DEPS}${DAEMON_DEPS}, mina-${network_deb}-config (=${MINA_DEB_VERSION})" \
+    'Mina Protocol Client and Daemon' "${SUGGESTED_DEPS}" "mina-${network_deb} (<< ${MINA_DEB_VERSION}), mina-${network_deb}-postfork-${POSTFORK_CODENAME}"
 
   copy_common_daemon_apps "${network}"
 
@@ -796,7 +796,7 @@ build_daemon_automode_deb() {
   local prefork_pkg="mina-${network_deb}-prefork-${POSTFORK_CODENAME}"
   local postfork_pkg="mina-${network_deb}-postfork-${POSTFORK_CODENAME}"
   local prefork_version="${PREFORK_LEGACY_VERSION:-${MINA_DEB_VERSION}}"
-  local depends="${postfork_pkg} (>= ${MINA_DEB_VERSION}), ${prefork_pkg} (>= ${prefork_version})"
+  local depends="${postfork_pkg} (=${MINA_DEB_VERSION}), ${prefork_pkg} (=${prefork_version})"
 
   create_control_file "${package_name}" "${depends}" \
     "Transitional metapackage for Mina ${network} automode (installs both prefork and postfork runtimes)" \
