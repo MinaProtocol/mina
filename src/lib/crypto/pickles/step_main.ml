@@ -374,30 +374,13 @@ module Make (Inductive_rule : Inductive_rule.Intf) = struct
             in
             exists_wrap_domains prev_requests local_signature_length
           in
-          let proof_witnesses =
-            (* Inject the app-state values into the per-proof witnesses. *)
-            let rec go :
-                type vars ns1 ns2.
-                   (vars, ns1, ns2) H3.T(Per_proof_witness.No_app_state).t
-                -> (vars, ns1) H2.T(Inductive_rule.Previous_proof_statement).t
-                -> (vars, ns1, ns2) H3.T(Per_proof_witness).t =
-             fun proofs stmts ->
-              match (proofs, stmts) with
-              | [], [] ->
-                  []
-              | proof :: proofs, stmt :: stmts ->
-                  { proof with app_state = stmt.public_input }
-                  :: go proofs stmts
-            in
-            go prevs previous_proof_statements
-          in
           let srs = Backend.Tock.Keypair.load_urs () in
           [%log internal] "Step_compute_bulletproof_challenges" ;
           let bulletproof_challenges =
             with_label "prevs_verified" (fun () ->
                 let rec go :
                     type vars vals ns1 ns2 n.
-                       (vars, ns1, ns2) H3.T(Per_proof_witness).t
+                       (vars, ns1, ns2) H3.T(Per_proof_witness.No_app_state).t
                     -> (vars, vals, ns1, ns2) H4.T(Types_map.For_step).t
                     -> vars H1.T(E01(Digest)).t
                     -> vars H1.T(E01(Unfinalized)).t
@@ -410,10 +393,10 @@ module Make (Inductive_rule : Inductive_rule.Intf) = struct
                          , n )
                          Vector.t
                     -> (_, n) Vector.t * B.t list =
-                 fun proof_witnesses datas messages_for_next_wrap_proofs
-                     unfinalizeds stmts pi ~actual_wrap_domains ->
+                 fun prevs datas messages_for_next_wrap_proofs unfinalizeds
+                     stmts pi ~actual_wrap_domains ->
                   match
-                    ( proof_witnesses
+                    ( prevs
                     , datas
                     , messages_for_next_wrap_proofs
                     , unfinalizeds
@@ -423,12 +406,13 @@ module Make (Inductive_rule : Inductive_rule.Intf) = struct
                   with
                   | [], [], [], [], [], Z, [] ->
                       ([], [])
-                  | ( pw :: proof_witnesses
+                  | ( prev :: prevs
                     , d :: datas
                     , messages_for_next_wrap_proof
                       :: messages_for_next_wrap_proofs
                     , unfinalized :: unfinalizeds
-                    , { proof_must_verify = must_verify; _ } :: stmts
+                    , { public_input; proof_must_verify = must_verify; _ }
+                      :: stmts
                     , S pi
                     , actual_wrap_domain :: actual_wrap_domains ) ->
                       let () =
@@ -466,11 +450,14 @@ module Make (Inductive_rule : Inductive_rule.Intf) = struct
                             ()
                       in
                       let chals, v =
-                        verify_one ~srs pw d messages_for_next_wrap_proof
-                          unfinalized must_verify
+                        (* Reattach this predecessor's app-state to its witness
+                           for verification. *)
+                        verify_one ~srs
+                          { prev with app_state = public_input }
+                          d messages_for_next_wrap_proof unfinalized must_verify
                       in
                       let chalss, vs =
-                        go proof_witnesses datas messages_for_next_wrap_proofs
+                        go prevs datas messages_for_next_wrap_proofs
                           unfinalizeds stmts pi ~actual_wrap_domains
                       in
                       (chals :: chalss, v :: vs)
@@ -530,7 +517,7 @@ module Make (Inductive_rule : Inductive_rule.Intf) = struct
                     in
                     go rule.prevs known_wrap_keys
                   in
-                  go proof_witnesses datas messages_for_next_wrap_proofs
+                  go prevs datas messages_for_next_wrap_proofs
                     unfinalized_proofs previous_proof_statements proofs_verified
                     ~actual_wrap_domains
                 in
@@ -540,18 +527,20 @@ module Make (Inductive_rule : Inductive_rule.Intf) = struct
           let messages_for_next_step_proof =
             let challenge_polynomial_commitments =
               let module M =
-                H3.Map (Per_proof_witness) (E03 (Step_verifier.Inner_curve))
+                H3.Map
+                  (Per_proof_witness.No_app_state)
+                  (E03 (Step_verifier.Inner_curve))
                   (struct
                     let f :
                         type a b c.
-                           (a, b, c) Per_proof_witness.t
+                           (a, b, c) Per_proof_witness.No_app_state.t
                         -> Step_verifier.Inner_curve.t =
                      fun acc ->
                       acc.wrap_proof.opening.challenge_polynomial_commitment
                   end)
               in
               let module V = H3.To_vector (Step_verifier.Inner_curve) in
-              V.f proofs_verified (M.f proof_witnesses)
+              V.f proofs_verified (M.f prevs)
             in
             with_label "hash_messages_for_next_step_proof" (fun () ->
                 let hash_messages_for_next_step_proof =
