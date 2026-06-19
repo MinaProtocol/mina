@@ -127,8 +127,6 @@ module type Prev_request = sig
     | Witness :
         (unit, width) Per_proof_witness.Constant.t Snarky_backendless.Request.t
           (** This predecessor's witness. *)
-    | Wrap_domain : Pickles_base.Proofs_verified.t Snarky_backendless.Request.t
-          (** This predecessor's wrap-domain index. *)
     | Unfinalized : Unfinalized.Constant.t Snarky_backendless.Request.t
           (** This predecessor's unfinalized proof. *)
     | Messages_for_next_wrap_proof :
@@ -165,7 +163,6 @@ module Make_prev_request (Spec : Prev_spec) () :
   type _ Snarky_backendless.Request.t +=
     | Witness :
         (unit, Spec.n) Per_proof_witness.Constant.t Snarky_backendless.Request.t
-    | Wrap_domain : Pickles_base.Proofs_verified.t Snarky_backendless.Request.t
     | Unfinalized : Unfinalized.Constant.t Snarky_backendless.Request.t
     | Messages_for_next_wrap_proof :
         Digest.Constant.t Snarky_backendless.Request.t

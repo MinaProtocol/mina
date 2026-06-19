@@ -351,28 +351,6 @@ module Make (Inductive_rule : Inductive_rule.Intf) = struct
                   []
             in
             exists_messages gap_adds local_signature_length prev_requests
-          and actual_wrap_domains =
-            (* One wrap-domain index per predecessor, from each predecessor's
-               own [Wrap_domain] request — a fold over [prev_requests]. *)
-            let rec exists_wrap_domains :
-                type ws n.
-                   ws H1.T(Requests.Prev_request_packed).t
-                -> (ws, n) Hlist.Length.t
-                -> (Pickles_base.Proofs_verified.t Typ.prover_value, n) Vector.t
-                =
-             fun reqs len ->
-              match (reqs, len) with
-              | [], Z ->
-                  []
-              | req :: reqs, S len ->
-                  let (module M) = req in
-                  let v =
-                    exists (Typ.prover_value ()) ~request:(fun () ->
-                        M.Wrap_domain )
-                  in
-                  v :: exists_wrap_domains reqs len
-            in
-            exists_wrap_domains prev_requests local_signature_length
           in
           let srs = Backend.Tock.Keypair.load_urs () in
           [%log internal] "Step_compute_bulletproof_challenges" ;
@@ -388,23 +366,18 @@ module Make (Inductive_rule : Inductive_rule.Intf) = struct
                        , ns1 )
                        H2.T(Inductive_rule.Previous_proof_statement).t
                     -> (vars, n) Length.t
-                    -> actual_wrap_domains:
-                         ( Pickles_base.Proofs_verified.t Typ.prover_value
-                         , n )
-                         Vector.t
                     -> (_, n) Vector.t * B.t list =
                  fun prevs datas messages_for_next_wrap_proofs unfinalizeds
-                     stmts pi ~actual_wrap_domains ->
+                     stmts pi ->
                   match
                     ( prevs
                     , datas
                     , messages_for_next_wrap_proofs
                     , unfinalizeds
                     , stmts
-                    , pi
-                    , actual_wrap_domains )
+                    , pi )
                   with
-                  | [], [], [], [], [], Z, [] ->
+                  | [], [], [], [], [], Z ->
                       ([], [])
                   | ( prev :: prevs
                     , d :: datas
@@ -413,42 +386,7 @@ module Make (Inductive_rule : Inductive_rule.Intf) = struct
                     , unfinalized :: unfinalizeds
                     , { public_input; proof_must_verify = must_verify; _ }
                       :: stmts
-                    , S pi
-                    , actual_wrap_domain :: actual_wrap_domains ) ->
-                      let () =
-                        (* Fail with an error if the proof's domain differs from
-                           the hard-coded one otherwise.
-                        *)
-                        match d.wrap_domain with
-                        | `Known wrap_domain ->
-                            as_prover (fun () ->
-                                let actual_wrap_domain =
-                                  As_prover.read (Typ.prover_value ())
-                                    actual_wrap_domain
-                                  |> Pickles_base.Proofs_verified.to_int
-                                in
-                                let actual_wrap_domain =
-                                  Common.wrap_domains
-                                    ~proofs_verified:actual_wrap_domain
-                                in
-                                match (wrap_domain, actual_wrap_domain.h) with
-                                | ( Pow_2_roots_of_unity expected
-                                  , Pow_2_roots_of_unity actual )
-                                  when expected <> actual ->
-                                    failwithf
-                                      "This circuit was compiled for proofs \
-                                       using the wrap domain of size %d, but a \
-                                       proof was given with size %d. You \
-                                       should pass the ~override_wrap_domain \
-                                       argument to set the correct domain \
-                                       size."
-                                      expected actual ()
-                                | Pow_2_roots_of_unity _, Pow_2_roots_of_unity _
-                                  ->
-                                    () )
-                        | `Side_loaded _ ->
-                            ()
-                      in
+                    , S pi ) ->
                       let chals, v =
                         (* Reattach this predecessor's app-state to its witness
                            for verification. *)
@@ -458,7 +396,7 @@ module Make (Inductive_rule : Inductive_rule.Intf) = struct
                       in
                       let chalss, vs =
                         go prevs datas messages_for_next_wrap_proofs
-                          unfinalizeds stmts pi ~actual_wrap_domains
+                          unfinalizeds stmts pi
                       in
                       (chals :: chalss, v :: vs)
                 in
@@ -519,7 +457,6 @@ module Make (Inductive_rule : Inductive_rule.Intf) = struct
                   in
                   go prevs datas messages_for_next_wrap_proofs
                     unfinalized_proofs previous_proof_statements proofs_verified
-                    ~actual_wrap_domains
                 in
                 Boolean.Assert.all vs ; chalss )
           in

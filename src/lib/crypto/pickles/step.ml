@@ -119,15 +119,6 @@ struct
     let challenge_polynomial =
       Wrap_verifier.challenge_polynomial (module Backend.Tock.Field)
     in
-    let all_possible_domains = lazy (Wrap_verifier.all_possible_domains ()) in
-    let wrap_domain_index domain_size =
-      let domain_index =
-        Vector.foldi ~init:0 (Lazy.force all_possible_domains)
-          ~f:(fun j acc (Pow_2_roots_of_unity domain) ->
-            if Int.equal domain domain_size then j else acc )
-      in
-      Pickles_base.Proofs_verified.of_int_exn domain_index
-    in
     let expand_proof :
         type var value local_max_proofs_verified m.
            Impls.Wrap.Verification_key.t
@@ -555,10 +546,6 @@ struct
                  (Provide
                     prev_statement_with_hashes.proof_state
                       .messages_for_next_wrap_proof ) )
-        | M.Wrap_domain ->
-            Some
-              (respond
-                 (Provide (wrap_domain_index dlog_vk.domain.log_size_of_group)) )
         | _ ->
             None
       in

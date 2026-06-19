@@ -22,7 +22,7 @@
     - [Dummy_messages_for_next_wrap_proof]: Padding digest for the next wrap
       proof's messages
 
-    Each predecessor's own witness, unfinalized proof, wrap-domain index and
+    Each predecessor's own witness, unfinalized proof and
     messages-for-next-wrap-proof digest are sourced from its own
     {!module-type:Prev_request} instance rather than from a combined request.
 
@@ -74,8 +74,6 @@ module type Prev_request = sig
     | Witness :
         (unit, width) Per_proof_witness.Constant.t Snarky_backendless.Request.t
           (** This predecessor's witness. *)
-    | Wrap_domain : Pickles_base.Proofs_verified.t Snarky_backendless.Request.t
-          (** This predecessor's wrap-domain index. *)
     | Unfinalized : Unfinalized.Constant.t Snarky_backendless.Request.t
           (** This predecessor's unfinalized proof. *)
     | Messages_for_next_wrap_proof :
