@@ -15,14 +15,16 @@
 
     Step circuits request:
     - [Compute_prev_proof_parts]: Predecessor proof data
-    - [Proof_with_datas]: Full predecessor proof witnesses
     - [Wrap_index]: Wrap circuit verification key
     - [App_state]: Application-specific public input
     - [Return_value]: Output value to return
     - [Auxiliary_value]: Prover-only auxiliary data
-    - [Unfinalized_proofs]: Deferred proof data
-    - [Messages_for_next_wrap_proof]: Data for next wrap proof
-    - [Wrap_domain_indices]: Domain configuration
+    - [Dummy_messages_for_next_wrap_proof]: Padding digest for the next wrap
+      proof's messages
+
+    Each predecessor's own witness, unfinalized proof, wrap-domain index and
+    messages-for-next-wrap-proof digest are sourced from its own
+    {!module-type:Prev_request} instance rather than from a combined request.
 
     {2 Wrap Requests}
 
@@ -41,6 +43,70 @@
     - {!module:Wrap_main} for wrap circuit request handling *)
 
 open Pickles_types
+
+(** The requests for a single predecessor, together with the compile-time data
+    fixing its witness layout. The constructors are exposed so instances can be
+    packed first-class and carried in an hlist, and a predecessor's handler can
+    answer them with a single [match] rather than a per-request closure. *)
+module type Prev_request = sig
+  type width
+
+  (** This predecessor's max-proofs-verified width, as a value. *)
+  val width : width Nat.t
+
+  (** This predecessor's feature flags, fixing its witness layout. *)
+  val feature_flags : Opt.Flag.t Plonk_types.Features.Full.t
+
+  (** The number of polynomial chunks in this predecessor's proof. *)
+  val num_chunks : int
+
+  (** This predecessor's witness [Typ], fixed by [width], [feature_flags] and
+      [num_chunks]. A thunk because the branch-count index is phantom and so
+      must stay universally quantified (a [Typ.t] value cannot be polymorphic
+      in it). *)
+  val typ :
+       unit
+    -> ( (unit, width, _) Per_proof_witness.t
+       , (unit, width) Per_proof_witness.Constant.t )
+       Impls.Step.Typ.t
+
+  type _ Snarky_backendless.Request.t +=
+    | Witness :
+        (unit, width) Per_proof_witness.Constant.t Snarky_backendless.Request.t
+          (** This predecessor's witness. *)
+    | Wrap_domain : Pickles_base.Proofs_verified.t Snarky_backendless.Request.t
+          (** This predecessor's wrap-domain index. *)
+    | Unfinalized : Unfinalized.Constant.t Snarky_backendless.Request.t
+          (** This predecessor's unfinalized proof. *)
+    | Messages_for_next_wrap_proof :
+        Import.Types.Digest.Constant.t Snarky_backendless.Request.t
+          (** This predecessor's messages-for-next-wrap-proof digest. *)
+end
+
+(** The compile-time data fixing a single predecessor's witness layout: its
+    width together with the feature flags and chunk count that
+    {!Per_proof_witness.typ} depends on. Supplied to {!Make_prev_request}. *)
+module type Prev_spec = sig
+  include Nat.Intf
+
+  val feature_flags : Opt.Flag.t Plonk_types.Features.Full.t
+
+  val num_chunks : int
+end
+
+(** Mint a fresh set of requests for one predecessor. The [()] makes each
+    application generative, so each predecessor's constructors are fresh and
+    distinct: the step circuit can fire — and the handler answer — each
+    predecessor's requests directly, with no index or runtime width
+    comparison. *)
+module Make_prev_request (Spec : Prev_spec) () :
+  Prev_request with type width = Spec.n
+
+(** {!module-type:Prev_request} packed first-class, for carrying one per
+    predecessor in an hlist indexed by the predecessor widths. *)
+module Prev_request_packed : sig
+  type 'width t = (module Prev_request with type width = 'width)
+end
 
 (** Request types for step circuits.
 
@@ -87,17 +153,6 @@ module Step (Inductive_rule : Inductive_rule.Intf) : sig
             (** Request to compute derived values from predecessor proofs.
                 The prover responds with the proof statements and triggers
                 asynchronous computation of proof parts. *)
-      | Proof_with_datas :
-          ( prev_values
-          , local_signature
-          , local_branches )
-          Hlist.H3.T(Per_proof_witness.Constant.No_app_state).t
-          Snarky_backendless.Request.t
-            (** Request for full predecessor proof witness data. This includes
-                polynomial commitments (succinct representations of the execution
-                trace and constraints), evaluations at challenge points, and
-                accumulator state - the "data" that proofs carry in the
-                Proof-Carrying Data paradigm. *)
       | Wrap_index :
           Backend.Tock.Curve.Affine.t array Plonk_verification_key_evals.t
           Snarky_backendless.Request.t
@@ -111,21 +166,13 @@ module Step (Inductive_rule : Inductive_rule.Intf) : sig
       | Auxiliary_value : auxiliary_value -> unit Snarky_backendless.Request.t
             (** Provide the auxiliary (prover-only) value from main.
                 This is a "write" request - the circuit provides the value. *)
-      | Unfinalized_proofs :
-          (Unfinalized.Constant.t, proofs_verified) Vector.t
-          Snarky_backendless.Request.t
-            (** Request for unfinalized proof data - the deferred scalar field
-                computations from predecessor wrap proofs. *)
-      | Messages_for_next_wrap_proof :
-          (Import.Types.Digest.Constant.t, max_proofs_verified) Vector.t
-          Snarky_backendless.Request.t
-            (** Request for message digests to pass to the next wrap proof.
-                These link the step proof to its subsequent wrap. *)
-      | Wrap_domain_indices :
-          (Pickles_base.Proofs_verified.t, proofs_verified) Vector.t
-          Snarky_backendless.Request.t
-            (** Request for domain indices indicating which wrap domain size
-                each predecessor proof used (based on proofs_verified count). *)
+      | Dummy_messages_for_next_wrap_proof :
+          Import.Types.Digest.Constant.t Snarky_backendless.Request.t
+            (** Request for the dummy message digest used to fill the padding
+                slots of the max-proofs-verified-length messages layout (the
+                slots with no corresponding predecessor). Predecessors' real
+                digests are sourced from their own per-predecessor
+                {!Prev_request.Messages_for_next_wrap_proof} requests. *)
   end
 
   (** Create a fresh first-class module of step requests with the given types.

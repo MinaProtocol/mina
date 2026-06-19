@@ -119,6 +119,15 @@ struct
     let challenge_polynomial =
       Wrap_verifier.challenge_polynomial (module Backend.Tock.Field)
     in
+    let all_possible_domains = lazy (Wrap_verifier.all_possible_domains ()) in
+    let wrap_domain_index domain_size =
+      let domain_index =
+        Vector.foldi ~init:0 (Lazy.force all_possible_domains)
+          ~f:(fun j acc (Pow_2_roots_of_unity domain) ->
+            if Int.equal domain domain_size then j else acc )
+      in
+      Pickles_base.Proofs_verified.of_int_exn domain_index
+    in
     let expand_proof :
         type var value local_max_proofs_verified m.
            Impls.Wrap.Verification_key.t
@@ -127,16 +136,17 @@ struct
         -> local_max_proofs_verified Proof.t
         -> (var, value, local_max_proofs_verified) Types_map.Basic.t
         -> must_verify:bool
+        -> prev_request:
+             (module Requests.Prev_request
+                with type width = local_max_proofs_verified )
         -> [ `Sg of Tock.Curve.Affine.t ]
            * Unfinalized.Constant.t
-           * Statement_with_hashes.t
            * X_hat.t
-           * ( value
-             , local_max_proofs_verified
-             , m )
-             Per_proof_witness.Constant.No_app_state.t
-           * [ `Actual_wrap_domain of int ] =
-     fun dlog_vk dlog_index app_state (T t) data ~must_verify ->
+           * [ `Actual_wrap_domain of int ]
+           * (   Snarky_backendless.Request.request
+              -> Snarky_backendless.Request.response option ) =
+     fun dlog_vk dlog_index app_state (T t) data ~must_verify
+         ~prev_request:(module M) ->
       let t =
         { t with
           statement =
@@ -512,8 +522,8 @@ struct
       let shifted_value =
         Shifted_value.Type2.of_field (module Tock.Field) ~shift:Shifts.tock2
       in
-      ( `Sg challenge_polynomial_commitment
-      , { Types.Step.Proof_state.Per_proof.deferred_values =
+      let unfinalized : Unfinalized.Constant.t =
+        { deferred_values =
             { plonk =
                 { plonk with
                   zeta = plonk0.zeta
@@ -530,20 +540,48 @@ struct
         ; sponge_digest_before_evaluations =
             Digest.Constant.of_tock_field sponge_digest_before_evaluations
         }
-      , prev_statement_with_hashes
+      in
+      (* This predecessor's responder: a single [match] over its own (distinct)
+         request constructors, answering each from the values computed above. *)
+      let responder (Snarky_backendless.Request.With { request; respond }) =
+        match request with
+        | M.Witness ->
+            Some (respond (Provide witness))
+        | M.Unfinalized ->
+            Some (respond (Provide unfinalized))
+        | M.Messages_for_next_wrap_proof ->
+            Some
+              (respond
+                 (Provide
+                    prev_statement_with_hashes.proof_state
+                      .messages_for_next_wrap_proof ) )
+        | M.Wrap_domain ->
+            Some
+              (respond
+                 (Provide (wrap_domain_index dlog_vk.domain.log_size_of_group)) )
+        | _ ->
+            None
+      in
+      ( `Sg challenge_polynomial_commitment
+      , unfinalized
       , x_hat
-      , witness
-      , `Actual_wrap_domain dlog_vk.domain.log_size_of_group )
+      , `Actual_wrap_domain dlog_vk.domain.log_size_of_group
+      , responder )
     in
     let challenge_polynomial_commitments = ref None in
     let unfinalized_proofs = ref None in
-    let statements_with_hashes = ref None in
     let x_hats = ref None in
-    let witnesses = ref None in
     let prev_proofs = ref None in
     let return_value = ref None in
     let auxiliary_value = ref None in
     let actual_wrap_domains = ref None in
+    (* One responder per predecessor, each built by [expand_proof] closing over
+       that predecessor's witnessed values and matching its own request
+       constructors (see [Requests.Make_prev_request]). The step circuit fires
+       each predecessor's requests directly; the handler below answers them by
+       trying each responder in turn. Order is irrelevant: the constructors are
+       distinct per predecessor, so at most one responder matches any request. *)
+    let prev_responders = ref [] in
     let compute_prev_proof_parts prev_proof_requests =
       [%log internal] "Step_compute_prev_proof_parts" ;
       let%map.Promise prevs =
@@ -562,11 +600,10 @@ struct
       in
       let ( challenge_polynomial_commitments'
           , unfinalized_proofs'
-          , statements_with_hashes'
           , x_hats'
-          , witnesses'
           , prev_proofs'
-          , actual_wrap_domains' ) =
+          , actual_wrap_domains'
+          , prev_responders' ) =
         let[@warning "-4"] rec go :
             type vars values ns ms k.
                (vars, values, ns, ms) H4.T(Tag).t
@@ -574,21 +611,20 @@ struct
             -> ( values
                , ns )
                H2.T(Inductive_rule.Previous_proof_statement.Constant).t
+            -> ns H1.T(Requests.Prev_request_packed).t
             -> (vars, k) Length.t
             -> (Tock.Curve.Affine.t, k) Vector.t
                * (Unfinalized.Constant.t, k) Vector.t
-               * (Statement_with_hashes.t, k) Vector.t
                * (X_hat.t, k) Vector.t
-               * ( values
-                 , ns
-                 , ms )
-                 H3.T(Per_proof_witness.Constant.No_app_state).t
                * ns H1.T(Proof).t
-               * (int, k) Vector.t =
-         fun ts datas prev_proof_stmts l ->
-          match (ts, datas, prev_proof_stmts, l) with
-          | [], [], [], Z ->
-              ([], [], [], [], [], [], [])
+               * (int, k) Vector.t
+               * (   Snarky_backendless.Request.request
+                  -> Snarky_backendless.Request.response option )
+                 list =
+         fun ts datas prev_proof_stmts reqs l ->
+          match (ts, datas, prev_proof_stmts, reqs, l) with
+          | [], [], [], [], Z ->
+              ([], [], [], [], [], [])
           | ( t :: ts
             , data :: datas
             , { public_input = app_state
@@ -596,38 +632,39 @@ struct
               ; proof_must_verify = must_verify
               }
               :: prev_proof_stmts
+            , req :: reqs
             , S l ) ->
               let dlog_vk, dlog_index =
                 if Type_equal.Id.same self.Tag.id t.id then
                   (self_dlog_vk, self_dlog_plonk_index)
                 else (data.wrap_vk, data.wrap_key)
               in
-              let `Sg sg, u, s, x, w, `Actual_wrap_domain domain =
+              let `Sg sg, u, x, `Actual_wrap_domain domain, responder =
                 expand_proof dlog_vk dlog_index app_state p data ~must_verify
-              and sgs, us, ss, xs, ws, ps, domains =
-                go ts datas prev_proof_stmts l
+                  ~prev_request:req
+              and sgs, us, xs, ps, domains, responders =
+                go ts datas prev_proof_stmts reqs l
               in
               ( sg :: sgs
               , u :: us
-              , s :: ss
               , x :: xs
-              , w :: ws
               , p :: ps
-              , domain :: domains )
-          | _, _, _ :: _, _ ->
+              , domain :: domains
+              , responder :: responders )
+          | _, _, _ :: _, _, _ ->
               .
-          | _, _, [], _ ->
+          | _, _, [], _, _ ->
               .
         in
-        go branch_data.rule.prevs prevs prev_proof_requests prev_vars_length
+        go branch_data.rule.prevs prevs prev_proof_requests
+          branch_data.prev_requests prev_vars_length
       in
       challenge_polynomial_commitments := Some challenge_polynomial_commitments' ;
       unfinalized_proofs := Some unfinalized_proofs' ;
-      statements_with_hashes := Some statements_with_hashes' ;
       x_hats := Some x_hats' ;
-      witnesses := Some witnesses' ;
       prev_proofs := Some prev_proofs' ;
       actual_wrap_domains := Some actual_wrap_domains' ;
+      prev_responders := prev_responders' ;
       [%log internal] "Step_compute_prev_proof_parts_done"
     in
     let unfinalized_proofs = lazy (Option.value_exn !unfinalized_proofs) in
@@ -701,46 +738,27 @@ struct
            ~dlog_plonk_index:self_dlog_plonk_index
            (Lazy.force messages_for_next_step_proof) )
     in
-    let messages_for_next_wrap_proof_padded =
-      let rec pad :
-          type n k maxes.
-             (Digest.Constant.t, k) Vector.t
-          -> maxes H1.T(Nat).t
-          -> (maxes, n) Hlist.Length.t
-          -> (Digest.Constant.t, n) Vector.t =
-       fun xs maxes l ->
-        match (xs, maxes, l) with
-        | [], [], Z ->
-            []
-        | _x :: _xs, [], Z ->
-            assert false
-        | x :: xs, _ :: ms, S n ->
-            x :: pad xs ms n
-        | [], _m :: ms, S n ->
-            let t : _ Types.Wrap.Proof_state.Messages_for_next_wrap_proof.t =
-              { challenge_polynomial_commitment = Lazy.force Dummy.Ipa.Step.sg
-              ; old_bulletproof_challenges =
-                  Vector.init Max_proofs_verified.n ~f:(fun _ ->
-                      Lazy.force Dummy.Ipa.Wrap.challenges_computed )
-              }
-            in
-            Wrap_hack.hash_messages_for_next_wrap_proof t :: pad [] ms n
-      in
+    (* The dummy digest filling the front padding slots of the
+       max-proofs-verified-length messages layout (the slots with no
+       corresponding predecessor); each predecessor's real digest is answered
+       by its own responder. Lazy so the prover only builds it when the circuit
+       actually requests a padding slot. *)
+    let dummy_messages_for_next_wrap_proof =
       lazy
-        (Vector.rev
-           (pad
-              (Vector.map
-                 (Vector.rev (Option.value_exn !statements_with_hashes))
-                 ~f:(fun s -> s.proof_state.messages_for_next_wrap_proof) )
-              Maxes.maxes Maxes.length ) )
+        (let t : _ Types.Wrap.Proof_state.Messages_for_next_wrap_proof.t =
+           { challenge_polynomial_commitment = Lazy.force Dummy.Ipa.Step.sg
+           ; old_bulletproof_challenges =
+               Vector.init Max_proofs_verified.n ~f:(fun _ ->
+                   Lazy.force Dummy.Ipa.Wrap.challenges_computed )
+           }
+         in
+         Wrap_hack.hash_messages_for_next_wrap_proof t )
     in
     let handler (Snarky_backendless.Request.With { request; respond } as r) =
       let k x = respond (Provide x) in
       match request with
       | Req.Compute_prev_proof_parts prev_proof_requests ->
           k (compute_prev_proof_parts prev_proof_requests)
-      | Req.Proof_with_datas ->
-          k (Option.value_exn !witnesses)
       | Req.Wrap_index ->
           k self_dlog_plonk_index
       | Req.App_state ->
@@ -751,29 +769,21 @@ struct
       | Req.Auxiliary_value res ->
           auxiliary_value := Some res ;
           k ()
-      | Req.Unfinalized_proofs ->
-          k (Lazy.force unfinalized_proofs)
-      | Req.Messages_for_next_wrap_proof ->
-          k (Lazy.force messages_for_next_wrap_proof_padded)
-      | Req.Wrap_domain_indices ->
-          let all_possible_domains = Wrap_verifier.all_possible_domains () in
-          let wrap_domain_indices =
-            Vector.map (Option.value_exn !actual_wrap_domains)
-              ~f:(fun domain_size ->
-                let domain_index =
-                  Vector.foldi ~init:0 all_possible_domains
-                    ~f:(fun j acc (Pow_2_roots_of_unity domain) ->
-                      if Int.equal domain domain_size then j else acc )
-                in
-                Pickles_base.Proofs_verified.of_int_exn domain_index )
-          in
-          k wrap_domain_indices
+      | Req.Dummy_messages_for_next_wrap_proof ->
+          k (Lazy.force dummy_messages_for_next_wrap_proof)
       | _ -> (
-          match handler with
-          | Some f ->
-              f r
-          | None ->
-              Snarky_backendless.Request.unhandled )
+          (* Each predecessor's own Witness / Unfinalized /
+             Messages_for_next_wrap_proof / Wrap_domain request is answered by
+             its responder; fall back to the rule-supplied handler otherwise. *)
+          match List.find_map !prev_responders ~f:(fun f -> f r) with
+          | Some response ->
+              response
+          | None -> (
+              match handler with
+              | Some f ->
+                  f r
+              | None ->
+                  Snarky_backendless.Request.unhandled ) )
     in
     let prev_challenge_polynomial_commitments =
       lazy

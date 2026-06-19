@@ -56,6 +56,8 @@ module Make (Inductive_rule : Inductive_rule.Intf) = struct
                 and type local_branches = 'local_heights
                 and type return_value = 'ret_value
                 and type auxiliary_value = 'auxiliary_value )
+        ; prev_requests :
+            'local_widths Hlist.H1.T(Requests.Prev_request_packed).t
         ; feature_flags : bool Plonk_types.Features.t
         }
         -> ( 'a_var
@@ -96,18 +98,17 @@ module Make (Inductive_rule : Inductive_rule.Intf) = struct
     let (T (self_width, proofs_verified)) = HT.length rule.prevs in
     let rec extract_lengths :
         type a b n m k.
-           (a, b, n, m) HT.t
-        -> (a, k) Length.t
-        -> n H1.T(Nat).t * (n, k) Length.t * (m, k) Length.t =
+        (a, b, n, m) HT.t -> (a, k) Length.t -> n H1.T(Nat).t * (n, k) Length.t
+        =
      fun ts len ->
       match (ts, len) with
       | [], Z ->
-          ([], Z, Z)
+          ([], Z)
       | t :: ts, S len -> (
-          let ns, len_ns, len_ms = extract_lengths ts len in
+          let ns, len_ns = extract_lengths ts len in
           match Type_equal.Id.same_witness self.id t.id with
           | Some T ->
-              (max_proofs_verified :: ns, S len_ns, S len_ms)
+              (max_proofs_verified :: ns, S len_ns)
           | None ->
               let (module M) =
                 match t.kind with
@@ -119,15 +120,61 @@ module Make (Inductive_rule : Inductive_rule.Intf) = struct
                     d.permanent.max_proofs_verified
               in
               let T = M.eq in
-              (M.n :: ns, S len_ns, S len_ms) )
+              (M.n :: ns, S len_ns) )
     in
     Timer.clock __LOC__ ;
-    let widths, local_signature_length, local_branches_length =
+    let widths, local_signature_length =
       extract_lengths rule.prevs proofs_verified
     in
     let lte = Nat.lte_exn self_width max_proofs_verified in
     let module Step_requests = Requests.Step (Inductive_rule) in
     let requests = Step_requests.create () in
+    (* One request module per predecessor, minted distinctly per prev (so the
+       step circuit and handler can dispatch each predecessor's requests
+       directly) and carrying that predecessor's width, feature flags and chunk
+       count — everything fixing its witness layout. Built here, alongside
+       [requests], where the per-prev data is in scope, then carried in an hlist
+       and threaded through to both the step circuit and its handler. *)
+    let feature_flags_and_num_chunks (d : _ Tag.t) =
+      if Type_equal.Id.same self.id d.id then (feature_flags, num_chunks)
+      else (Types_map.feature_flags d, Types_map.num_chunks d)
+    in
+    let prev_requests =
+      let make_one :
+          type w.
+             w Nat.t
+          -> Opt.Flag.t Plonk_types.Features.Full.t
+          -> int
+          -> w Requests.Prev_request_packed.t =
+       fun width feature_flags num_chunks :
+           (module Requests.Prev_request with type width = w) ->
+        ( module Requests.Make_prev_request
+                   (struct
+                     type n = w
+
+                     let n = width
+
+                     let feature_flags = feature_flags
+
+                     let num_chunks = num_chunks
+                   end)
+                   () )
+      in
+      let rec go :
+          type pvars pvals ws hs.
+             (pvars, pvals, ws, hs) H4.T(Tag).t
+          -> ws H1.T(Nat).t
+          -> ws H1.T(Requests.Prev_request_packed).t =
+       fun ds widths ->
+        match (ds, widths) with
+        | [], [] ->
+            []
+        | d :: ds, width :: widths ->
+            let feature_flags, num_chunks = feature_flags_and_num_chunks d in
+            make_one width feature_flags num_chunks :: go ds widths
+      in
+      go rule.prevs widths
+    in
     let (typ : (var, value) Impls.Step.Typ.t) =
       match public_input with
       | Input typ ->
@@ -204,8 +251,7 @@ module Make (Inductive_rule : Inductive_rule.Intf) = struct
                   ((2 * (permuts + 1) * num_chunks) - 2 + permuts) / permuts )
           }
         ~public_input ~auxiliary_typ ~self_branches:branches ~proofs_verified
-        ~local_signature:widths ~local_signature_length ~local_branches_length
-        ~lte ~known_wrap_keys ~self
+        ~prev_requests ~local_signature_length ~lte ~known_wrap_keys ~self
       |> unstage
     in
     Timer.clock __LOC__ ;
@@ -240,6 +286,7 @@ module Make (Inductive_rule : Inductive_rule.Intf) = struct
       ; domains = own_domains
       ; main = step
       ; requests
+      ; prev_requests
       ; feature_flags = actual_feature_flags
       }
 end
