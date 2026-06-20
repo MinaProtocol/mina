@@ -42,7 +42,6 @@ in  Pipeline.build
             , PipelineTag.Type.Focal
             ]
           , profile = Profiles.Type.Mainnet
-          , scope =
-            [ PipelineScope.Type.MainlineNightly, PipelineScope.Type.Release ]
+          , scope = [ PipelineScope.Type.Weekly, PipelineScope.Type.Release ]
           }
       )
