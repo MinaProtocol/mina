@@ -39,6 +39,6 @@ in  Pipeline.build
             , PipelineTag.Type.Jammy
             ]
           , debVersion = DebianVersions.DebVersion.Jammy
-          , scope = [ PipelineScope.Type.Release ]
+          , scope = [ PipelineScope.Type.Weekly, PipelineScope.Type.Release ]
           }
       )

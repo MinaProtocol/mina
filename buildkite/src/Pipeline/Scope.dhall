@@ -1,9 +1,10 @@
 -- Scope defines pipeline run scope
 --
--- Scope of the pipeline can be either PullRequest, Nightly, MainlineNightly or Release.
+-- Scope of the pipeline can be either PullRequest, Nightly, MainlineNightly, Weekly or Release.
 -- PullRequest - run pipeline for pull request
 -- Nightly - run pipeline for nightly changes
 -- MainlineNightly - run pipeline for mainline nightly changes
+-- Weekly - run pipeline for the weekly full-matrix sweep (all distros/dockers/debians)
 -- Release - run pipeline for release changes
 --
 -- Scope is used to determine which jobs should be run in the pipeline.
@@ -14,7 +15,7 @@ let Prelude = ../External/Prelude.dhall
 
 let Extensions = ../Lib/Extensions.dhall
 
-let Scope = < PullRequest | Nightly | MainlineNightly | Release >
+let Scope = < PullRequest | Nightly | MainlineNightly | Weekly | Release >
 
 let capitalName =
           \(scope : Scope)
@@ -22,6 +23,7 @@ let capitalName =
             { PullRequest = "PullRequest"
             , Nightly = "Nightly"
             , MainlineNightly = "MainlineNightly"
+            , Weekly = "Weekly"
             , Release = "Release"
             }
             scope
@@ -32,6 +34,7 @@ let lowerName =
             { PullRequest = "pullrequest"
             , Nightly = "nightly"
             , MainlineNightly = "mainlinenightly"
+            , Weekly = "weekly"
             , Release = "release"
             }
             scope
@@ -41,11 +44,17 @@ let join =
       ->  Extensions.join "," (Prelude.List.map Scope Text lowerName scopes)
 
 let Full =
-      [ Scope.PullRequest, Scope.Nightly, Scope.MainlineNightly, Scope.Release ]
+      [ Scope.PullRequest
+      , Scope.Nightly
+      , Scope.MainlineNightly
+      , Scope.Weekly
+      , Scope.Release
+      ]
 
 let PullRequestOnly = [ Scope.PullRequest ]
 
-let AllButPullRequest = [ Scope.Nightly, Scope.MainlineNightly, Scope.Release ]
+let AllButPullRequest =
+      [ Scope.Nightly, Scope.MainlineNightly, Scope.Weekly, Scope.Release ]
 
 in  { Type = Scope
     , Full = Full

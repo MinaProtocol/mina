@@ -42,6 +42,6 @@ in  Pipeline.build
             ]
           , debVersion = DebianVersions.DebVersion.Noble
           , profile = Profiles.Type.Mainnet
-          , scope = [ PipelineScope.Type.Release ]
+          , scope = [ PipelineScope.Type.Weekly, PipelineScope.Type.Release ]
           }
       )

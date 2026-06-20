@@ -6,7 +6,13 @@ let Scope = ./Scope.dhall
 
 let Filter
     : Type
-    = < PullRequestOnly | StableOnly | Nightly | MainlineNightly | All >
+    = < PullRequestOnly
+      | StableOnly
+      | Nightly
+      | MainlineNightly
+      | Weekly
+      | All
+      >
 
 let scopes
     : Filter -> List Scope.Type
@@ -16,10 +22,12 @@ let scopes
             , StableOnly = [ Scope.Type.MainlineNightly, Scope.Type.Release ]
             , Nightly = [ Scope.Type.Nightly ]
             , MainlineNightly = [ Scope.Type.MainlineNightly ]
+            , Weekly = [ Scope.Type.Weekly ]
             , All =
               [ Scope.Type.PullRequest
               , Scope.Type.Nightly
               , Scope.Type.MainlineNightly
+              , Scope.Type.Weekly
               , Scope.Type.Release
               ]
             }
@@ -33,6 +41,7 @@ let show
             , StableOnly = "stableonly"
             , Nightly = "nightly"
             , MainlineNightly = "mainlinenightly"
+            , Weekly = "weekly"
             , All = "all"
             }
             filter
