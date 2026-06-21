@@ -33,13 +33,18 @@ in  Pipeline.build
       Pipeline.Config::{
       , spec = JobSpec::{
         , dirtyWhen =
-          [ S.strictlyStart (S.contains "src")
-          , S.exactly "buildkite/scripts/connect/connect-to-network" "sh"
-          , S.exactly "buildkite/src/Jobs/Test/ConnectToMainnet" "dhall"
+          [ S.strictlyStart (S.contains "scripts/debian")
+          , S.strictlyStart (S.contains "scripts/rocksdb")
+          , S.exactly
+              "buildkite/scripts/connect/connect-to-network-migration"
+              "sh"
+          , S.exactly
+              "buildkite/src/Jobs/Test/ConnectToMainnetMigration"
+              "dhall"
           , S.exactly "buildkite/src/Command/ConnectToNetwork" "dhall"
           ]
         , path = "Test"
-        , name = "ConnectToMainnet"
+        , name = "ConnectToMainnetMigration"
         , scope =
           [ PipelineScope.Type.MainlineNightly, PipelineScope.Type.Release ]
         , tags =
@@ -67,6 +72,8 @@ in  Pipeline.build
             , mina_suffix = "${Network.lowerName network}"
             , testnet = "${Network.lowerName network}"
             , peer_list_url = Network.peerListUrl network
+            , script =
+                "./buildkite/scripts/connect/connect-to-network-migration.sh"
             }
         ]
       }

@@ -6,28 +6,21 @@ let Pipeline = ../../Pipeline/Dsl.dhall
 
 let PipelineTag = ../../Pipeline/Tag.dhall
 
-let PipelineScope = ../../Pipeline/Scope.dhall
-
 let ConnectToNetwork = ../../Command/ConnectToNetwork.dhall
 
 let Network = ../../Constants/Network.dhall
 
 let DebianVersions = ../../Constants/DebianVersions.dhall
 
-let Profile = ../../Constants/Profiles.dhall
+let network = Network.Type.Mesa
 
 let Expr = ../../Pipeline/Expr.dhall
 
 let MainlineBranch = ../../Pipeline/MainlineBranch.dhall
 
-let network = Network.Type.Mainnet
-
 let dependsOn =
       DebianVersions.dependsOn
-        DebianVersions.DepsSpec::{
-        , network = network
-        , profile = Profile.Type.Mainnet
-        }
+        DebianVersions.DepsSpec::{ network = Network.Type.Mesa }
 
 in  Pipeline.build
       Pipeline.Config::{
@@ -35,28 +28,26 @@ in  Pipeline.build
         , dirtyWhen =
           [ S.strictlyStart (S.contains "src")
           , S.exactly "buildkite/scripts/connect/connect-to-network" "sh"
-          , S.exactly "buildkite/src/Jobs/Test/ConnectToMainnet" "dhall"
+          , S.exactly "buildkite/src/Jobs/Test/ConnectToMesa" "dhall"
+          , S.exactly "buildkite/src/Command/ConnectToNetwork" "dhall"
           , S.exactly "buildkite/src/Command/ConnectToNetwork" "dhall"
           ]
         , path = "Test"
-        , name = "ConnectToMainnet"
-        , scope =
-          [ PipelineScope.Type.MainlineNightly, PipelineScope.Type.Release ]
+        , name = "ConnectToMesa"
         , tags =
           [ PipelineTag.Type.Long
           , PipelineTag.Type.Test
           , PipelineTag.Type.Stable
-          , PipelineTag.Type.Rosetta
           ]
         , excludeIf =
           [ Expr.Type.DescendantOf
-              { ancestor = MainlineBranch.Type.Mesa
-              , reason = "Mesa does not have mainnet network yet"
-              }
-          , Expr.Type.DescendantOf
               { ancestor = MainlineBranch.Type.Develop
               , reason =
-                  "Develop branch is incompatible with current mainnet network"
+                  "Develop branch is incompatible with current mesa network"
+              }
+          , Expr.Type.DescendantOf
+              { ancestor = MainlineBranch.Type.Mesa
+              , reason = "Mesa branch is incompatible with current mesa network"
               }
           ]
         }
@@ -65,7 +56,7 @@ in  Pipeline.build
             ConnectToNetwork.Spec::{
             , dependsOn = dependsOn
             , mina_suffix = "${Network.lowerName network}"
-            , testnet = "${Network.lowerName network}"
+            , testnet = "testnet"
             , peer_list_url = Network.peerListUrl network
             }
         ]
