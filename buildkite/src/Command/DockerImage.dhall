@@ -212,9 +212,12 @@ let generateStep =
                 else  ""
 
           let pruneDockerImages =
-                    "if [ -z \"\\\${SKIP_DOCKER_PRUNE:-}\" ]; then "
-                ++  "docker system prune --all --force"
-                ++  "; else echo 'Skipping docker prune due to SKIP_DOCKER_PRUNE'; fi"
+              -- Single source of truth for the prune (see disk-cleanup.sh).
+              -- THRESHOLD=0 forces it before every build (builds are the heavy
+              -- disk consumers); the script is concurrency-safe (dangling-only,
+              -- keeps tagged images for co-located jobs) and honours
+              -- SKIP_DOCKER_PRUNE itself.
+                "DISK_PRUNE_THRESHOLD=0 ./buildkite/scripts/docker/disk-cleanup.sh"
 
           let loadOnlyArg =
                       if DockerPublish.shouldPublish

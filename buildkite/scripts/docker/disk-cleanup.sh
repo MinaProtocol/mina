@@ -3,15 +3,21 @@
 # Reclaim docker disk on the CI agent when it is getting full, to avoid the
 # "no space left on device" failures during `docker run`.
 #
-# The prune in the docker *build* job (DockerImage.dhall) only runs on build
-# steps. Jobs that do NOT build docker images -- tests via RunInToolchain
-# (load_from_cache.sh) and the postgres tests via RunWithPostgres -- can still
-# land on an agent left full by an earlier build's dangling images. This is the
-# shared cleanup those agent-side entry points call before running docker.
+# Shared cleanup called by all the agent-side entry points before they run
+# docker: the docker build job (DockerImage.dhall, forced), tests via
+# RunInToolchain (load_from_cache.sh) and the postgres tests via RunWithPostgres.
+#
+# CONCURRENCY-SAFE: agents (generic-multi) run several builds at once, so we must
+# not disturb other jobs. `docker system prune` (WITHOUT --all) removes only
+# dangling (<none>) images -- the ~24GB/build leftovers that fill the disk --
+# plus stopped containers and dangling build cache. It never touches running
+# containers, and it KEEPS all tagged images, so a concurrent job's toolchain /
+# base images (which it may have pulled but not yet started a container from) are
+# left intact. (We deliberately avoid --all, which would evict those.)
 #
 # Acts only when / usage >= DISK_PRUNE_THRESHOLD (default 80) so healthy agents
-# pay nothing; honours SKIP_DOCKER_PRUNE; never fatal. When it does prune it
-# removes ALL unused docker data (any age) -- needed images are re-fetched.
+# pay nothing; set DISK_PRUNE_THRESHOLD=0 to always prune (used by the build
+# job). Honours SKIP_DOCKER_PRUNE; never fatal.
 
 set +e
 
@@ -33,8 +39,8 @@ if [[ "$USE" -lt "$THRESHOLD" ]]; then
   exit 0
 fi
 
-echo "disk-cleanup: / at ${USE}% (>= ${THRESHOLD}%), pruning all unused docker data"
-docker system prune --all --force
+echo "disk-cleanup: / at ${USE}% (>= ${THRESHOLD}%), pruning dangling docker data (concurrency-safe, no --all)"
+docker system prune --force
 
 echo "disk-cleanup: / usage after cleanup:"
 df -h / 2>/dev/null
