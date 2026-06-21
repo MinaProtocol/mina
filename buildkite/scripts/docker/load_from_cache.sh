@@ -24,6 +24,13 @@ fi
 IMAGE="$1"
 CACHE_ROOT="${CACHE_ROOT:-/var/storagebox/docker-cache}"
 
+# Diagnostics for the recurring "no space left on device" failures: report the
+# agent's disk + docker usage right before we touch docker. Read-only and
+# non-fatal. Disable by setting DISK_REPORT=0.
+if [[ "${DISK_REPORT:-1}" != "0" && -x ./buildkite/scripts/docker/disk-report.sh ]]; then
+  ./buildkite/scripts/docker/disk-report.sh || true
+fi
+
 if [[ "$IMAGE" != *:* ]]; then
   echo "ERROR: image '$IMAGE' has no tag; expected <registry>/<service>:<tag>" >&2
   exit 1
