@@ -16,9 +16,12 @@
 # We copy the very same file to the very same paths, so the daemon resolves the
 # genesis ledger identically to the packaged case.
 #
-# GITHASH_CONFIG comes from buildkite/scripts/export-git-env-vars.sh; if it is
-# unset we still lay down the named config (the magic config is best-effort).
-# Target dir is ${MINA_CONFIG_DIR:-/var/lib/coda}; uses sudo when not root.
+# The magic config is named after the build's git hash. We resolve it the same
+# way the deb build does (scripts/export-git-env-vars.sh): use GITHASH_CONFIG if
+# already exported (callers normally `source export-git-env-vars.sh` first), else
+# an explicit OVERRIDE_GITHASH, else derive it from HEAD -- so the hash is always
+# determined, never skipped. Target dir is ${MINA_CONFIG_DIR:-/var/lib/coda};
+# uses sudo when not root.
 
 set -eo pipefail
 
@@ -50,13 +53,17 @@ if [[ "$(id -u)" -ne 0 ]] && command -v sudo >/dev/null 2>&1; then
   SUDO="sudo"
 fi
 
-$SUDO mkdir -p "$CODA_DIR"
-$SUDO cp "$SRC" "${CODA_DIR}/${NETWORK}.json"
+# Resolve the build git hash exactly as export-git-env-vars.sh does, falling
+# back to HEAD so it is always defined (not best-effort).
+GITHASH_CONFIG="${GITHASH_CONFIG:-${OVERRIDE_GITHASH:-$(git rev-parse --short=8 --verify HEAD 2>/dev/null || true)}}"
 
-if [[ -n "${GITHASH_CONFIG:-}" ]]; then
-  $SUDO cp "$SRC" "${CODA_DIR}/config_${GITHASH_CONFIG}.json"
-else
-  echo "restore_daemon_config: GITHASH_CONFIG unset, skipping magic config" >&2
+if [[ -z "$GITHASH_CONFIG" ]]; then
+  echo "restore_daemon_config: could not determine GITHASH_CONFIG (set GITHASH_CONFIG/OVERRIDE_GITHASH, or run inside a git checkout)" >&2
+  exit 1
 fi
 
-echo "restore_daemon_config: installed ${NETWORK} genesis config into ${CODA_DIR}" >&2
+$SUDO mkdir -p "$CODA_DIR"
+$SUDO cp "$SRC" "${CODA_DIR}/${NETWORK}.json"
+$SUDO cp "$SRC" "${CODA_DIR}/config_${GITHASH_CONFIG}.json"
+
+echo "restore_daemon_config: installed ${NETWORK} genesis config (incl. config_${GITHASH_CONFIG}.json) into ${CODA_DIR}" >&2
