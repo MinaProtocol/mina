@@ -55,7 +55,9 @@ in  Pipeline.build
             Command.Config::{
             , commands =
               [ RunWithPostgres.runInToolchainWithPostgresAndDebs
-                  ([] : List Text)
+                  [ "APPS_BUILD_FLAG=instrumented"
+                  , "APPS_BARE_BINARIES=archive_hardfork_toolbox.exe:mina-archive-hardfork-toolbox"
+                  ]
                   ( Some
                       ( RunWithPostgres.ScriptOrArchive.Archive
                           { Script = "post_upgrade_archive.sql"
@@ -72,7 +74,9 @@ in  Pipeline.build
               , Cmd.run
                   "buildkite/scripts/upload-partial-coverage-data.sh ${key}"
               , RunWithPostgres.runInToolchainWithPostgresAndDebs
-                  ([] : List Text)
+                  [ "APPS_BUILD_FLAG=instrumented"
+                  , "APPS_BARE_BINARIES=archive_hardfork_toolbox.exe:mina-archive-hardfork-toolbox"
+                  ]
                   ( Some
                       ( RunWithPostgres.ScriptOrArchive.Archive
                           { Script = "hf_archive.sql"
