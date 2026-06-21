@@ -213,7 +213,8 @@ let generateStep =
 
           let pruneDockerImages =
                     "if [ -z \"\\\${SKIP_DOCKER_PRUNE:-}\" ]; then "
-                ++  "docker system prune --all --force --filter until=24h"
+                ++  "docker system prune --all --force --filter until=24h ; "
+                ++  "docker image prune --force"
                 ++  "; else echo 'Skipping docker prune due to SKIP_DOCKER_PRUNE'; fi"
 
           let loadOnlyArg =
@@ -266,6 +267,8 @@ let generateStep =
                       ++  " && "
                       ++  exportBranchNameCmd
                       ++  " && source ./buildkite/scripts/export-git-env-vars.sh "
+                      ++  " && "
+                      ++  pruneDockerImages
                       ++  " && "
                       ++  buildDockerCmd
                       ++  maybeVerify
