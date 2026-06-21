@@ -31,6 +31,13 @@ if [[ "${DISK_REPORT:-1}" != "0" && -x ./buildkite/scripts/docker/disk-report.sh
   ./buildkite/scripts/docker/disk-report.sh || true
 fi
 
+# Reclaim disk if the agent is getting full, before we run docker. Covers
+# RunInToolchain jobs (which don't run a docker build, so the build-job prune
+# never fires for them). Threshold-gated and non-fatal. Disable with DISK_CLEANUP=0.
+if [[ "${DISK_CLEANUP:-1}" != "0" && -x ./buildkite/scripts/docker/disk-cleanup.sh ]]; then
+  ./buildkite/scripts/docker/disk-cleanup.sh || true
+fi
+
 if [[ "$IMAGE" != *:* ]]; then
   echo "ERROR: image '$IMAGE' has no tag; expected <registry>/<service>:<tag>" >&2
   exit 1
