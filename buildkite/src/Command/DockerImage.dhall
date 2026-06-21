@@ -213,8 +213,7 @@ let generateStep =
 
           let pruneDockerImages =
                     "if [ -z \"\\\${SKIP_DOCKER_PRUNE:-}\" ]; then "
-                ++  "docker system prune --all --force --filter until=24h ; "
-                ++  "docker image prune --force"
+                ++  "docker system prune --all --force"
                 ++  "; else echo 'Skipping docker prune due to SKIP_DOCKER_PRUNE'; fi"
 
           let loadOnlyArg =
