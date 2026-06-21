@@ -38,6 +38,6 @@ in  { step =
               , key = key
               , target = Size.Large
               , depends_on = dependsOn
-              , artifact_paths = [ S.contains "test_output/artifacts/**/*" ]
+              , artifact_paths = [ S.contains "test_output/artifacts/*" ]
               }
     }

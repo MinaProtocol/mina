@@ -12,20 +12,15 @@ ARCHIVE_TEST_APP=${ARCHIVE_TEST_APP:-_build/default/src/test/archive/archive_nod
 # shellcheck disable=SC2034
 MINA_TEST_POSTGRES_URI=${POSTGRES_URI:-"postgres://postgres:postgres@localhost:5432"}
 
-# Collect test logs here so Buildkite can upload them as artifacts
+# Collect the test log here so Buildkite can upload it as an artifact
 # (see artifact_paths in buildkite/src/Command/ArchiveNodeTest.dhall).
+# Running with -v makes Alcotest stream the full per-test output (including the
+# exception/backtrace the summary collapses to "exception") to stdout, which the
+# tee below captures, so we don't need to also ship Alcotest's _build/_tests
+# tree (whose suite-named subdirectories break the artifact glob).
 ARTIFACTS_DIR=${ARTIFACTS_DIR:-test_output/artifacts}
 mkdir -p "$ARTIFACTS_DIR"
 TEST_LOG="$ARTIFACTS_DIR/archive-node-test.log"
-
-# On exit, also gather Alcotest's per-test output (contains the full
-# exception/backtrace that the console summary collapses to "exception").
-collect_alcotest_logs () {
-  if [[ -d _build/_tests ]]; then
-    cp -r _build/_tests "$ARTIFACTS_DIR/alcotest" 2>/dev/null || true
-  fi
-}
-trap collect_alcotest_logs EXIT
 
 echo "Running archive node test"
 # pipefail so the test's exit status survives the tee pipe; tee keeps the
