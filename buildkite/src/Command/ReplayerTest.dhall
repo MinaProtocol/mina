@@ -18,7 +18,9 @@ in  { step =
               Command.Config::{
               , commands =
                 [ RunWithPostgres.runInToolchainWithPostgresAndDebs
-                    ([] : List Text)
+                    [ "APPS_BUILD_FLAG=instrumented"
+                    , "APPS_BARE_BINARIES=replayer.exe:mina-replayer"
+                    ]
                     ( Some
                         ( RunWithPostgres.ScriptOrArchive.Script
                             "./src/test/archive/sample_db/archive_db.sql"

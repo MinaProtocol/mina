@@ -24,7 +24,9 @@ in  { step =
                 [ Cmd.run
                     "cp /var/storagebox/test_data/develop/replayer_mesa/mina-devnet-config_*.deb ./src/test/archive/sample_mesa_hf_db/"
                 , RunWithPostgres.runInToolchainWithPostgresAndDebs
-                    ([] : List Text)
+                    [ "APPS_BUILD_FLAG=instrumented"
+                    , "APPS_BARE_BINARIES=replayer.exe:mina-replayer"
+                    ]
                     ( Some
                         ( RunWithPostgres.ScriptOrArchive.Archive
                             { Script = "mesa_hf_dry_run_db.sql"
