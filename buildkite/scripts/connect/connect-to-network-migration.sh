@@ -2,21 +2,20 @@
 
 set -eox pipefail
 
-# Functional connect test: start the freshly-built daemon, wait for it to sync
-# against the live network and assert the network id. This is the binary-only
-# half of the old connect test -- the .deb upgrade/downgrade + RocksDB storage
-# migration cycle now lives in connect-to-network-migration.sh, which is a
-# Debian/packaging test run only when packaging is exercised.
-#
-# Runs from bare apps restored from the apps cache (mina + mina-graphql-client +
-# libp2p_helper + the network's genesis config), mirroring what the .deb would
-# install, with a .deb fallback on a cache miss.
+# Debian packaging / version-migration test: install the current daemon .deb,
+# sync against the live network, convert RocksDB storage to the legacy format,
+# downgrade to the official stable release, re-sync, upgrade back to current and
+# re-sync. This exercises the .deb upgrade/downgrade path and the storage
+# converter, so it is inherently package-bound (uses install_official.sh for the
+# released package and the versioned storage-toolbox scanners) and runs only as
+# a Debian-gated test. The binary-only sync check lives in connect-to-network.sh.
 
 # --- Initialization ---
 MINA_DEBIAN_NETWORK=""
 NETWORK_NAME=""
 WAIT_BETWEEN_POLLING_GRAPHQL=""
 SYNC_TIMEOUT=""
+STABLE_VERSION="3.3.0"
 
 usage() {
     cat << EOF
@@ -59,6 +58,10 @@ while [[ $# -gt 0 ]]; do
             SYNC_TIMEOUT="$2"
             shift 2
             ;;
+        --stable-version)
+            STABLE_VERSION="$2"
+            shift 2
+            ;;
         --help)
             usage
             ;;
@@ -78,23 +81,22 @@ fi
 # --- Main Script Logic ---
 
 git config --global --add safe.directory /workdir
-source buildkite/scripts/export-git-env-vars.sh
 
-# Restore the daemon, the GraphQL client and the libp2p helper bare from the apps
-# cache, and reproduce the .deb's /var/lib/coda genesis config. The daemon finds
-# the helper as coda-libp2p_helper on PATH, exactly like the packaged case. Fall
-# back to the .deb on any cache miss (e.g. outside Buildkite, or before the
-# libp2p_helper cache write lands).
-if ./buildkite/scripts/apps/restore_binary.sh "$MINA_DEBIAN_NETWORK" \
-  && ./buildkite/scripts/apps/restore_app.sh "$MINA_DEBIAN_NETWORK" mina_graphql_client_app.exe mina-graphql-client \
-  && ./buildkite/scripts/apps/restore_app.sh "$MINA_DEBIAN_NETWORK" libp2p_helper coda-libp2p_helper \
-  && ./buildkite/scripts/apps/restore_daemon_config.sh "$MINA_DEBIAN_NETWORK"; then
-  echo "Using bare mina + mina-graphql-client + libp2p_helper from apps cache"
-else
-  echo "Falling back to debian-installed mina-${MINA_DEBIAN_NETWORK}"
-  source buildkite/scripts/debian/update.sh --verbose
-  source buildkite/scripts/debian/install.sh "mina-${MINA_DEBIAN_NETWORK}" 1
-fi
+source buildkite/scripts/debian/update.sh --verbose
+source buildkite/scripts/export-git-env-vars.sh
+source buildkite/scripts/debian/install.sh "mina-${MINA_DEBIAN_NETWORK},mina-daemon-storage-toolbox" 1
+
+# Stash mina-graphql-client so it survives the legacy downgrade below.
+# The official 3.3.0 mina-${MINA_DEBIAN_NETWORK} package does not ship this
+# binary; without stashing, the post-downgrade sync check would fail because
+# the helper would have been removed. The binary is self-contained except
+# for libc/libssl/libgmp which remain present across the downgrade.
+MINA_GRAPHQL_CLIENT=/tmp/mina-graphql-client.stashed
+cp "$(command -v mina-graphql-client)" "$MINA_GRAPHQL_CLIENT"
+
+# Legacy scanner installs to a separate versioned path under /usr/lib/mina/
+FORCE_VERSION="*" ROOT="legacy" ./buildkite/scripts/debian/install.sh "mina-daemon-recovery-storage-toolbox" 1
+
 
 # Remove lockfile if present
 rm /home/opam/.mina-config/.mina-lock || true
@@ -122,7 +124,7 @@ start_daemon_and_wait_for_sync() {
 
     local sync_status=""
     while [ "$(date +%s)" -lt $deadline ]; do
-        sync_status=$(timeout 5 mina-graphql-client sync-status \
+        sync_status=$(timeout 5 "$MINA_GRAPHQL_CLIENT" sync-status \
             --graphql-uri http://localhost:3085/graphql --raw \
             2>/dev/null || echo "CONNECT_ERROR")
 
@@ -141,7 +143,7 @@ start_daemon_and_wait_for_sync() {
     # Check network id via GraphQL.
     # Wrap in timeout so a hung GraphQL endpoint doesn't stall the script for
     # the ~5 minute default retry budget inside exec_graphql_request.
-    NETWORK_ID=$(timeout 10 mina-graphql-client network-id \
+    NETWORK_ID=$(timeout 10 "$MINA_GRAPHQL_CLIENT" network-id \
         --graphql-uri http://localhost:3085/graphql --raw)
 
     EXPECTED_NETWORK="mina:$NETWORK_NAME"
@@ -154,9 +156,34 @@ start_daemon_and_wait_for_sync() {
     fi
 }
 
-# Start the daemon, confirm it syncs and reports the expected network id.
+# --- Step 1: Test with current mina ---
 start_daemon_and_wait_for_sync mina
 
-# Stop the daemon
+# --- Step 2: Stop daemon ---
 mina client stop-daemon
 wait "$DAEMON_PID"
+
+# --- Step 3: Convert RocksDB to legacy format ---
+
+mina-storage-converter \
+    --node-dir /home/opam/.mina-config \
+    --current-scanner /usr/lib/mina/storage/10.5.2/${GITTAG}/mina-rocksdb-scanner \
+    --stable-scanner /usr/lib/mina/storage/5.7.12/${STABLE_VERSION}/mina-rocksdb-scanner \
+    --yes --verbose
+
+if [[ "$MINA_DEBIAN_NETWORK" == "mainnet" ]]; then
+    source buildkite/scripts/debian/install_official.sh --package "mina-mainnet" --channel stable --version "$STABLE_VERSION*"
+else
+    source buildkite/scripts/debian/install_official.sh --package "mina-${MINA_DEBIAN_NETWORK}" --version "$STABLE_VERSION*"
+fi
+
+# --- Step 4: Check sync with legacy mina and shutdown ---
+start_daemon_and_wait_for_sync mina
+mina client stop-daemon
+wait "$DAEMON_PID"
+
+# --- Step 5: Upgrade mina to current ---
+source buildkite/scripts/debian/install.sh "mina-${MINA_DEBIAN_NETWORK}" 1
+
+# --- Step 6: Check sync with current mina ---
+start_daemon_and_wait_for_sync mina
