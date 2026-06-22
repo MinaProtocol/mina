@@ -31,21 +31,14 @@ let send_uptime_data ~logger ~interruptor ~(submitter_keypair : Keypair.t) ~url
   let headers =
     Cohttp.Header.of_list [ ("Content-Type", "application/json") ]
   in
-  let metadata_of_body = function
-    | `String s ->
-        [ ("error", `String s) ]
-    | `Strings ss ->
-        [ ("error", `List (List.map ss ~f:(fun s -> `String s))) ]
-    | `Empty | `Pipe _ ->
-        []
-  in
   let max_attempts = 8 in
-  let attempt_pause_sec = 4.0 in
-  (* see https://github.com/MinaProtocol/mina/blob/compatible/src/app/delegation_backend/README.md
-     for significance of these status codes
-  *)
   let unrecoverable_status_codes = [ 400; 401; 411; 413 ] in
-  let run_attempt attempt =
+  let strategy =
+    Backoff.Strategy.create ~base:(Time_ns.Span.of_sec 4.0)
+      ~max_delay:(Time_ns.Span.of_sec 4.0) ~max_attempts:(Some max_attempts)
+      ()
+  in
+  let run_attempt () =
     let interruptible =
       match%map
         make_interruptible
@@ -55,7 +48,7 @@ let send_uptime_data ~logger ~interruptor ~(submitter_keypair : Keypair.t) ~url
                    (Yojson.Safe.to_string json |> Cohttp_async.Body.of_string)
                  url ) )
       with
-      | Ok ({ status; _ }, body) ->
+      | Ok ({ status; _ }, _body) ->
           let status_code = Cohttp.Code.code_of_status status in
           let status_string = Cohttp.Code.string_of_status status in
           let unretriable =
@@ -83,35 +76,17 @@ let send_uptime_data ~logger ~interruptor ~(submitter_keypair : Keypair.t) ~url
                 ; ("http_code", `Int status_code)
                 ; ("http_error", `String status_string)
                 ]
-          else if attempt >= max_attempts then
-            let base_metadata =
-              [ ("state_hash", State_hash.to_yojson state_hash)
-              ; ("url", `String (Uri.to_string url))
-              ; ("http_code", `Int status_code)
-              ; ("http_error", `String status_string)
-              ]
-            in
-            let extra_metadata = metadata_of_body body in
-            let metadata = base_metadata @ extra_metadata in
-            [%log error]
-              "After %d attempts, failed to send block with state hash \
-               $state_hash to uptime service at URL $url, no more retries"
-              max_attempts ~metadata
           else
-            let base_metadata =
-              [ ("state_hash", State_hash.to_yojson state_hash)
-              ; ("url", `String (Uri.to_string url))
-              ; ("http_code", `Int status_code)
-              ; ("http_error", `String status_string)
-              ]
-            in
-            let extra_metadata = metadata_of_body body in
-            let metadata = base_metadata @ extra_metadata in
             [%log info]
               "Failure when sending block with state hash $state_hash to \
-               uptime service at URL $url, attempt %d of %d, retrying"
-              attempt max_attempts ~metadata ) ;
-          succeeded || unretriable
+               uptime service at URL $url, retrying"
+              ~metadata:
+                [ ("state_hash", State_hash.to_yojson state_hash)
+                ; ("url", `String (Uri.to_string url))
+                ; ("http_code", `Int status_code)
+                ; ("http_error", `String status_string)
+                ] ) ;
+          if succeeded || unretriable then Ok () else Error (Error.of_string "uptime post failed")
       | Error exn ->
           [%log warn]
             "Error when sending block with state hash $state_hash to uptime \
@@ -121,34 +96,26 @@ let send_uptime_data ~logger ~interruptor ~(submitter_keypair : Keypair.t) ~url
               ; ("url", `String (Uri.to_string url))
               ; ("error", `String (Exn.to_string exn))
               ] ;
-          (* retry *)
-          false
+          Error (Error.of_string "uptime post exception")
     in
     match%map.Deferred Interruptible.force interruptible with
-    | Ok succeeded ->
-        succeeded
+    | Ok (Ok ()) ->
+        Ok ()
+    | Ok (Error _) ->
+        Error (Error.of_string "uptime post failed")
     | Error _ ->
         [%log error]
           "In uptime service, POST of block with state hash $state_hash was \
            interrupted"
           ~metadata:[ ("state_hash", State_hash.to_yojson state_hash) ] ;
-        (* interrupted, don't want to retry, claim success *)
-        true
+        Ok ()
   in
-  let rec go attempt =
-    let open Deferred.Let_syntax in
-    let%bind succeeded = run_attempt attempt in
-    if succeeded then Deferred.return ()
-    else if attempt < max_attempts then (
-      let%bind () = Async.after (Time.Span.of_sec attempt_pause_sec) in
-      [%log info]
-        "In uptime service, retrying to send block, attempt %d of %d attempts \
-         allowed"
-        attempt max_attempts ;
-      go (attempt + 1) )
-    else Deferred.unit
-  in
-  make_interruptible (go 1)
+  make_interruptible
+    (let%map.Deferred _ =
+       Backoff.Deferred.retry ~log_errors:true strategy ~logger
+         ~f:(fun () -> run_attempt ())
+     in
+     () )
 
 let block_base64_of_breadcrumb breadcrumb =
   let external_transition =
