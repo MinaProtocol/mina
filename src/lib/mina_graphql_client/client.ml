@@ -34,69 +34,48 @@ let exec_graphql_request ?(num_tries = 10) ?(retry_delay_sec = 30.0)
   let past_deadline () =
     match deadline with None -> false | Some d -> Time.( >= ) (Time.now ()) d
   in
-  let bounded_sleep span =
-    match deadline with
-    | None ->
-        span
-    | Some d ->
-        let remaining = Time.diff d (Time.now ()) in
-        if Time.Span.( <= ) remaining Time.Span.zero then Time.Span.zero
-        else Time.Span.min span remaining
-  in
   let deadline_failure_msg () =
     sprintf
       "GraphQL \"%s\" to \"%s\" request hit caller's deadline before succeeding"
       query_name (Uri.to_string node_uri)
   in
-  let rec retry n =
-    if past_deadline () then (
-      [%log error] "$query to $uri exhausted caller's deadline" ~metadata ;
-      Deferred.Or_error.error_string (deadline_failure_msg ()) )
-    else if n <= 0 then (
-      [%log error]
-        "GraphQL request \"$query\" to \"$uri\" failed too many times" ~metadata ;
-      Deferred.Or_error.errorf
-        "GraphQL \"%s\" to \"%s\" request failed too many times" query_name
-        (Uri.to_string node_uri) )
-    else
-      match%bind Queries.Client.query query_obj node_uri with
-      | Ok result ->
-          [%log info] "GraphQL request \"$query\" to \"$uri\" succeeded"
-            ~metadata ;
-          Deferred.Or_error.return result
-      | Error (`Failed_request err_string) ->
-          [%log warn]
-            "GraphQL request \"$query\" to \"$uri\" failed: \"$error\" \
-             ($num_tries attempts left)"
-            ~metadata:
-              ( metadata
-              @ [ ("error", `String err_string); ("num_tries", `Int (n - 1)) ]
-              ) ;
-          (* Skip the retry sleep when this was the last attempt — otherwise
-             a [num_tries=1] caller burns [retry_delay_sec] (~30s by default)
-             waiting for a retry that will never happen.  This matters for
-             the one-shot CLI subcommands, which set [num_tries:1] precisely
-             to fail fast against an unreachable daemon. *)
-          if n - 1 <= 0 then
-            Deferred.Or_error.errorf
-              "GraphQL \"%s\" to \"%s\" request failed too many times: %s"
-              query_name (Uri.to_string node_uri) err_string
-          else if past_deadline () then
-            Deferred.Or_error.error_string (deadline_failure_msg ())
-          else
-            let%bind () =
-              after (bounded_sleep (Time.Span.of_sec retry_delay_sec))
-            in
-            retry (n - 1)
-      | Error (`Graphql_error err_string) ->
-          [%log error]
-            "GraphQL request \"$query\" to \"$uri\" returned an error: \
-             \"$error\" (this is a graphql error so not retrying)"
-            ~metadata:(metadata @ [ ("error", `String err_string) ]) ;
-          Deferred.Or_error.error_string err_string
+  let%bind () = after (Time.Span.of_sec initial_delay_sec) in
+  let strategy =
+    Backoff.Strategy.create
+      ~base:(Time_ns.Span.of_sec retry_delay_sec)
+      ~max_delay:(Time_ns.Span.of_sec retry_delay_sec)
+      ~max_attempts:(Some num_tries) ()
   in
-  let%bind () = after (bounded_sleep (Time.Span.of_sec initial_delay_sec)) in
-  retry num_tries
+  let retry () =
+    Backoff.Deferred.retry ~log_errors:true strategy ~logger ~f:(fun () ->
+        match%bind Queries.Client.query query_obj node_uri with
+        | Ok result ->
+            return (Ok (Ok result))
+        | Error (`Failed_request err) ->
+            return (Error (Error.of_string err))
+        | Error (`Graphql_error err) ->
+            return (Ok (Error (Error.of_string err))) )
+  in
+  let result =
+    match deadline with
+    | None ->
+        retry ()
+    | Some d -> (
+        if past_deadline () then
+          Deferred.return (Error (Error.of_string (deadline_failure_msg ())))
+        else
+          let remaining = Time.diff d (Time.now ()) in
+          match%map Clock.with_timeout remaining (retry ()) with
+          | `Timeout ->
+              Error (Error.of_string (deadline_failure_msg ()))
+          | `Result r ->
+              r )
+  in
+  match%map result with
+  | Ok (Ok r) ->
+      Ok r
+  | Ok (Error err) | Error err ->
+      Error err
 
 let get_peer_id ~logger node_uri =
   let open Deferred.Or_error.Let_syntax in
