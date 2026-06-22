@@ -9,7 +9,7 @@ module Strategy = struct
     ; rng : Random.State.t
     }
 
-  let create ~base ~max_delay ~max_attempts
+  let create ~base ~max_delay ?max_attempts
       ?(random_state = Random.State.default) () =
     { base; max_delay; max_attempts; rng = Random.State.copy random_state }
 end
@@ -55,8 +55,8 @@ module Make (M : Monad) = struct
                   ~attempt ~rng
               in
               if log_errors then
-                [%log warn]
-                  "Backoff: attempt %d failed, retrying after %s" attempt
+                [%log warn] "Backoff: attempt %d failed, retrying after %s"
+                  attempt
                   (Time_ns.Span.to_string_hum delay)
                   ~metadata:[ ("error", Error_json.error_to_yojson e) ]
               else

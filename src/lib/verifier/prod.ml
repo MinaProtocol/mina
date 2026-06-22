@@ -536,7 +536,7 @@ let create ~logger ?(enable_internal_tracing = false) ?internal_trace_filename
 let with_retry ~logger f =
   let strategy =
     Backoff.Strategy.create ~base:(Time_ns.Span.of_sec 5.0)
-      ~max_delay:(Time_ns.Span.of_sec 5.0) ~max_attempts:(Some 5) ()
+      ~max_delay:(Time_ns.Span.of_sec 5.0) ~max_attempts:5 ()
   in
   Backoff.Deferred.retry strategy ~logger ~f:(fun () ->
       match%bind f () with

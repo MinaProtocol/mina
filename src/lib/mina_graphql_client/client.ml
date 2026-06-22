@@ -44,7 +44,7 @@ let exec_graphql_request ?(num_tries = 10) ?(retry_delay_sec = 30.0)
     Backoff.Strategy.create
       ~base:(Time_ns.Span.of_sec retry_delay_sec)
       ~max_delay:(Time_ns.Span.of_sec retry_delay_sec)
-      ~max_attempts:(Some num_tries) ()
+      ~max_attempts:num_tries ()
   in
   let retry () =
     Backoff.Deferred.retry ~log_errors:true strategy ~logger ~f:(fun () ->

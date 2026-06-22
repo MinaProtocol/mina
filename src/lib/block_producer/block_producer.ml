@@ -746,7 +746,7 @@ module Vrf_evaluation_state = struct
 
   let vrf_retry_strategy =
     Backoff.Strategy.create ~base:(Time_ns.Span.of_sec 1.0)
-      ~max_delay:(Time_ns.Span.of_sec 10.0) ~max_attempts:(Some 3) ()
+      ~max_delay:(Time_ns.Span.of_sec 10.0) ~max_attempts:3 ()
 
   let poll_vrf_evaluator ~logger vrf_evaluator =
     let f () =

@@ -44,7 +44,8 @@ let main ~logger ~proof_level ~constraint_constants ~signature_kind
   in
   let retry_strategy =
     Backoff.Strategy.create ~base:(Time_ns.Span.of_sec 10.0)
-      ~max_delay:(Time_ns.Span.of_sec 120.0) ~max_attempts:None ()
+      ~max_delay:(Time_ns.Span.of_sec 120.0)
+      ()
   in
   let retry_forever ~f =
     Backoff.Deferred.retry ~log_errors:true retry_strategy ~logger ~f
@@ -113,8 +114,7 @@ let main ~logger ~proof_level ~constraint_constants ~signature_kind
                         [%log error]
                           "Couldn't inform the daemon about the snark work \
                            failure"
-                          ~metadata:
-                            [ ("error", Error_json.error_to_yojson e) ]
+                          ~metadata:[ ("error", Error_json.error_to_yojson e) ]
                     | Ok () ->
                         ()
                   in
@@ -125,17 +125,14 @@ let main ~logger ~proof_level ~constraint_constants ~signature_kind
         | Error _ ->
             go ()
         | Ok ({ data = elapsed; _ } as data) ->
-            let wire_result =
-              Result.Partitioned.Stable.Latest.{ id; data }
-            in
+            let wire_result = Result.Partitioned.Stable.Latest.{ id; data } in
             ( match partitioned_spec with
             | Spec.Partitioned.Poly.Single { spec = single_spec; _ } ->
-                Metrics.emit_single_metrics_stable ~logger ~single_spec
-                  ~elapsed
+                Metrics.emit_single_metrics_stable ~logger ~single_spec ~elapsed
             | Spec.Partitioned.Poly.Sub_zkapp_command
                 { spec = sub_zkapp_spec; _ } ->
-                Metrics.emit_subzkapp_metrics ~logger ~sub_zkapp_spec
-                  ~elapsed ) ;
+                Metrics.emit_subzkapp_metrics ~logger ~sub_zkapp_spec ~elapsed
+            ) ;
             let submit_work () =
               match%bind
                 retry_forever ~f:(fun () ->
@@ -155,8 +152,8 @@ let main ~logger ~proof_level ~constraint_constants ~signature_kind
                   go ()
               | Ok `SpecUnmatched ->
                   [%log info]
-                    "Result $work_ids rejected by $address since it has \
-                     wrong shape"
+                    "Result $work_ids rejected by $address since it has wrong \
+                     shape"
                     ~metadata:[ address_json; work_ids_json ] ;
                   go ()
             in

@@ -12,7 +12,7 @@ module Strategy : sig
   val create :
        base:Time_ns.Span.t
     -> max_delay:Time_ns.Span.t
-    -> max_attempts:int option
+    -> ?max_attempts:int
     -> ?random_state:Random.State.t
     -> unit
     -> t

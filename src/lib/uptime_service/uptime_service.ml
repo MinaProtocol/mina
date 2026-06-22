@@ -35,8 +35,7 @@ let send_uptime_data ~logger ~interruptor ~(submitter_keypair : Keypair.t) ~url
   let unrecoverable_status_codes = [ 400; 401; 411; 413 ] in
   let strategy =
     Backoff.Strategy.create ~base:(Time_ns.Span.of_sec 4.0)
-      ~max_delay:(Time_ns.Span.of_sec 4.0) ~max_attempts:(Some max_attempts)
-      ()
+      ~max_delay:(Time_ns.Span.of_sec 4.0) ~max_attempts ()
   in
   let run_attempt () =
     let interruptible =
@@ -55,7 +54,7 @@ let send_uptime_data ~logger ~interruptor ~(submitter_keypair : Keypair.t) ~url
             List.mem unrecoverable_status_codes status_code ~equal:Int.equal
           in
           let succeeded = status_code = 200 in
-          ( if succeeded then
+          if succeeded then
             [%log info]
               "Sent block with state hash $state_hash to uptime service at URL \
                $url"
@@ -85,8 +84,9 @@ let send_uptime_data ~logger ~interruptor ~(submitter_keypair : Keypair.t) ~url
                 ; ("url", `String (Uri.to_string url))
                 ; ("http_code", `Int status_code)
                 ; ("http_error", `String status_string)
-                ] ) ;
-          if succeeded || unretriable then Ok () else Error (Error.of_string "uptime post failed")
+                ] ;
+          if succeeded || unretriable then Ok ()
+          else Error (Error.of_string "uptime post failed")
       | Error exn ->
           [%log warn]
             "Error when sending block with state hash $state_hash to uptime \
@@ -112,8 +112,8 @@ let send_uptime_data ~logger ~interruptor ~(submitter_keypair : Keypair.t) ~url
   in
   make_interruptible
     (let%map.Deferred _ =
-       Backoff.Deferred.retry ~log_errors:true strategy ~logger
-         ~f:(fun () -> run_attempt ())
+       Backoff.Deferred.retry ~log_errors:true strategy ~logger ~f:(fun () ->
+           run_attempt () )
      in
      () )
 

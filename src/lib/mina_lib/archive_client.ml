@@ -6,11 +6,10 @@ let dispatch ?(max_tries = 5) ~logger
     (archive_location : Host_and_port.t Cli_lib.Flag.Types.with_name) diff =
   let strategy =
     Backoff.Strategy.create ~base:(Time_ns.Span.of_sec 1.0)
-      ~max_delay:(Time_ns.Span.of_sec 10.0) ~max_attempts:(Some max_tries) ()
+      ~max_delay:(Time_ns.Span.of_sec 10.0) ~max_attempts:max_tries ()
   in
   Backoff.Deferred.retry ~log_errors:true strategy ~logger ~f:(fun () ->
-      Daemon_rpcs.Client.dispatch Archive_lib.Rpc.t diff
-        archive_location.value )
+      Daemon_rpcs.Client.dispatch Archive_lib.Rpc.t diff archive_location.value )
   >>| function
   | Ok () ->
       Ok ()
@@ -32,7 +31,7 @@ let make_dispatch_block rpc ?(max_tries = 5)
     (archive_location : Host_and_port.t Cli_lib.Flag.Types.with_name) block =
   let strategy =
     Backoff.Strategy.create ~base:(Time_ns.Span.of_sec 1.0)
-      ~max_delay:(Time_ns.Span.of_sec 10.0) ~max_attempts:(Some max_tries) ()
+      ~max_delay:(Time_ns.Span.of_sec 10.0) ~max_attempts:max_tries ()
   in
   Backoff.Deferred.retry strategy ~logger:_null_logger ~f:(fun () ->
       Daemon_rpcs.Client.dispatch rpc block archive_location.value )
