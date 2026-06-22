@@ -4,6 +4,8 @@ let Command = ./Base.dhall
 
 let Size = ./Size.dhall
 
+let SelectFiles = ../Lib/SelectFiles.dhall
+
 let DebianVersions = ../Constants/DebianVersions.dhall
 
 let RunInToolchain = ./RunInToolchain.dhall
@@ -41,5 +43,6 @@ in  { Spec = Spec
               , key = "connect-to-${spec.testnet}"
               , target = Size.Large
               , depends_on = spec.dependsOn
+              , artifact_paths = [ SelectFiles.contains "test_output/artifacts/*" ]
               }
     }

@@ -100,8 +100,32 @@ mina libp2p generate-keypair --privkey-path /home/opam/libp2p-keys/key
 # Set permissions on the keypair so the daemon doesn't complain
 chmod -R 0700 /home/opam/libp2p-keys/
 
+# Capture the daemon's structured logs as Buildkite artifacts so sync failures
+# are diagnosable after the fact (the daemon still streams to the console as
+# before; this only adds uploadable copies). See artifact_paths in
+# buildkite/src/Command/ConnectToNetwork.dhall.
+ARTIFACTS_DIR=${ARTIFACTS_DIR:-test_output/artifacts}
+MINA_CONFIG_DIR=/home/opam/.mina-config
+mkdir -p "$ARTIFACTS_DIR"
+SYNC_PHASE=0
+
+# Copy the daemon's *.log files (mina.log explains why a sync stalled: peers,
+# bootstrap, catchup) into the artifacts dir, tagged so each phase is kept.
+collect_daemon_logs() {
+    local tag="$1"
+    local log
+    for log in "$MINA_CONFIG_DIR"/*.log; do
+        [ -e "$log" ] || continue
+        cp "$log" "$ARTIFACTS_DIR/${NETWORK_NAME}-${tag}-$(basename "$log")" 2>/dev/null || true
+    done
+    return 0
+}
+# Safety net: also grab logs if the script aborts unexpectedly.
+trap 'collect_daemon_logs final' EXIT
+
 start_daemon_and_wait_for_sync() {
     local MINA="$1"
+    SYNC_PHASE=$((SYNC_PHASE + 1))
 
     # Start the daemon in the background
     "$MINA" daemon \
@@ -129,6 +153,7 @@ start_daemon_and_wait_for_sync() {
 
     if [[ "$sync_status" != "SYNCED" ]]; then
         echo "Error: Daemon failed to sync into network withint timeout of $SYNC_TIMEOUT, current status: $sync_status"
+        collect_daemon_logs "phase${SYNC_PHASE}-failed"
         exit 1
     fi
 
@@ -144,8 +169,11 @@ start_daemon_and_wait_for_sync() {
         echo "Network id correct ($NETWORK_ID)"
     else
         echo "Network id incorrect (expected: $EXPECTED_NETWORK, got: $NETWORK_ID)"
+        collect_daemon_logs "phase${SYNC_PHASE}-netid-mismatch"
         exit 1
     fi
+
+    collect_daemon_logs "phase${SYNC_PHASE}-ok"
 }
 
 # --- Step 1: Test with current mina ---
