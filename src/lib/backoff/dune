@@ -1,0 +1,15 @@
+(library
+ (name backoff)
+ (public_name backoff)
+ (libraries
+  ;; opam libraries
+  async_kernel
+  core_kernel
+  ;; local libraries
+  error_json
+  logger)
+ (preprocess
+  (pps ppx_jane ppx_mina))
+ (instrumentation
+  (backend bisect_ppx))
+ (synopsis "Exponential backoff with jitter for retry loops"))

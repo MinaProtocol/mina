@@ -6,6 +6,7 @@
 (package (name archive_hardfork_toolbox))
 (package (name archive_blocks))
 (package (name archive_lib))
+(package (name backoff) (synopsis "Exponential backoff with jitter for retry loops"))
 (package (name base58_check))
 (package (name best_tip_merger))
 (package (name best_tip_prover))
