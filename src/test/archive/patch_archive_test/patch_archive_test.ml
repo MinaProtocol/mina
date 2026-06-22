@@ -82,6 +82,7 @@ let main ~db_uri ~network_data_folder () =
     >>= Deferred.List.map ~f:(fun e ->
             Deferred.return (output_folder ^ "/" ^ e) )
   in
+  let extensional_files = Utils.sort_archive_files extensional_files in
 
   let%bind () =
     if List.length extensional_files < 3 then (
