@@ -135,6 +135,7 @@ let runInDockerWithPostgresConn
           in  Cmd.chain
                 (   [ "( docker stop ${postgresDockerName} && docker rm ${postgresDockerName} ) || true"
                     , "source buildkite/scripts/export-git-env-vars.sh"
+                    , "./buildkite/scripts/docker/disk-cleanup.sh || true"
                     , "docker run --network host --volume ${outerDir}:/workdir --workdir /workdir --name ${postgresDockerName} -d -e POSTGRES_USER=${user} -e POSTGRES_PASSWORD=${password} -e POSTGRES_DB=${dbName} ${dockerVersion}"
                     , "sleep 5"
                     ]
@@ -232,6 +233,7 @@ let runInToolchainWithPostgresAndDebs
           in  Cmd.chain
                 (   [ "( docker stop ${postgresDockerName} && docker rm ${postgresDockerName} ) || true"
                     , "source buildkite/scripts/export-git-env-vars.sh"
+                    , "./buildkite/scripts/docker/disk-cleanup.sh || true"
                     , "docker run --network host --volume ${outerDir}:/workdir --workdir /workdir --name ${postgresDockerName} -d -e POSTGRES_USER=${user} -e POSTGRES_PASSWORD=${password} -e POSTGRES_DB=${dbName} ${dockerVersion}"
                     , "sleep 5"
                     ]
