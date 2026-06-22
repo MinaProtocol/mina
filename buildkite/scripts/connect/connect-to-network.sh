@@ -101,6 +101,12 @@ if ./buildkite/scripts/apps/restore_binary.sh "$MINA_DEBIAN_NETWORK" \
   # The converter is an in-repo script (the .deb just packages it); install it
   # the same way the .deb does.
   $SUDO install -D -m 0755 scripts/rocksdb/convert-to-legacy.sh /usr/local/bin/mina-storage-converter
+  # The recovery storage toolbox .deb installed below has a dpkg dependency on
+  # the mina-logproc .deb. The .deb fallback path pulls it in transitively via
+  # mina-<net>; in the bare path nothing does, and a bare binary can't satisfy a
+  # dpkg Depends, so install the current mina-logproc .deb explicitly. (Only the
+  # current build root ships mina-logproc -- the legacy root does not.)
+  source buildkite/scripts/debian/install.sh "mina-logproc" 1
   echo "Using bare mina + current rocksdb-scanner + storage-converter from apps cache"
 else
   echo "Falling back to debian-installed mina-${MINA_DEBIAN_NETWORK} + storage toolbox"
