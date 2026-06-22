@@ -64,9 +64,7 @@ let router ~signature_kind ~graphql_uri ~minimum_user_command_fee
             ~minimum_user_command_fee
       | _ ->
           Deferred.return (Error `Page_not_found) )
-  |> Deferred.map ~f:(function
-       | Ok x -> x
-       | Error exn -> Error (`Exception exn) )
+  |> Deferred.map ~f:(function Ok x -> x | Error exn -> Error (`Exception exn))
 
 let pg_log_data ~logger ~pool : unit Deferred.t =
   match%bind Lazy.force pool with
@@ -250,21 +248,18 @@ let command ?signature_kind ~minimum_user_command_fee ~account_creation_fee () =
       "Rosetta process running on http://localhost:$port" ;
     Cohttp_async.Server.close_finished server
 
-
 let%test_module "router" =
   ( module struct
     let%test_unit "unknown route returns page_not_found" =
       let pool =
-        lazy
-          (Deferred.Result.fail (`App (Errors.create `Graphql_uri_not_set)))
+        lazy (Deferred.Result.fail (`App (Errors.create `Graphql_uri_not_set)))
       in
       let result =
         Thread_safe.block_on_async_exn (fun () ->
-          router ~signature_kind:Mina_signature_kind.Testnet ~graphql_uri:None
-            ~minimum_user_command_fee:Currency.Fee.zero
-            ~account_creation_fee:Currency.Fee.zero ~pool
-            ~logger:(Logger.null ()) ~safe_mode:false
-            [ "unknown" ] (`Null) )
+            router ~signature_kind:Mina_signature_kind.Testnet ~graphql_uri:None
+              ~minimum_user_command_fee:Currency.Fee.zero
+              ~account_creation_fee:Currency.Fee.zero ~pool
+              ~logger:(Logger.null ()) ~safe_mode:false [ "unknown" ] `Null )
       in
       match result with
       | Error `Page_not_found ->
@@ -275,13 +270,13 @@ let%test_module "router" =
     let%test_unit "Monitor.try_with catches sync exception" =
       let result =
         Thread_safe.block_on_async_exn (fun () ->
-          Monitor.try_with ~extract_exn:true (fun () ->
-            failwith "test sync exception" )
-          |> Deferred.map ~f:(function
-            | Ok _ ->
-                Error `Unexpected_ok
-            | Error _ ->
-                Ok () ) )
+            Monitor.try_with ~extract_exn:true (fun () ->
+                failwith "test sync exception" )
+            |> Deferred.map ~f:(function
+                 | Ok _ ->
+                     Error `Unexpected_ok
+                 | Error _ ->
+                     Ok () ) )
       in
       match result with
       | Ok () ->
@@ -289,23 +284,21 @@ let%test_module "router" =
       | Error `Unexpected_ok ->
           failwith "expected exception to be caught"
 
-    let%test_unit "Monitor.try_with exception maps to Exception error variant"
-        =
+    let%test_unit "Monitor.try_with exception maps to Exception error variant" =
       let result =
         Thread_safe.block_on_async_exn (fun () ->
-          Monitor.try_with ~extract_exn:true (fun () ->
-            failwith "router exception test" )
-          |> Deferred.map ~f:(function
-            | Ok x ->
-                x
-            | Error exn ->
-                Error (`Exception exn) ) )
+            Monitor.try_with ~extract_exn:true (fun () ->
+                failwith "router exception test" )
+            |> Deferred.map ~f:(function
+                 | Ok x ->
+                     x
+                 | Error exn ->
+                     Error (`Exception exn) ) )
       in
       match result with
       | Error (`Exception exn) ->
           let msg = Exn.to_string exn in
-          assert (
-            String.is_substring msg ~substring:"router exception test" )
+          assert (String.is_substring msg ~substring:"router exception test")
       | Ok _ ->
           failwith "expected Error (`Exception _)"
   end )

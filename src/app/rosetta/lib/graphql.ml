@@ -126,8 +126,7 @@ let%test_module "parse_response_body" =
           failwith "expected Error"
       | Error e ->
           let expected =
-            Errors.create
-              ~context:"Response from Mina Daemon is not a 200"
+            Errors.create ~context:"Response from Mina Daemon is not a 200"
               (`Graphql_mina_query "Status code 500 -- server error")
           in
           assert (Errors.equal e expected)
