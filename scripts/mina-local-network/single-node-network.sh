@@ -39,6 +39,10 @@ EPOCH_MIN=""
 PRINT_SLOT_MS=false
 MINA_EXE_ARG=""
 VALUE_TRANSFERS=true
+# This network is meant to run for a long time, so by default disable the
+# daemon's ~weekly self-restart (mina default --stop-time 168h) by setting it to
+# 5 years. Override with --stop-time-hours (e.g. 168 to restore the default).
+STOP_TIME_HOURS=43800
 EXTRA_ARGS=()
 
 help() {
@@ -55,6 +59,10 @@ Usage: $(basename "$0") [--fast | --no-proofs] [--epoch-min <#>] [--mina-exe <pa
                   | snapped to the nearest value dividing 2_628_000_000 ms (a
                   | consensus checkpoint-window requirement) and floored to the
                   | preset's minimum slot. Without it the preset slot is used.
+--stop-time-hours <#> | Uptime (hours) after which the daemon stops itself.
+                  | The mina default is 168 (~weekly self-restart); this script
+                  | defaults to 43800 (5 years) so the network does not restart
+                  | on its own. Pass 168 to restore the upstream behaviour.
 --mina-exe <path> | Path to a mina executable to run the network with.
                   | When not provided, mina is built with nix (flake package
                   | '#devnet', as in scripts/hardfork/build-and-test.sh) and the
@@ -91,6 +99,14 @@ while [[ "$#" -gt 0 ]]; do
       exit 1
     fi
     EPOCH_MIN="${2}"
+    shift
+    ;;
+  --stop-time-hours)
+    if [[ "$#" -lt 2 ]]; then
+      echo "Error: --stop-time-hours requires an argument." >&2
+      exit 1
+    fi
+    STOP_TIME_HOURS="${2}"
     shift
     ;;
   --print-slot-ms)
@@ -260,6 +276,7 @@ exec "${SCRIPT_DIR}/mina-local-network.sh" \
   -wd "${WORK_DELAY}" \
   -st "${SLOT_TIME_MS}" \
   -swc "${SNARK_WORKERS}" \
+  -stopt "${STOP_TIME_HOURS}" \
   -sf 0.001 \
   "${VALUE_TRANSFER_ARGS[@]}" \
   -w 1 -f 0 -n 0 \

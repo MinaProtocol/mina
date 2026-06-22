@@ -51,6 +51,7 @@ INDEFINITE=false
 FAST=false
 NO_PROOFS=false
 EPOCH_MIN=""
+STOP_TIME_HOURS=""
 ZKAPPS=false
 NUM_UPDATES=7
 NUM_ZKAPPS=2
@@ -78,6 +79,10 @@ Usage: $(basename "$0") (--duration-min <#> | --indefinite) [options] [-- <extra
                         | 1 worker, 2s min slot) for fast iteration.
 --epoch-min <#>         | Target epoch length in minutes (48 slots/epoch; the
                         | slot time, and thus the send rate, is derived from it).
+--stop-time-hours <#>   | Uptime (hours) after which the daemon stops itself.
+                        | Forwarded to single-node-network.sh, which defaults to
+                        | 43800 (5 years) so the node does not self-restart;
+                        | pass 168 for the upstream ~weekly behaviour.
 --num-updates <#>       | (--zkapps only) Proof-authorized account updates per
                         | max-cost command; a command equals num-updates+1 segments.
                         |   Default: ${NUM_UPDATES} (i.e. 8 segments)
@@ -113,6 +118,10 @@ while [[ "$#" -gt 0 ]]; do
     ;;
   --epoch-min)
     EPOCH_MIN="${2}"
+    shift
+    ;;
+  --stop-time-hours)
+    STOP_TIME_HOURS="${2}"
     shift
     ;;
   --num-updates)
@@ -170,6 +179,7 @@ PRESET_ARGS=()
 ${FAST} && PRESET_ARGS+=(--fast)
 ${NO_PROOFS} && PRESET_ARGS+=(--no-proofs)
 [[ -n "${EPOCH_MIN}" ]] && PRESET_ARGS+=(--epoch-min "${EPOCH_MIN}")
+[[ -n "${STOP_TIME_HOURS}" ]] && PRESET_ARGS+=(--stop-time-hours "${STOP_TIME_HOURS}")
 
 # Ask single-node-network.sh for the exact slot time it will run with, so the
 # send rate is derived from the same source of truth.
