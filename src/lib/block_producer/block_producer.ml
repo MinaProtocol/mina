@@ -733,20 +733,6 @@ let time ~logger ~time_controller label f =
     !"%s: $time %!" label ;
   x
 
-let retry ?(max = 3) ~logger ~error_message f =
-  let rec go n =
-    if n >= max then failwith error_message
-    else
-      match%bind f () with
-      | Error e ->
-          [%log error] "%s : $error. Trying again" error_message
-            ~metadata:[ ("error", `String (Error.to_string_hum e)) ] ;
-          go (n + 1)
-      | Ok res ->
-          return res
-  in
-  go 0
-
 module Vrf_evaluation_state = struct
   type status =
     | At of Mina_numbers.Global_slot_since_hard_fork.t
@@ -758,12 +744,20 @@ module Vrf_evaluation_state = struct
     ; mutable vrf_evaluator_status : status
     }
 
+  let vrf_retry_strategy =
+    Backoff.Strategy.create ~base:(Time_ns.Span.of_sec 1.0)
+      ~max_delay:(Time_ns.Span.of_sec 10.0) ~max_attempts:(Some 3) ()
+
   let poll_vrf_evaluator ~logger vrf_evaluator =
     let f () =
       O1trace.thread "query_vrf_evaluator" (fun () ->
           Vrf_evaluator.slots_won_so_far vrf_evaluator )
     in
-    retry ~logger ~error_message:"Error fetching slots from the VRF evaluator" f
+    match%map Backoff.Deferred.retry vrf_retry_strategy ~logger ~f with
+    | Ok res ->
+        res
+    | Error _ ->
+        failwith "Error fetching slots from the VRF evaluator"
 
   let create () = { queue = Core.Queue.create (); vrf_evaluator_status = Start }
 
@@ -810,8 +804,11 @@ module Vrf_evaluation_state = struct
         O1trace.thread "set_vrf_evaluator_epoch_state" (fun () ->
             Vrf_evaluator.set_new_epoch_state vrf_evaluator ~epoch_data_for_vrf )
       in
-      retry ~logger
-        ~error_message:"Error setting epoch state of the VRF evaluator" f
+      match%map Backoff.Deferred.retry vrf_retry_strategy ~logger ~f with
+      | Ok res ->
+          res
+      | Error _ ->
+          failwith "Error setting epoch state of the VRF evaluator"
     in
     [%log info] "Sending data for VRF evaluations for epoch $epoch"
       ~metadata:

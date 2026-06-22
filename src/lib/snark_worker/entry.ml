@@ -42,24 +42,12 @@ let main ~logger ~proof_level ~constraint_constants ~signature_kind
     Prod.Impl.Worker_state.create ~constraint_constants ~proof_level
       ~signature_kind ()
   in
-  let wait ?(sec = 0.5) () = after (Time.Span.of_sec sec) in
-  (* retry interval with jitter *)
-  let retry_pause sec = Random.float_range (sec -. 2.0) (sec +. 2.0) in
-  let log_and_retry label error sec k =
-    let error_str = Error.to_string_hum error in
-    (* HACK: the bind before the call to go () produces an evergrowing
-         backtrace history which takes forever to print and fills our disks.
-         If the string becomes too long, chop off the first 10 lines and include
-         only that *)
-    ( if String.length error_str < 4096 then
-      [%log error] !"Error %s: %{sexp:Error.t}" label error
-    else
-      let lines = String.split ~on:'\n' error_str in
-      [%log error] !"Error %s: %s" label
-        (String.concat ~sep:"\\n" (List.take lines 10)) ) ;
-    let%bind () = wait ~sec () in
-    (* FIXME: Use a backoff algo here *)
-    k ()
+  let retry_strategy =
+    Backoff.Strategy.create ~base:(Time_ns.Span.of_sec 10.0)
+      ~max_delay:(Time_ns.Span.of_sec 120.0) ~max_attempts:None ()
+  in
+  let retry_forever ~f =
+    Backoff.Deferred.retry ~log_errors:true retry_strategy ~logger ~f
   in
   let rec go () =
     let%bind daemon_address =
@@ -80,20 +68,20 @@ let main ~logger ~proof_level ~constraint_constants ~signature_kind
       !"Snark worker using daemon $addr"
       ~metadata:[ ("addr", `String (Host_and_port.to_string daemon_address)) ] ;
     match%bind
-      dispatch Rpc_get_work.Stable.Latest.rpc shutdown_on_disconnect ()
-        daemon_address
+      retry_forever ~f:(fun () ->
+          dispatch Rpc_get_work.Stable.Latest.rpc shutdown_on_disconnect ()
+            daemon_address )
     with
-    | Error e ->
-        log_and_retry "getting work" e (retry_pause 10.) go
+    | Error _ ->
+        go ()
     | Ok None ->
         let random_delay =
           Prod.Impl.Worker_state.worker_wait_time
           +. (0.5 *. Random.float Prod.Impl.Worker_state.worker_wait_time)
         in
-        (* No work to be done -- quietly take a brief nap *)
         [%log info] "No jobs available. Napping for $time seconds"
           ~metadata:[ ("time", `Float random_delay) ] ;
-        let%bind () = wait ~sec:random_delay () in
+        let%bind () = after (Time.Span.of_sec random_delay) in
         go ()
     | Ok (Some partitioned_spec) -> (
         let address_json =
@@ -108,43 +96,54 @@ let main ~logger ~proof_level ~constraint_constants ~signature_kind
           "SNARK work $work_ids received from $address. Starting proof \
            generation"
           ~metadata:[ address_json; work_ids_json ] ;
-        let%bind () = wait () in
-        (* Pause to wait for stdout to flush *)
+        let%bind () = after (Time.Span.of_sec 0.5) in
         let id = Spec.Partitioned.Poly.get_id partitioned_spec in
         match%bind
-          Prod.Impl.perform_partitioned ~state ~spec:partitioned_spec
-        with
-        | Error e ->
-            let%bind () =
-              match%map
-                dispatch Rpc_failed_to_generate_snark.Stable.Latest.rpc
-                  shutdown_on_disconnect (e, id) daemon_address
+          retry_forever ~f:(fun () ->
+              match%bind
+                Prod.Impl.perform_partitioned ~state ~spec:partitioned_spec
               with
               | Error e ->
-                  [%log error]
-                    "Couldn't inform the daemon about the snark work failure"
-                    ~metadata:[ ("error", Error_json.error_to_yojson e) ]
-              | Ok () ->
-                  ()
-            in
-            log_and_retry "performing work" e (retry_pause 10.) go
+                  let%bind () =
+                    match%map
+                      dispatch Rpc_failed_to_generate_snark.Stable.Latest.rpc
+                        shutdown_on_disconnect (e, id) daemon_address
+                    with
+                    | Error e ->
+                        [%log error]
+                          "Couldn't inform the daemon about the snark work \
+                           failure"
+                          ~metadata:
+                            [ ("error", Error_json.error_to_yojson e) ]
+                    | Ok () ->
+                        ()
+                  in
+                  return (Error e)
+              | Ok data ->
+                  return (Ok data) )
+        with
+        | Error _ ->
+            go ()
         | Ok ({ data = elapsed; _ } as data) ->
-            let wire_result = Result.Partitioned.Stable.Latest.{ id; data } in
+            let wire_result =
+              Result.Partitioned.Stable.Latest.{ id; data }
+            in
             ( match partitioned_spec with
             | Spec.Partitioned.Poly.Single { spec = single_spec; _ } ->
-                Metrics.emit_single_metrics_stable ~logger ~single_spec ~elapsed
+                Metrics.emit_single_metrics_stable ~logger ~single_spec
+                  ~elapsed
             | Spec.Partitioned.Poly.Sub_zkapp_command
                 { spec = sub_zkapp_spec; _ } ->
-                Metrics.emit_subzkapp_metrics ~logger ~sub_zkapp_spec ~elapsed
-            ) ;
-            let rec submit_work () =
+                Metrics.emit_subzkapp_metrics ~logger ~sub_zkapp_spec
+                  ~elapsed ) ;
+            let submit_work () =
               match%bind
-                dispatch Rpc_submit_work.Stable.Latest.rpc
-                  shutdown_on_disconnect wire_result daemon_address
+                retry_forever ~f:(fun () ->
+                    dispatch Rpc_submit_work.Stable.Latest.rpc
+                      shutdown_on_disconnect wire_result daemon_address )
               with
-              | Error e ->
-                  log_and_retry "submitting work" e (retry_pause 10.)
-                    submit_work
+              | Error _ ->
+                  go ()
               | Ok `Ok ->
                   [%log info]
                     "Submitted completed SNARK work $work_ids to $address"
@@ -156,8 +155,8 @@ let main ~logger ~proof_level ~constraint_constants ~signature_kind
                   go ()
               | Ok `SpecUnmatched ->
                   [%log info]
-                    "Result $work_ids rejected by $address since it has wrong \
-                     shape"
+                    "Result $work_ids rejected by $address since it has \
+                     wrong shape"
                     ~metadata:[ address_json; work_ids_json ] ;
                   go ()
             in
