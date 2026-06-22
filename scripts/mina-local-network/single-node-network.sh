@@ -5,8 +5,10 @@
 # enough transactions, every block emits a freshly snarked ledger.
 #
 # Three presets over scripts/mina-local-network/mina-local-network.sh, all with
-# transaction capacity 2^2 and work_delay 0 (4 scan-state trees, ledger proof
-# emitted 3 blocks after a transaction is included):
+# transaction capacity 2^2 (4 scan-state trees). The proof-based presets use
+# work_delay 0 (a ledger proof emitted ~3 blocks after a transaction is
+# included); --no-proofs uses work_delay 1 to avoid a scan-state stall under
+# sustained load (see the WORK_DELAY note below):
 #
 #   default     : full proofs, 3 snark workers, 131.4s slots (txn -> snarked
 #                 ledger ~395s); throughput-bound, zkApp txns must stay <= 8 segs
@@ -129,6 +131,16 @@ fi
 # minimum slot time. --epoch-min may lengthen the slot beyond the floor but
 # never shorten it below the per-preset minimum.
 PROOF_LEVEL=full
+# Scan-state work delay. The proof-based presets keep work_delay=0 (a freshly
+# snarked ledger every block once the pipeline is primed); there the proving
+# cost sets the pace, so the tight zero-delay schedule is fine and desirable.
+# With --no-proofs there is no proving cost and blocks fill from the value-
+# transfer generator, and work_delay=0 makes the scan state stall under
+# sustained load with "Constraints failed: First pass ledger of the statement on
+# the right connects to the second pass ledger of the statement on the left"
+# (validate_ledgers_at_merge). work_delay=1 removes the stall; the snarked ledger
+# then advances every other block instead of every block, which is fine here.
+WORK_DELAY=0
 if ${NO_PROOFS}; then
   PRESET="no-proofs (proof_level=none, 1 worker, 2s min slot)"
   PROOF_LEVEL=none
@@ -136,6 +148,7 @@ if ${NO_PROOFS}; then
   DEFAULT_SLOT_TIME_MS=2000
   SLOT_FLOOR_MS=2000
   TRANSACTION_INTERVAL=4
+  WORK_DELAY=1
 elif ${FAST}; then
   PRESET="fast (#2: 7 workers, 75s slots, zkApps up to 10 segments)"
   SNARK_WORKERS=7
@@ -244,7 +257,7 @@ exec "${SCRIPT_DIR}/mina-local-network.sh" \
   -u delay_sec:120 \
   -pl "${PROOF_LEVEL}" \
   -tc 2 \
-  -wd 0 \
+  -wd "${WORK_DELAY}" \
   -st "${SLOT_TIME_MS}" \
   -swc "${SNARK_WORKERS}" \
   -sf 0.001 \
