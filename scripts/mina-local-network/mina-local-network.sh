@@ -1274,7 +1274,8 @@ if ${VALUE_TRANSFERS} || ${ZKAPP_TRANSACTIONS}; then
 
   while [ $SYNCED -eq 0 ]; do
     SYNC_STATUS=$(${MINA_GRAPHQL_CLIENT_EXE} sync-status --graphql-uri ${REST_SERVER} --raw)
-    SYNCED=$(echo "${SYNC_STATUS}" | grep -c "SYNCED")
+    # `sync-status --raw` prints "Synced" (not the enum "SYNCED"); match case-insensitively
+    SYNCED=$(echo "${SYNC_STATUS}" | grep -ci "synced")
     sleep ${POLL_INTERVAL}
   done
 

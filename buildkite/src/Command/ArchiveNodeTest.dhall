@@ -6,6 +6,8 @@ let Size = ./Size.dhall
 
 let RunWithPostgres = ./RunWithPostgres.dhall
 
+let S = ../Lib/SelectFiles.dhall
+
 let ContainerImages = ../Constants/ContainerImages.dhall
 
 let key = "archive-node-test"
@@ -36,5 +38,6 @@ in  { step =
               , key = key
               , target = Size.Large
               , depends_on = dependsOn
+              , artifact_paths = [ S.contains "test_output/artifacts/*" ]
               }
     }
