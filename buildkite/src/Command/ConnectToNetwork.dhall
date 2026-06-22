@@ -43,6 +43,7 @@ in  { Spec = Spec
               , key = "connect-to-${spec.testnet}"
               , target = Size.Large
               , depends_on = spec.dependsOn
-              , artifact_paths = [ SelectFiles.contains "test_output/artifacts/*" ]
+              , artifact_paths =
+                [ SelectFiles.contains "test_output/artifacts/*" ]
               }
     }
