@@ -1,5 +1,3 @@
-let Cmd = ../Lib/Cmds.dhall
-
 let Command = ./Base.dhall
 
 let Size = ./Size.dhall
@@ -11,7 +9,7 @@ let ContainerImages = ../Constants/ContainerImages.dhall
 let key = "rosetta-block-race-test"
 
 let debs =
-      "mina-mainnet-generic-instrumented,mina-archive-mainnet-instrumented,mina-rosetta-mainnet-generic"
+      "mina-mainnet-generic,mina-archive-mainnet,mina-rosetta-mainnet-generic"
 
 in  { step =
             \(dependsOn : List Command.TaggedKey.Type)
@@ -19,7 +17,9 @@ in  { step =
               Command.Config::{
               , commands =
                 [ RunWithPostgres.runInToolchainWithPostgresAndDebs
-                    ([] : List Text)
+                    [ "APPS_NETWORK=mainnet"
+                    , "APPS_BARE_BINARIES=mina_mainnet_signatures.exe:mina,archive.exe:mina-archive,rosetta_mainnet_signatures.exe:mina-rosetta"
+                    ]
                     ( Some
                         ( RunWithPostgres.ScriptOrArchive.OnlineTarGzDump
                             "https://storage.googleapis.com/mina-archive-dumps/mainnet-archive-dump-2025-11-11_0000.sql.tar.gz"
@@ -28,8 +28,6 @@ in  { step =
                     ContainerImages.minaToolchainBullseye.amd64
                     debs
                     "./buildkite/scripts/tests/rosetta/block-race-test.sh"
-                , Cmd.run
-                    "./buildkite/scripts/upload-partial-coverage-data.sh ${key}"
                 ]
               , label = "Rosetta: Rosetta Block Race test"
               , key = key
