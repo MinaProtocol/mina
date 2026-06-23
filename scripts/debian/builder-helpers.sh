@@ -214,7 +214,7 @@ install_mina_service() {
     devnet)
       local seed_list_url='seed-lists/devnet_seeds.txt'
       ;;
-    mesa)
+    mesa|mesa-mut)
       local seed_list_url='o1labs-gitops-infrastructure/mina-mesa-network/mina-mesa-network-seeds.txt'
       ;;
     *)
@@ -298,11 +298,20 @@ copy_common_daemon_configs() {
   # We want to copy the genesis ledger for the network ($1) and in case of
   # devnet/mainnet also copy the magic config (config_$GITHASH_CONFIG.json).
   # This config is automatically picked up by the daemon on startup.
+  # mesa-mut is the mutable variant of the mesa network: it has no genesis
+  # ledger of its own and reuses mesa's genesis ledger as its source.
+  local LEDGER_SOURCE="${NETWORK_NAME}"
   case "${NETWORK_NAME}" in
-    devnet|mainnet|mesa)
-      cp ../genesis_ledgers/"${NETWORK_NAME}".json \
+    mesa-mut)
+      LEDGER_SOURCE="mesa"
+      ;;
+  esac
+
+  case "${NETWORK_NAME}" in
+    devnet|mainnet|mesa|mesa-mut)
+      cp ../genesis_ledgers/"${LEDGER_SOURCE}".json \
         "${BUILDDIR}/var/lib/coda/config_${GITHASH_CONFIG}.json"
-      cp ../genesis_ledgers/${NETWORK_NAME}.json "${BUILDDIR}/var/lib/coda/${NETWORK_NAME}.json"
+      cp ../genesis_ledgers/${LEDGER_SOURCE}.json "${BUILDDIR}/var/lib/coda/${NETWORK_NAME}.json"
       ;;
     *)
       echo "Unknown network name provided: ${NETWORK_NAME}"; exit 1
@@ -563,7 +572,29 @@ build_profile_deb() {
 
   local profile="${1}"
 
-  local package_name="mina-${profile}-profile"
+  # The per-profile generic daemon layer that sits between the network-free
+  # mina-generic package and the per-network mina-${network} config package:
+  #   mina-generic -> mina-${profile}-generic -> mina-${network}
+  # Devnet/Mainnet carry the "-generic" suffix; Lightnet and Dev do not
+  # (mina-lightnet, mina-dev). breaks_pkgs supersedes the legacy monolithic
+  # mina-${profile} package, but only where that name differs from the package
+  # we are building (avoids a self-conflict for the lightnet/dev names).
+  local package_name
+  local breaks_pkgs
+  case "${profile}" in
+    devnet|mainnet)
+      package_name="mina-${profile}-generic"
+      breaks_pkgs="mina-${profile} (<< ${MINA_DEB_VERSION})"
+      ;;
+    lightnet|dev)
+      package_name="mina-${profile}"
+      breaks_pkgs=""
+      ;;
+    *)
+      printf "Unknown profile %s provided for profile deb\n" "${profile}" >&2
+      exit 1
+      ;;
+  esac
 
   echo "--- Building package ${package_name}"
   echo "------------------------------------------------------------"
@@ -571,19 +602,11 @@ build_profile_deb() {
   echo "Profile Name: ${1} (like mainnet, devnet, lightnet, dev)"
 
   create_control_file "${package_name}" "" \
-    "Mina profile for network ${profile}" "" "mina-${profile} (<< ${MINA_DEB_VERSION})"
+    "Mina profile for network ${profile}" "" "${breaks_pkgs}"
 
   # Store node config hint (based on DUNE_PROFILE)
   mkdir -p "${BUILDDIR}/etc/coda/build_config"
-  case "${profile}" in
-    mainnet|lightnet|dev|devnet)
-      printf "${profile}" > "${BUILDDIR}/etc/coda/build_config/PROFILE"
-      ;;
-    *)
-      printf "Unknown profile ${profile} provided for profile deb" >&2
-      exit 1
-      ;;
-  esac
+  printf '%s' "${profile}" > "${BUILDDIR}/etc/coda/build_config/PROFILE"
 
   build_deb "${package_name}"
 }
@@ -674,7 +697,14 @@ create_symlinks_for_shared_apps() {
     mainnet)
       dispatch_profile="mainnet"
       ;;
-    devnet)
+    # mesa is a devnet-signature hardfork network; it deploys with the devnet
+    # profile (see Profiles.fromNetwork in buildkite Dhall and
+    # dispatcher-tests.sh), so the activation marker is auto-fork-mesa-devnet.
+    # mesa-mut is the mutable, devnet-signature variant of mesa: it shares
+    # mesa's runtime identity (same /usr/lib/mina/mesa runtime dir,
+    # MINA_NETWORK=mesa and devnet dispatch profile), so it resolves the same
+    # auto-fork-mesa-devnet marker.
+    devnet|mesa|mesa-mut)
       dispatch_profile="devnet"
       ;;
     *)
@@ -1004,7 +1034,7 @@ build_archive_deb () {
     devnet)
       package_name="$MINA_ARCHIVE_DEB_NAME"
       ;;
-    mesa)
+    mesa|mesa-mut)
       package_name="mina-archive-${network}${DEB_SUFFIX}"
       ;;
     *)

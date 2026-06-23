@@ -270,7 +270,8 @@ case "${SERVICE}" in
         ;;
     mina-daemon-profiled)
         # Profiled image = the network-free generic base + a baked profile hint
-        # package (mina-${profile}-profile). Layered like the configured image.
+        # package (mina-${profile}-generic, or mina-lightnet / mina-dev).
+        # Layered like the configured image.
         DOCKERFILE_PATH="dockerfiles/Dockerfile-install-profile"
         SERVICE="mina-daemon"
         VERSION_ARG_OVERRIDE="--build-arg version=$VERSION"
