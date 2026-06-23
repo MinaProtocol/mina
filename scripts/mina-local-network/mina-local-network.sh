@@ -263,6 +263,7 @@ on-exit() {
   esac
 
   echo "Completed shutdown phase of mina local network"
+  echo "stat: exit_mode=${ON_EXIT} config_mode=${CONFIG_MODE} tx_phase=${TX_PHASE:-idle} tx_count=${value_txn_id:-0} transfer_node=${TRANSFER_NODE_TYPE:-none}:${TRANSFER_NODE_INDEX:--1} transfer_port=${TRANSFER_PORT_BASE:--1} transfer_pid=${TRANFER_NODE_PID:--1} transfer_pid_alive=$(is_process_running "${TRANFER_NODE_PID:--1}" && echo 1 || echo 0)"
   exit 0
 }
 
@@ -1218,8 +1219,12 @@ printf "\n"
 # ================================================
 # Start sending transactions and zkApp transactions
 
+TX_PHASE=idle
+value_txn_id=0
+
 if ${VALUE_TRANSFERS} || ${ZKAPP_TRANSACTIONS}; then
 
+  TX_PHASE=waiting_daemon
   VALID_TRANSFER_NODES=$((WHALES + FISH))
 
   if [ "$VALID_TRANSFER_NODES" -eq 0 ]; then
@@ -1265,6 +1270,7 @@ if ${VALUE_TRANSFERS} || ${ZKAPP_TRANSACTIONS}; then
     sleep ${POLL_INTERVAL}
   done
 
+  TX_PHASE=waiting_sync
   SYNCED=0
 
   echo "Waiting for Node (${REST_SERVER})'s transition frontier to be up"
@@ -1273,13 +1279,14 @@ if ${VALUE_TRANSFERS} || ${ZKAPP_TRANSACTIONS}; then
   set +e
 
   while [ $SYNCED -eq 0 ]; do
-    SYNC_STATUS=$(${MINA_GRAPHQL_CLIENT_EXE} sync-status --graphql-uri ${REST_SERVER} --raw)
-    SYNCED=$(echo "${SYNC_STATUS}" | grep -c "SYNCED")
+    SYNCED=$(${MINA_GRAPHQL_CLIENT_EXE} sync-status --graphql-uri ${REST_SERVER} | jq -r 'if .sync_status == "Synced" then 1 else 0 end')
     sleep ${POLL_INTERVAL}
   done
 
   echo "Starting to send value transfer transactions/zkApp transactions every: ${TRANSACTION_INTERVAL} seconds"
   printf "\n"
+
+  TX_PHASE=sending
 
   if ${ZKAPP_TRANSACTIONS} && ! config_mode_is_inherit "${CONFIG_MODE}"; then
     echo "Set up zkapp account"
@@ -1335,6 +1342,7 @@ if ${VALUE_TRANSFERS} || ${ZKAPP_TRANSACTIONS}; then
     fi
   done
 
+  TX_PHASE=idle
   set -e
 
 fi
