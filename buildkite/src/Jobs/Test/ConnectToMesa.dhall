@@ -10,7 +10,7 @@ let ConnectToNetwork = ../../Command/ConnectToNetwork.dhall
 
 let Network = ../../Constants/Network.dhall
 
-let Dockers = ../../Constants/DockerVersions.dhall
+let DebianVersions = ../../Constants/DebianVersions.dhall
 
 let network = Network.Type.Mesa
 
@@ -19,7 +19,8 @@ let Expr = ../../Pipeline/Expr.dhall
 let MainlineBranch = ../../Pipeline/MainlineBranch.dhall
 
 let dependsOn =
-      Dockers.dependsOn Dockers.DepsSpec::{ network = Network.Type.Mesa }
+      DebianVersions.dependsOn
+        DebianVersions.DepsSpec::{ network = Network.Type.Mesa }
 
 in  Pipeline.build
       Pipeline.Config::{

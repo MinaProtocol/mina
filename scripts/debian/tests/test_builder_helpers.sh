@@ -384,6 +384,9 @@ MOCKEXE
     # archive scripts
     create_mock_exe "scripts/archive/missing-blocks-guardian.sh" "$PROJECT_ROOT"
 
+    # rocksdb storage converter (packaged by the storage toolbox deb)
+    create_mock_exe "scripts/rocksdb/convert-to-legacy.sh" "$PROJECT_ROOT"
+
     # systemd service template
     mkdir -p "${PROJECT_ROOT}/scripts"
     cat > "${PROJECT_ROOT}/scripts/mina.service" << 'SVCEOF'
@@ -492,6 +495,28 @@ test_build_logproc_deb() {
     # Files
     assert_file_captured "$CAPTURED_FILES" "usr/local/bin/mina-logproc"
     assert_file_captured "$CAPTURED_FILES" "DEBIAN/control"
+}
+
+test_build_daemon_storage_toolbox_deb() {
+    safe_build build_daemon_storage_toolbox_deb || { log_fail "build exited non-zero"; return; }
+    load_captured_state
+    assert_eq "deb name" "mina-daemon-storage-toolbox" "$CAPTURED_DEB_NAME"
+    assert_control_field "$CAPTURED_CONTROL" "Package" "mina-daemon-storage-toolbox"
+
+    # Downgrade-safety. The connect test downgrades to a stable release and back,
+    # which requires the storage toolbox debs to be installable over/alongside a
+    # different version. That works because:
+    #   1. the scanner lives at a version-namespaced path
+    #      (/usr/lib/mina/storage/<rocksdb>/<mina>/), so an older toolbox installs
+    #      to a *different* path and never file-conflicts with a newer one; and
+    #   2. there is no Breaks / Conflicts / Replaces constraint that dpkg would
+    #      use to refuse installing an older storage toolbox.
+    # (ROCKSDB_VERSION 10.5.2 is hardcoded in build_daemon_storage_toolbox_deb.)
+    assert_file_captured "$CAPTURED_FILES" "usr/lib/mina/storage/10.5.2/${GITTAG}/mina-rocksdb-scanner"
+    assert_file_captured "$CAPTURED_FILES" "usr/local/bin/mina-storage-converter"
+    assert_control_no_field "$CAPTURED_CONTROL" "Breaks"
+    assert_control_no_field "$CAPTURED_CONTROL" "Conflicts"
+    assert_control_no_field "$CAPTURED_CONTROL" "Replaces"
 }
 
 test_build_test_executive_deb() {
@@ -1259,6 +1284,7 @@ main() {
 
     # Simple packages
     run_test test_build_logproc_deb
+    run_test test_build_daemon_storage_toolbox_deb
     run_test test_build_test_executive_deb
     run_test test_build_batch_txn_deb
 
