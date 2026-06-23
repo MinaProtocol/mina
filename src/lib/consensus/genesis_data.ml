@@ -10,6 +10,18 @@ let genesis_ledger_total_currency ~ledger =
              ~message:"failed to calculate total currency in genesis ledger"
       else sum )
 
+let genesis_ledger_total_stake ~ledger =
+  Mina_ledger.Ledger.foldi ~init:Currency.Amount.zero (Lazy.force ledger)
+    ~f:(fun _addr sum (account : Mina_base.Account.t) ->
+      if
+        Mina_base.(Token_id.equal account.token_id Token_id.default)
+        && Option.is_some account.delegate
+      then
+        Currency.Amount.add sum (Currency.Balance.to_amount @@ account.balance)
+        |> Base.Option.value_exn ?here:None ?error:None
+             ~message:"failed to calculate total stake in genesis ledger"
+      else sum )
+
 let genesis_ledger_hash ~ledger =
   Mina_ledger.Ledger.merkle_root (Lazy.force ledger)
   |> Mina_base.Frozen_ledger_hash.of_ledger_hash
@@ -36,7 +48,7 @@ module Epoch = struct
     let to_hashed (t : Genesis_ledger.Packed.t t) : Hashed.t t =
       let ledger = Genesis_ledger.Packed.t t.ledger in
       let total_currency = genesis_ledger_total_currency ~ledger in
-      let total_stake = Currency.Amount.zero in
+      let total_stake = genesis_ledger_total_stake ~ledger in
       let hash = genesis_ledger_hash ~ledger in
       { ledger = { hash; total_currency; total_stake }; seed = t.seed }
   end
@@ -73,6 +85,6 @@ module Ledger = struct
     let ledger = Genesis_ledger.Packed.t t in
     { hash = genesis_ledger_hash ~ledger
     ; total_currency = genesis_ledger_total_currency ~ledger
-    ; total_stake = Currency.Amount.zero
+    ; total_stake = genesis_ledger_total_stake ~ledger
     }
 end
