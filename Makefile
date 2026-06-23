@@ -335,6 +335,13 @@ build-extract-blocks: ocaml_checks ## Build the extract_blocks executable
 		--profile=$(DUNE_PROFILE) \
 		&& echo "✅ Build complete"
 
+.PHONY: build-mina-bootstrap
+build-mina-bootstrap: ## Build the mina-bootstrap Go CLI (no dune / ocaml)
+	$(info 🏗️  Building mina-bootstrap Go CLI)
+	@cd src/app/bootstrap && \
+		CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o "$(CURDIR)/_build/mina-bootstrap" . && \
+		echo "✅ mina-bootstrap built at $(CURDIR)/_build/mina-bootstrap"
+
 .PHONY: build-archive-blocks
 build-archive-blocks: ocaml_checks ## Build the archive_blocks executable
 	$(info 🏗️  Building archive_blocks with profile $(DUNE_PROFILE) and commit $(GITLONGHASH))
