@@ -61,11 +61,11 @@ func runArchive(_ *cobra.Command, _ []string) error {
 		date = time.Now().UTC().Format("2006-01-02")
 	}
 	hour := archiveHour
-	if len(hour) != 4 {
-		return fmt.Errorf("--hour must be 4 digits (HHMM), got %q", hour)
+	if err := validateHour(hour); err != nil {
+		return err
 	}
 
-	tarballName := fmt.Sprintf("%s-%s_%s.sql.tar.gz", net.ArchiveDumpPrefix, date, hour)
+	tarballName := dumpTarballName(net.ArchiveDumpPrefix, date, hour)
 	tarballPath := filepath.Join(archiveWorkDir, tarballName)
 
 	ctx := context.Background()
@@ -110,4 +110,20 @@ func runArchive(_ *cobra.Command, _ []string) error {
 
 	fmt.Fprintf(os.Stdout, "Archive bootstrap complete. Restart postgres to apply tuning settings.\n")
 	return nil
+}
+
+// validateHour checks that an --hour value is a 4-character HHMM string.
+func validateHour(hour string) error {
+	if len(hour) != 4 {
+		return fmt.Errorf("--hour must be 4 digits (HHMM), got %q", hour)
+	}
+	return nil
+}
+
+// dumpTarballName builds the archive-dump tarball object name for a given
+// dump prefix, date (YYYY-MM-DD), and hour (HHMM):
+//
+//	<prefix>-<date>_<hour>.sql.tar.gz
+func dumpTarballName(prefix, date, hour string) string {
+	return fmt.Sprintf("%s-%s_%s.sql.tar.gz", prefix, date, hour)
 }
