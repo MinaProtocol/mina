@@ -1,4 +1,4 @@
-let Dockers = ../../Constants/DockerVersions.dhall
+let Dockers = ../../Constants/Docker/Versions.dhall
 
 let Network = ../../Constants/Network.dhall
 

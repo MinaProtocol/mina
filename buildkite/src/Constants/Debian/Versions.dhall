@@ -1,12 +1,12 @@
-let Profiles = ./Profiles.dhall
+let Profiles = ../Artifact/Profiles.dhall
 
-let Network = ./Network.dhall
+let Network = ../Artifact/Network.dhall
 
-let BuildFlags = ./BuildFlags.dhall
+let BuildFlags = ../Artifact/BuildFlags.dhall
 
-let Arch = ./Arch.dhall
+let Arch = ../Artifact/Arch.dhall
 
-let S = ../Lib/SelectFiles.dhall
+let S = ../../Lib/SelectFiles.dhall
 
 let DebVersion = < Bookworm | Bullseye | Jammy | Focal | Noble >
 
@@ -55,11 +55,14 @@ let DepsSpec =
 
 let dependsOn =
           \(spec : DepsSpec.Type)
-      ->  let name =
+      ->  let profileSuffix = Profiles.toSuffixUppercase spec.profile
+
+          let name =
                 "${spec.prefix}${capitalName
-                                   spec.deb_version}${BuildFlags.toSuffixUppercase
-                                                        spec.build_flag}${Arch.nameSuffix
-                                                                            spec.arch}"
+                                   spec.deb_version}${Network.capitalName
+                                                        spec.network}${profileSuffix}${BuildFlags.toSuffixUppercase
+                                                                                         spec.build_flag}${Arch.nameSuffix
+                                                                                                             spec.arch}"
 
           in  [ { name = name, key = "${spec.step}-deb-pkg" } ]
 
@@ -80,7 +83,6 @@ let minimalDirtyWhen =
       , S.strictlyStart (S.contains "scripts/docker")
       , S.exactly "buildkite/scripts/build-artifact" "sh"
       , S.exactly "buildkite/scripts/version-linter" "sh"
-      , S.exactly "buildkite/scripts/apps/write_to_cache" "sh"
       , S.strictlyStart (S.contains "buildkite/scripts/tests")
       , S.strictlyStart (S.contains "scripts/rosetta")
       , S.exactly "scripts/rosetta/test-block-race" "sh"
@@ -97,7 +99,6 @@ let bullseyeDirtyWhen =
         , S.exactly "buildkite/scripts/connect/connect-to-network" "sh"
         , S.strictlyStart (S.contains "buildkite/scripts/tests/rosetta")
         , S.exactly "scripts/patch-archive-test" "sh"
-        , S.exactly "buildkite/scripts/single-node-tests" "sh"
         , S.strictlyStart (S.contains "buildkite/src/Jobs/Test")
         ]
       # minimalDirtyWhen

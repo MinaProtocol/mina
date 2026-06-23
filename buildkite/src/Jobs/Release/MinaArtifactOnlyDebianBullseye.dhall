@@ -1,6 +1,6 @@
 let ArtifactPipelines = ../../Command/MinaArtifact.dhall
 
-let Artifacts = ../../Constants/Artifacts.dhall
+let Artifacts = ../../Constants/Artifact/Artifacts.dhall
 
 let Pipeline = ../../Pipeline/Dsl.dhall
 
@@ -10,19 +10,21 @@ let DebianChannel = ../../Constants/DebianChannel.dhall
 
 let Network = ../../Constants/Network.dhall
 
+let Profile = ../../Constants/Profiles.dhall
+
 in  Pipeline.build
       ( ArtifactPipelines.onlyDebianPipeline
           ArtifactPipelines.MinaBuildSpec::{
           , artifacts =
-            [ Artifacts.Type.DaemonConfig
+            [ Artifacts.Type.Daemon { network = Network.Type.Devnet }
+            , Artifacts.Type.DaemonProfiled { profile = Profile.Type.Devnet }
+            , Artifacts.Type.Archive { network = Network.Type.Devnet }
+            , Artifacts.Type.Rosetta { network = Network.Type.Devnet }
             , Artifacts.Type.LogProc
-            , Artifacts.Type.Archive
             , Artifacts.Type.TxTools
             , Artifacts.Type.TestExecutive
-            , Artifacts.Type.RosettaAppsOnly
             ]
           , tags = [ PipelineTag.Type.Docker ]
-          , network = Network.Type.Devnet
           , channel = DebianChannel.Type.Experimental
           , prefix = "MinaArtifactOnlyDebian"
           }

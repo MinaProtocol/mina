@@ -1,4 +1,4 @@
-let Prelude = ../External/Prelude.dhall
+let Prelude = ../../External/Prelude.dhall
 
 let List/any = Prelude.List.any
 

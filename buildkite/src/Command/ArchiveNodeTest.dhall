@@ -29,7 +29,7 @@ in  { step =
                         )
                     )
                     ContainerImages.minaToolchainBullseye.amd64
-                    "mina-test-suite,mina-devnet-generic-instrumented,mina-archive-devnet-instrumented"
+                    "mina-test-suite,mina-generic-instrumented,mina-archive-devnet-instrumented"
                     "./scripts/tests/archive-node-test.sh"
                 , Cmd.run
                     "buildkite/scripts/upload-partial-coverage-data.sh ${key}"

@@ -2,7 +2,7 @@ let Pipeline = ../../Pipeline/Dsl.dhall
 
 let PipelineTag = ../../Pipeline/Tag.dhall
 
-let Artifacts = ../../Constants/Artifacts.dhall
+let Docker = ../../Constants/Docker/Package.dhall
 
 let JobSpec = ../../Pipeline/JobSpec.dhall
 
@@ -35,7 +35,7 @@ in  Pipeline.build
       , steps =
         [ let toolchainBullseyeSpec =
                 DockerImage.ReleaseSpec::{
-                , service = Artifacts.Type.Toolchain
+                , service = Docker.Type.Toolchain
                 , deb_codename = DebianVersions.DebVersion.Jammy
                 , no_cache = True
                 , deb_install_mode = DockerImage.DebianInstallMode.NoInstall
