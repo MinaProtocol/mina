@@ -1273,8 +1273,7 @@ if ${VALUE_TRANSFERS} || ${ZKAPP_TRANSACTIONS}; then
   set +e
 
   while [ $SYNCED -eq 0 ]; do
-    SYNC_STATUS=$(${MINA_GRAPHQL_CLIENT_EXE} sync-status --graphql-uri ${REST_SERVER} --raw)
-    SYNCED=$(echo "${SYNC_STATUS}" | grep -c "SYNCED")
+    SYNCED=$(${MINA_GRAPHQL_CLIENT_EXE} sync-status --graphql-uri ${REST_SERVER} | jq -r 'if .sync_status == "Synced" then 1 else 0 end')
     sleep ${POLL_INTERVAL}
   done
 
