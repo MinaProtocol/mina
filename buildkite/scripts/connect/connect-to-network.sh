@@ -74,6 +74,16 @@ if [[ "$(id -u)" -ne 0 ]] && command -v sudo >/dev/null 2>&1; then
   SUDO="sudo"
 fi
 
+# The daemon fetches the genesis (and epoch) ledger tarballs referenced by the
+# runtime config from S3 when they are not already on disk. Pin the public
+# read-only mirror explicitly: this container otherwise inherits
+# MINA_LEDGER_S3_BUCKET (a ContainerEnvVars passthrough) from the agent, where it
+# is set to the auth-required write bucket for the hardfork pipelines. The
+# daemon's unauthenticated curl then 403s and the node crashes with
+# "Could not find a ledger tar file for hash ...". The read-only bucket serves
+# the devnet/mainnet genesis ledgers anonymously.
+export MINA_LEDGER_S3_BUCKET="https://s3-us-west-2.amazonaws.com/snark-keys-ro.o1test.net"
+
 # Where the current rocksdb-scanner lives -- the same versioned path the
 # mina-daemon-storage-toolbox .deb installs it to, so mina-storage-converter
 # finds it identically.
