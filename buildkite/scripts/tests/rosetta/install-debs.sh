@@ -24,7 +24,7 @@ NETWORK="${MINA_NETWORK_DEB:-devnet}"
 # don't ship) on top of our --config-file, and starts cleanly against the
 # test's hand-rolled testnet.json.
 DEBS=(
-  "mina-${NETWORK}-generic"
+  "mina-generic"
   "mina-archive-${NETWORK}"
   "mina-rosetta-${NETWORK}"
   "mina-tx-tools"

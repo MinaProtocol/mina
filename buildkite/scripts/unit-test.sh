@@ -8,6 +8,7 @@ if [[ $# -ne 2 ]]; then
 fi
 
 export DUNE_PROFILE=$1
+export MINA_PROFILE=$DUNE_PROFILE
 path=$2
 
 # shellcheck disable=SC1090
