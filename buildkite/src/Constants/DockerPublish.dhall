@@ -14,6 +14,7 @@ let isEssential =
             , Archive = True
             , TestExecutive = False
             , TxTools = False
+            , MinaBootstrap = True
             , RosettaAppsOnly = True
             , RosettaConfig = True
             , FunctionalTestSuite = True
