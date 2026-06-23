@@ -50,6 +50,7 @@ let All =
       , Artifact.CreatePreforkGenesis
       , Artifact.DelegationVerifier
       , Artifact.DaemonStorageToolbox
+      , Artifact.FunctionalTestSuite
       ]
 
 let Main =

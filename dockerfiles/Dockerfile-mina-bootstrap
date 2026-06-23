@@ -6,8 +6,7 @@
 #      (psql is shelled out to by the `archive` subcommand)
 #
 # Resulting image size: ~150MB (slim) — could be reduced to ~20MB if we move
-# to FROM scratch and drop the `archive` subcommand's psql dependency, e.g.
-# by shipping a separate Dockerfile-mina-bootstrap-no-pg variant.
+# to FROM scratch and drop the `archive` subcommand's psql dependency.
 
 ARG GO_IMAGE=golang:1.21-bookworm
 ARG BASE_IMAGE=debian:bookworm-slim
