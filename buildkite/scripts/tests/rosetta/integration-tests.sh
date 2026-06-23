@@ -100,7 +100,16 @@ export MINA_GRAPHQL_PORT=${MINA_GRAPHQL_PORT:=3085}
 # Files from ROSETTA_CLI_CONFIG_FILES will be read from
 # ROSETTA_CONFIGURATION_INPUT_DIR and some placeholders will be
 # substituted.
-ROSETTA_CONFIGURATION_INPUT_DIR=${ROSETTA_CONFIGURATION_INPUT_DIR:=/etc/mina/rosetta/rosetta-cli-config}
+# In the bare-binary path the mina-rosetta deb is not installed, so the
+# rosetta-cli config it ships under /etc/mina/rosetta is absent; fall back to
+# the in-repo copy (the same files the deb is built from).
+if [[ -z "${ROSETTA_CONFIGURATION_INPUT_DIR:-}" ]]; then
+  if [[ -d /etc/mina/rosetta/rosetta-cli-config ]]; then
+    ROSETTA_CONFIGURATION_INPUT_DIR=/etc/mina/rosetta/rosetta-cli-config
+  else
+    ROSETTA_CONFIGURATION_INPUT_DIR=src/app/rosetta/rosetta-cli-config
+  fi
+fi
 ROSETTA_CLI_CONFIG_FILES=${ROSETTA_CLI_CONFIG_FILES:="config.json mina.ros"}
 ROSETTA_CLI_MAIN_CONFIG_FILE=${ROSETTA_CLI_MAIN_CONFIG_FILE:="config.json"}
 
@@ -211,7 +220,11 @@ sudo pg_ctlcluster ${POSTGRES_VERSION} main start || true
 sudo pg_dropcluster --stop ${POSTGRES_VERSION} main || true
 sudo mkdir -p ${POSTGRES_DATA_DIR}
 sudo chown postgres:postgres ${POSTGRES_DATA_DIR}
-sudo pg_createcluster --start -d ${POSTGRES_DATA_DIR} --createclusterconf /etc/mina/rosetta/scripts/postgresql.conf ${POSTGRES_VERSION} main
+# postgresql.conf is shipped by the mina-rosetta deb under /etc/mina/rosetta;
+# fall back to the in-repo copy when running from bare binaries.
+ROSETTA_PG_CONF=/etc/mina/rosetta/scripts/postgresql.conf
+[[ -f "$ROSETTA_PG_CONF" ]] || ROSETTA_PG_CONF=src/app/rosetta/scripts/postgresql.conf
+sudo pg_createcluster --start -d ${POSTGRES_DATA_DIR} --createclusterconf "$ROSETTA_PG_CONF" ${POSTGRES_VERSION} main
 sudo -u postgres psql --command "CREATE USER ${POSTGRES_USERNAME} WITH SUPERUSER PASSWORD '${POSTGRES_USERNAME}';"
 sudo -u postgres createdb -O ${POSTGRES_USERNAME} ${POSTGRES_DBNAME}
 psql -f "${MINA_ARCHIVE_SQL_SCHEMA_PATH}" "${PG_CONN}"
