@@ -8,7 +8,7 @@
 # Resulting image size: ~150MB (slim) — could be reduced to ~20MB if we move
 # to FROM scratch and drop the `archive` subcommand's psql dependency.
 
-ARG GO_IMAGE=golang:1.21-bookworm
+ARG GO_IMAGE=golang:1.21.13-bookworm
 ARG BASE_IMAGE=debian:bookworm-slim
 
 # ---------- builder ----------
