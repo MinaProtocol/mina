@@ -680,7 +680,7 @@ module Make_str (A : Wire_types.Concrete) = struct
       include Mina_base.Epoch_ledger
 
       let genesis ~(ledger : Genesis_data.Hashed.t) =
-        { Poly.hash = ledger.hash; total_currency = ledger.total_currency }
+        { Poly.hash = ledger.hash; total_currency = ledger.total_stake }
     end
 
     module Vrf = struct
@@ -1937,7 +1937,7 @@ module Make_str (A : Wire_types.Concrete) = struct
             previous_consensus_state.epoch_count ~prev_epoch ~next_epoch
             ~next_slot ~prev_protocol_state_hash:previous_protocol_state_hash
             ~producer_vrf_result ~snarked_ledger_hash ~genesis_ledger_hash
-            ~total_currency
+            ~total_currency:total_stake
         in
         let min_window_density, sub_window_densities =
           Min_window_density.update_min_window_density ~constants
@@ -3402,7 +3402,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                   (Mina_base.State_hash.With_state_hashes.state_hash
                      previous_protocol_state )
                 ~producer_vrf_result ~snarked_ledger_hash ~genesis_ledger_hash
-                ~total_currency
+                ~total_currency:prev.total_stake
             in
             let min_window_density, sub_window_densities =
               Min_window_density.update_min_window_density ~constants
