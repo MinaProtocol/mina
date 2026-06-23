@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # Integration test for the full automode transition lifecycle:
-#   mina-devnet-generic (v1) → mina-devnet-automode (v2) → mina-devnet-generic (v3)
+#   mina-generic (v1) → mina-devnet-automode (v2) → mina-generic (v3)
 #
 # In the split package layout the "normal" daemon is mina-NETWORK-generic
 # (binaries, owns /usr/local/bin/mina) + mina-NETWORK-config (config + service).
@@ -95,13 +95,14 @@ else
     SUDO="sudo"
 fi
 
-# In the split layout the normal daemon binaries live in mina-NETWORK-generic
-# (not the legacy monolithic mina-NETWORK), so that is the package we install,
-# reversion and assert on for the v1/v3 "normal" states.
-PKG_DAEMON="mina-${NETWORK}-generic"
+# In the split layout the normal daemon binaries live in the network-free
+# mina-generic package (not the legacy monolithic mina-NETWORK), so that is the
+# package we install, reversion and assert on for the v1/v3 "normal" states. The
+# per-profile generic layer (mina-NETWORK-generic) ships only the PROFILE hint.
+PKG_DAEMON="mina-generic"
 PKG_AUTOMODE="mina-${NETWORK}-automode"
 PKG_CONFIG="mina-${NETWORK}-config"
-PKG_PROFILE="mina-${NETWORK}-profile"
+PKG_PROFILE="mina-${NETWORK}-generic"
 PKG_POSTFORK="mina-${NETWORK}-postfork-mesa"
 PKG_PREFORK="mina-${NETWORK}-prefork-mesa"
 
@@ -256,10 +257,20 @@ V2_DEBS=(
     "${PREFORK_DEBS[@]}"
 )
 
-# V3: mina-devnet + config + logproc (post-hardfork, back to normal)
+# V3: mina-generic + config + profile + logproc (post-hardfork, back to normal)
+#
+# The network-free mina-generic daemon deliberately carries NO hard dependency
+# on a network profile package: the same deb is reused for every network, and
+# the generic docker image must be installable on its own (see commit dropping
+# the profile dependency from the generic/archive packages). Instead, the
+# profile is layered on top per-network — exactly how the "one generic + per
+# profile profiled" docker images are assembled. The transition test mirrors
+# that real deployment shape by co-installing the matching profile package
+# alongside generic + config in the final post-hardfork state.
 V3_DEBS=(
     "${REPO_DIR}/${PKG_DAEMON}_${V3}_amd64.deb"
     "${REPO_DIR}/${PKG_CONFIG}_${V3}_all.deb"
+    "${REPO_DIR}/${PKG_PROFILE}_${V3}_amd64.deb"
     "${REPO_DIR}/mina-logproc_${V3}_amd64.deb"
 )
 
@@ -377,10 +388,10 @@ fi
 log_info "PASS: ${PKG_DAEMON} v3 installed"
 
 if ! dpkg -l "${PKG_PROFILE}" 2>/dev/null | grep -q "^ii"; then
-    log_error "${PKG_PROFILE} should have been installed as a dependency of ${PKG_DAEMON} v3"
+    log_error "${PKG_PROFILE} should be installed alongside ${PKG_DAEMON} v3 in the post-hardfork state"
     exit 1
 fi
-log_info "PASS: ${PKG_PROFILE} installed automatically"
+log_info "PASS: ${PKG_PROFILE} installed (layered on top of the generic daemon)"
 
 # Automode metapackage should be gone
 if dpkg -l "${PKG_AUTOMODE}" 2>/dev/null | grep -q "^ii"; then
