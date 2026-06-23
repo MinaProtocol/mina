@@ -8,15 +8,15 @@ let ChainIdTest = ../../Command/ChainIdTest.dhall
 
 let PipelineScope = ../../Pipeline/Scope.dhall
 
-let scopes = [ PipelineScope.Type.PullRequest ]
+let scopes = [ PipelineScope.Type.MainlineNightly, PipelineScope.Type.Release ]
 
-let network = Network.Type.Devnet
+let network = Network.Type.Mesa
 
 let deps =
       Dockers.dependsOn
         Dockers.DepsSpec::{ network = network, profile = Profile.Type.Devnet }
 
 let expectedChainId =
-      "8c6312664c60ecc4c0c695e69f6301692c0b20f354b55e08e69a289f3d373e50"
+      "c0b179da879e26cfd2aa118282ca148d2eaa0a13041c789bcac5a92c7dccf6ce"
 
-in  ChainIdTest.makeTest "ChainIdTestDevnet" scopes deps network expectedChainId
+in  ChainIdTest.makeTest "ChainIdTestMesa" scopes deps network expectedChainId

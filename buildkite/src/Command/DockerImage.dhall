@@ -10,7 +10,7 @@ let Size = ./Size.dhall
 
 let Profiles = ../Constants/Profiles.dhall
 
-let Artifacts = ../Constants/Artifacts.dhall
+let Docker = ../Constants/Docker/Package.dhall
 
 let BuildFlags = ../Constants/BuildFlags.dhall
 
@@ -26,7 +26,7 @@ let DebianVersions = ../Constants/DebianVersions.dhall
 
 let Network = ../Constants/Network.dhall
 
-let DockerPublish = ../Constants/DockerPublish.dhall
+let DockerPublish = ../Constants/Docker/Publish.dhall
 
 let VerifyDockers = ../Command/Packages/VerifyDockers.dhall
 
@@ -42,7 +42,7 @@ let ReleaseSpec =
       { Type =
           { deps : List Command.TaggedKey.Type
           , network : Network.Type
-          , service : Artifacts.Type
+          , service : Docker.Type
           , version : Text
           , branch : Text
           , repo : Text
@@ -74,7 +74,7 @@ let ReleaseSpec =
           , network = Network.Type.Devnet
           , arch = Arch.Type.Amd64
           , version = "\\\${MINA_DOCKER_TAG}"
-          , service = Artifacts.Type.DaemonConfig
+          , service = Docker.Type.Daemon { network = Network.Type.Devnet }
           , branch = "\\\${BUILDKITE_BRANCH}"
           , repo = "\\\${BUILDKITE_REPO}"
           , deb_install_mode = DebianInstallMode.DownloadOnly
@@ -102,11 +102,19 @@ let ReleaseSpec =
 
 let stepKey =
           \(spec : ReleaseSpec.Type)
-      ->  "${Artifacts.lowerName spec.service}${spec.step_key_suffix}"
+      ->  let segment =
+                      if Docker.isProfiled spec.service
+
+                then  Profiles.lowerName spec.deb_profile
+
+                else  Network.lowerName spec.network
+
+          in  "${Docker.lowerName
+                   spec.service}-${segment}${spec.step_key_suffix}"
 
 let stepLabel =
           \(spec : ReleaseSpec.Type)
-      ->  "Docker: ${Artifacts.capitalName
+      ->  "Docker: ${Docker.capitalName
                        spec.service} ${Network.capitalName
                                          spec.network} ${DebianVersions.capitalName
                                                            spec.deb_codename} ${Profiles.toSuffixUppercase
@@ -132,14 +140,6 @@ let generateStep =
                   }
                   spec.deb_install_mode
 
-          let maybeStopDebianRepo =
-                merge
-                  { DownloadOnly =
-                      " && echo Skipping local debian repo teardown "
-                  , NoInstall = " && echo Skipping local debian repo teardown "
-                  }
-                  spec.deb_install_mode
-
           let debSuffix =
                 merge
                   { None = if spec.generic then " --deb-suffix generic" else ""
@@ -158,29 +158,6 @@ let generateStep =
                 merge
                   { Arm64 = " --custom-suffix arm64 ", Amd64 = "" }
                   spec.arch
-
-          let customSuffix =
-                merge
-                  { Profile = ""
-                  , DaemonConfig = archCustomSuffix
-                  , DaemonLegacyHardfork = ""
-                  , DaemonAppsOnly = ""
-                  , DaemonPrefork = ""
-                  , DaemonAutoHardfork = ""
-                  , DaemonAutomode = ""
-                  , LogProc = ""
-                  , Archive = ""
-                  , TestExecutive = ""
-                  , TxTools = ""
-                  , RosettaAppsOnly = ""
-                  , RosettaConfig = archCustomSuffix
-                  , FunctionalTestSuite = ""
-                  , Toolchain = ""
-                  , CreatePreforkGenesis = ""
-                  , DelegationVerifier = ""
-                  , DaemonStorageToolbox = ""
-                  }
-                  spec.service
 
           let storageRepairVersionSuffix =
                 merge
@@ -228,7 +205,7 @@ let generateStep =
 
                 else  " --load-only "
 
-          let serviceName = Artifacts.dockerServiceName spec.service
+          let serviceName = Docker.serviceName spec.service
 
           let maybeSaveToCacheArg =
                       if spec.save_to_ci_cache
@@ -259,7 +236,7 @@ let generateStep =
                 ++  " --platform ${Arch.platform spec.arch}"
                 ++  " --docker-registry ${DockerRepo.show spec.docker_repo}"
                 ++  loadOnlyArg
-                ++  customSuffix
+                ++  archCustomSuffix
                 ++  imageNameArg
                 ++  maybeSaveToCacheArg
 
@@ -293,7 +270,6 @@ let generateStep =
                           ++  " && source ./buildkite/scripts/export-git-env-vars.sh "
                           ++  " && "
                           ++  buildDockerCmd
-                          ++  maybeStopDebianRepo
                           ++  maybeVerify
                         )
                     ]

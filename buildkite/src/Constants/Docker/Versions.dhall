@@ -1,14 +1,14 @@
-let Profiles = ./Profiles.dhall
+let Profiles = ../Artifact/Profiles.dhall
 
-let Artifacts = ./Artifacts.dhall
+let Pkg = ./Package.dhall
 
-let Network = ./Network.dhall
+let Network = ../Artifact/Network.dhall
 
-let DebianVersions = ./DebianVersions.dhall
+let DebianVersions = ../Debian/Versions.dhall
 
-let BuildFlags = ./BuildFlags.dhall
+let BuildFlags = ../Artifact/BuildFlags.dhall
 
-let Arch = ./Arch.dhall
+let Arch = ../Artifact/Arch.dhall
 
 let Docker
     : Type
@@ -42,7 +42,7 @@ let DepsSpec =
           , prefix : Text
           , network : Network.Type
           , profile : Profiles.Type
-          , artifact : Artifacts.Type
+          , artifact : Pkg.Type
           , buildFlags : BuildFlags.Type
           , arch : Arch.Type
           , suffix : Text
@@ -52,7 +52,7 @@ let DepsSpec =
           , prefix = "MinaArtifact"
           , network = Network.Type.Devnet
           , profile = Profiles.Type.Devnet
-          , artifact = Artifacts.Type.DaemonConfig
+          , artifact = Pkg.Type.Daemon { network = Network.Type.Devnet }
           , buildFlags = BuildFlags.Type.None
           , suffix = "docker-image"
           , arch = Arch.Type.Amd64
@@ -61,11 +61,10 @@ let DepsSpec =
 
 let dependsOn =
           \(spec : DepsSpec.Type)
-      ->  let network = "${Network.capitalName spec.network}"
-
-          let profileSuffix = "${Profiles.toSuffixUppercase spec.profile}"
-
-          let key = "${Artifacts.lowerName spec.artifact}-${spec.suffix}"
+      ->  let key =
+                "${Pkg.lowerName
+                     spec.artifact}-${Network.lowerName
+                                        spec.network}-${spec.suffix}"
 
           let buildFlagSuffix =
                 merge
@@ -79,7 +78,7 @@ let dependsOn =
 
           in  [ { name =
                     "${spec.prefix}${capitalName
-                                       spec.codename}${network}${profileSuffix}${buildFlagSuffix}${archSuffix}"
+                                       spec.codename}${buildFlagSuffix}${archSuffix}"
                 , key = key
                 }
               ]
