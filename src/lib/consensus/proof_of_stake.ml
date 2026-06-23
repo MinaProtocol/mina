@@ -149,6 +149,94 @@ module Make_str (A : Wire_types.Concrete) = struct
             |> var_of_hash_packed )
     end
 
+    (* Consensus' view of an epoch ledger. Unlike [Mina_base.Epoch_ledger],
+       which zkApp preconditions match against, it carries the total stake
+       too: the VRF threshold is computed against [total_stake]. *)
+    module Epoch_ledger = struct
+      module Poly = struct
+        [%%versioned
+        module Stable = struct
+          module V1 = struct
+            type ('ledger_hash, 'amount) t =
+                  ('ledger_hash, 'amount) A.Data.Epoch_ledger.Poly.V1.t =
+              { hash : 'ledger_hash
+              ; total_currency : 'amount
+              ; total_stake : 'amount
+              }
+            [@@deriving sexp, equal, compare, hash, yojson, hlist]
+          end
+        end]
+      end
+
+      module Value = struct
+        [%%versioned
+        module Stable = struct
+          module V1 = struct
+            type t =
+              ( Mina_base.Frozen_ledger_hash0.Stable.V1.t
+              , Amount.Stable.V1.t )
+              Poly.Stable.V1.t
+            [@@deriving sexp, equal, compare, hash, yojson]
+
+            let to_latest = Fn.id
+          end
+        end]
+      end
+
+      type var = (Mina_base.Frozen_ledger_hash0.var, Amount.var) Poly.t
+
+      let typ : (var, Value.t) Typ.t =
+        Typ.of_hlistable
+          [ Mina_base.Frozen_ledger_hash0.typ; Amount.typ; Amount.typ ]
+          ~var_to_hlist:Poly.to_hlist ~var_of_hlist:Poly.of_hlist
+          ~value_to_hlist:Poly.to_hlist ~value_of_hlist:Poly.of_hlist
+
+      let to_input ({ hash; total_currency; total_stake } : Value.t) =
+        Random_oracle.Input.Chunked.(
+          List.reduce_exn ~f:append
+            [ field (hash :> Tick.Field.t)
+            ; Amount.to_input total_currency
+            ; Amount.to_input total_stake
+            ] )
+
+      let var_to_input ({ Poly.hash; total_currency; total_stake } : var) =
+        Random_oracle.Input.Chunked.(
+          List.reduce_exn ~f:append
+            [ field (Mina_base.Frozen_ledger_hash0.var_to_hash_packed hash)
+            ; Amount.var_to_input total_currency
+            ; Amount.var_to_input total_stake
+            ] )
+
+      let if_ cond ~(then_ : var) ~(else_ : var) =
+        let open Tick.Checked.Let_syntax in
+        let%map hash =
+          Mina_base.Frozen_ledger_hash0.if_ cond ~then_:then_.hash
+            ~else_:else_.hash
+        and total_currency =
+          Amount.Checked.if_ cond ~then_:then_.total_currency
+            ~else_:else_.total_currency
+        and total_stake =
+          Amount.Checked.if_ cond ~then_:then_.total_stake
+            ~else_:else_.total_stake
+        in
+        { Poly.hash; total_currency; total_stake }
+
+      (* The zkApp precondition view of this ledger. *)
+      let to_zkapp_view ({ hash; total_currency; _ } : Value.t) :
+          Mina_base.Epoch_ledger.Value.t =
+        { Mina_base.Epoch_ledger.Poly.hash; total_currency }
+
+      let var_to_zkapp_view ({ hash; total_currency; _ } : var) :
+          Mina_base.Epoch_ledger.var =
+        { Mina_base.Epoch_ledger.Poly.hash; total_currency }
+
+      let genesis ~(ledger : Genesis_data.Hashed.t) : Value.t =
+        { hash = ledger.hash
+        ; total_currency = ledger.total_currency
+        ; total_stake = ledger.total_stake
+        }
+    end
+
     module Epoch_and_slot = struct
       type t = Epoch.t * Slot.t [@@deriving sexp]
 
@@ -194,7 +282,7 @@ module Make_str (A : Wire_types.Concrete) = struct
 
         module V3 = struct
           type t =
-            { epoch_ledger : Mina_base.Epoch_ledger.Value.Stable.V1.t
+            { epoch_ledger : Epoch_ledger.Value.Stable.V1.t
             ; epoch_seed : Mina_base.Epoch_seed.Stable.V1.t
             ; epoch : Mina_numbers.Length.Stable.V1.t
             ; global_slot : Mina_numbers.Global_slot_since_hard_fork.Stable.V1.t
@@ -212,7 +300,7 @@ module Make_str (A : Wire_types.Concrete) = struct
       end]
 
       type t = Stable.Latest.t =
-        { epoch_ledger : Mina_base.Epoch_ledger.Value.t
+        { epoch_ledger : Epoch_ledger.Value.t
         ; epoch_seed : Mina_base.Epoch_seed.t
         ; epoch : Mina_numbers.Length.t
         ; global_slot : Mina_numbers.Global_slot_since_hard_fork.t
@@ -675,13 +763,6 @@ module Make_str (A : Wire_types.Concrete) = struct
       end
     end
 
-    module Epoch_ledger = struct
-      include Mina_base.Epoch_ledger
-
-      let genesis ~(ledger : Genesis_data.Hashed.t) =
-        { Poly.hash = ledger.hash; total_currency = ledger.total_currency }
-    end
-
     module Vrf = struct
       include Consensus_vrf
       module T = Integrated
@@ -758,7 +839,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           let%bind truncated_result = Output.Checked.truncate result in
           let%map satisifed =
             Threshold.Checked.is_satisfied ~my_stake
-              ~total_stake:epoch_ledger.total_currency truncated_result
+              ~total_stake:epoch_ledger.total_stake truncated_result
           in
           (satisifed, result, truncated_result, winner_account)
       end
@@ -921,6 +1002,31 @@ module Make_str (A : Wire_types.Concrete) = struct
     module Epoch_data = struct
       include Mina_base.Epoch_data
 
+      type var =
+        ( Epoch_ledger.var
+        , Epoch_seed.var
+        , Mina_base.State_hash.var
+        , Mina_base.State_hash.var
+        , Length.Checked.t )
+        Poly.t
+
+      let if_ cond ~(then_ : var) ~(else_ : var) =
+        let open Snark_params.Tick.Checked.Let_syntax in
+        let%map ledger =
+          Epoch_ledger.if_ cond ~then_:then_.ledger ~else_:else_.ledger
+        and seed = Epoch_seed.if_ cond ~then_:then_.seed ~else_:else_.seed
+        and start_checkpoint =
+          Mina_base.State_hash.if_ cond ~then_:then_.start_checkpoint
+            ~else_:else_.start_checkpoint
+        and lock_checkpoint =
+          Mina_base.State_hash.if_ cond ~then_:then_.lock_checkpoint
+            ~else_:else_.lock_checkpoint
+        and epoch_length =
+          Length.Checked.if_ cond ~then_:then_.epoch_length
+            ~else_:else_.epoch_length
+        in
+        { Poly.ledger; seed; start_checkpoint; lock_checkpoint; epoch_length }
+
       module Make (Lock_checkpoint : sig
         type t [@@deriving sexp, compare, hash, to_yojson]
 
@@ -1062,14 +1168,19 @@ module Make_str (A : Wire_types.Concrete) = struct
           ((staking_data, next_data) : Staking.Value.t * Next.Value.t)
           epoch_count ~prev_epoch ~next_epoch ~next_slot
           ~prev_protocol_state_hash ~producer_vrf_result ~snarked_ledger_hash
-          ~genesis_ledger_hash ~total_currency ~(constants : Constants.t) =
+          ~genesis_ledger_hash ~total_currency ~total_stake
+          ~(constants : Constants.t) =
         let next_staking_ledger =
           (*If snarked ledger hash is still the genesis ledger hash then the epoch ledger should continue to be `next_data.ledger`. This is because the epoch ledgers at genesis can be different from the genesis ledger*)
           if
             Mina_base.Frozen_ledger_hash.equal snarked_ledger_hash
               genesis_ledger_hash
           then next_data.ledger
-          else { Epoch_ledger.Poly.hash = snarked_ledger_hash; total_currency }
+          else
+            { Epoch_ledger.Poly.hash = snarked_ledger_hash
+            ; total_currency
+            ; total_stake
+            }
         in
         let staking_data', next_data', epoch_count' =
           if Epoch.(next_epoch > prev_epoch) then
@@ -1938,7 +2049,7 @@ module Make_str (A : Wire_types.Concrete) = struct
             previous_consensus_state.epoch_count ~prev_epoch ~next_epoch
             ~next_slot ~prev_protocol_state_hash:previous_protocol_state_hash
             ~producer_vrf_result ~snarked_ledger_hash ~genesis_ledger_hash
-            ~total_currency
+            ~total_currency ~total_stake
         in
         let min_window_density, sub_window_densities =
           Min_window_density.update_min_window_density ~constants
@@ -2251,6 +2362,7 @@ module Make_str (A : Wire_types.Concrete) = struct
             Epoch_ledger.if_ update_next_epoch_ledger
               ~then_:
                 { total_currency = new_total_currency
+                ; total_stake = new_total_stake
                 ; hash = previous_blockchain_state_ledger_hash
                 }
               ~else_:previous_state.next_epoch_data.ledger
@@ -2375,6 +2487,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         , min_window_density
         , sub_window_densities
         , total_currency
+        , total_stake
         , global_slot_since_genesis
         , block_stake_winner
         , last_vrf_output
@@ -3405,7 +3518,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                   (Mina_base.State_hash.With_state_hashes.state_hash
                      previous_protocol_state )
                 ~producer_vrf_result ~snarked_ledger_hash ~genesis_ledger_hash
-                ~total_currency
+                ~total_currency ~total_stake:prev.total_stake
             in
             let min_window_density, sub_window_densities =
               Min_window_density.update_min_window_density ~constants
@@ -3716,7 +3829,9 @@ module Make_str (A : Wire_types.Concrete) = struct
         let maybe_sk, account = Genesis_ledger.largest_account_exn () in
         let private_key = Option.value_exn maybe_sk in
         let public_key_compressed = Account.public_key account in
-        let total_stake = genesis_ledger.total_currency in
+        let total_stake =
+          previous_consensus_state.staking_epoch_data.ledger.total_stake
+        in
         let block_producer_pubkeys =
           Public_key.Compressed.Set.of_list [ public_key_compressed ]
         in
@@ -3859,7 +3974,7 @@ module Make_str (A : Wire_types.Concrete) = struct
 
       let gen_epoch_data ~genesis_currency ~starts_at_block_height
           ?start_checkpoint ?lock_checkpoint epoch_length :
-          Epoch_data.Value.t Quickcheck.Generator.t =
+          Epoch_data.Staking.Value.t Quickcheck.Generator.t =
         let open Quickcheck.Generator.Let_syntax in
         let height_at_end_of_epoch =
           Length.add starts_at_block_height epoch_length
@@ -3873,6 +3988,9 @@ module Make_str (A : Wire_types.Concrete) = struct
         let ledger : Epoch_ledger.Value.t =
           { hash = ledger_hash
           ; total_currency =
+              currency_at_height ~genesis_currency
+                (Length.to_int height_at_end_of_epoch)
+          ; total_stake =
               currency_at_height ~genesis_currency
                 (Length.to_int height_at_end_of_epoch)
           }

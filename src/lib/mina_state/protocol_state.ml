@@ -146,6 +146,19 @@ module Make_str (A : Wire_types.Concrete) = struct
 
     let consensus_state { Poly.consensus_state; _ } = consensus_state
 
+    (* zkApp preconditions see the epoch ledger without its total stake. *)
+    let epoch_data_zkapp_view (d : (_, _, _, _, _) Epoch_data.Poly.t) =
+      { d with
+        ledger =
+          Consensus.Data.Epoch_ledger.to_zkapp_view d.Epoch_data.Poly.ledger
+      }
+
+    let epoch_data_var_zkapp_view (d : (_, _, _, _, _) Epoch_data.Poly.t) =
+      { d with
+        ledger =
+          Consensus.Data.Epoch_ledger.var_to_zkapp_view d.Epoch_data.Poly.ledger
+      }
+
     let view_checked (t : var) :
         Zkapp_precondition.Protocol_state.View.Checked.t =
       let module C = Consensus.Proof_of_stake.Exported.Consensus_state in
@@ -156,8 +169,9 @@ module Make_str (A : Wire_types.Concrete) = struct
       ; min_window_density = C.min_window_density_var cs
       ; total_currency = C.total_currency_var cs
       ; global_slot_since_genesis = C.global_slot_since_genesis_var cs
-      ; staking_epoch_data = C.staking_epoch_data_var cs
-      ; next_epoch_data = C.next_epoch_data_var cs
+      ; staking_epoch_data =
+          epoch_data_var_zkapp_view (C.staking_epoch_data_var cs)
+      ; next_epoch_data = epoch_data_var_zkapp_view (C.next_epoch_data_var cs)
       }
 
     let hash s =
@@ -174,8 +188,8 @@ module Make_str (A : Wire_types.Concrete) = struct
       ; min_window_density = C.min_window_density cs
       ; total_currency = C.total_currency cs
       ; global_slot_since_genesis = C.global_slot_since_genesis cs
-      ; staking_epoch_data = C.staking_epoch_data cs
-      ; next_epoch_data = C.next_epoch_data cs
+      ; staking_epoch_data = epoch_data_zkapp_view (C.staking_epoch_data cs)
+      ; next_epoch_data = epoch_data_zkapp_view (C.next_epoch_data cs)
       }
 
     module For_tests = struct

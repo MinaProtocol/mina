@@ -70,7 +70,7 @@ module Slot = Slot_scalar
 module Epoch = Epoch_scalar
 
 module Epoch_ledger = struct
-  open Mina_base.Epoch_ledger
+  open Consensus.Data.Epoch_ledger
 
   let typ () : ('ctx, Value.t option) Graphql_async.Schema.typ =
     let open Graphql_async in

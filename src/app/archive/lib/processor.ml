@@ -1876,6 +1876,18 @@ module Epoch_data = struct
       ; epoch_length
       }
 
+  let add_consensus_if_doesn't_exist (module Conn : Mina_caqti.CONNECTION)
+      (t :
+        ( Consensus.Data.Epoch_ledger.Value.t
+        , _
+        , _
+        , _
+        , _ )
+        Mina_base.Epoch_data.Poly.t ) =
+    add_if_doesn't_exist
+      (module Conn)
+      { t with ledger = Consensus.Data.Epoch_ledger.to_zkapp_view t.ledger }
+
   let load (module Conn : Mina_caqti.CONNECTION) id =
     Conn.find
       (find_req Caqti_type.int typ
@@ -2975,12 +2987,12 @@ module Block = struct
             |> Blockchain_state.snarked_ledger_hash )
         in
         let%bind staking_epoch_data_id =
-          Epoch_data.add_if_doesn't_exist
+          Epoch_data.add_consensus_if_doesn't_exist
             (module Conn)
             (Consensus.Data.Consensus_state.staking_epoch_data consensus_state)
         in
         let%bind next_epoch_data_id =
-          Epoch_data.add_if_doesn't_exist
+          Epoch_data.add_consensus_if_doesn't_exist
             (module Conn)
             (Consensus.Data.Consensus_state.next_epoch_data consensus_state)
         in

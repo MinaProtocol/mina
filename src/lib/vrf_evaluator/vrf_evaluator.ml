@@ -184,7 +184,7 @@ module Worker_state = struct
       epoch_data.global_slot_since_genesis
     in
     let delegatee_table = epoch_data.delegatee_table in
-    let total_stake = epoch_data.epoch_ledger.total_currency in
+    let total_stake = epoch_data.epoch_ledger.total_stake in
     (* Try vrfs for all keypairs that are unseen within this slot until one wins or all lose *)
     (* TODO: Don't do this, and instead pick the one that has the highest chance of winning. See #2573 *)
     let slot : Slot.t = Slot.of_uint32 @@ Consensus_time.slot consensus_time in
