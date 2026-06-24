@@ -12,7 +12,7 @@ let command
       ->  let image =
                 merge
                   { Amd64 = ContainerImages.minaToolchainBullseye.amd64
-                  , Arm64 = ContainerImages.minaToolchainBullseye.arm64
+                  , Arm64 = ContainerImages.minaToolchainBookworm.arm64
                   }
                   arch
 
