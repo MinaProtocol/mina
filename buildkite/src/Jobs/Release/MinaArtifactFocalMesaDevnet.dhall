@@ -32,8 +32,7 @@ in  Pipeline.build
             , Artifacts.Type.CreatePreforkGenesis
             ]
           , network = Network.Type.Mesa
-          , scope =
-            [ PipelineScope.Type.MainlineNightly, PipelineScope.Type.Release ]
+          , scope = [ PipelineScope.Type.Weekly, PipelineScope.Type.Release ]
           , tags =
             [ PipelineTag.Type.Long
             , PipelineTag.Type.Release

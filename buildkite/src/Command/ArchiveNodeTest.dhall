@@ -6,6 +6,8 @@ let Size = ./Size.dhall
 
 let RunWithPostgres = ./RunWithPostgres.dhall
 
+let S = ../Lib/SelectFiles.dhall
+
 let ContainerImages = ../Constants/ContainerImages.dhall
 
 let key = "archive-node-test"
@@ -17,7 +19,9 @@ in  { step =
               , commands =
                 [ RunWithPostgres.runInToolchainWithPostgresAndDebs
                     [ "ARCHIVE_TEST_APP=mina-archive-node-test"
-                    , "MINA_TEST_NETWORK_DATA=/etc/mina/test/archive/sample_db"
+                    , "MINA_TEST_NETWORK_DATA=src/test/archive/sample_db"
+                    , "APPS_BUILD_FLAG=instrumented"
+                    , "APPS_BARE_BINARIES=archive_node_tests.exe:mina-archive-node-test,archive.exe:mina-archive,archive_blocks.exe:mina-archive-blocks,replayer.exe:mina-replayer,mina_testnet_signatures.exe:mina,runtime_genesis_ledger.exe:mina-create-genesis"
                     ]
                     ( Some
                         ( RunWithPostgres.ScriptOrArchive.Script
@@ -36,5 +40,6 @@ in  { step =
               , key = key
               , target = Size.Large
               , depends_on = dependsOn
+              , artifact_paths = [ S.contains "test_output/artifacts/*" ]
               }
     }

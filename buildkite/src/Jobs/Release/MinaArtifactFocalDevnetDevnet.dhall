@@ -30,8 +30,7 @@ in  Pipeline.build
             , Artifacts.Type.DaemonStorageToolbox
             ]
           , network = Network.Type.Devnet
-          , scope =
-            [ PipelineScope.Type.MainlineNightly, PipelineScope.Type.Release ]
+          , scope = [ PipelineScope.Type.Weekly, PipelineScope.Type.Release ]
           , tags =
             [ PipelineTag.Type.Long
             , PipelineTag.Type.Release
