@@ -414,8 +414,8 @@ build_test_executive_deb () {
 # Output: mina-tx-tools_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
 # Dependencies: ${SHARED_DEPS}${DAEMON_DEPS} (zkapp tool needs daemon deps)
 #
-# Ships both binaries that previously lived in mina-batch-txn and
-# mina-zkapp-test-transaction; those names are now transitional metapackages.
+# Ships both binaries that previously lived in the standalone mina-batch-txn
+# and mina-zkapp-test-transaction packages, which no longer exist.
 #
 build_tx_tools_deb() {
   echo "------------------------------------------------------------"
@@ -423,7 +423,7 @@ build_tx_tools_deb() {
 
   # Replaces/Breaks lets apt cleanly take over /usr/local/bin/mina-batch-txn
   # and /usr/local/bin/mina-zkapp-test-transaction from the older standalone
-  # packages of those names (now transitional metapackages with no payload).
+  # packages of those names (removed in favour of this consolidated package).
   create_control_file mina-tx-tools "${SHARED_DEPS}${DAEMON_DEPS}" \
     'Mina transaction testing tools: load-test (batch-txn) and zkApp transaction generator.' \
     "" \
@@ -440,27 +440,6 @@ build_tx_tools_deb() {
   build_deb mina-tx-tools
 }
 ## END TX TOOLS PACKAGE ##
-
-## GENERATE BATCH TXN METAPACKAGE ##
-
-#
-# Builds mina-batch-txn transitional metapackage for backward compatibility.
-# The actual mina-batch-txn binary now ships in mina-tx-tools.
-#
-# Output: mina-batch-txn_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb (no payload)
-# Dependencies: mina-tx-tools (= ${MINA_DEB_VERSION})
-#
-build_batch_txn_deb() {
-  echo "------------------------------------------------------------"
-  echo "--- Building mina-batch-txn transitional metapackage:"
-
-  create_control_file mina-batch-txn \
-    "mina-tx-tools (= ${MINA_DEB_VERSION})" \
-    'Transitional metapackage. Installs mina-tx-tools which contains mina-batch-txn.'
-
-  build_deb mina-batch-txn
-}
-## END BATCH TXN METAPACKAGE ##
 
 ## GENERATE TEST SUITE PACKAGE ##
 

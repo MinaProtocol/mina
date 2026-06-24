@@ -203,11 +203,7 @@ let toDebianNames =
                           , Archive = [ toDebianName a network ]
                           , LogProc = [ "logproc" ]
                           , TestExecutive = [ "test_executive" ]
-                          , TxTools =
-                            [ "tx_tools"
-                            , "batch_txn"
-                            , "zkapp_test_transaction"
-                            ]
+                          , TxTools = [ "tx_tools" ]
                           , RosettaAppsOnly = [ toDebianName a network ]
                           , RosettaConfig = [ toDebianName a network ]
                           , FunctionalTestSuite = [ "functional_test_suite" ]

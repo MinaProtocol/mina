@@ -27,7 +27,7 @@ DEBS=(
   "mina-${NETWORK}-generic"
   "mina-archive-${NETWORK}"
   "mina-rosetta-${NETWORK}"
-  "mina-zkapp-test-transaction"
+  "mina-tx-tools"
 )
 
 DEBS_CSV="$(IFS=,; echo "${DEBS[*]}")"

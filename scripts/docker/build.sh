@@ -277,9 +277,6 @@ case "${SERVICE}" in
         cat dockerfiles/toolchain/1-build-deps dockerfiles/toolchain/2-opam-deps dockerfiles/toolchain/3-toolchain > "$TEMP_DOCKERFILE"
         DOCKERFILE_PATH="$TEMP_DOCKERFILE"
         ;;
-    mina-tx-tools)
-        DOCKERFILE_PATH="dockerfiles/Dockerfile-mina-tx-tools"
-        ;;
     mina-rosetta)
         DOCKERFILE_PATH="dockerfiles/Dockerfile-mina-rosetta"
         ;;

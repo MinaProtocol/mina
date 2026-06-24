@@ -208,7 +208,7 @@ let generateDockerForCodename =
                                       ++  " --backend local --artifacts mina-logproc,mina-${Network.lowerName
                                                                                               spec.network},mina-archive-${Network.lowerName
                                                                                                                              spec.network},mina-rosetta-${Network.lowerName
-                                                                                                                                                            spec.network},mina-zkapp-test-transaction,mina-daemon-storage-toolbox "
+                                                                                                                                                            spec.network},mina-tx-tools,mina-daemon-storage-toolbox "
                                       ++  " --buildkite-build-id ${cached_build_id}"
                                       ++  " --codename ${lowerNameCodename} "
                                       ++  " --target \\\${BUILDKITE_BUILD_ID} "
