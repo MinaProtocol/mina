@@ -35,4 +35,10 @@ DEBS_CSV="$(IFS=,; echo "${DEBS[*]}")"
 # Run the installer in a child process (not `source`d) so its strict-mode
 # flags (`set -u`, custom `PS4`) don't leak back into the calling shell. Use
 # sudo (toolchain image runs as opam user with NOPASSWD sudo).
-bash ./buildkite/scripts/debian/install.sh "${DEBS_CSV}" 1
+#
+# restore-or-install.sh is a drop-in for debian/install.sh: when
+# APPS_BARE_BINARIES is set it restores the freshly dune-built executables from
+# the apps cache (skipping the deb install, so no prebuilt mina-rosetta docker
+# image / published debs are needed); when it is unset (or a cache miss occurs)
+# it falls back to installing the debs above, preserving the previous behaviour.
+bash ./buildkite/scripts/debian/restore-or-install.sh "${DEBS_CSV}" 1
