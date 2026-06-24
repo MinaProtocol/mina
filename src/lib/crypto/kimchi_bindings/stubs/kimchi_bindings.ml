@@ -587,4 +587,18 @@ module Protocol = struct
         = "caml_pasta_fq_plonk_proof_deep_copy"
     end
   end
+
+  module Linearization = struct
+    external fp_linearization_tokens :
+         unit
+      -> Kimchi_types.polish_token array
+         * (string * Kimchi_types.polish_token array) array
+      = "fp_linearization_tokens"
+
+    external fq_linearization_tokens :
+         unit
+      -> Kimchi_types.polish_token array
+         * (string * Kimchi_types.polish_token array) array
+      = "fq_linearization_tokens"
+  end
 end
