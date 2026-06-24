@@ -89,3 +89,61 @@ let%test_unit "[`No_peers] state wakes on a useful_peers signal" =
           ()
       | `Result (Error `Finished) ->
           failwith "job was cancelled/stopped unexpectedly" )
+
+(* End-to-end regression test for the full self-heal path.
+
+   Unlike the test above (which injects a [useful_peers] signal directly), this
+   one exercises the production recovery chain: a download fails, which marks the
+   job [tried_and_failed] against the peer and temporarily ignores it; the loop
+   parks in [`No_peers]; the temporary-ignore expires; the loop wakes,
+   re-evaluates to [`Stalled], resets the peer's knowledge (clearing
+   [tried_and_failed]); and the subsequent retry succeeds.
+
+   The recovery delays are set to small values via [create]'s optional
+   parameters so the whole chain runs in well under a second. [get] fails the
+   first attempt and succeeds thereafter. [peers] returns a single stable peer so
+   that [reset_knowledge] (which drops peers not in the peer set) keeps it, and
+   [peer_refresh_interval] is small so the peer is delivered promptly after the
+   initial empty broadcast value. *)
+
+let%test_unit "[`No_peers] self-heals through `Stalled`/reset_knowledge" =
+  Thread_safe.block_on_async_exn (fun () ->
+      let logger = Logger.null () in
+      let trust_system = Trust_system.null () in
+      let stop = Ivar.create () in
+      let peer =
+        Peer.create
+          (Core.Unix.Inet_addr.of_string "1.2.3.4")
+          ~libp2p_port:8302
+          ~peer_id:(Peer.Id.unsafe_of_string "regression-test-peer")
+      in
+      let knowledge_context, _knowledge_w = Broadcast_pipe.create () in
+      let download_attempts = ref 0 in
+      let%bind downloader =
+        D.create ~ignore_period:(Time.Span.of_ms 200.)
+          ~post_stall_retry_delay:(Time.Span.of_ms 200.)
+          ~peer_refresh_interval:(Time.Span.of_ms 100.) ~max_batch_size:1
+          ~stop:(Ivar.read stop) ~logger ~trust_system
+          ~get:(fun _peer keys ->
+            incr download_attempts ;
+            if !download_attempts = 1 then
+              Deferred.return
+                (Or_error.error_string "simulated download failure")
+            else Deferred.Or_error.return keys )
+          ~knowledge_context
+          ~knowledge:(fun () _peer -> Deferred.return `All)
+          ~peers:(fun () -> Deferred.return [ peer ])
+          ~preferred:[] ()
+      in
+      let job = D.download downloader ~key:1 ~attempts:Peer.Map.empty in
+      let%map result = with_timeout (Time.Span.of_sec 15.) (D.Job.result job) in
+      Ivar.fill_if_empty stop () ;
+      match result with
+      | `Timeout ->
+          failwith
+            "downloader did not self-heal: the failed job was not retried \
+             after the temporary ignore expired"
+      | `Result (Ok _) ->
+          [%test_eq: bool] (!download_attempts >= 2) true
+      | `Result (Error `Finished) ->
+          failwith "job was cancelled/stopped unexpectedly" )
