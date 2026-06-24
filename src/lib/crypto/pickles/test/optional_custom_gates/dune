@@ -2,7 +2,8 @@
  (names
   test_fix_domains
   pickles_test_optional_custom_gates
-  lookup_range_check)
+  lookup_range_check
+  test_mmap_cache)
  (libraries
   ;; opam libraries
   alcotest
@@ -51,6 +52,7 @@
   group_map
   snarky_curve
   key_cache
+  key_cache.native
   snark_keys_header
   tuple_lib
   promise
