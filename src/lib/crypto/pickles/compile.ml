@@ -929,10 +929,10 @@ module Side_loaded = struct
   let chunking_data_of_num_chunks num_chunks =
     Option.map num_chunks ~f:(fun num_chunks ->
         if num_chunks < 1 then
-          failwith "Pickles.Side_loaded.verify: num_chunks must be a positive integer" ;
+          failwith
+            "Pickles.Side_loaded.verify: num_chunks must be a positive integer" ;
         ( { Verify.Instance.num_chunks
-          ; domain_size =
-              Common.Max_degree.step_domain_log2_for_num_chunks num_chunks
+          ; domain_size = Common.Max_degree.max_total_step_rows_log2 num_chunks
           ; zk_rows = Plonk_checks.zk_rows_for_num_chunks num_chunks
           }
           : Verify.Instance.chunking_data ) )
@@ -972,8 +972,7 @@ module Side_loaded = struct
                   { constraints = 0 }
               }
             in
-            Verify.Instance.T
-              (max_proofs_verified, m, chunking_data, vk, x, p) )
+            Verify.Instance.T (max_proofs_verified, m, chunking_data, vk, x, p) )
         |> Verify.verify_heterogenous )
 
   let verify ?num_chunks ~typ ts =

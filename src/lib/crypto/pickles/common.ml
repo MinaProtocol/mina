@@ -10,8 +10,7 @@ module Max_degree = struct
 
   let wrap_log2 = Nat.to_int Backend.Tock.Rounds.n
 
-  let step_domain_log2_for_num_chunks num_chunks =
-    step_log2 + Int.ceil_log2 num_chunks
+  let max_total_step_rows_log2 num_chunks = step_log2 + Int.ceil_log2 num_chunks
 end
 
 let tick_shifts, tock_shifts =
