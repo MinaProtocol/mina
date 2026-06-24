@@ -31,6 +31,15 @@ open Core_kernel
 open Async
 open Mina_automation
 
+(* Reference: https://discuss.ocaml.org/t/more-natural-preferred-way-to-shuffle-an-array *)
+let knuth_shuffle a =
+  let a = Array.copy a in
+  for i = Array.length a - 1 downto 1 do
+    let k = Random.int (i + 1) in
+    Array.swap a k i
+  done ;
+  a
+
 let main ~db_uri ~network_data_folder () =
   let open Deferred.Let_syntax in
   let network_name = "dummy" in
@@ -83,12 +92,26 @@ let main ~db_uri ~network_data_folder () =
       exit 1 )
     else Deferred.unit
   in
-  (* Never remove the first or last block. The guardian repairs gaps by fetching
-     missing parents, so use the block immediately before the tip to exercise
-     the repair path deterministically. Randomly removing blocks from this
-     forked fixture can create independent canonical gaps that the guardian does
-     not promise to repair. *)
-  let missing_blocks = [| List.length extensional_files - 2 |] in
+  let missing_blocks_count = min 1 (List.length extensional_files - 2) in
+
+  (* never remove last and first block as missing-block-guardian can have issues
+     when patching "border" blocks as it expect to fill gaps in the middle.
+     Select an orphan-branch parent from the fixed sample DB so replayer still
+     has an intact canonical chain to validate after patching.
+  *)
+  let missing_block_state_hash =
+    "3NKSqLA8BWMgHHkX4TqkVQjTmHLkXBumBb2aSBS3myzHQGopXC9x"
+  in
+  let candidate_blocks =
+    List.filter_mapi extensional_files ~f:(fun i file ->
+        if String.is_substring file ~substring:missing_block_state_hash then
+          Some i
+        else None )
+    |> Array.of_list
+  in
+  let missing_blocks =
+    Array.slice (knuth_shuffle candidate_blocks) 0 missing_blocks_count
+  in
   let unpatched_extensional_files =
     List.filteri extensional_files ~f:(fun i _ ->
         not (Array.mem missing_blocks i ~equal:Int.equal) )
