@@ -80,7 +80,11 @@ end) : sig
   val cancel : t -> Key.t -> unit
 
   val create :
-       max_batch_size:int
+       ?ignore_period:Time.Span.t
+    -> ?post_stall_retry_delay:Time.Span.t
+    -> ?no_progress_recheck_delay:Time.Span.t
+    -> ?peer_refresh_interval:Time.Span.t
+    -> max_batch_size:int
     -> stop:unit Deferred.t
     -> logger:Logger.t
     -> trust_system:Trust_system.t
@@ -90,6 +94,7 @@ end) : sig
          (Knowledge_context.t -> Peer.t -> Key.t Claimed_knowledge.t Deferred.t)
     -> peers:(unit -> Peer.t list Deferred.t)
     -> preferred:Peer.t list
+    -> unit
     -> t Deferred.t
 
   val download : t -> key:Key.t -> attempts:Attempt.t Peer.Map.t -> Job.t
@@ -265,6 +270,7 @@ end = struct
       ; knowledge_requesting_peers : Peer.Hash_set.t
       ; temporary_ignores :
           ((unit, unit) Clock.Event.t[@sexp.opaque]) Peer.Table.t
+      ; ignore_period : Time.Span.t
       ; mutable all_preferred : Preferred_heap.t
       ; knowledge : Knowledge.t Peer.Table.t
             (* Written to when something changes. *)
@@ -294,6 +300,7 @@ end = struct
         ; all_preferred
         ; knowledge_requesting_peers
         ; temporary_ignores
+        ; ignore_period = _
         ; downloading_peers
         ; r = _
         ; w = _
@@ -324,7 +331,7 @@ end = struct
                  (Hash_set.to_list knowledge_requesting_peers) ) )
         ]
 
-    let create ~preferred ~all_peers =
+    let create ~ignore_period ~preferred ~all_peers =
       let knowledge =
         Peer.Table.of_alist_exn
           (List.map (List.dedup_and_sort ~compare:Peer.compare all_peers)
@@ -337,6 +344,7 @@ end = struct
       { downloading_peers = Peer.Hash_set.create ()
       ; knowledge_requesting_peers = Peer.Hash_set.create ()
       ; temporary_ignores = Peer.Table.create ()
+      ; ignore_period
       ; knowledge
       ; r
       ; w
@@ -346,6 +354,7 @@ end = struct
     let tear_down
         { downloading_peers
         ; temporary_ignores
+        ; ignore_period = _
         ; knowledge_requesting_peers
         ; knowledge
         ; r = _
@@ -500,8 +509,6 @@ end = struct
       Hashtbl.iter t.knowledge ~f:(fun s ->
           List.iter ks ~f:(Hash_set.remove s.tried_and_failed) )
 
-    let ignore_period = Time.Span.of_min 2.
-
     let update t u =
       O1trace.sync_thread "update_downloader" (fun () ->
           match u with
@@ -567,7 +574,7 @@ end = struct
                if List.is_empty succs then
                  Hashtbl.update t.temporary_ignores peer0 ~f:(fun x ->
                      cancel x ;
-                     Clock.Event.run_after ignore_period
+                     Clock.Event.run_after t.ignore_period
                        (fun () ->
                          Hashtbl.remove t.temporary_ignores peer0 ;
                          if not (Strict_pipe.Writer.is_closed t.w) then
@@ -627,6 +634,8 @@ end = struct
     ; logger : Logger.t
     ; trust_system : Trust_system.t
     ; stop : unit Deferred.t
+    ; post_stall_retry_delay : Time.Span.t
+    ; no_progress_recheck_delay : Time.Span.t
     }
 
   let logger t = t.logger
@@ -734,6 +743,8 @@ end = struct
         ; logger = _
         ; trust_system = _
         ; stop = _
+        ; post_stall_retry_delay = _
+        ; no_progress_recheck_delay = _
         } as t ) =
     let rec clear_queue q =
       match Q.dequeue q with
@@ -882,8 +893,6 @@ end = struct
                    ] ) ) )
       ]
 
-  let post_stall_retry_delay = Time.Span.of_min 1.
-
   let rec step t =
     if Q.length t.pending = 0 then (
       [%log' debug t.logger] "Downloader: no jobs. waiting" ;
@@ -924,9 +933,9 @@ end = struct
           [%log' debug t.logger]
             "Downloader: all stalled. Resetting knowledge, waiting %s and then \
              retrying."
-            (Time.Span.to_string_hum post_stall_retry_delay) ;
+            (Time.Span.to_string_hum t.post_stall_retry_delay) ;
           Useful_peers.reset_knowledge t.useful_peers ~all_peers:t.all_peers ;
-          let%bind () = after post_stall_retry_delay in
+          let%bind () = after t.post_stall_retry_delay in
           [%log' debug t.logger] "Downloader: continuing after reset" ;
           step t
       | `Useful (peer, might_know) -> (
@@ -956,8 +965,12 @@ end = struct
   let mark_preferred t peer ~now =
     Useful_peers.Preferred_heap.add t.useful_peers.all_preferred (peer, now)
 
-  let create ~max_batch_size ~stop ~logger ~trust_system ~get ~knowledge_context
-      ~knowledge ~peers ~preferred =
+  let create ?(ignore_period = Time.Span.of_min 2.)
+      ?(post_stall_retry_delay = Time.Span.of_min 1.)
+      ?(no_progress_recheck_delay = Time.Span.of_min 1.)
+      ?(peer_refresh_interval = Time.Span.of_min 1.) ~max_batch_size ~stop
+      ~logger ~trust_system ~get ~knowledge_context ~knowledge ~peers ~preferred
+      () =
     let%map all_peers = peers () in
     let pipe ~name c =
       Strict_pipe.create ~warn_on_drop:false ~name
@@ -974,19 +987,21 @@ end = struct
       ; jobs_added_bvar = Bvar.create ()
       ; got_new_peers_r
       ; got_new_peers_w
-      ; useful_peers = Useful_peers.create ~all_peers ~preferred
+      ; useful_peers = Useful_peers.create ~ignore_period ~all_peers ~preferred
       ; get
       ; max_batch_size
       ; logger
       ; trust_system
       ; downloading = Key.Table.create ()
       ; stop
+      ; post_stall_retry_delay
+      ; no_progress_recheck_delay
       }
     in
     let peers =
       let r, w = Broadcast_pipe.create [] in
       upon stop (fun () -> Broadcast_pipe.Writer.close w) ;
-      Clock.every' ~stop (Time.Span.of_min 1.) (fun () ->
+      Clock.every' ~stop peer_refresh_interval (fun () ->
           peers ()
           >>= fun ps ->
           try Broadcast_pipe.Writer.write w ps

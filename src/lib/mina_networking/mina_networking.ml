@@ -462,6 +462,7 @@ let glue_sync_ledger :
                       (List.filter_map ps ~f:(fun (q, r) ->
                            match r with Ok r -> Some (q, r) | Error _ -> None )
                       ) ) ) )
+      ()
   in
   don't_wait_for
     (let%bind downloader = downloader in

@@ -70,7 +70,7 @@ let%test_unit "[`No_peers] state wakes on a useful_peers signal" =
           ~knowledge_context
           ~knowledge:(fun () _peer -> Deferred.return (`Some []))
           ~peers:(fun () -> Deferred.return [])
-          ~preferred:[]
+          ~preferred:[] ()
       in
       let job = D.download downloader ~key:1 ~attempts:Peer.Map.empty in
       (* Let the loop settle into [`No_peers] (the flush delay is 100ms). *)
