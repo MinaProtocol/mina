@@ -903,12 +903,37 @@ end = struct
       | `Ok () ->
           step t )
     else
+      let read p =
+        Pipe.read_choice_single_consumer_exn
+          (Strict_pipe.Reader.to_linear_pipe p).pipe [%here]
+      in
+      (* The [useful_peers] and [got_new_peers] signals are best-effort
+         (capacity-0, drop-head): a wakeup is lost if it fires before we are
+         parked on the read. Racing the signals against a timeout ensures that a
+         dropped wakeup cannot leave the loop parked indefinitely after the peer
+         set has in fact recovered. *)
+      let wait_for_change pipes =
+        Deferred.choose
+          ( Deferred.choice (after t.no_progress_recheck_delay) (fun () ->
+                `Ok () )
+          :: List.map pipes ~f:read )
+      in
       match
         Useful_peers.useful_peer t.useful_peers
           ~pending_jobs:(Q.to_list t.pending)
       with
       | `No_peers -> (
-          match%bind Strict_pipe.Reader.read t.got_new_peers_r with
+          [%log' debug t.logger]
+            "Downloader: Waiting. No known peer has the remaining jobs" ;
+          (* Wake on new peers, on any change in peer usefulness (e.g. a
+             temporary-ignore expiring), or on the fallback timeout. The
+             [useful_peers] wake matters here in particular: once every job has
+             been tried against every peer no peer has positive knowledge, so it
+             is the only signal by which the loop learns that an ignored peer has
+             become usable again. *)
+          match%bind
+            wait_for_change [ t.got_new_peers_r; t.useful_peers.r ]
+          with
           | `Eof ->
               [%log' debug t.logger] "Downloader: new peers eof" ;
               Deferred.unit
@@ -916,13 +941,7 @@ end = struct
               step t )
       | `Useful_but_busy -> (
           [%log' debug t.logger] "Downloader: Waiting. All useful peers busy" ;
-          let read p =
-            Pipe.read_choice_single_consumer_exn
-              (Strict_pipe.Reader.to_linear_pipe p).pipe [%here]
-          in
-          match%bind
-            Deferred.choose [ read t.flush_r; read t.useful_peers.r ]
-          with
+          match%bind wait_for_change [ t.flush_r; t.useful_peers.r ] with
           | `Eof ->
               [%log' debug t.logger] "Downloader: flush eof" ;
               Deferred.unit
