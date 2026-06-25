@@ -387,6 +387,73 @@ let%test_module "Archive node unit tests" =
       | Error e ->
           failwith @@ Caqti_error.show e
 
+    (* Regression for the zkapp_events / zkapp_field_array btree overflow.
+       element_ids is an unbounded int[] of child ids. A max-cost zkApp emitting
+       ~1030 events (or one event carrying ~1030 fields) serializes to a
+       ~4128-byte array; with a UNIQUE/btree index over the raw array that
+       exceeds Postgres' 2704-byte key limit and the insert is rolled back.
+
+       Required behaviour: a large element_ids array must (a) insert without
+       overflowing, and (b) still be content-deduplicated -- re-adding the
+       identical array reuses the same row, while a different array gets a
+       distinct row. *)
+    let%test_unit "Zkapp_events: large event list inserts and dedups" =
+      let conn = Lazy.force conn_lazy in
+      Thread_safe.block_on_async_exn
+      @@ fun () ->
+      let events =
+        List.init 1030 ~f:(fun i ->
+            [| Pickles.Backend.Tick.Field.of_string (Int.to_string i) |] )
+      in
+      let different =
+        List.init 1030 ~f:(fun i ->
+            [| Pickles.Backend.Tick.Field.of_string (Int.to_string (i + 1)) |] )
+      in
+      match%map
+        let open Deferred.Result.Let_syntax in
+        let%bind id1 =
+          Processor.Zkapp_events.add_if_doesn't_exist conn events
+        in
+        let%bind id2 =
+          Processor.Zkapp_events.add_if_doesn't_exist conn events
+        in
+        let%map id_other =
+          Processor.Zkapp_events.add_if_doesn't_exist conn different
+        in
+        [%test_eq: int] id1 id2 ;
+        [%test_pred: int * int] (fun (a, b) -> a <> b) (id1, id_other)
+      with
+      | Ok () ->
+          ()
+      | Error e ->
+          failwith @@ Caqti_error.show e
+
+    (* Same overflow one level down: a single zkApp event may carry up to
+       max_event_elements (1024) fields, stored as one zkapp_field_array
+       element_ids int[]. A large single event must insert without overflow and
+       still dedup -- re-adding the identical event reuses the row. *)
+    let%test_unit "Zkapp_events: single large event inserts and dedups" =
+      let conn = Lazy.force conn_lazy in
+      Thread_safe.block_on_async_exn
+      @@ fun () ->
+      let events =
+        [ Array.init 1030 ~f:(fun i ->
+              Pickles.Backend.Tick.Field.of_string (Int.to_string i) )
+        ]
+      in
+      match%map
+        let open Deferred.Result.Let_syntax in
+        let%bind id1 =
+          Processor.Zkapp_events.add_if_doesn't_exist conn events
+        in
+        let%map id2 = Processor.Zkapp_events.add_if_doesn't_exist conn events in
+        [%test_eq: int] id1 id2
+      with
+      | Ok () ->
+          ()
+      | Error e ->
+          failwith @@ Caqti_error.show e
+
     (* Regression test for the [tokens_value_key] (UNIQUE on [tokens.value])
        violation. A custom token can already be present in [tokens] with an
        owner set (inserted while processing a block). A later code path that
