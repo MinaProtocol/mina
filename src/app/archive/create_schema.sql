@@ -128,12 +128,26 @@ CREATE TABLE zkapp_field
    The elements of the array are NOT NULL (not enforced by Postgresql)
 
 */
+/* Content hash of an element_ids array, used to deduplicate zkapp_field_array
+   and zkapp_events without indexing the raw int[].
+
+   The arrays are unbounded (a max-cost zkApp event carries up to ~1030 ids); a
+   btree UNIQUE/index over the raw array overflows Postgres' 2704-byte key limit.
+   Hashing collapses any array to a 32-byte key, so uniqueness and indexed
+   lookup both survive arbitrary array size. sha256 (not md5) so a crafted
+   collision cannot force a wrong dedup. Declared IMMUTABLE (the int->text
+   rendering is locale-independent for integers) so it is usable in an index;
+   the 'NULL' element placeholder keeps NULL elements unambiguous. */
+CREATE FUNCTION zkapp_element_ids_hash(element_ids int[]) RETURNS bytea
+  LANGUAGE sql IMMUTABLE STRICT PARALLEL SAFE
+  AS $$ SELECT sha256(convert_to(array_to_string(element_ids, ',', 'NULL'), 'UTF8')) $$;
+
 CREATE TABLE zkapp_field_array
 ( id                       serial  PRIMARY KEY
-, element_ids              int[]   NOT NULL UNIQUE
+, element_ids              int[]   NOT NULL
 );
-
-CREATE INDEX idx_zkapp_field_array_element_ids ON zkapp_field_array(element_ids);
+CREATE UNIQUE INDEX zkapp_field_array_element_ids_hash_key
+  ON zkapp_field_array (zkapp_element_ids_hash(element_ids));
 
 /* Fixed-width arrays of algebraic fields, given as id's from
    zkapp_field
@@ -228,10 +242,12 @@ CREATE TABLE zkapp_action_states
 */
 CREATE TABLE zkapp_events
 ( id                       serial           PRIMARY KEY
-, element_ids              int[]            NOT NULL UNIQUE
+, element_ids              int[]            NOT NULL
 );
-
-CREATE INDEX idx_zkapp_events_element_ids ON zkapp_events(element_ids);
+/* See zkapp_field_array_element_ids_hash_key: dedup by a 32-byte content hash
+   so the UNIQUE index never overflows the btree key-size limit. */
+CREATE UNIQUE INDEX zkapp_events_element_ids_hash_key
+  ON zkapp_events (zkapp_element_ids_hash(element_ids));
 
 /* field elements derived from verification keys */
 CREATE TABLE zkapp_verification_key_hashes

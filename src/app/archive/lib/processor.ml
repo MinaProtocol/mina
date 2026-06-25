@@ -389,6 +389,49 @@ end
 module Zkapp_field_array = struct
   let table_name = "zkapp_field_array"
 
+  (* Render an int array as a Postgres array literal, e.g. [| 1; 2 |] -> '{1,2}'.
+     The elements are integers, so this is injection-safe. *)
+  let to_sql_literal (element_ids : int array) =
+    Array.to_list element_ids |> List.map ~f:Int.to_string
+    |> String.concat ~sep:"," |> sprintf "{%s}"
+
+  module Element_ids_map = Map.Make (struct
+    type t = int array [@@deriving sexp]
+
+    let compare = Array.compare Int.compare
+  end)
+
+  (* Deduplicate an element_ids array into [table_name] by its content hash and
+     return the (existing or new) row id. element_ids is an unbounded int[]; its
+     raw value cannot carry a btree UNIQUE/index (a max-cost zkApp overflows the
+     2704-byte key limit). Instead the unique index is on
+     [zkapp_element_ids_hash(element_ids)], a fixed-width sha256, so the lookup
+     below is an index scan rather than a sequential scan. Single serialized
+     writer per block, so a plain SELECT-then-INSERT (no ON CONFLICT) is race
+     free, matching [Mina_caqti.select_insert_into_cols]. *)
+  let add_element_ids_by_hash (module Conn : Mina_caqti.CONNECTION) ~table_name
+      (element_ids : int array) =
+    let open Deferred.Result.Let_syntax in
+    let%bind existing =
+      Conn.find_opt
+        (Mina_caqti.find_opt_req Mina_caqti.array_int_typ Caqti_type.int
+           (sprintf
+              "SELECT id FROM %s WHERE zkapp_element_ids_hash(element_ids) = \
+               zkapp_element_ids_hash(?::int[])"
+              table_name ) )
+        element_ids
+    in
+    match existing with
+    | Some id ->
+        return id
+    | None ->
+        Conn.find
+          (find_req Mina_caqti.array_int_typ Caqti_type.int
+             (sprintf
+                "INSERT INTO %s (element_ids) VALUES (?::int[]) RETURNING id"
+                table_name ) )
+          element_ids
+
   let add_if_doesn't_exist (module Conn : Mina_caqti.CONNECTION)
       (fps : Pickles.Backend.Tick.Field.t array) =
     let open Deferred.Result.Let_syntax in
@@ -397,12 +440,56 @@ module Zkapp_field_array = struct
         ~f:(Zkapp_field.add_if_doesn't_exist (module Conn))
       >>| Array.of_list
     in
-    Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
-      ~table_name
-      ~cols:([ "element_ids" ], Mina_caqti.array_int_typ)
-      ~tannot:(function "element_ids" -> Some "int[]" | _ -> None)
-      (module Conn)
-      element_ids
+    add_element_ids_by_hash (module Conn) ~table_name element_ids
+
+  (* Batched dedup-insert of a list of element_ids arrays, returning the
+     (existing or new) id of each in input order.
+
+     A single multi-row INSERT keeps the batched fast path used for max-cost
+     zkApps. Duplicate arrays are collapsed by the content-hash unique index via
+     ON CONFLICT DO NOTHING; we then read every input's id back through that same
+     hash index and map it into input order. (RETURNING cannot be relied on here
+     because it omits the rows that conflicted.) *)
+  let add_multi (module Conn : Mina_caqti.CONNECTION)
+      (element_ids_list : int array list) =
+    let open Deferred.Result.Let_syntax in
+    match element_ids_list with
+    | [] ->
+        return []
+    | _ ->
+        let values =
+          List.map element_ids_list ~f:(fun a ->
+              sprintf "('%s')" (to_sql_literal a) )
+          |> String.concat ~sep:", "
+        in
+        let%bind () =
+          Conn.exec
+            (Caqti_request.Infix.(Caqti_type.unit ->. Caqti_type.unit)
+               (sprintf
+                  "INSERT INTO %s (element_ids) VALUES %s ON CONFLICT \
+                   (zkapp_element_ids_hash(element_ids)) DO NOTHING"
+                  table_name values ) )
+            ()
+        in
+        let hashes =
+          List.map element_ids_list ~f:(fun a ->
+              sprintf "zkapp_element_ids_hash('%s'::int[])" (to_sql_literal a) )
+          |> String.concat ~sep:", "
+        in
+        let%map rows =
+          Conn.collect_list
+            (collect_req Caqti_type.unit
+               Caqti_type.(t2 Mina_caqti.array_int_typ int)
+               (sprintf
+                  "SELECT element_ids, id FROM %s WHERE \
+                   zkapp_element_ids_hash(element_ids) IN (%s)"
+                  table_name hashes ) )
+            ()
+        in
+        let id_by_array =
+          Element_ids_map.of_alist_reduce rows ~f:(fun id _ -> id)
+        in
+        List.map element_ids_list ~f:(Map.find_exn id_by_array)
 
   let load (module Conn : Mina_caqti.CONNECTION) id =
     Conn.find
@@ -1515,28 +1602,25 @@ module Zkapp_events = struct
 
   let table_name = "zkapp_events"
 
-  module Field_array_map = Map.Make (struct
-    type t = int array [@@deriving sexp]
-
-    let compare = Array.compare Int.compare
-  end)
-
   (* Account_update.Body.Events'.t is defined as `field array list`,
      which is ismorphic to a list of list of fields.
 
-     We are batching the insertion of field and field_array to optimize
-     the speed of archiving max-cost zkapps.
+     We batch the insertion of field and field_array to optimize the speed of
+     archiving max-cost zkapps:
 
-     1. we flatten the list of list of fields to get all the field elements
-     2. insert all the field elements in one query
-     3. construct a map "M" from `field_id` to `field` by querying against the zkapp_field table
-     4. use "M" and the list of list of fields to compute the list of list of field_ids
-     5. insert all list of `list of field_ids` in one query
-     6. construct a map "M'" from `field_array_id` to `field_id array` by querying against
-        the zkapp_field_array table
-     7. use "M'" and the list of list of field_ids to compute the list of field_array_ids
-     8. insert the list of field_arrays
-  *)
+     1. flatten the list of list of fields to get all the field elements
+     2. insert all the field elements in one query (zkapp_field; deduplicated
+        via ON CONFLICT, since `field` is a bounded text column)
+     3. build a map from `field` to `field_id` and recover the list of list of
+        field_ids
+     4. insert all the field-id arrays in one query (zkapp_field_array), keeping
+        the returned ids in order
+     5. insert the resulting field_array_id array as a single zkapp_events row
+
+     Steps 4 and 5 deduplicate on a content hash, not the raw int[]: the latter
+     is unbounded and a btree index over it overflows Postgres' key-size limit.
+     The UNIQUE index is on [zkapp_element_ids_hash(element_ids)] (sha256), so
+     identical arrays collapse to one row while lookups stay indexed. *)
   let add_if_doesn't_exist (module Conn : Mina_caqti.CONNECTION)
       (events : Account_update.Body.Events'.t) =
     let open Deferred.Result.Let_syntax in
@@ -1565,33 +1649,16 @@ module Zkapp_events = struct
             (* if there's no fields, then we must have some list of empty lists *)
             return @@ List.map field_list_list ~f:(fun _ -> [])
         in
-        (* this conversion should be done by caqti using `typ`, FIX this in the future *)
-        let field_array_list =
-          List.map field_id_list_list ~f:(fun id_list ->
-              List.map id_list ~f:Int.to_string
-              |> String.concat ~sep:", " |> sprintf "{%s}" )
+        let field_arrays = List.map field_id_list_list ~f:Array.of_list in
+        let%map field_array_ids =
+          Zkapp_field_array.add_multi (module Conn) field_arrays
         in
-        let%map field_array_map =
-          Mina_caqti.insert_multi_into_col ~table_name:"zkapp_field_array"
-            ~col:("element_ids", Mina_caqti.array_int_typ)
-            (module Conn)
-            field_array_list
-          >>| Field_array_map.of_alist_exn
-        in
-        let field_array_id_list =
-          List.map field_id_list_list ~f:(fun field_id_list ->
-              Map.find_exn field_array_map (Array.of_list field_id_list) )
-          |> Array.of_list
-        in
-        field_array_id_list
+        Array.of_list field_array_ids
       else return @@ Array.of_list []
     in
-    Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
-      ~table_name
-      ~cols:([ "element_ids" ], Mina_caqti.array_int_typ)
-      ~tannot:(function "element_ids" -> Some "int[]" | _ -> None)
+    Zkapp_field_array.add_element_ids_by_hash
       (module Conn)
-      field_array_id_list
+      ~table_name field_array_id_list
 
   let load (module Conn : Mina_caqti.CONNECTION) id =
     Conn.find
