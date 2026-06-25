@@ -409,6 +409,39 @@ let docker_commands
                 )
                 flattened_docker_steps
 
+let bootstrap_deb
+    : MinaBuildSpec.Type -> Command.Type
+    =     \(spec : MinaBuildSpec.Type)
+      ->  Command.build
+            Command.Config::{
+            , commands =
+                  Toolchain.select
+                    spec.toolchainSelectMode
+                    spec.debVersion
+                    spec.arch
+                    [ "MINA_BRANCH=\$BUILDKITE_BRANCH"
+                    , "MINA_COMMIT_SHA1=\$BUILDKITE_COMMIT"
+                    , "MINA_DEB_CODENAME=${DebianVersions.lowerName
+                                             spec.debVersion}"
+                    , "ARCHITECTURE=${Arch.lowerName spec.arch}"
+                    ]
+                    "make build-mina-bootstrap && ./scripts/debian/build.sh mina_bootstrap"
+                # [ Cmd.run
+                      "./buildkite/scripts/debian/write_to_cache.sh ${DebianVersions.lowerName
+                                                                        spec.debVersion}"
+                  ]
+            , label = "Debian: Build mina-bootstrap ${labelSuffix spec}"
+            , key = "build-deb-pkg${Optional/default Text "" spec.suffix}"
+            , target = Size.Multi
+            , if_ = spec.if_
+            , retries =
+              [ Command.Retry::{
+                , exit_status = Command.ExitStatus.Code +2
+                , limit = Some 2
+                }
+              ]
+            }
+
 let pipelineBuilder
     : MinaBuildSpec.Type -> List Command.Type -> Pipeline.Config.Type
     =     \(spec : MinaBuildSpec.Type)
@@ -436,8 +469,14 @@ let pipeline
     =     \(spec : MinaBuildSpec.Type)
       ->  pipelineBuilder spec ([ build_artifacts spec ] # docker_commands spec)
 
+let bootstrapPipeline
+    : MinaBuildSpec.Type -> Pipeline.Config.Type
+    =     \(spec : MinaBuildSpec.Type)
+      ->  pipelineBuilder spec ([ bootstrap_deb spec ] # docker_commands spec)
+
 in  { pipeline = pipeline
     , onlyDebianPipeline = onlyDebianPipeline
+    , bootstrapPipeline = bootstrapPipeline
     , MinaBuildSpec = MinaBuildSpec
     , labelSuffix = labelSuffix
     , buildArtifacts = build_artifacts

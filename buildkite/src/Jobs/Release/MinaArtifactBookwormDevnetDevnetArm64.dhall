@@ -28,7 +28,6 @@ in  Pipeline.build
             , Artifacts.Type.TxTools
             , Artifacts.Type.CreatePreforkGenesis
             , Artifacts.Type.DaemonStorageToolbox
-            , Artifacts.Type.MinaBootstrap
             ]
           , network = Network.Type.Devnet
           , arch = Arch.Type.Arm64

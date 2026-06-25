@@ -29,7 +29,6 @@ in  Pipeline.build
             , Artifacts.Type.CreatePreforkGenesis
             , Artifacts.Type.DelegationVerifier
             , Artifacts.Type.DaemonStorageToolbox
-            , Artifacts.Type.MinaBootstrap
             ]
           , network = Network.Type.Devnet
           , tags =
