@@ -48,6 +48,8 @@ esac; shift; done
 #     (it generates its own transactions), restored as plain `mina`.
 #   - archive: runs with --no-run; it only parses a pre-generated JSON into CSV
 #     and executes no binary, so neither a .deb nor a cached exe is needed.
+#   - ledger-apply: its pre-command generates the benchmark JSON; this step only
+#     parses and compares that file, so it does not need a binary or .deb.
 # Any cache miss falls back to the .deb.
 BARE_NONE=false
 case "$BENCHMARK" in
@@ -57,6 +59,7 @@ case "$BENCHMARK" in
   ledger-export) BARE_EXE=ledger_export_benchmark.exe; BARE_AS=mina-ledger-export-benchmark ;;
   snark)         BARE_EXE=mina_testnet_signatures.exe; BARE_AS=mina ;;
   archive)       BARE_NONE=true ;;
+  ledger-apply)  BARE_NONE=true ;;
   *)             BARE_EXE="" ;;
 esac
 
@@ -64,7 +67,7 @@ INSTALLED_BARE=false
 if [[ "$BARE_NONE" == true ]]; then
   git config --global --add safe.directory /workdir
   source buildkite/scripts/export-git-env-vars.sh
-  echo "archive bench is parse-only (--no-run); skipping binary and .deb install"
+  echo "$BENCHMARK bench is parse-only here; skipping binary and .deb install"
   pip3 install -r scripts/benchmarks/requirements.txt
   INSTALLED_BARE=true
 elif [[ -n "$BARE_EXE" ]]; then

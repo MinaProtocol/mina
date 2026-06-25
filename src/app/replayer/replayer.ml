@@ -999,7 +999,7 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
             [%log info]
               "Searching for block with greatest height on canonical chain" ;
             let%bind max_slot =
-              query_db ~f:(fun db -> Sql.Block.get_max_slot db ())
+              query_db ~f:(fun db -> Sql.Block.get_max_canonical_slot db ())
             in
             [%log info] "Maximum global slot since genesis in blocks is %Ld"
               max_slot ;
