@@ -1,3 +1,54 @@
+(** Account update representation for zkApp transactions.
+
+    An account update represents a single operation on an account within a
+    zkApp transaction. Each update specifies what changes to make to an
+    account and how the update is authorized (signature, proof, or none).
+
+    {2 Structure}
+
+    An account update consists of:
+    - {!module:Body} - The operation to perform (balance changes, etc.)
+    - Authorization - How the update is authorized ({!module:Control})
+    - Auxiliary data - Cached computations (action hashes)
+
+    {2 Authorization Kinds}
+
+    Account updates can be authorized in three ways:
+    - {b Signature}: Authorized by a valid signature from the account's key
+    - {b Proof}: Authorized by a valid zkSNARK proof
+    - {b None_given}: No authorization required (for certain operations)
+
+    The {!module:Authorization_kind} module encodes which type of
+    authorization is expected, and {!module:Control} holds the actual
+    authorization data.
+
+    {2 Token Permissions}
+
+    The {!module:May_use_token} type controls token access:
+    - [No]: Can only use the default MINA token
+    - [Parents_own_token]: Can use the token owned by the parent update
+    - [Inherit_from_parent]: Inherits token permission from parent
+
+    {2 Preconditions}
+
+    Account updates can specify preconditions that must be satisfied:
+    - {!module:Account_precondition}: Conditions on account state
+    - Network preconditions: Conditions on protocol state
+    - Valid while: Global slot range when the update is valid
+
+    {2 Fee Payer}
+
+    The {!module:Fee_payer} is a special account update that pays
+    transaction fees. It is always authorized by signature and uses the
+    default token.
+
+    {2 Serialization}
+
+    Account updates support multiple representations:
+    - {!module:T.Simple}: Flat representation with explicit [call_depth]
+    - {!module:T.Graphql_repr}: Representation for GraphQL APIs
+    - Wire format: Binary serialization (excludes auxiliary data) *)
+
 open Core_kernel
 open Mina_base_util
 open Snark_params.Tick
@@ -12,10 +63,25 @@ module type Type = sig
   type t
 end
 
+(** Events emitted by account updates. Re-export from {!Zkapp_account}. *)
 module Events = Zkapp_account.Events
+
+(** Actions (sequenced events) emitted by account updates.
+    Re-export from {!Zkapp_account}. *)
 module Actions = Zkapp_account.Actions
+
+(** URI storage for zkApp accounts. Re-export from {!Zkapp_account}. *)
 module Zkapp_uri = Zkapp_account.Zkapp_uri
 
+(** Specifies how an account update is authorized.
+
+    - [Signature]: Requires a valid signature from the account's private key
+    - [Proof vk_hash]: Requires a valid zkSNARK proof verified against the
+      verification key with the given hash
+    - [None_given]: No authorization required (e.g., receiving funds)
+
+    The authorization kind must match the actual authorization provided in
+    the account update's {!module:Control} field. *)
 module Authorization_kind = struct
   [%%versioned
   module Stable = struct
@@ -129,6 +195,10 @@ module Authorization_kind = struct
     Structured.typ |> Typ.transport ~there:to_structured ~back:of_structured_exn
 end
 
+(** Token permission for account updates.
+
+    Controls whether an account update can operate on custom tokens
+    (non-MINA). Used to enforce token ownership rules in the protocol. *)
 module May_use_token = struct
   [%%versioned
   module Stable = struct
@@ -508,7 +578,18 @@ module May_use_token = struct
     |> Typ.transport ~there:As_record.of_variant ~back:As_record.to_variant
 end
 
+(** Account state updates.
+
+    Specifies changes to make to an account's on-chain state. Each field uses
+    {!Zkapp_basic.Set_or_keep.t} to indicate whether to set a new value or
+    keep the existing one.
+
+    @see Update.t for the full record type *)
 module Update = struct
+  (** Vesting schedule information for timed accounts.
+
+      Timed accounts have tokens that vest (become spendable) over time
+      according to a schedule defined by these parameters. *)
   module Timing_info = struct
     [%%versioned
     module Stable = struct
@@ -933,6 +1014,11 @@ module Update = struct
          obj
 end
 
+(** Preconditions on account state.
+
+    Specifies conditions that must be satisfied by the target account for the
+    update to be valid. This allows zkApp transactions to be conditional on
+    the account's current state. *)
 module Account_precondition = struct
   [%%versioned
   module Stable = struct
@@ -1003,16 +1089,23 @@ module Account_precondition = struct
   let nonce ({ nonce; _ } : t) = nonce
 end
 
+(** All preconditions for an account update.
+
+    Combines network (protocol state) preconditions, account preconditions,
+    and validity time range into a single structure. *)
 module Preconditions = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
       type t = Mina_wire_types.Mina_base.Account_update.Preconditions.V1.t =
         { network : Zkapp_precondition.Protocol_state.Stable.V1.t
+              (** Conditions on protocol state (block height, snarked ledger hash, etc.) *)
         ; account : Account_precondition.Stable.V1.t
+              (** Conditions on the target account's state *)
         ; valid_while :
             Mina_numbers.Global_slot_since_genesis.Stable.V1.t
             Zkapp_precondition.Numeric.Stable.V1.t
+              (** Global slot range during which this update is valid *)
         }
       [@@deriving annot, sexp, equal, yojson, hash, hlist, compare, fields]
 
@@ -1082,10 +1175,19 @@ module Preconditions = struct
     }
 end
 
+(** The body of an account update.
+
+    Contains all the data specifying what operation to perform on an account.
+    This includes the target account, state changes, balance changes, events,
+    actions, and preconditions.
+
+    The body is hashed to create the account update digest, which is signed
+    or proved depending on the authorization kind. *)
 module Body = struct
   (* Why isn't this derived automatically? *)
   let hash_fold_array f init x = Array.fold ~init ~f x
 
+  (** Internal events type for versioning. *)
   module Events' = struct
     [%%versioned
     module Stable = struct
@@ -1101,26 +1203,39 @@ module Body = struct
     end]
   end
 
+  (** GraphQL representation of account update body.
+
+      Includes [call_depth] to encode the tree structure as a flat list. *)
   module Graphql_repr = struct
     [%%versioned
     module Stable = struct
       module V1 = struct
         type t =
           { public_key : Public_key.Compressed.Stable.V1.t
-          ; token_id : Token_id.Stable.V2.t
-          ; update : Update.Stable.V1.t
+                (** Target account's public key *)
+          ; token_id : Token_id.Stable.V2.t  (** Token to operate on *)
+          ; update : Update.Stable.V1.t  (** State changes to apply *)
           ; balance_change :
               (Amount.Stable.V1.t, Sgn.Stable.V1.t) Signed_poly.Stable.V1.t
+                (** Amount to add (positive) or subtract (negative) from balance *)
           ; increment_nonce : bool
-          ; events : Events'.Stable.V1.t
+                (** Whether to increment the account nonce *)
+          ; events : Events'.Stable.V1.t  (** Events to emit *)
           ; actions : Events'.Stable.V1.t
+                (** Actions to emit (sequenced events) *)
           ; call_data : Pickles.Backend.Tick.Field.Stable.V1.t
-          ; call_depth : int
+                (** Arbitrary field element for contract communication *)
+          ; call_depth : int  (** Nesting depth in the call forest *)
           ; preconditions : Preconditions.Stable.V1.t
+                (** Conditions that must be satisfied *)
           ; use_full_commitment : bool
+                (** If true, sign the full commitment including memo and fee payer *)
           ; implicit_account_creation_fee : bool
+                (** If true, implicitly pay account creation fee *)
           ; may_use_token : May_use_token.Stable.V1.t
+                (** Token permission for this update *)
           ; authorization_kind : Authorization_kind.Stable.V1.t
+                (** Expected authorization type *)
           }
         [@@deriving annot, sexp, equal, yojson, hash, compare, fields]
 
@@ -1159,6 +1274,9 @@ module Body = struct
       }
   end
 
+  (** Simplified representation for easy construction.
+
+      Like {!Graphql_repr}, includes [call_depth] to encode nesting. *)
   module Simple = struct
     [%%versioned
     module Stable = struct
@@ -1292,16 +1410,23 @@ module Body = struct
     ; authorization_kind
     }
 
+  (** Body type for fee payer account updates.
+
+      The fee payer is a special account update that pays the transaction fee.
+      It is always authorized by signature and operates on the default MINA token. *)
   module Fee_payer = struct
     [%%versioned
     module Stable = struct
       module V1 = struct
         type t = Mina_wire_types.Mina_base.Account_update.Body.Fee_payer.V1.t =
           { public_key : Public_key.Compressed.Stable.V1.t
-          ; fee : Fee.Stable.V1.t
+                (** Public key of the fee payer *)
+          ; fee : Fee.Stable.V1.t  (** Transaction fee to pay *)
           ; valid_until : Global_slot_since_genesis.Stable.V1.t option
                 [@name "validUntil"]
+                (** Optional slot after which this transaction is invalid *)
           ; nonce : Account_nonce.Stable.V1.t
+                (** Expected nonce of the fee payer account *)
           }
         [@@deriving annot, sexp, equal, yojson, hash, compare, hlist, fields]
 
@@ -1640,6 +1765,14 @@ module Body = struct
     }
 end
 
+(** Polymorphic account update type.
+
+    Parameterized over body, authorization, and auxiliary data types.
+    This allows the same structure to be used with different concrete types
+    for wire format, in-memory representation, and various stages of processing.
+
+    The auxiliary data ([aux]) field stores cached computations like action
+    hashes that are expensive to recompute. It is not serialized. *)
 module Poly = struct
   (** This is a helper module to make writing the sexp/yojson/binable instances
       of types in this module easier. By going through this, the aux field of
@@ -1689,7 +1822,9 @@ module Poly = struct
     Fn.compose of_wire (Wire.Stable.V1.t_of_sexp body authorization)
 end
 
+(** Main account update types and operations. *)
 module T = struct
+  (** Account update without auxiliary data. Used for serialization. *)
   module Without_aux = struct
     [%%versioned_binable
     module Stable = struct
@@ -1833,6 +1968,9 @@ module T = struct
   end
 end
 
+(** Apply a function to the proof in an account update's authorization.
+
+    Leaves signatures and none_given authorizations unchanged. *)
 let map_proofs ~f p =
   let map_auth = function
     | Control.Poly.Proof p ->
@@ -1847,22 +1985,32 @@ let map_proofs ~f p =
   ; aux = p.Poly.aux
   }
 
+(** Remove proof data, replacing with unit. *)
 let forget_proofs p = map_proofs ~f:(const ()) p
 
+(** Recompute auxiliary data from the body. *)
 let reset_aux (p : _ Poly.t) =
   T.with_aux ~body:p.body ~authorization:p.authorization
 
+(** Clear auxiliary data, replacing with unit. *)
 let forget_aux (p : _ Poly.t) = { p with aux = () }
 
+(** Remove both proof data and auxiliary data. *)
 let forget_proofs_and_aux p = forget_proofs @@ forget_aux p
 
+(** Fee payer account update.
+
+    The fee payer is the account that pays the transaction fee. It is always
+    authorized by signature (never by proof). The fee payer's nonce is always
+    incremented, and its balance is always decreased by the fee amount. *)
 module Fee_payer = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
       type t = Mina_wire_types.Mina_base.Account_update.Fee_payer.V1.t =
-        { body : Body.Fee_payer.Stable.V1.t
+        { body : Body.Fee_payer.Stable.V1.t  (** Fee payer body *)
         ; authorization : Signature.Stable.V1.t
+              (** Signature authorizing the fee payment *)
         }
       [@@deriving sexp, annot, equal, hash, compare, fields, yojson]
 
@@ -1870,6 +2018,7 @@ module Fee_payer = struct
     end
   end]
 
+  (** Construct a fee payer from body and authorization. *)
   let make ~body ~authorization : t = { body; authorization }
 
   let gen : t Quickcheck.Generator.t =
