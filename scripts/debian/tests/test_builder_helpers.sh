@@ -878,6 +878,9 @@ test_build_daemon_devnet_generic_deb() {
     assert_control_contains "$CAPTURED_CONTROL" "Depends" "libssl1.1"
     assert_control_contains "$CAPTURED_CONTROL" "Depends" "mina-logproc"
     assert_control_contains "$CAPTURED_CONTROL" "Suggests" "jq"
+    # The plain generic already carries the mina-generic name, so it needs no
+    # Provides (only the flavored variants provide the virtual name).
+    assert_control_no_field "$CAPTURED_CONTROL" "Provides"
     # The generic package is network-agnostic: it carries no network-specific
     # Replaces/Breaks (it neither replaces nor conflicts with mina-<network> or
     # the per-network postfork packages).
@@ -915,6 +918,53 @@ test_build_daemon_mainnet_generic_deb() {
 
     # Generic package must NOT ship mina.service (config package owns it)
     assert_file_not_captured "$CAPTURED_FILES" "usr/lib/systemd/user/mina.service"
+}
+
+################################################################################
+# Tests: Profile packages
+################################################################################
+
+# The profile package ships only the PROFILE hint file and carries no binaries;
+# it must depend on the network-free mina-generic package (which owns the
+# daemon binaries that dispatch the profile at runtime).
+
+test_build_profile_lightnet_deb() {
+    safe_build build_profile_deb lightnet || { log_fail "build exited non-zero"; return; }
+
+    load_captured_state
+    assert_eq "deb name" "mina-lightnet" "$CAPTURED_DEB_NAME"
+    assert_control_field "$CAPTURED_CONTROL" "Package" "mina-lightnet"
+
+    # Must pull in the generic binaries
+    assert_control_contains "$CAPTURED_CONTROL" "Depends" "mina-generic"
+
+    # Profile package carries only the PROFILE hint, no binaries
+    assert_file_captured "$CAPTURED_FILES" "etc/coda/build_config/PROFILE"
+    assert_captured_file_contains "$CAPTURED_LAST_BUILD_DIR" "etc/coda/build_config/PROFILE" "lightnet"
+    assert_file_not_captured "$CAPTURED_FILES" "usr/local/bin/mina"
+
+    # mina-lightnet is the profile package's own name, so it carries no Breaks
+    # against itself (devnet/mainnet carry the -generic suffix and Break the
+    # legacy monolithic name instead).
+    assert_control_no_field "$CAPTURED_CONTROL" "Breaks"
+}
+
+test_build_profile_devnet_deb() {
+    safe_build build_profile_deb devnet || { log_fail "build exited non-zero"; return; }
+
+    load_captured_state
+    assert_eq "deb name" "mina-devnet-generic" "$CAPTURED_DEB_NAME"
+    assert_control_field "$CAPTURED_CONTROL" "Package" "mina-devnet-generic"
+
+    # Must pull in the generic binaries
+    assert_control_contains "$CAPTURED_CONTROL" "Depends" "mina-generic"
+
+    assert_file_captured "$CAPTURED_FILES" "etc/coda/build_config/PROFILE"
+    assert_captured_file_contains "$CAPTURED_LAST_BUILD_DIR" "etc/coda/build_config/PROFILE" "devnet"
+    assert_file_not_captured "$CAPTURED_FILES" "usr/local/bin/mina"
+
+    # The -generic profile package supersedes the legacy monolithic mina-devnet
+    assert_control_contains "$CAPTURED_CONTROL" "Breaks" "mina-devnet"
 }
 
 ################################################################################
@@ -1131,6 +1181,9 @@ test_build_daemon_devnet_generic_lightnet_naming() {
     load_captured_state
     assert_eq "deb name" "mina-generic-lightnet" "$CAPTURED_DEB_NAME"
     assert_control_field "$CAPTURED_CONTROL" "Package" "mina-generic-lightnet"
+    # A flavored generic must Provide the flavor-neutral mina-generic so it can
+    # satisfy the profile packages' dependency.
+    assert_control_contains "$CAPTURED_CONTROL" "Provides" "mina-generic"
 
     DEB_SUFFIX="${saved_suffix}"
 }
@@ -1262,6 +1315,10 @@ main() {
     # Generic packages
     run_test test_build_daemon_devnet_generic_deb
     run_test test_build_daemon_mainnet_generic_deb
+
+    # Profile packages
+    run_test test_build_profile_lightnet_deb
+    run_test test_build_profile_devnet_deb
 
     # Archive packages
     run_test test_build_archive_devnet_deb
