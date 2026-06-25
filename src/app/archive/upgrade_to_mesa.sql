@@ -18,7 +18,7 @@ SET archive.current_protocol_version = '3.0.0';
 -- Post-HF protocol version. This one corresponds to Mesa, specifically
 SET archive.target_protocol_version = '4.0.0';
 -- The version of this script. If you modify the script, please bump the version
-SET archive.migration_version = '0.0.5';
+SET archive.migration_version = '0.0.6';
 
 -- TODO: put below in a common script
 
@@ -238,6 +238,73 @@ SELECT pg_temp.add_zkapp_states_element(28);
 SELECT pg_temp.add_zkapp_states_element(29);
 SELECT pg_temp.add_zkapp_states_element(30);
 SELECT pg_temp.add_zkapp_states_element(31);
+
+-- 3b. Replace the raw element_ids UNIQUE btree on zkapp_field_array and
+--     zkapp_events with a UNIQUE index over a fixed-width content hash.
+--
+--     The raw int[] UNIQUE btree overflows Postgres' 2704-byte key limit on a
+--     max-cost zkApp (~1030-element array). Hashing collapses any array to a
+--     32-byte key, restoring dedup + indexed lookup without the overflow.
+--
+--     Idempotent and safe on any starting state:
+--       * original schema (UNIQUE present, no duplicates),
+--       * the relaxed "insert-only" band-aid (UNIQUE dropped, duplicates exist),
+--       * already migrated (re-running is a no-op).
+--     Order is mandatory: drop old constraint -> dedup -> create hash index,
+--     because CREATE UNIQUE INDEX aborts while duplicate arrays remain.
+
+-- IMMUTABLE content-hash function (integer text is locale-independent).
+CREATE OR REPLACE FUNCTION zkapp_element_ids_hash(element_ids int[]) RETURNS bytea
+  LANGUAGE sql IMMUTABLE STRICT PARALLEL SAFE
+  AS $$ SELECT sha256(convert_to(array_to_string(element_ids, ',', 'NULL'), 'UTF8')) $$;
+
+-- Drop the old raw-array UNIQUE constraints and standalone indexes if present.
+ALTER TABLE zkapp_field_array DROP CONSTRAINT IF EXISTS zkapp_field_array_element_ids_key;
+DROP INDEX IF EXISTS idx_zkapp_field_array_element_ids;
+ALTER TABLE zkapp_events DROP CONSTRAINT IF EXISTS zkapp_events_element_ids_key;
+DROP INDEX IF EXISTS idx_zkapp_events_element_ids;
+
+-- Deduplicate existing rows, deepest table first. Collapsing zkapp_field_array
+-- rows can make two zkapp_events arrays identical, so do field_array before
+-- events. Repointing rewrites the field_array ids embedded in
+-- zkapp_events.element_ids (order-preserving) and the scalar events_id/actions_id.
+CREATE TEMP TABLE pg_temp_fa_remap AS
+SELECT id AS dup_id, canon_id FROM (
+  SELECT id, min(id) OVER (PARTITION BY element_ids) AS canon_id FROM zkapp_field_array
+) s WHERE id <> canon_id;
+CREATE INDEX ON pg_temp_fa_remap (dup_id);
+
+WITH affected AS (
+  SELECT e.id, array_agg(COALESCE(r.canon_id, u.elem) ORDER BY u.ord) AS new_ids
+  FROM zkapp_events e
+  CROSS JOIN LATERAL unnest(e.element_ids) WITH ORDINALITY AS u(elem, ord)
+  LEFT JOIN pg_temp_fa_remap r ON r.dup_id = u.elem
+  WHERE e.id IN (
+    SELECT DISTINCT e2.id FROM zkapp_events e2
+    CROSS JOIN LATERAL unnest(e2.element_ids) AS x(elem)
+    JOIN pg_temp_fa_remap r2 ON r2.dup_id = x.elem)
+  GROUP BY e.id)
+UPDATE zkapp_events e SET element_ids = a.new_ids FROM affected a WHERE e.id = a.id;
+
+DELETE FROM zkapp_field_array fa USING pg_temp_fa_remap r WHERE fa.id = r.dup_id;
+DROP TABLE pg_temp_fa_remap;
+
+CREATE TEMP TABLE pg_temp_ev_remap AS
+SELECT id AS dup_id, canon_id FROM (
+  SELECT id, min(id) OVER (PARTITION BY element_ids) AS canon_id FROM zkapp_events
+) s WHERE id <> canon_id;
+CREATE INDEX ON pg_temp_ev_remap (dup_id);
+
+UPDATE zkapp_account_update_body b SET events_id  = r.canon_id FROM pg_temp_ev_remap r WHERE b.events_id  = r.dup_id;
+UPDATE zkapp_account_update_body b SET actions_id = r.canon_id FROM pg_temp_ev_remap r WHERE b.actions_id = r.dup_id;
+DELETE FROM zkapp_events e USING pg_temp_ev_remap r WHERE e.id = r.dup_id;
+DROP TABLE pg_temp_ev_remap;
+
+-- Now that arrays are unique, install the content-hash UNIQUE indexes.
+CREATE UNIQUE INDEX IF NOT EXISTS zkapp_field_array_element_ids_hash_key
+  ON zkapp_field_array (zkapp_element_ids_hash(element_ids));
+CREATE UNIQUE INDEX IF NOT EXISTS zkapp_events_element_ids_hash_key
+  ON zkapp_events (zkapp_element_ids_hash(element_ids));
 
 -- 4. Update schema_history
 
