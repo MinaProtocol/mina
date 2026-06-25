@@ -601,7 +601,19 @@ build_profile_deb() {
   echo "build_profile_deb inputs:"
   echo "Profile Name: ${1} (like mainnet, devnet, lightnet, dev)"
 
-  create_control_file "${package_name}" "" \
+  # The profile package ships only the PROFILE hint file; the actual daemon
+  # binaries live in the network-free mina-generic package (the runtime reads
+  # the PROFILE file to dispatch the profile). Depend on it so that installing
+  # a profile package (e.g. mina-lightnet, mina-devnet-generic) pulls in the
+  # generic binaries.
+  #
+  # Depend on the flavor-neutral name "mina-generic": the profile package is
+  # itself flavor-agnostic (the same mina-${profile}-generic.deb is produced by
+  # the plain, instrumented and lightnet builds), so its dependency must not
+  # pin a flavor. The flavored generics (mina-generic-instrumented,
+  # mina-generic-lightnet) declare "Provides: mina-generic (= VERSION)" so they
+  # satisfy this dependency when they are the generic installed.
+  create_control_file "${package_name}" "mina-generic (>= ${MINA_DEB_VERSION})" \
     "Mina profile for network ${profile}" "" "${breaks_pkgs}"
 
   # Store node config hint (based on DUNE_PROFILE)
@@ -891,9 +903,18 @@ build_daemon_generic_deb() {
   local _suffix="${DEB_SUFFIX#-}"
   MINA_GENERIC_DEB_NAME="mina-generic${_suffix:+-${_suffix}}"
 
+  # A flavored generic (mina-generic-instrumented, mina-generic-lightnet) must
+  # satisfy the flavor-neutral "mina-generic" dependency declared by the profile
+  # packages, so it provides that virtual name at the same version. The plain
+  # "mina-generic" build needs no Provides (it already carries that name).
+  local provides=""
+  if [ "${MINA_GENERIC_DEB_NAME}" != "mina-generic" ]; then
+    provides="mina-generic (= ${MINA_DEB_VERSION})"
+  fi
+
   create_control_file "${MINA_GENERIC_DEB_NAME}" "${SHARED_DEPS}${DAEMON_DEPS}" \
     "Mina Protocol Client and Daemon for the Generic usage" \
-    "${SUGGESTED_DEPS}"
+    "${SUGGESTED_DEPS}" "" "${provides}"
 
   copy_common_daemon_apps
 
