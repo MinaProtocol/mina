@@ -56,7 +56,7 @@ default_targets=(
   logproc
   archive_devnet
   archive_mainnet
-  batch_txn
+  tx_tools
   daemon_mainnet
   daemon_mainnet_config
   daemon_mainnet_generic
@@ -67,7 +67,6 @@ default_targets=(
   rosetta_devnet
   test_executive
   functional_test_suite
-  zkapp_test_transaction
   delegation_verify
 )
 

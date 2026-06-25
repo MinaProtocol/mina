@@ -283,22 +283,7 @@ let docker_step
                 , CreatePreforkGenesis = [] : List DockerImage.ReleaseSpec.Type
                 , DaemonPrefork = [] : List DockerImage.ReleaseSpec.Type
                 , DaemonAutomode = [] : List DockerImage.ReleaseSpec.Type
-                , BatchTxn =
-                  [ DockerImage.ReleaseSpec::{
-                    , deps = deps
-                    , service = Artifacts.Type.BatchTxn
-                    , network = spec.network
-                    , deb_codename = spec.debVersion
-                    , deb_profile = spec.profile
-                    , build_flags = spec.buildFlags
-                    , docker_publish = spec.docker_publish
-                    , deb_repo = DebianRepo.Type.Local
-                    , deb_legacy_version = spec.deb_legacy_version
-                    , arch = spec.arch
-                    , if_ = spec.if_
-                    , size = size
-                    }
-                  ]
+                , TxTools = [] : List DockerImage.ReleaseSpec.Type
                 , DelegationVerifier =
                   [ DockerImage.ReleaseSpec::{
                     , deps = deps
@@ -371,21 +356,6 @@ let docker_step
                     , deb_install_mode =
                         DockerImage.DebianInstallMode.DownloadOnly
                     , arch = spec.arch
-                    , size = size
-                    }
-                  ]
-                , ZkappTestTransaction =
-                  [ DockerImage.ReleaseSpec::{
-                    , deps = deps
-                    , service = Artifacts.Type.ZkappTestTransaction
-                    , build_flags = spec.buildFlags
-                    , docker_publish = spec.docker_publish
-                    , deb_repo = DebianRepo.Type.Local
-                    , deb_profile = spec.profile
-                    , deb_codename = spec.debVersion
-                    , deb_legacy_version = spec.deb_legacy_version
-                    , arch = spec.arch
-                    , if_ = spec.if_
                     , size = size
                     }
                   ]

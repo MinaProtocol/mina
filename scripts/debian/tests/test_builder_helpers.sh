@@ -534,15 +534,24 @@ test_build_test_executive_deb() {
     assert_file_captured "$CAPTURED_FILES" "usr/local/bin/mina-test-executive"
 }
 
-test_build_batch_txn_deb() {
-    safe_build build_batch_txn_deb || { log_fail "build exited non-zero"; return; }
+test_build_tx_tools_deb() {
+    # Real package containing both tx-tooling binaries.
+    safe_build build_tx_tools_deb || { log_fail "build exited non-zero"; return; }
 
     load_captured_state
-    assert_eq "deb name" "mina-batch-txn" "$CAPTURED_DEB_NAME"
-    assert_control_field "$CAPTURED_CONTROL" "Package" "mina-batch-txn"
+    assert_eq "deb name" "mina-tx-tools" "$CAPTURED_DEB_NAME"
+    assert_control_field "$CAPTURED_CONTROL" "Package" "mina-tx-tools"
     assert_control_contains "$CAPTURED_CONTROL" "Depends" "libssl1.1"
 
     assert_file_captured "$CAPTURED_FILES" "usr/local/bin/mina-batch-txn"
+    assert_file_captured "$CAPTURED_FILES" "usr/local/bin/mina-zkapp-test-transaction"
+
+    # Must Replaces/Breaks the older standalone mina-batch-txn and
+    # mina-zkapp-test-transaction so apt can take over their binaries on upgrade.
+    assert_control_contains "$CAPTURED_CONTROL" "Replaces" "mina-batch-txn"
+    assert_control_contains "$CAPTURED_CONTROL" "Replaces" "mina-zkapp-test-transaction"
+    assert_control_contains "$CAPTURED_CONTROL" "Breaks" "mina-batch-txn"
+    assert_control_contains "$CAPTURED_CONTROL" "Breaks" "mina-zkapp-test-transaction"
 }
 
 ################################################################################
@@ -1090,19 +1099,6 @@ test_hardfork_config_deb_restores_architecture() {
 # Tests: Utility packages
 ################################################################################
 
-test_build_zkapp_test_transaction_deb() {
-    safe_build build_zkapp_test_transaction_deb || { log_fail "build exited non-zero"; return; }
-
-    load_captured_state
-    assert_eq "deb name" "mina-zkapp-test-transaction" "$CAPTURED_DEB_NAME"
-    assert_control_field "$CAPTURED_CONTROL" "Package" "mina-zkapp-test-transaction"
-    assert_control_contains "$CAPTURED_CONTROL" "Depends" "libssl1.1"
-    assert_control_contains "$CAPTURED_CONTROL" "Depends" "libffi7"
-    assert_control_no_field "$CAPTURED_CONTROL" "Suggests"
-
-    assert_file_captured "$CAPTURED_FILES" "usr/local/bin/mina-zkapp-test-transaction"
-}
-
 test_build_delegation_verify_deb() {
     safe_build build_delegation_verify_deb || { log_fail "build exited non-zero"; return; }
 
@@ -1286,7 +1282,7 @@ main() {
     run_test test_build_logproc_deb
     run_test test_build_daemon_storage_toolbox_deb
     run_test test_build_test_executive_deb
-    run_test test_build_batch_txn_deb
+    run_test test_build_tx_tools_deb
 
     # Multi-binary packages
     run_test test_build_functional_test_suite_deb
@@ -1330,7 +1326,6 @@ main() {
     run_test test_build_daemon_mainnet_hardfork_config_deb
 
     # Utility packages
-    run_test test_build_zkapp_test_transaction_deb
     run_test test_build_delegation_verify_deb
 
     # Naming variants
