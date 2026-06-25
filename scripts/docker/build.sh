@@ -277,9 +277,6 @@ case "${SERVICE}" in
         cat dockerfiles/toolchain/1-build-deps dockerfiles/toolchain/2-opam-deps dockerfiles/toolchain/3-toolchain > "$TEMP_DOCKERFILE"
         DOCKERFILE_PATH="$TEMP_DOCKERFILE"
         ;;
-    mina-batch-txn)
-        DOCKERFILE_PATH="dockerfiles/Dockerfile-txn-burst"
-        ;;
     mina-rosetta)
         DOCKERFILE_PATH="dockerfiles/Dockerfile-mina-rosetta"
         ;;
@@ -287,9 +284,6 @@ case "${SERVICE}" in
         DOCKERFILE_PATH="dockerfiles/Dockerfile-install-config"
         SERVICE="mina-rosetta"
         VERSION_ARG_OVERRIDE="--build-arg version=$VERSION"
-        ;;
-    mina-zkapp-test-transaction)
-        DOCKERFILE_PATH="dockerfiles/Dockerfile-zkapp-test-transaction"
         ;;
     delegation-backend)
         DOCKERFILE_PATH="dockerfiles/Dockerfile-delegation-backend"

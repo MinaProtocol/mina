@@ -21,9 +21,9 @@ in  Pipeline.build
             , Artifacts.Type.LogProc
             , Artifacts.Type.Archive
             , Artifacts.Type.RosettaConfig
+            , Artifacts.Type.TxTools
             , Artifacts.Type.TestExecutive
             , Artifacts.Type.RosettaAppsOnly
-            , Artifacts.Type.ZkappTestTransaction
             , Artifacts.Type.DaemonStorageToolbox
             ]
           , network = Network.Type.Devnet

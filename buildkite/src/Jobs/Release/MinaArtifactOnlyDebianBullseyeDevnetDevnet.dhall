@@ -17,7 +17,7 @@ in  Pipeline.build
             [ Artifacts.Type.DaemonConfig
             , Artifacts.Type.LogProc
             , Artifacts.Type.Archive
-            , Artifacts.Type.BatchTxn
+            , Artifacts.Type.TxTools
             , Artifacts.Type.TestExecutive
             , Artifacts.Type.RosettaAppsOnly
             ]

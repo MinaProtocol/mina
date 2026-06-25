@@ -406,30 +406,40 @@ build_test_executive_deb () {
 }
 ## END TEST_EXECUTIVE PACKAGE ##
 
-## GENERATE BATCH TXN TOOL PACKAGE ##
+## GENERATE TX TOOLS PACKAGE ##
 
 #
-# Builds mina-batch-txn package for transaction load testing
+# Builds mina-tx-tools package containing both transaction-testing binaries
 #
-# Output: mina-batch-txn_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
-# Dependencies: ${SHARED_DEPS}
+# Output: mina-tx-tools_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
+# Dependencies: ${SHARED_DEPS}${DAEMON_DEPS} (zkapp tool needs daemon deps)
 #
-# Tool for generating transaction load against mina nodes.
+# Ships both binaries that previously lived in the standalone mina-batch-txn
+# and mina-zkapp-test-transaction packages, which no longer exist.
 #
-build_batch_txn_deb() {
+build_tx_tools_deb() {
+  echo "------------------------------------------------------------"
+  echo "--- Building mina-tx-tools (batch-txn + zkapp-test-transaction):"
 
-  create_control_file mina-batch-txn "${SHARED_DEPS}" \
-    'Load transaction tool against a mina node.'
+  # Replaces/Breaks lets apt cleanly take over /usr/local/bin/mina-batch-txn
+  # and /usr/local/bin/mina-zkapp-test-transaction from the older standalone
+  # packages of those names (removed in favour of this consolidated package).
+  create_control_file mina-tx-tools "${SHARED_DEPS}${DAEMON_DEPS}" \
+    'Mina transaction testing tools: load-test (batch-txn) and zkApp transaction generator.' \
+    "" \
+    "mina-batch-txn (<< ${MINA_DEB_VERSION}), mina-zkapp-test-transaction (<< ${MINA_DEB_VERSION})"
 
   mkdir -p "${BUILDDIR}/usr/local/bin"
 
   # Binaries
   cp ./default/src/app/batch_txn_tool/batch_txn_tool.exe \
     "${BUILDDIR}/usr/local/bin/mina-batch-txn"
+  cp ./default/src/app/zkapp_test_transaction/zkapp_test_transaction.exe \
+    "${BUILDDIR}/usr/local/bin/mina-zkapp-test-transaction"
 
-  build_deb mina-batch-txn
+  build_deb mina-tx-tools
 }
-## END BATCH TXN TOOL PACKAGE ##
+## END TX TOOLS PACKAGE ##
 
 ## GENERATE TEST SUITE PACKAGE ##
 
@@ -1001,34 +1011,6 @@ build_archive_deb () {
 
 }
 ## END ARCHIVE PACKAGE ##
-
-## ZKAPP TEST TXN ##
-
-#
-# Builds mina-zkapp-test-transaction package for zkApp testing
-#
-# Output: mina-zkapp-test-transaction_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
-# Dependencies: ${SHARED_DEPS}${DAEMON_DEPS}
-#
-# Utility for generating zkApp transactions in Mina GraphQL format for testing.
-#
-build_zkapp_test_transaction_deb () {
-  echo "------------------------------------------------------------"
-  echo "--- Building Mina Generic testnet ZkApp test transaction tool:"
-
-  create_control_file mina-zkapp-test-transaction \
-    "${SHARED_DEPS}${DAEMON_DEPS}" \
-    'Utility to generate ZkApp transactions in Mina GraphQL format'
-
-  mkdir -p "${BUILDDIR}/usr/local/bin"
-
-  # Binaries
-  cp ./default/src/app/zkapp_test_transaction/zkapp_test_transaction.exe \
-    "${BUILDDIR}/usr/local/bin/mina-zkapp-test-transaction"
-
-  build_deb mina-zkapp-test-transaction
-}
-## END ZKAPP TEST TXN PACKAGE ##
 
 #
 # Builds mina-delegation-verify package for delegation verification
