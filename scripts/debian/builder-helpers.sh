@@ -459,7 +459,12 @@ build_tx_tools_deb() {
 # before invoking this script.
 #
 build_mina_bootstrap_deb() {
-  create_control_file mina-bootstrap "${SHARED_DEPS}, postgresql-client" \
+  # mina-bootstrap is a statically linked Go binary (CGO_ENABLED=0), so it needs
+  # none of the OCaml/C SHARED_DEPS (libssl/libgmp/libgomp/liblmdb). Its only
+  # runtime deps are postgresql-client (the `archive` subcommand shells out to
+  # psql) and ca-certificates (TLS verification for the HTTPS dump/block
+  # downloads) -- matching what Dockerfile-mina-bootstrap installs.
+  create_control_file mina-bootstrap "postgresql-client, ca-certificates" \
     'Pre-staging CLI for Mina node operators: archive dumps, precomputed blocks, ledgers.'
 
   mkdir -p "${BUILDDIR}/usr/local/bin"
