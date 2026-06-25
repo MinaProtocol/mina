@@ -17,18 +17,33 @@ module Missing_blocks_count = struct
      [MIN(height)] are not "missing" — they simply predate this
      archive.  This keeps the count consistent with
      missing_blocks_guardian, which only looks for gaps within the
-     range of blocks the archive actually holds. *)
+     range of blocks the archive actually holds.
+
+     The count is computed purely arithmetically: the number of heights
+     in the window ([window_end - window_start + 1]) minus the number of
+     blocks actually present in that range.  This avoids materialising a
+     [generate_series] row per height and the LEFT JOIN against it.  On
+     an empty [blocks] table [MIN]/[MAX] are NULL, so the whole
+     expression is NULL; the outer [COALESCE(..., 0)] keeps the
+     mli contract (returns 0, never NULL). *)
   let query missing_blocks_width =
     Mina_caqti.find_req Caqti_type.unit Caqti_type.int
       (Core_kernel.sprintf
          {sql|
-        SELECT COUNT(*)
-        FROM (SELECT h::int FROM generate_series(
-                GREATEST((SELECT MIN(height) FROM blocks),
-                         (SELECT MAX(height) FROM blocks) - %d),
-                (SELECT MAX(height) FROM blocks)) h
-              LEFT JOIN blocks b ON h = b.height
-              WHERE b.height IS NULL) AS v
+        WITH extremes AS (
+          SELECT MIN(height) AS min_block, MAX(height) AS max_block
+          FROM blocks
+        ), window_bounds AS (
+          SELECT GREATEST(min_block, max_block - %d) AS window_start,
+                 max_block AS window_end
+          FROM extremes
+        )
+        SELECT COALESCE(
+                 (window_end - window_start + 1)
+                 - (SELECT COUNT(*) FROM blocks
+                    WHERE height BETWEEN window_start AND window_end),
+                 0)::int AS missing_blocks
+        FROM window_bounds
       |sql}
          missing_blocks_width )
 
