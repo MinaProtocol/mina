@@ -77,12 +77,24 @@
 #   127 - Binary not found or not executable
 #
 # DRYRUN MODE:
-#   Set DRYRUN=1 in environment to print the exec command instead of executing it.
-#   Useful for debugging argument processing and runtime selection.
+#   Set MINA_DISPATCHER_DRYRUN=1 in environment to print the exec command instead
+#   of executing it. Useful for debugging argument processing and runtime
+#   selection.
 #   Example:
-#     DRYRUN=1 mina daemon --peer-list-url ...
-#   Output:
+#     MINA_DISPATCHER_DRYRUN=1 mina daemon --peer-list-url ...
+#   Output (to stderr):
 #     mina-dispatch DRYRUN: exec /path/to/binary arg1 arg2 ...
+#
+# JSON MODE:
+#   Set MINA_DISPATCHER_JSON=1 to emit a single machine-readable JSON object on
+#   stdout instead of human-readable text, so callers can parse the dispatch
+#   decision/errors with jq rather than scraping stderr. Implies dry-run (the
+#   command is described, not exec'd). Examples:
+#     resolved command:
+#       {"runtime":"mesa","binary":"/usr/lib/mina/mesa/mina",
+#        "args":["daemon","-config-file","..."],"command":"/usr/lib/mina/mesa/mina daemon ..."}
+#     error:
+#       {"error":"config_directory_discrepancy","exit_code":1,"message":"..."}
 # SECURITY CONSIDERATIONS:
 #   - SOURCE_FILE must be owned by root and not world-writable
 #   - Binary paths are constructed from trusted configuration only
@@ -100,13 +112,99 @@ set -euo pipefail
 SOURCE_FILE=${SOURCE_FILE:-"/etc/default/mina-dispatch"}
 MINA_DISPATCHER_DEBUG=${MINA_DISPATCHER_DEBUG:-0}
 MINA_DISPATCHER_DRYRUN=${MINA_DISPATCHER_DRYRUN:-0}
+# JSON mode: emit machine-readable output instead of human-readable text, so
+# callers (e.g. the dispatcher tests) can parse decisions/errors with jq rather
+# than substring-matching. Implies dry-run for the success path (we describe the
+# command instead of exec'ing it). Off by default; production behaviour is
+# unchanged when MINA_DISPATCHER_JSON=0.
+MINA_DISPATCHER_JSON=${MINA_DISPATCHER_JSON:-0}
+
+# =============================================================================
+# Output Helpers (human-readable vs JSON)
+# =============================================================================
+
+# Escape a string for embedding in a JSON double-quoted value.
+json_escape() {
+  local s="$1" out="" i c
+  for (( i = 0; i < ${#s}; i++ )); do
+    c="${s:i:1}"
+    case "$c" in
+      '"') out+=$'\\"' ;;
+      \\) out+=$'\\\\' ;;
+      $'\n') out+='\n' ;;
+      $'\t') out+='\t' ;;
+      $'\r') out+='\r' ;;
+      *) out+="$c" ;;
+    esac
+  done
+  printf '%s' "$out"
+}
+
+# Emit a JSON array of the given strings: ["a","b",...]
+json_array() {
+  local first=1 elem
+  printf '['
+  for elem in "$@"; do
+    if [[ $first -eq 1 ]]; then first=0; else printf ','; fi
+    printf '"%s"' "$(json_escape "$elem")"
+  done
+  printf ']'
+}
+
+# True when the dispatcher should describe (not execute) the command: either an
+# explicit dry-run, or JSON mode (which always describes rather than exec's).
+dryrun_active() {
+  [[ "${MINA_DISPATCHER_DRYRUN:-0}" -ne 0 || "${MINA_DISPATCHER_JSON:-0}" -ne 0 ]]
+}
+
+# Report an error and exit. In JSON mode a single object is printed to stdout:
+#   {"error":"<key>","exit_code":<n>,"message":"<joined message>"}
+# Otherwise the provided lines are printed to stderr verbatim (preserving the
+# original human-readable output) and the same exit code is used.
+# Usage: dispatch_fail <exit_code> <error_key> <line> [line...]
+dispatch_fail() {
+  local code="$1" key="$2"
+  shift 2
+  if [[ "$MINA_DISPATCHER_JSON" -ne 0 ]]; then
+    printf '{"error":"%s","exit_code":%s,"message":"%s"}\n' \
+      "$(json_escape "$key")" "$code" "$(json_escape "$*")"
+  else
+    printf '%s\n' "$@" >&2
+  fi
+  exit "$code"
+}
+
+# Emit the resolved dry-run command. In JSON mode a single object is printed to
+# stdout describing the runtime, binary and final argument vector:
+#   {"runtime":"<rt>","binary":"<bin>","args":[...],"command":"<bin args>"}
+# Otherwise the original human-readable line is printed to stderr.
+# Usage: emit_dryrun <runtime> <binary> [arg...]
+emit_dryrun() {
+  local rt="$1" bin="$2"
+  shift 2
+  if [[ "$MINA_DISPATCHER_JSON" -ne 0 ]]; then
+    local command="$bin"
+    if [[ $# -gt 0 ]]; then
+      command="$bin $*"
+    fi
+    printf '{"runtime":"%s","binary":"%s","args":%s,"command":"%s"}\n' \
+      "$(json_escape "$rt")" \
+      "$(json_escape "$bin")" \
+      "$(json_array "$@")" \
+      "$(json_escape "$command")"
+  elif [[ $# -gt 0 ]]; then
+    echo "mina-dispatch DRYRUN: exec $bin $*" >&2
+  else
+    echo "mina-dispatch DRYRUN: exec $bin" >&2
+  fi
+}
 
 # Validate source file exists before sourcing
 if [[ ! -f "$SOURCE_FILE" ]]; then
-  echo "mina-dispatch ERROR: source file not found: $SOURCE_FILE" >&2
-  echo "  Installation is incomplete or corrupted." >&2
-  echo "  Expected configuration at: $SOURCE_FILE" >&2
-  exit 1
+  dispatch_fail 1 source_file_not_found \
+    "mina-dispatch ERROR: source file not found: $SOURCE_FILE" \
+    "  Installation is incomplete or corrupted." \
+    "  Expected configuration at: $SOURCE_FILE"
 fi
 
 # Security check: warn if source file has problematic permissions
@@ -137,18 +235,17 @@ declare -a required_vars=(
 
 for var in "${required_vars[@]}"; do
   if [[ -z "${!var:-}" ]]; then
-    echo "mina-dispatch ERROR: $var is not defined" >&2
-    echo "  This variable should be set in: $SOURCE_FILE" >&2
-    exit 1
+    dispatch_fail 1 required_var_undefined \
+      "mina-dispatch ERROR: $var is not defined" \
+      "  This variable should be set in: $SOURCE_FILE"
   fi
 done
 
 if [[ -z "${MINA_HARDFORK_STATE_DIR:-}" ]]; then
-  echo "mina-dispatch ERROR: MINA_HARDFORK_STATE_DIR is not defined" >&2
-  echo "  This variable should be set in your environment and point" >&2
-  echo "  to the mina config directory (usually ${HOME}/.mina-config)." >&2
-
-  exit 1
+  dispatch_fail 1 missing_hardfork_state_dir \
+    "mina-dispatch ERROR: MINA_HARDFORK_STATE_DIR is not defined" \
+    "  This variable should be set in your environment and point" \
+    "  to the mina config directory (usually ${HOME}/.mina-config)."
 fi
 
 # =============================================================================
@@ -184,10 +281,10 @@ cmd="$(basename "$0")"
 # Handle direct invocation for debugging: mina-dispatch mina --help
 if [[ "$cmd" == "mina-dispatch" ]]; then
   if [[ $# -lt 1 ]]; then
-    echo "mina-dispatch ERROR: no command provided" >&2
-    echo "  Usage: mina-dispatch <command> [arguments...]" >&2
-    echo "  Example: mina-dispatch mina daemon --help" >&2
-    exit 1
+    dispatch_fail 1 no_command \
+      "mina-dispatch ERROR: no command provided" \
+      "  Usage: mina-dispatch <command> [arguments...]" \
+      "  Example: mina-dispatch mina daemon --help"
   fi
   cmd="$1"
   shift
@@ -195,8 +292,8 @@ fi
 
 # Validate command name contains only safe characters
 if [[ ! "$cmd" =~ ^[a-zA-Z0-9_-]+$ ]]; then
-  echo "mina-dispatch ERROR: invalid command name: $cmd" >&2
-  exit 1
+  dispatch_fail 1 invalid_command_name \
+    "mina-dispatch ERROR: invalid command name: $cmd"
 fi
 
 # =============================================================================
@@ -206,13 +303,13 @@ fi
 bin="${RUNTIMES_BASE_PATH}/${runtime}/${cmd}"
 
 if [[ ! -f "$bin" ]]; then
-  echo "mina-dispatch ERROR: binary not found: $bin" >&2
-  exit 127
+  dispatch_fail 127 binary_not_found \
+    "mina-dispatch ERROR: binary not found: $bin"
 fi
 
 if [[ ! -x "$bin" ]]; then
-  echo "mina-dispatch ERROR: binary not executable: $bin" >&2
-  exit 127
+  dispatch_fail 127 binary_not_executable \
+    "mina-dispatch ERROR: binary not executable: $bin"
 fi
 
 # =============================================================================
@@ -222,8 +319,8 @@ fi
 if [[ "$cmd" == "mina" ]]; then
   helper="${RUNTIMES_BASE_PATH}/${runtime}/coda-libp2p_helper"
   if [[ ! -x "$helper" ]]; then
-    echo "mina-dispatch ERROR: coda-libp2p_helper not found or not executable: $helper" >&2
-    exit 127
+    dispatch_fail 127 libp2p_helper_not_found \
+      "mina-dispatch ERROR: coda-libp2p_helper not found or not executable: $helper"
   fi
   export "${MINA_LIBP2P_ENVVAR_NAME}=${helper}"
 fi
@@ -265,6 +362,10 @@ else
 fi
 
 if [[ -z "$first_arg" ]]; then
+  if [[ "$MINA_DISPATCHER_JSON" -ne 0 ]]; then
+    dispatch_fail 1 no_subcommand \
+      "mina-dispatch ERROR: no subcommand provided for automatic hardfork handling"
+  fi
   echo "mina-dispatch ERROR: no subcommand provided for automatic hardfork handling" >&2
   print_argument_warning
   exit 1
@@ -272,8 +373,8 @@ fi
 
 if [[ "$first_arg" == "--version" || "$first_arg" == "-version" ]]; then
   # Pass --version directly to the binary without argument processing
-  if [[ "${MINA_DISPATCHER_DRYRUN:-0}" -ne 0 ]]; then
-    echo "mina-dispatch DRYRUN: exec $bin $first_arg" >&2
+  if dryrun_active; then
+    emit_dryrun "$runtime" "$bin" "$first_arg"
     exit 0
   fi
   exec "$bin" "$first_arg"
@@ -287,14 +388,18 @@ if [[ "$first_arg" == "client" ]]; then
   # correct runtime binary instead of unconditionally using mesa.
   runtime="mesa"
   bin="${RUNTIMES_BASE_PATH}/${runtime}/${cmd}"
-  if [[ "${MINA_DISPATCHER_DRYRUN:-0}" -ne 0 ]]; then
-    echo "mina-dispatch DRYRUN: exec $bin ${args[*]}" >&2
+  if dryrun_active; then
+    emit_dryrun "$runtime" "$bin" "${args[@]}"
     exit 0
   fi
   exec "$bin" "${args[@]}"
 fi
 
 if [[ "$first_arg" != "daemon" ]]; then
+  if [[ "$MINA_DISPATCHER_JSON" -ne 0 ]]; then
+    dispatch_fail 1 unsupported_subcommand \
+      "mina-dispatch ERROR: unsupported subcommand '$first_arg' for automatic hardfork handling"
+  fi
   echo "mina-dispatch ERROR: unsupported subcommand '$first_arg' for automatic hardfork handling" >&2
   print_argument_warning
   exit 1
@@ -350,10 +455,10 @@ if [[ "$runtime" == "mesa" ]]; then
           # Compare as normalized paths, not raw strings, so that equivalent
           # spellings (trailing slash, "." / ".." segments) are accepted.
           if [[ "$(normalize_path "$provided_dir")" != "$(normalize_path "$MINA_HARDFORK_STATE_DIR")" ]]; then
-            echo "mina-dispatch ERROR: Discrepancy between provided --config-directory ($provided_dir) and expected ($MINA_HARDFORK_STATE_DIR)" >&2
-            echo " Those must match for auto hardfork mode correct behavior." >&2
-            echo " Please adjust your invocation accordingly." >&2
-            exit 1
+            dispatch_fail 1 config_directory_discrepancy \
+              "mina-dispatch ERROR: Discrepancy between provided --config-directory ($provided_dir) and expected ($MINA_HARDFORK_STATE_DIR)" \
+              " Those must match for auto hardfork mode correct behavior." \
+              " Please adjust your invocation accordingly."
           fi
         fi
         new_args+=("$arg")
@@ -415,13 +520,9 @@ fi
 # =============================================================================
 
 
-# DRYRUN: If set, print the exec command and exit
-if [[ "${MINA_DISPATCHER_DRYRUN:-0}" -ne 0 ]]; then
-  if [[ ${#args[@]} -gt 0 ]]; then
-    echo "mina-dispatch DRYRUN: exec $bin ${args[*]}" >&2
-  else
-    echo "mina-dispatch DRYRUN: exec $bin" >&2
-  fi
+# DRYRUN / JSON: describe the command instead of executing it, then exit.
+if dryrun_active; then
+  emit_dryrun "$runtime" "$bin" "${args[@]}"
   exit 0
 fi
 
@@ -431,18 +532,10 @@ if [[ ${#args[@]} -gt 0 ]]; then
   if [[ "$MINA_DISPATCHER_DEBUG" -ne 0 ]]; then
     echo "DEBUG: Executing $bin with arguments: ${args[*]}" >&2
   fi
-  if [[ "${MINA_DISPATCHER_DRYRUN}" -ne 0 ]]; then
-    echo "$bin ${args[*]}"
-  else
-    exec "$bin" "${args[@]}"
-  fi
+  exec "$bin" "${args[@]}"
 else
   if [[ "$MINA_DISPATCHER_DEBUG" -ne 0 ]]; then
     echo "DEBUG: Executing $bin with no arguments" >&2
   fi
-  if [[ "${MINA_DISPATCHER_DRYRUN}" -ne 0 ]]; then
-    echo "$bin"
-  else
-    exec "$bin"
-  fi
+  exec "$bin"
 fi
