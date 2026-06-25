@@ -454,6 +454,38 @@ let%test_module "Archive node unit tests" =
       | Error e ->
           failwith @@ Caqti_error.show e
 
+    (* The batched zkapp_field_array insert used by Zkapp_events: add_multi must
+       (a) insert large arrays without btree overflow, (b) return the ids in
+       input order, and (c) collapse arrays that repeat -- within the batch and
+       across calls -- to the same id via the content-hash unique index. *)
+    let%test_unit "Zkapp_field_array.add_multi preserves order and dedups" =
+      let conn = Lazy.force conn_lazy in
+      Thread_safe.block_on_async_exn
+      @@ fun () ->
+      let big1 = Array.init 1030 ~f:(fun i -> i + 1) in
+      let big2 = Array.init 1030 ~f:(fun i -> i + 2) in
+      let small = [| 7; 8; 9 |] in
+      match%map
+        let open Deferred.Result.Let_syntax in
+        let%map ids =
+          Processor.Zkapp_field_array.add_multi conn [ big1; big2; small; big1 ]
+        in
+        match ids with
+        | [ i1; i2; i3; i4 ] ->
+            (* distinct arrays -> distinct ids *)
+            [%test_pred: int * int] (fun (a, b) -> a <> b) (i1, i2) ;
+            [%test_pred: int * int] (fun (a, b) -> a <> b) (i1, i3) ;
+            [%test_pred: int * int] (fun (a, b) -> a <> b) (i2, i3) ;
+            (* big1 repeated in the batch -> same id, in its input position *)
+            [%test_eq: int] i1 i4
+        | _ ->
+            failwithf "expected 4 ids, got %d" (List.length ids) ()
+      with
+      | Ok () ->
+          ()
+      | Error e ->
+          failwith @@ Caqti_error.show e
+
     (* Regression test for the [tokens_value_key] (UNIQUE on [tokens.value])
        violation. A custom token can already be present in [tokens] with an
        owner set (inserted while processing a block). A later code path that
