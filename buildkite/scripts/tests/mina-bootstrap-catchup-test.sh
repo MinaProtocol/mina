@@ -26,6 +26,12 @@ PG_BASE="${POSTGRES_URI:-postgres://postgres:postgres@localhost:5432}"
 PG_ADMIN_URI="${PG_BASE}/postgres"
 PG_ARCHIVE_URI="${PG_CONN:-${PG_BASE}/archive}"
 
+echo "--- Marking the checkout safe for git"
+# The container user does not own /workdir, so git refuses to operate on it
+# ("dubious ownership"), which breaks `go build` VCS stamping and the dune
+# mina_version git stamp. Mark everything (repo + submodules) safe.
+git config --global --add safe.directory '*'
+
 echo "--- Ensuring psql client is available"
 if ! command -v psql >/dev/null 2>&1; then
   sudo apt-get update -y && sudo apt-get install -y postgresql-client
