@@ -40,13 +40,14 @@ module Latest_block_timestamp : sig
        Async.Deferred.t
 end
 
-(** Maximum height among blocks with [chain_status = 'canonical'].
-    Returns 0L if no canonical blocks exist. *)
+(** Maximum height among blocks with [chain_status = 'canonical'],
+    or [None] if no canonical blocks exist. *)
 module Highest_canonical_height : sig
   val run :
        (module Mina_caqti.CONNECTION)
     -> unit
-    -> (int64, [> Caqti_error.call_or_retrieve ]) result Async.Deferred.t
+    -> (int64 option, [> Caqti_error.call_or_retrieve ]) result
+       Async.Deferred.t
 end
 
 (** Count of pending blocks at or below the given height. *)

@@ -78,12 +78,22 @@ module Latest_block_timestamp = struct
 end
 
 module Highest_canonical_height = struct
+  (* Highest height among canonical blocks, or [None] when the archive
+     holds no canonical block yet.  We deliberately do NOT
+     [COALESCE(MAX(height), 0)]: a height of 0 is indistinguishable from
+     a genuine genesis-only chain, and callers (e.g. the missing-blocks
+     auditor) need to tell "no canonical chain" apart from "canonical
+     chain tops out at height 0".  Selecting the top row with [LIMIT 1]
+     rather than [MAX] makes the empty case return zero rows, which
+     [find_opt] surfaces as [None] — mirroring [Latest_block_timestamp]. *)
   let query =
-    Mina_caqti.find_req Caqti_type.unit Caqti_type.int64
-      {sql| SELECT COALESCE(MAX(height), 0) FROM blocks
-            WHERE chain_status = 'canonical' |sql}
+    Mina_caqti.find_opt_req Caqti_type.unit Caqti_type.int64
+      {sql| SELECT height FROM blocks
+            WHERE chain_status = 'canonical'
+            ORDER BY height DESC
+            LIMIT 1 |sql}
 
-  let run (module Conn : Mina_caqti.CONNECTION) () = Conn.find query ()
+  let run (module Conn : Mina_caqti.CONNECTION) () = Conn.find_opt query ()
 end
 
 module Pending_blocks_below_canonical = struct
