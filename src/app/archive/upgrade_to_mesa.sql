@@ -300,6 +300,45 @@ UPDATE zkapp_account_update_body b SET actions_id = r.canon_id FROM pg_temp_ev_r
 DELETE FROM zkapp_events e USING pg_temp_ev_remap r WHERE e.id = r.dup_id;
 DROP TABLE pg_temp_ev_remap;
 
+-- The dedup cascades up: remapping events_id/actions_id collapses
+-- zkapp_account_update_body rows that differed only by those (volatile) ids into
+-- exact duplicates, which must also be deduped (else the archive's own
+-- SELECT-before-INSERT hits "Received 2 tuples, expected at most one"). That in
+-- turn duplicates zkapp_account_update (body_id), whose ids are remapped inside
+-- zkapp_commands.zkapp_account_updates_ids. zkapp_commands keeps its hash UNIQUE,
+-- so it has no row duplicates -- only the array is rewritten.
+CREATE TEMP TABLE pg_temp_aub_remap AS
+SELECT id AS dup_id, canon_id FROM (
+  SELECT id, min(id) OVER (PARTITION BY
+    account_identifier_id, update_id, balance_change, increment_nonce, events_id, actions_id,
+    call_data_id, call_depth, zkapp_network_precondition_id, zkapp_account_precondition_id,
+    zkapp_valid_while_precondition_id, use_full_commitment, implicit_account_creation_fee,
+    may_use_token, authorization_kind, verification_key_hash_id) AS canon_id
+  FROM zkapp_account_update_body
+) s WHERE id <> canon_id;
+CREATE INDEX ON pg_temp_aub_remap (dup_id);
+UPDATE zkapp_account_update au SET body_id = r.canon_id FROM pg_temp_aub_remap r WHERE au.body_id = r.dup_id;
+DELETE FROM zkapp_account_update_body b USING pg_temp_aub_remap r WHERE b.id = r.dup_id;
+DROP TABLE pg_temp_aub_remap;
+
+CREATE TEMP TABLE pg_temp_au_remap AS
+SELECT id AS dup_id, canon_id FROM (
+  SELECT id, min(id) OVER (PARTITION BY body_id) AS canon_id FROM zkapp_account_update
+) s WHERE id <> canon_id;
+CREATE INDEX ON pg_temp_au_remap (dup_id);
+WITH affected AS (
+  SELECT c.id, array_agg(COALESCE(r.canon_id, u.elem) ORDER BY u.ord) AS new_ids
+  FROM zkapp_commands c
+  CROSS JOIN LATERAL unnest(c.zkapp_account_updates_ids) WITH ORDINALITY AS u(elem, ord)
+  LEFT JOIN pg_temp_au_remap r ON r.dup_id = u.elem
+  WHERE c.id IN (SELECT DISTINCT c2.id FROM zkapp_commands c2
+                 CROSS JOIN LATERAL unnest(c2.zkapp_account_updates_ids) AS x(elem)
+                 JOIN pg_temp_au_remap r2 ON r2.dup_id = x.elem)
+  GROUP BY c.id)
+UPDATE zkapp_commands c SET zkapp_account_updates_ids = a.new_ids FROM affected a WHERE c.id = a.id;
+DELETE FROM zkapp_account_update au USING pg_temp_au_remap r WHERE au.id = r.dup_id;
+DROP TABLE pg_temp_au_remap;
+
 -- Now that arrays are unique, install the content-hash UNIQUE indexes.
 CREATE UNIQUE INDEX IF NOT EXISTS zkapp_field_array_element_ids_hash_key
   ON zkapp_field_array (zkapp_element_ids_hash(element_ids));
