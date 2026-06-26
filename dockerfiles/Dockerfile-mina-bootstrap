@@ -3,10 +3,10 @@
 # Two-stage build:
 #   1. golang:bookworm builds the static binary
 #   2. final image is debian:bookworm-slim with the binary + postgresql-client
-#      (psql is shelled out to by the `archive` subcommand)
+#      (psql is shelled out to by the `archive restore`/`catchup` subcommands)
 #
 # Resulting image size: ~150MB (slim) — could be reduced to ~20MB if we move
-# to FROM scratch and drop the `archive` subcommand's psql dependency.
+# to FROM scratch and drop the archive subcommands' psql dependency.
 
 ARG GO_IMAGE=golang:1.21.13-bookworm
 ARG BASE_IMAGE=debian:bookworm-slim

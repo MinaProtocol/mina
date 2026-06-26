@@ -31,7 +31,7 @@ block from that height up to the chain tip from the Mina Foundation's public
 GCS bucket.
 
 This is the post-restore step for an operator who has just loaded an archive
-dump (e.g. via 'mina-bootstrap archive'): the dump is hours old, so this
+dump (e.g. via 'mina-bootstrap archive restore'): the dump is hours old, so this
 command fetches only the diff between the dump's tip and the current chain
 tip and feeds it to mina-archive-blocks.
 

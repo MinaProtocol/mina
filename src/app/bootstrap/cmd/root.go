@@ -33,9 +33,10 @@ func init() {
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "enable debug logging")
 	rootCmd.PersistentFlags().StringVar(&network, "network", "mainnet", "Mina network: mainnet, devnet")
 
+	// Archive-node staging verbs are grouped under `archive`
+	// (restore/catchup/precomputed); see archive.go. Future domains (ledger,
+	// daemon, ...) get their own top-level groups.
 	rootCmd.AddCommand(archiveCmd)
-	rootCmd.AddCommand(precomputedCmd)
-	rootCmd.AddCommand(catchupCmd)
 }
 
 func Execute() error {

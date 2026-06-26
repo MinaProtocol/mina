@@ -10,9 +10,9 @@ for the design discussion and full subcommand roadmap.
 
 ## Status
 
-v1 — `archive`, `precomputed`, and `catchup` subcommands working. Genesis
-ledger, replayer checkpoint, daemon state, and verify commands are scoped for
-follow-ups.
+v1 — `archive restore`, `archive catchup`, and `archive precomputed`
+subcommands working. Genesis ledger, replayer checkpoint, daemon state, and
+verify commands are scoped for follow-ups (as their own top-level groups).
 
 ## Build
 
@@ -22,17 +22,27 @@ go build -o ./bin/mina-bootstrap .
 ```
 
 The binary is statically linked and has no runtime dependencies other than
-`psql` from `postgresql-client` (only when using the `archive` subcommand
-without `--skip-pg`).
+`psql` from `postgresql-client` (only when using `archive restore` /
+`archive catchup`).
 
 ## Subcommands
 
-### `mina-bootstrap archive`
+mina-bootstrap is organized by domain. Archive-node staging verbs live under
+the `archive` group; future domains (ledger downloads, daemon artifacts, ...)
+will get their own top-level groups.
+
+```
+mina-bootstrap archive restore      # download + restore an archive dump
+mina-bootstrap archive catchup      # backfill the forward diff to chain tip
+mina-bootstrap archive precomputed  # fetch a height range of precomputed blocks
+```
+
+### `mina-bootstrap archive restore`
 
 Download today's archive dump and restore it into Postgres.
 
 ```bash
-mina-bootstrap archive \
+mina-bootstrap archive restore \
   --network mainnet \
   --pg-uri "postgres://postgres:postgres@localhost:5432/archive"
 ```
@@ -53,12 +63,12 @@ uses (`max_connections=500`, `max_locks_per_transaction=100`, etc.) before
 loading the dump. Restart Postgres after bootstrap to make the tuning take
 effect.
 
-### `mina-bootstrap precomputed`
+### `mina-bootstrap archive precomputed`
 
 Fetch a range of precomputed blocks for archive backfill.
 
 ```bash
-mina-bootstrap precomputed --network mainnet --range 50000-51000 --out ./blocks
+mina-bootstrap archive precomputed --network mainnet --range 50000-51000 --out ./blocks
 ```
 
 Range formats:
@@ -76,15 +86,15 @@ tool — keeping that step explicit so operators can decide ordering and
 batch size. The `catchup` subcommand below wraps download + apply for the
 common post-restore case.
 
-### `mina-bootstrap catchup`
+### `mina-bootstrap archive catchup`
 
 Backfill an archive DB up to chain tip with precomputed blocks. This is the
-post-restore step after `mina-bootstrap archive`: the restored dump is hours
-old, so `catchup` reads the DB's current tip, fetches only the forward diff
-from the bucket, and applies it via `mina-archive-blocks`.
+post-restore step after `mina-bootstrap archive restore`: the restored dump is
+hours old, so `catchup` reads the DB's current tip, fetches only the forward
+diff from the bucket, and applies it via `mina-archive-blocks`.
 
 ```bash
-mina-bootstrap catchup \
+mina-bootstrap archive catchup \
   --network mainnet \
   --pg-uri "postgres://postgres:postgres@localhost:5432/archive"
 ```
@@ -131,6 +141,7 @@ services:
     image: gcr.io/o1labs-192920/mina-bootstrap:3.0.4
     command:
       - archive
+      - restore
       - --network=mainnet
       - --pg-uri=postgres://postgres:postgres@postgres:5432/archive
     depends_on:
@@ -158,8 +169,8 @@ go build -o ./bin/mina-bootstrap .
 ```
 
 For local smoke tests against a real GCS bucket, the `--skip-pg` flag on
-`archive` lets you exercise the download + extract path without a Postgres
-dependency.
+`archive restore` lets you exercise the download + extract path without a
+Postgres dependency.
 
 Integration tests are gated behind the `integration` build tag and skip when
 their env vars are unset. The catchup end-to-end test restores nothing itself

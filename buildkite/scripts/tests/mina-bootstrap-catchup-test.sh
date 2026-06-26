@@ -3,8 +3,8 @@
 # End-to-end integration test for `mina-bootstrap catchup`.
 #
 # Dogfoods the full operator flow against a live, real network:
-#   1. mina-bootstrap archive  -> download + restore a real archive dump
-#   2. mina-bootstrap catchup  -> backfill the forward diff from the bucket
+#   1. mina-bootstrap archive restore  -> download + restore a real archive dump
+#   2. mina-bootstrap archive catchup  -> backfill the forward diff from the bucket
 #   3. assert no gap + every expected block inserted (the integration-tagged
 #      Go test TestCatchupNoGap)
 #
@@ -60,7 +60,7 @@ DUMP_OK=false
 for offset in 0 1 2 3; do
   DATE="$(date -u -d "-${offset} day" +%Y-%m-%d)"
   echo "Trying ${NETWORK} dump for ${DATE} 0000 ..."
-  if "$BOOTSTRAP_BIN" archive \
+  if "$BOOTSTRAP_BIN" archive restore \
        --network "$NETWORK" \
        --date "$DATE" \
        --work-dir "$WORK_DIR" \

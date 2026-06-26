@@ -10,7 +10,7 @@
 //
 // Provide a connection string for whichever networks you want to exercise.
 // The DB must already have an archive dump restored into it (e.g. via
-// `mina-bootstrap archive`); this test only performs the forward catchup:
+// `mina-bootstrap archive restore`); this test only performs the forward catchup:
 //
 //	BOOTSTRAP_TEST_MAINNET_PG_URI=postgres://mina:pw@localhost:5432/archive \
 //	BOOTSTRAP_TEST_DEVNET_PG_URI=postgres://mina:pw@localhost:5433/archive \

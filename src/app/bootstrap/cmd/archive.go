@@ -25,8 +25,23 @@ var (
 	archiveSkipPg  bool
 )
 
+// archiveCmd is the parent group for archive-node staging commands
+// (restore, catchup, precomputed). mina-bootstrap is intentionally not
+// archive-only, so archive-specific verbs live under this namespace, leaving
+// room for future top-level groups (ledger, daemon, ...).
 var archiveCmd = &cobra.Command{
 	Use:   "archive",
+	Short: "Stage an archive node: restore dumps and backfill blocks",
+	Long: `Commands for staging a Mina archive node from the Mina Foundation's
+public artifact buckets:
+
+  restore      download an archive dump and load it into Postgres
+  catchup      backfill the forward diff up to chain tip after a restore
+  precomputed  fetch a height range of precomputed blocks`,
+}
+
+var archiveRestoreCmd = &cobra.Command{
+	Use:   "restore",
 	Short: "Download a Mina archive dump and restore it into Postgres",
 	Long: `Downloads the latest (or a date-pinned) archive dump from the Mina
 Foundation's public GCS bucket, extracts it, applies the recommended
@@ -35,18 +50,22 @@ Postgres tuning, and loads the SQL into the target database.
 Replaces the multi-step curl + tar + psql sequence currently inlined in
 the Rosetta docker-compose bootstrap_db service and documented across
 the docs2 archive-node setup pages.`,
-	RunE: runArchive,
+	RunE: runArchiveRestore,
 }
 
 func init() {
-	archiveCmd.Flags().StringVar(&archivePgURI, "pg-uri", "", "Postgres URI (postgres://user:pw@host:port/db). Required unless --skip-pg.")
-	archiveCmd.Flags().StringVar(&archiveDate, "date", "", "Dump date in YYYY-MM-DD form. Defaults to today (UTC).")
-	archiveCmd.Flags().StringVar(&archiveHour, "hour", "0000", "Dump hour in HHMM form (dumps are produced hourly). Default 0000 (midnight UTC).")
-	archiveCmd.Flags().StringVar(&archiveWorkDir, "work-dir", ".", "Where to download and extract intermediate files.")
-	archiveCmd.Flags().BoolVar(&archiveSkipPg, "skip-pg", false, "Download + extract only; skip the psql restore step.")
+	archiveRestoreCmd.Flags().StringVar(&archivePgURI, "pg-uri", "", "Postgres URI (postgres://user:pw@host:port/db). Required unless --skip-pg.")
+	archiveRestoreCmd.Flags().StringVar(&archiveDate, "date", "", "Dump date in YYYY-MM-DD form. Defaults to today (UTC).")
+	archiveRestoreCmd.Flags().StringVar(&archiveHour, "hour", "0000", "Dump hour in HHMM form (dumps are produced hourly). Default 0000 (midnight UTC).")
+	archiveRestoreCmd.Flags().StringVar(&archiveWorkDir, "work-dir", ".", "Where to download and extract intermediate files.")
+	archiveRestoreCmd.Flags().BoolVar(&archiveSkipPg, "skip-pg", false, "Download + extract only; skip the psql restore step.")
+
+	archiveCmd.AddCommand(archiveRestoreCmd)
+	archiveCmd.AddCommand(catchupCmd)
+	archiveCmd.AddCommand(precomputedCmd)
 }
 
-func runArchive(_ *cobra.Command, _ []string) error {
+func runArchiveRestore(_ *cobra.Command, _ []string) error {
 	if !archiveSkipPg && archivePgURI == "" {
 		return fmt.Errorf("--pg-uri is required (or pass --skip-pg to download only)")
 	}
