@@ -1,9 +1,9 @@
 # Archive upgrade: `element_ids` content-hash index (from the band-aid build)
 
-For archive node operators currently running the **band-aid** build — the
-insert-only one that dropped the `element_ids` `UNIQUE` constraints on
-`zkapp_events` / `zkapp_field_array` to stop the btree-key overflow. Under that
-build, identical arrays accumulate as **duplicate rows** (storage bloat,
+For archive node operators **already on mesa** and running the **band-aid**
+build — the insert-only one that dropped the `element_ids` `UNIQUE` constraints
+on `zkapp_events` / `zkapp_field_array` to stop the btree-key overflow. Under
+that build, identical arrays accumulate as **duplicate rows** (storage bloat,
 dominated by the empty `{}` array).
 
 This upgrade moves you to the proper fix: a fixed-width **sha256 content-hash**
@@ -28,18 +28,19 @@ DB **first**, with the node **stopped**, then deploy the binary.
 2. **(Recommended) Preview the duplicate volume** — dry run, changes nothing,
    reports BEFORE/AFTER counts so you can size the maintenance window:
    ```
-   psql "<conn>" -f dedup_zkapp_element_ids.sql
+   psql "<conn>" -f migrate_zkapp_element_ids_to_hash.sql
    ```
 
 3. **Stop the archive node** (do not migrate while it is writing).
 
-4. **Migrate the schema** — idempotent; dedups existing rows, creates the
-   `zkapp_element_ids_hash` function, and adds the hash `UNIQUE` indexes:
+4. **Migrate the schema** — the same script with `-v apply=true`. You are
+   already on mesa, so this is the **focused element_ids step only** (it does
+   NOT re-run the berkeley→mesa migration). Idempotent: it dedups existing rows,
+   creates the `zkapp_element_ids_hash` function, and adds the hash `UNIQUE`
+   indexes, rolling back on any integrity failure:
    ```
-   psql "<conn>" -f upgrade_to_mesa.sql
+   psql "<conn>" -v apply=true -f migrate_zkapp_element_ids_to_hash.sql
    ```
-   (On a band-aided DB the old-constraint drops are no-ops; the new step 3b does
-   the dedup + hash index.)
 
 5. **Deploy the new archive binary** (`mina-archive`, `mina-archive-blocks`)
    built from the content-hash fix.
