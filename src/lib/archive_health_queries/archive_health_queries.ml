@@ -97,6 +97,14 @@ module Highest_canonical_height = struct
 end
 
 module Pending_blocks_below_canonical = struct
+  (* Count blocks still marked [pending] at or below the given height
+     (in practice the highest canonical height — see
+     [Highest_canonical_height]).  In a healthy archive every block at or
+     below the canonical tip should itself have been finalized as
+     canonical, so this count is expected to be 0.  A non-zero result
+     means canonicalization has lagged or stalled: blocks below the
+     canonical watermark are still pending, which the missing-blocks
+     auditor flags as a gap in the chain-status bookkeeping. *)
   let query =
     Mina_caqti.find_req Caqti_type.int64 Caqti_type.int64
       {sql| SELECT COUNT(*) FROM blocks
