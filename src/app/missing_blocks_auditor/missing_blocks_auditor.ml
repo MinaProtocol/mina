@@ -92,30 +92,30 @@ let main ~archive_uri () =
                   Core_kernel.exit 1 ) )
       in
       [%log info] "Querying for gaps in chain statuses" ;
+      (* [Highest_canonical_height] returns [None] when the archive holds
+         no canonical block.  The auditor must not silently succeed on an
+         empty canonical chain, so we fail loudly in that case rather than
+         treating it as height 0. *)
       let%bind highest_canonical =
         match%bind
           Mina_caqti.Pool.use
             (fun db -> Sql.Chain_status.run_highest_canonical db ())
             pool
         with
-        | Ok height ->
+        | Ok (Some height) ->
             return height
+        | Ok None ->
+            [%log error] "Error getting greatest height of canonical blocks"
+              ~metadata:
+                [ ( "error"
+                  , `String "no canonical blocks found in archive database" )
+                ] ;
+            Core.exit 1
         | Error msg ->
             [%log error] "Error getting greatest height of canonical blocks"
               ~metadata:[ ("error", `String (Caqti_error.show msg)) ] ;
             exit 1
       in
-      (* The shared [Archive_health_queries.Highest_canonical_height] query
-         coalesces a NULL max height to 0 so the healthcheck CLI can run
-         against a fresh / empty archive. The auditor, however, must not
-         silently succeed on an empty canonical chain — preserve the
-         pre-refactor behavior of failing loudly in that case. *)
-      if Int64.equal highest_canonical Int64.zero then (
-        [%log error] "Error getting greatest height of canonical blocks"
-          ~metadata:
-            [ ("error", `String "no canonical blocks found in archive database")
-            ] ;
-        Core.exit 1 ) ;
       let%bind pending_below =
         match%bind
           Mina_caqti.Pool.use
