@@ -10,8 +10,8 @@ for the design discussion and full subcommand roadmap.
 
 ## Status
 
-v1 — `archive` and `precomputed` subcommands working. Genesis ledger,
-replayer checkpoint, daemon state, and verify commands are scoped for
+v1 — `archive`, `precomputed`, and `catchup` subcommands working. Genesis
+ledger, replayer checkpoint, daemon state, and verify commands are scoped for
 follow-ups.
 
 ## Build
@@ -73,8 +73,44 @@ The tool refuses anything over 50,000 blocks per invocation. Operators backfilli
 
 After download, apply the blocks with the existing `mina-archive-blocks`
 tool — keeping that step explicit so operators can decide ordering and
-batch size. A future `mina-bootstrap apply-blocks` subcommand can wrap that
-once we have demand.
+batch size. The `catchup` subcommand below wraps download + apply for the
+common post-restore case.
+
+### `mina-bootstrap catchup`
+
+Backfill an archive DB up to chain tip with precomputed blocks. This is the
+post-restore step after `mina-bootstrap archive`: the restored dump is hours
+old, so `catchup` reads the DB's current tip, fetches only the forward diff
+from the bucket, and applies it via `mina-archive-blocks`.
+
+```bash
+mina-bootstrap catchup \
+  --network mainnet \
+  --pg-uri "postgres://postgres:postgres@localhost:5432/archive"
+```
+
+By default the start height is `(max height in DB) + 1` and the end is the
+chain tip (open-ended discovery). Override either bound for fine-grained
+control.
+
+Flags:
+
+| Flag | Default | Description |
+|---|---|---|
+| `--network` | `mainnet` | `mainnet` or `devnet` |
+| `--pg-uri` | (required) | Postgres URI to read the tip from and apply blocks to |
+| `--out` | `./blocks` | Directory to write downloaded block files |
+| `--archive-blocks-bin` | `mina-archive-blocks` | Path to the `mina-archive-blocks` binary used to apply |
+| `--skip-apply` | `false` | Download the diff only; skip the apply step |
+| `--from-height` | `0` | Override the start height (default: DB tip + 1) |
+| `--to-height` | `0` | Override the end height, inclusive (default: open-ended to tip) |
+
+It intentionally does **not** chase missing-block gaps *below* the dump's
+tip — it only grabs the forward diff. Use the missing-blocks guardian for
+gap repair. The same 50,000-block-per-invocation safety cap applies.
+
+Requires `psql` (to read the tip) and `mina-archive-blocks` (to apply, unless
+`--skip-apply`) on `PATH`.
 
 ## Authentication
 
@@ -124,3 +160,15 @@ go build -o ./bin/mina-bootstrap .
 For local smoke tests against a real GCS bucket, the `--skip-pg` flag on
 `archive` lets you exercise the download + extract path without a Postgres
 dependency.
+
+Integration tests are gated behind the `integration` build tag and skip when
+their env vars are unset. The catchup end-to-end test restores nothing itself
+— point it at an already-restored archive DB and it backfills a bounded
+forward window, then asserts no gap and that every expected block was
+inserted:
+
+```bash
+BOOTSTRAP_TEST_MAINNET_PG_URI=postgres://mina:pw@localhost:5432/archive \
+BOOTSTRAP_TEST_DEVNET_PG_URI=postgres://mina:pw@localhost:5433/archive \
+  go test -tags integration ./cmd/... -run TestCatchupNoGap -v
+```

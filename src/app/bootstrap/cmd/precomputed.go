@@ -95,15 +95,26 @@ func runPrecomputed(_ *cobra.Command, _ []string) error {
 	}
 	slog.Info("found blocks in range", "count", len(wanted), "range_start", start, "open_ended", openEnded)
 
-	for _, key := range wanted {
-		dst := filepath.Join(precomputedOut, key)
-		if err := download.GCSObject(ctx, net.PrecomputedBucket, key, dst); err != nil {
-			return fmt.Errorf("download %s: %w", key, err)
-		}
+	if _, err := downloadBlocks(ctx, net, wanted, precomputedOut); err != nil {
+		return err
 	}
 
 	fmt.Fprintf(os.Stdout, "Downloaded %d precomputed blocks to %s\n", len(wanted), precomputedOut)
 	return nil
+}
+
+// downloadBlocks fetches each block key from the network's precomputed bucket
+// into outDir and returns the local file paths in the same order.
+func downloadBlocks(ctx context.Context, net networks.Network, keys []string, outDir string) ([]string, error) {
+	paths := make([]string, 0, len(keys))
+	for _, key := range keys {
+		dst := filepath.Join(outDir, key)
+		if err := download.GCSObject(ctx, net.PrecomputedBucket, key, dst); err != nil {
+			return nil, fmt.Errorf("download %s: %w", key, err)
+		}
+		paths = append(paths, dst)
+	}
+	return paths, nil
 }
 
 func discoverBlocks(ctx context.Context, net networks.Network, start, end int, openEnded bool) ([]string, error) {

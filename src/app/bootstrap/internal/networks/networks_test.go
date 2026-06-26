@@ -51,6 +51,67 @@ func TestLookupKnownNetworks(t *testing.T) {
 	}
 }
 
+func TestBlockHeight(t *testing.T) {
+	mainnet, _ := Lookup("mainnet")
+	devnet, _ := Lookup("devnet")
+
+	tests := []struct {
+		name     string
+		net      Network
+		filename string
+		want     int
+		wantErr  bool
+	}{
+		{
+			name:     "mainnet plain",
+			net:      mainnet,
+			filename: "mainnet-50000-3NLfKanQ53X2MRKx5ZRvb9nVCEB9eJpcnssGCTpT3J1cojhB5M19.json",
+			want:     50000,
+		},
+		{
+			name:     "devnet plain",
+			net:      devnet,
+			filename: "devnet-100-3NKabc.json",
+			want:     100,
+		},
+		{
+			name:     "leading directory ignored",
+			net:      mainnet,
+			filename: "./blocks/mainnet-1-3NKgenesis.json",
+			want:     1,
+		},
+		{
+			name:     "wrong network prefix errors",
+			net:      mainnet,
+			filename: "devnet-50000-3NLf.json",
+			wantErr:  true,
+		},
+		{
+			name:     "missing height-hash separator errors",
+			net:      mainnet,
+			filename: "mainnet-50000.json",
+			wantErr:  true,
+		},
+		{
+			name:     "non-numeric height errors",
+			net:      mainnet,
+			filename: "mainnet-abc-3NLf.json",
+			wantErr:  true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := tt.net.BlockHeight(tt.filename)
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("BlockHeight(%q) err = %v, wantErr %v", tt.filename, err, tt.wantErr)
+			}
+			if !tt.wantErr && got != tt.want {
+				t.Errorf("BlockHeight(%q) = %d, want %d", tt.filename, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestLookupUnknownNetwork(t *testing.T) {
 	for _, name := range []string{"", "testnet", "MAINNET", "main", "berkeley"} {
 		t.Run(name, func(t *testing.T) {

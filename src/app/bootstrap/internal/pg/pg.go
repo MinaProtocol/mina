@@ -12,6 +12,8 @@ import (
 	"log/slog"
 	"os"
 	"os/exec"
+	"strconv"
+	"strings"
 )
 
 // TuningSettings are the ALTER SYSTEM values applied before loading the
@@ -41,6 +43,69 @@ func ApplyTuning(ctx context.Context, uri string) error {
 func LoadSQLFile(ctx context.Context, uri, sqlPath string) error {
 	slog.Info("loading sql dump", "path", sqlPath)
 	return run(ctx, "psql", uri, "-f", sqlPath)
+}
+
+// MaxBlockHeight returns the highest height present in the archive DB's
+// `blocks` table, or 0 when the table is empty. It is used to work out which
+// precomputed blocks still need to be backfilled after a dump restore.
+func MaxBlockHeight(ctx context.Context, uri string) (int, error) {
+	out, err := query(ctx, uri, "SELECT COALESCE(MAX(height), 0) FROM blocks")
+	if err != nil {
+		return 0, err
+	}
+	return parseMaxHeight(out)
+}
+
+// parseMaxHeight parses the raw stdout of the MAX(height) query into an int.
+func parseMaxHeight(out string) (int, error) {
+	s := strings.TrimSpace(out)
+	h, err := strconv.Atoi(s)
+	if err != nil {
+		return 0, fmt.Errorf("parse max block height %q: %w", s, err)
+	}
+	return h, nil
+}
+
+// HeightsBetween returns the distinct block heights present in [lo, hi]
+// (inclusive), ascending. Used to verify a catchup left no gap.
+func HeightsBetween(ctx context.Context, uri string, lo, hi int) ([]int, error) {
+	out, err := query(ctx, uri, fmt.Sprintf(
+		"SELECT DISTINCT height FROM blocks WHERE height BETWEEN %d AND %d ORDER BY height", lo, hi))
+	if err != nil {
+		return nil, err
+	}
+	return parseHeights(out)
+}
+
+// parseHeights parses newline-separated integer heights from psql -tA output.
+func parseHeights(out string) ([]int, error) {
+	var heights []int
+	for _, line := range strings.Split(strings.TrimSpace(out), "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		h, err := strconv.Atoi(line)
+		if err != nil {
+			return nil, fmt.Errorf("parse height %q: %w", line, err)
+		}
+		heights = append(heights, h)
+	}
+	return heights, nil
+}
+
+// query runs a single SQL statement with psql in tuples-only, unaligned mode
+// (-tA) and returns its stdout. Stderr is streamed through so psql connection
+// errors stay visible.
+func query(ctx context.Context, uri, sql string) (string, error) {
+	cmd := exec.CommandContext(ctx, "psql", uri, "-tAc", sql)
+	cmd.Stderr = os.Stderr
+	slog.Debug("exec", "cmd", "psql", "sql", sql)
+	out, err := cmd.Output()
+	if err != nil {
+		return "", fmt.Errorf("psql query: %w", err)
+	}
+	return string(out), nil
 }
 
 func run(ctx context.Context, name string, args ...string) error {

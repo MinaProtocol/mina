@@ -8,7 +8,12 @@
 //     stale config)
 package networks
 
-import "fmt"
+import (
+	"fmt"
+	"path"
+	"strconv"
+	"strings"
+)
 
 type Network struct {
 	Name string
@@ -46,4 +51,24 @@ func Lookup(name string) (Network, error) {
 		return Network{}, fmt.Errorf("unknown network %q (known: mainnet, devnet)", name)
 	}
 	return n, nil
+}
+
+// BlockHeight extracts the height embedded in a precomputed block filename of
+// the form "<PrecomputedFilenamePrefix><height>-<statehash>.json", e.g.
+// "mainnet-50000-3NLf...json" -> 50000. A leading directory path is ignored.
+func (n Network) BlockHeight(filename string) (int, error) {
+	base := path.Base(filename)
+	rest, ok := strings.CutPrefix(base, n.PrecomputedFilenamePrefix)
+	if !ok {
+		return 0, fmt.Errorf("filename %q lacks expected %q prefix", base, n.PrecomputedFilenamePrefix)
+	}
+	heightStr, _, ok := strings.Cut(rest, "-")
+	if !ok {
+		return 0, fmt.Errorf("filename %q missing height-hash separator", base)
+	}
+	h, err := strconv.Atoi(heightStr)
+	if err != nil {
+		return 0, fmt.Errorf("parse height from %q: %w", base, err)
+	}
+	return h, nil
 }

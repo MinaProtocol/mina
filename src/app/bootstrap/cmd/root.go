@@ -35,6 +35,7 @@ func init() {
 
 	rootCmd.AddCommand(archiveCmd)
 	rootCmd.AddCommand(precomputedCmd)
+	rootCmd.AddCommand(catchupCmd)
 }
 
 func Execute() error {
