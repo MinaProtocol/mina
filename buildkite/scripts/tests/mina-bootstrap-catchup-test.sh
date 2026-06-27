@@ -49,8 +49,14 @@ make build-mina-bootstrap
 BOOTSTRAP_BIN="$(pwd)/_build/mina-bootstrap"
 
 echo "--- Building mina-archive-blocks"
+# The opam env setup in ~/.profile is not `set -u`/`set -e` clean (it references
+# unbound vars and runs commands that may return non-zero), so relax strict mode
+# while sourcing it -- the repo's other dune-build scripts (unit-test.sh,
+# build-artifact.sh) source it without -u for the same reason.
+set +eu
 # shellcheck disable=SC1090
 source ~/.profile
+set -eu
 dune build src/app/archive_blocks/archive_blocks.exe
 ARCHIVE_BLOCKS_BIN="$(pwd)/_build/default/src/app/archive_blocks/archive_blocks.exe"
 
