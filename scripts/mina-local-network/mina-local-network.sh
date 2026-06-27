@@ -296,6 +296,16 @@ on-exit() {
         wait "$ROSETTA_PID"
       fi
 
+      # 2b. stop the archive node. It is spawned with '&' and is otherwise never
+      # reaped, so without this it survives the network teardown as an orphan,
+      # keeps holding the archive server port, and (across a hardfork) the next
+      # network's archive node cannot bind that port. Kill it explicitly here.
+      if [[ -n "${ARCHIVE_PID:-}" ]]; then
+        echo "Killing archive node at ${ARCHIVE_PID}"
+        kill "$ARCHIVE_PID" 2>/dev/null || true
+        wait "$ARCHIVE_PID" 2>/dev/null || true
+      fi
+
       # 3. stop the seed node, if we've spawned it.
       if [[ -n "${SEED_PID}" ]]; then
         stop-node "seed" "$SEED_START_PORT"
@@ -410,9 +420,21 @@ exec-snark-worker() {
 
 # Executes the Archive node
 exec-archive-node() {
+  # In inherit (fork) mode the post-fork genesis config has its ledger section
+  # stripped (see CleanUpNetworkForForkPhase in the hardfork test), so passing it
+  # as --config-file makes the archive fail to compute precomputed_values:
+  #   "No ledger was provided in the runtime configuration".
+  # The genesis accounts are already present in the inherited DB, and post-fork
+  # blocks link to the pre-fork parent that is already archived, so the archive
+  # needs no runtime config at all in inherit mode: omitting --config-file makes
+  # it skip genesis-account loading and simply archive incoming blocks via RPC.
+  local archive_config_arg=()
+  if ! config_mode_is_inherit "$CONFIG_MODE"; then
+    archive_config_arg=(--config-file "${CONFIG}")
+  fi
   # shellcheck disable=SC2068
   exec ${ARCHIVE_EXE} run \
-    --config-file "${CONFIG}" \
+    "${archive_config_arg[@]}" \
     --log-level "${LOG_LEVEL}" \
     --postgres-uri postgresql://"${PG_USER}":"${PG_PASSWD}"@"${PG_HOST}":"${PG_PORT}"/"${PG_DB}" \
     --server-port "${ARCHIVE_SERVER_PORT}" \
@@ -534,11 +556,13 @@ recreate-schema() {
 
   PGPASSWORD="${PG_PASSWD}" psql postgresql://"${PG_USER}":"${PG_PASSWD}"@"${PG_HOST}":"${PG_PORT}" -c "CREATE DATABASE ${PG_DB};"
 
-  # We need to change our working directory as script has relation to others subscripts
-  # and calling them from local folder
-  pushd ./src/app/archive
-  psql postgresql://"${PG_USER}":"${PG_PASSWD}"@"${PG_HOST}":"${PG_PORT}"/"${PG_DB}" < create_schema.sql
-  popd
+  # Allow overriding the schema file via CREATE_SCHEMA_FILE (absolute path). This is
+  # used by the hardfork test to load a Berkeley-compatible schema for the pre-fork
+  # network; it then applies upgrade_to_mesa.sql before the fork. Defaults to the
+  # in-tree schema.
+  local schema_file="${CREATE_SCHEMA_FILE:-$(pwd)/src/app/archive/create_schema.sql}"
+  echo "Loading archive schema from ${schema_file}"
+  psql postgresql://"${PG_USER}":"${PG_PASSWD}"@"${PG_HOST}":"${PG_PORT}"/"${PG_DB}" < "${schema_file}"
 
   echo "Schema '${PG_DB}' created successfully."
   printf "\n"
