@@ -26,10 +26,13 @@ PG_BASE="${POSTGRES_URI:-postgres://postgres:postgres@localhost:5432}"
 PG_ADMIN_URI="${PG_BASE}/postgres"
 PG_ARCHIVE_URI="${PG_CONN:-${PG_BASE}/archive}"
 
-echo "--- Marking the checkout safe for git"
-# The container user does not own /workdir, so git refuses to operate on it
-# ("dubious ownership"), which breaks `go build` VCS stamping and the dune
-# mina_version git stamp. Mark everything (repo + submodules) safe.
+echo "--- Taking ownership of the checkout"
+# runInDockerWithPostgresConn (unlike the deb toolchain helper) does not chown
+# the checkout, so /workdir is owned by another user. The container user then
+# cannot create _build/ (go build + dune both write there) and git refuses to
+# operate on it ("dubious ownership", which also breaks go's VCS stamping).
+# Claim the tree like the deb path's `sudo chown -R opam .` does.
+sudo chown -R "$(id -u):$(id -g)" .
 git config --global --add safe.directory '*'
 
 echo "--- Ensuring psql client is available"
