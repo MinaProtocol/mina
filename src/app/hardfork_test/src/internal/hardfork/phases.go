@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -160,9 +161,37 @@ func (t *HardforkTest) RunForkNetworkPhase(latestPreForkHeight int, mainGenesisT
 		return err
 	}
 
-	// Validate user commands in blocks
-	if err := t.ValidateBlockWithUserCommandCreatedForkNetwork(t.Config.AnyDaemon().Port(config.PORT_REST)); err != nil {
-		return err
+	// Validate user commands in blocks. This requires the fork network to carry
+	// user transactions; when the post-fork network is intentionally quiet (the
+	// max-cost experiment drives traffic externally during the hold below), there
+	// are no built-in payments to observe, so skip this check.
+	forkValueTransfers := false
+	if v := os.Getenv("HARDFORK_VALUE_TRANSFERS_FORK"); v != "" {
+		forkValueTransfers = v != "0"
+	}
+	if forkValueTransfers {
+		if err := t.ValidateBlockWithUserCommandCreatedForkNetwork(t.Config.AnyDaemon().Port(config.PORT_REST)); err != nil {
+			return err
+		}
+	} else {
+		t.Logger.Info("Fork network is quiet (no built-in value transfers); skipping user-command-in-block validation. Post-fork traffic is driven externally during the hold.")
+	}
+
+	// Optional post-fork hold: keep the Mesa network (and its archive node) alive
+	// after validation so an external driver can (1) verify the migrated archive on
+	// a few clean post-fork blocks and (2) run the max-cost ITN zkApp load while
+	// watching the archive/postgres for the expected error. Without this the phase
+	// returns immediately and the deferred gracefulShutdown tears the network down.
+	if holdStr := os.Getenv("HARDFORK_POSTFORK_HOLD_MIN"); holdStr != "" {
+		if holdMin, err := strconv.Atoi(holdStr); err == nil && holdMin > 0 {
+			t.Logger.Info("Post-fork hold: keeping fork network alive for %d minute(s) for external load/observation", holdMin)
+			select {
+			case <-time.After(time.Duration(holdMin) * time.Minute):
+				t.Logger.Info("Post-fork hold elapsed; proceeding to shutdown")
+			case <-t.ctx.Done():
+				t.Logger.Info("Post-fork hold interrupted; proceeding to shutdown")
+			}
+		}
 	}
 
 	return nil
