@@ -43,6 +43,22 @@ module Missing_blocks_gap = struct
 end
 
 module Chain_status = struct
+  (* The auditor's chain-status gap check runs in two steps, each a thin
+     wrapper over a shared {!Archive_health_queries} query so the SQL is
+     defined once and reused by the healthcheck CLI and metrics:
+
+     1. [run_highest_canonical] — the height of the chain tip we trust
+        ({!Archive_health_queries.Highest_canonical_height}, [None] when
+        there is no canonical block at all).
+     2. [run_count_pending_below] — how many blocks at or below that
+        canonical height are still [pending]
+        ({!Archive_health_queries.Pending_blocks_below_canonical}).
+
+     In a healthy archive (2) is 0: everything at or below the canonical
+     tip should itself be canonical.  A non-zero count means
+     canonicalization stalled and the chain-status bookkeeping has a gap,
+     which the auditor reports.  See [missing_blocks_auditor.ml] for the
+     call site that threads (1) into (2). *)
   let run_highest_canonical db () =
     Archive_health_queries.Highest_canonical_height.run db ()
 
