@@ -1708,20 +1708,29 @@ let gen_max_cost_zkapp_command_from ?memo ?fee_range ?pk ?(n_updates : int = 15)
   let[@warning "-8"] (head :: tail) =
     List.map pks ~f:(fun pk -> mk_account_update ~pk ~vk)
   in
-  let events =
-    List.init genesis_constants.max_event_elements ~f:(fun i ->
-        [| Snark_params.Tick.Field.of_int i |] )
-  in
-  let actions =
-    List.init genesis_constants.max_action_elements ~f:(fun i ->
-        [| Snark_params.Tick.Field.of_int i |] )
-  in
-  let account_updates =
-    { head with body = { head.body with events; actions } } :: tail
-  in
   let fee_payer_id = Account_id.create fee_payer_pk Token_id.default in
   let fee_payer_account, _ =
     Account_id.Table.find_exn account_state_tbl fee_payer_id
+  in
+  (* Keep events and actions maxed out (max_event_elements / max_action_elements
+     total field elements), but alternate their on-wire encoding per generated
+     transaction so both valid shapes are exercised across a load run. The
+     fee-payer nonce increments once per generated command (see the
+     [Account_id.Table.change] below), giving a deterministic A/B/A/B alternation
+     applied to both events and actions.
+       Shape A: a list of N single-element field arrays      [ [|f0|]; [|f1|]; ... ]
+       Shape B: a singleton list of one N-element field array [ [|f0; f1; ...; f_{N-1}|] ]
+     Both encode N field elements and pass [Zkapp_command.valid_size]. *)
+  let use_shape_b = Account.Nonce.to_int fee_payer_account.nonce mod 2 = 1 in
+  let mk_maxed n =
+    if use_shape_b then
+      [ Array.init n ~f:(fun i -> Snark_params.Tick.Field.of_int i) ]
+    else List.init n ~f:(fun i -> [| Snark_params.Tick.Field.of_int i |])
+  in
+  let events = mk_maxed genesis_constants.max_event_elements in
+  let actions = mk_maxed genesis_constants.max_action_elements in
+  let account_updates =
+    { head with body = { head.body with events; actions } } :: tail
   in
   let%map fee =
     Option.value_map fee_range
@@ -1926,8 +1935,14 @@ let%test_module _ =
       let events = first_update.body.events in
       let actions = first_update.body.actions in
 
-      assert (List.length events = genesis_constants.max_event_elements) ;
-      assert (List.length actions = genesis_constants.max_action_elements) ;
+      (* events/actions may be encoded as either Shape A (a list of single-element
+         arrays) or Shape B (a singleton list of one all-elements array); assert
+         on the total number of field elements, which is shape-independent. *)
+      let total_elements l =
+        List.fold l ~init:0 ~f:(fun acc arr -> acc + Array.length arr)
+      in
+      assert (total_elements events = genesis_constants.max_event_elements) ;
+      assert (total_elements actions = genesis_constants.max_action_elements) ;
       let _ =
         Zkapp_command.Call_forest.mapi_with_trees command.account_updates
           ~f:(fun _ndx acc tree ->
