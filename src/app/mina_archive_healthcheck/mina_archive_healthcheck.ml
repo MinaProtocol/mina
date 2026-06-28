@@ -6,6 +6,10 @@ module Q = Archive_health_queries
 
 let default_missing_blocks_width = 2000
 
+(* "delay" throughout this CLI means archive-tip staleness: the number
+   of seconds between wall-clock now and the timestamp of the most
+   recent block, i.e. [now - latest_block_timestamp].  A large delay
+   means the archive has not ingested a block recently. *)
 let default_max_delay = 360
 
 let default_max_missing = 10
@@ -56,7 +60,8 @@ let max_delay_flag =
     flag "--max-delay"
       ~doc:
         (sprintf
-           "SECONDS Maximum acceptable delay since last block (default: %d)"
+           "SECONDS Maximum acceptable archive-tip staleness, i.e. (now - \
+            latest block timestamp); fail if it exceeds this (default: %d)"
            default_max_delay )
       (optional_with_default default_max_delay int))
 
