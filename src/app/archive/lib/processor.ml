@@ -2063,32 +2063,46 @@ module User_command = struct
     let add_if_doesn't_exist ~logger (module Conn : Mina_caqti.CONNECTION)
         (ps : Zkapp_command.t) =
       let open Deferred.Result.Let_syntax in
-      let zkapp_command = Zkapp_command.to_simple ps in
-      let%bind zkapp_fee_payer_body_id =
-        Metrics.time ~label:"Zkapp_fee_payer_body.add" ~logger
-        @@ fun () ->
-        Zkapp_fee_payer_body.add_if_doesn't_exist
-          (module Conn)
-          zkapp_command.fee_payer.body
-      in
-      let%bind zkapp_account_updates_ids =
-        Metrics.time ~label:"Zkapp_account_update.add" ~logger
-        @@ fun () ->
-        Mina_caqti.deferred_result_list_map zkapp_command.account_updates
-          ~f:(Zkapp_account_update.add_if_doesn't_exist ~logger (module Conn))
-        >>| Array.of_list
-      in
-      let memo = ps.memo |> Signed_command_memo.to_base58_check in
-      let hash =
+      let transaction_hash =
         Transaction_hash.hash_zkapp_command_with_hashes ps
-        |> Transaction_hash.to_base58_check
       in
-      Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
-        ~table_name:"zkapp_commands" ~cols:(Fields.names, typ)
-        ~tannot:(function
-          | "zkapp_account_updates_ids" -> Some "int[]" | _ -> None )
-        (module Conn)
-        { zkapp_fee_payer_body_id; zkapp_account_updates_ids; memo; hash }
+      (* A zkapp command is uniquely identified by its transaction hash. The same
+         command can occur in more than one block (e.g. forked sibling blocks at
+         the same height share a transaction), so dedup on the hash alone and
+         reuse the existing row. Building the child rows unconditionally is both
+         wasteful and, once zkapp_field_array/zkapp_events are inserted without
+         dedup, unsafe: re-minting child ids makes the full-tuple match in
+         select_insert_into_cols miss and fall through to an INSERT that collides
+         on zkapp_commands_hash_key. *)
+      match%bind find_opt (module Conn) ~transaction_hash with
+      | Some id ->
+          return id
+      | None ->
+          let zkapp_command = Zkapp_command.to_simple ps in
+          let%bind zkapp_fee_payer_body_id =
+            Metrics.time ~label:"Zkapp_fee_payer_body.add" ~logger
+            @@ fun () ->
+            Zkapp_fee_payer_body.add_if_doesn't_exist
+              (module Conn)
+              zkapp_command.fee_payer.body
+          in
+          let%bind zkapp_account_updates_ids =
+            Metrics.time ~label:"Zkapp_account_update.add" ~logger
+            @@ fun () ->
+            Mina_caqti.deferred_result_list_map zkapp_command.account_updates
+              ~f:
+                (Zkapp_account_update.add_if_doesn't_exist ~logger
+                   (module Conn) )
+            >>| Array.of_list
+          in
+          let memo = ps.memo |> Signed_command_memo.to_base58_check in
+          let hash = Transaction_hash.to_base58_check transaction_hash in
+          Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
+            ~table_name:"zkapp_commands" ~cols:(Fields.names, typ)
+            ~tannot:(function
+              | "zkapp_account_updates_ids" -> Some "int[]" | _ -> None )
+            (module Conn)
+            { zkapp_fee_payer_body_id; zkapp_account_updates_ids; memo; hash }
   end
 
   let via (t : User_command.t) : [ `Zkapp_command | `Ident ] =
