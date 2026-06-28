@@ -397,7 +397,10 @@ module Zkapp_field_array = struct
         ~f:(Zkapp_field.add_if_doesn't_exist (module Conn))
       >>| Array.of_list
     in
-    Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
+    (* No content dedup: element_ids has no UNIQUE constraint/index (a btree over
+       the unbounded int[] overflows Postgres' 2704-byte key limit for max-cost
+       zkApps), so always INSERT a fresh row and return its id. *)
+    Mina_caqti.insert_into_cols_returning ~returning:("id", Caqti_type.int)
       ~table_name
       ~cols:([ "element_ids" ], Mina_caqti.array_int_typ)
       ~tannot:(function "element_ids" -> Some "int[]" | _ -> None)
@@ -1515,83 +1518,70 @@ module Zkapp_events = struct
 
   let table_name = "zkapp_events"
 
-  module Field_array_map = Map.Make (struct
-    type t = int array [@@deriving sexp]
+  (* Account_update.Body.Events'.t is `field array list` (a list of arrays of
+     fields). We insert in batched, NON-deduplicated steps:
 
-    let compare = Array.compare Int.compare
-  end)
+     1. flatten to all field strings and insert them (zkapp_field keeps its
+        UNIQUE(field) constraint, so this step still dedups by content);
+     2. for each event (a field array), render its field ids as an int[] literal
+        and insert them all into zkapp_field_array in one query, taking the
+        returned ids POSITIONALLY (in VALUES order) — NO content dedup, since
+        zkapp_field_array.element_ids has no UNIQUE/index (a btree over the
+        unbounded int[] overflows Postgres' 2704-byte key limit for max-cost
+        zkApps);
+     3. insert that array of field_array ids into zkapp_events (also no dedup).
 
-  (* Account_update.Body.Events'.t is defined as `field array list`,
-     which is ismorphic to a list of list of fields.
-
-     We are batching the insertion of field and field_array to optimize
-     the speed of archiving max-cost zkapps.
-
-     1. we flatten the list of list of fields to get all the field elements
-     2. insert all the field elements in one query
-     3. construct a map "M" from `field_id` to `field` by querying against the zkapp_field table
-     4. use "M" and the list of list of fields to compute the list of list of field_ids
-     5. insert all list of `list of field_ids` in one query
-     6. construct a map "M'" from `field_array_id` to `field_id array` by querying against
-        the zkapp_field_array table
-     7. use "M'" and the list of list of field_ids to compute the list of field_array_ids
-     8. insert the list of field_arrays
-  *)
+     The EMPTY case (events = []) is represented as NULL: we create NO zkapp_events
+     row and return None, so account_update_body.events_id/actions_id store NULL.
+     This eliminates the dominant duplicate (the empty {} array) structurally
+     rather than via content dedup. Returns [int option]. *)
   let add_if_doesn't_exist (module Conn : Mina_caqti.CONNECTION)
       (events : Account_update.Body.Events'.t) =
     let open Deferred.Result.Let_syntax in
-    let%bind field_array_id_list =
-      if not @@ List.is_empty events then
-        let field_list_list =
-          List.map events ~f:(fun field_array ->
-              Array.map field_array ~f:Pickles.Backend.Tick.Field.to_string
-              |> Array.to_list )
-        in
-        let fields = field_list_list |> List.concat in
-        let%bind field_id_list_list =
-          if not @@ List.is_empty fields then
-            let%map field_map =
-              Mina_caqti.insert_multi_into_col ~table_name:"zkapp_field"
-                ~col:("field", Caqti_type.string)
-                (module Conn)
-                fields
-              >>| String.Map.of_alist_exn
-            in
-            let field_id_list_list =
-              List.map field_list_list ~f:(List.map ~f:(Map.find_exn field_map))
-            in
-            field_id_list_list
-          else
-            (* if there's no fields, then we must have some list of empty lists *)
-            return @@ List.map field_list_list ~f:(fun _ -> [])
-        in
-        (* this conversion should be done by caqti using `typ`, FIX this in the future *)
-        let field_array_list =
-          List.map field_id_list_list ~f:(fun id_list ->
-              List.map id_list ~f:Int.to_string
-              |> String.concat ~sep:", " |> sprintf "{%s}" )
-        in
-        let%map field_array_map =
-          Mina_caqti.insert_multi_into_col ~table_name:"zkapp_field_array"
-            ~col:("element_ids", Mina_caqti.array_int_typ)
-            (module Conn)
-            field_array_list
-          >>| Field_array_map.of_alist_exn
-        in
-        let field_array_id_list =
-          List.map field_id_list_list ~f:(fun field_id_list ->
-              Map.find_exn field_array_map (Array.of_list field_id_list) )
-          |> Array.of_list
-        in
-        field_array_id_list
-      else return @@ Array.of_list []
-    in
-    Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
-      ~table_name
-      ~cols:([ "element_ids" ], Mina_caqti.array_int_typ)
-      ~tannot:(function "element_ids" -> Some "int[]" | _ -> None)
-      (module Conn)
-      field_array_id_list
+    if List.is_empty events then return None
+    else
+      let field_list_list =
+        List.map events ~f:(fun field_array ->
+            Array.map field_array ~f:Pickles.Backend.Tick.Field.to_string
+            |> Array.to_list )
+      in
+      let fields = field_list_list |> List.concat in
+      let%bind field_id_list_list =
+        if not @@ List.is_empty fields then
+          let%map field_map =
+            Mina_caqti.insert_multi_into_col ~table_name:"zkapp_field"
+              ~col:("field", Caqti_type.string)
+              (module Conn)
+              fields
+            >>| String.Map.of_alist_exn
+          in
+          List.map field_list_list ~f:(List.map ~f:(Map.find_exn field_map))
+        else
+          (* no fields => a non-empty list of empty events; each maps to {} *)
+          return @@ List.map field_list_list ~f:(fun _ -> [])
+      in
+      (* this conversion should be done by caqti using `typ`, FIX this in the future *)
+      let field_array_list =
+        List.map field_id_list_list ~f:(fun id_list ->
+            List.map id_list ~f:Int.to_string
+            |> String.concat ~sep:", " |> sprintf "{%s}" )
+      in
+      let%bind field_array_ids =
+        Mina_caqti.insert_multi_into_col_no_dedup
+          ~table_name:"zkapp_field_array" ~col:"element_ids"
+          (module Conn)
+          field_array_list
+      in
+      let element_ids = Array.of_list field_array_ids in
+      let%map id =
+        Mina_caqti.insert_into_cols_returning ~returning:("id", Caqti_type.int)
+          ~table_name
+          ~cols:([ "element_ids" ], Mina_caqti.array_int_typ)
+          ~tannot:(function "element_ids" -> Some "int[]" | _ -> None)
+          (module Conn)
+          element_ids
+      in
+      Some id
 
   let load (module Conn : Mina_caqti.CONNECTION) id =
     Conn.find
@@ -1606,8 +1596,8 @@ module Zkapp_account_update_body = struct
     ; update_id : int
     ; balance_change : string
     ; increment_nonce : bool
-    ; events_id : int
-    ; actions_id : int
+    ; events_id : int option
+    ; actions_id : int option
     ; call_data_id : int
     ; call_depth : int
     ; zkapp_network_precondition_id : int
@@ -1628,8 +1618,8 @@ module Zkapp_account_update_body = struct
         ; int
         ; string
         ; bool
-        ; int
-        ; int
+        ; option int
+        ; option int
         ; int
         ; int
         ; int
