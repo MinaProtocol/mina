@@ -160,8 +160,6 @@ module Output = struct
     ; problems = None
     ; error = None
     }
-
-  let to_json = to_yojson
 end
 
 (* The [json_error] callback for every [healthy]-keyed subcommand is
@@ -169,12 +167,12 @@ end
    same failure as [{ready=false; error}] instead. *)
 let health_error e =
   Output.(
-    to_json
+    to_yojson
       { empty with healthy = Some false; error = Some (Error.to_string_hum e) })
 
 let readiness_error e =
   Output.(
-    to_json
+    to_yojson
       { empty with ready = Some false; error = Some (Error.to_string_hum e) })
 
 let with_pool ~postgres_uri f =
@@ -237,7 +235,7 @@ let db_ready_command =
          ( match result with
          | Ok _height ->
              if json then
-               output Output.(to_json { empty with healthy = Some true })
+               output Output.(to_yojson { empty with healthy = Some true })
              else printf "OK\n" ;
              Ok ()
          | Error e ->
@@ -258,7 +256,7 @@ let block_height_command =
              if json then
                output
                  Output.(
-                   to_json
+                   to_yojson
                      { empty with
                        healthy = Some true
                      ; block_height = Some height
@@ -303,7 +301,7 @@ let block_recency_command =
                    if json then
                      output
                        Output.(
-                         to_json
+                         to_yojson
                            { empty with
                              healthy = Some true
                            ; delay_seconds = Some delay_secs
@@ -322,7 +320,7 @@ let block_recency_command =
                    if json then (
                      output
                        Output.(
-                         to_json
+                         to_yojson
                            { empty with
                              healthy = Some false
                            ; delay_seconds = Some delay_secs
@@ -360,7 +358,7 @@ let missing_blocks_command =
                if json then
                  output
                    Output.(
-                     to_json
+                     to_yojson
                        { empty with
                          healthy = Some true
                        ; missing_blocks = Some count
@@ -379,7 +377,7 @@ let missing_blocks_command =
                if json then (
                  output
                    Output.(
-                     to_json
+                     to_yojson
                        { empty with
                          healthy = Some false
                        ; missing_blocks = Some count
@@ -415,7 +413,7 @@ let unparented_blocks_command =
                if json then
                  output
                    Output.(
-                     to_json
+                     to_yojson
                        { empty with
                          healthy = Some true
                        ; unparented_blocks = Some count
@@ -432,7 +430,7 @@ let unparented_blocks_command =
                if json then (
                  output
                    Output.(
-                     to_json
+                     to_yojson
                        { empty with
                          healthy = Some false
                        ; unparented_blocks = Some count
@@ -521,7 +519,7 @@ let ready_command =
                if json then
                  output
                    Output.(
-                     to_json
+                     to_yojson
                        { empty with
                          ready = Some true
                        ; block_height = Some height
@@ -538,7 +536,7 @@ let ready_command =
                if json then (
                  output
                    Output.(
-                     to_json
+                     to_yojson
                        { empty with
                          ready = Some false
                        ; block_height = Some height
@@ -597,7 +595,7 @@ let wait_command =
            if json then (
              output
                Output.(
-                 to_json
+                 to_yojson
                    { empty with
                      ready = Some false
                    ; timed_out = Some false
@@ -633,7 +631,7 @@ let wait_command =
                  if json then
                    output
                      Output.(
-                       to_json
+                       to_yojson
                          { empty with ready = Some true; db_only = Some true })
                  else print_endline "READY (db-only)" ;
                  Deferred.Or_error.return ()
@@ -641,7 +639,7 @@ let wait_command =
                  if json then (
                    output
                      Output.(
-                       to_json
+                       to_yojson
                          { empty with
                            ready = Some false
                          ; timed_out = Some true
@@ -676,7 +674,7 @@ let wait_command =
                    if json then (
                      output
                        Output.(
-                         to_json
+                         to_yojson
                            { empty with
                              ready = Some false
                            ; timed_out = Some true
@@ -700,7 +698,7 @@ let wait_command =
                    if json then
                      output
                        Output.(
-                         to_json
+                         to_yojson
                            { empty with
                              ready = Some true
                            ; block_height = Some height
@@ -714,7 +712,7 @@ let wait_command =
                    if json then (
                      output
                        Output.(
-                         to_json
+                         to_yojson
                            { empty with
                              ready = Some false
                            ; timed_out = Some true
