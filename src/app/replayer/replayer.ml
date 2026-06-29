@@ -563,7 +563,7 @@ let zkapp_command_to_transaction ~proof_cache_db ~logger ~pool
   @@ Mina_transaction.Transaction.Command
        (User_command.Zkapp_command zkapp_command)
 
-let find_canonical_chain ~logger pool slot =
+let find_canonical_chain ~canonical_only ~logger pool slot =
   (* find longest canonical chain
      a slot may represent several blocks, only one of which can be on canonical chain
      starting with max slot, look for chain, decrementing slot until chain found
@@ -579,18 +579,19 @@ let find_canonical_chain ~logger pool slot =
         Some state_hash
   in
   let%bind state_hashes =
-    query_db ~f:(fun db -> Sql.Block.get_state_hashes_by_slot db slot)
+    query_db ~f:(fun db ->
+        Sql.Block.get_state_hashes_by_slot ~canonical_only db slot )
   in
   Deferred.List.find_map state_hashes ~f:find_state_hash_chain
 
-let try_slot ~logger pool slot =
+let try_slot ~canonical_only ~logger pool slot =
   let num_tries = 5 in
   let rec go ~slot ~tries_left =
     if tries_left <= 0 then (
       [%log fatal] "Could not find canonical chain after trying %d slots"
         num_tries ;
       Core_kernel.exit 1 ) ;
-    match%bind find_canonical_chain ~logger pool slot with
+    match%bind find_canonical_chain ~canonical_only ~logger pool slot with
     | None ->
         go ~slot:(Int64.pred slot) ~tries_left:(tries_left - 1)
     | Some state_hash ->
@@ -919,10 +920,10 @@ let filter_block_infos_for_hard_fork ~logger ~target_state_hash
       block_infos
 
 let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
-    ~checkpoint_interval ~checkpoint_output_folder_opt ~checkpoint_file_prefix
-    ~genesis_dir_opt ~stop_slot_config_file ~hard_fork_output_file
-    ~hard_fork_target ~log_json ~log_level ~log_filename ~file_log_level
-    ~constraint_constants ~proof_level () =
+    ~canonical_only ~checkpoint_interval ~checkpoint_output_folder_opt
+    ~checkpoint_file_prefix ~genesis_dir_opt ~stop_slot_config_file
+    ~hard_fork_output_file ~hard_fork_target ~log_json ~log_level ~log_filename
+    ~file_log_level ~constraint_constants ~proof_level () =
   Cli_lib.Stdout_log.setup log_json log_level ;
   Option.iter log_filename ~f:(fun log_filename ->
       Logger.Consumer_registry.register ~id:"default"
@@ -1001,11 +1002,13 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
             [%log info]
               "Searching for block with greatest height on canonical chain" ;
             let%bind max_slot =
-              query_db ~f:(fun db -> Sql.Block.get_max_canonical_slot db ())
+              if canonical_only then
+                query_db ~f:(fun db -> Sql.Block.get_max_canonical_slot db ())
+              else query_db ~f:(fun db -> Sql.Block.get_max_slot db ())
             in
             [%log info] "Maximum global slot since genesis in blocks is %Ld"
               max_slot ;
-            try_slot ~logger pool max_slot
+            try_slot ~canonical_only ~logger pool max_slot
       in
       if not @@ List.is_empty input.first_pass_ledger_hashes then (
         [%log info] "Populating set of first-pass ledger hashes" ;
@@ -1265,7 +1268,9 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
                Int64.(input.start_slot_since_genesis + interval) ) )
       in
       let%bind max_canonical_slot =
-        query_db ~f:(fun db -> Sql.Block.get_max_canonical_slot db ())
+        if canonical_only then
+          query_db ~f:(fun db -> Sql.Block.get_max_canonical_slot db ())
+        else query_db ~f:(fun db -> Sql.Block.get_max_slot db ())
       in
       let%bind genesis_snarked_ledger_hash =
         let%map hash_str =
@@ -2063,9 +2068,13 @@ let () =
                "URI URI for connecting to the archive database (e.g., \
                 postgres://$USER@localhost:5432/archiver)"
              Param.(required string)
-         and continue_on_error =
-           Param.flag "--continue-on-error"
-             ~doc:"Continue processing after errors" Param.no_arg
+          and continue_on_error =
+            Param.flag "--continue-on-error"
+              ~doc:"Continue processing after errors" Param.no_arg
+          and canonical_only =
+            Param.flag "--canonical-only"
+              ~doc:"Only consider blocks with chain_status=canonical"
+              Param.no_arg
          and checkpoint_interval =
            Param.flag "--checkpoint-interval"
              ~doc:"NN Write checkpoint file every NN slots"
@@ -2108,7 +2117,7 @@ let () =
          and file_log_level = Cli_lib.Flag.Log.file_log_level
          and log_filename = Cli_lib.Flag.Log.file in
          main ~input_file ~output_file_opt ~archive_uri ~checkpoint_interval
-           ~continue_on_error ~checkpoint_output_folder_opt
-           ~checkpoint_file_prefix ~genesis_dir_opt ~stop_slot_config_file
-           ~hard_fork_output_file ~hard_fork_target ~log_json ~log_level
-           ~file_log_level ~log_filename ~constraint_constants ~proof_level )))
+            ~continue_on_error ~canonical_only ~checkpoint_output_folder_opt
+            ~checkpoint_file_prefix ~genesis_dir_opt ~stop_slot_config_file
+            ~hard_fork_output_file ~hard_fork_target ~log_json ~log_level
+            ~file_log_level ~log_filename ~constraint_constants ~proof_level )))

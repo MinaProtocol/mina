@@ -149,8 +149,16 @@ module Block = struct
             AND chain_status = 'canonical'
       |sql}
 
-  let get_state_hashes_by_slot (module Conn : Mina_caqti.CONNECTION) slot =
-    Conn.collect_list state_hashes_by_slot_query slot
+  let state_hashes_by_slot_noncanonical_query =
+    Mina_caqti.collect_req Caqti_type.int64 Caqti_type.string
+      {sql| SELECT state_hash FROM blocks
+            WHERE global_slot_since_genesis = $1
+      |sql}
+
+  let get_state_hashes_by_slot ?(canonical_only = true)
+      (module Conn : Mina_caqti.CONNECTION) slot =
+    if canonical_only then Conn.collect_list state_hashes_by_slot_query slot
+    else Conn.collect_list state_hashes_by_slot_noncanonical_query slot
 
   (* find all blocks, working back from block with given state hash *)
   let chain_query =
