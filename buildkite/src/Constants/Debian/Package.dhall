@@ -18,6 +18,7 @@ let Package
       | DaemonStorageToolbox
       | PreforkGenesisLedger
       | Archive
+      | ArchiveGeneric
       | RosettaGeneric
       | Rosetta
       | TestExecutive
@@ -38,6 +39,7 @@ let All =
       , Package.DaemonStorageToolbox
       , Package.PreforkGenesisLedger
       , Package.Archive
+      , Package.ArchiveGeneric
       , Package.RosettaGeneric
       , Package.Rosetta
       , Package.TestExecutive
@@ -51,6 +53,7 @@ let MainPackages =
       [ Package.DaemonGeneric
       , Package.DaemonConfig
       , Package.Archive
+      , Package.ArchiveGeneric
       , Package.LogProc
       , Package.RosettaGeneric
       , Package.Rosetta
@@ -83,11 +86,12 @@ let index =
             , DaemonStorageToolbox = 7
             , PreforkGenesisLedger = 8
             , Archive = 9
-            , RosettaGeneric = 10
-            , Rosetta = 11
-            , TestExecutive = 12
-            , TxTools = 13
-            , LogProc = 14
+            , ArchiveGeneric = 10
+            , RosettaGeneric = 11
+            , Rosetta = 12
+            , TestExecutive = 13
+            , TxTools = 14
+            , LogProc = 15
             , FunctionalTestSuite = 16
             , DelegationVerifier = 17
             }
@@ -106,6 +110,7 @@ let isNetworked =
             , DaemonStorageToolbox = False
             , PreforkGenesisLedger = True
             , Archive = True
+            , ArchiveGeneric = False
             , RosettaGeneric = False
             , Rosetta = True
             , TestExecutive = False
@@ -129,6 +134,7 @@ let capitalName =
             , DaemonStorageToolbox = "DaemonStorageToolbox"
             , PreforkGenesisLedger = "PreforkGenesisLedger"
             , Archive = "Archive"
+            , ArchiveGeneric = "ArchiveGeneric"
             , RosettaGeneric = "RosettaGeneric"
             , Rosetta = "Rosetta"
             , TestExecutive = "TestExecutive"
@@ -152,6 +158,7 @@ let lowerName =
             , DaemonStorageToolbox = "daemon_storage_toolbox"
             , PreforkGenesisLedger = "prefork_genesis_ledger"
             , Archive = "archive"
+            , ArchiveGeneric = "archive_generic"
             , RosettaGeneric = "rosetta_generic"
             , Rosetta = "rosetta"
             , TestExecutive = "test_executive"
@@ -179,6 +186,7 @@ let buildToken =
             , PreforkGenesisLedger =
                 "prefork_${Network.lowerName network}_genesis_ledger"
             , Archive = "archive_${Network.lowerName network}"
+            , ArchiveGeneric = "archive_generic"
             , RosettaGeneric = "rosetta_generic"
             , Rosetta = "rosetta_${Network.lowerName network}"
             , TestExecutive = "test_executive"
@@ -207,19 +215,19 @@ let aptName =
       ->  \(profile : Profile.Type)
       ->  \(network : Network.Type)
       ->  merge
-            { Profile = Profile.genericName profile
+            { Profile = Profile.profileName profile
             , DaemonGeneric = "mina-generic"
             , DaemonConfig = "mina-${Network.lowerName network}-config"
-            , DaemonHardforkConfig =
-                "mina-${Network.lowerName network}-hardfork-config"
+            , DaemonHardforkConfig = "mina-${Network.lowerName network}-config"
             , DaemonAutomode = "mina-${Network.lowerName network}-automode"
-            , DaemonPostfork = "mina-${Network.lowerName network}-postfork"
-            , DaemonPrefork = "mina-${Network.lowerName network}-prefork"
+            , DaemonPostfork = "mina-${Network.lowerName network}-postfork-mesa"
+            , DaemonPrefork = "mina-${Network.lowerName network}-prefork-mesa"
             , DaemonStorageToolbox = "mina-daemon-storage-toolbox"
             , PreforkGenesisLedger =
                 "mina-create-${Network.lowerName
                                  network}-prefork-genesis-ledger"
             , Archive = "mina-archive-${Network.lowerName network}"
+            , ArchiveGeneric = "mina-archive-generic"
             , RosettaGeneric = "mina-rosetta-generic"
             , Rosetta = "mina-rosetta-${Network.lowerName network}"
             , TestExecutive = "mina-test-executive"
@@ -253,9 +261,9 @@ let test_profile_apt =
       :     "mina-lightnet"
         ===  aptName Package.Profile Profile.Type.Lightnet Network.Type.Devnet
 
-let test_profile_generic_apt =
+let test_profile_apt =
         assert
-      :     "mina-devnet-generic"
+      :     "mina-devnet-profile"
         ===  aptName Package.Profile Profile.Type.Devnet Network.Type.Devnet
 
 let test_daemon_config_token =

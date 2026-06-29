@@ -607,17 +607,13 @@ debian-build-prefork-genesis-ledger: ## Build the Debian Create Legacy Genesis p
 	$(call check_env_var,NETWORK_NAME)
 	$(call build_debian_package,prefork_$(NETWORK_NAME)_genesis_ledger)
 
-.PHONY: debian-build-rosetta-devnet-generic
-debian-build-rosetta-devnet-generic: ## Build the Debian Rosetta package
-	$(call build_debian_package,rosetta_devnet_generic)
+.PHONY: debian-build-rosetta-generic
+debian-build-rosetta-generic: ## Build the Debian Rosetta generic package
+	$(call build_debian_package,rosetta_generic)
 
-.PHONY: debian-build-rosetta-mainnet-generic
-debian-build-rosetta-mainnet-generic: ## Build the Debian Rosetta package
-	$(call build_debian_package,rosetta_mainnet_generic)
-
-.PHONY: debian-build-zkapp-test-transaction
-debian-build-zkapp-test-transaction: ## Build the Debian Zkapp Test Transaction package for devnet
-	$(call build_debian_package,zkapp_test_transaction)
+.PHONY: debian-build-tx-tools
+debian-build-tx-tools: ## Build the Debian tx-tools package (batch_txn + zkapp_test_transaction)
+	$(call build_debian_package,tx_tools)
 
 .PHONY: debian-build-rosetta-devnet
 debian-build-rosetta-devnet: ## Build the Debian Rosetta package for devnet
@@ -629,19 +625,11 @@ debian-build-rosetta-mainnet: ## Build the Debian Rosetta package for mainnet
 
 .PHONY: debian-build-daemon-devnet-postfork
 debian-build-daemon-devnet-postfork: ## Build the Debian daemon package for automote devnet post hardfork
-	$(call build_debian_package,daemon_postfork_devnet)
+	$(call build_debian_package,daemon_devnet_postfork)
 
 .PHONY: debian-build-daemon-mainnet-postfork
 debian-build-daemon-mainnet-postfork: ## Build the Debian daemon package for automote mainnet post hardfork
-	$(call build_debian_package,daemon_postfork_mainnet)
-
-.PHONY: debian-build-daemon-devnet-prefork
-debian-build-daemon-devnet-prefork: ## Build the Debian daemon package for automote devnet pre hardfork
-	$(call build_debian_package,daemon_prefork_devnet)
-
-.PHONY: debian-build-daemon-mainnet-prefork
-debian-build-daemon-mainnet-prefork: ## Build the Debian daemon package for automote mainnet pre hardfork
-	$(call build_debian_package,daemon_prefork_mainnet)
+	$(call build_debian_package,daemon_mainnet_postfork)
 
 .PHONY: debian-daemon-storage-toolbox
 debian-daemon-storage-toolbox: ## Build the Debian daemon storage toolbox package

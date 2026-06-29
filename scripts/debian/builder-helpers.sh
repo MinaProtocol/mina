@@ -536,32 +536,22 @@ build_rosetta_deb() {
 
   local network="$1"
 
+  local profile
+  case "${network}" in
+    mainnet) profile="mainnet" ;;
+    devnet|mesa|mesa-mut) profile="devnet" ;;
+    *) echo "Unknown network: ${network}" >&2; exit 1 ;;
+  esac
+
   echo "------------------------------------------------------------"
-  echo "--- Building ${network} rosetta deb"
+  echo "--- Building ${network} rosetta tent metapackage"
 
   local package_name="mina-rosetta-${network}${DEB_SUFFIX}"
 
-  create_control_file "${package_name}" "${SHARED_DEPS}" \
-    'Mina Protocol Rosetta Client' "${SUGGESTED_DEPS}"
+  local depends="mina-rosetta-generic${DEB_SUFFIX} (>= ${MINA_DEB_VERSION}), mina-${profile}-profile (>= ${MINA_DEB_VERSION})"
 
-  mkdir -p "${BUILDDIR}/usr/local/bin"
-
-  # Rosetta binaries (self-contained network package).
-  cp "./default/src/app/rosetta/rosetta.exe" \
-    "${BUILDDIR}/usr/local/bin/mina-rosetta"
-  cp "./default/src/app/rosetta/ocaml-signer/signer.exe" \
-    "${BUILDDIR}/usr/local/bin/mina-ocaml-signer"
-
-  mkdir -p "${BUILDDIR}/etc/mina/rosetta/"{rosetta-cli-config,scripts}
-
-  # --- Copy artifacts
-  cp ../src/app/rosetta/scripts/* "${BUILDDIR}/etc/mina/rosetta/scripts"
-  cp ../src/app/rosetta/rosetta-cli-config/*.json \
-    "${BUILDDIR}/etc/mina/rosetta/rosetta-cli-config"
-  cp ../src/app/rosetta/rosetta-cli-config/*.ros \
-    "${BUILDDIR}/etc/mina/rosetta/rosetta-cli-config"
-  cp ./default/src/app/rosetta/indexer_test/indexer_test.exe \
-    "${BUILDDIR}/usr/local/bin/mina-rosetta-indexer-test"
+  create_control_file "${package_name}" "${depends}" \
+    "Mina Protocol Rosetta Client for ${network}"
 
   build_deb "${package_name}"
 }
@@ -572,10 +562,10 @@ build_profile_deb() {
 
   local profile="${1}"
 
-  # The per-profile generic daemon layer that sits between the network-free
+  # The per-profile daemon layer that sits between the network-free
   # mina-generic package and the per-network mina-${network} config package:
-  #   mina-generic -> mina-${profile}-generic -> mina-${network}
-  # Devnet/Mainnet carry the "-generic" suffix; Lightnet and Dev do not
+  #   mina-generic  ->  mina-${profile}-profile  ->  mina-${network}
+  # Devnet/Mainnet carry the "-profile" suffix; Lightnet and Dev do not
   # (mina-lightnet, mina-dev). breaks_pkgs supersedes the legacy monolithic
   # mina-${profile} package, but only where that name differs from the package
   # we are building (avoids a self-conflict for the lightnet/dev names).
@@ -583,7 +573,7 @@ build_profile_deb() {
   local breaks_pkgs
   case "${profile}" in
     devnet|mainnet)
-      package_name="mina-${profile}-generic"
+      package_name="mina-${profile}-profile"
       breaks_pkgs="mina-${profile} (<< ${MINA_DEB_VERSION})"
       ;;
     lightnet|dev)
@@ -602,18 +592,10 @@ build_profile_deb() {
   echo "Profile Name: ${1} (like mainnet, devnet, lightnet, dev)"
 
   # The profile package ships only the PROFILE hint file; the actual daemon
-  # binaries live in the network-free mina-generic package (the runtime reads
-  # the PROFILE file to dispatch the profile). Depend on it so that installing
-  # a profile package (e.g. mina-lightnet, mina-devnet-generic) pulls in the
-  # generic binaries.
-  #
-  # Depend on the flavor-neutral name "mina-generic": the profile package is
-  # itself flavor-agnostic (the same mina-${profile}-generic.deb is produced by
-  # the plain, instrumented and lightnet builds), so its dependency must not
-  # pin a flavor. The flavored generics (mina-generic-instrumented,
-  # mina-generic-lightnet) declare "Provides: mina-generic (= VERSION)" so they
-  # satisfy this dependency when they are the generic installed.
-  create_control_file "${package_name}" "mina-generic (>= ${MINA_DEB_VERSION})" \
+  # binaries live in the network-free mina-generic package. The profile
+  # package has no apt dependency on generic — the tent metapackage
+  # (mina-${network}) is responsible for pulling all three layers together.
+  create_control_file "${package_name}" "" \
     "Mina profile for network ${profile}" "" "${breaks_pkgs}"
 
   # Store node config hint (based on DUNE_PROFILE)
@@ -623,6 +605,37 @@ build_profile_deb() {
   build_deb "${package_name}"
 }
 ## END PACKAGE ##
+
+## PROFILE-GENERIC TENT PACKAGE ##
+
+#
+# Builds mina-${PROFILE}-generic convenience tent for Devnet/Mainnet profiles.
+# Lightnet and Dev don't use this — they ship directly as mina-${profile}.
+#
+# This is an empty metapackage that depends on mina-generic (the daemon
+# binaries) and mina-${PROFILE}-profile (the PROFILE hint file), so that
+# `apt-get install mina-devnet-generic` pulls in a working daemon with the
+# correct profile baked in. It Replaces the old mina-${PROFILE} monolithic
+# package.
+#
+build_profile_generic_tent_deb() {
+
+  local profile="$1"
+
+  echo "------------------------------------------------------------"
+  echo "--- Building ${profile}-generic tent metapackage:"
+
+  local package_name="mina-${profile}-generic"
+
+  local depends="mina-generic (>= ${MINA_DEB_VERSION}), mina-${profile}-profile (>= ${MINA_DEB_VERSION})"
+
+  create_control_file "${package_name}" "${depends}" \
+    "Mina Protocol metapackage for ${profile} (installs generic and profile packages)" \
+    "" "mina-${profile} (<< ${MINA_DEB_VERSION})"
+
+  build_deb "${package_name}"
+}
+## END PROFILE-GENERIC TENT PACKAGE ##
 
 ## CONFIG PACKAGE ##
 build_daemon_config_deb() {
@@ -882,6 +895,44 @@ build_daemon_automode_deb() {
 }
 ## END AUTOMODE METAPACKAGE ##
 
+## TENT METAPACKAGE ##
+
+#
+# Builds mina-NETWORK transitional metapackage (tent package)
+#
+# Output: mina-${NETWORK}_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
+#
+# The old monolithic mina-${NETWORK} is now split into three layers:
+#   mina-generic (binaries) + mina-${NETWORK}-profile (profile) + mina-${NETWORK}-config
+# This empty tent metapackage carries the legacy name and depends on all three,
+# so `apt-get install mina-${NETWORK}` still pulls in a working daemon.
+# It Conflicts with mina-${NETWORK}-automode (hardfork) since they are mutually
+# exclusive, and Replaces mina-${NETWORK} (<< V) to cleanly take over from
+# the old monolithic package.
+#
+build_daemon_tent_deb() {
+
+  local network="$1"
+
+  echo "------------------------------------------------------------"
+  echo "--- Building ${network} tent metapackage:"
+
+  local package_name="mina-${network}"
+
+  # network-to-profile is 1:1 for the main networks (devnet, mainnet)
+  local profile="${network}"
+
+  local depends="mina-${profile}-generic (>= ${MINA_DEB_VERSION}), mina-${network}-config (>= ${MINA_DEB_VERSION})"
+
+  create_control_file "${package_name}" "${depends}" \
+    "Mina Protocol metapackage for ${network} (installs generic, profile and config packages)" \
+    "" "" "" \
+    "mina-${network}-automode"
+
+  build_deb "${package_name}"
+}
+## END TENT METAPACKAGE ##
+
 ## GENERIC PACKAGE ##
 
 #
@@ -1047,6 +1098,14 @@ copy_common_archive_configs() {
 build_archive_deb () {
 
   local network="$1"
+
+  local profile
+  case "${network}" in
+    mainnet) profile="mainnet" ;;
+    devnet|mesa|mesa-mut) profile="devnet" ;;
+    *) echo "Unknown network: ${network}" >&2; exit 1 ;;
+  esac
+
   local package_name
   case "${network}" in
     mainnet)
@@ -1058,18 +1117,16 @@ build_archive_deb () {
     mesa|mesa-mut)
       package_name="mina-archive-${network}${DEB_SUFFIX}"
       ;;
-    *)
-      echo "Unknown network name provided: ${network}" >&2
-      exit 1
-      ;;
   esac
 
   echo "------------------------------------------------------------"
-  echo "--- Building archive ${network} deb"
+  echo "--- Building archive ${network} tent metapackage"
 
-  create_control_file "${package_name}" "${ARCHIVE_DEPS}" "Mina Archive Node for network ${network}"
+  local depends="mina-archive-generic${DEB_SUFFIX} (>= ${MINA_DEB_VERSION}), mina-${profile}-profile (>= ${MINA_DEB_VERSION})"
 
-  copy_common_archive_configs "${package_name}"
+  create_control_file "${package_name}" "${depends}" "Mina Archive Node for network ${network}"
+
+  build_deb "${package_name}"
 
 }
 ## END ARCHIVE PACKAGE ##
