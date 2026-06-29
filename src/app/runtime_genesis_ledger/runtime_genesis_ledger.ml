@@ -13,7 +13,49 @@ module Hash_json = struct
   type t = { ledger : Hashes.t; epoch_data : epoch_data } [@@deriving to_yojson]
 end
 
+module Output_config = struct
+  type epoch_ledger = { seed : string; hash : string; s3_data_hash : string }
+  [@@deriving to_yojson]
+
+  type epoch_data = { staking : epoch_ledger; next : epoch_ledger }
+  [@@deriving to_yojson]
+
+  type ledger = { add_genesis_winner : bool; hash : string; s3_data_hash : string }
+  [@@deriving to_yojson]
+
+  type proof_fork =
+    { state_hash : string
+    ; blockchain_length : int
+    ; global_slot_since_genesis : int
+    }
+  [@@deriving to_yojson]
+
+  type proof = { fork : proof_fork } [@@deriving to_yojson]
+
+  type genesis = { genesis_state_timestamp : string } [@@deriving to_yojson]
+
+  type t =
+    { genesis : genesis
+    ; proof : proof
+    ; ledger : ledger
+    ; epoch_data : epoch_data
+    }
+  [@@deriving to_yojson]
+end
+
 let logger = Logger.create ()
+
+let apply_delegate_overrides ~unstake_pk ~self_delegate_missing
+    (accounts : Runtime_config.Accounts.t) : Runtime_config.Accounts.t =
+  let open Runtime_config.Accounts.Single in
+  List.map accounts ~f:(fun a ->
+      match unstake_pk with
+      | Some upd_pk when String.equal a.pk upd_pk ->
+          { a with delegate = None }
+      | _ ->
+          if self_delegate_missing && Option.is_none a.delegate then
+            { a with delegate = Some a.pk }
+          else a )
 
 let load_ledger ~ignore_missing_fields ~pad_app_state ~hardfork_slot
     ~(constraint_constants : Genesis_constants.Constraint_constants.t)
@@ -163,11 +205,66 @@ let load_config_exn config_file =
   in
   ( extract_accounts_exn ledger
   , Option.map ~f:extract_accounts_exn staking_ledger
-  , Option.map ~f:extract_accounts_exn next_ledger )
+  , Option.map ~f:extract_accounts_exn next_ledger
+  , config )
+
+let write_output_config
+    ~(config : Runtime_config.t)
+    ~(genesis_state_timestamp : string)
+    ~(hash_json : Hash_json.t)
+    ~(output_config_path : string) =
+  let proof =
+    Option.value_exn ~message:"No proof provided in config" config.proof
+  in
+  let fork =
+    Option.value_exn ~message:"No fork proof in config" proof.fork
+  in
+  let proof_fork : Output_config.proof_fork =
+    { state_hash = fork.state_hash
+    ; blockchain_length = fork.blockchain_length
+    ; global_slot_since_genesis = fork.global_slot_since_genesis
+    }
+  in
+  let epoch_data_cfg =
+    Option.value_exn ~message:"No epoch data in config" config.epoch_data
+  in
+  let staking_seed = epoch_data_cfg.staking.seed in
+  let next_seed =
+    Option.map epoch_data_cfg.next ~f:(fun n -> n.seed)
+  in
+  let h = hash_json.epoch_data in
+  let epoch_data : Output_config.epoch_data =
+    { staking =
+        { seed = staking_seed
+        ; hash = h.staking.hash
+        ; s3_data_hash = h.staking.s3_data_hash
+        }
+    ; next =
+        { seed = Option.value ~default:staking_seed next_seed
+        ; hash = h.next.hash
+        ; s3_data_hash = h.next.s3_data_hash
+        }
+    }
+  in
+  let output : Output_config.t =
+    { genesis = { genesis_state_timestamp }
+    ; proof = { fork = proof_fork }
+    ; ledger =
+        { add_genesis_winner = false
+        ; hash = hash_json.ledger.hash
+        ; s3_data_hash = hash_json.ledger.s3_data_hash
+        }
+    ; epoch_data
+    }
+  in
+  [%log info] "Writing output config to %s" output_config_path ;
+  Async.Writer.save output_config_path
+    ~contents:(Yojson.Safe.to_string (Output_config.to_yojson output))
 
 let main ~(constraint_constants : Genesis_constants.Constraint_constants.t)
     ~config_file ~genesis_dir ~hash_output_file ~ignore_missing_fields
-    ~pad_app_state ~prefork_genesis_config () =
+    ~pad_app_state ~prefork_genesis_config ~unstake_pk ~self_delegate_missing
+    ~output_config_path ~genesis_state_timestamp () =
   let hardfork_slot =
     match prefork_genesis_config with
     | None ->
@@ -207,8 +304,19 @@ let main ~(constraint_constants : Genesis_constants.Constraint_constants.t)
                 ] ;
             Some slot )
   in
-  let%bind accounts, staking_accounts_opt, next_accounts_opt =
+  let%bind accounts, staking_accounts_opt, next_accounts_opt, config =
     load_config_exn config_file
+  in
+  let accounts =
+    apply_delegate_overrides ~unstake_pk ~self_delegate_missing accounts
+  in
+  let staking_accounts_opt =
+    Option.map staking_accounts_opt
+      ~f:(apply_delegate_overrides ~unstake_pk ~self_delegate_missing)
+  in
+  let next_accounts_opt =
+    Option.map next_accounts_opt
+      ~f:(apply_delegate_overrides ~unstake_pk ~self_delegate_missing)
   in
   let ledger =
     load_ledger ~ignore_missing_fields ~pad_app_state ~constraint_constants
@@ -231,8 +339,20 @@ let main ~(constraint_constants : Genesis_constants.Constraint_constants.t)
   let%bind hash_json =
     generate_hash_json ~genesis_dir ledger staking_ledger next_ledger
   in
-  Async.Writer.save hash_output_file
-    ~contents:(Yojson.Safe.to_string (Hash_json.to_yojson hash_json))
+  let%bind () =
+    Async.Writer.save hash_output_file
+      ~contents:(Yojson.Safe.to_string (Hash_json.to_yojson hash_json))
+  in
+  match output_config_path with
+  | None ->
+      Deferred.unit
+  | Some output_config_path ->
+      let genesis_state_timestamp =
+        Option.value_exn ~message:"--genesis-state-timestamp required when using --output-config"
+          genesis_state_timestamp
+      in
+      write_output_config ~config ~genesis_state_timestamp ~hash_json
+        ~output_config_path
 
 let () =
   let constraint_constants = Genesis_constants.Compiled.constraint_constants in
@@ -265,8 +385,6 @@ let () =
              ~doc:
                "BOOL whether to ignore missing fields in account definition \
                 (and replace with default values)"
-         (* TODO: at later stages replace with a flag to do all
-            ledger transformations necessary for the hardfork *)
          and pad_app_state =
            flag "--pad-app-state" no_arg
              ~doc:
@@ -280,6 +398,28 @@ let () =
                 daemon.slot_chain_end + daemon.hard_fork_genesis_slot_delta in \
                 this config. If those fields are absent, no vesting parameter \
                 update is performed."
+         and unstake_pk =
+           flag "--unstake-pk" (optional string)
+             ~doc:
+               "STRING public key of an account to unstake (set delegate to \
+                null)."
+         and self_delegate_missing =
+           flag "--self-delegate-missing" no_arg
+             ~doc:
+               "BOOL whether to set delegate to self for accounts with no \
+                delegate (excluding the unstake-pk account)."
+         and output_config_path =
+           flag "--output-config" (optional string)
+             ~doc:
+               "PATH path to write the merged daemon.json for the post-fork \
+                network. Requires --genesis-state-timestamp."
+         and genesis_state_timestamp =
+           flag "--genesis-state-timestamp" (optional string)
+             ~doc:
+               "STRING RFC3339 timestamp for the fork genesis state. Required \
+                when --output-config is set."
          in
          main ~constraint_constants ~config_file ~genesis_dir ~hash_output_file
-           ~ignore_missing_fields ~pad_app_state ~prefork_genesis_config) )
+           ~ignore_missing_fields ~pad_app_state ~prefork_genesis_config
+           ~unstake_pk ~self_delegate_missing ~output_config_path
+           ~genesis_state_timestamp) )

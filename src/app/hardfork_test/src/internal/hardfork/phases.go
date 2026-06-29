@@ -69,8 +69,21 @@ func (t *HardforkTest) RunMainNetworkPhase(mainGenesisTs int64, beforeShutdown H
 
 	t.Logger.Info("Network analyze result: %v", analysis)
 
-	if err := t.ValidateSlotOccupancy(analysis.GenesisBlock, analysis.Consensus.LastBlockBeforeTxEnd); err != nil {
-		return nil, err
+	if t.Config.UnstakingTest {
+		occ, err := t.ComputeSlotOccupancy(analysis.GenesisBlock, analysis.Consensus.LastBlockBeforeTxEnd)
+		if err != nil {
+			return nil, fmt.Errorf("failed to compute pre-fork slot occupancy: %w", err)
+		}
+		analysis.PreForkOccupancy = occ
+		t.Logger.Info("Pre-fork slot occupancy (expected low due to dormant whale): %f", occ)
+		if occ >= 0.50 {
+			return nil, fmt.Errorf("pre-fork slot occupancy (%f) is unexpectedly high, dormant whale not diluting VRF denominator correctly", occ)
+		}
+	} else {
+		if err := t.ValidateSlotOccupancy(analysis.GenesisBlock, analysis.Consensus.LastBlockBeforeTxEnd); err != nil {
+			return nil, err
+		}
+		analysis.PreForkOccupancy, _ = t.ComputeSlotOccupancy(analysis.GenesisBlock, analysis.Consensus.LastBlockBeforeTxEnd)
 	}
 
 	if err := t.ValidateLatestOccupiedSlot(analysis.Consensus.LastOccupiedSlot); err != nil {
@@ -102,7 +115,7 @@ type ForkData struct {
 }
 
 // RunForkNetworkPhase runs the fork network and validates its operation
-func (t *HardforkTest) RunForkNetworkPhase(latestPreForkHeight int, mainGenesisTs int64) error {
+func (t *HardforkTest) RunForkNetworkPhase(latestPreForkHeight int, mainGenesisTs int64, analysis *BlockAnalysisResult) error {
 	// Start fork network
 	forkCmd, err := t.RunForkNetwork()
 	if err != nil {
@@ -144,8 +157,19 @@ func (t *HardforkTest) RunForkNetworkPhase(latestPreForkHeight int, mainGenesisT
 	t.Logger.Info("Block height is %d at slot %d.", bestTip.BlockHeight, bestTip.Slot)
 
 	// Validate slot occupancy
-	if err := t.ValidateSlotOccupancy(*commonGenesisBlock, *bestTip); err != nil {
-		return err
+	if t.Config.UnstakingTest {
+		postForkOcc, err := t.ComputeSlotOccupancy(*commonGenesisBlock, *bestTip)
+		if err != nil {
+			return fmt.Errorf("failed to compute post-fork slot occupancy: %w", err)
+		}
+		t.Logger.Info("Post-fork slot occupancy: %f (pre-fork was %f)", postForkOcc, analysis.PreForkOccupancy)
+		if postForkOcc <= analysis.PreForkOccupancy {
+			return fmt.Errorf("post-fork slot occupancy (%f) did not improve over pre-fork (%f)", postForkOcc, analysis.PreForkOccupancy)
+		}
+	} else {
+		if err := t.ValidateSlotOccupancy(*commonGenesisBlock, *bestTip); err != nil {
+			return err
+		}
 	}
 
 	// Validate user commands in blocks
@@ -200,17 +224,35 @@ func (t *HardforkTest) legacyFork(daemon config.DaemonInfo, analysis BlockAnalys
 	}
 
 	forkDataPath := filepath.Join(nodeDir, "fork_data")
+	if err := os.MkdirAll(forkDataPath, 0755); err != nil {
+		return err
+	}
 	patchedConfigFile := filepath.Join(forkDataPath, "daemon.json")
 	patchedLedgersDir := filepath.Join(forkDataPath, "genesis")
-
-	forkGenesisTs := t.Config.ForkGenesisTsGivenMainGenesisTs(mainGenesisTs)
-
-	preforkGenesisConfigFile := filepath.Join(t.Config.Root, "daemon.json")
 	forkHashesFile := filepath.Join(forkDataPath, "ledger_hashes.json")
 
-	patchedConfigBytes, err := t.PatchForkConfigAndGenerateLedgersLegacy(&analysis, prepatchConfigFile, patchedLedgersDir, forkHashesFile, patchedConfigFile, preforkGenesisConfigFile, forkGenesisTs, mainGenesisTs)
-	if err != nil {
+	forkGenesisTs := t.Config.ForkGenesisTsGivenMainGenesisTs(mainGenesisTs)
+	forkGenesisTimestamp := config.FormatTimestamp(forkGenesisTs)
+
+	forkLedgerArgs := []string{
+		"--output-config", patchedConfigFile,
+		"--genesis-state-timestamp", forkGenesisTimestamp,
+	}
+
+	if t.Config.UnstakingTest {
+		forkLedgerArgs = append(forkLedgerArgs,
+			"--unstake-pk", t.Config.DormantWhalePk,
+			"--self-delegate-missing",
+		)
+	}
+
+	if err := t.GenerateForkLedgers(t.Config.ForkRuntimeGenesisLedger, prepatchConfigFile, patchedLedgersDir, forkHashesFile, forkLedgerArgs...); err != nil {
 		return err
+	}
+
+	patchedConfigBytes, err := os.ReadFile(patchedConfigFile)
+	if err != nil {
+		return fmt.Errorf("failed to read output config: %w", err)
 	}
 
 	var patchedConfig FinalForkConfigView
@@ -313,6 +355,14 @@ func (t *HardforkTest) autoFork(daemon config.DaemonInfo, analysis BlockAnalysis
 }
 
 func (t *HardforkTest) ForkPhase(analysis *BlockAnalysisResult, mainGenesisTs int64) error {
+	if t.Config.UnstakingTest {
+		for _, info := range t.Config.DaemonInfos {
+			if info.ForkMethod != config.Legacy {
+				panic("unstaking test requires all daemons to use 'legacy' fork method")
+			}
+		}
+	}
+
 	numDaemons := len(t.Config.DaemonInfos)
 	errors := make([]error, numDaemons)
 
@@ -414,17 +464,15 @@ func (t *HardforkTest) CleanUpNetworkForForkPhase() error {
 			return fmt.Errorf("Can't read fork config from node %s: %v", info.Name, err)
 		}
 		t.Logger.Info("Node %s will be using fork config of content: %s", info.Name, string(forkConfigContent))
-		// NOTE: Compute chain_id from the merged config (fork + shared) to determine
-		// the nested directory structure the post-fork daemon will use. The daemon
-		// loads its config-directory daemon.json first, then overlays --config-file
-		// args, so we pass both in the same order.
-		chainId, err := t.ComputeChainId(forkConfigFile, networkDaemonConfig)
+
+		chainId, err := t.ComputeChainId(forkConfigFile)
 		if err != nil {
 			return fmt.Errorf("failed to compute chain_id from fork config on node %s: %w", info.Name, err)
 		}
 		t.Logger.Info("Computed chain_id for fork config on node %s: %s", info.Name, chainId)
+
 		chainStateDir := filepath.Join(nodeDir, chainId)
-		if err = os.Mkdir(chainStateDir, 0755); err != nil {
+		if err = os.MkdirAll(chainStateDir, 0755); err != nil {
 			return err
 		}
 		filesToMove := []MoveFileSpec{

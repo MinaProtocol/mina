@@ -59,6 +59,7 @@ SLOT_TX_END=
 SLOT_CHAIN_END=
 HARDFORK_GENESIS_SLOT_DELTA=
 EXTRA_FILES_ROOT=
+EXTRA_GENESIS_ACCOUNTS=
 
 # ================================================
 # Globals (assigned during execution of script)
@@ -166,7 +167,9 @@ help() {
 --node-status-url <url>                  | Url of the node status collection service 
                                          |   Default: not set
 --extra-files-root <path>                | Directory of file tree need to be overlayed on a prepared network folder, useful when initializing from fresh but need some files set. 
-                                         |   Default: None
+                                          |   Default: None
+--extra-genesis-accounts <path>          | Path to a JSON file with extra accounts to inject into genesis ledger
+                                          |   Default: None
 -h   |--help                             | Displays this help message
 
 Available logging levels:
@@ -660,6 +663,10 @@ while [[ "$#" -gt 0 ]]; do
     EXTRA_FILES_ROOT="${2}"
     shift
     ;;
+  --extra-genesis-accounts)
+    EXTRA_GENESIS_ACCOUNTS="${2}"
+    shift
+    ;;
   *)
     echo "Unknown parameter passed: ${1}"
 
@@ -885,7 +892,16 @@ load_config() {
         --snark-coordinator-accounts-directory "${ROOT}"/snark_coordinator_keys \
         --out-genesis-ledger-file "${ROOT}"/genesis_ledger.json
 
+      if [ -n "${EXTRA_GENESIS_ACCOUNTS}" ]; then
+        echo "Injecting extra genesis accounts from ${EXTRA_GENESIS_ACCOUNTS}..."
+        jq --slurpfile extra "${EXTRA_GENESIS_ACCOUNTS}" \
+          '.accounts += $extra[0].accounts' \
+          "${ROOT}"/genesis_ledger.json > "${ROOT}"/genesis_ledger_tmp.json
+        mv "${ROOT}"/genesis_ledger_tmp.json "${ROOT}"/genesis_ledger.json
+      fi
+
       reset-genesis-ledger "${ROOT}" "${config_file}"
+
       echo "Using freshly generated config file ${config_file}:"
       cat "${config_file}"
       ;;

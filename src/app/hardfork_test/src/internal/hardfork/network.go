@@ -1,16 +1,74 @@
 package hardfork
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/MinaProtocol/mina/src/app/hardfork_test/src/internal/client"
 	"github.com/MinaProtocol/mina/src/app/hardfork_test/src/internal/config"
 )
+
+type extraGenesisAccount struct {
+	Pk       string      `json:"pk"`
+	Sk       interface{} `json:"sk"`
+	Balance  string      `json:"balance"`
+	Delegate interface{} `json:"delegate"`
+}
+
+type extraGenesisAccounts struct {
+	Accounts []extraGenesisAccount `json:"accounts"`
+}
+
+func (t *HardforkTest) setupDormantWhaleAccount(root string) error {
+	dormantWhaleDir := filepath.Join(root, "dormant_whale_keys")
+	if err := os.MkdirAll(dormantWhaleDir, 0755); err != nil {
+		return fmt.Errorf("failed to create dormant whale key directory: %w", err)
+	}
+	t.Config.DormantWhaleKeyDir = dormantWhaleDir
+
+	privkeyPath := filepath.Join(dormantWhaleDir, "dormant_whale_account")
+	genCmd := exec.Command(t.Config.MainMinaExe, "advanced", "generate-keypair", "-privkey-path", privkeyPath)
+	genCmd.Env = append(os.Environ(), "MINA_PRIVKEY_PASS=naughty blue worm")
+	genCmd.Stdout = os.Stdout
+	genCmd.Stderr = os.Stderr
+	if err := genCmd.Run(); err != nil {
+		return fmt.Errorf("failed to generate dormant whale keypair: %w", err)
+	}
+
+	pubkeyBytes, err := os.ReadFile(privkeyPath + ".pub")
+	if err != nil {
+		return fmt.Errorf("failed to read dormant whale public key: %w", err)
+	}
+	t.Config.DormantWhalePk = strings.TrimSpace(string(pubkeyBytes))
+	t.Logger.Info("Dormant whale public key: %s", t.Config.DormantWhalePk)
+
+	extraFile := filepath.Join(os.TempDir(), "extra_genesis_accounts.json")
+	extra := extraGenesisAccounts{
+		Accounts: []extraGenesisAccount{
+			{
+				Pk:       t.Config.DormantWhalePk,
+				Sk:       nil,
+				Balance:  t.Config.DormantWhaleBalance,
+				Delegate: nil,
+			},
+		},
+	}
+	data, err := json.Marshal(extra)
+	if err != nil {
+		return fmt.Errorf("failed to marshal extra genesis accounts: %w", err)
+	}
+	if err := os.WriteFile(extraFile, data, 0644); err != nil {
+		return fmt.Errorf("failed to write extra genesis accounts: %w", err)
+	}
+	t.Config.DormantWhaleKeyDir = dormantWhaleDir
+	return nil
+}
 
 func (t *HardforkTest) startLocalNetwork(minaExecutable string, profile string, extraArgs []string) (*exec.Cmd, error) {
 
@@ -34,7 +92,14 @@ func (t *HardforkTest) startLocalNetwork(minaExecutable string, profile string, 
 	)
 
 	cmd.Args = append(cmd.Args, extraArgs...)
-	cmd.Env = append(os.Environ(), "MINA_EXE="+minaExecutable)
+	tmpDir, err := os.MkdirTemp("", "mina-hf-tmp-")
+	if err != nil {
+		return nil, fmt.Errorf("failed to create temp dir: %w", err)
+	}
+	cmd.Env = append(os.Environ(),
+		"MINA_EXE="+minaExecutable,
+		"TMPDIR="+tmpDir,
+	)
 
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -56,6 +121,12 @@ func (t *HardforkTest) RunMainNetwork(extraFilesRoot string, mainGenesisTs int64
 
 	mainGenesisTimestamp := config.FormatTimestamp(mainGenesisTs)
 
+	if t.Config.UnstakingTest {
+		if err := t.setupDormantWhaleAccount(t.Config.Root); err != nil {
+			return nil, fmt.Errorf("failed to setup dormant whale: %w", err)
+		}
+	}
+
 	args := []string{
 		"--update-genesis-timestamp", fmt.Sprintf("fixed:%s", mainGenesisTimestamp),
 		"--config", "reset",
@@ -64,6 +135,13 @@ func (t *HardforkTest) RunMainNetwork(extraFilesRoot string, mainGenesisTs int64
 		"--slot-chain-end", strconv.Itoa(t.Config.SlotChainEnd),
 		"--hardfork-genesis-slot-delta", strconv.Itoa(t.Config.HfSlotDelta),
 		"--extra-files-root", extraFilesRoot,
+	}
+
+	if t.Config.UnstakingTest {
+		args = append(args,
+			"--extra-genesis-accounts",
+			filepath.Join(os.TempDir(), "extra_genesis_accounts.json"),
+		)
 	}
 
 	return t.startLocalNetwork(t.Config.MainMinaExe, "main", args)

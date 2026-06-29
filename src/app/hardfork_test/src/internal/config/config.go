@@ -71,6 +71,12 @@ type Config struct {
 	ForkMethods ForkMethodSet
 
 	DaemonInfos []DaemonInfo
+
+	// Unstaking test
+	UnstakingTest      bool
+	DormantWhalePk     string
+	DormantWhaleKeyDir string
+	DormantWhaleBalance string
 }
 
 // DefaultConfig returns the default configuration with values

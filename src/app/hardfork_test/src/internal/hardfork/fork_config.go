@@ -3,10 +3,6 @@ package hardfork
 import (
 	"bytes"
 	"fmt"
-	"os"
-	"os/exec"
-	"path/filepath"
-	"strconv"
 	"time"
 )
 
@@ -41,32 +37,4 @@ func (t *HardforkTest) GetForkConfig(port int) ([]byte, error) {
 	}
 
 	return nil, fmt.Errorf("failed to extract valid fork config after %d attempts", t.Config.ForkConfigMaxRetries)
-}
-
-// CreateRuntimeConfig creates the runtime configuration for the fork
-func (t *HardforkTest) PatchRuntimeConfigLegacy(forkGenesisTimestamp, forkConfigPath, configFile, baseConfigFile, forkHashesFile string) ([]byte, error) {
-	cmd := exec.Command(filepath.Join(t.ScriptDir, "create_runtime_config.sh"))
-	cmd.Env = append(os.Environ(),
-		"GENESIS_TIMESTAMP="+forkGenesisTimestamp,
-		"FORKING_FROM_CONFIG_JSON="+baseConfigFile,
-		"SECONDS_PER_SLOT="+strconv.Itoa(t.Config.MainSlot),
-		"FORK_CONFIG_JSON="+forkConfigPath,
-		"LEDGER_HASHES_JSON="+forkHashesFile,
-	)
-
-	// Redirect stderr to main process stderr
-	cmd.Stderr = os.Stderr
-
-	configOutput, err := cmd.Output()
-	if err != nil {
-		return nil, fmt.Errorf("failed to create runtime config: %w", err)
-	}
-
-	// Write config to file
-	err = os.WriteFile(configFile, configOutput, 0644)
-	if err != nil {
-		return configOutput, fmt.Errorf("failed to write config.json: %w", err)
-	}
-
-	return configOutput, nil
 }

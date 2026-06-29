@@ -13,9 +13,10 @@
 set -eux -o pipefail
 
 PREFORK=""
+FORKTO="develop"
 EXTRA_ARGS=()
 
-USAGE="Usage: $0 --fork-from <PREFORK> [ADDITONAL ARGS TO HF TEST...]"
+USAGE="Usage: $0 --fork-from <PREFORK> [--fork-to <POSTFORK>] [ADDITONAL ARGS TO HF TEST...]"
 usage() {
   if (( $# > 0 )); then
     echo "$1" >&2
@@ -36,6 +37,13 @@ while [[ $# -gt 0 ]]; do
         usage "Error: $1 requires an argument."
       fi
       PREFORK="$2"
+      shift 2
+      ;;
+    --fork-to)
+      if [[ $# -lt 2 ]]; then
+        usage "Error: $1 requires an argument."
+      fi
+      FORKTO="$2"
       shift 2
       ;;
     --help|-h)
@@ -123,7 +131,7 @@ git submodule update --init --recursive --depth 1
 nix "${NIX_OPTS[@]}" build "$PWD?submodules=1#devnet" --out-link "prefork-devnet"
 
 # 2. Build "develop" branch as a postfork build
-git checkout develop
+git checkout $FORKTO
 git submodule update --init --recursive --depth 1
 nix "${NIX_OPTS[@]}" build "$PWD?submodules=1#devnet" --out-link "postfork-devnet"
 
