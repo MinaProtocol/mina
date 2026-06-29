@@ -60,27 +60,41 @@ set -eu
 dune build src/app/archive_blocks/archive_blocks.exe
 ARCHIVE_BLOCKS_BIN="$(pwd)/_build/default/src/app/archive_blocks/archive_blocks.exe"
 
-echo "--- Downloading + extracting a recent ${NETWORK} archive dump"
+echo "--- Downloading + extracting a ${NETWORK} archive dump"
 WORK_DIR="$(pwd)/_build/bootstrap-it"
 mkdir -p "$WORK_DIR"
-# Dumps are hourly; the most recent midnight dump may not exist yet early in the
-# UTC day, so walk back a few days until a download succeeds.
 DUMP_OK=false
-for offset in 0 1 2 3; do
-  DATE="$(date -u -d "-${offset} day" +%Y-%m-%d)"
-  echo "Trying ${NETWORK} dump for ${DATE} 0000 ..."
+if [ -n "${DUMP_DATE:-}" ]; then
+  # Pinned dump (e.g. the frozen `mesa` reference net, which has no recent
+  # dumps). Fetch exactly DUMP_DATE/DUMP_HOUR.
+  echo "Fetching pinned ${NETWORK} dump for ${DUMP_DATE} ${DUMP_HOUR:-0000} ..."
   if "$BOOTSTRAP_BIN" archive restore \
        --network "$NETWORK" \
-       --date "$DATE" \
+       --date "$DUMP_DATE" \
+       --hour "${DUMP_HOUR:-0000}" \
        --work-dir "$WORK_DIR" \
        --skip-pg; then
     DUMP_OK=true
-    break
   fi
-  echo "No dump for ${DATE}, trying an earlier day."
-done
+else
+  # Live nets: dumps are hourly and the most recent midnight dump may not exist
+  # yet early in the UTC day, so walk back a few days until one downloads.
+  for offset in 0 1 2 3; do
+    DATE="$(date -u -d "-${offset} day" +%Y-%m-%d)"
+    echo "Trying ${NETWORK} dump for ${DATE} 0000 ..."
+    if "$BOOTSTRAP_BIN" archive restore \
+         --network "$NETWORK" \
+         --date "$DATE" \
+         --work-dir "$WORK_DIR" \
+         --skip-pg; then
+      DUMP_OK=true
+      break
+    fi
+    echo "No dump for ${DATE}, trying an earlier day."
+  done
+fi
 if [ "$DUMP_OK" != true ]; then
-  echo "Could not find a recent ${NETWORK} archive dump to restore" >&2
+  echo "Could not find a ${NETWORK} archive dump to restore" >&2
   exit 1
 fi
 

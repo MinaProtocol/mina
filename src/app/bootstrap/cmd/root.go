@@ -31,7 +31,7 @@ curl + gsutil incantations in operator docs and compose stacks.`,
 
 func init() {
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "enable debug logging")
-	rootCmd.PersistentFlags().StringVar(&network, "network", "mainnet", "Mina network: mainnet, devnet")
+	rootCmd.PersistentFlags().StringVar(&network, "network", "mainnet", "Mina network: mainnet, devnet, mesa")
 
 	// Archive-node staging verbs are grouped under `archive`
 	// (restore/catchup/precomputed); see archive.go. Future domains (ledger,

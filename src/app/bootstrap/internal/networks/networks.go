@@ -43,12 +43,24 @@ var registry = map[string]Network{
 		PrecomputedBucket:         "mina_network_block_data",
 		PrecomputedFilenamePrefix: "devnet-",
 	},
+	// mesa targets the "hetzner-pre-mesa-1" reference network, whose dumps and
+	// precomputed blocks use the post-hardfork (version 4) block format. The
+	// public mainnet/devnet block bucket still serves version 3, so this is the
+	// network used to exercise the V4 archive toolchain (e.g. the catchup
+	// integration test). It is a frozen test net (~2148 blocks).
+	"mesa": {
+		Name:                      "mesa",
+		ArchiveDumpBucket:         "mina-archive-dumps",
+		ArchiveDumpPrefix:         "hetzner-pre-mesa-1-archive-dump",
+		PrecomputedBucket:         "mesa-hf-precomputed-blocks",
+		PrecomputedFilenamePrefix: "hetzner-pre-mesa-1-",
+	},
 }
 
 func Lookup(name string) (Network, error) {
 	n, ok := registry[name]
 	if !ok {
-		return Network{}, fmt.Errorf("unknown network %q (known: mainnet, devnet)", name)
+		return Network{}, fmt.Errorf("unknown network %q (known: mainnet, devnet, mesa)", name)
 	}
 	return n, nil
 }

@@ -51,7 +51,7 @@ Flags:
 
 | Flag | Default | Description |
 |---|---|---|
-| `--network` | `mainnet` | `mainnet` or `devnet` |
+| `--network` | `mainnet` | `mainnet`, `devnet`, or `mesa` |
 | `--pg-uri` | (required) | Postgres connection URI |
 | `--date` | today (UTC) | Dump date in `YYYY-MM-DD` form |
 | `--hour` | `0000` | Dump hour in `HHMM` form. Dumps are produced hourly (`0000`, `0100`, `0200`, ...) |
@@ -107,7 +107,7 @@ Flags:
 
 | Flag | Default | Description |
 |---|---|---|
-| `--network` | `mainnet` | `mainnet` or `devnet` |
+| `--network` | `mainnet` | `mainnet`, `devnet`, or `mesa` |
 | `--pg-uri` | (required) | Postgres URI to read the tip from and apply blocks to |
 | `--out` | `./blocks` | Directory to write downloaded block files |
 | `--archive-blocks-bin` | `mina-archive-blocks` | Path to the `mina-archive-blocks` binary used to apply |

@@ -24,6 +24,13 @@ func TestLookupKnownNetworks(t *testing.T) {
 			precomputedBucket:         "mina_network_block_data",
 			precomputedFilenamePrefix: "devnet-",
 		},
+		{
+			name:                      "mesa",
+			archiveDumpBucket:         "mina-archive-dumps",
+			archiveDumpPrefix:         "hetzner-pre-mesa-1-archive-dump",
+			precomputedBucket:         "mesa-hf-precomputed-blocks",
+			precomputedFilenamePrefix: "hetzner-pre-mesa-1-",
+		},
 	}
 
 	for _, tt := range tests {
@@ -54,6 +61,7 @@ func TestLookupKnownNetworks(t *testing.T) {
 func TestBlockHeight(t *testing.T) {
 	mainnet, _ := Lookup("mainnet")
 	devnet, _ := Lookup("devnet")
+	mesa, _ := Lookup("mesa")
 
 	tests := []struct {
 		name     string
@@ -79,6 +87,12 @@ func TestBlockHeight(t *testing.T) {
 			net:      mainnet,
 			filename: "./blocks/mainnet-1-3NKgenesis.json",
 			want:     1,
+		},
+		{
+			name:     "mesa multi-segment prefix",
+			net:      mesa,
+			filename: "hetzner-pre-mesa-1-2148-3NLfsvdvqDAsj2RKNenreJoMdLMGLWTTFaUKyVuge7BdRdSx8Cj2.json",
+			want:     2148,
 		},
 		{
 			name:     "wrong network prefix errors",

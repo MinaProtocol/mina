@@ -14,7 +14,12 @@
 //
 //	BOOTSTRAP_TEST_MAINNET_PG_URI=postgres://mina:pw@localhost:5432/archive \
 //	BOOTSTRAP_TEST_DEVNET_PG_URI=postgres://mina:pw@localhost:5433/archive \
+//	BOOTSTRAP_TEST_MESA_PG_URI=postgres://mina:pw@localhost:5434/archive \
 //	  go test -tags integration ./cmd/... -run TestCatchupNoGap -v
+//
+// The CI job uses the `mesa` network: its precomputed blocks are version 4,
+// matching the archive binary built from this branch. The public mainnet/devnet
+// block bucket still serves version 3, so a V4 binary cannot apply them.
 //
 // Optional knobs:
 //
@@ -44,6 +49,7 @@ func TestCatchupNoGap(t *testing.T) {
 	}{
 		{"mainnet", "BOOTSTRAP_TEST_MAINNET_PG_URI"},
 		{"devnet", "BOOTSTRAP_TEST_DEVNET_PG_URI"},
+		{"mesa", "BOOTSTRAP_TEST_MESA_PG_URI"},
 	}
 
 	ran := false

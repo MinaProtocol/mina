@@ -55,7 +55,7 @@ in  Pipeline.build
             Command.Config::{
             , commands =
               [ RunWithPostgres.runInDockerWithPostgresConn
-                  [ "NETWORK=devnet" ]
+                  [ "NETWORK=mesa", "DUMP_DATE=2025-11-18", "DUMP_HOUR=1300" ]
                   (None RunWithPostgres.ScriptOrArchive)
                   ContainerImages.minaToolchain
                   "./buildkite/scripts/tests/mina-bootstrap-catchup-test.sh"
