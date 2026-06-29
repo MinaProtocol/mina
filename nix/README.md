@@ -19,6 +19,10 @@ mina`, etc. You can discover all the available packages as usual, by using tab
 completion or `nix eval mina#packages.x86_64-linux --apply __attrNames` or your
 favourite way.
 
+**Multi-worktree**: Use direnv with `use flake "git+file://$PWD?submodules=1"`
+in each worktree's `.envrc`, or pin each with a custom name:
+`nix/pin.sh my-branch` then `nix develop my-branch#with-lsp`.
+
 </details>
 
 ## 1. Install Nix
@@ -76,6 +80,23 @@ For the curious, `mina` registry entry will resolve to
 `git+file:///path/to/your/mina/checkout?submodules=1`. Should you want to hack
 on a different mina checkout, try e.g. `nix develop
 "git+file://$PWD?submodules=1"` from that checkout.
+
+**Working with multiple worktrees**: The registry entry `mina` is global and can
+only point to one checkout. For parallel development across multiple worktrees,
+you have two options:
+
+1. **Use direnv** (recommended) with `use flake "git+file://$PWD?submodules=1"`
+   in each worktree's `.envrc`. This auto-enters the correct environment per
+   directory — no registry needed.
+
+2. **Register each worktree with a unique name**:
+   ```bash
+   cd /path/to/worktree1 && nix/pin.sh my-feature
+   cd /path/to/worktree2 && nix/pin.sh bugfix
+   nix develop my-feature#with-lsp
+   nix develop bugfix#with-lsp
+   ```
+   ```
 
 ## 4. Use it
 
@@ -271,6 +292,12 @@ sudo nixos-container start mina
 TL;DR
 ```
 printf './nix/pin.sh\nuse flake mina\n' > .envrc
+direnv allow
+```
+
+For worktree-safe direnv (no global registry needed):
+```
+echo 'use flake "git+file://$PWD?submodules=1"' > .envrc
 direnv allow
 ```
 
