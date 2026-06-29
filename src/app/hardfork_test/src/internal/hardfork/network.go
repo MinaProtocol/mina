@@ -142,7 +142,7 @@ func (t *HardforkTest) RunMainNetwork(extraFilesRoot string, mainGenesisTs int64
 			"--extra-genesis-accounts",
 			filepath.Join(os.TempDir(), "extra_genesis_accounts.json"),
 			"--active-stake-per-whale",
-			fmt.Sprintf("%.1f", t.Config.ActiveStakePerWhale),
+			fmt.Sprintf("%.0f", t.Config.ActiveStakePerWhale),
 		)
 	}
 
