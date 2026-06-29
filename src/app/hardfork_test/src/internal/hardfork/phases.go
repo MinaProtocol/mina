@@ -507,16 +507,25 @@ func (t *HardforkTest) CleanUpNetworkForForkPhase() error {
 	return nil
 }
 
+const fillRateThreshold = 0.10
+
 // expectedPreForkFillUpperBound computes the upper bound for pre-fork fill rate
 // using the VRF probability formula from Ouroboros Praos. Returns 2x the
 // analytical expected fill as a safe threshold.
 func (t *HardforkTest) expectedPreForkFillUpperBound() float64 {
-	dormantBalance := t.Config.DormantWhaleBalance
 	activeStake := t.Config.ActiveStakePerWhale
+	dormantBalance := t.Config.DormantWhaleBalance
 	totalCurrency := float64(t.Config.NumWhales)*activeStake + dormantBalance
 	p := 1.0
 	for i := 0; i < t.Config.NumWhales; i++ {
+		// P(producer wins) = 1 - (1 - activeStake/totalCurrency)
+		// approximation of φ_f(α) = 1 - (1-f)^α for small f
 		p *= (1.0 - activeStake/totalCurrency)
 	}
-	return (1.0 - p) * 2.0
+	expectedFillRatePessimistic := 1.0 - p + fillRateThreshold
+	if expectedFillRatePessimistic > 1.0 {
+		return 1.0
+	} else {
+		return expectedFillRatePessimistic
+	}
 }
