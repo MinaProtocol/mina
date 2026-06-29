@@ -12,8 +12,9 @@
   core_kernel
   integers
   sexplib0
-  ;; local libraries
-  block_time
+   ;; local libraries
+   backoff
+   block_time
   blockchain_snark
   coda_genesis_proof
   consensus
