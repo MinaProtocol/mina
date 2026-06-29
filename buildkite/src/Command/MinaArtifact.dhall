@@ -165,7 +165,7 @@ let expandDockerServices =
                         , mk (Docker.Type.Rosetta { network = net })
                         ]
                 , TestExecutive = none
-                , TxTools = [ mk Docker.Type.TxTools ]
+                , TxTools = none
                 , FunctionalTestSuite = none
                 , DelegationVerifier = [ mk Docker.Type.DelegationVerifier ]
                 , Toolchain = none

@@ -38,9 +38,11 @@ in  Pipeline.build
                 { network = Network.Type.Mainnet }
             , Artifacts.Type.CreatePreforkGenesis
                 { network = Network.Type.Mesa }
+            , Artifacts.Type.ArchiveGeneric
             , Artifacts.Type.Archive { network = Network.Type.Devnet }
             , Artifacts.Type.Archive { network = Network.Type.Mainnet }
             , Artifacts.Type.Archive { network = Network.Type.Mesa }
+            , Artifacts.Type.RosettaGeneric
             , Artifacts.Type.Rosetta { network = Network.Type.Devnet }
             , Artifacts.Type.Rosetta { network = Network.Type.Mainnet }
             , Artifacts.Type.Rosetta { network = Network.Type.Mesa }
