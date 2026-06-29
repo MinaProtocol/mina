@@ -164,8 +164,9 @@ PGPASSWORD="${PG_PW}" psql \
           -h "${PG_HOST}" \
           -p "${PG_PORT}" \
           "${PG_DB}" < ./src/test/archive/sample_db/archive_db.sql
-dune exec src/app/replayer/replayer.exe -- \
-     --archive-uri "$PG_URI" \
-     --input-file src/test/archive/sample_db/replayer_input_file.json \
-     --log-level Trace \
-     --log-json  | jq
+ dune exec src/app/replayer/replayer.exe -- \
+      --archive-uri "$PG_URI" \
+      --input-file src/test/archive/sample_db/replayer_input_file.json \
+      --canonical-only \
+      --log-level Trace \
+      --log-json  | jq

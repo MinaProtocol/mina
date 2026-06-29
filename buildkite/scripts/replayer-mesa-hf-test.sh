@@ -29,7 +29,8 @@ export MINA_LEDGER_S3_BUCKET
 
 $REPLAYER_APP \
   --archive-uri "$PG_CONN" \
-  --input-file "$INPUT_FILE"
+  --input-file "$INPUT_FILE" \
+  --canonical-only
 
 RESULT=$?
 
