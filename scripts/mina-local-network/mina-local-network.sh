@@ -60,7 +60,7 @@ SLOT_CHAIN_END=
 HARDFORK_GENESIS_SLOT_DELTA=
 EXTRA_FILES_ROOT=
 EXTRA_GENESIS_ACCOUNTS=
-ACTIVE_STAKE_PER_WHALE="11500000.0"
+ACTIVE_STAKE_PER_WHALE="11550000"
 
 # ================================================
 # Globals (assigned during execution of script)

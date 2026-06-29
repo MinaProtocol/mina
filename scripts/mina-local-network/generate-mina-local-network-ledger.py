@@ -65,7 +65,7 @@ def encode_nanominas(nanominas):
               )
 @click.option('--active-stake-per-whale',
               default=11550000,
-              type=float,
+              type=int,
               help='Active stake per whale account in mina (default: 11550000)')
 # Fish Account Params
 @click.option('--num-fish-accounts',

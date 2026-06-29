@@ -93,7 +93,7 @@ func DefaultConfig() *Config {
 		HfSlotDelta:                   30, // if this is too small and fork network is spawned after fork genesis, it'll fail to create any block
 		NumWhales:                     2,
 		NumFish:                       0,
-		ActiveStakePerWhale:           11500000.0,
+		ActiveStakePerWhale:           11550000.0,
 		DormantWhaleBalance:           50000000.0,
 		NumNodes:                      0,
 		PaymentInterval:               20,
