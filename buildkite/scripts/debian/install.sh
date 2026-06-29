@@ -49,13 +49,15 @@ else
   # shellcheck disable=SC2206
   debs=(${DEBS//,/ })
   # Install a single profile package (devnet) as the on-disk default profile.
-  # The per-profile generic packages (mina-devnet-generic, mina-mainnet-generic,
+  # The per-profile leaf packages (mina-devnet-profile, mina-mainnet-profile,
   # mina-lightnet, mina-dev) all ship /etc/coda/build_config/PROFILE and are
   # therefore mutually exclusive (installing more than one collides in dpkg).
+  # The convenience tent mina-${profile}-generic depends on this leaf package
+  # plus mina-generic.
   # The daemon resolves its profile from MINA_PROFILE first and only falls back to
   # this file, so tests needing a different profile (e.g. single-node-tests) set
   # MINA_PROFILE themselves and override the devnet default.
-  ./buildkite/scripts/cache/manager.sh read --root "$ROOT" "debians/$MINA_DEB_CODENAME/mina-devnet-generic_*" $LOCAL_DEB_FOLDER
+  ./buildkite/scripts/cache/manager.sh read --root "$ROOT" "debians/$MINA_DEB_CODENAME/mina-devnet-profile_*" $LOCAL_DEB_FOLDER
   for i in "${debs[@]}"; do
     case $i in
       mina-generic*)

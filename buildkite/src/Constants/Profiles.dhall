@@ -81,11 +81,11 @@ let toExtraLabelSegment =
             { Devnet = "", Mainnet = "", Lightnet = "-lightnet", Dev = "-dev" }
             profile
 
-let genericName =
+let profileName =
           \(profile : Profile)
       ->  merge
-            { Devnet = "mina-devnet-generic"
-            , Mainnet = "mina-mainnet-generic"
+            { Devnet = "mina-devnet-profile"
+            , Mainnet = "mina-mainnet-profile"
             , Lightnet = "mina-lightnet"
             , Dev = "mina-dev"
             }
@@ -100,5 +100,5 @@ in  { Type = Profile
     , toSuffixLowercase = toSuffixLowercase
     , toLabelSegment = toLabelSegment
     , toExtraLabelSegment = toExtraLabelSegment
-    , genericName = genericName
+    , profileName = profileName
     }

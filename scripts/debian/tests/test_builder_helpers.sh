@@ -594,12 +594,8 @@ test_build_rosetta_mainnet_deb() {
     load_captured_state
     assert_eq "deb name" "mina-rosetta-mainnet" "$CAPTURED_DEB_NAME"
     assert_control_field "$CAPTURED_CONTROL" "Package" "mina-rosetta-mainnet"
-    assert_control_contains "$CAPTURED_CONTROL" "Depends" "libssl1.1"
-    assert_control_contains "$CAPTURED_CONTROL" "Suggests" "jq"
-    assert_control_contains "$CAPTURED_CONTROL" "Suggests" "curl"
-
-    assert_rosetta_binaries "$CAPTURED_FILES"
-    assert_rosetta_configs "$CAPTURED_FILES"
+    assert_control_contains "$CAPTURED_CONTROL" "Depends" "mina-rosetta-generic"
+    assert_control_contains "$CAPTURED_CONTROL" "Depends" "mina-mainnet-profile"
 }
 
 test_build_rosetta_devnet_deb() {
@@ -608,10 +604,8 @@ test_build_rosetta_devnet_deb() {
     load_captured_state
     assert_eq "deb name" "mina-rosetta-devnet" "$CAPTURED_DEB_NAME"
     assert_control_field "$CAPTURED_CONTROL" "Package" "mina-rosetta-devnet"
-    assert_control_contains "$CAPTURED_CONTROL" "Suggests" "jq"
-
-    assert_rosetta_binaries "$CAPTURED_FILES"
-    assert_rosetta_configs "$CAPTURED_FILES"
+    assert_control_contains "$CAPTURED_CONTROL" "Depends" "mina-rosetta-generic"
+    assert_control_contains "$CAPTURED_CONTROL" "Depends" "mina-devnet-profile"
 }
 
 ################################################################################
@@ -935,16 +929,13 @@ test_build_profile_lightnet_deb() {
     assert_eq "deb name" "mina-lightnet" "$CAPTURED_DEB_NAME"
     assert_control_field "$CAPTURED_CONTROL" "Package" "mina-lightnet"
 
-    # Must pull in the generic binaries
-    assert_control_contains "$CAPTURED_CONTROL" "Depends" "mina-generic"
-
-    # Profile package carries only the PROFILE hint, no binaries
+    # Profile packages carry only the PROFILE hint, no deps
     assert_file_captured "$CAPTURED_FILES" "etc/coda/build_config/PROFILE"
     assert_captured_file_contains "$CAPTURED_LAST_BUILD_DIR" "etc/coda/build_config/PROFILE" "lightnet"
     assert_file_not_captured "$CAPTURED_FILES" "usr/local/bin/mina"
 
     # mina-lightnet is the profile package's own name, so it carries no Breaks
-    # against itself (devnet/mainnet carry the -generic suffix and Break the
+    # against itself (devnet/mainnet carry the -profile suffix and Break the
     # legacy monolithic name instead).
     assert_control_no_field "$CAPTURED_CONTROL" "Breaks"
 }
@@ -953,11 +944,8 @@ test_build_profile_devnet_deb() {
     safe_build build_profile_deb devnet || { log_fail "build exited non-zero"; return; }
 
     load_captured_state
-    assert_eq "deb name" "mina-devnet-generic" "$CAPTURED_DEB_NAME"
-    assert_control_field "$CAPTURED_CONTROL" "Package" "mina-devnet-generic"
-
-    # Must pull in the generic binaries
-    assert_control_contains "$CAPTURED_CONTROL" "Depends" "mina-generic"
+    assert_eq "deb name" "mina-devnet-profile" "$CAPTURED_DEB_NAME"
+    assert_control_field "$CAPTURED_CONTROL" "Package" "mina-devnet-profile"
 
     assert_file_captured "$CAPTURED_FILES" "etc/coda/build_config/PROFILE"
     assert_captured_file_contains "$CAPTURED_LAST_BUILD_DIR" "etc/coda/build_config/PROFILE" "devnet"
@@ -977,16 +965,8 @@ test_build_archive_devnet_deb() {
     load_captured_state
     assert_eq "deb name" "mina-archive-devnet" "$CAPTURED_DEB_NAME"
     assert_control_field "$CAPTURED_CONTROL" "Package" "mina-archive-devnet"
-    assert_control_contains "$CAPTURED_CONTROL" "Depends" "libssl1.1"
-    assert_control_contains "$CAPTURED_CONTROL" "Depends" "libpq-dev"
-    assert_control_contains "$CAPTURED_CONTROL" "Depends" "libjemalloc2"
-    # Archive packages should NOT depend on DAEMON_DEPS
-    assert_not_contains "archive deps no libffi" "$CAPTURED_CONTROL" "libffi"
-
-    assert_archive_binaries "$CAPTURED_FILES"
-    # SQL migration scripts
-    assert_file_captured "$CAPTURED_FILES" "etc/mina/archive/create_schema.sql"
-    assert_file_captured "$CAPTURED_FILES" "etc/mina/archive/migrations.sql"
+    assert_control_contains "$CAPTURED_CONTROL" "Depends" "mina-archive-generic"
+    assert_control_contains "$CAPTURED_CONTROL" "Depends" "mina-devnet-profile"
 }
 
 test_build_archive_mainnet_deb() {
@@ -995,11 +975,8 @@ test_build_archive_mainnet_deb() {
     load_captured_state
     assert_eq "deb name" "mina-archive-mainnet" "$CAPTURED_DEB_NAME"
     assert_control_field "$CAPTURED_CONTROL" "Package" "mina-archive-mainnet"
-    assert_control_contains "$CAPTURED_CONTROL" "Depends" "libpq-dev"
-
-    assert_archive_binaries "$CAPTURED_FILES"
-    assert_file_captured "$CAPTURED_FILES" "etc/mina/archive/create_schema.sql"
-    assert_file_captured "$CAPTURED_FILES" "etc/mina/archive/migrations.sql"
+    assert_control_contains "$CAPTURED_CONTROL" "Depends" "mina-archive-generic"
+    assert_control_contains "$CAPTURED_CONTROL" "Depends" "mina-mainnet-profile"
 }
 
 ################################################################################
@@ -1237,7 +1214,7 @@ test_codename_noble_archive_deps() {
     local saved_archive="${ARCHIVE_DEPS}"
     ARCHIVE_DEPS="${NOBLE_ARCHIVE_DEPS}"
 
-    safe_build build_archive_deb devnet || { log_fail "build exited non-zero"; return; }
+    safe_build build_archive_generic_deb || { log_fail "build exited non-zero"; return; }
 
     load_captured_state
     assert_control_contains "$CAPTURED_CONTROL" "Depends" "libssl3t64"

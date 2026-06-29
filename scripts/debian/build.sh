@@ -38,6 +38,11 @@ resolve_and_build_package() {
     return
   fi
 
+  if [[ "$package" =~ ^daemon_(mainnet|devnet)$ ]]; then
+    build_daemon_tent_deb "${BASH_REMATCH[1]}"
+    return
+  fi
+
   if [[ "$package" =~ ^daemon_(mainnet|devnet|mesa-mut|mesa)_(config|generic|hardfork_config|prefork|postfork|automode)$ ]]; then
     "build_daemon_${BASH_REMATCH[2]}_deb" "${BASH_REMATCH[1]}"
     return
@@ -53,22 +58,33 @@ resolve_and_build_package() {
     return
   fi
 
+  if [[ "$package" =~ ^profile_(mainnet|devnet)_generic$ ]]; then
+    build_profile_generic_tent_deb "${BASH_REMATCH[1]}"
+    return
+  fi
+
   echo "Invalid debian package name '$package'"
   exit 1
 }
 
 default_targets=(
   profile_devnet
+  profile_devnet_generic
   profile_mainnet
+  profile_mainnet_generic
   profile_lightnet
   logproc
+  archive_generic
   archive_devnet
   archive_mainnet
   tx_tools
+  daemon_mainnet
   daemon_mainnet_config
   daemon_mainnet_generic
+  daemon_devnet
   daemon_devnet_config
   daemon_devnet_generic
+  rosetta_generic
   rosetta_mainnet
   rosetta_devnet
   test_executive

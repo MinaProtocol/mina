@@ -218,7 +218,7 @@ let toDebian =
                 ->  Debian.Type.PreforkGenesisLedger
             , DaemonStorageToolbox = Debian.Type.DaemonStorageToolbox
             , LogProc = Debian.Type.LogProc
-            , ArchiveGeneric = Debian.Type.Archive
+            , ArchiveGeneric = Debian.Type.ArchiveGeneric
             , Archive = \(a : { network : Network.Type }) -> Debian.Type.Archive
             , RosettaGeneric = Debian.Type.RosettaGeneric
             , Rosetta = \(a : { network : Network.Type }) -> Debian.Type.Rosetta

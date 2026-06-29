@@ -9,10 +9,11 @@ ARG deb_arch="all"
 ARG version=latest
 
 # Profiled daemon image: the network-agnostic generic daemon base plus a baked
-# profile hint package (mina-${profile}-generic, or mina-lightnet / mina-dev for
-# those profiles), which drops /etc/coda/build_config/PROFILE so the runtime
-# selects this profile by default. It is FROM the single network-free generic
-# image, mirroring how Dockerfile-install-config layers the per-network config
+# profile tent package (mina-${profile}-generic, or mina-lightnet / mina-dev for
+# those profiles), which pulls in the profile hint package and drops
+# /etc/coda/build_config/PROFILE so the runtime selects this profile by default.
+# It is FROM the single network-free generic image,
+# mirroring how Dockerfile-install-config layers the per-network config
 # package on top:  mina-generic -> mina-${profile}-generic -> mina-${network}
 FROM ${docker_repo}/${image_name}:${version}-generic${build_flags_suffix}${custom_suffix}
 
@@ -24,7 +25,7 @@ ARG deb_profile
 
 WORKDIR /root/
 
-# The profile package is staged into the build context's _debs/ directory by
+# The profile tent package is staged into the build context's _debs/ directory by
 # scripts/docker/build.sh (DownloadOnly mode via read_all_from_cache.sh) and
 # installed directly from the local filesystem (no apt repo / no apt index).
 # Devnet/Mainnet ship as mina-${deb_profile}-generic; Lightnet and Dev ship as
