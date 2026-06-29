@@ -377,5 +377,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
            ( List.hd_exn
            @@ (Network.archive_nodes network |> Core.String.Map.data) )
        in
-       check_replayer_logs ~logger logs )
+       let%bind n = check_replayer_logs ~logger logs in
+       if n < 8 || n > 30 then
+         Malleable_error.hard_error_string
+           (sprintf "Replayer replayed %d blocks, expected between 8 and 30" n)
+       else Malleable_error.return () )
 end
