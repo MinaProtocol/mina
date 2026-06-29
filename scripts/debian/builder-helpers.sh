@@ -157,10 +157,35 @@ EOF
 
 # Function to ease package build
 build_deb() {
-  echo "--- Building ${1}_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb"
+  local package_name="$1"
+  local deb_file="${package_name}_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb"
+
+  # Memoize: if this .deb was already produced (e.g. daemon_mainnet_generic and
+  # daemon_devnet_generic both produce mina-generic), skip the second build.
+  if [[ -f "$deb_file" ]]; then
+    echo "--- Skipping ${deb_file} (already built)"
+    rm -rf "${BUILDDIR}"
+    return 0
+  fi
+
+  echo "--- Building ${deb_file}"
   echo "------------------------------------------------------------"
   echo "build_deb inputs:"
-  echo "Package Name: ${1}"
+  echo "Package Name: ${package_name}"
+
+  # Memoize: if this .deb was already produced (e.g. daemon_mainnet_generic and
+  # daemon_devnet_generic both produce mina-generic), skip the second build.
+  # Only in non-capture mode (tests need fresh captures).
+  if [[ -z "${BUILD_DEB_CAPTURE_DIR:-}" ]] && [[ -f "$deb_file" ]]; then
+    echo "--- Skipping ${deb_file} (already built)"
+    rm -rf "${BUILDDIR}"
+    return 0
+  fi
+
+  echo "--- Building ${deb_file}"
+  echo "------------------------------------------------------------"
+  echo "build_deb inputs:"
+  echo "Package Name: ${package_name}"
 
   # echo contents of deb
   echo "------------------------------------------------------------"
@@ -170,13 +195,13 @@ build_deb() {
   # If BUILD_DEB_CAPTURE_DIR is set (used by tests), capture the staging
   # directory state to that directory instead of invoking fakeroot/dpkg-deb.
   if [[ -n "${BUILD_DEB_CAPTURE_DIR:-}" ]]; then
-    echo "${1}" > "${BUILD_DEB_CAPTURE_DIR}/deb_name"
+    echo "${package_name}" > "${BUILD_DEB_CAPTURE_DIR}/deb_name"
     cp "${BUILDDIR}/DEBIAN/control" "${BUILD_DEB_CAPTURE_DIR}/control"
     (cd "${BUILDDIR}" && find . -type f | sort) > "${BUILD_DEB_CAPTURE_DIR}/files"
     rm -rf "${BUILD_DEB_CAPTURE_DIR}/last_build"
     cp -a "${BUILDDIR}" "${BUILD_DEB_CAPTURE_DIR}/last_build"
     rm -rf "${BUILDDIR}"
-    echo "--- Captured ${1} staging directory to ${BUILD_DEB_CAPTURE_DIR}"
+    echo "--- Captured ${package_name} staging directory to ${BUILD_DEB_CAPTURE_DIR}"
     return 0
   fi
 
@@ -187,9 +212,9 @@ build_deb() {
   # Docker image, we're examining those packages in buildkite's agent, where
   # `zstd` might not be available.
   fakeroot dpkg-deb -Zgzip --build "${BUILDDIR}" \
-    "${1}"_"${MINA_DEB_VERSION}"_"${ARCHITECTURE}".deb
+    "${package_name}"_"${MINA_DEB_VERSION}"_"${ARCHITECTURE}".deb
   echo "build_deb outputs:"
-  ls -lh "${1}"_*.deb
+  ls -lh "${package_name}"_*.deb
   echo "deleting BUILDDIR ${BUILDDIR}"
   rm -rf "${BUILDDIR}"
 }
