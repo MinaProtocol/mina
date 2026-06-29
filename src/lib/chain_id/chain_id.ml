@@ -55,9 +55,9 @@ let make ~(genesis_constants : Genesis_constants.t) ~constraint_constants
   let protocol_state_with_hashes =
     Mina_state.Genesis_protocol_state.t
       ~genesis_ledger:
-        (Consensus.Genesis_data.Hashed.zero_total_currency genesis_ledger)
+        (Consensus.Genesis_data.Hashed.zero_totals genesis_ledger)
       ~genesis_epoch_data:
-        (Consensus.Genesis_data.Epoch.zero_total_currency genesis_epoch_data)
+        (Consensus.Genesis_data.Epoch.zero_totals genesis_epoch_data)
       ~constraint_constants ~consensus_constants
       ~genesis_body_reference:Staged_ledger_diff.genesis_body_reference
   in
