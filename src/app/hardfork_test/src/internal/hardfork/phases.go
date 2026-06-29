@@ -76,8 +76,9 @@ func (t *HardforkTest) RunMainNetworkPhase(mainGenesisTs int64, beforeShutdown H
 		}
 		analysis.PreForkOccupancy = occ
 		t.Logger.Info("Pre-fork slot occupancy (expected low due to dormant whale): %f", occ)
-		if occ >= 0.50 {
-			return nil, fmt.Errorf("pre-fork slot occupancy (%f) is unexpectedly high, dormant whale not diluting VRF denominator correctly", occ)
+		upperBound := t.expectedPreForkFillUpperBound()
+		if occ >= upperBound {
+			return nil, fmt.Errorf("pre-fork slot occupancy (%f) exceeds expected upper bound (%f), dormant whale not diluting VRF denominator correctly", occ, upperBound)
 		}
 	} else {
 		if err := t.ValidateSlotOccupancy(analysis.GenesisBlock, analysis.Consensus.LastBlockBeforeTxEnd); err != nil {
@@ -504,4 +505,18 @@ func (t *HardforkTest) CleanUpNetworkForForkPhase() error {
 		}
 	}
 	return nil
+}
+
+// expectedPreForkFillUpperBound computes the upper bound for pre-fork fill rate
+// using the VRF probability formula from Ouroboros Praos. Returns 2x the
+// analytical expected fill as a safe threshold.
+func (t *HardforkTest) expectedPreForkFillUpperBound() float64 {
+	dormantBalance := t.Config.DormantWhaleBalance
+	activeStake := t.Config.ActiveStakePerWhale
+	totalCurrency := float64(t.Config.NumWhales)*activeStake + dormantBalance
+	p := 1.0
+	for i := 0; i < t.Config.NumWhales; i++ {
+		p *= (1.0 - activeStake/totalCurrency)
+	}
+	return (1.0 - p) * 2.0
 }

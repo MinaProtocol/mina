@@ -90,7 +90,7 @@ func init() {
 
 	// Unstaking test
 	rootCmd.Flags().BoolVar(&cfg.UnstakingTest, "unstaking-test", false, "Enable unstaking fill-rate test")
-	rootCmd.Flags().StringVar(&cfg.DormantWhaleBalance, "dormant-whale-balance", "50000000.0", "Balance for the dormant whale account (in mina, nanomina-encoded string)")
+	rootCmd.Flags().Float64Var(&cfg.DormantWhaleBalance, "dormant-whale-balance", 50000000.0, "Balance for the dormant whale account (in mina)")
 
 	rootCmd.MarkFlagRequired("main-mina-exe")
 	rootCmd.MarkFlagRequired("main-runtime-genesis-ledger")

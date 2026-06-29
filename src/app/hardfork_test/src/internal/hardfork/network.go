@@ -54,7 +54,7 @@ func (t *HardforkTest) setupDormantWhaleAccount(root string) error {
 			{
 				Pk:       t.Config.DormantWhalePk,
 				Sk:       nil,
-				Balance:  t.Config.DormantWhaleBalance,
+				Balance:  fmt.Sprintf("%.1f", t.Config.DormantWhaleBalance),
 				Delegate: nil,
 			},
 		},
@@ -141,6 +141,8 @@ func (t *HardforkTest) RunMainNetwork(extraFilesRoot string, mainGenesisTs int64
 		args = append(args,
 			"--extra-genesis-accounts",
 			filepath.Join(os.TempDir(), "extra_genesis_accounts.json"),
+			"--active-stake-per-whale",
+			fmt.Sprintf("%.1f", t.Config.ActiveStakePerWhale),
 		)
 	}
 

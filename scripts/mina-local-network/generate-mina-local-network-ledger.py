@@ -63,6 +63,9 @@ def encode_nanominas(nanominas):
               default=DEFAULT_OFFLINE_WHALE_KEYS_DIR.absolute(),
               help='Directory where Offline Whale Account Keys will be stored.'
               )
+@click.option('--active-stake-per-whale',
+              default=11550000,
+              help='Active stake per whale account in mina (default: 11550000)')
 # Fish Account Params
 @click.option('--num-fish-accounts',
               default=10,
@@ -97,6 +100,7 @@ def generate_ledger(generate_remainder,
                     num_whale_accounts,
                     online_whale_accounts_directory,
                     offline_whale_accounts_directory,
+                    active_stake_per_whale,
                     num_fish_accounts,
                     online_fish_accounts_directory,
                     offline_fish_accounts_directory,
@@ -384,7 +388,7 @@ def generate_ledger(generate_remainder,
             .format(num_whale_accounts,
                     len(ledger_public_keys["online_whale_keys"])))
 
-    whale_offline_balance = encode_nanominas(66000 * 175 * (10**9))
+    whale_offline_balance = encode_nanominas(active_stake_per_whale * (10**9))
     whale_online_balance = encode_nanominas(499 * (10**9))
 
     # Whale Accounts

@@ -60,6 +60,7 @@ SLOT_CHAIN_END=
 HARDFORK_GENESIS_SLOT_DELTA=
 EXTRA_FILES_ROOT=
 EXTRA_GENESIS_ACCOUNTS=
+ACTIVE_STAKE_PER_WHALE="11500000.0"
 
 # ================================================
 # Globals (assigned during execution of script)
@@ -667,6 +668,10 @@ while [[ "$#" -gt 0 ]]; do
     EXTRA_GENESIS_ACCOUNTS="${2}"
     shift
     ;;
+  --active-stake-per-whale)
+    ACTIVE_STAKE_PER_WHALE="${2}"
+    shift
+    ;;
   *)
     echo "Unknown parameter passed: ${1}"
 
@@ -890,6 +895,7 @@ load_config() {
         --online-whale-accounts-directory "${ROOT}"/online_whale_keys \
         --online-fish-accounts-directory "${ROOT}"/online_fish_keys \
         --snark-coordinator-accounts-directory "${ROOT}"/snark_coordinator_keys \
+        --active-stake-per-whale "${ACTIVE_STAKE_PER_WHALE}" \
         --out-genesis-ledger-file "${ROOT}"/genesis_ledger.json
 
       if [ -n "${EXTRA_GENESIS_ACCOUNTS}" ]; then
