@@ -465,7 +465,7 @@ func (t *HardforkTest) CleanUpNetworkForForkPhase() error {
 		}
 		t.Logger.Info("Node %s will be using fork config of content: %s", info.Name, string(forkConfigContent))
 
-		chainId, err := t.ComputeChainId(forkConfigFile)
+		chainId, err := t.ComputeChainId(forkConfigFile, filepath.Join(t.Config.Root, "daemon.json"))
 		if err != nil {
 			return fmt.Errorf("failed to compute chain_id from fork config on node %s: %w", info.Name, err)
 		}
