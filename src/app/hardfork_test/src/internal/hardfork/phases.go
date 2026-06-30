@@ -232,7 +232,12 @@ func (t *HardforkTest) legacyFork(daemon config.DaemonInfo, analysis BlockAnalys
 	preforkGenesisConfigFile := filepath.Join(t.Config.Root, "daemon.json")
 	forkHashesFile := filepath.Join(forkDataPath, "ledger_hashes.json")
 
-	patchedConfigBytes, err := t.PatchForkConfigAndGenerateLedgersLegacy(&analysis, prepatchConfigFile, patchedLedgersDir, forkHashesFile, patchedConfigFile, preforkGenesisConfigFile, forkGenesisTs, mainGenesisTs)
+	var extraArgs []string
+	if t.Config.UnstakingTest {
+		extraArgs = append(extraArgs, "--unstake-pk", t.Config.DormantWhalePk)
+	}
+
+	patchedConfigBytes, err := t.PatchForkConfigAndGenerateLedgersLegacy(&analysis, prepatchConfigFile, patchedLedgersDir, forkHashesFile, patchedConfigFile, preforkGenesisConfigFile, forkGenesisTs, mainGenesisTs, extraArgs...)
 	if err != nil {
 		return err
 	}
@@ -337,6 +342,14 @@ func (t *HardforkTest) autoFork(daemon config.DaemonInfo, analysis BlockAnalysis
 }
 
 func (t *HardforkTest) ForkPhase(analysis *BlockAnalysisResult, mainGenesisTs int64) error {
+	if t.Config.UnstakingTest {
+		for _, info := range t.Config.DaemonInfos {
+			if info.ForkMethod != config.Legacy {
+				panic(fmt.Sprintf("unstaking test requires all nodes use legacy fork method, but node %s uses %s", info.Name, info.ForkMethod))
+			}
+		}
+	}
+
 	numDaemons := len(t.Config.DaemonInfos)
 	errors := make([]error, numDaemons)
 

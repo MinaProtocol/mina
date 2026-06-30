@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strconv"
 
 	"github.com/MinaProtocol/mina/src/app/hardfork_test/src/internal/config"
@@ -17,23 +18,23 @@ type LedgerHashes struct {
 }
 
 // GenerateForkLedgers generates the hardfork ledgers using the specified executable
-func (t *HardforkTest) GenerateForkLedgers(executablePath, forkConfigPath, ledgersDir, hashesFile string) error {
+func (t *HardforkTest) GenerateForkLedgers(executablePath, forkConfigPath, ledgersDir, hashesFile string, extraArgs ...string) error {
 	t.Logger.Info("Generating hardfork ledgers with %s...", executablePath)
 
-	// Create hardfork ledgers directory
 	os.RemoveAll(ledgersDir)
 	os.MkdirAll(ledgersDir, 0755)
 
-	// Generate hardfork ledgers with specified executable
-	cmd := exec.Command(
-		executablePath,
+	args := []string{
 		"--config-file", forkConfigPath,
 		"--genesis-dir", ledgersDir,
 		"--hash-output-file", hashesFile,
-		// Forking to mesa need App State size to be expanded to 32
-		// TODO: Consider design the test so this pad app state size is only applied when forking into Mesa
 		"--pad-app-state",
-	)
+	}
+	args = append(args, extraArgs...)
+
+	cmd := exec.Command(executablePath, args...)
+
+	cmd.Env = append(os.Environ(), "TMPDIR="+filepath.Join(t.Config.Root, "tmp"))
 
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -62,9 +63,9 @@ func (t *HardforkTest) GenerateAndValidateHashesAndLedgers(analysis BlockAnalysi
 // 1. generate fork ledgers with runtime-genesis-ledger
 // 2. patch the genesis time & slot for fork config with create_runtime_config.sh
 // 3. perform some base sanity check on the fork config
-func (t *HardforkTest) PatchForkConfigAndGenerateLedgersLegacy(analysis *BlockAnalysisResult, forkConfigPath, forkLedgersDir, forkHashesFile, configFile, preforkGenesisConfigFile string, forkGenesisTs, mainGenesisTs int64) ([]byte, error) {
+func (t *HardforkTest) PatchForkConfigAndGenerateLedgersLegacy(analysis *BlockAnalysisResult, forkConfigPath, forkLedgersDir, forkHashesFile, configFile, preforkGenesisConfigFile string, forkGenesisTs, mainGenesisTs int64, extraArgs ...string) ([]byte, error) {
 	// Generate fork ledgers using fork network executable
-	if err := t.GenerateForkLedgers(t.Config.ForkRuntimeGenesisLedger, forkConfigPath, forkLedgersDir, forkHashesFile); err != nil {
+	if err := t.GenerateForkLedgers(t.Config.ForkRuntimeGenesisLedger, forkConfigPath, forkLedgersDir, forkHashesFile, extraArgs...); err != nil {
 		return nil, err
 	}
 
