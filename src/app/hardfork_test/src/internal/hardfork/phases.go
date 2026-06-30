@@ -115,7 +115,7 @@ type ForkData struct {
 }
 
 // RunForkNetworkPhase runs the fork network and validates its operation
-func (t *HardforkTest) RunForkNetworkPhase(latestPreForkHeight int, mainGenesisTs int64) error {
+func (t *HardforkTest) RunForkNetworkPhase(latestPreForkHeight int, mainGenesisTs int64, analysis *BlockAnalysisResult) error {
 	// Start fork network
 	forkCmd, err := t.RunForkNetwork()
 	if err != nil {
