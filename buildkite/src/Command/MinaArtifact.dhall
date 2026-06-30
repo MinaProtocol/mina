@@ -158,7 +158,7 @@ let expandDockerServices =
                 , Archive =
                         \(_ : { network : Network.Type })
                     ->  [ mk (Docker.Type.Archive { network = net }) ]
-                , RosettaGeneric = [ mk Docker.Type.RosettaGeneric ]
+                , RosettaGeneric = none
                 , Rosetta =
                         \(_ : { network : Network.Type })
                     ->  [ mk Docker.Type.RosettaGeneric
