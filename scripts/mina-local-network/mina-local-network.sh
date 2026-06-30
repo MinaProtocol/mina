@@ -59,6 +59,8 @@ SLOT_TX_END=
 SLOT_CHAIN_END=
 HARDFORK_GENESIS_SLOT_DELTA=
 EXTRA_FILES_ROOT=
+ACTIVE_STAKE_PER_WHALE="11550000"
+EXTRA_GENESIS_ACCOUNTS=""
 
 # ================================================
 # Globals (assigned during execution of script)
@@ -167,7 +169,9 @@ help() {
                                          |   Default: not set
 --extra-files-root <path>                | Directory of file tree need to be overlayed on a prepared network folder, useful when initializing from fresh but need some files set. 
                                          |   Default: None
--h   |--help                             | Displays this help message
+--active-stake-per-whale <#>             | Active stake per whale in nanomina. Default: 11550000
+--extra-genesis-accounts <path>          | Path to a JSON file of extra genesis accounts to merge into the generated ledger
+-h   |--help                              | Displays this help message
 
 Available logging levels:
   Spam, Trace, Debug, Info, Warn, Error, Faulty_peer, Fatal
@@ -660,6 +664,14 @@ while [[ "$#" -gt 0 ]]; do
     EXTRA_FILES_ROOT="${2}"
     shift
     ;;
+  --active-stake-per-whale)
+    ACTIVE_STAKE_PER_WHALE="${2}"
+    shift
+    ;;
+  --extra-genesis-accounts)
+    EXTRA_GENESIS_ACCOUNTS="${2}"
+    shift
+    ;;
   *)
     echo "Unknown parameter passed: ${1}"
 
@@ -883,7 +895,15 @@ load_config() {
         --online-whale-accounts-directory "${ROOT}"/online_whale_keys \
         --online-fish-accounts-directory "${ROOT}"/online_fish_keys \
         --snark-coordinator-accounts-directory "${ROOT}"/snark_coordinator_keys \
+        --active-stake-per-whale "${ACTIVE_STAKE_PER_WHALE}" \
         --out-genesis-ledger-file "${ROOT}"/genesis_ledger.json
+
+      if [ -n "${EXTRA_GENESIS_ACCOUNTS}" ]; then
+        jq --slurpfile extra "${EXTRA_GENESIS_ACCOUNTS}" \
+          '.accounts += $extra[0].accounts' \
+          "${ROOT}"/genesis_ledger.json > "${ROOT}"/genesis_ledger_tmp.json
+        mv "${ROOT}"/genesis_ledger_tmp.json "${ROOT}"/genesis_ledger.json
+      fi
 
       reset-genesis-ledger "${ROOT}" "${config_file}"
       echo "Using freshly generated config file ${config_file}:"
