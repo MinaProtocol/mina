@@ -550,8 +550,22 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
               ~txn_hash:hash ~node_included_in:`Any_node ) )
     in
     section_hard "running replayer"
-      (let%bind logs =
-         Network.Node.run_replayer ~logger
+      (* Without an explicit target the replayer only replays up to the highest
+         canonical block, which in a short-lived test network is genesis, so it
+         emits too few logs. Target a recent proof block instead: it is deep in
+         the chain and therefore already persisted in the archive. *)
+      (let proof_state_hash =
+         let ns = network_state t in
+         match ns.proof_block_state_hashes with
+         | hash :: _ ->
+             hash
+         | [] ->
+             failwith "Expected at least one proof block state hash"
+       in
+       [%log info] "Replaying archive up to proof block $state_hash"
+         ~metadata:[ ("state_hash", State_hash.to_yojson proof_state_hash) ] ;
+       let%bind logs =
+         Network.Node.run_replayer ~target_state_hash:proof_state_hash ~logger
            (List.hd_exn @@ (Network.archive_nodes network |> Core.Map.data))
        in
        check_replayer_logs ~logger logs )
