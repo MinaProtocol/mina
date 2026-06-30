@@ -716,13 +716,20 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
              (Error.of_string "Ledger update contains a timing update") ) )
     in
     section_hard "Running replayer"
-      (* Without an explicit target the replayer only replays up to the highest
-         canonical block, which in a short-lived test network is genesis, so it
-         emits too few logs. This test does not wait for a ledger proof, so
-         target a recent best-chain block instead. Pick one a couple below the
-         best tip so it is already persisted in the archive (avoiding a race
-         with archive ingestion of the very latest block). *)
-      (let%bind best_chain =
+      (* The replayer replays from genesis up to an explicit target block, and
+         check_replayer_logs requires at least 25 "Info" log lines: it emits a
+         fixed startup base plus one Info line per replayed block, so the count
+         grows with the target block's height. This test deliberately does not
+         wait for a ledger proof (to stay fast), and a short-lived network with
+         a 2-minute block window may only have a handful of blocks; without a
+         lower bound on the replay span the count can land just under 25. So
+         first grow the chain by a safe margin, then target a block a couple
+         below the best tip so it is already persisted in the archive (avoiding
+         a race with archive ingestion of the very latest block). *)
+      (let%bind () =
+         wait_for t (Wait_condition.block_height_growth ~height_growth:10)
+       in
+       let%bind best_chain =
          Graphql_requests.must_get_best_chain ~logger
            (Network.Node.get_ingress_uri node)
        in
