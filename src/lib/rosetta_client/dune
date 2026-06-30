@@ -1,0 +1,69 @@
+(library
+ (name rosetta_client)
+ (public_name rosetta_client)
+ (libraries
+  ;; opam libraries
+  core
+  core_kernel
+  async
+  cohttp
+  cohttp-async
+  uri
+  yojson
+  ;; local libraries
+  rosetta_models)
+ (inline_tests
+  (flags -verbose -show-counts))
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_version ppx_let ppx_here ppx_inline_test ppx_assert)))
+
+;; Embed the four rosetta-cli config files as string constants so the
+;; [Config] module can expose them without relying on an installed
+;; filesystem path.  We concatenate the files into a generated
+;; [embedded_configs.ml] using raw-string literals with the fixed
+;; delimiter [rosetta].  The runtest rule below guards against any
+;; future config change that would collide with this delimiter.
+
+(rule
+ (targets embedded_configs.ml)
+ (deps
+  (:cfg ../../app/rosetta/rosetta-cli-config/config.json)
+  (:mros ../../app/rosetta/rosetta-cli-config/mina.ros)
+  (:nodel ../../app/rosetta/rosetta-cli-config/mina-no-delegation-test.ros)
+  (:retfn ../../app/rosetta/rosetta-cli-config/mina-with-return-funds.ros))
+ (action
+  (with-stdout-to
+   %{targets}
+   (progn
+    (echo
+     "(* Auto-generated from src/app/rosetta/rosetta-cli-config/. Do not edit. *)\n\n")
+    (echo "let config_json = {rosetta|")
+    (cat %{cfg})
+    (echo "|rosetta}\n\n")
+    (echo "let mina_ros = {rosetta|")
+    (cat %{mros})
+    (echo "|rosetta}\n\n")
+    (echo "let mina_no_delegation_test_ros = {rosetta|")
+    (cat %{nodel})
+    (echo "|rosetta}\n\n")
+    (echo "let mina_with_return_funds_ros = {rosetta|")
+    (cat %{retfn})
+    (echo "|rosetta}\n")))))
+
+;; Collision guard: the raw-string delimiter above is fixed at
+;; [rosetta].  Fail loudly on [dune runtest] if any of the embedded
+;; files ever grows a literal "|rosetta}" that would terminate the
+;; raw-string literal prematurely.
+
+(rule
+ (alias runtest)
+ (deps
+  (:cfg ../../app/rosetta/rosetta-cli-config/config.json)
+  (:mros ../../app/rosetta/rosetta-cli-config/mina.ros)
+  (:nodel ../../app/rosetta/rosetta-cli-config/mina-no-delegation-test.ros)
+  (:retfn ../../app/rosetta/rosetta-cli-config/mina-with-return-funds.ros))
+ (action
+  (bash
+   "for f in %{cfg} %{mros} %{nodel} %{retfn}; do if grep -q '|rosetta}' \"$f\"; then echo \"ERROR: $f contains the raw-string delimiter |rosetta} used by embedded_configs.ml. Change the delimiter in dune.\" >&2; exit 1; fi; done")))

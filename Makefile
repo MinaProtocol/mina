@@ -209,6 +209,8 @@ build-mainnet-sigs: ocaml_checks reformat-diff libp2p_helper build ## Build main
 		src/app/cli/src/mina_mainnet_signatures.exe \
 		src/app/rosetta/rosetta_mainnet_signatures.exe \
 		src/app/rosetta/ocaml-signer/signer_mainnet_signatures.exe \
+		src/app/rosetta/healthcheck/rosetta_healthcheck.exe \
+		src/app/rosetta/client/rosetta_client_cli.exe \
 		--profile=mainnet \
 		&& echo "✅ Build complete"
 
@@ -221,6 +223,8 @@ build-devnet-sigs: ocaml_checks reformat-diff libp2p_helper build ## Build devne
 		src/app/cli/src/mina_testnet_signatures.exe \
 		src/app/rosetta/rosetta_testnet_signatures.exe \
 		src/app/rosetta/ocaml-signer/signer_testnet_signatures.exe \
+		src/app/rosetta/healthcheck/rosetta_healthcheck.exe \
+		src/app/rosetta/client/rosetta_client_cli.exe \
 		--profile=devnet \
 		&& echo "✅ Build complete"
 
@@ -287,6 +291,8 @@ build-rosetta: ocaml_checks ## Build Rosetta API components
 		src/app/archive/archive.exe \
 		src/app/rosetta/rosetta.exe \
 		src/app/rosetta/ocaml-signer/signer.exe \
+		src/app/rosetta/healthcheck/rosetta_healthcheck.exe \
+		src/app/rosetta/client/rosetta_client_cli.exe \
 		--profile=$(DUNE_PROFILE) \
 		&& echo "✅ Build complete"
 

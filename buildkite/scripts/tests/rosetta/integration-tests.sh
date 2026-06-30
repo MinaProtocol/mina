@@ -246,6 +246,28 @@ psql -f ./src/test/archive/sample_db/archive_db.sql "${INDEXER_PG_CONN}"
 mina-rosetta-indexer-test --archive_uri "${INDEXER_PG_CONN}"
 sudo -u postgres dropdb "${INDEXER_DBNAME}"
 
+echo "=========================== NEGATIVE TEST: healthcheck against not-yet-running Rosetta ==========================="
+# Sanity check: before Rosetta is up, `rosetta-healthcheck ready` must
+# fail cleanly.  Catches regressions in error formatting and exit codes
+# (e.g. raw OCaml [Unix_error] leaking through to stderr on ECONNREFUSED).
+set +e
+NEGATIVE_OUTPUT=$(rosetta-healthcheck ready \
+  --online-uri "http://127.0.0.1:${MINA_ROSETTA_ONLINE_PORT}" \
+  --json 2>&1)
+NEGATIVE_EXIT=$?
+set -e
+if [ "$NEGATIVE_EXIT" -eq 0 ]; then
+  echo "ERROR: healthcheck reported READY before Rosetta was started" >&2
+  echo "Output: $NEGATIVE_OUTPUT" >&2
+  exit 1
+fi
+if echo "$NEGATIVE_OUTPUT" | grep -q "Unix_error\|Unix\.\|Core\.Unix"; then
+  echo "ERROR: healthcheck leaked raw OCaml exception syntax" >&2
+  echo "Output: $NEGATIVE_OUTPUT" >&2
+  exit 1
+fi
+echo "   ✅  healthcheck correctly reported not-ready with a clean error"
+
 # Mina Rosetta
 echo "=========================== STARTING ROSETTA API ONLINE AND OFFLINE INSTANCES ==========================="
 ports=("$MINA_ROSETTA_ONLINE_PORT" "$MINA_ROSETTA_OFFLINE_PORT")
@@ -255,7 +277,24 @@ for port in "${ports[@]}"; do
     --graphql-uri http://127.0.0.1:${MINA_GRAPHQL_PORT}/graphql \
     --log-level ${LOG_LEVEL} \
     --port ${port} &
-  sleep 5
+  # Wait for the HTTP listener to bind.  We intentionally do NOT probe a
+  # functional Rosetta endpoint here: at this point the Mina daemon isn't
+  # running yet, and any Rosetta route that calls the daemon (e.g.
+  # /network/list) would fail for the full timeout.  Functional readiness
+  # is exercised later by `rosetta-cli configuration:validate` and the
+  # subsequent sweeps, once the daemon is up.
+  echo "Waiting for Rosetta on port ${port} to bind..."
+  for i in $(seq 1 60); do
+    if (echo > "/dev/tcp/127.0.0.1/${port}") 2>/dev/null; then
+      echo "Rosetta on port ${port} is listening"
+      break
+    fi
+    if [ "$i" -eq 60 ]; then
+      echo "ERROR: Rosetta on port ${port} did not bind within 60s"
+      exit 1
+    fi
+    sleep 1
+  done
 done
 
 # Mina Archive

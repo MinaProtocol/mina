@@ -1,0 +1,32 @@
+;; Hermetic alcotest smoke tests for rosetta-client.
+;;
+;; These exercise only subcommands that don't need a running Rosetta
+;; server: --help for each subgroup, config show / export, and the
+;; clean error paths of the HTTP and JSON-validation code.
+
+(test
+ (name test_rosetta_client)
+ (libraries
+  ;; opam libraries
+  alcotest
+  core
+  core_kernel
+  core_unix
+  core_unix.filename_unix
+  core_unix.sys_unix
+  stdio
+  yojson
+  ;; mina libraries
+  rosetta_client)
+ (deps
+  ../rosetta_client_cli.exe
+  ;; Source-of-truth rosetta-cli-config files, read by the byte-equality
+  ;; test for [config export] (see test_config_export_writes_four_files).
+  ../../rosetta-cli-config/config.json
+  ../../rosetta-cli-config/mina.ros
+  ../../rosetta-cli-config/mina-no-delegation-test.ros
+  ../../rosetta-cli-config/mina-with-return-funds.ros)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_version)))
