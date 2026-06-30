@@ -9,7 +9,7 @@ ARG deb_codename=bullseye
 ARG deb_release=unstable
 ARG network=mainnet
 ARG deb_repo="http://packages.o1test.net"
-ARG deb_profile
+ARG deb_profile=devnet
 ARG deb_suffix
 ARG apt_cache_url=""
 
