@@ -82,6 +82,10 @@ def encode_nanominas(nanominas):
 @click.option('--snark-coordinator-accounts-directory',
               default=DEFAULT_SNARK_COORDINATOR_KEYS_DIR.absolute(),
               help='Directory where Snark Coordinator Account Keys will be stored.')
+@click.option('--active-stake-per-whale',
+              default=11550000,
+              type=int,
+              help='Active stake per whale in nanomina. Default: 11550000')
 @click.option(
     '--out-genesis-ledger-file',
     default=DEFAULT_GENESIS_LEDGER_FILE.absolute(),
@@ -102,6 +106,7 @@ def generate_ledger(generate_remainder,
                     offline_fish_accounts_directory,
                     staker_csv_file,
                     snark_coordinator_accounts_directory,
+                    active_stake_per_whale,
                     out_genesis_ledger_file,
                     out_annotated_ledger_file,
                     ):
@@ -384,7 +389,7 @@ def generate_ledger(generate_remainder,
             .format(num_whale_accounts,
                     len(ledger_public_keys["online_whale_keys"])))
 
-    whale_offline_balance = encode_nanominas(66000 * 175 * (10**9))
+    whale_offline_balance = encode_nanominas(active_stake_per_whale * (10**9))
     whale_online_balance = encode_nanominas(499 * (10**9))
 
     # Whale Accounts
