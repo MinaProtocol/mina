@@ -5,6 +5,8 @@ import (
 	"math/rand"
 	"os"
 	"path/filepath"
+	"strconv"
+	"strings"
 	"time"
 )
 
@@ -318,4 +320,12 @@ func validateScriptDir(path string) error {
 	}
 
 	return nil
+}
+
+func EncodeNanominas(nanominas uint64) string {
+	s := strconv.FormatUint(nanominas, 10)
+	if len(s) > 9 {
+		return s[:len(s)-9] + "." + s[len(s)-9:]
+	}
+	return "0." + strings.Repeat("0", 9-len(s)) + s
 }
