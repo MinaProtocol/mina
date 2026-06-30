@@ -17,20 +17,12 @@ services:
       - '${POSTGRES_PORT}:5432'
 
   bootstrap_db:
-    image: '${MINA_ARCHIVE_IMAGE}'
+    image: '${MINA_BOOTSTRAP_IMAGE}'
     command:
-      - bash
-      - -c
-      - |
-        set -eox pipefail
-        curl -fSL -O ${ARCHIVE_DUMP_BASE_URL}/${ARCHIVE_DUMP_PREFIX}-$$(date +%F_0000).sql.tar.gz
-        tar -zxvf ${ARCHIVE_DUMP_PREFIX}-$$(date +%F_0000).sql.tar.gz
-        psql postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB} \
-          -c "ALTER SYSTEM SET max_connections = 500" \
-          -c "ALTER SYSTEM SET max_locks_per_transaction = 100" \
-          -c "ALTER SYSTEM SET max_pred_locks_per_relation = 100" \
-          -c "ALTER SYSTEM SET max_pred_locks_per_transaction = 5000"
-        psql postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB} -f ${ARCHIVE_DUMP_PREFIX}-$$(date +%F_0000).sql
+      - archive
+      - --network=${MINA_NETWORK}
+      - --pg-uri=postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      - --work-dir=/tmp/bootstrap
     depends_on:
       postgres:
         condition: service_healthy
