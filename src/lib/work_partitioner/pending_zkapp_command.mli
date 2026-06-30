@@ -1,6 +1,14 @@
 open Core_kernel
 open Snark_work_lib
 
+type parent_ptr = { node : pending_node ref; index : int }
+
+and pending_node =
+  { parent_ptr : parent_ptr option
+  ; range : Id.Range.t
+  ; merge_inputs : Ledger_proof.t option Array.t
+  }
+
 (** [t] is a pool for zkapp segments and mergeable proofs corresponding to a
     single zkapp transaction. *)
 type t
@@ -10,7 +18,8 @@ type t
 val create_and_yield_segment :
      job:(Spec.Single.t, Id.Single.t) With_job_meta.t
   -> unscheduled_segments:
-       Spec.Sub_zkapp.Stable.Latest.t Mina_stdlib.Nonempty_list.Stable.Latest.t
+       Spec.Sub_zkapp.SegmentSpec.Stable.Latest.t
+       Mina_stdlib.Nonempty_list.Stable.Latest.t
   -> t * Spec.Sub_zkapp.Stable.Latest.t * Id.Range.Stable.Latest.t
 
 val zkapp_job : t -> (Spec.Single.t, Id.Single.t) With_job_meta.t
@@ -29,7 +38,7 @@ val submit_proof :
   -> elapsed:Core_kernel_private.Span_float.t
   -> range:Id.Range.Stable.Latest.t
   -> t
-  -> unit Or_error.t
+  -> (unit, [ `No_such_range of Id.Range.t ]) result
 
 (** [try_finalize t] attempts to unwrap completed proof, metric and spec from
     [t] if the proof for entire zkapp transaction is completed *)
