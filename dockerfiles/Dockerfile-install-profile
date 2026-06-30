@@ -34,7 +34,9 @@ COPY scripts/install-mina-debs.sh /usr/local/bin/install-mina-debs.sh
 COPY _debs /opt/mina-local-debs
 RUN chmod +x /usr/local/bin/install-mina-debs.sh \
   && case "${deb_profile}" in \
-       lightnet|dev) profile_pkg="mina-${deb_profile}" ;; \
-       *) profile_pkg="mina-${deb_profile}-generic" ;; \
+       lightnet|dev) profile_pkg="mina-${deb_profile}"; PROFILE_DEB="${profile_pkg}" ;; \
+       *) profile_pkg="mina-${deb_profile}-generic"; PROFILE_DEB="mina-${deb_profile}-profile" ;; \
      esac \
-  && /usr/local/bin/install-mina-debs.sh "${profile_pkg}=${deb_version}"
+  && /usr/local/bin/install-mina-debs.sh \
+       "${profile_pkg}=${deb_version}" \
+       "${PROFILE_DEB}=${deb_version}"
