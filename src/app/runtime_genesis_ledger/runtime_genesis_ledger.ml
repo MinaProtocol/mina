@@ -109,6 +109,17 @@ let sanitize_proof (pf : Runtime_config.Proof_keys.t) =
   ; account_creation_fee = None
   }
 
+let apply_delegate_override ~unstake_pks (accounts : Runtime_config.Accounts.t)
+    : Runtime_config.Accounts.t =
+  match unstake_pks with
+  | [] ->
+      accounts
+  | _ ->
+      List.map accounts ~f:(fun (account : Runtime_config.Accounts.Single.t) ->
+          if List.mem unstake_pks account.pk ~equal:String.equal then
+            { account with delegate = None }
+          else account )
+
 let extract_accounts_exn = function
   | { Runtime_config.Ledger.base = Accounts accounts
     ; num_accounts = None
@@ -167,7 +178,7 @@ let load_config_exn config_file =
 
 let main ~(constraint_constants : Genesis_constants.Constraint_constants.t)
     ~config_file ~genesis_dir ~hash_output_file ~ignore_missing_fields
-    ~pad_app_state ~prefork_genesis_config () =
+    ~pad_app_state ~prefork_genesis_config ~unstake_pks () =
   let hardfork_slot =
     match prefork_genesis_config with
     | None ->
@@ -209,6 +220,13 @@ let main ~(constraint_constants : Genesis_constants.Constraint_constants.t)
   in
   let%bind accounts, staking_accounts_opt, next_accounts_opt =
     load_config_exn config_file
+  in
+  let accounts = apply_delegate_override ~unstake_pks accounts in
+  let staking_accounts_opt =
+    Option.map staking_accounts_opt ~f:(apply_delegate_override ~unstake_pks)
+  in
+  let next_accounts_opt =
+    Option.map next_accounts_opt ~f:(apply_delegate_override ~unstake_pks)
   in
   let ledger =
     load_ledger ~ignore_missing_fields ~pad_app_state ~constraint_constants
@@ -280,6 +298,15 @@ let () =
                 daemon.slot_chain_end + daemon.hard_fork_genesis_slot_delta in \
                 this config. If those fields are absent, no vesting parameter \
                 update is performed."
+         and unstake_pks =
+           flag "--unstake-pk" (listed string)
+             ~doc:
+               "STRING base58 public key of an account to unstake (set \
+                delegate to None) in the generated ledger. Can be specified \
+                multiple times to unstake multiple accounts. This is used to \
+                exclude dormant whales' balances from the post-fork VRF \
+                denominator."
          in
          main ~constraint_constants ~config_file ~genesis_dir ~hash_output_file
-           ~ignore_missing_fields ~pad_app_state ~prefork_genesis_config) )
+           ~ignore_missing_fields ~pad_app_state ~prefork_genesis_config
+           ~unstake_pks) )
