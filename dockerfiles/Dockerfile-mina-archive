@@ -12,11 +12,13 @@ ARG deb_repo="http://packages.o1test.net"
 ARG deb_profile=devnet
 ARG deb_suffix
 ARG apt_cache_url=""
+ARG build_flags_suffix
 
 ARG GCLOUD_VERSION=476.0.0
 
 # if --build-arg deb_suffix is defined, add hypen at beginning.
 ENV SUFFIX=${deb_suffix:+-${deb_suffix}}
+ENV BUILD_FLAGS_SUFFIX=${build_flags_suffix}
 # construct mina debian package name based on network and suffix.
 # possible values:
 # - mina-archive-mainnet

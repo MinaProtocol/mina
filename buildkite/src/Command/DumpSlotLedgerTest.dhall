@@ -8,7 +8,8 @@ let ContainerImages = ../Constants/ContainerImages.dhall
 
 let key = "dump-slot-ledger-test"
 
-let debs = "mina-archive-devnet-instrumented"
+let debs =
+      "mina-archive-generic-instrumented,mina-devnet-profile,mina-archive-devnet-instrumented"
 
 in  { step =
             \(dependsOn : List Command.TaggedKey.Type)
