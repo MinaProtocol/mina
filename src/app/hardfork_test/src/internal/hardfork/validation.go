@@ -19,6 +19,7 @@ type BlockAnalysisResult struct {
 	Consensus          ConsensusState
 	GenesisBlock       client.BlockData
 	SnarkedHashByEpoch SnarkedHashByEpoch
+	PreForkOccupancy   float64
 }
 
 func (t *HardforkTest) WaitForBestTip(port int, pred func(client.BlockData) bool, predDescription string, timeout time.Duration) error {
@@ -43,17 +44,24 @@ func (t *HardforkTest) WaitForBestTip(port int, pred func(client.BlockData) bool
 	return fmt.Errorf("timed out waiting for condition: %s at port %d", predDescription, port)
 }
 
+func (t *HardforkTest) ComputeSlotOccupancy(startBlock, lastBlock client.BlockData) (float64, error) {
+	t.Logger.Info("Calculating slot occupancy between block %v and %v", startBlock, lastBlock)
+
+	if startBlock.BlockHeight == lastBlock.BlockHeight {
+		return 0, fmt.Errorf("starting block has same height as last block, can't calculate slot occupancy!")
+	}
+
+	return float64(lastBlock.BlockHeight-startBlock.BlockHeight) / float64(lastBlock.Slot-startBlock.Slot), nil
+}
+
 // ValidateSlotOccupancy checks if block occupancy is above 50%
 func (t *HardforkTest) ValidateSlotOccupancy(startBlock, lastBlock client.BlockData) error {
 	expectedOccupancy := 0.5
 
-	t.Logger.Info("Calculating slot occupancy between block %v and %v", startBlock, lastBlock)
-
-	if startBlock.BlockHeight == lastBlock.BlockHeight {
-		return fmt.Errorf("starting block has same height as last block, can't calculate slot occupancy!")
+	actualOccupancy, err := t.ComputeSlotOccupancy(startBlock, lastBlock)
+	if err != nil {
+		return err
 	}
-
-	actualOccupancy := float64(lastBlock.BlockHeight-startBlock.BlockHeight) / float64(lastBlock.Slot-startBlock.Slot)
 
 	if actualOccupancy < expectedOccupancy {
 		return fmt.Errorf("slot occupancy (%f) is below expected (%f)", actualOccupancy, expectedOccupancy)

@@ -69,8 +69,21 @@ func (t *HardforkTest) RunMainNetworkPhase(mainGenesisTs int64, beforeShutdown H
 
 	t.Logger.Info("Network analyze result: %v", analysis)
 
-	if err := t.ValidateSlotOccupancy(analysis.GenesisBlock, analysis.Consensus.LastBlockBeforeTxEnd); err != nil {
-		return nil, err
+	if t.Config.UnstakingTest {
+		occ, err := t.ComputeSlotOccupancy(analysis.GenesisBlock, analysis.Consensus.LastBlockBeforeTxEnd)
+		if err != nil {
+			return nil, fmt.Errorf("failed to compute pre-fork slot occupancy: %w", err)
+		}
+		analysis.PreForkOccupancy = occ
+		t.Logger.Info("Pre-fork slot occupancy (expected low due to dormant whale): %f", occ)
+		upperBound := t.expectedPreForkFillUpperBound()
+		if occ >= upperBound {
+			return nil, fmt.Errorf("pre-fork slot occupancy (%f) exceeds expected upper bound (%f), dormant whale not diluting VRF denominator correctly", occ, upperBound)
+		}
+	} else {
+		if err := t.ValidateSlotOccupancy(analysis.GenesisBlock, analysis.Consensus.LastBlockBeforeTxEnd); err != nil {
+			return nil, err
+		}
 	}
 
 	if err := t.ValidateLatestOccupiedSlot(analysis.Consensus.LastOccupiedSlot); err != nil {
@@ -144,8 +157,19 @@ func (t *HardforkTest) RunForkNetworkPhase(latestPreForkHeight int, mainGenesisT
 	t.Logger.Info("Block height is %d at slot %d.", bestTip.BlockHeight, bestTip.Slot)
 
 	// Validate slot occupancy
-	if err := t.ValidateSlotOccupancy(*commonGenesisBlock, *bestTip); err != nil {
-		return err
+	if t.Config.UnstakingTest {
+		postForkOcc, err := t.ComputeSlotOccupancy(*commonGenesisBlock, *bestTip)
+		if err != nil {
+			return fmt.Errorf("failed to compute post-fork slot occupancy: %w", err)
+		}
+		t.Logger.Info("Post-fork slot occupancy: %f (pre-fork was %f)", postForkOcc, analysis.PreForkOccupancy)
+		if postForkOcc <= analysis.PreForkOccupancy {
+			return fmt.Errorf("post-fork slot occupancy (%f) did not improve over pre-fork (%f)", postForkOcc, analysis.PreForkOccupancy)
+		}
+	} else {
+		if err := t.ValidateSlotOccupancy(*commonGenesisBlock, *bestTip); err != nil {
+			return err
+		}
 	}
 
 	// Validate user commands in blocks
@@ -456,4 +480,21 @@ func (t *HardforkTest) CleanUpNetworkForForkPhase() error {
 		}
 	}
 	return nil
+}
+
+const fillRateThreshold = 0.25
+
+func (t *HardforkTest) expectedPreForkFillUpperBound() float64 {
+	activeStake := t.Config.ActiveStakePerWhale
+	dormantBalance := t.Config.DormantWhaleBalance
+	totalCurrency := float64(t.Config.NumWhales)*activeStake + dormantBalance
+	p := 1.0
+	for i := 0; i < t.Config.NumWhales; i++ {
+		p *= (1.0 - activeStake/totalCurrency)
+	}
+	expectedFill := 1.0 - p + fillRateThreshold
+	if expectedFill > 1.0 {
+		return 1.0
+	}
+	return expectedFill
 }
