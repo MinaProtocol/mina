@@ -11,7 +11,7 @@ let ContainerImages = ../Constants/ContainerImages.dhall
 let key = "patch-archive-test"
 
 let debs =
-      "mina-test-suite,mina-generic-instrumented,mina-archive-devnet-instrumented"
+      "mina-test-suite,mina-generic-instrumented,mina-archive-generic-instrumented,mina-devnet-profile,mina-archive-devnet-instrumented"
 
 in  { step =
             \(dependsOn : List Command.TaggedKey.Type)
