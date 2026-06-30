@@ -71,6 +71,12 @@ type Config struct {
 	ForkMethods ForkMethodSet
 
 	DaemonInfos []DaemonInfo
+
+	UnstakingTest        bool
+	DormantWhaleBalance  float64
+	ActiveStakePerWhale  float64
+	DormantWhalePk       string
+	DormantWhaleKeyDir   string
 }
 
 // DefaultConfig returns the default configuration with values
@@ -106,6 +112,10 @@ func DefaultConfig() *Config {
 		NodeStartPort:        6000,
 
 		ForkMethods: make(ForkMethodSet),
+
+		UnstakingTest:       false,
+		DormantWhaleBalance: 50000000,
+		ActiveStakePerWhale: 11550000,
 	}
 }
 

@@ -88,6 +88,9 @@ func init() {
 
 	rootCmd.Flags().Var(&cfg.ForkMethods, "allow-fork-method", "Implementation of fork to use")
 
+	rootCmd.Flags().BoolVar(&cfg.UnstakingTest, "unstaking-test", cfg.UnstakingTest, "Enable unstaking test mode")
+	rootCmd.Flags().Float64Var(&cfg.DormantWhaleBalance, "dormant-whale-balance", cfg.DormantWhaleBalance, "Balance for the dormant whale account")
+
 	rootCmd.MarkFlagRequired("main-mina-exe")
 	rootCmd.MarkFlagRequired("main-runtime-genesis-ledger")
 	rootCmd.MarkFlagRequired("fork-mina-exe")
