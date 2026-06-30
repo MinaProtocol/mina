@@ -23,10 +23,20 @@ NETWORK="${MINA_NETWORK_DEB:-devnet}"
 # devnet runtime config (which carries epoch_data for an epoch ledger we
 # don't ship) on top of our --config-file, and starts cleanly against the
 # test's hand-rolled testnet.json.
+# Profile leaf package name for the current network (debs must include the full
+# mina dependency closure since install.sh has no apt repo to resolve deps).
+case "${NETWORK}" in
+  mainnet) PROFILE_DEB="mina-mainnet-profile" ;;
+  *) PROFILE_DEB="mina-devnet-profile" ;;
+esac
+
 DEBS=(
   "mina-generic"
   "mina-archive-${NETWORK}"
   "mina-rosetta-${NETWORK}"
+  "mina-archive-generic"
+  "mina-rosetta-generic"
+  "${PROFILE_DEB}"
   "mina-tx-tools"
 )
 
