@@ -35,8 +35,11 @@ module Hashed = struct
 
   let hash t = t.hash
 
-  let zero_total_currency (t : t) : t =
-    { t with total_currency = Currency.Amount.zero }
+  let zero_totals (t : t) : t =
+    { t with
+      total_currency = Currency.Amount.zero
+    ; total_stake = Currency.Amount.zero
+    }
 end
 
 module Epoch = struct
@@ -57,11 +60,11 @@ module Epoch = struct
 
   type 'ledger t = 'ledger tt option
 
-  let zero_total_currency (t : Hashed.t t) : Hashed.t t =
+  let zero_totals (t : Hashed.t t) : Hashed.t t =
     Option.map
       ~f:(fun x ->
-        { staking = Data.map ~f:Hashed.zero_total_currency x.staking
-        ; next = Option.map ~f:(Data.map ~f:Hashed.zero_total_currency) x.next
+        { staking = Data.map ~f:Hashed.zero_totals x.staking
+        ; next = Option.map ~f:(Data.map ~f:Hashed.zero_totals) x.next
         } )
       t
 
