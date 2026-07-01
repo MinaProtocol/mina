@@ -75,10 +75,11 @@ type Config struct {
 	DaemonInfos []DaemonInfo
 
 	UnstakingTest        bool
-	DormantWhaleBalance  float64
+	InactiveStakePortion float64
+	NumDormantWhales    int
 	ActiveStakePerWhale  float64
-	DormantWhalePk       string
-	DormantWhaleKeyDir   string
+	DormantWhalePks      []string
+	DormantWhaleKeyDirs  []string
 }
 
 // DefaultConfig returns the default configuration with values
@@ -115,8 +116,9 @@ func DefaultConfig() *Config {
 
 		ForkMethods: make(ForkMethodSet),
 
-		UnstakingTest:       false,
-		DormantWhaleBalance: 50000000,
+		UnstakingTest:        false,
+		InactiveStakePortion: 0.684,
+		NumDormantWhales:    1,
 		ActiveStakePerWhale: 11550000,
 	}
 }
@@ -320,6 +322,37 @@ func validateScriptDir(path string) error {
 	}
 
 	return nil
+}
+
+func (c *Config) TotalDormantBalance() float64 {
+	if c.InactiveStakePortion <= 0.0 || c.InactiveStakePortion >= 1.0 {
+		return 0.0
+	}
+	totalActive := float64(c.NumWhales) * c.ActiveStakePerWhale
+	return totalActive * c.InactiveStakePortion / (1.0 - c.InactiveStakePortion)
+}
+
+func (c *Config) DormantBalances() []float64 {
+	n := c.NumDormantWhales
+	if n <= 0 {
+		return nil
+	}
+	total := c.TotalDormantBalance()
+	if total <= 0.0 {
+		return make([]float64, n)
+	}
+	proportions := make([]float64, n)
+	sum := 0.0
+	for j := 0; j < n; j++ {
+		v := rand.Float64()
+		proportions[j] = v
+		sum += v
+	}
+	balances := make([]float64, n)
+	for j := 0; j < n; j++ {
+		balances[j] = total * proportions[j] / sum
+	}
+	return balances
 }
 
 func EncodeNanominas(nanominas uint64) string {

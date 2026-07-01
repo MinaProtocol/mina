@@ -234,7 +234,9 @@ func (t *HardforkTest) legacyFork(daemon config.DaemonInfo, analysis BlockAnalys
 
 	var extraArgs []string
 	if t.Config.UnstakingTest {
-		extraArgs = append(extraArgs, "--unstake-pk", t.Config.DormantWhalePk)
+		for _, pk := range t.Config.DormantWhalePks {
+			extraArgs = append(extraArgs, "--unstake-pk", pk)
+		}
 	}
 
 	patchedConfigBytes, err := t.PatchForkConfigAndGenerateLedgersLegacy(&analysis, prepatchConfigFile, patchedLedgersDir, forkHashesFile, patchedConfigFile, preforkGenesisConfigFile, forkGenesisTs, mainGenesisTs, extraArgs...)
@@ -499,8 +501,8 @@ const fillRateThreshold = 0.25
 
 func (t *HardforkTest) expectedPreForkFillUpperBound() float64 {
 	activeStake := t.Config.ActiveStakePerWhale
-	dormantBalance := t.Config.DormantWhaleBalance
-	totalCurrency := float64(t.Config.NumWhales)*activeStake + dormantBalance
+	totalDormant := t.Config.TotalDormantBalance()
+	totalCurrency := float64(t.Config.NumWhales)*activeStake + totalDormant
 	p := 1.0
 	for i := 0; i < t.Config.NumWhales; i++ {
 		p *= (1.0 - activeStake/totalCurrency)

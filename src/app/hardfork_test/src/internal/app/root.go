@@ -89,7 +89,8 @@ func init() {
 	rootCmd.Flags().Var(&cfg.ForkMethods, "allow-fork-method", "Implementation of fork to use")
 
 	rootCmd.Flags().BoolVar(&cfg.UnstakingTest, "unstaking-test", cfg.UnstakingTest, "Enable unstaking test mode")
-	rootCmd.Flags().Float64Var(&cfg.DormantWhaleBalance, "dormant-whale-balance", cfg.DormantWhaleBalance, "Balance for the dormant whale account")
+	rootCmd.Flags().Float64Var(&cfg.InactiveStakePortion, "inactive-stake-portion", cfg.InactiveStakePortion, "Portion of total stake that is inactive (0-1)")
+	rootCmd.Flags().IntVar(&cfg.NumDormantWhales, "num-dormant-whales", cfg.NumDormantWhales, "Number of dormant whale accounts (>= 1)")
 
 	rootCmd.MarkFlagRequired("main-mina-exe")
 	rootCmd.MarkFlagRequired("main-runtime-genesis-ledger")

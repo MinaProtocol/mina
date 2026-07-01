@@ -87,14 +87,16 @@ func (t *HardforkTest) RunMainNetwork(extraFilesRoot string, mainGenesisTs int64
 	}
 
 	if t.Config.UnstakingTest {
-		extraAccountsPath, err := t.setupDormantWhaleAccount()
+		extraAccountsPath, err := t.setupDormantWhaleAccounts()
 		if err != nil {
 			return nil, err
 		}
-		args = append(args,
-			"--extra-genesis-accounts", extraAccountsPath,
-			"--active-stake-per-whale", strconv.FormatFloat(t.Config.ActiveStakePerWhale, 'f', 0, 64),
-		)
+		if extraAccountsPath != "" {
+			args = append(args,
+				"--extra-genesis-accounts", extraAccountsPath,
+				"--active-stake-per-whale", strconv.FormatFloat(t.Config.ActiveStakePerWhale, 'f', 0, 64),
+			)
+		}
 	}
 
 	return t.startLocalNetwork(t.Config.MainMinaExe, "main", args)
@@ -117,41 +119,47 @@ func (t *HardforkTest) WaitUntilBestChainQuery(slotDurationSec int, genesisSlot 
 	)
 }
 
-func (t *HardforkTest) setupDormantWhaleAccount() (string, error) {
-	dormantDir, err := os.MkdirTemp("", "dormant-whale-keys")
-	if err != nil {
-		return "", fmt.Errorf("failed to create temp dir for dormant whale keys: %w", err)
+func (t *HardforkTest) setupDormantWhaleAccounts() (string, error) {
+	if t.Config.NumDormantWhales <= 0 || t.Config.TotalDormantBalance() <= 0.0 {
+		return "", nil
 	}
 
-	t.Config.DormantWhaleKeyDir = dormantDir
+	var accounts []extraGenesisAccount
+	balances := t.Config.DormantBalances()
 
-	keyPath := filepath.Join(dormantDir, "dormant_whale_account")
+	for i := 0; i < t.Config.NumDormantWhales; i++ {
+		dormantDir, err := os.MkdirTemp("", fmt.Sprintf("dormant-whale-%d-keys", i))
+		if err != nil {
+			return "", fmt.Errorf("failed to create temp dir for dormant whale %d keys: %w", i, err)
+		}
+		t.Config.DormantWhaleKeyDirs = append(t.Config.DormantWhaleKeyDirs, dormantDir)
 
-	cmd := exec.Command(t.Config.MainMinaExe, "advanced", "generate-keypair", "-privkey-path", keyPath)
-	cmd.Env = append(os.Environ(), "MINA_PRIVKEY_PASS="+os.Getenv("MINA_PRIVKEY_PASS"))
-	if err := cmd.Run(); err != nil {
-		return "", fmt.Errorf("failed to generate dormant whale keypair: %w", err)
+		keyPath := filepath.Join(dormantDir, "dormant_whale_account")
+
+		cmd := exec.Command(t.Config.MainMinaExe, "advanced", "generate-keypair", "-privkey-path", keyPath)
+		cmd.Env = append(os.Environ(), "MINA_PRIVKEY_PASS="+os.Getenv("MINA_PRIVKEY_PASS"))
+		if err := cmd.Run(); err != nil {
+			return "", fmt.Errorf("failed to generate dormant whale %d keypair: %w", i, err)
+		}
+
+		pubkeyBytes, err := os.ReadFile(keyPath + ".pub")
+		if err != nil {
+			return "", fmt.Errorf("failed to read dormant whale %d public key: %w", i, err)
+		}
+		pubkey := strings.TrimSpace(string(pubkeyBytes))
+
+		t.Config.DormantWhalePks = append(t.Config.DormantWhalePks, pubkey)
+
+		accounts = append(accounts, extraGenesisAccount{
+			Pk:       pubkey,
+			Sk:       nil,
+			Balance:  config.EncodeNanominas(uint64(balances[i] * 1e9)),
+			Delegate: pubkey,
+		})
 	}
-
-	pubkeyBytes, err := os.ReadFile(keyPath + ".pub")
-	if err != nil {
-		return "", fmt.Errorf("failed to read dormant whale public key: %w", err)
-	}
-	pubkey := strings.TrimSpace(string(pubkeyBytes))
-
-	t.Config.DormantWhalePk = pubkey
 
 	extraFile := filepath.Join(os.TempDir(), "extra_genesis_accounts.json")
-	extra := extraGenesisAccounts{
-		Accounts: []extraGenesisAccount{
-			{
-				Pk:       pubkey,
-				Sk:       nil,
-				Balance:  config.EncodeNanominas(uint64(t.Config.DormantWhaleBalance * 1e9)),
-				Delegate: pubkey,
-			},
-		},
-	}
+	extra := extraGenesisAccounts{Accounts: accounts}
 	data, err := json.Marshal(extra)
 	if err != nil {
 		return "", fmt.Errorf("failed to marshal extra genesis accounts: %w", err)
