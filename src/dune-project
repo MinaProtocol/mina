@@ -57,6 +57,7 @@
 (package (name hex))
 (package (name init))
 (package (name integers_stubs_js))
+(package (name integration_test_local_apps_engine))
 (package (name integration_test_local_engine))
 (package (name integration_test_lib))
 (package (name internal_tracing))
