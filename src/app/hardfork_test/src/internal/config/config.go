@@ -90,6 +90,42 @@ type Config struct {
 	// Path to the temporary JSON file holding the extra genesis account that is
 	// passed to mina-local-network.sh (filled in at runtime).
 	VestingExtraAccountFile string
+
+	// ---- Archive bug reproduction (#18941 tokens_value_key + element_ids btree
+	// overflow) ----
+	//
+	// When ReproArchiveBugs is set, the test drives a custom-token ITN load on the
+	// pre-fork (compatible) network so a real OWNED custom token is archived, then
+	// (at the fork transition) migrates the shared archive DB to the Mesa schema,
+	// and on the post-fork (Mesa) network drives a max-cost zkApp load and probes
+	// the archive for both bugs. With the buggy archive binary + the migration that
+	// keeps the element_ids UNIQUE both bugs reproduce and the test FAILS (non-zero
+	// exit); with the fixed archive binary + the element_ids-dropping migration
+	// neither reproduces and the test passes.
+	ReproArchiveBugs bool
+	// Postgres connection for the shared archive DB. ArchivePgUri is the full URI
+	// used by detection/probes; the host/port/user/db parts are what
+	// mina-local-network.sh consumes to wire the live archive node.
+	ArchivePgUri  string
+	ArchivePgHost string
+	ArchivePgPort int
+	ArchivePgUser string
+	ArchivePgDb   string
+	// Archive node wiring: port for the live archive in each phase, and the
+	// protocol-appropriate archive binaries (compatible pre-fork, Mesa post-fork).
+	ArchivePort      int
+	MainArchiveExe   string
+	ForkArchiveExe   string
+	CreateSchemaFile string
+	// Berkeley->Mesa migration SQL applied at the fork transition. The file choice
+	// (v0.0.5 keeps the element_ids UNIQUE = buggy; v0.0.6 drops it = fixed) is what
+	// makes Bug B reproduce or not.
+	MigrationSql string
+	// ITN auth: path the ed25519 key PEM is written to (a sibling of Root if empty;
+	// the test signs in-process, so the file is for debugging only). ItnPubKey is the
+	// base64 public key, filled in at runtime and passed to the daemon via --itn-keys.
+	ItnKeyPath string
+	ItnPubKey  string
 }
 
 // Vesting-account test parameters. All amounts are in nanomina.
@@ -153,6 +189,13 @@ func DefaultConfig() *Config {
 		HTTPClientTimeoutSeconds:      600,
 		// ^ fork config take really long time to complete (2-3 minutes)
 		ClientMaxRetries: 5,
+
+		// Archive bug reproduction defaults.
+		ArchivePgHost: "localhost",
+		ArchivePgPort: 5432,
+		ArchivePgUser: "agent",
+		ArchivePgDb:   "archive",
+		ArchivePort:   3086,
 
 		SeedStartPort:        3000,
 		SnarkCoordinatorPort: 7000,

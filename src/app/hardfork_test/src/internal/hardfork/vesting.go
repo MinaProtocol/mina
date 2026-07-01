@@ -188,6 +188,87 @@ func (t *HardforkTest) ValidateVestingAfterFork(port, hardforkSlot int) error {
 	return nil
 }
 
+// ValidateVestingInArchive asserts the ARCHIVE DB recorded the seeded vesting
+// account's ROTATED (slot-reduction-updated) timing on the fork genesis block. This
+// only happens when the post-fork archive ran add_genesis_accounts over the fork
+// genesis ledger (i.e. was started with --config-file). It complements the daemon-side
+// ValidateVestingAfterFork, which proves the live fork ledger rotated the schedule but
+// says nothing about what the archive persisted: an archive started WITHOUT the fork
+// config (add_genesis_accounts skipped) keeps only the STALE pre-fork timing and never
+// records the rotated fork-genesis schedule.
+//
+//   - bugClean: the fork-genesis timing row exists and matches ExpectedMigratedTiming.
+//   - bugReproduced: the row exists but the timing is un-rotated (e.g. stale cliff/period)
+//     — the archived fork genesis was not slot-reduction-updated.
+//   - bugInconclusive: no fork-genesis timing row for the account — add_genesis_accounts
+//     never ran over the fork genesis (e.g. a no-config / #18941-fallback archive), so
+//     the archived rotation cannot be validated. Fail-closed (never read as clean).
+//
+// The query is scoped to the FORK GENESIS block (global_slot_since_hard_fork = 0 at the
+// fork genesis slot) so it reads the add_genesis_accounts row and never the stale
+// pre-fork chain-genesis row (which lives at global_slot_since_genesis = 0).
+func (t *HardforkTest) ValidateVestingInArchive() (bugStatus, string) {
+	if !t.Config.VestingTestEnabled {
+		return bugClean, "vesting test disabled; archive vesting-rotation check skipped"
+	}
+	pk := t.Config.VestingAccountPubKey
+	if pk == "" {
+		return bugInconclusive, "no vesting account public key was recorded"
+	}
+	slot := t.expectedGenesisSlot
+	expected := ExpectedMigratedTiming(slot)
+	query := fmt.Sprintf(`select ti.initial_minimum_balance, ti.cliff_time, ti.cliff_amount, ti.vesting_period, ti.vesting_increment
+from timing_info ti
+join account_identifiers ai on ti.account_identifier_id = ai.id
+join public_keys pk on ai.public_key_id = pk.id
+join accounts_accessed aa on aa.timing_id = ti.id
+join blocks b on aa.block_id = b.id
+where pk.value = '%s' and b.global_slot_since_hard_fork = 0 and b.global_slot_since_genesis = %d
+order by b.height limit 1;`, pk, slot)
+	out, err := t.psqlQuery(query)
+	if err != nil {
+		return bugInconclusive, fmt.Sprintf("archive vesting-timing query failed: %v", err)
+	}
+	if strings.TrimSpace(out) == "" {
+		return bugInconclusive, fmt.Sprintf(
+			"no add_genesis_accounts timing row for vesting account %s on the fork genesis block (slot %d); "+
+				"the live --config-file archive did not run add_genesis_accounts (e.g. #18941 fallback) — "+
+				"archived vesting rotation is unverifiable", pk, slot)
+	}
+	fields := strings.Split(strings.TrimSpace(out), "|")
+	if len(fields) != 5 {
+		return bugInconclusive, fmt.Sprintf("unexpected archive timing row %q for vesting account %s", out, pk)
+	}
+	parse := func(s string) int64 { n, _ := strconv.ParseInt(strings.TrimSpace(s), 10, 64); return n }
+	actual := ExpectedTiming{
+		InitialMinimumBalance: parse(fields[0]),
+		CliffTime:             parse(fields[1]),
+		CliffAmount:           parse(fields[2]),
+		VestingPeriod:         parse(fields[3]),
+		VestingIncrement:      parse(fields[4]),
+	}
+	var mismatches []string
+	checkField := func(name string, exp, act int64) {
+		if exp != act {
+			mismatches = append(mismatches, fmt.Sprintf("%s: expected %d, got %d", name, exp, act))
+		}
+	}
+	checkField("initialMinimumBalance", expected.InitialMinimumBalance, actual.InitialMinimumBalance)
+	checkField("cliffTime", expected.CliffTime, actual.CliffTime)
+	checkField("cliffAmount", expected.CliffAmount, actual.CliffAmount)
+	checkField("vestingPeriod", expected.VestingPeriod, actual.VestingPeriod)
+	checkField("vestingIncrement", expected.VestingIncrement, actual.VestingIncrement)
+	if len(mismatches) > 0 {
+		return bugReproduced, fmt.Sprintf(
+			"archive recorded an un-rotated vesting schedule for %s on the fork genesis block (hardfork_slot=%d) — "+
+				"the archived fork genesis was not slot-reduction-updated. Mismatches: %s",
+			pk, slot, strings.Join(mismatches, "; "))
+	}
+	return bugClean, fmt.Sprintf(
+		"archive recorded the rotated vesting schedule for %s on the fork genesis block (cliff_time=%d, vesting_period=%d)",
+		pk, actual.CliffTime, actual.VestingPeriod)
+}
+
 // ValidateVestingLiquidUnlock polls the injected account's liquid balance and
 // asserts it does not become fully liquid before the correct (migrated) cliff
 // slot. Under the migrate_to_mesa bug the cliff is never advanced, so the funds

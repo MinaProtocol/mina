@@ -296,6 +296,16 @@ on-exit() {
         wait "$ROSETTA_PID"
       fi
 
+      # 2b. stop the archive node. It is spawned with '&' and is otherwise never
+      # reaped, so without this it survives the network teardown as an orphan,
+      # keeps holding the archive server port, and (across a hardfork) the next
+      # network's archive node cannot bind that port. Kill it explicitly here.
+      if [[ -n "${ARCHIVE_PID:-}" ]]; then
+        echo "Killing archive node at ${ARCHIVE_PID}"
+        kill "$ARCHIVE_PID" 2>/dev/null || true
+        wait "$ARCHIVE_PID" 2>/dev/null || true
+      fi
+
       # 3. stop the seed node, if we've spawned it.
       if [[ -n "${SEED_PID}" ]]; then
         stop-node "seed" "$SEED_START_PORT"
@@ -410,9 +420,48 @@ exec-snark-worker() {
 
 # Executes the Archive node
 exec-archive-node() {
+  # ---------------------------------------------------------------------------
+  # Archive node --config-file management across a hardfork run.
+  #
+  # The archive is given --config-file exactly when it should (re)load a genesis
+  # ledger and run add_genesis_accounts (which materializes the genesis accounts —
+  # incl. timed/vesting accounts — into the DB). WHO supplies that config differs by
+  # phase, and this function only owns the pre-fork half:
+  #
+  #   * Pre-fork  (--config reset, main network): spawned HERE with
+  #     --config-file "${CONFIG}" (= ${ROOT}/daemon.json), which at reset time still
+  #     carries its inline genesis ledger. The archive runs add_genesis_accounts over
+  #     the PRE-FORK genesis and loads the pre-fork genesis accounts (with pre-fork
+  #     vesting timing) into the DB.
+  #
+  #   * Post-fork (--config inherit, fork network): "${CONFIG}" (= ${ROOT}/daemon.json)
+  #     has had its ledger section stripped by CleanUpNetworkForForkPhase — the fork
+  #     daemons run from the PER-NODE config nodes/<name>/daemon.json via
+  #     --config-directory, not from ${CONFIG} — so passing ${CONFIG} here would fail
+  #     with "No ledger was provided in the runtime configuration". Hence this path
+  #     omits --config-file. That is correct: the post-fork archive's config is
+  #     supplied out-of-band, depending on the caller:
+  #       - Hardfork archive-repro test (HARDFORK_ARCHIVE_EXTERNAL=1): this script does
+  #         NOT spawn the fork archive at all (see the spawn site). The Go hardfork test
+  #         (StartForkArchive) owns it and starts it WITH the per-node fork genesis
+  #         config (nodes/seed/daemon.json) plus the fork genesis ledger tar staged into
+  #         the archive's ledger search path, so add_genesis_accounts runs over the FORK
+  #         genesis and loads the fork genesis accounts — with the
+  #         slot_reduction_update-rotated vesting timing. This is where #18941 and the
+  #         archived vesting rotation are exercised (ValidateVestingInArchive asserts the
+  #         latter).
+  #       - Standalone (flag unset): the archive is spawned here without a config and
+  #         archives incoming post-fork blocks via RPC only, linking to the pre-fork
+  #         parent already in the DB. The fork genesis accounts are not re-materialized —
+  #         acceptable for a plain dev net that only needs post-fork blocks archived.
+  # ---------------------------------------------------------------------------
+  local archive_config_arg=()
+  if ! config_mode_is_inherit "$CONFIG_MODE"; then
+    archive_config_arg=(--config-file "${CONFIG}")
+  fi
   # shellcheck disable=SC2068
   exec ${ARCHIVE_EXE} run \
-    --config-file "${CONFIG}" \
+    "${archive_config_arg[@]}" \
     --log-level "${LOG_LEVEL}" \
     --postgres-uri postgresql://"${PG_USER}":"${PG_PASSWD}"@"${PG_HOST}":"${PG_PORT}"/"${PG_DB}" \
     --server-port "${ARCHIVE_SERVER_PORT}" \
@@ -534,11 +583,13 @@ recreate-schema() {
 
   PGPASSWORD="${PG_PASSWD}" psql postgresql://"${PG_USER}":"${PG_PASSWD}"@"${PG_HOST}":"${PG_PORT}" -c "CREATE DATABASE ${PG_DB};"
 
-  # We need to change our working directory as script has relation to others subscripts
-  # and calling them from local folder
-  pushd ./src/app/archive
-  psql postgresql://"${PG_USER}":"${PG_PASSWD}"@"${PG_HOST}":"${PG_PORT}"/"${PG_DB}" < create_schema.sql
-  popd
+  # Allow overriding the schema file via CREATE_SCHEMA_FILE (absolute path). This is
+  # used by the hardfork test to load a Berkeley-compatible schema for the pre-fork
+  # network; it then applies upgrade_to_mesa.sql before the fork. Defaults to the
+  # in-tree schema.
+  local schema_file="${CREATE_SCHEMA_FILE:-$(pwd)/src/app/archive/create_schema.sql}"
+  echo "Loading archive schema from ${schema_file}"
+  psql postgresql://"${PG_USER}":"${PG_PASSWD}"@"${PG_HOST}":"${PG_PORT}"/"${PG_DB}" < "${schema_file}"
 
   echo "Schema '${PG_DB}' created successfully."
   printf "\n"
@@ -1080,13 +1131,21 @@ fi
 # ----------
 
 if [[ -n "${ARCHIVE_SERVER_PORT}" ]]; then
-  echo 'Starting the Archive Node...'
-  printf "\n"
+  if [[ "${HARDFORK_ARCHIVE_EXTERNAL:-0}" == "1" ]] && config_mode_is_inherit "${CONFIG_MODE}"; then
+    # The hardfork archive-repro drives the post-fork (inherit-mode) archive itself so
+    # it can run add_genesis_accounts at startup (#18941). The daemons still get
+    # -archive-address ${ARCHIVE_SERVER_PORT}; the externally-managed archive binds it.
+    echo 'Post-fork archive node is managed externally (archive-repro); not spawning here.'
+    printf "\n"
+  else
+    echo 'Starting the Archive Node...'
+    printf "\n"
 
-  mkdir -p "${NODES_FOLDER}"/archive
+    mkdir -p "${NODES_FOLDER}"/archive
 
-  spawn-archive-node "${NODES_FOLDER}"/archive
-  ARCHIVE_PID=$!
+    spawn-archive-node "${NODES_FOLDER}"/archive
+    ARCHIVE_PID=$!
+  fi
 fi
 
 if [[ -n "${ROSETTA_PORT}" ]]; then

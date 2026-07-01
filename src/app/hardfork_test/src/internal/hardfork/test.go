@@ -16,14 +16,23 @@ import (
 
 // HardforkTest represents the main hardfork test logic
 type HardforkTest struct {
-	Config         *config.Config
-	Client         *client.Client
-	Logger         *utils.Logger
-	ScriptDir      string
-	runningCmds    []*exec.Cmd
-	runningCmdsMux sync.Mutex
-	ctx            context.Context
-	cancel         context.CancelFunc
+	Config    *config.Config
+	Client    *client.Client
+	Logger    *utils.Logger
+	ScriptDir string
+	itn       *itnAuth // in-process ITN GraphQL client (archive-repro mode)
+	// Fork-network archive node owned by the archive-repro logic (see StartForkArchive):
+	// the live post-fork archive is started by Go — not mina-local-network.sh — so its
+	// add_genesis_accounts startup exercises #18941 on the real node.
+	forkArchiveCmd      *exec.Cmd
+	forkArchiveLog      string
+	bug18941            bugStatus // recorded at the live archive's startup
+	bug18941Detail      string
+	expectedGenesisSlot int // fork genesis global slot (stashed by RunForkNetworkPhase)
+	runningCmds         []*exec.Cmd
+	runningCmdsMux      sync.Mutex
+	ctx                 context.Context
+	cancel              context.CancelFunc
 }
 
 // NewHardforkTest creates a new instance of the hardfork test
@@ -130,6 +139,12 @@ func (t *HardforkTest) Run() error {
 	}
 	defer t.CleanupVestingAccount()
 
+	// Archive bug reproduction: generate the ITN key, reset the archive DB, and
+	// export the archive/ITN wiring the network phases read (no-op unless enabled).
+	if err := t.InitArchiveRepro(); err != nil {
+		return err
+	}
+
 	// Calculate main network genesis timestamp
 	mainGenesisTs := time.Now().Unix() + int64(t.Config.MainDelayMin*60)
 
@@ -156,9 +171,36 @@ func (t *HardforkTest) Run() error {
 		return err
 	}
 
+	// Archive bug reproduction: migrate the shared archive DB Berkeley->Mesa at the
+	// fork transition (pre-fork archive stopped, post-fork archive not yet started).
+	if t.Config.ReproArchiveBugs {
+		if err := t.ApplyMigration(); err != nil {
+			return err
+		}
+		// Start the post-fork archive node the production way — running
+		// add_genesis_accounts at startup — BEFORE the fork daemons, so the node is
+		// listening before any fork block and #18941 is exercised on the real node.
+		// (A buggy archive fails here; StartForkArchive brings up a fallback so the
+		// element_ids check still gets its data.)
+		if err := t.StartForkArchive(t.forkGenesisConfigPath()); err != nil {
+			return err
+		}
+		defer t.StopForkArchive()
+	}
+
 	t.Logger.Info("Phase 4: Running fork network...")
 	if err := t.RunForkNetworkPhase(analysis.Consensus.LastBlockBeforeTxEnd.BlockHeight, mainGenesisTs); err != nil {
 		return err
+	}
+
+	// Archive bug reproduction: assert the archive is free of #18941 (verdict recorded
+	// at the live archive's startup above) and the element_ids overflow (detected from
+	// the now-ingested archive log + DB). A reproduction returns a non-nil error so the
+	// test exits non-zero.
+	if t.Config.ReproArchiveBugs {
+		if err := t.AssertArchiveBugsAbsent(); err != nil {
+			return err
+		}
 	}
 
 	t.Logger.Info("===== Hardfork test completed successfully! =====")
