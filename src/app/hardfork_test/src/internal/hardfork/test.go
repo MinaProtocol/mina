@@ -24,14 +24,15 @@ type HardforkTest struct {
 	// Fork-network archive node owned by the archive-repro logic (see StartForkArchive):
 	// the live post-fork archive is started by Go — not mina-local-network.sh — so its
 	// add_genesis_accounts startup exercises #18941 on the real node.
-	forkArchiveCmd *exec.Cmd
-	forkArchiveLog string
-	bug18941       bugStatus // recorded at the live archive's startup
-	bug18941Detail string
-	runningCmds    []*exec.Cmd
-	runningCmdsMux sync.Mutex
-	ctx            context.Context
-	cancel         context.CancelFunc
+	forkArchiveCmd      *exec.Cmd
+	forkArchiveLog      string
+	bug18941            bugStatus // recorded at the live archive's startup
+	bug18941Detail      string
+	expectedGenesisSlot int // fork genesis global slot (stashed by RunForkNetworkPhase)
+	runningCmds         []*exec.Cmd
+	runningCmdsMux      sync.Mutex
+	ctx                 context.Context
+	cancel              context.CancelFunc
 }
 
 // NewHardforkTest creates a new instance of the hardfork test

@@ -123,6 +123,8 @@ func (t *HardforkTest) RunForkNetworkPhase(latestPreForkHeight int, mainGenesisT
 	// Calculate expected genesis slot
 	forkGenesisTs := t.Config.ForkGenesisTsGivenMainGenesisTs(mainGenesisTs)
 	expectedGenesisSlot := (forkGenesisTs - mainGenesisTs) / int64(t.Config.MainSlot)
+	// Stash for the post-fork archive-side vesting-rotation check (ValidateVestingInArchive).
+	t.expectedGenesisSlot = int(expectedGenesisSlot)
 
 	t.Logger.Info("Fork network genesis slot: %d", expectedGenesisSlot)
 

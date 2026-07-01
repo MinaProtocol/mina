@@ -424,10 +424,16 @@ exec-archive-node() {
   # stripped (see CleanUpNetworkForForkPhase in the hardfork test), so passing it
   # as --config-file makes the archive fail to compute precomputed_values:
   #   "No ledger was provided in the runtime configuration".
-  # The genesis accounts are already present in the inherited DB, and post-fork
-  # blocks link to the pre-fork parent that is already archived, so the archive
-  # needs no runtime config at all in inherit mode: omitting --config-file makes
-  # it skip genesis-account loading and simply archive incoming blocks via RPC.
+  # So this inherit-mode path omits --config-file, which makes the archive skip
+  # add_genesis_accounts and simply archive incoming blocks via RPC.
+  # CAVEAT: this is a limitation, not a no-op. The FORK genesis ledger is NOT identical
+  # to the inherited pre-fork DB: runtime_genesis_ledger applies slot_reduction_update,
+  # which ROTATES actively-vesting accounts' timing (cliff/period). A no-config archive
+  # therefore keeps only the STALE pre-fork timing and never records the rotated
+  # fork-genesis schedule. The hardfork archive-repro flow (HARDFORK_ARCHIVE_EXTERNAL=1,
+  # handled at the spawn site above) instead drives the fork archive itself WITH the
+  # (ledger-staged) fork genesis config so add_genesis_accounts runs and the rotated
+  # genesis accounts are archived; ValidateVestingInArchive asserts that.
   local archive_config_arg=()
   if ! config_mode_is_inherit "$CONFIG_MODE"; then
     archive_config_arg=(--config-file "${CONFIG}")

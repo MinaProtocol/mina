@@ -655,6 +655,17 @@ func (t *HardforkTest) AssertArchiveBugsAbsent() error {
 	// #18941 was decided at the live archive's startup (add_genesis_accounts).
 	record("#18941 tokens_value_key", t.bug18941, t.bug18941Detail)
 
+	// Archive-side vesting rotation: when the live archive ran add_genesis_accounts
+	// (#18941 absent), assert it PERSISTED the fork genesis's rotated vesting schedule —
+	// the reason the post-fork config is fed to the archive at all. This complements the
+	// daemon-side ValidateVestingAfterFork (which only checks the live ledger). When
+	// #18941 reproduced, the fallback archive skipped add_genesis_accounts, so there is
+	// no rotated row to validate and the run is already failing on #18941.
+	if t.bug18941 == bugClean {
+		vst, vdetail := t.ValidateVestingInArchive()
+		record("archive vesting rotation", vst, vdetail)
+	}
+
 	// Fail-closed: a reproduced bug OR an indeterminate check both fail the run, so
 	// the test only passes (exit 0) when BOTH checks definitively show the bug absent.
 	if len(reproduced) > 0 {
