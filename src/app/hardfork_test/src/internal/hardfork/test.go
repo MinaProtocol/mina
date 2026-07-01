@@ -20,6 +20,7 @@ type HardforkTest struct {
 	Client         *client.Client
 	Logger         *utils.Logger
 	ScriptDir      string
+	itn            *itnAuth // in-process ITN GraphQL client (archive-repro mode)
 	runningCmds    []*exec.Cmd
 	runningCmdsMux sync.Mutex
 	ctx            context.Context
@@ -130,6 +131,12 @@ func (t *HardforkTest) Run() error {
 	}
 	defer t.CleanupVestingAccount()
 
+	// Archive bug reproduction: generate the ITN key, reset the archive DB, and
+	// export the archive/ITN wiring the network phases read (no-op unless enabled).
+	if err := t.InitArchiveRepro(); err != nil {
+		return err
+	}
+
 	// Calculate main network genesis timestamp
 	mainGenesisTs := time.Now().Unix() + int64(t.Config.MainDelayMin*60)
 
@@ -156,9 +163,26 @@ func (t *HardforkTest) Run() error {
 		return err
 	}
 
+	// Archive bug reproduction: migrate the shared archive DB Berkeley->Mesa at the
+	// fork transition (pre-fork archive stopped, post-fork archive not yet started).
+	if t.Config.ReproArchiveBugs {
+		if err := t.ApplyMigration(); err != nil {
+			return err
+		}
+	}
+
 	t.Logger.Info("Phase 4: Running fork network...")
 	if err := t.RunForkNetworkPhase(analysis.Consensus.LastBlockBeforeTxEnd.BlockHeight, mainGenesisTs); err != nil {
 		return err
+	}
+
+	// Archive bug reproduction: the fork network (and its Mesa archive) is now shut
+	// down. Assert the archive is free of #18941 and the element_ids overflow; a
+	// reproduction returns a non-nil error so the test exits non-zero.
+	if t.Config.ReproArchiveBugs {
+		if err := t.AssertArchiveBugsAbsent(t.forkGenesisConfigPath()); err != nil {
+			return err
+		}
 	}
 
 	t.Logger.Info("===== Hardfork test completed successfully! =====")

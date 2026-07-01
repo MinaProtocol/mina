@@ -2,6 +2,7 @@ package hardfork
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -101,6 +102,18 @@ func (t *HardforkTest) startLocalNetwork(minaExecutable string, profile string, 
 
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
+
+	// For the archive-bug reproduction, also tee this phase's combined output
+	// (which includes the live archive node's logs) to a file so the element_ids
+	// btree-overflow signal can be detected after the post-fork max-cost load.
+	if t.Config.ReproArchiveBugs {
+		if f, err := os.Create(filepath.Join(t.Config.Root, profile+"-network.log")); err == nil {
+			cmd.Stdout = io.MultiWriter(os.Stdout, f)
+			cmd.Stderr = io.MultiWriter(os.Stderr, f)
+		} else {
+			t.Logger.Error("Archive repro: could not open %s-network.log: %v", profile, err)
+		}
+	}
 
 	// Start command
 	if err := cmd.Start(); err != nil {

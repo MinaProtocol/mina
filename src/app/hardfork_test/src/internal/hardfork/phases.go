@@ -63,6 +63,14 @@ func (t *HardforkTest) RunMainNetworkPhase(mainGenesisTs int64, beforeShutdown H
 				Add(time.Duration(2*t.Config.MainSlot)*time.Second)),
 	)
 
+	// Archive bug reproduction: drive the custom-token ITN load on the pre-fork
+	// (compatible) network so a real OWNED custom token is archived before the fork.
+	if t.Config.ReproArchiveBugs {
+		if err := t.DriveTokenLoadPreFork(); err != nil {
+			return nil, fmt.Errorf("pre-fork custom-token load failed: %w", err)
+		}
+	}
+
 	analysis, err := t.AnalyzeBlocksOnMainNetwork(mainGenesisTs)
 	if err != nil {
 		return nil, err
@@ -175,6 +183,22 @@ func (t *HardforkTest) RunForkNetworkPhase(latestPreForkHeight int, mainGenesisT
 		}
 	} else {
 		t.Logger.Info("Fork network is quiet (no built-in value transfers); skipping user-command-in-block validation. Post-fork traffic is driven externally during the hold.")
+	}
+
+	// Archive bug reproduction: drive the max-cost zkApp load on the post-fork
+	// (Mesa) network so the Mesa archive ingests the overflowing 1024-element field
+	// array, then let it settle so the element_ids overflow (if any) is recorded
+	// before the network is torn down and the bug assertion runs.
+	if t.Config.ReproArchiveBugs {
+		if err := t.DriveMaxCostLoadPostFork(); err != nil {
+			return fmt.Errorf("post-fork max-cost load failed: %w", err)
+		}
+		settle := 7 * time.Minute
+		t.Logger.Info("Archive repro: letting the max-cost load archive for %s", settle)
+		select {
+		case <-time.After(settle):
+		case <-t.ctx.Done():
+		}
 	}
 
 	// Optional post-fork hold: keep the Mesa network (and its archive node) alive
