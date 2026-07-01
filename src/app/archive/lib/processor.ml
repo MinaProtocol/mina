@@ -397,9 +397,6 @@ module Zkapp_field_array = struct
         ~f:(Zkapp_field.add_if_doesn't_exist (module Conn))
       >>| Array.of_list
     in
-    (* No content dedup: element_ids has no UNIQUE constraint/index (a btree over
-       the unbounded int[] overflows Postgres' 2704-byte key limit for max-cost
-       zkApps), so always INSERT a fresh row and return its id. *)
     Mina_caqti.insert_into_cols_returning ~returning:("id", Caqti_type.int)
       ~table_name
       ~cols:([ "element_ids" ], Mina_caqti.array_int_typ)
