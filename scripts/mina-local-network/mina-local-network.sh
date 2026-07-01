@@ -420,20 +420,41 @@ exec-snark-worker() {
 
 # Executes the Archive node
 exec-archive-node() {
-  # In inherit (fork) mode the post-fork genesis config has its ledger section
-  # stripped (see CleanUpNetworkForForkPhase in the hardfork test), so passing it
-  # as --config-file makes the archive fail to compute precomputed_values:
-  #   "No ledger was provided in the runtime configuration".
-  # So this inherit-mode path omits --config-file, which makes the archive skip
-  # add_genesis_accounts and simply archive incoming blocks via RPC.
-  # CAVEAT: this is a limitation, not a no-op. The FORK genesis ledger is NOT identical
-  # to the inherited pre-fork DB: runtime_genesis_ledger applies slot_reduction_update,
-  # which ROTATES actively-vesting accounts' timing (cliff/period). A no-config archive
-  # therefore keeps only the STALE pre-fork timing and never records the rotated
-  # fork-genesis schedule. The hardfork archive-repro flow (HARDFORK_ARCHIVE_EXTERNAL=1,
-  # handled at the spawn site above) instead drives the fork archive itself WITH the
-  # (ledger-staged) fork genesis config so add_genesis_accounts runs and the rotated
-  # genesis accounts are archived; ValidateVestingInArchive asserts that.
+  # ---------------------------------------------------------------------------
+  # Archive node --config-file management across a hardfork run.
+  #
+  # The archive is given --config-file exactly when it should (re)load a genesis
+  # ledger and run add_genesis_accounts (which materializes the genesis accounts —
+  # incl. timed/vesting accounts — into the DB). WHO supplies that config differs by
+  # phase, and this function only owns the pre-fork half:
+  #
+  #   * Pre-fork  (--config reset, main network): spawned HERE with
+  #     --config-file "${CONFIG}" (= ${ROOT}/daemon.json), which at reset time still
+  #     carries its inline genesis ledger. The archive runs add_genesis_accounts over
+  #     the PRE-FORK genesis and loads the pre-fork genesis accounts (with pre-fork
+  #     vesting timing) into the DB.
+  #
+  #   * Post-fork (--config inherit, fork network): "${CONFIG}" (= ${ROOT}/daemon.json)
+  #     has had its ledger section stripped by CleanUpNetworkForForkPhase — the fork
+  #     daemons run from the PER-NODE config nodes/<name>/daemon.json via
+  #     --config-directory, not from ${CONFIG} — so passing ${CONFIG} here would fail
+  #     with "No ledger was provided in the runtime configuration". Hence this path
+  #     omits --config-file. That is correct: the post-fork archive's config is
+  #     supplied out-of-band, depending on the caller:
+  #       - Hardfork archive-repro test (HARDFORK_ARCHIVE_EXTERNAL=1): this script does
+  #         NOT spawn the fork archive at all (see the spawn site). The Go hardfork test
+  #         (StartForkArchive) owns it and starts it WITH the per-node fork genesis
+  #         config (nodes/seed/daemon.json) plus the fork genesis ledger tar staged into
+  #         the archive's ledger search path, so add_genesis_accounts runs over the FORK
+  #         genesis and loads the fork genesis accounts — with the
+  #         slot_reduction_update-rotated vesting timing. This is where #18941 and the
+  #         archived vesting rotation are exercised (ValidateVestingInArchive asserts the
+  #         latter).
+  #       - Standalone (flag unset): the archive is spawned here without a config and
+  #         archives incoming post-fork blocks via RPC only, linking to the pre-fork
+  #         parent already in the DB. The fork genesis accounts are not re-materialized —
+  #         acceptable for a plain dev net that only needs post-fork blocks archived.
+  # ---------------------------------------------------------------------------
   local archive_config_arg=()
   if ! config_mode_is_inherit "$CONFIG_MODE"; then
     archive_config_arg=(--config-file "${CONFIG}")
