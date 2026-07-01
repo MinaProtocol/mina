@@ -225,7 +225,7 @@ let build_artifacts
                           # spec.extraBuildEnvs
                           # DebianVersions.overrideEnvs
                         )
-                        "${spec.buildScript} ${debianTokens}"
+                        "${spec.buildScript} ${debianTokens} profile_devnet_generic profile_mainnet_generic"
                     # [ Cmd.run
                           "./buildkite/scripts/debian/write_to_cache.sh ${DebianVersions.lowerName
                                                                             spec.debVersion}"

@@ -103,7 +103,7 @@ PKG_DAEMON="mina-generic"
 PKG_AUTOMODE="mina-${NETWORK}-automode"
 PKG_CONFIG="mina-${NETWORK}-config"
 # Profile leaf package (just the PROFILE hint, no deps).
-# The tent PKG_PROFILE (mina-${NETWORK}-generic) depends on this.
+# PKG_PROFILE is the profile tent (depends on mina-generic + profile leaf).
 PKG_PROFILE="mina-${NETWORK}-generic"
 PKG_PROFILE_LEAF="mina-${NETWORK}-profile"
 PKG_POSTFORK="mina-${NETWORK}-postfork-mesa"
@@ -134,8 +134,6 @@ log_info "=== Step 1: Download debs from cache ==="
 ./buildkite/scripts/cache/manager.sh read "debians/${CODENAME}/${PKG_DAEMON}_*" "${DEB_DIR}"
 ./buildkite/scripts/cache/manager.sh read "debians/${CODENAME}/${PKG_AUTOMODE}_*" "${DEB_DIR}"
 ./buildkite/scripts/cache/manager.sh read "debians/${CODENAME}/${PKG_CONFIG}_*" "${DEB_DIR}"
-./buildkite/scripts/cache/manager.sh read "debians/${CODENAME}/${PKG_PROFILE}_*" "${DEB_DIR}"
-./buildkite/scripts/cache/manager.sh read "debians/${CODENAME}/${PKG_PROFILE_LEAF}_*" "${DEB_DIR}"
 ./buildkite/scripts/cache/manager.sh read "debians/${CODENAME}/${PKG_POSTFORK}_*" "${DEB_DIR}"
 ./buildkite/scripts/cache/manager.sh read "debians/${CODENAME}/mina-logproc_*" "${DEB_DIR}"
 
@@ -221,8 +219,6 @@ reversion_deb "${ORIG_LOGPROC_DEB}"  "${V2}" "${REPO_DIR}/mina-logproc_${V2}_amd
 # V3: generic daemon + config + profile + logproc (post-hardfork, back to normal)
 reversion_deb "${ORIG_DAEMON_DEB}"  "${V3}" "${REPO_DIR}/${PKG_DAEMON}_${V3}_amd64.deb"
 reversion_deb "${ORIG_CONFIG_DEB}"  "${V3}" "${REPO_DIR}/${PKG_CONFIG}_${V3}_all.deb"
-reversion_deb "${ORIG_PROFILE_DEB}" "${V3}" "${REPO_DIR}/${PKG_PROFILE}_${V3}_amd64.deb"
-    "${REPO_DIR}/${PKG_PROFILE_LEAF}_${V3}_amd64.deb"
 reversion_deb "${ORIG_LOGPROC_DEB}" "${V3}" "${REPO_DIR}/mina-logproc_${V3}_amd64.deb"
 
 log_info "Versioned packages:"
@@ -276,6 +272,7 @@ V3_DEBS=(
     "${REPO_DIR}/${PKG_DAEMON}_${V3}_amd64.deb"
     "${REPO_DIR}/${PKG_CONFIG}_${V3}_all.deb"
     "${REPO_DIR}/${PKG_PROFILE}_${V3}_amd64.deb"
+    "${REPO_DIR}/${PKG_PROFILE_LEAF}_${V3}_amd64.deb"
     "${REPO_DIR}/mina-logproc_${V3}_amd64.deb"
 )
 
