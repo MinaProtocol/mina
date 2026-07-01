@@ -16,8 +16,9 @@ package hardfork
 // (compatible) network mints an OWNED custom token that the compatible archive
 // records; at the fork transition the shared archive DB is migrated to the Mesa
 // schema; a max-cost ITN load on the post-fork (Mesa) network makes the Mesa
-// archive ingest the overflowing field array; and finally a probe starts the Mesa
-// archive over the fork genesis config to exercise add_genesis_accounts.
+// archive ingest the overflowing field array; and the post-fork archive node runs
+// add_genesis_accounts at its own startup over the fork genesis config (the #18941
+// path), exercised on the real live node rather than a synthetic probe.
 //
 // Buggy binaries + the migration that keeps the element_ids UNIQUE reproduce both
 // bugs and AssertArchiveBugsAbsent returns an error (the test exits non-zero);
@@ -25,21 +26,22 @@ package hardfork
 // test passes.
 
 import (
-	"bytes"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 )
 
 // itnPort returns the seed daemon's ITN GraphQL port (daemon base port + 5).
 func (t *HardforkTest) itnPort() int { return t.Config.SeedStartPort + 5 }
 
-// forkGenesisConfigPath returns the post-fork seed daemon.json (moved into place
-// by CleanUpNetworkForForkPhase), used as the genesis config for the #18941 probe.
+// forkGenesisConfigPath returns the post-fork seed daemon.json (moved into place by
+// CleanUpNetworkForForkPhase), the genesis config the live archive node loads at
+// startup to run add_genesis_accounts (the #18941 path).
 func (t *HardforkTest) forkGenesisConfigPath() string {
 	for _, info := range t.Config.DaemonInfos {
 		if info.Name == "seed" {
@@ -83,10 +85,11 @@ func (t *HardforkTest) InitArchiveRepro() error {
 		return nil
 	}
 	c := t.Config
+	// Default the #18941 verdict to inconclusive; StartForkArchive overwrites it at the
+	// live archive's startup. If that never runs, the assertion fails closed.
+	t.bug18941 = bugInconclusive
+	t.bug18941Detail = "the live post-fork archive was never started"
 
-	if c.ProbeArchiveExe == "" {
-		c.ProbeArchiveExe = c.ForkArchiveExe
-	}
 	if c.ItnKeyPath == "" {
 		// The ITN auth key MUST live outside Root: mina-local-network.sh does
 		// `rm -rf $ROOT` when it (re)initializes the main network (config=reset),
@@ -147,6 +150,10 @@ func (t *HardforkTest) InitArchiveRepro() error {
 	// (Postgres connection + schema). The pre-fork archive is compatible-lineage,
 	// the post-fork archive is Mesa-lineage (bin_io must match the phase daemon).
 	os.Setenv("HARDFORK_ARCHIVE_PORT", strconv.Itoa(c.ArchivePort))
+	// The post-fork (inherit-mode) archive is started by Go (StartForkArchive), not by
+	// mina-local-network.sh, so it can run add_genesis_accounts at startup and exercise
+	// #18941 on the real node. The pre-fork (reset-mode) archive is still script-spawned.
+	os.Setenv("HARDFORK_ARCHIVE_EXTERNAL", "1")
 	os.Setenv("MAIN_ARCHIVE_EXE", c.MainArchiveExe)
 	os.Setenv("FORK_ARCHIVE_EXE", c.ForkArchiveExe)
 	os.Setenv("CREATE_SCHEMA_FILE", c.CreateSchemaFile)
@@ -345,9 +352,9 @@ func (t *HardforkTest) DriveMaxCostLoadPostFork() error {
 type bugStatus int
 
 const (
-	bugReproduced  bugStatus = iota // the bug definitively reproduced
-	bugClean                        // the bug is definitively absent (fix verified)
-	bugInconclusive                 // neither could be established (setup/timing issue)
+	bugReproduced   bugStatus = iota // the bug definitively reproduced
+	bugClean                         // the bug is definitively absent (fix verified)
+	bugInconclusive                  // neither could be established (setup/timing issue)
 )
 
 // DetectElementIdsOverflow reports whether the element_ids btree overflow
@@ -360,17 +367,24 @@ const (
 //     neither triggered nor shown fixed. (We must NOT treat "only small Shape-A
 //     arrays archived" as reproduced — that false-positives the fixed run.)
 func (t *HardforkTest) DetectElementIdsOverflow() (bugStatus, string) {
-	logPath := filepath.Join(t.Config.Root, "fork-network.log")
-	if data, err := os.ReadFile(logPath); err == nil {
-		s := string(data)
-		if strings.Contains(s, "exceeds btree") ||
-			strings.Contains(s, "zkapp_field_array_element_ids_key") ||
-			strings.Contains(s, "zkapp_events_element_ids_key") {
-			if raw := lineContaining(s, "exceeds btree"); raw != "" {
-				t.Logger.Info("Archive repro: element_ids raw signal: %s", raw)
-			}
-			return bugReproduced, "Mesa archive logged the element_ids btree-overflow error"
+	// The btree-overflow error surfaces in the live archive's log (now Go-owned,
+	// t.forkArchiveLog) and — for older/script-spawned setups — in fork-network.log.
+	var s string
+	for _, logPath := range []string{t.forkArchiveLog, filepath.Join(t.Config.Root, "fork-network.log")} {
+		if logPath == "" {
+			continue
 		}
+		if data, err := os.ReadFile(logPath); err == nil {
+			s += string(data)
+		}
+	}
+	if strings.Contains(s, "exceeds btree") ||
+		strings.Contains(s, "zkapp_field_array_element_ids_key") ||
+		strings.Contains(s, "zkapp_events_element_ids_key") {
+		if raw := lineContaining(s, "exceeds btree"); raw != "" {
+			t.Logger.Info("Archive repro: element_ids raw signal: %s", raw)
+		}
+		return bugReproduced, "Mesa archive logged the element_ids btree-overflow error"
 	}
 	large := t.psqlCount("select count(*) from zkapp_field_array where coalesce(array_length(element_ids,1),0) >= 100;")
 	total := t.psqlCount("select count(*) from zkapp_field_array;")
@@ -383,109 +397,171 @@ func (t *HardforkTest) DetectElementIdsOverflow() (bugStatus, string) {
 			"the max-cost load delivered no Shape-B 1024-element command to the archive, so the overflow is undetermined", total)
 }
 
-// ProbeAddGenesisAccounts starts the Mesa probe archive over the shared DB with
-// the fork genesis config and reports whether #18941 (tokens_value_key) reproduced
-// in add_genesis_accounts:
-//   - bugReproduced: add_genesis_accounts hit tokens_value_key (buggy archive).
-//   - bugClean: the archive logged "Archive process ready" (genesis accounts added
-//     without collision — the fix).
-//   - bugInconclusive: the probe could not even reach add_genesis_accounts (no
-//     ledger tars staged, or it failed to load the hash-referenced fork genesis
-//     ledger), or it timed out / exited without a decisive signal. These must NOT
-//     be read as "fixed": a probe that never ran the collision path proves nothing.
-func (t *HardforkTest) ProbeAddGenesisAccounts(genesisConfig string) (bugStatus, string) {
-	t.Logger.Info("Archive repro: probing add_genesis_accounts (%s over %s)",
-		t.Config.ProbeArchiveExe, t.Config.ArchivePgUri)
-	// The fork genesis config references its ledger by hash (not inline accounts),
-	// so the probe archive must load the ledger tarball to materialize the genesis
-	// accounts. Those tars live under the fork node's chain-state dir, which is NOT
-	// in the archive's ledger search path — without staging them the probe dies with
-	// "Could not find a ledger tar file for hash ..." before add_genesis_accounts
-	// runs, masking #18941. Stage them into the autogen cache the archive searches.
+// StartForkArchive starts the post-fork (Mesa) archive node the way production does —
+// with the fork genesis config, so it runs add_genesis_accounts at startup, the code
+// path where #18941 lives. This is the live archive node the fork daemons stream blocks
+// to (it binds the archive server port), so #18941 is exercised on the REAL node
+// startup rather than a synthetic post-teardown probe. The verdict is recorded in
+// t.bug18941 for AssertArchiveBugsAbsent. Called after ApplyMigration, before the fork
+// daemons start, so the node is listening before any fork block is produced.
+//
+//   - fixed archive: add_genesis_accounts succeeds ("Archive process ready"); the node
+//     stays up and ingests the fork blocks, incl. the max-cost element_ids array.
+//   - buggy archive: add_genesis_accounts collides on tokens_value_key and the node
+//     exits (#18941 reproduced at real startup). The collision happens before the fork
+//     network's first block, so we then start a FALLBACK archive WITHOUT the genesis
+//     config (skipping add_genesis_accounts) on the same port, so the fork blocks are
+//     still archived and the element_ids check has its data.
+func (t *HardforkTest) StartForkArchive(genesisConfig string) error {
+	t.forkArchiveLog = filepath.Join(t.Config.Root, "fork-archive.log")
+	// The fork genesis config references its ledger by hash (not inline accounts), so
+	// the archive must load the ledger tarball to materialize the genesis accounts.
+	// Those tars live under the fork node's chain-state dir, NOT in the archive's search
+	// path — without staging them add_genesis_accounts dies with "Could not find a
+	// ledger tar file ..." before the collision, masking #18941.
 	if n := t.stageGenesisLedgerTars(); n == 0 {
-		return bugInconclusive, "no genesis/epoch ledger tars were staged; the probe cannot load the fork " +
-			"genesis ledger and would never reach add_genesis_accounts (would mask #18941)"
+		t.bug18941 = bugInconclusive
+		t.bug18941Detail = "no genesis/epoch ledger tars were staged; the live archive could not run " +
+			"add_genesis_accounts (would mask #18941)"
+		t.Logger.Error("Archive repro: %s", t.bug18941Detail)
+		// Still bring up a plain archive so the element_ids path remains testable.
+		cmd, err := t.spawnForkArchive(genesisConfig, false)
+		if err != nil {
+			return err
+		}
+		t.forkArchiveCmd = cmd
+		return nil
 	}
-	cmd := exec.Command(t.Config.ProbeArchiveExe, "run",
+	t.Logger.Info("Archive repro: starting post-fork archive with add_genesis_accounts "+
+		"(fork genesis %s over %s)", genesisConfig, t.Config.ArchivePgUri)
+	cmd, err := t.spawnForkArchive(genesisConfig, true) // WITH --config-file -> add_genesis_accounts
+	if err != nil {
+		return err
+	}
+	st, detail := t.watchForkArchiveStartup(cmd)
+	t.bug18941, t.bug18941Detail = st, detail
+	switch st {
+	case bugClean:
+		t.Logger.Info("Archive repro: #18941 absent at live archive startup: %s", detail)
+		t.forkArchiveCmd = cmd // healthy live archive; keep it running to ingest blocks
+		return nil
+	case bugReproduced:
+		t.Logger.Error("Archive repro: REPRODUCED #18941 at live archive startup: %s", detail)
+	default:
+		t.Logger.Error("Archive repro: #18941 inconclusive at live archive startup: %s", detail)
+	}
+	// #18941 reproduced or inconclusive: the add_genesis_accounts archive is gone.
+	// Start a fallback archive WITHOUT the genesis config so the fork blocks (and the
+	// element_ids max-cost array) are still archived for the element_ids check.
+	t.stopProc(cmd)
+	fb, err := t.spawnForkArchive(genesisConfig, false)
+	if err != nil {
+		return fmt.Errorf("failed to start fallback fork archive: %w", err)
+	}
+	t.forkArchiveCmd = fb
+	t.Logger.Info("Archive repro: fallback fork archive started (no add_genesis_accounts) for the element_ids check")
+	return nil
+}
+
+// spawnForkArchive starts a Mesa archive node on the archive server port, appending its
+// output to t.forkArchiveLog. With withConfig it passes --config-file (running
+// add_genesis_accounts at startup); without it, the archive skips genesis loading and
+// simply archives incoming blocks via RPC.
+func (t *HardforkTest) spawnForkArchive(genesisConfig string, withConfig bool) (*exec.Cmd, error) {
+	args := []string{"run",
 		"--postgres-uri", t.Config.ArchivePgUri,
-		"--server-port", strconv.Itoa(t.Config.ArchivePort+10),
-		"--config-file", genesisConfig)
-	var buf bytes.Buffer
-	cmd.Stdout = &buf
-	cmd.Stderr = &buf
-	if err := cmd.Start(); err != nil {
-		return bugInconclusive, fmt.Sprintf("failed to start probe archive: %v", err)
+		"--server-port", strconv.Itoa(t.Config.ArchivePort)}
+	if withConfig {
+		args = append(args, "--config-file", genesisConfig)
 	}
+	cmd := exec.Command(t.Config.ForkArchiveExe, args...)
+	f, err := os.OpenFile(t.forkArchiveLog, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	if err != nil {
+		return nil, fmt.Errorf("open fork archive log: %w", err)
+	}
+	cmd.Stdout = f
+	cmd.Stderr = f
+	if err := cmd.Start(); err != nil {
+		f.Close()
+		return nil, fmt.Errorf("start fork archive: %w", err)
+	}
+	return cmd, nil
+}
+
+// watchForkArchiveStartup watches a just-started add_genesis_accounts archive for its
+// decisive signal, reading t.forkArchiveLog. It does NOT kill the process: on bugClean
+// the caller keeps it running as the live archive. Ledger-load failures / exit-without-
+// signal / timeout are inconclusive (never "fixed"): an archive that never ran the
+// collision path proves nothing.
+func (t *HardforkTest) watchForkArchiveStartup(cmd *exec.Cmd) (bugStatus, string) {
 	done := make(chan struct{})
 	go func() { cmd.Wait(); close(done) }()
-	kill := func() {
-		if cmd.Process != nil {
-			cmd.Process.Kill()
-		}
+	read := func() string {
+		data, _ := os.ReadFile(t.forkArchiveLog)
+		return string(data)
 	}
-	// scan returns (decided, status). A genesis-ledger load failure is treated as
-	// inconclusive (the probe never reached add_genesis_accounts), NOT as clean.
-	scan := func() (bool, bugStatus) {
-		s := buf.String()
+	classify := func(s string) (bool, bugStatus, string) {
 		if strings.Contains(s, "tokens_value_key") || strings.Contains(s, "Failed to add genesis accounts") {
-			return true, bugReproduced
+			if raw := lineContaining(s, "tokens_value_key"); raw != "" {
+				t.Logger.Info("Archive repro: archive raw signal: %s", raw)
+			}
+			return true, bugReproduced, "add_genesis_accounts hit tokens_value_key at live archive startup (#18941 reproduced)"
 		}
 		if strings.Contains(s, "Could not find a ledger tar file") ||
 			strings.Contains(s, "Could not get precomputed values") ||
 			strings.Contains(s, "Could not find or generate") {
-			return true, bugInconclusive
+			return true, bugInconclusive, "live archive could not load the fork genesis ledger: " + firstLine(tail(s, 400))
 		}
 		if strings.Contains(s, "Archive process ready") {
-			return true, bugClean
-		}
-		// Not yet decided. The bugStatus here is a sentinel only — every caller gates
-		// on the bool (decided) first, so this value is never consumed while
-		// decided==false; bugInconclusive makes the "undetermined" intent explicit.
-		return false, bugInconclusive
-	}
-	// Loading the hash-referenced genesis ledger and inserting accounts in chunks of
-	// 100 before the collision can take minutes on a loaded box, so allow ample time;
-	// a timeout is inconclusive, never "fixed".
-	timeout := time.After(600 * time.Second)
-	decide := func(st bugStatus) (bugStatus, string) {
-		s := buf.String()
-		switch st {
-		case bugReproduced:
-			// Echo the raw DB-side collision so it lands in the main test log; it
-			// otherwise appears only in the shared Postgres log.
-			if raw := lineContaining(s, "tokens_value_key"); raw != "" {
-				t.Logger.Info("Archive repro: probe raw signal: %s", raw)
-			}
-			return bugReproduced, "add_genesis_accounts hit tokens_value_key (#18941 reproduced)"
-		case bugClean:
 			if raw := lineContaining(s, "Archive process ready"); raw != "" {
-				t.Logger.Info("Archive repro: probe raw signal: %s", raw)
+				t.Logger.Info("Archive repro: archive raw signal: %s", raw)
 			}
-			return bugClean, "probe archive started cleanly (add_genesis_accounts succeeded; #18941 fixed)"
-		default:
-			return bugInconclusive, "probe could not load the fork genesis ledger / no decisive signal: " +
-				firstLine(tail(buf.String(), 400))
+			return true, bugClean, "live archive ran add_genesis_accounts and reported ready (#18941 absent)"
 		}
+		return false, bugInconclusive, ""
 	}
+	// add_genesis_accounts loads the hash-referenced genesis ledger and inserts accounts
+	// in chunks before the collision, which can take minutes on a loaded box.
+	timeout := time.After(600 * time.Second)
 	for {
-		if decided, st := scan(); decided {
-			kill()
-			return decide(st)
+		if decided, st, detail := classify(read()); decided {
+			return st, detail
 		}
 		select {
 		case <-done:
-			if _, st := scan(); st == bugReproduced {
-				return decide(bugReproduced)
+			if decided, st, detail := classify(read()); decided {
+				return st, detail
 			}
-			// The fixed archive stays running (decided clean above before exit), so a
-			// process exit here means a crash without the collision — inconclusive.
-			return bugInconclusive, "probe archive exited without a decisive signal: " +
-				firstLine(tail(buf.String(), 400))
+			return bugInconclusive, "live archive exited during startup without a decisive signal: " +
+				firstLine(tail(read(), 400))
 		case <-timeout:
-			kill()
-			return bugInconclusive, "probe timed out without a decisive signal: " + firstLine(tail(buf.String(), 400))
+			return bugInconclusive, "live archive did not reach a decisive add_genesis_accounts signal within timeout"
 		case <-time.After(2 * time.Second):
 		}
+	}
+}
+
+// StopForkArchive stops the Go-owned fork archive node (live or fallback), if any.
+func (t *HardforkTest) StopForkArchive() {
+	if t.forkArchiveCmd != nil {
+		t.Logger.Info("Archive repro: stopping the post-fork archive node")
+		t.stopProc(t.forkArchiveCmd)
+		t.forkArchiveCmd = nil
+	}
+}
+
+// stopProc terminates a process (SIGTERM, then wait) started by the archive-repro code.
+func (t *HardforkTest) stopProc(cmd *exec.Cmd) {
+	if cmd == nil || cmd.Process == nil {
+		return
+	}
+	_ = cmd.Process.Signal(syscall.SIGTERM)
+	done := make(chan struct{})
+	go func() { cmd.Wait(); close(done) }()
+	select {
+	case <-done:
+	case <-time.After(15 * time.Second):
+		_ = cmd.Process.Kill()
 	}
 }
 
@@ -546,15 +622,17 @@ func (t *HardforkTest) stageGenesisLedgerTars() int {
 		staged++
 		return nil
 	})
-	t.Logger.Info("Archive repro: staged %d genesis/epoch ledger tar(s) into %s for the #18941 probe", staged, cacheDir)
+	t.Logger.Info("Archive repro: staged %d genesis/epoch ledger tar(s) into %s for add_genesis_accounts", staged, cacheDir)
 	return staged
 }
 
-// AssertArchiveBugsAbsent runs the post-fork bug probes and detection. Returns nil
-// when the archive is healthy (fixes applied) and a non-nil error enumerating the
-// reproduced bugs otherwise, so the hardfork test exits non-zero against the buggy
-// archive/migration and passes against the fixed ones.
-func (t *HardforkTest) AssertArchiveBugsAbsent(genesisConfig string) error {
+// AssertArchiveBugsAbsent evaluates the two archive-bug checks and returns nil when the
+// archive is healthy (fixes applied), or a non-nil error enumerating the reproduced bugs
+// otherwise, so the hardfork test exits non-zero against the buggy archive/migration and
+// passes against the fixed ones. The #18941 verdict was recorded earlier at the live
+// archive node's add_genesis_accounts startup (StartForkArchive); element_ids is detected
+// here from the (now-ingested) archive log + DB.
+func (t *HardforkTest) AssertArchiveBugsAbsent() error {
 	t.Logger.Info("===== Archive bug assertion: checking #18941 + element_ids overflow =====")
 	var reproduced, inconclusive []string
 
@@ -574,12 +652,8 @@ func (t *HardforkTest) AssertArchiveBugsAbsent(genesisConfig string) error {
 	st, detail := t.DetectElementIdsOverflow()
 	record("element_ids btree overflow", st, detail)
 
-	if genesisConfig == "" {
-		record("#18941 tokens_value_key", bugInconclusive, "no fork genesis config available for the probe")
-	} else {
-		st, detail := t.ProbeAddGenesisAccounts(genesisConfig)
-		record("#18941 tokens_value_key", st, detail)
-	}
+	// #18941 was decided at the live archive's startup (add_genesis_accounts).
+	record("#18941 tokens_value_key", t.bug18941, t.bug18941Detail)
 
 	// Fail-closed: a reproduced bug OR an indeterminate check both fail the run, so
 	// the test only passes (exit 0) when BOTH checks definitively show the bug absent.

@@ -102,7 +102,6 @@ func init() {
 	rootCmd.Flags().BoolVar(&cfg.ReproArchiveBugs, "repro-archive-bugs", cfg.ReproArchiveBugs, "Drive a custom-token + max-cost ITN load across the fork and assert the archive node is free of #18941 (tokens_value_key) and the element_ids btree overflow; reproduces (and FAILS, non-zero) against the buggy archive/migration, passes against the fixed ones")
 	rootCmd.Flags().StringVar(&cfg.MainArchiveExe, "main-archive-exe", cfg.MainArchiveExe, "Compatible (pre-fork) mina-archive binary for the live main-network archive node")
 	rootCmd.Flags().StringVar(&cfg.ForkArchiveExe, "fork-archive-exe", cfg.ForkArchiveExe, "Mesa (post-fork) mina-archive binary for the live fork-network archive node")
-	rootCmd.Flags().StringVar(&cfg.ProbeArchiveExe, "probe-archive-exe", cfg.ProbeArchiveExe, "Mesa mina-archive binary used for the add_genesis_accounts (#18941) probe (defaults to --fork-archive-exe)")
 	rootCmd.Flags().StringVar(&cfg.CreateSchemaFile, "create-schema-file", cfg.CreateSchemaFile, "Berkeley (pre-fork) archive create_schema.sql used to initialize the shared archive DB")
 	rootCmd.Flags().StringVar(&cfg.MigrationSql, "migration-sql", cfg.MigrationSql, "Berkeley->Mesa upgrade_to_mesa.sql applied at the fork transition (v0.0.5 keeps the element_ids UNIQUE = buggy; v0.0.6 drops it = fixed)")
 	rootCmd.Flags().StringVar(&cfg.ItnKeyPath, "itn-key", cfg.ItnKeyPath, "Path the in-process ITN ed25519 auth key PEM is written to (a sibling of --root if empty; debug only)")

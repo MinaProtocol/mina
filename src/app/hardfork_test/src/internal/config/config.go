@@ -117,9 +117,6 @@ type Config struct {
 	MainArchiveExe   string
 	ForkArchiveExe   string
 	CreateSchemaFile string
-	// Bug A probe: the Mesa mina-archive binary started with the fork genesis config
-	// to trigger add_genesis_accounts (defaults to ForkArchiveExe).
-	ProbeArchiveExe string
 	// Berkeley->Mesa migration SQL applied at the fork transition. The file choice
 	// (v0.0.5 keeps the element_ids UNIQUE = buggy; v0.0.6 drops it = fixed) is what
 	// makes Bug B reproduce or not.

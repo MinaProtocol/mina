@@ -1104,13 +1104,21 @@ fi
 # ----------
 
 if [[ -n "${ARCHIVE_SERVER_PORT}" ]]; then
-  echo 'Starting the Archive Node...'
-  printf "\n"
+  if [[ "${HARDFORK_ARCHIVE_EXTERNAL:-0}" == "1" ]] && config_mode_is_inherit "${CONFIG_MODE}"; then
+    # The hardfork archive-repro drives the post-fork (inherit-mode) archive itself so
+    # it can run add_genesis_accounts at startup (#18941). The daemons still get
+    # -archive-address ${ARCHIVE_SERVER_PORT}; the externally-managed archive binds it.
+    echo 'Post-fork archive node is managed externally (archive-repro); not spawning here.'
+    printf "\n"
+  else
+    echo 'Starting the Archive Node...'
+    printf "\n"
 
-  mkdir -p "${NODES_FOLDER}"/archive
+    mkdir -p "${NODES_FOLDER}"/archive
 
-  spawn-archive-node "${NODES_FOLDER}"/archive
-  ARCHIVE_PID=$!
+    spawn-archive-node "${NODES_FOLDER}"/archive
+    ARCHIVE_PID=$!
+  fi
 fi
 
 if [[ -n "${ROSETTA_PORT}" ]]; then

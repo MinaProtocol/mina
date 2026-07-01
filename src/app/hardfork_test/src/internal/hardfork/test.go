@@ -16,11 +16,18 @@ import (
 
 // HardforkTest represents the main hardfork test logic
 type HardforkTest struct {
-	Config         *config.Config
-	Client         *client.Client
-	Logger         *utils.Logger
-	ScriptDir      string
-	itn            *itnAuth // in-process ITN GraphQL client (archive-repro mode)
+	Config    *config.Config
+	Client    *client.Client
+	Logger    *utils.Logger
+	ScriptDir string
+	itn       *itnAuth // in-process ITN GraphQL client (archive-repro mode)
+	// Fork-network archive node owned by the archive-repro logic (see StartForkArchive):
+	// the live post-fork archive is started by Go — not mina-local-network.sh — so its
+	// add_genesis_accounts startup exercises #18941 on the real node.
+	forkArchiveCmd *exec.Cmd
+	forkArchiveLog string
+	bug18941       bugStatus // recorded at the live archive's startup
+	bug18941Detail string
 	runningCmds    []*exec.Cmd
 	runningCmdsMux sync.Mutex
 	ctx            context.Context
@@ -169,6 +176,15 @@ func (t *HardforkTest) Run() error {
 		if err := t.ApplyMigration(); err != nil {
 			return err
 		}
+		// Start the post-fork archive node the production way — running
+		// add_genesis_accounts at startup — BEFORE the fork daemons, so the node is
+		// listening before any fork block and #18941 is exercised on the real node.
+		// (A buggy archive fails here; StartForkArchive brings up a fallback so the
+		// element_ids check still gets its data.)
+		if err := t.StartForkArchive(t.forkGenesisConfigPath()); err != nil {
+			return err
+		}
+		defer t.StopForkArchive()
 	}
 
 	t.Logger.Info("Phase 4: Running fork network...")
@@ -176,11 +192,12 @@ func (t *HardforkTest) Run() error {
 		return err
 	}
 
-	// Archive bug reproduction: the fork network (and its Mesa archive) is now shut
-	// down. Assert the archive is free of #18941 and the element_ids overflow; a
-	// reproduction returns a non-nil error so the test exits non-zero.
+	// Archive bug reproduction: assert the archive is free of #18941 (verdict recorded
+	// at the live archive's startup above) and the element_ids overflow (detected from
+	// the now-ingested archive log + DB). A reproduction returns a non-nil error so the
+	// test exits non-zero.
 	if t.Config.ReproArchiveBugs {
-		if err := t.AssertArchiveBugsAbsent(t.forkGenesisConfigPath()); err != nil {
+		if err := t.AssertArchiveBugsAbsent(); err != nil {
 			return err
 		}
 	}
