@@ -1,0 +1,39 @@
+# Dockerfile for mina-bootstrap, the artifact-fetching / setup CLI.
+#
+# Two-stage build:
+#   1. golang:bookworm builds the static binary
+#   2. final image is debian:bookworm-slim with the binary + postgresql-client
+#      (psql is shelled out to by the `archive restore`/`catchup` subcommands)
+#
+# Resulting image size: ~150MB (slim) — could be reduced to ~20MB if we move
+# to FROM scratch and drop the archive subcommands' psql dependency.
+
+ARG GO_IMAGE=golang:1.21.13-bookworm
+ARG BASE_IMAGE=debian:bookworm-slim
+
+# ---------- builder ----------
+FROM ${GO_IMAGE} AS builder
+
+WORKDIR /src
+COPY src/app/bootstrap/go.mod src/app/bootstrap/go.sum ./
+RUN go mod download
+
+COPY src/app/bootstrap/ ./
+RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/mina-bootstrap .
+
+# ---------- runtime ----------
+FROM ${BASE_IMAGE}
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update --quiet \
+    && apt-get install --no-install-recommends --quiet --yes \
+        ca-certificates \
+        postgresql-client \
+        dumb-init \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY --from=builder /out/mina-bootstrap /usr/local/bin/mina-bootstrap
+
+ENTRYPOINT ["/usr/bin/dumb-init", "/usr/local/bin/mina-bootstrap"]
+CMD ["--help"]

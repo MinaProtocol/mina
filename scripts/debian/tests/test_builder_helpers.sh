@@ -369,6 +369,10 @@ MOCKEXE
     create_mock_exe "default/src/app/dump_slot_ledger/dump_slot_ledger.exe"
     create_mock_exe "default/src/app/mina_graphql_client/mina_graphql_client_app.exe"
 
+    # mina-bootstrap is a Go binary written straight into BUILD_DIR (by
+    # `make build-mina-bootstrap`), not under default/src/...
+    create_mock_exe "mina-bootstrap"
+
     #---------------------------------------------------------------------------
     # Source files under PROJECT_ROOT (referenced via ../ from BUILD_DIR)
     #---------------------------------------------------------------------------
@@ -1111,6 +1115,21 @@ test_build_delegation_verify_deb() {
     assert_file_captured "$CAPTURED_FILES" "etc/mina/aws/authenticate.sh"
 }
 
+test_build_mina_bootstrap_deb() {
+    safe_build build_mina_bootstrap_deb || { log_fail "build exited non-zero"; return; }
+
+    load_captured_state
+    assert_eq "deb name" "mina-bootstrap" "$CAPTURED_DEB_NAME"
+    assert_control_field "$CAPTURED_CONTROL" "Package" "mina-bootstrap"
+    # Static Go binary: depends only on postgresql-client (psql) and
+    # ca-certificates (TLS), NOT the OCaml/C shared libs.
+    assert_control_contains "$CAPTURED_CONTROL" "Depends" "postgresql-client"
+    assert_control_contains "$CAPTURED_CONTROL" "Depends" "ca-certificates"
+    assert_control_no_field "$CAPTURED_CONTROL" "Suggests"
+
+    assert_file_captured "$CAPTURED_FILES" "usr/local/bin/mina-bootstrap"
+}
+
 test_build_prefork_devnet_genesis_ledger_deb() {
     safe_build build_prefork_genesis_ledger_deb devnet || { log_fail "build exited non-zero"; return; }
 
@@ -1327,6 +1346,7 @@ main() {
 
     # Utility packages
     run_test test_build_delegation_verify_deb
+    run_test test_build_mina_bootstrap_deb
 
     # Naming variants
     run_test test_build_daemon_devnet_lightnet_naming

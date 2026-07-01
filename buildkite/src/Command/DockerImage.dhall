@@ -171,6 +171,7 @@ let generateStep =
                   , Archive = ""
                   , TestExecutive = ""
                   , TxTools = ""
+                  , MinaBootstrap = ""
                   , RosettaAppsOnly = ""
                   , RosettaConfig = archCustomSuffix
                   , FunctionalTestSuite = ""

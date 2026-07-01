@@ -441,6 +441,47 @@ build_tx_tools_deb() {
 }
 ## END TX TOOLS PACKAGE ##
 
+## GENERATE MINA-BOOTSTRAP PACKAGE ##
+
+#
+# Builds mina-bootstrap package: the artifact-fetching / setup CLI.
+#
+# Output: mina-bootstrap_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
+# Dependencies: postgresql-client (psql is shelled out to by `archive`)
+#
+# Go-based CLI that automates archive-dump downloads, precomputed block
+# fetches, and other pre-staging steps for Mina node operators. See
+# src/app/bootstrap/README.md and #18842 for design context.
+#
+# Prerequisite: the Go binary must already be built and present at
+# ${BUILD_DIR}/mina-bootstrap. The buildkite pipeline does this in a
+# preceding step (`go build -o ${BUILD_DIR}/mina-bootstrap ./src/app/bootstrap`)
+# before invoking this script.
+#
+build_mina_bootstrap_deb() {
+  # mina-bootstrap is a statically linked Go binary (CGO_ENABLED=0), so it needs
+  # none of the OCaml/C SHARED_DEPS (libssl/libgmp/libgomp/liblmdb). Its only
+  # runtime deps are postgresql-client (the `archive` subcommand shells out to
+  # psql) and ca-certificates (TLS verification for the HTTPS dump/block
+  # downloads) -- matching what Dockerfile-mina-bootstrap installs.
+  create_control_file mina-bootstrap "postgresql-client, ca-certificates" \
+    'Pre-staging CLI for Mina node operators: archive dumps, precomputed blocks, ledgers.'
+
+  mkdir -p "${BUILDDIR}/usr/local/bin"
+
+  # The Go build target (make build-mina-bootstrap) writes the static binary
+  # directly to BUILD_DIR (no dune _build/default/... subtree).
+  if [[ ! -f "./mina-bootstrap" ]]; then
+    echo "Error: ${BUILD_DIR}/mina-bootstrap not found."
+    echo "Build it first with: make build-mina-bootstrap"
+    exit 1
+  fi
+  cp ./mina-bootstrap "${BUILDDIR}/usr/local/bin/mina-bootstrap"
+
+  build_deb mina-bootstrap
+}
+## END MINA-BOOTSTRAP PACKAGE ##
+
 ## GENERATE TEST SUITE PACKAGE ##
 
 #

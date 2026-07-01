@@ -34,6 +34,7 @@ let Tag
       | Jammy
       | Archive
       | Mesa
+      | Bootstrap
       >
 
 let capitalName =
@@ -65,6 +66,7 @@ let capitalName =
             , Jammy = "Jammy"
             , Archive = "Archive"
             , Mesa = "Mesa"
+            , Bootstrap = "Bootstrap"
             }
             tag
 
@@ -97,6 +99,7 @@ let lowerName =
             , Jammy = "jammy"
             , Archive = "archive"
             , Mesa = "mesa"
+            , Bootstrap = "bootstrap"
             }
             tag
 

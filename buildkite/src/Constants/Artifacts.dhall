@@ -22,6 +22,7 @@ let Artifact
       | Archive
       | TestExecutive
       | TxTools
+      | MinaBootstrap
       | RosettaAppsOnly
       | RosettaConfig
       | FunctionalTestSuite
@@ -41,6 +42,7 @@ let All =
       , Artifact.LogProc
       , Artifact.Archive
       , Artifact.TxTools
+      , Artifact.MinaBootstrap
       , Artifact.TestExecutive
       , Artifact.RosettaAppsOnly
       , Artifact.RosettaConfig
@@ -71,6 +73,7 @@ let capitalName =
             , Archive = "Archive"
             , TestExecutive = "TestExecutive"
             , TxTools = "TxTools"
+            , MinaBootstrap = "MinaBootstrap"
             , RosettaAppsOnly = "RosettaAppsOnly"
             , RosettaConfig = "RosettaConfig"
             , DelegationVerifier = "DelegationVerifier"
@@ -94,6 +97,7 @@ let lowerName =
             , Archive = "archive"
             , TestExecutive = "test_executive"
             , TxTools = "tx_tools"
+            , MinaBootstrap = "mina_bootstrap"
             , RosettaAppsOnly = "rosetta_apps_only"
             , RosettaConfig = "rosetta_config"
             , FunctionalTestSuite = "functional_test_suite"
@@ -116,6 +120,7 @@ let dockerServiceName =
             , TestExecutive = "mina-test-executive"
             , LogProc = "mina-logproc"
             , TxTools = "mina-tx-tools"
+            , MinaBootstrap = "mina-bootstrap"
             , RosettaAppsOnly = "mina-rosetta"
             , RosettaConfig = "mina-rosetta-configured"
             , FunctionalTestSuite = "mina-test-suite"
@@ -140,6 +145,7 @@ let dockerName =
             , TestExecutive = dockerServiceName artifact
             , LogProc = dockerServiceName artifact
             , TxTools = dockerServiceName artifact
+            , MinaBootstrap = dockerServiceName artifact
             , RosettaAppsOnly = dockerServiceName artifact
             , RosettaConfig = "mina-rosetta"
             , FunctionalTestSuite = dockerServiceName artifact
@@ -174,6 +180,7 @@ let toDebianName =
             , TestExecutive = "test_executive"
             , TxTools = "tx_tools"
             , RosettaAppsOnly = "rosetta_${Network.lowerName network}"
+            , MinaBootstrap = "mina_bootstrap"
             , RosettaConfig = ""
             , FunctionalTestSuite = "functional_test_suite"
             , Toolchain = ""
@@ -204,6 +211,7 @@ let toDebianNames =
                           , LogProc = [ "logproc" ]
                           , TestExecutive = [ "test_executive" ]
                           , TxTools = [ "tx_tools" ]
+                          , MinaBootstrap = [ "mina_bootstrap" ]
                           , RosettaAppsOnly = [ toDebianName a network ]
                           , RosettaConfig = [ toDebianName a network ]
                           , FunctionalTestSuite = [ "functional_test_suite" ]
@@ -279,6 +287,7 @@ let dockerTag =
                 , LogProc = "${spec.version}"
                 , TestExecutive = "${spec.version}"
                 , TxTools = "${spec.version}"
+                , MinaBootstrap = "${spec.version}"
                 , RosettaConfig =
                     "${spec.version}${network_part}${extraordinary_profile_part}${extra_build_flags_part}"
                 , RosettaAppsOnly =

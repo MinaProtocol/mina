@@ -335,6 +335,18 @@ build-extract-blocks: ocaml_checks ## Build the extract_blocks executable
 		--profile=$(DUNE_PROFILE) \
 		&& echo "✅ Build complete"
 
+.PHONY: build-mina-bootstrap
+build-mina-bootstrap: ## Build the mina-bootstrap Go CLI (no dune / ocaml)
+	$(info 🏗️  Building mina-bootstrap Go CLI)
+	@# mina-bootstrap imports log/slog (Go 1.21+) and modules needing Go >= 1.21,
+	@# but the Bullseye Debian builder image ships Go 1.19. scripts/ensure-go.sh
+	@# selects the system go when it is new enough, otherwise downloads a pinned
+	@# Go >= 1.21 (kept in sync with dockerfiles/Dockerfile-mina-bootstrap).
+	@GO_BIN="$$($(CURDIR)/scripts/ensure-go.sh)" && \
+		cd src/app/bootstrap && \
+		CGO_ENABLED=0 GOOS=linux "$$GO_BIN" build -trimpath -ldflags="-s -w" -o "$(CURDIR)/_build/mina-bootstrap" . && \
+		echo "✅ mina-bootstrap built at $(CURDIR)/_build/mina-bootstrap"
+
 .PHONY: build-archive-blocks
 build-archive-blocks: ocaml_checks ## Build the archive_blocks executable
 	$(info 🏗️  Building archive_blocks with profile $(DUNE_PROFILE) and commit $(GITLONGHASH))
