@@ -10,18 +10,10 @@
     , arm64 =
         "europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/mina-toolchain:f009c00-bookworm-devnet-arm64"
     }
-, minaToolchainBullseye =
-    { amd64 =
-        "europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/mina-toolchain:f009c00-bullseye-devnet"
-    , arm64 =
-        "europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/mina-toolchain:f009c00-bullseye-devnet-arm64"
-    }
-, minaToolchainNoble =
-    { amd64 =
-        "europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/mina-toolchain:f009c00-noble-devnet"
-    , arm64 =
-        "europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/mina-toolchain:f009c00-noble-devnet-arm64"
-    }
+, minaToolchainBullseye.amd64 =
+    "europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/mina-toolchain:f009c00-bullseye-devnet"
+, minaToolchainNoble.amd64 =
+    "europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/mina-toolchain:f009c00-noble-devnet"
 , minaToolchainJammy.amd64 =
     "europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/mina-toolchain:f009c00-jammy-devnet"
 , minaToolchain =

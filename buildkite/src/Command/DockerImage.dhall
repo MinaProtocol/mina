@@ -214,19 +214,7 @@ let generateStep =
 
           let pruneDockerImages =
                     "if [ -z \"\\\${SKIP_DOCKER_PRUNE:-}\" ]; then "
-                ++  "docker system prune --all --force "
-                ++  merge
-                      { Arm64 = ""
-                      , XLarge = "--filter until=24h"
-                      , Large = "--filter until=24h"
-                      , Medium = "--filter until=24h"
-                      , Small = "--filter until=24h"
-                      , Integration = "--filter until=24h"
-                      , QA = "--filter until=24h"
-                      , Multi = "--filter until=24h"
-                      , Perf = "--filter until=24h"
-                      }
-                      spec.size
+                ++  "docker system prune --all --force --filter until=24h"
                 ++  "; else echo 'Skipping docker prune due to SKIP_DOCKER_PRUNE'; fi"
 
           let loadOnlyArg =
@@ -299,7 +287,7 @@ let generateStep =
                   spec.deb_repo
 
           let target =
-                merge { Arm64 = Size.Arm64, Amd64 = Size.XLarge } spec.arch
+                merge { Arm64 = Size.XLarge, Amd64 = Size.XLarge } spec.arch
 
           in  Command.build
                 Command.Config::{
