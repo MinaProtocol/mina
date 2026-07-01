@@ -1996,31 +1996,51 @@ module User_command = struct
         (ps : Zkapp_command.t) =
       let open Deferred.Result.Let_syntax in
       let zkapp_command = Zkapp_command.to_simple ps in
-      let%bind zkapp_fee_payer_body_id =
-        Metrics.time ~label:"Zkapp_fee_payer_body.add" ~logger
-        @@ fun () ->
-        Zkapp_fee_payer_body.add_if_doesn't_exist
-          (module Conn)
-          zkapp_command.fee_payer.body
-      in
-      let%bind zkapp_account_updates_ids =
-        Metrics.time ~label:"Zkapp_account_update.add" ~logger
-        @@ fun () ->
-        Mina_caqti.deferred_result_list_map zkapp_command.account_updates
-          ~f:(Zkapp_account_update.add_if_doesn't_exist ~logger (module Conn))
-        >>| Array.of_list
-      in
-      let memo = ps.memo |> Signed_command_memo.to_base58_check in
-      let hash =
+      let transaction_hash =
         Transaction_hash.hash_zkapp_command_with_hashes ps
-        |> Transaction_hash.to_base58_check
       in
-      Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
-        ~table_name:"zkapp_commands" ~cols:(Fields.names, typ)
-        ~tannot:(function
-          | "zkapp_account_updates_ids" -> Some "int[]" | _ -> None )
-        (module Conn)
-        { zkapp_fee_payer_body_id; zkapp_account_updates_ids; memo; hash }
+      (* Look up by hash first. If the same tx was already archived — for
+         example, because a competing fork's block referenced it during a
+         reorg — return the existing id instead of attempting an INSERT.
+         Without this pre-check, `select_insert_into_cols` below would
+         run a SELECT keyed on the full record (zkapp_fee_payer_body_id,
+         zkapp_account_updates_ids, memo, hash); reorgs cause the
+         zkapp_account_updates_ids array to differ between the two blocks
+         even for the same tx (because Zkapp_account_update.add_if_doesn't_exist
+         allocates row ids in insertion order), so the SELECT misses and
+         we fall through to the INSERT, which then dies on the
+         zkapp_commands_hash_key UNIQUE constraint. That exception aborts
+         the entire block-archive transaction, causes mina-archive to log
+         "Failed to archive block" and drop the canonical block on the
+         floor, leaving every subsequent block with parent_id = NULL and
+         permanently stalling chain_status canonicalization. *)
+      let%bind existing_id = find_opt (module Conn) ~transaction_hash in
+      match existing_id with
+      | Some id ->
+          return id
+      | None ->
+          let%bind zkapp_fee_payer_body_id =
+            Metrics.time ~label:"Zkapp_fee_payer_body.add" ~logger
+            @@ fun () ->
+            Zkapp_fee_payer_body.add_if_doesn't_exist
+              (module Conn)
+              zkapp_command.fee_payer.body
+          in
+          let%bind zkapp_account_updates_ids =
+            Metrics.time ~label:"Zkapp_account_update.add" ~logger
+            @@ fun () ->
+            Mina_caqti.deferred_result_list_map zkapp_command.account_updates
+              ~f:(Zkapp_account_update.add_if_doesn't_exist ~logger (module Conn))
+            >>| Array.of_list
+          in
+          let memo = ps.memo |> Signed_command_memo.to_base58_check in
+          let hash = Transaction_hash.to_base58_check transaction_hash in
+          Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
+            ~table_name:"zkapp_commands" ~cols:(Fields.names, typ)
+            ~tannot:(function
+              | "zkapp_account_updates_ids" -> Some "int[]" | _ -> None )
+            (module Conn)
+            { zkapp_fee_payer_body_id; zkapp_account_updates_ids; memo; hash }
   end
 
   let via (t : User_command.t) : [ `Zkapp_command | `Ident ] =
