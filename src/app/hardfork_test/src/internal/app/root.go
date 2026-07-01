@@ -1,6 +1,8 @@
 package app
 
 import (
+	"fmt"
+
 	"github.com/MinaProtocol/mina/src/app/hardfork_test/src/internal/config"
 	"github.com/MinaProtocol/mina/src/app/hardfork_test/src/internal/hardfork"
 	"github.com/spf13/cobra"
@@ -32,12 +34,18 @@ Example:
     --fork-mina-exe /path/to/mina-fork --fork-runtime-genesis-ledger /path/to/runtime_genesis_ledger-fork
 `,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		// Validate required arguments
+		if !cfg.UnstakingTest {
+			if cmd.Flags().Changed("inactive-stake-portion") {
+				return fmt.Errorf("--inactive-stake-portion requires --unstaking-test")
+			}
+			if cmd.Flags().Changed("num-dormant-whales") {
+				return fmt.Errorf("--num-dormant-whales requires --unstaking-test")
+			}
+		}
 		if err := cfg.Validate(); err != nil {
 			return err
 		}
 
-		// Create and run the hardfork test
 		return hardfork.NewHardforkTest(cfg).Run()
 	},
 }
