@@ -143,50 +143,68 @@ module Base
         ; throttle
         ; on_push
         ; log_gossip_heard
-        } ->
+        } -> (
         O1trace.sync_thread (sprintf "handle_%s_gossip" trace_label)
         @@ fun () ->
-        let%bind () = on_push () in
-        let env' = Msg.convert msg in
-        let cb' = Msg.convert_callback cb in
-        Diff.log_internal ~logger "received" env' ;
-        ( match cb' with
-        | BC.External cb'' ->
-            Diff.update_metrics env' cb'' ~log_gossip_heard ~logger ;
+        (* Handle a gossiped pool diff inside an exception boundary. Some steps
+           run before [Diff.verify] (e.g. [log_internal] renders each command,
+           which can raise on a malformed memo), and this receive path has no
+           ambient exception handler, so catch here and drop the message. *)
+        let handle () =
+          let%bind () = on_push () in
+          let env' = Msg.convert msg in
+          let cb' = Msg.convert_callback cb in
+          Diff.log_internal ~logger "received" env' ;
+          ( match cb' with
+          | BC.External cb'' ->
+              Diff.update_metrics env' cb'' ~log_gossip_heard ~logger ;
+              don't_wait_for
+                ( match%map Mina_net2.Validation_callback.await cb'' with
+                | None ->
+                    let diff = Envelope.Incoming.data env' in
+                    [%log error]
+                      !"Validation timed out on %s"
+                      Diff.label
+                      ~metadata:[ ("diff", `String (Diff.summary diff)) ]
+                | Some _ ->
+                    () )
+          | _ ->
+              () ) ;
+          if Throttle.num_jobs_waiting_to_start throttle > max_waiting_jobs then (
+            Diff.log_internal ~logger "rejected" ~reason:"throttle_full" env' ;
+            [%log warn] "Ignoring push to %s: throttle is full" trace_label )
+          else
             don't_wait_for
-              ( match%map Mina_net2.Validation_callback.await cb'' with
-              | None ->
-                  let diff = Envelope.Incoming.data env' in
-                  [%log error]
-                    !"Validation timed out on %s"
-                    Diff.label
-                    ~metadata:[ ("diff", `String (Diff.summary diff)) ]
-              | Some _ ->
-                  () )
-        | _ ->
-            () ) ;
-        if Throttle.num_jobs_waiting_to_start throttle > max_waiting_jobs then (
-          Diff.log_internal ~logger "rejected" ~reason:"throttle_full" env' ;
-          [%log warn] "Ignoring push to %s: throttle is full" trace_label )
-        else
-          don't_wait_for
-            (Throttle.enqueue throttle (fun () ->
-                 match%bind
-                   verify_impl ~logger ~trace_label pool rl env' cb'
-                 with
-                 | None ->
-                     [%log debug] "Received unverified gossip on %s" trace_label
-                       ~metadata:
-                         [ ("sender", Envelope.Sender.to_yojson env'.sender)
-                         ; ( "received_at"
-                           , `String (Time.to_string env'.received_at) )
-                         ] ;
-                     Deferred.unit
-                 | Some verified_env ->
-                     let m' = wrap (verified_env, cb') in
-                     Option.value ~default:Deferred.unit
-                       (Strict_pipe.Writer.write w m') ) ) ;
-        Deferred.unit
+              (Throttle.enqueue throttle (fun () ->
+                   match%bind
+                     verify_impl ~logger ~trace_label pool rl env' cb'
+                   with
+                   | None ->
+                       [%log debug] "Received unverified gossip on %s"
+                         trace_label
+                         ~metadata:
+                           [ ("sender", Envelope.Sender.to_yojson env'.sender)
+                           ; ( "received_at"
+                             , `String (Time.to_string env'.received_at) )
+                           ] ;
+                       Deferred.unit
+                   | Some verified_env ->
+                       let m' = wrap (verified_env, cb') in
+                       Option.value ~default:Deferred.unit
+                         (Strict_pipe.Writer.write w m') ) ) ;
+          Deferred.unit
+        in
+        match%map Monitor.try_with ~run:`Now ~rest:`Log handle with
+        | Ok () ->
+            ()
+        | Error exn ->
+            [%log error]
+              "Dropping gossiped diff: uncaught exception during \
+               pre-verification handling: $error"
+              ~metadata:
+                [ ("error", `String (Exn.to_string exn))
+                ; ("label", `String trace_label)
+                ] )
     | Void ->
         Deferred.unit
 
