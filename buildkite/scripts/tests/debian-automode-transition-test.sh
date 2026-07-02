@@ -155,7 +155,6 @@ log_info "=== Step 2: Create versioned package variants ==="
 ORIG_DAEMON_DEB=$(ls "${DEB_DIR}"/${PKG_DAEMON}_*.deb | head -1)
 ORIG_AUTOMODE_DEB=$(ls "${DEB_DIR}"/${PKG_AUTOMODE}_*.deb | head -1)
 ORIG_CONFIG_DEB=$(ls "${DEB_DIR}"/${PKG_CONFIG}_*.deb | head -1)
-ORIG_PROFILE_DEB=$(ls "${DEB_DIR}"/${PKG_PROFILE}_*.deb | head -1)
 ORIG_POSTFORK_DEB=$(ls "${DEB_DIR}"/${PKG_POSTFORK}_*.deb | head -1)
 ORIG_LOGPROC_DEB=$(ls "${DEB_DIR}"/mina-logproc_*.deb | head -1)
 
