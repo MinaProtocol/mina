@@ -300,6 +300,20 @@ on-exit() {
       if [[ -n "${SEED_PID}" ]]; then
         stop-node "seed" "$SEED_START_PORT"
       fi
+
+      # 4. stop the archive node, if we've spawned it. It has no GraphQL
+      # stop-daemon endpoint and does not exit on the INT/TERM delivered to the
+      # process group, so kill it explicitly (TERM, then KILL as a fallback)
+      # to avoid leaking it -- and, downstream, its PostgreSQL connection.
+      if [[ -n "${ARCHIVE_PID}" ]] && kill -0 "${ARCHIVE_PID}" 2>/dev/null; then
+        echo "Killing Archive node at ${ARCHIVE_PID}"
+        kill "${ARCHIVE_PID}" 2>/dev/null
+        for _ in 1 2 3 4 5; do
+          kill -0 "${ARCHIVE_PID}" 2>/dev/null || break
+          sleep 1
+        done
+        kill -9 "${ARCHIVE_PID}" 2>/dev/null || true
+      fi
       ;;
     kill_snark_workers)
       # NOTE: SNARK workers are already killed out of this case-statement. Hence

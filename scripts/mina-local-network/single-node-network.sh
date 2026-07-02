@@ -43,6 +43,15 @@ VALUE_TRANSFERS=true
 # daemon's ~weekly self-restart (mina default --stop-time 168h) by setting it to
 # 5 years. Override with --stop-time-hours (e.g. 168 to restore the default).
 STOP_TIME_HOURS=43800
+# Archive node. When --archive is passed, an archive node is spawned alongside
+# the network (via mina-local-network.sh -ap) and the seed daemon streams its
+# blocks to it. The PostgreSQL connection is taken from the PG_* environment
+# variables read by mina-local-network.sh (single-node-load.sh brings up an
+# ephemeral cluster and exports them); run PostgreSQL yourself when invoking this
+# script directly with --archive.
+ARCHIVE=false
+ARCHIVE_PORT=3086
+ARCHIVE_EXE_ARG=""
 EXTRA_ARGS=()
 
 help() {
@@ -67,6 +76,15 @@ Usage: $(basename "$0") [--fast | --no-proofs] [--epoch-min <#>] [--mina-exe <pa
                   | When not provided, mina is built with nix (flake package
                   | '#devnet', as in scripts/hardfork/build-and-test.sh) and the
                   | resulting binary is used.
+--archive         | Spawn an archive node and stream the seed daemon's blocks to
+                  | it. Requires a reachable PostgreSQL; the connection is read
+                  | from the PG_* env vars (PG_HOST/PG_PORT/PG_USER/PG_PW/PG_DB)
+                  | that mina-local-network.sh consults. single-node-load.sh
+                  | starts an ephemeral cluster and exports these for you.
+--archive-port <#>| Archive node server port (default: ${ARCHIVE_PORT}).
+--archive-exe <path> | Path to a mina-archive executable. When not provided (and
+                  | --archive is set), it is built with nix ('#devnet.archive').
+                  | Required if --mina-exe is given, since no nix build happens then.
 --no-value-transfers | Do not send periodic value-transfer transactions. Useful
                   | when an external load (e.g. ITN scheduler) keeps the
                   | blocks full instead.
@@ -122,6 +140,25 @@ while [[ "$#" -gt 0 ]]; do
     ;;
   --no-value-transfers)
     VALUE_TRANSFERS=false
+    ;;
+  --archive)
+    ARCHIVE=true
+    ;;
+  --archive-port)
+    if [[ "$#" -lt 2 ]]; then
+      echo "Error: --archive-port requires an argument." >&2
+      exit 1
+    fi
+    ARCHIVE_PORT="${2}"
+    shift
+    ;;
+  --archive-exe)
+    if [[ "$#" -lt 2 ]]; then
+      echo "Error: --archive-exe requires an argument." >&2
+      exit 1
+    fi
+    ARCHIVE_EXE_ARG="${2}"
+    shift
     ;;
   -h | --help)
     help
@@ -220,6 +257,7 @@ EPOCH_ACTUAL_MIN="$(( EPOCH_CENTIMIN / 100 )).$(printf '%02d' "$(( EPOCH_CENTIMI
 
 # Resolve the mina executable: use the one provided via --mina-exe, otherwise
 # build it with nix the same way scripts/hardfork/build-and-test.sh does.
+NIX_OPTS=( --accept-flake-config --experimental-features 'nix-command flakes' )
 if [[ -n "${MINA_EXE_ARG}" ]]; then
   if [[ ! -x "${MINA_EXE_ARG}" ]]; then
     echo "Error: --mina-exe '${MINA_EXE_ARG}' does not exist or is not executable." >&2
@@ -228,7 +266,6 @@ if [[ -n "${MINA_EXE_ARG}" ]]; then
   MINA_EXE="$(realpath "${MINA_EXE_ARG}")"
 else
   echo "No --mina-exe provided; building mina with nix (this may take a while)..."
-  NIX_OPTS=( --accept-flake-config --experimental-features 'nix-command flakes' )
   git -C "${REPO_ROOT}" submodule update --init --recursive --depth 1
   nix "${NIX_OPTS[@]}" build "${REPO_ROOT}?submodules=1#devnet" \
     --out-link "${REPO_ROOT}/single-node-devnet"
@@ -236,6 +273,31 @@ else
 fi
 export MINA_EXE
 echo "Using mina executable: ${MINA_EXE}"
+
+# Resolve the archive executable when --archive is set. mina-local-network.sh
+# defaults ARCHIVE_EXE to a dune-built path that does not exist for nix runs, so
+# resolve it here and export it. The '#devnet.archive' flake output provides the
+# 'mina-archive' binary (src/app/archive/archive.exe), the same one the docker
+# archive image and the hardfork archive test use.
+if ${ARCHIVE}; then
+  if [[ -n "${ARCHIVE_EXE_ARG}" ]]; then
+    if [[ ! -x "${ARCHIVE_EXE_ARG}" ]]; then
+      echo "Error: --archive-exe '${ARCHIVE_EXE_ARG}' does not exist or is not executable." >&2
+      exit 1
+    fi
+    ARCHIVE_EXE="$(realpath "${ARCHIVE_EXE_ARG}")"
+  elif [[ -n "${MINA_EXE_ARG}" ]]; then
+    echo "Error: --archive with --mina-exe also requires --archive-exe <path to mina-archive>." >&2
+    exit 1
+  else
+    echo "No --archive-exe provided; building the archive node with nix (this may take a while)..."
+    nix "${NIX_OPTS[@]}" build "${REPO_ROOT}?submodules=1#devnet.archive" \
+      --out-link "${REPO_ROOT}/single-node-devnet-archive"
+    ARCHIVE_EXE="${REPO_ROOT}/single-node-devnet-archive/bin/mina-archive"
+  fi
+  export ARCHIVE_EXE
+  echo "Using archive executable: ${ARCHIVE_EXE}"
+fi
 
 echo "Starting single-node network with preset: ${PRESET}"
 echo "Slot time: ${SLOT_TIME_MS}ms (48 slots/epoch -> epoch ~${EPOCH_ACTUAL_MIN} min)"
@@ -268,6 +330,16 @@ if ${VALUE_TRANSFERS}; then
   VALUE_TRANSFER_ARGS=(-vt -ti "${TRANSACTION_INTERVAL}")
 fi
 
+# Enabling the archive is a matter of handing mina-local-network.sh a non-empty
+# archive server port (-ap): it then recreates the PostgreSQL schema (reset
+# mode), spawns the archive node with --config-file "${ROOT}/daemon.json" (so it
+# runs add_genesis_accounts over the genesis ledger) and passes
+# -archive-address to the seed daemon so blocks are streamed to it.
+ARCHIVE_NET_ARGS=()
+if ${ARCHIVE}; then
+  ARCHIVE_NET_ARGS=(-ap "${ARCHIVE_PORT}")
+fi
+
 exec "${SCRIPT_DIR}/mina-local-network.sh" \
   -c reset \
   -u delay_sec:120 \
@@ -279,6 +351,7 @@ exec "${SCRIPT_DIR}/mina-local-network.sh" \
   -stopt "${STOP_TIME_HOURS}" \
   -sf 0.001 \
   "${VALUE_TRANSFER_ARGS[@]}" \
+  "${ARCHIVE_NET_ARGS[@]}" \
   -w 1 -f 0 -n 0 \
   --seed-is-whale \
   --seed-is-coordinator \

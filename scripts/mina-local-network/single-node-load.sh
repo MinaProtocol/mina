@@ -61,6 +61,24 @@ SEED_BASE_PORT=3000
 MEMO_PREFIX="load"
 RENEW_WINDOW_MIN=60
 PAYMENT_AMOUNT="1000000000"
+# Archive node. --archive brings up an ephemeral PostgreSQL cluster (torn down
+# with this script) and tells single-node-network.sh to spawn an archive node
+# that ingests the seed daemon's blocks.
+ARCHIVE=false
+ARCHIVE_PORT=3086
+ARCHIVE_EXE_ARG=""
+# A dedicated PG port/user/db for the ephemeral cluster, kept off the default
+# 5432 so it never clashes with a pre-existing local PostgreSQL. The role is
+# 'postgres' on purpose: mina-local-network.sh's recreate-schema issues its
+# DROP/CREATE DATABASE over a URI with NO database path, which libpq resolves to
+# a database named after the role -- and initdb always creates a 'postgres'
+# database, so that maintenance connection lands somewhere that exists (a role
+# named after the OS user would have no matching database and fail).
+ARCHIVE_PG_PORT=5433
+ARCHIVE_PG_USER="postgres"
+ARCHIVE_PG_DB="archive"
+ARCHIVE_PG_DATA=""
+NET_PID=""
 EXTRA_ARGS=()
 
 help() {
@@ -89,6 +107,17 @@ Usage: $(basename "$0") (--duration-min <#> | --indefinite) [options] [-- <extra
 --num-zkapps <#>        | (--zkapps only) zkApp accounts to deploy upfront.
                         |   Default: ${NUM_ZKAPPS}
 --mina-exe <path>       | Mina executable; built with nix when not provided.
+--archive               | Also run an archive node. Brings up an ephemeral local
+                        | PostgreSQL cluster (fresh datadir on port
+                        | ${ARCHIVE_PG_PORT}, stopped and removed when this
+                        | script exits) and passes --archive to
+                        | single-node-network.sh so the seed daemon streams its
+                        | blocks into the archive DB.
+--archive-port <#>      | Archive node server port (default: ${ARCHIVE_PORT}).
+--archive-exe <path>    | mina-archive executable; built with nix when not
+                        | provided (needed when --mina-exe is also given).
+--pg-port <#>           | Port for the ephemeral archive PostgreSQL cluster.
+                        |   Default: ${ARCHIVE_PG_PORT}
 --root <path>           | Network root directory.
                         |   Default: ${NETWORK_ROOT}
 -h                      | Show this help.
@@ -134,6 +163,21 @@ while [[ "$#" -gt 0 ]]; do
     ;;
   --mina-exe)
     MINA_EXE_ARG="${2}"
+    shift
+    ;;
+  --archive)
+    ARCHIVE=true
+    ;;
+  --archive-port)
+    ARCHIVE_PORT="${2}"
+    shift
+    ;;
+  --archive-exe)
+    ARCHIVE_EXE_ARG="${2}"
+    shift
+    ;;
+  --pg-port)
+    ARCHIVE_PG_PORT="${2}"
     shift
     ;;
   --root)
@@ -370,22 +414,83 @@ export ITN_FEATURES=1
 MINA_EXE_ARGS=()
 [[ -n "${MINA_EXE_ARG}" ]] && MINA_EXE_ARGS=(--mina-exe "${MINA_EXE_ARG}")
 
-"${SCRIPT_DIR}/single-node-network.sh" \
-  "${PRESET_ARGS[@]}" \
-  "${MINA_EXE_ARGS[@]}" \
-  --no-value-transfers \
-  "${EXTRA_ARGS[@]}" \
-  -r "${NETWORK_ROOT}" \
-  --itn-keys "${ITN_PUB}" &
-NET_PID=$!
-
+# cleanup tears down everything this script owns: the network process tree and,
+# if we started one, the ephemeral archive PostgreSQL cluster (server + datadir).
+# Defined and trapped BEFORE anything is spawned so an early failure cannot leak
+# a running postgres.
 cleanup() {
   if [[ -n "${NET_PID}" ]] && kill -0 "${NET_PID}" 2>/dev/null; then
     kill -TERM "${NET_PID}" 2>/dev/null || true
     wait "${NET_PID}" 2>/dev/null || true
   fi
+  if [[ -n "${ARCHIVE_PG_DATA}" && -f "${ARCHIVE_PG_DATA}/postmaster.pid" ]]; then
+    echo "Stopping ephemeral archive PostgreSQL..."
+    pg_ctl -D "${ARCHIVE_PG_DATA}" -m immediate stop >/dev/null 2>&1 || true
+  fi
+  [[ -n "${ARCHIVE_PG_DATA}" && -d "${ARCHIVE_PG_DATA}" ]] && rm -rf "${ARCHIVE_PG_DATA}" 2>/dev/null || true
 }
 trap cleanup EXIT INT TERM
+
+# Bring up a throwaway local PostgreSQL for the archive node: a fresh datadir on
+# a dedicated port, listening on TCP 127.0.0.1 (the archive connects via a TCP
+# URI), trust auth (no password needed for local dev). The PG_* environment it
+# exports is what mina-local-network.sh reads to recreate the schema and point
+# the archive node at this cluster. It is stopped and deleted by cleanup().
+start_archive_postgres() {
+  if ! command -v pg_ctl >/dev/null 2>&1 || ! command -v initdb >/dev/null 2>&1 \
+     || ! command -v psql >/dev/null 2>&1; then
+    if command -v nix-shell >/dev/null 2>&1; then
+      echo "postgres tools not on PATH; materializing them via nix-shell..."
+      local pgbin
+      pgbin=$(nix-shell --packages postgresql --run 'dirname "$(command -v pg_ctl)"')
+      PATH="${pgbin}:${PATH}"
+      export PATH
+    else
+      echo "Error: postgres tools (initdb/pg_ctl/psql) not found and nix-shell is unavailable." >&2
+      echo "Get them with: nix-shell -p postgresql" >&2
+      exit 1
+    fi
+  fi
+
+  ARCHIVE_PG_DATA=$(mktemp -d -t mina-archive-pg.XXXXXX)
+  local pg_log="${ARCHIVE_PG_DATA}/postgres.log"
+  echo "Initializing ephemeral archive PostgreSQL in ${ARCHIVE_PG_DATA} (port ${ARCHIVE_PG_PORT})..."
+  initdb -D "${ARCHIVE_PG_DATA}" -U "${ARCHIVE_PG_USER}" --auth=trust >/dev/null
+
+  # -w waits until the server is accepting connections; the unix socket lives in
+  # the datadir and only 127.0.0.1 is opened so we never clash with the loopback
+  # of any other cluster.
+  pg_ctl -D "${ARCHIVE_PG_DATA}" -l "${pg_log}" -w start \
+    -o "-p ${ARCHIVE_PG_PORT} -k ${ARCHIVE_PG_DATA} -c listen_addresses=127.0.0.1"
+
+  # mina-local-network.sh reads the password from PG_PW (PG_PASSWD=${PG_PW:-""})
+  # and the rest directly from these names.
+  export PG_HOST=127.0.0.1
+  export PG_PORT="${ARCHIVE_PG_PORT}"
+  export PG_USER="${ARCHIVE_PG_USER}"
+  export PG_PW=""
+  export PG_DB="${ARCHIVE_PG_DB}"
+  echo "Ephemeral archive PostgreSQL ready at postgresql://${PG_USER}@${PG_HOST}:${PG_PORT}/${PG_DB}"
+}
+
+# Forward the archive setup to single-node-network.sh, and start postgres first
+# so the schema recreation at network startup finds a live cluster.
+ARCHIVE_ARGS=()
+if ${ARCHIVE}; then
+  start_archive_postgres
+  ARCHIVE_ARGS=(--archive --archive-port "${ARCHIVE_PORT}")
+  [[ -n "${ARCHIVE_EXE_ARG}" ]] && ARCHIVE_ARGS+=(--archive-exe "${ARCHIVE_EXE_ARG}")
+fi
+
+"${SCRIPT_DIR}/single-node-network.sh" \
+  "${PRESET_ARGS[@]}" \
+  "${MINA_EXE_ARGS[@]}" \
+  "${ARCHIVE_ARGS[@]}" \
+  --no-value-transfers \
+  "${EXTRA_ARGS[@]}" \
+  -r "${NETWORK_ROOT}" \
+  --itn-keys "${ITN_PUB}" &
+NET_PID=$!
 
 network_died() {
   if ! kill -0 "${NET_PID}" 2>/dev/null; then
