@@ -561,11 +561,17 @@ let zkapp_command_to_transaction ~proof_cache_db ~logger ~pool
   @@ Mina_transaction.Transaction.Command
        (User_command.Zkapp_command zkapp_command)
 
-let find_canonical_chain ~logger pool slot =
+let find_canonical_chain ~logger pool height =
   (* find longest canonical chain
-     a slot may represent several blocks, only one of which can be on canonical chain
-     starting with max slot, look for chain, decrementing slot until chain found
-  *)
+     a height may represent several blocks, only one of which can be on canonical chain
+     starting with max height, look for chain, decrementing height until chain found
+
+     NB: we search by blockchain HEIGHT, not global_slot_since_genesis. Across a
+     hard fork the slot counter may be rebased backward (e.g. mesa1 -> mesa2, whose
+     genesis slot is below the last pre-fork block), so the block with the greatest
+     global slot can belong to an EARLIER era's (rolled-back) branch. Height is
+     monotonic across forks, so the greatest-height block is always the true chain
+     tip regardless of slot rebasing. *)
   let query_db = Mina_caqti.query pool in
   let find_state_hash_chain state_hash =
     match%map query_db ~f:(fun db -> Sql.Block.get_chain db state_hash) with
@@ -577,27 +583,27 @@ let find_canonical_chain ~logger pool slot =
         Some state_hash
   in
   let%bind state_hashes =
-    query_db ~f:(fun db -> Sql.Block.get_state_hashes_by_slot db slot)
+    query_db ~f:(fun db -> Sql.Block.get_state_hashes_by_height db height)
   in
   Deferred.List.find_map state_hashes ~f:find_state_hash_chain
 
-let try_slot ~logger pool slot =
+let try_height ~logger pool height =
   let num_tries = 5 in
-  let rec go ~slot ~tries_left =
+  let rec go ~height ~tries_left =
     if tries_left <= 0 then (
-      [%log fatal] "Could not find canonical chain after trying %d slots"
+      [%log fatal] "Could not find canonical chain after trying %d heights"
         num_tries ;
       Core_kernel.exit 1 ) ;
-    match%bind find_canonical_chain ~logger pool slot with
+    match%bind find_canonical_chain ~logger pool height with
     | None ->
-        go ~slot:(Int64.pred slot) ~tries_left:(tries_left - 1)
+        go ~height:(Int64.pred height) ~tries_left:(tries_left - 1)
     | Some state_hash ->
         [%log spam]
-          "Found possible canonical chain to target state hash %s at slot %Ld"
-          state_hash slot ;
+          "Found possible canonical chain to target state hash %s at height %Ld"
+          state_hash height ;
         return state_hash
   in
-  go ~slot ~tries_left:num_tries
+  go ~height ~tries_left:num_tries
 
 let write_replayer_checkpoint ~logger ~ledger ~last_global_slot_since_genesis
     ~max_canonical_slot ~checkpoint_output_folder_opt ~checkpoint_file_prefix =
@@ -998,12 +1004,11 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
         | None ->
             [%log info]
               "Searching for block with greatest height on canonical chain" ;
-            let%bind max_slot =
-              query_db ~f:(fun db -> Sql.Block.get_max_slot db ())
+            let%bind max_height =
+              query_db ~f:(fun db -> Sql.Block.get_max_height db ())
             in
-            [%log info] "Maximum global slot since genesis in blocks is %Ld"
-              max_slot ;
-            try_slot ~logger pool max_slot
+            [%log info] "Maximum block height in blocks is %Ld" max_height ;
+            try_height ~logger pool max_height
       in
       if not @@ List.is_empty input.first_pass_ledger_hashes then (
         [%log info] "Populating set of first-pass ledger hashes" ;
@@ -1021,6 +1026,40 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
             let block_infos =
               filter_block_infos_for_hard_fork ~logger ~target_state_hash
                 ~hard_fork_params_opt block_infos
+            in
+            (* Isolate the replay target's hard-fork era. The parent-ancestry
+               chain can span multiple hard forks; when a fork rebases the slot
+               counter backward (e.g. mesa1 -> mesa2, whose genesis slot is below
+               the last pre-fork block), the eras' global_slot_since_genesis
+               ranges OVERLAP. Two blocks then share a global_slot_since_genesis
+               and the gsg-keyed global_slot_hashes_tbl below would collide. A
+               block's era is identified by
+                 era = global_slot_since_genesis - global_slot_since_hard_fork
+               (the era's genesis global slot). Keep only the target's era. *)
+            let era_of (bi : Sql.Block_info.t) =
+              Int64.( - ) bi.global_slot_since_genesis
+                bi.global_slot_since_hard_fork
+            in
+            let block_infos =
+              match
+                List.find block_infos ~f:(fun bi ->
+                    String.equal bi.state_hash target_state_hash )
+              with
+              | Some target_bi ->
+                  let era = era_of target_bi in
+                  let kept, dropped =
+                    List.partition_tf block_infos ~f:(fun bi ->
+                        Int64.equal (era_of bi) era )
+                  in
+                  if not (List.is_empty dropped) then
+                    [%log info]
+                      "Restricting replay to hard-fork era (genesis global \
+                       slot %Ld); dropped %d ancestor block(s) belonging to \
+                       earlier hard-fork era(s) with overlapping global slots"
+                      era (List.length dropped) ;
+                  kept
+              | None ->
+                  block_infos
             in
             let ({ id = oldest_block_id; _ } : Sql.Block_info.t) =
               Option.value_exn
@@ -1046,13 +1085,42 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
                         Sql.Snarked_ledger_hashes.run db snarked_ledger_hash_id )
                   in
 
-                  Hashtbl.add_exn global_slot_hashes_tbl
-                    ~key:global_slot_since_genesis
-                    ~data:
-                      ( State_hash.of_base58_check_exn state_hash
-                      , Ledger_hash.of_base58_check_exn ledger_hash
-                      , Frozen_ledger_hash.of_base58_check_exn snarked_hash
-                      , global_slot_since_hard_fork ) )
+                  match
+                    Hashtbl.add global_slot_hashes_tbl
+                      ~key:global_slot_since_genesis
+                      ~data:
+                        ( State_hash.of_base58_check_exn state_hash
+                        , Ledger_hash.of_base58_check_exn ledger_hash
+                        , Frozen_ledger_hash.of_base58_check_exn snarked_hash
+                        , global_slot_since_hard_fork )
+                  with
+                  | `Ok ->
+                      ()
+                  | `Duplicate ->
+                      (* Two blocks in the chain-to-target share this
+                         global_slot_since_genesis. This means the archive spans
+                         multiple hard forks whose slot ranges overlap and the
+                         era-isolation filter above did not collapse them to one
+                         era -- fail with an actionable message instead of a raw
+                         Hashtbl.add_exn backtrace. *)
+                      [%log fatal]
+                        "Two blocks share global_slot_since_genesis %Ld in the \
+                         chain leading to the replay target. The archive spans \
+                         multiple hard forks whose global-slot ranges overlap; \
+                         the replayer can only process one hard-fork era per \
+                         run. Replay each era separately (set start_slot / \
+                         --stop-slot-config-file to the era of interest)."
+                        global_slot_since_genesis
+                        ~metadata:
+                          [ ( "global_slot_since_genesis"
+                            , `String
+                                (Int64.to_string global_slot_since_genesis) )
+                          ; ("state_hash", `String state_hash)
+                          ; ( "global_slot_since_hard_fork"
+                            , `String
+                                (Int64.to_string global_slot_since_hard_fork) )
+                          ] ;
+                      Core_kernel.exit 1 )
             in
             return (Int.Set.of_list ids, oldest_block_id) )
       in
