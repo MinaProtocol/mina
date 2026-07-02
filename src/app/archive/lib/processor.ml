@@ -1553,11 +1553,8 @@ module Zkapp_events = struct
             (* if there's no fields, then we must have some list of empty lists *)
             return @@ List.map field_list_list ~f:(fun _ -> [])
         in
-        (* this conversion should be done by caqti using `typ`, FIX this in the future *)
         let field_array_list =
-          List.map field_id_list_list ~f:(fun id_list ->
-              List.map id_list ~f:Int.to_string
-              |> String.concat ~sep:", " |> sprintf "{%s}" )
+          List.map field_id_list_list ~f:Array.of_list
         in
         let%map field_array_map =
           Mina_caqti.insert_multi_into_col ~table_name:"zkapp_field_array"
