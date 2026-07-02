@@ -590,7 +590,6 @@ test_build_daemon_mainnet_deb() {
     assert_control_contains "$CAPTURED_CONTROL" "Depends" "libffi7"
     assert_control_contains "$CAPTURED_CONTROL" "Depends" "libjemalloc2"
     assert_control_contains "$CAPTURED_CONTROL" "Depends" "mina-logproc"
-    assert_control_contains "$CAPTURED_CONTROL" "Depends" "mina-mainnet-config"
     # Config dependency is pinned to the exact build version
     assert_control_contains "$CAPTURED_CONTROL" "Depends" "mina-mainnet-config (=${EXPECTED_VERSION})"
     assert_control_contains "$CAPTURED_CONTROL" "Suggests" "jq"
@@ -642,7 +641,6 @@ test_build_daemon_devnet_deb() {
     load_captured_state
     assert_eq "deb name" "mina-devnet" "$CAPTURED_DEB_NAME"
     assert_control_field "$CAPTURED_CONTROL" "Package" "mina-devnet"
-    assert_control_contains "$CAPTURED_CONTROL" "Depends" "mina-devnet-config"
     # Config dependency is pinned to the exact build version
     assert_control_contains "$CAPTURED_CONTROL" "Depends" "mina-devnet-config (=${EXPECTED_VERSION})"
     assert_control_contains "$CAPTURED_CONTROL" "Depends" "mina-logproc"
@@ -817,8 +815,6 @@ test_build_daemon_devnet_automode_deb() {
     assert_eq "deb name" "mina-devnet-automode" "$CAPTURED_DEB_NAME"
     assert_control_field "$CAPTURED_CONTROL" "Package" "mina-devnet-automode"
     assert_control_field "$CAPTURED_CONTROL" "Architecture" "amd64"
-    assert_control_contains "$CAPTURED_CONTROL" "Depends" "mina-devnet-postfork-mesa"
-    assert_control_contains "$CAPTURED_CONTROL" "Depends" "mina-devnet-prefork-mesa"
     # Prefork/postfork runtimes are pinned to the exact build version
     assert_control_contains "$CAPTURED_CONTROL" "Depends" "mina-devnet-postfork-mesa (=${EXPECTED_VERSION})"
     assert_control_contains "$CAPTURED_CONTROL" "Depends" "mina-devnet-prefork-mesa (=${EXPECTED_VERSION})"
@@ -838,8 +834,6 @@ test_build_daemon_mainnet_automode_deb() {
     assert_eq "deb name" "mina-mainnet-automode" "$CAPTURED_DEB_NAME"
     assert_control_field "$CAPTURED_CONTROL" "Package" "mina-mainnet-automode"
     assert_control_field "$CAPTURED_CONTROL" "Architecture" "amd64"
-    assert_control_contains "$CAPTURED_CONTROL" "Depends" "mina-mainnet-postfork-mesa"
-    assert_control_contains "$CAPTURED_CONTROL" "Depends" "mina-mainnet-prefork-mesa"
     # Prefork/postfork runtimes are pinned to the exact build version
     assert_control_contains "$CAPTURED_CONTROL" "Depends" "mina-mainnet-postfork-mesa (=${EXPECTED_VERSION})"
     assert_control_contains "$CAPTURED_CONTROL" "Depends" "mina-mainnet-prefork-mesa (=${EXPECTED_VERSION})"
