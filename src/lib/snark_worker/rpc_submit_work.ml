@@ -40,7 +40,7 @@ include Versioned_rpc.Both_convert.Plain.Make (Master)
 module Stable = struct
   module V3 = struct
     module T = struct
-      type query = Result.Partitioned.Stable.V1.t
+      type query = Result.Partitioned.Stable.V2.t
 
       type response = [ `SpecUnmatched | `Removed | `Ok ]
 

@@ -12,6 +12,7 @@ MINA_EXE=${MINA_EXE:-_build/default/src/app/cli/src/mina.exe}
 ARCHIVE_EXE=${ARCHIVE_EXE:-_build/default/src/app/archive/archive.exe}
 ROSETTA_EXE=${ROSETTA_EXE:-_build/default/src/app/rosetta/rosetta.exe}
 ZKAPP_EXE=${ZKAPP_EXE:-_build/default/src/app/zkapp_test_transaction/zkapp_test_transaction.exe}
+MINA_GRAPHQL_CLIENT_EXE=${MINA_GRAPHQL_CLIENT_EXE:-mina-graphql-client}
 
 export MINA_PRIVKEY_PASS='naughty blue worm'
 export MINA_LIBP2P_PASS="${MINA_PRIVKEY_PASS}"
@@ -262,6 +263,7 @@ on-exit() {
   esac
 
   echo "Completed shutdown phase of mina local network"
+  echo "stat: exit_mode=${ON_EXIT} config_mode=${CONFIG_MODE} tx_phase=${TX_PHASE:-idle} tx_count=${value_txn_id:-0} transfer_node=${TRANSFER_NODE_TYPE:-none}:${TRANSFER_NODE_INDEX:--1} transfer_port=${TRANSFER_PORT_BASE:--1} transfer_pid=${TRANFER_NODE_PID:--1} transfer_pid_alive=$(is_process_running "${TRANFER_NODE_PID:--1}" && echo 1 || echo 0)"
   exit 0
 }
 
@@ -1217,8 +1219,12 @@ printf "\n"
 # ================================================
 # Start sending transactions and zkApp transactions
 
+TX_PHASE=idle
+value_txn_id=0
+
 if ${VALUE_TRANSFERS} || ${ZKAPP_TRANSACTIONS}; then
 
+  TX_PHASE=waiting_daemon
   VALID_TRANSFER_NODES=$((WHALES + FISH))
 
   if [ "$VALID_TRANSFER_NODES" -eq 0 ]; then
@@ -1264,6 +1270,7 @@ if ${VALUE_TRANSFERS} || ${ZKAPP_TRANSACTIONS}; then
     sleep ${POLL_INTERVAL}
   done
 
+  TX_PHASE=waiting_sync
   SYNCED=0
 
   echo "Waiting for Node (${REST_SERVER})'s transition frontier to be up"
@@ -1272,20 +1279,21 @@ if ${VALUE_TRANSFERS} || ${ZKAPP_TRANSACTIONS}; then
   set +e
 
   while [ $SYNCED -eq 0 ]; do
-    SYNC_STATUS=$(curl -sS -g -X POST -H "Content-Type: application/json" -d '{"query":"query { syncStatus }"}' ${REST_SERVER})
-    SYNCED=$(echo "${SYNC_STATUS}" | grep -c "SYNCED")
+    SYNCED=$(${MINA_GRAPHQL_CLIENT_EXE} sync-status --graphql-uri ${REST_SERVER} | jq -r 'if .sync_status == "Synced" then 1 else 0 end')
     sleep ${POLL_INTERVAL}
   done
 
   echo "Starting to send value transfer transactions/zkApp transactions every: ${TRANSACTION_INTERVAL} seconds"
   printf "\n"
 
+  TX_PHASE=sending
+
   if ${ZKAPP_TRANSACTIONS} && ! config_mode_is_inherit "${CONFIG_MODE}"; then
     echo "Set up zkapp account"
     printf "\n"
 
     QUERY=$(${ZKAPP_EXE} create-zkapp-account --fee-payer-key "${FEE_PAYER_KEY_FILE}" --nonce 0 --sender-key "${SENDER_KEY_FILE}" --sender-nonce 0 --receiver-amount 1000 --zkapp-account-key ${ZKAPP_ACCOUNT_KEY_FILE} --fee 5 | sed 1,7d)
-    python3 scripts/mina-local-network/send-graphql-query.py ${REST_SERVER} "${QUERY}"
+    ${MINA_GRAPHQL_CLIENT_EXE} send-raw --graphql-uri ${REST_SERVER} --query "$QUERY"
   fi
 
   if ${VALUE_TRANSFERS}; then
@@ -1301,13 +1309,9 @@ if ${VALUE_TRANSFERS} || ${ZKAPP_TRANSACTIONS}; then
   FEE_PAYER_PUB_KEY=$(cat "${FEE_PAYER_KEY_FILE}.pub")
   SENDER_PUB_KEY=$(cat "${SENDER_KEY_FILE}.pub")
 
-  fee_payer_nonce=$(curl -sS -g -X POST -H "Content-Type: application/json" \
-    -d "{\"query\":\"query { account(publicKey: \\\"${FEE_PAYER_PUB_KEY}\\\") { inferredNonce } }\"}" \
-    "${REST_SERVER}" | jq -r '.data.account.inferredNonce // 0')
+  fee_payer_nonce=$(${MINA_GRAPHQL_CLIENT_EXE} account --graphql-uri ${REST_SERVER} --public-key "$FEE_PAYER_PUB_KEY" | jq -r '.inferred_nonce // 0')
 
-  sender_nonce=$(curl -sS -g -X POST -H "Content-Type: application/json" \
-    -d "{\"query\":\"query { account(publicKey: \\\"${SENDER_PUB_KEY}\\\") { inferredNonce } }\"}" \
-    "${REST_SERVER}" | jq -r '.data.account.inferredNonce // 0')
+  sender_nonce=$(${MINA_GRAPHQL_CLIENT_EXE} account --graphql-uri ${REST_SERVER} --public-key "$SENDER_PUB_KEY" | jq -r '.inferred_nonce // 0')
   state=0
 
   # TODO: simulate scripts/hardfork/run-localnet.sh to send txns to everyone in the ledger.
@@ -1327,17 +1331,18 @@ if ${VALUE_TRANSFERS} || ${ZKAPP_TRANSACTIONS}; then
 
     if ${ZKAPP_TRANSACTIONS}; then
       QUERY=$(${ZKAPP_EXE} transfer-funds-one-receiver --fee-payer-key ${FEE_PAYER_KEY_FILE} --nonce $fee_payer_nonce --sender-key ${SENDER_KEY_FILE} --sender-nonce $sender_nonce --receiver-amount 1 --fee 5 --receiver $ZKAPP_ACCOUNT_PUB_KEY | sed 1,5d)
-      python3 scripts/mina-local-network/send-graphql-query.py ${REST_SERVER} "${QUERY}"
+      ${MINA_GRAPHQL_CLIENT_EXE} send-raw --graphql-uri ${REST_SERVER} --query "$QUERY"
       let fee_payer_nonce++
       let sender_nonce++
 
       QUERY=$(${ZKAPP_EXE} update-state --fee-payer-key ${FEE_PAYER_KEY_FILE} --nonce $fee_payer_nonce --zkapp-account-key ${ZKAPP_ACCOUNT_KEY_FILE} --zkapp-state $state --fee 5 | sed 1,5d)
-      python3 scripts/mina-local-network/send-graphql-query.py ${REST_SERVER} "${QUERY}"
+      ${MINA_GRAPHQL_CLIENT_EXE} send-raw --graphql-uri ${REST_SERVER} --query "$QUERY"
       let fee_payer_nonce++
       let state++
     fi
   done
 
+  TX_PHASE=idle
   set -e
 
 fi

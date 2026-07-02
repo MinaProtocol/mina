@@ -300,7 +300,7 @@ end
 module type Snark_pool_diff_intf = sig
   type resource_pool
 
-  type t = Mina_wire_types.Network_pool.Snark_pool.Diff_versioned.V2.t =
+  type t = Mina_wire_types.Network_pool.Snark_pool.Diff_versioned.V3.t =
     | Add_solved_work of
         Transaction_snark_work.Statement.t
         * Ledger_proof.t One_or_two.t Priced_proof.t
@@ -314,11 +314,11 @@ module type Snark_pool_diff_intf = sig
       | Empty
 
     val read_all_proofs_from_disk :
-      t -> Mina_wire_types.Network_pool.Snark_pool.Diff_versioned.V2.t
+      t -> Mina_wire_types.Network_pool.Snark_pool.Diff_versioned.V3.t
 
     val write_all_proofs_to_disk :
          proof_cache_db:Proof_cache_tag.cache_db
-      -> Mina_wire_types.Network_pool.Snark_pool.Diff_versioned.V2.t
+      -> Mina_wire_types.Network_pool.Snark_pool.Diff_versioned.V3.t
       -> t
   end
 

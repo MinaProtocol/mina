@@ -1207,7 +1207,7 @@ let run_catchup ~context:(module Context : CONTEXT) ~trust_system ~verifier
                   ( State_hash.With_state_hashes.state_hash x
                   , Mina_state.Protocol_state.consensus_state x.data
                     |> Consensus.Data.Consensus_state.blockchain_length ) ) ) )
-      ~knowledge
+      ~knowledge ()
   in
   check_invariant ~downloader t ;
   let () =

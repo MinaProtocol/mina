@@ -56,6 +56,8 @@ let Cmd = ../Lib/Cmds.dhall
 
 let ContainerImages = ../Constants/ContainerImages.dhall
 
+let ContainerEnvVars = ../Constants/ContainerEnvVars.dhall
+
 let ScriptOrArchive
     : Type
     = < Script : Text
@@ -133,6 +135,7 @@ let runInDockerWithPostgresConn
           in  Cmd.chain
                 (   [ "( docker stop ${postgresDockerName} && docker rm ${postgresDockerName} ) || true"
                     , "source buildkite/scripts/export-git-env-vars.sh"
+                    , "./buildkite/scripts/docker/disk-cleanup.sh || true"
                     , "docker run --network host --volume ${outerDir}:/workdir --workdir /workdir --name ${postgresDockerName} -d -e POSTGRES_USER=${user} -e POSTGRES_PASSWORD=${password} -e POSTGRES_DB=${dbName} ${dockerVersion}"
                     , "sleep 5"
                     ]
@@ -141,6 +144,105 @@ let runInDockerWithPostgresConn
                     ]
                 )
 
+let runInToolchainWithPostgresAndDebs
+    : List Text -> Optional ScriptOrArchive -> Text -> Text -> Text -> Cmd.Type
+    =     \(environment : List Text)
+      ->  \(initScript : Optional ScriptOrArchive)
+      ->  \(toolchain : Text)
+      ->  \(debs : Text)
+      ->  \(innerScript : Text)
+      ->  let port = "5432"
+
+          let user = "postgres"
+
+          let password = "postgres"
+
+          let postgresDockerName = "postgres"
+
+          let dockerVersion = ContainerImages.postgres
+
+          let dbName = "archive"
+
+          let pg_uri = "postgres://${user}:${password}@localhost:${port}"
+
+          let pg_conn = "${pg_uri}/${dbName}"
+
+          let bkEnvVars =
+                Text/concatMap
+                  Text
+                  (\(var : Text) -> " --env ${var}")
+                  ContainerEnvVars
+
+          let extraEnvVars =
+                Text/concatMap
+                  Text
+                  (\(var : Text) -> " --env ${var}")
+                  (   [ "PG_PORT=${port}"
+                      , "POSTGRES_USER=${user}"
+                      , "POSTGRES_PASSWORD=${password}"
+                      , "POSTGRES_DB=${dbName}"
+                      , "POSTGRES_URI=${pg_uri}"
+                      , "PG_CONN=${pg_conn}"
+                      ]
+                    # environment
+                  )
+
+          let gitEnvVars =
+                Text/concatMap
+                  Text
+                  (\(var : Text) -> " --env ${var}")
+                  [ "MINA_DEB_CODENAME"
+                  , "MINA_DEB_VERSION"
+                  , "MINA_DEB_RELEASE"
+                  ]
+
+          let outerDir
+              : Text
+              = "\\\$BUILDKITE_BUILD_CHECKOUT_PATH"
+
+          let runInitScript =
+                merge
+                  { Some =
+                          \(script : ScriptOrArchive)
+                      ->  merge
+                            { Script =
+                                    \(s : Text)
+                                ->  [ "docker exec ${postgresDockerName} psql ${pg_conn} -f /workdir/${s}"
+                                    ]
+                            , Archive =
+                                    \ ( archive
+                                      : { Script : Text, Archive : Text }
+                                      )
+                                ->  [ "tar -xzf ${archive.Archive}"
+                                    , "docker exec ${postgresDockerName} find /workdir -name \"${archive.Script}\" -exec psql ${pg_conn} -f {} \\;"
+                                    ]
+                            , OnlineTarGzDump =
+                                    \(url : Text)
+                                ->  [ "curl -sSL ${url} | tar -xz"
+                                    , "docker exec ${postgresDockerName} find /workdir -maxdepth 1 -name \"*.sql\" -exec psql ${pg_conn} -f {} \\;"
+                                    ]
+                            }
+                            script
+                  , None = [] : List Text
+                  }
+                  initScript
+
+          let installAndRun =
+                "sudo chown -R opam . && ./buildkite/scripts/debian/restore-or-install.sh ${debs} 1 && ${innerScript}"
+
+          in  Cmd.chain
+                (   [ "( docker stop ${postgresDockerName} && docker rm ${postgresDockerName} ) || true"
+                    , "source buildkite/scripts/export-git-env-vars.sh"
+                    , "./buildkite/scripts/docker/disk-cleanup.sh || true"
+                    , "docker run --network host --volume ${outerDir}:/workdir --workdir /workdir --name ${postgresDockerName} -d -e POSTGRES_USER=${user} -e POSTGRES_PASSWORD=${password} -e POSTGRES_DB=${dbName} ${dockerVersion}"
+                    , "sleep 5"
+                    ]
+                  # runInitScript
+                  # [ "docker run --pid=container:postgres --network host --volume /var/storagebox:/var/storagebox --volume /var/secrets:/var/secrets --volume ${outerDir}:/workdir --workdir /workdir --entrypoint /bin/bash${bkEnvVars}${extraEnvVars}${gitEnvVars} ${toolchain} -c '${installAndRun}'"
+                    ]
+                )
+
 in  { runInDockerWithPostgresConn = runInDockerWithPostgresConn
+    , runInToolchainWithPostgresAndDebs = runInToolchainWithPostgresAndDebs
     , ScriptOrArchive = ScriptOrArchive
     }

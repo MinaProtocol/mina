@@ -999,7 +999,7 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
             [%log info]
               "Searching for block with greatest height on canonical chain" ;
             let%bind max_slot =
-              query_db ~f:(fun db -> Sql.Block.get_max_slot db ())
+              query_db ~f:(fun db -> Sql.Block.get_max_canonical_slot db ())
             in
             [%log info] "Maximum global slot since genesis in blocks is %Ld"
               max_slot ;
@@ -2030,7 +2030,8 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
                 exit 1 ) ) )
 
 let () =
-  let constraint_constants = Genesis_constants.Compiled.constraint_constants in
+  let (module G) = Genesis_constants.profiled () in
+  let constraint_constants = G.constraint_constants in
   let proof_level = Genesis_constants.Proof_level.Full in
   Command.(
     run

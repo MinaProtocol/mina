@@ -33,7 +33,7 @@ module Base = struct
     module Stable = struct
       [@@@no_toplevel_latest_type]
 
-      module V2 = struct
+      module V3 = struct
         type ('messages_for_next_wrap_proof, 'messages_for_next_step_proof) t =
           { statement :
               ( Limb_vector.Constant.Hex64.Stable.V1.t
@@ -57,7 +57,7 @@ module Base = struct
               ( Tick.Field.Stable.V1.t
               , Tick.Field.Stable.V1.t
                 Mina_stdlib.Bounded_types.ArrayN16.Stable.V1.t )
-              Plonk_types.All_evals.Stable.V1.t
+              Plonk_types.All_evals.Stable.V2.t
           ; proof : Wrap_wire_proof.Stable.V1.t
           }
         [@@deriving compare, sexp, yojson, hash, equal]
@@ -71,7 +71,7 @@ module Base = struct
           *)
       ( 'messages_for_next_wrap_proof
       , 'messages_for_next_step_proof )
-      Mina_wire_types.Pickles.Concrete_.Proof.Base.Wrap.V2.t =
+      Mina_wire_types.Pickles.Concrete_.Proof.Base.Wrap.V3.t =
       { statement :
           ( Challenge.Constant.t
           , Challenge.Constant.t Scalar_challenge.t
@@ -224,7 +224,7 @@ module Make (MLMB : Nat.Intf) = struct
           Step_bp_vec.t
           Max_proofs_verified_at_most.t )
         Base.Messages_for_next_proof_over_same_field.Step.t )
-      Base.Wrap.Stable.V2.t
+      Base.Wrap.Stable.V3.t
     [@@deriving compare, sexp, yojson, hash, equal]
   end
 
@@ -253,15 +253,8 @@ module Make (MLMB : Nat.Intf) = struct
           }
       }
     in
-    let prev_evals : _ Plonk_types.All_evals.Stable.V1.t =
-      { evals =
-          { prev_evals.evals with
-            public_input =
-              (let x1, x2 = prev_evals.evals.public_input in
-               (x1.(0), x2.(0)) )
-          }
-      ; ft_eval1 = prev_evals.ft_eval1
-      }
+    let prev_evals : _ Plonk_types.All_evals.Stable.V2.t =
+      { evals = prev_evals.evals; ft_eval1 = prev_evals.ft_eval1 }
     in
     { statement; prev_evals; proof }
 
@@ -289,14 +282,7 @@ module Make (MLMB : Nat.Intf) = struct
       }
     in
     let prev_evals : _ Plonk_types.All_evals.t =
-      { evals =
-          { public_input =
-              (let x1, x2 = prev_evals.evals.public_input in
-               ([| x1 |], [| x2 |]) )
-          ; evals = prev_evals.evals.evals
-          }
-      ; ft_eval1 = prev_evals.ft_eval1
-      }
+      { evals = prev_evals.evals; ft_eval1 = prev_evals.ft_eval1 }
     in
     T { statement; prev_evals; proof }
 
@@ -352,7 +338,7 @@ module Proofs_verified_2 = struct
     module Stable = struct
       [@@@no_toplevel_latest_type]
 
-      module V2 = struct
+      module V3 = struct
         type t =
           ( ( Tock.Inner_curve.Affine.Stable.V1.t
             , Reduced_messages_for_next_proof_over_same_field.Wrap
@@ -370,7 +356,7 @@ module Proofs_verified_2 = struct
               Step_bp_vec.Stable.V1.t
               At_most.At_most_2.Stable.V1.t )
             Base.Messages_for_next_proof_over_same_field.Step.Stable.V1.t )
-          Base.Wrap.Stable.V2.t
+          Base.Wrap.Stable.V3.t
         [@@deriving compare, sexp, yojson, hash, equal]
 
         let to_latest = Fn.id
@@ -384,7 +370,7 @@ module Proofs_verified_2 = struct
   module Stable = struct
     [@@@no_toplevel_latest_type]
 
-    module V2 = struct
+    module V3 = struct
       type t = T.t
 
       let to_latest = Fn.id
@@ -393,7 +379,7 @@ module Proofs_verified_2 = struct
 
       include
         Binable.Of_binable
-          (Repr.Stable.V2)
+          (Repr.Stable.V3)
           (struct
             type nonrec t = t
 
@@ -415,7 +401,7 @@ module Proofs_verified_max = struct
     module Stable = struct
       [@@@no_toplevel_latest_type]
 
-      module V2 = struct
+      module V3 = struct
         type t =
           ( ( Tock.Inner_curve.Affine.Stable.V1.t
             , Reduced_messages_for_next_proof_over_same_field.Wrap
@@ -434,7 +420,7 @@ module Proofs_verified_max = struct
               Step_bp_vec.Stable.V1.t
               Side_loaded_verification_key.Width.Max_at_most.Stable.V1.t )
             Base.Messages_for_next_proof_over_same_field.Step.Stable.V1.t )
-          Base.Wrap.Stable.V2.t
+          Base.Wrap.Stable.V3.t
         [@@deriving compare, sexp, yojson, hash, equal]
 
         let to_latest = Fn.id
@@ -448,7 +434,7 @@ module Proofs_verified_max = struct
   module Stable = struct
     [@@@no_toplevel_latest_type]
 
-    module V2 = struct
+    module V3 = struct
       type t = T.t
 
       let to_latest = Fn.id
@@ -457,7 +443,7 @@ module Proofs_verified_max = struct
 
       include
         Binable.Of_binable
-          (Repr.Stable.V2)
+          (Repr.Stable.V3)
           (struct
             type nonrec t = t
 

@@ -14,8 +14,6 @@ let DebianVersions = ../../Constants/DebianVersions.dhall
 
 let Network = ../../Constants/Network.dhall
 
-let Arch = ../../Constants/Arch.dhall
-
 let Docker = ../../Command/Docker/Type.dhall
 
 let Size = ../../Command/Size.dhall
@@ -36,14 +34,14 @@ let buildTestCmd
                 Command.Config::{
                 , commands =
                     RunInToolchain.runInToolchainBullseye
-                      Arch.Type.Amd64
                       ([] : List Text)
                       ''
                       ./buildkite/scripts/tests/debian-upgrade-test.sh \
                         --codename bullseye \
                         --channel alpha \
                         --package mina-devnet \
-                        --new-debian "debians/bullseye/mina-devnet_*.deb"
+                        --install-packages mina-generic,mina-devnet-config \
+                        --new-debian "debians/bullseye/mina-generic_*.deb"
                       ''
                 , label = "Debian upgrade test (bullseye)"
                 , key = key

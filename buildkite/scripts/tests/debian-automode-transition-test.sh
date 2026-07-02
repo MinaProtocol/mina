@@ -1,17 +1,20 @@
 #!/usr/bin/env bash
 
 # Integration test for the full automode transition lifecycle:
-#   mina-devnet (v1) → mina-devnet-automode (v2) → mina-devnet (v3)
+#   mina-generic (v1) → mina-devnet-automode (v2) → mina-generic (v3)
+#
+# In the split package layout the "normal" daemon is mina-NETWORK-generic
+# (binaries, owns /usr/local/bin/mina) + mina-NETWORK-config (config + service).
 #
 # Validates that:
-# - mina-devnet installs cleanly
-# - mina-devnet-automode replaces mina-devnet via apt
-# - mina-devnet (higher version) replaces automode and restores normal layout
+# - mina-NETWORK-generic + -config install cleanly
+# - mina-NETWORK-automode replaces the generic daemon via apt
+# - mina-NETWORK-generic (higher version) replaces automode and restores layout
 # - No automode-specific files remain after the final transition
 #
 # Prerequisites:
 #   - Built debs available in cache (depends on debian build CI step)
-#   - Running inside a toolchain container with apt/dpkg/fakeroot/aptly
+#   - Running inside a toolchain container with apt/dpkg/fakeroot
 #
 # Usage:
 #   debian-automode-transition-test.sh --codename <codename> --network <network>
@@ -44,7 +47,6 @@ log_error() { echo -e "${RED}[ERROR]${CLEAR} $*"; }
 
 CODENAME="bullseye"
 NETWORK="devnet"
-APTLY_PORT=8080
 
 usage() {
     echo "Usage: $0 [OPTIONS]"
@@ -82,7 +84,6 @@ mkdir -p "${DEB_DIR}" "${REPO_DIR}" "${VERSIONED_DIR}"
 
 cleanup() {
     log_info "Cleaning up..."
-    ./scripts/debian/aptly.sh stop --clean 2>/dev/null || true
     rm -rf "${WORKDIR}"
 }
 trap cleanup EXIT
@@ -94,13 +95,21 @@ else
     SUDO="sudo"
 fi
 
-PKG_DAEMON="mina-${NETWORK}"
+# In the split layout the normal daemon binaries live in the network-free
+# mina-generic package (not the legacy monolithic mina-NETWORK), so that is the
+# package we install, reversion and assert on for the v1/v3 "normal" states. The
+# per-profile generic layer (mina-NETWORK-generic) ships only the PROFILE hint.
+PKG_DAEMON="mina-generic"
 PKG_AUTOMODE="mina-${NETWORK}-automode"
 PKG_CONFIG="mina-${NETWORK}-config"
+# Profile leaf package (just the PROFILE hint, no deps).
+# PKG_PROFILE is the profile tent (depends on mina-generic + profile leaf).
+PKG_PROFILE="mina-${NETWORK}-generic"
+PKG_PROFILE_LEAF="mina-${NETWORK}-profile"
 PKG_POSTFORK="mina-${NETWORK}-postfork-mesa"
 PKG_PREFORK="mina-${NETWORK}-prefork-mesa"
 
-# Automode-specific paths that should NOT exist after restoring mina-devnet
+# Automode-specific paths that should NOT exist after restoring the generic daemon
 AUTOMODE_PATHS=(
     "/usr/local/bin/mina-dispatch"
     "/etc/default/mina-dispatch"
@@ -108,7 +117,7 @@ AUTOMODE_PATHS=(
     "/usr/lib/mina/berkeley"
 )
 
-# Normal mina-devnet paths that SHOULD exist after restore
+# Normal daemon paths (shipped by mina-NETWORK-generic) that SHOULD exist after restore
 DAEMON_PATHS=(
     "/usr/local/bin/mina"
     "/usr/local/bin/coda-libp2p_helper"
@@ -131,6 +140,8 @@ log_info "=== Step 1: Download debs from cache ==="
 # Download the legacy prefork deb from the persistent legacy cache.
 # The automode metapackage depends on prefork at PREFORK_LEGACY_VERSION (not the
 # current build version), so we need the real legacy deb to satisfy that constraint.
+./buildkite/scripts/cache/manager.sh read "debians/${CODENAME}/${PKG_PROFILE}_*" "${DEB_DIR}"
+./buildkite/scripts/cache/manager.sh read "debians/${CODENAME}/${PKG_PROFILE_LEAF}_*" "${DEB_DIR}"
 ./buildkite/scripts/cache/manager.sh read --root "legacy" "debians/${CODENAME}/${PKG_PREFORK}_*" "${DEB_DIR}"
 
 log_info "Downloaded debs:"
@@ -149,6 +160,8 @@ ORIG_CONFIG_DEB=$(ls "${DEB_DIR}"/${PKG_CONFIG}_*.deb | head -1)
 ORIG_POSTFORK_DEB=$(ls "${DEB_DIR}"/${PKG_POSTFORK}_*.deb | head -1)
 ORIG_LOGPROC_DEB=$(ls "${DEB_DIR}"/mina-logproc_*.deb | head -1)
 ORIG_PREFORK_DEB=$(ls "${DEB_DIR}"/${PKG_PREFORK}_*.deb | head -1)
+ORIG_PROFILE_DEB=$(ls "${DEB_DIR}"/${PKG_PROFILE}_*.deb | head -1)
+ORIG_PROFILE_LEAF_DEB=$(ls "${DEB_DIR}"/${PKG_PROFILE_LEAF}_*.deb | head -1)
 
 reversion_deb() {
     local input_deb="$1"
@@ -175,12 +188,33 @@ dep_pinned_version() {
         | tr -d ' '
 }
 
+reversion_legacy_daemon_deb() {
+    local input_deb="$1"
+    local new_version="$2"
+    local output_deb="$3"
+    local session_dir="${WORKDIR}/session_tmp"
+
+    rm -rf "${session_dir}"
+    "${SESSION_DIR}/deb-session-open.sh" "${input_deb}" "${session_dir}"
+    "${SESSION_DIR}/deb-session-reversion.sh" --update-deps "${session_dir}" "${new_version}"
+    sed -i -E "s/, ${PKG_PROFILE} \\([^)]*\\)//" "${session_dir}/control/control"
+    if grep -q "^Depends:.*${PKG_PROFILE}" "${session_dir}/control/control"; then
+        log_error "Legacy ${PKG_DAEMON} package should not depend on ${PKG_PROFILE}"
+        grep -E "^(Package|Version|Depends):" "${session_dir}/control/control" || true
+        exit 1
+    fi
+    "${SESSION_DIR}/deb-session-save.sh" "${session_dir}" "${output_deb}"
+    rm -rf "${session_dir}"
+}
+
 V1="1.0.0-transition-test"
 V2="2.0.0-transition-test"
 V3="3.0.0-transition-test"
 
-# V1: mina-devnet + config + logproc (pre-hardfork)
+# V1: generic daemon + config + logproc (pre-hardfork)
 reversion_deb "${ORIG_DAEMON_DEB}"  "${V1}" "${REPO_DIR}/${PKG_DAEMON}_${V1}_amd64.deb"
+# V1: mina-devnet + config + logproc (pre-hardfork, before profile packages)
+reversion_legacy_daemon_deb "${ORIG_DAEMON_DEB}" "${V1}" "${REPO_DIR}/${PKG_DAEMON}_${V1}_amd64.deb"
 reversion_deb "${ORIG_CONFIG_DEB}"  "${V1}" "${REPO_DIR}/${PKG_CONFIG}_${V1}_all.deb"
 reversion_deb "${ORIG_LOGPROC_DEB}" "${V1}" "${REPO_DIR}/mina-logproc_${V1}_amd64.deb"
 
@@ -211,51 +245,87 @@ reversion_deb "${ORIG_POSTFORK_DEB}" "${V2}" "${REPO_DIR}/${PKG_POSTFORK}_${V2}_
 reversion_deb "${ORIG_CONFIG_DEB}"   "${V2}" "${REPO_DIR}/${PKG_CONFIG}_${V2}_all.deb"
 reversion_deb "${ORIG_LOGPROC_DEB}"  "${V2}" "${REPO_DIR}/mina-logproc_${V2}_amd64.deb"
 
-# V3: mina-devnet + config + logproc (post-hardfork, back to normal)
+# V3: generic daemon + config + profile + logproc (post-hardfork, back to normal)
 reversion_deb "${ORIG_DAEMON_DEB}"  "${V3}" "${REPO_DIR}/${PKG_DAEMON}_${V3}_amd64.deb"
 reversion_deb "${ORIG_CONFIG_DEB}"  "${V3}" "${REPO_DIR}/${PKG_CONFIG}_${V3}_all.deb"
 reversion_deb "${ORIG_LOGPROC_DEB}" "${V3}" "${REPO_DIR}/mina-logproc_${V3}_amd64.deb"
+reversion_deb "${ORIG_PROFILE_DEB}" "${V3}" "${REPO_DIR}/${PKG_PROFILE}_${V3}_amd64.deb"
+reversion_deb "${ORIG_PROFILE_LEAF_DEB}" "${V3}" "${REPO_DIR}/${PKG_PROFILE_LEAF}_${V3}_amd64.deb"
 
 log_info "Versioned packages:"
 ls -la "${REPO_DIR}"/*.deb
 
 ################################################################################
-# Step 3: Start local apt repo
+# Step 3: Resolve the local .deb files for each transition stage
 ################################################################################
+#
+# Rather than serving the reversioned debs from a local package repository and
+# letting apt resolve everything by name, we install the concrete .deb files
+# directly.
+# apt-get still does full dependency resolution (Conflicts/Replaces, downgrades,
+# and pulling any non-mina deps from the system apt sources) when handed local
+# .deb files in a single invocation.
 
-log_info "=== Step 3: Start local apt repository ==="
+log_info "=== Step 3: Resolve local .deb files per stage ==="
 
-./scripts/debian/aptly.sh start \
-    --codename "${CODENAME}" \
-    --debians "${REPO_DIR}" \
-    --component unstable \
-    --clean \
-    --background \
-    --wait \
-    --port "${APTLY_PORT}"
+# Prefork debs come straight from the legacy cache (their original version) and
+# satisfy the automode metapackage's prefork dependency. Pass all of them so the
+# correct one matching the dependency constraint is available to apt.
+mapfile -t PREFORK_DEBS < <(ls "${REPO_DIR}"/"${PKG_PREFORK}"_*.deb)
 
-# Add local repo to apt sources
-$SUDO bash -c "echo 'deb [trusted=yes] http://localhost:${APTLY_PORT}/ ${CODENAME} unstable' > /etc/apt/sources.list.d/transition-test.list"
-$SUDO apt-get update
+# V1: mina-devnet + config + logproc (pre-hardfork)
+V1_DEBS=(
+    "${REPO_DIR}/${PKG_DAEMON}_${V1}_amd64.deb"
+    "${REPO_DIR}/${PKG_CONFIG}_${V1}_all.deb"
+    "${REPO_DIR}/mina-logproc_${V1}_amd64.deb"
+)
 
-log_info "Available packages:"
-apt-cache showpkg "${PKG_DAEMON}" 2>/dev/null | head -20 || true
-apt-cache showpkg "${PKG_AUTOMODE}" 2>/dev/null | head -20 || true
+# V2: automode + postfork + config + logproc (+ prefork files) (hardfork)
+V2_DEBS=(
+    "${REPO_DIR}/${PKG_AUTOMODE}_${V2}_all.deb"
+    "${REPO_DIR}/${PKG_POSTFORK}_${V2}_amd64.deb"
+    "${REPO_DIR}/${PKG_CONFIG}_${V2}_all.deb"
+    "${REPO_DIR}/mina-logproc_${V2}_amd64.deb"
+    "${PREFORK_DEBS[@]}"
+)
+
+# V3: mina-generic + config + profile + logproc (post-hardfork, back to normal)
+#
+# The network-free mina-generic daemon deliberately carries NO hard dependency
+# on a network profile package: the same deb is reused for every network, and
+# the generic docker image must be installable on its own (see commit dropping
+# the profile dependency from the generic/archive packages). Instead, the
+# profile is layered on top per-network — exactly how the "one generic + per
+# profile profiled" docker images are assembled. The transition test mirrors
+# that real deployment shape by co-installing the matching profile package
+# alongside generic + config in the final post-hardfork state.
+V3_DEBS=(
+    "${REPO_DIR}/${PKG_DAEMON}_${V3}_amd64.deb"
+    "${REPO_DIR}/${PKG_CONFIG}_${V3}_all.deb"
+    "${REPO_DIR}/${PKG_PROFILE}_${V3}_amd64.deb"
+    "${REPO_DIR}/${PKG_PROFILE_LEAF}_${V3}_amd64.deb"
+    "${REPO_DIR}/mina-logproc_${V3}_amd64.deb"
+)
 
 ################################################################################
-# Step 4: Install mina-devnet v1 (pre-hardfork state)
+# Step 4: Install generic daemon v1 (pre-hardfork state)
 ################################################################################
 
 log_info "=== Step 4: Install ${PKG_DAEMON} v1 ==="
 
-log_info "Package dependencies for ${PKG_DAEMON}=${V1}:"
-apt-cache depends "${PKG_DAEMON}=${V1}" 2>/dev/null || true
-apt-cache policy "${PKG_DAEMON}=${V1}" 2>/dev/null || true
+log_info "Installing local .deb files for v1:"
+printf '  %s\n' "${V1_DEBS[@]}"
 
-$SUDO apt-get install -y --allow-downgrades "${PKG_DAEMON}=${V1}" "${PKG_CONFIG}=${V1}" "mina-logproc=${V1}"
+$SUDO apt-get install -y --allow-downgrades --no-install-recommends "${V1_DEBS[@]}"
 
 log_info "Installed ${PKG_DAEMON} v1"
 dpkg -l "${PKG_DAEMON}" 2>/dev/null | tail -1
+
+if dpkg -l "${PKG_PROFILE}" 2>/dev/null | grep -q "^ii"; then
+    log_error "${PKG_PROFILE} should not be installed in v1"
+    exit 1
+fi
+log_info "PASS: ${PKG_PROFILE} is not installed in v1"
 
 # Verify mina binary is a real file (not a symlink to dispatcher)
 if [[ -L "/usr/local/bin/mina" ]]; then
@@ -279,15 +349,27 @@ log_info "PASS: No automode paths in v1"
 
 log_info "=== Step 5: Upgrade to ${PKG_AUTOMODE} v2 ==="
 
-$SUDO apt-get install -y --allow-downgrades "${PKG_AUTOMODE}=${V2}" "${PKG_CONFIG}=${V2}" "mina-logproc=${V2}"
+log_info "Installing local .deb files for v2:"
+printf '  %s\n' "${V2_DEBS[@]}"
+
+$SUDO apt-get install -y --allow-downgrades --no-install-recommends "${V2_DEBS[@]}"
+
+# When automode is installed from an apt repo, its prefork/postfork sub-packages
+# are pulled in as automatically-installed dependencies, so a later `apt-get
+# autoremove` reclaims them once automode is gone. Installing the .deb files
+# directly (no repo) marks every explicitly-named file as manually installed,
+# which would defeat autoremove. Re-mark the sub-packages as auto so the orphan
+# cleanup in Step 6 mirrors the real repo-based transition.
+$SUDO apt-mark auto "${PKG_PREFORK}" "${PKG_POSTFORK}" || true
 
 log_info "Package state after automode install:"
 dpkg -l "${PKG_AUTOMODE}" 2>/dev/null | tail -1 || true
 dpkg -l "${PKG_POSTFORK}" 2>/dev/null | tail -1 || true
 dpkg -l "${PKG_PREFORK}" 2>/dev/null | tail -1 || true
+dpkg -l "${PKG_PROFILE}" 2>/dev/null | tail -1 || true
 dpkg -l "${PKG_DAEMON}" 2>/dev/null | tail -1 || true
 
-# mina-devnet should be removed (replaced by automode)
+# the generic daemon should be removed (replaced by automode)
 if dpkg -l "${PKG_DAEMON}" 2>/dev/null | grep -q "^ii"; then
     log_error "${PKG_DAEMON} should have been replaced by ${PKG_AUTOMODE}"
     exit 1
@@ -309,14 +391,17 @@ fi
 log_info "PASS: /usr/local/bin/mina is a symlink (automode dispatcher)"
 
 ################################################################################
-# Step 6: Restore mina-devnet v3 (post-hardfork, back to normal)
+# Step 6: Restore generic daemon v3 (post-hardfork, back to normal)
 ################################################################################
 
 log_info "=== Step 6: Restore ${PKG_DAEMON} v3 ==="
 
-$SUDO apt-get install -y --allow-downgrades "${PKG_DAEMON}=${V3}" "${PKG_CONFIG}=${V3}" "mina-logproc=${V3}"
+log_info "Installing local .deb files for v3:"
+printf '  %s\n' "${V3_DEBS[@]}"
 
-# automode metapackage conflicts with mina-devnet, so apt should remove it.
+$SUDO apt-get install -y --allow-downgrades --no-install-recommends "${V3_DEBS[@]}"
+
+# automode metapackage conflicts with the generic daemon, so apt should remove it.
 # The prefork/postfork sub-packages were only dependencies of automode, so
 # they become orphans. Run autoremove to clean them up (simulates operator
 # running apt autoremove after a transition).
@@ -328,12 +413,18 @@ dpkg -l "${PKG_AUTOMODE}" 2>/dev/null | tail -1 || true
 dpkg -l "${PKG_POSTFORK}" 2>/dev/null | tail -1 || true
 dpkg -l "${PKG_PREFORK}" 2>/dev/null | tail -1 || true
 
-# mina-devnet v3 should be installed
+# generic daemon v3 should be installed
 if ! dpkg -l "${PKG_DAEMON}" 2>/dev/null | grep -q "^ii"; then
     log_error "${PKG_DAEMON} v3 should be installed"
     exit 1
 fi
 log_info "PASS: ${PKG_DAEMON} v3 installed"
+
+if ! dpkg -l "${PKG_PROFILE}" 2>/dev/null | grep -q "^ii"; then
+    log_error "${PKG_PROFILE} should be installed alongside ${PKG_DAEMON} v3 in the post-hardfork state"
+    exit 1
+fi
+log_info "PASS: ${PKG_PROFILE} installed (layered on top of the generic daemon)"
 
 # Automode metapackage should be gone
 if dpkg -l "${PKG_AUTOMODE}" 2>/dev/null | grep -q "^ii"; then

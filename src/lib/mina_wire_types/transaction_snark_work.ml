@@ -4,10 +4,10 @@ module Statement = struct
   end
 end
 
-module V2 = struct
+module V3 = struct
   type t =
     { fee : Currency.Fee.V1.t
-    ; proofs : Ledger_proof.V2.t One_or_two.V1.t
+    ; proofs : Ledger_proof.V3.t One_or_two.V1.t
     ; prover : Public_key.Compressed.V1.t
     }
 end

@@ -52,6 +52,8 @@ if [[ -z "$PREFORK" ]]; then
   usage "Error: --fork-from must be provided."
 fi
 
+export MINA_PROFILE="devnet"
+
 NIX_OPTS=( --accept-flake-config --experimental-features 'nix-command flakes' )
 
 if [[ -n "${NIX_CACHE_NAR_SECRET:-}" ]]; then
@@ -146,6 +148,7 @@ fi
 git checkout "$TEST_COMMIT"
 git submodule update --init --recursive --depth 1
 nix "${NIX_OPTS[@]}" build "$PWD?submodules=1#hardfork_test" --out-link "hardfork_test"
+nix "${NIX_OPTS[@]}" build "$PWD?submodules=1#mina-graphql-client" --out-link "mina-graphql-client"
 
 # 5. Execute hardfork_test on them.
 
@@ -160,6 +163,7 @@ hardfork_test/bin/hardfork_test \
   --main-runtime-genesis-ledger prefork-devnet/bin/runtime_genesis_ledger \
   --fork-mina-exe postfork-devnet/bin/mina \
   --fork-runtime-genesis-ledger postfork-devnet/bin/runtime_genesis_ledger \
+  --mina-graphql-client-exe mina-graphql-client/bin/mina-graphql-client \
   --slot-tx-end "$SLOT_TX_END" \
   --slot-chain-end "$SLOT_CHAIN_END" \
   --script-dir "$SCRIPT_DIR" \

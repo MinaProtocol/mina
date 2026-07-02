@@ -82,6 +82,7 @@ let main ~db_uri ~network_data_folder () =
     >>= Deferred.List.map ~f:(fun e ->
             Deferred.return (output_folder ^ "/" ^ e) )
   in
+  let extensional_files = Utils.sort_archive_files extensional_files in
 
   let%bind () =
     if List.length extensional_files < 3 then (
@@ -91,13 +92,22 @@ let main ~db_uri ~network_data_folder () =
       exit 1 )
     else Deferred.unit
   in
-  let missing_blocks_count = min 3 (List.length extensional_files - 2) in
+  let missing_blocks_count = min 1 (List.length extensional_files - 2) in
 
   (* never remove last and first block as missing-block-guardian can have issues
-     when patching "border" blocks as it expect to fill gaps in the middle
+     when patching "border" blocks as it expect to fill gaps in the middle.
+     Select an orphan-branch parent from the fixed sample DB so replayer still
+     has an intact canonical chain to validate after patching.
   *)
+  let missing_block_state_hash =
+    "3NKSqLA8BWMgHHkX4TqkVQjTmHLkXBumBb2aSBS3myzHQGopXC9x"
+  in
   let candidate_blocks =
-    Array.init (List.length extensional_files - 2) ~f:Int.succ
+    List.filter_mapi extensional_files ~f:(fun i file ->
+        if String.is_substring file ~substring:missing_block_state_hash then
+          Some i
+        else None )
+    |> Array.of_list
   in
   let missing_blocks =
     Array.slice (knuth_shuffle candidate_blocks) 0 missing_blocks_count

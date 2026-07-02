@@ -21,9 +21,18 @@ if [[ -z "$CONFIG_DEB" ]]; then
   echo "ERROR: mina-devnet-config deb not found in src/test/archive/sample_mesa_hf_db/"
   exit 1
 fi
-dpkg -i "$CONFIG_DEB"
+sudo dpkg -i "$CONFIG_DEB"
 
 echo "Running replayer from mesa hard fork checkpoint"
+
+# The replayer resolves its constraint constants from the runtime profile
+# (Genesis_constants.profiled), which falls back to "dev" when neither
+# MINA_PROFILE nor the deb-installed /etc/coda/build_config/PROFILE file is
+# present. The mina-devnet-config deb installed above ships only genesis config
+# (no PROFILE file), and the bare replayer.exe has no MINA_PROFILE, so without
+# this the replayer loads the genesis ledger at dev's ledger_depth and fails
+# with a root-hash mismatch. Mesa runs the devnet profile.
+export MINA_PROFILE=devnet
 
 export MINA_LEDGER_S3_BUCKET
 

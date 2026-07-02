@@ -60,11 +60,19 @@ STAKING_SEED="${STAKING_SEED:-2vahsgRV5nDPmtgr2Xo2Uq2dkngfSgvg7d1TKqQbY3wUS2ZDxC
 NEXT_SEED="${NEXT_SEED:-2vbH4D8B76WMYPRFgeuVvdWVhv6tAFoCJtg83yuJT1dud3QVSiZn}"
 
 # Default configuration
-DEFAULT_GENESIS_TIMESTAMP="$(date -u -d "$(date -u +%Y-%m-%d) $(( $(date -u +%H) + 1 )):00:00" +%Y-%m-%dT%H:%M:%SZ)"
+# Next full hour in UTC (portable: works on both GNU and BSD/macOS date)
+_next_epoch=$(( ($(date -u +%s) / 3600 + 1) * 3600 ))
+if date -u -d @0 +%s >/dev/null 2>&1; then
+    DEFAULT_GENESIS_TIMESTAMP="$(date -u -d @$_next_epoch +%Y-%m-%dT%H:%M:%SZ)"
+else
+    DEFAULT_GENESIS_TIMESTAMP="$(date -u -r $_next_epoch +%Y-%m-%dT%H:%M:%SZ)"
+fi
+unset _next_epoch
 DEFAULT_BP_KEYS=2
 DEFAULT_PLAIN_KEYS=4
 DEFAULT_EXTRA_BALANCE=100000000
 DEFAULT_EXTRA_KEYS=1
+DEFAULT_PLAIN_BALANCE=""
 DEFAULT_PREFIX="itn-testbed"
 DEFAULT_OUTPUT_DIR="$PWD"
 
@@ -74,11 +82,13 @@ BP_KEYS="$DEFAULT_BP_KEYS"
 PLAIN_KEYS="$DEFAULT_PLAIN_KEYS"
 EXTRA_BALANCE="$DEFAULT_EXTRA_BALANCE"
 EXTRA_KEYS="$DEFAULT_EXTRA_KEYS"
+PLAIN_BALANCE="$DEFAULT_PLAIN_BALANCE"
 PREFIX="$DEFAULT_PREFIX"
 OUTPUT_DIR="$DEFAULT_OUTPUT_DIR"
 MINA_BINARY=""
 RUNTIME_GENESIS_LEDGER_BINARY=""
 PAD_APP_STATE=""
+PER_KEY_PASSWORD=false
 
 export MINA_PRIVKEY_PASS="${MINA_PRIVKEY_PASS:-}"
 
@@ -136,6 +146,10 @@ OPTIONS:
   --runtime-genesis-ledger-binary PATH
                                Path to runtime_genesis_ledger binary (builds if not specified or missing)
 
+  --per-key-password          Generate a unique random password for each key
+                               and write it to a .pass file alongside the keypair.
+                               Default: off (uses MINA_PRIVKEY_PASS for all keys)
+
   --pad-app-state             Pad app state when generating ledger hashes
                                (passed to runtime_genesis_ledger)
 
@@ -187,6 +201,7 @@ OUTPUT FILES NEEDED FOR HF DRYRUN:
   - PREFIX/ directory                     Generated ledger directory
   - PREFIX-bp*.pub, PREFIX-bp*            Block producer key pairs
   - PREFIX-plain*.pub, PREFIX-plain*      Plain key pairs
+  - PREFIX-{bp,plain}*.pass               Per-key passwords (only with --per-key-password)
   - runtime_config.json                   Final runtime configuration
 
 OUTPUT FILES WHICH ARE NOT NEEDED FOR HF DRYRUN (can be deleted):
@@ -213,12 +228,28 @@ validate_positive_integer() {
     local value="$1"
     local name="$2"
     local max="${3:-}"
-    
+
     if ! [[ "$value" =~ ^[1-9][0-9]*$ ]]; then
         echo "Error: $name must be a positive integer, got: $value" >&2
         exit 1
     fi
-    
+
+    if [[ -n "$max" ]] && (( value > max )); then
+        echo "Error: $name must be <= $max, got: $value" >&2
+        exit 1
+    fi
+}
+
+validate_non_negative_integer() {
+    local value="$1"
+    local name="$2"
+    local max="${3:-}"
+
+    if ! [[ "$value" =~ ^(0|[1-9][0-9]*)$ ]]; then
+        echo "Error: $name must be a non-negative integer, got: $value" >&2
+        exit 1
+    fi
+
     if [[ -n "$max" ]] && (( value > max )); then
         echo "Error: $name must be <= $max, got: $value" >&2
         exit 1
@@ -262,7 +293,12 @@ while [[ $# -gt 0 ]]; do
             ;;
         -e|--extra-keys)
             EXTRA_KEYS="$2"
-            validate_positive_integer "$EXTRA_KEYS" "Extra keys" 50
+            validate_non_negative_integer "$EXTRA_KEYS" "Extra keys" 50
+            shift 2
+            ;;
+        --plain-balance)
+            PLAIN_BALANCE="$2"
+            validate_balance "$PLAIN_BALANCE"
             shift 2
             ;;
         --prefix)
@@ -291,6 +327,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         --pad-app-state)
             PAD_APP_STATE="--pad-app-state"
+            shift
+            ;;
+        --per-key-password)
+            PER_KEY_PASSWORD=true
             shift
             ;;
         -h|--help)
@@ -361,6 +401,12 @@ fi
 # Check if nix is needed after parsing arguments
 check_nix_if_needed
 
+# Check openssl dependency for per-key password generation
+if [[ "$PER_KEY_PASSWORD" == "true" ]] && ! command -v openssl >/dev/null 2>&1; then
+    echo "Error: openssl is required for --per-key-password but is not installed" >&2
+    exit 1
+fi
+
 # Change to output directory
 cd "$OUTPUT_DIR"
 
@@ -371,13 +417,15 @@ echo "  Genesis Timestamp: $GENESIS_TIMESTAMP"
 echo "  Block Producer Keys: $BP_KEYS"
 echo "  Plain Keys: $PLAIN_KEYS"
 echo "  Balance for each extra key: $EXTRA_BALANCE MINA"
-echo "  Extra Keys: $EXTRA_KEYS"
+echo "  Extra Keys (with delegation): $EXTRA_KEYS"
+echo "  Plain Balance (no delegation): ${PLAIN_BALANCE:-"disabled"}"
 echo "  Key Prefix: $PREFIX"
 echo "  Staking Seed: $STAKING_SEED"
 echo "  Next Seed: $NEXT_SEED"
 echo "  Output Directory: $OUTPUT_DIR"
 echo "  Mina Binary: ${MINA_BINARY:-"(will build if needed)"}"
 echo "  Runtime Genesis Ledger Binary: ${RUNTIME_GENESIS_LEDGER_BINARY:-"(will build if needed)"}"
+echo "  Per-Key Password: $PER_KEY_PASSWORD"
 echo "  Pad App State: ${PAD_APP_STATE:-"disabled"}"
 echo
 
@@ -415,26 +463,34 @@ ensure_binary() {
 ensure_binary "MINA_BINARY" "devnet" "mina"
 ensure_binary "RUNTIME_GENESIS_LEDGER_BINARY" "devnet.genesis" "runtime_genesis_ledger"
 
+# Key generation helper
+generate_key() {
+    local key_path="$1"
+    if [[ -f "$key_path" ]] && [[ -f "${key_path}.pub" ]]; then
+        echo "  Skipping $key_path (already exists)..."
+        return
+    fi
+    echo "  Generating $key_path..."
+    if [[ "$PER_KEY_PASSWORD" == "true" ]]; then
+        local pass
+        pass=$(openssl rand -base64 32)
+        MINA_PRIVKEY_PASS="$pass" "$MINA_BINARY" advanced generate-keypair --privkey-path "$key_path"
+        echo "$pass" > "${key_path}.pass"
+    else
+        "$MINA_BINARY" advanced generate-keypair --privkey-path "$key_path"
+    fi
+}
+
 # Generate block producer keys
 echo "Generating $BP_KEYS block producer keys..."
 for ((i=1; i<=BP_KEYS; i++)); do
-    if [[ -f "${PREFIX}-bp${i}" ]] && [[ -f "${PREFIX}-bp${i}.pub" ]]; then
-        echo "  Skipping ${PREFIX}-bp${i} (already exists)..."
-    else
-        echo "  Generating ${PREFIX}-bp${i}..."
-        "$MINA_BINARY" advanced generate-keypair --privkey-path "${PREFIX}-bp${i}"
-    fi
+    generate_key "${PREFIX}-bp${i}"
 done
 
 # Generate plain keys
 echo "Generating $PLAIN_KEYS plain keys..."
 for ((i=1; i<=PLAIN_KEYS; i++)); do
-    if [[ -f "${PREFIX}-plain${i}" ]] && [[ -f "${PREFIX}-plain${i}.pub" ]]; then
-        echo "  Skipping ${PREFIX}-plain${i} (already exists)..."
-    else
-        echo "  Generating ${PREFIX}-plain${i}..."
-        "$MINA_BINARY" advanced generate-keypair --privkey-path "${PREFIX}-plain${i}"
-    fi
+    generate_key "${PREFIX}-plain${i}"
 done
 
 # Build key arguments for prepare-test-ledger script
@@ -474,17 +530,26 @@ fi
 
 # Call prepare-test-ledger script with all keys
 echo "Calling prepare-test-ledger-hf-dryrun.sh with:"
-echo "  Extra keys: $EXTRA_KEYS"
-echo "  Balance for each extra key: $EXTRA_BALANCE MINA"
+echo "  Extra keys (with delegation): $EXTRA_KEYS"
+if [[ $EXTRA_KEYS -gt 0 ]]; then
+    echo "  Balance for each extra key: $EXTRA_BALANCE MINA"
+fi
 echo "  Total keys added to ledger: ${#KEY_ARGS[@]}"
-echo "  Number of plain keys not put into ledger: $((PLAIN_KEYS - EXTRA_KEYS))"
+if [[ -n "$PLAIN_BALANCE" ]]; then
+    BALANCE_ONLY_KEYS=$((PLAIN_KEYS - EXTRA_KEYS))
+    echo "  Plain keys with balance only (no delegation): $BALANCE_ONLY_KEYS ($PLAIN_BALANCE MINA each)"
+else
+    echo "  Number of plain keys not put into ledger: $((PLAIN_KEYS - EXTRA_KEYS))"
+fi
 # Print percentage of extra and bp keys of the total keys in ledger
-PERCENTAGE_BP_KEYS=$(( (BP_KEYS * 10000) / ${#KEY_ARGS[@]} ))
-PERCENTAGE_EXTRA_KEYS=$(( (EXTRA_KEYS * 10000) / ${#KEY_ARGS[@]} ))
-PERCENTAGE_BP_KEYS_DISPLAY=$((PERCENTAGE_BP_KEYS / 100)).$((PERCENTAGE_BP_KEYS % 100))
-PERCENTAGE_EXTRA_KEYS_DISPLAY=$((PERCENTAGE_EXTRA_KEYS / 100)).$((PERCENTAGE_EXTRA_KEYS % 100))
-echo "  Target stake ownership by active stake (block producer keys): $PERCENTAGE_BP_KEYS_DISPLAY%"
-echo "  Target stake ownership by inactive stake (plain keys): $PERCENTAGE_EXTRA_KEYS_DISPLAY%"
+if [[ ${#KEY_ARGS[@]} -gt 0 ]]; then
+    PERCENTAGE_BP_KEYS=$(( (BP_KEYS * 10000) / ${#KEY_ARGS[@]} ))
+    PERCENTAGE_EXTRA_KEYS=$(( (EXTRA_KEYS * 10000) / ${#KEY_ARGS[@]} ))
+    PERCENTAGE_BP_KEYS_DISPLAY=$((PERCENTAGE_BP_KEYS / 100)).$((PERCENTAGE_BP_KEYS % 100))
+    PERCENTAGE_EXTRA_KEYS_DISPLAY=$((PERCENTAGE_EXTRA_KEYS / 100)).$((PERCENTAGE_EXTRA_KEYS % 100))
+    echo "  Target stake ownership by active stake (block producer keys): $PERCENTAGE_BP_KEYS_DISPLAY%"
+    echo "  Target stake ownership by inactive stake (plain keys): $PERCENTAGE_EXTRA_KEYS_DISPLAY%"
+fi
 
 "$SCRIPT_DIR/prepare-test-ledger-hf-dryrun.sh" -e "$EXTRA_KEYS" -b "$EXTRA_BALANCE" "${KEY_ARGS[@]}"
 
@@ -502,6 +567,30 @@ fi
 if [[ ! -f "next.json" ]]; then
     echo "Error: Expected output file next.json was not generated by prepare script" >&2
     exit 1
+fi
+
+# Inject balance-only plain keys (those not covered by -e) into ledger files
+if [[ -n "$PLAIN_BALANCE" ]]; then
+    INJECT_START=$((EXTRA_KEYS + 1))
+    INJECT_ENTRIES=()
+    for ((i=INJECT_START; i<=PLAIN_KEYS; i++)); do
+        if [[ -f "${PREFIX}-plain${i}.pub" ]]; then
+            pk=$(cat "${PREFIX}-plain${i}.pub")
+            INJECT_ENTRIES+=("{\"pk\":\"$pk\",\"delegate\":\"$pk\",\"balance\":\"$PLAIN_BALANCE\"}")
+        else
+            echo "Error: Plain key file ${PREFIX}-plain${i}.pub not found" >&2
+            exit 1
+        fi
+    done
+
+    if [[ ${#INJECT_ENTRIES[@]} -gt 0 ]]; then
+        INJECT_JSON=$(printf '%s\n' "${INJECT_ENTRIES[@]}" | jq -s '.')
+        echo "Injecting $((PLAIN_KEYS - EXTRA_KEYS)) plain keys with balance $PLAIN_BALANCE MINA (no delegation)..."
+        for ledger_file in genesis.json staking.json next.json; do
+            jq --argjson new "$INJECT_JSON" '. + $new' "$ledger_file" > "${ledger_file}.tmp" \
+                && mv "${ledger_file}.tmp" "$ledger_file"
+        done
+    fi
 fi
 
 # Generate full runtime configuration
@@ -535,7 +624,10 @@ jq --slurpfile hashes hashes.json -n "$JQ_EXPR * \$hashes[0]" > runtime_config.j
 echo
 echo "=== Generation Complete ==="
 echo "Generated files:"
-echo "  Key files: ${PREFIX}-bp*.{pub,key}, ${PREFIX}-plain*.{pub,key}"
+echo "  Key files: ${PREFIX}-{bp,plain}*.pub, ${PREFIX}-{bp,plain}*"
+if [[ "$PER_KEY_PASSWORD" == "true" ]]; then
+    echo "  Password files: ${PREFIX}-{bp,plain}*.pass"
+fi
 echo "  Configuration: runtime_config.json, runtime_config_full.json"
 echo "  Hashes: hashes.json"
 echo "  Ledger files: genesis.json, staking.json, next.json"

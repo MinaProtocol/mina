@@ -9,14 +9,16 @@ ARG deb_codename=bullseye
 ARG deb_release=unstable
 ARG network=mainnet
 ARG deb_repo="http://packages.o1test.net"
-ARG deb_profile
+ARG deb_profile=devnet
 ARG deb_suffix
 ARG apt_cache_url=""
+ARG build_flags_suffix
 
 ARG GCLOUD_VERSION=476.0.0
 
 # if --build-arg deb_suffix is defined, add hypen at beginning.
 ENV SUFFIX=${deb_suffix:+-${deb_suffix}}
+ENV BUILD_FLAGS_SUFFIX=${build_flags_suffix}
 # construct mina debian package name based on network and suffix.
 # possible values:
 # - mina-archive-mainnet
@@ -87,9 +89,21 @@ ENV USE_GKE_GCLOUD_AUTH_PLUGIN=True
 
 
 # archive-node package
-RUN echo "deb [trusted=yes] ${deb_repo} $deb_codename $deb_release" > /etc/apt/sources.list.d/o1.list \
-  && apt-get update --quiet --yes \
-  && apt-get install --no-install-recommends --quiet --yes "${MINA_DEB}=$deb_version" \
-  && rm -rf /var/lib/apt/lists/*
+# Installed DIRECTLY from the local build context: scripts/docker/build.sh stages
+# the freshly-built .deb files under _debs, which we COPY to /opt/mina-local-debs,
+# and install-mina-debs.sh installs the resolved .deb file with a single apt-get
+# call (no apt repo / no apt index). With the 3-layer split, the per-network
+# archive package is an empty tent that depends on mina-archive-generic and the
+# profile leaf package. These deps must be passed explicitly.
+ENV MINA_ARCHIVE_GENERIC_DEB=mina-archive-generic${BUILD_FLAGS_SUFFIX}
+COPY scripts/install-mina-debs.sh /usr/local/bin/install-mina-debs.sh
+COPY _debs /opt/mina-local-debs
+RUN chmod +x /usr/local/bin/install-mina-debs.sh \
+  && case "${deb_profile}" in lightnet|dev) PROFILE_DEB="mina-${deb_profile}" ;; *) PROFILE_DEB="mina-${deb_profile}-profile" ;; esac \
+  && APT_NO_DOWNGRADE=1 \
+     /usr/local/bin/install-mina-debs.sh \
+       "${MINA_DEB}=$deb_version" \
+       "${MINA_ARCHIVE_GENERIC_DEB}=$deb_version" \
+       "${PROFILE_DEB}=$deb_version"
 
 ENTRYPOINT ["/usr/bin/dumb-init", "/entrypoint.sh"]

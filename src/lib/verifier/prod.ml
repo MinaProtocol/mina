@@ -534,22 +534,18 @@ let create ~logger ?(enable_internal_tracing = false) ?internal_trace_filename
   { worker = worker_ref; logger }
 
 let with_retry ~logger f =
-  let pause = Time.Span.of_sec 5. in
-  let rec go attempts_remaining =
-    [%log trace] "Verifier trying with $attempts_remaining"
-      ~metadata:[ ("attempts_remaining", `Int attempts_remaining) ] ;
-    match%bind f () with
-    | Ok (`Continue x) ->
-        return (Ok x)
-    | Ok (`Stop e) ->
-        return (Error e)
-    | Error e ->
-        if attempts_remaining = 0 then return (Error e)
-        else
-          let%bind () = after pause in
-          go (attempts_remaining - 1)
+  let strategy =
+    Backoff.Strategy.create ~base:(Time_ns.Span.of_sec 5.0)
+      ~max_delay:(Time_ns.Span.of_sec 5.0) ~max_attempts:5 ()
   in
-  go 4
+  Backoff.Deferred.retry strategy ~logger ~f:(fun () ->
+      match%bind f () with
+      | Ok (`Continue x) ->
+          return (Ok x)
+      | Ok (`Stop e) ->
+          return (Error e)
+      | Error e ->
+          return (Error e) )
 
 let verify_blockchain_snarks { worker; logger } chains =
   O1trace.thread "dispatch_blockchain_snark_verification" (fun () ->
