@@ -159,15 +159,12 @@ let generateStep =
                   { Arm64 = " --custom-suffix arm64 ", Amd64 = "" }
                   spec.arch
 
-          -- Only Daemon/Rosetta ("*-config" images) need an arch marker
-          -- baked into the *custom* suffix build-arg on top of --platform.
-          -- Every other service already gets its arch suffix for free from
-          -- --platform (scripts/docker/helper.sh get_platform_suffix), which
-          -- is also the only arch suffix manager.sh verify's tag ever
-          -- expects (buildkite/scripts/release/manager.sh get_arch_suffix) -
-          -- so applying archCustomSuffix unconditionally double-suffixes
-          -- (e.g. mina-archive:...-arm64-arm64) and self-verify 404s.
           let customSuffix =
+              -- Only Daemon/Rosetta ("*-config" images) need an arch marker
+              -- baked into the custom suffix build-arg on top of --platform;
+              -- --platform alone already derives -arm64 for everyone else
+              -- (scripts/docker/helper.sh get_platform_suffix), which is the
+              -- only arch suffix manager.sh verify's tag ever expects.
                 merge
                   { DaemonGeneric = ""
                   , DaemonProfiled = \(args : { profile : Profiles.Type }) -> ""
