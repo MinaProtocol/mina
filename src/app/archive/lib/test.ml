@@ -465,12 +465,12 @@ let%test_module "Archive node unit tests" =
       (* Derive the precomputed values (and hence the exact fork genesis block)
          the same way [add_genesis_accounts] does internally, so the block we
          insert below is the very block it will later look up and backfill. *)
+      let (module G) = Genesis_constants.profiled () in
       let%bind precomputed_values =
         match%map
           Genesis_ledger_helper.init_from_config_file ~logger
-            ~proof_level:Genesis_constants.Compiled.proof_level
-            ~genesis_constants ~constraint_constants ~cli_proof_level:None
-            runtime_config
+            ~proof_level:G.proof_level ~genesis_constants ~constraint_constants
+            ~cli_proof_level:None runtime_config
         with
         | Ok precomputed_values ->
             precomputed_values

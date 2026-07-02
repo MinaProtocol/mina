@@ -22,7 +22,10 @@ if ./buildkite/scripts/apps/restore_binary.sh devnet \
   echo "Using bare mina + mina-create-genesis from apps cache"
 else
   echo "Falling back to debian-installed mina"
-  source buildkite/scripts/debian/install.sh "mina-devnet-generic-instrumented" 1
+  # This job depends on the instrumented build, whose daemon binaries ship in
+  # the network-free mina-generic-instrumented package (it Provides mina-generic
+  # to satisfy the profile package's dependency).
+  source buildkite/scripts/debian/install.sh "mina-generic-instrumented" 1
 
   echo "removing magic config files"
   sudo rm -f /var/lib/coda/config_*

@@ -22,10 +22,16 @@ if APPS_PROFILE=lightnet ./buildkite/scripts/apps/restore_binary.sh devnet \
   echo "Using bare mina + libp2p_helper + mina-command-line-tests + mina-node-status-mock-server from apps cache"
 else
   echo "Falling back to debian-installed test-suite + lightnet daemon"
-  source buildkite/scripts/debian/install.sh "mina-test-suite,mina-devnet-generic-lightnet" 1
+  # The daemon binary lives in the network-free mina-generic package; the
+  # profile is selected at runtime via MINA_PROFILE=lightnet (set below), so no
+  # lightnet-specific daemon package is needed. mina-test-suite supplies the
+  # mina-command-line-tests driver and the node-status mock server.
+  source buildkite/scripts/debian/install.sh "mina-test-suite,mina-generic" 1
 fi
 
 export MINA_LIBP2P_PASS="naughty blue worm"
 export MINA_PRIVKEY_PASS="naughty blue worm"
+
+export MINA_PROFILE=lightnet
 
 mina-command-line-tests test -v
