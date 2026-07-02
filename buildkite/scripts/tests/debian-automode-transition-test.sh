@@ -159,6 +159,8 @@ ORIG_AUTOMODE_DEB=$(ls "${DEB_DIR}"/${PKG_AUTOMODE}_*.deb | head -1)
 ORIG_CONFIG_DEB=$(ls "${DEB_DIR}"/${PKG_CONFIG}_*.deb | head -1)
 ORIG_POSTFORK_DEB=$(ls "${DEB_DIR}"/${PKG_POSTFORK}_*.deb | head -1)
 ORIG_LOGPROC_DEB=$(ls "${DEB_DIR}"/mina-logproc_*.deb | head -1)
+ORIG_PROFILE_DEB=$(ls "${DEB_DIR}"/${PKG_PROFILE}_*.deb | head -1)
+ORIG_PROFILE_LEAF_DEB=$(ls "${DEB_DIR}"/${PKG_PROFILE_LEAF}_*.deb | head -1)
 
 # The prefork debs come from the legacy cache at their original versions.
 # Copy all of them into the repo — no reversioning needed since the automode
@@ -221,6 +223,8 @@ reversion_deb "${ORIG_LOGPROC_DEB}"  "${V2}" "${REPO_DIR}/mina-logproc_${V2}_amd
 reversion_deb "${ORIG_DAEMON_DEB}"  "${V3}" "${REPO_DIR}/${PKG_DAEMON}_${V3}_amd64.deb"
 reversion_deb "${ORIG_CONFIG_DEB}"  "${V3}" "${REPO_DIR}/${PKG_CONFIG}_${V3}_all.deb"
 reversion_deb "${ORIG_LOGPROC_DEB}" "${V3}" "${REPO_DIR}/mina-logproc_${V3}_amd64.deb"
+reversion_deb "${ORIG_PROFILE_DEB}" "${V3}" "${REPO_DIR}/${PKG_PROFILE}_${V3}_amd64.deb"
+reversion_deb "${ORIG_PROFILE_LEAF_DEB}" "${V3}" "${REPO_DIR}/${PKG_PROFILE_LEAF}_${V3}_amd64.deb"
 
 log_info "Versioned packages:"
 ls -la "${REPO_DIR}"/*.deb
