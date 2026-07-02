@@ -140,6 +140,8 @@ log_info "=== Step 1: Download debs from cache ==="
 # Download the legacy prefork deb from the persistent legacy cache.
 # The automode metapackage depends on prefork at PREFORK_LEGACY_VERSION (not the
 # current build version), so we need the real legacy deb to satisfy that constraint.
+./buildkite/scripts/cache/manager.sh read "debians/${CODENAME}/${PKG_PROFILE}_*" "${DEB_DIR}"
+./buildkite/scripts/cache/manager.sh read "debians/${CODENAME}/${PKG_PROFILE_LEAF}_*" "${DEB_DIR}"
 ./buildkite/scripts/cache/manager.sh read --root "legacy" "debians/${CODENAME}/${PKG_PREFORK}_*" "${DEB_DIR}"
 
 log_info "Downloaded debs:"
