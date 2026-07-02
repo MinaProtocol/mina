@@ -195,12 +195,24 @@ module Token = struct
     let open Deferred.Result.Let_syntax in
     let value = Token_id.to_string token_id in
     match Token_owners.find_owner token_id with
-    | None ->
+    | None -> (
         (* not necessarily the default token *)
-        Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
-          ~table_name ~cols:(Fields.names, typ)
-          (module Conn)
-          { value; owner_public_key_id = None; owner_token_id = None }
+        (* The [value] column is UNIQUE ([tokens_value_key]). A row for this
+           value may already exist with an owner set (e.g. inserted by block
+           processing for a custom token), while here we have no owner info
+           because [Token_owners] is not populated on this path (the genesis
+           account insertion does not pre-populate it). Selecting by the full
+           {value; NULL; NULL} tuple would miss such an owned row and the
+           subsequent INSERT would violate [tokens_value_key]. So look up by
+           value alone first and reuse the existing id if present. *)
+        match%bind find_opt (module Conn) token_id with
+        | Some id ->
+            return id
+        | None ->
+            Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
+              ~table_name ~cols:(Fields.names, typ)
+              (module Conn)
+              { value; owner_public_key_id = None; owner_token_id = None } )
     | Some acct_id -> (
         assert (not @@ Token_id.(equal default) token_id) ;
         assert (
