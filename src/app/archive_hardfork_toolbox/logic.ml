@@ -63,8 +63,9 @@ let populate_genesis_accounts ~postgres_uri ~runtime_config_file ~chunks_length
     Yojson.Safe.from_file runtime_config_file
     |> Runtime_config.of_yojson |> Result.ok_or_failwith
   in
-  let genesis_constants = Genesis_constants.Compiled.genesis_constants in
-  let constraint_constants = Genesis_constants.Compiled.constraint_constants in
+  let (module G) = Genesis_constants.profiled () in
+  let genesis_constants = G.genesis_constants in
+  let constraint_constants = G.constraint_constants in
   let pool = connect postgres_uri in
   [%log info] "Populating genesis accounts from runtime config %s"
     runtime_config_file ;

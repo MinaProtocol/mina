@@ -602,9 +602,11 @@ let load_and_initialize_config ~genesis_dir ~logger ~config_file =
     |> Result.map_error ~f:Error.of_string
     |> Or_error.ok_exn
   in
-  let genesis_constants = Genesis_constants.Compiled.genesis_constants in
-  let constraint_constants = Genesis_constants.Compiled.constraint_constants in
-  let proof_level = Genesis_constants.Compiled.proof_level in
+
+  let (module G) = Genesis_constants.profiled () in
+  let genesis_constants = G.genesis_constants in
+  let constraint_constants = G.constraint_constants in
+  let proof_level = G.proof_level in
   Genesis_ledger_helper.init_from_config_file ~genesis_constants
     ~constraint_constants ~logger ~proof_level ~cli_proof_level:None
     ~genesis_dir runtime_config

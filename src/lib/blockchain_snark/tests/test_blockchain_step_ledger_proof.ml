@@ -8,11 +8,13 @@
 open Core_kernel
 module Blockchain_snark = Blockchain_snark.Blockchain_snark_state
 
-let constraint_constants = Genesis_constants.Compiled.constraint_constants
+module G = (val Genesis_constants.profiled ())
+
+let constraint_constants = G.constraint_constants
 
 let consensus_constants =
   Consensus.Constants.create ~constraint_constants
-    ~protocol_constants:Genesis_constants.Compiled.genesis_constants.protocol
+    ~protocol_constants:G.genesis_constants.protocol
 
 let genesis_ledger =
   Consensus.Genesis_data.Ledger.to_hashed Genesis_ledger.for_unit_tests

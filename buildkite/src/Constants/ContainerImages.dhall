@@ -1,12 +1,11 @@
 -- TODO: Automatically push, tag, and update images #4862
--- NOTE: minaToolchain is the default image for various jobs, set to minaToolchainBookworm
+-- NOTE: minaToolchain is the default image for various jobs, set to minaToolchainBullseye
 -- NOTE: minaToolchainBullseye is also used for building Ubuntu Focal packages in CI
 -- NOTE: minaToolchainBookworm is also used for building Ubuntu Jammy packages in CI
 { toolchainBase =
     "europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/ci-toolchain-base:v4"
 , minaToolchainBookworm =
-    { amd64 =
-        "europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/mina-toolchain:f009c00-bookworm-devnet"
+    { amd64 = "europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/mina-toolchain:f009c00-bookworm-devnet"
     , arm64 =
         "europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/mina-toolchain:f009c00-bookworm-devnet-arm64"
     }
@@ -17,7 +16,7 @@
 , minaToolchainJammy.amd64 =
     "europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/mina-toolchain:f009c00-jammy-devnet"
 , minaToolchain =
-    "europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/mina-toolchain:f009c00-bookworm-devnet"
+    "europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/mina-toolchain:f009c00-bullseye-devnet"
 , postgres =
     "europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/postgres:12.4-alpine"
 , xrefcheck =
