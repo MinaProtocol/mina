@@ -121,6 +121,20 @@ module Block = struct
   let get_max_slot (module Conn : Mina_caqti.CONNECTION) () =
     Conn.find max_slot_query ()
 
+  let max_height_query =
+    Mina_caqti.find_req Caqti_type.unit Caqti_type.int64
+      {sql| SELECT MAX(height) FROM blocks |sql}
+
+  let get_max_height (module Conn : Mina_caqti.CONNECTION) () =
+    Conn.find max_height_query ()
+
+  let state_hashes_by_height_query =
+    Mina_caqti.collect_req Caqti_type.int64 Caqti_type.string
+      {sql| SELECT state_hash FROM blocks WHERE height = $1 |sql}
+
+  let get_state_hashes_by_height (module Conn : Mina_caqti.CONNECTION) height =
+    Conn.collect_list state_hashes_by_height_query height
+
   let max_canonical_slot_query =
     Mina_caqti.find_req Caqti_type.unit Caqti_type.int64
       {sql| SELECT MAX(global_slot_since_genesis) FROM blocks
