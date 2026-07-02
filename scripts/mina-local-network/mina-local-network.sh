@@ -42,6 +42,10 @@ PROOF_LEVEL="full"
 WORK_DELAY=1
 TRANSACTION_CAPACITY_LOG2=2
 LOG_PRECOMPUTED_BLOCKS=false
+# Hours of uptime after which each daemon stops itself (the mina default is 168,
+# i.e. ~weekly restarts). Empty means "use the daemon default". Set high for
+# long-lived dev networks that should not self-restart.
+STOP_TIME_HOURS=""
 
 SNARK_WORKER_FEE=0.001
 TRANSACTION_INTERVAL=10 # in seconds
@@ -173,6 +177,8 @@ help() {
                                          |   Default: ${LOG_PRECOMPUTED_BLOCKS}
 -pl  |--proof-level <proof-level>        | Proof level
                                          |   Default: ${PROOF_LEVEL}
+-stopt|--stop-time <hours>               | Uptime (hours) after which each daemon stops itself. The mina default is 168 (~weekly restarts); set higher to avoid self-restarts on long-lived networks. Empty uses the daemon default.
+                                         |   Default: ${STOP_TIME_HOURS:-<daemon default 168>}
 -wd  |--work-delay <#>                   | Scan state work delay, in blocks (only used with '--config reset'). WARN: with proof level 'full', changing this changes the circuits and forces (re)generation of proving keys on first start.
                                          |   Default: ${WORK_DELAY}
 -tc  |--transaction-capacity-log2 <#>    | Log2 of the scan state transaction capacity, i.e. depth of a scan state tree (only used with '--config reset'). WARN: with proof level 'full', changing this changes the circuits and forces (re)generation of proving keys on first start.
@@ -294,6 +300,20 @@ on-exit() {
       if [[ -n "${SEED_PID}" ]]; then
         stop-node "seed" "$SEED_START_PORT"
       fi
+
+      # 4. stop the archive node, if we've spawned it. It has no GraphQL
+      # stop-daemon endpoint and does not exit on the INT/TERM delivered to the
+      # process group, so kill it explicitly (TERM, then KILL as a fallback)
+      # to avoid leaking it -- and, downstream, its PostgreSQL connection.
+      if [[ -n "${ARCHIVE_PID}" ]] && kill -0 "${ARCHIVE_PID}" 2>/dev/null; then
+        echo "Killing Archive node at ${ARCHIVE_PID}"
+        kill "${ARCHIVE_PID}" 2>/dev/null
+        for _ in 1 2 3 4 5; do
+          kill -0 "${ARCHIVE_PID}" 2>/dev/null || break
+          sleep 1
+        done
+        kill -9 "${ARCHIVE_PID}" 2>/dev/null || true
+      fi
       ;;
     kill_snark_workers)
       # NOTE: SNARK workers are already killed out of this case-statement. Hence
@@ -354,6 +374,12 @@ exec-daemon() {
 
   if [ -n "$NODE_STATUS_URL" ]; then
     common_extra_args+=( --node-status-url "$NODE_STATUS_URL" )
+  fi
+
+  # Override the daemon's self-stop uptime (mina default 168h ~= weekly
+  # restarts). Used to keep long-lived dev networks from restarting themselves.
+  if [ -n "$STOP_TIME_HOURS" ]; then
+    common_extra_args+=( --stop-time "$STOP_TIME_HOURS" )
   fi
 
   local per_daemon_extra_args=""
@@ -665,6 +691,10 @@ while [[ "$#" -gt 0 ]]; do
   -lp | --log-precomputed-blocks) LOG_PRECOMPUTED_BLOCKS=true ;;
   -pl | --proof-level)
     PROOF_LEVEL="${2}"
+    shift
+    ;;
+  -stopt | --stop-time)
+    STOP_TIME_HOURS="${2}"
     shift
     ;;
   -wd | --work-delay)
