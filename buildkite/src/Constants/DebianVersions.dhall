@@ -55,14 +55,11 @@ let DepsSpec =
 
 let dependsOn =
           \(spec : DepsSpec.Type)
-      ->  let profileSuffix = Profiles.toSuffixUppercase spec.profile
-
-          let name =
+      ->  let name =
                 "${spec.prefix}${capitalName
-                                   spec.deb_version}${Network.capitalName
-                                                        spec.network}${profileSuffix}${BuildFlags.toSuffixUppercase
-                                                                                         spec.build_flag}${Arch.nameSuffix
-                                                                                                             spec.arch}"
+                                   spec.deb_version}${BuildFlags.toSuffixUppercase
+                                                        spec.build_flag}${Arch.nameSuffix
+                                                                            spec.arch}"
 
           in  [ { name = name, key = "${spec.step}-deb-pkg" } ]
 

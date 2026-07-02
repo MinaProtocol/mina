@@ -16,6 +16,7 @@ ENV DEBIAN_FRONTEND noninteractive
 ARG deb_suffix
 ARG build_flags_suffix
 ARG apt_cache_url=""
+ARG deb_profile=devnet
 
 # if --build-arg deb_suffix is defined, add hypen at beginning.
 ENV SUFFIX=${deb_suffix:+-${deb_suffix}}
@@ -33,11 +34,13 @@ ENV BUILD_FLAGS_SUFFIX=${build_flags_suffix}
 # suffix, so the install step below adds "-generic" and also pulls the config
 # package (reproducing the former monolithic mina-${network} package).
 # possible values:
-# - mina-devnet-generic + mina-devnet-config (full image)
-# - mina-devnet-generic / mina-devnet-generic-instrumented (apps-only, no config)
+# - mina-${profile}-profile + mina-devnet-config (full image)
+# - mina-${profile}-profile / mina-${profile}-profile-instrumented (apps-only, no config)
 ENV MINA_CONFIG_DEB=mina-${network}-config
 ENV MINA_ARCHIVE_DEB=mina-archive-${network}${BUILD_FLAGS_SUFFIX}
-ENV MINA_ROSETTA_DEB=mina-rosetta-${network}
+ENV MINA_ROSETTA_DEB=mina-rosetta-${network}${BUILD_FLAGS_SUFFIX}
+ENV MINA_ARCHIVE_GENERIC_DEB=mina-archive-generic${BUILD_FLAGS_SUFFIX}
+ENV MINA_ROSETTA_GENERIC_DEB=mina-rosetta-generic${BUILD_FLAGS_SUFFIX}
 
 
 # We do not install the below platform-specific dependencies,
@@ -120,19 +123,26 @@ COPY scripts/install-mina-debs.sh /usr/local/bin/install-mina-debs.sh
 COPY _debs /opt/mina-local-debs
 RUN echo "Building image with version $deb_version from repo $deb_release $deb_codename for network $network" \
     && chmod +x /usr/local/bin/install-mina-debs.sh \
+    && case "${deb_profile}" in lightnet|dev) PROFILE_DEB="mina-${deb_profile}" ;; *) PROFILE_DEB="mina-${deb_profile}-profile" ;; esac \
     && if echo "${SUFFIX}" | grep -q -- '-generic'; then \
          /usr/local/bin/install-mina-debs.sh \
-           "mina-${network}${SUFFIX}=$deb_version" \
+           "mina${SUFFIX}=$deb_version" \
            "mina-logproc=$deb_version" \
+           "${MINA_ARCHIVE_GENERIC_DEB}=$deb_version" \
            "${MINA_ARCHIVE_DEB}=$deb_version" \
-           "${MINA_ROSETTA_DEB}=$deb_version" ; \
+           "${MINA_ROSETTA_GENERIC_DEB}=$deb_version" \
+           "${MINA_ROSETTA_DEB}=$deb_version" \
+           "${PROFILE_DEB}=$deb_version" ; \
        else \
          /usr/local/bin/install-mina-debs.sh \
-           "mina-${network}-generic${SUFFIX}=$deb_version" \
+           "mina-generic${SUFFIX}=$deb_version" \
            "mina-logproc=$deb_version" \
            "${MINA_CONFIG_DEB}=$deb_version" \
+           "${MINA_ARCHIVE_GENERIC_DEB}=$deb_version" \
            "${MINA_ARCHIVE_DEB}=$deb_version" \
-           "${MINA_ROSETTA_DEB}=$deb_version" ; \
+           "${MINA_ROSETTA_GENERIC_DEB}=$deb_version" \
+           "${MINA_ROSETTA_DEB}=$deb_version" \
+           "${PROFILE_DEB}=$deb_version" ; \
        fi
 
 # --- Set up postgres

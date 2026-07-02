@@ -10,11 +10,9 @@ let Optional/default = Prelude.Optional.default
 
 let List/map = Prelude.List.map
 
-let Artifacts = ../../Constants/Artifacts.dhall
+let Docker = ../../Constants/Docker/Package.dhall
 
 let Size = ../../Command/Size.dhall
-
-let Package = ../../Constants/DebianPackage.dhall
 
 let Network = ../../Constants/Network.dhall
 
@@ -36,13 +34,11 @@ let Cmd = ../../Lib/Cmds.dhall
 
 let FixPermissions = ../FixPermissions.dhall
 
-let Artifact = ../../Constants/Artifacts.dhall
-
 let Architecture = ../../Constants/Arch.dhall
 
 let Spec =
       { Type =
-          { artifacts : List Artifact.Type
+          { artifacts : List Docker.Type
           , networks : List Network.Type
           , backend : Text
           , channel : DebianChannel.Type
@@ -77,7 +73,7 @@ let Spec =
           , if_ : Optional Text
           }
       , default =
-          { artifacts = [] : List Package.Type
+          { artifacts = [] : List Docker.Type
           , debian_repo = DebianRepo.Type.Unstable
           , networks = [ Network.Type.Mainnet, Network.Type.Devnet ]
           , backend = "local"
@@ -108,7 +104,7 @@ let publish
                   "\\\${GITTAG}"
                   "\\\$(date \"+%Y%m%d\")"
 
-          let artifacts = join "," (Artifacts.dockerNames spec.artifacts)
+          let artifacts = join "," (Docker.dockerNames spec.artifacts)
 
           let networks =
                 join

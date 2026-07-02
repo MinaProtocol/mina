@@ -1,6 +1,6 @@
 let MinaArtifactToolchain = ../../Command/MinaArtifactToolchain.dhall
 
-let Artifacts = ../../Constants/Artifacts.dhall
+let Docker = ../../Constants/Docker/Package.dhall
 
 let DockerImage = ../../Command/DockerImage.dhall
 
@@ -12,7 +12,7 @@ let Size = ../../Command/Size.dhall
 
 in  MinaArtifactToolchain.pipeline
       DockerImage.ReleaseSpec::{
-      , service = Artifacts.Type.Toolchain
+      , service = Docker.Type.Toolchain
       , deb_codename = DebianVersions.DebVersion.Bullseye
       , no_cache = True
       , deb_install_mode = DockerImage.DebianInstallMode.NoInstall

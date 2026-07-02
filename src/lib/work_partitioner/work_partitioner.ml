@@ -33,10 +33,11 @@ type t =
 let create ~(reassignment_timeout : Time.Span.t) ~(logger : Logger.t)
     ~(proof_cache_db : Proof_cache_tag.cache_db)
     ~(signature_kind : Mina_signature_kind.t) : t =
+  let (module G) = Genesis_constants.profiled () in
   let module T = Transaction_snark.Make (struct
-    let constraint_constants = Genesis_constants.Compiled.constraint_constants
+    let constraint_constants = G.constraint_constants
 
-    let proof_level = Genesis_constants.Compiled.proof_level
+    let proof_level = G.proof_level
 
     let signature_kind = signature_kind
   end) in

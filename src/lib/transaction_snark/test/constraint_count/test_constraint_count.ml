@@ -233,7 +233,8 @@ let test_transaction_merge () =
 (** Test transaction-base circuit *)
 let test_transaction_base () =
   let signature_kind = Mina_signature_kind.t_DEPRECATED in
-  let constraint_constants = Genesis_constants.Compiled.constraint_constants in
+  let (module G) = Genesis_constants.profiled () in
+  let constraint_constants = G.constraint_constants in
   let cs =
     Transaction_snark.base_constraint_system ~signature_kind
       ~constraint_constants
@@ -244,7 +245,8 @@ let test_transaction_base () =
 (** Test zkapp-opt_signed-opt_signed circuit *)
 let test_zkapp_opt_signed_opt_signed () =
   let signature_kind = Mina_signature_kind.t_DEPRECATED in
-  let constraint_constants = Genesis_constants.Compiled.constraint_constants in
+  let (module G) = Genesis_constants.profiled () in
+  let constraint_constants = G.constraint_constants in
   let cs =
     Transaction_snark.zkapp_opt_signed_opt_signed_constraint_system
       ~signature_kind ~constraint_constants
@@ -255,7 +257,8 @@ let test_zkapp_opt_signed_opt_signed () =
 (** Test zkapp-opt_signed circuit *)
 let test_zkapp_opt_signed () =
   let signature_kind = Mina_signature_kind.t_DEPRECATED in
-  let constraint_constants = Genesis_constants.Compiled.constraint_constants in
+  let (module G) = Genesis_constants.profiled () in
+  let constraint_constants = G.constraint_constants in
   let cs =
     Transaction_snark.zkapp_opt_signed_constraint_system ~signature_kind
       ~constraint_constants
@@ -266,7 +269,9 @@ let test_zkapp_opt_signed () =
 (** Test zkapp-proved circuit *)
 let test_zkapp_proved () =
   let signature_kind = Mina_signature_kind.t_DEPRECATED in
-  let constraint_constants = Genesis_constants.Compiled.constraint_constants in
+
+  let (module G) = Genesis_constants.profiled () in
+  let constraint_constants = G.constraint_constants in
   let cs =
     Transaction_snark.zkapp_proved_constraint_system ~signature_kind
       ~constraint_constants
