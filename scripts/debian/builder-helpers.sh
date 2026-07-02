@@ -83,7 +83,6 @@ BUILDDIR="deb_build"
 # Function to ease creation of Debian package control files
 create_control_file() {
 
-  echo "------------------------------------------------------------"
   echo "create_control_file inputs:"
   echo "Package Name: ${1}"
   echo "Dependencies: ${2}"
@@ -149,7 +148,6 @@ Description:
  Built from ${GITHASH} by ${BUILD_URL}
 EOF
 
-  echo "------------------------------------------------------------"
   echo "Control File:"
   cat "${BUILDDIR}/DEBIAN/control"
 
@@ -162,33 +160,17 @@ build_deb() {
 
   # Memoize: if this .deb was already produced (e.g. daemon_mainnet_generic and
   # daemon_devnet_generic both produce mina-generic), skip the second build.
-  if [[ -f "$deb_file" ]]; then
-    echo "--- Skipping ${deb_file} (already built)"
-    rm -rf "${BUILDDIR}"
-    return 0
-  fi
-
-  echo "--- Building ${deb_file}"
-  echo "------------------------------------------------------------"
-  echo "build_deb inputs:"
-  echo "Package Name: ${package_name}"
-
-  # Memoize: if this .deb was already produced (e.g. daemon_mainnet_generic and
-  # daemon_devnet_generic both produce mina-generic), skip the second build.
   # Only in non-capture mode (tests need fresh captures).
   if [[ -z "${BUILD_DEB_CAPTURE_DIR:-}" ]] && [[ -f "$deb_file" ]]; then
-    echo "--- Skipping ${deb_file} (already built)"
+    echo "Skipping ${deb_file} (already built)"
     rm -rf "${BUILDDIR}"
     return 0
   fi
 
-  echo "--- Building ${deb_file}"
-  echo "------------------------------------------------------------"
-  echo "build_deb inputs:"
+  echo "Building ${deb_file}"
   echo "Package Name: ${package_name}"
 
   # echo contents of deb
-  echo "------------------------------------------------------------"
   echo "Deb Contents:"
   find "${BUILDDIR}"
 
@@ -201,12 +183,11 @@ build_deb() {
     rm -rf "${BUILD_DEB_CAPTURE_DIR}/last_build"
     cp -a "${BUILDDIR}" "${BUILD_DEB_CAPTURE_DIR}/last_build"
     rm -rf "${BUILDDIR}"
-    echo "--- Captured ${package_name} staging directory to ${BUILD_DEB_CAPTURE_DIR}"
+    echo "Captured ${package_name} staging directory to ${BUILD_DEB_CAPTURE_DIR}"
     return 0
   fi
 
   # Build the package
-  echo "------------------------------------------------------------"
   # NOTE: the reason for `-Zgzip` is we might be building on newer Ubuntu, e.g.
   # Noble. The default packaging format is `zstd`, but then when we're building
   # Docker image, we're examining those packages in buildkite's agent, where
@@ -256,7 +237,6 @@ install_mina_service() {
 # Does NOT install mina.service (the config package owns it, see
 # install_mina_service).
 copy_common_daemon_utils() {
-  echo "------------------------------------------------------------"
   echo "copy_common_daemon_utils inputs:"
 
   local MINA_BIN="${1:-${BUILDDIR}/usr/local/bin/mina}"
@@ -275,7 +255,6 @@ copy_common_daemon_utils() {
 # Copies common daemon binaries only to debian package
 copy_common_daemon_apps() {
 
-  echo "------------------------------------------------------------"
   echo "copy_common_daemon_apps inputs:"
 
   local TARGET_ROOT_DIR="${1:-${BUILDDIR}/usr/local/bin}"
@@ -311,7 +290,6 @@ copy_common_daemon_apps() {
 # Function to DRY copying config files into daemon packages
 copy_common_daemon_configs() {
 
-  echo "------------------------------------------------------------"
   echo "copy_common_daemon_configs inputs:"
   echo "Network Name: ${1} (like mainnet, devnet)"
 
@@ -431,7 +409,6 @@ build_test_executive_deb () {
 # and mina-zkapp-test-transaction packages, which no longer exist.
 #
 build_tx_tools_deb() {
-  echo "------------------------------------------------------------"
   echo "--- Building mina-tx-tools (batch-txn + zkapp-test-transaction):"
 
   # Replaces/Breaks lets apt cleanly take over /usr/local/bin/mina-batch-txn
@@ -515,7 +492,6 @@ build_functional_test_suite_deb() {
 #
 build_rosetta_generic_deb() {
 
-  echo "------------------------------------------------------------"
   echo "--- Building rosetta generic deb"
 
   local package_name="mina-rosetta-generic${DEB_SUFFIX}"
@@ -568,7 +544,6 @@ build_rosetta_deb() {
     *) echo "Unknown network: ${network}" >&2; exit 1 ;;
   esac
 
-  echo "------------------------------------------------------------"
   echo "--- Building ${network} rosetta tent metapackage"
 
   local package_name="mina-rosetta-${network}${DEB_SUFFIX}"
@@ -612,7 +587,6 @@ build_profile_deb() {
   esac
 
   echo "--- Building package ${package_name}"
-  echo "------------------------------------------------------------"
   echo "build_profile_deb inputs:"
   echo "Profile Name: ${1} (like mainnet, devnet, lightnet, dev)"
 
@@ -647,7 +621,6 @@ build_profile_generic_tent_deb() {
 
   local profile="$1"
 
-  echo "------------------------------------------------------------"
   echo "--- Building ${profile}-generic tent metapackage:"
 
   local package_name="mina-${profile}-generic"
@@ -667,7 +640,6 @@ build_daemon_config_deb() {
 
   local network="$1"
 
-  echo "------------------------------------------------------------"
   echo "--- Building ${network} config deb without keys:"
 
   local package_name="mina-${network}-config"
@@ -717,7 +689,6 @@ build_daemon_prefork_deb() {
 
   local network="$1"
 
-  echo "------------------------------------------------------------"
   echo "--- Building mainnet berkeley deb for prefork automode :"
 
   local package_name="mina-${network}-prefork-${POSTFORK_CODENAME}"
@@ -795,7 +766,6 @@ EOF
   mkdir -p "${BUILDDIR}/usr/lib/mina/berkeley"
   ln -sf ../../lib/mina/berkeley/mina-create-genesis "${BUILDDIR}/usr/local/bin/mina-create-legacy-genesis"
 
-  echo "------------------------------------------------------------"
   echo "Created symlinks in ${BUILDDIR}/usr/local/bin:"
   find "${BUILDDIR}/usr/local/bin/" -type l -exec ls -la {} \;
 
@@ -808,7 +778,6 @@ copy_common_daemon_post_automode_apps_and_configs() {
 
   local prefork_network="${1}"
 
-  echo "------------------------------------------------------------"
   echo "copy_common_daemon_post_automode_configs inputs:"
   echo "Network Name: ${prefork_network} (like mainnet, devnet, berkeley)"
 
@@ -857,7 +826,6 @@ build_daemon_postfork_deb() {
   local package_name="mina-${network}-postfork-${POSTFORK_CODENAME}"
 
 
-  echo "------------------------------------------------------------"
   echo "--- Building ${network} postfork deb for hardfork automode:"
 
   # The postfork runtime ships /etc/bash_completion.d/mina (and shares the
@@ -901,7 +869,6 @@ build_daemon_automode_deb() {
 
   local network="$1"
 
-  echo "------------------------------------------------------------"
   echo "--- Building ${network} automode transitional metapackage:"
 
   local package_name="mina-${network}-automode"
@@ -939,7 +906,6 @@ build_daemon_tent_deb() {
 
   local network="$1"
 
-  echo "------------------------------------------------------------"
   echo "--- Building ${network} tent metapackage:"
 
   local package_name="mina-${network}"
@@ -973,7 +939,6 @@ build_daemon_tent_deb() {
 #
 build_daemon_generic_deb() {
 
-  echo "------------------------------------------------------------"
   echo "--- Building Mina Generic package"
 
   local _suffix="${DEB_SUFFIX#-}"
@@ -1039,7 +1004,6 @@ build_daemon_hardfork_config_deb() {
   local network="$1"
   local package_name="mina-${network}-config"
 
-  echo "------------------------------------------------------------"
   echo "--- Building hardfork config for ${network} network deb without keys:"
 
   # Config package contains only architecture-independent configuration data
@@ -1144,7 +1108,6 @@ build_archive_deb () {
       ;;
   esac
 
-  echo "------------------------------------------------------------"
   echo "--- Building archive ${network} tent metapackage"
 
   local depends="mina-archive-generic${DEB_SUFFIX} (>= ${MINA_DEB_VERSION}), mina-${profile}-profile (>= ${MINA_DEB_VERSION})"
@@ -1172,7 +1135,6 @@ build_archive_generic_deb () {
 
   local package_name="mina-archive-generic${DEB_SUFFIX}"
 
-  echo "------------------------------------------------------------"
   echo "--- Building archive generic deb"
 
   create_control_file "${package_name}" "${ARCHIVE_DEPS}" "Mina Archive Node for generic usage"
@@ -1191,7 +1153,6 @@ build_archive_generic_deb () {
 # Utility for verifying delegation in Mina GraphQL format.
 #
 build_delegation_verify_deb () {
-  echo "------------------------------------------------------------"
   echo "--- Building Mina Berkeley delegation verify tool:"
 
   create_control_file mina-delegation-verify \
@@ -1226,7 +1187,6 @@ build_delegation_verify_deb () {
 # Contains the runtime_genesis_ledger tool for Mina protocol.
 #
 build_prefork_devnet_genesis_ledger_deb() {
-  echo "------------------------------------------------------------"
   echo "--- Building Mina Generic devnet create prefork genesis tool:"
 
   DEB_NAME="mina-create-devnet-prefork-genesis-ledger"
@@ -1261,7 +1221,6 @@ build_prefork_genesis_ledger_deb() {
 
   local network="$1"
 
-  echo "------------------------------------------------------------"
   echo "--- Building Mina Generic ${network} create prefork genesis tool:"
 
   local package_name="mina-create-${network}-prefork-genesis-ledger"
@@ -1283,7 +1242,6 @@ build_prefork_genesis_ledger_deb() {
 
 
 build_daemon_storage_toolbox_deb() {
-  echo "------------------------------------------------------------"
   echo "--- Building Mina Berkeley daemon storage toolbox:"
 
   ROCKSDB_VERSION="10.5.2"
