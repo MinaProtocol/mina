@@ -367,11 +367,43 @@ fi
 echo "PASSED: client subcommand uses mesa runtime"
 
 # =============================================================================
-# Test 9: Berkeley Daemon Always Runs In migrate-exit Mode
+# Test 9: libp2p Subcommand Passes Through To Selected Runtime
 # =============================================================================
 
 echo ""
-echo "=== Test 9: Berkeley Daemon migrate-exit Injection ==="
+echo "=== Test 9: libp2p Subcommand Pass-Through ==="
+echo "Verifying that 'libp2p' is forwarded verbatim to the selected runtime"
+
+# Without activation marker -> berkeley runtime
+MINA_EXEC_COMMAND=$(docker run --env MINA_DISPATCHER_DRYRUN=1 --entrypoint bash "$DOCKER_IMAGE" \
+  -c "mina libp2p generate-keypair -privkey-path /tmp/k" 2>&1)
+
+if [[ "$MINA_EXEC_COMMAND" != *"/berkeley/mina libp2p generate-keypair"* ]]; then
+  echo "FAILED: libp2p subcommand should pass through to berkeley runtime without activation marker"
+  echo "  Expected substring: /berkeley/mina libp2p generate-keypair"
+  echo "  Actual output: $MINA_EXEC_COMMAND"
+  exit 1
+fi
+
+# With activation marker -> mesa runtime
+MINA_EXEC_COMMAND=$(docker run --env MINA_DISPATCHER_DRYRUN=1 --entrypoint bash "$DOCKER_IMAGE" \
+  -c "$(create_activation_marker) && mina libp2p generate-keypair -privkey-path /tmp/k" 2>&1)
+
+if [[ "$MINA_EXEC_COMMAND" != *"/mesa/mina libp2p generate-keypair"* ]]; then
+  echo "FAILED: libp2p subcommand should pass through to mesa runtime with activation marker"
+  echo "  Expected substring: /mesa/mina libp2p generate-keypair"
+  echo "  Actual output: $MINA_EXEC_COMMAND"
+  exit 1
+fi
+
+echo "PASSED: libp2p subcommand passes through to the selected runtime"
+
+# =============================================================================
+# Test 10: Berkeley Daemon Always Runs In migrate-exit Mode
+# =============================================================================
+
+echo ""
+echo "=== Test 10: Berkeley Daemon migrate-exit Injection ==="
 echo "Verifying that the pre-fork (berkeley) daemon always gets --hardfork-handling migrate-exit"
 
 # Without activation marker -> berkeley runtime
@@ -393,11 +425,11 @@ fi
 echo "PASSED: berkeley daemon runs in migrate-exit mode"
 
 # =============================================================================
-# Test 10: Berkeley Daemon Respects User-Provided hardfork-handling
+# Test 11: Berkeley Daemon Respects User-Provided hardfork-handling
 # =============================================================================
 
 echo ""
-echo "=== Test 10: Berkeley Daemon hardfork-handling Respected ==="
+echo "=== Test 11: Berkeley Daemon hardfork-handling Respected ==="
 echo "Verifying that a user-provided --hardfork-handling value is left untouched"
 
 MINA_EXEC_COMMAND=$(docker run --env MINA_DISPATCHER_DRYRUN=1 --entrypoint bash "$DOCKER_IMAGE" \

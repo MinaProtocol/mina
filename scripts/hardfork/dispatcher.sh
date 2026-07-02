@@ -22,7 +22,10 @@
 #   3. If the state file exists, mesa runtime is used; otherwise berkeley
 #   4. Arguments are processed and modified as needed for the target runtime
 #   5. The actual binary is exec'd with the processed arguments
-#   6. Not all subcommand are supported in. Main focus is on "daemon" command. Other commands might require explicit invocation of the runtime binary (mina-berkeley, mina-mesa).
+#   6. Only "daemon" gets hardfork-aware argument rewriting. "client", "libp2p"
+#      and "--version" are forwarded to the selected runtime as-is. Any other
+#      subcommand is rejected and must be run by invoking the runtime binary
+#      directly (mina-berkeley, mina-mesa, or the full /usr/lib/mina/... path).
 #
 # RUNTIME SELECTION:
 #   - MINA_HARDFORK_STATE_DIR absent  -> berkeley runtime (pre-hardfork)
@@ -237,16 +240,6 @@ fi
 # Argument Processing
 # =============================================================================
 
-# Detailed explanation of the argument processing logic
-function print_argument_warning() {
-  echo "  Automatic argument adjustments are only implemented for the 'daemon' subcommand." >&2
-  echo "  Please ensure you are invoking the correct runtime binary directly if needed." >&2
-  echo "  For example, use 'mina-berkeley' or 'mina-mesa' instead of relying on the dispatcher (mina)." >&2
-  echo "  If you want to call others utility daemon apps using specific version need to be called by full path /usr/lib/mina/berkeley/... or /usr/lib/mina/mesa/..." >&2
-}
-
-
-
 first_arg=""
 
 # Copy arguments to a new array for processing
@@ -256,12 +249,6 @@ if [[ $# -gt 0 ]]; then
   first_arg="${args[0]}"
 else
   args=()
-fi
-
-if [[ -z "$first_arg" ]]; then
-  echo "mina-dispatch ERROR: no subcommand provided for automatic hardfork handling" >&2
-  print_argument_warning
-  exit 1
 fi
 
 if [[ "$first_arg" == "--version" || "$first_arg" == "-version" ]]; then
@@ -288,9 +275,26 @@ if [[ "$first_arg" == "client" ]]; then
   exec "$bin" "${args[@]}"
 fi
 
+if [[ "$first_arg" == "libp2p" ]]; then
+  # 'libp2p' subcommands (e.g. 'mina libp2p generate-keypair') are hardfork
+  # agnostic: they need none of the --genesis-ledger-dir / -config-file rewriting
+  # that 'daemon' requires, so they are forwarded verbatim to the selected
+  # runtime. The MINA_LIBP2P_HELPER_PATH export done earlier (for cmd == "mina")
+  # is inherited by the exec'd process, so this works without manual setup.
+  echo "mina-dispatch INFO: passing 'libp2p' through to ${runtime} runtime" >&2
+  if [[ "${MINA_DISPATCHER_DRYRUN:-0}" -ne 0 ]]; then
+    echo "mina-dispatch DRYRUN: exec $bin ${args[*]}" >&2
+    exit 0
+  fi
+  exec "$bin" "${args[@]}"
+fi
+
 if [[ "$first_arg" != "daemon" ]]; then
-  echo "mina-dispatch ERROR: unsupported subcommand '$first_arg' for automatic hardfork handling" >&2
-  print_argument_warning
+  echo "mina-dispatch ERROR: unsupported subcommand '${first_arg:-<none>}' for automatic hardfork handling" >&2
+  echo "  Only 'daemon' is rewritten; 'libp2p', 'client' and '--version' are passed through." >&2
+  echo "  To run any other subcommand against a specific runtime, call the binary directly:" >&2
+  echo "    ${RUNTIMES_BASE_PATH}/berkeley/mina <subcommand> ...   (pre-fork)" >&2
+  echo "    ${RUNTIMES_BASE_PATH}/mesa/mina <subcommand> ...       (post-fork)" >&2
   exit 1
 fi
 
