@@ -314,7 +314,7 @@ copy_common_daemon_configs() {
     devnet|mainnet|mesa|mesa-mut)
       cp ../genesis_ledgers/"${LEDGER_SOURCE}".json \
         "${BUILDDIR}/var/lib/coda/config_${GITHASH_CONFIG}.json"
-      cp ../genesis_ledgers/${LEDGER_SOURCE}.json "${BUILDDIR}/var/lib/coda/${NETWORK_NAME}.json"
+      cp ../genesis_ledgers/"${LEDGER_SOURCE}".json "${BUILDDIR}/var/lib/coda/${NETWORK_NAME}.json"
       ;;
     *)
       echo "Unknown network name provided: ${NETWORK_NAME}"; exit 1
@@ -971,7 +971,7 @@ copy_common_daemon_hardfork_configs() {
   local NETWORK_NAME="${1}"
 
   # Copy build config and ledgers
-  copy_common_daemon_configs ${NETWORK_NAME}
+  copy_common_daemon_configs "${NETWORK_NAME}"
 
   { [ -z ${RUNTIME_CONFIG_JSON+x} ] || [ -z ${LEDGER_TARBALLS+x} ]; }  \
     && echo "required env vars were not provided" && exit 1
