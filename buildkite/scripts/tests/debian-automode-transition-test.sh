@@ -196,6 +196,12 @@ if [[ -z "${EXPECTED_PREFORK_VERSION}" ]]; then
     log_error "Could not determine pinned prefork version from ${ORIG_AUTOMODE_DEB} Depends"
     exit 1
 fi
+
+# Report exactly which version we pin to, alongside the legacy cache deb's own
+# version, so the reversion is auditable. When the two already match the
+# reversion is a no-op; otherwise it aligns the legacy deb with the '=' pin.
+LEGACY_PREFORK_VERSION=$(dpkg-deb -f "${ORIG_PREFORK_DEB}" Version)
+log_info "Automode pins ${PKG_PREFORK} to exact version: ${EXPECTED_PREFORK_VERSION} (legacy cache deb is ${LEGACY_PREFORK_VERSION})"
 reversion_deb "${ORIG_PREFORK_DEB}" "${EXPECTED_PREFORK_VERSION}" \
     "${REPO_DIR}/${PKG_PREFORK}_${EXPECTED_PREFORK_VERSION}_amd64.deb"
 
