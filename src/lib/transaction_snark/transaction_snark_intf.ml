@@ -37,44 +37,44 @@
     {v
     | Circuit                     | Constraints | Public Input | Auxiliary Input |
     |-----------------------------|-------------|--------------|-----------------|
-    | transaction-merge           | 632         | 300          | 1,895           |
-    | transaction-base            | 12,875      | 300          | 37,502          |
-    | zkapp-opt_signed-opt_signed | 14,537      | 300          | 56,588          |
-    | zkapp-opt_signed            | 8,026       | 300          | 32,166          |
-    | zkapp-proved                | 4,249       | 300          | 30,732          |
+    | transaction-merge           | 634         | 300          | 1,899           |
+    | transaction-base            | 12,875      | 300          | 37,503          |
+    | zkapp-opt_signed-opt_signed | 16,332      | 300          | 73,525          |
+    | zkapp-opt_signed            | 8,924       | 300          | 40,635          |
+    | zkapp-proved                | 5,146       | 300          | 39,201          |
     v}
 
     {b Devnet profile:}
     {v
     | Circuit                     | Constraints | Public Input | Auxiliary Input |
     |-----------------------------|-------------|--------------|-----------------|
-    | transaction-merge           | 632         | 300          | 1,895           |
-    | transaction-base            | 15,357      | 300          | 63,806          |
-    | zkapp-opt_signed-opt_signed | 16,206      | 300          | 74,242          |
-    | zkapp-opt_signed            | 8,883       | 300          | 41,170          |
-    | zkapp-proved                | 5,106       | 300          | 39,736          |
+    | transaction-merge           | 634         | 300          | 1,899           |
+    | transaction-base            | 15,357      | 300          | 63,807          |
+    | zkapp-opt_signed-opt_signed | 18,001      | 300          | 91,179          |
+    | zkapp-opt_signed            | 9,781       | 300          | 49,639          |
+    | zkapp-proved                | 6,003       | 300          | 48,205          |
     v}
 
     {b Lightnet profile:}
     {v
     | Circuit                     | Constraints | Public Input | Auxiliary Input |
     |-----------------------------|-------------|--------------|-----------------|
-    | transaction-merge           | 632         | 300          | 1,895           |
-    | transaction-base            | 15,357      | 300          | 63,806          |
-    | zkapp-opt_signed-opt_signed | 16,206      | 300          | 74,242          |
-    | zkapp-opt_signed            | 8,883       | 300          | 41,170          |
-    | zkapp-proved                | 5,106       | 300          | 39,736          |
+    | transaction-merge           | 634         | 300          | 1,899           |
+    | transaction-base            | 15,357      | 300          | 63,807          |
+    | zkapp-opt_signed-opt_signed | 18,001      | 300          | 91,179          |
+    | zkapp-opt_signed            | 9,781       | 300          | 49,639          |
+    | zkapp-proved                | 6,003       | 300          | 48,205          |
     v}
 
     {b Mainnet profile:}
     {v
     | Circuit                     | Constraints | Public Input | Auxiliary Input |
     |-----------------------------|-------------|--------------|-----------------|
-    | transaction-merge           | 632         | 300          | 1,895           |
-    | transaction-base            | 15,357      | 300          | 63,806          |
-    | zkapp-opt_signed-opt_signed | 16,206      | 300          | 74,242          |
-    | zkapp-opt_signed            | 8,883       | 300          | 41,170          |
-    | zkapp-proved                | 5,106       | 300          | 39,736          |
+    | transaction-merge           | 634         | 300          | 1,899           |
+    | transaction-base            | 15,357      | 300          | 63,807          |
+    | zkapp-opt_signed-opt_signed | 18,001      | 300          | 91,179          |
+    | zkapp-opt_signed            | 9,781       | 300          | 49,639          |
+    | zkapp-proved                | 6,003       | 300          | 48,205          |
     v}
 
     If these values change, update the tables above and the expected values in
@@ -98,7 +98,7 @@ module type Full = sig
 
   [%%versioned:
   module Stable : sig
-    module V2 : sig
+    module V3 : sig
       type t [@@deriving compare, equal, sexp, yojson, hash]
     end
   end]

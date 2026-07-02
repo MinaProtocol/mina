@@ -6,7 +6,7 @@ module Types : sig
       type 'a t
 
       module Proofs_verified_2 : sig
-        module V2 : sig
+        module V3 : sig
           type nonrec t = Pickles_types.Nat.two t
         end
       end
@@ -24,7 +24,7 @@ module Types : sig
       end
 
       module Proof : sig
-        module V2 : sig
+        module V3 : sig
           type t = Verification_key.Max_width.n Proof.t
         end
       end
@@ -125,7 +125,7 @@ module Concrete_ : sig
 
     module Base : sig
       module Wrap : sig
-        module V2 : sig
+        module V3 : sig
           type digest_constant =
             Pickles_types.Nat.four Pickles_limb_vector.Constant.t
 
@@ -147,7 +147,7 @@ module Concrete_ : sig
             ; prev_evals :
                 ( Snark_params.Tick.Field.t
                 , Snark_params.Tick.Field.t array )
-                Pickles_types.Plonk_types.All_evals.V1.t
+                Pickles_types.Plonk_types.All_evals.V2.t
             ; proof : Wrap_wire_proof.V1.t
             }
         end
@@ -166,13 +166,13 @@ module Concrete_ : sig
               Pickles_types.Vector.t )
             Pickles_reduced_messages_for_next_proof_over_same_field.Step.V1.t
           )
-          Base.Wrap.V2.t
+          Base.Wrap.V3.t
           -> ('s, 'mlmb) with_data
 
     type 'mlmb t = (unit, 'mlmb) with_data
 
     module Proofs_verified_2 : sig
-      module V2 : sig
+      module V3 : sig
         type nonrec t = Pickles_types.Nat.two t
       end
     end
@@ -206,7 +206,7 @@ module Concrete_ : sig
     end
 
     module Proof : sig
-      module V2 : sig
+      module V3 : sig
         type t = Verification_key.Max_width.n Proof.t
       end
     end

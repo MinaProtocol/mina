@@ -12,7 +12,7 @@ module Wire_types = Mina_wire_types.Transaction_snark
 let proof_cache = ref None
 
 module Make_sig (A : Wire_types.Types.S) = struct
-  module type S = Transaction_snark_intf.Full with type Stable.V2.t = A.V2.t
+  module type S = Transaction_snark_intf.Full with type Stable.V3.t = A.V3.t
 end
 
 module Make_str (A : Wire_types.Concrete) = struct
@@ -65,8 +65,8 @@ module Make_str (A : Wire_types.Concrete) = struct
   module Proof = struct
     [%%versioned
     module Stable = struct
-      module V2 = struct
-        type t = Pickles.Proof.Proofs_verified_2.Stable.V2.t
+      module V3 = struct
+        type t = Pickles.Proof.Proofs_verified_2.Stable.V3.t
         [@@deriving yojson, compare, equal, sexp, hash]
 
         let to_latest = Fn.id
@@ -76,10 +76,10 @@ module Make_str (A : Wire_types.Concrete) = struct
 
   [%%versioned
   module Stable = struct
-    module V2 = struct
+    module V3 = struct
       type t =
         ( Mina_state.Snarked_ledger_state.With_sok.Stable.V2.t
-        , Proof.Stable.V2.t )
+        , Proof.Stable.V3.t )
         Proof_carrying_data.Stable.V1.t
       [@@deriving compare, equal, sexp, version, yojson, hash]
 
@@ -3262,7 +3262,6 @@ module Make_str (A : Wire_types.Concrete) = struct
         Fee_excess.combine_checked s1.Statement.Poly.fee_excess
           s2.Statement.Poly.fee_excess
       in
-      (*TODO reviewer: Check s1.target.local = s2.source.local?*)
       let%bind () =
         with_label __LOC__ (fun () ->
             let%bind valid_pending_coinbase_stack_transition =
@@ -3284,7 +3283,9 @@ module Make_str (A : Wire_types.Concrete) = struct
             Local_state.Checked.assert_equal s.source.local_state
               s1.source.local_state ;
             Local_state.Checked.assert_equal s.target.local_state
-              s2.target.local_state )
+              s2.target.local_state ;
+            Local_state.Checked.assert_equal_ignoring_ledger
+              s1.target.local_state s2.source.local_state )
       in
       let valid_ledger =
         Statement.valid_ledgers_at_merge_checked
