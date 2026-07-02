@@ -99,10 +99,6 @@ let load_config_files ~logger ~genesis_constants ~constraint_constants ~conf_dir
                 ] ;
             failwithf "Could not parse configuration file: %s" err () )
   in
-  let ledger_backing =
-    make_ledger_backing ~constraint_constants ~runtime_config:config
-      ~hardfork_handling
-  in
   let chain_state_locations, chain_id_opt =
     Init.Chain_state_locations.of_config ~logger
       ~signature_kind:Mina_signature_kind.t_DEPRECATED ~proof_level
@@ -160,6 +156,11 @@ let load_config_files ~logger ~genesis_constants ~constraint_constants ~conf_dir
         if not (Chain_id.equal cid chain_id) then
           failwithf "Chain_id mismatch %s /= %s" (to_string cid)
             (to_string chain_id) ()
+  in
+  let ledger_backing =
+    make_ledger_backing
+      ~constraint_constants:precomputed_values.constraint_constants
+      ~runtime_config:config ~hardfork_handling
   in
   ( precomputed_values
   , config_jsons
