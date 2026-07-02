@@ -78,6 +78,70 @@ validate_git_commit_format() {
   fi
 }
 
+# Run mina-dispatch inside the image in JSON mode and capture the emitted JSON
+# object into DISPATCH_JSON and the exit status into DISPATCH_STATUS. Stderr
+# (INFO/DEBUG noise) is discarded so DISPATCH_JSON is a clean, parseable object.
+#
+# This lifts the repetitive `docker run --env ... --entrypoint bash ... ; STATUS=$?`
+# block that every dispatch assertion below would otherwise duplicate.
+#
+# Args:
+#   $1     - command line to run inside the container (e.g. "mina daemon --config-directory /x")
+#   $2     - (optional) "marker" (default) to create the activation marker first
+#            (mesa runtime), or "no-marker" to leave it absent (berkeley runtime)
+#   $3..   - (optional) extra arguments inserted into `docker run` (e.g. --env KEY=VAL)
+DISPATCH_JSON=""
+DISPATCH_STATUS=0
+run_dispatch_json() {
+  local inner_cmd="$1"
+  local marker_mode="${2:-marker}"
+  # Drop the consumed positional args; the remainder are extra docker run args.
+  if [[ $# -ge 2 ]]; then shift 2; else shift $#; fi
+
+  local setup=""
+  if [[ "$marker_mode" == "marker" ]]; then
+    setup="$(create_activation_marker) && "
+  fi
+
+  set +e
+  DISPATCH_JSON=$(docker run --env MINA_DISPATCHER_JSON=1 "$@" --entrypoint bash "$DOCKER_IMAGE" \
+    -c "${setup}${inner_cmd}" 2>/dev/null)
+  DISPATCH_STATUS=$?
+  set -e
+}
+
+# Assert that jq filter $1 over DISPATCH_JSON produces a value containing $2.
+assert_json_contains() {
+  local filter="$1" needle="$2" actual
+  actual=$(jq -r "$filter" <<< "$DISPATCH_JSON")
+  if [[ "$actual" != *"$needle"* ]]; then
+    echo "FAILED: expected '${filter}' to contain '${needle}'"
+    echo "  Actual:    $actual"
+    echo "  Full JSON: $DISPATCH_JSON"
+    exit 1
+  fi
+}
+
+# Assert that jq filter $1 over DISPATCH_JSON equals $2 exactly.
+assert_json_eq() {
+  local filter="$1" expected="$2" actual
+  actual=$(jq -r "$filter" <<< "$DISPATCH_JSON")
+  if [[ "$actual" != "$expected" ]]; then
+    echo "FAILED: expected '${filter}' == '${expected}', got '${actual}'"
+    echo "  Full JSON: $DISPATCH_JSON"
+    exit 1
+  fi
+}
+
+# Assert that the dispatcher exited non-zero (used for the error-path tests).
+assert_dispatch_failed() {
+  if [[ "$DISPATCH_STATUS" -eq 0 ]]; then
+    echo "FAILED: expected non-zero exit, got 0"
+    echo "  Full JSON: $DISPATCH_JSON"
+    exit 1
+  fi
+}
+
 # =============================================================================
 # Argument Parsing
 # =============================================================================
@@ -114,6 +178,12 @@ done
 
 if [[ -z "$DOCKER_IMAGE" ]]; then
   echo "Error: --docker argument is required"
+  exit 1
+fi
+
+# The JSON-mode assertions parse mina-dispatch output with jq.
+if ! command -v jq >/dev/null 2>&1; then
+  echo "Error: jq is required to run these tests"
   exit 1
 fi
 
@@ -181,42 +251,26 @@ echo ""
 echo "=== Test 3: Config Append ==="
 echo "Verifying that user-provided config is kept and hardfork config is appended as last -config-file"
 
-# Modify mina-dispatch to echo the command instead of executing it
-MINA_EXEC_COMMAND=$(docker run --env MINA_DISPATCHER_DRYRUN=1 --entrypoint bash "$DOCKER_IMAGE" \
-  -c "$(create_activation_marker) && mina daemon -config-file /var/lib/coda/fake_config.json" 2>&1)
+run_dispatch_json "mina daemon -config-file /var/lib/coda/fake_config.json"
 
-# Check user's config file is still present
+COMMAND=$(jq -r '.command' <<< "$DISPATCH_JSON")
+
+# User's config file is still present, and the hardfork config is appended.
 USER_CONFIG="-config-file /var/lib/coda/fake_config.json"
-if [[ "$MINA_EXEC_COMMAND" != *"$USER_CONFIG"* ]]; then
-  echo "FAILED: User-provided config file was removed"
-  echo "  Expected substring: $USER_CONFIG"
-  echo "  Actual command: $MINA_EXEC_COMMAND"
-  exit 1
-fi
+HARDFORK_CONFIG="-config-file $(activation_marker_dir)/daemon.json"
+assert_json_contains '.command' "$USER_CONFIG"
+assert_json_contains '.command' "$HARDFORK_CONFIG"
 
-# Check hardfork config is appended
-EXPECTED_CONFIG="-config-file $(activation_marker_dir)/daemon.json"
-if [[ "$MINA_EXEC_COMMAND" != *"$EXPECTED_CONFIG"* ]]; then
-  echo "FAILED: Hardfork config not appended"
-  echo "  Expected substring: $EXPECTED_CONFIG"
-  echo "  Actual command: $MINA_EXEC_COMMAND"
-  exit 1
-fi
-
-# Verify hardfork config appears AFTER user config (is last -config-file)
-USER_CONFIG_POS="${MINA_EXEC_COMMAND%%$USER_CONFIG*}"
-HARDFORK_CONFIG_POS="${MINA_EXEC_COMMAND%%$EXPECTED_CONFIG*}"
+# Verify hardfork config appears AFTER user config (is the last -config-file).
+USER_CONFIG_POS="${COMMAND%%"$USER_CONFIG"*}"
+HARDFORK_CONFIG_POS="${COMMAND%%"$HARDFORK_CONFIG"*}"
 if [[ ${#USER_CONFIG_POS} -ge ${#HARDFORK_CONFIG_POS} ]]; then
   echo "FAILED: Hardfork config should appear after user config"
-  echo "  Actual command: $MINA_EXEC_COMMAND"
+  echo "  Command: $COMMAND"
   exit 1
 fi
 
-if [[ "$MINA_EXEC_COMMAND" != *"--genesis-ledger-dir $(activation_marker_dir)/genesis"* ]]; then
-  echo "FAILED: Genesis ledger directory not overridden to mesa-ledgers"
-  echo "  Actual command: $MINA_EXEC_COMMAND"
-  exit 1
-fi
+assert_json_contains '.command' "--genesis-ledger-dir $(activation_marker_dir)/genesis"
 
 echo "PASSED: User config kept and hardfork config appended as last -config-file"
 
@@ -228,25 +282,12 @@ echo ""
 echo "=== Test 4: Genesis Ledger Override ==="
 echo "Verifying that user-provided genesis ledger directory is overridden with hardfork ones"
 
-MINA_EXEC_COMMAND=$(docker run --env MINA_DISPATCHER_DRYRUN=1 --entrypoint bash "$DOCKER_IMAGE" \
-  -c "$(create_activation_marker) && mina daemon --genesis-ledger-dir /var/lib/coda/fake/ledger" 2>&1)
+run_dispatch_json "mina daemon --genesis-ledger-dir /var/lib/coda/fake/ledger"
 
-EXPECTED_CONFIG="--genesis-ledger-dir $(activation_marker_dir)/genesis"
-if [[ "$MINA_EXEC_COMMAND" != *"$EXPECTED_CONFIG"* ]]; then
-  echo "FAILED: Genesis ledger override not applied"
-  echo "  Expected substring: $EXPECTED_CONFIG"
-  echo "  Actual command: $MINA_EXEC_COMMAND"
-  exit 1
-fi
-
-# Hardfork config should also be appended even without user-provided --config-file
-EXPECTED_HF_CONFIG="-config-file $(activation_marker_dir)/daemon.json"
-if [[ "$MINA_EXEC_COMMAND" != *"$EXPECTED_HF_CONFIG"* ]]; then
-  echo "FAILED: Hardfork daemon config not appended"
-  echo "  Expected substring: $EXPECTED_HF_CONFIG"
-  echo "  Actual command: $MINA_EXEC_COMMAND"
-  exit 1
-fi
+# Genesis ledger dir overridden to mesa ledgers, and hardfork config appended
+# even without a user-provided --config-file.
+assert_json_contains '.command' "--genesis-ledger-dir $(activation_marker_dir)/genesis"
+assert_json_contains '.command' "-config-file $(activation_marker_dir)/daemon.json"
 
 echo "PASSED: Genesis ledger overridden and hardfork config appended"
 
@@ -258,24 +299,10 @@ echo ""
 echo "=== Test 5: Unsupported Subcommand ==="
 echo "Verifying that dispatcher reports an error for non-daemon subcommands"
 
-set +e
-MINA_EXEC_COMMAND=$(docker run --env MINA_DISPATCHER_DRYRUN=1 --entrypoint bash "$DOCKER_IMAGE" \
-  -c "mina accounts list" 2>&1)
-STATUS=$?
-set -e
+run_dispatch_json "mina accounts list" no-marker
 
-EXPECTED_ERROR="mina-dispatch ERROR: unsupported subcommand 'accounts'"
-if [[ "$MINA_EXEC_COMMAND" != *"$EXPECTED_ERROR"* ]]; then
-  echo "FAILED: Expected unsupported subcommand error"
-  echo "  Expected substring: $EXPECTED_ERROR"
-  echo "  Actual output: $MINA_EXEC_COMMAND"
-  exit 1
-fi
-
-if [[ "$STATUS" -eq 0 ]]; then
-  echo "FAILED: Expected non-zero exit for unsupported subcommand"
-  exit 1
-fi
+assert_json_eq '.error' "unsupported_subcommand"
+assert_dispatch_failed
 
 echo "PASSED: Unsupported subcommand error is emitted"
 
@@ -287,24 +314,10 @@ echo ""
 echo "=== Test 6: MINA_HARDFORK_STATE_DIR Required ==="
 echo "Verifying that missing MINA_HARDFORK_STATE_DIR returns an error"
 
-set +e
-MINA_EXEC_COMMAND=$(docker run --env MINA_HARDFORK_STATE_DIR= --entrypoint bash "$DOCKER_IMAGE" \
-  -c "mina --version" 2>&1)
-STATUS=$?
-set -e
+run_dispatch_json "mina --version" no-marker --env MINA_HARDFORK_STATE_DIR=
 
-EXPECTED_ERROR="mina-dispatch ERROR: MINA_HARDFORK_STATE_DIR is not defined"
-if [[ "$MINA_EXEC_COMMAND" != *"$EXPECTED_ERROR"* ]]; then
-  echo "FAILED: Expected missing MINA_HARDFORK_STATE_DIR error"
-  echo "  Expected substring: $EXPECTED_ERROR"
-  echo "  Actual output: $MINA_EXEC_COMMAND"
-  exit 1
-fi
-
-if [[ "$STATUS" -eq 0 ]]; then
-  echo "FAILED: Expected non-zero exit when MINA_HARDFORK_STATE_DIR is missing"
-  exit 1
-fi
+assert_json_eq '.error' "missing_hardfork_state_dir"
+assert_dispatch_failed
 
 echo "PASSED: Missing MINA_HARDFORK_STATE_DIR error is emitted"
 
@@ -316,32 +329,12 @@ echo ""
 echo "=== Test 7: Config Directory Validation ==="
 echo "Verifying that --config-directory must match hardfork state directory"
 
-set +e
-MINA_EXEC_COMMAND=$(docker run --env MINA_DISPATCHER_DRYRUN=1 --entrypoint bash "$DOCKER_IMAGE" \
-  -c "$(create_activation_marker) && mina daemon --config-directory /var/lib/coda/fake" 2>&1)
-STATUS=$?
-set -e
+run_dispatch_json "mina daemon --config-directory /var/lib/coda/fake"
 
-EXPECTED_ERROR="mina-dispatch ERROR: Discrepancy between provided --config-directory"
-if [[ "$MINA_EXEC_COMMAND" != *"$EXPECTED_ERROR"* ]]; then
-  echo "FAILED: Expected config directory validation error"
-  echo "  Expected substring: $EXPECTED_ERROR"
-  echo "  Actual output: $MINA_EXEC_COMMAND"
-  exit 1
-fi
-
-EXPECTED_DIR="/root/.mina-config"
-if [[ "$MINA_EXEC_COMMAND" != *"$EXPECTED_DIR"* ]]; then
-  echo "FAILED: Expected error to mention required hardfork config directory"
-  echo "  Expected substring: $EXPECTED_DIR"
-  echo "  Actual output: $MINA_EXEC_COMMAND"
-  exit 1
-fi
-
-if [[ "$STATUS" -eq 0 ]]; then
-  echo "FAILED: Expected non-zero exit for mismatched --config-directory"
-  exit 1
-fi
+assert_json_eq '.error' "config_directory_discrepancy"
+# Error message should mention the required hardfork config directory.
+assert_json_contains '.message' "/root/.mina-config"
+assert_dispatch_failed
 
 echo "PASSED: Mismatched --config-directory is rejected"
 
@@ -353,16 +346,11 @@ echo ""
 echo "=== Test 8: Client Subcommand Uses Mesa ==="
 echo "Verifying that 'client status' always dispatches to mesa runtime"
 
-# Without activation marker - client should still use mesa
-MINA_EXEC_COMMAND=$(docker run --env MINA_DISPATCHER_DRYRUN=1 --entrypoint bash "$DOCKER_IMAGE" \
-  -c "mina client status" 2>&1)
+# Without activation marker - client should still use mesa.
+run_dispatch_json "mina client status" no-marker
 
-if [[ "$MINA_EXEC_COMMAND" != *"/mesa/mina client status"* ]]; then
-  echo "FAILED: client subcommand should use mesa runtime even without activation marker"
-  echo "  Expected substring: /mesa/mina client status"
-  echo "  Actual output: $MINA_EXEC_COMMAND"
-  exit 1
-fi
+assert_json_eq '.runtime' "mesa"
+assert_json_contains '.command' "/mesa/mina client status"
 
 echo "PASSED: client subcommand uses mesa runtime"
 
@@ -448,6 +436,61 @@ if [[ "$MINA_EXEC_COMMAND" == *"--hardfork-handling migrate-exit"* ]]; then
 fi
 
 echo "PASSED: user-provided hardfork-handling left untouched"
+
+# =============================================================================
+# Test 12: Config Directory Path Comparison (equivalent spellings accepted)
+# =============================================================================
+
+echo ""
+echo "=== Test 12: Config Directory Path Comparison ==="
+echo "Verifying that --config-directory equal to the hardfork state dir is accepted"
+echo "even when written with a trailing slash or '.'/'..' segments"
+
+# The hardfork state directory in the image (MINA_HARDFORK_STATE_DIR).
+HARDFORK_STATE_DIR="/root/.mina-config"
+
+# Each of these refers to the same directory as $HARDFORK_STATE_DIR and must
+# therefore be accepted (no discrepancy error, dispatcher proceeds normally).
+EQUIVALENT_DIRS=(
+  "${HARDFORK_STATE_DIR}/"
+  "${HARDFORK_STATE_DIR}/."
+  "/root/../root/.mina-config"
+)
+
+for equivalent_dir in "${EQUIVALENT_DIRS[@]}"; do
+  echo "--- Checking equivalent path: ${equivalent_dir}"
+
+  run_dispatch_json "mina daemon --config-directory ${equivalent_dir}"
+
+  # Equivalent path is accepted: the dispatcher succeeds (no error object) ...
+  if [[ "$DISPATCH_STATUS" -ne 0 ]]; then
+    echo "FAILED: Dispatcher exited non-zero for an equivalent --config-directory"
+    echo "  Provided:  ${equivalent_dir}"
+    echo "  Full JSON: $DISPATCH_JSON"
+    exit 1
+  fi
+  assert_json_eq '.error // "none"' "none"
+  # ... and the original (un-normalized) argument is passed through untouched.
+  assert_json_contains '.command' "--config-directory ${equivalent_dir}"
+done
+
+echo "PASSED: Equivalent --config-directory spellings are accepted via path comparison"
+
+# =============================================================================
+# Test 13: Config Directory Path Comparison (genuine mismatch still rejected)
+# =============================================================================
+
+echo ""
+echo "=== Test 13: Config Directory Genuine Mismatch ==="
+echo "Verifying that a path resolving to a different directory is still rejected"
+
+# This contains '..' but normalizes to a different directory, so it must error.
+run_dispatch_json "mina daemon --config-directory /root/.mina-config/../other"
+
+assert_json_eq '.error' "config_directory_discrepancy"
+assert_dispatch_failed
+
+echo "PASSED: Genuine path mismatch is still rejected"
 
 # =============================================================================
 # Summary
