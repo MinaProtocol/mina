@@ -365,24 +365,32 @@ let protocol_state_precondition_of_id pool id =
     }
     : Zkapp_precondition.Protocol_state.t )
 
-let load_events pool id =
-  let query_db ~f = Mina_caqti.query ~f pool in
-  let%map fields_list =
-    (* each id refers to an item in 'zkapp_field_array' *)
-    let%bind field_array_ids =
-      query_db ~f:(fun db -> Processor.Zkapp_events.load db id)
-    in
-    Deferred.List.map (Array.to_list field_array_ids) ~f:(fun array_id ->
-        let%bind field_ids =
-          query_db ~f:(fun db -> Processor.Zkapp_field_array.load db array_id)
+let load_events pool id_opt =
+  (* A NULL events_id/actions_id represents the empty events/actions list. This
+     must reconstruct to [] exactly as the historical empty-{} zkapp_events row
+     did, so already-archived data and re-derived Bodies hash identically. *)
+  match id_opt with
+  | None ->
+      return []
+  | Some id ->
+      let query_db ~f = Mina_caqti.query ~f pool in
+      let%map fields_list =
+        (* each id refers to an item in 'zkapp_field_array' *)
+        let%bind field_array_ids =
+          query_db ~f:(fun db -> Processor.Zkapp_events.load db id)
         in
-        Deferred.List.map (Array.to_list field_ids) ~f:(fun field_id ->
-            let%map field_str =
-              query_db ~f:(fun db -> Processor.Zkapp_field.load db field_id)
+        Deferred.List.map (Array.to_list field_array_ids) ~f:(fun array_id ->
+            let%bind field_ids =
+              query_db ~f:(fun db ->
+                  Processor.Zkapp_field_array.load db array_id )
             in
-            Zkapp_basic.F.of_string field_str ) )
-  in
-  List.map fields_list ~f:Array.of_list
+            Deferred.List.map (Array.to_list field_ids) ~f:(fun field_id ->
+                let%map field_str =
+                  query_db ~f:(fun db -> Processor.Zkapp_field.load db field_id)
+                in
+                Zkapp_basic.F.of_string field_str ) )
+      in
+      List.map fields_list ~f:Array.of_list
 
 let get_fee_payer_body ~pool body_id =
   let query_db ~f = Mina_caqti.query ~f pool in
