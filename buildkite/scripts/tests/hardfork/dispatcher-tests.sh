@@ -399,6 +399,57 @@ fi
 echo "PASSED: libp2p subcommand passes through to the selected runtime"
 
 # =============================================================================
+# Test 10: Berkeley Daemon Always Runs In migrate-exit Mode
+# =============================================================================
+
+echo ""
+echo "=== Test 10: Berkeley Daemon migrate-exit Injection ==="
+echo "Verifying that the pre-fork (berkeley) daemon always gets --hardfork-handling migrate-exit"
+
+# Without activation marker -> berkeley runtime
+MINA_EXEC_COMMAND=$(docker run --env MINA_DISPATCHER_DRYRUN=1 --entrypoint bash "$DOCKER_IMAGE" \
+  -c "mina daemon" 2>&1)
+
+if [[ "$MINA_EXEC_COMMAND" != *"/berkeley/mina daemon"* ]]; then
+  echo "FAILED: Expected berkeley runtime for daemon without activation marker"
+  echo "  Actual command: $MINA_EXEC_COMMAND"
+  exit 1
+fi
+
+if [[ "$MINA_EXEC_COMMAND" != *"--hardfork-handling migrate-exit"* ]]; then
+  echo "FAILED: berkeley daemon should have --hardfork-handling migrate-exit injected"
+  echo "  Actual command: $MINA_EXEC_COMMAND"
+  exit 1
+fi
+
+echo "PASSED: berkeley daemon runs in migrate-exit mode"
+
+# =============================================================================
+# Test 11: Berkeley Daemon Respects User-Provided hardfork-handling
+# =============================================================================
+
+echo ""
+echo "=== Test 11: Berkeley Daemon hardfork-handling Respected ==="
+echo "Verifying that a user-provided --hardfork-handling value is left untouched"
+
+MINA_EXEC_COMMAND=$(docker run --env MINA_DISPATCHER_DRYRUN=1 --entrypoint bash "$DOCKER_IMAGE" \
+  -c "mina daemon --hardfork-handling keep-running" 2>&1)
+
+if [[ "$MINA_EXEC_COMMAND" != *"--hardfork-handling keep-running"* ]]; then
+  echo "FAILED: user-provided --hardfork-handling keep-running should be preserved"
+  echo "  Actual command: $MINA_EXEC_COMMAND"
+  exit 1
+fi
+
+if [[ "$MINA_EXEC_COMMAND" == *"--hardfork-handling migrate-exit"* ]]; then
+  echo "FAILED: migrate-exit must not be injected when user provided their own value"
+  echo "  Actual command: $MINA_EXEC_COMMAND"
+  exit 1
+fi
+
+echo "PASSED: user-provided hardfork-handling left untouched"
+
+# =============================================================================
 # Summary
 # =============================================================================
 

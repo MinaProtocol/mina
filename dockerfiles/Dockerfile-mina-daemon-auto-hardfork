@@ -103,6 +103,10 @@ RUN chmod +x /mina_daemon_puppeteer.py /find_puppeteer.sh /start.sh /stop.sh
 ENV MINA_TIME_OFFSET 0
 
 ENV MINA_HARDFORK_STATE_DIR /root/.mina-config
-ENV MINA_APP /usr/local/bin/mina-dispatch
+
+# MINA_APP is intentionally left unset: daemon-entrypoint.sh defaults to bare
+# `mina`, which PATH-resolves to /usr/local/bin/mina (the mina-dispatch symlink).
+# Invoking via the `mina` symlink keeps the dispatcher out of its direct-invocation
+# (debugging) mode, so `docker run <img> daemon ...` / `--version` work as expected.
 
 ENTRYPOINT ["/usr/bin/dumb-init", "/entrypoint.sh"]

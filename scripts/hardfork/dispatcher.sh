@@ -31,12 +31,17 @@
 #   - MINA_HARDFORK_STATE_DIR absent  -> berkeley runtime (pre-hardfork)
 #   - MINA_HARDFORK_STATE_DIR present -> mesa runtime (post-hardfork)
 #
-# ARGUMENT PROCESSING (mesa runtime only):
+# ARGUMENT PROCESSING (mesa runtime, daemon only):
 #   - "-config-file <path>" is KEPT and MESA_CONFIG is appended as the last -config-file
 #   - "--genesis-ledger-dir <path>" is rewritten to use MESA_LEDGERS_DIR
 #   - "--hardfork-handling <value>" is REMOVED (not supported in mesa)
 #   - If --genesis-ledger-dir is not provided, it is appended with MESA_LEDGERS_DIR
 #   - Auto-hardfork daemon config (-config-file MESA_CONFIG) is always appended last
+#
+# ARGUMENT PROCESSING (berkeley runtime, daemon only):
+#   - If "--hardfork-handling" is not provided, "--hardfork-handling migrate-exit"
+#     is appended (installing the automode package implies automode). If the user
+#     provides their own "--hardfork-handling", arguments are left untouched.
 #
 # REQUIRED ENVIRONMENT (via SOURCE_FILE):
 #   MINA_NETWORK          - Network identifier (e.g., mainnet, devnet)
@@ -399,6 +404,27 @@ if [[ "$runtime" == "mesa" ]]; then
   fi
   # Replace args with the processed continuous array
   args=("${new_args[@]}")
+elif [[ "$first_arg" == "daemon" ]]; then
+  # Berkeley (pre-fork) runtime. The automode package runs the pre-fork daemon
+  # in migrate-exit mode by default: installing the automode package implies
+  # automode, so there is no reason to make users pass --hardfork-handling
+  # themselves (see https://github.com/MinaProtocol/MIPs/pull/32).
+  #
+  # If the user explicitly passes --hardfork-handling we assume they know what
+  # they are doing and leave the arguments untouched.
+  has_hardfork_handling=false
+  for arg in "${args[@]}"; do
+    if [[ "$arg" == "--hardfork-handling" || "$arg" == "-hardfork-handling" ]]; then
+      has_hardfork_handling=true
+      break
+    fi
+  done
+
+  if [[ "$has_hardfork_handling" == false ]]; then
+    args+=("--hardfork-handling" "migrate-exit")
+  elif [[ "$MINA_DISPATCHER_DEBUG" -ne 0 ]]; then
+    echo "mina-dispatch INFO: User-provided --hardfork-handling detected; leaving it untouched" >&2
+  fi
 fi
 
 # =============================================================================
