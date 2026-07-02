@@ -548,7 +548,7 @@ build_rosetta_deb() {
 
   local package_name="mina-rosetta-${network}${DEB_SUFFIX}"
 
-  local depends="mina-rosetta-generic${DEB_SUFFIX} (>= ${MINA_DEB_VERSION}), mina-${profile}-profile (>= ${MINA_DEB_VERSION})"
+  local depends="mina-rosetta-generic${DEB_SUFFIX} (=${MINA_DEB_VERSION}), mina-${profile}-profile (=${MINA_DEB_VERSION})"
 
   create_control_file "${package_name}" "${depends}" \
     "Mina Protocol Rosetta Client for ${network}"
@@ -625,7 +625,7 @@ build_profile_generic_tent_deb() {
 
   local package_name="mina-${profile}-generic"
 
-  local depends="mina-generic (>= ${MINA_DEB_VERSION}), mina-${profile}-profile (>= ${MINA_DEB_VERSION})"
+  local depends="mina-generic (=${MINA_DEB_VERSION}), mina-${profile}-profile (=${MINA_DEB_VERSION})"
 
   create_control_file "${package_name}" "${depends}" \
     "Mina Protocol metapackage for ${profile} (installs generic and profile packages)" \
@@ -876,7 +876,7 @@ build_daemon_automode_deb() {
   local prefork_pkg="mina-${network}-prefork-${POSTFORK_CODENAME}"
   local postfork_pkg="mina-${network}-postfork-${POSTFORK_CODENAME}"
   local prefork_version="${PREFORK_LEGACY_VERSION:-${MINA_DEB_VERSION}}"
-  local depends="${postfork_pkg} (>= ${MINA_DEB_VERSION}), ${prefork_pkg} (>= ${prefork_version}), mina-${network}-config (>= ${MINA_DEB_VERSION})"
+  local depends="${postfork_pkg} (=${MINA_DEB_VERSION}), ${prefork_pkg} (=${prefork_version}), mina-${network}-config (=${MINA_DEB_VERSION})"
 
   create_control_file "${package_name}" "${depends}" \
     "Transitional metapackage for Mina ${network} automode (installs both prefork and postfork runtimes)" \
@@ -913,7 +913,7 @@ build_daemon_tent_deb() {
   # network-to-profile is 1:1 for the main networks (devnet, mainnet)
   local profile="${network}"
 
-  local depends="mina-${profile}-generic (>= ${MINA_DEB_VERSION}), mina-${network}-config (>= ${MINA_DEB_VERSION})"
+  local depends="mina-${profile}-generic (=${MINA_DEB_VERSION}), mina-${network}-config (=${MINA_DEB_VERSION})"
 
   create_control_file "${package_name}" "${depends}" \
     "Mina Protocol metapackage for ${network} (installs generic, profile and config packages)" \
@@ -1110,7 +1110,7 @@ build_archive_deb () {
 
   echo "--- Building archive ${network} tent metapackage"
 
-  local depends="mina-archive-generic${DEB_SUFFIX} (>= ${MINA_DEB_VERSION}), mina-${profile}-profile (>= ${MINA_DEB_VERSION})"
+  local depends="mina-archive-generic${DEB_SUFFIX} (=${MINA_DEB_VERSION}), mina-${profile}-profile (=${MINA_DEB_VERSION})"
 
   create_control_file "${package_name}" "${depends}" "Mina Archive Node for network ${network}"
 
