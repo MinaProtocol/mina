@@ -33,7 +33,8 @@ module type S = sig
       type field_var = Field.t
 
       type t =
-        { proofs_verified_mask : Proofs_verified.Prefix_mask.Step.Checked.t
+        { proofs_verified_mask :
+            Nat.z Proofs_verified.Prefix_mask.Step.Checked.t
         ; domain_log2 : Field.t
         }
 
@@ -46,7 +47,8 @@ module type S = sig
       type field_var = Field.t
 
       type t =
-        { proofs_verified_mask : Proofs_verified.Prefix_mask.Wrap.Checked.t
+        { proofs_verified_mask :
+            Nat.z Proofs_verified.Prefix_mask.Wrap.Checked.t
         ; domain_log2 : Field.t
         }
 

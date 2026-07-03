@@ -90,26 +90,26 @@ module Prefix_mask = struct
     open Step_impl
 
     module Checked = struct
-      type t = (Boolean.var, Nat.N2.n) Vector.t
+      type 'n t = (Boolean.var, 'n Nat.N2.plus_n) Vector.t
     end
 
-    let typ : (Checked.t, proofs_verified) Typ.t =
+    let typ n : ('n Checked.t, proofs_verified) Typ.t =
       Typ.transport
-        (Pickles_types.Vector.typ Boolean.typ Pickles_types.Nat.N2.n)
-        ~there:(to_bool_vec Nat.N2.n) ~back:of_bool_vec
+        (Pickles_types.Vector.typ Boolean.typ n)
+        ~there:(to_bool_vec n) ~back:of_bool_vec
   end
 
   module Wrap = struct
     open Wrap_impl
 
     module Checked = struct
-      type t = (Boolean.var, Nat.N2.n) Vector.t
+      type 'n t = (Boolean.var, 'n Nat.N2.plus_n) Vector.t
     end
 
-    let typ : (Checked.t, proofs_verified) Typ.t =
+    let typ n : ('n Checked.t, proofs_verified) Typ.t =
       Typ.transport
-        (Pickles_types.Vector.wrap_typ Boolean.typ Pickles_types.Nat.N2.n)
-        ~there:(to_bool_vec Nat.N2.n) ~back:of_bool_vec
+        (Pickles_types.Vector.wrap_typ Boolean.typ n)
+        ~there:(to_bool_vec n) ~back:of_bool_vec
   end
 end
 
@@ -117,13 +117,14 @@ module One_hot = struct
   open Kimchi_pasta_snarky_backend
 
   module Checked = struct
-    type t = Pickles_types.Nat.N3.n One_hot_vector.Step.t
+    type 'n t = 'n Nat.N3.plus_n One_hot_vector.Step.t
 
-    let to_input (t : t) =
+    let to_input (type n) (t : n t) =
       Random_oracle_input.Chunked.packeds
         (Array.map
            Pickles_types.(
-             Vector.to_array (t :> (Step_impl.Boolean.var, Nat.N3.n) Vector.t))
+             Vector.to_array
+               (t :> (Step_impl.Boolean.var, n Nat.N3.plus_n) Vector.t))
            ~f:(fun b -> ((b :> Step_impl.Field.t), 1)) )
   end
 
@@ -151,7 +152,7 @@ module One_hot = struct
     in
     Random_oracle_input.Chunked.packeds (Array.map one_hot ~f:(fun b -> (b, 1)))
 
-  let typ : (Checked.t, proofs_verified) Step_impl.Typ.t =
+  let typ n : ('n Checked.t, proofs_verified) Step_impl.Typ.t =
     let module M = One_hot_vector.Make (Step_impl) in
-    Step_impl.Typ.transport (M.typ Pickles_types.Nat.N3.n) ~there ~back
+    Step_impl.Typ.transport (M.typ n) ~there ~back
 end

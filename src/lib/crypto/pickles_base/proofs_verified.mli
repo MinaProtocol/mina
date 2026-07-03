@@ -31,14 +31,14 @@ module One_hot : sig
   open Kimchi_pasta_snarky_backend
 
   module Checked : sig
-    type t = Pickles_types.Nat.N3.n One_hot_vector.Step.t
+    type 'n t = 'n Nat.N3.plus_n One_hot_vector.Step.t
 
-    val to_input : t -> Step_impl.Field.t Random_oracle_input.Chunked.t
+    val to_input : 'n t -> Step_impl.Field.t Random_oracle_input.Chunked.t
   end
 
   val to_input : zero:'a -> one:'a -> t -> 'a Random_oracle_input.Chunked.t
 
-  val typ : (Checked.t, t) Step_impl.Typ.t
+  val typ : 'n Nat.N3.plus_n Nat.t -> ('n Checked.t, t) Step_impl.Typ.t
 end
 
 val to_bool_vec : 'n Nat.t -> t -> (bool, 'n) Vector.t
@@ -50,17 +50,17 @@ module Prefix_mask : sig
 
   module Step : sig
     module Checked : sig
-      type t = (Step_impl.Boolean.var, Nat.N2.n) Vector.t
+      type 'n t = (Step_impl.Boolean.var, 'n Nat.N2.plus_n) Vector.t
     end
 
-    val typ : (Checked.t, t) Step_impl.Typ.t
+    val typ : 'n Nat.N2.plus_n Nat.t -> ('n Checked.t, t) Step_impl.Typ.t
   end
 
   module Wrap : sig
     module Checked : sig
-      type t = (Wrap_impl.Boolean.var, Nat.N2.n) Vector.t
+      type 'n t = (Wrap_impl.Boolean.var, 'n Nat.N2.plus_n) Vector.t
     end
 
-    val typ : (Checked.t, t) Wrap_impl.Typ.t
+    val typ : 'n Nat.N2.plus_n Nat.t -> ('n Checked.t, t) Wrap_impl.Typ.t
   end
 end

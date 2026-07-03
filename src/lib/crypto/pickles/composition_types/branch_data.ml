@@ -104,7 +104,8 @@ module Make_str (A : Wire_types.Concrete) = struct
       type field_var = Field.t
 
       type t =
-        { proofs_verified_mask : Proofs_verified.Prefix_mask.Step.Checked.t
+        { proofs_verified_mask :
+            Pickles_types.Nat.z Proofs_verified.Prefix_mask.Step.Checked.t
         ; domain_log2 : Field.t
         }
       [@@deriving hlist]
@@ -122,7 +123,8 @@ module Make_str (A : Wire_types.Concrete) = struct
       type field_var = Field.t
 
       type t =
-        { proofs_verified_mask : Proofs_verified.Prefix_mask.Wrap.Checked.t
+        { proofs_verified_mask :
+            Pickles_types.Nat.z Proofs_verified.Prefix_mask.Wrap.Checked.t
         ; domain_log2 : Field.t
         }
       [@@deriving hlist]
@@ -153,8 +155,10 @@ module Make_str (A : Wire_types.Concrete) = struct
       (Checked.Step.t, t) Step_impl.Typ.t =
     let open Step_impl in
     let proofs_verified_mask :
-        (Proofs_verified.Prefix_mask.Step.Checked.t, Proofs_verified.t) Typ.t =
-      Proofs_verified.Prefix_mask.Step.typ
+        ( Pickles_types.Nat.z Proofs_verified.Prefix_mask.Step.Checked.t
+        , Proofs_verified.t )
+        Typ.t =
+      Proofs_verified.Prefix_mask.Step.typ Pickles_types.Nat.N2.n
     in
     let domain_log2 : (Field.t, Domain_log2.t) Typ.t =
       let (Typ t) =
@@ -178,8 +182,10 @@ module Make_str (A : Wire_types.Concrete) = struct
       (Checked.Wrap.t, t) Wrap_impl.Typ.t =
     let open Wrap_impl in
     let proofs_verified_mask :
-        (Proofs_verified.Prefix_mask.Wrap.Checked.t, Proofs_verified.t) Typ.t =
-      Proofs_verified.Prefix_mask.Wrap.typ
+        ( Pickles_types.Nat.z Proofs_verified.Prefix_mask.Wrap.Checked.t
+        , Proofs_verified.t )
+        Typ.t =
+      Proofs_verified.Prefix_mask.Wrap.typ Pickles_types.Nat.N2.n
     in
     let domain_log2 : (Field.t, Domain_log2.t) Typ.t =
       let (Typ t) =
