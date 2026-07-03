@@ -232,7 +232,7 @@ module Tree_proof = struct
   let _tag, _, p, Provers.[ step ] =
     Common.time "compile" (fun () ->
         compile_promise () ~public_input:(Input Field.typ)
-          ~override_wrap_domain:Pickles_base.Proofs_verified.N1
+          ~override_wrap_domain:Pickles_base.Proofs_verified.n1
           ~auxiliary_typ:Typ.unit
           ~max_proofs_verified:(module Pickles_types.Nat.N2)
           ~name:"blockchain-snark"
@@ -343,7 +343,7 @@ module Tree_proof_return = struct
   let _tag, _, p, Provers.[ step ] =
     Common.time "compile" (fun () ->
         compile_promise () ~public_input:(Output Field.typ)
-          ~override_wrap_domain:Pickles_base.Proofs_verified.N1
+          ~override_wrap_domain:Pickles_base.Proofs_verified.n1
           ~auxiliary_typ:Typ.unit
           ~max_proofs_verified:(module Pickles_types.Nat.N2)
           ~name:"blockchain-snark"

@@ -1,9 +1,9 @@
 open Pickles_types
 
-(** Represents how many proofs are verified. Currently only [0], [1] or [2] *)
+(** Represents how many proofs are verified. *)
 module Stable : sig
   module V2 : sig
-    type t = Mina_wire_types.Pickles_base.Proofs_verified.V2.t = N0 | N1 | N2
+    type t = Mina_wire_types.Pickles_base.Proofs_verified.V2.t
     [@@deriving sexp, compare, yojson, hash, equal]
 
     include Plonkish_prelude.Sigs.Binable.S with type t := t
@@ -25,20 +25,37 @@ module Stable : sig
   end
 end
 
-type t = Stable.Latest.t = N0 | N1 | N2
-[@@deriving sexp, compare, yojson, hash, equal]
+(** A non-negative number of proofs verified. Construct with [of_int_exn] or
+    [of_nat]; read with [to_int] or by coercion. *)
+type t = private int [@@deriving sexp, compare, yojson, hash, equal]
 
-(** [of_nat_exn t_n] converts the type level natural [t_n] to the data type natural.
-    Raise an exception if [t_n] represents a value above or equal to 3 *)
-val of_nat_exn : 'n Nat.t -> t
+(** [of_nat n] converts the type level natural [n] to the data type natural. *)
+val of_nat : 'n Nat.t -> t
 
-(** [of_int_exn n] converts the runtime natural [n] to the data type natural. Raise
-    an exception if the value [n] is above or equal to 3 *)
+(** [of_int_exn n] converts the runtime natural [n] to the data type natural.
+    Raise an exception if [n] is negative. *)
 val of_int_exn : int -> t
 
-(** [to_int v] converts the value [v] to the corresponding integer, i.e [N0 ->
-    0], [N1 -> 1] and [N2 -> 2] *)
+val n0 : t
+
+val n1 : t
+
+val n2 : t
+
 val to_int : t -> int
+
+(** Conversions between the in-memory [t] and the serialised [Stable] encodings. *)
+
+val to_stable_v2 : t -> Stable.V2.t
+
+(** Raise an exception if the value is negative. *)
+val of_stable_v2 : Stable.V2.t -> t
+
+(** Raise an exception if [t] is above 2: [V1] is the encoding the Mina protocol
+    accepts, and is deliberately kept narrow. *)
+val to_stable_v1 : t -> Stable.V1.t
+
+val of_stable_v1 : Stable.V1.t -> t
 
 module One_hot : sig
   open Kimchi_pasta_snarky_backend

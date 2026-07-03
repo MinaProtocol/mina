@@ -197,16 +197,7 @@ let dummy (type h r) (h : h Nat.t) (most_recent_width : r Nat.t) ~domain_log2 :
         { proof_state =
             { deferred_values =
                 { branch_data =
-                    { proofs_verified =
-                        ( match most_recent_width with
-                        | Z ->
-                            N0
-                        | S Z ->
-                            N1
-                        | S (S Z) ->
-                            N2
-                        | S _ ->
-                            assert false )
+                    { proofs_verified = Nat.to_int most_recent_width
                     ; domain_log2 =
                         Branch_data.Domain_log2.of_int_exn domain_log2
                     }

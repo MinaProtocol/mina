@@ -17,6 +17,8 @@ module type S = sig
 
   [%%versioned:
   module Stable : sig
+    [@@@no_toplevel_latest_type]
+
     module V2 : sig
       type t =
         { proofs_verified : Proofs_verified.Stable.V2.t
@@ -33,6 +35,13 @@ module type S = sig
       [@@deriving hlist, compare, sexp, yojson, hash, equal]
     end
   end]
+
+  (* In-memory representation; coincides with the [V2] wire encoding. *)
+  type t =
+    { proofs_verified : Proofs_verified.Stable.V2.t
+    ; domain_log2 : Domain_log2.Stable.V1.t
+    }
+  [@@deriving hlist, compare, sexp, yojson, hash, equal]
 
   module Checked : sig
     module Step : sig

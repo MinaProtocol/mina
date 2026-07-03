@@ -494,7 +494,7 @@ end) : S = struct
   let tag, cache_handle, p, Pickles.Provers.[ step ] =
     Pickles.compile () ~cache:Cache_dir.cache
       ~public_input:(Input Statement.typ)
-      ~override_wrap_domain:Pickles_base.Proofs_verified.N1
+      ~override_wrap_domain:Pickles_base.Proofs_verified.n1
       ~auxiliary_typ:Typ.unit
       ~max_proofs_verified:(module Nat.N2)
       ~name:"blockchain-snark"

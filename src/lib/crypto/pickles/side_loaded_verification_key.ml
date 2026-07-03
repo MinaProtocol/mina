@@ -234,7 +234,9 @@ module Stable = struct
         let wrap_vk =
           reconstruct_wrap_vk
             ~proofs_verified:
-              (Pickles_base.Proofs_verified.to_int actual_wrap_domain_size)
+              (Pickles_base.Proofs_verified.to_int
+                 (Pickles_base.Proofs_verified.of_stable_v2
+                    actual_wrap_domain_size ) )
             c
         in
         { Poly.max_proofs_verified
@@ -314,7 +316,7 @@ module Stable = struct
           reconstruct_wrap_vk
             ~proofs_verified:
               (Pickles_base.Proofs_verified.to_int
-                 (Pickles_base.Proofs_verified.Stable.V1.to_latest
+                 (Pickles_base.Proofs_verified.of_stable_v1
                     actual_wrap_domain_size ) )
             c
         in
@@ -374,11 +376,7 @@ let dummy_wrap_vk :
     option
     Lazy.t =
   lazy
-    (let d =
-       (Common.wrap_domains
-          ~proofs_verified:(Pickles_base.Proofs_verified.to_int N2) )
-         .h
-     in
+    (let d = (Common.wrap_domains ~proofs_verified:2).h in
      let log2_size = Import.Domain.log2_size d in
      let public =
        let (T (input, _conv, _conv_inv)) =
@@ -428,8 +426,8 @@ let dummy_wrap_vk :
          } ) )
 
 let dummy : t =
-  { max_proofs_verified = N2
-  ; actual_wrap_domain_size = N2
+  { max_proofs_verified = 2
+  ; actual_wrap_domain_size = 2
   ; wrap_index =
       (let g = Backend.Tock.Curve.(to_affine_exn one) in
        { sigma_comm = Vector.init Plonk_types.Permuts.n ~f:(fun _ -> g)
@@ -449,15 +447,9 @@ let dummy_with_wrap_vk = lazy { dummy with wrap_vk = Lazy.force dummy_wrap_vk }
 (* Downgrade the in-memory (latest) verification key to its [V2] wire encoding.
    Raises if the key verifies more than 2 proofs. *)
 let to_stable_v2 (t : t) : Stable.V2.t =
-  let downgrade :
-      Pickles_base.Proofs_verified.t -> Pickles_base.Proofs_verified.Stable.V1.t
-      = function
-    | N0 ->
-        Pickles_base.Proofs_verified.Stable.V1.N0
-    | N1 ->
-        Pickles_base.Proofs_verified.Stable.V1.N1
-    | N2 ->
-        Pickles_base.Proofs_verified.Stable.V1.N2
+  let downgrade (x : Pickles_base.Proofs_verified.Stable.V2.t) :
+      Pickles_base.Proofs_verified.Stable.V1.t =
+    Pickles_base.Proofs_verified.(to_stable_v1 (of_stable_v2 x))
   in
   { t with
     max_proofs_verified = downgrade t.max_proofs_verified
@@ -516,9 +508,17 @@ end
 let typ : (Checked.t, t) Impls.Step.Typ.t =
   let open Step_main_inputs in
   let open Impl in
+  (* The serialised key uses the [V2] proofs-verified encoding; transport the
+     [One_hot] typ, whose value type is the in-memory [Proofs_verified.t]. *)
+  let proofs_verified_typ =
+    Typ.transport
+      (Pickles_base.Proofs_verified.One_hot.typ Pickles_types.Nat.N3.n)
+      ~there:Pickles_base.Proofs_verified.of_stable_v2
+      ~back:Pickles_base.Proofs_verified.to_stable_v2
+  in
   Typ.of_hlistable
-    [ Pickles_base.Proofs_verified.One_hot.typ Pickles_types.Nat.N3.n
-    ; Pickles_base.Proofs_verified.One_hot.typ Pickles_types.Nat.N3.n
+    [ proofs_verified_typ
+    ; proofs_verified_typ
     ; Plonk_verification_key_evals.typ Inner_curve.typ
     ]
     ~var_to_hlist:Checked.to_hlist ~var_of_hlist:Checked.of_hlist

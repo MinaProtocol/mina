@@ -628,7 +628,7 @@ module Transfer_recursive = struct
   let lazy_compiled =
     lazy
       (Pickles.compile () ~cache:Cache_dir.cache
-         ~override_wrap_domain:Pickles_base.Proofs_verified.N1
+         ~override_wrap_domain:Pickles_base.Proofs_verified.n1
          ~public_input:(Input Rules.Transfer.Recursive.Statement.typ)
          ~auxiliary_typ:Impl.Typ.unit
          ~max_proofs_verified:(module Nat.N2)
@@ -657,7 +657,7 @@ end
 let lazy_compiled =
   lazy
     (Zkapps_examples.compile () ~cache:Cache_dir.cache
-       ~override_wrap_domain:Pickles_base.Proofs_verified.N1
+       ~override_wrap_domain:Pickles_base.Proofs_verified.n1
        ~auxiliary_typ:Impl.Typ.unit
        ~max_proofs_verified:(module Nat.N2)
        ~name:"tokens"
