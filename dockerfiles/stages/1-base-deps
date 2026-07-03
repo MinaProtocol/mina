@@ -1,0 +1,88 @@
+#################################################################################################
+# The "base-deps" stage
+# - Common, mina-UNRELATED base layer shared by the mina-daemon and mina-archive images.
+# - Installs only the OS-level bits both services need: apt proxy config, ca-certificates +
+#   the http->https sources switch, the shared apt dependencies, and the google-cloud-sdk.
+# - This stage is published to docker.io as the `mina-base` reference image and is compared
+#   byte-for-byte against the CI cache (see buildkite/scripts/docker/verify-toolchain-cache.sh).
+#################################################################################################
+ARG image=europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/debian:bullseye-slim
+
+FROM ${image} AS base-deps
+
+# In multi-stage builds, Docker requires re-declaring ARG variables after each FROM
+# to make them available in that stage, even if declared globally before the first FROM.
+ARG TARGETARCH
+ARG deb_codename=bullseye
+ARG deb_release=unstable
+ARG network=mainnet
+ARG deb_repo="http://packages.o1test.net"
+ARG deb_profile
+ARG deb_suffix
+ARG apt_cache_url=""
+
+ARG GCLOUD_VERSION=476.0.0
+
+ENV DEBIAN_FRONTEND noninteractive
+
+# We do not install the below platform-specific dependencies,
+# and instead assume that apt will install the proper deps based on the package definition.
+# The packages are noted here just for clarity/documentation.
+# Bullseye/Focal-only Deps:
+#    libffi7
+#    libprocps8
+#    libjemalloc2
+#    libssl
+
+# Optional: configure APT caching proxy (bypass proxy for deb_repo)
+COPY scripts/configure-apt-proxy.sh /usr/local/bin/configure-apt-proxy.sh
+RUN chmod +x /usr/local/bin/configure-apt-proxy.sh \
+  && /usr/local/bin/configure-apt-proxy.sh "$apt_cache_url" "$deb_repo"
+
+# Install ca-certificates using HTTP
+RUN apt-get update --quiet --yes \
+  && apt-get install --quiet --yes --no-install-recommends ca-certificates \
+  && rm -rf /var/lib/apt/lists/*
+
+# Switch to HTTPS
+RUN if [ -f /etc/apt/sources.list ]; then \
+  sed -i 's/http:\/\//https:\/\//g' /etc/apt/sources.list; \
+else \
+  sed -i 's/http:\/\//https:\/\//g' /etc/apt/sources.list.d/debian.sources; \
+fi
+
+# Shared OS dependencies installed by both the daemon and the archive images
+# (intersection of both dependency lists, plus libgmp10 and gettext which the daemon needs).
+RUN apt-get update --quiet --yes \
+  && apt-get upgrade --quiet --yes \
+  && apt-get install --quiet --yes --no-install-recommends \
+    apt-transport-https \
+    curl \
+    dnsutils \
+    dumb-init \
+    gettext \
+    gnupg2 \
+    jq \
+    libgmp10 \
+    libgomp1 \
+    libpq-dev \
+    procps \
+    python3 \
+    tzdata \
+  && rm -rf /var/lib/apt/lists/*
+
+# Install google-cloud-sdk for GCLOUD_UPLOAD feature
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+
+RUN case "${TARGETARCH}" in \
+        "amd64") GCLOUD_ARCH="x86_64" ;; \
+        "arm64") GCLOUD_ARCH="arm" ;; \
+        *) echo "Unsupported arch: ${TARGETARCH}"; exit 1 ;; \
+    esac; \
+    curl -sSfL "https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-cli-${GCLOUD_VERSION}-linux-${GCLOUD_ARCH}.tar.gz" | \
+    tar -xz -C /opt/ && \
+    /opt/google-cloud-sdk/bin/gcloud components install gke-gcloud-auth-plugin kubectl --quiet
+
+ENV PATH="/opt/google-cloud-sdk/bin:${PATH}"
+
+ENV USE_GKE_GCLOUD_AUTH_PLUGIN=True
