@@ -152,11 +152,16 @@ module One_hot = struct
            ~f:(fun b -> ((b :> Step_impl.Field.t), 1)) )
   end
 
-  let to_input ~zero ~one (t : t) =
-    if t > 2 then
-      failwithf "Proofs_verified.One_hot.to_input: cannot encode %i in 3 bits" t
-        () ;
-    let one_hot = Array.init 3 ~f:(fun idx -> if idx = t then one else zero) in
+  let to_input (n : 'n Nat.N3.plus_n Nat.t) ~zero ~one (t : t) =
+    let length = Nat.to_int n in
+    if t >= length then
+      failwithf
+        "Proofs_verified.One_hot.to_input: Attempted to encode %i into an \
+         undersized vector (%i)"
+        t length () ;
+    let one_hot =
+      Array.init length ~f:(fun idx -> if idx = t then one else zero)
+    in
     Random_oracle_input.Chunked.packeds (Array.map one_hot ~f:(fun b -> (b, 1)))
 
   let typ n : ('n Checked.t, proofs_verified) Step_impl.Typ.t =
