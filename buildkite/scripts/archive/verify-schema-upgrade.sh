@@ -134,6 +134,41 @@ dump_and_normalize() {
     > "$output_file"
 }
 
+# --- Normalize documented lossy downgrade deltas ---
+# The downgrade intentionally does not restore Berkeley's element_ids btree
+# UNIQUE/indexes or events_id/actions_id NOT NULL constraints. Post-Mesa data may
+# contain duplicates, oversized arrays, or NULL values that Berkeley rejected.
+normalize_known_downgrade_deltas() {
+    local schema_file="$1"
+    local tmp_file="${schema_file}.known_downgrade_deltas"
+
+    awk '
+        /^ALTER TABLE ONLY public\.zkapp_(events|field_array)$/ {
+            alter_line = $0
+            if ((getline constraint_line) <= 0) {
+                print alter_line
+                next
+            }
+            if (constraint_line ~ /^    ADD CONSTRAINT zkapp_(events|field_array)_element_ids_key UNIQUE \(element_ids\);$/) {
+                next
+            }
+            print alter_line
+            print constraint_line
+            next
+        }
+        /^CREATE INDEX idx_zkapp_(events|field_array)_element_ids ON public\.zkapp_(events|field_array) USING btree \(element_ids\);$/ {
+            next
+        }
+        {
+            sub(/^    events_id integer NOT NULL,/, "    events_id integer,")
+            sub(/^    actions_id integer NOT NULL,/, "    actions_id integer,")
+            print
+        }
+    ' "$schema_file" > "$tmp_file"
+
+    mv "$tmp_file" "$schema_file"
+}
+
 # --- Main ---
 main() {
     parse_args "$@"
@@ -208,6 +243,7 @@ main() {
     echo ""
     echo "=== Test 2: Downgrade path verification ==="
     echo "  Expected: ${SOURCE_BRANCH} schema + upgrade + downgrade == ${SOURCE_BRANCH} schema"
+    echo "            except documented lossy Berkeley constraint restorations"
 
     create_db "archive_downgraded"
     create_db "archive_source_ref"
@@ -225,6 +261,8 @@ main() {
 
     dump_and_normalize "archive_source_ref" "$schema_source_ref"
     dump_and_normalize "archive_downgraded" "$schema_downgraded"
+    normalize_known_downgrade_deltas "$schema_source_ref"
+    normalize_known_downgrade_deltas "$schema_downgraded"
 
     echo "Comparing schemas..."
     if diff -u "$schema_source_ref" "$schema_downgraded"; then
