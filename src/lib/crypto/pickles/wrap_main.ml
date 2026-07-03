@@ -40,7 +40,7 @@ let pack_statement max_proofs_verified t =
   let open Types.Step in
   Spec.pack
     (module Impl)
-    (module Branch_data.Checked.Wrap)
+    ~branch_data_pack:Branch_data.Checked.Wrap.pack ~branch_data_width:Nat.N2.n
     (Statement.spec max_proofs_verified Backend.Tock.Rounds.n)
     (Statement.to_data t)
 

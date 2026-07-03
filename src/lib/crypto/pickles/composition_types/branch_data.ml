@@ -83,7 +83,10 @@ module Make_str (A : Wire_types.Concrete) = struct
     }
   [@@deriving hlist, compare, sexp, yojson, hash, equal]
 
-  let length_in_bits = 10
+  (* [n] is the width of the proofs-verified prefix mask. The packed layout is
+     the low 2 mask bits, then 8 bits of [domain_log2], then any remaining mask
+     bits, so the total is [n + 8] bits. *)
+  let length_in_bits (n : _ Pickles_types.Nat.t) = Pickles_types.Nat.to_int n + 8
 
   let pack (type f)
       (module Impl : Snarky_backendless.Snark_intf.Run with type field = f) n
@@ -133,18 +136,18 @@ module Make_str (A : Wire_types.Concrete) = struct
 
       type field_var = Field.t
 
-      type t =
-        { proofs_verified_mask :
-            Pickles_types.Nat.z Proofs_verified.Prefix_mask.Step.Checked.t
+      type 'n t =
+        { proofs_verified_mask : 'n Proofs_verified.Prefix_mask.Step.Checked.t
         ; domain_log2 : Field.t
         }
       [@@deriving hlist]
 
-      let pack ({ proofs_verified_mask; domain_log2 } : t) : Field.t =
+      let pack ({ proofs_verified_mask; domain_log2 } : _ t) : Field.t =
         let open Field in
-        let four = of_int 4 in
-        (four * domain_log2)
-        + pack (Pickles_types.Vector.to_list proofs_verified_mask)
+        let (x0 :: x1 :: rest) = proofs_verified_mask in
+        (of_int 1024 * pack (Pickles_types.Vector.to_list rest))
+        + (of_int 4 * domain_log2)
+        + pack [ x0; x1 ]
     end
 
     module Wrap = struct
@@ -152,18 +155,18 @@ module Make_str (A : Wire_types.Concrete) = struct
 
       type field_var = Field.t
 
-      type t =
-        { proofs_verified_mask :
-            Pickles_types.Nat.z Proofs_verified.Prefix_mask.Wrap.Checked.t
+      type 'n t =
+        { proofs_verified_mask : 'n Proofs_verified.Prefix_mask.Wrap.Checked.t
         ; domain_log2 : Field.t
         }
       [@@deriving hlist]
 
-      let pack ({ proofs_verified_mask; domain_log2 } : t) : Field.t =
+      let pack ({ proofs_verified_mask; domain_log2 } : _ t) : Field.t =
         let open Field in
-        let four = of_int 4 in
-        (four * domain_log2)
-        + pack (Pickles_types.Vector.to_list proofs_verified_mask)
+        let (x0 :: x1 :: rest) = proofs_verified_mask in
+        (of_int 1024 * pack (Pickles_types.Vector.to_list rest))
+        + (of_int 4 * domain_log2)
+        + pack [ x0; x1 ]
     end
   end
 
@@ -181,15 +184,15 @@ module Make_str (A : Wire_types.Concrete) = struct
       ~(* We actually only need it to be less than 252 bits in order to pack
           the whole branch_data struct safely, but it's cheapest to check that it's
           under 16 bits *)
-      (assert_16_bits : Step_impl.Field.t -> unit) :
-      (Checked.Step.t, t) Step_impl.Typ.t =
+      (assert_16_bits : Step_impl.Field.t -> unit) n :
+      ('n Checked.Step.t, t) Step_impl.Typ.t =
     let open Step_impl in
     let proofs_verified_mask :
-        ( Pickles_types.Nat.z Proofs_verified.Prefix_mask.Step.Checked.t
+        ( 'n Proofs_verified.Prefix_mask.Step.Checked.t
         , Proofs_verified.Stable.V2.t )
         Typ.t =
       Typ.transport
-        (Proofs_verified.Prefix_mask.Step.typ Pickles_types.Nat.N2.n)
+        (Proofs_verified.Prefix_mask.Step.typ n)
         ~there:Proofs_verified.of_stable_v2 ~back:Proofs_verified.to_stable_v2
     in
     let domain_log2 : (Field.t, Domain_log2.t) Typ.t =
@@ -210,15 +213,15 @@ module Make_str (A : Wire_types.Concrete) = struct
       ~(* We actually only need it to be less than 252 bits in order to pack
           the whole branch_data struct safely, but it's cheapest to check that it's
           under 16 bits *)
-      (assert_16_bits : Wrap_impl.Field.t -> unit) :
-      (Checked.Wrap.t, t) Wrap_impl.Typ.t =
+      (assert_16_bits : Wrap_impl.Field.t -> unit) n :
+      ('n Checked.Wrap.t, t) Wrap_impl.Typ.t =
     let open Wrap_impl in
     let proofs_verified_mask :
-        ( Pickles_types.Nat.z Proofs_verified.Prefix_mask.Wrap.Checked.t
+        ( 'n Proofs_verified.Prefix_mask.Wrap.Checked.t
         , Proofs_verified.Stable.V2.t )
         Typ.t =
       Typ.transport
-        (Proofs_verified.Prefix_mask.Wrap.typ Pickles_types.Nat.N2.n)
+        (Proofs_verified.Prefix_mask.Wrap.typ n)
         ~there:Proofs_verified.of_stable_v2 ~back:Proofs_verified.to_stable_v2
     in
     let domain_log2 : (Field.t, Domain_log2.t) Typ.t =

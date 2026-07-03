@@ -782,7 +782,7 @@ struct
 
   let domain_for_compiled (type branches)
       (domains : (Domains.t, branches) Vector.t)
-      (branch_data : Branch_data.Checked.Step.t) :
+      (branch_data : Pickles_types.Nat.z Branch_data.Checked.Step.t) :
       Field.t Plonk_checks.plonk_domain =
     let (T unique_domains) =
       List.map (Vector.to_list domains) ~f:Domains.h
@@ -847,7 +847,7 @@ struct
         , _
         , _
         , _
-        , Branch_data.Checked.Step.t
+        , Pickles_types.Nat.z Branch_data.Checked.Step.t
         , _ )
         Types.Wrap.Proof_state.Deferred_values.In_circuit.t )
       { Plonk_types.All_evals.In_circuit.ft_eval1; evals } =
@@ -1253,7 +1253,8 @@ struct
       with_label "pack_statement" (fun () ->
           Spec.pack
             (module Impl)
-            (module Branch_data.Checked.Step)
+            ~branch_data_pack:Branch_data.Checked.Step.pack
+            ~branch_data_width:Nat.N2.n
             (Types.Wrap.Statement.In_circuit.spec
                (module Impl)
                lookup_parameters feature_flags )

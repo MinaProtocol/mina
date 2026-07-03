@@ -6,13 +6,8 @@ type ('f, 'v) impl =
 module type Branch_data_checked = sig
   type field_var
 
-  type t
-
-  val pack : t -> field_var
+  type 'n t
 end
-
-type ('branch_data, 'f) branch_data =
-  (module Branch_data_checked with type field_var = 'f and type t = 'branch_data)
 
 (** Basic types *)
 type (_, _, _) basic =
@@ -92,13 +87,15 @@ module Wrap_impl := Kimchi_pasta_snarky_backend.Wrap_impl
 
 val typ :
      assert_16_bits:(Step_impl.Field.t -> unit)
+  -> branch_data_width:
+       'n Pickles_types.Nat.s Pickles_types.Nat.s Pickles_types.Nat.t
   -> ('b, 'c) Step_impl.Typ.t
   -> ( 'd
      , 'e
      , < bool1 : bool
        ; bool2 : Step_impl.Boolean.var
        ; branch_data1 : Branch_data.t
-       ; branch_data2 : Branch_data.Checked.Step.t
+       ; branch_data2 : 'n Branch_data.Checked.Step.t
        ; bulletproof_challenge1 :
            Limb_vector.Challenge.Constant.t
            Kimchi_backend_common.Scalar_challenge.t
@@ -118,13 +115,15 @@ val typ :
 
 val wrap_typ :
      assert_16_bits:(Wrap_impl.Field.t -> unit)
+  -> branch_data_width:
+       'n Pickles_types.Nat.s Pickles_types.Nat.s Pickles_types.Nat.t
   -> ('b, 'c) Wrap_impl.Typ.t
   -> ( 'd
      , 'e
      , < bool1 : bool
        ; bool2 : Wrap_impl.Boolean.var
        ; branch_data1 : Branch_data.t
-       ; branch_data2 : Branch_data.Checked.Wrap.t
+       ; branch_data2 : 'n Branch_data.Checked.Wrap.t
        ; bulletproof_challenge1 :
            Limb_vector.Challenge.Constant.t
            Kimchi_backend_common.Scalar_challenge.t
@@ -160,7 +159,9 @@ module Wrap_etyp :
     module type of Make_ETyp (Kimchi_pasta_snarky_backend.Wrap_impl)
 
 val packed_typ :
-     ('b, 'c) Step_etyp.t
+     branch_data_width:
+       'n Pickles_types.Nat.s Pickles_types.Nat.s Pickles_types.Nat.t
+  -> ('b, 'c) Step_etyp.t
   -> ( 'd
      , 'e
      , < bool1 : bool
@@ -185,7 +186,9 @@ val packed_typ :
   -> ('e, 'd) Step_etyp.t
 
 val wrap_packed_typ :
-     ('b, 'c) Wrap_etyp.t
+     branch_data_width:
+       'n Pickles_types.Nat.s Pickles_types.Nat.s Pickles_types.Nat.t
+  -> ('b, 'c) Wrap_etyp.t
   -> ( 'd
      , 'e
      , < bool1 : bool
@@ -211,7 +214,9 @@ val wrap_packed_typ :
 
 val pack :
      ('f, 'v) impl
-  -> ('branch_data_checked, 'v) branch_data
+  -> branch_data_pack:('branch_data_checked -> 'v)
+  -> branch_data_width:
+       'n Pickles_types.Nat.s Pickles_types.Nat.s Pickles_types.Nat.t
   -> ( 'a
      , 'b
      , < bool1 : bool

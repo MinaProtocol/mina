@@ -54,6 +54,24 @@ module Lte = struct
    fun t1 t2 -> match (t1, t2) with Z, _ -> Z | S t1, S t2 -> S (trans t1 t2)
 end
 
+module Max = struct
+  (* The larger of [a] and [b], together with witnesses that both are at most
+     it. *)
+  type ('a, 'b) t =
+    | T : 'c nat * ('a, 'c) Lte.t * ('b, 'c) Lte.t -> ('a, 'b) t
+end
+
+let rec max : type a b. a nat -> b nat -> (a, b) Max.t =
+ fun a b ->
+  match (a, b) with
+  | Z, _ ->
+      Max.T (b, Lte.Z, Lte.refl b)
+  | _, Z ->
+      Max.T (a, Lte.refl a, Lte.Z)
+  | S a, S b ->
+      let (Max.T (c, la, lb)) = max a b in
+      Max.T (S c, Lte.S la, Lte.S lb)
+
 module N0 = struct
   type 'a plus_n = 'a
 

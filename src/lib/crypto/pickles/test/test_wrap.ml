@@ -133,7 +133,8 @@ let run_recursive_proof_test (actual_feature_flags : Plonk_types.Features.flags)
            Limb_vector.Challenge.Constant.zero )
       (Shifted_value.Type1.typ Field.typ)
       (Import.Branch_data.typ
-         ~assert_16_bits:(Step_verifier.assert_n_bits ~n:16) )
+         ~assert_16_bits:(Step_verifier.assert_n_bits ~n:16)
+         Pickles_types.Nat.N2.n )
   in
 
   (* Use deferred_values_typ and the constant helper to prepare deferred_values
