@@ -118,19 +118,24 @@ let to_stable_v1 (x : t) : Stable.V1.t =
 let of_stable_v1 (x : Stable.V1.t) : t =
   match x with Stable.V1.N0 -> N0 | Stable.V1.N1 -> N1 | Stable.V1.N2 -> N2
 
+(* The prefix mask is right-aligned: the [to_int t] set bits sit at the end of
+   the vector, e.g. [N1] over width 2 is [false; true]. This matches the
+   convention used by the consumers (see [wrap_main.ml], which builds the mask
+   with [ones_vector |> Vector.rev] and pads with [extend_front_exn]). *)
 let to_bool_vec : 'n Nat.t -> proofs_verified -> (bool, 'n) Vector.t =
  fun n t ->
   let stop_idx = to_int t in
-  Vector.init n ~f:(fun idx -> idx < stop_idx)
+  let len = Nat.to_int n in
+  Vector.init n ~f:(fun idx -> idx >= len - stop_idx)
 
 let of_bool_vec (v : (bool, 'n) Vector.t) : proofs_verified =
-  Vector.foldi v ~init:0 ~f:(fun idx count value ->
+  Vector.foldi (Vector.rev v) ~init:0 ~f:(fun idx count value ->
       if value then
         if idx = count then count + 1
         else
           invalid_arg
-            "Prefix_mask.of_bool_vec: expected [true; true; ...; true; false; \
-             false; ... false]"
+            "Prefix_mask.of_bool_vec: expected [false; false; ...; false; \
+             true; ...; true; true]"
       else count )
   |> of_int_exn
 
