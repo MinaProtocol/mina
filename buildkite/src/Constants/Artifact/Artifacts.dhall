@@ -241,11 +241,7 @@ let toDebianToken =
             (profile artifact)
             (resolvedNetwork artifact)
 
-let networkOrdinal =
-          \(n : Network.Type)
-      ->  merge
-            { Devnet = 0, Mainnet = 1, PreMesa1 = 2, Mesa = 3, MesaMut = 4 }
-            n
+let networkOrdinal = \(n : Network.Type) -> merge { Devnet = 0, Mainnet = 1 } n
 
 let networks =
           \(artifacts : List Artifact)

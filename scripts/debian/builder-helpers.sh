@@ -220,9 +220,6 @@ install_mina_service() {
     devnet)
       local seed_list_url='seed-lists/devnet_seeds.txt'
       ;;
-    mesa|mesa-mut)
-      local seed_list_url='o1labs-gitops-infrastructure/mina-mesa-network/mina-mesa-network-seeds.txt'
-      ;;
     *)
       echo "Unknown network name provided: ${network}"; exit 1
       ;;
@@ -301,17 +298,10 @@ copy_common_daemon_configs() {
   # We want to copy the genesis ledger for the network ($1) and in case of
   # devnet/mainnet also copy the magic config (config_$GITHASH_CONFIG.json).
   # This config is automatically picked up by the daemon on startup.
-  # mesa-mut is the mutable variant of the mesa network: it has no genesis
-  # ledger of its own and reuses mesa's genesis ledger as its source.
   local LEDGER_SOURCE="${NETWORK_NAME}"
-  case "${NETWORK_NAME}" in
-    mesa-mut)
-      LEDGER_SOURCE="mesa"
-      ;;
-  esac
 
   case "${NETWORK_NAME}" in
-    devnet|mainnet|mesa|mesa-mut)
+    devnet|mainnet)
       cp ../genesis_ledgers/"${LEDGER_SOURCE}".json \
         "${BUILDDIR}/var/lib/coda/config_${GITHASH_CONFIG}.json"
       cp ../genesis_ledgers/"${LEDGER_SOURCE}".json "${BUILDDIR}/var/lib/coda/${NETWORK_NAME}.json"
@@ -540,7 +530,7 @@ build_rosetta_deb() {
   local profile
   case "${network}" in
     mainnet) profile="mainnet" ;;
-    devnet|mesa|mesa-mut) profile="devnet" ;;
+    devnet) profile="devnet" ;;
     *) echo "Unknown network: ${network}" >&2; exit 1 ;;
   esac
 
@@ -718,14 +708,10 @@ create_symlinks_for_shared_apps() {
     mainnet)
       dispatch_profile="mainnet"
       ;;
-    # mesa is a devnet-signature hardfork network; it deploys with the devnet
-    # profile (see Profiles.fromNetwork in buildkite Dhall and
-    # dispatcher-tests.sh), so the activation marker is auto-fork-mesa-devnet.
-    # mesa-mut is the mutable, devnet-signature variant of mesa: it shares
-    # mesa's runtime identity (same /usr/lib/mina/mesa runtime dir,
-    # MINA_NETWORK=mesa and devnet dispatch profile), so it resolves the same
-    # auto-fork-mesa-devnet marker.
-    devnet|mesa|mesa-mut)
+    # The mesa hardfork deploys with the devnet signature/profile (see
+    # Profiles.fromNetwork in buildkite Dhall and dispatcher-tests.sh), so the
+    # activation marker is auto-fork-mesa-devnet.
+    devnet)
       dispatch_profile="devnet"
       ;;
     *)
@@ -1091,7 +1077,7 @@ build_archive_deb () {
   local profile
   case "${network}" in
     mainnet) profile="mainnet" ;;
-    devnet|mesa|mesa-mut) profile="devnet" ;;
+    devnet) profile="devnet" ;;
     *) echo "Unknown network: ${network}" >&2; exit 1 ;;
   esac
 
@@ -1102,9 +1088,6 @@ build_archive_deb () {
       ;;
     devnet)
       package_name="$MINA_ARCHIVE_DEB_NAME"
-      ;;
-    mesa|mesa-mut)
-      package_name="mina-archive-${network}${DEB_SUFFIX}"
       ;;
   esac
 
