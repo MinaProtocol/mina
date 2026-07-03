@@ -412,7 +412,6 @@ SVCEOF
     mkdir -p "${PROJECT_ROOT}/genesis_ledgers"
     echo '{"genesis": "mainnet"}' > "${PROJECT_ROOT}/genesis_ledgers/mainnet.json"
     echo '{"genesis": "devnet"}' > "${PROJECT_ROOT}/genesis_ledgers/devnet.json"
-    echo '{"genesis": "mesa"}' > "${PROJECT_ROOT}/genesis_ledgers/mesa.json"
 
     # rosetta scripts and configs
     create_mock_exe "src/app/rosetta/scripts/run.sh" "$PROJECT_ROOT"
@@ -753,25 +752,6 @@ test_build_daemon_mainnet_postfork_deb() {
 
     # Prefork config shipped here (different hash)
     assert_file_captured "$CAPTURED_FILES" "var/lib/coda/config_ef01abcd.json"
-
-    unset PREFORK_LEGACY_VERSION
-}
-
-test_build_daemon_mesa_postfork_deb() {
-    export PREFORK_LEGACY_VERSION="3.3.0-compatible-ef01abc"
-
-    safe_build build_daemon_postfork_deb mesa || { log_fail "build exited non-zero"; return; }
-
-    load_captured_state
-    assert_eq "deb name" "mina-mesa-postfork-mesa" "$CAPTURED_DEB_NAME"
-    assert_control_field "$CAPTURED_CONTROL" "Package" "mina-mesa-postfork-mesa"
-
-    # Dispatcher present and the env file maps the mesa network to the devnet
-    # deployment profile (auto-fork-mesa-devnet activation marker)
-    assert_file_captured "$CAPTURED_FILES" "usr/local/bin/mina-dispatch"
-    assert_file_captured "$CAPTURED_FILES" "etc/default/mina-dispatch"
-    assert_captured_file_contains "$CAPTURED_LAST_BUILD_DIR" \
-        "etc/default/mina-dispatch" "MINA_PROFILE=devnet"
 
     unset PREFORK_LEGACY_VERSION
 }
@@ -1283,7 +1263,6 @@ main() {
     # Postfork packages
     run_test test_build_daemon_devnet_postfork_deb
     run_test test_build_daemon_mainnet_postfork_deb
-    run_test test_build_daemon_mesa_postfork_deb
     run_test test_build_daemon_postfork_deb_without_prefork_version
     run_test test_build_daemon_postfork_deb_unresolvable_prefork_hash
 

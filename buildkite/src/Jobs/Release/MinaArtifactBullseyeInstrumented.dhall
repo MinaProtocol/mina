@@ -18,7 +18,6 @@ in  Pipeline.build
           , artifacts =
             [ Artifacts.Type.Daemon { network = Network.Type.Devnet }
             , Artifacts.Type.Daemon { network = Network.Type.Mainnet }
-            , Artifacts.Type.Daemon { network = Network.Type.MesaMut }
             , Artifacts.Type.DaemonGeneric
             , Artifacts.Type.DaemonProfiled { profile = Profile.Type.Lightnet }
             , Artifacts.Type.DaemonProfiled { profile = Profile.Type.Devnet }
@@ -27,16 +26,12 @@ in  Pipeline.build
                 { network = Network.Type.Devnet }
             , Artifacts.Type.CreatePreforkGenesis
                 { network = Network.Type.Mainnet }
-            , Artifacts.Type.CreatePreforkGenesis
-                { network = Network.Type.MesaMut }
             , Artifacts.Type.ArchiveGeneric
             , Artifacts.Type.Archive { network = Network.Type.Devnet }
             , Artifacts.Type.Archive { network = Network.Type.Mainnet }
-            , Artifacts.Type.Archive { network = Network.Type.MesaMut }
             , Artifacts.Type.RosettaGeneric
             , Artifacts.Type.Rosetta { network = Network.Type.Devnet }
             , Artifacts.Type.Rosetta { network = Network.Type.Mainnet }
-            , Artifacts.Type.Rosetta { network = Network.Type.MesaMut }
             , Artifacts.Type.LogProc
             , Artifacts.Type.TxTools
             , Artifacts.Type.FunctionalTestSuite
