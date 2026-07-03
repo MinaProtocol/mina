@@ -1,6 +1,6 @@
 module Proofs_verified = struct
   module V2 = struct
-    type t = N0 | N1 | N2
+    type t = N0 | N1 | N2 | N_other of int
   end
 
   module V1 = struct

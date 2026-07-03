@@ -245,13 +245,8 @@ include Wire_types.Make (Make_sig) (Make_str)
    Raises if the number of proofs verified cannot be represented in [V1]. *)
 let to_stable_v1 ({ proofs_verified; domain_log2 } : t) : Stable.V1.t =
   { proofs_verified =
-      ( match proofs_verified with
-      | N0 ->
-          Proofs_verified.Stable.V1.N0
-      | N1 ->
-          Proofs_verified.Stable.V1.N1
-      | N2 ->
-          Proofs_verified.Stable.V1.N2 )
+      Proofs_verified.to_stable_v1
+        (Proofs_verified.of_stable_v2 proofs_verified)
   ; domain_log2
   }
 

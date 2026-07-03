@@ -8,7 +8,11 @@ module Stable = struct
   [@@@no_toplevel_latest_type]
 
   module V2 = struct
-    type t = Mina_wire_types.Pickles_base.Proofs_verified.V2.t = N0 | N1 | N2
+    type t = Mina_wire_types.Pickles_base.Proofs_verified.V2.t =
+      | N0
+      | N1
+      | N2
+      | N_other of int
     [@@deriving sexp, compare, yojson, hash, equal]
 
     let to_latest = Fn.id
@@ -28,11 +32,12 @@ module Stable = struct
   end
 end]
 
-type t = N0 | N1 | N2 [@@deriving sexp, compare, yojson, hash, equal]
+type t = N0 | N1 | N2 | N_other of int
+[@@deriving sexp, compare, yojson, hash, equal]
 
 [@@@warning "+4"]
 
-let to_int : t -> int = function N0 -> 0 | N1 -> 1 | N2 -> 2
+let to_int : t -> int = function N0 -> 0 | N1 -> 1 | N2 -> 2 | N_other i -> i
 
 (** Inside the circuit, we use two different representations for this type,
     depending on what we need it for.
@@ -67,33 +72,48 @@ let of_nat_exn (type n) (n : n Nat.t) : t =
       N1
   | S (S Z) ->
       N2
-  | S _ ->
-      raise
-        (Invalid_argument
-           (Printf.sprintf "Proofs_verified.of_nat: got %d" (to_int n)) )
+  | S (S n) ->
+      N_other (2 + Nat.to_int n)
 
 let of_int_exn (n : int) : t =
-  match n with
-  | 0 ->
-      N0
-  | 1 ->
-      N1
-  | 2 ->
-      N2
-  | _ ->
-      raise
-        (Invalid_argument (Printf.sprintf "Proofs_verified.of_int: got %d" n))
+  match n with 0 -> N0 | 1 -> N1 | 2 -> N2 | _ -> N_other n
 
 (* Conversions between the in-memory [t] and the serialised [Stable] encodings.
    The encodings are currently structurally identical to [t]. *)
 let to_stable_v2 (x : t) : Stable.V2.t =
-  match x with N0 -> Stable.V2.N0 | N1 -> Stable.V2.N1 | N2 -> Stable.V2.N2
+  match x with
+  | N0 ->
+      Stable.V2.N0
+  | N1 ->
+      Stable.V2.N1
+  | N2 ->
+      Stable.V2.N2
+  | N_other n ->
+      Stable.V2.N_other n
 
 let of_stable_v2 (x : Stable.V2.t) : t =
-  match x with Stable.V2.N0 -> N0 | Stable.V2.N1 -> N1 | Stable.V2.N2 -> N2
+  match x with
+  | Stable.V2.N0 ->
+      N0
+  | Stable.V2.N1 ->
+      N1
+  | Stable.V2.N2 ->
+      N2
+  | Stable.V2.N_other n ->
+      (* TODO: This should really have an upper bound as well. *)
+      if n > 2 then N_other n
+      else failwithf "Invalid choice for Proofs_verified.N_other: %i" n ()
 
 let to_stable_v1 (x : t) : Stable.V1.t =
-  match x with N0 -> Stable.V1.N0 | N1 -> Stable.V1.N1 | N2 -> Stable.V1.N2
+  match x with
+  | N0 ->
+      Stable.V1.N0
+  | N1 ->
+      Stable.V1.N1
+  | N2 ->
+      Stable.V1.N2
+  | N_other _ ->
+      failwith "Unsupported Proofs_verified.N_other in Stable.V1.t"
 
 let of_stable_v1 (x : Stable.V1.t) : t =
   match x with Stable.V1.N0 -> N0 | Stable.V1.N1 -> N1 | Stable.V1.N2 -> N2
@@ -159,7 +179,15 @@ module One_hot = struct
            ~f:(fun b -> ((b :> Step_impl.Field.t), 1)) )
   end
 
-  let there : proofs_verified -> int = function N0 -> 0 | N1 -> 1 | N2 -> 2
+  let there : proofs_verified -> int = function
+    | N0 ->
+        0
+    | N1 ->
+        1
+    | N2 ->
+        2
+    | N_other i ->
+        i
 
   let back : int -> proofs_verified = function
     | 0 ->
@@ -168,8 +196,10 @@ module One_hot = struct
         N1
     | 2 ->
         N2
-    | _ ->
+    | n when n < 0 ->
         failwith "Invalid mask"
+    | n ->
+        N_other n
 
   let to_input ~zero ~one (t : t) =
     let one_hot =
@@ -180,6 +210,8 @@ module One_hot = struct
           [| zero; one; zero |]
       | N2 ->
           [| zero; zero; one |]
+      | N_other _ ->
+          failwith "TODO"
     in
     Random_oracle_input.Chunked.packeds (Array.map one_hot ~f:(fun b -> (b, 1)))
 

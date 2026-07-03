@@ -451,15 +451,9 @@ let dummy_with_wrap_vk = lazy { dummy with wrap_vk = Lazy.force dummy_wrap_vk }
 (* Downgrade the in-memory (latest) verification key to its [V2] wire encoding.
    Raises if the key verifies more than 2 proofs. *)
 let to_stable_v2 (t : t) : Stable.V2.t =
-  let downgrade :
-         Pickles_base.Proofs_verified.Stable.V2.t
-      -> Pickles_base.Proofs_verified.Stable.V1.t = function
-    | N0 ->
-        Pickles_base.Proofs_verified.Stable.V1.N0
-    | N1 ->
-        Pickles_base.Proofs_verified.Stable.V1.N1
-    | N2 ->
-        Pickles_base.Proofs_verified.Stable.V1.N2
+  let downgrade (x : Pickles_base.Proofs_verified.Stable.V2.t) :
+      Pickles_base.Proofs_verified.Stable.V1.t =
+    Pickles_base.Proofs_verified.(to_stable_v1 (of_stable_v2 x))
   in
   { t with
     max_proofs_verified = downgrade t.max_proofs_verified
