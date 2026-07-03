@@ -247,15 +247,16 @@ module For_tests_only = struct
                   ~plonk:tick_plonk_minimal)
         ; branch_data =
             { proofs_verified =
-                ( match actual_proofs_verified with
-                | Z ->
-                    Branch_data.Proofs_verified.N0
-                | S Z ->
-                    N1
-                | S (S Z) ->
-                    N2
-                | S _ ->
-                    assert false )
+                Branch_data.Proofs_verified.to_stable_v2
+                  ( match actual_proofs_verified with
+                  | Z ->
+                      Branch_data.Proofs_verified.N0
+                  | S Z ->
+                      N1
+                  | S (S Z) ->
+                      N2
+                  | S _ ->
+                      assert false )
             ; domain_log2 =
                 Branch_data.Domain_log2.of_int_exn
                   step_vk.domain.log_size_of_group

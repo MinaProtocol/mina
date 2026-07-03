@@ -25,8 +25,7 @@ module Stable : sig
   end
 end
 
-type t = Stable.Latest.t = N0 | N1 | N2
-[@@deriving sexp, compare, yojson, hash, equal]
+type t = N0 | N1 | N2 [@@deriving sexp, compare, yojson, hash, equal]
 
 (** [of_nat_exn t_n] converts the type level natural [t_n] to the data type natural.
     Raise an exception if [t_n] represents a value above or equal to 3 *)
@@ -39,6 +38,16 @@ val of_int_exn : int -> t
 (** [to_int v] converts the value [v] to the corresponding integer, i.e [N0 ->
     0], [N1 -> 1] and [N2 -> 2] *)
 val to_int : t -> int
+
+(** Conversions between the in-memory [t] and the serialised [Stable] encodings. *)
+
+val to_stable_v2 : t -> Stable.V2.t
+
+val of_stable_v2 : Stable.V2.t -> t
+
+val to_stable_v1 : t -> Stable.V1.t
+
+val of_stable_v1 : Stable.V1.t -> t
 
 module One_hot : sig
   open Kimchi_pasta_snarky_backend

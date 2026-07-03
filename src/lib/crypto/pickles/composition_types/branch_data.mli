@@ -6,6 +6,7 @@ include
       Mina_wire_types.Pickles_composition_types.Branch_data.V1.t
      and type Stable.V2.t =
       Mina_wire_types.Pickles_composition_types.Branch_data.V2.t
+     and type t = Mina_wire_types.Pickles_composition_types.Branch_data.V2.t
 
 (** [to_stable_v1 t] downgrades the in-memory branch data to its [V1] wire
     encoding. Raises if more than 2 proofs are verified. *)

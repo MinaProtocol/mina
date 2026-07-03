@@ -47,7 +47,7 @@ val index_to_field_elements :
 
 val to_input :
      field_of_int:(int -> 'a)
-  -> ('a * 'a, Pickles_base__Proofs_verified.t, 'b) Poly.t
+  -> ('a * 'a, Pickles_base__Proofs_verified.Stable.V2.t, 'b) Poly.t
   -> 'a Random_oracle_input.Chunked.t
 
 val max_log2_degree : int
@@ -84,12 +84,6 @@ module Repr : sig
 
     module Latest = V3
   end
-
-  type 'g t = 'g Stable.Latest.t =
-    { max_proofs_verified : Proofs_verified.Stable.V2.t
-    ; actual_wrap_domain_size : Proofs_verified.Stable.V2.t
-    ; wrap_index : 'g Pickles_types.Plonk_verification_key_evals.t
-    }
 end
 
 module Width : sig

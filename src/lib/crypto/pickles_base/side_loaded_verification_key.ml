@@ -121,6 +121,8 @@ end
 module Repr = struct
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V3 = struct
       type 'g t =
         { max_proofs_verified : Proofs_verified.Stable.V2.t
@@ -200,9 +202,11 @@ let to_input (type a) ~(field_of_int : int -> a) :
         } : _ Random_oracle_input.Chunked.t ->
     List.reduce_exn ~f:append
       [ Proofs_verified.One_hot.to_input ~zero:(field_of_int 0)
-          ~one:(field_of_int 1) max_proofs_verified
+          ~one:(field_of_int 1)
+          (Proofs_verified.of_stable_v2 max_proofs_verified)
       ; Proofs_verified.One_hot.to_input ~zero:(field_of_int 0)
-          ~one:(field_of_int 1) actual_wrap_domain_size
+          ~one:(field_of_int 1)
+          (Proofs_verified.of_stable_v2 actual_wrap_domain_size)
       ; wrap_index_to_input
           (Fn.compose Array.of_list (fun (x, y) -> [ x; y ]))
           wrap_index

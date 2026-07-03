@@ -7,6 +7,7 @@ module Make_sig (A : Wire_types.Types.S) = struct
       with type Domain_log2.Stable.V1.t = A.Domain_log2.V1.t
        and type Stable.V1.t = A.V1.t
        and type Stable.V2.t = A.V2.t
+       and type t = A.V2.t
 end
 
 module Make_str (A : Wire_types.Concrete) = struct
@@ -45,6 +46,8 @@ module Make_str (A : Wire_types.Concrete) = struct
      Next 8 bits: domain_log2 *)
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V2 = struct
       type t = A.V2.t =
         { proofs_verified : Proofs_verified.Stable.V2.t
@@ -70,6 +73,16 @@ module Make_str (A : Wire_types.Concrete) = struct
     end
   end]
 
+  (* The in-memory representation coincides with the [V2] wire encoding: the
+     [proofs_verified] field is the serialised [Proofs_verified.Stable.V2.t],
+     not the standalone in-memory [Proofs_verified.t]. The two are bridged at
+     the circuit boundary in [pack]/[unpack]/[typ] below. *)
+  type t = Stable.Latest.t =
+    { proofs_verified : Proofs_verified.Stable.V2.t
+    ; domain_log2 : Domain_log2.Stable.V1.t
+    }
+  [@@deriving hlist, compare, sexp, yojson, hash, equal]
+
   let length_in_bits = 10
 
   let pack (type f)
@@ -80,7 +93,8 @@ module Make_str (A : Wire_types.Concrete) = struct
     let times4 x = double (double x) in
     let domain_log2 = of_int (Char.to_int domain_log2) in
     let (x0 :: x1 :: proofs_verified_rest) =
-      Proofs_verified.to_bool_vec n proofs_verified
+      Proofs_verified.to_bool_vec n
+        (Proofs_verified.of_stable_v2 proofs_verified)
     in
     (* shift domain_log2 over by 2 bits (multiply by 4) *)
     (of_int 1024 * project (Pickles_types.Vector.to_list proofs_verified_rest))
@@ -103,7 +117,8 @@ module Make_str (A : Wire_types.Concrete) = struct
             n_sub_2
         in
         { proofs_verified =
-            Proofs_verified.of_bool_vec (x0 :: x1 :: proofs_verified_rest)
+            Proofs_verified.to_stable_v2
+              (Proofs_verified.of_bool_vec (x0 :: x1 :: proofs_verified_rest))
         ; domain_log2 =
             Domain_log2.of_bits_msb [ y7; y6; y5; y4; y3; y2; y1; y0 ]
         }
@@ -171,9 +186,11 @@ module Make_str (A : Wire_types.Concrete) = struct
     let open Step_impl in
     let proofs_verified_mask :
         ( Pickles_types.Nat.z Proofs_verified.Prefix_mask.Step.Checked.t
-        , Proofs_verified.t )
+        , Proofs_verified.Stable.V2.t )
         Typ.t =
-      Proofs_verified.Prefix_mask.Step.typ Pickles_types.Nat.N2.n
+      Typ.transport
+        (Proofs_verified.Prefix_mask.Step.typ Pickles_types.Nat.N2.n)
+        ~there:Proofs_verified.of_stable_v2 ~back:Proofs_verified.to_stable_v2
     in
     let domain_log2 : (Field.t, Domain_log2.t) Typ.t =
       let (Typ t) =
@@ -198,9 +215,11 @@ module Make_str (A : Wire_types.Concrete) = struct
     let open Wrap_impl in
     let proofs_verified_mask :
         ( Pickles_types.Nat.z Proofs_verified.Prefix_mask.Wrap.Checked.t
-        , Proofs_verified.t )
+        , Proofs_verified.Stable.V2.t )
         Typ.t =
-      Proofs_verified.Prefix_mask.Wrap.typ Pickles_types.Nat.N2.n
+      Typ.transport
+        (Proofs_verified.Prefix_mask.Wrap.typ Pickles_types.Nat.N2.n)
+        ~there:Proofs_verified.of_stable_v2 ~back:Proofs_verified.to_stable_v2
     in
     let domain_log2 : (Field.t, Domain_log2.t) Typ.t =
       let (Typ t) =

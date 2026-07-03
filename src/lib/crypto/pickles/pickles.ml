@@ -234,9 +234,10 @@ module Make_str (_ : Wire_types.Concrete) = struct
           ; wrap_index =
               Plonk_verification_key_evals.map wrap_key ~f:(fun x -> x.(0))
           ; max_proofs_verified =
-              Pickles_base.Proofs_verified.of_nat_exn
-                (Nat.Add.n d.max_proofs_verified)
-          ; actual_wrap_domain_size
+              Pickles_base.Proofs_verified.(
+                to_stable_v2 (of_nat_exn (Nat.Add.n d.max_proofs_verified)))
+          ; actual_wrap_domain_size =
+              Pickles_base.Proofs_verified.to_stable_v2 actual_wrap_domain_size
           }
           : t )
 
@@ -1153,15 +1154,18 @@ module Make_str (_ : Wire_types.Concrete) = struct
                       in
                       let branch_data : Composition_types.Branch_data.t =
                         { proofs_verified =
-                            ( match actual_proofs_verified with
-                            | Z ->
-                                Composition_types.Branch_data.Proofs_verified.N0
-                            | S Z ->
-                                N1
-                            | S (S Z) ->
-                                N2
-                            | S _ ->
-                                assert false )
+                            Composition_types.Branch_data.Proofs_verified
+                            .to_stable_v2
+                              ( match actual_proofs_verified with
+                              | Z ->
+                                  Composition_types.Branch_data.Proofs_verified
+                                  .N0
+                              | S Z ->
+                                  N1
+                              | S (S Z) ->
+                                  N2
+                              | S _ ->
+                                  assert false )
                         ; domain_log2 =
                             Composition_types.Branch_data.Domain_log2.of_int_exn
                               step_vk.domain.log_size_of_group

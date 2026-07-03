@@ -5,6 +5,8 @@ open Pickles_types
 
 [%%versioned
 module Stable = struct
+  [@@@no_toplevel_latest_type]
+
   module V2 = struct
     type t = Mina_wire_types.Pickles_base.Proofs_verified.V2.t = N0 | N1 | N2
     [@@deriving sexp, compare, yojson, hash, equal]
@@ -25,6 +27,8 @@ module Stable = struct
           Latest.N2
   end
 end]
+
+type t = N0 | N1 | N2 [@@deriving sexp, compare, yojson, hash, equal]
 
 [@@@warning "+4"]
 
@@ -79,6 +83,20 @@ let of_int_exn (n : int) : t =
   | _ ->
       raise
         (Invalid_argument (Printf.sprintf "Proofs_verified.of_int: got %d" n))
+
+(* Conversions between the in-memory [t] and the serialised [Stable] encodings.
+   The encodings are currently structurally identical to [t]. *)
+let to_stable_v2 (x : t) : Stable.V2.t =
+  match x with N0 -> Stable.V2.N0 | N1 -> Stable.V2.N1 | N2 -> Stable.V2.N2
+
+let of_stable_v2 (x : Stable.V2.t) : t =
+  match x with Stable.V2.N0 -> N0 | Stable.V2.N1 -> N1 | Stable.V2.N2 -> N2
+
+let to_stable_v1 (x : t) : Stable.V1.t =
+  match x with N0 -> Stable.V1.N0 | N1 -> Stable.V1.N1 | N2 -> Stable.V1.N2
+
+let of_stable_v1 (x : Stable.V1.t) : t =
+  match x with Stable.V1.N0 -> N0 | Stable.V1.N1 -> N1 | Stable.V1.N2 -> N2
 
 let to_bool_vec : 'n Nat.t -> proofs_verified -> (bool, 'n) Vector.t =
  fun n t ->
