@@ -24,7 +24,22 @@ let tick_shifts, tock_shifts =
 
 let wrap_domains ~proofs_verified =
   let h =
-    match proofs_verified with 0 -> 13 | 1 -> 14 | 2 -> 15 | _ -> assert false
+    (* 15 is the largest wrap domain we support without chunking (the wrap IPA
+       has [Backend.Tock.Rounds.Wrap = Nat.N15] rounds). It is enough for up to
+       6 proofs verified when the verified proofs are narrow (width 0), but
+       only 4 for same-width merges, whose step circuit chunks at width 5. 7+
+       would need a domain of 16, i.e. chunking. *)
+    match proofs_verified with
+    | 0 ->
+        13
+    | 1 ->
+        14
+    | n when n <= 6 ->
+        15
+    | n ->
+        failwithf
+          "wrap_domains: %d proofs verified needs a domain > 2^15 (chunking)" n
+          ()
   in
   { Domains.h = Domain.Pow_2_roots_of_unity h }
 
