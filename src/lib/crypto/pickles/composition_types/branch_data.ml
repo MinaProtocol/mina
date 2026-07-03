@@ -26,6 +26,9 @@ module Make_str (A : Wire_types.Concrete) = struct
       end
     end]
 
+    (* Fixed by [t = char]. *)
+    let length_in_bits = 8
+
     let of_int_exn : int -> t = Char.of_int_exn
 
     let of_bits_msb (bs : bool list) : t =
@@ -38,12 +41,14 @@ module Make_str (A : Wire_types.Concrete) = struct
         (module Impl : Snarky_backendless.Snark_intf.Run with type field = f)
         (x : f) : t =
       Impl.Field.Constant.unpack x
-      |> Fn.flip List.take 8 |> List.rev |> of_bits_msb
+      |> Fn.flip List.take length_in_bits
+      |> List.rev |> of_bits_msb
   end
 
   (* We pack this into a single field element as follows:
-     First 2 bits: proofs_verified
-     Next 8 bits: domain_log2 *)
+     First 2 bits: the low bits of the proofs_verified mask
+     Next [Domain_log2.length_in_bits] bits: domain_log2
+     Remaining bits: the rest of the proofs_verified mask *)
   [%%versioned
   module Stable = struct
     [@@@no_toplevel_latest_type]
@@ -83,45 +88,51 @@ module Make_str (A : Wire_types.Concrete) = struct
     }
   [@@deriving hlist, compare, sexp, yojson, hash, equal]
 
-  let length_in_bits = 10
+  (* [n] is the width of the proofs-verified prefix mask (at least 2). *)
+  let length_in_bits (n : _ Pickles_types.Nat.t) =
+    Pickles_types.Nat.to_int n + Domain_log2.length_in_bits
+
+  (* The packing arithmetic, shared by the out-of-circuit and in-circuit
+     encoders so the layout is written down once. *)
+  let pack_layout ~of_int ~add ~mul ~pack_bits mask domain_log2 =
+    let domain_log2_shift = of_int (1 lsl 2) in
+    let mask_rest_shift = of_int (1 lsl (2 + Domain_log2.length_in_bits)) in
+    let ( + ) = add and ( * ) = mul in
+    match mask with
+    | x0 :: x1 :: proofs_verified_rest ->
+        (mask_rest_shift * pack_bits proofs_verified_rest)
+        + (domain_log2_shift * domain_log2)
+        + pack_bits [ x0; x1 ]
+    | _ ->
+        assert false
 
   let pack (type f)
       (module Impl : Snarky_backendless.Snark_intf.Run with type field = f) n
       ({ proofs_verified; domain_log2 } : t) : f =
     let open Impl.Field.Constant in
-    let double x = x + x in
-    let times4 x = double (double x) in
-    let domain_log2 = of_int (Char.to_int domain_log2) in
-    let (x0 :: x1 :: proofs_verified_rest) =
-      Proofs_verified.to_bool_vec n
-        (Proofs_verified.of_stable_v2 proofs_verified)
-    in
-    (* shift domain_log2 over by 2 bits (multiply by 4) *)
-    (of_int 1024 * project (Pickles_types.Vector.to_list proofs_verified_rest))
-    + times4 domain_log2
-    + project [ x0; x1 ]
+    pack_layout ~of_int ~add:( + ) ~mul:( * ) ~pack_bits:project
+      (Pickles_types.Vector.to_list
+         (Proofs_verified.to_bool_vec n
+            (Proofs_verified.of_stable_v2 proofs_verified) ) )
+      (of_int (Char.to_int domain_log2))
 
   let unpack (type f)
       (module Impl : Snarky_backendless.Snark_intf.Run with type field = f) n
       (x : f) : t =
     let open Pickles_types in
-    match Impl.Field.Constant.unpack x with
-    | x0 :: x1 :: y0 :: y1 :: y2 :: y3 :: y4 :: y5 :: y6 :: y7
-      :: proofs_verified_rest ->
-        let (Nat.S (Nat.S n_sub_2)) = n in
-        let proofs_verified_rest =
-          Vector.of_list_and_length_exn
-            (List.take proofs_verified_rest (Nat.to_int n_sub_2))
-            n_sub_2
-        in
-        { proofs_verified =
-            Proofs_verified.to_stable_v2
-              (Proofs_verified.of_bool_vec (x0 :: x1 :: proofs_verified_rest))
-        ; domain_log2 =
-            Domain_log2.of_bits_msb [ y7; y6; y5; y4; y3; y2; y1; y0 ]
-        }
-    | _ ->
-        assert false
+    let mask_low, rest = List.split_n (Impl.Field.Constant.unpack x) 2 in
+    let domain_log2_bits, mask_rest =
+      List.split_n rest Domain_log2.length_in_bits
+    in
+    let mask =
+      Vector.of_list_and_length_exn
+        (mask_low @ List.take mask_rest (Nat.to_int n - 2))
+        n
+    in
+    { proofs_verified =
+        Proofs_verified.to_stable_v2 (Proofs_verified.of_bool_vec mask)
+    ; domain_log2 = Domain_log2.of_bits_msb (List.rev domain_log2_bits)
+    }
 
   open Kimchi_pasta_snarky_backend
 
@@ -131,18 +142,17 @@ module Make_str (A : Wire_types.Concrete) = struct
 
       type field_var = Field.t
 
-      type t =
-        { proofs_verified_mask :
-            Pickles_types.Nat.z Proofs_verified.Prefix_mask.Step.Checked.t
+      type 'n t =
+        { proofs_verified_mask : 'n Proofs_verified.Prefix_mask.Step.Checked.t
         ; domain_log2 : Field.t
         }
       [@@deriving hlist]
 
-      let pack ({ proofs_verified_mask; domain_log2 } : t) : Field.t =
+      let pack ({ proofs_verified_mask; domain_log2 } : _ t) : Field.t =
         let open Field in
-        let four = of_int 4 in
-        (four * domain_log2)
-        + pack (Pickles_types.Vector.to_list proofs_verified_mask)
+        pack_layout ~of_int ~add:( + ) ~mul:( * ) ~pack_bits:pack
+          (Pickles_types.Vector.to_list proofs_verified_mask)
+          domain_log2
     end
 
     module Wrap = struct
@@ -150,18 +160,17 @@ module Make_str (A : Wire_types.Concrete) = struct
 
       type field_var = Field.t
 
-      type t =
-        { proofs_verified_mask :
-            Pickles_types.Nat.z Proofs_verified.Prefix_mask.Wrap.Checked.t
+      type 'n t =
+        { proofs_verified_mask : 'n Proofs_verified.Prefix_mask.Wrap.Checked.t
         ; domain_log2 : Field.t
         }
       [@@deriving hlist]
 
-      let pack ({ proofs_verified_mask; domain_log2 } : t) : Field.t =
+      let pack ({ proofs_verified_mask; domain_log2 } : _ t) : Field.t =
         let open Field in
-        let four = of_int 4 in
-        (four * domain_log2)
-        + pack (Pickles_types.Vector.to_list proofs_verified_mask)
+        pack_layout ~of_int ~add:( + ) ~mul:( * ) ~pack_bits:pack
+          (Pickles_types.Vector.to_list proofs_verified_mask)
+          domain_log2
     end
   end
 
@@ -179,15 +188,15 @@ module Make_str (A : Wire_types.Concrete) = struct
       ~(* We actually only need it to be less than 252 bits in order to pack
           the whole branch_data struct safely, but it's cheapest to check that it's
           under 16 bits *)
-      (assert_16_bits : Step_impl.Field.t -> unit) :
-      (Checked.Step.t, t) Step_impl.Typ.t =
+      (assert_16_bits : Step_impl.Field.t -> unit) n :
+      ('n Checked.Step.t, t) Step_impl.Typ.t =
     let open Step_impl in
     let proofs_verified_mask :
-        ( Pickles_types.Nat.z Proofs_verified.Prefix_mask.Step.Checked.t
+        ( 'n Proofs_verified.Prefix_mask.Step.Checked.t
         , Proofs_verified.Stable.V2.t )
         Typ.t =
       Typ.transport
-        (Proofs_verified.Prefix_mask.Step.typ Pickles_types.Nat.N2.n)
+        (Proofs_verified.Prefix_mask.Step.typ n)
         ~there:Proofs_verified.of_stable_v2 ~back:Proofs_verified.to_stable_v2
     in
     let domain_log2 : (Field.t, Domain_log2.t) Typ.t =
@@ -208,15 +217,15 @@ module Make_str (A : Wire_types.Concrete) = struct
       ~(* We actually only need it to be less than 252 bits in order to pack
           the whole branch_data struct safely, but it's cheapest to check that it's
           under 16 bits *)
-      (assert_16_bits : Wrap_impl.Field.t -> unit) :
-      (Checked.Wrap.t, t) Wrap_impl.Typ.t =
+      (assert_16_bits : Wrap_impl.Field.t -> unit) n :
+      ('n Checked.Wrap.t, t) Wrap_impl.Typ.t =
     let open Wrap_impl in
     let proofs_verified_mask :
-        ( Pickles_types.Nat.z Proofs_verified.Prefix_mask.Wrap.Checked.t
+        ( 'n Proofs_verified.Prefix_mask.Wrap.Checked.t
         , Proofs_verified.Stable.V2.t )
         Typ.t =
       Typ.transport
-        (Proofs_verified.Prefix_mask.Wrap.typ Pickles_types.Nat.N2.n)
+        (Proofs_verified.Prefix_mask.Wrap.typ n)
         ~there:Proofs_verified.of_stable_v2 ~back:Proofs_verified.to_stable_v2
     in
     let domain_log2 : (Field.t, Domain_log2.t) Typ.t =

@@ -1,5 +1,6 @@
 (tests
  (names
+  test_branch_data
   test_common
   test_impls
   test_no_sideloaded

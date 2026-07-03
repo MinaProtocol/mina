@@ -68,7 +68,7 @@ type ('app_state, 'max_proofs_verified, 'num_branches) t =
       , unit
       , Digest.Make(Impl).t
       , scalar_challenge Types.Bulletproof_challenge.t Types.Step_bp_vec.t
-      , Branch_data.Checked.Step.t )
+      , Pickles_types.Nat.z Branch_data.Checked.Step.t )
       Types.Wrap.Proof_state.In_circuit.t
         (** The accumulator state corresponding to the above proof. Contains
       - `deferred_values`: The values necessary for finishing the deferred "scalar field" computations.
@@ -149,7 +149,9 @@ let typ (type n avar aval) ~feature_flags ~num_chunks
         ~dummy_scalar_challenge:(Sc.create Limb_vector.Challenge.Constant.zero)
         (Shifted_value.Type1.typ Field.typ)
         Impls.Step.Typ.unit Digest.typ
-        (Branch_data.typ ~assert_16_bits:(Step_verifier.assert_n_bits ~n:16))
+        (Branch_data.typ
+           ~assert_16_bits:(Step_verifier.assert_n_bits ~n:16)
+           Pickles_types.Nat.N2.n )
     ; Plonk_types.All_evals.typ ~num_chunks
         (* Assume we have lookup iff we have runtime tables *)
         feature_flags
