@@ -620,6 +620,7 @@ let docker_step
                           }
                         ]
                 , Toolchain = [] : List DockerImage.ReleaseSpec.Type
+                , Base = [] : List DockerImage.ReleaseSpec.Type
                 }
                 entry.service
 

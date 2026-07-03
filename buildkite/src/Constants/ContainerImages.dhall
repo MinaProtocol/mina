@@ -12,6 +12,9 @@
 --       identical either way; ffab0f8 is already published and the arm64
 --       toolchain build under QEMU is flaky, so there is nothing to gain from
 --       rebuilding it. Reunify the sha on the next full toolchain bump.
+-- NOTE: minaBase* are the published common base-deps images on docker.io. The tag
+--       format matches build.sh's HASHTAG for service=mina-base: <githash>-<codename>-<network>.
+--       The 169fd52 short-hash placeholder is updated whenever the base image is re-published.
 { toolchainBase =
     "europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/ci-toolchain-base:v4"
 , minaToolchainBookworm =
@@ -27,6 +30,16 @@
     "docker.io/minaprotocol/mina-toolchain:d906afe-jammy-devnet"
 , minaToolchain =
     "docker.io/minaprotocol/mina-toolchain:d906afe-bullseye-devnet"
+, minaBaseBookworm =
+    { amd64 = "docker.io/minaprotocol/mina-base:169fd52-bookworm-devnet"
+    , arm64 = "docker.io/minaprotocol/mina-base:169fd52-bookworm-devnet-arm64"
+    }
+, minaBaseBullseye.amd64 =
+    "docker.io/minaprotocol/mina-base:169fd52-bullseye-devnet"
+, minaBaseFocal.amd64 = "docker.io/minaprotocol/mina-base:169fd52-focal-devnet"
+, minaBaseJammy.amd64 = "docker.io/minaprotocol/mina-base:169fd52-jammy-devnet"
+, minaBaseNoble.amd64 = "docker.io/minaprotocol/mina-base:169fd52-noble-devnet"
+, minaBase = "docker.io/minaprotocol/mina-base:169fd52-bullseye-devnet"
 , postgres =
     "europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/postgres:12.4-alpine"
 , xrefcheck =
