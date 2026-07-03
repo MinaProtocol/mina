@@ -20,6 +20,7 @@ let Package =
       | TxTools
       | DelegationVerifier
       | Toolchain
+      | Base
       >
 
 let capitalName =
@@ -39,6 +40,7 @@ let capitalName =
             , TxTools = "TxTools"
             , DelegationVerifier = "DelegationVerifier"
             , Toolchain = "Toolchain"
+            , Base = "Base"
             }
             package
 
@@ -59,6 +61,7 @@ let lowerName =
             , TxTools = "tx_tools"
             , DelegationVerifier = "delegation_verifier"
             , Toolchain = "toolchain"
+            , Base = "base"
             }
             package
 
@@ -77,6 +80,7 @@ let isEssential =
             , TxTools = False
             , DelegationVerifier = True
             , Toolchain = True
+            , Base = True
             }
             package
 
@@ -95,6 +99,7 @@ let isGeneric =
             , TxTools = False
             , DelegationVerifier = False
             , Toolchain = False
+            , Base = False
             }
             package
 
@@ -113,6 +118,7 @@ let isNetworked =
             , TxTools = False
             , DelegationVerifier = False
             , Toolchain = False
+            , Base = False
             }
             package
 
@@ -131,6 +137,7 @@ let isProfiled =
             , TxTools = False
             , DelegationVerifier = False
             , Toolchain = False
+            , Base = False
             }
             package
 
@@ -156,6 +163,7 @@ let serviceName =
             , TxTools = "mina-tx-tools"
             , DelegationVerifier = "mina-delegation-verifier"
             , Toolchain = "mina-toolchain"
+            , Base = "mina-base"
             }
             package
 
@@ -178,6 +186,7 @@ let dockerName =
             , TxTools = "mina-tx-tools"
             , DelegationVerifier = "mina-delegation-verifier"
             , Toolchain = "mina-toolchain"
+            , Base = "mina-base"
             }
             package
 
