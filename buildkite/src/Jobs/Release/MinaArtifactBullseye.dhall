@@ -16,7 +16,6 @@ in  Pipeline.build
           , artifacts =
             [ Artifacts.Type.Daemon { network = Network.Type.Devnet }
             , Artifacts.Type.Daemon { network = Network.Type.Mainnet }
-            , Artifacts.Type.Daemon { network = Network.Type.Mesa }
             , Artifacts.Type.DaemonGeneric
             , Artifacts.Type.DaemonProfiled { profile = Profile.Type.Lightnet }
             , Artifacts.Type.DaemonProfiled { profile = Profile.Type.Devnet }
@@ -25,27 +24,20 @@ in  Pipeline.build
                 { network = Network.Type.Devnet }
             , Artifacts.Type.DaemonAutoHardfork
                 { network = Network.Type.Mainnet }
-            , Artifacts.Type.DaemonAutoHardfork { network = Network.Type.Mesa }
             , Artifacts.Type.DaemonPrefork { network = Network.Type.Devnet }
             , Artifacts.Type.DaemonPostfork { network = Network.Type.Devnet }
             , Artifacts.Type.DaemonPrefork { network = Network.Type.Mainnet }
             , Artifacts.Type.DaemonPostfork { network = Network.Type.Mainnet }
-            , Artifacts.Type.DaemonPrefork { network = Network.Type.Mesa }
-            , Artifacts.Type.DaemonPostfork { network = Network.Type.Mesa }
             , Artifacts.Type.CreatePreforkGenesis
                 { network = Network.Type.Devnet }
             , Artifacts.Type.CreatePreforkGenesis
                 { network = Network.Type.Mainnet }
-            , Artifacts.Type.CreatePreforkGenesis
-                { network = Network.Type.Mesa }
             , Artifacts.Type.ArchiveGeneric
             , Artifacts.Type.Archive { network = Network.Type.Devnet }
             , Artifacts.Type.Archive { network = Network.Type.Mainnet }
-            , Artifacts.Type.Archive { network = Network.Type.Mesa }
             , Artifacts.Type.RosettaGeneric
             , Artifacts.Type.Rosetta { network = Network.Type.Devnet }
             , Artifacts.Type.Rosetta { network = Network.Type.Mainnet }
-            , Artifacts.Type.Rosetta { network = Network.Type.Mesa }
             , Artifacts.Type.LogProc
             , Artifacts.Type.TestExecutive
             , Artifacts.Type.TxTools

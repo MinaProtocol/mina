@@ -36,14 +36,7 @@ let duneProfile =
 
 let fromNetwork =
           \(network : Network.Type)
-      ->  merge
-            { Devnet = Profile.Devnet
-            , Mainnet = Profile.Mainnet
-            , PreMesa1 = Profile.Devnet
-            , Mesa = Profile.Devnet
-            , MesaMut = Profile.Devnet
-            }
-            network
+      ->  merge { Devnet = Profile.Devnet, Mainnet = Profile.Mainnet } network
 
 let toSuffixUppercase =
           \(profile : Profile)
