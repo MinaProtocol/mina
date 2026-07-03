@@ -5,11 +5,24 @@ open Pickles_types
 
 [%%versioned
 module Stable = struct
+  module V2 = struct
+    type t = Mina_wire_types.Pickles_base.Proofs_verified.V2.t = N0 | N1 | N2
+    [@@deriving sexp, compare, yojson, hash, equal]
+
+    let to_latest = Fn.id
+  end
+
   module V1 = struct
     type t = Mina_wire_types.Pickles_base.Proofs_verified.V1.t = N0 | N1 | N2
     [@@deriving sexp, compare, yojson, hash, equal]
 
-    let to_latest = Fn.id
+    let to_latest = function
+      | N0 ->
+          Latest.N0
+      | N1 ->
+          Latest.N1
+      | N2 ->
+          Latest.N2
   end
 end]
 

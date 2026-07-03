@@ -121,6 +121,15 @@ end
 module Repr = struct
   [%%versioned
   module Stable = struct
+    module V3 = struct
+      type 'g t =
+        { max_proofs_verified : Proofs_verified.Stable.V2.t
+        ; actual_wrap_domain_size : Proofs_verified.Stable.V2.t
+        ; wrap_index : 'g Plonk_verification_key_evals.Stable.V2.t
+        }
+      [@@deriving sexp, equal, compare, yojson]
+    end
+
     module V2 = struct
       type 'g t =
         { max_proofs_verified : Proofs_verified.Stable.V1.t

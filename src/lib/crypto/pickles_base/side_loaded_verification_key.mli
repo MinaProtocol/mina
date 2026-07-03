@@ -56,6 +56,19 @@ val bits : len:int -> int -> bool list
 
 module Repr : sig
   module Stable : sig
+    module V3 : sig
+      type 'g t =
+        { max_proofs_verified : Proofs_verified.Stable.V2.t
+        ; actual_wrap_domain_size : Proofs_verified.Stable.V2.t
+        ; wrap_index : 'g Pickles_types.Plonk_verification_key_evals.Stable.V2.t
+        }
+      [@@deriving sexp, equal, compare, yojson]
+
+      include Plonkish_prelude.Sigs.Binable.S1 with type 'a t := 'a t
+
+      val __versioned__ : unit
+    end
+
     module V2 : sig
       type 'g t =
         { max_proofs_verified : Proofs_verified.Stable.V1.t
@@ -69,12 +82,12 @@ module Repr : sig
       val __versioned__ : unit
     end
 
-    module Latest = V2
+    module Latest = V3
   end
 
   type 'g t = 'g Stable.Latest.t =
-    { max_proofs_verified : Proofs_verified.t
-    ; actual_wrap_domain_size : Proofs_verified.Stable.V1.t
+    { max_proofs_verified : Proofs_verified.Stable.V2.t
+    ; actual_wrap_domain_size : Proofs_verified.Stable.V2.t
     ; wrap_index : 'g Pickles_types.Plonk_verification_key_evals.t
     }
 end

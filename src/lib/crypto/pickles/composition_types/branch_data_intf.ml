@@ -17,6 +17,14 @@ module type S = sig
 
   [%%versioned:
   module Stable : sig
+    module V2 : sig
+      type t =
+        { proofs_verified : Proofs_verified.Stable.V2.t
+        ; domain_log2 : Domain_log2.Stable.V1.t
+        }
+      [@@deriving hlist, compare, sexp, yojson, hash, equal]
+    end
+
     module V1 : sig
       type t =
         { proofs_verified : Proofs_verified.Stable.V1.t

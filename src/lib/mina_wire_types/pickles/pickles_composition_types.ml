@@ -11,6 +11,13 @@ module Branch_data = struct
           ; domain_log2 : Domain_log2.V1.t
           }
       end
+
+      module V2 : sig
+        type t =
+          { proofs_verified : Pickles_base.Proofs_verified.V2.t
+          ; domain_log2 : Domain_log2.V1.t
+          }
+      end
     end
   end
 
@@ -26,6 +33,13 @@ module Branch_data = struct
     module V1 = struct
       type t =
         { proofs_verified : Pickles_base.Proofs_verified.V1.t
+        ; domain_log2 : Domain_log2.V1.t
+        }
+    end
+
+    module V2 = struct
+      type t =
+        { proofs_verified : Pickles_base.Proofs_verified.V2.t
         ; domain_log2 : Domain_log2.V1.t
         }
     end

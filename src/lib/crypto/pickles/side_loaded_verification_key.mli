@@ -70,6 +70,19 @@ end
 
 [%%versioned:
 module Stable : sig
+  module V3 : sig
+    type t =
+      ( Backend.Tock.Curve.Affine.t
+      , Pickles_base.Proofs_verified.Stable.V2.t
+      , Vk.t )
+      Poly.Stable.V2.t
+    [@@deriving hash, sexp, compare, equal, yojson]
+
+    include Codable.Base58_check_intf with type t := t
+
+    include Codable.Base64_intf with type t := t
+  end
+
   module V2 : sig
     type t =
       ( Backend.Tock.Curve.Affine.t
@@ -89,6 +102,13 @@ type t = Stable.Latest.t [@@deriving hash, sexp, compare, equal]
 val dummy : t
 
 val dummy_with_wrap_vk : t Lazy.t
+
+(** [to_stable_v2 t] downgrades the verification key to its [V2] wire encoding.
+    Raises if the key verifies more than 2 proofs. *)
+val to_stable_v2 : t -> Stable.V2.t
+
+(** [of_stable_v2 t] upgrades the [V2] wire encoding to the in-memory key. *)
+val of_stable_v2 : Stable.V2.t -> t
 
 include Codable.Base58_check_intf with type t := t
 
