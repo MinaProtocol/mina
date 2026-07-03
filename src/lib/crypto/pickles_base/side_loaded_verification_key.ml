@@ -201,10 +201,10 @@ let to_input (type a) ~(field_of_int : int -> a) :
         ; wrap_vk = _
         } : _ Random_oracle_input.Chunked.t ->
     List.reduce_exn ~f:append
-      [ Proofs_verified.One_hot.to_input ~zero:(field_of_int 0)
+      [ Proofs_verified.One_hot.to_input Nat.N3.n ~zero:(field_of_int 0)
           ~one:(field_of_int 1)
           (Proofs_verified.of_stable_v2 max_proofs_verified)
-      ; Proofs_verified.One_hot.to_input ~zero:(field_of_int 0)
+      ; Proofs_verified.One_hot.to_input Nat.N3.n ~zero:(field_of_int 0)
           ~one:(field_of_int 1)
           (Proofs_verified.of_stable_v2 actual_wrap_domain_size)
       ; wrap_index_to_input

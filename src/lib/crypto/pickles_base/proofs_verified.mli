@@ -63,7 +63,12 @@ module One_hot : sig
     val to_input : 'n t -> Step_impl.Field.t Random_oracle_input.Chunked.t
   end
 
-  val to_input : zero:'a -> one:'a -> t -> 'a Random_oracle_input.Chunked.t
+  val to_input :
+       'n Nat.N3.plus_n Nat.t
+    -> zero:'a
+    -> one:'a
+    -> t
+    -> 'a Random_oracle_input.Chunked.t
 
   val typ : 'n Nat.N3.plus_n Nat.t -> ('n Checked.t, t) Step_impl.Typ.t
 end

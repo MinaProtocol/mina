@@ -201,17 +201,17 @@ module One_hot = struct
     | n ->
         N_other n
 
-  let to_input ~zero ~one (t : t) =
+  let to_input (n : 'n Nat.N3.plus_n Nat.t) ~zero ~one (t : t) =
+    let target_idx = to_int t in
+    let length = Nat.to_int n in
+    if target_idx >= length then
+      failwithf
+        "Proofs_verified.One_hot.to_input: Attempted to encode %i into an \
+         undersized vector (%i)"
+        target_idx length () ;
     let one_hot =
-      match t with
-      | N0 ->
-          [| one; zero; zero |]
-      | N1 ->
-          [| zero; one; zero |]
-      | N2 ->
-          [| zero; zero; one |]
-      | N_other _ ->
-          failwith "TODO"
+      Array.init (Nat.to_int n) ~f:(fun idx ->
+          if idx = target_idx then one else zero )
     in
     Random_oracle_input.Chunked.packeds (Array.map one_hot ~f:(fun b -> (b, 1)))
 
