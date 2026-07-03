@@ -33,6 +33,36 @@ module Base = struct
     module Stable = struct
       [@@@no_toplevel_latest_type]
 
+      module V4 = struct
+        type ('messages_for_next_wrap_proof, 'messages_for_next_step_proof) t =
+          { statement :
+              ( Limb_vector.Constant.Hex64.Stable.V1.t
+                Vector.Vector_2.Stable.V1.t
+              , Limb_vector.Constant.Hex64.Stable.V1.t
+                Vector.Vector_2.Stable.V1.t
+                Scalar_challenge.Stable.V2.t
+              , Tick.Field.Stable.V1.t Shifted_value.Type1.Stable.V1.t
+              , bool
+              , 'messages_for_next_wrap_proof
+              , Digest.Constant.Stable.V1.t
+              , 'messages_for_next_step_proof
+              , Limb_vector.Constant.Hex64.Stable.V1.t
+                Vector.Vector_2.Stable.V1.t
+                Scalar_challenge.Stable.V2.t
+                Bulletproof_challenge.Stable.V1.t
+                Step_bp_vec.Stable.V1.t
+              , Branch_data.Stable.V2.t )
+              Types.Wrap.Statement.Minimal.Stable.V1.t
+          ; prev_evals :
+              ( Tick.Field.Stable.V1.t
+              , Tick.Field.Stable.V1.t
+                Mina_stdlib.Bounded_types.ArrayN16.Stable.V1.t )
+              Plonk_types.All_evals.Stable.V2.t
+          ; proof : Wrap_wire_proof.Stable.V1.t
+          }
+        [@@deriving compare, sexp, yojson, hash, equal]
+      end
+
       module V3 = struct
         type ('messages_for_next_wrap_proof, 'messages_for_next_step_proof) t =
           { statement :
@@ -88,6 +118,37 @@ module Base = struct
       ; proof : Wrap_wire_proof.t
       }
     [@@deriving compare, sexp, yojson, hash, equal]
+
+    let map_statement_branch_data (type bd1 bd2) ~(f : bd1 -> bd2)
+        (s : (_, _, _, _, _, _, _, _, bd1) Types.Wrap.Statement.Minimal.t) :
+        (_, _, _, _, _, _, _, _, bd2) Types.Wrap.Statement.Minimal.t =
+      { s with
+        proof_state =
+          { s.proof_state with
+            deferred_values =
+              { s.proof_state.deferred_values with
+                branch_data = f s.proof_state.deferred_values.branch_data
+              }
+          }
+      }
+
+    (* Convert the latest ([V4]) wrap proof to its wire ([V3]) encoding and
+       back. [to_stable_v3] raises if the branch verifies more than 2 proofs. *)
+    let to_stable_v3 ({ statement; prev_evals; proof } : (_, _) Stable.V4.t) :
+        (_, _) Stable.V3.t =
+      { Stable.V3.statement =
+          map_statement_branch_data ~f:Branch_data.to_stable_v1 statement
+      ; prev_evals
+      ; proof
+      }
+
+    let of_stable_v3 ({ statement; prev_evals; proof } : (_, _) Stable.V3.t) :
+        (_, _) Stable.V4.t =
+      { Stable.V4.statement =
+          map_statement_branch_data ~f:Branch_data.of_stable_v1 statement
+      ; prev_evals
+      ; proof
+      }
   end
 end
 
@@ -224,7 +285,7 @@ module Make (MLMB : Nat.Intf) = struct
           Step_bp_vec.t
           Max_proofs_verified_at_most.t )
         Base.Messages_for_next_proof_over_same_field.Step.t )
-      Base.Wrap.Stable.V3.t
+      Base.Wrap.Stable.V4.t
     [@@deriving compare, sexp, yojson, hash, equal]
   end
 
@@ -338,6 +399,30 @@ module Proofs_verified_2 = struct
     module Stable = struct
       [@@@no_toplevel_latest_type]
 
+      module V4 = struct
+        type t =
+          ( ( Tock.Inner_curve.Affine.Stable.V1.t
+            , Reduced_messages_for_next_proof_over_same_field.Wrap
+              .Challenges_vector
+              .Stable
+              .V2
+              .t
+              Vector.Vector_2.Stable.V1.t )
+            Types.Wrap.Proof_state.Messages_for_next_wrap_proof.Stable.V1.t
+          , ( unit
+            , Tock.Curve.Affine.t At_most.At_most_2.Stable.V1.t
+            , Limb_vector.Constant.Hex64.Stable.V1.t Vector.Vector_2.Stable.V1.t
+              Scalar_challenge.Stable.V2.t
+              Bulletproof_challenge.Stable.V1.t
+              Step_bp_vec.Stable.V1.t
+              At_most.At_most_2.Stable.V1.t )
+            Base.Messages_for_next_proof_over_same_field.Step.Stable.V1.t )
+          Base.Wrap.Stable.V4.t
+        [@@deriving compare, sexp, yojson, hash, equal]
+
+        let to_latest = Fn.id
+      end
+
       module V3 = struct
         type t =
           ( ( Tock.Inner_curve.Affine.Stable.V1.t
@@ -359,7 +444,7 @@ module Proofs_verified_2 = struct
           Base.Wrap.Stable.V3.t
         [@@deriving compare, sexp, yojson, hash, equal]
 
-        let to_latest = Fn.id
+        let to_latest = Base.Wrap.of_stable_v3
       end
     end]
 
@@ -369,6 +454,25 @@ module Proofs_verified_2 = struct
   [%%versioned_binable
   module Stable = struct
     [@@@no_toplevel_latest_type]
+
+    module V4 = struct
+      type t = T.t
+
+      let to_latest = Fn.id
+
+      include (T : module type of T with type t := t with module Repr := T.Repr)
+
+      include
+        Binable.Of_binable
+          (Repr.Stable.V4)
+          (struct
+            type nonrec t = t
+
+            let to_binable x = to_repr x
+
+            let of_binable x = of_repr x
+          end)
+    end
 
     module V3 = struct
       type t = T.t
@@ -383,9 +487,9 @@ module Proofs_verified_2 = struct
           (struct
             type nonrec t = t
 
-            let to_binable x = to_repr x
+            let to_binable x = Base.Wrap.to_stable_v3 (to_repr x)
 
-            let of_binable x = of_repr x
+            let of_binable x = of_repr (Base.Wrap.of_stable_v3 x)
           end)
     end
   end]
@@ -400,6 +504,31 @@ module Proofs_verified_max = struct
     [%%versioned
     module Stable = struct
       [@@@no_toplevel_latest_type]
+
+      module V4 = struct
+        type t =
+          ( ( Tock.Inner_curve.Affine.Stable.V1.t
+            , Reduced_messages_for_next_proof_over_same_field.Wrap
+              .Challenges_vector
+              .Stable
+              .V2
+              .t
+              Side_loaded_verification_key.Width.Max_vector.Stable.V1.t )
+            Types.Wrap.Proof_state.Messages_for_next_wrap_proof.Stable.V1.t
+          , ( unit
+            , Tock.Curve.Affine.t
+              Side_loaded_verification_key.Width.Max_at_most.Stable.V1.t
+            , Limb_vector.Constant.Hex64.Stable.V1.t Vector.Vector_2.Stable.V1.t
+              Scalar_challenge.Stable.V2.t
+              Bulletproof_challenge.Stable.V1.t
+              Step_bp_vec.Stable.V1.t
+              Side_loaded_verification_key.Width.Max_at_most.Stable.V1.t )
+            Base.Messages_for_next_proof_over_same_field.Step.Stable.V1.t )
+          Base.Wrap.Stable.V4.t
+        [@@deriving compare, sexp, yojson, hash, equal]
+
+        let to_latest = Fn.id
+      end
 
       module V3 = struct
         type t =
@@ -423,7 +552,7 @@ module Proofs_verified_max = struct
           Base.Wrap.Stable.V3.t
         [@@deriving compare, sexp, yojson, hash, equal]
 
-        let to_latest = Fn.id
+        let to_latest = Base.Wrap.of_stable_v3
       end
     end]
 
@@ -433,6 +562,25 @@ module Proofs_verified_max = struct
   [%%versioned_binable
   module Stable = struct
     [@@@no_toplevel_latest_type]
+
+    module V4 = struct
+      type t = T.t
+
+      let to_latest = Fn.id
+
+      include (T : module type of T with type t := t with module Repr := T.Repr)
+
+      include
+        Binable.Of_binable
+          (Repr.Stable.V4)
+          (struct
+            type nonrec t = t
+
+            let to_binable x = to_repr x
+
+            let of_binable x = of_repr x
+          end)
+    end
 
     module V3 = struct
       type t = T.t
@@ -447,9 +595,9 @@ module Proofs_verified_max = struct
           (struct
             type nonrec t = t
 
-            let to_binable x = to_repr x
+            let to_binable x = Base.Wrap.to_stable_v3 (to_repr x)
 
-            let of_binable x = of_repr x
+            let of_binable x = of_repr (Base.Wrap.of_stable_v3 x)
           end)
     end
   end]

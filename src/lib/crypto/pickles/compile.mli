@@ -70,6 +70,10 @@ module Side_loaded : sig
   module Verification_key : sig
     [%%versioned:
     module Stable : sig
+      module V3 : sig
+        type t [@@deriving sexp, equal, compare, hash, yojson]
+      end
+
       module V2 : sig
         type t [@@deriving sexp, equal, compare, hash, yojson]
       end
@@ -103,6 +107,16 @@ module Side_loaded : sig
   module Proof : sig
     [%%versioned:
     module Stable : sig
+      module V4 : sig
+        (* TODO: This should really be able to be any width up to the max width... *)
+        type t = Verification_key.Max_width.n Proof.t
+        [@@deriving sexp, equal, yojson, hash, compare]
+
+        val to_base64 : t -> string
+
+        val of_base64 : string -> (t, string) Result.t
+      end
+
       module V3 : sig
         (* TODO: This should really be able to be any width up to the max width... *)
         type t = Verification_key.Max_width.n Proof.t

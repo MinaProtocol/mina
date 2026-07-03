@@ -32,11 +32,11 @@ module Stable = struct
 
       (* don't send hash over the wire; restore hash on receipt *)
 
-      let to_binable (t : t) = t.data
+      let to_binable (t : t) = Side_loaded_verification_key.to_stable_v2 t.data
 
       let of_binable vk : t =
-        let data = vk in
-        let hash = digest_vk vk in
+        let data = Side_loaded_verification_key.of_stable_v2 vk in
+        let hash = digest_vk data in
         { data; hash }
     end
 

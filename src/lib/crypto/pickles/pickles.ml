@@ -6,7 +6,9 @@ module Wire_types = Mina_wire_types.Pickles
 module Make_sig (A : Wire_types.Types.S) = struct
   module type S =
     Pickles_intf.S
-      with type Side_loaded.Verification_key.Stable.V2.t =
+      with type Side_loaded.Verification_key.Stable.V3.t =
+        A.Side_loaded.Verification_key.V3.t
+       and type Side_loaded.Verification_key.Stable.V2.t =
         A.Side_loaded.Verification_key.V2.t
        and type 'a Proof.t = 'a A.Proof.t
 end

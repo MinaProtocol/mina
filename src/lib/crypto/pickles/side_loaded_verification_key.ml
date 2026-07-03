@@ -120,17 +120,156 @@ end
 module R = struct
   [%%versioned
   module Stable = struct
-    module V2 = struct
-      type t = Backend.Tock.Curve.Affine.Stable.V1.t Repr.Stable.V2.t
+    module V3 = struct
+      type t = Backend.Tock.Curve.Affine.Stable.V1.t Repr.Stable.V3.t
       [@@deriving sexp, equal, compare, yojson]
 
       let to_latest = Fn.id
     end
+
+    module V2 = struct
+      type t = Backend.Tock.Curve.Affine.Stable.V1.t Repr.Stable.V2.t
+      [@@deriving sexp, equal, compare, yojson]
+
+      let to_latest
+          ({ max_proofs_verified; actual_wrap_domain_size; wrap_index } : t) :
+          V3.t =
+        { Repr.Stable.V3.max_proofs_verified =
+            Pickles_base.Proofs_verified.Stable.V1.to_latest max_proofs_verified
+        ; actual_wrap_domain_size =
+            Pickles_base.Proofs_verified.Stable.V1.to_latest
+              actual_wrap_domain_size
+        ; wrap_index
+        }
+    end
   end]
 end
 
+(* Reconstruct the (unversioned) wrap verification key from the serialised
+   wrap index, if the SRS can be loaded. Shared between all versions. *)
+let reconstruct_wrap_vk ~proofs_verified
+    (wrap_index : Backend.Tock.Curve.Affine.t Plonk_verification_key_evals.t) :
+    Impls.Wrap.Verification_key.t option =
+  let d = (Common.wrap_domains ~proofs_verified).h in
+  let log2_size = Import.Domain.log2_size d in
+  let public =
+    let (T (input, _conv, _conv_inv)) =
+      Impls.Wrap.input ~feature_flags:Plonk_types.Features.Full.maybe ()
+    in
+    let (Typ typ) = input in
+    typ.size_in_field_elements
+  in
+  (* we only compute the wrap_vk if the srs can be loaded *)
+  let srs = try Some (Backend.Tock.Keypair.load_urs ()) with _ -> None in
+  Option.map srs ~f:(fun srs : Impls.Wrap.Verification_key.t ->
+      { domain =
+          { log_size_of_group = log2_size
+          ; group_gen = Backend.Tock.Field.domain_generator ~log2_size
+          }
+      ; max_poly_size = 1 lsl Nat.to_int Backend.Tock.Rounds.n
+      ; public
+      ; prev_challenges = 2 (* Due to Wrap_hack *)
+      ; srs
+      ; evals =
+          (let g (x, y) =
+             { Kimchi_types.unshifted = [| Kimchi_types.Finite (x, y) |]
+             ; shifted = None
+             }
+           in
+           { sigma_comm = Array.map ~f:g (Vector.to_array wrap_index.sigma_comm)
+           ; coefficients_comm =
+               Array.map ~f:g (Vector.to_array wrap_index.coefficients_comm)
+           ; generic_comm = g wrap_index.generic_comm
+           ; mul_comm = g wrap_index.mul_comm
+           ; psm_comm = g wrap_index.psm_comm
+           ; emul_comm = g wrap_index.emul_comm
+           ; complete_add_comm = g wrap_index.complete_add_comm
+           ; endomul_scalar_comm = g wrap_index.endomul_scalar_comm
+           ; xor_comm = None
+           ; range_check0_comm = None
+           ; range_check1_comm = None
+           ; foreign_field_add_comm = None
+           ; foreign_field_mul_comm = None
+           ; rot_comm = None
+           } )
+      ; shifts = Common.tock_shifts ~log2_size
+      ; lookup_index = None
+      ; zk_rows = Plonk_checks.zk_rows_by_default
+      } )
+
 [%%versioned_binable
 module Stable = struct
+  module V3 = struct
+    module T = struct
+      type t =
+        ( Backend.Tock.Curve.Affine.t
+        , Pickles_base.Proofs_verified.Stable.V2.t
+        , Vk.t )
+        Poly.Stable.V2.t
+      [@@deriving hash]
+
+      let to_latest = Fn.id
+
+      let description = "Verification key"
+
+      let version_byte = Base58_check.Version_bytes.verification_key
+
+      let to_repr
+          { Poly.max_proofs_verified
+          ; actual_wrap_domain_size
+          ; wrap_index
+          ; wrap_vk = _
+          } =
+        { Repr.Stable.V3.max_proofs_verified
+        ; actual_wrap_domain_size
+        ; wrap_index
+        }
+
+      let of_repr
+          ({ Repr.Stable.V3.max_proofs_verified
+           ; actual_wrap_domain_size
+           ; wrap_index = c
+           } :
+            R.Stable.V3.t ) : t =
+        let wrap_vk =
+          reconstruct_wrap_vk
+            ~proofs_verified:
+              (Pickles_base.Proofs_verified.to_int actual_wrap_domain_size)
+            c
+        in
+        { Poly.max_proofs_verified
+        ; actual_wrap_domain_size
+        ; wrap_index = c
+        ; wrap_vk
+        }
+
+      (* Proxy derivers to [R.t]'s, ignoring [wrap_vk] *)
+
+      let sexp_of_t t = R.Stable.V3.sexp_of_t (to_repr t)
+
+      let t_of_sexp sexp = of_repr (R.Stable.V3.t_of_sexp sexp)
+
+      let equal x y = R.Stable.V3.equal (to_repr x) (to_repr y)
+
+      let compare x y = R.Stable.V3.compare (to_repr x) (to_repr y)
+
+      include
+        Binable.Of_binable
+          (R.Stable.V3)
+          (struct
+            type nonrec t = t
+
+            let to_binable r = to_repr r
+
+            let of_binable r = of_repr r
+          end)
+    end
+
+    include T
+    include Codable.Make_base58_check (T)
+    include Codable.Make_base64 (T)
+  end
+
   module V2 = struct
     module T = struct
       type t =
@@ -140,7 +279,15 @@ module Stable = struct
         Poly.Stable.V2.t
       [@@deriving hash]
 
-      let to_latest = Fn.id
+      let to_latest (t : t) : V3.t =
+        { t with
+          max_proofs_verified =
+            Pickles_base.Proofs_verified.Stable.V1.to_latest
+              t.max_proofs_verified
+        ; actual_wrap_domain_size =
+            Pickles_base.Proofs_verified.Stable.V1.to_latest
+              t.actual_wrap_domain_size
+        }
 
       let description = "Verification key"
 
@@ -163,60 +310,13 @@ module Stable = struct
            ; wrap_index = c
            } :
             R.Stable.V2.t ) : t =
-        let d =
-          (Common.wrap_domains
-             ~proofs_verified:
-               (Pickles_base.Proofs_verified.to_int actual_wrap_domain_size) )
-            .h
-        in
-        let log2_size = Import.Domain.log2_size d in
-        let public =
-          let (T (input, _conv, _conv_inv)) =
-            Impls.Wrap.input ~feature_flags:Plonk_types.Features.Full.maybe ()
-          in
-          let (Typ typ) = input in
-          typ.size_in_field_elements
-        in
-        (* we only compute the wrap_vk if the srs can be loaded *)
-        let srs =
-          try Some (Backend.Tock.Keypair.load_urs ()) with _ -> None
-        in
         let wrap_vk =
-          Option.map srs ~f:(fun srs : Impls.Wrap.Verification_key.t ->
-              { domain =
-                  { log_size_of_group = log2_size
-                  ; group_gen = Backend.Tock.Field.domain_generator ~log2_size
-                  }
-              ; max_poly_size = 1 lsl Nat.to_int Backend.Tock.Rounds.n
-              ; public
-              ; prev_challenges = 2 (* Due to Wrap_hack *)
-              ; srs
-              ; evals =
-                  (let g (x, y) =
-                     { Kimchi_types.unshifted = [| Kimchi_types.Finite (x, y) |]
-                     ; shifted = None
-                     }
-                   in
-                   { sigma_comm = Array.map ~f:g (Vector.to_array c.sigma_comm)
-                   ; coefficients_comm =
-                       Array.map ~f:g (Vector.to_array c.coefficients_comm)
-                   ; generic_comm = g c.generic_comm
-                   ; mul_comm = g c.mul_comm
-                   ; psm_comm = g c.psm_comm
-                   ; emul_comm = g c.emul_comm
-                   ; complete_add_comm = g c.complete_add_comm
-                   ; endomul_scalar_comm = g c.endomul_scalar_comm
-                   ; xor_comm = None
-                   ; range_check0_comm = None
-                   ; range_check1_comm = None
-                   ; foreign_field_add_comm = None
-                   ; foreign_field_mul_comm = None
-                   ; rot_comm = None
-                   } )
-              ; shifts = Common.tock_shifts ~log2_size
-              ; lookup_index = None
-              ; zk_rows = Plonk_checks.zk_rows_by_default
-              } )
+          reconstruct_wrap_vk
+            ~proofs_verified:
+              (Pickles_base.Proofs_verified.to_int
+                 (Pickles_base.Proofs_verified.Stable.V1.to_latest
+                    actual_wrap_domain_size ) )
+            c
         in
         { Poly.max_proofs_verified
         ; actual_wrap_domain_size
@@ -226,13 +326,13 @@ module Stable = struct
 
       (* Proxy derivers to [R.t]'s, ignoring [wrap_vk] *)
 
-      let sexp_of_t t = R.sexp_of_t (to_repr t)
+      let sexp_of_t t = R.Stable.V2.sexp_of_t (to_repr t)
 
-      let t_of_sexp sexp = of_repr (R.t_of_sexp sexp)
+      let t_of_sexp sexp = of_repr (R.Stable.V2.t_of_sexp sexp)
 
-      let equal x y = R.equal (to_repr x) (to_repr y)
+      let equal x y = R.Stable.V2.equal (to_repr x) (to_repr y)
 
-      let compare x y = R.compare (to_repr x) (to_repr y)
+      let compare x y = R.Stable.V2.compare (to_repr x) (to_repr y)
 
       include
         Binable.Of_binable
@@ -345,6 +445,33 @@ let dummy : t =
   }
 
 let dummy_with_wrap_vk = lazy { dummy with wrap_vk = Lazy.force dummy_wrap_vk }
+
+(* Downgrade the in-memory (latest) verification key to its [V2] wire encoding.
+   Raises if the key verifies more than 2 proofs. *)
+let to_stable_v2 (t : t) : Stable.V2.t =
+  let downgrade :
+      Pickles_base.Proofs_verified.t -> Pickles_base.Proofs_verified.Stable.V1.t
+      = function
+    | N0 ->
+        Pickles_base.Proofs_verified.Stable.V1.N0
+    | N1 ->
+        Pickles_base.Proofs_verified.Stable.V1.N1
+    | N2 ->
+        Pickles_base.Proofs_verified.Stable.V1.N2
+  in
+  { t with
+    max_proofs_verified = downgrade t.max_proofs_verified
+  ; actual_wrap_domain_size = downgrade t.actual_wrap_domain_size
+  }
+
+(* Upgrade the [V2] wire encoding to the in-memory (latest) verification key. *)
+let of_stable_v2 (t : Stable.V2.t) : t =
+  { t with
+    max_proofs_verified =
+      Pickles_base.Proofs_verified.Stable.V1.to_latest t.max_proofs_verified
+  ; actual_wrap_domain_size =
+      Pickles_base.Proofs_verified.Stable.V1.to_latest t.actual_wrap_domain_size
+  }
 
 module Checked = struct
   open Step_main_inputs

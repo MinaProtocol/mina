@@ -2,6 +2,17 @@ open Pickles_types
 
 (** Represents how many proofs are verified. Currently only [0], [1] or [2] *)
 module Stable : sig
+  module V2 : sig
+    type t = Mina_wire_types.Pickles_base.Proofs_verified.V2.t = N0 | N1 | N2
+    [@@deriving sexp, compare, yojson, hash, equal]
+
+    include Plonkish_prelude.Sigs.Binable.S with type t := t
+
+    include Plonkish_prelude.Sigs.VERSIONED
+  end
+
+  module Latest = V2
+
   module V1 : sig
     type t = Mina_wire_types.Pickles_base.Proofs_verified.V1.t = N0 | N1 | N2
     [@@deriving sexp, compare, yojson, hash, equal]
@@ -9,10 +20,12 @@ module Stable : sig
     include Plonkish_prelude.Sigs.Binable.S with type t := t
 
     include Plonkish_prelude.Sigs.VERSIONED
+
+    val to_latest : t -> V2.t
   end
 end
 
-type t = Stable.V1.t = N0 | N1 | N2
+type t = Stable.Latest.t = N0 | N1 | N2
 [@@deriving sexp, compare, yojson, hash, equal]
 
 (** [of_nat_exn t_n] converts the type level natural [t_n] to the data type natural.

@@ -6,6 +6,7 @@ module Make_sig (A : Wire_types.Types.S) = struct
     Branch_data_intf.S
       with type Domain_log2.Stable.V1.t = A.Domain_log2.V1.t
        and type Stable.V1.t = A.V1.t
+       and type Stable.V2.t = A.V2.t
 end
 
 module Make_str (A : Wire_types.Concrete) = struct
@@ -44,6 +45,16 @@ module Make_str (A : Wire_types.Concrete) = struct
      Next 8 bits: domain_log2 *)
   [%%versioned
   module Stable = struct
+    module V2 = struct
+      type t = A.V2.t =
+        { proofs_verified : Proofs_verified.Stable.V2.t
+        ; domain_log2 : Domain_log2.Stable.V1.t
+        }
+      [@@deriving hlist, compare, sexp, yojson, hash, equal]
+
+      let to_latest = Fn.id
+    end
+
     module V1 = struct
       type t = A.V1.t =
         { proofs_verified : Proofs_verified.Stable.V1.t
@@ -51,7 +62,11 @@ module Make_str (A : Wire_types.Concrete) = struct
         }
       [@@deriving hlist, compare, sexp, yojson, hash, equal]
 
-      let to_latest = Fn.id
+      let to_latest { proofs_verified; domain_log2 } =
+        { V2.proofs_verified =
+            Proofs_verified.Stable.V1.to_latest proofs_verified
+        ; domain_log2
+        }
     end
   end]
 
@@ -206,3 +221,23 @@ module Make_str (A : Wire_types.Concrete) = struct
 end
 
 include Wire_types.Make (Make_sig) (Make_str)
+
+(* Downgrade the in-memory (latest) branch data to its [V1] wire encoding.
+   Raises if the number of proofs verified cannot be represented in [V1]. *)
+let to_stable_v1 ({ proofs_verified; domain_log2 } : t) : Stable.V1.t =
+  { proofs_verified =
+      ( match proofs_verified with
+      | N0 ->
+          Proofs_verified.Stable.V1.N0
+      | N1 ->
+          Proofs_verified.Stable.V1.N1
+      | N2 ->
+          Proofs_verified.Stable.V1.N2 )
+  ; domain_log2
+  }
+
+(* Upgrade the [V1] wire encoding to the in-memory (latest) branch data. *)
+let of_stable_v1 ({ proofs_verified; domain_log2 } : Stable.V1.t) : t =
+  { proofs_verified = Proofs_verified.Stable.V1.to_latest proofs_verified
+  ; domain_log2
+  }

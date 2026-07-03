@@ -94,6 +94,13 @@ module type S = sig
     module Proofs_verified_2 : sig
       [%%versioned:
       module Stable : sig
+        module V4 : sig
+          type t = Make(Nat.N2).t
+          [@@deriving sexp, compare, equal, yojson, hash]
+
+          val to_yojson_full : t -> Yojson.Safe.t
+        end
+
         module V3 : sig
           type t = Make(Nat.N2).t
           [@@deriving sexp, compare, equal, yojson, hash]
@@ -305,6 +312,10 @@ module type S = sig
     module Verification_key : sig
       [%%versioned:
       module Stable : sig
+        module V3 : sig
+          type t [@@deriving sexp, equal, compare, hash, yojson]
+        end
+
         module V2 : sig
           type t [@@deriving sexp, equal, compare, hash, yojson]
         end
@@ -317,6 +328,10 @@ module type S = sig
       val dummy : t
 
       val dummy_with_wrap_vk : t Lazy.t
+
+      val to_stable_v2 : t -> Stable.V2.t
+
+      val of_stable_v2 : Stable.V2.t -> t
 
       open Impls.Step
 
@@ -340,6 +355,16 @@ module type S = sig
     module Proof : sig
       [%%versioned:
       module Stable : sig
+        module V4 : sig
+          (* TODO: This should really be able to be any width up to the max width... *)
+          type t = Verification_key.Max_width.n Proof.t
+          [@@deriving sexp, equal, yojson, hash, compare]
+
+          val to_base64 : t -> string
+
+          val of_base64 : string -> (t, string) Result.t
+        end
+
         module V3 : sig
           (* TODO: This should really be able to be any width up to the max width... *)
           type t = Verification_key.Max_width.n Proof.t

@@ -11,6 +11,13 @@ module Branch_data : sig
           ; domain_log2 : Domain_log2.V1.t
           }
       end
+
+      module V2 : sig
+        type t =
+          { proofs_verified : Pickles_base.Proofs_verified.V2.t
+          ; domain_log2 : Domain_log2.V1.t
+          }
+      end
     end
   end
 
@@ -24,7 +31,11 @@ module Branch_data : sig
       (Signature : Local_sig) (_ : functor (A : Concrete) -> Signature(A).S) :
     Signature(M).S
 
-  include Types.S with module Domain_log2 = M.Domain_log2 and module V1 = M.V1
+  include
+    Types.S
+      with module Domain_log2 = M.Domain_log2
+       and module V1 = M.V1
+       and module V2 = M.V2
 end
 
 module Wrap : sig

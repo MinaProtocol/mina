@@ -30,6 +30,36 @@ module Base : sig
     module Stable : sig
       [@@@no_toplevel_latest_type]
 
+      module V4 : sig
+        type ('messages_for_next_wrap_proof, 'messages_for_next_step_proof) t =
+          { statement :
+              ( Limb_vector.Constant.Hex64.Stable.V1.t
+                Pickles_types.Vector.Vector_2.Stable.V1.t
+              , Limb_vector.Constant.Hex64.Stable.V1.t
+                Pickles_types.Vector.Vector_2.Stable.V1.t
+                Import.Scalar_challenge.Stable.V2.t
+              , Backend.Tick.Field.Stable.V1.t
+                Pickles_types.Shifted_value.Type1.Stable.V1.t
+              , bool
+              , 'messages_for_next_wrap_proof
+              , Import.Digest.Constant.Stable.V1.t
+              , 'messages_for_next_step_proof
+              , Limb_vector.Constant.Hex64.Stable.V1.t
+                Pickles_types.Vector.Vector_2.Stable.V1.t
+                Import.Scalar_challenge.Stable.V2.t
+                Import.Bulletproof_challenge.Stable.V1.t
+                Import.Step_bp_vec.Stable.V1.t
+              , Import.Branch_data.Stable.V2.t )
+              Import.Types.Wrap.Statement.Minimal.Stable.V1.t
+          ; prev_evals :
+              ( Backend.Tick.Field.Stable.V1.t
+              , Backend.Tick.Field.Stable.V1.t array )
+              Pickles_types.Plonk_types.All_evals.Stable.V2.t
+          ; proof : Wrap_wire_proof.Stable.V1.t
+          }
+        [@@deriving compare, sexp, hash, equal]
+      end
+
       module V3 : sig
         type ('messages_for_next_wrap_proof, 'messages_for_next_step_proof) t =
           { statement :
@@ -134,7 +164,7 @@ module Make (MLMB : Pickles_types.Nat.Intf) : sig
           Import.Step_bp_vec.t
           Max_proofs_verified_at_most.t )
         Base.Messages_for_next_proof_over_same_field.Step.t )
-      Base.Wrap.Stable.V3.t
+      Base.Wrap.Stable.V4.t
     [@@deriving compare, sexp, yojson, hash, equal]
   end
 
@@ -156,6 +186,14 @@ module Proofs_verified_2 : sig
 
   [%%versioned:
   module Stable : sig
+    module V4 : sig
+      include module type of T with module Repr := T.Repr
+
+      include Plonkish_prelude.Sigs.VERSIONED
+
+      include Plonkish_prelude.Sigs.Binable.S with type t := t
+    end
+
     module V3 : sig
       include module type of T with module Repr := T.Repr
 
@@ -173,6 +211,14 @@ module Proofs_verified_max : sig
 
   [%%versioned:
   module Stable : sig
+    module V4 : sig
+      include module type of T with module Repr := T.Repr
+
+      include Plonkish_prelude.Sigs.VERSIONED
+
+      include Plonkish_prelude.Sigs.Binable.S with type t := t
+    end
+
     module V3 : sig
       include module type of T with module Repr := T.Repr
 
