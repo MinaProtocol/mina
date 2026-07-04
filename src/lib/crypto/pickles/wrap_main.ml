@@ -179,14 +179,21 @@ let wrap_main
           in
           let () =
             with_label __LOC__ (fun () ->
-                (* Check that the branch_data public-input is correct *)
-                Branch_data.Checked.Wrap.pack
-                  { proofs_verified_mask =
-                      Vector.extend_front_exn actual_proofs_verified_mask
-                        Nat.N2.n Boolean.false_
-                  ; domain_log2
-                  }
-                |> Field.Assert.equal branch_data )
+                (* Check that the branch_data public-input is correct. The mask
+                   is at least 2 bits wide (for wire compatibility) but grows to
+                   hold one bit per possibly-verified proof. *)
+                let (Nat.Max.T (mask_width, mask_width_ge_2, _)) =
+                  Nat.max Nat.N2.n Max_proofs_verified.n
+                in
+                match mask_width_ge_2 with
+                | Nat.Lte.S (Nat.Lte.S _) ->
+                    Branch_data.Checked.Wrap.pack
+                      { proofs_verified_mask =
+                          Vector.extend_front_exn actual_proofs_verified_mask
+                            mask_width Boolean.false_
+                      ; domain_log2
+                      }
+                    |> Field.Assert.equal branch_data )
           in
           let prev_proof_state =
             with_label __LOC__ (fun () ->
