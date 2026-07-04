@@ -1266,11 +1266,15 @@ struct
        into the public input format expected by the wrap circuit. *)
     let public_input :
         [ `Field of Field.t | `Packed_bits of Field.t * int ] array =
+      (* The verified proof's branch_data mask is [max (2, proofs_verified)]
+         bits wide; pack it at that width. *)
+      let (Nat.Max.T (branch_data_width, _, _)) =
+        Nat.max Nat.N2.n (Nat.Add.n proofs_verified)
+      in
       with_label "pack_statement" (fun () ->
           Spec.pack
             (module Impl)
-            ~branch_data_pack:Branch_data.Checked.Step.pack
-            ~branch_data_width:Nat.N2.n
+            ~branch_data_pack:Branch_data.Checked.Step.pack ~branch_data_width
             (Types.Wrap.Statement.In_circuit.spec
                (module Impl)
                lookup_parameters feature_flags )

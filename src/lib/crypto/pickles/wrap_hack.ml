@@ -27,9 +27,15 @@ module Padded_length = Nat.N2
 let pad_vector (type a) ~dummy (v : (a, _) Vector.t) =
   Vector.extend_front_exn v Padded_length.n dummy
 
-(* Specialized padding function. *)
+(* Specialized padding function. Pads (at the front) up to [max (2, n)] dummy
+   challenge vectors; the result is length-agnostic (a list). *)
 let pad_challenges (chalss : (_ Vector.t, _) Vector.t) =
-  pad_vector ~dummy:(Lazy.force Dummy.Ipa.Wrap.challenges_computed) chalss
+  let dummy = Lazy.force Dummy.Ipa.Wrap.challenges_computed in
+  let chalss = Vector.to_list chalss in
+  let num_padding =
+    Int.max 0 (Nat.to_int Padded_length.n - List.length chalss)
+  in
+  List.init num_padding ~f:(fun _ -> dummy) @ chalss
 
 (* Specialized padding function. Pads (at the front) up to [max (2, n)] dummy
    accumulator entries; the result is length-agnostic (a list). *)
@@ -88,12 +94,34 @@ let pad_proof (type mlmb) (T p : mlmb Proof.t) : Proof.Proofs_verified_max.t =
     }
 
 module Checked = struct
-  let pad_challenges (chalss : (_ Vector.t, _) Vector.t) =
-    pad_vector
-      ~dummy:
-        (Vector.map ~f:Impls.Wrap.Field.constant
-           (Lazy.force Dummy.Ipa.Wrap.challenges_computed) )
-      chalss
+  (* Pad (at the front) up to [max (2, n)] dummy challenge vectors. The padded
+     width is named [(Padded_length.n, n) Max_type.t] so it does not escape. *)
+  let pad_challenges (type n)
+      (chalss :
+        ((Impls.Wrap.Field.t, Backend.Tock.Rounds.n) Vector.t, n) Vector.t ) :
+      ( (Impls.Wrap.Field.t, Backend.Tock.Rounds.n) Vector.t
+      , (Padded_length.n, n) Nat.Max_type.t )
+      Vector.t =
+    let dummy =
+      Vector.map ~f:Impls.Wrap.Field.constant
+        (Lazy.force Dummy.Ipa.Wrap.challenges_computed)
+    in
+    let module L = Core_kernel.Type_equal.Lift (struct
+      type 'a t =
+        ((Impls.Wrap.Field.t, Backend.Tock.Rounds.n) Vector.t, 'a) Vector.t
+    end) in
+    match Nat.compare Padded_length.n (Vector.length chalss) with
+    | `Lte le ->
+        Core_kernel.Type_equal.conv
+          (Core_kernel.Type_equal.sym (L.lift (Nat.Max_type.le le)))
+          (Vector.extend_front_exn chalss (Vector.length chalss) dummy)
+    | `Gt gt ->
+        Core_kernel.Type_equal.conv
+          (Core_kernel.Type_equal.sym
+             (L.lift
+                (Nat.Max_type.ge
+                   (Nat.gt_implies_gte Padded_length.n (Vector.length chalss) gt) ) ) )
+          (Vector.extend_front_exn chalss Padded_length.n dummy)
 
   (* Pad (at the front) up to [max (2, n)] dummy commitments, to match the
      accumulator width of the proof being verified. The padded width is named

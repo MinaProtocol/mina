@@ -413,10 +413,16 @@ let wrap_main
                         Wrap_hack.Checked.pad_challenges
                           old_bulletproof_challenges
                       in
+                      (* The accumulator is padded to [max (2, local max)]; the
+                         proofs-verified count passed here must match. *)
+                      let (module Padded_proofs_verified) =
+                        Nat.Add.create
+                          (Vector.length old_bulletproof_challenges)
+                      in
                       let finalized, chals =
                         with_label __LOC__ (fun () ->
                             Wrap_verifier.finalize_other_proof
-                              (module Wrap_hack.Padded_length)
+                              (module Padded_proofs_verified)
                               ~domain:
                                 (wrap_domain :> _ Plonk_checks.plonk_domain)
                               ~sponge ~old_bulletproof_challenges

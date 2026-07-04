@@ -25,11 +25,10 @@ val pad_challenges :
        Pickles_types.Vector.t
      , 'a )
      Pickles_types.Vector.t
-  -> ( ( Backend.Tock.Field.t
-       , Pickles_types.Nat.z Backend.Tock.Rounds.plus_n )
-       Pickles_types.Vector.t
-     , Pickles_types.Nat.z Padded_length.plus_n )
+  -> ( Backend.Tock.Field.t
+     , Pickles_types.Nat.z Backend.Tock.Rounds.plus_n )
      Pickles_types.Vector.t
+     list
 
 module Checked : sig
   val pad_challenges :
@@ -41,7 +40,7 @@ module Checked : sig
     -> ( ( Impls.Wrap.Field.t
          , Pickles_types.Nat.z Backend.Tock.Rounds.plus_n )
          Pickles_types.Vector.t
-       , Pickles_types.Nat.z Padded_length.plus_n )
+       , (Padded_length.n, 'a) Pickles_types.Nat.Max_type.t )
        Pickles_types.Vector.t
 
   val pad_commitments :

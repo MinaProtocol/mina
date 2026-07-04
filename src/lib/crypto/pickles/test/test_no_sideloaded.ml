@@ -545,7 +545,7 @@ module Tree_proof_n3 = struct
     | _ ->
         respond Unhandled
 
-  let _tag, _, p, Provers.[ step ] =
+  let tag, _, p, Provers.[ step ] =
     Common.time "compile" (fun () ->
         compile_promise () ~public_input:(Input Field.typ)
           ~auxiliary_typ:Typ.unit
@@ -608,6 +608,68 @@ module Tree_proof_n3 = struct
            Proof.verify_promise [ (input, proof) ] ) )
 end
 
+(* Extension probe: a circuit with [max_proofs_verified = 1] that verifies the
+   [max_proofs_verified = 3] proof produced above. This exercises consuming a
+   wider proof (whose branch_data mask is 3 bits) inside a narrower circuit. *)
+module Verify_n3 = struct
+  type _ Snarky_backendless.Request.t +=
+    | N3_proof : Pickles_types.Nat.N3.n Proof.t Snarky_backendless.Request.t
+
+  let handler (proof : _ Proof.t)
+      (Snarky_backendless.Request.With { request; respond }) =
+    match request with
+    | N3_proof ->
+        respond (Provide proof)
+    | _ ->
+        respond Unhandled
+
+  let _tag, _, p, Provers.[ step ] =
+    Common.time "compile" (fun () ->
+        compile_promise () ~public_input:(Input Field.typ)
+          ~auxiliary_typ:Typ.unit
+          ~max_proofs_verified:(module Pickles_types.Nat.N1)
+          ~name:"verify-n3"
+          ~choices:(fun ~self:_ ->
+            [ { identifier = "main"
+              ; feature_flags = Pickles_types.Plonk_types.Features.none_bool
+              ; prevs = [ Tree_proof_n3.tag ]
+              ; main =
+                  (fun { public_input = _self } ->
+                    dummy_constraints () ;
+                    let proof =
+                      exists (Typ.prover_value ()) ~request:(fun () -> N3_proof)
+                    in
+                    Promise.return
+                      { Inductive_rule.previous_proof_statements =
+                          [ { public_input = Field.zero
+                            ; proof
+                            ; proof_must_verify = Boolean.true_
+                            }
+                          ]
+                      ; public_output = ()
+                      ; auxiliary_output = ()
+                      } )
+              }
+            ] ) )
+
+  module Proof = (val p)
+
+  let example =
+    let _n3_input, n3_proof = Tree_proof_n3.example in
+    let (), (), b0 =
+      Common.time "verify n3 b0" (fun () ->
+          Promise.block_on_async_exn (fun () ->
+              step ~handler:(handler n3_proof) Field.Constant.zero ) )
+    in
+    (Field.Constant.zero, b0)
+
+  let test_verify () =
+    let input, proof = example in
+    Or_error.ok_exn
+      (Promise.block_on_async_exn (fun () ->
+           Proof.verify_promise [ (input, proof) ] ) )
+end
+
 let () =
   let open Alcotest in
   run "Pickles no sideloaded"
@@ -623,6 +685,6 @@ let () =
       , [ test_case "verify" `Quick Add_one_return.test_verify ] )
     ; ( "Auxiliary return"
       , [ test_case "verify" `Quick Auxiliary_return.test_verify ] )
-    ; ( "Tree proof N3"
-      , [ test_case "verify" `Quick Tree_proof_n3.test_verify ] )
+    ; ("Tree proof N3", [ test_case "verify" `Quick Tree_proof_n3.test_verify ])
+    ; ("Verify N3", [ test_case "verify" `Quick Verify_n3.test_verify ])
     ]
