@@ -123,13 +123,13 @@ module Checked = struct
         Composition_types.Wrap.Proof_state.Messages_for_next_wrap_proof.t ) =
     let open Wrap_main_inputs in
     let sponge =
-      (* The sponge states we would reach if we absorbed the padding challenges *)
+      (* The sponge states we would reach if we absorbed the padding challenges.
+         The accumulator is padded (at the front) up to [max (2, n)] vectors, so
+         the number of padding challenges absorbed is [max (0, 2 - n)]. *)
       let s = Sponge.create sponge_params in
+      let num_padding = Int.max 0 (2 - Nat.to_int max_proofs_verified) in
       let state, sponge_state =
-        (Lazy.force dummy_messages_for_next_wrap_proof_sponge_states).(2
-                                                                       - Nat
-                                                                         .to_int
-                                                                           max_proofs_verified)
+        (Lazy.force dummy_messages_for_next_wrap_proof_sponge_states).(num_padding)
       in
       { s with
         state = Array.map state ~f:Impls.Wrap.Field.constant
