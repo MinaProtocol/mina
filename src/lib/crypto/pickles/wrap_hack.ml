@@ -10,8 +10,9 @@ open Pickles_types
 
    To simplify the implementation when the number of proofs-verified
    varies across proof systems (being either 0, 1, or 2) we secretly
-   pad the accumulator so that it always has exactly 2 vectors, padding
-   with dummy vectors.
+   pad the accumulator so that it always has at least 2 vectors, padding
+   with dummy vectors. An accumulator of [n > 2] vectors is not padded, so the
+   padded width is [max (2, n)].
 
    We also then pad with the corresponding dummy commitments when proving
    wrap statements, as in `pad_accumulator` which is used in wrap.ml.
@@ -27,20 +28,26 @@ module Padded_length = Nat.N2
 let pad_vector (type a) ~dummy (v : (a, _) Vector.t) =
   Vector.extend_front_exn v Padded_length.n dummy
 
+(* The padded accumulator width for [n] accumulator vectors:
+   [max (Padded_length, n)]. *)
+let padded_length n = Nat.Max_type.nat Padded_length.n n
+
+(* Pad (at the front) up to [padded_length] by prepending [dummy]. *)
+let pad_front ~dummy v =
+  Vector.extend_front_exn v (padded_length (Vector.length v)) dummy
+
 (* Specialized padding function. *)
 let pad_challenges (chalss : (_ Vector.t, _) Vector.t) =
   pad_vector ~dummy:(Lazy.force Dummy.Ipa.Wrap.challenges_computed) chalss
 
-(* Specialized padding function. *)
 let pad_accumulator (xs : (Tock.Proof.Challenge_polynomial.t, _) Vector.t) =
-  pad_vector xs
-    ~dummy:
-      { Tock.Proof.Challenge_polynomial.commitment =
-          Lazy.force Dummy.Ipa.Wrap.sg
-      ; challenges =
-          Vector.to_array (Lazy.force Dummy.Ipa.Wrap.challenges_computed)
-      }
-  |> Vector.to_list
+  let dummy =
+    { Tock.Proof.Challenge_polynomial.commitment = Lazy.force Dummy.Ipa.Wrap.sg
+    ; challenges =
+        Vector.to_array (Lazy.force Dummy.Ipa.Wrap.challenges_computed)
+    }
+  in
+  Vector.to_list (pad_front xs ~dummy)
 
 (* Hash the me only, padding first. *)
 let hash_messages_for_next_wrap_proof (type n)
@@ -50,7 +57,9 @@ let hash_messages_for_next_wrap_proof (type n)
       Composition_types.Wrap.Proof_state.Messages_for_next_wrap_proof.t ) =
   let t =
     { t with
-      old_bulletproof_challenges = pad_challenges t.old_bulletproof_challenges
+      old_bulletproof_challenges =
+        pad_front t.old_bulletproof_challenges
+          ~dummy:(Lazy.force Dummy.Ipa.Wrap.challenges_computed)
     }
   in
   Tock_field_sponge.digest Tock_field_sponge.params
@@ -123,13 +132,15 @@ module Checked = struct
         Composition_types.Wrap.Proof_state.Messages_for_next_wrap_proof.t ) =
     let open Wrap_main_inputs in
     let sponge =
-      (* The sponge states we would reach if we absorbed the padding challenges *)
+      (* The sponge states we would reach if we absorbed the padding challenges
+         that [pad_front] prepends. *)
       let s = Sponge.create sponge_params in
+      let num_padding =
+        Nat.to_int (padded_length max_proofs_verified)
+        - Nat.to_int max_proofs_verified
+      in
       let state, sponge_state =
-        (Lazy.force dummy_messages_for_next_wrap_proof_sponge_states).(2
-                                                                       - Nat
-                                                                         .to_int
-                                                                           max_proofs_verified)
+        (Lazy.force dummy_messages_for_next_wrap_proof_sponge_states).(num_padding)
       in
       { s with
         state = Array.map state ~f:Impls.Wrap.Field.constant

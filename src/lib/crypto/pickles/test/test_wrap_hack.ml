@@ -52,5 +52,9 @@ let () =
             (test_hash_messages_for_next_wrap_proof Nat.N1.n)
         ; test_case "hash_messages_for_next_wrap_proof correct 2" `Quick
             (test_hash_messages_for_next_wrap_proof Nat.N2.n)
+        ; test_case "hash_messages_for_next_wrap_proof correct 3" `Quick
+            (test_hash_messages_for_next_wrap_proof Nat.N3.n)
+        ; test_case "hash_messages_for_next_wrap_proof correct 4" `Quick
+            (test_hash_messages_for_next_wrap_proof Nat.N4.n)
         ] )
     ]
