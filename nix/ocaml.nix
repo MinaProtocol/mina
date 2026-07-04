@@ -213,10 +213,6 @@ let
         GO_CAPNP_STD = "${pkgs.go-capnproto2.src}/std";
         nativeBuildInputs = s.nativeBuildInputs ++ [ pkgs.capnproto ];
       });
-      pkgs.bindings_js = super.pkgs.bindings_js.overrideAttrs {
-        KIMCHI_WASM_NODEJS = "${pkgs.kimchi_wasm}/nodejs";
-        KIMCHI_WASM_WEB = "${pkgs.kimchi_wasm}/web";
-      };
       pkgs.__src-lib-mina_block-tests__ = let
         gzipped = pkgs.fetchurl {
           url =
@@ -235,14 +231,6 @@ let
       in super.pkgs.__src-lib-mina_block-tests__.overrideAttrs {
         TEST_PRECOMPUTED_BLOCK_JSON_PATH = "${ungzipped}";
       };
-      files.src-lib-crypto-kimchi_bindings-js-node_js =
-        super.files.src-lib-crypto-kimchi_bindings-js-node_js.overrideAttrs {
-          KIMCHI_WASM_NODEJS = "${pkgs.kimchi_wasm}/nodejs";
-        };
-      files.src-lib-crypto-kimchi_bindings-js-web =
-        super.files.src-lib-crypto-kimchi_bindings-js-web.overrideAttrs {
-          KIMCHI_WASM_WEB = "${pkgs.kimchi_wasm}/web";
-        };
       pkgs.__src-lib-ppx_mina-tests__ =
         makefileTest "__src-lib-ppx_mina-tests__" super;
       pkgs.__src-lib-ppx_version-test__ =
@@ -363,9 +351,6 @@ let
         DISABLE_CHECK_OPAM_SWITCH = "true";
 
         MINA_VERSION_IMPLEMENTATION = "mina_version.runtime";
-
-        KIMCHI_WASM_NODEJS = "${pkgs.kimchi_wasm}/nodejs";
-        KIMCHI_WASM_WEB = "${pkgs.kimchi_wasm}/web";
 
         configurePhase = ''
           export MINA_ROOT="$PWD"
