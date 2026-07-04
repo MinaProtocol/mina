@@ -651,13 +651,13 @@ struct
             let sum, adds =
               Sg_old_length.add num_commitments_without_degree_bound
             in
-            let module La = Core_kernel.Type_equal.Lift (struct
+            let module La = Core.Type_equal.Lift (struct
               type 'a t =
                 ('a, Nat.N45.n, Nat.N45.n Sg_old_length.plus_n) Nat.Adds.t
             end) in
             ignore sum ;
-            Core_kernel.Type_equal.conv
-              (Core_kernel.Type_equal.sym (La.lift Sg_old_length.eq))
+            Core.Type_equal.conv
+              (Core.Type_equal.sym (La.lift Sg_old_length.eq))
               adds
           in
           let without_degree_bound =
@@ -1265,11 +1265,15 @@ struct
        into the public input format expected by the wrap circuit. *)
     let public_input :
         [ `Field of Field.t | `Packed_bits of Field.t * int ] array =
+      (* The verified proof's branch_data mask is [max (2, proofs_verified)]
+         bits wide; pack it at that width. *)
+      let (Nat.Max.T (branch_data_width, _, _)) =
+        Nat.max Nat.N2.n (Nat.Add.n proofs_verified)
+      in
       with_label "pack_statement" (fun () ->
           Spec.pack
             (module Impl)
-            ~branch_data_pack:Branch_data.Checked.Step.pack
-            ~branch_data_width:Nat.N2.n
+            ~branch_data_pack:Branch_data.Checked.Step.pack ~branch_data_width
             (Types.Wrap.Statement.In_circuit.spec
                (module Impl)
                lookup_parameters feature_flags )

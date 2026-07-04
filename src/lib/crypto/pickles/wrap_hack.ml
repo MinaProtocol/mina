@@ -24,10 +24,6 @@ open Pickles_types
 
 module Padded_length = Nat.N2
 
-(* Pad up to length 2 by preprending dummy values. *)
-let pad_vector (type a) ~dummy (v : (a, _) Vector.t) =
-  Vector.extend_front_exn v Padded_length.n dummy
-
 (* The padded accumulator width for [n] accumulator vectors:
    [max (Padded_length, n)]. *)
 let padded_length n = Nat.Max_type.nat Padded_length.n n
@@ -36,9 +32,9 @@ let padded_length n = Nat.Max_type.nat Padded_length.n n
 let pad_front ~dummy v =
   Vector.extend_front_exn v (padded_length (Vector.length v)) dummy
 
-(* Specialized padding function. *)
-let pad_challenges (chalss : (_ Vector.t, _) Vector.t) =
-  pad_vector ~dummy:(Lazy.force Dummy.Ipa.Wrap.challenges_computed) chalss
+let pad_challenges chalss =
+  Vector.to_list
+    (pad_front chalss ~dummy:(Lazy.force Dummy.Ipa.Wrap.challenges_computed))
 
 let pad_accumulator (xs : (Tock.Proof.Challenge_polynomial.t, _) Vector.t) =
   let dummy =
@@ -67,8 +63,23 @@ let hash_messages_for_next_wrap_proof (type n)
      .to_field_elements t ~g1:(fun ((x, y) : Tick.Curve.Affine.t) -> [ x; y ] )
     )
 
-(* Pad the messages_for_next_wrap_proof of a proof *)
+(* Pad the messages_for_next_wrap_proof of a proof to the side-loaded width.
+   Unlike [pad_front], this pads to exactly [Side_loaded_verification_key.Width.Max],
+   the protocol's cap on proofs verified by a side-loaded proof. *)
 let pad_proof (type mlmb) (T p : mlmb Proof.t) : Proof.Proofs_verified_max.t =
+  let old_bulletproof_challenges =
+    p.statement.proof_state.messages_for_next_wrap_proof
+      .old_bulletproof_challenges
+  in
+  let max_width = Side_loaded_verification_key.Width.Max.n in
+  if
+    Nat.to_int (Vector.length old_bulletproof_challenges) > Nat.to_int max_width
+  then
+    failwithf
+      "Side-loaded proofs may verify at most %d proofs; this proof verifies %d"
+      (Nat.to_int max_width)
+      (Nat.to_int (Vector.length old_bulletproof_challenges))
+      () ;
   T
     { p with
       statement =
@@ -78,22 +89,19 @@ let pad_proof (type mlmb) (T p : mlmb Proof.t) : Proof.Proofs_verified_max.t =
               messages_for_next_wrap_proof =
                 { p.statement.proof_state.messages_for_next_wrap_proof with
                   old_bulletproof_challenges =
-                    pad_vector
-                      p.statement.proof_state.messages_for_next_wrap_proof
-                        .old_bulletproof_challenges
-                      ~dummy:Dummy.Ipa.Wrap.challenges
+                    Vector.extend_front_exn old_bulletproof_challenges max_width
+                      Dummy.Ipa.Wrap.challenges
                 }
             }
         }
     }
 
 module Checked = struct
-  let pad_challenges (chalss : (_ Vector.t, _) Vector.t) =
-    pad_vector
+  let pad_challenges chalss =
+    pad_front chalss
       ~dummy:
         (Vector.map ~f:Impls.Wrap.Field.constant
            (Lazy.force Dummy.Ipa.Wrap.challenges_computed) )
-      chalss
 
   let pad_commitments commitments =
     pad_front commitments
