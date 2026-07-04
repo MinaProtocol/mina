@@ -247,7 +247,7 @@ module Make
     (Basic : sig
       val typ_basic :
            assert_16_bits:(Impl.Field.t -> unit)
-        -> branch_data_width:'bdw Nat.s Nat.s Nat.t
+        -> branch_data_width:'bdw Nat.t
         -> ('other_field_var, 'other_field) Impl.Typ.t
         -> ( 'a
            , 'b
@@ -270,7 +270,7 @@ module Make
         -> ('b, 'a) Impl.Typ.t
 
       val packed_typ_basic :
-           branch_data_width:'bdw Nat.s Nat.s Nat.t
+           branch_data_width:'bdw Nat.t
         -> ('other_field_var, 'other_field) Make_ETyp(Impl).t
         -> ( 'a
            , 'b
@@ -496,8 +496,7 @@ module Step =
       module C = Common (Impl)
 
       let typ_basic (type other_field other_field_var bdw) ~assert_16_bits
-          ~(branch_data_width :
-             bdw Pickles_types.Nat.s Pickles_types.Nat.s Nat.t )
+          ~(branch_data_width : bdw Nat.t)
           (field : (other_field_var, other_field) Impl.Typ.t) =
         let typ_basic : type a b.
                ( a
@@ -600,8 +599,7 @@ module Wrap =
       module C = Common (Impl)
 
       let typ_basic (type other_field other_field_var bdw) ~assert_16_bits
-          ~(branch_data_width :
-             bdw Pickles_types.Nat.s Pickles_types.Nat.s Nat.t )
+          ~(branch_data_width : bdw Nat.t)
           (field : (other_field_var, other_field) Impl.Typ.t) =
         let typ_basic : type a b.
                ( a

@@ -95,12 +95,11 @@ module Checked = struct
            (Lazy.force Dummy.Ipa.Wrap.challenges_computed) )
       chalss
 
-  let pad_commitments (commitments : _ Vector.t) =
-    pad_vector
+  let pad_commitments commitments =
+    pad_front commitments
       ~dummy:
         (Tuple_lib.Double.map ~f:Impls.Step.Field.constant
            (Lazy.force Dummy.Ipa.Wrap.sg) )
-      commitments
 
   (* We precompute the sponge states that would result from absorbing
      0, 1, or 2 dummy challenge vectors. This is used to speed up hashing

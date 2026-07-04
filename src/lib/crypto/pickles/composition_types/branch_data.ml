@@ -142,8 +142,8 @@ module Make_str (A : Wire_types.Concrete) = struct
 
       type field_var = Field.t
 
-      type 'n t =
-        { proofs_verified_mask : 'n Proofs_verified.Prefix_mask.Step.Checked.t
+      type 'w t =
+        { proofs_verified_mask : 'w Proofs_verified.Prefix_mask.Step.Checked.t
         ; domain_log2 : Field.t
         }
       [@@deriving hlist]
@@ -160,8 +160,8 @@ module Make_str (A : Wire_types.Concrete) = struct
 
       type field_var = Field.t
 
-      type 'n t =
-        { proofs_verified_mask : 'n Proofs_verified.Prefix_mask.Wrap.Checked.t
+      type 'w t =
+        { proofs_verified_mask : 'w Proofs_verified.Prefix_mask.Wrap.Checked.t
         ; domain_log2 : Field.t
         }
       [@@deriving hlist]

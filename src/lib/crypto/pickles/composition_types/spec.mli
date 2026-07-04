@@ -86,8 +86,7 @@ module Wrap_impl := Kimchi_pasta_snarky_backend.Wrap_impl
 
 val typ :
      assert_16_bits:(Step_impl.Field.t -> unit)
-  -> branch_data_width:
-       'n Pickles_types.Nat.s Pickles_types.Nat.s Pickles_types.Nat.t
+  -> branch_data_width:'n Pickles_types.Nat.t
   -> ('b, 'c) Step_impl.Typ.t
   -> ( 'd
      , 'e
@@ -114,8 +113,7 @@ val typ :
 
 val wrap_typ :
      assert_16_bits:(Wrap_impl.Field.t -> unit)
-  -> branch_data_width:
-       'n Pickles_types.Nat.s Pickles_types.Nat.s Pickles_types.Nat.t
+  -> branch_data_width:'n Pickles_types.Nat.t
   -> ('b, 'c) Wrap_impl.Typ.t
   -> ( 'd
      , 'e
@@ -158,8 +156,7 @@ module Wrap_etyp :
     module type of Make_ETyp (Kimchi_pasta_snarky_backend.Wrap_impl)
 
 val packed_typ :
-     branch_data_width:
-       'n Pickles_types.Nat.s Pickles_types.Nat.s Pickles_types.Nat.t
+     branch_data_width:'n Pickles_types.Nat.t
   -> ('b, 'c) Step_etyp.t
   -> ( 'd
      , 'e
@@ -185,8 +182,7 @@ val packed_typ :
   -> ('e, 'd) Step_etyp.t
 
 val wrap_packed_typ :
-     branch_data_width:
-       'n Pickles_types.Nat.s Pickles_types.Nat.s Pickles_types.Nat.t
+     branch_data_width:'n Pickles_types.Nat.t
   -> ('b, 'c) Wrap_etyp.t
   -> ( 'd
      , 'e
@@ -214,8 +210,7 @@ val wrap_packed_typ :
 val pack :
      ('f, 'v) impl
   -> branch_data_pack:('branch_data_checked -> 'v)
-  -> branch_data_width:
-       'n Pickles_types.Nat.s Pickles_types.Nat.s Pickles_types.Nat.t
+  -> branch_data_width:'n Pickles_types.Nat.t
   -> ( 'a
      , 'b
      , < bool1 : bool
