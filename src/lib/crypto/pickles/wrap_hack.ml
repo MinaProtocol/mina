@@ -31,26 +31,35 @@ let pad_vector (type a) ~dummy (v : (a, _) Vector.t) =
 let pad_challenges (chalss : (_ Vector.t, _) Vector.t) =
   pad_vector ~dummy:(Lazy.force Dummy.Ipa.Wrap.challenges_computed) chalss
 
-(* Specialized padding function. *)
+(* Specialized padding function. Pads (at the front) up to [max (2, n)] dummy
+   accumulator entries; the result is length-agnostic (a list). *)
 let pad_accumulator (xs : (Tock.Proof.Challenge_polynomial.t, _) Vector.t) =
-  pad_vector xs
-    ~dummy:
-      { Tock.Proof.Challenge_polynomial.commitment =
-          Lazy.force Dummy.Ipa.Wrap.sg
-      ; challenges =
-          Vector.to_array (Lazy.force Dummy.Ipa.Wrap.challenges_computed)
-      }
-  |> Vector.to_list
+  let dummy =
+    { Tock.Proof.Challenge_polynomial.commitment = Lazy.force Dummy.Ipa.Wrap.sg
+    ; challenges =
+        Vector.to_array (Lazy.force Dummy.Ipa.Wrap.challenges_computed)
+    }
+  in
+  let xs = Vector.to_list xs in
+  let num_padding = Int.max 0 (Nat.to_int Padded_length.n - List.length xs) in
+  List.init num_padding ~f:(fun _ -> dummy) @ xs
 
-(* Hash the me only, padding first. *)
+(* Hash the me only, padding first. The accumulator is padded (at the front) up
+   to [max (2, n)] vectors of dummy challenges. *)
 let hash_messages_for_next_wrap_proof (type n)
     (t :
       ( Tick.Curve.Affine.t
       , (_, n) Vector.t )
       Composition_types.Wrap.Proof_state.Messages_for_next_wrap_proof.t ) =
+  let old = t.old_bulletproof_challenges in
+  let (Nat.Max.T (padded_length, _, _)) =
+    Nat.max Padded_length.n (Vector.length old)
+  in
   let t =
     { t with
-      old_bulletproof_challenges = pad_challenges t.old_bulletproof_challenges
+      old_bulletproof_challenges =
+        Vector.extend_front_exn old padded_length
+          (Lazy.force Dummy.Ipa.Wrap.challenges_computed)
     }
   in
   Tock_field_sponge.digest Tock_field_sponge.params
