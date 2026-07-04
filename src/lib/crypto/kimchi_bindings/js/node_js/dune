@@ -10,22 +10,8 @@
  (preprocess
   (pps ppx_version js_of_ocaml-ppx)))
 
+; the backend library includes flags.sexp; it used to be produced by the
+; (removed) kimchi_wasm wasm-bindgen build rule
 (rule
- (targets
-  kimchi_wasm_bg.wasm.d.ts
-  kimchi_wasm_bg.wasm
-  kimchi_wasm.d.ts
-  kimchi_wasm.js
-  flags.sexp)
- (deps
-  build.sh
-  ../../dune-build-root
-  (source_tree ../../../proof-systems))
- (locks /cargo-lock) ; lock for rustup
- (action
-  (progn
-   (setenv
-    CARGO_TARGET_DIR
-    "%{read:../../dune-build-root}/cargo_kimchi_wasm"
-    (run bash build.sh))
-   (write-file flags.sexp "()"))))
+ (targets flags.sexp)
+ (action (write-file flags.sexp "()")))

@@ -119,6 +119,14 @@ export declare class WasmFpProverCommitments {
 export type NapiFpProverCommitments = WasmFpProverCommitments
 
 export declare class WasmFpProverProof {
+  /**
+   * Drop the heavy proof contents by replacing them with a small
+   * dummy. Rust memory behind napi objects is normally freed only
+   * when the JS GC runs the wrapper's finalizer, which on wasm32
+   * can be far too late (4 GiB ceiling, see o1js AGENT_LOG.md) —
+   * callers that are done with a proof free it deterministically.
+   */
+  free(): void
   constructor(commitments: NapiProverCommitments, proof: NapiOpeningProof, evals: NapiProofEvaluations, ftEval1: NapiPastaFp, public: NapiFlatVector<NapiPastaFp>, prevChallengesScalars: NapiVecVecFp, prevChallengesComms: NapiVector<WasmFpPolyComm>)
   get commitments(): NapiProverCommitments
   get proof(): NapiOpeningProof
@@ -228,6 +236,14 @@ export declare class WasmFqProverCommitments {
 export type NapiFqProverCommitments = WasmFqProverCommitments
 
 export declare class WasmFqProverProof {
+  /**
+   * Drop the heavy proof contents by replacing them with a small
+   * dummy. Rust memory behind napi objects is normally freed only
+   * when the JS GC runs the wrapper's finalizer, which on wasm32
+   * can be far too late (4 GiB ceiling, see o1js AGENT_LOG.md) —
+   * callers that are done with a proof free it deterministically.
+   */
+  free(): void
   constructor(commitments: NapiProverCommitments, proof: NapiOpeningProof, evals: NapiProofEvaluations, ftEval1: NapiPastaFq, public: NapiFlatVector<NapiPastaFq>, prevChallengesScalars: NapiVecVecFq, prevChallengesComms: NapiVector<WasmFqPolyComm>)
   get commitments(): NapiProverCommitments
   get proof(): NapiOpeningProof
@@ -314,6 +330,12 @@ export type NapiPastaFqRuntimeTableCfg = WasmPastaFqRuntimeTableCfg
 
 export declare class WasmVecVecFp {
   constructor(capacity: number)
+  /**
+   * Drop the contents (potentially tens of MB of witness data)
+   * deterministically instead of waiting for the JS GC finalizer —
+   * see o1js AGENT_LOG.md, wasm32 memory exhaustion.
+   */
+  free(): void
   push(vector: Uint8Array): void
   get(index: number): Uint8Array
   set(index: number, vector: Uint8Array): void
@@ -322,6 +344,12 @@ export type NapiVecVecFp = WasmVecVecFp
 
 export declare class WasmVecVecFq {
   constructor(capacity: number)
+  /**
+   * Drop the contents (potentially tens of MB of witness data)
+   * deterministically instead of waiting for the JS GC finalizer —
+   * see o1js AGENT_LOG.md, wasm32 memory exhaustion.
+   */
+  free(): void
   push(vector: Uint8Array): void
   get(index: number): Uint8Array
   set(index: number, vector: Uint8Array): void
@@ -412,7 +440,7 @@ export declare function caml_pallas_affine_one(): WasmGPallas
 
 export declare function caml_pasta_fp_plonk_circuit_serialize(publicInputSize: number, vector: WasmFpGateVector): string
 
-export declare function caml_pasta_fp_plonk_gate_vector_add(vector: WasmFpGateVector, gate: WasmFpGate): void
+export declare function caml_pasta_fp_plonk_gate_vector_add(vector: WasmFpGateVector, typ: number, wires: Int32Array, coeffs: Uint8Array): void
 
 export declare function caml_pasta_fp_plonk_gate_vector_create(): WasmFpGateVector
 
@@ -476,7 +504,7 @@ export declare function caml_pasta_fp_poseidon_block_cipher(state: Uint8Array): 
 
 export declare function caml_pasta_fq_plonk_circuit_serialize(publicInputSize: number, vector: WasmFqGateVector): string
 
-export declare function caml_pasta_fq_plonk_gate_vector_add(vector: WasmFqGateVector, gate: WasmFqGate): void
+export declare function caml_pasta_fq_plonk_gate_vector_add(vector: WasmFqGateVector, typ: number, wires: Int32Array, coeffs: Uint8Array): void
 
 export declare function caml_pasta_fq_plonk_gate_vector_create(): WasmFqGateVector
 
@@ -547,6 +575,10 @@ export declare function camlPastaFpPlonkGateVectorFromBytesExternal(bytes: Uint8
 export declare function camlPastaFqPlonkGateVectorFromBytesExternal(bytes: Uint8Array): ExternalObject<WasmFqGateVector>
 
 export declare function camlRayonInitSingleThreaded(): boolean
+
+export declare function camlRayonSpawnPool(numThreads: number): boolean
+
+export declare function camlRayonStartedThreads(): number
 
 export declare function fp_oracles_create(lgrComm: NapiVector<WasmPolyComm>, index: WasmPlonkVerifierIndex, proof: WasmProverProof): WasmFpOracles
 

@@ -27,7 +27,12 @@ var caml_pasta_fp_plonk_proof_create = function (
         prev_challenges,
         prev_sgs
     );
-    return tsRustConversion.fp.proofFromRust(proof);
+    var result = tsRustConversion.fp.proofFromRust(proof);
+    // free the Rust-side proof and witness eagerly; their GC finalizers may
+    // run much too late on wasm32 (see o1js AGENT_LOG.md, memory exhaustion)
+    if (proof.free) proof.free();
+    if (witness_cols.free) witness_cols.free();
+    return result;
 };
 
 // Provides: caml_pasta_fp_plonk_proof_verify
@@ -35,7 +40,9 @@ var caml_pasta_fp_plonk_proof_create = function (
 var caml_pasta_fp_plonk_proof_verify = function (index, proof) {
     index = tsRustConversion.fp.verifierIndexToRust(index);
     proof = tsRustConversion.fp.proofToRust(proof);
-    return kimchi_ffi.caml_pasta_fp_plonk_proof_verify(index, proof);
+    var ok = kimchi_ffi.caml_pasta_fp_plonk_proof_verify(index, proof);
+    if (proof.free) proof.free();
+    return ok;
 };
 
 // Provides: caml_pasta_fp_plonk_proof_batch_verify
@@ -49,7 +56,11 @@ var caml_pasta_fp_plonk_proof_batch_verify = function (indexes, proofs) {
         proofs,
         tsRustConversion.fp.proofToRust
     );
-    return kimchi_ffi.caml_pasta_fp_plonk_proof_batch_verify(indexes, proofs);
+    var ok = kimchi_ffi.caml_pasta_fp_plonk_proof_batch_verify(indexes, proofs);
+    for (var j = 0; j < proofs.length; j++) {
+        if (proofs[j] && proofs[j].free) proofs[j].free();
+    }
+    return ok;
 };
 
 // Provides: caml_pasta_fp_plonk_proof_dummy
@@ -95,7 +106,12 @@ var caml_pasta_fq_plonk_proof_create = function (
         prev_challenges,
         prev_sgs
     );
-    return tsRustConversion.fq.proofFromRust(proof);
+    var result = tsRustConversion.fq.proofFromRust(proof);
+    // free the Rust-side proof and witness eagerly; their GC finalizers may
+    // run much too late on wasm32 (see o1js AGENT_LOG.md, memory exhaustion)
+    if (proof.free) proof.free();
+    if (witness_cols.free) witness_cols.free();
+    return result;
 };
 
 // Provides: caml_pasta_fq_plonk_proof_verify
@@ -103,7 +119,9 @@ var caml_pasta_fq_plonk_proof_create = function (
 var caml_pasta_fq_plonk_proof_verify = function (index, proof) {
     index = tsRustConversion.fq.verifierIndexToRust(index);
     proof = tsRustConversion.fq.proofToRust(proof);
-    return kimchi_ffi.caml_pasta_fq_plonk_proof_verify(index, proof);
+    var ok = kimchi_ffi.caml_pasta_fq_plonk_proof_verify(index, proof);
+    if (proof.free) proof.free();
+    return ok;
 };
 
 // Provides: caml_pasta_fq_plonk_proof_batch_verify
@@ -117,7 +135,11 @@ var caml_pasta_fq_plonk_proof_batch_verify = function (indexes, proofs) {
         proofs,
         tsRustConversion.fq.proofToRust
     );
-    return kimchi_ffi.caml_pasta_fq_plonk_proof_batch_verify(indexes, proofs);
+    var ok = kimchi_ffi.caml_pasta_fq_plonk_proof_batch_verify(indexes, proofs);
+    for (var j = 0; j < proofs.length; j++) {
+        if (proofs[j] && proofs[j].free) proofs[j].free();
+    }
+    return ok;
 };
 
 // Provides: caml_pasta_fq_plonk_proof_dummy

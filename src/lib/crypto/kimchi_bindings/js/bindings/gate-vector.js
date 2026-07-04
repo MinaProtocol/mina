@@ -12,9 +12,12 @@ var caml_pasta_fp_plonk_gate_vector_create = function () {
 // Provides: caml_pasta_fp_plonk_gate_vector_add
 // Requires: kimchi_ffi, tsRustConversion
 var caml_pasta_fp_plonk_gate_vector_add = function (vector, gate) {
+    var flat = tsRustConversion.fp.gateToRust(gate);
     return kimchi_ffi.caml_pasta_fp_plonk_gate_vector_add(
         vector,
-        tsRustConversion.fp.gateToRust(gate)
+        flat.typ,
+        flat.wires,
+        flat.coeffs
     );
 };
 
@@ -72,9 +75,12 @@ var caml_pasta_fq_plonk_gate_vector_create = function () {
 // Provides: caml_pasta_fq_plonk_gate_vector_add
 // Requires: kimchi_ffi, tsRustConversion
 var caml_pasta_fq_plonk_gate_vector_add = function (vector, gate) {
+    var flat = tsRustConversion.fq.gateToRust(gate);
     return kimchi_ffi.caml_pasta_fq_plonk_gate_vector_add(
         vector,
-        tsRustConversion.fq.gateToRust(gate)
+        flat.typ,
+        flat.wires,
+        flat.coeffs
     );
 };
 
