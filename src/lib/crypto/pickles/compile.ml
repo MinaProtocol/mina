@@ -327,6 +327,30 @@ struct
     in
     let module V = H4.To_vector (Local_max_proofs_verifieds) in
     let padded = V.f branches (M.f choices) |> Vector.transpose in
+    (* Consistency guard for wide proofs. Each prev slot's recursion
+       accumulator is padded to [max (2, w)] where [w] is the max proofs-verified
+       across the branches' prevs at that slot. If two branches disagree on that
+       padded width (i.e. [max (2, w)] differs), a narrower prev would be padded
+       to a wider accumulator than it committed to, producing an unsatisfiable
+       circuit. Since any width <= 2 maps to 2, this can only trigger once a
+       width exceeds 2; supporting it needs per-branch (Pseudo-selected)
+       accumulator padding. *)
+    Vector.iteri padded ~f:(fun slot slot_widths ->
+        match
+          List.dedup_and_sort ~compare:Int.compare
+            (List.map (Vector.to_list slot_widths) ~f:(Int.max 2))
+        with
+        | [] | [ _ ] ->
+            ()
+        | widths ->
+            failwithf
+              "Pickles.compile: the branches disagree on the proofs-verified \
+               width of previous-proof slot %d (padded widths: %s). Verifying \
+               proofs of different widths greater than 2 in the same slot \
+               across branches is not yet supported."
+              slot
+              (String.concat ~sep:", " (List.map widths ~f:Int.to_string))
+              () ) ;
     (padded, Maxes.m padded)
 
   module Lazy_keys = struct

@@ -937,6 +937,78 @@ module Tree_proof_n4 = struct
            Proof.verify_promise [ (input, proof) ] ) )
 end
 
+(* The consistency guard must reject a multi-branch circuit whose branches
+   verify prevs of different widths (one width-3, one narrower) in the same
+   slot, rather than silently producing an unsatisfiable circuit. *)
+module Mixed_widths_rejected = struct
+  type _ Snarky_backendless.Request.t +=
+    | Wide : Pickles_types.Nat.N3.n Proof.t Snarky_backendless.Request.t
+    | Narrow : Pickles_types.Nat.N0.n Proof.t Snarky_backendless.Request.t
+
+  let attempt () =
+    let _tag, _, _p, Provers.[ _; _ ] =
+      Common.time "compile mixed-rejected" (fun () ->
+          compile_promise () ~public_input:(Input Field.typ)
+            ~auxiliary_typ:Typ.unit
+            ~max_proofs_verified:(module Pickles_types.Nat.N1)
+            ~name:"mixed-widths-rejected"
+            ~choices:(fun ~self:_ ->
+              [ { identifier = "wide"
+                ; feature_flags = Pickles_types.Plonk_types.Features.none_bool
+                ; prevs = [ Tree_proof_n3.tag ]
+                ; main =
+                    (fun { public_input = _self } ->
+                      dummy_constraints () ;
+                      let proof =
+                        exists (Typ.prover_value ()) ~request:(fun () -> Wide)
+                      in
+                      Promise.return
+                        { Inductive_rule.previous_proof_statements =
+                            [ { public_input = Field.zero
+                              ; proof
+                              ; proof_must_verify = Boolean.true_
+                              }
+                            ]
+                        ; public_output = ()
+                        ; auxiliary_output = ()
+                        } )
+                }
+              ; { identifier = "narrow"
+                ; feature_flags = Pickles_types.Plonk_types.Features.none_bool
+                ; prevs = [ No_recursion.tag ]
+                ; main =
+                    (fun { public_input = _self } ->
+                      dummy_constraints () ;
+                      let proof =
+                        exists (Typ.prover_value ()) ~request:(fun () ->
+                            Narrow )
+                      in
+                      Promise.return
+                        { Inductive_rule.previous_proof_statements =
+                            [ { public_input = Field.zero
+                              ; proof
+                              ; proof_must_verify = Boolean.true_
+                              }
+                            ]
+                        ; public_output = ()
+                        ; auxiliary_output = ()
+                        } )
+                }
+              ] ) )
+    in
+    ()
+
+  let test_rejected () =
+    match attempt () with
+    | () ->
+        failwith
+          "expected the consistency guard to reject the mixed-width \
+           configuration"
+    | exception Failure msg ->
+        assert (
+          Core_kernel.String.is_substring msg ~substring:"proofs-verified width" )
+end
+
 let () =
   let open Alcotest in
   run "Pickles no sideloaded"
@@ -958,4 +1030,6 @@ let () =
     ; ( "Self recursion 3"
       , [ test_case "verify" `Quick Self_recursion_3.test_verify ] )
     ; ("Tree proof N4", [ test_case "verify" `Quick Tree_proof_n4.test_verify ])
+    ; ( "Mixed widths rejected"
+      , [ test_case "rejected" `Quick Mixed_widths_rejected.test_rejected ] )
     ]
