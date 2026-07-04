@@ -146,10 +146,11 @@ module Prefix_mask = struct
     open Step_impl
 
     module Checked = struct
-      type 'n t = (Boolean.var, 'n Nat.N2.plus_n) Vector.t
+      (* Indexed by the full mask width. *)
+      type 'w t = (Boolean.var, 'w) Vector.t
     end
 
-    let typ n : ('n Checked.t, proofs_verified) Typ.t =
+    let typ n : ('w Checked.t, proofs_verified) Typ.t =
       Typ.transport
         (Pickles_types.Vector.typ Boolean.typ n)
         ~there:(to_bool_vec n) ~back:of_bool_vec
@@ -159,10 +160,11 @@ module Prefix_mask = struct
     open Wrap_impl
 
     module Checked = struct
-      type 'n t = (Boolean.var, 'n Nat.N2.plus_n) Vector.t
+      (* Indexed by the full mask width. *)
+      type 'w t = (Boolean.var, 'w) Vector.t
     end
 
-    let typ n : ('n Checked.t, proofs_verified) Typ.t =
+    let typ n : ('w Checked.t, proofs_verified) Typ.t =
       Typ.transport
         (Pickles_types.Vector.wrap_typ Boolean.typ n)
         ~there:(to_bool_vec n) ~back:of_bool_vec

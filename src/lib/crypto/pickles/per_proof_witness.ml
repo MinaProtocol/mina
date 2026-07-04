@@ -68,7 +68,10 @@ type ('app_state, 'max_proofs_verified, 'num_branches) t =
       , unit
       , Digest.Make(Impl).t
       , scalar_challenge Types.Bulletproof_challenge.t Types.Step_bp_vec.t
-      , Pickles_types.Nat.z Branch_data.Checked.Step.t )
+      , ( Pickles_types.Nat.N2.n
+        , 'max_proofs_verified )
+        Pickles_types.Nat.Max_type.t
+        Branch_data.Checked.Step.t )
       Types.Wrap.Proof_state.In_circuit.t
         (** The accumulator state corresponding to the above proof. Contains
       - `deferred_values`: The values necessary for finishing the deferred "scalar field" computations.
@@ -138,6 +141,25 @@ let typ (type n avar aval) ~feature_flags ~num_chunks
     (statement : (avar, aval) Impls.Step.Typ.t) (max_proofs_verified : n Nat.t)
     =
   let module Sc = Scalar_challenge in
+  (* The proof's branch_data mask is [max (2, max_proofs_verified)] bits wide;
+     name that width as [(N2, n) Max_type.t] so it can appear in [t]'s type. *)
+  let branch_data_width : (Nat.N2.n, n) Nat.Max_type.t Nat.t =
+    let module L = Core_kernel.Type_equal.Lift (struct
+      type 'a t = 'a Nat.t
+    end) in
+    match Nat.compare Nat.N2.n max_proofs_verified with
+    | `Lte le ->
+        Core_kernel.Type_equal.conv
+          (Core_kernel.Type_equal.sym (L.lift (Nat.Max_type.le le)))
+          max_proofs_verified
+    | `Gt gt ->
+        Core_kernel.Type_equal.conv
+          (Core_kernel.Type_equal.sym
+             (L.lift
+                (Nat.Max_type.ge
+                   (Nat.gt_implies_gte Nat.N2.n max_proofs_verified gt) ) ) )
+          Nat.N2.n
+  in
   let open Impls.Step in
   let open Step_verifier in
   Impls.Step.Typ.of_hlistable ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
@@ -151,7 +173,7 @@ let typ (type n avar aval) ~feature_flags ~num_chunks
         Impls.Step.Typ.unit Digest.typ
         (Branch_data.typ
            ~assert_16_bits:(Step_verifier.assert_n_bits ~n:16)
-           Pickles_types.Nat.N2.n )
+           branch_data_width )
     ; Plonk_types.All_evals.typ ~num_chunks
         (* Assume we have lookup iff we have runtime tables *)
         feature_flags

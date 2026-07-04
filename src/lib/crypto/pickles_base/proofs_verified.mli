@@ -82,17 +82,19 @@ module Prefix_mask : sig
 
   module Step : sig
     module Checked : sig
-      type 'n t = (Step_impl.Boolean.var, 'n Nat.N2.plus_n) Vector.t
+      (** Indexed by the full mask width. *)
+      type 'w t = (Step_impl.Boolean.var, 'w) Vector.t
     end
 
-    val typ : 'n Nat.N2.plus_n Nat.t -> ('n Checked.t, t) Step_impl.Typ.t
+    val typ : 'w Nat.t -> ('w Checked.t, t) Step_impl.Typ.t
   end
 
   module Wrap : sig
     module Checked : sig
-      type 'n t = (Wrap_impl.Boolean.var, 'n Nat.N2.plus_n) Vector.t
+      (** Indexed by the full mask width. *)
+      type 'w t = (Wrap_impl.Boolean.var, 'w) Vector.t
     end
 
-    val typ : 'n Nat.N2.plus_n Nat.t -> ('n Checked.t, t) Wrap_impl.Typ.t
+    val typ : 'w Nat.t -> ('w Checked.t, t) Wrap_impl.Typ.t
   end
 end

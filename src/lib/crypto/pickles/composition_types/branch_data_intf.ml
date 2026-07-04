@@ -49,8 +49,9 @@ module type S = sig
 
       type field_var = Field.t
 
-      type 'n t =
-        { proofs_verified_mask : 'n Proofs_verified.Prefix_mask.Step.Checked.t
+      (* Indexed by the full mask width. *)
+      type 'w t =
+        { proofs_verified_mask : 'w Proofs_verified.Prefix_mask.Step.Checked.t
         ; domain_log2 : Field.t
         }
 
@@ -62,8 +63,9 @@ module type S = sig
 
       type field_var = Field.t
 
-      type 'n t =
-        { proofs_verified_mask : 'n Proofs_verified.Prefix_mask.Wrap.Checked.t
+      (* Indexed by the full mask width. *)
+      type 'w t =
+        { proofs_verified_mask : 'w Proofs_verified.Prefix_mask.Wrap.Checked.t
         ; domain_log2 : Field.t
         }
 
@@ -75,19 +77,19 @@ module type S = sig
 
   val typ :
        assert_16_bits:(Impls.Step_impl.Field.t -> unit)
-    -> 'n Nat.s Nat.s Nat.t
-    -> ('n Checked.Step.t, t) Impls.Step_impl.Typ.t
+    -> 'w Nat.t
+    -> ('w Checked.Step.t, t) Impls.Step_impl.Typ.t
 
   val wrap_typ :
        assert_16_bits:(Impls.Wrap_impl.Field.t -> unit)
-    -> 'n Nat.s Nat.s Nat.t
-    -> ('n Checked.Wrap.t, t) Impls.Wrap_impl.Typ.t
+    -> 'w Nat.t
+    -> ('w Checked.Wrap.t, t) Impls.Wrap_impl.Typ.t
 
   val packed_typ :
-    'n Nat.s Nat.s Nat.t -> (Impls.Step_impl.Field.t, t) Impls.Step_impl.Typ.t
+    'w Nat.t -> (Impls.Step_impl.Field.t, t) Impls.Step_impl.Typ.t
 
   val wrap_packed_typ :
-    'n Nat.s Nat.s Nat.t -> (Impls.Wrap_impl.Field.t, t) Impls.Wrap_impl.Typ.t
+    'w Nat.t -> (Impls.Wrap_impl.Field.t, t) Impls.Wrap_impl.Typ.t
 
   val length_in_bits : _ Nat.t -> int
 

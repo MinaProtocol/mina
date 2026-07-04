@@ -86,7 +86,8 @@ module Make_str (A : Wire_types.Concrete) = struct
   (* [n] is the width of the proofs-verified prefix mask. The packed layout is
      the low 2 mask bits, then 8 bits of [domain_log2], then any remaining mask
      bits, so the total is [n + 8] bits. *)
-  let length_in_bits (n : _ Pickles_types.Nat.t) = Pickles_types.Nat.to_int n + 8
+  let length_in_bits (n : _ Pickles_types.Nat.t) =
+    Pickles_types.Nat.to_int n + 8
 
   let pack (type f)
       (module Impl : Snarky_backendless.Snark_intf.Run with type field = f) n
@@ -95,14 +96,20 @@ module Make_str (A : Wire_types.Concrete) = struct
     let double x = x + x in
     let times4 x = double (double x) in
     let domain_log2 = of_int (Char.to_int domain_log2) in
-    let (x0 :: x1 :: proofs_verified_rest) =
-      Proofs_verified.to_bool_vec n
-        (Proofs_verified.of_stable_v2 proofs_verified)
-    in
-    (* shift domain_log2 over by 2 bits (multiply by 4) *)
-    (of_int 1024 * project (Pickles_types.Vector.to_list proofs_verified_rest))
-    + times4 domain_log2
-    + project [ x0; x1 ]
+    (* The mask is at least 2 bits wide; split off the low 2 bits at the value
+       level so the width may be an abstract [Nat.Max_type.t]. *)
+    match
+      Pickles_types.Vector.to_list
+        (Proofs_verified.to_bool_vec n
+           (Proofs_verified.of_stable_v2 proofs_verified) )
+    with
+    | x0 :: x1 :: proofs_verified_rest ->
+        (* shift domain_log2 over by 2 bits (multiply by 4) *)
+        (of_int 1024 * project proofs_verified_rest)
+        + times4 domain_log2
+        + project [ x0; x1 ]
+    | _ ->
+        assert false
 
   let unpack (type f)
       (module Impl : Snarky_backendless.Snark_intf.Run with type field = f) n
@@ -113,15 +120,13 @@ module Make_str (A : Wire_types.Concrete) = struct
       :: x1
          :: y0 :: y1 :: y2 :: y3 :: y4 :: y5 :: y6 :: y7 :: proofs_verified_rest
       ->
-        let (Nat.S (Nat.S n_sub_2)) = n in
-        let proofs_verified_rest =
-          Vector.of_list_and_length_exn
-            (List.take proofs_verified_rest (Nat.to_int n_sub_2))
-            n_sub_2
+        (* The full mask is [Nat.to_int n] bits wide (>= 2). *)
+        let mask_bits =
+          x0 :: x1 :: List.take proofs_verified_rest (Nat.to_int n - 2)
         in
+        let mask = Vector.of_list_and_length_exn mask_bits n in
         { proofs_verified =
-            Proofs_verified.to_stable_v2
-              (Proofs_verified.of_bool_vec (x0 :: x1 :: proofs_verified_rest))
+            Proofs_verified.to_stable_v2 (Proofs_verified.of_bool_vec mask)
         ; domain_log2 =
             Domain_log2.of_bits_msb [ y7; y6; y5; y4; y3; y2; y1; y0 ]
         }
@@ -136,18 +141,21 @@ module Make_str (A : Wire_types.Concrete) = struct
 
       type field_var = Field.t
 
-      type 'n t =
-        { proofs_verified_mask : 'n Proofs_verified.Prefix_mask.Step.Checked.t
+      type 'w t =
+        { proofs_verified_mask : 'w Proofs_verified.Prefix_mask.Step.Checked.t
         ; domain_log2 : Field.t
         }
       [@@deriving hlist]
 
       let pack ({ proofs_verified_mask; domain_log2 } : _ t) : Field.t =
         let open Field in
-        let (x0 :: x1 :: rest) = proofs_verified_mask in
-        (of_int 1024 * pack (Pickles_types.Vector.to_list rest))
-        + (of_int 4 * domain_log2)
-        + pack [ x0; x1 ]
+        match Pickles_types.Vector.to_list proofs_verified_mask with
+        | x0 :: x1 :: rest ->
+            (of_int 1024 * pack rest)
+            + (of_int 4 * domain_log2)
+            + pack [ x0; x1 ]
+        | _ ->
+            assert false
     end
 
     module Wrap = struct
@@ -155,18 +163,21 @@ module Make_str (A : Wire_types.Concrete) = struct
 
       type field_var = Field.t
 
-      type 'n t =
-        { proofs_verified_mask : 'n Proofs_verified.Prefix_mask.Wrap.Checked.t
+      type 'w t =
+        { proofs_verified_mask : 'w Proofs_verified.Prefix_mask.Wrap.Checked.t
         ; domain_log2 : Field.t
         }
       [@@deriving hlist]
 
       let pack ({ proofs_verified_mask; domain_log2 } : _ t) : Field.t =
         let open Field in
-        let (x0 :: x1 :: rest) = proofs_verified_mask in
-        (of_int 1024 * pack (Pickles_types.Vector.to_list rest))
-        + (of_int 4 * domain_log2)
-        + pack [ x0; x1 ]
+        match Pickles_types.Vector.to_list proofs_verified_mask with
+        | x0 :: x1 :: rest ->
+            (of_int 1024 * pack rest)
+            + (of_int 4 * domain_log2)
+            + pack [ x0; x1 ]
+        | _ ->
+            assert false
     end
   end
 

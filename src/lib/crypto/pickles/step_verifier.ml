@@ -543,9 +543,7 @@ struct
            from all previous proofs. Absorbing them into the transcript binds
            this proof to its predecessors. Padded to a fixed length to support
            variable numbers of previous proofs. *)
-        let sg_old : (_, Wrap_hack.Padded_length.n) Vector.t =
-          Wrap_hack.Checked.pad_commitments sg_old
-        in
+        let sg_old = Wrap_hack.Checked.pad_commitments sg_old in
         Vector.iter ~f:(absorb sponge PC) sg_old ;
         (* == IVC Step 3: Compute public input commitment (x_hat) ==
            Compute the commitment to the public input polynomial using
@@ -644,9 +642,27 @@ struct
         let bulletproof_challenges =
           let num_commitments_without_degree_bound = Nat.N45.n in
           (* Collect all polynomial commitments for the IPA *)
+          let sg_old_commitments = Vector.map sg_old ~f:(fun g -> [| g |]) in
+          (* [sg_old] is padded to [max (2, proofs_verified)]; build the append
+             witness from its actual length rather than a fixed [Padded_length]. *)
+          let (module Sg_old_length) =
+            Nat.Add.create (Vector.length sg_old_commitments)
+          in
+          let sg_old_add_witness =
+            let sum, adds =
+              Sg_old_length.add num_commitments_without_degree_bound
+            in
+            let module La = Core_kernel.Type_equal.Lift (struct
+              type 'a t =
+                ('a, Nat.N45.n, Nat.N45.n Sg_old_length.plus_n) Nat.Adds.t
+            end) in
+            ignore sum ;
+            Core_kernel.Type_equal.conv
+              (Core_kernel.Type_equal.sym (La.lift Sg_old_length.eq))
+              adds
+          in
           let without_degree_bound =
-            Vector.append
-              (Vector.map sg_old ~f:(fun g -> [| g |]))
+            Vector.append sg_old_commitments
               ( [| x_hat |] :: [| ft_comm |] :: z_comm :: m.generic_comm
               :: m.psm_comm :: m.complete_add_comm :: m.mul_comm :: m.emul_comm
               :: m.endomul_scalar_comm
@@ -656,9 +672,7 @@ struct
                    (snd
                       Plonk_types.(
                         Columns.add (fst (Columns.add Permuts_minus_1.n))) ) )
-              (snd
-                 (Wrap_hack.Padded_length.add
-                    num_commitments_without_degree_bound ) )
+              sg_old_add_witness
           in
           with_label "check_bulletproof" (fun () ->
               check_bulletproof ~sponge:sponge_before_evaluations ~xi ~advice

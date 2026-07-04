@@ -47,7 +47,7 @@ module Checked : sig
   val pad_commitments :
        (Impls.Step.Field.t Tuple_lib.Double.t, 'a) Pickles_types.Vector.t
     -> ( Impls.Step.Field.t Tuple_lib.Double.t
-       , Pickles_types.Nat.z Padded_length.plus_n )
+       , (Padded_length.n, 'a) Pickles_types.Nat.Max_type.t )
        Pickles_types.Vector.t
 
   val dummy_messages_for_next_wrap_proof_sponge_states :

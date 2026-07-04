@@ -95,12 +95,34 @@ module Checked = struct
            (Lazy.force Dummy.Ipa.Wrap.challenges_computed) )
       chalss
 
-  let pad_commitments (commitments : _ Vector.t) =
-    pad_vector
-      ~dummy:
-        (Tuple_lib.Double.map ~f:Impls.Step.Field.constant
-           (Lazy.force Dummy.Ipa.Wrap.sg) )
-      commitments
+  (* Pad (at the front) up to [max (2, n)] dummy commitments, to match the
+     accumulator width of the proof being verified. The padded width is named
+     [(Padded_length.n, n) Max_type.t] so it does not escape as an existential. *)
+  let pad_commitments (type n) (commitments : (_, n) Vector.t) :
+      (_, (Padded_length.n, n) Nat.Max_type.t) Vector.t =
+    let dummy =
+      Tuple_lib.Double.map ~f:Impls.Step.Field.constant
+        (Lazy.force Dummy.Ipa.Wrap.sg)
+    in
+    let module L = Core_kernel.Type_equal.Lift (struct
+      type 'a t = (Impls.Step.Field.t Tuple_lib.Double.t, 'a) Vector.t
+    end) in
+    match Nat.compare Padded_length.n (Vector.length commitments) with
+    | `Lte le ->
+        Core_kernel.Type_equal.conv
+          (Core_kernel.Type_equal.sym (L.lift (Nat.Max_type.le le)))
+          (Vector.extend_front_exn commitments
+             (Vector.length commitments)
+             dummy )
+    | `Gt gt ->
+        Core_kernel.Type_equal.conv
+          (Core_kernel.Type_equal.sym
+             (L.lift
+                (Nat.Max_type.ge
+                   (Nat.gt_implies_gte Padded_length.n
+                      (Vector.length commitments)
+                      gt ) ) ) )
+          (Vector.extend_front_exn commitments Padded_length.n dummy)
 
   (* We precompute the sponge states that would result from absorbing
      0, 1, or 2 dummy challenge vectors. This is used to speed up hashing
