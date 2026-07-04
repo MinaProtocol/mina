@@ -57,8 +57,7 @@ end
 module Max = struct
   (* The larger of [a] and [b], together with witnesses that both are at most
      it. *)
-  type ('a, 'b) t =
-    | T : 'c nat * ('a, 'c) Lte.t * ('b, 'c) Lte.t -> ('a, 'b) t
+  type ('a, 'b) t = T : 'c nat * ('a, 'c) Lte.t * ('b, 'c) Lte.t -> ('a, 'b) t
 end
 
 let rec max : type a b. a nat -> b nat -> (a, b) Max.t =
@@ -71,6 +70,22 @@ let rec max : type a b. a nat -> b nat -> (a, b) Max.t =
   | S a, S b ->
       let (Max.T (c, la, lb)) = max a b in
       Max.T (S c, Lte.S la, Lte.S lb)
+
+module Max_type = struct
+  (* [(a, b) t] is the type-level maximum of [a] and [b]. It is abstract:
+     [le]/[ge] reveal it as [b] (resp. [a]) given a proof that [a <= b] (resp.
+     [b <= a]). This lets the maximum be named as a function of its arguments,
+     rather than escaping as an existential. *)
+  type (_, _) t
+
+  let le (type a b) (_ : (a, b) Lte.t) : ((a, b) t, b) Core_kernel.Type_equal.t
+      =
+    Obj.magic Core_kernel.Type_equal.T
+
+  let ge (type a b) (_ : (b, a) Lte.t) : ((a, b) t, a) Core_kernel.Type_equal.t
+      =
+    Obj.magic Core_kernel.Type_equal.T
+end
 
 module N0 = struct
   type 'a plus_n = 'a

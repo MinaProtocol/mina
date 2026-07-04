@@ -40,11 +40,23 @@ end
 module Max : sig
   (** The larger of two type-level naturals, with witnesses that both are at
       most it. *)
-  type ('a, 'b) t =
-    | T : 'c nat * ('a, 'c) Lte.t * ('b, 'c) Lte.t -> ('a, 'b) t
+  type ('a, 'b) t = T : 'c nat * ('a, 'c) Lte.t * ('b, 'c) Lte.t -> ('a, 'b) t
 end
 
 val max : 'a nat -> 'b nat -> ('a, 'b) Max.t
+
+module Max_type : sig
+  (** [('a, 'b) t] is the type-level maximum of ['a] and ['b], as an abstract
+      type nameable purely from ['a] and ['b] (no existential). Use [le]/[ge]
+      to reveal it once the ordering is known. *)
+  type (_, _) t
+
+  (** Given ['a <= 'b], the maximum is ['b]. *)
+  val le : ('a, 'b) Lte.t -> (('a, 'b) t, 'b) Core_kernel.Type_equal.t
+
+  (** Given ['b <= 'a], the maximum is ['a]. *)
+  val ge : ('b, 'a) Lte.t -> (('a, 'b) t, 'a) Core_kernel.Type_equal.t
+end
 
 module Add : sig
   module type Intf = sig
