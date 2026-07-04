@@ -2,7 +2,7 @@
 
 # Installs the coinbase rosetta-cli binary (with mina's stake-delegation patch)
 # into /usr/local/bin/rosetta-cli on the host. Mirrors the install steps from
-# dockerfiles/Dockerfile-mina-rosetta.
+# dockerfiles/stages/rosetta/1-base-deps.
 #
 # Idempotent: skips if rosetta-cli is already installed.
 

@@ -424,7 +424,7 @@ check-bash: ## Run shellcheck on bash scripts
 .PHONY: check-docker
 check-docker: ## Run hadolint on Docker files
 ifdef BUILDKITE
-	hadolint --ignore DL3008 --ignore DL3002 --ignore DL3013 --ignore DL3007 --ignore DL3006 --ignore DL3028 dockerfiles/Dockerfile-* dockerfiles/toolchain/*
+	hadolint --ignore DL3008 --ignore DL3002 --ignore DL3013 --ignore DL3007 --ignore DL3006 --ignore DL3028 dockerfiles/Dockerfile-* dockerfiles/toolchain/* dockerfiles/stages/1-base-deps dockerfiles/stages/daemon/* dockerfiles/stages/archive/* dockerfiles/stages/rosetta/*
 else
 	docker run --rm -v $(PWD):/workspace -w /workspace \
 		hadolint/hadolint hadolint \
@@ -435,7 +435,11 @@ else
 		--ignore DL3006 \
 		--ignore DL3028 \
 		dockerfiles/Dockerfile-* \
-		dockerfiles/toolchain/*
+		dockerfiles/toolchain/* \
+		dockerfiles/stages/1-base-deps \
+		dockerfiles/stages/daemon/* \
+		dockerfiles/stages/archive/* \
+		dockerfiles/stages/rosetta/*
 endif
 
 ########################################
