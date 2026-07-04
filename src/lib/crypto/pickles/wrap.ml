@@ -256,7 +256,7 @@ module For_tests_only = struct
                   | S (S Z) ->
                       N2
                   | S _ ->
-                      assert false )
+                      N_other (Nat.to_int actual_proofs_verified) )
             ; domain_log2 =
                 Branch_data.Domain_log2.of_int_exn
                   step_vk.domain.log_size_of_group
