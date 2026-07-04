@@ -239,6 +239,31 @@ let rec gt_implies_gte : type n m.
   | S n, S m ->
       S (gt_implies_gte n m (fun pi -> not_lte (S pi)))
 
+module Max_type = struct
+  (* [(a, b) t] is the type-level maximum of [a] and [b]. It is abstract:
+     [le]/[ge] reveal it as [b] (resp. [a]) given a proof that [a <= b] (resp.
+     [b <= a]). This lets the maximum be named as a function of its arguments,
+     rather than escaping as an existential. *)
+  type (_, _) t
+
+  let le (type a b) (_ : (a, b) Lte.t) : ((a, b) t, b) Core.Type_equal.t =
+    Obj.magic Core.Type_equal.T
+
+  let ge (type a b) (_ : (b, a) Lte.t) : ((a, b) t, a) Core.Type_equal.t =
+    Obj.magic Core.Type_equal.T
+
+  (* [max a b] as a natural indexed by [(a, b) t]. *)
+  let nat (type a b) (a : a nat) (b : b nat) : (a, b) t nat =
+    let module L = Core.Type_equal.Lift (struct
+      type 'n t = 'n nat
+    end) in
+    match compare a b with
+    | `Lte a_le_b ->
+        Core.Type_equal.(conv (sym (L.lift (le a_le_b)))) b
+    | `Gt gt ->
+        Core.Type_equal.(conv (sym (L.lift (ge (gt_implies_gte a b gt))))) a
+end
+
 let rec eq : type n m.
        n nat
     -> m nat
