@@ -24,8 +24,10 @@ let tick_shifts, tock_shifts =
 
 let wrap_domains ~proofs_verified =
   let h =
-    (* 15 is the largest wrap domain we support without chunking; it is enough
-       for 3, 4 and possibly 5 proofs verified, which all fall through here. *)
+    (* 15 is the largest wrap domain we support without chunking (the wrap IPA
+       has [Backend.Tock.Rounds.Wrap = Nat.N15] rounds). It is enough for up to
+       6 proofs verified, which all fall through here; 7+ would need a domain of
+       16, i.e. chunking. *)
     match proofs_verified with 0 -> 13 | 1 -> 14 | _ -> 15
   in
   { Domains.h = Domain.Pow_2_roots_of_unity h }
