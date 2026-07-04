@@ -88,6 +88,7 @@ while [[ "$#" -gt 0 ]]; do case $1 in
       # shellcheck disable=SC2034
       DEB_REPO_KEY="$2"; shift;;
   --custom-arg) CUSTOM_ARG="$2"; shift;;
+  --docker-target) INPUT_DOCKER_TARGET="$2"; shift;;
   *) echo "Unknown parameter passed: $1"; exit 1;;
 esac; shift; done
 
@@ -243,14 +244,36 @@ CUSTOM_ARG=${CUSTOM_ARG:-""}
 # (per-network generic). Set per-service below.
 GENERIC_NETWORK_SEG=""
 
+# Target stage to stop at for staged (multi-fragment) Dockerfiles. Each staged
+# service sets a sensible default below; --docker-target overrides it. Empty
+# means "build the final stage" (no --target passed to buildx).
+DOCKER_TARGET="${INPUT_DOCKER_TARGET:-}"
+
 case "${SERVICE}" in
+    mina-base)
+        # Build ONLY the shared, mina-unrelated common base layer. This image is
+        # published to docker.io as a reference image and saved/loaded via the CI cache.
+        TEMP_DOCKERFILE=$(mktemp /tmp/Dockerfile-mina-base.XXXXXX)
+        cat dockerfiles/stages/1-base-deps > "$TEMP_DOCKERFILE"
+        DOCKERFILE_PATH="$TEMP_DOCKERFILE"
+        DOCKER_TARGET="${INPUT_DOCKER_TARGET:-base-deps}"
+        ;;
     mina-archive)
-        DOCKERFILE_PATH="dockerfiles/Dockerfile-mina-archive"
+        # Staged build: shared base-deps + archive-specific stage.
+        TEMP_DOCKERFILE=$(mktemp /tmp/Dockerfile-mina-archive.XXXXXX)
+        cat dockerfiles/stages/1-base-deps dockerfiles/stages/archive/2-mina-archive > "$TEMP_DOCKERFILE"
+        DOCKERFILE_PATH="$TEMP_DOCKERFILE"
+        DOCKER_TARGET="${INPUT_DOCKER_TARGET:-mina-archive}"
         ;;
     mina-daemon)
-        DOCKERFILE_PATH="dockerfiles/Dockerfile-mina-daemon"
-        # The generic daemon is network-agnostic: publish it as a SINGLE image
-        # tagged "<version>-generic" with no network segment.
+        # Staged build: shared base-deps + daemon stage + opt-in prefork-genesis stage.
+        # Default target is the daemon stage (the CONFIGLESS generic daemon, tagged
+        # "<version>-generic" with no network segment); the prefork-genesis layer is
+        # opt-in via --docker-target mina-daemon-prefork-genesis.
+        TEMP_DOCKERFILE=$(mktemp /tmp/Dockerfile-mina-daemon.XXXXXX)
+        cat dockerfiles/stages/1-base-deps dockerfiles/stages/daemon/2-mina-daemon dockerfiles/stages/daemon/3-prefork-genesis > "$TEMP_DOCKERFILE"
+        DOCKERFILE_PATH="$TEMP_DOCKERFILE"
+        DOCKER_TARGET="${INPUT_DOCKER_TARGET:-mina-daemon}"
         export NETWORKLESS_TAG=1
         ;;
     mina-daemon-configured)
@@ -273,7 +296,12 @@ case "${SERVICE}" in
         export PROFILED_TAG=1
         ;;
     mina-daemon-legacy-hardfork)
-        DOCKERFILE_PATH="dockerfiles/Dockerfile-mina-daemon"
+        # Same staged daemon assembly as mina-daemon, but the legacy-hardfork image
+        # needs the prefork-genesis layer, so default to that (opt-in) stage.
+        TEMP_DOCKERFILE=$(mktemp /tmp/Dockerfile-mina-daemon-legacy.XXXXXX)
+        cat dockerfiles/stages/1-base-deps dockerfiles/stages/daemon/2-mina-daemon dockerfiles/stages/daemon/3-prefork-genesis > "$TEMP_DOCKERFILE"
+        DOCKERFILE_PATH="$TEMP_DOCKERFILE"
+        DOCKER_TARGET="${INPUT_DOCKER_TARGET:-mina-daemon-prefork-genesis}"
         ;;
     mina-daemon-auto-hardfork)
         if [[ -z "$INPUT_LEGACY_VERSION" ]]; then
@@ -290,7 +318,11 @@ case "${SERVICE}" in
         DOCKERFILE_PATH="$TEMP_DOCKERFILE"
         ;;
     mina-rosetta)
-        DOCKERFILE_PATH="dockerfiles/Dockerfile-mina-rosetta"
+        # Staged build: rosetta's own heavy base + mina-rosetta stage.
+        TEMP_DOCKERFILE=$(mktemp /tmp/Dockerfile-mina-rosetta.XXXXXX)
+        cat dockerfiles/stages/rosetta/1-base-deps dockerfiles/stages/rosetta/2-mina-rosetta > "$TEMP_DOCKERFILE"
+        DOCKERFILE_PATH="$TEMP_DOCKERFILE"
+        DOCKER_TARGET="${INPUT_DOCKER_TARGET:-mina-rosetta}"
         ;;
     mina-rosetta-configured)
         DOCKERFILE_PATH="dockerfiles/Dockerfile-install-config"
@@ -374,7 +406,12 @@ fi
 
 BUILD_NETWORK="--allow=network.host"
 
-docker buildx build --load --network=host --progress=plain $PLATFORM $DOCKER_REPO_ARG $NO_CACHE $BUILD_NETWORK $CACHE $NETWORK $IMAGE $DEB_CODENAME $DEB_RELEASE $DEB_VERSION --build-arg deb_profile="$DEB_PROFILE" --build-arg generic_network="$GENERIC_NETWORK_SEG" $DOCKER_DEB_SUFFIX_ARG $BUILD_FLAGS_SUFFIX_ARG $DEB_REPO $APT_CACHE_ARG $BRANCH $REPO $LEGACY_VERSION $CUSTOM_SUFFIX_ARG $CUSTOM_ARG $DEB_ARCH $IMAGE_NAME_ARG $VERSION_ARG "$DOCKER_CONTEXT" -t "$TAG" -f $DOCKERFILE_PATH
+TARGET_ARG=""
+if [[ -n "${DOCKER_TARGET:-}" ]]; then
+  TARGET_ARG="--target ${DOCKER_TARGET}"
+fi
+
+docker buildx build --load --network=host --progress=plain $PLATFORM $TARGET_ARG $DOCKER_REPO_ARG $NO_CACHE $BUILD_NETWORK $CACHE $NETWORK $IMAGE $DEB_CODENAME $DEB_RELEASE $DEB_VERSION --build-arg deb_profile="$DEB_PROFILE" --build-arg generic_network="$GENERIC_NETWORK_SEG" $DOCKER_DEB_SUFFIX_ARG $BUILD_FLAGS_SUFFIX_ARG $DEB_REPO $APT_CACHE_ARG $BRANCH $REPO $LEGACY_VERSION $CUSTOM_SUFFIX_ARG $CUSTOM_ARG $DEB_ARCH $IMAGE_NAME_ARG $VERSION_ARG "$DOCKER_CONTEXT" -t "$TAG" -t "$HASHTAG" -f $DOCKERFILE_PATH
 
 docker tag "$TAG" "$HASHTAG"
 
@@ -387,7 +424,7 @@ if [[ -n "${SAVE_TO_CI_CACHE_ROOT:-}" ]]; then
     if command -v apt-get >/dev/null 2>&1; then
       ${SUDO:-sudo} apt-get update -qq
       ${SUDO:-sudo} apt-get install -y --no-install-recommends zstd
-    else
+    els
       echo "ERROR: zstd missing and no apt-get available to install it"
       exit 1
     fi

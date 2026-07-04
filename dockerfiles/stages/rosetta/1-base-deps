@@ -1,0 +1,73 @@
+#################################################################################################
+# The rosetta "base-deps" stage
+# - Rosetta's own heavy, mina-UNRELATED base layer. Kept separate from the shared
+#   dockerfiles/stages/1-base-deps because rosetta uses ubuntu:focal, its own broad apt
+#   dependency list, and postgresql-15 from the pgdg archive (none of which the daemon/archive
+#   base needs). Rosetta is built for every codename like daemon/archive; the separate base
+#   exists because of its heavy rosetta-specific toolchain, not the distro.
+# - rosetta-cli and the Go toolchain that builds it are intentionally NOT installed here: they
+#   are test-only (the rosetta integration test builds its own copy via
+#   buildkite/scripts/tests/rosetta/install-cli.sh) and have no role in the production runtime.
+#################################################################################################
+ARG image=europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/ubuntu:focal
+FROM ${image} AS rosetta-base
+ARG deb_codename=focal
+ARG deb_repo="http://packages.o1test.net"
+ARG apt_cache_url=""
+
+ARG psql_version=15
+
+ENV DEBIAN_FRONTEND noninteractive
+
+# Optional: configure APT caching proxy (bypass proxy for deb_repo)
+COPY scripts/configure-apt-proxy.sh /usr/local/bin/configure-apt-proxy.sh
+RUN chmod +x /usr/local/bin/configure-apt-proxy.sh \
+  && /usr/local/bin/configure-apt-proxy.sh "$apt_cache_url" "$deb_repo"
+
+# Install ca-certificates using HTTP
+RUN apt-get update --quiet --yes \
+  && apt-get install --quiet --yes --no-install-recommends ca-certificates \
+  && rm -rf /var/lib/apt/lists/*
+
+# Switch to HTTPS
+RUN if [ -f /etc/apt/sources.list ]; then \
+  sed -i 's/http:\/\//https:\/\//g' /etc/apt/sources.list; \
+else \
+  sed -i 's/http:\/\//https:\/\//g' /etc/apt/sources.list.d/debian.sources; \
+fi
+
+# --- Dependencies across many platforms
+RUN apt-get update --quiet --yes \
+    && apt-get upgrade --quiet --yes \
+    && apt-get install --quiet --yes --no-install-recommends \
+    apt-utils \
+    apt-transport-https \
+    bc \
+    curl \
+    build-essential \
+    dnsutils \
+    dumb-init \
+    gettext \
+    gnupg2 \
+    libgmp10 \
+    libgomp1 \
+    tzdata \
+    jq \
+    git \
+    sudo \
+    procps \
+    && rm -rf /var/lib/apt/lists/*
+
+# --- Install Postgresql
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+RUN curl -s https://www.postgresql.org/media/keys/ACCC4CF8.asc | apt-key add - \
+    && echo deb https://apt-archive.postgresql.org/pub/repos/apt/ "$deb_codename"-pgdg-archive main | tee /etc/apt/sources.list.d/pgdg.list \
+    && apt-get update -y \
+    && apt-get install --no-install-recommends -y \
+    postgresql-"$psql_version" \
+    postgresql-client-"$psql_version" \
+    && rm -rf /var/lib/apt/lists/*
+
+# --- Generate en_US.UTF-8 locale to allow use of O(1) Labs DB dumps
+RUN sed -i -e 's/# en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' /etc/locale.gen \
+    && locale-gen
