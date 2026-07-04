@@ -154,7 +154,8 @@ let reconstruct_wrap_vk ~proofs_verified
   let log2_size = Import.Domain.log2_size d in
   let public =
     let (T (input, _conv, _conv_inv)) =
-      Impls.Wrap.input ~feature_flags:Plonk_types.Features.Full.maybe ()
+      Impls.Wrap.input ~branch_data_width:Nat.N2.n
+        ~feature_flags:Plonk_types.Features.Full.maybe ()
     in
     let (Typ typ) = input in
     typ.size_in_field_elements
@@ -384,7 +385,8 @@ let dummy_wrap_vk :
      let log2_size = Import.Domain.log2_size d in
      let public =
        let (T (input, _conv, _conv_inv)) =
-         Impls.Wrap.input ~feature_flags:Plonk_types.Features.Full.maybe ()
+         Impls.Wrap.input ~branch_data_width:Nat.N2.n
+           ~feature_flags:Plonk_types.Features.Full.maybe ()
        in
        let (Typ typ) = input in
        typ.size_in_field_elements

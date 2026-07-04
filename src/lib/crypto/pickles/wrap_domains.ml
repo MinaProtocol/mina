@@ -47,9 +47,16 @@ struct
     in
     Timer.clock __LOC__ ;
     let%bind.Promise main = Lazy.force main in
+    let (Nat.Max.T (branch_data_width, branch_data_width_ge_2, _)) =
+      Nat.max Nat.N2.n (Nat.Add.n max_proofs_verified)
+    in
+    let wrap_input =
+      match branch_data_width_ge_2 with
+      | Nat.Lte.S (Nat.Lte.S _) ->
+          Impls.Wrap.input ~branch_data_width ~feature_flags ()
+    in
     let t =
-      Fix_domains.wrap_domains
-        (Impls.Wrap.input ~feature_flags ())
+      Fix_domains.wrap_domains wrap_input
         (T (Impls.Wrap.Typ.unit, Fn.id, Fn.id))
         (fun input -> Promise.return (main input))
     in

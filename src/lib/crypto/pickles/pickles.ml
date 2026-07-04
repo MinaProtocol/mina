@@ -738,7 +738,9 @@ module Make_str (_ : Wire_types.Concrete) = struct
           in
           let (wrap_pk, wrap_vk), disk_key =
             let open Impls.Wrap in
-            let (T (typ, conv, _conv_inv)) = input ~feature_flags () in
+            let (T (typ, conv, _conv_inv)) =
+              input ~branch_data_width:Nat.N2.n ~feature_flags ()
+            in
             let main x () : unit = wrap_main (conv x) in
             let self_id = Type_equal.Id.uid self.id in
             let disk_key_prover =
@@ -1219,7 +1221,8 @@ module Make_str (_ : Wire_types.Concrete) = struct
                     in
                     let%map.Promise next_proof =
                       let (T (input, conv, _conv_inv)) =
-                        Impls.Wrap.input ~feature_flags ()
+                        Impls.Wrap.input ~branch_data_width:Nat.N2.n
+                          ~feature_flags ()
                       in
                       Common.time "wrap proof" (fun () ->
                           Impls.Wrap.generate_witness_conv

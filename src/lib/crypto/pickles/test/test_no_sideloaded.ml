@@ -524,6 +524,90 @@ module Auxiliary_return = struct
            Proof.verify_promise [ (input, proof) ] ) )
 end
 
+(* Probe: exercise [compile] with a maximum of 3 proofs verified, to start
+   unwinding the hard-coded maximum of 2. The branch verifies three
+   (base-case) [No_recursion] proofs. *)
+module Tree_proof_n3 = struct
+  type _ Snarky_backendless.Request.t +=
+    | Proof0 : Pickles_types.Nat.N0.n Proof.t Snarky_backendless.Request.t
+    | Proof1 : Pickles_types.Nat.N0.n Proof.t Snarky_backendless.Request.t
+    | Proof2 : Pickles_types.Nat.N0.n Proof.t Snarky_backendless.Request.t
+
+  let handler (p0 : _ Proof.t) (p1 : _ Proof.t) (p2 : _ Proof.t)
+      (Snarky_backendless.Request.With { request; respond }) =
+    match request with
+    | Proof0 ->
+        respond (Provide p0)
+    | Proof1 ->
+        respond (Provide p1)
+    | Proof2 ->
+        respond (Provide p2)
+    | _ ->
+        respond Unhandled
+
+  let _tag, _, p, Provers.[ step ] =
+    Common.time "compile" (fun () ->
+        compile_promise () ~public_input:(Input Field.typ)
+          ~auxiliary_typ:Typ.unit
+          ~max_proofs_verified:(module Pickles_types.Nat.N3)
+          ~name:"tree-proof-n3"
+          ~choices:(fun ~self:_ ->
+            [ { identifier = "main"
+              ; feature_flags = Pickles_types.Plonk_types.Features.none_bool
+              ; prevs = [ No_recursion.tag; No_recursion.tag; No_recursion.tag ]
+              ; main =
+                  (fun { public_input = _self } ->
+                    dummy_constraints () ;
+                    let proof0 =
+                      exists (Typ.prover_value ()) ~request:(fun () -> Proof0)
+                    in
+                    let proof1 =
+                      exists (Typ.prover_value ()) ~request:(fun () -> Proof1)
+                    in
+                    let proof2 =
+                      exists (Typ.prover_value ()) ~request:(fun () -> Proof2)
+                    in
+                    Promise.return
+                      { Inductive_rule.previous_proof_statements =
+                          [ { public_input = Field.zero
+                            ; proof = proof0
+                            ; proof_must_verify = Boolean.true_
+                            }
+                          ; { public_input = Field.zero
+                            ; proof = proof1
+                            ; proof_must_verify = Boolean.true_
+                            }
+                          ; { public_input = Field.zero
+                            ; proof = proof2
+                            ; proof_must_verify = Boolean.true_
+                            }
+                          ]
+                      ; public_output = ()
+                      ; auxiliary_output = ()
+                      } )
+              }
+            ] ) )
+
+  module Proof = (val p)
+
+  let example =
+    let _, no_proof = No_recursion.example in
+    let (), (), b0 =
+      Common.time "tree n3 b0" (fun () ->
+          Promise.block_on_async_exn (fun () ->
+              step
+                ~handler:(handler no_proof no_proof no_proof)
+                Field.Constant.zero ) )
+    in
+    (Field.Constant.zero, b0)
+
+  let test_verify () =
+    let input, proof = example in
+    Or_error.ok_exn
+      (Promise.block_on_async_exn (fun () ->
+           Proof.verify_promise [ (input, proof) ] ) )
+end
+
 let () =
   let open Alcotest in
   run "Pickles no sideloaded"
@@ -539,4 +623,6 @@ let () =
       , [ test_case "verify" `Quick Add_one_return.test_verify ] )
     ; ( "Auxiliary return"
       , [ test_case "verify" `Quick Auxiliary_return.test_verify ] )
+    ; ( "Tree proof N3"
+      , [ test_case "verify" `Quick Tree_proof_n3.test_verify ] )
     ]

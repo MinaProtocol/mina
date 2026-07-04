@@ -669,7 +669,14 @@ struct
       let disk_key_prover =
         lazy
           (let%map.Promise wrap_main = Lazy.force wrap_main in
-           let (T (typ, conv, _conv_inv)) = input ~feature_flags () in
+           let (Nat.Max.T (branch_data_width, branch_data_width_ge_2, _)) =
+             Nat.max Nat.N2.n Max_proofs_verified.n
+           in
+           let (T (typ, conv, _conv_inv)) =
+             match branch_data_width_ge_2 with
+             | Nat.Lte.S (Nat.Lte.S _) ->
+                 input ~branch_data_width ~feature_flags ()
+           in
            let main x () = wrap_main (conv x) in
            let cs =
              constraint_system ~input_typ:typ ~return_typ:Impls.Wrap.Typ.unit

@@ -209,6 +209,7 @@ let verify_heterogenous (ts : Instance.t list) =
         in
         let input =
           tock_unpadded_public_input_of_statement
+            ~max_proofs_verified:Max_proofs_verified.n
             ~feature_flags:Plonk_types.Features.Full.maybe prepared_statement
         in
         let message =

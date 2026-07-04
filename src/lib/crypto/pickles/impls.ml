@@ -226,7 +226,7 @@ module Wrap = struct
       Typ { typ_unchecked with check }
   end
 
-  let input
+  let input ~branch_data_width
       ~feature_flags:
         ({ Plonk_types.Features.Full.uses_lookups; _ } as feature_flags) () =
     let feature_flags = Plonk_types.Features.of_full feature_flags in
@@ -258,7 +258,7 @@ module Wrap = struct
     in
     let open Types.Wrap.Statement in
     let (T (typ, f, f_inv)) =
-      Spec.wrap_packed_typ ~branch_data_width:Nat.N2.n
+      Spec.wrap_packed_typ ~branch_data_width
         (T
            ( Shifted_value.Type1.wrap_typ fp
            , (fun (Shifted_value x as t) ->

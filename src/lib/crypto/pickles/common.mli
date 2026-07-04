@@ -336,7 +336,8 @@ val tick_public_input_of_statement :
     @param feature_flags Flags indicating which optional features are enabled
     @param statement The wrap statement to convert *)
 val tock_public_input_of_statement :
-     feature_flags:
+     max_proofs_verified:'n Pickles_types.Nat.t
+  -> feature_flags:
        Pickles_types.Opt.Flag.t Pickles_types.Plonk_types.Features.Full.t
   -> ( Limb_vector.Challenge.Constant.t
      , Limb_vector.Challenge.Constant.t Composition_types.Scalar_challenge.t
@@ -365,7 +366,8 @@ val tock_public_input_of_statement :
     @param feature_flags Flags indicating which optional features are enabled
     @param statement The wrap statement to convert *)
 val tock_unpadded_public_input_of_statement :
-     feature_flags:
+     max_proofs_verified:'n Pickles_types.Nat.t
+  -> feature_flags:
        Pickles_types.Opt.Flag.t Pickles_types.Plonk_types.Features.Full.t
   -> ( Limb_vector.Challenge.Constant.t
      , Limb_vector.Challenge.Constant.t Composition_types.Scalar_challenge.t
