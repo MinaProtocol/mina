@@ -782,7 +782,7 @@ struct
 
   let domain_for_compiled (type branches)
       (domains : (Domains.t, branches) Vector.t)
-      (branch_data : Pickles_types.Nat.z Branch_data.Checked.Step.t) :
+      (branch_data : _ Branch_data.Checked.Step.t) :
       Field.t Plonk_checks.plonk_domain =
     let (T unique_domains) =
       List.map (Vector.to_list domains) ~f:Domains.h
@@ -847,7 +847,7 @@ struct
         , _
         , _
         , _
-        , Pickles_types.Nat.z Branch_data.Checked.Step.t
+        , 'bdw Branch_data.Checked.Step.t
         , _ )
         Types.Wrap.Proof_state.Deferred_values.In_circuit.t )
       { Plonk_types.All_evals.In_circuit.ft_eval1; evals } =
@@ -860,6 +860,11 @@ struct
       ~assert_equal:Boolean.Assert.( = ) ~feature_flags:plonk.feature_flags
       evals.evals ;
     let actual_width_mask = branch_data.proofs_verified_mask in
+    (* The mask is [max (2, proofs_verified)] bits wide; the actual proofs
+       verified is always at most that. *)
+    let proofs_verified_lte_mask =
+      Nat.lte_exn Proofs_verified.n (Vector.length actual_width_mask)
+    in
     let T = Proofs_verified.eq in
     (* You use the NEW bulletproof challenges to check b. Not the old ones. *)
     (* == Step 2: Scalar challenge conversion ==
@@ -909,8 +914,7 @@ struct
       let sg_evals pt =
         Vector.map2
           ~f:(fun keep f -> (keep, f pt))
-          (Vector.trim_front actual_width_mask
-             (Nat.lte_exn Proofs_verified.n Nat.N2.n) )
+          (Vector.trim_front actual_width_mask proofs_verified_lte_mask)
           sg_olds
       in
       (sg_evals plonk.zeta, sg_evals zetaw)
@@ -925,10 +929,8 @@ struct
       let challenge_digest =
         let opt_sponge = Opt_sponge.create sponge_params in
         Vector.iter2
-          (Vector.trim_front actual_width_mask
-             (Nat.lte_exn Proofs_verified.n Nat.N2.n) )
-          prev_challenges
-          ~f:(fun keep chals ->
+          (Vector.trim_front actual_width_mask proofs_verified_lte_mask)
+          prev_challenges ~f:(fun keep chals ->
             Vector.iter chals ~f:(fun chal ->
                 Opt_sponge.absorb opt_sponge (keep, chal) ) ) ;
         Opt_sponge.squeeze opt_sponge
