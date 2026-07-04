@@ -376,6 +376,8 @@ export declare function caml_fp_srs_create_parallel(depth: number): WasmFpSrs
 
 export declare function caml_fp_srs_from_bytes(bytes: Uint8Array): NapiFpSrs
 
+export declare function caml_fp_srs_from_raw_bytes(bytes: Uint8Array): WasmFpSrs
+
 export declare function caml_fp_srs_get(srs: WasmFpSrs): Array<NapiGVesta>
 
 export declare function caml_fp_srs_get_lagrange_basis(srs: WasmFpSrs, domainSize: number): NapiVector<WasmFpPolyComm>
@@ -386,6 +388,8 @@ export declare function caml_fp_srs_lagrange_commitment(srs: WasmFpSrs, domainSi
 
 export declare function caml_fp_srs_lagrange_commitments_whole_domain_ptr(srs: WasmFpSrs, domainSize: number): NapiVector<WasmFpPolyComm>
 
+export declare function caml_fp_srs_length(srs: WasmFpSrs): number
+
 export declare function caml_fp_srs_maybe_lagrange_commitment(srs: WasmFpSrs, domainSize: number, i: number): WasmFpPolyComm | null
 
 export declare function caml_fp_srs_read(offset: number | undefined | null, path: string): WasmFpSrs | null
@@ -395,6 +399,8 @@ export declare function caml_fp_srs_set(hAndGs: Array<NapiGVesta>): WasmFpSrs
 export declare function caml_fp_srs_set_lagrange_basis(srs: WasmFpSrs, domainSize: number, inputBases: NapiVector<WasmFpPolyComm>): void
 
 export declare function caml_fp_srs_to_bytes(srs: NapiFpSrs): Uint8Array
+
+export declare function caml_fp_srs_to_raw_bytes(srs: WasmFpSrs): Uint8Array
 
 export declare function caml_fp_srs_write(append: boolean | undefined | null, srs: WasmFpSrs, path: string): void
 
@@ -414,6 +420,8 @@ export declare function caml_fq_srs_create_parallel(depth: number): WasmFqSrs
 
 export declare function caml_fq_srs_from_bytes(bytes: Uint8Array): NapiFqSrs
 
+export declare function caml_fq_srs_from_raw_bytes(bytes: Uint8Array): WasmFqSrs
+
 export declare function caml_fq_srs_get(srs: WasmFqSrs): Array<NapiGPallas>
 
 export declare function caml_fq_srs_get_lagrange_basis(srs: WasmFqSrs, domainSize: number): NapiVector<WasmFqPolyComm>
@@ -424,6 +432,8 @@ export declare function caml_fq_srs_lagrange_commitment(srs: WasmFqSrs, domainSi
 
 export declare function caml_fq_srs_lagrange_commitments_whole_domain_ptr(srs: WasmFqSrs, domainSize: number): NapiVector<WasmFqPolyComm>
 
+export declare function caml_fq_srs_length(srs: WasmFqSrs): number
+
 export declare function caml_fq_srs_maybe_lagrange_commitment(srs: WasmFqSrs, domainSize: number, i: number): WasmFqPolyComm | null
 
 export declare function caml_fq_srs_read(offset: number | undefined | null, path: string): WasmFqSrs | null
@@ -433,6 +443,8 @@ export declare function caml_fq_srs_set(hAndGs: Array<NapiGPallas>): WasmFqSrs
 export declare function caml_fq_srs_set_lagrange_basis(srs: WasmFqSrs, domainSize: number, inputBases: NapiVector<WasmFqPolyComm>): void
 
 export declare function caml_fq_srs_to_bytes(srs: NapiFqSrs): Uint8Array
+
+export declare function caml_fq_srs_to_raw_bytes(srs: WasmFqSrs): Uint8Array
 
 export declare function caml_fq_srs_write(append: boolean | undefined | null, srs: WasmFqSrs, path: string): void
 
