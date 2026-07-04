@@ -298,7 +298,8 @@ struct
       let module O = Tock.Oracles in
       let o =
         let public_input =
-          tock_public_input_of_statement ~feature_flags
+          tock_public_input_of_statement
+            ~max_proofs_verified:Local_max_proofs_verified.n ~feature_flags
             prev_statement_with_hashes
         in
         O.create dlog_vk

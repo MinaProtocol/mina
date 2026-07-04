@@ -497,7 +497,12 @@ let wrap
     |> Wrap_hack.pad_accumulator
   in
   let%map.Promise next_proof =
-    let (T (input, conv, _conv_inv)) = Impls.Wrap.input ~feature_flags () in
+    let (Nat.Max.T (branch_data_width, Nat.Lte.S (Nat.Lte.S _), _)) =
+      Nat.max Nat.N2.n max_proofs_verified
+    in
+    let (T (input, conv, _conv_inv)) =
+      Impls.Wrap.input ~branch_data_width ~feature_flags ()
+    in
     Common.time "wrap proof" (fun () ->
         [%log internal] "Wrap_generate_witness_conv" ;
         Impls.Wrap.generate_witness_conv

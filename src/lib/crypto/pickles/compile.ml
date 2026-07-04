@@ -666,7 +666,12 @@ struct
       let disk_key_prover =
         lazy
           (let%map.Promise wrap_main = Lazy.force wrap_main in
-           let (T (typ, conv, _conv_inv)) = input ~feature_flags () in
+           let (Nat.Max.T (branch_data_width, Nat.Lte.S (Nat.Lte.S _), _)) =
+             Nat.max Nat.N2.n Max_proofs_verified.n
+           in
+           let (T (typ, conv, _conv_inv)) =
+             input ~branch_data_width ~feature_flags ()
+           in
            let main x () = wrap_main (conv x) in
            let cs =
              constraint_system ~input_typ:typ ~return_typ:Impls.Wrap.Typ.unit
@@ -695,9 +700,11 @@ struct
       in
       let r =
         Common.time "wrap read or generate " (fun () ->
-            Cache.Wrap.read_or_generate (* Due to Wrap_hack *)
-              ~prev_challenges:2 cache ~s_p:wrap_storable ~s_v:wrap_vk_storable
-              ~lazy_mode disk_key_prover disk_key_verifier )
+            Cache.Wrap.read_or_generate
+              ~prev_challenges:
+                (Nat.to_int (Wrap_hack.padded_length Max_proofs_verified.n))
+              cache ~s_p:wrap_storable ~s_v:wrap_vk_storable ~lazy_mode
+              disk_key_prover disk_key_verifier )
       in
       (r, disk_key_verifier)
     in
