@@ -705,9 +705,12 @@ struct
       in
       let r =
         Common.time "wrap read or generate " (fun () ->
-            Cache.Wrap.read_or_generate (* Due to Wrap_hack *)
-              ~prev_challenges:2 cache ~s_p:wrap_storable ~s_v:wrap_vk_storable
-              ~lazy_mode disk_key_prover disk_key_verifier )
+            Cache.Wrap.read_or_generate
+            (* The wrap accumulator is padded (by Wrap_hack) to
+               [max (2, max_proofs_verified)] previous challenges. *)
+              ~prev_challenges:(Int.max 2 (Nat.to_int Max_proofs_verified.n))
+              cache ~s_p:wrap_storable ~s_v:wrap_vk_storable ~lazy_mode
+              disk_key_prover disk_key_verifier )
       in
       (r, disk_key_verifier)
     in
