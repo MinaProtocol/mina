@@ -8,19 +8,24 @@ that needs a custom image without a CI round-trip.
 
 - A locally-built `.deb` — see
   [build-debian-locally.md](./build-debian-locally.md).
-- The [`aptly`](https://www.aptly.info/) tool installed.
 - Docker (`docker buildx` for multiarch).
 
 ## Steps
 
-1. Start a local Debian repository on top of `_build/`:
+`scripts/docker/build.sh` installs the mina packages directly from the
+local filesystem — no apt repository is involved. It stages any `.deb`
+files it finds in the `dockerfiles/` build context into
+`dockerfiles/_debs/`, which the Dockerfiles `COPY` and install.
+
+1. Copy your locally-built `.deb`(s) into the docker build context:
 
     ```sh
-    ./scripts/debian/aptly.sh start -b -c focal -d _build/ -m unstable -l -p 8081
+    cp _build/*.deb dockerfiles/
     ```
 
-    > **Important:** the `.deb` files must be in `_build/` (the path
-    > passed via `-d`).
+    > **Important:** the `.deb` files must be present in `dockerfiles/`
+    > before the build; the staging step only picks up what is already
+    > in the build context.
 
 2. Build the Docker image:
 
