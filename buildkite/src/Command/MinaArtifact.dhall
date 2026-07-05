@@ -241,6 +241,125 @@ let build_artifacts
                   ]
                 }
 
+let commonBuildEnvs =
+          \(spec : MinaBuildSpec.Type)
+      ->  let nets = Artifact.networks spec.artifacts
+
+          in    [ "AWS_ACCESS_KEY_ID"
+                , "AWS_SECRET_ACCESS_KEY"
+                , "MINA_BRANCH=\$BUILDKITE_BRANCH"
+                , "MINA_COMMIT_SHA1=\$BUILDKITE_COMMIT"
+                , "MINA_DEB_CODENAME=${DebianVersions.lowerName
+                                         spec.debVersion}"
+                , "ARCHITECTURE=${Arch.lowerName spec.arch}"
+                , Network.foldMinaBuildMainnetEnv nets
+                , "PREFORK_LEGACY_VERSION=${spec.deb_legacy_version}"
+                ]
+              # BuildFlags.buildEnvs spec.buildFlags
+              # spec.extraBuildEnvs
+              # DebianVersions.overrideEnvs
+
+let treeVariant =
+          \(spec : MinaBuildSpec.Type)
+      ->  "${DebianVersions.lowerName
+               spec.debVersion}${BuildFlags.toLabelSegment
+                                   spec.buildFlags}${Arch.toSuffixLowercase
+                                                       spec.arch}"
+
+let appsJobName
+    : MinaBuildSpec.Type -> Text
+    = \(spec : MinaBuildSpec.Type) -> "${selfName spec}Apps"
+
+let build_apps
+    : MinaBuildSpec.Type -> Command.Type
+    =     \(spec : MinaBuildSpec.Type)
+      ->  let nets = Artifact.networks spec.artifacts
+
+          let appsCacheWrites =
+                List/map
+                  Network.Type
+                  Cmd.Type
+                  (     \(net : Network.Type)
+                    ->  Cmd.run
+                          "./buildkite/scripts/apps/write_to_cache.sh ${DebianVersions.lowerName
+                                                                          spec.debVersion} ${Network.lowerName
+                                                                                               net}-${Profiles.toSuffixLowercase
+                                                                                                        ( Profiles.fromNetwork
+                                                                                                            net
+                                                                                                        )}${BuildFlags.toLabelSegment
+                                                                                                              spec.buildFlags}${Arch.toSuffixLowercase
+                                                                                                                                  spec.arch}"
+                  )
+                  nets
+
+          in  Command.build
+                Command.Config::{
+                , commands =
+                      Toolchain.select
+                        spec.toolchainSelectMode
+                        spec.debVersion
+                        spec.arch
+                        (commonBuildEnvs spec)
+                        "./buildkite/scripts/build-artifact.sh"
+                    # appsCacheWrites
+                    # [ Cmd.run
+                          "./buildkite/scripts/apps/write_build_tree_to_cache.sh ${DebianVersions.lowerName
+                                                                                     spec.debVersion} ${treeVariant
+                                                                                                          spec}"
+                      ]
+                , label = "Build apps: ${labelSuffix spec}"
+                , key = "build-apps"
+                , target = Size.Multi
+                , if_ = spec.if_
+                , retries =
+                  [ Command.Retry::{
+                    , exit_status = Command.ExitStatus.Code +2
+                    , limit = Some 2
+                    }
+                  ]
+                }
+
+let build_debian
+    : MinaBuildSpec.Type -> Command.Type
+    =     \(spec : MinaBuildSpec.Type)
+      ->  let debianTokens =
+                Text/concatSep
+                  " "
+                  ( List/map
+                      Artifact.Type
+                      Text
+                      Artifact.toDebianToken
+                      spec.artifacts
+                  )
+
+          in  Command.build
+                Command.Config::{
+                , commands =
+                      Toolchain.select
+                        spec.toolchainSelectMode
+                        spec.debVersion
+                        spec.arch
+                        (commonBuildEnvs spec)
+                        "./buildkite/scripts/debian/build-from-cache.sh ${treeVariant
+                                                                            spec} ${debianTokens} profile_devnet_generic profile_mainnet_generic"
+                    # [ Cmd.run
+                          "./buildkite/scripts/debian/write_to_cache.sh ${DebianVersions.lowerName
+                                                                            spec.debVersion}"
+                      ]
+                , label = "Debian: Build ${labelSuffix spec}"
+                , key = "build-deb-pkg${Optional/default Text "" spec.suffix}"
+                , depends_on =
+                  [ { name = appsJobName spec, key = "build-apps" } ]
+                , target = Size.Multi
+                , if_ = spec.if_
+                , retries =
+                  [ Command.Retry::{
+                    , exit_status = Command.ExitStatus.Code +2
+                    , limit = Some 2
+                    }
+                  ]
+                }
+
 let docker_step
     : DockerService -> MinaBuildSpec.Type -> List DockerImage.ReleaseSpec.Type
     =     \(entry : DockerService)
@@ -512,9 +631,45 @@ let pipeline
     =     \(spec : MinaBuildSpec.Type)
       ->  pipelineBuilder spec ([ build_artifacts spec ] # docker_commands spec)
 
+let appsPipeline
+    : MinaBuildSpec.Type -> Pipeline.Config.Type
+    =     \(spec : MinaBuildSpec.Type)
+      ->  Pipeline.Config::{
+          , spec = JobSpec::{
+            , dirtyWhen = DebianVersions.dirtyWhen spec.debVersion
+            , path = "Release"
+            , name = "${appsJobName spec}"
+            , tags = spec.tags
+            , scope = spec.scope
+            , includeIf = spec.includeIf
+            , excludeIf = spec.excludeIf
+            }
+          , steps = [ build_apps spec ]
+          }
+
+let packagePipeline
+    : MinaBuildSpec.Type -> Pipeline.Config.Type
+    =     \(spec : MinaBuildSpec.Type)
+      ->  Pipeline.Config::{
+          , spec = JobSpec::{
+            , dirtyWhen = DebianVersions.dirtyWhen spec.debVersion
+            , path = "Release"
+            , name = "${spec.prefix}${nameSuffix spec}"
+            , tags = spec.tags
+            , scope = spec.scope
+            , includeIf = spec.includeIf
+            , excludeIf = spec.excludeIf
+            }
+          , steps = [ build_debian spec ] # docker_commands spec
+          }
+
 in  { pipeline = pipeline
     , onlyDebianPipeline = onlyDebianPipeline
+    , appsPipeline = appsPipeline
+    , packagePipeline = packagePipeline
     , MinaBuildSpec = MinaBuildSpec
     , labelSuffix = labelSuffix
     , buildArtifacts = build_artifacts
+    , buildApps = build_apps
+    , buildDebian = build_debian
     }
