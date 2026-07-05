@@ -21,9 +21,9 @@ let Docker = ../../Command/Docker/Type.dhall
 let Size = ../../Command/Size.dhall
 
 let dependsOn =
-        DebianVersions.dependsOn
+        DebianVersions.appDependsOn
           DebianVersions.DepsSpec::{ profile = Profiles.Type.Lightnet }
-      # DebianVersions.dependsOn
+      # DebianVersions.appDependsOn
           DebianVersions.DepsSpec::{ build_flag = BuildFlags.Type.Instrumented }
 
 let buildTestCmd
