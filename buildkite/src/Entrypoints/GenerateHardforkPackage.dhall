@@ -62,7 +62,6 @@ let Spec =
           , use_generic_dockers_from_version : Optional Text
           , size : Size
           , deb_legacy_version : Text
-          , deb_storage_repair_version : Text
           }
       , default =
           { codenames =
@@ -81,8 +80,6 @@ let Spec =
           , use_generic_dockers_from_version = None Text
           , size = Size.XLarge
           , deb_legacy_version = defaultMinaArtifactSpec.deb_legacy_version
-          , deb_storage_repair_version =
-              defaultMinaArtifactSpec.deb_storage_repair_version
           }
       }
 
@@ -317,8 +314,6 @@ let generateDockerForCodename =
                       , deb_codename = codename.DebVersion
                       , deb_profile = profile
                       , deb_legacy_version = spec.deb_legacy_version
-                      , deb_storage_repair_version = Some
-                          spec.deb_storage_repair_version
                       , size = spec.size
                       , deb_version = spec.version
                       , generic = True
@@ -349,8 +344,6 @@ let generateDockerForCodename =
                       , deb_codename = codename.DebVersion
                       , deb_profile = profile
                       , deb_legacy_version = spec.deb_legacy_version
-                      , deb_storage_repair_version = Some
-                          spec.deb_storage_repair_version
                       , size = spec.size
                       , deb_version = spec.version
                       , step_key_suffix =

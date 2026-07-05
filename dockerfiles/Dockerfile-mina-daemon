@@ -12,7 +12,6 @@ ARG deb_repo="http://packages.o1test.net"
 ARG deb_profile
 ARG deb_suffix
 ARG deb_legacy_version
-ARG deb_storage_repair_version
 ARG apt_cache_url=""
 
 ARG GCLOUD_VERSION=476.0.0
@@ -34,9 +33,6 @@ ENV MINA_CREATE_GENESIS_DEB=mina-create-${network}-prefork-genesis-ledger
 
 # Storage toolbox for fixing daemon storage
 ENV MINA_STORAGE_DEB=mina-daemon-storage-toolbox
-
-# Storage recovery toolbox for fixing daemon storage
-ENV MINA_STORAGE_REPAIR_DEB=mina-daemon-recovery-storage-toolbox
 
 ENV DEBIAN_FRONTEND noninteractive
 
@@ -109,8 +105,8 @@ ENV USE_GKE_GCLOUD_AUTH_PLUGIN=True
 # to its concrete .deb file and installs them with a single apt-get call (no apt
 # repo / no apt index). Since there is no repo to resolve the mina dependency
 # closure, every mina dependency is requested explicitly here: mina-logproc is a
-# dependency of the daemon (and of the storage / create-genesis / recovery
-# toolboxes) and must be present as a local file too. The network config package
+# dependency of the daemon (and of the storage / create-genesis toolboxes) and
+# must be present as a local file too. The network config package
 # (mina-${network}-config) is intentionally NOT installed here -- see the note on
 # the install RUN below.
 COPY scripts/install-mina-debs.sh /usr/local/bin/install-mina-debs.sh
@@ -130,7 +126,6 @@ RUN echo "Building image with version $deb_version from repo $deb_release $deb_c
        "mina-logproc=$deb_version" \
        "${MINA_STORAGE_DEB}=${deb_version}" \
        "${MINA_CREATE_GENESIS_DEB}=${deb_legacy_version}" \
-       "${MINA_STORAGE_REPAIR_DEB}=${deb_storage_repair_version}" \
      ) \
   && /usr/local/bin/install-mina-debs.sh "${mina_debs[@]}"
 
