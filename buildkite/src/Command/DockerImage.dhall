@@ -159,6 +159,31 @@ let generateStep =
                   { Arm64 = " --custom-suffix arm64 ", Amd64 = "" }
                   spec.arch
 
+          let customSuffix =
+              -- Only Daemon/Rosetta ("*-config" images) need an arch marker
+              -- baked into the custom suffix build-arg on top of --platform;
+              -- --platform alone already derives -arm64 for everyone else
+              -- (scripts/docker/helper.sh get_platform_suffix), which is the
+              -- only arch suffix manager.sh verify's tag ever expects.
+                merge
+                  { DaemonGeneric = ""
+                  , DaemonProfiled = \(args : { profile : Profiles.Type }) -> ""
+                  , Daemon =
+                      \(args : { network : Network.Type }) -> archCustomSuffix
+                  , DaemonLegacyHardfork =
+                      \(args : { network : Network.Type }) -> ""
+                  , DaemonAutoHardfork =
+                      \(args : { network : Network.Type }) -> ""
+                  , Archive = \(args : { network : Network.Type }) -> ""
+                  , RosettaGeneric = ""
+                  , Rosetta =
+                      \(args : { network : Network.Type }) -> archCustomSuffix
+                  , TxTools = ""
+                  , DelegationVerifier = ""
+                  , Toolchain = ""
+                  }
+                  spec.service
+
           let storageRepairVersionSuffix =
                 merge
                   { None = ""
@@ -236,7 +261,7 @@ let generateStep =
                 ++  " --platform ${Arch.platform spec.arch}"
                 ++  " --docker-registry ${DockerRepo.show spec.docker_repo}"
                 ++  loadOnlyArg
-                ++  archCustomSuffix
+                ++  customSuffix
                 ++  imageNameArg
                 ++  maybeSaveToCacheArg
 
