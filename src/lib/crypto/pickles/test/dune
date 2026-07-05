@@ -3,6 +3,7 @@
   test_common
   test_impls
   test_no_sideloaded
+  test_wide_recursion
   test_opt_sponge
   test_plonk_curve_ops
   test_ro
