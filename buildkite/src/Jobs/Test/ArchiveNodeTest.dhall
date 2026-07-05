@@ -13,7 +13,7 @@ let DebianVersions = ../../Constants/DebianVersions.dhall
 let BuildFlags = ../../Constants/BuildFlags.dhall
 
 let dependsOn =
-      DebianVersions.dependsOn
+      DebianVersions.appDependsOn
         DebianVersions.DepsSpec::{ build_flag = BuildFlags.Type.Instrumented }
 
 in  Pipeline.build
