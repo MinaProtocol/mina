@@ -21,7 +21,7 @@ let Size = ../../Command/Size.dhall
 let RunWithPostgres = ../../Command/RunWithPostgres.dhall
 
 let dependsOn =
-      DebianVersions.dependsOn
+      DebianVersions.appDependsOn
         DebianVersions.DepsSpec::{ build_flag = BuildFlags.Type.Instrumented }
 
 let key = "archive-hardfork-toolbox-test"
