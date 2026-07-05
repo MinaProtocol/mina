@@ -166,7 +166,8 @@ let generateStep =
               -- (scripts/docker/helper.sh get_platform_suffix), which is the
               -- only arch suffix manager.sh verify's tag ever expects.
                 merge
-                  { DaemonGeneric = ""
+                  { Base = ""
+                  , DaemonGeneric = ""
                   , DaemonProfiled = \(args : { profile : Profiles.Type }) -> ""
                   , Daemon =
                       \(args : { network : Network.Type }) -> archCustomSuffix
