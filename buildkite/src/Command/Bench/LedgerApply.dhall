@@ -19,7 +19,7 @@ let Spec =
       }
 
 let dependsOn =
-      DebianVersions.dependsOn
+      DebianVersions.appDependsOn
         DebianVersions.DepsSpec::{ build_flag = BuildFlags.Type.Instrumented }
 
 let pipeline
