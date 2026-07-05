@@ -7,7 +7,7 @@ Native Linux build instructions (Ubuntu-flavoured by default).
 > handles the system dependency matrix for you; [Nix](../nix/README.md)
 > does the same declaratively. The native path below is a **best-effort
 > starting point** — the canonical install steps are what's run in
-> [`dockerfiles/stages/`](../dockerfiles/), and this doc can drift behind
+> [`dockerfiles/toolchain/`](../dockerfiles/toolchain/), and this doc can drift behind
 > them when CI adds or bumps a system dep. If you hit a missing
 > dependency, please open a PR updating this page.
 
@@ -25,7 +25,7 @@ historically been developed against Ubuntu LTS releases.
 Mina has a variety of opam and system dependencies. A number of C
 libraries are expected to be available in the system; the **canonical
 list is what's installed by
-[`dockerfiles/stages/1-build-deps`](../dockerfiles/stages/1-build-deps)**
+[`dockerfiles/toolchain/1-build-deps`](../dockerfiles/toolchain/1-build-deps)**
 — if you suspect a missing dep, grep that file for the matching `apt
 install` line. Most of these are installed via `apt`; RocksDB is
 installed automatically as a `dune` rule in the `ocaml-rocksdb` library.
