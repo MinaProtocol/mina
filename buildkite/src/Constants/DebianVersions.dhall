@@ -113,13 +113,45 @@ let dirtyWhen =
             }
             debVersion
 
+let packageDirtyWhen =
+      [ S.exactly "buildkite/src/Constants/DebianVersions" "dhall"
+      , S.exactly "buildkite/src/Constants/ContainerImages" "dhall"
+      , S.exactly "buildkite/src/Command/MinaArtifact" "dhall"
+      , S.strictlyStart (S.contains "buildkite/src/Jobs/Release/MinaArtifact")
+      , S.strictlyStart (S.contains "dockerfiles")
+      , S.strictlyStart (S.contains "scripts/debian")
+      , S.strictlyStart (S.contains "scripts/docker")
+      , S.strictlyStart (S.contains "scripts/hardfork")
+      , S.strictlyStart (S.contains "buildkite/scripts/docker")
+      , S.strictlyStart (S.contains "buildkite/scripts/debian")
+      , S.exactly "buildkite/scripts/build-artifact" "sh"
+      , S.strictlyStart (S.contains "buildkite/scripts/apps")
+      , S.strictlyStart (S.contains "buildkite/scripts/cache")
+      , S.strictlyStart (S.contains "buildkite/scripts/tests/debian")
+      , S.strictlyStart (S.contains "buildkite/scripts/tests/hardfork")
+      , S.strictlyStart (S.contains "buildkite/src/Jobs/Test/Debian")
+      , S.exactly "buildkite/src/Jobs/Test/AutoHardforkTest" "dhall"
+      ]
+
+let appDependsOn =
+          \(spec : DepsSpec.Type)
+      ->  let name =
+                "${spec.prefix}${capitalName
+                                   spec.deb_version}${BuildFlags.toSuffixUppercase
+                                                        spec.build_flag}${Arch.nameSuffix
+                                                                            spec.arch}Apps"
+
+          in  [ { name = name, key = "build-apps" } ]
+
 let overrideEnvs = [ "OVERRIDE_TAG", "OVERRIDE_GITHASH", "SKIP_GITBRANCH" ]
 
 in  { DebVersion = DebVersion
     , capitalName = capitalName
     , lowerName = lowerName
     , dependsOn = dependsOn
+    , appDependsOn = appDependsOn
     , dirtyWhen = dirtyWhen
+    , packageDirtyWhen = packageDirtyWhen
     , DepsSpec = DepsSpec
     , overrideEnvs = overrideEnvs
     }
