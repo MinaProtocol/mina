@@ -92,7 +92,7 @@ function export_suffixes () {
     # BUILD_FLAGS_SUFFIX_ARG: passed to Dockerfile as build arg for packages
     # that only use the build flags suffix (e.g. archive uses instrumented but not generic)
     local __build_flags="${DEB_BUILD_FLAGS:-}"
-    if [[ "$__build_flags" == "none" ]]; then
+    if [[ -z "$__build_flags" || "$__build_flags" == "none" ]]; then
         __build_flags=""
     else
         __build_flags="-${__build_flags}"
