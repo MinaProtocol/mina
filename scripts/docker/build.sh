@@ -79,7 +79,6 @@ while [[ "$#" -gt 0 ]]; do case $1 in
   --deb-release) INPUT_RELEASE="$2"; shift;;
   --deb-version) DEB_VERSION="$2"; shift;;
   --deb-legacy-version) INPUT_LEGACY_VERSION="$2"; shift;;
-  --deb-storage-repair-version) INPUT_STORAGE_REPAIR_VERSION="$2"; shift;;
   --deb-profile) DEB_PROFILE="$2"; shift;;
   --deb-repo) INPUT_REPO="$2"; shift;;
   --deb-arch) DEB_ARCH="$2"; shift;;
@@ -118,13 +117,6 @@ if [[ -z "${INPUT_BRANCH:-}" ]]; then
   BRANCH="--build-arg MINA_BRANCH=compatible"
 else
   BRANCH="--build-arg MINA_BRANCH=$INPUT_BRANCH"
-fi
-
-if [[ -z "${INPUT_STORAGE_REPAIR_VERSION:-}" ]]; then
-  echo "Debian storage repair version is not set. Using the default (unset)"
-  DEB_STORAGE_REPAIR_VERSION=""
-else
-  DEB_STORAGE_REPAIR_VERSION="--build-arg deb_storage_repair_version=$INPUT_STORAGE_REPAIR_VERSION"
 fi
 
 if [[ -z "${MINA_REPO:-}" ]]; then
@@ -382,7 +374,7 @@ fi
 
 BUILD_NETWORK="--allow=network.host"
 
-docker buildx build --load --network=host --progress=plain $PLATFORM $DOCKER_REPO_ARG $NO_CACHE $BUILD_NETWORK $CACHE $NETWORK $IMAGE $DEB_CODENAME $DEB_RELEASE $DEB_VERSION --build-arg deb_profile="$DEB_PROFILE" --build-arg generic_network="$GENERIC_NETWORK_SEG" $DOCKER_DEB_SUFFIX_ARG $BUILD_FLAGS_SUFFIX_ARG $DEB_REPO $APT_CACHE_ARG $BRANCH $REPO $LEGACY_VERSION $CUSTOM_SUFFIX_ARG $CUSTOM_ARG $DEB_ARCH $DEB_STORAGE_REPAIR_VERSION $IMAGE_NAME_ARG $VERSION_ARG "$DOCKER_CONTEXT" -t "$TAG" -t "$HASHTAG" -f $DOCKERFILE_PATH
+docker buildx build --load --network=host --progress=plain $PLATFORM $DOCKER_REPO_ARG $NO_CACHE $BUILD_NETWORK $CACHE $NETWORK $IMAGE $DEB_CODENAME $DEB_RELEASE $DEB_VERSION --build-arg deb_profile="$DEB_PROFILE" --build-arg generic_network="$GENERIC_NETWORK_SEG" $DOCKER_DEB_SUFFIX_ARG $BUILD_FLAGS_SUFFIX_ARG $DEB_REPO $APT_CACHE_ARG $BRANCH $REPO $LEGACY_VERSION $CUSTOM_SUFFIX_ARG $CUSTOM_ARG $DEB_ARCH $IMAGE_NAME_ARG $VERSION_ARG "$DOCKER_CONTEXT" -t "$TAG" -t "$HASHTAG" -f $DOCKERFILE_PATH
 
 if [[ -n "${SAVE_TO_CI_CACHE_ROOT:-}" ]]; then
 
