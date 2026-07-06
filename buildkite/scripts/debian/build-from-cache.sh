@@ -10,21 +10,22 @@
 # only restore the tree and package it. Keep the packaging logic below in sync
 # with build-release.sh.
 #
-# Usage: build-from-cache.sh <build-tree-variant> <package-token> [<package-token> ...]
+# Usage: build-from-cache.sh <apps-variant> <build-variant> <package-token> [<package-token> ...]
 
 set -eo pipefail
 
 [ -z "${MINA_DEB_CODENAME+x}" ] && echo "MINA_DEB_CODENAME env var was not provided" && exit 1
 
-VARIANT=$1
-shift
+APPS_VARIANT=$1
+BUILD_VARIANT=$2
+shift 2
 
-if [[ -z "$VARIANT" ]]; then
-  echo "Usage: $0 <build-tree-variant> <package-token> [...]" >&2
+if [[ -z "$APPS_VARIANT" || -z "$BUILD_VARIANT" ]]; then
+  echo "Usage: $0 <apps-variant> <build-variant> <package-token> [...]" >&2
   exit 1
 fi
 
-./buildkite/scripts/apps/restore_build_tree.sh "${MINA_DEB_CODENAME}" "${VARIANT}"
+./buildkite/scripts/apps/restore_build_tree.sh "${MINA_DEB_CODENAME}" "${APPS_VARIANT}" "${BUILD_VARIANT}"
 
 echo "--- Bundle all packages for Debian ${MINA_DEB_CODENAME}"
 echo " Includes mina daemon, archive-node, rosetta"

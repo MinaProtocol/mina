@@ -270,6 +270,22 @@ let appsJobName
     : MinaBuildSpec.Type -> Text
     = \(spec : MinaBuildSpec.Type) -> "${selfName spec}Apps"
 
+let primaryAppsVariant
+    : MinaBuildSpec.Type -> Text
+    =     \(spec : MinaBuildSpec.Type)
+      ->  let primary =
+                Optional/default
+                  Network.Type
+                  Network.Type.Devnet
+                  (List/head Network.Type (Artifact.networks spec.artifacts))
+
+          in  "${Network.lowerName
+                   primary}-${Profiles.toSuffixLowercase
+                                ( Profiles.fromNetwork primary
+                                )}${BuildFlags.toLabelSegment
+                                      spec.buildFlags}${Arch.toSuffixLowercase
+                                                          spec.arch}"
+
 let build_apps
     : MinaBuildSpec.Type -> Command.Type
     =     \(spec : MinaBuildSpec.Type)
@@ -303,9 +319,9 @@ let build_apps
                         "./buildkite/scripts/build-artifact.sh"
                     # appsCacheWrites
                     # [ Cmd.run
-                          "./buildkite/scripts/apps/write_build_tree_to_cache.sh ${DebianVersions.lowerName
-                                                                                     spec.debVersion} ${treeVariant
-                                                                                                          spec}"
+                          "./buildkite/scripts/apps/write_build_manifest_to_cache.sh ${DebianVersions.lowerName
+                                                                                         spec.debVersion} ${treeVariant
+                                                                                                              spec}"
                       ]
                 , label = "Build apps: ${labelSuffix spec}"
                 , key = "build-apps"
@@ -340,8 +356,9 @@ let build_debian
                         spec.debVersion
                         spec.arch
                         (commonBuildEnvs spec)
-                        "./buildkite/scripts/debian/build-from-cache.sh ${treeVariant
-                                                                            spec} ${debianTokens} profile_devnet_generic profile_mainnet_generic"
+                        "./buildkite/scripts/debian/build-from-cache.sh ${primaryAppsVariant
+                                                                            spec} ${treeVariant
+                                                                                      spec} ${debianTokens} profile_devnet_generic profile_mainnet_generic"
                     # [ Cmd.run
                           "./buildkite/scripts/debian/write_to_cache.sh ${DebianVersions.lowerName
                                                                             spec.debVersion}"
