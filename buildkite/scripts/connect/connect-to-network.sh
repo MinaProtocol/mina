@@ -87,12 +87,34 @@ mina libp2p generate-keypair --privkey-path /home/opam/libp2p-keys/key
 # Set permissions on the keypair so the daemon doesn't complain
 chmod -R 0700 /home/opam/libp2p-keys/
 
+MAINNET_PEERS=(
+    "/dns4/mina-mainnet-seed.staketab.com/tcp/10003/p2p/12D3KooWSDTiXcdBVpN12ZqXJ49qCFp8zB1NnovuhZu6A28GLF1J"
+    "/dns4/mina-seed.bitcat.network/tcp/10001/p2p/12D3KooWQzozNTDKL7MqUh6Nh11GMA4pQhRCAsNTRWxCAzAi4VbE"
+    "/dns4/seed-1.mainnet.gcp.o1test.net/tcp/10003/p2p/12D3KooWCa1d7G3SkRxy846qTvdAFX69NnoYZ32orWVLqJcDVGHW"
+    "/dns4/seed-2.mainnet.gcp.o1test.net/tcp/32002/p2p/12D3KooWK4NfthViCTyLgVQa1WvqDC1NccVxGruCXCZUt3GqvFvn"
+    "/dns4/seed-3.mainnet.gcp.o1test.net/tcp/32003/p2p/12D3KooWNofeYVAJXA3WGg2qCDhs3GEe71kTmKpFQXRbZmCz1Vr7"
+    "/dns4/seed-4.mainnet.gcp.o1test.net/tcp/10003/p2p/12D3KooWEdBiTUQqxp3jeuWaZkwiSNcFxC6d6Tdq7u2Lf2ZD2Q6X"
+    "/dns4/seed-5.mainnet.gcp.o1test.net/tcp/32005/p2p/12D3KooWL1DJTigSwuKQRfQE3p7puFUqfbHjXbZJ9YBWtMNpr3GU"
+    "/dns4/seed-6.mainnet.gcp.o1test.net/tcp/32006/p2p/12D3KooWHGx4u32n42ub7dJNxAcAhwiA1WDq1Zsjn3k7RsS11pE8"
+    "/dns4/seed.minataur.net/tcp/8302/p2p/12D3KooWNyExDzG8T1BYXHpXQS66kaw3zi6qi5Pg9KD3GEyHW5FF"
+    "/dns4/seed.piconbello.com/tcp/10001/p2p/12D3KooWRFac2AztcTeen2DYNwnTrmVBvwNDsRiFpDVdTkwdFAHP"
+)
+
 start_daemon_and_wait_for_sync() {
     local MINA="$1"
 
+    local -a peer_list_args
+    if [[ "$NETWORK_NAME" == "mainnet" ]]; then
+        for peer in "${MAINNET_PEERS[@]}"; do
+            peer_list_args+=(--peer "$peer")
+        done
+    else
+        peer_list_args=(--peer-list-url "https://bootnodes.minaprotocol.com/networks/${NETWORK_NAME}.txt")
+    fi
+
     # Start the daemon in the background
     "$MINA" daemon \
-      --peer-list-url "https://bootnodes.minaprotocol.com/networks/${NETWORK_NAME}.txt" \
+      "${peer_list_args[@]}" \
       --libp2p-keypair "/home/opam/libp2p-keys/key" \
     &
 
