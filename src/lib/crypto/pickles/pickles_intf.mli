@@ -410,6 +410,7 @@ module type S = sig
     -> ?override_wrap_domain:Pickles_base.Proofs_verified.t
     -> ?num_chunks:int
     -> ?lazy_mode:bool
+    -> ?known_step_domains:(Import.Domains.t, 'branches) Vector.t
     -> public_input:
          ( 'var
          , 'value
@@ -464,6 +465,7 @@ module type S = sig
     -> ?override_wrap_domain:Pickles_base.Proofs_verified.t
     -> ?num_chunks:int
     -> ?lazy_mode:bool
+    -> ?known_step_domains:(Import.Domains.t, 'branches) Vector.t
     -> public_input:
          ( 'var
          , 'value
@@ -518,6 +520,7 @@ module type S = sig
     -> ?override_wrap_domain:Pickles_base.Proofs_verified.t
     -> ?num_chunks:int
     -> ?lazy_mode:bool
+    -> ?known_step_domains:(Import.Domains.t, 'branches) Vector.t
     -> public_input:
          ( 'var
          , 'value

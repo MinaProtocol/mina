@@ -77,6 +77,7 @@ module Make (Inductive_rule : Inductive_rule.Intf) = struct
       (type branches max_proofs_verified var value a_var a_value ret_var
       ret_value ) ~index
       ~(self : (var, value, max_proofs_verified, branches) Tag.t) ~wrap_domains
+      ?known_domains
       ~(feature_flags : Opt.Flag.t Plonk_types.Features.Full.t) ~num_chunks
       ~(actual_feature_flags : bool Plonk_types.Features.t)
       ~(max_proofs_verified : max_proofs_verified Nat.t)
@@ -210,21 +211,26 @@ module Make (Inductive_rule : Inductive_rule.Intf) = struct
     in
     Timer.clock __LOC__ ;
     let own_domains =
-      let%bind.Promise known_wrap_keys = known_wrap_keys in
-      let main =
-        step
-          ~step_domains:
-            (Vector.init branches ~f:(fun _ -> Fix_domains.rough_domains))
-          ~known_wrap_keys
-      in
-      let etyp =
-        Impls.Step.input ~proofs_verified:max_proofs_verified
-        (* TODO *)
-      in
-      let%bind.Promise () = chain_to in
-      Fix_domains.domains ~feature_flags:actual_feature_flags
-        (T (Impls.Step.Typ.unit, Fn.id, Fn.id))
-        etyp main
+      match known_domains with
+      | Some domains ->
+          let%map.Promise () = chain_to in
+          Vector.nth_exn domains index
+      | None ->
+          let%bind.Promise known_wrap_keys = known_wrap_keys in
+          let main =
+            step
+              ~step_domains:
+                (Vector.init branches ~f:(fun _ -> Fix_domains.rough_domains))
+              ~known_wrap_keys
+          in
+          let etyp =
+            Impls.Step.input ~proofs_verified:max_proofs_verified
+            (* TODO *)
+          in
+          let%bind.Promise () = chain_to in
+          Fix_domains.domains ~feature_flags:actual_feature_flags
+            (T (Impls.Step.Typ.unit, Fn.id, Fn.id))
+            etyp main
     in
     let step ~step_domains =
       let%bind.Promise known_wrap_keys = known_wrap_keys in

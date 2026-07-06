@@ -297,6 +297,7 @@ val compile_with_wrap_main_override_promise :
        ('max_proofs_verified, 'branches, 'prev_varss) wrap_main_generic
   -> ?num_chunks:int
   -> ?lazy_mode:bool
+  -> ?known_step_domains:(Import.Domains.t, 'branches) Vector.t
   -> public_input:
        ( 'var
        , 'value

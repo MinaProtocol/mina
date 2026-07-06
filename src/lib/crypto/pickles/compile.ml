@@ -349,6 +349,7 @@ struct
            (max_proofs_verified, branches, prev_varss) wrap_main_generic
       -> ?num_chunks:int
       -> ?lazy_mode:bool
+      -> ?known_step_domains:(Domains.t, branches) Vector.t
       -> branches:branches Nat.t
       -> prev_varss_length:(prev_varss, branches) Length.t
       -> max_proofs_verified:
@@ -381,7 +382,7 @@ struct
          { step_storable; step_vk_storable; wrap_storable; wrap_vk_storable }
        ~proof_cache ?disk_keys ?override_wrap_domain ?override_wrap_main
        ?(num_chunks = Plonk_checks.num_chunks_by_default) ?(lazy_mode = false)
-       ~branches ~prev_varss_length ~max_proofs_verified ~name
+       ?known_step_domains ~branches ~prev_varss_length ~max_proofs_verified ~name
        ?constraint_constants ~public_input ~auxiliary_typ ~choices () ->
     let snark_keys_header kind constraint_system_hash =
       let constraint_constants : Snark_keys_header.Constraint_constants.t =
@@ -518,7 +519,8 @@ struct
                     Step_branch_data.create ~index:!i ~feature_flags ~num_chunks
                       ~actual_feature_flags:rule.feature_flags
                       ~max_proofs_verified:Max_proofs_verified.n ~branches ~self
-                      ~public_input ~auxiliary_typ Arg_var.to_field_elements
+                      ~public_input ?known_domains:known_step_domains
+                      ~auxiliary_typ Arg_var.to_field_elements
                       Arg_value.to_field_elements rule ~wrap_domains ~chain_to )
               in
               Timer.clock __LOC__ ; incr i ; res
@@ -992,6 +994,7 @@ let compile_with_wrap_main_override_promise :
          (max_proofs_verified, branches, prev_varss) wrap_main_generic
     -> ?num_chunks:int
     -> ?lazy_mode:bool
+    -> ?known_step_domains:(Domains.t, branches) Vector.t
     -> public_input:
          ( var
          , value
@@ -1037,6 +1040,7 @@ let compile_with_wrap_main_override_promise :
  *)
  fun ?self ?(cache = []) ?(storables = Storables.default) ?proof_cache
      ?disk_keys ?override_wrap_domain ?override_wrap_main ?num_chunks ?lazy_mode
+     ?known_step_domains
      ~public_input ~auxiliary_typ ~max_proofs_verified ~name
      ?constraint_constants ~choices () ->
   let self =
@@ -1111,9 +1115,10 @@ let compile_with_wrap_main_override_promise :
   in
   let provers, wrap_vk, wrap_disk_key, cache_handle =
     M.compile ~self ~proof_cache ~cache ~storables ?disk_keys
-      ?override_wrap_domain ?override_wrap_main ?num_chunks ?lazy_mode ~branches
-      ~prev_varss_length ~max_proofs_verified ~name ~public_input ~auxiliary_typ
-      ?constraint_constants ~choices:(conv_irs choices) ()
+      ?override_wrap_domain ?override_wrap_main ?num_chunks ?lazy_mode
+      ?known_step_domains ~branches ~prev_varss_length ~max_proofs_verified
+      ~name ~public_input ~auxiliary_typ ?constraint_constants
+      ~choices:(conv_irs choices) ()
   in
   let (module Max_proofs_verified) = max_proofs_verified in
   let T = Max_proofs_verified.eq in
