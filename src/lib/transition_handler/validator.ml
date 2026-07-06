@@ -206,6 +206,15 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~time_controller
           | Error (`In_frontier _) | Error (`In_process _) ->
               [%log internal] "Failure"
                 ~metadata:[ ("reason", `String "In_frontier or In_process") ] ;
+              [%log debug]
+                "Dropping duplicate block $state_hash (already in frontier or \
+                 in process)"
+                ~metadata:
+                  [ ("state_hash", State_hash.to_yojson transition_hash) ] ;
+              (* Fire validation callback to prevent timeout for duplicate blocks *)
+              Option.iter vc ~f:(fun vc ->
+                  Mina_net2.Validation_callback.fire_if_not_already_fired vc
+                    `Ignore ) ;
               Trust_system.record_envelope_sender trust_system logger sender
                 ( Trust_system.Actions.Sent_old_gossip
                 , Some
