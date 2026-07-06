@@ -25,7 +25,9 @@ let runInToolchainImage
       ->  \(environment : List Text)
       ->  \(innerScript : Text)
       ->    binfmtSetup arch
-          # [ FixPermissions.command arch ]
+          # [ Cmd.run "./buildkite/scripts/docker/load_from_cache.sh ${image}"
+            , FixPermissions.command arch
+            ]
           # [ Cmd.runInDocker
                 Cmd.Docker::{
                 , image = image

@@ -1,0 +1,21 @@
+;; Hermetic alcotest smoke tests for mina-healthcheck.
+;;
+;; These exercise only the subcommands that don't require a running
+;; daemon: --help at the top level and per-subcommand, plus the
+;; single-JSON-record contract for each subcommand against a
+;; non-routable [http://127.0.0.1:1/graphql] URI.
+
+(test
+ (name test_mina_healthcheck)
+ (libraries
+  ;; opam libraries
+  alcotest
+  core
+  core_unix
+  stdio
+  yojson)
+ (deps ../mina_healthcheck.exe)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_version)))

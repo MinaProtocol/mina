@@ -5,38 +5,44 @@
 #      package publishes don't get cached.
 #   2. Unconditionally bypass the proxy for archive.ubuntu.com /
 #      security.ubuntu.com. The o1Labs apt-cacher-ng has the local
-#      (unsigned) aptly publication first in its Remap-uburep chain — a
+#      (unsigned) apt repository publication first in its Remap-uburep chain — a
 #      proxied request for archive.ubuntu.com would get our unsigned
 #      Release file, which apt then rejects with "is no longer signed"
 #      (anti-downgrade). Sending these DIRECT keeps Canonical default
 #      sources verifiable regardless of mirror state. (See gitops-
 #      infrastructure PR #1289.)
-#   3. Opt into the o1Labs deb-mirror for Ubuntu base packages on
-#      allowlisted codenames. ONLY codenames the deb-mirror actually
-#      serves today belong in the allowlist — apt-get update fails
-#      fatally on 404s for an allowlisted-but-unmirrored codename
-#      (Error-Mode "any" is the strict default; it does NOT demote
-#      fetch failures to warnings, only "is no longer signed" downgrades).
-#      Today: focal only. Extension procedure when adding a new
-#      codename (jammy, bullseye, …):
+#   3. Opt into the o1Labs deb-mirror for OS base packages on allowlisted
+#      codenames. ONLY codenames the deb-mirror actually serves today
+#      belong in the allowlist — apt-get update fails fatally on 404s
+#      for an allowlisted-but-unmirrored codename (Error-Mode "any" is
+#      the strict default; it does NOT demote fetch failures to
+#      warnings, only "is no longer signed" downgrades).
+#      Today:
+#        - focal (Ubuntu 20.04)    → ${APT_MIRROR_URL}/ubuntu/, components main universe
+#        - bullseye (Debian 11)    → ${APT_MIRROR_URL}/debian/,  components main
+#      The Ubuntu side writes mirror-ubuntu.list; the Debian side writes
+#      mirror-debian.list (both pinned at the default priority 500 — see
+#      below for why we don't override-pin).
+#      Extension procedure when adding jammy / bookworm / noble / future
+#      codenames:
 #        a. gitops-infrastructure PR: add mirror entries to
 #           platform/hetzner-cloud/deb-mirror/mirrors.yaml, sync via
 #           `./mirror-ctl.sh sync-running deb-mirror-1`, verify
-#           `curl /ubuntu/dists/<codename>/Release` returns 200 with
-#           `Components: main universe`.
-#        b. gitops-infrastructure PR: extend mirror-ubuntu.list in
-#           platform/hetzner-rivendell-1/applications/buildkite-agents/
-#           entrypoint{,-development}.yaml.gotmpl.
+#           `curl /<prefix>/dists/<codename>/Release` returns 200 with
+#           the expected Components.
+#        b. gitops-infrastructure PR: extend mirror-ubuntu.list (or its
+#           Debian equivalent) in platform/hetzner-rivendell-1/
+#           applications/buildkite-agents/entrypoint{,-development}.yaml.gotmpl.
 #        c. ONLY THEN, this allowlist (mirrors the Buildkite ARC agent's
-#           [trusted=yes] mirror-ubuntu.list + Pin-Priority 900 pattern,
-#           see gitops-infrastructure PR #1287).
+#           [trusted=yes] mirror-ubuntu.list pattern, see gitops-
+#           infrastructure PR #1287).
 #
 # Usage: configure-apt-proxy.sh [APT_CACHE_URL] [DEB_REPO] [APT_MIRROR_URL]
 #   APT_CACHE_URL   - apt-cacher-ng or similar caching proxy URL
 #                     (e.g. http://apt-cache-ingress.mirror-ingress:3142)
 #   DEB_REPO        - URL of the Mina deb repo that must bypass the proxy
 #                     (e.g. http://packages.o1test.net)
-#   APT_MIRROR_URL  - Base URL of the o1Labs deb-mirror's aptly publication
+#   APT_MIRROR_URL  - Base URL of the o1Labs deb-mirror's apt repository publication
 #                     (e.g. http://deb-mirror-ingress.mirror-ingress). When
 #                     omitted but APT_CACHE_URL looks like an in-cluster
 #                     apt-cache-ingress URL, this script derives it by
@@ -46,12 +52,13 @@
 # so it remains safe to call unconditionally.
 #
 # When APT_MIRROR_URL is set (or derivable) AND the running OS codename is in
-# the allowlist (focal today), this script also:
-#   - writes /etc/apt/sources.list.d/mirror-ubuntu.list pointing at the local
-#     mirror with [trusted=yes] for main+universe across {CODENAME,
-#     CODENAME-security, CODENAME-updates}, mirroring the Buildkite ARC
-#     agent's existing pattern for docker/postgresql/yarn/buildkite-agent/
-#     nodesource.
+# the allowlist (focal, bullseye), this script also:
+#   - writes /etc/apt/sources.list.d/mirror-{ubuntu,debian}.list pointing at
+#     the local mirror with [trusted=yes] across {CODENAME, CODENAME-security,
+#     CODENAME-updates}. Ubuntu codenames use components "main universe" and
+#     the /ubuntu URL prefix; Debian codenames use "main" and /debian. This
+#     mirrors the Buildkite ARC agent's existing pattern for docker/postgresql/
+#     yarn/buildkite-agent/nodesource.
 #   - does NOT pin the mirror with Pin-Priority. Pinning at >500 over-broadens:
 #     it would force apt to prefer OUR Ubuntu-version of a package even when a
 #     third-party repo (e.g. postgresql.org → postgresql-15) needs a strictly-
@@ -97,7 +104,7 @@ conf=/etc/apt/apt.conf.d/01proxy
   fi
   # Ubuntu Canonical archives ALWAYS go DIRECT (see header note 2):
   # the o1Labs apt-cacher-ng's Remap-uburep chain has the local unsigned
-  # aptly publication first, so a proxied request for archive.ubuntu.com
+  # apt repository publication first, so a proxied request for archive.ubuntu.com
   # would resolve to our unsigned Release and apt would refuse it as
   # "is no longer signed". Bypassing the proxy for these two hosts keeps
   # Canonical defaults verifiable regardless of mirror state.
@@ -142,42 +149,57 @@ fi
 
 # Codename allowlist. ONLY codenames the deb-mirror actually serves belong
 # here — apt-get update fails fatally on 404s for an allowlisted-but-
-# unmirrored codename. Today: focal only.
+# unmirrored codename. Today:
+#   focal     (Ubuntu 20.04, /ubuntu prefix, "main universe")
+#   bullseye  (Debian 11,    /debian prefix, "main")
 #
-# Procedure for adding jammy / bullseye / noble / future codenames:
-#   1. gitops-infrastructure PR — add ubuntu-<codename>* mirror entries to
+# Procedure for adding jammy / bookworm / noble / future codenames:
+#   1. gitops-infrastructure PR — add <distro>-<codename>* mirror entries to
 #      platform/hetzner-cloud/deb-mirror/mirrors.yaml. Sync via
 #      `./mirror-ctl.sh sync-running deb-mirror-1`. Verify with
-#      `curl http://deb-mirror-ingress.mirror-ingress/ubuntu/dists/<codename>/Release`
-#      that Components includes "main universe".
-#   2. gitops-infrastructure PR — extend mirror-ubuntu.list in
+#      `curl http://deb-mirror-ingress.mirror-ingress/<prefix>/dists/<codename>/Release`
+#      that the Components line matches what you set below.
+#   2. gitops-infrastructure PR — extend the relevant mirror-*.list block in
 #      platform/hetzner-rivendell-1/applications/buildkite-agents/
 #      entrypoint{,-development}.yaml.gotmpl with the new codename triple.
-#   3. ONLY THEN, this allowlist.
+#   3. ONLY THEN, this allowlist + matching MIRROR_URL_PREFIX / MIRROR_COMPONENTS
+#      / MIRROR_LIST entry.
 case "$CODENAME" in
     focal)
+        MIRROR_LIST=/etc/apt/sources.list.d/mirror-ubuntu.list
+        MIRROR_URL_PREFIX="${APT_MIRROR_URL}/ubuntu"
+        MIRROR_COMPONENTS="main universe"
+        ;;
+    bullseye)
+        # Debian 11. Mina daemon's default Docker base image. Mirrored as the
+        # publish_prefix=debian publication added in gitops-infrastructure
+        # PR #1361. We only mirror Debian's `main` (no contrib / non-free)
+        # today; extend mirrors.yaml first if a build ever needs them.
+        MIRROR_LIST=/etc/apt/sources.list.d/mirror-debian.list
+        MIRROR_URL_PREFIX="${APT_MIRROR_URL}/debian"
+        MIRROR_COMPONENTS="main"
         ;;
     "")
-        echo "--- /etc/os-release has no VERSION_CODENAME; skipping deb-mirror Ubuntu setup ---"
+        echo "--- /etc/os-release has no VERSION_CODENAME; skipping deb-mirror setup ---"
         exit 0
         ;;
     *)
-        echo "--- deb-mirror has no Ubuntu mirror for codename '${CODENAME}'; skipping ---"
+        echo "--- deb-mirror has no mirror for codename '${CODENAME}'; skipping ---"
         exit 0
         ;;
 esac
 
-echo "--- Configuring deb-mirror Ubuntu sources (codename: ${CODENAME}) ---"
+echo "--- Configuring deb-mirror sources (codename: ${CODENAME}, prefix: ${MIRROR_URL_PREFIX}, components: ${MIRROR_COMPONENTS}) ---"
 
 # Derive host from APT_MIRROR_URL (strip scheme and any port) for the proxy
 # bypass below.
 mirror_host="${APT_MIRROR_URL#*://}"
 mirror_host="${mirror_host%%[:/]*}"
 
-cat > /etc/apt/sources.list.d/mirror-ubuntu.list <<EOF
-deb [trusted=yes] ${APT_MIRROR_URL}/ubuntu ${CODENAME} main universe
-deb [trusted=yes] ${APT_MIRROR_URL}/ubuntu ${CODENAME}-security main universe
-deb [trusted=yes] ${APT_MIRROR_URL}/ubuntu ${CODENAME}-updates main universe
+cat > "$MIRROR_LIST" <<EOF
+deb [trusted=yes] ${MIRROR_URL_PREFIX} ${CODENAME} ${MIRROR_COMPONENTS}
+deb [trusted=yes] ${MIRROR_URL_PREFIX} ${CODENAME}-security ${MIRROR_COMPONENTS}
+deb [trusted=yes] ${MIRROR_URL_PREFIX} ${CODENAME}-updates ${MIRROR_COMPONENTS}
 EOF
 
 # No Pin-Priority file. Earlier versions of this script wrote
@@ -209,8 +231,8 @@ Acquire::http::Proxy::${mirror_host} "DIRECT";
 Acquire::https::Proxy::${mirror_host} "DIRECT";
 EOF
 
-echo "--- /etc/apt/sources.list.d/mirror-ubuntu.list ---"
-cat /etc/apt/sources.list.d/mirror-ubuntu.list
+echo "--- ${MIRROR_LIST} ---"
+cat "$MIRROR_LIST"
 echo "--- /etc/apt/apt.conf.d/02proxy-bypass-mirror ---"
 cat /etc/apt/apt.conf.d/02proxy-bypass-mirror
 echo "------------------------"

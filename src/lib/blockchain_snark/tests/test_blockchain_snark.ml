@@ -37,7 +37,7 @@ let devnet_expected_values =
   { constraints = 10224
   ; public_input_size = 1
   ; auxiliary_input_size = 39397
-  ; digest = "bb70c6cd1767f3a723cf7edd4cc77355"
+  ; digest = "35f0209250e81bc60f7729f734498e43"
   }
 
 let lightnet_expected_values =
@@ -51,7 +51,7 @@ let mainnet_expected_values =
   { constraints = 10224
   ; public_input_size = 1
   ; auxiliary_input_size = 39397
-  ; digest = "bb70c6cd1767f3a723cf7edd4cc77355"
+  ; digest = "35f0209250e81bc60f7729f734498e43"
   }
 
 let expected_values =
@@ -69,7 +69,8 @@ let expected_values =
 
 (** Test blockchain-step circuit stats *)
 let test_blockchain_step () =
-  let constraint_constants = Genesis_constants.Compiled.constraint_constants in
+  let (module G) = Genesis_constants.profiled () in
+  let constraint_constants = G.constraint_constants in
   let proof_level = Genesis_constants.Proof_level.Full in
   let cs =
     Blockchain_snark.Blockchain_snark_state.step_constraint_system ~proof_level

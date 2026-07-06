@@ -1,0 +1,459 @@
+#!/usr/bin/env bash
+
+# Integration test for the full automode transition lifecycle:
+#   mina-generic (v1) → mina-devnet-automode (v2) → mina-generic (v3)
+#
+# In the split package layout the "normal" daemon is mina-NETWORK-generic
+# (binaries, owns /usr/local/bin/mina) + mina-NETWORK-config (config + service).
+#
+# Validates that:
+# - mina-NETWORK-generic + -config install cleanly
+# - mina-NETWORK-automode replaces the generic daemon via apt
+# - mina-NETWORK-generic (higher version) replaces automode and restores layout
+# - No automode-specific files remain after the final transition
+#
+# Prerequisites:
+#   - Built debs available in cache (depends on debian build CI step)
+#   - Running inside a toolchain container with apt/dpkg/fakeroot
+#
+# Usage:
+#   debian-automode-transition-test.sh --codename <codename> --network <network>
+
+set -euox pipefail
+
+CLEAR='\033[0m'
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[0;33m'
+
+export DEBIAN_FRONTEND=noninteractive
+
+git config --global --add safe.directory /workdir
+source buildkite/scripts/export-git-env-vars.sh
+
+SESSION_DIR="./scripts/debian/session"
+
+################################################################################
+# Logging
+################################################################################
+
+log_info()  { echo -e "${GREEN}[INFO]${CLEAR} $*"; }
+log_warn()  { echo -e "${YELLOW}[WARN]${CLEAR} $*"; }
+log_error() { echo -e "${RED}[ERROR]${CLEAR} $*"; }
+
+################################################################################
+# CLI
+################################################################################
+
+CODENAME="bullseye"
+NETWORK="devnet"
+
+usage() {
+    echo "Usage: $0 [OPTIONS]"
+    echo ""
+    echo "Options:"
+    echo "  -c, --codename    Debian codename (default: bullseye)"
+    echo "  -N, --network     Network name (default: devnet)"
+    echo "  -h, --help        Show this help"
+}
+
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        -c|--codename) CODENAME="$2"; shift 2 ;;
+        -N|--network)  NETWORK="$2"; shift 2 ;;
+        -h|--help)     usage; exit 0 ;;
+        *) log_error "Unknown option: $1"; usage; exit 1 ;;
+    esac
+done
+
+if [[ -z "${BUILDKITE_BUILD_ID:-}" ]]; then
+    log_error "BUILDKITE_BUILD_ID must be set"
+    exit 1
+fi
+
+################################################################################
+# Setup
+################################################################################
+
+WORKDIR=$(mktemp -d)
+DEB_DIR="${WORKDIR}/debs"
+REPO_DIR="${WORKDIR}/repo"
+VERSIONED_DIR="${WORKDIR}/versioned"
+
+mkdir -p "${DEB_DIR}" "${REPO_DIR}" "${VERSIONED_DIR}"
+
+cleanup() {
+    log_info "Cleaning up..."
+    rm -rf "${WORKDIR}"
+}
+trap cleanup EXIT
+
+# Detect sudo
+if [[ "${EUID}" -eq 0 ]]; then
+    SUDO=""
+else
+    SUDO="sudo"
+fi
+
+# In the split layout the normal daemon binaries live in the network-free
+# mina-generic package (not the legacy monolithic mina-NETWORK), so that is the
+# package we install, reversion and assert on for the v1/v3 "normal" states. The
+# per-profile generic layer (mina-NETWORK-generic) ships only the PROFILE hint.
+PKG_DAEMON="mina-generic"
+PKG_AUTOMODE="mina-${NETWORK}-automode"
+PKG_CONFIG="mina-${NETWORK}-config"
+# Profile leaf package (just the PROFILE hint, no deps).
+# PKG_PROFILE is the profile tent (depends on mina-generic + profile leaf).
+PKG_PROFILE="mina-${NETWORK}-generic"
+PKG_PROFILE_LEAF="mina-${NETWORK}-profile"
+PKG_POSTFORK="mina-${NETWORK}-postfork-mesa"
+PKG_PREFORK="mina-${NETWORK}-prefork-mesa"
+
+# Automode-specific paths that should NOT exist after restoring the generic daemon
+AUTOMODE_PATHS=(
+    "/usr/local/bin/mina-dispatch"
+    "/etc/default/mina-dispatch"
+    "/usr/lib/mina/mesa"
+    "/usr/lib/mina/berkeley"
+)
+
+# Normal daemon paths (shipped by mina-NETWORK-generic) that SHOULD exist after restore
+DAEMON_PATHS=(
+    "/usr/local/bin/mina"
+    "/usr/local/bin/coda-libp2p_helper"
+    "/usr/local/bin/mina-create-genesis"
+)
+
+################################################################################
+# Step 1: Download debs from cache
+################################################################################
+
+log_info "=== Step 1: Download debs from cache ==="
+
+# Download all relevant debs for this codename
+./buildkite/scripts/cache/manager.sh read "debians/${CODENAME}/${PKG_DAEMON}_*" "${DEB_DIR}"
+./buildkite/scripts/cache/manager.sh read "debians/${CODENAME}/${PKG_AUTOMODE}_*" "${DEB_DIR}"
+./buildkite/scripts/cache/manager.sh read "debians/${CODENAME}/${PKG_CONFIG}_*" "${DEB_DIR}"
+./buildkite/scripts/cache/manager.sh read "debians/${CODENAME}/${PKG_POSTFORK}_*" "${DEB_DIR}"
+./buildkite/scripts/cache/manager.sh read "debians/${CODENAME}/mina-logproc_*" "${DEB_DIR}"
+
+# Download the legacy prefork deb from the persistent legacy cache.
+# The automode metapackage depends on prefork at PREFORK_LEGACY_VERSION (not the
+# current build version), so we need the real legacy deb to satisfy that constraint.
+./buildkite/scripts/cache/manager.sh read "debians/${CODENAME}/${PKG_PROFILE}_*" "${DEB_DIR}"
+./buildkite/scripts/cache/manager.sh read "debians/${CODENAME}/${PKG_PROFILE_LEAF}_*" "${DEB_DIR}"
+./buildkite/scripts/cache/manager.sh read --root "legacy" "debians/${CODENAME}/${PKG_PREFORK}_*" "${DEB_DIR}"
+
+log_info "Downloaded debs:"
+ls -la "${DEB_DIR}"/*.deb
+
+################################################################################
+# Step 2: Create versioned variants using deb-session
+################################################################################
+
+log_info "=== Step 2: Create versioned package variants ==="
+
+# Original version from the build
+ORIG_DAEMON_DEB=$(ls "${DEB_DIR}"/${PKG_DAEMON}_*.deb | head -1)
+ORIG_AUTOMODE_DEB=$(ls "${DEB_DIR}"/${PKG_AUTOMODE}_*.deb | head -1)
+ORIG_CONFIG_DEB=$(ls "${DEB_DIR}"/${PKG_CONFIG}_*.deb | head -1)
+ORIG_POSTFORK_DEB=$(ls "${DEB_DIR}"/${PKG_POSTFORK}_*.deb | head -1)
+ORIG_LOGPROC_DEB=$(ls "${DEB_DIR}"/mina-logproc_*.deb | head -1)
+ORIG_PROFILE_DEB=$(ls "${DEB_DIR}"/${PKG_PROFILE}_*.deb | head -1)
+ORIG_PROFILE_LEAF_DEB=$(ls "${DEB_DIR}"/${PKG_PROFILE_LEAF}_*.deb | head -1)
+
+# The prefork debs come from the legacy cache at their original versions.
+# Copy all of them into the repo — no reversioning needed since the automode
+# metapackage already references the legacy version in its dependency.
+# We must include all variants so the correct one satisfying the dependency
+# constraint (>= PREFORK_LEGACY_VERSION) is available.
+cp "${DEB_DIR}"/${PKG_PREFORK}_*.deb "${REPO_DIR}/"
+
+reversion_deb() {
+    local input_deb="$1"
+    local new_version="$2"
+    local output_deb="$3"
+    local session_dir="${WORKDIR}/session_tmp"
+
+    rm -rf "${session_dir}"
+    "${SESSION_DIR}/deb-session-open.sh" "${input_deb}" "${session_dir}"
+    "${SESSION_DIR}/deb-session-reversion.sh" --update-deps "${session_dir}" "${new_version}"
+    "${SESSION_DIR}/deb-session-save.sh" "${session_dir}" "${output_deb}"
+    rm -rf "${session_dir}"
+}
+
+reversion_legacy_daemon_deb() {
+    local input_deb="$1"
+    local new_version="$2"
+    local output_deb="$3"
+    local session_dir="${WORKDIR}/session_tmp"
+
+    rm -rf "${session_dir}"
+    "${SESSION_DIR}/deb-session-open.sh" "${input_deb}" "${session_dir}"
+    "${SESSION_DIR}/deb-session-reversion.sh" --update-deps "${session_dir}" "${new_version}"
+    sed -i -E "s/, ${PKG_PROFILE} \\([^)]*\\)//" "${session_dir}/control/control"
+    if grep -q "^Depends:.*${PKG_PROFILE}" "${session_dir}/control/control"; then
+        log_error "Legacy ${PKG_DAEMON} package should not depend on ${PKG_PROFILE}"
+        grep -E "^(Package|Version|Depends):" "${session_dir}/control/control" || true
+        exit 1
+    fi
+    "${SESSION_DIR}/deb-session-save.sh" "${session_dir}" "${output_deb}"
+    rm -rf "${session_dir}"
+}
+
+V1="1.0.0-transition-test"
+V2="2.0.0-transition-test"
+V3="3.0.0-transition-test"
+
+# V1: generic daemon + config + logproc (pre-hardfork)
+reversion_deb "${ORIG_DAEMON_DEB}"  "${V1}" "${REPO_DIR}/${PKG_DAEMON}_${V1}_amd64.deb"
+# V1: mina-devnet + config + logproc (pre-hardfork, before profile packages)
+reversion_legacy_daemon_deb "${ORIG_DAEMON_DEB}" "${V1}" "${REPO_DIR}/${PKG_DAEMON}_${V1}_amd64.deb"
+reversion_deb "${ORIG_CONFIG_DEB}"  "${V1}" "${REPO_DIR}/${PKG_CONFIG}_${V1}_all.deb"
+reversion_deb "${ORIG_LOGPROC_DEB}" "${V1}" "${REPO_DIR}/mina-logproc_${V1}_amd64.deb"
+
+# V2: automode + postfork + config + logproc (hardfork)
+# Note: prefork is already in REPO_DIR from the legacy cache (not reversioned)
+reversion_deb "${ORIG_AUTOMODE_DEB}" "${V2}" "${REPO_DIR}/${PKG_AUTOMODE}_${V2}_all.deb"
+reversion_deb "${ORIG_POSTFORK_DEB}" "${V2}" "${REPO_DIR}/${PKG_POSTFORK}_${V2}_amd64.deb"
+reversion_deb "${ORIG_CONFIG_DEB}"   "${V2}" "${REPO_DIR}/${PKG_CONFIG}_${V2}_all.deb"
+reversion_deb "${ORIG_LOGPROC_DEB}"  "${V2}" "${REPO_DIR}/mina-logproc_${V2}_amd64.deb"
+
+# V3: generic daemon + config + profile + logproc (post-hardfork, back to normal)
+reversion_deb "${ORIG_DAEMON_DEB}"  "${V3}" "${REPO_DIR}/${PKG_DAEMON}_${V3}_amd64.deb"
+reversion_deb "${ORIG_CONFIG_DEB}"  "${V3}" "${REPO_DIR}/${PKG_CONFIG}_${V3}_all.deb"
+reversion_deb "${ORIG_LOGPROC_DEB}" "${V3}" "${REPO_DIR}/mina-logproc_${V3}_amd64.deb"
+reversion_deb "${ORIG_PROFILE_DEB}" "${V3}" "${REPO_DIR}/${PKG_PROFILE}_${V3}_amd64.deb"
+reversion_deb "${ORIG_PROFILE_LEAF_DEB}" "${V3}" "${REPO_DIR}/${PKG_PROFILE_LEAF}_${V3}_amd64.deb"
+
+log_info "Versioned packages:"
+ls -la "${REPO_DIR}"/*.deb
+
+################################################################################
+# Step 3: Resolve the local .deb files for each transition stage
+################################################################################
+#
+# Rather than serving the reversioned debs from a local package repository and
+# letting apt resolve everything by name, we install the concrete .deb files
+# directly.
+# apt-get still does full dependency resolution (Conflicts/Replaces, downgrades,
+# and pulling any non-mina deps from the system apt sources) when handed local
+# .deb files in a single invocation.
+
+log_info "=== Step 3: Resolve local .deb files per stage ==="
+
+# Prefork debs come straight from the legacy cache (their original version) and
+# satisfy the automode metapackage's prefork dependency. Pass all of them so the
+# correct one matching the dependency constraint is available to apt.
+mapfile -t PREFORK_DEBS < <(ls "${REPO_DIR}"/"${PKG_PREFORK}"_*.deb)
+
+# V1: mina-devnet + config + logproc (pre-hardfork)
+V1_DEBS=(
+    "${REPO_DIR}/${PKG_DAEMON}_${V1}_amd64.deb"
+    "${REPO_DIR}/${PKG_CONFIG}_${V1}_all.deb"
+    "${REPO_DIR}/mina-logproc_${V1}_amd64.deb"
+)
+
+# V2: automode + postfork + config + logproc (+ prefork files) (hardfork)
+V2_DEBS=(
+    "${REPO_DIR}/${PKG_AUTOMODE}_${V2}_all.deb"
+    "${REPO_DIR}/${PKG_POSTFORK}_${V2}_amd64.deb"
+    "${REPO_DIR}/${PKG_CONFIG}_${V2}_all.deb"
+    "${REPO_DIR}/mina-logproc_${V2}_amd64.deb"
+    "${PREFORK_DEBS[@]}"
+)
+
+# V3: mina-generic + config + profile + logproc (post-hardfork, back to normal)
+#
+# The network-free mina-generic daemon deliberately carries NO hard dependency
+# on a network profile package: the same deb is reused for every network, and
+# the generic docker image must be installable on its own (see commit dropping
+# the profile dependency from the generic/archive packages). Instead, the
+# profile is layered on top per-network — exactly how the "one generic + per
+# profile profiled" docker images are assembled. The transition test mirrors
+# that real deployment shape by co-installing the matching profile package
+# alongside generic + config in the final post-hardfork state.
+V3_DEBS=(
+    "${REPO_DIR}/${PKG_DAEMON}_${V3}_amd64.deb"
+    "${REPO_DIR}/${PKG_CONFIG}_${V3}_all.deb"
+    "${REPO_DIR}/${PKG_PROFILE}_${V3}_amd64.deb"
+    "${REPO_DIR}/${PKG_PROFILE_LEAF}_${V3}_amd64.deb"
+    "${REPO_DIR}/mina-logproc_${V3}_amd64.deb"
+)
+
+################################################################################
+# Step 4: Install generic daemon v1 (pre-hardfork state)
+################################################################################
+
+log_info "=== Step 4: Install ${PKG_DAEMON} v1 ==="
+
+log_info "Installing local .deb files for v1:"
+printf '  %s\n' "${V1_DEBS[@]}"
+
+$SUDO apt-get install -y --allow-downgrades --no-install-recommends "${V1_DEBS[@]}"
+
+log_info "Installed ${PKG_DAEMON} v1"
+dpkg -l "${PKG_DAEMON}" 2>/dev/null | tail -1
+
+if dpkg -l "${PKG_PROFILE}" 2>/dev/null | grep -q "^ii"; then
+    log_error "${PKG_PROFILE} should not be installed in v1"
+    exit 1
+fi
+log_info "PASS: ${PKG_PROFILE} is not installed in v1"
+
+# Verify mina binary is a real file (not a symlink to dispatcher)
+if [[ -L "/usr/local/bin/mina" ]]; then
+    log_error "/usr/local/bin/mina should be a real binary in v1, not a symlink"
+    exit 1
+fi
+log_info "PASS: /usr/local/bin/mina is a real binary"
+
+# Verify no automode paths exist
+for path in "${AUTOMODE_PATHS[@]}"; do
+    if [[ -e "$path" ]]; then
+        log_error "Automode path should not exist in v1: $path"
+        exit 1
+    fi
+done
+log_info "PASS: No automode paths in v1"
+
+################################################################################
+# Step 5: Upgrade to mina-devnet-automode v2 (hardfork transition)
+################################################################################
+
+log_info "=== Step 5: Upgrade to ${PKG_AUTOMODE} v2 ==="
+
+log_info "Installing local .deb files for v2:"
+printf '  %s\n' "${V2_DEBS[@]}"
+
+$SUDO apt-get install -y --allow-downgrades --no-install-recommends "${V2_DEBS[@]}"
+
+# When automode is installed from an apt repo, its prefork/postfork sub-packages
+# are pulled in as automatically-installed dependencies, so a later `apt-get
+# autoremove` reclaims them once automode is gone. Installing the .deb files
+# directly (no repo) marks every explicitly-named file as manually installed,
+# which would defeat autoremove. Re-mark the sub-packages as auto so the orphan
+# cleanup in Step 6 mirrors the real repo-based transition.
+$SUDO apt-mark auto "${PKG_PREFORK}" "${PKG_POSTFORK}" || true
+
+log_info "Package state after automode install:"
+dpkg -l "${PKG_AUTOMODE}" 2>/dev/null | tail -1 || true
+dpkg -l "${PKG_POSTFORK}" 2>/dev/null | tail -1 || true
+dpkg -l "${PKG_PREFORK}" 2>/dev/null | tail -1 || true
+dpkg -l "${PKG_PROFILE}" 2>/dev/null | tail -1 || true
+dpkg -l "${PKG_DAEMON}" 2>/dev/null | tail -1 || true
+
+# the generic daemon should be removed (replaced by automode)
+if dpkg -l "${PKG_DAEMON}" 2>/dev/null | grep -q "^ii"; then
+    log_error "${PKG_DAEMON} should have been replaced by ${PKG_AUTOMODE}"
+    exit 1
+fi
+log_info "PASS: ${PKG_DAEMON} removed by automode transition"
+
+# mina-dispatch should exist (from postfork package)
+if [[ ! -e "/usr/local/bin/mina-dispatch" ]]; then
+    log_error "mina-dispatch should exist after automode install"
+    exit 1
+fi
+log_info "PASS: mina-dispatch present"
+
+# /usr/local/bin/mina should be a symlink to mina-dispatch
+if [[ ! -L "/usr/local/bin/mina" ]]; then
+    log_error "/usr/local/bin/mina should be a symlink in automode"
+    exit 1
+fi
+log_info "PASS: /usr/local/bin/mina is a symlink (automode dispatcher)"
+
+################################################################################
+# Step 6: Restore generic daemon v3 (post-hardfork, back to normal)
+################################################################################
+
+log_info "=== Step 6: Restore ${PKG_DAEMON} v3 ==="
+
+log_info "Installing local .deb files for v3:"
+printf '  %s\n' "${V3_DEBS[@]}"
+
+$SUDO apt-get install -y --allow-downgrades --no-install-recommends "${V3_DEBS[@]}"
+
+# automode metapackage conflicts with the generic daemon, so apt should remove it.
+# The prefork/postfork sub-packages were only dependencies of automode, so
+# they become orphans. Run autoremove to clean them up (simulates operator
+# running apt autoremove after a transition).
+$SUDO apt-get autoremove -y
+
+log_info "Package state after restore:"
+dpkg -l "${PKG_DAEMON}" 2>/dev/null | tail -1 || true
+dpkg -l "${PKG_AUTOMODE}" 2>/dev/null | tail -1 || true
+dpkg -l "${PKG_POSTFORK}" 2>/dev/null | tail -1 || true
+dpkg -l "${PKG_PREFORK}" 2>/dev/null | tail -1 || true
+
+# generic daemon v3 should be installed
+if ! dpkg -l "${PKG_DAEMON}" 2>/dev/null | grep -q "^ii"; then
+    log_error "${PKG_DAEMON} v3 should be installed"
+    exit 1
+fi
+log_info "PASS: ${PKG_DAEMON} v3 installed"
+
+if ! dpkg -l "${PKG_PROFILE}" 2>/dev/null | grep -q "^ii"; then
+    log_error "${PKG_PROFILE} should be installed alongside ${PKG_DAEMON} v3 in the post-hardfork state"
+    exit 1
+fi
+log_info "PASS: ${PKG_PROFILE} installed (layered on top of the generic daemon)"
+
+# Automode metapackage should be gone
+if dpkg -l "${PKG_AUTOMODE}" 2>/dev/null | grep -q "^ii"; then
+    log_error "${PKG_AUTOMODE} should have been removed"
+    exit 1
+fi
+log_info "PASS: ${PKG_AUTOMODE} removed"
+
+# Postfork/prefork should be gone (removed by autoremove)
+if dpkg -l "${PKG_POSTFORK}" 2>/dev/null | grep -q "^ii"; then
+    log_error "${PKG_POSTFORK} should have been removed by autoremove"
+    exit 1
+fi
+log_info "PASS: ${PKG_POSTFORK} removed"
+
+if dpkg -l "${PKG_PREFORK}" 2>/dev/null | grep -q "^ii"; then
+    log_error "${PKG_PREFORK} should have been removed by autoremove"
+    exit 1
+fi
+log_info "PASS: ${PKG_PREFORK} removed"
+
+# Verify /usr/local/bin/mina is a real binary again (not a symlink)
+if [[ -L "/usr/local/bin/mina" ]]; then
+    log_error "/usr/local/bin/mina should be a real binary after restore, not a symlink"
+    exit 1
+fi
+log_info "PASS: /usr/local/bin/mina is a real binary again"
+
+# Verify daemon binaries exist
+for path in "${DAEMON_PATHS[@]}"; do
+    if [[ ! -e "$path" ]]; then
+        log_error "Daemon path should exist after restore: $path"
+        exit 1
+    fi
+done
+log_info "PASS: All daemon binaries present"
+
+# Verify automode-specific files are gone
+AUTOMODE_LEFTOVER=0
+for path in "${AUTOMODE_PATHS[@]}"; do
+    if [[ -e "$path" ]]; then
+        log_error "Automode leftover found: $path"
+        AUTOMODE_LEFTOVER=1
+    fi
+done
+
+if [[ "${AUTOMODE_LEFTOVER}" -eq 1 ]]; then
+    log_error "Automode files were not cleaned up during transition back to ${PKG_DAEMON}"
+    exit 1
+fi
+log_info "PASS: No automode files remain"
+
+################################################################################
+# Done
+################################################################################
+
+log_info "=== Debian Automode Transition Test PASSED ==="
+log_info "Successfully tested: ${PKG_DAEMON}(v1) → ${PKG_AUTOMODE}(v2) → ${PKG_DAEMON}(v3)"

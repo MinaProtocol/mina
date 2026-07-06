@@ -10,8 +10,8 @@ let get_filenames =
   | filenames ->
       filenames
 
-let verify_snark_work ~verify_transaction_snarks ~proof ~message =
-  verify_transaction_snarks [ (proof, message) ]
+let verify_snark_work ~verify_transaction_snarks ~proof =
+  verify_transaction_snarks [ proof ]
 
 let config_flag =
   let open Command.Param in
@@ -108,7 +108,19 @@ module Make_verifier (Source : Submission.Data_source) = struct
               Mina_base.Sok_message.create ~fee:snark_work_fee
                 ~prover:(Source.submitter submission)
             in
-            verify_snark_work ~verify_transaction_snarks ~proof ~message
+            let%bind () =
+              Deferred.return
+              @@
+              if
+                Sok_message.Digest.equal
+                  (Sok_message.digest message)
+                  (Ledger_proof.sok_digest proof)
+              then Ok ()
+              else
+                Or_error.error_string
+                  "proof's sok message digest does not match the sok message"
+            in
+            verify_snark_work ~verify_transaction_snarks ~proof
       else return ()
     in
     let header = Mina_block.Stable.Latest.header block in
@@ -156,12 +168,11 @@ let filesystem_command =
       and config_file = config_flag
       and signature_kind = Cli_lib.Flag.signature_kind in
       fun () ->
+        let (module G) = Genesis_constants.profiled () in
         let logger = Logger.create () in
-        let genesis_constants = Genesis_constants.Compiled.genesis_constants in
-        let constraint_constants =
-          Genesis_constants.Compiled.constraint_constants
-        in
-        let proof_level = Genesis_constants.Compiled.proof_level in
+        let genesis_constants = G.genesis_constants in
+        let constraint_constants = G.constraint_constants in
+        let proof_level = G.proof_level in
         let%bind.Deferred verify_blockchain_snarks, verify_transaction_snarks =
           instantiate_verify_functions ~logger config_file ~genesis_constants
             ~constraint_constants ~proof_level ~cli_proof_level:None
@@ -198,11 +209,11 @@ let cassandra_command =
       fun () ->
         let open Deferred.Let_syntax in
         let logger = Logger.create () in
-        let genesis_constants = Genesis_constants.Compiled.genesis_constants in
-        let constraint_constants =
-          Genesis_constants.Compiled.constraint_constants
-        in
-        let proof_level = Genesis_constants.Compiled.proof_level in
+
+        let (module G) = Genesis_constants.profiled () in
+        let genesis_constants = G.genesis_constants in
+        let constraint_constants = G.constraint_constants in
+        let proof_level = G.proof_level in
         let%bind.Deferred verify_blockchain_snarks, verify_transaction_snarks =
           instantiate_verify_functions ~logger config_file ~genesis_constants
             ~constraint_constants ~proof_level ~cli_proof_level:None
@@ -239,11 +250,11 @@ let stdin_command =
       fun () ->
         let open Deferred.Let_syntax in
         let logger = Logger.create () in
-        let genesis_constants = Genesis_constants.Compiled.genesis_constants in
-        let constraint_constants =
-          Genesis_constants.Compiled.constraint_constants
-        in
-        let proof_level = Genesis_constants.Compiled.proof_level in
+
+        let (module G) = Genesis_constants.profiled () in
+        let genesis_constants = G.genesis_constants in
+        let constraint_constants = G.constraint_constants in
+        let proof_level = G.proof_level in
         let%bind.Deferred verify_blockchain_snarks, verify_transaction_snarks =
           instantiate_verify_functions ~logger config_file ~genesis_constants
             ~constraint_constants ~proof_level ~cli_proof_level:None

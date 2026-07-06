@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # NOTE: This script patches the genesis timestamp of a fork config so a new 
-# network could be schedueld to genesis in some instant in the future.
+# network could be scheduled to genesis in some instant in the future.
 
 set -eux -o pipefail
 

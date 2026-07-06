@@ -2,12 +2,18 @@
 
 set -u
 
+# When invoked inside the toolchain container, the bind-mounted /workdir is
+# owned by the host buildkite-agent user, which trips git's "dubious ownership"
+# guard. export-git-env-vars.sh below runs git, so mark the cwd as safe first.
+# Harmless on hosts (the entry just lists a trusted path).
+git config --global --add safe.directory "$(pwd)"
+
 if [[ $# -gt 2 ]] || [[ $# -lt 1 ]]; then
     echo "Usage: $0 '<debians>' '[use-sudo]'"
     exit 1
 fi
 
-if [ -z "${MINA_DEB_CODENAME:-}" ]; then 
+if [ -z "${MINA_DEB_CODENAME:-}" ]; then
     echo "MINA_DEB_CODENAME env var is not defined"
     exit 1
 fi
@@ -42,18 +48,35 @@ if [ -z "$DEBS" ]; then
 else
   # shellcheck disable=SC2206
   debs=(${DEBS//,/ })
+  # Install a single profile package (devnet) as the on-disk default profile.
+  # The per-profile leaf packages (mina-devnet-profile, mina-mainnet-profile,
+  # mina-lightnet, mina-dev) all ship /etc/coda/build_config/PROFILE and are
+  # therefore mutually exclusive (installing more than one collides in dpkg).
+  # The convenience tent mina-${profile}-generic depends on this leaf package
+  # plus mina-generic.
+  # The daemon resolves its profile from MINA_PROFILE first and only falls back to
+  # this file, so tests needing a different profile (e.g. single-node-tests) set
+  # MINA_PROFILE themselves and override the devnet default.
+  ./buildkite/scripts/cache/manager.sh read --root "$ROOT" "debians/$MINA_DEB_CODENAME/mina-devnet-profile_*" $LOCAL_DEB_FOLDER
   for i in "${debs[@]}"; do
     case $i in
-      mina-devnet-generic*)
+      mina-generic*)
         # Download mina-logproc too
           ./buildkite/scripts/cache/manager.sh read --root "$ROOT" "debians/$MINA_DEB_CODENAME/mina-logproc*" $LOCAL_DEB_FOLDER
       ;;
-      mina-devnet|mina-mainnet)
+      mina-devnet|mina-mainnet|mina-mesa)
         # Download mina-logproc and sub debians (apps and config) too
           ./buildkite/scripts/cache/manager.sh read --root "$ROOT" "debians/$MINA_DEB_CODENAME/mina-logproc*" $LOCAL_DEB_FOLDER
           ./buildkite/scripts/cache/manager.sh read --root "$ROOT" "debians/$MINA_DEB_CODENAME/${i}-config*" $LOCAL_DEB_FOLDER
       ;;
-      mina-devnet-legacy|mina-mainnet-legacy)
+      mina-devnet-instrumented|mina-mainnet-instrumented|mina-mesa-instrumented)
+        # Instrumented daemon depends on mina-logproc and the non-instrumented
+        # network-config deb (config files are the same for both flavors).
+          network_pkg=${i%-instrumented}
+          ./buildkite/scripts/cache/manager.sh read --root "$ROOT" "debians/$MINA_DEB_CODENAME/mina-logproc*" $LOCAL_DEB_FOLDER
+          ./buildkite/scripts/cache/manager.sh read --root "$ROOT" "debians/$MINA_DEB_CODENAME/${network_pkg}-config*" $LOCAL_DEB_FOLDER
+      ;;
+      mina-*-prefork*)
         # Download mina-logproc legacy too
         ./buildkite/scripts/cache/manager.sh read --root "legacy" "debians/$MINA_DEB_CODENAME/${i}*" $LOCAL_DEB_FOLDER
     esac
@@ -61,36 +84,37 @@ else
   done
 fi
 
-debs_with_version=()
-for i in "${debs[@]}"; do
-   debs_with_version+=("${i}=${VERSION}")
-done
+# Enumerate the concrete .deb files that were downloaded into the local folder
+# and install them directly with apt-get (local-file install). apt-get still
+# resolves any non-mina dependencies from the system's normal apt sources, and
+# installing local .deb files upgrades/downgrades the mina packages in place.
+#
+# Use absolute paths: apt-get only treats an argument as a local .deb file when
+# it starts with '/' or './'. A bare relative path like 'debs/foo.deb' is
+# instead parsed as the 'package/release' selector syntax (package "debs" from
+# release "foo.deb"), which fails with "Unable to locate package debs".
+ABS_DEB_FOLDER="$(cd "$LOCAL_DEB_FOLDER" && pwd)"
+deb_files=()
+while IFS= read -r -d '' f; do
+  deb_files+=("$f")
+done < <(find "$ABS_DEB_FOLDER" -maxdepth 1 -name '*.deb' -print0)
 
-# Start aptly
-source ./scripts/debian/aptly.sh start --codename $MINA_DEB_CODENAME --debians $LOCAL_DEB_FOLDER --component unstable --clean --background --wait
+if [ "${#deb_files[@]}" -eq 0 ]; then
+  echo "No .deb files were downloaded into '$LOCAL_DEB_FOLDER'. Nothing to install."
+  exit 1
+fi
 
 # Install debians
 echo "Installing mina packages: $DEBS"
-echo "deb [trusted=yes] http://localhost:8080 $MINA_DEB_CODENAME unstable" | $SUDO tee /etc/apt/sources.list.d/mina.list
+echo "Installing the following local .deb files:"
+printf '  %s\n' "${deb_files[@]}"
 
-# Bypass any configured APT proxy for localhost (where aptly serves packages)
-eval "$(./buildkite/scripts/debian/apt-proxy-bypass.sh localhost)"
-
-# Update apt packages for the new repo, preserving all others
-$SUDO apt-get update --yes \
-  -o Dir::Etc::sourcelist="sources.list.d/mina.list" \
-  -o Dir::Etc::sourceparts="-" \
-  -o APT::Get::List-Cleanup="0" \
-  $APT_PROXY_BYPASS_OPTS
-$SUDO apt-get remove --yes "${debs[@]}"
-$SUDO apt-get install --yes --allow-downgrades \
-  $APT_PROXY_BYPASS_OPTS \
-  "${debs_with_version[@]}"
-
-
+# Installing the local .deb files already replaces (upgrades/downgrades) any
+# currently-installed version of the same packages, so no explicit pre-remove
+# step is needed. --allow-downgrades permits installing an older version when
+# the upgrade tests require it; non-mina dependencies are pulled from the
+# system's normal apt sources in a single resolution pass.
+$SUDO apt-get install -y --allow-downgrades --no-install-recommends "${deb_files[@]}"
 
 # Cleaning up
-source ./scripts/debian/aptly.sh stop  --clean
-$SUDO rm -f /etc/apt/sources.list.d/mina.list
-
 rm -rf $LOCAL_DEB_FOLDER

@@ -2,10 +2,12 @@
 
 # Test script for verifying debian package upgrades work correctly.
 # This test:
-# 1. Installs the current mina-devnet from packages.o1test.net
+# 1. Installs the current (pre-split) mina-devnet from packages.o1test.net
 # 2. Records config files and version before upgrade
-# 3. Downloads new debian from Hetzner cache
-# 4. Upgrades the package
+# 3. Downloads the new debian(s) from Hetzner cache
+# 4. Upgrades to the new layout: the monolithic mina-devnet is replaced by
+#    mina-generic (binaries) + mina-devnet-config (config + service),
+#    which declare Replaces/Breaks against the old mina-devnet.
 # 5. Verifies config files and version after upgrade
 
 set -euox pipefail
@@ -19,8 +21,13 @@ YELLOW='\033[0;33m'
 REPO="${REPO:-packages.o1test.net}"
 CODENAME="${CODENAME:-bullseye}"
 CHANNEL="${CHANNEL:-alpha}"
+# PACKAGE is the pre-split package we install from the public repo (step 1) and
+# whose migration we are exercising.
 PACKAGE="${PACKAGE:-mina-devnet}"
-NEW_DEBIAN_PATH="${NEW_DEBIAN_PATH:-}"  # Path pattern in cache, e.g., "debians/bullseye/mina-devnet_*.deb"
+# INSTALL_PACKAGES is the comma-separated set we upgrade TO from cache (step 4).
+# In the split layout the daemon is mina-generic + mina-devnet-config.
+INSTALL_PACKAGES="${INSTALL_PACKAGES:-mina-generic,mina-devnet-config}"
+NEW_DEBIAN_PATH="${NEW_DEBIAN_PATH:-}"  # Path pattern in cache, e.g., "debians/bullseye/mina-generic_*.deb"
 
 # Don't prompt for answers during apt-get install
 export DEBIAN_FRONTEND=noninteractive
@@ -50,12 +57,13 @@ function usage() {
     echo "  -r, --repo          Repository URL (default: packages.o1test.net)"
     echo "  -c, --codename      Debian codename (default: bullseye)"
     echo "  -C, --channel       Repository channel (default: alpha)"
-    echo "  -p, --package       Package name (default: mina-devnet)"
-    echo "  -n, --new-debian    Path to new debian in cache (required)"
+    echo "  -p, --package       Pre-split package to install from repo (default: mina-devnet)"
+    echo "  -i, --install-packages  Comma-separated packages to upgrade to (default: mina-generic,mina-devnet-config)"
+    echo "  -n, --new-debian    Path to new debian in cache, used to derive version (required)"
     echo "  -h, --help          Show this help message"
     echo ""
     echo "Example:"
-    echo "  $0 --new-debian 'debians/bullseye/mina-devnet_*.deb'"
+    echo "  $0 --new-debian 'debians/bullseye/mina-generic_*.deb'"
 }
 
 # Function to extract the first 8 characters of the commit hash from a version string
@@ -82,6 +90,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         -p|--package)
             PACKAGE="$2"
+            shift 2
+            ;;
+        -i|--install-packages)
+            INSTALL_PACKAGES="$2"
             shift 2
             ;;
         -n|--new-debian)
@@ -179,20 +191,23 @@ fi
 
 log_info "Downloaded from cache: ${NEW_DEB_FILE}"
 
-# Extract version from the downloaded deb filename to pass to install.sh
-# Filename format: {package}_{version}_{arch}.deb
+# Extract version from the downloaded deb filename to pass to install.sh.
+# Filename format: {package}_{version}_{arch}.deb — grab the middle field so
+# this works regardless of which package name we derive the version from.
 NEW_DEB_BASENAME=$(basename "${NEW_DEB_FILE}")
-FORCE_VERSION=$(echo "${NEW_DEB_BASENAME}" | sed "s/^${PACKAGE}_//; s/_[^_]*\.deb$//")
+FORCE_VERSION=$(echo "${NEW_DEB_BASENAME}" | sed -E 's/^.*_([^_]+)_[^_]+\.deb$/\1/')
 export FORCE_VERSION
 log_info "Extracted version from deb: ${FORCE_VERSION}"
 
-# Step 4: Upgrade the package
-log_info "--- Step 4: Upgrading package ---"
+# Step 4: Upgrade to the new (split) package layout.  install.sh pulls these
+# from the build cache at ${FORCE_VERSION}; mina-generic/-config declare
+# Replaces/Breaks on the old mina-devnet, so apt removes it during the upgrade.
+log_info "--- Step 4: Upgrading package(s): ${INSTALL_PACKAGES} ---"
 
 if [[ -n "$SUDO" ]]; then
-    source buildkite/scripts/debian/install.sh "mina-devnet" 1
+    source buildkite/scripts/debian/install.sh "${INSTALL_PACKAGES}" 1
 else
-    source buildkite/scripts/debian/install.sh "mina-devnet"
+    source buildkite/scripts/debian/install.sh "${INSTALL_PACKAGES}"
 fi
 
 # Step 5: Verify post-upgrade state
@@ -204,15 +219,29 @@ log_info "Post-upgrade mina version: ${POST_COMMIT}"
 POST_COMMIT_SHORT=$(get_short_commit "${POST_COMMIT}")
 log_info "Post-upgrade commit: ${POST_COMMIT_SHORT}"
 
+# Function to verify file existence and log details
+# Arguments:
+#   1: File path
+#   2: Human-readable name/description for error messages
+verify_required_file() {
+    local file_path="$1"
+    local description="$2"
 
-POST_CONFIG_FILE="${CONFIG_DIR}"/config_${POST_COMMIT_SHORT}.json
-if [[ -f "${POST_CONFIG_FILE}" ]]; then
-    log_info "Found config file: ${POST_CONFIG_FILE}"
-    log_info "  - $(basename "$POST_CONFIG_FILE"): $(stat -c %s "$POST_CONFIG_FILE") bytes"
-else
-    log_error "No config_${POST_COMMIT_SHORT}.json file found after upgrade"
-    exit 1
-fi
+    if [[ -f "$file_path" ]]; then
+        log_info "Found ${description}: ${file_path}"
+        log_info "  - $(basename "$file_path"): $(stat -c %s "$file_path") bytes"
+    else
+        log_error "No ${file_path} file found after upgrade (${description})"
+        exit 1
+    fi
+}
+
+# --- Usage ---
+
+POST_CONFIG_FILE="${CONFIG_DIR}/config_${POST_COMMIT_SHORT}.json"
+verify_required_file "$POST_CONFIG_FILE" "config file"
+
+verify_required_file "/etc/coda/build_config/PROFILE" "profile file"
 
 log_info "=== Debian Upgrade Test PASSED ==="
 log_info "Successfully upgraded from ${PRE_COMMIT} to ${POST_COMMIT}"

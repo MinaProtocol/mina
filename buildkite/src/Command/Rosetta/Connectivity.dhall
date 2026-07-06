@@ -18,13 +18,15 @@ let Size = ../../Command/Size.dhall
 
 let Network = ../../Constants/Network.dhall
 
-let Artifacts = ../../Constants/Artifacts.dhall
+let Docker = ../../Constants/Docker/Package.dhall
 
-let Dockers = ../../Constants/DockerVersions.dhall
+let Dockers = ../../Constants/Docker/Versions.dhall
 
 let Profiles = ../../Constants/Profiles.dhall
 
 let DockerRepo = ../../Constants/DockerRepo.dhall
+
+let Expr = ../../Pipeline/Expr.dhall
 
 let RunInToolchain = ../../Command/RunInToolchain.dhall
 
@@ -46,6 +48,8 @@ let Spec =
           , scope : List PipelineScope.Type
           , repo : DockerRepo.Type
           , if_ : B/If
+          , excludeIf : List Expr.Type
+          , includeIf : List Expr.Type
           }
       , default =
           { dockerType = Dockers.Type.Bullseye
@@ -57,6 +61,8 @@ let Spec =
           , profile = Profiles.Type.Devnet
           , scope = PipelineScope.Full
           , repo = DockerRepo.Type.InternalEurope
+          , includeIf = [] : List Expr.Type
+          , excludeIf = [] : List Expr.Type
           , if_ =
               "build.pull_request.base_branch != \"develop\" && build.branch != \"develop\""
           }
@@ -95,7 +101,7 @@ let command
                   Dockers.DepsSpec::{
                   , codename = spec.dockerType
                   , network = spec.network
-                  , artifact = Artifacts.Type.Rosetta
+                  , artifact = Docker.Type.Rosetta { network = spec.network }
                   , profile = spec.profile
                   }
             }
@@ -119,13 +125,15 @@ let pipeline
                       "dhall"
                   , S.exactly "scripts/tests/rosetta-connectivity" "sh"
                   , S.exactly
-                      "buildkite/scripts/tests/rosetta-integration-tests"
+                      "buildkite/scripts/tests/rosetta/integration-tests"
                       "sh"
                   ]
                 # spec.additionalDirtyWhen
             , path = "Test"
             , name = "Rosetta${Network.capitalName spec.network}Connect"
             , scope = spec.scope
+            , excludeIf = spec.excludeIf
+            , includeIf = spec.includeIf
             , tags =
               [ PipelineTag.Type.Long
               , PipelineTag.Type.Test

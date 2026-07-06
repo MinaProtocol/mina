@@ -4,8 +4,8 @@ open Core_kernel
 module Stable = struct
   [@@@no_toplevel_latest_type]
 
-  module V1 = struct
-    type t = { staged_ledger_diff : Diff.Stable.V2.t }
+  module V2 = struct
+    type t = { staged_ledger_diff : Diff.Stable.V3.t }
     [@@deriving equal, fields, sexp]
 
     let to_latest = Fn.id
@@ -36,15 +36,15 @@ type t = { staged_ledger_diff : Diff.t } [@@deriving fields]
 let create staged_ledger_diff = { staged_ledger_diff }
 
 let to_binio_bigstring b =
-  let sz = Stable.V1.bin_size_t b in
+  let sz = Stable.Latest.bin_size_t b in
   let buf = Bin_prot.Common.create_buf sz in
-  ignore (Stable.V1.bin_write_t buf ~pos:0 b : int) ;
+  ignore (Stable.Latest.bin_write_t buf ~pos:0 b : int) ;
   buf
 
 let serialize_with_len_and_tag ~tag b =
-  let len = Stable.V1.bin_size_t b in
+  let len = Stable.Latest.bin_size_t b in
   let bs' = Bigstring.create (len + 5) in
-  ignore (Stable.V1.bin_write_t bs' ~pos:5 b : int) ;
+  ignore (Stable.Latest.bin_write_t bs' ~pos:5 b : int) ;
   Bigstring.set_uint8_exn ~pos:4 bs' tag ;
   Bigstring.set_uint32_le_exn ~pos:0 bs' (len + 1) ;
   bs'

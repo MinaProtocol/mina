@@ -1,9 +1,5 @@
 let S = ../../Lib/SelectFiles.dhall
 
-let B = ../../External/Buildkite.dhall
-
-let B/SoftFail = B.definitions/commandStep/properties/soft_fail/Type
-
 let JobSpec = ../../Pipeline/JobSpec.dhall
 
 let Pipeline = ../../Pipeline/Dsl.dhall
@@ -14,11 +10,16 @@ let ConnectToNetwork = ../../Command/ConnectToNetwork.dhall
 
 let Network = ../../Constants/Network.dhall
 
-let Dockers = ../../Constants/DockerVersions.dhall
+let DebianVersions = ../../Constants/DebianVersions.dhall
+
+let Expr = ../../Pipeline/Expr.dhall
+
+let MainlineBranch = ../../Pipeline/MainlineBranch.dhall
 
 let network = Network.Type.Devnet
 
-let dependsOn = Dockers.dependsOn Dockers.DepsSpec::{ network = network }
+let dependsOn =
+      DebianVersions.dependsOn DebianVersions.DepsSpec::{ network = network }
 
 in  Pipeline.build
       Pipeline.Config::{
@@ -36,14 +37,25 @@ in  Pipeline.build
           , PipelineTag.Type.Test
           , PipelineTag.Type.Stable
           ]
+        , excludeIf =
+          [ Expr.Type.DescendantOf
+              { ancestor = MainlineBranch.Type.Mesa
+              , reason = "Mesa does not have devnet network yet"
+              }
+          , Expr.Type.DescendantOf
+              { ancestor = MainlineBranch.Type.Develop
+              , reason =
+                  "Develop branch is incompatible with current devnet network"
+              }
+          ]
         }
       , steps =
         [ ConnectToNetwork.step
-            dependsOn
-            "${Network.lowerName network}"
-            "${Network.lowerName network}"
-            "40s"
-            "25min"
-            (B/SoftFail.Boolean False)
+            ConnectToNetwork.Spec::{
+            , dependsOn = dependsOn
+            , mina_suffix = "${Network.lowerName network}"
+            , testnet = "${Network.lowerName network}"
+            , peer_list_url = Network.peerListUrl network
+            }
         ]
       }

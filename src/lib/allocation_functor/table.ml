@@ -52,8 +52,8 @@ module Allocation_data = struct
   let unregister_allocation data id =
     Queue.filter_inplace data.allocation_times ~f:(fun (id', _) -> id = id')
 
-  let compute_statistics { allocation_times; _ } =
-    let now = Time.now () in
+  let compute_statistics ?now { allocation_times; _ } =
+    let now = Option.value now ~default:(Time.now ()) in
     let count = Queue.length allocation_times in
     let lifetime_ms_of_time time = Time.Span.to_ms (Time.diff now time) in
     let get_lifetime_ms i =
@@ -89,8 +89,8 @@ module Allocation_data = struct
     in
     Allocation_statistics.{ count; lifetimes }
 
-  let compute_statistics t =
-    try compute_statistics t
+  let compute_statistics ?now t =
+    try compute_statistics ?now t
     with _ ->
       Allocation_statistics.
         { count = 0; lifetimes = Allocation_statistics.make_quartiles 0. }
@@ -119,7 +119,7 @@ module Allocation_data = struct
           ; next_allocation_id = 0
           }
         in
-        let stats = compute_statistics data in
+        let stats = compute_statistics ~now data in
         [%test_eq: int] stats.count (List.length time_offsets) ;
         [%test_eq: robust_float] stats.lifetimes.q1 expected_quartiles.q1 ;
         [%test_eq: robust_float] stats.lifetimes.q2 expected_quartiles.q2 ;
