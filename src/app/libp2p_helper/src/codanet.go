@@ -656,28 +656,26 @@ func (h *Helper) TrimOpenConns(ctx context.Context) {
 }
 
 // MakeHelper does all the initialization to run one host
-func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Multiaddr, statedir string, pk crypto.PrivKey, networkID string, seeds []peer.AddrInfo, gatingConfig *CodaGatingConfig, minConnections, maxConnections int, peerProtectionRatio float32, grace time.Duration, knownPrivateIpNets []gonet.IPNet) (*Helper, error) {
-	me, err := peer.IDFromPrivateKey(pk)
+func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Multiaddr, statedir string, privateKey crypto.PrivKey, networkID string, seeds []peer.AddrInfo, gatingConfig *CodaGatingConfig, minConnections, maxConnections int, peerProtectionRatio float32, grace time.Duration, knownPrivateIpNets []gonet.IPNet) (*Helper, error) {
+	me, err := peer.IDFromPrivateKey(privateKey)
 	if err != nil {
 		return nil, err
 	}
 
+	// Deny out all intranet p2p communication
 	initPrivateIpFilter()
 
-	dso := dsb.DefaultOptions
-
-	ds, err := dsb.NewDatastore(path.Join(statedir, "libp2p-peerstore-v0"), &dso)
+	dhtDataStore, err := dsb.NewDatastore(path.Join(statedir, "libp2p-dht-v0"), &dsb.DefaultOptions)
 	if err != nil {
 		return nil, err
 	}
 
-	dsoDht := dsb.DefaultOptions
-	dsDht, err := dsb.NewDatastore(path.Join(statedir, "libp2p-dht-v0"), &dsoDht)
+	peerDataStore, err := dsb.NewDatastore(path.Join(statedir, "libp2p-peerstore-v0"), &dsb.DefaultOptions)
 	if err != nil {
 		return nil, err
 	}
 
-	ps, err := pstoreds.NewPeerstore(ctx, ds, pstoreds.DefaultOpts())
+	peerStore, err := pstoreds.NewPeerstore(ctx, peerDataStore, pstoreds.DefaultOpts())
 	if err != nil {
 		return nil, err
 	}
@@ -686,8 +684,8 @@ func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Mu
 
 	pnetKey := blake2b.Sum256([]byte(rendezvousString))
 
-	// custom validator to omit the ipns validation.
-	rv := customValidator{Base: record.NamespacedValidator{"pk": record.PublicKeyValidator{}}}
+	// Custom validator to omit IPNS validation.
+	recordValidator := customValidator{Base: record.NamespacedValidator{"pk": record.PublicKeyValidator{}}}
 
 	lanPatcher := patcher.NewPatcher()
 	wanPatcher := patcher.NewPatcher()
@@ -711,14 +709,14 @@ func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Mu
 		knownPrivateAddrFilters.AddFilter(net, ma.ActionAccept)
 	}
 
-	gs := NewCodaGatingState(gatingConfig, knownPrivateAddrFilters)
+	gatingState := NewCodaGatingState(gatingConfig, knownPrivateAddrFilters)
 	host, err := p2p.New(
 		p2p.Transport(tcp.NewTCPTransport),
 		p2p.Muxer("/coda/yamux/1.0.0", libp2pyamux.DefaultTransport),
-		p2p.Identity(pk),
-		p2p.Peerstore(ps),
+		p2p.Identity(privateKey),
+		p2p.Peerstore(peerStore),
 		p2p.DisableRelay(),
-		p2p.ConnectionGater(gs),
+		p2p.ConnectionGater(gatingState),
 		p2p.ConnectionManager(connManager),
 		p2p.ListenAddrs(listenOn...),
 		p2p.AddrsFactory(func(as []ma.Multiaddr) []ma.Multiaddr {
@@ -736,8 +734,8 @@ func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Mu
 				}
 
 				kad, err = dual.New(ctx, host,
-					dual.WanDHTOption(dht.Datastore(dsDht)),
-					dual.DHTOption(dht.Validator(rv)),
+					dual.WanDHTOption(dht.Datastore(dhtDataStore)),
+					dual.DHTOption(dht.Validator(recordValidator)),
 					dual.DHTOption(dht.BootstrapPeers(seeds...)),
 					dual.DHTOption(dht.ProtocolPrefix("/coda")),
 				)
@@ -775,7 +773,7 @@ func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Mu
 		Rendezvous:        rendezvousString,
 		Discovery:         nil,
 		Me:                me,
-		gatingState:       gs,
+		gatingState:       gatingState,
 		ConnectionManager: connManager,
 		BandwidthCounter:  bandwidthCounter,
 		MsgStats:          &MessageStats{min: math.MaxUint64},
