@@ -306,7 +306,7 @@ module Status = struct
             in
             let diff = diff time current_time in
             if Block_time.(time > current_time) then
-              sprintf "in %s" (Span.to_string_hum diff)
+              sprintf "in %s" (Time.Span.to_string (Span.to_time_span diff))
             else "Producing a block now..."
           in
           let slot_str (slot : Next_producer_timing.slot) =
