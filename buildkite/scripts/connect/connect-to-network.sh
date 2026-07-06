@@ -92,7 +92,7 @@ start_daemon_and_wait_for_sync() {
 
     # Start the daemon in the background
     "$MINA" daemon \
-      --peer-list-url "https://storage.googleapis.com/seed-lists/${NETWORK_NAME}_seeds.txt" \
+      --peer-list-url "https://bootnodes.minaprotocol.com/networks/${NETWORK_NAME}.txt" \
       --libp2p-keypair "/home/opam/libp2p-keys/key" \
     &
 
