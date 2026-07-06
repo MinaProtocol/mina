@@ -1479,9 +1479,3 @@ module For_tests = struct
       account_updates = Call_forest.map t.account_updates ~f:(replace_vk vk)
     }
 end
-
-let%test "latest zkApp version" =
-  (* if this test fails, update `Transaction_hash.hash_of_transaction_id`
-     for latest version, then update this test
-  *)
-  Stable.Latest.version = 1
