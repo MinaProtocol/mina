@@ -97,7 +97,6 @@ let main ~logger ~proof_level ~constraint_constants ~signature_kind
           "SNARK work $work_ids received from $address. Starting proof \
            generation"
           ~metadata:[ address_json; work_ids_json ] ;
-        let%bind () = after (Time.Span.of_sec 0.5) in
         let id = Spec.Partitioned.Poly.get_id partitioned_spec in
         match%bind
           retry_forever ~f:(fun () ->
