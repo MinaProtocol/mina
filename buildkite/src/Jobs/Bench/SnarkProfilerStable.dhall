@@ -11,6 +11,7 @@ let bench = "snark"
 in  Pipeline.build
       ( BenchBase.pipeline
           BenchBase.Spec::{
+          , dependsOn = BenchBase.nightlyDependsOn
           , scope = PipelineScope.AllButPullRequest
           , path = "Bench"
           , name = name
