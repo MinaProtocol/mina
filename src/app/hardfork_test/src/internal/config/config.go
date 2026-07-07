@@ -78,6 +78,19 @@ type Config struct {
 	ForkMethods ForkMethodSet
 
 	DaemonInfos []DaemonInfo
+
+	// Vesting-account test (see vesting.go). When enabled, the hardfork test
+	// injects a timed account into the pre-fork genesis ledger, and checks its
+	// timing after the fork to ensure the Mesa slot-reduction update was applied
+	// correctly.
+	VestingTestEnabled bool
+}
+
+// HardforkSlot is the global slot since genesis at which the fork network's
+// genesis is set; this is the slot used by the migration to adjust vesting
+// parameters. It matches expectedGenesisSlot computed in RunForkNetworkPhase.
+func (c *Config) HardforkSlot() int {
+	return c.SlotChainEnd + c.HfSlotDelta
 }
 
 // DefaultConfig returns the default configuration with values
@@ -115,6 +128,8 @@ func DefaultConfig() *Config {
 		NodeStartPort:        6000,
 
 		ForkMethods: make(ForkMethodSet),
+
+		VestingTestEnabled: true,
 	}
 }
 

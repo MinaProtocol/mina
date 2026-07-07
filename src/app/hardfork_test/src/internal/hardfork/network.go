@@ -76,6 +76,12 @@ func (t *HardforkTest) RunMainNetwork(extraFilesRoot string, mainGenesisTs int64
 		"--extra-files-root", extraFilesRoot,
 	}
 
+	// Seed the timed/vesting account into the freshly generated genesis ledger so
+	// it flows through fork-config extraction and migration (see vesting.go).
+	if t.Config.VestingTestEnabled && t.vestingAccount != nil {
+		args = append(args, "--extra-genesis-account-file", t.vestingAccount.extraAccountFile)
+	}
+
 	return t.startLocalNetwork(t.Config.MainMinaExe, "main", args)
 }
 
