@@ -145,17 +145,17 @@ func (d *DaemonInfo) NodeDirRel(root string) string {
 	return filepath.Join(root, "nodes", d.Name)
 }
 
-func (c *Config) InitDaemonInfos() {
+func (c *Config) InitDaemonInfos() error {
+	// Build the daemon slots first (without fork methods); methods are assigned
+	// below so that every requested method is guaranteed at least one daemon.
 	result := []DaemonInfo{
 		{
-			StartPort:  c.SeedStartPort,
-			Name:       "seed",
-			ForkMethod: c.ForkMethods.RandomChoose(),
+			StartPort: c.SeedStartPort,
+			Name:      "seed",
 		},
 		{
-			StartPort:  c.SnarkCoordinatorPort,
-			Name:       "snark_coordinator",
-			ForkMethod: c.ForkMethods.RandomChoose(),
+			StartPort: c.SnarkCoordinatorPort,
+			Name:      "snark_coordinator",
 		},
 	}
 
@@ -172,42 +172,77 @@ func (c *Config) InitDaemonInfos() {
 
 	for whale_id := standaloneWhaleStart; whale_id < c.NumWhales; whale_id++ {
 		result = append(result, DaemonInfo{
-			StartPort:  c.WhaleStartPort + whale_id*PORT_PER_NODE,
-			Name:       fmt.Sprintf("whale_%d", whale_id),
-			ForkMethod: c.ForkMethods.RandomChoose(),
+			StartPort: c.WhaleStartPort + whale_id*PORT_PER_NODE,
+			Name:      fmt.Sprintf("whale_%d", whale_id),
 		})
 	}
 
 	for fish_id := 0; fish_id < c.NumFish; fish_id++ {
 		result = append(result, DaemonInfo{
-			StartPort:  c.FishStartPort + fish_id*PORT_PER_NODE,
-			Name:       fmt.Sprintf("fish_%d", fish_id),
-			ForkMethod: c.ForkMethods.RandomChoose(),
+			StartPort: c.FishStartPort + fish_id*PORT_PER_NODE,
+			Name:      fmt.Sprintf("fish_%d", fish_id),
 		})
 	}
 
 	for node_id := 0; node_id < c.NumNodes; node_id++ {
 		result = append(result, DaemonInfo{
-			StartPort:  c.NodeStartPort + node_id*PORT_PER_NODE,
-			Name:       fmt.Sprintf("plain_%d", node_id),
-			ForkMethod: c.ForkMethods.RandomChoose(),
+			StartPort: c.NodeStartPort + node_id*PORT_PER_NODE,
+			Name:      fmt.Sprintf("plain_%d", node_id),
 		})
 	}
 
-	// NOTE: ensure there's at least one daemon not running in auto mode, o.w. we
-	// can't check on anything after slot-chain-end
-	allAuto := true
-	for _, info := range result {
-		if info.ForkMethod != Auto {
-			allAuto = false
+	// Assign fork methods so that every method passed via --allow-fork-method is
+	// used by at least one daemon. Mixing migration paths that disagree on a given
+	// ledger (e.g. legacy via runtime_genesis_ledger vs auto/advanced via
+	// migrate_to_mesa) makes the post-fork nodes compute different genesis ledger
+	// hashes and fail to peer, so coverage must be explicit and bounded by the
+	// number of daemons rather than left to chance.
+	methods := c.ForkMethods.Methods()
+	if len(methods) == 0 {
+		return fmt.Errorf("no fork method supplied; pass at least one --allow-fork-method")
+	}
+	if len(methods) > len(result) {
+		return fmt.Errorf(
+			"requested %d fork method(s) %s but the network only has %d daemon(s); "+
+				"each requested method needs its own daemon. Either request fewer methods "+
+				"(drop some --allow-fork-method flags) or grow the network with "+
+				"--num-whales / --num-fish / --num-nodes.",
+			len(methods), c.ForkMethods.String(), len(result))
+	}
+
+	// Auto daemons exit at slot-chain-end (migrate-exit), so an all-auto network
+	// leaves nothing alive for the post-chain-end checks. Require a non-auto
+	// method; `advanced` exercises the same migrate_to_mesa path as auto.
+	hasNonAuto := false
+	for _, m := range methods {
+		if m != Auto {
+			hasNonAuto = true
 		}
 	}
-	if allAuto {
-		nonAutoForkMethods := []ForkMethod{Legacy, Advanced}
-		result[rand.Intn(len(result))].ForkMethod = nonAutoForkMethods[rand.Intn(len(nonAutoForkMethods))]
+	if !hasNonAuto {
+		return fmt.Errorf(
+			"only the 'auto' fork method was requested, but auto daemons exit at " +
+				"slot-chain-end and the post-fork checks need a still-running daemon. Add a " +
+				"non-auto method, e.g. --allow-fork-method advanced (which exercises the same " +
+				"migration path as auto).")
+	}
+
+	// Give the first len(methods) slots one distinct method each, fill the rest
+	// randomly, then shuffle so the assignment isn't tied to daemon position.
+	assignment := make([]ForkMethod, len(result))
+	copy(assignment, methods)
+	for i := len(methods); i < len(assignment); i++ {
+		assignment[i] = methods[rand.Intn(len(methods))]
+	}
+	rand.Shuffle(len(assignment), func(i, j int) {
+		assignment[i], assignment[j] = assignment[j], assignment[i]
+	})
+	for i := range result {
+		result[i].ForkMethod = assignment[i]
 	}
 
 	c.DaemonInfos = result
+	return nil
 }
 
 func (c *Config) AllDaemonSatisfying(tag string, pred func(*DaemonInfo) bool) []*DaemonInfo {

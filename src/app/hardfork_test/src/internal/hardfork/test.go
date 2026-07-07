@@ -27,9 +27,12 @@ type HardforkTest struct {
 }
 
 // NewHardforkTest creates a new instance of the hardfork test
-func NewHardforkTest(cfg *config.Config) *HardforkTest {
+func NewHardforkTest(cfg *config.Config) (*HardforkTest, error) {
 	ctx, cancel := context.WithCancel(context.Background())
-	cfg.InitDaemonInfos()
+	if err := cfg.InitDaemonInfos(); err != nil {
+		cancel()
+		return nil, err
+	}
 	return &HardforkTest{
 		Config:      cfg,
 		Client:      client.NewClient(cfg.HTTPClientTimeoutSeconds, cfg.ClientMaxRetries),
@@ -38,7 +41,7 @@ func NewHardforkTest(cfg *config.Config) *HardforkTest {
 		runningCmds: make([]*exec.Cmd, 0),
 		ctx:         ctx,
 		cancel:      cancel,
-	}
+	}, nil
 }
 
 // gracefulShutdown attempts to gracefully shutdown a process with timeout
