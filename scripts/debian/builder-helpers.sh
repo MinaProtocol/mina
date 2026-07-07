@@ -583,8 +583,9 @@ build_daemon_deb() {
       ;;
   esac
 
-  create_control_file "${package_name}" "${SHARED_DEPS}${DAEMON_DEPS}, mina-${network}-config (=${MINA_DEB_VERSION})" \
-    'Mina Protocol Client and Daemon' "${SUGGESTED_DEPS}" "mina-${network} (<< ${MINA_DEB_VERSION}), mina-${network}-postfork-${POSTFORK_CODENAME}"
+  local network_deb="${network//_/-}"
+  create_control_file "${package_name}" "${SHARED_DEPS}${DAEMON_DEPS}, mina-${network_deb}-config (=${MINA_DEB_VERSION})" \
+    'Mina Protocol Client and Daemon' "${SUGGESTED_DEPS}" "mina-${network_deb} (<< ${MINA_DEB_VERSION}), mina-${network_deb}-postfork-${POSTFORK_CODENAME}"
 
   copy_common_daemon_apps "${network}"
 
