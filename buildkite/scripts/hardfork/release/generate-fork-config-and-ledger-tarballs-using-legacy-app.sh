@@ -54,7 +54,7 @@ MINA_DEB_CODENAME=$CODENAME FORCE_VERSION=$FORCE_VERSION ROOT="legacy" ./buildki
 
 curl "${CONFIG_JSON_GZ_URL}" > config.json.gz && gunzip config.json.gz
 
-./scripts/hardfork/release/generate-fork-config-with-ledger-tarballs-using-legacy-app.sh --exe mina-create-prefork-genesis --config "config.json" --workdir "$WORKDIR" --prefork-genesis-config "genesis_ledgers/${NETWORK}.json"
+./scripts/hardfork/release/generate-fork-config-with-ledger-tarballs-using-legacy-app.sh --exe mina-create-prefork-genesis --config "config.json" --workdir "$WORKDIR"
 
 echo "--- Caching legacy ledger tarballs and hashes"
 
