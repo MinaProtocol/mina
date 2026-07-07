@@ -8,6 +8,8 @@ let PipelineTag = ../../Pipeline/Tag.dhall
 
 let JobSpec = ../../Pipeline/JobSpec.dhall
 
+let PipelineScope = ../../Pipeline/Scope.dhall
+
 let Command = ../../Command/Base.dhall
 
 let Size = ../../Command/Size.dhall
@@ -44,6 +46,7 @@ in  Pipeline.build
         , dirtyWhen = dirtyWhen
         , path = "Test"
         , name = "AutoHardforkTest"
+        , scope = PipelineScope.AllButPullRequest
         , tags =
           [ PipelineTag.Type.Long
           , PipelineTag.Type.Test

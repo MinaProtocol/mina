@@ -10,9 +10,12 @@ let Network = ../../Constants/Network.dhall
 
 let Profile = ../../Constants/Profiles.dhall
 
+let PipelineScope = ../../Pipeline/Scope.dhall
+
 in  Pipeline.build
       ( ArtifactPipelines.appsPipeline
           ArtifactPipelines.MinaBuildSpec::{
+          , scope = PipelineScope.AllButPullRequest
           , artifacts =
             [ Artifacts.Type.Daemon { network = Network.Type.Devnet }
             , Artifacts.Type.Daemon { network = Network.Type.Mainnet }
