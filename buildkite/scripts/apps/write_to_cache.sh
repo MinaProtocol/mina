@@ -35,3 +35,11 @@ HELPER="src/app/libp2p_helper/result/bin/libp2p_helper"
 if [[ -f "$HELPER" ]]; then
   ./buildkite/scripts/cache/manager.sh write-to-dir "$HELPER" "apps/${CODENAME}/${VARIANT}"
 fi
+
+# minimina is a Rust binary (built under src/app/minimina/target/release, not a
+# dune _build/*.exe). Cache it alongside the exes so the debian packaging job can
+# restore it into the build tree without a separate copy of the binaries.
+MINIMINA="src/app/minimina/target/release/minimina"
+if [[ -f "$MINIMINA" ]]; then
+  ./buildkite/scripts/cache/manager.sh write-to-dir "$MINIMINA" "apps/${CODENAME}/${VARIANT}"
+fi

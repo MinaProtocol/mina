@@ -13,7 +13,7 @@ let Pipeline = ../../Pipeline/Dsl.dhall
 let PipelineTag = ../../Pipeline/Tag.dhall
 
 in  Pipeline.build
-      ( ArtifactPipelines.packagePipeline
+      ( ArtifactPipelines.appsPipeline
           ArtifactPipelines.MinaBuildSpec::{
           , artifacts =
             [ Artifacts.Type.Daemon { network = Network.Type.Devnet }
