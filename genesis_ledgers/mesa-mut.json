@@ -1,0 +1,34 @@
+{
+  "genesis": {
+    "genesis_state_timestamp": "2026-06-17T14:00:00Z"
+  },
+  "proof": {
+    "fork": {
+      "state_hash": "3NKfDPqtvJyVLVYn2eabjxXspH336eqkjHDkPus5WzbJ8iczckKs",
+      "blockchain_length": 302442,
+      "global_slot_since_genesis": 455340
+    }
+  },
+  "daemon": {
+    "slot_tx_end": 2720,
+    "slot_chain_end": 2800,
+    "hard_fork_genesis_slot_delta": 80
+  },
+  "ledger": {
+    "add_genesis_winner": false,
+    "hash": "jxjzsXhiDAcdYDvXDJ8S4sZtt6YxqR43ZSWcDUVstwfgVCw7WoR",
+    "s3_data_hash": "a7447b7751844e826cee7153b631fc089a41f331a6062a49797430d6ae9351bc"
+  },
+  "epoch_data": {
+    "staking": {
+      "seed": "2vaEcYiLC6YwM7bwrSUivu8mGVWYjxvbrXa8CCG4yQnAX7JSCsvz",
+      "hash": "jxcDTrg4ERkUNeEqLkvhES7Y3teZh3kqyZ6Qr9Hhsq9LMCFMLrN",
+      "s3_data_hash": "e33ca48af115aba46fafc8231044a9a8444f7dd211204534548e878b08944c34"
+    },
+    "next": {
+      "seed": "2varWoEzGB6YzZ5k2nA27BCeCi1K5CjC34Ck76VN7NqYYcFtEyPS",
+      "hash": "jxhWftUEL7MLQgkpLZDM6r8i9THfm5jeKdjeT5Ehu8nDr5tZfav",
+      "s3_data_hash": "4f0c22c38cab3424937ba6311e7909a8734e5bcef50b0641a5767439d92189a4"
+    }
+  }
+}
