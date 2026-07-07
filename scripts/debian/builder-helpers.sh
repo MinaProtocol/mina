@@ -84,7 +84,7 @@ signature_of_network() {
     mainnet)
       printf "mainnet"
       ;;
-    devnet|mesa)
+    devnet|mesa*)
       printf "testnet"
       ;;
     *)
@@ -295,10 +295,13 @@ copy_common_daemon_configs() {
   # devnet/mainnet also copy the magic config (config_$GITHASH_CONFIG.json).
   # This config is automatically picked up by the daemon on startup.
   case "${NETWORK_NAME}" in
-    devnet|mainnet|mesa)
-      cp ../genesis_ledgers/"${NETWORK_NAME}".json \
+    devnet|mainnet|mesa|mesa_mut)
+      # Genesis ledger files use hyphens (e.g. mesa-mut.json), but bash-side
+      # network names use underscores (mesa_mut); convert before lookup.
+      local ledger_name="${NETWORK_NAME//_/-}"
+      cp ../genesis_ledgers/"${ledger_name}".json \
         "${BUILDDIR}/var/lib/coda/config_${GITHASH_CONFIG}.json"
-      cp ../genesis_ledgers/${NETWORK_NAME}.json "${BUILDDIR}/var/lib/coda/${NETWORK_NAME}.json"
+      cp ../genesis_ledgers/"${ledger_name}".json "${BUILDDIR}/var/lib/coda/${ledger_name}.json"
       ;;
     *)
       echo "Unknown network name provided: ${NETWORK_NAME}"; exit 1
@@ -472,7 +475,7 @@ build_rosetta_deb() {
   echo "------------------------------------------------------------"
   echo "--- Building ${network} rosetta deb"
 
-  local package_name="mina-rosetta-${network}"
+  local package_name="mina-rosetta-${network//_/-}"
 
   create_control_file "${package_name}" "${SHARED_DEPS}" \
     'Mina Protocol Rosetta Client' "${SUGGESTED_DEPS}"
@@ -511,7 +514,8 @@ build_daemon_config_deb() {
   echo "------------------------------------------------------------"
   echo "--- Building ${network} config deb without keys:"
 
-  local package_name="mina-${network}-config"
+  local network_deb="${network//_/-}"
+  local package_name="mina-${network_deb}-config"
 
   # Config package contains only architecture-independent configuration data
   # (no binaries), so we build it with Architecture: all to make it usable on
@@ -523,7 +527,7 @@ build_daemon_config_deb() {
   ARCHITECTURE=all
 
   create_control_file "${package_name}" "" \
-     "Mina Protocol Config for daemons running under ${network}" "" "mina-${network} (<< ${MINA_DEB_VERSION})"
+     "Mina Protocol Config for daemons running under ${network}" "" "mina-${network_deb} (<< ${MINA_DEB_VERSION})"
 
   copy_common_daemon_configs "${network}"
 
@@ -570,6 +574,10 @@ build_daemon_deb() {
       package_name="mina-mesa"
       seed_list_url='o1labs-gitops-infrastructure/mina-mesa-network/mina-mesa-network-seeds.txt'
       ;;
+    mesa_mut)
+      package_name="mina-mesa-mut"
+      seed_list_url="o1labs-gitops-infrastructure/mina-mesa-mut/mina-mesa-mut-peer-list-url.txt"
+      ;;
     *)
       echo "Unknown network name provided: ${network}"; exit 1
       ;;
@@ -612,7 +620,7 @@ build_daemon_prefork_deb() {
   echo "------------------------------------------------------------"
   echo "--- Building mainnet berkeley deb for prefork automode :"
 
-  local package_name="mina-${network}-prefork-${POSTFORK_CODENAME}"
+  local package_name="mina-${network//_/-}-prefork-${POSTFORK_CODENAME}"
 
 
   create_control_file "${package_name}" "${SHARED_DEPS}${DAEMON_DEPS}" \
@@ -704,7 +712,8 @@ copy_common_daemon_post_automode_apps_and_configs() {
       else
         echo "Copying config for prefork daemon as config_${prefork_githash_config}.json"
         mkdir -p "${BUILDDIR}/var/lib/coda"
-        cp "../genesis_ledgers/${prefork_network}.json" \
+        # Genesis ledger files use hyphens, network names use underscores; convert before lookup.
+        cp "../genesis_ledgers/${prefork_network//_/-}.json" \
            "${BUILDDIR}/var/lib/coda/config_${prefork_githash_config}.json"
       fi
     else
@@ -723,7 +732,8 @@ copy_common_daemon_post_automode_apps_and_configs() {
 
 build_daemon_postfork_deb() {
   local prefork_network="$1"
-  local package_name="mina-${prefork_network}-postfork-${POSTFORK_CODENAME}"
+
+  local package_name="mina-${prefork_network//_/-}-postfork-${POSTFORK_CODENAME}"
 
 
   echo "------------------------------------------------------------"
@@ -743,13 +753,16 @@ build_daemon_postfork_deb() {
     mesa)
       seed_list_url='o1labs-gitops-infrastructure/mina-mesa-network/mina-mesa-network-seeds.txt'
       ;;
+    mesa_mut)
+      seed_list_url="o1labs-gitops-infrastructure/mina-mesa-mut/mina-mesa-mut-peer-list-url.txt"
+      ;;
     *)
       echo "Unknown network name provided: ${prefork_network}"; exit 1
       ;;
   esac
 
   copy_common_daemon_post_automode_apps_and_configs \
-    "${prefork_network}" \
+    "${prefork_network//_/-}" \
     "${seed_list_url}"
 
   build_deb "$package_name"
@@ -772,14 +785,15 @@ build_daemon_postfork_deb() {
 build_daemon_automode_deb() {
 
   local network="$1"
+  local network_deb="${network//_/-}"
 
   echo "------------------------------------------------------------"
   echo "--- Building ${network} automode transitional metapackage:"
 
-  local package_name="mina-${network}-automode"
+  local package_name="mina-${network_deb}-automode"
 
-  local prefork_pkg="mina-${network}-prefork-${POSTFORK_CODENAME}"
-  local postfork_pkg="mina-${network}-postfork-${POSTFORK_CODENAME}"
+  local prefork_pkg="mina-${network_deb}-prefork-${POSTFORK_CODENAME}"
+  local postfork_pkg="mina-${network_deb}-postfork-${POSTFORK_CODENAME}"
   local prefork_version="${PREFORK_LEGACY_VERSION:-${MINA_DEB_VERSION}}"
   local depends="${postfork_pkg} (=${MINA_DEB_VERSION}), ${prefork_pkg} (=${prefork_version})"
 
@@ -816,11 +830,12 @@ build_daemon_generic_deb() {
   echo "--- Building Mina Generic package for specified network without keys:"
 
   local _suffix="${DEB_SUFFIX#-}"
-  MINA_GENERIC_DEB_NAME="mina-${network}-generic${_suffix:+-${_suffix}}"
+  local network_deb="${network//_/-}"
+  MINA_GENERIC_DEB_NAME="mina-${network_deb}-generic${_suffix:+-${_suffix}}"
 
   create_control_file "${MINA_GENERIC_DEB_NAME}" "${SHARED_DEPS}${DAEMON_DEPS}" \
     "Mina Protocol Client and Daemon for the Generic ${network} Network" \
-    "${SUGGESTED_DEPS}" "mina-${network} (<< ${MINA_DEB_VERSION})"
+    "${SUGGESTED_DEPS}" "mina-${network_deb} (<< ${MINA_DEB_VERSION})"
 
   copy_common_daemon_apps "${network}"
 
@@ -834,6 +849,8 @@ build_daemon_generic_deb() {
 
 copy_common_daemon_hardfork_configs() {
   local NETWORK_NAME="${1}"
+  # Genesis ledger files use hyphens, network names use underscores; convert before lookup.
+  local ledger_name="${NETWORK_NAME//_/-}"
 
   # Copy build config and ledgers
   copy_common_daemon_configs ${NETWORK_NAME}
@@ -848,9 +865,9 @@ copy_common_daemon_hardfork_configs() {
   done
 
   # Copy older genesis ledger as .old.json for backwards compatibility
-  cp "../genesis_ledgers/${NETWORK_NAME}.json" "${BUILDDIR}/var/lib/coda/${NETWORK_NAME}.old.json"
+  cp "../genesis_ledgers/${ledger_name}.json" "${BUILDDIR}/var/lib/coda/${ledger_name}.old.json"
 
-  cp "${RUNTIME_CONFIG_JSON}" "${BUILDDIR}/var/lib/coda/${NETWORK_NAME}.json"
+  cp "${RUNTIME_CONFIG_JSON}" "${BUILDDIR}/var/lib/coda/${ledger_name}.json"
 }
 
 
@@ -867,7 +884,8 @@ copy_common_daemon_hardfork_configs() {
 build_daemon_hardfork_config_deb() {
 
   local network="$1"
-  local package_name="mina-${network}-config"
+  local network_deb="${network//_/-}"
+  local package_name="mina-${network_deb}-config"
 
   echo "------------------------------------------------------------"
   echo "--- Building hardfork config for ${network} network deb without keys:"
@@ -882,7 +900,7 @@ build_daemon_hardfork_config_deb() {
   ARCHITECTURE=all
 
   create_control_file "${package_name}" "" \
-    "Mina Protocol hardfork config for the ${network} Network" "" "mina-${network} (<< ${MINA_DEB_VERSION})"
+    "Mina Protocol hardfork config for the ${network} Network" "" "mina-${network_deb} (<< ${MINA_DEB_VERSION})"
 
   copy_common_daemon_hardfork_configs "${network}"
 
@@ -959,6 +977,9 @@ build_archive_deb () {
       ;;
     mesa)
       package_name="mina-archive-mesa${DEB_SUFFIX}"
+      ;;
+    mesa_mut)
+      package_name="mina-archive-mesa-mut${DEB_SUFFIX}"
       ;;
     *)
       echo "Unknown network name provided: ${network}" >&2
@@ -1065,6 +1086,35 @@ build_prefork_devnet_genesis_ledger_deb() {
 
   build_deb "$DEB_NAME"
 }
+
+#
+# Builds mina-create-mesa-mut-prefork-genesis package for prefork genesis creation
+#
+# Output: mina-create-mesa-mut-prefork-genesis_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
+# Dependencies: ${SHARED_DEPS}${DAEMON_DEPS}
+#
+# Utility for creating prefork genesis ledgers for post-hardfork verification.
+# Contains the runtime_genesis_ledger tool for Mina protocol.
+#
+build_prefork_mesa_mut_genesis_ledger_deb() {
+  echo "------------------------------------------------------------"
+  echo "--- Building Mina Generic mesa-mut create prefork genesis tool:"
+
+  DEB_NAME="mina-create-mesa-mut-prefork-genesis-ledger"
+
+  create_control_file "$DEB_NAME" \
+    "${SHARED_DEPS}${DAEMON_DEPS}" \
+    'Utility to verify post hardfork ledger for Mina'
+
+  mkdir -p "${BUILDDIR}/usr/local/bin"
+
+  # Binaries
+  cp ./default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe \
+    "${BUILDDIR}/usr/local/bin/mina-create-prefork-genesis"
+
+  build_deb "$DEB_NAME"
+}
+
 
 #
 # Builds mina-create-mainnet-prefork-genesis package for prefork genesis creation

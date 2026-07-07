@@ -6,11 +6,11 @@ let Artifacts = ../../Constants/Artifacts.dhall
 
 let Pipeline = ../../Pipeline/Dsl.dhall
 
-let PipelineTag = ../../Pipeline/Tag.dhall
-
 let PipelineScope = ../../Pipeline/Scope.dhall
 
 let Network = ../../Constants/Network.dhall
+
+let PipelineTag = ../../Pipeline/Tag.dhall
 
 let Expr = ../../Pipeline/Expr.dhall
 
@@ -23,25 +23,28 @@ in  Pipeline.build
             [ Artifacts.Type.Daemon
             , Artifacts.Type.DaemonConfig
             , Artifacts.Type.DaemonAppsOnly
+            , Artifacts.Type.DaemonAutoHardfork
+            , Artifacts.Type.DaemonAutomode
             , Artifacts.Type.LogProc
             , Artifacts.Type.Archive
             , Artifacts.Type.Rosetta
             , Artifacts.Type.ZkappTestTransaction
             , Artifacts.Type.CreatePreforkGenesis
-            , Artifacts.Type.DelegationVerifier
+            , Artifacts.Type.DaemonStorageToolbox
             ]
-          , network = Network.Type.Mesa
+          , network = Network.Type.MesaMut
+          , scope =
+            [ PipelineScope.Type.MainlineNightly, PipelineScope.Type.Release ]
           , tags =
             [ PipelineTag.Type.Long
             , PipelineTag.Type.Release
             , PipelineTag.Type.Docker
             , PipelineTag.Type.Mesa
+            , PipelineTag.Type.Devnet
             , PipelineTag.Type.Amd64
-            , PipelineTag.Type.Bookworm
+            , PipelineTag.Type.Focal
             ]
-          , debVersion = DebianVersions.DebVersion.Bookworm
-          , scope =
-            [ PipelineScope.Type.MainlineNightly, PipelineScope.Type.Release ]
+          , debVersion = DebianVersions.DebVersion.Focal
           , includeIf =
             [ Expr.Type.DescendantOf
                 { ancestor = MainlineBranch.Type.Mesa

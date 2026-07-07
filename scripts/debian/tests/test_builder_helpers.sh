@@ -404,6 +404,8 @@ SVCEOF
     echo '{"genesis": "mainnet"}' > "${PROJECT_ROOT}/genesis_ledgers/mainnet.json"
     echo '{"genesis": "devnet"}' > "${PROJECT_ROOT}/genesis_ledgers/devnet.json"
     echo '{"genesis": "mesa"}' > "${PROJECT_ROOT}/genesis_ledgers/mesa.json"
+    # Genesis ledger filename uses a hyphen while the bash network name uses an underscore (mesa_mut)
+    echo '{"genesis": "mesa-mut"}' > "${PROJECT_ROOT}/genesis_ledgers/mesa-mut.json"
 
     # rosetta scripts and configs
     create_mock_exe "src/app/rosetta/scripts/run.sh" "$PROJECT_ROOT"
@@ -988,6 +990,39 @@ test_build_daemon_mainnet_hardfork_config_deb() {
     unset RUNTIME_CONFIG_JSON LEDGER_TARBALLS
 }
 
+test_build_daemon_mesa_mut_hardfork_config_deb() {
+    # Regression test: the bash network name uses an underscore (mesa_mut) but the
+    # genesis ledger file on disk uses a hyphen (mesa-mut.json). The hardfork config
+    # path must convert before lookup, otherwise it fails with
+    #   cp: cannot stat '../genesis_ledgers/mesa_mut.json'
+    export RUNTIME_CONFIG_JSON="${TEST_TMPDIR}/fork_config.json"
+    export LEDGER_TARBALLS="${TEST_TMPDIR}/ledger1.tar.gz ${TEST_TMPDIR}/ledger2.tar.gz"
+
+    safe_build build_daemon_hardfork_config_deb mesa_mut || { log_fail "build exited non-zero"; return; }
+
+    load_captured_state
+    assert_eq "deb name" "mina-mesa-mut-config" "$CAPTURED_DEB_NAME"
+    assert_control_field "$CAPTURED_CONTROL" "Package" "mina-mesa-mut-config"
+    assert_control_field "$CAPTURED_CONTROL" "Architecture" "all"
+
+    assert_file_captured "$CAPTURED_FILES" "var/lib/coda/config_${EXPECTED_GITHASH_CONFIG}.json"
+    assert_captured_file_contains "$CAPTURED_LAST_BUILD_DIR" \
+        "var/lib/coda/config_${EXPECTED_GITHASH_CONFIG}.json" '{"fork": true}'
+
+    assert_file_captured "$CAPTURED_FILES" "var/lib/coda/ledger1.tar.gz"
+    assert_file_captured "$CAPTURED_FILES" "var/lib/coda/ledger2.tar.gz"
+
+    # Old genesis ledger backup resolves the hyphenated source and is written with a hyphen
+    assert_file_captured "$CAPTURED_FILES" "var/lib/coda/mesa-mut.old.json"
+    assert_captured_file_contains "$CAPTURED_LAST_BUILD_DIR" "var/lib/coda/mesa-mut.old.json" "mesa-mut"
+
+    # mesa-mut.json replaced with fork config (hyphenated destination)
+    assert_file_captured "$CAPTURED_FILES" "var/lib/coda/mesa-mut.json"
+    assert_captured_file_contains "$CAPTURED_LAST_BUILD_DIR" "var/lib/coda/mesa-mut.json" '{"fork": true}'
+
+    unset RUNTIME_CONFIG_JSON LEDGER_TARBALLS
+}
+
 ################################################################################
 # Tests: Architecture restoration after config packages
 ################################################################################
@@ -1268,6 +1303,7 @@ main() {
     # Hardfork config packages
     run_test test_build_daemon_devnet_hardfork_config_deb
     run_test test_build_daemon_mainnet_hardfork_config_deb
+    run_test test_build_daemon_mesa_mut_hardfork_config_deb
 
     # Utility packages
     run_test test_build_zkapp_test_transaction_deb
