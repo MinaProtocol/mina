@@ -59,6 +59,7 @@ SLOT_TX_END=
 SLOT_CHAIN_END=
 HARDFORK_GENESIS_SLOT_DELTA=
 EXTRA_FILES_ROOT=
+EXTRA_GENESIS_ACCOUNT_FILE=
 SEED_IS_WHALE=false
 SNARK_COORDINATOR_IS_WHALE=false
 
@@ -182,7 +183,9 @@ help() {
                                          |   Default: ${ON_EXIT}
 --node-status-url <url>                  | Url of the node status collection service 
                                          |   Default: not set
---extra-files-root <path>                | Directory of file tree need to be overlayed on a prepared network folder, useful when initializing from fresh but need some files set. 
+--extra-files-root <path>                | Directory of file tree need to be overlayed on a prepared network folder, useful when initializing from fresh but need some files set.
+                                         |   Default: None
+--extra-genesis-account-file <path>      | Path to a JSON file holding an array of extra genesis-ledger accounts to merge into the freshly generated ledger (only used with '--config reset'). Useful for seeding e.g. timed/vesting accounts.
                                          |   Default: None
 --seed-is-whale                          | When set, the seed node also runs as a whale block producer (presence of argument), consuming the first whale account instead of spawning it as a standalone whale daemon.
                                          |   Default: ${SEED_IS_WHALE}
@@ -693,6 +696,10 @@ while [[ "$#" -gt 0 ]]; do
     EXTRA_FILES_ROOT="${2}"
     shift
     ;;
+  --extra-genesis-account-file)
+    EXTRA_GENESIS_ACCOUNT_FILE="${2}"
+    shift
+    ;;
   --seed-is-whale)
     SEED_IS_WHALE=true
     ;;
@@ -923,6 +930,30 @@ load_config() {
         --online-fish-accounts-directory "${ROOT}"/online_fish_keys \
         --snark-coordinator-accounts-directory "${ROOT}"/snark_coordinator_keys \
         --out-genesis-ledger-file "${ROOT}"/genesis_ledger.json
+
+      if [[ -n "${EXTRA_GENESIS_ACCOUNT_FILE}" ]]; then
+        if [[ ! -f "${EXTRA_GENESIS_ACCOUNT_FILE}" ]]; then
+          echo "Error: extra genesis account file '${EXTRA_GENESIS_ACCOUNT_FILE}' does not exist." >&2
+          exit 1
+        fi
+        echo "Merging extra genesis accounts from ${EXTRA_GENESIS_ACCOUNT_FILE} into the ledger..."
+        if ! merged_ledger=$(mktemp); then
+          echo "Error: failed to create temporary ledger file." >&2
+          exit 1
+        fi
+        if ! jq --slurpfile extra "${EXTRA_GENESIS_ACCOUNT_FILE}" \
+          '.accounts += $extra[0]' \
+          "${ROOT}"/genesis_ledger.json > "${merged_ledger}"; then
+          echo "Error: failed to merge extra genesis accounts from '${EXTRA_GENESIS_ACCOUNT_FILE}'." >&2
+          rm -f "${merged_ledger}"
+          exit 1
+        fi
+        if ! mv -f "${merged_ledger}" "${ROOT}"/genesis_ledger.json; then
+          echo "Error: failed to replace genesis ledger with merged ledger." >&2
+          rm -f "${merged_ledger}"
+          exit 1
+        fi
+      fi
 
       reset-genesis-ledger "${ROOT}" "${config_file}"
       echo "Using freshly generated config file ${config_file}:"
