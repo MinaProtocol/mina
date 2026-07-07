@@ -23,22 +23,25 @@ in  Pipeline.build
             [ Artifacts.Type.Daemon
             , Artifacts.Type.DaemonConfig
             , Artifacts.Type.DaemonAppsOnly
+            , Artifacts.Type.DaemonAutoHardfork
+            , Artifacts.Type.DaemonAutomode
             , Artifacts.Type.LogProc
             , Artifacts.Type.Archive
             , Artifacts.Type.Rosetta
             , Artifacts.Type.ZkappTestTransaction
             , Artifacts.Type.CreatePreforkGenesis
+            , Artifacts.Type.DaemonStorageToolbox
             ]
-          , network = Network.Type.Mesa
+          , network = Network.Type.MesaMut
           , tags =
             [ PipelineTag.Type.Long
             , PipelineTag.Type.Release
             , PipelineTag.Type.Docker
             , PipelineTag.Type.Mesa
             , PipelineTag.Type.Amd64
-            , PipelineTag.Type.Noble
+            , PipelineTag.Type.Jammy
             ]
-          , debVersion = DebianVersions.DebVersion.Noble
+          , debVersion = DebianVersions.DebVersion.Jammy
           , scope =
             [ PipelineScope.Type.MainlineNightly, PipelineScope.Type.Release ]
           , includeIf =

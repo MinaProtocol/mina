@@ -12,14 +12,15 @@ let Network = ../../Constants/Network.dhall
 
 let Dockers = ../../Constants/DockerVersions.dhall
 
-let network = Network.Type.Mesa
+let network = Network.Type.MesaPreflight
 
 let Expr = ../../Pipeline/Expr.dhall
 
 let MainlineBranch = ../../Pipeline/MainlineBranch.dhall
 
 let dependsOn =
-      Dockers.dependsOn Dockers.DepsSpec::{ network = Network.Type.Mesa }
+      Dockers.dependsOn
+        Dockers.DepsSpec::{ network = Network.Type.MesaPreflight }
 
 in  Pipeline.build
       Pipeline.Config::{
