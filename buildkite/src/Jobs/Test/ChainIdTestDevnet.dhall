@@ -1,7 +1,5 @@
 let Dockers = ../../Constants/Docker/Versions.dhall
 
-let BuildFlags = ../../Constants/Artifact/BuildFlags.dhall
-
 let Network = ../../Constants/Network.dhall
 
 let Profile = ../../Constants/Profiles.dhall
@@ -19,7 +17,7 @@ let deps =
         Dockers.DepsSpec::{
         , network = network
         , profile = Profile.Type.Devnet
-        , buildFlags = BuildFlags.Type.Instrumented
+        , prefix = "MinaArtifactPr"
         }
 
 let expectedChainId =
