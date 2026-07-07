@@ -261,7 +261,7 @@ on-exit() {
 
       for ((i=0; i<NODES; i++)); do
         port=$((NODE_START_PORT + i*6))
-        stop-node "node_${i}" "$port" &
+        stop-node "plain_${i}" "$port" &
         job_pids+=("$!")
       done
 
@@ -810,7 +810,7 @@ if [ ! -d "${ROOT}" ]; then
   for ((i = 0; i < NODES; i++)); do
     generate-keypair "${ROOT}"/offline_whale_keys/offline_whale_account_${i}
     generate-keypair "${ROOT}"/online_whale_keys/online_whale_account_${i}
-    generate-libp2p-keypair "${ROOT}"/libp2p_keys/node_${i}
+    generate-libp2p-keypair "${ROOT}"/libp2p_keys/plain_${i}
   done
 
   if [ "$(uname)" != "Darwin" ] && [ ${FISH} -gt 0 ]; then
@@ -1166,10 +1166,10 @@ done
 # ----------
 
 for ((i = 0; i < NODES; i++)); do
-  FOLDER=${NODES_FOLDER}/node_${i}
+  FOLDER=${NODES_FOLDER}/plain_${i}
   mkdir -p "${FOLDER}"
   spawn-daemon "plain_${i}" "${FOLDER}" $((NODE_START_PORT + i * 6)) -peer ${SEED_PEER_ID} \
-    -libp2p-keypair "${ROOT}"/libp2p_keys/node_${i} "${ARCHIVE_ADDRESS_CLI_ARG}"
+    -libp2p-keypair "${ROOT}"/libp2p_keys/plain_${i} "${ARCHIVE_ADDRESS_CLI_ARG}"
   NODE_PIDS[${i}]=$!
 done
 
@@ -1285,7 +1285,7 @@ EOF
 		Instance #${i}:
 		  pid ${NODE_PIDS[${i}]}
 		  status: ${MINA_EXE} client status -daemon-port $((NODE_START_PORT + i * 6))
-		  data dir: ${NODES_FOLDER}/node_${i}
+		  data dir: ${NODES_FOLDER}/plain_${i}
 EOF
   done
 fi
