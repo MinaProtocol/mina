@@ -8,12 +8,15 @@ let PipelineTag = ../../Pipeline/Tag.dhall
 
 let Network = ../../Constants/Network.dhall
 
+let PipelineScope = ../../Pipeline/Scope.dhall
+
 in  Pipeline.build
-      ( ArtifactPipelines.onlyDebianPipeline
+      ( ArtifactPipelines.appsPipeline
           ArtifactPipelines.MinaBuildSpec::{
           , artifacts =
             [ Artifacts.Type.Daemon { network = Network.Type.Devnet } ]
           , prefix = "MinaArtifactBenchDaemon"
+          , scope = PipelineScope.PullRequestOnly
           , tags =
             [ PipelineTag.Type.Long
             , PipelineTag.Type.Release

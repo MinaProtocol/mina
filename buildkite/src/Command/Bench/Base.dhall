@@ -26,9 +26,19 @@ let Benchmarks = ../../Constants/Benchmarks.dhall
 
 let SelectFiles = ../../Lib/SelectFiles.dhall
 
-let Network = ../../Constants/Network.dhall
-
 let B/SoftFail = B.definitions/commandStep/properties/soft_fail/Type
+
+let instrumentedDep =
+      DebianVersions.dependsOn
+        DebianVersions.DepsSpec::{ build_flag = BuildFlags.Type.Instrumented }
+
+let prDependsOn =
+        instrumentedDep
+      # DebianVersions.appDependsOn
+          DebianVersions.DepsSpec::{ prefix = "MinaArtifactBenchDaemon" }
+
+let nightlyDependsOn =
+      instrumentedDep # DebianVersions.appDependsOn DebianVersions.DepsSpec::{=}
 
 let Spec =
       { Type =
@@ -48,16 +58,7 @@ let Spec =
           }
       , default =
           { size = Size.Perf
-          , dependsOn =
-                DebianVersions.dependsOn
-                  DebianVersions.DepsSpec::{
-                  , build_flag = BuildFlags.Type.Instrumented
-                  }
-              # DebianVersions.dependsOn
-                  DebianVersions.DepsSpec::{
-                  , network = Network.Type.Devnet
-                  , prefix = "MinaArtifactBenchDaemon"
-                  }
+          , dependsOn = prDependsOn
           , additionalDirtyWhen = [] : List SelectFiles.Type
           , yellowThreshold = 0.1
           , redThreshold = 0.2
@@ -120,4 +121,8 @@ let pipeline
           , steps = [ command spec ]
           }
 
-in  { command = command, pipeline = pipeline, Spec = Spec }
+in  { command = command
+    , pipeline = pipeline
+    , Spec = Spec
+    , nightlyDependsOn = nightlyDependsOn
+    }
