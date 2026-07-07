@@ -92,6 +92,29 @@ vesting assertion firing. For a clean single-path signal use **`--allow-fork-met
 `ValidateVestingAfterFork` fails as designed); use `--allow-fork-method legacy`
 as the green control.
 
+### Fork methods
+
+One or more fork methods are requested via `--allow-fork-method` (repeatable);
+valid values are `legacy`, `advanced`, and `auto`:
+
+- **legacy** — migrates the ledger via `runtime_genesis_ledger` (applies the
+  slot-reduction update correctly).
+- **advanced** — `mina advanced generate-hardfork-config` against the live
+  daemon; uses the converting ledger / `migrate_to_mesa`.
+- **auto** — daemon self-generates its hardfork config at slot-chain-end under
+  `--hardfork-handling migrate-exit`; also uses `migrate_to_mesa`. Auto daemons
+  **exit** at slot-chain-end.
+
+Each requested method is assigned to **at least one** daemon (remaining daemons
+get a random method from the set), so:
+
+- Requesting more methods than there are daemons fails with an error — request
+  fewer methods or grow the network with `--num-whales` / `--num-fish` /
+  `--num-nodes`.
+- At least one **non-auto** method is required, because auto daemons exit at
+  slot-chain-end and the post-fork checks need a still-running daemon. Use
+  `advanced` for an auto-equivalent migration path that keeps the daemon alive.
+
 ## Usage
 
 ```

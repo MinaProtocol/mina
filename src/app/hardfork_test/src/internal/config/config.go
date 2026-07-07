@@ -256,6 +256,29 @@ func (c *Config) InitDaemonInfos() error {
 		result[i].ForkMethod = assignment[i]
 	}
 
+	// Post-shuffle guard: never give the seed daemon (result[0]) the Auto fork
+	// method. The seed is the sole P2P hub — if it exits via auto-fork
+	// migrate-exit, the remaining nodes lose their seed, diverge onto different
+	// forks, and the consensus check fails. Swap with the first non-seed daemon
+	// that has a non-Auto method.
+	if result[0].ForkMethod == Auto {
+		swapped := false
+		for i := 1; i < len(result); i++ {
+			if result[i].ForkMethod != Auto {
+				result[0].ForkMethod, result[i].ForkMethod = result[i].ForkMethod, result[0].ForkMethod
+				swapped = true
+				break
+			}
+		}
+		if !swapped {
+			// This path is unreachable: the all-auto validation at lines 231-242
+			// already rejects a method set consisting only of Auto before the
+			// assignment loop. If this ever happens, the assignment invariants are
+			// broken and the test must stop instead of running with an auto seed.
+			return fmt.Errorf("seed daemon was assigned Auto fork method and no non-Auto daemon exists to swap with")
+		}
+	}
+
 	c.DaemonInfos = result
 	return nil
 }
