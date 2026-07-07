@@ -59,6 +59,8 @@ SLOT_TX_END=
 SLOT_CHAIN_END=
 HARDFORK_GENESIS_SLOT_DELTA=
 EXTRA_FILES_ROOT=
+SEED_IS_WHALE=false
+SNARK_COORDINATOR_IS_WHALE=false
 
 # ================================================
 # Globals (assigned during execution of script)
@@ -71,7 +73,22 @@ CONFIG=""
 SNARK_COORDINATOR_PID=""
 SEED_PID=""
 ARCHIVE_PID=""
+# Index of the first whale account spawned as a *standalone* whale daemon. When
+# the seed and/or snark coordinator double as whale block producers (see
+# --seed-is-whale / --snark-coordinator-is-whale) they consume the leading whale
+# accounts, and the standalone whale loop starts past them.
+WHALE_STANDALONE_START=0
+SEED_WHALE_KEY=""
+SNARK_COORDINATOR_WHALE_KEY=""
 WHALE_PIDS=()
+# Candidate daemons (port base, pid, online key file, label) that can originate
+# value-transfer / zkApp transactions. Built up as block-producing daemons are
+# spawned so selection always targets a daemon that is actually running,
+# including when the seed / snark coordinator double as whales.
+TRANSFER_NODE_PORTS=()
+TRANSFER_NODE_PIDS=()
+TRANSFER_NODE_KEYS=()
+TRANSFER_NODE_LABELS=()
 SNARK_WORKERS_PIDS=()
 FISH_PIDS=()
 NODE_PIDS=()
@@ -167,6 +184,10 @@ help() {
                                          |   Default: not set
 --extra-files-root <path>                | Directory of file tree need to be overlayed on a prepared network folder, useful when initializing from fresh but need some files set. 
                                          |   Default: None
+--seed-is-whale                          | When set, the seed node also runs as a whale block producer (presence of argument), consuming the first whale account instead of spawning it as a standalone whale daemon.
+                                         |   Default: ${SEED_IS_WHALE}
+--snark-coordinator-is-whale             | When set, the snark coordinator node also runs as a whale block producer (presence of argument), consuming the next whale account instead of spawning it as a standalone whale daemon.
+                                         |   Default: ${SNARK_COORDINATOR_IS_WHALE}
 -h   |--help                             | Displays this help message
 
 Available logging levels:
@@ -189,6 +210,18 @@ stop-node() {
     if ! "$MINA_EXE" client stop-daemon --daemon-port "$port"; then
         echo "Failed to stop $tag on port $port, maybe it has already exited?" >&2
     fi
+}
+
+register-transfer-node() {
+    local label="$1"
+    local port_base="$2"
+    local pid="$3"
+    local key_file="$4"
+
+    TRANSFER_NODE_PORTS+=("${port_base}")
+    TRANSFER_NODE_PIDS+=("${pid}")
+    TRANSFER_NODE_KEYS+=("${key_file}")
+    TRANSFER_NODE_LABELS+=("${label}")
 }
 
 # Kill all processes when script exits
@@ -232,7 +265,7 @@ on-exit() {
         job_pids+=("$!")
       done
 
-      for ((i=0; i<WHALES; i++)); do
+      for ((i=WHALE_STANDALONE_START; i<WHALES; i++)); do
         port=$((WHALE_START_PORT + i*6))
         stop-node "whale_${i}" "$port" &
         job_pids+=("$!")
@@ -660,6 +693,12 @@ while [[ "$#" -gt 0 ]]; do
     EXTRA_FILES_ROOT="${2}"
     shift
     ;;
+  --seed-is-whale)
+    SEED_IS_WHALE=true
+    ;;
+  --snark-coordinator-is-whale)
+    SNARK_COORDINATOR_IS_WHALE=true
+    ;;
   *)
     echo "Unknown parameter passed: ${1}"
 
@@ -1004,6 +1043,20 @@ fi
 
 # ----------
 
+# Optionally let the seed node double as a whale block producer, consuming the
+# first whale account so it is not also spawned as a standalone whale daemon.
+SEED_BLOCK_PRODUCER_ARGS=()
+if [[ "${SEED_IS_WHALE}" == "true" ]] && ! ${DEMO_MODE}; then
+  if [ "${WHALE_STANDALONE_START}" -ge "${WHALES}" ]; then
+    echo "Error: --seed-is-whale requires at least $((WHALE_STANDALONE_START + 1)) whale account(s), but WHALES=${WHALES}." >&2
+    exit 1
+  fi
+  SEED_WHALE_KEY="${ROOT}/online_whale_keys/online_whale_account_${WHALE_STANDALONE_START}"
+  SEED_BLOCK_PRODUCER_ARGS=(-block-producer-key "${SEED_WHALE_KEY}")
+  echo "Seed node will also act as whale block producer (online_whale_account_${WHALE_STANDALONE_START})"
+  WHALE_STANDALONE_START=$((WHALE_STANDALONE_START + 1))
+fi
+
 SEED_PEER_ID=
 case "${SEED}" in
   spawn:*)
@@ -1021,7 +1074,7 @@ case "${SEED}" in
         --seed \
         ${ARCHIVE_ADDRESS_CLI_ARG}
     else
-      spawn-daemon seed "${NODES_FOLDER}"/seed "${SEED_START_PORT}" -seed -libp2p-keypair ${SEED_PEER_KEY} "${ARCHIVE_ADDRESS_CLI_ARG}"
+      spawn-daemon seed "${NODES_FOLDER}"/seed "${SEED_START_PORT}" -seed -libp2p-keypair ${SEED_PEER_KEY} "${SEED_BLOCK_PRODUCER_ARGS[@]}" "${ARCHIVE_ADDRESS_CLI_ARG}"
     fi
     SEED_PID=$!
 
@@ -1046,6 +1099,11 @@ case "${SEED}" in
 esac
 printf "$SEED_PEER_ID" > "${ROOT}/seed_peer_id.txt"
 
+# Register the seed as a transaction origin when it doubles as a whale.
+if [[ -n "${SEED_PID}" && -n "${SEED_WHALE_KEY}" ]]; then
+  register-transfer-node "seed" "${SEED_START_PORT}" "${SEED_PID}" "${SEED_WHALE_KEY}"
+fi
+
 #---------- Starting snark coordinator
 
 
@@ -1056,21 +1114,41 @@ elif [ "${SNARK_WORKERS_COUNT}" -eq "0" ]; then
   SNARK_COORDINATOR_PORT=""
 fi
 
+# Optionally let the snark coordinator double as a whale block producer,
+# consuming the next whale account so it is not spawned as a standalone whale.
+SNARK_COORDINATOR_BLOCK_PRODUCER_ARGS=()
+if [[ -n "${SNARK_COORDINATOR_PORT}" && "${SNARK_COORDINATOR_IS_WHALE}" == "true" ]]; then
+  if [ "${WHALE_STANDALONE_START}" -ge "${WHALES}" ]; then
+    echo "Error: --snark-coordinator-is-whale requires at least $((WHALE_STANDALONE_START + 1)) whale account(s), but WHALES=${WHALES}." >&2
+    exit 1
+  fi
+  SNARK_COORDINATOR_WHALE_KEY="${ROOT}/online_whale_keys/online_whale_account_${WHALE_STANDALONE_START}"
+  SNARK_COORDINATOR_BLOCK_PRODUCER_ARGS=(-block-producer-key "${SNARK_COORDINATOR_WHALE_KEY}")
+  echo "Snark coordinator node will also act as whale block producer (online_whale_account_${WHALE_STANDALONE_START})"
+  WHALE_STANDALONE_START=$((WHALE_STANDALONE_START + 1))
+fi
+
 if [[ -n "${SNARK_COORDINATOR_PORT}" ]]; then
   SNARK_COORDINATOR_FLAGS="-snark-worker-fee ${SNARK_WORKER_FEE} -run-snark-coordinator ${SNARK_COORDINATOR_PUBKEY} -work-selection seq"
-  spawn-daemon snark_coordinator "${NODES_FOLDER}"/snark_coordinator "${SNARK_COORDINATOR_PORT}" -peer ${SEED_PEER_ID} -libp2p-keypair ${SNARK_COORDINATOR_PEER_KEY} ${SNARK_COORDINATOR_FLAGS}
+  spawn-daemon snark_coordinator "${NODES_FOLDER}"/snark_coordinator "${SNARK_COORDINATOR_PORT}" -peer ${SEED_PEER_ID} -libp2p-keypair ${SNARK_COORDINATOR_PEER_KEY} "${SNARK_COORDINATOR_BLOCK_PRODUCER_ARGS[@]}" ${SNARK_COORDINATOR_FLAGS}
   SNARK_COORDINATOR_PID=$!
+
+  # Register the snark coordinator as a transaction origin when it doubles as a whale.
+  if [[ -n "${SNARK_COORDINATOR_WHALE_KEY}" ]]; then
+    register-transfer-node "snark_coordinator" "${SNARK_COORDINATOR_PORT}" "${SNARK_COORDINATOR_PID}" "${SNARK_COORDINATOR_WHALE_KEY}"
+  fi
 fi
 
 # ----------
 
-for ((i = 0; i < WHALES; i++)); do
+for ((i = WHALE_STANDALONE_START; i < WHALES; i++)); do
   FOLDER=${NODES_FOLDER}/whale_${i}
   KEY_FILE=${ROOT}/online_whale_keys/online_whale_account_${i}
   mkdir -p "${FOLDER}"
   spawn-daemon "whale_${i}" "${FOLDER}" $((WHALE_START_PORT + i * 6)) -peer ${SEED_PEER_ID} -block-producer-key ${KEY_FILE} \
     -libp2p-keypair "${ROOT}"/libp2p_keys/whale_${i} "${ARCHIVE_ADDRESS_CLI_ARG}"
   WHALE_PIDS[${i}]=$!
+  register-transfer-node "whale_${i}" "$((WHALE_START_PORT + i * 6))" "${WHALE_PIDS[${i}]}" "${KEY_FILE}"
 done
 
 # ----------
@@ -1082,6 +1160,7 @@ for ((i = 0; i < FISH; i++)); do
   spawn-daemon "fish_${i}" "${FOLDER}" $((FISH_START_PORT + i * 6)) -peer ${SEED_PEER_ID} -block-producer-key "${KEY_FILE}" \
     -libp2p-keypair "${ROOT}"/libp2p_keys/fish_${i} "${ARCHIVE_ADDRESS_CLI_ARG}"
   FISH_PIDS[${i}]=$!
+  register-transfer-node "fish_${i}" "$((FISH_START_PORT + i * 6))" "${FISH_PIDS[${i}]}" "${KEY_FILE}"
 done
 
 # ----------
@@ -1169,11 +1248,11 @@ if [[ -n "${ROSETTA_PORT}" ]]; then
 EOF
 fi
 
-if [ "${WHALES}" -gt 0 ]; then
+if [ "${WHALE_STANDALONE_START}" -lt "${WHALES}" ]; then
   cat <<EOF
 	Whales:
 EOF
-  for ((i = 0; i < WHALES; i++)); do
+  for ((i = WHALE_STANDALONE_START; i < WHALES; i++)); do
     cat <<EOF
 		Instance #${i}:
 		  pid ${WHALE_PIDS[${i}]}
@@ -1219,31 +1298,23 @@ printf "\n"
 
 if ${VALUE_TRANSFERS} || ${ZKAPP_TRANSACTIONS}; then
 
-  VALID_TRANSFER_NODES=$((WHALES + FISH))
+  VALID_TRANSFER_NODES=${#TRANSFER_NODE_PORTS[@]}
 
   if [ "$VALID_TRANSFER_NODES" -eq 0 ]; then
       echo "Error: No nodes available to send transactions."
       exit 1
   fi
 
+  # Pick a random block-producing daemon that is actually running. This list
+  # covers standalone whales/fish as well as the seed / snark coordinator when
+  # they double as whale block producers.
   RANDOM_INDEX=$(( RANDOM % VALID_TRANSFER_NODES ))
+  TRANSFER_NODE_LABEL="${TRANSFER_NODE_LABELS[$RANDOM_INDEX]}"
+  TRANSFER_PORT_BASE="${TRANSFER_NODE_PORTS[$RANDOM_INDEX]}"
+  TRANFER_NODE_PID="${TRANSFER_NODE_PIDS[$RANDOM_INDEX]}"
+  KEY_FILE="${TRANSFER_NODE_KEYS[$RANDOM_INDEX]}"
 
-  # Determine if the index falls into the Whale or Fish range
-  if [ "$RANDOM_INDEX" -lt "$WHALES" ]; then
-      TRANSFER_NODE_TYPE="whale"
-      # For whales, the relative index is just the RANDOM_INDEX
-      TRANSFER_NODE_INDEX="$RANDOM_INDEX"
-      TRANSFER_PORT_BASE=$(( WHALE_START_PORT + TRANSFER_NODE_INDEX * 6 ))
-      TRANFER_NODE_PID="${WHALE_PIDS[TRANSFER_NODE_INDEX]}"
-  else
-      TRANSFER_NODE_TYPE="fish" # Fixed variable name here
-      TRANSFER_NODE_INDEX=$((RANDOM_INDEX - WHALES))
-      # For fish, we subtract the whale count to get the 0-based fish index
-      TRANSFER_PORT_BASE=$(( FISH_START_PORT + TRANSFER_NODE_INDEX * 6 ))
-      TRANFER_NODE_PID="${FISH_PIDS[TRANSFER_NODE_INDEX]}"
-  fi
-
-  echo "Using ${TRANSFER_NODE_TYPE} at base port ${TRANSFER_PORT_BASE} to send transactions"
+  echo "Using ${TRANSFER_NODE_LABEL} at base port ${TRANSFER_PORT_BASE} to send transactions"
 
 
   FEE_PAYER_KEY_FILE=${ROOT}/offline_whale_keys/offline_whale_account_0
@@ -1253,7 +1324,6 @@ if ${VALUE_TRANSFERS} || ${ZKAPP_TRANSACTIONS}; then
     ZKAPP_ACCOUNT_PUB_KEY=$(cat "${ROOT}/zkapp_keys/zkapp_account.pub")
   fi
 
-  KEY_FILE="${ROOT}/online_${TRANSFER_NODE_TYPE}_keys/online_${TRANSFER_NODE_TYPE}_account_${TRANSFER_NODE_INDEX}"
   PUB_KEY=$(cat "${KEY_FILE}.pub")
   REST_SERVER="http://127.0.0.1:$((TRANSFER_PORT_BASE + 1))/graphql"
 
@@ -1314,7 +1384,7 @@ if ${VALUE_TRANSFERS} || ${ZKAPP_TRANSACTIONS}; then
   value_txn_id=0
   while is_process_running "${TRANFER_NODE_PID}"; do
     sleep ${TRANSACTION_INTERVAL}
-    echo "${TRANSFER_NODE_TYPE} ${TRANSFER_NODE_INDEX} at ${TRANFER_NODE_PID} is alive, sending txns"
+    echo "${TRANSFER_NODE_LABEL} at ${TRANFER_NODE_PID} is alive, sending txns"
 
     if ${VALUE_TRANSFERS} && \
       ${MINA_EXE} client send-payment \
