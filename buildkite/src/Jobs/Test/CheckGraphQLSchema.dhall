@@ -10,7 +10,11 @@ let CheckGraphQLSchema = ../../Command/CheckGraphQLSchema.dhall
 
 let DebianVersions = ../../Constants/DebianVersions.dhall
 
-let dependsOn = DebianVersions.dependsOn DebianVersions.DepsSpec::{=}
+let BuildFlags = ../../Constants/BuildFlags.dhall
+
+let dependsOn =
+      DebianVersions.dependsOn
+        DebianVersions.DepsSpec::{ build_flag = BuildFlags.Type.Instrumented }
 
 in  Pipeline.build
       Pipeline.Config::{

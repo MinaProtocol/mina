@@ -12,6 +12,8 @@ let Network = ../../Constants/Network.dhall
 
 let DebianVersions = ../../Constants/DebianVersions.dhall
 
+let BuildFlags = ../../Constants/BuildFlags.dhall
+
 let Expr = ../../Pipeline/Expr.dhall
 
 let MainlineBranch = ../../Pipeline/MainlineBranch.dhall
@@ -19,7 +21,11 @@ let MainlineBranch = ../../Pipeline/MainlineBranch.dhall
 let network = Network.Type.Devnet
 
 let dependsOn =
-      DebianVersions.dependsOn DebianVersions.DepsSpec::{ network = network }
+      DebianVersions.dependsOn
+        DebianVersions.DepsSpec::{
+        , network = network
+        , build_flag = BuildFlags.Type.Instrumented
+        }
 
 in  Pipeline.build
       Pipeline.Config::{

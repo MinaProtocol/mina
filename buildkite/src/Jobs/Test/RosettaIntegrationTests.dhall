@@ -14,6 +14,8 @@ let Size = ../../Command/Size.dhall
 
 let DebianVersions = ../../Constants/DebianVersions.dhall
 
+let BuildFlags = ../../Constants/BuildFlags.dhall
+
 let RunInToolchain = ../../Command/RunInToolchain.dhall
 
 let Network = ../../Constants/Network.dhall
@@ -80,6 +82,7 @@ in  Pipeline.build
                   DebianVersions.DepsSpec::{
                   , network = network
                   , profile = Profiles.Type.Devnet
+                  , build_flag = BuildFlags.Type.Instrumented
                   }
             }
         ]

@@ -12,6 +12,8 @@ let RunInToolchain = ../../Command/RunInToolchain.dhall
 
 let DebianVersions = ../../Constants/DebianVersions.dhall
 
+let BuildFlags = ../../Constants/BuildFlags.dhall
+
 let Network = ../../Constants/Network.dhall
 
 let Docker = ../../Command/Docker/Type.dhall
@@ -23,6 +25,7 @@ let dependsOn =
         DebianVersions.DepsSpec::{
         , deb_version = DebianVersions.DebVersion.Bullseye
         , network = Network.Type.Devnet
+        , build_flag = BuildFlags.Type.Instrumented
         }
 
 let buildTestCmd

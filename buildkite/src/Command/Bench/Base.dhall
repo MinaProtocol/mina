@@ -54,7 +54,10 @@ let Spec =
                   , build_flag = BuildFlags.Type.Instrumented
                   }
               # DebianVersions.dependsOn
-                  DebianVersions.DepsSpec::{ network = Network.Type.Devnet }
+                  DebianVersions.DepsSpec::{
+                  , network = Network.Type.Devnet
+                  , prefix = "MinaArtifactBenchDaemon"
+                  }
           , additionalDirtyWhen = [] : List SelectFiles.Type
           , yellowThreshold = 0.1
           , redThreshold = 0.2
