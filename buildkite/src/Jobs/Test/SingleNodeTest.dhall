@@ -24,7 +24,7 @@ let dependsOn =
         DebianVersions.dependsOn
           DebianVersions.DepsSpec::{
           , profile = Profiles.Type.Lightnet
-          , build_flag = BuildFlags.Type.Instrumented
+          , prefix = "MinaArtifactPr"
           }
       # DebianVersions.dependsOn
           DebianVersions.DepsSpec::{ build_flag = BuildFlags.Type.Instrumented }

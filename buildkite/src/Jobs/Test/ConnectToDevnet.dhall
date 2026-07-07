@@ -12,8 +12,6 @@ let Network = ../../Constants/Network.dhall
 
 let DebianVersions = ../../Constants/DebianVersions.dhall
 
-let BuildFlags = ../../Constants/BuildFlags.dhall
-
 let Expr = ../../Pipeline/Expr.dhall
 
 let MainlineBranch = ../../Pipeline/MainlineBranch.dhall
@@ -24,7 +22,7 @@ let dependsOn =
       DebianVersions.dependsOn
         DebianVersions.DepsSpec::{
         , network = network
-        , build_flag = BuildFlags.Type.Instrumented
+        , prefix = "MinaArtifactPr"
         }
 
 in  Pipeline.build

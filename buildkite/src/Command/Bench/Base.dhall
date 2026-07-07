@@ -26,6 +26,8 @@ let Benchmarks = ../../Constants/Benchmarks.dhall
 
 let SelectFiles = ../../Lib/SelectFiles.dhall
 
+let Network = ../../Constants/Network.dhall
+
 let B/SoftFail = B.definitions/commandStep/properties/soft_fail/Type
 
 let instrumentedDep =
@@ -34,11 +36,16 @@ let instrumentedDep =
 
 let prDependsOn =
         instrumentedDep
-      # DebianVersions.appDependsOn
-          DebianVersions.DepsSpec::{ prefix = "MinaArtifactBenchDaemon" }
+      # DebianVersions.dependsOn
+          DebianVersions.DepsSpec::{
+          , network = Network.Type.Devnet
+          , prefix = "MinaArtifactPr"
+          }
 
 let nightlyDependsOn =
-      instrumentedDep # DebianVersions.appDependsOn DebianVersions.DepsSpec::{=}
+        instrumentedDep
+      # DebianVersions.dependsOn
+          DebianVersions.DepsSpec::{ network = Network.Type.Devnet }
 
 let Spec =
       { Type =
