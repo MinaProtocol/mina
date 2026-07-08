@@ -23,12 +23,16 @@ let Size = ../../Command/Size.dhall
 let Profiles = ../../Constants/Profiles.dhall
 
 let dependsOnMainnet =
-      DebianVersions.dependsOn
-        DebianVersions.DepsSpec::{
-        , deb_version = DebianVersions.DebVersion.Bullseye
-        , network = Network.Type.Mainnet
-        , profile = Profiles.Type.Mainnet
-        }
+        DebianVersions.dependsOn
+          DebianVersions.DepsSpec::{
+          , deb_version = DebianVersions.DebVersion.Bullseye
+          , network = Network.Type.Mainnet
+          , profile = Profiles.Type.Mainnet
+          }
+      # DebianVersions.dependsOn
+          DebianVersions.DepsSpec::{
+          , deb_version = DebianVersions.DebVersion.Bullseye
+          }
 
 let dirtyWhen =
       [ S.strictlyStart (S.contains "src")

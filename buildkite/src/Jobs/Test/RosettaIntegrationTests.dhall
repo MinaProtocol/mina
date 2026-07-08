@@ -80,7 +80,6 @@ in  Pipeline.build
                   DebianVersions.DepsSpec::{
                   , network = network
                   , profile = Profiles.Type.Devnet
-                  , prefix = "MinaArtifactPr"
                   }
             }
         ]

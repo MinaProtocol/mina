@@ -20,9 +20,7 @@ let Size = ../../Command/Size.dhall
 
 let DebianVersions = ../../Constants/DebianVersions.dhall
 
-let dependsOn =
-      DebianVersions.dependsOn
-        DebianVersions.DepsSpec::{ prefix = "MinaArtifactPr" }
+let dependsOn = DebianVersions.dependsOn DebianVersions.DepsSpec::{=}
 
 let buildTestCmd
     : Text -> Size -> List Command.TaggedKey.Type -> B/SoftFail -> Command.Type

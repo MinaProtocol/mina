@@ -14,11 +14,7 @@ let network = Network.Type.Devnet
 
 let deps =
       Dockers.dependsOn
-        Dockers.DepsSpec::{
-        , network = network
-        , profile = Profile.Type.Devnet
-        , prefix = "MinaArtifactPr"
-        }
+        Dockers.DepsSpec::{ network = network, profile = Profile.Type.Devnet }
 
 let expectedChainId =
       "8c6312664c60ecc4c0c695e69f6301692c0b20f354b55e08e69a289f3d373e50"

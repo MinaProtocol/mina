@@ -10,9 +10,7 @@ let CheckGraphQLSchema = ../../Command/CheckGraphQLSchema.dhall
 
 let DebianVersions = ../../Constants/DebianVersions.dhall
 
-let dependsOn =
-      DebianVersions.dependsOn
-        DebianVersions.DepsSpec::{ prefix = "MinaArtifactPr" }
+let dependsOn = DebianVersions.dependsOn DebianVersions.DepsSpec::{=}
 
 in  Pipeline.build
       Pipeline.Config::{

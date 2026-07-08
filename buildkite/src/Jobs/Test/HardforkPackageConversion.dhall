@@ -46,10 +46,7 @@ in  Pipeline.build
             , target = Size.Large
             , depends_on =
                 DebianVersions.dependsOn
-                  DebianVersions.DepsSpec::{
-                  , network = Network.Type.Devnet
-                  , prefix = "MinaArtifactPr"
-                  }
+                  DebianVersions.DepsSpec::{ network = Network.Type.Devnet }
             }
         ]
       }

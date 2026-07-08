@@ -30,23 +30,6 @@ let Network = ../../Constants/Network.dhall
 
 let B/SoftFail = B.definitions/commandStep/properties/soft_fail/Type
 
-let instrumentedDep =
-      DebianVersions.dependsOn
-        DebianVersions.DepsSpec::{ build_flag = BuildFlags.Type.Instrumented }
-
-let prDependsOn =
-        instrumentedDep
-      # DebianVersions.dependsOn
-          DebianVersions.DepsSpec::{
-          , network = Network.Type.Devnet
-          , prefix = "MinaArtifactPr"
-          }
-
-let nightlyDependsOn =
-        instrumentedDep
-      # DebianVersions.dependsOn
-          DebianVersions.DepsSpec::{ network = Network.Type.Devnet }
-
 let Spec =
       { Type =
           { key : Text
@@ -65,7 +48,13 @@ let Spec =
           }
       , default =
           { size = Size.Perf
-          , dependsOn = prDependsOn
+          , dependsOn =
+                DebianVersions.dependsOn
+                  DebianVersions.DepsSpec::{
+                  , build_flag = BuildFlags.Type.Instrumented
+                  }
+              # DebianVersions.dependsOn
+                  DebianVersions.DepsSpec::{ network = Network.Type.Devnet }
           , additionalDirtyWhen = [] : List SelectFiles.Type
           , yellowThreshold = 0.1
           , redThreshold = 0.2
@@ -128,8 +117,4 @@ let pipeline
           , steps = [ command spec ]
           }
 
-in  { command = command
-    , pipeline = pipeline
-    , Spec = Spec
-    , nightlyDependsOn = nightlyDependsOn
-    }
+in  { command = command, pipeline = pipeline, Spec = Spec }
