@@ -614,6 +614,123 @@ EOF
   assert_not_contains "$output" "Including job IncludeIfNoMatch" "Should not include job when includeIf doesn't match"
 }
 
+# Test: Integration test - dependency resolution
+# A job selected by dirty-when must pull in the build jobs it depends on, even
+# when those builds' own dirty-when did not match the change set. This is the
+# case that used to break: modifying a bench file triggers the bench but not the
+# apps/package build it needs.
+test_integration_dependency_resolution() {
+  echo -e "\n${YELLOW}Testing: Integration - dependency resolution${NC}"
+
+  # Bench job: selected by dirty-when, depends on a build job's package step.
+  cat > "$TEST_DIR/jobs/DepBench.yml" << 'EOF'
+spec:
+  name: DepBench
+  path: Bench
+  tags:
+    - DepTest
+  scope:
+    - PullRequest
+pipeline:
+  steps:
+    - key: dep-bench-run
+      depends_on:
+        - step: _DepBuild-build-deb-pkg
+EOF
+  echo "bench" > "$TEST_DIR/jobs/DepBench.dirtywhen"
+
+  # Package build: dirty-when does NOT match the bench change; depends on apps.
+  cat > "$TEST_DIR/jobs/DepBuild.yml" << 'EOF'
+spec:
+  name: DepBuild
+  path: Release
+  tags:
+    - DepTest
+  scope:
+    - PullRequest
+pipeline:
+  steps:
+    - key: _DepBuild-build-deb-pkg
+      depends_on:
+        - step: _DepBuildApps-build-apps
+EOF
+  echo "^src/" > "$TEST_DIR/jobs/DepBuild.dirtywhen"
+
+  # Apps build: transitive dependency, also not matched by the change.
+  cat > "$TEST_DIR/jobs/DepBuildApps.yml" << 'EOF'
+spec:
+  name: DepBuildApps
+  path: Release
+  tags:
+    - DepTest
+  scope:
+    - PullRequest
+pipeline:
+  steps:
+    - key: _DepBuildApps-build-apps
+EOF
+  echo "^src/" > "$TEST_DIR/jobs/DepBuildApps.dirtywhen"
+
+  # Change set touches only a bench file: matches DepBench, not the builds.
+  echo "buildkite/scripts/bench/run.sh" > "$TEST_DIR/dep_diff.txt"
+
+  local output
+  output=$(FORCE_CLOSEST_ANCESTOR="$TEST_CLOSEST_ANCESTOR" "$MONOREPO_SCRIPT" \
+    --scopes pullrequest \
+    --tags deptest \
+    --filter-mode any \
+    --selection-mode triaged \
+    --jobs "$TEST_DIR/jobs" \
+    --git-diff-file "$TEST_DIR/dep_diff.txt" \
+    --mainline-branches "$MAINLINE_BRANCHES_COMMA_SEPARATED" \
+    --dry-run 2>&1 || true)
+
+  assert_contains "$output" "Including job DepBench" "Bench job selected by dirty-when"
+  assert_contains "$output" "Including dependency job DepBuild" "Package build pulled in as a dependency"
+  assert_contains "$output" "Including dependency job DepBuildApps" "Transitive apps build pulled in"
+  assert_contains "$output" "skipping upload for job: DepBuild" "Dependency build is in the upload set"
+  assert_contains "$output" "skipping upload for job: DepBuildApps" "Transitive dependency is in the upload set"
+}
+
+# Test: Integration test - dependency deduplication
+# When two selected jobs share a dependency, that dependency is uploaded once.
+test_integration_dependency_dedup() {
+  echo -e "\n${YELLOW}Testing: Integration - dependency dedup (no duplicate uploads)${NC}"
+
+  # Second bench that also depends on the same DepBuild package step.
+  cat > "$TEST_DIR/jobs/DepBench2.yml" << 'EOF'
+spec:
+  name: DepBench2
+  path: Bench
+  tags:
+    - DepTest
+  scope:
+    - PullRequest
+pipeline:
+  steps:
+    - key: dep-bench2-run
+      depends_on:
+        - step: _DepBuild-build-deb-pkg
+EOF
+  echo "bench" > "$TEST_DIR/jobs/DepBench2.dirtywhen"
+
+  local output
+  output=$(FORCE_CLOSEST_ANCESTOR="$TEST_CLOSEST_ANCESTOR" "$MONOREPO_SCRIPT" \
+    --scopes pullrequest \
+    --tags deptest \
+    --filter-mode any \
+    --selection-mode triaged \
+    --jobs "$TEST_DIR/jobs" \
+    --git-diff-file "$TEST_DIR/dep_diff.txt" \
+    --mainline-branches "$MAINLINE_BRANCHES_COMMA_SEPARATED" \
+    --dry-run 2>&1 || true)
+
+  # DepBuild is a shared dependency of DepBench and DepBench2, uploaded once.
+  local build_uploads
+  build_uploads=$(echo "$output" | grep -c "skipping upload for job: DepBuild$" || true)
+  assert_equals "1" "$build_uploads" "Shared dependency DepBuild uploaded exactly once"
+}
+
 # Test: Integration test - both excludeIf and includeIf (includeIf matches, excludeIf doesn't)
 test_integration_both_include_exclude_include_wins() {
   echo -e "\n${YELLOW}Testing: Integration - includeIf matches, excludeIf doesn't${NC}"
@@ -736,6 +853,8 @@ main() {
   test_integration_tag_filtering
   test_integration_scope_filtering
   test_integration_include_if_not_matching
+  test_integration_dependency_resolution
+  test_integration_dependency_dedup
 
   teardown
 
