@@ -215,8 +215,7 @@ let generateStep =
                     "if [ -z \"\\\${SKIP_DOCKER_PRUNE:-}\" ]; then "
                 ++  "docker system prune --all --force "
                 ++  merge
-                      { Arm64 = ""
-                      , XLarge = "--filter until=24h"
+                      { XLarge = "--filter until=24h"
                       , Large = "--filter until=24h"
                       , Medium = "--filter until=24h"
                       , Small = "--filter until=24h"
@@ -294,7 +293,7 @@ let generateStep =
                   spec.deb_repo
 
           let target =
-                merge { Arm64 = Size.Arm64, Amd64 = Size.XLarge } spec.arch
+                merge { Arm64 = Size.XLarge, Amd64 = Size.XLarge } spec.arch
 
           in  Command.build
                 Command.Config::{

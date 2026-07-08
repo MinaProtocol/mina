@@ -36,7 +36,6 @@ let buildTestCmd
                 Command.Config::{
                 , commands =
                     RunInToolchain.runInToolchainBullseye
-                      Arch.Type.Amd64
                       ([] : List Text)
                       ''
                       ./buildkite/scripts/tests/debian-upgrade-test.sh \

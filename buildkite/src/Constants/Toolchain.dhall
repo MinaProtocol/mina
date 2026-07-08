@@ -13,10 +13,10 @@ let runner =
       ->  \(arch : Arch.Type)
       ->  merge
             { Bookworm = RunInToolchain.runInToolchainBookworm arch
-            , Bullseye = RunInToolchain.runInToolchainBullseye arch
+            , Bullseye = RunInToolchain.runInToolchainBullseye
             , Jammy = RunInToolchain.runInToolchainJammy
             , Focal = RunInToolchain.runInToolchain
-            , Noble = RunInToolchain.runInToolchainNoble arch
+            , Noble = RunInToolchain.runInToolchainNoble
             }
             debVersion
 
