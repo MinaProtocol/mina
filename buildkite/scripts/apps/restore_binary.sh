@@ -7,11 +7,14 @@
 #
 # Usage: restore_binary.sh <network>      (network: devnet | mainnet | mesa)
 #
-# This is a thin convenience wrapper over restore_app.sh: it maps the network to
-# the signature-specific binary name and installs it as the plain `mina`, so
-# client scripts never deal with the variant or the signature name. The cache
-# location (codename/profile/flag/arch) is derived from the build identity by
-# restore_app.sh -- see its header for the env knobs.
+# This is a thin convenience wrapper over restore_app.sh: it installs the daemon
+# binary as the plain `mina`, so client scripts never deal with the variant. The
+# app-build (and the .deb, see scripts/debian/builder-helpers.sh) ships
+# src/app/cli/src/mina.exe as `mina`; the network's signatures are baked in at
+# build time via the profile and encoded in the cache variant that restore_app.sh
+# derives from the network -- there is no separate mina_<sig>_signatures.exe in
+# the cache. The cache location (codename/profile/flag/arch) is derived from the
+# build identity by restore_app.sh -- see its header for the env knobs.
 #
 # Exits non-zero without side effects if not in Buildkite context or the binary
 # is not cached, so callers can fall back to installing the .deb.
@@ -26,12 +29,11 @@ if [[ -z "$NETWORK" ]]; then
 fi
 
 case "$NETWORK" in
-  devnet | mesa) sig=testnet ;;
-  mainnet) sig=mainnet ;;
+  devnet | mesa | mainnet) ;;
   *)
     echo "restore_binary: unknown network '$NETWORK'" >&2
     exit 1
     ;;
 esac
 
-exec ./buildkite/scripts/apps/restore_app.sh "$NETWORK" "mina_${sig}_signatures.exe" mina
+exec ./buildkite/scripts/apps/restore_app.sh "$NETWORK" mina.exe mina
