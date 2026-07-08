@@ -1101,6 +1101,20 @@ module Tick : S = struct
      ; Sub
      ; Mul
      ; Add
+     ; Challenge Alpha
+     ; Pow 11
+     ; Load 35
+     ; Load 39
+     ; Mul
+     ; Cell (Witness 2, Curr)
+     ; Mul
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
+     ; Sub
+     ; Mul
+     ; Add
      ; Mul
      ; Add
      ; Cell (Index Gate_type.EndoMulScalar, Curr)
@@ -7679,6 +7693,20 @@ module Tock : S = struct
      ; Cell (Witness 14, Curr)
      ; Add
      ; Cell (Witness 6, Next)
+     ; Sub
+     ; Mul
+     ; Add
+     ; Challenge Alpha
+     ; Pow 11
+     ; Load 35
+     ; Load 39
+     ; Mul
+     ; Cell (Witness 2, Curr)
+     ; Mul
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
      ; Sub
      ; Mul
      ; Add

@@ -350,8 +350,12 @@ let
 
         MINA_VERSION_IMPLEMENTATION = "mina_version.runtime";
 
-        KIMCHI_WASM_NODEJS = "${pkgs.kimchi_wasm}/nodejs";
-        KIMCHI_WASM_WEB = "${pkgs.kimchi_wasm}/web";
+        # Plain strings, not store paths: a ${pkgs.kimchi_wasm} reference here would
+        # force building the wasm bindings just to enter the dev shell (and their
+        # pinned nightly predates proof-systems' MSRV). Only the kimchi_bindings/js
+        # dune rules read these; building them in the shell is unsupported.
+        KIMCHI_WASM_NODEJS = "/kimchi-wasm-not-built-in-dev-shell/nodejs";
+        KIMCHI_WASM_WEB = "/kimchi-wasm-not-built-in-dev-shell/web";
 
         configurePhase = ''
           export MINA_ROOT="$PWD"

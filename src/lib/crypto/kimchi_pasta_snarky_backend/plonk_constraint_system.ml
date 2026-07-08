@@ -1418,32 +1418,40 @@ end = struct
   let dump_gate_labels (sys : t) : string =
     let json_escape s =
       String.concat_map s ~f:(fun c ->
-        match c with
-        | '"' -> "\\\""
-        | '\\' -> "\\\\"
-        | '\n' -> "\\n"
-        | _ -> String.make 1 c)
+          match c with
+          | '"' ->
+              "\\\""
+          | '\\' ->
+              "\\\\"
+          | '\n' ->
+              "\\n"
+          | _ ->
+              String.make 1 c )
     in
     let public_input_size = Set_once.get_exn sys.public_input_size [%here] in
     let pi_labels = List.init public_input_size ~f:(fun _ -> []) in
     let gate_labels = List.rev sys.gate_labels_rev in
     let all_labels = pi_labels @ gate_labels in
-    let lines = List.mapi all_labels ~f:(fun row labels ->
-      let context_json = "[" ^ String.concat ~sep:","
-        (List.rev_map labels ~f:(fun s ->
-          Printf.sprintf "\"%s\"" (json_escape s))) ^ "]" in
-      Printf.sprintf "{\"row\":%d,\"context\":%s}" row context_json)
+    let lines =
+      List.mapi all_labels ~f:(fun row labels ->
+          let context_json =
+            "["
+            ^ String.concat ~sep:","
+                (List.rev_map labels ~f:(fun s ->
+                     Printf.sprintf "\"%s\"" (json_escape s) ) )
+            ^ "]"
+          in
+          Printf.sprintf "{\"row\":%d,\"context\":%s}" row context_json )
     in
     String.concat ~sep:"\n" lines
 
   let dump_cached_constants (sys : t) : string =
     let var_to_string v = Sexp.to_string (V.sexp_of_t v) in
-    let entries =
-      Hashtbl.to_alist sys.cached_constants
-    in
-    let lines = List.map entries ~f:(fun (fp, var) ->
-      Printf.sprintf "{\"var\":\"%s\",\"value\":\"%s\"}"
-        (var_to_string var) (Fp.to_string fp))
+    let entries = Hashtbl.to_alist sys.cached_constants in
+    let lines =
+      List.map entries ~f:(fun (fp, var) ->
+          Printf.sprintf "{\"var\":\"%s\",\"value\":\"%s\"}" (var_to_string var)
+            (Fp.to_string fp) )
     in
     "[" ^ String.concat ~sep:",\n " lines ^ "]"
 
@@ -1975,7 +1983,7 @@ end = struct
           let row =
             [| Some round.xt
              ; Some round.yt
-             ; None
+             ; Some round.inv
              ; None
              ; Some round.xp
              ; Some round.yp
