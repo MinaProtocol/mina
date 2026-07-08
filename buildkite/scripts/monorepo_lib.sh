@@ -236,6 +236,31 @@ build_step_index() {
   done < <(find "$jobs_dir" -type f -name "*.yml")
 }
 
+# job_dependency_files - print the immediate dependency job files of a job: the
+# jobs that own the steps this job's steps depend on. Dedupes and skips
+# self-references (steps that depend on other steps of the same job). Requires
+# build_step_index to have been called first.
+# Args:
+#   $1: job YAML file
+job_dependency_files() {
+  local file="$1"
+  local -A seen=()
+  local dep_key dep_file
+  while IFS= read -r dep_key; do
+    [[ -z "$dep_key" || "$dep_key" == "null" ]] && continue
+    dep_file="${STEP_KEY_TO_FILE[$dep_key]-}"
+    if [[ -z "$dep_file" ]]; then
+      echo "⚠️  Warning: dependency step '$dep_key' (required by $(basename "$file")) is not produced by any known job" >&2
+      continue
+    fi
+    [[ "$dep_file" == "$file" ]] && continue
+    if [[ -z "${seen[$dep_file]-}" ]]; then
+      seen["$dep_file"]=1
+      echo "$dep_file"
+    fi
+  done < <(yq -r '[.pipeline.steps[]?.depends_on[]?.step] | .[]' "$file" 2>/dev/null)
+}
+
 # resolve_transitive_deps - print the set of dependency job files (transitive,
 # excluding the starting file itself) for a given job. Each dependency is emitted
 # at most once. Requires build_step_index to have been called first.
@@ -251,21 +276,14 @@ resolve_transitive_deps() {
     local cur="${queue[0]}"
     queue=("${queue[@]:1}")
 
-    local dep_key dep_file
-    while IFS= read -r dep_key; do
-      [[ -z "$dep_key" || "$dep_key" == "null" ]] && continue
-      dep_file="${STEP_KEY_TO_FILE[$dep_key]-}"
-      if [[ -z "$dep_file" ]]; then
-        echo "⚠️  Warning: dependency step '$dep_key' (required by $(basename "$cur")) is not produced by any known job" >&2
-        continue
-      fi
-      # Skip self-references (steps depending on other steps of the same job).
-      [[ "$dep_file" == "$cur" ]] && continue
+    local dep_file
+    while IFS= read -r dep_file; do
+      [[ -z "$dep_file" ]] && continue
       if [[ -z "${visited[$dep_file]-}" ]]; then
         visited["$dep_file"]=1
         queue+=("$dep_file")
       fi
-    done < <(yq -r '[.pipeline.steps[]?.depends_on[]?.step] | .[]' "$cur" 2>/dev/null)
+    done < <(job_dependency_files "$cur")
   done
 
   local f
