@@ -4,15 +4,15 @@ let List/any = Prelude.List.any
 
 let Network
     : Type
-    = < Devnet | Mainnet | PreMesa1 | Mesa >
+    = < Devnet | Mainnet | MesaMut | MesaPreflight >
 
 let capitalName =
           \(network : Network)
       ->  merge
             { Devnet = "Devnet"
             , Mainnet = "Mainnet"
-            , PreMesa1 = "PreMesa1"
-            , Mesa = "Mesa"
+            , MesaMut = "MesaMut"
+            , MesaPreflight = "MesaPreflight"
             }
             network
 
@@ -21,8 +21,8 @@ let lowerName =
       ->  merge
             { Devnet = "devnet"
             , Mainnet = "mainnet"
-            , PreMesa1 = "hetzner-pre-mesa-1"
-            , Mesa = "mesa"
+            , MesaMut = "mesa-mut"
+            , MesaPreflight = "mesa-preflight"
             }
             network
 
@@ -31,8 +31,8 @@ let debianSuffix =
       ->  merge
             { Devnet = "devnet"
             , Mainnet = "mainnet"
-            , PreMesa1 = "hetzner-pre-mesa-1"
-            , Mesa = "mesa"
+            , MesaMut = "mesa-mut"
+            , MesaPreflight = "mesa-preflight"
             }
             network
 
@@ -43,9 +43,9 @@ let peerListUrl =
                 "https://storage.googleapis.com/seed-lists/devnet_seeds.txt"
             , Mainnet =
                 "https://storage.googleapis.com/seed-lists/mainnet_seeds.txt"
-            , PreMesa1 =
-                "https://storage.googleapis.com/o1labs-gitops-infrastructure/mina-mesa-network/mina-mesa-network-seeds.txt"
-            , Mesa =
+            , MesaMut =
+                "https://storage.googleapis.com/gs://o1labs-gitops-infrastructure/mina-mesa-mut/mina-mesa-mut-peer-list-url.txt"
+            , MesaPreflight =
                 "https://storage.googleapis.com/o1labs-gitops-infrastructure/mina-mesa-network/mina-mesa-network-seeds.txt"
             }
             network
@@ -55,7 +55,11 @@ let toLabelSegment = \(network : Network) -> "-${debianSuffix network}"
 let requiresMainnetBuild =
           \(network : Network)
       ->  merge
-            { Devnet = False, Mainnet = True, PreMesa1 = False, Mesa = False }
+            { Devnet = False
+            , Mainnet = True
+            , MesaMut = False
+            , MesaPreflight = False
+            }
             network
 
 let buildMainnetEnv =
