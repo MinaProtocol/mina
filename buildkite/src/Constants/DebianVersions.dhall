@@ -56,10 +56,11 @@ let DepsSpec =
 let dependsOn =
           \(spec : DepsSpec.Type)
       ->  let name =
-                "${spec.prefix}${capitalName
-                                   spec.deb_version}${BuildFlags.toSuffixUppercase
-                                                        spec.build_flag}${Arch.nameSuffix
-                                                                            spec.arch}"
+                "${spec.prefix}${Network.namePrefixSegment
+                                   spec.network}${capitalName
+                                                    spec.deb_version}${BuildFlags.toSuffixUppercase
+                                                                         spec.build_flag}${Arch.nameSuffix
+                                                                                             spec.arch}"
 
           in  [ { name = name, key = "${spec.step}-deb-pkg" } ]
 
@@ -136,10 +137,11 @@ let packageDirtyWhen =
 let appDependsOn =
           \(spec : DepsSpec.Type)
       ->  let name =
-                "${spec.prefix}${capitalName
-                                   spec.deb_version}${BuildFlags.toSuffixUppercase
-                                                        spec.build_flag}${Arch.nameSuffix
-                                                                            spec.arch}Apps"
+                "${spec.prefix}${Network.namePrefixSegment
+                                   spec.network}${capitalName
+                                                    spec.deb_version}${BuildFlags.toSuffixUppercase
+                                                                         spec.build_flag}${Arch.nameSuffix
+                                                                                             spec.arch}Apps"
 
           in  [ { name = name, key = "build-apps" } ]
 

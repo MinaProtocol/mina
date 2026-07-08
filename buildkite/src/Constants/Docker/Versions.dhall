@@ -77,8 +77,9 @@ let dependsOn =
           let archSuffix = merge { Amd64 = "", Arm64 = "Arm64" } spec.arch
 
           in  [ { name =
-                    "${spec.prefix}${capitalName
-                                       spec.codename}${buildFlagSuffix}${archSuffix}"
+                    "${spec.prefix}${Network.namePrefixSegment
+                                       spec.network}${capitalName
+                                                        spec.codename}${buildFlagSuffix}${archSuffix}"
                 , key = key
                 }
               ]

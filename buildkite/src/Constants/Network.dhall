@@ -18,6 +18,9 @@ let debianSuffix =
           \(network : Network)
       ->  merge { Devnet = "devnet", Mainnet = "mainnet" } network
 
+let namePrefixSegment =
+      \(network : Network) -> merge { Devnet = "", Mainnet = "Mainnet" } network
+
 let peerListUrl =
           \(network : Network)
       ->  merge
@@ -52,6 +55,7 @@ let foldMinaBuildMainnetEnv =
 in  { Type = Network
     , capitalName = capitalName
     , lowerName = lowerName
+    , namePrefixSegment = namePrefixSegment
     , debianSuffix = debianSuffix
     , peerListUrl = peerListUrl
     , toLabelSegment = toLabelSegment
