@@ -167,7 +167,12 @@ else
   closest_ancestor=$(find_closest_ancestor)
 fi
 
-find "$JOBS" -type f -name "*.yml" | while read -r file; do
+# Phase 1: triage. Collect every job that passes tags, scope, dirty-when and
+# include/exclude filters into the SELECTED_FILES set. Nothing is uploaded yet:
+# their dependencies must be pulled in first (Phase 2).
+declare -A SELECTED_FILES=()
+
+while IFS= read -r file; do
   tags=$(yq .spec.tags "$file")
   scope=$(yq .spec.scope "$file")
   job_name=$(yq -r .spec.name "$file")
@@ -213,14 +218,42 @@ find "$JOBS" -type f -name "*.yml" | while read -r file; do
   fi
 
   echo "✅ Including job $job_name in build "
+  SELECTED_FILES["$file"]=1
+done < <(find "$JOBS" -type f -name "*.yml")
+
+# Phase 2: dependency resolution. A selected job may depend on build jobs whose
+# own dirty-when did not match; pull every transitive prerequisite into the run
+# set. TO_UPLOAD is a set, so each job -- whether selected directly or required
+# as a dependency -- is uploaded exactly once (duplicates are ignored).
+build_step_index "$JOBS"
+
+declare -A TO_UPLOAD=()
+for file in "${!SELECTED_FILES[@]}"; do
+  TO_UPLOAD["$file"]=1
+done
+
+for file in "${!SELECTED_FILES[@]}"; do
+  while IFS= read -r dep_file; do
+    [[ -z "$dep_file" ]] && continue
+    if [[ -z "${TO_UPLOAD[$dep_file]-}" ]]; then
+      TO_UPLOAD["$dep_file"]=1
+      dep_name=$(yq -r .spec.name "$dep_file")
+      sel_name=$(yq -r .spec.name "$file")
+      echo "➕ Including dependency job $dep_name (required by $sel_name)"
+    fi
+  done < <(resolve_transitive_deps "$file")
+done
+
+# Phase 3: upload every job in the run set exactly once.
+for file in "${!TO_UPLOAD[@]}"; do
+  job_name=$(yq -r .spec.name "$file")
 
   if [[ "$DRY_RUN" == true ]]; then
-      printf " -> 🛑 Dry run enabled, skipping upload for job: %s\n" "$job_name"
-  else
-    job_path=$(yq -r .spec.path "$file")
-
-    ./buildkite/scripts/pipeline/upload.sh "(./buildkite/src/Jobs/$job_path/$job_name.dhall).pipeline"
-    printf " -> ✅ Uploaded job: %s\n" "$job_name"
+    printf " -> 🛑 Dry run enabled, skipping upload for job: %s\n" "$job_name"
+    continue
   fi
 
+  job_path=$(yq -r .spec.path "$file")
+  ./buildkite/scripts/pipeline/upload.sh "(./buildkite/src/Jobs/$job_path/$job_name.dhall).pipeline"
+  printf " -> ✅ Uploaded job: %s\n" "$job_name"
 done
