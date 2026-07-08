@@ -207,6 +207,73 @@ select_job() {
   fi
 }
 
+# ------------------------------------------------------------------------------
+# Dependency resolution
+#
+#   A job selected by dirty-when triage may depend (via step depends_on) on other
+#   jobs -- typically build jobs -- whose own dirty-when did NOT match the change
+#   set. Those dependencies must still be uploaded, otherwise the selected job
+#   waits on a step that never gets scheduled. The helpers below reproduce the
+#   dependency walk used by run-single-job-with-deps.sh (the !ci-single-me logic)
+#   so triage can pull every prerequisite job into the run set.
+# ------------------------------------------------------------------------------
+
+# Global: maps a pipeline step key to the job YAML file that defines it.
+declare -A STEP_KEY_TO_FILE
+
+# build_step_index - populate STEP_KEY_TO_FILE from every job YAML in a directory.
+# Args:
+#   $1: jobs directory
+build_step_index() {
+  local jobs_dir="$1"
+  STEP_KEY_TO_FILE=()
+  local file key
+  while IFS= read -r file; do
+    while IFS= read -r key; do
+      [[ -z "$key" || "$key" == "null" ]] && continue
+      STEP_KEY_TO_FILE["$key"]="$file"
+    done < <(yq -r '[.pipeline.steps[]?.key] | .[]' "$file" 2>/dev/null)
+  done < <(find "$jobs_dir" -type f -name "*.yml")
+}
+
+# resolve_transitive_deps - print the set of dependency job files (transitive,
+# excluding the starting file itself) for a given job. Each dependency is emitted
+# at most once. Requires build_step_index to have been called first.
+# Args:
+#   $1: starting job YAML file
+resolve_transitive_deps() {
+  local start="$1"
+  local -A visited=()
+  local -a queue=("$start")
+  visited["$start"]=1
+
+  while [[ ${#queue[@]} -gt 0 ]]; do
+    local cur="${queue[0]}"
+    queue=("${queue[@]:1}")
+
+    local dep_key dep_file
+    while IFS= read -r dep_key; do
+      [[ -z "$dep_key" || "$dep_key" == "null" ]] && continue
+      dep_file="${STEP_KEY_TO_FILE[$dep_key]-}"
+      if [[ -z "$dep_file" ]]; then
+        echo "⚠️  Warning: dependency step '$dep_key' (required by $(basename "$cur")) is not produced by any known job" >&2
+        continue
+      fi
+      # Skip self-references (steps depending on other steps of the same job).
+      [[ "$dep_file" == "$cur" ]] && continue
+      if [[ -z "${visited[$dep_file]-}" ]]; then
+        visited["$dep_file"]=1
+        queue+=("$dep_file")
+      fi
+    done < <(yq -r '[.pipeline.steps[]?.depends_on[]?.step] | .[]' "$cur" 2>/dev/null)
+  done
+
+  local f
+  for f in "${!visited[@]}"; do
+    [[ "$f" != "$start" ]] && echo "$f"
+  done
+}
+
 # find_closest_ancestor - Find the closest mainline branch ancestor
 # Uses global variable MAINLINE_BRANCHES (array of branch names)
 # Returns: name of the closest ancestor branch
