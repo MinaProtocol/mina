@@ -23,7 +23,6 @@ let dependsOnDevnet =
         DebianVersions.DepsSpec::{
         , deb_version = DebianVersions.DebVersion.Bullseye
         , network = Network.Type.Devnet
-        , prefix = "MinaArtifactPr"
         }
 
 let buildTestCmd

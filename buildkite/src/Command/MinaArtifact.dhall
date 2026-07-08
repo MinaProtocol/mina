@@ -103,16 +103,34 @@ let labelSuffix
                                     spec.buildFlags}${Arch.labelSuffix
                                                         spec.arch}"
 
-let nameSuffix
+let primaryNetwork
+    : MinaBuildSpec.Type -> Network.Type
+    =     \(spec : MinaBuildSpec.Type)
+      ->  Optional/default
+            Network.Type
+            Network.Type.Devnet
+            (List/head Network.Type (Artifact.networks spec.artifacts))
+
+let baseNameSuffix
     : MinaBuildSpec.Type -> Text
     =     \(spec : MinaBuildSpec.Type)
       ->  "${DebianVersions.capitalName
                spec.debVersion}${BuildFlags.toSuffixUppercase
                                    spec.buildFlags}${Arch.nameSuffix spec.arch}"
 
+let nameSuffix
+    : MinaBuildSpec.Type -> Text
+    =     \(spec : MinaBuildSpec.Type)
+      ->  "${Network.namePrefixSegment (primaryNetwork spec)}${baseNameSuffix
+                                                                 spec}"
+
 let selfName
     : MinaBuildSpec.Type -> Text
     = \(spec : MinaBuildSpec.Type) -> "${spec.prefix}${nameSuffix spec}"
+
+let genericBuildName
+    : MinaBuildSpec.Type -> Text
+    = \(spec : MinaBuildSpec.Type) -> "${spec.prefix}${baseNameSuffix spec}"
 
 let DockerService =
       { service : Docker.Type, network : Network.Type, profile : Profiles.Type }
@@ -403,7 +421,7 @@ let docker_step
 
           let dependsOnGeneric =
                   deps
-                # [ { name = selfName spec
+                # [ { name = genericBuildName spec
                     , key =
                         "${Docker.lowerName
                              Docker.Type.DaemonGeneric}-${Network.lowerName

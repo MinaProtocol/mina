@@ -22,10 +22,7 @@ let Size = ../../Command/Size.dhall
 
 let dependsOn =
         DebianVersions.dependsOn
-          DebianVersions.DepsSpec::{
-          , profile = Profiles.Type.Lightnet
-          , prefix = "MinaArtifactPr"
-          }
+          DebianVersions.DepsSpec::{ profile = Profiles.Type.Lightnet }
       # DebianVersions.dependsOn
           DebianVersions.DepsSpec::{ build_flag = BuildFlags.Type.Instrumented }
 
