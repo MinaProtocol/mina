@@ -687,7 +687,7 @@ let packagePipeline
     =     \(spec : MinaBuildSpec.Type)
       ->  Pipeline.Config::{
           , spec = JobSpec::{
-            , dirtyWhen = DebianVersions.dirtyWhen spec.debVersion
+            , dirtyWhen = DebianVersions.packageDirtyWhen
             , path = "Release"
             , name = "${spec.prefix}${nameSuffix spec}"
             , tags = spec.tags
