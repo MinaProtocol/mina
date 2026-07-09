@@ -842,67 +842,79 @@ module Make_str (A : Wire_types.Concrete) = struct
           ~producer_private_key ~producer_public_key ~total_stake
           ~(get_delegators :
                 Public_key.Compressed.t
-             -> Mina_base.Account.t Mina_base.Account.Index.Table.t option ) =
+             -> Mina_base.Account.t Mina_base.Account.Index.Table.t option )
+          ~should_abort :
+          [ `Finished of
+            ( [ `Vrf_eval of string ]
+            * [> `Vrf_output of Consensus_vrf.Output_hash.t ]
+            * [> `Delegator of
+                 Public_key.Compressed.t * Mina_base.Account.Index.t ] )
+            option
+          | `Stale ]
+          Deferred.t =
         let open Context in
         let open Message in
-        let open Interruptible.Let_syntax in
+        let open Deferred.Let_syntax in
+        let yield = Staged.unstage (Async.Scheduler.yield_every ~n:50) in
         let delegators =
           get_delegators producer_public_key
           |> Option.value_map ~f:Hashtbl.to_alist ~default:[]
         in
         let rec go acc = function
           | [] ->
-              Interruptible.return acc
+              Deferred.return (`Finished acc)
           | (delegator, (account : Mina_base.Account.t)) :: delegators ->
-              let%bind () = Interruptible.return () in
-              let vrf_result =
-                T.eval ~constraint_constants ~private_key:producer_private_key
-                  { global_slot; seed; delegator }
-              in
-              let truncated_vrf_result = Output.truncate vrf_result in
-              [%log debug]
-                "VRF result for delegator: $delegator, balance: $balance, \
-                 amount: $amount, result: $result"
-                ~metadata:
-                  [ ( "delegator"
-                    , `Int (Mina_base.Account.Index.to_int delegator) )
-                  ; ( "delegator_pk"
-                    , Public_key.Compressed.to_yojson account.public_key )
-                  ; ("balance", `Int (Balance.to_nanomina_int account.balance))
-                  ; ("amount", `Int (Amount.to_nanomina_int total_stake))
-                  ; ( "result"
-                    , `String
-                        (* use sexp representation; int might be too small *)
-                        ( Fold.string_bits truncated_vrf_result
-                        |> Bignum_bigint.of_bit_fold_lsb
-                        |> Bignum_bigint.sexp_of_t |> Sexp.to_string ) )
-                  ] ;
-              Mina_metrics.Counter.inc_one
-                Mina_metrics.Consensus.vrf_evaluations ;
-              if
-                Threshold.is_satisfied ~my_stake:account.balance ~total_stake
-                  truncated_vrf_result
-              then
-                let string_of_blake2 =
-                  Blake2.(Fn.compose to_raw_string digest_string)
+              let%bind () = yield () in
+              if should_abort () then Deferred.return `Stale
+              else
+                let vrf_result =
+                  T.eval ~constraint_constants ~private_key:producer_private_key
+                    { global_slot; seed; delegator }
                 in
-                let vrf_eval = string_of_blake2 truncated_vrf_result in
-                let this_vrf () =
-                  go
-                    (Some
-                       ( `Vrf_eval vrf_eval
-                       , `Vrf_output vrf_result
-                       , `Delegator (account.public_key, delegator) ) )
-                    delegators
-                in
-                match acc with
-                | Some (`Vrf_eval prev_best_vrf_eval, _, _) ->
-                    if String.compare prev_best_vrf_eval vrf_eval < 0 then
+                let truncated_vrf_result = Output.truncate vrf_result in
+                [%log debug]
+                  "VRF result for delegator: $delegator, balance: $balance, \
+                   amount: $amount, result: $result"
+                  ~metadata:
+                    [ ( "delegator"
+                      , `Int (Mina_base.Account.Index.to_int delegator) )
+                    ; ( "delegator_pk"
+                      , Public_key.Compressed.to_yojson account.public_key )
+                    ; ("balance", `Int (Balance.to_nanomina_int account.balance))
+                    ; ("amount", `Int (Amount.to_nanomina_int total_stake))
+                    ; ( "result"
+                      , `String
+                          (* use sexp representation; int might be too small *)
+                          ( Fold.string_bits truncated_vrf_result
+                          |> Bignum_bigint.of_bit_fold_lsb
+                          |> Bignum_bigint.sexp_of_t |> Sexp.to_string ) )
+                    ] ;
+                Mina_metrics.Counter.inc_one
+                  Mina_metrics.Consensus.vrf_evaluations ;
+                if
+                  Threshold.is_satisfied ~my_stake:account.balance ~total_stake
+                    truncated_vrf_result
+                then
+                  let string_of_blake2 =
+                    Blake2.(Fn.compose to_raw_string digest_string)
+                  in
+                  let vrf_eval = string_of_blake2 truncated_vrf_result in
+                  let this_vrf () =
+                    go
+                      (Some
+                         ( `Vrf_eval vrf_eval
+                         , `Vrf_output vrf_result
+                         , `Delegator (account.public_key, delegator) ) )
+                      delegators
+                  in
+                  match acc with
+                  | Some (`Vrf_eval prev_best_vrf_eval, _, _) ->
+                      if String.compare prev_best_vrf_eval vrf_eval < 0 then
+                        this_vrf ()
+                      else go acc delegators
+                  | None ->
                       this_vrf ()
-                    else go acc delegators
-                | None ->
-                    this_vrf ()
-              else go acc delegators
+                else go acc delegators
         in
         go None delegators
     end
@@ -3692,15 +3704,20 @@ module Make_str (A : Wire_types.Concrete) = struct
         let check i =
           let global_slot = Mina_numbers.Global_slot_since_hard_fork.of_int i in
           let%map result =
-            Interruptible.force
-              (Vrf.check
-                 ~context:(module Context)
-                 ~global_slot ~seed ~producer_private_key:private_key
-                 ~producer_public_key:public_key_compressed ~total_stake
-                 ~get_delegators:
-                   (Local_state.Snapshot.delegators epoch_snapshot) )
+            Vrf.check
+              ~context:(module Context)
+              ~global_slot ~seed ~producer_private_key:private_key
+              ~producer_public_key:public_key_compressed ~total_stake
+              ~get_delegators:(Local_state.Snapshot.delegators epoch_snapshot)
+              ~should_abort:(fun () -> false)
           in
-          match Result.ok_exn result with Some _ -> 1 | None -> 0
+          match result with
+          | `Finished (Some _) ->
+              1
+          | `Finished None ->
+              0
+          | `Stale ->
+              failwith "Unexpected stale VRF check"
         in
         let rec loop acc_count i =
           match i < samples with

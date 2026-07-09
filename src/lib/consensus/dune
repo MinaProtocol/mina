@@ -67,7 +67,6 @@
   currency
   mina_stdlib_unix
   coda_genesis_ledger
-  interruptible
   network_peer
   pickles
   snark_bits
@@ -114,5 +113,5 @@
   (backend bisect_ppx))
  (preprocess
   (pps ppx_version ppx_jane))
- (enabled_if false) ;; Compilation is disabled until this executable has been fixed.
- )
+ (enabled_if false)) ;; Compilation is disabled until this executable has been fixed.
+ 
