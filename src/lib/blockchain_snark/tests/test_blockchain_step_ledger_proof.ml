@@ -154,8 +154,7 @@ let test_variant_rejected () =
     not (Mina_base.Frozen_ledger_hash.equal variant_snarked real_snarked)
   in
   (* The circuit must reject this witness. *)
-  if circuit_accepts then
-    Alcotest.fail "Circuit accepted a variant witness."
+  if circuit_accepts then Alcotest.fail "Circuit accepted a variant witness."
   else if not hashes_differ then
     Alcotest.fail "Hashes unexpectedly equal — test setup error"
   else ()
@@ -166,7 +165,8 @@ let tests =
           test_baseline_accepted
       ] )
   ; ( "variant"
-    , [ Alcotest.test_case "variant witness rejected" `Quick test_variant_rejected
+    , [ Alcotest.test_case "variant witness rejected" `Quick
+          test_variant_rejected
       ] )
   ]
 
@@ -183,7 +183,7 @@ let () =
       Alcotest.run "Blockchain step circuit" tests
   | other ->
       Printf.printf
-        "Skipping blockchain step circuit test under profile %s \
-         (dev-only fixtures)\n\
+        "Skipping blockchain step circuit test under profile %s (dev-only \
+         fixtures)\n\
          %!"
         other
