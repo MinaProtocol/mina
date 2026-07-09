@@ -33,10 +33,10 @@ let dirtyWhen =
       ]
 
 let bareBinaries =
-          "mina_testnet_signatures.exe:mina"
+          "mina.exe:mina"
       ++  ",archive.exe:mina-archive"
-      ++  ",rosetta_testnet_signatures.exe:mina-rosetta"
-      ++  ",signer_testnet_signatures.exe:mina-ocaml-signer"
+      ++  ",rosetta.exe:mina-rosetta"
+      ++  ",signer.exe:mina-ocaml-signer"
       ++  ",zkapp_test_transaction.exe:mina-zkapp-test-transaction"
       ++  ",indexer_test.exe:mina-rosetta-indexer-test"
       ++  ",libp2p_helper:libp2p_helper"
@@ -45,6 +45,7 @@ let envExports =
       [ "MINA_NETWORK_DEB=${Network.lowerName network}"
       , "MINA_DEB_CODENAME=bullseye"
       , "APPS_NETWORK=${Network.lowerName network}"
+      , "MINA_PROFILE=${Network.lowerName network}"
       , "APPS_BARE_BINARIES=${bareBinaries}"
       ]
 
