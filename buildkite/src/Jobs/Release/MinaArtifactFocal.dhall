@@ -46,8 +46,7 @@ in  Pipeline.build
             , Artifacts.Type.TxTools
             , Artifacts.Type.DaemonStorageToolbox
             ]
-          , scope =
-            [ PipelineScope.Type.MainlineNightly, PipelineScope.Type.Release ]
+          , scope = [ PipelineScope.Type.Weekly, PipelineScope.Type.Release ]
           , tags =
             [ PipelineTag.Type.Long
             , PipelineTag.Type.Release
