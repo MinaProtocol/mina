@@ -78,7 +78,8 @@ if [[ -v DUNE_INSTRUMENT_WITH ]]; then
     DEB_SUFFIX="${DEB_SUFFIX}-${INSTRUMENTED_SUFFIX}"
 fi
 
-BUILDDIR="deb_build"
+# Allow override via environment (set by build.sh for isolated parallel workers).
+BUILDDIR="${BUILDDIR:-deb_build}"
 
 # Function to ease creation of Debian package control files
 create_control_file() {
@@ -158,13 +159,19 @@ build_deb() {
   local package_name="$1"
   local deb_file="${package_name}_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb"
 
-  # Memoize: if this .deb was already produced (e.g. daemon_mainnet_generic and
-  # daemon_devnet_generic both produce mina-generic), skip the second build.
-  # Only in non-capture mode (tests need fresh captures).
+  # The .deb file must NOT already exist.  build.sh validates that every
+  # requested token produces a unique output, so this should never trigger
+  # in normal use.  If it does, it is a bug in the upstream duplicate-
+  # detection logic or this invocation has stale output from a previous run.
   if [[ -z "${BUILD_DEB_CAPTURE_DIR:-}" ]] && [[ -f "$deb_file" ]]; then
-    echo "Skipping ${deb_file} (already built)"
+    echo "ERROR: ${deb_file} already exists." >&2
+    echo "       build.sh validates that every requested token produces a unique" >&2
+    echo "       .deb output.  If you see this error:" >&2
+    echo "        - two tokens mapped to the same .deb (duplicate-output bug), or" >&2
+    echo "        - stale .deb files from a previous run are present." >&2
+    echo "       Clean _build/*.deb and retry." >&2
     rm -rf "${BUILDDIR}"
-    return 0
+    return 1
   fi
 
   echo "Building ${deb_file}"
