@@ -77,7 +77,7 @@ in  Pipeline.build
             , target = Size.Small
             , artifact_paths = [ S.contains "test_output/artifacts/*" ]
             , depends_on =
-                DebianVersions.dependsOn
+                DebianVersions.appDependsOn
                   DebianVersions.DepsSpec::{
                   , network = network
                   , profile = Profiles.Type.Devnet
