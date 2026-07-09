@@ -24,10 +24,9 @@ let namePrefixSegment =
 let peerListUrl =
           \(network : Network)
       ->  merge
-            { Devnet =
-                "https://storage.googleapis.com/seed-lists/devnet_seeds.txt"
+            { Devnet = "https://bootnodes.minaprotocol.com/networks/devnet.txt"
             , Mainnet =
-                "https://storage.googleapis.com/seed-lists/mainnet_seeds.txt"
+                "https://bootnodes.minaprotocol.com/networks/mainnet.txt"
             }
             network
 

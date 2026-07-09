@@ -2,7 +2,7 @@ let Profiles = ../Artifact/Profiles.dhall
 
 let Pkg = ./Package.dhall
 
-let Network = ../Artifact/Network.dhall
+let Network = ../Network.dhall
 
 let DebianVersions = ../Debian/Versions.dhall
 
