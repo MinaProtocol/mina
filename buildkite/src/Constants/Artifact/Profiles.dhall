@@ -1,4 +1,4 @@
-let Network = ./Network.dhall
+let Network = ../Network.dhall
 
 let Profile
     : Type
