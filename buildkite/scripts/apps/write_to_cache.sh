@@ -5,10 +5,10 @@
 # where <variant> identifies the build (network-profile[-instrumented][-arm64]).
 #
 # The variant depth is required: several builds share a codename and produce
-# identically-named binaries (e.g. mina_testnet_signatures.exe is emitted by the
-# devnet, mesa and instrumented builds alike). Without the variant they would
-# overwrite each other in apps/<codename>/, leaving whichever build finished last
-# -- a non-deterministic, wrong artifact for any consumer.
+# identically-named binaries (e.g. mina.exe is emitted by the devnet, mesa and
+# instrumented builds alike, differing only by build profile). Without the
+# variant they would overwrite each other in apps/<codename>/, leaving whichever
+# build finished last -- a non-deterministic, wrong artifact for any consumer.
 
 CODENAME=$1
 VARIANT=$2
