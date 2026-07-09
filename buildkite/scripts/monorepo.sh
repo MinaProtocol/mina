@@ -221,10 +221,18 @@ while IFS= read -r file; do
   SELECTED_FILES["$file"]=1
 done < <(find "$JOBS" -type f -name "*.yml")
 
-# Phase 2: dependency resolution. A selected job may depend on build jobs whose
-# own dirty-when did not match; pull every transitive prerequisite into the run
-# set. TO_UPLOAD is a set, so each job -- whether selected directly or required
-# as a dependency -- is uploaded exactly once (duplicates are ignored).
+# Phase 2: dependency resolution. A selected job may depend on a build job whose
+# own dirty-when did not match, so triage would not upload it. Pull only such
+# "would not be selected" prerequisites into the run set.
+#
+# A dependency is pulled ONLY when select_job would reject it on its own. If it
+# would be selected, its own triage step already uploads it -- and re-uploading
+# it here would duplicate the step key. That matters for full/multi-phase runs
+# (e.g. nightly): every job is selected in full mode, so nothing is ever pulled,
+# and cross-phase duplicates (a build selected in one phase, depended on from
+# another) are avoided. select_job is phase-independent (it only looks at the
+# selection mode and the job's own dirty-when), so the decision is consistent
+# regardless of which phase's tag/scope filter is running.
 build_step_index "$JOBS"
 
 declare -A TO_UPLOAD=()
@@ -235,12 +243,21 @@ done
 for file in "${!SELECTED_FILES[@]}"; do
   while IFS= read -r dep_file; do
     [[ -z "$dep_file" ]] && continue
-    if [[ -z "${TO_UPLOAD[$dep_file]-}" ]]; then
-      TO_UPLOAD["$dep_file"]=1
-      dep_name=$(yq -r .spec.name "$dep_file")
-      sel_name=$(yq -r .spec.name "$file")
-      echo "➕ Including dependency job $dep_name (required by $sel_name)"
+    [[ -n "${TO_UPLOAD[$dep_file]-}" ]] && continue
+
+    dep_name=$(yq -r .spec.name "$dep_file")
+
+    # Skip dependencies that triage would select on their own; their dedicated
+    # step already uploads them (pulling would duplicate the step key).
+    dep_selected=$(select_job "$SELECTION_FULL" "$SELECTION_TRIAGED" "$dep_file" "$dep_name" "$GIT_DIFF_FILE")
+    if [[ "$dep_selected" -eq 1 ]]; then
+      echo "↩️  Skipping dependency $dep_name: already selected by its own triage step" >&2
+      continue
     fi
+
+    TO_UPLOAD["$dep_file"]=1
+    sel_name=$(yq -r .spec.name "$file")
+    echo "➕ Including dependency job $dep_name (required by $sel_name)"
   done < <(resolve_transitive_deps "$file")
 done
 
