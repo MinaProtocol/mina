@@ -57,11 +57,17 @@ case "$BENCHMARK" in
   heap-usage)    BARE_EXE=heap_usage.exe;              BARE_AS=mina-heap-usage ;;
   zkapp)         BARE_EXE=zkapp_limits.exe;            BARE_AS=mina-zkapp-limits ;;
   ledger-export) BARE_EXE=ledger_export_benchmark.exe; BARE_AS=mina-ledger-export-benchmark ;;
-  snark)         BARE_EXE=mina_testnet_signatures.exe; BARE_AS=mina ;;
+  snark)         BARE_EXE=mina.exe;                    BARE_AS=mina ;;
   archive)       BARE_NONE=true ;;
   ledger-apply)  BARE_NONE=true ;;
   *)             BARE_EXE="" ;;
 esac
+
+# The daemon binary resolves its node profile from MINA_PROFILE, defaulting to
+# "dev" (ledger_depth 10) when unset. Benches run against devnet-sized data, so
+# pin the profile to devnet (ledger_depth 35) -- the .deb path gets this from
+# /etc/coda/build_config/PROFILE, the bare-cache binary needs it set explicitly.
+export MINA_PROFILE=devnet
 
 INSTALLED_BARE=false
 if [[ "$BARE_NONE" == true ]]; then
