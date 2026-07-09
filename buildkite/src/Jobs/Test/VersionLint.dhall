@@ -20,7 +20,7 @@ let Size = ../../Command/Size.dhall
 
 let DebianVersions = ../../Constants/DebianVersions.dhall
 
-let dependsOn = DebianVersions.dependsOn DebianVersions.DepsSpec::{=}
+let dependsOn = DebianVersions.appDependsOn DebianVersions.DepsSpec::{=}
 
 let buildTestCmd
     : Text -> Size -> List Command.TaggedKey.Type -> B/SoftFail -> Command.Type
