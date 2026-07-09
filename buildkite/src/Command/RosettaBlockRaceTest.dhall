@@ -17,7 +17,8 @@ in  { step =
               , commands =
                 [ RunWithPostgres.runInToolchainWithPostgresAndDebs
                     [ "APPS_NETWORK=mainnet"
-                    , "APPS_BARE_BINARIES=mina_mainnet_signatures.exe:mina,archive.exe:mina-archive,rosetta_mainnet_signatures.exe:mina-rosetta"
+                    , "MINA_PROFILE=mainnet"
+                    , "APPS_BARE_BINARIES=mina.exe:mina,archive.exe:mina-archive,rosetta.exe:mina-rosetta"
                     ]
                     ( Some
                         ( RunWithPostgres.ScriptOrArchive.OnlineTarGzDump
