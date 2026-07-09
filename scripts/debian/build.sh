@@ -43,6 +43,7 @@ resolve_deb_output() {
     test_executive)        echo "mina-test-executive" ;;
     functional_test_suite) echo "mina-test-suite" ;;
     delegation_verify)     echo "mina-delegation-verify" ;;
+    daemon_storage_toolbox) echo "mina-daemon-storage-toolbox" ;;
 
     # Rosetta packages
     rosetta_generic) echo "mina-rosetta-generic${DEB_SUFFIX}" ;;

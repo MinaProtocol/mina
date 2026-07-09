@@ -1,5 +1,5 @@
 #!/bin/bash
-# shellcheck disable=SC2034  # nameref arrays (good, bad) appear unused but are consumed by validate_unique_outputs
+# shellcheck disable=SC2034,SC2329  # nameref arrays/test fns are consumed indirectly by validate_unique_outputs/test dispatch
 set -euo pipefail
 
 ################################################################################
@@ -162,6 +162,7 @@ test_resolve_simple_tokens() {
   assert_eq "test_executive"        "mina-test-executive"     "$(resolve_deb_output test_executive)"
   assert_eq "functional_test_suite" "mina-test-suite"         "$(resolve_deb_output functional_test_suite)"
   assert_eq "delegation_verify"     "mina-delegation-verify"  "$(resolve_deb_output delegation_verify)"
+  assert_eq "daemon_storage_toolbox" "mina-daemon-storage-toolbox" "$(resolve_deb_output daemon_storage_toolbox)"
 }
 
 test_resolve_rosetta_tokens() {
