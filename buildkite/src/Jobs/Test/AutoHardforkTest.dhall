@@ -27,6 +27,9 @@ let dirtyWhen =
       , S.exactly "scripts/hardfork/dispatcher" "sh"
       , S.exactly "scripts/hardfork/create_runtime_config" "sh"
       , S.exactly "buildkite/scripts/tests/hardfork/dispatcher-tests" "sh"
+      , S.exactly
+          "buildkite/scripts/tests/hardfork/create-runtime-config-tests"
+          "sh"
       , S.exactly "scripts/docker/build" "sh"
       , S.exactly "scripts/debian/builder-helpers" "sh"
       ]
@@ -70,6 +73,16 @@ in  Pipeline.build
                   , artifact = Artifacts.Type.DaemonAutoHardfork
                   , network = network
                   }
+            }
+        , Command.build
+            Command.Config::{
+            , commands =
+              [ Cmd.run
+                  "buildkite/scripts/tests/hardfork/create-runtime-config-tests.sh"
+              ]
+            , label = "Auto Hardfork: create_runtime_config Tests"
+            , key = "auto-hardfork-create-runtime-config-tests"
+            , target = Size.Small
             }
         ]
       }
