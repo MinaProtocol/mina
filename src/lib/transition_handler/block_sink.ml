@@ -369,8 +369,7 @@ let%test_module "out-of-range block timestamp is handled gracefully" =
                    the daemon" =
       push_must_not_crash (Block_time.of_uint64 Unsigned.UInt64.max_int)
 
-    let%test_unit "gossip block with timestamp = 2^63 is handled gracefully"
-        =
+    let%test_unit "gossip block with timestamp = 2^63 is handled gracefully" =
       push_must_not_crash
         (Block_time.of_uint64
            (Unsigned.UInt64.of_string "9223372036854775808") )
