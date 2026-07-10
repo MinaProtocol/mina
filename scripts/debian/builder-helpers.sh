@@ -669,8 +669,10 @@ build_daemon_config_deb() {
 # For automode purpose. We need to control location for both runtimes
 CURRENT_CODENAME=berkeley
 POSTFORK_CODENAME=mesa
-AUTOMODE_CURRENT_DIR="${BUILDDIR}/usr/lib/mina/${CURRENT_CODENAME}"
-AUTOMODE_POSTFORK_DIR="${BUILDDIR}/usr/lib/mina/${POSTFORK_CODENAME}"
+# AUTOMODE_CURRENT_DIR and AUTOMODE_POSTFORK_DIR are no longer computed at source
+# time.  They depend on BUILDDIR, which is overridden per worker in parallel
+# builds.  Each function that needs these paths computes them locally so they
+# always pick up the current BUILDDIR value.
 
 #
 # Builds mina-NETWORK-prefork-POSTFORK_CODENAME tailored package for automode package
@@ -678,13 +680,14 @@ AUTOMODE_POSTFORK_DIR="${BUILDDIR}/usr/lib/mina/${POSTFORK_CODENAME}"
 # Output: mina-${NETWORK}-prefork-${POSTFORK_CODENAME}_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
 # Dependencies: ${SHARED_DEPS}${DAEMON_DEPS}
 #
-# Contains only the legacy binaries placed in "$AUTOMODE_CURRENT_DIR" without
+# Contains only the legacy binaries placed in the berkeley runtime directory without
 # configuration files or genesis ledgers.
 #
 
 build_daemon_prefork_deb() {
 
   local network="$1"
+  local automode_current_dir="${BUILDDIR}/usr/lib/mina/${CURRENT_CODENAME}"
 
   echo "--- Building mainnet berkeley deb for prefork automode :"
 
@@ -694,7 +697,7 @@ build_daemon_prefork_deb() {
   create_control_file "${package_name}" "${SHARED_DEPS}${DAEMON_DEPS}" \
     "Mina Protocol Client and Daemon for prefork under network ${network}" "${SUGGESTED_DEPS}"
 
-  copy_common_daemon_apps "$AUTOMODE_CURRENT_DIR"
+  copy_common_daemon_apps "$automode_current_dir"
 
   build_deb "${package_name}"
 }
@@ -704,6 +707,8 @@ build_daemon_prefork_deb() {
 # for automode runtimes that share the same dispatcher but different runtimes
 create_symlinks_for_shared_apps() {
   local NETWORK_NAME=${1}
+  local automode_current_dir="${BUILDDIR}/usr/lib/mina/${CURRENT_CODENAME}"
+  local automode_postfork_dir="${BUILDDIR}/usr/lib/mina/${POSTFORK_CODENAME}"
 
   # The dispatcher resolves the hardfork activation marker from
   # auto-fork-${MINA_NETWORK}-${MINA_PROFILE}, so MINA_PROFILE must be the
@@ -752,8 +757,8 @@ EOF
   ln -sf mina-dispatch "${BUILDDIR}/usr/local/bin/mina-rocksdb-scanner"
   ln -sf mina-dispatch "${BUILDDIR}/usr/local/bin/mina"
 
-  ln -sf "${AUTOMODE_CURRENT_DIR}/mina" mina-berkeley
-  ln -sf "${AUTOMODE_POSTFORK_DIR}/mina" mina-mesa
+  ln -sf "${automode_current_dir}/mina" mina-berkeley
+  ln -sf "${automode_postfork_dir}/mina" mina-mesa
 
   # Create directory for legacy binaries symlink if needed
   mkdir -p "${BUILDDIR}/usr/lib/mina/berkeley"
@@ -770,14 +775,15 @@ EOF
 copy_common_daemon_post_automode_apps_and_configs() {
 
   local prefork_network="${1}"
+  local automode_postfork_dir="${BUILDDIR}/usr/lib/mina/${POSTFORK_CODENAME}"
 
   echo "copy_common_daemon_post_automode_configs inputs:"
   echo "Network Name: ${prefork_network} (like mainnet, devnet, berkeley)"
 
   # Copy binaries to separate directory as we need both berkeley and mesa binaries for automode packages
   # and they share the same dispatcher and some common apps,
-  mkdir -p "${AUTOMODE_POSTFORK_DIR}"
-  copy_common_daemon_apps "${AUTOMODE_POSTFORK_DIR}"
+  mkdir -p "${automode_postfork_dir}"
+  copy_common_daemon_apps "${automode_postfork_dir}"
 
   # Create symlinks for shared apps in the main bin directory that
   # dispatch to the correct runtime based on env var set in /etc/default/mina-dispatch
@@ -807,7 +813,7 @@ copy_common_daemon_post_automode_apps_and_configs() {
 
   # Generate bash completion for the postfork runtime. mina.service is shipped
   # by the mina-<network>-config package, not here, to avoid dpkg conflicts.
-  copy_common_daemon_utils "${AUTOMODE_POSTFORK_DIR}/mina"
+  copy_common_daemon_utils "${automode_postfork_dir}/mina"
 
 }
 
