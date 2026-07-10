@@ -1,6 +1,6 @@
 let Profiles = ../Artifact/Profiles.dhall
 
-let Network = ../Artifact/Network.dhall
+let Network = ../Network.dhall
 
 let BuildFlags = ../Artifact/BuildFlags.dhall
 

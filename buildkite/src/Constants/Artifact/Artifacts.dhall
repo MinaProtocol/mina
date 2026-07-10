@@ -4,7 +4,7 @@ let List/map = Prelude.List.map
 
 let Debian = ../Debian/Package.dhall
 
-let Network = ./Network.dhall
+let Network = ../Network.dhall
 
 let Profiles = ./Profiles.dhall
 

@@ -1,6 +1,6 @@
 let Prelude = ../../External/Prelude.dhall
 
-let Network = ../Artifact/Network.dhall
+let Network = ../Network.dhall
 
 let Profile = ../Artifact/Profiles.dhall
 
