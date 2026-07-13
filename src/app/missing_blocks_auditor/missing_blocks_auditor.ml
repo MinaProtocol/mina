@@ -146,18 +146,28 @@ let main ~archive_uri () =
             exit 1
       in
       let chain_len = List.length canonical_chain |> Int64.of_int in
-      if Int64.equal chain_len highest_canonical then
+      (* The archive of a forked network starts at the fork block, not at height
+         1, so the canonical chain it can hold is shorter than the tip height by
+         everything below the fork. Comparing the length against the tip height
+         outright would report every healthy hardfork archive as missing all the
+         pre-fork blocks. *)
+      let expected_chain_len =
+        Int64.( - ) highest_canonical
+          (Int64.of_int genesis_or_fork_block_height)
+        |> Int64.succ
+      in
+      if Int64.equal chain_len expected_chain_len then
         [%log info] "Length of canonical chain is %Ld blocks" chain_len
       else (
         add_error chain_length_error ;
         if genesis_or_fork_block_height = 1 then
           [%log info] "Length of canonical chain is %Ld blocks, expected: %Ld"
-            chain_len highest_canonical
+            chain_len expected_chain_len
         else
           [%log info]
             "Length of canonical chain is %Ld blocks, expected: %Ld. (Note: \
              genesis or first fork block has height %d)"
-            chain_len highest_canonical genesis_or_fork_block_height ) ;
+            chain_len expected_chain_len genesis_or_fork_block_height ) ;
       let invalid_chain =
         List.filter canonical_chain
           ~f:(fun (_block_id, _state_hash, chain_status) ->
