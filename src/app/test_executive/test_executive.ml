@@ -66,6 +66,7 @@ let tests : test list =
   ; ( "peers-reliability"
     , (module Peers_reliability_test.Make : Intf.Test.Functor_intf) )
   ; ("slot-end", (module Slot_end_test.Make : Intf.Test.Functor_intf))
+  ; ("staking", (module Staking_test.Make : Intf.Test.Functor_intf))
   ; ( "verification-key"
     , (module Verification_key_update.Make : Intf.Test.Functor_intf) )
   ; ("zkapps", (module Zkapps.Make : Intf.Test.Functor_intf))

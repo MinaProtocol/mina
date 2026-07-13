@@ -627,7 +627,7 @@ let%test_module "Account precondition tests" =
                   U.check_zkapp_command_with_merges_exn ~state_body ledger
                     [ zkapp_command ] ) ) )
 
-    let mk_delegate_precondition pk : Account_update.Account_precondition.t =
+    let delegate_precondition : Account_update.Account_precondition.t =
       let open Zkapp_basic.Or_ignore in
       let state =
         Pickles_types.Vector.init Zkapp_state.Max_state_size.n ~f:(fun _ ->
@@ -636,7 +636,7 @@ let%test_module "Account precondition tests" =
       { balance = Ignore
       ; nonce = Ignore
       ; receipt_chain_hash = Ignore
-      ; delegate = Check pk
+      ; delegate = Check Public_key.Compressed.empty
       ; state
       ; action_state = Ignore
       ; proved_state = Ignore
@@ -696,9 +696,6 @@ let%test_module "Account precondition tests" =
                   (* add delegate precondition for new account *)
                   let%bind zkapp_command =
                     let zkapp_pk = Public_key.compress new_kp.public_key in
-                    let delegate_precondition =
-                      mk_delegate_precondition zkapp_pk
-                    in
                     let zkapp =
                       { zkapp_command0 with
                         account_updates =
@@ -719,8 +716,76 @@ let%test_module "Account precondition tests" =
                   U.check_zkapp_command_with_merges_exn ~state_body ledger
                     [ zkapp_command ] ) ) )
 
-    let%test_unit "unsatisfied delegate precondition, custom token" =
-      (* when new account has a custom token, it doesn't get a self-delegation *)
+    (* Shared setup for the custom-token delegate tests below: initialize a
+       ledger with [token_creator] funded, derive the token id, and build a
+       keymap covering both the creator and the (not-yet-created) token holder. *)
+    let setup_custom_token_ledger ~ledger
+        ~(token_creator : Signature_lib.Keypair.t)
+        ~(token_holder : Signature_lib.Keypair.t) =
+      let module Init_ledger = Mina_transaction_logic.For_tests.Init_ledger in
+      let token_creator_pk =
+        Signature_lib.Public_key.compress token_creator.public_key
+      in
+      Init_ledger.init
+        (module Mina_ledger.Ledger.Ledger_inner)
+        [| (token_creator, 5_000_000_000L) |]
+        ledger ;
+      let custom_token_id =
+        Account_id.derive_token_id
+          ~owner:(Account_id.create token_creator_pk Token_id.default)
+      in
+      let keymap =
+        List.fold [ token_creator; token_holder ]
+          ~init:Public_key.Compressed.Map.empty
+          ~f:(fun map { Signature_lib.Keypair.private_key; public_key } ->
+            Public_key.Compressed.Map.add_exn map
+              ~key:(Public_key.compress public_key)
+              ~data:private_key )
+      in
+      (token_creator_pk, custom_token_id, keymap)
+
+    (* Build a zkapp_command that mints 100 of [custom_token_id] to
+       [token_holder], optionally applying [holder_update] and / or
+       [holder_precondition] to the holder's account update. *)
+    let build_mint_custom_token_cmd ~signature_kind ~account_creation_fee
+        ~token_creator ~token_creator_pk ~token_holder ~custom_token_id ~keymap
+        ?holder_update ?holder_precondition () =
+      let open Zkapp_command_builder in
+      let zkapp0 =
+        mk_forest
+          [ mk_node
+              (mk_account_update_body Signature No token_creator
+                 Token_id.default (-account_creation_fee) )
+              [ mk_node
+                  (mk_account_update_body ?update:holder_update Signature
+                     Parents_own_token token_holder custom_token_id 100 )
+                  []
+              ]
+          ]
+        |> mk_zkapp_command ~fee:7 ~fee_payer_pk:token_creator_pk
+             ~fee_payer_nonce:Account.Nonce.zero
+      in
+      let with_precondition =
+        match holder_precondition with
+        | None ->
+            zkapp0
+        | Some pc ->
+            { zkapp0 with
+              account_updates =
+                add_account_precondition ~at:1 pc zkapp0.account_updates
+            }
+      in
+      { with_precondition with
+        account_updates =
+          Zkapp_command.Call_forest.accumulate_hashes_predicated ~signature_kind
+            with_precondition.account_updates
+      }
+      |> replace_authorizations ~keymap
+
+    let%test_unit "custom tokens have empty delegation" =
+      (* A newly-minted custom-token account has delegate = empty. Verified
+         by attaching an [Account_precondition] with [delegate = Check empty]
+         to the account update and asserting the tx succeeds. *)
       let constraint_constants = U.constraint_constants in
       let signature_kind = U.signature_kind in
       let account_creation_fee =
@@ -728,73 +793,57 @@ let%test_module "Account precondition tests" =
       in
       Quickcheck.test ~trials:5
         (Quickcheck.Generator.tuple2 Signature_lib.Keypair.gen
-           Signature_lib.Keypair.gen ) ~f:(fun (new_kp, token_account) ->
+           Signature_lib.Keypair.gen ) ~f:(fun (token_creator, token_holder) ->
           Mina_ledger.Ledger.with_ledger ~depth:U.ledger_depth ~f:(fun ledger ->
               Async.Thread_safe.block_on_async_exn (fun () ->
-                  let module Init_ledger =
-                    Mina_transaction_logic.For_tests.Init_ledger
-                  in
                   let open Async.Deferred.Let_syntax in
-                  let token_owner = new_kp in
-                  let token_owner_pk =
-                    Signature_lib.Public_key.compress token_owner.public_key
-                  in
-                  Init_ledger.init
-                    (module Mina_ledger.Ledger.Ledger_inner)
-                    [| (token_owner, 5_000_000_000L) |]
-                    ledger ;
-                  let custom_token_id =
-                    Account_id.derive_token_id
-                      ~owner:(Account_id.create token_owner_pk Token_id.default)
-                  in
-                  let token_account_pk =
-                    Public_key.compress token_account.public_key
-                  in
-                  let keymap =
-                    List.fold [ token_owner; token_account ]
-                      ~init:Public_key.Compressed.Map.empty
-                      ~f:(fun map { private_key; public_key } ->
-                        Public_key.Compressed.Map.add_exn map
-                          ~key:(Public_key.compress public_key)
-                          ~data:private_key )
+                  let token_creator_pk, custom_token_id, keymap =
+                    setup_custom_token_ledger ~ledger ~token_creator
+                      ~token_holder
                   in
                   let%bind mint_token_zkapp_command =
-                    let open Zkapp_command_builder in
-                    let nonce = Account.Nonce.zero in
-                    let zkapp0 =
-                      mk_forest
-                        [ mk_node
-                            (mk_account_update_body Signature No token_owner
-                               Token_id.default (-account_creation_fee) )
-                            [ mk_node
-                                (mk_account_update_body Signature
-                                   Parents_own_token token_account
-                                   custom_token_id 100 )
-                                []
-                            ]
-                        ]
-                      |> mk_zkapp_command ~fee:7 ~fee_payer_pk:token_owner_pk
-                           ~fee_payer_nonce:nonce
-                    in
-                    let zkapp_dummy_signatures =
-                      let delegate_precondition =
-                        mk_delegate_precondition token_account_pk
-                      in
-                      { zkapp0 with
-                        account_updates =
-                          add_account_precondition ~at:1 delegate_precondition
-                            zkapp0.account_updates
-                          |> Zkapp_command.Call_forest
-                             .accumulate_hashes_predicated ~signature_kind
-                      }
-                    in
-                    replace_authorizations ~keymap zkapp_dummy_signatures
+                    build_mint_custom_token_cmd ~signature_kind
+                      ~account_creation_fee ~token_creator ~token_creator_pk
+                      ~token_holder ~custom_token_id ~keymap
+                      ~holder_precondition:delegate_precondition ()
+                  in
+                  U.check_zkapp_command_with_merges_exn ledger
+                    [ mint_token_zkapp_command ] ) ) )
+
+    let%test_unit "custom tokens reject delegate updates" =
+      (* zkapp_command_logic.ml gates delegate writes on token = default, so
+         a zkapp that attempts to set the delegate field of a custom-token
+         account fails with [Update_not_permitted_delegate]. *)
+      let constraint_constants = U.constraint_constants in
+      let signature_kind = U.signature_kind in
+      let account_creation_fee =
+        Currency.Fee.to_nanomina_int constraint_constants.account_creation_fee
+      in
+      Quickcheck.test ~trials:5
+        (Quickcheck.Generator.tuple3 Signature_lib.Keypair.gen
+           Signature_lib.Keypair.gen Signature_lib.Public_key.Compressed.gen )
+        ~f:(fun (token_creator, token_holder, attempted_delegate) ->
+          Mina_ledger.Ledger.with_ledger ~depth:U.ledger_depth ~f:(fun ledger ->
+              Async.Thread_safe.block_on_async_exn (fun () ->
+                  let open Async.Deferred.Let_syntax in
+                  let token_creator_pk, custom_token_id, keymap =
+                    setup_custom_token_ledger ~ledger ~token_creator
+                      ~token_holder
+                  in
+                  let holder_update =
+                    { Account_update.Update.noop with
+                      delegate = Zkapp_basic.Set_or_keep.Set attempted_delegate
+                    }
+                  in
+                  let%bind set_delegate_zkapp_command =
+                    build_mint_custom_token_cmd ~signature_kind
+                      ~account_creation_fee ~token_creator ~token_creator_pk
+                      ~token_holder ~custom_token_id ~keymap ~holder_update ()
                   in
                   U.check_zkapp_command_with_merges_exn
-                    ~expected_failure:
-                      (Account_delegate_precondition_unsatisfied, U.Pass_2)
+                    ~expected_failure:(Update_not_permitted_delegate, U.Pass_2)
                     ledger
-                    [ mint_token_zkapp_command ] ) ) )
+                    [ set_delegate_zkapp_command ] ) ) )
 
     let%test_unit "invalid account predicate in other zkapp_command" =
       let state_body = U.genesis_state_body in

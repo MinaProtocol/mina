@@ -255,6 +255,55 @@ struct
     ; hard_timeout = Slots (soft_timeout_in_slots * 2)
     }
 
+  (* Like [signed_command_to_be_included_in_frontier], but additionally
+     asserts that the included command's [Transaction_status] matches
+     [has_failures]: when [has_failures = false] the command must be
+     [Applied], and when [has_failures = true] it must be [Failed _]. This
+     uses the [Breadcrumb_added] event stream directly — which carries the
+     per-txn [With_status.t] — rather than [network_state], which drops the
+     status via [With_status.data]. Mirrors [zkapp_to_be_included_in_frontier]
+     for signed commands. *)
+  let signed_command_to_be_included_in_frontier_with_status ~txn_hash
+      ~has_failures =
+    let check () _node (breadcrumb_added : Event_type.Breadcrumb_added.t) =
+      let cmd_opt =
+        List.find breadcrumb_added.transaction_hashes
+          ~f:
+            (Fn.compose
+               (Mina_transaction.Transaction_hash.equal txn_hash)
+               With_status.data )
+      in
+      match cmd_opt with
+      | None ->
+          Predicate_continuation ()
+      | Some hash_with_status ->
+          let actual_status = hash_with_status.With_status.status in
+          let matches =
+            match actual_status with
+            | Transaction_status.Applied ->
+                not has_failures
+            | Failed _ ->
+                has_failures
+          in
+          if matches then Predicate_passed
+          else
+            Predicate_failure
+              (Error.createf "Unexpected status for signed command %s: %s"
+                 (Mina_transaction.Transaction_hash.to_base58_check txn_hash)
+                 ( Transaction_status.to_yojson actual_status
+                 |> Yojson.Safe.to_string ) )
+    in
+    let soft_timeout_in_slots = 8 in
+    { id = Signed_command_to_be_included_in_frontier
+    ; description =
+        sprintf "signed command with hash %s (has_failures=%b)"
+          (Mina_transaction.Transaction_hash.to_base58_check txn_hash)
+          has_failures
+    ; predicate = Event_predicate (Event_type.Breadcrumb_added, (), check)
+    ; soft_timeout = Slots soft_timeout_in_slots
+    ; hard_timeout = Slots (soft_timeout_in_slots * 2)
+    }
+
   let ledger_proofs_emitted_since_genesis ~test_config ~num_proofs =
     let open Network_state in
     let check () (state : Network_state.t) =

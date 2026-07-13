@@ -33,52 +33,7 @@
     actual constraint system used in production. See {!Genesis_constants.Proof_level}
     for details on proof levels.
 
-    {b Dev profile:}
-    {v
-    | Circuit                     | Constraints | Public Input | Auxiliary Input |
-    |-----------------------------|-------------|--------------|-----------------|
-    | transaction-merge           | 632         | 300          | 1,895           |
-    | transaction-base            | 12,875      | 300          | 37,502          |
-    | zkapp-opt_signed-opt_signed | 14,537      | 300          | 56,588          |
-    | zkapp-opt_signed            | 8,026       | 300          | 32,166          |
-    | zkapp-proved                | 4,249       | 300          | 30,732          |
-    v}
-
-    {b Devnet profile:}
-    {v
-    | Circuit                     | Constraints | Public Input | Auxiliary Input |
-    |-----------------------------|-------------|--------------|-----------------|
-    | transaction-merge           | 632         | 300          | 1,895           |
-    | transaction-base            | 15,357      | 300          | 63,806          |
-    | zkapp-opt_signed-opt_signed | 16,206      | 300          | 74,242          |
-    | zkapp-opt_signed            | 8,883       | 300          | 41,170          |
-    | zkapp-proved                | 5,106       | 300          | 39,736          |
-    v}
-
-    {b Lightnet profile:}
-    {v
-    | Circuit                     | Constraints | Public Input | Auxiliary Input |
-    |-----------------------------|-------------|--------------|-----------------|
-    | transaction-merge           | 632         | 300          | 1,895           |
-    | transaction-base            | 15,357      | 300          | 63,806          |
-    | zkapp-opt_signed-opt_signed | 16,206      | 300          | 74,242          |
-    | zkapp-opt_signed            | 8,883       | 300          | 41,170          |
-    | zkapp-proved                | 5,106       | 300          | 39,736          |
-    v}
-
-    {b Mainnet profile:}
-    {v
-    | Circuit                     | Constraints | Public Input | Auxiliary Input |
-    |-----------------------------|-------------|--------------|-----------------|
-    | transaction-merge           | 632         | 300          | 1,895           |
-    | transaction-base            | 15,357      | 300          | 63,806          |
-    | zkapp-opt_signed-opt_signed | 16,206      | 300          | 74,242          |
-    | zkapp-opt_signed            | 8,883       | 300          | 41,170          |
-    | zkapp-proved                | 5,106       | 300          | 39,736          |
-    v}
-
-    If these values change, update the tables above and the expected values in
-    [test/constraint_count/test_constraint_count.ml]. *)
+    *)
 
 module type Full = sig
   open Core

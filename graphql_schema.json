@@ -13046,7 +13046,7 @@
             {
               "name": "delegate",
               "description":
-                "The public key to which you are delegating - if you are not delegating to anybody, this would return your public key",
+                "The public key to which you are delegating, or null if you are not delegating to anybody (i.e. unstaked)",
               "args": [],
               "type": {
                 "kind": "SCALAR",
@@ -13059,7 +13059,7 @@
             {
               "name": "delegateAccount",
               "description":
-                "The account to which you are delegating - if you are not delegating to anybody, this would return your public key",
+                "The account to which you are delegating, or null if you are not delegating to anybody (i.e. unstaked)",
               "args": [],
               "type": { "kind": "OBJECT", "name": "Account", "ofType": null },
               "isDeprecated": false,

@@ -85,11 +85,7 @@ module L = struct
     if Public_key.Compressed.(equal empty account.public_key) then (
       let public_key = Account_id.public_key id in
       let account' : Account.t =
-        { account with
-          delegate = Some public_key
-        ; public_key
-        ; token_id = Account_id.token_id id
-        }
+        { account with public_key; token_id = Account_id.token_id id }
       in
       set t loc account' ;
       (`Added, account', loc) )
@@ -161,17 +157,8 @@ let get_or_initialize_exn account_id t idx =
   let account = get_exn t idx in
   if Public_key.Compressed.(equal empty account.public_key) then
     let public_key = Account_id.public_key account_id in
-    let token_id = Account_id.token_id account_id in
-    let delegate =
-      (* Only allow delegation if this account is for the default token. *)
-      if Token_id.(equal default) token_id then Some public_key else None
-    in
     ( `Added
-    , { account with
-        delegate
-      ; public_key
-      ; token_id = Account_id.token_id account_id
-      } )
+    , { account with public_key; token_id = Account_id.token_id account_id } )
   else (`Existed, account)
 
 let has_locked_tokens_exn ~global_slot ~account_id t =

@@ -87,6 +87,28 @@ module Send_delegation =
   }
 |}]
 
+module Send_delegation_with_raw_sig =
+[%graphql
+{|
+ mutation (
+ $input:SendDelegationInput!,
+ $rawSignature: String!
+ )@encoders(module: "Encoders")
+  {
+    sendDelegation(
+      input:$input,
+      signature: {rawSignature: $rawSignature}
+    )
+    {
+      delegation {
+        id
+        nonce
+        hash
+      }
+    }
+  }
+|}]
+
 module Set_snark_worker =
 [%graphql
 {|
