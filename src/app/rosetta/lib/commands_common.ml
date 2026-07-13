@@ -281,6 +281,12 @@ module Zkapp_command_info = struct
     module Op_build = Op.T (M)
 
     let to_operations (t : t) =
+      (* [creation_fee] is populated only for an account update that carries
+         [implicit_account_creation_fee], i.e. the one the ledger charged the
+         fee to by shrinking its own [balance_change]. When the flag is unset the
+         creating command funds the fee out of *other* account updates' negative
+         balance changes, which are already emitted as [Zkapp_balance_update]
+         ops; emitting a fee op there too would double-count it. *)
       let mk_account_creation_fee (upd : Zkapp_account_update_info.t) related =
         match upd.creation_fee with
         | None ->
