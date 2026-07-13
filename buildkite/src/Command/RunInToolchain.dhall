@@ -1,17 +1,29 @@
 -- Helpers for running a command inside the mina toolchain docker image.
 --
--- Submodules: the Buildkite agents are configured to NOT auto-checkout git
--- submodules. Most CI jobs (lint, dhall checks, tests that run against prebuilt
--- artifacts) do not need them, so submodule init is OPT-IN: the default
--- `runInToolchain*` wrappers do NOT initialize submodules.
+-- Submodules: most CI jobs (lint, dhall checks, tests that run against prebuilt
+-- artifacts) never read submodule contents, so submodule init is OPT-IN: the
+-- default `runInToolchain*` wrappers do NOT initialize submodules.
+--
+-- The opt-in lives at the command level rather than in each step's env because
+-- BUILDKITE_GIT_SUBMODULES is a protected, build-level variable: Buildkite
+-- ignores it when set from a step, so submodule checkout cannot be turned off
+-- per-job from the pipeline. It can only be turned off for the whole agent, and
+-- then re-enabled explicitly by the jobs that need it.
+--
+-- That agent-side default has NOT been flipped yet. Until it is, agents still
+-- auto-checkout submodules and the opt-in below is merely redundant (build jobs
+-- re-init an already-initialized tree); the savings land once agents stop
+-- checking out submodules by default. Keep the opt-ins correct in the meantime,
+-- since they become load-bearing the moment that switch is thrown.
 --
 -- Jobs that build code from source (the proof-systems/snarky submodules are
 -- linked into the OCaml build) must opt in. They either:
 --   * use a `*WithSubmodules` wrapper (e.g. runInToolchainWithSubmodules), or
 --   * set `submodules = True` on the `Config` passed to `runInToolchainImage`
 --     (this is how Toolchain.select threads it for artifact builds).
--- When enabled, `git submodule sync/update --init --recursive` runs on the agent
--- host before the toolchain container starts (the host tree is bind-mounted in).
+-- When enabled, the submodule sync/update runs on the agent host before the
+-- toolchain container starts (the host tree is bind-mounted in); see
+-- `submodulesInit` below for the exact fetch flags.
 
 let Cmd = ../Lib/Cmds.dhall
 
@@ -53,8 +65,9 @@ let submodulesInit
     =     \(submodules : Bool)
       ->        if submodules
 
-          then  [ Cmd.run
-                    "git submodule sync --recursive && git submodule update --init --recursive"
+          then  [ Cmd.run "git submodule sync --recursive"
+                , Cmd.run
+                    "git submodule update --init --recursive --depth 1 --single-branch --jobs \"\$(nproc)\""
                 ]
 
           else  [] : List Cmd.Type
