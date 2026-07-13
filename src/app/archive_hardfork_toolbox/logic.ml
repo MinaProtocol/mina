@@ -50,6 +50,28 @@ let connect postgres_uri =
   | Ok pool ->
       pool
 
+(* Populate accounts_accessed for the genesis block described by the runtime
+   config. When the config has [proof.fork] set, the genesis block is the fork
+   genesis, so this attaches the full fork genesis ledger to the fork block. This
+   is the same routine the archive runs at startup with --config-file; exposing it
+   here lets operators repair an existing hardfork archive whose fork genesis was
+   never populated (e.g. because the archive was not (re)started with the fork
+   config). *)
+let populate_genesis_accounts ~postgres_uri ~runtime_config_file ~chunks_length
+    () =
+  let runtime_config =
+    Yojson.Safe.from_file runtime_config_file
+    |> Runtime_config.of_yojson |> Result.ok_or_failwith
+  in
+  let genesis_constants = Genesis_constants.Compiled.genesis_constants in
+  let constraint_constants = Genesis_constants.Compiled.constraint_constants in
+  let pool = connect postgres_uri in
+  [%log info] "Populating genesis accounts from runtime config %s"
+    runtime_config_file ;
+  Archive_lib.Processor.add_genesis_accounts ~logger
+    ~runtime_config_opt:(Some runtime_config) ~genesis_constants ~chunks_length
+    ~constraint_constants pool
+
 let is_in_best_chain ~postgres_uri ~fork_state_hash ~fork_height ~fork_slot () =
   let pool = connect postgres_uri in
   let query_db = Mina_caqti.query pool in
