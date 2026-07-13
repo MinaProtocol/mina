@@ -35,7 +35,7 @@ in  { Spec = Spec
         ->  Command.build
               Command.Config::{
               , commands =
-                  RunInToolchain.runInToolchain
+                  RunInToolchain.runInDefaultToolchain
                     DebianVersions.overrideEnvs
                     "./buildkite/scripts/connect/connect-to-network.sh --mina-debian-network ${spec.mina_suffix} --network-name ${spec.testnet} --wait-between-polling ${spec.wait_between_graphql_poll} --sync-timeout ${spec.sync_timeout} --peer-list-url ${spec.peer_list_url}"
               , label = "Connect to ${spec.testnet}"

@@ -31,24 +31,22 @@ let build
     =     \(c : Config)
       ->  let key = "${c.keyPrefix}-unit-test-${c.testProfile}"
 
-          let runInToolchain =
-                      if c.submodules
-
-                then  RunInToolchain.runInToolchainWithSubmodules
-
-                else  RunInToolchain.runInToolchain
-
           let buildTestCmd
               : Size -> Command.Type
               =     \(cmd_target : Size)
                 ->  Command.build
                       Command.Config::{
                       , commands =
-                          runInToolchain
-                            [ "DUNE_INSTRUMENT_WITH=bisect_ppx"
-                            , "COVERALLS_TOKEN"
-                            ]
-                            "buildkite/scripts/unit-test.sh ${c.testProfile} ${c.testPath} && buildkite/scripts/upload-partial-coverage-data.sh ${key} dev"
+                          RunInToolchain.runInToolchain
+                            RunInToolchain.Config::{
+                            , submodules = c.submodules
+                            , environment =
+                              [ "DUNE_INSTRUMENT_WITH=bisect_ppx"
+                              , "COVERALLS_TOKEN"
+                              ]
+                            , innerScript =
+                                "buildkite/scripts/unit-test.sh ${c.testProfile} ${c.testPath} && buildkite/scripts/upload-partial-coverage-data.sh ${key} dev"
+                            }
                       , label = c.label
                       , key = key
                       , target = cmd_target

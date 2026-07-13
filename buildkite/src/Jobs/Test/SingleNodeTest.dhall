@@ -31,7 +31,7 @@ let buildTestCmd
           in  Command.build
                 Command.Config::{
                 , commands =
-                    RunInToolchain.runInToolchain
+                    RunInToolchain.runInDefaultToolchain
                       (   [ "DUNE_INSTRUMENT_WITH=bisect_ppx"
                           , "COVERALLS_TOKEN"
                           ]

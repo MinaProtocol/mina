@@ -85,7 +85,7 @@ let command
                                                                                                                                                                                                                      spec.repo} --run-compatibility-test develop --run-load-test --branch \\\${BUILDKITE_BRANCH} --commit \\\${BUILDKITE_COMMIT} --metrics-mode --perf-output-file /workdir/rosetta.perf"
                       ]
                   ]
-                # RunInToolchain.runInToolchain
+                # RunInToolchain.runInDefaultToolchain
                     (Benchmarks.toEnvList Benchmarks.Type::{=})
                     "./buildkite/scripts/bench/send.sh"
             , label =
