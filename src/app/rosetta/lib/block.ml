@@ -597,6 +597,7 @@ module Sql = struct
         { body : Archive_lib.Processor.Zkapp_account_update_body.t
         ; account : string
         ; token : string
+        ; creation_fee : int64 option
         }
       [@@deriving hlist]
 
@@ -606,6 +607,7 @@ module Sql = struct
              ~f:(fun n -> "zaub." ^ n)
         @ [ "pk_update_body.value as account"
           ; "token_update_body.value as token"
+          ; "ac.creation_fee"
           ]
 
       let account t = `Pk t.account
@@ -618,6 +620,7 @@ module Sql = struct
             [ Archive_lib.Processor.Zkapp_account_update_body.typ
             ; string
             ; string
+            ; option int64
             ]
     end
 
@@ -673,6 +676,41 @@ module Sql = struct
            ON zaub.id = zau.body_id
          LEFT JOIN account_identifiers ai_update_body
            ON zaub.account_identifier_id = ai_update_body.id
+         LEFT JOIN accounts_created ac
+           ON bzc.block_id = ac.block_id
+           AND ai_update_body.id = ac.account_identifier_id
+           AND bzc.status = 'applied'
+           AND zau.id = (
+             SELECT min(zau2.id)
+             FROM blocks_zkapp_commands bzc2
+             INNER JOIN zkapp_commands zc2
+               ON bzc2.zkapp_command_id = zc2.id
+             INNER JOIN zkapp_account_update zau2
+               ON zau2.id = ANY (zc2.zkapp_account_updates_ids)
+             INNER JOIN zkapp_account_update_body zaub2
+               ON zaub2.id = zau2.body_id
+             WHERE bzc2.block_id = bzc.block_id
+               AND bzc2.status = 'applied'
+               AND zaub2.account_identifier_id = ai_update_body.id
+           )
+           AND NOT EXISTS (
+             SELECT 1
+             FROM blocks_user_commands buc2
+             INNER JOIN user_commands uc2
+               ON buc2.user_command_id = uc2.id
+             WHERE buc2.block_id = bzc.block_id
+               AND buc2.status = 'applied'
+               AND uc2.receiver_id = ai_update_body.public_key_id
+           )
+           AND NOT EXISTS (
+             SELECT 1
+             FROM blocks_internal_commands bic2
+             INNER JOIN internal_commands ic2
+               ON bic2.internal_command_id = ic2.id
+             WHERE bic2.block_id = bzc.block_id
+               AND bic2.status = 'applied'
+               AND ic2.receiver_id = ai_update_body.public_key_id
+           )
          LEFT JOIN public_keys pk_update_body
            ON ai_update_body.public_key_id = pk_update_body.id
          LEFT JOIN tokens token_update_body
@@ -758,6 +796,8 @@ module Sql = struct
           ; use_full_commitment = body.use_full_commitment
           ; status
           ; token = Zkapp_account_update.token upd
+          ; creation_fee =
+              Option.map upd.creation_fee ~f:Unsigned.UInt64.of_int64
           } )
 
     let account_updates_and_command_to_info account_updates
