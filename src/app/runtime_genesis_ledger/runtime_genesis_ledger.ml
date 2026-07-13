@@ -4,6 +4,8 @@ module Ledger = Mina_ledger.Ledger
 
 module Hashes = struct
   type t = { s3_data_hash : string; hash : string } [@@deriving to_yojson]
+
+  let empty = { s3_data_hash = ""; hash = "" }
 end
 
 module Hash_json = struct
@@ -54,28 +56,41 @@ let generate_ledger_tarball ~genesis_dir ~ledger_name_prefix ledger =
   let%map s3_data_hash = Genesis_ledger_helper.sha3_hash tar_path in
   { Hashes.s3_data_hash; hash }
 
-let generate_hash_json ~genesis_dir ledger staking_ledger next_ledger =
+let generate_hash_json ~genesis_dir ~skip_genesis ~skip_staking ~skip_next
+    ledger staking_ledger next_ledger =
   let%bind ledger_hashes =
-    generate_ledger_tarball ~ledger_name_prefix:"genesis_ledger" ~genesis_dir
-      ledger
+    if skip_genesis then (
+      [%log info] "Skipping genesis ledger tarball generation (--no-genesis)" ;
+      Deferred.return Hashes.empty )
+    else
+      generate_ledger_tarball ~ledger_name_prefix:"genesis_ledger" ~genesis_dir
+        ledger
   in
   let%bind staking =
-    generate_ledger_tarball ~ledger_name_prefix:"epoch_ledger" ~genesis_dir
-      staking_ledger
-  in
-  let%map next =
-    (* If next ledger has the same merkle root as staking ledger, reuse the
-       same tar file to avoid generating it twice with different timestamps/hashes *)
-    let staking_hash = Mina_ledger.Ledger.merkle_root staking_ledger in
-    let next_hash = Mina_ledger.Ledger.merkle_root next_ledger in
-    if Mina_base.Ledger_hash.equal staking_hash next_hash then (
-      [%log info]
-        "Next epoch ledger has the same hash as staking ledger, reusing \
-         staking ledger tar" ;
-      Deferred.return staking )
+    if skip_staking then (
+      [%log info] "Skipping staking ledger tarball generation (--no-staking)" ;
+      Deferred.return Hashes.empty )
     else
       generate_ledger_tarball ~ledger_name_prefix:"epoch_ledger" ~genesis_dir
-        next_ledger
+        staking_ledger
+  in
+  let%map next =
+    if skip_next then (
+      [%log info] "Skipping next ledger tarball generation (--no-next)" ;
+      Deferred.return Hashes.empty )
+    else
+      (* If next ledger has the same merkle root as staking ledger, reuse the
+         same tar file to avoid generating it twice with different timestamps/hashes *)
+      let staking_hash = Mina_ledger.Ledger.merkle_root staking_ledger in
+      let next_hash = Mina_ledger.Ledger.merkle_root next_ledger in
+      if Mina_base.Ledger_hash.equal staking_hash next_hash then (
+        [%log info]
+          "Next epoch ledger has the same hash as staking ledger, reusing \
+           staking ledger tar" ;
+        Deferred.return staking )
+      else
+        generate_ledger_tarball ~ledger_name_prefix:"epoch_ledger" ~genesis_dir
+          next_ledger
   in
   { Hash_json.ledger = ledger_hashes; epoch_data = { staking; next } }
 
@@ -167,7 +182,8 @@ let load_config_exn config_file =
 
 let main ~(constraint_constants : Genesis_constants.Constraint_constants.t)
     ~config_file ~genesis_dir ~hash_output_file ~ignore_missing_fields
-    ~pad_app_state ~hardfork_slot ~prefork_genesis_config () =
+    ~pad_app_state ~hardfork_slot ~prefork_genesis_config ~skip_genesis
+    ~skip_staking ~skip_next () =
   let hardfork_slot =
     match (hardfork_slot, prefork_genesis_config) with
     | None, None ->
@@ -218,7 +234,8 @@ let main ~(constraint_constants : Genesis_constants.Constraint_constants.t)
       next_accounts_opt
   in
   let%bind hash_json =
-    generate_hash_json ~genesis_dir ledger staking_ledger next_ledger
+    generate_hash_json ~genesis_dir ~skip_genesis ~skip_staking ~skip_next
+      ledger staking_ledger next_ledger
   in
   Async.Writer.save hash_output_file
     ~contents:(Yojson.Safe.to_string (Hash_json.to_yojson hash_json))
@@ -275,7 +292,16 @@ let () =
                 `--hardfork-slot` is set, the program would read the genesis \
                 timestamps in the config to calculate the proper hardfork \
                 slot."
+         and skip_genesis =
+           flag "--no-genesis" no_arg
+             ~doc:"Skip genesis ledger tarball generation"
+         and skip_staking =
+           flag "--no-staking" no_arg
+             ~doc:"Skip staking epoch ledger tarball generation"
+         and skip_next =
+           flag "--no-next" no_arg
+             ~doc:"Skip next epoch ledger tarball generation"
          in
          main ~constraint_constants ~config_file ~genesis_dir ~hash_output_file
            ~ignore_missing_fields ~pad_app_state ~hardfork_slot
-           ~prefork_genesis_config) )
+           ~prefork_genesis_config ~skip_genesis ~skip_staking ~skip_next) )
