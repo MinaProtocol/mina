@@ -152,15 +152,19 @@ log_info "Pre-upgrade mina version: ${PRE_COMMIT}"
 PRE_COMMIT_SHORT=$(get_short_commit "${PRE_COMMIT}")
 log_info "Pre-upgrade mina short commit: ${PRE_COMMIT_SHORT}"
 
-# List config files before upgrade
+# List config files before upgrade.
+# The config filename hash is produced by `git rev-parse --short=8`, whose
+# width is a MINIMUM: git widens it (to 9+) when the 8-char prefix is
+# ambiguous in the repo. get_short_commit truncates to exactly 8, so glob
+# on the 8-char prefix instead of an exact name to tolerate the widening.
 log_info "Config file before upgrade:"
-PRE_CONFIG_FILE=${CONFIG_DIR}/config_${PRE_COMMIT_SHORT}.json
+PRE_CONFIG_FILE=$(ls "${CONFIG_DIR}"/config_"${PRE_COMMIT_SHORT}"*.json 2>/dev/null | head -1)
 
-if [[ -f "${PRE_CONFIG_FILE}" ]]; then
+if [[ -n "${PRE_CONFIG_FILE}" && -f "${PRE_CONFIG_FILE}" ]]; then
     log_info "Found config file: ${PRE_CONFIG_FILE}"
     log_info "  - $(basename "$PRE_CONFIG_FILE"): $(stat -c %s "$PRE_CONFIG_FILE") bytes"
 else
-    log_error "No config_${PRE_COMMIT_SHORT}.json file found before upgrade"
+    log_error "No config_${PRE_COMMIT_SHORT}*.json file found before upgrade"
     exit 1
 fi
 
@@ -205,12 +209,13 @@ POST_COMMIT_SHORT=$(get_short_commit "${POST_COMMIT}")
 log_info "Post-upgrade commit: ${POST_COMMIT_SHORT}"
 
 
-POST_CONFIG_FILE="${CONFIG_DIR}"/config_${POST_COMMIT_SHORT}.json
-if [[ -f "${POST_CONFIG_FILE}" ]]; then
+# Glob on the 8-char prefix (see note above): `--short=8` may widen to 9+.
+POST_CONFIG_FILE=$(ls "${CONFIG_DIR}"/config_"${POST_COMMIT_SHORT}"*.json 2>/dev/null | head -1)
+if [[ -n "${POST_CONFIG_FILE}" && -f "${POST_CONFIG_FILE}" ]]; then
     log_info "Found config file: ${POST_CONFIG_FILE}"
     log_info "  - $(basename "$POST_CONFIG_FILE"): $(stat -c %s "$POST_CONFIG_FILE") bytes"
 else
-    log_error "No config_${POST_COMMIT_SHORT}.json file found after upgrade"
+    log_error "No config_${POST_COMMIT_SHORT}*.json file found after upgrade"
     exit 1
 fi
 

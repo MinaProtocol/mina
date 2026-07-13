@@ -29,8 +29,13 @@ fi
 
 echo "Found genesis config: $CONFIG_FILE"
 
-# Extract the commit hash from the config filename (config_<hash>.json)
-CONFIG_COMMIT=$(basename "$CONFIG_FILE" | grep -oP 'config_\K[a-f0-9]+')
+# Extract the commit hash from the config filename (config_<hash>.json).
+# The filename hash is produced by `git rev-parse --short=8`, which is a
+# MINIMUM width: git widens it (to 9+) when the 8-char prefix is ambiguous
+# across any object in the repo. The binary hash above is truncated to a
+# fixed 8 chars, so normalize the config hash to the same 8-char prefix
+# before comparing — otherwise an ambiguous commit fails a valid package.
+CONFIG_COMMIT=$(basename "$CONFIG_FILE" | grep -oP 'config_\K[a-f0-9]+' | head -c 8)
 echo "Config file commit hash: $CONFIG_COMMIT"
 
 if [ "$MINA_COMMIT" = "$CONFIG_COMMIT" ]; then
