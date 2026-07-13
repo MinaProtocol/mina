@@ -52,3 +52,10 @@ _coverage/
 
 CLAUDE.local.md
 /.claude/
+
+# OpenCode deepwork progress files
+.slim/deepwork/
+.cortexkit/
+
+# mina-local-network plan artifacts
+/.mina-local-network/

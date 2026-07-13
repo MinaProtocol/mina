@@ -1,0 +1,91 @@
+{
+  // single-node: one daemon that is seed, whale block producer, and snark
+  // coordinator. External snark workers produce SNARK proofs so every block
+  // emits a freshly snarked ledger.
+  "schema_version": 1,
+  "name": "single-node",
+  "description": "Single-node local network: one daemon acting as seed + block producer + snark coordinator, with external snark workers.",
+
+  "runtime_config": {
+    "genesis": {
+      "slots_per_epoch": 48,
+      "k": 10,
+      "grace_period_slots": 3
+    },
+    "proof": {
+      "level": "full",
+      "work_delay": 0,
+      "transaction_capacity": {
+        "2_to_the": 2
+      },
+      "block_window_duration_ms": 131400
+    }
+  },
+
+  "ledger_generation": {
+    "tiers": {
+      "whale": {
+        "count": 1,
+        "offline_balance": "11550000mina",
+        "online_balance": "499mina"
+      },
+      "snark_coordinator": {
+        "count": 1,
+        "offline_balance": "5mina"
+      }
+    },
+    "accounts": {
+      "snark-fees": {
+        "balance": "5nanomina",
+        "kind": "snark_fee"
+      }
+    }
+  },
+
+  "logging": {
+    "console": {
+      "node": "Warn",
+      "snark_worker": "Error"
+    },
+    "file": {
+      "node": "Warn",
+      "snark_worker": "Error"
+    }
+  },
+
+  "nodes": {
+    "seed": {
+      "capabilities": {
+        "p2p_seed": {},
+        "block_producer": {
+          "account": "whale-0"
+        },
+        "snark_coordinator": {
+          "fee_receiver": "snark-fees",
+          "fee": "0.001",
+          "work_selection": "seq",
+          "worker_pools": {
+            "default": {
+              "count": 3,
+              "nap": "PT1S"
+            }
+          }
+        },
+        "itn_graphql": {}
+      },
+      "demo_mode": true,
+      "itn_keys": "libp2p_keys/itn-key"    }
+  },
+
+  "binaries": {
+    "mina": "_build/default/src/app/cli/src/mina.exe",
+    "archive": "_build/default/src/app/archive/archive.exe"
+  },
+
+  "state": {
+    "mode": "reset",
+    "genesis_timestamp": {
+      "delay": "PT120S"
+    }
+  }
+}
