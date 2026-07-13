@@ -248,8 +248,11 @@ func (at bitswapTestAttempt) awaitResourceDownload(nodes []testNode, roots []Bit
 	ctxs := make([]context.Context, len(at))
 	cancels := make([]context.CancelFunc, len(at))
 	for ni := range at {
-		// ctx, cancelF := context.WithTimeout(nodes[ni].node.Ctx, 5*time.Second)
-		ctx, cancelF := context.WithCancel(nodes[ni].node.Ctx)
+		// Bound each node's wait: a stuck bitswap delivery must not block the
+		// whole suite until the 60m go-test timeout. On expiry ctx.Err() is
+		// DeadlineExceeded (not Canceled), which the loop below reports as an
+		// error; downloadAndCheckResources retries it a bounded number of times.
+		ctx, cancelF := context.WithTimeout(nodes[ni].node.Ctx, 120*time.Second)
 		ctxs[ni] = ctx
 		cancels[ni] = cancelF
 		go func(ni int) {
@@ -309,7 +312,7 @@ loop:
 			if ctx.Err() == context.Canceled {
 				continue loop
 			} else {
-				err = fmt.Errorf("%d: %v", i, ctx.Err())
+				err = fmt.Errorf("%d: %w", i, ctx.Err())
 			}
 		case err = <-errChan:
 		}
@@ -336,14 +339,29 @@ func (at bitswapTestAttempt) confirmResourceDownload(nodes []testNode, getReques
 	return nil
 }
 
+// maxDownloadAttempts bounds how many times a single download step is retried
+// when awaitResourceDownload times out. A healthy download succeeds on the first
+// try; a transient bitswap stall self-heals on retry; a genuine break still fails
+// fast (execute() bails on the returned error) instead of hanging the 60m suite.
+const maxDownloadAttempts = 3
+
 func (at *bitswapTestAttempt) downloadAndCheckResources(nodes []testNode, roots []BitswapBlockLink, getRequests func(*bitswapTestNodeParams) []int) (err error) {
-	err = at.requestResources(nodes, roots, getRequests)
-	if err != nil {
-		return err
-	}
-	err = at.awaitResourceDownload(nodes, roots, getRequests)
-	if err != nil {
-		return err
+	// Retry the request+await on a per-node download timeout. Re-requesting an
+	// already-downloaded resource is idempotent (bitswap re-emits it from
+	// storage), so replaying the whole step is safe. Only a DeadlineExceeded is
+	// retried; any other error is a real failure and returns immediately.
+	for attempt := 1; ; attempt++ {
+		if err = at.requestResources(nodes, roots, getRequests); err != nil {
+			return err
+		}
+		err = at.awaitResourceDownload(nodes, roots, getRequests)
+		if err == nil {
+			break
+		}
+		if !errors.Is(err, context.DeadlineExceeded) || attempt >= maxDownloadAttempts {
+			return err
+		}
+		nodes[0].node.P2p.Logger.Warnf("awaitResourceDownload timed out (attempt %d/%d), retrying: %v", attempt, maxDownloadAttempts, err)
 	}
 	err = at.confirmResourceDownload(nodes, getRequests)
 	if err != nil {
