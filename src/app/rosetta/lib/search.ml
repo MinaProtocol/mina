@@ -860,11 +860,32 @@ module Sql = struct
               ON zaub.id = zau.body_id
             INNER JOIN account_identifiers ai_update_body
               ON zaub.account_identifier_id = ai_update_body.id
+            -- Bill one creation fee per created account, not one per
+            -- occurrence of the creating update (see block.ml).
             LEFT JOIN accounts_created ac
                 ON bzc.block_id = ac.block_id
                 AND ai_update_body.id = ac.account_identifier_id
                 AND bzc.status = 'applied'
                 AND zaub.implicit_account_creation_fee
+                AND NOT EXISTS (
+                  SELECT 1
+                  FROM blocks_zkapp_commands bzc2
+                  INNER JOIN zkapp_commands zc2
+                    ON zc2.id = bzc2.zkapp_command_id
+                  CROSS JOIN LATERAL
+                    unnest (zc2.zkapp_account_updates_ids) WITH ORDINALITY
+                      AS au_ref2 (au_id, au_ord)
+                  INNER JOIN zkapp_account_update zau2
+                    ON zau2.id = au_ref2.au_id
+                  INNER JOIN zkapp_account_update_body zaub2
+                    ON zaub2.id = zau2.body_id
+                  WHERE bzc2.block_id = bzc.block_id
+                    AND bzc2.status = 'applied'
+                    AND zaub2.implicit_account_creation_fee
+                    AND zaub2.account_identifier_id = ai_update_body.id
+                    AND (bzc2.sequence_no, zc2.id, au_ref2.au_ord)
+                      < (bzc.sequence_no, zc.id, au_ref.au_ord)
+                )
             INNER JOIN public_keys pk_update_body
               ON ai_update_body.public_key_id = pk_update_body.id
             INNER JOIN tokens token_update_body
