@@ -16,6 +16,8 @@ let DebianVersions = ../../Constants/DebianVersions.dhall
 
 let RunInToolchain = ../../Command/RunInToolchain.dhall
 
+let ContainerImages = ../../Constants/ContainerImages.dhall
+
 let Network = ../../Constants/Network.dhall
 
 let Profiles = ../../Constants/Profiles.dhall
@@ -69,9 +71,13 @@ in  Pipeline.build
                   [ Cmd.run
                       "export MINA_DEB_CODENAME=bullseye && source ./buildkite/scripts/export-git-env-vars.sh && echo \\\${MINA_DOCKER_TAG}"
                   ]
-                # RunInToolchain.runInToolchainBullseye
-                    envExports
-                    "buildkite/scripts/tests/rosetta/integration-tests.sh"
+                # RunInToolchain.runInToolchain
+                    RunInToolchain.Config::{
+                    , image = ContainerImages.minaToolchainBullseye.amd64
+                    , environment = envExports
+                    , innerScript =
+                        "buildkite/scripts/tests/rosetta/integration-tests.sh"
+                    }
             , label = "Rosetta integration tests Bullseye"
             , key = "rosetta-integration-tests-bullseye"
             , target = Size.Small

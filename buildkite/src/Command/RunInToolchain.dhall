@@ -1,8 +1,20 @@
 -- Helpers for running a command inside the mina toolchain docker image.
 --
+-- Everything funnels through `runInToolchain`, which takes a `Config` and is the
+-- only real entrypoint; a call site sets just the fields that differ from the
+-- defaults (default image, amd64, no submodules).
+--
+-- `runInDefaultToolchain` is the shorthand for the common case -- default image,
+-- amd64, no submodules -- where all a job wants to hand over is env + script.
+-- Standard jobs should use it; reach for `runInToolchain` only when something
+-- actually differs (a different image, arm64, submodules).
+--
 -- Submodules: most CI jobs (lint, dhall checks, tests that run against prebuilt
--- artifacts) never read submodule contents, so submodule init is OPT-IN: the
--- default `runInToolchain*` wrappers do NOT initialize submodules.
+-- artifacts) never read submodule contents, so submodule init is OPT-IN --
+-- `Config.default` sets `submodules = False`. Jobs that build code from source
+-- (proof-systems/snarky are linked into the OCaml build) must pass
+-- `submodules = True`; Toolchain.select threads the same flag for artifact
+-- builds.
 --
 -- The opt-in lives at the command level rather than in each step's env because
 -- BUILDKITE_GIT_SUBMODULES is a protected, build-level variable: Buildkite
@@ -11,19 +23,10 @@
 -- then re-enabled explicitly by the jobs that need it.
 --
 -- That agent-side default has NOT been flipped yet. Until it is, agents still
--- auto-checkout submodules and the opt-in below is merely redundant (build jobs
+-- auto-checkout submodules and the opt-in is merely redundant (build jobs
 -- re-init an already-initialized tree); the savings land once agents stop
 -- checking out submodules by default. Keep the opt-ins correct in the meantime,
 -- since they become load-bearing the moment that switch is thrown.
---
--- Jobs that build code from source (the proof-systems/snarky submodules are
--- linked into the OCaml build) must opt in. They either:
---   * use a `*WithSubmodules` wrapper (e.g. runInToolchainWithSubmodules), or
---   * set `submodules = True` on the `Config` passed to `runInToolchainImage`
---     (this is how Toolchain.select threads it for artifact builds).
--- When enabled, the submodule sync/update runs on the agent host before the
--- toolchain container starts (the host tree is bind-mounted in); see
--- `submodulesInit` below for the exact fetch flags.
 
 let Cmd = ../Lib/Cmds.dhall
 
@@ -43,6 +46,7 @@ let Config =
           }
       , default =
           { submodules = False
+          , image = ContainerImages.minaToolchain
           , arch = Arch.Type.Amd64
           , environment = [] : List Text
           }
@@ -72,7 +76,7 @@ let submodulesInit
 
           else  [] : List Cmd.Type
 
-let runInToolchainImage
+let runInToolchain
     : Config.Type -> List Cmd.Type
     =     \(c : Config.Type)
       ->    submodulesInit c.submodules
@@ -89,116 +93,14 @@ let runInToolchainImage
                 c.innerScript
             ]
 
-let imageFor
-    :     Arch.Type
-      ->  { bookworm : Text
-          , bullseye : Text
-          , jammy : Text
-          , noble : Text
-          , focal : Text
-          }
-    =     \(arch : Arch.Type)
-      ->  { bookworm =
-              merge
-                { Amd64 = ContainerImages.minaToolchainBookworm.amd64
-                , Arm64 = ContainerImages.minaToolchainBookworm.arm64
-                }
-                arch
-          , bullseye = ContainerImages.minaToolchainBullseye.amd64
-          , jammy = ContainerImages.minaToolchainJammy.amd64
-          , noble = ContainerImages.minaToolchainNoble.amd64
-          , focal = ContainerImages.minaToolchain
-          }
-
-let runInToolchain
+let runInDefaultToolchain
     : List Text -> Text -> List Cmd.Type
     =     \(environment : List Text)
       ->  \(innerScript : Text)
-      ->  runInToolchainImage
-            Config::{
-            , image = ContainerImages.minaToolchain
-            , environment = environment
-            , innerScript = innerScript
-            }
-
-let runInToolchainNoble
-    : List Text -> Text -> List Cmd.Type
-    =     \(environment : List Text)
-      ->  \(innerScript : Text)
-      ->  runInToolchainImage
-            Config::{
-            , image = ContainerImages.minaToolchainNoble.amd64
-            , environment = environment
-            , innerScript = innerScript
-            }
-
-let runInToolchainJammy
-    : List Text -> Text -> List Cmd.Type
-    =     \(environment : List Text)
-      ->  \(innerScript : Text)
-      ->  runInToolchainImage
-            Config::{
-            , image = ContainerImages.minaToolchainJammy.amd64
-            , environment = environment
-            , innerScript = innerScript
-            }
-
-let runInToolchainBookworm
-    : Arch.Type -> List Text -> Text -> List Cmd.Type
-    =     \(arch : Arch.Type)
-      ->  \(environment : List Text)
-      ->  \(innerScript : Text)
-      ->  runInToolchainImage
-            Config::{
-            , image = (imageFor arch).bookworm
-            , arch = arch
-            , environment = environment
-            , innerScript = innerScript
-            }
-
-let runInToolchainBullseye
-    : List Text -> Text -> List Cmd.Type
-    =     \(environment : List Text)
-      ->  \(innerScript : Text)
-      ->  runInToolchainImage
-            Config::{
-            , image = ContainerImages.minaToolchainBullseye.amd64
-            , environment = environment
-            , innerScript = innerScript
-            }
-
-let runInToolchainWithSubmodules
-    : List Text -> Text -> List Cmd.Type
-    =     \(environment : List Text)
-      ->  \(innerScript : Text)
-      ->  runInToolchainImage
-            Config::{
-            , submodules = True
-            , image = ContainerImages.minaToolchain
-            , environment = environment
-            , innerScript = innerScript
-            }
-
-let runInToolchainNobleWithSubmodules
-    : List Text -> Text -> List Cmd.Type
-    =     \(environment : List Text)
-      ->  \(innerScript : Text)
-      ->  runInToolchainImage
-            Config::{
-            , submodules = True
-            , image = ContainerImages.minaToolchainNoble.amd64
-            , environment = environment
-            , innerScript = innerScript
-            }
+      ->  runInToolchain
+            Config::{ environment = environment, innerScript = innerScript }
 
 in  { Config = Config
-    , imageFor = imageFor
     , runInToolchain = runInToolchain
-    , runInToolchainWithSubmodules = runInToolchainWithSubmodules
-    , runInToolchainNobleWithSubmodules = runInToolchainNobleWithSubmodules
-    , runInToolchainImage = runInToolchainImage
-    , runInToolchainNoble = runInToolchainNoble
-    , runInToolchainBookworm = runInToolchainBookworm
-    , runInToolchainBullseye = runInToolchainBullseye
-    , runInToolchainJammy = runInToolchainJammy
+    , runInDefaultToolchain = runInDefaultToolchain
     }

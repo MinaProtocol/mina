@@ -8,7 +8,7 @@ in  { step =
         Command.build
           Command.Config::{
           , commands =
-              RunInToolchain.runInToolchain
+              RunInToolchain.runInDefaultToolchain
                 ([] : List Text)
                 "./scripts/debian/session/tests/run-deb-session-tests.sh"
           , label = "Debian session script tests"

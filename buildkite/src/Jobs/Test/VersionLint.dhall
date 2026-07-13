@@ -22,6 +22,16 @@ let DebianVersions = ../../Constants/DebianVersions.dhall
 
 let dependsOn = DebianVersions.appDependsOn DebianVersions.DepsSpec::{=}
 
+let lintStep =
+          \(submodules : Bool)
+      ->  \(script : Text)
+      ->  RunInToolchain.runInToolchain
+            RunInToolchain.Config::{
+            , submodules = submodules
+            , environment = DebianVersions.overrideEnvs
+            , innerScript = script
+            }
+
 let buildTestCmd
     : Text -> Size -> List Command.TaggedKey.Type -> B/SoftFail -> Command.Type
     =     \(release_branch : Text)
@@ -31,14 +41,12 @@ let buildTestCmd
       ->  Command.build
             Command.Config::{
             , commands =
-                  RunInToolchain.runInToolchainWithSubmodules
-                    DebianVersions.overrideEnvs
-                    "buildkite/scripts/dump-mina-type-shapes.sh"
-                # RunInToolchain.runInToolchainWithSubmodules
-                    DebianVersions.overrideEnvs
+                  lintStep True "buildkite/scripts/dump-mina-type-shapes.sh"
+                # lintStep
+                    False
                     "buildkite/scripts/version-linter-patch-missing-type-shapes.sh ${release_branch}"
-                # RunInToolchain.runInToolchainWithSubmodules
-                    DebianVersions.overrideEnvs
+                # lintStep
+                    False
                     "buildkite/scripts/version-linter.sh ${release_branch}"
             , label = "Versioned type linter for ${release_branch}"
             , key = "version-linter-${release_branch}"
