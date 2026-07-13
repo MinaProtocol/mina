@@ -147,6 +147,13 @@ dump_and_normalize() {
 #   * downgrade: the downgrade does not restore them (lossy) — post-Mesa data may
 #                hold duplicates, oversized arrays, or NULLs Berkeley rejected.
 # Strip that documented delta from both sides before comparing.
+#
+# TODO: the upgrade arm of this tolerance is only needed because compatible's
+# released upgrade_to_mesa.sql never dropped the element_ids UNIQUE/index and the
+# events_id/actions_id NOT NULL, while develop's does. Once compatible's migration
+# carries those DROPs, stop normalizing the upgrade comparison (Test 1) and let it
+# assert the constraints are gone; the downgrade arm (Test 2) stays either way,
+# since the downgrade is deliberately lossy.
 normalize_known_schema_deltas() {
     local schema_file="$1"
     local tmp_file="${schema_file}.known_downgrade_deltas"
