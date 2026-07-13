@@ -1,0 +1,22 @@
+(library
+ (name downloader_test)
+ (libraries
+  ;; opam libraries
+  async
+  async_kernel
+  async_unix
+  core
+  core_kernel
+  ppx_inline_test.config
+  ;; local libraries
+  logger
+  network_peer
+  pipe_lib
+  trust_system
+  downloader)
+ (inline_tests
+  (flags -verbose -show-counts))
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_version ppx_jane)))
