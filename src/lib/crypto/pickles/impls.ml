@@ -110,43 +110,34 @@ module Step = struct
   module Challenge = Challenge.Make (Impl)
 
   type unfinalized_proof =
-    ( Challenge.Constant.t
-    , Challenge.Constant.t Scalar_challenge.t
+    ( Tock.Field.t Shifted_value.Type2.t
+      Types.Step_plonk_iop.In_circuit.Constant.t
     , Tock.Field.t Shifted_value.Type2.t
-    , ( Challenge.Constant.t Scalar_challenge.t Bulletproof_challenge.t
-      , Tock.Rounds.n )
-      Vector.t
-    , Digest.Constant.t
-    , bool )
-    Types.Step.Proof_state.Per_proof.In_circuit.t
+    , Digest.Constant.t )
+    Types.Step_per_proof.Constant.t
 
   type 'proofs_verified statement =
     ( (unfinalized_proof, 'proofs_verified) Pickles_types.Vector.t
     , Import.Types.Digest.Constant.t
     , (Import.Types.Digest.Constant.t, 'proofs_verified) Pickles_types.Vector.t
     )
-    Import.Types.Step.Statement.t
+    Import.Types.Step_statement.t
 
   type unfinalized_proof_var =
-    ( Field.t
-    , Field.t Scalar_challenge.t
+    ( Other_field.t Shifted_value.Type2.t Types.Step_plonk_iop.In_circuit.Step.t
     , Other_field.t Shifted_value.Type2.t
-    , ( Field.t Scalar_challenge.t Bulletproof_challenge.t
-      , Tock.Rounds.n )
-      Pickles_types.Vector.t
-    , Field.t
-    , Boolean.var )
-    Types.Step.Proof_state.Per_proof.In_circuit.t
+    , Field.t )
+    Types.Step_per_proof.Step.t
 
   type 'proofs_verified statement_var =
     ( (unfinalized_proof_var, 'proofs_verified) Pickles_types.Vector.t
     , Impl.Field.t
     , (Impl.Field.t, 'proofs_verified) Pickles_types.Vector.t )
-    Import.Types.Step.Statement.t
+    Import.Types.Step_statement.t
 
   let input ~proofs_verified =
-    let open Types.Step.Statement in
-    let spec = spec proofs_verified Tock.Rounds.n in
+    let module Stmt = Types.Step_statement in
+    let spec = Stmt.Step.spec proofs_verified Tock.Rounds.n in
     let (T (typ, f, f_inv)) =
       Spec.packed_typ
         (T
@@ -157,8 +148,13 @@ module Step = struct
            , Fn.id ) )
         spec
     in
-    let typ = Typ.transport typ ~there:to_data ~back:of_data in
-    Spec.Step_etyp.T (typ, (fun x -> of_data (f x)), fun x -> f_inv (to_data x))
+    let typ =
+      Typ.transport typ ~there:Stmt.Constant.to_data ~back:Stmt.Constant.of_data
+    in
+    Spec.Step_etyp.T
+      ( typ
+      , (fun x -> Stmt.Step.of_data (f x))
+      , fun x -> f_inv (Stmt.Step.to_data x) )
 
   module Async_promise = Async_generic (Promise)
 end
@@ -239,7 +235,7 @@ module Wrap = struct
          high-bit separation is needed (unlike Type2 which splits into
          (high_bits, low_bit) for larger scalar fields). *)
     let lookup =
-      { Types.Wrap.Lookup_parameters.use = uses_lookups
+      { Types.Wrap_lookup_parameters.use = uses_lookups
       ; zero =
           { value =
               { challenge = Limb_vector.Challenge.Constant.zero
@@ -256,7 +252,7 @@ module Wrap = struct
     let fp : (Impl.Field.t, Other_field.Constant.t) Typ.t =
       Other_field.typ_unchecked
     in
-    let open Types.Wrap.Statement in
+    let module Stmt = Types.Wrap_statement in
     let (T (typ, f, f_inv)) =
       Spec.wrap_packed_typ
         (T
@@ -265,15 +261,15 @@ module Wrap = struct
                Impl.run_checked (Other_field.check x) ;
                t )
            , Fn.id ) )
-        (In_circuit.spec (module Impl) lookup feature_flags)
+        (Stmt.Constant.spec (module Impl) lookup feature_flags)
     in
     let typ =
       Typ.transport typ
-        ~there:(In_circuit.to_data ~option_map:Option.map)
-        ~back:(In_circuit.of_data ~option_map:Option.map)
+        ~there:(Stmt.Constant.to_data ~option_map:Option.map)
+        ~back:(Stmt.Constant.of_data ~option_map:Option.map)
     in
     Spec.Wrap_etyp.T
       ( typ
-      , (fun x -> In_circuit.of_data ~option_map:Opt.map (f x))
-      , fun x -> f_inv (In_circuit.to_data ~option_map:Opt.map x) )
+      , (fun x -> Stmt.Wrap.of_data ~option_map:Opt.map (f x))
+      , fun x -> f_inv (Stmt.Wrap.to_data ~option_map:Opt.map x) )
 end

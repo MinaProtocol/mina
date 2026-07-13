@@ -958,7 +958,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                     in
                     let x_hat = O.(p_eval_1 o, p_eval_2 o) in
                     let%bind.Promise step_vk, _ = Lazy.force step_vk in
-                    let next_statement : _ Types.Wrap.Statement.In_circuit.t =
+                    let next_statement : _ Types.Wrap_statement.In_circuit.t =
                       let scalar_chal f =
                         Scalar_challenge.map ~f:Challenge.Constant.of_tick_field
                           (f o)
@@ -967,8 +967,8 @@ module Make_str (_ : Wire_types.Concrete) = struct
                         O.digest_before_evaluations o
                       in
                       let plonk0 =
-                        { Types.Wrap.Proof_state.Deferred_values.Plonk.Minimal
-                          .alpha = scalar_chal O.alpha
+                        { Types.Wrap_plonk_iop.Minimal.Poly.alpha =
+                            scalar_chal O.alpha
                         ; beta = O.beta o
                         ; gamma = O.gamma o
                         ; zeta = scalar_chal O.zeta
@@ -1243,30 +1243,82 @@ module Make_str (_ : Wire_types.Concrete) = struct
                                   |> Wrap_hack.pad_accumulator ) )
                             ~input_typ:input ~return_typ:Impls.Wrap.Typ.unit
                             (fun x () : unit -> wrap_main (conv x))
-                            { messages_for_next_step_proof =
-                                prev_statement_with_hashes.proof_state
-                                  .messages_for_next_step_proof
-                            ; proof_state =
-                                { next_statement.proof_state with
-                                  messages_for_next_wrap_proof =
-                                    Wrap_hack.hash_messages_for_next_wrap_proof
-                                      messages_for_next_wrap_proof_prepared
-                                ; deferred_values =
-                                    { next_statement.proof_state.deferred_values with
-                                      plonk =
-                                        { next_statement.proof_state
-                                            .deferred_values
-                                            .plonk
-                                          with
-                                          joint_combiner = None
-                                        }
-                                    }
-                                }
-                            } )
+                            (* Materialise the value-side
+                               [Wrap_statement.Constant.t] (with
+                               inner Plonk = Plonk.In_circuit.Constant.t)
+                               that [Impls.Wrap.input] now expects. *)
+                            (let { Composition_types.Wrap_proof_state
+                                   .Deferred_values
+                                   .Plonk
+                                   .In_circuit
+                                   .alpha
+                                 ; beta
+                                 ; gamma
+                                 ; zeta
+                                 ; zeta_to_srs_length
+                                 ; zeta_to_domain_size
+                                 ; perm
+                                 ; feature_flags
+                                 ; joint_combiner = _
+                                 } =
+                               next_statement.proof_state.deferred_values.plonk
+                             in
+                             let plonk_constant :
+                                 _
+                                 Composition_types.Wrap_proof_state
+                                 .Deferred_values
+                                 .Plonk
+                                 .In_circuit
+                                 .Constant
+                                 .t =
+                               { alpha
+                               ; beta
+                               ; gamma
+                               ; zeta
+                               ; zeta_to_srs_length
+                               ; zeta_to_domain_size
+                               ; perm
+                               ; feature_flags
+                               ; joint_combiner = None
+                               }
+                             in
+                             let { Composition_types.Wrap_proof_state
+                                   .Deferred_values
+                                   .Poly
+                                   .xi
+                                 ; combined_inner_product
+                                 ; b
+                                 ; branch_data
+                                 ; bulletproof_challenges
+                                 ; plonk = _
+                                 } =
+                               next_statement.proof_state.deferred_values
+                             in
+                             { Types.Wrap_statement.Constant
+                               .messages_for_next_step_proof =
+                                 prev_statement_with_hashes.proof_state
+                                   .messages_for_next_step_proof
+                             ; proof_state =
+                                 { deferred_values =
+                                     { xi
+                                     ; combined_inner_product
+                                     ; b
+                                     ; branch_data
+                                     ; bulletproof_challenges
+                                     ; plonk = plonk_constant
+                                     }
+                                 ; sponge_digest_before_evaluations =
+                                     next_statement.proof_state
+                                       .sponge_digest_before_evaluations
+                                 ; messages_for_next_wrap_proof =
+                                     Wrap_hack.hash_messages_for_next_wrap_proof
+                                       messages_for_next_wrap_proof_prepared
+                                 }
+                             } ) )
                     in
                     ( { proof = Wrap_wire_proof.of_kimchi_proof next_proof.proof
                       ; statement =
-                          Types.Wrap.Statement.to_minimal
+                          Types.Wrap_statement.to_minimal
                             ~to_option:Opt.to_option next_statement
                       ; prev_evals =
                           { Plonk_types.All_evals.evals =
@@ -1439,7 +1491,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
 
       let%test_module "test domain size too large" =
         ( module Compile.Make_adversarial_test (struct
-          let tweak_statement (stmt : _ Import.Types.Wrap.Statement.In_circuit.t)
+          let tweak_statement (stmt : _ Import.Types.Wrap_statement.In_circuit.t)
               =
             (* Modify the statement to use an invalid domain size. *)
             { stmt with

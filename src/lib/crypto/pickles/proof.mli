@@ -18,11 +18,44 @@ module Base : sig
           ( 'unfinalized_proofs
           , ('s, 'sgs, 'bp_chals) Messages_for_next_proof_over_same_field.Step.t
           , 'messages_for_next_wrap_proof )
-          Import.Types.Step.Statement.t
+          Import.Types.Step_statement.t
       ; index : int
       ; prev_evals : 'prev_evals
       ; proof : Backend.Tick.Proof.with_public_evals
       }
+
+    (** 5-parameter specialisation of {!t} pinning every slot whose
+        shape is uniformly fixed at every step / wrap consumer. *)
+    module Specialised : sig
+      type nonrec ( 'app_state
+                  , 'max_proofs_verified
+                  , 'actual_proofs_verified
+                  , 'bp_chal_length
+                  , 'max_local_max_proofs_verifieds )
+                  t =
+        ( 'app_state
+        , ( Impls.Step.unfinalized_proof
+          , 'max_proofs_verified )
+          Pickles_types.Vector.t
+        , ( Backend.Tock.Curve.Affine.t
+          , 'actual_proofs_verified )
+          Pickles_types.Vector.t
+        , ( ( Import.Challenge.Constant.t Import.Scalar_challenge.t
+              Import.Bulletproof_challenge.t
+            , 'bp_chal_length )
+            Pickles_types.Vector.t
+          , 'actual_proofs_verified )
+          Pickles_types.Vector.t
+        , 'max_local_max_proofs_verifieds
+          Pickles_types.Hlist.H1.T(Messages_for_next_proof_over_same_field.Wrap)
+          .t
+        , ( ( Backend.Tock.Field.t
+            , Backend.Tock.Field.t array )
+            Pickles_types.Plonk_types.All_evals.t
+          , 'max_proofs_verified )
+          Pickles_types.Vector.t )
+        t
+    end
   end
 
   module Wrap : sig
@@ -50,7 +83,7 @@ module Base : sig
                 Import.Bulletproof_challenge.Stable.V1.t
                 Import.Step_bp_vec.Stable.V1.t
               , Import.Branch_data.Stable.V1.t )
-              Import.Types.Wrap.Statement.Minimal.Stable.V1.t
+              Import.Types.Wrap_statement.Minimal.Poly.Stable.V1.t
           ; prev_evals :
               ( Backend.Tick.Field.Stable.V1.t
               , Backend.Tick.Field.Stable.V1.t array )
@@ -81,7 +114,7 @@ module Base : sig
             Import.Bulletproof_challenge.t
             Import.Step_bp_vec.t
           , Import.Branch_data.t )
-          Import.Types.Wrap.Statement.Minimal.t
+          Import.Types.Wrap_statement.Minimal.Poly.t
       ; prev_evals :
           ( Backend.Tick.Field.t
           , Backend.Tick.Field.t array )
@@ -89,6 +122,23 @@ module Base : sig
       ; proof : Wrap_wire_proof.Stable.V1.t
       }
     [@@deriving compare, sexp, yojson, hash, equal]
+
+    (** 4-parameter specialisation of {!t} pinning the
+        messages-for-next-{wrap,step}-proof slots to their canonical
+        unhashed shapes. *)
+    module Specialised : sig
+      type nonrec ( 'app_state
+                  , 'max_proofs_verified
+                  , 'actual_proofs_verified
+                  , 'bp_chal_length )
+                  t =
+        ( 'max_proofs_verified Messages_for_next_proof_over_same_field.Wrap.t
+        , ( 'app_state
+          , 'actual_proofs_verified
+          , 'bp_chal_length )
+          Composition_types.Reduced_messages_for_next.Step.Specialised.t )
+        t
+    end
   end
 end
 
@@ -122,11 +172,11 @@ module Make (MLMB : Pickles_types.Nat.Intf) : sig
 
   module Repr : sig
     type t =
-      ( ( Backend.Tock.Inner_curve.Affine.t
+      ( ( Backend.Tick.Curve.Affine.t
         , Reduced_messages_for_next_proof_over_same_field.Wrap.Challenges_vector
           .t
           MLMB_vec.t )
-        Import.Types.Wrap.Proof_state.Messages_for_next_wrap_proof.t
+        Import.Types.Messages_for_next.Wrap_proof.Poly.t
       , ( unit
         , Backend.Tock.Curve.Affine.t Max_proofs_verified_at_most.t
         , Import.Challenge.Constant.t Import.Scalar_challenge.t

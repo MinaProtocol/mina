@@ -570,7 +570,7 @@ struct
   let check_bulletproof ~(sponge : Sponge.t) ~(xi : Scalar_challenge.t)
       ~(advice :
          Other_field.Packed.t Shifted_value.Type1.t
-         Types.Step.Bulletproof.Advice.t )
+         Types.Step_bulletproof.Advice.t )
       ~polynomials:(without_degree_bound, with_degree_bound)
       ~openings_proof:
         ({ lr; delta; z_1; z_2; challenge_polynomial_commitment } :
@@ -668,7 +668,7 @@ struct
     let (T max) = Nat.of_int max in
     Vector.to_array (Util.Wrap.ones_vector ~first_zero:length max)
 
-  module Plonk = Types.Wrap.Proof_state.Deferred_values.Plonk
+  module Plonk = Types.Wrap_plonk_iop
 
   (* Just for exhaustiveness over fields *)
   let iter2 ~chal ~scalar_chal
@@ -718,10 +718,10 @@ struct
     with_label __LOC__ (fun () -> scalar_chal alpha_0 alpha_1) ;
     with_label __LOC__ (fun () -> scalar_chal zeta_0 zeta_1)
 
-  let assert_eq_plonk
-      (m1 : (_, Field.t Import.Scalar_challenge.t, _) Plonk.Minimal.In_circuit.t)
-      (m2 : (_, Scalar_challenge.t, _) Plonk.Minimal.In_circuit.t) =
-    iter2 m1 m2
+  let assert_eq_plonk (m1 : Plonk.Minimal.Wrap.t) (m2 : Plonk.Minimal.Wrap.t) =
+    iter2
+      (Plonk.Minimal.Wrap.to_in_circuit m1)
+      (Plonk.Minimal.Wrap.to_in_circuit m2)
       ~chal:(fun c1 c2 -> Field.Assert.equal c1 c2)
       ~scalar_chal:(fun ({ inner = t1 } : _ Import.Scalar_challenge.t)
                         ({ inner = t2 } : Scalar_challenge.t) ->
@@ -834,7 +834,7 @@ struct
          [ `Field of Field.t * Boolean.var | `Packed_bits of Field.t * int ]
          array ) ~(sg_old : (_, Max_proofs_verified.n) Vector.t) ~advice
       ~(messages : _ Messages.In_circuit.t) ~which_branch ~openings_proof
-      ~(plonk : _ Types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit.t) =
+      ~(plonk : _ Types.Wrap_plonk_iop.In_circuit.Wrap.t) =
     let T = Max_proofs_verified.eq in
     (* Pair sg_old with the mask to track which proofs are real *)
     let sg_old =
@@ -1329,7 +1329,9 @@ struct
                 ~verification_key:
                   (Plonk_verification_key_evals.Step.forget_optional_commitments
                      m )
-                ~plonk ~t_comm )
+                ~plonk:
+                  (Types.Wrap_plonk_iop.In_circuit.Wrap.to_in_circuit plonk)
+                ~t_comm )
         in
         (* == IVC Step 15: Bulletproof/IPA verification ==
            Verify the Inner Product Argument opening proof. This checks that
@@ -1483,9 +1485,9 @@ struct
       map ~f:Field.constant (create (module Field.Constant)))
 
   let map_plonk_to_field plonk =
-    Types.Step.Proof_state.Deferred_values.Plonk.In_circuit.map_challenges
-      ~f:Util.Wrap.seal ~scalar:scalar_to_field plonk
-    |> Types.Step.Proof_state.Deferred_values.Plonk.In_circuit.map_fields
+    Types.Step_plonk_iop.In_circuit.map_challenges ~f:Util.Wrap.seal
+      ~scalar:scalar_to_field plonk
+    |> Types.Step_plonk_iop.In_circuit.map_fields
          ~f:(Shifted_value.Type2.map ~f:Util.Wrap.seal)
 
   module Plonk_checks = struct
@@ -1512,21 +1514,27 @@ struct
       (module Proofs_verified : Nat.Add.Intf with type n = b) ~domain ~sponge
       ~(old_bulletproof_challenges : (_, b) Vector.t)
       ({ xi; combined_inner_product; bulletproof_challenges; b; plonk } :
-        ( _
-        , _
-        , _ Shifted_value.Type2.t
-        , _ )
-        Types.Step.Proof_state.Deferred_values.In_circuit.t )
+        ( _ Types.Step_plonk_iop.In_circuit.Wrap.t
+        , Field.t Shifted_value.Type2.t )
+        Types.Step_deferred_values.Wrap.t )
       { Plonk_types.All_evals.In_circuit.ft_eval1; evals } =
-    let module Plonk = Types.Step.Proof_state.Deferred_values.Plonk in
+    let module Plonk = Types.Step_plonk_iop in
     let T = Proofs_verified.eq in
     (* You use the NEW bulletproof challenges to check b. Not the old ones. *)
     let open Field in
     (* == Step 1: Convert PlonK values to field elements ==
        Map scalar challenges to field elements using the endomorphism.
        The endomorphism allows efficient scalar multiplication by decomposing
-       scalars as s = a + b * endo. *)
-    let plonk = map_plonk_to_field plonk in
+       scalars as s = a + b * endo.
+
+       Lift the fresh [Plonk.In_circuit.Wrap.t] to the polymorphic
+       [Plonk.In_circuit.t] for [map_plonk_to_field]. Caller-side
+       cleanup is the win; internally we still use the polymorphic
+       Plonk record because [map_plonk_to_field] / the rest of the
+       body destructure it positionally. *)
+    let plonk =
+      map_plonk_to_field (Plonk.In_circuit.Wrap.to_in_circuit plonk)
+    in
     (* == Step 2: Compute evaluation points ==
        Compute zetaw = generator * zeta, the second evaluation point. *)
     let zetaw = Field.mul domain#generator plonk.zeta in
@@ -1618,9 +1626,20 @@ struct
     let r = scalar_to_field (Import.Scalar_challenge.create r_actual) in
     (* == Step 6: Prepare PlonK minimal form and combined evaluations == *)
     let plonk_minimal =
-      plonk |> Plonk.to_minimal
-      |> Plonk.Minimal.to_wrap
-           ~feature_flags:Features.(map ~f:Boolean.var_of_value none_bool)
+      let { Composition_types.Step_plonk_iop.Minimal.Poly.alpha
+          ; beta
+          ; gamma
+          ; zeta
+          } =
+        Plonk.to_minimal plonk
+      in
+      { Composition_types.Wrap_plonk_iop.Minimal.Poly.alpha
+      ; beta
+      ; gamma
+      ; zeta
+      ; joint_combiner = None
+      ; feature_flags = Features.(map ~f:Boolean.var_of_value none_bool)
+      }
     in
     (* Combine chunked polynomial evaluations into single values *)
     let combined_evals =
@@ -1760,14 +1779,42 @@ struct
        Check that the PlonK arithmetic constraints are satisfied.
        This is a wrap proof, so no optional features need consideration. *)
     let plonk_checks_passed =
+      let plonk_wrap : _ Composition_types.Wrap_plonk_iop.In_circuit.t =
+        let { Composition_types.Step_plonk_iop.In_circuit.alpha
+            ; beta
+            ; gamma
+            ; zeta
+            ; zeta_to_srs_length
+            ; zeta_to_domain_size
+            ; perm
+            } =
+          plonk
+        in
+        let false_ = Boolean.false_ in
+        { alpha
+        ; beta
+        ; gamma
+        ; zeta
+        ; zeta_to_srs_length
+        ; zeta_to_domain_size
+        ; perm
+        ; feature_flags =
+            { range_check0 = false_
+            ; range_check1 = false_
+            ; foreign_field_add = false_
+            ; foreign_field_mul = false_
+            ; xor = false_
+            ; rot = false_
+            ; lookup = false_
+            ; runtime_tables = false_
+            }
+        ; joint_combiner = Pickles_types.Opt.nothing
+        }
+      in
       with_label __LOC__ (fun () ->
           Plonk_checks.checked
             (module Impl)
-            ~env ~shift:shift2
-            (Composition_types.Step.Proof_state.Deferred_values.Plonk.In_circuit
-             .to_wrap ~opt_none:Pickles_types.Opt.nothing ~false_:Boolean.false_
-               plonk )
-            combined_evals )
+            ~env ~shift:shift2 plonk_wrap combined_evals )
     in
     (* == Step 11: Combine all checks and return == *)
     print_bool "xi_correct" xi_correct ;

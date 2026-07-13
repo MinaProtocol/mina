@@ -25,19 +25,15 @@ module Wrap = struct
       | Old_bulletproof_challenges :
           max_local_max_proofs_verifieds H1.T(Challenges_vector.Constant).t t
       | Proof_state :
-          ( ( ( Challenge.Constant.t
-              , Challenge.Constant.t Scalar_challenge.t
+          ( ( ( Field.Constant.t Shifted_value.Type2.t
+                Types.Step_plonk_iop.In_circuit.Constant.t
               , Field.Constant.t Shifted_value.Type2.t
-              , ( Challenge.Constant.t Scalar_challenge.t Bulletproof_challenge.t
-                , Tock.Rounds.n )
-                Vector.t
-              , Digest.Constant.t
-              , bool )
-              Types.Step.Proof_state.Per_proof.In_circuit.t
+              , Digest.Constant.t )
+              Types.Step_per_proof.Constant.t
             , max_proofs_verified )
             Vector.t
           , Digest.Constant.t )
-          Types.Step.Proof_state.t
+          Types.Step_proof_state.t
           t
       | Messages : Tock.Inner_curve.Affine.t Plonk_types.Messages.t t
       | Openings_proof :
@@ -72,20 +68,15 @@ module Wrap = struct
         | Old_bulletproof_challenges :
             max_local_max_proofs_verifieds H1.T(Challenges_vector.Constant).t t
         | Proof_state :
-            ( ( ( Challenge.Constant.t
-                , Challenge.Constant.t Scalar_challenge.t
+            ( ( ( Tock.Field.t Shifted_value.Type2.t
+                  Types.Step_plonk_iop.In_circuit.Constant.t
                 , Tock.Field.t Shifted_value.Type2.t
-                , ( Challenge.Constant.t Scalar_challenge.t
-                    Bulletproof_challenge.t
-                  , Tock.Rounds.n )
-                  Vector.t
-                , Digest.Constant.t
-                , bool )
-                Types.Step.Proof_state.Per_proof.In_circuit.t
+                , Digest.Constant.t )
+                Types.Step_per_proof.Constant.t
               , max_proofs_verified )
               Vector.t
             , Digest.Constant.t )
-            Types.Step.Proof_state.t
+            Types.Step_proof_state.t
             t
         | Messages : Tock.Inner_curve.Affine.t Plonk_types.Messages.t t
         | Openings_proof :

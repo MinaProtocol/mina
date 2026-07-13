@@ -26,27 +26,12 @@ val wrap_main :
   -> srs:Kimchi_bindings.Protocol.SRS.Fp.t
   -> (module Pickles_types.Nat.Add.Intf with type n = 'max_proofs_verified)
   -> ('max_proofs_verified, 'max_local_max_proofs_verifieds) Requests.Wrap.t
-     * (   ( Wrap_main_inputs.Impl.Field.t
-           , Wrap_verifier.Scalar_challenge.t
-           , Wrap_verifier.Other_field.Packed.t
+     * (   ( Wrap_verifier.Other_field.Packed.t
              Pickles_types.Shifted_value.Type1.t
-           , ( Wrap_verifier.Other_field.Packed.t
-               Pickles_types.Shifted_value.Type1.t
-             , Wrap_main_inputs.Impl.Boolean.var )
-             Pickles_types.Opt.t
-           , ( Wrap_verifier.Scalar_challenge.t
-             , Wrap_main_inputs.Impl.Boolean.var )
-             Pickles_types.Opt.t
-           , Impls.Wrap.Boolean.var
-           , Impls.Wrap.Field.t
-           , Impls.Wrap.Field.t
-           , Impls.Wrap.Field.t
-           , ( Impls.Wrap.Field.t Import.Scalar_challenge.t
-               Import.Types.Bulletproof_challenge.t
-             , 'c )
-             Pickles_types.Vector.t
-           , Wrap_main_inputs.Impl.Field.t )
-           Import.Types.Wrap.Statement.In_circuit.t
+             Import.Types.Wrap_plonk_iop.In_circuit.Wrap.t
+           , Wrap_verifier.Other_field.Packed.t
+             Pickles_types.Shifted_value.Type1.t )
+           Import.Types.Wrap_statement.Wrap.t
         -> unit )
        Promise.t
        Lazy.t

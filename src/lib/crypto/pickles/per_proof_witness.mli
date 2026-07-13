@@ -21,21 +21,7 @@ type ('app_state, 'max_proofs_verified, 'num_branches) t =
         (** The polynomial commitments, polynomial evaluations, and opening proof corresponding to
       this latest wrap proof.
   *)
-  ; proof_state :
-      ( challenge
-      , scalar_challenge
-      , Impl.Field.t Pickles_types.Shifted_value.Type1.t
-      , ( Impl.Field.t Pickles_types.Shifted_value.Type1.t
-        , Impl.Boolean.var )
-        Pickles_types.Opt.t
-      , (scalar_challenge, Impl.Boolean.var) Pickles_types.Opt.t
-      , Impl.Boolean.var
-      , unit
-      , Import.Digest.Make(Impl).t
-      , scalar_challenge Import.Bulletproof_challenge.t
-        Import.Types.Step_bp_vec.t
-      , Import.Branch_data.Checked.Step.t )
-      Import.Types.Wrap.Proof_state.In_circuit.t
+  ; proof_state : Import.Types.Wrap_proof_state.In_circuit.Step.t
         (** The accumulator state corresponding to the above proof. Contains
       - `deferred_values`: The values necessary for finishing the deferred "scalar field" computations.
       That is, computations which are over the "step" circuit's internal field that the
@@ -78,19 +64,7 @@ module Constant : sig
   type ('statement, 'max_proofs_verified) t =
     { app_state : 'statement
     ; wrap_proof : Wrap_proof.Constant.t
-    ; proof_state :
-        ( challenge
-        , scalar_challenge
-        , Backend.Tick.Field.t Pickles_types.Shifted_value.Type1.t
-        , Backend.Tick.Field.t Pickles_types.Shifted_value.Type1.t option
-        , scalar_challenge option
-        , bool
-        , unit
-        , Import.Digest.Constant.t
-        , scalar_challenge Import.Bulletproof_challenge.t
-          Import.Types.Step_bp_vec.t
-        , Import.Branch_data.t )
-        Import.Types.Wrap.Proof_state.In_circuit.t
+    ; proof_state : Import.Types.Wrap_proof_state.In_circuit.Constant.t
     ; prev_proof_evals :
         ( Backend.Tick.Field.t
         , Backend.Tick.Field.t array )

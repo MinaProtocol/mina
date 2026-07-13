@@ -135,16 +135,11 @@ module Step : sig
       yet been finalized by the wrap circuit. Contains deferred scalar-field
       computations that will be completed in wrap. *)
   type unfinalized_proof =
-    ( Challenge.Constant.t
-    , Challenge.Constant.t Import.Scalar_challenge.t
+    ( Backend.Tock.Field.t Shifted_value.Type2.t
+      Import.Types.Step_plonk_iop.In_circuit.Constant.t
     , Backend.Tock.Field.t Shifted_value.Type2.t
-    , ( Challenge.Constant.t Import.Scalar_challenge.t
-        Import.Types.Bulletproof_challenge.t
-      , Backend.Tock.Rounds.n )
-      Vector.t
-    , Digest.Constant.t
-    , bool )
-    Import.Types.Step.Proof_state.Per_proof.In_circuit.t
+    , Digest.Constant.t )
+    Import.Types.Step_per_proof.Constant.t
 
   (** Constant (out-of-circuit) step statement type, parameterized by the
       number of proofs verified. Contains unfinalized proofs and message
@@ -153,20 +148,16 @@ module Step : sig
     ( (unfinalized_proof, 'proofs_verified) Vector.t
     , Import.Types.Digest.Constant.t
     , (Import.Types.Digest.Constant.t, 'proofs_verified) Vector.t )
-    Import.Types.Step.Statement.t
+    Import.Types.Step_statement.t
 
   (** In-circuit representation of unfinalized proof state. Uses circuit
       variables instead of constants. *)
   type unfinalized_proof_var =
-    ( Field.t
-    , Field.t Import.Scalar_challenge.t
+    ( Other_field.t Shifted_value.Type2.t
+      Import.Types.Step_plonk_iop.In_circuit.Step.t
     , Other_field.t Shifted_value.Type2.t
-    , ( Field.t Import.Scalar_challenge.t Import.Types.Bulletproof_challenge.t
-      , Backend.Tock.Rounds.n )
-      Vector.t
-    , Field.t
-    , Boolean.var )
-    Import.Types.Step.Proof_state.Per_proof.In_circuit.t
+    , Field.t )
+    Import.Types.Step_per_proof.Step.t
 
   (** In-circuit step statement type. The circuit variable version of
       {!statement}. *)
@@ -174,7 +165,7 @@ module Step : sig
     ( (unfinalized_proof_var, 'proofs_verified) Vector.t
     , Impl.Field.t
     , (Impl.Field.t, 'proofs_verified) Vector.t )
-    Import.Types.Step.Statement.t
+    Import.Types.Step_statement.t
 
   (** Create the input specification for a step circuit.
       @param proofs_verified Type-level natural for number of proofs verified
@@ -286,41 +277,13 @@ module Wrap : sig
   val input :
        feature_flags:Opt.Flag.t Plonk_types.Features.Full.t
     -> unit
-    -> ( ( Impl.Field.t
-         , Impl.Field.t Composition_types.Scalar_challenge.t
-         , Impl.Field.t Pickles_types.Shifted_value.Type1.t
-         , ( Impl.Field.t Pickles_types.Shifted_value.Type1.t
-           , Impl.Field.t Snarky_backendless.Snark_intf.Boolean0.t )
-           Pickles_types.Opt.t
-         , ( Impl.Field.t Composition_types.Scalar_challenge.t
-           , Impl.Field.t Snarky_backendless.Snark_intf.Boolean0.t )
-           Pickles_types.Opt.t
-         , Impl.Boolean.var
-         , Impl.Field.t
-         , Impl.Field.t
-         , Impl.Field.t
-         , ( Impl.Field.t Kimchi_backend_common.Scalar_challenge.t
-             Composition_types.Bulletproof_challenge.t
-           , Pickles_types.Nat.z Backend.Tick.Rounds.plus_n )
-           Pickles_types.Vector.t
-         , Impl.Field.t )
-         Import.Types.Wrap.Statement.In_circuit.t
-       , ( Limb_vector.Challenge.Constant.t
-         , Limb_vector.Challenge.Constant.t Composition_types.Scalar_challenge.t
-         , Other_field.Constant.t Pickles_types.Shifted_value.Type1.t
-         , Other_field.Constant.t Pickles_types.Shifted_value.Type1.t option
-         , Limb_vector.Challenge.Constant.t Composition_types.Scalar_challenge.t
-           option
-         , bool
-         , Import.Types.Digest.Constant.t
-         , Import.Types.Digest.Constant.t
-         , Import.Types.Digest.Constant.t
-         , ( Limb_vector.Challenge.Constant.t
-             Kimchi_backend_common.Scalar_challenge.t
-             Composition_types.Bulletproof_challenge.t
-           , Pickles_types.Nat.z Backend.Tick.Rounds.plus_n )
-           Pickles_types.Vector.t
-         , Composition_types.Branch_data.t )
-         Import.Types.Wrap.Statement.In_circuit.t )
+    -> ( ( Impl.Field.t Pickles_types.Shifted_value.Type1.t
+           Import.Types.Wrap_plonk_iop.In_circuit.Wrap.t
+         , Impl.Field.t Pickles_types.Shifted_value.Type1.t )
+         Import.Types.Wrap_statement.Wrap.t
+       , ( Other_field.Constant.t Pickles_types.Shifted_value.Type1.t
+           Import.Types.Wrap_plonk_iop.In_circuit.Constant.t
+         , Other_field.Constant.t Pickles_types.Shifted_value.Type1.t )
+         Import.Types.Wrap_statement.Constant.t )
        Import.Spec.Wrap_etyp.t
 end

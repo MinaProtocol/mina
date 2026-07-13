@@ -413,7 +413,7 @@ val incrementally_verify_proof :
        Pickles_types.Vector.t
   -> advice:
        Other_field.Packed.t Pickles_types.Shifted_value.Type1.t
-       Import.Types.Step.Bulletproof.Advice.t
+       Import.Types.Step_bulletproof.Advice.t
   -> messages:
        ( Wrap_main_inputs.Impl.Field.t * Wrap_main_inputs.Impl.Field.t
        , Wrap_main_inputs.Impl.Boolean.var )
@@ -424,17 +424,8 @@ val incrementally_verify_proof :
        , Other_field.Packed.t Pickles_types.Shifted_value.Type1.t )
        Pickles_types.Plonk_types.Openings.Bulletproof.t
   -> plonk:
-       ( Wrap_main_inputs.Impl.Field.t
-       , Wrap_main_inputs.Impl.Field.t Import.Scalar_challenge.t
-       , Wrap_main_inputs.Impl.Field.t Pickles_types.Shifted_value.Type1.t
-       , ( Wrap_main_inputs.Impl.Field.t Pickles_types.Shifted_value.Type1.t
-         , Wrap_main_inputs.Impl.Boolean.var )
-         Pickles_types.Opt.t
-       , ( Wrap_main_inputs.Impl.Field.t Import.Scalar_challenge.t
-         , Wrap_main_inputs.Impl.Boolean.var )
-         Pickles_types.Opt.t
-       , Wrap_main_inputs.Impl.Boolean.var )
-       Import.Types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit.t
+       Wrap_main_inputs.Impl.Field.t Pickles_types.Shifted_value.Type1.t
+       Import.Types.Wrap_plonk_iop.In_circuit.Wrap.t
   -> Wrap_main_inputs.Impl.Field.t
      * ( [> `Success of Wrap_main_inputs.Impl.Boolean.var ]
        * Scalar_challenge.t Import.Bulletproof_challenge.t Core_kernel.Array.t
@@ -506,19 +497,16 @@ val finalize_other_proof :
        ( (Wrap_main_inputs.Impl.Field.t, 'a) Pickles_types.Vector.t
        , 'b )
        Pickles_types.Vector.t
-  -> ( Impl.Field.t
-     , Impl.Field.t Import.Scalar_challenge.t
-     , Impl.Field.t Pickles_types.Shifted_value.Type2.t
-     , ( Impl.Field.t Import.Scalar_challenge.t Import.Bulletproof_challenge.t
-       , 'c )
-       Pickles_types.Vector.t )
-     Import.Types.Step.Proof_state.Deferred_values.In_circuit.t
+  -> ( Impl.Field.t Pickles_types.Shifted_value.Type2.t
+       Import.Types.Step_plonk_iop.In_circuit.Wrap.t
+     , Impl.Field.t Pickles_types.Shifted_value.Type2.t )
+     Import.Types.Step_deferred_values.Wrap.t
   -> ( Wrap_main_inputs.Impl.Field.t
      , Wrap_main_inputs.Impl.Field.t Array.t
      , Wrap_main_inputs.Impl.Boolean.var )
      Pickles_types.Plonk_types.All_evals.In_circuit.t
   -> Wrap_main_inputs.Impl.Boolean.var
-     * (Impl.Field.t, 'c) Pickles_types.Vector.t
+     * (Impl.Field.t, Backend.Tock.Rounds.n) Pickles_types.Vector.t
 
 (** {2 Verification Key Selection} *)
 

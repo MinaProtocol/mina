@@ -21,11 +21,39 @@ module Base = struct
           ( 'unfinalized_proofs
           , ('s, 'sgs, 'bp_chals) Messages_for_next_proof_over_same_field.Step.t
           , 'messages_for_next_wrap_proof )
-          Types.Step.Statement.t
+          Types.Step_statement.t
       ; index : int
       ; prev_evals : 'prev_evals
       ; proof : Tick.Proof.with_public_evals
       }
+
+    (** 5-parameter specialisation of {!t} pinning every slot whose
+        shape is uniformly fixed at every step / wrap consumer. *)
+    module Specialised = struct
+      type nonrec ( 'app_state
+                  , 'max_proofs_verified
+                  , 'actual_proofs_verified
+                  , 'bp_chal_length
+                  , 'max_local_max_proofs_verifieds )
+                  t =
+        ( 'app_state
+        , ( Impls.Step.unfinalized_proof
+          , 'max_proofs_verified )
+          Pickles_types.Vector.t
+        , (Tock.Curve.Affine.t, 'actual_proofs_verified) Pickles_types.Vector.t
+        , ( ( Challenge.Constant.t Scalar_challenge.t Bulletproof_challenge.t
+            , 'bp_chal_length )
+            Pickles_types.Vector.t
+          , 'actual_proofs_verified )
+          Pickles_types.Vector.t
+        , 'max_local_max_proofs_verifieds
+          Pickles_types.Hlist.H1.T(Messages_for_next_proof_over_same_field.Wrap)
+          .t
+        , ( (Tock.Field.t, Tock.Field.t array) Plonk_types.All_evals.t
+          , 'max_proofs_verified )
+          Pickles_types.Vector.t )
+        t
+    end
   end
 
   module Wrap = struct
@@ -52,7 +80,7 @@ module Base = struct
                 Bulletproof_challenge.Stable.V1.t
                 Step_bp_vec.Stable.V1.t
               , Branch_data.Stable.V1.t )
-              Types.Wrap.Statement.Minimal.Stable.V1.t
+              Types.Wrap_statement.Minimal.Poly.Stable.V1.t
           ; prev_evals :
               ( Tick.Field.Stable.V1.t
               , Tick.Field.Stable.V1.t
@@ -83,11 +111,28 @@ module Base = struct
           , Challenge.Constant.t Scalar_challenge.t Bulletproof_challenge.t
             Step_bp_vec.t
           , Branch_data.t )
-          Types.Wrap.Statement.Minimal.t
+          Types.Wrap_statement.Minimal.Poly.t
       ; prev_evals : (Tick.Field.t, Tick.Field.t array) Plonk_types.All_evals.t
       ; proof : Wrap_wire_proof.t
       }
     [@@deriving compare, sexp, yojson, hash, equal]
+
+    (** 4-parameter specialisation of {!t} pinning the
+        messages-for-next-{wrap,step}-proof slots to their canonical
+        unhashed shapes. *)
+    module Specialised = struct
+      type nonrec ( 'app_state
+                  , 'max_proofs_verified
+                  , 'actual_proofs_verified
+                  , 'bp_chal_length )
+                  t =
+        ( 'max_proofs_verified Messages_for_next_proof_over_same_field.Wrap.t
+        , ( 'app_state
+          , 'actual_proofs_verified
+          , 'bp_chal_length )
+          Composition_types.Reduced_messages_for_next.Step.Specialised.t )
+        t
+    end
   end
 end
 
@@ -213,11 +258,11 @@ module Make (MLMB : Nat.Intf) = struct
 
   module Repr = struct
     type t =
-      ( ( Tock.Inner_curve.Affine.t
+      ( ( Tick.Curve.Affine.t
         , Reduced_messages_for_next_proof_over_same_field.Wrap.Challenges_vector
           .t
           MLMB_vec.t )
-        Types.Wrap.Proof_state.Messages_for_next_wrap_proof.t
+        Types.Messages_for_next.Wrap_proof.Poly.t
       , ( unit
         , Tock.Curve.Affine.t Max_proofs_verified_at_most.t
         , Challenge.Constant.t Scalar_challenge.t Bulletproof_challenge.t
@@ -354,14 +399,14 @@ module Proofs_verified_2 = struct
 
       module V2 = struct
         type t =
-          ( ( Tock.Inner_curve.Affine.Stable.V1.t
+          ( ( Tick.Curve.Affine.Stable.V1.t
             , Reduced_messages_for_next_proof_over_same_field.Wrap
               .Challenges_vector
               .Stable
               .V2
               .t
               Vector.Vector_2.Stable.V1.t )
-            Types.Wrap.Proof_state.Messages_for_next_wrap_proof.Stable.V1.t
+            Types.Messages_for_next.Wrap_proof.Poly.Stable.V1.t
           , ( unit
             , Tock.Curve.Affine.t At_most.At_most_2.Stable.V1.t
             , Limb_vector.Constant.Hex64.Stable.V1.t Vector.Vector_2.Stable.V1.t
@@ -417,14 +462,14 @@ module Proofs_verified_max = struct
 
       module V2 = struct
         type t =
-          ( ( Tock.Inner_curve.Affine.Stable.V1.t
+          ( ( Tick.Curve.Affine.Stable.V1.t
             , Reduced_messages_for_next_proof_over_same_field.Wrap
               .Challenges_vector
               .Stable
               .V2
               .t
               Side_loaded_verification_key.Width.Max_vector.Stable.V1.t )
-            Types.Wrap.Proof_state.Messages_for_next_wrap_proof.Stable.V1.t
+            Types.Messages_for_next.Wrap_proof.Poly.Stable.V1.t
           , ( unit
             , Tock.Curve.Affine.t
               Side_loaded_verification_key.Width.Max_at_most.Stable.V1.t
