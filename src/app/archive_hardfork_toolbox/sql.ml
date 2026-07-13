@@ -50,8 +50,40 @@ module Block_info = struct
       custom ~encode ~decode (t4 int int64 string Protocol_version.typ))
 end
 
-let chain_of_query_templated ~join_condition =
-  {%string|
+(* Walks the parent chain from the block whose state hash is $1 back to genesis.
+   Used by the callers that start from a state hash (is-in-best-chain,
+   confirmations, no-commands-after). *)
+let chain_of_query =
+  {sql|
+    WITH RECURSIVE chain AS (
+        SELECT
+            b.id AS id,
+            b.parent_id AS parent_id,
+            b.state_hash AS state_hash,
+            b.height AS height,
+            b.global_slot_since_genesis AS global_slot_since_genesis,
+            b.protocol_version_id AS protocol_version_id
+        FROM blocks b
+        WHERE b.state_hash = $1
+
+        UNION ALL
+
+        SELECT
+            p.id,
+            p.parent_id,
+            p.state_hash,
+            p.height,
+            p.global_slot_since_genesis,
+            p.protocol_version_id
+        FROM blocks p
+        JOIN chain c ON p.id = c.parent_id AND c.parent_id IS NOT NULL
+    )
+  |sql}
+
+(* Walks the parent chain from the block with id $1 down to (and including) the
+   block with id $2. Used by blocks_between_both_inclusive. *)
+let chain_of_query_until_inclusive =
+  {sql|
     WITH RECURSIVE chain AS (
         SELECT
             b.id AS id,
@@ -73,14 +105,9 @@ let chain_of_query_templated ~join_condition =
             p.global_slot_since_genesis,
             p.protocol_version_id
         FROM blocks p
-        JOIN chain c ON p.id = c.parent_id AND %{join_condition} AND c.parent_id IS NOT NULL
+        JOIN chain c ON p.id = c.parent_id AND c.id <> $2 AND c.parent_id IS NOT NULL
     )
-  |}
-
-let chain_of_query = chain_of_query_templated ~join_condition:"TRUE"
-
-let chain_of_query_until_inclusive =
-  chain_of_query_templated ~join_condition:"c.id <> $2"
+  |sql}
 
 let latest_state_hash (module Conn : CONNECTION) =
   let query =
