@@ -198,6 +198,16 @@ module type S = sig
   val merkle_path_at_addr : 'a t -> addr -> merkle_path Or_error.t
 
   val get_account_at_addr : 'a t -> addr -> account Or_error.t
+
+  val handle_num_accounts :
+       'a t
+    -> int
+    -> hash
+    -> [ `Success | `Hash_mismatch of hash * hash | `Depth_mismatch of int ]
+
+  module For_test : sig
+    val num_accounts_answer : merkle_tree -> int * hash
+  end
 end
 
 (*
@@ -267,6 +277,19 @@ end = struct
   let intermediate_range ledger_depth addr i =
     Array.init (1 lsl i) ~f:(fun idx ->
         Addr.extend_exn ~ledger_depth addr ~num_bits:i (Int64.of_int idx) )
+
+  let num_accounts_answer mt =
+    let count = MT.num_accounts mt in
+    let height = Int.ceil_log2 count in
+    (* FIXME: bug when height=0 https://github.com/o1-labs/nanobit/issues/365 *)
+    let depth = MT.depth mt in
+    let content_root_addr =
+      funpow (depth - height)
+        (fun a ->
+          Addr.child_exn ~ledger_depth:depth a Mina_stdlib.Direction.Left )
+        (Addr.root ())
+    in
+    (count, MT.get_inner_hash_at_addr_exn mt content_root_addr)
 
   module Responder = struct
     type t =
@@ -353,19 +376,8 @@ end = struct
                   assert false )
                 else Either.First (Answer.Contents_are accounts)
         | Num_accounts ->
-            let len = MT.num_accounts mt in
-            let height = Int.ceil_log2 len in
-            (* FIXME: bug when height=0 https://github.com/o1-labs/nanobit/issues/365 *)
-            let content_root_addr =
-              funpow
-                (MT.depth mt - height)
-                (fun a ->
-                  Addr.child_exn ~ledger_depth a Mina_stdlib.Direction.Left )
-                (Addr.root ())
-            in
-            Either.First
-              (Num_accounts
-                 (len, MT.get_inner_hash_at_addr_exn mt content_root_addr) )
+            let count, content_root = num_accounts_answer mt in
+            Either.First (Num_accounts (count, content_root))
         | What_child_hashes (a, subtree_depth) -> (
             match subtree_depth with
             | n when n >= 1 -> (
@@ -578,6 +590,8 @@ end = struct
 
   (** Compute the hash of an empty tree of the specified height. *)
   let empty_hash_at_height h =
+    assert (
+      h >= 0 || failwith (sprintf "empty_hash_at_height: negative height %d" h) ) ;
     let rec go prev ctr =
       if ctr = h then prev else go (Hash.merge ~height:ctr prev prev) (ctr + 1)
     in
@@ -587,6 +601,11 @@ end = struct
       height of that hash in the tree and the height of the whole tree, compute
       the hash of the whole tree. *)
   let complete_with_empties hash start_height result_height =
+    assert (
+      start_height <= result_height
+      || failwith
+           (sprintf "complete_with_empties: start_height %d > result_height %d"
+              start_height result_height ) ) ;
     let rec go cur_empty prev_hash height =
       if height = result_height then prev_hash
       else
@@ -614,21 +633,34 @@ end = struct
   (** Handle the initial Num_accounts message, starting the main syncing
       process. *)
   let handle_num_accounts :
-      'a t -> int -> Hash.t -> [ `Success | `Hash_mismatch of Hash.t * Hash.t ]
-      =
+         'a t
+      -> int
+      -> Hash.t
+      -> [ `Success
+         | `Hash_mismatch of Hash.t * Hash.t
+         | `Depth_mismatch of int ] =
    fun t n content_hash ->
     let rh = Root_hash.to_hash (desired_root_exn t) in
-    let height = Int.ceil_log2 n in
-    (* FIXME: bug when height=0 https://github.com/o1-labs/nanobit/issues/365 *)
-    let actual = complete_with_empties content_hash height (MT.depth t.tree) in
-    if Hash.equal actual rh then (
-      Addr.Table.clear t.waiting_parents ;
-      (* We should use this information to set the empty account slots empty and
-         start syncing at the content root. See #1972. *)
-      Addr.Table.clear t.waiting_content ;
-      handle_node t (Addr.root ()) rh ;
-      `Success )
-    else `Hash_mismatch (rh, actual)
+    let ledger_depth = MT.depth t.tree in
+    (* Reject counts outside (0, 2^ledger_depth]. *)
+    if n <= 0 || n > Int.shift_left 1 ledger_depth then
+      `Depth_mismatch ledger_depth
+    else
+      let height = Int.ceil_log2 n in
+      (* FIXME: bug when height=0 https://github.com/o1-labs/nanobit/issues/365 *)
+      let actual = complete_with_empties content_hash height ledger_depth in
+      if Hash.equal actual rh then (
+        Addr.Table.clear t.waiting_parents ;
+        (* We should use this information to set the empty account slots empty and
+           start syncing at the content root. See #1972. *)
+        Addr.Table.clear t.waiting_content ;
+        handle_node t (Addr.root ()) rh ;
+        `Success )
+      else `Hash_mismatch (rh, actual)
+
+  module For_test = struct
+    let num_accounts_answer = num_accounts_answer
+  end
 
   let main_loop t =
     let open (val t.context) in
@@ -704,6 +736,19 @@ end = struct
               match handle_num_accounts t count content_root with
               | `Success ->
                   credit_fulfilled_request ()
+              | `Depth_mismatch ledger_depth ->
+                  let%map () =
+                    record_envelope_sender t.trust_system logger sender
+                      ( Actions.Violated_protocol
+                      , Some
+                          ( "Claimed num_accounts $count, but a ledger of \
+                             depth $ledger_depth holds at most 2^$ledger_depth \
+                             accounts; impossible count"
+                          , [ ("count", `Int count)
+                            ; ("ledger_depth", `Int ledger_depth)
+                            ] ) )
+                  in
+                  requeue_query ()
               | `Hash_mismatch (expected, actual) ->
                   let%map () =
                     record_envelope_sender t.trust_system logger sender
