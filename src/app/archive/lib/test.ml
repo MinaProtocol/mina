@@ -418,6 +418,117 @@ let%test_module "Archive node unit tests" =
       | Error e ->
           failwith @@ Caqti_error.show e
 
+    (* Regression test for the hardfork "fork genesis" bug that breaks Rosetta
+       balance reconciliation at the fork boundary. A hard fork restarts the
+       chain at a genesis block whose [blockchain_length] is [fork.blockchain_length
+       + 1] (not 1). When such a block is present in the archive but was ingested
+       WITHOUT its ledger accounts (e.g. the archive was never (re)started with
+       the fork [--config-file]), [accounts_accessed] is empty for it, so Rosetta
+       reports zero balances at the fork block. [add_genesis_accounts] -- the
+       routine the [populate-genesis-accounts] toolbox command invokes -- must
+       backfill the full fork genesis ledger onto that existing block. *)
+    let%test_unit "Accounts_accessed: add_genesis_accounts backfills the fork \
+                   genesis ledger onto an existing fork genesis block" =
+      let pool = Lazy.force conn_pool_lazy in
+      Thread_safe.block_on_async_exn
+      @@ fun () ->
+      let num_accounts = 3 in
+      let accounts =
+        List.init num_accounts ~f:(fun i ->
+            let pk = Public_key.compress (Keypair.create ()).public_key in
+            { Runtime_config.Accounts.Single.default with
+              pk = Public_key.Compressed.to_base58_check pk
+            ; balance = Currency.Balance.of_mina_int_exn (1000 + i)
+            } )
+      in
+      (* [fork.state_hash] is only parsed (not validated against a real block),
+         so any well-formed state hash works. *)
+      let fork_state_hash =
+        State_hash.to_base58_check
+          (Quickcheck.random_value
+             ~seed:(`Deterministic "fork-genesis-accounts-test") State_hash.gen )
+      in
+      let runtime_config =
+        { Runtime_config.default with
+          proof =
+            Some
+              (Runtime_config.Proof_keys.make
+                 ~fork:
+                   { Runtime_config.Fork_config.state_hash = fork_state_hash
+                   ; blockchain_length = 100 (* genesis block height => 101 *)
+                   ; global_slot_since_genesis = 100
+                   }
+                 () )
+        ; ledger = Some (Runtime_config.ledger_of_accounts accounts)
+        }
+      in
+      (* Derive the precomputed values (and hence the exact fork genesis block)
+         the same way [add_genesis_accounts] does internally, so the block we
+         insert below is the very block it will later look up and backfill. *)
+      let (module G) = Genesis_constants.profiled () in
+      let%bind precomputed_values =
+        match%map
+          Genesis_ledger_helper.init_from_config_file ~logger
+            ~proof_level:G.proof_level ~genesis_constants ~constraint_constants
+            ~cli_proof_level:None runtime_config
+        with
+        | Ok precomputed_values ->
+            precomputed_values
+        | Error err ->
+            failwithf "init_from_config_file: %s" (Error.to_string_hum err) ()
+      in
+      let genesis_block =
+        let With_hash.{ data = block; hash = the_hash }, _ =
+          Mina_block.genesis ~precomputed_values
+        in
+        With_hash.{ data = block; hash = the_hash }
+      in
+      let count_accounts_accessed block_id =
+        match%map
+          Mina_caqti.Pool.use
+            (fun (module Conn : Mina_caqti.CONNECTION) ->
+              Conn.find
+                (Mina_caqti.find_req Caqti_type.int Caqti_type.int
+                   "SELECT COUNT(*) FROM accounts_accessed WHERE block_id = ?" )
+                block_id )
+            pool
+        with
+        | Ok count ->
+            count
+        | Error e ->
+            failwith @@ Caqti_error.show e
+      in
+      (* Reproduce the production state: the fork genesis block is present in the
+         archive but was ingested with NO ledger accounts attached. *)
+      let%bind genesis_block_id =
+        match%map
+          Mina_caqti.Pool.use
+            (fun (module Conn : Mina_caqti.CONNECTION) ->
+              Processor.Block.add_if_doesn't_exist
+                (module Conn)
+                ~logger
+                ~constraint_constants:precomputed_values.constraint_constants
+                genesis_block ~accounts_accessed:[] ~accounts_created:[] )
+            pool
+        with
+        | Ok genesis_block_id ->
+            genesis_block_id
+        | Error e ->
+            failwith @@ Caqti_error.show e
+      in
+      let%bind before = count_accounts_accessed genesis_block_id in
+      (* The bug: the fork genesis block has no accounts_accessed rows. *)
+      [%test_result: int] ~expect:0 before ;
+      let%bind () =
+        Processor.add_genesis_accounts ~logger
+          ~runtime_config_opt:(Some runtime_config) ~genesis_constants
+          ~chunks_length:100 ~constraint_constants pool
+      in
+      let%map after = count_accounts_accessed genesis_block_id in
+      (* The fix: every fork genesis ledger account is now attached to the
+         fork genesis block. *)
+      [%test_result: int] ~expect:num_accounts after
+
     (*
     let%test_unit "Block: read and write with pruning" =
       let conn = Lazy.force conn_lazy in
