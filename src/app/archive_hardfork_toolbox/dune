@@ -19,7 +19,6 @@
   base
   base.caml
   integers
-  yojson
   ppx_deriving_yojson.runtime
   ;; local libraries
   logger
