@@ -635,11 +635,11 @@ end = struct
     let open (val t.context) in
     if Addr.depth addr >= MT.depth t.tree - account_subtree_height then (
       expect_content t addr exp_hash ;
-      Linear_pipe.write_without_pushback_if_open t.queries
+      Linear_pipe.write_without_pushback t.queries
         (desired_root_exn t, What_contents addr) )
     else (
       expect_children t addr exp_hash ;
-      Linear_pipe.write_without_pushback_if_open t.queries
+      Linear_pipe.write_without_pushback t.queries
         ( desired_root_exn t
         , What_child_hashes (addr, ledger_sync_config.default_subtree_depth) ) )
 
@@ -702,7 +702,12 @@ end = struct
         (* If a peer misbehaves we still need the information we asked them for,
            so requeue in that case. *)
         let requeue_query () =
-          Linear_pipe.write_without_pushback_if_open t.queries (root_hash, query)
+          [%log warn] "Requeuing query that's not resolved"
+            ~metadata:
+              [ ("root_hash", Root_hash.to_yojson root_hash)
+              ; ("query", Query.to_yojson Addr.to_yojson query)
+              ] ;
+          Linear_pipe.write_without_pushback t.queries (root_hash, query)
         in
         let credit_fulfilled_request () =
           record_envelope_sender t.trust_system logger sender
@@ -830,7 +835,7 @@ end = struct
       t.validity_listener <- Ivar.create () ;
       t.desired_root <- Some h ;
       t.auxiliary_data <- Some data ;
-      Linear_pipe.write_without_pushback_if_open t.queries (h, Num_accounts) ;
+      Linear_pipe.write_without_pushback t.queries (h, Num_accounts) ;
       `New )
     else if
       Option.fold t.auxiliary_data ~init:false ~f:(fun _ saved_data ->
