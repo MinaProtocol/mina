@@ -3262,7 +3262,6 @@ module Make_str (A : Wire_types.Concrete) = struct
         Fee_excess.combine_checked s1.Statement.Poly.fee_excess
           s2.Statement.Poly.fee_excess
       in
-      (*TODO reviewer: Check s1.target.local = s2.source.local?*)
       let%bind () =
         with_label __LOC__ (fun () ->
             let%bind valid_pending_coinbase_stack_transition =
@@ -3284,7 +3283,9 @@ module Make_str (A : Wire_types.Concrete) = struct
             Local_state.Checked.assert_equal s.source.local_state
               s1.source.local_state ;
             Local_state.Checked.assert_equal s.target.local_state
-              s2.target.local_state )
+              s2.target.local_state ;
+            Local_state.Checked.assert_equal_ignoring_ledger
+              s1.target.local_state s2.source.local_state )
       in
       let valid_ledger =
         Statement.valid_ledgers_at_merge_checked
