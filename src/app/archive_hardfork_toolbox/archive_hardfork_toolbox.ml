@@ -91,24 +91,41 @@ let convert_chain_to_canonical_command =
   Async.Command.async_or_error
     ~summary:
       "Mark the chain leading to the target block as canonical for a protocol \
-       version"
+       version. With no target/protocol flags, auto-detects the latest \
+       hard-fork boundary."
     (let%map_open.Command { value = postgres_uri; _ } =
        Lazy.force Uri.Archive.postgres
-     and latest_block_state_hash =
-       Command.Param.(flag "--target-block-hash" (required string))
-         ~doc:"String State hash of block that should remain canonical"
-     and expected_protocol_version_str =
-       Command.Param.(flag "--protocol-version" (required string))
+     and target_block_hash =
+       Command.Param.(flag "--target-block-hash" (optional string))
          ~doc:
-           "String Protocol version in format <transaction>.<network>.<patch>"
+           "String State hash of block that should remain canonical (default: \
+            parent of the latest hard-fork block)"
+     and fork_height =
+       Command.Param.(flag "--fork-height" (optional int))
+         ~doc:
+           "Int Height of the block that should remain canonical (alternative \
+            to --target-block-hash)"
+     and protocol_version_str =
+       Command.Param.(flag "--protocol-version" (optional string))
+         ~doc:
+           "String Protocol version in format <transaction>.<network>.<patch> \
+            (default: the target block's own protocol version)"
      and stop_at_slot =
        Command.Param.(flag "--stop-at-slot" (optional int))
          ~doc:
            "Int If provided, stops marking blocks as canonical when that's \
             older than this global slot since genesis slot"
+     and dry_run =
+       Command.Param.(flag "--dry-run" no_arg)
+         ~doc:
+           "Print the blocks that would change and a summary without writing \
+            any changes"
+     and json =
+       Command.Param.(flag "--json" no_arg)
+         ~doc:"Emit the change plan as JSON instead of a human-readable table"
      in
-     convert_chain_to_canonical ~postgres_uri ~latest_block_state_hash
-       ~expected_protocol_version_str ~stop_at_slot )
+     convert_chain_to_canonical ~postgres_uri ?target_block_hash ?fork_height
+       ?protocol_version_str ~json ~stop_at_slot ~dry_run )
 
 let fetch_last_filled_block_command =
   Async.Command.async ~summary:"Select last filled block"

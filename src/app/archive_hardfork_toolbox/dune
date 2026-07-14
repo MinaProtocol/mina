@@ -19,6 +19,7 @@
   base.caml
   integers
   yojson
+  ppx_deriving_yojson.runtime
   ;; local libraries
   logger
   archive_lib
@@ -42,7 +43,7 @@
   signature_lib
   unsigned_extended
   with_hash)
- (modules logic sql config)
+ (modules logic sql config utils change_plan)
  (instrumentation
   (backend bisect_ppx))
  (preprocess
