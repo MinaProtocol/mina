@@ -299,6 +299,64 @@ module Make_test_edge_cases (Input : Input_intf) = struct
         Deferred.any [ deferred_res; Ivar.read got_failure_ivar ] )
 end
 
+module Make_test_content_length (Input : Input_intf) = struct
+  open Input
+  module Sync_responder = Sync_ledger.Responder
+
+  let trust_system = Trust_system.null ()
+
+  let num_accts = 1026
+
+  let () =
+    Async.Scheduler.set_record_backtraces true ;
+    Core.Backtrace.elide := false
+
+  let%test "sync completes despite a mismatched Contents_are answer" =
+    let l1, _k1 = Ledger.load_ledger 1 1 in
+    let l2, _k2 = Ledger.load_ledger num_accts 2 in
+    let desired_root = Ledger.merkle_root l2 in
+    let lsync = Sync_ledger.create l1 ~context:(module Context) ~trust_system in
+    let qr = Sync_ledger.query_reader lsync in
+    let aw = Sync_ledger.answer_writer lsync in
+    let sr =
+      Sync_responder.create l2 ignore ~context:(module Context) ~trust_system
+    in
+    let adjusted = ref false in
+    don't_wait_for
+      (Linear_pipe.iter_unordered ~max_concurrency:3 qr
+         ~f:(fun (root_hash, query) ->
+           let%bind answ_or_error =
+             Sync_responder.answer_query sr (Envelope.Incoming.local query)
+           in
+           let answ = Or_error.ok_exn answ_or_error in
+           (* Once, return a Contents_are answer with some extra accounts. *)
+           let answ =
+             match (query, answ) with
+             | ( Syncable_ledger.Query.What_contents _
+               , Syncable_ledger.Answer.Contents_are accounts )
+               when not !adjusted ->
+                 adjusted := true ;
+                 Syncable_ledger.Answer.Contents_are
+                   (accounts @ List.init 100 ~f:(fun _ -> List.hd_exn accounts))
+             | _ ->
+                 answ
+           in
+           Linear_pipe.write aw (root_hash, query, Envelope.Incoming.local answ) )
+      ) ;
+    Async.Thread_safe.block_on_async_exn (fun () ->
+        match%map
+          Clock_ns.with_timeout (Time_ns.Span.of_sec 30.)
+            (Sync_ledger.fetch lsync desired_root ~data:() ~equal:(fun () () ->
+                 true ) )
+        with
+        | `Result (`Ok mt) ->
+            Root_hash.equal desired_root (Ledger.merkle_root mt)
+        | `Result (`Target_changed _) ->
+            false
+        | `Timeout ->
+            false )
+end
+
 module Root_hash = struct
   include Merkle_ledger_tests.Test_stubs.Hash
 
@@ -500,6 +558,8 @@ module Db = struct
     Make_test_edge_cases (DB16_subtree_depths81)
   module TestDB16_Edge_Cases_subtree_depth80 =
     Make_test_edge_cases (DB16_subtree_depths80)
+  module TestDB16_Content_Length =
+    Make_test_content_length (DB16_subtree_depths86)
 end
 
 module Mask = struct
