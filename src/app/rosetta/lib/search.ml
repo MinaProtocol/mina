@@ -846,8 +846,14 @@ module Sql = struct
               ON zfpb.public_key_id = pk_fee_payer.id
             INNER JOIN blocks b
               ON bzc.block_id = b.id
+            -- Expand the account-updates array positionally so a repeated
+            -- account-update id yields one row per occurrence (see block.ml);
+            -- `= ANY(array)` would collapse repeats and drop balance-change ops.
+            LEFT JOIN LATERAL
+              unnest (zc.zkapp_account_updates_ids) WITH ORDINALITY
+                AS au_ref (au_id, au_ord) ON true
             LEFT JOIN zkapp_account_update zau
-              ON zau.id = ANY (zc.zkapp_account_updates_ids)
+              ON zau.id = au_ref.au_id
             INNER JOIN zkapp_account_update_body zaub
               ON zaub.id = zau.body_id
             INNER JOIN account_identifiers ai_update_body

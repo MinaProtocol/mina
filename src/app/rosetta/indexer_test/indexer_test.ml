@@ -801,6 +801,107 @@ module Offset_limit = struct
       ] )
 end
 
+module Zkapp_account_update_multiplicity = struct
+  (* Regression test for the zkApp [= ANY (zkapp_account_updates_ids)] bug: when a
+     zkApp command's account-updates array repeats an id (identical account
+     updates share one zkapp_account_update row), the /block query must still
+     produce one account update — and hence one balance-change operation — per
+     array element; the buggy [= ANY] join collapses the repeat to one.
+
+     The fixture is inserted at runtime into the indexer's throwaway database
+     (reusing whatever account-update / block / fee-payer rows exist), rather
+     than added to sample_db/archive_db.sql, which is a regenerated fixture
+     shared with several other tests. *)
+  let dup_command_hash = "5JuDUPzkAppAccountUpdateMultiplicityRegressionTest01"
+
+  let default_token = Rosetta_lib.Amount_of.Token_id.default
+
+  (* One zkApp command whose account-updates array repeats an existing
+     default-token account-update id (so it must yield two account updates). *)
+  let insert_command_sql =
+    [%string
+      {sql|
+        INSERT INTO zkapp_commands
+          (id, zkapp_fee_payer_body_id, zkapp_account_updates_ids, memo, hash)
+        VALUES
+          ( (SELECT COALESCE(MAX(id), 0) + 1 FROM zkapp_commands)
+          , (SELECT MIN(id) FROM zkapp_fee_payer_body)
+          , (SELECT ARRAY[a.id, a.id]
+             FROM zkapp_account_update a
+             INNER JOIN zkapp_account_update_body b ON b.id = a.body_id
+             INNER JOIN account_identifiers ai ON ai.id = b.account_identifier_id
+             INNER JOIN tokens t ON t.id = ai.token_id
+             WHERE t.value = '%{default_token}'
+             ORDER BY a.id LIMIT 1)
+          , 'E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH'
+          , '%{dup_command_hash}' )
+      |sql}]
+
+  let insert_block_link_sql =
+    [%string
+      {sql|
+        INSERT INTO blocks_zkapp_commands
+          (block_id, zkapp_command_id, sequence_no, status, failure_reasons_ids)
+        SELECT b.block_id,
+               (SELECT id FROM zkapp_commands WHERE hash = '%{dup_command_hash}'),
+               COALESCE(MAX(bzc.sequence_no), -1) + 1,
+               'applied', NULL
+        FROM (SELECT block_id FROM blocks_zkapp_commands ORDER BY block_id LIMIT 1) b
+        INNER JOIN blocks_zkapp_commands bzc ON bzc.block_id = b.block_id
+        GROUP BY b.block_id
+      |sql}]
+
+  let block_id_sql =
+    [%string
+      {sql|
+        SELECT bzc.block_id FROM blocks_zkapp_commands bzc
+        INNER JOIN zkapp_commands zc ON zc.id = bzc.zkapp_command_id
+        WHERE zc.hash = '%{dup_command_hash}'
+      |sql}]
+
+  let test { pool; _ } =
+    let open Deferred.Let_syntax in
+    let%map account_updates =
+      with_db pool (fun (module Conn : Mina_caqti.CONNECTION) ->
+          let open Deferred.Result.Let_syntax in
+          let%bind () =
+            Conn.exec
+              (Mina_caqti.exec_req Caqti_type.unit insert_command_sql)
+              ()
+          in
+          let%bind () =
+            Conn.exec
+              (Mina_caqti.exec_req Caqti_type.unit insert_block_link_sql)
+              ()
+          in
+          let%bind block_id =
+            Conn.find
+              (Mina_caqti.find_req Caqti_type.unit Caqti_type.int block_id_sql)
+              ()
+          in
+          let%map rows =
+            Lib.Block.Sql.Zkapp_commands.run (module Conn) block_id
+          in
+          let command =
+            List.find_exn (Lib.Block.Sql.Zkapp_commands.to_command_infos rows)
+              ~f:(fun info ->
+                String.equal info.Lib.Commands_common.Zkapp_command_info.hash
+                  dup_command_hash )
+          in
+          command.Lib.Commands_common.Zkapp_command_info.account_updates )
+    in
+    Alcotest.(check int)
+      "one account update per zkapp_account_updates_ids element" 2
+      (List.length account_updates)
+
+  let test_suite =
+    let open Alcotest_async in
+    ( "zkapp-account-update-multiplicity"
+    , [ test_case ~timeout:(sec 60.)
+          "duplicate account-update id emits one op per occurrence" `Quick test
+      ] )
+end
+
 let () =
   Async.Thread_safe.block_on_async_exn (fun () ->
       Alcotest_async.(
@@ -813,4 +914,5 @@ let () =
           ; Op_type.test_suite
           ; Max_block.test_suite
           ; Offset_limit.test_suite
+          ; Zkapp_account_update_multiplicity.test_suite
           ]) )
