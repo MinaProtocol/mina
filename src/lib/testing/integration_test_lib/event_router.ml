@@ -1,6 +1,6 @@
 open Async_kernel
 open Core_kernel
-module Timeout = Timeout_lib.Core_time
+module Timeout = Mina_stdlib.Timeout_lib.Core_time
 
 module Make (Engine : Intf.Engine.S) () :
   Intf.Dsl.Event_router_intf with module Engine := Engine = struct
