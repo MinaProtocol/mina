@@ -71,7 +71,7 @@ let submodulesInit
 
           then  [ Cmd.run "git submodule sync --recursive"
                 , Cmd.run
-                    "git submodule update --init --recursive --depth 1 --single-branch --jobs \"\$(nproc)\""
+                    "git submodule update --init --recursive --depth 1 --jobs \"\$(nproc)\""
                 ]
 
           else  [] : List Cmd.Type
