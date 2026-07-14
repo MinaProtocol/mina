@@ -5,8 +5,6 @@ import (
 	"os"
 	"os/exec"
 	"strconv"
-
-	"github.com/MinaProtocol/mina/src/app/hardfork_test/src/internal/config"
 )
 
 // LedgerHashes holds the expected ledger hashes for validation
@@ -16,7 +14,7 @@ type LedgerHashes struct {
 	LedgerHash  string
 }
 
-// GenerateForkLedgers generates the hardfork ledgers using the specified
+// GenerateGenesisLedgersFromRuntimeConfig generates the hardfork ledgers using the specified
 // executable. When preforkGenesisConfig is non-empty it is passed as
 // --prefork-genesis-config, which makes runtime_genesis_ledger derive the
 // hardfork slot (slot_chain_end + hard_fork_genesis_slot_delta) from it and
@@ -28,7 +26,7 @@ type LedgerHashes struct {
 // (scripts/hardfork/release/generate-fork-config-with-ledger-tarballs.sh). It is
 // left empty when (re)generating the pre-fork ledgers, whose hashes must match
 // the still-un-migrated live network state.
-func (t *HardforkTest) GenerateForkLedgers(executablePath, forkConfigPath, ledgersDir, hashesFile, preforkGenesisConfig string) error {
+func (t *HardforkTest) GenerateGenesisLedgersFromRuntimeConfig(executablePath, forkConfigPath, ledgersDir, hashesFile, preforkGenesisConfig string) error {
 	t.Logger.Info("Generating hardfork ledgers with %s...", executablePath)
 
 	// Create hardfork ledgers directory
@@ -61,11 +59,11 @@ func (t *HardforkTest) GenerateForkLedgers(executablePath, forkConfigPath, ledge
 	return nil
 }
 
-func (t *HardforkTest) GenerateAndValidateHashesAndLedgers(analysis BlockAnalysisResult, forkConfigPath, preforkLedgersDir, prepatchForkConfig string) error {
+func (t *HardforkTest) RegenerateAndValidatePrepatchLedgerHashes(analysis BlockAnalysisResult, forkConfigPath, preforkLedgersDir, prepatchForkConfig string) error {
 	// Generate prefork ledgers using main network executable. No prefork genesis
 	// config here: these hashes are validated against the still-un-migrated live
 	// prefork network state, so the slot-reduction update must NOT be applied.
-	if err := t.GenerateForkLedgers(t.Config.MainRuntimeGenesisLedger, forkConfigPath, preforkLedgersDir, prepatchForkConfig, ""); err != nil {
+	if err := t.GenerateGenesisLedgersFromRuntimeConfig(t.Config.MainRuntimeGenesisLedger, forkConfigPath, preforkLedgersDir, prepatchForkConfig, ""); err != nil {
 		return err
 	}
 
@@ -75,22 +73,15 @@ func (t *HardforkTest) GenerateAndValidateHashesAndLedgers(analysis BlockAnalysi
 	)
 }
 
-// PatchForkConfigAndGenerateLedgersLegacy does the following:
-// 1. generate fork ledgers with runtime-genesis-ledger
-// 2. patch the genesis time & slot for fork config with create_runtime_config.sh
-// 3. perform some base sanity check on the fork config
-func (t *HardforkTest) PatchForkConfigAndGenerateLedgersLegacy(analysis *BlockAnalysisResult, forkConfigPath, forkLedgersDir, forkHashesFile, configFile, preforkGenesisConfigFile string, forkGenesisTs, mainGenesisTs int64) ([]byte, error) {
-	// Generate fork ledgers using fork network executable. Pass the prefork
-	// genesis config so runtime_genesis_ledger applies the Mesa vesting
-	// slot-reduction update (mirrors the release flow); otherwise the legacy
-	// ledger would keep un-migrated timing and diverge from auto/advanced.
-	if err := t.GenerateForkLedgers(t.Config.ForkRuntimeGenesisLedger, forkConfigPath, forkLedgersDir, forkHashesFile, preforkGenesisConfigFile); err != nil {
-		return nil, err
-	}
-
-	// Create runtime config
-	forkGenesisTimestamp := config.FormatTimestamp(forkGenesisTs)
-	return t.PatchRuntimeConfigLegacy(forkGenesisTimestamp, forkConfigPath, configFile, preforkGenesisConfigFile, forkHashesFile)
+// GenerateLegacyPostforkGenesisLedgers generates postfork genesis ledgers
+// from the prepatch fork config using the fork-network runtime_genesis_ledger binary.
+func (t *HardforkTest) GenerateLegacyPostforkGenesisLedgers(
+	forkConfigPath, forkLedgersDir, forkHashesFile, preforkGenesisConfigFile string,
+) error {
+	return t.GenerateGenesisLedgersFromRuntimeConfig(
+		t.Config.ForkRuntimeGenesisLedger,
+		forkConfigPath, forkLedgersDir, forkHashesFile, preforkGenesisConfigFile,
+	)
 }
 
 func (t *HardforkTest) AdvancedGenerateHardForkConfig(configDir string, clientPort int) error {
