@@ -279,13 +279,59 @@ let fetch_last_filled_block ~postgres_uri () =
   Yojson.Safe.to_channel Out_channel.stdout json ;
   Out_channel.newline Out_channel.stdout
 
-let convert_chain_to_canonical ~postgres_uri ~latest_block_state_hash
-    ~expected_protocol_version_str ~stop_at_slot () =
-  let expected_protocol_version =
-    Sql.Protocol_version.of_string expected_protocol_version_str
-  in
+let convert_chain_to_canonical ~postgres_uri ?target_block_hash ?fork_height
+    ?protocol_version_str ?(json = false) ~stop_at_slot ~dry_run () =
   let pool = connect postgres_uri in
   let query_db = Mina_caqti.query pool in
+  (* Resolve the target block: an explicit state hash, an explicit height, or,
+     when neither is given, auto-detect the parent of the latest hard-fork
+     block (i.e. the last pre-fork block that should remain canonical). *)
+  let%bind.Deferred.Or_error latest_block =
+    match (target_block_hash, fork_height) with
+    | Some _, Some _ ->
+        Deferred.Or_error.errorf
+          "Provide at most one of --target-block-hash or --fork-height"
+    | Some state_hash, None -> (
+        match%map query_db ~f:(Sql.block_info_by_state_hash ~state_hash) with
+        | Some info ->
+            Or_error.return info
+        | None ->
+            Or_error.errorf "Cannot find block with state hash %s" state_hash )
+    | None, Some height -> (
+        match%map
+          query_db ~f:(Sql.blocks_info_by_height ~height:(Int64.of_int height))
+        with
+        | [ info ] ->
+            Or_error.return info
+        | [] ->
+            Or_error.errorf "Cannot find any block at height %d" height
+        | _ :: _ ->
+            Or_error.errorf
+              "Found multiple blocks at height %d; disambiguate with \
+               --target-block-hash"
+              height )
+    | None, None -> (
+        match%map query_db ~f:Sql.parent_of_latest_fork_block with
+        | Some info ->
+            Or_error.return info
+        | None ->
+            Or_error.errorf
+              "Could not auto-detect a fork boundary (no hard-fork block with \
+               a parent was found). Provide --target-block-hash or \
+               --fork-height." )
+  in
+  let latest_block_state_hash = latest_block.state_hash in
+  (* Protocol version: explicit override, otherwise the target block's own. *)
+  let expected_protocol_version =
+    match protocol_version_str with
+    | Some s ->
+        Sql.Protocol_version.of_string s
+    | None ->
+        latest_block.protocol_version
+  in
+  let expected_protocol_version_str =
+    Sql.Protocol_version.to_string expected_protocol_version
+  in
   let%bind.Deferred.Or_error oldest_block =
     match%map
       query_db
@@ -297,31 +343,11 @@ let convert_chain_to_canonical ~postgres_uri ~latest_block_state_hash
         Or_error.errorf "Cannot locate genesis block for protocol version %s"
           expected_protocol_version_str
   in
-  let%bind.Deferred.Or_error latest_block =
-    match%map
-      query_db
-        ~f:(Sql.block_info_by_state_hash ~state_hash:latest_block_state_hash)
-    with
-    | Some info ->
-        Or_error.return info
-    | None ->
-        Or_error.errorf "Cannot find block with state hash %s"
-          latest_block_state_hash
-  in
   let%bind blocks_to_ensure_canonical =
     query_db
       ~f:
         (Sql.blocks_between_both_inclusive ~oldest_block_id:oldest_block.id
            ~latest_block_id:latest_block.id )
-  in
-
-  let () =
-    printf "Blocks to ensure canonical (%d blocks):\n"
-      (List.length blocks_to_ensure_canonical) ;
-    List.iter blocks_to_ensure_canonical ~f:(fun b ->
-        printf "  - id: %d, state_hash: %s, height: %Ld, protocol_version: %s\n"
-          b.id b.state_hash b.height
-          (Sql.Protocol_version.to_string b.protocol_version) )
   in
 
   let%bind.Deferred.Or_error () =
@@ -363,16 +389,135 @@ let convert_chain_to_canonical ~postgres_uri ~latest_block_state_hash
       Deferred.Or_error.errorf "Some blocks have unexpected state hash: %s"
         message
   in
-  [%log info] "Marking chain from %s to %s as canonical for protocol version %s"
-    oldest_block.state_hash latest_block_state_hash
-    (Sql.Protocol_version.to_string expected_protocol_version) ;
   let canonical_block_ids =
     List.map blocks_to_ensure_canonical ~f:(fun b -> b.id)
   in
-  let%map () =
+  let canonical_count = List.length blocks_to_ensure_canonical in
+  (* The hard fork just above the target, if any. Its slot is the upper bound that
+     protects the post-fork chain when the fork keeps the same protocol version
+     (see fork_block_above_height). None when the target is at the tip (no later
+     fork), which preserves the previous behaviour. *)
+  let%bind fork_context =
+    query_db ~f:(Sql.fork_block_above_height ~height:latest_block.height)
+  in
+  let fork_boundary_slot =
+    Option.map fork_context ~f:(fun fc -> fc.Sql.Fork_context.fork_slot)
+  in
+  (* The blocks that change status: the ancestry blocks not yet canonical
+     (-> canonical), and the same-version off-chain blocks below the boundary
+     (-> orphaned). The rest of the ancestry (including the protocol-version
+     genesis) is already canonical and is not listed. *)
+  let%bind blocks_to_heal =
+    query_db ~f:(Sql.noncanonical_blocks_in_set ~canonical_block_ids)
+  in
+  let%bind blocks_to_orphan =
     query_db
       ~f:
-        (Sql.mark_pending_blocks_as_canonical_or_orphaned ~canonical_block_ids
-           ~stop_at_slot ~protocol_version:expected_protocol_version )
+        (Sql.blocks_to_orphan ~canonical_block_ids ~stop_at_slot
+           ~fork_boundary_slot ~protocol_version:expected_protocol_version )
   in
-  Ok ()
+  let%bind orphaned_count, pending_to_canonical, pending_to_orphaned =
+    query_db
+      ~f:
+        (Sql.conversion_summary_counts ~canonical_block_ids ~stop_at_slot
+           ~fork_boundary_slot ~protocol_version:expected_protocol_version )
+  in
+  (* Assemble the change plan: each block that changes, plus the fork block for
+     context, with its current/new status and the reason. The already-canonical
+     ancestry (including the protocol-version genesis) is not listed. *)
+  let heal_changes =
+    List.map blocks_to_heal ~f:(fun (height, hash, current) ->
+        { Change_plan.Change.height
+        ; state_hash = hash
+        ; current
+        ; new_status = "canonical"
+        ; untouched = false
+        ; reason =
+            ( if String.equal hash latest_block_state_hash then
+              "fork parent (target)"
+            else "on chain to target" )
+        } )
+  in
+  let orphan_changes =
+    List.map blocks_to_orphan ~f:(fun (height, hash, current) ->
+        { Change_plan.Change.height
+        ; state_hash = hash
+        ; current
+        ; new_status = "orphaned"
+        ; untouched = false
+        ; reason = "off-chain / competing, below fork boundary"
+        } )
+  in
+  let fork_change =
+    match fork_context with
+    | Some
+        { Sql.Fork_context.fork_state_hash; fork_height; fork_chain_status; _ }
+      ->
+        [ { Change_plan.Change.height = fork_height
+          ; state_hash = fork_state_hash
+          ; current = fork_chain_status
+          ; new_status = fork_chain_status
+          ; untouched = true
+          ; reason = "post-fork genesis (protected)"
+          }
+        ]
+    | None ->
+        []
+  in
+  let changes =
+    List.sort
+      (heal_changes @ orphan_changes @ fork_change)
+      ~compare:(fun a b ->
+        Int64.compare a.Change_plan.Change.height b.Change_plan.Change.height )
+  in
+  let plan =
+    { Change_plan.dry_run
+    ; target =
+        { Change_plan.Block_ref.state_hash = latest_block_state_hash
+        ; height = latest_block.height
+        ; protocol_version = expected_protocol_version_str
+        }
+    ; fork_block =
+        Option.map fork_context ~f:(fun fc ->
+            let { Sql.Fork_context.fork_state_hash
+                ; fork_height
+                ; fork_slot
+                ; fork_chain_status
+                ; parent_state_hash
+                ; parent_height
+                } =
+              fc
+            in
+            { Change_plan.Fork_ref.state_hash = fork_state_hash
+            ; height = fork_height
+            ; global_slot = fork_slot
+            ; chain_status = fork_chain_status
+            ; parent_state_hash
+            ; parent_height
+            } )
+    ; boundary_slot = fork_boundary_slot
+    ; summary =
+        { Change_plan.Summary.to_canonical = canonical_count
+        ; to_canonical_pending = pending_to_canonical
+        ; to_orphaned = orphaned_count
+        ; to_orphaned_pending = pending_to_orphaned
+        }
+    ; changes
+    }
+  in
+  if json then Change_plan.render_json plan else Change_plan.render_human plan ;
+  if dry_run then Deferred.Or_error.return ()
+  else (
+    if not json then
+      [%log info]
+        "Marking chain from %s to %s as canonical for protocol version %s"
+        oldest_block.state_hash latest_block_state_hash
+        expected_protocol_version_str ;
+    let%map () =
+      query_db
+        ~f:
+          (Sql.mark_pending_blocks_as_canonical_or_orphaned ~canonical_block_ids
+             ~stop_at_slot ~fork_boundary_slot
+             ~protocol_version:expected_protocol_version )
+    in
+    Ok () )
