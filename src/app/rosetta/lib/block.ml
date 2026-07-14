@@ -659,8 +659,16 @@ module Sql = struct
            ON zfpb.public_key_id = pk_fee_payer.id
          INNER JOIN blocks b
            ON bzc.block_id = b.id
+         -- Expand the account-updates array positionally: an id may appear more
+         -- than once (identical updates share a single zkapp_account_update row),
+         -- and each occurrence is a distinct on-chain application. `= ANY(array)`
+         -- would collapse repeats to one row, dropping (N-1) balance-change ops.
+         -- LATERAL ... ON true keeps fee-payer-only commands (empty/NULL array).
+         LEFT JOIN LATERAL
+           unnest (zc.zkapp_account_updates_ids) WITH ORDINALITY
+             AS au_ref (au_id, au_ord) ON true
          LEFT JOIN zkapp_account_update zau
-           ON zau.id = ANY (zc.zkapp_account_updates_ids)
+           ON zau.id = au_ref.au_id
          LEFT JOIN zkapp_account_update_body zaub
            ON zaub.id = zau.body_id
          LEFT JOIN account_identifiers ai_update_body
@@ -671,7 +679,7 @@ module Sql = struct
            ON token_update_body.id = ai_update_body.token_id
          WHERE bzc.block_id = ?
           AND (token_update_body.value = ? OR token_update_body.id IS NULL)
-         ORDER BY zc.id, bzc.sequence_no
+         ORDER BY zc.id, bzc.sequence_no, au_ref.au_ord
       |}]
 
     let query =
