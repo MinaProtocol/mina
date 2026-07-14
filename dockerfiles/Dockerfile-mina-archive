@@ -25,6 +25,22 @@ ENV BUILD_FLAGS_SUFFIX=${build_flags_suffix}
 # - mina-archive-devnet-lightnet etc.
 ENV MINA_DEB=mina-archive-${network}${SUFFIX}
 
+# The per-network config package ships the runtime config JSON and, for hardfork
+# networks, the genesis ledger tarball(s) into /var/lib/coda. Bundling it lets
+# `mina-archive-hardfork-toolbox populate-genesis-accounts` (and `mina-archive
+# run --config-file`) resolve the fork genesis ledger locally -- no S3, no
+# network -- to backfill accounts_accessed for the fork genesis block.
+#
+# Unlike the daemon (see Dockerfile-mina-daemon), the archive image can carry a
+# config safely: its entrypoint never picks up /var/lib/coda/* implicitly, so
+# these files stay inert unless a command names them via --config-file. The
+# archive image is also already per-network, so there is no network-free generic
+# base for the -configured pattern to layer onto.
+#
+# Architecture: all, and no profile/build-flag suffix -- the package is named
+# mina-<network>-config for every variant.
+ENV MINA_CONFIG_DEB=mina-${network}-config
+
 ENV DEBIAN_FRONTEND noninteractive
 RUN echo "Building image with version $deb_codename $deb_release $deb_version"
 
@@ -88,7 +104,8 @@ ENV PATH="/opt/google-cloud-sdk/bin:${PATH}"
 ENV USE_GKE_GCLOUD_AUTH_PLUGIN=True
 
 
-# archive-node package
+# archive-node package (+ the per-network config so the hardfork toolbox can
+# resolve the fork genesis ledger from /var/lib/coda)
 # Installed DIRECTLY from the local build context: scripts/docker/build.sh stages
 # the freshly-built .deb files under _debs, which we COPY to /opt/mina-local-debs,
 # and install-mina-debs.sh installs the resolved .deb file with a single apt-get
@@ -104,6 +121,7 @@ RUN chmod +x /usr/local/bin/install-mina-debs.sh \
      /usr/local/bin/install-mina-debs.sh \
        "${MINA_DEB}=$deb_version" \
        "${MINA_ARCHIVE_GENERIC_DEB}=$deb_version" \
-       "${PROFILE_DEB}=$deb_version"
+       "${PROFILE_DEB}=$deb_version" \
+       "${MINA_CONFIG_DEB}=$deb_version"
 
 ENTRYPOINT ["/usr/bin/dumb-init", "/entrypoint.sh"]
