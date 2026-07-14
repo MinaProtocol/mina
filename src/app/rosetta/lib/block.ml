@@ -597,6 +597,7 @@ module Sql = struct
         { body : Archive_lib.Processor.Zkapp_account_update_body.t
         ; account : string
         ; token : string
+        ; creation_fee : int64 option
         }
       [@@deriving hlist]
 
@@ -606,6 +607,7 @@ module Sql = struct
              ~f:(fun n -> "zaub." ^ n)
         @ [ "pk_update_body.value as account"
           ; "token_update_body.value as token"
+          ; "ac.creation_fee"
           ]
 
       let account t = `Pk t.account
@@ -618,6 +620,7 @@ module Sql = struct
             [ Archive_lib.Processor.Zkapp_account_update_body.typ
             ; string
             ; string
+            ; option int64
             ]
     end
 
@@ -673,6 +676,39 @@ module Sql = struct
            ON zaub.id = zau.body_id
          LEFT JOIN account_identifiers ai_update_body
            ON zaub.account_identifier_id = ai_update_body.id
+         -- The ledger charges the creation fee once per account it creates, but
+         -- the creating update surfaces on more than one row here: identical
+         -- updates share a single zkapp_account_update row, so it can appear
+         -- under several applied commands of the block, and a command's array
+         -- may repeat its id -- each repeat being expanded to its own row by
+         -- the unnest above. Bill the first such row only, ordering by
+         -- (command, position in the array); the subquery therefore has to
+         -- expand the array positionally too, or repeats would be invisible to
+         -- it and every repeat would be billed.
+         LEFT JOIN accounts_created ac
+           ON bzc.block_id = ac.block_id
+           AND ai_update_body.id = ac.account_identifier_id
+           AND bzc.status = 'applied'
+           AND zaub.implicit_account_creation_fee
+           AND NOT EXISTS (
+             SELECT 1
+             FROM blocks_zkapp_commands bzc2
+             INNER JOIN zkapp_commands zc2
+               ON zc2.id = bzc2.zkapp_command_id
+             CROSS JOIN LATERAL
+               unnest (zc2.zkapp_account_updates_ids) WITH ORDINALITY
+                 AS au_ref2 (au_id, au_ord)
+             INNER JOIN zkapp_account_update zau2
+               ON zau2.id = au_ref2.au_id
+             INNER JOIN zkapp_account_update_body zaub2
+               ON zaub2.id = zau2.body_id
+             WHERE bzc2.block_id = bzc.block_id
+               AND bzc2.status = 'applied'
+               AND zaub2.implicit_account_creation_fee
+               AND zaub2.account_identifier_id = ai_update_body.id
+               AND (bzc2.sequence_no, zc2.id, au_ref2.au_ord)
+                   < (bzc.sequence_no, zc.id, au_ref.au_ord)
+           )
          LEFT JOIN public_keys pk_update_body
            ON ai_update_body.public_key_id = pk_update_body.id
          LEFT JOIN tokens token_update_body
@@ -758,6 +794,8 @@ module Sql = struct
           ; use_full_commitment = body.use_full_commitment
           ; status
           ; token = Zkapp_account_update.token upd
+          ; creation_fee =
+              Option.map upd.creation_fee ~f:Unsigned.UInt64.of_int64
           } )
 
     let account_updates_and_command_to_info account_updates
