@@ -204,7 +204,7 @@ func (t *HardforkTest) legacyFork(daemon config.DaemonInfo, analysis BlockAnalys
 
 	prepatchLedgersDir := filepath.Join(forkDataPrepatchPath, "ledgers")
 	prepatchHashesFile := filepath.Join(forkDataPrepatchPath, "ledger_hashes.json")
-	if err := t.GenerateAndValidateHashesAndLedgers(analysis, prepatchConfigFile, prepatchLedgersDir, prepatchHashesFile); err != nil {
+	if err := t.RegenerateAndValidatePrepatchLedgerHashes(analysis, prepatchConfigFile, prepatchLedgersDir, prepatchHashesFile); err != nil {
 		return err
 	}
 
@@ -217,7 +217,17 @@ func (t *HardforkTest) legacyFork(daemon config.DaemonInfo, analysis BlockAnalys
 	preforkGenesisConfigFile := filepath.Join(t.Config.Root, "daemon.json")
 	forkHashesFile := filepath.Join(forkDataPath, "ledger_hashes.json")
 
-	patchedConfigBytes, err := t.PatchForkConfigAndGenerateLedgersLegacy(&analysis, prepatchConfigFile, patchedLedgersDir, forkHashesFile, patchedConfigFile, preforkGenesisConfigFile, forkGenesisTs, mainGenesisTs)
+	if err := t.GenerateLegacyPostforkGenesisLedgers(
+		prepatchConfigFile, patchedLedgersDir, forkHashesFile, preforkGenesisConfigFile,
+	); err != nil {
+		return err
+	}
+
+	forkGenesisTimestamp := config.FormatTimestamp(forkGenesisTs)
+	patchedConfigBytes, err := t.PatchRuntimeConfigLegacy(
+		forkGenesisTimestamp, prepatchConfigFile, patchedConfigFile,
+		preforkGenesisConfigFile, forkHashesFile,
+	)
 	if err != nil {
 		return err
 	}
