@@ -15,7 +15,8 @@ end
 
 let logger = Logger.create ()
 
-let load_ledger ~ignore_missing_fields ~pad_app_state ~hardfork_slot
+let load_ledger ~ignore_missing_fields ~pad_app_state ~identity_conversion
+    ~hardfork_slot
     ~(constraint_constants : Genesis_constants.Constraint_constants.t)
     (accounts : Runtime_config.Accounts.t) =
   let transform_account account =
@@ -23,11 +24,8 @@ let load_ledger ~ignore_missing_fields ~pad_app_state ~hardfork_slot
       Runtime_config.Accounts.Single.to_account ~ignore_missing_fields
         ~pad_app_state account
     in
-    match hardfork_slot with
-    | None ->
-        account_padded
-    | Some hardfork_slot ->
-        Mina_base.Account.slot_reduction_update ~hardfork_slot account_padded
+    Runtime_genesis_ledger_lib.convert_account ~identity_conversion
+      ~hardfork_slot account_padded
   in
 
   let accounts =
@@ -167,12 +165,21 @@ let load_config_exn config_file =
 
 let main ~(constraint_constants : Genesis_constants.Constraint_constants.t)
     ~config_file ~genesis_dir ~hash_output_file ~ignore_missing_fields
-    ~pad_app_state ~prefork_genesis_config () =
+    ~pad_app_state ~identity_conversion ~prefork_genesis_config () =
   let hardfork_slot =
-    match prefork_genesis_config with
-    | None ->
+    (* When the source accounts are already in the target form the vesting
+       conversion must be the identity: load accounts verbatim and ignore
+       --prefork-genesis-config entirely (no hardfork-slot derivation).
+       See https://github.com/MinaProtocol/mina/issues/18981. *)
+    match (identity_conversion, prefork_genesis_config) with
+    | true, _ ->
+        [%log info]
+          "--identity-conversion set: loading accounts verbatim and ignoring \
+           --prefork-genesis-config" ;
         None
-    | Some prefork_genesis_config -> (
+    | false, None ->
+        None
+    | false, Some prefork_genesis_config -> (
         let runtime_config =
           Yojson.Safe.from_file prefork_genesis_config
           |> Runtime_config.of_yojson |> Result.ok_or_failwith
@@ -211,21 +218,21 @@ let main ~(constraint_constants : Genesis_constants.Constraint_constants.t)
     load_config_exn config_file
   in
   let ledger =
-    load_ledger ~ignore_missing_fields ~pad_app_state ~constraint_constants
-      ~hardfork_slot accounts
+    load_ledger ~ignore_missing_fields ~pad_app_state ~identity_conversion
+      ~constraint_constants ~hardfork_slot accounts
   in
   let staking_ledger : Ledger.t =
     Option.value_map ~default:ledger
       ~f:
-        (load_ledger ~ignore_missing_fields ~pad_app_state ~constraint_constants
-           ~hardfork_slot )
+        (load_ledger ~ignore_missing_fields ~pad_app_state ~identity_conversion
+           ~constraint_constants ~hardfork_slot )
       staking_accounts_opt
   in
   let next_ledger =
     Option.value_map ~default:staking_ledger
       ~f:
-        (load_ledger ~ignore_missing_fields ~pad_app_state ~constraint_constants
-           ~hardfork_slot )
+        (load_ledger ~ignore_missing_fields ~pad_app_state ~identity_conversion
+           ~constraint_constants ~hardfork_slot )
       next_accounts_opt
   in
   let%bind hash_json =
@@ -280,6 +287,15 @@ let () =
                 daemon.slot_chain_end + daemon.hard_fork_genesis_slot_delta in \
                 this config. If those fields are absent, no vesting parameter \
                 update is performed."
+         and identity_conversion =
+           flag "--identity-conversion" no_arg
+             ~doc:
+               "BOOL use the identity vesting conversion for a Mesa -> Mesa \
+                fork: load accounts verbatim, skip the Berkeley -> Mesa \
+                slot_reduction_update re-base, and ignore \
+                --prefork-genesis-config. Default (flag absent): apply the \
+                Berkeley -> Mesa conversion."
          in
          main ~constraint_constants ~config_file ~genesis_dir ~hash_output_file
-           ~ignore_missing_fields ~pad_app_state ~prefork_genesis_config) )
+           ~ignore_missing_fields ~pad_app_state ~identity_conversion
+           ~prefork_genesis_config) )
