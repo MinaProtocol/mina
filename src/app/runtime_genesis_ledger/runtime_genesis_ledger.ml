@@ -167,15 +167,15 @@ let main ~(constraint_constants : Genesis_constants.Constraint_constants.t)
     ~config_file ~genesis_dir ~hash_output_file ~ignore_missing_fields
     ~pad_app_state ~identity_conversion ~prefork_genesis_config () =
   let hardfork_slot =
-    (* For a Mesa -> Mesa fork the source accounts are already in Mesa form, so
-       the vesting conversion must be the identity: load accounts verbatim and
-       ignore --prefork-genesis-config entirely (no hardfork-slot derivation).
+    (* When the source accounts are already in the target form the vesting
+       conversion must be the identity: load accounts verbatim and ignore
+       --prefork-genesis-config entirely (no hardfork-slot derivation).
        See https://github.com/MinaProtocol/mina/issues/18981. *)
     match (identity_conversion, prefork_genesis_config) with
     | true, _ ->
         [%log info]
-          "--identity-conversion set: loading accounts verbatim (Mesa -> Mesa) \
-           and ignoring --prefork-genesis-config" ;
+          "--identity-conversion set: loading accounts verbatim and ignoring \
+           --prefork-genesis-config" ;
         None
     | false, None ->
         None
