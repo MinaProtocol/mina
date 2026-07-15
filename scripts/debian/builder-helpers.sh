@@ -549,7 +549,7 @@ build_daemon_deb() {
       ;;
     devnet)
       package_name="${MINA_DEB_NAME}"
-      seed_list_url="seed-lists/${network}_seeds.txt"
+      seed_list_url="o1labs-gitops-infrastructure/pre-mesa/pre-mesa-seeds.txt"
       ;;
     *)
       echo "Unknown network name provided: ${network}"; exit 1
@@ -637,7 +637,7 @@ build_daemon_generic_deb() {
 
   copy_common_daemon_apps "${network}"
 
-  copy_common_daemon_utils "seed-lists/${network}_seeds.txt"
+  copy_common_daemon_utils "o1labs-gitops-infrastructure/pre-mesa/pre-mesa-seeds.txt"
 
   build_deb "${MINA_GENERIC_DEB_NAME}"
 
