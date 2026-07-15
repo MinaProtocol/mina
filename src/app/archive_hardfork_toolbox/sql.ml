@@ -282,20 +282,26 @@ let blocks_to_orphan (module Conn : CONNECTION) ~canonical_block_ids
     , fork_boundary_slot )
 
 (* Counts, over the blocks the conversion would touch (subject to the same slot
-   and fork-boundary filters as the mutation), how many would become orphaned and
-   how many currently-pending blocks change status in each direction. *)
+   and fork-boundary filters as the mutation), how many become canonical and how
+   many become orphaned, plus how many currently-pending blocks change status in
+   each direction. Returned as (to_canonical, pending_to_canonical, to_orphaned,
+   pending_to_orphaned). The orphaned count excludes rows already orphaned so it
+   matches the printed change plan and a re-run reports 0 rather than recounting
+   settled blocks. *)
 let conversion_summary_counts (module Conn : CONNECTION) ~canonical_block_ids
     ~stop_at_slot ~fork_boundary_slot ~protocol_version =
   let query =
     Caqti_type.(
       t4 (option int) Mina_caqti.array_int_typ Protocol_version.typ
         (option int64)
-      ->! t3 int int int)
+      ->! t4 int int int int)
       {%string|
         SELECT
-          COUNT(*) FILTER (WHERE NOT (id = ANY($2::int[])))::int,
+          COUNT(*) FILTER (WHERE id = ANY($2::int[]))::int,
           COUNT(*) FILTER (WHERE chain_status = 'pending'::chain_status_type
                              AND id = ANY($2::int[]))::int,
+          COUNT(*) FILTER (WHERE NOT (id = ANY($2::int[]))
+                             AND chain_status <> 'orphaned'::chain_status_type)::int,
           COUNT(*) FILTER (WHERE chain_status = 'pending'::chain_status_type
                              AND NOT (id = ANY($2::int[])))::int
         FROM blocks
