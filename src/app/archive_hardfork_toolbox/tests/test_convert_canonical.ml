@@ -850,6 +850,62 @@ let test_same_protocol_version_fork () =
     ; { state_hash = "L"; expected_chain_status = "orphaned" }
     ]
 
+let query_summary_counts conn_str db_name ~canonical_block_ids
+    ~fork_boundary_slot ~protocol_version =
+  TestDb.with_pool conn_str ~db_name (fun pool ->
+      Deferred.Or_error.try_with (fun () ->
+          Mina_caqti.query pool
+            ~f:
+              (Sql.conversion_summary_counts ~canonical_block_ids
+                 ~stop_at_slot:None ~fork_boundary_slot ~protocol_version ) ) )
+
+(* Focused unit test for the change-plan summary counts. Uses the
+   same-protocol-version fixture: canonical set {A, B, C} (ids 1..3), leftover L
+   (id 4) to orphan, and the post-fork chain F, G held out by the boundary slot.
+   Asserts the exact 4-tuple (to_canonical, pending_to_canonical, to_orphaned,
+   pending_to_orphaned), then re-runs against a fixture where L is already
+   orphaned to confirm to_orphaned excludes settled rows (so a re-run reports 0
+   rather than recounting them). *)
+let test_summary_counts () =
+  let open Deferred.Or_error.Let_syntax in
+  let canonical_block_ids = [ 1; 2; 3 ] in
+  let protocol_version = Sql.Protocol_version.of_string "1.0.0" in
+  (* F is the post-fork genesis at global_slot_since_genesis = 4; the boundary
+     keeps F, G out of every count while L (slot 3) stays in. *)
+  let fork_boundary_slot = Some 4L in
+  let check ~name ~blocks ~expected =
+    let db_name = sprintf "test_%s" name in
+    let%bind conn_str = setup_db db_name blocks in
+    let%bind actual =
+      query_summary_counts conn_str db_name ~canonical_block_ids
+        ~fork_boundary_slot ~protocol_version
+    in
+    let show (a, b, c, d) = sprintf "(%d, %d, %d, %d)" a b c d in
+    if [%equal: int * int * int * int] actual expected then (
+      printf "✅ Test %s passed\n" name ;
+      Deferred.Or_error.return () )
+    else (
+      printf "❌ Test %s failed: expected %s, got %s\n" name (show expected)
+        (show actual) ;
+      Deferred.Or_error.error_string (sprintf "Test %s failed" name) )
+  in
+  (* Fresh fixture: A,B,C become canonical (2 of them pending), L becomes
+     orphaned (pending). *)
+  let%bind () =
+    check ~name:"summary_counts_fresh" ~blocks:same_protocol_version_blocks
+      ~expected:(3, 2, 1, 1)
+  in
+  (* Re-run: L is already orphaned, so to_orphaned and pending_to_orphaned drop
+     to 0 while the canonical counts are unchanged. *)
+  let orphaned_leftover_blocks =
+    List.map same_protocol_version_blocks ~f:(fun block ->
+        if String.equal block.Block.state_hash "L" then
+          { block with Block.chain_status = "orphaned" }
+        else block )
+  in
+  check ~name:"summary_counts_rerun" ~blocks:orphaned_leftover_blocks
+    ~expected:(3, 2, 0, 0)
+
 let () =
   Alcotest.run "Archive Hardfork Toolbox Tests"
     [ ( "convert_chain_to_canonical"
@@ -870,6 +926,11 @@ let () =
           , `Quick
           , fun () ->
               Thread_safe.block_on_async_exn test_same_protocol_version_fork
+              |> Or_error.ok_exn )
+        ; ( "test_summary_counts"
+          , `Quick
+          , fun () ->
+              Thread_safe.block_on_async_exn test_summary_counts
               |> Or_error.ok_exn )
         ] )
     ]

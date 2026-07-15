@@ -415,7 +415,6 @@ let convert_chain_to_canonical ~postgres_uri ?target_block_hash ?fork_height
   let canonical_block_ids =
     List.map blocks_to_ensure_canonical ~f:(fun b -> b.id)
   in
-  let canonical_count = List.length blocks_to_ensure_canonical in
   (* The hard fork just above the target, if any. Its slot is the upper bound that
      protects the post-fork chain when the fork keeps the same protocol version
      (see fork_block_above_height). None when the target is at the tip (no later
@@ -439,7 +438,10 @@ let convert_chain_to_canonical ~postgres_uri ?target_block_hash ?fork_height
         (Sql.blocks_to_orphan ~canonical_block_ids ~stop_at_slot
            ~fork_boundary_slot ~protocol_version:expected_protocol_version )
   in
-  let%bind orphaned_count, pending_to_canonical, pending_to_orphaned =
+  let%bind ( canonical_count
+           , pending_to_canonical
+           , orphaned_count
+           , pending_to_orphaned ) =
     query_db
       ~f:
         (Sql.conversion_summary_counts ~canonical_block_ids ~stop_at_slot
