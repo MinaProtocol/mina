@@ -376,16 +376,29 @@ let select_cols_from_id ~(table_name : string) ~(cols : string list) : string =
    The optional `tannot` function maps column names to type annotations.
    No type annotation is included if `tannot` returns an empty string. *)
 let insert_into_cols ~(returning : string) ~(table_name : string)
-    ?(tannot : string -> string option = Fn.const None) ~(cols : string list) ()
-    : string =
+    ?(tannot : string -> string option = Fn.const None) ~(cols : string list)
+    ?(on_conflict : string option) () : string =
   let values =
     List.map cols ~f:(fun col ->
         match tannot col with None -> "?" | Some tannot -> "?::" ^ tannot )
     |> String.concat ~sep:", "
   in
-  sprintf "INSERT INTO %s (%s) VALUES (%s) RETURNING %s" table_name
-    (String.concat ~sep:", " cols)
-    values returning
+  let insert =
+    sprintf "INSERT INTO %s (%s) VALUES (%s)" table_name
+      (String.concat ~sep:", " cols)
+      values
+  in
+  match on_conflict with
+  | Some col ->
+      let assignments =
+        String.split col ~on:',' |> List.map ~f:String.strip
+        |> List.map ~f:(fun col -> sprintf "%s = EXCLUDED.%s" col col)
+        |> String.concat ~sep:", "
+      in
+      sprintf "%s ON CONFLICT (%s) DO UPDATE SET %s RETURNING %s" insert col
+        assignments returning
+  | None ->
+      sprintf "%s RETURNING %s" insert returning
 
 (* run `select_cols` and return the result, if found
    if not found, run `insert_into_cols` and return the result
@@ -453,6 +466,29 @@ let insert_into_cols_returning ~(returning : string * 'r Caqti_type.t)
     ( Caqti_request.Infix.(snd cols ->! snd returning)
     @@ insert_into_cols ~returning:(fst returning) ~table_name ?tannot
          ~cols:(fst cols) () )
+    value
+
+(* Like [insert_into_cols] but generates an upsert:
+   INSERT INTO table (cols) VALUES (params)
+   ON CONFLICT (on_conflict) DO UPDATE SET on_conflict = EXCLUDED.on_conflict
+   RETURNING returning.
+   The DO UPDATE is a no-op that returns the existing row's id when a conflict
+   occurs, preventing UNIQUE violation errors under concurrent insertion. *)
+let upsert_into_cols ~(on_conflict : string) ~(returning : string)
+    ~(table_name : string) ?(tannot : string -> string option = Fn.const None)
+    ~(cols : string list) () : string =
+  insert_into_cols ~returning ~table_name ~tannot ~cols ~on_conflict ()
+
+(* Upsert with ON CONFLICT, returning the id of either the newly inserted row
+   or the existing row that caused the conflict. *)
+let upsert_into_cols_returning ~(on_conflict : string)
+    ~(returning : string * 'r Caqti_type.t) ~(table_name : string) ?tannot
+    ~(cols : string list * 'cols Caqti_type.t) (module Conn : CONNECTION)
+    (value : 'cols) =
+  Conn.find
+    ( Caqti_request.Infix.(snd cols ->! snd returning)
+    @@ upsert_into_cols ~on_conflict ~returning:(fst returning) ~table_name
+         ?tannot ~cols:(fst cols) () )
     value
 
 (* No-dedup multi-row insert of one column's pre-rendered SQL literals, returning

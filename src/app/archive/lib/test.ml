@@ -223,6 +223,63 @@ let%test_module "Archive node unit tests" =
               | Error e ->
                   failwith @@ Caqti_error.show e ) )
 
+    let%test_unit "Zkapp_command: duplicate insertion returns same id" =
+      (* Regression test for issue 19041: calls add_inner twice on the same
+         connection to simulate the concurrent race where two transactions both
+         pass find_opt (hash not yet present) and reach the inner upsert.  The
+         first call inserts; the second call hits ON CONFLICT (hash) and returns
+         the same id instead of UNIQUE-violating. *)
+      let conn = Lazy.force conn_lazy in
+      Thread_safe.block_on_async_exn
+      @@ fun () ->
+      Async.Quickcheck.async_test ~trials:20 ~sexp_of:[%sexp_of: User_command.t]
+        user_command_zkapp_gen ~f:(fun user_command ->
+          match user_command with
+          | Signed_command _ ->
+              failwith "zkapp_gen failed"
+          | Zkapp_command p -> (
+              let rec add_token_owners
+                  (forest :
+                    ( Account_update.t
+                    , Zkapp_command.Digest.Account_update.t
+                    , Zkapp_command.Digest.Forest.t )
+                    Zkapp_command.Call_forest.t ) =
+                List.iter forest ~f:(fun { With_stack_hash.elt = tree; _ } ->
+                    if List.is_empty tree.calls then ()
+                    else
+                      let acct_id =
+                        Account_update.account_id tree.account_update
+                      in
+                      let token_id =
+                        Account_id.derive_token_id ~owner:acct_id
+                      in
+                      Processor.Token_owners.add_to_owner_tbl token_id acct_id ;
+                      add_token_owners tree.calls )
+              in
+              let%bind _ =
+                Processor.Protocol_versions.add_if_doesn't_exist conn
+                  ~transaction:Protocol_version.(transaction current)
+                  ~network:Protocol_version.(network current)
+                  ~patch:Protocol_version.(patch current)
+              in
+              add_token_owners p.account_updates ;
+              match%map
+                let open Deferred.Result.Let_syntax in
+                let%bind id1 =
+                  Processor.For_test.add_zkapp_command_without_find_opt ~logger
+                    conn p
+                in
+                let%map id2 =
+                  Processor.For_test.add_zkapp_command_without_find_opt ~logger
+                    conn p
+                in
+                [%test_result: int] ~expect:id1 id2
+              with
+              | Ok () ->
+                  ()
+              | Error e ->
+                  failwith @@ Caqti_error.show e ) )
+
     let%test_unit "Fee_transfer: read and write" =
       let kind_gen =
         let open Quickcheck.Generator in

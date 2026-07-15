@@ -66,11 +66,11 @@ module Public_key = struct
     | Some id ->
         return id
     | None ->
-        let public_key = Public_key.Compressed.to_base58_check t in
-        Conn.find
-          (Mina_caqti.find_req Caqti_type.string Caqti_type.int
-             "INSERT INTO public_keys (value) VALUES (?) RETURNING id" )
-          public_key
+        Mina_caqti.upsert_into_cols_returning ~on_conflict:"value"
+          ~returning:("id", Caqti_type.int) ~table_name:"public_keys"
+          ~cols:([ "value" ], Caqti_type.string)
+          (module Conn)
+          (Public_key.Compressed.to_base58_check t)
 end
 
 (* Unlike other modules here, `Token_owners` does not correspond with a database table *)
@@ -209,8 +209,15 @@ module Token = struct
         | Some id ->
             return id
         | None ->
-            Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
-              ~table_name ~cols:(Fields.names, typ)
+            (* Atomic upsert on value (tokens_value_key): under concurrent
+               insertion two transactions can both pass find_opt and collide.
+               Owner metadata is a deterministic function of value (derived
+               token ids produce consistent owners; the default no-owner token
+               has a distinct fixed value), so any conflict row already has
+               the correct owner metadata (or none, which is also correct). *)
+            Mina_caqti.upsert_into_cols_returning ~on_conflict:"value"
+              ~returning:("id", Caqti_type.int) ~table_name
+              ~cols:(Fields.names, typ)
               (module Conn)
               { value; owner_public_key_id = None; owner_token_id = None } )
     | Some acct_id -> (
@@ -236,8 +243,14 @@ module Token = struct
         | None ->
             let owner_public_key_id = Some owner_public_key_id in
             let owner_token_id = Some owner_token_id in
-            Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
-              ~table_name ~cols:(Fields.names, typ)
+            (* Atomic upsert on value (tokens_value_key): two concurrent
+               inserters can both pass find_opt and collide. Owner metadata
+               is a deterministic function of value (see no-owner path), so
+               any conflict row already has correct owner_public_key_id /
+               owner_token_id. *)
+            Mina_caqti.upsert_into_cols_returning ~on_conflict:"value"
+              ~returning:("id", Caqti_type.int) ~table_name
+              ~cols:(Fields.names, typ)
               (module Conn)
               { value; owner_public_key_id; owner_token_id } )
 
@@ -568,8 +581,8 @@ module Zkapp_verification_keys = struct
       Zkapp_verification_key_hashes.add_if_doesn't_exist (module Conn) vk.hash
     in
     let value = { verification_key; hash_id } in
-    Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
-      ~table_name ~cols:(Fields.names, typ)
+    Mina_caqti.upsert_into_cols_returning ~on_conflict:"verification_key"
+      ~returning:("id", Caqti_type.int) ~table_name ~cols:(Fields.names, typ)
       (module Conn)
       value
 
@@ -1325,9 +1338,10 @@ module Snarked_ledger_hash = struct
     | Some id ->
         return id
     | None ->
-        Conn.find
-          (find_req Caqti_type.string Caqti_type.int
-             "INSERT INTO snarked_ledger_hashes (value) VALUES (?) RETURNING id" )
+        Mina_caqti.upsert_into_cols_returning ~on_conflict:"value"
+          ~returning:("id", Caqti_type.int) ~table_name:"snarked_ledger_hashes"
+          ~cols:([ "value" ], Caqti_type.string)
+          (module Conn)
           hash
 
   let load (module Conn : Mina_caqti.CONNECTION) id =
@@ -1957,12 +1971,15 @@ module User_command = struct
                 |> Unsigned.UInt32.to_int64 )
           in
           (* TODO: Converting these uint64s to int64 can overflow; see #5419 *)
-          Conn.find
-            (find_req typ Caqti_type.int
-               (Mina_caqti.insert_into_cols ~returning:"id" ~table_name
-                  ~tannot:(function
-                    | "command_type" -> Some "user_command_type" | _ -> None )
-                  ~cols:Fields.names () ) )
+          (* Atomic upsert keyed on hash instead of plain INSERT: under concurrent
+             block insertion two transactions can both pass the find_opt check
+             above and collide on user_commands_hash_key. *)
+          Mina_caqti.upsert_into_cols_returning ~on_conflict:"hash"
+            ~returning:("id", Caqti_type.int) ~table_name
+            ~tannot:(function
+              | "command_type" -> Some "user_command_type" | _ -> None )
+            ~cols:(Fields.names, typ)
+            (module Conn)
             { command_type =
                 ( match via with
                 | `Ident ->
@@ -2004,12 +2021,14 @@ module User_command = struct
           let%bind receiver_id =
             Public_key.add_if_doesn't_exist (module Conn) user_cmd.receiver
           in
-          Conn.find
-            (find_req typ Caqti_type.int
-               (Mina_caqti.insert_into_cols ~returning:"id" ~table_name
-                  ~tannot:(function
-                    | "command_type" -> Some "user_command_type" | _ -> None )
-                  ~cols:Fields.names () ) )
+          (* Atomic upsert keyed on hash instead of plain INSERT:
+             concurrent block insertion can race past find_opt. *)
+          Mina_caqti.upsert_into_cols_returning ~on_conflict:"hash"
+            ~returning:("id", Caqti_type.int) ~table_name
+            ~tannot:(function
+              | "command_type" -> Some "user_command_type" | _ -> None )
+            ~cols:(Fields.names, typ)
+            (module Conn)
             { command_type = user_cmd.command_type
             ; fee_payer_id
             ; source_id
@@ -2057,49 +2076,58 @@ module User_command = struct
         @@ Mina_caqti.select_cols_from_id ~table_name ~cols:Fields.names )
         id
 
+    let add_without_find_opt ~logger (module Conn : Mina_caqti.CONNECTION)
+        (ps : Zkapp_command.t) =
+      (* Skip find_opt; go straight to child builds + upsert. *)
+      let open Deferred.Result.Let_syntax in
+      let transaction_hash =
+        Transaction_hash.hash_zkapp_command_with_hashes ps
+      in
+      let zkapp_command = Zkapp_command.to_simple ps in
+      let%bind zkapp_fee_payer_body_id =
+        Metrics.time ~label:"Zkapp_fee_payer_body.add" ~logger
+        @@ fun () ->
+        Zkapp_fee_payer_body.add_if_doesn't_exist
+          (module Conn)
+          zkapp_command.fee_payer.body
+      in
+      let%bind zkapp_account_updates_ids =
+        Metrics.time ~label:"Zkapp_account_update.add" ~logger
+        @@ fun () ->
+        Mina_caqti.deferred_result_list_map zkapp_command.account_updates
+          ~f:(Zkapp_account_update.add_if_doesn't_exist ~logger (module Conn))
+        >>| Array.of_list
+      in
+      let memo = ps.memo |> Signed_command_memo.to_base58_check in
+      let hash = Transaction_hash.to_base58_check transaction_hash in
+      (* Atomic upsert keyed on hash instead of select-then-insert:
+         under concurrent block insertion, two transactions can both pass
+         the find_opt check above, build child rows with different ids
+         (zkapp_field_array has no UNIQUE), and collide on
+         zkapp_commands_hash_key.  ON CONFLICT (hash) DO UPDATE SET
+         hash = EXCLUDED.hash is a no-op that returns the existing id. *)
+      Mina_caqti.upsert_into_cols_returning ~on_conflict:"hash"
+        ~returning:("id", Caqti_type.int) ~table_name:"zkapp_commands"
+        ~cols:(Fields.names, typ)
+        ~tannot:(function
+          | "zkapp_account_updates_ids" -> Some "int[]" | _ -> None )
+        (module Conn)
+        { zkapp_fee_payer_body_id; zkapp_account_updates_ids; memo; hash }
+
     let add_if_doesn't_exist ~logger (module Conn : Mina_caqti.CONNECTION)
         (ps : Zkapp_command.t) =
       let open Deferred.Result.Let_syntax in
       let transaction_hash =
         Transaction_hash.hash_zkapp_command_with_hashes ps
       in
-      (* A zkapp command is uniquely identified by its transaction hash. The same
-         command can occur in more than one block (e.g. forked sibling blocks at
-         the same height share a transaction), so dedup on the hash alone and
-         reuse the existing row. Building the child rows unconditionally is both
-         wasteful and, once zkapp_field_array/zkapp_events are inserted without
-         dedup, unsafe: re-minting child ids makes the full-tuple match in
-         select_insert_into_cols miss and fall through to an INSERT that collides
-         on zkapp_commands_hash_key. *)
+      (* Dedup on hash alone: same command in sibling blocks reuses existing row.
+         Building child rows unconditionally is wasteful and, with non-deduping
+         child tables, can lead to UNIQUE collisions on zkapp_commands_hash_key. *)
       match%bind find_opt (module Conn) ~transaction_hash with
       | Some id ->
           return id
       | None ->
-          let zkapp_command = Zkapp_command.to_simple ps in
-          let%bind zkapp_fee_payer_body_id =
-            Metrics.time ~label:"Zkapp_fee_payer_body.add" ~logger
-            @@ fun () ->
-            Zkapp_fee_payer_body.add_if_doesn't_exist
-              (module Conn)
-              zkapp_command.fee_payer.body
-          in
-          let%bind zkapp_account_updates_ids =
-            Metrics.time ~label:"Zkapp_account_update.add" ~logger
-            @@ fun () ->
-            Mina_caqti.deferred_result_list_map zkapp_command.account_updates
-              ~f:
-                (Zkapp_account_update.add_if_doesn't_exist ~logger
-                   (module Conn) )
-            >>| Array.of_list
-          in
-          let memo = ps.memo |> Signed_command_memo.to_base58_check in
-          let hash = Transaction_hash.to_base58_check transaction_hash in
-          Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
-            ~table_name:"zkapp_commands" ~cols:(Fields.names, typ)
-            ~tannot:(function
-              | "zkapp_account_updates_ids" -> Some "int[]" | _ -> None )
-            (module Conn)
-            { zkapp_fee_payer_body_id; zkapp_account_updates_ids; memo; hash }
+          add_without_find_opt ~logger (module Conn) ps
   end
 
   let via (t : User_command.t) : [ `Zkapp_command | `Ident ] =
@@ -2142,6 +2170,16 @@ module Internal_command = struct
 
   let table_name = "internal_commands"
 
+  let insert_sql =
+    {sql| INSERT INTO internal_commands
+           (command_type, receiver_id, fee, hash)
+          VALUES (?::internal_command_type, ?, ?, ?)
+          ON CONFLICT (hash, command_type)
+          DO UPDATE SET hash = EXCLUDED.hash,
+            command_type = EXCLUDED.command_type
+          RETURNING id
+    |sql}
+
   let find_opt (module Conn : Mina_caqti.CONNECTION)
       ~(v1_transaction_hash : bool) ~(transaction_hash : Transaction_hash.t)
       ~(command_type : string) =
@@ -2178,13 +2216,14 @@ module Internal_command = struct
         let%bind receiver_id =
           Public_key.add_if_doesn't_exist (module Conn) internal_cmd.receiver
         in
-        Conn.find
-          (find_req typ Caqti_type.int
-             (Mina_caqti.insert_into_cols ~returning:"id" ~table_name
-                ~tannot:(function
-                  | "command_type" -> Some "internal_command_type" | _ -> None
-                  )
-                ~cols:Fields.names () ) )
+        (* Atomic upsert keyed on (hash, command_type) instead of plain INSERT:
+           concurrent block insertion can race past find_opt. *)
+        Mina_caqti.upsert_into_cols_returning ~on_conflict:"hash,command_type"
+          ~returning:("id", Caqti_type.int) ~table_name
+          ~tannot:(function
+            | "command_type" -> Some "internal_command_type" | _ -> None )
+          ~cols:(Fields.names, typ)
+          (module Conn)
           { command_type = internal_cmd.command_type
           ; receiver_id
           ; fee = Currency.Fee.to_string internal_cmd.fee
@@ -2246,12 +2285,7 @@ module Fee_transfer = struct
           Public_key.add_if_doesn't_exist (module Conn) pk
         in
         Conn.find
-          (find_req typ Caqti_type.int
-             {sql| INSERT INTO internal_commands
-                    (command_type, receiver_id, fee, hash)
-                   VALUES (?::internal_command_type, ?, ?, ?)
-                   RETURNING id
-             |sql} )
+          (find_req typ Caqti_type.int Internal_command.insert_sql)
           { kind
           ; receiver_id
           ; fee =
@@ -2295,12 +2329,7 @@ module Coinbase = struct
           Public_key.add_if_doesn't_exist (module Conn) pk
         in
         Conn.find
-          (find_req typ Caqti_type.int
-             {sql| INSERT INTO internal_commands
-                    (command_type, receiver_id, fee, hash)
-                   VALUES (?::internal_command_type, ?, ?, ?)
-                   RETURNING id
-             |sql} )
+          (find_req typ Caqti_type.int Internal_command.insert_sql)
           { receiver_id
           ; amount =
               Coinbase.amount t |> Currency.Amount.to_uint64
@@ -3011,17 +3040,19 @@ module Block = struct
         let consensus_state = Protocol_state.consensus_state protocol_state in
         let blockchain_state = Protocol_state.blockchain_state protocol_state in
         let%bind block_id =
-          Conn.find
-            (find_req typ Caqti_type.int
-               (Mina_caqti.insert_into_cols ~returning:"id" ~table_name
-                  ~tannot:(function
-                    | "chain_status" ->
-                        Some "chain_status_type"
-                    | "sub_window_densities" ->
-                        Some "bigint[]"
-                    | _ ->
-                        None )
-                  ~cols:Fields.names () ) )
+          (* Atomic upsert keyed on state_hash instead of plain INSERT:
+             concurrent block insertion can race past find_opt. *)
+          Mina_caqti.upsert_into_cols_returning ~on_conflict:"state_hash"
+            ~returning:("id", Caqti_type.int) ~table_name
+            ~tannot:(function
+              | "chain_status" ->
+                  Some "chain_status_type"
+              | "sub_window_densities" ->
+                  Some "bigint[]"
+              | _ ->
+                  None )
+            ~cols:(Fields.names, typ)
+            (module Conn)
             { state_hash = hash |> State_hash.to_base58_check
             ; parent_id
             ; parent_hash =
@@ -4981,6 +5012,9 @@ let setup_server ~proof_cache_db ~(genesis_constants : Genesis_constants.t)
       Async.never ()
 
 module For_test = struct
+  let add_zkapp_command_without_find_opt =
+    User_command.Zkapp_command.add_without_find_opt
+
   let assert_parent_exist ~parent_id ~parent_hash conn =
     let open Deferred.Result.Let_syntax in
     match parent_id with
