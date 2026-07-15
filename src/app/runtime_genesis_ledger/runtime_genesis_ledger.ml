@@ -15,14 +15,17 @@ end
 
 let logger = Logger.create ()
 
-let load_ledger ~ignore_missing_fields ~pad_app_state
+let load_ledger ~ignore_missing_fields ~pad_app_state ~hardfork_slot
     ~(constraint_constants : Genesis_constants.Constraint_constants.t)
     (accounts : Runtime_config.Accounts.t) =
   let accounts =
     List.map accounts ~f:(fun account ->
+        let account =
+          Runtime_config.Accounts.Single.to_account ~ignore_missing_fields
+            ~pad_app_state account
+        in
         ( None
-        , Runtime_config.Accounts.Single.to_account ~ignore_missing_fields
-            ~pad_app_state account ) )
+        , Runtime_genesis_ledger_lib.convert_account ~hardfork_slot account ) )
   in
   let packed =
     Genesis_ledger_helper.Ledger.packed_genesis_ledger_of_accounts ~logger
@@ -158,24 +161,26 @@ let load_config_exn config_file =
 
 let main ~(constraint_constants : Genesis_constants.Constraint_constants.t)
     ~config_file ~genesis_dir ~hash_output_file ~ignore_missing_fields
-    ~pad_app_state () =
+    ~pad_app_state ~hardfork_slot () =
   let%bind accounts, staking_accounts_opt, next_accounts_opt =
     load_config_exn config_file
   in
   let ledger =
     load_ledger ~ignore_missing_fields ~pad_app_state ~constraint_constants
-      accounts
+      ~hardfork_slot accounts
   in
   let staking_ledger : Ledger.t =
     Option.value_map ~default:ledger
       ~f:
-        (load_ledger ~ignore_missing_fields ~pad_app_state ~constraint_constants)
+        (load_ledger ~ignore_missing_fields ~pad_app_state ~constraint_constants
+           ~hardfork_slot)
       staking_accounts_opt
   in
   let next_ledger =
     Option.value_map ~default:staking_ledger
       ~f:
-        (load_ledger ~ignore_missing_fields ~pad_app_state ~constraint_constants)
+        (load_ledger ~ignore_missing_fields ~pad_app_state ~constraint_constants
+           ~hardfork_slot)
       next_accounts_opt
   in
   let%bind hash_json =
@@ -215,13 +220,24 @@ let () =
              ~doc:
                "BOOL whether to ignore missing fields in account definition \
                 (and replace with default values)"
-         (* TODO: at later stages replace with a flag to do all
-            ledger transformations necessary for the hardfork *)
-         and pad_app_state =
-           flag "--pad-app-state" no_arg
-             ~doc:
-               "BOOL whether to pad app_state to max allowed size (default: \
-                false)"
-         in
-         main ~constraint_constants ~config_file ~genesis_dir ~hash_output_file
-           ~ignore_missing_fields ~pad_app_state) )
+          (* TODO: at later stages replace with a flag to do all
+             ledger transformations necessary for the hardfork *)
+          and pad_app_state =
+            flag "--pad-app-state" no_arg
+              ~doc:
+                "BOOL whether to pad app_state to max allowed size (default: \
+                 false)"
+          and hardfork_slot_opt =
+            flag "--hardfork-slot" (optional int)
+              ~doc:
+                "SLOT hardfork slot number for vesting parameter update. When \
+                 provided, every account will have its vesting parameters \
+                 converted (slot re-basing). When absent, accounts are loaded \
+                 verbatim."
+          in
+          let hardfork_slot =
+            Option.map hardfork_slot_opt
+              ~f:Mina_numbers.Global_slot_since_genesis.of_int
+          in
+          main ~constraint_constants ~config_file ~genesis_dir ~hash_output_file
+            ~ignore_missing_fields ~pad_app_state ~hardfork_slot) )
