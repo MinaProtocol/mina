@@ -234,7 +234,7 @@ let aptName =
             , TxTools = "mina-tx-tools"
             , LogProc = "mina-logproc"
             , FunctionalTestSuite = "mina-test-suite"
-            , DelegationVerifier = "mina-delegation-verifier"
+            , DelegationVerifier = "mina-delegation-verify"
             }
             package
 

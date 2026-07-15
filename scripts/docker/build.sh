@@ -303,7 +303,7 @@ case "${SERVICE}" in
         DOCKERFILE_PATH="dockerfiles/Dockerfile-delegation-backend"
         DOCKER_CONTEXT="src/app/delegation_backend"
         ;;
-    mina-delegation-verifier)
+    mina-delegation-verify)
         DOCKERFILE_PATH="dockerfiles/Dockerfile-delegation-stateless-verifier"
         ;;
     delegation-backend-toolchain)

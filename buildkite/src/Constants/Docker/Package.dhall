@@ -57,7 +57,7 @@ let lowerName =
             , RosettaGeneric = "rosetta_apps_only"
             , Rosetta = \(args : { network : Network.Type }) -> "rosetta_config"
             , TxTools = "tx_tools"
-            , DelegationVerifier = "delegation_verifier"
+            , DelegationVerifier = "delegation_verify"
             , Toolchain = "toolchain"
             }
             package
@@ -154,7 +154,7 @@ let serviceName =
                     \(args : { network : Network.Type })
                 ->  "mina-rosetta-configured"
             , TxTools = "mina-tx-tools"
-            , DelegationVerifier = "mina-delegation-verifier"
+            , DelegationVerifier = "mina-delegation-verify"
             , Toolchain = "mina-toolchain"
             }
             package
@@ -176,7 +176,7 @@ let dockerName =
             , RosettaGeneric = "mina-rosetta"
             , Rosetta = \(args : { network : Network.Type }) -> "mina-rosetta"
             , TxTools = "mina-tx-tools"
-            , DelegationVerifier = "mina-delegation-verifier"
+            , DelegationVerifier = "mina-delegation-verify"
             , Toolchain = "mina-toolchain"
             }
             package
