@@ -36,7 +36,9 @@ in  Pipeline.build
         [ Command.build
             Command.Config::{
             , commands =
-              [ Cmd.run "./scripts/debian/tests/test_builder_helpers.sh" ]
+              [ Cmd.run "./scripts/debian/tests/test_builder_helpers.sh"
+              , Cmd.run "./scripts/debian/tests/test_build_parallel.sh"
+              ]
             , label = "Debian builder-helpers tests"
             , key = "builder-helpers-tests"
             , target = Size.Small
