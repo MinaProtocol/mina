@@ -386,6 +386,7 @@ module Zkapp_account_update_info = struct
     ; use_full_commitment : bool
     ; status : [ `Success | `Failed ]
     ; token : [ `Token_id of string ]
+    ; creation_fee : Unsigned_extended.UInt64.t option
     }
   [@@deriving to_yojson, equal]
 
@@ -399,6 +400,7 @@ module Zkapp_account_update_info = struct
       ; use_full_commitment = true
       ; status = `Success
       ; token = `Token_id Amount_of.Token_id.default
+      ; creation_fee = None
       }
     ; { authorization_kind = "NOK"
       ; account = `Pk "Alice"
@@ -409,6 +411,7 @@ module Zkapp_account_update_info = struct
       ; use_full_commitment = false
       ; status = `Failed
       ; token = `Token_id Amount_of.Token_id.default
+      ; creation_fee = None
       }
     ]
 end
@@ -431,16 +434,39 @@ module Zkapp_command_info = struct
     module Op_build = Op.T (M)
 
     let to_operations (t : t) =
+      (* [creation_fee] is populated only for an account update that carries
+         [implicit_account_creation_fee], i.e. the one the ledger charged the
+         fee to by shrinking its own [balance_change]. When the flag is unset the
+         creating command funds the fee out of *other* account updates' negative
+         balance changes, which are already emitted as [Zkapp_balance_update]
+         ops; emitting a fee op there too would double-count it. *)
+      let mk_account_creation_fee (upd : Zkapp_account_update_info.t) related =
+        match upd.creation_fee with
+        | None ->
+            []
+        | Some fee ->
+            [ { Op.label = `Account_creation_fee_via_zkapp (fee, upd.account)
+              ; related_to = Some related
+              }
+            ]
+      in
       Op_build.build
         ~a_eq:
           [%equal:
             [ `Zkapp_fee_payer_dec
-            | `Zkapp_account_update of Zkapp_account_update_info.t ]]
+            | `Zkapp_account_update of Zkapp_account_update_info.t
+            | `Account_creation_fee_via_zkapp of
+              Unsigned.UInt64.t * [ `Pk of string ] ]]
         ~plan:
           ( { Op.label = `Zkapp_fee_payer_dec; related_to = None }
-          :: List.map t.account_updates ~f:(fun upd ->
-                 { Op.label = `Zkapp_account_update upd; related_to = None } )
-          )
+          :: List.concat_map t.account_updates ~f:(fun upd ->
+                 let balance_op =
+                   { Op.label = `Zkapp_account_update upd; related_to = None }
+                 in
+                 let fee_ops =
+                   mk_account_creation_fee upd (`Zkapp_account_update upd)
+                 in
+                 balance_op :: fee_ops ) )
         ~f:(fun ~related_operations ~operation_identifier op ->
           let default_token = `Token_id Amount_of.Token_id.default in
           match op.label with
@@ -477,6 +503,19 @@ module Zkapp_command_info = struct
                 ; account = Some (account_id upd.account upd.token)
                 ; _type = Operation_types.name `Zkapp_balance_update
                 ; amount
+                ; coin_change = None
+                ; metadata = None
+                }
+          | `Account_creation_fee_via_zkapp (account_creation_fee, account) ->
+              M.return
+                { Operation.operation_identifier
+                ; related_operations
+                ; status = Some (Operation_statuses.name `Success)
+                ; account =
+                    Some
+                      (account_id account (`Token_id Amount_of.Token_id.default))
+                ; _type = Operation_types.name `Account_creation_fee_via_zkapp
+                ; amount = Some Amount_of.(negated @@ mina account_creation_fee)
                 ; coin_change = None
                 ; metadata = None
                 } )
