@@ -24,8 +24,7 @@
   mina_runtime_config
   mina_ledger
   mina_stdlib
-  precomputed_values
-  runtime_genesis_ledger_lib)
+  precomputed_values)
  (instrumentation
   (backend bisect_ppx))
  (preprocess
