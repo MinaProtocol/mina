@@ -1376,28 +1376,11 @@ module Mutations = struct
               | Some ledger -> (
                   match custom_token_opt with
                   | Some ct ->
-                      (* Stand up the single custom token, then run the
-                         transfer/re-mint load against it. *)
                       don't_wait_for
-                        (let%bind setup_ok =
-                           Itn_zkapps.setup_custom_token ~constraint_constants
-                             ~mina ~logger ~fee_payer_array ~keymap
-                             ~zkapp_command_details ~stop_signal
-                             ~stop_time:tm_end ~uuid ~ct
-                         in
-                         if setup_ok then
-                           let tm_next = Time.add (Time.now ()) wait_span in
-                           Itn_zkapps.send_custom_token_zkapps ~fee_payer_array
-                             ~tm_end ~scheduler_tbl ~uuid ~keymap ~stop_signal
-                             ~mina ~zkapp_command_details ~wait_span ~logger ~ct
-                             tm_next 0
-                         else (
-                           [%log error]
-                             "Custom token setup did not complete, stopping \
-                              handle %s"
-                             (Uuid.to_string uuid) ;
-                           Uuid.Table.remove scheduler_tbl uuid ;
-                           Deferred.unit ) )
+                      @@ Itn_zkapps.run_custom_token_load ~constraint_constants
+                           ~mina ~logger ~fee_payer_array ~scheduler_tbl ~keymap
+                           ~zkapp_command_details ~stop_signal ~tm_end
+                           ~wait_span ~uuid ~ct
                   | None ->
                       let account_state_tbl =
                         let get_account ids role =

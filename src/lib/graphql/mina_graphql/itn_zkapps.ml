@@ -671,3 +671,28 @@ let send_custom_token_zkapps
             ~metadata:[ ("error", `String e) ]
     in
     repeat tm_next counter
+
+(* stand up the custom token, then run the transfer/re-mint load against it.
+   The default-token counterpart is [send_zkapps]; keeping the setup+load
+   sequencing here (rather than inline in the GraphQL resolver) keeps the two
+   entry points symmetric. *)
+let run_custom_token_load
+    ~(constraint_constants : Genesis_constants.Constraint_constants.t) ~mina
+    ~logger ~(fee_payer_array : Signature_lib.Keypair.t Array.t) ~scheduler_tbl
+    ~keymap
+    ~(zkapp_command_details : Types.Input.Itn.ZkappCommandsDetails.input)
+    ~stop_signal ~tm_end ~wait_span ~uuid ~(ct : custom_token) =
+  let%bind setup_ok =
+    setup_custom_token ~constraint_constants ~mina ~logger ~fee_payer_array
+      ~keymap ~zkapp_command_details ~stop_signal ~stop_time:tm_end ~uuid ~ct
+  in
+  if setup_ok then
+    let tm_next = Time.add (Time.now ()) wait_span in
+    send_custom_token_zkapps ~fee_payer_array ~tm_end ~scheduler_tbl ~uuid
+      ~keymap ~stop_signal ~mina ~zkapp_command_details ~wait_span ~logger ~ct
+      tm_next 0
+  else (
+    [%log error] "Custom token setup did not complete, stopping handle %s"
+      (Uuid.to_string uuid) ;
+    Uuid.Table.remove scheduler_tbl uuid ;
+    Deferred.unit )
