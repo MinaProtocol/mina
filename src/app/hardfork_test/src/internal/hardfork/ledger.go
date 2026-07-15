@@ -15,18 +15,11 @@ type LedgerHashes struct {
 }
 
 // GenerateGenesisLedgersFromRuntimeConfig generates the hardfork ledgers using the specified
-// executable. When preforkGenesisConfig is non-empty it is passed as
-// --prefork-genesis-config, which makes runtime_genesis_ledger derive the
-// hardfork slot (slot_chain_end + hard_fork_genesis_slot_delta) from it and
-// apply the Mesa vesting slot-reduction update to timed accounts. The legacy
-// path MUST supply it for the final fork ledgers: without it the generated
-// ledger keeps un-migrated vesting timing, which both diverges from the
-// auto/advanced (daemon-side) migration — splitting the network on chain id —
-// and from the real release flow
-// (scripts/hardfork/release/generate-fork-config-with-ledger-tarballs.sh). It is
-// left empty when (re)generating the pre-fork ledgers, whose hashes must match
-// the still-un-migrated live network state.
-func (t *HardforkTest) GenerateGenesisLedgersFromRuntimeConfig(executablePath, forkConfigPath, ledgersDir, hashesFile, preforkGenesisConfig string) error {
+// executable. When hardforkSlot is non-zero it is passed as
+// --hardfork-slot, which makes runtime_genesis_ledger apply the vesting
+// slot-reduction update (slot re-basing) to timed accounts. A zero hardforkSlot
+// means accounts are loaded verbatim without conversion.
+func (t *HardforkTest) GenerateGenesisLedgersFromRuntimeConfig(executablePath, forkConfigPath, ledgersDir, hashesFile string, hardforkSlot int) error {
 	t.Logger.Info("Generating hardfork ledgers with %s...", executablePath)
 
 	// Create hardfork ledgers directory
@@ -42,8 +35,8 @@ func (t *HardforkTest) GenerateGenesisLedgersFromRuntimeConfig(executablePath, f
 		// TODO: Consider design the test so this pad app state size is only applied when forking into Mesa
 		"--pad-app-state",
 	}
-	if preforkGenesisConfig != "" {
-		args = append(args, "--prefork-genesis-config", preforkGenesisConfig)
+	if hardforkSlot != 0 {
+		args = append(args, "--hardfork-slot", strconv.Itoa(hardforkSlot))
 	}
 
 	cmd := exec.Command(executablePath, args...)
@@ -63,7 +56,7 @@ func (t *HardforkTest) RegenerateAndValidatePrepatchLedgerHashes(analysis BlockA
 	// Generate prefork ledgers using main network executable. No prefork genesis
 	// config here: these hashes are validated against the still-un-migrated live
 	// prefork network state, so the slot-reduction update must NOT be applied.
-	if err := t.GenerateGenesisLedgersFromRuntimeConfig(t.Config.MainRuntimeGenesisLedger, forkConfigPath, preforkLedgersDir, prepatchForkConfig, ""); err != nil {
+	if err := t.GenerateGenesisLedgersFromRuntimeConfig(t.Config.MainRuntimeGenesisLedger, forkConfigPath, preforkLedgersDir, prepatchForkConfig, 0); err != nil {
 		return err
 	}
 
@@ -76,11 +69,11 @@ func (t *HardforkTest) RegenerateAndValidatePrepatchLedgerHashes(analysis BlockA
 // GenerateLegacyPostforkGenesisLedgers generates postfork genesis ledgers
 // from the prepatch fork config using the fork-network runtime_genesis_ledger binary.
 func (t *HardforkTest) GenerateLegacyPostforkGenesisLedgers(
-	forkConfigPath, forkLedgersDir, forkHashesFile, preforkGenesisConfigFile string,
+	forkConfigPath, forkLedgersDir, forkHashesFile string, hardforkSlot int,
 ) error {
 	return t.GenerateGenesisLedgersFromRuntimeConfig(
 		t.Config.ForkRuntimeGenesisLedger,
-		forkConfigPath, forkLedgersDir, forkHashesFile, preforkGenesisConfigFile,
+		forkConfigPath, forkLedgersDir, forkHashesFile, hardforkSlot,
 	)
 }
 
