@@ -15,8 +15,8 @@
     "hash": "jwXMfukdwJVNpZ3wMEZbuq4zwucYS4cJnij23buAnNYo1GKKrFB"
   },
   "daemon": {
-    "slot_tx_end": 1420,
-    "slot_chain_end": 1460,
+    "slot_tx_end": 1460,
+    "slot_chain_end": 1500,
     "hard_fork_genesis_slot_delta": 40
   },
   "epoch_data": {
