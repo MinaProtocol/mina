@@ -491,23 +491,32 @@ end = struct
       -> Addr.t
       -> Account.t list
       -> [ `Success
-         | `Hash_mismatch of Hash.t * Hash.t  (** expected hash, actual *) ] =
+         | `Hash_mismatch of Hash.t * Hash.t  (** expected hash, actual *)
+         | `Content_length_mismatch of int * int  (** received, capacity *) ] =
    fun t addr content ->
     let open (val t.context) in
     let expected = Addr.Table.find_exn t.waiting_content addr in
-    (* TODO #444 should we batch all the updates and do them at the end? *)
-    (* We might write the wrong data to the underlying ledger here, but if so
-       we'll requeue the address and it'll be overwritten. *)
-    MT.set_all_accounts_rooted_at_exn t.tree addr content ;
-    Addr.Table.remove t.waiting_content addr ;
-    [%log trace]
-      ~metadata:
-        [ ("address", Addr.to_yojson addr); ("hash", Hash.to_yojson expected) ]
-      "Found content addr $address, with hash $hash, removing from waiting \
-       content" ;
-    let actual = MT.get_inner_hash_at_addr_exn t.tree addr in
-    if Hash.equal actual expected then `Success
-    else `Hash_mismatch (expected, actual)
+    let capacity = 1 lsl Addr.height ~ledger_depth:(MT.depth t.tree) addr in
+    if List.length content > capacity then
+      (* Content longer than the subtree under [addr] is rejected and requeued;
+         [addr] stays in [waiting_content] so the retry is accepted. *)
+      `Content_length_mismatch (List.length content, capacity)
+    else (
+      (* TODO #444 should we batch all the updates and do them at the end? *)
+      (* We might write the wrong data to the underlying ledger here, but if so
+         we'll requeue the address and it'll be overwritten. *)
+      MT.set_all_accounts_rooted_at_exn t.tree addr content ;
+      Addr.Table.remove t.waiting_content addr ;
+      [%log trace]
+        ~metadata:
+          [ ("address", Addr.to_yojson addr)
+          ; ("hash", Hash.to_yojson expected)
+          ]
+        "Found content addr $address, with hash $hash, removing from waiting \
+         content" ;
+      let actual = MT.get_inner_hash_at_addr_exn t.tree addr in
+      if Hash.equal actual expected then `Success
+      else `Hash_mismatch (expected, actual) )
 
   (* Merges each 2 contigous nodes, halving the size of the array *)
   let merge_siblings : Hash.t array -> index -> Hash.t array =
@@ -729,6 +738,18 @@ end = struct
                             ; ("addr", Addr.to_yojson addr)
                             ; ("actual", Hash.to_yojson actual)
                             ; ("expected", Hash.to_yojson expected)
+                            ] ) )
+                  in
+                  requeue_query ()
+              | `Content_length_mismatch (received, capacity) ->
+                  let%map () =
+                    record_envelope_sender t.trust_system logger sender
+                      ( Actions.Violated_protocol
+                      , Some
+                          ( "unexpected number of accounts for $addr"
+                          , [ ("received", `Int received)
+                            ; ("capacity", `Int capacity)
+                            ; ("addr", Addr.to_yojson addr)
                             ] ) )
                   in
                   requeue_query () )
