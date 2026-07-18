@@ -784,23 +784,64 @@ test_build_daemon_postfork_deb_without_prefork_version() {
 }
 
 test_build_daemon_postfork_deb_unresolvable_prefork_hash() {
-    # When the prefork hash can't be resolved by git, warn but don't fail
+    # When the prefork commit does not exist in this repo, git cannot resolve
+    # the 7-char version hash back to the 8-char config hash, and no
+    # PREFORK_GITHASH_CONFIG override is set. We must warn but not fail, and
+    # ship no config (we can't guess the missing 8th char of the hash).
     export PREFORK_LEGACY_VERSION="3.3.0-compatible-badhash"
+    unset PREFORK_GITHASH_CONFIG 2>/dev/null || true
 
     safe_build build_daemon_postfork_deb devnet || { log_fail "build exited non-zero"; return; }
 
     load_captured_state
 
     # No config files — postfork config comes from config package,
-    # and prefork config can't be shipped because hash is unresolvable
+    # and prefork config can't be shipped because the hash is unresolvable
     local config_count
     config_count=$(echo "$CAPTURED_FILES" | grep -c "config_" || true)
     if [[ "$config_count" -eq 0 ]]; then
         log_pass
     else
-        log_fail "Expected 0 config_*.json (unresolvable prefork hash), got ${config_count}"
+        log_fail "Expected 0 config_*.json (unresolvable prefork hash, no override), got ${config_count}"
     fi
 
+    unset PREFORK_LEGACY_VERSION
+}
+
+test_build_daemon_postfork_deb_prefork_githash_override() {
+    # When the prefork commit is not in this repo (git can't resolve the short
+    # hash), the pipeline supplies the full 8-char config hash directly via the
+    # PREFORK_GITHASH_CONFIG override. The prefork config must then ship under
+    # that exact filename, bypassing git resolution entirely.
+    export PREFORK_LEGACY_VERSION="3.3.0-compatible-badhash"
+    export PREFORK_GITHASH_CONFIG="abadcafe"
+
+    safe_build build_daemon_postfork_deb devnet || { log_fail "build exited non-zero"; return; }
+
+    load_captured_state
+
+    # Postfork config still comes from the config package, not here
+    assert_file_not_captured "$CAPTURED_FILES" "var/lib/coda/config_${EXPECTED_GITHASH_CONFIG}.json"
+
+    # Prefork config shipped under the override hash (full 8-char), and no
+    # attempt made to ship the unresolvable version hash
+    assert_file_captured "$CAPTURED_FILES" "var/lib/coda/config_abadcafe.json"
+    assert_file_not_captured "$CAPTURED_FILES" "var/lib/coda/config_badhash.json"
+
+    # Exactly one config file (the prefork override), nothing else
+    local config_count
+    config_count=$(echo "$CAPTURED_FILES" | grep -c "config_" || true)
+    if [[ "$config_count" -eq 1 ]]; then
+        log_pass
+    else
+        log_fail "Expected 1 config_*.json (prefork githash override), got ${config_count}"
+    fi
+
+    # Prefork config should have the correct network content
+    assert_captured_file_contains "$CAPTURED_LAST_BUILD_DIR" \
+        "var/lib/coda/config_abadcafe.json" "devnet"
+
+    unset PREFORK_GITHASH_CONFIG
     unset PREFORK_LEGACY_VERSION
 }
 
@@ -1252,6 +1293,7 @@ main() {
     run_test test_build_daemon_mainnet_postfork_deb
     run_test test_build_daemon_postfork_deb_without_prefork_version
     run_test test_build_daemon_postfork_deb_unresolvable_prefork_hash
+    run_test test_build_daemon_postfork_deb_prefork_githash_override
 
     # Automode metapackages
     run_test test_build_daemon_devnet_automode_deb

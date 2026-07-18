@@ -61,6 +61,7 @@ let Spec =
           , size : Size
           , deb_legacy_version : Text
           , deb_storage_repair_version : Text
+          , deb_legacy_githash_config : Text
           }
       , default =
           { codenames =
@@ -81,6 +82,8 @@ let Spec =
           , deb_legacy_version = defaultMinaArtifactSpec.deb_legacy_version
           , deb_storage_repair_version =
               defaultMinaArtifactSpec.deb_storage_repair_version
+          , deb_legacy_githash_config =
+              defaultMinaArtifactSpec.deb_legacy_githash_config
           }
       }
 
@@ -228,6 +231,8 @@ let generateDockerForCodename =
                         , network = spec.network
                         , prefix = pipelineName
                         , suffix = Some "-${lowerNameCodename}"
+                        , deb_legacy_githash_config =
+                            spec.deb_legacy_githash_config
                         }
                     ]
                   }

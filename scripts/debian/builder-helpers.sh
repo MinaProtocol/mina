@@ -694,21 +694,44 @@ copy_common_daemon_post_automode_apps_and_configs() {
   # mina-<network>-config package, so we do NOT ship them here to avoid
   # dpkg file conflicts.  Only ship the prefork config when it differs from
   # the postfork hash, since the config package won't contain it.
+  #
+  # The prefork daemon auto-loads config_<GITHASH_CONFIG>.json where
+  # GITHASH_CONFIG is the full 8-char short hash of the prefork commit.  The
+  # hash embedded in PREFORK_LEGACY_VERSION is only the 7-char GITHASH (see
+  # scripts/export-git-env-vars.sh), so we must recover the missing 8th char.
+  # We do that by resolving the short hash against this repo with `git
+  # rev-parse --short=8`.  When the prefork commit is NOT present in this
+  # checkout git cannot resolve it, so the pipeline can supply the full 8-char
+  # hash directly via the PREFORK_GITHASH_CONFIG override.
+  #
+  # PREFORK_GITHASH_CONFIG is injected into the build container from the Dhall
+  # pipeline (buildkite/src/Command/MinaArtifact.dhall and
+  # buildkite/src/Entrypoints/GenerateHardforkPackage.dhall, field
+  # deb_legacy_githash_config); leave it empty to fall back to git resolution.
   if [[ -n "${PREFORK_LEGACY_VERSION:-}" ]]; then
     local prefork_short_hash="${PREFORK_LEGACY_VERSION##*-}"
-    local prefork_githash_config
-    prefork_githash_config=$(git rev-parse --short=8 "$prefork_short_hash" 2>/dev/null || echo "")
-    if [[ -n "$prefork_githash_config" ]]; then
-      if [[ "$prefork_githash_config" == "$GITHASH_CONFIG" ]]; then
-        echo "Prefork githash (${prefork_githash_config}) is the same as postfork; skipping config copy."
-      else
-        echo "Copying config for prefork daemon as config_${prefork_githash_config}.json"
-        mkdir -p "${BUILDDIR}/var/lib/coda"
-        cp "../genesis_ledgers/${prefork_network}.json" \
-           "${BUILDDIR}/var/lib/coda/config_${prefork_githash_config}.json"
-      fi
+    local config_hash
+
+    if [[ -n "${PREFORK_GITHASH_CONFIG:-}" ]]; then
+      echo "Using PREFORK_GITHASH_CONFIG override (${PREFORK_GITHASH_CONFIG}) for prefork config filename."
+      config_hash="$PREFORK_GITHASH_CONFIG"
     else
-      echo "WARNING: Could not resolve prefork commit hash from '${prefork_short_hash}'. Prefork config not shipped."
+      config_hash=$(git rev-parse --short=8 "$prefork_short_hash" 2>/dev/null || echo "")
+      if [[ -z "$config_hash" ]]; then
+        echo "WARNING: Could not resolve prefork commit hash from '${prefork_short_hash}' in mina repo, and PREFORK_GITHASH_CONFIG override is not set; prefork config not shipped."
+      fi
+    fi
+
+    if [[ -n "$config_hash" && "$config_hash" == "$GITHASH_CONFIG" ]]; then
+      echo "Prefork githash (${config_hash}) is the same as postfork; skipping config copy."
+      config_hash=""
+    fi
+
+    if [[ -n "$config_hash" ]]; then
+      echo "Copying config for prefork daemon as config_${config_hash}.json"
+      mkdir -p "${BUILDDIR}/var/lib/coda"
+      cp "../genesis_ledgers/${prefork_network}.json" \
+         "${BUILDDIR}/var/lib/coda/config_${config_hash}.json"
     fi
   fi
 
