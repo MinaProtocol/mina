@@ -564,11 +564,11 @@ build_daemon_deb() {
       ;;
     devnet)
       package_name="${MINA_DEB_NAME}"
-      seed_list_url='seed-lists/devnet_seeds.txt'
+      seed_list_url="o1labs-gitops-infrastructure/mina-mesa-rc/mina-mesa-rc-peer-list-url.txt"
       ;;
     mesa)
       package_name="mina-mesa"
-      seed_list_url='o1labs-gitops-infrastructure/mina-mesa-network/mina-mesa-network-seeds.txt'
+      seed_list_url="o1labs-gitops-infrastructure/mina-mesa-rc/mina-mesa-rc-peer-list-url.txt"
       ;;
     *)
       echo "Unknown network name provided: ${network}"; exit 1
@@ -761,7 +761,7 @@ build_daemon_postfork_deb() {
       seed_list_url='mina-seed-lists/mainnet_seeds.txt'
       ;;
     devnet)
-      seed_list_url='seed-lists/devnet_seeds.txt'
+      seed_list_url="o1labs-gitops-infrastructure/mina-mesa-rc/mina-mesa-rc-peer-list-url.txt"
       ;;
     mesa)
       seed_list_url='o1labs-gitops-infrastructure/mina-mesa-network/mina-mesa-network-seeds.txt'
@@ -847,7 +847,7 @@ build_daemon_generic_deb() {
 
   copy_common_daemon_apps "${network}"
 
-  copy_common_daemon_utils "seed-lists/${network}_seeds.txt"
+  copy_common_daemon_utils "o1labs-gitops-infrastructure/mina-mesa-rc/mina-mesa-rc-peer-list-url.txt"
 
   build_deb "${MINA_GENERIC_DEB_NAME}"
 

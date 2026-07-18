@@ -1,6 +1,6 @@
 {
   "genesis": {
-    "genesis_state_timestamp": "2024-04-09T21:00:00Z"
+    "genesis_state_timestamp": "2026-07-17T16:00:00Z"
   },
   "proof": {
     "fork": {
@@ -11,23 +11,19 @@
   },
   "ledger": {
     "add_genesis_winner": false,
-    "hash": "jy1wjiJgTkzXr7yL8r5x4ikaNJuikibsRMnkjdH6uqGCsDmR2sf",
-    "s3_data_hash": "e2609d4d6a09656577468145a29c89bdc5f857b1b04a0b64c2d0e9f92937d909"
+    "s3_data_hash": "c26d9e43dfc1a0435b64e44dccfe31dc1b8b2efb46fc49aacdba6e8656f30e5f",
+    "hash": "jxcCwMcYXnJ8JM3zFUY4sd9H5zGkQXQJEcgvhZbEzCM7RdbDTxi"
   },
   "epoch_data": {
     "staking": {
-      "seed": "2vbdR3vZUxh8NFnsnrefko7YCiLUKNPUbQpqSQAFXFijtTjd3531",
-      "hash": "jxvdSnpgWjjERJFdcYNxChJ9F39v4tGrNSzDcaQXuXeJnicrYEP",
-      "s3_data_hash": "84a349f6dd12c76b694b283975885994bcfb9117c3f41fa941e0229da3ce2a33"
+      "seed": "2vahsgRV5nDPmtgr2Xo2Uq2dkngfSgvg7d1TKqQbY3wUS2ZDxCC3",
+      "s3_data_hash": "344bff5f314ba83b842dd5bc076f8be99986ce050a0a9e7c77865b0fe1a4ea24",
+      "hash": "jy2zgmSQWeRgUNhndmeyPyjsEVXXf55izvkFYmdFP51dLbRRs1E"
     },
     "next": {
-      "seed": "2vaduyGw7uST2rT1HmvSxjrkZX26XnFvu4NJvCebMmLzoWaQtdGT",
-      "hash": "jxjmYHK1tnGy5S6CDaLDTRrDbw17DmtEd6Jnw3L86QSsLm15w5g",
-      "s3_data_hash": "094ceb7c580ef53be0bf2385698fd8d2faebf91fdd8542c076df649aa261b94e"
+      "seed": "2vbH4D8B76WMYPRFgeuVvdWVhv6tAFoCJtg83yuJT1dud3QVSiZn",
+      "s3_data_hash": "57d732e8e386919e571564290be3e5fae136faa305646085f53f7c533f37ec98",
+      "hash": "jxsFVXHoseM7dWHAX1rpRPnGKML3WqaezJokKPLypLZF2Bh74Tj"
     }
-  },
-  "daemon": {
-    "network_id": "devnet",
-    "peer_list_url": "https://bootnodes.minaprotocol.com/networks/devnet.txt"
   }
 }
