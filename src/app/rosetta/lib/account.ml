@@ -220,6 +220,75 @@ module Sql = struct
     let balance_info : Balance_info.t = { liquid_balance; total_balance } in
     Deferred.Result.return (balance_info, nonce)
 
+  let%test_module "historical vesting liquid balance" =
+    ( module struct
+      module Slot = Mina_numbers.Global_slot_since_genesis
+
+      let uint64 = Unsigned.UInt64.of_int
+
+      let timing ~initial_minimum_balance ~cliff_time ~cliff_amount
+          ~vesting_period ~vesting_increment :
+          Archive_lib.Processor.Timing_info.t =
+        { account_identifier_id = 0
+        ; initial_minimum_balance = Int.to_string initial_minimum_balance
+        ; cliff_time = Int64.of_int cliff_time
+        ; cliff_amount = Int.to_string cliff_amount
+        ; vesting_period = Int64.of_int vesting_period
+        ; vesting_increment = Int.to_string vesting_increment
+        }
+
+      (* Fixture: an account whose entire balance is its initial minimum
+         balance (so liquid(start) = 0), observed partway through vesting.
+
+           initial_minimum_balance = 100   total = 100
+           cliff_time = 10   cliff_amount = 0
+           vesting_period = 1   vesting_increment = 10
+
+         At end_slot 12 -> 2 vesting periods past the cliff ->
+           min_balance(12) = 100 - 2*10 = 80
+           liquid(12)      = total - min_balance(12) = 20     (correct)
+           locked(12)      = 80
+
+         The buggy production formula instead computes
+           liquid = total + incremental = 100 + (min(0) - min(12)) = 120,
+         which exceeds total and underflows locked = total - liquid. *)
+      let total = uint64 100
+
+      let timing_info =
+        Some
+          (timing ~initial_minimum_balance:100 ~cliff_time:10 ~cliff_amount:0
+             ~vesting_period:1 ~vesting_increment:10 )
+
+      let liquid ~start ~end_ =
+        liquid_balance_at_slot ~total_balance:total ~timing_info_opt:timing_info
+          ~start_slot:(Slot.of_int start) ~end_slot:(Slot.of_int end_)
+
+      let%test "liquid never exceeds total (partially vested)" =
+        Unsigned.UInt64.compare (liquid ~start:0 ~end_:12) total <= 0
+
+      let%test "locked never underflows (locked <= total)" =
+        let l = liquid ~start:0 ~end_:12 in
+        Unsigned.UInt64.compare (Unsigned.UInt64.sub total l) total <= 0
+
+      let%test "liquid = total - min_balance(end_slot)" =
+        Unsigned.UInt64.equal (liquid ~start:0 ~end_:12) (uint64 20)
+
+      let%test "pre-cliff: liquid = total - initial_minimum_balance" =
+        (* start and end both before the cliff: nothing has unlocked, so the
+           liquid balance is total minus the still-fully-locked min balance. *)
+        Unsigned.UInt64.equal (liquid ~start:0 ~end_:5) (uint64 0)
+
+      let%test "fully vested: liquid = total, locked = 0" =
+        let l = liquid ~start:0 ~end_:1000 in
+        Unsigned.UInt64.equal l total
+
+      let%test "untimed account is fully liquid" =
+        Unsigned.UInt64.equal
+          (liquid_balance_at_slot ~total_balance:total ~timing_info_opt:None
+             ~start_slot:(Slot.of_int 0) ~end_slot:(Slot.of_int 12) )
+          total
+    end )
+
   let run (module Conn : Mina_caqti.CONNECTION) ~block_query ~address ~token_id
       =
     let open Deferred.Result.Let_syntax in
