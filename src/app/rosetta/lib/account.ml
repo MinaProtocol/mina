@@ -30,6 +30,16 @@ end
 
 module Sql = struct
   module Balance_from_last_relevant_command = struct
+    (* The most recent block at or below the requested height that touched the
+       account, together with the account's total balance and nonce as of that
+       block. Decoded from the [(height, global_slot, balance, nonce)] SQL row. *)
+    type t =
+      { block_height : int64
+      ; block_global_slot_since_genesis : int64
+      ; total_balance : int64
+      ; nonce : int64
+      }
+
     let query_pending =
       Mina_caqti.find_opt_req
         Caqti_type.(t3 string int64 string)
@@ -111,9 +121,25 @@ module Sql = struct
           (module Conn)
           ~height:requested_block_height
       in
-      Conn.find_opt
-        (if has_canonical_height then query_canonical else query_pending)
-        (address, requested_block_height, token_id)
+      let%map row_opt =
+        Conn.find_opt
+          (if has_canonical_height then query_canonical else query_pending)
+          (address, requested_block_height, token_id)
+      in
+      Option.map row_opt
+        ~f:(fun
+             ( ( block_height
+               , block_global_slot_since_genesis
+               , total_balance
+               , nonce )
+             , timing_id )
+           ->
+          ( { block_height
+            ; block_global_slot_since_genesis
+            ; total_balance
+            ; nonce
+            }
+          , timing_id ) )
   end
 
   let compute_incremental_balance
@@ -138,17 +164,31 @@ module Sql = struct
       ~cliff_time ~cliff_amount ~vesting_period ~vesting_increment
       ~initial_minimum_balance
 
+  (* Pure computation of an account's liquid (unlocked) balance at [end_slot],
+     given its [total_balance] and (optional) vesting schedule. Extracted out
+     of [find_current_balance] so it can be exercised directly by inline tests
+     -- [find_current_balance] itself is only reachable behind a database
+     handle. Behaviour-preserving: still computes exactly what production did
+     before this extraction. *)
+  let liquid_balance_at_slot ~total_balance ~timing_info_opt ~start_slot
+      ~end_slot : Unsigned.UInt64.t =
+    match timing_info_opt with
+    | None ->
+        (* No vesting schedule: the whole balance is liquid. *)
+        total_balance
+    | Some timing_info ->
+        let incremental_balance_between_slots =
+          compute_incremental_balance timing_info ~start_slot ~end_slot
+        in
+        Unsigned.UInt64.Infix.(
+          total_balance + incremental_balance_between_slots)
+
   let find_current_balance (module Conn : Mina_caqti.CONNECTION)
-      ~requested_block_global_slot_since_genesis ~last_relevant_command_info
-      ?timing_id () =
+      ~requested_block_global_slot_since_genesis
+      ~(last_relevant_command : Balance_from_last_relevant_command.t) ?timing_id
+      () =
     let open Deferred.Result.Let_syntax in
     let open Unsigned in
-    let ( _
-        , last_relevant_command_global_slot_since_genesis
-        , last_relevant_command_balance
-        , nonce ) =
-      last_relevant_command_info
-    in
     let%bind timing_info_opt =
       match timing_id with
       | Some timing_id ->
@@ -161,35 +201,22 @@ module Sql = struct
       Mina_numbers.Global_slot_since_genesis.of_uint32
         (Unsigned.UInt32.of_int64 requested_block_global_slot_since_genesis)
     in
-    let%bind liquid_balance, nonce =
-      match timing_info_opt with
-      | None ->
-          (* This account has no special vesting, so just use its last
-             known balance from the command.*)
-          Deferred.Result.return
-            (last_relevant_command_balance, UInt64.of_int64 nonce)
-      | Some timing_info ->
-          (* This block was in the genesis ledger and has been
-             involved in at least one user or internal command. We need
-             to compute the change in its balance between the most recent
-             command and the start block (if it has vesting it may have
-             changed). *)
-          let incremental_balance_between_slots =
-            compute_incremental_balance timing_info
-              ~start_slot:
-                (Mina_numbers.Global_slot_since_genesis.of_int
-                   (Int.of_int64_exn
-                      last_relevant_command_global_slot_since_genesis ) )
-              ~end_slot
-          in
-          Deferred.Result.return
-            ( UInt64.Infix.(
-                UInt64.of_int64 last_relevant_command_balance
-                + incremental_balance_between_slots)
-              |> UInt64.to_int64
-            , UInt64.of_int64 nonce )
+    (* This block was in the genesis ledger and has been involved in at least
+       one user or internal command. We compute the change in its balance
+       between the most recent command and the start block (if it has vesting
+       it may have changed). *)
+    let start_slot =
+      Mina_numbers.Global_slot_since_genesis.of_int
+        (Int.of_int64_exn last_relevant_command.block_global_slot_since_genesis)
     in
-    let total_balance = last_relevant_command_balance in
+    let liquid_balance =
+      liquid_balance_at_slot
+        ~total_balance:(UInt64.of_int64 last_relevant_command.total_balance)
+        ~timing_info_opt ~start_slot ~end_slot
+      |> UInt64.to_int64
+    in
+    let nonce = UInt64.of_int64 last_relevant_command.nonce in
+    let total_balance = last_relevant_command.total_balance in
     let balance_info : Balance_info.t = { liquid_balance; total_balance } in
     Deferred.Result.return (balance_info, nonce)
 
@@ -219,7 +246,7 @@ module Sql = struct
             , block_info.global_slot_since_genesis
             , block_info.state_hash )
     in
-    let%bind last_relevant_command_info_opt =
+    let%bind last_relevant_command_opt =
       Balance_from_last_relevant_command.run
         (module Conn)
         ~requested_block_height ~address ~token_id
@@ -232,17 +259,17 @@ module Sql = struct
       }
     in
     let%bind balance_info, nonce =
-      match last_relevant_command_info_opt with
+      match last_relevant_command_opt with
       | None ->
           (* account doesn' exist yet at the request block, return zero balance *)
           let nonce = Unsigned.UInt64.of_int 0 in
           Deferred.Result.return
             ({ Balance_info.liquid_balance = 0L; total_balance = 0L }, nonce)
-      | Some (last_relevant_command_info, timing_id) ->
+      | Some (last_relevant_command, timing_id) ->
           find_current_balance
             (module Conn)
-            ~requested_block_global_slot_since_genesis
-            ~last_relevant_command_info ~timing_id ()
+            ~requested_block_global_slot_since_genesis ~last_relevant_command
+            ~timing_id ()
     in
     Deferred.Result.return (requested_block_identifier, balance_info, nonce)
 end
