@@ -33,6 +33,16 @@ func (t *HardforkTest) startLocalNetwork(minaExecutable string, profile string, 
 		"--root", t.Config.Root,
 	)
 
+	// Combine block-producer roles onto the seed and snark coordinator so the
+	// network runs as 2 daemons instead of 4. These flags apply to both the main
+	// and fork networks (both must keep producing blocks).
+	if t.Config.SeedIsWhale {
+		cmd.Args = append(cmd.Args, "--seed-is-whale")
+	}
+	if t.Config.SnarkCoordinatorIsWhale {
+		cmd.Args = append(cmd.Args, "--snark-coordinator-is-whale")
+	}
+
 	cmd.Args = append(cmd.Args, extraArgs...)
 	cmd.Env = append(os.Environ(), "MINA_EXE="+minaExecutable)
 
@@ -64,6 +74,12 @@ func (t *HardforkTest) RunMainNetwork(extraFilesRoot string, mainGenesisTs int64
 		"--slot-chain-end", strconv.Itoa(t.Config.SlotChainEnd),
 		"--hardfork-genesis-slot-delta", strconv.Itoa(t.Config.HfSlotDelta),
 		"--extra-files-root", extraFilesRoot,
+	}
+
+	// Seed the timed/vesting account into the freshly generated genesis ledger so
+	// it flows through fork-config extraction and migration (see vesting.go).
+	if t.Config.VestingTestEnabled && t.vestingAccount != nil {
+		args = append(args, "--extra-genesis-account-file", t.vestingAccount.extraAccountFile)
 	}
 
 	return t.startLocalNetwork(t.Config.MainMinaExe, "main", args)
