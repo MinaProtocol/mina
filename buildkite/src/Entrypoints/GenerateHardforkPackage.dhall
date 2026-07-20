@@ -202,7 +202,7 @@ let generateDockerForCodename =
                                     Toolchain.SelectionMode.ByDebianAndArch
                                     codename.DebVersion
                                     codename.Arch
-                                    ([] : List Text)
+                                    [ "FORCE_DOCKER_OVERWRITE" ]
                                     (     "./buildkite/scripts/release/manager.sh persist "
                                       ++  " --backend local --artifacts mina-logproc,mina-${Network.lowerName
                                                                                               spec.network},mina-archive-${Network.lowerName

@@ -372,6 +372,25 @@ if [[ "${DOCKERFILE_PATH}" == "dockerfiles/Dockerfile-install-config" || "${DOCK
     unset _dep_image_name _dep_version _dep_build_flags _dep_custom _dep_tag _rewritten_repo
 fi
 
+# FORCE_DOCKER_OVERWRITE — when set (to any non-empty value), allows pushing a
+# Docker image even if the tag already exists in the remote registry. Without it
+# the script errors out to prevent silent overwrites (e.g. a hardfork build
+# accidentally replacing a release devnet image). The variable is expected to be
+# set at the Buildkite pipeline level so that hardfork pipelines can opt in while
+# regular release pipelines remain protected.
+# Checked before the build so we fail fast rather than after a long buildx run.
+if [[ "${DOCKER_ACTION}" == "push" ]]; then
+  if docker manifest inspect "$TAG" > /dev/null 2>&1; then
+    if [[ -n "${FORCE_DOCKER_OVERWRITE:-}" ]]; then
+      echo "⚠️  Image $TAG already exists in the registry. Overwriting (FORCE_DOCKER_OVERWRITE is set)."
+    else
+      echo "❌ Image $TAG already exists in the registry. Refusing to overwrite."
+      echo "   To overwrite, set FORCE_DOCKER_OVERWRITE=1"
+      exit 1
+    fi
+  fi
+fi
+
 BUILD_NETWORK="--allow=network.host"
 
 docker buildx build --load --network=host --progress=plain $PLATFORM $DOCKER_REPO_ARG $NO_CACHE $BUILD_NETWORK $CACHE $NETWORK $IMAGE $DEB_CODENAME $DEB_RELEASE $DEB_VERSION --build-arg deb_profile="$DEB_PROFILE" --build-arg generic_network="$GENERIC_NETWORK_SEG" $DOCKER_DEB_SUFFIX_ARG $BUILD_FLAGS_SUFFIX_ARG $DEB_REPO $APT_CACHE_ARG $BRANCH $REPO $LEGACY_VERSION $CUSTOM_SUFFIX_ARG $CUSTOM_ARG $DEB_ARCH $IMAGE_NAME_ARG $VERSION_ARG "$DOCKER_CONTEXT" -t "$TAG" -t "$HASHTAG" -f $DOCKERFILE_PATH
