@@ -2,6 +2,11 @@
   "genesis": {
     "genesis_state_timestamp": "2026-07-17T16:00:00Z"
   },
+  "daemon": {
+    "slot_tx_end": 2400,
+    "slot_chain_end": 2440,
+    "hard_fork_genesis_slot_delta": 40
+  },
   "proof": {
     "fork": {
       "state_hash": "3NKSvjaGSKiQuAt8BP1b1VCpLbJc9RcEFjYCaBYsJJFdrtd6tpaV",
