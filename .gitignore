@@ -52,3 +52,6 @@ _coverage/
 
 CLAUDE.local.md
 /.claude/
+
+# mina-local-network plan artifacts
+/.mina-local-network/

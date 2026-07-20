@@ -19,15 +19,19 @@ type BlockAnalysisResult struct {
 	Consensus          ConsensusState
 	GenesisBlock       client.BlockData
 	SnarkedHashByEpoch SnarkedHashByEpoch
+	// PreForkPoolNonces is the nonce every value_transfer pool account reached on
+	// the pre-fork chain, keyed by account ref. The fork network inherits those
+	// accounts; the fork phase asserts each nonce carried over unchanged.
+	PreForkPoolNonces map[string]int
 }
 
-func (t *HardforkTest) WaitForBestTip(port int, pred func(client.BlockData) bool, predDescription string, timeout time.Duration) error {
+func (t *HardforkTest) WaitForBestTip(di *config.DaemonInfo, pred func(client.BlockData) bool, predDescription string, timeout time.Duration) error {
 	deadline := time.Now().Add(timeout)
 
-	t.Logger.Info("Waiting for best tip at port %d to satisfy condition: %s", port, predDescription)
+	t.Logger.Info("Waiting for best tip on node %q to satisfy condition: %s", di.Name, predDescription)
 
 	for time.Now().Before(deadline) {
-		bestTip, err := t.Client.BestTip(port)
+		bestTip, err := t.Client.BestTip(di)
 		if err != nil {
 			t.Logger.Debug("Failed to get best tip: %v", err)
 			time.Sleep(time.Duration(t.Config.PollingIntervalSeconds) * time.Second)
@@ -40,7 +44,7 @@ func (t *HardforkTest) WaitForBestTip(port int, pred func(client.BlockData) bool
 
 		time.Sleep(time.Duration(t.Config.PollingIntervalSeconds) * time.Second)
 	}
-	return fmt.Errorf("timed out waiting for condition: %s at port %d", predDescription, port)
+	return fmt.Errorf("timed out waiting for condition: %s on node %q", predDescription, di.Name)
 }
 
 // ValidateSlotOccupancy checks if block occupancy is above 50%
@@ -83,19 +87,19 @@ func (t *HardforkTest) ValidateLatestLastBlockBeforeTxEndSlot(lastBlockBeforeTxE
 }
 
 // ValidateNoNewBlocks verifies that no new blocks are created after chain end
-func (t *HardforkTest) ValidateNoNewBlocks(port int) error {
+func (t *HardforkTest) ValidateNoNewBlocks(di *config.DaemonInfo) error {
 	t.Logger.Info("Waiting to verify no new blocks are created after chain end...")
 
-	bestTip1, err := t.Client.BestTip(port)
+	bestTip1, err := t.Client.BestTip(di)
 	if err != nil {
-		return fmt.Errorf("failed to get bestTip at port %d: %w", port, err)
+		return fmt.Errorf("failed to get bestTip on node %q: %w", di.Name, err)
 	}
 
 	time.Sleep(time.Duration(t.Config.NoNewBlocksWaitSeconds) * time.Second)
 
-	bestTip2, err := t.Client.BestTip(port)
+	bestTip2, err := t.Client.BestTip(di)
 	if err != nil {
-		return fmt.Errorf("failed to get bestTip at port %d: %w", port, err)
+		return fmt.Errorf("failed to get bestTip on node %q: %w", di.Name, err)
 	}
 
 	if bestTip2.BlockHeight > bestTip1.BlockHeight {
@@ -105,27 +109,27 @@ func (t *HardforkTest) ValidateNoNewBlocks(port int) error {
 	return nil
 }
 
-func (t *HardforkTest) ReportBlocksInfo(port int, blocks []client.BlockData) {
+func (t *HardforkTest) ReportBlocksInfo(di *config.DaemonInfo, blocks []client.BlockData) {
 	t.Logger.Info("================================================")
 	for _, block := range blocks {
-		t.Logger.Info("node at %d has block %v", port, block)
+		t.Logger.Info("node %q has block %v", di.Name, block)
 	}
 }
 
-func (t *HardforkTest) ConsensusStateOnNode(port int) (*ConsensusState, error) {
+func (t *HardforkTest) ConsensusStateOnNode(di *config.DaemonInfo) (*ConsensusState, error) {
 
 	state := new(ConsensusState)
 
-	recentBlocks, err := t.Client.RecentBlocks(port, config.ProtocolK)
+	recentBlocks, err := t.Client.RecentBlocks(di, t.ConsensusParams.K)
 
-	t.ReportBlocksInfo(port, recentBlocks)
+	t.ReportBlocksInfo(di, recentBlocks)
 
 	if err != nil {
-		return nil, fmt.Errorf("failed to collect blocks at port %d: %w", port, err)
+		return nil, fmt.Errorf("failed to collect blocks on node %q: %w", di.Name, err)
 	}
 
 	if len(recentBlocks) == 0 {
-		return nil, fmt.Errorf("no blocks is tracked at port %d!", port)
+		return nil, fmt.Errorf("no blocks is tracked on node %q!", di.Name)
 	}
 
 	// Process each block
@@ -142,7 +146,7 @@ func (t *HardforkTest) ConsensusStateOnNode(port int) (*ConsensusState, error) {
 	}
 
 	if state.LastBlockBeforeTxEnd.Slot == 0 {
-		return nil, fmt.Errorf("no blocks with slot > 0 at port %d", port)
+		return nil, fmt.Errorf("no blocks with slot > 0 on node %q", di.Name)
 	}
 
 	return state, nil
@@ -154,7 +158,7 @@ func (t *HardforkTest) CollectEpochHashes(mainGenesisTs int64) (*SnarkedHashByEp
 	// NOTE: we're only tracking epoch ledgers on a single node, we're relying that
 	// epoch hashes having stronger consensus guarantee because it's updated much
 	// slower than blocks
-	slotPerCheck := config.ProtocolK / 2
+	slotPerCheck := t.ConsensusParams.K / 2
 	// Very unlikely to happen but we have it here for fail-safe
 	if slotPerCheck < 1 {
 		slotPerCheck = 1
@@ -165,13 +169,20 @@ func (t *HardforkTest) CollectEpochHashes(mainGenesisTs int64) (*SnarkedHashByEp
 
 	snarkedHashByEpoch := make(SnarkedHashByEpoch)
 	lastSlotPerEpoch := make(map[int]int)
+	// The snarked ledger hash each epoch froze at, and the slot it was first seen
+	// frozen at. See checkSnarkedHashFrozen.
+	frozenHash := make(map[int]string)
+	frozenSlot := make(map[int]int)
 	for time.Now().Before(slotChainEnd) {
-		recentBlocks, err := t.Client.RecentBlocks(t.Config.AnyDaemon().Port(config.PORT_REST), config.ProtocolK)
+		recentBlocks, err := t.Client.RecentBlocks(t.Config.AnyDaemon(), t.ConsensusParams.K)
 		if err != nil {
 			return nil, err
 		}
 
 		for _, block := range recentBlocks {
+			if err := t.checkSnarkedHashFrozen(block, frozenHash, frozenSlot); err != nil {
+				return nil, err
+			}
 			// NOTE: If it's equal, we're likely to have a chain-reorg, so always accept
 			// new data.
 			if block.Slot >= lastSlotPerEpoch[block.Epoch] {
@@ -190,6 +201,48 @@ func (t *HardforkTest) CollectEpochHashes(mainGenesisTs int64) (*SnarkedHashByEp
 	return &snarkedHashByEpoch, nil
 }
 
+// checkSnarkedHashFrozen asserts that the snarked ledger hash does not move once
+// slot-tx-end is reached.
+//
+// The daemon guarantees this: from slot-tx-end on, a block's staged ledger diff
+// must be empty, and "empty" includes carrying no completed SNARK work
+// (Staged_ledger_diff.is_empty). No completed work can be applied, so the scan
+// state cannot emit a ledger proof, so the snarked ledger cannot advance. It is
+// enforced when blocks are validated rather than only when they are produced,
+// so it holds for every block the network accepts.
+//
+// Asserted rather than assumed because the fork is cut from this settled state:
+// the fork config's ledger and epoch_data hashes are taken from it. If it ever
+// did move, the run would fail somewhere far away — a ledger hash mismatch, or
+// nodes computing different chain ids — rather than here, saying the ledger did
+// not freeze.
+//
+// Per epoch, not globally: an epoch boundary can fall between slot-tx-end and
+// slot-chain-end, and each epoch's ledger freezes at its own hash.
+func (t *HardforkTest) checkSnarkedHashFrozen(
+	block client.BlockData, frozenHash map[int]string, frozenSlot map[int]int,
+) error {
+	if block.Slot < t.Config.SlotTxEnd {
+		return nil
+	}
+	seen, ok := frozenHash[block.Epoch]
+	if !ok {
+		frozenHash[block.Epoch] = block.SnarkedHash
+		frozenSlot[block.Epoch] = block.Slot
+		return nil
+	}
+	if seen != block.SnarkedHash {
+		return fmt.Errorf(
+			"snarked ledger hash of epoch %d changed after slot-tx-end (%d): it was %s at slot %d, "+
+				"but block %s at slot %d has %s. No block from slot-tx-end on may carry completed "+
+				"SNARK work, so the snarked ledger cannot advance past it — the fork is cut from "+
+				"this state and would be taken from a moving ledger",
+			block.Epoch, t.Config.SlotTxEnd, seen, frozenSlot[block.Epoch],
+			block.StateHash, block.Slot, block.SnarkedHash)
+	}
+	return nil
+}
+
 func (t *HardforkTest) ConsensusAcrossNodesAfterSlotChainEnd() (*ConsensusState, error) {
 	allAliveDaemons := t.Config.AllDaemonSatisfying("alive(non-auto)", func(di *config.DaemonInfo) bool { return di.ForkMethod != config.Auto })
 
@@ -202,7 +255,7 @@ func (t *HardforkTest) ConsensusAcrossNodesAfterSlotChainEnd() (*ConsensusState,
 		wg.Add(1)
 		go func(i int, daemon *config.DaemonInfo) {
 			defer wg.Done()
-			state, err := t.ConsensusStateOnNode(daemon.Port(config.PORT_REST))
+			state, err := t.ConsensusStateOnNode(daemon)
 			states[i] = state
 			errors[i] = err
 		}(i, daemon)
@@ -225,9 +278,17 @@ func (t *HardforkTest) ConsensusAcrossNodesAfterSlotChainEnd() (*ConsensusState,
 		last_state := states[i-1]
 
 		if state.LastBlockBeforeTxEnd != last_state.LastBlockBeforeTxEnd {
+			// The fork is cut at this block, so the nodes must agree on which one it
+			// is. What buries it is the run of empty blocks between slot-tx-end and
+			// slot-chain-end; if that gap is too short, the block is still shallow
+			// enough when the chain stops for the nodes to differ.
 			return nil, fmt.Errorf(
-				"Node %s and node %s doesn't agree on last block seen before tx end! The previous has %v while the later has %v",
-				allAliveDaemons[i-1].Name, allAliveDaemons[i].Name, last_state, state)
+				"Node %s and node %s doesn't agree on last block seen before tx end! The previous has %v while the later has %v. "+
+					"The fork block is buried by the %d slots between slot-tx-end (%d) and slot-chain-end (%d); "+
+					"widening that gap gives the nodes more blocks to converge on it before the chain stops (k=%d blocks)",
+				allAliveDaemons[i-1].Name, allAliveDaemons[i].Name, last_state, state,
+				t.Config.SlotChainEnd-t.Config.SlotTxEnd, t.Config.SlotTxEnd, t.Config.SlotChainEnd,
+				t.ConsensusParams.K)
 		}
 	}
 
@@ -244,7 +305,7 @@ func (t *HardforkTest) GenesisBlockAcrossNetwork() (*client.BlockData, error) {
 	var daemonReturningCommonGenesisBlock config.DaemonInfo
 
 	for _, info := range t.Config.DaemonInfos {
-		ourGenesisBlock, err := t.Client.GenesisBlock(info.Port(config.PORT_REST))
+		ourGenesisBlock, err := t.Client.GenesisBlock(&info)
 		if err != nil {
 			return nil, fmt.Errorf("Failed to query genesis block on node %s: %w", info.Name, err)
 		}
@@ -323,12 +384,12 @@ func (t *HardforkTest) FindStakingHash(
 }
 
 // ValidateBlockWithUserCommandCreated checks that blocks contain user commands
-func (t *HardforkTest) ValidateBlockWithUserCommandCreatedForkNetwork(port int) error {
+func (t *HardforkTest) ValidateBlockWithUserCommandCreatedForkNetwork(di *config.DaemonInfo) error {
 	allBlocksEmpty := true
 	for i := 0; i < t.Config.UserCommandCheckMaxIterations; i++ {
 		time.Sleep(time.Duration(t.Config.ForkSlot) * time.Second)
 
-		userCmds, err := t.Client.NumUserCommandsInBestChain(port)
+		userCmds, err := t.Client.NumUserCommandsInBestChain(di)
 		if err != nil {
 			t.Logger.Debug("Failed to get blocks with user commands: %v", err)
 			continue

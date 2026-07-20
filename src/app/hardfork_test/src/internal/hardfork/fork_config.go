@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"strconv"
 	"time"
+
+	"github.com/MinaProtocol/mina/src/app/hardfork_test/src/internal/config"
 )
 
 // ForkConfigData holds the expected fork configuration data
@@ -20,9 +22,9 @@ type ForkConfigData struct {
 }
 
 // ExtractForkConfig extracts the fork configuration from the network
-func (t *HardforkTest) GetForkConfig(port int) ([]byte, error) {
+func (t *HardforkTest) GetForkConfig(di *config.DaemonInfo) ([]byte, error) {
 	for attempt := 1; attempt <= t.Config.ForkConfigMaxRetries; attempt++ {
-		forkConfig, err := t.Client.ForkConfig(port)
+		forkConfig, err := t.Client.ForkConfig(di)
 		if err != nil {
 			t.Logger.Error("Failed to get fork config: %v", err)
 			continue
@@ -30,7 +32,7 @@ func (t *HardforkTest) GetForkConfig(port int) ([]byte, error) {
 		forkConfigBytes := []byte(forkConfig.Raw)
 
 		if !bytes.Equal(forkConfigBytes, []byte("null")) {
-			t.Logger.Info("Successfully queried fork config on node port %d", port)
+			t.Logger.Info("successfully queried fork config on node %q", di.Name)
 			return forkConfigBytes, nil
 		}
 

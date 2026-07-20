@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/MinaProtocol/mina/src/app/hardfork_test/src/internal/config"
 	"github.com/tidwall/gjson"
 )
 
@@ -27,9 +28,10 @@ func NewClient(timeoutSeconds int, maxRetries int) *Client {
 	}
 }
 
-// query sends a GraphQL query to the specified port with retry logic
-func (c *Client) query(port int, query string) (gjson.Result, error) {
-	url := fmt.Sprintf("http://localhost:%d/graphql", port)
+// query sends a GraphQL query to the specified node's REST endpoint with retry
+// logic. The node is named in failures; its REST port is what gets dialed.
+func (c *Client) query(node *config.DaemonInfo, query string) (gjson.Result, error) {
+	url := fmt.Sprintf("http://localhost:%d/graphql", node.Port(config.PORT_REST))
 
 	// Format the query payload
 	payload := map[string]string{
@@ -207,16 +209,16 @@ func parseBlock(value gjson.Result) *BlockData {
 	return block
 }
 
-func (c *Client) GenesisBlock(port int) (*BlockData, error) {
-	result, err := c.query(port, genesisBlockQuery)
+func (c *Client) GenesisBlock(node *config.DaemonInfo) (*BlockData, error) {
+	result, err := c.query(node, genesisBlockQuery)
 	if err != nil {
 		return nil, err
 	}
 	return parseBlock(result.Get("data.genesisBlock")), nil
 }
 
-func (c *Client) RecentBlocks(port int, limit int) ([]BlockData, error) {
-	result, err := c.query(port, fmt.Sprintf(blocksQueryWithLimit, limit))
+func (c *Client) RecentBlocks(node *config.DaemonInfo, limit int) ([]BlockData, error) {
+	result, err := c.query(node, fmt.Sprintf(blocksQueryWithLimit, limit))
 	if err != nil {
 		return nil, err
 	}
@@ -231,20 +233,20 @@ func (c *Client) RecentBlocks(port int, limit int) ([]BlockData, error) {
 	return blocks, nil
 }
 
-func (c *Client) BestTip(port int) (*BlockData, error) {
-	blocks, err := c.RecentBlocks(port, 1)
+func (c *Client) BestTip(node *config.DaemonInfo) (*BlockData, error) {
+	blocks, err := c.RecentBlocks(node, 1)
 	if err != nil {
 		return nil, err
 	}
 	if len(blocks) == 0 {
-		return nil, fmt.Errorf("No best tip found! at port %d", port)
+		return nil, fmt.Errorf("no best tip found on node %q", node.Name)
 	}
 
 	return &blocks[0], nil
 }
 
-func (c *Client) ForkConfig(port int) (gjson.Result, error) {
-	result, err := c.query(port, "fork_config")
+func (c *Client) ForkConfig(node *config.DaemonInfo) (gjson.Result, error) {
+	result, err := c.query(node, "fork_config")
 	if err != nil {
 		return gjson.Result{}, err
 	}
@@ -287,8 +289,8 @@ account(publicKey: "%s") {
 
 // AccountTiming queries the timing parameters and balances of the account with
 // the given public key.
-func (c *Client) AccountTiming(port int, pubKey string) (*accountTiming, error) {
-	result, err := c.query(port, fmt.Sprintf(accountTimingQuery, pubKey))
+func (c *Client) AccountTiming(node *config.DaemonInfo, pubKey string) (*accountTiming, error) {
+	result, err := c.query(node, fmt.Sprintf(accountTimingQuery, pubKey))
 	if err != nil {
 		return nil, err
 	}
@@ -303,14 +305,14 @@ func (c *Client) AccountTiming(port int, pubKey string) (*accountTiming, error) 
 	}
 
 	if response.Data.Account == nil {
-		return nil, fmt.Errorf("account %s not found at port %d", pubKey, port)
+		return nil, fmt.Errorf("account %s not found on node %q", pubKey, node.Name)
 	}
 
 	return response.Data.Account, nil
 }
 
-func (c *Client) NumUserCommandsInBestChain(port int) (int, error) {
-	result, err := c.query(port, "bestChain { commandTransactionCount }")
+func (c *Client) NumUserCommandsInBestChain(node *config.DaemonInfo) (int, error) {
+	result, err := c.query(node, "bestChain { commandTransactionCount }")
 	if err != nil {
 		return 0, err
 	}

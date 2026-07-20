@@ -11,12 +11,14 @@ var (
 	ErrMissingForkMinaExe              = errors.New("missing fork Mina executable path")
 	ErrMissingForkRuntimeGenesisLedger = errors.New("missing fork runtime genesis ledger executable path")
 	ErrMissingScriptDir                = errors.New("missing script dir path")
+	ErrMissingTopologyFile             = errors.New("missing topology preset path")
 	ErrMissingRoot                     = errors.New("missing network root")
 
 	// Errors related to file existence and permissions
 	ErrFileNotExists = errors.New("file does not exist")
 	ErrNotExecutable = errors.New("file is not executable")
 	ErrNotADir       = errors.New("path is not a directory")
+	ErrNotAFile      = errors.New("path is not a file")
 )
 
 // FileValidationError creates a formatted error message for file validation issues
