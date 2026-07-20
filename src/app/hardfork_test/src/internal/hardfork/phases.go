@@ -54,7 +54,7 @@ func (t *HardforkTest) RunMainNetworkPhase(mainGenesisTs int64, beforeShutdown H
 
 	defer t.gracefulShutdown(mainNetCmd, "Main network")
 
-	t.WaitForBestTip(t.Config.AnyDaemon().Port(config.PORT_REST), func(block client.BlockData) bool {
+	t.WaitForBestTip(t.Config.AnyDaemon(), func(block client.BlockData) bool {
 		return block.Slot >= 1
 	}, fmt.Sprintf("best tip reached slot 1"),
 		time.Until(
@@ -84,9 +84,19 @@ func (t *HardforkTest) RunMainNetworkPhase(mainGenesisTs int64, beforeShutdown H
 	nonAutoDaemon := t.Config.AnyDaemonSatisfying("non-auto", func(di *config.DaemonInfo) bool {
 		return di.ForkMethod != config.Auto
 	})
-	if err := t.ValidateNoNewBlocks(nonAutoDaemon.Port(config.PORT_REST)); err != nil {
+	if err := t.ValidateNoNewBlocks(nonAutoDaemon); err != nil {
 		return nil, err
 	}
+
+	// Read here, not in phase 4: the daemons are still up, and the chain has just
+	// been shown to have stopped, so these nonces cannot move afterwards. By
+	// phase 4 the network that knows them is gone. The fork phase asserts each
+	// pool account carried this nonce across the fork.
+	preForkPoolNonces, err := t.PreForkPoolNonces()
+	if err != nil {
+		return nil, err
+	}
+	analysis.PreForkPoolNonces = preForkPoolNonces
 
 	if err := beforeShutdown(t, analysis); err != nil {
 		return nil, err
@@ -102,9 +112,18 @@ type ForkData struct {
 }
 
 // RunForkNetworkPhase runs the fork network and validates its operation
-func (t *HardforkTest) RunForkNetworkPhase(latestPreForkHeight int, mainGenesisTs int64) error {
-	// Start fork network
-	forkCmd, err := t.RunForkNetwork()
+func (t *HardforkTest) RunForkNetworkPhase(
+	latestPreForkHeight int, mainGenesisTs int64, preForkPoolNonces map[string]int,
+) error {
+	// Start fork network. No nonce is injected: the fork network inherits the
+	// pre-fork ledger, and its value_transfer worker discovers each account's
+	// carried-over nonce on its own. The carry-over is *checked* inside mln: the
+	// pre-fork nonces are handed to the fork's value_transfer workloads, and the
+	// worker asserts each pool account inherited its nonce before its first send —
+	// the only place that read can be ordered before the workload moves the nonce,
+	// and where "not yet queryable just after genesis" is a retry rather than a
+	// spurious failure.
+	forkCmd, err := t.RunForkNetwork(mainGenesisTs, preForkPoolNonces)
 	if err != nil {
 		return err
 	}
@@ -136,7 +155,7 @@ func (t *HardforkTest) RunForkNetworkPhase(latestPreForkHeight int, mainGenesisT
 	}
 
 	// Check block height at slot BestChainQueryFrom
-	bestTip, err := t.Client.BestTip(t.Config.AnyDaemon().Port(config.PORT_REST))
+	bestTip, err := t.Client.BestTip(t.Config.AnyDaemon())
 	if err != nil {
 		return err
 	}
@@ -158,7 +177,7 @@ func (t *HardforkTest) RunForkNetworkPhase(latestPreForkHeight int, mainGenesisT
 	}
 
 	// Validate user commands in blocks
-	if err := t.ValidateBlockWithUserCommandCreatedForkNetwork(t.Config.AnyDaemon().Port(config.PORT_REST)); err != nil {
+	if err := t.ValidateBlockWithUserCommandCreatedForkNetwork(t.Config.AnyDaemon()); err != nil {
 		return err
 	}
 
@@ -172,7 +191,7 @@ func (t *HardforkTest) legacyFork(daemon config.DaemonInfo, analysis BlockAnalys
 
 	nodeDir := daemon.NodeDirRel(t.Config.Root)
 
-	forkConfigBytes, err := t.GetForkConfig(daemon.StartPort + int(config.PORT_REST))
+	forkConfigBytes, err := t.GetForkConfig(&daemon)
 	if err != nil {
 		return err
 	}
@@ -279,7 +298,7 @@ func (t *HardforkTest) advancedFork(daemon config.DaemonInfo, analysis BlockAnal
 	nodeDir := daemon.NodeDirRel(t.Config.Root)
 
 	forkDataPath := filepath.Join(nodeDir, "fork_data")
-	if err := t.AdvancedGenerateHardForkConfig(forkDataPath, daemon.StartPort+int(config.PORT_CLIENT)); err != nil {
+	if err := t.AdvancedGenerateHardForkConfig(forkDataPath, daemon.Port(config.PORT_CLIENT)); err != nil {
 		return err
 	}
 

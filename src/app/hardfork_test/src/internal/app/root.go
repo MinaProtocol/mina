@@ -1,6 +1,8 @@
 package app
 
 import (
+	"fmt"
+
 	"github.com/MinaProtocol/mina/src/app/hardfork_test/src/internal/config"
 	"github.com/MinaProtocol/mina/src/app/hardfork_test/src/internal/hardfork"
 	"github.com/spf13/cobra"
@@ -58,15 +60,21 @@ func init() {
 	rootCmd.Flags().StringVar(&cfg.ForkMinaExe, "fork-mina-exe", "", "Path to the fork Mina executable (required)")
 	rootCmd.Flags().StringVar(&cfg.ForkRuntimeGenesisLedger, "fork-runtime-genesis-ledger", "", "Path to the fork runtime genesis ledger executable (required)")
 
-	// Network size. These also bound how many fork methods can be requested at
-	// once, since every --allow-fork-method needs at least one daemon.
-	rootCmd.Flags().IntVar(&cfg.NumWhales, "num-whales", cfg.NumWhales, "Number of whale (block-producer) accounts; whales beyond those absorbed by the seed/snark-coordinator run as standalone daemons")
-	rootCmd.Flags().IntVar(&cfg.NumFish, "num-fish", cfg.NumFish, "Number of fish (smaller block-producer) daemons")
-	rootCmd.Flags().IntVar(&cfg.NumNodes, "num-nodes", cfg.NumNodes, "Number of plain (non-block-producing) daemons")
+	// The topology declares the network's daemons, so it also bounds how many
+	// fork methods can be requested at once: every --allow-fork-method needs at
+	// least one daemon.
+	rootCmd.Flags().StringVar(&cfg.TopologyFile, "topology-file", cfg.TopologyFile,
+		"Path to a topology preset, e.g. scripts/mina-local-network/presets/hf-test-legacy.jsonc (required)")
 
-	// Test configuration
-	rootCmd.Flags().IntVar(&cfg.SlotTxEnd, "slot-tx-end", cfg.SlotTxEnd, "Slot at which transactions should end")
-	rootCmd.Flags().IntVar(&cfg.SlotChainEnd, "slot-chain-end", cfg.SlotChainEnd, "Slot at which chain should end")
+	// Test configuration. Both slot ends are resolved by config.ResolveSlotEnds
+	// when left unset, and the effective values are logged at startup — pass the
+	// logged slot-tx-end back to reproduce a run.
+	rootCmd.Flags().IntVar(&cfg.SlotTxEnd, "slot-tx-end", cfg.SlotTxEnd,
+		fmt.Sprintf("Slot at which transactions should end (default: random in [%d, %d])",
+			config.RandomSlotTxEndMin, config.RandomSlotTxEndMax))
+	rootCmd.Flags().IntVar(&cfg.SlotChainEnd, "slot-chain-end", cfg.SlotChainEnd,
+		fmt.Sprintf("Slot at which chain should end; must exceed --slot-tx-end (default: --slot-tx-end + %d)",
+			config.SlotChainEndGap))
 	rootCmd.Flags().IntVar(&cfg.BestChainQueryFrom, "best-chain-query-from", cfg.BestChainQueryFrom, "Slot from which to start calling bestchain query")
 
 	// Slot configuration

@@ -2,15 +2,75 @@
 
 A Go application for testing hardfork functionality in the Mina Protocol. This test validates that a network can successfully transition from one protocol version to another through a hardfork mechanism.
 
+Reading a CI log for this test? [`KNOWN_ISSUES.md`](KNOWN_ISSUES.md) catalogues
+the warnings, fatal-looking crash reports and timing errors that every healthy
+run produces, so you can tell known noise from a new problem.
+
 ## Overview
 
 ### Network Topology
 
-By default the test runs a compact network of **2 Mina nodes and 2 snark
-workers**: the seed node and the snark coordinator each double as a whale block
-producer (via the `--seed-is-whale` / `--snark-coordinator-is-whale` options of
-`mina-local-network.sh`), so no standalone whale daemons are spawned. This keeps
-two block producers (for healthy slot occupancy) while halving the daemon count.
+The network's shape is **data, not code**. It lives with mina-local-network's
+other presets, in
+[`scripts/mina-local-network/presets/`](../../../scripts/mina-local-network/presets),
+next to the schema that governs it:
+
+| preset | `build-and-test.sh --topology` | daemons | used by |
+| --- | --- | --- | --- |
+| `hf-test-legacy.jsonc` | `legacy` (default) | 2 | `HardForkTestLegacy` |
+| `hf-test-mixed.jsonc` | `mixed` | 3 | `HardForkTestMixed` — three fork methods need three daemons |
+
+The presets are read from disk, not compiled in, so editing one does not mean
+rebuilding this binary. `build-and-test.sh` maps the short name to a path and
+passes it as `--topology-file`; the binary itself only ever takes a path.
+
+The default `legacy` network is compact: **2 Mina nodes and 2 snark workers**.
+Both whale accounts are absorbed by the two nodes rather than being spawned as
+standalone whale daemons, so the network keeps two block producers (for healthy
+slot occupancy) while halving the daemon count.
+
+To change the network — add a node, retune a balance, resize a worker pool —
+edit the preset. The daemon list is derived from it, so there is nothing to keep
+in sync. To add a shape, drop in a new `hf-test-<name>.jsonc` and pass `<name>`
+to `build-and-test.sh --topology`. mina-local-network's own test suite validates
+every preset against the schema, so a malformed one fails there rather than
+mid-run.
+
+The test overlays only what cannot be known until the run (binaries, the state
+root, the genesis timestamp, per-node fork arguments) and hands the result to
+`mina-local-network.py`, which plans and spawns it. Ports are never assigned
+here: the planner allocates them and the test reads them back from
+`<root>/network-plan.json`.
+
+#### Node names
+
+Nodes are named after what they are, so a name cannot drift from a node's actual
+role:
+
+```
+<balance-tier>-<cap1>+<cap2>+...-<id>
+```
+
+The tier prefix is omitted for a node with no balance tier, a node with no
+capabilities is named `plain`, and `<id>` is unique across the network.
+Capability tokens are `seed`, `bp` (block producer), and `coordinator` (snark
+coordinator). The `legacy` topology is:
+
+```
+whale-seed+bp+coordinator-0   seed, block producer (whale-0), snark coordinator
+whale-bp-1                    block producer (whale-1)
+```
+
+and `mixed` adds `plain-2`, which validates only. A larger network would extend
+the same scheme:
+
+```
+whale-bp-2, whale-bp-3        further standalone whale block producers
+fish-bp-4, fish-bp-5          fish block producers (accounts fish-0, fish-1)
+```
+
+Note the snark coordinator runs on the seed node; there is no separate
+coordinator daemon.
 
 ### High-Level Test Sequence
 
@@ -40,9 +100,9 @@ This validates the critical hardfork mechanism:
 ### Vesting account test
 
 Before the fork, the harness injects a timed account into the pre-fork genesis
-ledger (via the `--extra-genesis-account-file` option of
-`mina-local-network.sh`). The account is "not yet vesting" at the hardfork slot
-and fully unlocks at its cliff, which is placed `2 * offset` slots after the
+ledger (by pointing the topology's `ledger_generation.extra_accounts_file` at a
+file it generates). The account is "not yet vesting" at the hardfork slot and
+fully unlocks at its cliff, which is placed `2 * offset` slots after the
 hardfork under correct migration (`offset` slots without it).
 
 After the fork the harness:
@@ -76,8 +136,7 @@ Each requested method is assigned to **at least one** daemon (remaining daemons
 get a random method from the set), so:
 
 - Requesting more methods than there are daemons fails with an error — request
-  fewer methods or grow the network with `--num-whales` / `--num-fish` /
-  `--num-nodes`.
+  fewer methods, or select a topology with more nodes via `--topology-file`.
 - At least one **non-auto** method is required, because auto daemons exit at
   slot-chain-end and the post-fork checks need a still-running daemon. Use
   `advanced` for an auto-equivalent migration path that keeps the daemon alive.
@@ -98,8 +157,16 @@ as the green control.
 ./hardfork_test --main-mina-exe /path/to/mina \
   --main-runtime-genesis-ledger /path/to/runtime_genesis_ledger \
   --fork-mina-exe /path/to/mina-fork \
-  --fork-runtime-genesis-ledger /path/to/runtime_genesis_ledger-fork
+  --fork-runtime-genesis-ledger /path/to/runtime_genesis_ledger-fork \
+  --allow-fork-method advanced \
+  --script-dir /path/to/scripts/hardfork \
+  --topology-file /path/to/scripts/mina-local-network/presets/hf-test-legacy.jsonc
 ```
+
+Most runs go through
+[`scripts/hardfork/build-and-test.sh`](../../../scripts/hardfork/build-and-test.sh),
+which builds both binaries and resolves `--topology <name>` to the preset path
+for you.
 
 ### Required Arguments
 
@@ -107,47 +174,66 @@ as the green control.
 - `--main-runtime-genesis-ledger`: Path to the main runtime genesis ledger executable
 - `--fork-mina-exe`: Path to the fork Mina executable
 - `--fork-runtime-genesis-ledger`: Path to the fork runtime genesis ledger executable
+- `--allow-fork-method`: Fork method to allow (repeatable; `legacy`, `advanced`, or
+  `auto`). See "Fork methods" above.
+- `--script-dir`: Path to the hardfork script directory. Has no default and is
+  rejected when empty, so it must be passed even though it is not enforced by the
+  flag parser.
+- `--topology-file`: Path to the topology preset to run, e.g.
+  `scripts/mina-local-network/presets/hf-test-legacy.jsonc`. Same story: no
+  default, rejected when empty. Takes a **path**, not a name — resolving a name
+  is `build-and-test.sh`'s job, so this binary never has to know the repo layout.
+
+The topology declares the daemons, so it also bounds how many fork methods can
+be requested: every `--allow-fork-method` value is assigned to at least one
+daemon (see "Fork methods" below), so requesting more methods than the topology
+has daemons is an error. Network size is not a command-line option — edit the
+preset, or add a new one.
 
 ### Optional Arguments
 
-#### Network Size
-- `--num-whales`: Number of whale (block-producer) accounts (default: 2). Whales
-  beyond those absorbed by the seed/snark-coordinator run as standalone daemons.
-- `--num-fish`: Number of fish (smaller block-producer) daemons (default: 0)
-- `--num-nodes`: Number of plain (non-block-producing) daemons (default: 0)
-
-The number of daemons bounds how many fork methods can be requested: every
-`--allow-fork-method` value is assigned to at least one daemon (see "Fork
-methods" below), so requesting more methods than there are daemons is an error.
-
 #### Test Configuration
-- `--slot-tx-end`: Slot at which transactions should end (default: 30)
-- `--slot-chain-end`: Slot at which chain should end (default: 38)
+- `--slot-tx-end`: Slot at which transactions should end. Default: a random slot
+  in `[30, 149]`, so runs sweep a range of fork points rather than always forking
+  at the same slot. The effective value is logged at startup — pass it back to
+  reproduce a run, as nothing else about the slot schedule is random.
+- `--slot-chain-end`: Slot at which the chain should end; must exceed
+  `--slot-tx-end` (default: `--slot-tx-end + 8`). The slots between the two are
+  the run of empty blocks that buries the fork block, so the nodes agree on which
+  block the fork was cut at.
 - `--best-chain-query-from`: Slot from which to start calling bestchain query (default: 25)
 
 #### Slot Configuration
-- `--main-slot`: Slot duration in seconds for main version (default: 15)
-- `--fork-slot`: Slot duration in seconds for fork version (default: 15)
+- `--main-slot`: Slot duration in seconds for main version (default: 30)
+- `--fork-slot`: Slot duration in seconds for fork version (default: 30)
 
 #### Delay Configuration
-- `--main-delay`: Delay before genesis slot in minutes for main version (default: 5)
-- `--fork-delay`: Delay before genesis slot in minutes for fork version (default: 5)
+- `--main-delay`: Delay before genesis slot in minutes for main version (default: 4).
+  Must exceed the time it takes to materialize and spawn the network (~2min), or
+  nodes start after the chain start time and miss early slots.
+- `--hf-slot-delta`: Difference in slots between `--slot-chain-end` and the genesis
+  of the new network (default: 18). Fork genesis is fixed before the run starts, so
+  the daemons' idle wait before it is a residual — this many slots minus the work
+  between chain end and the fork network being ready (413-446s across 12 measured CI
+  runs, 300s of which is `--no-new-blocks-wait`). That residual is also the whole
+  margin: if the work overruns it, the daemons start after fork genesis and produce
+  no block.
 
-#### Script Configuration
-- `--script-dir`: Path to the hardfork script directory (default: "$PWD/scripts/hardfork")
+#### Network Root
+- `--root`: Directory in which to create a network; use an absolute path.
 
 #### Timeout Configuration
 - `--shutdown-timeout`: Timeout in minutes to wait for graceful shutdown before forcing kill (default: 10)
 - `--http-timeout`: HTTP client timeout in seconds for GraphQL requests (default: 600)
 
 #### Polling and Retry Configuration
-- `--polling-interval`: Interval in seconds for polling height checks (default: 5)
+- `--polling-interval`: Interval in seconds for polling height checks (default: 8)
 - `--fork-config-retry-delay`: Delay in seconds between fork config fetch retries (default: 60)
 - `--fork-config-max-retries`: Maximum number of retries for fork config fetch (default: 15)
 - `--no-new-blocks-wait`: Wait time in seconds to verify no new blocks after chain end (default: 300)
 - `--user-command-check-max-iterations`: Max iterations to check for user commands in blocks (default: 10)
 - `--fork-earliest-block-max-retries`: Maximum number of retries to wait for earliest block in fork network (default: 10)
-- `--graphql-max-retries`: Maximum number of retries for GraphQL requests (default: 5)
+- `--client-max-retries`: Maximum number of retries for client requests (default: 5)
 
 ## Example
 
@@ -157,6 +243,8 @@ methods" below), so requesting more methods than there are daemons is an error.
   --main-runtime-genesis-ledger ./runtime_genesis_ledger \
   --fork-mina-exe ./mina-develop \
   --fork-runtime-genesis-ledger ./runtime_genesis_ledger-develop \
+  --allow-fork-method advanced \
+  --script-dir ./scripts/hardfork \
   --slot-tx-end 40 \
   --main-delay 10
 ```

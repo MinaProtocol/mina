@@ -1,0 +1,234 @@
+{
+  "$defs": {
+    "BlockProducerCap": {
+      "additionalProperties": false,
+      "description": "The ``--block-producer-key`` capability.\n\nExactly one of ``stake_tier`` (abstract \u2014 the sampler picks a distinct\nonline-tier key) or ``account`` (concrete \u2014 a pin) must be given.",
+      "properties": {
+        "stake_tier": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Stake Tier"
+        },
+        "account": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Account"
+        }
+      },
+      "title": "BlockProducerCap",
+      "type": "object"
+    },
+    "Fragment": {
+      "additionalProperties": false,
+      "description": "A named bundle of capabilities that must share a node.\n\n``replica`` copies are placed on that many *distinct* nodes. Every other\nfield is an optional typed capability; at least one must be present (a\nfragment with no capabilities is meaningless \u2014 bare relay nodes come from the\nnode budget, not from empty fragments).",
+      "properties": {
+        "replica": {
+          "default": 1,
+          "title": "Replica",
+          "type": "integer"
+        },
+        "seed": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SeedCap"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "block_producer": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BlockProducerCap"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "snark_coordinator": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SnarkCoordinatorCap"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "title": "Fragment",
+      "type": "object"
+    },
+    "NodeBudget": {
+      "additionalProperties": false,
+      "description": "The daemon count range \u2014 a merge\u2194spread dial, not an absolute headcount.\n\nA low draw forces fragments to merge; a high draw spreads them and fills the\nsurplus with bare gossip relays.",
+      "properties": {
+        "min": {
+          "title": "Min",
+          "type": "integer"
+        },
+        "max": {
+          "title": "Max",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "min",
+        "max"
+      ],
+      "title": "NodeBudget",
+      "type": "object"
+    },
+    "PlacementRelation": {
+      "description": "How two fragments relate on the physical node map \u2014 exclusion only.\n\n``separate``/``incompatible`` are HARD (no weight); ``avoid_colocate`` is SOFT \u2014\na ``weight`` biases the odds the two fragments land on different nodes.\n\nThere is intentionally no ``together``/``prefer_colocate``: co-location is\nalready expressed by co-listing capabilities in one fragment (they then share a\nnode by definition) or by a low node budget that merges fragments\nopportunistically, and the propagation goal wants spreading, not concentrating.\nForcing two *distinct* fragments together buys nothing and has ambiguous\nreplica semantics, so the relation set stays exclusion-only.",
+      "enum": [
+        "separate",
+        "incompatible",
+        "avoid_colocate"
+      ],
+      "title": "PlacementRelation",
+      "type": "string"
+    },
+    "PlacementRule": {
+      "additionalProperties": false,
+      "description": "A typed relation between two fragments, referenced by name.\n\n``of`` is exactly two fragment names (a self-rule repeats the name). A soft\nrelation requires ``weight`` (a positive int); a hard relation forbids it.",
+      "properties": {
+        "relation": {
+          "$ref": "#/$defs/PlacementRelation"
+        },
+        "of": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Of",
+          "type": "array"
+        },
+        "weight": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Weight"
+        }
+      },
+      "required": [
+        "relation",
+        "of"
+      ],
+      "title": "PlacementRule",
+      "type": "object"
+    },
+    "SeedCap": {
+      "additionalProperties": false,
+      "description": "The ``--seed`` capability. Carries no config (``{}``).",
+      "properties": {},
+      "title": "SeedCap",
+      "type": "object"
+    },
+    "ServiceReq": {
+      "additionalProperties": true,
+      "description": "An external service declared by existence.\n\nIts mandatory wiring (archive fed by a daemon; rosetta to a consistent\narchive+daemon pair) is intrinsic to the component model, not authored here \u2014\nso the minimal form is just ``{ replica: 1 }``. Any extra fields (archive\n``postgres``, ``port``, ``binary``; rosetta ``max_db_pool_size``) pass through\nto the resolved service config unchanged, an explicit extension boundary for\nenvironment specifics; they are validated downstream against the service schema.",
+      "properties": {
+        "replica": {
+          "default": 1,
+          "title": "Replica",
+          "type": "integer"
+        }
+      },
+      "title": "ServiceReq",
+      "type": "object"
+    },
+    "SnarkCoordinatorCap": {
+      "additionalProperties": false,
+      "description": "The ``--snark-coordinator`` capability.\n\n``workers`` prover nodes are wired to this coordinator (they live outside the\ndaemon node budget); ``fee_receiver`` names the account fees are paid to.",
+      "properties": {
+        "workers": {
+          "default": 0,
+          "title": "Workers",
+          "type": "integer"
+        },
+        "fee_receiver": {
+          "title": "Fee Receiver",
+          "type": "string"
+        }
+      },
+      "required": [
+        "fee_receiver"
+      ],
+      "title": "SnarkCoordinatorCap",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "The ``requirements`` block of a v2 topology \u2014 the sampler's whole input.",
+  "properties": {
+    "fragments": {
+      "additionalProperties": {
+        "$ref": "#/$defs/Fragment"
+      },
+      "title": "Fragments",
+      "type": "object"
+    },
+    "nodes": {
+      "$ref": "#/$defs/NodeBudget"
+    },
+    "services": {
+      "additionalProperties": {
+        "$ref": "#/$defs/ServiceReq"
+      },
+      "default": {},
+      "title": "Services",
+      "type": "object"
+    },
+    "placement": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/PlacementRule"
+      },
+      "title": "Placement",
+      "type": "array"
+    },
+    "seed": {
+      "anyOf": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Seed"
+    }
+  },
+  "required": [
+    "fragments",
+    "nodes"
+  ],
+  "title": "Requirements",
+  "type": "object"
+}

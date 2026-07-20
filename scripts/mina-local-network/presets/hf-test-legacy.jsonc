@@ -1,0 +1,100 @@
+{
+  // Network shape for the HardForkTestLegacy job, as a v2 constraint topology:
+  // the network is described by `requirements` (fragments + a node budget) and the
+  // sampler lowers it to concrete daemons. The fragments are abstract -- a seed, two
+  // whale block producers, and a snark coordinator -- and the node budget is a range,
+  // so the sampler draws a fresh valid layout each run (merging capabilities onto
+  // fewer nodes at the low end, spreading them out with bare relays at the high end).
+  // The job runs one fork method, so any layout with >= 2 daemons works; two whale
+  // producers already force >= 2 (one block_producer per node), so min is 2.
+  //
+  // This file is the source of truth for WHAT the network is. The hardfork test
+  // overlays only what cannot be known until the run:
+  //
+  //   state.root                                    --root
+  //   state.extra_files_root                        run temp dir
+  //   state.genesis_timestamp.value                 now + --main-delay
+  //   binaries.mina                                 --main-mina-exe / --fork-mina-exe
+  //   ledger_generation.extra_accounts_file         vesting account temp file
+  //   runtime_config.proof.block_window_duration_ms --main-slot / --fork-slot
+  //   runtime_config.daemon.*                       --slot-tx-end, --slot-chain-end, --hf-slot-delta
+  //   nodes.<name>.extra_args                       per assigned fork method
+  //
+  // The concrete node set, names, and ports are chosen by the sampler and read
+  // back from the plan; the harness lowers the preset once (`plan lower`), builds
+  // its daemon list from those sampled nodes, and both the main and fork networks
+  // render from that single lowered layout -- so they always agree without pinning
+  // a seed.
+  //
+  // The fork network reuses this same layout -- workloads included -- with only the
+  // genesis timestamp, fork binary, and slot duration substituted. Nothing pins
+  // nonces: the fork network inherits the pre-fork ledger, its value_transfer
+  // worker discovers each account's carried-over nonce itself, and the test
+  // asserts every pool account's nonce survived the fork unchanged.
+  "schema_version": 2,
+  "name": "hf-test-legacy",
+
+  "runtime_config": {
+    "genesis": {
+      "slots_per_epoch": 48,
+      "k": 10,
+      "grace_period_slots": 3
+    },
+    "proof": {
+      "level": "full"
+    }
+  },
+
+  "ledger_generation": {
+    "tiers": {
+      // count must cover every whale producer the fragments bind.
+      "whale": {
+        "count": 2,
+        "offline_balance": "11550000mina",
+        "online_balance": "499mina"
+      },
+      "snark_coordinator": {
+        "count": 1,
+        "offline_balance": "5mina"
+      }
+    },
+    "accounts": {
+      "snark-fees": {
+        "balance": "5nanomina",
+        "kind": "snark_fee"
+      }
+    }
+  },
+
+  "requirements": {
+    "fragments": {
+      "seed": { "replica": 1, "seed": {} },
+      "bp": { "replica": 2, "block_producer": { "stake_tier": "whale" } },
+      "coordinator": {
+        "replica": 1,
+        "snark_coordinator": { "workers": 2, "fee_receiver": "snark-fees" }
+      }
+    },
+    // Prefer a producer and the snark coordinator on different nodes, the way a
+    // real network separates the roles. Soft (a weight, not a hard rule) so the
+    // sampler still sometimes merges them and still yields bare relay nodes.
+    "placement": [
+      { "relation": "avoid_colocate", "of": ["bp", "coordinator"], "weight": 3 }
+    ],
+    // Two whale producers need >= 2 nodes (one block_producer per node); capped at
+    // three so the layout stays small enough for CI while still varying.
+    "nodes": { "min": 2, "max": 3 }
+  },
+
+  "workloads": {
+    "value-transfer": {
+      "type": "value_transfer",
+      "start": "after_genesis",
+      "config": {
+        "amount_min": "1mina",
+        "amount_max": "10mina",
+        "interval_seconds": 20
+      }
+    }
+  }
+}

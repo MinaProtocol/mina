@@ -213,7 +213,11 @@ func (t *HardforkTest) CleanupVestingAccount() {
 // asserts that its timing parameters match the expected slot-reduction-updated
 // values. A mismatch (in particular an unchanged cliff time / vesting period) is
 // the signature of the migrate_to_mesa bug.
-func (t *HardforkTest) ValidateVestingAfterFork(port, hardforkSlot int) error {
+//
+// It takes the whole daemon rather than just its port so its log lines can name
+// which daemon (and therefore which fork method) they describe: every daemon
+// validates the same account, so the account alone does not identify them.
+func (t *HardforkTest) ValidateVestingAfterFork(daemon config.DaemonInfo, hardforkSlot int) error {
 	if !t.Config.VestingTestEnabled {
 		return nil
 	}
@@ -224,7 +228,7 @@ func (t *HardforkTest) ValidateVestingAfterFork(port, hardforkSlot int) error {
 
 	expected := account.ExpectedMigratedTiming(hardforkSlot)
 
-	actual, err := t.Client.AccountTiming(port, account.PK)
+	actual, err := t.Client.AccountTiming(&daemon, account.PK)
 	if err != nil {
 		return fmt.Errorf("failed to query vesting account timing on fork network: %w", err)
 	}
@@ -253,8 +257,10 @@ func (t *HardforkTest) ValidateVestingAfterFork(port, hardforkSlot int) error {
 	}
 
 	t.Logger.Info(
-		"Vesting test: account %s timing correctly migrated (cliff_time=%d, vesting_period=%d)",
-		account.PK, actual.Timing.CliffTime, actual.Timing.VestingPeriod,
+		"Vesting test: daemon %s (fork method %s): account %s timing correctly migrated "+
+			"(cliff_time=%d, vesting_period=%d)",
+		daemon.Name, daemon.ForkMethod, account.PK,
+		actual.Timing.CliffTime, actual.Timing.VestingPeriod,
 	)
 	return nil
 }
@@ -274,12 +280,11 @@ func (t *HardforkTest) ValidateVestingOnForkNetwork(hardforkSlot int) error {
 
 	var timingErrors []string
 	for _, daemon := range t.Config.DaemonInfos {
-		port := daemon.Port(config.PORT_REST)
 		t.Logger.Info(
 			"Vesting test: validating migrated timing on daemon %s using fork method %s (REST port %d)",
-			daemon.Name, daemon.ForkMethod, port,
+			daemon.Name, daemon.ForkMethod, daemon.Port(config.PORT_REST),
 		)
-		if err := t.ValidateVestingAfterFork(port, hardforkSlot); err != nil {
+		if err := t.ValidateVestingAfterFork(daemon, hardforkSlot); err != nil {
 			timingErrors = append(timingErrors, fmt.Sprintf(
 				"%s using fork method %s: %v",
 				daemon.Name, daemon.ForkMethod, err,
@@ -297,12 +302,11 @@ func (t *HardforkTest) ValidateVestingOnForkNetwork(hardforkSlot int) error {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			port := daemon.Port(config.PORT_REST)
 			t.Logger.Info(
 				"Vesting test: watching liquid balance on daemon %s using fork method %s (REST port %d)",
-				daemon.Name, daemon.ForkMethod, port,
+				daemon.Name, daemon.ForkMethod, daemon.Port(config.PORT_REST),
 			)
-			err := t.ValidateVestingLiquidUnlock(port, hardforkSlot)
+			err := t.ValidateVestingLiquidUnlock(daemon, hardforkSlot)
 			results <- validationResult{daemon: daemon, err: err}
 		}()
 	}
@@ -335,7 +339,10 @@ func (t *HardforkTest) ValidateVestingOnForkNetwork(hardforkSlot int) error {
 // The check only *fails* on a definitive early unlock; if the network does not
 // reach the expected cliff within the polling window it logs a warning and
 // returns nil, leaving ValidateVestingAfterFork as the authoritative gate.
-func (t *HardforkTest) ValidateVestingLiquidUnlock(port, hardforkSlot int) error {
+// It takes the whole daemon rather than just its port for the same reason as
+// ValidateVestingAfterFork: these run concurrently, one per daemon, and all
+// watch the same account, so only the daemon name distinguishes their output.
+func (t *HardforkTest) ValidateVestingLiquidUnlock(daemon config.DaemonInfo, hardforkSlot int) error {
 	if !t.Config.VestingTestEnabled {
 		return nil
 	}
@@ -352,21 +359,22 @@ func (t *HardforkTest) ValidateVestingLiquidUnlock(port, hardforkSlot int) error
 	deadline := time.Now().Add(maxWait)
 
 	t.Logger.Info(
-		"Vesting test: watching liquid balance of %s; it must stay locked until slot %d",
-		account.PK, expectedCliff,
+		"Vesting test: daemon %s (fork method %s): watching liquid balance of %s; "+
+			"it must stay locked until slot %d",
+		daemon.Name, daemon.ForkMethod, account.PK, expectedCliff,
 	)
 
 	for time.Now().Before(deadline) {
 		// Query the account first, then the best tip, so the slot we compare
 		// against is never *earlier* than the slot the liquid balance was
 		// computed at. This makes an "unlocked too early" verdict reliable.
-		acct, err := t.Client.AccountTiming(port, account.PK)
+		acct, err := t.Client.AccountTiming(&daemon, account.PK)
 		if err != nil {
 			t.Logger.Debug("Vesting test: failed to query account liquid balance: %v", err)
 			time.Sleep(time.Duration(t.Config.PollingIntervalSeconds) * time.Second)
 			continue
 		}
-		tip, err := t.Client.BestTip(port)
+		tip, err := t.Client.BestTip(&daemon)
 		if err != nil {
 			t.Logger.Debug("Vesting test: failed to query best tip: %v", err)
 			time.Sleep(time.Duration(t.Config.PollingIntervalSeconds) * time.Second)
@@ -386,8 +394,9 @@ func (t *HardforkTest) ValidateVestingLiquidUnlock(port, hardforkSlot int) error
 		if tip.Slot >= expectedCliff {
 			if fullyLiquid {
 				t.Logger.Info(
-					"Vesting test: account %s became fully liquid at/after slot %d as expected",
-					account.PK, expectedCliff,
+					"Vesting test: daemon %s (fork method %s): account %s became fully liquid "+
+						"at/after slot %d as expected",
+					daemon.Name, daemon.ForkMethod, account.PK, expectedCliff,
 				)
 				return nil
 			}
@@ -399,9 +408,9 @@ func (t *HardforkTest) ValidateVestingLiquidUnlock(port, hardforkSlot int) error
 	}
 
 	t.Logger.Info(
-		"Vesting test: fork network did not reach the expected cliff slot %d within the polling window; "+
-			"relying on the timing-parameter assertion for correctness",
-		expectedCliff,
+		"Vesting test: daemon %s (fork method %s): fork network did not reach the expected cliff "+
+			"slot %d within the polling window; relying on the timing-parameter assertion for correctness",
+		daemon.Name, daemon.ForkMethod, expectedCliff,
 	)
 	return nil
 }
