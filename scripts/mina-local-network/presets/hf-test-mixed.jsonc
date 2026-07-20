@@ -1,0 +1,82 @@
+{
+  // Network shape for the HardForkTestMixed job, as a v2 constraint topology: the
+  // same abstract fragments as hf-test-legacy (a seed, two whale block producers, a
+  // snark coordinator), but a larger node budget.
+  //
+  // That job requests three fork methods (legacy, advanced, auto) and every
+  // requested method must be assigned to at least one daemon, so three methods need
+  // three daemons. The four fragment-replicas already force >= 3 distinct nodes (the
+  // two producers cannot share a node, and the coordinator merges onto at most one of
+  // the seed/producer nodes), so a min of 3 guarantees the third fork method a
+  // daemon; the sampler still varies which capabilities merge and whether a fourth
+  // bare relay appears.
+  //
+  // See hf-test-legacy.jsonc for which fields the test overlays at run time and for
+  // how the harness lowers the preset once and reads the sampled node set back.
+  "schema_version": 2,
+  "name": "hf-test-mixed",
+
+  "runtime_config": {
+    "genesis": {
+      "slots_per_epoch": 48,
+      "k": 10,
+      "grace_period_slots": 3
+    },
+    "proof": {
+      "level": "full"
+    }
+  },
+
+  "ledger_generation": {
+    "tiers": {
+      // count must cover every whale producer the fragments bind.
+      "whale": {
+        "count": 2,
+        "offline_balance": "11550000mina",
+        "online_balance": "499mina"
+      },
+      "snark_coordinator": {
+        "count": 1,
+        "offline_balance": "5mina"
+      }
+    },
+    "accounts": {
+      "snark-fees": {
+        "balance": "5nanomina",
+        "kind": "snark_fee"
+      }
+    }
+  },
+
+  "requirements": {
+    "fragments": {
+      "seed": { "replica": 1, "seed": {} },
+      "bp": { "replica": 2, "block_producer": { "stake_tier": "whale" } },
+      "coordinator": {
+        "replica": 1,
+        "snark_coordinator": { "workers": 2, "fee_receiver": "snark-fees" }
+      }
+    },
+    // Prefer a producer and the snark coordinator on different nodes, the way a
+    // real network separates the roles. Soft (a weight, not a hard rule) so the
+    // sampler still sometimes merges them and still yields bare relay nodes.
+    "placement": [
+      { "relation": "avoid_colocate", "of": ["bp", "coordinator"], "weight": 3 }
+    ],
+    // Three fork methods need three daemons; capped at four so the layout stays
+    // small enough for CI while still varying (merge vs. spread + a bare relay).
+    "nodes": { "min": 3, "max": 4 }
+  },
+
+  "workloads": {
+    "value-transfer": {
+      "type": "value_transfer",
+      "start": "after_genesis",
+      "config": {
+        "amount_min": "1mina",
+        "amount_max": "10mina",
+        "interval_seconds": 20
+      }
+    }
+  }
+}

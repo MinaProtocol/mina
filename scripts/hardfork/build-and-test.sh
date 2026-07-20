@@ -14,9 +14,10 @@ set -eux -o pipefail
 
 PREFORK=""
 POSTFORK=""
+TOPOLOGY="legacy"
 EXTRA_ARGS=()
 
-USAGE="Usage: $0 --fork-from <PREFORK> [--fork-into <POSTFORK>] [ADDITIONAL ARGS TO HF TEST...]"
+USAGE="Usage: $0 --fork-from <PREFORK> [--fork-into <POSTFORK>] [--topology <NAME>] [ADDITIONAL ARGS TO HF TEST...]"
 usage() {
   if (( $# > 0 )); then
     echo "$1" >&2
@@ -45,6 +46,14 @@ while [[ $# -gt 0 ]]; do
         usage "Error: $1 requires an argument."
       fi
       POSTFORK="$2"
+      shift 2
+      ;;
+    --topology)
+      # ensure value exists
+      if [[ $# -lt 2 ]]; then
+        usage "Error: $1 requires an argument."
+      fi
+      TOPOLOGY="$2"
       shift 2
       ;;
     --help|-h)
@@ -96,6 +105,17 @@ fi
 pushd "$(git rev-parse --show-toplevel)"
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 
+# The topology presets live with mina-local-network, next to the schema that
+# governs them. Resolving the name to a path is this script's job: hardfork_test
+# is handed a file and never has to know the repo layout.
+#
+# Checked here, before the two nix builds, so a typo costs a second rather than
+# the ~50 minutes it takes to reach the step that reads it.
+TOPOLOGY_FILE="$SCRIPT_DIR/../mina-local-network/presets/hf-test-$TOPOLOGY.jsonc"
+if [[ ! -f "$TOPOLOGY_FILE" ]]; then
+  usage "Error: unknown topology '$TOPOLOGY' (no such preset: $TOPOLOGY_FILE)"
+fi
+
 if [ -n "${BUILDKITE:-}" ]; then
   git config --global --add safe.directory /workdir
 fi
@@ -109,10 +129,22 @@ POSTFORK="${POSTFORK:-origin/develop}"
 
 if [ -n "${BUILDKITE:-}" ]; then
   # This is a CI run, ensure nix docker has everything what we want.
-  nix-env -iA unstable.{curl,gawk,git-lfs,gnused,jq,python311}
+  #
+  # Only what this script's own path actually needs: curl, because the daemon
+  # shells out to it to fetch genesis ledgers (src/lib/cache_dir/native/
+  # cache_dir.ml); jq, because create_runtime_config.sh builds the fork config
+  # with it; and python, for the venv below. The nix builds are sandboxed with
+  # their own closures and do not read this profile.
+  nix-env -iA unstable.{curl,jq,python311}
 
+  # Putting the venv on PATH is all `activate` does that matters here (it sets
+  # PATH, VIRTUAL_ENV and a prompt; nothing reads the latter two). Doing it
+  # directly keeps the script statically analysable: `activate` does not exist
+  # until the line above runs, so sourcing it is a permanent shellcheck blind
+  # spot. PATH is what pip installs into, and what the `python3` that
+  # hardfork_test spawns resolves through.
   python -m venv .venv
-  source .venv/bin/activate
+  export PATH="$PWD/.venv/bin:$PATH"
   pip install -r scripts/mina-local-network/requirements.txt
 
   # Manually patch zone infos, nix doesn't provide stdenv breaking janestreet's core
@@ -145,8 +177,8 @@ nix "${NIX_OPTS[@]}" build "$PWD?submodules=1#devnet" --out-link "postfork-devne
 # 3. Upload to nix cache 
 
 if [[ -n "${NIX_CACHE_GCP_ID:-}" ]] && [[ -n "${NIX_CACHE_GCP_SECRET:-}" ]]; then
-  mkdir -p $HOME/.aws
-  cat <<EOF> $HOME/.aws/credentials
+  mkdir -p "$HOME/.aws"
+  cat <<EOF> "$HOME/.aws/credentials"
 [default]
 aws_access_key_id=$NIX_CACHE_GCP_ID
 aws_secret_access_key=$NIX_CACHE_GCP_SECRET
@@ -164,20 +196,40 @@ nix "${NIX_OPTS[@]}" build "$PWD?submodules=1#hardfork_test" --out-link "hardfor
 
 # 5. Execute hardfork_test on them.
 
-SLOT_TX_END=${SLOT_TX_END:-$((RANDOM%120+30))}      
-# WARN: ensure SLOT_CHAIN_END - SLOT_TX_END > k is always true!
-SLOT_CHAIN_END=${SLOT_CHAIN_END:-$((SLOT_TX_END+8))}
-
 NETWORK_ROOT=$(mktemp -d --tmpdir hardfork-network.XXXXXXX)
 
+# The network root holds a config directory per daemon: rocksdb databases, the
+# genesis and epoch ledgers, precomputed-block logs and any crash reports. It
+# grows with the length of the run and nothing else ever reclaims it, so leaving
+# it behind is a disk leak on whatever host the test ran on. Remove it on every
+# exit path — failures included, which is precisely when a leak would otherwise
+# happen. Set HARDFORK_KEEP_NETWORK_ROOT=1 to retain it for local debugging.
+cleanup_network_root() {
+  local status=$?
+  if [[ -n "${HARDFORK_KEEP_NETWORK_ROOT:-}" ]]; then
+    echo "Keeping network root for debugging: $NETWORK_ROOT" >&2
+  else
+    echo "Removing network root: $NETWORK_ROOT" >&2
+    rm -rf "$NETWORK_ROOT" || echo "Warning: could not remove $NETWORK_ROOT" >&2
+  fi
+  return "$status"
+}
+trap cleanup_network_root EXIT
+
+# The slot schedule is hardfork_test's to decide: it randomizes slot-tx-end,
+# derives slot-chain-end from it, and logs both. Deriving it needs the network's
+# consensus parameters, which only hardfork_test reads (from the topology), so
+# this script cannot compute it without keeping a second copy of them.
+#
+# To pin a run to a known fork point, pass --slot-tx-end through as an extra
+# argument; hardfork_test logs whatever it settled on.
 hardfork_test/bin/hardfork_test \
   --main-mina-exe prefork-devnet/bin/mina \
   --main-runtime-genesis-ledger prefork-devnet/bin/runtime_genesis_ledger \
   --fork-mina-exe postfork-devnet/bin/mina \
   --fork-runtime-genesis-ledger postfork-devnet/bin/runtime_genesis_ledger \
-  --slot-tx-end "$SLOT_TX_END" \
-  --slot-chain-end "$SLOT_CHAIN_END" \
   --script-dir "$SCRIPT_DIR" \
+  --topology-file "$TOPOLOGY_FILE" \
   --root "$NETWORK_ROOT" \
   "${EXTRA_ARGS[@]}"
 
