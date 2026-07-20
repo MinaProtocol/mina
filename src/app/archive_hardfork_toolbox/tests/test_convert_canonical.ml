@@ -618,8 +618,9 @@ let test_convert_scenario
   let postgres_uri = Uri.of_string (sprintf "%s/%s" conn_str db_name) in
   let%bind () =
     Logic.convert_chain_to_canonical ~postgres_uri
-      ~latest_block_state_hash:target_hash
-      ~expected_protocol_version_str:protocol_version ~stop_at_slot:None ()
+      ?target_block_hash:(Some target_hash)
+      ?protocol_version_str:(Some protocol_version) ~stop_at_slot:None
+      ~dry_run:false ()
   in
 
   (* Get results *)
@@ -639,9 +640,297 @@ let make_test scenario =
   Thread_safe.block_on_async_exn (test_convert_scenario scenario)
   |> Or_error.ok_exn
 
+(* Two-protocol-version fixture with a real hard-fork boundary: the pre-fork tail
+   (B, C) is left pending, and C is the parent of the post-fork genesis F
+   (global_slot_since_hard_fork = 0). Used to exercise auto-detection and dry-run. *)
+let auto_detect_blocks : Block.t list =
+  [ { id = 1
+    ; state_hash = "A"
+    ; parent_id = None
+    ; parent_hash = "0"
+    ; height = 1
+    ; global_slot_since_genesis = 0
+    ; global_slot_since_hard_fork = 0
+    ; protocol_version_id = 1
+    ; chain_status = "canonical"
+    }
+  ; { id = 2
+    ; state_hash = "B"
+    ; parent_id = Some 1
+    ; parent_hash = "A"
+    ; height = 2
+    ; global_slot_since_genesis = 1
+    ; global_slot_since_hard_fork = 1
+    ; protocol_version_id = 1
+    ; chain_status = "pending"
+    }
+  ; { id = 3
+    ; state_hash = "C"
+    ; parent_id = Some 2
+    ; parent_hash = "B"
+    ; height = 3
+    ; global_slot_since_genesis = 2
+    ; global_slot_since_hard_fork = 2
+    ; protocol_version_id = 1
+    ; chain_status = "pending"
+    }
+  ; { id = 4
+    ; state_hash = "F"
+    ; parent_id = Some 3
+    ; parent_hash = "C"
+    ; height = 4
+    ; global_slot_since_genesis = 3
+    ; global_slot_since_hard_fork = 0
+    ; protocol_version_id = 2
+    ; chain_status = "canonical"
+    }
+  ; { id = 5
+    ; state_hash = "G"
+    ; parent_id = Some 4
+    ; parent_hash = "F"
+    ; height = 5
+    ; global_slot_since_genesis = 4
+    ; global_slot_since_hard_fork = 1
+    ; protocol_version_id = 2
+    ; chain_status = "canonical"
+    }
+  ]
+
+let setup_db db_name blocks =
+  let open Deferred.Or_error.Let_syntax in
+  let conn_str = get_postgres_uri () in
+  let%bind () = TestDb.drop_database_if_exists conn_str db_name in
+  let%bind () = TestDb.create_database conn_str db_name in
+  let%bind () = TestDb.create_test_schema conn_str db_name in
+  let%bind () =
+    TestDb.insert_protocol_versions conn_str db_name [ (1, 0, 0); (2, 0, 0) ]
+  in
+  let%bind () = TestDb.insert_blocks conn_str db_name blocks in
+  return conn_str
+
+let check_blocks conn_str db_name ~name expected =
+  let open Deferred.Or_error.Let_syntax in
+  let%bind actual = TestDb.get_all_blocks conn_str db_name in
+  if List.equal BlockState.equal actual expected then (
+    printf "✅ Test %s passed\n" name ;
+    Deferred.Or_error.return () )
+  else (
+    printf "❌ Test %s failed\n" name ;
+    printf "Expected: %s\n" (List.to_string ~f:BlockState.show expected) ;
+    printf "Actual: %s\n" (List.to_string ~f:BlockState.show actual) ;
+    Deferred.Or_error.error_string (sprintf "Test %s failed" name) )
+
+(* With no target/protocol flags, the tool auto-detects the latest boundary:
+   parent of F is C (protocol version 1.0.0), so the pre-fork tail A..C becomes
+   canonical, while F and G (post-fork) are untouched. *)
+let test_auto_detect_latest_boundary () =
+  let open Deferred.Or_error.Let_syntax in
+  let name = "test_auto_detect_latest_boundary" in
+  let db_name = sprintf "test_%s" name in
+  let%bind conn_str = setup_db db_name auto_detect_blocks in
+  let postgres_uri = Uri.of_string (sprintf "%s/%s" conn_str db_name) in
+  let%bind () =
+    Logic.convert_chain_to_canonical ~postgres_uri ~stop_at_slot:None
+      ~dry_run:false ()
+  in
+  check_blocks conn_str db_name ~name
+    [ { state_hash = "A"; expected_chain_status = "canonical" }
+    ; { state_hash = "B"; expected_chain_status = "canonical" }
+    ; { state_hash = "C"; expected_chain_status = "canonical" }
+    ; { state_hash = "F"; expected_chain_status = "canonical" }
+    ; { state_hash = "G"; expected_chain_status = "canonical" }
+    ]
+
+(* A dry run auto-detects and reports but writes nothing: statuses stay as in the
+   input fixture (B, C remain pending). *)
+let test_dry_run_writes_nothing () =
+  let open Deferred.Or_error.Let_syntax in
+  let name = "test_dry_run_writes_nothing" in
+  let db_name = sprintf "test_%s" name in
+  let%bind conn_str = setup_db db_name auto_detect_blocks in
+  let postgres_uri = Uri.of_string (sprintf "%s/%s" conn_str db_name) in
+  let%bind () =
+    Logic.convert_chain_to_canonical ~postgres_uri ~stop_at_slot:None
+      ~dry_run:true ()
+  in
+  check_blocks conn_str db_name ~name
+    [ { state_hash = "A"; expected_chain_status = "canonical" }
+    ; { state_hash = "B"; expected_chain_status = "pending" }
+    ; { state_hash = "C"; expected_chain_status = "pending" }
+    ; { state_hash = "F"; expected_chain_status = "canonical" }
+    ; { state_hash = "G"; expected_chain_status = "canonical" }
+    ]
+
+(* Emergency hard fork that does NOT bump the protocol version: pre-fork (A..C, L)
+   and post-fork (F, G) all share protocol version 1.0.0. F is the post-fork
+   genesis (global_slot_since_hard_fork = 0) built on the fork parent C; L is a
+   leftover on the old chain, also a child of C but below the fork boundary. The
+   pre-fork tail B, C must become canonical, the leftover L orphaned, and the
+   post-fork chain F, G must be left canonical (the boundary protects it even
+   though it shares the protocol version). *)
+let same_protocol_version_blocks : Block.t list =
+  [ { id = 1
+    ; state_hash = "A"
+    ; parent_id = None
+    ; parent_hash = "0"
+    ; height = 1
+    ; global_slot_since_genesis = 0
+    ; global_slot_since_hard_fork = 0
+    ; protocol_version_id = 1
+    ; chain_status = "canonical"
+    }
+  ; { id = 2
+    ; state_hash = "B"
+    ; parent_id = Some 1
+    ; parent_hash = "A"
+    ; height = 2
+    ; global_slot_since_genesis = 1
+    ; global_slot_since_hard_fork = 1
+    ; protocol_version_id = 1
+    ; chain_status = "pending"
+    }
+  ; { id = 3
+    ; state_hash = "C"
+    ; parent_id = Some 2
+    ; parent_hash = "B"
+    ; height = 3
+    ; global_slot_since_genesis = 2
+    ; global_slot_since_hard_fork = 2
+    ; protocol_version_id = 1
+    ; chain_status = "pending"
+    }
+  ; { id = 4
+    ; state_hash = "L"
+    ; parent_id = Some 3
+    ; parent_hash = "C"
+    ; height = 4
+    ; global_slot_since_genesis = 3
+    ; global_slot_since_hard_fork = 3
+    ; protocol_version_id = 1
+    ; chain_status = "pending"
+    }
+  ; { id = 5
+    ; state_hash = "F"
+    ; parent_id = Some 3
+    ; parent_hash = "C"
+    ; height = 4
+    ; global_slot_since_genesis = 4
+    ; global_slot_since_hard_fork = 0
+    ; protocol_version_id = 1
+    ; chain_status = "canonical"
+    }
+  ; { id = 6
+    ; state_hash = "G"
+    ; parent_id = Some 5
+    ; parent_hash = "F"
+    ; height = 5
+    ; global_slot_since_genesis = 5
+    ; global_slot_since_hard_fork = 1
+    ; protocol_version_id = 1
+    ; chain_status = "canonical"
+    }
+  ]
+
+let test_same_protocol_version_fork () =
+  let open Deferred.Or_error.Let_syntax in
+  let name = "test_same_protocol_version_fork" in
+  let db_name = sprintf "test_%s" name in
+  let%bind conn_str = setup_db db_name same_protocol_version_blocks in
+  let postgres_uri = Uri.of_string (sprintf "%s/%s" conn_str db_name) in
+  let%bind () =
+    Logic.convert_chain_to_canonical ~postgres_uri ~stop_at_slot:None
+      ~dry_run:false ()
+  in
+  check_blocks conn_str db_name ~name
+    [ { state_hash = "A"; expected_chain_status = "canonical" }
+    ; { state_hash = "B"; expected_chain_status = "canonical" }
+    ; { state_hash = "C"; expected_chain_status = "canonical" }
+    ; { state_hash = "F"; expected_chain_status = "canonical" }
+    ; { state_hash = "G"; expected_chain_status = "canonical" }
+    ; { state_hash = "L"; expected_chain_status = "orphaned" }
+    ]
+
+let query_summary_counts conn_str db_name ~canonical_block_ids
+    ~fork_boundary_slot ~protocol_version =
+  TestDb.with_pool conn_str ~db_name (fun pool ->
+      Deferred.Or_error.try_with (fun () ->
+          Mina_caqti.query pool
+            ~f:
+              (Sql.conversion_summary_counts ~canonical_block_ids
+                 ~stop_at_slot:None ~fork_boundary_slot ~protocol_version ) ) )
+
+(* Focused unit test for the change-plan summary counts. Uses the
+   same-protocol-version fixture: canonical set {A, B, C} (ids 1..3), leftover L
+   (id 4) to orphan, and the post-fork chain F, G held out by the boundary slot.
+   Asserts the exact 4-tuple (to_canonical, pending_to_canonical, to_orphaned,
+   pending_to_orphaned), then re-runs against a fixture where L is already
+   orphaned to confirm to_orphaned excludes settled rows (so a re-run reports 0
+   rather than recounting them). *)
+let test_summary_counts () =
+  let open Deferred.Or_error.Let_syntax in
+  let canonical_block_ids = [ 1; 2; 3 ] in
+  let protocol_version = Sql.Protocol_version.of_string "1.0.0" in
+  (* F is the post-fork genesis at global_slot_since_genesis = 4; the boundary
+     keeps F, G out of every count while L (slot 3) stays in. *)
+  let fork_boundary_slot = Some 4L in
+  let check ~name ~blocks ~expected =
+    let db_name = sprintf "test_%s" name in
+    let%bind conn_str = setup_db db_name blocks in
+    let%bind actual =
+      query_summary_counts conn_str db_name ~canonical_block_ids
+        ~fork_boundary_slot ~protocol_version
+    in
+    let show (a, b, c, d) = sprintf "(%d, %d, %d, %d)" a b c d in
+    if [%equal: int * int * int * int] actual expected then (
+      printf "✅ Test %s passed\n" name ;
+      Deferred.Or_error.return () )
+    else (
+      printf "❌ Test %s failed: expected %s, got %s\n" name (show expected)
+        (show actual) ;
+      Deferred.Or_error.error_string (sprintf "Test %s failed" name) )
+  in
+  (* Fresh fixture: A,B,C become canonical (2 of them pending), L becomes
+     orphaned (pending). *)
+  let%bind () =
+    check ~name:"summary_counts_fresh" ~blocks:same_protocol_version_blocks
+      ~expected:(3, 2, 1, 1)
+  in
+  (* Re-run: L is already orphaned, so to_orphaned and pending_to_orphaned drop
+     to 0 while the canonical counts are unchanged. *)
+  let orphaned_leftover_blocks =
+    List.map same_protocol_version_blocks ~f:(fun block ->
+        if String.equal block.Block.state_hash "L" then
+          { block with Block.chain_status = "orphaned" }
+        else block )
+  in
+  check ~name:"summary_counts_rerun" ~blocks:orphaned_leftover_blocks
+    ~expected:(3, 2, 0, 0)
+
 let () =
   Alcotest.run "Archive Hardfork Toolbox Tests"
     [ ( "convert_chain_to_canonical"
       , List.map TestScenarios.all_scenarios ~f:(fun scenario ->
             (scenario.name, `Quick, fun () -> make_test scenario) ) )
+    ; ( "convert_chain_to_canonical_extras"
+      , [ ( "test_auto_detect_latest_boundary"
+          , `Quick
+          , fun () ->
+              Thread_safe.block_on_async_exn test_auto_detect_latest_boundary
+              |> Or_error.ok_exn )
+        ; ( "test_dry_run_writes_nothing"
+          , `Quick
+          , fun () ->
+              Thread_safe.block_on_async_exn test_dry_run_writes_nothing
+              |> Or_error.ok_exn )
+        ; ( "test_same_protocol_version_fork"
+          , `Quick
+          , fun () ->
+              Thread_safe.block_on_async_exn test_same_protocol_version_fork
+              |> Or_error.ok_exn )
+        ; ( "test_summary_counts"
+          , `Quick
+          , fun () ->
+              Thread_safe.block_on_async_exn test_summary_counts
+              |> Or_error.ok_exn )
+        ] )
     ]

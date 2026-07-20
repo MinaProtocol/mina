@@ -57,6 +57,7 @@ func init() {
 	rootCmd.Flags().StringVar(&cfg.MainRuntimeGenesisLedger, "main-runtime-genesis-ledger", "", "Path to the main runtime genesis ledger executable (required)")
 	rootCmd.Flags().StringVar(&cfg.ForkMinaExe, "fork-mina-exe", "", "Path to the fork Mina executable (required)")
 	rootCmd.Flags().StringVar(&cfg.ForkRuntimeGenesisLedger, "fork-runtime-genesis-ledger", "", "Path to the fork runtime genesis ledger executable (required)")
+	rootCmd.Flags().StringVar(&cfg.MinaGraphqlClientExe, "mina-graphql-client-exe", "mina-graphql-client", "Path to the mina-graphql-client executable")
 
 	// Network size. These also bound how many fork methods can be requested at
 	// once, since every --allow-fork-method needs at least one daemon.

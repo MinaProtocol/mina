@@ -59,19 +59,27 @@ RUN echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.
 ENV USE_GKE_GCLOUD_AUTH_PLUGIN=True
 
 # Mina daemon package
-# jemalloc is also installed automatically here to match the package dependencies for this $deb_codename
+# jemalloc is also installed automatically here to match the package dependencies for this $deb_codename.
+# Both the postfork metapackage and the legacy prefork package are installed
+# DIRECTLY from the local build context: scripts/docker/build.sh stages the
+# freshly-built .deb files (and, via read_all_from_cache.sh, the legacy-root
+# debs) under _debs, which we COPY to /opt/mina-local-debs, and
+# install-mina-debs.sh installs the resolved .deb files with apt-get (no apt
+# repo / no apt index). The postfork metapackage depends on mina-logproc, which
+# has no repo to resolve it, so it is requested explicitly as a local file. The
+# prefork package's (unversioned) mina-logproc dependency is already satisfied
+# by that install, so the legacy prefork step only needs the prefork package.
+COPY scripts/install-mina-debs.sh /usr/local/bin/install-mina-debs.sh
+COPY _debs /opt/mina-local-debs
 RUN echo "Building image with version $deb_version from repo $deb_release $deb_codename for network $network" \
-  && echo "deb [trusted=yes] ${deb_repo} $deb_codename $deb_release" > /etc/apt/sources.list.d/o1.list \
-  && apt-get update --quiet --yes \
-  && apt-get install --no-install-recommends --quiet --yes --allow-downgrades "${MINA_DEB}=$deb_version" \
-  && rm -rf /var/lib/apt/lists/*
+  && chmod +x /usr/local/bin/install-mina-debs.sh \
+  && /usr/local/bin/install-mina-debs.sh \
+       "${MINA_DEB}=$deb_version" \
+       "mina-logproc=$deb_version"
 
-RUN echo "Installing legacy package with version $deb_version from repo $deb_release $deb_codename for network $network" \
-  && echo "deb [trusted=yes] ${deb_repo} ${deb_codename} ${deb_release}" > /etc/apt/sources.list.d/o1.list \
-  && cat /etc/apt/sources.list.d/o1.list \
-  && apt-get update --quiet --yes \
-  && apt-get install --quiet --yes --no-install-recommends --allow-downgrades "mina-${network}-prefork-mesa=$deb_legacy_version" \
-  && rm -rf /var/lib/apt/lists/*
+RUN echo "Installing legacy package with version $deb_legacy_version from repo $deb_release $deb_codename for network $network" \
+  && /usr/local/bin/install-mina-debs.sh \
+       "mina-${network}-prefork-mesa=$deb_legacy_version"
 
 # Move to a non-root UID in the future (specifically 50000, as it is memorable and safely within the bounds of most systems)
 # for now stick to root for compatibility

@@ -9,7 +9,6 @@
   async_kernel
   uri
   stdio
-  yojson
   caqti-driver-postgresql
   caqti
   cli_lib
@@ -19,6 +18,8 @@
   base
   base.caml
   integers
+  yojson
+  ppx_deriving_yojson.runtime
   ;; local libraries
   logger
   archive_lib
@@ -42,7 +43,7 @@
   signature_lib
   unsigned_extended
   with_hash)
- (modules logic sql)
+ (modules logic sql config utils change_plan)
  (instrumentation
   (backend bisect_ppx))
  (preprocess
@@ -53,6 +54,7 @@
    ppx_mina
    ppx_sexp_conv
    ppx_string
+   ppx_deriving_yojson
    ppx_version)))
 
 (executable
@@ -67,7 +69,6 @@
   async_kernel
   uri
   stdio
-  yojson
   caqti-driver-postgresql
   caqti
   cli_lib
@@ -78,6 +79,7 @@
   base.caml
   async.async_command
   integers
+  yojson
   ;; local libraries
   archive_hardfork_toolbox_lib
   logger

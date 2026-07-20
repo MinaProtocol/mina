@@ -64,7 +64,17 @@ let _json_serialization_roundtrips_from_file () =
   json_serialization_roundtrips_impl
   @@ In_channel.read_all large_precomputed_json_file
 
-let field_element_decimal_deserialization () =
+(* TODO Restore this test once the regtest-devnet-319281 sample can be
+   regenerated with the native-kimchi proof format. The committed fixture was
+   exported from a real devnet block and contains a zkApp account update whose
+   [authorization] Pickles proof is serialized in the pre-native-kimchi format;
+   it no longer deserializes against the new Proof/All_evals types (fails with
+   "array_of_sexp: list needed"). The local `dump_blocks` tool only generates
+   signed-command payments, so it cannot produce a replacement block with a
+   zkApp Proof authorization (and the decimal-encoded field element in
+   authorization_kind that this test is meant to exercise). Regeneration
+   requires a block sourced from a network running the new format. *)
+let _field_element_decimal_deserialization () =
   let filename =
     "regtest-devnet-319281-3NKq8WXEzMFJH3VdmK4seCTpciyjSY2Rf39K7q1Yyt1p4HkqSzqA.json"
   in
@@ -91,10 +101,14 @@ let () =
                  json_serialization_roundtrips_from_file
           *)
         ] )
-    ; ( "field element represented by decimal"
-      , [ test_case "block is deserializable" `Quick
-            field_element_decimal_deserialization
-        ] )
+      (* TODO Restore this test once regtest-devnet-319281 can be regenerated
+         with the native-kimchi proof format (see comment on
+         _field_element_decimal_deserialization above).
+         ; ( "field element represented by decimal"
+           , [ test_case "block is deserializable" `Quick
+                 _field_element_decimal_deserialization
+             ] )
+      *)
       (* TODO Restore these tests once hetzner-itn-1-1795 can be regenerated
 
          ; ( "memory caching"

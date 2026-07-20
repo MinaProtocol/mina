@@ -279,20 +279,23 @@ let close_protocol ?(reset_existing_streams = false) t ~protocol =
       (module Libp2p_ipc.Rpcs.RemoveStreamHandler)
       (Libp2p_ipc.Rpcs.RemoveStreamHandler.create_request ~protocol)
   in
-  if reset_existing_streams then
-    Hashtbl.filter_inplace t.streams ~f:(fun stream ->
-        if not (String.equal (Libp2p_stream.protocol stream) protocol) then true
-        else (
-          don't_wait_for
-            (* TODO: this probably needs to be more thorough than a reset. Also force the write pipe closed? *)
-            ( match%map Libp2p_stream.reset ~helper:t.helper stream with
-            | Ok () ->
-                ()
-            | Error e ->
-                [%log' error t.logger]
-                  "failed to reset stream while closing protocol: $error"
-                  ~metadata:[ ("error", `String (Error.to_string_hum e)) ] ) ;
-          false ) ) ;
+  ( if reset_existing_streams then
+    let streams_to_reset =
+      Hashtbl.data t.streams
+      |> List.filter ~f:(fun stream ->
+             String.equal (Libp2p_stream.protocol stream) protocol )
+    in
+    List.iter streams_to_reset ~f:(fun stream ->
+        don't_wait_for
+          (* TODO: this probably needs to be more thorough than a reset. Also force the write pipe closed? *)
+          ( match%map Libp2p_stream.reset ~helper:t.helper stream with
+          | Ok () ->
+              ()
+          | Error e ->
+              [%log' error t.logger]
+                "failed to reset stream while closing protocol: $error"
+                ~metadata:[ ("error", `String (Error.to_string_hum e)) ] ) ;
+        Libp2p_stream.release_buffers stream ~reason:`Shutdown_or_release ) ) ;
   match result with
   | Ok _ ->
       Hashtbl.remove t.protocol_handlers protocol
@@ -511,16 +514,18 @@ let handle_push_message t push_message =
                              if Or_error.is_ok result then
                                Hashtbl.remove t.protocol_handlers protocol ) ;
                           raise handler_exn ) ) )
-              else
+              else (
                 (* silently ignore new streams for closed protocol handlers.
-                    these are buffered stream open RPCs that were enqueued before
-                    our close went into effect. *)
-                (* TODO: we leak the new pipes here*)
+                   these are buffered stream open RPCs that were enqueued before
+                   our close went into effect. *)
+                Libp2p_stream.release_buffers stream
+                  ~reason:`Shutdown_or_release ;
                 [%log' warn t.logger]
                   "incoming stream for protocol that is being closed after \
-                   error"
+                   error" )
           | None ->
               (* TODO: punish *)
+              Libp2p_stream.release_buffers stream ~reason:`Shutdown_or_release ;
               [%log' error t.logger]
                 "incoming stream for protocol we don't know about?" )
   (* Received a message on some stream *)
@@ -548,11 +553,7 @@ let handle_push_message t push_message =
           let stream_id_str = Libp2p_ipc.stream_id_to_string stream_id in
           ( match Hashtbl.find t.streams stream_id_str with
           | Some stream ->
-              let (`Stream_should_be_released should_release) =
-                Libp2p_stream.stream_closed ~logger:t.logger ~who_closed:Them
-                  stream
-              in
-              if should_release then Hashtbl.remove t.streams stream_id_str ;
+              Libp2p_stream.release_buffers stream ~reason:`Lost ;
               log_stream_table_stats t
           | None ->
               () ) ;
@@ -574,7 +575,8 @@ let handle_push_message t push_message =
                 Libp2p_stream.stream_closed ~logger:t.logger ~who_closed:Them
                   stream
               in
-              if should_release then Hashtbl.remove t.streams stream_id_str ;
+              if should_release then
+                Libp2p_stream.release_buffers stream ~reason:`Handler_done ;
               log_stream_table_stats t
           | None ->
               [%log' error t.logger]

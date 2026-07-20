@@ -44,7 +44,11 @@ func (t *HardforkTest) startLocalNetwork(minaExecutable string, profile string, 
 	}
 
 	cmd.Args = append(cmd.Args, extraArgs...)
-	cmd.Env = append(os.Environ(), "MINA_EXE="+minaExecutable)
+	cmd.Env = append(
+		os.Environ(),
+		"MINA_EXE="+minaExecutable,
+		"MINA_GRAPHQL_CLIENT_EXE="+t.Config.MinaGraphqlClientExe,
+	)
 
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr

@@ -55,14 +55,12 @@ let DepsSpec =
 
 let dependsOn =
           \(spec : DepsSpec.Type)
-      ->  let profileSuffix = Profiles.toSuffixUppercase spec.profile
-
-          let name =
-                "${spec.prefix}${capitalName
-                                   spec.deb_version}${Network.capitalName
-                                                        spec.network}${profileSuffix}${BuildFlags.toSuffixUppercase
-                                                                                         spec.build_flag}${Arch.nameSuffix
-                                                                                                             spec.arch}"
+      ->  let name =
+                "${spec.prefix}${Network.namePrefixSegment
+                                   spec.network}${capitalName
+                                                    spec.deb_version}${BuildFlags.toSuffixUppercase
+                                                                         spec.build_flag}${Arch.nameSuffix
+                                                                                             spec.arch}"
 
           in  [ { name = name, key = "${spec.step}-deb-pkg" } ]
 
@@ -77,12 +75,13 @@ let minimalDirtyWhen =
       , S.strictlyStart (S.contains "buildkite/scripts/bench")
       , S.exactly "buildkite/src/Command/ReplayerTest" "dhall"
       , S.strictlyStart (S.contains "buildkite/src/Jobs/Release/MinaArtifact")
-      , S.strictlyStart (S.contains "dockerfiles/stages")
+      , S.strictlyStart (S.contains "dockerfiles/toolchain")
       , S.strictlyStart (S.contains "dockerfiles")
       , S.strictlyStart (S.contains "scripts/debian")
       , S.strictlyStart (S.contains "scripts/docker")
       , S.exactly "buildkite/scripts/build-artifact" "sh"
       , S.exactly "buildkite/scripts/version-linter" "sh"
+      , S.exactly "buildkite/scripts/apps/write_to_cache" "sh"
       , S.strictlyStart (S.contains "buildkite/scripts/tests")
       , S.strictlyStart (S.contains "scripts/rosetta")
       , S.exactly "scripts/rosetta/test-block-race" "sh"
@@ -97,8 +96,9 @@ let bullseyeDirtyWhen =
         [ S.strictlyStart (S.contains "src")
         , S.strictly (S.contains "Makefile")
         , S.exactly "buildkite/scripts/connect/connect-to-network" "sh"
-        , S.exactly "buildkite/scripts/tests/rosetta-integration-tests" "sh"
+        , S.strictlyStart (S.contains "buildkite/scripts/tests/rosetta")
         , S.exactly "scripts/patch-archive-test" "sh"
+        , S.exactly "buildkite/scripts/single-node-tests" "sh"
         , S.strictlyStart (S.contains "buildkite/src/Jobs/Test")
         ]
       # minimalDirtyWhen
@@ -114,13 +114,46 @@ let dirtyWhen =
             }
             debVersion
 
+let packageDirtyWhen =
+      [ S.exactly "buildkite/src/Constants/DebianVersions" "dhall"
+      , S.exactly "buildkite/src/Constants/ContainerImages" "dhall"
+      , S.exactly "buildkite/src/Command/MinaArtifact" "dhall"
+      , S.strictlyStart (S.contains "buildkite/src/Jobs/Release/MinaArtifact")
+      , S.strictlyStart (S.contains "dockerfiles")
+      , S.strictlyStart (S.contains "scripts/debian")
+      , S.strictlyStart (S.contains "scripts/docker")
+      , S.strictlyStart (S.contains "scripts/hardfork")
+      , S.strictlyStart (S.contains "buildkite/scripts/docker")
+      , S.strictlyStart (S.contains "buildkite/scripts/debian")
+      , S.exactly "buildkite/scripts/build-artifact" "sh"
+      , S.strictlyStart (S.contains "buildkite/scripts/apps")
+      , S.strictlyStart (S.contains "buildkite/scripts/cache")
+      , S.strictlyStart (S.contains "buildkite/scripts/tests/debian")
+      , S.strictlyStart (S.contains "buildkite/scripts/tests/hardfork")
+      , S.strictlyStart (S.contains "buildkite/src/Jobs/Test/Debian")
+      , S.exactly "buildkite/src/Jobs/Test/AutoHardforkTest" "dhall"
+      ]
+
+let appDependsOn =
+          \(spec : DepsSpec.Type)
+      ->  let name =
+                "${spec.prefix}${Network.namePrefixSegment
+                                   spec.network}${capitalName
+                                                    spec.deb_version}${BuildFlags.toSuffixUppercase
+                                                                         spec.build_flag}${Arch.nameSuffix
+                                                                                             spec.arch}Apps"
+
+          in  [ { name = name, key = "build-apps" } ]
+
 let overrideEnvs = [ "OVERRIDE_TAG", "OVERRIDE_GITHASH", "SKIP_GITBRANCH" ]
 
 in  { DebVersion = DebVersion
     , capitalName = capitalName
     , lowerName = lowerName
     , dependsOn = dependsOn
+    , appDependsOn = appDependsOn
     , dirtyWhen = dirtyWhen
+    , packageDirtyWhen = packageDirtyWhen
     , DepsSpec = DepsSpec
     , overrideEnvs = overrideEnvs
     }

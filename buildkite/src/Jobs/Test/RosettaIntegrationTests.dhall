@@ -12,29 +12,42 @@ let Command = ../../Command/Base.dhall
 
 let Size = ../../Command/Size.dhall
 
-let Dockers = ../../Constants/DockerVersions.dhall
+let DebianVersions = ../../Constants/DebianVersions.dhall
 
-let Artifacts = ../../Constants/Artifacts.dhall
+let RunInToolchain = ../../Command/RunInToolchain.dhall
 
 let Network = ../../Constants/Network.dhall
 
-let RunWithPostgres = ../../Command/RunWithPostgres.dhall
+let Profiles = ../../Constants/Profiles.dhall
 
 let network = Network.Type.Devnet
 
 let dirtyWhen =
       [ S.strictlyStart (S.contains "src")
       , S.exactly "buildkite/src/Jobs/Test/RosettaIntegrationTests" "dhall"
-      , S.exactly "buildkite/scripts/tests/rosetta-integration-tests" "sh"
-      , S.exactly "dockerfiles/Dockerfile-mina-rosetta" ""
+      , S.strictlyStart (S.contains "buildkite/scripts/tests/rosetta")
+      , S.exactly "buildkite/scripts/debian/install" "sh"
+      , S.exactly "buildkite/scripts/debian/restore-or-install" "sh"
+      , S.strictlyStart (S.contains "buildkite/scripts/apps")
+      , S.strictlyStart (S.contains "scripts/debian")
       ]
 
-let rosettaDocker =
-      Artifacts.fullDockerTag
-        Artifacts.Tag::{
-        , artifact = Artifacts.Type.RosettaAppsOnly
-        , network = network
-        }
+let bareBinaries =
+          "mina.exe:mina"
+      ++  ",archive.exe:mina-archive"
+      ++  ",rosetta.exe:mina-rosetta"
+      ++  ",signer.exe:mina-ocaml-signer"
+      ++  ",zkapp_test_transaction.exe:mina-zkapp-test-transaction"
+      ++  ",indexer_test.exe:mina-rosetta-indexer-test"
+      ++  ",libp2p_helper:libp2p_helper"
+
+let envExports =
+      [ "MINA_NETWORK_DEB=${Network.lowerName network}"
+      , "MINA_DEB_CODENAME=bullseye"
+      , "APPS_NETWORK=${Network.lowerName network}"
+      , "MINA_PROFILE=${Network.lowerName network}"
+      , "APPS_BARE_BINARIES=${bareBinaries}"
+      ]
 
 in  Pipeline.build
       Pipeline.Config::{
@@ -53,31 +66,21 @@ in  Pipeline.build
         [ Command.build
             Command.Config::{
             , commands =
-              [ Cmd.run
-                  "export MINA_DEB_CODENAME=bullseye && source ./buildkite/scripts/export-git-env-vars.sh && echo \\\${MINA_DOCKER_TAG}"
-              , RunWithPostgres.runInDockerWithPostgresConn
-                  ([] : List Text)
-                  ( Some
-                      ( RunWithPostgres.ScriptOrArchive.Script
-                          "./src/test/archive/sample_db/archive_db.sql"
-                      )
-                  )
-                  rosettaDocker
-                  "./buildkite/scripts/rosetta-indexer-test.sh"
-              , Cmd.runInDocker
-                  Cmd.Docker::{ image = rosettaDocker }
-                  "buildkite/scripts/tests/rosetta-integration-tests.sh"
-              ]
+                  [ Cmd.run
+                      "export MINA_DEB_CODENAME=bullseye && source ./buildkite/scripts/export-git-env-vars.sh && echo \\\${MINA_DOCKER_TAG}"
+                  ]
+                # RunInToolchain.runInToolchainBullseye
+                    envExports
+                    "buildkite/scripts/tests/rosetta/integration-tests.sh"
             , label = "Rosetta integration tests Bullseye"
             , key = "rosetta-integration-tests-bullseye"
             , target = Size.Small
             , artifact_paths = [ S.contains "test_output/artifacts/*" ]
             , depends_on =
-                Dockers.dependsOn
-                  Dockers.DepsSpec::{
-                  , codename = Dockers.Type.Bullseye
-                  , artifact = Artifacts.Type.RosettaAppsOnly
+                DebianVersions.appDependsOn
+                  DebianVersions.DepsSpec::{
                   , network = network
+                  , profile = Profiles.Type.Devnet
                   }
             }
         ]

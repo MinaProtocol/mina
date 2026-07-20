@@ -18,9 +18,9 @@ let Size = ../../Command/Size.dhall
 
 let Network = ../../Constants/Network.dhall
 
-let Artifacts = ../../Constants/Artifacts.dhall
+let Docker = ../../Constants/Docker/Package.dhall
 
-let Dockers = ../../Constants/DockerVersions.dhall
+let Dockers = ../../Constants/Docker/Versions.dhall
 
 let Profiles = ../../Constants/Profiles.dhall
 
@@ -101,7 +101,7 @@ let command
                   Dockers.DepsSpec::{
                   , codename = spec.dockerType
                   , network = spec.network
-                  , artifact = Artifacts.Type.Rosetta
+                  , artifact = Docker.Type.Rosetta { network = spec.network }
                   , profile = spec.profile
                   }
             }
@@ -125,7 +125,7 @@ let pipeline
                       "dhall"
                   , S.exactly "scripts/tests/rosetta-connectivity" "sh"
                   , S.exactly
-                      "buildkite/scripts/tests/rosetta-integration-tests"
+                      "buildkite/scripts/tests/rosetta/integration-tests"
                       "sh"
                   ]
                 # spec.additionalDirtyWhen

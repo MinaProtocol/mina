@@ -6,7 +6,11 @@ let Prelude = ../External/Prelude.dhall
 
 let List/map = Prelude.List.map
 
+let List/concatMap = Prelude.List.concatMap
+
 let Optional/default = Prelude.Optional.default
+
+let Text/concatSep = Prelude.Text.concatSep
 
 let Command = ./Base.dhall
 
@@ -26,11 +30,9 @@ let DockerImage = ./DockerImage.dhall
 
 let DebianVersions = ../Constants/DebianVersions.dhall
 
-let DockerVersion = ../Constants/DockerVersions.dhall
-
 let DebianRepo = ../Constants/DebianRepo.dhall
 
-let DockerPublish = ../Constants/DockerPublish.dhall
+let DockerPublish = ../Constants/Docker/Publish.dhall
 
 let DebianChannel = ../Constants/DebianChannel.dhall
 
@@ -40,7 +42,9 @@ let Network = ../Constants/Network.dhall
 
 let BuildFlags = ../Constants/BuildFlags.dhall
 
-let Artifacts = ../Constants/Artifacts.dhall
+let Docker = ../Constants/Docker/Package.dhall
+
+let Artifact = ../Constants/Artifact/Artifacts.dhall
 
 let Toolchain = ../Constants/Toolchain.dhall
 
@@ -51,10 +55,8 @@ let Expr = ../Pipeline/Expr.dhall
 let MinaBuildSpec =
       { Type =
           { prefix : Text
-          , artifacts : List Artifacts.Type
+          , artifacts : List Artifact.Type
           , debVersion : DebianVersions.DebVersion
-          , profile : Profiles.Type
-          , network : Network.Type
           , buildFlags : BuildFlags.Type
           , toolchainSelectMode : Toolchain.SelectionMode
           , extraBuildEnvs : List Text
@@ -65,7 +67,6 @@ let MinaBuildSpec =
           , buildScript : Text
           , arch : Arch.Type
           , deb_legacy_version : Text
-          , deb_storage_repair_version : Text
           , docker_publish : DockerPublish.Type
           , suffix : Optional Text
           , if_ : Optional B/If
@@ -74,12 +75,10 @@ let MinaBuildSpec =
           }
       , default =
           { prefix = "MinaArtifact"
-          , artifacts = Artifacts.AllButTests
+          , artifacts = [ Artifact.Type.LogProc ]
           , buildScript = "./buildkite/scripts/build-release.sh"
           , debVersion = DebianVersions.DebVersion.Bullseye
-          , profile = Profiles.Type.Devnet
           , buildFlags = BuildFlags.Type.None
-          , network = Network.Type.Devnet
           , toolchainSelectMode = Toolchain.SelectionMode.ByDebianAndArch
           , tags = [ PipelineTag.Type.Long, PipelineTag.Type.Release ]
           , scope = PipelineScope.Full
@@ -88,7 +87,6 @@ let MinaBuildSpec =
           , extraBuildEnvs = [] : List Text
           , suffix = None Text
           , deb_legacy_version = "3.4.0-alpha1-compatible-ad13ff4"
-          , deb_storage_repair_version = "3.3.0-master-35445f7"
           , arch = Arch.Type.Amd64
           , docker_publish = DockerPublish.Type.Essential
           , if_ = None B/If
@@ -101,210 +99,436 @@ let labelSuffix
     : MinaBuildSpec.Type -> Text
     =     \(spec : MinaBuildSpec.Type)
       ->  "${DebianVersions.capitalName
-               spec.debVersion} ${Network.capitalName
-                                    spec.network} ${Profiles.toSuffixUppercase
-                                                      spec.profile} ${BuildFlags.toSuffixUppercase
-                                                                        spec.buildFlags}${Arch.labelSuffix
-                                                                                            spec.arch}"
+               spec.debVersion} ${BuildFlags.toSuffixUppercase
+                                    spec.buildFlags}${Arch.labelSuffix
+                                                        spec.arch}"
+
+let primaryNetwork
+    : MinaBuildSpec.Type -> Network.Type
+    =     \(spec : MinaBuildSpec.Type)
+      ->  Optional/default
+            Network.Type
+            Network.Type.Devnet
+            (List/head Network.Type (Artifact.networks spec.artifacts))
+
+let baseNameSuffix
+    : MinaBuildSpec.Type -> Text
+    =     \(spec : MinaBuildSpec.Type)
+      ->  "${DebianVersions.capitalName
+               spec.debVersion}${BuildFlags.toSuffixUppercase
+                                   spec.buildFlags}${Arch.nameSuffix spec.arch}"
 
 let nameSuffix
     : MinaBuildSpec.Type -> Text
     =     \(spec : MinaBuildSpec.Type)
-      ->  "${DebianVersions.capitalName
-               spec.debVersion}${Network.capitalName
-                                   spec.network}${Profiles.toSuffixUppercase
-                                                    spec.profile}${BuildFlags.toSuffixUppercase
-                                                                     spec.buildFlags}${Arch.nameSuffix
-                                                                                         spec.arch}"
+      ->  "${Network.namePrefixSegment (primaryNetwork spec)}${baseNameSuffix
+                                                                 spec}"
+
+let selfName
+    : MinaBuildSpec.Type -> Text
+    = \(spec : MinaBuildSpec.Type) -> "${spec.prefix}${nameSuffix spec}"
+
+let genericBuildName
+    : MinaBuildSpec.Type -> Text
+    = \(spec : MinaBuildSpec.Type) -> "${spec.prefix}${baseNameSuffix spec}"
+
+let DockerService =
+      { service : Docker.Type, network : Network.Type, profile : Profiles.Type }
+
+let expandDockerServices =
+          \(artifact : Artifact.Type)
+      ->  let net = Artifact.resolvedNetwork artifact
+
+          let prof = Artifact.profile artifact
+
+          let mk =
+                    \(svc : Docker.Type)
+                ->  { service = svc, network = net, profile = prof }
+
+          let none = [] : List DockerService
+
+          in  merge
+                { Daemon =
+                        \(_ : { network : Network.Type })
+                    ->  [ mk (Docker.Type.Daemon { network = net }) ]
+                , DaemonGeneric = [ mk Docker.Type.DaemonGeneric ]
+                , DaemonProfiled =
+                        \(_ : { profile : Profiles.Type })
+                    ->  [ mk (Docker.Type.DaemonProfiled { profile = prof }) ]
+                , DaemonLegacyHardfork =
+                        \(_ : { network : Network.Type })
+                    ->  [ mk
+                            (Docker.Type.DaemonLegacyHardfork { network = net })
+                        ]
+                , DaemonAutoHardfork =
+                        \(_ : { network : Network.Type })
+                    ->  [ mk (Docker.Type.DaemonAutoHardfork { network = net })
+                        ]
+                , DaemonPrefork = \(_ : { network : Network.Type }) -> none
+                , DaemonPostfork = \(_ : { network : Network.Type }) -> none
+                , CreatePreforkGenesis =
+                    \(_ : { network : Network.Type }) -> none
+                , DaemonStorageToolbox = none
+                , LogProc = none
+                , ArchiveGeneric = none
+                , Archive =
+                        \(_ : { network : Network.Type })
+                    ->  [ mk (Docker.Type.Archive { network = net }) ]
+                , RosettaGeneric = none
+                , Rosetta =
+                        \(_ : { network : Network.Type })
+                    ->  [ mk Docker.Type.RosettaGeneric
+                        , mk (Docker.Type.Rosetta { network = net })
+                        ]
+                , TestExecutive = none
+                , TxTools = none
+                , FunctionalTestSuite = none
+                , DelegationVerifier = [ mk Docker.Type.DelegationVerifier ]
+                , Toolchain = none
+                }
+                artifact
 
 let build_artifacts
     : MinaBuildSpec.Type -> Command.Type
     =     \(spec : MinaBuildSpec.Type)
-      ->  Command.build
-            Command.Config::{
-            , commands =
-                  Toolchain.select
-                    spec.toolchainSelectMode
-                    spec.debVersion
-                    spec.arch
-                    (   [ "DUNE_PROFILE=${Profiles.duneProfile spec.profile}"
-                        , "AWS_ACCESS_KEY_ID"
-                        , "AWS_SECRET_ACCESS_KEY"
-                        , "MINA_BRANCH=\$BUILDKITE_BRANCH"
-                        , "MINA_COMMIT_SHA1=\$BUILDKITE_COMMIT"
-                        , "MINA_DEB_CODENAME=${DebianVersions.lowerName
-                                                 spec.debVersion}"
-                        , "ARCHITECTURE=${Arch.lowerName spec.arch}"
-                        , Network.buildMainnetEnv spec.network
-                        , "PREFORK_LEGACY_VERSION=${spec.deb_legacy_version}"
-                        ]
-                      # BuildFlags.buildEnvs spec.buildFlags
-                      # spec.extraBuildEnvs
-                      # DebianVersions.overrideEnvs
-                    )
-                    "${spec.buildScript} ${Artifacts.toDebianNames
-                                             spec.artifacts
-                                             spec.network}"
-                # [ Cmd.run
-                      "./buildkite/scripts/debian/write_to_cache.sh ${DebianVersions.lowerName
-                                                                        spec.debVersion}"
-                  , Cmd.run
-                      "./buildkite/scripts/apps/write_to_cache.sh ${DebianVersions.lowerName
-                                                                      spec.debVersion}"
+      ->  let nets = Artifact.networks spec.artifacts
+
+          let debianTokens =
+                Text/concatSep
+                  " "
+                  ( List/map
+                      Artifact.Type
+                      Text
+                      Artifact.toDebianToken
+                      spec.artifacts
+                  )
+
+          let appsCacheWrites =
+                List/map
+                  Network.Type
+                  Cmd.Type
+                  (     \(net : Network.Type)
+                    ->  Cmd.run
+                          "./buildkite/scripts/apps/write_to_cache.sh ${DebianVersions.lowerName
+                                                                          spec.debVersion} ${Network.lowerName
+                                                                                               net}-${Profiles.toSuffixLowercase
+                                                                                                        ( Profiles.fromNetwork
+                                                                                                            net
+                                                                                                        )}${BuildFlags.toLabelSegment
+                                                                                                              spec.buildFlags}${Arch.toSuffixLowercase
+                                                                                                                                  spec.arch}"
+                  )
+                  nets
+
+          in  Command.build
+                Command.Config::{
+                , commands =
+                      Toolchain.select
+                        spec.toolchainSelectMode
+                        spec.debVersion
+                        spec.arch
+                        (   [ "AWS_ACCESS_KEY_ID"
+                            , "AWS_SECRET_ACCESS_KEY"
+                            , "MINA_BRANCH=\$BUILDKITE_BRANCH"
+                            , "MINA_COMMIT_SHA1=\$BUILDKITE_COMMIT"
+                            , "MINA_DEB_CODENAME=${DebianVersions.lowerName
+                                                     spec.debVersion}"
+                            , "ARCHITECTURE=${Arch.lowerName spec.arch}"
+                            , Network.foldMinaBuildMainnetEnv nets
+                            , "PREFORK_LEGACY_VERSION=${spec.deb_legacy_version}"
+                            ]
+                          # BuildFlags.buildEnvs spec.buildFlags
+                          # spec.extraBuildEnvs
+                          # DebianVersions.overrideEnvs
+                        )
+                        "${spec.buildScript} ${debianTokens} profile_devnet_generic profile_mainnet_generic"
+                    # [ Cmd.run
+                          "./buildkite/scripts/debian/write_to_cache.sh ${DebianVersions.lowerName
+                                                                            spec.debVersion}"
+                      ]
+                    # appsCacheWrites
+                , label = "Debian: Build ${labelSuffix spec}"
+                , key = "build-deb-pkg${Optional/default Text "" spec.suffix}"
+                , target = Size.Multi
+                , if_ = spec.if_
+                , retries =
+                  [ Command.Retry::{
+                    , exit_status = Command.ExitStatus.Code +2
+                    , limit = Some 2
+                    }
                   ]
-            , label = "Debian: Build ${labelSuffix spec}"
-            , key = "build-deb-pkg${Optional/default Text "" spec.suffix}"
-            , target = Size.Multi
-            , if_ = spec.if_
-            , retries =
-              [ Command.Retry::{
-                , exit_status = Command.ExitStatus.Code +2
-                , limit = Some 2
                 }
-              ]
-            }
+
+let commonBuildEnvs =
+          \(spec : MinaBuildSpec.Type)
+      ->  let nets = Artifact.networks spec.artifacts
+
+          in    [ "AWS_ACCESS_KEY_ID"
+                , "AWS_SECRET_ACCESS_KEY"
+                , "MINA_BRANCH=\$BUILDKITE_BRANCH"
+                , "MINA_COMMIT_SHA1=\$BUILDKITE_COMMIT"
+                , "MINA_DEB_CODENAME=${DebianVersions.lowerName
+                                         spec.debVersion}"
+                , "ARCHITECTURE=${Arch.lowerName spec.arch}"
+                , Network.foldMinaBuildMainnetEnv nets
+                , "PREFORK_LEGACY_VERSION=${spec.deb_legacy_version}"
+                ]
+              # BuildFlags.buildEnvs spec.buildFlags
+              # spec.extraBuildEnvs
+              # DebianVersions.overrideEnvs
+
+let treeVariant =
+          \(spec : MinaBuildSpec.Type)
+      ->  "${DebianVersions.lowerName
+               spec.debVersion}${BuildFlags.toLabelSegment
+                                   spec.buildFlags}${Arch.toSuffixLowercase
+                                                       spec.arch}"
+
+let appsJobName
+    : MinaBuildSpec.Type -> Text
+    = \(spec : MinaBuildSpec.Type) -> "${selfName spec}Apps"
+
+let primaryAppsVariant
+    : MinaBuildSpec.Type -> Text
+    =     \(spec : MinaBuildSpec.Type)
+      ->  let primary =
+                Optional/default
+                  Network.Type
+                  Network.Type.Devnet
+                  (List/head Network.Type (Artifact.networks spec.artifacts))
+
+          in  "${Network.lowerName
+                   primary}-${Profiles.toSuffixLowercase
+                                ( Profiles.fromNetwork primary
+                                )}${BuildFlags.toLabelSegment
+                                      spec.buildFlags}${Arch.toSuffixLowercase
+                                                          spec.arch}"
+
+let build_apps
+    : MinaBuildSpec.Type -> Command.Type
+    =     \(spec : MinaBuildSpec.Type)
+      ->  let nets = Artifact.networks spec.artifacts
+
+          let appsCacheWrites =
+                List/map
+                  Network.Type
+                  Cmd.Type
+                  (     \(net : Network.Type)
+                    ->  Cmd.run
+                          "./buildkite/scripts/apps/write_to_cache.sh ${DebianVersions.lowerName
+                                                                          spec.debVersion} ${Network.lowerName
+                                                                                               net}-${Profiles.toSuffixLowercase
+                                                                                                        ( Profiles.fromNetwork
+                                                                                                            net
+                                                                                                        )}${BuildFlags.toLabelSegment
+                                                                                                              spec.buildFlags}${Arch.toSuffixLowercase
+                                                                                                                                  spec.arch}"
+                  )
+                  nets
+
+          in  Command.build
+                Command.Config::{
+                , commands =
+                      Toolchain.select
+                        spec.toolchainSelectMode
+                        spec.debVersion
+                        spec.arch
+                        (commonBuildEnvs spec)
+                        "./buildkite/scripts/build-artifact.sh"
+                    # appsCacheWrites
+                    # [ Cmd.run
+                          "./buildkite/scripts/apps/write_build_manifest_to_cache.sh ${DebianVersions.lowerName
+                                                                                         spec.debVersion} ${treeVariant
+                                                                                                              spec}"
+                      ]
+                , label = "Build apps: ${labelSuffix spec}"
+                , key = "build-apps"
+                , target = Size.Multi
+                , if_ = spec.if_
+                , retries =
+                  [ Command.Retry::{
+                    , exit_status = Command.ExitStatus.Code +2
+                    , limit = Some 2
+                    }
+                  ]
+                }
+
+let build_debian
+    : MinaBuildSpec.Type -> Command.Type
+    =     \(spec : MinaBuildSpec.Type)
+      ->  let debianTokens =
+                Text/concatSep
+                  " "
+                  ( List/map
+                      Artifact.Type
+                      Text
+                      Artifact.toDebianToken
+                      spec.artifacts
+                  )
+
+          in  Command.build
+                Command.Config::{
+                , commands =
+                      Toolchain.select
+                        spec.toolchainSelectMode
+                        spec.debVersion
+                        spec.arch
+                        (commonBuildEnvs spec)
+                        "./buildkite/scripts/debian/build-from-cache.sh ${primaryAppsVariant
+                                                                            spec} ${treeVariant
+                                                                                      spec} ${debianTokens} profile_devnet_generic profile_mainnet_generic"
+                    # [ Cmd.run
+                          "./buildkite/scripts/debian/write_to_cache.sh ${DebianVersions.lowerName
+                                                                            spec.debVersion}"
+                      ]
+                , label = "Debian: Build ${labelSuffix spec}"
+                , key = "build-deb-pkg${Optional/default Text "" spec.suffix}"
+                , depends_on =
+                  [ { name = appsJobName spec, key = "build-apps" } ]
+                , target = Size.Multi
+                , if_ = spec.if_
+                , retries =
+                  [ Command.Retry::{
+                    , exit_status = Command.ExitStatus.Code +2
+                    , limit = Some 2
+                    }
+                  ]
+                }
 
 let docker_step
-    : Artifacts.Type -> MinaBuildSpec.Type -> List DockerImage.ReleaseSpec.Type
-    =     \(artifact : Artifacts.Type)
+    : DockerService -> MinaBuildSpec.Type -> List DockerImage.ReleaseSpec.Type
+    =     \(entry : DockerService)
       ->  \(spec : MinaBuildSpec.Type)
-      ->  let step_dep_name = "build"
+      ->  let network = entry.network
 
-          let deps =
-                DebianVersions.dependsOn
-                  DebianVersions.DepsSpec::{
-                  , deb_version = spec.debVersion
-                  , network = spec.network
-                  , profile = spec.profile
-                  , build_flag = spec.buildFlags
-                  , step = step_dep_name
-                  , prefix = spec.prefix
-                  , arch = spec.arch
-                  }
+          let profile = entry.profile
+
+          let netSeg = "-${Network.lowerName network}-docker-image"
+
+          let deps
+              : List Command.TaggedKey.Type
+              = [ { name = selfName spec, key = "build-deb-pkg" } ]
+
+          let withDocker =
+                    \(dep : Docker.Type)
+                ->    deps
+                    # [ { name = selfName spec
+                        , key = "${Docker.lowerName dep}${netSeg}"
+                        }
+                      ]
+
+          let genericNetwork = Network.Type.Devnet
+
+          let dependsOnGeneric =
+                  deps
+                # [ { name = genericBuildName spec
+                    , key =
+                        "${Docker.lowerName
+                             Docker.Type.DaemonGeneric}-${Network.lowerName
+                                                            genericNetwork}-docker-image"
+                    }
+                  ]
 
           let size = Size.XLarge
 
           in  merge
-                { Daemon =
-                  [ DockerImage.ReleaseSpec::{
-                    , deps = deps
-                    , service = Artifacts.Type.Daemon
-                    , network = spec.network
-                    , deb_codename = spec.debVersion
-                    , deb_profile = spec.profile
-                    , build_flags = spec.buildFlags
-                    , docker_publish = spec.docker_publish
-                    , deb_repo = DebianRepo.Type.Local
-                    , deb_legacy_version = spec.deb_legacy_version
-                    , deb_storage_repair_version = Some
-                        spec.deb_storage_repair_version
-                    , verify = True
-                    , arch = spec.arch
-                    , size = size
-                    , if_ = spec.if_
-                    }
-                  ]
-                , DaemonAutoHardfork =
-                  [ DockerImage.ReleaseSpec::{
-                    , deps =
-                          deps
-                        # DockerVersion.dependsOn
-                            DockerVersion.DepsSpec::{
-                            , codename = DockerVersion.ofDebian spec.debVersion
-                            , network = spec.network
-                            , profile = spec.profile
-                            , artifact = Artifacts.Type.Daemon
-                            }
-                    , service = Artifacts.Type.DaemonAutoHardfork
-                    , network = spec.network
-                    , deb_codename = spec.debVersion
-                    , deb_profile = spec.profile
-                    , build_flags = spec.buildFlags
-                    , docker_publish = spec.docker_publish
-                    , deb_repo = DebianRepo.Type.Local
-                    , deb_legacy_version = spec.deb_legacy_version
-                    , size = size
-                    }
-                  ]
+                { DaemonAutoHardfork =
+                        \(args : { network : Network.Type })
+                    ->  [ DockerImage.ReleaseSpec::{
+                          , deps =
+                              withDocker
+                                (Docker.Type.Daemon { network = network })
+                          , service =
+                              Docker.Type.DaemonAutoHardfork
+                                { network = network }
+                          , network = network
+                          , deb_codename = spec.debVersion
+                          , deb_profile = profile
+                          , build_flags = spec.buildFlags
+                          , docker_publish = spec.docker_publish
+                          , deb_repo = DebianRepo.Type.Local
+                          , deb_legacy_version = spec.deb_legacy_version
+                          , size = size
+                          }
+                        ]
                 , DaemonLegacyHardfork =
-                  [ DockerImage.ReleaseSpec::{
-                    , deps =
-                          deps
-                        # DockerVersion.dependsOn
-                            DockerVersion.DepsSpec::{
-                            , codename = DockerVersion.ofDebian spec.debVersion
-                            , network = spec.network
-                            , profile = spec.profile
-                            , artifact = Artifacts.Type.DaemonLegacyHardfork
-                            }
-                    , service = Artifacts.Type.DaemonLegacyHardfork
-                    , network = spec.network
-                    , deb_codename = spec.debVersion
-                    , deb_profile = spec.profile
-                    , build_flags = spec.buildFlags
-                    , docker_publish = spec.docker_publish
-                    , deb_repo = DebianRepo.Type.Local
-                    , deb_legacy_version = spec.deb_legacy_version
-                    , arch = spec.arch
-                    , size = size
-                    }
-                  ]
-                , DaemonAppsOnly =
+                        \(args : { network : Network.Type })
+                    ->  [ DockerImage.ReleaseSpec::{
+                          , deps =
+                              withDocker
+                                ( Docker.Type.DaemonLegacyHardfork
+                                    { network = network }
+                                )
+                          , service =
+                              Docker.Type.DaemonLegacyHardfork
+                                { network = network }
+                          , network = network
+                          , deb_codename = spec.debVersion
+                          , deb_profile = profile
+                          , build_flags = spec.buildFlags
+                          , docker_publish = spec.docker_publish
+                          , deb_repo = DebianRepo.Type.Local
+                          , deb_legacy_version = spec.deb_legacy_version
+                          , arch = spec.arch
+                          , size = size
+                          }
+                        ]
+                , DaemonGeneric =
                   [ DockerImage.ReleaseSpec::{
                     , deps = deps
-                    , service = Artifacts.Type.DaemonAppsOnly
-                    , network = spec.network
+                    , service = Docker.Type.DaemonGeneric
+                    , network = genericNetwork
                     , deb_codename = spec.debVersion
-                    , deb_profile = spec.profile
+                    , deb_profile = profile
                     , build_flags = spec.buildFlags
                     , docker_publish = spec.docker_publish
                     , deb_repo = DebianRepo.Type.Local
                     , deb_legacy_version = spec.deb_legacy_version
-                    , deb_storage_repair_version = Some
-                        spec.deb_storage_repair_version
                     , generic = True
                     , verify = True
                     , arch = spec.arch
                     , size = size
                     }
                   ]
-                , DaemonConfig =
-                  [ DockerImage.ReleaseSpec::{
-                    , deps =
-                          deps
-                        # DockerVersion.dependsOn
-                            DockerVersion.DepsSpec::{
-                            , codename = DockerVersion.ofDebian spec.debVersion
-                            , network = spec.network
-                            , profile = spec.profile
-                            , artifact = Artifacts.Type.DaemonAppsOnly
-                            , arch = spec.arch
-                            , buildFlags = spec.buildFlags
-                            }
-                    , service = Artifacts.Type.DaemonConfig
-                    , network = spec.network
-                    , deb_codename = spec.debVersion
-                    , docker_publish = spec.docker_publish
-                    , deb_profile = spec.profile
-                    , build_flags = spec.buildFlags
-                    , deb_install_mode =
-                        DockerImage.DebianInstallMode.DownloadOnly
-                    , arch = spec.arch
-                    , size = size
-                    }
-                  ]
-                , TestExecutive = [] : List DockerImage.ReleaseSpec.Type
-                , LogProc = [] : List DockerImage.ReleaseSpec.Type
-                , CreatePreforkGenesis = [] : List DockerImage.ReleaseSpec.Type
-                , DaemonPrefork = [] : List DockerImage.ReleaseSpec.Type
-                , DaemonAutomode = [] : List DockerImage.ReleaseSpec.Type
-                , BatchTxn =
+                , DaemonProfiled =
+                        \(args : { profile : Profiles.Type })
+                    ->  [ DockerImage.ReleaseSpec::{
+                          , deps = dependsOnGeneric
+                          , service = entry.service
+                          , network = network
+                          , deb_codename = spec.debVersion
+                          , docker_publish = spec.docker_publish
+                          , deb_profile = profile
+                          , build_flags = spec.buildFlags
+                          , deb_install_mode =
+                              DockerImage.DebianInstallMode.DownloadOnly
+                          , arch = spec.arch
+                          , size = size
+                          }
+                        ]
+                , Daemon =
+                        \(args : { network : Network.Type })
+                    ->  [ DockerImage.ReleaseSpec::{
+                          , deps = dependsOnGeneric
+                          , service = Docker.Type.Daemon { network = network }
+                          , network = network
+                          , deb_codename = spec.debVersion
+                          , docker_publish = spec.docker_publish
+                          , deb_profile = profile
+                          , build_flags = spec.buildFlags
+                          , deb_install_mode =
+                              DockerImage.DebianInstallMode.DownloadOnly
+                          , arch = spec.arch
+                          , size = size
+                          }
+                        ]
+                , TxTools =
                   [ DockerImage.ReleaseSpec::{
                     , deps = deps
-                    , service = Artifacts.Type.BatchTxn
-                    , network = spec.network
+                    , service = Docker.Type.TxTools
+                    , network = network
                     , deb_codename = spec.debVersion
-                    , deb_profile = spec.profile
+                    , deb_profile = profile
                     , build_flags = spec.buildFlags
                     , docker_publish = spec.docker_publish
                     , deb_repo = DebianRepo.Type.Local
@@ -317,10 +541,10 @@ let docker_step
                 , DelegationVerifier =
                   [ DockerImage.ReleaseSpec::{
                     , deps = deps
-                    , service = Artifacts.Type.DelegationVerifier
-                    , network = spec.network
+                    , service = Docker.Type.DelegationVerifier
+                    , network = network
                     , deb_codename = spec.debVersion
-                    , deb_profile = spec.profile
+                    , deb_profile = profile
                     , build_flags = spec.buildFlags
                     , docker_publish = spec.docker_publish
                     , deb_repo = DebianRepo.Type.Local
@@ -330,48 +554,31 @@ let docker_step
                     , size = size
                     }
                   ]
-                , DaemonStorageToolbox = [] : List DockerImage.ReleaseSpec.Type
                 , Archive =
+                        \(args : { network : Network.Type })
+                    ->  [ DockerImage.ReleaseSpec::{
+                          , deps = deps
+                          , service = Docker.Type.Archive { network = network }
+                          , network = network
+                          , deb_codename = spec.debVersion
+                          , deb_profile = profile
+                          , build_flags = spec.buildFlags
+                          , docker_publish = spec.docker_publish
+                          , deb_repo = DebianRepo.Type.Local
+                          , deb_legacy_version = spec.deb_legacy_version
+                          , verify = True
+                          , arch = spec.arch
+                          , if_ = spec.if_
+                          , size = size
+                          }
+                        ]
+                , RosettaGeneric =
                   [ DockerImage.ReleaseSpec::{
                     , deps = deps
-                    , service = Artifacts.Type.Archive
-                    , network = spec.network
+                    , service = Docker.Type.RosettaGeneric
+                    , network = network
                     , deb_codename = spec.debVersion
-                    , deb_profile = spec.profile
-                    , build_flags = spec.buildFlags
-                    , docker_publish = spec.docker_publish
-                    , deb_repo = DebianRepo.Type.Local
-                    , deb_legacy_version = spec.deb_legacy_version
-                    , verify = True
-                    , arch = spec.arch
-                    , if_ = spec.if_
-                    , size = size
-                    }
-                  ]
-                , Rosetta =
-                  [ DockerImage.ReleaseSpec::{
-                    , deps = deps
-                    , service = Artifacts.Type.Rosetta
-                    , network = spec.network
-                    , deb_codename = spec.debVersion
-                    , deb_profile = spec.profile
-                    , build_flags = spec.buildFlags
-                    , docker_publish = spec.docker_publish
-                    , deb_repo = DebianRepo.Type.Local
-                    , deb_legacy_version = spec.deb_legacy_version
-                    , verify = True
-                    , arch = spec.arch
-                    , if_ = spec.if_
-                    , size = size
-                    }
-                  ]
-                , RosettaAppsOnly =
-                  [ DockerImage.ReleaseSpec::{
-                    , deps = deps
-                    , service = Artifacts.Type.RosettaAppsOnly
-                    , network = spec.network
-                    , deb_codename = spec.debVersion
-                    , deb_profile = spec.profile
+                    , deb_profile = profile
                     , build_flags = spec.buildFlags
                     , docker_publish = spec.docker_publish
                     , deb_repo = DebianRepo.Type.Local
@@ -383,84 +590,46 @@ let docker_step
                     , size = size
                     }
                   ]
-                , RosettaConfig =
-                  [ DockerImage.ReleaseSpec::{
-                    , deps =
-                          deps
-                        # DockerVersion.dependsOn
-                            DockerVersion.DepsSpec::{
-                            , codename = DockerVersion.ofDebian spec.debVersion
-                            , network = spec.network
-                            , profile = spec.profile
-                            , artifact = Artifacts.Type.RosettaAppsOnly
-                            }
-                    , service = Artifacts.Type.RosettaConfig
-                    , network = spec.network
-                    , image_name = Some
-                        (Artifacts.dockerName Artifacts.Type.Rosetta)
-                    , deb_codename = spec.debVersion
-                    , docker_publish = spec.docker_publish
-                    , deb_install_mode =
-                        DockerImage.DebianInstallMode.DownloadOnly
-                    , arch = spec.arch
-                    , size = size
-                    }
-                  ]
-                , ZkappTestTransaction =
-                  [ DockerImage.ReleaseSpec::{
-                    , deps = deps
-                    , service = Artifacts.Type.ZkappTestTransaction
-                    , build_flags = spec.buildFlags
-                    , docker_publish = spec.docker_publish
-                    , deb_repo = DebianRepo.Type.Local
-                    , deb_profile = spec.profile
-                    , deb_codename = spec.debVersion
-                    , deb_legacy_version = spec.deb_legacy_version
-                    , arch = spec.arch
-                    , if_ = spec.if_
-                    , size = size
-                    }
-                  ]
-                , FunctionalTestSuite =
-                  [ DockerImage.ReleaseSpec::{
-                    , deps = deps
-                    , service = Artifacts.Type.FunctionalTestSuite
-                    , network = Network.Type.Devnet
-                    , deb_codename = spec.debVersion
-                    , build_flags = spec.buildFlags
-                    , docker_publish = spec.docker_publish
-                    , deb_repo = DebianRepo.Type.Local
-                    , deb_profile = spec.profile
-                    , deb_legacy_version = spec.deb_legacy_version
-                    , arch = spec.arch
-                    , size = size
-                    , if_ = spec.if_
-                    }
-                  ]
+                , Rosetta =
+                        \(args : { network : Network.Type })
+                    ->  [ DockerImage.ReleaseSpec::{
+                          , deps = withDocker Docker.Type.RosettaGeneric
+                          , service = Docker.Type.Rosetta { network = network }
+                          , network = network
+                          , deb_profile = profile
+                          , build_flags = spec.buildFlags
+                          , image_name = Some
+                              ( Docker.dockerName
+                                  (Docker.Type.Rosetta { network = network })
+                              )
+                          , deb_codename = spec.debVersion
+                          , docker_publish = spec.docker_publish
+                          , deb_install_mode =
+                              DockerImage.DebianInstallMode.DownloadOnly
+                          , arch = spec.arch
+                          , size = size
+                          }
+                        ]
                 , Toolchain = [] : List DockerImage.ReleaseSpec.Type
                 }
-                artifact
+                entry.service
 
 let docker_commands
     : MinaBuildSpec.Type -> List Command.Type
     =     \(spec : MinaBuildSpec.Type)
-      ->  let docker_steps =
-                List/map
-                  Artifacts.Type
-                  (List DockerImage.ReleaseSpec.Type)
-                  (\(artifact : Artifacts.Type) -> docker_step artifact spec)
+      ->  let services =
+                List/concatMap
+                  Artifact.Type
+                  DockerService
+                  expandDockerServices
                   spec.artifacts
 
           let flattened_docker_steps =
-                Prelude.List.fold
-                  (List DockerImage.ReleaseSpec.Type)
-                  docker_steps
-                  (List DockerImage.ReleaseSpec.Type)
-                  (     \(x : List DockerImage.ReleaseSpec.Type)
-                    ->  \(y : List DockerImage.ReleaseSpec.Type)
-                    ->  x # y
-                  )
-                  ([] : List DockerImage.ReleaseSpec.Type)
+                List/concatMap
+                  DockerService
+                  DockerImage.ReleaseSpec.Type
+                  (\(e : DockerService) -> docker_step e spec)
+                  services
 
           in  List/map
                 DockerImage.ReleaseSpec.Type
@@ -497,9 +666,45 @@ let pipeline
     =     \(spec : MinaBuildSpec.Type)
       ->  pipelineBuilder spec ([ build_artifacts spec ] # docker_commands spec)
 
+let appsPipeline
+    : MinaBuildSpec.Type -> Pipeline.Config.Type
+    =     \(spec : MinaBuildSpec.Type)
+      ->  Pipeline.Config::{
+          , spec = JobSpec::{
+            , dirtyWhen = DebianVersions.dirtyWhen spec.debVersion
+            , path = "Release"
+            , name = "${appsJobName spec}"
+            , tags = spec.tags
+            , scope = spec.scope
+            , includeIf = spec.includeIf
+            , excludeIf = spec.excludeIf
+            }
+          , steps = [ build_apps spec ]
+          }
+
+let packagePipeline
+    : MinaBuildSpec.Type -> Pipeline.Config.Type
+    =     \(spec : MinaBuildSpec.Type)
+      ->  Pipeline.Config::{
+          , spec = JobSpec::{
+            , dirtyWhen = DebianVersions.packageDirtyWhen
+            , path = "Release"
+            , name = "${spec.prefix}${nameSuffix spec}"
+            , tags = spec.tags
+            , scope = spec.scope
+            , includeIf = spec.includeIf
+            , excludeIf = spec.excludeIf
+            }
+          , steps = [ build_debian spec ] # docker_commands spec
+          }
+
 in  { pipeline = pipeline
     , onlyDebianPipeline = onlyDebianPipeline
+    , appsPipeline = appsPipeline
+    , packagePipeline = packagePipeline
     , MinaBuildSpec = MinaBuildSpec
     , labelSuffix = labelSuffix
     , buildArtifacts = build_artifacts
+    , buildApps = build_apps
+    , buildDebian = build_debian
     }

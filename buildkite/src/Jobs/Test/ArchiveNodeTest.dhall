@@ -8,18 +8,13 @@ let JobSpec = ../../Pipeline/JobSpec.dhall
 
 let ArchiveNodeTest = ../../Command/ArchiveNodeTest.dhall
 
-let Artifacts = ../../Constants/Artifacts.dhall
-
-let Dockers = ../../Constants/DockerVersions.dhall
+let DebianVersions = ../../Constants/DebianVersions.dhall
 
 let BuildFlags = ../../Constants/BuildFlags.dhall
 
 let dependsOn =
-      Dockers.dependsOn
-        Dockers.DepsSpec::{
-        , buildFlags = BuildFlags.Type.Instrumented
-        , artifact = Artifacts.Type.FunctionalTestSuite
-        }
+      DebianVersions.appDependsOn
+        DebianVersions.DepsSpec::{ build_flag = BuildFlags.Type.Instrumented }
 
 in  Pipeline.build
       Pipeline.Config::{

@@ -54,6 +54,8 @@ end
 
 let error_count = ref 0
 
+let blocks_replayed = ref 0
+
 let json_ledger_hash_of_ledger ledger =
   Ledger_hash.to_yojson @@ Ledger.merkle_root ledger
 
@@ -999,7 +1001,7 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
             [%log info]
               "Searching for block with greatest height on canonical chain" ;
             let%bind max_slot =
-              query_db ~f:(fun db -> Sql.Block.get_max_slot db ())
+              query_db ~f:(fun db -> Sql.Block.get_max_canonical_slot db ())
             in
             [%log info] "Maximum global slot since genesis in blocks is %Ld"
               max_slot ;
@@ -1368,29 +1370,33 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
           (user_cmds : Sql.User_command.t list)
           (zkapp_cmds : Sql.Zkapp_command.t list) =
         let check_ledger_hash_at_slot state_hash ledger_hash =
-          if Ledger_hash.equal (Ledger.merkle_root ledger) ledger_hash then
+          if Ledger_hash.equal (Ledger.merkle_root ledger) ledger_hash then (
+            incr blocks_replayed ;
             [%log info]
               "Applied all commands at global slot since genesis %Ld, got \
                expected ledger hash"
               ~metadata:
-                [ ("ledger_hash", json_ledger_hash_of_ledger ledger)
+                [ ("replayer_event", `String "block_applied")
+                ; ("ledger_hash", json_ledger_hash_of_ledger ledger)
                 ; ("state_hash", State_hash.to_yojson state_hash)
                 ; ( "global_slot_since_genesis"
                   , `String (Int64.to_string last_global_slot_since_genesis) )
                 ; ("block_id", `Int last_block_id)
                 ]
-              last_global_slot_since_genesis
+              last_global_slot_since_genesis )
           else if
             List.mem state_hashes_to_avoid
               (State_hash.to_base58_check state_hash)
               ~equal:String.equal
-          then
+          then (
+            incr blocks_replayed ;
             [%log info]
               ~metadata:
-                [ ("state_hash", `String (State_hash.to_base58_check state_hash))
+                [ ("replayer_event", `String "block_applied")
+                ; ("state_hash", `String (State_hash.to_base58_check state_hash))
                 ]
               "This block has an inconsistent ledger hash due to a known \
-               historical issue."
+               historical issue." )
           else (
             [%log error]
               "Applied all commands at global slot since genesis %Ld, ledger \
@@ -1975,6 +1981,13 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
           ~last_block_id:oldest_block_id sorted_internal_cmds sorted_user_cmds
           sorted_zkapp_cmds
       in
+      [%log info] "Replay complete"
+        ~metadata:
+          [ ("replayer_event", `String "replay_done")
+          ; ("blocks_replayed", `Int !blocks_replayed)
+          ; ( "start_slot"
+            , `String (Int64.to_string input.start_slot_since_genesis) )
+          ] ;
       let%bind () =
         match hard_fork_params_opt with
         | Some
@@ -2030,7 +2043,8 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
                 exit 1 ) ) )
 
 let () =
-  let constraint_constants = Genesis_constants.Compiled.constraint_constants in
+  let (module G) = Genesis_constants.profiled () in
+  let constraint_constants = G.constraint_constants in
   let proof_level = Genesis_constants.Proof_level.Full in
   Command.(
     run

@@ -524,7 +524,6 @@ module Network_manager = struct
        context)" ;
     let entrypoint_filename, entrypoint_script =
       Docker_node_config.Base_node_config.entrypoint_script
-        network_config.commit_id
     in
     Out_channel.with_file ~fail_if_exists:true
       (docker_dir ^/ entrypoint_filename) ~f:(fun ch ->

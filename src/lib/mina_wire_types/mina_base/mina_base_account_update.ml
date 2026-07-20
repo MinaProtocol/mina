@@ -116,5 +116,5 @@ module Poly = struct
 end
 
 module V2 = struct
-  type t = (Body.V2.t, Mina_base_control.V2.t) Poly.V1.t
+  type t = (Body.V2.t, Mina_base_control.V3.t) Poly.V1.t
 end

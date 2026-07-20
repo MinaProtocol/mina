@@ -40,7 +40,7 @@ module Stable = struct
 
   module V2 = struct
     type t =
-      (Single_spec.Stable.V2.t, Sub_zkapp_spec.Stable.V2.t) Poly.Stable.V1.t
+      (Single_spec.Stable.V3.t, Sub_zkapp_spec.Stable.V2.t) Poly.Stable.V1.t
     [@@deriving sexp, yojson]
 
     let to_latest = Fn.id

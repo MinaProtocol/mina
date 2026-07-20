@@ -5,24 +5,18 @@ ARG deb_version
 ARG deb_release=unstable
 ARG network=mainnet
 ARG deb_repo="http://packages.o1test.net"
-ARG TARGETARCH
 
 ARG psql_version=15
-# Golang version number used to detemine tarball name
-ARG GO_VERSION=1.19.11
 
 ARG MINA_DAEMON_PORT=8302
 ARG MINA_CONFIG_DIR=/data/.mina-config
-# Sample public key for use in dev profile / demo mode genesis block
-ARG PK=B62qiZfzW27eavtPrnF6DeDSAKEjXuGFdkouC3T5STRa6rrYLiDUP2p
-
-ARG ROSETTA_CLI_VERSION=v0.10.1
 
 ENV DEBIAN_FRONTEND noninteractive
 
 ARG deb_suffix
 ARG build_flags_suffix
 ARG apt_cache_url=""
+ARG deb_profile=devnet
 
 # if --build-arg deb_suffix is defined, add hypen at beginning.
 ENV SUFFIX=${deb_suffix:+-${deb_suffix}}
@@ -30,13 +24,23 @@ ENV SUFFIX=${deb_suffix:+-${deb_suffix}}
 # without custom suffixes like "generic". Used for packages like archive
 # that get the instrumented suffix but not the generic suffix.
 ENV BUILD_FLAGS_SUFFIX=${build_flags_suffix}
-# construct mina debian package name based on network and suffix.
+# construct mina debian package names based on network and suffix.
+# The daemon binaries now live in the generic package, with the genesis/config
+# data split out into a separate config package.
+#
+# Apps-only builds are invoked with deb_suffix=generic, so ${SUFFIX} already
+# selects the generic package (e.g. -generic, -generic-instrumented) and the
+# config package is intentionally omitted. Full builds do not pass a generic
+# suffix, so the install step below adds "-generic" and also pulls the config
+# package (reproducing the former monolithic mina-${network} package).
 # possible values:
-# - mina-devnet
-# - mina-devnet-lightnet etc.
-ENV MINA_DEB=mina-${network}${SUFFIX}
+# - mina-${profile}-profile + mina-devnet-config (full image)
+# - mina-${profile}-profile / mina-${profile}-profile-instrumented (apps-only, no config)
+ENV MINA_CONFIG_DEB=mina-${network}-config
 ENV MINA_ARCHIVE_DEB=mina-archive-${network}${BUILD_FLAGS_SUFFIX}
-ENV MINA_ROSETTA_DEB=mina-rosetta-${network}
+ENV MINA_ROSETTA_DEB=mina-rosetta-${network}${BUILD_FLAGS_SUFFIX}
+ENV MINA_ARCHIVE_GENERIC_DEB=mina-archive-generic${BUILD_FLAGS_SUFFIX}
+ENV MINA_ROSETTA_GENERIC_DEB=mina-rosetta-generic${BUILD_FLAGS_SUFFIX}
 
 
 # We do not install the below platform-specific dependencies,
@@ -97,45 +101,49 @@ RUN curl -s https://www.postgresql.org/media/keys/ACCC4CF8.asc | apt-key add - \
     postgresql-client-"$psql_version" \
     && rm -rf /var/lib/apt/lists/*
 
-# --- Golang install of a given GO_VERSION (add -v for spam output of each file from the go dist)
+# rosetta-cli and the Go toolchain that builds it are intentionally NOT installed
+# in the production image: they are test-only (the rosetta integration test builds
+# its own copy via buildkite/scripts/tests/rosetta/install-cli.sh) and have no
+# role in the production runtime. Keeping them out slims the shipped image.
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
-RUN curl -s "https://dl.google.com/go/go${GO_VERSION}.linux-${TARGETARCH}.tar.gz" | tar -xz -C /usr/lib/
-
-# --- Install rosetta-cli
-# The following commands install rosetta-cli with an updated rosetta-sdk-go dependency, which supports delegation transactions.
-# Upstream PR to rosetta-sdk-go: https://github.com/coinbase/rosetta-sdk-go/pull/457
-# They can be replaced once there is a new release of rosetta-cli containing the above change by:
-#RUN curl -sSfL https://raw.githubusercontent.com/coinbase/mesh-cli/${ROSETTA_CLI_VERSION}/scripts/install.sh | sh -s
-RUN curl -L "https://github.com/coinbase/mesh-cli/archive/refs/tags/v0.10.1.tar.gz" -o "/tmp/v0.10.1.tar.gz" \
-    && tar xzf "/tmp/v0.10.1.tar.gz" -C "/tmp"
-
-WORKDIR /tmp/mesh-cli-0.10.1
-RUN GOBIN="/bin" \
-    export GOBIN \
-    && /usr/lib/go/bin/go mod edit -replace github.com/coinbase/rosetta-sdk-go@v0.8.1=github.com/MinaProtocol/rosetta-sdk-go@stake-delegation-v1 \
-    && /usr/lib/go/bin/go mod tidy \
-    && /usr/lib/go/bin/go install
 
 # --- Generate en_US.UTF-8 locale to allow use of O(1) Labs DB dumps
 RUN sed -i -e 's/# en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' /etc/locale.gen \
     && locale-gen
 
-# --- Set up sample/demo wallets and configuration
-RUN mkdir -p ${MINA_CONFIG_DIR}/wallets/store/ \
-    && chmod 700 ${MINA_CONFIG_DIR}/wallets/store/ \
-    && echo "$PK" >  ${MINA_CONFIG_DIR}/wallets/store/$PK.pub \
-    && echo '{"box_primitive":"xsalsa20poly1305","pw_primitive":"argon2i","nonce":"6pcvpWSLkMi393dT5VSLR6ft56AWKkCYRqJoYia","pwsalt":"ASoBkV3NsY7ZRuxztyPJdmJCiz3R","pwdiff":[134217728,6],"ciphertext":"Dmq1Qd8uNbZRT1NT7zVbn3eubpn9Myx9Je9ZQGTKDxUv4BoPNmZAGox18qVfbbEUSuhT4ZGDt"}' \
-    > ${MINA_CONFIG_DIR}/wallets/store/${PK} \
-    && chmod go-rwx ${MINA_CONFIG_DIR}/wallets/store/${PK}
-
-
 # Mina daemon package
-# jemalloc is also installed automatically here to match the package dependencies for this $deb_codename
+# jemalloc is also installed automatically here to match the package dependencies for this $deb_codename.
+# Installed DIRECTLY from the local build context: scripts/docker/build.sh stages
+# the freshly-built .deb files under _debs, which we COPY to /opt/mina-local-debs,
+# and install-mina-debs.sh installs the resolved .deb files with a single apt-get
+# call (no apt repo / no apt index). Since there is no repo to resolve the mina
+# dependency closure, the daemon metapackage's dependencies (mina-logproc and
+# mina-${network}-config) are requested explicitly as local files too.
+COPY scripts/install-mina-debs.sh /usr/local/bin/install-mina-debs.sh
+COPY _debs /opt/mina-local-debs
 RUN echo "Building image with version $deb_version from repo $deb_release $deb_codename for network $network" \
-    && echo "deb [trusted=yes] ${deb_repo} $deb_codename $deb_release" > /etc/apt/sources.list.d/o1.list \
-    && apt-get update --quiet --yes \
-    && apt-get install --no-install-recommends --quiet --yes --allow-downgrades "${MINA_DEB}=$deb_version" "${MINA_ARCHIVE_DEB}=$deb_version" "${MINA_ROSETTA_DEB}=$deb_version" "mina-zkapp-test-transaction=$deb_version" \
-    && rm -rf /var/lib/apt/lists/*
+    && chmod +x /usr/local/bin/install-mina-debs.sh \
+    && case "${deb_profile}" in lightnet|dev) PROFILE_DEB="mina-${deb_profile}" ;; *) PROFILE_DEB="mina-${deb_profile}-profile" ;; esac \
+    && if echo "${SUFFIX}" | grep -q -- '-generic'; then \
+         /usr/local/bin/install-mina-debs.sh \
+           "mina${SUFFIX}=$deb_version" \
+           "mina-logproc=$deb_version" \
+           "${MINA_ARCHIVE_GENERIC_DEB}=$deb_version" \
+           "${MINA_ARCHIVE_DEB}=$deb_version" \
+           "${MINA_ROSETTA_GENERIC_DEB}=$deb_version" \
+           "${MINA_ROSETTA_DEB}=$deb_version" \
+           "${PROFILE_DEB}=$deb_version" ; \
+       else \
+         /usr/local/bin/install-mina-debs.sh \
+           "mina-generic${SUFFIX}=$deb_version" \
+           "mina-logproc=$deb_version" \
+           "${MINA_CONFIG_DEB}=$deb_version" \
+           "${MINA_ARCHIVE_GENERIC_DEB}=$deb_version" \
+           "${MINA_ARCHIVE_DEB}=$deb_version" \
+           "${MINA_ROSETTA_GENERIC_DEB}=$deb_version" \
+           "${MINA_ROSETTA_DEB}=$deb_version" \
+           "${PROFILE_DEB}=$deb_version" ; \
+       fi
 
 # --- Set up postgres
 USER postgres

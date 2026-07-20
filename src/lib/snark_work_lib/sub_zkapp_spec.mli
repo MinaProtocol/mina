@@ -13,8 +13,8 @@ module Stable : sig
           ; spec : Transaction_snark.Zkapp_command_segment.Basic.Stable.V1.t
           }
       | Merge of
-          { proof1 : Ledger_proof.Stable.V2.t
-          ; proof2 : Ledger_proof.Stable.V2.t
+          { proof1 : Ledger_proof.Stable.V3.t
+          ; proof2 : Ledger_proof.Stable.V3.t
           }
     [@@deriving sexp, yojson]
 

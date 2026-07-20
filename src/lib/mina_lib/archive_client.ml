@@ -4,61 +4,51 @@ open Pipe_lib
 
 let dispatch ?(max_tries = 5) ~logger
     (archive_location : Host_and_port.t Cli_lib.Flag.Types.with_name) diff =
-  let rec go tries_left errs =
-    if Int.( <= ) tries_left 0 then
-      let e = Error.of_list (List.rev errs) in
-      return
-        (Error
-           (Error.tag_arg e
-              (sprintf
-                 "Could not send archive diff data to archive process after %d \
-                  tries. The process may not be running, please check the \
-                  daemon-argument"
-                 max_tries )
-              ( ("host_and_port", archive_location.value)
-              , ("daemon-argument", archive_location.name) )
-              [%sexp_of: (string * Host_and_port.t) * (string * string)] ) )
-    else
-      match%bind
-        Daemon_rpcs.Client.dispatch Archive_lib.Rpc.t diff
-          archive_location.value
-      with
-      | Ok () ->
-          return (Ok ())
-      | Error e ->
-          [%log error]
-            "Error sending data to the archive process $error. Retrying..."
-            ~metadata:[ ("error", `String (Error.to_string_hum e)) ] ;
-          go (tries_left - 1) (e :: errs)
+  let strategy =
+    Backoff.Strategy.create ~base:(Time_ns.Span.of_sec 1.0)
+      ~max_delay:(Time_ns.Span.of_sec 10.0) ~max_attempts:max_tries ()
   in
-  go max_tries []
+  Backoff.Deferred.retry ~log_errors:true strategy ~logger ~f:(fun () ->
+      Daemon_rpcs.Client.dispatch Archive_lib.Rpc.t diff archive_location.value )
+  >>| function
+  | Ok () ->
+      Ok ()
+  | Error e ->
+      Error
+        (Error.tag_arg e
+           (sprintf
+              "Could not send archive diff data to archive process after %d \
+               tries. The process may not be running, please check the \
+               daemon-argument"
+              max_tries )
+           ( ("host_and_port", archive_location.value)
+           , ("daemon-argument", archive_location.name) )
+           [%sexp_of: (string * Host_and_port.t) * (string * string)] )
+
+let _null_logger = Logger.null ()
 
 let make_dispatch_block rpc ?(max_tries = 5)
     (archive_location : Host_and_port.t Cli_lib.Flag.Types.with_name) block =
-  let rec go tries_left errs =
-    if Int.( <= ) tries_left 0 then
-      let e = Error.of_list (List.rev errs) in
-      return
-        (Error
-           (Error.tag_arg e
-              (sprintf
-                 "Could not send block data to archive process after %d tries. \
-                  The process may not be running, please check the \
-                  daemon-argument"
-                 max_tries )
-              ( ("host_and_port", archive_location.value)
-              , ("daemon-argument", archive_location.name) )
-              [%sexp_of: (string * Host_and_port.t) * (string * string)] ) )
-    else
-      match%bind
-        Daemon_rpcs.Client.dispatch rpc block archive_location.value
-      with
-      | Ok () ->
-          return (Ok ())
-      | Error e ->
-          go (tries_left - 1) (e :: errs)
+  let strategy =
+    Backoff.Strategy.create ~base:(Time_ns.Span.of_sec 1.0)
+      ~max_delay:(Time_ns.Span.of_sec 10.0) ~max_attempts:max_tries ()
   in
-  go max_tries []
+  Backoff.Deferred.retry strategy ~logger:_null_logger ~f:(fun () ->
+      Daemon_rpcs.Client.dispatch rpc block archive_location.value )
+  >>| function
+  | Ok () ->
+      Ok ()
+  | Error e ->
+      Error
+        (Error.tag_arg e
+           (sprintf
+              "Could not send block data to archive process after %d tries. \
+               The process may not be running, please check the \
+               daemon-argument"
+              max_tries )
+           ( ("host_and_port", archive_location.value)
+           , ("daemon-argument", archive_location.name) )
+           [%sexp_of: (string * Host_and_port.t) * (string * string)] )
 
 let dispatch_precomputed_block =
   make_dispatch_block Archive_lib.Rpc.precomputed_block
@@ -93,45 +83,46 @@ let run ~logger ~precomputed_values
                transfer breadcrumb_reader writer ) ) ) ;
   O1trace.background_thread "send_diffs_to_archiver" (fun () ->
       Async.Pipe.iter reader ~f:(fun breadcrumbs ->
-          Deferred.List.iter breadcrumbs ~f:(fun breadcrumb ->
-              let start = Time.now () in
-              let diff =
-                Archive_lib.Diff.Builder.breadcrumb_added ~precomputed_values
-                  ~logger breadcrumb
-              in
-              let diff_time = Time.now () in
-              [%log debug]
-                "Archive data generation for $state_hash took $time ms"
-                ~metadata:
-                  [ ( "state_hash"
-                    , Mina_base.State_hash.to_yojson
-                        (Transition_frontier.Breadcrumb.state_hash breadcrumb)
-                    )
-                  ; ( "time"
-                    , `Float (Time.Span.to_ms (Time.diff diff_time start)) )
-                  ] ;
-              match%map
-                dispatch archive_location ~logger (Transition_frontier diff)
-              with
-              | Ok () ->
-                  [%log debug]
-                    "Dispatched archive data for $state_hash, took $time ms"
-                    ~metadata:
-                      [ ( "state_hash"
-                        , Mina_base.State_hash.to_yojson
-                            (Transition_frontier.Breadcrumb.state_hash
-                               breadcrumb ) )
-                      ; ( "time"
-                        , `Float
-                            (Time.Span.to_ms
-                               (Time.diff (Time.now ()) diff_time) ) )
-                      ] ;
-                  ()
-              | Error e ->
-                  [%log warn]
-                    ~metadata:
-                      [ ("error", Error_json.error_to_yojson e)
-                      ; ( "breadcrumb"
-                        , Transition_frontier.Breadcrumb.to_yojson breadcrumb )
-                      ]
-                    "Could not send breadcrumb to archive: $error" ) ) )
+          breadcrumbs
+          |> List.map ~f:(fun breadcrumb ->
+                 let start = Time.now () in
+                 let diff =
+                   Archive_lib.Diff.Builder.breadcrumb_added ~precomputed_values
+                     ~logger breadcrumb
+                 in
+                 let diff_time = Time.now () in
+                 [%log debug]
+                   "Archive data generation for $state_hash took $time ms"
+                   ~metadata:
+                     [ ( "state_hash"
+                       , Mina_base.State_hash.to_yojson
+                           (Transition_frontier.Breadcrumb.state_hash breadcrumb)
+                       )
+                     ; ( "time"
+                       , `Float (Time.Span.to_ms (Time.diff diff_time start)) )
+                     ] ;
+                 dispatch archive_location ~logger (Transition_frontier diff)
+                 >>| function
+                 | Ok () ->
+                     [%log debug]
+                       "Dispatched archive data for $state_hash, took $time ms"
+                       ~metadata:
+                         [ ( "state_hash"
+                           , Mina_base.State_hash.to_yojson
+                               (Transition_frontier.Breadcrumb.state_hash
+                                  breadcrumb ) )
+                         ; ( "time"
+                           , `Float
+                               (Time.Span.to_ms
+                                  (Time.diff (Time.now ()) diff_time) ) )
+                         ]
+                 | Error e ->
+                     [%log warn]
+                       ~metadata:
+                         [ ("error", Error_json.error_to_yojson e)
+                         ; ( "breadcrumb"
+                           , Transition_frontier.Breadcrumb.to_yojson breadcrumb
+                           )
+                         ]
+                       "Could not send breadcrumb to archive: $error" )
+          |> Deferred.all_unit ) )

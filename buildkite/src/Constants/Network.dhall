@@ -4,59 +4,36 @@ let List/any = Prelude.List.any
 
 let Network
     : Type
-    = < Devnet | Mainnet | PreMesa1 | Mesa >
+    = < Devnet | Mainnet >
 
 let capitalName =
           \(network : Network)
-      ->  merge
-            { Devnet = "Devnet"
-            , Mainnet = "Mainnet"
-            , PreMesa1 = "PreMesa1"
-            , Mesa = "Mesa"
-            }
-            network
+      ->  merge { Devnet = "Devnet", Mainnet = "Mainnet" } network
 
 let lowerName =
           \(network : Network)
-      ->  merge
-            { Devnet = "devnet"
-            , Mainnet = "mainnet"
-            , PreMesa1 = "hetzner-pre-mesa-1"
-            , Mesa = "mesa"
-            }
-            network
+      ->  merge { Devnet = "devnet", Mainnet = "mainnet" } network
 
 let debianSuffix =
           \(network : Network)
-      ->  merge
-            { Devnet = "devnet"
-            , Mainnet = "mainnet"
-            , PreMesa1 = "hetzner-pre-mesa-1"
-            , Mesa = "mesa"
-            }
-            network
+      ->  merge { Devnet = "devnet", Mainnet = "mainnet" } network
+
+let namePrefixSegment =
+      \(network : Network) -> merge { Devnet = "", Mainnet = "Mainnet" } network
 
 let peerListUrl =
           \(network : Network)
       ->  merge
-            { Devnet =
-                "https://storage.googleapis.com/seed-lists/devnet_seeds.txt"
+            { Devnet = "https://bootnodes.minaprotocol.com/networks/devnet.txt"
             , Mainnet =
-                "https://storage.googleapis.com/seed-lists/mainnet_seeds.txt"
-            , PreMesa1 =
-                "https://storage.googleapis.com/o1labs-gitops-infrastructure/mina-mesa-network/mina-mesa-network-seeds.txt"
-            , Mesa =
-                "https://storage.googleapis.com/o1labs-gitops-infrastructure/mina-mesa-network/mina-mesa-network-seeds.txt"
+                "https://bootnodes.minaprotocol.com/networks/mainnet.txt"
             }
             network
 
 let toLabelSegment = \(network : Network) -> "-${debianSuffix network}"
 
 let requiresMainnetBuild =
-          \(network : Network)
-      ->  merge
-            { Devnet = False, Mainnet = True, PreMesa1 = False, Mesa = False }
-            network
+      \(network : Network) -> merge { Devnet = False, Mainnet = True } network
 
 let buildMainnetEnv =
           \(network : Network)
@@ -77,6 +54,7 @@ let foldMinaBuildMainnetEnv =
 in  { Type = Network
     , capitalName = capitalName
     , lowerName = lowerName
+    , namePrefixSegment = namePrefixSegment
     , debianSuffix = debianSuffix
     , peerListUrl = peerListUrl
     , toLabelSegment = toLabelSegment

@@ -1,7 +1,8 @@
-# Local Coda Demo
+# Local Mina Demo
 
 If all you need is a running daemon and some blocks, the
-`codaprotocol/coda-demo` container has everything you need! It uses the same
+`minaprotocol/mina-daemon` container has everything you need when started in
+demo mode (set the `RUN_DEMO=true` environment variable). It uses the same
 configuration as the testnet, but instead of the community participants ledger
 it uses a simple ledger with a single demo account.
 
@@ -14,6 +15,6 @@ The public key of the demo account is `B62qrPN5Y5yq8kGE3FbVKbGTdTAJNdtNtB5sNVpxy
 This account has 100% of the stake.
 
 The demo container will run a block producer and a snark worker. You need to
-make sure the `--publish` at least the GraphQL port, for example `docker run
---publish 3085:3085 -it codaprotocol/coda-demo`. Any additional arguments will
-be passed to the daemon.
+make sure the `--publish` at least the GraphQL port, for example
+`docker run --publish 3085:3085 -e RUN_DEMO=true -it minaprotocol/mina-daemon:<version>`.
+Any additional arguments will be passed to the daemon.

@@ -12,9 +12,9 @@ let Command = ../../Command/Base.dhall
 
 let Size = ../../Command/Size.dhall
 
-let Dockers = ../../Constants/DockerVersions.dhall
+let Dockers = ../../Constants/Docker/Versions.dhall
 
-let Artifacts = ../../Constants/Artifacts.dhall
+let Docker = ../../Constants/Docker/Package.dhall
 
 let Network = ../../Constants/Network.dhall
 
@@ -35,9 +35,9 @@ let dirtyWhen =
       ]
 
 let hardforkDocker =
-      Artifacts.fullDockerTag
-        Artifacts.Tag::{
-        , artifact = Artifacts.Type.DaemonAutoHardfork
+      Docker.fullDockerTag
+        Docker.Tag::{
+        , package = Docker.Type.DaemonAutoHardfork { network = network }
         , network = network
         }
 
@@ -70,7 +70,8 @@ in  Pipeline.build
                 Dockers.dependsOn
                   Dockers.DepsSpec::{
                   , codename = Dockers.Type.Bullseye
-                  , artifact = Artifacts.Type.DaemonAutoHardfork
+                  , artifact =
+                      Docker.Type.DaemonAutoHardfork { network = network }
                   , network = network
                   }
             }

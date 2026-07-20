@@ -12,7 +12,7 @@ module Wire_types = Mina_wire_types.Transaction_snark
 let proof_cache = ref None
 
 module Make_sig (A : Wire_types.Types.S) = struct
-  module type S = Transaction_snark_intf.Full with type Stable.V2.t = A.V2.t
+  module type S = Transaction_snark_intf.Full with type Stable.V3.t = A.V3.t
 end
 
 module Make_str (A : Wire_types.Concrete) = struct
@@ -65,8 +65,8 @@ module Make_str (A : Wire_types.Concrete) = struct
   module Proof = struct
     [%%versioned
     module Stable = struct
-      module V2 = struct
-        type t = Pickles.Proof.Proofs_verified_2.Stable.V2.t
+      module V3 = struct
+        type t = Pickles.Proof.Proofs_verified_2.Stable.V3.t
         [@@deriving yojson, compare, equal, sexp, hash]
 
         let to_latest = Fn.id
@@ -76,10 +76,10 @@ module Make_str (A : Wire_types.Concrete) = struct
 
   [%%versioned
   module Stable = struct
-    module V2 = struct
+    module V3 = struct
       type t =
         ( Mina_state.Snarked_ledger_state.With_sok.Stable.V2.t
-        , Proof.Stable.V2.t )
+        , Proof.Stable.V3.t )
         Proof_carrying_data.Stable.V1.t
       [@@deriving compare, equal, sexp, version, yojson, hash]
 
