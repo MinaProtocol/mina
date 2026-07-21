@@ -44,7 +44,7 @@ let pipeline
               , SelectFiles.exactly "scripts/tests/ledger_test_apply" "sh"
               ]
             , preCommands =
-                RunInToolchain.runInToolchain
+                RunInToolchain.runInDefaultToolchain
                   (   [ "DUNE_INSTRUMENT_WITH=bisect_ppx"
                       , "COVERALLS_TOKEN"
                       , "BENCHMARK_FILE=input.json"

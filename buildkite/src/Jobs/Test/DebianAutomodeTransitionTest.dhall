@@ -10,6 +10,8 @@ let Command = ../../Command/Base.dhall
 
 let RunInToolchain = ../../Command/RunInToolchain.dhall
 
+let ContainerImages = ../../Constants/ContainerImages.dhall
+
 let DebianVersions = ../../Constants/DebianVersions.dhall
 
 let Network = ../../Constants/Network.dhall
@@ -36,13 +38,16 @@ let buildTestCmd
           in  Command.build
                 Command.Config::{
                 , commands =
-                    RunInToolchain.runInToolchainBullseye
-                      ([] : List Text)
-                      ''
-                      ./buildkite/scripts/tests/debian-automode-transition-test.sh \
-                        --codename bullseye \
-                        --network ${network}
-                      ''
+                    RunInToolchain.runInToolchain
+                      RunInToolchain.Config::{
+                      , image = ContainerImages.minaToolchainBullseye.amd64
+                      , innerScript =
+                          ''
+                          ./buildkite/scripts/tests/debian-automode-transition-test.sh \
+                            --codename bullseye \
+                            --network ${network}
+                          ''
+                      }
                 , label =
                     "Debian automode transition test (bullseye, ${network})"
                 , key = key

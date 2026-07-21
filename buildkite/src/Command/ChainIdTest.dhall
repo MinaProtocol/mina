@@ -31,7 +31,7 @@ let buildTestStep =
           in  Command.build
                 Command.Config::{
                 , commands =
-                    RunInToolchain.runInToolchain
+                    RunInToolchain.runInDefaultToolchain
                       DebianVersions.overrideEnvs
                       "buildkite/scripts/test-chain-id.sh ${networkName} ${expectedChainId}"
                 , label = "Test chain-id for ${networkName}"
