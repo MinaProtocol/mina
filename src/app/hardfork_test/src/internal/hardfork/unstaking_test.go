@@ -69,6 +69,20 @@ func TestComputeSlotOccupancy(t *testing.T) {
 	); err == nil {
 		t.Error("expected error when start and last block have the same height")
 	}
+
+	// Swapped arguments must error, not return a negative or infinite value
+	if _, err := ht.ComputeSlotOccupancy(
+		client.BlockData{BlockHeight: 16, Slot: 30},
+		client.BlockData{BlockHeight: 1, Slot: 0},
+	); err == nil {
+		t.Error("expected error when last block is not after starting block")
+	}
+	if _, err := ht.ComputeSlotOccupancy(
+		client.BlockData{BlockHeight: 1, Slot: 10},
+		client.BlockData{BlockHeight: 5, Slot: 10},
+	); err == nil {
+		t.Error("expected error when both blocks are at the same slot")
+	}
 }
 
 func TestExpectedPreForkFillUpperBound(t *testing.T) {

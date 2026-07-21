@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/MinaProtocol/mina/src/app/hardfork_test/src/internal/client"
+	"github.com/MinaProtocol/mina/src/app/hardfork_test/src/internal/config"
 )
 
 // Slot fill rate f hardcoded in the daemon (src/lib/consensus/vrf/consensus_vrf.ml),
@@ -27,6 +28,14 @@ const preForkFillMargin = 0.15
 // broken rather than diluted, and the comparison against the post-fork
 // occupancy would be meaningless
 const preForkMinOccupancy = 0.05
+
+// Relative tolerance when cross-checking the file-derived total currency
+// against the staking epoch ledger's total currency reported by the daemon.
+// The two may differ by accounts the daemon injects on top of the configured
+// genesis (e.g. the genesis winner, ~1000 MINA against ~80M total); a mismatch
+// beyond this tolerance means the genesis ledger file no longer describes the
+// ledger the VRF samples.
+const totalCurrencyTolerance = 0.001
 
 // StakeStats summarizes the genesis ledger from the VRF's point of view, in
 // nanomina
@@ -231,6 +240,19 @@ func (t *HardforkTest) validatePreForkOccupancyDiluted(analysis *BlockAnalysisRe
 	upperBound, err := ExpectedPreForkFillUpperBound(stats)
 	if err != nil {
 		return err
+	}
+
+	// The fill bound is modeled on the genesis ledger file under the
+	// assumption that it is the staking epoch ledger the VRF samples during
+	// the whole measurement window (epoch 0). Cross-check the file-derived
+	// total against what consensus actually reports.
+	consensusTotal, err := t.Client.StakingEpochLedgerTotalCurrency(t.Config.AnyDaemon().Port(config.PORT_REST))
+	if err != nil {
+		return fmt.Errorf("failed to query staking epoch ledger total currency: %w", err)
+	}
+	t.Logger.Info("Staking epoch ledger total currency per consensus: %d nanomina (genesis ledger file: %d nanomina)", consensusTotal, stats.TotalCurrency)
+	if math.Abs(float64(consensusTotal)-float64(stats.TotalCurrency)) > totalCurrencyTolerance*float64(consensusTotal) {
+		return fmt.Errorf("genesis ledger file total currency (%d nanomina) disagrees with the staking epoch ledger total currency (%d nanomina) by more than %.2f%%; the fill-rate bound would be computed against the wrong ledger", stats.TotalCurrency, consensusTotal, totalCurrencyTolerance*100)
 	}
 
 	t.Logger.Info("Genesis stake: total currency %d, active producer stake %d, lazy stake %d (lazy portion %f)",

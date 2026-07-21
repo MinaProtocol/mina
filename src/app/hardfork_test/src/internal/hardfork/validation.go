@@ -49,12 +49,17 @@ func (t *HardforkTest) WaitForBestTip(port int, pred func(client.BlockData) bool
 }
 
 // ComputeSlotOccupancy computes the fraction of slots between two blocks that
-// are occupied by a block
+// are occupied by a block. startBlock must be an ancestor of lastBlock: block
+// heights are dense along a chain, so the height delta counts exactly the
+// blocks after startBlock, while the slot delta counts the slot opportunities.
 func (t *HardforkTest) ComputeSlotOccupancy(startBlock, lastBlock client.BlockData) (float64, error) {
 	t.Logger.Info("Calculating slot occupancy between block %v and %v", startBlock, lastBlock)
 
-	if startBlock.BlockHeight == lastBlock.BlockHeight {
-		return 0, fmt.Errorf("starting block has same height as last block, can't calculate slot occupancy!")
+	if lastBlock.Slot <= startBlock.Slot {
+		return 0, fmt.Errorf("last block (slot %d) is not after starting block (slot %d), can't calculate slot occupancy!", lastBlock.Slot, startBlock.Slot)
+	}
+	if lastBlock.BlockHeight <= startBlock.BlockHeight {
+		return 0, fmt.Errorf("last block height (%d) is not above starting block height (%d), can't calculate slot occupancy!", lastBlock.BlockHeight, startBlock.BlockHeight)
 	}
 
 	return float64(lastBlock.BlockHeight-startBlock.BlockHeight) / float64(lastBlock.Slot-startBlock.Slot), nil

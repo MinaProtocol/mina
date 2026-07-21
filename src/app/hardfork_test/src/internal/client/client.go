@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/tidwall/gjson"
@@ -249,6 +250,26 @@ func (c *Client) ForkConfig(port int) (gjson.Result, error) {
 	}
 
 	return result.Get("data.fork_config"), nil
+}
+
+// StakingEpochLedgerTotalCurrency returns the total currency (in nanomina) of
+// the current staking epoch ledger — the denominator of the VRF threshold
+// check.
+func (c *Client) StakingEpochLedgerTotalCurrency(port int) (uint64, error) {
+	result, err := c.query(port, `bestChain (maxLength: 1){ protocolState { consensusState { stakingEpochData { ledger { totalCurrency } } } } }`)
+	if err != nil {
+		return 0, err
+	}
+	blocks := result.Get("data.bestChain").Array()
+	if len(blocks) == 0 {
+		return 0, fmt.Errorf("no best chain block at port %d", port)
+	}
+	raw := blocks[0].Get("protocolState.consensusState.stakingEpochData.ledger.totalCurrency").String()
+	total, err := strconv.ParseUint(raw, 10, 64)
+	if err != nil {
+		return 0, fmt.Errorf("failed to parse staking epoch ledger total currency %q: %w", raw, err)
+	}
+	return total, nil
 }
 
 func (c *Client) NumUserCommandsInBestChain(port int) (int, error) {
