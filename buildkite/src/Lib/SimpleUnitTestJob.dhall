@@ -23,6 +23,7 @@ let Config
       , testPath : Text
       , tags : List PipelineTag.Type
       , cmdTarget : Size
+      , submodules : Bool
       }
 
 let build
@@ -37,10 +38,15 @@ let build
                       Command.Config::{
                       , commands =
                           RunInToolchain.runInToolchain
-                            [ "DUNE_INSTRUMENT_WITH=bisect_ppx"
-                            , "COVERALLS_TOKEN"
-                            ]
-                            "buildkite/scripts/unit-test.sh ${c.testProfile} ${c.testPath} && buildkite/scripts/upload-partial-coverage-data.sh ${key} dev"
+                            RunInToolchain.Config::{
+                            , submodules = c.submodules
+                            , environment =
+                              [ "DUNE_INSTRUMENT_WITH=bisect_ppx"
+                              , "COVERALLS_TOKEN"
+                              ]
+                            , innerScript =
+                                "buildkite/scripts/unit-test.sh ${c.testProfile} ${c.testPath} && buildkite/scripts/upload-partial-coverage-data.sh ${key} dev"
+                            }
                       , label = c.label
                       , key = key
                       , target = cmd_target

@@ -9,7 +9,7 @@ in  { step =
         ->  Command.build
               Command.Config::{
               , commands =
-                  RunInToolchain.runInToolchain
+                  RunInToolchain.runInDefaultToolchain
                     ([] : List Text)
                     "./buildkite/scripts/check-graphql-schema.sh"
               , label = "Check GraphQL Schema"

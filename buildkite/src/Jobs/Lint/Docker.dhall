@@ -33,7 +33,7 @@ in  Pipeline.build
         [ Command.build
             Command.Config::{
             , commands =
-                RunInToolchain.runInToolchain
+                RunInToolchain.runInDefaultToolchain
                   ([] : List Text)
                   "make check-docker"
             , label = "Docker: hadolint"
