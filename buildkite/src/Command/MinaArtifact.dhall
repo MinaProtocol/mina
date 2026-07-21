@@ -66,6 +66,7 @@ let MinaBuildSpec =
           , arch : Arch.Type
           , deb_legacy_version : Text
           , deb_storage_repair_version : Text
+          , deb_legacy_githash_config : Text
           , docker_publish : DockerPublish.Type
           , suffix : Optional Text
           , if_ : Optional B/If
@@ -89,6 +90,7 @@ let MinaBuildSpec =
           , suffix = None Text
           , deb_legacy_version = "3.4.0-alpha1-compatible-ad13ff4"
           , deb_storage_repair_version = "3.3.0-master-35445f7"
+          , deb_legacy_githash_config = ""
           , arch = Arch.Type.Amd64
           , docker_publish = DockerPublish.Type.Essential
           , if_ = None B/If
@@ -137,6 +139,7 @@ let build_artifacts
                         , "ARCHITECTURE=${Arch.lowerName spec.arch}"
                         , Network.buildMainnetEnv spec.network
                         , "PREFORK_LEGACY_VERSION=${spec.deb_legacy_version}"
+                        , "PREFORK_GITHASH_CONFIG=${spec.deb_legacy_githash_config}"
                         ]
                       # BuildFlags.buildEnvs spec.buildFlags
                       # spec.extraBuildEnvs
