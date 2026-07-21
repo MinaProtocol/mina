@@ -16,7 +16,7 @@ PREFORK=""
 FORKTO="develop"
 EXTRA_ARGS=()
 
-USAGE="Usage: $0 --fork-from <PREFORK> [--fork-to <FORKTO>] [ADDITONAL ARGS TO HF TEST...]"
+USAGE="Usage: $0 --fork-from <PREFORK> [--fork-to <FORKTO>] [--slot-tx-end <SLOT>] [--slot-chain-end <SLOT>] [ADDITONAL ARGS TO HF TEST...]"
 usage() {
   if (( $# > 0 )); then
     echo "$1" >&2
@@ -44,6 +44,20 @@ while [[ $# -gt 0 ]]; do
         usage "Error: $1 requires an argument."
       fi
       FORKTO="$2"
+      shift 2
+      ;;
+    --slot-tx-end)
+      if [[ $# -lt 2 ]]; then
+        usage "Error: $1 requires an argument."
+      fi
+      SLOT_TX_END="$2"
+      shift 2
+      ;;
+    --slot-chain-end)
+      if [[ $# -lt 2 ]]; then
+        usage "Error: $1 requires an argument."
+      fi
+      SLOT_CHAIN_END="$2"
       shift 2
       ;;
     --help|-h)
