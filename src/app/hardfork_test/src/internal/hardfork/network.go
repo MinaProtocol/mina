@@ -66,6 +66,10 @@ func (t *HardforkTest) RunMainNetwork(extraFilesRoot string, mainGenesisTs int64
 		"--extra-files-root", extraFilesRoot,
 	}
 
+	if t.Config.UnstakingTest {
+		args = append(args, "--lazy-whales", strconv.Itoa(t.Config.NumLazyWhales))
+	}
+
 	return t.startLocalNetwork(t.Config.MainMinaExe, "main", args)
 }
 
