@@ -127,6 +127,35 @@ func TestExpectedPreForkFillUpperBound(t *testing.T) {
 	}
 }
 
+func TestUnstakedTotal(t *testing.T) {
+	t.Parallel()
+
+	// GraphQL Amounts are raw nanomina integer strings. The minuend is the
+	// PRE-FORK genesis total (the fork genesis block's own totalCurrency
+	// additionally contains pre-fork coinbases and must not be used).
+	preFork := client.BlockData{TotalCurrency: "80853498000000000"}
+	forkGenesis := client.BlockData{StakingLedgerTotalCurrency: "23103498000000000"}
+	got, err := UnstakedTotal(preFork, forkGenesis)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if want := uint64(57_750_000_000_000_000); got != want {
+		t.Errorf("UnstakedTotal = %d, want %d", got, want)
+	}
+
+	// Missing fields (e.g. build that doesn't serve them) must error
+	if _, err := UnstakedTotal(client.BlockData{}, client.BlockData{}); err == nil {
+		t.Error("expected error for empty amounts")
+	}
+	// Fork staking total above the pre-fork genesis total is nonsense
+	if _, err := UnstakedTotal(
+		client.BlockData{TotalCurrency: "100"},
+		client.BlockData{StakingLedgerTotalCurrency: "101"},
+	); err == nil {
+		t.Error("expected error when staked exceeds total")
+	}
+}
+
 func writePubkey(t *testing.T, dir, name, pk string) {
 	t.Helper()
 	if err := os.MkdirAll(dir, 0755); err != nil {

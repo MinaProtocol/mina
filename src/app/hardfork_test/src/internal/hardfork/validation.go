@@ -20,10 +20,11 @@ type BlockAnalysisResult struct {
 	GenesisBlock       client.BlockData
 	SnarkedHashByEpoch SnarkedHashByEpoch
 
-	// Pre-fork slot occupancy, recorded during the main network phase so the
-	// fork network phase can assert the post-fork occupancy improved on it
-	// (only populated in unstaking test mode)
-	PreForkOccupancy float64
+	// Pre-fork slot occupancy and genesis stake breakdown, recorded during
+	// the main network phase so the fork network phase can assert against
+	// them (only populated in unstaking test mode)
+	PreForkOccupancy  float64
+	PreForkStakeStats StakeStats
 }
 
 func (t *HardforkTest) WaitForBestTip(port int, pred func(client.BlockData) bool, predDescription string, timeout time.Duration) error {

@@ -152,7 +152,7 @@ func (t *HardforkTest) RunForkNetworkPhase(analysis *BlockAnalysisResult, mainGe
 
 	// Validate slot occupancy
 	if t.Config.UnstakingTest {
-		if err := t.validatePostForkOccupancyRecovered(analysis, *commonGenesisBlock, *bestTip); err != nil {
+		if err := t.validatePostForkUnstaking(analysis, *commonGenesisBlock, *bestTip); err != nil {
 			return err
 		}
 	} else {

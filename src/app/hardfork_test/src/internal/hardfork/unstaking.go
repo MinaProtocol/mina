@@ -237,6 +237,7 @@ func (t *HardforkTest) validatePreForkOccupancyDiluted(analysis *BlockAnalysisRe
 	if err != nil {
 		return err
 	}
+	analysis.PreForkStakeStats = stats
 	upperBound, err := ExpectedPreForkFillUpperBound(stats)
 	if err != nil {
 		return err
@@ -269,10 +270,67 @@ func (t *HardforkTest) validatePreForkOccupancyDiluted(analysis *BlockAnalysisRe
 	return nil
 }
 
-// validatePostForkOccupancyRecovered asserts that unstaking the lazy whales at
-// the fork restored the slot occupancy: it must beat the pre-fork occupancy
-// and clear the standard 50% health bar.
-func (t *HardforkTest) validatePostForkOccupancyRecovered(analysis *BlockAnalysisResult, commonGenesisBlock, bestTip client.BlockData) error {
+// UnstakedTotal computes the amount of currency the fork removed from the VRF
+// denominator: the pre-fork genesis total currency minus the fork network's
+// staking epoch ledger total. On a post-fork (v2) build the epoch ledger's
+// totalCurrency field carries total_stake, and the fork's staking epoch
+// ledger is exactly the pre-fork genesis ledger with the --unstake-pk patch
+// applied — the same ledger on both sides of the subtraction, so every staked
+// account (including the genesis winner) cancels and the difference is
+// exactly the unstaked balances. Note: the fork genesis block's own
+// totalCurrency must NOT be used as the minuend — it describes the staged
+// ledger at the fork block, which additionally contains the pre-fork coinbase
+// supply increase.
+func UnstakedTotal(preForkGenesis, forkGenesis client.BlockData) (uint64, error) {
+	// GraphQL Amount fields are raw nanomina integer strings (unlike the
+	// decimal-mina balances in the genesis ledger file)
+	total, err := strconv.ParseUint(preForkGenesis.TotalCurrency, 10, 64)
+	if err != nil {
+		return 0, fmt.Errorf("total currency of pre-fork genesis block %s: %w", preForkGenesis.StateHash, err)
+	}
+	staked, err := strconv.ParseUint(forkGenesis.StakingLedgerTotalCurrency, 10, 64)
+	if err != nil {
+		return 0, fmt.Errorf("staking ledger total currency of fork genesis block %s: %w", forkGenesis.StateHash, err)
+	}
+	if staked > total {
+		return 0, fmt.Errorf("fork staking ledger total (%d nanomina) exceeds pre-fork genesis total currency (%d nanomina)", staked, total)
+	}
+	return total - staked, nil
+}
+
+// validatePostForkUnstaking asserts that the fork actually removed the lazy
+// whales from the VRF denominator, then that slot occupancy recovered
+// accordingly. The deterministic checks come first: the conservation identity
+// (unstaked amount at fork genesis == the lazy whales' balances, exact) and
+// per-account delegate clearing; the occupancy comparisons then confirm the
+// behavioral consequence.
+func (t *HardforkTest) validatePostForkUnstaking(analysis *BlockAnalysisResult, commonGenesisBlock, bestTip client.BlockData) error {
+	unstaked, err := UnstakedTotal(analysis.GenesisBlock, commonGenesisBlock)
+	if err != nil {
+		return fmt.Errorf("failed to compute unstaked total at fork genesis: %w", err)
+	}
+	lazy := analysis.PreForkStakeStats.LazyStake
+	t.Logger.Info("Fork genesis: unstaked amount %d nanomina, pre-fork lazy stake %d nanomina", unstaked, lazy)
+	if unstaked != lazy {
+		return fmt.Errorf("unstaked amount at fork genesis (%d nanomina) does not equal the lazy whales' stake (%d nanomina); the fork did not remove exactly the lazy stake from the VRF denominator", unstaked, lazy)
+	}
+
+	port := t.Config.AnyDaemon().Port(config.PORT_REST)
+	lazyPks, err := t.LazyWhalePks()
+	if err != nil {
+		return err
+	}
+	for _, pk := range lazyPks {
+		delegate, err := t.Client.AccountDelegate(port, pk)
+		if err != nil {
+			return fmt.Errorf("failed to query post-fork delegate of lazy whale %s: %w", pk, err)
+		}
+		if delegate != "" {
+			return fmt.Errorf("lazy whale %s still has delegate %s on the fork network, expected none", pk, delegate)
+		}
+	}
+	t.Logger.Info("All %d lazy whales are unstaked on the fork network", len(lazyPks))
+
 	postOcc, err := t.ComputeSlotOccupancy(commonGenesisBlock, bestTip)
 	if err != nil {
 		return fmt.Errorf("failed to compute post-fork slot occupancy: %w", err)

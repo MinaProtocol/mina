@@ -113,6 +113,10 @@ type BlockData struct {
 	NumUserCommands int    `json:"num_user_commands"`
 	NumFeeTransfers int    `json:"num_fee_transfers"`
 	Coinbase        string `json:"coinbase"`
+	// Raw nanomina amounts as reported by GraphQL. On a post-fork (v2) build
+	// the staking epoch ledger's totalCurrency field carries total_stake.
+	TotalCurrency              string `json:"total_currency"`
+	StakingLedgerTotalCurrency string `json:"staking_ledger_total_currency"`
 }
 
 func (block *BlockData) NonEmpty() bool {
@@ -135,8 +139,9 @@ genesisBlock {
       blockHeight
       slotSinceGenesis
       epoch
+      totalCurrency
       stakingEpochData {
-        ledger { hash }
+        ledger { hash totalCurrency }
         seed
       }
       nextEpochData {
@@ -165,8 +170,9 @@ bestChain (maxLength: %d){
       blockHeight
       slotSinceGenesis
       epoch
+      totalCurrency
       stakingEpochData {
-        ledger { hash }
+        ledger { hash totalCurrency }
         seed
       }
       nextEpochData {
@@ -189,19 +195,21 @@ bestChain (maxLength: %d){
 
 func parseBlock(value gjson.Result) *BlockData {
 	block := &BlockData{
-		StateHash:       value.Get("stateHash").String(),
-		BlockHeight:     int(value.Get("protocolState.consensusState.blockHeight").Int()),
-		Slot:            int(value.Get("protocolState.consensusState.slotSinceGenesis").Int()),
-		CurEpochHash:    value.Get("protocolState.consensusState.stakingEpochData.ledger.hash").String(),
-		CurEpochSeed:    value.Get("protocolState.consensusState.stakingEpochData.seed").String(),
-		NextEpochHash:   value.Get("protocolState.consensusState.nextEpochData.ledger.hash").String(),
-		NextEpochSeed:   value.Get("protocolState.consensusState.nextEpochData.seed").String(),
-		StagedHash:      value.Get("protocolState.blockchainState.stagedLedgerHash").String(),
-		SnarkedHash:     value.Get("protocolState.blockchainState.snarkedLedgerHash").String(),
-		Epoch:           int(value.Get("protocolState.consensusState.epoch").Int()),
-		NumUserCommands: int(value.Get("commandTransactionCount").Int()),
-		NumFeeTransfers: len(value.Get("transactions.feeTransfer").Array()),
-		Coinbase:        value.Get("transactions.coinbase").String(),
+		StateHash:                  value.Get("stateHash").String(),
+		BlockHeight:                int(value.Get("protocolState.consensusState.blockHeight").Int()),
+		Slot:                       int(value.Get("protocolState.consensusState.slotSinceGenesis").Int()),
+		CurEpochHash:               value.Get("protocolState.consensusState.stakingEpochData.ledger.hash").String(),
+		CurEpochSeed:               value.Get("protocolState.consensusState.stakingEpochData.seed").String(),
+		NextEpochHash:              value.Get("protocolState.consensusState.nextEpochData.ledger.hash").String(),
+		NextEpochSeed:              value.Get("protocolState.consensusState.nextEpochData.seed").String(),
+		StagedHash:                 value.Get("protocolState.blockchainState.stagedLedgerHash").String(),
+		SnarkedHash:                value.Get("protocolState.blockchainState.snarkedLedgerHash").String(),
+		Epoch:                      int(value.Get("protocolState.consensusState.epoch").Int()),
+		NumUserCommands:            int(value.Get("commandTransactionCount").Int()),
+		NumFeeTransfers:            len(value.Get("transactions.feeTransfer").Array()),
+		Coinbase:                   value.Get("transactions.coinbase").String(),
+		TotalCurrency:              value.Get("protocolState.consensusState.totalCurrency").String(),
+		StakingLedgerTotalCurrency: value.Get("protocolState.consensusState.stakingEpochData.ledger.totalCurrency").String(),
 	}
 
 	return block
@@ -270,6 +278,20 @@ func (c *Client) StakingEpochLedgerTotalCurrency(port int) (uint64, error) {
 		return 0, fmt.Errorf("failed to parse staking epoch ledger total currency %q: %w", raw, err)
 	}
 	return total, nil
+}
+
+// AccountDelegate returns the delegate of the account with the given public
+// key, or ("", nil) if the account exists and has no delegate (unstaked).
+func (c *Client) AccountDelegate(port int, pk string) (string, error) {
+	result, err := c.query(port, fmt.Sprintf(`account(publicKey: %q) { delegate }`, pk))
+	if err != nil {
+		return "", err
+	}
+	account := result.Get("data.account")
+	if !account.Exists() || account.Type == gjson.Null {
+		return "", fmt.Errorf("account %s not found at port %d", pk, port)
+	}
+	return account.Get("delegate").String(), nil
 }
 
 func (c *Client) NumUserCommandsInBestChain(port int) (int, error) {
