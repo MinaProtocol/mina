@@ -2,6 +2,7 @@ use crate::docker::compose::CONFIG_DIRECTORY;
 use crate::native::port_manager;
 use crate::native::process_tracker::{ProcessRecord, ProcessTracker};
 use crate::service::{ServiceConfig, ServiceType};
+use crate::supervisor::{NodeSpec, SupervisorPlan};
 use chrono::Local;
 use log::{info, warn};
 use nix::sys::signal::{self, Signal};
@@ -70,6 +71,61 @@ impl NativeManager {
             self.start_service(service, network_id)?;
         }
         Ok(())
+    }
+
+    /// Path of the supervisor's RPC socket for this network.
+    pub fn supervisor_socket(network_path: &Path) -> PathBuf {
+        network_path.join("supervisor.sock")
+    }
+
+    /// Build the [`SupervisorPlan`] the foreground supervisor runs: one
+    /// [`NodeSpec`] per service (reusing the same command generation as
+    /// [`Self::start_service`]), plus the shared env and per-service log path.
+    /// Checks port availability up front so we fail before spawning anything.
+    pub fn build_supervisor_plan(
+        &self,
+        services: &[ServiceConfig],
+        network_id: &str,
+    ) -> Result<SupervisorPlan> {
+        let ports = port_manager::collect_all_ports(services);
+        port_manager::check_ports_available(&ports)?;
+
+        let network_path_str = self.network_path.to_str().unwrap();
+        let mut nodes = Vec::new();
+        for service in services {
+            if service.service_type == ServiceType::UptimeServiceBackend {
+                warn!(
+                    "Skipping uptime service backend '{}' in native mode",
+                    service.service_name
+                );
+                continue;
+            }
+            let config_dir = self.config_dir_for_service(&service.service_name);
+            fs::create_dir_all(&config_dir)?;
+            let config_dir_str = config_dir.to_str().unwrap();
+            let (binary, args) =
+                self.build_command(service, network_id, network_path_str, config_dir_str)?;
+            nodes.push(NodeSpec {
+                name: service.service_name.clone(),
+                binary,
+                args,
+                env: vec![
+                    ("MINA_PRIVKEY_PASS".into(), "naughty blue worm".into()),
+                    ("MINA_LIBP2P_PASS".into(), "naughty blue worm".into()),
+                    ("MINA_CLIENT_TRUSTLIST".into(), "0.0.0.0/0".into()),
+                    ("RAYON_NUM_THREADS".into(), "2".into()),
+                ],
+                log_file: self
+                    .logs_dir()
+                    .join(format!("{}.log", service.service_name)),
+            });
+        }
+
+        Ok(SupervisorPlan {
+            network_id: network_id.to_string(),
+            socket_path: Self::supervisor_socket(&self.network_path),
+            nodes,
+        })
     }
 
     pub fn stop_all(&self) -> Result<()> {

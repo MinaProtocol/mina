@@ -7,6 +7,7 @@ mod keys;
 mod native;
 mod output;
 mod service;
+mod supervisor;
 mod topology;
 mod utils;
 
@@ -146,6 +147,23 @@ fn main() -> Result<()> {
                 let network_path = directory_manager.network_path(&network_id);
                 check_network_exists(&network_id)?;
 
+                if let ExecutionMode::Native = mode {
+                    // Query the foreground supervisor over its RPC socket.
+                    let socket = NativeManager::supervisor_socket(&network_path);
+                    return match supervisor::rpc_call(&socket, "status", serde_json::Value::Null) {
+                        Ok(status) => {
+                            println!(
+                                "{}",
+                                serde_json::to_string_pretty(&status).unwrap_or_default()
+                            );
+                            Ok(())
+                        }
+                        Err(e) => exit_with(format!(
+                            "Network '{network_id}' is not running (no supervisor): {e}"
+                        )),
+                    };
+                }
+
                 let docker = DockerManager::new(&network_path);
                 let ls_out = match docker.compose_ls() {
                     Ok(out) => out,
@@ -267,16 +285,31 @@ fn main() -> Result<()> {
                     ExecutionMode::Native => {
                         let native = NativeManager::new(&network_path, native_bin(&bin_path));
                         let services = directory_manager.get_services_info(&network_id)?;
-                        match native.start_all(&services, &network_id) {
-                            Ok(_) => {
-                                println!("{}", network::Start { network_id });
-                                Ok(())
-                            }
+                        let plan = match native.build_supervisor_plan(&services, &network_id) {
+                            Ok(plan) => plan,
                             Err(e) => {
-                                let error_message =
-                                    format!("Failed to start network '{network_id}': {e}");
-                                exit_with(error_message)
+                                return exit_with(format!(
+                                    "Failed to prepare network '{network_id}': {e}"
+                                ));
                             }
+                        };
+                        info!(
+                            "Starting network '{network_id}' in the foreground. \
+                             Ctrl-C or 'minimina network stop -i {network_id}' to stop."
+                        );
+                        println!(
+                            "{}",
+                            network::Start {
+                                network_id: network_id.clone()
+                            }
+                        );
+                        // Foreground: the supervisor owns the daemons and blocks
+                        // until 'stop' (RPC) or SIGINT. Detached mode is a later ticket.
+                        match supervisor::run_blocking(plan) {
+                            Ok(()) => Ok(()),
+                            Err(e) => exit_with(format!(
+                                "Supervisor error for network '{network_id}': {e}"
+                            )),
                         }
                     }
                 }
@@ -304,17 +337,18 @@ fn main() -> Result<()> {
                         }
                     }
                     ExecutionMode::Native => {
-                        let native = NativeManager::new(&network_path, native_bin(&bin_path));
-                        match native.stop_all() {
+                        // The foreground supervisor owns the daemons; ask it to
+                        // tear the network down over its RPC socket.
+                        let socket = NativeManager::supervisor_socket(&network_path);
+                        match supervisor::rpc_call(&socket, "stop", serde_json::Value::Null) {
                             Ok(_) => {
                                 println!("{}", network::Stop { network_id });
                                 Ok(())
                             }
-                            Err(e) => {
-                                let error_message =
-                                    format!("Failed to stop network '{network_id}': {e}");
-                                exit_with(error_message)
-                            }
+                            Err(e) => exit_with(format!(
+                                "Failed to stop network '{network_id}' \
+                                 (is it running?): {e}"
+                            )),
                         }
                     }
                 }
