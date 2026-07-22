@@ -1,4 +1,3 @@
-mod amounts;
 mod cli;
 mod directory_manager;
 mod docker;
@@ -884,15 +883,21 @@ fn generate_default_genesis_ledger(
     match mode {
         ExecutionMode::Docker => {
             let keys_manager = KeysManager::new(network_path, docker_image);
-            *bp_keys_opt = Some(
-                keys_manager
-                    .generate_bp_key_pairs(&all_services)
-                    .map_err(|e| Error::other(format!("Failed to generate key pairs for mina services: {e}")))?,
-            );
+            *bp_keys_opt = Some(keys_manager.generate_bp_key_pairs(&all_services).map_err(
+                |e| {
+                    Error::other(format!(
+                        "Failed to generate key pairs for mina services: {e}"
+                    ))
+                },
+            )?);
             *libp2p_keys_opt = Some(
                 keys_manager
                     .generate_libp2p_key_pairs(&all_services)
-                    .map_err(|e| Error::other(format!("Failed to generate libp2p key pairs for mina services: {e}")))?,
+                    .map_err(|e| {
+                        Error::other(format!(
+                            "Failed to generate libp2p key pairs for mina services: {e}"
+                        ))
+                    })?,
             );
         }
         ExecutionMode::Native => {
@@ -900,15 +905,21 @@ fn generate_default_genesis_ledger(
                 network_path,
                 bin_path.expect("native mode guarantees bin_path is resolved"),
             );
-            *bp_keys_opt = Some(
-                keys_manager
-                    .generate_bp_key_pairs(&all_services)
-                    .map_err(|e| Error::other(format!("Failed to generate key pairs for mina services: {e}")))?,
-            );
+            *bp_keys_opt = Some(keys_manager.generate_bp_key_pairs(&all_services).map_err(
+                |e| {
+                    Error::other(format!(
+                        "Failed to generate key pairs for mina services: {e}"
+                    ))
+                },
+            )?);
             *libp2p_keys_opt = Some(
                 keys_manager
                     .generate_libp2p_key_pairs(&all_services)
-                    .map_err(|e| Error::other(format!("Failed to generate libp2p key pairs for mina services: {e}")))?,
+                    .map_err(|e| {
+                        Error::other(format!(
+                            "Failed to generate libp2p key pairs for mina services: {e}"
+                        ))
+                    })?,
             );
         }
     }
@@ -1354,10 +1365,7 @@ fn exit_with(error_message: String) -> Result<()> {
 /// * Docker mode: `--bin-path` is rejected (the flag is exclusive to native mode).
 /// * Native mode, flag supplied: validate that `<dir>/mina` exists.
 /// * Native mode, flag omitted: delegate to [`mina_locator::locate`].
-fn resolve_bin_path(
-    mode: &ExecutionMode,
-    provided: Option<PathBuf>,
-) -> Result<Option<PathBuf>> {
+fn resolve_bin_path(mode: &ExecutionMode, provided: Option<PathBuf>) -> Result<Option<PathBuf>> {
     match (mode, provided) {
         (ExecutionMode::Docker, Some(_)) => Err(Error::new(
             ErrorKind::InvalidInput,
