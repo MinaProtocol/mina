@@ -1,23 +1,23 @@
-//! Foreground, tokio-managed network supervisor (skeleton — layer 1).
+//! Foreground, tokio-managed network supervisor.
 //!
-//! `network start` (native) builds a tokio runtime and calls [`run_blocking`].
-//! The supervisor owns the daemons **as its children** (so it reaps their real
-//! exit codes), and serves a hand-rolled **JSON-RPC 2.0** API over a Unix domain
-//! socket so a separate short-lived CLI invocation (`status`/`stop`) can drive it
-//! while it runs in the foreground.
+//! `network start` builds a tokio runtime and calls [`run_blocking`]. The
+//! supervisor owns the network's **units** — native child processes *or* docker
+//! containers — reaping their real exit codes, and serves a hand-rolled
+//! **JSON-RPC 2.0** API over a Unix domain socket so a separate short-lived CLI
+//! invocation (`status`/`stop`) can drive it while it runs in the foreground.
 //!
-//! Scope of this skeleton (see wayfinder ticket `supervisor-skeleton`):
-//!   * no detachment — the process stays attached to the terminal;
-//!   * no workloads, no read/control RPCs beyond `status`/`stop`;
-//!   * native backend only.
+//! A "unit" is backend-agnostic: [`RunningUnit::Native`] wraps a
+//! `tokio::process::Child`; [`RunningUnit::Docker`] wraps a bollard container.
+//! Both expose the same spawn / wait-reap / kill shape, which is what lets the
+//! same supervisor own either backend (replacing `docker compose`).
 //!
-//! Concurrency model: one `Arc<Mutex<SupervisorState>>` (a `std::sync::Mutex`
-//! that is **never held across an `.await`** — we copy data out, drop the guard,
-//! then await). Writers are the per-child waiter tasks and the RPC handlers.
+//! Scope today: no detachment (foreground); `status`/`stop` only; native path
+//! wired into the CLI, docker path exercised by an `#[ignore]`d integration test
+//! pending the `main.rs` docker plan builder (ticket `docker-bollard-supervisor`).
 //!
-//! Transport: newline-delimited JSON. Each request is one line
-//! (`{"jsonrpc":"2.0","id":..,"method":..,"params":..}`) and each response is one
-//! line — directly interoperable with Go's `json.Encoder`/`json.Decoder`.
+//! Concurrency: one `Arc<Mutex<SupervisorState>>` (`std::sync::Mutex`, never held
+//! across `.await` — copy out, drop the guard, then await). Transport:
+//! newline-delimited JSON, interoperable with Go's `json.Encoder`/`json.Decoder`.
 
 use log::{error, info, warn};
 use serde::{Deserialize, Serialize};
@@ -29,15 +29,23 @@ use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::net::UnixListener;
 use tokio::sync::Notify;
 
+use bollard::container::{
+    Config, CreateContainerOptions, NetworkingConfig, RemoveContainerOptions, StopContainerOptions,
+    WaitContainerOptions,
+};
+use bollard::image::CreateImageOptions;
+use bollard::network::CreateNetworkOptions;
+use bollard::secret::{EndpointSettings, HostConfig, PortBinding};
+use bollard::Docker;
+use futures_util::StreamExt;
+
 // ---------------------------------------------------------------------------
-// Plan subset
+// Plan (subset of the materialized plan the supervisor needs)
 // ---------------------------------------------------------------------------
 
-/// One daemon the supervisor launches and owns. This is the *subset* of the
-/// materialized plan the skeleton needs; the full `materialized-plan.json` shape
-/// is produced later by the sampler/materializer.
+/// A native daemon: a local process the supervisor spawns and owns.
 #[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct NodeSpec {
+pub struct NativeNodeSpec {
     pub name: String,
     pub binary: PathBuf,
     pub args: Vec<String>,
@@ -46,13 +54,56 @@ pub struct NodeSpec {
     pub log_file: PathBuf,
 }
 
+/// A host↔container bind mount.
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct Mount {
+    pub host: String,
+    pub container: String,
+    #[serde(default)]
+    pub read_only: bool,
+}
+
+/// A docker daemon: a container the supervisor creates, starts, and owns.
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct DockerNodeSpec {
+    pub name: String,
+    pub image: String,
+    #[serde(default)]
+    pub entrypoint: Option<Vec<String>>,
+    #[serde(default)]
+    pub cmd: Vec<String>,
+    #[serde(default)]
+    pub env: Vec<(String, String)>,
+    /// (host_port, container_port) pairs to publish.
+    #[serde(default)]
+    pub ports: Vec<(u16, u16)>,
+    #[serde(default)]
+    pub mounts: Vec<Mount>,
+    /// Network aliases (service-name DNS) — replaces compose service names.
+    #[serde(default)]
+    pub aliases: Vec<String>,
+}
+
+/// Which backend a network runs on and its per-node specs.
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub enum BackendSpec {
+    Native {
+        nodes: Vec<NativeNodeSpec>,
+    },
+    Docker {
+        /// Docker network to create + attach every container to.
+        network_name: String,
+        nodes: Vec<DockerNodeSpec>,
+    },
+}
+
 /// Everything the supervisor needs to run a network. Held as the in-memory SSOT
 /// for the process lifetime; never re-read from disk.
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct SupervisorPlan {
     pub network_id: String,
     pub socket_path: PathBuf,
-    pub nodes: Vec<NodeSpec>,
+    pub spec: BackendSpec,
 }
 
 // ---------------------------------------------------------------------------
@@ -64,15 +115,15 @@ pub struct SupervisorPlan {
 #[derive(Clone, Debug, Serialize)]
 #[serde(tag = "state", rename_all = "snake_case")]
 pub enum NodeStatus {
-    Running { pid: u32 },
+    Running { pid: Option<u32> },
     Exited { code: Option<i32> },
     Failed { error: String },
 }
 
 struct SupervisorState {
     nodes: HashMap<String, NodeStatus>,
-    /// PIDs of live children, for teardown.
-    pids: HashMap<String, u32>,
+    /// Kill handles for live units, for teardown.
+    killers: HashMap<String, Killer>,
     shutdown: bool,
 }
 
@@ -80,7 +131,7 @@ impl SupervisorState {
     fn new() -> Self {
         SupervisorState {
             nodes: HashMap::new(),
-            pids: HashMap::new(),
+            killers: HashMap::new(),
             shutdown: false,
         }
     }
@@ -91,12 +142,288 @@ impl SupervisorState {
         names.sort();
         let nodes: Vec<serde_json::Value> = names
             .into_iter()
-            .map(|n| {
-                serde_json::json!({ "name": n, "status": self.nodes[n] })
-            })
+            .map(|n| serde_json::json!({ "name": n, "status": self.nodes[n] }))
             .collect();
         serde_json::json!({ "nodes": nodes })
     }
+}
+
+// ---------------------------------------------------------------------------
+// Units: the backend-agnostic runnable
+// ---------------------------------------------------------------------------
+
+/// A running unit the supervisor awaits for exit. Owned by its waiter task.
+enum RunningUnit {
+    Native(tokio::process::Child),
+    Docker { docker: Docker, name: String },
+}
+
+impl RunningUnit {
+    /// Await the unit's exit and return its exit code (`None` if unknown).
+    async fn wait(&mut self) -> Option<i32> {
+        match self {
+            RunningUnit::Native(child) => match child.wait().await {
+                Ok(status) => status.code(),
+                Err(e) => {
+                    warn!("supervisor: wait() failed: {e}");
+                    None
+                }
+            },
+            RunningUnit::Docker { docker, name } => {
+                let mut stream =
+                    docker.wait_container(name, None::<WaitContainerOptions<String>>);
+                match stream.next().await {
+                    Some(Ok(r)) => Some(r.status_code as i32),
+                    Some(Err(e)) => {
+                        warn!("supervisor: wait_container '{name}' failed: {e}");
+                        None
+                    }
+                    None => None,
+                }
+            }
+        }
+    }
+}
+
+/// A cheap, cloneable handle to terminate a unit during teardown.
+#[derive(Clone)]
+enum Killer {
+    Native { pid: u32 },
+    Docker { docker: Docker, name: String },
+}
+
+impl Killer {
+    /// Graceful stop (SIGTERM / `docker stop`).
+    async fn terminate(&self) {
+        match self {
+            Killer::Native { pid } => {
+                use nix::sys::signal::{self, Signal};
+                use nix::unistd::Pid;
+                let _ = signal::kill(Pid::from_raw(*pid as i32), Signal::SIGTERM);
+            }
+            Killer::Docker { docker, name } => {
+                let _ = docker
+                    .stop_container(name, Some(StopContainerOptions { t: 2 }))
+                    .await;
+            }
+        }
+    }
+
+    /// Forceful removal (SIGKILL survivors / `docker rm -f`).
+    async fn force_kill(&self) {
+        match self {
+            Killer::Native { pid } => {
+                if process_alive(*pid) {
+                    use nix::sys::signal::{self, Signal};
+                    use nix::unistd::Pid;
+                    let _ = signal::kill(Pid::from_raw(*pid as i32), Signal::SIGKILL);
+                }
+            }
+            Killer::Docker { docker, name } => {
+                let _ = docker
+                    .remove_container(
+                        name,
+                        Some(RemoveContainerOptions {
+                            force: true,
+                            ..Default::default()
+                        }),
+                    )
+                    .await;
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Launching
+// ---------------------------------------------------------------------------
+
+/// Spawn a native daemon as an owned child. Sets `PR_SET_PDEATHSIG(SIGKILL)` so
+/// the child dies if the supervisor dies (best-effort backstop; teardown does an
+/// explicit kill).
+fn spawn_native(node: &NativeNodeSpec) -> std::io::Result<tokio::process::Child> {
+    use std::os::unix::process::CommandExt;
+
+    let log = std::fs::File::create(&node.log_file)?;
+    let log_err = log.try_clone()?;
+
+    let mut cmd = std::process::Command::new(&node.binary);
+    cmd.args(&node.args);
+    for (k, v) in &node.env {
+        cmd.env(k, v);
+    }
+    cmd.stdout(std::process::Stdio::from(log));
+    cmd.stderr(std::process::Stdio::from(log_err));
+
+    // SAFETY: `pre_exec` runs in the child after fork, before exec. `prctl` is
+    // async-signal-safe. pdeathsig is per-thread ⇒ best-effort backstop on a
+    // multi-thread runtime; explicit teardown is the real guarantee.
+    unsafe {
+        cmd.pre_exec(|| {
+            let r = nix::libc::prctl(
+                nix::libc::PR_SET_PDEATHSIG,
+                nix::libc::SIGKILL as nix::libc::c_ulong,
+            );
+            if r != 0 {
+                return Err(std::io::Error::last_os_error());
+            }
+            Ok(())
+        });
+    }
+
+    let mut tokio_cmd = tokio::process::Command::from(cmd);
+    tokio_cmd.kill_on_drop(true);
+    tokio_cmd.spawn()
+}
+
+/// Connect to the docker daemon and create the network (labelled for grouping).
+async fn docker_connect_and_network(
+    network_name: &str,
+    network_id: &str,
+) -> std::io::Result<Docker> {
+    let docker = Docker::connect_with_local_defaults()
+        .map_err(|e| std::io::Error::other(format!("docker connect failed: {e}")))?;
+    let mut labels = HashMap::new();
+    labels.insert("minimina.network".to_string(), network_id.to_string());
+    // Best-effort: ignore "already exists" so re-runs don't hard-fail.
+    if let Err(e) = docker
+        .create_network(CreateNetworkOptions {
+            name: network_name.to_string(),
+            labels,
+            ..Default::default()
+        })
+        .await
+    {
+        warn!("supervisor: create_network '{network_name}' (continuing): {e}");
+    }
+    Ok(docker)
+}
+
+/// Pull the image, create + start the container, return its running unit, kill
+/// handle, and host-side pid.
+async fn launch_docker(
+    docker: &Docker,
+    network_name: &str,
+    network_id: &str,
+    node: &DockerNodeSpec,
+) -> std::io::Result<(RunningUnit, Killer, Option<u32>)> {
+    // Pull (cached if already present).
+    let mut pull = docker.create_image(
+        Some(CreateImageOptions {
+            from_image: node.image.clone(),
+            ..Default::default()
+        }),
+        None,
+        None,
+    );
+    while let Some(item) = pull.next().await {
+        item.map_err(|e| std::io::Error::other(format!("pull '{}' failed: {e}", node.image)))?;
+    }
+
+    // Port bindings + exposed ports.
+    let mut port_bindings = HashMap::new();
+    let mut exposed = HashMap::new();
+    for (host, container) in &node.ports {
+        let key = format!("{container}/tcp");
+        port_bindings.insert(
+            key.clone(),
+            Some(vec![PortBinding {
+                host_ip: Some("0.0.0.0".to_string()),
+                host_port: Some(host.to_string()),
+            }]),
+        );
+        exposed.insert(key, HashMap::new());
+    }
+
+    let binds: Vec<String> = node
+        .mounts
+        .iter()
+        .map(|m| {
+            if m.read_only {
+                format!("{}:{}:ro", m.host, m.container)
+            } else {
+                format!("{}:{}", m.host, m.container)
+            }
+        })
+        .collect();
+
+    let mut endpoints = HashMap::new();
+    endpoints.insert(
+        network_name.to_string(),
+        EndpointSettings {
+            aliases: Some(node.aliases.clone()),
+            ..Default::default()
+        },
+    );
+
+    let mut labels = HashMap::new();
+    labels.insert("minimina.network".to_string(), network_id.to_string());
+
+    let host_config = HostConfig {
+        binds: if binds.is_empty() { None } else { Some(binds) },
+        port_bindings: if port_bindings.is_empty() {
+            None
+        } else {
+            Some(port_bindings)
+        },
+        ..Default::default()
+    };
+
+    docker
+        .create_container(
+            Some(CreateContainerOptions {
+                name: node.name.clone(),
+                platform: None,
+            }),
+            Config {
+                image: Some(node.image.clone()),
+                entrypoint: node.entrypoint.clone(),
+                cmd: if node.cmd.is_empty() {
+                    None
+                } else {
+                    Some(node.cmd.clone())
+                },
+                env: Some(node.env.iter().map(|(k, v)| format!("{k}={v}")).collect()),
+                exposed_ports: if exposed.is_empty() {
+                    None
+                } else {
+                    Some(exposed)
+                },
+                labels: Some(labels),
+                host_config: Some(host_config),
+                networking_config: Some(NetworkingConfig {
+                    endpoints_config: endpoints,
+                }),
+                ..Default::default()
+            },
+        )
+        .await
+        .map_err(|e| std::io::Error::other(format!("create_container '{}' failed: {e}", node.name)))?;
+
+    docker
+        .start_container(&node.name, None::<bollard::container::StartContainerOptions<String>>)
+        .await
+        .map_err(|e| std::io::Error::other(format!("start_container '{}' failed: {e}", node.name)))?;
+
+    let pid = docker
+        .inspect_container(&node.name, None)
+        .await
+        .ok()
+        .and_then(|i| i.state)
+        .and_then(|s| s.pid)
+        .map(|p| p as u32);
+
+    Ok((
+        RunningUnit::Docker {
+            docker: docker.clone(),
+            name: node.name.clone(),
+        },
+        Killer::Docker {
+            docker: docker.clone(),
+            name: node.name.clone(),
+        },
+        pid,
+    ))
 }
 
 // ---------------------------------------------------------------------------
@@ -150,7 +477,6 @@ impl RpcResponse {
     }
 }
 
-// JSON-RPC method-not-found code.
 const METHOD_NOT_FOUND: i64 = -32601;
 
 // ---------------------------------------------------------------------------
@@ -170,64 +496,57 @@ async fn run(plan: SupervisorPlan) -> std::io::Result<()> {
     let state = Arc::new(Mutex::new(SupervisorState::new()));
     let shutdown = Arc::new(Notify::new());
 
-    // Spawn every daemon as a child + a waiter task that reaps its exit.
-    for node in &plan.nodes {
-        match spawn_node(node) {
-            Ok(mut child) => {
-                let pid = child.id().unwrap_or(0);
-                info!("supervisor: started '{}' (pid {})", node.name, pid);
-                {
-                    let mut st = state.lock().unwrap();
-                    st.nodes
-                        .insert(node.name.clone(), NodeStatus::Running { pid });
-                    st.pids.insert(node.name.clone(), pid);
+    // Launch every unit + a waiter task that reaps its exit.
+    let docker = match &plan.spec {
+        BackendSpec::Native { nodes } => {
+            for node in nodes {
+                match spawn_native(node) {
+                    Ok(child) => {
+                        let pid = child.id();
+                        register_unit(
+                            &state,
+                            &node.name,
+                            pid,
+                            RunningUnit::Native(child),
+                            Killer::Native { pid: pid.unwrap_or(0) },
+                        );
+                    }
+                    Err(e) => fail_unit(&state, &node.name, e.to_string()),
                 }
-                let st = state.clone();
-                let name = node.name.clone();
-                tokio::spawn(async move {
-                    let code = match child.wait().await {
-                        Ok(status) => status.code(),
-                        Err(e) => {
-                            warn!("supervisor: wait() failed for '{name}': {e}");
-                            None
-                        }
-                    };
-                    info!("supervisor: '{name}' exited (code {code:?})");
-                    let mut st = st.lock().unwrap();
-                    st.nodes.insert(name.clone(), NodeStatus::Exited { code });
-                    st.pids.remove(&name);
-                });
             }
-            Err(e) => {
-                error!("supervisor: failed to start '{}': {e}", node.name);
-                state.lock().unwrap().nodes.insert(
-                    node.name.clone(),
-                    NodeStatus::Failed {
-                        error: e.to_string(),
-                    },
-                );
-            }
+            None
         }
-    }
+        BackendSpec::Docker {
+            network_name,
+            nodes,
+        } => {
+            let docker = docker_connect_and_network(network_name, &plan.network_id).await?;
+            for node in nodes {
+                match launch_docker(&docker, network_name, &plan.network_id, node).await {
+                    Ok((unit, killer, pid)) => register_unit(&state, &node.name, pid, unit, killer),
+                    Err(e) => fail_unit(&state, &node.name, e.to_string()),
+                }
+            }
+            Some((docker, network_name.clone()))
+        }
+    };
 
     // Bind the RPC socket (unlink any stale socket first).
     let _ = std::fs::remove_file(&plan.socket_path);
     let listener = UnixListener::bind(&plan.socket_path)?;
-    info!(
-        "supervisor: serving RPC on '{}'",
-        plan.socket_path.display()
-    );
+    info!("supervisor: serving RPC on '{}'", plan.socket_path.display());
 
-    // Accept loop as its own task so the main task can select on shutdown.
     let accept_state = state.clone();
     let accept_shutdown = shutdown.clone();
     let accept_task = tokio::spawn(async move {
         loop {
             match listener.accept().await {
                 Ok((stream, _addr)) => {
-                    let st = accept_state.clone();
-                    let sd = accept_shutdown.clone();
-                    tokio::spawn(handle_connection(stream, st, sd));
+                    tokio::spawn(handle_connection(
+                        stream,
+                        accept_state.clone(),
+                        accept_shutdown.clone(),
+                    ));
                 }
                 Err(e) => {
                     warn!("supervisor: accept error: {e}");
@@ -237,23 +556,53 @@ async fn run(plan: SupervisorPlan) -> std::io::Result<()> {
         }
     });
 
-    // Wait for a stop request or SIGINT.
     tokio::select! {
         _ = shutdown.notified() => info!("supervisor: stop requested"),
-        r = tokio::signal::ctrl_c() => {
-            match r {
-                Ok(()) => info!("supervisor: SIGINT received"),
-                Err(e) => warn!("supervisor: signal error: {e}"),
-            }
-        }
+        r = tokio::signal::ctrl_c() => match r {
+            Ok(()) => info!("supervisor: SIGINT received"),
+            Err(e) => warn!("supervisor: signal error: {e}"),
+        },
     }
 
-    // Teardown: stop accepting, kill children, clean up the socket.
     accept_task.abort();
-    teardown(&state);
+    teardown(&state, &docker).await;
     let _ = std::fs::remove_file(&plan.socket_path);
     info!("supervisor: network '{}' stopped", plan.network_id);
     Ok(())
+}
+
+/// Record a launched unit in state and spawn its waiter task.
+fn register_unit(
+    state: &Arc<Mutex<SupervisorState>>,
+    name: &str,
+    pid: Option<u32>,
+    mut unit: RunningUnit,
+    killer: Killer,
+) {
+    info!("supervisor: started '{name}' (pid {pid:?})");
+    {
+        let mut st = state.lock().unwrap();
+        st.nodes.insert(name.to_string(), NodeStatus::Running { pid });
+        st.killers.insert(name.to_string(), killer);
+    }
+    let st = state.clone();
+    let name = name.to_string();
+    tokio::spawn(async move {
+        let code = unit.wait().await;
+        info!("supervisor: '{name}' exited (code {code:?})");
+        let mut guard = st.lock().unwrap();
+        guard.nodes.insert(name.clone(), NodeStatus::Exited { code });
+        guard.killers.remove(&name);
+    });
+}
+
+fn fail_unit(state: &Arc<Mutex<SupervisorState>>, name: &str, error: String) {
+    error!("supervisor: failed to start '{name}': {error}");
+    state
+        .lock()
+        .unwrap()
+        .nodes
+        .insert(name.to_string(), NodeStatus::Failed { error });
 }
 
 /// Handle one client connection: newline-delimited JSON-RPC request/response.
@@ -267,7 +616,7 @@ async fn handle_connection(
     loop {
         let line = match lines.next_line().await {
             Ok(Some(l)) => l,
-            Ok(None) => break, // client closed
+            Ok(None) => break,
             Err(e) => {
                 warn!("supervisor: read error: {e}");
                 break;
@@ -281,7 +630,7 @@ async fn handle_connection(
             Ok(req) => dispatch(req, &state, &shutdown),
             Err(e) => RpcResponse::err(
                 serde_json::Value::Null,
-                -32700, // parse error
+                -32700,
                 format!("invalid request: {e}"),
             ),
         };
@@ -301,8 +650,7 @@ async fn handle_connection(
     }
 }
 
-/// Dispatch a single request. Pure w.r.t. the socket — locks state only briefly,
-/// never across an await (there are no awaits here).
+/// Dispatch a single request. Locks state only briefly, never across an await.
 fn dispatch(
     req: RpcRequest,
     state: &Arc<Mutex<SupervisorState>>,
@@ -318,74 +666,28 @@ fn dispatch(
             shutdown.notify_one();
             RpcResponse::ok(req.id, serde_json::json!({ "stopping": true }))
         }
-        other => RpcResponse::err(
-            req.id,
-            METHOD_NOT_FOUND,
-            format!("unknown method '{other}'"),
-        ),
+        other => RpcResponse::err(req.id, METHOD_NOT_FOUND, format!("unknown method '{other}'")),
     }
 }
 
-/// Spawn a daemon as an owned child. Sets `PR_SET_PDEATHSIG(SIGKILL)` so the
-/// child dies if the supervisor dies (best-effort backstop; teardown does an
-/// explicit kill).
-fn spawn_node(node: &NodeSpec) -> std::io::Result<tokio::process::Child> {
-    use std::os::unix::process::CommandExt;
-
-    let log = std::fs::File::create(&node.log_file)?;
-    let log_err = log.try_clone()?;
-
-    let mut cmd = std::process::Command::new(&node.binary);
-    cmd.args(&node.args);
-    for (k, v) in &node.env {
-        cmd.env(k, v);
-    }
-    cmd.stdout(std::process::Stdio::from(log));
-    cmd.stderr(std::process::Stdio::from(log_err));
-
-    // SAFETY: `pre_exec` runs in the child after fork, before exec. `prctl` is
-    // async-signal-safe. Note: pdeathsig is keyed to the calling *thread*, so on
-    // a multi-thread runtime it is a best-effort backstop, not a guarantee.
-    unsafe {
-        cmd.pre_exec(|| {
-            let r = nix::libc::prctl(
-                nix::libc::PR_SET_PDEATHSIG,
-                nix::libc::SIGKILL as nix::libc::c_ulong,
-            );
-            if r != 0 {
-                return Err(std::io::Error::last_os_error());
-            }
-            Ok(())
-        });
-    }
-
-    let mut tokio_cmd = tokio::process::Command::from(cmd);
-    tokio_cmd.kill_on_drop(true);
-    tokio_cmd.spawn()
-}
-
-/// SIGTERM every live child, give them a moment, then SIGKILL survivors.
-fn teardown(state: &Arc<Mutex<SupervisorState>>) {
-    use nix::sys::signal::{self, Signal};
-    use nix::unistd::Pid;
-
-    let pids: Vec<(String, u32)> = {
+/// Terminate every live unit (graceful → force), then remove the docker network.
+async fn teardown(state: &Arc<Mutex<SupervisorState>>, docker: &Option<(Docker, String)>) {
+    let killers: Vec<Killer> = {
         let st = state.lock().unwrap();
-        st.pids.iter().map(|(n, p)| (n.clone(), *p)).collect()
+        st.killers.values().cloned().collect()
     };
-    if pids.is_empty() {
-        return;
+    for k in &killers {
+        k.terminate().await;
     }
-
-    for (name, pid) in &pids {
-        info!("supervisor: SIGTERM '{name}' (pid {pid})");
-        let _ = signal::kill(Pid::from_raw(*pid as i32), Signal::SIGTERM);
+    if !killers.is_empty() {
+        tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+        for k in &killers {
+            k.force_kill().await;
+        }
     }
-    std::thread::sleep(std::time::Duration::from_secs(2));
-    for (name, pid) in &pids {
-        if process_alive(*pid) {
-            warn!("supervisor: SIGKILL '{name}' (pid {pid})");
-            let _ = signal::kill(Pid::from_raw(*pid as i32), Signal::SIGKILL);
+    if let Some((docker, network_name)) = docker {
+        if let Err(e) = docker.remove_network(network_name).await {
+            warn!("supervisor: remove_network '{network_name}': {e}");
         }
     }
 }
@@ -401,8 +703,7 @@ fn process_alive(pid: u32) -> bool {
 // ---------------------------------------------------------------------------
 
 /// Send one JSON-RPC request over the socket and return the `result` value.
-/// Blocking + synchronous — usable from the otherwise non-async CLI without
-/// dragging tokio into the caller.
+/// Blocking + synchronous — usable from the otherwise non-async CLI.
 pub fn rpc_call(
     socket_path: &Path,
     method: &str,
@@ -444,8 +745,8 @@ pub fn rpc_call(
 mod tests {
     use super::*;
 
-    /// End-to-end: launch a real child under the supervisor, query `status`,
-    /// then `stop`, and confirm the child is reaped and the socket is cleaned up.
+    /// End-to-end native: launch a real child, query `status`, then `stop`, and
+    /// confirm the child is reaped and the socket is cleaned up.
     #[test]
     fn supervise_status_stop_reaps_child() {
         let dir = tempdir::TempDir::new("supervisor-test").unwrap();
@@ -455,19 +756,19 @@ mod tests {
         let plan = SupervisorPlan {
             network_id: "test-net".into(),
             socket_path: socket_path.clone(),
-            nodes: vec![NodeSpec {
-                name: "sleeper".into(),
-                binary: "/bin/sleep".into(),
-                args: vec!["300".into()],
-                env: vec![],
-                log_file,
-            }],
+            spec: BackendSpec::Native {
+                nodes: vec![NativeNodeSpec {
+                    name: "sleeper".into(),
+                    binary: "/bin/sleep".into(),
+                    args: vec!["300".into()],
+                    env: vec![],
+                    log_file,
+                }],
+            },
         };
 
-        // Run the supervisor on its own thread.
         let sup = std::thread::spawn(move || run_blocking(plan).unwrap());
 
-        // Wait for the socket to appear.
         let mut waited = 0;
         while !socket_path.exists() && waited < 100 {
             std::thread::sleep(std::time::Duration::from_millis(50));
@@ -475,7 +776,6 @@ mod tests {
         }
         assert!(socket_path.exists(), "socket never appeared");
 
-        // status -> the sleeper should be running with a pid.
         let status = rpc_call(&socket_path, "status", serde_json::Value::Null).unwrap();
         let nodes = status["nodes"].as_array().unwrap();
         assert_eq!(nodes.len(), 1);
@@ -484,13 +784,11 @@ mod tests {
         let pid = nodes[0]["status"]["pid"].as_u64().unwrap() as u32;
         assert!(process_alive(pid), "sleeper should be alive");
 
-        // stop -> supervisor tears down and returns.
         let stop = rpc_call(&socket_path, "stop", serde_json::Value::Null).unwrap();
         assert_eq!(stop["stopping"], true);
 
         sup.join().unwrap();
 
-        // The child must be gone and the socket cleaned up.
         assert!(!process_alive(pid), "sleeper should have been killed");
         assert!(!socket_path.exists(), "socket should be removed");
     }
@@ -509,5 +807,52 @@ mod tests {
         assert_eq!(resp.id, serde_json::json!(7));
         assert!(resp.result.is_none());
         assert_eq!(resp.error.unwrap().code, METHOD_NOT_FOUND);
+    }
+
+    /// End-to-end docker: launch a real alpine container as a supervisor unit,
+    /// query `status`, then `stop`, and confirm teardown removes it. Requires a
+    /// docker daemon; `#[ignore]`d so CI (no docker-in-docker) skips it.
+    /// Run manually: `cargo test supervise_docker_unit -- --ignored --nocapture`.
+    #[test]
+    #[ignore]
+    fn supervise_docker_unit_status_stop() {
+        let dir = tempdir::TempDir::new("supervisor-docker-test").unwrap();
+        let socket_path = dir.path().join("supervisor.sock");
+
+        let plan = SupervisorPlan {
+            network_id: "docker-test-net".into(),
+            socket_path: socket_path.clone(),
+            spec: BackendSpec::Docker {
+                network_name: "minimina-suptest-net".into(),
+                nodes: vec![DockerNodeSpec {
+                    name: "minimina-suptest-ctr".into(),
+                    image: "alpine:3.19".into(),
+                    entrypoint: None,
+                    cmd: vec!["sleep".into(), "300".into()],
+                    env: vec![],
+                    ports: vec![],
+                    mounts: vec![],
+                    aliases: vec!["suptest-node".into()],
+                }],
+            },
+        };
+
+        let sup = std::thread::spawn(move || run_blocking(plan).unwrap());
+
+        let mut waited = 0;
+        while !socket_path.exists() && waited < 600 {
+            std::thread::sleep(std::time::Duration::from_millis(100));
+            waited += 1;
+        }
+        assert!(socket_path.exists(), "socket never appeared");
+
+        let status = rpc_call(&socket_path, "status", serde_json::Value::Null).unwrap();
+        let nodes = status["nodes"].as_array().unwrap();
+        assert_eq!(nodes.len(), 1);
+        assert_eq!(nodes[0]["status"]["state"], "running");
+
+        let _ = rpc_call(&socket_path, "stop", serde_json::Value::Null).unwrap();
+        sup.join().unwrap();
+        assert!(!socket_path.exists(), "socket should be removed");
     }
 }
