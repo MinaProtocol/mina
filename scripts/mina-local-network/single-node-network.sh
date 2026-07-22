@@ -1,0 +1,166 @@
+#!/usr/bin/env bash
+
+# Spins up a single-daemon Mina network (seed + whale block producer + snark
+# coordinator in one process, holding >99.99% of stake) tuned so that, with
+# enough transactions, every block emits a freshly snarked ledger.
+#
+# Two presets over scripts/mina-local-network/mina-local-network.sh, both with
+# full proofs, transaction capacity 2^2 and work_delay 0 (4 scan-state trees,
+# ledger proof emitted 3 blocks after a transaction is included):
+#
+#   default : 3 snark workers, 131.4s slots (txn -> snarked ledger ~395s)
+#             throughput-bound; zkApp transactions must stay <= 8 segments
+#   --fast  : 7 snark workers,  75s slots  (txn -> snarked ledger ~225s)
+#             latency-bound; zkApp transactions may go up to 10 segments
+#
+# NOTE on slot times: consensus requires floor(365days_ms / slot_ms) to be
+# divisible by 12 (checkpoint window sizing, src/lib/consensus/constants.ml),
+# i.e. pick slot times dividing 2628000000 ms. 75000 and 131400 both qualify;
+# a round 135000 does not and crashes the daemon at startup.
+#
+# Sizing assumes ~10s per proof task (segment / merge / simple base) and a
+# block shape of: coinbase + fee transfer + 2 zkApp commands. The block
+# producer's blockchain proof must also fit within a slot on this machine.
+
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(git -C "${SCRIPT_DIR}" rev-parse --show-toplevel)"
+
+FAST=false
+MINA_EXE_ARG=""
+VALUE_TRANSFERS=true
+EXTRA_ARGS=()
+
+help() {
+  cat <<EOF
+Usage: $(basename "$0") [--fast] [--mina-exe <path>] [-- <extra mina-local-network.sh args>]
+
+--fast            | Use the fast preset: 7 snark workers, 75s slots (~225s txn -> snarked ledger).
+                  | Default preset: 3 snark workers, 131.4s slots (~395s txn -> snarked ledger).
+--mina-exe <path> | Path to a mina executable to run the network with.
+                  | When not provided, mina is built with nix (flake package
+                  | '#devnet', as in scripts/hardfork/build-and-test.sh) and the
+                  | resulting binary is used.
+--no-value-transfers | Do not send periodic value-transfer transactions. Useful
+                  | when an external load (e.g. ITN zkApp scheduler) keeps the
+                  | blocks full instead.
+-h                | Show this help.
+
+Any other argument is forwarded verbatim to mina-local-network.sh *after* the
+preset's arguments, so it can override them (e.g. '-c inherit' to reuse a
+previously generated config and proving keys, or '-st 150000' to slow down).
+
+NOTE: the first run with a given preset generates proving keys for its
+constraint constants (slow, one-time). The presets share circuits, so
+switching between them only requires '-c reset' for the new slot time.
+EOF
+  exit
+}
+
+while [[ "$#" -gt 0 ]]; do
+  case "${1}" in
+  --fast)
+    FAST=true
+    ;;
+  --mina-exe)
+    if [[ "$#" -lt 2 ]]; then
+      echo "Error: --mina-exe requires an argument." >&2
+      exit 1
+    fi
+    MINA_EXE_ARG="${2}"
+    shift
+    ;;
+  --no-value-transfers)
+    VALUE_TRANSFERS=false
+    ;;
+  -h | --help)
+    help
+    ;;
+  --)
+    shift
+    EXTRA_ARGS+=("$@")
+    break
+    ;;
+  *)
+    EXTRA_ARGS+=("${1}")
+    ;;
+  esac
+  shift
+done
+
+if ${FAST}; then
+  PRESET="fast (#2: 7 workers, 75s slots, zkApps up to 10 segments)"
+  SNARK_WORKERS=7
+  SLOT_TIME_MS=75000
+  TRANSACTION_INTERVAL=15
+else
+  PRESET="default (#5: 3 workers, 131.4s slots, zkApps up to 8 segments)"
+  SNARK_WORKERS=3
+  SLOT_TIME_MS=131400
+  TRANSACTION_INTERVAL=25
+fi
+
+# Resolve the mina executable: use the one provided via --mina-exe, otherwise
+# build it with nix the same way scripts/hardfork/build-and-test.sh does.
+if [[ -n "${MINA_EXE_ARG}" ]]; then
+  if [[ ! -x "${MINA_EXE_ARG}" ]]; then
+    echo "Error: --mina-exe '${MINA_EXE_ARG}' does not exist or is not executable." >&2
+    exit 1
+  fi
+  MINA_EXE="$(realpath "${MINA_EXE_ARG}")"
+else
+  echo "No --mina-exe provided; building mina with nix (this may take a while)..."
+  NIX_OPTS=( --accept-flake-config --experimental-features 'nix-command flakes' )
+  git -C "${REPO_ROOT}" submodule update --init --recursive --depth 1
+  nix "${NIX_OPTS[@]}" build "${REPO_ROOT}?submodules=1#devnet" \
+    --out-link "${REPO_ROOT}/single-node-devnet"
+  MINA_EXE="${REPO_ROOT}/single-node-devnet/bin/mina"
+fi
+export MINA_EXE
+echo "Using mina executable: ${MINA_EXE}"
+
+echo "Starting single-node network with preset: ${PRESET}"
+
+# mina-local-network.sh generates the genesis ledger (and optionally sends
+# GraphQL queries) with python helpers that need the 'click' and 'requests'
+# packages. If the ambient python3 lacks them, materialize a suitable
+# interpreter with nix-shell and put it in front of PATH.
+if ! python3 -c 'import click, requests' 2>/dev/null; then
+  if command -v nix-shell >/dev/null; then
+    echo "python3 lacks click/requests; getting an interpreter via nix-shell..."
+    PYTHON3_WITH_PKGS=$(nix-shell \
+      --packages "python3.withPackages (ps: [ ps.click ps.requests ])" \
+      --run 'command -v python3')
+    PATH="$(dirname "${PYTHON3_WITH_PKGS}"):${PATH}"
+    export PATH
+  else
+    echo "Error: python3 lacks the 'click'/'requests' packages and nix-shell is unavailable." >&2
+    echo "Install them, e.g.: pip install -r scripts/mina-local-network/requirements.txt" >&2
+    echo "or run inside: nix-shell -p \"python3.withPackages (ps: [ ps.click ps.requests ])\"" >&2
+    exit 1
+  fi
+fi
+
+# mina-local-network.sh refers to its helper scripts relative to the repo root.
+cd "${REPO_ROOT}"
+
+VALUE_TRANSFER_ARGS=()
+if ${VALUE_TRANSFERS}; then
+  VALUE_TRANSFER_ARGS=(-vt -ti "${TRANSACTION_INTERVAL}")
+fi
+
+exec "${SCRIPT_DIR}/mina-local-network.sh" \
+  -c reset \
+  -u delay_sec:120 \
+  -pl full \
+  -tc 2 \
+  -wd 0 \
+  -st "${SLOT_TIME_MS}" \
+  -swc "${SNARK_WORKERS}" \
+  -sf 0.001 \
+  "${VALUE_TRANSFER_ARGS[@]}" \
+  -w 1 -f 0 -n 0 \
+  --seed-is-whale \
+  --seed-is-coordinator \
+  "${EXTRA_ARGS[@]}"
