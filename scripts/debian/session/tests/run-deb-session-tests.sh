@@ -3,74 +3,107 @@
 # ------------------------------------------------------------------------------
 # run-deb-session-tests.sh
 # ------------------------------------------------------------------------------
-# This script runs a suite of integration tests for the deb-session scripts,
-# which provide a session-based interface for manipulating Debian packages.
-#
-# The tests cover the following operations:
+# Integration tests for the deb-session operations, covering:
 #   - Opening a Debian package into a session directory
-#   - Inserting files into the session (directory and file targets)
+#   - Inserting files (directory and file targets)
 #   - Moving files within the session
 #   - Replacing files matching a glob pattern
 #   - Removing files matching a glob pattern
 #   - Replacing the version (reversion)
 #   - Replacing the suite
 #   - Renaming the package
-#   - Saving the session back to a .deb file and verifying its contents
+#   - Saving the session back to a .deb and verifying its contents
 #
-# Each test step uses assert functions to verify correctness, and the script
-# will exit with an error if any assertion fails.
+# The suite runs against one of two interchangeable engines, selected by the
+# SESSION_ENGINE env var:
+#
+#   bash         (default) — the scripts/debian/session/deb-session-*.sh scripts
+#   deb-toolkit            — `deb-toolkit session <verb>` (binary on PATH, or
+#                            $DEB_TOOLKIT)
+#
+# Both engines expose the same verbs with the same argument order and produce
+# the same session-directory layout, so the assertions below are shared. This
+# is what makes the suite a parity gate: the same script, run once per engine
+# (in CI, bash in the toolchain image and deb-toolkit in the release-toolkit
+# image), must reach identical conclusions.
+#
+# Control-field assertions run against the *saved* .deb via `dpkg-deb --field`
+# (which normalizes constraint spacing) rather than the raw session control
+# file, so the two engines' cosmetic differences — e.g. `(>=X)` vs `(>= X)` —
+# do not cause spurious failures.
 # ------------------------------------------------------------------------------
 
 set -eux -o pipefail
 
-# Determine the directory of this test script and the session scripts directory
 TEST_DIR="$(realpath "$(dirname "${BASH_SOURCE[0]}")")"
 SESSION_SCRIPTS_DIR="$(realpath "$TEST_DIR/..")"
 
-# Log a message with a test prefix
+SESSION_ENGINE="${SESSION_ENGINE:-bash}"
+DEB_TOOLKIT="${DEB_TOOLKIT:-deb-toolkit}"
+
 log() {
-  echo "[deb-session-test] $*"
+  echo "[deb-session-test][$SESSION_ENGINE] $*"
 }
 
-# Print an error message and exit
 fail() {
-  echo "[deb-session-test][ERROR] $*" >&2
+  echo "[deb-session-test][$SESSION_ENGINE][ERROR] $*" >&2
   exit 1
 }
 
-# Assert that a file's contents match the expected string
+# Dispatch a session verb to the selected engine. Both engines take the verb's
+# arguments in the same order, so this is a straight pass-through.
+session_verb() {
+  local verb="$1"
+  shift
+  case "$SESSION_ENGINE" in
+    bash)
+      "$SESSION_SCRIPTS_DIR/deb-session-${verb}.sh" "$@"
+      ;;
+    deb-toolkit)
+      "$DEB_TOOLKIT" session "$verb" "$@"
+      ;;
+    *)
+      fail "Unknown SESSION_ENGINE '$SESSION_ENGINE' (expected 'bash' or 'deb-toolkit')"
+      ;;
+  esac
+}
+
 assert_file_equals() {
-  local path="$1"
-  local expected="$2"
-  local actual
+  local path="$1" expected="$2" actual
   actual="$(cat "$path")"
   if [[ "$actual" != "$expected" ]]; then
     fail "File $path does not match expected contents. Got: '$actual'"
   fi
 }
 
-# Assert that a file or directory does not exist
 assert_not_exists() {
-  local path="$1"
-  if [[ -e "$path" ]]; then
-    fail "Expected $path to be absent"
-  fi
+  [[ ! -e "$1" ]] || fail "Expected $1 to be absent"
 }
 
-# Assert that a file or directory exists
 assert_exists() {
-  local path="$1"
-  if [[ ! -e "$path" ]]; then
-    fail "Expected $path to exist"
+  [[ -e "$1" ]] || fail "Expected $1 to exist"
+}
+
+# Assert that a `dpkg-deb --field` value contains a substring. Reads the saved
+# .deb, so constraint spacing is already normalized by dpkg.
+assert_field_contains() {
+  local deb="$1" field="$2" needle="$3" value
+  value="$(dpkg-deb --field "$deb" "$field")"
+  if [[ "$value" != *"$needle"* ]]; then
+    fail "Field $field of $deb missing '$needle'. Got: '$value'"
   fi
 }
 
-# Create a temporary working directory for the test session
-WORKDIR="$(mktemp -d -t deb-session-test-XXXXXX)"
-# Ensure cleanup on exit
-cleanup() {
-  rm -rf "$WORKDIR"
+assert_field_equals() {
+  local deb="$1" field="$2" expected="$3" value
+  value="$(dpkg-deb --field "$deb" "$field")"
+  if [[ "$value" != "$expected" ]]; then
+    fail "Field $field of $deb expected '$expected', got '$value'"
+  fi
 }
+
+WORKDIR="$(mktemp -d -t deb-session-test-XXXXXX)"
+cleanup() { rm -rf "$WORKDIR"; }
 trap cleanup EXIT
 
 # ------------------------------------------------------------------------------
@@ -95,14 +128,12 @@ Conflicts: mina-devnet (<< 1.0)
 Description: Sample package for deb-session tests
 EOF
 
-# Populate the package with some files
 echo "ledger-original" > "$PKG_DIR/var/lib/coda/ledger.dat"
 echo "config-one" > "$PKG_DIR/var/lib/coda/config_1.json"
 echo "config-two" > "$PKG_DIR/var/lib/coda/config_2.json"
 echo "devnet-config" > "$PKG_DIR/var/lib/coda/devnet.json"
 echo "node-config" > "$PKG_DIR/etc/mina/node.json"
 
-# Build the .deb package
 INPUT_DEB="$WORKDIR/input.deb"
 dpkg-deb --build "$PKG_DIR" "$INPUT_DEB"
 
@@ -110,7 +141,7 @@ dpkg-deb --build "$PKG_DIR" "$INPUT_DEB"
 # Open the package into a session directory
 # ------------------------------------------------------------------------------
 SESSION_DIR="$WORKDIR/session"
-"$SESSION_SCRIPTS_DIR/deb-session-open.sh" "$INPUT_DEB" "$SESSION_DIR"
+session_verb open "$INPUT_DEB" "$SESSION_DIR"
 
 assert_exists "$SESSION_DIR/metadata.env"
 assert_exists "$SESSION_DIR/control/control"
@@ -121,164 +152,100 @@ assert_exists "$SESSION_DIR/data/var/lib/coda/config_2.json"
 assert_exists "$SESSION_DIR/data/var/lib/coda/devnet.json"
 
 # ------------------------------------------------------------------------------
-# Test inserting files into a directory target
+# Insert files into a directory target (explicit -d works on both engines)
 # ------------------------------------------------------------------------------
-log "Testing deb-session-insert.sh (directory target)"
+log "Testing insert (directory target)"
 INSERT_FILE1="$WORKDIR/new-ledger1.tar.gz"
 INSERT_FILE2="$WORKDIR/new-ledger2.tar.gz"
 echo "ledger-one" > "$INSERT_FILE1"
 echo "ledger-two" > "$INSERT_FILE2"
 
-# Insert two files into /var/lib/coda/ in the session
-"$SESSION_SCRIPTS_DIR/deb-session-insert.sh" \
-  "$SESSION_DIR" \
-  "/var/lib/coda/" \
-  "$INSERT_FILE1" "$INSERT_FILE2"
+session_verb insert -d "$SESSION_DIR" "/var/lib/coda" "$INSERT_FILE1" "$INSERT_FILE2"
 
 assert_file_equals "$SESSION_DIR/data/var/lib/coda/new-ledger1.tar.gz" "ledger-one"
 assert_file_equals "$SESSION_DIR/data/var/lib/coda/new-ledger2.tar.gz" "ledger-two"
 
 # ------------------------------------------------------------------------------
-# Test inserting a file into a file target
+# Insert a file into a file target
 # ------------------------------------------------------------------------------
-log "Testing deb-session-insert.sh (file target)"
+log "Testing insert (file target)"
 FILE_DEST_SOURCE="$WORKDIR/new-config.json"
 echo '{"inserted":true}' > "$FILE_DEST_SOURCE"
-"$SESSION_SCRIPTS_DIR/deb-session-insert.sh" \
-  "$SESSION_DIR" \
-  "/etc/mina/override.json" \
-  "$FILE_DEST_SOURCE"
+session_verb insert "$SESSION_DIR" "/etc/mina/override.json" "$FILE_DEST_SOURCE"
 
 assert_file_equals "$SESSION_DIR/data/etc/mina/override.json" '{"inserted":true}'
 
 # ------------------------------------------------------------------------------
-# Test moving a file within the session
+# Move a file within the session
 # ------------------------------------------------------------------------------
-log "Testing deb-session-move.sh"
-"$SESSION_SCRIPTS_DIR/deb-session-move.sh" \
-  "$SESSION_DIR" \
-  "/var/lib/coda/new-ledger1.tar.gz" \
-  "/var/lib/coda/moved-ledger.tar.gz"
+log "Testing move"
+session_verb move "$SESSION_DIR" \
+  "/var/lib/coda/new-ledger1.tar.gz" "/var/lib/coda/moved-ledger.tar.gz"
 
 assert_exists "$SESSION_DIR/data/var/lib/coda/moved-ledger.tar.gz"
 assert_not_exists "$SESSION_DIR/data/var/lib/coda/new-ledger1.tar.gz"
 
 # ------------------------------------------------------------------------------
-# Test replacing files matching a glob pattern
+# Replace files matching a glob pattern
 # ------------------------------------------------------------------------------
-log "Testing deb-session-replace.sh"
+log "Testing replace"
 REPLACEMENT_FILE="$WORKDIR/replacement.json"
 echo 'replaced' > "$REPLACEMENT_FILE"
-"$SESSION_SCRIPTS_DIR/deb-session-replace.sh" \
-  "$SESSION_DIR" \
-  "/var/lib/coda/config_*.json" \
-  "$REPLACEMENT_FILE"
+session_verb replace "$SESSION_DIR" "/var/lib/coda/config_*.json" "$REPLACEMENT_FILE"
 
 assert_file_equals "$SESSION_DIR/data/var/lib/coda/config_1.json" 'replaced'
 assert_file_equals "$SESSION_DIR/data/var/lib/coda/config_2.json" 'replaced'
 
 # ------------------------------------------------------------------------------
-# Test removing files matching a glob pattern
+# Remove files matching a glob pattern
 # ------------------------------------------------------------------------------
-log "Testing deb-session-remove.sh"
-"$SESSION_SCRIPTS_DIR/deb-session-remove.sh" \
-  "$SESSION_DIR" \
-  "/var/lib/coda/*.tar.gz"
+log "Testing remove"
+session_verb remove "$SESSION_DIR" "/var/lib/coda/*.tar.gz"
 
 assert_not_exists "$SESSION_DIR/data/var/lib/coda/moved-ledger.tar.gz"
 assert_not_exists "$SESSION_DIR/data/var/lib/coda/new-ledger2.tar.gz"
 
 # ------------------------------------------------------------------------------
-# Test replacing the version (reversion)
+# Reversion (no flag): both engines rewrite the version everywhere it is pinned
 # ------------------------------------------------------------------------------
-log "Testing deb-session-reversion.sh"
-"$SESSION_SCRIPTS_DIR/deb-session-reversion.sh" \
-  "$SESSION_DIR" \
-  "2.0.0-rc1"
-
-# Verify the control file was updated
-CURRENT_VERSION=$(awk '/^Version:/ {print $2}' "$SESSION_DIR/control/control")
-if [[ "$CURRENT_VERSION" != "2.0.0-rc1" ]]; then
-  fail "control file not updated with new version (got: $CURRENT_VERSION)"
-fi
-
-# Verify versioned dependencies were updated
-CURRENT_DEPENDS=$(grep '^Depends:' "$SESSION_DIR/control/control")
-if [[ "$CURRENT_DEPENDS" != *"mina-devnet-config (>=2.0.0-rc1)"* ]]; then
-  fail "Depends not updated with new version (got: $CURRENT_DEPENDS)"
-fi
-
-CURRENT_REPLACES=$(grep '^Replaces:' "$SESSION_DIR/control/control")
-if [[ "$CURRENT_REPLACES" != *"mina-devnet (<< 2.0.0-rc1)"* ]]; then
-  fail "Replaces not updated with new version (got: $CURRENT_REPLACES)"
-fi
-
-CURRENT_BREAKS=$(grep '^Breaks:' "$SESSION_DIR/control/control")
-if [[ "$CURRENT_BREAKS" != *"mina-devnet (<< 2.0.0-rc1)"* ]]; then
-  fail "Breaks not updated with new version (got: $CURRENT_BREAKS)"
-fi
-
-CURRENT_CONFLICTS=$(grep '^Conflicts:' "$SESSION_DIR/control/control")
-if [[ "$CURRENT_CONFLICTS" != *"mina-devnet (<< 2.0.0-rc1)"* ]]; then
-  fail "Conflicts not updated with new version (got: $CURRENT_CONFLICTS)"
-fi
-
-# Verify non-versioned dependencies were NOT changed
-if [[ "$CURRENT_DEPENDS" != *"libssl1.1"* ]] || [[ "$CURRENT_DEPENDS" != *"libffi7"* ]]; then
-  fail "Non-versioned dependencies were corrupted (got: $CURRENT_DEPENDS)"
-fi
+log "Testing reversion"
+session_verb reversion "$SESSION_DIR" "2.0.0-rc1"
 
 # ------------------------------------------------------------------------------
-# Test replacing the suite
+# Replace the suite
 # ------------------------------------------------------------------------------
-log "Testing deb-session-replace-suite.sh"
-"$SESSION_SCRIPTS_DIR/deb-session-replace-suite.sh" \
-  "$SESSION_DIR" \
-  "stable"
-
-# Verify the control file was updated
-CURRENT_SUITE=$(awk '/^Suite:/ {print $2}' "$SESSION_DIR/control/control")
-if [[ "$CURRENT_SUITE" != "stable" ]]; then
-  fail "control file not updated with new suite (got: $CURRENT_SUITE)"
-fi
+log "Testing replace-suite"
+session_verb replace-suite "$SESSION_DIR" "stable"
 
 # ------------------------------------------------------------------------------
-# Test renaming the package
+# Rename the package
 # ------------------------------------------------------------------------------
-log "Testing deb-session-rename-package.sh"
-"$SESSION_SCRIPTS_DIR/deb-session-rename-package.sh" \
-  "$SESSION_DIR" \
-  "mina-devnet-hardfork"
-
-# Verify the control file was updated
-PACKAGE_NAME=$(awk '/^Package:/ {print $2}' "$SESSION_DIR/control/control")
-if [[ "$PACKAGE_NAME" != "mina-devnet-hardfork" ]]; then
-  fail "control file not updated with new package name (got: $PACKAGE_NAME)"
-fi
+log "Testing rename-package"
+session_verb rename-package "$SESSION_DIR" "mina-devnet-hardfork"
 
 # ------------------------------------------------------------------------------
-# Test saving the session back to a .deb and verifying contents
+# Save the session back to a .deb, then assert control + contents on the artifact
 # ------------------------------------------------------------------------------
-log "Testing deb-session-save.sh"
+log "Testing save"
 OUTPUT_DEB="$WORKDIR/output.deb"
-"$SESSION_SCRIPTS_DIR/deb-session-save.sh" "$SESSION_DIR" "$OUTPUT_DEB" --verify
+session_verb save "$SESSION_DIR" "$OUTPUT_DEB" --verify
 
-NEW_PACKAGE_NAME="$(dpkg-deb --field "$OUTPUT_DEB" Package)"
-if [[ "$NEW_PACKAGE_NAME" != "mina-devnet-hardfork" ]]; then
-  fail "Saved package has unexpected name: $NEW_PACKAGE_NAME"
-fi
+# Control fields — read from the saved .deb so constraint spacing is normalized.
+assert_field_equals "$OUTPUT_DEB" Package "mina-devnet-hardfork"
+assert_field_equals "$OUTPUT_DEB" Version "2.0.0-rc1"
+assert_field_equals "$OUTPUT_DEB" Suite "stable"
 
-NEW_VERSION="$(dpkg-deb --field "$OUTPUT_DEB" Version)"
-if [[ "$NEW_VERSION" != "2.0.0-rc1" ]]; then
-  fail "Saved package has unexpected version: $NEW_VERSION"
-fi
+# Every versioned constraint that pinned the old version now tracks the new one.
+assert_field_contains "$OUTPUT_DEB" Depends "mina-devnet-config (>= 2.0.0-rc1)"
+assert_field_contains "$OUTPUT_DEB" Replaces "mina-devnet (<< 2.0.0-rc1)"
+assert_field_contains "$OUTPUT_DEB" Breaks "mina-devnet (<< 2.0.0-rc1)"
+assert_field_contains "$OUTPUT_DEB" Conflicts "mina-devnet (<< 2.0.0-rc1)"
 
-NEW_SUITE="$(dpkg-deb --field "$OUTPUT_DEB" Suite)"
-if [[ "$NEW_SUITE" != "stable" ]]; then
-  fail "Saved package has unexpected suite: $NEW_SUITE"
-fi
+# Non-versioned dependencies are left untouched.
+assert_field_contains "$OUTPUT_DEB" Depends "libssl1.1"
+assert_field_contains "$OUTPUT_DEB" Depends "libffi7"
 
-# Extract the resulting .deb and verify its contents
+# Data contents survived the mutations.
 EXTRACT_DIR="$WORKDIR/extracted"
 mkdir -p "$EXTRACT_DIR"
 dpkg-deb -x "$OUTPUT_DEB" "$EXTRACT_DIR"
@@ -287,4 +254,4 @@ assert_file_equals "$EXTRACT_DIR/var/lib/coda/config_1.json" 'replaced'
 assert_file_equals "$EXTRACT_DIR/etc/mina/override.json" '{"inserted":true}'
 assert_not_exists "$EXTRACT_DIR/var/lib/coda/moved-ledger.tar.gz"
 
-log "All deb-session scripts executed successfully"
+log "All deb-session operations executed and verified successfully"
