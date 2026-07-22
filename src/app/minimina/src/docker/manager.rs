@@ -147,7 +147,8 @@ impl DockerManager {
             })?;
 
             nodes.push(DockerNodeSpec {
-                name: container_name.clone(),
+                name: config.service_name.clone(),
+                container_name: container_name.clone(),
                 image,
                 entrypoint: Some(vec!["mina".to_string()]),
                 cmd: cmd_str.split_whitespace().map(str::to_string).collect(),
