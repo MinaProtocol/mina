@@ -301,7 +301,7 @@ async fn docker_connect_and_network(
 
 /// Pull the image, create + start the container, return its running unit, kill
 /// handle, and host-side pid.
-async fn launch_docker(
+async fn spawn_container(
     docker: &Docker,
     network_name: &str,
     network_id: &str,
@@ -427,6 +427,83 @@ async fn launch_docker(
 }
 
 // ---------------------------------------------------------------------------
+// Execution: the backend, owning any network-level resources
+// ---------------------------------------------------------------------------
+
+/// The backend a network runs on. It owns network-*level* resources (docker: the
+/// docker network + DNS) and knows how to launch its own units. Its unit
+/// representation (`RunningUnit`/`Killer`) is an internal detail — native and
+/// docker units are NOT mix-and-match across executions, so the backend is a
+/// single axis, not a `Unit`×`Execution` matrix.
+enum Execution {
+    Native,
+    Docker { docker: Docker, network_name: String },
+}
+
+impl Execution {
+    /// Acquire network-level resources (docker: connect + create the network).
+    async fn setup(spec: &BackendSpec, network_id: &str) -> std::io::Result<Execution> {
+        match spec {
+            BackendSpec::Native { .. } => Ok(Execution::Native),
+            BackendSpec::Docker { network_name, .. } => {
+                let docker = docker_connect_and_network(network_name, network_id).await?;
+                Ok(Execution::Docker {
+                    docker,
+                    network_name: network_name.clone(),
+                })
+            }
+        }
+    }
+
+    /// Launch a native daemon as an owned child.
+    fn launch_native(
+        &self,
+        node: &NativeNodeSpec,
+    ) -> std::io::Result<(RunningUnit, Killer, Option<u32>)> {
+        let child = spawn_native(node)?;
+        let pid = child.id();
+        Ok((
+            RunningUnit::Native(child),
+            Killer::Native {
+                pid: pid.unwrap_or(0),
+            },
+            pid,
+        ))
+    }
+
+    /// Launch a docker daemon as an owned container on this execution's network.
+    async fn launch_docker(
+        &self,
+        node: &DockerNodeSpec,
+        network_id: &str,
+    ) -> std::io::Result<(RunningUnit, Killer, Option<u32>)> {
+        match self {
+            Execution::Docker {
+                docker,
+                network_name,
+            } => spawn_container(docker, network_name, network_id, node).await,
+            Execution::Native => Err(std::io::Error::other(
+                "launch_docker called on a native execution",
+            )),
+        }
+    }
+
+    /// Release network-level resources (docker: remove the network). Units are
+    /// torn down separately (see `stop_units`).
+    async fn teardown(&self) {
+        if let Execution::Docker {
+            docker,
+            network_name,
+        } = self
+        {
+            if let Err(e) = docker.remove_network(network_name).await {
+                warn!("supervisor: remove_network '{network_name}': {e}");
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
 // JSON-RPC 2.0 envelope (hand-rolled)
 // ---------------------------------------------------------------------------
 
@@ -496,40 +573,28 @@ async fn run(plan: SupervisorPlan) -> std::io::Result<()> {
     let state = Arc::new(Mutex::new(SupervisorState::new()));
     let shutdown = Arc::new(Notify::new());
 
-    // Launch every unit + a waiter task that reaps its exit.
-    let docker = match &plan.spec {
+    // Acquire the backend + any network-level resources, then launch every unit
+    // (each with a waiter task that reaps its exit). The one match here is on the
+    // spec *data* (native and docker node specs differ), not a leaky abstraction.
+    let execution = Execution::setup(&plan.spec, &plan.network_id).await?;
+    match &plan.spec {
         BackendSpec::Native { nodes } => {
             for node in nodes {
-                match spawn_native(node) {
-                    Ok(child) => {
-                        let pid = child.id();
-                        register_unit(
-                            &state,
-                            &node.name,
-                            pid,
-                            RunningUnit::Native(child),
-                            Killer::Native { pid: pid.unwrap_or(0) },
-                        );
-                    }
-                    Err(e) => fail_unit(&state, &node.name, e.to_string()),
-                }
-            }
-            None
-        }
-        BackendSpec::Docker {
-            network_name,
-            nodes,
-        } => {
-            let docker = docker_connect_and_network(network_name, &plan.network_id).await?;
-            for node in nodes {
-                match launch_docker(&docker, network_name, &plan.network_id, node).await {
+                match execution.launch_native(node) {
                     Ok((unit, killer, pid)) => register_unit(&state, &node.name, pid, unit, killer),
                     Err(e) => fail_unit(&state, &node.name, e.to_string()),
                 }
             }
-            Some((docker, network_name.clone()))
         }
-    };
+        BackendSpec::Docker { nodes, .. } => {
+            for node in nodes {
+                match execution.launch_docker(node, &plan.network_id).await {
+                    Ok((unit, killer, pid)) => register_unit(&state, &node.name, pid, unit, killer),
+                    Err(e) => fail_unit(&state, &node.name, e.to_string()),
+                }
+            }
+        }
+    }
 
     // Bind the RPC socket (unlink any stale socket first).
     let _ = std::fs::remove_file(&plan.socket_path);
@@ -565,7 +630,8 @@ async fn run(plan: SupervisorPlan) -> std::io::Result<()> {
     }
 
     accept_task.abort();
-    teardown(&state, &docker).await;
+    stop_units(&state).await;
+    execution.teardown().await;
     let _ = std::fs::remove_file(&plan.socket_path);
     info!("supervisor: network '{}' stopped", plan.network_id);
     Ok(())
@@ -670,8 +736,9 @@ fn dispatch(
     }
 }
 
-/// Terminate every live unit (graceful → force), then remove the docker network.
-async fn teardown(state: &Arc<Mutex<SupervisorState>>, docker: &Option<(Docker, String)>) {
+/// Terminate every live unit (graceful → force). Network-level teardown is the
+/// execution's job (see `Execution::teardown`).
+async fn stop_units(state: &Arc<Mutex<SupervisorState>>) {
     let killers: Vec<Killer> = {
         let st = state.lock().unwrap();
         st.killers.values().cloned().collect()
@@ -683,11 +750,6 @@ async fn teardown(state: &Arc<Mutex<SupervisorState>>, docker: &Option<(Docker, 
         tokio::time::sleep(std::time::Duration::from_secs(2)).await;
         for k in &killers {
             k.force_kill().await;
-        }
-    }
-    if let Some((docker, network_name)) = docker {
-        if let Err(e) = docker.remove_network(network_name).await {
-            warn!("supervisor: remove_network '{network_name}': {e}");
         }
     }
 }
