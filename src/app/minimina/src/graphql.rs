@@ -1,7 +1,11 @@
-use log::info;
+use chrono::{DateTime, NaiveDateTime, Utc};
+use log::{info, warn};
 
 use crate::{directory_manager::DirectoryManager, exit_with, output::network, TIMEOUT_IN_SECS};
-use std::{self, io::Result};
+use std::{
+    self,
+    io::{Error, ErrorKind, Result},
+};
 
 pub struct GraphQl {
     directory_manager: DirectoryManager,
@@ -99,6 +103,154 @@ impl GraphQl {
     }
 }
 
+/// Parse the genesis timestamp string the daemon reports (ISO-8601) into a UTC
+/// datetime.
+///
+/// The daemon reports ISO-8601 with a trailing `Z` for the UTC offset; that is
+/// normalized to `+00:00` so it parses as RFC-3339. A timestamp carrying no
+/// offset at all is assumed to already be UTC. This is a pure function, factored
+/// out so it is testable without a running daemon.
+fn parse_genesis_timestamp(s: &str) -> Result<DateTime<Utc>> {
+    let normalized = s.replace('Z', "+00:00");
+
+    // Offset-bearing timestamp (the common case: daemon reports "...Z").
+    if let Ok(dt) = DateTime::parse_from_rfc3339(&normalized) {
+        return Ok(dt.with_timezone(&Utc));
+    }
+
+    // Naive timestamp with no offset: assume it is already UTC. Try with and
+    // without fractional seconds.
+    for fmt in ["%Y-%m-%dT%H:%M:%S%.f", "%Y-%m-%dT%H:%M:%S"] {
+        if let Ok(ndt) = NaiveDateTime::parse_from_str(&normalized, fmt) {
+            return Ok(DateTime::from_naive_utc_and_offset(ndt, Utc));
+        }
+    }
+
+    Err(Error::new(
+        ErrorKind::InvalidData,
+        format!("genesisTimestamp is not an ISO-8601 timestamp: {s:?}"),
+    ))
+}
+
+/// Ask a running daemon for the genesis timestamp it is actually using.
+///
+/// Part of the hardfork readiness gate. POSTs
+/// `query { genesisConstants { genesisTimestamp } }` and parses the returned
+/// ISO-8601 string into a UTC datetime. The daemon is always queried directly:
+/// there is deliberately no static fallback, because the genesis instant in
+/// force is only known to the running daemon.
+#[allow(dead_code)]
+pub fn genesis_timestamp(gql_endpoint: &str) -> Result<DateTime<Utc>> {
+    let query = r#"{ "query": "query { genesisConstants { genesisTimestamp } }" }"#;
+
+    let client = reqwest::blocking::Client::new();
+    let response = client
+        .post(gql_endpoint)
+        .header("Content-Type", "application/json")
+        .body(query)
+        .send()
+        .map_err(|e| {
+            Error::new(
+                ErrorKind::Other,
+                format!("Failed to query genesisTimestamp from '{gql_endpoint}': {e}"),
+            )
+        })?;
+
+    let body = response.text().map_err(|e| {
+        Error::new(
+            ErrorKind::Other,
+            format!("Failed to read genesisTimestamp response from '{gql_endpoint}': {e}"),
+        )
+    })?;
+
+    let json: serde_json::Value = serde_json::from_str(&body).map_err(|e| {
+        Error::new(
+            ErrorKind::InvalidData,
+            format!("genesisTimestamp response from '{gql_endpoint}' is not JSON: {e}"),
+        )
+    })?;
+
+    let raw = json["data"]["genesisConstants"]["genesisTimestamp"]
+        .as_str()
+        .ok_or_else(|| {
+            Error::new(
+                ErrorKind::InvalidData,
+                format!("genesisTimestamp missing from GraphQL response of '{gql_endpoint}'"),
+            )
+        })?;
+
+    parse_genesis_timestamp(raw)
+}
+
+/// Poll until the daemon is both `SYNCED` and past its genesis timestamp.
+///
+/// Part of the hardfork readiness gate. `SYNCED` alone is reached roughly one
+/// genesis-delay *before* the chain starts producing, so this additionally waits
+/// for the wall clock to reach the genesis timestamp the daemon reports. This is
+/// the stronger readiness check hardfork support needs; it is not yet wired into
+/// the network-create flow (a separate ticket).
+///
+/// Transient GraphQL/HTTP errors during polling are tolerated (logged and
+/// retried). Returns an error only if neither condition is met within the
+/// overall timeout.
+#[allow(dead_code)]
+pub fn wait_for_genesis(gql_endpoint: &str) -> Result<()> {
+    const INTERVAL_IN_SECS: u64 = 2;
+    let mut elapsed = 0u64;
+    info!("Waiting for genesis readiness (SYNCED + past genesis) at '{gql_endpoint}'");
+    let client = reqwest::blocking::Client::new();
+
+    while u64::from(TIMEOUT_IN_SECS) > elapsed {
+        match poll_genesis_ready(&client, gql_endpoint) {
+            Ok(true) => {
+                info!("Genesis reached at '{gql_endpoint}': daemon SYNCED and past genesis");
+                return Ok(());
+            }
+            Ok(false) => {}
+            Err(e) => {
+                warn!("Transient error while polling genesis readiness at '{gql_endpoint}': {e}");
+            }
+        }
+        std::thread::sleep(std::time::Duration::from_secs(INTERVAL_IN_SECS));
+        elapsed += INTERVAL_IN_SECS;
+    }
+
+    exit_with(format!(
+        "Genesis not reached at '{gql_endpoint}' within {TIMEOUT_IN_SECS}s \
+         (daemon never synced past its genesis timestamp)",
+    ))
+}
+
+/// One poll of the genesis gate: true iff `syncStatus == "SYNCED"` and the wall
+/// clock is at or past the daemon's genesis timestamp.
+#[allow(dead_code)]
+fn poll_genesis_ready(client: &reqwest::blocking::Client, gql_endpoint: &str) -> Result<bool> {
+    let query = r#"{ "query": "query { syncStatus }" }"#;
+    let body = client
+        .post(gql_endpoint)
+        .header("Content-Type", "application/json")
+        .body(query)
+        .send()
+        .and_then(|r| r.text())
+        .map_err(|e| Error::new(ErrorKind::Other, format!("syncStatus request failed: {e}")))?;
+
+    let json: serde_json::Value = serde_json::from_str(&body)
+        .map_err(|e| Error::new(ErrorKind::InvalidData, format!("syncStatus not JSON: {e}")))?;
+
+    let sync_status = json["data"]["syncStatus"].as_str().ok_or_else(|| {
+        Error::new(
+            ErrorKind::InvalidData,
+            "syncStatus missing from GraphQL response".to_string(),
+        )
+    })?;
+
+    if sync_status != "SYNCED" {
+        return Ok(false);
+    }
+
+    Ok(Utc::now() >= genesis_timestamp(gql_endpoint)?)
+}
+
 #[cfg(test)]
 mod test {
     #[test]
@@ -166,5 +318,45 @@ mod test {
 
         let endpoint = graphql.get_endpoint("mina-snark-worker-1", network_id);
         assert_eq!(endpoint, None);
+    }
+
+    #[test]
+    fn test_parse_genesis_timestamp_z_suffix() {
+        use super::parse_genesis_timestamp;
+        use chrono::{TimeZone, Utc};
+
+        let parsed = parse_genesis_timestamp("2024-01-02T03:04:05Z").unwrap();
+        assert_eq!(parsed, Utc.with_ymd_and_hms(2024, 1, 2, 3, 4, 5).unwrap());
+    }
+
+    #[test]
+    fn test_parse_genesis_timestamp_explicit_offset() {
+        use super::parse_genesis_timestamp;
+        use chrono::{TimeZone, Utc};
+
+        // +00:00 offset should be equivalent to the Z-suffixed form.
+        let parsed = parse_genesis_timestamp("2024-01-02T03:04:05+00:00").unwrap();
+        assert_eq!(parsed, Utc.with_ymd_and_hms(2024, 1, 2, 3, 4, 5).unwrap());
+
+        // A non-zero offset must be normalized back to UTC.
+        let parsed = parse_genesis_timestamp("2024-01-02T05:04:05+02:00").unwrap();
+        assert_eq!(parsed, Utc.with_ymd_and_hms(2024, 1, 2, 3, 4, 5).unwrap());
+    }
+
+    #[test]
+    fn test_parse_genesis_timestamp_naive_assumed_utc() {
+        use super::parse_genesis_timestamp;
+        use chrono::{TimeZone, Utc};
+
+        // No offset at all: assumed to already be UTC.
+        let parsed = parse_genesis_timestamp("2024-01-02T03:04:05").unwrap();
+        assert_eq!(parsed, Utc.with_ymd_and_hms(2024, 1, 2, 3, 4, 5).unwrap());
+    }
+
+    #[test]
+    fn test_parse_genesis_timestamp_invalid() {
+        use super::parse_genesis_timestamp;
+
+        assert!(parse_genesis_timestamp("not-a-timestamp").is_err());
     }
 }
