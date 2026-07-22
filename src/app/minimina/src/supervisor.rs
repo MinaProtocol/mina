@@ -30,8 +30,8 @@ use tokio::net::UnixListener;
 use tokio::sync::Notify;
 
 use bollard::container::{
-    Config, CreateContainerOptions, NetworkingConfig, RemoveContainerOptions, StopContainerOptions,
-    WaitContainerOptions,
+    Config, CreateContainerOptions, LogsOptions, NetworkingConfig, RemoveContainerOptions,
+    StopContainerOptions, WaitContainerOptions,
 };
 use bollard::image::CreateImageOptions;
 use bollard::network::CreateNetworkOptions;
@@ -126,6 +126,25 @@ pub enum NodeStatus {
     Failed { error: String },
 }
 
+/// Per-node launch spec, retained so a stopped unit can be relaunched by name
+/// (`node_start`).
+enum NodeLaunch {
+    Native(NativeNodeSpec),
+    Docker(DockerNodeSpec),
+}
+
+/// Immutable per-run context: set up once, then only read. Shared (`Arc`) with
+/// every RPC handler so node ops can reach the backend + per-node specs without
+/// touching the mutable state lock.
+struct SupervisorCtx {
+    /// The backend (docker handle / network) used to (re)launch + exec units.
+    execution: Execution,
+    network_id: String,
+    /// Per-node launch spec, for `node_start` restart.
+    launches: HashMap<String, NodeLaunch>,
+}
+
+/// Mutable live state, behind a `std::sync::Mutex` never held across `.await`.
 struct SupervisorState {
     nodes: HashMap<String, NodeStatus>,
     /// Kill handles for live units, for teardown.
@@ -508,6 +527,36 @@ impl Execution {
             }
         }
     }
+
+    /// Stream a container's logs (docker only). `tail` limits to the last N lines.
+    async fn container_logs(
+        &self,
+        container: &str,
+        tail: Option<u64>,
+    ) -> std::io::Result<String> {
+        match self {
+            Execution::Docker { docker, .. } => {
+                let opts = LogsOptions::<String> {
+                    stdout: true,
+                    stderr: true,
+                    tail: tail.map(|t| t.to_string()).unwrap_or_else(|| "all".to_string()),
+                    ..Default::default()
+                };
+                let mut stream = docker.logs(container, Some(opts));
+                let mut out = String::new();
+                while let Some(item) = stream.next().await {
+                    match item {
+                        Ok(chunk) => out.push_str(&String::from_utf8_lossy(&chunk.into_bytes())),
+                        Err(e) => return Err(std::io::Error::other(e)),
+                    }
+                }
+                Ok(out)
+            }
+            Execution::Native => Err(std::io::Error::other(
+                "container_logs called on native execution",
+            )),
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -521,7 +570,6 @@ struct RpcRequest {
     #[serde(default)]
     id: serde_json::Value,
     method: String,
-    #[allow(dead_code)]
     #[serde(default)]
     params: serde_json::Value,
 }
@@ -577,29 +625,42 @@ pub fn run_blocking(plan: SupervisorPlan) -> std::io::Result<()> {
 }
 
 async fn run(plan: SupervisorPlan) -> std::io::Result<()> {
+    // Acquire the backend + any network-level resources.
+    let execution = Execution::setup(&plan.spec, &plan.network_id).await?;
+
+    // Retain each node's launch spec (for `node_start`) and remember the launch
+    // order (the one match here is on the spec *data* — native and docker node
+    // specs differ — not a leaky abstraction).
+    let mut launches: HashMap<String, NodeLaunch> = HashMap::new();
+    let ordered: Vec<String> = match &plan.spec {
+        BackendSpec::Native { nodes } => nodes
+            .iter()
+            .map(|n| {
+                launches.insert(n.name.clone(), NodeLaunch::Native(n.clone()));
+                n.name.clone()
+            })
+            .collect(),
+        BackendSpec::Docker { nodes, .. } => nodes
+            .iter()
+            .map(|n| {
+                launches.insert(n.name.clone(), NodeLaunch::Docker(n.clone()));
+                n.name.clone()
+            })
+            .collect(),
+    };
+
+    let ctx = Arc::new(SupervisorCtx {
+        execution,
+        network_id: plan.network_id.clone(),
+        launches,
+    });
     let state = Arc::new(Mutex::new(SupervisorState::new()));
     let shutdown = Arc::new(Notify::new());
 
-    // Acquire the backend + any network-level resources, then launch every unit
-    // (each with a waiter task that reaps its exit). The one match here is on the
-    // spec *data* (native and docker node specs differ), not a leaky abstraction.
-    let execution = Execution::setup(&plan.spec, &plan.network_id).await?;
-    match &plan.spec {
-        BackendSpec::Native { nodes } => {
-            for node in nodes {
-                match execution.launch_native(node) {
-                    Ok((unit, killer, pid)) => register_unit(&state, &node.name, pid, unit, killer),
-                    Err(e) => fail_unit(&state, &node.name, e.to_string()),
-                }
-            }
-        }
-        BackendSpec::Docker { nodes, .. } => {
-            for node in nodes {
-                match execution.launch_docker(node, &plan.network_id).await {
-                    Ok((unit, killer, pid)) => register_unit(&state, &node.name, pid, unit, killer),
-                    Err(e) => fail_unit(&state, &node.name, e.to_string()),
-                }
-            }
+    // Launch every unit in order (each with a waiter task that reaps its exit).
+    for name in &ordered {
+        if let Some(launch) = ctx.launches.get(name) {
+            launch_and_register(&ctx, &state, name, launch).await;
         }
     }
 
@@ -608,6 +669,7 @@ async fn run(plan: SupervisorPlan) -> std::io::Result<()> {
     let listener = UnixListener::bind(&plan.socket_path)?;
     info!("supervisor: serving RPC on '{}'", plan.socket_path.display());
 
+    let accept_ctx = ctx.clone();
     let accept_state = state.clone();
     let accept_shutdown = shutdown.clone();
     let accept_task = tokio::spawn(async move {
@@ -616,6 +678,7 @@ async fn run(plan: SupervisorPlan) -> std::io::Result<()> {
                 Ok((stream, _addr)) => {
                     tokio::spawn(handle_connection(
                         stream,
+                        accept_ctx.clone(),
                         accept_state.clone(),
                         accept_shutdown.clone(),
                     ));
@@ -638,7 +701,7 @@ async fn run(plan: SupervisorPlan) -> std::io::Result<()> {
 
     accept_task.abort();
     stop_units(&state).await;
-    execution.teardown().await;
+    ctx.execution.teardown().await;
     let _ = std::fs::remove_file(&plan.socket_path);
     info!("supervisor: network '{}' stopped", plan.network_id);
     Ok(())
@@ -681,6 +744,7 @@ fn fail_unit(state: &Arc<Mutex<SupervisorState>>, name: &str, error: String) {
 /// Handle one client connection: newline-delimited JSON-RPC request/response.
 async fn handle_connection(
     stream: tokio::net::UnixStream,
+    ctx: Arc<SupervisorCtx>,
     state: Arc<Mutex<SupervisorState>>,
     shutdown: Arc<Notify>,
 ) {
@@ -700,7 +764,7 @@ async fn handle_connection(
         }
 
         let response = match serde_json::from_str::<RpcRequest>(&line) {
-            Ok(req) => dispatch(req, &state, &shutdown),
+            Ok(req) => dispatch(req, &ctx, &state, &shutdown).await,
             Err(e) => RpcResponse::err(
                 serde_json::Value::Null,
                 -32700,
@@ -723,23 +787,167 @@ async fn handle_connection(
     }
 }
 
-/// Dispatch a single request. Locks state only briefly, never across an await.
-fn dispatch(
+const INVALID_PARAMS: i64 = -32602;
+const NODE_ERROR: i64 = -32000;
+
+/// Extract a required string `name` param.
+fn param_name(params: &serde_json::Value) -> Result<String, RpcError> {
+    params
+        .get("name")
+        .and_then(|v| v.as_str())
+        .map(str::to_string)
+        .ok_or_else(|| RpcError {
+            code: INVALID_PARAMS,
+            message: "missing 'name' string param".to_string(),
+        })
+}
+
+/// Dispatch a single request. State-mutating helpers keep the `std::sync::Mutex`
+/// for only the moment they touch it, never across an `.await`.
+async fn dispatch(
     req: RpcRequest,
+    ctx: &Arc<SupervisorCtx>,
     state: &Arc<Mutex<SupervisorState>>,
     shutdown: &Arc<Notify>,
 ) -> RpcResponse {
-    match req.method.as_str() {
-        "status" => {
-            let snap = state.lock().unwrap().snapshot();
-            RpcResponse::ok(req.id, snap)
-        }
+    let id = req.id.clone();
+    let result: Result<serde_json::Value, RpcError> = match req.method.as_str() {
+        "status" => Ok(state.lock().unwrap().snapshot()),
         "stop" => {
             state.lock().unwrap().shutdown = true;
             shutdown.notify_one();
-            RpcResponse::ok(req.id, serde_json::json!({ "stopping": true }))
+            Ok(serde_json::json!({ "stopping": true }))
         }
-        other => RpcResponse::err(req.id, METHOD_NOT_FOUND, format!("unknown method '{other}'")),
+        "node_start" => match param_name(&req.params) {
+            Ok(name) => node_start(ctx, state, &name).await,
+            Err(e) => Err(e),
+        },
+        "node_stop" => match param_name(&req.params) {
+            Ok(name) => node_stop(state, &name).await,
+            Err(e) => Err(e),
+        },
+        "node_logs" => match param_name(&req.params) {
+            Ok(name) => {
+                let tail = req.params.get("tail").and_then(|v| v.as_u64());
+                node_logs(ctx, &name, tail).await
+            }
+            Err(e) => Err(e),
+        },
+        other => Err(RpcError {
+            code: METHOD_NOT_FOUND,
+            message: format!("unknown method '{other}'"),
+        }),
+    };
+    match result {
+        Ok(v) => RpcResponse::ok(id, v),
+        Err(e) => RpcResponse::err(id, e.code, e.message),
+    }
+}
+
+/// (Re)start a single node from its retained launch spec.
+async fn node_start(
+    ctx: &Arc<SupervisorCtx>,
+    state: &Arc<Mutex<SupervisorState>>,
+    name: &str,
+) -> Result<serde_json::Value, RpcError> {
+    let already = matches!(
+        state.lock().unwrap().nodes.get(name),
+        Some(NodeStatus::Running { .. })
+    );
+    if already {
+        return Err(RpcError {
+            code: NODE_ERROR,
+            message: format!("node '{name}' is already running"),
+        });
+    }
+    match ctx.launches.get(name) {
+        Some(launch) => {
+            launch_and_register(ctx, state, name, launch).await;
+            Ok(serde_json::json!({ "started": name }))
+        }
+        None => Err(RpcError {
+            code: NODE_ERROR,
+            message: format!("unknown node '{name}'"),
+        }),
+    }
+}
+
+/// Stop a single node (graceful → force). Its waiter task records the exit.
+async fn node_stop(
+    state: &Arc<Mutex<SupervisorState>>,
+    name: &str,
+) -> Result<serde_json::Value, RpcError> {
+    let killer = state.lock().unwrap().killers.remove(name);
+    match killer {
+        Some(k) => {
+            k.terminate().await;
+            tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+            k.force_kill().await;
+            Ok(serde_json::json!({ "stopped": name }))
+        }
+        None => Err(RpcError {
+            code: NODE_ERROR,
+            message: format!("node '{name}' is not running"),
+        }),
+    }
+}
+
+/// Fetch a node's logs — native: read its log file; docker: stream container logs.
+async fn node_logs(
+    ctx: &Arc<SupervisorCtx>,
+    name: &str,
+    tail: Option<u64>,
+) -> Result<serde_json::Value, RpcError> {
+    let logs = match ctx.launches.get(name) {
+        Some(NodeLaunch::Native(spec)) => {
+            let all = std::fs::read_to_string(&spec.log_file).unwrap_or_default();
+            tail_lines(&all, tail)
+        }
+        Some(NodeLaunch::Docker(spec)) => ctx
+            .execution
+            .container_logs(&spec.container_name, tail)
+            .await
+            .map_err(|e| RpcError {
+                code: NODE_ERROR,
+                message: e.to_string(),
+            })?,
+        None => {
+            return Err(RpcError {
+                code: NODE_ERROR,
+                message: format!("unknown node '{name}'"),
+            })
+        }
+    };
+    Ok(serde_json::json!({ "logs": logs }))
+}
+
+/// Keep only the last `tail` lines of `s` (all of it when `tail` is `None`).
+fn tail_lines(s: &str, tail: Option<u64>) -> String {
+    match tail {
+        Some(n) => {
+            let lines: Vec<&str> = s.lines().collect();
+            let start = lines.len().saturating_sub(n as usize);
+            lines[start..].join("\n")
+        }
+        None => s.to_string(),
+    }
+}
+
+/// Launch one node (native or docker) and register it + its waiter task. Shared
+/// by startup and `node_start`.
+async fn launch_and_register(
+    ctx: &Arc<SupervisorCtx>,
+    state: &Arc<Mutex<SupervisorState>>,
+    name: &str,
+    launch: &NodeLaunch,
+) {
+    let result = match launch {
+        NodeLaunch::Native(spec) => ctx.execution.launch_native(spec),
+        NodeLaunch::Docker(spec) => ctx.execution.launch_docker(spec, &ctx.network_id).await,
+    };
+    match result {
+        Ok((unit, killer, pid)) => register_unit(state, name, pid, unit, killer),
+        Err(e) => fail_unit(state, name, e.to_string()),
     }
 }
 
@@ -862,8 +1070,72 @@ mod tests {
         assert!(!socket_path.exists(), "socket should be removed");
     }
 
+    /// node_stop then node_start a live unit: it dies, then relaunches with a new
+    /// pid — the restart path the hardfork orchestrator drives.
+    #[test]
+    fn supervise_node_stop_then_start() {
+        let dir = tempdir::TempDir::new("supervisor-node-test").unwrap();
+        let socket_path = dir.path().join("supervisor.sock");
+        let plan = SupervisorPlan {
+            network_id: "test-net".into(),
+            socket_path: socket_path.clone(),
+            spec: BackendSpec::Native {
+                nodes: vec![NativeNodeSpec {
+                    name: "sleeper".into(),
+                    binary: "/bin/sleep".into(),
+                    args: vec!["300".into()],
+                    env: vec![],
+                    log_file: dir.path().join("sleeper.log"),
+                }],
+            },
+        };
+        let sup = std::thread::spawn(move || run_blocking(plan).unwrap());
+
+        let mut waited = 0;
+        while !socket_path.exists() && waited < 100 {
+            std::thread::sleep(std::time::Duration::from_millis(50));
+            waited += 1;
+        }
+        assert!(socket_path.exists());
+
+        let name = serde_json::json!({ "name": "sleeper" });
+        let st = rpc_call(&socket_path, "status", serde_json::Value::Null).unwrap();
+        let pid1 = st["nodes"][0]["status"]["pid"].as_u64().unwrap() as u32;
+
+        // node_stop: SIGTERM the unit; it dies and the waiter records `exited`.
+        assert_eq!(
+            rpc_call(&socket_path, "node_stop", name.clone()).unwrap()["stopped"],
+            "sleeper"
+        );
+        std::thread::sleep(std::time::Duration::from_millis(300));
+        assert!(!process_alive(pid1));
+        let st = rpc_call(&socket_path, "status", serde_json::Value::Null).unwrap();
+        assert_eq!(st["nodes"][0]["status"]["state"], "exited");
+
+        // node_start: relaunch → running with a fresh pid.
+        assert_eq!(
+            rpc_call(&socket_path, "node_start", name.clone()).unwrap()["started"],
+            "sleeper"
+        );
+        std::thread::sleep(std::time::Duration::from_millis(200));
+        let st = rpc_call(&socket_path, "status", serde_json::Value::Null).unwrap();
+        assert_eq!(st["nodes"][0]["status"]["state"], "running");
+        let pid2 = st["nodes"][0]["status"]["pid"].as_u64().unwrap() as u32;
+        assert_ne!(pid1, pid2);
+        assert!(process_alive(pid2));
+
+        rpc_call(&socket_path, "stop", serde_json::Value::Null).unwrap();
+        sup.join().unwrap();
+        assert!(!process_alive(pid2));
+    }
+
     #[test]
     fn unknown_method_returns_error() {
+        let ctx = Arc::new(SupervisorCtx {
+            execution: Execution::Native,
+            network_id: "t".into(),
+            launches: HashMap::new(),
+        });
         let state = Arc::new(Mutex::new(SupervisorState::new()));
         let shutdown = Arc::new(Notify::new());
         let req = RpcRequest {
@@ -872,7 +1144,8 @@ mod tests {
             method: "nope".into(),
             params: serde_json::Value::Null,
         };
-        let resp = dispatch(req, &state, &shutdown);
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        let resp = rt.block_on(dispatch(req, &ctx, &state, &shutdown));
         assert_eq!(resp.id, serde_json::json!(7));
         assert!(resp.result.is_none());
         assert_eq!(resp.error.unwrap().code, METHOD_NOT_FOUND);
