@@ -2,7 +2,7 @@ use crate::docker::compose::CONFIG_DIRECTORY;
 use crate::native::port_manager;
 use crate::native::process_tracker::{ProcessRecord, ProcessTracker};
 use crate::service::{ServiceConfig, ServiceType};
-use crate::supervisor::{NodeSpec, SupervisorPlan};
+use crate::supervisor::{BackendSpec, NativeNodeSpec, SupervisorPlan};
 use chrono::Local;
 use log::{info, warn};
 use nix::sys::signal::{self, Signal};
@@ -105,7 +105,7 @@ impl NativeManager {
             let config_dir_str = config_dir.to_str().unwrap();
             let (binary, args) =
                 self.build_command(service, network_id, network_path_str, config_dir_str)?;
-            nodes.push(NodeSpec {
+            nodes.push(NativeNodeSpec {
                 name: service.service_name.clone(),
                 binary,
                 args,
@@ -124,7 +124,7 @@ impl NativeManager {
         Ok(SupervisorPlan {
             network_id: network_id.to_string(),
             socket_path: Self::supervisor_socket(&self.network_path),
-            nodes,
+            spec: BackendSpec::Native { nodes },
         })
     }
 
