@@ -33,6 +33,8 @@ use bollard::container::{
     Config, CreateContainerOptions, LogsOptions, NetworkingConfig, RemoveContainerOptions,
     StopContainerOptions, WaitContainerOptions,
 };
+use crate::archive;
+use bollard::exec::{CreateExecOptions, StartExecResults};
 use bollard::image::CreateImageOptions;
 use bollard::network::CreateNetworkOptions;
 use bollard::secret::{EndpointSettings, HostConfig, PortBinding};
@@ -140,6 +142,8 @@ struct SupervisorCtx {
     /// The backend (docker handle / network) used to (re)launch + exec units.
     execution: Execution,
     network_id: String,
+    /// Host network directory — config dirs, keypairs, and archive data live here.
+    network_path: PathBuf,
     /// Per-node launch spec, for `node_start` restart.
     launches: HashMap<String, NodeLaunch>,
 }
@@ -557,6 +561,51 @@ impl Execution {
             )),
         }
     }
+
+    /// Run a command "inside" a unit and return its combined stdout+stderr.
+    /// Docker: `exec` into `container`. Native: run the command on the host
+    /// (a native unit has no container, so the caller passes a full host command
+    /// and `container` is ignored).
+    async fn exec(&self, container: &str, cmd: &[String]) -> std::io::Result<String> {
+        match self {
+            Execution::Docker { docker, .. } => {
+                let exec = docker
+                    .create_exec(
+                        container,
+                        CreateExecOptions {
+                            cmd: Some(cmd.iter().map(|s| s.as_str()).collect()),
+                            attach_stdout: Some(true),
+                            attach_stderr: Some(true),
+                            ..Default::default()
+                        },
+                    )
+                    .await
+                    .map_err(|e| std::io::Error::other(format!("create_exec '{container}': {e}")))?;
+                let mut out = String::new();
+                if let StartExecResults::Attached { mut output, .. } = docker
+                    .start_exec(&exec.id, None)
+                    .await
+                    .map_err(|e| std::io::Error::other(format!("start_exec '{container}': {e}")))?
+                {
+                    while let Some(item) = output.next().await {
+                        if let Ok(chunk) = item {
+                            out.push_str(&String::from_utf8_lossy(&chunk.into_bytes()));
+                        }
+                    }
+                }
+                Ok(out)
+            }
+            Execution::Native => {
+                let (bin, args) = cmd
+                    .split_first()
+                    .ok_or_else(|| std::io::Error::other("empty exec command"))?;
+                let output = tokio::process::Command::new(bin).args(args).output().await?;
+                let mut s = String::from_utf8_lossy(&output.stdout).to_string();
+                s.push_str(&String::from_utf8_lossy(&output.stderr));
+                Ok(s)
+            }
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -652,6 +701,12 @@ async fn run(plan: SupervisorPlan) -> std::io::Result<()> {
     let ctx = Arc::new(SupervisorCtx {
         execution,
         network_id: plan.network_id.clone(),
+        // Network dir is the socket's parent (`<net>/supervisor.sock`).
+        network_path: plan
+            .socket_path
+            .parent()
+            .map(|p| p.to_path_buf())
+            .unwrap_or_default(),
         launches,
     });
     let state = Arc::new(Mutex::new(SupervisorState::new()));
@@ -819,7 +874,14 @@ async fn dispatch(
             Ok(serde_json::json!({ "stopping": true }))
         }
         "node_start" => match param_name(&req.params) {
-            Ok(name) => node_start(ctx, state, &name).await,
+            Ok(name) => {
+                let fresh = req
+                    .params
+                    .get("fresh_state")
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(false);
+                node_start(ctx, state, &name, fresh).await
+            }
             Err(e) => Err(e),
         },
         "node_stop" => match param_name(&req.params) {
@@ -833,6 +895,19 @@ async fn dispatch(
             }
             Err(e) => Err(e),
         },
+        "node_dump_precomputed" => match param_name(&req.params) {
+            Ok(name) => node_dump_precomputed(ctx, &name),
+            Err(e) => Err(e),
+        },
+        "node_import_accounts" => match param_name(&req.params) {
+            Ok(name) => node_import_accounts(ctx, &name).await,
+            Err(e) => Err(e),
+        },
+        "dump_archive_data" => dump_archive_data(ctx).await,
+        "run_replayer" => match param_name(&req.params) {
+            Ok(name) => run_replayer(ctx, &name).await,
+            Err(e) => Err(e),
+        },
         other => Err(RpcError {
             code: METHOD_NOT_FOUND,
             message: format!("unknown method '{other}'"),
@@ -844,11 +919,20 @@ async fn dispatch(
     }
 }
 
-/// (Re)start a single node from its retained launch spec.
+/// Host config directory for a unit (`<net>/config-directory/<name>`) — same path
+/// on both backends (docker bind-mounts it into the container at
+/// `/config-directory`).
+fn config_dir(ctx: &SupervisorCtx, name: &str) -> PathBuf {
+    ctx.network_path.join("config-directory").join(name)
+}
+
+/// (Re)start a single node from its retained launch spec. With `fresh_state`, the
+/// unit's config directory is wiped first (a clean restart).
 async fn node_start(
     ctx: &Arc<SupervisorCtx>,
     state: &Arc<Mutex<SupervisorState>>,
     name: &str,
+    fresh_state: bool,
 ) -> Result<serde_json::Value, RpcError> {
     let already = matches!(
         state.lock().unwrap().nodes.get(name),
@@ -862,12 +946,38 @@ async fn node_start(
     }
     match ctx.launches.get(name) {
         Some(launch) => {
+            if fresh_state {
+                let dir = config_dir(ctx, name);
+                let _ = std::fs::remove_dir_all(&dir);
+                if let Err(e) = std::fs::create_dir_all(&dir) {
+                    return Err(RpcError {
+                        code: NODE_ERROR,
+                        message: format!("failed to reset config dir '{}': {e}", dir.display()),
+                    });
+                }
+            }
             launch_and_register(ctx, state, name, launch).await;
             Ok(serde_json::json!({ "started": name }))
         }
         None => Err(RpcError {
             code: NODE_ERROR,
             message: format!("unknown node '{name}'"),
+        }),
+    }
+}
+
+/// Dump a node's precomputed-blocks log (`<config-dir>/precomputed_blocks.log`),
+/// which is on the host for both backends (docker bind-mounts the config dir).
+fn node_dump_precomputed(
+    ctx: &Arc<SupervisorCtx>,
+    name: &str,
+) -> Result<serde_json::Value, RpcError> {
+    let path = config_dir(ctx, name).join("precomputed_blocks.log");
+    match std::fs::read_to_string(&path) {
+        Ok(blocks) => Ok(serde_json::json!({ "precomputed_blocks": blocks })),
+        Err(e) => Err(RpcError {
+            code: NODE_ERROR,
+            message: format!("cannot read '{}': {e}", path.display()),
         }),
     }
 }
@@ -931,6 +1041,164 @@ fn tail_lines(s: &str, tail: Option<u64>) -> String {
         }
         None => s.to_string(),
     }
+}
+
+/// Import every keypair into a node's wallet via `mina accounts import` (offline,
+/// against the node's config dir). Docker: `exec` into the container; native: run
+/// the node's `mina` binary on the host.
+async fn node_import_accounts(
+    ctx: &Arc<SupervisorCtx>,
+    name: &str,
+) -> Result<serde_json::Value, RpcError> {
+    let Some(launch) = ctx.launches.get(name) else {
+        return Err(RpcError {
+            code: NODE_ERROR,
+            message: format!("unknown node '{name}'"),
+        });
+    };
+    // privkey files under network-keypairs (host), excluding the `.pub` pubkeys.
+    let keypairs_dir = ctx.network_path.join("network-keypairs");
+    let mut files: Vec<String> = Vec::new();
+    if let Ok(rd) = std::fs::read_dir(&keypairs_dir) {
+        for entry in rd.flatten() {
+            if let Some(f) = entry.file_name().to_str() {
+                if entry.path().is_file() && !f.contains(".pub") {
+                    files.push(f.to_string());
+                }
+            }
+        }
+    }
+    let mut imported = 0;
+    for file in &files {
+        let (container, cmd) = match launch {
+            NodeLaunch::Docker(spec) => (
+                spec.container_name.clone(),
+                vec![
+                    "mina".into(),
+                    "accounts".into(),
+                    "import".into(),
+                    "--privkey-path".into(),
+                    format!("/local-network/network-keypairs/{file}"),
+                    "--config-directory".into(),
+                    "/config-directory".into(),
+                ],
+            ),
+            NodeLaunch::Native(spec) => (
+                name.to_string(),
+                vec![
+                    spec.binary.to_string_lossy().to_string(),
+                    "accounts".into(),
+                    "import".into(),
+                    "--privkey-path".into(),
+                    keypairs_dir.join(file).to_string_lossy().to_string(),
+                    "--config-directory".into(),
+                    config_dir(ctx, name).to_string_lossy().to_string(),
+                ],
+            ),
+        };
+        ctx.execution.exec(&container, &cmd).await.map_err(|e| RpcError {
+            code: NODE_ERROR,
+            message: format!("import '{file}': {e}"),
+        })?;
+        imported += 1;
+    }
+    Ok(serde_json::json!({ "imported": imported }))
+}
+
+/// `pg_dump` the archive database. Docker: `exec` into the postgres container;
+/// native: run `pg_dump` on the host against `127.0.0.1`.
+async fn dump_archive_data(ctx: &Arc<SupervisorCtx>) -> Result<serde_json::Value, RpcError> {
+    let pg = archive::PgConfig::default();
+    let (container, cmd) = match &ctx.execution {
+        Execution::Docker { .. } => (
+            format!("postgres-{}", ctx.network_id),
+            vec![
+                "pg_dump".into(),
+                "--insert".into(),
+                "-U".into(),
+                pg.user.to_string(),
+                pg.db.to_string(),
+            ],
+        ),
+        Execution::Native => (
+            String::new(),
+            vec![
+                "pg_dump".into(),
+                "-h".into(),
+                "127.0.0.1".into(),
+                "-p".into(),
+                pg.port.to_string(),
+                "-U".into(),
+                pg.user.to_string(),
+                "--insert".into(),
+                pg.db.to_string(),
+            ],
+        ),
+    };
+    let data = ctx.execution.exec(&container, &cmd).await.map_err(|e| RpcError {
+        code: NODE_ERROR,
+        message: format!("pg_dump: {e}"),
+    })?;
+    Ok(serde_json::json!({ "archive_data": data }))
+}
+
+/// Run the replayer against the archive DB (the caller sets the start slot in
+/// `replayer_input.json` first). Docker: `exec` `mina-replayer` in the archive-
+/// service container; native: run the co-located `mina-replayer` on the host.
+async fn run_replayer(
+    ctx: &Arc<SupervisorCtx>,
+    name: &str,
+) -> Result<serde_json::Value, RpcError> {
+    let svc = archive::archive_service_unit_name(name);
+    let Some(launch) = ctx.launches.get(&svc) else {
+        return Err(RpcError {
+            code: NODE_ERROR,
+            message: format!("no archive-service for node '{name}'"),
+        });
+    };
+    let (container, cmd) = match launch {
+        NodeLaunch::Docker(spec) => (
+            spec.container_name.clone(),
+            vec![
+                "mina-replayer".into(),
+                "--continue-on-error".into(),
+                "--input-file".into(),
+                "/local-network/replayer_input.json".into(),
+                "--archive-uri".into(),
+                archive::PgConfig::default().uri(&format!("postgres-{}", ctx.network_id)),
+                "--output-file".into(),
+                "/dev/null".into(),
+            ],
+        ),
+        NodeLaunch::Native(spec) => {
+            let bin = spec
+                .binary
+                .parent()
+                .map(|p| p.join("mina-replayer"))
+                .unwrap_or_else(|| PathBuf::from("mina-replayer"));
+            (
+                name.to_string(),
+                vec![
+                    bin.to_string_lossy().to_string(),
+                    "--continue-on-error".into(),
+                    "--input-file".into(),
+                    ctx.network_path
+                        .join("replayer_input.json")
+                        .to_string_lossy()
+                        .to_string(),
+                    "--archive-uri".into(),
+                    archive::PgConfig::default().uri("127.0.0.1"),
+                    "--output-file".into(),
+                    "/dev/null".into(),
+                ],
+            )
+        }
+    };
+    let logs = ctx.execution.exec(&container, &cmd).await.map_err(|e| RpcError {
+        code: NODE_ERROR,
+        message: format!("replayer: {e}"),
+    })?;
+    Ok(serde_json::json!({ "replayer_logs": logs }))
 }
 
 /// Launch one node (native or docker) and register it + its waiter task. Shared
@@ -1129,11 +1397,65 @@ mod tests {
         assert!(!process_alive(pid2));
     }
 
+    /// `node_dump_precomputed` reads the host file, and `node_start` with
+    /// `fresh_state` wipes the unit's config dir.
+    #[test]
+    fn supervise_node_fresh_state_and_dump_precomputed() {
+        let dir = tempdir::TempDir::new("supervisor-fresh-test").unwrap();
+        let socket_path = dir.path().join("supervisor.sock");
+        // network_path = socket parent ⇒ config dir at <net>/config-directory/<name>.
+        let cfg = dir.path().join("config-directory").join("sleeper");
+        std::fs::create_dir_all(&cfg).unwrap();
+        std::fs::write(cfg.join("precomputed_blocks.log"), "block1\nblock2").unwrap();
+
+        let plan = SupervisorPlan {
+            network_id: "test-net".into(),
+            socket_path: socket_path.clone(),
+            spec: BackendSpec::Native {
+                nodes: vec![NativeNodeSpec {
+                    name: "sleeper".into(),
+                    binary: "/bin/sleep".into(),
+                    args: vec!["300".into()],
+                    env: vec![],
+                    log_file: dir.path().join("sleeper.log"),
+                }],
+            },
+        };
+        let sup = std::thread::spawn(move || run_blocking(plan).unwrap());
+        let mut waited = 0;
+        while !socket_path.exists() && waited < 100 {
+            std::thread::sleep(std::time::Duration::from_millis(50));
+            waited += 1;
+        }
+        assert!(socket_path.exists());
+
+        let name = serde_json::json!({ "name": "sleeper" });
+        let dump = rpc_call(&socket_path, "node_dump_precomputed", name.clone()).unwrap();
+        assert_eq!(dump["precomputed_blocks"], "block1\nblock2");
+
+        rpc_call(&socket_path, "node_stop", name.clone()).unwrap();
+        std::thread::sleep(std::time::Duration::from_millis(200));
+        rpc_call(
+            &socket_path,
+            "node_start",
+            serde_json::json!({ "name": "sleeper", "fresh_state": true }),
+        )
+        .unwrap();
+        assert!(
+            !cfg.join("precomputed_blocks.log").exists(),
+            "fresh_state should have wiped the config dir"
+        );
+
+        rpc_call(&socket_path, "stop", serde_json::Value::Null).unwrap();
+        sup.join().unwrap();
+    }
+
     #[test]
     fn unknown_method_returns_error() {
         let ctx = Arc::new(SupervisorCtx {
             execution: Execution::Native,
             network_id: "t".into(),
+            network_path: std::path::PathBuf::from("/tmp"),
             launches: HashMap::new(),
         });
         let state = Arc::new(Mutex::new(SupervisorState::new()));

@@ -174,9 +174,9 @@ impl_display!(network::List);
 impl_display!(network::Delete);
 impl_display!(node::Start);
 impl_display!(node::Stop);
-impl_display!(node::ArchiveData);
 impl_display!(node::Logs);
 impl_display!(node::PrecomputedBlocks);
+impl_display!(node::ArchiveData);
 impl_display!(node::ReplayerLogs);
 impl_display!(Error);
 
