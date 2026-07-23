@@ -224,6 +224,7 @@ func (t *HardforkTest) validatePreForkOccupancyDiluted(analysis *BlockAnalysisRe
 	if err != nil {
 		return err
 	}
+	analysis.LazyWhalePks = lazyList
 	lazyPks := make(map[string]bool, len(lazyList))
 	for _, pk := range lazyList {
 		lazyPks[pk] = true
@@ -364,10 +365,7 @@ func (t *HardforkTest) validatePostForkUnstaking(analysis *BlockAnalysisResult, 
 	}
 
 	port := t.Config.AnyDaemon().Port(config.PORT_REST)
-	lazyPks, err := t.LazyWhalePks()
-	if err != nil {
-		return err
-	}
+	lazyPks := analysis.LazyWhalePks
 	for _, pk := range lazyPks {
 		delegate, err := t.Client.AccountDelegate(port, pk)
 		if err != nil {

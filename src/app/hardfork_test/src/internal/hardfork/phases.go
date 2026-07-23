@@ -228,11 +228,7 @@ func (t *HardforkTest) legacyFork(daemon config.DaemonInfo, analysis BlockAnalys
 	// executable above.
 	var extraArgs []string
 	if t.Config.UnstakingTest {
-		lazyPks, err := t.LazyWhalePks()
-		if err != nil {
-			return err
-		}
-		for _, pk := range lazyPks {
+		for _, pk := range analysis.LazyWhalePks {
 			extraArgs = append(extraArgs, "--unstake-pk", pk)
 		}
 	}

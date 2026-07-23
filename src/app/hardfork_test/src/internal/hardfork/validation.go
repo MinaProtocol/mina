@@ -29,6 +29,12 @@ type BlockAnalysisResult struct {
 	// them (only populated in unstaking test mode)
 	PreForkOccupancy  float64
 	PreForkStakeStats StakeStats
+	// Lazy whale public keys, classified once against the genesis ledger during
+	// the main network phase and reused by the fork phases (fork-config
+	// --unstake-pk args and the post-fork delegate check) rather than
+	// re-reading the key files and ledger each time. Only populated in
+	// unstaking test mode.
+	LazyWhalePks []string
 }
 
 func (t *HardforkTest) WaitForBestTip(port int, pred func(client.BlockData) bool, predDescription string, timeout time.Duration) error {
