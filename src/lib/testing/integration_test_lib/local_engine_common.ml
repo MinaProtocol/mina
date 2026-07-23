@@ -18,6 +18,34 @@ let node_env_vars =
   ; ("MINA_LIBP2P_PASS", "")
   ]
 
+(** A short random lowercase id, used to keep node/service and database names
+    unique across concurrent runs. Shared by both engines. *)
+let generate_random_id () =
+  let rand_char () =
+    let ascii_a = int_of_char 'a' in
+    let ascii_z = int_of_char 'z' in
+    char_of_int (ascii_a + Random.int (ascii_z - ascii_a + 1))
+  in
+  String.init 4 ~f:(fun _ -> rand_char ())
+
+(** Enforce that every named node in a test has a distinct name. Shared by both
+    engines' [Network_config.expand]. *)
+let validate_unique_node_names (test_config : Test_config.t) =
+  let names =
+    List.map test_config.block_producers
+      ~f:(fun (bp : Test_config.Block_producer_node.t) -> bp.node_name)
+    @
+    match test_config.snark_coordinator with
+    | None ->
+        []
+    | Some (sc : Test_config.Snark_coordinator_node.t) ->
+        [ sc.node_name ]
+  in
+  if List.contains_dup ~compare:String.compare names then
+    failwith
+      "All nodes in testnet must have unique names.  Check to make sure you \
+       are not using the same node_name more than once"
+
 module Ops = struct
   (** [run ~prog ~args] executes a command and returns its stdout, hard-erroring
       on failure. *)
