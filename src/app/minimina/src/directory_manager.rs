@@ -24,6 +24,9 @@ use std::{
 };
 
 pub const NETWORK_KEYPAIRS: &str = "network-keypairs";
+/// Name of a node's config directory — a subdirectory under the network path on
+/// the host, and the mount point (`/config-directory`) inside a container.
+pub const CONFIG_DIRECTORY: &str = "config-directory";
 const LIBP2P_KEYPAIRS: &str = "libp2p-keypairs";
 const MINIMINA_HOME: &str = "MINIMINA_HOME";
 
