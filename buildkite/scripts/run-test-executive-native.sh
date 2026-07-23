@@ -59,7 +59,7 @@ ARCHIVE_BIN="/usr/local/bin/mina-archive"
 echo "Verifying binary paths..."
 ls -la "$MINA_BIN" "$ARCHIVE_BIN"
 
-mina-test-executive app "$TEST_NAME" \
+mina-test-executive native "$TEST_NAME" \
   --mina-image "$MINA_BIN" \
   --archive-image "$ARCHIVE_BIN" \
   | tee "$TEST_NAME.local.test.log" \

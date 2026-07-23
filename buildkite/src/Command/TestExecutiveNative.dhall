@@ -6,19 +6,19 @@ let Cmd = ../Lib/Cmds.dhall
 
 let SelectFiles = ../Lib/SelectFiles.dhall
 
-in  { executeLocalApps =
+in  { executeNative =
             \(testName : Text)
         ->  \(dependsOn : List Command.TaggedKey.Type)
         ->  Command.build
               Command.Config::{
               , commands =
                 [ Cmd.run
-                    "MINA_DEB_CODENAME=bullseye ; source ./buildkite/scripts/export-git-env-vars.sh && ./buildkite/scripts/run-test-executive-local-apps.sh ${testName}"
+                    "MINA_DEB_CODENAME=bullseye ; source ./buildkite/scripts/export-git-env-vars.sh && ./buildkite/scripts/run-test-executive-native.sh ${testName}"
                 ]
               , artifact_paths =
                 [ SelectFiles.contains "${testName}*.local.test.log" ]
-              , label = "${testName} integration test local-apps"
-              , key = "integration-test-${testName}-local-apps"
+              , label = "${testName} integration test native"
+              , key = "integration-test-${testName}-native"
               , target = Size.Integration
               , depends_on = dependsOn
               }
