@@ -68,8 +68,14 @@ module Network_config = struct
     Local_engine_common.validate_unique_node_names test_config ;
     let genesis_ledger = Genesis_ledger.create test_config.genesis_ledger in
     let test_config =
-      (* Override proof level to match the compile-time proof level of the
-         binary, so that native tests work with any build profile *)
+      (* Force the test's proof level to match the proof level the binary was
+         compiled with. test_executive fails if they disagree, and unlike the
+         docker engine — which runs a binary from a profile-specific image whose
+         proof level already matches the test — the native engine runs whatever
+         local [mina] binary the caller points at (dev = Check, devnet/mainnet =
+         Full, lightnet = No_check). A binary's proof level is fixed at compile
+         time, so we adapt the test to the binary rather than the other way
+         round; this is what lets the same test run under any build profile. *)
       let compile_proof_level =
         match Genesis_constants.Compiled.proof_level with
         | Full ->
