@@ -1,3 +1,4 @@
+mod archive;
 mod cli;
 mod directory_manager;
 mod docker;
@@ -1104,11 +1105,21 @@ fn create_network_docker(
     network_id: &str,
     services: &[ServiceConfig],
 ) -> Result<()> {
-    if ServiceConfig::get_archive_node(services).is_some() {
-        warn!(
-            "Archive nodes are not yet supported on the bollard docker backend; \
-             the archive node will be skipped when the network starts."
-        );
+    // Archive: stage the schema SQLs where the postgres container's
+    // `/docker-entrypoint-initdb.d` picks them up — auto-applied on first boot,
+    // after `POSTGRES_DB` creates the `archive` database. Number-prefixed to
+    // preserve apply order (initdb.d runs its scripts alphabetically).
+    if let Some(archive_node) = ServiceConfig::get_archive_node(services) {
+        let network_path = directory_manager.network_path(network_id);
+        let initdb_dir = network_path.join("postgres-initdb");
+        std::fs::create_dir_all(&initdb_dir)?;
+        if let Some(scripts) = &archive_node.archive_schema_files {
+            for (i, script) in scripts.iter().enumerate() {
+                let fetched = fetch_schema(script, network_path.clone()).unwrap();
+                let fname = fetched.file_name().unwrap().to_str().unwrap();
+                std::fs::copy(&fetched, initdb_dir.join(format!("{:02}_{fname}", i + 1)))?;
+            }
+        }
     }
     if let Err(e) = directory_manager.save_network_info(network_id, services) {
         error!("Error generating network.json: {e}");
@@ -1130,44 +1141,13 @@ fn create_network_native(
     native.create(None)?;
     info!("Successfully prepared native network '{network_id}'!");
 
-    // Handle archive node setup with local postgres
+    // Archive: initialize an ephemeral postgres cluster under the network dir and
+    // apply the schema now, so at `network start` the supervisor just runs
+    // `postgres` on a ready datadir (no dependency on a system postgres server).
     if let Some(archive_node) = ServiceConfig::get_archive_node(services) {
-        default::LedgerGenerator::generate_replayer_input(
-            &directory_manager.network_path(network_id),
-        )?;
-
-        // Create database using local psql
-        info!("Creating archive database using local postgres...");
-        let createdb_out = std::process::Command::new("createdb")
-            .args(["-U", "postgres", "archive"])
-            .output()?;
-
-        if !createdb_out.status.success() {
-            warn!(
-                "createdb may have failed (database might already exist): {}",
-                String::from_utf8_lossy(&createdb_out.stderr)
-            );
-        }
-
-        // Apply schema scripts directly via psql
-        if let Some(scripts) = &archive_node.archive_schema_files {
-            let network_path = directory_manager.network_path(network_id);
-            for script in scripts {
-                let file_path = fetch_schema(script, network_path.clone()).unwrap();
-                info!("Applying schema script: {}", file_path.display());
-                let psql_out = std::process::Command::new("psql")
-                    .args(["-U", "postgres", "-d", "archive", "-f"])
-                    .arg(&file_path)
-                    .output()?;
-
-                if !psql_out.status.success() {
-                    warn!(
-                        "psql schema application may have failed: {}",
-                        String::from_utf8_lossy(&psql_out.stderr)
-                    );
-                }
-            }
-        }
+        let network_path = directory_manager.network_path(network_id);
+        default::LedgerGenerator::generate_replayer_input(&network_path)?;
+        init_ephemeral_postgres(&network_path, network_id, archive_node)?;
     }
 
     // generate network.json and services.json
@@ -1180,6 +1160,119 @@ fn create_network_native(
     }
 
     println!("{}", output::generate_network_info(services, network_id));
+    Ok(())
+}
+
+/// Initialize an ephemeral postgres cluster for native archive: `initdb` a
+/// datadir under the network path, briefly start it, `createdb` + apply the
+/// archive schema, then stop it. At `network start` the supervisor runs
+/// `postgres` on this ready datadir. Requires the postgres client/server
+/// binaries on PATH (`initdb`/`pg_ctl`/`createdb`/`psql`) — no running system
+/// postgres server needed.
+fn init_ephemeral_postgres(
+    network_path: &Path,
+    network_id: &str,
+    archive_node: &ServiceConfig,
+) -> Result<()> {
+    let pg = archive::PgConfig::default();
+    let pgdata = network_path.join("pgdata");
+    let pgdata_str = pgdata.to_str().unwrap();
+    let port = pg.port.to_string();
+    // Short unix-socket dir (network dirs can exceed the ~107-char limit).
+    let socket_dir = archive::postgres_socket_dir(network_id);
+    std::fs::create_dir_all(&socket_dir)?;
+    let sockdir = socket_dir.to_str().unwrap();
+
+    info!("Initializing ephemeral postgres cluster at '{}'", pgdata.display());
+    // `--locale=C` so initdb doesn't depend on the ambient LANG/LC_* being valid.
+    let initdb = std::process::Command::new("initdb")
+        .args([
+            "-D",
+            pgdata_str,
+            "-U",
+            pg.user,
+            "-A",
+            "trust",
+            "--locale=C",
+            "-E",
+            "UTF8",
+        ])
+        .output()
+        .map_err(|e| Error::other(format!("failed to run 'initdb' (is postgres on PATH?): {e}")))?;
+    if !initdb.status.success() {
+        return exit_with(format!(
+            "initdb failed: {}",
+            String::from_utf8_lossy(&initdb.stderr)
+        ));
+    }
+
+    let start = std::process::Command::new("pg_ctl")
+        .args([
+            "-D",
+            pgdata_str,
+            "-o",
+            &format!("-p {port} -k {sockdir} -c listen_addresses=127.0.0.1"),
+            "-w",
+            "start",
+        ])
+        .output()?;
+    if !start.status.success() {
+        return exit_with(format!(
+            "pg_ctl start failed: {}",
+            String::from_utf8_lossy(&start.stderr)
+        ));
+    }
+
+    // createdb + schema against the temp server; always stop it afterwards.
+    let init = init_archive_db(network_path, archive_node, &port);
+    let _ = std::process::Command::new("pg_ctl")
+        .args(["-D", pgdata_str, "-w", "stop"])
+        .output();
+    init
+}
+
+/// Create the `archive` database and apply its schema against a running
+/// postgres on `127.0.0.1:<port>`.
+fn init_archive_db(network_path: &Path, archive_node: &ServiceConfig, port: &str) -> Result<()> {
+    let pg = archive::PgConfig::default();
+    let createdb = std::process::Command::new("createdb")
+        .args(["-h", "127.0.0.1", "-p", port, "-U", pg.user, pg.db])
+        .output()?;
+    if !createdb.status.success() {
+        warn!(
+            "createdb may have failed (database might already exist): {}",
+            String::from_utf8_lossy(&createdb.stderr)
+        );
+    }
+
+    if let Some(scripts) = &archive_node.archive_schema_files {
+        for script in scripts {
+            let file_path = fetch_schema(script, network_path.to_path_buf()).unwrap();
+            info!("Applying archive schema: {}", file_path.display());
+            let psql = std::process::Command::new("psql")
+                .args([
+                    "-h",
+                    "127.0.0.1",
+                    "-p",
+                    port,
+                    "-U",
+                    pg.user,
+                    "-d",
+                    pg.db,
+                    "-v",
+                    "ON_ERROR_STOP=1",
+                    "-f",
+                ])
+                .arg(&file_path)
+                .output()?;
+            if !psql.status.success() {
+                warn!(
+                    "psql schema application may have failed: {}",
+                    String::from_utf8_lossy(&psql.stderr)
+                );
+            }
+        }
+    }
     Ok(())
 }
 

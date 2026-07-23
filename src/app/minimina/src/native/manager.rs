@@ -1,3 +1,4 @@
+use crate::archive;
 use crate::directory_manager::CONFIG_DIRECTORY;
 use crate::native::port_manager;
 use crate::native::process_tracker::{ProcessRecord, ProcessTracker};
@@ -92,6 +93,40 @@ impl NativeManager {
 
         let network_path_str = self.network_path.to_str().unwrap();
         let mut nodes = Vec::new();
+
+        // Archive: an ephemeral postgres process (its cluster is `initdb`'d and
+        // schema-applied at `network create`) + the mina-archive service, both
+        // launched before the daemons. The archive-node daemon itself is emitted
+        // by the loop below (build_command adds `-archive-address 127.0.0.1:PORT`).
+        if let Some(archive) = ServiceConfig::get_archive_node(services) {
+            let archive_port = archive.archive_port.unwrap_or(archive::DEFAULT_ARCHIVE_PORT);
+            let pgdata = self.network_path.join("pgdata");
+            let socket_dir = archive::postgres_socket_dir(network_id);
+            fs::create_dir_all(&socket_dir)?;
+            nodes.push(NativeNodeSpec {
+                name: archive::postgres_unit_name(),
+                binary: PathBuf::from("postgres"),
+                args: archive::postgres_server_args(
+                    pgdata.to_str().unwrap(),
+                    socket_dir.to_str().unwrap(),
+                ),
+                env: vec![],
+                log_file: self.logs_dir().join("postgres.log"),
+            });
+
+            let svc_name = archive::archive_service_unit_name(&archive.service_name);
+            nodes.push(NativeNodeSpec {
+                name: svc_name.clone(),
+                binary: self.bin_path.join("mina-archive"),
+                args: archive::archive_service_args("localhost", archive_port),
+                env: vec![
+                    ("MINA_PRIVKEY_PASS".into(), "naughty blue worm".into()),
+                    ("MINA_LIBP2P_PASS".into(), "naughty blue worm".into()),
+                ],
+                log_file: self.logs_dir().join(format!("{svc_name}.log")),
+            });
+        }
+
         for service in services {
             if service.service_type == ServiceType::UptimeServiceBackend {
                 warn!(

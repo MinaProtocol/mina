@@ -137,6 +137,30 @@ impl ServiceConfig {
         base_command.join(" ")
     }
 
+    /// Generate the command for the archive-node **daemon** — a normal mina
+    /// daemon that forwards blocks to the archive-service at
+    /// `<archive_service_host>:<archive_port>`.
+    pub fn generate_archive_command(&self, archive_service_host: String) -> String {
+        assert_eq!(self.service_type, ServiceType::ArchiveNode);
+        let mut base_command = self.generate_base_command();
+
+        // Handling multiple peers
+        self.add_peers_command(&mut base_command);
+
+        if let Some(archive_port) = &self.archive_port {
+            base_command.push("-archive-address".to_string());
+            base_command.push(format!("{}:{}", archive_service_host, archive_port));
+        } else {
+            warn!(
+                "No archive port provided for archive node '{}'. This is not recommended.",
+                self.service_name
+            );
+        }
+
+        self.add_libp2p_command(&mut base_command);
+        base_command.join(" ")
+    }
+
     /// Generate command for block producer node
     pub fn generate_block_producer_command(
         &self,
