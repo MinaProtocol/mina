@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
 use crate::{
-    docker::compose::CONFIG_DIRECTORY, genesis_ledger::GENESIS_LEDGER_JSON, topology::GitBuild,
+    directory_manager::CONFIG_DIRECTORY, genesis_ledger::GENESIS_LEDGER_JSON, topology::GitBuild,
 };
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Clone, Default)]
@@ -132,27 +132,6 @@ impl ServiceConfig {
 
         let mut base_command = self.generate_base_command();
         base_command.push("-seed".to_string());
-
-        self.add_libp2p_command(&mut base_command);
-        base_command.join(" ")
-    }
-
-    pub fn generate_archive_command(&self, archive_service_host: String) -> String {
-        assert_eq!(self.service_type, ServiceType::ArchiveNode);
-        let mut base_command = self.generate_base_command();
-
-        // Handling multiple peers
-        self.add_peers_command(&mut base_command);
-
-        if let Some(archive_port) = &self.archive_port {
-            base_command.push("-archive-address".to_string());
-            base_command.push(format!("{}:{}", archive_service_host, archive_port));
-        } else {
-            warn!(
-                "No archive port provided for archive node '{}'. This is not recommended.",
-                self.service_name
-            );
-        }
 
         self.add_libp2p_command(&mut base_command);
         base_command.join(" ")

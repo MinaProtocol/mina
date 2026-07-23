@@ -1,4 +1,4 @@
-use crate::docker::compose::CONFIG_DIRECTORY;
+use crate::directory_manager::CONFIG_DIRECTORY;
 use crate::native::port_manager;
 use crate::native::process_tracker::{ProcessRecord, ProcessTracker};
 use crate::service::{ServiceConfig, ServiceType};
