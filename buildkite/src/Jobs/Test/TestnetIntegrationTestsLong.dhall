@@ -39,5 +39,10 @@ in  Pipeline.build
           , PipelineTag.Type.Stable
           ]
         }
-      , steps = [ TestExecutive.executeLocal "post-hard-fork" dependsOn ]
+      , steps =
+        [ TestExecutive.execute
+            TestExecutive.Engine.Docker
+            "post-hard-fork"
+            dependsOn
+        ]
       }
