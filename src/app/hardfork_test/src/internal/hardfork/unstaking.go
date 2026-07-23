@@ -228,6 +228,18 @@ func (t *HardforkTest) validatePreForkOccupancyDiluted(analysis *BlockAnalysisRe
 	}
 	t.Logger.Info("Active-producer cross-check passed: %d running producers all authored blocks in the pre-fork window", len(producerPks))
 
+	// The whole pre-fork analysis assumes the measurement window stays inside the
+	// genesis-anchored epoch (epoch 0): the VRF samples the genesis staking-epoch
+	// ledger for every slot, the fill model is computed against that ledger, and
+	// the total-currency cross-check below compares it to the genesis ledger
+	// file. If slot_tx_end were pushed past an epoch boundary the staking ledger
+	// would roll to a later, coinbase-grown snapshot and those comparisons would
+	// silently be against the wrong ledger. Assert the invariant rather than only
+	// relying on slot_tx_end < slots_per_epoch holding by configuration.
+	if txEndEpoch := analysis.Consensus.LastBlockBeforeTxEnd.Epoch; txEndEpoch != 0 {
+		return fmt.Errorf("last block before tx-end is in epoch %d, not the genesis epoch 0; the pre-fork occupancy model and total-currency cross-check assume the measurement window stays within epoch 0 (slot_tx_end must be below slots_per_epoch)", txEndEpoch)
+	}
+
 	sActive, err := preForkActiveShare(stats)
 	if err != nil {
 		return err
@@ -253,6 +265,12 @@ func (t *HardforkTest) validatePreForkOccupancyDiluted(analysis *BlockAnalysisRe
 	// construction, so this comparison stays valid regardless of run length;
 	// a live query at chain-end could instead read a later, coinbase-grown
 	// staking-epoch snapshot if the run ever crossed an epoch boundary.
+	//
+	// This is a tolerance comparison, not exact equality or a ledger-hash
+	// identity: the daemon's staking-epoch ledger differs from genesis_ledger.json
+	// by the injected genesis-winner account (see totalCurrencyTolerance for the
+	// provenance), so the two account sets — and their Merkle roots — can never
+	// match exactly.
 	consensusTotal := analysis.GenesisBlock.StakingLedgerTotalCurrency
 	t.Logger.Info("Staking epoch ledger total currency per consensus: %d nanomina (genesis ledger file: %d nanomina)", consensusTotal, stats.TotalCurrency)
 	if math.Abs(float64(consensusTotal)-float64(stats.TotalCurrency)) > totalCurrencyTolerance*float64(consensusTotal) {
