@@ -13,10 +13,22 @@ import (
 	"github.com/MinaProtocol/mina/src/app/hardfork_test/src/internal/currency"
 )
 
-// Slot fill rate f hardcoded in the daemon (src/lib/consensus/vrf/consensus_vrf.ml),
-// independent of build profile. A producer holding fraction s of the VRF
-// denominator wins a slot with probability 1 - (1-f)^s; VRF evaluations are
-// independent across producers, so P(slot filled) = 1 - (1-f)^(sum of s_i).
+// Slot fill rate f, a compile-time consensus constant in the daemon, not
+// exposed by any daemon query and independent of build profile — so it is
+// mirrored here by hand. Source of truth (grep it if this copy is ever
+// suspect): src/lib/consensus/vrf/consensus_vrf.ml, module Threshold,
+//
+//	let f = Bignum.(of_int 3 / of_int 4)
+//
+// (= 0.75, valid while the sibling constant c stays at 2^0, which the same file
+// documents as production behavior). A producer holding fraction s of the VRF
+// denominator wins a slot with probability 1 - (1-f)^s; VRF
+// evaluations are independent across producers, so
+// P(slot filled) = 1 - (1-f)^(sum of s_i). There is no cheap runtime
+// cross-check for this copy, but the post-fork occupancy is itself an indirect
+// one: with the lazy whales unstaked s_active -> 1, so the modeled fill
+// saturates to f and the post-fork band (centered on ~f) would flag a stale
+// value.
 const vrfFillFraction = 0.75
 
 // occupancyBandZ is the confidence multiplier for the derived occupancy margin:
@@ -32,10 +44,20 @@ const preForkMinOccupancy = 0.05
 
 // Relative tolerance when cross-checking the file-derived total currency
 // against the staking epoch ledger's total currency reported by the daemon.
-// The two may differ by accounts the daemon injects on top of the configured
-// genesis (e.g. the genesis winner, ~1000 MINA against ~80M total); a mismatch
-// beyond this tolerance means the genesis ledger file no longer describes the
-// ledger the VRF samples.
+// At proof_level=full (the local-network default) the daemon injects the
+// genesis-winner account on top of the configured genesis, so its total exceeds
+// the file total by that account's balance. That balance is 1000 *nanomina*
+// (0.000001 MINA) — src/lib/consensus/proof_of_stake.ml, genesis_winner_account,
+//
+//	Currency.Balance.of_nanomina_int_exn 1000
+//
+// injected per src/lib/genesis_ledger_helper/genesis_ledger_helper.ml when
+// proof_level=Full and add_genesis_winner is unset. So the real discrepancy is
+// a fixed, negligible amount and this tolerance is generous slack, not a figure
+// sized to it. A mismatch beyond it means the genesis ledger file no longer
+// describes the ledger the VRF samples. Kept a named constant rather than a
+// config knob: the discrepancy is a fixed protocol artifact, not a per-run
+// tuning parameter.
 const totalCurrencyTolerance = 0.001
 
 // StakeStats summarizes the genesis ledger from the VRF's point of view.
