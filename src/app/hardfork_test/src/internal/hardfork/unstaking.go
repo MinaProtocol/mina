@@ -209,8 +209,14 @@ func ComputeStakeStats(genesisLedgerPath string, runningProducerPks, lazyPks map
 
 // validatePreForkOccupancyDiluted asserts that the pre-fork slot occupancy is
 // low because the lazy whales dilute the VRF denominator, while the network is
-// still alive. The measured occupancy is recorded on the analysis result for
-// the post-fork comparison.
+// still alive. This is *behavioral corroboration* that the dilution took
+// effect, not the primary proof — the exact conservation identity checked in
+// validatePostForkUnstaking is the proof. Occupancy is a probabilistic
+// measurement over a single window, so if these bounds ever flake the fix is to
+// widen the measurement window or sample more (the band already tracks the
+// window length), never to loosen them toward the deterministic identity. The
+// measured occupancy is recorded on the analysis result for the post-fork
+// comparison.
 func (t *HardforkTest) validatePreForkOccupancyDiluted(analysis *BlockAnalysisResult) error {
 	occ, err := t.ComputeSlotOccupancy(analysis.GenesisBlock, analysis.Consensus.LastBlockBeforeTxEnd, t.Config.SlotTxEnd)
 	if err != nil {
@@ -305,7 +311,7 @@ func (t *HardforkTest) validatePreForkOccupancyDiluted(analysis *BlockAnalysisRe
 	t.Logger.Info("Genesis stake: total currency %d, active producer stake %d, lazy stake %d (lazy portion %f)",
 		stats.TotalCurrency, stats.ActiveProducerStake, stats.LazyStake,
 		float64(stats.LazyStake)/float64(stats.TotalCurrency))
-	t.Logger.Info("Pre-fork slot occupancy: %f (model expects %f, band [%f, %f] over %d slots)",
+	t.Logger.Info("Pre-fork slot occupancy: %f (corroborating dilution; model expects %f, band [%f, %f] over %d slots)",
 		occ, band.Expected, band.Lower, band.Upper, nPre)
 
 	// Liveness floor: a totally dead network is a distinct failure from a model
@@ -351,10 +357,12 @@ func UnstakedTotal(preForkGenesis, forkGenesis client.BlockData) (currency.Nanom
 
 // validatePostForkUnstaking asserts that the fork actually removed the lazy
 // whales from the VRF denominator, then that slot occupancy recovered
-// accordingly. The deterministic checks come first: the conservation identity
-// (unstaked amount at fork genesis == the lazy whales' balances, exact) and
-// per-account delegate clearing; the occupancy comparisons then confirm the
-// behavioral consequence.
+// accordingly. The deterministic checks come first and ARE the proof: the
+// conservation identity (unstaked amount at fork genesis == the lazy whales'
+// balances, exact) and per-account delegate clearing. The occupancy
+// comparisons that follow only corroborate the behavioral consequence; being a
+// probabilistic measurement, a flaky occupancy check is a signal to widen the
+// window or add sampling, not a licence to relax the exact identity above.
 func (t *HardforkTest) validatePostForkUnstaking(analysis *BlockAnalysisResult, commonGenesisBlock, bestTip client.BlockData) error {
 	unstaked, err := UnstakedTotal(analysis.GenesisBlock, commonGenesisBlock)
 	if err != nil {
@@ -403,7 +411,7 @@ func (t *HardforkTest) validatePostForkUnstaking(analysis *BlockAnalysisResult, 
 		return fmt.Errorf("failed to compute post-fork occupancy band: %w", err)
 	}
 
-	t.Logger.Info("Post-fork slot occupancy: %f (pre-fork was %f; model expects %f, lower bound %f over %d slots)",
+	t.Logger.Info("Post-fork slot occupancy: %f (corroborating the conservation identity; pre-fork was %f; model expects %f, lower bound %f over %d slots)",
 		postOcc, analysis.PreForkOccupancy, postBand.Expected, postBand.Lower, nPost)
 
 	if postOcc <= analysis.PreForkOccupancy {
