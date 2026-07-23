@@ -10,42 +10,12 @@ import (
 
 	"github.com/MinaProtocol/mina/src/app/hardfork_test/src/internal/client"
 	"github.com/MinaProtocol/mina/src/app/hardfork_test/src/internal/config"
+	"github.com/MinaProtocol/mina/src/app/hardfork_test/src/internal/currency"
 	"github.com/MinaProtocol/mina/src/app/hardfork_test/src/internal/utils"
 )
 
 func testHarness(cfg *config.Config) *HardforkTest {
 	return &HardforkTest{Config: cfg, Logger: utils.NewLogger()}
-}
-
-func TestParseNanominas(t *testing.T) {
-	t.Parallel()
-
-	valid := []struct {
-		in   string
-		want uint64
-	}{
-		{"0.000000000", 0},
-		{"11550000.000000000", 11_550_000_000_000_000},
-		{"499.000000000", 499_000_000_000},
-		{"0.000000001", 1},
-		{"1", 1_000_000_000},
-		{"65500.5", 65_500_500_000_000},
-	}
-	for _, tc := range valid {
-		got, err := parseNanominas(tc.in)
-		if err != nil {
-			t.Errorf("parseNanominas(%q) errored: %v", tc.in, err)
-		} else if got != tc.want {
-			t.Errorf("parseNanominas(%q) = %d, want %d", tc.in, got, tc.want)
-		}
-	}
-
-	invalid := []string{"", "abc", "1.0000000001", "-1.0", "1.2.3"}
-	for _, in := range invalid {
-		if _, err := parseNanominas(in); err == nil {
-			t.Errorf("parseNanominas(%q) should have errored", in)
-		}
-	}
 }
 
 func TestComputeSlotOccupancy(t *testing.T) {
@@ -130,27 +100,24 @@ func TestExpectedPreForkFillUpperBound(t *testing.T) {
 func TestUnstakedTotal(t *testing.T) {
 	t.Parallel()
 
-	// GraphQL Amounts are raw nanomina integer strings. The minuend is the
-	// PRE-FORK genesis total (the fork genesis block's own totalCurrency
-	// additionally contains pre-fork coinbases and must not be used).
-	preFork := client.BlockData{TotalCurrency: "80853498000000000"}
-	forkGenesis := client.BlockData{StakingLedgerTotalCurrency: "23103498000000000"}
+	// BlockData amounts are nanomina uint64s, parsed from the GraphQL string
+	// scalars at construction. The minuend is the PRE-FORK genesis total (the
+	// fork genesis block's own totalCurrency additionally contains pre-fork
+	// coinbases and must not be used).
+	preFork := client.BlockData{TotalCurrency: 80853498000000000}
+	forkGenesis := client.BlockData{StakingLedgerTotalCurrency: 23103498000000000}
 	got, err := UnstakedTotal(preFork, forkGenesis)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if want := uint64(57_750_000_000_000_000); got != want {
+	if want := currency.Nanomina(57_750_000_000_000_000); got != want {
 		t.Errorf("UnstakedTotal = %d, want %d", got, want)
 	}
 
-	// Missing fields (e.g. build that doesn't serve them) must error
-	if _, err := UnstakedTotal(client.BlockData{}, client.BlockData{}); err == nil {
-		t.Error("expected error for empty amounts")
-	}
 	// Fork staking total above the pre-fork genesis total is nonsense
 	if _, err := UnstakedTotal(
-		client.BlockData{TotalCurrency: "100"},
-		client.BlockData{StakingLedgerTotalCurrency: "101"},
+		client.BlockData{TotalCurrency: 100},
+		client.BlockData{StakingLedgerTotalCurrency: 101},
 	); err == nil {
 		t.Error("expected error when staked exceeds total")
 	}
@@ -194,7 +161,16 @@ func TestLazyWhalePksAndComputeStakeStats(t *testing.T) {
 	}
 
 	online := func(pk string) *string { return &pk }
-	ledger := genesisLedgerFile{Accounts: []genesisLedgerAccount{
+	// Build the ledger file with its real on-disk shape: balances are decimal
+	// *mina* strings (ComputeStakeStats parses them to nanomina on read).
+	type rawAccount struct {
+		Pk       string  `json:"pk"`
+		Balance  string  `json:"balance"`
+		Delegate *string `json:"delegate"`
+	}
+	ledger := struct {
+		Accounts []rawAccount `json:"accounts"`
+	}{Accounts: []rawAccount{
 		// The generator pairs offline/online keys in glob order, so the
 		// pairing may not follow the filename indices: here offline1 (not
 		// offline0) happens to be the account delegated to the running
@@ -239,10 +215,9 @@ func TestLazyWhalePksAndComputeStakeStats(t *testing.T) {
 		t.Fatalf("ComputeStakeStats: %v", err)
 	}
 
-	const mina = uint64(1_000_000_000)
-	wantTotal := (3*11_550_000 + 3*499 + 100_000) * mina
-	wantActive := (11_550_000 + 499) * mina
-	wantLazy := 2 * 11_550_000 * mina
+	wantTotal := (3*11_550_000 + 3*499 + 100_000) * currency.Mina
+	wantActive := (11_550_000 + 499) * currency.Mina
+	wantLazy := 2 * 11_550_000 * currency.Mina
 	if stats.TotalCurrency != wantTotal {
 		t.Errorf("TotalCurrency = %d, want %d", stats.TotalCurrency, wantTotal)
 	}

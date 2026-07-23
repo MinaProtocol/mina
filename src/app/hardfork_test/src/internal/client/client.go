@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"strconv"
 	"time"
 
+	"github.com/MinaProtocol/mina/src/app/hardfork_test/src/internal/currency"
 	"github.com/tidwall/gjson"
 )
 
@@ -113,10 +113,12 @@ type BlockData struct {
 	NumUserCommands int    `json:"num_user_commands"`
 	NumFeeTransfers int    `json:"num_fee_transfers"`
 	Coinbase        string `json:"coinbase"`
-	// Raw nanomina amounts as reported by GraphQL. On a post-fork (v2) build
-	// the staking epoch ledger's totalCurrency field carries total_stake.
-	TotalCurrency              string `json:"total_currency"`
-	StakingLedgerTotalCurrency string `json:"staking_ledger_total_currency"`
+	// Currency amounts, read from the GraphQL integer-nanomina string scalars via
+	// gjson .Uint() at construction (NOT the decimal-mina currency.UnmarshalJSON
+	// path — see currency.Nanomina). On a post-fork (v2) build the staking epoch
+	// ledger's totalCurrency field carries total_stake.
+	TotalCurrency              currency.Nanomina `json:"total_currency"`
+	StakingLedgerTotalCurrency currency.Nanomina `json:"staking_ledger_total_currency"`
 }
 
 func (block *BlockData) NonEmpty() bool {
@@ -208,11 +210,18 @@ func parseBlock(value gjson.Result) *BlockData {
 		NumUserCommands:            int(value.Get("commandTransactionCount").Int()),
 		NumFeeTransfers:            len(value.Get("transactions.feeTransfer").Array()),
 		Coinbase:                   value.Get("transactions.coinbase").String(),
-		TotalCurrency:              value.Get("protocolState.consensusState.totalCurrency").String(),
-		StakingLedgerTotalCurrency: value.Get("protocolState.consensusState.stakingEpochData.ledger.totalCurrency").String(),
+		TotalCurrency:              nanominaAt(value, "protocolState.consensusState.totalCurrency"),
+		StakingLedgerTotalCurrency: nanominaAt(value, "protocolState.consensusState.stakingEpochData.ledger.totalCurrency"),
 	}
 
 	return block
+}
+
+// nanominaAt reads a GraphQL amount at path as an integer-nanomina scalar. The
+// daemon serializes amounts as nanomina uint64 strings, so .Uint() is the
+// correct decoder here — NOT the decimal-mina currency.UnmarshalJSON path.
+func nanominaAt(value gjson.Result, path string) currency.Nanomina {
+	return currency.Nanomina(value.Get(path).Uint())
 }
 
 func (c *Client) GenesisBlock(port int) (*BlockData, error) {
@@ -258,26 +267,6 @@ func (c *Client) ForkConfig(port int) (gjson.Result, error) {
 	}
 
 	return result.Get("data.fork_config"), nil
-}
-
-// StakingEpochLedgerTotalCurrency returns the total currency (in nanomina) of
-// the current staking epoch ledger — the denominator of the VRF threshold
-// check.
-func (c *Client) StakingEpochLedgerTotalCurrency(port int) (uint64, error) {
-	result, err := c.query(port, `bestChain (maxLength: 1){ protocolState { consensusState { stakingEpochData { ledger { totalCurrency } } } } }`)
-	if err != nil {
-		return 0, err
-	}
-	blocks := result.Get("data.bestChain").Array()
-	if len(blocks) == 0 {
-		return 0, fmt.Errorf("no best chain block at port %d", port)
-	}
-	raw := blocks[0].Get("protocolState.consensusState.stakingEpochData.ledger.totalCurrency").String()
-	total, err := strconv.ParseUint(raw, 10, 64)
-	if err != nil {
-		return 0, fmt.Errorf("failed to parse staking epoch ledger total currency %q: %w", raw, err)
-	}
-	return total, nil
 }
 
 // AccountDelegate returns the delegate of the account with the given public

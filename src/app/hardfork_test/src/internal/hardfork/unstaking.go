@@ -6,11 +6,11 @@ import (
 	"math"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 
 	"github.com/MinaProtocol/mina/src/app/hardfork_test/src/internal/client"
 	"github.com/MinaProtocol/mina/src/app/hardfork_test/src/internal/config"
+	"github.com/MinaProtocol/mina/src/app/hardfork_test/src/internal/currency"
 )
 
 // Slot fill rate f hardcoded in the daemon (src/lib/consensus/vrf/consensus_vrf.ml),
@@ -37,15 +37,14 @@ const preForkMinOccupancy = 0.05
 // ledger the VRF samples.
 const totalCurrencyTolerance = 0.001
 
-// StakeStats summarizes the genesis ledger from the VRF's point of view, in
-// nanomina
+// StakeStats summarizes the genesis ledger from the VRF's point of view.
 type StakeStats struct {
 	// Sum of all account balances: the pre-fork VRF denominator
-	TotalCurrency uint64
+	TotalCurrency currency.Nanomina
 	// Sum of balances delegated to a producer key with a running daemon
-	ActiveProducerStake uint64
+	ActiveProducerStake currency.Nanomina
 	// Sum of the lazy whale account balances
-	LazyStake uint64
+	LazyStake currency.Nanomina
 }
 
 // LazyWhalePks returns the public keys of the lazy whale offline accounts:
@@ -127,9 +126,9 @@ func readPubkeyFile(path string) (string, error) {
 }
 
 type genesisLedgerAccount struct {
-	Pk       string  `json:"pk"`
-	Balance  string  `json:"balance"`
-	Delegate *string `json:"delegate"`
+	Pk       string            `json:"pk"`
+	Balance  currency.Nanomina `json:"balance"`
+	Delegate *string           `json:"delegate"`
 }
 
 type genesisLedgerFile struct {
@@ -165,10 +164,7 @@ func ComputeStakeStats(genesisLedgerPath string, runningProducerPks, lazyPks map
 	}
 
 	for _, account := range ledger.Accounts {
-		balance, err := parseNanominas(account.Balance)
-		if err != nil {
-			return stats, fmt.Errorf("account %s: %w", account.Pk, err)
-		}
+		balance := account.Balance
 		stats.TotalCurrency += balance
 
 		delegate := account.Pk
@@ -184,29 +180,6 @@ func ComputeStakeStats(genesisLedgerPath string, runningProducerPks, lazyPks map
 	}
 
 	return stats, nil
-}
-
-// parseNanominas parses a decimal mina amount as emitted by
-// generate-mina-local-network-ledger.py (e.g. "11550000.000000000") into
-// nanomina
-func parseNanominas(balance string) (uint64, error) {
-	whole, frac, found := strings.Cut(balance, ".")
-	if !found {
-		frac = "0"
-	}
-	wholeN, err := strconv.ParseUint(whole, 10, 64)
-	if err != nil {
-		return 0, fmt.Errorf("invalid balance %q: %w", balance, err)
-	}
-	if len(frac) > 9 {
-		return 0, fmt.Errorf("invalid balance %q: more than 9 fractional digits", balance)
-	}
-	frac = frac + strings.Repeat("0", 9-len(frac))
-	fracN, err := strconv.ParseUint(frac, 10, 64)
-	if err != nil {
-		return 0, fmt.Errorf("invalid balance %q: %w", balance, err)
-	}
-	return wholeN*1_000_000_000 + fracN, nil
 }
 
 // validatePreForkOccupancyDiluted asserts that the pre-fork slot occupancy is
@@ -247,10 +220,15 @@ func (t *HardforkTest) validatePreForkOccupancyDiluted(analysis *BlockAnalysisRe
 	// assumption that it is the staking epoch ledger the VRF samples during
 	// the whole measurement window (epoch 0). Cross-check the file-derived
 	// total against what consensus actually reports.
-	consensusTotal, err := t.Client.StakingEpochLedgerTotalCurrency(t.Config.AnyDaemon().Port(config.PORT_REST))
-	if err != nil {
-		return fmt.Errorf("failed to query staking epoch ledger total currency: %w", err)
-	}
+	//
+	// Read that total off the genesis block already in hand
+	// (analysis.GenesisBlock, agreed across the network by
+	// GenesisBlockAcrossNetwork) rather than a live bestChain query. The
+	// genesis block's staking epoch ledger is the epoch-0 snapshot by
+	// construction, so this comparison stays valid regardless of run length;
+	// a live query at chain-end could instead read a later, coinbase-grown
+	// staking-epoch snapshot if the run ever crossed an epoch boundary.
+	consensusTotal := analysis.GenesisBlock.StakingLedgerTotalCurrency
 	t.Logger.Info("Staking epoch ledger total currency per consensus: %d nanomina (genesis ledger file: %d nanomina)", consensusTotal, stats.TotalCurrency)
 	if math.Abs(float64(consensusTotal)-float64(stats.TotalCurrency)) > totalCurrencyTolerance*float64(consensusTotal) {
 		return fmt.Errorf("genesis ledger file total currency (%d nanomina) disagrees with the staking epoch ledger total currency (%d nanomina) by more than %.2f%%; the fill-rate bound would be computed against the wrong ledger", stats.TotalCurrency, consensusTotal, totalCurrencyTolerance*100)
@@ -281,17 +259,9 @@ func (t *HardforkTest) validatePreForkOccupancyDiluted(analysis *BlockAnalysisRe
 // totalCurrency must NOT be used as the minuend — it describes the staged
 // ledger at the fork block, which additionally contains the pre-fork coinbase
 // supply increase.
-func UnstakedTotal(preForkGenesis, forkGenesis client.BlockData) (uint64, error) {
-	// GraphQL Amount fields are raw nanomina integer strings (unlike the
-	// decimal-mina balances in the genesis ledger file)
-	total, err := strconv.ParseUint(preForkGenesis.TotalCurrency, 10, 64)
-	if err != nil {
-		return 0, fmt.Errorf("total currency of pre-fork genesis block %s: %w", preForkGenesis.StateHash, err)
-	}
-	staked, err := strconv.ParseUint(forkGenesis.StakingLedgerTotalCurrency, 10, 64)
-	if err != nil {
-		return 0, fmt.Errorf("staking ledger total currency of fork genesis block %s: %w", forkGenesis.StateHash, err)
-	}
+func UnstakedTotal(preForkGenesis, forkGenesis client.BlockData) (currency.Nanomina, error) {
+	total := preForkGenesis.TotalCurrency
+	staked := forkGenesis.StakingLedgerTotalCurrency
 	if staked > total {
 		return 0, fmt.Errorf("fork staking ledger total (%d nanomina) exceeds pre-fork genesis total currency (%d nanomina)", staked, total)
 	}
