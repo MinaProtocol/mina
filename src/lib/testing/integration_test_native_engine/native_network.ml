@@ -31,6 +31,10 @@ module Node = struct
     ; log_file : string
     }
 
+  (* Size of the buffer used to stream a node's log file to a destination in
+     [tail_mina_logs_to_file]. *)
+  let log_follow_buffer_size = 4096
+
   let id { config; _ } = config.service_name
 
   let infra_id { config; _ } = config.service_name
@@ -73,35 +77,57 @@ module Node = struct
     return ()
 
   let tail_mina_logs_to_file ~logger (t : t) ~log_file =
-    let open Malleable_error.Let_syntax in
-    [%log info] "Tailing logs from (node: %s) to file %s" t.config.service_name
-      log_file ;
-    (* Use [tail -F] so [log_file] keeps following [t.log_file] even across
-       rotation or before the file exists, rather than copying a snapshot. *)
-    let%bind.Deferred cwd = Unix.getcwd () in
-    let%bind.Deferred process =
-      Process.create_exn ~working_dir:cwd ~prog:"tail"
-        ~args:[ "-F"; "-n"; "+1"; t.log_file ]
-        ()
-    in
+    [%log info] "Streaming logs from (node: %s) to file %s"
+      t.config.service_name log_file ;
+    (* [start] already captures the node's stdout/stderr to [t.log_file]. Mirror
+       that file into [log_file] as it grows, in-process, rather than spawning
+       an external [tail -F]: when we hit EOF but the node is still running, we
+       wait briefly and read again (following appends). [Monitor.protect]
+       guarantees the reader and writer are closed on every exit path, so no
+       file descriptor or writer is left dangling if the transfer raises. *)
+    let poll = Time.Span.of_ms 200. in
     don't_wait_for
-      ( match%bind.Deferred
+      ( match%map.Deferred
           Monitor.try_with ~here:[%here] (fun () ->
-              let%bind.Deferred writer = Writer.open_file log_file in
-              let pipe_w = Writer.pipe writer in
+              (* Wait for the node to create its log file before following it. *)
               let%bind.Deferred () =
-                Deferred.all_unit
-                  [ Reader.transfer (Process.stdout process) pipe_w
-                  ; Reader.transfer (Process.stderr process) pipe_w
-                  ]
+                Deferred.repeat_until_finished () (fun () ->
+                    match%bind.Deferred Sys.file_exists t.log_file with
+                    | `Yes ->
+                        Deferred.return (`Finished ())
+                    | _ ->
+                        if t.should_be_running then
+                          let%map.Deferred () = Clock.after poll in
+                          `Repeat ()
+                        else Deferred.return (`Finished ()) )
               in
-              Writer.close writer )
+              let%bind.Deferred dst = Writer.open_file log_file in
+              Monitor.protect ~here:[%here]
+                ~finally:(fun () -> Writer.close dst)
+                (fun () ->
+                  let%bind.Deferred src = Reader.open_file t.log_file in
+                  Monitor.protect ~here:[%here]
+                    ~finally:(fun () -> Reader.close src)
+                    (fun () ->
+                      let buf = Bytes.create log_follow_buffer_size in
+                      Deferred.repeat_until_finished () (fun () ->
+                          match%bind.Deferred Reader.read src buf with
+                          | `Ok len ->
+                              Writer.write_bytes dst buf ~len ;
+                              let%map.Deferred () = Writer.flushed dst in
+                              `Repeat ()
+                          | `Eof ->
+                              if t.should_be_running then
+                                let%map.Deferred () = Clock.after poll in
+                                `Repeat ()
+                              else Deferred.return (`Finished ()) ) ) ) )
         with
       | Ok () ->
-          Deferred.unit
-      | Error _ ->
-          Deferred.unit ) ;
-    return ()
+          ()
+      | Error exn ->
+          [%log warn] "Log streaming for node %s stopped: %s"
+            t.config.service_name (Exn.to_string exn) ) ;
+    Malleable_error.return ()
 
   let run_replayer ?(start_slot_since_genesis = 0) ?target_state_hash ~logger
       (t : t) =
