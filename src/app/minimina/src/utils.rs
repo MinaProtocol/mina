@@ -23,21 +23,36 @@ use url::Url;
 /// # Returns
 ///
 /// * `io::Result<Output>` - The output from the command execution.
+/// Run an external command, capturing its output. Fails (with the command,
+/// exit status, and stderr in the message) if the command can't be spawned or
+/// exits non-zero — so callers get the real error instead of silently treating
+/// a failed run as empty output.
 pub fn run_command(cmd: &str, args: &[&str]) -> io::Result<Output> {
     debug!("Running command: {cmd} {}", args.join(" "));
 
-    match Command::new(cmd).args(args).output() {
-        Ok(output) => {
-            debug!("status: {}", output.status);
-            debug!("stdout: {}", String::from_utf8_lossy(&output.stdout));
-            debug!("stderr: {}", String::from_utf8_lossy(&output.stderr));
-            Ok(output)
+    let output = Command::new(cmd).args(args).output().map_err(|e| {
+        error!("Failed to spawn `{cmd}`: {e}");
+        io::Error::other(format!("failed to spawn `{cmd}`: {e}"))
+    })?;
+
+    debug!("status: {}", output.status);
+    debug!("stdout: {}", String::from_utf8_lossy(&output.stdout));
+    debug!("stderr: {}", String::from_utf8_lossy(&output.stderr));
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let mut msg = format!("`{cmd} {}` exited with {}", args.join(" "), output.status);
+        if !stderr.trim().is_empty() {
+            msg.push_str(&format!("\nstderr: {}", stderr.trim()));
+        } else if !stdout.trim().is_empty() {
+            msg.push_str(&format!("\nstdout: {}", stdout.trim()));
         }
-        Err(e) => {
-            error!("Failed to run command: {e}");
-            Err(io::Error::other(e))
-        }
+        error!("{msg}");
+        return Err(io::Error::other(msg));
     }
+
+    Ok(output)
 }
 
 /// Fetch the UID and GID of the current user.
@@ -91,6 +106,25 @@ mod tests {
         let output = run_command("echo", &["hello", "world"]).unwrap();
         assert!(output.status.success());
         assert_eq!(String::from_utf8_lossy(&output.stdout), "hello world\n");
+    }
+
+    #[test]
+    fn test_run_command_nonzero_exit_surfaces_stderr() {
+        // A non-zero exit is an error, and the message carries stderr rather
+        // than being silently swallowed as empty output.
+        let err = run_command("sh", &["-c", "echo boom >&2; exit 3"]).unwrap_err();
+        let msg = err.to_string();
+        assert!(msg.contains("exited with"), "got: {msg}");
+        assert!(msg.contains("boom"), "got: {msg}");
+    }
+
+    #[test]
+    fn test_run_command_spawn_failure_names_command() {
+        let err = run_command("minimina-no-such-binary-xyz", &[]).unwrap_err();
+        assert!(
+            err.to_string().contains("minimina-no-such-binary-xyz"),
+            "got: {err}"
+        );
     }
 
     #[test]
