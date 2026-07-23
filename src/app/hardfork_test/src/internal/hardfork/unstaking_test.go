@@ -254,17 +254,27 @@ func TestOccupancyBandDecisions(t *testing.T) {
 func TestExpectedFillRate(t *testing.T) {
 	t.Parallel()
 
-	cases := []struct {
-		sActive float64
-		want    float64
-	}{
-		{0.0, 0.0},                         // no active stake: no slot can be won
-		{1.0, vrfFillFraction},             // full stake active: saturates at f = 0.75
-		{0.285, 1 - math.Pow(0.25, 0.285)}, // CI config (2 active + 5 lazy whales)
+	// Boundary properties, expressed through the named constant rather than a
+	// recomputed copy of the fill formula:
+	//   sActive = 0 -> no slot can be won            -> 0
+	//   sActive = 1 -> saturates at the daemon's f   -> vrfFillFraction
+	if got := expectedFillRate(0); got != 0 {
+		t.Errorf("expectedFillRate(0) = %f, want 0", got)
 	}
-	for _, tc := range cases {
-		if got := expectedFillRate(tc.sActive); math.Abs(got-tc.want) > 1e-9 {
-			t.Errorf("expectedFillRate(%f) = %f, want %f", tc.sActive, got, tc.want)
+	if got := expectedFillRate(1); math.Abs(got-vrfFillFraction) > 1e-9 {
+		t.Errorf("expectedFillRate(1) = %f, want vrfFillFraction %f", got, vrfFillFraction)
+	}
+
+	// For interior shares (incl. the CI config's ~0.285), cross-check by
+	// INVERTING the model instead of re-evaluating it: the per-slot miss
+	// probability (1 - fill) raised to the 1/sActive power must recover the
+	// daemon's (1 - f). This references vrfFillFraction and is independent of how
+	// expectedFillRate computes the forward direction, so it is not a
+	// f(x) == f(x) tautology.
+	for _, s := range []float64{0.1, 0.285, 0.6} {
+		miss := 1 - expectedFillRate(s)
+		if got := math.Pow(miss, 1/s); math.Abs(got-(1-vrfFillFraction)) > 1e-9 {
+			t.Errorf("inverting expectedFillRate(%f): (1-fill)^(1/s) = %f, want 1-f = %f", s, got, 1-vrfFillFraction)
 		}
 	}
 
