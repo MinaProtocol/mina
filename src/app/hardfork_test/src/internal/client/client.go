@@ -128,7 +128,7 @@ func (block *BlockData) NonEmpty() bool {
 func (block BlockData) String() string {
 	b, err := json.MarshalIndent(block, "", "  ")
 	if err != nil {
-		return fmt.Sprintf("%+v", block)
+		return fmt.Sprintf("BlockData(unmarshalable: %v)", err)
 	}
 	return string(b)
 }
