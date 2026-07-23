@@ -36,9 +36,6 @@ use std::{
     process::exit,
 };
 
-// The least supported version of docker compose
-const LEAST_COMPOSE_VERSION: &str = "2.21.0";
-
 // Hardcoded daemon image for default network
 // TODO: This image is very old (berkeley-rc1). Update to a more current image in a separate PR.
 const DEFAULT_DAEMON_DOCKER_IMAGE: &str =
@@ -1051,52 +1048,9 @@ fn check_execution_environment(mode: &ExecutionMode) -> Result<()> {
                 return Err(Error::new(ErrorKind::NotFound, "docker is not installed"));
             }
 
-            // Docker is installed, now check docker compose plugin
-            let compose_result = std::process::Command::new("docker")
-                .args(["compose", "version", "--short"])
-                .output();
-
-            match compose_result {
-                Ok(output) if output.status.success() => {
-                    let version = String::from_utf8_lossy(&output.stdout).trim().to_string();
-                    if version.as_str() < LEAST_COMPOSE_VERSION {
-                        error!(
-                            "Docker Compose version '{version}' is older than \
-                                the minimum supported version '{LEAST_COMPOSE_VERSION}'. \
-                                Please update Docker Compose: https://docs.docker.com/compose/install/"
-                        );
-                        return Err(Error::new(
-                            ErrorKind::InvalidInput,
-                            "docker compose needs to be updated",
-                        ));
-                    }
-                    Ok(())
-                }
-                Ok(output) => {
-                    let stderr = String::from_utf8_lossy(&output.stderr);
-                    error!(
-                        "Docker Compose plugin (v2) is not installed. \
-                            'docker compose' command failed. \
-                            Please install Docker Compose: https://docs.docker.com/compose/install/\n\
-                            stderr: {stderr}"
-                    );
-                    Err(Error::new(
-                        ErrorKind::NotFound,
-                        "docker compose plugin is not installed",
-                    ))
-                }
-                Err(e) => {
-                    error!(
-                        "Docker Compose plugin (v2) is not installed. \
-                            'docker compose' command failed: {e}. \
-                            Please install Docker Compose: https://docs.docker.com/compose/install/"
-                    );
-                    Err(Error::new(
-                        ErrorKind::NotFound,
-                        "docker compose plugin is not installed",
-                    ))
-                }
-            }
+            // The supervisor drives docker directly via the bollard API, so no
+            // docker-compose plugin is required.
+            Ok(())
         }
         // Native mode's mina discovery lives in `resolve_bin_path`.
         ExecutionMode::Native => Ok(()),
