@@ -76,7 +76,7 @@ module Network_config = struct
     let genesis_ledger = Genesis_ledger.create test_config.genesis_ledger in
     let test_config =
       (* Override proof level to match the compile-time proof level of the
-         binary, so that local-apps tests work with any build profile *)
+         binary, so that native tests work with any build profile *)
       let compile_proof_level =
         match Genesis_constants.Compiled.proof_level with
         | Full ->
@@ -154,7 +154,7 @@ module Network_manager = struct
     ; network_config : Network_config.t
     ; mutable deployed : bool
     ; genesis_keypairs : Network_keypair.t Core.String.Map.t
-    ; mutable nodes : Local_network.Node.t list
+    ; mutable nodes : Native_network.Node.t list
     }
 
   let generate_random_id () =
@@ -221,7 +221,7 @@ module Network_manager = struct
     [%log info] "Writing seed libp2p keypair to %s" kps_base_path ;
     let keypath = kps_base_path ^/ "libp2p_key" in
     Out_channel.with_file ~fail_if_exists:true keypath ~f:(fun ch ->
-        Local_node_config.Seed_config.libp2p_keypair
+        Native_node_config.Seed_config.libp2p_keypair
         |> Out_channel.output_string ch ) ;
     let%bind _ =
       Util.run_cmd_exn kps_base_path "chmod" [ "600"; "libp2p_key" ]
@@ -260,14 +260,14 @@ module Network_manager = struct
     Malleable_error.return t
 
   let build_node_config ~working_dir ~service_name ~node_type ~ports
-      ~(base_config : Local_node_config.Base_node_config.t) ~extra_args
+      ~(base_config : Native_node_config.Base_node_config.t) ~extra_args
       ~mina_binary ~network_keypair ~postgres_connection_uri =
     let config_dir =
       create_node_config_dir ~working_dir ~node_name:service_name
     in
     let libp2p_key_path =
       match node_type with
-      | Local_network.Node.Seed ->
+      | Native_network.Node.Seed ->
           (* Seed nodes use the hardcoded libp2p keypair *)
           working_dir ^/ "keys" ^/ "libp2p_key"
       | _ ->
@@ -275,7 +275,7 @@ module Network_manager = struct
           config_dir ^/ "libp2p_key"
     in
     let base_cmd_args =
-      Local_node_config.Base_node_config.to_cmd_args base_config ~ports
+      Native_node_config.Base_node_config.to_cmd_args base_config ~ports
         ~libp2p_key_path
     in
     let config_dir_args =
@@ -284,7 +284,7 @@ module Network_manager = struct
     let cmd_args = List.concat [ extra_args; base_cmd_args; config_dir_args ] in
     let log_file = working_dir ^/ service_name ^ ".log" in
     let runtime_config_path = base_config.runtime_config_path in
-    { Local_network.Node.config =
+    { Native_network.Node.config =
         { network_keypair
         ; service_name
         ; postgres_connection_uri
@@ -305,7 +305,7 @@ module Network_manager = struct
   (* Archive nodes run the [mina-archive] binary, whose CLI does NOT accept the
      daemon's flags (client/rest/external/metrics ports, libp2p keypair, etc.).
      Build the command line directly here, mirroring
-     [integration_test_local_engine]'s [Archive_node_config.create_cmd]:
+     [integration_test_docker_engine]'s [Archive_node_config.create_cmd]:
      [mina-archive run -postgres-uri ... -server-port ...] plus an optional
      [-config-file]. *)
   let build_archive_node_config ~working_dir ~service_name ~ports
@@ -332,16 +332,16 @@ module Network_manager = struct
     in
     let cmd_args = List.concat [ base_args; config_file_args ] in
     let log_file = working_dir ^/ service_name ^ ".log" in
-    { Local_network.Node.config =
+    { Native_network.Node.config =
         { network_keypair = None
         ; service_name
         ; postgres_connection_uri = Some postgres_connection_uri
-        ; graphql_port = ports.Local_node_config.Node_ports.rest_port
+        ; graphql_port = ports.Native_node_config.Node_ports.rest_port
         ; ports
         ; config_dir
         ; libp2p_key_path
         ; runtime_config_path
-        ; node_type = Local_network.Node.Archive
+        ; node_type = Native_network.Node.Archive
         ; cmd_args
         ; mina_binary = mina_archive_binary
         }
@@ -357,10 +357,10 @@ module Network_manager = struct
     let working_dir = t.working_dir in
     let runtime_config_path = working_dir ^/ "runtime_config.json" in
     let port_manager =
-      Local_node_config.PortManager.create ~min_port:11000 ~max_port:12000
+      Native_node_config.PortManager.create ~min_port:11000 ~max_port:12000
     in
     let seed_ports =
-      Local_node_config.PortManager.allocate_ports_for_node port_manager
+      Native_node_config.PortManager.allocate_ports_for_node port_manager
     in
     (* Pre-compute all node names so we can create directories first *)
     let seed_name = sprintf "seed-%s" (generate_random_id ()) in
@@ -405,39 +405,39 @@ module Network_manager = struct
     in
     (* Build seed node *)
     let seed_base_config =
-      Local_node_config.Base_node_config.default ~peer:None
+      Native_node_config.Base_node_config.default ~peer:None
         ~runtime_config_path:(Some runtime_config_path)
         ~start_filtered_logs:network_config.local.start_filtered_logs
     in
     let seed_node =
       build_node_config ~working_dir ~service_name:seed_name
-        ~node_type:Local_network.Node.Seed ~ports:seed_ports
+        ~node_type:Native_network.Node.Seed ~ports:seed_ports
         ~base_config:seed_base_config ~extra_args:[ "daemon"; "-seed" ]
         ~mina_binary:network_config.local.mina_binary ~network_keypair:None
         ~postgres_connection_uri:None
     in
     let seed_peer =
-      Local_node_config.Seed_config.create_libp2p_peer
+      Native_node_config.Seed_config.create_libp2p_peer
         ~external_port:seed_ports.external_port
     in
     (* Build archive seed nodes (one per archive node) *)
     let archive_seed_nodes =
       List.map archive_seed_names ~f:(fun name ->
           let ports =
-            Local_node_config.PortManager.allocate_ports_for_node port_manager
+            Native_node_config.PortManager.allocate_ports_for_node port_manager
           in
           let archive_server_port =
-            Local_node_config.PortManager.allocate_port port_manager
+            Native_node_config.PortManager.allocate_port port_manager
           in
           let archive_address = sprintf "127.0.0.1:%d" archive_server_port in
           let base_config =
-            Local_node_config.Base_node_config.default ~peer:(Some seed_peer)
+            Native_node_config.Base_node_config.default ~peer:(Some seed_peer)
               ~runtime_config_path:(Some runtime_config_path)
               ~start_filtered_logs:network_config.local.start_filtered_logs
           in
           let node =
             build_node_config ~working_dir ~service_name:name
-              ~node_type:Local_network.Node.Seed ~ports ~base_config
+              ~node_type:Native_network.Node.Seed ~ports ~base_config
               ~extra_args:
                 [ "daemon"; "-seed"; "-archive-address"; archive_address ]
               ~mina_binary:network_config.local.mina_binary
@@ -447,7 +447,7 @@ module Network_manager = struct
     in
     let seed_nodes = List.map archive_seed_nodes ~f:fst @ [ seed_node ] in
     let seeds =
-      List.map seed_nodes ~f:(fun node -> (Local_network.Node.id node, node))
+      List.map seed_nodes ~f:(fun node -> (Native_network.Node.id node, node))
       |> Core.String.Map.of_alist_exn
     in
     (* Build archive nodes.
@@ -459,10 +459,10 @@ module Network_manager = struct
         ~f:(fun index (_seed_node, archive_server_port) ->
           let name = List.nth_exn archive_node_names index in
           let ports =
-            Local_node_config.PortManager.allocate_ports_for_node port_manager
+            Native_node_config.PortManager.allocate_ports_for_node port_manager
           in
           let postgres_port =
-            Local_node_config.PortManager.allocate_port port_manager
+            Native_node_config.PortManager.allocate_port port_manager
           in
           let postgres_connection_uri =
             sprintf "postgres://postgres:password@127.0.0.1:%d/archive"
@@ -474,7 +474,7 @@ module Network_manager = struct
               ~mina_archive_binary:network_config.local.mina_archive_binary
               ~postgres_connection_uri ~server_port:archive_server_port
           in
-          (Local_network.Node.id node, node) )
+          (Native_network.Node.id node, node) )
       |> Core.String.Map.of_alist_exn
     in
     (* Build block producer nodes *)
@@ -501,16 +501,16 @@ module Network_manager = struct
             working_dir ^/ "keys" ^/ bp_info.bp_account_name
           in
           let ports =
-            Local_node_config.PortManager.allocate_ports_for_node port_manager
+            Native_node_config.PortManager.allocate_ports_for_node port_manager
           in
           let base_config =
-            Local_node_config.Base_node_config.default ~peer:(Some seed_peer)
+            Native_node_config.Base_node_config.default ~peer:(Some seed_peer)
               ~runtime_config_path:(Some runtime_config_path)
               ~start_filtered_logs:network_config.local.start_filtered_logs
           in
           let node =
             build_node_config ~working_dir ~service_name:bp_info.bp_node_name
-              ~node_type:Local_network.Node.Block_producer ~ports ~base_config
+              ~node_type:Native_network.Node.Block_producer ~ports ~base_config
               ~extra_args:
                 [ "daemon"
                 ; "-block-producer-key"
@@ -554,16 +554,16 @@ module Network_manager = struct
               (Public_key.compress network_kp.keypair.public_key)
           in
           let coordinator_ports =
-            Local_node_config.PortManager.allocate_ports_for_node port_manager
+            Native_node_config.PortManager.allocate_ports_for_node port_manager
           in
           let base_config =
-            Local_node_config.Base_node_config.default ~peer:(Some seed_peer)
+            Native_node_config.Base_node_config.default ~peer:(Some seed_peer)
               ~runtime_config_path:(Some runtime_config_path)
               ~start_filtered_logs:network_config.local.start_filtered_logs
           in
           let coordinator_node =
             build_node_config ~working_dir ~service_name:sc_info.sc_node_name
-              ~node_type:Local_network.Node.Snark_coordinator
+              ~node_type:Native_network.Node.Snark_coordinator
               ~ports:coordinator_ports ~base_config
               ~extra_args:
                 [ "daemon"
@@ -584,16 +584,16 @@ module Network_manager = struct
           let worker_map =
             List.mapi snark_worker_names ~f:(fun _index name ->
                 let ports =
-                  Local_node_config.PortManager.allocate_ports_for_node
+                  Native_node_config.PortManager.allocate_ports_for_node
                     port_manager
                 in
                 let worker_base_config =
-                  Local_node_config.Base_node_config.default ~peer:None
+                  Native_node_config.Base_node_config.default ~peer:None
                     ~runtime_config_path:None ~start_filtered_logs:[]
                 in
                 let node =
                   build_node_config ~working_dir ~service_name:name
-                    ~node_type:Local_network.Node.Snark_worker ~ports
+                    ~node_type:Native_network.Node.Snark_worker ~ports
                     ~base_config:worker_base_config
                     ~extra_args:
                       [ "internal"
@@ -616,10 +616,10 @@ module Network_manager = struct
     in
     t.deployed <- true ;
     let nodes_to_string =
-      Fn.compose (String.concat ~sep:", ") (List.map ~f:Local_network.Node.id)
+      Fn.compose (String.concat ~sep:", ") (List.map ~f:Native_network.Node.id)
     in
     let network =
-      { Local_network.namespace = t.test_name
+      { Native_network.namespace = t.test_name
       ; constants = t.constants
       ; seeds
       ; block_producers
@@ -661,8 +661,8 @@ module Network_manager = struct
     (* Stop all running node processes *)
     let%bind.Deferred () =
       Deferred.List.iter t.nodes ~f:(fun node ->
-          [%log info] "Stopping node %s" (Local_network.Node.id node) ;
-          let%map.Deferred _ = Local_network.Node.stop node in
+          [%log info] "Stopping node %s" (Native_network.Node.id node) ;
+          let%map.Deferred _ = Native_network.Node.stop node in
           () )
     in
     t.nodes <- [] ;

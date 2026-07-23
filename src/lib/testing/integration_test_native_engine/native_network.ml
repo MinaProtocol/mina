@@ -8,7 +8,7 @@ module Node = struct
     ; service_name : string
     ; postgres_connection_uri : string option
     ; graphql_port : int
-    ; ports : Local_node_config.Node_ports.t
+    ; ports : Native_node_config.Node_ports.t
     ; config_dir : string
     ; libp2p_key_path : string
     ; runtime_config_path : string option
@@ -239,7 +239,7 @@ module Node = struct
               Malleable_error.return ()
           | _ ->
               [%log info] "Generating libp2p keypair at %s" libp2p_key_path ;
-              let env = `Extend Local_node_config.Base_node_config.env_vars in
+              let env = `Extend Native_node_config.Base_node_config.env_vars in
               let%map _output =
                 Util.run_cmd_or_hard_error ~env node.config.config_dir
                   node.config.mina_binary
@@ -269,7 +269,7 @@ module Node = struct
               [%log info] "Importing account key %s for node %s" key_path
                 node.config.service_name ;
               let config_dir_arg = node.config.config_dir ^/ ".mina-config" in
-              let env = `Extend Local_node_config.Base_node_config.env_vars in
+              let env = `Extend Native_node_config.Base_node_config.env_vars in
               let%map _output =
                 Util.run_cmd_or_hard_error ~env node.config.config_dir
                   node.config.mina_binary
@@ -287,7 +287,7 @@ module Node = struct
       | _ ->
           Malleable_error.return ()
     in
-    let env = `Extend Local_node_config.Base_node_config.env_vars in
+    let env = `Extend Native_node_config.Base_node_config.env_vars in
     let%bind.Deferred process =
       Process.create_exn ~working_dir:node.config.config_dir
         ~prog:node.config.mina_binary ~args:node.config.cmd_args ~env ()
