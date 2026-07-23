@@ -58,5 +58,6 @@ Pipfile.lock
 _coverage/
 
 CLAUDE.local.md
-/.claude/
+/.claude/*
+!/.claude/skills
 /.opencode/
