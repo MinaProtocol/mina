@@ -81,7 +81,9 @@ impl KeysManager {
             .lines()
             .find(|line| line.contains("Public key: "))
             .ok_or_else(|| {
-                std::io::Error::new(std::io::ErrorKind::NotFound, "Public key not found")
+                std::io::Error::other(format!(
+                    "could not find 'Public key: ' in keypair output for '{service_name}':\n{stdout_str}"
+                ))
             })?;
 
         let public_key = public_key_line
@@ -146,6 +148,11 @@ impl KeysManager {
 
         // Extract the full keypair
         let stdout_str = String::from_utf8_lossy(&output.stdout);
+        if !stdout_str.contains("libp2p keypair:") {
+            return Err(std::io::Error::other(format!(
+                "could not find 'libp2p keypair:' in keypair output for '{service_name}':\n{stdout_str}"
+            )));
+        }
         let keypair = stdout_str.replace("libp2p keypair:", "").trim().to_string();
         let keys = NodeKey {
             key_string: keypair,

@@ -38,15 +38,17 @@ use std::{
 };
 
 // Hardcoded daemon image for default network
-// TODO: This image is very old (berkeley-rc1). Update to a more current image in a separate PR.
-const DEFAULT_DAEMON_DOCKER_IMAGE: &str =
-    "gcr.io/o1labs-192920/mina-daemon:2.0.0berkeley-rc1-1551e2f-bullseye-berkeley";
+// Hardcoded daemon image for default network. Published on docker.io for every
+// supported base (focal/jammy/noble/bullseye/bookworm); pinned to bullseye here.
+const DEFAULT_DAEMON_DOCKER_IMAGE: &str = "minaprotocol/mina-daemon:3.4.0-bd0fe9e-bullseye-mainnet";
 
 // Hardcoded archive image for default network
 const DEFAULT_ARCHIVE_DOCKER_IMAGE: &str =
-    "gcr.io/o1labs-192920/mina-archive:2.0.0berkeley-rc1-1551e2f-bullseye";
+    "minaprotocol/mina-archive:3.4.0-bd0fe9e-bullseye-mainnet";
 
-const IMAGE_COMMIT_HASH: &str = "1551e2f";
+// Commit the default images were built from; the archive schema SQL is fetched
+// from GitHub at this ref so it matches the archive binary.
+const IMAGE_COMMIT_HASH: &str = "bd0fe9e";
 
 // Timeout in seconds for waiting operations
 const TIMEOUT_IN_SECS: u16 = 180;
@@ -476,6 +478,23 @@ fn ensure_not_running(network_path: &Path) -> Result<()> {
     }
 }
 
+/// Pull a docker image with docker's own streamed progress (inherited stdio),
+/// so a large first-time pull shows feedback instead of a silent hang. A no-op
+/// beyond a quick manifest check when the image is already present.
+fn pull_docker_image(image: &str) -> Result<()> {
+    info!("Pulling docker image '{image}' (cached if already present)...");
+    let status = std::process::Command::new("docker")
+        .args(["pull", image])
+        .status()
+        .map_err(|e| Error::other(format!("failed to spawn `docker pull {image}`: {e}")))?;
+    if !status.success() {
+        return Err(Error::other(format!(
+            "`docker pull {image}` exited with {status}"
+        )));
+    }
+    Ok(())
+}
+
 /// Generates a genesis ledger for the default network:
 /// 1 seed, 2 bps, and a snark coordinator with one woker
 fn generate_default_genesis_ledger(
@@ -506,6 +525,10 @@ fn generate_default_genesis_ledger(
     // generate key-pairs for default services based on mode
     match mode {
         ExecutionMode::Docker => {
+            // Pre-pull the daemon image with docker's own streamed progress, so
+            // the first keygen `docker run` doesn't silently block on a
+            // multi-GB pull (a captured `docker run` hides its progress).
+            pull_docker_image(docker_image)?;
             let keys_manager = KeysManager::new(network_path, docker_image);
             *bp_keys_opt = Some(keys_manager.generate_bp_key_pairs(&all_services).map_err(
                 |e| {
