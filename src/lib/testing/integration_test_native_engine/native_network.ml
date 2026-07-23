@@ -147,8 +147,9 @@ module Node = struct
       ~postgres_uri ~start_slot_since_genesis ?target_state_hash ()
 
   let dump_precomputed_blocks ~logger (t : t) =
-    [%log info] "Dumping precomputed blocks from logs for (node: %s)"
-      t.config.service_name ;
+    (* The native node captures its output to [t.log_file]; read it and hand the
+       contents to the shared parser (see also the docker engine, which fetches
+       logs from its container). *)
     let%bind.Deferred logs =
       match%map.Deferred
         Monitor.try_with ~here:[%here] (fun () ->
@@ -163,54 +164,8 @@ module Node = struct
             t.log_file t.config.service_name (Exn.to_string exn) ;
           ""
     in
-    let log_lines =
-      String.split logs ~on:'\n'
-      |> List.filter ~f:(String.is_prefix ~prefix:"{\"timestamp\":")
-    in
-    let jsons = List.map log_lines ~f:Yojson.Safe.from_string in
-    let metadata_jsons =
-      List.map jsons ~f:(fun json ->
-          match Yojson.Safe.Util.member "metadata" json with
-          | `Null ->
-              failwithf "Log line is missing metadata: %s"
-                (Yojson.Safe.to_string json)
-                ()
-          | md ->
-              md )
-    in
-    let state_hash_and_blocks =
-      List.fold metadata_jsons ~init:[] ~f:(fun acc json ->
-          match Yojson.Safe.Util.member "precomputed_block" json with
-          | `Null ->
-              acc
-          | block -> (
-              match Yojson.Safe.Util.member "state_hash" json with
-              | `Null ->
-                  failwith
-                    "Log metadata contains a precomputed block, but no state \
-                     hash"
-              | state_hash ->
-                  (state_hash, block) :: acc ) )
-    in
-    let%bind.Deferred () =
-      Deferred.List.iter state_hash_and_blocks
-        ~f:(fun (state_hash_json, block_json) ->
-          let state_hash = Yojson.Safe.Util.to_string state_hash_json in
-          let block = Yojson.Safe.pretty_to_string block_json in
-          let filename = state_hash ^ ".json" in
-          match%map.Deferred Sys.file_exists filename with
-          | `Yes ->
-              [%log info]
-                "File already exists for precomputed block with state hash %s"
-                state_hash
-          | _ ->
-              [%log info]
-                "Dumping precomputed block with state hash %s to file %s"
-                state_hash filename ;
-              Out_channel.with_file filename ~f:(fun out_ch ->
-                  Out_channel.output_string out_ch block ) )
-    in
-    Malleable_error.return ()
+    Local_engine_common.Ops.dump_precomputed_blocks_from_logs ~logger
+      ~service_name:t.config.service_name ~logs
 
   (* Archive-node Postgres provisioning. The Postgres server itself is provided
      by the environment (a real server on CI); here we only create the
