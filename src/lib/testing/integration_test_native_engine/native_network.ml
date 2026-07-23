@@ -186,6 +186,80 @@ module Node = struct
     in
     Malleable_error.return ()
 
+  (* Archive-node Postgres provisioning. The Postgres server itself is provided
+     by the environment (a real server on CI); here we only create the
+     per-test database and load the archive schema into it, mirroring the
+     docker engine's postgres init entrypoint. *)
+
+  let postgres_db_name uri =
+    Uri.path (Uri.of_string uri) |> String.chop_prefix_if_exists ~prefix:"/"
+
+  (* Administrative connection to the same server but the default [postgres]
+     maintenance database, used to CREATE/DROP the per-test database. *)
+  let postgres_admin_uri uri =
+    Uri.with_path (Uri.of_string uri) "/postgres" |> Uri.to_string
+
+  (* Locate the archive schema. Prefer the copy shipped by the mina-archive
+     debian package (present on CI); fall back to the in-repo copy for local
+     runs. *)
+  let archive_schema_file () =
+    let candidates =
+      [ "/etc/mina/archive/create_schema.sql"
+      ; "src/app/archive/create_schema.sql"
+      ]
+    in
+    Deferred.List.find candidates ~f:(fun path ->
+        match%map Sys.file_exists path with `Yes -> true | _ -> false )
+
+  let provision_archive_db ~logger uri =
+    let open Malleable_error.Let_syntax in
+    let db_name = postgres_db_name uri in
+    let admin_uri = postgres_admin_uri uri in
+    [%log info] "Creating archive database %s" db_name ;
+    let%bind _ =
+      Util.run_cmd_or_hard_error "/" "psql"
+        [ admin_uri
+        ; "-v"
+        ; "ON_ERROR_STOP=1"
+        ; "-c"
+        ; sprintf {|DROP DATABASE IF EXISTS "%s";|} db_name
+        ; "-c"
+        ; sprintf {|CREATE DATABASE "%s";|} db_name
+        ]
+    in
+    let%bind schema =
+      match%bind.Deferred archive_schema_file () with
+      | Some schema ->
+          Malleable_error.return schema
+      | None ->
+          Malleable_error.hard_error_string
+            "could not locate create_schema.sql to initialise the archive \
+             database"
+    in
+    [%log info] "Loading archive schema %s into database %s" schema db_name ;
+    let%map _ =
+      Util.run_cmd_or_hard_error "/" "psql"
+        [ uri; "-v"; "ON_ERROR_STOP=1"; "-f"; schema ]
+    in
+    ()
+
+  let drop_archive_db ~logger uri =
+    let db_name = postgres_db_name uri in
+    let admin_uri = postgres_admin_uri uri in
+    [%log info] "Dropping archive database %s" db_name ;
+    match%map.Deferred
+      Monitor.try_with ~here:[%here] (fun () ->
+          Util.run_cmd_exn "/" "psql"
+            [ admin_uri
+            ; "-c"
+            ; sprintf {|DROP DATABASE IF EXISTS "%s";|} db_name
+            ] )
+    with
+    | Ok _ ->
+        ()
+    | Error _ ->
+        [%log warn] "Failed to drop archive database %s" db_name
+
   let recreate_config_dir ~logger ~fresh_state config_dir =
     let%bind.Deferred () =
       if fresh_state then
@@ -227,8 +301,9 @@ module Node = struct
     (* Generate libp2p keypair for non-seed nodes *)
     let%bind () =
       match node.config.node_type with
-      | Seed ->
-          (* Seed nodes use the hardcoded libp2p key *)
+      | Seed | Archive ->
+          (* Seed nodes use the hardcoded libp2p key; archive nodes run
+             [mina-archive], which has no libp2p identity at all. *)
           Malleable_error.return ()
       | _ -> (
           (* Non-seed nodes need their own libp2p key generated *)
@@ -287,6 +362,15 @@ module Node = struct
       | _ ->
           Malleable_error.return ()
     in
+    (* Archive nodes need their per-test database created and the archive
+       schema loaded before [mina-archive] connects to it. *)
+    let%bind () =
+      match (node.config.node_type, node.config.postgres_connection_uri) with
+      | Archive, Some uri ->
+          provision_archive_db ~logger uri
+      | _ ->
+          Malleable_error.return ()
+    in
     let env = `Extend Native_node_config.Base_node_config.env_vars in
     let%bind.Deferred process =
       Process.create_exn ~working_dir:node.config.config_dir
@@ -331,6 +415,15 @@ module Node = struct
           Deferred.unit
     in
     node.process <- None ;
+    (* Drop the archive node's per-test database so repeated runs against a
+       shared Postgres server stay clean. *)
+    let%bind.Deferred () =
+      match (node.config.node_type, node.config.postgres_connection_uri) with
+      | Archive, Some uri ->
+          drop_archive_db ~logger:(Logger.create ()) uri
+      | _ ->
+          Deferred.unit
+    in
     return ()
 end
 

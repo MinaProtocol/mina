@@ -45,6 +45,10 @@ if command -v pg_isready &>/dev/null; then
     # shellcheck disable=SC2046
     pg_ctlcluster $(pg_lsclusters -h | head -1 | awk '{print $1, $2}') start || true
   fi
+  # Give the postgres role a password so the archive node can authenticate
+  # over TCP (postgres:password@127.0.0.1:5432); the engine creates and drops
+  # a per-test database itself.
+  psql -U postgres -c "ALTER USER postgres WITH PASSWORD 'password';" 2>/dev/null || true
   echo "PostgreSQL is ready"
 fi
 

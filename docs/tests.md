@@ -248,6 +248,30 @@ mina-test-executive docker "$TEST_NAME" \
 
 In CI the integration tests are driven by `buildkite/scripts/run-test-executive-docker.sh`. The `--debug` flag keeps the testnet alive after the test completes, which is useful for post-mortem inspection of node logs via `docker logs`.
 
+#### Native engine (no Docker)
+
+The `native` engine runs the same tests against bare `mina` / `mina-archive`
+binaries on the host instead of Docker containers. Here `--mina-image` /
+`--archive-image` are paths to those binaries rather than image identifiers:
+
+```bash
+mina-test-executive native "$TEST_NAME" \
+  --mina-image /usr/local/bin/mina \
+  --archive-image /usr/local/bin/mina-archive
+```
+
+Tests that run archive nodes need a PostgreSQL **server**. The engine does not
+start one; it connects to the server given by `--postgres-uri` (env
+`MINA_TEST_POSTGRES_URI`, default `postgres://postgres:password@127.0.0.1:5432`)
+and, for each archive node, **creates a per-test `test_archive_<id>` database**
+on that server, loads the archive schema into it, and **drops it** when the node
+stops. The flag is optional and only relevant for archive tests — tests without
+archive nodes never touch PostgreSQL, so the default is fine for them.
+
+In CI the native engine is driven by
+`buildkite/scripts/run-test-executive-native.sh`, which starts the environment's
+PostgreSQL server before invoking the test.
+
 ---
 
 ## End-to-end Tests

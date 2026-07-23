@@ -15,6 +15,7 @@ module Network_config = struct
     ; seed_external_port : int
     ; log_precomputed_blocks : bool
     ; start_filtered_logs : string list
+    ; postgres_uri : string
     }
   [@@deriving to_yojson]
 
@@ -48,7 +49,6 @@ module Network_config = struct
   let expand ~logger ~test_name ~(cli_inputs : Cli_inputs.t) ~(debug : bool)
       ~(images : Test_config.Container_images.t) ~(test_config : Test_config.t)
       ~(constants : Test_config.constants) =
-    let _ = cli_inputs in
     let ({ block_producers
          ; snark_coordinator
          ; snark_worker_fee
@@ -141,6 +141,7 @@ module Network_config = struct
         ; seed_external_port = 0
         ; log_precomputed_blocks = test_config.log_precomputed_blocks
         ; start_filtered_logs
+        ; postgres_uri = cli_inputs.postgres_uri
         }
     }
 end
@@ -451,9 +452,12 @@ module Network_manager = struct
       |> Core.String.Map.of_alist_exn
     in
     (* Build archive nodes.
-       NOTE: Archive nodes require an externally running PostgreSQL instance.
-       The archive process will fail to start if PostgreSQL is not available
-       at the configured postgres_connection_uri. *)
+       Archive nodes require a running PostgreSQL server, reachable at
+       [network_config.local.postgres_uri]. Each archive node gets its own
+       per-test database on that server, which the node creates and loads the
+       archive schema into on start, and drops on stop (see
+       [Native_network.Node]). The [test_] prefix keeps these databases easy to
+       identify and reclaim. *)
     let archive_nodes =
       List.mapi archive_seed_nodes
         ~f:(fun index (_seed_node, archive_server_port) ->
@@ -461,12 +465,12 @@ module Network_manager = struct
           let ports =
             Native_node_config.PortManager.allocate_ports_for_node port_manager
           in
-          let postgres_port =
-            Native_node_config.PortManager.allocate_port port_manager
-          in
+          let db_name = sprintf "test_archive_%s" (generate_random_id ()) in
           let postgres_connection_uri =
-            sprintf "postgres://postgres:password@127.0.0.1:%d/archive"
-              postgres_port
+            Uri.with_path
+              (Uri.of_string network_config.local.postgres_uri)
+              ("/" ^ db_name)
+            |> Uri.to_string
           in
           let node =
             build_archive_node_config ~working_dir ~service_name:name ~ports
