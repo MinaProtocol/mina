@@ -12,6 +12,10 @@ let TestExecutive = ../../Command/TestExecutive.dhall
 
 let IntegrationImages = ../../Constants/IntegrationImages.dhall
 
+let Prelude = ../../External/Prelude.dhall
+
+let List/map = Prelude.List.map
+
 let dependsOn = IntegrationImages.dependsOn
 
 in  Pipeline.build
@@ -37,19 +41,14 @@ in  Pipeline.build
         , scope = PipelineScope.AllButPullRequest
         }
       , steps =
-        [ TestExecutive.executeLocal "block-prod-prio" dependsOn
-        , TestExecutive.executeLocal "block-reward" dependsOn
-        , TestExecutive.executeLocal "chain-reliability" dependsOn
-        , TestExecutive.executeLocal "epoch-ledger" dependsOn
-        , TestExecutive.executeLocal "genesis-export" dependsOn
-        , TestExecutive.executeLocal "gossip-consis" dependsOn
-        , TestExecutive.executeLocal "medium-bootstrap" dependsOn
-        , TestExecutive.executeLocal "payments" dependsOn
-        , TestExecutive.executeLocal "peers-reliability" dependsOn
-        , TestExecutive.executeLocal "slot-end" dependsOn
-        , TestExecutive.executeLocal "verification-key" dependsOn
-        , TestExecutive.executeLocal "zkapps" dependsOn
-        , TestExecutive.executeLocal "zkapps-timing" dependsOn
-        , TestExecutive.executeLocal "zkapps-nonce" dependsOn
-        ]
+          List/map
+            Text
+            TestExecutive.Type
+            (     \(testName : Text)
+              ->  TestExecutive.execute
+                    TestExecutive.Engine.Docker
+                    testName
+                    dependsOn
+            )
+            TestExecutive.tests
       }
