@@ -478,6 +478,23 @@ fn ensure_not_running(network_path: &Path) -> Result<()> {
     }
 }
 
+/// Pull a docker image with docker's own streamed progress (inherited stdio),
+/// so a large first-time pull shows feedback instead of a silent hang. A no-op
+/// beyond a quick manifest check when the image is already present.
+fn pull_docker_image(image: &str) -> Result<()> {
+    info!("Pulling docker image '{image}' (cached if already present)...");
+    let status = std::process::Command::new("docker")
+        .args(["pull", image])
+        .status()
+        .map_err(|e| Error::other(format!("failed to spawn `docker pull {image}`: {e}")))?;
+    if !status.success() {
+        return Err(Error::other(format!(
+            "`docker pull {image}` exited with {status}"
+        )));
+    }
+    Ok(())
+}
+
 /// Generates a genesis ledger for the default network:
 /// 1 seed, 2 bps, and a snark coordinator with one woker
 fn generate_default_genesis_ledger(
@@ -508,6 +525,10 @@ fn generate_default_genesis_ledger(
     // generate key-pairs for default services based on mode
     match mode {
         ExecutionMode::Docker => {
+            // Pre-pull the daemon image with docker's own streamed progress, so
+            // the first keygen `docker run` doesn't silently block on a
+            // multi-GB pull (a captured `docker run` hides its progress).
+            pull_docker_image(docker_image)?;
             let keys_manager = KeysManager::new(network_path, docker_image);
             *bp_keys_opt = Some(keys_manager.generate_bp_key_pairs(&all_services).map_err(
                 |e| {

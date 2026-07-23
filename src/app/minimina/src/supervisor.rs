@@ -336,7 +336,10 @@ async fn spawn_container(
     network_id: &str,
     node: &DockerNodeSpec,
 ) -> std::io::Result<(RunningUnit, Killer, Option<u32>)> {
-    // Pull (cached if already present).
+    // Pull (cached if already present), streaming concise progress so a
+    // multi-GB image doesn't look like a hang. Skip the chatty byte-level
+    // frames (those carry `progress`) and dedupe so we print one line per layer
+    // milestone ("Pulling fs layer", "Download complete", "Pull complete", …).
     let mut pull = docker.create_image(
         Some(CreateImageOptions {
             from_image: node.image.clone(),
@@ -345,8 +348,23 @@ async fn spawn_container(
         None,
         None,
     );
+    let mut last_line: Option<String> = None;
     while let Some(item) = pull.next().await {
-        item.map_err(|e| std::io::Error::other(format!("pull '{}' failed: {e}", node.image)))?;
+        let info =
+            item.map_err(|e| std::io::Error::other(format!("pull '{}' failed: {e}", node.image)))?;
+        if info.progress.is_some() {
+            continue;
+        }
+        if let Some(status) = info.status {
+            let line = match &info.id {
+                Some(id) => format!("{id}: {status}"),
+                None => status,
+            };
+            if last_line.as_deref() != Some(line.as_str()) {
+                eprintln!("  pull {}: {line}", node.image);
+                last_line = Some(line);
+            }
+        }
     }
 
     // Port bindings + exposed ports.
