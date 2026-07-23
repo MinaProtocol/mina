@@ -188,7 +188,7 @@ func ComputeStakeStats(genesisLedgerPath string, runningProducerPks, lazyPks map
 // still alive. The measured occupancy is recorded on the analysis result for
 // the post-fork comparison.
 func (t *HardforkTest) validatePreForkOccupancyDiluted(analysis *BlockAnalysisResult) error {
-	occ, err := t.ComputeSlotOccupancy(analysis.GenesisBlock, analysis.Consensus.LastBlockBeforeTxEnd)
+	occ, err := t.ComputeSlotOccupancy(analysis.GenesisBlock, analysis.Consensus.LastBlockBeforeTxEnd, t.Config.SlotTxEnd)
 	if err != nil {
 		return fmt.Errorf("failed to compute pre-fork slot occupancy: %w", err)
 	}
@@ -218,8 +218,9 @@ func (t *HardforkTest) validatePreForkOccupancyDiluted(analysis *BlockAnalysisRe
 		return err
 	}
 	// n is the slot span the occupancy was measured over — the same denominator
-	// ComputeSlotOccupancy divides by — so the band margin tracks the window.
-	nPre := analysis.Consensus.LastBlockBeforeTxEnd.Slot - analysis.GenesisBlock.Slot
+	// ComputeSlotOccupancy divides by (the intended tx-end boundary, not the
+	// last observed block) — so the band margin tracks the window.
+	nPre := t.Config.SlotTxEnd - analysis.GenesisBlock.Slot
 	band, err := newOccupancyBand(expectedFillRate(sActive), nPre)
 	if err != nil {
 		return fmt.Errorf("failed to compute pre-fork occupancy band: %w", err)
@@ -323,7 +324,11 @@ func (t *HardforkTest) validatePostForkUnstaking(analysis *BlockAnalysisResult, 
 	}
 	t.Logger.Info("All %d lazy whales are unstaked on the fork network", len(lazyPks))
 
-	postOcc, err := t.ComputeSlotOccupancy(commonGenesisBlock, bestTip)
+	// The post-fork window has no tx-end boundary; it runs genesis → the best
+	// tip we queried, so the boundary is the tip's own slot and the window ends
+	// on a hit (a small residual upward bias, unavoidable without a boundary
+	// past the tip). nPost below matches this same denominator.
+	postOcc, err := t.ComputeSlotOccupancy(commonGenesisBlock, bestTip, bestTip.Slot)
 	if err != nil {
 		return fmt.Errorf("failed to compute post-fork slot occupancy: %w", err)
 	}
@@ -353,7 +358,7 @@ func (t *HardforkTest) validatePostForkUnstaking(analysis *BlockAnalysisResult, 
 		return fmt.Errorf("post-fork slot occupancy (%f) is below the model lower bound (%f); unstaking did not restore occupancy to the level the undiluted active stake predicts (partial-unstaking regression)", postOcc, postBand.Lower)
 	}
 	// Retain the absolute >= 0.5 health bar as an additional coarse guard.
-	return t.ValidateSlotOccupancy(commonGenesisBlock, bestTip)
+	return t.ValidateSlotOccupancy(commonGenesisBlock, bestTip, bestTip.Slot)
 }
 
 // preForkActiveShare is the active producers' share of the pre-fork VRF

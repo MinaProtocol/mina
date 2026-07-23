@@ -49,12 +49,26 @@ func (t *HardforkTest) WaitForBestTip(port int, pred func(client.BlockData) bool
 	return fmt.Errorf("timed out waiting for condition: %s at port %d", predDescription, port)
 }
 
-// ComputeSlotOccupancy computes the fraction of slots between two blocks that
-// are occupied by a block. startBlock must be an ancestor of lastBlock: block
-// heights are dense along a chain, so the height delta counts exactly the
-// blocks after startBlock, while the slot delta counts the slot opportunities.
-func (t *HardforkTest) ComputeSlotOccupancy(startBlock, lastBlock client.BlockData) (float64, error) {
-	t.Logger.Info("Calculating slot occupancy between block %v and %v", startBlock, lastBlock)
+// ComputeSlotOccupancy computes the slot fill rate over the half-open window
+// (startBlock.Slot, boundarySlot]: the fraction of those slots that produced a
+// block. startBlock is the window's lower anchor and its own slot is excluded —
+// it is genesis, not a VRF-produced slot. Block heights are dense along a
+// chain, so the height delta counts exactly the blocks produced after
+// startBlock up to lastBlock; startBlock must therefore be an ancestor of
+// lastBlock.
+//
+// The denominator is boundarySlot − startBlock.Slot, NOT lastBlock.Slot −
+// startBlock.Slot. The window runs to an intended boundary (e.g. slot_tx_end),
+// not to the last observed block: anchoring the denominator on lastBlock would
+// end the window on a guaranteed hit and silently drop the empty slots between
+// the last block and the boundary, biasing the fill rate upward. boundarySlot
+// must be at or beyond lastBlock.Slot; callers pass the last block that falls
+// before the boundary, so no block lives in (lastBlock.Slot, boundarySlot] and
+// the height-delta numerator still counts every block in the window. When the
+// boundary coincides with lastBlock.Slot the window ends on a hit — the
+// residual upward bias callers accept when no boundary past the tip exists.
+func (t *HardforkTest) ComputeSlotOccupancy(startBlock, lastBlock client.BlockData, boundarySlot int) (float64, error) {
+	t.Logger.Info("Calculating slot occupancy between block %v and %v over a window ending at slot %d", startBlock, lastBlock, boundarySlot)
 
 	if lastBlock.Slot <= startBlock.Slot {
 		return 0, fmt.Errorf("last block (slot %d) is not after starting block (slot %d), can't calculate slot occupancy!", lastBlock.Slot, startBlock.Slot)
@@ -62,15 +76,20 @@ func (t *HardforkTest) ComputeSlotOccupancy(startBlock, lastBlock client.BlockDa
 	if lastBlock.BlockHeight <= startBlock.BlockHeight {
 		return 0, fmt.Errorf("last block height (%d) is not above starting block height (%d), can't calculate slot occupancy!", lastBlock.BlockHeight, startBlock.BlockHeight)
 	}
+	if boundarySlot < lastBlock.Slot {
+		return 0, fmt.Errorf("window boundary slot (%d) is before the last block's slot (%d); the boundary must be at or beyond the last observed block", boundarySlot, lastBlock.Slot)
+	}
 
-	return float64(lastBlock.BlockHeight-startBlock.BlockHeight) / float64(lastBlock.Slot-startBlock.Slot), nil
+	return float64(lastBlock.BlockHeight-startBlock.BlockHeight) / float64(boundarySlot-startBlock.Slot), nil
 }
 
-// ValidateSlotOccupancy checks if block occupancy is above 50%
-func (t *HardforkTest) ValidateSlotOccupancy(startBlock, lastBlock client.BlockData) error {
+// ValidateSlotOccupancy checks if block occupancy is above 50% over the window
+// (startBlock.Slot, boundarySlot]; see ComputeSlotOccupancy for the window
+// convention.
+func (t *HardforkTest) ValidateSlotOccupancy(startBlock, lastBlock client.BlockData, boundarySlot int) error {
 	expectedOccupancy := 0.5
 
-	actualOccupancy, err := t.ComputeSlotOccupancy(startBlock, lastBlock)
+	actualOccupancy, err := t.ComputeSlotOccupancy(startBlock, lastBlock, boundarySlot)
 	if err != nil {
 		return err
 	}

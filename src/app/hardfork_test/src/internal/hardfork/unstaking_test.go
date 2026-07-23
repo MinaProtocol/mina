@@ -22,9 +22,12 @@ func TestComputeSlotOccupancy(t *testing.T) {
 	t.Parallel()
 	ht := testHarness(config.DefaultConfig())
 
+	// Genesis anchor at height 1 / slot 0 excluded from the denominator; 15
+	// blocks over the (0, 30] window = 0.5.
 	occ, err := ht.ComputeSlotOccupancy(
 		client.BlockData{BlockHeight: 1, Slot: 0},
 		client.BlockData{BlockHeight: 16, Slot: 30},
+		30,
 	)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -33,9 +36,39 @@ func TestComputeSlotOccupancy(t *testing.T) {
 		t.Errorf("occupancy = %f, want 0.5", occ)
 	}
 
+	// The boundary, not the last block, sets the denominator. The last block
+	// sits at slot 28 but the window runs to slot 30, so the two empty trailing
+	// slots must lower occupancy (15/30 = 0.5), not be dropped (15/28 ≈ 0.536).
+	occ, err = ht.ComputeSlotOccupancy(
+		client.BlockData{BlockHeight: 1, Slot: 0},
+		client.BlockData{BlockHeight: 16, Slot: 28},
+		30,
+	)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if occ != 0.5 {
+		t.Errorf("occupancy with trailing empty slots = %f, want 0.5 (empty slots must not be dropped)", occ)
+	}
+
+	// A fully filled window is 1.0: every slot after the genesis anchor produced
+	// a block, and the last block coincides with the boundary.
+	occ, err = ht.ComputeSlotOccupancy(
+		client.BlockData{BlockHeight: 1, Slot: 0},
+		client.BlockData{BlockHeight: 31, Slot: 30},
+		30,
+	)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if occ != 1.0 {
+		t.Errorf("fully filled window occupancy = %f, want 1.0", occ)
+	}
+
 	if _, err := ht.ComputeSlotOccupancy(
 		client.BlockData{BlockHeight: 5, Slot: 0},
 		client.BlockData{BlockHeight: 5, Slot: 30},
+		30,
 	); err == nil {
 		t.Error("expected error when start and last block have the same height")
 	}
@@ -44,14 +77,26 @@ func TestComputeSlotOccupancy(t *testing.T) {
 	if _, err := ht.ComputeSlotOccupancy(
 		client.BlockData{BlockHeight: 16, Slot: 30},
 		client.BlockData{BlockHeight: 1, Slot: 0},
+		30,
 	); err == nil {
 		t.Error("expected error when last block is not after starting block")
 	}
 	if _, err := ht.ComputeSlotOccupancy(
 		client.BlockData{BlockHeight: 1, Slot: 10},
 		client.BlockData{BlockHeight: 5, Slot: 10},
+		30,
 	); err == nil {
 		t.Error("expected error when both blocks are at the same slot")
+	}
+
+	// A boundary before the last observed block is a caller error: blocks would
+	// live past the window boundary and the numerator would over-count.
+	if _, err := ht.ComputeSlotOccupancy(
+		client.BlockData{BlockHeight: 1, Slot: 0},
+		client.BlockData{BlockHeight: 16, Slot: 30},
+		28,
+	); err == nil {
+		t.Error("expected error when boundary slot is before the last block's slot")
 	}
 }
 

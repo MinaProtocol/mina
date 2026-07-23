@@ -74,7 +74,7 @@ func (t *HardforkTest) RunMainNetworkPhase(mainGenesisTs int64, beforeShutdown H
 			return nil, err
 		}
 	} else {
-		if err := t.ValidateSlotOccupancy(analysis.GenesisBlock, analysis.Consensus.LastBlockBeforeTxEnd); err != nil {
+		if err := t.ValidateSlotOccupancy(analysis.GenesisBlock, analysis.Consensus.LastBlockBeforeTxEnd, t.Config.SlotTxEnd); err != nil {
 			return nil, err
 		}
 	}
@@ -156,7 +156,7 @@ func (t *HardforkTest) RunForkNetworkPhase(analysis *BlockAnalysisResult, mainGe
 			return err
 		}
 	} else {
-		if err := t.ValidateSlotOccupancy(*commonGenesisBlock, *bestTip); err != nil {
+		if err := t.ValidateSlotOccupancy(*commonGenesisBlock, *bestTip, bestTip.Slot); err != nil {
 			return err
 		}
 	}
