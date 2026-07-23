@@ -66,7 +66,13 @@ pub struct Mount {
 /// A docker daemon: a container the supervisor creates, starts, and owns.
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct DockerNodeSpec {
+    /// Supervisor unit identity — the **bare** service name, matching the native
+    /// backend so `status`/node-RPC identity is uniform across backends.
     pub name: String,
+    /// Docker container name + primary DNS alias — suffixed with the network id
+    /// for host-uniqueness. Internal to the docker backend; the commands' peer /
+    /// archive-address hostnames resolve to this via docker DNS.
+    pub container_name: String,
     pub image: String,
     #[serde(default)]
     pub entrypoint: Option<Vec<String>>,
@@ -369,10 +375,11 @@ async fn spawn_container(
         ..Default::default()
     };
 
+    let cname = &node.container_name;
     docker
         .create_container(
             Some(CreateContainerOptions {
-                name: node.name.clone(),
+                name: cname.clone(),
                 platform: None,
             }),
             Config {
@@ -398,15 +405,15 @@ async fn spawn_container(
             },
         )
         .await
-        .map_err(|e| std::io::Error::other(format!("create_container '{}' failed: {e}", node.name)))?;
+        .map_err(|e| std::io::Error::other(format!("create_container '{cname}' failed: {e}")))?;
 
     docker
-        .start_container(&node.name, None::<bollard::container::StartContainerOptions<String>>)
+        .start_container(cname, None::<bollard::container::StartContainerOptions<String>>)
         .await
-        .map_err(|e| std::io::Error::other(format!("start_container '{}' failed: {e}", node.name)))?;
+        .map_err(|e| std::io::Error::other(format!("start_container '{cname}' failed: {e}")))?;
 
     let pid = docker
-        .inspect_container(&node.name, None)
+        .inspect_container(cname, None)
         .await
         .ok()
         .and_then(|i| i.state)
@@ -416,11 +423,11 @@ async fn spawn_container(
     Ok((
         RunningUnit::Docker {
             docker: docker.clone(),
-            name: node.name.clone(),
+            name: cname.clone(),
         },
         Killer::Docker {
             docker: docker.clone(),
-            name: node.name.clone(),
+            name: cname.clone(),
         },
         pid,
     ))
@@ -887,7 +894,8 @@ mod tests {
             spec: BackendSpec::Docker {
                 network_name: "minimina-suptest-net".into(),
                 nodes: vec![DockerNodeSpec {
-                    name: "minimina-suptest-ctr".into(),
+                    name: "suptest".into(),
+                    container_name: "minimina-suptest-ctr".into(),
                     image: "alpine:3.19".into(),
                     entrypoint: None,
                     cmd: vec!["sleep".into(), "300".into()],

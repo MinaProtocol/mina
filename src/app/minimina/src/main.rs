@@ -104,13 +104,9 @@ fn main() -> Result<()> {
 
                 match mode {
                     ExecutionMode::Docker => {
-                        // generate docker compose
-                        if let Err(e) = docker.compose_generate_file(&services) {
-                            return exit_with(format!(
-                                "Failed to generate docker-compose.yaml with error: {e}"
-                            ));
-                        }
-                        create_network(&docker, &directory_manager, &network_id, &services)
+                        // Containers are created by the supervisor at `network start`;
+                        // create only records the plan artifacts.
+                        create_network_docker(&directory_manager, &network_id, &services)
                     }
                     ExecutionMode::Native => {
                         let native = NativeManager::new(&network_path, native_bin(&bin_path));
@@ -147,52 +143,19 @@ fn main() -> Result<()> {
                 let network_path = directory_manager.network_path(&network_id);
                 check_network_exists(&network_id)?;
 
-                if let ExecutionMode::Native = mode {
-                    // Query the foreground supervisor over its RPC socket.
-                    let socket = NativeManager::supervisor_socket(&network_path);
-                    return match supervisor::rpc_call(&socket, "status", serde_json::Value::Null) {
-                        Ok(status) => {
-                            println!(
-                                "{}",
-                                serde_json::to_string_pretty(&status).unwrap_or_default()
-                            );
-                            Ok(())
-                        }
-                        Err(e) => exit_with(format!(
-                            "Network '{network_id}' is not running (no supervisor): {e}"
-                        )),
-                    };
+                // Backend-agnostic: query the foreground supervisor over its RPC
+                // socket (the supervisor serves the same socket for native and
+                // docker networks).
+                let socket = NativeManager::supervisor_socket(&network_path);
+                match supervisor::rpc_call(&socket, "status", serde_json::Value::Null) {
+                    Ok(status) => {
+                        println!("{}", serde_json::to_string_pretty(&status).unwrap_or_default());
+                        Ok(())
+                    }
+                    Err(e) => exit_with(format!(
+                        "Network '{network_id}' is not running (no supervisor): {e}"
+                    )),
                 }
-
-                let docker = DockerManager::new(&network_path);
-                let ls_out = match docker.compose_ls() {
-                    Ok(out) => out,
-                    Err(e) => {
-                        let error_message = format!(
-                            "Failed to get status from docker compose ls for network '{network_id}': {e}."
-                        );
-                        return exit_with(error_message);
-                    }
-                };
-
-                let ps_out = match docker.compose_ps(None) {
-                    Ok(out) => out,
-                    Err(e) => {
-                        let error_message = format!(
-                            "Failed to get status from docker compose ps for network '{network_id}': {e}."
-                        );
-                        return exit_with(error_message);
-                    }
-                };
-
-                let compose_file_path = docker.compose_path.to_str().unwrap();
-                let mut status = network::Status::new(&network_id);
-                status.update_from_compose_ls(ls_out, compose_file_path);
-                status.update_from_compose_ps(ps_out);
-                status.network_dir = network_path.into_os_string().into_string().unwrap();
-
-                println!("{status}");
-                Ok(())
             }
 
             NetworkCommand::Delete(cmd) => {
@@ -262,50 +225,35 @@ fn main() -> Result<()> {
                     warn!("{e} In case network is unstable consider updating by running 'network create' again.");
                 }
 
-                match mode {
+                // Runs the foreground supervisor, which blocks until 'stop'/SIGINT.
+                let plan = match mode {
                     ExecutionMode::Docker => {
                         let docker = DockerManager::new(&network_path);
-                        match docker.compose_start_all() {
-                            Ok(output) => {
-                                if cmd.verbose {
-                                    println!("Status: {}", output.status);
-                                    println!("Stdout: {}", String::from_utf8_lossy(&output.stdout));
-                                    println!("Stderr: {}", String::from_utf8_lossy(&output.stderr));
-                                }
-                                println!("{}", network::Start { network_id });
-                                Ok(())
-                            }
-                            Err(e) => {
-                                let error_message =
-                                    format!("Failed to start network '{network_id}': {e}");
-                                exit_with(error_message)
-                            }
-                        }
+                        let services = directory_manager.get_services_info(&network_id)?;
+                        docker.build_docker_supervisor_plan(&services, &network_id)
                     }
                     ExecutionMode::Native => {
                         let native = NativeManager::new(&network_path, native_bin(&bin_path));
                         let services = directory_manager.get_services_info(&network_id)?;
-                        let plan = match native.build_supervisor_plan(&services, &network_id) {
-                            Ok(plan) => plan,
-                            Err(e) => {
-                                return exit_with(format!(
-                                    "Failed to prepare network '{network_id}': {e}"
-                                ));
-                            }
-                        };
-                        info!(
-                            "Starting network '{network_id}' in the foreground. \
-                             Ctrl-C or 'minimina network stop -i {network_id}' to stop."
-                        );
-                        println!("{}", network::Start { network_id: network_id.clone() });
-                        // Foreground: the supervisor owns the daemons and blocks
-                        // until 'stop' (RPC) or SIGINT. Detached mode is a later ticket.
-                        match supervisor::run_blocking(plan) {
-                            Ok(()) => Ok(()),
-                            Err(e) => {
-                                exit_with(format!("Supervisor error for network '{network_id}': {e}"))
-                            }
-                        }
+                        native.build_supervisor_plan(&services, &network_id)
+                    }
+                };
+                let plan = match plan {
+                    Ok(plan) => plan,
+                    Err(e) => {
+                        return exit_with(format!("Failed to prepare network '{network_id}': {e}"));
+                    }
+                };
+                info!(
+                    "Starting network '{network_id}' in the foreground. \
+                     Ctrl-C or 'minimina network stop -i {network_id}' to stop."
+                );
+                println!("{}", network::Start { network_id: network_id.clone() });
+                // Foreground: detached mode is a later ticket.
+                match supervisor::run_blocking(plan) {
+                    Ok(()) => Ok(()),
+                    Err(e) => {
+                        exit_with(format!("Supervisor error for network '{network_id}': {e}"))
                     }
                 }
             }
@@ -316,36 +264,17 @@ fn main() -> Result<()> {
 
                 let network_path = directory_manager.network_path(&network_id);
 
-                match mode {
-                    ExecutionMode::Docker => {
-                        let docker = DockerManager::new(&network_path);
-                        match docker.compose_stop_all() {
-                            Ok(_) => {
-                                println!("{}", network::Stop { network_id });
-                                Ok(())
-                            }
-                            Err(e) => {
-                                let error_message =
-                                    format!("Failed to stop network '{network_id}': {e}");
-                                exit_with(error_message)
-                            }
-                        }
+                // Backend-agnostic: the foreground supervisor owns the units; ask
+                // it to tear the network down over its RPC socket.
+                let socket = NativeManager::supervisor_socket(&network_path);
+                match supervisor::rpc_call(&socket, "stop", serde_json::Value::Null) {
+                    Ok(_) => {
+                        println!("{}", network::Stop { network_id });
+                        Ok(())
                     }
-                    ExecutionMode::Native => {
-                        // The foreground supervisor owns the daemons; ask it to
-                        // tear the network down over its RPC socket.
-                        let socket = NativeManager::supervisor_socket(&network_path);
-                        match supervisor::rpc_call(&socket, "stop", serde_json::Value::Null) {
-                            Ok(_) => {
-                                println!("{}", network::Stop { network_id });
-                                Ok(())
-                            }
-                            Err(e) => exit_with(format!(
-                                "Failed to stop network '{network_id}' \
-                                 (is it running?): {e}"
-                            )),
-                        }
-                    }
+                    Err(e) => exit_with(format!(
+                        "Failed to stop network '{network_id}' (is it running?): {e}"
+                    )),
                 }
             }
         },
@@ -700,121 +629,6 @@ fn main() -> Result<()> {
     }
 }
 
-fn create_network(
-    docker: &DockerManager,
-    directory_manager: &DirectoryManager,
-    network_id: &str,
-    services: &[ServiceConfig],
-) -> Result<()> {
-    match docker.compose_create(None) {
-        Ok(output) => {
-            if !output.status.success() {
-                let error_message = format!(
-                    "Failed to create network '{network_id}' with 'docker compose create': {}",
-                    String::from_utf8_lossy(&output.stderr)
-                );
-                return exit_with(error_message);
-            }
-            info!("Successfully created docker-compose for network '{network_id}'!");
-
-            // if we have archive node we need to:
-            //  - create input file for replayer (for run-replayer command)
-            //  - create database and apply schema scripts
-            if let Some(archive_node) = ServiceConfig::get_archive_node(services) {
-                // generate input file for mina-replayer
-                default::LedgerGenerator::generate_replayer_input(
-                    &directory_manager.network_path(network_id),
-                )?;
-
-                // create archive database and apply schema scripts
-                // start postgres container
-                let postgres_name = format!("postgres-{network_id}");
-                let error_message =
-                    format!("Failed to start postgres container in network '{network_id}'.");
-
-                match docker.compose_start(vec![&postgres_name]) {
-                    Ok(out) => {
-                        if out.status.success() {
-                            info!("Successfully started postgres container in network '{network_id}'!");
-                        } else {
-                            return exit_with(format!(
-                                "{}: {}",
-                                error_message,
-                                String::from_utf8_lossy(&out.stderr)
-                            ));
-                        }
-                    }
-                    Err(e) => return exit_with(format!("{error_message}: {e}")),
-                };
-
-                // make sure postgres is running
-                container_is_running(docker, &postgres_name)?;
-
-                // create database
-                let cmd = ["createdb", "-U", "postgres", "archive"];
-                docker.exec(&postgres_name, &cmd)?;
-
-                // apply schema scripts
-                let scripts = archive_node.archive_schema_files.as_ref().unwrap();
-                apply_schema_scripts(
-                    docker.clone(),
-                    &postgres_name,
-                    scripts,
-                    &directory_manager.network_path(network_id),
-                )?;
-
-                // stop postgres
-                docker.compose_stop(vec![&postgres_name])?;
-            }
-
-            // generate network.json and services.json
-            if let Err(e) = directory_manager.save_network_info(network_id, services) {
-                error!("Error generating network.json: {e}")
-            }
-
-            if let Err(e) = directory_manager.save_services_info(network_id, services) {
-                error!("Error generating services.json: {e}")
-            }
-
-            println!("{}", output::generate_network_info(services, network_id));
-            Ok(())
-        }
-        Err(e) => {
-            let error_message = format!(
-                "Failed to register network '{network_id}' with 'docker compose create': {e}"
-            );
-            exit_with(error_message)
-        }
-    }
-}
-
-fn container_is_running(docker: &DockerManager, container_name: &str) -> Result<()> {
-    let mut container_running = false;
-    let mut retries = 0;
-
-    while !container_running && retries < TIMEOUT_IN_SECS {
-        let containers = docker.compose_ps(None)?;
-        let container = docker.filter_container_by_name(containers, container_name);
-
-        if let Some(container) = container {
-            if container.state == ContainerState::Running {
-                container_running = true;
-            }
-        }
-
-        retries += 1;
-        std::thread::sleep(std::time::Duration::from_secs(1));
-    }
-
-    if !container_running {
-        return exit_with(format!(
-            "Failed to start container '{container_name}' within {TIMEOUT_IN_SECS}s",
-        ));
-    }
-
-    Ok(())
-}
-
 #[allow(dead_code)]
 fn wait_for_daemon(
     docker: &DockerManager,
@@ -839,45 +653,6 @@ fn wait_for_daemon(
             "Failed to start daemon for node '{node_id}' on network '{network_id}' within {TIMEOUT_IN_SECS}s",
         ));
     }
-    Ok(())
-}
-
-/// Applies provided schema `scripts` to the postgres db, `postgres_name`
-fn apply_schema_scripts(
-    docker: DockerManager,
-    postgres_name: &str,
-    scripts: &Vec<String>,
-    network_path: &Path,
-) -> Result<()> {
-    // copy scripts first
-    for script in scripts {
-        let file_path = fetch_schema(script, network_path.to_path_buf()).unwrap();
-        let file_name = file_path.file_name().unwrap().to_str().unwrap();
-        let docker_file_path = Path::new("/tmp").join(file_path.file_name().unwrap());
-
-        info!("Copying schema script: {}", file_name);
-        docker.cp(postgres_name, &file_path, &docker_file_path)?;
-    }
-
-    // then apply scripts 1 by 1
-    for script in scripts {
-        let file_path = fetch_schema(script, network_path.to_path_buf()).unwrap();
-        let file_name = file_path.file_name().unwrap().to_str().unwrap();
-        let docker_file_path = Path::new("/tmp").join(file_path.file_name().unwrap());
-        let cmd = [
-            "psql",
-            "-U",
-            "postgres",
-            "-d",
-            "archive",
-            "-f",
-            docker_file_path.to_str().unwrap(),
-        ];
-
-        info!("Applying schema script: {}", file_name);
-        docker.exec(postgres_name, &cmd)?;
-    }
-
     Ok(())
 }
 
@@ -1318,6 +1093,31 @@ fn check_execution_environment(mode: &ExecutionMode) -> Result<()> {
         // Native mode's mina discovery lives in `resolve_bin_path`.
         ExecutionMode::Native => Ok(()),
     }
+}
+
+/// Docker `network create` on the bollard backend: containers are created and
+/// owned by the foreground supervisor at `network start`, so create only records
+/// the plan artifacts (network.json / services.json). Archive/uptime backends are
+/// not yet ported to bollard and are skipped at start.
+fn create_network_docker(
+    directory_manager: &DirectoryManager,
+    network_id: &str,
+    services: &[ServiceConfig],
+) -> Result<()> {
+    if ServiceConfig::get_archive_node(services).is_some() {
+        warn!(
+            "Archive nodes are not yet supported on the bollard docker backend; \
+             the archive node will be skipped when the network starts."
+        );
+    }
+    if let Err(e) = directory_manager.save_network_info(network_id, services) {
+        error!("Error generating network.json: {e}");
+    }
+    if let Err(e) = directory_manager.save_services_info(network_id, services) {
+        error!("Error generating services.json: {e}");
+    }
+    println!("{}", output::generate_network_info(services, network_id));
+    Ok(())
 }
 
 fn create_network_native(
