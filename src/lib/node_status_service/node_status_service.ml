@@ -14,8 +14,7 @@ type catchup_job_states = Transition_frontier.Full_catchup_tree.job_states =
 [@@deriving yojson]
 
 type rpc_count =
-  { get_some_initial_peers : int
-  ; get_staged_ledger_aux_and_pending_coinbases_at_hash : int
+  { get_staged_ledger_aux_and_pending_coinbases_at_hash : int
   ; answer_sync_ledger_query : int
   ; get_transition_chain : int
   ; get_transition_knowledge : int
@@ -153,9 +152,7 @@ let reset_gauges () =
     ; snark_pool_diff_broadcasted
     ]
     @ List.map ~f:snd
-        [ get_some_initial_peers_rpcs_sent
-        ; get_some_initial_peers_rpcs_received
-        ; get_staged_ledger_aux_and_pending_coinbases_at_hash_rpcs_sent
+        [ get_staged_ledger_aux_and_pending_coinbases_at_hash_rpcs_sent
         ; get_staged_ledger_aux_and_pending_coinbases_at_hash_rpcs_received
         ; answer_sync_ledger_query_rpcs_sent
         ; answer_sync_ledger_query_rpcs_received
@@ -270,10 +267,7 @@ let start ~commit_id ~logger ~node_status_url ~transition_frontier ~sync_status
                 Time.Span.to_sec @@ Time.diff (Time.now ()) start_time
             ; peer_count = List.length peers
             ; rpc_sent =
-                { get_some_initial_peers =
-                    Float.to_int @@ Mina_metrics.Gauge.value
-                    @@ snd Mina_metrics.Network.get_some_initial_peers_rpcs_sent
-                ; get_staged_ledger_aux_and_pending_coinbases_at_hash =
+                { get_staged_ledger_aux_and_pending_coinbases_at_hash =
                     Float.to_int @@ Mina_metrics.Gauge.value
                     @@ snd
                          Mina_metrics.Network
@@ -313,12 +307,7 @@ let start ~commit_id ~logger ~node_status_url ~transition_frontier ~sync_status
                     @@ snd Mina_metrics.Network.get_epoch_ledger_rpcs_sent
                 }
             ; rpc_received =
-                { get_some_initial_peers =
-                    Float.to_int @@ Mina_metrics.Gauge.value
-                    @@ snd
-                         Mina_metrics.Network
-                         .get_some_initial_peers_rpcs_received
-                ; get_staged_ledger_aux_and_pending_coinbases_at_hash =
+                { get_staged_ledger_aux_and_pending_coinbases_at_hash =
                     Float.to_int @@ Mina_metrics.Gauge.value
                     @@ snd
                          Mina_metrics.Network
