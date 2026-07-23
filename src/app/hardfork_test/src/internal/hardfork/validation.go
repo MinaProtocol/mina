@@ -16,7 +16,7 @@ type ConsensusState struct {
 	// Set of public keys that actually produced a block in the observed window
 	// (block creators reported by consensus). This is the on-chain evidence of
 	// which producers were live, independent of the key files the harness reads.
-	ObservedProducerPks map[string]bool `json:"observed_producer_pks"`
+	ObservedProducerPks map[string]struct{} `json:"observed_producer_pks"`
 }
 
 type BlockAnalysisResult struct {
@@ -164,7 +164,7 @@ func (t *HardforkTest) ReportBlocksInfo(port int, blocks []client.BlockData) {
 func (t *HardforkTest) ConsensusStateOnNode(port int) (*ConsensusState, error) {
 
 	state := new(ConsensusState)
-	state.ObservedProducerPks = make(map[string]bool)
+	state.ObservedProducerPks = make(map[string]struct{})
 
 	recentBlocks, err := t.Client.RecentBlocks(port, config.ProtocolK)
 
@@ -194,7 +194,7 @@ func (t *HardforkTest) ConsensusStateOnNode(port int) (*ConsensusState, error) {
 		// active-stake classification can be cross-checked against which
 		// producers were actually live.
 		if block.Slot > 0 && block.Creator != "" {
-			state.ObservedProducerPks[block.Creator] = true
+			state.ObservedProducerPks[block.Creator] = struct{}{}
 		}
 	}
 

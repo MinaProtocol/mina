@@ -142,33 +142,33 @@ func TestValidateActiveProducerLiveness(t *testing.T) {
 
 	// CI-shaped partition: active + lazy = total.
 	stats := StakeStats{TotalCurrency: 1000, ActiveProducerStake: 285, LazyStake: 715}
-	running := map[string]bool{"A": true, "B": true}
+	running := map[string]struct{}{"A": {}, "B": {}}
 
 	// Both running producers produced blocks (plus an empty-slot signature is
 	// irrelevant): passes.
-	if err := validateActiveProducerLiveness(running, map[string]bool{"A": true, "B": true}, stats); err != nil {
+	if err := validateActiveProducerLiveness(running, map[string]struct{}{"A": {}, "B": {}}, stats); err != nil {
 		t.Errorf("expected pass when every running producer authored a block, got %v", err)
 	}
 
 	// A running producer that never produced a block (B died): must fail.
-	if err := validateActiveProducerLiveness(running, map[string]bool{"A": true}, stats); err == nil {
+	if err := validateActiveProducerLiveness(running, map[string]struct{}{"A": {}}, stats); err == nil {
 		t.Error("expected failure when a running producer authored no blocks (dead producer)")
 	}
 
 	// A block creator that is not a known running producer: must fail.
-	if err := validateActiveProducerLiveness(running, map[string]bool{"A": true, "B": true, "C": true}, stats); err == nil {
+	if err := validateActiveProducerLiveness(running, map[string]struct{}{"A": {}, "B": {}, "C": {}}, stats); err == nil {
 		t.Error("expected failure when an unexpected key produced a block (rogue producer)")
 	}
 
 	// Partition overcount: active + lazy exceeds total, even with liveness OK.
 	overcount := StakeStats{TotalCurrency: 1000, ActiveProducerStake: 600, LazyStake: 500}
-	if err := validateActiveProducerLiveness(running, map[string]bool{"A": true, "B": true}, overcount); err == nil {
+	if err := validateActiveProducerLiveness(running, map[string]struct{}{"A": {}, "B": {}}, overcount); err == nil {
 		t.Error("expected failure when active + lazy stake exceeds total currency")
 	}
 
 	// Exact partition (active + lazy == total) is allowed.
 	exact := StakeStats{TotalCurrency: 1000, ActiveProducerStake: 300, LazyStake: 700}
-	if err := validateActiveProducerLiveness(running, map[string]bool{"A": true, "B": true}, exact); err != nil {
+	if err := validateActiveProducerLiveness(running, map[string]struct{}{"A": {}, "B": {}}, exact); err != nil {
 		t.Errorf("expected pass when active + lazy == total, got %v", err)
 	}
 }
@@ -388,7 +388,7 @@ func TestLazyWhalePksAndComputeStakeStats(t *testing.T) {
 	if err != nil {
 		t.Fatalf("RunningProducerPks: %v", err)
 	}
-	if len(producerPks) != 1 || !producerPks["B62qonline0"] {
+	if _, ok := producerPks["B62qonline0"]; len(producerPks) != 1 || !ok {
 		t.Fatalf("RunningProducerPks = %v, want {B62qonline0}", producerPks)
 	}
 
@@ -441,7 +441,7 @@ func TestLazyWhalePksAndComputeStakeStats(t *testing.T) {
 	}
 	cfg.NumLazyWhales = 2
 
-	lazySet := map[string]bool{"B62qoffline0": true, "B62qoffline2": true}
+	lazySet := map[string]struct{}{"B62qoffline0": {}, "B62qoffline2": {}}
 	stats, err := ComputeStakeStats(ledgerPath, producerPks, lazySet)
 	if err != nil {
 		t.Fatalf("ComputeStakeStats: %v", err)

@@ -82,14 +82,14 @@ func (t *HardforkTest) LazyWhalePks() ([]string, error) {
 		return nil, err
 	}
 
-	allOnlineWhalePks := make(map[string]bool)
+	allOnlineWhalePks := make(map[string]struct{})
 	for i := 0; i < t.Config.NumWhales+t.Config.NumLazyWhales; i++ {
 		path := filepath.Join(t.Config.Root, "online_whale_keys", fmt.Sprintf("online_whale_account_%d.pub", i))
 		pk, err := readPubkeyFile(path)
 		if err != nil {
 			return nil, fmt.Errorf("failed to read online whale %d public key: %w", i, err)
 		}
-		allOnlineWhalePks[pk] = true
+		allOnlineWhalePks[pk] = struct{}{}
 	}
 
 	ledger, err := readGenesisLedger(filepath.Join(t.Config.Root, "genesis_ledger.json"))
@@ -102,7 +102,9 @@ func (t *HardforkTest) LazyWhalePks() ([]string, error) {
 		if account.Delegate == nil {
 			continue
 		}
-		if allOnlineWhalePks[*account.Delegate] && !running[*account.Delegate] {
+		_, isOnlineWhale := allOnlineWhalePks[*account.Delegate]
+		_, isRunning := running[*account.Delegate]
+		if isOnlineWhale && !isRunning {
 			pks = append(pks, account.Pk)
 		}
 	}
@@ -115,15 +117,15 @@ func (t *HardforkTest) LazyWhalePks() ([]string, error) {
 // RunningProducerPks returns the public keys of the block producer accounts
 // that actually have a daemon running: online whales 0..NumWhales-1 and online
 // fish 0..NumFish-1
-func (t *HardforkTest) RunningProducerPks() (map[string]bool, error) {
-	pks := make(map[string]bool)
+func (t *HardforkTest) RunningProducerPks() (map[string]struct{}, error) {
+	pks := make(map[string]struct{})
 	for i := 0; i < t.Config.NumWhales; i++ {
 		path := filepath.Join(t.Config.Root, "online_whale_keys", fmt.Sprintf("online_whale_account_%d.pub", i))
 		pk, err := readPubkeyFile(path)
 		if err != nil {
 			return nil, fmt.Errorf("failed to read online whale %d public key: %w", i, err)
 		}
-		pks[pk] = true
+		pks[pk] = struct{}{}
 	}
 	for i := 0; i < t.Config.NumFish; i++ {
 		path := filepath.Join(t.Config.Root, "online_fish_keys", fmt.Sprintf("online_fish_account_%d.pub", i))
@@ -131,7 +133,7 @@ func (t *HardforkTest) RunningProducerPks() (map[string]bool, error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed to read online fish %d public key: %w", i, err)
 		}
-		pks[pk] = true
+		pks[pk] = struct{}{}
 	}
 	return pks, nil
 }
@@ -178,7 +180,7 @@ func readGenesisLedger(path string) (*genesisLedgerFile, error) {
 // running producer key; a null delegate means self-delegation on the pre-fork
 // (mesa) build, so such an account is active iff its own key is a running
 // producer.
-func ComputeStakeStats(genesisLedgerPath string, runningProducerPks, lazyPks map[string]bool) (StakeStats, error) {
+func ComputeStakeStats(genesisLedgerPath string, runningProducerPks, lazyPks map[string]struct{}) (StakeStats, error) {
 	var stats StakeStats
 
 	ledger, err := readGenesisLedger(genesisLedgerPath)
@@ -194,10 +196,10 @@ func ComputeStakeStats(genesisLedgerPath string, runningProducerPks, lazyPks map
 		if account.Delegate != nil {
 			delegate = *account.Delegate
 		}
-		if runningProducerPks[delegate] {
+		if _, ok := runningProducerPks[delegate]; ok {
 			stats.ActiveProducerStake += balance
 		}
-		if lazyPks[account.Pk] {
+		if _, ok := lazyPks[account.Pk]; ok {
 			stats.LazyStake += balance
 		}
 	}
@@ -225,9 +227,9 @@ func (t *HardforkTest) validatePreForkOccupancyDiluted(analysis *BlockAnalysisRe
 		return err
 	}
 	analysis.LazyWhalePks = lazyList
-	lazyPks := make(map[string]bool, len(lazyList))
+	lazyPks := make(map[string]struct{}, len(lazyList))
 	for _, pk := range lazyList {
-		lazyPks[pk] = true
+		lazyPks[pk] = struct{}{}
 	}
 
 	stats, err := ComputeStakeStats(filepath.Join(t.Config.Root, "genesis_ledger.json"), producerPks, lazyPks)
@@ -421,14 +423,14 @@ func (t *HardforkTest) validatePostForkUnstaking(analysis *BlockAnalysisResult, 
 // consensus). The two must be equal, and the stake partition must not
 // overcount. This is the independent check on the s_active numerator that the
 // 0.1% total-currency cross-check provides for the denominator.
-func validateActiveProducerLiveness(running, observed map[string]bool, stats StakeStats) error {
+func validateActiveProducerLiveness(running, observed map[string]struct{}, stats StakeStats) error {
 	// Every running producer must have produced at least one block. A running
 	// producer that never appears as a creator is dead or misconfigured while
 	// its stake is still counted as active — occupancy would be suppressed with
 	// no dilution to explain it, which the occupancy lower band cannot reliably
 	// catch at the CI window length.
 	for pk := range running {
-		if !observed[pk] {
+		if _, ok := observed[pk]; !ok {
 			return fmt.Errorf("running producer %s authored no blocks in the pre-fork window; its stake is counted as active but it appears dead or misconfigured", pk)
 		}
 	}
@@ -436,7 +438,7 @@ func validateActiveProducerLiveness(running, observed map[string]bool, stats Sta
 	// block creator means the running-producer set is wrong, so the active-stake
 	// classification built from it cannot be trusted.
 	for pk := range observed {
-		if !running[pk] {
+		if _, ok := running[pk]; !ok {
 			return fmt.Errorf("block creator %s is not in the expected running-producer set; the active-stake classification is unreliable", pk)
 		}
 	}
