@@ -140,12 +140,20 @@ module Base_node_config = struct
     }
 
   let to_docker_env_vars t =
+    (* Per-node and docker-only: the docker entrypoint reads the daemon ports
+       from these env vars. The native engine passes ports as CLI flags
+       instead, and these values are dynamic (per node), so they cannot live in
+       the shared static list below. *)
     [ ("DAEMON_REST_PORT", t.rest_port)
     ; ("DAEMON_CLIENT_PORT", t.client_port)
     ; ("DAEMON_METRICS_PORT", t.metrics_port)
     ; ("DAEMON_EXTERNAL_PORT", t.external_port)
     ]
+    (* Static vars identical across both engines and every node; only these
+       qualify for the shared list. *)
     @ Local_engine_common.node_env_vars
+    (* Docker-only: mDNS peer discovery within the docker swarm. The native
+       engine uses explicit seed peering and does not set this. *)
     @ [ ("LIBP2P_ENABLE_MDNS", "true") ]
 
   let to_list t =
