@@ -30,9 +30,11 @@ use tokio::net::UnixListener;
 use tokio::sync::Notify;
 
 use bollard::container::{
-    Config, CreateContainerOptions, NetworkingConfig, RemoveContainerOptions, StopContainerOptions,
-    WaitContainerOptions,
+    Config, CreateContainerOptions, LogsOptions, NetworkingConfig, RemoveContainerOptions,
+    StopContainerOptions, WaitContainerOptions,
 };
+use crate::archive;
+use bollard::exec::{CreateExecOptions, StartExecResults};
 use bollard::image::CreateImageOptions;
 use bollard::network::CreateNetworkOptions;
 use bollard::secret::{EndpointSettings, HostConfig, PortBinding};
@@ -126,6 +128,27 @@ pub enum NodeStatus {
     Failed { error: String },
 }
 
+/// Per-node launch spec, retained so a stopped unit can be relaunched by name
+/// (`node_start`).
+enum NodeLaunch {
+    Native(NativeNodeSpec),
+    Docker(DockerNodeSpec),
+}
+
+/// Immutable per-run context: set up once, then only read. Shared (`Arc`) with
+/// every RPC handler so node ops can reach the backend + per-node specs without
+/// touching the mutable state lock.
+struct SupervisorCtx {
+    /// The backend (docker handle / network) used to (re)launch + exec units.
+    execution: Execution,
+    network_id: String,
+    /// Host network directory — config dirs, keypairs, and archive data live here.
+    network_path: PathBuf,
+    /// Per-node launch spec, for `node_start` restart.
+    launches: HashMap<String, NodeLaunch>,
+}
+
+/// Mutable live state, behind a `std::sync::Mutex` never held across `.await`.
 struct SupervisorState {
     nodes: HashMap<String, NodeStatus>,
     /// Kill handles for live units, for teardown.
@@ -508,6 +531,81 @@ impl Execution {
             }
         }
     }
+
+    /// Stream a container's logs (docker only). `tail` limits to the last N lines.
+    async fn container_logs(
+        &self,
+        container: &str,
+        tail: Option<u64>,
+    ) -> std::io::Result<String> {
+        match self {
+            Execution::Docker { docker, .. } => {
+                let opts = LogsOptions::<String> {
+                    stdout: true,
+                    stderr: true,
+                    tail: tail.map(|t| t.to_string()).unwrap_or_else(|| "all".to_string()),
+                    ..Default::default()
+                };
+                let mut stream = docker.logs(container, Some(opts));
+                let mut out = String::new();
+                while let Some(item) = stream.next().await {
+                    match item {
+                        Ok(chunk) => out.push_str(&String::from_utf8_lossy(&chunk.into_bytes())),
+                        Err(e) => return Err(std::io::Error::other(e)),
+                    }
+                }
+                Ok(out)
+            }
+            Execution::Native => Err(std::io::Error::other(
+                "container_logs called on native execution",
+            )),
+        }
+    }
+
+    /// Run a command "inside" a unit and return its combined stdout+stderr.
+    /// Docker: `exec` into `container`. Native: run the command on the host
+    /// (a native unit has no container, so the caller passes a full host command
+    /// and `container` is ignored).
+    async fn exec(&self, container: &str, cmd: &[String]) -> std::io::Result<String> {
+        match self {
+            Execution::Docker { docker, .. } => {
+                let exec = docker
+                    .create_exec(
+                        container,
+                        CreateExecOptions {
+                            cmd: Some(cmd.iter().map(|s| s.as_str()).collect()),
+                            attach_stdout: Some(true),
+                            attach_stderr: Some(true),
+                            ..Default::default()
+                        },
+                    )
+                    .await
+                    .map_err(|e| std::io::Error::other(format!("create_exec '{container}': {e}")))?;
+                let mut out = String::new();
+                if let StartExecResults::Attached { mut output, .. } = docker
+                    .start_exec(&exec.id, None)
+                    .await
+                    .map_err(|e| std::io::Error::other(format!("start_exec '{container}': {e}")))?
+                {
+                    while let Some(item) = output.next().await {
+                        if let Ok(chunk) = item {
+                            out.push_str(&String::from_utf8_lossy(&chunk.into_bytes()));
+                        }
+                    }
+                }
+                Ok(out)
+            }
+            Execution::Native => {
+                let (bin, args) = cmd
+                    .split_first()
+                    .ok_or_else(|| std::io::Error::other("empty exec command"))?;
+                let output = tokio::process::Command::new(bin).args(args).output().await?;
+                let mut s = String::from_utf8_lossy(&output.stdout).to_string();
+                s.push_str(&String::from_utf8_lossy(&output.stderr));
+                Ok(s)
+            }
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -521,7 +619,6 @@ struct RpcRequest {
     #[serde(default)]
     id: serde_json::Value,
     method: String,
-    #[allow(dead_code)]
     #[serde(default)]
     params: serde_json::Value,
 }
@@ -577,29 +674,48 @@ pub fn run_blocking(plan: SupervisorPlan) -> std::io::Result<()> {
 }
 
 async fn run(plan: SupervisorPlan) -> std::io::Result<()> {
+    // Acquire the backend + any network-level resources.
+    let execution = Execution::setup(&plan.spec, &plan.network_id).await?;
+
+    // Retain each node's launch spec (for `node_start`) and remember the launch
+    // order (the one match here is on the spec *data* — native and docker node
+    // specs differ — not a leaky abstraction).
+    let mut launches: HashMap<String, NodeLaunch> = HashMap::new();
+    let ordered: Vec<String> = match &plan.spec {
+        BackendSpec::Native { nodes } => nodes
+            .iter()
+            .map(|n| {
+                launches.insert(n.name.clone(), NodeLaunch::Native(n.clone()));
+                n.name.clone()
+            })
+            .collect(),
+        BackendSpec::Docker { nodes, .. } => nodes
+            .iter()
+            .map(|n| {
+                launches.insert(n.name.clone(), NodeLaunch::Docker(n.clone()));
+                n.name.clone()
+            })
+            .collect(),
+    };
+
+    let ctx = Arc::new(SupervisorCtx {
+        execution,
+        network_id: plan.network_id.clone(),
+        // Network dir is the socket's parent (`<net>/supervisor.sock`).
+        network_path: plan
+            .socket_path
+            .parent()
+            .map(|p| p.to_path_buf())
+            .unwrap_or_default(),
+        launches,
+    });
     let state = Arc::new(Mutex::new(SupervisorState::new()));
     let shutdown = Arc::new(Notify::new());
 
-    // Acquire the backend + any network-level resources, then launch every unit
-    // (each with a waiter task that reaps its exit). The one match here is on the
-    // spec *data* (native and docker node specs differ), not a leaky abstraction.
-    let execution = Execution::setup(&plan.spec, &plan.network_id).await?;
-    match &plan.spec {
-        BackendSpec::Native { nodes } => {
-            for node in nodes {
-                match execution.launch_native(node) {
-                    Ok((unit, killer, pid)) => register_unit(&state, &node.name, pid, unit, killer),
-                    Err(e) => fail_unit(&state, &node.name, e.to_string()),
-                }
-            }
-        }
-        BackendSpec::Docker { nodes, .. } => {
-            for node in nodes {
-                match execution.launch_docker(node, &plan.network_id).await {
-                    Ok((unit, killer, pid)) => register_unit(&state, &node.name, pid, unit, killer),
-                    Err(e) => fail_unit(&state, &node.name, e.to_string()),
-                }
-            }
+    // Launch every unit in order (each with a waiter task that reaps its exit).
+    for name in &ordered {
+        if let Some(launch) = ctx.launches.get(name) {
+            launch_and_register(&ctx, &state, name, launch).await;
         }
     }
 
@@ -608,6 +724,7 @@ async fn run(plan: SupervisorPlan) -> std::io::Result<()> {
     let listener = UnixListener::bind(&plan.socket_path)?;
     info!("supervisor: serving RPC on '{}'", plan.socket_path.display());
 
+    let accept_ctx = ctx.clone();
     let accept_state = state.clone();
     let accept_shutdown = shutdown.clone();
     let accept_task = tokio::spawn(async move {
@@ -616,6 +733,7 @@ async fn run(plan: SupervisorPlan) -> std::io::Result<()> {
                 Ok((stream, _addr)) => {
                     tokio::spawn(handle_connection(
                         stream,
+                        accept_ctx.clone(),
                         accept_state.clone(),
                         accept_shutdown.clone(),
                     ));
@@ -638,7 +756,7 @@ async fn run(plan: SupervisorPlan) -> std::io::Result<()> {
 
     accept_task.abort();
     stop_units(&state).await;
-    execution.teardown().await;
+    ctx.execution.teardown().await;
     let _ = std::fs::remove_file(&plan.socket_path);
     info!("supervisor: network '{}' stopped", plan.network_id);
     Ok(())
@@ -681,6 +799,7 @@ fn fail_unit(state: &Arc<Mutex<SupervisorState>>, name: &str, error: String) {
 /// Handle one client connection: newline-delimited JSON-RPC request/response.
 async fn handle_connection(
     stream: tokio::net::UnixStream,
+    ctx: Arc<SupervisorCtx>,
     state: Arc<Mutex<SupervisorState>>,
     shutdown: Arc<Notify>,
 ) {
@@ -700,7 +819,7 @@ async fn handle_connection(
         }
 
         let response = match serde_json::from_str::<RpcRequest>(&line) {
-            Ok(req) => dispatch(req, &state, &shutdown),
+            Ok(req) => dispatch(req, &ctx, &state, &shutdown).await,
             Err(e) => RpcResponse::err(
                 serde_json::Value::Null,
                 -32700,
@@ -723,23 +842,380 @@ async fn handle_connection(
     }
 }
 
-/// Dispatch a single request. Locks state only briefly, never across an await.
-fn dispatch(
+const INVALID_PARAMS: i64 = -32602;
+const NODE_ERROR: i64 = -32000;
+
+/// Extract a required string `name` param.
+fn param_name(params: &serde_json::Value) -> Result<String, RpcError> {
+    params
+        .get("name")
+        .and_then(|v| v.as_str())
+        .map(str::to_string)
+        .ok_or_else(|| RpcError {
+            code: INVALID_PARAMS,
+            message: "missing 'name' string param".to_string(),
+        })
+}
+
+/// Dispatch a single request. State-mutating helpers keep the `std::sync::Mutex`
+/// for only the moment they touch it, never across an `.await`.
+async fn dispatch(
     req: RpcRequest,
+    ctx: &Arc<SupervisorCtx>,
     state: &Arc<Mutex<SupervisorState>>,
     shutdown: &Arc<Notify>,
 ) -> RpcResponse {
-    match req.method.as_str() {
-        "status" => {
-            let snap = state.lock().unwrap().snapshot();
-            RpcResponse::ok(req.id, snap)
-        }
+    let id = req.id.clone();
+    let result: Result<serde_json::Value, RpcError> = match req.method.as_str() {
+        "status" => Ok(state.lock().unwrap().snapshot()),
         "stop" => {
             state.lock().unwrap().shutdown = true;
             shutdown.notify_one();
-            RpcResponse::ok(req.id, serde_json::json!({ "stopping": true }))
+            Ok(serde_json::json!({ "stopping": true }))
         }
-        other => RpcResponse::err(req.id, METHOD_NOT_FOUND, format!("unknown method '{other}'")),
+        "node_start" => match param_name(&req.params) {
+            Ok(name) => {
+                let fresh = req
+                    .params
+                    .get("fresh_state")
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(false);
+                node_start(ctx, state, &name, fresh).await
+            }
+            Err(e) => Err(e),
+        },
+        "node_stop" => match param_name(&req.params) {
+            Ok(name) => node_stop(state, &name).await,
+            Err(e) => Err(e),
+        },
+        "node_logs" => match param_name(&req.params) {
+            Ok(name) => {
+                let tail = req.params.get("tail").and_then(|v| v.as_u64());
+                node_logs(ctx, &name, tail).await
+            }
+            Err(e) => Err(e),
+        },
+        "node_dump_precomputed" => match param_name(&req.params) {
+            Ok(name) => node_dump_precomputed(ctx, &name),
+            Err(e) => Err(e),
+        },
+        "node_import_accounts" => match param_name(&req.params) {
+            Ok(name) => node_import_accounts(ctx, &name).await,
+            Err(e) => Err(e),
+        },
+        "dump_archive_data" => dump_archive_data(ctx).await,
+        "run_replayer" => match param_name(&req.params) {
+            Ok(name) => run_replayer(ctx, &name).await,
+            Err(e) => Err(e),
+        },
+        other => Err(RpcError {
+            code: METHOD_NOT_FOUND,
+            message: format!("unknown method '{other}'"),
+        }),
+    };
+    match result {
+        Ok(v) => RpcResponse::ok(id, v),
+        Err(e) => RpcResponse::err(id, e.code, e.message),
+    }
+}
+
+/// Host config directory for a unit (`<net>/config-directory/<name>`) — same path
+/// on both backends (docker bind-mounts it into the container at
+/// `/config-directory`).
+fn config_dir(ctx: &SupervisorCtx, name: &str) -> PathBuf {
+    ctx.network_path.join("config-directory").join(name)
+}
+
+/// (Re)start a single node from its retained launch spec. With `fresh_state`, the
+/// unit's config directory is wiped first (a clean restart).
+async fn node_start(
+    ctx: &Arc<SupervisorCtx>,
+    state: &Arc<Mutex<SupervisorState>>,
+    name: &str,
+    fresh_state: bool,
+) -> Result<serde_json::Value, RpcError> {
+    let already = matches!(
+        state.lock().unwrap().nodes.get(name),
+        Some(NodeStatus::Running { .. })
+    );
+    if already {
+        return Err(RpcError {
+            code: NODE_ERROR,
+            message: format!("node '{name}' is already running"),
+        });
+    }
+    match ctx.launches.get(name) {
+        Some(launch) => {
+            if fresh_state {
+                let dir = config_dir(ctx, name);
+                let _ = std::fs::remove_dir_all(&dir);
+                if let Err(e) = std::fs::create_dir_all(&dir) {
+                    return Err(RpcError {
+                        code: NODE_ERROR,
+                        message: format!("failed to reset config dir '{}': {e}", dir.display()),
+                    });
+                }
+            }
+            launch_and_register(ctx, state, name, launch).await;
+            Ok(serde_json::json!({ "started": name }))
+        }
+        None => Err(RpcError {
+            code: NODE_ERROR,
+            message: format!("unknown node '{name}'"),
+        }),
+    }
+}
+
+/// Dump a node's precomputed-blocks log (`<config-dir>/precomputed_blocks.log`),
+/// which is on the host for both backends (docker bind-mounts the config dir).
+fn node_dump_precomputed(
+    ctx: &Arc<SupervisorCtx>,
+    name: &str,
+) -> Result<serde_json::Value, RpcError> {
+    let path = config_dir(ctx, name).join("precomputed_blocks.log");
+    match std::fs::read_to_string(&path) {
+        Ok(blocks) => Ok(serde_json::json!({ "precomputed_blocks": blocks })),
+        Err(e) => Err(RpcError {
+            code: NODE_ERROR,
+            message: format!("cannot read '{}': {e}", path.display()),
+        }),
+    }
+}
+
+/// Stop a single node (graceful → force). Its waiter task records the exit.
+async fn node_stop(
+    state: &Arc<Mutex<SupervisorState>>,
+    name: &str,
+) -> Result<serde_json::Value, RpcError> {
+    let killer = state.lock().unwrap().killers.remove(name);
+    match killer {
+        Some(k) => {
+            k.terminate().await;
+            tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+            k.force_kill().await;
+            Ok(serde_json::json!({ "stopped": name }))
+        }
+        None => Err(RpcError {
+            code: NODE_ERROR,
+            message: format!("node '{name}' is not running"),
+        }),
+    }
+}
+
+/// Fetch a node's logs — native: read its log file; docker: stream container logs.
+async fn node_logs(
+    ctx: &Arc<SupervisorCtx>,
+    name: &str,
+    tail: Option<u64>,
+) -> Result<serde_json::Value, RpcError> {
+    let logs = match ctx.launches.get(name) {
+        Some(NodeLaunch::Native(spec)) => {
+            let all = std::fs::read_to_string(&spec.log_file).unwrap_or_default();
+            tail_lines(&all, tail)
+        }
+        Some(NodeLaunch::Docker(spec)) => ctx
+            .execution
+            .container_logs(&spec.container_name, tail)
+            .await
+            .map_err(|e| RpcError {
+                code: NODE_ERROR,
+                message: e.to_string(),
+            })?,
+        None => {
+            return Err(RpcError {
+                code: NODE_ERROR,
+                message: format!("unknown node '{name}'"),
+            })
+        }
+    };
+    Ok(serde_json::json!({ "logs": logs }))
+}
+
+/// Keep only the last `tail` lines of `s` (all of it when `tail` is `None`).
+fn tail_lines(s: &str, tail: Option<u64>) -> String {
+    match tail {
+        Some(n) => {
+            let lines: Vec<&str> = s.lines().collect();
+            let start = lines.len().saturating_sub(n as usize);
+            lines[start..].join("\n")
+        }
+        None => s.to_string(),
+    }
+}
+
+/// Import every keypair into a node's wallet via `mina accounts import` (offline,
+/// against the node's config dir). Docker: `exec` into the container; native: run
+/// the node's `mina` binary on the host.
+async fn node_import_accounts(
+    ctx: &Arc<SupervisorCtx>,
+    name: &str,
+) -> Result<serde_json::Value, RpcError> {
+    let Some(launch) = ctx.launches.get(name) else {
+        return Err(RpcError {
+            code: NODE_ERROR,
+            message: format!("unknown node '{name}'"),
+        });
+    };
+    // privkey files under network-keypairs (host), excluding the `.pub` pubkeys.
+    let keypairs_dir = ctx.network_path.join("network-keypairs");
+    let mut files: Vec<String> = Vec::new();
+    if let Ok(rd) = std::fs::read_dir(&keypairs_dir) {
+        for entry in rd.flatten() {
+            if let Some(f) = entry.file_name().to_str() {
+                if entry.path().is_file() && !f.contains(".pub") {
+                    files.push(f.to_string());
+                }
+            }
+        }
+    }
+    let mut imported = 0;
+    for file in &files {
+        let (container, cmd) = match launch {
+            NodeLaunch::Docker(spec) => (
+                spec.container_name.clone(),
+                vec![
+                    "mina".into(),
+                    "accounts".into(),
+                    "import".into(),
+                    "--privkey-path".into(),
+                    format!("/local-network/network-keypairs/{file}"),
+                    "--config-directory".into(),
+                    "/config-directory".into(),
+                ],
+            ),
+            NodeLaunch::Native(spec) => (
+                name.to_string(),
+                vec![
+                    spec.binary.to_string_lossy().to_string(),
+                    "accounts".into(),
+                    "import".into(),
+                    "--privkey-path".into(),
+                    keypairs_dir.join(file).to_string_lossy().to_string(),
+                    "--config-directory".into(),
+                    config_dir(ctx, name).to_string_lossy().to_string(),
+                ],
+            ),
+        };
+        ctx.execution.exec(&container, &cmd).await.map_err(|e| RpcError {
+            code: NODE_ERROR,
+            message: format!("import '{file}': {e}"),
+        })?;
+        imported += 1;
+    }
+    Ok(serde_json::json!({ "imported": imported }))
+}
+
+/// `pg_dump` the archive database. Docker: `exec` into the postgres container;
+/// native: run `pg_dump` on the host against `127.0.0.1`.
+async fn dump_archive_data(ctx: &Arc<SupervisorCtx>) -> Result<serde_json::Value, RpcError> {
+    let pg = archive::PgConfig::default();
+    let (container, cmd) = match &ctx.execution {
+        Execution::Docker { .. } => (
+            format!("postgres-{}", ctx.network_id),
+            vec![
+                "pg_dump".into(),
+                "--insert".into(),
+                "-U".into(),
+                pg.user.to_string(),
+                pg.db.to_string(),
+            ],
+        ),
+        Execution::Native => (
+            String::new(),
+            vec![
+                "pg_dump".into(),
+                "-h".into(),
+                "127.0.0.1".into(),
+                "-p".into(),
+                pg.port.to_string(),
+                "-U".into(),
+                pg.user.to_string(),
+                "--insert".into(),
+                pg.db.to_string(),
+            ],
+        ),
+    };
+    let data = ctx.execution.exec(&container, &cmd).await.map_err(|e| RpcError {
+        code: NODE_ERROR,
+        message: format!("pg_dump: {e}"),
+    })?;
+    Ok(serde_json::json!({ "archive_data": data }))
+}
+
+/// Run the replayer against the archive DB (the caller sets the start slot in
+/// `replayer_input.json` first). Docker: `exec` `mina-replayer` in the archive-
+/// service container; native: run the co-located `mina-replayer` on the host.
+async fn run_replayer(
+    ctx: &Arc<SupervisorCtx>,
+    name: &str,
+) -> Result<serde_json::Value, RpcError> {
+    let svc = archive::archive_service_unit_name(name);
+    let Some(launch) = ctx.launches.get(&svc) else {
+        return Err(RpcError {
+            code: NODE_ERROR,
+            message: format!("no archive-service for node '{name}'"),
+        });
+    };
+    let (container, cmd) = match launch {
+        NodeLaunch::Docker(spec) => (
+            spec.container_name.clone(),
+            vec![
+                "mina-replayer".into(),
+                "--continue-on-error".into(),
+                "--input-file".into(),
+                "/local-network/replayer_input.json".into(),
+                "--archive-uri".into(),
+                archive::PgConfig::default().uri(&format!("postgres-{}", ctx.network_id)),
+                "--output-file".into(),
+                "/dev/null".into(),
+            ],
+        ),
+        NodeLaunch::Native(spec) => {
+            let bin = spec
+                .binary
+                .parent()
+                .map(|p| p.join("mina-replayer"))
+                .unwrap_or_else(|| PathBuf::from("mina-replayer"));
+            (
+                name.to_string(),
+                vec![
+                    bin.to_string_lossy().to_string(),
+                    "--continue-on-error".into(),
+                    "--input-file".into(),
+                    ctx.network_path
+                        .join("replayer_input.json")
+                        .to_string_lossy()
+                        .to_string(),
+                    "--archive-uri".into(),
+                    archive::PgConfig::default().uri("127.0.0.1"),
+                    "--output-file".into(),
+                    "/dev/null".into(),
+                ],
+            )
+        }
+    };
+    let logs = ctx.execution.exec(&container, &cmd).await.map_err(|e| RpcError {
+        code: NODE_ERROR,
+        message: format!("replayer: {e}"),
+    })?;
+    Ok(serde_json::json!({ "replayer_logs": logs }))
+}
+
+/// Launch one node (native or docker) and register it + its waiter task. Shared
+/// by startup and `node_start`.
+async fn launch_and_register(
+    ctx: &Arc<SupervisorCtx>,
+    state: &Arc<Mutex<SupervisorState>>,
+    name: &str,
+    launch: &NodeLaunch,
+) {
+    let result = match launch {
+        NodeLaunch::Native(spec) => ctx.execution.launch_native(spec),
+        NodeLaunch::Docker(spec) => ctx.execution.launch_docker(spec, &ctx.network_id).await,
+    };
+    match result {
+        Ok((unit, killer, pid)) => register_unit(state, name, pid, unit, killer),
+        Err(e) => fail_unit(state, name, e.to_string()),
     }
 }
 
@@ -862,8 +1338,126 @@ mod tests {
         assert!(!socket_path.exists(), "socket should be removed");
     }
 
+    /// node_stop then node_start a live unit: it dies, then relaunches with a new
+    /// pid — the restart path the hardfork orchestrator drives.
+    #[test]
+    fn supervise_node_stop_then_start() {
+        let dir = tempdir::TempDir::new("supervisor-node-test").unwrap();
+        let socket_path = dir.path().join("supervisor.sock");
+        let plan = SupervisorPlan {
+            network_id: "test-net".into(),
+            socket_path: socket_path.clone(),
+            spec: BackendSpec::Native {
+                nodes: vec![NativeNodeSpec {
+                    name: "sleeper".into(),
+                    binary: "/bin/sleep".into(),
+                    args: vec!["300".into()],
+                    env: vec![],
+                    log_file: dir.path().join("sleeper.log"),
+                }],
+            },
+        };
+        let sup = std::thread::spawn(move || run_blocking(plan).unwrap());
+
+        let mut waited = 0;
+        while !socket_path.exists() && waited < 100 {
+            std::thread::sleep(std::time::Duration::from_millis(50));
+            waited += 1;
+        }
+        assert!(socket_path.exists());
+
+        let name = serde_json::json!({ "name": "sleeper" });
+        let st = rpc_call(&socket_path, "status", serde_json::Value::Null).unwrap();
+        let pid1 = st["nodes"][0]["status"]["pid"].as_u64().unwrap() as u32;
+
+        // node_stop: SIGTERM the unit; it dies and the waiter records `exited`.
+        assert_eq!(
+            rpc_call(&socket_path, "node_stop", name.clone()).unwrap()["stopped"],
+            "sleeper"
+        );
+        std::thread::sleep(std::time::Duration::from_millis(300));
+        assert!(!process_alive(pid1));
+        let st = rpc_call(&socket_path, "status", serde_json::Value::Null).unwrap();
+        assert_eq!(st["nodes"][0]["status"]["state"], "exited");
+
+        // node_start: relaunch → running with a fresh pid.
+        assert_eq!(
+            rpc_call(&socket_path, "node_start", name.clone()).unwrap()["started"],
+            "sleeper"
+        );
+        std::thread::sleep(std::time::Duration::from_millis(200));
+        let st = rpc_call(&socket_path, "status", serde_json::Value::Null).unwrap();
+        assert_eq!(st["nodes"][0]["status"]["state"], "running");
+        let pid2 = st["nodes"][0]["status"]["pid"].as_u64().unwrap() as u32;
+        assert_ne!(pid1, pid2);
+        assert!(process_alive(pid2));
+
+        rpc_call(&socket_path, "stop", serde_json::Value::Null).unwrap();
+        sup.join().unwrap();
+        assert!(!process_alive(pid2));
+    }
+
+    /// `node_dump_precomputed` reads the host file, and `node_start` with
+    /// `fresh_state` wipes the unit's config dir.
+    #[test]
+    fn supervise_node_fresh_state_and_dump_precomputed() {
+        let dir = tempdir::TempDir::new("supervisor-fresh-test").unwrap();
+        let socket_path = dir.path().join("supervisor.sock");
+        // network_path = socket parent ⇒ config dir at <net>/config-directory/<name>.
+        let cfg = dir.path().join("config-directory").join("sleeper");
+        std::fs::create_dir_all(&cfg).unwrap();
+        std::fs::write(cfg.join("precomputed_blocks.log"), "block1\nblock2").unwrap();
+
+        let plan = SupervisorPlan {
+            network_id: "test-net".into(),
+            socket_path: socket_path.clone(),
+            spec: BackendSpec::Native {
+                nodes: vec![NativeNodeSpec {
+                    name: "sleeper".into(),
+                    binary: "/bin/sleep".into(),
+                    args: vec!["300".into()],
+                    env: vec![],
+                    log_file: dir.path().join("sleeper.log"),
+                }],
+            },
+        };
+        let sup = std::thread::spawn(move || run_blocking(plan).unwrap());
+        let mut waited = 0;
+        while !socket_path.exists() && waited < 100 {
+            std::thread::sleep(std::time::Duration::from_millis(50));
+            waited += 1;
+        }
+        assert!(socket_path.exists());
+
+        let name = serde_json::json!({ "name": "sleeper" });
+        let dump = rpc_call(&socket_path, "node_dump_precomputed", name.clone()).unwrap();
+        assert_eq!(dump["precomputed_blocks"], "block1\nblock2");
+
+        rpc_call(&socket_path, "node_stop", name.clone()).unwrap();
+        std::thread::sleep(std::time::Duration::from_millis(200));
+        rpc_call(
+            &socket_path,
+            "node_start",
+            serde_json::json!({ "name": "sleeper", "fresh_state": true }),
+        )
+        .unwrap();
+        assert!(
+            !cfg.join("precomputed_blocks.log").exists(),
+            "fresh_state should have wiped the config dir"
+        );
+
+        rpc_call(&socket_path, "stop", serde_json::Value::Null).unwrap();
+        sup.join().unwrap();
+    }
+
     #[test]
     fn unknown_method_returns_error() {
+        let ctx = Arc::new(SupervisorCtx {
+            execution: Execution::Native,
+            network_id: "t".into(),
+            network_path: std::path::PathBuf::from("/tmp"),
+            launches: HashMap::new(),
+        });
         let state = Arc::new(Mutex::new(SupervisorState::new()));
         let shutdown = Arc::new(Notify::new());
         let req = RpcRequest {
@@ -872,7 +1466,8 @@ mod tests {
             method: "nope".into(),
             params: serde_json::Value::Null,
         };
-        let resp = dispatch(req, &state, &shutdown);
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        let resp = rt.block_on(dispatch(req, &ctx, &state, &shutdown));
         assert_eq!(resp.id, serde_json::json!(7));
         assert!(resp.result.is_none());
         assert_eq!(resp.error.unwrap().code, METHOD_NOT_FOUND);

@@ -26,7 +26,7 @@ use cli::{
     NetworkCommand, NodeCommand,
 };
 use directory_manager::DirectoryManager;
-use docker::manager::{ContainerState, DockerManager};
+use docker::manager::DockerManager;
 use env_logger::{Builder, Env};
 use graphql::GraphQl;
 use log::{error, info, warn};
@@ -36,9 +36,6 @@ use std::{
     path::{Path, PathBuf},
     process::exit,
 };
-
-// The least supported version of docker compose
-const LEAST_COMPOSE_VERSION: &str = "2.21.0";
 
 // Hardcoded daemon image for default network
 // TODO: This image is very old (berkeley-rc1). Update to a more current image in a separate PR.
@@ -69,9 +66,8 @@ fn main() -> Result<()> {
             NetworkCommand::Create(cmd) => {
                 let network_id = cmd.network_id().to_string();
                 let network_path = directory_manager.network_path(&network_id);
-                let docker = DockerManager::new(&network_path);
 
-                check_setup_network(&docker, &directory_manager, &network_id)?;
+                check_setup_network(&directory_manager, &network_id)?;
 
                 // key-pairs for block producers and libp2p keys for all services
                 // for default network (not topology based)
@@ -165,24 +161,15 @@ fn main() -> Result<()> {
 
                 let network_path = directory_manager.network_path(&network_id);
 
-                // Stop processes/containers first
-                match mode {
-                    ExecutionMode::Docker => {
-                        let docker = DockerManager::new(&network_path);
-                        if let Err(e) = docker.compose_down(None, true, true) {
-                            let error_message =
-                                format!("Failed to delete network '{network_id}': {e}");
-                            return exit_with(error_message);
-                        }
-                    }
-                    ExecutionMode::Native => {
-                        let native = NativeManager::new(&network_path, native_bin(&bin_path));
-                        if let Err(e) = native.destroy() {
-                            let error_message =
-                                format!("Failed to delete network '{network_id}': {e}");
-                            return exit_with(error_message);
-                        }
-                    }
+                // Teardown lives in `network stop`, which owns the supervisor's
+                // units. `delete` only removes the on-disk network; refuse if a
+                // supervisor is still live so we never yank a directory out from
+                // under a running network.
+                if let Err(e) = ensure_not_running(&network_path) {
+                    return exit_with(format!(
+                        "Cannot delete network '{network_id}': {e}. \
+                         Run 'minimina network stop -i {network_id}' first."
+                    ));
                 }
 
                 match directory_manager.delete_network_directory(&network_id) {
@@ -284,83 +271,43 @@ fn main() -> Result<()> {
             NodeCommand::Start(cmd) => {
                 let node_id = cmd.node_args.node_id().to_string();
                 let network_id = cmd.node_args.network_id().to_string();
-                let container = format!("{node_id}-{network_id}");
+                check_network_exists(&network_id)?;
                 let network_path = directory_manager.network_path(&network_id);
-                let docker = DockerManager::new(&network_path);
-                let nodes = docker.compose_ps(None)?;
+                // Backend-agnostic: ask the running supervisor to (re)start the unit.
+                let socket = NativeManager::supervisor_socket(&network_path);
 
-                let mut _fresh_state;
-
-                _fresh_state = match docker.filter_container_by_name(nodes, &container) {
-                    Some(node) => match node.state {
-                        ContainerState::Running => {
-                            warn!("Node '{node_id}' is already running in network '{network_id}'.");
-                            false
-                        }
-                        ContainerState::Created => {
-                            info!("Starting node '{node_id}' in network '{network_id}' for the first time.");
-                            true
-                        }
-                        container_state => {
-                            info!(
-                                "Node '{node_id}' is {} in network '{network_id}'.",
-                                container_state
-                            );
-                            false
-                        }
-                    },
-                    None => {
-                        let error =
-                            format!("Node '{node_id}' does not exist in network '{network_id}'.");
-                        return handle_start_error(&node_id, error.as_str());
-                    }
-                };
-
-                if cmd.fresh_state {
-                    info!("Starting node '{node_id}' in network '{network_id}' with fresh state.");
-                    docker.compose_down(Some(container.clone()), true, false)?;
-                    docker.compose_create(Some(container.clone()))?;
-                    _fresh_state = true;
-                }
-
-                if cmd.import_accounts {
-                    warn!("Importing accounts for node '{node_id}' in network '{network_id}'. This can take a moment...");
-                    import_all_accounts(&docker, &directory_manager, &node_id, &network_id)?;
-                }
-
-                match docker.compose_start(vec![&container]) {
-                    Ok(out) => {
-                        if out.status.success() {
-                            if cmd.graphql_filtered_logs {
-                                warn!("Waiting for graphql server to be operational so I can request filtered logs. This can take a moment...");
-                                let gql = GraphQl::new(directory_manager.clone());
-                                if let Some(gql_ep) = gql.get_endpoint(&node_id, &network_id) {
-                                    gql.wait_for_server(&gql_ep)?;
-                                    gql.request_filtered_logs(&gql_ep)?;
-                                }
+                match supervisor::rpc_call(
+                    &socket,
+                    "node_start",
+                    serde_json::json!({ "name": node_id, "fresh_state": cmd.fresh_state }),
+                ) {
+                    Ok(_) => {
+                        if cmd.import_accounts {
+                            warn!("Importing accounts for node '{node_id}'. This can take a moment...");
+                            if let Err(e) = supervisor::rpc_call(
+                                &socket,
+                                "node_import_accounts",
+                                serde_json::json!({ "name": node_id }),
+                            ) {
+                                return handle_start_error(&node_id, e);
                             }
-
-                            if cmd.node_args.raw_output {
-                                println!(
-                                    "Node '{node_id}' on network '{network_id}' \
-                                          has been started. {}",
-                                    String::from_utf8_lossy(&out.stdout)
-                                );
-                            } else {
-                                println!(
-                                    "{}",
-                                    node::Start {
-                                        // fresh_state,
-                                        node_id,
-                                        network_id,
-                                    }
-                                )
+                        }
+                        // GraphQL filtered logs stay a CLI-side concern (talk to the
+                        // node's own GraphQL endpoint once it is up).
+                        if cmd.graphql_filtered_logs {
+                            warn!("Waiting for the GraphQL server to request filtered logs...");
+                            let gql = GraphQl::new(directory_manager.clone());
+                            if let Some(gql_ep) = gql.get_endpoint(&node_id, &network_id) {
+                                gql.wait_for_server(&gql_ep)?;
+                                gql.request_filtered_logs(&gql_ep)?;
                             }
-
-                            Ok(())
+                        }
+                        if cmd.node_args.raw_output {
+                            println!("Node '{node_id}' on network '{network_id}' has been started.");
                         } else {
-                            handle_start_error(&node_id, String::from_utf8_lossy(&out.stderr))
+                            println!("{}", node::Start { node_id, network_id });
                         }
+                        Ok(())
                     }
                     Err(e) => handle_start_error(&node_id, e),
                 }
@@ -369,292 +316,164 @@ fn main() -> Result<()> {
             NodeCommand::Stop(cmd) => {
                 let node_id = cmd.node_id().to_string();
                 let network_id = cmd.network_id().to_string();
-                let container = format!("{node_id}-{network_id}");
+                check_network_exists(&network_id)?;
                 let network_path = directory_manager.network_path(&network_id);
-                let docker = DockerManager::new(&network_path);
+                let socket = NativeManager::supervisor_socket(&network_path);
 
-                match docker.compose_stop(vec![&container]) {
-                    Ok(out) => {
-                        if out.status.success() {
-                            if cmd.raw_output {
-                                println!(
-                                    "Node '{node_id}' on network '{network_id}' \
-                                          has been stopped. {}",
-                                    String::from_utf8_lossy(&out.stdout)
-                                );
-                            } else {
-                                println!(
-                                    "{}",
-                                    node::Stop {
-                                        node_id,
-                                        network_id,
-                                    }
-                                )
-                            }
-                            Ok(())
+                match supervisor::rpc_call(&socket, "node_stop", serde_json::json!({ "name": node_id })) {
+                    Ok(_) => {
+                        if cmd.raw_output {
+                            println!("Node '{node_id}' on network '{network_id}' has been stopped.");
                         } else {
-                            handle_stop_error(&node_id, String::from_utf8_lossy(&out.stderr))
+                            println!("{}", node::Stop { node_id, network_id });
                         }
+                        Ok(())
                     }
                     Err(e) => handle_stop_error(&node_id, e),
                 }
             }
 
             NodeCommand::Logs(cmd) => {
-                let node_id = cmd.node_id();
-                let network_id = cmd.network_id();
-                let network_path = directory_manager.network_path(network_id);
+                let node_id = cmd.node_id().to_string();
+                let network_id = cmd.network_id().to_string();
+                check_network_exists(&network_id)?;
+                let network_path = directory_manager.network_path(&network_id);
+                // Backend-agnostic: the supervisor returns the unit's logs
+                // (native: its log file; docker: streamed container logs).
+                let socket = NativeManager::supervisor_socket(&network_path);
 
-                match mode {
-                    ExecutionMode::Docker => {
-                        let docker = DockerManager::new(&network_path);
-                        let services = directory_manager
-                            .get_services_info(network_id)
-                            .expect("Failed to get services info");
-                        match docker.run_docker_logs(node_id, network_id) {
-                            Ok(output) => {
-                                if output.status.success() {
-                                    info!(
-                                        "Successfully got logs for '{node_id}' on '{network_id}'"
-                                    );
-                                    let out = if is_node_uptime_service(services, node_id) {
-                                        &output.stderr
-                                    } else {
-                                        &output.stdout
-                                    };
-                                    if cmd.raw_output {
-                                        println!("{}", String::from_utf8_lossy(out));
-                                    } else {
-                                        println!(
-                                            "{}",
-                                            output::node::Logs {
-                                                logs: String::from_utf8_lossy(out).into(),
-                                                network_id: network_id.into(),
-                                                node_id: node_id.into(),
-                                            }
-                                        )
-                                    }
-                                } else {
-                                    let error_message = format!(
-                                        "Failed to get logs for '{node_id}' on '{network_id}': {}",
-                                        String::from_utf8_lossy(&output.stderr)
-                                    );
-                                    return exit_with(error_message);
+                match supervisor::rpc_call(&socket, "node_logs", serde_json::json!({ "name": node_id })) {
+                    Ok(result) => {
+                        let logs = result["logs"].as_str().unwrap_or_default().to_string();
+                        if cmd.raw_output {
+                            println!("{logs}");
+                        } else {
+                            println!(
+                                "{}",
+                                output::node::Logs {
+                                    logs,
+                                    network_id,
+                                    node_id,
                                 }
-                            }
-                            Err(e) => error!("Error while running 'docker logs {node_id}'{e}"),
+                            )
                         }
+                        Ok(())
                     }
-                    ExecutionMode::Native => {
-                        let native = NativeManager::new(&network_path, native_bin(&bin_path));
-                        match native.service_logs(node_id) {
-                            Ok(logs) => {
-                                if cmd.raw_output {
-                                    println!("{logs}");
-                                } else {
-                                    println!(
-                                        "{}",
-                                        output::node::Logs {
-                                            logs,
-                                            network_id: network_id.into(),
-                                            node_id: node_id.into(),
-                                        }
-                                    )
-                                }
-                            }
-                            Err(e) => error!("Error getting logs for '{node_id}': {e}"),
-                        }
-                    }
+                    Err(e) => exit_with(format!("Failed to get logs for '{node_id}': {e}")),
                 }
-
-                Ok(())
             }
 
             NodeCommand::DumpArchiveData(cmd) => {
-                let network_id = cmd.network_id();
-                let node_id = cmd.node_id();
-                let network_path = directory_manager.network_path(cmd.network_id());
-                let docker = DockerManager::new(&network_path);
-                let services = directory_manager
-                    .get_services_info(network_id)
-                    .expect("Failed to get services info");
-
-                check_network_exists(network_id)?;
-
-                if !is_node_archive(services, node_id) {
-                    let error_message = format!(
-                        "Node '{node_id}' is not an archive node in '{network_id}' network."
-                    );
-                    return exit_with(error_message);
-                }
-
-                match docker.compose_dump_archive_data(network_id) {
-                    Ok(output) => {
-                        if output.status.success() {
-                            info!("Successfully dumped archive data for node '{node_id}', network '{network_id}'");
-                            if cmd.raw_output {
-                                println!("{}", String::from_utf8_lossy(&output.stdout));
-                            } else {
-                                println!(
-                                    "{}",
-                                    output::node::ArchiveData {
-                                        data: String::from_utf8_lossy(&output.stdout).into(),
-                                        network_id: network_id.into(),
-                                        node_id: node_id.into(),
-                                    }
-                                )
-                            }
+                let node_id = cmd.node_id().to_string();
+                let network_id = cmd.network_id().to_string();
+                check_network_exists(&network_id)?;
+                let socket =
+                    NativeManager::supervisor_socket(&directory_manager.network_path(&network_id));
+                match supervisor::rpc_call(&socket, "dump_archive_data", serde_json::Value::Null) {
+                    Ok(result) => {
+                        let data = result["archive_data"].as_str().unwrap_or_default().to_string();
+                        if cmd.raw_output {
+                            println!("{data}");
                         } else {
-                            let error_message = format!(
-                                "Failed to dump archive data for node '{node_id}', network '{network_id}': {}",
-                                String::from_utf8_lossy(&output.stderr)
-                            );
-                            return exit_with(error_message);
+                            println!(
+                                "{}",
+                                output::node::ArchiveData {
+                                    data,
+                                    network_id,
+                                    node_id,
+                                }
+                            )
                         }
+                        Ok(())
                     }
-                    Err(e) => {
-                        return exit_with(format!(
-                            "Error while dumping archive data for node '{node_id}', network_id '{network_id}': {e}"
-                        ))
-                    }
+                    Err(e) => exit_with(format!("Failed to dump archive data: {e}")),
                 }
-
-                Ok(())
             }
 
             NodeCommand::DumpPrecomputedBlocks(cmd) => {
-                let node_id = cmd.node_id();
-                let network_id = cmd.network_id();
-                let network_path = directory_manager.network_path(cmd.network_id());
-                let docker = DockerManager::new(&network_path);
-
-                check_network_exists(network_id)?;
-
-                match docker.compose_dump_precomputed_blocks(node_id, network_id) {
-                    Ok(output) => {
-                        if output.status.success() {
-                            info!("Successfully dumped precomputed blocks for '{node_id}' on '{network_id}'");
-                            if cmd.raw_output {
-                                println!("{}", String::from_utf8_lossy(&output.stdout));
-                            } else {
-                                println!(
-                                    "{}",
-                                    output::node::PrecomputedBlocks {
-                                        blocks: String::from_utf8_lossy(&output.stdout).into(),
-                                        network_id: network_id.into(),
-                                        node_id: node_id.into(),
-                                    }
-                                )
-                            }
+                let node_id = cmd.node_id().to_string();
+                let network_id = cmd.network_id().to_string();
+                check_network_exists(&network_id)?;
+                let socket = NativeManager::supervisor_socket(
+                    &directory_manager.network_path(&network_id),
+                );
+                match supervisor::rpc_call(
+                    &socket,
+                    "node_dump_precomputed",
+                    serde_json::json!({ "name": node_id }),
+                ) {
+                    Ok(result) => {
+                        let blocks =
+                            result["precomputed_blocks"].as_str().unwrap_or_default().to_string();
+                        if cmd.raw_output {
+                            println!("{blocks}");
                         } else {
-                            let error_message = format!(
-                                "Failed to dump precomputed blocks for '{node_id}' on '{network_id}': {}", String::from_utf8_lossy(&output.stderr)
-                            );
-                            return exit_with(error_message);
+                            println!(
+                                "{}",
+                                output::node::PrecomputedBlocks {
+                                    blocks,
+                                    network_id,
+                                    node_id,
+                                }
+                            )
                         }
+                        Ok(())
                     }
-                    Err(e) => {
-                        let error_message = format!(
-                            "Failed to dump precomputed blocks for '{node_id}' on '{network_id}': {e}"
-                        );
-                        return exit_with(error_message);
-                    }
+                    Err(e) => exit_with(format!(
+                        "Failed to dump precomputed blocks for '{node_id}': {e}"
+                    )),
                 }
-
-                Ok(())
             }
 
             NodeCommand::RunReplayer(cmd) => {
                 let start_slot = cmd.start_slot_since_genesis;
-                let node_id = cmd.node_args.node_id();
-                let network_id = cmd.node_args.network_id();
-                let network_path = directory_manager.network_path(cmd.node_args.network_id());
-                let docker = DockerManager::new(&network_path);
-                let services = directory_manager
-                    .get_services_info(network_id)
-                    .expect("Failed to get services info");
-                check_network_exists(network_id)?;
-
-                if !is_node_archive(services, node_id) {
-                    let error_message = format!(
-                        "Node '{node_id}' is not an archive node in '{network_id}' network."
-                    );
-                    return exit_with(error_message);
-                }
-
+                let node_id = cmd.node_args.node_id().to_string();
+                let network_id = cmd.node_args.network_id().to_string();
+                check_network_exists(&network_id)?;
+                let network_path = directory_manager.network_path(&network_id);
+                // Set the start slot in replayer_input.json before the supervisor
+                // runs the replayer.
                 if let Err(e) = genesis_ledger::set_slot_since_genesis(&network_path, start_slot) {
-                    let error_message = format!(
-                        "Failed to set slot since genesis to '{start_slot}' for node '{node_id}' on network '{network_id}': {e}"
-                    );
-                    return exit_with(error_message);
+                    return exit_with(format!("Failed to set replayer start slot: {e}"));
                 }
-
-                let archive_service_id = format!("{node_id}-service");
-                match docker.compose_run_replayer(&archive_service_id, network_id) {
-                    Ok(output) => {
-                        if output.status.success() {
-                            info!("Successfully ran replayer for node '{node_id}' on network '{network_id}' \
-                                    and start_slot_since_genesis '{start_slot}'");
-                            if cmd.node_args.raw_output {
-                                println!("{}", String::from_utf8_lossy(&output.stdout));
-                            } else {
-                                println!(
-                                    "{}",
-                                    output::node::ReplayerLogs {
-                                        logs: String::from_utf8_lossy(&output.stdout).into(),
-                                        network_id: network_id.into(),
-                                        node_id: node_id.into(),
-                                    }
-                                )
-                            }
+                let socket = NativeManager::supervisor_socket(&network_path);
+                match supervisor::rpc_call(&socket, "run_replayer", serde_json::json!({ "name": node_id })) {
+                    Ok(result) => {
+                        let logs = result["replayer_logs"].as_str().unwrap_or_default().to_string();
+                        if cmd.node_args.raw_output {
+                            println!("{logs}");
                         } else {
-                            let error_message = format!(
-                                "Failed to run replayer for node '{node_id}' on network '{network_id}' \
-                                  and start_slot_since_genesis '{start_slot}': {}",
-                                String::from_utf8_lossy(&output.stderr)
-                            );
-                            return exit_with(error_message);
+                            println!(
+                                "{}",
+                                output::node::ReplayerLogs {
+                                    logs,
+                                    network_id,
+                                    node_id,
+                                }
+                            )
                         }
+                        Ok(())
                     }
-                    Err(e) => {
-                        return exit_with(format!(
-                            "Error while running replayer for node '{node_id}' on network '{network_id}' \
-                              and start_slot_since_genesis '{start_slot}': {e}"
-                        ));
-                    }
+                    Err(e) => exit_with(format!("Failed to run replayer: {e}")),
                 }
-
-                Ok(())
             }
         },
     }
 }
 
-#[allow(dead_code)]
-fn wait_for_daemon(
-    docker: &DockerManager,
-    node_id: &str,
-    network_id: &str,
-    client_port: u16,
-) -> Result<()> {
-    let mut retries = 0;
-    let mut daemon_running = false;
-    info!("Waiting for daemon to start for node '{node_id}' on network '{network_id}'...");
-    while !daemon_running && retries < TIMEOUT_IN_SECS {
-        let out = docker.compose_client_status(node_id, network_id, client_port)?;
-        if out.status.success() {
-            daemon_running = true;
-        } else {
-            retries += 1;
-            std::thread::sleep(std::time::Duration::from_secs(1));
-        }
+/// Refuse the operation if a foreground supervisor is still serving this
+/// network. Liveness == "something answers on the RPC socket"; a `status` reply
+/// proves it. A connection failure (absent or stale socket) means no supervisor
+/// is live, so the caller may safely remove/overwrite the directory.
+fn ensure_not_running(network_path: &Path) -> Result<()> {
+    let socket = NativeManager::supervisor_socket(network_path);
+    match supervisor::rpc_call(&socket, "status", serde_json::Value::Null) {
+        Ok(_) => Err(Error::new(
+            ErrorKind::ResourceBusy,
+            "a supervisor is still running for this network",
+        )),
+        Err(_) => Ok(()),
     }
-    if !daemon_running {
-        return exit_with(format!(
-            "Failed to start daemon for node '{node_id}' on network '{network_id}' within {TIMEOUT_IN_SECS}s",
-        ));
-    }
-    Ok(())
 }
 
 /// Generates a genesis ledger for the default network:
@@ -848,17 +667,22 @@ fn generate_default_topology(
     ]
 }
 
-/// If the network exists, its directory is deleted, corresponding docker
-/// images are removed, and it is created anew.
+/// If the network exists, its directory is deleted and it is created anew.
 /// If the network doesn't exist, the directory structure is created.
-fn check_setup_network(
-    docker: &DockerManager,
-    directory_manager: &DirectoryManager,
-    network_id: &str,
-) -> Result<()> {
+///
+/// Overwriting an existing network only wipes its on-disk state; tearing down a
+/// running network is `network stop`'s job, so refuse if a supervisor is still
+/// live rather than yank the directory out from under it.
+fn check_setup_network(directory_manager: &DirectoryManager, network_id: &str) -> Result<()> {
     if directory_manager.network_path_exists(network_id) {
+        let network_path = directory_manager.network_path(network_id);
+        if let Err(e) = ensure_not_running(&network_path) {
+            return exit_with(format!(
+                "Cannot overwrite network '{network_id}': {e}. \
+                 Run 'minimina network stop -i {network_id}' first."
+            ));
+        }
         warn!("Network '{network_id}' already exists. Overwriting!");
-        docker.compose_down(None, false, false)?;
         directory_manager.delete_network_directory(network_id)?;
     }
 
@@ -1044,52 +868,9 @@ fn check_execution_environment(mode: &ExecutionMode) -> Result<()> {
                 return Err(Error::new(ErrorKind::NotFound, "docker is not installed"));
             }
 
-            // Docker is installed, now check docker compose plugin
-            let compose_result = std::process::Command::new("docker")
-                .args(["compose", "version", "--short"])
-                .output();
-
-            match compose_result {
-                Ok(output) if output.status.success() => {
-                    let version = String::from_utf8_lossy(&output.stdout).trim().to_string();
-                    if version.as_str() < LEAST_COMPOSE_VERSION {
-                        error!(
-                            "Docker Compose version '{version}' is older than \
-                                the minimum supported version '{LEAST_COMPOSE_VERSION}'. \
-                                Please update Docker Compose: https://docs.docker.com/compose/install/"
-                        );
-                        return Err(Error::new(
-                            ErrorKind::InvalidInput,
-                            "docker compose needs to be updated",
-                        ));
-                    }
-                    Ok(())
-                }
-                Ok(output) => {
-                    let stderr = String::from_utf8_lossy(&output.stderr);
-                    error!(
-                        "Docker Compose plugin (v2) is not installed. \
-                            'docker compose' command failed. \
-                            Please install Docker Compose: https://docs.docker.com/compose/install/\n\
-                            stderr: {stderr}"
-                    );
-                    Err(Error::new(
-                        ErrorKind::NotFound,
-                        "docker compose plugin is not installed",
-                    ))
-                }
-                Err(e) => {
-                    error!(
-                        "Docker Compose plugin (v2) is not installed. \
-                            'docker compose' command failed: {e}. \
-                            Please install Docker Compose: https://docs.docker.com/compose/install/"
-                    );
-                    Err(Error::new(
-                        ErrorKind::NotFound,
-                        "docker compose plugin is not installed",
-                    ))
-                }
-            }
+            // The supervisor drives docker directly via the bollard API, so no
+            // docker-compose plugin is required.
+            Ok(())
         }
         // Native mode's mina discovery lives in `resolve_bin_path`.
         ExecutionMode::Native => Ok(()),
@@ -1326,57 +1107,3 @@ fn handle_start_error(node_id: &str, error: impl ToString) -> Result<()> {
     exit_with(error_message)
 }
 
-fn is_node_uptime_service(services: Vec<ServiceConfig>, node_id: &str) -> bool {
-    if let Some(uptime) = ServiceConfig::get_uptime_service_backend(&services) {
-        if uptime.service_name == node_id {
-            return true;
-        }
-    }
-    false
-}
-
-fn is_node_archive(services: Vec<ServiceConfig>, node_id: &str) -> bool {
-    if let Some(archive) = ServiceConfig::get_archive_node(&services) {
-        if archive.service_name == node_id {
-            return true;
-        }
-    }
-    false
-}
-
-fn import_all_accounts(
-    docker: &DockerManager,
-    directory_manager: &DirectoryManager,
-    node_id: &str,
-    network_id: &str,
-) -> Result<()> {
-    let account_files = directory_manager.get_network_keypair_files(network_id)?;
-    for account_file in account_files {
-        let out = docker.compose_import_account(node_id, network_id, &account_file);
-        match out {
-            Ok(output) => {
-                if output.status.success() {
-                    info!(
-                        "Successfully imported account from file '{account_file}' \
-                        for node '{node_id}' on network '{network_id}'",
-                    );
-                } else {
-                    let error_message = format!(
-                        "Failed to import account from file '{account_file}' \
-                        for node '{node_id}' on network '{network_id}': {}",
-                        String::from_utf8_lossy(&output.stderr),
-                    );
-                    return exit_with(error_message);
-                }
-            }
-            Err(e) => {
-                let error_message = format!(
-                    "Failed to import account from file '{account_file}' \
-                    for node '{node_id}' on network '{network_id}': {e}",
-                );
-                return exit_with(error_message);
-            }
-        }
-    }
-    Ok(())
-}

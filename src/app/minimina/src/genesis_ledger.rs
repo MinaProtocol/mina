@@ -348,29 +348,21 @@ mod tests {
             TempDir::new("test_set_slot_since_genesis").expect("Cannot create temporary directory");
         let network_path = tempdir.path();
         let mut bp_keys_map: HashMap<String, NodeKey> = HashMap::new();
-        let service_key = NodeKey {
-            key_string: "test_key".to_string(),
-            key_path: "test_key_path".to_string(),
-        };
-        bp_keys_map.insert("node0".to_string(), service_key);
-        let result = default::LedgerGenerator::generate(network_path, &bp_keys_map);
-        println!("{:?}", result);
-        assert!(result.is_ok());
+        bp_keys_map.insert(
+            "node0".to_string(),
+            NodeKey {
+                key_string: "test_key".to_string(),
+                key_path: "test_key_path".to_string(),
+            },
+        );
+        default::LedgerGenerator::generate(network_path, &bp_keys_map).unwrap();
+        default::LedgerGenerator::generate_replayer_input(network_path).unwrap();
 
-        let result = default::LedgerGenerator::generate_replayer_input(network_path);
-        println!("{:?}", result);
-        assert!(result.is_ok());
+        set_slot_since_genesis(network_path, 100).unwrap();
 
-        let result = set_slot_since_genesis(network_path, 100);
-        println!("{:?}", result);
-        assert!(result.is_ok());
-
-        let path = network_path.to_path_buf();
-        let path = path.join(REPLAYER_INPUT_JSON);
-        assert!(path.exists());
-        let content = std::fs::read_to_string(path).unwrap();
+        let content =
+            std::fs::read_to_string(network_path.join(REPLAYER_INPUT_JSON)).unwrap();
         let replayer_input: ReplayerInput = serde_json::from_str(&content).unwrap();
-
         assert_eq!(replayer_input.start_slot_since_genesis, 100);
     }
 }
