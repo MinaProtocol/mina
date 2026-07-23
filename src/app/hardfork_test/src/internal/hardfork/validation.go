@@ -281,6 +281,17 @@ func (t *HardforkTest) ConsensusAcrossNodesAfterSlotChainEnd() (*ConsensusState,
 		state := states[i]
 		last_state := states[i-1]
 
+		// Cross-node agreement on LastBlockBeforeTxEnd is the fork base's
+		// canonicality guarantee for this test. The daemon anchors the fork on
+		// that block (mina_lib.ml best_chain_block_before_stop_slot) and builds
+		// the fork config treating it as finalized regardless of how deeply it is
+		// buried ("We pretend that the block is finalized ... for redundancy",
+		// mina_lib.ml). So the fork does NOT require the tx-end block to reach
+		// k-depth in the (tx-end, chain-end] wind-down; at the CI gap (8 slots,
+		// p ~= 0.33) that window often produces fewer than k = 10 blocks anyway,
+		// so a ">= k deep" burial assertion would be both unwarranted and flaky.
+		// All nodes converging on the same block after chain-end is what makes it
+		// effectively canonical here.
 		if state.LastBlockBeforeTxEnd != last_state.LastBlockBeforeTxEnd {
 			return nil, fmt.Errorf(
 				"Node %s and node %s doesn't agree on last block seen before tx end! The previous has %v while the later has %v",
