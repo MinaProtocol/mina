@@ -38,15 +38,17 @@ use std::{
 };
 
 // Hardcoded daemon image for default network
-// TODO: This image is very old (berkeley-rc1). Update to a more current image in a separate PR.
-const DEFAULT_DAEMON_DOCKER_IMAGE: &str =
-    "gcr.io/o1labs-192920/mina-daemon:2.0.0berkeley-rc1-1551e2f-bullseye-berkeley";
+// Hardcoded daemon image for default network. Published on docker.io for every
+// supported base (focal/jammy/noble/bullseye/bookworm); pinned to bullseye here.
+const DEFAULT_DAEMON_DOCKER_IMAGE: &str = "minaprotocol/mina-daemon:3.4.0-bd0fe9e-bullseye-mainnet";
 
 // Hardcoded archive image for default network
 const DEFAULT_ARCHIVE_DOCKER_IMAGE: &str =
-    "gcr.io/o1labs-192920/mina-archive:2.0.0berkeley-rc1-1551e2f-bullseye";
+    "minaprotocol/mina-archive:3.4.0-bd0fe9e-bullseye-mainnet";
 
-const IMAGE_COMMIT_HASH: &str = "1551e2f";
+// Commit the default images were built from; the archive schema SQL is fetched
+// from GitHub at this ref so it matches the archive binary.
+const IMAGE_COMMIT_HASH: &str = "bd0fe9e";
 
 // Timeout in seconds for waiting operations
 const TIMEOUT_IN_SECS: u16 = 180;
