@@ -55,45 +55,196 @@ func TestComputeSlotOccupancy(t *testing.T) {
 	}
 }
 
-func TestExpectedPreForkFillUpperBound(t *testing.T) {
+func TestActiveShares(t *testing.T) {
 	t.Parallel()
 
-	// Full stake active: bound saturates at 1 - 0.25^1 + margin = 0.9
-	bound, err := ExpectedPreForkFillUpperBound(StakeStats{TotalCurrency: 100, ActiveProducerStake: 100})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if math.Abs(bound-0.9) > 1e-9 {
-		t.Errorf("bound = %f, want 0.9", bound)
-	}
-
-	// ~28.5% active (the CI configuration: 2 active + 5 lazy whales):
-	// 1 - 0.25^0.285 + 0.15
+	// CI-shaped config: 28.5% active pre-fork; after unstaking the 71.5% lazy
+	// stake the active share is nearly the whole remaining denominator.
 	stats := StakeStats{TotalCurrency: 1000, ActiveProducerStake: 285, LazyStake: 715}
-	bound, err = ExpectedPreForkFillUpperBound(stats)
+
+	pre, err := preForkActiveShare(stats)
+	if err != nil {
+		t.Fatalf("preForkActiveShare: %v", err)
+	}
+	if math.Abs(pre-0.285) > 1e-9 {
+		t.Errorf("preForkActiveShare = %f, want 0.285", pre)
+	}
+
+	post, err := postForkActiveShare(stats)
+	if err != nil {
+		t.Fatalf("postForkActiveShare: %v", err)
+	}
+	if want := 285.0 / (1000.0 - 715.0); math.Abs(post-want) > 1e-9 {
+		t.Errorf("postForkActiveShare = %f, want %f", post, want)
+	}
+	// Post-fork share must exceed pre-fork share (denominator shrank).
+	if post <= pre {
+		t.Errorf("post-fork active share %f should exceed pre-fork %f", post, pre)
+	}
+
+	// Zero total currency must error, not divide by zero.
+	if _, err := preForkActiveShare(StakeStats{}); err == nil {
+		t.Error("expected error for zero total currency (pre)")
+	}
+	// Lazy stake >= total would make the post-fork denominator non-positive.
+	if _, err := postForkActiveShare(StakeStats{TotalCurrency: 100, LazyStake: 100}); err == nil {
+		t.Error("expected error when lazy stake is not below total currency")
+	}
+}
+
+func TestNewOccupancyBand(t *testing.T) {
+	t.Parallel()
+
+	// Band is centered on Expected with half-width windowMargin, clamped to [0,1].
+	band, err := newOccupancyBand(0.324, 30)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	want := 1 - math.Pow(0.25, 0.285) + 0.15
-	if math.Abs(bound-want) > 1e-9 {
-		t.Errorf("bound = %f, want %f", bound, want)
+	wantMargin, _ := windowMargin(0.324, 30, occupancyBandZ)
+	if math.Abs(band.Margin-wantMargin) > 1e-9 {
+		t.Errorf("Margin = %f, want %f", band.Margin, wantMargin)
 	}
-	if bound < 0 || bound > 1 || math.IsNaN(bound) {
-		t.Errorf("bound = %f, want a non-NaN value in [0,1]", bound)
+	if math.Abs(band.Lower-(0.324-wantMargin)) > 1e-9 || math.Abs(band.Upper-(0.324+wantMargin)) > 1e-9 {
+		t.Errorf("band = [%f, %f], want [%f, %f]", band.Lower, band.Upper, 0.324-wantMargin, 0.324+wantMargin)
 	}
 
-	// No active stake: bound = margin
-	bound, err = ExpectedPreForkFillUpperBound(StakeStats{TotalCurrency: 100})
+	// Edges clamp to [0,1]: a huge margin cannot push Lower below 0 or Upper above 1.
+	wide, err := newOccupancyBand(0.75, 1) // margin = 3*sqrt(0.1875) ~= 1.3 > 0.75
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if math.Abs(bound-preForkFillMargin) > 1e-9 {
-		t.Errorf("bound = %f, want %f", bound, preForkFillMargin)
+	if wide.Lower < 0 || wide.Upper > 1 {
+		t.Errorf("band edges not clamped: [%f, %f]", wide.Lower, wide.Upper)
 	}
 
-	// Zero total currency must error, not return NaN
-	if _, err := ExpectedPreForkFillUpperBound(StakeStats{}); err == nil {
-		t.Error("expected error for zero total currency")
+	// Non-positive window propagates the windowMargin error.
+	if _, err := newOccupancyBand(0.324, 0); err == nil {
+		t.Error("expected error for a zero-slot window")
+	}
+}
+
+// TestOccupancyBandDecisions exercises the assembled pre/post-fork bounds
+// against representative occupancy values: in-band pass, too-high / too-low
+// fail, and the partial-recovery case whose detection depends on window length.
+func TestOccupancyBandDecisions(t *testing.T) {
+	t.Parallel()
+
+	stats := StakeStats{TotalCurrency: 1000, ActiveProducerStake: 285, LazyStake: 715}
+
+	// Pre-fork band (~0.324 expected) over a 30-slot window.
+	sPre, _ := preForkActiveShare(stats)
+	pre, err := newOccupancyBand(expectedFillRate(sPre), 30)
+	if err != nil {
+		t.Fatalf("pre band: %v", err)
+	}
+	if !(pre.Lower < 0.33 && 0.33 < pre.Upper) {
+		t.Errorf("expected 0.33 in pre band [%f, %f]", pre.Lower, pre.Upper)
+	}
+	if 0.62 <= pre.Upper {
+		t.Errorf("expected 0.62 above pre band upper %f (dilution-didn't-take)", pre.Upper)
+	}
+	if 0.05 >= pre.Lower {
+		t.Errorf("expected 0.05 below pre band lower %f (over-suppressed)", pre.Lower)
+	}
+
+	// Post-fork lower bound (~0.75 expected). At n=30 the bound is ~0.51, so a
+	// 0.55 partial recovery still passes; a longer n=60 window tightens the
+	// bound above 0.55 and catches it.
+	sPost, _ := postForkActiveShare(stats)
+	post30, err := newOccupancyBand(expectedFillRate(sPost), 30)
+	if err != nil {
+		t.Fatalf("post band n=30: %v", err)
+	}
+	if !(0.55 >= post30.Lower) {
+		t.Errorf("at n=30 the 0.55 partial recovery should pass (lower %f)", post30.Lower)
+	}
+	post60, err := newOccupancyBand(expectedFillRate(sPost), 60)
+	if err != nil {
+		t.Fatalf("post band n=60: %v", err)
+	}
+	if !(0.55 < post60.Lower) {
+		t.Errorf("at n=60 the 0.55 partial recovery should fail (lower %f)", post60.Lower)
+	}
+	if post60.Lower >= post60.Expected {
+		t.Errorf("post lower bound %f should be below expected %f", post60.Lower, post60.Expected)
+	}
+}
+
+func TestExpectedFillRate(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		sActive float64
+		want    float64
+	}{
+		{0.0, 0.0},                         // no active stake: no slot can be won
+		{1.0, vrfFillFraction},             // full stake active: saturates at f = 0.75
+		{0.285, 1 - math.Pow(0.25, 0.285)}, // CI config (2 active + 5 lazy whales)
+	}
+	for _, tc := range cases {
+		if got := expectedFillRate(tc.sActive); math.Abs(got-tc.want) > 1e-9 {
+			t.Errorf("expectedFillRate(%f) = %f, want %f", tc.sActive, got, tc.want)
+		}
+	}
+
+	// Monotonic increasing in the active share
+	prev := expectedFillRate(0)
+	for _, s := range []float64{0.1, 0.3, 0.5, 0.9, 1.0} {
+		cur := expectedFillRate(s)
+		if cur <= prev {
+			t.Errorf("expectedFillRate not increasing: f(%f)=%f <= previous %f", s, cur, prev)
+		}
+		prev = cur
+	}
+}
+
+func TestWindowMargin(t *testing.T) {
+	t.Parallel()
+
+	// CI config sanity check: sActive ~= 0.285, n = 30, z = 3.
+	// p ~= 0.324, sigma = sqrt(p(1-p)/30) ~= 0.0855, margin ~= 0.256.
+	p := expectedFillRate(0.285)
+	margin, err := windowMargin(p, 30, occupancyBandZ)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	want := occupancyBandZ * math.Sqrt(p*(1-p)/30)
+	if math.Abs(margin-want) > 1e-9 {
+		t.Errorf("windowMargin(%f, 30, %f) = %f, want %f", p, occupancyBandZ, margin, want)
+	}
+	if margin < 0.24 || margin > 0.27 {
+		t.Errorf("CI-config margin = %f, expected ~0.256", margin)
+	}
+
+	// Monotonic decreasing in n: a longer window gives a tighter band.
+	var last float64 = math.Inf(1)
+	for _, n := range []int{5, 10, 30, 90, 200} {
+		m, err := windowMargin(p, n, occupancyBandZ)
+		if err != nil {
+			t.Fatalf("unexpected error at n=%d: %v", n, err)
+		}
+		if m >= last {
+			t.Errorf("margin not decreasing in n: margin(n=%d)=%f >= previous %f", n, m, last)
+		}
+		last = m
+	}
+
+	// Edge: p = 0 (sActive = 0) and p = 1 both give zero variance, zero margin.
+	for _, edge := range []float64{0.0, 1.0} {
+		m, err := windowMargin(edge, 30, occupancyBandZ)
+		if err != nil {
+			t.Fatalf("unexpected error for p=%f: %v", edge, err)
+		}
+		if math.Abs(m) > 1e-9 {
+			t.Errorf("windowMargin(%f, 30, z) = %f, want 0", edge, m)
+		}
+	}
+
+	// Non-positive window must error, not divide by zero or return NaN.
+	for _, n := range []int{0, -1} {
+		if _, err := windowMargin(p, n, occupancyBandZ); err == nil {
+			t.Errorf("windowMargin(p, %d, z) should have errored", n)
+		}
 	}
 }
 
