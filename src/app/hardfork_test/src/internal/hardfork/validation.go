@@ -13,6 +13,10 @@ import (
 type ConsensusState struct {
 	LastOccupiedSlot     int              `json:"last_occupied_slot"`
 	LastBlockBeforeTxEnd client.BlockData `json:"last_block_before_tx_end"`
+	// Set of public keys that actually produced a block in the observed window
+	// (block creators reported by consensus). This is the on-chain evidence of
+	// which producers were live, independent of the key files the harness reads.
+	ObservedProducerPks map[string]bool `json:"observed_producer_pks"`
 }
 
 type BlockAnalysisResult struct {
@@ -154,6 +158,7 @@ func (t *HardforkTest) ReportBlocksInfo(port int, blocks []client.BlockData) {
 func (t *HardforkTest) ConsensusStateOnNode(port int) (*ConsensusState, error) {
 
 	state := new(ConsensusState)
+	state.ObservedProducerPks = make(map[string]bool)
 
 	recentBlocks, err := t.Client.RecentBlocks(port, config.ProtocolK)
 
@@ -177,6 +182,13 @@ func (t *HardforkTest) ConsensusStateOnNode(port int) (*ConsensusState, error) {
 		// Track latest non-empty block
 		if block.Slot > state.LastBlockBeforeTxEnd.Slot && block.Slot < t.Config.SlotTxEnd {
 			state.LastBlockBeforeTxEnd = block
+		}
+
+		// Record the producer of every VRF-produced (non-genesis) block, so the
+		// active-stake classification can be cross-checked against which
+		// producers were actually live.
+		if block.Slot > 0 && block.Creator != "" {
+			state.ObservedProducerPks[block.Creator] = true
 		}
 	}
 

@@ -213,6 +213,21 @@ func (t *HardforkTest) validatePreForkOccupancyDiluted(analysis *BlockAnalysisRe
 	}
 	analysis.PreForkStakeStats = stats
 
+	// The occupancy band is only as trustworthy as s_active, whose numerator
+	// (ActiveProducerStake) is derived entirely from the genesis ledger file and
+	// the running-producer key files. Cross-check that classification against
+	// on-chain evidence before trusting the band: the running-producer set must
+	// have the expected size, and every running producer must have actually
+	// produced a block (a static file cannot witness runtime liveness, and the
+	// occupancy lower band is too weak to catch a single dead active producer).
+	if len(producerPks) != t.Config.NumWhales+t.Config.NumFish {
+		return fmt.Errorf("running-producer set has %d keys, expected %d (NumWhales %d + NumFish %d); producer keys are duplicated or missing", len(producerPks), t.Config.NumWhales+t.Config.NumFish, t.Config.NumWhales, t.Config.NumFish)
+	}
+	if err := validateActiveProducerLiveness(producerPks, analysis.Consensus.ObservedProducerPks, stats); err != nil {
+		return err
+	}
+	t.Logger.Info("Active-producer cross-check passed: %d running producers all authored blocks in the pre-fork window", len(producerPks))
+
 	sActive, err := preForkActiveShare(stats)
 	if err != nil {
 		return err
@@ -359,6 +374,41 @@ func (t *HardforkTest) validatePostForkUnstaking(analysis *BlockAnalysisResult, 
 	}
 	// Retain the absolute >= 0.5 health bar as an additional coarse guard.
 	return t.ValidateSlotOccupancy(commonGenesisBlock, bestTip, bestTip.Slot)
+}
+
+// validateActiveProducerLiveness cross-checks the file-derived active-producer
+// classification against on-chain evidence. running is the set of producers the
+// harness expects to be live (from key files); observed is the set that
+// actually authored a block in the pre-fork window (block creators reported by
+// consensus). The two must be equal, and the stake partition must not
+// overcount. This is the independent check on the s_active numerator that the
+// 0.1% total-currency cross-check provides for the denominator.
+func validateActiveProducerLiveness(running, observed map[string]bool, stats StakeStats) error {
+	// Every running producer must have produced at least one block. A running
+	// producer that never appears as a creator is dead or misconfigured while
+	// its stake is still counted as active — occupancy would be suppressed with
+	// no dilution to explain it, which the occupancy lower band cannot reliably
+	// catch at the CI window length.
+	for pk := range running {
+		if !observed[pk] {
+			return fmt.Errorf("running producer %s authored no blocks in the pre-fork window; its stake is counted as active but it appears dead or misconfigured", pk)
+		}
+	}
+	// Every observed producer must be a known running producer. An unexpected
+	// block creator means the running-producer set is wrong, so the active-stake
+	// classification built from it cannot be trusted.
+	for pk := range observed {
+		if !running[pk] {
+			return fmt.Errorf("block creator %s is not in the expected running-producer set; the active-stake classification is unreliable", pk)
+		}
+	}
+	// Partition sanity: the active and lazy stake are disjoint subsets of the
+	// total, so their sum cannot exceed it. A violation means the classification
+	// double-counts stake.
+	if stats.ActiveProducerStake+stats.LazyStake > stats.TotalCurrency {
+		return fmt.Errorf("active producer stake (%d nanomina) + lazy stake (%d nanomina) exceeds total currency (%d nanomina); the stake classification overcounts", stats.ActiveProducerStake, stats.LazyStake, stats.TotalCurrency)
+	}
+	return nil
 }
 
 // preForkActiveShare is the active producers' share of the pre-fork VRF

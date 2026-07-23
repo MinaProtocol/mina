@@ -137,6 +137,42 @@ func TestActiveShares(t *testing.T) {
 	}
 }
 
+func TestValidateActiveProducerLiveness(t *testing.T) {
+	t.Parallel()
+
+	// CI-shaped partition: active + lazy = total.
+	stats := StakeStats{TotalCurrency: 1000, ActiveProducerStake: 285, LazyStake: 715}
+	running := map[string]bool{"A": true, "B": true}
+
+	// Both running producers produced blocks (plus an empty-slot signature is
+	// irrelevant): passes.
+	if err := validateActiveProducerLiveness(running, map[string]bool{"A": true, "B": true}, stats); err != nil {
+		t.Errorf("expected pass when every running producer authored a block, got %v", err)
+	}
+
+	// A running producer that never produced a block (B died): must fail.
+	if err := validateActiveProducerLiveness(running, map[string]bool{"A": true}, stats); err == nil {
+		t.Error("expected failure when a running producer authored no blocks (dead producer)")
+	}
+
+	// A block creator that is not a known running producer: must fail.
+	if err := validateActiveProducerLiveness(running, map[string]bool{"A": true, "B": true, "C": true}, stats); err == nil {
+		t.Error("expected failure when an unexpected key produced a block (rogue producer)")
+	}
+
+	// Partition overcount: active + lazy exceeds total, even with liveness OK.
+	overcount := StakeStats{TotalCurrency: 1000, ActiveProducerStake: 600, LazyStake: 500}
+	if err := validateActiveProducerLiveness(running, map[string]bool{"A": true, "B": true}, overcount); err == nil {
+		t.Error("expected failure when active + lazy stake exceeds total currency")
+	}
+
+	// Exact partition (active + lazy == total) is allowed.
+	exact := StakeStats{TotalCurrency: 1000, ActiveProducerStake: 300, LazyStake: 700}
+	if err := validateActiveProducerLiveness(running, map[string]bool{"A": true, "B": true}, exact); err != nil {
+		t.Errorf("expected pass when active + lazy == total, got %v", err)
+	}
+}
+
 func TestNewOccupancyBand(t *testing.T) {
 	t.Parallel()
 

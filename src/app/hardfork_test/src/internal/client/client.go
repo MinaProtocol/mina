@@ -113,6 +113,10 @@ type BlockData struct {
 	NumUserCommands int    `json:"num_user_commands"`
 	NumFeeTransfers int    `json:"num_fee_transfers"`
 	Coinbase        string `json:"coinbase"`
+	// Public key of the account that produced this block (creatorAccount).
+	// Empty for the genesis block, which is not VRF-produced and whose query
+	// does not request the field.
+	Creator string `json:"creator"`
 	// Currency amounts, read from the GraphQL integer-nanomina string scalars via
 	// gjson .Uint() at construction (NOT the decimal-mina currency.UnmarshalJSON
 	// path — see currency.Nanomina). On a post-fork (v2) build the staking epoch
@@ -167,6 +171,7 @@ genesisBlock {
 const blocksQueryWithLimit = `
 bestChain (maxLength: %d){
   commandTransactionCount
+  creatorAccount { publicKey }
   protocolState {
     consensusState {
       blockHeight
@@ -195,6 +200,13 @@ bestChain (maxLength: %d){
 }
 `
 
+// nanominaAt reads a GraphQL amount at path as an integer-nanomina scalar. The
+// daemon serializes amounts as nanomina uint64 strings, so .Uint() is the
+// correct decoder here — NOT the decimal-mina currency.UnmarshalJSON path.
+func nanominaAt(value gjson.Result, path string) currency.Nanomina {
+	return currency.Nanomina(value.Get(path).Uint())
+}
+
 func parseBlock(value gjson.Result) *BlockData {
 	block := &BlockData{
 		StateHash:                  value.Get("stateHash").String(),
@@ -210,18 +222,12 @@ func parseBlock(value gjson.Result) *BlockData {
 		NumUserCommands:            int(value.Get("commandTransactionCount").Int()),
 		NumFeeTransfers:            len(value.Get("transactions.feeTransfer").Array()),
 		Coinbase:                   value.Get("transactions.coinbase").String(),
+		Creator:                    value.Get("creatorAccount.publicKey").String(),
 		TotalCurrency:              nanominaAt(value, "protocolState.consensusState.totalCurrency"),
 		StakingLedgerTotalCurrency: nanominaAt(value, "protocolState.consensusState.stakingEpochData.ledger.totalCurrency"),
 	}
 
 	return block
-}
-
-// nanominaAt reads a GraphQL amount at path as an integer-nanomina scalar. The
-// daemon serializes amounts as nanomina uint64 strings, so .Uint() is the
-// correct decoder here — NOT the decimal-mina currency.UnmarshalJSON path.
-func nanominaAt(value gjson.Result, path string) currency.Nanomina {
-	return currency.Nanomina(value.Get(path).Uint())
 }
 
 func (c *Client) GenesisBlock(port int) (*BlockData, error) {
