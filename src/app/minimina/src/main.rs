@@ -69,9 +69,8 @@ fn main() -> Result<()> {
             NetworkCommand::Create(cmd) => {
                 let network_id = cmd.network_id().to_string();
                 let network_path = directory_manager.network_path(&network_id);
-                let docker = DockerManager::new(&network_path);
 
-                check_setup_network(&docker, &directory_manager, &network_id)?;
+                check_setup_network(&directory_manager, &network_id)?;
 
                 // key-pairs for block producers and libp2p keys for all services
                 // for default network (not topology based)
@@ -165,24 +164,15 @@ fn main() -> Result<()> {
 
                 let network_path = directory_manager.network_path(&network_id);
 
-                // Stop processes/containers first
-                match mode {
-                    ExecutionMode::Docker => {
-                        let docker = DockerManager::new(&network_path);
-                        if let Err(e) = docker.compose_down(None, true, true) {
-                            let error_message =
-                                format!("Failed to delete network '{network_id}': {e}");
-                            return exit_with(error_message);
-                        }
-                    }
-                    ExecutionMode::Native => {
-                        let native = NativeManager::new(&network_path, native_bin(&bin_path));
-                        if let Err(e) = native.destroy() {
-                            let error_message =
-                                format!("Failed to delete network '{network_id}': {e}");
-                            return exit_with(error_message);
-                        }
-                    }
+                // Teardown lives in `network stop`, which owns the supervisor's
+                // units. `delete` only removes the on-disk network; refuse if a
+                // supervisor is still live so we never yank a directory out from
+                // under a running network.
+                if let Err(e) = ensure_not_running(&network_path) {
+                    return exit_with(format!(
+                        "Cannot delete network '{network_id}': {e}. \
+                         Run 'minimina network stop -i {network_id}' first."
+                    ));
                 }
 
                 match directory_manager.delete_network_directory(&network_id) {
@@ -474,31 +464,19 @@ fn main() -> Result<()> {
     }
 }
 
-#[allow(dead_code)]
-fn wait_for_daemon(
-    docker: &DockerManager,
-    node_id: &str,
-    network_id: &str,
-    client_port: u16,
-) -> Result<()> {
-    let mut retries = 0;
-    let mut daemon_running = false;
-    info!("Waiting for daemon to start for node '{node_id}' on network '{network_id}'...");
-    while !daemon_running && retries < TIMEOUT_IN_SECS {
-        let out = docker.compose_client_status(node_id, network_id, client_port)?;
-        if out.status.success() {
-            daemon_running = true;
-        } else {
-            retries += 1;
-            std::thread::sleep(std::time::Duration::from_secs(1));
-        }
+/// Refuse the operation if a foreground supervisor is still serving this
+/// network. Liveness == "something answers on the RPC socket"; a `status` reply
+/// proves it. A connection failure (absent or stale socket) means no supervisor
+/// is live, so the caller may safely remove/overwrite the directory.
+fn ensure_not_running(network_path: &Path) -> Result<()> {
+    let socket = NativeManager::supervisor_socket(network_path);
+    match supervisor::rpc_call(&socket, "status", serde_json::Value::Null) {
+        Ok(_) => Err(Error::new(
+            ErrorKind::ResourceBusy,
+            "a supervisor is still running for this network",
+        )),
+        Err(_) => Ok(()),
     }
-    if !daemon_running {
-        return exit_with(format!(
-            "Failed to start daemon for node '{node_id}' on network '{network_id}' within {TIMEOUT_IN_SECS}s",
-        ));
-    }
-    Ok(())
 }
 
 /// Generates a genesis ledger for the default network:
@@ -692,17 +670,22 @@ fn generate_default_topology(
     ]
 }
 
-/// If the network exists, its directory is deleted, corresponding docker
-/// images are removed, and it is created anew.
+/// If the network exists, its directory is deleted and it is created anew.
 /// If the network doesn't exist, the directory structure is created.
-fn check_setup_network(
-    docker: &DockerManager,
-    directory_manager: &DirectoryManager,
-    network_id: &str,
-) -> Result<()> {
+///
+/// Overwriting an existing network only wipes its on-disk state; tearing down a
+/// running network is `network stop`'s job, so refuse if a supervisor is still
+/// live rather than yank the directory out from under it.
+fn check_setup_network(directory_manager: &DirectoryManager, network_id: &str) -> Result<()> {
     if directory_manager.network_path_exists(network_id) {
+        let network_path = directory_manager.network_path(network_id);
+        if let Err(e) = ensure_not_running(&network_path) {
+            return exit_with(format!(
+                "Cannot overwrite network '{network_id}': {e}. \
+                 Run 'minimina network stop -i {network_id}' first."
+            ));
+        }
         warn!("Network '{network_id}' already exists. Overwriting!");
-        docker.compose_down(None, false, false)?;
         directory_manager.delete_network_directory(network_id)?;
     }
 
