@@ -135,81 +135,11 @@ module Node = struct
   let dump_precomputed_blocks ~logger (t : t) =
     let open Malleable_error.Let_syntax in
     let container_id = t.config.service_id in
-    [%log info]
-      "Dumping precomputed blocks from logs for (node: %s, container: %s)"
-      t.config.service_id container_id ;
+    (* Fetch the container's logs and hand the contents to the shared parser
+       (see also the native engine, which reads the node's log file). *)
     let%bind logs = get_logs_in_container container_id in
-    (* kubectl logs may include non-log output, like "Using password from environment variable" *)
-    let log_lines =
-      String.split logs ~on:'\n'
-      |> List.filter ~f:(String.is_prefix ~prefix:"{\"timestamp\":")
-    in
-    let jsons = List.map log_lines ~f:Yojson.Safe.from_string in
-    let metadata_jsons =
-      List.map jsons ~f:(fun json ->
-          match json with
-          | `Assoc items -> (
-              match List.Assoc.find items ~equal:String.equal "metadata" with
-              | Some md ->
-                  md
-              | None ->
-                  failwithf "Log line is missing metadata: %s"
-                    (Yojson.Safe.to_string json)
-                    () )
-          | other ->
-              failwithf "Expected log line to be a JSON record, got: %s"
-                (Yojson.Safe.to_string other)
-                () )
-    in
-    let state_hash_and_blocks =
-      List.fold metadata_jsons ~init:[] ~f:(fun acc json ->
-          match json with
-          | `Assoc items -> (
-              match
-                List.Assoc.find items ~equal:String.equal "precomputed_block"
-              with
-              | Some block -> (
-                  match
-                    List.Assoc.find items ~equal:String.equal "state_hash"
-                  with
-                  | Some state_hash ->
-                      (state_hash, block) :: acc
-                  | None ->
-                      failwith
-                        "Log metadata contains a precomputed block, but no \
-                         state hash" )
-              | None ->
-                  acc )
-          | other ->
-              failwithf "Expected log line to be a JSON record, got: %s"
-                (Yojson.Safe.to_string other)
-                () )
-    in
-    let%bind.Deferred () =
-      Deferred.List.iter state_hash_and_blocks
-        ~f:(fun (state_hash_json, block_json) ->
-          let double_quoted_state_hash =
-            Yojson.Safe.to_string state_hash_json
-          in
-          let state_hash =
-            String.sub double_quoted_state_hash ~pos:1
-              ~len:(String.length double_quoted_state_hash - 2)
-          in
-          let block = Yojson.Safe.pretty_to_string block_json in
-          let filename = state_hash ^ ".json" in
-          match%map.Deferred Sys.file_exists filename with
-          | `Yes ->
-              [%log info]
-                "File already exists for precomputed block with state hash %s"
-                state_hash
-          | _ ->
-              [%log info]
-                "Dumping precomputed block with state hash %s to file %s"
-                state_hash filename ;
-              Out_channel.with_file filename ~f:(fun out_ch ->
-                  Out_channel.output_string out_ch block ) )
-    in
-    Malleable_error.return ()
+    Local_engine_common.Ops.dump_precomputed_blocks_from_logs ~logger
+      ~service_name:t.config.service_id ~logs
 
   let start ~fresh_state node : unit Malleable_error.t =
     let open Malleable_error.Let_syntax in

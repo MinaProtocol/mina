@@ -73,4 +73,63 @@ module Ops = struct
         ; "--log-json"
         ; "--continue-on-error"
         ]
+
+  (* [dump_precomputed_blocks_from_logs ~logger ~service_name ~logs] parses a
+     node's [logs] for precomputed blocks and writes each one to a
+     [<state_hash>.json] file in the current directory. The two engines fetch
+     [logs] differently (docker container logs vs. the native node's log file),
+     but the parsing and file-writing are identical, so they share this. *)
+  let dump_precomputed_blocks_from_logs ~logger ~service_name ~logs =
+    let open Async in
+    [%log info] "Extracting precomputed blocks from logs for (node: %s)"
+      service_name ;
+    (* Node logs may include non-JSON output; keep only structured log lines. *)
+    let log_lines =
+      String.split logs ~on:'\n'
+      |> List.filter ~f:(String.is_prefix ~prefix:{|{"timestamp":|})
+    in
+    let metadata_jsons =
+      List.map log_lines ~f:(fun line ->
+          let json = Yojson.Safe.from_string line in
+          match Yojson.Safe.Util.member "metadata" json with
+          | `Null ->
+              failwithf "Log line is missing metadata: %s"
+                (Yojson.Safe.to_string json)
+                ()
+          | md ->
+              md )
+    in
+    let state_hash_and_blocks =
+      List.fold metadata_jsons ~init:[] ~f:(fun acc json ->
+          match Yojson.Safe.Util.member "precomputed_block" json with
+          | `Null ->
+              acc
+          | block -> (
+              match Yojson.Safe.Util.member "state_hash" json with
+              | `Null ->
+                  failwith
+                    "Log metadata contains a precomputed block, but no state \
+                     hash"
+              | state_hash ->
+                  (state_hash, block) :: acc ) )
+    in
+    let%bind.Deferred () =
+      Deferred.List.iter state_hash_and_blocks
+        ~f:(fun (state_hash_json, block_json) ->
+          let state_hash = Yojson.Safe.Util.to_string state_hash_json in
+          let block = Yojson.Safe.pretty_to_string block_json in
+          let filename = state_hash ^ ".json" in
+          match%map.Deferred Sys.file_exists filename with
+          | `Yes ->
+              [%log info]
+                "File already exists for precomputed block with state hash %s"
+                state_hash
+          | _ ->
+              [%log info]
+                "Dumping precomputed block with state hash %s to file %s"
+                state_hash filename ;
+              Out_channel.with_file filename ~f:(fun out_ch ->
+                  Out_channel.output_string out_ch block ) )
+    in
+    Malleable_error.return ()
 end
