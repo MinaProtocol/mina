@@ -7,6 +7,12 @@ open Pipe_lib
 
 module Engine = struct
   module type Network_config_intf = sig
+    (** Engine-specific command-line inputs. This is the hook through which an
+        engine declares its own command-line flags, on top of the flags shared
+        by all engines (e.g. [--mina-image], [--archive-image]): [test_executive]
+        parses [term] alongside those shared flags and passes the resulting [t]
+        to {!expand}. An engine with no backend-specific flags uses [t = unit]
+        and a [term] that parses nothing. *)
     module Cli_inputs : sig
       type t
 
