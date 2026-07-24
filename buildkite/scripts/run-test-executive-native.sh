@@ -55,7 +55,7 @@ fi
 source buildkite/scripts/debian/update.sh --verbose
 
 # Install all required Debian packages
-source buildkite/scripts/debian/install.sh "mina-devnet-generic,mina-archive,mina-test-executive"
+source buildkite/scripts/debian/install.sh "mina-devnet-generic,mina-archive-devnet,mina-test-executive"
 
 MINA_BIN="/usr/local/bin/mina"
 ARCHIVE_BIN="/usr/local/bin/mina-archive"
