@@ -60,9 +60,15 @@ rm -f .mina-config/.mina-lock
 # Export variables that the daemon would read directly
 export MINA_PRIVKEY_PASS MINA_LIBP2P_PASS UPTIME_PRIVKEY_PASS
 
-# Run the daemon in the foreground
+# Run the daemon in the foreground. We ignore terminating signals while the
+# daemon is running because this entrypoint script is expected to run under
+# dumb-init, and a signal sent to dumb-init (e.g., the signal from docker stop)
+# will automatically be forwarded to the daemon too.
+trap '' TERM INT HUP QUIT
 ${MINA_APP} ${INPUT_ARGS} ${EXTRA_FLAGS} ${APPENDED_FLAGS} 2>mina-stderr.log
 export MINA_EXIT_CODE="$?"
+trap - TERM INT HUP QUIT
+
 echo "Mina process exited with status code ${MINA_EXIT_CODE}"
 
 # Don't export variables to exitpoint scripts
@@ -89,6 +95,12 @@ if [[ ${VERBOSE} ]]; then
   tail -n 5 ".mina-config/mina-best-tip.log" | jq -rc '.metadata.added_transitions[0] | {state_hash: .state_hash, height: '${CONSENSUS_STATE}'.blockchain_length, slot: '${CONSENSUS_STATE}'.global_slot_since_genesis}'
 fi
 
-sleep 15 # to allow all mina proccesses to quit, cleanup, and finish logging
+# Sleep to allow all mina proccesses to quit, cleanup, and finish logging. This
+# is necessary because the daemon does not wait for its children to shut down;
+# it relies on them noticing the daemon has shut down to initiate their own
+# shutdown. Though not ideal, it does work, but it does also mean that the
+# daemon exiting is not a reliable indication that all the mina processes have
+# stopped.
+sleep 5
 
 exit ${MINA_EXIT_CODE}

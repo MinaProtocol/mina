@@ -154,6 +154,15 @@ let handle_libp2p_helper_termination t ~pids ~killed result =
   Mina_metrics.Process_memory.Libp2p_helper.clear_pid () ;
   if (not killed) && not t.finished then (
     match result with
+    | Ok (Error (`Signal _) as e) when Async_unix.Shutdown.is_shutting_down ()
+      ->
+        [%log' info t.logger]
+          "libp2p_helper process terminated due to signal during shutdown: \
+           $exit_status"
+          ~metadata:
+            [ ("exit_status", `String (Unix.Exit_or_signal.to_string_hum e)) ] ;
+        t.finished <- true ;
+        Deferred.unit
     | Ok ((Error (`Exit_non_zero _) | Error (`Signal _)) as e) ->
         [%log' fatal t.logger]
           !"libp2p_helper process died unexpectedly: $exit_status"
