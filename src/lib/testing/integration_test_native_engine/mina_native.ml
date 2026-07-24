@@ -668,7 +668,32 @@ module Network_manager = struct
 
   let cleanup t =
     let logger = t.logger in
+    (* Capture the node list before [destroy] clears it, so we can preserve the
+       per-node logs below. *)
+    let nodes = t.nodes in
     let%bind () = if t.deployed then destroy t else return () in
+    (* Copy each node's log into the current working directory before deleting
+       the (temporary) working dir, so CI collects them via the
+       [<test>*.local.test.log] artifact glob. Without this the per-node daemon
+       logs are lost on teardown and a failing node can't be diagnosed. *)
+    let%bind () =
+      Deferred.List.iter nodes ~f:(fun node ->
+          let dest =
+            sprintf "%s-%s.local.test.log" t.test_name
+              (Native_network.Node.id node)
+          in
+          match%map
+            Monitor.try_with ~here:[%here] (fun () ->
+                let%bind.Deferred contents =
+                  Reader.file_contents node.Native_network.Node.log_file
+                in
+                Writer.save dest ~contents )
+          with
+          | Ok () ->
+              ()
+          | Error _ ->
+              () )
+    in
     [%log info] "Cleaning up network configuration" ;
     let%bind () =
       match%bind
