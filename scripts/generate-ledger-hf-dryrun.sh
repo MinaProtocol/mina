@@ -523,11 +523,6 @@ if [[ ! -x "$SCRIPT_DIR/prepare-test-ledger-hf-dryrun.sh" ]]; then
     exit 1
 fi
 
-if [[ ! -x "$SCRIPT_DIR/prepare-test-ledger.sh" ]]; then
-    echo "Error: Required script not found or not executable: $SCRIPT_DIR/prepare-test-ledger.sh" >&2
-    exit 1
-fi
-
 # Call prepare-test-ledger script with all keys
 echo "Calling prepare-test-ledger-hf-dryrun.sh with:"
 echo "  Extra keys (with delegation): $EXTRA_KEYS"
