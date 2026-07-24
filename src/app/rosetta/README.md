@@ -9,7 +9,7 @@ ensure your Docker configuration has a large amount of RAM (at least 12GB,
 recommended 16GB) and then run the following:
 
 ```bash
-cat dockerfiles/Dockerfile-mina-rosetta \
+cat dockerfiles/stages/rosetta/1-base-deps dockerfiles/stages/rosetta/2-mina-rosetta \
     | docker build -t mina-rosetta:v2.0.0 \
         --build-arg "network=devnet" \
         --build-arg "image=debian:bullseye" \
@@ -29,7 +29,7 @@ Rosetta node. Each build argument is configurable and defines the following:
 * `network`: network version of the artifacts to install
 
 To build an image with just the minimal requirements to run a Rosetta node (e.g. when connecting to an existing Mina node and archive DB) you can run the same
-command but use `dockerfiles/Dockerfile-mina-daemon` instead.
+command but concatenate the daemon staged fragments instead: `cat dockerfiles/stages/1-base-deps dockerfiles/stages/daemon/2-mina-daemon dockerfiles/stages/daemon/3-prefork-genesis`.
 
 Alternatively, you could use an official image that is built in exactly this way by buildkite CI/CD.
 

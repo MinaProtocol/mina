@@ -303,6 +303,7 @@ let generateDockerForCodename =
                       , deb_codename = codename.DebVersion
                       , deb_profile = profile
                       , deb_legacy_version = spec.deb_legacy_version
+                      , docker_target = Some "mina-daemon-prefork-genesis"
                       , size = spec.size
                       , deb_version = spec.version
                       , generic = True

@@ -54,6 +54,7 @@ let ReleaseSpec =
           , deb_version : Text
           , deb_root_folder : Text
           , deb_legacy_version : Text
+          , docker_target : Optional Text
           , deb_suffix : Optional Text
           , deb_profile : Profiles.Type
           , deb_repo : DebianRepo.Type
@@ -82,6 +83,7 @@ let ReleaseSpec =
           , deb_release = "unstable"
           , deb_version = "\\\${MINA_DEB_VERSION}"
           , deb_legacy_version = "3.1.1-alpha1-compatible-14a8b92"
+          , docker_target = None Text
           , deb_profile = Profiles.Type.Devnet
           , build_flags = BuildFlags.Type.None
           , deb_repo = DebianRepo.Type.Local
@@ -164,7 +166,8 @@ let generateStep =
               -- (scripts/docker/helper.sh get_platform_suffix), which is the
               -- only arch suffix manager.sh verify's tag ever expects.
                 merge
-                  { DaemonGeneric = ""
+                  { Base = ""
+                  , DaemonGeneric = ""
                   , DaemonProfiled = \(args : { profile : Profiles.Type }) -> ""
                   , Daemon =
                       \(args : { network : Network.Type }) -> archCustomSuffix
@@ -230,6 +233,11 @@ let generateStep =
 
                 else  ""
 
+          let dockerTargetArg =
+                merge
+                  { Some = \(t : Text) -> " --docker-target ${t}", None = "" }
+                  spec.docker_target
+
           let buildDockerCmd =
                     "./scripts/docker/build.sh"
                 ++  " --service ${serviceName}"
@@ -246,6 +254,7 @@ let generateStep =
                 ++  " --deb-build-flags ${BuildFlags.lowerName
                                             spec.build_flags}"
                 ++  " --deb-legacy-version ${spec.deb_legacy_version}"
+                ++  dockerTargetArg
                 ++  debSuffix
                 ++  " --repo ${spec.repo}"
                 ++  " --platform ${Arch.platform spec.arch}"

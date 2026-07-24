@@ -1,0 +1,92 @@
+#################################################################################################
+# The "mina-daemon" stage
+# - Continues from the shared base-deps image.
+# - Installs the CONFIGLESS generic daemon deb (mina-generic) plus the storage toolbox debs
+#   (everything daemon-specific EXCEPT the create-prefork-genesis package, which lives in the
+#   dedicated opt-in genesis stage).
+# - Creates the mina user, copies entrypoint/healthcheck/cron/puppeteer scripts and sets the
+#   daemon ENTRYPOINT.
+#################################################################################################
+FROM base-deps AS mina-daemon
+
+# In multi-stage builds, Docker requires re-declaring ARG variables after each FROM.
+ARG deb_version
+ARG deb_release=unstable
+ARG deb_codename=bullseye
+ARG network=mainnet
+ARG deb_repo="http://packages.o1test.net"
+ARG deb_profile
+ARG deb_suffix
+
+# if --build-arg deb_suffix is defined, add hypen at beginning.
+ENV SUFFIX=${deb_suffix:+-${deb_suffix}}
+# Construct the daemon debian package name from the suffix. The daemon binaries
+# now ship in the network-agnostic generic package (profile/network selected at
+# runtime), so the package name no longer embeds the network. This stage is
+# invoked with deb_suffix=generic[-variant], yielding e.g.:
+# - mina-generic
+# - mina-generic-lightnet / mina-generic-instrumented etc.
+ENV MINA_DEB=mina${SUFFIX}
+
+# Storage toolbox for fixing daemon storage
+ENV MINA_STORAGE_DEB=mina-daemon-storage-toolbox
+
+# Mina daemon package
+# jemalloc is also installed automatically here to match the package dependencies for this $deb_codename.
+# Packages are installed DIRECTLY from the local build context: scripts/docker/build.sh
+# stages the freshly-built .deb files under _debs, which we COPY to /opt/mina-local-debs,
+# and install-mina-debs.sh resolves each requested package to its concrete .deb file and
+# installs them with a single apt-get call (no apt repo / no apt index). Since there is no
+# repo to resolve the mina dependency closure, every mina dependency (e.g. mina-logproc,
+# a dependency of the daemon and the storage toolboxes) is requested explicitly here.
+#
+# This builds the CONFIGLESS daemon image (the generic/apps-only variant): it deliberately
+# does NOT install mina-${network}-config. Baking a network config into the generic base
+# would override any runtime config injected later (e.g. by test_executive), so the generic
+# image stays free of /var/lib/coda/* configs. The configured image is produced separately
+# by Dockerfile-install-config, which is FROM this generic image and layers config on top.
+# The create-prefork-genesis package is NOT installed here either; it lives in the dedicated
+# opt-in genesis stage.
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+COPY scripts/install-mina-debs.sh /usr/local/bin/install-mina-debs.sh
+COPY _debs /opt/mina-local-debs
+RUN echo "Building image with version $deb_version from repo $deb_release $deb_codename for network $network" \
+  && chmod +x /usr/local/bin/install-mina-debs.sh \
+  && mina_debs=( \
+       "${MINA_DEB}=$deb_version" \
+       "mina-logproc=$deb_version" \
+       "${MINA_STORAGE_DEB}=${deb_version}" \
+     ) \
+  && /usr/local/bin/install-mina-debs.sh "${mina_debs[@]}"
+
+
+# Move to a non-root UID in the future (specifically 50000, as it is memorable and safely within the bounds of most systems)
+# for now stick to root for compatibility
+ARG UID=0
+
+# TODO: flesh out this feature + test
+# Create a mina user to execute the daemon with
+RUN mkdir /home/mina \
+  && adduser --uid 50000 --disabled-password --gecos '' mina \
+  && passwd -l mina \
+  && chown -R mina:mina /home/mina
+
+WORKDIR /home/mina
+USER mina
+
+## Reset workdir, USER, and ${UID} for root-owned version
+WORKDIR /root/
+USER 0
+
+COPY --chown=${UID} scripts/healthcheck-utilities.sh /healthcheck/utilities.sh
+COPY --chown=${UID} scripts/cron_job_dump_ledger.sh /cron_job_dump_ledger.sh
+COPY --chown=${UID} scripts/daemon-entrypoint.sh /entrypoint.sh
+# Solve this by marking scripts executable in git
+COPY --chown=${UID} ./auxiliary_entrypoints /entrypoint.d
+
+COPY --chown=${UID} puppeteer-context/* /
+RUN chmod +x /mina_daemon_puppeteer.py /find_puppeteer.sh /start.sh /stop.sh
+
+ENV MINA_TIME_OFFSET 0
+
+ENTRYPOINT ["/usr/bin/dumb-init", "/entrypoint.sh"]

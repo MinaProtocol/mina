@@ -51,6 +51,19 @@ COVERAGE_DIR=_coverage
 # Distribution codename, to be used in Docker builds
 CODENAME ?= $(shell lsb_release -cs)
 
+# Network for the aggregate local build targets (debian-build-all / docker-build-all).
+# devnet or mainnet.
+NETWORK ?= devnet
+
+# Set LOAD_ONLY=1 for purely local docker builds: images are loaded into the
+# local docker daemon only and NOT pushed to the (o1labs) registry. Leave unset
+# to preserve the historical push behaviour of build_docker_image.
+ifeq ($(LOAD_ONLY),1)
+DOCKER_LOAD_ONLY_ARG := --load-only
+else
+DOCKER_LOAD_ONLY_ARG :=
+endif
+
 # This commit hash
 GITHASH := $(shell git rev-parse --short=8 HEAD)
 GITLONGHASH := $(shell git rev-parse HEAD)
@@ -424,7 +437,7 @@ check-bash: ## Run shellcheck on bash scripts
 .PHONY: check-docker
 check-docker: ## Run hadolint on Docker files
 ifdef BUILDKITE
-	hadolint --ignore DL3008 --ignore DL3002 --ignore DL3013 --ignore DL3007 --ignore DL3006 --ignore DL3028 dockerfiles/Dockerfile-* dockerfiles/toolchain/*
+	hadolint --ignore DL3008 --ignore DL3002 --ignore DL3013 --ignore DL3007 --ignore DL3006 --ignore DL3028 dockerfiles/Dockerfile-* dockerfiles/toolchain/* dockerfiles/stages/1-base-deps dockerfiles/stages/daemon/* dockerfiles/stages/archive/* dockerfiles/stages/rosetta/*
 else
 	docker run --rm -v $(PWD):/workspace -w /workspace \
 		hadolint/hadolint hadolint \
@@ -435,7 +448,11 @@ else
 		--ignore DL3006 \
 		--ignore DL3028 \
 		dockerfiles/Dockerfile-* \
-		dockerfiles/toolchain/*
+		dockerfiles/toolchain/* \
+		dockerfiles/stages/1-base-deps \
+		dockerfiles/stages/daemon/* \
+		dockerfiles/stages/archive/* \
+		dockerfiles/stages/rosetta/*
 endif
 
 ########################################
@@ -689,7 +706,8 @@ start-local-debian-repo: ## Stage locally-built debians into the docker build co
 	@cp -f _build/*.deb dockerfiles/ \
 		&& echo "✅ Local debians staged"
 
-# General function for building Docker images
+# General function for building Docker images.
+# $(1)=service  $(2)=network  $(3)=extra build.sh args (optional, e.g. --deb-suffix generic)
 define build_docker_image
 	$(info 🐳 Building Docker image for service $(1) with \
 		codename $(CODENAME) \
@@ -697,18 +715,18 @@ define build_docker_image
 		and branch $$GITBRANCH \
 		and network $(2))
 
-	@BUILD_DIR=./_build \
-	MINA_DEB_CODENAME=$(CODENAME) \
-	KEEP_MY_TAGS_INTACT=true \
+	@export BUILD_DIR=./_build MINA_DEB_CODENAME=$(CODENAME) KEEP_MY_TAGS_INTACT=true && \
 	. ./scripts/export-git-env-vars.sh \
 	&& ./scripts/docker/build.sh \
 		--deb-codename $(CODENAME) \
 		--service $(1) \
 		--version "$$MINA_DEB_VERSION" \
 		--branch "$$GITBRANCH" \
-		--deb-legacy-version "$$MINA_DEB_LEGACY_VERSION" \
+		--deb-legacy-version "$${MINA_DEB_LEGACY_VERSION:-}" \
 		--docker-registry "europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo" \
 		--network $(2) \
+		$(3) \
+		$(DOCKER_LOAD_ONLY_ARG) \
 		--no-cache
 
 	$(info 📦 cleaning up staged local debians)
@@ -742,12 +760,12 @@ docker-build-daemon-devnet-generic: start-local-debian-repo ## Build the daemon 
 .PHONY: docker-build-daemon-devnet
 docker-build-daemon-devnet: SHELL := /bin/bash
 docker-build-daemon-devnet: start-local-debian-repo ## Build the daemon Docker image for devnet
-	$(call build_docker_image,mina-daemon,devnet)
+	$(call build_docker_image,mina-daemon,devnet,--deb-suffix generic)
 
 .PHONY: docker-build-daemon-mainnet
 docker-build-daemon-mainnet: SHELL := /bin/bash
 docker-build-daemon-mainnet: start-local-debian-repo ## Build the daemon Docker image for mainnet
-	$(call build_docker_image,mina-daemon,mainnet)
+	$(call build_docker_image,mina-daemon,mainnet,--deb-suffix generic)
 
 
 .PHONY: docker-build-daemon-devnet-automode-hardfork
@@ -768,12 +786,53 @@ docker-build-rosetta-devnet-generic: start-local-debian-repo ## Build the Rosett
 .PHONY: docker-build-rosetta-devnet
 docker-build-rosetta-devnet: SHELL := /bin/bash
 docker-build-rosetta-devnet: start-local-debian-repo ## Build the Rosetta Docker image for devnet
-	$(call build_docker_image,mina-rosetta,devnet)
+	$(call build_docker_image,mina-rosetta,devnet,--deb-suffix generic)
 
 .PHONY: docker-build-rosetta-mainnet
 docker-build-rosetta-mainnet: SHELL := /bin/bash
 docker-build-rosetta-mainnet: start-local-debian-repo ## Build the Rosetta Docker image for mainnet
-	$(call build_docker_image,mina-rosetta,mainnet)
+	$(call build_docker_image,mina-rosetta,mainnet,--deb-suffix generic)
+
+.PHONY: docker-build-base
+docker-build-base: SHELL := /bin/bash
+docker-build-base: ## Build the shared mina-base image (no mina debs required)
+	$(call build_docker_image,mina-base,$(NETWORK))
+
+########################################
+# Aggregate local build of all staged docker images
+
+# Package the full debian closure the staged base/archive/daemon/rosetta images
+# install from the local build context. This PACKAGES already-compiled binaries
+# from _build/ (run the relevant make build* targets first) -- it does not
+# compile. Select codename via CODENAME= and network via NETWORK=.
+.PHONY: debian-build-all
+debian-build-all: ## Package the deb closure for the staged images (CODENAME/NETWORK)
+	$(info 📦 Packaging deb closure for network $(NETWORK) / codename $(CODENAME) from _build)
+	BUILD_DIR="$(PWD)/_build" \
+	DUNE_PROFILE=$(NETWORK) \
+	MINA_DEB_CODENAME="$(CODENAME)" \
+	BRANCH_NAME="$(BRANCH_NAME)" \
+	./scripts/debian/build.sh \
+		logproc \
+		daemon_storage_toolbox \
+		daemon_$(NETWORK)_generic \
+		archive_generic \
+		archive_$(NETWORK) \
+		rosetta_generic \
+		rosetta_$(NETWORK) \
+		profile_$(NETWORK)
+
+# Build every staged docker image (base, archive, daemon, rosetta) for one
+# CODENAME/NETWORK, packaging the deb closure first. Set LOAD_ONLY=1 for a
+# purely local build (load into local docker, no registry push).
+.PHONY: docker-build-all
+docker-build-all: SHELL := /bin/bash
+docker-build-all: ## Build ALL staged docker images for CODENAME/NETWORK (packages debs first)
+	$(MAKE) debian-build-all CODENAME=$(CODENAME) NETWORK=$(NETWORK)
+	$(MAKE) docker-build-base CODENAME=$(CODENAME) NETWORK=$(NETWORK) LOAD_ONLY=$(LOAD_ONLY)
+	$(MAKE) docker-build-archive-$(NETWORK) CODENAME=$(CODENAME) LOAD_ONLY=$(LOAD_ONLY)
+	$(MAKE) docker-build-daemon-$(NETWORK) CODENAME=$(CODENAME) LOAD_ONLY=$(LOAD_ONLY)
+	$(MAKE) docker-build-rosetta-$(NETWORK) CODENAME=$(CODENAME) LOAD_ONLY=$(LOAD_ONLY)
 
 ########################################
 # Generate hardfork packages

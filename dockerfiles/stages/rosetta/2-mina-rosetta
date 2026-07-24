@@ -1,22 +1,24 @@
-ARG image=europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/ubuntu:focal
-FROM ${image} AS production
+#################################################################################################
+# The "mina-rosetta" stage
+# - Continues from the rosetta-base image.
+# - Installs the mina rosetta/archive/daemon debs (3-layer split: generic + profile + per-network
+#   tent, plus the network config for full builds), then sets up the postgres cluster and the
+#   rosetta entrypoint.
+#################################################################################################
+FROM rosetta-base AS mina-rosetta
+
+# In multi-stage builds, Docker requires re-declaring ARG variables after each FROM.
 ARG deb_codename=focal
 ARG deb_version
 ARG deb_release=unstable
 ARG network=mainnet
 ARG deb_repo="http://packages.o1test.net"
-
-ARG psql_version=15
+ARG deb_suffix
+ARG build_flags_suffix
+ARG deb_profile=devnet
 
 ARG MINA_DAEMON_PORT=8302
 ARG MINA_CONFIG_DIR=/data/.mina-config
-
-ENV DEBIAN_FRONTEND noninteractive
-
-ARG deb_suffix
-ARG build_flags_suffix
-ARG apt_cache_url=""
-ARG deb_profile=devnet
 
 # if --build-arg deb_suffix is defined, add hypen at beginning.
 ENV SUFFIX=${deb_suffix:+-${deb_suffix}}
@@ -42,75 +44,6 @@ ENV MINA_ROSETTA_DEB=mina-rosetta-${network}${BUILD_FLAGS_SUFFIX}
 ENV MINA_ARCHIVE_GENERIC_DEB=mina-archive-generic${BUILD_FLAGS_SUFFIX}
 ENV MINA_ROSETTA_GENERIC_DEB=mina-rosetta-generic${BUILD_FLAGS_SUFFIX}
 
-
-# We do not install the below platform-specific dependencies,
-# and instead assume that apt will install the proper deps based on the package definition.
-# The packages are noted here just for clarity/documentation.
-# Bullseye/Focal-only Deps:
-#    libffi7
-#    libprocps8
-#    libjemalloc2
-#    libssl
-
-# Optional: configure APT caching proxy (bypass proxy for deb_repo)
-COPY scripts/configure-apt-proxy.sh /usr/local/bin/configure-apt-proxy.sh
-RUN chmod +x /usr/local/bin/configure-apt-proxy.sh \
-  && /usr/local/bin/configure-apt-proxy.sh "$apt_cache_url" "$deb_repo"
-
-# Install ca-certificates using HTTP
-RUN apt-get update --quiet --yes \
-  && apt-get install --quiet --yes --no-install-recommends ca-certificates \
-  && rm -rf /var/lib/apt/lists/*
-
-# Switch to HTTPS
-RUN if [ -f /etc/apt/sources.list ]; then \
-  sed -i 's/http:\/\//https:\/\//g' /etc/apt/sources.list; \
-else \
-  sed -i 's/http:\/\//https:\/\//g' /etc/apt/sources.list.d/debian.sources; \
-fi
-
-# --- Dependencies across many platforms
-RUN apt-get update --quiet --yes \
-    && apt-get upgrade --quiet --yes \
-    && apt-get install --quiet --yes --no-install-recommends \
-    apt-utils \
-    apt-transport-https \
-    bc \
-    curl \
-    build-essential \
-    dnsutils \
-    dumb-init \
-    gettext \
-    gnupg2 \
-    libgmp10 \
-    libgomp1 \
-    tzdata \
-    jq \
-    git \
-    sudo \
-    procps \
-    && rm -rf /var/lib/apt/lists/*
-
-# --- Install Postgresql
-SHELL ["/bin/bash", "-o", "pipefail", "-c"]
-RUN curl -s https://www.postgresql.org/media/keys/ACCC4CF8.asc | apt-key add - \
-    && echo deb https://apt-archive.postgresql.org/pub/repos/apt/ "$deb_codename"-pgdg-archive main | tee /etc/apt/sources.list.d/pgdg.list \
-    && apt-get update -y \
-    && apt-get install --no-install-recommends -y \
-    postgresql-"$psql_version" \
-    postgresql-client-"$psql_version" \
-    && rm -rf /var/lib/apt/lists/*
-
-# rosetta-cli and the Go toolchain that builds it are intentionally NOT installed
-# in the production image: they are test-only (the rosetta integration test builds
-# its own copy via buildkite/scripts/tests/rosetta/install-cli.sh) and have no
-# role in the production runtime. Keeping them out slims the shipped image.
-SHELL ["/bin/bash", "-o", "pipefail", "-c"]
-
-# --- Generate en_US.UTF-8 locale to allow use of O(1) Labs DB dumps
-RUN sed -i -e 's/# en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' /etc/locale.gen \
-    && locale-gen
-
 # Mina daemon package
 # jemalloc is also installed automatically here to match the package dependencies for this $deb_codename.
 # Installed DIRECTLY from the local build context: scripts/docker/build.sh stages
@@ -119,6 +52,7 @@ RUN sed -i -e 's/# en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' /etc/locale.gen \
 # call (no apt repo / no apt index). Since there is no repo to resolve the mina
 # dependency closure, the daemon metapackage's dependencies (mina-logproc and
 # mina-${network}-config) are requested explicitly as local files too.
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 COPY scripts/install-mina-debs.sh /usr/local/bin/install-mina-debs.sh
 COPY _debs /opt/mina-local-debs
 RUN echo "Building image with version $deb_version from repo $deb_release $deb_codename for network $network" \
