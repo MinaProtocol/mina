@@ -466,7 +466,7 @@ reset-genesis-ledger() {
         "2_to_the": 2 
       },
     },
-    ledger: .
+    ledger: { accounts: .accounts }
   }
   ' < "${GENESIS_LEDGER_FOLDER}/genesis_ledger.json" > "${DAEMON_CONFIG}"
 }
