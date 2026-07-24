@@ -4,7 +4,7 @@
 
 use crate::directory_manager::{CONFIG_DIRECTORY, LOGS_DIRECTORY};
 use crate::native::port_manager;
-use crate::service::{ServiceConfig, ServiceType};
+use crate::service::{daemon_env, ServiceConfig, ServiceType};
 use crate::supervisor::plan::{NativeBackendSpec, NativeNodeSpec, SupervisorPlan};
 use log::warn;
 use std::fs;
@@ -73,12 +73,7 @@ impl NativePlanBuilder {
                 name: service.service_name.clone(),
                 binary,
                 args,
-                env: vec![
-                    ("MINA_PRIVKEY_PASS".into(), "naughty blue worm".into()),
-                    ("MINA_LIBP2P_PASS".into(), "naughty blue worm".into()),
-                    ("MINA_CLIENT_TRUSTLIST".into(), "0.0.0.0/0".into()),
-                    ("RAYON_NUM_THREADS".into(), "2".into()),
-                ],
+                env: daemon_env(),
                 log_file: self
                     .logs_dir()
                     .join(format!("{}.log", service.service_name)),

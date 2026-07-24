@@ -4,7 +4,7 @@
 //! supervisor's job.
 
 use crate::directory_manager::CONFIG_DIRECTORY;
-use crate::service::{ServiceConfig, ServiceType};
+use crate::service::{daemon_env, ServiceConfig, ServiceType};
 use crate::supervisor::plan::{DockerBackendSpec, DockerNodeSpec, Mount, SupervisorPlan};
 use std::io::Result;
 use std::path::{Path, PathBuf};
@@ -83,12 +83,7 @@ impl DockerPlanBuilder {
                 image,
                 entrypoint: Some(vec!["mina".to_string()]),
                 cmd: cmd_str.split_whitespace().map(str::to_string).collect(),
-                env: vec![
-                    ("MINA_PRIVKEY_PASS".into(), "naughty blue worm".into()),
-                    ("MINA_LIBP2P_PASS".into(), "naughty blue worm".into()),
-                    ("MINA_CLIENT_TRUSTLIST".into(), "0.0.0.0/0".into()),
-                    ("RAYON_NUM_THREADS".into(), "2".into()),
-                ],
+                env: daemon_env(),
                 ports,
                 mounts: vec![
                     Mount {

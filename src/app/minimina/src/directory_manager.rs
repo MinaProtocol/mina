@@ -6,7 +6,6 @@
 //! - `network-keypairs`: Contains the key pairs for the block producer service.
 //! - `libp2p-keypairs`: Contains the key pairs for the libp2p service.
 //! - `genesis_ledger.json`: Contains the genesis ledger for the network.
-//! - `docker-compose.yml`: Contains the docker compose file for the network.
 //! - `network.json`: Contains the network topology representation in JSON format.
 //! - `peer_list_file.txt`: Contains the list of libp2p peers for the network.
 
@@ -142,10 +141,6 @@ impl DirectoryManager {
 
     pub fn get_network_keypair_files(&self, network_id: &str) -> Result<Vec<String>> {
         self.get_files_in_network_subdir(network_id, NETWORK_KEYPAIRS, Some(".pub"))
-    }
-
-    pub fn _get_libp2p_keypair_files(&self, network_id: &str) -> Result<Vec<String>> {
-        self.get_files_in_network_subdir(network_id, LIBP2P_KEYPAIRS, Some(".peerid"))
     }
 
     fn get_files_in_network_subdir(

@@ -79,10 +79,6 @@ impl DockerManager {
         }
     }
 
-    pub fn _compose_up(&self) -> Result<Output> {
-        self.run_docker_compose(&["up", "-d"])
-    }
-
     pub fn compose_down(
         &self,
         specific_service: Option<String>,

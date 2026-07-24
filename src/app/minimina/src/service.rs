@@ -1,7 +1,7 @@
 //! # Service Module
 //!
 //! This module provides structures and methods to hold and manage configurations for different Mina daemons.
-//! With these configurations, docker-compose files can be dynamically generated to deploy and manage nodes in the network.
+//! The plan builders lower these configurations into the supervisor plan that deploys and manages nodes in the network.
 
 use log::warn;
 use serde::{Deserialize, Serialize};
@@ -26,6 +26,17 @@ pub enum ServiceType {
     ArchiveNode,
     #[serde(rename = "Uptime_service_backend")]
     UptimeServiceBackend,
+}
+
+/// Environment shared by every daemon unit, whichever backend runs it. Both
+/// plan builders bake this into their node specs.
+pub fn daemon_env() -> Vec<(String, String)> {
+    vec![
+        ("MINA_PRIVKEY_PASS".into(), "naughty blue worm".into()),
+        ("MINA_LIBP2P_PASS".into(), "naughty blue worm".into()),
+        ("MINA_CLIENT_TRUSTLIST".into(), "0.0.0.0/0".into()),
+        ("RAYON_NUM_THREADS".into(), "2".into()),
+    ]
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]

@@ -630,35 +630,6 @@ fn main() -> Result<()> {
     }
 }
 
-#[allow(dead_code)]
-fn wait_for_daemon(
-    docker: &DockerManager,
-    node_id: &str,
-    network_id: &str,
-    client_port: u16,
-) -> Result<()> {
-    let mut retries = 0;
-    let mut daemon_running = false;
-    info!("Waiting for daemon to start for node '{node_id}' on network '{network_id}'...");
-    while !daemon_running && retries < TIMEOUT_IN_SECS {
-        let out = docker.compose_client_status(node_id, network_id, client_port)?;
-        if out.status.success() {
-            daemon_running = true;
-        } else {
-            retries += 1;
-            std::thread::sleep(std::time::Duration::from_secs(1));
-        }
-    }
-    if !daemon_running {
-        return exit_with(format!(
-            "Failed to start daemon for node '{node_id}' on network '{network_id}' within {TIMEOUT_IN_SECS}s",
-        ));
-    }
-    Ok(())
-}
-
-/// Generates a genesis ledger for the default network:
-/// 1 seed, 2 bps, and a snark coordinator with one woker
 fn generate_default_genesis_ledger(
     bp_keys_opt: &mut Option<HashMap<String, NodeKey>>,
     libp2p_keys_opt: &mut Option<HashMap<String, NodeKey>>,
@@ -999,7 +970,7 @@ fn handle_topology(
             }
 
             info!(
-                "Generating docker-compose based on provided topology '{}'.",
+                "Generating services based on provided topology '{}'.",
                 topology_path.display()
             );
 
@@ -1008,7 +979,7 @@ fn handle_topology(
             create_services(directory_manager, topology_path, network_id)
         }
         None => {
-            info!("Topology not provided. Generating docker-compose based on default topology.");
+            info!("Topology not provided. Generating services based on the default topology.");
 
             if let (Some(bp_keys), Some(libp2p_keys)) = (&bp_keys.as_ref(), &libp2p_keys.as_ref()) {
                 Ok(generate_default_topology(
@@ -1019,7 +990,7 @@ fn handle_topology(
                     network_id,
                 ))
             } else {
-                let err = "Failed to generate docker-compose.yaml. Keys not generated.";
+                let err = "Failed to generate the default topology. Keys not generated.";
                 error!("{err}");
                 Err(Error::new(ErrorKind::InvalidData, err))
             }
