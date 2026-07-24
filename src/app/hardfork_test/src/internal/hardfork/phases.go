@@ -69,8 +69,14 @@ func (t *HardforkTest) RunMainNetworkPhase(mainGenesisTs int64, beforeShutdown H
 
 	t.Logger.Info("Network analyze result: %v", analysis)
 
-	if err := t.ValidateSlotOccupancy(analysis.GenesisBlock, analysis.Consensus.LastBlockBeforeTxEnd); err != nil {
-		return nil, err
+	if t.Config.UnstakingTest {
+		if err := t.validatePreForkOccupancyDiluted(analysis); err != nil {
+			return nil, err
+		}
+	} else {
+		if err := t.ValidateSlotOccupancy(analysis.GenesisBlock, analysis.Consensus.LastBlockBeforeTxEnd, t.Config.SlotTxEnd); err != nil {
+			return nil, err
+		}
 	}
 
 	if err := t.ValidateLatestOccupiedSlot(analysis.Consensus.LastOccupiedSlot); err != nil {
@@ -102,7 +108,8 @@ type ForkData struct {
 }
 
 // RunForkNetworkPhase runs the fork network and validates its operation
-func (t *HardforkTest) RunForkNetworkPhase(latestPreForkHeight int, mainGenesisTs int64) error {
+func (t *HardforkTest) RunForkNetworkPhase(analysis *BlockAnalysisResult, mainGenesisTs int64) error {
+	latestPreForkHeight := analysis.Consensus.LastBlockBeforeTxEnd.BlockHeight
 	// Start fork network
 	forkCmd, err := t.RunForkNetwork()
 	if err != nil {
@@ -144,8 +151,14 @@ func (t *HardforkTest) RunForkNetworkPhase(latestPreForkHeight int, mainGenesisT
 	t.Logger.Info("Block height is %d at slot %d.", bestTip.BlockHeight, bestTip.Slot)
 
 	// Validate slot occupancy
-	if err := t.ValidateSlotOccupancy(*commonGenesisBlock, *bestTip); err != nil {
-		return err
+	if t.Config.UnstakingTest {
+		if err := t.validatePostForkUnstaking(analysis, *commonGenesisBlock, *bestTip); err != nil {
+			return err
+		}
+	} else {
+		if err := t.ValidateSlotOccupancy(*commonGenesisBlock, *bestTip, bestTip.Slot); err != nil {
+			return err
+		}
 	}
 
 	// Validate user commands in blocks
@@ -208,7 +221,19 @@ func (t *HardforkTest) legacyFork(daemon config.DaemonInfo, analysis BlockAnalys
 	preforkGenesisConfigFile := filepath.Join(t.Config.Root, "daemon.json")
 	forkHashesFile := filepath.Join(forkDataPath, "ledger_hashes.json")
 
-	patchedConfigBytes, err := t.PatchForkConfigAndGenerateLedgersLegacy(&analysis, prepatchConfigFile, patchedLedgersDir, forkHashesFile, patchedConfigFile, preforkGenesisConfigFile, forkGenesisTs, mainGenesisTs)
+	// In unstaking test mode, clear the lazy whales' delegates in the fork
+	// genesis ledger so their stake is excluded from the post-fork VRF
+	// denominator (total_stake). Only the fork-side runtime_genesis_ledger
+	// understands --unstake-pk, so these args must not reach the prefork
+	// executable above.
+	var extraArgs []string
+	if t.Config.UnstakingTest {
+		for _, pk := range analysis.LazyWhalePks {
+			extraArgs = append(extraArgs, "--unstake-pk", pk)
+		}
+	}
+
+	patchedConfigBytes, err := t.PatchForkConfigAndGenerateLedgersLegacy(&analysis, prepatchConfigFile, patchedLedgersDir, forkHashesFile, patchedConfigFile, preforkGenesisConfigFile, forkGenesisTs, mainGenesisTs, extraArgs...)
 	if err != nil {
 		return err
 	}

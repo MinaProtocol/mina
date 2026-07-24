@@ -13,9 +13,14 @@
 set -eux -o pipefail
 
 PREFORK=""
+FORKTO="develop"
+# Set only via --slot-tx-end / --slot-chain-end; started empty here so an
+# inherited environment variable of the same name cannot influence the run.
+SLOT_TX_END=""
+SLOT_CHAIN_END=""
 EXTRA_ARGS=()
 
-USAGE="Usage: $0 --fork-from <PREFORK> [ADDITONAL ARGS TO HF TEST...]"
+USAGE="Usage: $0 --fork-from <PREFORK> [--fork-to <FORKTO>] [--slot-tx-end <SLOT>] [--slot-chain-end <SLOT>] [ADDITONAL ARGS TO HF TEST...]"
 usage() {
   if (( $# > 0 )); then
     echo "$1" >&2
@@ -36,6 +41,27 @@ while [[ $# -gt 0 ]]; do
         usage "Error: $1 requires an argument."
       fi
       PREFORK="$2"
+      shift 2
+      ;;
+    --fork-to)
+      if [[ $# -lt 2 ]]; then
+        usage "Error: $1 requires an argument."
+      fi
+      FORKTO="$2"
+      shift 2
+      ;;
+    --slot-tx-end)
+      if [[ $# -lt 2 ]]; then
+        usage "Error: $1 requires an argument."
+      fi
+      SLOT_TX_END="$2"
+      shift 2
+      ;;
+    --slot-chain-end)
+      if [[ $# -lt 2 ]]; then
+        usage "Error: $1 requires an argument."
+      fi
+      SLOT_CHAIN_END="$2"
       shift 2
       ;;
     --help|-h)
@@ -124,8 +150,8 @@ git checkout $PREFORK
 git submodule update --init --recursive --depth 1
 nix "${NIX_OPTS[@]}" build "$PWD?submodules=1#devnet" --out-link "prefork-devnet"
 
-# 2. Build "develop" branch as a postfork build
-git checkout develop
+# 2. Build postfork branch as a postfork build
+git checkout $FORKTO
 git submodule update --init --recursive --depth 1
 nix "${NIX_OPTS[@]}" build "$PWD?submodules=1#devnet" --out-link "postfork-devnet"
 
@@ -151,9 +177,27 @@ nix "${NIX_OPTS[@]}" build "$PWD?submodules=1#hardfork_test" --out-link "hardfor
 
 # 5. Execute hardfork_test on them.
 
-SLOT_TX_END=${SLOT_TX_END:-$((RANDOM%120+30))}      
-# WARN: ensure SLOT_CHAIN_END - SLOT_TX_END > k is always true!
-SLOT_CHAIN_END=${SLOT_CHAIN_END:-$((SLOT_TX_END+8))}
+# Pinning --slot-chain-end while letting --slot-tx-end randomize would pair a
+# fixed chain-end with a random tx-end (30-149), giving an unpredictable or even
+# inverted (chain-end below tx-end) wind-down gap. Refuse that combo.
+if [[ -z "$SLOT_TX_END" && -n "$SLOT_CHAIN_END" ]]; then
+  usage "Error: --slot-chain-end requires --slot-tx-end (a fixed chain-end with a randomized tx-end would give an unpredictable or inverted wind-down window)."
+fi
+
+# Fall back to defaults only when the flag was not given. Computed explicitly
+# (not via ${VAR:-...}) so the environment is never consulted as input.
+if [[ -z "$SLOT_TX_END" ]]; then
+  SLOT_TX_END=$((RANDOM % 120 + 30))
+fi
+# SLOT_CHAIN_END - SLOT_TX_END is the wind-down window (in slots) after
+# transactions stop, letting the last pre-tx-end block (the fork base) settle
+# before the chain halts. The daemon treats that block as finalized to build the
+# fork config, so the fork proceeds regardless; this gap is NOT strictly > k
+# (default 8 < k=10) but is kept close to k so the fork base is very unlikely to
+# be reorged before chain end.
+if [[ -z "$SLOT_CHAIN_END" ]]; then
+  SLOT_CHAIN_END=$((SLOT_TX_END + 8))
+fi
 
 NETWORK_ROOT=$(mktemp -d --tmpdir hardfork-network.XXXXXXX)
 

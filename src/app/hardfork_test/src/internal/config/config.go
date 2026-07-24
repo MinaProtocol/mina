@@ -71,6 +71,12 @@ type Config struct {
 	ForkMethods ForkMethodSet
 
 	DaemonInfos []DaemonInfo
+
+	// Unstaking test mode: the genesis ledger carries NumLazyWhales extra
+	// whale accounts with no block producer (dormant stake diluting the VRF
+	// denominator); at fork time their delegates are cleared via --unstake-pk
+	UnstakingTest bool
+	NumLazyWhales int
 }
 
 // DefaultConfig returns the default configuration with values
@@ -106,6 +112,9 @@ func DefaultConfig() *Config {
 		NodeStartPort:        6000,
 
 		ForkMethods: make(ForkMethodSet),
+
+		UnstakingTest: false,
+		NumLazyWhales: 5,
 	}
 }
 
@@ -263,6 +272,20 @@ func (c *Config) Validate() error {
 
 	if err := validateScriptDir(c.ScriptDir); err != nil {
 		return FileValidationError(c.ScriptDir, err)
+	}
+
+	if c.UnstakingTest {
+		if c.NumLazyWhales < 1 {
+			return fmt.Errorf("unstaking test requires at least 1 lazy whale, got %d", c.NumLazyWhales)
+		}
+		// The lazy whales' delegates are patched via runtime_genesis_ledger
+		// --unstake-pk, which only the legacy fork path invokes
+		if len(c.ForkMethods) != 1 {
+			return fmt.Errorf("unstaking test requires the legacy fork method only, got %s", c.ForkMethods.String())
+		}
+		if _, ok := c.ForkMethods[Legacy]; !ok {
+			return fmt.Errorf("unstaking test requires the legacy fork method, got %s", c.ForkMethods.String())
+		}
 	}
 
 	return nil
