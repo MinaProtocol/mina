@@ -2,6 +2,10 @@
 -- NOTE: minaToolchain is the default image for various jobs, set to minaToolchainBullseye
 -- NOTE: minaToolchainBullseye is also used for building Ubuntu Focal packages in CI
 -- NOTE: minaToolchainBookworm is also used for building Ubuntu Jammy packages in CI
+-- NOTE: minaReleaseToolkit bundles the deb-toolkit binary and is published by
+--       MinaProtocol/mina-release-toolkit. Pinned to a released version tag
+--       (not a moving tag like :latest) for reproducible CI; bump it
+--       deliberately when a newer toolkit is wanted.
 { toolchainBase =
     "europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/ci-toolchain-base:v4"
 , minaToolchainBookworm =
@@ -22,4 +26,5 @@
 , xrefcheck =
     "europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/dkhamsing/awesome_bot:latest"
 , nixos = "gcr.io/o1labs-192920/nix-unstable:1.0.0"
+, minaReleaseToolkit = "ghcr.io/minaprotocol/mina-release-toolkit:0.0.2"
 }
