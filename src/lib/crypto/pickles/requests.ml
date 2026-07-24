@@ -98,6 +98,82 @@ module Wrap = struct
     (module R)
 end
 
+(* The requests for a single predecessor, together with the compile-time data
+   fixing its witness layout. The constructors are exposed so a predecessor's
+   handler can be a single [match] over them rather than a per-request
+   closure. *)
+module type Prev_request = sig
+  type width
+
+  (* This predecessor's max-proofs-verified width, as a value. *)
+  val width : width Nat.t
+
+  (* This predecessor's feature flags, fixing its witness layout. *)
+  val feature_flags : Opt.Flag.t Plonk_types.Features.Full.t
+
+  (* The number of polynomial chunks in this predecessor's proof. *)
+  val num_chunks : int
+
+  (* This predecessor's witness [Typ], fixed by [width], [feature_flags] and
+     [num_chunks]. A thunk because the branch-count index is phantom and so
+     must stay universally quantified. *)
+  val typ :
+       unit
+    -> ( (unit, width, _) Per_proof_witness.t
+       , (unit, width) Per_proof_witness.Constant.t )
+       Impls.Step.Typ.t
+
+  type _ Snarky_backendless.Request.t +=
+    | Witness :
+        (unit, width) Per_proof_witness.Constant.t Snarky_backendless.Request.t
+          (** This predecessor's witness. *)
+    | Unfinalized : Unfinalized.Constant.t Snarky_backendless.Request.t
+          (** This predecessor's unfinalized proof. *)
+    | Messages_for_next_wrap_proof :
+        Digest.Constant.t Snarky_backendless.Request.t
+          (** This predecessor's messages-for-next-wrap-proof digest. *)
+end
+
+module type Prev_spec = sig
+  include Nat.Intf
+
+  val feature_flags : Opt.Flag.t Plonk_types.Features.Full.t
+
+  val num_chunks : int
+end
+
+(* Mint a fresh set of requests for one predecessor. The [()] makes each
+   application generative, so each predecessor's constructors are distinct: the
+   step circuit fires them directly, and each predecessor's handler matches its
+   own constructors against its own witnessed values (see [step.ml]). *)
+module Make_prev_request (Spec : Prev_spec) () :
+  Prev_request with type width = Spec.n = struct
+  type width = Spec.n
+
+  let width = Spec.n
+
+  let feature_flags = Spec.feature_flags
+
+  let num_chunks = Spec.num_chunks
+
+  let typ () =
+    Per_proof_witness.typ Impls.Step.Typ.unit Spec.n
+      ~feature_flags:Spec.feature_flags ~num_chunks:Spec.num_chunks
+
+  type _ Snarky_backendless.Request.t +=
+    | Witness :
+        (unit, Spec.n) Per_proof_witness.Constant.t Snarky_backendless.Request.t
+    | Unfinalized : Unfinalized.Constant.t Snarky_backendless.Request.t
+    | Messages_for_next_wrap_proof :
+        Digest.Constant.t Snarky_backendless.Request.t
+end
+
+(* [Prev_request] packed first-class, for carrying one per predecessor in an
+   hlist indexed by the predecessor widths. *)
+module Prev_request_packed = struct
+  type 'width t = (module Prev_request with type width = 'width)
+end
+
 module Step (Inductive_rule : Inductive_rule.Intf) = struct
   module type S = sig
     type statement
@@ -123,22 +199,11 @@ module Step (Inductive_rule : Inductive_rule.Intf) = struct
           , local_signature )
           H2.T(Inductive_rule.Previous_proof_statement.Constant).t
           -> unit Promise.t t
-      | Proof_with_datas :
-          ( prev_values
-          , local_signature
-          , local_branches )
-          H3.T(Per_proof_witness.Constant.No_app_state).t
-          t
       | Wrap_index : Tock.Curve.Affine.t array Plonk_verification_key_evals.t t
       | App_state : statement t
       | Return_value : return_value -> unit t
       | Auxiliary_value : auxiliary_value -> unit t
-      | Unfinalized_proofs :
-          (Unfinalized.Constant.t, proofs_verified) Vector.t t
-      | Messages_for_next_wrap_proof :
-          (Digest.Constant.t, max_proofs_verified) Vector.t t
-      | Wrap_domain_indices :
-          (Pickles_base.Proofs_verified.t, proofs_verified) Vector.t t
+      | Dummy_messages_for_next_wrap_proof : Digest.Constant.t t
   end
 
   let create :
@@ -177,23 +242,12 @@ module Step (Inductive_rule : Inductive_rule.Intf) = struct
             , local_signature )
             H2.T(Inductive_rule.Previous_proof_statement.Constant).t
             -> unit Promise.t t
-        | Proof_with_datas :
-            ( prev_values
-            , local_signature
-            , local_branches )
-            H3.T(Per_proof_witness.Constant.No_app_state).t
-            t
         | Wrap_index :
             Tock.Curve.Affine.t array Plonk_verification_key_evals.t t
         | App_state : statement t
         | Return_value : return_value -> unit t
         | Auxiliary_value : auxiliary_value -> unit t
-        | Unfinalized_proofs :
-            (Unfinalized.Constant.t, proofs_verified) Vector.t t
-        | Messages_for_next_wrap_proof :
-            (Digest.Constant.t, max_proofs_verified) Vector.t t
-        | Wrap_domain_indices :
-            (Pickles_base.Proofs_verified.t, proofs_verified) Vector.t t
+        | Dummy_messages_for_next_wrap_proof : Digest.Constant.t t
     end in
     (module R)
 end

@@ -39,6 +39,12 @@ module Adds = struct
     | S n ->
         let pi = add_zr n in
         S pi
+
+  let rec bump : type a b c. (a, b, c) t -> (a, b s, c s) t = function
+    | Z ->
+        Z
+    | S pi ->
+        S (bump pi)
 end
 
 module Lte = struct
@@ -52,6 +58,20 @@ module Lte = struct
 
   let rec trans : type a b c. (a, b) t -> (b, c) t -> (a, c) t =
    fun t1 t2 -> match (t1, t2) with Z, _ -> Z | S t1, S t2 -> S (trans t1 t2)
+
+  (* The complement of [n <= m]: the gap [g] with [g + n = m], as an
+     existentially-typed nat together with the addition witness. *)
+  type ('n, 'm) complement =
+    | Complement : 'g nat * ('g, 'n, 'm) Adds.t -> ('n, 'm) complement
+
+  let rec complement : type n m. (n, m) t -> m nat -> (n, m) complement =
+   fun lte m ->
+    match (lte, m) with
+    | Z, m ->
+        Complement (m, Adds.add_zr m)
+    | S lte, S m ->
+        let (Complement (g, pi)) = complement lte m in
+        Complement (g, Adds.bump pi)
 end
 
 module N0 = struct

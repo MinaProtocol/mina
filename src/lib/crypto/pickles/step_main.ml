@@ -131,12 +131,12 @@ module Make (Inductive_rule : Inductive_rule.Intf) = struct
       -> (module Nat.Add.Intf with type n = max_proofs_verified)
       -> self_branches:self_branches Nat.t
            (* How many branches does this proof system have *)
-      -> local_signature:local_signature H1.T(Nat).t
-           (* The specification, for each proof that this step circuit verifies, of the maximum width used
-              by that proof system. *)
+      -> prev_requests:local_signature H1.T(Requests.Prev_request_packed).t
+           (* One request module per predecessor, carrying the data fixing that
+              predecessor's witness layout (width, feature flags, chunk count)
+              together with its own fresh request constructors. *)
       -> local_signature_length:
            (local_signature, proofs_verified) Hlist.Length.t
-      -> local_branches_length:(local_branches, proofs_verified) Hlist.Length.t
       -> proofs_verified:(prev_vars, proofs_verified) Hlist.Length.t
       -> lte:(proofs_verified, max_proofs_verified) Nat.Lte.t
       -> public_input:
@@ -175,86 +175,9 @@ module Make (Inductive_rule : Inductive_rule.Intf) = struct
              Types.Step.Statement.t
              Promise.t )
          Staged.t =
-   fun (module Req) max_proofs_verified ~self_branches ~local_signature
-       ~local_signature_length ~local_branches_length ~proofs_verified ~lte
-       ~public_input ~auxiliary_typ ~basic ~known_wrap_keys ~self rule ->
-    let module Typ_with_max_proofs_verified = struct
-      type ('var, 'value, 'local_max_proofs_verified, 'local_branches) t =
-        ( ( 'var
-          , 'local_max_proofs_verified
-          , 'local_branches )
-          Per_proof_witness.No_app_state.t
-        , ( 'value
-          , 'local_max_proofs_verified
-          , 'local_branches )
-          Per_proof_witness.Constant.No_app_state.t )
-        Typ.t
-    end in
-    let feature_flags_and_num_chunks (d : _ Tag.t) =
-      if Type_equal.Id.same self.id d.id then
-        (basic.feature_flags, basic.num_chunks)
-      else (Types_map.feature_flags d, Types_map.num_chunks d)
-    in
-    let feature_flags_and_num_chunks =
-      let rec go :
-          type pvars pvals ns1 ns2 br.
-             (pvars, pvals, ns1, ns2) H4.T(Tag).t
-          -> (pvars, br) Length.t
-          -> (Opt.Flag.t Plonk_types.Features.Full.t * int, br) Vector.t =
-       fun ds ld ->
-        match[@warning "-4"] (ds, ld) with
-        | [], Z ->
-            []
-        | d :: ds, S ld ->
-            feature_flags_and_num_chunks d :: go ds ld
-        | [], _ ->
-            .
-        | _ :: _, _ ->
-            .
-      in
-      go rule.prevs proofs_verified
-    in
-    let prev_proof_typs =
-      let rec join :
-          type pvars pvals ns1 ns2 br.
-             (pvars, pvals, ns1, ns2) H4.T(Tag).t
-          -> ns1 H1.T(Nat).t
-          -> (pvars, br) Length.t
-          -> (ns1, br) Length.t
-          -> (ns2, br) Length.t
-          -> (Opt.Flag.t Plonk_types.Features.Full.t * int, br) Vector.t
-          -> (pvars, pvals, ns1, ns2) H4.T(Typ_with_max_proofs_verified).t =
-       fun ds ns1 ld ln1 ln2 feature_flags_and_num_chunkss ->
-        match[@warning "-4"]
-          (ds, ns1, ld, ln1, ln2, feature_flags_and_num_chunkss)
-        with
-        | [], [], Z, Z, Z, [] ->
-            []
-        | ( _d :: ds
-          , n1 :: ns1
-          , S ld
-          , S ln1
-          , S ln2
-          , (feature_flags, num_chunks) :: feature_flags_and_num_chunkss ) ->
-            let t =
-              Per_proof_witness.typ Typ.unit n1 ~feature_flags ~num_chunks
-            in
-            t :: join ds ns1 ld ln1 ln2 feature_flags_and_num_chunkss
-        | [], _, _, _, _, _ ->
-            .
-        | _ :: _, _, _, _, _, _ ->
-            .
-      in
-      join rule.prevs local_signature proofs_verified local_signature_length
-        local_branches_length feature_flags_and_num_chunks
-    in
-    let module Prev_typ =
-      H4.Typ (Typ_with_max_proofs_verified) (Per_proof_witness.No_app_state)
-        (Per_proof_witness.Constant.No_app_state)
-        (struct
-          let f = Fn.id
-        end)
-    in
+   fun (module Req) max_proofs_verified ~self_branches ~prev_requests
+       ~local_signature_length ~proofs_verified ~lte ~public_input
+       ~auxiliary_typ ~basic ~known_wrap_keys ~self rule ->
     let (input_typ, output_typ)
           : (a_var, a_value) Typ.t * (ret_var, ret_value) Typ.t =
       match public_input with
@@ -349,40 +272,85 @@ module Make (Inductive_rule : Inductive_rule.Intf) = struct
               (Plonk_verification_key_evals.typ
                  (Typ.array ~length:num_chunks Step_verifier.Inner_curve.typ) )
           and prevs =
-            exists (Prev_typ.f prev_proof_typs) ~request:(fun () ->
-                Req.Proof_with_datas )
-          and unfinalized_proofs_unextended =
-            exists
-              (Vector.typ'
-                 (Vector.map
-                    ~f:(fun _feature_flags ->
-                      Unfinalized.typ ~wrap_rounds:Backend.Tock.Rounds.n )
-                    feature_flags_and_num_chunks ) )
-              ~request:(fun () -> Req.Unfinalized_proofs)
-          and messages_for_next_wrap_proof =
-            exists (Vector.typ Digest.typ Max_proofs_verified.n)
-              ~request:(fun () -> Req.Messages_for_next_wrap_proof)
-          and actual_wrap_domains =
-            exists
-              (Vector.typ (Typ.prover_value ()) (Length.to_nat proofs_verified))
-              ~request:(fun () -> Req.Wrap_domain_indices)
-          in
-          let proof_witnesses =
-            (* Inject the app-state values into the per-proof witnesses. *)
-            let rec go :
-                type vars ns1 ns2.
-                   (vars, ns1, ns2) H3.T(Per_proof_witness.No_app_state).t
-                -> (vars, ns1) H2.T(Inductive_rule.Previous_proof_statement).t
-                -> (vars, ns1, ns2) H3.T(Per_proof_witness).t =
-             fun proofs stmts ->
-              match (proofs, stmts) with
+            (* Allocate each predecessor's witness with its own [Witness]
+               request, taken from the per-predecessor request hlist. Each
+               [Prev_request] is pinned to its predecessor's width, so its
+               request fires (and is later answered) directly, with no index or
+               width comparison. Co-walks the predecessors' [Tag]s only to
+               recover the per-proof type indices; the witness [Typ] itself
+               comes from each [Prev_request]. *)
+            let rec exists_prevs :
+                type pvars pvals ns1 ns2.
+                   (pvars, pvals, ns1, ns2) H4.T(Tag).t
+                -> ns1 H1.T(Requests.Prev_request_packed).t
+                -> (pvars, ns1, ns2) H3.T(Per_proof_witness.No_app_state).t =
+             fun tags reqs ->
+              match[@warning "-4"] (tags, reqs) with
               | [], [] ->
                   []
-              | proof :: proofs, stmt :: stmts ->
-                  { proof with app_state = stmt.public_input }
-                  :: go proofs stmts
+              | _tag :: tags, req :: reqs ->
+                  let (module M) = req in
+                  let v = exists (M.typ ()) ~request:(fun () -> M.Witness) in
+                  v :: exists_prevs tags reqs
+              | _ ->
+                  .
             in
-            go prevs previous_proof_statements
+            exists_prevs rule.prevs prev_requests
+          and unfinalized_proofs_unextended =
+            (* One [Unfinalized.typ] per predecessor, fired from each
+               predecessor's own [Unfinalized] request — a fold over
+               [prev_requests]. *)
+            let rec exists_unfinalized :
+                type ws n.
+                   ws H1.T(Requests.Prev_request_packed).t
+                -> (ws, n) Hlist.Length.t
+                -> (Unfinalized.t, n) Vector.t =
+             fun reqs len ->
+              match (reqs, len) with
+              | [], Z ->
+                  []
+              | req :: reqs, S len ->
+                  let (module M) = req in
+                  let v =
+                    exists (Unfinalized.typ ~wrap_rounds:Backend.Tock.Rounds.n)
+                      ~request:(fun () -> M.Unfinalized)
+                  in
+                  v :: exists_unfinalized reqs len
+            in
+            exists_unfinalized prev_requests local_signature_length
+          and messages_for_next_wrap_proof =
+            (* Fill the max-proofs-verified-length messages layout front to
+               back: the front [gap = max - proofs_verified] padding slots from
+               a single dummy request, then one slot per predecessor from its
+               own [Messages_for_next_wrap_proof] request. *)
+            let (Nat.Lte.Complement (_gap, gap_adds)) =
+              Nat.Lte.complement lte Max_proofs_verified.n
+            in
+            let rec exists_messages :
+                type gap ws n total.
+                   (gap, n, total) Nat.Adds.t
+                -> (ws, n) Hlist.Length.t
+                -> ws H1.T(Requests.Prev_request_packed).t
+                -> (Digest.t, total) Vector.t =
+             fun adds width reqs ->
+              match (adds, width, reqs) with
+              | S adds, _, _ ->
+                  let v =
+                    exists Digest.typ ~request:(fun () ->
+                        Req.Dummy_messages_for_next_wrap_proof )
+                  in
+                  v :: exists_messages adds width reqs
+              | Z, S width, req :: reqs ->
+                  let (module R) = req in
+                  let v =
+                    exists Digest.typ ~request:(fun () ->
+                        R.Messages_for_next_wrap_proof )
+                  in
+                  v :: exists_messages Nat.Adds.Z width reqs
+              | Z, Z, [] ->
+                  []
+            in
+            exists_messages gap_adds local_signature_length prev_requests
           in
           let srs = Backend.Tock.Keypair.load_urs () in
           [%log internal] "Step_compute_bulletproof_challenges" ;
@@ -390,7 +358,7 @@ module Make (Inductive_rule : Inductive_rule.Intf) = struct
             with_label "prevs_verified" (fun () ->
                 let rec go :
                     type vars vals ns1 ns2 n.
-                       (vars, ns1, ns2) H3.T(Per_proof_witness).t
+                       (vars, ns1, ns2) H3.T(Per_proof_witness.No_app_state).t
                     -> (vars, vals, ns1, ns2) H4.T(Types_map.For_step).t
                     -> vars H1.T(E01(Digest)).t
                     -> vars H1.T(E01(Unfinalized)).t
@@ -398,73 +366,37 @@ module Make (Inductive_rule : Inductive_rule.Intf) = struct
                        , ns1 )
                        H2.T(Inductive_rule.Previous_proof_statement).t
                     -> (vars, n) Length.t
-                    -> actual_wrap_domains:
-                         ( Pickles_base.Proofs_verified.t Typ.prover_value
-                         , n )
-                         Vector.t
                     -> (_, n) Vector.t * B.t list =
-                 fun proof_witnesses datas messages_for_next_wrap_proofs
-                     unfinalizeds stmts pi ~actual_wrap_domains ->
+                 fun prevs datas messages_for_next_wrap_proofs unfinalizeds
+                     stmts pi ->
                   match
-                    ( proof_witnesses
+                    ( prevs
                     , datas
                     , messages_for_next_wrap_proofs
                     , unfinalizeds
                     , stmts
-                    , pi
-                    , actual_wrap_domains )
+                    , pi )
                   with
-                  | [], [], [], [], [], Z, [] ->
+                  | [], [], [], [], [], Z ->
                       ([], [])
-                  | ( pw :: proof_witnesses
+                  | ( prev :: prevs
                     , d :: datas
                     , messages_for_next_wrap_proof
                       :: messages_for_next_wrap_proofs
                     , unfinalized :: unfinalizeds
-                    , { proof_must_verify = must_verify; _ } :: stmts
-                    , S pi
-                    , actual_wrap_domain :: actual_wrap_domains ) ->
-                      let () =
-                        (* Fail with an error if the proof's domain differs from
-                           the hard-coded one otherwise.
-                        *)
-                        match d.wrap_domain with
-                        | `Known wrap_domain ->
-                            as_prover (fun () ->
-                                let actual_wrap_domain =
-                                  As_prover.read (Typ.prover_value ())
-                                    actual_wrap_domain
-                                  |> Pickles_base.Proofs_verified.to_int
-                                in
-                                let actual_wrap_domain =
-                                  Common.wrap_domains
-                                    ~proofs_verified:actual_wrap_domain
-                                in
-                                match (wrap_domain, actual_wrap_domain.h) with
-                                | ( Pow_2_roots_of_unity expected
-                                  , Pow_2_roots_of_unity actual )
-                                  when expected <> actual ->
-                                    failwithf
-                                      "This circuit was compiled for proofs \
-                                       using the wrap domain of size %d, but a \
-                                       proof was given with size %d. You \
-                                       should pass the ~override_wrap_domain \
-                                       argument to set the correct domain \
-                                       size."
-                                      expected actual ()
-                                | Pow_2_roots_of_unity _, Pow_2_roots_of_unity _
-                                  ->
-                                    () )
-                        | `Side_loaded _ ->
-                            ()
-                      in
+                    , { public_input; proof_must_verify = must_verify; _ }
+                      :: stmts
+                    , S pi ) ->
                       let chals, v =
-                        verify_one ~srs pw d messages_for_next_wrap_proof
-                          unfinalized must_verify
+                        (* Reattach this predecessor's app-state to its witness
+                           for verification. *)
+                        verify_one ~srs
+                          { prev with app_state = public_input }
+                          d messages_for_next_wrap_proof unfinalized must_verify
                       in
                       let chalss, vs =
-                        go proof_witnesses datas messages_for_next_wrap_proofs
-                          unfinalizeds stmts pi ~actual_wrap_domains
+                        go prevs datas messages_for_next_wrap_proofs
+                          unfinalizeds stmts pi
                       in
                       (chals :: chalss, v :: vs)
                 in
@@ -523,9 +455,8 @@ module Make (Inductive_rule : Inductive_rule.Intf) = struct
                     in
                     go rule.prevs known_wrap_keys
                   in
-                  go proof_witnesses datas messages_for_next_wrap_proofs
+                  go prevs datas messages_for_next_wrap_proofs
                     unfinalized_proofs previous_proof_statements proofs_verified
-                    ~actual_wrap_domains
                 in
                 Boolean.Assert.all vs ; chalss )
           in
@@ -533,18 +464,20 @@ module Make (Inductive_rule : Inductive_rule.Intf) = struct
           let messages_for_next_step_proof =
             let challenge_polynomial_commitments =
               let module M =
-                H3.Map (Per_proof_witness) (E03 (Step_verifier.Inner_curve))
+                H3.Map
+                  (Per_proof_witness.No_app_state)
+                  (E03 (Step_verifier.Inner_curve))
                   (struct
                     let f :
                         type a b c.
-                           (a, b, c) Per_proof_witness.t
+                           (a, b, c) Per_proof_witness.No_app_state.t
                         -> Step_verifier.Inner_curve.t =
                      fun acc ->
                       acc.wrap_proof.opening.challenge_polynomial_commitment
                   end)
               in
               let module V = H3.To_vector (Step_verifier.Inner_curve) in
-              V.f proofs_verified (M.f proof_witnesses)
+              V.f proofs_verified (M.f prevs)
             in
             with_label "hash_messages_for_next_step_proof" (fun () ->
                 let hash_messages_for_next_step_proof =

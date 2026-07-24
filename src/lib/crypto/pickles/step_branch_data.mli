@@ -60,6 +60,8 @@ module Make (Inductive_rule : Inductive_rule.Intf) : sig
                 and type proofs_verified = 'proofs_verified
                 and type return_value = 'ret_value
                 and type statement = 'a_value )
+        ; prev_requests :
+            'local_widths Hlist.H1.T(Requests.Prev_request_packed).t
         ; feature_flags : bool Plonk_types.Features.t
         }
         -> ( 'a_var
