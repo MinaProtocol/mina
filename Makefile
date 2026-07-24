@@ -367,6 +367,13 @@ update-graphql: ## Update GraphQL schema
 		--profile=$(DUNE_PROFILE) \
 		graphql_schema.json
 
+.PHONY: build-mock-graphql
+build-mock-graphql: ## Build mock_schema.json into _build (subset check reads it from there)
+	@(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && \
+	dune build \
+		--profile=$(DUNE_PROFILE) \
+		mock_schema.json
+
 update-rust-vendors: ## Update the Rust vendors
 	@echo "Updating Rust vendors in src/lib/crypto/kimchi_bindings/stubs..."
 	@cd src/lib/crypto/kimchi_bindings/stubs && cargo vendor kimchi-stubs-vendors
