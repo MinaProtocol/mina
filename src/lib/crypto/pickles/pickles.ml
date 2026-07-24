@@ -264,7 +264,20 @@ module Make_str (_ : Wire_types.Concrete) = struct
       let of_proof : _ Proof.t -> t = Wrap_hack.pad_proof
     end
 
-    let verify_promise (type t) ~(typ : (_, t) Impls.Step.Typ.t)
+    let chunking_data_of_num_chunks num_chunks =
+      Option.map num_chunks ~f:(fun num_chunks ->
+          if num_chunks < 1 then
+            failwith
+              "Pickles.Side_loaded.verify: num_chunks must be a positive \
+               integer" ;
+          ( { Verify.Instance.num_chunks
+            ; domain_size =
+                Common.Max_degree.max_total_step_rows_log2 num_chunks
+            ; zk_rows = Plonk_checks.zk_rows_for_num_chunks num_chunks
+            }
+            : Verify.Instance.chunking_data ) )
+
+    let verify_promise (type t) ?num_chunks ~(typ : (_, t) Impls.Step.Typ.t)
         (ts : (Verification_key.t * t * Proof.t) list) =
       let m =
         ( module struct
@@ -281,6 +294,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
         (module Verification_key.Max_width : Nat.Intf
           with type n = Verification_key.Max_width.n )
       in
+      let chunking_data = chunking_data_of_num_chunks num_chunks in
       with_return (fun { return } ->
           List.map ts ~f:(fun (vk, x, p) ->
               let vk : V.t =
@@ -299,10 +313,11 @@ module Make_str (_ : Wire_types.Concrete) = struct
                     { constraints = 0 }
                 }
               in
-              Verify.Instance.T (max_proofs_verified, m, None, vk, x, p) )
+              Verify.Instance.T (max_proofs_verified, m, chunking_data, vk, x, p) )
           |> Verify.verify_heterogenous )
 
-    let verify ~typ ts = verify_promise ~typ ts |> Promise.to_deferred
+    let verify ?num_chunks ~typ ts =
+      verify_promise ?num_chunks ~typ ts |> Promise.to_deferred
 
     let srs_precomputation () : unit =
       let srs = Tock.Keypair.load_urs () in
