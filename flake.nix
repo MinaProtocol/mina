@@ -53,6 +53,26 @@
 
   inputs.nix-filter.url = "github:numtide/nix-filter";
 
+  inputs.proof-systems = {
+    # Pinned to the same commit used in the proof systems git submodule
+    # If you want to hack locally with an overriden proof systems, add the
+    # argument `--override-input proof-systems "github:o1-labs/proof-systems/<commit>"`
+    # to your `nix develop` or `nix build` command. Use the URI "path:/path/to/my/proof-systems"
+    # if you want to use a local proof systems repo.
+    url = "github:o1-labs/proof-systems/ab84160fa2c22290a8506a7742ac1378879fc386";
+    flake = false;
+  };
+
+  inputs.kimchi-stubs-vendors = {
+    url = "github:MinaProtocol/kimchi-stubs-vendors/818fbf6fa38f20f976657ea1d9705b7a29bd3a38";
+    flake = false;
+  };
+
+  inputs.snarky = {
+    url = "github:o1-labs/snarky/9f55ef7c2f2570365aeb24b6ddfc713f48be3117";
+    flake = false;
+  };
+
   inputs.flake-buildkite-pipeline.url = "github:tweag/flake-buildkite-pipeline";
 
   inputs.nix-utils.url = "github:juliosueiras-nix/nix-utils";
@@ -64,42 +84,17 @@
     , nix-utils, flockenzeit, nixpkgs-old, nixpkgs-unstable, ... }:
     let
       inherit (nixpkgs) lib;
-
-      # All the submodules required by .gitmodules
-      submodules = map builtins.head (builtins.filter lib.isList
-        (map (builtins.match "	path = (.*)")
-          (lib.splitString "\n" (builtins.readFile ./.gitmodules))));
-
-      # Warn about missing submodules
-      requireSubmodules = let
-        ref = r: "[34;1m${r}[31;1m";
-        command = c: "[37;1m${c}[31;1m";
-      in lib.warnIf (!builtins.all (x: x)
-        (map (x: builtins.pathExists ./${x} && builtins.readDir ./${x} != { })
-          submodules)) ''
-            Some submodules are missing, you may get errors. Consider one of the following:
-            - run ${command "nix/pin.sh"} and use "${
-              ref "mina"
-            }" flake ref, e.g. ${command "nix develop mina"} or ${
-              command "nix build mina"
-            };
-            - use "${ref "git+file://$PWD?submodules=1"}";
-            - use "${
-              ref "git+https://github.com/minaprotocol/mina?submodules=1"
-            }";
-            - use non-flake commands like ${command "nix-build"} and ${
-              command "nix-shell"
-            }.
-          '';
     in {
       overlays = {
         misc = import ./nix/misc.nix;
-        rust = import ./nix/rust.nix;
+        rust = import ./nix/rust.nix {
+          proof-systems-src = inputs.proof-systems;
+          kimchi-stubs-vendors-src = inputs.kimchi-stubs-vendors;
+        };
         go = import ./nix/go.nix;
         javascript = import ./nix/javascript.nix;
         ocaml = pkgs: prev: {
-          ocamlPackages_mina =
-            requireSubmodules (import ./nix/ocaml.nix { inherit inputs pkgs; });
+          ocamlPackages_mina = import ./nix/ocaml.nix { inherit inputs pkgs; };
         };
         # Skip tests on nodejs dep due to known issue with nixpkgs 24.11 https://github.com/NixOS/nixpkgs/issues/402079
         # this can be removed after upgrading
