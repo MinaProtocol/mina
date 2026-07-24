@@ -1,0 +1,15 @@
+(executable
+ (name main)
+ (libraries
+  ;; opam libraries
+  core
+  async
+  core_unix.command_unix
+  uri
+  caqti
+  caqti-async
+  caqti-driver-postgresql
+  ;; local libraries
+  mina_caqti)
+ (preprocess
+  (pps ppx_jane)))
