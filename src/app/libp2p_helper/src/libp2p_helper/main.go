@@ -199,6 +199,14 @@ func main() {
 			return
 		}
 
-		go app.handleIncomingMsg(&msg)
+		select {
+		case app.workerSem <- struct{}{}:
+			go func() {
+				defer func() { <-app.workerSem }()
+				app.handleIncomingMsg(&msg)
+			}()
+		default:
+			helperLog.Errorf("Worker pool full (%d), dropping incoming message. Increase LIBP2P_WORKER_POOL_SIZE if needed.", WorkerPoolSize)
+		}
 	}
 }

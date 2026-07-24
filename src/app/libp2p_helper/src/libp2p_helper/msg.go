@@ -182,10 +182,12 @@ func readGatingConfig(gc ipc.GatingConfig, addedPeers []peer.AddrInfo) (*codanet
 	if err != nil {
 		return nil, err
 	}
-	if !gc.CleanAddedPeers() {
-		for _, peer := range addedPeers {
-			trustedPeers[peer.ID] = struct{}{}
-		}
+	// Always include addedPeers as trusted. They serve as a staging buffer for
+	// peers added between Configure/SetGatingConfig calls. The OCaml daemon sends
+	// authoritative trusted_peers lists on every call, so addedPeers are
+	// redundant after consumption and must be reset unconditionally.
+	for _, peer := range addedPeers {
+		trustedPeers[peer.ID] = struct{}{}
 	}
 
 	return &codanet.CodaGatingConfig{
