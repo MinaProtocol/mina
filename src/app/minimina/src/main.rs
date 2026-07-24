@@ -14,7 +14,7 @@ mod utils;
 use crate::{
     genesis_ledger::*,
     keys::{KeysManager, NodeKey},
-    native::{keys::NativeKeysManager, manager::NativeManager, mina_locator},
+    native::{keys::NativeKeysManager, mina_locator, plan_builder::NativePlanBuilder},
     output::{network, node},
     service::{ServiceConfig, ServiceType},
     utils::fetch_schema,
@@ -25,7 +25,10 @@ use cli::{
     NetworkCommand, NodeCommand,
 };
 use directory_manager::DirectoryManager;
-use docker::manager::{ContainerState, DockerManager};
+use docker::{
+    manager::{ContainerState, DockerManager},
+    plan_builder::DockerPlanBuilder,
+};
 use env_logger::{Builder, Env};
 use graphql::GraphQl;
 use log::{error, info, warn};
@@ -106,13 +109,13 @@ fn main() -> Result<()> {
                         create_network_docker(&directory_manager, &network_id, &services)
                     }
                     ExecutionMode::Native => {
-                        let native = NativeManager::new(&network_path, native_bin(&bin_path));
-                        if let Err(e) = native.generate_config(&services) {
+                        let builder = NativePlanBuilder::new(&network_path, native_bin(&bin_path));
+                        if let Err(e) = builder.generate_config(&services) {
                             return exit_with(format!(
                                 "Failed to generate native config with error: {e}"
                             ));
                         }
-                        create_network_native(&native, &directory_manager, &network_id, &services)
+                        create_network_native(&directory_manager, &network_id, &services)
                     }
                 }
             }
@@ -143,7 +146,7 @@ fn main() -> Result<()> {
                 // Backend-agnostic: query the foreground supervisor over its RPC
                 // socket (the supervisor serves the same socket for native and
                 // docker networks).
-                let socket = NativeManager::supervisor_socket(&network_path);
+                let socket = supervisor::SupervisorPlan::socket_path_in(&network_path);
                 match supervisor::rpc_call(&socket, "status", serde_json::Value::Null) {
                     Ok(status) => {
                         println!(
@@ -175,12 +178,9 @@ fn main() -> Result<()> {
                         }
                     }
                     ExecutionMode::Native => {
-                        let native = NativeManager::new(&network_path, native_bin(&bin_path));
-                        if let Err(e) = native.destroy() {
-                            let error_message =
-                                format!("Failed to delete network '{network_id}': {e}");
-                            return exit_with(error_message);
-                        }
+                        // Nothing to stop here: the supervisor owns the processes
+                        // ('network stop'), and deleting the network directory
+                        // below removes all native on-disk state.
                     }
                 }
 
@@ -226,16 +226,13 @@ fn main() -> Result<()> {
                 }
 
                 // Runs the foreground supervisor, which blocks until 'stop'/SIGINT.
+                let services = directory_manager.get_services_info(&network_id)?;
                 let plan = match mode {
-                    ExecutionMode::Docker => {
-                        let docker = DockerManager::new(&network_path);
-                        let services = directory_manager.get_services_info(&network_id)?;
-                        docker.build_docker_supervisor_plan(&services, &network_id)
-                    }
+                    ExecutionMode::Docker => DockerPlanBuilder::new(&network_path)
+                        .build_supervisor_plan(&services, &network_id),
                     ExecutionMode::Native => {
-                        let native = NativeManager::new(&network_path, native_bin(&bin_path));
-                        let services = directory_manager.get_services_info(&network_id)?;
-                        native.build_supervisor_plan(&services, &network_id)
+                        NativePlanBuilder::new(&network_path, native_bin(&bin_path))
+                            .build_supervisor_plan(&services, &network_id)
                     }
                 };
                 let plan = match plan {
@@ -271,7 +268,7 @@ fn main() -> Result<()> {
 
                 // Backend-agnostic: the foreground supervisor owns the units; ask
                 // it to tear the network down over its RPC socket.
-                let socket = NativeManager::supervisor_socket(&network_path);
+                let socket = supervisor::SupervisorPlan::socket_path_in(&network_path);
                 match supervisor::rpc_call(&socket, "stop", serde_json::Value::Null) {
                     Ok(_) => {
                         println!("{}", network::Stop { network_id });
@@ -450,8 +447,7 @@ fn main() -> Result<()> {
                         }
                     }
                     ExecutionMode::Native => {
-                        let native = NativeManager::new(&network_path, native_bin(&bin_path));
-                        match native.service_logs(node_id) {
+                        match directory_manager.read_service_log(network_id, node_id) {
                             Ok(logs) => {
                                 if cmd.raw_output {
                                     println!("{logs}");
@@ -1083,13 +1079,12 @@ fn create_network_docker(
 }
 
 fn create_network_native(
-    native: &NativeManager,
     directory_manager: &DirectoryManager,
     network_id: &str,
     services: &[ServiceConfig],
 ) -> Result<()> {
-    // For native mode, create is a no-op (processes start on 'network start')
-    native.create(None)?;
+    // Native processes are created by the supervisor at 'network start';
+    // create only prepares plan artifacts and any archive database.
     info!("Successfully prepared native network '{network_id}'!");
 
     // Handle archive node setup with local postgres

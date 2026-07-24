@@ -71,6 +71,14 @@ pub struct SupervisorPlan {
     pub spec: BackendSpec,
 }
 
+impl SupervisorPlan {
+    /// Where a network's supervisor serves its RPC socket. Part of the
+    /// contract: plan builders bake it into the plan and the CLI dials it.
+    pub fn socket_path_in(network_path: &std::path::Path) -> PathBuf {
+        network_path.join("supervisor.sock")
+    }
+}
+
 /// Per-node status. `Exited` carries the reaped code so migrate-exit
 /// clean-vs-crash is distinguishable downstream.
 #[derive(Clone, Debug, Serialize)]

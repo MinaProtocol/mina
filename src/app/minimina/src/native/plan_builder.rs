@@ -1,76 +1,45 @@
-use crate::directory_manager::CONFIG_DIRECTORY;
+//! Native plan builder: lowers `ServiceConfig`s to the [`SupervisorPlan`] the
+//! supervisor runs (one child-process unit per service). Pure "describe", no
+//! lifecycle — running, stopping, and reaping are the supervisor's job.
+
+use crate::directory_manager::{CONFIG_DIRECTORY, LOGS_DIRECTORY};
 use crate::native::port_manager;
 use crate::service::{ServiceConfig, ServiceType};
-use crate::supervisor::{BackendSpec, NativeNodeSpec, SupervisorPlan};
+use crate::supervisor::plan::{BackendSpec, NativeNodeSpec, SupervisorPlan};
 use log::warn;
 use std::fs;
 use std::io::Result;
 use std::path::{Path, PathBuf};
-use std::process::Command;
 
-pub struct NativeManager {
+pub struct NativePlanBuilder {
     pub network_path: PathBuf,
     pub bin_path: PathBuf,
 }
 
-impl NativeManager {
+impl NativePlanBuilder {
     pub fn new(network_path: &Path, bin_path: &Path) -> Self {
-        NativeManager {
+        NativePlanBuilder {
             network_path: network_path.to_path_buf(),
             bin_path: bin_path.to_path_buf(),
         }
     }
 
     fn logs_dir(&self) -> PathBuf {
-        self.network_path.join("logs")
+        self.network_path.join(LOGS_DIRECTORY)
     }
 
     fn config_dir_for_service(&self, service_name: &str) -> PathBuf {
         self.network_path.join(CONFIG_DIRECTORY).join(service_name)
     }
 
-    /// Generate native config (stores services.json, creates dirs)
+    /// Create the on-disk directories the plan's units will write to
+    /// (log dir + per-service config dirs).
     pub fn generate_config(&self, configs: &[ServiceConfig]) -> Result<()> {
-        // Create logs directory
         fs::create_dir_all(self.logs_dir())?;
-        // Create per-service config directories
         for config in configs {
             fs::create_dir_all(self.config_dir_for_service(&config.service_name))?;
         }
         Ok(())
-    }
-
-    /// No-op for native mode - processes are created on start
-    pub fn create(&self, _specific_service: Option<String>) -> Result<std::process::Output> {
-        Command::new("true").output()
-    }
-
-    /// Remove this network's on-disk state (logs + per-service config dirs).
-    /// Process teardown is the supervisor's job (`network stop`), not ours.
-    pub fn destroy(&self) -> Result<()> {
-        let logs_dir = self.logs_dir();
-        if logs_dir.exists() {
-            fs::remove_dir_all(&logs_dir)?;
-        }
-        let config_base = self.network_path.join(CONFIG_DIRECTORY);
-        if config_base.exists() {
-            fs::remove_dir_all(&config_base)?;
-        }
-        Ok(())
-    }
-
-    pub fn service_logs(&self, service_name: &str) -> Result<String> {
-        let log_file = self.logs_dir().join(format!("{}.log", service_name));
-        if log_file.exists() {
-            fs::read_to_string(&log_file)
-        } else {
-            Ok(String::new())
-        }
-    }
-
-    /// Path of the supervisor's RPC socket for this network.
-    pub fn supervisor_socket(network_path: &Path) -> PathBuf {
-        network_path.join("supervisor.sock")
     }
 
     /// Build the [`SupervisorPlan`] the foreground supervisor runs: one
@@ -118,7 +87,7 @@ impl NativeManager {
 
         Ok(SupervisorPlan {
             network_id: network_id.to_string(),
-            socket_path: Self::supervisor_socket(&self.network_path),
+            socket_path: SupervisorPlan::socket_path_in(&self.network_path),
             spec: BackendSpec::Native { nodes },
         })
     }

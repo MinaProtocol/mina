@@ -27,6 +27,8 @@ pub const NETWORK_KEYPAIRS: &str = "network-keypairs";
 /// Name of a node's config directory — a subdirectory under the network path on
 /// the host, and the mount point (`/config-directory`) inside a container.
 pub const CONFIG_DIRECTORY: &str = "config-directory";
+/// Name of the per-network directory holding one `<service>.log` per unit.
+pub const LOGS_DIRECTORY: &str = "logs";
 const LIBP2P_KEYPAIRS: &str = "libp2p-keypairs";
 const MINIMINA_HOME: &str = "MINIMINA_HOME";
 
@@ -110,6 +112,19 @@ impl DirectoryManager {
     pub fn delete_network_directory(&self, network_id: &str) -> Result<()> {
         let network_path = self.network_path(network_id);
         fs::remove_dir_all(network_path)
+    }
+
+    /// Read a service's log file (empty if the unit hasn't logged yet).
+    pub fn read_service_log(&self, network_id: &str, service_name: &str) -> Result<String> {
+        let log_file = self
+            .network_path(network_id)
+            .join(LOGS_DIRECTORY)
+            .join(format!("{service_name}.log"));
+        if log_file.exists() {
+            fs::read_to_string(&log_file)
+        } else {
+            Ok(String::new())
+        }
     }
 
     pub fn list_network_directories(&self) -> Result<Vec<String>> {

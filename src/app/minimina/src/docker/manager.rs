@@ -1,19 +1,15 @@
-//! # Docker Manager Module
+//! # Legacy docker-compose shim
 //!
-//! Provides an interface for managing Docker operations within the application.
-//! Specifically, it offers functionalities to:
-//! - Generate a `docker-compose.yaml` file from provided service configurations.
-//! - Start up services using the generated Docker Compose file.
-//! - Shut down active services.
-//! - Handle interactions with the Docker CLI.
+//! Node-level docker commands (start/stop one node, import-account, replayer,
+//! dumps, client status) still shell out to the `docker compose` / `docker`
+//! CLIs. The network lifecycle no longer does — it runs on the supervisor
+//! (see [`crate::supervisor`]); plans are built by
+//! [`crate::docker::plan_builder`]. This shim is slated for deletion once the
+//! node commands are ported to supervisor RPCs.
 
 use crate::directory_manager::{CONFIG_DIRECTORY, NETWORK_KEYPAIRS};
 use crate::genesis_ledger::REPLAYER_INPUT_JSON;
-use crate::supervisor::{BackendSpec, DockerNodeSpec, Mount, SupervisorPlan};
-use crate::{
-    service::{ServiceConfig, ServiceType},
-    utils::run_command,
-};
+use crate::utils::run_command;
 use serde::{Deserialize, Serialize};
 use std::fmt;
 use std::{
@@ -81,107 +77,6 @@ impl DockerManager {
             network_path: network_path.to_path_buf(),
             compose_path,
         }
-    }
-
-    /// Path of the supervisor's RPC socket for this network.
-    pub fn supervisor_socket(network_path: &Path) -> PathBuf {
-        network_path.join("supervisor.sock")
-    }
-
-    /// Build the [`SupervisorPlan`] for docker mode: one container **unit** per
-    /// daemon service, reusing the same command generation as the (legacy) compose
-    /// backend. Container name == network alias == `<service>-<network_id>` so the
-    /// peer/archive hostnames the commands bake in resolve via docker DNS; the
-    /// host network dir is bind-mounted at `/local-network` and a per-service
-    /// config dir at `/config-directory` (both paths the commands expect).
-    ///
-    /// Archive and uptime-service backends are not yet ported to bollard.
-    pub fn build_docker_supervisor_plan(
-        &self,
-        services: &[ServiceConfig],
-        network_id: &str,
-    ) -> Result<SupervisorPlan> {
-        let network_path_str = self.network_path.to_str().unwrap().to_string();
-        let mut nodes = Vec::new();
-
-        for config in services {
-            let cmd_str = match config.service_type {
-                ServiceType::Seed => config.generate_seed_command(),
-                ServiceType::BlockProducer => config.generate_block_producer_command(None),
-                ServiceType::SnarkCoordinator => config.generate_snark_coordinator_command(),
-                ServiceType::SnarkWorker => {
-                    config.generate_snark_worker_command(network_id.to_string())
-                }
-                ServiceType::ArchiveNode | ServiceType::UptimeServiceBackend => {
-                    return Err(std::io::Error::new(
-                        std::io::ErrorKind::Unsupported,
-                        format!(
-                            "service '{}' ({:?}) is not yet supported on the bollard docker backend",
-                            config.service_name, config.service_type
-                        ),
-                    ));
-                }
-            };
-
-            let container_name = format!("{}-{}", config.service_name, network_id);
-            let config_dir_host = self
-                .network_path
-                .join(CONFIG_DIRECTORY)
-                .join(&config.service_name);
-            std::fs::create_dir_all(&config_dir_host)?;
-
-            let ports = match config.client_port {
-                Some(port) => {
-                    let gql = port + 1;
-                    let external = port + 2;
-                    vec![(port, port), (gql, gql), (external, external)]
-                }
-                None => vec![],
-            };
-
-            let image = config.docker_image.clone().ok_or_else(|| {
-                std::io::Error::new(
-                    std::io::ErrorKind::InvalidInput,
-                    format!("missing docker image for '{}'", config.service_name),
-                )
-            })?;
-
-            nodes.push(DockerNodeSpec {
-                name: container_name.clone(),
-                image,
-                entrypoint: Some(vec!["mina".to_string()]),
-                cmd: cmd_str.split_whitespace().map(str::to_string).collect(),
-                env: vec![
-                    ("MINA_PRIVKEY_PASS".into(), "naughty blue worm".into()),
-                    ("MINA_LIBP2P_PASS".into(), "naughty blue worm".into()),
-                    ("MINA_CLIENT_TRUSTLIST".into(), "0.0.0.0/0".into()),
-                    ("RAYON_NUM_THREADS".into(), "2".into()),
-                ],
-                ports,
-                mounts: vec![
-                    Mount {
-                        host: network_path_str.clone(),
-                        container: "/local-network".into(),
-                        read_only: false,
-                    },
-                    Mount {
-                        host: config_dir_host.to_str().unwrap().to_string(),
-                        container: format!("/{CONFIG_DIRECTORY}"),
-                        read_only: false,
-                    },
-                ],
-                aliases: vec![container_name],
-            });
-        }
-
-        Ok(SupervisorPlan {
-            network_id: network_id.to_string(),
-            socket_path: Self::supervisor_socket(&self.network_path),
-            spec: BackendSpec::Docker {
-                network_name: format!("minimina-{network_id}"),
-                nodes,
-            },
-        })
     }
 
     pub fn _compose_up(&self) -> Result<Output> {

@@ -29,7 +29,7 @@ mod native;
 pub mod plan;
 mod rpc;
 
-pub use plan::{BackendSpec, DockerNodeSpec, Mount, NativeNodeSpec, SupervisorPlan};
+pub use plan::{BackendSpec, SupervisorPlan};
 pub use rpc::rpc_call;
 
 use std::collections::HashMap;
@@ -216,6 +216,7 @@ async fn stop_units<K: Killer>(state: &Arc<Mutex<SupervisorState<K>>>) {
 #[cfg(test)]
 mod tests {
     use super::native::{process_alive, NativeKiller};
+    use super::plan::{DockerNodeSpec, NativeNodeSpec};
     use super::rpc::{dispatch, RpcRequest, METHOD_NOT_FOUND};
     use super::*;
 
