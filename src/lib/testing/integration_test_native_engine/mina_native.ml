@@ -672,27 +672,41 @@ module Network_manager = struct
        per-node logs below. *)
     let nodes = t.nodes in
     let%bind () = if t.deployed then destroy t else return () in
-    (* Copy each node's log into the current working directory before deleting
+    (* Copy each node's logs into the current working directory before deleting
        the (temporary) working dir, so CI collects them via the
-       [<test>*.local.test.log] artifact glob. Without this the per-node daemon
-       logs are lost on teardown and a failing node can't be diagnosed. *)
+       [<test>*.local.test.log] artifact glob. We preserve the node's own
+       stdout/stderr as well as the prover/verifier subprocess logs, since a
+       node that fails to initialise usually does so because one of those
+       subprocesses died. Without this the logs are lost on teardown and a
+       failing node can't be diagnosed. *)
+    let copy_log ~src ~dest =
+      match%map.Deferred
+        Monitor.try_with ~here:[%here] (fun () ->
+            let%bind.Deferred contents = Reader.file_contents src in
+            Writer.save dest ~contents )
+      with
+      | Ok () ->
+          ()
+      | Error _ ->
+          ()
+    in
     let%bind () =
       Deferred.List.iter nodes ~f:(fun node ->
-          let dest =
-            sprintf "%s-%s.local.test.log" t.test_name
-              (Native_network.Node.id node)
+          let name = Native_network.Node.id node in
+          let mina_config =
+            node.Native_network.Node.config.config_dir ^/ ".mina-config"
           in
-          match%map
-            Monitor.try_with ~here:[%here] (fun () ->
-                let%bind.Deferred contents =
-                  Reader.file_contents node.Native_network.Node.log_file
-                in
-                Writer.save dest ~contents )
-          with
-          | Ok () ->
-              ()
-          | Error _ ->
-              () )
+          let logs =
+            [ (node.Native_network.Node.log_file, "")
+            ; (mina_config ^/ "mina-prover.log", "-prover")
+            ; (mina_config ^/ "mina-verifier.log", "-verifier")
+            ]
+          in
+          Deferred.List.iter logs ~f:(fun (src, suffix) ->
+              let dest =
+                sprintf "%s-%s%s.local.test.log" t.test_name name suffix
+              in
+              copy_log ~src ~dest ) )
     in
     [%log info] "Cleaning up network configuration" ;
     let%bind () =
