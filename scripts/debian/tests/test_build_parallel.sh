@@ -281,6 +281,21 @@ test_validate_rejects_unknown_token() {
   fi
 }
 
+test_dispatches_delegation_verify_token() {
+  local called=""
+
+  build_delegation_verify_deb() {
+    called="yes"
+  }
+
+  resolve_and_build_package delegation_verify
+
+  if [[ "$called" != "yes" ]]; then
+    echo "FAIL: delegation_verify did not dispatch to build_delegation_verify_deb" >&2
+    exit 1
+  fi
+}
+
 ################################################################################
 # Tests: MINA_DEB_JOBS=1 serial path with isolated BUILDDIRs
 #         (build_deb may call exit 1 → run in subshell)
@@ -461,6 +476,7 @@ main_tests() {
   run_test_in_subshell test_validate_rejects_hardfork_config_duplicate
   run_test_in_subshell test_validate_accepts_distinct_tokens
   run_test_in_subshell test_validate_rejects_unknown_token
+  run_test_in_subshell test_dispatches_delegation_verify_token
 
   # MINA_DEB_JOBS=1 serial path with isolated BUILDDIR
   # (build functions may call exit 1)
