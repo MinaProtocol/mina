@@ -105,7 +105,10 @@ pub(super) fn serve<K: Send + 'static>(
                     tokio::spawn(handle_connection(stream, state.clone(), shutdown.clone()));
                 }
                 Err(e) => {
-                    warn!("supervisor: accept error: {e}");
+                    // The socket is the only way to drive the network; if it
+                    // dies, tear down cleanly rather than run undrivable.
+                    error!("supervisor: accept error, shutting down: {e}");
+                    shutdown.notify_one();
                     break;
                 }
             }

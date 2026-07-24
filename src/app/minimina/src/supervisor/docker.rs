@@ -13,7 +13,7 @@ use bollard::network::CreateNetworkOptions;
 use bollard::secret::{EndpointSettings, HostConfig, PortBinding};
 use bollard::Docker;
 use futures_util::StreamExt;
-use log::warn;
+use log::{info, warn};
 
 use super::backend::Backend;
 use super::plan::{BackendSpec, DockerBackendSpec, DockerNodeSpec};
@@ -60,7 +60,6 @@ impl Backend for DockerBackend {
             .map_err(|e| io::Error::other(format!("docker connect failed: {e}")))?;
         let mut labels = HashMap::new();
         labels.insert("minimina.network".to_string(), network_id.to_string());
-        // Best-effort: ignore "already exists" so re-runs don't hard-fail.
         if let Err(e) = docker
             .create_network(CreateNetworkOptions {
                 name: network_name.to_string(),
@@ -69,7 +68,18 @@ impl Backend for DockerBackend {
             })
             .await
         {
-            warn!("supervisor: create_network '{network_name}' (continuing): {e}");
+            // A leftover network from a crashed run answers 409; reuse it.
+            // Anything else (daemon down, permissions, bad name) is fatal.
+            match e {
+                bollard::errors::Error::DockerResponseServerError {
+                    status_code: 409, ..
+                } => info!("supervisor: network '{network_name}' already exists, reusing"),
+                e => {
+                    return Err(io::Error::other(format!(
+                        "create_network '{network_name}' failed: {e}"
+                    )))
+                }
+            }
         }
         Ok(DockerBackend {
             docker,
