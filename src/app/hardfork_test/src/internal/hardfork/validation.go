@@ -13,6 +13,10 @@ import (
 type ConsensusState struct {
 	LastOccupiedSlot     int              `json:"last_occupied_slot"`
 	LastBlockBeforeTxEnd client.BlockData `json:"last_block_before_tx_end"`
+	// Set of public keys that actually produced a block in the observed window
+	// (block creators reported by consensus). This is the on-chain evidence of
+	// which producers were live, independent of the key files the harness reads.
+	ObservedProducerPks map[string]struct{} `json:"observed_producer_pks"`
 }
 
 type BlockAnalysisResult struct {
@@ -25,6 +29,12 @@ type BlockAnalysisResult struct {
 	// them (only populated in unstaking test mode)
 	PreForkOccupancy  float64
 	PreForkStakeStats StakeStats
+	// Lazy whale public keys, classified once against the genesis ledger during
+	// the main network phase and reused by the fork phases (fork-config
+	// --unstake-pk args and the post-fork delegate check) rather than
+	// re-reading the key files and ledger each time. Only populated in
+	// unstaking test mode.
+	LazyWhalePks []string
 }
 
 func (t *HardforkTest) WaitForBestTip(port int, pred func(client.BlockData) bool, predDescription string, timeout time.Duration) error {
@@ -49,12 +59,26 @@ func (t *HardforkTest) WaitForBestTip(port int, pred func(client.BlockData) bool
 	return fmt.Errorf("timed out waiting for condition: %s at port %d", predDescription, port)
 }
 
-// ComputeSlotOccupancy computes the fraction of slots between two blocks that
-// are occupied by a block. startBlock must be an ancestor of lastBlock: block
-// heights are dense along a chain, so the height delta counts exactly the
-// blocks after startBlock, while the slot delta counts the slot opportunities.
-func (t *HardforkTest) ComputeSlotOccupancy(startBlock, lastBlock client.BlockData) (float64, error) {
-	t.Logger.Info("Calculating slot occupancy between block %v and %v", startBlock, lastBlock)
+// ComputeSlotOccupancy computes the slot fill rate over the half-open window
+// (startBlock.Slot, boundarySlot]: the fraction of those slots that produced a
+// block. startBlock is the window's lower anchor and its own slot is excluded —
+// it is genesis, not a VRF-produced slot. Block heights are dense along a
+// chain, so the height delta counts exactly the blocks produced after
+// startBlock up to lastBlock; startBlock must therefore be an ancestor of
+// lastBlock.
+//
+// The denominator is boundarySlot − startBlock.Slot, NOT lastBlock.Slot −
+// startBlock.Slot. The window runs to an intended boundary (e.g. slot_tx_end),
+// not to the last observed block: anchoring the denominator on lastBlock would
+// end the window on a guaranteed hit and silently drop the empty slots between
+// the last block and the boundary, biasing the fill rate upward. boundarySlot
+// must be at or beyond lastBlock.Slot; callers pass the last block that falls
+// before the boundary, so no block lives in (lastBlock.Slot, boundarySlot] and
+// the height-delta numerator still counts every block in the window. When the
+// boundary coincides with lastBlock.Slot the window ends on a hit — the
+// residual upward bias callers accept when no boundary past the tip exists.
+func (t *HardforkTest) ComputeSlotOccupancy(startBlock, lastBlock client.BlockData, boundarySlot int) (float64, error) {
+	t.Logger.Info("Calculating slot occupancy between block %v and %v over a window ending at slot %d", startBlock, lastBlock, boundarySlot)
 
 	if lastBlock.Slot <= startBlock.Slot {
 		return 0, fmt.Errorf("last block (slot %d) is not after starting block (slot %d), can't calculate slot occupancy!", lastBlock.Slot, startBlock.Slot)
@@ -62,15 +86,20 @@ func (t *HardforkTest) ComputeSlotOccupancy(startBlock, lastBlock client.BlockDa
 	if lastBlock.BlockHeight <= startBlock.BlockHeight {
 		return 0, fmt.Errorf("last block height (%d) is not above starting block height (%d), can't calculate slot occupancy!", lastBlock.BlockHeight, startBlock.BlockHeight)
 	}
+	if boundarySlot < lastBlock.Slot {
+		return 0, fmt.Errorf("window boundary slot (%d) is before the last block's slot (%d); the boundary must be at or beyond the last observed block", boundarySlot, lastBlock.Slot)
+	}
 
-	return float64(lastBlock.BlockHeight-startBlock.BlockHeight) / float64(lastBlock.Slot-startBlock.Slot), nil
+	return float64(lastBlock.BlockHeight-startBlock.BlockHeight) / float64(boundarySlot-startBlock.Slot), nil
 }
 
-// ValidateSlotOccupancy checks if block occupancy is above 50%
-func (t *HardforkTest) ValidateSlotOccupancy(startBlock, lastBlock client.BlockData) error {
+// ValidateSlotOccupancy checks if block occupancy is above 50% over the window
+// (startBlock.Slot, boundarySlot]; see ComputeSlotOccupancy for the window
+// convention.
+func (t *HardforkTest) ValidateSlotOccupancy(startBlock, lastBlock client.BlockData, boundarySlot int) error {
 	expectedOccupancy := 0.5
 
-	actualOccupancy, err := t.ComputeSlotOccupancy(startBlock, lastBlock)
+	actualOccupancy, err := t.ComputeSlotOccupancy(startBlock, lastBlock, boundarySlot)
 	if err != nil {
 		return err
 	}
@@ -135,6 +164,7 @@ func (t *HardforkTest) ReportBlocksInfo(port int, blocks []client.BlockData) {
 func (t *HardforkTest) ConsensusStateOnNode(port int) (*ConsensusState, error) {
 
 	state := new(ConsensusState)
+	state.ObservedProducerPks = make(map[string]struct{})
 
 	recentBlocks, err := t.Client.RecentBlocks(port, config.ProtocolK)
 
@@ -158,6 +188,13 @@ func (t *HardforkTest) ConsensusStateOnNode(port int) (*ConsensusState, error) {
 		// Track latest non-empty block
 		if block.Slot > state.LastBlockBeforeTxEnd.Slot && block.Slot < t.Config.SlotTxEnd {
 			state.LastBlockBeforeTxEnd = block
+		}
+
+		// Record the producer of every VRF-produced (non-genesis) block, so the
+		// active-stake classification can be cross-checked against which
+		// producers were actually live.
+		if block.Slot > 0 && block.Creator != "" {
+			state.ObservedProducerPks[block.Creator] = struct{}{}
 		}
 	}
 
@@ -244,6 +281,17 @@ func (t *HardforkTest) ConsensusAcrossNodesAfterSlotChainEnd() (*ConsensusState,
 		state := states[i]
 		last_state := states[i-1]
 
+		// Cross-node agreement on LastBlockBeforeTxEnd is the fork base's
+		// canonicality guarantee for this test. The daemon anchors the fork on
+		// that block (mina_lib.ml best_chain_block_before_stop_slot) and builds
+		// the fork config treating it as finalized regardless of how deeply it is
+		// buried ("We pretend that the block is finalized ... for redundancy",
+		// mina_lib.ml). So the fork does NOT require the tx-end block to reach
+		// k-depth in the (tx-end, chain-end] wind-down; at the CI gap (8 slots,
+		// p ~= 0.33) that window often produces fewer than k = 10 blocks anyway,
+		// so a ">= k deep" burial assertion would be both unwarranted and flaky.
+		// All nodes converging on the same block after chain-end is what makes it
+		// effectively canonical here.
 		if state.LastBlockBeforeTxEnd != last_state.LastBlockBeforeTxEnd {
 			return nil, fmt.Errorf(
 				"Node %s and node %s doesn't agree on last block seen before tx end! The previous has %v while the later has %v",
