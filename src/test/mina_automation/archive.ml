@@ -88,7 +88,7 @@ module Process = struct
     let logger = Logger.create () in
     don't_wait_for
     @@ Pipe.iter
-         (Process.stdout t.process |> Reader.pipe)
+         (Process.stdout t.process |> Reader.lines)
          ~f:(fun stdout ->
            let%bind () =
              Writer.with_file log_file ~append:true ~f:(fun writer ->
@@ -112,57 +112,9 @@ let start t =
   let open Deferred.Let_syntax in
   let args = Config.to_args t.config in
   let%bind _, process = Executor.run_in_background t.executor ~args () in
-  (* TODO: consider internalize [wait_until_ready] here and replace this wait *)
+  (* Callers that need to gate on archive readiness should use
+     [Healthcheck.wait_db_ready] rather than relying on this fixed
+     sleep — it polls the DB directly and survives schema-load
+     latency variation. *)
   let%map () = after (Time.Span.of_sec 5.) in
   Process.{ process; config = t.config }
-
-let wait_until_ready ~log_file =
-  let timeout = Time.Span.of_sec 30.0 in
-  let poll_interval = Time.Span.of_sec 1.0 in
-  let start_time = Time.now () in
-  let is_timeout () =
-    let elapsed = Time.(diff (now ()) start_time) in
-    Time.Span.( > ) elapsed timeout
-  in
-  let expected_message = "Archive process ready. Clients can now connect" in
-  let rec wait_until_log_created () =
-    let%bind () = after poll_interval in
-    match%bind Sys.file_exists log_file with
-    | `Yes ->
-        Deferred.Or_error.return ()
-    | _ when is_timeout () ->
-        Deferred.Or_error.error_string
-          "Timeout waiting for archive log file to be created"
-    | _ ->
-        wait_until_log_created ()
-  in
-  let%bind.Deferred.Or_error () = wait_until_log_created () in
-  let lines_to_check_from = ref 0 in
-  let rec wait_til_log_ready_emitted () =
-    if is_timeout () then
-      Deferred.Or_error.error_string
-        "Timeout waiting for archive process to be ready"
-    else
-      let%bind reader = Reader.open_file log_file in
-      let rec check_lines_from cur_line =
-        match%bind Reader.read_line reader with
-        | `Eof ->
-            let%bind () = after poll_interval in
-            lines_to_check_from := cur_line ;
-            wait_til_log_ready_emitted ()
-        | `Ok line when cur_line >= !lines_to_check_from -> (
-            if String.is_empty line then check_lines_from (cur_line + 1)
-            else
-              match
-                Yojson.Safe.from_string line |> Logger.Message.of_yojson
-              with
-              | Ok { message; _ } when String.equal message expected_message ->
-                  Deferred.Or_error.return ()
-              | _ ->
-                  check_lines_from (cur_line + 1) )
-        | `Ok _ ->
-            check_lines_from (cur_line + 1)
-      in
-      check_lines_from 0
-  in
-  wait_til_log_ready_emitted ()
