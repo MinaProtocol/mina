@@ -62,6 +62,7 @@ let Spec =
           , use_generic_dockers_from_version : Optional Text
           , size : Size
           , deb_legacy_version : Text
+          , deb_legacy_githash_config : Text
           }
       , default =
           { codenames =
@@ -80,6 +81,8 @@ let Spec =
           , use_generic_dockers_from_version = None Text
           , size = Size.XLarge
           , deb_legacy_version = defaultMinaArtifactSpec.deb_legacy_version
+          , deb_legacy_githash_config =
+              defaultMinaArtifactSpec.deb_legacy_githash_config
           }
       }
 
@@ -239,6 +242,8 @@ let generateDockerForCodename =
                         , debVersion = codename.DebVersion
                         , prefix = pipelineName
                         , suffix = Some "-${lowerNameCodename}"
+                        , deb_legacy_githash_config =
+                            spec.deb_legacy_githash_config
                         }
                     ]
                   }
