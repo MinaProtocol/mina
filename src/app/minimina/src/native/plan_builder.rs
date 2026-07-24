@@ -5,7 +5,7 @@
 use crate::directory_manager::{CONFIG_DIRECTORY, LOGS_DIRECTORY};
 use crate::native::port_manager;
 use crate::service::{ServiceConfig, ServiceType};
-use crate::supervisor::plan::{BackendSpec, NativeNodeSpec, SupervisorPlan};
+use crate::supervisor::plan::{NativeBackendSpec, NativeNodeSpec, SupervisorPlan};
 use log::warn;
 use std::fs;
 use std::io::Result;
@@ -88,7 +88,7 @@ impl NativePlanBuilder {
         Ok(SupervisorPlan {
             network_id: network_id.to_string(),
             socket_path: SupervisorPlan::socket_path_in(&self.network_path),
-            spec: BackendSpec::Native { nodes },
+            spec: Box::new(NativeBackendSpec { nodes }),
         })
     }
 

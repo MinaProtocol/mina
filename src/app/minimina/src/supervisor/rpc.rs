@@ -14,7 +14,6 @@ use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::net::UnixListener;
 use tokio::sync::Notify;
 
-use super::backend::Killer;
 use super::SupervisorState;
 
 #[derive(Deserialize)]
@@ -94,7 +93,7 @@ pub(super) const METHOD_NOT_FOUND: i64 = -32601;
 const PARSE_ERROR: i64 = -32700;
 
 /// Spawn the accept loop: one connection-handler task per client.
-pub(super) fn serve<K: Killer>(
+pub(super) fn serve<K: Send + 'static>(
     listener: UnixListener,
     state: Arc<Mutex<SupervisorState<K>>>,
     shutdown: Arc<Notify>,
@@ -115,7 +114,7 @@ pub(super) fn serve<K: Killer>(
 }
 
 /// Handle one client connection: newline-delimited JSON-RPC request/response.
-async fn handle_connection<K: Killer>(
+async fn handle_connection<K: Send + 'static>(
     stream: tokio::net::UnixStream,
     state: Arc<Mutex<SupervisorState<K>>>,
     shutdown: Arc<Notify>,
@@ -156,7 +155,7 @@ async fn handle_connection<K: Killer>(
 }
 
 /// Dispatch a single request. Locks state only briefly, never across an await.
-pub(super) fn dispatch<K: Killer>(
+pub(super) fn dispatch<K>(
     req: RpcRequest,
     state: &Arc<Mutex<SupervisorState<K>>>,
     shutdown: &Arc<Notify>,

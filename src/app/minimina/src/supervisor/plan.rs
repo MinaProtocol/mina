@@ -49,26 +49,41 @@ pub struct DockerNodeSpec {
     pub aliases: Vec<String>,
 }
 
-/// Which backend a network runs on and its per-node specs.
+/// The native backend's share of the plan.
 #[derive(Clone, Debug, Deserialize, Serialize)]
-pub enum BackendSpec {
-    Native {
-        nodes: Vec<NativeNodeSpec>,
-    },
-    Docker {
-        /// Docker network to create + attach every container to.
-        network_name: String,
-        nodes: Vec<DockerNodeSpec>,
-    },
+pub struct NativeBackendSpec {
+    pub nodes: Vec<NativeNodeSpec>,
+}
+
+/// The docker backend's share of the plan.
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct DockerBackendSpec {
+    /// Docker network to create + attach every container to.
+    pub network_name: String,
+    pub nodes: Vec<DockerNodeSpec>,
+}
+
+/// A backend's share of the plan: spec data that knows how to run itself.
+///
+/// The plan stores `Box<dyn BackendSpec>`, so the builder's choice of spec
+/// *is* the backend choice — there is no enum to re-match downstream. Each
+/// impl (runtime side) ties its spec type to its backend type and hands off
+/// to the monomorphic runtime, so the signature here is the only dynamic
+/// call in the supervisor.
+pub trait BackendSpec: Send + Sync {
+    fn run<'a>(
+        &'a self,
+        network_id: &'a str,
+        socket_path: &'a std::path::Path,
+    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = std::io::Result<()>> + Send + 'a>>;
 }
 
 /// Everything the supervisor needs to run a network. Held as the in-memory SSOT
 /// for the process lifetime; never re-read from disk.
-#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct SupervisorPlan {
     pub network_id: String,
     pub socket_path: PathBuf,
-    pub spec: BackendSpec,
+    pub spec: Box<dyn BackendSpec>,
 }
 
 impl SupervisorPlan {

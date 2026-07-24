@@ -8,11 +8,13 @@
 //!
 //! Module layout — one concern per file:
 //! - [`plan`] — the input contract (specs + status), shared with the plan
-//!   builders; depends on nothing here.
-//! - [`backend`] — the [`Backend`]/[`Unit`]/[`Killer`] traits: what a backend
-//!   must provide. One network is *all* native or *all* docker; [`run`] matches
-//!   the spec once, then everything is monomorphic in `B: Backend`, so mixing
-//!   is unrepresentable.
+//!   builders; depends on nothing here. The plan's `Box<dyn BackendSpec>` is
+//!   the *only* dynamic call in the supervisor: the builder's choice of spec
+//!   type is the backend choice, made exactly once.
+//! - [`backend`] — the [`Backend`] trait: what a backend must provide. One
+//!   network is *all* native or *all* docker; past the plan's one dynamic
+//!   entry, everything is monomorphic in `B: Backend`, so mixing is
+//!   unrepresentable.
 //! - [`native`] / [`docker`] — the two backend implementations.
 //! - [`rpc`] — the JSON-RPC server (per-connection tasks) and blocking client.
 //! - this file — the runtime: launch every unit with a waiter task that reaps
@@ -29,19 +31,18 @@ mod native;
 pub mod plan;
 mod rpc;
 
-pub use plan::{BackendSpec, SupervisorPlan};
+pub use plan::SupervisorPlan;
 pub use rpc::rpc_call;
 
 use std::collections::HashMap;
+use std::path::Path;
 use std::sync::{Arc, Mutex};
 
 use log::{error, info, warn};
 use tokio::net::UnixListener;
 use tokio::sync::Notify;
 
-use backend::{Backend, Killer, Unit};
-use docker::DockerBackend;
-use native::NativeBackend;
+use backend::Backend;
 use plan::{NamedSpec, NodeStatus};
 
 // ---------------------------------------------------------------------------
@@ -90,47 +91,33 @@ pub fn run_blocking(plan: SupervisorPlan) -> std::io::Result<()> {
     let rt = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()?;
-    rt.block_on(run(plan))
+    rt.block_on(plan.spec.run(&plan.network_id, &plan.socket_path))
 }
 
-/// The single point where the backend axis is resolved: match the spec once,
-/// then hand off to the monomorphic [`run_backend`].
-async fn run(plan: SupervisorPlan) -> std::io::Result<()> {
-    match &plan.spec {
-        BackendSpec::Native { nodes } => run_backend(NativeBackend::setup(), nodes, &plan).await,
-        BackendSpec::Docker {
-            network_name,
-            nodes,
-        } => {
-            let backend = DockerBackend::setup(network_name, &plan.network_id).await?;
-            run_backend(backend, nodes, &plan).await
-        }
-    }
-}
-
+/// The whole runtime, generic in the backend. Entered through
+/// [`plan::BackendSpec::run`], which each backend impl points at itself —
+/// dispatch already happened when the plan was built.
 async fn run_backend<B: Backend>(
-    backend: B,
-    nodes: &[B::NodeSpec],
-    plan: &SupervisorPlan,
+    spec: &B::Spec,
+    network_id: &str,
+    socket_path: &Path,
 ) -> std::io::Result<()> {
+    let backend = B::setup(spec, network_id).await?;
     let state = Arc::new(Mutex::new(SupervisorState::new()));
     let shutdown = Arc::new(Notify::new());
 
     // Launch every unit, each with a waiter task that reaps its exit.
-    for spec in nodes {
-        match backend.launch(spec).await {
-            Ok((unit, killer, pid)) => register_unit(&state, spec.name(), pid, unit, killer),
-            Err(e) => fail_unit(&state, spec.name(), e.to_string()),
+    for node in B::nodes(spec) {
+        match backend.launch(node).await {
+            Ok((unit, killer, pid)) => register_unit::<B>(&state, node.name(), pid, unit, killer),
+            Err(e) => fail_unit(&state, node.name(), e.to_string()),
         }
     }
 
     // Bind the RPC socket (unlink any stale socket first).
-    let _ = std::fs::remove_file(&plan.socket_path);
-    let listener = UnixListener::bind(&plan.socket_path)?;
-    info!(
-        "supervisor: serving RPC on '{}'",
-        plan.socket_path.display()
-    );
+    let _ = std::fs::remove_file(socket_path);
+    let listener = UnixListener::bind(socket_path)?;
+    info!("supervisor: serving RPC on '{}'", socket_path.display());
     let accept_task = rpc::serve(listener, state.clone(), shutdown.clone());
 
     tokio::select! {
@@ -142,20 +129,20 @@ async fn run_backend<B: Backend>(
     }
 
     accept_task.abort();
-    stop_units(&state).await;
+    stop_units::<B>(&state).await;
     backend.teardown().await;
-    let _ = std::fs::remove_file(&plan.socket_path);
-    info!("supervisor: network '{}' stopped", plan.network_id);
+    let _ = std::fs::remove_file(socket_path);
+    info!("supervisor: network '{network_id}' stopped");
     Ok(())
 }
 
 /// Record a launched unit in state and spawn its waiter task.
-fn register_unit<K: Killer>(
-    state: &Arc<Mutex<SupervisorState<K>>>,
+fn register_unit<B: Backend>(
+    state: &Arc<Mutex<SupervisorState<B::Killer>>>,
     name: &str,
     pid: Option<u32>,
-    mut unit: impl Unit,
-    killer: K,
+    mut unit: B::Unit,
+    killer: B::Killer,
 ) {
     info!("supervisor: started '{name}' (pid {pid:?})");
     state.lock().unwrap().nodes.insert(
@@ -168,7 +155,7 @@ fn register_unit<K: Killer>(
     let st = state.clone();
     let name = name.to_string();
     tokio::spawn(async move {
-        let code = unit.wait().await;
+        let code = B::wait(&mut unit).await;
         info!("supervisor: '{name}' exited (code {code:?})");
         st.lock().unwrap().nodes.insert(
             name,
@@ -193,18 +180,18 @@ fn fail_unit<K>(state: &Arc<Mutex<SupervisorState<K>>>, name: &str, error: Strin
 
 /// Terminate every live unit (graceful → force). Network-level teardown is the
 /// backend's job (see [`Backend::teardown`]).
-async fn stop_units<K: Killer>(state: &Arc<Mutex<SupervisorState<K>>>) {
-    let killers: Vec<K> = {
+async fn stop_units<B: Backend>(state: &Arc<Mutex<SupervisorState<B::Killer>>>) {
+    let killers: Vec<B::Killer> = {
         let st = state.lock().unwrap();
         st.nodes.values().filter_map(|n| n.killer.clone()).collect()
     };
     for k in &killers {
-        k.terminate().await;
+        B::terminate(k).await;
     }
     if !killers.is_empty() {
         tokio::time::sleep(std::time::Duration::from_secs(2)).await;
         for k in &killers {
-            k.force_kill().await;
+            B::force_kill(k).await;
         }
     }
 }
@@ -215,8 +202,8 @@ async fn stop_units<K: Killer>(state: &Arc<Mutex<SupervisorState<K>>>) {
 
 #[cfg(test)]
 mod tests {
-    use super::native::{process_alive, NativeKiller};
-    use super::plan::{DockerNodeSpec, NativeNodeSpec};
+    use super::native::process_alive;
+    use super::plan::{DockerBackendSpec, DockerNodeSpec, NativeBackendSpec, NativeNodeSpec};
     use super::rpc::{dispatch, RpcRequest, METHOD_NOT_FOUND};
     use super::*;
 
@@ -231,7 +218,7 @@ mod tests {
         let plan = SupervisorPlan {
             network_id: "test-net".into(),
             socket_path: socket_path.clone(),
-            spec: BackendSpec::Native {
+            spec: Box::new(NativeBackendSpec {
                 nodes: vec![NativeNodeSpec {
                     name: "sleeper".into(),
                     binary: "/bin/sleep".into(),
@@ -239,7 +226,7 @@ mod tests {
                     env: vec![],
                     log_file,
                 }],
-            },
+            }),
         };
 
         let sup = std::thread::spawn(move || run_blocking(plan).unwrap());
@@ -270,7 +257,7 @@ mod tests {
 
     #[test]
     fn unknown_method_returns_error() {
-        let state = Arc::new(Mutex::new(SupervisorState::<NativeKiller>::new()));
+        let state = Arc::new(Mutex::new(SupervisorState::<u32>::new()));
         let shutdown = Arc::new(Notify::new());
         let req = RpcRequest::new_test(serde_json::json!(7), "nope");
         let resp = dispatch(req, &state, &shutdown);
@@ -292,7 +279,7 @@ mod tests {
         let plan = SupervisorPlan {
             network_id: "docker-test-net".into(),
             socket_path: socket_path.clone(),
-            spec: BackendSpec::Docker {
+            spec: Box::new(DockerBackendSpec {
                 network_name: "minimina-suptest-net".into(),
                 nodes: vec![DockerNodeSpec {
                     name: "minimina-suptest-ctr".into(),
@@ -304,7 +291,7 @@ mod tests {
                     mounts: vec![],
                     aliases: vec!["suptest-node".into()],
                 }],
-            },
+            }),
         };
 
         let sup = std::thread::spawn(move || run_blocking(plan).unwrap());

@@ -5,7 +5,7 @@
 
 use crate::directory_manager::CONFIG_DIRECTORY;
 use crate::service::{ServiceConfig, ServiceType};
-use crate::supervisor::plan::{BackendSpec, DockerNodeSpec, Mount, SupervisorPlan};
+use crate::supervisor::plan::{DockerBackendSpec, DockerNodeSpec, Mount, SupervisorPlan};
 use std::io::Result;
 use std::path::{Path, PathBuf};
 
@@ -109,10 +109,10 @@ impl DockerPlanBuilder {
         Ok(SupervisorPlan {
             network_id: network_id.to_string(),
             socket_path: SupervisorPlan::socket_path_in(&self.network_path),
-            spec: BackendSpec::Docker {
+            spec: Box::new(DockerBackendSpec {
                 network_name: format!("minimina-{network_id}"),
                 nodes,
-            },
+            }),
         })
     }
 }

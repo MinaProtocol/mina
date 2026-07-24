@@ -4,54 +4,52 @@ use std::io;
 
 use log::warn;
 
-use super::backend::{Backend, Killer, Unit};
-use super::plan::NativeNodeSpec;
+use super::backend::Backend;
+use super::plan::{BackendSpec, NativeBackendSpec, NativeNodeSpec};
+use super::run_backend;
 
 /// The native backend owns no network-level resources — setup and teardown
 /// are trivial; everything lives in per-unit launch.
 pub struct NativeBackend;
 
-impl NativeBackend {
-    pub fn setup() -> Self {
-        NativeBackend
+impl BackendSpec for NativeBackendSpec {
+    fn run<'a>(
+        &'a self,
+        network_id: &'a str,
+        socket_path: &'a std::path::Path,
+    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = io::Result<()>> + Send + 'a>> {
+        Box::pin(run_backend::<NativeBackend>(self, network_id, socket_path))
     }
 }
 
-/// A supervisor-owned child process.
-pub struct NativeUnit(tokio::process::Child);
-
-/// Kill handle for a native unit: its pid.
-#[derive(Clone, Copy)]
-pub struct NativeKiller {
-    pid: u32,
-}
-
 impl Backend for NativeBackend {
+    type Spec = NativeBackendSpec;
     type NodeSpec = NativeNodeSpec;
-    type Unit = NativeUnit;
-    type Killer = NativeKiller;
+    /// The child's wait handle: exclusively owned, not cloneable — the reason
+    /// the [`Backend`] trait keeps unit and kill handles separate.
+    type Unit = tokio::process::Child;
+    /// The child's pid.
+    type Killer = u32;
+
+    async fn setup(_spec: &NativeBackendSpec, _network_id: &str) -> io::Result<Self> {
+        Ok(NativeBackend)
+    }
+
+    fn nodes(spec: &NativeBackendSpec) -> &[NativeNodeSpec] {
+        &spec.nodes
+    }
 
     async fn launch(
         &self,
         node: &NativeNodeSpec,
-    ) -> io::Result<(NativeUnit, NativeKiller, Option<u32>)> {
+    ) -> io::Result<(tokio::process::Child, u32, Option<u32>)> {
         let child = spawn_native(node)?;
         let pid = child.id();
-        Ok((
-            NativeUnit(child),
-            NativeKiller {
-                pid: pid.unwrap_or(0),
-            },
-            pid,
-        ))
+        Ok((child, pid.unwrap_or(0), pid))
     }
 
-    async fn teardown(&self) {}
-}
-
-impl Unit for NativeUnit {
-    async fn wait(&mut self) -> Option<i32> {
-        match self.0.wait().await {
+    async fn wait(child: &mut tokio::process::Child) -> Option<i32> {
+        match child.wait().await {
             Ok(status) => status.code(),
             Err(e) => {
                 warn!("supervisor: wait() failed: {e}");
@@ -59,22 +57,22 @@ impl Unit for NativeUnit {
             }
         }
     }
-}
 
-impl Killer for NativeKiller {
-    async fn terminate(&self) {
+    async fn terminate(pid: &u32) {
         use nix::sys::signal::{self, Signal};
         use nix::unistd::Pid;
-        let _ = signal::kill(Pid::from_raw(self.pid as i32), Signal::SIGTERM);
+        let _ = signal::kill(Pid::from_raw(*pid as i32), Signal::SIGTERM);
     }
 
-    async fn force_kill(&self) {
-        if process_alive(self.pid) {
+    async fn force_kill(pid: &u32) {
+        if process_alive(*pid) {
             use nix::sys::signal::{self, Signal};
             use nix::unistd::Pid;
-            let _ = signal::kill(Pid::from_raw(self.pid as i32), Signal::SIGKILL);
+            let _ = signal::kill(Pid::from_raw(*pid as i32), Signal::SIGKILL);
         }
     }
+
+    async fn teardown(&self) {}
 }
 
 /// Spawn a native daemon as an owned child. Sets `PR_SET_PDEATHSIG(SIGKILL)` so

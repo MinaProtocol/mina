@@ -15,8 +15,9 @@ use bollard::Docker;
 use futures_util::StreamExt;
 use log::warn;
 
-use super::backend::{Backend, Killer, Unit};
-use super::plan::DockerNodeSpec;
+use super::backend::Backend;
+use super::plan::{BackendSpec, DockerBackendSpec, DockerNodeSpec};
+use super::run_backend;
 
 /// The docker backend owns the network-level resources: the daemon connection
 /// and the docker network (+ DNS aliases) every container attaches to.
@@ -26,10 +27,35 @@ pub struct DockerBackend {
     network_id: String,
 }
 
-impl DockerBackend {
+/// A container handle: everything needed to wait on *or* kill a container via
+/// the daemon. Unlike the native backend, waiting needs no exclusive resource,
+/// so the same cloneable type serves as both unit and kill handle.
+#[derive(Clone)]
+pub struct ContainerHandle {
+    docker: Docker,
+    name: String,
+}
+
+impl BackendSpec for DockerBackendSpec {
+    fn run<'a>(
+        &'a self,
+        network_id: &'a str,
+        socket_path: &'a std::path::Path,
+    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = io::Result<()>> + Send + 'a>> {
+        Box::pin(run_backend::<DockerBackend>(self, network_id, socket_path))
+    }
+}
+
+impl Backend for DockerBackend {
+    type Spec = DockerBackendSpec;
+    type NodeSpec = DockerNodeSpec;
+    type Unit = ContainerHandle;
+    type Killer = ContainerHandle;
+
     /// Connect to the docker daemon and create the network (labelled for
     /// grouping).
-    pub async fn setup(network_name: &str, network_id: &str) -> io::Result<Self> {
+    async fn setup(spec: &DockerBackendSpec, network_id: &str) -> io::Result<Self> {
+        let network_name = &spec.network_name;
         let docker = Docker::connect_with_local_defaults()
             .map_err(|e| io::Error::other(format!("docker connect failed: {e}")))?;
         let mut labels = HashMap::new();
@@ -51,31 +77,16 @@ impl DockerBackend {
             network_id: network_id.to_string(),
         })
     }
-}
 
-/// A supervisor-owned container, awaited via the daemon's wait stream.
-pub struct DockerUnit {
-    docker: Docker,
-    name: String,
-}
-
-/// Kill handle for a docker unit: stop, then force-remove, via the daemon.
-#[derive(Clone)]
-pub struct DockerKiller {
-    docker: Docker,
-    name: String,
-}
-
-impl Backend for DockerBackend {
-    type NodeSpec = DockerNodeSpec;
-    type Unit = DockerUnit;
-    type Killer = DockerKiller;
+    fn nodes(spec: &DockerBackendSpec) -> &[DockerNodeSpec] {
+        &spec.nodes
+    }
 
     /// Pull the image, create + start the container.
     async fn launch(
         &self,
         node: &DockerNodeSpec,
-    ) -> io::Result<(DockerUnit, DockerKiller, Option<u32>)> {
+    ) -> io::Result<(ContainerHandle, ContainerHandle, Option<u32>)> {
         // Pull (cached if already present).
         let mut pull = self.docker.create_image(
             Some(CreateImageOptions {
@@ -190,60 +201,50 @@ impl Backend for DockerBackend {
             .and_then(|s| s.pid)
             .map(|p| p as u32);
 
-        Ok((
-            DockerUnit {
-                docker: self.docker.clone(),
-                name: node.name.clone(),
-            },
-            DockerKiller {
-                docker: self.docker.clone(),
-                name: node.name.clone(),
-            },
-            pid,
-        ))
+        let handle = ContainerHandle {
+            docker: self.docker.clone(),
+            name: node.name.clone(),
+        };
+        Ok((handle.clone(), handle, pid))
     }
 
-    async fn teardown(&self) {
-        if let Err(e) = self.docker.remove_network(&self.network_name).await {
-            warn!("supervisor: remove_network '{}': {e}", self.network_name);
-        }
-    }
-}
-
-impl Unit for DockerUnit {
-    async fn wait(&mut self) -> Option<i32> {
-        let mut stream = self
+    async fn wait(unit: &mut ContainerHandle) -> Option<i32> {
+        let mut stream = unit
             .docker
-            .wait_container(&self.name, None::<WaitContainerOptions<String>>);
+            .wait_container(&unit.name, None::<WaitContainerOptions<String>>);
         match stream.next().await {
             Some(Ok(r)) => Some(r.status_code as i32),
             Some(Err(e)) => {
-                warn!("supervisor: wait_container '{}' failed: {e}", self.name);
+                warn!("supervisor: wait_container '{}' failed: {e}", unit.name);
                 None
             }
             None => None,
         }
     }
-}
 
-impl Killer for DockerKiller {
-    async fn terminate(&self) {
-        let _ = self
+    async fn terminate(killer: &ContainerHandle) {
+        let _ = killer
             .docker
-            .stop_container(&self.name, Some(StopContainerOptions { t: 2 }))
+            .stop_container(&killer.name, Some(StopContainerOptions { t: 2 }))
             .await;
     }
 
-    async fn force_kill(&self) {
-        let _ = self
+    async fn force_kill(killer: &ContainerHandle) {
+        let _ = killer
             .docker
             .remove_container(
-                &self.name,
+                &killer.name,
                 Some(RemoveContainerOptions {
                     force: true,
                     ..Default::default()
                 }),
             )
             .await;
+    }
+
+    async fn teardown(&self) {
+        if let Err(e) = self.docker.remove_network(&self.network_name).await {
+            warn!("supervisor: remove_network '{}': {e}", self.network_name);
+        }
     }
 }
