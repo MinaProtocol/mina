@@ -21,7 +21,9 @@
 //!   its exit, serve RPC, tear down on `stop`/SIGINT.
 //!
 //! Scope today: no detachment (foreground). RPCs: network-level `status`/`stop`
-//! and node-level `node_start`/`node_stop`/`node_logs`.
+//! /`dump_archive_data`/`run_replayer`, and node-level `node_start` (with
+//! `fresh_state`)/`node_stop`/`node_logs`/`node_dump_precomputed`/
+//! `node_import_accounts`.
 //!
 //! Concurrency: one `Arc<Mutex<SupervisorState>>` (`std::sync::Mutex`, never
 //! held across `.await` — copy out, drop the guard, then await).
@@ -36,13 +38,15 @@ pub use plan::SupervisorPlan;
 pub use rpc::rpc_call;
 
 use std::collections::HashMap;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
 use log::{error, info, warn};
 use tokio::net::UnixListener;
 use tokio::sync::Notify;
 
+use crate::archive;
+use crate::directory_manager::{CONFIG_DIRECTORY, NETWORK_KEYPAIRS};
 use backend::Backend;
 use plan::{NamedSpec, NodeStatus};
 
@@ -101,8 +105,12 @@ impl<K> SupervisorState<K> {
 /// every RPC handler so node ops can reach the backend and each node's retained
 /// launch spec without touching the mutable state lock.
 struct SupervisorCtx<B: Backend> {
-    /// The live backend, used to (re)launch units and read their logs.
+    /// The live backend, used to (re)launch units, read logs, and exec ops.
     backend: B,
+    /// Network id — for archive container names / URIs the exec ops build.
+    network_id: String,
+    /// Host network directory (config dirs, keypairs, archive input live here).
+    network_path: PathBuf,
     /// Each node's launch spec, retained so a stopped unit can be relaunched by
     /// name (`node_start`) — the restart path the hardfork orchestrator drives.
     launches: HashMap<String, B::NodeSpec>,
@@ -133,12 +141,24 @@ async fn run_backend<B: Backend>(
 
     // Retain each node's launch spec (for `node_start`) and remember the launch
     // order, then share it all (`Arc`) with the RPC handlers.
-    let order: Vec<String> = B::nodes(spec).iter().map(|n| n.name().to_string()).collect();
+    let order: Vec<String> = B::nodes(spec)
+        .iter()
+        .map(|n| n.name().to_string())
+        .collect();
     let launches: HashMap<String, B::NodeSpec> = B::nodes(spec)
         .iter()
         .map(|n| (n.name().to_string(), n.clone()))
         .collect();
-    let ctx = Arc::new(SupervisorCtx { backend, launches });
+    let ctx = Arc::new(SupervisorCtx {
+        backend,
+        network_id: network_id.to_string(),
+        // Network dir is the socket's parent (`<net>/supervisor.sock`).
+        network_path: socket_path
+            .parent()
+            .map(Path::to_path_buf)
+            .unwrap_or_default(),
+        launches,
+    });
     let state = Arc::new(Mutex::new(SupervisorState::new()));
     let shutdown = Arc::new(Notify::new());
 
@@ -191,12 +211,21 @@ async fn launch_and_register<B: Backend>(
 // Node-level RPC operations
 // ---------------------------------------------------------------------------
 
+/// Host config directory for a unit (`<net>/config-directory/<name>`) — the same
+/// path on both backends (docker bind-mounts it into the container at
+/// `/config-directory`).
+fn config_dir<B: Backend>(ctx: &SupervisorCtx<B>, name: &str) -> PathBuf {
+    ctx.network_path.join(CONFIG_DIRECTORY).join(name)
+}
+
 /// (Re)start a single node from its retained launch spec. Errors if it is
-/// already running or the name is unknown.
+/// already running or the name is unknown. With `fresh_state`, the unit's config
+/// directory is wiped first (a clean restart).
 async fn node_start<B: Backend>(
     ctx: &Arc<SupervisorCtx<B>>,
     state: &Arc<Mutex<SupervisorState<B::Killer>>>,
     name: &str,
+    fresh_state: bool,
 ) -> Result<serde_json::Value, String> {
     // Reserve the name under the lock so two concurrent `node_start`s can't both
     // pass the "already running" check and both launch: reject if running or
@@ -223,8 +252,98 @@ async fn node_start<B: Backend>(
             },
         );
     }
+    if fresh_state {
+        let dir = config_dir(ctx, name);
+        let _ = std::fs::remove_dir_all(&dir);
+        if let Err(e) = std::fs::create_dir_all(&dir) {
+            // Don't strand the reserved `Running { pid: None }` placeholder (no
+            // killer, no waiter): record the failure so the node is `Failed`
+            // (retryable) rather than a phantom that is neither startable nor
+            // stoppable until the supervisor restarts.
+            let msg = format!("failed to reset config dir '{}': {e}", dir.display());
+            fail_unit(state, name, msg.clone());
+            return Err(msg);
+        }
+    }
     launch_and_register::<B>(ctx, state, name).await;
     Ok(serde_json::json!({ "started": name }))
+}
+
+/// Dump a node's precomputed-blocks log (`<config-dir>/precomputed_blocks.log`),
+/// on the host for both backends (docker bind-mounts the config dir).
+fn node_dump_precomputed<B: Backend>(
+    ctx: &Arc<SupervisorCtx<B>>,
+    name: &str,
+) -> Result<serde_json::Value, String> {
+    let path = config_dir(ctx, name).join("precomputed_blocks.log");
+    let blocks = std::fs::read_to_string(&path)
+        .map_err(|e| format!("cannot read '{}': {e}", path.display()))?;
+    Ok(serde_json::json!({ "precomputed_blocks": blocks }))
+}
+
+/// Import every keypair (under `<net>/network-keypairs`, `.pub` files excluded)
+/// into a node's wallet via the backend's `import_accounts`.
+async fn node_import_accounts<B: Backend>(
+    ctx: &Arc<SupervisorCtx<B>>,
+    name: &str,
+) -> Result<serde_json::Value, String> {
+    let node = ctx
+        .launches
+        .get(name)
+        .ok_or_else(|| format!("unknown node '{name}'"))?;
+    let files = list_privkey_files(&ctx.network_path.join(NETWORK_KEYPAIRS));
+    let imported = ctx
+        .backend
+        .import_accounts(node, &ctx.network_path, &files)
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(serde_json::json!({ "imported": imported }))
+}
+
+/// `pg_dump` the archive database via the backend.
+async fn dump_archive_data<B: Backend>(
+    ctx: &Arc<SupervisorCtx<B>>,
+) -> Result<serde_json::Value, String> {
+    let data = ctx
+        .backend
+        .dump_archive_data(&ctx.network_id)
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(serde_json::json!({ "archive_data": data }))
+}
+
+/// Run the replayer for archive node `name` (its archive-service unit does the
+/// work; the caller sets the start slot in `replayer_input.json` first).
+async fn run_replayer<B: Backend>(
+    ctx: &Arc<SupervisorCtx<B>>,
+    name: &str,
+) -> Result<serde_json::Value, String> {
+    let svc_name = archive::archive_service_unit_name(name);
+    let svc = ctx
+        .launches
+        .get(&svc_name)
+        .ok_or_else(|| format!("no archive-service for node '{name}'"))?;
+    let logs = ctx
+        .backend
+        .run_replayer(svc, &ctx.network_path, &ctx.network_id)
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(serde_json::json!({ "replayer_logs": logs }))
+}
+
+/// The privkey files under `dir` (plain files, excluding `.pub` pubkeys).
+fn list_privkey_files(dir: &Path) -> Vec<String> {
+    let mut files = Vec::new();
+    if let Ok(rd) = std::fs::read_dir(dir) {
+        for entry in rd.flatten() {
+            if let Some(f) = entry.file_name().to_str() {
+                if entry.path().is_file() && !f.contains(".pub") {
+                    files.push(f.to_string());
+                }
+            }
+        }
+    }
+    files
 }
 
 /// Stop a single node (graceful → force). Its killer is taken from state so
@@ -476,10 +595,65 @@ mod tests {
         assert!(!process_alive(pid2));
     }
 
+    /// `node_dump_precomputed` reads the host log, and `node_start` with
+    /// `fresh_state` wipes the unit's config dir.
+    #[test]
+    fn supervise_node_fresh_state_and_dump_precomputed() {
+        let dir = tempdir::TempDir::new("supervisor-fresh-test").unwrap();
+        let socket_path = dir.path().join("supervisor.sock");
+        // network_path = socket parent ⇒ config dir at <net>/config-directory/<name>.
+        let cfg = dir.path().join("config-directory").join("sleeper");
+        std::fs::create_dir_all(&cfg).unwrap();
+        std::fs::write(cfg.join("precomputed_blocks.log"), "block1\nblock2").unwrap();
+
+        let plan = SupervisorPlan {
+            network_id: "test-net".into(),
+            socket_path: socket_path.clone(),
+            spec: Box::new(NativeBackendSpec {
+                nodes: vec![NativeNodeSpec {
+                    name: "sleeper".into(),
+                    binary: "/bin/sleep".into(),
+                    args: vec!["300".into()],
+                    env: vec![],
+                    log_file: dir.path().join("sleeper.log"),
+                }],
+            }),
+        };
+        let sup = std::thread::spawn(move || run_blocking(plan).unwrap());
+        let mut waited = 0;
+        while !socket_path.exists() && waited < 100 {
+            std::thread::sleep(std::time::Duration::from_millis(50));
+            waited += 1;
+        }
+        assert!(socket_path.exists());
+
+        let name = serde_json::json!({ "name": "sleeper" });
+        let dump = rpc_call(&socket_path, "node_dump_precomputed", name.clone()).unwrap();
+        assert_eq!(dump["precomputed_blocks"], "block1\nblock2");
+
+        rpc_call(&socket_path, "node_stop", name.clone()).unwrap();
+        std::thread::sleep(std::time::Duration::from_millis(200));
+        rpc_call(
+            &socket_path,
+            "node_start",
+            serde_json::json!({ "name": "sleeper", "fresh_state": true }),
+        )
+        .unwrap();
+        assert!(
+            !cfg.join("precomputed_blocks.log").exists(),
+            "fresh_state should have wiped the config dir"
+        );
+
+        rpc_call(&socket_path, "stop", serde_json::Value::Null).unwrap();
+        sup.join().unwrap();
+    }
+
     #[test]
     fn unknown_method_returns_error() {
         let ctx = Arc::new(SupervisorCtx::<native::NativeBackend> {
             backend: native::NativeBackend,
+            network_id: "t".into(),
+            network_path: std::path::PathBuf::from("/tmp"),
             launches: HashMap::new(),
         });
         let state = Arc::new(Mutex::new(SupervisorState::<u32>::new()));
@@ -510,7 +684,8 @@ mod tests {
             spec: Box::new(DockerBackendSpec {
                 network_name: "minimina-suptest-net".into(),
                 nodes: vec![DockerNodeSpec {
-                    name: "minimina-suptest-ctr".into(),
+                    name: "suptest".into(),
+                    container_name: "minimina-suptest-ctr".into(),
                     image: "alpine:3.19".into(),
                     entrypoint: None,
                     cmd: vec!["sleep".into(), "300".into()],

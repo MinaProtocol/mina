@@ -43,7 +43,7 @@ impl Default for PgConfig {
 
 impl PgConfig {
     /// Connection URI for the archive-service's `--postgres-uri`.
-    fn uri(&self, host: &str) -> String {
+    pub(crate) fn uri(&self, host: &str) -> String {
         format!(
             "postgres://{}:{}@{host}:{}/{}",
             self.user, self.password, self.port, self.db
@@ -69,6 +69,13 @@ pub fn archive_service_args(pg_host: &str, archive_port: u16) -> Vec<String> {
 /// archive-node daemon dials, so both backends must derive it identically.
 pub fn archive_service_unit_name(archive_node_name: &str) -> String {
     format!("{archive_node_name}-archive-service")
+}
+
+/// The postgres container name / DNS host on docker for `network_id`. The plan
+/// builder (alias) and the exec ops (dump / replayer target) must agree, so
+/// both derive it here rather than hand-formatting the string.
+pub fn postgres_container_name(network_id: &str) -> String {
+    format!("postgres-{network_id}")
 }
 
 #[cfg(test)]

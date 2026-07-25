@@ -203,9 +203,16 @@ pub(super) async fn dispatch<B: Backend>(
             Ok(serde_json::json!({ "stopping": true }))
         }
         "node_start" => match param_name(&req.params) {
-            Ok(name) => super::node_start::<B>(ctx, state, &name)
-                .await
-                .map_err(node_err),
+            Ok(name) => {
+                let fresh = req
+                    .params
+                    .get("fresh_state")
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(false);
+                super::node_start::<B>(ctx, state, &name, fresh)
+                    .await
+                    .map_err(node_err)
+            }
             Err(e) => Err(e),
         },
         "node_stop" => match param_name(&req.params) {
@@ -219,6 +226,21 @@ pub(super) async fn dispatch<B: Backend>(
                     .await
                     .map_err(node_err)
             }
+            Err(e) => Err(e),
+        },
+        "node_dump_precomputed" => match param_name(&req.params) {
+            Ok(name) => super::node_dump_precomputed::<B>(ctx, &name).map_err(node_err),
+            Err(e) => Err(e),
+        },
+        "node_import_accounts" => match param_name(&req.params) {
+            Ok(name) => super::node_import_accounts::<B>(ctx, &name)
+                .await
+                .map_err(node_err),
+            Err(e) => Err(e),
+        },
+        "dump_archive_data" => super::dump_archive_data::<B>(ctx).await.map_err(node_err),
+        "run_replayer" => match param_name(&req.params) {
+            Ok(name) => super::run_replayer::<B>(ctx, &name).await.map_err(node_err),
             Err(e) => Err(e),
         },
         other => Err(RpcError {
