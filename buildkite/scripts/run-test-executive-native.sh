@@ -1,8 +1,45 @@
 #!/bin/bash
 set -oe pipefail -x
 
+# Dump the job container's memory-cgroup limit, current/peak usage, and — most
+# importantly — the kernel OOM-kill counter for this cgroup. If [oom_kill]
+# increments across the run, the cgroup OOM-killer is what terminates the
+# daemons' provers, confirming that the native daemons hit the pod's memory
+# limit (whereas the docker engine's daemons run under dockerd, outside it).
+# Also logs host MemTotal, to show the k8s "process sees host meminfo, not the
+# cgroup cap" gap. Writes to an artifact-collected file.
+MEM_DIAG_FILE=""
+dump_cgroup_mem() {
+  local tag="$1"
+  [ -n "$MEM_DIAG_FILE" ] || return 0
+  {
+    echo "=== [${tag}] $(date -u +%FT%TZ) ==="
+    if [ -f /sys/fs/cgroup/memory.max ]; then
+      echo "cgroup=v2"
+      echo "memory.max=$(cat /sys/fs/cgroup/memory.max 2>/dev/null)"
+      echo "memory.current=$(cat /sys/fs/cgroup/memory.current 2>/dev/null)"
+      echo "memory.peak=$(cat /sys/fs/cgroup/memory.peak 2>/dev/null)"
+      echo "memory.events:"
+      cat /sys/fs/cgroup/memory.events 2>/dev/null
+    elif [ -f /sys/fs/cgroup/memory/memory.limit_in_bytes ]; then
+      echo "cgroup=v1"
+      echo "memory.limit_in_bytes=$(cat /sys/fs/cgroup/memory/memory.limit_in_bytes 2>/dev/null)"
+      echo "memory.usage_in_bytes=$(cat /sys/fs/cgroup/memory/memory.usage_in_bytes 2>/dev/null)"
+      echo "memory.max_usage_in_bytes=$(cat /sys/fs/cgroup/memory/memory.max_usage_in_bytes 2>/dev/null)"
+      echo "memory.failcnt=$(cat /sys/fs/cgroup/memory/memory.failcnt 2>/dev/null)"
+    else
+      echo "cgroup=unknown"
+    fi
+    echo "host MemTotal: $(awk '/MemTotal/{print $2" "$3}' /proc/meminfo 2>/dev/null)"
+    free -m 2>/dev/null | sed 's/^/free: /'
+  } >>"$MEM_DIAG_FILE" 2>&1 || true
+}
+
 function cleanup
 {
+  # Capture the final memory state (incl. the cumulative OOM-kill count) before
+  # tearing down the process group.
+  dump_cgroup_mem "cleanup (after test)"
   echo "Cleaning up mina processes..."
   # Prefer terminating only processes in this script's process group,
   # instead of killing all mina/mina-archive processes on the host.
@@ -30,6 +67,7 @@ function cleanup
 trap cleanup EXIT
 
 TEST_NAME="$1"
+MEM_DIAG_FILE="${TEST_NAME}-cgroupmem.local.test.log"
 
 if [[ "${TEST_NAME:0:15}" == "block-prod-prio" ]] && [[ "$RUN_OPT_TESTS" == "" ]]; then
   echo "Skipping $TEST_NAME"
@@ -62,6 +100,14 @@ ARCHIVE_BIN="/usr/local/bin/mina-archive"
 
 echo "Verifying binary paths..."
 ls -la "$MINA_BIN" "$ARCHIVE_BIN"
+
+# Record the starting memory state and sample it every 10s in the background,
+# so we can see usage climb toward the cgroup limit right before a prover dies.
+dump_cgroup_mem "start (before test)"
+( while true; do
+    sleep 10
+    dump_cgroup_mem "sample"
+  done ) &
 
 mina-test-executive native "$TEST_NAME" \
   --mina-image "$MINA_BIN" \
