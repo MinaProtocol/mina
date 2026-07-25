@@ -25,7 +25,7 @@ use cli::{
     NetworkCommand, NodeCommand,
 };
 use directory_manager::DirectoryManager;
-use docker::{manager::DockerManager, plan_builder::DockerPlanBuilder};
+use docker::plan_builder::DockerPlanBuilder;
 use env_logger::{Builder, Env};
 use graphql::GraphQl;
 use log::{error, info, warn};
@@ -65,9 +65,8 @@ fn main() -> Result<()> {
             NetworkCommand::Create(cmd) => {
                 let network_id = cmd.network_id().to_string();
                 let network_path = directory_manager.network_path(&network_id);
-                let docker = DockerManager::new(&network_path);
 
-                check_setup_network(&docker, &directory_manager, &network_id)?;
+                check_setup_network(&directory_manager, &network_id)?;
 
                 // key-pairs for block producers and libp2p keys for all services
                 // for default network (not topology based)
@@ -164,21 +163,15 @@ fn main() -> Result<()> {
 
                 let network_path = directory_manager.network_path(&network_id);
 
-                // Stop processes/containers first
-                match mode {
-                    ExecutionMode::Docker => {
-                        let docker = DockerManager::new(&network_path);
-                        if let Err(e) = docker.compose_down(None, true, true) {
-                            let error_message =
-                                format!("Failed to delete network '{network_id}': {e}");
-                            return exit_with(error_message);
-                        }
-                    }
-                    ExecutionMode::Native => {
-                        // Nothing to stop here: the supervisor owns the processes
-                        // ('network stop'), and deleting the network directory
-                        // below removes all native on-disk state.
-                    }
+                // Teardown lives in `network stop`, which owns the supervisor's
+                // units. `delete` only removes the on-disk network; refuse if a
+                // supervisor is still live so we never yank a directory out from
+                // under a running network.
+                if let Err(e) = ensure_not_running(&network_path) {
+                    return exit_with(format!(
+                        "Cannot delete network '{network_id}': {e}. \
+                         Run 'minimina network stop -i {network_id}' first."
+                    ));
                 }
 
                 match directory_manager.delete_network_directory(&network_id) {
@@ -697,17 +690,37 @@ fn generate_default_topology(
     ]
 }
 
-/// If the network exists, its directory is deleted, corresponding docker
-/// images are removed, and it is created anew.
-/// If the network doesn't exist, the directory structure is created.
-fn check_setup_network(
-    docker: &DockerManager,
-    directory_manager: &DirectoryManager,
-    network_id: &str,
-) -> Result<()> {
+/// Refuse the operation if a foreground supervisor is still serving this
+/// network. Liveness == "something answers on the RPC socket"; a `status` reply
+/// proves it. A connection failure (absent or stale socket) means no supervisor
+/// is live, so the caller may safely remove/overwrite the directory.
+fn ensure_not_running(network_path: &Path) -> Result<()> {
+    let socket = supervisor::SupervisorPlan::socket_path_in(network_path);
+    match supervisor::rpc_call(&socket, "status", serde_json::Value::Null) {
+        Ok(_) => Err(Error::new(
+            ErrorKind::ResourceBusy,
+            "a supervisor is still running for this network",
+        )),
+        Err(_) => Ok(()),
+    }
+}
+
+/// If the network exists, its on-disk directory is deleted and it is created
+/// anew; if it doesn't exist, the directory structure is created. Tearing down a
+/// running network is `network stop`'s job (see [`ensure_not_running`]).
+fn check_setup_network(directory_manager: &DirectoryManager, network_id: &str) -> Result<()> {
     if directory_manager.network_path_exists(network_id) {
+        // Overwriting only wipes on-disk state; tearing down a running network is
+        // `network stop`'s job, so refuse if a supervisor is still live rather
+        // than yank the directory out from under it.
+        let network_path = directory_manager.network_path(network_id);
+        if let Err(e) = ensure_not_running(&network_path) {
+            return exit_with(format!(
+                "Cannot overwrite network '{network_id}': {e}. \
+                 Run 'minimina network stop -i {network_id}' first."
+            ));
+        }
         warn!("Network '{network_id}' already exists. Overwriting!");
-        docker.compose_down(None, false, false)?;
         directory_manager.delete_network_directory(network_id)?;
     }
 
