@@ -47,14 +47,17 @@ impl DockerPlanBuilder {
         // peer/archive hostnames the commands bake in resolve directly.
         if let Some(archive_node) = ServiceConfig::get_archive_node(services) {
             let archive_port = archive_node.resolved_archive_port();
-            let pg_container = format!("postgres-{network_id}");
+            let pg_container = archive::postgres_container_name(network_id);
             let svc_container = format!(
                 "{}-{network_id}",
                 archive::archive_service_unit_name(&archive_node.service_name)
             );
 
             nodes.push(DockerNodeSpec {
-                name: pg_container.clone(),
+                // Bare unit name mirrors native's so `network status` is uniform;
+                // the `<postgres>-<network>` container name carries DNS.
+                name: crate::native::archive::POSTGRES_UNIT_NAME.to_string(),
+                container_name: pg_container.clone(),
                 image: docker_archive::PG_IMAGE.to_string(),
                 entrypoint: None,
                 cmd: vec![],
@@ -76,7 +79,8 @@ impl DockerPlanBuilder {
             let mut svc_cmd = vec!["mina-archive".to_string()];
             svc_cmd.extend(archive::archive_service_args(&pg_container, archive_port));
             nodes.push(DockerNodeSpec {
-                name: svc_container.clone(),
+                name: archive::archive_service_unit_name(&archive_node.service_name),
+                container_name: svc_container.clone(),
                 image: archive_node.archive_docker_image.clone().ok_or_else(|| {
                     std::io::Error::new(
                         std::io::ErrorKind::InvalidInput,
@@ -151,7 +155,8 @@ impl DockerPlanBuilder {
             })?;
 
             nodes.push(DockerNodeSpec {
-                name: container_name.clone(),
+                name: config.service_name.clone(),
+                container_name: container_name.clone(),
                 image,
                 entrypoint: Some(vec!["mina".to_string()]),
                 cmd: cmd_str.split_whitespace().map(str::to_string).collect(),

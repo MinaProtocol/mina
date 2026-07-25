@@ -14,7 +14,8 @@ use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::net::UnixListener;
 use tokio::sync::Notify;
 
-use super::SupervisorState;
+use super::backend::Backend;
+use super::{SupervisorCtx, SupervisorState};
 
 #[derive(Deserialize)]
 pub(super) struct RpcRequest {
@@ -23,7 +24,6 @@ pub(super) struct RpcRequest {
     #[serde(default)]
     pub(super) id: serde_json::Value,
     pub(super) method: String,
-    #[allow(dead_code)]
     #[serde(default)]
     params: serde_json::Value,
 }
@@ -91,18 +91,41 @@ impl RpcResponse {
 
 pub(super) const METHOD_NOT_FOUND: i64 = -32601;
 const PARSE_ERROR: i64 = -32700;
+const INVALID_PARAMS: i64 = -32602;
+/// Server-defined error for a node operation that failed (unknown/duplicate
+/// node, launch failure, log read failure).
+const NODE_ERROR: i64 = -32000;
+
+/// Extract a required string `name` param, or the error response for a missing
+/// one.
+fn param_name(params: &serde_json::Value) -> Result<String, RpcError> {
+    params
+        .get("name")
+        .and_then(|v| v.as_str())
+        .map(str::to_string)
+        .ok_or_else(|| RpcError {
+            code: INVALID_PARAMS,
+            message: "missing 'name' string param".to_string(),
+        })
+}
 
 /// Spawn the accept loop: one connection-handler task per client.
-pub(super) fn serve<K: Send + 'static>(
+pub(super) fn serve<B: Backend>(
     listener: UnixListener,
-    state: Arc<Mutex<SupervisorState<K>>>,
+    ctx: Arc<SupervisorCtx<B>>,
+    state: Arc<Mutex<SupervisorState<B::Killer>>>,
     shutdown: Arc<Notify>,
 ) -> tokio::task::JoinHandle<()> {
     tokio::spawn(async move {
         loop {
             match listener.accept().await {
                 Ok((stream, _addr)) => {
-                    tokio::spawn(handle_connection(stream, state.clone(), shutdown.clone()));
+                    tokio::spawn(handle_connection::<B>(
+                        stream,
+                        ctx.clone(),
+                        state.clone(),
+                        shutdown.clone(),
+                    ));
                 }
                 Err(e) => {
                     // The socket is the only way to drive the network; if it
@@ -117,9 +140,10 @@ pub(super) fn serve<K: Send + 'static>(
 }
 
 /// Handle one client connection: newline-delimited JSON-RPC request/response.
-async fn handle_connection<K: Send + 'static>(
+async fn handle_connection<B: Backend>(
     stream: tokio::net::UnixStream,
-    state: Arc<Mutex<SupervisorState<K>>>,
+    ctx: Arc<SupervisorCtx<B>>,
+    state: Arc<Mutex<SupervisorState<B::Killer>>>,
     shutdown: Arc<Notify>,
 ) {
     let (reader, mut writer) = stream.into_split();
@@ -138,7 +162,7 @@ async fn handle_connection<K: Send + 'static>(
         }
 
         let response = match RpcRequest::parse(&line) {
-            Ok(req) => dispatch(req, &state, &shutdown),
+            Ok(req) => dispatch::<B>(req, &ctx, &state, &shutdown).await,
             Err(resp) => resp,
         };
 
@@ -157,27 +181,76 @@ async fn handle_connection<K: Send + 'static>(
     }
 }
 
-/// Dispatch a single request. Locks state only briefly, never across an await.
-pub(super) fn dispatch<K>(
+/// Dispatch a single request. State-mutating helpers keep the `std::sync::Mutex`
+/// only for the moment they touch it, never across an `.await`; node ops reach
+/// the backend + retained specs through `ctx`.
+pub(super) async fn dispatch<B: Backend>(
     req: RpcRequest,
-    state: &Arc<Mutex<SupervisorState<K>>>,
+    ctx: &Arc<SupervisorCtx<B>>,
+    state: &Arc<Mutex<SupervisorState<B::Killer>>>,
     shutdown: &Arc<Notify>,
 ) -> RpcResponse {
-    match req.method.as_str() {
-        "status" => {
-            let snap = state.lock().unwrap().snapshot();
-            RpcResponse::ok(req.id, snap)
-        }
+    let id = req.id.clone();
+    let node_err = |message: String| RpcError {
+        code: NODE_ERROR,
+        message,
+    };
+    let result: Result<serde_json::Value, RpcError> = match req.method.as_str() {
+        "status" => Ok(state.lock().unwrap().snapshot()),
         "stop" => {
             state.lock().unwrap().shutdown = true;
             shutdown.notify_one();
-            RpcResponse::ok(req.id, serde_json::json!({ "stopping": true }))
+            Ok(serde_json::json!({ "stopping": true }))
         }
-        other => RpcResponse::err(
-            req.id,
-            METHOD_NOT_FOUND,
-            format!("unknown method '{other}'"),
-        ),
+        "node_start" => match param_name(&req.params) {
+            Ok(name) => {
+                let fresh = req
+                    .params
+                    .get("fresh_state")
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(false);
+                super::node_start::<B>(ctx, state, &name, fresh)
+                    .await
+                    .map_err(node_err)
+            }
+            Err(e) => Err(e),
+        },
+        "node_stop" => match param_name(&req.params) {
+            Ok(name) => super::node_stop::<B>(state, &name).await.map_err(node_err),
+            Err(e) => Err(e),
+        },
+        "node_logs" => match param_name(&req.params) {
+            Ok(name) => {
+                let tail = req.params.get("tail").and_then(|v| v.as_u64());
+                super::node_logs::<B>(ctx, &name, tail)
+                    .await
+                    .map_err(node_err)
+            }
+            Err(e) => Err(e),
+        },
+        "node_dump_precomputed" => match param_name(&req.params) {
+            Ok(name) => super::node_dump_precomputed::<B>(ctx, &name).map_err(node_err),
+            Err(e) => Err(e),
+        },
+        "node_import_accounts" => match param_name(&req.params) {
+            Ok(name) => super::node_import_accounts::<B>(ctx, &name)
+                .await
+                .map_err(node_err),
+            Err(e) => Err(e),
+        },
+        "dump_archive_data" => super::dump_archive_data::<B>(ctx).await.map_err(node_err),
+        "run_replayer" => match param_name(&req.params) {
+            Ok(name) => super::run_replayer::<B>(ctx, &name).await.map_err(node_err),
+            Err(e) => Err(e),
+        },
+        other => Err(RpcError {
+            code: METHOD_NOT_FOUND,
+            message: format!("unknown method '{other}'"),
+        }),
+    };
+    match result {
+        Ok(v) => RpcResponse::ok(id, v),
+        Err(e) => RpcResponse::err(id, e.code, e.message),
     }
 }
 

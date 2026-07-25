@@ -29,9 +29,16 @@ pub struct Mount {
 }
 
 /// A docker daemon: a container the supervisor creates, starts, and owns.
+///
+/// `name` is the **bare** unit name (uniform with native: the RPC key, status
+/// label, and host config-dir name). `container_name` is the docker-specific
+/// `<service>-<network>` identity used for `create`/`start`/`inspect`/`logs`/
+/// `exec` and as the network alias, so the peer/archive hostnames baked into
+/// the daemon commands resolve via docker DNS.
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct DockerNodeSpec {
     pub name: String,
+    pub container_name: String,
     pub image: String,
     #[serde(default)]
     pub entrypoint: Option<Vec<String>>,

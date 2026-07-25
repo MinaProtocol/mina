@@ -113,19 +113,6 @@ impl DirectoryManager {
         fs::remove_dir_all(network_path)
     }
 
-    /// Read a service's log file (empty if the unit hasn't logged yet).
-    pub fn read_service_log(&self, network_id: &str, service_name: &str) -> Result<String> {
-        let log_file = self
-            .network_path(network_id)
-            .join(LOGS_DIRECTORY)
-            .join(format!("{service_name}.log"));
-        if log_file.exists() {
-            fs::read_to_string(&log_file)
-        } else {
-            Ok(String::new())
-        }
-    }
-
     pub fn list_network_directories(&self) -> Result<Vec<String>> {
         let mut networks = vec![];
         for entry in fs::read_dir(&self.base_path)? {
@@ -137,36 +124,6 @@ impl DirectoryManager {
             }
         }
         Ok(networks)
-    }
-
-    pub fn get_network_keypair_files(&self, network_id: &str) -> Result<Vec<String>> {
-        self.get_files_in_network_subdir(network_id, NETWORK_KEYPAIRS, Some(".pub"))
-    }
-
-    fn get_files_in_network_subdir(
-        &self,
-        network_id: &str,
-        subdir: &str,
-        not_containing: Option<&str>,
-    ) -> Result<Vec<String>> {
-        let path = self.network_path(network_id).join(subdir);
-        let mut files = vec![];
-        for entry in fs::read_dir(path)? {
-            let entry = entry?;
-            if entry.file_type()?.is_file() {
-                if let Some(file_name) = entry.file_name().to_str() {
-                    if let Some(sub_str) = not_containing {
-                        if !file_name.contains(sub_str) {
-                            files.push(file_name.to_string());
-                        }
-                    } else {
-                        files.push(file_name.to_string());
-                    }
-                }
-            }
-        }
-
-        Ok(files)
     }
 
     fn create_subdirectories(&self, network_id: &str) -> Result<()> {
@@ -588,43 +545,6 @@ mod tests {
         dir_manager.delete_network_directory(network_id)?;
 
         Ok(())
-    }
-
-    #[test]
-    fn test_get_files_in_network_subdir() {
-        let tempdir = TempDir::new("test_get_files_in_network_subdir")
-            .expect("Cannot create temporary directory");
-        let base_path = tempdir.path();
-        let network_id = "test_network";
-        let dir_manager = DirectoryManager::_new_with_base_path(base_path.into());
-        let subdir = "test_subdir";
-        let file1 = "test_file1";
-        let file2 = "test_file2.peerid";
-
-        // Create the network and subdirectories
-        dir_manager.create_network_directory(network_id).unwrap();
-        let subdir_path = dir_manager.network_path(network_id).join(subdir);
-
-        //Create the subdirectory
-        fs::create_dir_all(&subdir_path).unwrap();
-
-        // Create the files
-        fs::File::create(subdir_path.join(file1)).unwrap();
-        fs::File::create(subdir_path.join(file2)).unwrap();
-
-        // Check that the files are listed
-        let files = dir_manager
-            .get_files_in_network_subdir(network_id, subdir, None)
-            .unwrap();
-        assert!(files.contains(&file1.to_string()));
-        assert!(files.contains(&file2.to_string()));
-
-        // Check that the files are listed with filter not_containing
-        let files = dir_manager
-            .get_files_in_network_subdir(network_id, subdir, Some("peerid"))
-            .unwrap();
-        assert!(files.contains(&file1.to_string()));
-        assert!(!files.contains(&file2.to_string()));
     }
 
     #[test]
