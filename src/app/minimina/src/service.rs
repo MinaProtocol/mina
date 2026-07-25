@@ -148,6 +148,35 @@ impl ServiceConfig {
         base_command.join(" ")
     }
 
+    /// The archive-service port for this archive node. Single resolution point
+    /// so the archive-service unit and the daemon's `-archive-address` can never
+    /// disagree when the topology leaves the port unset.
+    pub fn resolved_archive_port(&self) -> u16 {
+        self.archive_port
+            .unwrap_or(crate::archive::DEFAULT_ARCHIVE_PORT)
+    }
+
+    /// Generate the command for the archive-node **daemon** — a normal mina
+    /// daemon that forwards blocks to the archive-service at
+    /// `<archive_service_host>:<archive_port>`.
+    pub fn generate_archive_command(&self, archive_service_host: String) -> String {
+        assert_eq!(self.service_type, ServiceType::ArchiveNode);
+        let mut base_command = self.generate_base_command();
+
+        // Handling multiple peers
+        self.add_peers_command(&mut base_command);
+
+        base_command.push("-archive-address".to_string());
+        base_command.push(format!(
+            "{}:{}",
+            archive_service_host,
+            self.resolved_archive_port()
+        ));
+
+        self.add_libp2p_command(&mut base_command);
+        base_command.join(" ")
+    }
+
     /// Generate command for block producer node
     pub fn generate_block_producer_command(
         &self,
