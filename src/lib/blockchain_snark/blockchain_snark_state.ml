@@ -322,6 +322,31 @@ let%snarkydef_ step ~(logger : Logger.t)
           Boolean.Assert.any
             [ Boolean.not nothing_changed; ledger_statements_equal ] )
     in
+    let%bind () =
+      (* Changed-path binding: the mirror of the nothing_changed constraint above.
+         On the changed path the recorded new ledger statement must be exactly the
+         statement the verified transaction proof attests to. Otherwise the only
+         gate here is valid_ledgers_at_merge_checked, which reads the current
+         statement's source / connecting-left / local-source ledgers but never its
+         target register, its connecting_ledger_right, or its supply_increase — so
+         a producer holding a valid txn_snark could record an arbitrary
+         snarked_ledger_hash (target.first_pass_ledger) along with other free
+         fields. Reuse the same helper as the nothing_changed analogue so the whole
+         statement is bound (source, target, both connecting ledgers, and
+         supply_increase), not just the two ledger registers. connecting_ledger_right
+         in particular is not cosmetic: the next block's valid_ledgers_at_merge
+         reads this block's connecting_ledger_right as its s1.connecting_ledger_right.
+         As on the nothing_changed path, fee_excess is not compared here (txn_snark's
+         is separately asserted zero) and the pending-coinbase stacks are handled by
+         the equal_var checks in txn_snark_input_correct. *)
+      let%bind current_matches_txn_snark =
+        txn_statement_ledger_hashes_equal
+          { txn_snark with sok_digest = () }
+          current_ledger_statement
+      in
+      with_label __LOC__ (fun () ->
+          Boolean.Assert.any [ nothing_changed; current_matches_txn_snark ] )
+    in
     let transaction_snark_should_verifiy = Boolean.not nothing_changed in
     let%bind result =
       Boolean.all [ updated_consensus_state; correct_coinbase_status ]
