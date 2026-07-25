@@ -20,7 +20,8 @@
 //! - this file — the runtime: launch every unit with a waiter task that reaps
 //!   its exit, serve RPC, tear down on `stop`/SIGINT.
 //!
-//! Scope today: no detachment (foreground); `status`/`stop` only.
+//! Scope today: no detachment (foreground). RPCs: network-level `status`/`stop`
+//! and node-level `node_start`/`node_stop`/`node_logs`.
 //!
 //! Concurrency: one `Arc<Mutex<SupervisorState>>` (`std::sync::Mutex`, never
 //! held across `.await` — copy out, drop the guard, then await).
@@ -51,14 +52,21 @@ use plan::{NamedSpec, NodeStatus};
 
 /// One supervised node: its status plus, while it is alive, the handle to
 /// terminate it (`None` once it has exited or if it never started).
+///
+/// `generation` identifies the current incarnation: each (re)launch stamps a
+/// fresh generation, so a superseded unit's waiter can tell its late exit apart
+/// from the fresh unit that replaced it and decline to clobber it.
 struct Node<K> {
     status: NodeStatus,
     killer: Option<K>,
+    generation: u64,
 }
 
 struct SupervisorState<K> {
     nodes: HashMap<String, Node<K>>,
     shutdown: bool,
+    /// Monotonic source of per-node incarnation ids (see [`Node::generation`]).
+    next_gen: u64,
 }
 
 impl<K> SupervisorState<K> {
@@ -66,7 +74,15 @@ impl<K> SupervisorState<K> {
         SupervisorState {
             nodes: HashMap::new(),
             shutdown: false,
+            next_gen: 0,
         }
+    }
+
+    /// Allocate the next incarnation id.
+    fn next_generation(&mut self) -> u64 {
+        let g = self.next_gen;
+        self.next_gen += 1;
+        g
     }
 
     /// Snapshot for the `status` RPC (ordered by node name for stable output).
@@ -79,6 +95,17 @@ impl<K> SupervisorState<K> {
             .collect();
         serde_json::json!({ "nodes": nodes })
     }
+}
+
+/// Immutable per-run context: built once, then only read. Shared (`Arc`) with
+/// every RPC handler so node ops can reach the backend and each node's retained
+/// launch spec without touching the mutable state lock.
+struct SupervisorCtx<B: Backend> {
+    /// The live backend, used to (re)launch units and read their logs.
+    backend: B,
+    /// Each node's launch spec, retained so a stopped unit can be relaunched by
+    /// name (`node_start`) — the restart path the hardfork orchestrator drives.
+    launches: HashMap<String, B::NodeSpec>,
 }
 
 // ---------------------------------------------------------------------------
@@ -103,22 +130,28 @@ async fn run_backend<B: Backend>(
     socket_path: &Path,
 ) -> std::io::Result<()> {
     let backend = B::setup(spec, network_id).await?;
+
+    // Retain each node's launch spec (for `node_start`) and remember the launch
+    // order, then share it all (`Arc`) with the RPC handlers.
+    let order: Vec<String> = B::nodes(spec).iter().map(|n| n.name().to_string()).collect();
+    let launches: HashMap<String, B::NodeSpec> = B::nodes(spec)
+        .iter()
+        .map(|n| (n.name().to_string(), n.clone()))
+        .collect();
+    let ctx = Arc::new(SupervisorCtx { backend, launches });
     let state = Arc::new(Mutex::new(SupervisorState::new()));
     let shutdown = Arc::new(Notify::new());
 
-    // Launch every unit, each with a waiter task that reaps its exit.
-    for node in B::nodes(spec) {
-        match backend.launch(node).await {
-            Ok((unit, killer, pid)) => register_unit::<B>(&state, node.name(), pid, unit, killer),
-            Err(e) => fail_unit(&state, node.name(), e.to_string()),
-        }
+    // Launch every unit in order, each with a waiter task that reaps its exit.
+    for name in &order {
+        launch_and_register::<B>(&ctx, &state, name).await;
     }
 
     // Bind the RPC socket (unlink any stale socket first).
     let _ = std::fs::remove_file(socket_path);
     let listener = UnixListener::bind(socket_path)?;
     info!("supervisor: serving RPC on '{}'", socket_path.display());
-    let accept_task = rpc::serve(listener, state.clone(), shutdown.clone());
+    let accept_task = rpc::serve::<B>(listener, ctx.clone(), state.clone(), shutdown.clone());
 
     tokio::select! {
         _ = shutdown.notified() => info!("supervisor: stop requested"),
@@ -130,10 +163,125 @@ async fn run_backend<B: Backend>(
 
     accept_task.abort();
     stop_units::<B>(&state).await;
-    backend.teardown().await;
+    ctx.backend.teardown().await;
     let _ = std::fs::remove_file(socket_path);
     info!("supervisor: network '{network_id}' stopped");
     Ok(())
+}
+
+/// Launch one node from its retained spec and register it + its waiter task.
+/// Shared by startup and `node_start`; an unknown name or a launch error is
+/// recorded as a `Failed` node rather than propagated.
+async fn launch_and_register<B: Backend>(
+    ctx: &Arc<SupervisorCtx<B>>,
+    state: &Arc<Mutex<SupervisorState<B::Killer>>>,
+    name: &str,
+) {
+    let Some(node) = ctx.launches.get(name) else {
+        fail_unit(state, name, format!("unknown node '{name}'"));
+        return;
+    };
+    match ctx.backend.launch(node).await {
+        Ok((unit, killer, pid)) => register_unit::<B>(state, name, pid, unit, killer),
+        Err(e) => fail_unit(state, name, e.to_string()),
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Node-level RPC operations
+// ---------------------------------------------------------------------------
+
+/// (Re)start a single node from its retained launch spec. Errors if it is
+/// already running or the name is unknown.
+async fn node_start<B: Backend>(
+    ctx: &Arc<SupervisorCtx<B>>,
+    state: &Arc<Mutex<SupervisorState<B::Killer>>>,
+    name: &str,
+) -> Result<serde_json::Value, String> {
+    // Reserve the name under the lock so two concurrent `node_start`s can't both
+    // pass the "already running" check and both launch: reject if running or
+    // unknown, else stamp a placeholder that blocks a racing start until the
+    // real unit registers (or fails). `launch_and_register` then overwrites it.
+    {
+        let mut st = state.lock().unwrap();
+        if matches!(
+            st.nodes.get(name).map(|n| &n.status),
+            Some(NodeStatus::Running { .. })
+        ) {
+            return Err(format!("node '{name}' is already running"));
+        }
+        if !ctx.launches.contains_key(name) {
+            return Err(format!("unknown node '{name}'"));
+        }
+        let generation = st.next_generation();
+        st.nodes.insert(
+            name.to_string(),
+            Node {
+                status: NodeStatus::Running { pid: None },
+                killer: None,
+                generation,
+            },
+        );
+    }
+    launch_and_register::<B>(ctx, state, name).await;
+    Ok(serde_json::json!({ "started": name }))
+}
+
+/// Stop a single node (graceful → force). Its killer is taken from state so
+/// teardown won't touch it again; the waiter task records the exit.
+async fn node_stop<B: Backend>(
+    state: &Arc<Mutex<SupervisorState<B::Killer>>>,
+    name: &str,
+) -> Result<serde_json::Value, String> {
+    let killer = state
+        .lock()
+        .unwrap()
+        .nodes
+        .get_mut(name)
+        .and_then(|n| n.killer.take());
+    match killer {
+        Some(k) => {
+            B::terminate(&k).await;
+            // Give the unit up to ~2s to exit on SIGTERM (its waiter flips the
+            // status to `Exited`), polling so a fast exit returns promptly;
+            // force-kill only if it is still alive at the deadline.
+            let mut exited = false;
+            for _ in 0..20 {
+                tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+                if matches!(
+                    state.lock().unwrap().nodes.get(name).map(|n| &n.status),
+                    Some(NodeStatus::Exited { .. })
+                ) {
+                    exited = true;
+                    break;
+                }
+            }
+            if !exited {
+                B::force_kill(&k).await;
+            }
+            Ok(serde_json::json!({ "stopped": name }))
+        }
+        None => Err(format!("node '{name}' is not running")),
+    }
+}
+
+/// Fetch a node's logs — native reads its log file; docker streams the
+/// container's logs. `tail` limits to the last N lines.
+async fn node_logs<B: Backend>(
+    ctx: &Arc<SupervisorCtx<B>>,
+    name: &str,
+    tail: Option<u64>,
+) -> Result<serde_json::Value, String> {
+    let node = ctx
+        .launches
+        .get(name)
+        .ok_or_else(|| format!("unknown node '{name}'"))?;
+    let logs = ctx
+        .backend
+        .logs(node, tail)
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(serde_json::json!({ "logs": logs }))
 }
 
 /// Record a launched unit in state and spawn its waiter task.
@@ -145,35 +293,47 @@ fn register_unit<B: Backend>(
     killer: B::Killer,
 ) {
     info!("supervisor: started '{name}' (pid {pid:?})");
-    state.lock().unwrap().nodes.insert(
-        name.to_string(),
-        Node {
-            status: NodeStatus::Running { pid },
-            killer: Some(killer),
-        },
-    );
+    let generation = {
+        let mut st = state.lock().unwrap();
+        let generation = st.next_generation();
+        st.nodes.insert(
+            name.to_string(),
+            Node {
+                status: NodeStatus::Running { pid },
+                killer: Some(killer),
+                generation,
+            },
+        );
+        generation
+    };
     let st = state.clone();
     let name = name.to_string();
     tokio::spawn(async move {
         let code = B::wait(&mut unit).await;
         info!("supervisor: '{name}' exited (code {code:?})");
-        st.lock().unwrap().nodes.insert(
-            name,
-            Node {
-                status: NodeStatus::Exited { code },
-                killer: None,
-            },
-        );
+        // Only record the exit if this is still the current incarnation: a
+        // restart (`node_start`) supersedes an older unit, whose late exit must
+        // not clobber the fresh unit's `Running` state (leaving it untracked).
+        let mut st = st.lock().unwrap();
+        if let Some(node) = st.nodes.get_mut(&name) {
+            if node.generation == generation {
+                node.status = NodeStatus::Exited { code };
+                node.killer = None;
+            }
+        }
     });
 }
 
 fn fail_unit<K>(state: &Arc<Mutex<SupervisorState<K>>>, name: &str, error: String) {
     error!("supervisor: failed to start '{name}': {error}");
-    state.lock().unwrap().nodes.insert(
+    let mut st = state.lock().unwrap();
+    let generation = st.next_generation();
+    st.nodes.insert(
         name.to_string(),
         Node {
             status: NodeStatus::Failed { error },
             killer: None,
+            generation,
         },
     );
 }
@@ -255,12 +415,80 @@ mod tests {
         assert!(!socket_path.exists(), "socket should be removed");
     }
 
+    /// node_stop then node_start a live unit: it dies, then relaunches with a
+    /// new pid — the restart path the hardfork orchestrator drives.
+    #[test]
+    fn supervise_node_stop_then_start() {
+        let dir = tempdir::TempDir::new("supervisor-node-test").unwrap();
+        let socket_path = dir.path().join("supervisor.sock");
+
+        let plan = SupervisorPlan {
+            network_id: "test-net".into(),
+            socket_path: socket_path.clone(),
+            spec: Box::new(NativeBackendSpec {
+                nodes: vec![NativeNodeSpec {
+                    name: "sleeper".into(),
+                    binary: "/bin/sleep".into(),
+                    args: vec!["300".into()],
+                    env: vec![],
+                    log_file: dir.path().join("sleeper.log"),
+                }],
+            }),
+        };
+
+        let sup = std::thread::spawn(move || run_blocking(plan).unwrap());
+
+        let mut waited = 0;
+        while !socket_path.exists() && waited < 100 {
+            std::thread::sleep(std::time::Duration::from_millis(50));
+            waited += 1;
+        }
+        assert!(socket_path.exists());
+
+        let name = serde_json::json!({ "name": "sleeper" });
+        let st = rpc_call(&socket_path, "status", serde_json::Value::Null).unwrap();
+        let pid1 = st["nodes"][0]["status"]["pid"].as_u64().unwrap() as u32;
+
+        // node_stop: SIGTERM the unit; it dies and the waiter records `exited`.
+        assert_eq!(
+            rpc_call(&socket_path, "node_stop", name.clone()).unwrap()["stopped"],
+            "sleeper"
+        );
+        std::thread::sleep(std::time::Duration::from_millis(300));
+        assert!(!process_alive(pid1));
+        let st = rpc_call(&socket_path, "status", serde_json::Value::Null).unwrap();
+        assert_eq!(st["nodes"][0]["status"]["state"], "exited");
+
+        // node_start: relaunch → running with a fresh pid.
+        assert_eq!(
+            rpc_call(&socket_path, "node_start", name.clone()).unwrap()["started"],
+            "sleeper"
+        );
+        std::thread::sleep(std::time::Duration::from_millis(200));
+        let st = rpc_call(&socket_path, "status", serde_json::Value::Null).unwrap();
+        assert_eq!(st["nodes"][0]["status"]["state"], "running");
+        let pid2 = st["nodes"][0]["status"]["pid"].as_u64().unwrap() as u32;
+        assert_ne!(pid1, pid2);
+        assert!(process_alive(pid2));
+
+        rpc_call(&socket_path, "stop", serde_json::Value::Null).unwrap();
+        sup.join().unwrap();
+        assert!(!process_alive(pid2));
+    }
+
     #[test]
     fn unknown_method_returns_error() {
+        let ctx = Arc::new(SupervisorCtx::<native::NativeBackend> {
+            backend: native::NativeBackend,
+            launches: HashMap::new(),
+        });
         let state = Arc::new(Mutex::new(SupervisorState::<u32>::new()));
         let shutdown = Arc::new(Notify::new());
         let req = RpcRequest::new_test(serde_json::json!(7), "nope");
-        let resp = dispatch(req, &state, &shutdown);
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        let resp = rt.block_on(dispatch::<native::NativeBackend>(
+            req, &ctx, &state, &shutdown,
+        ));
         assert_eq!(resp.id, serde_json::json!(7));
         assert!(resp.result.is_none());
         assert_eq!(resp.error.unwrap().code, METHOD_NOT_FOUND);

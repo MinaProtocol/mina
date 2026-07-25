@@ -27,7 +27,9 @@ use super::plan::NamedSpec;
 /// associated functions; `Unit`/`Killer` are plain handle types.
 pub trait Backend: Sized + Send + Sync + 'static {
     type Spec;
-    type NodeSpec: NamedSpec;
+    /// Per-node spec. `Clone + Send + Sync` so the supervisor can retain a copy
+    /// of each (shared with RPC handlers) to relaunch a stopped unit by name.
+    type NodeSpec: NamedSpec + Clone + Send + Sync + 'static;
     /// A live unit's wait handle. Exclusively owned by its waiter task.
     type Unit: Send + 'static;
     /// A live unit's kill handle. Cloned out of shared state at teardown.
@@ -53,6 +55,14 @@ pub trait Backend: Sized + Send + Sync + 'static {
 
     /// Forceful removal (SIGKILL survivors / `docker rm -f`).
     fn force_kill(killer: &Self::Killer) -> impl Future<Output = ()> + Send;
+
+    /// Fetch one node's logs (native: read its log file; docker: container
+    /// logs). `tail` limits to the last N lines when `Some`.
+    fn logs(
+        &self,
+        node: &Self::NodeSpec,
+        tail: Option<u64>,
+    ) -> impl Future<Output = io::Result<String>> + Send;
 
     /// Release network-level resources (docker: remove the network). Units
     /// are torn down separately, before this (see `super::stop_units`).

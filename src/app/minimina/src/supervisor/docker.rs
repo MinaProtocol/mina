@@ -5,8 +5,8 @@ use std::collections::HashMap;
 use std::io;
 
 use bollard::container::{
-    Config, CreateContainerOptions, NetworkingConfig, RemoveContainerOptions, StopContainerOptions,
-    WaitContainerOptions,
+    Config, CreateContainerOptions, LogsOptions, NetworkingConfig, RemoveContainerOptions,
+    StopContainerOptions, WaitContainerOptions,
 };
 use bollard::image::CreateImageOptions;
 use bollard::network::CreateNetworkOptions;
@@ -159,6 +159,20 @@ impl Backend for DockerBackend {
             ..Default::default()
         };
 
+        // Best-effort: remove any container that already holds this name — a
+        // self-exited unit being relaunched by `node_start`, or a leftover from
+        // a crashed prior run — so `create_container` won't 409 on the name.
+        let _ = self
+            .docker
+            .remove_container(
+                &node.name,
+                Some(RemoveContainerOptions {
+                    force: true,
+                    ..Default::default()
+                }),
+            )
+            .await;
+
         self.docker
             .create_container(
                 Some(CreateContainerOptions {
@@ -250,6 +264,26 @@ impl Backend for DockerBackend {
                 }),
             )
             .await;
+    }
+
+    async fn logs(&self, node: &DockerNodeSpec, tail: Option<u64>) -> io::Result<String> {
+        let opts = LogsOptions::<String> {
+            stdout: true,
+            stderr: true,
+            tail: tail
+                .map(|t| t.to_string())
+                .unwrap_or_else(|| "all".to_string()),
+            ..Default::default()
+        };
+        let mut stream = self.docker.logs(&node.name, Some(opts));
+        let mut out = String::new();
+        while let Some(item) = stream.next().await {
+            match item {
+                Ok(chunk) => out.push_str(&String::from_utf8_lossy(&chunk.into_bytes())),
+                Err(e) => return Err(io::Error::other(format!("logs '{}' failed: {e}", node.name))),
+            }
+        }
+        Ok(out)
     }
 
     async fn teardown(&self) {

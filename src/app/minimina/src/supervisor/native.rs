@@ -72,7 +72,30 @@ impl Backend for NativeBackend {
         }
     }
 
+    async fn logs(&self, node: &NativeNodeSpec, tail: Option<u64>) -> io::Result<String> {
+        // A not-yet-created log (node never started) is empty, not an error; any
+        // other read failure (permissions, IO) is surfaced rather than hidden.
+        let all = match std::fs::read_to_string(&node.log_file) {
+            Ok(s) => s,
+            Err(e) if e.kind() == io::ErrorKind::NotFound => String::new(),
+            Err(e) => return Err(e),
+        };
+        Ok(tail_lines(&all, tail))
+    }
+
     async fn teardown(&self) {}
+}
+
+/// Keep only the last `tail` lines of `s` (all of it when `tail` is `None`).
+fn tail_lines(s: &str, tail: Option<u64>) -> String {
+    match tail {
+        Some(n) => {
+            let lines: Vec<&str> = s.lines().collect();
+            let start = lines.len().saturating_sub(n as usize);
+            lines[start..].join("\n")
+        }
+        None => s.to_string(),
+    }
 }
 
 /// Spawn a native daemon as an owned child. Sets `PR_SET_PDEATHSIG(SIGKILL)` so
