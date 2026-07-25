@@ -6,7 +6,6 @@
 //! - `network-keypairs`: Contains the key pairs for the block producer service.
 //! - `libp2p-keypairs`: Contains the key pairs for the libp2p service.
 //! - `genesis_ledger.json`: Contains the genesis ledger for the network.
-//! - `docker-compose.yml`: Contains the docker compose file for the network.
 //! - `network.json`: Contains the network topology representation in JSON format.
 //! - `peer_list_file.txt`: Contains the list of libp2p peers for the network.
 
@@ -24,6 +23,11 @@ use std::{
 };
 
 pub const NETWORK_KEYPAIRS: &str = "network-keypairs";
+/// Name of a node's config directory — a subdirectory under the network path on
+/// the host, and the mount point (`/config-directory`) inside a container.
+pub const CONFIG_DIRECTORY: &str = "config-directory";
+/// Name of the per-network directory holding one `<service>.log` per unit.
+pub const LOGS_DIRECTORY: &str = "logs";
 const LIBP2P_KEYPAIRS: &str = "libp2p-keypairs";
 const MINIMINA_HOME: &str = "MINIMINA_HOME";
 
@@ -109,6 +113,19 @@ impl DirectoryManager {
         fs::remove_dir_all(network_path)
     }
 
+    /// Read a service's log file (empty if the unit hasn't logged yet).
+    pub fn read_service_log(&self, network_id: &str, service_name: &str) -> Result<String> {
+        let log_file = self
+            .network_path(network_id)
+            .join(LOGS_DIRECTORY)
+            .join(format!("{service_name}.log"));
+        if log_file.exists() {
+            fs::read_to_string(&log_file)
+        } else {
+            Ok(String::new())
+        }
+    }
+
     pub fn list_network_directories(&self) -> Result<Vec<String>> {
         let mut networks = vec![];
         for entry in fs::read_dir(&self.base_path)? {
@@ -124,10 +141,6 @@ impl DirectoryManager {
 
     pub fn get_network_keypair_files(&self, network_id: &str) -> Result<Vec<String>> {
         self.get_files_in_network_subdir(network_id, NETWORK_KEYPAIRS, Some(".pub"))
-    }
-
-    pub fn _get_libp2p_keypair_files(&self, network_id: &str) -> Result<Vec<String>> {
-        self.get_files_in_network_subdir(network_id, LIBP2P_KEYPAIRS, Some(".peerid"))
     }
 
     fn get_files_in_network_subdir(

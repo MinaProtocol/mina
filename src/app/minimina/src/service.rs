@@ -1,14 +1,14 @@
 //! # Service Module
 //!
 //! This module provides structures and methods to hold and manage configurations for different Mina daemons.
-//! With these configurations, docker-compose files can be dynamically generated to deploy and manage nodes in the network.
+//! The plan builders lower these configurations into the supervisor plan that deploys and manages nodes in the network.
 
 use log::warn;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
 use crate::{
-    docker::compose::CONFIG_DIRECTORY, genesis_ledger::GENESIS_LEDGER_JSON, topology::GitBuild,
+    directory_manager::CONFIG_DIRECTORY, genesis_ledger::GENESIS_LEDGER_JSON, topology::GitBuild,
 };
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Clone, Default)]
@@ -26,6 +26,17 @@ pub enum ServiceType {
     ArchiveNode,
     #[serde(rename = "Uptime_service_backend")]
     UptimeServiceBackend,
+}
+
+/// Environment shared by every daemon unit, whichever backend runs it. Both
+/// plan builders bake this into their node specs.
+pub fn daemon_env() -> Vec<(String, String)> {
+    vec![
+        ("MINA_PRIVKEY_PASS".into(), "naughty blue worm".into()),
+        ("MINA_LIBP2P_PASS".into(), "naughty blue worm".into()),
+        ("MINA_CLIENT_TRUSTLIST".into(), "0.0.0.0/0".into()),
+        ("RAYON_NUM_THREADS".into(), "2".into()),
+    ]
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -132,27 +143,6 @@ impl ServiceConfig {
 
         let mut base_command = self.generate_base_command();
         base_command.push("-seed".to_string());
-
-        self.add_libp2p_command(&mut base_command);
-        base_command.join(" ")
-    }
-
-    pub fn generate_archive_command(&self, archive_service_host: String) -> String {
-        assert_eq!(self.service_type, ServiceType::ArchiveNode);
-        let mut base_command = self.generate_base_command();
-
-        // Handling multiple peers
-        self.add_peers_command(&mut base_command);
-
-        if let Some(archive_port) = &self.archive_port {
-            base_command.push("-archive-address".to_string());
-            base_command.push(format!("{}:{}", archive_service_host, archive_port));
-        } else {
-            warn!(
-                "No archive port provided for archive node '{}'. This is not recommended.",
-                self.service_name
-            );
-        }
 
         self.add_libp2p_command(&mut base_command);
         base_command.join(" ")

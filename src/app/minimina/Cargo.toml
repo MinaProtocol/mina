@@ -23,6 +23,9 @@ reqwest = { version = "0.11.20", features = ["blocking"] }
 url = "2.4.1"
 tempdir = "0.3.7"
 nix = { version = "0.29", features = ["signal", "process"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "process", "signal", "io-util", "sync", "time"] }
+bollard = "0.17"
+futures-util = "0.3"
 
 [package.metadata.deb]
 maintainer = "Piotr Stachyra <piotr.stachyra@minaprotocol.com>"

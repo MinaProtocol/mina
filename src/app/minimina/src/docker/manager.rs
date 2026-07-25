@@ -1,22 +1,17 @@
-//! # Docker Manager Module
+//! # Legacy docker-compose shim
 //!
-//! Provides an interface for managing Docker operations within the application.
-//! Specifically, it offers functionalities to:
-//! - Generate a `docker-compose.yaml` file from provided service configurations.
-//! - Start up services using the generated Docker Compose file.
-//! - Shut down active services.
-//! - Handle interactions with the Docker CLI.
+//! Node-level docker commands (start/stop one node, import-account, replayer,
+//! dumps, client status) still shell out to the `docker compose` / `docker`
+//! CLIs. The network lifecycle no longer does — it runs on the supervisor
+//! (see [`crate::supervisor`]); plans are built by
+//! [`crate::docker::plan_builder`]. This shim is slated for deletion once the
+//! node commands are ported to supervisor RPCs.
 
-use crate::directory_manager::NETWORK_KEYPAIRS;
+use crate::directory_manager::{CONFIG_DIRECTORY, NETWORK_KEYPAIRS};
 use crate::genesis_ledger::REPLAYER_INPUT_JSON;
-use crate::{
-    docker::compose::DockerCompose, docker::compose::CONFIG_DIRECTORY, service::ServiceConfig,
-    utils::run_command,
-};
+use crate::utils::run_command;
 use serde::{Deserialize, Serialize};
 use std::fmt;
-use std::fs::File;
-use std::io::Write;
 use std::{
     io::Result,
     path::{Path, PathBuf},
@@ -69,16 +64,6 @@ pub enum ContainerState {
     Unknown,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct ComposeInfo {
-    #[serde(rename = "Name")]
-    pub name: String,
-    #[serde(rename = "Status")]
-    pub status: String,
-    #[serde(rename = "ConfigFiles")]
-    pub config_files: String,
-}
-
 #[derive(Clone)]
 pub struct DockerManager {
     pub network_path: PathBuf,
@@ -92,31 +77,6 @@ impl DockerManager {
             network_path: network_path.to_path_buf(),
             compose_path,
         }
-    }
-
-    pub fn compose_generate_file(&self, configs: &[ServiceConfig]) -> Result<()> {
-        let mut file = File::create(&self.compose_path)?;
-        let contents = DockerCompose::generate(configs, &self.network_path);
-        file.write_all(contents.as_bytes())?;
-        Ok(())
-    }
-
-    pub fn exec(&self, service: &str, cmd: &[&str]) -> Result<Output> {
-        let mut args = vec!["exec", "-i", service];
-        args.extend_from_slice(cmd);
-        let out = run_command("docker", &args)?;
-        Ok(out)
-    }
-
-    pub fn cp(&self, service: &str, src: &Path, dest: &Path) -> Result<Output> {
-        let destination = format!("{}:{}", service, dest.to_str().unwrap());
-        let args = vec!["cp", src.to_str().unwrap(), destination.as_str()];
-        let out = run_command("docker", &args)?;
-        Ok(out)
-    }
-
-    pub fn _compose_up(&self) -> Result<Output> {
-        self.run_docker_compose(&["up", "-d"])
     }
 
     pub fn compose_down(
@@ -154,16 +114,6 @@ impl DockerManager {
         self.run_docker_compose(&args)
     }
 
-    /// Start all services in the network
-    pub fn compose_start_all(&self) -> Result<Output> {
-        self.run_docker_compose(&["start"])
-    }
-
-    /// Stop all services in the network
-    pub fn compose_stop_all(&self) -> Result<Output> {
-        self.run_docker_compose(&["stop"])
-    }
-
     /// Start a subset of services in the network
     pub fn compose_start(&self, services: Vec<&str>) -> Result<Output> {
         let mut cmd = vec!["start"];
@@ -176,13 +126,6 @@ impl DockerManager {
         let mut cmd = vec!["stop"];
         cmd.extend(services);
         self.run_docker_compose(&cmd)
-    }
-
-    pub fn compose_ls(&self) -> Result<Vec<ComposeInfo>> {
-        let output = self.run_docker_compose(&["ls", "--format", "json"])?;
-        let stdout_str = String::from_utf8_lossy(&output.stdout);
-        let compose_info = serde_json::from_str(&stdout_str)?;
-        Ok(compose_info)
     }
 
     /// Get docker info of all services in the network
