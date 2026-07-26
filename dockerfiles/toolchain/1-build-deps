@@ -80,6 +80,7 @@ RUN CODENAME=$(grep "VERSION_CODENAME" /etc/os-release | cut -d= -f2); \
   libgmp-dev \
   libgmp3-dev \
   libjemalloc-dev \
+  libkrb5-dev \
   liblmdb-dev \
   liblmdb0 \
   libpq-dev \
