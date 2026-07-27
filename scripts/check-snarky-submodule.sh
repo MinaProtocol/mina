@@ -12,7 +12,7 @@ git config http.sslVerify true
 
 function in_branch {
   if git rev-list origin/"$1" | grep -q "${CURR}"; then
-    echo "Snarky submodule commit is an ancestor of snarky/$1"
+    echo "Snarky submodule commit ${CURR} is an ancestor of snarky/$1"
     true
   else
     false
@@ -20,6 +20,22 @@ function in_branch {
 }
 
 if (! in_branch "master"); then
+  cat >&2 <<EOF
+ERROR: the snarky submodule is pinned to ${CURR}, which is not an
+ancestor of snarky's origin/master.
+
+This means the pinned snarky commit has not been merged upstream.
+Push the snarky commit to snarky's master (or a branch merged into
+master) before merging the change that updates this submodule.
+
+Branches on snarky's origin that do contain ${CURR}:
+EOF
+  BRANCHES=$(git branch -r --contains "${CURR}" 2>/dev/null || true)
+  if [ -n "${BRANCHES}" ]; then
+    printf '%s\n' "${BRANCHES}" | sed 's/^/  /' >&2
+  else
+    echo "  (none - the commit may not be pushed to snarky's origin at all)" >&2
+  fi
   exit 1
 fi
 
