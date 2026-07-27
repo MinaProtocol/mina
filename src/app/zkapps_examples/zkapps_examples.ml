@@ -574,8 +574,7 @@ let compile :
      ~max_proofs_verified ~name ~choices () ->
   let vk_hash = ref None in
   let choices ~self =
-    let rec go :
-        type branches prev_varss prev_valuess widthss heightss.
+    let rec go : type branches prev_varss prev_valuess widthss heightss.
            ( branches
            , prev_varss
            , prev_valuess
@@ -644,8 +643,7 @@ let compile :
           @@ Pickles.Side_loaded.Verification_key.of_compiled tag ) )
   in
   let provers =
-    let rec go :
-        type prev_valuess widthss heightss.
+    let rec go : type prev_valuess widthss heightss.
            ( prev_valuess
            , widthss
            , heightss
@@ -671,10 +669,11 @@ let compile :
       | prover :: provers ->
           let prover ?handler () =
             let open Async_kernel in
-            let%map ( _stmt
-                    , ( { account_update; account_update_digest; calls }
-                      , auxiliary_value )
-                    , proof ) =
+            let%map
+                ( _stmt
+                , ( { account_update; account_update_digest; calls }
+                  , auxiliary_value )
+                , proof ) =
               prover ?handler ()
             in
             let account_update : Account_update.t =

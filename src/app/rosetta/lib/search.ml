@@ -257,20 +257,19 @@ module Sql = struct
     let gen_filter (op_1, op_2, null_cmp) l =
       String.concat ~sep:[%string " %{op_1} "]
       @@ List.map l ~f:(function
-           | ((_, (_, n, typ)) :: _) :: _ as field_n_l ->
-               let filters =
-                 String.concat ~sep:" OR "
-                 @@ List.map field_n_l ~f:(fun l ->
-                        String.concat ~sep:" AND "
-                        @@ List.map l ~f:(fun (field', (cmp_op, n', cast)) ->
-                               [%string
-                                 "%{field'} %{cmp_op} CAST($%{n'#Int} AS \
-                                  %{cast})"] ) )
-               in
-               [%string
-                 "($%{n#Int}::%{typ} %{null_cmp} NULL %{op_2} (%{filters}))"]
-           | _ ->
-               "" )
+        | ((_, (_, n, typ)) :: _) :: _ as field_n_l ->
+            let filters =
+              String.concat ~sep:" OR "
+              @@ List.map field_n_l ~f:(fun l ->
+                  String.concat ~sep:" AND "
+                  @@ List.map l ~f:(fun (field', (cmp_op, n', cast)) ->
+                      [%string
+                        "%{field'} %{cmp_op} CAST($%{n'#Int} AS %{cast})"] ) )
+            in
+            [%string
+              "($%{n#Int}::%{typ} %{null_cmp} NULL %{op_2} (%{filters}))"]
+        | _ ->
+            "" )
     in
     let block_filter =
       gen_filter
@@ -304,7 +303,8 @@ module Sql = struct
     let ppf = Format.formatter_of_buffer buffer in
     let () =
       Option.value_map params ~default:(Caqti_request.pp ppf req)
-        ~f:(fun params -> Caqti_request.make_pp_with_param () ppf (req, params))
+        ~f:(fun params ->
+          Caqti_request.make_pp_with_param () ppf (req, params) )
     in
     let () = Format.pp_print_flush ppf () in
     Buffer.contents buffer
@@ -339,7 +339,7 @@ module Sql = struct
         List.map
           ( "id"
           :: Archive_lib.Processor.User_command.Signed_command.Fields.names )
-          ~f:(fun n -> "u." ^ n)
+          ~f:(fun n -> "u." ^ n )
 
       let fields =
         String.concat ~sep:"," @@ fields'
@@ -1007,7 +1007,7 @@ module Sql = struct
         let map ~f l =
           map ~f:List.rev
           @@ List.fold_result l ~init:[] ~f:(fun acc x ->
-                 f x >>| fun x -> x :: acc )
+              f x >>| fun x -> x :: acc )
       end
     end in
     let module M = Deferred.Result in
@@ -1066,7 +1066,7 @@ module Sql = struct
     let zkapp_commands = Zkapp_commands.to_command_infos raw_zkapp_commands in
     { total_count =
         Int64.(
-          user_commands_count + internal_commands_count + zkapp_commands_count)
+          user_commands_count + internal_commands_count + zkapp_commands_count )
     ; Transactions_info.internal_commands
     ; user_commands
     ; zkapp_commands

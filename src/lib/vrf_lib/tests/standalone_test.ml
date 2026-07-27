@@ -66,7 +66,7 @@ let%test_module "vrf-test" =
       let equal x y =
         Snark_params.Tick.Inner_curve.(
           equal_or_infinity Field.equal (to_affine_or_infinity x)
-            (to_affine_or_infinity y))
+            (to_affine_or_infinity y) )
 
       module Checked = struct
         include

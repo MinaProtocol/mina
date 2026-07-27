@@ -94,8 +94,7 @@ module Make (Inductive_rule : Inductive_rule.Intf) = struct
     Timer.clock __LOC__ ;
     let module HT = H4.T (Tag) in
     let (T (self_width, proofs_verified)) = HT.length rule.prevs in
-    let rec extract_lengths :
-        type a b n m k.
+    let rec extract_lengths : type a b n m k.
            (a, b, n, m) HT.t
         -> (a, k) Length.t
         -> n H1.T(Nat).t * (n, k) Length.t * (m, k) Length.t =
@@ -146,8 +145,7 @@ module Make (Inductive_rule : Inductive_rule.Intf) = struct
     *)
     let module Optional_wrap_key = Types_map.For_step.Optional_wrap_key in
     let known_wrap_keys =
-      let rec go :
-          type a1 a2 n m.
+      let rec go : type a1 a2 n m.
           (a1, a2, n, m) H4.T(Tag).t -> m H1.T(Optional_wrap_key).t Promise.t =
         function
         | [] ->

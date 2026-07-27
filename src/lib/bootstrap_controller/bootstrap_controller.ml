@@ -83,7 +83,7 @@ let received_bad_proof ({ context = (module Context); _ } as t) host e =
         ( Violated_protocol
         , Some
             ( "Bad ancestor proof: $error"
-            , [ ("error", Error_json.error_to_yojson e) ] ) ))
+            , [ ("error", Error_json.error_to_yojson e) ] ) ) )
 
 let done_syncing_root root_sync_ledger =
   Option.is_some (Sync_ledger.Root.peek_valid_tree root_sync_ledger)
@@ -101,7 +101,7 @@ let start_sync_job_with_peer ~sender ~root_sync_ledger
       record t.trust_system logger sender
         Actions.
           ( Fulfilled_request
-          , Some ("Received verified peer root and best tip", []) ))
+          , Some ("Received verified peer root and best tip", []) ) )
   in
   t.best_seen_transition <- peer_best_tip ;
   t.current_root <- peer_root ;
@@ -273,8 +273,8 @@ let download_snarked_ledger ~trust_system ~preferred_peers ~transition_graph
        (sync_ledger t ~preferred:preferred_peers ~root_sync_ledger
           ~transition_graph ~sync_ledger_reader ) ;
      (* We ignore the resulting ledger returned here since it will always
-        * be the same as the ledger we started with because we are syncing
-        * a db ledger. *)
+      * be the same as the ledger we started with because we are syncing
+      * a db ledger. *)
      let%map _, data = Sync_ledger.Root.valid_tree root_sync_ledger in
      Sync_ledger.Root.destroy root_sync_ledger ;
      data )
@@ -310,7 +310,7 @@ let handle_scan_state_and_aux ~logger ~expected_staged_ledger_hash
           |> Mina_block.Validation.validate_staged_ledger_hash
                (`Staged_ledger_already_materialized received_staged_ledger_hash)
           |> Result.map_error ~f:(fun _ ->
-                 Error.of_string "received faulty scan state from peer" )
+              Error.of_string "received faulty scan state from peer" )
           |> Deferred.return
         in
         let protocol_states =
@@ -329,7 +329,7 @@ let handle_scan_state_and_aux ~logger ~expected_staged_ledger_hash
         let protocol_states_map =
           protocol_states
           |> List.map ~f:(fun ps ->
-                 (State_hash.With_state_hashes.state_hash ps, ps) )
+              (State_hash.With_state_hashes.state_hash ps, ps) )
           |> State_hash.Map.of_alist_exn
         in
         let get_state hash =
@@ -362,37 +362,38 @@ let handle_scan_state_and_aux ~logger ~expected_staged_ledger_hash
         let%map staged_ledger_construction_time, construction_result =
           time_deferred
             (let open Deferred.Let_syntax in
-            let temp_mask = Root_ledger.as_masked temp_snarked_ledger in
-            (* [of_scan_state_pending_coinbases_and_snarked_ledger] is called here
-             * to verify the scan state we received. We ignore the resulting staged
-             * ledger (from [temp_mask]). Later we call [Transition_frontier.load]
-             * which will indirectly invoke
-             * [of_scan_state_pending_coinbases_and_snarked_ledger_unchecked]
-             * repeating the same computation (except for proof verification
-             * which is skipped). Chain of calls:
-             * [Transition_frontier.load] -> .. -> [load_from_persistence_and_start]
-             * -> [load_full_frontier] -> [construct_staged_ledger_at_root] ->
-             * -> [of_scan_state_pending_coinbases_and_snarked_ledger_unchecked]
-             *)
-            let%map result =
-              Staged_ledger.of_scan_state_pending_coinbases_and_snarked_ledger
-                ~logger
-                ~snarked_local_state:
-                  Mina_block.(
-                    t.current_root |> Validation.block |> header
-                    |> Header.protocol_state |> Protocol_state.blockchain_state
-                    |> Blockchain_state.snarked_local_state)
-                ~verifier ~constraint_constants ~scan_state
-                ~snarked_ledger:temp_mask ~expected_merkle_root
-                ~pending_coinbases ~get_state ~signature_kind
-            in
-            ignore
-              ( Ledger.Maskable.unregister_mask_exn ~loc:__LOC__ temp_mask
-                : Ledger.unattached_mask ) ;
-            Result.map result
-              ~f:
-                (const
-                   (scan_state, pending_coinbases, new_root, protocol_states) ))
+             let temp_mask = Root_ledger.as_masked temp_snarked_ledger in
+             (* [of_scan_state_pending_coinbases_and_snarked_ledger] is called here
+              * to verify the scan state we received. We ignore the resulting staged
+              * ledger (from [temp_mask]). Later we call [Transition_frontier.load]
+              * which will indirectly invoke
+              * [of_scan_state_pending_coinbases_and_snarked_ledger_unchecked]
+              * repeating the same computation (except for proof verification
+              * which is skipped). Chain of calls:
+              * [Transition_frontier.load] -> .. -> [load_from_persistence_and_start]
+              * -> [load_full_frontier] -> [construct_staged_ledger_at_root] ->
+              * -> [of_scan_state_pending_coinbases_and_snarked_ledger_unchecked]
+              *)
+             let%map result =
+               Staged_ledger.of_scan_state_pending_coinbases_and_snarked_ledger
+                 ~logger
+                 ~snarked_local_state:
+                   Mina_block.(
+                     t.current_root |> Validation.block |> header
+                     |> Header.protocol_state |> Protocol_state.blockchain_state
+                     |> Blockchain_state.snarked_local_state )
+                 ~verifier ~constraint_constants ~scan_state
+                 ~snarked_ledger:temp_mask ~expected_merkle_root
+                 ~pending_coinbases ~get_state ~signature_kind
+             in
+             ignore
+               ( Ledger.Maskable.unregister_mask_exn ~loc:__LOC__ temp_mask
+                 : Ledger.unattached_mask ) ;
+             Result.map result
+               ~f:
+                 (const
+                    (scan_state, pending_coinbases, new_root, protocol_states) )
+            )
         in
         Ok (staged_ledger_construction_time, construction_result) )
   in
@@ -449,15 +450,16 @@ let run_cycle ~context:(module Context : CONTEXT) ~trust_system ~verifier
   in
   Mina_metrics.(
     Counter.inc Bootstrap.root_snarked_ledger_sync_ms
-      Time.Span.(to_ms sync_ledger_time)) ;
+      Time.Span.(to_ms sync_ledger_time) ) ;
   Mina_metrics.(
     Gauge.set Bootstrap.num_of_root_snarked_ledger_retargeted
-      (Float.of_int t.num_of_root_snarked_ledger_retargeted)) ;
+      (Float.of_int t.num_of_root_snarked_ledger_retargeted) ) ;
   (* step 2. Download scan state and pending coinbases. *)
-  let%bind ( staged_ledger_data_download_time
-           , (staged_ledger_construction_time, staged_ledger_aux_result) ) =
-    let%bind ( staged_ledger_data_download_time
-             , staged_ledger_data_download_result ) =
+  let%bind
+      ( staged_ledger_data_download_time
+      , (staged_ledger_construction_time, staged_ledger_aux_result) ) =
+    let%bind
+        staged_ledger_data_download_time, staged_ledger_data_download_result =
       time_deferred
         (Mina_networking.get_staged_ledger_aux_and_pending_coinbases_at_hash
            t.network sender.peer_id hash )
@@ -485,7 +487,7 @@ let run_cycle ~context:(module Context : CONTEXT) ~trust_system ~verifier
               , Some
                   ( "Can't find scan state from the peer or received faulty \
                      scan state from the peer."
-                  , [] ) ))
+                  , [] ) ) )
       in
       [%log error]
         ~metadata:
@@ -512,7 +514,7 @@ let run_cycle ~context:(module Context : CONTEXT) ~trust_system ~verifier
           record t.trust_system logger sender
             Actions.
               ( Fulfilled_request
-              , Some ("Received valid scan state from peer", []) ))
+              , Some ("Received valid scan state from peer", []) ) )
       in
       let best_seen_block_with_hash, _ = t.best_seen_transition in
       let consensus_state =
@@ -521,8 +523,9 @@ let run_cycle ~context:(module Context : CONTEXT) ~trust_system ~verifier
         |> Protocol_state.consensus_state
       in
       (* step 4. Synchronize consensus local state if necessary *)
-      let%bind ( local_state_sync_time
-               , (local_state_sync_required, local_state_sync_result) ) =
+      let%bind
+          ( local_state_sync_time
+          , (local_state_sync_required, local_state_sync_result) ) =
         time_deferred
           ( match
               Consensus.Hooks.required_local_state_sync
@@ -585,7 +588,7 @@ let run_cycle ~context:(module Context : CONTEXT) ~trust_system ~verifier
           Transition_frontier.Persistent_root.(
             set_root_state_hash persistent_root
             @@ Mina_block.Validated.state_hash
-            @@ Mina_block.Validated.lift new_root) ;
+            @@ Mina_block.Validated.lift new_root ) ;
           let%map new_frontier =
             let fail msg =
               failwith
@@ -620,7 +623,7 @@ let run_cycle ~context:(module Context : CONTEXT) ~trust_system ~verifier
           in
           let root_consensus_state =
             Transition_frontier.(
-              Breadcrumb.consensus_state_with_hashes (root new_frontier))
+              Breadcrumb.consensus_state_with_hashes (root new_frontier) )
           in
           let filtered_collected_transitions =
             List.filter collected_transitions
@@ -703,7 +706,7 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
       ] ;
   Mina_metrics.(
     Gauge.set Bootstrap.bootstrap_time_ms
-      Core.Time_float.(Span.to_ms @@ time_elapsed)) ;
+      Core.Time_float.(Span.to_ms @@ time_elapsed) ) ;
   result
 
 let%test_module "Bootstrap_controller tests" =
@@ -801,34 +804,35 @@ let%test_module "Bootstrap_controller tests" =
       ; num_of_root_snarked_ledger_retargeted = 0
       }
 
-    let%test_unit "Bootstrap controller caches all transitions it is passed \
-                   through the transition_reader" =
+    let%test_unit
+        "Bootstrap controller caches all transitions it is passed through the \
+         transition_reader" =
       let branch_size = (max_frontier_length * 2) + 2 in
       Quickcheck.test ~trials:1
         (let open Quickcheck.Generator.Let_syntax in
-        (* we only need one node for this test, but we need more than one peer so that mina_networking does not throw an error *)
-        let%bind fake_network =
-          Fake_network.Generator.(
-            gen ~precomputed_values ~verifier ~max_frontier_length
-              ~ledger_sync_config [ fresh_peer; fresh_peer ])
-        in
-        let%map make_branch =
-          Transition_frontier.Breadcrumb.For_tests.gen_seq ~precomputed_values
-            ~verifier
-            ~accounts_with_secret_keys:(Lazy.force Genesis_ledger.accounts)
-            branch_size
-        in
-        let [ me; _ ] = fake_network.peer_networks in
-        let branch =
-          Async.Thread_safe.block_on_async_exn (fun () ->
-              make_branch (Transition_frontier.root me.state.frontier) )
-        in
-        (fake_network, branch))
+         (* we only need one node for this test, but we need more than one peer so that mina_networking does not throw an error *)
+         let%bind fake_network =
+           Fake_network.Generator.(
+             gen ~precomputed_values ~verifier ~max_frontier_length
+               ~ledger_sync_config [ fresh_peer; fresh_peer ] )
+         in
+         let%map make_branch =
+           Transition_frontier.Breadcrumb.For_tests.gen_seq ~precomputed_values
+             ~verifier
+             ~accounts_with_secret_keys:(Lazy.force Genesis_ledger.accounts)
+             branch_size
+         in
+         let [ me; _ ] = fake_network.peer_networks in
+         let branch =
+           Async.Thread_safe.block_on_async_exn (fun () ->
+               make_branch (Transition_frontier.root me.state.frontier) )
+         in
+         (fake_network, branch) )
         ~f:(fun (fake_network, branch) ->
           let [ me; other ] = fake_network.peer_networks in
           let genesis_root =
             Transition_frontier.(
-              Breadcrumb.validated_transition @@ root me.state.frontier)
+              Breadcrumb.validated_transition @@ root me.state.frontier )
             |> Mina_block.Validated.remember
           in
           let transition_graph = Transition_cache.create () in
@@ -871,7 +875,7 @@ let%test_module "Bootstrap_controller tests" =
           let saved_transitions =
             Transition_cache.data transition_graph
             |> List.map ~f:(fun (x, _) ->
-                   Transition_cache.header_with_hash @@ Envelope.Incoming.data x )
+                Transition_cache.header_with_hash @@ Envelope.Incoming.data x )
           in
           let module E = struct
             module T = struct
@@ -898,7 +902,7 @@ let%test_module "Bootstrap_controller tests" =
       in
       let initial_root_transition =
         Transition_frontier.(
-          Breadcrumb.validated_transition (root my_net.state.frontier))
+          Breadcrumb.validated_transition (root my_net.state.frontier) )
       in
       let%bind () =
         Transition_frontier.close ~loc:__LOC__ my_net.state.frontier
@@ -949,7 +953,7 @@ let%test_module "Bootstrap_controller tests" =
             [ fresh_peer
             ; peer_with_branch
                 ~frontier_branch_size:((max_frontier_length * 2) + 2)
-            ])
+            ] )
         ~f:(fun fake_network ->
           let [ my_net; peer_net ] = fake_network.peer_networks in
           let block =
@@ -984,8 +988,8 @@ let%test_module "Bootstrap_controller tests" =
               @@ Transition_frontier.root_snarked_ledger peer_net.state.frontier
               ) )
 
-    let%test_unit "reconstruct staged_ledgers using \
-                   of_scan_state_and_snarked_ledger" =
+    let%test_unit
+        "reconstruct staged_ledgers using of_scan_state_and_snarked_ledger" =
       Quickcheck.test ~trials:1
         (Transition_frontier.For_tests.gen ~precomputed_values ~verifier
            ~max_length:max_frontier_length ~size:max_frontier_length () )
@@ -993,8 +997,7 @@ let%test_module "Bootstrap_controller tests" =
           Thread_safe.block_on_async_exn
           @@ fun () ->
           Deferred.List.iter ~how:`Sequential
-            (Transition_frontier.all_breadcrumbs frontier)
-            ~f:(fun breadcrumb ->
+            (Transition_frontier.all_breadcrumbs frontier) ~f:(fun breadcrumb ->
               let staged_ledger =
                 Transition_frontier.Breadcrumb.staged_ledger breadcrumb
               in

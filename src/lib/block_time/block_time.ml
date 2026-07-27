@@ -256,8 +256,9 @@ module Make_str (_ : Wire_types.Concrete) = struct
       let%map int64_time_span = Int64.(gen_incl zero max_value) in
       of_span_since_epoch @@ Span.of_ms int64_time_span
 
-    let%test "to_string_exn is total and round-trips through of_string_exn \
-              across the full uint64 range" =
+    let%test
+        "to_string_exn is total and round-trips through of_string_exn across \
+         the full uint64 range" =
       List.for_all
         [ zero
         ; of_uint64 (UInt64.of_int 1_000)

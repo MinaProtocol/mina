@@ -154,7 +154,7 @@ let test_empty_update () =
               (Account.create account_id
                  Currency.Balance.(
                    Option.value_exn
-                     (add_amount zero (Currency.Amount.of_nanomina_int_exn 500))) )
+                     (add_amount zero (Currency.Amount.of_nanomina_int_exn 500)) ) )
           in
           check_zkapp_command_with_merges_exn ledger [ zkapp_command ] ) )
 

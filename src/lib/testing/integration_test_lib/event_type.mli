@@ -156,16 +156,16 @@ type 'a t =
   | Log_error : Log_error.t t
   | Node_initialization : Node_initialization.t t
   | Node_offline : Node_offline.t t
-  | Transition_frontier_diff_application
-      : Transition_frontier_diff_application.t t
+  | Transition_frontier_diff_application :
+      Transition_frontier_diff_application.t t
   | Block_produced : Block_produced.t t
   | Breadcrumb_added : Breadcrumb_added.t t
   | Block_gossip : Gossip.Block.t t
   | Snark_work_gossip : Gossip.Snark_work.t t
   | Transactions_gossip : Gossip.Transactions.t t
   | Snark_work_failed : Snark_work_failed.t t
-  | Transition_frontier_loaded_from_persistence
-      : Transition_frontier_loaded_from_persistence.t t
+  | Transition_frontier_loaded_from_persistence :
+      Transition_frontier_loaded_from_persistence.t t
   | Persisted_frontier_loaded : Persisted_frontier_loaded.t t
   | Persisted_frontier_fresh_boot : Persisted_frontier_fresh_boot.t t
   | Persisted_frontier_dropped : Persisted_frontier_dropped.t t

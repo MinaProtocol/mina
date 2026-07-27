@@ -6,13 +6,13 @@ module Encoders = Mina_graphql.Types.Input
 module Scalars = Graphql_lib.Scalars
 
 module Send_proof_mutation =
-[%graphql
-({|
+  [%graphql
+  ({|
   mutation ($input: ProofBundleInput!) @encoders(module: "Encoders"){
     sendProofBundle(input: $input)
     }
   |}
-[@encoders Encoders] )]
+  [@encoders Encoders] )]
 
 let submit_graphql input graphql_endpoint =
   let obj = Send_proof_mutation.(make @@ makeVariables ~input ()) in
@@ -43,13 +43,13 @@ let perform (s : Impl.Worker_state.t) ~fee ~public_key
       ( proof
       , (time, match w with Transition _ -> `Transition | Merge _ -> `Merge) ) )
   |> Deferred.Or_error.map ~f:(fun proofs_and_time ->
-         { Snark_work_lib.Result.Without_metrics.proofs =
-             One_or_two.map proofs_and_time ~f:fst
-         ; statements =
-             One_or_two.map spec ~f:Snark_work_lib.Work.Single.Spec.statement
-         ; prover = public_key
-         ; fee
-         } )
+      { Snark_work_lib.Result.Without_metrics.proofs =
+          One_or_two.map proofs_and_time ~f:fst
+      ; statements =
+          One_or_two.map spec ~f:Snark_work_lib.Work.Single.Spec.statement
+      ; prover = public_key
+      ; fee
+      } )
 
 let command =
   let open Command.Let_syntax in

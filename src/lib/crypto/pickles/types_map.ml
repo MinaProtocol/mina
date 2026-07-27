@@ -248,24 +248,21 @@ let univ : t =
 let find t k =
   match Hashtbl.find t k with None -> failwith "key not found" | Some x -> x
 
-let lookup_compiled :
-    type var value n m.
+let lookup_compiled : type var value n m.
     (var, value, n, m) Tag.id -> (var, value, n, m) Compiled.t =
  fun t ->
   let (T (other_id, d)) = find univ.compiled (Type_equal.Id.uid t) in
   let T = Type_equal.Id.same_witness_exn t other_id in
   d
 
-let lookup_side_loaded :
-    type var value n m.
+let lookup_side_loaded : type var value n m.
     (var, value, n, m) Tag.id -> (var, value, n) Side_loaded.t =
  fun t ->
   let (T (other_id, d)) = find univ.side_loaded (Type_equal.Id.uid t) in
   let T = Type_equal.Id.same_witness_exn t other_id in
   d
 
-let lookup_basic :
-    type var value n m.
+let lookup_basic : type var value n m.
     (var, value, n, m) Tag.t -> (var, value, n) Basic.t Promise.t =
  fun t ->
   match t.kind with
@@ -274,8 +271,8 @@ let lookup_basic :
   | Side_loaded ->
       Promise.return @@ Side_loaded.to_basic (lookup_side_loaded t.id)
 
-let max_proofs_verified :
-    type n1. (_, _, n1, _) Tag.t -> (module Nat.Add.Intf with type n = n1) =
+let max_proofs_verified : type n1.
+    (_, _, n1, _) Tag.t -> (module Nat.Add.Intf with type n = n1) =
  fun tag ->
   match tag.kind with
   | Compiled ->
@@ -283,8 +280,8 @@ let max_proofs_verified :
   | Side_loaded ->
       (lookup_side_loaded tag.id).permanent.max_proofs_verified
 
-let public_input :
-    type var value. (var, value, _, _) Tag.t -> (var, value) Impls.Step.Typ.t =
+let public_input : type var value.
+    (var, value, _, _) Tag.t -> (var, value) Impls.Step.Typ.t =
  fun tag ->
   match tag.kind with
   | Compiled ->
@@ -292,8 +289,7 @@ let public_input :
   | Side_loaded ->
       (lookup_side_loaded tag.id).permanent.public_input
 
-let feature_flags :
-    type var value.
+let feature_flags : type var value.
     (var, value, _, _) Tag.t -> Opt.Flag.t Plonk_types.Features.Full.t =
  fun tag ->
   match tag.kind with

@@ -3,19 +3,19 @@ open Core
 let json =
   Command.Param.(
     flag "--json" ~aliases:[ "json" ] no_arg
-      ~doc:"Use JSON output (default: plaintext)")
+      ~doc:"Use JSON output (default: plaintext)" )
 
 let plaintext =
   Command.Param.(
     flag "--plaintext" ~aliases:[ "plaintext" ] no_arg
-      ~doc:"Use plaintext input or output (default: JSON)")
+      ~doc:"Use plaintext input or output (default: JSON)" )
 
 let performance =
   Command.Param.(
     flag "--performance" ~aliases:[ "performance" ] no_arg
       ~doc:
         "Include performance histograms in status output (default: don't \
-         include)")
+         include)" )
 
 let privkey_write_path =
   let open Command.Param in
@@ -183,7 +183,8 @@ module Host = struct
   let localhost = lazy (Core_unix.Host.getbyname_exn "localhost")
 
   let is_localhost host =
-    Option.value_map ~default:false (Core_unix.Host.getbyname host) ~f:(fun host ->
+    Option.value_map ~default:false (Core_unix.Host.getbyname host)
+      ~f:(fun host ->
         Core_unix.Host.have_address_in_common host (Lazy.force localhost) )
 end
 

@@ -936,9 +936,8 @@ module Make (Rpc_interface : RPC_INTERFACE) :
               ~rpc_name:Impl.name t peer transport
               (fun conn qs ->
                 Deferred.Or_error.List.map
-                  ~how:(Option.value ~default:`Sequential how)
-                  qs
-                  ~f:(fun q -> Impl.dispatch_multi conn q) )
+                  ~how:(Option.value ~default:`Sequential how) qs ~f:(fun q ->
+                    Impl.dispatch_multi conn q ) )
               qs
           in
           cleanup ~reason:`Handler_done ;

@@ -54,7 +54,7 @@ module Status = struct
     List.fold msgs
       ~init:
         (Printf.sprintf "\n\tTotal: %d (overflow:%d) (underflow:%d)\n\t" total
-           overflow underflow ) ~f:(fun acc x -> acc ^ "\n\t" ^ x)
+           overflow underflow ) ~f:(fun acc x -> acc ^ "\n\t" ^ x )
     ^ "\n\t..."
 
   module Rpc_timings = struct
@@ -166,8 +166,7 @@ module Status = struct
             | None ->
                 acc
             | Some report ->
-                ("Snark Worker Merge (hist.)", summarize_report report) :: acc
-            )
+                ("Snark Worker Merge (hist.)", summarize_report report) :: acc )
       in
       digest_entries ~title:"Performance Histograms" entries
   end

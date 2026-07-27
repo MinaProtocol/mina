@@ -107,34 +107,36 @@ let () =
     let constraint_constants = G.constraint_constants in
     Command_unix.run
       (let open Let_syntax in
-      async ~summary:"Write blocks to an archive database"
-        (let%map archive_uri =
-           Param.flag "--archive-uri" ~aliases:[ "archive-uri" ]
-             ~doc:
-               "URI URI for connecting to the archive database (e.g., \
-                postgres://$USER@localhost:5432/archiver)"
-             Param.(required string)
-         and precomputed =
-           Param.(flag "--precomputed" ~aliases:[ "precomputed" ] no_arg)
-             ~doc:"Blocks are in precomputed format"
-         and extensional =
-           Param.(flag "--extensional" ~aliases:[ "extensional" ] no_arg)
-             ~doc:"Blocks are in extensional format"
-         and success_file =
-           Param.flag "--successful-files" ~aliases:[ "successful-files" ]
-             ~doc:
-               "PATH Appends the list of files that were processed successfully"
-             (Flag.optional Param.string)
-         and failure_file =
-           Param.flag "--failed-files" ~aliases:[ "failed-files" ]
-             ~doc:"PATH Appends the list of files that failed to be processed"
-             (Flag.optional Param.string)
-         and log_successes =
-           Param.flag "--log-successful" ~aliases:[ "log-successful" ]
-             ~doc:
-               "true/false Whether to log messages for files that were \
-                processed successfully"
-             (Flag.optional_with_default true Param.bool)
-         and files = Param.anon Anons.(sequence ("FILES" %: Param.string)) in
-         main ~genesis_constants ~constraint_constants ~archive_uri ~precomputed
-           ~extensional ~success_file ~failure_file ~log_successes ~files )))
+       async ~summary:"Write blocks to an archive database"
+         (let%map archive_uri =
+            Param.flag "--archive-uri" ~aliases:[ "archive-uri" ]
+              ~doc:
+                "URI URI for connecting to the archive database (e.g., \
+                 postgres://$USER@localhost:5432/archiver)"
+              Param.(required string)
+          and precomputed =
+            Param.(flag "--precomputed" ~aliases:[ "precomputed" ] no_arg)
+              ~doc:"Blocks are in precomputed format"
+          and extensional =
+            Param.(flag "--extensional" ~aliases:[ "extensional" ] no_arg)
+              ~doc:"Blocks are in extensional format"
+          and success_file =
+            Param.flag "--successful-files" ~aliases:[ "successful-files" ]
+              ~doc:
+                "PATH Appends the list of files that were processed \
+                 successfully"
+              (Flag.optional Param.string)
+          and failure_file =
+            Param.flag "--failed-files" ~aliases:[ "failed-files" ]
+              ~doc:"PATH Appends the list of files that failed to be processed"
+              (Flag.optional Param.string)
+          and log_successes =
+            Param.flag "--log-successful" ~aliases:[ "log-successful" ]
+              ~doc:
+                "true/false Whether to log messages for files that were \
+                 processed successfully"
+              (Flag.optional_with_default true Param.bool)
+          and files = Param.anon Anons.(sequence ("FILES" %: Param.string)) in
+          main ~genesis_constants ~constraint_constants ~archive_uri
+            ~precomputed ~extensional ~success_file ~failure_file ~log_successes
+            ~files ) ) )

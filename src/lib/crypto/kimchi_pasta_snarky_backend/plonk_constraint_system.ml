@@ -891,8 +891,7 @@ let finalize_fixed_lookup_tables sys =
   match sys.fixed_lookup_tables with
   | Unfinalized_fixed_lookup_tables_rev fixed_lt_rev ->
       sys.fixed_lookup_tables <-
-        Compiled_fixed_lookup_tables
-          (Core.Array.of_list_rev fixed_lt_rev)
+        Compiled_fixed_lookup_tables (Core.Array.of_list_rev fixed_lt_rev)
   | Compiled_fixed_lookup_tables _ ->
       failwith "Fixed lookup tables have already been finalized"
 

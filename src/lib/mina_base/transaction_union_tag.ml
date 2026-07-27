@@ -147,8 +147,7 @@ module Unpacked = struct
           let add_if_true bit acc =
             if bit then Field.Var.add acc (bool_var :> Field.Var.t) else acc
           in
-          (add_if_true bit1 acc1, add_if_true bit2 acc2, add_if_true bit3 acc3)
-          )
+          (add_if_true bit1 acc1, add_if_true bit2 acc2, add_if_true bit3 acc3) )
     in
     Boolean.Unsafe.(of_cvar b1, of_cvar b2, of_cvar b3)
 
@@ -162,7 +161,8 @@ module Unpacked = struct
                  ; is_fee_transfer
                  ; is_coinbase
                  ; is_user_command
-                 } as t ) ->
+                 } as t )
+          ->
             let open Checked.Let_syntax in
             let%bind () = base_typ.check t in
             let%bind () =

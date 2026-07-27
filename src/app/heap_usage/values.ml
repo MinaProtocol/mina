@@ -95,7 +95,7 @@ let mk_scan_state_base_node
         | Fee_transfer ft ->
             let fee_transfer = ft.fee_transfer.data in
             List.map (Mina_base.Fee_transfer.receivers fee_transfer)
-              ~f:(fun acct_id -> (acct_id, `Accessed))
+              ~f:(fun acct_id -> (acct_id, `Accessed) )
         | Coinbase cb ->
             let coinbase = cb.coinbase.data in
             Mina_base.Coinbase.account_access_statuses coinbase applied
@@ -208,11 +208,11 @@ let scan_state_base_node_zkapp ~constraint_constants ~zkapp_command =
         let accessed =
           Mina_base.Zkapp_command.account_access_statuses zkapp_command applied
           |> List.filter_map ~f:(fun (acct_id, accessed) ->
-                 match accessed with
-                 | `Accessed ->
-                     Some acct_id
-                 | `Not_accessed ->
-                     None )
+              match accessed with
+              | `Accessed ->
+                  Some acct_id
+              | `Not_accessed ->
+                  None )
         in
         List.map accessed ~f:(fun acct_id -> (acct_id, Some account))
       in

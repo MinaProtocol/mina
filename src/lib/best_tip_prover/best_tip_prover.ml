@@ -52,7 +52,7 @@ module Make (Inputs : Inputs_intf) :
     let root_state_hash = Frontier_base.Breadcrumb.state_hash root in
     let root_is_genesis =
       State_hash.(
-        root_state_hash = Transition_frontier.genesis_state_hash frontier)
+        root_state_hash = Transition_frontier.genesis_state_hash frontier )
     in
     let%map () =
       Option.some_if

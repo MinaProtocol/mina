@@ -314,7 +314,7 @@ module Auth_required = struct
         =
       if_
         Pickles.Impls.Step.Boolean.(
-          (not signature_sufficient) && not signature_is_constant)
+          (not signature_sufficient) && not signature_is_constant )
         ~then_:(constant Signature) ~else_:t
   end
 

@@ -280,22 +280,22 @@ let close_protocol ?(reset_existing_streams = false) t ~protocol =
       (Libp2p_ipc.Rpcs.RemoveStreamHandler.create_request ~protocol)
   in
   ( if reset_existing_streams then
-    let streams_to_reset =
-      Hashtbl.data t.streams
-      |> List.filter ~f:(fun stream ->
-             String.equal (Libp2p_stream.protocol stream) protocol )
-    in
-    List.iter streams_to_reset ~f:(fun stream ->
-        don't_wait_for
-          (* TODO: this probably needs to be more thorough than a reset. Also force the write pipe closed? *)
-          ( match%map Libp2p_stream.reset ~helper:t.helper stream with
-          | Ok () ->
-              ()
-          | Error e ->
-              [%log' error t.logger]
-                "failed to reset stream while closing protocol: $error"
-                ~metadata:[ ("error", `String (Error.to_string_hum e)) ] ) ;
-        Libp2p_stream.release_buffers stream ~reason:`Shutdown_or_release ) ) ;
+      let streams_to_reset =
+        Hashtbl.data t.streams
+        |> List.filter ~f:(fun stream ->
+            String.equal (Libp2p_stream.protocol stream) protocol )
+      in
+      List.iter streams_to_reset ~f:(fun stream ->
+          don't_wait_for
+            (* TODO: this probably needs to be more thorough than a reset. Also force the write pipe closed? *)
+            ( match%map Libp2p_stream.reset ~helper:t.helper stream with
+            | Ok () ->
+                ()
+            | Error e ->
+                [%log' error t.logger]
+                  "failed to reset stream while closing protocol: $error"
+                  ~metadata:[ ("error", `String (Error.to_string_hum e)) ] ) ;
+          Libp2p_stream.release_buffers stream ~reason:`Shutdown_or_release ) ) ;
   match result with
   | Ok _ ->
       Hashtbl.remove t.protocol_handlers protocol

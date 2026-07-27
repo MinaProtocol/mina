@@ -1,7 +1,6 @@
 open Core
 open Snark_params
 open Unsigned
-
 module T = Mina_numbers.Nat.Make32 ()
 
 include (T : module type of T with module Checked := T.Checked)

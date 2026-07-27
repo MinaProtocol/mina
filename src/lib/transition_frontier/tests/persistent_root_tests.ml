@@ -3,8 +3,8 @@ open Core
 
 let%test_module "Persistent_root tests" =
   ( module struct
-    let%test_unit "potential_snarked_ledgers to_yojson and of_yojson are \
-                   inverses" =
+    let%test_unit
+        "potential_snarked_ledgers to_yojson and of_yojson are inverses" =
       Quickcheck.test ~trials:10
         (Quickcheck.Generator.list_non_empty String.quickcheck_generator)
         ~f:(fun directory_names ->

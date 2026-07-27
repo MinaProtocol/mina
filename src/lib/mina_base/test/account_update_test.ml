@@ -16,37 +16,37 @@ let update_json_roundtrip () =
   let open Zkapp_basic in
   Quickcheck.test ~trials:100
     (let open Quickcheck.Generator.Let_syntax in
-    let%bind i = Int.(gen_incl min_value max_value) in
-    let%bind delegate = Public_key.Compressed.gen in
-    let%bind auth_tag = Control.Tag.gen in
-    let%bind permissions = Permissions.gen ~auth_tag in
-    let%bind token = String.gen_with_length 6 Char.gen_uppercase in
-    let%bind timing = Timing_info.gen in
-    let%map voting_for = State_hash.gen in
-    let app_state =
-      Zkapp_state.V.init
-        ~f:
-          Zkapp_basic.Set_or_keep.(
-            fun n -> if n = 0 then Set (F.of_int i) else Keep)
-    in
-    let verification_key =
-      Set_or_keep.Set
-        (let data =
-           Pickles.Side_loaded.Verification_key.(
-             dummy |> to_base58_check |> of_base58_check_exn)
-         in
-         let hash = Zkapp_account.digest_vk data in
-         { With_hash.data; hash } )
-    in
-    { app_state
-    ; delegate = Set_or_keep.Set delegate
-    ; verification_key
-    ; permissions = Set_or_keep.Set permissions
-    ; zkapp_uri = Set_or_keep.Set "https://www.example.com"
-    ; token_symbol = Set_or_keep.Set token
-    ; timing = Set_or_keep.Set timing
-    ; voting_for = Set_or_keep.Set voting_for
-    })
+     let%bind i = Int.(gen_incl min_value max_value) in
+     let%bind delegate = Public_key.Compressed.gen in
+     let%bind auth_tag = Control.Tag.gen in
+     let%bind permissions = Permissions.gen ~auth_tag in
+     let%bind token = String.gen_with_length 6 Char.gen_uppercase in
+     let%bind timing = Timing_info.gen in
+     let%map voting_for = State_hash.gen in
+     let app_state =
+       Zkapp_state.V.init
+         ~f:
+           Zkapp_basic.Set_or_keep.(
+             fun n -> if n = 0 then Set (F.of_int i) else Keep )
+     in
+     let verification_key =
+       Set_or_keep.Set
+         (let data =
+            Pickles.Side_loaded.Verification_key.(
+              dummy |> to_base58_check |> of_base58_check_exn )
+          in
+          let hash = Zkapp_account.digest_vk data in
+          { With_hash.data; hash } )
+     in
+     { app_state
+     ; delegate = Set_or_keep.Set delegate
+     ; verification_key
+     ; permissions = Set_or_keep.Set permissions
+     ; zkapp_uri = Set_or_keep.Set "https://www.example.com"
+     ; token_symbol = Set_or_keep.Set token
+     ; timing = Set_or_keep.Set timing
+     ; voting_for = Set_or_keep.Set voting_for
+     } )
     ~f:(fun update ->
       let module Fd = Fields_derivers_zkapps.Derivers in
       let full = deriver (Fd.o ()) in

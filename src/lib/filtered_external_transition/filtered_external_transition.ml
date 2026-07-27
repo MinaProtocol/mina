@@ -113,7 +113,9 @@ let participant_pks
     List.fold fee_transfers ~init:empty ~f:(fun set (ft, _) ->
         Set.add set ft.receiver_pk )
   in
-  Set.add (Set.add (Set.union user_command_set fee_transfer_participants) creator) winner
+  Set.add
+    (Set.add (Set.union user_command_set fee_transfer_participants) creator)
+    winner
 
 let commands { transactions = { Transactions.Stable.Latest.commands; _ }; _ } =
   commands
@@ -167,8 +169,7 @@ let of_transition block tracked_participants
           let should_include_transaction command participants =
             List.exists (User_command.accounts_referenced command)
               ~f:(fun account_id ->
-                Set.mem participants
-                  (Account_id.public_key account_id) )
+                Set.mem participants (Account_id.public_key account_id) )
           in
           match tracked_participants with
           | `Some interested_participants

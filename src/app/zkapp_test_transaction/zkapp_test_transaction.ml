@@ -49,7 +49,7 @@ module Flags = struct
         Param.flag "--debug" Param.no_arg
           ~doc:"Debug mode, generates transaction snark"
       in
-      (keyfile, fee, nonce, memo, debug))
+      (keyfile, fee, nonce, memo, debug) )
 end
 
 let create_zkapp_account =
@@ -90,7 +90,7 @@ let create_zkapp_account =
        if Currency.Amount.(equal amount zero) then
          failwith "Receiver amount must be greater than 0" ;
        create_command ~debug ~sender ~sender_nonce ~fee ~fee_payer
-         ~fee_payer_nonce ~zkapp_keyfile ~amount ~memo ))
+         ~fee_payer_nonce ~zkapp_keyfile ~amount ~memo ) )
 
 let upgrade_zkapp =
   let create_command ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
@@ -141,7 +141,7 @@ let upgrade_zkapp =
        let zkapp_uri = Zkapp_basic.Set_or_keep.of_option zkapp_uri_str in
        create_command ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
          ~verification_key ~zkapp_uri ~auth ~constraint_constants
-         ~genesis_constants ))
+         ~genesis_constants ) )
 
 let transfer_funds_one_receiver =
   let create_command ~debug ~sender ~sender_nonce ~fee ~fee_payer
@@ -188,7 +188,7 @@ let transfer_funds_one_receiver =
        let genesis_constants = G.genesis_constants in
        create_command ~debug ~sender ~sender_nonce ~fee ~fee_payer
          ~fee_payer_nonce ~memo ~receiver ~amount ~genesis_constants
-         ~constraint_constants ))
+         ~constraint_constants ) )
 
 let transfer_funds =
   let create_command ~debug ~sender ~sender_nonce ~fee ~fee_payer
@@ -273,7 +273,7 @@ let transfer_funds =
        let genesis_constants = G.genesis_constants in
        create_command ~debug ~sender ~sender_nonce ~fee ~fee_payer
          ~fee_payer_nonce ~memo ~receivers ~genesis_constants
-         ~constraint_constants ))
+         ~constraint_constants ) )
 
 let update_state =
   let create_command ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile ~app_state
@@ -314,7 +314,7 @@ let update_state =
            (sprintf "Fee must at least be %s"
               (Currency.Fee.to_mina_string Flags.min_fee) ) ;
        create_command ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
-         ~app_state ~genesis_constants ~constraint_constants ))
+         ~app_state ~genesis_constants ~constraint_constants ) )
 
 let update_zkapp_uri =
   let create_command ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile ~zkapp_uri
@@ -358,7 +358,7 @@ let update_zkapp_uri =
        let genesis_constants = G.genesis_constants in
        let constraint_constants = G.constraint_constants in
        create_command ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
-         ~zkapp_uri ~auth ~genesis_constants ~constraint_constants ))
+         ~zkapp_uri ~auth ~genesis_constants ~constraint_constants ) )
 
 let update_action_state =
   let create_command ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
@@ -386,28 +386,28 @@ let update_action_state =
            Param.(
              required
                (Arg_type.comma_separated ~allow_empty:false
-                  ~strip_whitespace:true string ))
+                  ~strip_whitespace:true string ) )
        and action_state1 =
          Param.flag "--sequence-state1"
            ~doc:"String(hash)|Integer(field element) a list of elements"
            Param.(
              optional_with_default []
                (Arg_type.comma_separated ~allow_empty:false
-                  ~strip_whitespace:true string ))
+                  ~strip_whitespace:true string ) )
        and action_state2 =
          Param.flag "--sequence-state2"
            ~doc:"String(hash)|Integer(field element) a list of elements"
            Param.(
              optional_with_default []
                (Arg_type.comma_separated ~allow_empty:false
-                  ~strip_whitespace:true string ))
+                  ~strip_whitespace:true string ) )
        and action_state3 =
          Param.flag "--sequence-state3"
            ~doc:"String(hash)|Integer(field element) a list of elements"
            Param.(
              optional_with_default []
                (Arg_type.comma_separated ~allow_empty:false
-                  ~strip_whitespace:true string ))
+                  ~strip_whitespace:true string ) )
        in
        let fee = Option.value ~default:Flags.default_fee fee in
        let action_state =
@@ -424,7 +424,7 @@ let update_action_state =
            (sprintf "Fee must at least be %s"
               (Currency.Fee.to_mina_string Flags.min_fee) ) ;
        create_command ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
-         ~action_state ~genesis_constants ~constraint_constants ))
+         ~action_state ~genesis_constants ~constraint_constants ) )
 
 let update_token_symbol =
   let create_command ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
@@ -468,7 +468,7 @@ let update_token_symbol =
            (sprintf "Fee must at least be %s"
               (Currency.Fee.to_mina_string Flags.min_fee) ) ;
        create_command ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
-         ~token_symbol ~auth ~genesis_constants ~constraint_constants ))
+         ~token_symbol ~auth ~genesis_constants ~constraint_constants ) )
 
 let update_permissions =
   let create_command ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
@@ -569,7 +569,7 @@ let update_permissions =
               (Currency.Fee.to_mina_string Flags.min_fee) ) ;
        create_command ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
          ~genesis_constants ~constraint_constants ~snapp_update
-         ~current_auth:(Util.auth_of_string current_auth) ))
+         ~current_auth:(Util.auth_of_string current_auth) ) )
 
 let update_timings =
   let create_command ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
@@ -641,7 +641,7 @@ let update_timings =
               (Currency.Fee.to_mina_string Flags.min_fee) ) ;
        create_command ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
          ~snapp_update ~genesis_constants ~constraint_constants
-         ~current_auth:(Util.auth_of_string current_auth) ))
+         ~current_auth:(Util.auth_of_string current_auth) ) )
 
 let test_zkapp_with_genesis_ledger =
   Command.(
@@ -666,7 +666,7 @@ let test_zkapp_with_genesis_ledger =
              "PATH path to a configuration file consisting the genesis ledger"
            Param.(required string)
        in
-       test_zkapp_with_genesis_ledger_main keyfile zkapp_keyfile config_file ))
+       test_zkapp_with_genesis_ledger_main keyfile zkapp_keyfile config_file ) )
 
 let txn_commands =
   [ ("create-zkapp-account", create_zkapp_account)

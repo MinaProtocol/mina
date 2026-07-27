@@ -176,7 +176,7 @@ let test_zkapp_command ?expected_failure zkapp_command =
         Account.create account_id
           Currency.Balance.(
             Option.value_exn
-              (add_amount zero (Currency.Amount.of_nanomina_int_exn 500)))
+              (add_amount zero (Currency.Amount.of_nanomina_int_exn 500)) )
       in
       let _, loc =
         Ledger.get_or_create_account ledger account_id account

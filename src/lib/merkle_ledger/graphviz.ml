@@ -110,8 +110,8 @@ module Make (Inputs : Intf.Graphviz.I) :
     in
     let edges =
       List.folding_map edges ~init:(0, 0)
-        ~f:(fun (empty_account_counter, empty_hash_counter) { source; target }
-           ->
+        ~f:(fun
+            (empty_account_counter, empty_hash_counter) { source; target } ->
           let source = string_of_hash source in
           match target with
           | Hash target_hash ->

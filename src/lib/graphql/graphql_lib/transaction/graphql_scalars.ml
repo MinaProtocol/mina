@@ -40,7 +40,7 @@ let%test_module "Roundtrip tests" =
               ~constraint_constants:
                 Genesis_constants.For_unit_tests.Constraint_constants.t
             |> Quickcheck.Generator.map ~f:(fun (coinbase, _) ->
-                   hash_coinbase coinbase )
+                hash_coinbase coinbase )
         end
 
         include Make_test (TransactionHash) (TransactionHash_gen)

@@ -823,18 +823,16 @@ module type S = sig
 
     module Make_state_hooks
         (Blockchain_state : Blockchain_state)
-        (Protocol_state : Protocol_state
-                            with type blockchain_state :=
-                              Blockchain_state.Value.t
-                             and type blockchain_state_var :=
-                              Blockchain_state.var
-                             and type consensus_state := Consensus_state.Value.t
-                             and type consensus_state_var := Consensus_state.var)
-        (Snark_transition : Snark_transition
-                              with type blockchain_state_var :=
-                                Blockchain_state.var
-                               and type consensus_transition_var :=
-                                Consensus_transition.var) :
+        (Protocol_state :
+          Protocol_state
+            with type blockchain_state := Blockchain_state.Value.t
+             and type blockchain_state_var := Blockchain_state.var
+             and type consensus_state := Consensus_state.Value.t
+             and type consensus_state_var := Consensus_state.var)
+        (Snark_transition :
+          Snark_transition
+            with type blockchain_state_var := Blockchain_state.var
+             and type consensus_transition_var := Consensus_transition.var) :
       State_hooks
         with type blockchain_state := Blockchain_state.Value.t
          and type protocol_state := Protocol_state.Value.t

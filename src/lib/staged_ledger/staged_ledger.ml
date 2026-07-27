@@ -211,7 +211,10 @@ module T = struct
           (List.map proofs ~f:(fun (proof, _) -> proof))
       with
       | Ok b ->
-          let time_ms = Time_float.abs_diff (Time_float.now ()) start |> Time_float.Span.to_ms in
+          let time_ms =
+            Time_float.abs_diff (Time_float.now ()) start
+            |> Time_float.Span.to_ms
+          in
           [%log trace]
             ~metadata:
               [ ( "work_id"
@@ -256,18 +259,18 @@ module T = struct
     let%bind.Deferred.Result () =
       Deferred.return @@ Result.all_unit
       @@ List.map job_msg_proofs ~f:(fun (_, msg, proof) ->
-             if
-               Sok_message.Digest.equal
-                 (Ledger_proof.sok_digest proof)
-                 (Sok_message.digest msg)
-             then Ok ()
-             else
-               Error
-                 (Staged_ledger_error.Invalid_proofs
-                    ( proof_statement_msgs
-                    , Error.of_string
-                        "proof's sok message digest does not match the sok \
-                         message" ) ) )
+          if
+            Sok_message.Digest.equal
+              (Ledger_proof.sok_digest proof)
+              (Sok_message.digest msg)
+          then Ok ()
+          else
+            Error
+              (Staged_ledger_error.Invalid_proofs
+                 ( proof_statement_msgs
+                 , Error.of_string
+                     "proof's sok message digest does not match the sok message"
+                 ) ) )
     in
     match%map verify_proofs ~logger ~verifier proof_statement_msgs with
     | Ok (Ok ()) ->
@@ -291,8 +294,8 @@ module T = struct
     let verify ~verifier:{ logger; verifier } ts =
       verify_proofs ~logger ~verifier
         (List.map ts
-           ~f:(fun ({ data = proof; _ } : Scan_state.Ledger_proof_with_hash.t)
-              ->
+           ~f:(fun
+               ({ data = proof; _ } : Scan_state.Ledger_proof_with_hash.t) ->
              ( Ledger_proof.Cached.read_proof_from_disk proof
              , Ledger_proof.Cached.statement proof ) ) )
   end
@@ -1079,9 +1082,9 @@ module T = struct
     let transactions, works, commands_count, coinbases = pre_diff_info in
     let accounts_accessed =
       List.fold_left ~init:Account_id.Set.empty transactions ~f:(fun set txn ->
-          Set.
-            union set
-              (Account_id.Set.of_list (Transaction.accounts_referenced txn.With_status.data))  )
+          Set.union set
+            (Account_id.Set.of_list
+               (Transaction.accounts_referenced txn.With_status.data) ) )
       |> Set.to_list
     in
     Ledger.unsafe_preload_accounts_from_parent new_ledger accounts_accessed ;
@@ -1303,14 +1306,14 @@ module T = struct
           (* These blocks were already fully verified before persistence;
              skip signature/proof verification when loading from disk. *)
           fun cs ->
-           Deferred.Or_error.return
-             (Ok
-                (List.map cs ~f:(fun { With_status.data; _ } ->
-                     let (`If_this_is_used_it_should_have_a_comment_justifying_it
-                           v ) =
-                       User_command.to_valid_unsafe data
-                     in
-                     v ) ) )
+            Deferred.Or_error.return
+              (Ok
+                 (List.map cs ~f:(fun { With_status.data; _ } ->
+                      let (`If_this_is_used_it_should_have_a_comment_justifying_it
+                             v ) =
+                        User_command.to_valid_unsafe data
+                      in
+                      v ) ) )
       | _ ->
           Check_commands.check_commands t.ledger ~verifier
             ~transaction_pool_proxy
@@ -1656,8 +1659,7 @@ module T = struct
             User_command.(fee (forget_check t)) )
       in
       let prover_fee_others =
-Map.fold t.fee_transfers ~init:(Ok Fee.zero)
-          ~f:(fun ~key ~data fees ->
+        Map.fold t.fee_transfers ~init:(Ok Fee.zero) ~f:(fun ~key ~data fees ->
             let%bind others = fees in
             if Public_key.Compressed.equal t.receiver_pk key then Ok others
             else option "Fee overflow" (Fee.add others data) )
@@ -1689,12 +1691,10 @@ Map.fold t.fee_transfers ~init:(Ok Fee.zero)
             if Fee.(b > Fee.zero) then 1 else 0
       in
       let other_provers =
-Map.filter_keys t.fee_transfers
+        Map.filter_keys t.fee_transfers
           ~f:(Fn.compose not (Public_key.Compressed.equal t.receiver_pk))
       in
-      let total_fee_transfer_pks =
-Map.length other_provers + fee_for_self
-      in
+      let total_fee_transfer_pks = Map.length other_provers + fee_for_self in
       Sequence.length t.commands_rev
       + ((total_fee_transfer_pks + 1) / 2)
       + coinbase_added t
@@ -1752,8 +1752,7 @@ Map.length other_provers + fee_for_self
            fee_transfers map so that budget checks can be done *)
         let update_fee_transfers t (ft : Coinbase.Fee_transfer.t) coinbase =
           let updated_fee_transfers =
-Map.update t.fee_transfers ft.receiver_pk
-              ~f:(fun _ -> ft.fee )
+            Map.update t.fee_transfers ft.receiver_pk ~f:(fun _ -> ft.fee)
           in
           let new_t =
             { t with coinbase; fee_transfers = updated_fee_transfers }
@@ -2751,7 +2750,7 @@ let%test_module "staged ledger tests" =
       (*Add genesis state to the table*)
       let genesis, _ = dummy_state_and_view () in
       let state_hash = (Mina_state.Protocol_state.hashes genesis).state_hash in
-Hashtbl.add state_tbl ~key:state_hash ~data:genesis |> ignore ;
+      Hashtbl.add state_tbl ~key:state_hash ~data:genesis |> ignore ;
       let%map `Proof_count total_ledger_proofs, _ =
         iter_cmds_acc cmds cmd_iters
           (`Proof_count 0, `Slot global_slot)
@@ -2766,8 +2765,7 @@ Hashtbl.add state_tbl ~key:state_hash ~data:genesis |> ignore ;
             let state_hash =
               (Mina_state.Protocol_state.hashes current_state).state_hash
             in
-Hashtbl.add state_tbl ~key:state_hash ~data:current_state
-            |> ignore ;
+            Hashtbl.add state_tbl ~key:state_hash ~data:current_state |> ignore ;
             let%bind ledger_proof, diff =
               create_and_apply ~global_slot ~protocol_state_view:current_view
                 ~state_and_body_hash:
@@ -3370,8 +3368,7 @@ Hashtbl.add state_tbl ~key:state_hash ~data:current_state
                       List.map
                         ~f:(fun stmts ->
                           Transaction_snark_work.Checked.create_unsafe
-                            { fee; proofs = proofs ~fee ~prover stmts; prover }
-                          )
+                            { fee; proofs = proofs ~fee ~prover stmts; prover } )
                         work
                     in
                     let cmds_this_iter = cmds_this_iter |> Sequence.to_list in
@@ -4470,9 +4467,7 @@ Hashtbl.add state_tbl ~key:state_hash ~data:current_state
       in
       let%map kp =
         Quickcheck.Generator.filter Keypair.gen ~f:(fun kp ->
-            not
-              (Set.mem pks
-                 (Public_key.compress kp.public_key) ) )
+            not (Set.mem pks (Public_key.compress kp.public_key)) )
       and global_slot = Quickcheck.Generator.small_positive_int in
       (test_spec, kp, global_slot)
 

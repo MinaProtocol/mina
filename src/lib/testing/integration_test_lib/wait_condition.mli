@@ -3,9 +3,10 @@ open Core
 module Make
     (Engine : Intf.Engine.S)
     (Event_router : Intf.Dsl.Event_router_intf with module Engine := Engine)
-    (Network_state : Intf.Dsl.Network_state_intf
-                       with module Engine := Engine
-                        and module Event_router := Event_router) : sig
+    (Network_state :
+      Intf.Dsl.Network_state_intf
+        with module Engine := Engine
+         and module Event_router := Event_router) : sig
   type 'a predicate_result =
     | Predicate_passed
     | Predicate_continuation of 'a

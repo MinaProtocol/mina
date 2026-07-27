@@ -224,7 +224,7 @@ module Diff = struct
     match
       ( first_pre_diff.Pre_diff_two.coinbase
       , Option.value_map second_pre_diff_opt ~default:At_most_one.Zero
-          ~f:(fun d -> d.Pre_diff_one.coinbase) )
+          ~f:(fun d -> d.Pre_diff_one.coinbase ) )
     with
     | At_most_two.Zero, At_most_one.Zero ->
         Some Currency.Amount.zero
@@ -294,7 +294,7 @@ module Stable = struct
     let completed_works (t : t) =
       (fst t.diff).completed_works
       @ Option.value_map (snd t.diff) ~default:[] ~f:(fun d ->
-            d.completed_works )
+          d.completed_works )
   end
 end]
 
@@ -370,7 +370,7 @@ module With_valid_signatures = struct
     match
       ( first_pre_diff.coinbase
       , Option.value_map second_pre_diff_opt ~default:At_most_one.Zero
-          ~f:(fun d -> d.coinbase) )
+          ~f:(fun d -> d.coinbase ) )
     with
     | At_most_two.Zero, At_most_one.Zero ->
         Some Currency.Amount.zero

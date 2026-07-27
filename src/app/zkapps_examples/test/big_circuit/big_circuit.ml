@@ -149,7 +149,7 @@ let test_big_circuit () =
           (Account.create account_id
              Currency.Balance.(
                Option.value_exn
-                 (add_amount zero (Currency.Amount.of_nanomina_int_exn 500))) )
+                 (add_amount zero (Currency.Amount.of_nanomina_int_exn 500)) ) )
       in
 
       Async.Thread_safe.block_on_async_exn (fun _ ->

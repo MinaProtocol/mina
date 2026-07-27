@@ -159,7 +159,7 @@ module Queue_metrics = struct
         (Float.of_int max_bytes) ;
       Gauge.set
         (Network.stream_queue_bytes_sum ~protocol ~queue)
-        (Float.of_int sum_bytes))
+        (Float.of_int sum_bytes) )
 
   let recompute_gauges () =
     Hashtbl.iter_keys known_labels ~f:(fun key ->
@@ -271,7 +271,7 @@ module Queue_metrics = struct
           (Float.of_int messages) ;
         Counter.inc
           (Network.stream_queue_discarded_bytes ~protocol ~queue ~reason)
-          (Float.of_int bytes)) ;
+          (Float.of_int bytes) ) ;
       if messages > 0 || bytes > 0 then
         [%log' info entry.logger] "released queued libp2p stream data"
           ~metadata:

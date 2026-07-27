@@ -18,7 +18,7 @@ let test_step_circuit_behavior () =
   in
   let str_list =
     List.map (Lazy.force Impls.Step.Other_field.forbidden_shifted_values)
-      ~f:(fun (a, b) -> (Backend.Tick.Field.to_string a, b))
+      ~f:(fun (a, b) -> (Backend.Tick.Field.to_string a, b) )
   in
   assert ([%equal: (string * bool) list] str_list expected_list)
 

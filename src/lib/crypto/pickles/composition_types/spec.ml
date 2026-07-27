@@ -22,32 +22,31 @@ type ('branch_data, 'f) branch_data =
 
 type ('a, 'b, 'c) basic =
   | Unit : (unit, unit, < .. >) basic
-  | Field
-      : ('field1, 'field2, < field1 : 'field1 ; field2 : 'field2 ; .. >) basic
+  | Field :
+      ('field1, 'field2, < field1 : 'field1 ; field2 : 'field2 ; .. >) basic
   | Bool : ('bool1, 'bool2, < bool1 : 'bool1 ; bool2 : 'bool2 ; .. >) basic
-  | Digest
-      : ( 'digest1
-        , 'digest2
-        , < digest1 : 'digest1 ; digest2 : 'digest2 ; .. > )
-        basic
-  | Challenge
-      : ( 'challenge1
-        , 'challenge2
-        , < challenge1 : 'challenge1 ; challenge2 : 'challenge2 ; .. > )
-        basic
-  | Bulletproof_challenge
-      : ( 'bp_chal1
-        , 'bp_chal2
-        , < bulletproof_challenge1 : 'bp_chal1
-          ; bulletproof_challenge2 : 'bp_chal2
-          ; .. > )
-        basic
-  | Branch_data
-      : ( 'branch_data1
-        , 'branch_data2
-        , < branch_data1 : 'branch_data1 ; branch_data2 : 'branch_data2 ; .. >
-        )
-        basic
+  | Digest :
+      ( 'digest1
+      , 'digest2
+      , < digest1 : 'digest1 ; digest2 : 'digest2 ; .. > )
+      basic
+  | Challenge :
+      ( 'challenge1
+      , 'challenge2
+      , < challenge1 : 'challenge1 ; challenge2 : 'challenge2 ; .. > )
+      basic
+  | Bulletproof_challenge :
+      ( 'bp_chal1
+      , 'bp_chal2
+      , < bulletproof_challenge1 : 'bp_chal1
+        ; bulletproof_challenge2 : 'bp_chal2
+        ; .. > )
+      basic
+  | Branch_data :
+      ( 'branch_data1
+      , 'branch_data2
+      , < branch_data1 : 'branch_data1 ; branch_data2 : 'branch_data2 ; .. > )
+      basic
 
 module rec T : sig
   type (_, _, _) t =
@@ -83,8 +82,7 @@ end =
 type ('scalar, 'env) pack =
   { pack : 'a 'b. ('a, 'b, 'env) basic -> 'a option -> 'b -> 'scalar array }
 
-let rec pack :
-    type t v env.
+let rec pack : type t v env.
        zero:'scalar
     -> one:'scalar
     -> ('scalar, env) pack
@@ -174,8 +172,8 @@ module Wrap_etyp = Make_ETyp (Kimchi_pasta_snarky_backend.Wrap_impl)
 
 module Common
     (Impl : Snarky_backendless.Snark_intf.Run)
-    (Branch_data_checked : Branch_data_checked
-                             with type field_var := Impl.Field.t) =
+    (Branch_data_checked :
+      Branch_data_checked with type field_var := Impl.Field.t) =
 struct
   module Digest = D.Make (Impl)
   module Challenge = Limb_vector.Challenge.Make (Impl)
@@ -210,8 +208,7 @@ let pack_basic
   let open Impl in
   let module C = Common (Impl) (Branch_data_checked) in
   let open C in
-  let pack :
-      type a b.
+  let pack : type a b.
          (a, b, ((other_field, other_field_var, 'e) Env.t as 'e)) basic
       -> a option
       -> b
@@ -250,8 +247,8 @@ let pack (type f v) ((module Impl) as impl : (f, v) impl) branch_data t =
 
 module Make
     (Impl : Snarky_backendless.Snark_intf.Run)
-    (Branch_data_checked : Branch_data_checked
-                             with type field_var := Impl.Field.t)
+    (Branch_data_checked :
+      Branch_data_checked with type field_var := Impl.Field.t)
     (Basic : sig
       val typ_basic :
            assert_16_bits:(Impl.Field.t -> unit)
@@ -327,8 +324,7 @@ struct
             'var 'value. ('value, 'var, 'env) basic -> ('var, 'value) Impl.Typ.t
         }
     end in
-    let rec typ :
-        type var value env.
+    let rec typ : type var value env.
            env Typ_record.typ
         -> env is_boolean
         -> (value, var, env) T.t
@@ -406,8 +402,7 @@ struct
             ('value, 'var, 'env) basic -> ('var, 'value) Make_ETyp(Impl).t
         }
     end in
-    let rec etyp :
-        type var value env.
+    let rec etyp : type var value env.
            (Impl.Field.Constant.t, env) ETyp_record.etyp
         -> env is_boolean
         -> (value, var, env) T.t
@@ -471,7 +466,7 @@ struct
             let typ =
               typ
               |> Impl.Typ.transport ~there:(Option.value ~default:dummy1)
-                   ~back:(fun x -> Some x)
+                   ~back:(fun x -> Some x )
             in
             T (typ, f, f_inv)
         | Constant (x, _assert_eq, spec) ->
@@ -506,8 +501,7 @@ module Step =
 
       let typ_basic (type other_field other_field_var) ~assert_16_bits
           (field : (other_field_var, other_field) Impl.Typ.t) =
-        let typ_basic :
-            type a b.
+        let typ_basic : type a b.
                (a, b, ((other_field, other_field_var, 'e) C.Env.t as 'e)) basic
             -> (b, a) Impl.Typ.t =
           let open Impl in
@@ -554,8 +548,7 @@ module Step =
             as
             'a
         end in
-        let etyp :
-            type a b.
+        let etyp : type a b.
                (a, b, ((other_field, other_field_var, 'e) Env.t as 'e)) basic
             -> (b, a) Make_ETyp(Impl).t = function
           | Unit ->
@@ -601,8 +594,7 @@ module Wrap =
 
       let typ_basic (type other_field other_field_var) ~assert_16_bits
           (field : (other_field_var, other_field) Impl.Typ.t) =
-        let typ_basic :
-            type a b.
+        let typ_basic : type a b.
                (a, b, ((other_field, other_field_var, 'e) C.Env.t as 'e)) basic
             -> (b, a) Impl.Typ.t =
           let open Impl in
@@ -649,8 +641,7 @@ module Wrap =
             as
             'a
         end in
-        let etyp :
-            type a b.
+        let etyp : type a b.
                (a, b, ((other_field, other_field_var, 'e) Env.t as 'e)) basic
             -> (b, a) Make_ETyp(Impl).t = function
           | Unit ->

@@ -16,8 +16,7 @@ let run (module F : Intf.Fixture) =
       | Ok () ->
           ()
       | Error err ->
-          eprintf "Teardown failed with error: %s\n" (Error.to_string_hum err)
-      )
+          eprintf "Teardown failed with error: %s\n" (Error.to_string_hum err) )
     (fun () ->
       match%bind F.test_case test_case_after_setup with
       | Failed err ->

@@ -52,7 +52,8 @@ module Step = struct
 
     module Constant = Tock.Field
 
-    type t = (* Low bits, high bit *)
+    type t =
+      (* Low bits, high bit *)
       Field.t * Boolean.var
 
     let forbidden_shifted_values =

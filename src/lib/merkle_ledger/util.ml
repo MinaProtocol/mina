@@ -199,10 +199,10 @@ end = struct
           in
           let max_index_in_all_accounts =
             Option.value_map current_last_index ~default:foreign_last_index
-              ~f:(fun max_index -> Int.max max_index foreign_last_index)
+              ~f:(fun max_index -> Int.max max_index foreign_last_index )
           in
           Inputs.Location.(
-            Account (Addr.of_int_exn ~ledger_depth max_index_in_all_accounts))
+            Account (Addr.of_int_exn ~ledger_depth max_index_in_all_accounts) )
         in
         let last_location = new_last_location in
         Inputs.set_location_batch ~last_location t key_locations )
@@ -214,17 +214,17 @@ end = struct
     Inputs.set_raw_account_batch t locations_and_accounts ;
     set_hash_batch ?hash_cache t
     @@ List.map locations_and_accounts ~f:(fun (location, account) ->
-           let addr = Inputs.Location.to_path_exn location in
-           let account_hash =
-             lookup_hash ?hash_cache location ~compute:(fun () ->
-                 Inputs.Hash.hash_account account )
-           in
-           (Inputs.location_of_hash_addr addr, account_hash) )
+        let addr = Inputs.Location.to_path_exn location in
+        let account_hash =
+          lookup_hash ?hash_cache location ~compute:(fun () ->
+              Inputs.Hash.hash_account account )
+        in
+        (Inputs.location_of_hash_addr addr, account_hash) )
 
   let set_batch_accounts t addresses_and_accounts =
     set_batch t
     @@ List.map addresses_and_accounts ~f:(fun (addr, account) ->
-           (Inputs.location_of_account_addr addr, account) )
+        (Inputs.location_of_account_addr addr, account) )
 
   let set_all_accounts_rooted_at_exn t address accounts =
     let addresses =

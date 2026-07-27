@@ -4,7 +4,8 @@ let with_temp_dir f =
   let directory = Filename_unix.temp_dir ~in_dir:"/tmp" "coda_spun_test" "" in
   Fun.protect
     ~finally:(fun () ->
-      ignore (Core_unix.system ("rm -rf " ^ directory) : Core_unix.Exit_or_signal.t) )
+      ignore
+        (Core_unix.system ("rm -rf " ^ directory) : Core_unix.Exit_or_signal.t) )
     (fun () -> f directory)
 
 let test_dumb_logrotate_rotates_logs_when_expected () =
@@ -17,10 +18,12 @@ let test_dumb_logrotate_rotates_logs_when_expected () =
   let log_filename = "mina.log" in
   with_temp_dir (fun directory ->
       let exists name =
-        Result.is_ok (Core_unix.access (Filename.concat directory name) [ `Exists ])
+        Result.is_ok
+          (Core_unix.access (Filename.concat directory name) [ `Exists ])
       in
       let get_size name =
-        Int64.to_int_exn (Core_unix.stat (Filename.concat directory name)).st_size
+        Int64.to_int_exn
+          (Core_unix.stat (Filename.concat directory name)).st_size
       in
       let rec run_test ~last_size ~rotations ~rotation_expected =
         Logger.info logger ~module_:__MODULE__ ~location:__LOC__ "test" ;

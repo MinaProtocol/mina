@@ -12,7 +12,7 @@ module Stake_delegation = Mina_base.Stake_delegation
 let pk_to_public_key ~context (`Pk pk) =
   Public_key.Compressed.of_base58_check pk
   |> Result.map_error ~f:(fun _ ->
-         Errors.create ~context `Public_key_format_not_valid )
+      Errors.create ~context `Public_key_format_not_valid )
 
 let account_id (`Pk pk) (`Token_id token_id) =
   { Account_identifier.address = pk
@@ -46,7 +46,7 @@ module Op = struct
             let related_operations =
               op.related_to
               |> Option.bind ~f:(fun relate ->
-                     List.findi plan ~f:(fun _ a -> a_eq relate a.label) )
+                  List.findi plan ~f:(fun _ a -> a_eq relate a.label) )
               |> Option.map ~f:(fun (i, _) -> [ operation_identifier i ])
               |> Option.value ~default:[]
             in
@@ -141,7 +141,7 @@ module Partial = struct
         ~error:
           (Errors.create
              (`Operations_not_valid
-               [ Errors.Partial_reason.Fee_payer_and_source_mismatch ] ) )
+                [ Errors.Partial_reason.Fee_payer_and_source_mismatch ] ) )
     in
     let%bind memo =
       match t.memo with
@@ -159,7 +159,7 @@ module Partial = struct
               ~error:
                 (Errors.create
                    (`Operations_not_valid
-                     [ Errors.Partial_reason.Amount_not_some ] ) )
+                      [ Errors.Partial_reason.Amount_not_some ] ) )
           in
           let payload =
             { Payment_payload.Poly.receiver_pk
@@ -224,13 +224,13 @@ let of_operations ?memo ?valid_until (ops : Operation.t list) :
   let open V.Let_syntax in
   let open Partial.Reason in
   (* For a payment we demand:
-     *
-     * ops = length exactly 3
-     *
-     * payment_source_dec with account 'a, some amount 'x, status=None
-     * fee_payment with account 'a, some amount 'y, status=None
-     * payment_receiver_inc with account 'b, some amount 'x, status=None
-  *)
+   *
+   * ops = length exactly 3
+   *
+   * payment_source_dec with account 'a, some amount 'x, status=None
+   * fee_payment with account 'a, some amount 'y, status=None
+   * payment_receiver_inc with account 'b, some amount 'x, status=None
+   *)
   let payment =
     let%map () =
       if Mina_stdlib.List.Length.Compare.(ops = 3) then V.return ()
@@ -316,12 +316,12 @@ let of_operations ?memo ?valid_until (ops : Operation.t list) :
     }
   in
   (* For a delegation we demand:
-     *
-     * ops = length exactly 2
-     *
-     * fee_payment with account 'a, some amount 'y, status=None
-     * delegate_change with account 'a, metadata:{delegate_change_target:'b}, status="Pending"
-  *)
+   *
+   * ops = length exactly 2
+   *
+   * fee_payment with account 'a, some amount 'y, status=None
+   * delegate_change with account 'a, metadata:{delegate_change_target:'b}, status="Pending"
+   *)
   let delegation =
     let%map () =
       if Mina_stdlib.List.Length.Compare.(ops = 2) then V.return ()
@@ -400,16 +400,16 @@ let of_operations ?memo ?valid_until (ops : Operation.t list) :
 
 let to_operations ~failure_status (t : Partial.t) : Operation.t list =
   (* First build a plan. The plan specifies all operations ahead of time so
-     * we can later compute indices and relations when we're building the full
-     * models.
-     *
-     * For now, relations will be defined only on the two sides of a given
-     * transfer. ie. Source decreases, and receiver increases.
-  *)
+   * we can later compute indices and relations when we're building the full
+   * models.
+   *
+   * For now, relations will be defined only on the two sides of a given
+   * transfer. ie. Source decreases, and receiver increases.
+   *)
   let plan : 'a Op.t list =
     ( if not Unsigned.UInt64.(equal t.fee zero) then
-      [ { Op.label = `Fee_payment; related_to = None } ]
-    else [] )
+        [ { Op.label = `Fee_payment; related_to = None } ]
+      else [] )
     @ ( match failure_status with
       | Some (`Applied (Account_creation_fees_paid.By_receiver amount)) ->
           [ { Op.label = `Account_creation_fee_via_payment amount
@@ -490,7 +490,7 @@ let to_operations ~failure_status (t : Partial.t) : Operation.t list =
           ; _type = Operation_types.name `Payment_source_dec
           ; amount =
               ( if did_fail then None
-              else Some Amount_of.(negated @@ token t.token amount) )
+                else Some Amount_of.(negated @@ token t.token amount) )
           ; coin_change = None
           ; metadata
           }
@@ -528,11 +528,11 @@ let to_operations ~failure_status (t : Partial.t) : Operation.t list =
               merge_metadata metadata
                 (Some
                    (`Assoc
-                     [ ( "delegate_change_target"
-                       , `String
-                           (let (`Pk r) = t.receiver in
-                            r ) )
-                     ] ) )
+                      [ ( "delegate_change_target"
+                        , `String
+                            (let (`Pk r) = t.receiver in
+                             r ) )
+                      ] ) )
           } )
 
 let to_operations' (t : t) : Operation.t list =
@@ -569,8 +569,8 @@ let dummies =
     ; failure_status =
         Some
           (`Applied
-            (Account_creation_fees_paid.By_receiver
-               (Unsigned.UInt64.of_int 1_000_000) ) )
+             (Account_creation_fees_paid.By_receiver
+                (Unsigned.UInt64.of_int 1_000_000) ) )
     ; hash = "TXN_1new_HASH"
     ; valid_until = None
     ; memo = Some "hello"

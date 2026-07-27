@@ -88,8 +88,8 @@ let verify_on_header ~verify
     ( { Proof_carrying_data.proof = _, root_unverified
       ; data = best_tip_unverified
       } as pcd ) =
-  let%map.Async_kernel.Deferred.Or_error ( `Root root_header
-                                         , `Best_tip best_tip_header ) =
+  let%map.Async_kernel.Deferred.Or_error
+      `Root root_header, `Best_tip best_tip_header =
     verify (Proof_carrying.to_header_data ~to_header:header pcd)
   in
   let root = Validation.with_body root_header (body root_unverified) in

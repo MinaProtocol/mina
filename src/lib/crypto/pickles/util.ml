@@ -1,8 +1,7 @@
 open Core
 open Pickles_types
 
-let rec absorb :
-    type a g1 g1_opt f scalar.
+let rec absorb : type a g1 g1_opt f scalar.
        absorb_field:(f -> unit)
     -> absorb_scalar:(scalar -> unit)
     -> g1_to_field_elements:(g1 -> f list)
@@ -48,11 +47,11 @@ module Make (Impl : Kimchi_pasta_snarky_backend.Snark_intf) = struct
   (** [ones_vector (module I) ~first_zero n] returns a vector of booleans of
    length n which is all ones until position [first_zero], at which it is zero,
    and zero thereafter. *)
-  let ones_vector :
-      type n. first_zero:Impl.Field.t -> n Nat.t -> (Boolean.var, n) Vector.t =
+  let ones_vector : type n.
+      first_zero:Impl.Field.t -> n Nat.t -> (Boolean.var, n) Vector.t =
    fun ~first_zero n ->
-    let rec go :
-        type m. Boolean.var -> int -> m Nat.t -> (Boolean.var, m) Vector.t =
+    let rec go : type m.
+        Boolean.var -> int -> m Nat.t -> (Boolean.var, m) Vector.t =
      fun value i m ->
       match[@warning "-45"] m with
       | Pickles_types.Nat.Z ->

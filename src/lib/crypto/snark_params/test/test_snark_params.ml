@@ -24,7 +24,7 @@ let group_map_test () =
             ( (x * x * x)
             + (Tick.Inner_curve.Params.a * x)
             + Tick.Inner_curve.Params.b )
-            (y * y)) ;
+            (y * y) ) ;
       let actual_x, actual_y = actual in
       let checked_x, checked_y = checked_output in
       Alcotest.(check bool)
@@ -61,7 +61,7 @@ let compare_test () =
            map2
              (read Tick.Boolean.typ less)
              (read Tick.Boolean.typ less_or_equal)
-             ~f:Tuple2.create) )
+             ~f:Tuple2.create ) )
       |> Or_error.ok_exn
     in
     let r = Tick.Bigint.(compare (of_field x) (of_field y)) in

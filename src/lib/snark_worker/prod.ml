@@ -82,7 +82,7 @@ module Impl = struct
               ( "all_inputs"
               , Zkapp_command_inputs.(
                   read_all_proofs_from_disk all_inputs
-                  |> Stable.Latest.to_yojson) )
+                  |> Stable.Latest.to_yojson ) )
               :: metadata_without_all_inputs
         in
         [%log fatal]
@@ -114,7 +114,7 @@ module Impl = struct
               ( "all_inputs"
               , Zkapp_command_inputs.(
                   read_all_proofs_from_disk all_inputs
-                  |> Stable.Latest.to_yojson) )
+                  |> Stable.Latest.to_yojson ) )
               :: metadata_without_all_inputs
         in
 
@@ -190,7 +190,7 @@ module Impl = struct
                       ; ( "inputs"
                         , Zkapp_command_inputs.(
                             witnesses_specs_stmts |> read_all_proofs_from_disk
-                            |> Stable.Latest.to_yojson) )
+                            |> Stable.Latest.to_yojson ) )
                       ] ;
                   Deferred.return
                     (Or_error.error_string
@@ -272,18 +272,18 @@ module Impl = struct
         , (time, match w with Transition _ -> `Transition | Merge _ -> `Merge)
         ) )
     |> Deferred.Or_error.map ~f:(function
-         | `One (proof1, metrics1) ->
-             { Work.Work.Result.proofs = `One proof1
-             ; metrics = `One metrics1
-             ; spec
-             ; prover = public_key
-             }
-         | `Two ((proof1, metrics1), (proof2, metrics2)) ->
-             { Work.Work.Result.proofs = `Two (proof1, proof2)
-             ; metrics = `Two (metrics1, metrics2)
-             ; spec
-             ; prover = public_key
-             } )
+      | `One (proof1, metrics1) ->
+          { Work.Work.Result.proofs = `One proof1
+          ; metrics = `One metrics1
+          ; spec
+          ; prover = public_key
+          }
+      | `Two ((proof1, metrics1), (proof2, metrics2)) ->
+          { Work.Work.Result.proofs = `Two (proof1, proof2)
+          ; metrics = `Two (metrics1, metrics2)
+          ; spec
+          ; prover = public_key
+          } )
 
   let perform_partitioned
       ~state:

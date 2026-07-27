@@ -71,7 +71,7 @@ let test_fault_isolation () =
   let log = ref [] in
   register ~tier:FlushPersistentFrontier ~description:"before-fail" ~log ;
   Exit_handlers.register_async_shutdown_handler ~logger ~description:"will-fail"
-    ~tier:FlushPersistentFrontier (fun () -> failwith "boom") ;
+    ~tier:FlushPersistentFrontier (fun () -> failwith "boom" ) ;
   register ~tier:FlushPersistentFrontier ~description:"after-fail" ~log ;
   register ~tier:DestroyConfigAndLedgers ~description:"next-tier" ~log ;
   let%map () = Exit_handlers.For_testing.run_shutdown_handlers () in

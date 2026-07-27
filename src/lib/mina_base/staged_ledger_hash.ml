@@ -225,13 +225,13 @@ module Make_str (A : Wire_types.Concrete) = struct
     Random_oracle.Input.Chunked.(
       append
         (Non_snark.to_input non_snark)
-        (field (pending_coinbase_hash :> Field.t)))
+        (field (pending_coinbase_hash :> Field.t)) )
 
   let var_to_input ({ non_snark; pending_coinbase_hash } : var) =
     Random_oracle.Input.Chunked.(
       append
         (Non_snark.var_to_input non_snark)
-        (field (Pending_coinbase.Hash.var_to_hash_packed pending_coinbase_hash)))
+        (field (Pending_coinbase.Hash.var_to_hash_packed pending_coinbase_hash)) )
 
   let typ : (var, t) Typ.t =
     Typ.of_hlistable

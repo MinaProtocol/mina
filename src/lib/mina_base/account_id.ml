@@ -128,7 +128,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
 
   let to_input ((key, tid) : t) =
     Random_oracle_input.Chunked.(
-      append (Public_key.Compressed.to_input key) (field tid))
+      append (Public_key.Compressed.to_input key) (field tid) )
 
   let derive_token_id ~(owner : t) : Digest.t =
     Random_oracle.hash ~init:Hash_prefix.derive_token_id

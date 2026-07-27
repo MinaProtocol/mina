@@ -6,8 +6,8 @@ module Subchain = struct
     let fields = insert_commas Archive_lib.Processor.Block.Fields.names in
     let b_fields =
       insert_commas
-      @@ Core.List.map Archive_lib.Processor.Block.Fields.names
-           ~f:(fun field -> "b." ^ field)
+      @@ Core.List.map Archive_lib.Processor.Block.Fields.names ~f:(fun field ->
+          "b." ^ field )
     in
     Core.sprintf
       {sql| WITH RECURSIVE chain AS (

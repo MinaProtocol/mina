@@ -323,7 +323,7 @@ module Sql = struct
 
     let typ =
       Caqti_type.(
-        t3 int Archive_lib.Processor.User_command.Signed_command.typ Extras.typ)
+        t3 int Archive_lib.Processor.User_command.Signed_command.typ Extras.typ )
 
     let fields =
       String.concat ~sep:","
@@ -604,7 +604,7 @@ module Sql = struct
       let fields =
         String.concat ~sep:","
         @@ List.map Archive_lib.Processor.Zkapp_account_update_body.Fields.names
-             ~f:(fun n -> "zaub." ^ n)
+             ~f:(fun n -> "zaub." ^ n )
         @ [ "pk_update_body.value as account"
           ; "token_update_body.value as token"
           ; "ac.creation_fee"
@@ -842,7 +842,7 @@ module Sql = struct
         let map ~f l =
           map ~f:List.rev
           @@ List.fold_result l ~init:[] ~f:(fun acc x ->
-                 f x >>| fun x -> x :: acc )
+              f x >>| fun x -> x :: acc )
       end
     end in
     let open Deferred.Result.Let_syntax in
@@ -892,65 +892,58 @@ module Sql = struct
     let%map user_commands =
       Deferred.return
       @@ Result.List.map raw_user_commands ~f:(fun (_, uc, extras) ->
-             let open Result.Let_syntax in
-             let%bind kind =
-               match
-                 uc
-                   .Archive_lib.Processor.User_command.Signed_command
-                    .command_type
-               with
-               | "payment" ->
-                   return `Payment
-               | "delegation" ->
-                   return `Delegation
-               | other ->
-                   Result.fail
-                     (Errors.create
-                        ~context:
-                          (sprintf
-                             "The archive database is storing user commands \
-                              with %s; this is not a known type. Please report \
-                              a bug!"
-                             other )
-                        `Invariant_violation )
-             in
-             let fee_token = Mina_base.Token_id.(to_string default) in
-             let token = Mina_base.Token_id.(to_string default) in
-             let%map failure_status =
-               match User_commands.Extras.failure_reason extras with
-               | None -> (
-                   match
-                     User_commands.Extras.account_creation_fee_paid extras
-                   with
-                   | None ->
-                       return
-                       @@ `Applied
-                            User_command_info.Account_creation_fees_paid
-                            .By_no_one
-                   | Some receiver ->
-                       return
-                       @@ `Applied
-                            (User_command_info.Account_creation_fees_paid
-                             .By_receiver
-                               (Unsigned.UInt64.of_int64 receiver) ) )
-               | Some status ->
-                   return @@ `Failed status
-             in
-             { User_command_info.kind
-             ; fee_payer = User_commands.Extras.fee_payer extras
-             ; source = User_commands.Extras.source extras
-             ; receiver = User_commands.Extras.receiver extras
-             ; fee_token = `Token_id fee_token
-             ; token = `Token_id token
-             ; nonce = Unsigned.UInt32.of_int64 uc.nonce
-             ; amount = Option.map ~f:Unsigned.UInt64.of_string uc.amount
-             ; fee = Unsigned.UInt64.of_string uc.fee
-             ; hash = uc.hash
-             ; failure_status = Some failure_status
-             ; valid_until =
-                 Option.map ~f:Unsigned.UInt32.of_int64 uc.valid_until
-             ; memo = (if String.equal uc.memo "" then None else Some uc.memo)
-             } )
+          let open Result.Let_syntax in
+          let%bind kind =
+            match
+              uc.Archive_lib.Processor.User_command.Signed_command.command_type
+            with
+            | "payment" ->
+                return `Payment
+            | "delegation" ->
+                return `Delegation
+            | other ->
+                Result.fail
+                  (Errors.create
+                     ~context:
+                       (sprintf
+                          "The archive database is storing user commands with \
+                           %s; this is not a known type. Please report a bug!"
+                          other )
+                     `Invariant_violation )
+          in
+          let fee_token = Mina_base.Token_id.(to_string default) in
+          let token = Mina_base.Token_id.(to_string default) in
+          let%map failure_status =
+            match User_commands.Extras.failure_reason extras with
+            | None -> (
+                match User_commands.Extras.account_creation_fee_paid extras with
+                | None ->
+                    return
+                    @@ `Applied
+                         User_command_info.Account_creation_fees_paid.By_no_one
+                | Some receiver ->
+                    return
+                    @@ `Applied
+                         (User_command_info.Account_creation_fees_paid
+                          .By_receiver
+                            (Unsigned.UInt64.of_int64 receiver) ) )
+            | Some status ->
+                return @@ `Failed status
+          in
+          { User_command_info.kind
+          ; fee_payer = User_commands.Extras.fee_payer extras
+          ; source = User_commands.Extras.source extras
+          ; receiver = User_commands.Extras.receiver extras
+          ; fee_token = `Token_id fee_token
+          ; token = `Token_id token
+          ; nonce = Unsigned.UInt32.of_int64 uc.nonce
+          ; amount = Option.map ~f:Unsigned.UInt64.of_string uc.amount
+          ; fee = Unsigned.UInt64.of_string uc.fee
+          ; hash = uc.hash
+          ; failure_status = Some failure_status
+          ; valid_until = Option.map ~f:Unsigned.UInt32.of_int64 uc.valid_until
+          ; memo = (if String.equal uc.memo "" then None else Some uc.memo)
+          } )
     in
     let zkapp_commands = Zkapp_commands.to_command_infos raw_zkapp_commands in
     { Block_info.block_identifier =

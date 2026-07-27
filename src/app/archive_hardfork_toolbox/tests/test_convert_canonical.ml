@@ -149,7 +149,7 @@ module TestDb = struct
               ( Caqti_type.(
                   t3
                     (t4 int string (option int) string)
-                    (t4 int int int int) string)
+                    (t4 int int int int) string )
               ->. Caqti_type.unit )
                 {sql|
                   INSERT INTO blocks

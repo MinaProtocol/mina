@@ -28,8 +28,9 @@ let%test_module "Fee payer tests" =
               Zkapp_basic.Set_or_keep.Set (Pickles.Backend.Tick.Field.of_int i) )
       }
 
-    let%test_unit "update a snapp account with signature and fee paid by the \
-                   snapp account" =
+    let%test_unit
+        "update a snapp account with signature and fee paid by the snapp \
+         account" =
       Quickcheck.test ~trials:1 U.gen_snapp_ledger
         ~f:(fun ({ init_ledger; specs = _ }, new_kp) ->
           let fee = Fee.of_nanomina_int_exn 1_000_000 in
@@ -54,8 +55,9 @@ let%test_module "Fee payer tests" =
           U.test_snapp_update test_spec ~init_ledger ~vk ~zkapp_prover
             ~snapp_pk:(Public_key.compress new_kp.public_key) )
 
-    let%test_unit "update a snapp account with signature and fee paid by a \
-                   non-snapp account" =
+    let%test_unit
+        "update a snapp account with signature and fee paid by a non-snapp \
+         account" =
       Quickcheck.test ~trials:1 U.gen_snapp_ledger
         ~f:(fun ({ init_ledger; specs }, new_kp) ->
           let fee = Fee.of_nanomina_int_exn 1_000_000 in
@@ -81,8 +83,8 @@ let%test_module "Fee payer tests" =
           U.test_snapp_update test_spec ~init_ledger ~vk ~zkapp_prover
             ~snapp_pk:(Public_key.compress new_kp.public_key) )
 
-    let%test_unit "update a snapp account with proof and fee paid by the snapp \
-                   account" =
+    let%test_unit
+        "update a snapp account with proof and fee paid by the snapp account" =
       Quickcheck.test ~trials:1 U.gen_snapp_ledger
         ~f:(fun ({ init_ledger; specs = _ }, new_kp) ->
           let fee = Fee.of_nanomina_int_exn 1_000_000 in
@@ -110,8 +112,9 @@ let%test_module "Fee payer tests" =
             test_spec ~init_ledger ~vk ~zkapp_prover
             ~snapp_pk:(Public_key.compress new_kp.public_key) )
 
-    let%test_unit "update a snapp account with proof and fee paid by a \
-                   non-snapp account" =
+    let%test_unit
+        "update a snapp account with proof and fee paid by a non-snapp account"
+        =
       Quickcheck.test ~trials:1 U.gen_snapp_ledger
         ~f:(fun ({ init_ledger; specs }, new_kp) ->
           let fee = Fee.of_nanomina_int_exn 1_000_000 in
@@ -192,9 +195,9 @@ let%test_module "Fee payer tests" =
                   Sparse_ledger.of_ledger_subset_exn ledger
                     ( init_ledger |> Array.to_list
                     |> List.map ~f:(fun (kp, _) ->
-                           Account_id.create
-                             (Public_key.compress kp.public_key)
-                             Token_id.default ) )
+                        Account_id.create
+                          (Public_key.compress kp.public_key)
+                          Token_id.default ) )
                 in
                 Sparse_ledger.apply_transaction_first_pass ~constraint_constants
                   ~global_slot ~txn_state_view sparse_ledger
@@ -233,16 +236,16 @@ let%test_module "Fee payer tests" =
                   ~constraint_constants test_spec
               in
               ( if new_account then
-                ignore
-                  ( Option.value_map
-                      ~f:(fun location ->
-                        Some (Option.value_exn (Ledger.get ledger location)) )
-                      ~default:None
-                      (Ledger.location_of_account ledger zkapp_acc_id)
-                    : Account.t option )
-              else
-                let account = get_account ledger zkapp_acc_id in
-                assert (Option.is_none account.zkapp) ) ;
+                  ignore
+                    ( Option.value_map
+                        ~f:(fun location ->
+                          Some (Option.value_exn (Ledger.get ledger location)) )
+                        ~default:None
+                        (Ledger.location_of_account ledger zkapp_acc_id)
+                      : Account.t option )
+                else
+                  let account = get_account ledger zkapp_acc_id in
+                  assert (Option.is_none account.zkapp) ) ;
               let%map () =
                 U.check_zkapp_command_with_merges_exn ledger [ zkapp_command ]
               in

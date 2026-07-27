@@ -242,7 +242,7 @@ let create_accounts ~(genesis_constants : Genesis_constants.t)
         List.map zkapps_batch ~f:(fun zkapp ->
             let acct_update_pks =
               List.map (Zkapp_command.Call_forest.to_list zkapp.account_updates)
-                ~f:(fun acct_update -> acct_update.body.public_key)
+                ~f:(fun acct_update -> acct_update.body.public_key )
             in
             zkapp.fee_payer.body.public_key :: acct_update_pks )
         |> List.concat

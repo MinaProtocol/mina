@@ -279,7 +279,7 @@ module Rules = struct
         in
         Boolean.(
           Assert.any
-            [ is_correct; is_empty &&& forest_is_empty &&& new_stack_is_empty ]) ;
+            [ is_correct; is_empty &&& forest_is_empty &&& new_stack_is_empty ] ) ;
         (elt, new_stack)
     end
 
@@ -714,7 +714,7 @@ let initialize ?(may_use_token = Account_update.May_use_token.No) public_key
 
 let mint_prover =
   Lazy.map lazy_compiled
-    ~f:(fun (_, _, _, Pickles.Provers.[ _; mint_prover; _ ]) -> mint_prover)
+    ~f:(fun (_, _, _, Pickles.Provers.[ _; mint_prover; _ ]) -> mint_prover )
 
 let mint ~owner_public_key ~owner_token_id ~amount ~mint_to_public_key
     ?(may_use_token = Account_update.May_use_token.No) =

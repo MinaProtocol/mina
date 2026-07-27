@@ -10,7 +10,7 @@ open Zkapp_basic
 let digest_vk (t : Side_loaded_verification_key.t) =
   Random_oracle.(
     hash ~init:Hash_prefix_states.side_loaded_vk
-      (pack_input (Side_loaded_verification_key.to_input t)))
+      (pack_input (Side_loaded_verification_key.to_input t)) )
 
 let dummy_vk_hash =
   Memo.unit (fun () -> digest_vk Side_loaded_verification_key.dummy)

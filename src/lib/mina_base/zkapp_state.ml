@@ -37,8 +37,8 @@ end
 
 let max_size_int : int = Nat.to_int Max_state_size.n
 
-let _type_equal :
-    type a. (a V.t, a Vector.With_length(Max_state_size).t) Type_equal.t =
+let _type_equal : type a.
+    (a V.t, a Vector.With_length(Max_state_size).t) Type_equal.t =
   Type_equal.T
 
 let typ t = Vector.typ t Max_state_size.n

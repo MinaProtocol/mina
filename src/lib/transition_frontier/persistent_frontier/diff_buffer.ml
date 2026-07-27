@@ -7,7 +7,7 @@ let max_latency
     { Genesis_constants.Constraint_constants.block_window_duration_ms; _ } =
   Block_time.Span.(
     (block_window_duration_ms |> Int64.of_int |> Block_time.Span.of_ms)
-    * of_ms 5L)
+    * of_ms 5L )
 
 module Capacity = struct
   type t =

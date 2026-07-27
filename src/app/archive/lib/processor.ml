@@ -3623,8 +3623,8 @@ module Block = struct
     in
     (* TODO: undo the unused key vs value abstraction *)
     let differential_insert (type a value key key_cmp)
-        (key_comparator : (key, key_cmp) Core.Comparator.Module.t) (entries : a list)
-        ~(get_key : a -> key) ~(get_value : a -> value)
+        (key_comparator : (key, key_cmp) Core.Comparator.Module.t)
+        (entries : a list) ~(get_key : a -> key) ~(get_value : a -> value)
         ~(load_index :
            key list -> ((key, int, key_cmp) Map.t, 'err) Deferred.Result.t )
         ~(insert_values : value list -> (int list, 'err) Deferred.Result.t) :

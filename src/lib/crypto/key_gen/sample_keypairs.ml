@@ -17,7 +17,7 @@ let generated_keypairs =
      let sks =
        Quickcheck.(
          random_value ~seed:(`Deterministic "Coda_sample_keypairs")
-           (Generator.list_with_length n Private_key.gen))
+           (Generator.list_with_length n Private_key.gen) )
      in
      List.map sks ~f:(function sk ->
          let kp = Keypair.of_private_key_exn sk in

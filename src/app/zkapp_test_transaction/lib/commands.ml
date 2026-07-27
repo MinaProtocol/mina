@@ -768,7 +768,8 @@ let%test_module "ZkApps test transaction" =
           io_field "sendZkapp" ~typ:(non_null string)
             ~args:Arg.[ arg "input" ~typ:(non_null typ) ]
             ~doc:"sample query"
-            ~resolve:(fun _ () (zkapp_command' : Zkapp_command.Stable.Latest.t) ->
+            ~resolve:(fun
+                _ () (zkapp_command' : Zkapp_command.Stable.Latest.t) ->
               let ok_fee_payer =
                 print_diff_yojson ~path:[ "fee_payer" ]
                   (Account_update.Fee_payer.to_yojson zkapp_command.fee_payer)
@@ -786,11 +787,11 @@ let%test_module "ZkApps test transaction" =
                       && ok ) )
               in
               if ok_fee_payer && ok_account_updates then return (Ok "Passed")
-              else return (Error "invalid snapp transaction generated") ))
+              else return (Error "invalid snapp transaction generated") ) )
       in
       let schema =
         Graphql_async.Schema.(
-          schema [] ~mutations:[ query_top_level ] ~subscriptions:[])
+          schema [] ~mutations:[ query_top_level ] ~subscriptions:[] )
       in
       let%map res = execute () schema query in
       match res with

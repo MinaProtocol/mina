@@ -164,7 +164,7 @@ module Make (Inputs : Inputs_intf) = struct
                       | On_disk _ ->
                           true
                       | S3 _ ->
-                          false ) )
+                          false ))
                     store () urs
                 in
                 urs

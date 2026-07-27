@@ -194,7 +194,7 @@ let filesystem_command =
             Deferred.unit
         | Error e ->
             Output.display_error @@ Error.to_string_hum e ;
-            exit 1)
+            exit 1 )
 
 let cassandra_command =
   Command.async ~summary:"Verify submissions and block read from Cassandra"
@@ -238,7 +238,7 @@ let cassandra_command =
             Deferred.unit
         | Error e ->
             Output.display_error @@ Error.to_string_hum e ;
-            exit 1)
+            exit 1 )
 
 let stdin_command =
   Command.async
@@ -272,7 +272,7 @@ let stdin_command =
             Deferred.unit
         | Error e ->
             Output.display_error @@ Error.to_string_hum e ;
-            exit 1)
+            exit 1 )
 
 let command =
   Command.group

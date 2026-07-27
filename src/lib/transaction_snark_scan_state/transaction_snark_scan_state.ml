@@ -235,8 +235,7 @@ end
 
 type job = Available_job.t
 
-let hash_generic :
-    type a b.
+let hash_generic : type a b.
        ledger_proof_hash:(a -> string)
     -> tx_witness_hash:(b -> string)
     -> (a, b) Parallel_scan.State.t
@@ -254,7 +253,7 @@ let hash_generic :
   in
   let incomplete_updates =
     List.fold ~init:(Digestif.SHA256.init ()) previous_incomplete_zkapp_updates
-      ~f:(fun h t -> Digestif.SHA256.feed_string h (tx_witness_hash t))
+      ~f:(fun h t -> Digestif.SHA256.feed_string h (tx_witness_hash t) )
     |> Digestif.SHA256.get
   in
   let continue_in_next_tree =
@@ -262,7 +261,7 @@ let hash_generic :
   in
   [ state_hash; incomplete_updates; continue_in_next_tree ]
   |> List.fold ~init:(Digestif.SHA256.init ()) ~f:(fun h t ->
-         Digestif.SHA256.feed_string h (Digestif.SHA256.to_raw_string t) )
+      Digestif.SHA256.feed_string h (Digestif.SHA256.to_raw_string t) )
   |> Digestif.SHA256.get |> Staged_ledger_hash.Aux_hash.of_sha256
 
 (*Scan state and any zkapp updates that were applied to the to the most recent
@@ -786,9 +785,9 @@ module Transactions_ordered = struct
               List.fold ~init:([], [], target_first_pass_ledger)
                 txns_with_witnesses
                 ~f:(fun
-                     (first_pass_txns, second_pass_txns, _old_root)
-                     (txn_with_witness : Transaction_with_witness.t)
-                   ->
+                    (first_pass_txns, second_pass_txns, _old_root)
+                    (txn_with_witness : Transaction_with_witness.t)
+                  ->
                   let txn = txn_with_witness.transaction_with_status.data in
                   let target_first_pass_ledger =
                     txn_with_witness.statement.target.first_pass_ledger
@@ -1428,7 +1427,8 @@ let fill_work_and_enqueue_transactions t ~logger transactions work =
             ~default:
               (curr_stmt, ([], `Border_block_continued_in_the_next_tree false))
             old_proof_and_incomplete_zkapp_updates
-            ~f:(fun ({ data = p'; _ }, incomplete_zkapp_updates_from_old_proof) ->
+            ~f:(fun
+                ({ data = p'; _ }, incomplete_zkapp_updates_from_old_proof) ->
               ( Ledger_proof.Cached.statement p'
               , incomplete_zkapp_updates_from_old_proof ) )
         in

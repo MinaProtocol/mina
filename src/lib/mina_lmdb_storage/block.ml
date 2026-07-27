@@ -172,7 +172,10 @@ let%test_module "Block storage tests" =
       let body' =
         read_body db body_ref
         |> function
-        | Ok a -> a | Error _ -> failwith "unexpected failure to read_body"
+        | Ok a ->
+            a
+        | Error _ ->
+            failwith "unexpected failure to read_body"
       in
       if not (Mina_block.Body.Stable.Latest.equal body body') then
         failwith "Retrieved body not equal to original body"

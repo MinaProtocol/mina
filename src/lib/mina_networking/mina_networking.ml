@@ -299,7 +299,7 @@ let try_non_preferred_peers (type b) t input peers ~rpc :
                     Actions.
                       ( Fulfilled_request
                       , Some ("Nonpreferred peer returned valid response", [])
-                      ))
+                      ) )
               in
               return (Ok (Envelope.Incoming.map envelope ~f:(Fn.const data)))
           | Connected { data = Ok None; _ } ->
@@ -326,7 +326,7 @@ let rpc_peer_then_random (type b) t peer_id input ~rpc :
               record t.trust_system t.logger peer
                 Actions.
                   ( Fulfilled_request
-                  , Some ("Preferred peer returned valid response", []) ))
+                  , Some ("Preferred peer returned valid response", []) ) )
       in
       return (Ok (Envelope.Incoming.wrap ~data:response ~sender))
   | Connected { data = Ok None; sender; _ } ->
@@ -338,7 +338,7 @@ let rpc_peer_then_random (type b) t peer_id input ~rpc :
                 Actions.
                   ( No_reply_from_preferred_peer
                   , Some ("When querying preferred peer, got no response", [])
-                  ))
+                  ) )
         | Local ->
             return ()
       in
@@ -354,7 +354,7 @@ let rpc_peer_then_random (type b) t peer_id input ~rpc :
                   ( Outgoing_connection_error
                   , Some
                       ( "Error while doing RPC"
-                      , [ ("error", Error_json.error_to_yojson e) ] ) ))
+                      , [ ("error", Error_json.error_to_yojson e) ] ) ) )
         | Local ->
             return ()
       in
@@ -419,8 +419,9 @@ let glue_sync_ledger :
     let global_stop = Pipe_lib.Linear_pipe.closed query_reader in
     let knowledge h peer =
       match%map
-        query_peer ~heartbeat_timeout ~timeout:(Time_float.Span.of_sec 10.) t
-          peer.Peer.peer_id Rpcs.Answer_sync_ledger_query (h, Num_accounts)
+        query_peer ~heartbeat_timeout
+          ~timeout:(Time_float.Span.of_sec 10.)
+          t peer.Peer.peer_id Rpcs.Answer_sync_ledger_query (h, Num_accounts)
       with
       | Connected { data = Ok _; _ } ->
           `Call (fun (h', _) -> Ledger_hash.equal h' h)

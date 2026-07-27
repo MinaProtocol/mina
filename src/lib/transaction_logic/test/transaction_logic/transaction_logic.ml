@@ -35,12 +35,12 @@ let signed_command ?(valid_until = Global_slot_since_genesis.max_value) ?signer
       { body = Body.Payment { receiver_pk = rcv; amount = amt }
       ; common =
           (let open Signed_command.Payload.Common.Poly in
-          { fee = fee'
-          ; fee_payer_pk = sender.pk
-          ; nonce = sender.nonce
-          ; valid_until = valid
-          ; memo = Signed_command_memo.dummy
-          })
+           { fee = fee'
+           ; fee_payer_pk = sender.pk
+           ; nonce = sender.nonce
+           ; valid_until = valid
+           ; memo = Signed_command_memo.dummy
+           } )
       }
   in
   Command
@@ -97,7 +97,7 @@ let simple_payment () =
         Or_error.(
           Transaction_logic.apply_transactions ~signature_kind
             ~constraint_constants ~global_slot ~txn_state_view ledger [ txn ]
-          >>| List.map ~f:Transaction_applied.read_all_proofs_from_disk) )
+          >>| List.map ~f:Transaction_applied.read_all_proofs_from_disk ) )
 
 let simple_payment_signer_different_from_fee_payer () =
   Quickcheck.test ~trials:1000 setup
@@ -135,7 +135,10 @@ let coinbase_order_of_created_accounts_is_correct ~with_fee_transfer () =
   let coinbase_txn =
     Or_error.ok_exn @@ Coinbase.create ~amount ~receiver ~fee_transfer
   in
-  let accounts = [] (* All accounts are new *) in
+  let accounts =
+    []
+    (* All accounts are new *)
+  in
   let ledger =
     match Ledger_helpers.ledger_of_accounts ~depth:(Fixed_depth 2) accounts with
     | Ok l ->

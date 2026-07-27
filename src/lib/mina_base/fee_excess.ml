@@ -448,7 +448,7 @@ let%snarkydef_ combine_checked
               done ;
               Fee.of_uint64 !total
             in
-            Fee.Signed.create ~magnitude ~sgn)
+            Fee.Signed.create ~magnitude ~sgn )
     in
     let%bind excess_from_currency =
       Fee.Signed.Checked.to_field_var currency_excess

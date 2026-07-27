@@ -66,8 +66,7 @@ module Make (Impl : Snarky_backendless.Snark_intf.S) = struct
           As_prover.(
             map (read_var n) ~f:(fun n ->
                 List.init total_length ~f:(fun i ->
-                    Bigint.(
-                      compare (of_field (Field.of_int i)) (of_field n) < 0) ) ))
+                    Bigint.(compare (of_field (Field.of_int i)) (of_field n) < 0) ) ) )
     in
     let%map () =
       Field.Checked.Assert.equal
@@ -119,7 +118,7 @@ module Make (Impl : Snarky_backendless.Snark_intf.S) = struct
           As_prover.(
             map
               (read_var (Field.Var.project x_unpacked))
-              ~f:(fun x -> Field.of_int (num_bits_upper_bound_unchecked x)))
+              ~f:(fun x -> Field.of_int (num_bits_upper_bound_unchecked x)) )
     in
     let%map () = assert_num_bits_upper_bound x_unpacked res in
     res

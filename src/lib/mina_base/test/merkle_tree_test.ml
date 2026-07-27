@@ -62,9 +62,9 @@ let merkle_tree_isomorphic_to_list () =
 let index_retrieval () =
   Quickcheck.test ~trials:10
     (let open Quickcheck.Generator.Let_syntax in
-    let%bind elements, tree = gen_tree in
-    let%map index = Int.gen_incl 0 (List.length elements - 1) in
-    (index, List.nth_exn elements index, tree))
+     let%bind elements, tree = gen_tree in
+     let%map index = Int.gen_incl 0 (List.length elements - 1) in
+     (index, List.nth_exn elements index, tree) )
     ~f:(fun (index, elem, tree) ->
       [%test_eq: Elem.t option] (Some elem) (get tree index) )
 

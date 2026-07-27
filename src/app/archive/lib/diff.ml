@@ -54,20 +54,20 @@ module Builder = struct
       let senders =
         commands
         |> List.map ~f:(fun { data; _ } ->
-               User_command.(fee_payer (forget_check data)) )
+            User_command.(fee_payer (forget_check data)) )
         |> Account_id.Set.of_list
       in
       Set.to_list senders
       |> List.map ~f:(fun sender ->
-             Option.value_exn
-               (let open Option.Let_syntax in
-               let%bind ledger_location =
-                 Mina_ledger.Ledger.location_of_account ledger sender
-               in
-               let%map { receipt_chain_hash; _ } =
-                 Mina_ledger.Ledger.get ledger ledger_location
-               in
-               (sender, receipt_chain_hash)) )
+          Option.value_exn
+            (let open Option.Let_syntax in
+             let%bind ledger_location =
+               Mina_ledger.Ledger.location_of_account ledger sender
+             in
+             let%map { receipt_chain_hash; _ } =
+               Mina_ledger.Ledger.get ledger ledger_location
+             in
+             (sender, receipt_chain_hash) ) )
     in
     let block_with_hash = Mina_block.Validated.forget validated_block in
     let block = With_hash.data block_with_hash in

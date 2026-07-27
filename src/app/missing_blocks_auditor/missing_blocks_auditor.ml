@@ -181,13 +181,13 @@ let () =
   Command.(
     Command_unix.run
       (let open Let_syntax in
-      Command.async
-        ~summary:"Report state hashes of blocks missing from archive database"
-        (let%map archive_uri =
-           Param.flag "--archive-uri"
-             ~doc:
-               "URI URI for connecting to the archive database (e.g., \
-                postgres://$USER@localhost:5432/archiver)"
-             Param.(required string)
-         in
-         main ~archive_uri )))
+       Command.async
+         ~summary:"Report state hashes of blocks missing from archive database"
+         (let%map archive_uri =
+            Param.flag "--archive-uri"
+              ~doc:
+                "URI URI for connecting to the archive database (e.g., \
+                 postgres://$USER@localhost:5432/archiver)"
+              Param.(required string)
+          in
+          main ~archive_uri ) ) )

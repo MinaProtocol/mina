@@ -235,9 +235,9 @@ module Worker_state = struct
               go keypairs
           | Ok
               (Some
-                ( `Vrf_eval _vrf_string
-                , `Vrf_output vrf_result
-                , `Delegator delegator ) ) ->
+                 ( `Vrf_eval _vrf_string
+                 , `Vrf_output vrf_result
+                 , `Delegator delegator ) ) ->
               [%log info] "Won slot %d in epoch %d" (Slot.to_int slot)
                 (Epoch.to_int epoch) ;
               let slot_won =
@@ -259,7 +259,7 @@ module Worker_state = struct
     let start_consensus_time (epoch_data : Consensus.Data.Epoch_data_for_vrf.t)
         =
       Consensus.Data.Consensus_time.(
-        of_global_slot ~constants:consensus_constants epoch_data.global_slot)
+        of_global_slot ~constants:consensus_constants epoch_data.global_slot )
     in
     let wait_for_state_change () = Ivar.read t.state_changed in
     let scanning generation state_version consensus_time =
@@ -293,9 +293,9 @@ module Worker_state = struct
                 match current with
                 | Some
                     (`Scanning
-                      ( scanning_generation
-                      , scanning_state_version
-                      , consensus_time ) )
+                       ( scanning_generation
+                       , scanning_state_version
+                       , consensus_time ) )
                   when scanning_generation = generation
                        && scanning_state_version = state_version ->
                     consensus_time
@@ -348,7 +348,8 @@ module Worker_state = struct
                       [%log info] "Did not win slot $slot, took $time ms"
                         ~metadata:
                           [ ( "time"
-                            , `Float Time_float.(Span.to_ms (diff (now ()) start)) )
+                            , `Float
+                                Time_float.(Span.to_ms (diff (now ()) start)) )
                           ; ("slot", Slot.to_yojson slot)
                           ] ;
                       loop (next_slot generation state_version consensus_time)
@@ -356,7 +357,8 @@ module Worker_state = struct
                       [%log info] "Won a slot $slot, took $time ms"
                         ~metadata:
                           [ ( "time"
-                            , `Float Time_float.(Span.to_ms (diff (now ()) start)) )
+                            , `Float
+                                Time_float.(Span.to_ms (diff (now ()) start)) )
                           ; ("slot", Slot.to_yojson slot)
                           ] ;
                       enqueue_slot_won t slot_won

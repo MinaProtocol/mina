@@ -50,22 +50,21 @@ struct
     let%bind pk_bytes = Secret_file.read ~path:privkey_path ~password in
     let open Result.Let_syntax in
     Deferred.return
-    @@ let%bind sk =
-         try
-           return
-             (pk_bytes |> Bigstring.of_bytes |> Private_key.of_bigstring_exn)
-         with exn ->
-           Privkey_error.corrupted_privkey
-             (Error.createf "Error parsing decrypted private key file: %s"
-                (Exn.to_string exn) )
-       in
-       try return (Keypair.of_private_key_exn sk)
-       with exn ->
-         Privkey_error.corrupted_privkey
-           (Error.createf
-              "Error computing public key from private, is your keyfile \
-               corrupt? %s"
-              (Exn.to_string exn) )
+    @@
+    let%bind sk =
+      try return (pk_bytes |> Bigstring.of_bytes |> Private_key.of_bigstring_exn)
+      with exn ->
+        Privkey_error.corrupted_privkey
+          (Error.createf "Error parsing decrypted private key file: %s"
+             (Exn.to_string exn) )
+    in
+    try return (Keypair.of_private_key_exn sk)
+    with exn ->
+      Privkey_error.corrupted_privkey
+        (Error.createf
+           "Error computing public key from private, is your keyfile corrupt? \
+            %s"
+           (Exn.to_string exn) )
 
   (** Reads a private key from [privkey_path] using [Secret_file], throws on failure *)
   let read_exn ~(privkey_path : string) ~(password : Secret_file.password) :

@@ -134,13 +134,13 @@ let blocks_of_data ~max_block_size data =
     done ;
     (* create the non max link block, if there is one *)
     ( if schema.num_links_in_partial_branch_block > 0 then
-      let chunk_size =
-        max_block_size - 2
-        - (schema.num_links_in_partial_branch_block * link_size)
-      in
-      create_block
-        (dequeue_links schema.num_links_in_partial_branch_block)
-        chunk_size ) ;
+        let chunk_size =
+          max_block_size - 2
+          - (schema.num_links_in_partial_branch_block * link_size)
+        in
+        create_block
+          (dequeue_links schema.num_links_in_partial_branch_block)
+          chunk_size ) ;
     (* create the max link blocks *)
     let full_link_chunk_size =
       max_block_size - 2 - (schema.max_links_per_block * link_size)
@@ -280,8 +280,8 @@ let%test_module "bitswap blocks" =
           in
           [%test_eq: Bigstring.t] data result )
 
-    let%test_unit "forall x: schema_of_blocks (blocks_of_data x) = \
-                   create_schema x" =
+    let%test_unit
+        "forall x: schema_of_blocks (blocks_of_data x) = create_schema x" =
       Quickcheck.test For_tests.gen ~trials:100
         ~f:(fun (max_block_size, data) ->
           let schema = create_schema ~max_block_size (Bigstring.length data) in
@@ -289,8 +289,9 @@ let%test_module "bitswap blocks" =
           [%test_eq: schema] schema
             (schema_of_blocks ~max_block_size blocks root_block_hash) )
 
-    let%test_unit "when x is aligned (has no partial branch block): \
-                   data_of_blocks (blocks_of_data x) = x" =
+    let%test_unit
+        "when x is aligned (has no partial branch block): data_of_blocks \
+         (blocks_of_data x) = x" =
       let max_block_size = 100 in
       let data_length = max_block_size * 10 in
       let data =

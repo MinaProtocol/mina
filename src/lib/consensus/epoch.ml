@@ -2,9 +2,7 @@ open Core
 open Signed
 open Unsigned
 open Num_util
-
 include Mina_numbers.Nat.Make32 ()
-
 module Time = Block_time
 
 let of_time_exn ~(constants : Constants.t) t : t =
@@ -16,7 +14,7 @@ let of_time_exn ~(constants : Constants.t) t : t =
   uint32_of_int64
     Int64.Infix.(
       Time.Span.to_ms time_since_genesis
-      / Time.Span.(to_ms constants.epoch_duration))
+      / Time.Span.(to_ms constants.epoch_duration) )
 
 let start_time ~(constants : Constants.t) (epoch : t) =
   let ms =
@@ -35,7 +33,7 @@ let slot_start_time ~(constants : Constants.t) (epoch : t) (slot : Slot.t) =
     (start_time epoch ~constants)
     (Block_time.Span.of_ms
        Int64.Infix.(
-         int64_of_uint32 slot * Time.Span.to_ms constants.slot_duration_ms) )
+         int64_of_uint32 slot * Time.Span.to_ms constants.slot_duration_ms ) )
 
 let slot_end_time ~(constants : Constants.t) (epoch : t) (slot : Slot.t) =
   Time.add (slot_start_time epoch slot ~constants) constants.slot_duration_ms
@@ -47,7 +45,7 @@ let epoch_and_slot_of_time_exn ~(constants : Constants.t) tm : t * Slot.t =
     uint32_of_int64
     @@ Int64.Infix.(
          Time.Span.to_ms time_since_epoch
-         / Time.Span.to_ms constants.slot_duration_ms)
+         / Time.Span.to_ms constants.slot_duration_ms )
   in
   (epoch, slot)
 

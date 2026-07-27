@@ -66,7 +66,7 @@ struct
 
   let scale_fast_msb_bits base
       (Pickles_types.Shifted_value.Type1.Shifted_value
-        (bits_msb : Boolean.var array) ) : Field.t * Field.t =
+         (bits_msb : Boolean.var array) ) : Field.t * Field.t =
     let ((x_base, y_base) as base) = seal base in
     let ( !! ) = As_prover.read_var in
     let mk f = exists Field.typ ~compute:f in
@@ -235,7 +235,8 @@ struct
   *)
   let scale_fast2 (g : G.t)
       (Pickles_types.Shifted_value.Type2.Shifted_value
-        ((s_div_2 : Field.t), (s_odd : Boolean.var)) ) ~(num_bits : int) : G.t =
+         ((s_div_2 : Field.t), (s_odd : Boolean.var)) ) ~(num_bits : int) : G.t
+      =
     let s_div_2_bits = num_bits - 1 in
     (* The number of chunks need for scaling by s_div_2. *)
     let chunks_needed = chunks_needed ~num_bits:s_div_2_bits in
@@ -264,7 +265,7 @@ struct
                   let s = read Scalar_field.typ s in
                   let open Scalar_field.Constant in
                   let s_odd = Bigint.test_bit (to_bigint s) 0 in
-                  ((if s_odd then s - one else s) / of_int 2, s_odd)) )
+                  ((if s_odd then s - one else s) / of_int 2, s_odd) ) )
     in
 
     (* In this case, it's safe to use this field to compute

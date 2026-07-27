@@ -259,7 +259,7 @@ let theta (state : Circuit.Field.t State.matrix) : Circuit.Field.t State.matrix
           bxor64
             (* using (x + m mod m) to avoid negative values *)
             state_c.((x + keccak_dim - 1) mod keccak_dim)
-            (rot64 state_c.((x + 1) mod keccak_dim) 1 Left)) )
+            (rot64 state_c.((x + 1) mod keccak_dim) 1 Left) ) )
   in
   (* for all x in {0..4} and y in {0..4}: E[x,y] = A[x,y] xor D[x] *)
   (* return E *)
@@ -304,7 +304,7 @@ let chi (state : Circuit.Field.t State.matrix) : Circuit.Field.t State.matrix =
             state_b.(x).(y)
             (band64
                (bnot64_unchecked state_b.((x + 1) mod 5).(y))
-               state_b.((x + 2) mod 5).(y) ))
+               state_b.((x + 2) mod 5).(y) ) )
     done
   done ;
   (* We can use unchecked NOT because the length of the input is constrained to be

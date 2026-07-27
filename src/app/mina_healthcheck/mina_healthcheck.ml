@@ -31,18 +31,18 @@ let graphql_uri_flag =
   Command.Param.(
     flag "--graphql-uri" ~aliases:[ "-u" ]
       ~doc:(sprintf "URI GraphQL endpoint (default: %s)" default_uri)
-      (optional_with_default default_uri string))
+      (optional_with_default default_uri string) )
 
 let json_flag =
   Command.Param.(
     flag "--json" ~aliases:[ "-j" ] ~doc:" Output as JSON instead of text"
-      no_arg)
+      no_arg )
 
 let min_peers_flag =
   Command.Param.(
     flag "--min-peers" ~aliases:[ "-n" ]
       ~doc:"N Minimum peer count threshold (default: 2)"
-      (optional_with_default 2 int))
+      (optional_with_default 2 int) )
 
 let node_uri s = Uri.of_string s
 
@@ -117,36 +117,36 @@ let daemon_status_command =
            else Deferred.Or_error.fail e
        | Ok ds ->
            ( if json then
-             output
-               (HC.daemon_status_response_to_yojson
-                  { healthy = true
-                  ; sync_status = Some ds.sync_status
-                  ; blockchain_length = ds.blockchain_length
-                  ; highest_block_length_received =
-                      ds.highest_block_length_received
-                  ; uptime_secs = ds.uptime_secs
-                  ; state_hash = ds.state_hash
-                  ; commit_id = ds.commit_id
-                  ; peer_count = Some ds.peer_count
-                  ; error = None
-                  } )
-           else
-             let opt s = Option.value ~default:"n/a" s in
-             let opt_int n =
-               Option.value_map ~default:"n/a" ~f:Int.to_string n
-             in
-             printf "Sync status:       %s\n"
-               (Sync_status.to_string ds.sync_status) ;
-             printf "Blockchain length: %s\n" (opt_int ds.blockchain_length) ;
-             printf "Highest received:  %s\n"
-               (opt_int ds.highest_block_length_received) ;
-             printf "Uptime:            %s\n"
-               (Option.value_map ~default:"n/a"
-                  ~f:(fun s -> sprintf "%ds" s)
-                  ds.uptime_secs ) ;
-             printf "State hash:        %s\n" (opt ds.state_hash) ;
-             printf "Commit ID:         %s\n" (opt ds.commit_id) ;
-             printf "Peers:             %d\n" ds.peer_count ) ;
+               output
+                 (HC.daemon_status_response_to_yojson
+                    { healthy = true
+                    ; sync_status = Some ds.sync_status
+                    ; blockchain_length = ds.blockchain_length
+                    ; highest_block_length_received =
+                        ds.highest_block_length_received
+                    ; uptime_secs = ds.uptime_secs
+                    ; state_hash = ds.state_hash
+                    ; commit_id = ds.commit_id
+                    ; peer_count = Some ds.peer_count
+                    ; error = None
+                    } )
+             else
+               let opt s = Option.value ~default:"n/a" s in
+               let opt_int n =
+                 Option.value_map ~default:"n/a" ~f:Int.to_string n
+               in
+               printf "Sync status:       %s\n"
+                 (Sync_status.to_string ds.sync_status) ;
+               printf "Blockchain length: %s\n" (opt_int ds.blockchain_length) ;
+               printf "Highest received:  %s\n"
+                 (opt_int ds.highest_block_length_received) ;
+               printf "Uptime:            %s\n"
+                 (Option.value_map ~default:"n/a"
+                    ~f:(fun s -> sprintf "%ds" s)
+                    ds.uptime_secs ) ;
+               printf "State hash:        %s\n" (opt ds.state_hash) ;
+               printf "Commit ID:         %s\n" (opt ds.commit_id) ;
+               printf "Peers:             %d\n" ds.peer_count ) ;
            Deferred.Or_error.return () )
 
 let peer_count_command =

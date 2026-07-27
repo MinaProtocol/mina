@@ -171,7 +171,8 @@ let generate_loggers_and_parsers ~loc:_ ~path ty_ext msg_opt =
               Structured_log_events.repr ) =
           { id = [%e evar (event_name ^ "_structured_events_id")]
           ; event_name = [%e estring event_path]
-          ; arguments = Core.String.Set.of_list [%e elist ~f:estring label_names]
+          ; arguments =
+              Core.String.Set.of_list [%e elist ~f:estring label_names]
           ; log =
               (function
               | [%p record_pattern] ->

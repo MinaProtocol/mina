@@ -59,7 +59,8 @@ module Make
       in
       function
       | Mina_wire_types.Network_pool.Snark_pool.Diff_versioned.V3
-        .Add_solved_work (work, proofs) ->
+        .Add_solved_work
+          (work, proofs) ->
           (Add_solved_work (work, map_proofs proofs) : t)
       | Empty ->
           Empty

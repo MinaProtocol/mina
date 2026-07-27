@@ -17,7 +17,7 @@ open Impl
 let read_wrap_circuit_field_element_as_hex fe =
   let prover_fe = As_prover.read Field.typ fe in
   Kimchi_backend.Pasta.Pallas_based_plonk.(
-    Bigint.to_hex (Field.to_bigint prover_fe))
+    Bigint.to_hex (Field.to_bigint prover_fe) )
 
 module Other_field = struct
   type t = Impls.Step.Field.Constant.t [@@deriving sexp]
@@ -37,7 +37,7 @@ module Unsafe = struct
         (Typ.list Boolean.typ_unchecked ~length)
         ~compute:
           As_prover.(
-            fun () -> List.take (Field.Constant.unpack (read_var x)) length)
+            fun () -> List.take (Field.Constant.unpack (read_var x)) length )
     in
     Field.Assert.equal x (Field.project res) ;
     res
@@ -177,7 +177,7 @@ module Inner_curve = struct
                 (C.of_affine (read typ t))
                 (Other.Field.inv
                    (Other.Field.of_bits (List.map ~f:(read Boolean.typ) bs)) )
-              |> C.to_affine_exn)
+              |> C.to_affine_exn )
     in
     assert_equal t (scale res bs) ;
     res

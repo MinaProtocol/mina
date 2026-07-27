@@ -122,7 +122,7 @@ module Make (Inputs : Inputs_intf) = struct
                   "Pickles cannot handle point at infinity. Commitments must \
                    be representable in affine coordinates"
             | Finite (x, y) ->
-                (x, y) ) )
+                (x, y) ))
     | _ ->
         assert false
 end

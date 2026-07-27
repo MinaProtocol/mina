@@ -1,34 +1,37 @@
 open Core
 
-module Make (Inputs : sig
-  include Intf.Inputs.Intf
+module Make
+    (Inputs : sig
+      include Intf.Inputs.Intf
 
-  type converted_account
+      type converted_account
 
-  val convert : Account.t -> converted_account
-end)
-(Primary_ledger : Intf.Ledger.S
-                    with module Location = Inputs.Location
-                     and module Addr = Inputs.Location.Addr
-                     and type key := Inputs.Key.t
-                     and type token_id := Inputs.Token_id.t
-                     and type token_id_set := Inputs.Token_id.Set.t
-                     and type account := Inputs.Account.t
-                     and type root_hash := Inputs.Hash.t
-                     and type hash := Inputs.Hash.t
-                     and type account_id := Inputs.Account_id.t
-                     and type account_id_set := Inputs.Account_id.Set.t)
-(Converting_ledger : Intf.Ledger.S
-                       with module Location = Inputs.Location
-                        and module Addr = Inputs.Location.Addr
-                        and type key := Inputs.Key.t
-                        and type token_id := Inputs.Token_id.t
-                        and type token_id_set := Inputs.Token_id.Set.t
-                        and type account := Inputs.converted_account
-                        and type root_hash := Inputs.Hash.t
-                        and type hash := Inputs.Hash.t
-                        and type account_id := Inputs.Account_id.t
-                        and type account_id_set := Inputs.Account_id.Set.t) :
+      val convert : Account.t -> converted_account
+    end)
+    (Primary_ledger :
+      Intf.Ledger.S
+        with module Location = Inputs.Location
+         and module Addr = Inputs.Location.Addr
+         and type key := Inputs.Key.t
+         and type token_id := Inputs.Token_id.t
+         and type token_id_set := Inputs.Token_id.Set.t
+         and type account := Inputs.Account.t
+         and type root_hash := Inputs.Hash.t
+         and type hash := Inputs.Hash.t
+         and type account_id := Inputs.Account_id.t
+         and type account_id_set := Inputs.Account_id.Set.t)
+    (Converting_ledger :
+      Intf.Ledger.S
+        with module Location = Inputs.Location
+         and module Addr = Inputs.Location.Addr
+         and type key := Inputs.Key.t
+         and type token_id := Inputs.Token_id.t
+         and type token_id_set := Inputs.Token_id.Set.t
+         and type account := Inputs.converted_account
+         and type root_hash := Inputs.Hash.t
+         and type hash := Inputs.Hash.t
+         and type account_id := Inputs.Account_id.t
+         and type account_id_set := Inputs.Account_id.Set.t) :
   Intf.Ledger.Converting.S
     with module Location = Inputs.Location
      and module Addr = Inputs.Location.Addr
@@ -229,37 +232,40 @@ module With_database_config = struct
     }
 end
 
-module With_database (Inputs : sig
-  include Intf.Inputs.Intf
+module With_database
+    (Inputs : sig
+      include Intf.Inputs.Intf
 
-  type converted_account
+      type converted_account
 
-  val convert : Account.t -> converted_account
+      val convert : Account.t -> converted_account
 
-  val converted_equal : converted_account -> converted_account -> bool
-end)
-(Primary_db : Intf.Ledger.DATABASE
-                with module Location = Inputs.Location
-                 and module Addr = Inputs.Location.Addr
-                 and type key := Inputs.Key.t
-                 and type token_id := Inputs.Token_id.t
-                 and type token_id_set := Inputs.Token_id.Set.t
-                 and type account := Inputs.Account.t
-                 and type root_hash := Inputs.Hash.t
-                 and type hash := Inputs.Hash.t
-                 and type account_id := Inputs.Account_id.t
-                 and type account_id_set := Inputs.Account_id.Set.t)
-(Converting_db : Intf.Ledger.DATABASE
-                   with module Location = Inputs.Location
-                    and module Addr = Inputs.Location.Addr
-                    and type key := Inputs.Key.t
-                    and type token_id := Inputs.Token_id.t
-                    and type token_id_set := Inputs.Token_id.Set.t
-                    and type account := Inputs.converted_account
-                    and type root_hash := Inputs.Hash.t
-                    and type hash := Inputs.Hash.t
-                    and type account_id := Inputs.Account_id.t
-                    and type account_id_set := Inputs.Account_id.Set.t) =
+      val converted_equal : converted_account -> converted_account -> bool
+    end)
+    (Primary_db :
+      Intf.Ledger.DATABASE
+        with module Location = Inputs.Location
+         and module Addr = Inputs.Location.Addr
+         and type key := Inputs.Key.t
+         and type token_id := Inputs.Token_id.t
+         and type token_id_set := Inputs.Token_id.Set.t
+         and type account := Inputs.Account.t
+         and type root_hash := Inputs.Hash.t
+         and type hash := Inputs.Hash.t
+         and type account_id := Inputs.Account_id.t
+         and type account_id_set := Inputs.Account_id.Set.t)
+    (Converting_db :
+      Intf.Ledger.DATABASE
+        with module Location = Inputs.Location
+         and module Addr = Inputs.Location.Addr
+         and type key := Inputs.Key.t
+         and type token_id := Inputs.Token_id.t
+         and type token_id_set := Inputs.Token_id.Set.t
+         and type account := Inputs.converted_account
+         and type root_hash := Inputs.Hash.t
+         and type hash := Inputs.Hash.t
+         and type account_id := Inputs.Account_id.t
+         and type account_id_set := Inputs.Account_id.Set.t) =
 struct
   include Make (Inputs) (Primary_db) (Converting_db)
   module Config = With_database_config

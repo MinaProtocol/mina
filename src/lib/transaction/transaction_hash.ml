@@ -268,11 +268,11 @@ let%test_module "Transaction hashes" =
         account_updates =
           Zkapp_command.Call_forest.forget_hashes
           @@ Zkapp_command.Call_forest.map txn.account_updates ~f:(fun x ->
-                 { (Account_update.forget_aux x) with
-                   Account_update.Poly.authorization =
-                     Mina_base.Control.Poly.Proof
-                       (Lazy.force Proof.blockchain_dummy)
-                 } )
+              { (Account_update.forget_aux x) with
+                Account_update.Poly.authorization =
+                  Mina_base.Control.Poly.Proof
+                    (Lazy.force Proof.blockchain_dummy)
+              } )
       }
 
     let new_zkapp_transaction_id () =

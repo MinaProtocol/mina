@@ -61,7 +61,6 @@ struct
 end
 
 module Account_info = Make_account_info ()
-
 module Circuits = Make_circuits (Account_info)
 
 let account_update =

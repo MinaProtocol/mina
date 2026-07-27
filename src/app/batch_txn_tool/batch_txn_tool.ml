@@ -71,7 +71,7 @@ let output_cmds =
            let slot_limit =
              Float.(
                of_int txns_per_block /. of_int slot_time *. fill_rate
-               *. of_int rate_limit_interval)
+               *. of_int rate_limit_interval )
            in
            let limit = min (Float.to_int slot_limit) rate_limit_level in
            Some limit
@@ -162,7 +162,7 @@ let there_and_back_again ~num_txn_per_acct ~txns_per_block ~slot_time ~fill_rate
     let slot_limit =
       Float.(
         of_int txns_per_block /. of_int slot_time *. fill_rate
-        *. of_int rate_limit_interval)
+        *. of_int rate_limit_interval )
     in
     min (Float.to_int slot_limit) rate_limit_level
   in

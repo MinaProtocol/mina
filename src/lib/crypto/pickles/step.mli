@@ -51,7 +51,8 @@ open Pickles_types
       fixed-size vectors used for proof data. *)
 module Make
     (Inductive_rule : Inductive_rule.Intf with type 'a proof = 'a Proof.t)
-    (A : Pickles_types.Poly_types.T0) (A_value : sig
+    (A : Pickles_types.Poly_types.T0)
+    (A_value : sig
       type t
     end)
     (Max_proofs_verified : Pickles_types.Nat.Add.Intf_transparent) : sig

@@ -74,7 +74,7 @@ module Internal_command_info = struct
       (* We choose to represent the dec-side of fee transfers from txns from the
        * canonical user command that created them so we are able consistently
        * produce more balance changing operations in the mempool or a block.
-       * *)
+       *)
       let plan : 'a Op.t list =
         let mk_account_creation_fee related =
           match t.receiver_account_creation_fee_paid with
@@ -89,7 +89,7 @@ module Internal_command_info = struct
         match t.kind with
         | `Coinbase ->
             (* The coinbase transaction is really incrementing by the coinbase
-               * amount *)
+             * amount *)
             [ { Op.label = `Coinbase_inc; related_to = None } ]
             @ mk_account_creation_fee `Coinbase_inc
         | `Fee_transfer ->
@@ -291,7 +291,7 @@ module User_command_info = struct
         let memo_text = "rosetta-memo-test" in
         let memo_base58 =
           Mina_base.Signed_command_memo.(
-            create_from_string_exn memo_text |> to_base58_check)
+            create_from_string_exn memo_text |> to_base58_check )
         in
         let info = { (List.hd_exn dummies) with memo = Some memo_base58 } in
         let fields = metadata_fields info in
@@ -359,7 +359,7 @@ module User_command_info = struct
                   try
                     Some
                       Mina_base.Signed_command_memo.(
-                        s |> of_base58_check_exn |> to_string_hum)
+                        s |> of_base58_check_exn |> to_string_hum )
                   with _ -> None )
             in
             let expect_memo_field =
@@ -460,13 +460,13 @@ module Zkapp_command_info = struct
         ~plan:
           ( { Op.label = `Zkapp_fee_payer_dec; related_to = None }
           :: List.concat_map t.account_updates ~f:(fun upd ->
-                 let balance_op =
-                   { Op.label = `Zkapp_account_update upd; related_to = None }
-                 in
-                 let fee_ops =
-                   mk_account_creation_fee upd (`Zkapp_account_update upd)
-                 in
-                 balance_op :: fee_ops ) )
+              let balance_op =
+                { Op.label = `Zkapp_account_update upd; related_to = None }
+              in
+              let fee_ops =
+                mk_account_creation_fee upd (`Zkapp_account_update upd)
+              in
+              balance_op :: fee_ops ) )
         ~f:(fun ~related_operations ~operation_identifier op ->
           let default_token = `Token_id Amount_of.Token_id.default in
           match op.label with
@@ -489,12 +489,12 @@ module Zkapp_command_info = struct
                     Some
                       Amount_of.(
                         negated @@ token upd.token
-                        @@ Unsigned_extended.UInt64.of_string amount)
+                        @@ Unsigned_extended.UInt64.of_string amount )
                 | None ->
                     Some
                       Amount_of.(
                         token upd.token
-                        @@ Unsigned_extended.UInt64.of_string upd.balance_change)
+                        @@ Unsigned_extended.UInt64.of_string upd.balance_change )
               in
               M.return
                 { Operation.operation_identifier
@@ -607,7 +607,7 @@ module Zkapp_command_info = struct
         let memo_text = "rosetta-memo-test" in
         let memo_base58 =
           Mina_base.Signed_command_memo.(
-            create_from_string_exn memo_text |> to_base58_check)
+            create_from_string_exn memo_text |> to_base58_check )
         in
         let cmd = { (List.nth_exn dummies 0) with memo = Some memo_base58 } in
         let fields = metadata_fields cmd in
@@ -698,7 +698,7 @@ module Zkapp_command_info = struct
               try
                 Some
                   Mina_base.Signed_command_memo.(
-                    s |> of_base58_check_exn |> to_string_hum)
+                    s |> of_base58_check_exn |> to_string_hum )
               with _ -> None
             in
             let expect_memo_field =

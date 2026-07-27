@@ -1,8 +1,8 @@
 module Scalars = Graphql_lib.Scalars
 
 module Get_options_metadata =
-[%graphql
-{|
+  [%graphql
+  {|
     query get_options_metadata($sender: PublicKey!, $token_id: TokenId, $receiver_key: PublicKey!) {
       bestChain(maxLength: 5) {
         transactions {
@@ -23,8 +23,8 @@ module Get_options_metadata =
 |}]
 
 module Send_payment =
-[%graphql
-{|
+  [%graphql
+  {|
   mutation send($from: PublicKey!, $to_: PublicKey!, $token: UInt64,
                 $amount: UInt64!, $fee: UInt64!, $validUntil: UInt64,
                 $memo: String, $nonce: UInt32!, $signature: String!) {
@@ -38,8 +38,8 @@ module Send_payment =
   |}]
 
 module Send_delegation =
-[%graphql
-{|
+  [%graphql
+  {|
 mutation ($sender: PublicKey!,
           $receiver: PublicKey!,
           $fee: UInt64!,
@@ -104,29 +104,29 @@ module Options = struct
   let of_json r =
     Raw.of_yojson r
     |> Result.map_error ~f:(fun e ->
-           Errors.create ~context:"Options of_json" (`Json_parse (Some e)) )
+        Errors.create ~context:"Options of_json" (`Json_parse (Some e)) )
     |> Result.bind ~f:(fun (r : Raw.t) ->
-           let open Result.Let_syntax in
-           let error which e =
-             Errors.create
-               ~context:("Options of_json bad public key (" ^ which ^ ")")
-               (`Json_parse (Some (Core.Error.to_string_hum e)))
-           in
-           let%bind sender =
-             Public_key.Compressed.of_base58_check r.sender
-             |> Result.map_error ~f:(error "sender")
-           in
-           let%map receiver =
-             Public_key.Compressed.of_base58_check r.receiver
-             |> Result.map_error ~f:(error "receiver")
-           in
-           { sender
-           ; token_id = r.token_id
-           ; receiver
-           ; valid_until =
-               Option.map ~f:Unsigned_extended.UInt32.of_string r.valid_until
-           ; memo = r.memo
-           } )
+        let open Result.Let_syntax in
+        let error which e =
+          Errors.create
+            ~context:("Options of_json bad public key (" ^ which ^ ")")
+            (`Json_parse (Some (Core.Error.to_string_hum e)))
+        in
+        let%bind sender =
+          Public_key.Compressed.of_base58_check r.sender
+          |> Result.map_error ~f:(error "sender")
+        in
+        let%map receiver =
+          Public_key.Compressed.of_base58_check r.receiver
+          |> Result.map_error ~f:(error "receiver")
+        in
+        { sender
+        ; token_id = r.token_id
+        ; receiver
+        ; valid_until =
+            Option.map ~f:Unsigned_extended.UInt32.of_string r.valid_until
+        ; memo = r.memo
+        } )
 end
 
 (* TODO: unify handling of json between this and Options (above) and everything else in rosetta *)
@@ -156,7 +156,7 @@ module Metadata_data = struct
   let of_json r =
     of_yojson r
     |> Result.map_error ~f:(fun e ->
-           Errors.create ~context:"Options of_json" (`Json_parse (Some e)) )
+        Errors.create ~context:"Options of_json" (`Json_parse (Some e)) )
 end
 
 module Derive = struct
@@ -196,7 +196,7 @@ module Derive = struct
             (User_command_info.account_id
                (`Pk (Public_key.Compressed.to_base58_check pk_compressed))
                (`Token_id
-                 (Option.value ~default:Amount_of.Token_id.default token_id) ) )
+                  (Option.value ~default:Amount_of.Token_id.default token_id) ) )
       ; metadata = None
       }
   end
@@ -239,12 +239,13 @@ module Metadata = struct
                 make
                 @@ makeVariables
                      ~sender:
-                       (`String (Public_key.Compressed.to_base58_check address))
+                       (`String (Public_key.Compressed.to_base58_check address)
+                     )
                        (* for now, nonce is based on the fee payer's account using the default token,
                           per @mrmr1993
                        *)
                      ~token_id:
-                       (`String Mina_base.Token_id.(default |> to_string))
+                       (`String Mina_base.Token_id.(default |> to_string) )
                        (* WAS:
                           ( match token_id with
                           | Some x ->
@@ -254,7 +255,7 @@ module Metadata = struct
                        *)
                      ~receiver_key:
                        (`String (Public_key.Compressed.to_base58_check receiver))
-                     ())
+                     () )
               graphql_uri )
       ; validate_network_choice = Network.Validate_choice.Real.validate
       ; lift = Deferred.return
@@ -320,7 +321,7 @@ module Metadata = struct
             M.fail
               (Errors.create
                  (`Account_not_found
-                   (Public_key.Compressed.to_base58_check options.sender) ) )
+                    (Public_key.Compressed.to_base58_check options.sender) ) )
         | Some account ->
             M.return account
       in
@@ -339,7 +340,7 @@ module Metadata = struct
               let a =
                 Array.fold chain ~init:[] ~f:(fun fees block ->
                     Array.fold block.transactions.userCommands ~init:fees
-                      ~f:(fun fees cmd -> cmd.fee :: fees) )
+                      ~f:(fun fees cmd -> cmd.fee :: fees ) )
                 |> Array.of_list
               in
               Array.sort a ~compare:Unsigned_extended.UInt64.compare ;
@@ -373,7 +374,7 @@ module Metadata = struct
             ~token_id:options.Options.token_id ~nonce ~receiver:options.receiver
             ~account_creation_fee:
               ( if receiver_exists then None
-              else Some (Mina_currency.Fee.to_uint64 account_creation_fee) )
+                else Some (Mina_currency.Fee.to_uint64 account_creation_fee) )
             ~valid_until:options.valid_until ~memo:options.memo
           |> Metadata_data.to_yojson
       ; suggested_fee =
@@ -396,8 +397,8 @@ module Preprocess = struct
     let of_json r =
       of_yojson r
       |> Result.map_error ~f:(fun e ->
-             Errors.create ~context:"Preprocess metadata of_json"
-               (`Json_parse (Some e)) )
+          Errors.create ~context:"Preprocess metadata of_json"
+            (`Json_parse (Some e)) )
   end
 
   module Env = struct
@@ -435,7 +436,7 @@ module Preprocess = struct
       let key (`Pk pk) =
         Public_key.Compressed.of_base58_check pk
         |> Result.map_error ~f:(fun _ ->
-               Errors.create `Public_key_format_not_valid )
+            Errors.create `Public_key_format_not_valid )
         |> env.lift
       in
       let%bind sender =
@@ -507,12 +508,12 @@ module Payloads = struct
         let (`Pk pk) = partial_user_command.User_command_info.Partial.source in
         Public_key.Compressed.of_base58_check pk
         |> Result.map_error ~f:(fun _ ->
-               Errors.create ~context:"compression" `Public_key_format_not_valid )
+            Errors.create ~context:"compression" `Public_key_format_not_valid )
         |> Result.bind ~f:(fun pk ->
-               Result.of_option (Public_key.decompress pk)
-                 ~error:
-                   (Errors.create ~context:"decompression"
-                      `Public_key_format_not_valid ) )
+            Result.of_option (Public_key.decompress pk)
+              ~error:
+                (Errors.create ~context:"decompression"
+                   `Public_key_format_not_valid ) )
         |> Result.map ~f:Rosetta_coding.Coding.of_public_key
         |> Result.map ~f:ignore |> env.lift
       in
@@ -698,8 +699,8 @@ module Parse = struct
             Result.fail
             @@ Errors.create
                  (`Transaction_submit_fee_small
-                   (Mina_currency.Fee.to_mina_string minimum_user_command_fee)
-                   )
+                    (Mina_currency.Fee.to_mina_string minimum_user_command_fee)
+                 )
       | None ->
           Ok ()
 
@@ -719,7 +720,7 @@ module Parse = struct
             let%bind signed_rendered_transaction =
               Transaction.Signed.Rendered.of_yojson json
               |> Result.map_error ~f:(fun e ->
-                     Errors.create (`Json_parse (Some e)) )
+                  Errors.create (`Json_parse (Some e)) )
               |> env.lift
             in
             let%bind () =
@@ -755,7 +756,7 @@ module Parse = struct
             let%bind unsigned_rendered_transaction =
               Transaction.Unsigned.Rendered.of_yojson json
               |> Result.map_error ~f:(fun e ->
-                     Errors.create (`Json_parse (Some e)) )
+                  Errors.create (`Json_parse (Some e)) )
               |> env.lift
             in
             let%bind () =
@@ -820,12 +821,12 @@ module Hash = struct
         let (`Pk pk) = signed_transaction.command.source in
         Public_key.Compressed.of_base58_check pk
         |> Result.map_error ~f:(fun _ ->
-               Errors.create ~context:"compression" `Public_key_format_not_valid )
+            Errors.create ~context:"compression" `Public_key_format_not_valid )
         |> Result.bind ~f:(fun pk ->
-               Result.of_option (Public_key.decompress pk)
-                 ~error:
-                   (Errors.create ~context:"decompression"
-                      `Public_key_format_not_valid ) )
+            Result.of_option (Public_key.decompress pk)
+              ~error:
+                (Errors.create ~context:"decompression"
+                   `Public_key_format_not_valid ) )
         |> Result.map_error ~f:(fun _ -> Errors.create `Malformed_public_key)
         |> env.lift
       in
@@ -952,7 +953,7 @@ module Submit = struct
                        ~amount:(uint64 payment.amount) ~fee:(uint64 payment.fee)
                        ?validUntil:(Option.map ~f:uint32 payment.valid_until)
                        ?memo:payment.memo ~nonce:(uint32 payment.nonce)
-                       ~signature ())
+                       ~signature () )
                 graphql_uri )
         ; gql_delegation =
             (fun ~delegation ~signature () ->
@@ -965,7 +966,7 @@ module Submit = struct
                          (* TODO: Enable these when graphql supports sending validUntil for these transactions *)
                          (* ?validUntil:(Option.map ~f:uint32 delegation.valid_until) *)
                        ?memo:delegation.memo ~nonce:(uint32 delegation.nonce)
-                       ~signature ())
+                       ~signature () )
                 graphql_uri )
         ; db_transaction_exists =
             (fun ~nonce ~source ~receiver ~amount ~fee ->

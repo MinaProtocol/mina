@@ -189,7 +189,7 @@ let rec remove_tree t parent_hash =
   Hashtbl.remove t.collected_transitions parent_hash ;
   Mina_metrics.(
     Gauge.dec_one
-      Transition_frontier_controller.transitions_in_catchup_scheduler) ;
+      Transition_frontier_controller.transitions_in_catchup_scheduler ) ;
   List.iter children ~f:(fun child ->
       let transition, _ = Envelope.Incoming.data (Cached.peek child) in
       remove_tree t (State_hash.With_state_hashes.state_hash transition) )
@@ -212,7 +212,7 @@ let make_timeout t transition_with_hash duration =
       Hashtbl.remove t.parent_root_timeouts target_hash ;
       Mina_metrics.(
         Gauge.dec_one
-          Transition_frontier_controller.transitions_in_catchup_scheduler) ;
+          Transition_frontier_controller.transitions_in_catchup_scheduler ) ;
       remove_tree t target_hash ;
       [%log' info t.logger]
         ~metadata:
@@ -271,7 +271,7 @@ let watch t ~timeout_duration ~cached_transition ~valid_cb =
           : [ `Duplicate | `Ok ] ) ;
       Mina_metrics.(
         Gauge.inc_one
-          Transition_frontier_controller.transitions_in_catchup_scheduler)
+          Transition_frontier_controller.transitions_in_catchup_scheduler )
   | Some cached_sibling_transitions ->
       if
         List.exists cached_sibling_transitions
@@ -294,7 +294,7 @@ let watch t ~timeout_duration ~cached_transition ~valid_cb =
           ~f:(Option.value ~default:[]) ;
         Mina_metrics.(
           Gauge.inc_one
-            Transition_frontier_controller.transitions_in_catchup_scheduler)
+            Transition_frontier_controller.transitions_in_catchup_scheduler )
 
 (** Handles a header received from gossip.
     If a block corresponding to the header wasn't received yet, catchup
@@ -443,8 +443,8 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
                   Strict_pipe.Writer.close catchup_breadcrumbs_writer ;
                   Strict_pipe.Writer.close catchup_job_writer ) )
 
-    let%test_unit "catchup jobs do not fire after timeout if they are \
-                   invalidated" =
+    let%test_unit
+        "catchup jobs do not fire after timeout if they are invalidated" =
       let timeout_duration = Block_time.Span.of_ms 200L in
       let test_delta = Block_time.Span.of_ms 400L in
       Quickcheck.test ~trials:3
@@ -513,9 +513,9 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
                   failwith "pipe closed unexpectedly"
               | `Ok
                   (`Ok
-                    ( [ Mina_stdlib.Rose_tree.T ((received_breadcrumb, _vc), [])
-                      ]
-                    , `Catchup_scheduler ) ) ->
+                     ( [ Mina_stdlib.Rose_tree.T ((received_breadcrumb, _vc), [])
+                       ]
+                     , `Catchup_scheduler ) ) ->
                   [%test_eq: State_hash.t]
                     (Transition_frontier.Breadcrumb.state_hash
                        (Cached.peek received_breadcrumb) )
@@ -532,8 +532,9 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
           Strict_pipe.Writer.close catchup_breadcrumbs_writer ;
           Strict_pipe.Writer.close catchup_job_writer )
 
-    let%test_unit "catchup scheduler should not create duplicate jobs when a \
-                   sequence of transitions is added in reverse order" =
+    let%test_unit
+        "catchup scheduler should not create duplicate jobs when a sequence of \
+         transitions is added in reverse order" =
       let timeout_duration = Block_time.Span.of_ms 400L in
       Quickcheck.test ~trials:3
         (Transition_frontier.For_tests.gen_with_branch ~precomputed_values

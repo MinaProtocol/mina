@@ -60,8 +60,8 @@ module Schema = struct
     | Root_hash : State_hash.Stable.Latest.t t
     | Root_common : Root_data.Common.Stable.Latest.t t
     | Best_tip : State_hash.Stable.Latest.t t
-    | Protocol_states_for_root_scan_state
-        : Mina_state.Protocol_state.Value.Stable.Latest.t list t
+    | Protocol_states_for_root_scan_state :
+        Mina_state.Protocol_state.Value.Stable.Latest.t list t
 
   let to_string : type a. a t -> string = function
     | Db_version ->

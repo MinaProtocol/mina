@@ -1693,11 +1693,11 @@ let gen_max_cost_zkapp_command_from ?memo ?fee_range ?pk ?(n_updates : int = 15)
         let zkapp_accounts =
           Hashtbl.data account_state_tbl
           |> List.filter_map ~f:(fun ((a, role) : Account.t * role) ->
-                 match role with
-                 | `Ordinary_participant ->
-                     Option.map a.zkapp ~f:(fun _ -> a)
-                 | _ ->
-                     None )
+              match role with
+              | `Ordinary_participant ->
+                  Option.map a.zkapp ~f:(fun _ -> a)
+              | _ ->
+                  None )
         in
         let zkapp_pks = List.map zkapp_accounts ~f:(fun a -> a.public_key) in
         Quickcheck.Generator.(of_list zkapp_pks |> list_with_length n_updates)
@@ -1979,8 +1979,9 @@ let%test_module _ =
         in
         gen_and_test_tx ~n_expected_updates:n_updates ~keymap max_cost_cmd_gen )
 
-    let%test_unit "proof cache keys on Zkapp_statement enables reuse across \
-                   transactions" =
+    let%test_unit
+        "proof cache keys on Zkapp_statement enables reuse across transactions"
+        =
       (* Verifies that the proof cache, keyed on Zkapp_statement, produces
          valid proofs across multiple transactions and that deterministic
          events/actions enable cache reuse. *)

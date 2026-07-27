@@ -139,8 +139,7 @@ let get_hw_info () =
       ]
     in
     let%map outputs =
-      Deferred.List.map ~how:`Sequential linux_hw_progs
-        ~f:(fun (prog, args) ->
+      Deferred.List.map ~how:`Sequential linux_hw_progs ~f:(fun (prog, args) ->
           let header =
             sprintf "*** Output from '%s' ***\n"
               (String.concat ~sep:" " (prog :: args))

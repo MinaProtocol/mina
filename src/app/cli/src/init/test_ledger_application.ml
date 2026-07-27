@@ -33,8 +33,9 @@ let mk_tx ~transfer_parties_get_actions_events ~event_elements ~action_elements
       let open Base_quickcheck.Generator.Let_syntax in
       let%bind receivers =
         Base_quickcheck.Generator.list_with_length ~length:num_acc_updates
-        @@ let%map kp = Signature_lib.Keypair.gen in
-           (First kp, Currency.Amount.zero)
+        @@
+        let%map kp = Signature_lib.Keypair.gen in
+        (First kp, Currency.Amount.zero)
       in
       let%bind events =
         Quickcheck.Generator.list_with_length event_elements generate_event
@@ -62,7 +63,7 @@ let mk_tx ~transfer_parties_get_actions_events ~event_elements ~action_elements
         Currency.Amount.(
           scale
             (of_fee constraint_constants.account_creation_fee)
-            num_acc_updates)
+            num_acc_updates )
         |> Option.value_exn ~here:[%here]
     ; zkapp_account_keypairs
     ; memo = Signed_command_memo.empty

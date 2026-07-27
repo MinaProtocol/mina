@@ -34,7 +34,7 @@ let update_state public_key =
     (fun account_update ->
       let new_state =
         exists (Typ.list ~length:Mina_base.Zkapp_state.max_size_int Field.typ)
-          ~request:(fun () -> New_state)
+          ~request:(fun () -> New_state )
       in
       account_update#assert_state_proved ;
       account_update#set_full_state new_state )

@@ -117,7 +117,7 @@ module Allocation_data = struct
           { allocation_times =
               Queue.of_list
               @@ List.map (List.rev time_offsets) ~f:(fun offset ->
-                     (0, Time_float.sub now (Time_float.Span.of_ms offset)) )
+                  (0, Time_float.sub now (Time_float.Span.of_ms offset)) )
           ; next_allocation_id = 0
           }
         in
@@ -204,6 +204,6 @@ let dump () =
   let entries =
     Hashtbl.to_alist table
     |> List.Assoc.map ~f:(fun { statistics; _ } ->
-           Allocation_statistics.to_yojson statistics )
+        Allocation_statistics.to_yojson statistics )
   in
   `Assoc entries

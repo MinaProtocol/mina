@@ -308,7 +308,7 @@ let%test_module "Epoch ledger sync tests" =
           Any.Creatable
             ( (module Libp2p)
             , Libp2p.create ~allow_multiple_instances:true ~pids
-                gossip_net_params ))
+                gossip_net_params ) )
       in
       let log_gossip_heard : Mina_networking.Config.log_gossip_heard =
         { snark_pool_diff = false
@@ -502,7 +502,7 @@ let%test_module "Epoch ledger sync tests" =
       let%bind () =
         match%map
           Mina_ledger.Sync_ledger.Root.fetch sync_ledger1 staking_ledger_root
-            ~data:() ~equal:(fun () () -> true)
+            ~data:() ~equal:(fun () () -> true )
         with
         | `Ok ledger ->
             let sync_ledger1_tm1 = Unix.gettimeofday () in
@@ -519,7 +519,7 @@ let%test_module "Epoch ledger sync tests" =
       let sync_ledger2 = make_sync_ledger () in
       match%bind
         Mina_ledger.Sync_ledger.Root.fetch sync_ledger2 next_epoch_ledger_root
-          ~data:() ~equal:(fun () () -> true)
+          ~data:() ~equal:(fun () () -> true )
       with
       | `Ok ledger ->
           let sync_ledger2_tm1 = Unix.gettimeofday () in
@@ -617,13 +617,15 @@ let%test_module "Epoch ledger sync tests" =
             (module Context)
             ~starting_accounts:[]
 
-    let%test_unit "Sync current, next staking ledgers to empty ledgers, backed \
-                   with stable db" =
+    let%test_unit
+        "Sync current, next staking ledgers to empty ledgers, backed with \
+         stable db" =
       Async.Thread_safe.block_on_async_exn
         (test_sync_current_next_staking_to_empty_ledger ~backing_type:Stable_db)
 
-    let%test_unit "Sync current, next staking ledgers to empty ledgers, backed \
-                   with converting db" =
+    let%test_unit
+        "Sync current, next staking ledgers to empty ledgers, backed with \
+         converting db" =
       Async.Thread_safe.block_on_async_exn
         (test_sync_current_next_staking_to_empty_ledger
            ~backing_type:
@@ -654,14 +656,16 @@ let%test_module "Epoch ledger sync tests" =
             (module Context)
             ~starting_accounts ~backing_type
 
-    let%test_unit "Sync current, next staking ledgers to nonempty ledgers, \
-                   backed with stable db" =
+    let%test_unit
+        "Sync current, next staking ledgers to nonempty ledgers, backed with \
+         stable db" =
       Async.Thread_safe.block_on_async_exn
         (test_sync_current_next_staking_to_nonempty_ledger
            ~backing_type:Stable_db )
 
-    let%test_unit "Sync current, next staking ledgers to nonempty ledgers, \
-                   backed with converting db" =
+    let%test_unit
+        "Sync current, next staking ledgers to nonempty ledgers, backed with \
+         converting db" =
       Async.Thread_safe.block_on_async_exn
         (test_sync_current_next_staking_to_nonempty_ledger
            ~backing_type:

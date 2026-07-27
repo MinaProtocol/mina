@@ -76,11 +76,11 @@ let notify (t : t) ~logger ~frontier ~diffs_with_mutants =
 
 type ('ext, 'view) access =
   | Root_history : (Root_history.t, Root_history.view) access
-  | Snark_pool_refcount
-      : (Snark_pool_refcount.t, Snark_pool_refcount.view) access
+  | Snark_pool_refcount :
+      (Snark_pool_refcount.t, Snark_pool_refcount.view) access
   | Best_tip_diff : (Best_tip_diff.t, Best_tip_diff.view) access
-  | Transition_registry
-      : (Transition_registry.t, Transition_registry.view) access
+  | Transition_registry :
+      (Transition_registry.t, Transition_registry.view) access
   | New_breadcrumbs : (New_breadcrumbs.t, New_breadcrumbs.view) access
 
 type ('ext, 'view) broadcasted_extension =
@@ -92,9 +92,8 @@ type ('ext, 'view) broadcasted_extension =
       * 't
       -> ('ext, 'view) broadcasted_extension
 
-let get :
-    type ext view. t -> (ext, view) access -> (ext, view) broadcasted_extension
-    =
+let get : type ext view.
+    t -> (ext, view) access -> (ext, view) broadcasted_extension =
  fun { root_history
      ; snark_pool_refcount
      ; best_tip_diff
@@ -120,8 +119,8 @@ let get_extension : type ext view. t -> (ext, view) access -> ext =
   let (Broadcasted_extension ((module B), ext)) = get t access in
   B.extension ext
 
-let get_view_pipe :
-    type ext view. t -> (ext, view) access -> view Broadcast_pipe.Reader.t =
+let get_view_pipe : type ext view.
+    t -> (ext, view) access -> view Broadcast_pipe.Reader.t =
  fun t access ->
   let (Broadcasted_extension ((module B), ext)) = get t access in
   B.reader ext

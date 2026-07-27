@@ -404,10 +404,10 @@ module Transaction_pool = struct
                       let collected_errors =
                         Array.to_sequence a
                         |> Sequence.filter_map ~f:(function
-                             | `Valid_assuming (_, _, err) ->
-                                 Some err
-                             | _ ->
-                                 None )
+                          | `Valid_assuming (_, _, err) ->
+                              Some err
+                          | _ ->
+                              None )
                         |> Sequence.to_list
                       in
                       let error_attached =

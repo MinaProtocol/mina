@@ -45,7 +45,7 @@ module Max_block_height = struct
         Mina_metrics.(
           Gauge.set
             (Archive.max_block_height metric_server)
-            (Float.of_int max_height)) )
+            (Float.of_int max_height) ) )
 end
 
 module Missing_blocks = struct
@@ -69,7 +69,7 @@ module Missing_blocks = struct
         Mina_metrics.(
           Gauge.set
             (Archive.missing_blocks metric_server)
-            (Float.of_int missing_blocks)) )
+            (Float.of_int missing_blocks) ) )
 end
 
 module Unparented_blocks = struct
@@ -89,7 +89,7 @@ module Unparented_blocks = struct
         Mina_metrics.(
           Gauge.set
             (Archive.unparented_blocks metric_server)
-            (Float.of_int unparented_block_count)) )
+            (Float.of_int unparented_block_count) ) )
 end
 
 let log_error ~logger pool metric_server

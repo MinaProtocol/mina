@@ -82,4 +82,4 @@ let check_commands ledger ~verifier
       | `Valid_assuming _ ->
           Error
             (Verifier.Failure.Verification_failed
-               (Error.of_string "batch verification failed") ) ) )
+               (Error.of_string "batch verification failed") ) ))

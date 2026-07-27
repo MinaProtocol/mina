@@ -57,14 +57,14 @@ let deploy_zkapps ~scheduler_tbl ~mina ~ledger ~deployment_fee ~max_cost
             ~signature_kind:Testnet
             ~permissions:
               ( if max_cost then
-                { Permissions.user_default with
-                  set_verification_key =
-                    ( Permissions.Auth_required.Proof
-                    , Mina_numbers.Txn_version.current )
-                ; edit_state = Permissions.Auth_required.Proof
-                ; edit_action_state = Proof
-                }
-              else Permissions.user_default )
+                  { Permissions.user_default with
+                    set_verification_key =
+                      ( Permissions.Auth_required.Proof
+                      , Mina_numbers.Txn_version.current )
+                  ; edit_state = Permissions.Auth_required.Proof
+                  ; edit_action_state = Proof
+                  }
+                else Permissions.user_default )
             spec
         in
         let%bind zkapp_command = zkapp_command in
@@ -141,7 +141,7 @@ let rec wait_until_zkapps_deployed ?(deployed = false) ~scheduler_tbl ~mina
     let ledger =
       Utils.get_ledger_and_breadcrumb mina
       |> Option.value_map ~default:ledger ~f:(fun (new_ledger, _) ->
-             new_ledger )
+          new_ledger )
     in
     wait_until_zkapps_deployed ~scheduler_tbl ~deployed:true ~mina ~ledger
       ~deployment_fee ~max_cost ~init_balance ~fee_payer_array
@@ -154,8 +154,7 @@ let insert_account_queue ~account_queue ~account_queue_size ~account_state_tbl
   Queue.enqueue account_queue (Option.value_exn a) ;
   if Queue.length account_queue > account_queue_size then
     let a, role = Queue.dequeue_exn account_queue in
-    Hashtbl.add_exn account_state_tbl ~key:(Account.identifier a)
-      ~data:(a, role)
+    Hashtbl.add_exn account_state_tbl ~key:(Account.identifier a) ~data:(a, role)
   else ()
 
 let send_zkapps ~(genesis_constants : Genesis_constants.t)
@@ -214,13 +213,15 @@ let send_zkapps ~(genesis_constants : Genesis_constants.t)
             "Failed to fetch the best tip ledger, skip this round, we will try \
              again at $time"
             ~metadata:
-              [ ("time", `String (Time_float_unix.to_string_fix_proto `Local tm_next)) ] ;
+              [ ( "time"
+                , `String (Time_float_unix.to_string_fix_proto `Local tm_next)
+                )
+              ] ;
           Result.return None
       | Some (ledger, _) ->
           let number_of_accounts_generated =
             let f = function _, `New_account -> true | _ -> false in
-            Hashtbl.count ~f account_state_tbl
-            + Queue.count ~f account_queue
+            Hashtbl.count ~f account_state_tbl + Queue.count ~f account_queue
           in
           let generate_new_accounts =
             number_of_accounts_generated
@@ -238,32 +239,33 @@ let send_zkapps ~(genesis_constants : Genesis_constants.t)
           Option.some
           @@ Quickcheck.Generator.generate
                ( if zkapp_command_details.max_cost then
-                 Mina_generators.Zkapp_command_generators
-                 .gen_max_cost_zkapp_command_from ~memo
-                   ~fee_range:
-                     ( zkapp_command_details.min_fee
-                     , zkapp_command_details.max_fee )
-                   ~fee_payer_pk ~account_state_tbl ~vk
-                   ~genesis_constants:
-                     (Mina_lib.config mina).precomputed_values.genesis_constants
-                   ()
-               else
-                 Mina_generators.Zkapp_command_generators.gen_zkapp_command_from
-                   ~memo
-                   ?max_account_updates:
-                     zkapp_command_details.max_account_updates
-                   ~no_account_precondition:
-                     zkapp_command_details.no_precondition
-                   ~fee_range:
-                     ( zkapp_command_details.min_fee
-                     , zkapp_command_details.max_fee )
-                   ~balance_change_range:
-                     zkapp_command_details.balance_change_range
-                   ~ignore_sequence_events_precond:true ~no_token_accounts:true
-                   ~limited:true ~fee_payer_keypair:fee_payer ~keymap
-                   ~account_state_tbl ~generate_new_accounts ~ledger ~vk
-                   ~available_public_keys:unused_pks ~genesis_constants
-                   ~constraint_constants () )
+                   Mina_generators.Zkapp_command_generators
+                   .gen_max_cost_zkapp_command_from ~memo
+                     ~fee_range:
+                       ( zkapp_command_details.min_fee
+                       , zkapp_command_details.max_fee )
+                     ~fee_payer_pk ~account_state_tbl ~vk
+                     ~genesis_constants:
+                       (Mina_lib.config mina).precomputed_values
+                         .genesis_constants ()
+                 else
+                   Mina_generators.Zkapp_command_generators
+                   .gen_zkapp_command_from ~memo
+                     ?max_account_updates:
+                       zkapp_command_details.max_account_updates
+                     ~no_account_precondition:
+                       zkapp_command_details.no_precondition
+                     ~fee_range:
+                       ( zkapp_command_details.min_fee
+                       , zkapp_command_details.max_fee )
+                     ~balance_change_range:
+                       zkapp_command_details.balance_change_range
+                     ~ignore_sequence_events_precond:true
+                     ~no_token_accounts:true ~limited:true
+                     ~fee_payer_keypair:fee_payer ~keymap ~account_state_tbl
+                     ~generate_new_accounts ~ledger ~vk
+                     ~available_public_keys:unused_pks ~genesis_constants
+                     ~constraint_constants () )
                ~size:1
                ~random:(Splittable_random.State.create Random.State.default)
     in

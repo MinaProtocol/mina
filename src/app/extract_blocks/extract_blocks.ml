@@ -80,7 +80,7 @@ let fill_in_block pool (block : Archive_lib.Processor.Block.t) :
   let sub_window_densities =
     block.sub_window_densities
     |> Array.map ~f:(fun length ->
-           Unsigned.UInt32.of_int64 length |> Mina_numbers.Length.of_uint32 )
+        Unsigned.UInt32.of_int64 length |> Mina_numbers.Length.of_uint32 )
     |> Array.to_list
   in
   let total_currency = Currency.Amount.of_string block.total_currency in
@@ -153,7 +153,8 @@ let fill_in_accounts_accessed pool block_state_hash =
     query_db ~f:(fun db ->
         Processor.Accounts_accessed.all_from_block db block_id )
   in
-  Deferred.List.map ~how:`Sequential accounts_accessed ~f:(Load_data.get_account_accessed ~pool)
+  Deferred.List.map ~how:`Sequential accounts_accessed
+    ~f:(Load_data.get_account_accessed ~pool)
 
 let fill_in_accounts_created pool block_state_hash =
   let query_db = Mina_caqti.query pool in
@@ -230,7 +231,8 @@ let fill_in_tokens_used pool block_state_hash =
   in
   let%bind zkapp_cmd_tokens =
     let%bind zkapp_cmds =
-      Deferred.List.map ~how:`Sequential zkapps_in_block ~f:(fun { zkapp_command_id; _ } ->
+      Deferred.List.map ~how:`Sequential zkapps_in_block
+        ~f:(fun { zkapp_command_id; _ } ->
           query_db ~f:(fun db ->
               Processor.User_command.Zkapp_command.load db zkapp_command_id ) )
     in
@@ -241,9 +243,11 @@ let fill_in_tokens_used pool block_state_hash =
       query_db ~f:(fun db -> Processor.Token.find_by_id db default_id)
     in
     let%map account_updates_tokenss =
-      Deferred.List.map ~how:`Sequential zkapp_cmds ~f:(fun { zkapp_account_updates_ids; _ } ->
+      Deferred.List.map ~how:`Sequential zkapp_cmds
+        ~f:(fun { zkapp_account_updates_ids; _ } ->
           let%bind account_update_bodies =
-            Deferred.List.map ~how:`Sequential (Array.to_list zkapp_account_updates_ids)
+            Deferred.List.map ~how:`Sequential
+              (Array.to_list zkapp_account_updates_ids)
               ~f:(fun account_update_id ->
                 let%bind { body_id; _ } =
                   query_db ~f:(fun db ->
@@ -421,7 +425,8 @@ let fill_in_zkapp_commands pool block_state_hash =
         Option.value_map block_zkapp_cmd.failure_reasons_ids
           ~default:(return None) ~f:(fun ids ->
             let%map display =
-              Deferred.List.map ~how:`Sequential (Array.to_list ids) ~f:(fun id ->
+              Deferred.List.map ~how:`Sequential (Array.to_list ids)
+                ~f:(fun id ->
                   let%map { index; failures } =
                     query_db ~f:(fun db ->
                         Processor.Zkapp_account_update_failures.load db id )
@@ -565,7 +570,8 @@ let main ~archive_uri ~start_state_hash_opt ~end_state_hash_opt ~all_blocks
       in
       [%log info] "Querying for internal commands in blocks" ;
       let%bind blocks_with_internal_cmds =
-        Deferred.List.map ~how:`Sequential blocks_with_user_cmds ~f:(fun block ->
+        Deferred.List.map ~how:`Sequential blocks_with_user_cmds
+          ~f:(fun block ->
             let%map unsorted_internal_cmds =
               fill_in_internal_commands pool block.state_hash
             in
@@ -581,7 +587,8 @@ let main ~archive_uri ~start_state_hash_opt ~end_state_hash_opt ~all_blocks
       in
       [%log info] "Querying for zkapp commands in blocks" ;
       let%bind blocks_with_zkapp_cmds =
-        Deferred.List.map ~how:`Sequential blocks_with_internal_cmds ~f:(fun block ->
+        Deferred.List.map ~how:`Sequential blocks_with_internal_cmds
+          ~f:(fun block ->
             let%map unsorted_zkapp_cmds =
               fill_in_zkapp_commands pool block.state_hash
             in
@@ -595,7 +602,8 @@ let main ~archive_uri ~start_state_hash_opt ~end_state_hash_opt ~all_blocks
       in
       [%log info] "Querying for accounts accessed in blocks" ;
       let%bind blocks_with_accounts_accessed =
-        Deferred.List.map ~how:`Sequential blocks_with_zkapp_cmds ~f:(fun block ->
+        Deferred.List.map ~how:`Sequential blocks_with_zkapp_cmds
+          ~f:(fun block ->
             let%map accounts_accessed =
               fill_in_accounts_accessed pool block.state_hash
             in
@@ -603,7 +611,8 @@ let main ~archive_uri ~start_state_hash_opt ~end_state_hash_opt ~all_blocks
       in
       [%log info] "Querying for accounts created in blocks" ;
       let%bind blocks_with_accounts_created =
-        Deferred.List.map ~how:`Sequential blocks_with_accounts_accessed ~f:(fun block ->
+        Deferred.List.map ~how:`Sequential blocks_with_accounts_accessed
+          ~f:(fun block ->
             let%map accounts_created =
               fill_in_accounts_created pool block.state_hash
             in
@@ -611,13 +620,15 @@ let main ~archive_uri ~start_state_hash_opt ~end_state_hash_opt ~all_blocks
       in
       [%log info] "Querying for tokens used in blocks" ;
       let%bind blocks_with_accounts_created =
-        Deferred.List.map ~how:`Sequential blocks_with_accounts_created ~f:(fun block ->
+        Deferred.List.map ~how:`Sequential blocks_with_accounts_created
+          ~f:(fun block ->
             let%map tokens_used = fill_in_tokens_used pool block.state_hash in
             { block with tokens_used } )
       in
       [%log info] "Writing blocks" ;
       let%map () =
-        Deferred.List.iter ~how:`Sequential blocks_with_accounts_created ~f:(fun block ->
+        Deferred.List.iter ~how:`Sequential blocks_with_accounts_created
+          ~f:(fun block ->
             [%log info] "Writing block with $state_hash"
               ~metadata:
                 [ ("state_hash", State_hash.to_yojson block.state_hash) ] ;
@@ -649,41 +660,42 @@ let () =
   Command.(
     Command_unix.run
       (let open Let_syntax in
-      async
-        ~summary:
-          "Extract blocks from an archive db, either all blocks, or from a \
-           subchain"
-        (let%map archive_uri =
-           Param.flag "--archive-uri"
-             ~doc:
-               "URI URI for connecting to the archive database (e.g., \
-                postgres://$USER@localhost:5432/archiver)"
-             Param.(required string)
-         and start_state_hash_opt =
-           Param.flag "--start-state-hash"
-             ~doc:
-               "State hash of the block that begins a chain (default: start at \
-                the block closest to the end block without a parent, possibly \
-                the genesis block)"
-             Param.(optional string)
-         and end_state_hash_opt =
-           Param.flag "--end-state-hash"
-             ~doc:"State hash of the block that ends a chain"
-             Param.(optional string)
-         and all_blocks =
-           Param.flag "--all-blocks" Param.no_arg
-             ~doc:"Extract all blocks in the archive database"
-         and output_folder =
-           Param.flag "--output-folder" ~doc:"Output folder for blocks jsons"
-             Param.(optional_with_default "." string)
-         and network =
-           Param.flag "--network"
-             ~doc:"Network name which will be a prefix of each individual file"
-             Param.(optional string)
-         and include_block_height_in_name =
-           Param.flag "--include-block-height-in-name"
-             ~doc:"Includes block height in block name" Param.no_arg
-         in
+       async
+         ~summary:
+           "Extract blocks from an archive db, either all blocks, or from a \
+            subchain"
+         (let%map archive_uri =
+            Param.flag "--archive-uri"
+              ~doc:
+                "URI URI for connecting to the archive database (e.g., \
+                 postgres://$USER@localhost:5432/archiver)"
+              Param.(required string)
+          and start_state_hash_opt =
+            Param.flag "--start-state-hash"
+              ~doc:
+                "State hash of the block that begins a chain (default: start \
+                 at the block closest to the end block without a parent, \
+                 possibly the genesis block)"
+              Param.(optional string)
+          and end_state_hash_opt =
+            Param.flag "--end-state-hash"
+              ~doc:"State hash of the block that ends a chain"
+              Param.(optional string)
+          and all_blocks =
+            Param.flag "--all-blocks" Param.no_arg
+              ~doc:"Extract all blocks in the archive database"
+          and output_folder =
+            Param.flag "--output-folder" ~doc:"Output folder for blocks jsons"
+              Param.(optional_with_default "." string)
+          and network =
+            Param.flag "--network"
+              ~doc:"Network name which will be a prefix of each individual file"
+              Param.(optional string)
+          and include_block_height_in_name =
+            Param.flag "--include-block-height-in-name"
+              ~doc:"Includes block height in block name" Param.no_arg
+          in
 
-         main ~archive_uri ~start_state_hash_opt ~end_state_hash_opt ~all_blocks
-           ~output_folder ~network ~include_block_height_in_name )))
+          main ~archive_uri ~start_state_hash_opt ~end_state_hash_opt
+            ~all_blocks ~output_folder ~network ~include_block_height_in_name )
+      ) )

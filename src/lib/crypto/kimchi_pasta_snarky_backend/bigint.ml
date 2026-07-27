@@ -47,7 +47,8 @@ module type Intf = sig
 end
 
 module Make
-    (B : Bindings) (M : sig
+    (B : Bindings)
+    (M : sig
       val length_in_bytes : int
     end) : Intf with type t = B.t = struct
   include B

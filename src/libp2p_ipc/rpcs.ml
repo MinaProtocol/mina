@@ -174,7 +174,7 @@ module AddPeer = struct
     build'
       (module Request)
       Request.(
-        builder_op multiaddr_set_builder multiaddr *> op is_seed_set is_seed)
+        builder_op multiaddr_set_builder multiaddr *> op is_seed_set is_seed )
 end
 
 module ListPeers = struct
@@ -300,7 +300,7 @@ module Subscribe = struct
       (module Request)
       Request.(
         op topic_set topic
-        *> reader_op subscription_id_set_reader subscription_id)
+        *> reader_op subscription_id_set_reader subscription_id )
 end
 
 module Unsubscribe = struct
@@ -406,7 +406,7 @@ module OpenStream = struct
     build'
       (module Request)
       Request.(
-        builder_op peer_set_builder peer_id *> op protocol_id_set protocol)
+        builder_op peer_set_builder peer_id *> op protocol_id_set protocol )
 end
 
 module CloseStream = struct
@@ -489,7 +489,7 @@ module SendStream = struct
           (build
              (module StreamMessage)
              ( reader_op StreamMessage.stream_id_set_reader stream_id
-             *> op StreamMessage.data_set data ) ))
+             *> op StreamMessage.data_set data ) ) )
 end
 
 module SetNodeStatus = struct

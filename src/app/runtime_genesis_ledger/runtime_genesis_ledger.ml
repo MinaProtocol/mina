@@ -138,7 +138,7 @@ let load_config_exn config_file =
   let config =
     Runtime_config.of_yojson config_json
     |> Result.map_error ~f:(fun err ->
-           Failure ("Could not parse configuration: " ^ err) )
+        Failure ("Could not parse configuration: " ^ err) )
     |> Result.ok_exn
   in
   let config = sanitize_runtime_config config in
@@ -225,4 +225,4 @@ let () =
                 false)"
          in
          main ~constraint_constants ~config_file ~genesis_dir ~hash_output_file
-           ~ignore_missing_fields ~pad_app_state) )
+           ~ignore_missing_fields ~pad_app_state ) )

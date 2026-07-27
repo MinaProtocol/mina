@@ -73,7 +73,8 @@ let time_arg =
   (* Same timezone as Genesis_constants.genesis_state_timestamp. *)
   let default_timezone = Core.Time_float.Zone.of_utc_offset ~hours:(-8) in
   Command.Arg_type.create
-    (Time_float_unix.of_string_gen ~if_no_timezone:(`Use_this_one default_timezone))
+    (Time_float_unix.of_string_gen
+       ~if_no_timezone:(`Use_this_one default_timezone) )
 
 let command_prune =
   let open Command.Let_syntax in

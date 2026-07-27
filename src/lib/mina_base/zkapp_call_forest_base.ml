@@ -35,8 +35,9 @@ module Tree = struct
   let rec fold_forest2_exn (ts1 : (_ t, _) With_stack_hash.t list)
       (ts2 : (_ t, _) With_stack_hash.t list) ~f ~init =
     List.fold2_exn ts1 ts2 ~init
-      ~f:(fun acc { elt = elt1; stack_hash = _ } { elt = elt2; stack_hash = _ }
-         -> fold2_exn elt1 elt2 ~init:acc ~f )
+      ~f:(fun
+          acc { elt = elt1; stack_hash = _ } { elt = elt2; stack_hash = _ } ->
+        fold2_exn elt1 elt2 ~init:acc ~f )
 
   and fold2_exn
       { account_update = account_update1

@@ -82,8 +82,7 @@ module Make (Schema : Graphql_intf.Schema) = struct
              args
 
     (** [field_to_json] builds the serializer function for a field, based on the list of its arguments.*)
-    let rec field_to_json :
-        type ctx out arg field_to_json obj_to_json.
+    let rec field_to_json : type ctx out arg field_to_json obj_to_json.
            string
         -> (ctx, out, arg, field_to_json, obj_to_json) args
         -> (string * Yojson.Basic.t) list
@@ -98,8 +97,7 @@ module Make (Schema : Graphql_intf.Schema) = struct
           fun x -> field_to_json field_name t ((name, typ.to_json x) :: acc)
 
     (** [arg_obj_to_json] builds the serializer function for an obj argument, based on the list of its fields.*)
-    let rec arg_obj_to_json :
-        type ctx out arg field_to_json obj_to_json.
+    let rec arg_obj_to_json : type ctx out arg field_to_json obj_to_json.
            (ctx, out, arg, field_to_json, obj_to_json) args
         -> (string * Yojson.Basic.t) list
         -> obj_to_json =
@@ -202,8 +200,7 @@ module Make (Schema : Graphql_intf.Schema) = struct
 
     let arg ?doc name ~typ = Arg { name; typ; doc }
 
-    let arg' ?doc name ~typ ~default =
-      DefaultArg { name; typ; doc; default }
+    let arg' ?doc name ~typ ~default = DefaultArg { name; typ; doc; default }
   end
 
   module Fields = struct

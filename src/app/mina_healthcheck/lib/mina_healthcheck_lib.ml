@@ -106,15 +106,20 @@ let readiness_problems ~min_peers (r : Types.readiness) =
     deadline parameter cannot wedge us past the user's [--timeout]. *)
 let poll_until ?(quiet = false) ~timeout ~interval ~timeout_msg f =
   let start = Time_float.now () in
-  let deadline = Time_float.add start (Time_float.Span.of_sec (Float.of_int timeout)) in
+  let deadline =
+    Time_float.add start (Time_float.Span.of_sec (Float.of_int timeout))
+  in
   let interval_span = Time_float.Span.of_sec (Float.of_int interval) in
   let timed_out () = Time_float.( >= ) (Time_float.now ()) deadline in
   let remaining_budget () =
     let r = Time_float.diff deadline (Time_float.now ()) in
-    if Time_float.Span.( <= ) r Time_float.Span.zero then Time_float.Span.zero else r
+    if Time_float.Span.( <= ) r Time_float.Span.zero then Time_float.Span.zero
+    else r
   in
   let timeout_error_with_msg msg =
-    let elapsed = Time_float.Span.to_sec (Time_float.diff (Time_float.now ()) start) in
+    let elapsed =
+      Time_float.Span.to_sec (Time_float.diff (Time_float.now ()) start)
+    in
     Deferred.Or_error.errorf "timed out after %.2fs: %s" elapsed msg
   in
   let rec loop () =
@@ -134,9 +139,12 @@ let poll_until ?(quiet = false) ~timeout ~interval ~timeout_msg f =
             loop ()
       | `Result (Error e) ->
           ( if not quiet then
-            let elapsed = Time_float.Span.to_sec (Time_float.diff (Time_float.now ()) start) in
-            eprintf "[%6.2fs] connection error: %s\n%!" elapsed
-              (Error.to_string_hum e) ) ;
+              let elapsed =
+                Time_float.Span.to_sec
+                  (Time_float.diff (Time_float.now ()) start)
+              in
+              eprintf "[%6.2fs] connection error: %s\n%!" elapsed
+                (Error.to_string_hum e) ) ;
           if timed_out () then timeout_error_with_msg (Error.to_string_hum e)
           else
             let%bind () = after interval_span in

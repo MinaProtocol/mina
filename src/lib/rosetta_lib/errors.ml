@@ -353,16 +353,16 @@ end = struct
         | None, Some context | Some context, None ->
             Some
               (`Assoc
-                [ ("body", Variant.to_yojson t.kind)
-                ; ("error", `String context)
-                ] )
+                 [ ("body", Variant.to_yojson t.kind)
+                 ; ("error", `String context)
+                 ] )
         | Some context1, Some context2 ->
             Some
               (`Assoc
-                [ ("body", Variant.to_yojson t.kind)
-                ; ("error", `String context1)
-                ; ("extra", `String context2)
-                ] ) )
+                 [ ("body", Variant.to_yojson t.kind)
+                 ; ("error", `String context1)
+                 ; ("extra", `String context2)
+                 ] ) )
     ; description = Some (description t.kind)
     }
 
@@ -382,11 +382,10 @@ end = struct
     Variant.to_representatives
     |> Lazy.map ~f:(fun vs -> List.map vs ~f:(Fn.compose erase create))
     |> Lazy.map ~f:(fun es ->
-           List.map es ~f:(fun e ->
-               { e with Rosetta_models.Error.details = None } )
-           |> uniq
-                ~eq:(fun { Rosetta_models.Error.code; _ } { code = code2; _ } ->
-                  Int32.equal code code2 ) )
+        List.map es ~f:(fun e ->
+            { e with Rosetta_models.Error.details = None } )
+        |> uniq ~eq:(fun { Rosetta_models.Error.code; _ } { code = code2; _ } ->
+            Int32.equal code code2 ) )
 
   module Lift = struct
     let parse ?context res =
@@ -421,7 +420,7 @@ module Transaction_submit = struct
       else if p "is less than the minimum fee" then
         Some
           (`Transaction_submit_fee_small
-            (Currency.Fee.to_mina_string minimum_user_command_fee) )
+             (Currency.Fee.to_mina_string minimum_user_command_fee) )
       else if p "Error: Invalid_signature" then
         Some `Transaction_submit_invalid_signature
       else if p "[\"Insufficient_funds\"]" then
