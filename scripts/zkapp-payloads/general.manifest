@@ -37,7 +37,9 @@ repeated --num-events 8 --num-actions 8 --event-elements-per 4 --action-elements
 # Requires the --num-account-updates flag.
 multi-update --num-account-updates 6 --num-events 2 --event-elements-per 2
 
-# Wide zkApp state. The number of accepted state fields is fixed at build time,
-# so a tool built against a protocol version with more fields will set more of
-# them from the same line.
-wide-state --zkapp-state 1 --zkapp-state 2 --zkapp-state 3 --zkapp-state 4 --zkapp-state 5 --zkapp-state 6 --zkapp-state 7 --zkapp-state 8
+# zkApp state. The transaction carries as many state fields as the tool's
+# protocol version defines, so where there are more of them this line emits a
+# wider state array and leaves the fields it does not name untouched. Setting
+# every field of a wider state needs its own line, because passing more values
+# than the version defines is an error.
+state --zkapp-state 1 --zkapp-state 2 --zkapp-state 3 --zkapp-state 4 --zkapp-state 5 --zkapp-state 6 --zkapp-state 7 --zkapp-state 8
