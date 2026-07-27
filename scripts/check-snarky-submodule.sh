@@ -11,7 +11,7 @@ git fetch origin
 git config http.sslVerify true
 
 function in_branch {
-  if git rev-list origin/"$1" | grep -q "${CURR}"; then
+  if git merge-base --is-ancestor "${CURR}" origin/"$1"; then
     echo "Snarky submodule commit ${CURR} is an ancestor of snarky/$1"
     true
   else
