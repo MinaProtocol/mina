@@ -1,0 +1,50 @@
+{
+  "genesis": {
+    "slots_per_epoch": 48,
+    "k": 10,
+    "grace_period_slots": 3,
+    "genesis_state_timestamp": "2026-07-24 22:12:29+00:00"
+  },
+  "proof": {
+    "work_delay": 1,
+    "level": "none",
+    "transaction_capacity": {
+      "2_to_the": 2
+    },
+    "block_window_duration_ms": 30000
+  },
+  "ledger": {
+    "accounts": [
+      {
+        "pk": "B62qpj7mVSACR61cWRW8XbQ3T2e5ZgXFdseSdEHPhvNjEJ5rD3kq1Zh",
+        "sk": null,
+        "balance": "5.000000000",
+        "delegate": null
+      },
+      {
+        "pk": "B62qr1hJdXfjqbabch5x2GLBJLrJw5fmnWxPN9BTMLgLrLRM2rnxhGe",
+        "sk": null,
+        "balance": "11550000.000000000",
+        "delegate": "B62qqMo8981b6Z1q9mKVev6HfFwiQoUBRUWCpu3deMYcd9GaE2neXnP"
+      },
+      {
+        "pk": "B62qqMo8981b6Z1q9mKVev6HfFwiQoUBRUWCpu3deMYcd9GaE2neXnP",
+        "sk": null,
+        "balance": "499.000000000",
+        "delegate": null
+      },
+      {
+        "pk": "B62qoGS6NPXgwvQ8h3oofdKZ2ZWu1UG8JBmUygwPJ7pihGmqHg3cRia",
+        "sk": null,
+        "balance": "11550000.000000000",
+        "delegate": "B62qnRAr3K4oYZuUK8F36DPaoFruAV8udnHaNBjUPE5K1aR6vkmxMZw"
+      },
+      {
+        "pk": "B62qnRAr3K4oYZuUK8F36DPaoFruAV8udnHaNBjUPE5K1aR6vkmxMZw",
+        "sk": null,
+        "balance": "499.000000000",
+        "delegate": null
+      }
+    ]
+  }
+}
