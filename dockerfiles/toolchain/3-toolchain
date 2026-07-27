@@ -10,6 +10,7 @@ ARG INFLUXDB_CLI_VERSION=2.7.5
 ARG SHELLCHECK_VERSION=0.11.0
 ARG HADOLINT_VERSION=2.12.0
 ARG GCLOUD_VERSION=476.0.0
+ARG MINA_RELEASE_TOOLKIT_VERSION=0.0.4
 ARG TARGETARCH
 
 USER root
@@ -45,6 +46,20 @@ RUN apt-get update --yes \
 RUN curl -sLO https://github.com/MinaProtocol/deb-s3/releases/download/${DEBS3_VERSION}/deb-s3-${DEBS3_VERSION}.gem \
     && gem install deb-s3-${DEBS3_VERSION}.gem \
     && rm -f deb-s3-${DEBS3_VERSION}.gem
+
+# --- mina-bench-upload (benchmark output parser + InfluxDB uploader)
+# The mina-release-toolkit .deb bundles four Rust CLIs and declares the
+# union of their runtime deps (debsigs, debsig-verify, openssh-client are
+# release-manager's, not ours), so a plain `dpkg -i` aborts on unmet
+# dependencies. mina-bench-upload is a static musl binary that needs none
+# of them, so extract just that binary instead of installing the bundle.
+# Published amd64-only for now, so skip on other arches; benchmarks run on amd64.
+RUN if [ "${TARGETARCH}" = "amd64" ]; then \
+      curl -fsSLO "https://github.com/MinaProtocol/mina-release-toolkit/releases/download/v${MINA_RELEASE_TOOLKIT_VERSION}/mina-release-toolkit_${MINA_RELEASE_TOOLKIT_VERSION}_amd64.deb" \
+      && dpkg-deb -x "mina-release-toolkit_${MINA_RELEASE_TOOLKIT_VERSION}_amd64.deb" /tmp/mrt \
+      && install -m 0755 /tmp/mrt/usr/bin/mina-bench-upload /usr/local/bin/mina-bench-upload \
+      && rm -rf /tmp/mrt "mina-release-toolkit_${MINA_RELEASE_TOOLKIT_VERSION}_amd64.deb" ; \
+    fi
 
 # --- influx db tool
 # Custom version, with lock only on manifest upload
