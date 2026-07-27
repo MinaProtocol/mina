@@ -3,6 +3,9 @@
 # - Installs all compilers/interpreters, tools, and OS packages on the given debian or ubuntu image
 #################################################################################################
 # Supports europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/debian:bullseye-slim, and europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/ubuntu:focal
+# Also supports debian:bookworm and debian:trixie-slim (trixie = Debian 13, glibc 2.41+,
+# used by the portability effort). UNVALIDATED for trixie: OCaml 4.14.2 + C stubs must be
+# confirmed to compile against trixie's toolchain and glibc 2.41 on real infra.
 ARG image=europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/ubuntu:focal
 ARG deb_codename
 ARG apt_cache_url=""
@@ -57,9 +60,17 @@ COPY scripts/configure-apt-proxy.sh /usr/local/bin/configure-apt-proxy.sh
 RUN chmod +x /usr/local/bin/configure-apt-proxy.sh \
   && /usr/local/bin/configure-apt-proxy.sh "$apt_cache_url"
 
+# Per-codename package-name drift for the SSL and procps runtime libs.
+# trixie (Debian 13, glibc 2.41+) verified against debian:trixie-slim:
+#   - "libssl-dev" resolves (OpenSSL 3.5.x; the runtime lib is libssl3t64
+#     under the 64-bit time_t transition, but we install the -dev metapackage
+#     as for bookworm/bullseye, so no t64 suffix is needed here).
+#   - "libproc2-0" resolves (procps 4.x), same choice as bookworm/noble.
+# All other packages in the list below were confirmed present in trixie.
 RUN CODENAME=$(grep "VERSION_CODENAME" /etc/os-release | cut -d= -f2); \
   case "${CODENAME}" in \
     bookworm) LIBSSL="libssl-dev"; LIBPROCPS="libproc2-0" ;; \
+    trixie) LIBSSL="libssl-dev"; LIBPROCPS="libproc2-0" ;; \
     bullseye) LIBSSL="libssl-dev"; LIBPROCPS="libprocps-dev" ;; \
     focal) LIBSSL="libssl-dev"; LIBPROCPS="libprocps-dev" ;; \
     jammy) LIBSSL="libssl3"; LIBPROCPS="libprocps8";; \
@@ -95,6 +106,7 @@ RUN CODENAME=$(grep "VERSION_CODENAME" /etc/os-release | cut -d= -f2); \
   git \
   git-lfs \
   lld \
+  locales \
   m4 \
   pkg-config \
   rocksdb-tools \

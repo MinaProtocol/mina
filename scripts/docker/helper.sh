@@ -22,6 +22,12 @@ function export_base_image () {
     bookworm)
         IMAGE="europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/debian:bookworm"
     ;;
+    trixie)
+        # Debian 13 (glibc 2.41+). Portability effort: build glibc == bundled glibc.
+        # Draft uses the public debian:trixie-slim; a gar-cache mirror tag
+        # (euro-docker-repo/debian:trixie[-slim]) should be seeded before CI use.
+        IMAGE="debian:trixie-slim"
+    ;;
     esac
     export IMAGE
 }
