@@ -277,11 +277,13 @@ let transfer_funds =
 
 let update_state =
   let create_command ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile ~app_state
-      ~genesis_constants ~constraint_constants () =
+      ~num_events ~num_actions ~elements_per ~genesis_constants
+      ~constraint_constants () =
     let open Deferred.Let_syntax in
     let%map zkapp_command =
       update_state ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile ~app_state
-        ~genesis_constants ~constraint_constants
+        ~num_events ~num_actions ~elements_per ~genesis_constants
+        ~constraint_constants
     in
     Util.print_snapp_transaction ~debug zkapp_command ;
     ()
@@ -303,6 +305,22 @@ let update_state =
                  that represent the zkApp state (Use empty string for no-op)"
                 Mina_base.Zkapp_state.max_size_int )
            Param.(listed string)
+       and num_events =
+         Param.flag "--num-events"
+           ~doc:
+             "N Number of events (field-arrays) to generate in the account \
+              update (default 0, cap 1024)"
+           Param.(optional_with_default 0 int)
+       and num_actions =
+         Param.flag "--num-actions"
+           ~doc:
+             "N Number of actions (field-arrays) to generate in the account \
+              update (default 0, cap 1024)"
+           Param.(optional_with_default 0 int)
+       and elements_per =
+         Param.flag "--elements-per"
+           ~doc:"K Field elements per generated event/action array (default 1)"
+           Param.(optional_with_default 1 int)
        in
        let fee = Option.value ~default:Flags.default_fee fee in
 
@@ -314,7 +332,8 @@ let update_state =
            (sprintf "Fee must at least be %s"
               (Currency.Fee.to_mina_string Flags.min_fee) ) ;
        create_command ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
-         ~app_state ~genesis_constants ~constraint_constants ))
+         ~app_state ~num_events ~num_actions ~elements_per ~genesis_constants
+         ~constraint_constants ))
 
 let update_zkapp_uri =
   let create_command ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile ~zkapp_uri
