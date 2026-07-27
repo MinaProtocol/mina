@@ -1,0 +1,43 @@
+# Variants of zkApp transaction to generate, one per line:
+#
+#   <name> <flags passed to zkapp-test-transaction update-state>
+#
+# Blank lines and lines starting with # are ignored. Names must be unique; they
+# label the generated file and the summary line.
+#
+# Nothing here names a protocol version. "max" resolves against whichever event
+# and action limit the tool was built with, so this manifest can be replayed
+# unchanged against networks with different limits, and the payloads scale to
+# match.
+
+# No events and no actions. Exercises the path where a zkApp account update
+# carries neither, which archive nodes store as empty rather than as a list.
+empty
+
+# A small, ordinary payload.
+small --num-events 2 --num-actions 2 --event-elements-per 3 --action-elements-per 3
+
+# Events only, and actions only, so that a failure can be attributed to one
+# path rather than to both at once.
+events-only --num-events 8 --event-elements-per 4
+actions-only --num-actions 8 --action-elements-per 4
+
+# Fill the event and action limits exactly, in two shapes: many short arrays,
+# and fewer long ones. These are the payloads that stress per-element storage.
+saturate-events-short --num-events max
+saturate-events-long --num-events max --event-elements-per 16
+saturate-actions-short --num-actions max
+saturate-actions-long --num-actions max --action-elements-per 16
+
+# Identical arrays, which collide with each other. Consumers that deduplicate
+# events and actions by content take a different path for these.
+repeated --num-events 8 --num-actions 8 --event-elements-per 4 --action-elements-per 4 --repeat-arrays
+
+# Several account updates in one transaction, which raises its zkApp cost.
+# Requires the --num-account-updates flag.
+multi-update --num-account-updates 6 --num-events 2 --event-elements-per 2
+
+# Wide zkApp state. The number of accepted state fields is fixed at build time,
+# so a tool built against a protocol version with more fields will set more of
+# them from the same line.
+wide-state --zkapp-state 1 --zkapp-state 2 --zkapp-state 3 --zkapp-state 4 --zkapp-state 5 --zkapp-state 6 --zkapp-state 7 --zkapp-state 8
