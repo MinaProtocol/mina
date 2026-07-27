@@ -5,10 +5,8 @@ set -eu
 cd src/lib/snarky
 
 CURR=$(git rev-parse HEAD)
-# temporarily skip SSL verification (for CI)
-git config http.sslVerify false
-git fetch origin
-git config http.sslVerify true
+# skip SSL verification for this fetch only (for CI)
+git -c http.sslVerify=false fetch origin
 
 function in_branch {
   if git merge-base --is-ancestor "${CURR}" origin/"$1"; then
