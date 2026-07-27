@@ -33,6 +33,8 @@ module Flags = struct
     Param.flag "--nonce" ~doc:"NN Nonce of the fee payer account"
       Param.(required txn_nonce)
 
+  let array_count = Arg_type.create Util.array_count_of_string
+
   let common_flags =
     Command.(
       let open Let_syntax in
@@ -277,11 +279,13 @@ let transfer_funds =
 
 let update_state =
   let create_command ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile ~app_state
-      ~genesis_constants ~constraint_constants () =
+      ~num_events ~num_actions ~event_elements_per ~action_elements_per
+      ~repeat_arrays ~genesis_constants ~constraint_constants () =
     let open Deferred.Let_syntax in
     let%map zkapp_command =
       update_state ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile ~app_state
-        ~genesis_constants ~constraint_constants
+        ~num_events ~num_actions ~event_elements_per ~action_elements_per
+        ~repeat_arrays ~genesis_constants ~constraint_constants
     in
     Util.print_snapp_transaction ~debug zkapp_command ;
     ()
@@ -303,6 +307,32 @@ let update_state =
                  that represent the zkApp state (Use empty string for no-op)"
                 Mina_base.Zkapp_state.max_size_int )
            Param.(listed string)
+       and num_events =
+         Param.flag "--num-events"
+           ~doc:
+             "NN|max Number of event arrays to put in the account update, or \
+              \"max\" to fill up to the protocol cap (default: 0)"
+           Param.(optional_with_default (Util.Count 0) Flags.array_count)
+       and num_actions =
+         Param.flag "--num-actions"
+           ~doc:
+             "NN|max Number of action arrays to put in the account update, or \
+              \"max\" to fill up to the protocol cap (default: 0)"
+           Param.(optional_with_default (Util.Count 0) Flags.array_count)
+       and event_elements_per =
+         Param.flag "--event-elements-per"
+           ~doc:"NN Field elements in each event array (default: 1)"
+           Param.(optional_with_default 1 int)
+       and action_elements_per =
+         Param.flag "--action-elements-per"
+           ~doc:"NN Field elements in each action array (default: 1)"
+           Param.(optional_with_default 1 int)
+       and repeat_arrays =
+         Param.flag "--repeat-arrays"
+           ~doc:
+             "Emit identical event and action arrays instead of distinct ones, \
+              to exercise consumers that deduplicate them by content"
+           Param.no_arg
        in
        let fee = Option.value ~default:Flags.default_fee fee in
 
@@ -314,7 +344,9 @@ let update_state =
            (sprintf "Fee must at least be %s"
               (Currency.Fee.to_mina_string Flags.min_fee) ) ;
        create_command ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
-         ~app_state ~genesis_constants ~constraint_constants ))
+         ~app_state ~num_events ~num_actions ~event_elements_per
+         ~action_elements_per ~repeat_arrays ~genesis_constants
+         ~constraint_constants ))
 
 let update_zkapp_uri =
   let create_command ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile ~zkapp_uri
