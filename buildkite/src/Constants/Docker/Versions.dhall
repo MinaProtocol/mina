@@ -12,7 +12,7 @@ let Arch = ../Artifact/Arch.dhall
 
 let Docker
     : Type
-    = < Bookworm | Bullseye | Jammy | Focal | Noble >
+    = < Bookworm | Bullseye | Jammy | Focal | Noble | Trixie >
 
 let capitalName =
           \(docker : Docker)
@@ -22,6 +22,7 @@ let capitalName =
             , Jammy = "Jammy"
             , Focal = "Focal"
             , Noble = "Noble"
+            , Trixie = "Trixie"
             }
             docker
 
@@ -33,6 +34,7 @@ let lowerName =
             , Jammy = "jammy"
             , Focal = "focal"
             , Noble = "noble"
+            , Trixie = "trixie"
             }
             docker
 
@@ -92,6 +94,7 @@ let ofDebian =
             , Jammy = Docker.Jammy
             , Focal = Docker.Focal
             , Noble = Docker.Noble
+            , Trixie = Docker.Trixie
             }
             debian
 

@@ -8,7 +8,7 @@ let Arch = ../Artifact/Arch.dhall
 
 let S = ../../Lib/SelectFiles.dhall
 
-let DebVersion = < Bookworm | Bullseye | Jammy | Focal | Noble >
+let DebVersion = < Bookworm | Bullseye | Jammy | Focal | Noble | Trixie >
 
 let capitalName =
           \(debVersion : DebVersion)
@@ -18,6 +18,7 @@ let capitalName =
             , Jammy = "Jammy"
             , Focal = "Focal"
             , Noble = "Noble"
+            , Trixie = "Trixie"
             }
             debVersion
 
@@ -29,6 +30,7 @@ let lowerName =
             , Jammy = "jammy"
             , Focal = "focal"
             , Noble = "noble"
+            , Trixie = "trixie"
             }
             debVersion
 
@@ -110,6 +112,7 @@ let dirtyWhen =
             , Jammy = minimalDirtyWhen
             , Focal = minimalDirtyWhen
             , Noble = minimalDirtyWhen
+            , Trixie = minimalDirtyWhen
             }
             debVersion
 

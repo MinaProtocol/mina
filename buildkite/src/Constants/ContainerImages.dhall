@@ -2,6 +2,11 @@
 -- NOTE: minaToolchain is the default image for various jobs, set to minaToolchainBullseye
 -- NOTE: minaToolchainBullseye is also used for building Ubuntu Focal packages in CI
 -- NOTE: minaToolchainBookworm is also used for building Ubuntu Jammy packages in CI
+-- NOTE: minaToolchainTrixie is FORWARD-REFERENCED: the trixie toolchain image
+--       does not exist in the registry yet. The tag below is the one the
+--       MinaToolchainArtifactTrixie build will itself produce once it lands;
+--       update the git-hash prefix to a real published tag after the first
+--       trixie toolchain build completes.
 -- NOTE: minaReleaseToolkit bundles the deb-toolkit binary and is published by
 --       MinaProtocol/mina-release-toolkit. Pinned to a released version tag
 --       (not a moving tag like :latest) for reproducible CI; bump it
@@ -39,6 +44,7 @@
     "docker.io/minaprotocol/mina-toolchain:44e9e82-noble-devnet"
 , minaToolchainJammy.amd64 =
     "docker.io/minaprotocol/mina-toolchain:44e9e82-jammy-devnet"
+, minaToolchainTrixie.amd64 = "PLACEHOLDER"
 , minaToolchain =
     "docker.io/minaprotocol/mina-toolchain:44e9e82-bullseye-devnet"
 , minaBaseBookworm =
@@ -50,6 +56,7 @@
 , minaBaseFocal.amd64 = "docker.io/minaprotocol/mina-base:86b89d0-focal-devnet"
 , minaBaseJammy.amd64 = "docker.io/minaprotocol/mina-base:86b89d0-jammy-devnet"
 , minaBaseNoble.amd64 = "docker.io/minaprotocol/mina-base:86b89d0-noble-devnet"
+, minaBaseTrixie.amd64 = "PLACEHOLDER"
 , minaBase = "docker.io/minaprotocol/mina-base:86b89d0-bullseye-devnet"
 , postgres =
     "europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/postgres:12.4-alpine"

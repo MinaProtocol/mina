@@ -33,6 +33,7 @@ let imageFor
             , Jammy = ContainerImages.minaBaseJammy.amd64
             , Focal = ContainerImages.minaBaseFocal.amd64
             , Noble = ContainerImages.minaBaseNoble.amd64
+            , Trixie = ContainerImages.minaBaseTrixie.amd64
             }
             debVersion
 

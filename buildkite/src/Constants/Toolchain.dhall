@@ -41,6 +41,7 @@ let imageFor
             , Jammy = ContainerImages.minaToolchainJammy.amd64
             , Focal = ContainerImages.minaToolchain
             , Noble = ContainerImages.minaToolchainNoble.amd64
+            , Trixie = ContainerImages.minaToolchainTrixie.amd64
             }
             debVersion
 
