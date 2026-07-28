@@ -280,13 +280,13 @@ let transfer_funds =
 let update_state =
   let create_command ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile ~app_state
       ~num_events ~num_actions ~event_elements_per ~action_elements_per
-      ~repeat_arrays ~num_state_fields ~genesis_constants ~constraint_constants
-      () =
+      ~repeat_arrays ~num_state_fields ~max_state_fields ~genesis_constants
+      ~constraint_constants () =
     let open Deferred.Let_syntax in
     let%map zkapp_command =
       update_state ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile ~app_state
         ~num_events ~num_actions ~event_elements_per ~action_elements_per
-        ~repeat_arrays ~num_state_fields ~genesis_constants
+        ~repeat_arrays ~num_state_fields ~max_state_fields ~genesis_constants
         ~constraint_constants
     in
     Util.print_snapp_transaction ~debug zkapp_command ;
@@ -345,17 +345,17 @@ let update_state =
            Param.(optional_with_default (Util.Count 0) Flags.array_count)
        in
        let fee = Option.value ~default:Flags.default_fee fee in
-
        let (module G) = Genesis_constants.profiled () in
        let constraint_constants = G.constraint_constants in
        let genesis_constants = G.genesis_constants in
+       let max_state_fields = Mina_base.Zkapp_state.max_size_int in
        if Currency.Fee.(fee < Flags.min_fee) then
          failwith
            (sprintf "Fee must at least be %s"
               (Currency.Fee.to_mina_string Flags.min_fee) ) ;
        create_command ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
          ~app_state ~num_events ~num_actions ~event_elements_per
-         ~action_elements_per ~repeat_arrays ~num_state_fields
+         ~action_elements_per ~repeat_arrays ~num_state_fields ~max_state_fields
          ~genesis_constants ~constraint_constants ))
 
 let update_zkapp_uri =
