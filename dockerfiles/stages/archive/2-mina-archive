@@ -19,7 +19,7 @@ ARG deb_profile=devnet
 ARG deb_suffix
 ARG build_flags_suffix
 
-# if --build-arg deb_suffix is defined, add hypen at beginning.
+# if --build-arg deb_suffix is defined, add hyphen at beginning.
 ENV SUFFIX=${deb_suffix:+-${deb_suffix}}
 ENV BUILD_FLAGS_SUFFIX=${build_flags_suffix}
 # construct mina debian package name based on network and suffix.

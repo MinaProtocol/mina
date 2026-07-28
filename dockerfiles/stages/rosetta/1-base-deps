@@ -1,10 +1,11 @@
 #################################################################################################
 # The rosetta "base-deps" stage
 # - Rosetta's own heavy, mina-UNRELATED base layer. Kept separate from the shared
-#   dockerfiles/stages/1-base-deps because rosetta uses ubuntu:focal, its own broad apt
-#   dependency list, and postgresql-15 from the pgdg archive (none of which the daemon/archive
-#   base needs). Rosetta is built for every codename like daemon/archive; the separate base
-#   exists because of its heavy rosetta-specific toolchain, not the distro.
+#   dockerfiles/stages/1-base-deps because rosetta needs its own broad apt dependency list and
+#   postgresql-15 from the pgdg archive (neither of which the daemon/archive base needs).
+#   The base image is parameterised by --build-arg image (defaulting to ubuntu:focal below) and
+#   rosetta is built for every codename like daemon/archive; the separate base exists because of
+#   its heavy rosetta-specific toolchain, not because the distro is fixed.
 # - rosetta-cli and the Go toolchain that builds it are intentionally NOT installed here: they
 #   are test-only (the rosetta integration test builds its own copy via
 #   buildkite/scripts/tests/rosetta/install-cli.sh) and have no role in the production runtime.

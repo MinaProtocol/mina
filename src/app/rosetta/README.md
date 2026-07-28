@@ -29,7 +29,9 @@ Rosetta node. Each build argument is configurable and defines the following:
 * `network`: network version of the artifacts to install
 
 To build an image with just the minimal requirements to run a Rosetta node (e.g. when connecting to an existing Mina node and archive DB) you can run the same
-command but concatenate the daemon staged fragments instead: `cat dockerfiles/stages/1-base-deps dockerfiles/stages/daemon/2-mina-daemon dockerfiles/stages/daemon/3-prefork-genesis`.
+command but concatenate the daemon staged fragments instead: `cat dockerfiles/stages/1-base-deps dockerfiles/stages/daemon/2-mina-daemon`.
+
+`dockerfiles/stages/daemon/3-prefork-genesis` is deliberately left out: it bakes in the pinned legacy prefork-genesis package and is opt-in for hardfork builds only (CI requests it via `--docker-target mina-daemon-prefork-genesis`). Append it only if you actually need that layer.
 
 Alternatively, you could use an official image that is built in exactly this way by buildkite CI/CD.
 
