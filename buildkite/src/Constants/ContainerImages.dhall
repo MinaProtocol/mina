@@ -9,18 +9,18 @@
 { toolchainBase =
     "europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/ci-toolchain-base:v4"
 , minaToolchainBookworm =
-    { amd64 = "docker.io/minaprotocol/mina-toolchain:169fd52-bookworm-devnet"
+    { amd64 = "docker.io/minaprotocol/mina-toolchain:ffab0f8-bookworm-devnet"
     , arm64 =
-        "docker.io/minaprotocol/mina-toolchain:169fd52-bookworm-devnet-arm64"
+        "docker.io/minaprotocol/mina-toolchain:ffab0f8-bookworm-devnet-arm64"
     }
 , minaToolchainBullseye.amd64 =
-    "docker.io/minaprotocol/mina-toolchain:169fd52-bullseye-devnet"
+    "docker.io/minaprotocol/mina-toolchain:ffab0f8-bullseye-devnet"
 , minaToolchainNoble.amd64 =
-    "docker.io/minaprotocol/mina-toolchain:169fd52-noble-devnet"
+    "docker.io/minaprotocol/mina-toolchain:ffab0f8-noble-devnet"
 , minaToolchainJammy.amd64 =
-    "docker.io/minaprotocol/mina-toolchain:169fd52-jammy-devnet"
+    "docker.io/minaprotocol/mina-toolchain:ffab0f8-jammy-devnet"
 , minaToolchain =
-    "docker.io/minaprotocol/mina-toolchain:169fd52-bullseye-devnet"
+    "docker.io/minaprotocol/mina-toolchain:ffab0f8-bullseye-devnet"
 , postgres =
     "europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/postgres:12.4-alpine"
 , xrefcheck =
