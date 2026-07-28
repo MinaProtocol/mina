@@ -18,7 +18,7 @@ ARG deb_repo="http://packages.o1test.net"
 ARG deb_profile
 ARG deb_suffix
 
-# if --build-arg deb_suffix is defined, add hypen at beginning.
+# if --build-arg deb_suffix is defined, add hyphen at beginning.
 ENV SUFFIX=${deb_suffix:+-${deb_suffix}}
 # Construct the daemon debian package name from the suffix. The daemon binaries
 # now ship in the network-agnostic generic package (profile/network selected at

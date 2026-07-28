@@ -424,7 +424,7 @@ if [[ -n "${SAVE_TO_CI_CACHE_ROOT:-}" ]]; then
     if command -v apt-get >/dev/null 2>&1; then
       ${SUDO:-sudo} apt-get update -qq
       ${SUDO:-sudo} apt-get install -y --no-install-recommends zstd
-    els
+    else
       echo "ERROR: zstd missing and no apt-get available to install it"
       exit 1
     fi
