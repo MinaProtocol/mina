@@ -280,13 +280,13 @@ let transfer_funds =
 let update_state =
   let create_command ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile ~app_state
       ~num_events ~num_actions ~event_elements_per ~action_elements_per
-      ~repeat_arrays ~num_account_updates ~genesis_constants
+      ~repeat_arrays ~num_state_fields ~num_account_updates ~genesis_constants
       ~constraint_constants () =
     let open Deferred.Let_syntax in
     let%map zkapp_command =
       update_state ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile ~app_state
         ~num_events ~num_actions ~event_elements_per ~action_elements_per
-        ~repeat_arrays ~num_account_updates ~genesis_constants
+        ~repeat_arrays ~num_state_fields ~num_account_updates ~genesis_constants
         ~constraint_constants
     in
     Util.print_snapp_transaction ~debug zkapp_command ;
@@ -335,6 +335,14 @@ let update_state =
              "Emit identical event and action arrays instead of distinct ones, \
               to exercise consumers that deduplicate them by content"
            Param.no_arg
+       and num_state_fields =
+         Param.flag "--num-state-fields"
+           ~doc:
+             "NN|max Set this many zkApp state fields to generated values, or \
+              \"max\" for every field this protocol version defines. Cannot be \
+              combined with --zkapp-state (default: 0, meaning use \
+              --zkapp-state)"
+           Param.(optional_with_default (Util.Count 0) Flags.array_count)
        and num_account_updates =
          Param.flag "--num-account-updates"
            ~doc:
@@ -354,8 +362,8 @@ let update_state =
               (Currency.Fee.to_mina_string Flags.min_fee) ) ;
        create_command ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
          ~app_state ~num_events ~num_actions ~event_elements_per
-         ~action_elements_per ~repeat_arrays ~num_account_updates
-         ~genesis_constants ~constraint_constants ))
+         ~action_elements_per ~repeat_arrays ~num_state_fields
+         ~num_account_updates ~genesis_constants ~constraint_constants ))
 
 let update_zkapp_uri =
   let create_command ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile ~zkapp_uri

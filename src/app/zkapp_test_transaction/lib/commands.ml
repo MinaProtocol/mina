@@ -338,6 +338,30 @@ module Util = struct
      With [repeat] every array holds the same elements, which defeats the
      content-based deduplication that consumers such as the archive node apply
      to event and action arrays. *)
+
+  (* Pick the zkApp state fields to set: either the ones named explicitly, or
+     [count] generated ones. How many fields a zkApp account has is fixed when
+     the tool is built, so asking for [Max] is the only way to set all of them
+     without naming a number that a different protocol version rejects. *)
+  let state_fields ~explicit ~count =
+    match count with
+    | Count 0 ->
+        explicit
+    | _ ->
+        if not (List.is_empty explicit) then
+          failwith
+            "--zkapp-state and --num-state-fields both set the zkApp state; \
+             pass one or the other" ;
+        let n =
+          match count with Count n -> n | Max -> Zkapp_state.max_size_int
+        in
+        if n > Zkapp_state.max_size_int then
+          failwithf
+            "%d zkApp state fields is above the %d this protocol version \
+             defines"
+            n Zkapp_state.max_size_int () ;
+        List.init n ~f:(fun i -> Int.to_string (i + 1))
+
   let gen_field_arrays ~kind ~max_elements ~count ~elements_per ~repeat
       ~account_updates : Snark_params.Tick.Field.t array list =
     if elements_per < 1 then
@@ -544,12 +568,15 @@ let transfer_funds ~debug ~sender ~sender_nonce ~fee ~fee_payer ~fee_payer_nonce
 
 let update_state ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile ~app_state
     ~num_events ~num_actions ~event_elements_per ~action_elements_per
-    ~repeat_arrays ~num_account_updates ~genesis_constants ~constraint_constants
-    =
+    ~repeat_arrays ~num_state_fields ~num_account_updates ~genesis_constants
+    ~constraint_constants =
   let open Deferred.Let_syntax in
   let%bind keypair = Util.fee_payer_keypair_of_file keyfile in
   let%bind zkapp_keypair = Util.snapp_keypair_of_file zkapp_keyfile in
-  let app_state = Util.app_state_of_list app_state in
+  let app_state =
+    Util.app_state_of_list
+      (Util.state_fields ~explicit:app_state ~count:num_state_fields)
+  in
   if num_account_updates < 1 then
     failwithf "--num-account-updates must be at least 1, got %d"
       num_account_updates () ;
