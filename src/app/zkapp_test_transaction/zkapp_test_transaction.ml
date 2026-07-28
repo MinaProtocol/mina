@@ -280,14 +280,14 @@ let transfer_funds =
 let update_state =
   let create_command ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile ~app_state
       ~num_events ~num_actions ~event_elements_per ~action_elements_per
-      ~repeat_arrays ~num_state_fields ~num_account_updates ~genesis_constants
-      ~constraint_constants () =
+      ~repeat_arrays ~num_state_fields ~num_account_updates ~max_state_fields
+      ~genesis_constants ~constraint_constants () =
     let open Deferred.Let_syntax in
     let%map zkapp_command =
       update_state ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile ~app_state
         ~num_events ~num_actions ~event_elements_per ~action_elements_per
-        ~repeat_arrays ~num_state_fields ~num_account_updates ~genesis_constants
-        ~constraint_constants
+        ~repeat_arrays ~num_state_fields ~num_account_updates ~max_state_fields
+        ~genesis_constants ~constraint_constants
     in
     Util.print_snapp_transaction ~debug zkapp_command ;
     ()
@@ -360,10 +360,17 @@ let update_state =
          failwith
            (sprintf "Fee must at least be %s"
               (Currency.Fee.to_mina_string Flags.min_fee) ) ;
+       (* Read once at the entrypoint and thread down. Kept below the fee check
+          (rather than beside the genesis-constants block) so this mesa-only
+          addition does not adjoin the lines develop rewrote to
+          Genesis_constants.profiled (), which would make the branch fail the
+          "merges cleanly into develop" lint. *)
+       let max_state_fields = Mina_base.Zkapp_state.max_size_int in
        create_command ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
          ~app_state ~num_events ~num_actions ~event_elements_per
          ~action_elements_per ~repeat_arrays ~num_state_fields
-         ~num_account_updates ~genesis_constants ~constraint_constants ))
+         ~num_account_updates ~max_state_fields ~genesis_constants
+         ~constraint_constants ))
 
 let update_zkapp_uri =
   let create_command ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile ~zkapp_uri
