@@ -464,12 +464,17 @@ fi
 
 docker buildx build --load --network=host --progress=plain $PLATFORM $TARGET_ARG $DOCKER_REPO_ARG $NO_CACHE $BUILD_NETWORK $CACHE $NETWORK $IMAGE $DEB_CODENAME $DEB_RELEASE $DEB_VERSION --build-arg deb_profile="$DEB_PROFILE" --build-arg generic_network="$GENERIC_NETWORK_SEG" $DOCKER_DEB_SUFFIX_ARG $BUILD_FLAGS_SUFFIX_ARG $DEB_REPO $APT_CACHE_ARG $BRANCH $REPO $LEGACY_VERSION $CUSTOM_SUFFIX_ARG $CUSTOM_ARG $DEB_ARCH $IMAGE_NAME_ARG $VERSION_ARG "$DOCKER_CONTEXT" -t "$TAG" -t "$HASHTAG" -f $DOCKERFILE_PATH
 
-# NOT redundant with the -t "$HASHTAG" above, despite appearances: buildx has to
-# create the hash tag itself. Dropping the -t and relying on this docker tag
-# alone fails in CI -- `docker tag` reports no error, yet the later
-# `docker push "$HASHTAG"` dies with "tag does not exist" (see build 41899,
-# where it took out the daemon and archive images). build.sh has no `set -e`, so
-# the silent tag failure is only visible as that confusing push error. Keep both.
+# Belt and braces, deliberately kept alongside the -t "$HASHTAG" above: the
+# buildx flag makes the hash tag part of the build's own output, so it does not
+# depend on a separate `docker tag` still holding at push time.
+#
+# In build 41899 three concurrent docker jobs each pushed $TAG fine and then died
+# on `docker push "$HASHTAG"` with "tag does not exist", i.e. the tag was gone
+# between tagging and pushing (the $TAG push takes minutes for an 8.6GB image).
+# The same code passed every docker job one build earlier (41895), so that was a
+# race or an agent-side eviction rather than the tagging being wrong -- but since
+# build.sh has no `set -e`, a lost/failed tag surfaces only as that confusing
+# push error, so having buildx name both tags is worth the redundant line.
 docker tag "$TAG" "$HASHTAG"
 
 if [[ -n "${SAVE_TO_CI_CACHE_ROOT:-}" ]]; then
