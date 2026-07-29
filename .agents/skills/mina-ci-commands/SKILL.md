@@ -15,7 +15,8 @@ The Mina repo uses GitHub PR comments as CI control commands. Prefer `gh` CLI; d
 2. Confirm the repository is `MinaProtocol/mina` unless the user explicitly gives another repo.
 3. If the requested command is broad or expensive (`!ci-build-me`, `!ci-nightly-me`, broad `!ci-docker-me`), proceed if the user clearly requested it; otherwise ask confirmation.
 4. Prefer exact command-only comments unless extra context is useful. The CI bot mostly keys off the command text.
-5. After posting, return the GitHub comment URL and the exact command body.
+5. For PR-build commands (`!ci-build-me`, `!ci-nightly-me`, `!ci-docker-me`), confirm the PR is cleanly mergeable first — the webhook silently skips a non-mergeable PR, including the brief `UNKNOWN` window right after a push. Details and the poll command are in "Troubleshooting: the trigger produced no build".
+6. After posting, return the GitHub comment URL and the exact command body, then attach the triggered build as a follow-up `^ <build-url>` comment (see "Attach the Buildkite build URL as a follow-up comment").
 
 Useful PR extraction:
 
@@ -217,6 +218,99 @@ for pr in 19061 18638; do
     --jq ".[] | select(.body | test(\"!ci-\"; \"i\")) | {pr:$pr,user:.user.login,created_at,url:.html_url,body:.body}"
 done
 ```
+
+## Attach the Buildkite build URL as a follow-up comment
+
+The `ci-build-me` webhook eventually posts its own `^ https://buildkite.com/...` reply, but it can lag several minutes. After triggering a `!ci-*` command, locate the build it started and post a follow-up comment pinning the URL into the PR's comment section, mirroring the bot's own `^ <url>` format. This gives reviewers a direct link without waiting on the bot.
+
+Each command maps to a pipeline slug (see the tables above), all under the `o-1-labs-2` Buildkite org:
+
+| Command | Pipeline slug |
+|---|---|
+| `!ci-build-me` | `mina-o-1-labs` |
+| `!ci-nightly-me` | `mina-end-to-end-nightlies` |
+| `!ci-debian-me` | `mina-build-debian` |
+| `!ci-docker-me` | `mina-build-docker` |
+| `!ci-toolchain-me` | `mina-toolchains-build` |
+| `!ci-nix-me` | `mina-nix-experimental` |
+
+Match on the **head commit SHA**, not just the branch (`BUILDKITE_API_TOKEN` must be set). A branch filter alone is unreliable: right after a trigger the newest branch build is often a *previous* commit (webhook lag), and on busy pipelines the branch's builds may sit several pages deep. Query by commit and poll until the build for the current head appears:
+
+```bash
+pipeline=mina-o-1-labs   # from the mapping above
+sha=$(gh pr view "$pr" --repo MinaProtocol/mina --json headRefOid --jq .headRefOid)
+for i in $(seq 1 20); do
+  build_url=$(curl -s -H "Authorization: Bearer $BUILDKITE_API_TOKEN" \
+    "https://api.buildkite.com/v2/organizations/o-1-labs-2/pipelines/$pipeline/builds?commit=$sha&per_page=1" \
+    | python3 -c 'import sys,json; b=json.load(sys.stdin); print(b[0]["web_url"]) if b else print("")')
+  [ -n "$build_url" ] && break
+  sleep 30   # webhook lag; keep polling
+done
+```
+
+If polling never finds a build (empty after several minutes), the trigger was almost certainly skipped — jump to "Troubleshooting: the trigger produced no build" rather than posting a stale/guessed URL. Once found, post it exactly mirroring the bot's format (leading `^ `):
+
+```bash
+gh api repos/MinaProtocol/mina/issues/$pr/comments \
+  -f body="^ $build_url" \
+  --jq '.html_url'
+```
+
+## Troubleshooting: the trigger produced no build
+
+A posted `!ci-*` comment that spawns no Buildkite build is almost always **not** an authorship/permissions problem. Comments posted via `gh api` are authored by the authenticated `gh` user — a real GitHub user, indistinguishable to the webhook from a comment typed in the web UI. Verify and rule this out rather than assuming a "bot vs human" difference:
+
+```bash
+gh api user --jq .login                    # who your gh posts as
+gh api repos/MinaProtocol/mina/issues/comments/<id> --jq '{author:.user.login,type:.user.type}'
+```
+
+The real causes, in order of likelihood:
+
+1. **PR not cleanly mergeable.** The `ci-build-me` path skips a PR whose `mergeStateStatus` is `DIRTY`/`CONFLICTING` — or `UNKNOWN`, the transient state GitHub reports for a few seconds after every push while it recomputes. A trigger fired in that window is silently dropped. This is the most common surprise: a trigger sent seconds after a `git push` fails, the identical command a minute later succeeds. Poll until it settles, then re-post:
+   ```bash
+   gh pr view "$pr" --repo MinaProtocol/mina --json mergeable,mergeStateStatus \
+     --jq '{mergeable,mergeStateStatus}'   # want mergeable=MERGEABLE, status not DIRTY/UNKNOWN
+   ```
+2. **Author not a public org member.** Most commands require the comment author be a *public* member of the `MinaProtocol` org. Check with `gh api orgs/MinaProtocol/public_members/<login> -i` (204 = yes).
+3. **Webhook lag.** Genuine builds can take a couple of minutes to appear; keep polling by commit SHA (above) before concluding it was skipped.
+
+Who actually created a build (confirms the webhook fired vs a manual Buildkite trigger):
+
+```bash
+curl -s -H "Authorization: Bearer $BUILDKITE_API_TOKEN" \
+  "https://api.buildkite.com/v2/organizations/o-1-labs-2/pipelines/$pipeline/builds/<n>" \
+  | python3 -c 'import sys,json; b=json.load(sys.stdin); print(b.get("source"), (b.get("creator") or {}).get("name"), b["commit"][:9])'
+# source=api + the o1-labs token owner's name == the ci-build-me webhook fired
+```
+
+## Is the build actually failed?
+
+A build's top-level `state: failed` does not always mean the deliverable failed — an ancillary job (cache-parity verification, flaky arm64-under-QEMU, an agent hitting `no space left on device`) can fail while every job that matters passed. Before reporting failure, inspect per-job state and confirm the real artifact:
+
+```bash
+curl -s -H "Authorization: Bearer $BUILDKITE_API_TOKEN" \
+  "https://api.buildkite.com/v2/organizations/o-1-labs-2/pipelines/$pipeline/builds/<n>" \
+  | python3 -c '
+import sys,json
+b=json.load(sys.stdin); print("build:", b["state"])
+for j in b.get("jobs",[]):
+    if j.get("type")=="script":
+        print(" ", j.get("state"), "exit=%s"%j.get("exit_status"), j.get("name"))'
+```
+
+For a toolchain build specifically, the deliverable is the pushed image — verify it exists on docker.io regardless of the build's overall state (HTTP 200 = published):
+
+```bash
+tok=$(curl -s "https://auth.docker.io/token?service=registry.docker.io&scope=repository:minaprotocol/mina-toolchain:pull" \
+  | python3 -c 'import sys,json;print(json.load(sys.stdin)["token"])')
+curl -s -o /dev/null -w '%{http_code}\n' -H "Authorization: Bearer $tok" \
+  -H "Accept: application/vnd.oci.image.index.v1+json" \
+  -H "Accept: application/vnd.docker.distribution.manifest.list.v2+json" \
+  "https://registry-1.docker.io/v2/minaprotocol/mina-toolchain/manifests/<7charsha>-bullseye-devnet"
+```
+
+If the images are published and only an unrelated verification job failed, say so explicitly instead of reporting a blanket failure.
 
 ## Response format after triggering
 
