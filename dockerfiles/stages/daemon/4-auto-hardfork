@@ -1,62 +1,27 @@
-ARG image=europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/debian:bullseye-slim
+#################################################################################################
+# The "mina-daemon-auto-hardfork" stage
+# - Continues from the shared base-deps image, like every other staged service. This replaces the
+#   last monolithic Dockerfile, which carried its own copy of the base layer and had drifted:
+#   it installed google-cloud-sdk/kubectl/gke-gcloud-auth-plugin 462.0.1-0 from apt, while the
+#   shared base installs the ${GCLOUD_VERSION} (476.0.0) SDK tarball and adds the same two
+#   components via `gcloud components install`. The apt dependency list was already identical.
+# - Installs the POSTFORK metapackage (mina-${network}-postfork-mesa) at deb_version and then the
+#   legacy PREFORK package at deb_legacy_version, so one image can run either side of the fork.
+#   This is why it cannot extend the mina-daemon stage: that stage installs the generic daemon
+#   package (mina-generic), which is a different package set.
+# - Sets MINA_HARDFORK_STATE_DIR; the entrypoint/user/puppeteer tail matches the daemon stage.
+#################################################################################################
+FROM base-deps AS mina-daemon-auto-hardfork
 
-FROM ${image}
-
-# In multi-stage builds, Docker requires to re-declare ARG variables after each FROM 
-# to make them available in that stage. 
-# Even if the ARG is declared globally before the first FROM, 
-# it must be re-declared inside each stage.
+# In multi-stage builds, Docker requires re-declaring ARG variables after each FROM.
 ARG deb_version
-ARG deb_codename
-ARG network
-ARG deb_release
+ARG deb_release=unstable
+ARG deb_codename=bullseye
+ARG network=mainnet
+ARG deb_repo="http://packages.o1test.net"
 ARG deb_legacy_version
-ARG deb_repo
-
-ENV DEBIAN_FRONTEND noninteractive
 
 ENV MINA_DEB=mina-${network}-postfork-mesa
-
-# Install ca-certificates using HTTP
-RUN apt-get update --quiet --yes \
-  && apt-get install --quiet --yes --no-install-recommends ca-certificates \
-  && rm -rf /var/lib/apt/lists/*
-
-# Switch to HTTPS
-RUN if [ -f /etc/apt/sources.list ]; then \
-  sed -i 's/http:\/\//https:\/\//g' /etc/apt/sources.list; \
-else \
-  sed -i 's/http:\/\//https:\/\//g' /etc/apt/sources.list.d/debian.sources; \
-fi
-
-# Dependencies
-RUN apt-get update --quiet --yes \
-  && apt-get upgrade --quiet --yes \
-  && apt-get install --quiet --yes --no-install-recommends \
-    apt-transport-https \
-    curl \
-    dnsutils \
-    dumb-init \
-    gettext \
-    gnupg2 \
-    jq \
-    libgmp10 \
-    libgomp1 \
-    libpq-dev \
-    procps \
-    python3 \
-    tzdata \
-  && rm -rf /var/lib/apt/lists/*
-
-# Install google-cloud-sdk for GCLOUD_UPLOAD feature
-SHELL ["/bin/bash", "-o", "pipefail", "-c"]
-RUN echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" | tee -a /etc/apt/sources.list.d/google-cloud-sdk.list \
-  && curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key --keyring /usr/share/keyrings/cloud.google.gpg add - \
-  && apt-get update --quiet --yes \
-  && apt-get install --quiet --yes --no-install-recommends google-cloud-sdk=462.0.1-0 kubectl=1:462.0.1-0 google-cloud-sdk-gke-gcloud-auth-plugin=462.0.1-0 \
-  && rm -rf /var/lib/apt/lists/*
-
-ENV USE_GKE_GCLOUD_AUTH_PLUGIN=True
 
 # Mina daemon package
 # jemalloc is also installed automatically here to match the package dependencies for this $deb_codename.
@@ -69,6 +34,7 @@ ENV USE_GKE_GCLOUD_AUTH_PLUGIN=True
 # has no repo to resolve it, so it is requested explicitly as a local file. The
 # prefork package's (unversioned) mina-logproc dependency is already satisfied
 # by that install, so the legacy prefork step only needs the prefork package.
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 COPY scripts/install-mina-debs.sh /usr/local/bin/install-mina-debs.sh
 COPY _debs /opt/mina-local-debs
 RUN echo "Building image with version $deb_version from repo $deb_release $deb_codename for network $network" \

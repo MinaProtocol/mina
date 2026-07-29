@@ -23,7 +23,8 @@ let network = Network.Type.Devnet
 let dirtyWhen =
       [ S.strictlyStart (S.contains "src")
       , S.exactly "buildkite/src/Jobs/Test/AutoHardforkTest" "dhall"
-      , S.exactly_noext "dockerfiles/Dockerfile-mina-daemon-auto-hardfork"
+      , S.exactly_noext "dockerfiles/stages/daemon/4-auto-hardfork"
+      , S.exactly_noext "dockerfiles/stages/1-base-deps"
       , S.exactly "scripts/hardfork/dispatcher" "sh"
       , S.exactly "scripts/hardfork/create_runtime_config" "sh"
       , S.exactly "buildkite/scripts/tests/hardfork/dispatcher-tests" "sh"
