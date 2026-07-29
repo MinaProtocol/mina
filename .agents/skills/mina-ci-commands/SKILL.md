@@ -48,7 +48,8 @@ These commands are handled by the Mina `frontend/ci-build-me` webhook on `issue_
 | `!ci-nix-me` | `mina-nix-experimental` | Nix experimental pipeline. |
 | `!ci-debian-me` | `mina-build-debian` | Debian package build pipeline. |
 | `!ci-docker-me` | `mina-build-docker` | Docker image build pipeline; may be filtered. |
-| `!ci-toolchain-me` | `mina-toolchains-build` | Toolchain build pipeline. |
+| `!ci-toolchain-me` | `mina-toolchains-build` | Rebuild the opam toolchain images (tag `Toolchain`). Takes hours. Does **not** touch the `mina-base` images. |
+| `!ci-docker-base-me` | `mina-toolchains-build` | Rebuild the shared `mina-base` images (tag `Base`) for all codenames. Use after changing `dockerfiles/stages/1-base-deps`, or to publish/refresh the `minaBase*` pins. |
 | `!approved-for-mainnet` | `mina-pr-gating` | Mainnet approval/gating command; restricted to specific approvers. |
 
 Examples:
@@ -58,7 +59,23 @@ gh api repos/MinaProtocol/mina/issues/$pr/comments -f body='!ci-build-me' --jq '
 gh api repos/MinaProtocol/mina/issues/$pr/comments -f body='!ci-nightly-me' --jq '.html_url'
 gh api repos/MinaProtocol/mina/issues/$pr/comments -f body='!ci-debian-me' --jq '.html_url'
 gh api repos/MinaProtocol/mina/issues/$pr/comments -f body='!ci-toolchain-me' --jq '.html_url'
+gh api repos/MinaProtocol/mina/issues/$pr/comments -f body='!ci-docker-base-me' --jq '.html_url'
 ```
+
+## `!ci-docker-base-me`
+
+Takes no arguments. It triggers `mina-toolchains-build` with:
+
+```text
+BUILDKITE_PIPELINE_FILTER=BaseDockersOnly
+BUILDKITE_PIPELINE_JOB_SELECTION=Full
+```
+
+`BaseDockersOnly` maps to the `Base` tag, which only the `MinaBaseArtifact*` jobs carry, so the opam toolchain images are excluded. `Full` skips dirty-when triage, so the rebuild runs even when the PR touched nothing under `dockerfiles/stages/`.
+
+This is the **only** way these jobs run: they carry neither `Fast` nor `Long`, so the standard PR/nightly pipeline stages (`FastOnly`, `LongAndVeryLong`, `TearDownOnly`) filter them out regardless of `dirtyWhen`.
+
+Each selected job pushes to `docker.io/minaprotocol/mina-base:<githash>-<codename>-<network>` and writes `${CACHE_ROOT}/mina-base/<tag>.tar.zst` to the storagebox. After it finishes, bump the `minaBase*` pins in `buildkite/src/Constants/ContainerImages.dhall` to the new githash, otherwise the daemon/archive builds keep falling back to building the base-deps stage inline.
 
 ## `!ci-docker-me` filters
 
