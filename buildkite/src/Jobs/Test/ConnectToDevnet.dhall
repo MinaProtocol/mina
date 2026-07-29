@@ -19,7 +19,7 @@ let MainlineBranch = ../../Pipeline/MainlineBranch.dhall
 let network = Network.Type.Devnet
 
 let dependsOn =
-      DebianVersions.dependsOn DebianVersions.DepsSpec::{ network = network }
+      DebianVersions.appDependsOn DebianVersions.DepsSpec::{ network = network }
 
 in  Pipeline.build
       Pipeline.Config::{
