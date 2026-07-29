@@ -43,8 +43,8 @@ esac; shift; done
 declare -A BENCH_UPLOAD_FORMAT=(
   ["heap-usage"]="heap"
   ["zkapp"]="zkapp"
-  ["mina-base"]="janestreet"
-  ["ledger-export"]="janestreet"
+  ["mina-base"]="mina-base"
+  ["ledger-export"]="ledger-export"
   ["snark"]="snark"
 )
 UPLOAD_FORMAT="${BENCH_UPLOAD_FORMAT[$BENCHMARK]:-}"
