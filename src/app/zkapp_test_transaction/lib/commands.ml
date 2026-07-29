@@ -307,6 +307,86 @@ module Util = struct
   let action_state_of_list array_lst : Snark_params.Tick.Field.t array list =
     List.map ~f:Events.of_string_array array_lst
 
+  (* How many events/actions arrays to generate. [Max] saturates the protocol
+     cap instead of naming a number, so that one command line stays valid
+     across protocol versions that cap events and actions differently. *)
+  type array_count = Count of int | Max
+
+  let array_count_of_string s =
+    match String.lowercase (String.strip s) with
+    | "max" ->
+        Max
+    | _ -> (
+        match Option.try_with (fun () -> Int.of_string s) with
+        | Some n when n >= 0 ->
+            Count n
+        | _ ->
+            failwithf "expected a non-negative integer or \"max\", got %s" s ()
+        )
+
+  (* Generate the events or actions of a zkApp command: [count] field-arrays of
+     [elements_per] field elements each.
+
+     [max_elements] is the cap that Zkapp_command.valid_size enforces, and it
+     bounds the *total* number of field elements of one kind across the whole
+     command, not the length of a single array. Going over it builds a command
+     that every daemon rejects, so fail here with a message naming the total.
+
+     With [repeat] every array holds the same elements, which defeats the
+     content-based deduplication that consumers such as the archive node apply
+     to event and action arrays. *)
+
+  (* Pick the zkApp state fields to set: either the ones named explicitly, or
+     [count] generated ones. How many fields a zkApp account has is fixed when
+     the tool is built, so asking for [Max] is the only way to set all of them
+     without naming a number that a different protocol version rejects.
+     [max_fields] is that limit, read once at the entrypoint and passed down
+     rather than looked up here. *)
+  let state_fields ~explicit ~count ~max_fields =
+    match count with
+    | Count 0 ->
+        explicit
+    | _ ->
+        if not (List.is_empty explicit) then
+          failwith
+            "--zkapp-state and --num-state-fields both set the zkApp state; \
+             pass one or the other" ;
+        let n = match count with Count n -> n | Max -> max_fields in
+        if n > max_fields then
+          failwithf
+            "%d zkApp state fields is above the %d this protocol version \
+             defines"
+            n max_fields () ;
+        List.init n ~f:(fun i -> Int.to_string (i + 1))
+
+  let gen_field_arrays ~kind ~max_elements ~count ~elements_per ~repeat :
+      Snark_params.Tick.Field.t array list =
+    if elements_per < 1 then
+      failwithf "%s arrays need at least 1 field element, got %d" kind
+        elements_per () ;
+    let count =
+      match count with
+      | Count n ->
+          n
+      | Max ->
+          if elements_per > max_elements then
+            failwithf
+              "a single %s array of %d field elements is already above the \
+               maximum of %d (genesis constant max_%s_elements)"
+              kind elements_per max_elements kind () ;
+          max_elements / elements_per
+    in
+    let total = count * elements_per in
+    if total > max_elements then
+      failwithf
+        "%d %s arrays of %d field elements is %d elements, above the maximum \
+         of %d (genesis constant max_%s_elements)"
+        count kind elements_per total max_elements kind () ;
+    List.init count ~f:(fun i ->
+        Array.init elements_per ~f:(fun j ->
+            let ndx = if repeat then j else (i * elements_per) + j in
+            Snark_params.Tick.Field.of_int (ndx + 1) ) )
+
   let auth_of_string s : Permissions.Auth_required.t =
     match String.lowercase s with
     | "none" ->
@@ -483,11 +563,28 @@ let transfer_funds ~debug ~sender ~sender_nonce ~fee ~fee_payer ~fee_payer_nonce
   zkapp_command
 
 let update_state ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile ~app_state
-    ~genesis_constants ~constraint_constants =
+    ~num_events ~num_actions ~event_elements_per ~action_elements_per
+    ~repeat_arrays ~num_state_fields ~max_state_fields ~genesis_constants
+    ~constraint_constants =
   let open Deferred.Let_syntax in
   let%bind keypair = Util.fee_payer_keypair_of_file keyfile in
   let%bind zkapp_keypair = Util.snapp_keypair_of_file zkapp_keyfile in
-  let app_state = Util.app_state_of_list app_state in
+  let app_state =
+    Util.app_state_of_list
+      (Util.state_fields ~explicit:app_state ~count:num_state_fields
+         ~max_fields:max_state_fields )
+  in
+  let Genesis_constants.{ max_event_elements; max_action_elements; _ } =
+    genesis_constants
+  in
+  let events =
+    Util.gen_field_arrays ~kind:"event" ~max_elements:max_event_elements
+      ~count:num_events ~elements_per:event_elements_per ~repeat:repeat_arrays
+  in
+  let actions =
+    Util.gen_field_arrays ~kind:"action" ~max_elements:max_action_elements
+      ~count:num_actions ~elements_per:action_elements_per ~repeat:repeat_arrays
+  in
   let spec =
     { Transaction_snark.For_tests.Update_states_spec.sender = (keypair, nonce)
     ; fee
@@ -500,8 +597,8 @@ let update_state ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile ~app_state
     ; snapp_update = { Account_update.Update.dummy with app_state }
     ; current_auth = Permissions.Auth_required.Signature
     ; call_data = Snark_params.Tick.Field.zero
-    ; events = []
-    ; actions = []
+    ; events
+    ; actions
     ; preconditions = None
     }
   in
