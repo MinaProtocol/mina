@@ -136,13 +136,20 @@ if [[ -n "$UPLOAD_FORMAT" ]]; then
   # output, uploads the records to InfluxDB (creds from the INFLUX_* env set by
   # Benchmarks.toEnvList) and runs the historical-mean regression check. A red
   # regression exits non-zero, failing the build.
+  #
+  # Regression baseline is the union of the mainline branches (mirrors the
+  # Python harness's -m develop/compatible/master) -- a wider, more stable
+  # mean than a single branch, which matters for noisy timing benches.
+  compare_flags=()
+  for b in develop compatible master; do compare_flags+=(--compare-branch "$b"); done
   run_ported_bench | mina-bench-upload \
     --format "$UPLOAD_FORMAT" \
     --branch "$BRANCH" \
     --upload \
     --check-regression \
     --yellow "$YELLOW_THRESHOLD" \
-    --red "$RED_THRESHOLD"
+    --red "$RED_THRESHOLD" \
+    "${compare_flags[@]}"
 else
   python3 ./scripts/benchmarks test --benchmark ${BENCHMARK}  --branch ${BRANCH} --tmpfile ${BENCHMARK}.csv --yellow-threshold $YELLOW_THRESHOLD --red-threshold $RED_THRESHOLD $MAINLINE_BRANCHES $EXTRA_ARGS
 fi
