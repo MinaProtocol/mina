@@ -12,13 +12,13 @@ FROM ${image} AS base-deps
 
 # In multi-stage builds, Docker requires re-declaring ARG variables after each FROM
 # to make them available in that stage, even if declared globally before the first FROM.
+# Only the args this stage actually consumes are declared: nothing here is
+# mina-, network- or package-specific, so deb_release/network/deb_profile/
+# deb_suffix have no effect on the bytes produced (callers may still pass them
+# for the later stages of a concatenated build).
 ARG TARGETARCH
 ARG deb_codename=bullseye
-ARG deb_release=unstable
-ARG network=mainnet
 ARG deb_repo="http://packages.o1test.net"
-ARG deb_profile
-ARG deb_suffix
 ARG apt_cache_url=""
 
 ARG GCLOUD_VERSION=476.0.0

@@ -34,7 +34,7 @@ ENV MINA_DEB=mina-archive-${network}${SUFFIX}
 # run --config-file`) resolve the fork genesis ledger locally -- no S3, no
 # network -- to backfill accounts_accessed for the fork genesis block.
 #
-# Unlike the daemon (see Dockerfile-mina-daemon), the archive image can carry a
+# Unlike the daemon (see stages/daemon/2-mina-daemon), the archive image can carry a
 # config safely: its entrypoint never picks up /var/lib/coda/* implicitly, so
 # these files stay inert unless a command names them via --config-file. The
 # archive image is also already per-network, so there is no network-free generic
