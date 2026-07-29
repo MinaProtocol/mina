@@ -462,8 +462,14 @@ if [[ -n "${DOCKER_TARGET:-}" ]]; then
   TARGET_ARG="--target ${DOCKER_TARGET}"
 fi
 
-docker buildx build --load --network=host --progress=plain $PLATFORM $TARGET_ARG $DOCKER_REPO_ARG $NO_CACHE $BUILD_NETWORK $CACHE $NETWORK $IMAGE $DEB_CODENAME $DEB_RELEASE $DEB_VERSION --build-arg deb_profile="$DEB_PROFILE" --build-arg generic_network="$GENERIC_NETWORK_SEG" $DOCKER_DEB_SUFFIX_ARG $BUILD_FLAGS_SUFFIX_ARG $DEB_REPO $APT_CACHE_ARG $BRANCH $REPO $LEGACY_VERSION $CUSTOM_SUFFIX_ARG $CUSTOM_ARG $DEB_ARCH $IMAGE_NAME_ARG $VERSION_ARG "$DOCKER_CONTEXT" -t "$TAG" -f $DOCKERFILE_PATH
+docker buildx build --load --network=host --progress=plain $PLATFORM $TARGET_ARG $DOCKER_REPO_ARG $NO_CACHE $BUILD_NETWORK $CACHE $NETWORK $IMAGE $DEB_CODENAME $DEB_RELEASE $DEB_VERSION --build-arg deb_profile="$DEB_PROFILE" --build-arg generic_network="$GENERIC_NETWORK_SEG" $DOCKER_DEB_SUFFIX_ARG $BUILD_FLAGS_SUFFIX_ARG $DEB_REPO $APT_CACHE_ARG $BRANCH $REPO $LEGACY_VERSION $CUSTOM_SUFFIX_ARG $CUSTOM_ARG $DEB_ARCH $IMAGE_NAME_ARG $VERSION_ARG "$DOCKER_CONTEXT" -t "$TAG" -t "$HASHTAG" -f $DOCKERFILE_PATH
 
+# NOT redundant with the -t "$HASHTAG" above, despite appearances: buildx has to
+# create the hash tag itself. Dropping the -t and relying on this docker tag
+# alone fails in CI -- `docker tag` reports no error, yet the later
+# `docker push "$HASHTAG"` dies with "tag does not exist" (see build 41899,
+# where it took out the daemon and archive images). build.sh has no `set -e`, so
+# the silent tag failure is only visible as that confusing push error. Keep both.
 docker tag "$TAG" "$HASHTAG"
 
 if [[ -n "${SAVE_TO_CI_CACHE_ROOT:-}" ]]; then
