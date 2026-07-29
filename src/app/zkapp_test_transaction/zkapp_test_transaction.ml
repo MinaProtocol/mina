@@ -349,11 +349,16 @@ let update_state =
          Genesis_constants.Compiled.constraint_constants
        in
        let genesis_constants = Genesis_constants.Compiled.genesis_constants in
-       let max_state_fields = Mina_base.Zkapp_state.max_size_int in
        if Currency.Fee.(fee < Flags.min_fee) then
          failwith
            (sprintf "Fee must at least be %s"
               (Currency.Fee.to_mina_string Flags.min_fee) ) ;
+       (* Read once at the entrypoint and thread down. Kept below the fee check
+          (rather than beside the genesis-constants block) so this addition does
+          not adjoin the lines develop rewrote to Genesis_constants.profiled (),
+          which would make the branch fail the "merges cleanly into develop"
+          lint now that the develop port (#19138) has landed. *)
+       let max_state_fields = Mina_base.Zkapp_state.max_size_int in
        create_command ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
          ~app_state ~num_events ~num_actions ~event_elements_per
          ~action_elements_per ~repeat_arrays ~num_state_fields ~max_state_fields
