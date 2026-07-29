@@ -21,6 +21,13 @@ source "${SCRIPTPATH}"/helper.sh
 # shellcheck disable=SC1090,SC1091
 source "${SCRIPTPATH}"/../../buildkite/scripts/docker/gar-cache.sh
 
+# Several services assemble their Dockerfile by concatenating staged fragments
+# into a temp file (see the SERVICE case below); they all assign the same
+# variable, so one trap cleans up whichever branch ran -- including on the early
+# `exit 1` paths and on a failed docker build, where a tail-of-script rm would be
+# skipped and leak the file. Expands to a no-op rm when no temp file was made.
+trap 'rm -f "${TEMP_DOCKERFILE:-}"' EXIT
+
 function usage() {
   if [[ -n "$1" ]]; then
     echo -e "${RED}☞  $1${CLEAR}\n";
@@ -253,14 +260,14 @@ case "${SERVICE}" in
     mina-base)
         # Build ONLY the shared, mina-unrelated common base layer. This image is
         # published to docker.io as a reference image and saved/loaded via the CI cache.
-        TEMP_DOCKERFILE=$(mktemp /tmp/Dockerfile-mina-base.XXXXXX)
+        TEMP_DOCKERFILE=$(mktemp "${TMPDIR:-/tmp}"/Dockerfile-mina-base.XXXXXX)
         cat dockerfiles/stages/1-base-deps > "$TEMP_DOCKERFILE"
         DOCKERFILE_PATH="$TEMP_DOCKERFILE"
         DOCKER_TARGET="${INPUT_DOCKER_TARGET:-base-deps}"
         ;;
     mina-archive)
         # Staged build: shared base-deps + archive-specific stage.
-        TEMP_DOCKERFILE=$(mktemp /tmp/Dockerfile-mina-archive.XXXXXX)
+        TEMP_DOCKERFILE=$(mktemp "${TMPDIR:-/tmp}"/Dockerfile-mina-archive.XXXXXX)
         cat dockerfiles/stages/1-base-deps dockerfiles/stages/archive/2-mina-archive > "$TEMP_DOCKERFILE"
         DOCKERFILE_PATH="$TEMP_DOCKERFILE"
         DOCKER_TARGET="${INPUT_DOCKER_TARGET:-mina-archive}"
@@ -270,7 +277,7 @@ case "${SERVICE}" in
         # Default target is the daemon stage (the CONFIGLESS generic daemon, tagged
         # "<version>-generic" with no network segment); the prefork-genesis layer is
         # opt-in via --docker-target mina-daemon-prefork-genesis.
-        TEMP_DOCKERFILE=$(mktemp /tmp/Dockerfile-mina-daemon.XXXXXX)
+        TEMP_DOCKERFILE=$(mktemp "${TMPDIR:-/tmp}"/Dockerfile-mina-daemon.XXXXXX)
         cat dockerfiles/stages/1-base-deps dockerfiles/stages/daemon/2-mina-daemon dockerfiles/stages/daemon/3-prefork-genesis > "$TEMP_DOCKERFILE"
         DOCKERFILE_PATH="$TEMP_DOCKERFILE"
         DOCKER_TARGET="${INPUT_DOCKER_TARGET:-mina-daemon}"
@@ -298,7 +305,7 @@ case "${SERVICE}" in
     mina-daemon-legacy-hardfork)
         # Same staged daemon assembly as mina-daemon, but the legacy-hardfork image
         # needs the prefork-genesis layer, so default to that (opt-in) stage.
-        TEMP_DOCKERFILE=$(mktemp /tmp/Dockerfile-mina-daemon-legacy.XXXXXX)
+        TEMP_DOCKERFILE=$(mktemp "${TMPDIR:-/tmp}"/Dockerfile-mina-daemon-legacy.XXXXXX)
         cat dockerfiles/stages/1-base-deps dockerfiles/stages/daemon/2-mina-daemon dockerfiles/stages/daemon/3-prefork-genesis > "$TEMP_DOCKERFILE"
         DOCKERFILE_PATH="$TEMP_DOCKERFILE"
         DOCKER_TARGET="${INPUT_DOCKER_TARGET:-mina-daemon-prefork-genesis}"
@@ -313,13 +320,13 @@ case "${SERVICE}" in
         ;;
     mina-toolchain)
         # Create temp combined Dockerfile so we can use a build context (needed for COPY)
-        TEMP_DOCKERFILE=$(mktemp /tmp/Dockerfile-toolchain.XXXXXX)
+        TEMP_DOCKERFILE=$(mktemp "${TMPDIR:-/tmp}"/Dockerfile-toolchain.XXXXXX)
         cat dockerfiles/toolchain/1-build-deps dockerfiles/toolchain/2-opam-deps dockerfiles/toolchain/3-toolchain > "$TEMP_DOCKERFILE"
         DOCKERFILE_PATH="$TEMP_DOCKERFILE"
         ;;
     mina-rosetta)
         # Staged build: rosetta's own heavy base + mina-rosetta stage.
-        TEMP_DOCKERFILE=$(mktemp /tmp/Dockerfile-mina-rosetta.XXXXXX)
+        TEMP_DOCKERFILE=$(mktemp "${TMPDIR:-/tmp}"/Dockerfile-mina-rosetta.XXXXXX)
         cat dockerfiles/stages/rosetta/1-base-deps dockerfiles/stages/rosetta/2-mina-rosetta > "$TEMP_DOCKERFILE"
         DOCKERFILE_PATH="$TEMP_DOCKERFILE"
         DOCKER_TARGET="${INPUT_DOCKER_TARGET:-mina-rosetta}"
@@ -411,7 +418,7 @@ if [[ -n "${DOCKER_TARGET:-}" ]]; then
   TARGET_ARG="--target ${DOCKER_TARGET}"
 fi
 
-docker buildx build --load --network=host --progress=plain $PLATFORM $TARGET_ARG $DOCKER_REPO_ARG $NO_CACHE $BUILD_NETWORK $CACHE $NETWORK $IMAGE $DEB_CODENAME $DEB_RELEASE $DEB_VERSION --build-arg deb_profile="$DEB_PROFILE" --build-arg generic_network="$GENERIC_NETWORK_SEG" $DOCKER_DEB_SUFFIX_ARG $BUILD_FLAGS_SUFFIX_ARG $DEB_REPO $APT_CACHE_ARG $BRANCH $REPO $LEGACY_VERSION $CUSTOM_SUFFIX_ARG $CUSTOM_ARG $DEB_ARCH $IMAGE_NAME_ARG $VERSION_ARG "$DOCKER_CONTEXT" -t "$TAG" -t "$HASHTAG" -f $DOCKERFILE_PATH
+docker buildx build --load --network=host --progress=plain $PLATFORM $TARGET_ARG $DOCKER_REPO_ARG $NO_CACHE $BUILD_NETWORK $CACHE $NETWORK $IMAGE $DEB_CODENAME $DEB_RELEASE $DEB_VERSION --build-arg deb_profile="$DEB_PROFILE" --build-arg generic_network="$GENERIC_NETWORK_SEG" $DOCKER_DEB_SUFFIX_ARG $BUILD_FLAGS_SUFFIX_ARG $DEB_REPO $APT_CACHE_ARG $BRANCH $REPO $LEGACY_VERSION $CUSTOM_SUFFIX_ARG $CUSTOM_ARG $DEB_ARCH $IMAGE_NAME_ARG $VERSION_ARG "$DOCKER_CONTEXT" -t "$TAG" -f $DOCKERFILE_PATH
 
 docker tag "$TAG" "$HASHTAG"
 
@@ -443,11 +450,6 @@ if [[ "$DOCKER_ACTION" == "push" ]]; then
   docker push "$HASHTAG"
 else
   echo "Skipping push to remote registry, image loaded to local docker daemon only."
-fi
-
-# Clean up temp Dockerfile if one was created
-if [[ -n "${TEMP_DOCKERFILE:-}" ]]; then
-  rm -f "$TEMP_DOCKERFILE"
 fi
 
 echo "✅ Docker image for service ${SERVICE} built successfully."
