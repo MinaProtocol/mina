@@ -45,6 +45,7 @@ function usage() {
   echo "      --deb-profile         The profile string for the debian package to install"
   echo "      --deb-build-flags     The build-flags string for the debian package to install"
   echo "      --deb-suffix          The debian suffix to use for the docker image"
+  echo "      --base-image          (Optional) Published mina-base image to use for the shared base-deps stage of a staged build, instead of rebuilding that stage inline. Ignored when the image is not present locally."
   echo "  -c, --cache-from          Docker cache source image(s) to use for build caching"
   echo "      --custom-suffix       A custom suffix to append to the docker tag (e.g. -instrumented)"
   echo "      --custom-arg          Custom build arg to pass to docker build (e.g. --build-arg my_arg=value)"
@@ -96,6 +97,7 @@ while [[ "$#" -gt 0 ]]; do case $1 in
       DEB_REPO_KEY="$2"; shift;;
   --custom-arg) CUSTOM_ARG="$2"; shift;;
   --docker-target) INPUT_DOCKER_TARGET="$2"; shift;;
+  --base-image) INPUT_BASE_IMAGE="$2"; shift;;
   *) echo "Unknown parameter passed: $1"; exit 1;;
 esac; shift; done
 
@@ -244,6 +246,43 @@ export_base_image
 IMAGE="$(rewrite_via_gar_cache "${IMAGE}")"
 export IMAGE="--build-arg image=${IMAGE}"
 
+# --base-image lets a staged build reuse the PUBLISHED mina-base image for its
+# shared base-deps stage instead of re-executing that stage, which is the
+# expensive part of the build (apt-get update/upgrade + the gcloud SDK tarball).
+# The CI step preloads the image from the storagebox cache with
+# load_from_cache.sh; we only consult the local docker daemon here.
+#
+# Availability is deliberately soft: if the image is not present -- nothing
+# published for this pin yet, a cold/janitored cache, or any local build -- we
+# inline the fragment exactly as before. That keeps the build correct in every
+# environment and costs only the speedup, rather than making every daemon and
+# archive build hard-depend on a cache entry existing.
+STAGED_BASE_IMAGE=""
+if [[ -n "${INPUT_BASE_IMAGE:-}" ]]; then
+  if docker image inspect "${INPUT_BASE_IMAGE}" >/dev/null 2>&1; then
+    STAGED_BASE_IMAGE="${INPUT_BASE_IMAGE}"
+    echo "Reusing published base image ${STAGED_BASE_IMAGE} for the base-deps stage"
+  else
+    echo "WARNING: base image ${INPUT_BASE_IMAGE} not available locally; building the base-deps stage inline"
+  fi
+fi
+
+# Assemble a staged Dockerfile into $1 from the shared base-deps stage followed
+# by the fragments listed in $2... The base-deps stage is either the published
+# image (one FROM, reusing the existing --build-arg image plumbing so the
+# reference is never baked into a Dockerfile) or the inlined fragment.
+function assemble_staged_dockerfile () {
+  local out="$1"
+  shift
+  if [[ -n "$STAGED_BASE_IMAGE" ]]; then
+    printf 'ARG image\nFROM ${image} AS base-deps\n' > "$out"
+    export IMAGE="--build-arg image=${STAGED_BASE_IMAGE}"
+  else
+    cat dockerfiles/stages/1-base-deps > "$out"
+  fi
+  cat "$@" >> "$out"
+}
+
 CUSTOM_ARG=${CUSTOM_ARG:-""}
 
 # Network segment of the generic base image that the install-config FROM line
@@ -268,7 +307,7 @@ case "${SERVICE}" in
     mina-archive)
         # Staged build: shared base-deps + archive-specific stage.
         TEMP_DOCKERFILE=$(mktemp "${TMPDIR:-/tmp}"/Dockerfile-mina-archive.XXXXXX)
-        cat dockerfiles/stages/1-base-deps dockerfiles/stages/archive/2-mina-archive > "$TEMP_DOCKERFILE"
+        assemble_staged_dockerfile "$TEMP_DOCKERFILE" dockerfiles/stages/archive/2-mina-archive
         DOCKERFILE_PATH="$TEMP_DOCKERFILE"
         DOCKER_TARGET="${INPUT_DOCKER_TARGET:-mina-archive}"
         ;;
@@ -278,7 +317,7 @@ case "${SERVICE}" in
         # "<version>-generic" with no network segment); the prefork-genesis layer is
         # opt-in via --docker-target mina-daemon-prefork-genesis.
         TEMP_DOCKERFILE=$(mktemp "${TMPDIR:-/tmp}"/Dockerfile-mina-daemon.XXXXXX)
-        cat dockerfiles/stages/1-base-deps dockerfiles/stages/daemon/2-mina-daemon dockerfiles/stages/daemon/3-prefork-genesis > "$TEMP_DOCKERFILE"
+        assemble_staged_dockerfile "$TEMP_DOCKERFILE" dockerfiles/stages/daemon/2-mina-daemon dockerfiles/stages/daemon/3-prefork-genesis
         DOCKERFILE_PATH="$TEMP_DOCKERFILE"
         DOCKER_TARGET="${INPUT_DOCKER_TARGET:-mina-daemon}"
         export NETWORKLESS_TAG=1
@@ -306,7 +345,7 @@ case "${SERVICE}" in
         # Same staged daemon assembly as mina-daemon, but the legacy-hardfork image
         # needs the prefork-genesis layer, so default to that (opt-in) stage.
         TEMP_DOCKERFILE=$(mktemp "${TMPDIR:-/tmp}"/Dockerfile-mina-daemon-legacy.XXXXXX)
-        cat dockerfiles/stages/1-base-deps dockerfiles/stages/daemon/2-mina-daemon dockerfiles/stages/daemon/3-prefork-genesis > "$TEMP_DOCKERFILE"
+        assemble_staged_dockerfile "$TEMP_DOCKERFILE" dockerfiles/stages/daemon/2-mina-daemon dockerfiles/stages/daemon/3-prefork-genesis
         DOCKERFILE_PATH="$TEMP_DOCKERFILE"
         DOCKER_TARGET="${INPUT_DOCKER_TARGET:-mina-daemon-prefork-genesis}"
         ;;
@@ -316,7 +355,12 @@ case "${SERVICE}" in
           echo "Please provide the --deb-legacy-version argument."
           exit 1
         fi
-        DOCKERFILE_PATH="dockerfiles/Dockerfile-mina-daemon-auto-hardfork"
+        # Staged build: shared base-deps + the auto-hardfork stage (postfork
+        # metapackage at deb_version + legacy prefork at deb_legacy_version).
+        TEMP_DOCKERFILE=$(mktemp "${TMPDIR:-/tmp}"/Dockerfile-mina-daemon-auto-hardfork.XXXXXX)
+        assemble_staged_dockerfile "$TEMP_DOCKERFILE" dockerfiles/stages/daemon/4-auto-hardfork
+        DOCKERFILE_PATH="$TEMP_DOCKERFILE"
+        DOCKER_TARGET="${INPUT_DOCKER_TARGET:-mina-daemon-auto-hardfork}"
         ;;
     mina-toolchain)
         # Create temp combined Dockerfile so we can use a build context (needed for COPY)

@@ -44,6 +44,8 @@ let BuildFlags = ../Constants/BuildFlags.dhall
 
 let Docker = ../Constants/Docker/Package.dhall
 
+let BaseImage = ../Constants/Docker/BaseImage.dhall
+
 let Artifact = ../Constants/Artifact/Artifacts.dhall
 
 let Toolchain = ../Constants/Toolchain.dhall
@@ -428,6 +430,13 @@ let docker_step
 
           let genericNetwork = Network.Type.Devnet
 
+          let baseImage =
+              -- Only the services whose Dockerfile is assembled from the shared
+              -- base-deps fragment take this; the *-configured/-profiled images
+              -- are FROM an already-built mina image, and rosetta has its own
+              -- (postgres-heavy) base.
+                Some (BaseImage.imageFor spec.debVersion spec.arch)
+
           let dependsOnGeneric =
                   deps
                 # [ { name = genericBuildName spec
@@ -451,6 +460,7 @@ let docker_step
                               Docker.Type.DaemonAutoHardfork
                                 { network = network }
                           , network = network
+                          , base_image = baseImage
                           , deb_codename = spec.debVersion
                           , deb_profile = profile
                           , build_flags = spec.buildFlags
@@ -472,6 +482,7 @@ let docker_step
                               Docker.Type.DaemonLegacyHardfork
                                 { network = network }
                           , network = network
+                          , base_image = baseImage
                           , deb_codename = spec.debVersion
                           , deb_profile = profile
                           , build_flags = spec.buildFlags
@@ -487,6 +498,7 @@ let docker_step
                     , deps = deps
                     , service = Docker.Type.DaemonGeneric
                     , network = genericNetwork
+                    , base_image = baseImage
                     , deb_codename = spec.debVersion
                     , deb_profile = profile
                     , build_flags = spec.buildFlags
@@ -569,6 +581,7 @@ let docker_step
                           , deps = deps
                           , service = Docker.Type.Archive { network = network }
                           , network = network
+                          , base_image = baseImage
                           , deb_codename = spec.debVersion
                           , deb_profile = profile
                           , build_flags = spec.buildFlags

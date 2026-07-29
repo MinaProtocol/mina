@@ -55,6 +55,7 @@ let ReleaseSpec =
           , deb_root_folder : Text
           , deb_legacy_version : Text
           , docker_target : Optional Text
+          , base_image : Optional Text
           , deb_suffix : Optional Text
           , deb_profile : Profiles.Type
           , deb_repo : DebianRepo.Type
@@ -84,6 +85,7 @@ let ReleaseSpec =
           , deb_version = "\\\${MINA_DEB_VERSION}"
           , deb_legacy_version = "3.1.1-alpha1-compatible-14a8b92"
           , docker_target = None Text
+          , base_image = None Text
           , deb_profile = Profiles.Type.Devnet
           , build_flags = BuildFlags.Type.None
           , deb_repo = DebianRepo.Type.Local
@@ -238,6 +240,27 @@ let generateStep =
                   { Some = \(t : Text) -> " --docker-target ${t}", None = "" }
                   spec.docker_target
 
+          let baseImageArg =
+                merge
+                  { Some = \(i : Text) -> " --base-image ${i}", None = "" }
+                  spec.base_image
+
+          let maybeLoadBaseImage =
+              -- Preload the published mina-base image from the storagebox cache
+              -- so the staged build can start FROM it instead of re-running the
+              -- base-deps stage. Non-fatal on purpose: a miss (nothing published
+              -- for this pin yet, or a janitored cache) must not fail the build,
+              -- it just falls back to inlining the fragment in build.sh.
+                merge
+                  { Some =
+                          \(i : Text)
+                      ->      "( ./buildkite/scripts/docker/load_from_cache.sh ${i}"
+                          ++  " || echo mina-base-not-in-ci-cache-inlining-base-deps-stage )"
+                          ++  " && "
+                  , None = ""
+                  }
+                  spec.base_image
+
           let buildDockerCmd =
                     "./scripts/docker/build.sh"
                 ++  " --service ${serviceName}"
@@ -255,6 +278,7 @@ let generateStep =
                                             spec.build_flags}"
                 ++  " --deb-legacy-version ${spec.deb_legacy_version}"
                 ++  dockerTargetArg
+                ++  baseImageArg
                 ++  debSuffix
                 ++  " --repo ${spec.repo}"
                 ++  " --platform ${Arch.platform spec.arch}"
@@ -273,6 +297,7 @@ let generateStep =
                       ++  " && "
                       ++  pruneDockerImages
                       ++  " && "
+                      ++  maybeLoadBaseImage
                       ++  buildDockerCmd
                       ++  maybeVerify
                     )
@@ -293,6 +318,7 @@ let generateStep =
                           ++  maybeStartDebianRepo
                           ++  " && source ./buildkite/scripts/export-git-env-vars.sh "
                           ++  " && "
+                          ++  maybeLoadBaseImage
                           ++  buildDockerCmd
                           ++  maybeVerify
                         )
