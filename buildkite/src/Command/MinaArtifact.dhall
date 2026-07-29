@@ -67,6 +67,7 @@ let MinaBuildSpec =
           , buildScript : Text
           , arch : Arch.Type
           , deb_legacy_version : Text
+          , deb_legacy_githash_config : Text
           , docker_publish : DockerPublish.Type
           , suffix : Optional Text
           , if_ : Optional B/If
@@ -87,6 +88,7 @@ let MinaBuildSpec =
           , extraBuildEnvs = [] : List Text
           , suffix = None Text
           , deb_legacy_version = "3.4.0-alpha1-compatible-ad13ff4"
+          , deb_legacy_githash_config = ""
           , arch = Arch.Type.Amd64
           , docker_publish = DockerPublish.Type.Essential
           , if_ = None B/If
@@ -239,6 +241,7 @@ let build_artifacts
                             , "ARCHITECTURE=${Arch.lowerName spec.arch}"
                             , Network.foldMinaBuildMainnetEnv nets
                             , "PREFORK_LEGACY_VERSION=${spec.deb_legacy_version}"
+                            , "PREFORK_GITHASH_CONFIG=${spec.deb_legacy_githash_config}"
                             ]
                           # BuildFlags.buildEnvs spec.buildFlags
                           # spec.extraBuildEnvs
@@ -275,6 +278,7 @@ let commonBuildEnvs =
                 , "ARCHITECTURE=${Arch.lowerName spec.arch}"
                 , Network.foldMinaBuildMainnetEnv nets
                 , "PREFORK_LEGACY_VERSION=${spec.deb_legacy_version}"
+                , "PREFORK_GITHASH_CONFIG=${spec.deb_legacy_githash_config}"
                 ]
               # BuildFlags.buildEnvs spec.buildFlags
               # spec.extraBuildEnvs
