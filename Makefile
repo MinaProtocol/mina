@@ -64,6 +64,13 @@ else
 DOCKER_LOAD_ONLY_ARG :=
 endif
 
+# Individual docker-build-* targets build from scratch, preserving their
+# historical behaviour. docker-build-all overrides this to empty: it builds
+# mina-base, archive and daemon back-to-back off the SAME base-deps layer, so
+# --no-cache would re-run that layer's apt update/upgrade and gcloud SDK
+# download three times in one invocation.
+DOCKER_NO_CACHE ?= --no-cache
+
 # This commit hash
 GITHASH := $(shell git rev-parse --short=8 HEAD)
 GITLONGHASH := $(shell git rev-parse HEAD)
@@ -727,7 +734,7 @@ define build_docker_image
 		--network $(2) \
 		$(3) \
 		$(DOCKER_LOAD_ONLY_ARG) \
-		--no-cache
+		$(DOCKER_NO_CACHE)
 
 	$(info 📦 cleaning up staged local debians)
 	@rm -f dockerfiles/*.deb
@@ -825,14 +832,17 @@ debian-build-all: ## Package the deb closure for the staged images (CODENAME/NET
 # Build every staged docker image (base, archive, daemon, rosetta) for one
 # CODENAME/NETWORK, packaging the deb closure first. Set LOAD_ONLY=1 for a
 # purely local build (load into local docker, no registry push).
+# DOCKER_NO_CACHE is cleared for the whole run so the base-deps layer these
+# images share is built once and reused, rather than three times; pass
+# DOCKER_NO_CACHE=--no-cache to force the from-scratch behaviour back on.
 .PHONY: docker-build-all
 docker-build-all: SHELL := /bin/bash
 docker-build-all: ## Build ALL staged docker images for CODENAME/NETWORK (packages debs first)
 	$(MAKE) debian-build-all CODENAME=$(CODENAME) NETWORK=$(NETWORK)
-	$(MAKE) docker-build-base CODENAME=$(CODENAME) NETWORK=$(NETWORK) LOAD_ONLY=$(LOAD_ONLY)
-	$(MAKE) docker-build-archive-$(NETWORK) CODENAME=$(CODENAME) LOAD_ONLY=$(LOAD_ONLY)
-	$(MAKE) docker-build-daemon-$(NETWORK) CODENAME=$(CODENAME) LOAD_ONLY=$(LOAD_ONLY)
-	$(MAKE) docker-build-rosetta-$(NETWORK) CODENAME=$(CODENAME) LOAD_ONLY=$(LOAD_ONLY)
+	$(MAKE) docker-build-base CODENAME=$(CODENAME) NETWORK=$(NETWORK) LOAD_ONLY=$(LOAD_ONLY) DOCKER_NO_CACHE=
+	$(MAKE) docker-build-archive-$(NETWORK) CODENAME=$(CODENAME) LOAD_ONLY=$(LOAD_ONLY) DOCKER_NO_CACHE=
+	$(MAKE) docker-build-daemon-$(NETWORK) CODENAME=$(CODENAME) LOAD_ONLY=$(LOAD_ONLY) DOCKER_NO_CACHE=
+	$(MAKE) docker-build-rosetta-$(NETWORK) CODENAME=$(CODENAME) LOAD_ONLY=$(LOAD_ONLY) DOCKER_NO_CACHE=
 
 ########################################
 # Generate hardfork packages
