@@ -28,7 +28,7 @@ let basePipeline =
                   "MinaBaseArtifact${DebianVersions.capitalName
                                        spec.deb_codename}${Arch.nameSuffix
                                                              spec.arch}"
-              , tags = [ PipelineTag.Type.Toolchain ]
+              , tags = [ PipelineTag.Type.Base ]
               }
             , steps = [ DockerImage.generateStep spec ]
             }
