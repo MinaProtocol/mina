@@ -161,4 +161,4 @@ let command =
      in
      fun () -> dump_slot slot postgres.value )
 
-let () = Command.run command
+let () = Command_unix.run command

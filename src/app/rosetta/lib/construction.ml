@@ -56,7 +56,7 @@ mutation ($sender: PublicKey!,
 |}]
 
 (* Avoid shadowing graphql_ppx functions *)
-open Core_kernel
+open Core
 open Async
 open Rosetta_lib
 
@@ -110,7 +110,7 @@ module Options = struct
            let error which e =
              Errors.create
                ~context:("Options of_json bad public key (" ^ which ^ ")")
-               (`Json_parse (Some (Core_kernel.Error.to_string_hum e)))
+               (`Json_parse (Some (Core.Error.to_string_hum e)))
            in
            let%bind sender =
              Public_key.Compressed.of_base58_check r.sender
@@ -182,7 +182,7 @@ module Derive = struct
       let%bind pk_compressed =
         let pk_or_error =
           try Ok (Rosetta_coding.Coding.to_public_key_compressed hex_bytes)
-          with exn -> Error (Core_kernel.Error.of_exn exn)
+          with exn -> Error (Core.Error.of_exn exn)
         in
         env.lift
         @@ Result.map_error
@@ -642,7 +642,7 @@ module Parse = struct
                             "Parsing verify_payment_signature, bad %s public \
                              key"
                             which )
-                       (`Json_parse (Some (Core_kernel.Error.to_string_hum e))) )
+                       (`Json_parse (Some (Core.Error.to_string_hum e))) )
             in
             let%bind fee_payer_pk = parse_pk ~which:"source" payment.from in
             let%bind receiver_pk = parse_pk ~which:"receiver" payment.to_ in

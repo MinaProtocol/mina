@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Async_kernel
 
 type 'data short_lived_pipe_t = 'data Choosable_synchronous_pipe.writer_t

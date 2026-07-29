@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 
 let t ~genesis_ledger ~genesis_epoch_data ~constraint_constants
     ~consensus_constants ~genesis_body_reference =

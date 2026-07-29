@@ -31,14 +31,14 @@ let block_dir_flag =
   let open Command.Param in
   flag "--block-dir" ~aliases:[ "-block-dir" ]
     ~doc:"the path to the directory containing blocks for the submission"
-    (required Filename.arg_type)
+    (required Filename_unix.arg_type)
 
 let cassandra_executable_flag =
   let open Command.Param in
   flag "--executable"
     ~aliases:[ "-executable"; "--cqlsh"; "-cqlsh" ]
     ~doc:"the path to the cqlsh executable"
-    (optional Filename.arg_type)
+    (optional Filename_unix.arg_type)
 
 let timestamp =
   let open Command.Param in
@@ -163,7 +163,7 @@ let filesystem_command =
   Command.async ~summary:"Verify submissions and block read from the filesystem"
     Command.Let_syntax.(
       let%map_open block_dir = block_dir_flag
-      and inputs = anon (sequence ("filename" %: Filename.arg_type))
+      and inputs = anon (sequence ("filename" %: Filename_unix.arg_type))
       and no_checks = no_checks_flag
       and config_file = config_flag
       and signature_kind = Cli_lib.Flag.signature_kind in
@@ -282,4 +282,4 @@ let command =
     ; ("stdin", stdin_command)
     ]
 
-let () = Async.Command.run command
+let () = Command_unix.run command

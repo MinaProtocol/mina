@@ -138,7 +138,7 @@ module Make
     (Io : Cohttp.S.IO with type 'a t = 'a Schema.Io.t)
     (Body : HttpBody with type +'a io := 'a Schema.Io.t) =
 struct
-  module Ws = Websocket.Connection.Make (Io)
+  module Ws = Graphql_websocket.Connection.Make (Io)
   module Websocket_transport = Websocket_handler.Make (Schema.Io) (Ws)
 
   let ( >>= ) = Io.( >>= )

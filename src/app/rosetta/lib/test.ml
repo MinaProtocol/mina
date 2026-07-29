@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Rosetta_lib
 
 let assert_ ~f ~expected ~actual =

@@ -4,7 +4,7 @@
    Zkapp_command
 *)
 
-open Core_kernel
+open Core
 open Mina_base
 module Ledger = Mina_ledger.Ledger
 include User_command.Gen
@@ -61,7 +61,7 @@ let zkapp_command_with_ledger ?(ledger_init_state : Ledger.init_state option)
     List.fold new_keypairs ~init:Public_key.Compressed.Map.empty
       ~f:(fun map { public_key; private_key } ->
         let key = Public_key.compress public_key in
-        Public_key.Compressed.Map.add_exn map ~key ~data:private_key )
+        Map.add_exn map ~key ~data:private_key )
   in
   let num_keypairs_in_ledger = num_keypairs / 2 in
   let keypairs_in_ledger = List.take new_keypairs num_keypairs_in_ledger in

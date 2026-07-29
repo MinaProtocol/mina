@@ -179,7 +179,7 @@ val configure :
   -> min_connections:int
   -> max_connections:int
   -> validation_queue_size:int
-  -> known_private_ip_nets:Core.Unix.Cidr.t list
+  -> known_private_ip_nets:Core_unix.Cidr.t list
   -> topic_config:string list list
   -> unit Deferred.Or_error.t
 

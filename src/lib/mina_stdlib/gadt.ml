@@ -94,7 +94,7 @@ module Vect = struct
         (init'', h' :: t')
 
   module Quickcheck_generator = struct
-    open Core_kernel.Quickcheck
+    open Core.Quickcheck
     open Generator.Let_syntax
 
     let rec map :

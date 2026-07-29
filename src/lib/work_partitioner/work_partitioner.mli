@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 module Snark_worker_shared = Snark_worker_shared
 
 (** [t] is type of a Work Partitioner data structure, sitting between a Work
@@ -23,7 +23,7 @@ module Snark_worker_shared = Snark_worker_shared
 type t
 
 val create :
-     reassignment_timeout:Time.Span.t
+     reassignment_timeout:Time_float.Span.t
   -> logger:Logger.t
   -> proof_cache_db:Proof_cache_tag.cache_db
   -> signature_kind:Mina_signature_kind.t

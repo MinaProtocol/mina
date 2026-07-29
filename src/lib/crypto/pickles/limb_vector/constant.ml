@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Pickles_types
 
 type 'n t = (Int64.t, 'n) Vector.t [@@deriving sexp_of]

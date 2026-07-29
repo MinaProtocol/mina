@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Async
 open Currency
 open Signature_lib

@@ -5,6 +5,7 @@
  (libraries
   ;; opam libraries
   core
+  core_unix.command_unix
   async_kernel
   uri
   caqti-driver-postgresql

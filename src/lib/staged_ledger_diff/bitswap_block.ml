@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 
 let or_error_list_bind ls ~f =
   let open Or_error.Let_syntax in

@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Async_kernel
 open Pipe_lib
 open Mina_block
@@ -23,7 +23,7 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
     ~cache_exceptions ?transaction_pool_proxy =
   let open Context in
   let valid_transition_pipe_capacity = 50 in
-  let start_time = Time.now () in
+  let start_time = Time_float.now () in
   let f_drop_head name head valid_cb =
     let hashes =
       match head with
@@ -117,12 +117,12 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
            List.map new_breadcrumbs ~f:Transition_frontier.Breadcrumb.state_hash
            |> Set.of_list
          in
-         if Set.is_empty @@ Set.inter initial_state_hashes new_state_hashes then
+         if Core.Set.is_empty @@ Core.Set.inter initial_state_hashes new_state_hashes then
            Deferred.return false
          else (
            Mina_metrics.(
              Gauge.set Catchup.initial_catchup_time
-               Time.(Span.to_min @@ diff (now ()) start_time)) ;
+               Time_float.(Span.to_min @@ diff (now ()) start_time)) ;
            Deferred.return true ) ) ;
   Transition_handler.Validator.run
     ~context:(module Context)

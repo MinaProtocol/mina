@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 
 module Chunked = struct
   (** The input for a random oracle, formed of full field elements and 'chunks'

@@ -1,5 +1,5 @@
 (* Only show stdout for failed inline tests. *)
-open Core_kernel
+open Core
 
 let%test_module "Persistent_root tests" =
   ( module struct

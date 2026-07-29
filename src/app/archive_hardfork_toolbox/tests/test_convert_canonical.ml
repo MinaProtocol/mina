@@ -123,7 +123,7 @@ module TestDb = struct
         |sql}
     in
     with_pool conn_str ~db_name (fun pool ->
-        Deferred.Or_error.List.iter versions
+        Deferred.Or_error.List.iter ~how:`Sequential versions
           ~f:(fun (transaction, network, patch) ->
             Deferred.Or_error.try_with (fun () ->
                 Mina_caqti.query pool ~f:(fun (module Conn : Sql.CONNECTION) ->
@@ -131,7 +131,7 @@ module TestDb = struct
 
   let insert_blocks conn_str db_name blocks =
     with_pool conn_str ~db_name (fun pool ->
-        Deferred.Or_error.List.iter blocks ~f:(fun block ->
+        Deferred.Or_error.List.iter ~how:`Sequential blocks ~f:(fun block ->
             let Block.
                   { id
                   ; state_hash

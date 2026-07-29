@@ -1,5 +1,5 @@
 module Nat = Nat
-open Core_kernel
+open Core
 
 type 'a adjacency_list = ('a * 'a list) list
 

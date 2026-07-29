@@ -33,7 +33,7 @@ let test_case (test_data : t) =
     |> Option.value_exn ~message:"Failed to find upgrade script"
   in
   let upgrade_script_finished = Ivar.create () in
-  (let%bind () = after (Time.Span.of_min (Random.float_range 0. 5.)) in
+  (let%bind () = after (Time_float.Span.of_min (Random.float_range 0. 5.)) in
    [%log info] "Starting upgrade script" ;
    let%map result =
      Psql.run_script ~connection:(Psql.Conn_str archive_uri) upgrade_path

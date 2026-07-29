@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Vrf_lib.Standalone
 
 let%test_module "vrf-test" =

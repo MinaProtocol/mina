@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Async_kernel
 open Mina_base
 open Mina_state
@@ -69,9 +69,9 @@ let handle_validation_error ~logger ~rejected_blocks_logger ~time_received
     [ ("state_hash", State_hash.to_yojson state_hash)
     ; ( "time_received"
       , `String
-          (Time.to_string_abs
+          (Time_float.to_string_abs
              (Block_time.to_time_exn time_received)
-             ~zone:Time.Zone.utc ) )
+             ~zone:Time_float.Zone.utc ) )
     ]
     @ metadata
   in
@@ -213,9 +213,9 @@ module Duplicate_block_detector = struct
               , State_hash.to_yojson protocol_state_hash )
             ; ( "time_received"
               , `String
-                  (Time.to_string_abs
+                  (Time_float.to_string_abs
                      (Block_time.to_time_exn time_received)
-                     ~zone:Time.Zone.utc ) )
+                     ~zone:Time_float.Zone.utc ) )
             ]
           in
           let msg : (_, unit, string, unit) format4 =
@@ -342,9 +342,9 @@ let validate ~signature_kind ~proof_cache_db ~logger ~trust_system ~verifier
               [ ("state_hash", State_hash.to_yojson state_hash)
               ; ( "time_received"
                 , `String
-                    (Time.to_string_abs
+                    (Time_float.to_string_abs
                        (Block_time.to_time_exn time_received)
-                       ~zone:Time.Zone.utc ) )
+                       ~zone:Time_float.Zone.utc ) )
               ]
             in
             [%log error] ~metadata

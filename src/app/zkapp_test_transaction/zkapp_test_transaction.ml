@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Async
 open Mina_base
 open Cli_lib.Arg_type
@@ -683,6 +683,6 @@ let txn_commands =
   ]
 
 let () =
-  Command.run
+  Command_unix.run
     (Command.group ~summary:"ZkApp test transaction"
        ~preserve_subcommand_order:() txn_commands )

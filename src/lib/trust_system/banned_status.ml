@@ -1,9 +1,9 @@
-open Core_kernel
+open Core
 
 [%%versioned
 module Stable = struct
   module V1 = struct
-    type t = Unbanned | Banned_until of (Time.t[@version_asserted])
+    type t = Unbanned | Banned_until of (Time_float.t[@version_asserted])
 
     let to_latest = Fn.id
 
@@ -13,14 +13,15 @@ module Stable = struct
       | Banned_until tm ->
           `Assoc
             [ ( "Banned_until"
-              , `String (Time.to_string_abs tm ~zone:Time.Zone.utc) )
+              , `String (Time_float.to_string_abs tm ~zone:Time_float.Zone.utc)
+              )
             ]
 
     let of_yojson = function
       | `String "Unbanned" ->
           Ok Unbanned
       | `Assoc [ ("Banned_until", `String s) ] ->
-          Ok (Banned_until (Time.of_string s))
+          Ok (Banned_until (Time_float_unix.of_string_abs s))
       | _ ->
           Error "Banned_status.of_yojson: unexpected JSON"
   end

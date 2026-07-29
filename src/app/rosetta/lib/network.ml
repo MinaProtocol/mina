@@ -41,7 +41,7 @@ module Get_status =
 |}]
 
 (** Open after GraphQL query, to avoid shadowing functions used by the PPX *)
-open Core_kernel
+open Core
 
 module Mina_currency = Currency
 open Async

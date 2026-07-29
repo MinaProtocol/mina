@@ -702,7 +702,8 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
         , `List (List.map ~f:bootstrap_cycle_stats_to_yojson cycles) )
       ] ;
   Mina_metrics.(
-    Gauge.set Bootstrap.bootstrap_time_ms Core.Time.(Span.to_ms @@ time_elapsed)) ;
+    Gauge.set Bootstrap.bootstrap_time_ms
+      Core.Time_float.(Span.to_ms @@ time_elapsed)) ;
   result
 
 let%test_module "Bootstrap_controller tests" =
@@ -991,7 +992,8 @@ let%test_module "Bootstrap_controller tests" =
         ~f:(fun frontier ->
           Thread_safe.block_on_async_exn
           @@ fun () ->
-          Deferred.List.iter (Transition_frontier.all_breadcrumbs frontier)
+          Deferred.List.iter ~how:`Sequential
+            (Transition_frontier.all_breadcrumbs frontier)
             ~f:(fun breadcrumb ->
               let staged_ledger =
                 Transition_frontier.Breadcrumb.staged_ledger breadcrumb

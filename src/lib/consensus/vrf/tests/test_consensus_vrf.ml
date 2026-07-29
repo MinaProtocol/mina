@@ -6,7 +6,7 @@
       src/lib/consensus/vrf/tests/test_consensus_vrf.exe
 *)
 
-open Core_kernel
+open Core
 
 let test_hash_checked_and_unchecked () =
   let open Quickcheck.Generator.Let_syntax in

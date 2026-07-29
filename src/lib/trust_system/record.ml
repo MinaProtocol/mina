@@ -1,12 +1,20 @@
 open Core
 
+module Time_versioned = struct
+  module V1 = struct
+    include Time_float_unix.Stable.V1
+
+    let __versioned__ = ()
+  end
+end
+
 [%%versioned
 module Stable = struct
   module V1 = struct
     type t =
       { trust : float
-      ; trust_last_updated : Core.Time.Stable.V1.t
-      ; banned_until_opt : Core.Time.Stable.V1.t option
+      ; trust_last_updated : Time_versioned.V1.t
+      ; banned_until_opt : Time_versioned.V1.t option
       }
 
     let to_latest = Fn.id
@@ -31,7 +39,7 @@ let decay_rate = 0.5 ** (1. /. (60. *. 60. *. 24.))
     @param Now get the current time. Functored for mocking.
 *)
 module Make (Now : sig
-  val now : unit -> Time.t
+  val now : unit -> Time_float.t
 end) : S = struct
   (** Create a new blank trust record. *)
   let init () =
@@ -43,18 +51,20 @@ end) : S = struct
      records, and is not exposed outside this module. *)
   let update { trust; trust_last_updated; banned_until_opt } =
     let now = Now.now () in
-    let elap = Time.diff now trust_last_updated in
+    let elap = Time_float.diff now trust_last_updated in
     let elapsed_time =
-      if Time.Span.(elap >= zero) then elap else Time.Span.zero
+      if Time_float.Span.(elap >= zero) then elap else Time_float.Span.zero
     in
     (* ntpd or a user may have reset the system time, yielding a negative elapsed time.  in that case, clamp the elapsed time to zero*)
-    let new_trust = (decay_rate ** Time.Span.to_sec elapsed_time) *. trust in
+    let new_trust =
+      (decay_rate ** Time_float.Span.to_sec elapsed_time) *. trust
+    in
     { trust = new_trust
     ; trust_last_updated = now
     ; banned_until_opt =
         ( match banned_until_opt with
         | Some banned_until ->
-            if Time.is_later banned_until ~than:(Now.now ()) then
+            if Time_float.is_later banned_until ~than:(Now.now ()) then
               Some banned_until
             else None
         | None ->
@@ -66,7 +76,7 @@ end) : S = struct
     let new_record = update t in
     { new_record with
       trust = -1.0
-    ; banned_until_opt = Some (Time.add (Now.now ()) Time.Span.day)
+    ; banned_until_opt = Some (Time_float.add (Now.now ()) Time_float.Span.day)
     }
 
   (** Add some trust, subtract by passing a negative number. *)
@@ -77,8 +87,9 @@ end) : S = struct
       trust = new_trust
     ; banned_until_opt =
         ( if Float.(new_trust <= -1.) then
-          Some (Time.add new_record.trust_last_updated Time.Span.day)
-        else new_record.banned_until_opt )
+            Some
+              (Time_float.add new_record.trust_last_updated Time_float.Span.day)
+          else new_record.banned_until_opt )
     }
 
   (** Convert the internal type to the externally visible one. *)

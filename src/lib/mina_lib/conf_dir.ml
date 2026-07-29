@@ -8,7 +8,7 @@ open Core
     allows the hard fork dispatcher to use that variable to refer to the config
     directory. *)
 let compute_conf_dir_exn conf_dir_opt =
-  let home = Sys.home_directory () in
+  let home = Sys_unix.home_directory () in
   let conf_dir =
     Option.value ~default:(home ^/ Cli_lib.Default.conf_dir_name) conf_dir_opt
   in
@@ -38,7 +38,7 @@ let compute_conf_dir_exn conf_dir_opt =
     lockfile. *)
 let rec check_and_set_lockfile ~logger conf_dir =
   let lockfile = conf_dir ^/ ".mina-lock" in
-  match Sys.file_exists lockfile with
+  match Sys_unix.file_exists lockfile with
   | `No -> (
       let open Async in
       match%map
@@ -70,7 +70,7 @@ let rec check_and_set_lockfile ~logger conf_dir =
             Reader.with_file ~exclusive:true lockfile ~f:(fun reader ->
                 let%bind pid =
                   let rm_and_raise () =
-                    Core.Unix.unlink lockfile ;
+                    Core_unix.unlink lockfile ;
                     Mina_stdlib.Mina_user_error.raise
                       "Invalid format in lockfile (removing it)"
                   in
@@ -82,7 +82,7 @@ let rec check_and_set_lockfile ~logger conf_dir =
                 in
                 let still_running =
                   (* using signal 0 does not send a signal; see man page `kill(2)` *)
-                  match Signal.(send zero) (`Pid pid) with
+                  match Signal_unix.send Signal.zero (`Pid pid) with
                   | `Ok ->
                       true
                   | `No_such_process ->
@@ -139,7 +139,8 @@ let get_hw_info () =
       ]
     in
     let%map outputs =
-      Deferred.List.map linux_hw_progs ~f:(fun (prog, args) ->
+      Deferred.List.map ~how:`Sequential linux_hw_progs
+        ~f:(fun (prog, args) ->
           let header =
             sprintf "*** Output from '%s' ***\n"
               (String.concat ~sep:" " (prog :: args))
@@ -163,21 +164,23 @@ let export_logs_to_tar ?basename ~conf_dir =
   let basename =
     match basename with
     | None ->
-        let date, day = Time.(now () |> to_date_ofday ~zone:Zone.utc) in
-        let Time.Span.Parts.{ hr; min; sec; _ } = Time.Ofday.to_parts day in
+        let date, day = Time_float.(now () |> to_date_ofday ~zone:Zone.utc) in
+        let Time_float.Span.Parts.{ hr; min; sec; _ } =
+          Time_float.Ofday.to_parts day
+        in
         sprintf "%s_%02d-%02d-%02d" (Date.to_string date) hr min sec
     | Some basename ->
         basename
   in
   let export_dir = conf_dir ^/ "exported_logs" in
-  ( match Core.Sys.file_exists export_dir with
+  ( match Sys_unix.file_exists export_dir with
   | `No ->
-      Core.Unix.mkdir export_dir
+      Core_unix.mkdir export_dir
   | _ ->
       () ) ;
   let tarfile = export_dir ^/ basename ^ ".tar.gz" in
   let log_files =
-    Core.Sys.ls_dir conf_dir
+    Sys_unix.ls_dir conf_dir
     |> List.filter ~f:(String.is_substring ~substring:".log")
   in
   let%bind.Deferred hw_info_opt = get_hw_info () in
@@ -189,7 +192,8 @@ let export_logs_to_tar ?basename ~conf_dir =
       match%map
         Monitor.try_with ~here:[%here] ~extract_exn:true (fun () ->
             Writer.with_file ~exclusive:true hw_info_file ~f:(fun writer ->
-                Deferred.List.map (Option.value_exn hw_info_opt) ~f:(fun line ->
+                Deferred.List.map ~how:`Sequential
+                  (Option.value_exn hw_info_opt) ~f:(fun line ->
                     return (Writer.write_line writer line) ) ) )
       with
       | Ok _units ->
@@ -204,7 +208,9 @@ let export_logs_to_tar ?basename ~conf_dir =
     Option.value_map hw_file_opt ~default:base_files ~f:(fun hw_file ->
         hw_file :: base_files )
   in
-  let tmp_dir = Filename.temp_dir ~in_dir:"/tmp" ("mina-logs_" ^ basename) "" in
+  let tmp_dir =
+    Filename_unix.temp_dir ~in_dir:"/tmp" ("mina-logs_" ^ basename) ""
+  in
   let files_in_dir dir = List.map files ~f:(fun file -> dir ^/ file) in
   let conf_dir_files = files_in_dir conf_dir in
   let%bind _result0 =
@@ -224,6 +230,8 @@ let export_logs_to_tar ?basename ~conf_dir =
   in
   let tmp_dir_files = files_in_dir tmp_dir in
   let open Deferred.Let_syntax in
-  let%bind () = Deferred.List.iter tmp_dir_files ~f:Unix.remove in
+  let%bind () =
+    Deferred.List.iter ~how:`Sequential tmp_dir_files ~f:Unix.remove
+  in
   let%bind () = Unix.rmdir tmp_dir in
   Deferred.Or_error.return tarfile

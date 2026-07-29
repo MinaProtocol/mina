@@ -113,16 +113,16 @@ let start t =
   let args = Config.to_args t.config in
   let%bind _, process = Executor.run_in_background t.executor ~args () in
   (* TODO: consider internalize [wait_until_ready] here and replace this wait *)
-  let%map () = after (Time.Span.of_sec 5.) in
+  let%map () = after (Time_float.Span.of_sec 5.) in
   Process.{ process; config = t.config }
 
 let wait_until_ready ~log_file =
-  let timeout = Time.Span.of_sec 30.0 in
-  let poll_interval = Time.Span.of_sec 1.0 in
-  let start_time = Time.now () in
+  let timeout = Time_float.Span.of_sec 30.0 in
+  let poll_interval = Time_float.Span.of_sec 1.0 in
+  let start_time = Time_float.now () in
   let is_timeout () =
-    let elapsed = Time.(diff (now ()) start_time) in
-    Time.Span.( > ) elapsed timeout
+    let elapsed = Time_float.(diff (now ()) start_time) in
+    Time_float.Span.( > ) elapsed timeout
   in
   let expected_message = "Archive process ready. Clients can now connect" in
   let rec wait_until_log_created () =

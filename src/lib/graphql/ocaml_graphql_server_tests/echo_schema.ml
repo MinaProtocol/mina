@@ -47,8 +47,8 @@ let schema =
       ; field "sum_defaults" ~typ:int
           ~args:
             Arg.
-              [ arg' "x" ~typ:string ~default:"42"
-              ; arg' "y" ~typ:int ~default:3
+              [ arg' "x" ~typ:string ~default:(`String "42")
+              ; arg' "y" ~typ:int ~default:(`Int 3)
               ]
           ~resolve:(fun _ () x y ->
             try Some (int_of_string x + y) with _ -> None )

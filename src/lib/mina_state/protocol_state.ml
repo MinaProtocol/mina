@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Mina_base
 open Snark_params.Tick
 module Wire_types = Mina_wire_types.Mina_state.Protocol_state

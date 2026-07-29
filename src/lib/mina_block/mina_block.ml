@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Mina_base
 open Mina_state
 module Body = Staged_ledger_diff.Body

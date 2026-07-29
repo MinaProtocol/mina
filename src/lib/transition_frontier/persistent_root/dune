@@ -6,7 +6,6 @@
   core_kernel.uuid
   core_kernel
   core
-  core.uuid
   base.caml
   ;;local libraries
   precomputed_values
@@ -20,4 +19,4 @@
  (instrumentation
   (backend bisect_ppx))
  (preprocess
-  (pps ppx_jane ppx_mina ppx_version)))
+  (pps ppx_let ppx_mina ppx_version)))

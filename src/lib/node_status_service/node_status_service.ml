@@ -120,8 +120,7 @@ let send_node_status_data (type data) ~logger ~url (node_status_data : data)
         [ ("data", node_status_json); ("url", `String (Uri.to_string url)) ]
       in
       if
-        Cohttp.Code.(
-          code_of_status status >= 200 && code_of_status status < 300)
+        Cohttp.Code.(code_of_status status >= 200 && code_of_status status < 300)
       then [%log info] "Sent node status data to URL $url" ~metadata
       else
         let extra_metadata =
@@ -186,7 +185,7 @@ let start ~commit_id ~logger ~node_status_url ~transition_frontier ~sync_status
     ~block_producer_public_key_base58 =
   [%log info] "Starting node status service using URL $url"
     ~metadata:[ ("url", `String node_status_url) ] ;
-  let five_slots = Time.Span.scale slot_duration 5. in
+  let five_slots = Time_float.Span.scale slot_duration 5. in
   reset_gauges () ;
   every ~start:(after five_slots) ~continue_on_error:true five_slots
   @@ fun () ->
@@ -214,7 +213,7 @@ let start ~commit_id ~logger ~node_status_url ~transition_frontier ~sync_status
             let open Int64 in
             let info = sysinfo () in
             let mem_unit = of_int info.mem_unit in
-            { uptime = Time.Span.to_string info.uptime
+            { uptime = Time_float.Span.to_string info.uptime
             ; load = info.load15
             ; total_ram = of_int info.total_ram * mem_unit
             ; free_ram = of_int info.free_ram * mem_unit
@@ -264,10 +263,11 @@ let start ~commit_id ~logger ~node_status_url ~transition_frontier ~sync_status
                 (Node_addrs_and_ports.to_peer_exn addrs_and_ports).peer_id
             ; ip_address =
                 Node_addrs_and_ports.external_ip addrs_and_ports
-                |> Core.Unix.Inet_addr.to_string
+                |> Core_unix.Inet_addr.to_string
             ; timestamp = Mina_stdlib_unix.Rfc3339_time.get_rfc3339_time ()
             ; uptime_of_node =
-                Time.Span.to_sec @@ Time.diff (Time.now ()) start_time
+                Time_float.Span.to_sec
+                @@ Time_float.diff (Time_float.now ()) start_time
             ; peer_count = List.length peers
             ; rpc_sent =
                 { get_some_initial_peers =
@@ -393,7 +393,8 @@ let start ~commit_id ~logger ~node_status_url ~transition_frontier ~sync_status
                     { hash
                     ; sender
                     ; received_at =
-                        Time.to_string (Block_time.to_time_exn received_at)
+                        Time_float.to_string_utc
+                          (Block_time.to_time_exn received_at)
                     ; is_valid = false
                     ; reason_for_rejection = Some reason_for_rejection
                     } )
@@ -402,7 +403,8 @@ let start ~commit_id ~logger ~node_status_url ~transition_frontier ~sync_status
                       { hash
                       ; sender
                       ; received_at =
-                          Time.to_string (Block_time.to_time_exn received_at)
+                          Time_float.to_string_utc
+                            (Block_time.to_time_exn received_at)
                       ; is_valid = true
                       ; reason_for_rejection = None
                       } )
@@ -424,22 +426,23 @@ let start_simplified ~commit_id ~logger ~node_status_url ~chain_id ~network
     ~addrs_and_ports ~slot_duration ~block_producer_public_key_base58 =
   [%log info] "Starting simplified node status service using URL $url"
     ~metadata:[ ("url", `String node_status_url) ] ;
-  let five_slots = Time.Span.scale slot_duration 5. in
+  let five_slots = Time_float.Span.scale slot_duration 5. in
   every ~start:(after five_slots) ~continue_on_error:true five_slots
   @@ fun () ->
   don't_wait_for
-  @@ let%bind peers = Mina_networking.peers network in
-     let node_status_data =
-       { Simplified.max_observed_block_height =
-           !Mina_metrics.Transition_frontier.max_blocklength_observed
-       ; commit_hash = commit_id
-       ; chain_id
-       ; peer_id = (Node_addrs_and_ports.to_peer_exn addrs_and_ports).peer_id
-       ; peer_count = List.length peers
-       ; timestamp = Mina_stdlib_unix.Rfc3339_time.get_rfc3339_time ()
-       ; block_producer_public_key = block_producer_public_key_base58
-       }
-     in
-     send_node_status_data ~logger
-       ~url:(Uri.of_string node_status_url)
-       node_status_data Simplified.to_yojson
+  @@
+  let%bind peers = Mina_networking.peers network in
+  let node_status_data =
+    { Simplified.max_observed_block_height =
+        !Mina_metrics.Transition_frontier.max_blocklength_observed
+    ; commit_hash = commit_id
+    ; chain_id
+    ; peer_id = (Node_addrs_and_ports.to_peer_exn addrs_and_ports).peer_id
+    ; peer_count = List.length peers
+    ; timestamp = Mina_stdlib_unix.Rfc3339_time.get_rfc3339_time ()
+    ; block_producer_public_key = block_producer_public_key_base58
+    }
+  in
+  send_node_status_data ~logger
+    ~url:(Uri.of_string node_status_url)
+    node_status_data Simplified.to_yojson

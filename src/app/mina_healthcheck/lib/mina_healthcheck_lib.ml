@@ -105,21 +105,21 @@ let readiness_problems ~min_peers (r : Types.readiness) =
     suspenders bound, so even a buggy inner caller that ignores the
     deadline parameter cannot wedge us past the user's [--timeout]. *)
 let poll_until ?(quiet = false) ~timeout ~interval ~timeout_msg f =
-  let start = Time.now () in
-  let deadline = Time.add start (Time.Span.of_sec (Float.of_int timeout)) in
-  let interval_span = Time.Span.of_sec (Float.of_int interval) in
-  let timed_out () = Time.( >= ) (Time.now ()) deadline in
+  let start = Time_float.now () in
+  let deadline = Time_float.add start (Time_float.Span.of_sec (Float.of_int timeout)) in
+  let interval_span = Time_float.Span.of_sec (Float.of_int interval) in
+  let timed_out () = Time_float.( >= ) (Time_float.now ()) deadline in
   let remaining_budget () =
-    let r = Time.diff deadline (Time.now ()) in
-    if Time.Span.( <= ) r Time.Span.zero then Time.Span.zero else r
+    let r = Time_float.diff deadline (Time_float.now ()) in
+    if Time_float.Span.( <= ) r Time_float.Span.zero then Time_float.Span.zero else r
   in
   let timeout_error_with_msg msg =
-    let elapsed = Time.Span.to_sec (Time.diff (Time.now ()) start) in
+    let elapsed = Time_float.Span.to_sec (Time_float.diff (Time_float.now ()) start) in
     Deferred.Or_error.errorf "timed out after %.2fs: %s" elapsed msg
   in
   let rec loop () =
     let budget = remaining_budget () in
-    if Time.Span.( <= ) budget Time.Span.zero then
+    if Time_float.Span.( <= ) budget Time_float.Span.zero then
       timeout_error_with_msg timeout_msg
     else
       match%bind Clock.with_timeout budget (f ~deadline ()) with
@@ -134,7 +134,7 @@ let poll_until ?(quiet = false) ~timeout ~interval ~timeout_msg f =
             loop ()
       | `Result (Error e) ->
           ( if not quiet then
-            let elapsed = Time.Span.to_sec (Time.diff (Time.now ()) start) in
+            let elapsed = Time_float.Span.to_sec (Time_float.diff (Time_float.now ()) start) in
             eprintf "[%6.2fs] connection error: %s\n%!" elapsed
               (Error.to_string_hum e) ) ;
           if timed_out () then timeout_error_with_msg (Error.to_string_hum e)

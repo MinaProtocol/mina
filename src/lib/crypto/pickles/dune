@@ -4,17 +4,25 @@
  (name pickles)
  (public_name pickles)
  (modules_without_implementation full_signature type intf pickles_intf)
- (flags -open Core_kernel)
+ (flags -open Core)
  (instrumentation
   (backend bisect_ppx))
  (preprocess
   (pps
-   ppx_version
-   ppx_mina
-   ppx_jane
+   h_list.ppx
+   ppx_assert
+   ppx_bin_prot
    ppx_compare
+   ppx_custom_printf
    ppx_deriving_yojson
-   h_list.ppx))
+   ppx_fields_conv
+   ppx_hash
+   ppx_here
+   ppx_inline_test
+   ppx_let
+   ppx_mina
+   ppx_sexp_conv
+   ppx_version))
  (libraries
   ;; opam libraries
   stdio
@@ -22,7 +30,7 @@
   result
   base.caml
   bignum.bigint
-  core_kernel
+  core
   base64
   digestif
   ppx_inline_test.config

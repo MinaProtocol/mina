@@ -73,7 +73,7 @@ module Binary_block : S with type t = Mina_block.Stable.Latest.t = struct
 end
 
 let () =
-  let open Core_kernel in
+  let open Core in
   Backtrace.elide := false ;
   Async.Scheduler.set_record_backtraces true
 

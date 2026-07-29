@@ -76,16 +76,16 @@ let extract_perf_metrics log_file =
         else
           match Logger.Message.of_yojson (Yojson.Safe.from_string line) with
           | Ok entry ->
-              if String.Map.mem entry.metadata "is_perf_metric" then
+              if Map.mem entry.metadata "is_perf_metric" then
                 let time_in_ms =
-                  String.Map.find entry.metadata "elapsed"
+                  Map.find entry.metadata "elapsed"
                   |> Option.value_exn ~here:[%here]
                        ~message:
                          ("Missing elapsed in log entry in log line: " ^ line)
                   |> Yojson.Safe.Util.to_float
                 in
                 let label =
-                  String.Map.find entry.metadata "label"
+                  Map.find entry.metadata "label"
                   |> Option.value_exn ~here:[%here]
                        ~message:
                          ("Missing label in log entry in log line: " ^ line)
@@ -102,11 +102,11 @@ let extract_perf_metrics log_file =
     String.Map.of_alist_multi perf_metrics
     |> Map.to_alist
     |> List.map ~f:(fun (operation, times) ->
-           let avg_time =
-             List.fold times ~init:0.0 ~f:( +. )
-             /. Float.of_int (List.length times)
-           in
-           (operation, avg_time) )
+        let avg_time =
+          List.fold times ~init:0.0 ~f:( +. )
+          /. Float.of_int (List.length times)
+        in
+        (operation, avg_time) )
   in
   Deferred.return averaged_metrics
 

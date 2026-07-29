@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Async_kernel
 
 module Make (M : Storage_intf.With_checksum_intf) :

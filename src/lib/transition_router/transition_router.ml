@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Async_kernel
 open Pipe_lib
 open Network_peer
@@ -190,7 +190,7 @@ let download_best_tip ~context:(module Context : CONTEXT) ~notify_online
         match%bind
           Mina_networking.get_best_tip
             ~heartbeat_timeout:(Time_ns.Span.of_min 1.)
-            ~timeout:(Time.Span.of_min 1.) network peer
+            ~timeout:(Time_float.Span.of_min 1.) network peer
         with
         | Error e ->
             [%log debug]

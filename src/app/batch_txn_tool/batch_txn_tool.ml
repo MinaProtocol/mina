@@ -278,7 +278,7 @@ let there_and_back_again ~num_txn_per_acct ~txns_per_block ~slot_time ~fill_rate
   (* there... *)
   let%bind () =
     (* in a previous version of the code there could be multiple returners, thus the iter.  keeping this structure in case we decide to change back later *)
-    Deferred.List.iter [ returner_keypair ] ~f:(fun kp ->
+    Deferred.List.iter [ returner_keypair ] ~how:`Sequential ~f:(fun kp ->
         let%bind origin_nonce =
           get_nonce ~logger ~ingress_uri:node_ingress_uri
             ~pub_key:origin_pub_key
@@ -289,7 +289,7 @@ let there_and_back_again ~num_txn_per_acct ~txns_per_block ~slot_time ~fill_rate
 
   (* and back again... *)
   let%bind () =
-    Deferred.List.iter [ returner_keypair ] ~f:(fun kp ->
+    Deferred.List.iter ~how:`Sequential [ returner_keypair ] ~f:(fun kp ->
         let%bind returner_nonce =
           get_nonce ~logger ~ingress_uri:node_ingress_uri
             ~pub_key:(Signature_lib.Public_key.compress kp.public_key)
@@ -413,7 +413,7 @@ let output_there_and_back_cmds =
        ~signature_kind:Mina_signature_kind.t_DEPRECATED )
 
 let () =
-  Command.run
+  Command_unix.run
     (Command.group
        ~summary:"Generate public keys for sending batches of transactions"
        [ ("gen-keys", output_keys)

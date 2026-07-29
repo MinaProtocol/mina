@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Async
 
 let logger = Logger.null ()
@@ -51,7 +51,7 @@ let test_sequential_execution () =
   let register_delayed ~tier ~description ~delay =
     Exit_handlers.register_async_shutdown_handler ~logger ~description ~tier
       (fun () ->
-        let%map () = after (Time.Span.of_sec delay) in
+        let%map () = after (Time_float.Span.of_sec delay) in
         log := !log @ [ description ] )
   in
   register_delayed ~tier:FlushPersistentFrontier ~description:"slow-frontier"

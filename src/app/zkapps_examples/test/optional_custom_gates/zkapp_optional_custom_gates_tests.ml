@@ -7,7 +7,7 @@
      dune exec src/app/zkapps_examples/test/optional_custom_gates/zkapp_optional_custom_gates_tests.exe
 *)
 
-open Core_kernel
+open Core
 open Mina_base
 
 module Make_account_info () = struct

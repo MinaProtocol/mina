@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Fold_lib
 include Intf
 module Intf = Intf

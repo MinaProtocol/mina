@@ -123,7 +123,7 @@ module Impl = struct
         Error e
 
   let measure_runtime ~logger ~(spec_json : (string * Yojson.Safe.t) Lazy.t) k =
-    let start = Time.now () in
+    let start = Time_float.now () in
     match%map.Async.Deferred Monitor.try_with_join_or_error ~here:[%here] k with
     | Error e ->
         [%log error] "SNARK worker failed: $error"
@@ -131,7 +131,7 @@ module Impl = struct
             [ ("error", Error_json.error_to_yojson e); Lazy.force spec_json ] ;
         Error e
     | Ok res ->
-        let elapsed = Time.abs_diff (Time.now ()) start in
+        let elapsed = Time_float.abs_diff (Time_float.now ()) start in
         Ok (res, elapsed)
 
   let perform_single_untimed ~(m : (module Worker_state.S)) ~logger
@@ -256,7 +256,7 @@ module Impl = struct
         Deferred.Or_error.return
         @@ ( Transaction_snark.create ~statement:{ stmt with sok_digest }
                ~proof:(Lazy.force Proof.transaction_dummy)
-           , Time.Span.zero )
+           , Time_float.Span.zero )
 
   (* TODO: remove this after whole snark worker PR series had been merged *)
   let perform (s : Worker_state.t) public_key
@@ -350,7 +350,7 @@ module Impl = struct
             in
             { Proof_carrying_data.data = elapsed; proof } )
     | Worker_state.Check | Worker_state.No_check ->
-        let elapsed = Time.Span.zero in
+        let elapsed = Time_float.Span.zero in
         let statement =
           Work.Spec.Partitioned.Stable.Latest.statement partitioned_spec
         in

@@ -325,7 +325,7 @@ let wait_command =
            Deferred.Or_error.return () )
 
 let () =
-  Command.run
+  Command_unix.run
     (Command.group
        ~summary:
          "Mina daemon healthcheck CLI — lightweight probe commands for \

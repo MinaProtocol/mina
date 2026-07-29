@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 
 module type Hash_intf = sig
   type t

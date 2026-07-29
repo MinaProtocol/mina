@@ -54,7 +54,7 @@ let print_witnesses ~constraint_constants ~proof_level witnesses =
 
     let proof_level = proof_level
   end) in
-  Async.Deferred.List.iter (List.rev witnesses)
+  Async.Deferred.List.iter ~how:`Sequential (List.rev witnesses)
     ~f:(fun (witness, spec, statement) ->
       printf "%s"
         (sprintf

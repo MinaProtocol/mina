@@ -24,7 +24,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
   module Common = Common
   module Scalar_challenge = Scalar_challenge
   module SC = Scalar_challenge
-  open Core_kernel
+  open Core
   open Async_kernel
   open Import
   open Pickles_types

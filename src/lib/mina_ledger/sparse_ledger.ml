@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Mina_base
 include Sparse_ledger_base
 module GS = Global_state

@@ -2,14 +2,14 @@
 
 module Subchain = struct
   let make_sql ~join_condition =
-    let insert_commas s = Core_kernel.String.concat ~sep:"," s in
+    let insert_commas s = Core.String.concat ~sep:"," s in
     let fields = insert_commas Archive_lib.Processor.Block.Fields.names in
     let b_fields =
       insert_commas
-      @@ Core_kernel.List.map Archive_lib.Processor.Block.Fields.names
+      @@ Core.List.map Archive_lib.Processor.Block.Fields.names
            ~f:(fun field -> "b." ^ field)
     in
-    Core_kernel.sprintf
+    Core.sprintf
       {sql| WITH RECURSIVE chain AS (
 
               SELECT %s
@@ -52,7 +52,7 @@ module Subchain = struct
     Conn.collect_list query_from_start (end_state_hash, start_state_hash)
 
   let query_all =
-    let open Core_kernel in
+    let open Core in
     let comma_fields =
       String.concat Archive_lib.Processor.Block.Fields.names ~sep:","
     in

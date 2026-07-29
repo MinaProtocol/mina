@@ -8,7 +8,7 @@ let dispatch rpc shutdown_on_disconnect query address =
   let%map res =
     Rpc.Connection.with_client
       ~handshake_timeout:
-        (Time.Span.of_sec
+        (Time_float.Span.of_sec
            Node_config_unconfigurable_constants.rpc_handshake_timeout_sec )
       ~heartbeat_config:
         (Rpc.Connection.Heartbeat_config.create
@@ -82,7 +82,7 @@ let main ~logger ~proof_level ~constraint_constants ~signature_kind
         in
         [%log info] "No jobs available. Napping for $time seconds"
           ~metadata:[ ("time", `Float random_delay) ] ;
-        let%bind () = after (Time.Span.of_sec random_delay) in
+        let%bind () = after (Time_float.Span.of_sec random_delay) in
         go ()
     | Ok (Some partitioned_spec) -> (
         let address_json =

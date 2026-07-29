@@ -13,7 +13,6 @@ module Make_test_inputs (Engine : Intf.Engine.S) () :
     with type Engine.Network_config.Cli_inputs.t =
       Engine.Network_config.Cli_inputs.t = struct
   module Engine = Engine
-
   module Dsl = Dsl.Make (Engine) ()
 end
 
@@ -136,7 +135,7 @@ let report_test_errors ~log_error_set ~internal_error_set =
             color_eprintf
               (color_of_severity severity)
               "        [%s] %s\n"
-              (Time.to_string error_message.timestamp)
+              (Time_float.to_string_utc error_message.timestamp)
               (Yojson.Safe.to_string (Logger.Message.to_yojson error_message)) ) ;
         Print.eprintf "\n" )
   in
@@ -164,7 +163,7 @@ let report_test_errors ~log_error_set ~internal_error_set =
               color_eprintf
                 (color_of_severity severity)
                 "    [%s] %s\n"
-                (Time.to_string occurrence_time)
+                (Time_float.to_string_utc occurrence_time)
                 (Error.to_string_hum error) ) ) ;
       (* report non-contextualized internal errors *)
       List.iter internal_errors.from_current_context
@@ -172,7 +171,7 @@ let report_test_errors ~log_error_set ~internal_error_set =
           color_eprintf
             (color_of_severity severity)
             "[%s] %s\n"
-            (Time.to_string occurrence_time)
+            (Time_float.to_string_utc occurrence_time)
             (Error.to_string_hum error) ) ;
       (* determine if test is passed/failed and exit accordingly *)
       let test_failed =
@@ -254,7 +253,7 @@ let main inputs =
   let open Test_inputs in
   let test_name, (module Test) = inputs.test in
   let (module T) =
-    (module Test (Test_inputs) : Intf.Test.S
+    ( module Test (Test_inputs) : Intf.Test.S
       with type network = Engine.Network.t
        and type node = Engine.Network.Node.t
        and type dsl = Dsl.t )
@@ -376,11 +375,9 @@ let main inputs =
           [%log info] "%s started" (Engine.Network.Node.infra_id node) ;
           Malleable_error.return res
         in
-        let seed_nodes =
-          network |> Engine.Network.seeds |> Core.String.Map.data
-        in
+        let seed_nodes = network |> Engine.Network.seeds |> Core.Map.data in
         let non_seed_pods =
-          network |> Engine.Network.all_non_seed_nodes |> Core.String.Map.data
+          network |> Engine.Network.all_non_seed_nodes |> Core.Map.data
         in
         let _offline_node_event_subscription =
           (* Monitor for offline nodes; abort the test if a node goes down
@@ -405,7 +402,7 @@ let main inputs =
         let%bind () = Malleable_error.List.iter non_seed_pods ~f:start_print in
         [%log info] "Daemons started" ;
         let archive_nodes =
-          Engine.Network.archive_nodes network |> Core.String.Map.data
+          Engine.Network.archive_nodes network |> Core.Map.data
         in
         let%bind () =
           Malleable_error.List.iter archive_nodes ~f:(fun archive_node ->
@@ -445,19 +442,19 @@ let test_arg =
 
 let mina_image_arg =
   let doc = "Identifier of the Mina docker image to test." in
-  let env = Arg.env_var "MINA_IMAGE" ~doc in
+  let env = Cmd.Env.info "MINA_IMAGE" ~doc in
   Arg.(
     required
     & opt (some string) None
-    & info [ "mina-image" ] ~env ~docv:"MINA_IMAGE" ~doc)
+    & info [ "mina-image" ] ~env ~docv:"MINA_IMAGE" ~doc )
 
 let archive_image_arg =
   let doc = "Identifier of the archive node docker image to test." in
-  let env = Arg.env_var "ARCHIVE_IMAGE" ~doc in
+  let env = Cmd.Env.info "ARCHIVE_IMAGE" ~doc in
   Arg.(
     value
       ( opt (some string) None
-      & info [ "archive-image" ] ~env ~docv:"ARCHIVE_IMAGE" ~doc ))
+      & info [ "archive-image" ] ~env ~docv:"ARCHIVE_IMAGE" ~doc ) )
 
 let debug_arg =
   let doc =
@@ -471,7 +468,7 @@ let help_term = Term.(ret @@ const (`Help (`Plain, None)))
 let engine_cmd ((engine_name, (module Engine)) : engine) =
   let info =
     let doc = "Run mina integration test(s) on engine." in
-    Term.info engine_name ~doc ~exits:Term.default_exits
+    Cmd.info engine_name ~doc
   in
   let test_inputs_with_cli_inputs_arg =
     let wrap_cli_inputs cli_inputs =
@@ -486,23 +483,25 @@ let engine_cmd ((engine_name, (module Engine)) : engine) =
     in
     Term.(
       const cons_inputs $ test_inputs_with_cli_inputs_arg $ test_arg
-      $ mina_image_arg $ archive_image_arg $ debug_arg)
+      $ mina_image_arg $ archive_image_arg $ debug_arg )
   in
   let term = Term.(const start $ inputs_term) in
-  (term, info)
+  Cmd.v info term
 
 let help_cmd =
   let doc = "Print out test executive documentation." in
-  let info = Term.info "help" ~doc ~exits:Term.default_exits in
-  (help_term, info)
-
-let default_cmd =
-  let doc = "Run mina integration test(s)." in
-  let info = Term.info "test_executive" ~doc ~exits:Term.default_error_exits in
-  (help_term, info)
+  let info = Cmd.info "help" ~doc in
+  Cmd.v info help_term
 
 (* TODO: move required args to positions instead of flags, or provide reasonable
    defaults to make them optional *)
 let () =
   let engine_cmds = List.map engines ~f:engine_cmd in
-  Term.(exit @@ eval_choice default_cmd (engine_cmds @ [ help_cmd ]))
+  let default_info =
+    let doc = "Run mina integration test(s)." in
+    Cmd.info "test_executive" ~doc
+  in
+  let group =
+    Cmd.group default_info ~default:help_term (engine_cmds @ [ help_cmd ])
+  in
+  Stdlib.exit (Cmd.eval group)

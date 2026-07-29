@@ -1,22 +1,22 @@
-open Core_kernel
+open Core
 
 let l = ref ""
 
-let r = ref (Time.now ())
+let r = ref (Time_float.now ())
 
 let start =
   Common.when_profiling
     (fun loc ->
-      r := Time.now () ;
+      r := Time_float.now () ;
       l := loc )
     ignore
 
 let clock =
   Common.when_profiling
     (fun loc ->
-      let t = Time.now () in
+      let t = Time_float.now () in
       printf "%s -> %s: %s\n%!" !l loc
-        (Time.Span.to_string_hum (Time.diff t !r)) ;
+        (Time_float.Span.to_string_hum (Time_float.diff t !r)) ;
       r := t ;
       l := loc )
     ignore

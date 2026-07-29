@@ -267,6 +267,6 @@ let commands =
   ]
 
 let () =
-  Async_command.run
+  Command_unix.run
     (Async_command.group ~summary:"Archive hardfork toolbox"
        ~preserve_subcommand_order:() commands )

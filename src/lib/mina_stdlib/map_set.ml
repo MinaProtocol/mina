@@ -1,6 +1,6 @@
 (** Utilities for dealing with "multimaps" or mapsets. *)
 
-open Core_kernel
+open Core
 
 (* TODO consider using a lighter interface than Comparable.S *)
 module Make (Key : Comparable.S) (Set : Generic_set.S0) = struct

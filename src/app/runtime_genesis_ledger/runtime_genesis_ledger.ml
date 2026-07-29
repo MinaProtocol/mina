@@ -187,7 +187,7 @@ let main ~(constraint_constants : Genesis_constants.Constraint_constants.t)
 let () =
   let (module G) = Genesis_constants.profiled () in
   let constraint_constants = G.constraint_constants in
-  Command.run
+  Command_unix.run
     (Command.async
        ~summary:
          "Generate the genesis ledger and genesis proof for a given \

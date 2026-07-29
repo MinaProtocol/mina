@@ -23,7 +23,7 @@
         a 'transaction' or a 'merge'.
 *)
 
-open Core_kernel
+open Core
 open Pickles_types
 open Import
 module V = Pickles_base.Side_loaded_verification_key
@@ -235,7 +235,7 @@ module Stable = struct
       let compare x y = R.compare (to_repr x) (to_repr y)
 
       include
-        Binable.Of_binable
+        Binable.Of_binable_without_uuid
           (R.Stable.V2)
           (struct
             type nonrec t = t

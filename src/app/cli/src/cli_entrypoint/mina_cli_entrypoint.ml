@@ -25,9 +25,8 @@ let plugin_flag =
 let make_ledger_backing ~constraint_constants ~runtime_config ~hardfork_handling
     =
   let current_genesis_global_slot =
-    let%map.Option { global_slot_since_genesis = current_genesis_global_slot
-                   ; _
-                   } =
+    let%map.Option
+        { global_slot_since_genesis = current_genesis_global_slot; _ } =
       constraint_constants.Genesis_constants.Constraint_constants.fork
     in
     current_genesis_global_slot
@@ -59,7 +58,7 @@ let load_config_files ~logger ~genesis_constants ~constraint_constants ~conf_dir
     in
     [%log info] "Reading configuration files $config_files"
       ~metadata:[ ("config_files", `List config_files_paths) ] ;
-    Deferred.List.filter_map config_files
+    Deferred.List.filter_map ~how:`Sequential config_files
       ~f:(fun (config_file, handle_missing) ->
         match%bind Genesis_ledger_helper.load_config_json config_file with
         | Ok config_json ->
@@ -575,11 +574,11 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
          email address or discord username), it should be less than 200 \
          characters"
     |> Command.Param.map ~f:(fun opt ->
-           Option.value_map opt ~default:None ~f:(fun s ->
-               if String.length s < 200 then Some s
-               else
-                 Mina_stdlib.Mina_user_error.raisef
-                   "The length of contact info exceeds 200 characters:\n %s" s ) )
+        Option.value_map opt ~default:None ~f:(fun s ->
+            if String.length s < 200 then Some s
+            else
+              Mina_stdlib.Mina_user_error.raisef
+                "The length of contact info exceeds 200 characters:\n %s" s ) )
   and uptime_url_string =
     flag "--uptime-url" ~aliases:[ "uptime-url" ] (optional string)
       ~doc:"URL URL of the uptime service of the Mina delegation program"
@@ -650,7 +649,7 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
             Daemon.daemonize ~allow_threads_to_have_been_created:true
               ~redirect_stdout:`Dev_null ?cd:working_dir
               ~redirect_stderr:`Dev_null () )
-          else Option.iter working_dir ~f:Caml.Sys.chdir
+          else Option.iter working_dir ~f:Stdlib.Sys.chdir
         in
         (* NOTE: invocation of memtrace must happen after daemonization *)
         Memtrace.trace_if_requested ~context:"mina" () ;
@@ -754,7 +753,7 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
             Or_error.try_with_join (fun () ->
                 match Yojson.Safe.from_file version_filename with
                 | `Assoc list -> (
-                    match String.Map.(find (of_alist_exn list) "commit") with
+                    match Map.find (String.Map.of_alist_exn list) "commit" with
                     | Some (`String commit) ->
                         Ok commit
                     | _ ->
@@ -797,7 +796,7 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
               List.fold_until ~init:None
                 (Cache_dir.possible_paths json)
                 ~f:(fun _acc f ->
-                  match Core.Sys.file_exists f with
+                  match Sys_unix.file_exists f with
                   | `Yes ->
                       Stop (Some f)
                   | _ ->
@@ -824,7 +823,7 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
             Option.to_list config_file_installed
             @ (config_file_configdir :: Option.to_list config_file_envvar)
             @ List.map config_files ~f:(fun config_file ->
-                  (config_file, `Must_exist) )
+                (config_file, `Must_exist) )
           in
 
           let (module G) = Genesis_constants.profiled () in
@@ -833,25 +832,25 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
           let compile_config =
             Mina_compile_config.of_node_config (module Node_config)
           in
-          let%bind ( precomputed_values
-                   , config_jsons
-                   , config
-                   , chain_state_locations
-                   , ledger_backing
-                   , chain_id ) =
+          let%bind
+              ( precomputed_values
+              , config_jsons
+              , config
+              , chain_state_locations
+              , ledger_backing
+              , chain_id ) =
             load_config_files ~logger ~conf_dir ~genesis_dir
               ~proof_level:G.proof_level config_files ~genesis_constants
               ~constraint_constants ~cli_proof_level ~hardfork_handling
           in
           constraint_constants.block_window_duration_ms |> Float.of_int
-          |> Time.Span.of_ms |> Mina_metrics.initialize_all ;
+          |> Time_float.Span.of_ms |> Mina_metrics.initialize_all ;
 
           let rev_daemon_configs =
             List.rev_filter_map config_jsons
               ~f:(fun (config_file, config_json) ->
                 Option.map
-                  YJ.Util.(
-                    to_option Fn.id (YJ.Util.member "daemon" config_json))
+                  YJ.Util.(to_option Fn.id (YJ.Util.member "daemon" config_json))
                   ~f:(fun daemon_config -> (config_file, daemon_config)) )
           in
           let maybe_from_config (type a) (f : YJ.t -> a option)
@@ -863,9 +862,9 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
                 Some v
             | None ->
                 (* Load value from the latest config file that both
-                   * has the key we are looking for, and
-                   * has the key in a format that [f] can parse.
-                *)
+                 * has the key we are looking for, and
+                 * has the key in a format that [f] can parse.
+                 *)
                 let%map config_file, data =
                   List.find_map rev_daemon_configs
                     ~f:(fun (config_file, daemon_config) ->
@@ -960,21 +959,20 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
           let json_to_publickey_compressed_option which json =
             YJ.Util.to_string_option json
             |> Option.bind ~f:(fun pk_str ->
-                   match Public_key.Compressed.of_base58_check pk_str with
-                   | Ok key -> (
-                       match Public_key.decompress key with
-                       | None ->
-                           Mina_stdlib.Mina_user_error.raisef
-                             ~where:"decompressing a public key"
-                             "The %s public key %s could not be decompressed."
-                             which pk_str
-                       | Some _ ->
-                           Some key )
-                   | Error _e ->
-                       Mina_stdlib.Mina_user_error.raisef
-                         ~where:"decoding a public key"
-                         "The %s public key %s could not be decoded." which
-                         pk_str )
+                match Public_key.Compressed.of_base58_check pk_str with
+                | Ok key -> (
+                    match Public_key.decompress key with
+                    | None ->
+                        Mina_stdlib.Mina_user_error.raisef
+                          ~where:"decompressing a public key"
+                          "The %s public key %s could not be decompressed."
+                          which pk_str
+                    | Some _ ->
+                        Some key )
+                | Error _e ->
+                    Mina_stdlib.Mina_user_error.raisef
+                      ~where:"decoding a public key"
+                      "The %s public key %s could not be decoded." which pk_str )
           in
           let run_snark_worker_flag =
             maybe_from_config
@@ -1089,12 +1087,12 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
               let cidrs =
                 String.split ~on:',' env_str
                 |> List.filter_map ~f:(fun str ->
-                       try Some (Unix.Cidr.of_string str)
-                       with _ ->
-                         [%log warn] "Could not parse address $address in %s"
-                           env_var
-                           ~metadata:[ ("address", `String str) ] ;
-                         None )
+                    try Some (Unix.Cidr.of_string str)
+                    with _ ->
+                      [%log warn] "Could not parse address $address in %s"
+                        env_var
+                        ~metadata:[ ("address", `String str) ] ;
+                      None )
               in
               Some
                 (List.append cidrs (Option.value ~default:[] client_trustlist))
@@ -1107,7 +1105,7 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
           in
           let get_monitor_infos monitor =
             let rec get_monitors accum monitor =
-              match Async_kernel.Monitor.parent monitor with
+              match Async_kernel.Monitor.For_tests.parent monitor with
               | None ->
                   List.rev accum
               | Some parent ->
@@ -1146,7 +1144,7 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
                  $o1trace" ;
               Mina_metrics.(
                 Runtime.Long_async_histogram.observe Runtime.long_async_cycle
-                  secs) ) ;
+                  secs ) ) ;
           Stream.iter Async_kernel.Async_kernel_scheduler.long_jobs_with_context
             ~f:(fun (context, span) ->
               let secs = Time_ns.Span.to_sec span in
@@ -1170,7 +1168,7 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
                   ]
                 "Long async job, $long_async_job seconds, $monitors, $o1trace" ;
               Mina_metrics.(
-                Runtime.Long_job_histogram.observe Runtime.long_async_job secs) ) ;
+                Runtime.Long_job_histogram.observe Runtime.long_async_job secs ) ) ;
           let trace_database_initialization typ location =
             (* can't use %log ppx here, because we're using the passed-in location *)
             Logger.trace logger ~module_:__MODULE__ "Creating %s at %s"
@@ -1187,7 +1185,7 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
           let block_production_keypairs =
             block_production_keypair
             |> Option.map ~f:(fun kp ->
-                   (kp, Public_key.compress kp.Keypair.public_key) )
+                (kp, Public_key.compress kp.Keypair.public_key) )
             |> Option.to_list |> Keypair.And_compressed_pk.Set.of_list
           in
           let epoch_ledger_location =
@@ -1332,7 +1330,7 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
             Protocol_version.(to_string current) ;
           let gossip_net_params =
             Gossip_net.Libp2p.Config.
-              { timeout = Time.Span.of_sec 3.
+              { timeout = Time_float.Span.of_sec 3.
               ; logger
               ; mina_net_location = chain_state_locations.mina_net
               ; chain_id
@@ -1367,12 +1365,12 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
             ; creatable_gossip_net =
                 Mina_networking.Gossip_net.(
                   Any.Creatable
-                    ((module Libp2p), Libp2p.create ~pids gossip_net_params))
+                    ((module Libp2p), Libp2p.create ~pids gossip_net_params) )
             }
           in
           let coinbase_receiver : Consensus.Coinbase_receiver.t =
             Option.value_map coinbase_receiver_flag ~default:`Producer
-              ~f:(fun pk -> `Other pk)
+              ~f:(fun pk -> `Other pk )
           in
           let proposed_protocol_version_opt =
             Mina_run.get_proposed_protocol_version_opt ~conf_dir ~logger
@@ -1439,7 +1437,7 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
                adding bound to Mina_lib config introduces cycle
             *)
             Option.iter itn_max_logs ~f:Itn_logger.set_queue_bound ;
-          let start_time = Time.now () in
+          let start_time = Time_float.now () in
           let%map mina =
             Mina_lib.create ~commit_id:Mina_version.commit_id ~wallets
               (Mina_lib.Config.make ~logger ~pids ~trust_system ~conf_dir
@@ -1501,12 +1499,13 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
           ~child_pids:pids ~top_logger:logger mina_ref ;
         Async.Scheduler.within' ~monitor
         @@ fun () ->
-        let%bind { mina
-                 ; client_trustlist
-                 ; rest_server_port
-                 ; limited_graphql_port
-                 ; itn_graphql_port
-                 } =
+        let%bind
+            { mina
+            ; client_trustlist
+            ; rest_server_port
+            ; limited_graphql_port
+            ; itn_graphql_port
+            } =
           mina_initialization_deferred ()
         in
         mina_ref := Some mina ;
@@ -1530,7 +1529,7 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
               in
               Mina_metrics.Runtime.(
                 gc_stat_interval_mins :=
-                  Option.value ~default:!gc_stat_interval_mins gc_stat_interval) ;
+                  Option.value ~default:!gc_stat_interval_mins gc_stat_interval ) ;
               Mina_metrics.server ?forward_uri ~port ~logger () >>| ignore )
           |> Option.value ~default:Deferred.unit
         in
@@ -1650,8 +1649,8 @@ let dump_type_shapes =
                in
                Sexp.to_string summary_sexp
              in
-             Core_kernel.printf "%s, %s, %s, %s\n" path digest shape_summary
-               ty_decl ) ) )
+             Core.printf "%s, %s, %s, %s\n" path digest shape_summary ty_decl ) )
+    )
 
 let primitive_ok = function
   | "array" | "bytes" | "string" | "bigstring" ->
@@ -1794,433 +1793,431 @@ let internal_commands logger ~itn_features =
     , Command.async
         ~summary:"Run snark-worker on a sexp provided on a single line of stdin"
         (let open Command.Let_syntax in
-        let%map_open filename =
-          flag "--file" (required string)
-            ~doc:"File containing the s-expression of the snark work to execute"
-        and signature_kind = Cli_lib.Flag.signature_kind in
-        fun () ->
-          let open Deferred.Let_syntax in
-          let logger = Logger.create () in
-          let constraint_constants = G.constraint_constants in
-          let proof_level = G.proof_level in
-          Parallel.init_master () ;
-          match%bind
-            Reader.with_file filename ~f:(fun reader ->
-                [%log info] "Created reader for %s" filename ;
-                Reader.read_sexp reader )
-          with
-          | `Ok sexp -> (
-              let%bind worker_state =
-                Snark_worker.Impl.Worker_state.create ~proof_level
-                  ~constraint_constants ~signature_kind ()
-              in
-              let sok_message =
-                { Mina_base.Sok_message.fee = Currency.Fee.of_mina_int_exn 0
-                ; prover = Quickcheck.random_value Public_key.Compressed.gen
-                }
-              in
-              let spec =
-                [%of_sexp:
-                  ( Transaction_witness.Stable.Latest.t
-                  , Ledger_proof.t )
-                  Snark_work_lib.Work.Single.Spec.t] sexp
-              in
-              match%map
-                Snark_worker.Impl.perform_single worker_state
-                  ~message:sok_message spec
-              with
-              | Ok _ ->
-                  [%log info] "Successfully worked"
-              | Error err ->
-                  [%log error] "Work didn't work: $err"
-                    ~metadata:[ ("err", Error_json.error_to_yojson err) ] )
-          | `Eof ->
-              failwith "early EOF while reading sexp") )
+         let%map_open filename =
+           flag "--file" (required string)
+             ~doc:
+               "File containing the s-expression of the snark work to execute"
+         and signature_kind = Cli_lib.Flag.signature_kind in
+         fun () ->
+           let open Deferred.Let_syntax in
+           let logger = Logger.create () in
+           let constraint_constants = G.constraint_constants in
+           let proof_level = G.proof_level in
+           Parallel.init_master () ;
+           match%bind
+             Reader.with_file filename ~f:(fun reader ->
+                 [%log info] "Created reader for %s" filename ;
+                 Reader.read_sexp reader )
+           with
+           | `Ok sexp -> (
+               let%bind worker_state =
+                 Snark_worker.Impl.Worker_state.create ~proof_level
+                   ~constraint_constants ~signature_kind ()
+               in
+               let sok_message =
+                 { Mina_base.Sok_message.fee = Currency.Fee.of_mina_int_exn 0
+                 ; prover = Quickcheck.random_value Public_key.Compressed.gen
+                 }
+               in
+               let spec =
+                 [%of_sexp:
+                   ( Transaction_witness.Stable.Latest.t
+                   , Ledger_proof.t )
+                   Snark_work_lib.Work.Single.Spec.t] sexp
+               in
+               match%map
+                 Snark_worker.Impl.perform_single worker_state
+                   ~message:sok_message spec
+               with
+               | Ok _ ->
+                   [%log info] "Successfully worked"
+               | Error err ->
+                   [%log error] "Work didn't work: $err"
+                     ~metadata:[ ("err", Error_json.error_to_yojson err) ] )
+           | `Eof ->
+               failwith "early EOF while reading sexp" ) )
   ; ( "run-verifier"
     , Command.async
         ~summary:"Run verifier on a proof provided on a single line of stdin"
         (let open Command.Let_syntax in
-        let%map_open mode =
-          flag "--mode" ~aliases:[ "-mode" ] (required string)
-            ~doc:"transaction/blockchain the snark to verify. Defaults to json"
-        and format =
-          flag "--format" ~aliases:[ "-format" ] (optional string)
-            ~doc:"sexp/json the format to parse input in"
-        and limit =
-          flag "--limit" ~aliases:[ "-limit" ] (optional int)
-            ~doc:"limit the number of proofs taken from the file"
-        in
-        fun () ->
-          let open Async in
-          let logger = Logger.create () in
-          let constraint_constants = G.constraint_constants in
-          let proof_level = G.proof_level in
-          Parallel.init_master () ;
-          let%bind conf_dir = Unix.mkdtemp "/tmp/mina-verifier" in
-          let mode =
-            match mode with
-            | "transaction" ->
-                `Transaction
-            | "blockchain" ->
-                `Blockchain
-            | mode ->
-                failwithf
-                  "Expected mode flag to be one of transaction, blockchain, \
-                   got '%s'"
-                  mode ()
-          in
-          let format =
-            match format with
-            | Some "sexp" ->
-                `Sexp
-            | Some "json" | None ->
-                `Json
-            | Some format ->
-                failwithf
-                  "Expected format flag to be one of sexp, json, got '%s'"
-                  format ()
-          in
-          let%bind input =
-            match format with
-            | `Sexp -> (
-                let%map input_sexp =
-                  match%map Reader.read_sexp (Lazy.force Reader.stdin) with
-                  | `Ok input_sexp ->
-                      input_sexp
-                  | `Eof ->
-                      failwith "early EOF while reading sexp"
-                in
-                match mode with
-                | `Transaction ->
-                    `Transaction
-                      (List.t_of_sexp Ledger_proof.t_of_sexp input_sexp)
-                | `Blockchain ->
-                    `Blockchain
-                      (List.t_of_sexp Blockchain_snark.Blockchain.t_of_sexp
-                         input_sexp ) )
-            | `Json -> (
-                let%map input_line =
-                  match%map Reader.read_line (Lazy.force Reader.stdin) with
-                  | `Ok input_line ->
-                      input_line
-                  | `Eof ->
-                      failwith "early EOF while reading json"
-                in
-                match mode with
-                | `Transaction -> (
-                    match
-                      [%derive.of_yojson: Ledger_proof.t list]
-                        (Yojson.Safe.from_string input_line)
-                    with
-                    | Ok input ->
-                        `Transaction input
-                    | Error err ->
-                        failwithf "Could not parse JSON: %s" err () )
-                | `Blockchain -> (
-                    match
-                      [%derive.of_yojson: Blockchain_snark.Blockchain.t list]
-                        (Yojson.Safe.from_string input_line)
-                    with
-                    | Ok input ->
-                        `Blockchain input
-                    | Error err ->
-                        failwithf "Could not parse JSON: %s" err () ) )
-          in
+         let%map_open mode =
+           flag "--mode" ~aliases:[ "-mode" ] (required string)
+             ~doc:"transaction/blockchain the snark to verify. Defaults to json"
+         and format =
+           flag "--format" ~aliases:[ "-format" ] (optional string)
+             ~doc:"sexp/json the format to parse input in"
+         and limit =
+           flag "--limit" ~aliases:[ "-limit" ] (optional int)
+             ~doc:"limit the number of proofs taken from the file"
+         in
+         fun () ->
+           let open Async in
+           let logger = Logger.create () in
+           let constraint_constants = G.constraint_constants in
+           let proof_level = G.proof_level in
+           Parallel.init_master () ;
+           let%bind conf_dir = Unix.mkdtemp "/tmp/mina-verifier" in
+           let mode =
+             match mode with
+             | "transaction" ->
+                 `Transaction
+             | "blockchain" ->
+                 `Blockchain
+             | mode ->
+                 failwithf
+                   "Expected mode flag to be one of transaction, blockchain, \
+                    got '%s'"
+                   mode ()
+           in
+           let format =
+             match format with
+             | Some "sexp" ->
+                 `Sexp
+             | Some "json" | None ->
+                 `Json
+             | Some format ->
+                 failwithf
+                   "Expected format flag to be one of sexp, json, got '%s'"
+                   format ()
+           in
+           let%bind input =
+             match format with
+             | `Sexp -> (
+                 let%map input_sexp =
+                   match%map Reader.read_sexp (Lazy.force Reader.stdin) with
+                   | `Ok input_sexp ->
+                       input_sexp
+                   | `Eof ->
+                       failwith "early EOF while reading sexp"
+                 in
+                 match mode with
+                 | `Transaction ->
+                     `Transaction
+                       (List.t_of_sexp Ledger_proof.t_of_sexp input_sexp)
+                 | `Blockchain ->
+                     `Blockchain
+                       (List.t_of_sexp Blockchain_snark.Blockchain.t_of_sexp
+                          input_sexp ) )
+             | `Json -> (
+                 let%map input_line =
+                   match%map Reader.read_line (Lazy.force Reader.stdin) with
+                   | `Ok input_line ->
+                       input_line
+                   | `Eof ->
+                       failwith "early EOF while reading json"
+                 in
+                 match mode with
+                 | `Transaction -> (
+                     match
+                       [%derive.of_yojson: Ledger_proof.t list]
+                         (Yojson.Safe.from_string input_line)
+                     with
+                     | Ok input ->
+                         `Transaction input
+                     | Error err ->
+                         failwithf "Could not parse JSON: %s" err () )
+                 | `Blockchain -> (
+                     match
+                       [%derive.of_yojson: Blockchain_snark.Blockchain.t list]
+                         (Yojson.Safe.from_string input_line)
+                     with
+                     | Ok input ->
+                         `Blockchain input
+                     | Error err ->
+                         failwithf "Could not parse JSON: %s" err () ) )
+           in
 
-          let%bind verifier =
-            Verifier.For_tests.default ~constraint_constants ~proof_level
-              ~commit_id:Mina_version.commit_id ~logger
-              ~pids:(Pid.Table.create ()) ~conf_dir:(Some conf_dir) ()
-          in
-          let%bind result =
-            let cap lst =
-              Option.value_map ~default:Fn.id ~f:(Fn.flip List.take) limit lst
-            in
-            match input with
-            | `Transaction input ->
-                input |> cap |> Verifier.verify_transaction_snarks verifier
-            | `Blockchain input ->
-                input |> cap |> Verifier.verify_blockchain_snarks verifier
-          in
-          match result with
-          | Ok (Ok ()) ->
-              printf "Proofs verified successfully" ;
-              exit 0
-          | Ok (Error err) ->
-              printf "Proofs failed to verify:\n%s\n"
-                (Yojson.Safe.pretty_to_string (Error_json.error_to_yojson err)) ;
-              exit 1
-          | Error err ->
-              printf "Failed while verifying proofs:\n%s"
-                (Error.to_string_hum err) ;
-              exit 2) )
+           let%bind verifier =
+             Verifier.For_tests.default ~constraint_constants ~proof_level
+               ~commit_id:Mina_version.commit_id ~logger
+               ~pids:(Pid.Table.create ()) ~conf_dir:(Some conf_dir) ()
+           in
+           let%bind result =
+             let cap lst =
+               Option.value_map ~default:Fn.id ~f:(Fn.flip List.take) limit lst
+             in
+             match input with
+             | `Transaction input ->
+                 input |> cap |> Verifier.verify_transaction_snarks verifier
+             | `Blockchain input ->
+                 input |> cap |> Verifier.verify_blockchain_snarks verifier
+           in
+           match result with
+           | Ok (Ok ()) ->
+               printf "Proofs verified successfully" ;
+               exit 0
+           | Ok (Error err) ->
+               printf "Proofs failed to verify:\n%s\n"
+                 (Yojson.Safe.pretty_to_string (Error_json.error_to_yojson err)) ;
+               exit 1
+           | Error err ->
+               printf "Failed while verifying proofs:\n%s"
+                 (Error.to_string_hum err) ;
+               exit 2 ) )
   ; ( "dump-structured-events"
     , Command.async ~summary:"Dump the registered structured events"
         (let open Command.Let_syntax in
-        let%map outfile =
-          Core_kernel.Command.Param.flag "--out-file" ~aliases:[ "-out-file" ]
-            (Core_kernel.Command.Flag.optional Core_kernel.Command.Param.string)
-            ~doc:"FILENAME File to output to. Defaults to stdout"
-        and pretty =
-          Core_kernel.Command.Param.flag "--pretty" ~aliases:[ "-pretty" ]
-            Core_kernel.Command.Param.no_arg
-            ~doc:"  Set to output 'pretty' JSON"
-        in
-        fun () ->
-          let out_channel =
-            match outfile with
-            | Some outfile ->
-                Core_kernel.Out_channel.create outfile
-            | None ->
-                Core_kernel.Out_channel.stdout
-          in
-          let json =
-            Structured_log_events.dump_registered_events ()
-            |> [%derive.to_yojson:
-                 (string * Structured_log_events.id * string list) list]
-          in
-          if pretty then Yojson.Safe.pretty_to_channel out_channel json
-          else Yojson.Safe.to_channel out_channel json ;
-          ( match outfile with
-          | Some _ ->
-              Core_kernel.Out_channel.close out_channel
-          | None ->
-              () ) ;
-          Deferred.return ()) )
+         let%map outfile =
+           Core.Command.Param.flag "--out-file" ~aliases:[ "-out-file" ]
+             (Core.Command.Flag.optional Core.Command.Param.string)
+             ~doc:"FILENAME File to output to. Defaults to stdout"
+         and pretty =
+           Core.Command.Param.flag "--pretty" ~aliases:[ "-pretty" ]
+             Core.Command.Param.no_arg ~doc:"  Set to output 'pretty' JSON"
+         in
+         fun () ->
+           let out_channel =
+             match outfile with
+             | Some outfile ->
+                 Core.Out_channel.create outfile
+             | None ->
+                 Core.Out_channel.stdout
+           in
+           let json =
+             Structured_log_events.dump_registered_events ()
+             |> [%derive.to_yojson:
+                  (string * Structured_log_events.id * string list) list]
+           in
+           if pretty then Yojson.Safe.pretty_to_channel out_channel json
+           else Yojson.Safe.to_channel out_channel json ;
+           ( match outfile with
+           | Some _ ->
+               Core.Out_channel.close out_channel
+           | None ->
+               () ) ;
+           Deferred.return () ) )
   ; ("dump-type-shapes", dump_type_shapes)
   ; ("replay-blocks", replay_blocks logger ~itn_features)
   ; ("audit-type-shapes", audit_type_shapes)
   ; ( "test-genesis-block-generation"
     , Command.async ~summary:"Generate a genesis proof"
         (let open Command.Let_syntax in
-        let%map_open config_files =
-          flag "--config-file" ~aliases:[ "config-file" ]
-            ~doc:
-              "PATH path to a configuration file (overrides MINA_CONFIG_FILE, \
-               default: <config_dir>/daemon.json). Pass multiple times to \
-               override fields from earlier config files"
-            (listed string)
-        and conf_dir = Cli_lib.Flag.conf_dir
-        and genesis_dir =
-          flag "--genesis-ledger-dir" ~aliases:[ "genesis-ledger-dir" ]
-            ~doc:
-              "DIR Directory that contains the genesis ledger and the genesis \
-               blockchain proof (default: <config-dir>)"
-            (optional string)
-        and signature_kind = Cli_lib.Flag.signature_kind in
-        fun () ->
-          let open Deferred.Let_syntax in
-          Parallel.init_master () ;
-          let logger = Logger.create () in
-          let conf_dir = Mina_lib.Conf_dir.compute_conf_dir_exn conf_dir in
-          let genesis_constants = G.genesis_constants in
-          let constraint_constants = G.constraint_constants in
-          let proof_level = Genesis_constants.Proof_level.Full in
-          let config_files =
-            List.map config_files ~f:(fun config_file ->
-                (config_file, `Must_exist) )
-          in
-          let%bind ( precomputed_values
-                   , _config_jsons
-                   , _config
-                   , _chain_state_locations
-                   , _
-                   , _ ) =
-            load_config_files ~logger ~conf_dir ~genesis_dir ~genesis_constants
-              ~constraint_constants ~proof_level ~cli_proof_level:None
-              ~hardfork_handling:Keep_running config_files
-          in
-          let pids = Child_processes.Termination.create_pid_table () in
-          let%bind prover =
-            (* We create a prover process (unnecessarily) here, to have a more
+         let%map_open config_files =
+           flag "--config-file" ~aliases:[ "config-file" ]
+             ~doc:
+               "PATH path to a configuration file (overrides MINA_CONFIG_FILE, \
+                default: <config_dir>/daemon.json). Pass multiple times to \
+                override fields from earlier config files"
+             (listed string)
+         and conf_dir = Cli_lib.Flag.conf_dir
+         and genesis_dir =
+           flag "--genesis-ledger-dir" ~aliases:[ "genesis-ledger-dir" ]
+             ~doc:
+               "DIR Directory that contains the genesis ledger and the genesis \
+                blockchain proof (default: <config-dir>)"
+             (optional string)
+         and signature_kind = Cli_lib.Flag.signature_kind in
+         fun () ->
+           let open Deferred.Let_syntax in
+           Parallel.init_master () ;
+           let logger = Logger.create () in
+           let conf_dir = Mina_lib.Conf_dir.compute_conf_dir_exn conf_dir in
+           let genesis_constants = G.genesis_constants in
+           let constraint_constants = G.constraint_constants in
+           let proof_level = Genesis_constants.Proof_level.Full in
+           let config_files =
+             List.map config_files ~f:(fun config_file ->
+                 (config_file, `Must_exist) )
+           in
+           let%bind
+               ( precomputed_values
+               , _config_jsons
+               , _config
+               , _chain_state_locations
+               , _
+               , _ ) =
+             load_config_files ~logger ~conf_dir ~genesis_dir ~genesis_constants
+               ~constraint_constants ~proof_level ~cli_proof_level:None
+               ~hardfork_handling:Keep_running config_files
+           in
+           let pids = Child_processes.Termination.create_pid_table () in
+           let%bind prover =
+             (* We create a prover process (unnecessarily) here, to have a more
                realistic test.
             *)
-            Prover.create ~commit_id:Mina_version.commit_id ~logger ~pids
-              ~conf_dir ~proof_level
-              ~constraint_constants:precomputed_values.constraint_constants
-              ~signature_kind ()
-          in
-          match%bind
-            Prover.create_genesis_block prover
-              (Genesis_proof.to_inputs precomputed_values)
-          with
-          | Ok block ->
-              Format.eprintf "Generated block@.%s@."
-                ( Yojson.Safe.to_string
-                @@ Blockchain_snark.Blockchain.to_yojson block ) ;
-              exit 0
-          | Error err ->
-              Format.eprintf "Failed to generate block@.%s@."
-                (Yojson.Safe.to_string @@ Error_json.error_to_yojson err) ;
-              exit 1) )
+             Prover.create ~commit_id:Mina_version.commit_id ~logger ~pids
+               ~conf_dir ~proof_level
+               ~constraint_constants:precomputed_values.constraint_constants
+               ~signature_kind ()
+           in
+           match%bind
+             Prover.create_genesis_block prover
+               (Genesis_proof.to_inputs precomputed_values)
+           with
+           | Ok block ->
+               Format.eprintf "Generated block@.%s@."
+                 ( Yojson.Safe.to_string
+                 @@ Blockchain_snark.Blockchain.to_yojson block ) ;
+               exit 0
+           | Error err ->
+               Format.eprintf "Failed to generate block@.%s@."
+                 (Yojson.Safe.to_string @@ Error_json.error_to_yojson err) ;
+               exit 1 ) )
   ; ( "chain-id"
     , Command.async
         ~summary:"Print the chain_id that uniquely identifies the network"
         (let open Command.Let_syntax in
-        let%map_open config_files =
-          flag "--config-file" ~aliases:[ "config-file" ]
-            ~doc:
-              "PATH path to a configuration file (overrides MINA_CONFIG_FILE, \
-               default: <config_dir>/daemon.json). Pass multiple times to \
-               override fields from earlier config files"
-            (listed string)
-        and conf_dir = Cli_lib.Flag.conf_dir
-        and genesis_dir =
-          flag "--genesis-ledger-dir" ~aliases:[ "genesis-ledger-dir" ]
-            ~doc:"DIR Directory that contains the genesis ledger"
-            (optional string)
-        and from_config_hashes_only =
-          flag "--from-config-hashes-only"
-            ~aliases:[ "from-config-hashes-only" ]
-            ~doc:
-              "Compute chain_id using only the hashes in the config file, \
-               without requiring unpacked ledger data"
-            no_arg
-        in
-        fun () ->
-          let open Deferred.Let_syntax in
-          Parallel.init_master () ;
-          let logger = Logger.create () in
-          let conf_dir = Mina_lib.Conf_dir.compute_conf_dir_exn conf_dir in
+         let%map_open config_files =
+           flag "--config-file" ~aliases:[ "config-file" ]
+             ~doc:
+               "PATH path to a configuration file (overrides MINA_CONFIG_FILE, \
+                default: <config_dir>/daemon.json). Pass multiple times to \
+                override fields from earlier config files"
+             (listed string)
+         and conf_dir = Cli_lib.Flag.conf_dir
+         and genesis_dir =
+           flag "--genesis-ledger-dir" ~aliases:[ "genesis-ledger-dir" ]
+             ~doc:"DIR Directory that contains the genesis ledger"
+             (optional string)
+         and from_config_hashes_only =
+           flag "--from-config-hashes-only"
+             ~aliases:[ "from-config-hashes-only" ]
+             ~doc:
+               "Compute chain_id using only the hashes in the config file, \
+                without requiring unpacked ledger data"
+             no_arg
+         in
+         fun () ->
+           let open Deferred.Let_syntax in
+           Parallel.init_master () ;
+           let logger = Logger.create () in
+           let conf_dir = Mina_lib.Conf_dir.compute_conf_dir_exn conf_dir in
 
-          let (module G) = Genesis_constants.profiled () in
-          let genesis_constants = G.genesis_constants in
-          let constraint_constants = G.constraint_constants in
-          let proof_level = Genesis_constants.Proof_level.Full in
-          if from_config_hashes_only then (
-            let%bind config =
-              Deferred.List.filter_map config_files ~f:(fun config_file ->
-                  match%map
-                    Genesis_ledger_helper.load_config_json config_file
-                  with
-                  | Ok config_json -> (
-                      match Runtime_config.of_yojson config_json with
-                      | Ok config ->
-                          Some config
-                      | Error err ->
-                          failwithf "Could not parse configuration file %s: %s"
-                            config_file err () )
-                  | Error err ->
-                      Error.raise err )
-              >>| List.fold ~init:Runtime_config.default
-                    ~f:Runtime_config.combine
-            in
-            match
-              Init.Chain_state_locations.chain_id_of_config ~logger
-                ~signature_kind:Mina_signature_kind.t_DEPRECATED ~proof_level
-                ~genesis_constants ~constraint_constants config
-            with
-            | Some chain_id ->
-                printf "%s" (Chain_id.to_string chain_id) ;
-                exit 0
-            | None ->
-                eprintf
-                  "Could not compute chain_id from config hashes. Ensure the \
-                   config contains ledger.hash and epoch_data hashes.\n" ;
-                exit 1 )
-          else
-            let config_files =
-              List.map config_files ~f:(fun config_file ->
-                  (config_file, `Must_exist) )
-            in
-            let%bind ( _
-                     , _config_jsons
-                     , config
-                     , _chain_state_locations
-                     , _
-                     , chain_id ) =
-              load_config_files ~logger ~conf_dir ~genesis_dir
-                ~genesis_constants ~constraint_constants ~proof_level
-                ~cli_proof_level:None ~hardfork_handling:Keep_running
-                config_files
-            in
-            let chain_id = Lazy.force chain_id in
-            match
-              Init.Chain_state_locations.chain_id_of_config ~logger
-                ~signature_kind:Mina_signature_kind.t_DEPRECATED ~proof_level
-                ~genesis_constants ~constraint_constants config
-            with
-            | None ->
-                let () = printf "%s" (Chain_id.to_string chain_id) in
-                exit 0
-            | Some chain_id_from_config ->
-                if not (Chain_id.equal chain_id_from_config chain_id) then
-                  failwithf "Chain_id mismatch %s /= %s"
-                    Chain_id.(to_string chain_id_from_config)
-                    (Chain_id.to_string chain_id)
-                    ()
-                else
-                  let () = printf "%s" (Chain_id.to_string chain_id) in
-                  exit 0) )
+           let (module G) = Genesis_constants.profiled () in
+           let genesis_constants = G.genesis_constants in
+           let constraint_constants = G.constraint_constants in
+           let proof_level = Genesis_constants.Proof_level.Full in
+           if from_config_hashes_only then (
+             let%bind config =
+               Deferred.List.filter_map ~how:`Sequential config_files
+                 ~f:(fun config_file ->
+                   match%map
+                     Genesis_ledger_helper.load_config_json config_file
+                   with
+                   | Ok config_json -> (
+                       match Runtime_config.of_yojson config_json with
+                       | Ok config ->
+                           Some config
+                       | Error err ->
+                           failwithf "Could not parse configuration file %s: %s"
+                             config_file err () )
+                   | Error err ->
+                       Error.raise err )
+               >>| List.fold ~init:Runtime_config.default
+                     ~f:Runtime_config.combine
+             in
+             match
+               Init.Chain_state_locations.chain_id_of_config ~logger
+                 ~signature_kind:Mina_signature_kind.t_DEPRECATED ~proof_level
+                 ~genesis_constants ~constraint_constants config
+             with
+             | Some chain_id ->
+                 printf "%s" (Chain_id.to_string chain_id) ;
+                 exit 0
+             | None ->
+                 eprintf
+                   "Could not compute chain_id from config hashes. Ensure the \
+                    config contains ledger.hash and epoch_data hashes.\n" ;
+                 exit 1 )
+           else
+             let config_files =
+               List.map config_files ~f:(fun config_file ->
+                   (config_file, `Must_exist) )
+             in
+             let%bind
+                 _, _config_jsons, config, _chain_state_locations, _, chain_id =
+               load_config_files ~logger ~conf_dir ~genesis_dir
+                 ~genesis_constants ~constraint_constants ~proof_level
+                 ~cli_proof_level:None ~hardfork_handling:Keep_running
+                 config_files
+             in
+             let chain_id = Lazy.force chain_id in
+             match
+               Init.Chain_state_locations.chain_id_of_config ~logger
+                 ~signature_kind:Mina_signature_kind.t_DEPRECATED ~proof_level
+                 ~genesis_constants ~constraint_constants config
+             with
+             | None ->
+                 let () = printf "%s" (Chain_id.to_string chain_id) in
+                 exit 0
+             | Some chain_id_from_config ->
+                 if not (Chain_id.equal chain_id_from_config chain_id) then
+                   failwithf "Chain_id mismatch %s /= %s"
+                     Chain_id.(to_string chain_id_from_config)
+                     (Chain_id.to_string chain_id)
+                     ()
+                 else
+                   let () = printf "%s" (Chain_id.to_string chain_id) in
+                   exit 0 ) )
   ; ( "print-hard-fork-genesis-timestamp"
     , Command.async
         ~summary:
           "Print the scheduled hard fork genesis timestamp computed from the \
            given config file(s)"
         (let open Command.Let_syntax in
-        let%map_open config_files =
-          flag "--config-file" ~aliases:[ "config-file" ]
-            ~doc:
-              "PATH path to a configuration file. Pass multiple times to \
-               override fields from earlier config files"
-            (listed string)
-        in
-        fun () ->
-          let open Deferred.Let_syntax in
-          let logger = Logger.null () in
-          let (module G) = Genesis_constants.profiled () in
-          let genesis_constants = G.genesis_constants in
-          let constraint_constants = G.constraint_constants in
-          let proof_level = G.proof_level in
-          let config =
-            let config_jsons =
-              List.map config_files ~f:(fun config_file ->
-                  let json =
-                    In_channel.with_file config_file ~f:(fun ic ->
-                        Yojson.Safe.from_channel ic )
-                  in
-                  (config_file, json) )
-            in
-            List.fold ~init:Runtime_config.default config_jsons
-              ~f:(fun config (config_file, config_json) ->
-                match Runtime_config.of_yojson config_json with
-                | Ok loaded_config ->
-                    Runtime_config.combine config loaded_config
-                | Error err ->
-                    failwithf "Could not parse configuration file %s: %s"
-                      config_file err () )
-          in
-          let scheduled_genesis_slot =
-            match Runtime_config.scheduled_hard_fork_genesis_slot config with
-            | Some slot ->
-                slot
-            | None ->
-                failwith
-                  "Could not compute scheduled genesis slot: slot_chain_end \
-                   and hard_fork_genesis_slot_delta must both be set in the \
-                   daemon config"
-          in
-          let%map light_proof =
-            match%map
-              Genesis_ledger_helper.light_proof_from_runtime_config ~logger
-                ~cli_proof_level:None ~genesis_constants ~constraint_constants
-                ~proof_level config
-            with
-            | Ok light_proof ->
-                light_proof
-            | Error err ->
-                Error.raise err
-          in
-          let consensus_constants = light_proof.consensus_constants in
-          let timestamp =
-            Consensus.Data.Consensus_time.(
-              start_time ~constants:consensus_constants
-                (of_global_slot ~constants:consensus_constants
-                   scheduled_genesis_slot ))
-            |> Block_time.to_time_exn
-            |> Time.to_string_iso8601_basic ~zone:Time.Zone.utc
-          in
-          print_endline timestamp) )
+         let%map_open config_files =
+           flag "--config-file" ~aliases:[ "config-file" ]
+             ~doc:
+               "PATH path to a configuration file. Pass multiple times to \
+                override fields from earlier config files"
+             (listed string)
+         in
+         fun () ->
+           let open Deferred.Let_syntax in
+           let logger = Logger.null () in
+           let (module G) = Genesis_constants.profiled () in
+           let genesis_constants = G.genesis_constants in
+           let constraint_constants = G.constraint_constants in
+           let proof_level = G.proof_level in
+           let config =
+             let config_jsons =
+               List.map config_files ~f:(fun config_file ->
+                   let json =
+                     In_channel.with_file config_file ~f:(fun ic ->
+                         Yojson.Safe.from_channel ic )
+                   in
+                   (config_file, json) )
+             in
+             List.fold ~init:Runtime_config.default config_jsons
+               ~f:(fun config (config_file, config_json) ->
+                 match Runtime_config.of_yojson config_json with
+                 | Ok loaded_config ->
+                     Runtime_config.combine config loaded_config
+                 | Error err ->
+                     failwithf "Could not parse configuration file %s: %s"
+                       config_file err () )
+           in
+           let scheduled_genesis_slot =
+             match Runtime_config.scheduled_hard_fork_genesis_slot config with
+             | Some slot ->
+                 slot
+             | None ->
+                 failwith
+                   "Could not compute scheduled genesis slot: slot_chain_end \
+                    and hard_fork_genesis_slot_delta must both be set in the \
+                    daemon config"
+           in
+           let%map light_proof =
+             match%map
+               Genesis_ledger_helper.light_proof_from_runtime_config ~logger
+                 ~cli_proof_level:None ~genesis_constants ~constraint_constants
+                 ~proof_level config
+             with
+             | Ok light_proof ->
+                 light_proof
+             | Error err ->
+                 Error.raise err
+           in
+           let consensus_constants = light_proof.consensus_constants in
+           let timestamp =
+             Consensus.Data.Consensus_time.(
+               start_time ~constants:consensus_constants
+                 (of_global_slot ~constants:consensus_constants
+                    scheduled_genesis_slot ) )
+             |> Block_time.to_time_exn
+             |> Time_float.to_string_iso8601_basic ~zone:Time_float.Zone.utc
+           in
+           print_endline timestamp ) )
   ]
 
 let mina_commands logger ~itn_features =
@@ -2271,7 +2268,7 @@ let () =
    | [| _mina_exe; version |] when is_version_cmd version ->
        Mina_version.print_version ()
    | _ ->
-       Command.run
+       Command_unix.run
          (Command.group ~summary:"Mina" ~preserve_subcommand_order:()
             (mina_commands logger ~itn_features) ) ) ;
   Core.exit 0

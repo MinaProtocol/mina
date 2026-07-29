@@ -1,6 +1,6 @@
 (* archive_blocks.ml *)
 
-open Core_kernel
+open Core
 open Async
 open Archive_lib
 
@@ -79,7 +79,7 @@ let main ~genesis_constants ~constraint_constants ~archive_uri ~precomputed
              ~genesis_constants ~logger ~pool ~delete_older_than:None
              ~signature_kind:Mina_signature_kind.t_DEPRECATED )
       in
-      Deferred.List.iter files ~f:(fun file ->
+      Deferred.List.iter ~how:`Sequential files ~f:(fun file ->
           In_channel.with_file file ~f:(fun in_channel ->
               try
                 let json = Yojson.Safe.from_channel in_channel in
@@ -105,7 +105,7 @@ let () =
     let (module G) = Genesis_constants.profiled () in
     let genesis_constants = G.genesis_constants in
     let constraint_constants = G.constraint_constants in
-    run
+    Command_unix.run
       (let open Let_syntax in
       async ~summary:"Write blocks to an archive database"
         (let%map archive_uri =

@@ -1,19 +1,19 @@
-open Core_kernel
+open Core
 open Async
 
 (** [report_time ~label ?extra_metadata elapsed] logs a performance metric with the given [label] and [elapsed] time.
   - [label]: A string describing the metric being reported.
   - [extra_metadata]: An optional list of additional metadata key-value pairs to include in the log (default: []).
-  - [elapsed]: The time span to report, as a [Time.Span.t].
+  - [elapsed]: The time span to report, as a [Time_float.Span.t].
   The log entry will include the label, the elapsed time (in human-readable format and milliseconds), and any extra metadata provided.
 *)
 let report_time ~logger ~label ?(extra_metadata = []) elapsed =
   [%log info] "%s took %s" label
-    (Time.Span.to_string_hum elapsed)
+    (Time_float.Span.to_string_hum elapsed)
     ~metadata:
       ( [ ("is_perf_metric", `Bool true)
         ; ("label", `String label)
-        ; ("elapsed", `Float (Time.Span.to_ms elapsed))
+        ; ("elapsed", `Float (Time_float.Span.to_ms elapsed))
         ]
       @ extra_metadata )
 
@@ -24,10 +24,10 @@ let report_time ~logger ~label ?(extra_metadata = []) elapsed =
   @return The result of [f ()], after reporting the elapsed time.
 *)
 let time ~label ~logger f =
-  let start = Time.now () in
+  let start = Time_float.now () in
   let%map x = f () in
-  let stop = Time.now () in
-  let elapsed = Time.diff stop start in
+  let stop = Time_float.now () in
+  let elapsed = Time_float.diff stop start in
   report_time ~logger ~label elapsed ;
   x
 
@@ -52,7 +52,7 @@ module Missing_blocks = struct
   (*A block is missing if there is no entry for a specific height. However, if there is an entry then it doesn't necessarily mean that it is part of the main chain. Unparented_blocks will show value > 1 in that case. Look for the last 2000 blocks*)
   let query missing_blocks_width =
     Mina_caqti.find_req Caqti_type.unit Caqti_type.int
-      (Core_kernel.sprintf
+      (Core.sprintf
          {sql| 
         SELECT COUNT( * )
         FROM (SELECT h::int FROM generate_series(GREATEST(1, (SELECT MAX(height) FROM blocks) - %d) , (SELECT MAX(height) FROM blocks)) h

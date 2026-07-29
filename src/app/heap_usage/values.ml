@@ -1,6 +1,6 @@
 (* values.ml -- values for heap_usage app *)
 
-open Core_kernel
+open Core
 
 let sample_pk = Quickcheck.random_value Signature_lib.Public_key.gen
 

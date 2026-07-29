@@ -1,5 +1,5 @@
 open Network_peer
-open Core_kernel
+open Core
 open Async
 open Pipe_lib.Strict_pipe
 open Mina_base
@@ -102,7 +102,7 @@ let push sink (b_or_h, `Time_received tm, `Valid_cb cb) =
               |> Protocol_state.blockchain_state |> Blockchain_state.timestamp
               )
           with
-          | (_ : Core.Time.t) ->
+          | (_ : Core.Time_float.t) ->
               true
           | exception _ ->
               false
@@ -136,7 +136,7 @@ let push sink (b_or_h, `Time_received tm, `Valid_cb cb) =
             ( match%map Mina_net2.Validation_callback.await cb with
             | Some `Accept ->
                 let processing_time_span =
-                  Time.diff
+                  Time_float.diff
                     Block_time.(now time_controller |> to_time_exn)
                     processing_start_time
                 in
@@ -151,7 +151,7 @@ let push sink (b_or_h, `Time_received tm, `Valid_cb cb) =
                   ~metadata:[ ("state_hash", State_hash.to_yojson state_hash) ]
             ) ;
           Perf_histograms.add_span ~name:"external_transition_latency"
-            (Core.Time.abs_diff
+            (Core.Time_float.abs_diff
                Block_time.(now time_controller |> to_time_exn)
                ( Mina_block.Header.protocol_state header
                |> Protocol_state.blockchain_state |> Blockchain_state.timestamp
@@ -174,7 +174,7 @@ let push sink (b_or_h, `Time_received tm, `Valid_cb cb) =
           let%bind () =
             match
               Network_pool.Rate_limiter.add rate_limiter sender
-                ~now:(Time.now ()) ~score:1
+                ~now:(Time_float.now ()) ~score:1
             with
             | `Capacity_exceeded ->
                 Internal_tracing.with_state_hash state_hash
@@ -259,7 +259,7 @@ let push sink (b_or_h, `Time_received tm, `Valid_cb cb) =
           Mina_net2.Validation_callback.fire_if_not_already_fired cb `Reject )
 
 let log_rate_limiter_occasionally rl ~logger ~label =
-  let t = Time.Span.of_min 1. in
+  let t = Time_float.Span.of_min 1. in
   every t (fun () ->
       [%log debug]
         ~metadata:[ ("rate_limiter", Network_pool.Rate_limiter.summary rl) ]

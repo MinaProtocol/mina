@@ -112,7 +112,7 @@ let create (module Context : CONTEXT) (config : Config.t) ~sinks
   (* The node status RPC is implemented directly in go, serving a string which
      is periodically updated. This is so that one can make this RPC on a node even
      if that node is at its connection limit. *)
-  Clock.every' (Time.Span.of_min 1.) (fun () ->
+  Clock.every' (Time_float.Span.of_min 1.) (fun () ->
       O1trace.thread "update_node_status" (fun () ->
           match%bind get_node_status network with
           | Error _ ->
@@ -419,7 +419,7 @@ let glue_sync_ledger :
     let global_stop = Pipe_lib.Linear_pipe.closed query_reader in
     let knowledge h peer =
       match%map
-        query_peer ~heartbeat_timeout ~timeout:(Time.Span.of_sec 10.) t
+        query_peer ~heartbeat_timeout ~timeout:(Time_float.Span.of_sec 10.) t
           peer.Peer.peer_id Rpcs.Answer_sync_ledger_query (h, Num_accounts)
       with
       | Connected { data = Ok _; _ } ->
@@ -443,7 +443,8 @@ let glue_sync_ledger :
             then don't_wait_for (Broadcast_pipe.Writer.write root_hash_w h) ) ;
         let%map rs =
           query_peer' ~how:`Parallel ~heartbeat_timeout
-            ~timeout:(Time.Span.of_sec (Float.of_int (List.length qs) *. 2.))
+            ~timeout:
+              (Time_float.Span.of_sec (Float.of_int (List.length qs) *. 2.))
             t peer.peer_id Rpcs.Answer_sync_ledger_query qs
         in
         match rs with

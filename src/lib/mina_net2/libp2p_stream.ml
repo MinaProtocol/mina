@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Async_kernel
 open Network_peer
 
@@ -23,7 +23,7 @@ type queue_release_reason =
 
 module Queue_metrics = struct
   let env_var ~name ~default =
-    match Sys.getenv_opt name with
+    match Sys.getenv name with
     | None ->
         default
     | Some value -> (
@@ -34,7 +34,7 @@ module Queue_metrics = struct
           failwithf "%s must be a positive integer, got %S" name value () )
 
   let env_var_float ~name ~default ~min =
-    match Sys.getenv_opt name with
+    match Sys.getenv name with
     | None ->
         default
     | Some value -> (
@@ -511,7 +511,7 @@ let create_from_existing ~logger ~helper ~stream_id ~protocol ~peer
         else
           let parts = split_string msg ~every:max_chunk_size in
           match%map
-            Deferred.Or_error.List.iter parts ~f:(fun data ->
+            Deferred.Or_error.List.iter parts ~how:`Sequential ~f:(fun data ->
                 Deferred.Or_error.ignore_m
                 @@ Libp2p_helper.do_rpc helper
                      (module Libp2p_ipc.Rpcs.SendStream)

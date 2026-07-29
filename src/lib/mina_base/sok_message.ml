@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Mina_base_util
 open Mina_base_import
 module Wire_types = Mina_wire_types.Mina_base.Sok_message

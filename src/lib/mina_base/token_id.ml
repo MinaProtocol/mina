@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 
 module Legacy_token = Mina_numbers.Nat.Make64 ()
 

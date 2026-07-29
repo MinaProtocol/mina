@@ -1,6 +1,6 @@
 let%test_module "Epoch ledger sync tests" =
   ( module struct
-    open Core_kernel
+    open Core
     open Async
     open Mina_base
     open Pipe_lib
@@ -224,7 +224,7 @@ let%test_module "Epoch ledger sync tests" =
           ~frontier_broadcast_pipe:frontier_broadcast_pipe_r ~on_remote_push
           ~log_gossip_heard:false
           ~block_window_duration:
-            ( Time.Span.of_ms
+            ( Time_float.Span.of_ms
             @@ Float.of_int constraint_constants.block_window_duration_ms )
       in
       let snark_remote_sink, snark_pool =
@@ -240,7 +240,7 @@ let%test_module "Epoch ledger sync tests" =
             ~frontier_broadcast_pipe:frontier_broadcast_pipe_r ~on_remote_push
             ~log_gossip_heard:false
             ~block_window_duration:
-              ( Time.Span.of_ms
+              ( Time_float.Span.of_ms
               @@ Float.of_int constraint_constants.block_window_duration_ms )
         in
         (snark_remote_sink, snark_pool)
@@ -262,8 +262,8 @@ let%test_module "Epoch ledger sync tests" =
         let mina_net_location = Filename.concat conf_dir "mina_net2" in
         let seed_peer_list_url = None in
         let addrs_and_ports =
-          let external_ip = Core.Unix.Inet_addr.localhost in
-          let bind_ip = Core.Unix.Inet_addr.of_string "0.0.0.0" in
+          let external_ip = Core_unix.Inet_addr.localhost in
+          let bind_ip = Core_unix.Inet_addr.of_string "0.0.0.0" in
           let client_port =
             Cli_lib.Flag.Port.default_client - instance - (test_number * 2)
           in
@@ -278,7 +278,7 @@ let%test_module "Epoch ledger sync tests" =
         in
         let pubsub_v0 = Cli_lib.Default.pubsub_v0 in
         let gossip_net_params : Gossip_net.Libp2p.Config.t =
-          { timeout = Time.Span.of_sec 3.
+          { timeout = Time_float.Span.of_sec 3.
           ; logger
           ; mina_net_location
           ; chain_id
@@ -374,7 +374,7 @@ let%test_module "Epoch ledger sync tests" =
         (tr_tm1 -. tr_tm0) ;
       let network_peer =
         let peer_id = Mina_net2.Keypair.to_peer_id libp2p_keypair in
-        Peer.create Core.Unix.Inet_addr.localhost ~libp2p_port ~peer_id
+        Peer.create Core_unix.Inet_addr.localhost ~libp2p_port ~peer_id
       in
       return { networking = mina_networking; network_peer }
 
@@ -394,7 +394,7 @@ let%test_module "Epoch ledger sync tests" =
       let cleanup () = test_finished := true in
       (* set timeout so CI doesn't run forever *)
       don't_wait_for
-        (let%map () = after (Time.Span.of_min timeout_min) in
+        (let%map () = after (Time_float.Span.of_min timeout_min) in
          if not !test_finished then (cleanup () ; raise Sync_timeout) ) ;
       let net_info1_tm0 = Unix.gettimeofday () in
       let%bind network_info1 =

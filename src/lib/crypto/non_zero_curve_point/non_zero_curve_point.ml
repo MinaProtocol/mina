@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Snark_params.Tick
 
 let parity y = Bigint.(test_bit (of_field y) 0)

@@ -1,6 +1,6 @@
 (* uptime_service.ml -- proof of uptime for Mina delegation program *)
 
-open Core_kernel
+open Core
 open Async
 open Mina_base
 open Pipe_lib
@@ -16,7 +16,7 @@ module Proof_data = struct
   *)
   type t =
     { proof : Ledger_proof.Stable.Latest.t
-    ; proof_time : Core_kernel.Time.Span.t
+    ; proof_time : Core.Time_float.Span.t
     ; snark_work_fee : Currency.Fee.Stable.Latest.t
     }
   [@@deriving bin_io_unversioned]
@@ -138,7 +138,7 @@ let send_produced_block_at ~logger ~interruptor ~url ~peer_id
   match%bind
     make_interruptible
       (with_timeout
-         (Time.Span.of_min timeout_min)
+         (Time_float.Span.of_min timeout_min)
          (Bvar.wait block_produced_bvar) )
   with
   | `Timeout ->
@@ -385,7 +385,7 @@ let start ~logger ~uptime_url ~snark_worker_opt ~constraint_constants
         |> Consensus.Configuration.slot_duration |> Float.of_int
       in
       let make_slots_span min =
-        Block_time.Span.of_time_span (Time.Span.of_ms (slot_duration_ms *. min))
+        Block_time.Span.of_time_span (Time_float.Span.of_ms (slot_duration_ms *. min))
       in
       let five_slots_span = make_slots_span 5.0 in
       let four_slots_span = make_slots_span 4.0 in
@@ -434,7 +434,7 @@ let start ~logger ~uptime_url ~snark_worker_opt ~constraint_constants
           ~metadata:
             [ ("boundary_block_time", Block_time.to_yojson next_block_tm)
             ; ( "boundary_time"
-              , `String (Block_time.to_time_exn next_block_tm |> Time.to_string)
+              , `String (Block_time.to_time_exn next_block_tm |> Time_float_unix.to_string)
               )
             ] ;
         (* wait in Deferred monad *)
@@ -486,7 +486,7 @@ let start ~logger ~uptime_url ~snark_worker_opt ~constraint_constants
                       Block_time.add next_block_tm four_slots_span
                       |> Block_time.to_time_exn
                     in
-                    if Time.( <= ) next_producer_time four_slots_from_start then
+                    if Time_float.( <= ) next_producer_time four_slots_from_start then
                       (* send a block w/ SNARK work, then the produced block *)
                       let%bind () = send_block_and_snark_work () in
                       send_just_block next_producer_time

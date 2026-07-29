@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Snarky_blake2
 
 (* Module for Blake2 Snarky implementation tests

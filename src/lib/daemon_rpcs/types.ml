@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Async
 
 module Git_sha = struct
@@ -47,7 +47,7 @@ module Status = struct
     let msgs =
       List.map best ~f:(fun (v, (lo, hi)) ->
           Printf.sprintf
-            !"(%{sexp: Time.Span.t}, %{sexp: Time.Span.t}): %d"
+            !"(%{sexp: Time_float.Span.t}, %{sexp: Time_float.Span.t}): %d"
             lo hi v )
     in
     let total = List.sum (module Int) values ~f:Fn.id in
@@ -255,7 +255,7 @@ module Status = struct
 
     let uptime_secs =
       map_entry "Local uptime" ~f:(fun secs ->
-          Time.Span.to_string (Time.Span.of_int_sec secs) )
+          Time_float.Span.to_string (Time_float.Span.of_int_sec secs) )
 
     let ledger_merkle_root = string_option_entry "Ledger Merkle root"
 
@@ -349,10 +349,12 @@ module Status = struct
 
     let consensus_configuration =
       let ms_to_string i =
-        float_of_int i |> Time.Span.of_ms |> Time.Span.to_string
+        float_of_int i |> Time_float.Span.of_ms |> Time_float.Span.to_string
       in
-      (* Time.to_string is safe here because this is for display. *)
-      let time_to_string = Fn.compose Time.to_string Block_time.to_time_exn in
+      (* Time_float_unix.to_string is safe here because this is for display. *)
+      let time_to_string =
+        Fn.compose Time_float_unix.to_string Block_time.to_time_exn
+      in
       let render conf =
         let fmt_field name op field = (name, op (Field.get field conf)) in
         Consensus.Configuration.Fields.to_list

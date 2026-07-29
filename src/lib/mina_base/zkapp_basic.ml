@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 
 let field_of_bool = Mina_base_util.field_of_bool
 

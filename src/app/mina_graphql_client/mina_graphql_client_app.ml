@@ -416,7 +416,7 @@ let () =
     ~processor:(Logger.Processor.raw ())
     ~transport:(Logger.Transport.raw (fun s -> Core.prerr_endline s))
     () ;
-  Command.run
+  Command_unix.run
     (Command.group ~summary:"Mina GraphQL client utility"
        [ ("peer", peer_command)
        ; ("account", account_command)

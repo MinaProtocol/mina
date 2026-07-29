@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Async
 module Impl = Snark_worker.Impl
 module Graphql_client = Graphql_lib.Client
@@ -155,7 +155,7 @@ let command =
        in
        match%bind perform worker_state ~fee ~public_key spec with
        | Ok result -> (
-           Caml.Format.printf
+           Stdlib.Format.printf
              !"@[<v>Successfully proved. Result: \n\
               \               %{sexp: Ledger_proof.t \
                Snark_work_lib.Result.Without_metrics.t}@]@."
@@ -166,9 +166,9 @@ let command =
            | _ ->
                Deferred.unit )
        | Error err ->
-           Caml.Format.printf
+           Stdlib.Format.printf
              !"Proving failed with error: %s@."
              (Error.to_string_hum err) ;
            exit 1 )
 
-let () = Command.run command
+let () = Command_unix.run command

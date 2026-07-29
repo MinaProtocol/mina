@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 
 (* Same as the type of the field account_updates in Mina_base.Zkapp_command.t *)
 type t =

@@ -180,11 +180,11 @@ end
 module Host = struct
   (* Lazy so that merely loading this module performs no DNS lookup; resolved
      the first time [is_localhost] actually runs. *)
-  let localhost = lazy (Core.Unix.Host.getbyname_exn "localhost")
+  let localhost = lazy (Core_unix.Host.getbyname_exn "localhost")
 
   let is_localhost host =
-    Option.value_map ~default:false (Unix.Host.getbyname host) ~f:(fun host ->
-        Core.Unix.Host.have_address_in_common host (Lazy.force localhost) )
+    Option.value_map ~default:false (Core_unix.Host.getbyname host) ~f:(fun host ->
+        Core_unix.Host.have_address_in_common host (Lazy.force localhost) )
 end
 
 let example_host = "154.97.53.97"

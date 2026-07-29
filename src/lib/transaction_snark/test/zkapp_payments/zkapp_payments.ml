@@ -211,7 +211,7 @@ let%test_module "Zkapp payments tests" =
                     ; receivers =
                         (new_receiver, new_receiver_amount)
                         :: ( List.take specs (receiver_count - 1)
-                           |> List.map ~f:(fun s ->
+                           |> List.map ~f:(fun (s : Transaction_spec.t) ->
                                   ( Signature_lib.Public_key.compress
                                       (fst s.sender).public_key
                                   , amount ) ) )
@@ -281,7 +281,8 @@ let%test_module "Zkapp payments tests" =
                     ; receivers =
                         (new_receiver, amount)
                         :: ( List.take specs (receiver_count - 1)
-                           |> List.map ~f:(fun s -> (s.receiver, amount)) )
+                           |> List.map ~f:(fun s ->
+                                  (s.Transaction_spec.receiver, amount) ) )
                     ; amount = total_amount
                     ; zkapp_account_keypairs = []
                     ; memo

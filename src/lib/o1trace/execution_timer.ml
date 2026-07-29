@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 
 module T =
   Plugins.Register_plugin
@@ -13,7 +13,7 @@ module T =
 
 include T
 
-let rec record_elapsed_time (fiber : Thread.Fiber.t) elapsed_time =
+let rec record_elapsed_time (fiber : O1thread.Fiber.t) elapsed_time =
   let state = Plugins.plugin_state (module T) fiber.thread in
   (state := Time_ns.Span.(!state + elapsed_time)) ;
   match fiber.parent with

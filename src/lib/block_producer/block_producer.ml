@@ -19,7 +19,7 @@ module type CONTEXT = sig
 
   val zkapp_cmd_limit : int option ref
 
-  val vrf_poll_interval : Time.Span.t
+  val vrf_poll_interval : Time_float.Span.t
 
   val proof_cache_db : Proof_cache_tag.cache_db
 
@@ -330,7 +330,7 @@ let generate_next_state ~commit_id ~zkapp_cmd_limit ~constraint_constants
   match slot_chain_end with
   | Some slot_chain_end
     when Mina_numbers.Global_slot_since_hard_fork.(
-           global_slot_since_hard_fork >= slot_chain_end) ->
+           global_slot_since_hard_fork >= slot_chain_end ) ->
       [%log info] "Reached slot_chain_end $slot_chain_end, not producing blocks"
         ~metadata:
           [ ( "slot_chain_end"
@@ -632,10 +632,10 @@ let handle_block_production_errors ~logger ~rejected_blocks_logger
       return x
   | Error
       (`Prover_error
-        ( err
-        , ( previous_protocol_state_proof
-          , _internal_transition
-          , pending_coinbase_witness ) ) ) ->
+         ( err
+         , ( previous_protocol_state_proof
+           , _internal_transition
+           , pending_coinbase_witness ) ) ) ->
       let msg : (_, unit, string, unit) format4 =
         "Prover failed to prove freshly generated transition: $error"
       in
@@ -1096,7 +1096,7 @@ let produce ~genesis_breadcrumb ~context:(module Context : CONTEXT) ~prover
                            (Transition_frontier.find frontier) )
                 |> Deferred.return
               in
-              let transition_receipt_time = Some (Time.now ()) in
+              let transition_receipt_time = Some (Time_float.now ()) in
               let%bind breadcrumb =
                 time ~logger ~time_controller
                   "Build breadcrumb on produced block" (fun () ->
@@ -1155,7 +1155,7 @@ let produce ~genesis_breadcrumb ~context:(module Context : CONTEXT) ~prover
               Mina_metrics.(Counter.inc_one Block_producer.blocks_produced) ;
               Mina_metrics.Block_producer.(
                 Block_production_delay_histogram.observe block_production_delay
-                  Time.(
+                  Time_float.(
                     Span.to_ms
                     @@ diff (now ())
                     @@ Block_time.to_time_exn scheduled_time)) ;
@@ -1258,7 +1258,7 @@ let iteration ~schedule_next_vrf_check ~produce_block_now
   @@ fun () ->
   let consensus_state =
     Transition_frontier.(
-      best_tip transition_frontier |> Breadcrumb.consensus_state)
+      best_tip transition_frontier |> Breadcrumb.consensus_state )
   in
   let i' =
     Mina_numbers.Length.succ
@@ -1322,13 +1322,13 @@ let iteration ~schedule_next_vrf_check ~produce_block_now
         ~metadata:
           [ ( "slot"
             , Mina_numbers.Global_slot_since_genesis.(
-                to_yojson @@ of_uint32 slot) )
+                to_yojson @@ of_uint32 slot ) )
           ; ("epoch", Mina_numbers.Length.to_yojson epoch)
           ] ;
       let now = Block_time.now time_controller in
       let curr_global_slot =
         Consensus.Data.Consensus_time.(
-          of_time_exn ~constants:consensus_constants now |> to_global_slot)
+          of_time_exn ~constants:consensus_constants now |> to_global_slot )
       in
       let winner_pk = fst slot_won.delegator in
       let data =
@@ -1337,7 +1337,7 @@ let iteration ~schedule_next_vrf_check ~produce_block_now
       in
       if
         Mina_numbers.Global_slot_since_hard_fork.(
-          curr_global_slot = winning_global_slot)
+          curr_global_slot = winning_global_slot )
       then (
         (*produce now*)
         [%log info] "Producing a block now" ;
@@ -1376,7 +1376,7 @@ let iteration ~schedule_next_vrf_check ~produce_block_now
               Consensus.Data.Consensus_time.(
                 start_time ~constants:consensus_constants
                   (of_global_slot ~constants:consensus_constants
-                     winning_global_slot ))
+                     winning_global_slot ) )
               |> Block_time.to_span_since_epoch |> Block_time.Span.to_ms
             in
             set_next_producer_timing
@@ -1396,7 +1396,7 @@ let iteration ~schedule_next_vrf_check ~produce_block_now
                let scheduled_genesis_time =
                  time_of_ms
                    Int64.(
-                     time - of_int constraint_constants.block_window_duration_ms)
+                     time - of_int constraint_constants.block_window_duration_ms )
                in
                let span_till_time =
                  Block_time.diff scheduled_genesis_time
@@ -1467,7 +1467,7 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
                 Consensus.Data.Consensus_time.(
                   to_global_slot
                     (of_time_exn ~constants:consensus_constants
-                       (Block_time.now time_controller) ))
+                       (Block_time.now time_controller) ) )
               in
               fun ~diff_limit ~every ~message -> function
                 | None ->
@@ -1557,7 +1557,7 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
            milliseconds before starting block producer" ;
         ignore
           ( Block_time.Timeout.create time_controller time_till_genesis
-              ~f:(fun _ -> start ())
+              ~f:(fun _ -> start () )
             : unit Block_time.Timeout.t ) )
 
 let run_precomputed ~context:(module Context : CONTEXT) ~verifier ~trust_system
@@ -1698,14 +1698,14 @@ let run_precomputed ~context:(module Context : CONTEXT) ~verifier ~trust_system
                   ~skip_staged_ledger_verification:`Proofs
                   ~transition_receipt_time ()
                 |> Deferred.Result.map_error ~f:(function
-                     | `Invalid_staged_ledger_diff e ->
-                         `Invalid_staged_ledger_diff (e, staged_ledger_diff)
-                     | ( `Fatal_error _
-                       | `Invalid_genesis_protocol_state
-                       | `Invalid_staged_ledger_hash _
-                       | `Not_selected_over_frontier_root
-                       | `Parent_missing_from_frontier ) as err ->
-                         err ) )
+                  | `Invalid_staged_ledger_diff e ->
+                      `Invalid_staged_ledger_diff (e, staged_ledger_diff)
+                  | ( `Fatal_error _
+                    | `Invalid_genesis_protocol_state
+                    | `Invalid_staged_ledger_hash _
+                    | `Not_selected_over_frontier_root
+                    | `Parent_missing_from_frontier ) as err ->
+                      err ) )
           in
           let zero_coinbase_metadata =
             Zero_coinbase_logging.metadata_if_coinbase_zero
@@ -1726,10 +1726,10 @@ let run_precomputed ~context:(module Context : CONTEXT) ~verifier ~trust_system
           Mina_metrics.(Counter.inc_one Block_producer.blocks_produced) ;
           Mina_metrics.Block_producer.(
             Block_production_delay_histogram.observe block_production_delay
-              Time.(
+              Time_float.(
                 Span.to_ms
                 @@ diff (now ())
-                @@ Block_time.to_time_exn scheduled_time)) ;
+                @@ Block_time.to_time_exn scheduled_time ) ) ;
           let%bind.Async.Deferred () =
             Strict_pipe.Writer.write transition_writer breadcrumb
           in
@@ -1783,7 +1783,7 @@ let run_precomputed ~context:(module Context : CONTEXT) ~verifier ~trust_system
         match Sequence.next precomputed_blocks with
         | Some (precomputed_block, precomputed_blocks) ->
             let new_time_offset =
-              Time.diff (Time.now ())
+              Time_float.diff (Time_float.now ())
                 (Block_time.to_time_exn
                    precomputed_block.Precomputed.scheduled_time )
             in
@@ -1792,10 +1792,10 @@ let run_precomputed ~context:(module Context : CONTEXT) ~verifier ~trust_system
               ~metadata:
                 [ ( "old_time_offset"
                   , `String
-                      (Time.Span.to_string_hum
+                      (Time_float.Span.to_string_hum
                          (Block_time.Controller.get_time_offset ~logger) ) )
                 ; ( "new_time_offset"
-                  , `String (Time.Span.to_string_hum new_time_offset) )
+                  , `String (Time_float.Span.to_string_hum new_time_offset) )
                 ] ;
             Block_time.Controller.set_time_offset new_time_offset ;
             let%bind () = produce precomputed_block in

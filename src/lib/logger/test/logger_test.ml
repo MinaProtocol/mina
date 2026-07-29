@@ -1,23 +1,26 @@
 open Core
 
 let with_temp_dir f =
-  let directory = Filename.temp_dir ~in_dir:"/tmp" "coda_spun_test" "" in
+  let directory = Filename_unix.temp_dir ~in_dir:"/tmp" "coda_spun_test" "" in
   Fun.protect
     ~finally:(fun () ->
-      ignore (Unix.system ("rm -rf " ^ directory) : Unix.Exit_or_signal.t) )
+      ignore (Core_unix.system ("rm -rf " ^ directory) : Core_unix.Exit_or_signal.t) )
     (fun () -> f directory)
 
 let test_dumb_logrotate_rotates_logs_when_expected () =
-  let max_size = 1024 * 2 (* 2KB *) in
+  let max_size =
+    1024 * 2
+    (* 2KB *)
+  in
   let num_rotate = 1 in
   let logger = Logger.create () ~id:"test" in
   let log_filename = "mina.log" in
   with_temp_dir (fun directory ->
       let exists name =
-        Result.is_ok (Unix.access (Filename.concat directory name) [ `Exists ])
+        Result.is_ok (Core_unix.access (Filename.concat directory name) [ `Exists ])
       in
       let get_size name =
-        Int64.to_int_exn (Unix.stat (Filename.concat directory name)).st_size
+        Int64.to_int_exn (Core_unix.stat (Filename.concat directory name)).st_size
       in
       let rec run_test ~last_size ~rotations ~rotation_expected =
         Logger.info logger ~module_:__MODULE__ ~location:__LOC__ "test" ;
@@ -51,19 +54,19 @@ let test_dumb_logrotate_resumes_from_oldest () =
       let path name = Filename.concat directory name in
       let write_file name contents =
         let fd =
-          Unix.openfile ~perm:0o644
+          Core_unix.openfile ~perm:0o644
             ~mode:[ O_RDWR; O_CREAT; O_TRUNC ]
             (path name)
         in
         let len = String.length contents in
-        ignore (Unix.write fd ~buf:(Bytes.of_string contents) ~len : int) ;
-        Unix.close fd
+        ignore (Core_unix.write fd ~buf:(Bytes.of_string contents) ~len : int) ;
+        Core_unix.close fd
       in
       let get_contents name = In_channel.read_all (path name) in
       write_file "mina.log.0" "oldest\n" ;
-      Unix.sleep 1 ;
+      Core_unix.sleep 1 ;
       write_file "mina.log.1" "newer\n" ;
-      Unix.sleep 1 ;
+      Core_unix.sleep 1 ;
       write_file "mina.log.2" "newest\n" ;
       write_file "mina.log" "" ;
       let logger = Logger.create () ~id:"test_resume" in

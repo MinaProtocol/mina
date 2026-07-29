@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Snark_params.Tick.Run
 open Signature_lib
 

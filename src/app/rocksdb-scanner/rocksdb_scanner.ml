@@ -117,4 +117,4 @@ let main =
   Command.group ~summary:"RocksDB Hex Dump/Restore Tool"
     [ ("dump", dump_cmd); ("restore", restore_cmd) ]
 
-let () = Command.run main
+let () = Command_unix.run main

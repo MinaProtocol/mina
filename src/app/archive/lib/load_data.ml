@@ -4,7 +4,7 @@
    of archive db data
 *)
 
-open Core_kernel
+open Core
 open Async
 open Mina_base
 
@@ -115,7 +115,7 @@ let update_of_id pool update_id =
     in
     let field_ids = Pickles_types.Vector.to_list elements in
     let%map field_strs =
-      Deferred.List.map field_ids ~f:(fun id_opt ->
+      Deferred.List.map ~how:`Sequential field_ids ~f:(fun id_opt ->
           Option.value_map id_opt ~default:(return None) ~f:(fun id ->
               let%map field =
                 query_db ~f:(fun db -> Processor.Zkapp_field.load db id)
@@ -379,12 +379,12 @@ let load_events pool id_opt =
         let%bind field_array_ids =
           query_db ~f:(fun db -> Processor.Zkapp_events.load db id)
         in
-        Deferred.List.map (Array.to_list field_array_ids) ~f:(fun array_id ->
+        Deferred.List.map ~how:`Sequential (Array.to_list field_array_ids) ~f:(fun array_id ->
             let%bind field_ids =
               query_db ~f:(fun db ->
                   Processor.Zkapp_field_array.load db array_id )
             in
-            Deferred.List.map (Array.to_list field_ids) ~f:(fun field_id ->
+            Deferred.List.map ~how:`Sequential (Array.to_list field_ids) ~f:(fun field_id ->
                 let%map field_str =
                   query_db ~f:(fun db -> Processor.Zkapp_field.load db field_id)
                 in
@@ -524,7 +524,7 @@ let get_account_update_body ~pool body_id =
       in
       let elements = Pickles_types.Vector.to_list elements in
       let%map fields =
-        Deferred.List.map elements ~f:(fun id_opt ->
+        Deferred.List.map ~how:`Sequential elements ~f:(fun id_opt ->
             Option.value_map id_opt ~default:(return None) ~f:(fun id ->
                 let%map field_str =
                   query_db ~f:(fun db -> Processor.Zkapp_field.load db id)
@@ -764,7 +764,7 @@ let get_account_accessed ~pool (account : Processor.Accounts_accessed.t) :
         let elements = Pickles_types.Vector.to_list elements in
         let%bind app_state =
           let%map field_strs =
-            Deferred.List.map elements ~f:(fun id ->
+            Deferred.List.map ~how:`Sequential elements ~f:(fun id ->
                 query_db ~f:(fun db -> Processor.Zkapp_field.load db id) )
           in
           let fields = List.map field_strs ~f:Zkapp_basic.F.of_string in
@@ -807,7 +807,7 @@ let get_account_accessed ~pool (account : Processor.Accounts_accessed.t) :
         let elements = Pickles_types.Vector.to_list elements in
         let%bind action_state =
           let%map field_strs =
-            Deferred.List.map elements ~f:(fun id ->
+            Deferred.List.map ~how:`Sequential elements ~f:(fun id ->
                 query_db ~f:(fun db -> Processor.Zkapp_field.load db id) )
           in
           let fields = List.map field_strs ~f:Zkapp_basic.F.of_string in

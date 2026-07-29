@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Async
 open Rosetta_lib
 
@@ -98,7 +98,7 @@ let pg_log_data ~logger ~pool : unit Deferred.t =
               [%log error] "Could not get Postgresql system data"
                 ~metadata:[ ("error", `String (Caqti_error.show err)) ]
         in
-        let%bind () = after (Time.Span.of_sec pg_data_interval) in
+        let%bind () = after (Time_float.Span.of_sec pg_data_interval) in
         go ()
       in
       go ()

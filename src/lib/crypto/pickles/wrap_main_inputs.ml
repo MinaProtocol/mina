@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Backend
 module Me = Tock
 module Other = Tick

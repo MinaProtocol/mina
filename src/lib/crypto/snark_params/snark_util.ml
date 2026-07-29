@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 
 module Make (Impl : Snarky_backendless.Snark_intf.S) = struct
   open Impl

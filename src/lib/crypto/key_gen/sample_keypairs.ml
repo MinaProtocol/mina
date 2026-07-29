@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Signature_lib
 
 (* FIXME #2936: remove this "precomputed VRF keypair" *)

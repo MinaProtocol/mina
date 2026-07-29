@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Common
 open Backend
 module Impl = Impls.Step

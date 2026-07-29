@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Fold_lib
 open Snark_params
 
