@@ -10,24 +10,17 @@ let PipelineScope = ../../Pipeline/Scope.dhall
 
 let TestExecutive = ../../Command/TestExecutive.dhall
 
-let Dockers = ../../Constants/Docker/Versions.dhall
+let Command = ../../Command/Base.dhall
 
-let Docker = ../../Constants/Docker/Package.dhall
-
-let Network = ../../Constants/Network.dhall
-
-let Profiles = ../../Constants/Profiles.dhall
-
-let dependsOn =
-        Dockers.dependsOn
-          Dockers.DepsSpec::{
-          , artifact =
-              Docker.Type.DaemonProfiled { profile = Profiles.Type.Devnet }
-          }
-      # Dockers.dependsOn
-          Dockers.DepsSpec::{
-          , artifact = Docker.Type.Archive { network = Network.Type.Devnet }
-          }
+let dependsOn
+    : List Command.TaggedKey.Type
+    = [ { name = "IntegrationTestDockerImages"
+        , key = "daemon_profile-devnet-docker-image"
+        }
+      , { name = "IntegrationTestDockerImages"
+        , key = "archive-devnet-docker-image"
+        }
+      ]
 
 in  Pipeline.build
       Pipeline.Config::{
