@@ -10,9 +10,12 @@ set -eox pipefail
 # Binary acquisition is split from the migration: the CURRENT-version binaries
 # (mina, the current rocksdb-scanner, the in-repo storage converter,
 # mina-graphql-client, libp2p_helper) are restored bare from the apps cache --
-# mirroring what their .debs install -- with a .deb fallback on a cache miss. The
-# RELEASED bits the downgrade needs (the stable 3.3.0 recovery storage toolbox
-# and the official 3.3.0 daemon) are not built here, so they stay .deb installs.
+# mirroring what their .debs install. This job depends on the Apps (bare-binary)
+# build, not the debian/docker package build, so there is no this-build .deb to
+# fall back to; a cache miss is a hard failure. The RELEASED bits the downgrade
+# needs (a mina-logproc from packages.o1test.net, the stable 3.3.0 recovery
+# storage toolbox and the official 3.3.0 daemon) are not built here, so they stay
+# .deb installs from packages.o1test.net / the legacy cache / official apt.
 
 # --- Initialization ---
 MINA_DEBIAN_NETWORK=""
@@ -90,41 +93,32 @@ export MINA_LEDGER_S3_BUCKET="https://s3-us-west-2.amazonaws.com/snark-keys-ro.o
 CURRENT_SCANNER_DIR="/usr/lib/mina/storage/${ROCKSDB_VERSION}/${GITTAG}"
 
 # restore_current_mina re-installs the current daemon (used initially and again
-# when upgrading back after the downgrade), preferring the apps cache.
-BARE=0
+# when upgrading back after the downgrade) bare from the apps cache.
 restore_current_mina() {
-  if [[ "$BARE" == "1" ]]; then
-    ./buildkite/scripts/apps/restore_binary.sh "$MINA_DEBIAN_NETWORK"
-  else
-    source buildkite/scripts/debian/install.sh "mina-${MINA_DEBIAN_NETWORK}" 1
-  fi
+  ./buildkite/scripts/apps/restore_binary.sh "$MINA_DEBIAN_NETWORK"
 }
 
 # Restore the current-version binaries bare from the apps cache (mirroring the
-# .debs); fall back to the .debs on any cache miss.
-if ./buildkite/scripts/apps/restore_binary.sh "$MINA_DEBIAN_NETWORK" \
-  && ./buildkite/scripts/apps/restore_app.sh "$MINA_DEBIAN_NETWORK" mina_graphql_client_app.exe mina-graphql-client \
-  && ./buildkite/scripts/apps/restore_app.sh "$MINA_DEBIAN_NETWORK" libp2p_helper coda-libp2p_helper \
-  && MINA_BIN_DIR="$CURRENT_SCANNER_DIR" ./buildkite/scripts/apps/restore_app.sh "$MINA_DEBIAN_NETWORK" rocksdb_scanner.exe mina-rocksdb-scanner \
-  && ./buildkite/scripts/apps/restore_daemon_config.sh "$MINA_DEBIAN_NETWORK"; then
-  BARE=1
-  # The converter is an in-repo script (the .deb just packages it); install it
-  # the same way the .deb does.
-  $SUDO install -D -m 0755 scripts/rocksdb/convert-to-legacy.sh /usr/local/bin/mina-storage-converter
-  # The recovery storage toolbox .deb installed below has a dpkg dependency on
-  # the mina-logproc .deb. The .deb fallback path pulls it in transitively via
-  # mina-<net>; in the bare path nothing does, and a bare binary can't satisfy a
-  # dpkg Depends, so install the current mina-logproc .deb explicitly. (Only the
-  # current build root ships mina-logproc -- the legacy root does not.)
-  source buildkite/scripts/debian/install.sh "mina-logproc" 1
-  echo "Using bare mina + current rocksdb-scanner + storage-converter from apps cache"
-else
-  echo "Falling back to debian-installed mina-${MINA_DEBIAN_NETWORK} + storage toolbox"
-  source buildkite/scripts/debian/install.sh "mina-${MINA_DEBIAN_NETWORK},mina-daemon-storage-toolbox" 1
-fi
+# .debs). No .deb fallback: the job depends on the Apps build, not the package
+# build, so a cache miss is a hard failure rather than a silent .deb install.
+./buildkite/scripts/apps/restore_binary.sh "$MINA_DEBIAN_NETWORK"
+./buildkite/scripts/apps/restore_app.sh "$MINA_DEBIAN_NETWORK" mina_graphql_client_app.exe mina-graphql-client
+./buildkite/scripts/apps/restore_app.sh "$MINA_DEBIAN_NETWORK" libp2p_helper coda-libp2p_helper
+MINA_BIN_DIR="$CURRENT_SCANNER_DIR" ./buildkite/scripts/apps/restore_app.sh "$MINA_DEBIAN_NETWORK" rocksdb_scanner.exe mina-rocksdb-scanner
+./buildkite/scripts/apps/restore_daemon_config.sh "$MINA_DEBIAN_NETWORK"
+# The converter is an in-repo script (the .deb just packages it); install it the
+# same way the .deb does.
+$SUDO install -D -m 0755 scripts/rocksdb/convert-to-legacy.sh /usr/local/bin/mina-storage-converter
+echo "Using bare mina + current rocksdb-scanner + storage-converter from apps cache"
 
 # The stable (3.3.0) recovery storage toolbox ships the legacy scanner at its own
-# versioned path; it is a released artifact, not built here, so it stays a .deb.
+# versioned path; it is a released artifact (legacy cache root), not built here,
+# so it stays a .deb. Its .deb dpkg-Depends on mina-logproc, which is not built
+# under the Apps-only dependency, so install a released mina-logproc from
+# packages.o1test.net to satisfy the dependency (and provide the log processor).
+./buildkite/scripts/debian/install_official.sh \
+  --package mina-logproc --channel stable --version "${STABLE_VERSION}*"
+
 FORCE_VERSION="*" ROOT="legacy" ./buildkite/scripts/debian/install.sh "mina-daemon-recovery-storage-toolbox" 1
 
 # Remove lockfile if present
