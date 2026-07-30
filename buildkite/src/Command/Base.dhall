@@ -130,7 +130,14 @@ let targetToAgent =
             , Small = toMap { generic = "true" }
             , Integration = toMap { integration = "true" }
             , QA = toMap { qa = "true" }
-            , Perf = toMap { performance = "true" }
+            , -- NOTE: `performance=true` is also carried by the shared
+              -- `integration-*` k8s agents, so Perf jobs (benchmarks) often
+              -- spill onto them instead of the dedicated `performance-*` pool
+              -- -- making timing-sensitive benches vary run-to-run (proving
+              -- time swings ~6x). Until the perf pool is made exclusive /
+              -- large enough (infra, not this repo), the bench regression gate
+              -- is soft-failed; see buildkite/src/Command/Bench/Base.dhall.
+              Perf = toMap { performance = "true" }
             , Multi = toMap { generic_multi = "true" }
             }
             target
