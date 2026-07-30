@@ -297,6 +297,10 @@ let appsJobName
     : MinaBuildSpec.Type -> Text
     = \(spec : MinaBuildSpec.Type) -> "${selfName spec}Apps"
 
+let dockerJobName
+    : MinaBuildSpec.Type -> Text
+    = \(spec : MinaBuildSpec.Type) -> "${selfName spec}Docker"
+
 let primaryAppsVariant
     : MinaBuildSpec.Type -> Text
     =     \(spec : MinaBuildSpec.Type)
@@ -425,9 +429,11 @@ let docker_step
               = [ { name = selfName spec, key = "build-deb-pkg" } ]
 
           let withDocker =
+              -- The .deb dependency stays on the debian job; sibling docker
+              -- images now live in the separate docker job.
                     \(dep : Docker.Type)
                 ->    deps
-                    # [ { name = selfName spec
+                    # [ { name = dockerJobName spec
                         , key = "${Docker.lowerName dep}${netSeg}"
                         }
                       ]
@@ -443,7 +449,7 @@ let docker_step
 
           let dependsOnGeneric =
                   deps
-                # [ { name = genericBuildName spec
+                # [ { name = "${genericBuildName spec}Docker"
                     , key =
                         "${Docker.lowerName
                              Docker.Type.DaemonGeneric}-${Network.lowerName
@@ -691,7 +697,7 @@ let onlyDebianPipeline
 let pipeline
     : MinaBuildSpec.Type -> Pipeline.Config.Type
     =     \(spec : MinaBuildSpec.Type)
-      ->  pipelineBuilder spec ([ build_artifacts spec ] # docker_commands spec)
+      ->  pipelineBuilder spec [ build_artifacts spec ]
 
 let appsPipeline
     : MinaBuildSpec.Type -> Pipeline.Config.Type
@@ -722,13 +728,30 @@ let packagePipeline
             , includeIf = spec.includeIf
             , excludeIf = spec.excludeIf
             }
-          , steps = [ build_debian spec ] # docker_commands spec
+          , steps = [ build_debian spec ]
+          }
+
+let dockerPipeline
+    : MinaBuildSpec.Type -> Pipeline.Config.Type
+    =     \(spec : MinaBuildSpec.Type)
+      ->  Pipeline.Config::{
+          , spec = JobSpec::{
+            , dirtyWhen = DebianVersions.packageDirtyWhen
+            , path = "Release"
+            , name = "${dockerJobName spec}"
+            , tags = spec.tags
+            , scope = spec.scope
+            , includeIf = spec.includeIf
+            , excludeIf = spec.excludeIf
+            }
+          , steps = docker_commands spec
           }
 
 in  { pipeline = pipeline
     , onlyDebianPipeline = onlyDebianPipeline
     , appsPipeline = appsPipeline
     , packagePipeline = packagePipeline
+    , dockerPipeline = dockerPipeline
     , MinaBuildSpec = MinaBuildSpec
     , labelSuffix = labelSuffix
     , buildArtifacts = build_artifacts

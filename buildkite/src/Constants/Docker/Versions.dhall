@@ -79,7 +79,7 @@ let dependsOn =
           in  [ { name =
                     "${spec.prefix}${Network.namePrefixSegment
                                        spec.network}${capitalName
-                                                        spec.codename}${buildFlagSuffix}${archSuffix}"
+                                                        spec.codename}${buildFlagSuffix}${archSuffix}Docker"
                 , key = key
                 }
               ]
