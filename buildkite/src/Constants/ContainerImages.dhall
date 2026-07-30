@@ -12,6 +12,15 @@
 --       identical either way; ffab0f8 is already published and the arm64
 --       toolchain build under QEMU is flaky, so there is nothing to gain from
 --       rebuilding it. Reunify the sha on the next full toolchain bump.
+-- NOTE: minaBase* are the published common base-deps images on docker.io. The tag
+--       format matches build.sh's HASHTAG for service=mina-base: <githash>-<codename>-<network>.
+--       These are frozen references, like minaToolchain*: the daemon/archive/hardfork
+--       builds load them from the CI cache and build FROM them instead of re-running the
+--       base-deps stage. Re-publish with !ci-docker-base-me (pipeline
+--       mina-docker-base-build), then bump the short hash here to the one it produced.
+--       A stale or unpublished hash is not fatal -- scripts/docker/build.sh falls back to
+--       inlining the base-deps fragment when the image is not available locally -- so the
+--       only cost of forgetting the bump is losing the reuse.
 { toolchainBase =
     "europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/ci-toolchain-base:v4"
 , minaToolchainBookworm =
@@ -27,6 +36,16 @@
     "docker.io/minaprotocol/mina-toolchain:d906afe-jammy-devnet"
 , minaToolchain =
     "docker.io/minaprotocol/mina-toolchain:d906afe-bullseye-devnet"
+, minaBaseBookworm =
+    { amd64 = "docker.io/minaprotocol/mina-base:86b89d0-bookworm-devnet"
+    , arm64 = "docker.io/minaprotocol/mina-base:86b89d0-bookworm-devnet-arm64"
+    }
+, minaBaseBullseye.amd64 =
+    "docker.io/minaprotocol/mina-base:86b89d0-bullseye-devnet"
+, minaBaseFocal.amd64 = "docker.io/minaprotocol/mina-base:86b89d0-focal-devnet"
+, minaBaseJammy.amd64 = "docker.io/minaprotocol/mina-base:86b89d0-jammy-devnet"
+, minaBaseNoble.amd64 = "docker.io/minaprotocol/mina-base:86b89d0-noble-devnet"
+, minaBase = "docker.io/minaprotocol/mina-base:86b89d0-bullseye-devnet"
 , postgres =
     "europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/postgres:12.4-alpine"
 , xrefcheck =
