@@ -49,7 +49,7 @@ These commands are handled by the Mina `frontend/ci-build-me` webhook on `issue_
 | `!ci-debian-me` | `mina-build-debian` | Debian package build pipeline. |
 | `!ci-docker-me` | `mina-build-docker` | Docker image build pipeline; may be filtered. |
 | `!ci-toolchain-me` | `mina-toolchains-build` | Rebuild the opam toolchain images (tag `Toolchain`). Takes hours. Does **not** touch the `mina-base` images. |
-| `!ci-docker-base-me` | `mina-toolchains-build` | Rebuild the shared `mina-base` images (tag `Base`) for all codenames. Use after changing `dockerfiles/stages/1-base-deps`, or to publish/refresh the `minaBase*` pins. |
+| `!ci-docker-base-me` | `mina-docker-base-build` | Rebuild the shared `mina-base` images (tag `Base`) for all codenames. Use after changing `dockerfiles/stages/1-base-deps`, or to publish/refresh the `minaBase*` pins. |
 | `!approved-for-mainnet` | `mina-pr-gating` | Mainnet approval/gating command; restricted to specific approvers. |
 
 Examples:
@@ -64,7 +64,7 @@ gh api repos/MinaProtocol/mina/issues/$pr/comments -f body='!ci-docker-base-me' 
 
 ## `!ci-docker-base-me`
 
-Takes no arguments. It triggers `mina-toolchains-build` with:
+Takes no arguments. It triggers `mina-docker-base-build` with:
 
 ```text
 BUILDKITE_PIPELINE_FILTER=BaseDockersOnly
