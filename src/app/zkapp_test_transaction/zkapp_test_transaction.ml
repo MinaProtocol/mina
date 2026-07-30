@@ -280,14 +280,14 @@ let transfer_funds =
 let update_state =
   let create_command ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile ~app_state
       ~num_events ~num_actions ~event_elements_per ~action_elements_per
-      ~repeat_arrays ~num_state_fields ~max_state_fields ~genesis_constants
-      ~constraint_constants () =
+      ~repeat_arrays ~num_state_fields ~num_account_updates ~max_state_fields
+      ~genesis_constants ~constraint_constants () =
     let open Deferred.Let_syntax in
     let%map zkapp_command =
       update_state ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile ~app_state
         ~num_events ~num_actions ~event_elements_per ~action_elements_per
-        ~repeat_arrays ~num_state_fields ~max_state_fields ~genesis_constants
-        ~constraint_constants
+        ~repeat_arrays ~num_state_fields ~num_account_updates ~max_state_fields
+        ~genesis_constants ~constraint_constants
     in
     Util.print_snapp_transaction ~debug zkapp_command ;
     ()
@@ -343,6 +343,13 @@ let update_state =
               combined with --zkapp-state (default: 0, meaning use \
               --zkapp-state)"
            Param.(optional_with_default (Util.Count 0) Flags.array_count)
+       and num_account_updates =
+         Param.flag "--num-account-updates"
+           ~doc:
+             "NN Number of account updates against the zkApp account, which \
+              raises the cost of the transaction towards the protocol's \
+              per-transaction zkApp segment limit (default: 1)"
+           Param.(optional_with_default 1 int)
        in
        let fee = Option.value ~default:Flags.default_fee fee in
        let constraint_constants =
@@ -361,8 +368,9 @@ let update_state =
        let max_state_fields = Mina_base.Zkapp_state.max_size_int in
        create_command ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
          ~app_state ~num_events ~num_actions ~event_elements_per
-         ~action_elements_per ~repeat_arrays ~num_state_fields ~max_state_fields
-         ~genesis_constants ~constraint_constants ))
+         ~action_elements_per ~repeat_arrays ~num_state_fields
+         ~num_account_updates ~max_state_fields ~genesis_constants
+         ~constraint_constants ))
 
 let update_zkapp_uri =
   let create_command ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile ~zkapp_uri
