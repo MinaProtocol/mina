@@ -250,6 +250,54 @@ const handler = async (event, req) => {
     }
   }
 
+  // Mina Base Docker Build section
+  //
+  // Rebuilds ONLY the shared mina-base images (the common base-deps layer that
+  // the daemon/archive/hardfork images are built FROM), across every codename.
+  //
+  // Has its own pipeline (mina-docker-base-build) and its own tag: the base jobs
+  // are tagged Base, not Toolchain. The base image is debian-slim + shared apt
+  // deps + the gcloud SDK, which has nothing in common with the opam toolchain,
+  // so neither should be rebuilt because the other changed. !ci-toolchain-me
+  // therefore does NOT rebuild the base images, and this does not rebuild the
+  // toolchains.
+  //
+  // BaseDockersOnly selects the Base tag (see buildkite/src/Pipeline/TagFilter.dhall),
+  // and Full skips dirty-when triage so the rebuild happens even when the PR did
+  // not touch dockerfiles/stages/1-base-deps -- which is the whole point of an
+  // on-demand rebuild command.
+  //
+  // Kept ABOVE the !ci-docker-me branch on purpose: that one matches on a
+  // prefix, so anything sharing its prefix must be handled before it.
+  else if (
+    req.body.action == "created" &&
+    req.body.issue.pull_request &&
+    req.body.issue.pull_request.url &&
+    req.body.comment.body == "!ci-docker-base-me"
+  ) {
+    const orgData = await getRequest(req.body.sender.organizations_url);
+    if (orgData.data.filter((org) => org.login == "MinaProtocol").length > 0) {
+      const prData = await getRequest(req.body.issue.pull_request.url);
+      const buildkite = await runBuild(
+        {
+          sender: req.body.sender,
+          pull_request: prData.data,
+        },
+        "mina-docker-base-build",
+        {
+          BUILDKITE_PIPELINE_FILTER: "BaseDockersOnly",
+          BUILDKITE_PIPELINE_JOB_SELECTION: "Full",
+        }
+      );
+      return [buildkite];
+    } else {
+      return [
+        "comment author is not (publically) a member of the core team",
+        "comment author is not (publically) a member of the core team",
+      ];
+    }
+  }
+
   else if (
     req.body.action == "created" &&
     req.body.issue.pull_request &&

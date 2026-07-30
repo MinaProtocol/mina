@@ -17,6 +17,7 @@ let Tag
       | Test
       | Stable
       | Toolchain
+      | Base
       | Docker
       | Debian
       | Hardfork
@@ -47,6 +48,7 @@ let capitalName =
             , Release = "Release"
             , Test = "Test"
             , Toolchain = "Toolchain"
+            , Base = "Base"
             , Hardfork = "Hardfork"
             , Stable = "Stable"
             , Promote = "Promote"
@@ -79,6 +81,7 @@ let lowerName =
             , Release = "release"
             , Test = "test"
             , Toolchain = "toolchain"
+            , Base = "base"
             , Hardfork = "hardfork"
             , Stable = "stable"
             , Promote = "promote"
