@@ -1,0 +1,34 @@
+#################################################################################################
+# The "mina-daemon-prefork-genesis" stage
+# - Continues from the mina-daemon image.
+# - Installs the hardfork-aware PREFORK (legacy/old-protocol) genesis ledger package
+#   (mina-create-${network}-prefork-genesis-ledger), pinned to deb_legacy_version.
+# - "prefork" distinguishes this from the current-protocol genesis: it ships the legacy
+#   runtime-genesis-ledger tool used to (re)create the pre-hardfork genesis during
+#   hardfork package generation/verification. It is NOT part of a normal daemon image.
+# - Opt-in only (built via --docker-target mina-daemon-prefork-genesis). The ENTRYPOINT
+#   and user setup are inherited from the mina-daemon stage.
+#################################################################################################
+FROM mina-daemon AS mina-daemon-prefork-genesis
+
+# In multi-stage builds, Docker requires re-declaring ARG variables after each FROM.
+ARG deb_version
+ARG deb_release=unstable
+ARG deb_codename=bullseye
+ARG network=mainnet
+ARG deb_repo="http://packages.o1test.net"
+ARG deb_legacy_version
+
+# Prefork genesis ledger package name and version.
+# Create genesis debian is used for post hf verification.
+# It contains only runtime-genesis-ledger app which is moderately small
+ENV MINA_CREATE_GENESIS_DEB=mina-create-${network}-prefork-genesis-ledger
+
+# Install the prefork genesis ledger package (hardfork-aware layer).
+# Installed DIRECTLY from the local build context, like the rest of the mina debs.
+# install-mina-debs.sh and the staged _debs (at /opt/mina-local-debs) are inherited
+# from the mina-daemon stage, so no extra COPY is needed here; this stage only adds
+# the (legacy-versioned) create-prefork-genesis package on top.
+RUN echo "Installing prefork genesis package with version $deb_legacy_version for network $network" \
+  && /usr/local/bin/install-mina-debs.sh \
+       "${MINA_CREATE_GENESIS_DEB}=${deb_legacy_version}"
