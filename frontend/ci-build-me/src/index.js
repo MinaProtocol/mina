@@ -255,12 +255,12 @@ const handler = async (event, req) => {
   // Rebuilds ONLY the shared mina-base images (the common base-deps layer that
   // the daemon/archive/hardfork images are built FROM), across every codename.
   //
-  // Runs in the toolchain pipeline, because mina-base is a reference image
-  // published and cached exactly like mina-toolchain. But it is its own command,
-  // and the base jobs are tagged Base rather than Toolchain: the base image is
-  // debian-slim + shared apt deps + the gcloud SDK, which has nothing in common
-  // with the opam toolchain, so neither should be rebuilt because the other
-  // changed. !ci-toolchain-me therefore does NOT rebuild the base images.
+  // Has its own pipeline (mina-docker-base-build) and its own tag: the base jobs
+  // are tagged Base, not Toolchain. The base image is debian-slim + shared apt
+  // deps + the gcloud SDK, which has nothing in common with the opam toolchain,
+  // so neither should be rebuilt because the other changed. !ci-toolchain-me
+  // therefore does NOT rebuild the base images, and this does not rebuild the
+  // toolchains.
   //
   // BaseDockersOnly selects the Base tag (see buildkite/src/Pipeline/TagFilter.dhall),
   // and Full skips dirty-when triage so the rebuild happens even when the PR did
@@ -283,7 +283,7 @@ const handler = async (event, req) => {
           sender: req.body.sender,
           pull_request: prData.data,
         },
-        "mina-toolchains-build",
+        "mina-docker-base-build",
         {
           BUILDKITE_PIPELINE_FILTER: "BaseDockersOnly",
           BUILDKITE_PIPELINE_JOB_SELECTION: "Full",
