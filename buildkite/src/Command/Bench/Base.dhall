@@ -26,6 +26,9 @@ let SelectFiles = ../../Lib/SelectFiles.dhall
 
 let B/SoftFail = B.definitions/commandStep/properties/soft_fail/Type
 
+let B/SoftFailExit =
+      B.definitions/commandStep/properties/soft_fail/union/properties/exit_status/Type
+
 let Spec =
       { Type =
           { key : Text
@@ -72,7 +75,17 @@ let command
             , label = "Perf: ${spec.label}"
             , key = spec.key
             , target = spec.size
-            , soft_fail = Some (B/SoftFail.Boolean False)
+            , soft_fail =
+                -- Soft-fail ONLY a red regression (mina-bench-upload exit 1),
+                -- so a flapping perf threshold does not block the build while
+                -- the benches still run on shared CI agents. Parse (2) and
+                -- upload (3) errors keep hard-failing so real breakage surfaces.
+                -- Revert to a hard gate once benches run on dedicated perf
+                -- hardware. See run_ported_bench in buildkite/scripts/bench/run.sh.
+                Some
+                  ( B/SoftFail.`ListSoft_fail/Type`
+                      [ { exit_status = Some (B/SoftFailExit.Number 1) } ]
+                  )
             , docker = None Docker.Type
             , depends_on = spec.dependsOn
             }
