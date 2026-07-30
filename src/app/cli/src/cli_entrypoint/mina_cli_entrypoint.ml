@@ -1112,12 +1112,15 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
                   get_monitors (parent :: accum) parent
             in
             let monitors = get_monitors [ monitor ] monitor in
+            (* Log the monitor chain by name. We deliberately avoid
+               [Monitor.sexp_of_t]: that is the derived-sexp dump of the
+               monitor's internals, whose shape is unstable across core versions
+               (v0.16 emits the name as a bare atom, which broke the previous
+               record-coercion and crashed the daemon on the first long cycle).
+               [Monitor.name] is the public, stable accessor and is all this
+               debug line needs. *)
             List.map monitors ~f:(fun monitor ->
-                match Async_kernel.Monitor.sexp_of_t monitor with
-                | Sexp.List sexps ->
-                    `List (List.map ~f:Error_json.sexp_record_to_yojson sexps)
-                | Sexp.Atom _ ->
-                    failwith "Expected a sexp list" )
+                `String (Info.to_string_hum (Async_kernel.Monitor.name monitor)) )
           in
           let o1trace context =
             Execution_context.find_local context O1trace.local_storage_id
