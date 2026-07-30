@@ -21,8 +21,7 @@ let Network = ../../Constants/Network.dhall
 let network = Network.Type.Devnet
 
 let dirtyWhen =
-      [ S.strictlyStart (S.contains "src")
-      , S.exactly "buildkite/src/Jobs/Test/AutoHardforkTest" "dhall"
+      [ S.exactly "buildkite/src/Jobs/Test/AutoHardforkTest" "dhall"
       , S.exactly_noext "dockerfiles/stages/daemon/4-auto-hardfork"
       , S.exactly_noext "dockerfiles/stages/1-base-deps"
       , S.exactly "scripts/hardfork/dispatcher" "sh"

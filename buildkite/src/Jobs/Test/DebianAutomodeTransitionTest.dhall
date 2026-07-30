@@ -57,8 +57,7 @@ let buildTestCmd
                 }
 
 let dirtyWhen =
-      [ S.strictlyStart (S.contains "src")
-      , S.strictly (S.contains "Makefile")
+      [ S.strictly (S.contains "Makefile")
       , S.exactly "buildkite/src/Jobs/Test/DebianAutomodeTransitionTest" "dhall"
       , S.exactly "buildkite/scripts/tests/debian-automode-transition-test" "sh"
       , S.strictlyStart (S.contains "scripts/debian")
