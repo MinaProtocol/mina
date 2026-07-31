@@ -46,76 +46,71 @@ let Spec =
           , scope : List PipelineScope.Type
           }
       , default =
-        { size = Size.Perf
-        , dependsOn = DebianVersions.appDependsOn DebianVersions.DepsSpec::{=}
-        , additionalDirtyWhen = [] : List SelectFiles.Type
-        , yellowThreshold = 0.1
-        , redThreshold = 0.2
-        , preCommands = [] : List Cmd.Type
-        , extraArgs = ""
-        }
+          { size = Size.Perf
+          , dependsOn = DebianVersions.appDependsOn DebianVersions.DepsSpec::{=}
+          , additionalDirtyWhen = [] : List SelectFiles.Type
+          , yellowThreshold = 0.1
+          , redThreshold = 0.2
+          , preCommands = [] : List Cmd.Type
+          , extraArgs = ""
+          }
       }
 
 let command
     : Spec.Type -> Command.Type
-    = \(spec : Spec.Type) ->
-        Command.build
-          Command.Config::{
-          , commands =
-                spec.preCommands
-              # RunInToolchain.runInDefaultToolchain
-                  (   Benchmarks.toEnvList Benchmarks.Type::{=}
-                    # [ "BRANCH=\\\${BUILDKITE_PULL_REQUEST_BASE_BRANCH:-BUILDKITE_BRANCH}"
-                      ]
-                    # DebianVersions.overrideEnvs
-                  )
-                  "EXTRA_ARGS=\"${spec.extraArgs}\" ./buildkite/scripts/bench/run.sh  ${spec.bench} --red-threshold ${Double/show
-                                                                                                                        spec.redThreshold} --yellow-threshold ${Double/show
-                                                                                                                                                                  spec.yellowThreshold}"
-          , label = "Perf: ${spec.label}"
-          , key = spec.key
-          , target = spec.size
-          , soft_fail =
-              -- Soft-fail ONLY a red regression (mina-bench-upload exit 1),
-              -- so a flapping perf threshold does not block the build while
-              -- the benches still run on shared CI agents. Parse (2) and
-              -- upload (3) errors keep hard-failing so real breakage surfaces.
-              -- Revert to a hard gate once benches run on dedicated perf
-              -- hardware. See run_ported_bench in buildkite/scripts/bench/run.sh.
-              Some
+    =     \(spec : Spec.Type)
+      ->  Command.build
+            Command.Config::{
+            , commands =
+                  spec.preCommands
+                # RunInToolchain.runInDefaultToolchain
+                    (   Benchmarks.toEnvList Benchmarks.Type::{=}
+                      # [ "BRANCH=\\\${BUILDKITE_PULL_REQUEST_BASE_BRANCH:-BUILDKITE_BRANCH}"
+                        ]
+                      # DebianVersions.overrideEnvs
+                    )
+                    "EXTRA_ARGS=\"${spec.extraArgs}\" ./buildkite/scripts/bench/run.sh  ${spec.bench} --red-threshold ${Double/show
+                                                                                                                          spec.redThreshold} --yellow-threshold ${Double/show
+                                                                                                                                                                    spec.yellowThreshold}"
+            , label = "Perf: ${spec.label}"
+            , key = spec.key
+            , target = spec.size
+            , soft_fail = Some
                 ( B/SoftFail.ListSoft_fail/Type
                     [ { exit_status = Some (B/SoftFailExit.Number 1) } ]
                 )
-          , docker = None Docker.Type
-          , depends_on = spec.dependsOn
-          }
+            , docker = None Docker.Type
+            , depends_on = spec.dependsOn
+            }
 
 let pipeline
     : Spec.Type -> Pipeline.Config.Type
-    = \(spec : Spec.Type) ->
-        Pipeline.Config::{
-        , spec = JobSpec::{
-          , dirtyWhen =
-                [ SelectFiles.strictlyStart (SelectFiles.contains "src")
-                , SelectFiles.exactly "buildkite/src/Command/Bench/Base" "dhall"
-                , SelectFiles.exactly "buildkite/scripts/bench/install" "sh"
-                , SelectFiles.exactly "buildkite/scripts/bench/run" "sh"
-                , SelectFiles.contains "scripts/benchmark"
-                , SelectFiles.exactly
-                    "buildkite/src/Jobs/Bench/${spec.name}"
-                    "dhall"
-                ]
-              # spec.additionalDirtyWhen
-          , path = spec.path
-          , name = spec.name
-          , tags =
-            [ PipelineTag.Type.Long
-            , PipelineTag.Type.Test
-            , PipelineTag.Type.Stable
-            ]
-          , scope = spec.scope
+    =     \(spec : Spec.Type)
+      ->  Pipeline.Config::{
+          , spec = JobSpec::{
+            , dirtyWhen =
+                  [ SelectFiles.strictlyStart (SelectFiles.contains "src")
+                  , SelectFiles.exactly
+                      "buildkite/src/Command/Bench/Base"
+                      "dhall"
+                  , SelectFiles.exactly "buildkite/scripts/bench/install" "sh"
+                  , SelectFiles.exactly "buildkite/scripts/bench/run" "sh"
+                  , SelectFiles.contains "scripts/benchmark"
+                  , SelectFiles.exactly
+                      "buildkite/src/Jobs/Bench/${spec.name}"
+                      "dhall"
+                  ]
+                # spec.additionalDirtyWhen
+            , path = spec.path
+            , name = spec.name
+            , tags =
+              [ PipelineTag.Type.Long
+              , PipelineTag.Type.Test
+              , PipelineTag.Type.Stable
+              ]
+            , scope = spec.scope
+            }
+          , steps = [ command spec ]
           }
-        , steps = [ command spec ]
-        }
 
-in  { command, pipeline, Spec }
+in  { command = command, pipeline = pipeline, Spec = Spec }
