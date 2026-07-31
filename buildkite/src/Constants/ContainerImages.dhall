@@ -25,24 +25,24 @@
 { toolchainBase =
     "europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/ci-toolchain-base:v4"
 , minaToolchainBookworm =
-    { amd64 = "europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/mina-toolchain:f009c00-bookworm-devnet"
-    , arm64 =
-        "europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/mina-toolchain:f009c00-bookworm-devnet-arm64"
-    }
-, minaToolchainBullseye.amd64 =
-    "europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/mina-toolchain:f009c00-bullseye-devnet"
-, minaToolchainNoble.amd64 =
-    "europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/mina-toolchain:f009c00-noble-devnet"
-, minaToolchainJammy.amd64 =
-    "europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/mina-toolchain:f009c00-jammy-devnet"
+  { amd64 = "europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/mina-toolchain:f009c00-bookworm-devnet"
+  , arm64 =
+      "europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/mina-toolchain:f009c00-bookworm-devnet-arm64"
+  }
+, minaToolchainBullseye.amd64
+  = "europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/mina-toolchain:f009c00-bullseye-devnet"
+, minaToolchainNoble.amd64
+  = "europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/mina-toolchain:f009c00-noble-devnet"
+, minaToolchainJammy.amd64
+  = "europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/mina-toolchain:f009c00-jammy-devnet"
 , minaToolchain =
     "europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/mina-toolchain:f009c00-bullseye-devnet"
 , minaBaseBookworm =
-    { amd64 = "docker.io/minaprotocol/mina-base:86b89d0-bookworm-devnet"
-    , arm64 = "docker.io/minaprotocol/mina-base:86b89d0-bookworm-devnet-arm64"
-    }
-, minaBaseBullseye.amd64 =
-    "docker.io/minaprotocol/mina-base:86b89d0-bullseye-devnet"
+  { amd64 = "docker.io/minaprotocol/mina-base:86b89d0-bookworm-devnet"
+  , arm64 = "docker.io/minaprotocol/mina-base:86b89d0-bookworm-devnet-arm64"
+  }
+, minaBaseBullseye.amd64
+  = "docker.io/minaprotocol/mina-base:86b89d0-bullseye-devnet"
 , minaBaseFocal.amd64 = "docker.io/minaprotocol/mina-base:86b89d0-focal-devnet"
 , minaBaseJammy.amd64 = "docker.io/minaprotocol/mina-base:86b89d0-jammy-devnet"
 , minaBaseNoble.amd64 = "docker.io/minaprotocol/mina-base:86b89d0-noble-devnet"
