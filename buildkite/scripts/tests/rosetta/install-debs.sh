@@ -1,8 +1,9 @@
 #!/bin/bash
 
-# Installs the debian packages needed by the rosetta integration / indexer
-# tests on the host where the test script is running. Replaces the previous
-# pattern of running the tests inside the prebuilt mina-rosetta docker image.
+# Installs the debian packages needed by the rosetta integration / indexer /
+# connectivity tests on the host where the test script is running. Replaces the
+# previous pattern of running the tests inside the prebuilt mina-rosetta docker
+# image.
 #
 # Pulls the freshly-built debs out of the buildkite cache (per
 # buildkite/scripts/debian/install.sh) and installs them directly as local
