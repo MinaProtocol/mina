@@ -1,6 +1,6 @@
 {
   "genesis": {
-    "genesis_state_timestamp": "2026-07-31T11:00:00Z"
+    "genesis_state_timestamp": "2026-08-01T14:00:00Z"
   },
   "proof": {
     "fork": {
@@ -15,9 +15,9 @@
     "hash": "jwXMfukdwJVNpZ3wMEZbuq4zwucYS4cJnij23buAnNYo1GKKrFB"
   },
   "daemon": {
-    "slot_tx_end": 460,
-    "slot_chain_end": 500,
-    "hard_fork_genesis_slot_delta": 40
+    "slot_tx_end": 600,
+    "slot_chain_end": 620,
+    "hard_fork_genesis_slot_delta": 20
   },
   "epoch_data": {
     "staking": {
