@@ -448,7 +448,7 @@ ensure_binary() {
     
     echo "Building $binary_name..."
     local nix_result
-    nix_result=$(nix build --no-link --print-out-paths "$(dirname "$SCRIPT_DIR")?submodules=1"#"$nix_target")
+    nix_result=$(nix build --no-link --print-out-paths "$(dirname "$SCRIPT_DIR")"#"$nix_target")
     local new_binary_path="$nix_result/bin/$binary_name"
     
     if [[ ! -x "$new_binary_path" ]]; then
