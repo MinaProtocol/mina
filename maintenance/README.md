@@ -1,7 +1,78 @@
 # Maintenance Utilities
 
-## Dependency Analysis
+## Dependency checks (CI)
 
-Generate full dune transitive dependency graph with `./gen_deps.sh`. This script will output `deps.dot` and `deps.png`.
+`maintenance/deps` holds a dependency gate and advisor for the OCaml tree. It
+parses `dune` files directly, so it needs no opam switch, no build and no
+third-party package — only `python3`. A full scan of `src/` takes a few
+seconds, which is what makes it affordable on every PR.
 
-Once `deps.dot` is generated, you can narrow the dependency graph using `./narrow_deps.sh <node-id>`. You can inspect `deps.dot` to find the relevant node id you would like to narrow the graph to. Narrowing the graph will filter out the graph so that it only displays nodes which are dominated by the target, nodes that dominate the target, and all nodes in edges between these sets. For example, running `./narrow_deps.sh exe:./src/app/cli/src/dune:0` will generate a dependency graph for the `mina.exe` executable.
+```
+make check-deps      # the CI gate: fails when the graph regresses
+make deps-advice     # human report: which dependencies look removable
+make deps-baseline   # re-pin the baseline after an intended change
+```
+
+`make check-deps` runs four checks, all of them *ratchets* against
+`maintenance/deps/baseline.json`. They fail on change, not on absolute state,
+so the debt that already exists does not have to be paid off first.
+
+1. **Dependency budget.** Every executable's transitive internal library count
+   and opam package count is pinned. Growth fails. Shrinkage also fails, so
+   that improvements get recorded rather than silently reabsorbed.
+2. **New opam dependencies.** Any third-party package that appears anywhere in
+   the tree for the first time fails, to force a look from CODEOWNERS.
+3. **Layering rules.** `maintenance/deps/rules.json` lists edges that must not
+   exist (for example, nothing under `src/lib/crypto` may reach `mina_lib`).
+   Failures print the shortest offending path, so the report says *why* the
+   edge exists rather than just that it does.
+4. **Unused dependencies with real weight.** A declared dependency whose module
+   is never referenced in the dependent's source, and whose removal would drop
+   at least five libraries from some shipped executable.
+
+When a failure is legitimate — the dependency really is needed, or the growth
+is intended — run `make deps-baseline` and commit the diff. The point is that
+the number moves in a reviewable commit instead of drifting.
+
+### Adding a layering rule
+
+`rules.json` has two lists. `forbidden` is enforced; every rule in it holds
+today. `pending` is for rules we want but that are currently violated: they are
+printed by `make deps-advice` and ignored by `make check-deps`. Move a rule
+from `pending` to `forbidden` in the same PR that fixes it.
+
+### Known limitations
+
+Resolution is syntactic, so it is an approximation of what dune actually does:
+
+- `(select ... from ...)` is treated as depending on every alternative, and
+  `%{...}` variables are dropped, because neither can be resolved without dune.
+- `pkg.sublib` dependencies fall back to the containing package when the
+  sublibrary is not declared in-tree.
+- "Is this dependency referenced?" is answered by scanning every source file in
+  the stanza's directory for the dependency's module name. A directory holding
+  several stanzas can therefore hide an unused dependency — the check
+  under-reports rather than over-reports, which is the safe direction for
+  something that tells people to delete code.
+- Dependencies that are never named in source are excluded rather than
+  reported: implementations of virtual libraries (`(implements ...)`, chosen by
+  linking), ppx runtimes, C stub packages and instrumentation backends.
+- Directories where a `(rule)` generates a `.ml` are skipped entirely for the
+  unused-dependency check, since the generated text is not there to grep.
+
+Everything `make deps-advice` prints is a candidate, not a verdict. Confirm
+each removal with `dune build @check` before pushing it.
+
+## Dependency graph rendering
+
+Generate the full transitive dependency graph with `./gen_deps.sh`. This script
+will output `deps.dot` and `deps.png`. It needs `dune-deps` (`opam install
+dune-deps`) and graphviz, which is why it is not wired into CI.
+
+Once `deps.dot` is generated, you can narrow the dependency graph using
+`./narrow_deps.sh <node-id>`. You can inspect `deps.dot` to find the relevant
+node id you would like to narrow the graph to. Narrowing the graph will filter
+out the graph so that it only displays nodes which are dominated by the target,
+nodes that dominate the target, and all nodes in edges between these sets. For
+example, running `./narrow_deps.sh exe:./src/app/cli/src/dune:0` will generate a
+dependency graph for the `mina.exe` executable.
