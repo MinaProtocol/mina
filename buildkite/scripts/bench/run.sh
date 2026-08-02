@@ -48,15 +48,17 @@ declare -A BENCH_UPLOAD_FORMAT=(
   ["mina-base"]="mina-base"
   ["ledger-export"]="ledger-export"
   ["snark"]="snark"
-  ["archive"]="archive"
   ["ledger-apply"]="ledger-apply"
 )
 
-# Parse-only benches: the input file (produced by the job's preCommands -- the
-# cached archive.perf, or input.json from ledger_test_apply.sh) that
-# mina-bench-upload reads via --input, instead of a binary's stdout.
+# Parse-only benches: the input file (produced by the job's preCommands --
+# input.json from ledger_test_apply.sh) that mina-bench-upload reads via
+# --input, instead of a binary's stdout.
+# NOTE: archive is intentionally NOT here yet -- its parser emits a field named
+# "time", which InfluxDB rejects on the archive measurements (they already carry
+# "time" as the timestamp from the old Python writes). Needs a toolkit field
+# rename first; until then archive stays on the Python path below.
 declare -A BENCH_UPLOAD_INPUT=(
-  ["archive"]="archive.perf"
   ["ledger-apply"]="input.json"
 )
 UPLOAD_FORMAT="${BENCH_UPLOAD_FORMAT[$BENCHMARK]:-}"
