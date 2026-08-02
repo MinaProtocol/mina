@@ -19,7 +19,6 @@
   rocks
   sexplib0
   ;; local libraries
-  mina_stdlib_unix
   key_value_database)
  (preprocess
   (pps ppx_version ppx_jane))
