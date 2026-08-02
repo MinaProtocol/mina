@@ -37,17 +37,30 @@ while [[ "$#" -gt 0 ]]; do case $1 in
 esac; shift; done
 
 # Benches mina-bench-upload can parse, mapped to the parser --format. For a
-# bench in this map, run.sh runs its binary (see run_ported_bench) and pipes
-# stdout to mina-bench-upload (the Rust uploader in the toolchain image);
-# benches not listed fall through to the Python harness below.
+# bench in this map, run.sh feeds its data to mina-bench-upload (the Rust
+# uploader in the toolchain image) instead of the Python harness: stdout benches
+# run a binary (run_ported_bench); parse-only benches read a pre-generated file
+# named in BENCH_UPLOAD_INPUT. Benches not listed fall through to the Python
+# harness below.
 declare -A BENCH_UPLOAD_FORMAT=(
   ["heap-usage"]="heap"
   ["zkapp"]="zkapp"
   ["mina-base"]="mina-base"
   ["ledger-export"]="ledger-export"
   ["snark"]="snark"
+  ["archive"]="archive"
+  ["ledger-apply"]="ledger-apply"
+)
+
+# Parse-only benches: the input file (produced by the job's preCommands -- the
+# cached archive.perf, or input.json from ledger_test_apply.sh) that
+# mina-bench-upload reads via --input, instead of a binary's stdout.
+declare -A BENCH_UPLOAD_INPUT=(
+  ["archive"]="archive.perf"
+  ["ledger-apply"]="input.json"
 )
 UPLOAD_FORMAT="${BENCH_UPLOAD_FORMAT[$BENCHMARK]:-}"
+UPLOAD_INPUT="${BENCH_UPLOAD_INPUT[$BENCHMARK]:-}"
 
 # Emit the bench binary's stdout for $BENCHMARK; the caller pipes it into
 # mina-bench-upload. Each invocation (binary, args, env) mirrors what the
@@ -142,14 +155,27 @@ if [[ -n "$UPLOAD_FORMAT" ]]; then
   # mean than a single branch, which matters for noisy timing benches.
   compare_flags=()
   for b in develop compatible master; do compare_flags+=(--compare-branch "$b"); done
-  run_ported_bench | mina-bench-upload \
-    --format "$UPLOAD_FORMAT" \
-    --branch "$BRANCH" \
-    --upload \
-    --check-regression \
-    --yellow "$YELLOW_THRESHOLD" \
-    --red "$RED_THRESHOLD" \
-    "${compare_flags[@]}"
+  if [[ -n "$UPLOAD_INPUT" ]]; then
+    # Parse-only bench: read the file the job's preCommands generated.
+    mina-bench-upload \
+      --format "$UPLOAD_FORMAT" \
+      --input "$UPLOAD_INPUT" \
+      --branch "$BRANCH" \
+      --upload \
+      --check-regression \
+      --yellow "$YELLOW_THRESHOLD" \
+      --red "$RED_THRESHOLD" \
+      "${compare_flags[@]}"
+  else
+    run_ported_bench | mina-bench-upload \
+      --format "$UPLOAD_FORMAT" \
+      --branch "$BRANCH" \
+      --upload \
+      --check-regression \
+      --yellow "$YELLOW_THRESHOLD" \
+      --red "$RED_THRESHOLD" \
+      "${compare_flags[@]}"
+  fi
 else
   python3 ./scripts/benchmarks test --benchmark ${BENCHMARK}  --branch ${BRANCH} --tmpfile ${BENCHMARK}.csv --yellow-threshold $YELLOW_THRESHOLD --red-threshold $RED_THRESHOLD $MAINLINE_BRANCHES $EXTRA_ARGS
 fi
