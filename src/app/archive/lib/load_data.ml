@@ -210,11 +210,11 @@ let update_of_id pool update_id =
     Set_or_keep.of_option perms_opt
   in
   let%bind zkapp_uri =
-    Mina_caqti.get_zkapp_set_or_keep zkapp_uri_id
+    Zkapp_caqti.get_zkapp_set_or_keep zkapp_uri_id
       ~f:(with_pool ~f:Processor.Zkapp_uri.load)
   in
   let%bind token_symbol =
-    Mina_caqti.get_zkapp_set_or_keep token_symbol_id
+    Zkapp_caqti.get_zkapp_set_or_keep token_symbol_id
       ~f:(with_pool ~f:Processor.Token_symbols.load)
   in
   let%bind timing =

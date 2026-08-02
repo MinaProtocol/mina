@@ -11,7 +11,7 @@
   caqti
   async_kernel
   ;; local libraries
-  mina_base)
+  h_list)
  (preprocess
   (pps ppx_mina ppx_version ppx_jane ppx_custom_printf h_list.ppx))
  (instrumentation

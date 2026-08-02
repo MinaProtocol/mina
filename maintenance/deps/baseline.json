@@ -95,8 +95,8 @@
       "opam": 61
     },
     "exe:app/missing_blocks_auditor:missing_blocks_auditor": {
-      "libs": 102,
-      "opam": 36
+      "libs": 6,
+      "opam": 17
     },
     "exe:app/reformat:reformat": {
       "libs": 0,

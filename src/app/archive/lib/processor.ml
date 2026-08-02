@@ -433,7 +433,7 @@ module Zkapp_states_nullable = struct
         sprintf "element%d" n )
 
   let typ =
-    Mina_caqti.Vector.typ
+    Caqti_vector.typ
       (Caqti_type.(option int), Mina_base.Zkapp_state.Max_state_size.n)
 
   let table_name = "zkapp_states_nullable"
@@ -471,8 +471,7 @@ module Zkapp_states = struct
         sprintf "element%d" n )
 
   let typ =
-    Mina_caqti.Vector.typ
-      (Caqti_type.int, Mina_base.Zkapp_state.Max_state_size.n)
+    Caqti_vector.typ (Caqti_type.int, Mina_base.Zkapp_state.Max_state_size.n)
 
   let table_name = "zkapp_states"
 
@@ -505,7 +504,7 @@ module Zkapp_action_states = struct
 
   type t = (int, Len.n) Pickles_types.Vector.t
 
-  let typ = Mina_caqti.Vector.typ (Caqti_type.int, Len.n)
+  let typ = Caqti_vector.typ (Caqti_type.int, Len.n)
 
   let names =
     List.init (Pickles_types.Nat.to_int Len.n) ~f:(fun n ->
@@ -847,37 +846,37 @@ module Zkapp_updates = struct
       |> Zkapp_states_nullable.add_if_doesn't_exist (module Conn)
     in
     let%bind delegate_id =
-      Mina_caqti.add_if_zkapp_set
+      Zkapp_caqti.add_if_zkapp_set
         (Public_key.add_if_doesn't_exist (module Conn))
         update.delegate
     in
     let%bind verification_key_id =
-      Mina_caqti.add_if_zkapp_set
+      Zkapp_caqti.add_if_zkapp_set
         (Zkapp_verification_keys.add_if_doesn't_exist (module Conn))
         update.verification_key
     in
     let%bind permissions_id =
-      Mina_caqti.add_if_zkapp_set
+      Zkapp_caqti.add_if_zkapp_set
         (Zkapp_permissions.add_if_doesn't_exist (module Conn))
         update.permissions
     in
     let%bind timing_id =
-      Mina_caqti.add_if_zkapp_set
+      Zkapp_caqti.add_if_zkapp_set
         (Zkapp_timing_info.add_if_doesn't_exist (module Conn))
         update.timing
     in
     let%bind zkapp_uri_id =
-      Mina_caqti.add_if_zkapp_set
+      Zkapp_caqti.add_if_zkapp_set
         (Zkapp_uri.add_if_doesn't_exist (module Conn))
         update.zkapp_uri
     in
     let%bind token_symbol_id =
-      Mina_caqti.add_if_zkapp_set
+      Zkapp_caqti.add_if_zkapp_set
         (Token_symbols.add_if_doesn't_exist (module Conn))
         update.token_symbol
     in
     let%bind voting_for_id =
-      Mina_caqti.add_if_zkapp_set
+      Zkapp_caqti.add_if_zkapp_set
         (Voting_for.add_if_doesn't_exist (module Conn))
         update.voting_for
     in
@@ -993,17 +992,17 @@ module Zkapp_account_precondition = struct
       (acct : Zkapp_precondition.Account.t) =
     let open Deferred.Result.Let_syntax in
     let%bind balance_id =
-      Mina_caqti.add_if_zkapp_check
+      Zkapp_caqti.add_if_zkapp_check
         (Zkapp_balance_bounds.add_if_doesn't_exist (module Conn))
         acct.balance
     in
     let%bind nonce_id =
-      Mina_caqti.add_if_zkapp_check
+      Zkapp_caqti.add_if_zkapp_check
         (Zkapp_nonce_bounds.add_if_doesn't_exist (module Conn))
         acct.nonce
     in
     let%bind delegate_id =
-      Mina_caqti.add_if_zkapp_check
+      Zkapp_caqti.add_if_zkapp_check
         (Public_key.add_if_doesn't_exist (module Conn))
         acct.delegate
     in
@@ -1012,7 +1011,7 @@ module Zkapp_account_precondition = struct
       |> Zkapp_states_nullable.add_if_doesn't_exist (module Conn)
     in
     let%bind action_state_id =
-      Mina_caqti.add_if_zkapp_check
+      Zkapp_caqti.add_if_zkapp_check
         (Zkapp_field.add_if_doesn't_exist (module Conn))
         acct.action_state
     in
@@ -1365,12 +1364,12 @@ module Zkapp_epoch_ledger = struct
       (epoch_ledger : _ Epoch_ledger.Poly.t) =
     let open Deferred.Result.Let_syntax in
     let%bind hash_id =
-      Mina_caqti.add_if_zkapp_check
+      Zkapp_caqti.add_if_zkapp_check
         (Snarked_ledger_hash.add_if_doesn't_exist (module Conn))
         epoch_ledger.hash
     in
     let%bind total_currency_id =
-      Mina_caqti.add_if_zkapp_check
+      Zkapp_caqti.add_if_zkapp_check
         (Zkapp_amount_bounds.add_if_doesn't_exist (module Conn))
         epoch_ledger.total_currency
     in
@@ -1411,7 +1410,7 @@ module Zkapp_epoch_data = struct
       Zkapp_epoch_ledger.add_if_doesn't_exist (module Conn) epoch_data.ledger
     in
     let%bind epoch_length_id =
-      Mina_caqti.add_if_zkapp_check
+      Zkapp_caqti.add_if_zkapp_check
         (Zkapp_length_bounds.add_if_doesn't_exist (module Conn))
         epoch_data.epoch_length
     in
@@ -1470,27 +1469,27 @@ module Zkapp_network_precondition = struct
       (ps : Mina_base.Zkapp_precondition.Protocol_state.t) =
     let open Deferred.Result.Let_syntax in
     let%bind snarked_ledger_hash_id =
-      Mina_caqti.add_if_zkapp_check
+      Zkapp_caqti.add_if_zkapp_check
         (Snarked_ledger_hash.add_if_doesn't_exist (module Conn))
         ps.snarked_ledger_hash
     in
     let%bind blockchain_length_id =
-      Mina_caqti.add_if_zkapp_check
+      Zkapp_caqti.add_if_zkapp_check
         (Zkapp_length_bounds.add_if_doesn't_exist (module Conn))
         ps.blockchain_length
     in
     let%bind min_window_density_id =
-      Mina_caqti.add_if_zkapp_check
+      Zkapp_caqti.add_if_zkapp_check
         (Zkapp_length_bounds.add_if_doesn't_exist (module Conn))
         ps.min_window_density
     in
     let%bind total_currency_id =
-      Mina_caqti.add_if_zkapp_check
+      Zkapp_caqti.add_if_zkapp_check
         (Zkapp_amount_bounds.add_if_doesn't_exist (module Conn))
         ps.total_currency
     in
     let%bind global_slot_since_genesis =
-      Mina_caqti.add_if_zkapp_check
+      Zkapp_caqti.add_if_zkapp_check
         (Zkapp_global_slot_bounds.add_if_doesn't_exist (module Conn))
         ps.global_slot_since_genesis
     in
@@ -1679,7 +1678,7 @@ module Zkapp_account_update_body = struct
         body.preconditions.account
     in
     let%bind zkapp_valid_while_precondition_id =
-      Mina_caqti.add_if_zkapp_check
+      Zkapp_caqti.add_if_zkapp_check
         (Zkapp_global_slot_bounds.add_if_doesn't_exist (module Conn))
         body.preconditions.valid_while
     in

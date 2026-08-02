@@ -48,14 +48,14 @@
       "from": "lib:lib/mina_caqti:*",
       "to": "lib:app/*",
       "why": "The Caqti helpers must not depend on applications."
-    }
-  ],
-  "pending": [
+    },
     {
       "from": "lib:lib/mina_caqti:*",
       "to": "lib:lib/mina_base:*",
-      "why": "514 lines of Caqti helpers pull in 101 libraries for Zkapp_basic.Set_or_keep and Zkapp_basic.Or_ignore alone. Moving those four wrappers into archive_lib takes missing_blocks_auditor from 106 libraries to 5."
-    },
+      "why": "mina_caqti is a generic helper library over the Caqti bindings. Depending on the protocol stack for two variant types made every database tool carry the whole of Mina; the zkApp Set_or_keep/Or_ignore wrappers live in archive_lib instead (Zkapp_caqti)."
+    }
+  ],
+  "pending": [
     {
       "from": "exe:app/generate_keypair:*",
       "to": "lib:lib/transaction_snark:*",

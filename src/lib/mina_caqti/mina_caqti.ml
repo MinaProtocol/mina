@@ -2,7 +2,6 @@
 
 open Async
 open Core_kernel
-open Mina_base
 
 (* custom Caqti types for generating type annotations on queries *)
 let find_req t u s = Caqti_request.Infix.(t ->! u) s
@@ -103,101 +102,6 @@ module Type_spec = struct
     let encode t = Ok (hlist_to_tuple tys (to_hlist t)) in
     let decode t = Ok (of_hlist (tuple_to_hlist tys t)) in
     Caqti_type.custom ~encode ~decode (to_rep tys)
-end
-
-module Vector = struct
-  type (_, _, _, _) t =
-    | [] : ('elem, unit, unit, Pickles_types.Nat.z) t
-    | ( :: ) :
-        'elem Caqti_type.t * ('elem, 'fun_t, 'tup_t, 'n) t
-        -> ('elem, 'elem -> 'fun_t, 'elem * 'tup_t, 'n Pickles_types.Nat.s) t
-
-  let rec vec_to_hlist :
-            'elem 'hlist 'tup 'n.
-               ('elem, 'hlist, 'tup, 'n) t
-            -> ('elem, 'n) Pickles_types.Vector.t
-            -> (unit, 'hlist) H_list.t =
-    fun (type elem hlist tup n) (spec : (elem, hlist, tup, n) t)
-        (v : (elem, n) Pickles_types.Vector.t) ->
-     match (spec, v) with
-     | [], [] ->
-         ([] : (unit, hlist) H_list.t)
-     | _ :: spec, x :: v ->
-         x :: vec_to_hlist spec v
-
-  let rec hlist_to_vec :
-            'elem 'hlist 'tup 'n.
-               ('elem, 'hlist, 'tup, 'n) t
-            -> (unit, 'hlist) H_list.t
-            -> ('elem, 'n) Pickles_types.Vector.t =
-    fun (type elem hlist tup n) (spec : (elem, hlist, tup, n) t)
-        (l : (unit, hlist) H_list.t) ->
-     match (spec, l) with
-     | _ :: spec, x :: l ->
-         (x :: hlist_to_vec spec l : (elem, n) Pickles_types.Vector.t)
-     | [], [] ->
-         []
-
-  module type Intf = sig
-    (** defines a function type, like ['elem -> 'elem -> ... -> 'elem -> unit] *)
-    type 'elem fun_t
-
-    (** defines a tuple type, like ['elem * 'elem * ... * 'elem * unit] *)
-    type 'elem tup_t
-
-    type n
-
-    val spec : 'elem Caqti_type.t -> ('elem, 'elem fun_t, 'elem tup_t, n) t
-
-    val type_spec : 'elem Caqti_type.t -> ('elem fun_t, 'elem tup_t) Type_spec.t
-  end
-
-  let rec spec_of_nat :
-      type n. n Plonkish_prelude.Nat.nat -> (module Intf with type n = n) =
-    function
-    | Z ->
-        let module N = struct
-          type 'elem fun_t = unit
-
-          type 'elem tup_t = unit
-
-          type n = Pickles_types.Nat.z
-
-          let spec _ = []
-
-          let type_spec _ = Type_spec.[]
-        end in
-        (module N : Intf with type n = n)
-    | S p ->
-        let (module Prev) = spec_of_nat p in
-        let module N = struct
-          type 'elem fun_t = 'elem -> 'elem Prev.fun_t
-
-          type 'elem tup_t = 'elem * 'elem Prev.tup_t
-
-          type n = Prev.n Pickles_types.Nat.s
-
-          let spec :
-              type elem.
-              elem Caqti_type.t -> (elem, elem fun_t, elem tup_t, n) t =
-           fun t -> t :: Prev.spec t
-
-          let type_spec :
-              'elem Caqti_type.t -> ('elem fun_t, 'elem tup_t) Type_spec.t =
-           fun t -> t :: Prev.type_spec t
-        end in
-        (module N : Intf with type n = n)
-
-  let typ :
-      type elem n.
-         elem Caqti_type.t * n Plonkish_prelude.Nat.nat
-      -> (elem, n) Pickles_types.Vector.vec Caqti_type.t =
-   fun (elem, n) ->
-    let (module M) = spec_of_nat n in
-    Type_spec.custom_type
-      ~to_hlist:(vec_to_hlist (M.spec elem))
-      ~of_hlist:(hlist_to_vec (M.spec elem))
-      (M.type_spec elem)
 end
 
 (* build coding for array type that can be interpreted as a string
@@ -331,16 +235,6 @@ let deferred_result_lift_opt :
 let add_if_some (f : 'arg -> ('res, 'err) Deferred.Result.t) :
     'arg option -> ('res option, 'err) Deferred.Result.t =
   Fn.compose deferred_result_lift_opt @@ Option.map ~f
-
-(* if zkApp-related item is Set, run `f` *)
-let add_if_zkapp_set (f : 'arg -> ('res, 'err) Deferred.Result.t) :
-    'arg Zkapp_basic.Set_or_keep.t -> ('res option, 'err) Deferred.Result.t =
-  Fn.compose (add_if_some f) Zkapp_basic.Set_or_keep.to_option
-
-(* if zkApp-related item is Check, run `f` *)
-let add_if_zkapp_check (f : 'arg -> ('res, 'err) Deferred.Result.t) :
-    'arg Zkapp_basic.Or_ignore.t -> ('res option, 'err) Deferred.Result.t =
-  Fn.compose (add_if_some f) Zkapp_basic.Or_ignore.to_option
 
 (* `select_cols ~select:"s0" ~table_name:"t0" ~cols:["col0";"col1";...] ()`
    creates the string
@@ -532,18 +426,6 @@ let make_get_opt ~of_option ~f item_opt =
             failwithf "Error querying db, error: %s" (Caqti_error.show msg) () )
   in
   of_option res_opt
-
-(** convert options to Set or Keep for zkApps-related results *)
-let get_zkapp_set_or_keep (item_opt : 'arg option)
-    ~(f : 'arg -> ('res, _) Deferred.Result.t) :
-    'res Zkapp_basic.Set_or_keep.t Deferred.t =
-  make_get_opt ~of_option:Zkapp_basic.Set_or_keep.of_option ~f item_opt
-
-(** convert options to Check or Ignore for zkApps-related results *)
-let get_zkapp_or_ignore (item_opt : 'arg option)
-    ~(f : 'arg -> ('res, _) Deferred.Result.t) :
-    'res Zkapp_basic.Or_ignore.t Deferred.t =
-  make_get_opt item_opt ~of_option:Zkapp_basic.Or_ignore.of_option ~f
 
 let get_opt_item (arg_opt : 'arg option)
     ~(f : 'arg -> ('res, _) Deferred.Result.t) : 'res option Deferred.t =
