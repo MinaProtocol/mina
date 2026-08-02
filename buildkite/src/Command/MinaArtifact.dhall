@@ -365,50 +365,55 @@ let build_apps
                   ]
                 }
 
+let debianTokens
+    : MinaBuildSpec.Type -> Text
+    =     \(spec : MinaBuildSpec.Type)
+      ->  Text/concatSep
+            " "
+            (List/map Artifact.Type Text Artifact.toDebianToken spec.artifacts)
+
+let buildDebianFromApps
+    : MinaBuildSpec.Type -> Text -> List Cmd.Type
+    =     \(spec : MinaBuildSpec.Type)
+      ->  \(tokens : Text)
+      ->  Toolchain.select
+            Toolchain.Spec::{
+            , mode = spec.toolchainSelectMode
+            , debVersion = spec.debVersion
+            , arch = spec.arch
+            , submodules = False
+            }
+            (commonBuildEnvs spec)
+            "./buildkite/scripts/debian/build-from-cache.sh ${primaryAppsVariant
+                                                                spec} ${treeVariant
+                                                                          spec} ${tokens}"
+
 let build_debian
     : MinaBuildSpec.Type -> Command.Type
     =     \(spec : MinaBuildSpec.Type)
-      ->  let debianTokens =
-                Text/concatSep
-                  " "
-                  ( List/map
-                      Artifact.Type
-                      Text
-                      Artifact.toDebianToken
-                      spec.artifacts
-                  )
-
-          in  Command.build
-                Command.Config::{
-                , commands =
-                      Toolchain.select
-                        Toolchain.Spec::{
-                        , mode = spec.toolchainSelectMode
-                        , debVersion = spec.debVersion
-                        , arch = spec.arch
-                        , submodules = False
-                        }
-                        (commonBuildEnvs spec)
-                        "./buildkite/scripts/debian/build-from-cache.sh ${primaryAppsVariant
-                                                                            spec} ${treeVariant
-                                                                                      spec} ${debianTokens} profile_devnet_generic profile_mainnet_generic"
-                    # [ Cmd.run
-                          "./buildkite/scripts/debian/write_to_cache.sh ${DebianVersions.lowerName
-                                                                            spec.debVersion}"
-                      ]
-                , label = "Debian: Build ${labelSuffix spec}"
-                , key = "build-deb-pkg${Optional/default Text "" spec.suffix}"
-                , depends_on =
-                  [ { name = appsJobName spec, key = "build-apps" } ]
-                , target = Size.Multi
-                , if_ = spec.if_
-                , retries =
-                  [ Command.Retry::{
-                    , exit_status = Command.ExitStatus.Code +2
-                    , limit = Some 2
-                    }
+      ->  Command.build
+            Command.Config::{
+            , commands =
+                  buildDebianFromApps
+                    spec
+                    "${debianTokens
+                         spec} profile_devnet_generic profile_mainnet_generic"
+                # [ Cmd.run
+                      "./buildkite/scripts/debian/write_to_cache.sh ${DebianVersions.lowerName
+                                                                        spec.debVersion}"
                   ]
+            , label = "Debian: Build ${labelSuffix spec}"
+            , key = "build-deb-pkg${Optional/default Text "" spec.suffix}"
+            , depends_on = [ { name = appsJobName spec, key = "build-apps" } ]
+            , target = Size.Multi
+            , if_ = spec.if_
+            , retries =
+              [ Command.Retry::{
+                , exit_status = Command.ExitStatus.Code +2
+                , limit = Some 2
                 }
+              ]
+            }
 
 let docker_step
     : DockerService -> MinaBuildSpec.Type -> List DockerImage.ReleaseSpec.Type
@@ -734,4 +739,6 @@ in  { pipeline = pipeline
     , buildArtifacts = build_artifacts
     , buildApps = build_apps
     , buildDebian = build_debian
+    , buildDebianFromApps = buildDebianFromApps
+    , debianTokens = debianTokens
     }
