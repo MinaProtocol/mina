@@ -1,0 +1,20 @@
+(library
+ (name cli_lib_keypair)
+ (public_name cli_lib.keypair)
+ (libraries
+  ;; opam libraries
+  async
+  core
+  core_kernel
+  ;; local libraries
+  mina_base
+  mina_signature_kind
+  rosetta_coding
+  secrets
+  signature_lib
+  snark_params)
+ (preprocess
+  (pps ppx_version ppx_jane))
+ (instrumentation
+  (backend bisect_ppx))
+ (synopsis "The generate-keypair and validate-keypair commands"))

@@ -11,7 +11,7 @@
   ;; local libraries
   mina_version
   mina_stdlib
-  cli_lib)
+  cli_lib.keypair)
  (instrumentation
   (backend bisect_ppx))
  (preprocess

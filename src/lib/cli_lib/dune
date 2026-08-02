@@ -25,6 +25,7 @@
   bin_prot.shape
   stdio
   ;; local libraries
+  cli_lib.keypair
   genesis_constants
   random_oracle
   pickles

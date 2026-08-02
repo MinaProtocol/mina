@@ -1658,7 +1658,8 @@ let generate_libp2p_keypair_do privkey_path =
             let%bind me = Mina_net2.generate_random_keypair net in
             let%bind () = Mina_net2.shutdown net in
             let%map () =
-              Secrets.Libp2p_keypair.Terminal_stdin.write_exn ~privkey_path me
+              Secrets_libp2p.Libp2p_keypair.Terminal_stdin.write_exn
+                ~privkey_path me
             in
             printf "libp2p keypair:\n%s\n" (Mina_net2.Keypair.to_string me)
         | Error e ->
@@ -1689,7 +1690,7 @@ let dump_libp2p_keypair_do privkey_path =
         with
         | Ok net ->
             let%bind () = Mina_net2.shutdown net in
-            let%map me = Secrets.Libp2p_keypair.read_exn' privkey_path in
+            let%map me = Secrets_libp2p.Libp2p_keypair.read_exn' privkey_path in
             printf "libp2p keypair:\n%s\n" (Mina_net2.Keypair.to_string me)
         | Error e ->
             [%log fatal] "failed to dump libp2p keypair: $error"
