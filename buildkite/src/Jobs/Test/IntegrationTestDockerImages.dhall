@@ -47,6 +47,8 @@ let DockerImage = ../../Command/DockerImage.dhall
 
 let DockerFromLocalDebs = ../../Command/DockerFromLocalDebs.dhall
 
+let IntegrationImages = ../../Constants/IntegrationImages.dhall
+
 let ArtifactPipelines = ../../Command/MinaArtifact.dhall
 
 let Artifacts = ../../Constants/Artifact/Artifacts.dhall
@@ -57,19 +59,15 @@ let Docker = ../../Constants/Docker/Package.dhall
 
 let BaseImage = ../../Constants/Docker/BaseImage.dhall
 
-let Network = ../../Constants/Network.dhall
-
-let Profiles = ../../Constants/Profiles.dhall
-
 let Arch = ../../Constants/Arch.dhall
 
 let Size = ../../Command/Size.dhall
 
-let network = Network.Type.Devnet
+let network = IntegrationImages.network
 
-let profile = Profiles.Type.Devnet
+let profile = IntegrationImages.profile
 
-let debVersion = DebianVersions.DebVersion.Bullseye
+let debVersion = IntegrationImages.debVersion
 
 let arch = Arch.Type.Amd64
 
@@ -110,15 +108,7 @@ let archiveBuildSpec =
       , arch = arch
       }
 
-let keySpec =
-          \(service : Docker.Type)
-      ->  DockerImage.ReleaseSpec::{
-          , service = service
-          , network = network
-          , deb_codename = debVersion
-          , deb_profile = profile
-          , size = Size.XLarge
-          }
+let keySpec = IntegrationImages.keySpec
 
 let genericImage =
       DockerFromLocalDebs.Spec::{
@@ -158,11 +148,9 @@ let daemonStep =
                       [ genericImage, profiledImage ]
                   ]
             , label =
-                DockerImage.stepLabel
-                  (keySpec (Docker.Type.DaemonProfiled { profile = profile }))
+                DockerImage.stepLabel (keySpec IntegrationImages.daemonService)
             , key =
-                DockerImage.stepKey
-                  (keySpec (Docker.Type.DaemonProfiled { profile = profile }))
+                DockerImage.stepKey (keySpec IntegrationImages.daemonService)
             , target = Size.XLarge
             , depends_on = appsDep
             }
@@ -177,11 +165,8 @@ let archiveStep =
                 (ArtifactPipelines.debianTokens archiveBuildSpec)
             # [ DockerFromLocalDebs.buildImages debVersion [ archiveImage ] ]
         , label =
-            DockerImage.stepLabel
-              (keySpec (Docker.Type.Archive { network = network }))
-        , key =
-            DockerImage.stepKey
-              (keySpec (Docker.Type.Archive { network = network }))
+            DockerImage.stepLabel (keySpec IntegrationImages.archiveService)
+        , key = DockerImage.stepKey (keySpec IntegrationImages.archiveService)
         , target = Size.XLarge
         , depends_on = appsDep
         }
@@ -200,6 +185,7 @@ in  Pipeline.build
           , S.strictlyStart (S.contains "scripts/docker")
           , S.strictlyStart (S.contains "scripts/debian")
           , S.strictlyStart (S.contains "buildkite/scripts/apps")
+          , S.exactly "buildkite/src/Constants/IntegrationImages" "dhall"
           ]
         , path = "Test"
         , name = "IntegrationTestDockerImages"
