@@ -33,7 +33,7 @@ let Artifacts = ../../Constants/Artifact/Artifacts.dhall
 
 let Docker = ../../Constants/Docker/Package.dhall
 
-let DockerRepo = ../../Constants/DockerRepo.dhall
+let DockerFromLocalDebs = ../../Command/DockerFromLocalDebs.dhall
 
 let BaseImage = ../../Constants/Docker/BaseImage.dhall
 
@@ -64,6 +64,8 @@ let dirtyWhen =
       , S.exactly "scripts/docker/build" "sh"
       , S.exactly "scripts/debian/builder-helpers" "sh"
       , S.exactly "buildkite/scripts/debian/build-from-cache" "sh"
+      , S.exactly "buildkite/scripts/docker/build-from-local-debs" "sh"
+      , S.exactly "buildkite/src/Command/DockerFromLocalDebs" "dhall"
       , S.strictlyStart (S.contains "buildkite/scripts/apps")
       ]
 
@@ -84,13 +86,14 @@ let hardforkDocker =
         , network = network
         }
 
-let buildImage =
-          "./buildkite/scripts/tests/hardfork/build-auto-hardfork-image.sh"
-      ++  " --network ${Network.lowerName network}"
-      ++  " --profile ${Profiles.lowerName profile}"
-      ++  " --legacy-version ${buildSpec.deb_legacy_version}"
-      ++  " --base-image ${BaseImage.imageFor debVersion arch}"
-      ++  " --docker-registry ${DockerRepo.show DockerRepo.Type.InternalEurope}"
+let imageSpec =
+      DockerFromLocalDebs.Spec::{
+      , service = Docker.Type.DaemonAutoHardfork { network = network }
+      , network = network
+      , profile = profile
+      , baseImage = Some (BaseImage.imageFor debVersion arch)
+      , legacyVersion = Some buildSpec.deb_legacy_version
+      }
 
 in  Pipeline.build
       Pipeline.Config::{
@@ -111,13 +114,7 @@ in  Pipeline.build
                   ArtifactPipelines.buildDebianFromApps
                     buildSpec
                     (ArtifactPipelines.debianTokens buildSpec)
-                # [ Cmd.run
-                      (     "export MINA_DEB_CODENAME=${DebianVersions.lowerName
-                                                          debVersion}"
-                        ++  " && export BRANCH_NAME=\\\${BUILDKITE_BRANCH}"
-                        ++  " && source ./buildkite/scripts/export-git-env-vars.sh"
-                        ++  " && ${buildImage}"
-                      )
+                # [ DockerFromLocalDebs.buildImages debVersion [ imageSpec ]
                   , Cmd.run
                       "buildkite/scripts/tests/hardfork/dispatcher-tests.sh --docker ${hardforkDocker}"
                   ]
