@@ -7,39 +7,39 @@
   ],
   "entrypoints": {
     "exe:app/archive:archive": {
-      "libs": 187,
+      "libs": 184,
       "opam": 52
     },
     "exe:app/archive_blocks:archive_blocks": {
-      "libs": 185,
-      "opam": 52
+      "libs": 174,
+      "opam": 48
     },
     "exe:app/archive_hardfork_toolbox:archive_hardfork_toolbox": {
-      "libs": 186,
+      "libs": 183,
       "opam": 52
     },
     "exe:app/batch_txn_tool:batch_txn_tool": {
-      "libs": 234,
+      "libs": 231,
       "opam": 61
     },
     "exe:app/benchmarks:benchmarks": {
-      "libs": 107,
+      "libs": 104,
       "opam": 33
     },
     "exe:app/best_tip_merger:best_tip_merger": {
-      "libs": 203,
-      "opam": 55
+      "libs": 175,
+      "opam": 50
     },
     "exe:app/cli/src:mina": {
-      "libs": 249,
+      "libs": 248,
       "opam": 66
     },
     "exe:app/cli/src:mina_mainnet_signatures": {
-      "libs": 250,
+      "libs": 249,
       "opam": 66
     },
     "exe:app/cli/src:mina_testnet_signatures": {
-      "libs": 250,
+      "libs": 249,
       "opam": 66
     },
     "exe:app/coverage_utils/display_summary:main": {
@@ -47,55 +47,55 @@
       "opam": 3
     },
     "exe:app/delegation_verify:delegation_verify": {
-      "libs": 198,
+      "libs": 195,
       "opam": 51
     },
     "exe:app/disk_caching_stats:disk_caching_stats": {
-      "libs": 206,
-      "opam": 54
+      "libs": 172,
+      "opam": 47
     },
     "exe:app/dump_blocks:dump_blocks": {
-      "libs": 170,
+      "libs": 167,
       "opam": 46
     },
     "exe:app/dump_slot_ledger:dump_slot_ledger": {
-      "libs": 179,
+      "libs": 176,
       "opam": 52
     },
     "exe:app/extract_blocks:extract_blocks": {
-      "libs": 185,
-      "opam": 52
+      "libs": 174,
+      "opam": 48
     },
     "exe:app/generate_keypair:generate_keypair": {
-      "libs": 179,
+      "libs": 176,
       "opam": 50
     },
     "exe:app/graphql_schema_dump:graphql_schema_dump": {
-      "libs": 233,
+      "libs": 229,
       "opam": 61
     },
     "exe:app/heap_usage:heap_usage": {
-      "libs": 206,
-      "opam": 54
+      "libs": 162,
+      "opam": 46
     },
     "exe:app/ledger_export_bench:ledger_export_benchmark": {
-      "libs": 153,
-      "opam": 44
+      "libs": 119,
+      "opam": 39
     },
     "exe:app/logproc:logproc": {
       "libs": 5,
       "opam": 15
     },
     "exe:app/mina_graphql_client:mina_graphql_client_app": {
-      "libs": 234,
+      "libs": 231,
       "opam": 61
     },
     "exe:app/mina_healthcheck:mina_healthcheck": {
-      "libs": 235,
+      "libs": 232,
       "opam": 61
     },
     "exe:app/missing_blocks_auditor:missing_blocks_auditor": {
-      "libs": 105,
+      "libs": 102,
       "opam": 36
     },
     "exe:app/reformat:reformat": {
@@ -103,67 +103,67 @@
       "opam": 6
     },
     "exe:app/replayer:replayer": {
-      "libs": 186,
+      "libs": 182,
       "opam": 52
     },
     "exe:app/rocksdb-scanner:rocksdb_scanner": {
-      "libs": 6,
-      "opam": 12
+      "libs": 5,
+      "opam": 11
     },
     "exe:app/rosetta/ocaml-signer:signer": {
-      "libs": 205,
+      "libs": 202,
       "opam": 55
     },
     "exe:app/rosetta/ocaml-signer:signer_mainnet_signatures": {
-      "libs": 205,
+      "libs": 202,
       "opam": 55
     },
     "exe:app/rosetta/ocaml-signer:signer_testnet_signatures": {
-      "libs": 205,
+      "libs": 202,
       "opam": 55
     },
     "exe:app/rosetta:rosetta": {
-      "libs": 203,
+      "libs": 200,
       "opam": 55
     },
     "exe:app/rosetta:rosetta_mainnet_signatures": {
-      "libs": 204,
+      "libs": 201,
       "opam": 55
     },
     "exe:app/rosetta:rosetta_testnet_signatures": {
-      "libs": 204,
+      "libs": 201,
       "opam": 55
     },
     "exe:app/runtime_genesis_ledger:runtime_genesis_ledger": {
-      "libs": 183,
+      "libs": 180,
       "opam": 50
     },
     "exe:app/test_executive:test_executive": {
-      "libs": 238,
+      "libs": 235,
       "opam": 62
     },
     "exe:app/validate_keypair:validate_keypair": {
-      "libs": 179,
+      "libs": 176,
       "opam": 50
     },
     "exe:app/zkapp_limits:zkapp_limits": {
-      "libs": 104,
+      "libs": 101,
       "opam": 30
     },
     "exe:app/zkapp_test_transaction:zkapp_test_transaction": {
-      "libs": 233,
+      "libs": 230,
       "opam": 61
     },
     "exe:lib/blockchain_snark/tests/print_blockchain_snark_vk:print_blockchain_snark_vk": {
-      "libs": 139,
+      "libs": 134,
       "opam": 39
     },
     "exe:lib/consensus:proof_of_stake_fuzzer": {
-      "libs": 162,
+      "libs": 159,
       "opam": 45
     },
     "exe:lib/crypto/crypto_params/gen:gen": {
-      "libs": 54,
+      "libs": 52,
       "opam": 27
     },
     "exe:lib/crypto/kimchi_bindings/js/test/nodejs:nodejs_test": {
@@ -179,15 +179,15 @@
       "opam": 9
     },
     "exe:lib/crypto/signature_lib/find_address:find_address": {
-      "libs": 70,
+      "libs": 67,
       "opam": 23
     },
     "exe:lib/dummy_values/gen_values:gen_values": {
-      "libs": 56,
+      "libs": 54,
       "opam": 28
     },
     "exe:lib/generated_graphql_queries/gen:gen": {
-      "libs": 104,
+      "libs": 101,
       "opam": 31
     },
     "exe:lib/mina_metrics/js_test:mina_metrics_js_test": {
@@ -195,7 +195,7 @@
       "opam": 11
     },
     "exe:lib/o1js_stub:o1js_stub": {
-      "libs": 115,
+      "libs": 112,
       "opam": 32
     },
     "exe:lib/ppx_annot/tests:ppx_annot_tests": {
@@ -211,23 +211,23 @@
       "opam": 4
     },
     "exe:lib/snark_worker/standalone:run_snark_worker": {
-      "libs": 232,
+      "libs": 229,
       "opam": 61
     },
     "exe:lib/transaction_snark/test/print_transaction_snark_vk:print_transaction_snark_vk": {
-      "libs": 138,
+      "libs": 133,
       "opam": 39
     },
     "exe:lib/transaction_snark/test/zkapp_fuzzy:zkapp_fuzzy": {
-      "libs": 144,
+      "libs": 139,
       "opam": 40
     },
     "exe:test/archive/patch_archive_test:patch_archive_test": {
-      "libs": 247,
+      "libs": 246,
       "opam": 65
     },
     "exe:test/command_line_tests:command_line_tests": {
-      "libs": 249,
+      "libs": 248,
       "opam": 65
     },
     "exe:test/node_status_mock_server:node_status_mock_server": {
@@ -325,20 +325,12 @@
   ],
   "unreferenced": [
     [
-      "exe:app/best_tip_merger:best_tip_merger",
-      "lib:app/rosetta/lib:lib"
+      "exe:app/heap_usage:heap_usage",
+      "lib:lib/mina_block:mina_block"
     ],
     [
-      "lib:lib/genesis_ledger_helper:genesis_ledger_helper",
+      "exe:app/runtime_genesis_ledger:runtime_genesis_ledger",
       "lib:lib/cli_lib:cli_lib"
-    ],
-    [
-      "lib:lib/runtime_config:runtime_config",
-      "lib:lib/staged_ledger:staged_ledger"
-    ],
-    [
-      "lib:lib/snark_profiler_lib:snark_profiler_lib",
-      "lib:lib/generated_graphql_queries:generated_graphql_queries"
     ]
   ]
 }

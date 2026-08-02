@@ -40,7 +40,6 @@
   kimchi_pasta.constraint_system
   kimchi_pasta_snarky_backend
   bitstring_lib
-  snarky.intf
   pickles.backend
   pickles_types
   snarky.backendless
@@ -57,7 +56,6 @@
   pickles.composition_types
   pickles.plonk_checks
   pickles_base.one_hot_vector
-  snarky_log
   group_map
   snarky_curve
   key_cache
