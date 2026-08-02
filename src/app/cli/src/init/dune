@@ -95,6 +95,7 @@
   daemon_rpcs
   trust_system
   secrets
+  secrets.libp2p
   participating_state
   staged_ledger
   mina_commands

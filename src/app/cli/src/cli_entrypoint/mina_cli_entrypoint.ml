@@ -737,7 +737,7 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
               | None ->
                   return None
               | Some s ->
-                  Secrets.Libp2p_keypair.Terminal_stdin.read_exn
+                  Secrets_libp2p.Libp2p_keypair.Terminal_stdin.read_exn
                     ~should_prompt_user:false ~which:"libp2p keypair" s
                   |> Deferred.map ~f:Option.some )
         in

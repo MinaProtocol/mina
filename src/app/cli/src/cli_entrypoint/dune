@@ -35,6 +35,7 @@
   cache_dir
   parallel
   secrets
+  secrets.libp2p
   logger
   mina_lib
   currency

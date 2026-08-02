@@ -11,4 +11,4 @@ let () =
   | [| _generate_keypair_exe; version |] when is_version_cmd version ->
       Mina_version.print_version ()
   | _ ->
-      Command.run Cli_lib.Commands.generate_keypair
+      Command.run Cli_lib_keypair.Commands.generate_keypair

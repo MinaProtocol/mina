@@ -53,23 +53,22 @@
       "from": "lib:lib/mina_caqti:*",
       "to": "lib:lib/mina_base:*",
       "why": "mina_caqti is a generic helper library over the Caqti bindings. Depending on the protocol stack for two variant types made every database tool carry the whole of Mina; the zkApp Set_or_keep/Or_ignore wrappers live in archive_lib instead (Zkapp_caqti)."
-    }
-  ],
-  "pending": [
+    },
     {
       "from": "exe:app/generate_keypair:*",
       "to": "lib:lib/transaction_snark:*",
-      "why": "generate_keypair uses one symbol from cli_lib (Cli_lib.Commands.generate_keypair) and pays 176 libraries for it. Splitting the keypair commands out of cli_lib would make this a bare binary."
+      "why": "mina-generate-keypair writes a keypair file. It has no business linking the transaction SNARK; the commands live in cli_lib.keypair so it does not pull the rest of cli_lib."
     },
     {
       "from": "exe:app/validate_keypair:*",
       "to": "lib:lib/transaction_snark:*",
-      "why": "Same as generate_keypair: one symbol from cli_lib, 176 libraries of cost."
+      "why": "mina-validate-keypair signs and verifies one dummy transaction. It needs mina_base and snark_params, but not the proof system."
     },
     {
       "from": "lib:lib/genesis_ledger_helper:*",
       "to": "lib:lib/cli_lib:*",
-      "why": "genesis_ledger_helper never references Cli_lib, but the edge drags the daemon CLI into the whole archive toolchain."
+      "why": "genesis_ledger_helper never referenced Cli_lib; the edge dragged the daemon CLI into the whole archive toolchain."
     }
-  ]
+  ],
+  "pending": []
 }

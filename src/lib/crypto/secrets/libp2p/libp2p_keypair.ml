@@ -1,7 +1,8 @@
 open Core
 open Async
 open Async.Deferred.Let_syntax
-open Keypair_common
+open Secrets
+open Secrets.Keypair_common
 
 module T = struct
   type t = Mina_net2.Keypair.t
