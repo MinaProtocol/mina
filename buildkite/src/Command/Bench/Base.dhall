@@ -26,6 +26,9 @@ let SelectFiles = ../../Lib/SelectFiles.dhall
 
 let B/SoftFail = B.definitions/commandStep/properties/soft_fail/Type
 
+let B/SoftFailExit =
+      B.definitions/commandStep/properties/soft_fail/union/properties/exit_status/Type
+
 let Spec =
       { Type =
           { key : Text
@@ -72,7 +75,10 @@ let command
             , label = "Perf: ${spec.label}"
             , key = spec.key
             , target = spec.size
-            , soft_fail = Some (B/SoftFail.Boolean False)
+            , soft_fail = Some
+                ( B/SoftFail.ListSoft_fail/Type
+                    [ { exit_status = Some (B/SoftFailExit.Number 1) } ]
+                )
             , docker = None Docker.Type
             , depends_on = spec.dependsOn
             }

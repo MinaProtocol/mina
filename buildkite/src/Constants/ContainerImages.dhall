@@ -6,12 +6,13 @@
 --       MinaProtocol/mina-release-toolkit. Pinned to a released version tag
 --       (not a moving tag like :latest) for reproducible CI; bump it
 --       deliberately when a newer toolkit is wanted.
--- NOTE: the amd64 mina-toolchain images are on d906afe (adds mina-bench-upload
---       for benchmark uploads), while bookworm arm64 stays on ffab0f8. The
---       mina-bench-upload install is amd64-only, so the arm64 image content is
---       identical either way; ffab0f8 is already published and the arm64
---       toolchain build under QEMU is flaky, so there is nothing to gain from
---       rebuilding it. Reunify the sha on the next full toolchain bump.
+-- NOTE: the amd64 mina-toolchain images are on b8d9c69 (carries the
+--       mina-bench-upload benchmark uploader), while bookworm arm64 stays on
+--       ffab0f8. The mina-bench-upload install is amd64-only, so the arm64
+--       image content is identical either way; ffab0f8 is already published
+--       and the arm64 toolchain build under QEMU is flaky, so there is nothing
+--       to gain from rebuilding it. Reunify the sha on the next full toolchain
+--       bump.
 -- NOTE: minaBase* are the published common base-deps images on docker.io. The tag
 --       format matches build.sh's HASHTAG for service=mina-base: <githash>-<codename>-<network>.
 --       These are frozen references, like minaToolchain*: the daemon/archive/hardfork
