@@ -466,7 +466,13 @@ reset-genesis-ledger() {
         "2_to_the": 2 
       },
     },
-    ledger: .
+    # The genesis winner account is prepended by the daemon and must sit at
+    # index 0: the genesis stake proof hardcodes delegator = 0. It is only
+    # added by default when proof level is Full, so ask for it explicitly.
+    ledger: (. + {
+      add_genesis_winner: true,
+      num_accounts: ((.accounts | length) + 1)
+    })
   }
   ' < "${GENESIS_LEDGER_FOLDER}/genesis_ledger.json" > "${DAEMON_CONFIG}"
 }
