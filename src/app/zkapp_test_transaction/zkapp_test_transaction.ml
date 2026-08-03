@@ -308,14 +308,20 @@ let update_state =
        and num_events =
          Param.flag "--num-events"
            ~doc:
-             "N Number of events (field-arrays) to generate in the account \
-              update (default 0, cap 1024)"
+             (sprintf
+                "N Number of events (field-arrays) to generate in the account \
+                 update (default 0); the transaction may carry at most %d \
+                 event elements in total"
+                Node_config_unconfigurable_constants.max_event_elements )
            Param.(optional_with_default 0 int)
        and num_actions =
          Param.flag "--num-actions"
            ~doc:
-             "N Number of actions (field-arrays) to generate in the account \
-              update (default 0, cap 1024)"
+             (sprintf
+                "N Number of actions (field-arrays) to generate in the account \
+                 update (default 0); the transaction may carry at most %d \
+                 action elements in total"
+                Node_config_unconfigurable_constants.max_action_elements )
            Param.(optional_with_default 0 int)
        and elements_per =
          Param.flag "--elements-per"

@@ -307,26 +307,31 @@ module Util = struct
   let action_state_of_list array_lst : Snark_params.Tick.Field.t array list =
     List.map ~f:Events.of_string_array array_lst
 
-  (* Generate [count] field-arrays, each holding [elements_per] field elements,
-     for producing a heavy zkApp command (large events/actions). The resulting
-     account_update carries a lot of field data, exercising the archive's
-     zkapp_field / zkapp_field_array / zkapp_events insertion paths.
+  (* Generator for [count] field-arrays, each holding [elements_per] random
+     field elements, for producing a heavy zkApp command (large events/actions).
+     The resulting account_update carries a lot of field data, exercising the
+     archive's zkapp_field / zkapp_field_array / zkapp_events insertion paths.
 
-     Each event/action array is bounded on-chain to [max_elements] field elements
-     (Node_config.max_event_elements / max_action_elements); an [elements_per]
-     above that builds a transaction the protocol rejects, so reject it up front
-     with a clear error. The number of arrays [count] is not protocol-bounded. *)
+     [Zkapp_command.valid_size] rejects a command whose events (resp. actions)
+     carry more than [max_elements] field elements in total
+     (Node_config.max_event_elements / max_action_elements), so reject an
+     oversized request up front with a clear error. *)
   let gen_field_arrays ~kind ~max_elements ~count ~elements_per :
-      Snark_params.Tick.Field.t array list =
-    if count > 0 && elements_per > max_elements then
+      Snark_params.Tick.Field.t array list Quickcheck.Generator.t =
+    if count * elements_per > max_elements then
       failwithf
-        "--elements-per (%d) exceeds the maximum of %d field elements per %s \
-         array (Node_config.max_%s_elements)"
-        elements_per max_elements kind kind () ;
-    List.init count ~f:(fun i ->
-        Events.of_string_array
-          (Array.init elements_per ~f:(fun j ->
-               Int.to_string ((i * elements_per) + j + 1) ) ) )
+        "%d %s arrays of %d field elements each exceed the maximum of %d %s \
+         elements per transaction (Node_config.max_%s_elements)"
+        count kind elements_per max_elements kind kind () ;
+    let open Quickcheck.Generator.Let_syntax in
+    let array_gen =
+      let%map fields =
+        Quickcheck.Generator.list_with_length elements_per
+          Snark_params.Tick.Field.gen
+      in
+      Array.of_list fields
+    in
+    Quickcheck.Generator.list_with_length count array_gen
 
   let auth_of_string s : Permissions.Auth_required.t =
     match String.lowercase s with
@@ -523,13 +528,17 @@ let update_state ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile ~app_state
     ; current_auth = Permissions.Auth_required.Signature
     ; call_data = Snark_params.Tick.Field.zero
     ; events =
-        Util.gen_field_arrays ~kind:"event"
-          ~max_elements:Node_config_unconfigurable_constants.max_event_elements
-          ~count:num_events ~elements_per
+        Quickcheck.random_value ~seed:`Nondeterministic
+          (Util.gen_field_arrays ~kind:"event"
+             ~max_elements:
+               Node_config_unconfigurable_constants.max_event_elements
+             ~count:num_events ~elements_per )
     ; actions =
-        Util.gen_field_arrays ~kind:"action"
-          ~max_elements:Node_config_unconfigurable_constants.max_action_elements
-          ~count:num_actions ~elements_per
+        Quickcheck.random_value ~seed:`Nondeterministic
+          (Util.gen_field_arrays ~kind:"action"
+             ~max_elements:
+               Node_config_unconfigurable_constants.max_action_elements
+             ~count:num_actions ~elements_per )
     ; preconditions = None
     }
   in
