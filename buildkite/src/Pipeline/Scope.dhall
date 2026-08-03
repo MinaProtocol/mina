@@ -10,6 +10,13 @@
 -- Scope is used to determine which jobs should be run in the pipeline.
 -- We can see scope as specialized tag that is applied to jobs. Single job can have multiple scopes.
 -- On Pipeline top level we can filter jobs based on scope, tags and mode.
+--
+-- AllButNightly and StableAndWeekly exist for the jobs that build or test debian
+-- packages and docker images. Nightly runs with job selection Full, which
+-- bypasses dirtyWhen entirely, so a packaging job left in the Nightly scope
+-- rebuilds the whole artifact matrix every night whether or not anything about
+-- packaging changed. Everything that consumed those artifacts now takes its
+-- binaries from the app-build cache instead, so nightly no longer needs them.
 
 let Prelude = ../External/Prelude.dhall
 
@@ -56,10 +63,17 @@ let PullRequestOnly = [ Scope.PullRequest ]
 let AllButPullRequest =
       [ Scope.Nightly, Scope.MainlineNightly, Scope.Weekly, Scope.Release ]
 
+let AllButNightly =
+      [ Scope.PullRequest, Scope.MainlineNightly, Scope.Weekly, Scope.Release ]
+
+let StableAndWeekly = [ Scope.MainlineNightly, Scope.Weekly, Scope.Release ]
+
 in  { Type = Scope
     , Full = Full
     , PullRequestOnly = PullRequestOnly
     , AllButPullRequest = AllButPullRequest
+    , AllButNightly = AllButNightly
+    , StableAndWeekly = StableAndWeekly
     , capitalName = capitalName
     , lowerName = lowerName
     , join = join

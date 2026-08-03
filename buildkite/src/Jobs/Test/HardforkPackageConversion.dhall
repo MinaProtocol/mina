@@ -4,6 +4,8 @@ let Pipeline = ../../Pipeline/Dsl.dhall
 
 let PipelineTag = ../../Pipeline/Tag.dhall
 
+let PipelineScope = ../../Pipeline/Scope.dhall
+
 let JobSpec = ../../Pipeline/JobSpec.dhall
 
 let Command = ../../Command/Base.dhall
@@ -33,6 +35,7 @@ in  Pipeline.build
           , PipelineTag.Type.Test
           , PipelineTag.Type.Stable
           ]
+        , scope = PipelineScope.AllButNightly
         }
       , steps =
         [ Command.build

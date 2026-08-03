@@ -27,7 +27,7 @@ in  Pipeline.build
             , Artifacts.Type.Archive { network = Network.Type.Mainnet }
             , Artifacts.Type.Rosetta { network = Network.Type.Mainnet }
             ]
-          , scope = PipelineScope.AllButPullRequest
+          , scope = PipelineScope.StableAndWeekly
           , tags =
             [ PipelineTag.Type.Long
             , PipelineTag.Type.Release

@@ -6,6 +6,8 @@ let Pipeline = ../../Pipeline/Dsl.dhall
 
 let PipelineTag = ../../Pipeline/Tag.dhall
 
+let PipelineScope = ../../Pipeline/Scope.dhall
+
 let DebianChannel = ../../Constants/DebianChannel.dhall
 
 let Network = ../../Constants/Network.dhall
@@ -29,5 +31,6 @@ in  Pipeline.build
           , tags = [ PipelineTag.Type.Docker ]
           , channel = DebianChannel.Type.Experimental
           , prefix = "MinaArtifactOnlyDebian"
+          , scope = PipelineScope.AllButNightly
           }
       )

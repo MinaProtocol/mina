@@ -6,6 +6,8 @@ let Pipeline = ../../Pipeline/Dsl.dhall
 
 let PipelineTag = ../../Pipeline/Tag.dhall
 
+let PipelineScope = ../../Pipeline/Scope.dhall
+
 let Network = ../../Constants/Network.dhall
 
 let Profile = ../../Constants/Profiles.dhall
@@ -43,5 +45,6 @@ in  Pipeline.build
             , PipelineTag.Type.Amd64
             , PipelineTag.Type.Bullseye
             ]
+          , scope = PipelineScope.AllButNightly
           }
       )
