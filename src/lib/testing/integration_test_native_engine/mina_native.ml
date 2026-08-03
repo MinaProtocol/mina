@@ -3,6 +3,12 @@ open Async
 open Signature_lib
 open Integration_test_lib
 
+(** Proof level the [mina] binary was compiled with, as resolved from the build
+    profile. *)
+let compiled_proof_level () =
+  let (module G) = Genesis_constants.profiled () in
+  G.proof_level
+
 module Network_config = struct
   module Cli_inputs = Cli_inputs
 
@@ -77,7 +83,7 @@ module Network_config = struct
          time, so we adapt the test to the binary rather than the other way
          round; this is what lets the same test run under any build profile. *)
       let compile_proof_level =
-        match Genesis_constants.Compiled.proof_level with
+        match compiled_proof_level () with
         | Full ->
             Runtime_config.Proof_keys.Level.Full
         | Check ->
@@ -597,7 +603,7 @@ module Network_manager = struct
                       ; "snark-worker"
                       ; "-proof-level"
                       ; Genesis_constants.Proof_level.to_string
-                          Genesis_constants.Compiled.proof_level
+                          (compiled_proof_level ())
                       ; "-daemon-address"
                       ; sprintf "127.0.0.1:%d" coordinator_ports.client_port
                       ; "--shutdown-on-disconnect"
