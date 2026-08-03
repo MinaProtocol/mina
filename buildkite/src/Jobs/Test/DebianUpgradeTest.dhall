@@ -89,6 +89,7 @@ in  Pipeline.build
           let dirtyWhen =
                 [ S.strictlyStart (S.contains "src")
                 , S.strictly (S.contains "Makefile")
+                , S.strictlyStart (S.contains "mk/")
                 , S.exactly "buildkite/src/Jobs/Test/DebianUpgradeTest" "dhall"
                 , S.exactly "buildkite/scripts/tests/debian-upgrade-test" "sh"
                 , S.strictlyStart (S.contains "scripts/debian")

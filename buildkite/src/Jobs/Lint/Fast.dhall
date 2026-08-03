@@ -25,6 +25,7 @@ in  Pipeline.build
       , spec = JobSpec::{
         , dirtyWhen =
           [ S.strictly (S.contains "Makefile")
+          , S.strictlyStart (S.contains "mk/")
           , S.strictlyStart (S.contains "src/")
           , S.strictlyStart (S.contains "rfcs/")
           , S.exactly_noext "CODEOWNERS"
