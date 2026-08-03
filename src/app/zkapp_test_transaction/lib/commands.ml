@@ -342,10 +342,8 @@ module Util = struct
   (* Pick the zkApp state fields to set: either the ones named explicitly, or
      [count] generated ones. How many fields a zkApp account has is fixed when
      the tool is built, so asking for [Max] is the only way to set all of them
-     without naming a number that a different protocol version rejects.
-     [max_fields] is that limit, read once at the entrypoint and passed down
-     rather than looked up here. *)
-  let state_fields ~explicit ~count ~max_fields =
+     without naming a number that a different protocol version rejects. *)
+  let state_fields ~explicit ~count =
     match count with
     | Count 0 ->
         explicit
@@ -354,12 +352,14 @@ module Util = struct
           failwith
             "--zkapp-state and --num-state-fields both set the zkApp state; \
              pass one or the other" ;
-        let n = match count with Count n -> n | Max -> max_fields in
-        if n > max_fields then
+        let n =
+          match count with Count n -> n | Max -> Zkapp_state.max_size_int
+        in
+        if n > Zkapp_state.max_size_int then
           failwithf
             "%d zkApp state fields is above the %d this protocol version \
              defines"
-            n max_fields () ;
+            n Zkapp_state.max_size_int () ;
         List.init n ~f:(fun i -> Int.to_string (i + 1))
 
   let gen_field_arrays ~kind ~max_elements ~count ~elements_per ~repeat
@@ -568,15 +568,14 @@ let transfer_funds ~debug ~sender ~sender_nonce ~fee ~fee_payer ~fee_payer_nonce
 
 let update_state ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile ~app_state
     ~num_events ~num_actions ~event_elements_per ~action_elements_per
-    ~repeat_arrays ~num_state_fields ~num_account_updates ~max_state_fields
-    ~genesis_constants ~constraint_constants =
+    ~repeat_arrays ~num_state_fields ~num_account_updates ~genesis_constants
+    ~constraint_constants =
   let open Deferred.Let_syntax in
   let%bind keypair = Util.fee_payer_keypair_of_file keyfile in
   let%bind zkapp_keypair = Util.snapp_keypair_of_file zkapp_keyfile in
   let app_state =
     Util.app_state_of_list
-      (Util.state_fields ~explicit:app_state ~count:num_state_fields
-         ~max_fields:max_state_fields )
+      (Util.state_fields ~explicit:app_state ~count:num_state_fields)
   in
   if num_account_updates < 1 then
     failwithf "--num-account-updates must be at least 1, got %d"
