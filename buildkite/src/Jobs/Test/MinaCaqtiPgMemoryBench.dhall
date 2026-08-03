@@ -10,9 +10,11 @@ let RunWithPostgres = ../../Command/RunWithPostgres.dhall
 
 let RunPerformanceTest = ../../Command/RunPerformanceTest.dhall
 
-let WithCargo = ../../Command/WithCargo.dhall
-
 let ContainerImages = ../../Constants/ContainerImages.dhall
+
+let FixPermissions = ../../Command/FixPermissions.dhall
+
+let Arch = ../../Constants/Arch.dhall
 
 in  Pipeline.build
       Pipeline.Config::{
@@ -38,13 +40,12 @@ in  Pipeline.build
             , key = "mina-caqti-pg-memory-bench"
             , label = "Mina caqti postgres memory-usage bench"
             , runCommands =
-              [ RunWithPostgres.runInDockerWithPostgresConn
+              [ FixPermissions.command Arch.Type.Amd64
+              , RunWithPostgres.runInDockerWithPostgresConn
                   [ "BUILDKITE_BRANCH", "BUILDKITE_COMMIT" ]
                   (None RunWithPostgres.ScriptOrArchive)
                   ContainerImages.minaToolchain
-                  ( WithCargo.withCargo
-                      "./buildkite/scripts/tests/mina-caqti-pg-memory-bench.sh"
-                  )
+                  "./buildkite/scripts/tests/mina-caqti-pg-memory-bench.sh"
               ]
             }
         ]

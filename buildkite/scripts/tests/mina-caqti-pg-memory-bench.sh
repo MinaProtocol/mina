@@ -7,14 +7,14 @@
 # buildkite/scripts/bench/send.sh uploads it.
 #
 # The PostgreSQL instance is provided by RunWithPostgres (see the Buildkite job),
-# which exports POSTGRES_URI; the benchmark creates its own scratch tables, so no
+# which exports PG_CONN; the benchmark creates its own scratch tables, so no
 # schema is loaded here.
 #
 # USAGE:
 #   ./mina-caqti-pg-memory-bench.sh [iterations]
 #
 # Must be run from the repository root (where dune-project exists), inside the
-# mina-toolchain image with $POSTGRES_URI set.
+# mina-toolchain image with $PG_CONN set.
 
 set -euo pipefail
 
@@ -25,7 +25,11 @@ fi
 
 iterations="${1:-4000}"
 perf_file="${PERF_OUTPUT_FILE:-/workdir/mina_caqti_pg_memory.perf}"
-: "${POSTGRES_URI:?POSTGRES_URI must be set (provided by RunWithPostgres)}"
+pg_uri="${PG_CONN:-${POSTGRES_URI:-}}"
+: "${pg_uri:?PG_CONN or POSTGRES_URI must be set (provided by RunWithPostgres)}"
+
+# mina_caqti pulls in mina_base, whose kimchi bindings need the Rust toolchain.
+export PATH="/home/opam/.cargo/bin:$PATH"
 
 eval "$(opam config env)"
 
@@ -34,7 +38,7 @@ dune build src/lib/mina_caqti/test/pg_memory/main.exe
 
 echo "Running the micro-benchmark (${iterations} iterations/scenario)..."
 ./_build/default/src/lib/mina_caqti/test/pg_memory/main.exe \
-    --uri "${POSTGRES_URI}" \
+    --uri "${pg_uri}" \
     --iterations "${iterations}" \
     --variant "${MINA_BENCH_VARIANT:-ci}" \
     --git-branch "${BUILDKITE_BRANCH:-unknown}" \
