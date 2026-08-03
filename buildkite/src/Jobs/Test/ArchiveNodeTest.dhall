@@ -28,7 +28,6 @@ in  Pipeline.build
           , S.exactly "buildkite/src/Command/Bench/Base" "dhall"
           , S.exactly "buildkite/scripts/bench/install" "sh"
           , S.exactly "buildkite/scripts/bench/run" "sh"
-          , S.contains "scripts/benchmark"
           , S.exactly "buildkite/src/Jobs/Bench/ArchiveStable" "dhall"
           , S.exactly "buildkite/src/Jobs/Bench/ArchiveUnstable" "dhall"
           ]

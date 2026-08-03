@@ -95,7 +95,6 @@ let pipeline
                       "dhall"
                   , SelectFiles.exactly "buildkite/scripts/bench/install" "sh"
                   , SelectFiles.exactly "buildkite/scripts/bench/run" "sh"
-                  , SelectFiles.contains "scripts/benchmark"
                   , SelectFiles.exactly
                       "buildkite/src/Jobs/Bench/${spec.name}"
                       "dhall"
