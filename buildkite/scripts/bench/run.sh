@@ -4,31 +4,19 @@ set -eox pipefail
 
 YELLOW_THRESHOLD="0.1"
 RED_THRESHOLD="0.3"
-EXTRA_ARGS="${EXTRA_ARGS:-}"
 BRANCH="${BRANCH:-BUILDKITE_BRANCH}"
 
-MAINLINE_BRANCHES="-m develop -m compatible -m master -m dkijania/bench_for_ledger_test"
 while [[ "$#" -gt 0 ]]; do case $1 in
   heap-usage) BENCHMARK="heap-usage"; ;;
   mina-base) BENCHMARK="mina-base"; ;;
-  archive)
-    BENCHMARK="archive";
-    EXTRA_ARGS="--no-run ${EXTRA_ARGS}"
-
-  ;;
-  ledger-export)
-    BENCHMARK="ledger-export"
-    EXTRA_ARGS="--genesis-ledger-path ./genesis_ledgers/devnet.json"
-  ;;
-  ledger-apply)
-    BENCHMARK="ledger-apply"
-  ;;
+  archive) BENCHMARK="archive"; ;;
+  ledger-export) BENCHMARK="ledger-export"; ;;
+  ledger-apply) BENCHMARK="ledger-apply"; ;;
   snark)
-    BENCHMARK="snark";
+    BENCHMARK="snark"
     K=1
     MAX_NUM_UPDATES=4
     MIN_NUM_UPDATES=2
-    EXTRA_ARGS="--k ${K} --max-num-updates ${MAX_NUM_UPDATES} --min-num-updates ${MIN_NUM_UPDATES}"
   ;;
   zkapp) BENCHMARK="zkapp"; ;;
   --yellow-threshold) YELLOW_THRESHOLD="$2"; shift;;
@@ -36,37 +24,37 @@ while [[ "$#" -gt 0 ]]; do case $1 in
   *) echo "Unknown parameter passed: $1"; exit 1;;
 esac; shift; done
 
-# Benches mina-bench-upload can parse, mapped to the parser --format. For a
-# bench in this map, run.sh feeds its data to mina-bench-upload (the Rust
-# uploader in the toolchain image) instead of the Python harness: stdout benches
-# run a binary (run_ported_bench); parse-only benches read a pre-generated file
-# named in BENCH_UPLOAD_INPUT. Benches not listed fall through to the Python
-# harness below.
+# Each bench feeds its data to mina-bench-upload (the Rust parser + InfluxDB
+# uploader in the toolchain image), mapped to its parser --format. Stdout
+# benches run a binary (run_ported_bench); parse-only benches read a
+# pre-generated file named in BENCH_UPLOAD_INPUT.
 declare -A BENCH_UPLOAD_FORMAT=(
   ["heap-usage"]="heap"
   ["zkapp"]="zkapp"
   ["mina-base"]="mina-base"
   ["ledger-export"]="ledger-export"
   ["snark"]="snark"
+  ["archive"]="archive"
   ["ledger-apply"]="ledger-apply"
 )
 
-# Parse-only benches: the input file (produced by the job's preCommands --
-# input.json from ledger_test_apply.sh) that mina-bench-upload reads via
-# --input, instead of a binary's stdout.
-# NOTE: archive is intentionally NOT here yet -- its parser emits a field named
-# "time", which InfluxDB rejects on the archive measurements (they already carry
-# "time" as the timestamp from the old Python writes). Needs a toolkit field
-# rename first; until then archive stays on the Python path below.
+# Parse-only benches: the input file (produced by the job's preCommands -- the
+# cached archive.perf, or input.json from ledger_test_apply.sh) that
+# mina-bench-upload reads via --input, instead of a binary's stdout.
 declare -A BENCH_UPLOAD_INPUT=(
+  ["archive"]="archive.perf"
   ["ledger-apply"]="input.json"
 )
 UPLOAD_FORMAT="${BENCH_UPLOAD_FORMAT[$BENCHMARK]:-}"
 UPLOAD_INPUT="${BENCH_UPLOAD_INPUT[$BENCHMARK]:-}"
 
+if [[ -z "$UPLOAD_FORMAT" ]]; then
+  echo "run.sh: no mina-bench-upload --format for benchmark '${BENCHMARK:-}'" >&2
+  exit 1
+fi
+
 # Emit the bench binary's stdout for $BENCHMARK; the caller pipes it into
-# mina-bench-upload. Each invocation (binary, args, env) mirrors what the
-# Python harness ran, so the parser sees the output it was built for.
+# mina-bench-upload.
 run_ported_bench () {
   case "$BENCHMARK" in
     heap-usage)
@@ -91,21 +79,11 @@ run_ported_bench () {
   esac
 }
 
-# The mina-base, heap-usage and zkapp micro-benchmarks each invoke a single
-# self-contained test-suite executable with no genesis ledger, /etc/mina config
-# or network -- so the freshly-built bare binary from the apps cache is enough,
-# no .deb required. Map each to its cached exe and the name the python harness
-# expects on PATH (mirroring what the deb installs):
-#   - mina-base/heap-usage/zkapp/ledger-export: a self-contained micro-bench exe.
-#     ledger-export reads only ./genesis_ledgers/devnet.json (in-repo, passed via
-#     --genesis-ledger-path), not a deb payload.
-#   - snark: `mina transaction-snark-profiler`, a self-contained mina subcommand
-#     (it generates its own transactions), restored as plain `mina`.
-#   - archive: runs with --no-run; it only parses a pre-generated JSON into CSV
-#     and executes no binary, so neither a .deb nor a cached exe is needed.
-#   - ledger-apply: its pre-command generates the benchmark JSON; this step only
-#     parses and compares that file, so it does not need a binary or .deb.
-# Any cache miss falls back to the .deb.
+# The stdout micro-benchmarks each invoke a single self-contained test-suite
+# executable; use the freshly-built bare binary from the apps cache when
+# available (no .deb required), else fall back to the .deb. The parse-only
+# benches (archive, ledger-apply) run no binary here -- their input file is
+# produced by the job's preCommands -- so they need neither.
 BARE_NONE=false
 case "$BENCHMARK" in
   mina-base)     BARE_EXE=benchmarks.exe;              BARE_AS=mina-benchmarks ;;
@@ -129,7 +107,6 @@ if [[ "$BARE_NONE" == true ]]; then
   git config --global --add safe.directory /workdir
   source buildkite/scripts/export-git-env-vars.sh
   echo "$BENCHMARK bench is parse-only here; skipping binary and .deb install"
-  [[ -n "$UPLOAD_FORMAT" ]] || pip3 install -r scripts/benchmarks/requirements.txt
   INSTALLED_BARE=true
 elif [[ -n "$BARE_EXE" ]]; then
   git config --global --add safe.directory /workdir
@@ -137,7 +114,6 @@ elif [[ -n "$BARE_EXE" ]]; then
 
   if ./buildkite/scripts/apps/restore_app.sh devnet "$BARE_EXE" "$BARE_AS"; then
     echo "Using bare $BARE_AS from apps cache (no .deb needed)"
-    [[ -n "$UPLOAD_FORMAT" ]] || pip3 install -r scripts/benchmarks/requirements.txt
     INSTALLED_BARE=true
   fi
 fi
@@ -146,38 +122,31 @@ if [[ "$INSTALLED_BARE" == false ]]; then
   source buildkite/scripts/bench/install.sh
 fi
 
-if [[ -n "$UPLOAD_FORMAT" ]]; then
-  # Run the bench binary and pipe stdout to mina-bench-upload: it parses the
-  # output, uploads the records to InfluxDB (creds from the INFLUX_* env set by
-  # Benchmarks.toEnvList) and runs the historical-mean regression check. A red
-  # regression exits non-zero, failing the build.
-  #
-  # Regression baseline is the union of the mainline branches (mirrors the
-  # Python harness's -m develop/compatible/master) -- a wider, more stable
-  # mean than a single branch, which matters for noisy timing benches.
-  compare_flags=()
-  for b in develop compatible master; do compare_flags+=(--compare-branch "$b"); done
-  if [[ -n "$UPLOAD_INPUT" ]]; then
-    # Parse-only bench: read the file the job's preCommands generated.
-    mina-bench-upload \
-      --format "$UPLOAD_FORMAT" \
-      --input "$UPLOAD_INPUT" \
-      --branch "$BRANCH" \
-      --upload \
-      --check-regression \
-      --yellow "$YELLOW_THRESHOLD" \
-      --red "$RED_THRESHOLD" \
-      "${compare_flags[@]}"
-  else
-    run_ported_bench | mina-bench-upload \
-      --format "$UPLOAD_FORMAT" \
-      --branch "$BRANCH" \
-      --upload \
-      --check-regression \
-      --yellow "$YELLOW_THRESHOLD" \
-      --red "$RED_THRESHOLD" \
-      "${compare_flags[@]}"
-  fi
+# Feed the bench data to mina-bench-upload: it parses the output, uploads the
+# records to InfluxDB (creds from the INFLUX_* env set by Benchmarks.toEnvList)
+# and runs the historical-mean regression check against the union of the
+# mainline branches (a wider, more stable baseline than a single branch, which
+# matters for noisy timing benches). A red regression exits non-zero.
+compare_flags=()
+for b in develop compatible master; do compare_flags+=(--compare-branch "$b"); done
+if [[ -n "$UPLOAD_INPUT" ]]; then
+  # Parse-only bench: read the file the job's preCommands generated.
+  mina-bench-upload \
+    --format "$UPLOAD_FORMAT" \
+    --input "$UPLOAD_INPUT" \
+    --branch "$BRANCH" \
+    --upload \
+    --check-regression \
+    --yellow "$YELLOW_THRESHOLD" \
+    --red "$RED_THRESHOLD" \
+    "${compare_flags[@]}"
 else
-  python3 ./scripts/benchmarks test --benchmark ${BENCHMARK}  --branch ${BRANCH} --tmpfile ${BENCHMARK}.csv --yellow-threshold $YELLOW_THRESHOLD --red-threshold $RED_THRESHOLD $MAINLINE_BRANCHES $EXTRA_ARGS
+  run_ported_bench | mina-bench-upload \
+    --format "$UPLOAD_FORMAT" \
+    --branch "$BRANCH" \
+    --upload \
+    --check-regression \
+    --yellow "$YELLOW_THRESHOLD" \
+    --red "$RED_THRESHOLD" \
+    "${compare_flags[@]}"
 fi
