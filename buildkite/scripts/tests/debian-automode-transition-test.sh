@@ -31,6 +31,12 @@ export DEBIAN_FRONTEND=noninteractive
 git config --global --add safe.directory /workdir
 source buildkite/scripts/export-git-env-vars.sh
 
+# Where the debs under test come from: this build's cache by default, or a
+# directory of debs the job packaged itself when LOCAL_DEB_SOURCE_DIR is set.
+# The prefork deb always comes from the persistent legacy cache root.
+# shellcheck source=buildkite/scripts/debian/fetch_debs.sh
+source ./buildkite/scripts/debian/fetch_debs.sh
+
 SESSION_DIR="./scripts/debian/session"
 
 ################################################################################
@@ -131,18 +137,18 @@ DAEMON_PATHS=(
 log_info "=== Step 1: Download debs from cache ==="
 
 # Download all relevant debs for this codename
-./buildkite/scripts/cache/manager.sh read "debians/${CODENAME}/${PKG_DAEMON}_*" "${DEB_DIR}"
-./buildkite/scripts/cache/manager.sh read "debians/${CODENAME}/${PKG_AUTOMODE}_*" "${DEB_DIR}"
-./buildkite/scripts/cache/manager.sh read "debians/${CODENAME}/${PKG_CONFIG}_*" "${DEB_DIR}"
-./buildkite/scripts/cache/manager.sh read "debians/${CODENAME}/${PKG_POSTFORK}_*" "${DEB_DIR}"
-./buildkite/scripts/cache/manager.sh read "debians/${CODENAME}/mina-logproc_*" "${DEB_DIR}"
+fetch_deb "${DEB_DIR}" "debians/${CODENAME}/${PKG_DAEMON}_*"
+fetch_deb "${DEB_DIR}" "debians/${CODENAME}/${PKG_AUTOMODE}_*"
+fetch_deb "${DEB_DIR}" "debians/${CODENAME}/${PKG_CONFIG}_*"
+fetch_deb "${DEB_DIR}" "debians/${CODENAME}/${PKG_POSTFORK}_*"
+fetch_deb "${DEB_DIR}" "debians/${CODENAME}/mina-logproc_*"
 
 # Download the legacy prefork deb from the persistent legacy cache.
 # The automode metapackage depends on prefork at PREFORK_LEGACY_VERSION (not the
 # current build version), so we need the real legacy deb to satisfy that constraint.
-./buildkite/scripts/cache/manager.sh read "debians/${CODENAME}/${PKG_PROFILE}_*" "${DEB_DIR}"
-./buildkite/scripts/cache/manager.sh read "debians/${CODENAME}/${PKG_PROFILE_LEAF}_*" "${DEB_DIR}"
-./buildkite/scripts/cache/manager.sh read --root "legacy" "debians/${CODENAME}/${PKG_PREFORK}_*" "${DEB_DIR}"
+fetch_deb "${DEB_DIR}" "debians/${CODENAME}/${PKG_PROFILE}_*"
+fetch_deb "${DEB_DIR}" "debians/${CODENAME}/${PKG_PROFILE_LEAF}_*"
+fetch_legacy_deb "${DEB_DIR}" "debians/${CODENAME}/${PKG_PREFORK}_*"
 
 log_info "Downloaded debs:"
 ls -la "${DEB_DIR}"/*.deb

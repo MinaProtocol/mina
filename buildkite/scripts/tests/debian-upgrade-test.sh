@@ -35,6 +35,11 @@ export DEBIAN_FRONTEND=noninteractive
 git config --global --add safe.directory /workdir
 source buildkite/scripts/export-git-env-vars.sh
 
+# Where the new debs come from: this build's cache by default, or a directory of
+# debs the job packaged itself when LOCAL_DEB_SOURCE_DIR is set.
+# shellcheck source=buildkite/scripts/debian/fetch_debs.sh
+source ./buildkite/scripts/debian/fetch_debs.sh
+
 
 function log_info() {
     echo -e "${GREEN}[INFO]${CLEAR} $*"
@@ -181,7 +186,7 @@ log_info "--- Step 3: Downloading new debian from cache ---"
 
 mkdir -p "${LOCAL_DEB_DIR}"
 
-./buildkite/scripts/cache/manager.sh read "${NEW_DEBIAN_PATH}" "${LOCAL_DEB_DIR}"
+fetch_deb "${LOCAL_DEB_DIR}" "${NEW_DEBIAN_PATH}"
 
 NEW_DEB_FILE=$(ls "${LOCAL_DEB_DIR}"/*.deb 2>/dev/null | head -1)
 if [[ -z "${NEW_DEB_FILE}" ]]; then
