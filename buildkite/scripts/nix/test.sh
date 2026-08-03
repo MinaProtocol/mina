@@ -9,7 +9,9 @@ if [[ $# -ne 1 ]]; then
 fi
 
 SCRIPTPATH="$( cd "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
-NIX_OPTS=( --accept-flake-config --experimental-features 'nix-command flakes' )
+
+# shellcheck source=buildkite/scripts/nix/lib.sh
+source "$SCRIPTPATH/lib.sh"
 
 if [[ "$NIX_CACHE_NAR_SECRET" != "" ]]; then
   echo "$NIX_CACHE_NAR_SECRET" > /tmp/nix-cache-secret
@@ -39,30 +41,11 @@ if [[ "$NIX_SECRET_KEY" != "" ]]; then
   NIX_OPTS+=( --secret-key-files "$NIX_SECRET_KEY" )
 fi
 
-# There's an error in CI syncing submodules saying
-# "...' is not owned by current user"
-# run chown to the current user to fix it
-chown -R "${USER}" /workdir
-
 nix-env -i git-lfs
 
-git config --global --add safe.directory /workdir
-
-# We are in buildkite context so all buildkite related envs are available
-# We can use BUILDKITE_BRANCH to checkout the PR branch
-# Checking out the PR branch is necessary to make nix happy as it doesn't like detached head.
-# To be more precise nix has issue when performing operations on detached head
-# On Ci machine it spit out issues like:
-# fatal: reference is not a tree: ....
-# error:
-#       … while fetching the input 'git+file:///workdir'
-#
-#       error: program 'git' failed with exit code 128
-# That is why we checkout branch explicitly
-
-git branch -D $BUILDKITE_BRANCH 2>/dev/null || true
-git checkout -b $BUILDKITE_BRANCH
-git reset --hard $BUILDKITE_COMMIT
+# Ownership fix + detached-HEAD checkout; see lib.sh for why both are
+# needed. Uses BUILDKITE_BRANCH/BUILDKITE_COMMIT from the Buildkite context.
+prepare_nix_workdir
 
 # Test developer terminal with lsp server
 nix "${NIX_OPTS[@]}" develop "$PWD?submodules=1#with-lsp" --command bash -c "echo tested"
