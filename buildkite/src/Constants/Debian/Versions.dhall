@@ -73,7 +73,6 @@ let minimalDirtyWhen =
       , S.exactly "buildkite/src/Command/PatchArchiveTest" "dhall"
       , S.exactly "buildkite/src/Command/ArchiveNodeTest" "dhall"
       , S.exactly "buildkite/src/Command/Bench/Base" "dhall"
-      , S.strictlyStart (S.contains "scripts/benchmarks")
       , S.strictlyStart (S.contains "buildkite/scripts/bench")
       , S.exactly "buildkite/src/Command/ReplayerTest" "dhall"
       , S.strictlyStart (S.contains "buildkite/src/Jobs/Release/MinaArtifact")

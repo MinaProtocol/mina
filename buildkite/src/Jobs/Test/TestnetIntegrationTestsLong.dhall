@@ -10,24 +10,9 @@ let PipelineScope = ../../Pipeline/Scope.dhall
 
 let TestExecutive = ../../Command/TestExecutive.dhall
 
-let Dockers = ../../Constants/Docker/Versions.dhall
+let IntegrationImages = ../../Constants/IntegrationImages.dhall
 
-let Docker = ../../Constants/Docker/Package.dhall
-
-let Network = ../../Constants/Network.dhall
-
-let Profiles = ../../Constants/Profiles.dhall
-
-let dependsOn =
-        Dockers.dependsOn
-          Dockers.DepsSpec::{
-          , artifact =
-              Docker.Type.DaemonProfiled { profile = Profiles.Type.Devnet }
-          }
-      # Dockers.dependsOn
-          Dockers.DepsSpec::{
-          , artifact = Docker.Type.Archive { network = Network.Type.Devnet }
-          }
+let dependsOn = IntegrationImages.dependsOn
 
 in  Pipeline.build
       Pipeline.Config::{
@@ -38,6 +23,7 @@ in  Pipeline.build
           , S.strictlyStart
               (S.contains "buildkite/src/Jobs/Test/TestnetIntegrationTest")
           , S.strictlyStart (S.contains "buildkite/src/Command/TestExecutive")
+          , S.exactly "buildkite/src/Constants/IntegrationImages" "dhall"
           ]
         , path = "Test"
         , name = "TestnetIntegrationTestsLong"

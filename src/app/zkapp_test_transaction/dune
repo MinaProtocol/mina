@@ -13,7 +13,6 @@
   async
   async_unix
   ;;local libraries
-  mina_node_config.unconfigurable_constants
   mina_graphql
   mina_numbers
   currency

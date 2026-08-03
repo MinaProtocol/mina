@@ -408,6 +408,14 @@ let send_raw_command =
            Core.exit 1 )
 
 let () =
+  (* Route logs to stderr so stdout carries only the JSON result. Without this
+     the default logger consumer writes structured log lines to stdout, mixing
+     them with the result and breaking consumers that pipe the output to `jq`
+     or otherwise parse stdout as JSON. *)
+  Logger.Consumer_registry.register ~id:"default"
+    ~processor:(Logger.Processor.raw ())
+    ~transport:(Logger.Transport.raw (fun s -> Core.prerr_endline s))
+    () ;
   Command.run
     (Command.group ~summary:"Mina GraphQL client utility"
        [ ("peer", peer_command)

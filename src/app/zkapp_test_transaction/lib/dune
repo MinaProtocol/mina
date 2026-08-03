@@ -17,7 +17,6 @@
   ppx_inline_test.config
   graphql-async
   ;;local libraries
-  mina_node_config.unconfigurable_constants
   pickles
   kimchi_pasta
   kimchi_pasta.basic

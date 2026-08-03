@@ -44,6 +44,8 @@ let BuildFlags = ../Constants/BuildFlags.dhall
 
 let Docker = ../Constants/Docker/Package.dhall
 
+let BaseImage = ../Constants/Docker/BaseImage.dhall
+
 let Artifact = ../Constants/Artifact/Artifacts.dhall
 
 let Toolchain = ../Constants/Toolchain.dhall
@@ -67,6 +69,7 @@ let MinaBuildSpec =
           , buildScript : Text
           , arch : Arch.Type
           , deb_legacy_version : Text
+          , deb_legacy_githash_config : Text
           , docker_publish : DockerPublish.Type
           , suffix : Optional Text
           , if_ : Optional B/If
@@ -87,6 +90,7 @@ let MinaBuildSpec =
           , extraBuildEnvs = [] : List Text
           , suffix = None Text
           , deb_legacy_version = "3.4.0-alpha1-compatible-ad13ff4"
+          , deb_legacy_githash_config = ""
           , arch = Arch.Type.Amd64
           , docker_publish = DockerPublish.Type.Essential
           , if_ = None B/If
@@ -239,6 +243,7 @@ let build_artifacts
                             , "ARCHITECTURE=${Arch.lowerName spec.arch}"
                             , Network.foldMinaBuildMainnetEnv nets
                             , "PREFORK_LEGACY_VERSION=${spec.deb_legacy_version}"
+                            , "PREFORK_GITHASH_CONFIG=${spec.deb_legacy_githash_config}"
                             ]
                           # BuildFlags.buildEnvs spec.buildFlags
                           # spec.extraBuildEnvs
@@ -275,6 +280,7 @@ let commonBuildEnvs =
                 , "ARCHITECTURE=${Arch.lowerName spec.arch}"
                 , Network.foldMinaBuildMainnetEnv nets
                 , "PREFORK_LEGACY_VERSION=${spec.deb_legacy_version}"
+                , "PREFORK_GITHASH_CONFIG=${spec.deb_legacy_githash_config}"
                 ]
               # BuildFlags.buildEnvs spec.buildFlags
               # spec.extraBuildEnvs
@@ -359,50 +365,55 @@ let build_apps
                   ]
                 }
 
+let debianTokens
+    : MinaBuildSpec.Type -> Text
+    =     \(spec : MinaBuildSpec.Type)
+      ->  Text/concatSep
+            " "
+            (List/map Artifact.Type Text Artifact.toDebianToken spec.artifacts)
+
+let buildDebianFromApps
+    : MinaBuildSpec.Type -> Text -> List Cmd.Type
+    =     \(spec : MinaBuildSpec.Type)
+      ->  \(tokens : Text)
+      ->  Toolchain.select
+            Toolchain.Spec::{
+            , mode = spec.toolchainSelectMode
+            , debVersion = spec.debVersion
+            , arch = spec.arch
+            , submodules = False
+            }
+            (commonBuildEnvs spec)
+            "./buildkite/scripts/debian/build-from-cache.sh ${primaryAppsVariant
+                                                                spec} ${treeVariant
+                                                                          spec} ${tokens}"
+
 let build_debian
     : MinaBuildSpec.Type -> Command.Type
     =     \(spec : MinaBuildSpec.Type)
-      ->  let debianTokens =
-                Text/concatSep
-                  " "
-                  ( List/map
-                      Artifact.Type
-                      Text
-                      Artifact.toDebianToken
-                      spec.artifacts
-                  )
-
-          in  Command.build
-                Command.Config::{
-                , commands =
-                      Toolchain.select
-                        Toolchain.Spec::{
-                        , mode = spec.toolchainSelectMode
-                        , debVersion = spec.debVersion
-                        , arch = spec.arch
-                        , submodules = False
-                        }
-                        (commonBuildEnvs spec)
-                        "./buildkite/scripts/debian/build-from-cache.sh ${primaryAppsVariant
-                                                                            spec} ${treeVariant
-                                                                                      spec} ${debianTokens} profile_devnet_generic profile_mainnet_generic"
-                    # [ Cmd.run
-                          "./buildkite/scripts/debian/write_to_cache.sh ${DebianVersions.lowerName
-                                                                            spec.debVersion}"
-                      ]
-                , label = "Debian: Build ${labelSuffix spec}"
-                , key = "build-deb-pkg${Optional/default Text "" spec.suffix}"
-                , depends_on =
-                  [ { name = appsJobName spec, key = "build-apps" } ]
-                , target = Size.Multi
-                , if_ = spec.if_
-                , retries =
-                  [ Command.Retry::{
-                    , exit_status = Command.ExitStatus.Code +2
-                    , limit = Some 2
-                    }
+      ->  Command.build
+            Command.Config::{
+            , commands =
+                  buildDebianFromApps
+                    spec
+                    "${debianTokens
+                         spec} profile_devnet_generic profile_mainnet_generic"
+                # [ Cmd.run
+                      "./buildkite/scripts/debian/write_to_cache.sh ${DebianVersions.lowerName
+                                                                        spec.debVersion}"
                   ]
+            , label = "Debian: Build ${labelSuffix spec}"
+            , key = "build-deb-pkg${Optional/default Text "" spec.suffix}"
+            , depends_on = [ { name = appsJobName spec, key = "build-apps" } ]
+            , target = Size.Multi
+            , if_ = spec.if_
+            , retries =
+              [ Command.Retry::{
+                , exit_status = Command.ExitStatus.Code +2
+                , limit = Some 2
                 }
+              ]
+            }
 
 let docker_step
     : DockerService -> MinaBuildSpec.Type -> List DockerImage.ReleaseSpec.Type
@@ -428,6 +439,13 @@ let docker_step
 
           let genericNetwork = Network.Type.Devnet
 
+          let baseImage =
+              -- Only the services whose Dockerfile is assembled from the shared
+              -- base-deps fragment take this; the *-configured/-profiled images
+              -- are FROM an already-built mina image, and rosetta has its own
+              -- (postgres-heavy) base.
+                Some (BaseImage.imageFor spec.debVersion spec.arch)
+
           let dependsOnGeneric =
                   deps
                 # [ { name = genericBuildName spec
@@ -451,6 +469,7 @@ let docker_step
                               Docker.Type.DaemonAutoHardfork
                                 { network = network }
                           , network = network
+                          , base_image = baseImage
                           , deb_codename = spec.debVersion
                           , deb_profile = profile
                           , build_flags = spec.buildFlags
@@ -472,6 +491,7 @@ let docker_step
                               Docker.Type.DaemonLegacyHardfork
                                 { network = network }
                           , network = network
+                          , base_image = baseImage
                           , deb_codename = spec.debVersion
                           , deb_profile = profile
                           , build_flags = spec.buildFlags
@@ -487,6 +507,7 @@ let docker_step
                     , deps = deps
                     , service = Docker.Type.DaemonGeneric
                     , network = genericNetwork
+                    , base_image = baseImage
                     , deb_codename = spec.debVersion
                     , deb_profile = profile
                     , build_flags = spec.buildFlags
@@ -569,6 +590,7 @@ let docker_step
                           , deps = deps
                           , service = Docker.Type.Archive { network = network }
                           , network = network
+                          , base_image = baseImage
                           , deb_codename = spec.debVersion
                           , deb_profile = profile
                           , build_flags = spec.buildFlags
@@ -620,6 +642,7 @@ let docker_step
                           }
                         ]
                 , Toolchain = [] : List DockerImage.ReleaseSpec.Type
+                , Base = [] : List DockerImage.ReleaseSpec.Type
                 }
                 entry.service
 
@@ -716,4 +739,6 @@ in  { pipeline = pipeline
     , buildArtifacts = build_artifacts
     , buildApps = build_apps
     , buildDebian = build_debian
+    , buildDebianFromApps = buildDebianFromApps
+    , debianTokens = debianTokens
     }
