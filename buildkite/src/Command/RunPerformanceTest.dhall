@@ -73,10 +73,10 @@ let command
       ->  Command.build
             Command.Config::{
             , commands =
-                    spec.runCommands
-                  # RunInToolchain.runInDefaultToolchain
-                      (Benchmarks.toEnvList Benchmarks.Type::{=})
-                      spec.uploadScript
+                  spec.runCommands
+                # RunInToolchain.runInDefaultToolchain
+                    (Benchmarks.toEnvList Benchmarks.Type::{=})
+                    spec.uploadScript
             , label = spec.label
             , key = spec.key
             , target = spec.size
