@@ -62,8 +62,14 @@ so runs land in the perf time-series database:
 
 ```
 mina_caqti_pg_memory_bench,branch=<b>,commit=<c>,variant=<v>,scenario=<name> \
-  prepared_final=<n>i,prepared_per_call=<f>,backend_kib_final=<n>i,iterations=<n>i <ns>
+  prepared_final=<n>i,prepared_per_call=<f>,iterations=<n>i,backend_kib_final=<n>i <ns>
 ```
+
+`backend_kib_final` is present only where the server exposes
+`pg_backend_memory_contexts` (PostgreSQL 14+); on older servers — including the
+PostgreSQL 12 the CI job provisions — the field is left out of the point rather
+than written as a zero, so the series is visibly absent instead of looking like a
+flat measurement.
 
 Tags are taken from `--variant`/`--network`/`--git-branch`/`--git-commit`
 (falling back to `$MINA_BENCH_VARIANT` / `$GIT_BRANCH` / `$GIT_COMMIT`). Run the
