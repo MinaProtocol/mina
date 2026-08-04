@@ -9,6 +9,8 @@
   caqti
   caqti-async
   caqti-driver-postgresql
+  core.uuid
+  core_kernel.uuid
   ;; local libraries
   mina_caqti)
  (preprocess

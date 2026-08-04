@@ -12,7 +12,7 @@ connections these accumulate without bound and OOM the postgres backend
 (observed: 1.5–2 GB RSS per idle backend, ~1 OOMKill / 2 h on ITN).
 
 The benchmark drives one helper `N` times on a single long-lived connection and,
-**on that same connection**, samples two deterministic signals:
+**on that same connection**, samples two deterministic signals in a single query:
 
 - `pg_prepared_statements` — exact server-side prepared-statement count;
 - `pg_backend_memory_contexts` — backend cache/plan memory (PostgreSQL 14+).
@@ -20,6 +20,10 @@ The benchmark drives one helper `N` times on a single long-lived connection and,
 On unfixed code the prepared-statement count grows linearly with the number of
 calls; once the offending requests are marked `~oneshot:true` (or hoisted to a
 module-level constant) it stays flat.
+
+Whether the second signal is available is discovered by querying it rather than
+by comparing version numbers: on a server without the view the sample query
+fails once, and the run continues reporting the prepared-statement count alone.
 
 ## Scenarios
 
@@ -29,15 +33,29 @@ module-level constant) it stays flat.
 | `insert_multi_into_col` | 2 (INSERT + SELECT) | [#18860][18860pr] (parameter binding) / [#18858][18858pr] |
 | `upsert_into_cols_returning` | 1 | **neither PR** — included to show the residual leak (runs on every block) |
 
-Every scenario uses a `text` column so the exact same source compiles against
+Every scenario uses `text` columns so the exact same source compiles against
 `develop`, #18858 and #18860 (the latter changed `insert_multi_into_col`'s
 `values` from `string list` to `'col list`; with `'col = string` the call is
 unchanged).
 
+The shapes are deliberately not uniform — `select_insert_into_cols` runs against
+a three-column unique key, `upsert_into_cols_returning` against a two-column one
+with a payload column (and reuses every second key, so the `ON CONFLICT DO
+UPDATE` branch is exercised too), and `insert_multi_into_col` inserts a list
+whose length varies per call.
+
+Column values come from Quickcheck generators seeded per (scenario, iteration):
+payload lengths and contents vary from call to call, while two runs of the
+benchmark still see the identical sequence, which is what keeps the numbers
+comparable across builds. Values that must not collide carry the iteration index
+as a prefix — a duplicate would silently turn an INSERT into a SELECT hit and
+change what is being measured.
+
 ## Usage
 
-Needs a live PostgreSQL. Point it at a throwaway database (the tool creates and
-drops its own `mb_*` tables):
+Needs a live PostgreSQL. Each scenario creates one table named
+`pg_memory_<uuid>`, and drops that table when it finishes; nothing else in the
+database is touched, and the tool never drops a table it did not create:
 
 ```sh
 dune build src/lib/mina_caqti/test/pg_memory/main.exe
@@ -80,12 +98,14 @@ infra.
 ## Example (develop, unfixed)
 
 ```
-== scenario: select_insert_into_cols ==
+== scenario: select_insert_into_cols (table pg_memory_1a5d2fc119c535f3) ==
    calls      prepared     backend_KiB
    0          0            1380
    1000       2000         ...
    2000       4000         34418          <- 2 leaked prepared stmts / call
 ```
+
+On a server older than PostgreSQL 14 the `backend_KiB` column reads `n/a`.
 
 With #18858 applied, `select_insert_into_cols` and `insert_multi_into_col` hold
 at `prepared=0`, while `upsert_into_cols_returning` still climbs — demonstrating
