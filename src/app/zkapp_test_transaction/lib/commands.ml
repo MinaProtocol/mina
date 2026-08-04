@@ -324,21 +324,6 @@ module Util = struct
             failwithf "expected a non-negative integer or \"max\", got %s" s ()
         )
 
-  (* Generate the events or actions of a zkApp command: [count] field-arrays of
-     [elements_per] field elements each.
-
-     [max_elements] is the cap that Zkapp_command.valid_size enforces, and it
-     bounds the *total* number of field elements of one kind across the whole
-     command, not the length of a single array. These arrays are attached to
-     every one of the [account_updates] account updates, so the total to check
-     against the cap is [account_updates * count * elements_per]. Going over it
-     builds a command that every daemon rejects, so fail here with a message
-     naming the total.
-
-     With [repeat] every array holds the same elements, which defeats the
-     content-based deduplication that consumers such as the archive node apply
-     to event and action arrays. *)
-
   (* Pick the zkApp state fields to set: either the ones named explicitly, or
      [count] generated ones. How many fields a zkApp account has is fixed when
      the tool is built, so asking for [Max] is the only way to set all of them
@@ -362,8 +347,18 @@ module Util = struct
             n max_fields () ;
         List.init n ~f:(fun i -> Int.to_string (i + 1))
 
-  let gen_field_arrays ~kind ~max_elements ~count ~elements_per ~repeat
-      ~account_updates : Snark_params.Tick.Field.t array list =
+  (* Resolve how many events or actions arrays to generate, and reject counts
+     that no daemon would accept.
+
+     [max_elements] is the cap that Zkapp_command.valid_size enforces, and it
+     bounds the *total* number of field elements of one kind across the whole
+     command, not the length of a single array. These arrays are attached to
+     every one of the [account_updates] account updates, so the total to check
+     against the cap is [account_updates * count * elements_per]. Going over it
+     builds a command that every daemon rejects, so fail here with a message
+     naming the total. *)
+  let resolve_array_count ~kind ~max_elements ~count ~elements_per
+      ~account_updates =
     if elements_per < 1 then
       failwithf "%s arrays need at least 1 field element, got %d" kind
         elements_per () ;
@@ -373,25 +368,44 @@ module Util = struct
       | Count n ->
           n
       | Max ->
-          if per_update_cost > max_elements then
-            failwithf
-              "one %s array of %d field elements across %d account updates is \
-               already %d elements, above the maximum of %d (genesis constant \
-               max_%s_elements)"
-              kind elements_per account_updates per_update_cost max_elements
-              kind () ;
-          max_elements / per_update_cost
+          (* Never resolve to zero arrays: one array that is already over the
+             cap is an error, which the check below reports. *)
+          Int.max 1 (max_elements / per_update_cost)
     in
     let total = count * per_update_cost in
     if total > max_elements then
       failwithf
-        "%d %s arrays of %d field elements across %d account updates is %d \
-         elements, above the maximum of %d (genesis constant max_%s_elements)"
-        count kind elements_per account_updates total max_elements kind () ;
-    List.init count ~f:(fun i ->
-        Array.init elements_per ~f:(fun j ->
-            let ndx = if repeat then j else (i * elements_per) + j in
-            Snark_params.Tick.Field.of_int (ndx + 1) ) )
+        "%s arrays are capped at %d elements (genesis constant \
+         max_%s_elements); %d arrays of %d field elements across %d account \
+         updates comes to %d"
+        kind max_elements kind count elements_per account_updates total () ;
+    count
+
+  (* Generate the events or actions of a zkApp command: [count] field-arrays of
+     [elements_per] random field elements each.
+
+     With [repeat] every array holds the same elements, which defeats the
+     content-based deduplication that consumers such as the archive node apply
+     to event and action arrays. *)
+  let gen_field_arrays ~kind ~max_elements ~count ~elements_per ~repeat
+      ~account_updates : Snark_params.Tick.Field.t array list =
+    let count =
+      resolve_array_count ~kind ~max_elements ~count ~elements_per
+        ~account_updates
+    in
+    let open Quickcheck.Generator.Let_syntax in
+    let array_gen =
+      let%map fields =
+        List.gen_with_length elements_per Snark_params.Tick.Field.gen
+      in
+      Array.of_list fields
+    in
+    Quickcheck.random_value ~seed:`Nondeterministic
+      ( if repeat then
+        (* Copies, so no consumer can mutate one entry through another. *)
+        let%map array = array_gen in
+        List.init count ~f:(fun _ -> Array.copy array)
+      else List.gen_with_length count array_gen )
 
   let auth_of_string s : Permissions.Auth_required.t =
     match String.lowercase s with
