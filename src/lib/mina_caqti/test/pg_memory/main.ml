@@ -28,12 +28,6 @@
 open Core
 open Async
 
-let ok_exn ~ctx = function
-  | Ok x ->
-      x
-  | Error e ->
-      failwithf "%s: %s" ctx (Caqti_error.show e) ()
-
 (* Instrumentation / DDL requests are marked [~oneshot:true] so that running
    them does NOT itself add to the prepared-statement count we are measuring. *)
 let exec_oneshot sql =
@@ -52,8 +46,8 @@ let server_version_num_req =
    leak; we report it in KiB as a secondary, corroborating signal to the
    deterministic prepared-statement count. [pg_backend_memory_contexts] only
    exists on PostgreSQL 14+, so callers must gate on the server version and
-   report 0 where it is unavailable (the prepared-statement count remains the
-   primary, version-independent signal). *)
+   report nothing where it is unavailable (the prepared-statement count remains
+   the primary, version-independent signal). *)
 let backend_bytes_req =
   Caqti_request.Infix.(Caqti_type.unit ->! Caqti_type.int)
     ~oneshot:true
@@ -63,14 +57,14 @@ let backend_bytes_req =
 module Conn_ops = struct
   (* small helpers over a first-class CONNECTION module *)
   let exec (module C : Mina_caqti.CONNECTION) req arg =
-    C.exec req arg >>| ok_exn ~ctx:"exec"
+    C.exec req arg >>| Mina_caqti.ok_exn ~ctx:"exec"
 
   let get_int (module C : Mina_caqti.CONNECTION) req =
-    C.find req () >>| ok_exn ~ctx:"find"
+    C.find req () >>| Mina_caqti.ok_exn ~ctx:"find"
 
   let ddl conn sql = exec conn (exec_oneshot sql) ()
 
-  (* PG14+ only; report 0 on older servers (pg_backend_memory_contexts absent) *)
+  (* PG14+ only; pg_backend_memory_contexts is absent on older servers *)
   let has_backend_memory_contexts conn =
     get_int conn server_version_num_req >>| fun v -> v >= 140000
 
@@ -125,7 +119,7 @@ let scenarios : scenario list =
             ~table_name:"mb_sic"
             ~cols:([ "k" ], Caqti_type.string)
             conn (sprintf "k-%d" i)
-          >>| ok_exn ~ctx:"select_insert_into_cols"
+          >>| Mina_caqti.ok_exn ~ctx:"select_insert_into_cols"
           >>| ignore )
     }
   ; { name = "insert_multi_into_col"
@@ -140,7 +134,7 @@ let scenarios : scenario list =
           Mina_caqti.insert_multi_into_col ~table_name:"mb_imc"
             ~col:("v", Caqti_type.string) conn
             [ sprintf "v-%d" i ]
-          >>| ok_exn ~ctx:"insert_multi_into_col"
+          >>| Mina_caqti.ok_exn ~ctx:"insert_multi_into_col"
           >>| ignore )
     }
   ; { name = "upsert_into_cols_returning"
@@ -154,14 +148,15 @@ let scenarios : scenario list =
             ~returning:("id", Caqti_type.int) ~table_name:"mb_upsert"
             ~cols:([ "k" ], Caqti_type.string)
             conn (sprintf "k-%d" i)
-          >>| ok_exn ~ctx:"upsert_into_cols_returning"
+          >>| Mina_caqti.ok_exn ~ctx:"upsert_into_cols_returning"
           >>| ignore )
     }
   ]
 
 let run_scenario ~uri ~iterations ~sample_every (s : scenario) =
   let%bind conn =
-    Mina_caqti.connect uri >>| ok_exn ~ctx:(sprintf "connect[%s]" s.name)
+    Mina_caqti.connect uri
+    >>| Mina_caqti.ok_exn ~ctx:(sprintf "connect[%s]" s.name)
   in
   let%bind () =
     Deferred.List.iter s.ddl ~f:(fun sql -> Conn_ops.ddl conn sql)
