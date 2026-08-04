@@ -88,7 +88,8 @@ type result =
   { name : string
   ; prepared_final : int
   ; per_call : float
-  ; backend_kib_final : int
+  ; backend_kib_final : int option
+        (* [None] on servers without [pg_backend_memory_contexts] (<PG14) *)
   ; iterations : int
   }
 
@@ -170,11 +171,13 @@ let run_scenario ~uri ~iterations ~sample_every (s : scenario) =
   if not has_memctx then
     printf
       "   (note: pg_backend_memory_contexts unavailable on this server \
-       (<PG14); backend_KiB reported as 0)\n" ;
-  printf "   %-10s %-12s %-14s\n" "calls" "prepared" "backend_KiB" ;
+       (<PG14); backend_KiB not measured)\n" ;
+  printf "   %-10s %-12s %-14s\n" "calls" "prepared"
+    (if has_memctx then "backend_KiB" else "") ;
   let sample_and_print calls =
     let%map prepared, bytes = Conn_ops.sample ~has_memctx conn in
-    printf "   %-10d %-12d %-14d\n" calls prepared (bytes / 1024) ;
+    printf "   %-10d %-12d %-14s\n" calls prepared
+      (if has_memctx then Int.to_string (bytes / 1024) else "n/a") ;
     (prepared, bytes)
   in
   let%bind prepared0, _ = sample_and_print 0 in
@@ -189,11 +192,14 @@ let run_scenario ~uri ~iterations ~sample_every (s : scenario) =
   in
   let%bind () = Conn_ops.disconnect conn in
   let per_call = Float.of_int final_prepared /. Float.of_int iterations in
-  let backend_kib_final = final_bytes / 1024 in
+  let backend_kib_final =
+    if has_memctx then Some (final_bytes / 1024) else None
+  in
   printf
     "   RESULT scenario=%s iterations=%d prepared_final=%d \
-     prepared_per_call=%.3f backend_KiB_final=%d\n"
-    s.name iterations final_prepared per_call backend_kib_final ;
+     prepared_per_call=%.3f backend_KiB_final=%s\n"
+    s.name iterations final_prepared per_call
+    (Option.value_map backend_kib_final ~default:"n/a" ~f:Int.to_string) ;
   return
     { name = s.name
     ; prepared_final = final_prepared
@@ -215,13 +221,22 @@ let influx_lines ~measurement ~tags (results : result list) =
     List.map tags ~f:(fun (k, v) -> sprintf "%s=%s" k (sanitize v))
     |> String.concat ~sep:","
   in
+  (* [backend_kib_final] is omitted rather than sent as 0 where the server has no
+     [pg_backend_memory_contexts]: a constant-zero series charts as a real
+     measurement, whereas a missing one is visibly missing. *)
   List.map results ~f:(fun r ->
-      sprintf
-        "%s,%s,scenario=%s \
-         prepared_final=%di,prepared_per_call=%.6f,backend_kib_final=%di,iterations=%di \
-         %d"
-        (sanitize measurement) tag_str (sanitize r.name) r.prepared_final
-        r.per_call r.backend_kib_final r.iterations ts_ns )
+      let fields =
+        [ sprintf "prepared_final=%di" r.prepared_final
+        ; sprintf "prepared_per_call=%.6f" r.per_call
+        ; sprintf "iterations=%di" r.iterations
+        ]
+        @ Option.value_map r.backend_kib_final ~default:[] ~f:(fun kib ->
+              [ sprintf "backend_kib_final=%di" kib ] )
+      in
+      sprintf "%s,%s,scenario=%s %s %d" (sanitize measurement) tag_str
+        (sanitize r.name)
+        (String.concat ~sep:"," fields)
+        ts_ns )
 
 let main ~uri ~iterations ~sample_every ~assert_max_prepared ~influxdb_file
     ~measurement ~tags () =
