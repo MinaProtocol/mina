@@ -5,17 +5,17 @@
    Caqti keys its per-connection prepared-statement cache by request-object
    identity, so a fresh request per call makes the PostgreSQL backend register
    a new server-side prepared statement (PREPARE _caqtiN) that lives for the
-   lifetime of the connection. On the archive's long-lived pooled connections
-   these accumulate without bound and OOM the postgres backend.
+   lifetime of the connection. On long-lived pooled connections these accumulate
+   without bound and grow the backend's memory.
 
    This tool drives a chosen helper N times on a single long-lived connection
    and, on that same connection, samples:
      - [pg_prepared_statements]        -> exact server-side prepared-stmt count
      - [pg_backend_memory_contexts]    -> backend cache/plan memory (PG14+)
-   On unfixed code the prepared-statement count grows ~linearly with the number
-   of calls; once the offending requests are marked [~oneshot:true] (or hoisted
-   to module level) it stays flat. The tool is therefore both a reproduction of
-   the leak and a regression guard (see [--assert-max-prepared]).
+   A helper that builds a request per call makes the count grow ~linearly with
+   the number of calls; one that reuses its request, or marks it [~oneshot:true]
+   so it is never cached, keeps it flat. [--assert-max-prepared] turns that into
+   a regression guard.
 
    Each scenario works on its own table, named with a UUID and created fresh:
    the benchmark never drops a table it did not create, and drops the one it did
@@ -43,8 +43,8 @@ let exec_oneshot sql =
 (* Both signals in one round trip. [sum] is deliberately NOT coalesced: a NULL
    means "nothing to measure" and stays distinguishable from a genuine zero.
    Cached query plans live under CacheMemoryContext as child contexts
-   (CachedPlanSource / CachedPlan), so the backend total tracks the leak as a
-   secondary, corroborating signal to the deterministic prepared-statement
+   (CachedPlanSource / CachedPlan), so the backend total tracks the same growth
+   as a secondary, corroborating signal to the deterministic prepared-statement
    count. *)
 let sample_req =
   Caqti_request.Infix.(Caqti_type.unit ->! Caqti_type.(t2 int (option int)))
@@ -368,7 +368,7 @@ let () =
          ~doc:"NAME InfluxDB measurement name"
      and variant =
        flag "--variant" (optional string)
-         ~doc:"V tag runs (e.g. baseline/pr18858); else $MINA_BENCH_VARIANT"
+         ~doc:"V tag runs (e.g. baseline); else $MINA_BENCH_VARIANT"
      and network =
        flag "--network" (optional string) ~doc:"NET optional network tag"
      and git_branch =

@@ -1,15 +1,15 @@
 # mina_caqti postgres memory-usage benchmark
 
-A small, deterministic benchmark of PostgreSQL backend memory used by
-`Mina_caqti`'s DB helpers. It was written to reproduce and measure the leak in
-[MinaProtocol/mina#18857][18857], and stays useful afterwards as a standard
-memory-usage / regression check. Root cause it targets: several `Mina_caqti`
-helpers build a **fresh `Caqti_request.t` on every call**. Caqti keys its per-connection
-prepared-statement cache by request-object *identity*, so each call makes the
-backend register a new server-side prepared statement (`PREPARE _caqtiN`) that
-lives for the connection's lifetime. On the archive's long-lived pooled
-connections these accumulate without bound and OOM the postgres backend
-(observed: 1.5–2 GB RSS per idle backend, ~1 OOMKill / 2 h on ITN).
+A small, deterministic benchmark of the PostgreSQL backend memory used by
+`Mina_caqti`'s DB helpers, useful as a standard memory-usage / regression check
+for them.
+
+What it measures: Caqti keys its per-connection prepared-statement cache by
+request-object *identity*. A helper that builds a fresh `Caqti_request.t` on
+every call therefore makes the backend register a new server-side prepared
+statement (`PREPARE _caqtiN`) per call, which lives for the connection's
+lifetime. On long-lived pooled connections those accumulate without bound and
+grow the backend's memory.
 
 The benchmark drives one helper `N` times on a single long-lived connection and,
 **on that same connection**, samples two deterministic signals in a single query:
@@ -17,9 +17,9 @@ The benchmark drives one helper `N` times on a single long-lived connection and,
 - `pg_prepared_statements` — exact server-side prepared-statement count;
 - `pg_backend_memory_contexts` — backend cache/plan memory (PostgreSQL 14+).
 
-On unfixed code the prepared-statement count grows linearly with the number of
-calls; once the offending requests are marked `~oneshot:true` (or hoisted to a
-module-level constant) it stays flat.
+A helper that builds a request per call makes the count grow linearly with the
+number of calls; one that reuses its request — or marks it `~oneshot:true` so it
+is never cached — keeps it flat.
 
 Whether the second signal is available is discovered by querying it rather than
 by comparing version numbers: on a server without the view the sample query
@@ -27,16 +27,16 @@ fails once, and the run continues reporting the prepared-statement count alone.
 
 ## Scenarios
 
-| helper | requests built per call | fixed by |
-| --- | --- | --- |
-| `select_insert_into_cols` | 2 (SELECT + INSERT) | [#18858][18858pr] (`~oneshot:true`) |
-| `insert_multi_into_col` | 2 (INSERT + SELECT) | [#18860][18860pr] (parameter binding) / [#18858][18858pr] |
-| `upsert_into_cols_returning` | 1 | **neither PR** — included to show the residual leak (runs on every block) |
+| helper | requests built per call |
+| --- | --- |
+| `select_insert_into_cols` | 2 (SELECT + INSERT) |
+| `insert_multi_into_col` | 2 (INSERT + SELECT) |
+| `upsert_into_cols_returning` | 1 |
 
-Every scenario uses `text` columns so the exact same source compiles against
-`develop`, #18858 and #18860 (the latter changed `insert_multi_into_col`'s
-`values` from `string list` to `'col list`; with `'col = string` the call is
-unchanged).
+Every scenario uses `text` columns, which keeps the call sites valid across
+signature variants of these helpers (`insert_multi_into_col` has taken both a
+`string list` and a `'col list` of values; with `'col = string` the call is
+identical either way).
 
 The shapes are deliberately not uniform — `select_insert_into_cols` runs against
 a three-column unique key, `upsert_into_cols_returning` against a two-column one
@@ -69,8 +69,7 @@ The URI may also be supplied via `MINA_CAQTI_TEST_PG_URI`. With neither, the
 tool prints a skip notice and exits 0 (no-op where no database is available).
 
 `--assert-max-prepared K` makes it exit non-zero if any scenario's final
-prepared-statement count exceeds `K`, so it can double as a CI regression guard
-on the fixed code.
+prepared-statement count exceeds `K`, so it can double as a CI regression guard.
 
 ### Perf metrics (InfluxDB)
 
@@ -84,45 +83,22 @@ mina_caqti_pg_memory_bench,branch=<b>,commit=<c>,variant=<v>,scenario=<name> \
 ```
 
 `backend_kib_final` is present only where the server exposes
-`pg_backend_memory_contexts` (PostgreSQL 14+); on older servers — including the
-PostgreSQL 12 the CI job provisions — the field is left out of the point rather
-than written as a zero, so the series is visibly absent instead of looking like a
-flat measurement.
+`pg_backend_memory_contexts` (PostgreSQL 14+); on older servers the field is left
+out of the point rather than written as a zero, so the series is visibly absent
+instead of looking like a flat measurement.
 
 Tags are taken from `--variant`/`--network`/`--git-branch`/`--git-commit`
 (falling back to `$MINA_BENCH_VARIANT` / `$GIT_BRANCH` / `$GIT_COMMIT`). Run the
-tool once per build variant (e.g. `variant=baseline` on develop and
-`variant=pr18858` on the fixed build) to chart the before/after on the perf
-infra.
+tool once per build variant to chart one against another on the perf infra.
 
-## Example (develop, unfixed)
+## Example
 
 ```
 == scenario: select_insert_into_cols (table pg_memory_1a5d2fc119c535f3) ==
    calls      prepared     backend_KiB
    0          0            1380
    1000       2000         ...
-   2000       4000         34418          <- 2 leaked prepared stmts / call
+   2000       4000         34418          <- 2 prepared statements per call
 ```
 
 On a server older than PostgreSQL 14 the `backend_KiB` column reads `n/a`.
-
-With #18858 applied, `select_insert_into_cols` and `insert_multi_into_col` hold
-at `prepared=0`, while `upsert_into_cols_returning` still climbs — demonstrating
-that the two PRs fully neutralise the helpers they touch but do not eliminate
-the leak class.
-
-## Running in CI
-
-The Buildkite job `Test/MinaCaqtiPgMemoryBench`
-(`buildkite/src/Jobs/Test/MinaCaqtiPgMemoryBench.dhall`, runner
-`buildkite/scripts/tests/mina-caqti-pg-memory-bench.sh`) provisions PostgreSQL in
-the toolchain image, builds and runs this benchmark, and uploads the
-`--influxdb-file` output to the perf InfluxDB via
-`buildkite/scripts/bench/send.sh`. It is triggered by `dirtyWhen` on
-`src/lib/mina_caqti`, so a change that adds `~oneshot:true` (or otherwise
-touches the helpers) re-measures the leak automatically.
-
-[18857]: https://github.com/MinaProtocol/mina/issues/18857
-[18858pr]: https://github.com/MinaProtocol/mina/pull/18858
-[18860pr]: https://github.com/MinaProtocol/mina/pull/18860
