@@ -65,16 +65,30 @@ func (app *app) NextId() uint64 {
 func (app *app) AddPeers(infos ...peer.AddrInfo) {
 	app.addedPeersMutex.Lock()
 	defer app.addedPeersMutex.Unlock()
-	app._addedPeers = append(app._addedPeers, infos...)
+	// Deduplicate by peer ID so repeated AddPeer calls for the same peers
+	// (e.g. reconnect loops) don't grow the slice unboundedly. The latest
+	// AddrInfo wins, keeping the freshest addresses.
+	for _, info := range infos {
+		replaced := false
+		for i, existing := range app._addedPeers {
+			if existing.ID == info.ID {
+				app._addedPeers[i] = info
+				replaced = true
+				break
+			}
+		}
+		if !replaced {
+			app._addedPeers = append(app._addedPeers, info)
+		}
+	}
 }
 
-// GetAddedPeers returns list of peers
-//
-// Elements of returned slice should never be modified!
+// GetAddedPeers returns a snapshot of the added peers. A copy is returned
+// because AddPeers may overwrite elements in place after the lock is released.
 func (app *app) GetAddedPeers() []peer.AddrInfo {
 	app.addedPeersMutex.RLock()
 	defer app.addedPeersMutex.RUnlock()
-	return app._addedPeers
+	return append([]peer.AddrInfo(nil), app._addedPeers...)
 }
 
 func (app *app) ResetAddedPeers() {
