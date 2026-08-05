@@ -49,6 +49,63 @@ pub struct DockerNodeSpec {
     pub aliases: Vec<String>,
 }
 
+impl DockerNodeSpec {
+    /// A minimal container spec: everything else defaults to empty and is
+    /// filled fluently. The name doubles as the container's DNS alias on the
+    /// docker network — that identity is what lets peers dial it by unit name.
+    pub fn new(name: impl Into<String>, image: impl Into<String>) -> Self {
+        let name = name.into();
+        DockerNodeSpec {
+            aliases: vec![name.clone()],
+            name,
+            image: image.into(),
+            entrypoint: None,
+            cmd: vec![],
+            env: vec![],
+            ports: vec![],
+            mounts: vec![],
+        }
+    }
+
+    pub fn entrypoint(mut self, entrypoint: Vec<String>) -> Self {
+        self.entrypoint = Some(entrypoint);
+        self
+    }
+
+    pub fn cmd(mut self, cmd: Vec<String>) -> Self {
+        self.cmd = cmd;
+        self
+    }
+
+    pub fn env(mut self, env: Vec<(String, String)>) -> Self {
+        self.env = env;
+        self
+    }
+
+    pub fn ports(mut self, ports: Vec<(u16, u16)>) -> Self {
+        self.ports = ports;
+        self
+    }
+
+    pub fn mount_rw(mut self, host: impl Into<String>, container: impl Into<String>) -> Self {
+        self.mounts.push(Mount {
+            host: host.into(),
+            container: container.into(),
+            read_only: false,
+        });
+        self
+    }
+
+    pub fn mount_ro(mut self, host: impl Into<String>, container: impl Into<String>) -> Self {
+        self.mounts.push(Mount {
+            host: host.into(),
+            container: container.into(),
+            read_only: true,
+        });
+        self
+    }
+}
+
 /// The native backend's share of the plan.
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct NativeBackendSpec {

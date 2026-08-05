@@ -7,7 +7,7 @@ use crate::archive::{self, PgConfig};
 use crate::directory_manager::CONFIG_DIRECTORY;
 use crate::docker::archive as docker_archive;
 use crate::service::{daemon_env, ServiceConfig, ServiceType};
-use crate::supervisor::plan::{DockerBackendSpec, DockerNodeSpec, Mount, SupervisorPlan};
+use crate::supervisor::plan::{DockerBackendSpec, DockerNodeSpec, SupervisorPlan};
 use std::io::Result;
 use std::path::{Path, PathBuf};
 
@@ -53,50 +53,32 @@ impl DockerPlanBuilder {
                 archive::archive_service_unit_name(&archive_node.service_name)
             );
 
-            nodes.push(DockerNodeSpec {
-                name: pg_container.clone(),
-                image: docker_archive::PG_IMAGE.to_string(),
-                entrypoint: None,
-                cmd: vec![],
-                env: docker_archive::postgres_container_env(&PgConfig::default()),
-                ports: vec![], // internal-only; reached via DNS
-                mounts: vec![Mount {
-                    host: self
-                        .network_path
-                        .join("postgres-initdb")
-                        .to_str()
-                        .unwrap()
-                        .to_string(),
-                    container: "/docker-entrypoint-initdb.d".into(),
-                    read_only: true,
-                }],
-                aliases: vec![pg_container.clone()],
-            });
+            // No published ports: internal-only, reached via DNS.
+            nodes.push(
+                DockerNodeSpec::new(pg_container.clone(), docker_archive::PG_IMAGE)
+                    .env(docker_archive::postgres_container_env(&PgConfig::default()))
+                    .mount_ro(
+                        self.network_path.join("postgres-initdb").to_str().unwrap(),
+                        "/docker-entrypoint-initdb.d",
+                    ),
+            );
 
+            let svc_image = archive_node.archive_docker_image.clone().ok_or_else(|| {
+                std::io::Error::new(
+                    std::io::ErrorKind::InvalidInput,
+                    format!(
+                        "missing archive docker image for '{}'",
+                        archive_node.service_name
+                    ),
+                )
+            })?;
             let mut svc_cmd = vec!["mina-archive".to_string()];
             svc_cmd.extend(archive::archive_service_args(&pg_container, archive_port));
-            nodes.push(DockerNodeSpec {
-                name: svc_container.clone(),
-                image: archive_node.archive_docker_image.clone().ok_or_else(|| {
-                    std::io::Error::new(
-                        std::io::ErrorKind::InvalidInput,
-                        format!(
-                            "missing archive docker image for '{}'",
-                            archive_node.service_name
-                        ),
-                    )
-                })?,
-                entrypoint: None,
-                cmd: svc_cmd,
-                env: vec![],
-                ports: vec![],
-                mounts: vec![Mount {
-                    host: network_path_str.clone(),
-                    container: "/local-network".into(),
-                    read_only: false,
-                }],
-                aliases: vec![svc_container],
-            });
+            nodes.push(
+                DockerNodeSpec::new(svc_container, svc_image)
+                    .cmd(svc_cmd)
+                    .mount_rw(network_path_str.clone(), "/local-network"),
+            );
         }
 
         for config in services {
@@ -150,27 +132,18 @@ impl DockerPlanBuilder {
                 )
             })?;
 
-            nodes.push(DockerNodeSpec {
-                name: container_name.clone(),
-                image,
-                entrypoint: Some(vec!["mina".to_string()]),
-                cmd: cmd_str.split_whitespace().map(str::to_string).collect(),
-                env: daemon_env(),
-                ports,
-                mounts: vec![
-                    Mount {
-                        host: network_path_str.clone(),
-                        container: "/local-network".into(),
-                        read_only: false,
-                    },
-                    Mount {
-                        host: config_dir_host.to_str().unwrap().to_string(),
-                        container: format!("/{CONFIG_DIRECTORY}"),
-                        read_only: false,
-                    },
-                ],
-                aliases: vec![container_name],
-            });
+            nodes.push(
+                DockerNodeSpec::new(container_name, image)
+                    .entrypoint(vec!["mina".to_string()])
+                    .cmd(cmd_str.split_whitespace().map(str::to_string).collect())
+                    .env(daemon_env())
+                    .ports(ports)
+                    .mount_rw(network_path_str.clone(), "/local-network")
+                    .mount_rw(
+                        config_dir_host.to_str().unwrap(),
+                        format!("/{CONFIG_DIRECTORY}"),
+                    ),
+            );
         }
 
         Ok(SupervisorPlan {

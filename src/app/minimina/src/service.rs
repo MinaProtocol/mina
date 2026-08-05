@@ -28,15 +28,24 @@ pub enum ServiceType {
     UptimeServiceBackend,
 }
 
-/// Environment shared by every daemon unit, whichever backend runs it. Both
-/// plan builders bake this into their node specs.
-pub fn daemon_env() -> Vec<(String, String)> {
+/// Passphrases for the throwaway local-network keypairs, needed by any unit
+/// that reads them (daemons, mina-archive).
+pub fn keypair_pass_env() -> Vec<(String, String)> {
     vec![
         ("MINA_PRIVKEY_PASS".into(), "naughty blue worm".into()),
         ("MINA_LIBP2P_PASS".into(), "naughty blue worm".into()),
+    ]
+}
+
+/// Environment shared by every daemon unit, whichever backend runs it. Both
+/// plan builders bake this into their node specs.
+pub fn daemon_env() -> Vec<(String, String)> {
+    let mut env = keypair_pass_env();
+    env.extend([
         ("MINA_CLIENT_TRUSTLIST".into(), "0.0.0.0/0".into()),
         ("RAYON_NUM_THREADS".into(), "2".into()),
-    ]
+    ]);
+    env
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]

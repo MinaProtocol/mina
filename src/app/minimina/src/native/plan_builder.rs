@@ -6,7 +6,7 @@ use crate::archive;
 use crate::directory_manager::{CONFIG_DIRECTORY, LOGS_DIRECTORY};
 use crate::native::archive as native_archive;
 use crate::native::port_manager;
-use crate::service::{daemon_env, ServiceConfig, ServiceType};
+use crate::service::{daemon_env, keypair_pass_env, ServiceConfig, ServiceType};
 use crate::supervisor::plan::{NativeBackendSpec, NativeNodeSpec, SupervisorPlan};
 use log::warn;
 use std::fs;
@@ -65,7 +65,7 @@ impl NativePlanBuilder {
         // by the loop below (build_command adds `-archive-address 127.0.0.1:PORT`).
         if let Some(archive) = ServiceConfig::get_archive_node(services) {
             let archive_port = archive.resolved_archive_port();
-            let pgdata = self.network_path.join("pgdata");
+            let pgdata = native_archive::pgdata_dir(&self.network_path);
             let socket_dir = native_archive::postgres_socket_dir(network_id);
             fs::create_dir_all(&socket_dir)?;
             nodes.push(NativeNodeSpec {
@@ -84,10 +84,7 @@ impl NativePlanBuilder {
                 name: svc_name.clone(),
                 binary: self.bin_path.join("mina-archive"),
                 args: archive::archive_service_args("localhost", archive_port),
-                env: vec![
-                    ("MINA_PRIVKEY_PASS".into(), "naughty blue worm".into()),
-                    ("MINA_LIBP2P_PASS".into(), "naughty blue worm".into()),
-                ],
+                env: keypair_pass_env(),
                 log_file: self.logs_dir().join(format!("{svc_name}.log")),
             });
         }

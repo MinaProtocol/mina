@@ -13,6 +13,13 @@ use std::path::{Path, PathBuf};
 /// Supervisor unit name for the native postgres process.
 pub const POSTGRES_UNIT_NAME: &str = "postgres";
 
+/// Data directory of the ephemeral postgres cluster. Shared between `provision`
+/// (which `initdb`s it) and the native plan builder (which runs `postgres` on
+/// it), so both agree on the location.
+pub fn pgdata_dir(network_path: &Path) -> PathBuf {
+    network_path.join("pgdata")
+}
+
 /// Short unix-socket directory for the native postgres. Network dirs are often
 /// deeper than the ~107-char unix-socket path limit, so the socket lives under
 /// `/tmp` (per-network); all real connections use TCP on `127.0.0.1:<port>`.
@@ -49,7 +56,7 @@ pub fn provision(
     archive_node: &ServiceConfig,
 ) -> Result<()> {
     let pg = PgConfig::default();
-    let pgdata = network_path.join("pgdata");
+    let pgdata = pgdata_dir(network_path);
     let pgdata_str = pgdata.to_str().unwrap();
     let port = pg.port.to_string();
     // Short unix-socket dir (network dirs can exceed the ~107-char limit).
