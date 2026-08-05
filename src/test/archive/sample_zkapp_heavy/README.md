@@ -36,7 +36,7 @@ it would upload.
 
 ## Regenerate / refresh the corpus (the zkApp-heavy load test)
 
-Use the co-located `generate-corpus.sh`. It bootstraps a small local network, submits
+Use the co-located `generate_corpus.py`. It bootstraps a small local network, submits
 heavy zkApp `update-state` transactions (using `zkapp_test_transaction`'s
 `--num-events` / `--num-actions` / `--elements-per` flags), then extracts and repackages
 the produced precomputed blocks.
@@ -52,15 +52,16 @@ dune build \
   src/app/logproc/logproc.exe
 
 # generate ~120 heavy zkApp update-states and repackage the corpus in place
-./src/test/archive/sample_zkapp_heavy/generate-corpus.sh 120 20 20 8
+./src/test/archive/sample_zkapp_heavy/generate_corpus.py \
+  --count 120 --num-events 20 --num-actions 20 --elements-per 8
 ```
 
-Tune the load with the arguments `<count> <num_events> <num_actions> <elements_per>`
-(defaults `120 20 20 8`). The script prints the resulting block / event / action counts
-so you can confirm the corpus is heavy enough (aim for ≥10 canonical blocks with zkApp
-commands, matching the archive test convention).
+Those four flags carry the defaults shown above; `--help` lists the rest (network
+directory, GraphQL endpoint, genesis delay, drain time, output path). The script prints
+the resulting block / event / action counts so you can confirm the corpus is heavy enough
+(aim for ≥10 canonical blocks with zkApp commands, matching the archive test convention).
 
 > Note: the zkApp deploy must use the **same** key as both fee-payer and sender —
 > `create_zkapp_command` sets the sender's nonce precondition to `succ(sender_nonce)` when
-> fee-payer ≠ sender, which no external nonce can satisfy. `generate-corpus.sh` already
+> fee-payer ≠ sender, which no external nonce can satisfy. `generate_corpus.py` already
 > does this.
