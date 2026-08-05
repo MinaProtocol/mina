@@ -1,7 +1,7 @@
 # zkApp-heavy precomputed-block corpus
 
 Static data for the **archive-node end-to-end memory benchmark**
-(`buildkite/scripts/tests/archive-memory-bench.sh`).
+(`buildkite/scripts/tests/archive-memory-bench.py`).
 
 `precomputed_blocks.tar.xz` is a chain of **1273 precomputed blocks** produced by a local
 `develop` network, deliberately loaded with heavy zkApp traffic:
@@ -24,15 +24,23 @@ result is published to the perf-infra InfluxDB (measurement `archive_memory_benc
 
 ## Run it locally
 
+The database it connects to comes from the environment, as in CI: `POSTGRES_URI` with the
+archive schema already loaded, and `POSTGRES_DB` (used to find the serving backends in
+`pg_stat_activity`).
+
 ```bash
 nix develop mina
-# from the repo root, with a local postgres available:
-./buildkite/scripts/tests/archive-memory-bench.sh <pg_user> <pg_password> <pg_db>
+# from the repo root, against a database created with src/app/archive/create_schema.sql:
+export POSTGRES_URI=postgres://user:password@localhost:5432/archive_bench
+export POSTGRES_DB=archive_bench
+./buildkite/scripts/tests/archive-memory-bench.py --perf-file /tmp/archive_memory.perf
 ```
 
 It builds `archive_blocks`, unpacks this corpus, feeds it, and prints the growth curve, a
-summary (archive RSS growth, PG-backend RSS peak, head→tail rise), and the InfluxDB line
-it would upload.
+summary (archive RSS growth, PG-backend RSS peak, tail average), and the InfluxDB line it
+would upload. `--limit N` replays only the first N blocks and `--skip-build` reuses an
+existing `archive_blocks.exe`, which together make a local run quick; `--help` lists the
+rest.
 
 ## Regenerate / refresh the corpus (the zkApp-heavy load test)
 
