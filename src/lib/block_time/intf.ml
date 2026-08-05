@@ -4,6 +4,20 @@ module type S = sig
   open Snark_params
   open Snark_bits
 
+  (** A block timestamp: an {b unsigned} count of milliseconds since the Unix
+      epoch ([Unsigned.UInt64.t]).  It is therefore ALWAYS non-negative and
+      spans the full [0 .. 2^64-1] range, including values [>= 2^63];
+      {!max_value} is itself a legal timestamp.
+
+      Every operation that stays within the uint64 domain — bin_io, sexp,
+      yojson, comparison, arithmetic, {!to_uint64}/{!of_uint64},
+      {!to_string_exn}, and SNARK packing — is total and lossless across the
+      whole range.  The ONLY genuinely partial conversion is mapping to Core's
+      float-backed {!Core_kernel.Time.t}, which cannot faithfully hold values
+      [>= 2^63] (~year 2262).  That partiality is isolated in {!to_time_opt};
+      {!to_time_exn} is a checked wrapper that raises above it.  Note the
+      [Span] float conversions ({!Span.to_time_span}, {!Span.to_time_ns_span})
+      are lossy for large spans but never raise. *)
   module Time : sig
     type t [@@deriving sexp, compare, yojson]
 
@@ -104,6 +118,11 @@ module type S = sig
 
       val of_time_span : Time.Span.t -> t
 
+      (** Lossy calendar-domain conversion via float: spans [>= 2^63] ms exceed
+          the signed-int64 reinterpretation and wrap to a NEGATIVE
+          [Time.Span.t], and above [2^53] ms precision is lost.  Never raises,
+          and is not a wire/serialization path; all in-repo callers pass small
+          slot/diff spans. *)
       val to_time_span : t -> Time.Span.t
 
       module Bits : Bits_intf.Convertible_bits with type t := t
@@ -183,6 +202,15 @@ module type S = sig
 
     val of_time : Time.t -> t
 
+    (** [None] when [t >= 2^63], which is unrepresentable in the float-backed
+        {!Core_kernel.Time.t}.  This is the single partial conversion out of
+        the unsigned-uint64 domain; prefer it on any path that may see
+        full-range input. *)
+    val to_time_opt : t -> Time.t option
+
+    (** Raises when [t >= 2^63].  Prefer {!to_time_opt}; use only where the
+        caller has already established [t < 2^63] (e.g. locally-generated
+        times). *)
     val to_time_exn : t -> Time.t
 
     val now : Controller.t -> t
@@ -197,14 +225,20 @@ module type S = sig
 
     val of_time_ns : Time_ns.t -> t
 
+    (** Total unsigned-decimal serialization; never raises (the [_exn] suffix
+        is retained only to avoid a wide rename).  Lossless across
+        [0 .. 2^64-1] and byte-identical to the yojson/sexp encoding. *)
     val to_string_exn : t -> string
 
-    (** Strip time offset *)
+    (** Strip time offset.  Total; never raises. *)
     val to_string_system_time_exn : Controller.t -> t -> string
 
     (** Strip time offset *)
     val to_system_time : Controller.t -> t -> t
 
+    (** Parse an unsigned decimal string in [0 .. 2^64-1].  Raises on a leading
+        '-' (negative timestamps are not representable) or on non-numeric /
+        out-of-range input.  Inverse of {!to_string_exn}. *)
     val of_string_exn : string -> t
 
     val gen_incl : t -> t -> t Quickcheck.Generator.t

@@ -404,15 +404,23 @@ let handle_push_message t push_message =
           in
           match Hashtbl.find t.subscriptions subscription_id with
           | Some (Subscription.E sub) ->
+              (* Run gossip validation for every topic inside an exception
+                 boundary. Validation drives the topic's sink, and the libp2p
+                 protocol requires a validation response per message; an
+                 unhandled exception on this path would otherwise escape to the
+                 net2 monitor. Catch it, reject the message, and log. The [`Log]
+                 rest-handler also turns exceptions from detached
+                 ([don't_wait_for]) sink work into log lines. *)
               upon
-                (O1trace.thread "validate_libp2p_gossip" (fun () ->
-                     Subscription.handle_and_validate sub ~validation_expiration
-                       ~sender ~data ) )
+                (Monitor.try_with ~rest:`Log (fun () ->
+                     O1trace.thread "validate_libp2p_gossip" (fun () ->
+                         Subscription.handle_and_validate sub
+                           ~validation_expiration ~sender ~data ) ) )
                 (function
-                  | `Validation_timeout ->
+                  | Ok `Validation_timeout ->
                       [%log' warn t.logger]
                         "validation callback timed out before we could respond"
-                  | `Decoding_error e ->
+                  | Ok (`Decoding_error e) ->
                       [%log' error t.logger]
                         "failed to decode message published on subscription \
                          $topic ($subscription_id): $error"
@@ -425,9 +433,23 @@ let handle_push_message t push_message =
                           ] ;
                       Libp2p_helper.send_validation t.helper ~validation_id
                         ~validation_result:ValidationResult.Reject
-                  | `Validation_result validation_result ->
+                  | Ok (`Validation_result validation_result) ->
                       Libp2p_helper.send_validation t.helper ~validation_id
-                        ~validation_result )
+                        ~validation_result
+                  | Error exn ->
+                      [%log' error t.logger]
+                        "uncaught exception while validating gossip on \
+                         subscription $topic ($subscription_id); rejecting the \
+                         message: $error"
+                        ~metadata:
+                          [ ("topic", `String (Subscription.topic sub))
+                          ; ( "subscription_id"
+                            , `String
+                                (Subscription.Id.to_string subscription_id) )
+                          ; ("error", `String (Exn.to_string exn))
+                          ] ;
+                      Libp2p_helper.send_validation t.helper ~validation_id
+                        ~validation_result:ValidationResult.Reject )
           | None ->
               [%log' error t.logger]
                 "asked to validate message for unregistered subscription id \
