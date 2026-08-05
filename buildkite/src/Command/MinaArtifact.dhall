@@ -474,7 +474,6 @@ let docker_step
                           , deb_profile = profile
                           , build_flags = spec.buildFlags
                           , docker_publish = spec.docker_publish
-                          , deb_repo = DebianRepo.Type.Local
                           , deb_legacy_version = spec.deb_legacy_version
                           , size = size
                           }
@@ -496,7 +495,6 @@ let docker_step
                           , deb_profile = profile
                           , build_flags = spec.buildFlags
                           , docker_publish = spec.docker_publish
-                          , deb_repo = DebianRepo.Type.Local
                           , deb_legacy_version = spec.deb_legacy_version
                           , arch = spec.arch
                           , size = size
@@ -512,7 +510,6 @@ let docker_step
                     , deb_profile = profile
                     , build_flags = spec.buildFlags
                     , docker_publish = spec.docker_publish
-                    , deb_repo = DebianRepo.Type.Local
                     , deb_legacy_version = spec.deb_legacy_version
                     , generic = True
                     , verify = True
@@ -561,7 +558,6 @@ let docker_step
                     , deb_profile = profile
                     , build_flags = spec.buildFlags
                     , docker_publish = spec.docker_publish
-                    , deb_repo = DebianRepo.Type.Local
                     , deb_legacy_version = spec.deb_legacy_version
                     , arch = spec.arch
                     , if_ = spec.if_
@@ -577,7 +573,6 @@ let docker_step
                     , deb_profile = profile
                     , build_flags = spec.buildFlags
                     , docker_publish = spec.docker_publish
-                    , deb_repo = DebianRepo.Type.Local
                     , deb_legacy_version = spec.deb_legacy_version
                     , arch = spec.arch
                     , if_ = spec.if_
@@ -595,7 +590,6 @@ let docker_step
                           , deb_profile = profile
                           , build_flags = spec.buildFlags
                           , docker_publish = spec.docker_publish
-                          , deb_repo = DebianRepo.Type.Local
                           , deb_legacy_version = spec.deb_legacy_version
                           , verify = True
                           , arch = spec.arch
@@ -612,7 +606,6 @@ let docker_step
                     , deb_profile = profile
                     , build_flags = spec.buildFlags
                     , docker_publish = spec.docker_publish
-                    , deb_repo = DebianRepo.Type.Local
                     , deb_legacy_version = spec.deb_legacy_version
                     , generic = True
                     , verify = True

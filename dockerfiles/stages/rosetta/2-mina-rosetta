@@ -12,7 +12,6 @@ ARG deb_codename=focal
 ARG deb_version
 ARG deb_release=unstable
 ARG network=mainnet
-ARG deb_repo="http://packages.o1test.net"
 ARG deb_suffix
 ARG build_flags_suffix
 ARG deb_profile=devnet
