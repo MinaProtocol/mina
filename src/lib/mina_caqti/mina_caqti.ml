@@ -512,12 +512,19 @@ let insert_multi_into_col_no_dedup ~(table_name : string) ~(col : string)
         Caqti_request.Infix.((Caqti_type.unit ->* Caqti_type.int) insert)
         ()
 
-let query ~f pool =
-  match%bind Pool.use f pool with
+(** Unwrap a Caqti result, raising on error. [ctx] names the operation being
+    performed and is prepended to the message. *)
+let ok_exn ?ctx = function
   | Ok v ->
-      return v
+      v
   | Error msg ->
-      failwithf "Error querying db, error: %s" (Caqti_error.show msg) ()
+      failwithf "%sError querying db, error: %s"
+        (Option.value_map ctx ~default:"" ~f:(sprintf "%s: "))
+        (Caqti_error.show msg) ()
+
+let query ~f pool =
+  let%map res = Pool.use f pool in
+  ok_exn res
 
 (** functions to retrieve an item from the db, where the input has
     option type; the resulting option is converted to a suitable type
@@ -525,11 +532,8 @@ let query ~f pool =
 let make_get_opt ~of_option ~f item_opt =
   let%map res_opt =
     Option.value_map item_opt ~default:(return None) ~f:(fun item ->
-        match%map f item with
-        | Ok v ->
-            Some v
-        | Error msg ->
-            failwithf "Error querying db, error: %s" (Caqti_error.show msg) () )
+        let%map res = f item in
+        Some (ok_exn res) )
   in
   of_option res_opt
 
