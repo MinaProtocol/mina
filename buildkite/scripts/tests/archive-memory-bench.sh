@@ -48,7 +48,14 @@ mapfile -t files < <(find "$work" -name '*.json' | sort)
 echo "  ${#files[@]} precomputed blocks"
 
 PSQL() { psql -tAq "$POSTGRES_URI" -c "$1" 2>/dev/null; }
-rss_kib() { awk '/^VmRSS:/{print $2}' "/proc/$1/status" 2>/dev/null || echo 0; }
+rss_kib() {
+    local key value
+    [[ -r "/proc/$1/status" ]] || { echo 0; return; }
+    while read -r key value _; do
+        if [[ "$key" == "VmRSS:" ]]; then echo "$value"; return; fi
+    done < "/proc/$1/status"
+    echo 0
+}
 pg_pids() { PSQL "select pid from pg_stat_activity where datname='$db' and backend_type='client backend' and pid<>pg_backend_pid()"; }
 pg_rss_total() { local s=0 p r; for p in $(pg_pids); do r=$(rss_kib "$p"); s=$((s + ${r:-0})); done; echo "$s"; }
 
@@ -72,26 +79,49 @@ wait "$abpid" || { echo "archive_blocks failed:"; cat "$work/ablog"; exit 1; }
 ingest_seconds=$(( $(date +%s) - t0 ))
 
 blocks_ok=$(wc -l < "$succ" | tr -d ' '); blocks_failed=$(wc -l < "$fail" | tr -d ' ')
-# throughput (blocks per second); guard against a zero-second run
-blocks_per_sec=$(awk -v b="${blocks_ok:-0}" -v s="${ingest_seconds:-0}" \
-    'BEGIN{ printf "%.3f", (s>0)? b/s : 0 }')
+# throughput (blocks per second) to three decimals, in integer arithmetic;
+# guard against a zero-second run
+if (( ingest_seconds > 0 )); then
+    milli_per_sec=$(( (blocks_ok * 1000 + ingest_seconds / 2) / ingest_seconds ))
+    blocks_per_sec=$(printf '%d.%03d' $(( milli_per_sec / 1000 )) $(( milli_per_sec % 1000 )))
+else
+    blocks_per_sec="0.000"
+fi
 
-# Robust metrics: drop the pre-init startup sample (ab_rss < 50MB), then take
+# Robust metrics: drop the pre-init startup samples (ab_rss < 50MB), then take
 # steady-state archive RSS growth, the PG-backend RSS peak, and the mean backend
 # RSS over the final third of the run (the sustained level once the zkApp-heavy
 # tail is being ingested). Peak and tail-mean both track the leak monotonically.
-read -r ab_growth pg_peak pg_tail_avg < <(awk -F, '
-  NR>1 && $3>50000 {
-    n++; ab[n]=$3; if($4>0){m++; pg[m]=$4}
-  }
-  END{
-    abg = (n>0)? ab[n]-ab[1] : 0
-    peak=0; for(i=1;i<=m;i++) if(pg[i]>peak) peak=pg[i]
-    t0=int(2*m/3)+1; s=0; c=0
-    for(i=t0;i<=m;i++){ s+=pg[i]; c++ }
-    tavg = (c>0)? s/c : peak
-    printf "%d %d %d\n", abg, peak, tavg
-  }' "$csv") || true
+ab_first=0 ab_last=0 ab_samples=0 pg_peak=0
+pg_series=()
+while IFS=, read -r _elapsed _blocks_done ab_rss pg_rss; do
+    if (( ab_rss > 50000 )); then
+        if (( ab_samples == 0 )); then ab_first=$ab_rss; fi
+        ab_samples=$(( ab_samples + 1 ))
+        ab_last=$ab_rss
+        if (( pg_rss > 0 )); then
+            pg_series+=( "$pg_rss" )
+            if (( pg_rss > pg_peak )); then pg_peak=$pg_rss; fi
+        fi
+    fi
+done < <(tail -n +2 "$csv")
+
+ab_growth=$(( ab_last - ab_first ))
+pg_samples=${#pg_series[@]}
+pg_tail_avg=0
+if (( pg_samples > 0 )); then
+    tail_sum=0
+    tail_count=0
+    for (( i = 2 * pg_samples / 3; i < pg_samples; i++ )); do
+        tail_sum=$(( tail_sum + pg_series[i] ))
+        tail_count=$(( tail_count + 1 ))
+    done
+    if (( tail_count > 0 )); then
+        pg_tail_avg=$(( tail_sum / tail_count ))
+    else
+        pg_tail_avg=$pg_peak
+    fi
+fi
 
 ts_ns=$(date +%s%N)
 sanitize() { printf '%s' "$1" | tr ' ,=' '___'; }
