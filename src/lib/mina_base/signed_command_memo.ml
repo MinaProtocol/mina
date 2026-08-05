@@ -211,6 +211,10 @@ module Make_str (_ : Wire_types.Concrete) = struct
       (Random_oracle.Legacy.pack_input
          (Random_oracle_input.Legacy.bitstring (to_bits memo)) )
 
+  (* Bounds-check the declared-length byte [memo.[1]] against the bytes
+     actually present before [String.sub] (data bytes start at [pos = 2],
+     after the tag and length bytes); a short memo would otherwise raise
+     [Invalid_argument]. *)
   let to_plaintext (memo : t) : string Or_error.t =
     if is_bytes memo then
       match length memo with
