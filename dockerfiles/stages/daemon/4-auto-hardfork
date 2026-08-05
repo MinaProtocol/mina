@@ -18,7 +18,6 @@ ARG deb_version
 ARG deb_release=unstable
 ARG deb_codename=bullseye
 ARG network=mainnet
-ARG deb_repo="http://packages.o1test.net"
 ARG deb_legacy_version
 
 ENV MINA_DEB=mina-${network}-postfork-mesa

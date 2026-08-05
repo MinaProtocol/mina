@@ -8,13 +8,12 @@ let Optional/toList = Prelude.Optional.toList
 
 let DebianRepo
     : Type
-    = < Local | Unstable | Nightly | Stable >
+    = < Unstable | Nightly | Stable >
 
 let address =
           \(repo : DebianRepo)
       ->  merge
-            { Local = "http://localhost:8080"
-            , Unstable = "https://unstable.apt.packages.minaprotocol.com"
+            { Unstable = "https://unstable.apt.packages.minaprotocol.com"
             , Nightly = "https://nightly.apt.packages.minaprotocol.com"
             , Stable = "https://stable.apt.packages.minaprotocol.com"
             }
@@ -23,8 +22,7 @@ let address =
 let bucket =
           \(repo : DebianRepo)
       ->  merge
-            { Local = None Text
-            , Unstable = Some "unstable.apt.packages.minaprotocol.com"
+            { Unstable = Some "unstable.apt.packages.minaprotocol.com"
             , Nightly = Some "nightly.apt.packages.minaprotocol.com"
             , Stable = Some "stable.apt.packages.minaprotocol.com"
             }
@@ -55,8 +53,7 @@ let bucketArg =
 let keyId =
           \(repo : DebianRepo)
       ->  merge
-            { Local = None Text
-            , Unstable = Some "386E9DAC378726A48ED5CE56ADB30D9ACE02F414"
+            { Unstable = Some "386E9DAC378726A48ED5CE56ADB30D9ACE02F414"
             , Nightly = Some "386E9DAC378726A48ED5CE56ADB30D9ACE02F414"
             , Stable = Some "386E9DAC378726A48ED5CE56ADB30D9ACE02F414"
             }
@@ -64,17 +61,14 @@ let keyId =
 
 let isSigned =
           \(repo : DebianRepo)
-      ->  merge
-            { Local = False, Unstable = True, Nightly = True, Stable = True }
-            repo
+      ->  merge { Unstable = True, Nightly = True, Stable = True } repo
 
 let keyAddress =
           \(repo : DebianRepo)
       ->  let keyPath = "/key.asc"
 
           in  merge
-                { Local = None Text
-                , Unstable = Some (address repo ++ keyPath)
+                { Unstable = Some (address repo ++ keyPath)
                 , Nightly = Some (address repo ++ keyPath)
                 , Stable = Some (address repo ++ keyPath)
                 }

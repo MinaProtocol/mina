@@ -13,17 +13,16 @@
 ARG image=europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/ubuntu:focal
 FROM ${image} AS rosetta-base
 ARG deb_codename=focal
-ARG deb_repo="http://packages.o1test.net"
 ARG apt_cache_url=""
 
 ARG psql_version=15
 
 ENV DEBIAN_FRONTEND noninteractive
 
-# Optional: configure APT caching proxy (bypass proxy for deb_repo)
+# Optional: configure APT caching proxy
 COPY scripts/configure-apt-proxy.sh /usr/local/bin/configure-apt-proxy.sh
 RUN chmod +x /usr/local/bin/configure-apt-proxy.sh \
-  && /usr/local/bin/configure-apt-proxy.sh "$apt_cache_url" "$deb_repo"
+  && /usr/local/bin/configure-apt-proxy.sh "$apt_cache_url"
 
 # Install ca-certificates using HTTP
 RUN apt-get update --quiet --yes \
