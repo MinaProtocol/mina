@@ -298,3 +298,167 @@ let create
       } )
 
 let void = Void
+
+let%test_module "out-of-range block timestamp is handled gracefully" =
+  ( module struct
+    open Async
+
+    let logger = Logger.null ()
+
+    let precomputed_values = Lazy.force Precomputed_values.for_unit_tests
+
+    let consensus_constants = precomputed_values.consensus_constants
+
+    let time_controller = Block_time.Controller.basic ~logger
+
+    let header_with_timestamp ts =
+      let genesis_state =
+        Precomputed_values.genesis_state_with_hashes precomputed_values
+      in
+      let ps = With_hash.data genesis_state in
+      let blockchain_state' =
+        Blockchain_state.set_timestamp (Protocol_state.blockchain_state ps) ts
+      in
+      let ps' =
+        Protocol_state.create_value
+          ~previous_state_hash:(Protocol_state.previous_state_hash ps)
+          ~genesis_state_hash:(Protocol_state.genesis_state_hash ps)
+          ~blockchain_state:blockchain_state'
+          ~consensus_state:(Protocol_state.consensus_state ps)
+          ~constants:(Protocol_state.constants ps)
+      in
+      Mina_block.Header.create ~protocol_state:ps'
+        ~protocol_state_proof:(Lazy.force Proof.blockchain_dummy)
+        ~delta_block_chain_proof:(Protocol_state.previous_state_hash ps', [])
+        ()
+
+    let make_sink () =
+      let reader, sink =
+        create
+          { logger
+          ; slot_duration_ms = consensus_constants.slot_duration_ms
+          ; on_push = (fun () -> Deferred.unit)
+          ; time_controller
+          ; log_gossip_heard = false
+          ; consensus_constants
+          ; genesis_constants = precomputed_values.genesis_constants
+          ; constraint_constants = precomputed_values.constraint_constants
+          }
+      in
+      (* Drain the pipe so push doesn't block on the synchronous write. *)
+      don't_wait_for
+        (Pipe_lib.Strict_pipe.Reader.iter reader ~f:(fun _ -> Deferred.unit)) ;
+      sink
+
+    let push_header_with_timestamp ts =
+      let sink = make_sink () in
+      let header = header_with_timestamp ts in
+      let incoming =
+        Envelope.Incoming.wrap ~data:header ~sender:Envelope.Sender.Local
+      in
+      let cb = Mina_net2.Validation_callback.create_without_expiration () in
+      push sink
+        ( `Header incoming
+        , `Time_received (Block_time.now time_controller)
+        , `Valid_cb cb )
+
+    let push_must_not_crash ts =
+      Thread_safe.block_on_async_exn (fun () -> push_header_with_timestamp ts)
+
+    let%test_unit "gossip block with timestamp = UInt64.max_int must not crash \
+                   the daemon" =
+      push_must_not_crash (Block_time.of_uint64 Unsigned.UInt64.max_int)
+
+    let%test_unit "gossip block with timestamp = 2^63 is handled gracefully" =
+      push_must_not_crash
+        (Block_time.of_uint64
+           (Unsigned.UInt64.of_string "9223372036854775808") )
+
+    let%test_unit "gossip block with timestamp = 2^63 - 1 must not crash the \
+                   daemon" =
+      push_must_not_crash
+        (Block_time.of_uint64
+           (Unsigned.UInt64.of_string "9223372036854775807") )
+  end )
+
+let%test_module "malformed gossiped block is handled gracefully" =
+  ( module struct
+    open Async
+
+    let logger = Logger.null ()
+
+    let precomputed_values = Lazy.force Precomputed_values.for_unit_tests
+
+    let consensus_constants = precomputed_values.consensus_constants
+
+    let time_controller = Block_time.Controller.basic ~logger
+
+    (* Coinbase pair (One, One) is rejected by [Pre_diff_info.check_coinbase]
+       before any coinbase arithmetic, so [get_transactions] returns
+       [Coinbase_error] regardless of ledger state. *)
+    let malformed_body () =
+      let (sl_diff : Staged_ledger_diff.t) =
+        { diff =
+            ( { completed_works = []
+              ; commands = []
+              ; coinbase = Staged_ledger_diff.At_most_two.One None
+              ; internal_command_statuses = []
+              }
+            , Some
+                { completed_works = []
+                ; commands = []
+                ; coinbase = Staged_ledger_diff.At_most_one.One None
+                ; internal_command_statuses = []
+                } )
+        }
+      in
+      Staged_ledger_diff.Body.create sl_diff
+
+    let malformed_block () =
+      let genesis_state =
+        Precomputed_values.genesis_state_with_hashes precomputed_values
+      in
+      let protocol_state = With_hash.data genesis_state in
+      let header =
+        Mina_block.Header.create ~protocol_state
+          ~protocol_state_proof:(Lazy.force Proof.blockchain_dummy)
+          ~delta_block_chain_proof:
+            (Protocol_state.previous_state_hash protocol_state, [])
+          ()
+      in
+      (* block_sink handles the on-disk-proofs [Stable.Latest.t] form *)
+      Mina_block.read_all_proofs_from_disk
+        (Mina_block.create ~header ~body:(malformed_body ()))
+
+    let make_sink () =
+      let reader, sink =
+        create
+          { logger
+          ; slot_duration_ms = consensus_constants.slot_duration_ms
+          ; on_push = (fun () -> Deferred.unit)
+          ; time_controller
+          ; log_gossip_heard = false
+          ; consensus_constants
+          ; genesis_constants = precomputed_values.genesis_constants
+          ; constraint_constants = precomputed_values.constraint_constants
+          }
+      in
+      (* Drain the pipe so a successful (post-fix) push does not block. *)
+      don't_wait_for
+        (Pipe_lib.Strict_pipe.Reader.iter reader ~f:(fun _ -> Deferred.unit)) ;
+      sink
+
+    let%test_unit "gossip block with unparseable staged-ledger diff is handled \
+                   gracefully" =
+      Thread_safe.block_on_async_exn (fun () ->
+          let sink = make_sink () in
+          let incoming =
+            Envelope.Incoming.wrap ~data:(malformed_block ())
+              ~sender:Envelope.Sender.Local
+          in
+          let cb = Mina_net2.Validation_callback.create_without_expiration () in
+          push sink
+            ( `Block incoming
+            , `Time_received (Block_time.now time_controller)
+            , `Valid_cb cb ) )
+  end )

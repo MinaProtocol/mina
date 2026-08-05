@@ -264,6 +264,29 @@ module Make_str (_ : Wire_types.Concrete) = struct
       let open Quickcheck.Let_syntax in
       let%map int64_time_span = Int64.(gen_incl zero max_value) in
       of_span_since_epoch @@ Span.of_ms int64_time_span
+
+    let%test "to_string_exn is total and round-trips through of_string_exn \
+              across the full uint64 range" =
+      List.for_all
+        [ zero
+        ; of_uint64 (UInt64.of_int 1_000)
+        ; of_uint64 (UInt64.of_string "9223372036854775807") (* 2^63 - 1 *)
+        ; of_uint64 (UInt64.of_string "9223372036854775808") (* 2^63 *)
+        ; of_uint64 UInt64.max_int
+        ]
+        ~f:(fun t ->
+          String.equal
+            (of_string_exn (to_string_exn t) |> to_string_exn)
+            (to_string_exn t) )
+
+    let%test "to_time_opt is None exactly on high-bit (>= 2^63) timestamps" =
+      Option.is_none (to_time_opt (of_uint64 UInt64.max_int))
+      && Option.is_none
+           (to_time_opt (of_uint64 (UInt64.of_string "9223372036854775808")))
+      && Option.is_some (to_time_opt (of_uint64 (UInt64.of_int 1_000)))
+
+    let%test "of_string_exn rejects negative input" =
+      Or_error.is_error (Or_error.try_with (fun () -> of_string_exn "-1"))
   end
 
   include Time
