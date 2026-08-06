@@ -95,16 +95,16 @@ CURRENT_SCANNER_DIR="/usr/lib/mina/storage/${ROCKSDB_VERSION}/${GITTAG}"
 # restore_current_mina re-installs the current daemon (used initially and again
 # when upgrading back after the downgrade) bare from the apps cache.
 restore_current_mina() {
-  ./buildkite/scripts/apps/restore_binary.sh "$MINA_DEBIAN_NETWORK"
+  ./buildkite/scripts/apps/restore_binary.sh
 }
 
 # Restore the current-version binaries bare from the apps cache (mirroring the
 # .debs). No .deb fallback: the job depends on the Apps build, not the package
 # build, so a cache miss is a hard failure rather than a silent .deb install.
-./buildkite/scripts/apps/restore_binary.sh "$MINA_DEBIAN_NETWORK"
-./buildkite/scripts/apps/restore_app.sh "$MINA_DEBIAN_NETWORK" mina_graphql_client_app.exe mina-graphql-client
-./buildkite/scripts/apps/restore_app.sh "$MINA_DEBIAN_NETWORK" libp2p_helper coda-libp2p_helper
-MINA_BIN_DIR="$CURRENT_SCANNER_DIR" ./buildkite/scripts/apps/restore_app.sh "$MINA_DEBIAN_NETWORK" rocksdb_scanner.exe mina-rocksdb-scanner
+./buildkite/scripts/apps/restore_binary.sh
+./buildkite/scripts/apps/restore_app.sh mina_graphql_client_app.exe mina-graphql-client
+./buildkite/scripts/apps/restore_app.sh libp2p_helper coda-libp2p_helper
+MINA_BIN_DIR="$CURRENT_SCANNER_DIR" ./buildkite/scripts/apps/restore_app.sh rocksdb_scanner.exe mina-rocksdb-scanner
 ./buildkite/scripts/apps/restore_daemon_config.sh "$MINA_DEBIAN_NETWORK"
 # The converter is an in-repo script (the .deb just packages it); install it the
 # same way the .deb does.

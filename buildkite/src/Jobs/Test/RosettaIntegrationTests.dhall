@@ -46,7 +46,6 @@ let bareBinaries =
 let envExports =
       [ "MINA_NETWORK_DEB=${Network.lowerName network}"
       , "MINA_DEB_CODENAME=bullseye"
-      , "APPS_NETWORK=${Network.lowerName network}"
       , "MINA_PROFILE=${Network.lowerName network}"
       , "APPS_BARE_BINARIES=${bareBinaries}"
       ]
