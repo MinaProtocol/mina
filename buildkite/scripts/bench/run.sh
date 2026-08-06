@@ -112,7 +112,7 @@ elif [[ -n "$BARE_EXE" ]]; then
   git config --global --add safe.directory /workdir
   source buildkite/scripts/export-git-env-vars.sh
 
-  if ./buildkite/scripts/apps/restore_app.sh devnet "$BARE_EXE" "$BARE_AS"; then
+  if ./buildkite/scripts/apps/restore_app.sh "$BARE_EXE" "$BARE_AS"; then
     echo "Using bare $BARE_AS from apps cache (no .deb needed)"
     INSTALLED_BARE=true
   fi

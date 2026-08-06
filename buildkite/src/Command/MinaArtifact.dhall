@@ -192,6 +192,18 @@ let expandDockerServices =
                 }
                 artifact
 
+let appsVariant
+    : MinaBuildSpec.Type -> Text
+    =     \(spec : MinaBuildSpec.Type)
+      ->  merge
+            { None = merge { Amd64 = "", Arm64 = "arm64" } spec.arch
+            , Instrumented =
+                merge
+                  { Amd64 = "instrumented", Arm64 = "instrumented-arm64" }
+                  spec.arch
+            }
+            spec.buildFlags
+
 let build_artifacts
     : MinaBuildSpec.Type -> Command.Type
     =     \(spec : MinaBuildSpec.Type)
@@ -207,22 +219,11 @@ let build_artifacts
                       spec.artifacts
                   )
 
-          let appsCacheWrites =
-                List/map
-                  Network.Type
-                  Cmd.Type
-                  (     \(net : Network.Type)
-                    ->  Cmd.run
-                          "./buildkite/scripts/apps/write_to_cache.sh ${DebianVersions.lowerName
-                                                                          spec.debVersion} ${Network.lowerName
-                                                                                               net}-${Profiles.toSuffixLowercase
-                                                                                                        ( Profiles.fromNetwork
-                                                                                                            net
-                                                                                                        )}${BuildFlags.toLabelSegment
-                                                                                                              spec.buildFlags}${Arch.toSuffixLowercase
-                                                                                                                                  spec.arch}"
-                  )
-                  nets
+          let appsCacheWrite =
+                Cmd.run
+                  "./buildkite/scripts/apps/write_to_cache.sh ${DebianVersions.lowerName
+                                                                  spec.debVersion} ${appsVariant
+                                                                                       spec}"
 
           in  Command.build
                 Command.Config::{
@@ -253,8 +254,8 @@ let build_artifacts
                     # [ Cmd.run
                           "./buildkite/scripts/debian/write_to_cache.sh ${DebianVersions.lowerName
                                                                             spec.debVersion}"
+                      , appsCacheWrite
                       ]
-                    # appsCacheWrites
                 , label = "Debian: Build ${labelSuffix spec}"
                 , key = "build-deb-pkg${Optional/default Text "" spec.suffix}"
                 , target = Size.Multi
@@ -297,43 +298,14 @@ let appsJobName
     : MinaBuildSpec.Type -> Text
     = \(spec : MinaBuildSpec.Type) -> "${selfName spec}Apps"
 
-let primaryAppsVariant
-    : MinaBuildSpec.Type -> Text
-    =     \(spec : MinaBuildSpec.Type)
-      ->  let primary =
-                Optional/default
-                  Network.Type
-                  Network.Type.Devnet
-                  (List/head Network.Type (Artifact.networks spec.artifacts))
-
-          in  "${Network.lowerName
-                   primary}-${Profiles.toSuffixLowercase
-                                ( Profiles.fromNetwork primary
-                                )}${BuildFlags.toLabelSegment
-                                      spec.buildFlags}${Arch.toSuffixLowercase
-                                                          spec.arch}"
-
 let build_apps
     : MinaBuildSpec.Type -> Command.Type
     =     \(spec : MinaBuildSpec.Type)
-      ->  let nets = Artifact.networks spec.artifacts
-
-          let appsCacheWrites =
-                List/map
-                  Network.Type
-                  Cmd.Type
-                  (     \(net : Network.Type)
-                    ->  Cmd.run
-                          "./buildkite/scripts/apps/write_to_cache.sh ${DebianVersions.lowerName
-                                                                          spec.debVersion} ${Network.lowerName
-                                                                                               net}-${Profiles.toSuffixLowercase
-                                                                                                        ( Profiles.fromNetwork
-                                                                                                            net
-                                                                                                        )}${BuildFlags.toLabelSegment
-                                                                                                              spec.buildFlags}${Arch.toSuffixLowercase
-                                                                                                                                  spec.arch}"
-                  )
-                  nets
+      ->  let appsCacheWrite =
+                Cmd.run
+                  "./buildkite/scripts/apps/write_to_cache.sh ${DebianVersions.lowerName
+                                                                  spec.debVersion} ${appsVariant
+                                                                                       spec}"
 
           in  Command.build
                 Command.Config::{
@@ -347,8 +319,8 @@ let build_apps
                         }
                         (commonBuildEnvs spec)
                         "./buildkite/scripts/build-artifact.sh"
-                    # appsCacheWrites
-                    # [ Cmd.run
+                    # [ appsCacheWrite
+                      , Cmd.run
                           "./buildkite/scripts/apps/write_build_manifest_to_cache.sh ${DebianVersions.lowerName
                                                                                          spec.debVersion} ${treeVariant
                                                                                                               spec}"
@@ -384,9 +356,9 @@ let buildDebianFromApps
             , submodules = False
             }
             (commonBuildEnvs spec)
-            "./buildkite/scripts/debian/build-from-cache.sh ${primaryAppsVariant
-                                                                spec} ${treeVariant
-                                                                          spec} ${tokens}"
+            "APPS_VARIANT=${appsVariant
+                              spec} ./buildkite/scripts/debian/build-from-cache.sh ${treeVariant
+                                                                                       spec} ${tokens}"
 
 let build_debian
     : MinaBuildSpec.Type -> Command.Type

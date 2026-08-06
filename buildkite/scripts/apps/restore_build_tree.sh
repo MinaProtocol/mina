@@ -10,22 +10,23 @@
 # scripts/debian/builder-helpers.sh finds each binary at the dune path it
 # copies from.
 #
-# Usage: restore_build_tree.sh <codename> <apps-variant> <build-variant>
-#   apps-variant  : the apps-cache variant to pull binaries from (any network's
-#                   variant works -- write_to_cache.sh flattens every binary
-#                   into each one; the caller passes the build's primary net).
-#   build-variant : the manifest variant (network-agnostic build identity).
+# Usage: APPS_VARIANT=<variant> restore_build_tree.sh <codename> <build-variant>
+#   APPS_VARIANT  : the apps-cache variant to pull binaries from, empty for the
+#                   default (standard amd64) build -- see apps/write_to_cache.sh.
+#   build-variant : the manifest variant (the same build identity, prefixed with
+#                   the codename).
 
 set -eo pipefail
 
 CODENAME=$1
-APPS_VARIANT=$2
-BUILD_VARIANT=$3
+BUILD_VARIANT=$2
 
-if [[ -z "$CODENAME" || -z "$APPS_VARIANT" || -z "$BUILD_VARIANT" ]]; then
-  echo "Usage: $0 <codename> <apps-variant> <build-variant>" >&2
+if [[ -z "$CODENAME" || -z "$BUILD_VARIANT" ]]; then
+  echo "Usage: APPS_VARIANT=<variant> $0 <codename> <build-variant>" >&2
   exit 1
 fi
+
+APPS_DIR="apps/${CODENAME}${APPS_VARIANT:+/${APPS_VARIANT}}"
 
 TMP_DIR="$(mktemp -d)"
 trap 'rm -rf "$TMP_DIR"' EXIT
@@ -44,8 +45,8 @@ while IFS= read -r relpath; do
   fetch_dir="${TMP_DIR}/fetch"
   mkdir -p "$fetch_dir"
   if ! ./buildkite/scripts/cache/manager.sh read \
-    "apps/${CODENAME}/${APPS_VARIANT}/${base}" "$fetch_dir" >/dev/null; then
-    echo "restore_build_tree: ${base} not found in apps/${CODENAME}/${APPS_VARIANT}" >&2
+    "${APPS_DIR}/${base}" "$fetch_dir" >/dev/null; then
+    echo "restore_build_tree: ${base} not found in ${APPS_DIR}" >&2
     exit 1
   fi
   install -D -m 0755 "${fetch_dir}/${base}" "$relpath"

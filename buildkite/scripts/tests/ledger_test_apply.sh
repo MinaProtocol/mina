@@ -24,8 +24,8 @@ export APPS_BUILD_FLAG=instrumented
 # mina-create-genesis uses the devnet constants (ledger_depth 35).
 export MINA_PROFILE=devnet
 
-if ./buildkite/scripts/apps/restore_binary.sh devnet \
-  && ./buildkite/scripts/apps/restore_app.sh devnet runtime_genesis_ledger.exe mina-create-genesis; then
+if ./buildkite/scripts/apps/restore_binary.sh \
+  && ./buildkite/scripts/apps/restore_app.sh runtime_genesis_ledger.exe mina-create-genesis; then
   echo "Using bare mina + mina-create-genesis from apps cache"
 else
   echo "Falling back to debian-installed mina"
