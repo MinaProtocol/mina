@@ -2,6 +2,11 @@
   "genesis": {
     "genesis_state_timestamp": "2026-08-07T09:00:00Z"
   },
+  "daemon": {
+    "slot_tx_end": 660,
+    "slot_chain_end": 700,
+    "hard_fork_genesis_slot_delta": 20
+  },
   "proof": {
     "fork": {
       "state_hash": "3NL8in8VkFuN6LS4wMNSzHNhJMqac8dhb7Las7T6UaSFbWme9GkD",
@@ -25,8 +30,5 @@
       "hash": "jwAiap62mMQfYn94CBmvFwXgeQY62KXtaxDUdNMr2uxnYhx9weJ",
       "s3_data_hash": "798a6558ebb266073e9c3fff9c46827fd6dd8af47b33ecb3535586e9d4c96a11"
     }
-  },
-  "daemon": {
-    "network_id": "devnet-dryrun"
   }
 }
