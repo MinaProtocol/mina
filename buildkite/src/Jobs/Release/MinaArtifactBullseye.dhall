@@ -35,7 +35,7 @@ in  Pipeline.build
             , Artifacts.Type.FunctionalTestSuite
             ]
           , tags =
-            [ PipelineTag.Type.Long
+            [ PipelineTag.Type.Packaging
             , PipelineTag.Type.Release
             , PipelineTag.Type.Docker
             , PipelineTag.Type.Rosetta
