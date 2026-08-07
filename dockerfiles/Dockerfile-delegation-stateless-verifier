@@ -10,7 +10,6 @@ ARG deb_version
 ARG deb_codename=bullseye
 ARG deb_release=unstable
 ARG network=mainnet
-ARG deb_repo="http://packages.o1test.net"
 
 ENV DEBIAN_FRONTEND noninteractive
 RUN echo "Building image with version $deb_codename $deb_release $deb_version"
@@ -28,10 +27,17 @@ else \
 fi
 
 # install mina delegation verifier
+COPY scripts/deb-files.sh /usr/local/bin/deb-files.sh
+RUN chmod +x /usr/local/bin/deb-files.sh
+
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
-RUN echo "deb [trusted=yes] ${deb_repo} $deb_codename $deb_release" | tee /etc/apt/sources.list.d/mina.list \
-  && apt-get update\
-  && apt-get install --quiet --yes --no-install-recommends --allow-downgrades "mina-delegation-verify=$deb_version" \
+# deb-files.sh writes a list of paths separated by spaces, and the list must
+# divide into one argument for each package.
+# hadolint ignore=SC2046
+RUN --mount=type=bind,source=.,target=/debs \
+  apt-get update \
+  && apt-get install --quiet --yes --no-install-recommends --allow-downgrades \
+  $(/usr/local/bin/deb-files.sh /debs "mina-delegation-verify=${deb_version}") \
   && rm -rf /var/lib/apt/lists/*
 
 # awscli and cqlsh-expansion are used by the delegation verification tool

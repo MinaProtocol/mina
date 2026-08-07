@@ -34,7 +34,7 @@ let Arch = ../Constants/Arch.dhall
 
 let DebianInstallMode
     : Type
-    = < ThroughLocalRepo | NoInstall | DownloadOnly >
+    = < NoInstall | DownloadOnly >
 
 let ReleaseSpec =
       { Type =
@@ -74,7 +74,7 @@ let ReleaseSpec =
           , service = Artifacts.Type.Daemon
           , branch = "\\\${BUILDKITE_BRANCH}"
           , repo = "\\\${BUILDKITE_REPO}"
-          , deb_install_mode = DebianInstallMode.ThroughLocalRepo
+          , deb_install_mode = DebianInstallMode.DownloadOnly
           , deb_root_folder = "\\\${BUILDKITE_BUILD_ID}"
           , deb_codename = DebianVersions.DebVersion.Bullseye
           , deb_release = "unstable"
@@ -120,23 +120,11 @@ let generateStep =
 
           let maybeCacheOption = if spec.no_cache then "--no-cache" else ""
 
-          let maybeStartDebianRepo =
+          let maybeReadDebians =
                 merge
-                  { ThroughLocalRepo =
-                      " && ./buildkite/scripts/debian/start_local_repo.sh --root ${spec.deb_root_folder} --arch ${Arch.lowerName
-                                                                                                                    spec.arch}"
-                  , DownloadOnly =
+                  { DownloadOnly =
                       " && ROOT=${spec.deb_root_folder} LOCAL_DEB_FOLDER=\"dockerfiles\" ./buildkite/scripts/debian/read_all_from_cache.sh "
-                  , NoInstall = " && echo Skipping local debian repo setup "
-                  }
-                  spec.deb_install_mode
-
-          let maybeStopDebianRepo =
-                merge
-                  { ThroughLocalRepo = " && ./scripts/debian/aptly.sh stop"
-                  , DownloadOnly =
-                      " && echo Skipping local debian repo teardown "
-                  , NoInstall = " && echo Skipping local debian repo teardown "
+                  , NoInstall = " && echo This image installs no Mina package "
                   }
                   spec.deb_install_mode
 
@@ -235,7 +223,6 @@ let generateStep =
                 ++  " ${maybeCacheOption} "
                 ++  " --deb-codename ${DebianVersions.lowerName
                                          spec.deb_codename}"
-                ++  " --deb-repo ${DebianRepo.address spec.deb_repo}"
                 ++  " --deb-release ${spec.deb_release}"
                 ++  " --deb-version ${spec.deb_version}"
                 ++  " --deb-profile ${Profiles.lowerName spec.deb_profile}"
@@ -275,11 +262,10 @@ let generateStep =
                           ++  exportBranchNameCmd
                           ++  " && "
                           ++  pruneDockerImages
-                          ++  maybeStartDebianRepo
+                          ++  maybeReadDebians
                           ++  " && source ./buildkite/scripts/export-git-env-vars.sh "
                           ++  " && "
                           ++  buildDockerCmd
-                          ++  maybeStopDebianRepo
                           ++  maybeVerify
                         )
                     ]

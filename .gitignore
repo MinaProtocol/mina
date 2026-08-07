@@ -52,3 +52,6 @@ _coverage/
 
 CLAUDE.local.md
 /.claude/
+
+# Debian packages staged into the Docker build context
+dockerfiles/*.deb

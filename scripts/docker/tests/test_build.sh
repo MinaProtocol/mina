@@ -308,29 +308,45 @@ test_toolchain_joins_the_stage_files() {
     assert_has_line "the toolchain tag has no network" "$args" "testreg/mina-toolchain:3.1.0"
 }
 
-# A service without a build context sends the Dockerfile to docker on stdin.
-test_delegation_verifier_has_no_build_context() {
+# Every service has a build context now: each image installs its packages from
+# files in that context.
+test_delegation_verifier_has_a_build_context() {
     local args="${STUB_DIR}/deleg.args"
     run_build "$args" \
         --service mina-delegation-verifier --version 3.1.0 --network devnet \
         --docker-registry testreg --deb-build-flags none
 
-    assert_has_line "stdin" "$args" "-"
-    assert_no_line "no context directory" "$args" "dockerfiles/"
+    assert_has_line "context" "$args" "dockerfiles/"
+    assert_has_line "dockerfile" "$args" \
+        "dockerfiles/Dockerfile-delegation-stateless-verifier"
+    assert_no_line "the Dockerfile does not come on stdin" "$args" "-"
     assert_has_line "tag" "$args" "testreg/mina-delegation-verifier:3.1.0"
 }
 
-# The docker build cannot reach the host on "localhost". The address must become
-# the gateway of the docker bridge network, which the stub reports as
-# 172.17.0.1.
-test_localhost_becomes_the_bridge_gateway() {
+# The images install their packages from files in the build context, so no
+# Debian repository reaches the build, and --deb-repo is not an option any more.
+test_no_debian_repository_reaches_the_build() {
     local args="${STUB_DIR}/repo.args"
     run_build "$args" \
         --service mina-daemon --version 3.1.0 --network devnet \
-        --docker-registry testreg --deb-build-flags none \
-        --deb-repo "http://localhost:8080"
+        --docker-registry testreg --deb-build-flags none
 
-    assert_has_line "gateway address" "$args" "deb_repo=http://172.17.0.1:8080"
+    if grep -q "^deb_repo=" "$args"; then
+        log_fail "the build still gets a deb_repo build argument"
+    else
+        log_pass
+    fi
+
+    # An old caller that still gives --deb-repo must stop, not build with a
+    # repository that the image ignores.
+    run_build "$args" \
+        --service mina-daemon --version 3.1.0 --network devnet \
+        --docker-registry testreg --deb-repo http://localhost:8080
+    if [[ "$LAST_EXIT" -eq 0 ]]; then
+        log_fail "--deb-repo must not be accepted"
+    else
+        log_pass
+    fi
 }
 
 test_cache_options() {
@@ -542,8 +558,8 @@ main() {
     run_test test_custom_arg_keeps_a_value_with_a_space
     run_test test_arm64_gets_a_platform_suffix
     run_test test_toolchain_joins_the_stage_files
-    run_test test_delegation_verifier_has_no_build_context
-    run_test test_localhost_becomes_the_bridge_gateway
+    run_test test_delegation_verifier_has_a_build_context
+    run_test test_no_debian_repository_reaches_the_build
     run_test test_cache_options
     run_test test_optional_build_args_are_absent_when_not_given
     run_test test_auto_hardfork_needs_a_legacy_version

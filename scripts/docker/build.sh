@@ -70,7 +70,6 @@ while [[ "$#" -gt 0 ]]; do case $1 in
   --deb-legacy-version) INPUT_LEGACY_VERSION="$2"; shift;;
   --deb-storage-repair-version) INPUT_STORAGE_REPAIR_VERSION="$2"; shift;;
   --deb-profile) DEB_PROFILE="$2"; shift;;
-  --deb-repo) INPUT_REPO="$2"; shift;;
   --deb-arch) DEB_ARCH="$2"; shift;;
   --deb-build-flags) DEB_BUILD_FLAGS="$2"; shift;;
   --deb-suffix) export DOCKER_DEB_SUFFIX="$2"; shift;;
@@ -189,28 +188,22 @@ else
   CACHE="--cache-from $INPUT_CACHE"
 fi
 
-if [[ -z "${INPUT_REPO:-}" ]]; then
-  echo "Debian repository is not set. Using the default (http://localhost:8080)"
-  DEB_REPO="--build-arg deb_repo=http://localhost:8080"
-else
-  echo "Using provided Debian repository: $INPUT_REPO"
-  DEB_REPO="--build-arg deb_repo=$INPUT_REPO"
-fi
-
-GW=$(docker network inspect bridge --format '{{(index .IPAM.Config 0).Gateway}}')
-LOCALHOST_REPLACEMENT=$GW
-if [[ -z "${INPUT_REPO:-}" ]]; then
-  echo "Debian repository is not set. Using the default (http://$LOCALHOST_REPLACEMENT:8080)"
-  DEB_REPO="--build-arg deb_repo=http://$LOCALHOST_REPLACEMENT:8080"
-else
-  echo "Converting localhost to $LOCALHOST_REPLACEMENT in repository URL"
-  CONVERTED_REPO=$(echo "$INPUT_REPO" | sed "s/localhost/$LOCALHOST_REPLACEMENT/g")
-  DEB_REPO="--build-arg deb_repo=$CONVERTED_REPO"
-fi
-
+# The images install the Mina packages from files in the build context, so the
+# build needs no Debian repository. Only the APT cache proxy, which serves the
+# packages of the distribution, can still name the host as "localhost". The
+# build container cannot reach the host under that name, so change it to the
+# address of the gateway of the docker bridge network.
 APT_CACHE_ARG=""
 if [[ -n "${APT_CACHE_PROXY:-}" ]]; then
-  CONVERTED_PROXY=$(echo "$APT_CACHE_PROXY" | sed "s/localhost/$LOCALHOST_REPLACEMENT/g")
+  CONVERTED_PROXY="$APT_CACHE_PROXY"
+  if [[ "$CONVERTED_PROXY" == *localhost* ]]; then
+    if GW=$(docker network inspect bridge --format '{{(index .IPAM.Config 0).Gateway}}' 2>/dev/null) \
+       && [[ -n "$GW" ]]; then
+      CONVERTED_PROXY=${CONVERTED_PROXY//localhost/$GW}
+    else
+      echo "WARNING: cannot read the gateway of the docker bridge network, keeping 'localhost'"
+    fi
+  fi
   # Probe proxy reachability before passing to Docker build; fall back to direct if unreachable
   if curl -so /dev/null --connect-timeout 2 --max-time 4 "$CONVERTED_PROXY" 2>/dev/null; then
     APT_CACHE_ARG="--build-arg apt_cache_url=$CONVERTED_PROXY"
@@ -290,6 +283,8 @@ case "${SERVICE}" in
         ;;
     mina-delegation-verifier)
         DOCKERFILE_PATH="dockerfiles/Dockerfile-delegation-stateless-verifier"
+        # A build context is needed: the image installs its package from a file.
+        DOCKER_CONTEXT="dockerfiles/"
         ;;
     delegation-backend-toolchain)
         DOCKERFILE_PATH="dockerfiles/Dockerfile-delegation-backend-toolchain"
@@ -320,9 +315,9 @@ BUILD_NETWORK="--allow=network.host"
 # If DOCKER_CONTEXT is not specified, assume none and just pipe the dockerfile into docker build
 if [[ -z "${DOCKER_CONTEXT:-}" ]]; then
   cat $DOCKERFILE_PATH | docker buildx build  --network=host \
-  --"$DOCKER_ACTION" --progress=plain $PLATFORM $DOCKER_REPO_ARG $NO_CACHE $BUILD_NETWORK $CACHE $NETWORK $IMAGE $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $DOCKER_DEB_SUFFIX_ARG $BUILD_FLAGS_SUFFIX_ARG $DEB_REPO $APT_CACHE_ARG $BRANCH $REPO $LEGACY_VERSION $CUSTOM_SUFFIX_ARG $CUSTOM_ARG $DEB_STORAGE_REPAIR_VERSION $DEB_ARCH $IMAGE_NAME_ARG $VERSION_ARG -t "$TAG" -t "$HASHTAG" -
+  --"$DOCKER_ACTION" --progress=plain $PLATFORM $DOCKER_REPO_ARG $NO_CACHE $BUILD_NETWORK $CACHE $NETWORK $IMAGE $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $DOCKER_DEB_SUFFIX_ARG $BUILD_FLAGS_SUFFIX_ARG $APT_CACHE_ARG $BRANCH $REPO $LEGACY_VERSION $CUSTOM_SUFFIX_ARG $CUSTOM_ARG $DEB_STORAGE_REPAIR_VERSION $DEB_ARCH $IMAGE_NAME_ARG $VERSION_ARG -t "$TAG" -t "$HASHTAG" -
 else
-  docker buildx build --"$DOCKER_ACTION" --network=host --progress=plain $PLATFORM $DOCKER_REPO_ARG $NO_CACHE $BUILD_NETWORK $CACHE $NETWORK $IMAGE $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $DOCKER_DEB_SUFFIX_ARG $BUILD_FLAGS_SUFFIX_ARG $DEB_REPO $APT_CACHE_ARG $BRANCH $REPO $LEGACY_VERSION $CUSTOM_SUFFIX_ARG $CUSTOM_ARG $DEB_ARCH $DEB_STORAGE_REPAIR_VERSION $IMAGE_NAME_ARG $VERSION_ARG "$DOCKER_CONTEXT" -t "$TAG" -t "$HASHTAG" -f $DOCKERFILE_PATH
+  docker buildx build --"$DOCKER_ACTION" --network=host --progress=plain $PLATFORM $DOCKER_REPO_ARG $NO_CACHE $BUILD_NETWORK $CACHE $NETWORK $IMAGE $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $DOCKER_DEB_SUFFIX_ARG $BUILD_FLAGS_SUFFIX_ARG $APT_CACHE_ARG $BRANCH $REPO $LEGACY_VERSION $CUSTOM_SUFFIX_ARG $CUSTOM_ARG $DEB_ARCH $DEB_STORAGE_REPAIR_VERSION $IMAGE_NAME_ARG $VERSION_ARG "$DOCKER_CONTEXT" -t "$TAG" -t "$HASHTAG" -f $DOCKERFILE_PATH
 fi
 
 # Clean up temp Dockerfile if one was created

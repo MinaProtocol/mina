@@ -4,7 +4,6 @@ ARG network=mainnet
 ARG docker_repo=gcr.io/o1labs-192920
 ARG deb_release=unstable
 ARG deb_legacy_version
-ARG deb_repo="http://packages.o1test.net"
 
 FROM ${docker_repo}/mina-daemon:${deb_version}-${deb_codename}-${network} AS mina_daemon_hardfork
 
@@ -17,13 +16,15 @@ ARG deb_codename
 ARG network
 ARG deb_release
 ARG deb_legacy_version
-ARG deb_repo
 
-RUN echo "Installing legacy package with version $deb_version from repo $deb_release $deb_codename for network $network" \
-  && echo "deb [trusted=yes] ${deb_repo} ${deb_codename} ${deb_release}" > /etc/apt/sources.list.d/o1.list \
-  && cat /etc/apt/sources.list.d/o1.list \
+# deb-files.sh writes a list of paths separated by spaces, and the list must
+# divide into one argument for each package.
+# hadolint ignore=SC2046
+RUN --mount=type=bind,source=.,target=/debs \
+  echo "Installing legacy package with version $deb_legacy_version for network $network from the build context" \
   && apt-get update --quiet --yes \
-  && apt-get install --quiet --yes --no-install-recommends --allow-downgrades "mina-${network}-prefork-mesa=$deb_legacy_version" \
+  && apt-get install --quiet --yes --no-install-recommends --allow-downgrades \
+  $(/usr/local/bin/deb-files.sh /debs "mina-${network}-prefork-mesa=${deb_legacy_version}") \
   && rm -rf /var/lib/apt/lists/*
 
 ## Reset workdir, USER, and ${UID} for root-owned version

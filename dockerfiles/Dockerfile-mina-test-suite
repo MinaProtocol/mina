@@ -6,7 +6,6 @@ ARG TARGETARCH
 ARG deb_codename=bullseye
 ARG deb_version
 ARG deb_release=unstable
-ARG deb_repo="http://packages.o1test.net"
 ARG network=mainnet
 
 ARG psql_version=13
@@ -24,10 +23,11 @@ ENV DEBIAN_FRONTEND noninteractive
 #    libprocps8
 #    libjemalloc2
 
-# Optional: configure APT caching proxy (bypass proxy for deb_repo)
+# Optional: configure APT caching proxy for the distribution packages
 COPY scripts/configure-apt-proxy.sh /usr/local/bin/configure-apt-proxy.sh
-RUN chmod +x /usr/local/bin/configure-apt-proxy.sh \
-  && /usr/local/bin/configure-apt-proxy.sh "$apt_cache_url" "$deb_repo"
+COPY scripts/deb-files.sh /usr/local/bin/deb-files.sh
+RUN chmod +x /usr/local/bin/configure-apt-proxy.sh /usr/local/bin/deb-files.sh \
+  && /usr/local/bin/configure-apt-proxy.sh "$apt_cache_url"
 
 # Install ca-certificates using HTTP
 RUN apt-get update --quiet --yes \
@@ -94,10 +94,20 @@ RUN curl -s https://www.postgresql.org/media/keys/ACCC4CF8.asc | apt-key add - \
 RUN locale-gen en_US.UTF-8
 
 # jemalloc is also installed automatically here to match the package dependencies for this $deb_codename
-RUN echo "Building image with version $deb_version from repo $deb_release $deb_codename " \
-  && echo "deb [trusted=yes] ${deb_repo} $deb_codename $deb_release" > /etc/apt/sources.list.d/o1.list \
+# deb-files.sh writes a list of paths separated by spaces, and the list must
+# divide into one argument for each package.
+# hadolint ignore=SC2046
+RUN --mount=type=bind,source=.,target=/debs \
+  echo "Building image with version $deb_version from the build context" \
   && apt-get update --quiet --yes \
-  && apt-get install --no-install-recommends --quiet --yes --allow-downgrades -o Dpkg::Options::="--force-overwrite" "mina-test-suite=$deb_version" "mina-$network-instrumented=$deb_version" "mina-archive-$network-instrumented=$deb_version" "mina-rosetta-$network=$deb_version" \
+  && apt-get install --no-install-recommends --quiet --yes --allow-downgrades -o Dpkg::Options::="--force-overwrite" \
+  $(/usr/local/bin/deb-files.sh /debs \
+  "mina-test-suite=${deb_version}" \
+  "mina-logproc=${deb_version}" \
+  "?mina-${network}-config=${deb_version}" \
+  "mina-${network}-instrumented=${deb_version}" \
+  "mina-archive-${network}-instrumented=${deb_version}" \
+  "mina-rosetta-${network}=${deb_version}") \
   && rm -rf /var/lib/apt/lists/*
 
 ENTRYPOINT ["sleep","infinity"]

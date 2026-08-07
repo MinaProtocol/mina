@@ -688,20 +688,16 @@ cache-put-debian: ## Upload debian packages for prefork genesis creation
 ########################################
 # Docker images
 
-.PHONY: start-local-debian-repo
-start-local-debian-repo: ## Start a local Debian repository
-	$(info 📦 Starting local Debian repository with codename $(CODENAME))
+.PHONY: stage-debians-for-docker
+stage-debians-for-docker: ## Copy the built Debian packages into the Docker build context
+	$(info 📦 Staging Debian packages from _build into dockerfiles/)
 
-	@./scripts/debian/aptly.sh stop || true
+	@if ! ls _build/*.deb >/dev/null 2>&1; then \
+		echo "Error: no .deb in _build. Build the packages first, for example 'make debian-build-daemon-devnet'." >&2; \
+		exit 1; \
+	fi
 
-	@./scripts/debian/aptly.sh start \
-		--codename $(CODENAME) \
-		--debians _build \
-		--component unstable \
-		--clean \
-		--background \
-		--wait \
-		&& echo "✅ Build complete"
+	@cp _build/*.deb dockerfiles/ && echo "✅ $$(ls -1 dockerfiles/*.deb | wc -l) package(s) staged"
 
 # General function for building Docker images
 define build_docker_image
@@ -723,8 +719,8 @@ define build_docker_image
 		--network $(2) \
 		--no-cache
 
-	$(info 📦 stopping local Debian repository)
-	@./scripts/debian/aptly.sh stop
+	$(info 🧹 removing the staged Debian packages)
+	@rm -f dockerfiles/*.deb
 endef
 
 
@@ -738,42 +734,42 @@ docker-build-toolchain: ## Build the toolchain to be used in CI
 
 .PHONY: docker-build-archive-devnet
 docker-build-archive-devnet: SHELL := /bin/bash
-docker-build-archive-devnet: start-local-debian-repo ## Build the archive Docker image for devnet
+docker-build-archive-devnet: stage-debians-for-docker ## Build the archive Docker image for devnet
 	$(call build_docker_image,mina-archive,devnet)
 
 .PHONY: docker-build-archive-mainnet
 docker-build-archive-mainnet: SHELL := /bin/bash
-docker-build-archive-mainnet: start-local-debian-repo ## Build the archive Docker image for mainnet
+docker-build-archive-mainnet: stage-debians-for-docker ## Build the archive Docker image for mainnet
 	$(call build_docker_image,mina-archive,mainnet)
 
 .PHONY: docker-build-daemon-devnet-generic
 docker-build-daemon-devnet-generic: SHELL := /bin/bash
-docker-build-daemon-devnet-generic: start-local-debian-repo ## Build the daemon Docker image
+docker-build-daemon-devnet-generic: stage-debians-for-docker ## Build the daemon Docker image
 	$(call build_docker_image,mina-daemon,devnet-generic)
 
 .PHONY: docker-build-daemon-devnet
 docker-build-daemon-devnet: SHELL := /bin/bash
-docker-build-daemon-devnet: start-local-debian-repo ## Build the daemon Docker image for devnet
+docker-build-daemon-devnet: stage-debians-for-docker ## Build the daemon Docker image for devnet
 	$(call build_docker_image,mina-daemon,devnet)
 
 .PHONY: docker-build-daemon-mainnet
 docker-build-daemon-mainnet: SHELL := /bin/bash
-docker-build-daemon-mainnet: start-local-debian-repo ## Build the daemon Docker image for mainnet
+docker-build-daemon-mainnet: stage-debians-for-docker ## Build the daemon Docker image for mainnet
 	$(call build_docker_image,mina-daemon,mainnet)
 
 .PHONY: docker-build-rosetta
 docker-build-rosetta-devnet-generic: SHELL := /bin/bash
-docker-build-rosetta-devnet-generic: start-local-debian-repo ## Build the Rosetta Docker image
+docker-build-rosetta-devnet-generic: stage-debians-for-docker ## Build the Rosetta Docker image
 	$(call build_docker_image,mina-rosetta,devnet-generic)
 
 .PHONY: docker-build-rosetta-devnet
 docker-build-rosetta-devnet: SHELL := /bin/bash
-docker-build-rosetta-devnet: start-local-debian-repo ## Build the Rosetta Docker image for devnet
+docker-build-rosetta-devnet: stage-debians-for-docker ## Build the Rosetta Docker image for devnet
 	$(call build_docker_image,mina-rosetta,devnet)
 
 .PHONY: docker-build-rosetta-mainnet
 docker-build-rosetta-mainnet: SHELL := /bin/bash
-docker-build-rosetta-mainnet: start-local-debian-repo ## Build the Rosetta Docker image for mainnet
+docker-build-rosetta-mainnet: stage-debians-for-docker ## Build the Rosetta Docker image for mainnet
 	$(call build_docker_image,mina-rosetta,mainnet)
 
 ########################################
@@ -806,7 +802,7 @@ docker-build-daemon-hardfork-docker: ## Generate hardfork packages
 	$(call check_env_var,BRANCH_NAME)
 
 	$(MAKE) debian-build-config-$(NETWORK_NAME)
-	$(MAKE) start-local-debian-repo
+	$(MAKE) stage-debians-for-docker
 
 	@export BUILD_DIR=./_build && \
 	export MINA_DEB_CODENAME=$(CODENAME) && \
@@ -824,8 +820,6 @@ docker-build-daemon-hardfork-docker: ## Generate hardfork packages
 		--load-only
 		--no-cache
 
-	cp _build/mina-devnet-config_*.deb .
-
 	@export BUILD_DIR=./_build && \
 	export MINA_DEB_CODENAME=$(CODENAME) && \
 	export KEEP_MY_TAGS_INTACT=true && \
@@ -841,8 +835,8 @@ docker-build-daemon-hardfork-docker: ## Generate hardfork packages
 		--no-cache \
 		--load-only
 
-	$(info 📦 stopping local Debian repository)
-	@./scripts/debian/aptly.sh stop
+	$(info 🧹 removing the staged Debian packages)
+	@rm -f dockerfiles/*.deb
 
 .PHONY: docker-build-hardfork-rosetta-docker
 docker-build-hardfork-rosetta-docker: SHELL := /bin/bash
@@ -853,7 +847,7 @@ docker-build-hardfork-rosetta-docker: ## Generate hardfork packages
 	$(call check_env_var,BRANCH_NAME)
 
 	$(MAKE) debian-build-config-$(NETWORK_NAME)
-	$(MAKE) start-local-debian-repo
+	$(MAKE) stage-debians-for-docker
 
 	@export BUILD_DIR=./_build && \
 	export MINA_DEB_CODENAME=$(CODENAME) && \
@@ -870,8 +864,6 @@ docker-build-hardfork-rosetta-docker: ## Generate hardfork packages
 		--custom-suffix generic \
 		--load-only \
 		--no-cache
-
-	cp _build/mina-devnet-config_*.deb .
 
 	@export BUILD_DIR=./_build && \
 	export MINA_DEB_CODENAME=$(CODENAME) && \
@@ -890,8 +882,8 @@ docker-build-hardfork-rosetta-docker: ## Generate hardfork packages
 		--load-only
 
 
-	$(info 📦 stopping local Debian repository)
-	@./scripts/debian/aptly.sh stop
+	$(info 🧹 removing the staged Debian packages)
+	@rm -f dockerfiles/*.deb
 
 ########################################
 # Generate odoc documentation
