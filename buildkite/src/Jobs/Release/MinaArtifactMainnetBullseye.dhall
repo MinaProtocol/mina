@@ -29,7 +29,7 @@ in  Pipeline.build
             ]
           , scope = PipelineScope.AllButPullRequest
           , tags =
-            [ PipelineTag.Type.Long
+            [ PipelineTag.Type.Packaging
             , PipelineTag.Type.Release
             , PipelineTag.Type.Docker
             , PipelineTag.Type.Rosetta
