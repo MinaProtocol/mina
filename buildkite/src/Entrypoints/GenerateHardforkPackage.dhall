@@ -45,7 +45,7 @@ let List/map = Prelude.List.map
 let DebianArchPair =
       { DebVersion : DebianVersions.DebVersion, Arch : Arch.Type }
 
-let defaultMinaArtifactSpec = MinaArtifact.MinaBuildSpec::{=}
+let defaultMinaArtifactSpec = MinaArtifact.PackagingSpec::{=}
 
 let Spec =
       { Type =
@@ -228,7 +228,7 @@ let generateDockerForCodename =
                           ]
                   , None =
                     [ MinaArtifact.buildArtifacts
-                        MinaArtifact.MinaBuildSpec::{
+                        MinaArtifact.PackagingSpec::{
                         , artifacts =
                           [ Artifact.Type.LogProc
                           , Artifact.Type.Daemon { network = spec.network }

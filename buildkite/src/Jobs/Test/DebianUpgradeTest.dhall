@@ -41,7 +41,7 @@ let dependsOn =
         }
 
 let buildSpec =
-      ArtifactPipelines.MinaBuildSpec::{
+      ArtifactPipelines.PackagingSpec::{
       , artifacts =
         [ Artifacts.Type.DaemonGeneric
         , Artifacts.Type.Daemon { network = network }

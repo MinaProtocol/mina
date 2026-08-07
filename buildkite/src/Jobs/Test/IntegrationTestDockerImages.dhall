@@ -85,7 +85,7 @@ let appsDep =
 let disableGarEnv = Some (toMap { GAR_CACHE_DISABLED = "true" })
 
 let daemonBuildSpec =
-      ArtifactPipelines.MinaBuildSpec::{
+      ArtifactPipelines.PackagingSpec::{
       , artifacts =
         [ Artifacts.Type.DaemonGeneric
         , Artifacts.Type.LogProc
@@ -97,7 +97,7 @@ let daemonBuildSpec =
       }
 
 let archiveBuildSpec =
-      ArtifactPipelines.MinaBuildSpec::{
+      ArtifactPipelines.PackagingSpec::{
       , artifacts =
         [ Artifacts.Type.Archive { network = network }
         , Artifacts.Type.ArchiveGeneric

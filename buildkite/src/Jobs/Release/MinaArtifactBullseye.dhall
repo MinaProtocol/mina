@@ -12,7 +12,7 @@ let Profile = ../../Constants/Profiles.dhall
 
 in  Pipeline.build
       ( ArtifactPipelines.packagePipeline
-          ArtifactPipelines.MinaBuildSpec::{
+          ArtifactPipelines.PackagingSpec::{
           , artifacts =
             [ Artifacts.Type.Daemon { network = Network.Type.Devnet }
             , Artifacts.Type.DaemonGeneric

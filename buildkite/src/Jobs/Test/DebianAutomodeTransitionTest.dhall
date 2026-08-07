@@ -41,7 +41,7 @@ let dependsOnDevnet =
         }
 
 let buildSpec =
-      ArtifactPipelines.MinaBuildSpec::{
+      ArtifactPipelines.PackagingSpec::{
       , artifacts =
         [ Artifacts.Type.DaemonGeneric
         , Artifacts.Type.Daemon { network = devnet }
