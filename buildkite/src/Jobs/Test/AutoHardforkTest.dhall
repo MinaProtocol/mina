@@ -70,7 +70,7 @@ let dirtyWhen =
       ]
 
 let buildSpec =
-      ArtifactPipelines.MinaBuildSpec::{
+      ArtifactPipelines.PackagingSpec::{
       , artifacts =
         [ Artifacts.Type.DaemonPostfork { network = network }
         , Artifacts.Type.LogProc

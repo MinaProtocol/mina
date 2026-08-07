@@ -54,7 +54,7 @@ let Arch = ../Constants/Arch.dhall
 
 let Expr = ../Pipeline/Expr.dhall
 
-let MinaBuildSpec =
+let PackagingSpec =
       { Type =
           { prefix : Text
           , artifacts : List Artifact.Type
@@ -189,41 +189,41 @@ let appsBuildEnvs =
           # DebianVersions.overrideEnvs
 
 let labelSuffix
-    : MinaBuildSpec.Type -> Text
-    =     \(spec : MinaBuildSpec.Type)
+    : PackagingSpec.Type -> Text
+    =     \(spec : PackagingSpec.Type)
       ->  "${DebianVersions.capitalName
                spec.debVersion} ${BuildFlags.toSuffixUppercase
                                     spec.buildFlags}${Arch.labelSuffix
                                                         spec.arch}"
 
 let primaryNetwork
-    : MinaBuildSpec.Type -> Network.Type
-    =     \(spec : MinaBuildSpec.Type)
+    : PackagingSpec.Type -> Network.Type
+    =     \(spec : PackagingSpec.Type)
       ->  Optional/default
             Network.Type
             Network.Type.Devnet
             (List/head Network.Type (Artifact.networks spec.artifacts))
 
 let baseNameSuffix
-    : MinaBuildSpec.Type -> Text
-    =     \(spec : MinaBuildSpec.Type)
+    : PackagingSpec.Type -> Text
+    =     \(spec : PackagingSpec.Type)
       ->  "${DebianVersions.capitalName
                spec.debVersion}${BuildFlags.toSuffixUppercase
                                    spec.buildFlags}${Arch.nameSuffix spec.arch}"
 
 let nameSuffix
-    : MinaBuildSpec.Type -> Text
-    =     \(spec : MinaBuildSpec.Type)
+    : PackagingSpec.Type -> Text
+    =     \(spec : PackagingSpec.Type)
       ->  "${Network.namePrefixSegment (primaryNetwork spec)}${baseNameSuffix
                                                                  spec}"
 
 let selfName
-    : MinaBuildSpec.Type -> Text
-    = \(spec : MinaBuildSpec.Type) -> "${spec.prefix}${nameSuffix spec}"
+    : PackagingSpec.Type -> Text
+    = \(spec : PackagingSpec.Type) -> "${spec.prefix}${nameSuffix spec}"
 
 let genericBuildName
-    : MinaBuildSpec.Type -> Text
-    = \(spec : MinaBuildSpec.Type) -> "${spec.prefix}${baseNameSuffix spec}"
+    : PackagingSpec.Type -> Text
+    = \(spec : PackagingSpec.Type) -> "${spec.prefix}${baseNameSuffix spec}"
 
 let DockerService =
       { service : Docker.Type, network : Network.Type, profile : Profiles.Type }
@@ -282,8 +282,8 @@ let expandDockerServices =
                 artifact
 
 let appsVariant
-    : MinaBuildSpec.Type -> Text
-    =     \(spec : MinaBuildSpec.Type)
+    : PackagingSpec.Type -> Text
+    =     \(spec : PackagingSpec.Type)
       ->  merge
             { None = merge { Amd64 = "", Arm64 = "arm64" } spec.arch
             , Instrumented =
@@ -294,8 +294,8 @@ let appsVariant
             spec.buildFlags
 
 let build_artifacts
-    : MinaBuildSpec.Type -> Command.Type
-    =     \(spec : MinaBuildSpec.Type)
+    : PackagingSpec.Type -> Command.Type
+    =     \(spec : PackagingSpec.Type)
       ->  let nets = Artifact.networks spec.artifacts
 
           let debianTokens =
@@ -358,7 +358,7 @@ let build_artifacts
                 }
 
 let commonBuildEnvs =
-          \(spec : MinaBuildSpec.Type)
+          \(spec : PackagingSpec.Type)
       ->  let nets = Artifact.networks spec.artifacts
 
           in    [ "AWS_ACCESS_KEY_ID"
@@ -377,15 +377,15 @@ let commonBuildEnvs =
               # DebianVersions.overrideEnvs
 
 let treeVariant =
-          \(spec : MinaBuildSpec.Type)
+          \(spec : PackagingSpec.Type)
       ->  "${DebianVersions.lowerName
                spec.debVersion}${BuildFlags.toLabelSegment
                                    spec.buildFlags}${Arch.toSuffixLowercase
                                                        spec.arch}"
 
 let appsJobName
-    : MinaBuildSpec.Type -> Text
-    = \(spec : MinaBuildSpec.Type) -> "${selfName spec}Apps"
+    : PackagingSpec.Type -> Text
+    = \(spec : PackagingSpec.Type) -> "${selfName spec}Apps"
 
 let build_apps
     : AppsSpec.Type -> Command.Type
@@ -427,15 +427,15 @@ let build_apps
                 }
 
 let debianTokens
-    : MinaBuildSpec.Type -> Text
-    =     \(spec : MinaBuildSpec.Type)
+    : PackagingSpec.Type -> Text
+    =     \(spec : PackagingSpec.Type)
       ->  Text/concatSep
             " "
             (List/map Artifact.Type Text Artifact.toDebianToken spec.artifacts)
 
 let buildDebianFromApps
-    : MinaBuildSpec.Type -> Text -> List Cmd.Type
-    =     \(spec : MinaBuildSpec.Type)
+    : PackagingSpec.Type -> Text -> List Cmd.Type
+    =     \(spec : PackagingSpec.Type)
       ->  \(tokens : Text)
       ->  Toolchain.select
             Toolchain.Spec::{
@@ -450,8 +450,8 @@ let buildDebianFromApps
                                                                                        spec} ${tokens}"
 
 let build_debian
-    : MinaBuildSpec.Type -> Command.Type
-    =     \(spec : MinaBuildSpec.Type)
+    : PackagingSpec.Type -> Command.Type
+    =     \(spec : PackagingSpec.Type)
       ->  Command.build
             Command.Config::{
             , commands =
@@ -477,9 +477,9 @@ let build_debian
             }
 
 let docker_step
-    : DockerService -> MinaBuildSpec.Type -> List DockerImage.ReleaseSpec.Type
+    : DockerService -> PackagingSpec.Type -> List DockerImage.ReleaseSpec.Type
     =     \(entry : DockerService)
-      ->  \(spec : MinaBuildSpec.Type)
+      ->  \(spec : PackagingSpec.Type)
       ->  let network = entry.network
 
           let profile = entry.profile
@@ -701,8 +701,8 @@ let docker_step
                 entry.service
 
 let docker_commands
-    : MinaBuildSpec.Type -> List Command.Type
-    =     \(spec : MinaBuildSpec.Type)
+    : PackagingSpec.Type -> List Command.Type
+    =     \(spec : PackagingSpec.Type)
       ->  let services =
                 List/concatMap
                   Artifact.Type
@@ -726,8 +726,8 @@ let docker_commands
                 flattened_docker_steps
 
 let pipelineBuilder
-    : MinaBuildSpec.Type -> List Command.Type -> Pipeline.Config.Type
-    =     \(spec : MinaBuildSpec.Type)
+    : PackagingSpec.Type -> List Command.Type -> Pipeline.Config.Type
+    =     \(spec : PackagingSpec.Type)
       ->  \(steps : List Command.Type)
       ->  Pipeline.Config::{
           , spec = JobSpec::{
@@ -743,14 +743,13 @@ let pipelineBuilder
           }
 
 let onlyDebianPipeline
-    : MinaBuildSpec.Type -> Pipeline.Config.Type
-    =     \(spec : MinaBuildSpec.Type)
+    -- The one job that still compiles AND packages in a single step
+    -- (build_artifacts), rather than restoring the tree an app build produced.
+    -- So this is the one place PackagingSpec drives a compile too; splitting it
+    -- like the other codenames would make the name exact.
+    : PackagingSpec.Type -> Pipeline.Config.Type
+    =     \(spec : PackagingSpec.Type)
       ->  pipelineBuilder spec [ build_artifacts spec ]
-
-let pipeline
-    : MinaBuildSpec.Type -> Pipeline.Config.Type
-    =     \(spec : MinaBuildSpec.Type)
-      ->  pipelineBuilder spec ([ build_artifacts spec ] # docker_commands spec)
 
 let appsPipeline
     : AppsSpec.Type -> Pipeline.Config.Type
@@ -773,8 +772,8 @@ let appsPipeline
           }
 
 let packagePipeline
-    : MinaBuildSpec.Type -> Pipeline.Config.Type
-    =     \(spec : MinaBuildSpec.Type)
+    : PackagingSpec.Type -> Pipeline.Config.Type
+    =     \(spec : PackagingSpec.Type)
       ->  Pipeline.Config::{
           , spec = JobSpec::{
             , dirtyWhen = DebianVersions.packageDirtyWhen
@@ -788,11 +787,10 @@ let packagePipeline
           , steps = [ build_debian spec ] # docker_commands spec
           }
 
-in  { pipeline = pipeline
-    , onlyDebianPipeline = onlyDebianPipeline
+in  { onlyDebianPipeline = onlyDebianPipeline
     , appsPipeline = appsPipeline
     , packagePipeline = packagePipeline
-    , MinaBuildSpec = MinaBuildSpec
+    , PackagingSpec = PackagingSpec
     , AppsSpec = AppsSpec
     , labelSuffix = labelSuffix
     , buildArtifacts = build_artifacts
