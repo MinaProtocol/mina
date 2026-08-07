@@ -614,6 +614,10 @@ debian-build-daemon-devnet-prefork: ## Build the Debian daemon package for autom
 debian-build-daemon-mainnet-prefork: ## Build the Debian daemon package for automote mainnet pre hardfork
 	$(call build_debian_package,daemon_mainnet_prefork)
 
+.PHONY: debian-build-config-devnet
+debian-build-config-devnet: ## Build the Debian config package for devnet
+	$(call build_debian_package,daemon_devnet_config)
+
 .PHONY: debian-build-config-mainnet
 debian-build-config-mainnet: ## Build the Debian config package for mainnet
 	$(call build_debian_package,daemon_mainnet_config)
@@ -889,10 +893,10 @@ docker-build-daemon-hardfork-docker: ## Generate hardfork packages
 		--network $(NETWORK_NAME) \
 		--deb-suffix generic \
 		--custom-suffix generic \
-		--load-only
+		--load-only \
 		--no-cache
 
-	cp _build/mina-devnet-config_*.deb .
+	cp _build/mina-$(NETWORK_NAME)-config_*.deb .
 
 	@export BUILD_DIR=./_build && \
 	export MINA_DEB_CODENAME=$(CODENAME) && \
@@ -900,7 +904,7 @@ docker-build-daemon-hardfork-docker: ## Generate hardfork packages
 	. ./scripts/export-git-env-vars.sh && \
 	./scripts/docker/build.sh \
 		--deb-codename $(CODENAME) \
-		--service mina-daemon-config \
+		--service mina-daemon-configured \
 		--version "$$MINA_DOCKER_TAG" \
 		--deb-version "$$MINA_DEB_VERSION" \
 		--branch $(BRANCH_NAME) \
@@ -939,7 +943,7 @@ docker-build-hardfork-rosetta-docker: ## Generate hardfork packages
 		--load-only \
 		--no-cache
 
-	cp _build/mina-devnet-config_*.deb .
+	cp _build/mina-$(NETWORK_NAME)-config_*.deb .
 
 	@export BUILD_DIR=./_build && \
 	export MINA_DEB_CODENAME=$(CODENAME) && \
@@ -947,7 +951,7 @@ docker-build-hardfork-rosetta-docker: ## Generate hardfork packages
 	. ./scripts/export-git-env-vars.sh && \
 	./scripts/docker/build.sh \
 		--deb-codename $(CODENAME) \
-		--service mina-rosetta-config \
+		--service mina-rosetta-configured \
 		--version "$$MINA_DOCKER_TAG" \
 		--deb-version "$$MINA_DEB_VERSION" \
 		--branch $(BRANCH_NAME) \
