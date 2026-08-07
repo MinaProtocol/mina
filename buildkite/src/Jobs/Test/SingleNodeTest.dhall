@@ -51,6 +51,7 @@ in  Pipeline.build
           let unitDirtyWhen =
                 [ S.strictlyStart (S.contains "src")
                 , S.strictly (S.contains "Makefile")
+                , S.strictlyStart (S.contains "mk/")
                 , S.exactly "buildkite/src/Jobs/Test/SingleNodeTest" "dhall"
                 , S.exactly "buildkite/scripts/single-node-tests" "sh"
                 ]

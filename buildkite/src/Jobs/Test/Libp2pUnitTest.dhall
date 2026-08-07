@@ -23,6 +23,7 @@ in  Pipeline.build
           [ S.strictlyStart (S.contains "src/app/libp2p_helper")
           , S.strictlyStart (S.contains "src/libp2p_ipc")
           , S.exactly "Makefile" ""
+          , S.strictlyStart (S.contains "mk/")
           , S.exactly "buildkite/src/Jobs/Test/Libp2pUnitTest" "dhall"
           ]
         , path = "Test"

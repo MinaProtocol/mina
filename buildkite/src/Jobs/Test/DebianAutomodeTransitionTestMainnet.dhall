@@ -39,6 +39,7 @@ let dependsOnMainnet =
 let dirtyWhen =
       [ S.strictlyStart (S.contains "src")
       , S.strictly (S.contains "Makefile")
+      , S.strictlyStart (S.contains "mk/")
       , S.exactly
           "buildkite/src/Jobs/Test/DebianAutomodeTransitionTestMainnet"
           "dhall"
