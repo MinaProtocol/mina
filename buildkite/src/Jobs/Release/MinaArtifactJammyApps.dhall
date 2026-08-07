@@ -6,16 +6,16 @@ let Artifacts = ../../Constants/Artifact/Artifacts.dhall
 
 let Pipeline = ../../Pipeline/Dsl.dhall
 
+let PipelineTag = ../../Pipeline/Tag.dhall
+
 let PipelineScope = ../../Pipeline/Scope.dhall
 
 let Network = ../../Constants/Network.dhall
 
 let Profile = ../../Constants/Profiles.dhall
 
-let PipelineTag = ../../Pipeline/Tag.dhall
-
 in  Pipeline.build
-      ( ArtifactPipelines.packagePipeline
+      ( ArtifactPipelines.appsPipeline
           ArtifactPipelines.MinaBuildSpec::{
           , artifacts =
             [ Artifacts.Type.Daemon { network = Network.Type.Devnet }
@@ -24,14 +24,14 @@ in  Pipeline.build
             , Artifacts.Type.DaemonProfiled { profile = Profile.Type.Lightnet }
             , Artifacts.Type.DaemonProfiled { profile = Profile.Type.Devnet }
             , Artifacts.Type.DaemonProfiled { profile = Profile.Type.Mainnet }
-            , Artifacts.Type.DaemonAutoHardfork
-                { network = Network.Type.Devnet }
-            , Artifacts.Type.DaemonAutoHardfork
-                { network = Network.Type.Mainnet }
             , Artifacts.Type.DaemonPrefork { network = Network.Type.Devnet }
             , Artifacts.Type.DaemonPostfork { network = Network.Type.Devnet }
             , Artifacts.Type.DaemonPrefork { network = Network.Type.Mainnet }
             , Artifacts.Type.DaemonPostfork { network = Network.Type.Mainnet }
+            , Artifacts.Type.DaemonAutoHardfork
+                { network = Network.Type.Devnet }
+            , Artifacts.Type.DaemonAutoHardfork
+                { network = Network.Type.Mainnet }
             , Artifacts.Type.CreatePreforkGenesis
                 { network = Network.Type.Devnet }
             , Artifacts.Type.CreatePreforkGenesis
@@ -46,15 +46,15 @@ in  Pipeline.build
             , Artifacts.Type.TxTools
             , Artifacts.Type.DaemonStorageToolbox
             ]
-          , scope = [ PipelineScope.Type.Weekly, PipelineScope.Type.Release ]
           , tags =
-            [ PipelineTag.Type.Packaging
+            [ PipelineTag.Type.Long
             , PipelineTag.Type.Release
             , PipelineTag.Type.Docker
             , PipelineTag.Type.Devnet
             , PipelineTag.Type.Amd64
-            , PipelineTag.Type.Focal
+            , PipelineTag.Type.Jammy
             ]
-          , debVersion = DebianVersions.DebVersion.Focal
+          , debVersion = DebianVersions.DebVersion.Jammy
+          , scope = [ PipelineScope.Type.Weekly, PipelineScope.Type.Release ]
           }
       )

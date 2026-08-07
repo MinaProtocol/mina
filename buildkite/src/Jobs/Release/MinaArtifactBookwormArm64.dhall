@@ -17,7 +17,7 @@ let Profile = ../../Constants/Profiles.dhall
 let Arch = ../../Constants/Arch.dhall
 
 in  Pipeline.build
-      ( ArtifactPipelines.pipeline
+      ( ArtifactPipelines.packagePipeline
           ArtifactPipelines.MinaBuildSpec::{
           , artifacts =
             [ Artifacts.Type.Daemon { network = Network.Type.Devnet }
