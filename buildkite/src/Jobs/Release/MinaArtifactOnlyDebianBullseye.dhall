@@ -14,7 +14,7 @@ let Profile = ../../Constants/Profiles.dhall
 
 in  Pipeline.build
       ( ArtifactPipelines.onlyDebianPipeline
-          ArtifactPipelines.MinaBuildSpec::{
+          ArtifactPipelines.PackagingSpec::{
           , artifacts =
             [ Artifacts.Type.Daemon { network = Network.Type.Devnet }
             , Artifacts.Type.DaemonProfiled { profile = Profile.Type.Devnet }
