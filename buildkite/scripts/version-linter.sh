@@ -34,7 +34,7 @@ source buildkite/scripts/export-git-env-vars.sh
 # freshly-built bare binary from the apps cache is sufficient; no debian package
 # is required. Fall back to the .deb when the bare binary is unavailable. Either
 # way `mina` ends up on PATH.
-if ./buildkite/scripts/apps/restore_binary.sh devnet; then
+if ./buildkite/scripts/apps/restore_binary.sh; then
   echo "Using bare mina from apps cache"
 else
   echo "Falling back to debian-installed mina"
