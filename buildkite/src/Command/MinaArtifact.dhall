@@ -99,6 +99,95 @@ let MinaBuildSpec =
           }
       }
 
+let AppsSpec =
+    -- What an app build actually needs, and nothing else.
+    --
+    -- The app build compiles EVERYTHING: build-artifact.sh runs a fixed set of
+    -- make targets and never looks at an artifact list. Nor does anything
+    -- downstream of it -- the apps cache variant is derived from arch and build
+    -- flags alone (there is one cache per codename/arch/flags, not per network
+    -- or profile). So an app build has no artifacts, no network and no profile:
+    -- those describe what gets PACKAGED from the binaries afterwards, which is
+    -- the packaging job's business.
+    --
+    -- nameSegment exists only so a second app job can be told apart by name; it
+    -- is not a network selector. There is nothing network-specific to select.
+      { Type =
+          { prefix : Text
+          , nameSegment : Text
+          , debVersion : DebianVersions.DebVersion
+          , buildFlags : BuildFlags.Type
+          , arch : Arch.Type
+          , toolchainSelectMode : Toolchain.SelectionMode
+          , extraBuildEnvs : List Text
+          , scope : List PipelineScope.Type
+          , tags : List PipelineTag.Type
+          , if_ : Optional B/If
+          , includeIf : List Expr.Type
+          , excludeIf : List Expr.Type
+          }
+      , default =
+          { prefix = "MinaArtifact"
+          , nameSegment = ""
+          , debVersion = DebianVersions.DebVersion.Bullseye
+          , buildFlags = BuildFlags.Type.None
+          , arch = Arch.Type.Amd64
+          , toolchainSelectMode = Toolchain.SelectionMode.ByDebianAndArch
+          , extraBuildEnvs = [] : List Text
+          , scope = PipelineScope.Full
+          , tags = [ PipelineTag.Type.Long, PipelineTag.Type.Release ]
+          , if_ = None B/If
+          , includeIf = [] : List Expr.Type
+          , excludeIf = [] : List Expr.Type
+          }
+      }
+
+let appsLabelSuffix
+    : AppsSpec.Type -> Text
+    =     \(spec : AppsSpec.Type)
+      ->  "${DebianVersions.capitalName
+               spec.debVersion} ${BuildFlags.toSuffixUppercase
+                                    spec.buildFlags}${Arch.labelSuffix
+                                                        spec.arch}"
+
+let appsSpecVariant
+    : AppsSpec.Type -> Text
+    =     \(spec : AppsSpec.Type)
+      ->  merge
+            { None = merge { Amd64 = "", Arm64 = "arm64" } spec.arch
+            , Instrumented =
+                merge
+                  { Amd64 = "instrumented", Arm64 = "instrumented-arm64" }
+                  spec.arch
+            }
+            spec.buildFlags
+
+let appsSpecTreeVariant
+    : AppsSpec.Type -> Text
+    =     \(spec : AppsSpec.Type)
+      ->  "${DebianVersions.lowerName
+               spec.debVersion}${BuildFlags.toLabelSegment
+                                   spec.buildFlags}${Arch.toSuffixLowercase
+                                                       spec.arch}"
+
+let appsBuildEnvs =
+    -- Deliberately excludes MINA_BUILD_MAINNET and the PREFORK_* pair that the
+    -- packaging envs carry: MINA_BUILD_MAINNET is read by nothing at all, and
+    -- PREFORK_LEGACY_VERSION / PREFORK_GITHASH_CONFIG are read only by
+    -- scripts/debian/builder-helpers.sh when it assembles the prefork packages.
+    -- None of them influence compilation.
+          \(spec : AppsSpec.Type)
+      ->    [ "AWS_ACCESS_KEY_ID"
+            , "AWS_SECRET_ACCESS_KEY"
+            , "MINA_BRANCH=\$BUILDKITE_BRANCH"
+            , "MINA_COMMIT_SHA1=\$BUILDKITE_COMMIT"
+            , "MINA_DEB_CODENAME=${DebianVersions.lowerName spec.debVersion}"
+            , "ARCHITECTURE=${Arch.lowerName spec.arch}"
+            ]
+          # BuildFlags.buildEnvs spec.buildFlags
+          # spec.extraBuildEnvs
+          # DebianVersions.overrideEnvs
+
 let labelSuffix
     : MinaBuildSpec.Type -> Text
     =     \(spec : MinaBuildSpec.Type)
@@ -299,12 +388,12 @@ let appsJobName
     = \(spec : MinaBuildSpec.Type) -> "${selfName spec}Apps"
 
 let build_apps
-    : MinaBuildSpec.Type -> Command.Type
-    =     \(spec : MinaBuildSpec.Type)
+    : AppsSpec.Type -> Command.Type
+    =     \(spec : AppsSpec.Type)
       ->  let appsCacheWrite =
                 Cmd.run
                   "./buildkite/scripts/apps/write_to_cache.sh ${DebianVersions.lowerName
-                                                                  spec.debVersion} ${appsVariant
+                                                                  spec.debVersion} ${appsSpecVariant
                                                                                        spec}"
 
           in  Command.build
@@ -317,15 +406,15 @@ let build_apps
                         , arch = spec.arch
                         , submodules = True
                         }
-                        (commonBuildEnvs spec)
+                        (appsBuildEnvs spec)
                         "./buildkite/scripts/build-artifact.sh"
                     # [ appsCacheWrite
                       , Cmd.run
                           "./buildkite/scripts/apps/write_build_manifest_to_cache.sh ${DebianVersions.lowerName
-                                                                                         spec.debVersion} ${treeVariant
+                                                                                         spec.debVersion} ${appsSpecTreeVariant
                                                                                                               spec}"
                       ]
-                , label = "Build apps: ${labelSuffix spec}"
+                , label = "Build apps: ${appsLabelSuffix spec}"
                 , key = "build-apps"
                 , target = Size.Multi
                 , if_ = spec.if_
@@ -664,13 +753,17 @@ let pipeline
       ->  pipelineBuilder spec ([ build_artifacts spec ] # docker_commands spec)
 
 let appsPipeline
-    : MinaBuildSpec.Type -> Pipeline.Config.Type
-    =     \(spec : MinaBuildSpec.Type)
+    : AppsSpec.Type -> Pipeline.Config.Type
+    =     \(spec : AppsSpec.Type)
       ->  Pipeline.Config::{
           , spec = JobSpec::{
             , dirtyWhen = DebianVersions.dirtyWhen spec.debVersion
             , path = "Release"
-            , name = "${appsJobName spec}"
+            , name =
+                "${spec.prefix}${spec.nameSegment}${DebianVersions.capitalName
+                                                      spec.debVersion}${BuildFlags.toSuffixUppercase
+                                                                          spec.buildFlags}${Arch.nameSuffix
+                                                                                              spec.arch}Apps"
             , tags = spec.tags
             , scope = spec.scope
             , includeIf = spec.includeIf
@@ -700,6 +793,7 @@ in  { pipeline = pipeline
     , appsPipeline = appsPipeline
     , packagePipeline = packagePipeline
     , MinaBuildSpec = MinaBuildSpec
+    , AppsSpec = AppsSpec
     , labelSuffix = labelSuffix
     , buildArtifacts = build_artifacts
     , buildApps = build_apps
