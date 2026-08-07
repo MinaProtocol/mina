@@ -82,6 +82,10 @@ check_names: dump_pipelines ## Check pipeline names
 test_monorepo: ## Run monorepo tests
 	@./scripts/test_monorepo.sh
 
+.PHONY: list_jobs
+list_jobs: ## Print the jobs a pipeline stage would run (set BUILDKITE_PIPELINE_* env vars)
+	@../buildkite/scripts/pipeline/list_jobs.sh --regenerate
+
 .PHONY: all
 all: ## Run all checks
 all: check_syntax lint format check_deps check_dirty check_dups check_names

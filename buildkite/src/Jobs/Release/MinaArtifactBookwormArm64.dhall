@@ -46,7 +46,7 @@ in  Pipeline.build
             ]
           , arch = Arch.Type.Arm64
           , tags =
-            [ PipelineTag.Type.Long
+            [ PipelineTag.Type.Packaging
             , PipelineTag.Type.Release
             , PipelineTag.Type.Docker
             , PipelineTag.Type.Devnet
