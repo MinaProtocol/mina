@@ -18,7 +18,6 @@ FROM ${image} AS base-deps
 # for the later stages of a concatenated build).
 ARG TARGETARCH
 ARG deb_codename=bullseye
-ARG deb_repo="http://packages.o1test.net"
 ARG apt_cache_url=""
 
 ARG GCLOUD_VERSION=476.0.0
@@ -34,10 +33,10 @@ ENV DEBIAN_FRONTEND noninteractive
 #    libjemalloc2
 #    libssl
 
-# Optional: configure APT caching proxy (bypass proxy for deb_repo)
+# Optional: configure APT caching proxy
 COPY scripts/configure-apt-proxy.sh /usr/local/bin/configure-apt-proxy.sh
 RUN chmod +x /usr/local/bin/configure-apt-proxy.sh \
-  && /usr/local/bin/configure-apt-proxy.sh "$apt_cache_url" "$deb_repo"
+  && /usr/local/bin/configure-apt-proxy.sh "$apt_cache_url"
 
 # Install ca-certificates using HTTP
 RUN apt-get update --quiet --yes \

@@ -88,13 +88,9 @@ while [[ "$#" -gt 0 ]]; do case $1 in
   --deb-version) DEB_VERSION="$2"; shift;;
   --deb-legacy-version) INPUT_LEGACY_VERSION="$2"; shift;;
   --deb-profile) DEB_PROFILE="$2"; shift;;
-  --deb-repo) INPUT_REPO="$2"; shift;;
   --deb-arch) DEB_ARCH="$2"; shift;;
   --deb-build-flags) DEB_BUILD_FLAGS="$2"; shift;;
   --deb-suffix) export DOCKER_DEB_SUFFIX="$2"; shift;;
-  --deb-repo-key)
-      # shellcheck disable=SC2034
-      DEB_REPO_KEY="$2"; shift;;
   --custom-arg) CUSTOM_ARG="$2"; shift;;
   --docker-target) INPUT_DOCKER_TARGET="$2"; shift;;
   --base-image) INPUT_BASE_IMAGE="$2"; shift;;
@@ -207,27 +203,14 @@ else
   CACHE="--cache-from $INPUT_CACHE"
 fi
 
-if [[ -z "${INPUT_REPO:-}" ]]; then
-  echo "Debian repository is not set. Using the default (http://localhost:8080)"
-  DEB_REPO="--build-arg deb_repo=http://localhost:8080"
-else
-  echo "Using provided Debian repository: $INPUT_REPO"
-  DEB_REPO="--build-arg deb_repo=$INPUT_REPO"
-fi
-
-GW=$(docker network inspect bridge --format '{{(index .IPAM.Config 0).Gateway}}')
-LOCALHOST_REPLACEMENT=$GW
-if [[ -z "${INPUT_REPO:-}" ]]; then
-  echo "Debian repository is not set. Using the default (http://$LOCALHOST_REPLACEMENT:8080)"
-  DEB_REPO="--build-arg deb_repo=http://$LOCALHOST_REPLACEMENT:8080"
-else
-  echo "Converting localhost to $LOCALHOST_REPLACEMENT in repository URL"
-  CONVERTED_REPO=$(echo "$INPUT_REPO" | sed "s/localhost/$LOCALHOST_REPLACEMENT/g")
-  DEB_REPO="--build-arg deb_repo=$CONVERTED_REPO"
-fi
-
+# The mina packages are installed from the .deb files staged into the build
+# context (see the _debs staging below), never from an apt repository, so the
+# build takes no Debian repository argument at all. The only URL left to pass in
+# is the optional apt cache proxy, and "localhost" in it must be rewritten to the
+# docker bridge gateway: the host resolves it, the build container does not.
 APT_CACHE_ARG=""
 if [[ -n "${APT_CACHE_PROXY:-}" ]]; then
+  LOCALHOST_REPLACEMENT=$(docker network inspect bridge --format '{{(index .IPAM.Config 0).Gateway}}')
   CONVERTED_PROXY=$(echo "$APT_CACHE_PROXY" | sed "s/localhost/$LOCALHOST_REPLACEMENT/g")
   # Probe proxy reachability before passing to Docker build; fall back to direct if unreachable
   if curl -so /dev/null --connect-timeout 2 --max-time 4 "$CONVERTED_PROXY" 2>/dev/null; then
@@ -462,7 +445,7 @@ if [[ -n "${DOCKER_TARGET:-}" ]]; then
   TARGET_ARG="--target ${DOCKER_TARGET}"
 fi
 
-docker buildx build --load --network=host --progress=plain $PLATFORM $TARGET_ARG $DOCKER_REPO_ARG $NO_CACHE $BUILD_NETWORK $CACHE $NETWORK $IMAGE $DEB_CODENAME $DEB_RELEASE $DEB_VERSION --build-arg deb_profile="$DEB_PROFILE" --build-arg generic_network="$GENERIC_NETWORK_SEG" $DOCKER_DEB_SUFFIX_ARG $BUILD_FLAGS_SUFFIX_ARG $DEB_REPO $APT_CACHE_ARG $BRANCH $REPO $LEGACY_VERSION $CUSTOM_SUFFIX_ARG $CUSTOM_ARG $DEB_ARCH $IMAGE_NAME_ARG $VERSION_ARG "$DOCKER_CONTEXT" -t "$TAG" -t "$HASHTAG" -f $DOCKERFILE_PATH
+docker buildx build --load --network=host --progress=plain $PLATFORM $TARGET_ARG $DOCKER_REPO_ARG $NO_CACHE $BUILD_NETWORK $CACHE $NETWORK $IMAGE $DEB_CODENAME $DEB_RELEASE $DEB_VERSION --build-arg deb_profile="$DEB_PROFILE" --build-arg generic_network="$GENERIC_NETWORK_SEG" $DOCKER_DEB_SUFFIX_ARG $BUILD_FLAGS_SUFFIX_ARG $APT_CACHE_ARG $BRANCH $REPO $LEGACY_VERSION $CUSTOM_SUFFIX_ARG $CUSTOM_ARG $DEB_ARCH $IMAGE_NAME_ARG $VERSION_ARG "$DOCKER_CONTEXT" -t "$TAG" -t "$HASHTAG" -f $DOCKERFILE_PATH
 
 # Local hash tag: --save-to-ci-cache saves it, and --load-only consumers look
 # the image up by it. Also set by buildx above, and re-asserted here because the

@@ -135,7 +135,6 @@ echo "--- Building ${SERVICE} locally (no push)"
   --version "${MINA_DOCKER_TAG}" \
   --branch "${BUILDKITE_BRANCH}" \
   --deb-codename "${MINA_DEB_CODENAME}" \
-  --deb-repo http://localhost:8080 \
   --deb-release unstable \
   --deb-version "${MINA_DEB_VERSION}" \
   --deb-profile "${PROFILE}" \

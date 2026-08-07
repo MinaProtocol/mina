@@ -1,15 +1,12 @@
 #!/bin/sh
 # Configure APT for o1Labs CI/build environments:
 #   1. Route most apt traffic through an apt-cacher-ng caching proxy
-#      (APT_CACHE_URL) while bypassing the Mina deb repo (DEB_REPO) so
-#      package publishes don't get cached.
-#   1b. Unconditionally bypass the known Mina deb repo hosts, whether or not
-#      DEB_REPO names them. DEB_REPO is per-build (a build using
-#      DebianRepo.Local passes http://localhost:8080), so deriving the
-#      bypass from it alone leaves packages.o1test.net proxied in exactly
-#      those builds. That host redirects http -> https at the CDN, and
-#      apt-cacher-ng cannot follow a redirect to TLS for a cached remote --
-#      it returns "500 Remote or cache error" and apt fails hard with
+#      (APT_CACHE_URL) while bypassing the known Mina deb repo hosts, so
+#      package publishes don't get cached. The bypass list is fixed, not
+#      derived from a per-build repo argument: packages.o1test.net redirects
+#      http -> https at the CDN, and apt-cacher-ng cannot follow a redirect to
+#      TLS for a cached remote -- it returns "500 Remote or cache error" and
+#      apt fails hard with
 #      "E: Failed to fetch .../InRelease  500  Remote or cache error".
 #   2. Unconditionally bypass the proxy for archive.ubuntu.com /
 #      security.ubuntu.com. The o1Labs apt-cacher-ng has the local
@@ -45,11 +42,9 @@
 #           [trusted=yes] mirror-ubuntu.list pattern, see gitops-
 #           infrastructure PR #1287).
 #
-# Usage: configure-apt-proxy.sh [APT_CACHE_URL] [DEB_REPO] [APT_MIRROR_URL]
+# Usage: configure-apt-proxy.sh [APT_CACHE_URL] [APT_MIRROR_URL]
 #   APT_CACHE_URL   - apt-cacher-ng or similar caching proxy URL
 #                     (e.g. http://apt-cache-ingress.mirror-ingress:3142)
-#   DEB_REPO        - URL of the Mina deb repo that must bypass the proxy
-#                     (e.g. http://packages.o1test.net)
 #   APT_MIRROR_URL  - Base URL of the o1Labs deb-mirror's apt repository publication
 #                     (e.g. http://deb-mirror-ingress.mirror-ingress). When
 #                     omitted but APT_CACHE_URL looks like an in-cluster
@@ -91,8 +86,7 @@
 set -eu
 
 APT_CACHE_URL="${1:-}"
-DEB_REPO="${2:-}"
-APT_MIRROR_URL="${3:-}"
+APT_MIRROR_URL="${2:-}"
 
 # Nothing to configure when no proxy is requested.
 [ -n "$APT_CACHE_URL" ] || exit 0
@@ -104,10 +98,7 @@ conf=/etc/apt/apt.conf.d/01proxy
 {
   echo "Acquire::http::Proxy \"${APT_CACHE_URL}\";"
   echo "Acquire::https::Proxy \"${APT_CACHE_URL}\";"
-  # The Mina deb repos ALWAYS go DIRECT, independently of DEB_REPO (see header
-  # note 1b). DEB_REPO only names the repo this particular build pulls from, so
-  # a build pointed elsewhere (e.g. DebianRepo.Local -> http://localhost:8080)
-  # would leave packages.o1test.net proxied -- and it must not be.
+  # The Mina deb repos ALWAYS go DIRECT (see header note 1).
   # packages.o1test.net redirects http -> https at the CDN, and apt-cacher-ng
   # cannot follow a redirect to TLS for a cached remote: it answers
   # "500 Remote or cache error", which apt treats as fatal. Fetched directly the
@@ -121,21 +112,6 @@ stable.apt.packages.minaprotocol.com"
     echo "Acquire::http::Proxy::${mina_repo_host} \"DIRECT\";"
     echo "Acquire::https::Proxy::${mina_repo_host} \"DIRECT\";"
   done
-  # Any other repo named by DEB_REPO (a local file server, a mirror) is bypassed
-  # too, so publishes never land in the cache. Skipped when it is one of the
-  # hosts already emitted above, to keep the generated conf free of duplicates.
-  if [ -n "$DEB_REPO" ]; then
-    host="${DEB_REPO#*://}"
-    host="${host%%[:/]*}"
-    already=0
-    for mina_repo_host in $MINA_DEB_REPO_HOSTS; do
-      [ "$host" = "$mina_repo_host" ] && already=1
-    done
-    if [ "$already" = "0" ]; then
-      echo "Acquire::http::Proxy::${host} \"DIRECT\";"
-      echo "Acquire::https::Proxy::${host} \"DIRECT\";"
-    fi
-  fi
   # Ubuntu Canonical archives ALWAYS go DIRECT (see header note 2):
   # the o1Labs apt-cacher-ng's Remap-uburep chain has the local unsigned
   # apt repository publication first, so a proxied request for archive.ubuntu.com
