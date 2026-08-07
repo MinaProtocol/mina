@@ -35,6 +35,7 @@ let Tag
       | Jammy
       | Archive
       | Mesa
+      | Packaging
       >
 
 let capitalName =
@@ -67,6 +68,7 @@ let capitalName =
             , Jammy = "Jammy"
             , Archive = "Archive"
             , Mesa = "Mesa"
+            , Packaging = "Packaging"
             }
             tag
 
@@ -100,6 +102,7 @@ let lowerName =
             , Jammy = "jammy"
             , Archive = "archive"
             , Mesa = "mesa"
+            , Packaging = "packaging"
             }
             tag
 
