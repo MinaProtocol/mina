@@ -503,23 +503,6 @@ test_DEFECT_three_services_point_to_a_dockerfile_that_is_absent() {
         "${REPO_ROOT}/dockerfiles/Dockerfile-delegation-backend-toolchain"
 }
 
-# DEFECT: build.sh maps the service "mina-daemon-auto-hardfork" to
-# dockerfiles/Dockerfile-mina-daemon-auto-hardfork, and that file is not in this
-# branch. Six rendered pipelines call the service, in the MainlineNightly and
-# Release scopes, so the fault appears only in a nightly or a release build.
-# Either add the Dockerfile, or point the service to
-# dockerfiles/Dockerfile-mina-daemon-hardfork, which does exist.
-test_DEFECT_auto_hardfork_dockerfile_is_absent() {
-    assert_file_absent "auto hardfork dockerfile" \
-        "${REPO_ROOT}/dockerfiles/Dockerfile-mina-daemon-auto-hardfork"
-    # The service is still declared, so the fault is reachable.
-    if grep -rq "DaemonAutoHardfork" "${REPO_ROOT}/buildkite/src/Command/MinaArtifact.dhall"; then
-        log_pass
-    else
-        log_fail "REPAIRED: CI no longer builds DaemonAutoHardfork. Change this test."
-    fi
-}
-
 # The services that CI and the Makefile use must point to a Dockerfile that
 # exists. This test finds a Dockerfile that a rename or a deletion has lost.
 test_live_services_have_a_dockerfile() {
@@ -528,6 +511,7 @@ test_live_services_have_a_dockerfile() {
         dockerfiles/Dockerfile-mina-archive \
         dockerfiles/Dockerfile-mina-daemon \
         dockerfiles/Dockerfile-mina-rosetta \
+        dockerfiles/Dockerfile-mina-daemon-hardfork \
         dockerfiles/Dockerfile-txn-burst \
         dockerfiles/Dockerfile-zkapp-test-transaction \
         dockerfiles/Dockerfile-mina-test-suite \
@@ -574,7 +558,6 @@ main() {
     run_test test_DEFECT_a_partial_service_name_passes_the_check
     run_test test_DEFECT_valid_services_holds_names_that_cannot_build
     run_test test_DEFECT_three_services_point_to_a_dockerfile_that_is_absent
-    run_test test_DEFECT_auto_hardfork_dockerfile_is_absent
 
     teardown_stub_docker
 
