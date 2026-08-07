@@ -26,8 +26,6 @@ let DockerImage = ../Command/DockerImage.dhall
 
 let DebianVersions = ../Constants/DebianVersions.dhall
 
-let DebianRepo = ../Constants/DebianRepo.dhall
-
 let Docker = ../Constants/Docker/Package.dhall
 
 let Artifact = ../Constants/Artifact/Artifacts.dhall
@@ -437,7 +435,6 @@ let generateHfRelatedStepsForCodename =
                 , network = spec.network
                 , deb_codename = codename.DebVersion
                 , deb_profile = profile
-                , deb_repo = DebianRepo.Type.Local
                 , deb_legacy_version = spec.deb_legacy_version
                 , step_key_suffix =
                     "-${DebianVersions.lowerName
