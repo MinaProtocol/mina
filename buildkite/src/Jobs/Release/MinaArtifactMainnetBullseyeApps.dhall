@@ -1,6 +1,11 @@
+-- NOTE: this job compiles exactly what MinaArtifactBullseyeApps compiles, and
+-- writes to the SAME apps cache (`write_to_cache.sh bullseye`) -- the cache
+-- variant is keyed on codename/arch/build-flags only, never on network. It is
+-- kept for now purely so the consumers that name it keep resolving; collapsing
+-- the two is a follow-up.
 let ArtifactPipelines = ../../Command/MinaArtifact.dhall
 
-let Artifacts = ../../Constants/Artifact/Artifacts.dhall
+let DebianVersions = ../../Constants/DebianVersions.dhall
 
 let Pipeline = ../../Pipeline/Dsl.dhall
 
@@ -8,25 +13,11 @@ let PipelineTag = ../../Pipeline/Tag.dhall
 
 let PipelineScope = ../../Pipeline/Scope.dhall
 
-let Network = ../../Constants/Network.dhall
-
-let Profile = ../../Constants/Profiles.dhall
-
 in  Pipeline.build
       ( ArtifactPipelines.appsPipeline
-          ArtifactPipelines.MinaBuildSpec::{
-          , artifacts =
-            [ Artifacts.Type.Daemon { network = Network.Type.Mainnet }
-            , Artifacts.Type.DaemonProfiled { profile = Profile.Type.Mainnet }
-            , Artifacts.Type.DaemonAutoHardfork
-                { network = Network.Type.Mainnet }
-            , Artifacts.Type.DaemonPrefork { network = Network.Type.Mainnet }
-            , Artifacts.Type.DaemonPostfork { network = Network.Type.Mainnet }
-            , Artifacts.Type.CreatePreforkGenesis
-                { network = Network.Type.Mainnet }
-            , Artifacts.Type.Archive { network = Network.Type.Mainnet }
-            , Artifacts.Type.Rosetta { network = Network.Type.Mainnet }
-            ]
+          ArtifactPipelines.AppsSpec::{
+          , nameSegment = "Mainnet"
+          , debVersion = DebianVersions.DebVersion.Bullseye
           , scope = PipelineScope.AllButPullRequest
           , tags =
             [ PipelineTag.Type.Long
