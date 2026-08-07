@@ -74,7 +74,6 @@ let envExports =
           \(spec : Spec.Type)
       ->  [ "MINA_NETWORK_DEB=${Network.lowerName spec.network}"
           , "MINA_DEB_CODENAME=${Dockers.lowerName spec.dockerType}"
-          , "APPS_NETWORK=${Network.lowerName spec.network}"
           , "MINA_PROFILE=${Profiles.lowerName spec.profile}"
           , "APPS_BARE_BINARIES=${bareBinaries}"
           ]

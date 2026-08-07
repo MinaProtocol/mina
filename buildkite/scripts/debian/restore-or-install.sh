@@ -9,8 +9,8 @@
 # pairs (e.g. "archive.exe:mina-archive,replayer.exe:mina-replayer"). When set,
 # each binary is restored from the namespaced apps cache (mirroring the binary a
 # deb would install) via restore_app.sh, and the package install is skipped. The
-# cache variant is derived by restore_app.sh from MINA_DEB_CODENAME / APPS_PROFILE
-# / APPS_BUILD_FLAG / APPS_ARCH -- so callers set those to match the build they
+# cache variant is derived by restore_app.sh from MINA_DEB_CODENAME /
+# APPS_BUILD_FLAG / APPS_ARCH -- so callers set those to match the build they
 # depend on (e.g. APPS_BUILD_FLAG=instrumented).
 #
 # If APPS_BARE_BINARIES is unset, or any restore fails (cache miss, not in
@@ -30,7 +30,6 @@ set -eo pipefail
 
 DEBS=$1
 RETRIES=${2:-1}
-NETWORK="${APPS_NETWORK:-devnet}"
 
 if [[ -z "$DEBS" ]]; then
   echo "Usage: $0 <comma-separated-debs> <retries>" >&2
@@ -62,7 +61,7 @@ for pair in "${pairs[@]}"; do
     ok=false
     break
   fi
-  if ! ./buildkite/scripts/apps/restore_app.sh "$NETWORK" "$exe" "$install_as"; then
+  if ! ./buildkite/scripts/apps/restore_app.sh "$exe" "$install_as"; then
     ok=false
     break
   fi

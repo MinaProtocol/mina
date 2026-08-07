@@ -16,8 +16,7 @@ in  { step =
               Command.Config::{
               , commands =
                 [ RunWithPostgres.runInToolchainWithPostgresAndDebs
-                    [ "APPS_NETWORK=mainnet"
-                    , "MINA_PROFILE=mainnet"
+                    [ "MINA_PROFILE=mainnet"
                     , "APPS_BARE_BINARIES=mina.exe:mina,archive.exe:mina-archive,rosetta.exe:mina-rosetta"
                     ]
                     ( Some

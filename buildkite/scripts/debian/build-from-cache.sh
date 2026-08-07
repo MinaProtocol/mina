@@ -10,22 +10,26 @@
 # only restore the tree and package it. Keep the packaging logic below in sync
 # with build-release.sh.
 #
-# Usage: build-from-cache.sh <apps-variant> <build-variant> <package-token> [<package-token> ...]
+# Usage: APPS_VARIANT=<variant> build-from-cache.sh <build-variant> <package-token> [...]
+#
+# APPS_VARIANT selects the apps-cache directory to restore the binaries from. It
+# is EMPTY for the default (standard, non-instrumented, amd64) build, which is
+# why it travels in the environment rather than as a leading positional -- an
+# empty positional would silently shift <build-variant> into its place.
 
 set -eo pipefail
 
 [ -z "${MINA_DEB_CODENAME+x}" ] && echo "MINA_DEB_CODENAME env var was not provided" && exit 1
 
-APPS_VARIANT=$1
-BUILD_VARIANT=$2
-shift 2
+BUILD_VARIANT=$1
+shift 1
 
-if [[ -z "$APPS_VARIANT" || -z "$BUILD_VARIANT" ]]; then
-  echo "Usage: $0 <apps-variant> <build-variant> <package-token> [...]" >&2
+if [[ -z "$BUILD_VARIANT" ]]; then
+  echo "Usage: APPS_VARIANT=<variant> $0 <build-variant> <package-token> [...]" >&2
   exit 1
 fi
 
-./buildkite/scripts/apps/restore_build_tree.sh "${MINA_DEB_CODENAME}" "${APPS_VARIANT}" "${BUILD_VARIANT}"
+./buildkite/scripts/apps/restore_build_tree.sh "${MINA_DEB_CODENAME}" "${BUILD_VARIANT}"
 
 echo "--- Bundle all packages for Debian ${MINA_DEB_CODENAME}"
 echo " Includes mina daemon, archive-node, rosetta"
