@@ -28,6 +28,9 @@
   },
   "daemon": {
     "network_id": "devnet",
-    "peer_list_url": "https://bootnodes.minaprotocol.com/networks/devnet.txt"
+    "peer_list_url": "https://bootnodes.minaprotocol.com/networks/devnet.txt",
+    "slot_tx_end": 413540,
+    "slot_chain_end": 413640,
+    "hard_fork_genesis_slot_delta": 60
   }
 }
