@@ -1105,6 +1105,12 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
           in
           let get_monitor_infos monitor =
             let rec get_monitors accum monitor =
+              (* KNOWN WART (core-v0.16 port): async v0.16 moved the public
+                 [Monitor.parent] accessor under [For_tests], which carries no
+                 stability guarantee and may move again on the next core bump.
+                 There is no other public way to walk the monitor chain; if this
+                 disappears, drop the parent chain and log the innermost monitor
+                 only. *)
               match Async_kernel.Monitor.For_tests.parent monitor with
               | None ->
                   List.rev accum
