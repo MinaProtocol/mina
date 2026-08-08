@@ -57,7 +57,7 @@ let clear_dir toplevel_dir =
     | `Yes ->
         let%map dirs, files =
           Sys.ls_dir fullname
-          >>= Deferred.List.map ~f:(all_files fullname) ~how:`Parallel
+          >>= Deferred.List.map ~f:(all_files fullname) ~how:`Sequential
           >>| List.unzip
         in
         let dirs =
@@ -69,10 +69,15 @@ let clear_dir toplevel_dir =
         Deferred.return ([], [ fullname ])
   in
   let%bind dirs, files = all_files toplevel_dir "" in
+  (* [how] became a required argument in async v0.16; [`Sequential] is the
+     pre-v0.16 default and is load-bearing here: [dirs] is built deepest-first,
+     so a parent may only be [rmdir]'d after its children have been removed.
+     Running these in parallel would race a parent against its own children and
+     raise [ENOTEMPTY] nondeterministically. *)
   let%bind () =
-    Deferred.List.iter files ~f:(fun file -> Sys.remove file) ~how:`Parallel
+    Deferred.List.iter files ~f:(fun file -> Sys.remove file) ~how:`Sequential
   in
-  Deferred.List.iter dirs ~f:(fun file -> Unix.rmdir file) ~how:`Parallel
+  Deferred.List.iter dirs ~f:(fun file -> Unix.rmdir file) ~how:`Sequential
 
 let create_dir ?(clear_if_exists = false) dir =
   match Sys_unix.file_exists dir with
