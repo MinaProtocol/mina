@@ -15,8 +15,8 @@ let Profile = ../../Constants/Profiles.dhall
 let PipelineTag = ../../Pipeline/Tag.dhall
 
 in  Pipeline.build
-      ( ArtifactPipelines.pipeline
-          ArtifactPipelines.MinaBuildSpec::{
+      ( ArtifactPipelines.packagePipeline
+          ArtifactPipelines.PackagingSpec::{
           , artifacts =
             [ Artifacts.Type.Daemon { network = Network.Type.Devnet }
             , Artifacts.Type.Daemon { network = Network.Type.Mainnet }
@@ -48,7 +48,7 @@ in  Pipeline.build
             ]
           , scope = [ PipelineScope.Type.Weekly, PipelineScope.Type.Release ]
           , tags =
-            [ PipelineTag.Type.Long
+            [ PipelineTag.Type.Packaging
             , PipelineTag.Type.Release
             , PipelineTag.Type.Docker
             , PipelineTag.Type.Devnet

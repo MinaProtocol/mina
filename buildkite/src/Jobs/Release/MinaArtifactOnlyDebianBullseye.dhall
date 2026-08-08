@@ -14,7 +14,7 @@ let Profile = ../../Constants/Profiles.dhall
 
 in  Pipeline.build
       ( ArtifactPipelines.onlyDebianPipeline
-          ArtifactPipelines.MinaBuildSpec::{
+          ArtifactPipelines.PackagingSpec::{
           , artifacts =
             [ Artifacts.Type.Daemon { network = Network.Type.Devnet }
             , Artifacts.Type.DaemonProfiled { profile = Profile.Type.Devnet }
@@ -26,7 +26,7 @@ in  Pipeline.build
             , Artifacts.Type.TxTools
             , Artifacts.Type.TestExecutive
             ]
-          , tags = [ PipelineTag.Type.Docker ]
+          , tags = [ PipelineTag.Type.Packaging, PipelineTag.Type.Docker ]
           , channel = DebianChannel.Type.Experimental
           , prefix = "MinaArtifactOnlyDebian"
           }

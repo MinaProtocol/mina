@@ -14,7 +14,7 @@ let PipelineTag = ../../Pipeline/Tag.dhall
 
 in  Pipeline.build
       ( ArtifactPipelines.packagePipeline
-          ArtifactPipelines.MinaBuildSpec::{
+          ArtifactPipelines.PackagingSpec::{
           , artifacts =
             [ Artifacts.Type.Daemon { network = Network.Type.Devnet }
             , Artifacts.Type.DaemonGeneric
@@ -33,7 +33,7 @@ in  Pipeline.build
             ]
           , buildFlags = BuildFlags.Type.Instrumented
           , tags =
-            [ PipelineTag.Type.Long
+            [ PipelineTag.Type.Packaging
             , PipelineTag.Type.Release
             , PipelineTag.Type.Docker
             , PipelineTag.Type.Devnet

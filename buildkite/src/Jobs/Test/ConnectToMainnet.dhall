@@ -23,12 +23,11 @@ let MainlineBranch = ../../Pipeline/MainlineBranch.dhall
 let network = Network.Type.Mainnet
 
 let dependsOn =
-        DebianVersions.dependsOn
-          DebianVersions.DepsSpec::{
-          , network = network
-          , profile = Profile.Type.Mainnet
-          }
-      # DebianVersions.dependsOn DebianVersions.DepsSpec::{=}
+      DebianVersions.appDependsOn
+        DebianVersions.DepsSpec::{
+        , network = network
+        , profile = Profile.Type.Mainnet
+        }
 
 in  Pipeline.build
       Pipeline.Config::{

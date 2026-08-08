@@ -17,7 +17,7 @@ source buildkite/scripts/export-git-env-vars.sh
 # package. Either way `mina` is on PATH and /var/lib/coda/<net>.json exists, so
 # chain-id resolves the genesis ledger identically. Fall back to the .deb on a
 # cache miss (e.g. outside Buildkite).
-if ./buildkite/scripts/apps/restore_binary.sh "${MINA_DEBIAN_NETWORK}" \
+if ./buildkite/scripts/apps/restore_binary.sh \
   && ./buildkite/scripts/apps/restore_daemon_config.sh "${MINA_DEBIAN_NETWORK}"; then
   echo "Using bare mina + replicated genesis config from apps cache"
 else

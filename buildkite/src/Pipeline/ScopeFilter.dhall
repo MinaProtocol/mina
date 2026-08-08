@@ -11,6 +11,7 @@ let Filter
       | Nightly
       | MainlineNightly
       | Weekly
+      | Release
       | All
       >
 
@@ -23,6 +24,7 @@ let scopes
             , Nightly = [ Scope.Type.Nightly ]
             , MainlineNightly = [ Scope.Type.MainlineNightly ]
             , Weekly = [ Scope.Type.Weekly ]
+            , Release = [ Scope.Type.Release ]
             , All =
               [ Scope.Type.PullRequest
               , Scope.Type.Nightly
@@ -42,6 +44,7 @@ let show
             , Nightly = "nightly"
             , MainlineNightly = "mainlinenightly"
             , Weekly = "weekly"
+            , Release = "release"
             , All = "all"
             }
             filter

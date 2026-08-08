@@ -15,8 +15,8 @@ let Network = ../../Constants/Network.dhall
 let Profile = ../../Constants/Profiles.dhall
 
 in  Pipeline.build
-      ( ArtifactPipelines.pipeline
-          ArtifactPipelines.MinaBuildSpec::{
+      ( ArtifactPipelines.packagePipeline
+          ArtifactPipelines.PackagingSpec::{
           , artifacts =
             [ Artifacts.Type.Daemon { network = Network.Type.Devnet }
             , Artifacts.Type.Daemon { network = Network.Type.Mainnet }
@@ -48,7 +48,7 @@ in  Pipeline.build
             , Artifacts.Type.DaemonStorageToolbox
             ]
           , tags =
-            [ PipelineTag.Type.Long
+            [ PipelineTag.Type.Packaging
             , PipelineTag.Type.Release
             , PipelineTag.Type.Docker
             , PipelineTag.Type.Devnet

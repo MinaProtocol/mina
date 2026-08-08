@@ -21,12 +21,11 @@ let Expr = ../../Pipeline/Expr.dhall
 let MainlineBranch = ../../Pipeline/MainlineBranch.dhall
 
 let dependsOn =
-        DebianVersions.dependsOn
-          DebianVersions.DepsSpec::{
-          , network = Network.Type.Mainnet
-          , profile = Profiles.Type.Mainnet
-          }
-      # DebianVersions.dependsOn DebianVersions.DepsSpec::{=}
+      DebianVersions.appDependsOn
+        DebianVersions.DepsSpec::{
+        , network = Network.Type.Mainnet
+        , profile = Profiles.Type.Mainnet
+        }
 
 in  Pipeline.build
       Pipeline.Config::{

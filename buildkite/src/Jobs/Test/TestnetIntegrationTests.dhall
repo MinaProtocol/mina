@@ -10,17 +10,9 @@ let PipelineScope = ../../Pipeline/Scope.dhall
 
 let TestExecutive = ../../Command/TestExecutive.dhall
 
-let Command = ../../Command/Base.dhall
+let IntegrationImages = ../../Constants/IntegrationImages.dhall
 
-let dependsOn
-    : List Command.TaggedKey.Type
-    = [ { name = "IntegrationTestDockerImages"
-        , key = "daemon_profile-devnet-docker-image"
-        }
-      , { name = "IntegrationTestDockerImages"
-        , key = "archive-devnet-docker-image"
-        }
-      ]
+let dependsOn = IntegrationImages.dependsOn
 
 in  Pipeline.build
       Pipeline.Config::{
@@ -31,6 +23,7 @@ in  Pipeline.build
           , S.strictlyStart
               (S.contains "buildkite/src/Jobs/Test/TestnetIntegrationTest")
           , S.strictlyStart (S.contains "buildkite/src/Command/TestExecutive")
+          , S.exactly "buildkite/src/Constants/IntegrationImages" "dhall"
           , S.strictlyStart
               (S.contains "buildkite/scripts/run-test-executive-local")
           ]

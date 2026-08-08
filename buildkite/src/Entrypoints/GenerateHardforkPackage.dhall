@@ -26,8 +26,6 @@ let DockerImage = ../Command/DockerImage.dhall
 
 let DebianVersions = ../Constants/DebianVersions.dhall
 
-let DebianRepo = ../Constants/DebianRepo.dhall
-
 let Docker = ../Constants/Docker/Package.dhall
 
 let Artifact = ../Constants/Artifact/Artifacts.dhall
@@ -47,7 +45,7 @@ let List/map = Prelude.List.map
 let DebianArchPair =
       { DebVersion : DebianVersions.DebVersion, Arch : Arch.Type }
 
-let defaultMinaArtifactSpec = MinaArtifact.MinaBuildSpec::{=}
+let defaultMinaArtifactSpec = MinaArtifact.PackagingSpec::{=}
 
 let Spec =
       { Type =
@@ -62,6 +60,7 @@ let Spec =
           , use_generic_dockers_from_version : Optional Text
           , size : Size
           , deb_legacy_version : Text
+          , deb_legacy_githash_config : Text
           }
       , default =
           { codenames =
@@ -80,6 +79,8 @@ let Spec =
           , use_generic_dockers_from_version = None Text
           , size = Size.XLarge
           , deb_legacy_version = defaultMinaArtifactSpec.deb_legacy_version
+          , deb_legacy_githash_config =
+              defaultMinaArtifactSpec.deb_legacy_githash_config
           }
       }
 
@@ -227,7 +228,7 @@ let generateDockerForCodename =
                           ]
                   , None =
                     [ MinaArtifact.buildArtifacts
-                        MinaArtifact.MinaBuildSpec::{
+                        MinaArtifact.PackagingSpec::{
                         , artifacts =
                           [ Artifact.Type.LogProc
                           , Artifact.Type.Daemon { network = spec.network }
@@ -239,6 +240,8 @@ let generateDockerForCodename =
                         , debVersion = codename.DebVersion
                         , prefix = pipelineName
                         , suffix = Some "-${lowerNameCodename}"
+                        , deb_legacy_githash_config =
+                            spec.deb_legacy_githash_config
                         }
                     ]
                   }
@@ -303,6 +306,7 @@ let generateDockerForCodename =
                       , deb_codename = codename.DebVersion
                       , deb_profile = profile
                       , deb_legacy_version = spec.deb_legacy_version
+                      , docker_target = Some "mina-daemon-prefork-genesis"
                       , size = spec.size
                       , deb_version = spec.version
                       , generic = True
@@ -431,7 +435,6 @@ let generateHfRelatedStepsForCodename =
                 , network = spec.network
                 , deb_codename = codename.DebVersion
                 , deb_profile = profile
-                , deb_repo = DebianRepo.Type.Local
                 , deb_legacy_version = spec.deb_legacy_version
                 , step_key_suffix =
                     "-${DebianVersions.lowerName

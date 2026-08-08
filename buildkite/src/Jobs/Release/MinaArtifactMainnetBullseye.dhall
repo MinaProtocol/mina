@@ -14,7 +14,7 @@ let Profile = ../../Constants/Profiles.dhall
 
 in  Pipeline.build
       ( ArtifactPipelines.packagePipeline
-          ArtifactPipelines.MinaBuildSpec::{
+          ArtifactPipelines.PackagingSpec::{
           , artifacts =
             [ Artifacts.Type.Daemon { network = Network.Type.Mainnet }
             , Artifacts.Type.DaemonProfiled { profile = Profile.Type.Mainnet }
@@ -29,7 +29,7 @@ in  Pipeline.build
             ]
           , scope = PipelineScope.AllButPullRequest
           , tags =
-            [ PipelineTag.Type.Long
+            [ PipelineTag.Type.Packaging
             , PipelineTag.Type.Release
             , PipelineTag.Type.Docker
             , PipelineTag.Type.Rosetta

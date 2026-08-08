@@ -112,6 +112,15 @@ end
 
 type 'mlmb t = (unit, 'mlmb) With_data.t
 
+module For_tests = struct
+  (* Append a copy of the first [lr] entry to the wrap proof's bulletproof. *)
+  let append_lr_entry (T wrap : _ t) : _ t =
+    let wwp = wrap.proof in
+    let bp = wwp.bulletproof in
+    let lr' = Array.append bp.lr [| bp.lr.(0) |] in
+    T { wrap with proof = { wwp with bulletproof = { bp with lr = lr' } } }
+end
+
 let dummy (type h r) (h : h Nat.t) (most_recent_width : r Nat.t) ~domain_log2 :
     h t =
   let open Ro in

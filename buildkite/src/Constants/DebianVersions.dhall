@@ -71,7 +71,6 @@ let minimalDirtyWhen =
       , S.exactly "buildkite/src/Command/PatchArchiveTest" "dhall"
       , S.exactly "buildkite/src/Command/ArchiveNodeTest" "dhall"
       , S.exactly "buildkite/src/Command/Bench/Base" "dhall"
-      , S.strictlyStart (S.contains "scripts/benchmarks")
       , S.strictlyStart (S.contains "buildkite/scripts/bench")
       , S.exactly "buildkite/src/Command/ReplayerTest" "dhall"
       , S.strictlyStart (S.contains "buildkite/src/Jobs/Release/MinaArtifact")
@@ -115,9 +114,24 @@ let dirtyWhen =
             debVersion
 
 let packageDirtyWhen =
+    -- Strictly what a packaging job reads or produces: the .deb and docker
+    -- build scripts, the Dockerfiles, and the Dhall that defines the jobs.
+    --
+    -- It deliberately does NOT list the compile (buildkite/scripts/build-artifact.sh
+    -- and the apps-cache writers) -- packaging never runs those, it restores the
+    -- tree the app build already produced. The only apps script it touches is
+    -- restore_build_tree.sh, via buildkite/scripts/debian/build-from-cache.sh.
+    --
+    -- Nor does it list the packaging TESTS. Those used to be here so that a test
+    -- selected by its own dirty-when would not be left with a dangling
+    -- dependency on a packaging job that had not been selected. monorepo.sh
+    -- resolves dependencies itself now (phase 2): selecting DebianUpgradeTest
+    -- pulls MinaArtifactBullseye in regardless of this list, so listing the
+    -- tests here only made packaging run on changes it does not depend on.
       [ S.exactly "buildkite/src/Constants/DebianVersions" "dhall"
       , S.exactly "buildkite/src/Constants/ContainerImages" "dhall"
       , S.exactly "buildkite/src/Command/MinaArtifact" "dhall"
+      , S.exactly "buildkite/src/Command/DockerImage" "dhall"
       , S.strictlyStart (S.contains "buildkite/src/Jobs/Release/MinaArtifact")
       , S.strictlyStart (S.contains "dockerfiles")
       , S.strictlyStart (S.contains "scripts/debian")
@@ -125,13 +139,8 @@ let packageDirtyWhen =
       , S.strictlyStart (S.contains "scripts/hardfork")
       , S.strictlyStart (S.contains "buildkite/scripts/docker")
       , S.strictlyStart (S.contains "buildkite/scripts/debian")
-      , S.exactly "buildkite/scripts/build-artifact" "sh"
-      , S.strictlyStart (S.contains "buildkite/scripts/apps")
+      , S.exactly "buildkite/scripts/apps/restore_build_tree" "sh"
       , S.strictlyStart (S.contains "buildkite/scripts/cache")
-      , S.strictlyStart (S.contains "buildkite/scripts/tests/debian")
-      , S.strictlyStart (S.contains "buildkite/scripts/tests/hardfork")
-      , S.strictlyStart (S.contains "buildkite/src/Jobs/Test/Debian")
-      , S.exactly "buildkite/src/Jobs/Test/AutoHardforkTest" "dhall"
       ]
 
 let appDependsOn =

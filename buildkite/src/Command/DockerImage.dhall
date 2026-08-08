@@ -18,8 +18,6 @@ let Cmd = ../Lib/Cmds.dhall
 
 let DockerLogin = ../Command/DockerLogin/Type.dhall
 
-let DebianRepo = ../Constants/DebianRepo.dhall
-
 let DockerRepo = ../Constants/DockerRepo.dhall
 
 let DebianVersions = ../Constants/DebianVersions.dhall
@@ -54,9 +52,10 @@ let ReleaseSpec =
           , deb_version : Text
           , deb_root_folder : Text
           , deb_legacy_version : Text
+          , docker_target : Optional Text
+          , base_image : Optional Text
           , deb_suffix : Optional Text
           , deb_profile : Profiles.Type
-          , deb_repo : DebianRepo.Type
           , build_flags : BuildFlags.Type
           , step_key_suffix : Text
           , docker_publish : DockerPublish.Type
@@ -82,9 +81,10 @@ let ReleaseSpec =
           , deb_release = "unstable"
           , deb_version = "\\\${MINA_DEB_VERSION}"
           , deb_legacy_version = "3.1.1-alpha1-compatible-14a8b92"
+          , docker_target = None Text
+          , base_image = None Text
           , deb_profile = Profiles.Type.Devnet
           , build_flags = BuildFlags.Type.None
-          , deb_repo = DebianRepo.Type.Local
           , docker_publish = DockerPublish.Type.Essential
           , no_cache = False
           , save_to_ci_cache = False
@@ -130,11 +130,12 @@ let generateStep =
 
           let maybeCacheOption = if spec.no_cache then "--no-cache" else ""
 
-          let maybeStartDebianRepo =
+          let maybeFetchLocalDebs =
                 merge
                   { DownloadOnly =
                       " && ROOT=${spec.deb_root_folder} LOCAL_DEB_FOLDER=\"dockerfiles\" ./buildkite/scripts/debian/read_all_from_cache.sh "
-                  , NoInstall = " && echo Skipping local debian repo setup "
+                  , NoInstall =
+                      " && echo Skipping local debian package download "
                   }
                   spec.deb_install_mode
 
@@ -164,7 +165,8 @@ let generateStep =
               -- (scripts/docker/helper.sh get_platform_suffix), which is the
               -- only arch suffix manager.sh verify's tag ever expects.
                 merge
-                  { DaemonGeneric = ""
+                  { Base = ""
+                  , DaemonGeneric = ""
                   , DaemonProfiled = \(args : { profile : Profiles.Type }) -> ""
                   , Daemon =
                       \(args : { network : Network.Type }) -> archCustomSuffix
@@ -230,6 +232,32 @@ let generateStep =
 
                 else  ""
 
+          let dockerTargetArg =
+                merge
+                  { Some = \(t : Text) -> " --docker-target ${t}", None = "" }
+                  spec.docker_target
+
+          let baseImageArg =
+                merge
+                  { Some = \(i : Text) -> " --base-image ${i}", None = "" }
+                  spec.base_image
+
+          let maybeLoadBaseImage =
+              -- Preload the published mina-base image from the storagebox cache
+              -- so the staged build can start FROM it instead of re-running the
+              -- base-deps stage. Non-fatal on purpose: a miss (nothing published
+              -- for this pin yet, or a janitored cache) must not fail the build,
+              -- it just falls back to inlining the fragment in build.sh.
+                merge
+                  { Some =
+                          \(i : Text)
+                      ->      "( ./buildkite/scripts/docker/load_from_cache.sh ${i}"
+                          ++  " || echo mina-base-not-in-ci-cache-inlining-base-deps-stage )"
+                          ++  " && "
+                  , None = ""
+                  }
+                  spec.base_image
+
           let buildDockerCmd =
                     "./scripts/docker/build.sh"
                 ++  " --service ${serviceName}"
@@ -239,13 +267,14 @@ let generateStep =
                 ++  " ${maybeCacheOption} "
                 ++  " --deb-codename ${DebianVersions.lowerName
                                          spec.deb_codename}"
-                ++  " --deb-repo ${DebianRepo.address spec.deb_repo}"
                 ++  " --deb-release ${spec.deb_release}"
                 ++  " --deb-version ${spec.deb_version}"
                 ++  " --deb-profile ${Profiles.lowerName spec.deb_profile}"
                 ++  " --deb-build-flags ${BuildFlags.lowerName
                                             spec.build_flags}"
                 ++  " --deb-legacy-version ${spec.deb_legacy_version}"
+                ++  dockerTargetArg
+                ++  baseImageArg
                 ++  debSuffix
                 ++  " --repo ${spec.repo}"
                 ++  " --platform ${Arch.platform spec.arch}"
@@ -255,41 +284,21 @@ let generateStep =
                 ++  imageNameArg
                 ++  maybeSaveToCacheArg
 
-          let remoteRepoCmds =
+          let commands =
                 [ Cmd.run
                     (     exportMinaDebCmd
                       ++  " && "
                       ++  exportBranchNameCmd
-                      ++  " && source ./buildkite/scripts/export-git-env-vars.sh "
                       ++  " && "
                       ++  pruneDockerImages
+                      ++  maybeFetchLocalDebs
+                      ++  " && source ./buildkite/scripts/export-git-env-vars.sh "
                       ++  " && "
+                      ++  maybeLoadBaseImage
                       ++  buildDockerCmd
                       ++  maybeVerify
                     )
                 ]
-
-          let commands =
-                merge
-                  { Unstable = remoteRepoCmds
-                  , Nightly = remoteRepoCmds
-                  , Stable = remoteRepoCmds
-                  , Local =
-                    [ Cmd.run
-                        (     exportMinaDebCmd
-                          ++  " && "
-                          ++  exportBranchNameCmd
-                          ++  " && "
-                          ++  pruneDockerImages
-                          ++  maybeStartDebianRepo
-                          ++  " && source ./buildkite/scripts/export-git-env-vars.sh "
-                          ++  " && "
-                          ++  buildDockerCmd
-                          ++  maybeVerify
-                        )
-                    ]
-                  }
-                  spec.deb_repo
 
           let target =
                 merge { Arm64 = Size.XLarge, Amd64 = Size.XLarge } spec.arch

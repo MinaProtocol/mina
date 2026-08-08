@@ -12,7 +12,7 @@ let Profile = ../../Constants/Profiles.dhall
 
 in  Pipeline.build
       ( ArtifactPipelines.packagePipeline
-          ArtifactPipelines.MinaBuildSpec::{
+          ArtifactPipelines.PackagingSpec::{
           , artifacts =
             [ Artifacts.Type.Daemon { network = Network.Type.Devnet }
             , Artifacts.Type.DaemonGeneric
@@ -35,7 +35,7 @@ in  Pipeline.build
             , Artifacts.Type.FunctionalTestSuite
             ]
           , tags =
-            [ PipelineTag.Type.Long
+            [ PipelineTag.Type.Packaging
             , PipelineTag.Type.Release
             , PipelineTag.Type.Docker
             , PipelineTag.Type.Rosetta

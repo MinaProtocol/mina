@@ -41,6 +41,11 @@ fi
 LOCAL_DEB_FOLDER=debs
 mkdir -p $LOCAL_DEB_FOLDER
 
+# fetch_deb honours LOCAL_DEB_SOURCE_DIR, so a caller that packaged the debs
+# itself in this job installs those instead of the packaging job's cached ones.
+# shellcheck source=buildkite/scripts/debian/fetch_debs.sh
+source ./buildkite/scripts/debian/fetch_debs.sh
+
 # Download required debians from bucket locally
 if [ -z "$DEBS" ]; then 
     echo "DEBS env var is empty. It should contain comma separated names of debians to install"
@@ -72,31 +77,31 @@ else
     esac
   done
   if [ "$generic_profile_needed" == "1" ] && [ "$concrete_profile_present" == "0" ]; then
-    ./buildkite/scripts/cache/manager.sh read --root "$ROOT" "debians/$MINA_DEB_CODENAME/mina-devnet-profile_*" $LOCAL_DEB_FOLDER
+    fetch_deb $LOCAL_DEB_FOLDER "debians/$MINA_DEB_CODENAME/mina-devnet-profile_*"
   fi
   for i in "${debs[@]}"; do
     case $i in
       mina-generic*)
         # Download mina-logproc too
-          ./buildkite/scripts/cache/manager.sh read --root "$ROOT" "debians/$MINA_DEB_CODENAME/mina-logproc*" $LOCAL_DEB_FOLDER
+          fetch_deb $LOCAL_DEB_FOLDER "debians/$MINA_DEB_CODENAME/mina-logproc*"
       ;;
       mina-devnet|mina-mainnet|mina-mesa)
         # Download mina-logproc and sub debians (apps and config) too
-          ./buildkite/scripts/cache/manager.sh read --root "$ROOT" "debians/$MINA_DEB_CODENAME/mina-logproc*" $LOCAL_DEB_FOLDER
-          ./buildkite/scripts/cache/manager.sh read --root "$ROOT" "debians/$MINA_DEB_CODENAME/${i}-config*" $LOCAL_DEB_FOLDER
+          fetch_deb $LOCAL_DEB_FOLDER "debians/$MINA_DEB_CODENAME/mina-logproc*"
+          fetch_deb $LOCAL_DEB_FOLDER "debians/$MINA_DEB_CODENAME/${i}-config*"
       ;;
       mina-devnet-instrumented|mina-mainnet-instrumented|mina-mesa-instrumented)
         # Instrumented daemon depends on mina-logproc and the non-instrumented
         # network-config deb (config files are the same for both flavors).
           network_pkg=${i%-instrumented}
-          ./buildkite/scripts/cache/manager.sh read --root "$ROOT" "debians/$MINA_DEB_CODENAME/mina-logproc*" $LOCAL_DEB_FOLDER
-          ./buildkite/scripts/cache/manager.sh read --root "$ROOT" "debians/$MINA_DEB_CODENAME/${network_pkg}-config*" $LOCAL_DEB_FOLDER
+          fetch_deb $LOCAL_DEB_FOLDER "debians/$MINA_DEB_CODENAME/mina-logproc*"
+          fetch_deb $LOCAL_DEB_FOLDER "debians/$MINA_DEB_CODENAME/${network_pkg}-config*"
       ;;
       mina-*-prefork*)
         # Download mina-logproc legacy too
-        ./buildkite/scripts/cache/manager.sh read --root "legacy" "debians/$MINA_DEB_CODENAME/${i}*" $LOCAL_DEB_FOLDER
+        fetch_legacy_deb $LOCAL_DEB_FOLDER "debians/$MINA_DEB_CODENAME/${i}*"
     esac
-    ./buildkite/scripts/cache/manager.sh read --root "$ROOT" "debians/$MINA_DEB_CODENAME/${i}_${VERSION}_*" $LOCAL_DEB_FOLDER
+    fetch_deb $LOCAL_DEB_FOLDER "debians/$MINA_DEB_CODENAME/${i}_${VERSION}_*"
   done
 fi
 

@@ -14,18 +14,42 @@ let ContainerImages = ../../Constants/ContainerImages.dhall
 
 let DebianVersions = ../../Constants/DebianVersions.dhall
 
+let ArtifactPipelines = ../../Command/MinaArtifact.dhall
+
+let Artifacts = ../../Constants/Artifact/Artifacts.dhall
+
+let Profiles = ../../Constants/Profiles.dhall
+
 let Network = ../../Constants/Network.dhall
 
 let Docker = ../../Command/Docker/Type.dhall
 
 let Size = ../../Command/Size.dhall
 
+let network = Network.Type.Devnet
+
+let profile = Profiles.Type.Devnet
+
+let debVersion = DebianVersions.DebVersion.Bullseye
+
 let dependsOn =
-      DebianVersions.dependsOn
+      DebianVersions.appDependsOn
         DebianVersions.DepsSpec::{
-        , deb_version = DebianVersions.DebVersion.Bullseye
-        , network = Network.Type.Devnet
+        , deb_version = debVersion
+        , network = network
+        , profile = profile
         }
+
+let buildSpec =
+      ArtifactPipelines.PackagingSpec::{
+      , artifacts =
+        [ Artifacts.Type.DaemonGeneric
+        , Artifacts.Type.Daemon { network = network }
+        , Artifacts.Type.LogProc
+        , Artifacts.Type.DaemonProfiled { profile = profile }
+        ]
+      , debVersion = debVersion
+      }
 
 let buildTestCmd
     : Size -> Command.Type
@@ -35,19 +59,23 @@ let buildTestCmd
           in  Command.build
                 Command.Config::{
                 , commands =
-                    RunInToolchain.runInToolchain
-                      RunInToolchain.Config::{
-                      , image = ContainerImages.minaToolchainBullseye.amd64
-                      , innerScript =
-                          ''
-                          ./buildkite/scripts/tests/debian-upgrade-test.sh \
-                            --codename bullseye \
-                            --channel alpha \
-                            --package mina-devnet \
-                            --install-packages mina-generic,mina-devnet-config \
-                            --new-debian "debians/bullseye/mina-generic_*.deb"
-                          ''
-                      }
+                      ArtifactPipelines.buildDebianFromApps
+                        buildSpec
+                        (ArtifactPipelines.debianTokens buildSpec)
+                    # RunInToolchain.runInToolchain
+                        RunInToolchain.Config::{
+                        , image = ContainerImages.minaToolchainBullseye.amd64
+                        , environment = [ "LOCAL_DEB_SOURCE_DIR=_build" ]
+                        , innerScript =
+                            ''
+                            ./buildkite/scripts/tests/debian-upgrade-test.sh \
+                              --codename bullseye \
+                              --channel alpha \
+                              --package mina-devnet \
+                              --install-packages mina-generic,mina-devnet-config \
+                              --new-debian "debians/bullseye/mina-generic_*.deb"
+                            ''
+                        }
                 , label = "Debian upgrade test (bullseye)"
                 , key = key
                 , target = cmd_target

@@ -44,6 +44,8 @@ let BuildFlags = ../Constants/BuildFlags.dhall
 
 let Docker = ../Constants/Docker/Package.dhall
 
+let BaseImage = ../Constants/Docker/BaseImage.dhall
+
 let Artifact = ../Constants/Artifact/Artifacts.dhall
 
 let Toolchain = ../Constants/Toolchain.dhall
@@ -52,7 +54,7 @@ let Arch = ../Constants/Arch.dhall
 
 let Expr = ../Pipeline/Expr.dhall
 
-let MinaBuildSpec =
+let PackagingSpec =
       { Type =
           { prefix : Text
           , artifacts : List Artifact.Type
@@ -67,6 +69,7 @@ let MinaBuildSpec =
           , buildScript : Text
           , arch : Arch.Type
           , deb_legacy_version : Text
+          , deb_legacy_githash_config : Text
           , docker_publish : DockerPublish.Type
           , suffix : Optional Text
           , if_ : Optional B/If
@@ -86,7 +89,8 @@ let MinaBuildSpec =
           , debianRepo = DebianRepo.Type.Unstable
           , extraBuildEnvs = [] : List Text
           , suffix = None Text
-          , deb_legacy_version = "3.4.0-alpha1-compatible-ad13ff4"
+          , deb_legacy_version = "3.4.0-b3762e1"
+          , deb_legacy_githash_config = ""
           , arch = Arch.Type.Amd64
           , docker_publish = DockerPublish.Type.Essential
           , if_ = None B/If
@@ -95,42 +99,131 @@ let MinaBuildSpec =
           }
       }
 
+let AppsSpec =
+    -- What an app build actually needs, and nothing else.
+    --
+    -- The app build compiles EVERYTHING: build-artifact.sh runs a fixed set of
+    -- make targets and never looks at an artifact list. Nor does anything
+    -- downstream of it -- the apps cache variant is derived from arch and build
+    -- flags alone (there is one cache per codename/arch/flags, not per network
+    -- or profile). So an app build has no artifacts, no network and no profile:
+    -- those describe what gets PACKAGED from the binaries afterwards, which is
+    -- the packaging job's business.
+    --
+    -- nameSegment exists only so a second app job can be told apart by name; it
+    -- is not a network selector. There is nothing network-specific to select.
+      { Type =
+          { prefix : Text
+          , nameSegment : Text
+          , debVersion : DebianVersions.DebVersion
+          , buildFlags : BuildFlags.Type
+          , arch : Arch.Type
+          , toolchainSelectMode : Toolchain.SelectionMode
+          , extraBuildEnvs : List Text
+          , scope : List PipelineScope.Type
+          , tags : List PipelineTag.Type
+          , if_ : Optional B/If
+          , includeIf : List Expr.Type
+          , excludeIf : List Expr.Type
+          }
+      , default =
+          { prefix = "MinaArtifact"
+          , nameSegment = ""
+          , debVersion = DebianVersions.DebVersion.Bullseye
+          , buildFlags = BuildFlags.Type.None
+          , arch = Arch.Type.Amd64
+          , toolchainSelectMode = Toolchain.SelectionMode.ByDebianAndArch
+          , extraBuildEnvs = [] : List Text
+          , scope = PipelineScope.Full
+          , tags = [ PipelineTag.Type.Long, PipelineTag.Type.Release ]
+          , if_ = None B/If
+          , includeIf = [] : List Expr.Type
+          , excludeIf = [] : List Expr.Type
+          }
+      }
+
+let appsLabelSuffix
+    : AppsSpec.Type -> Text
+    =     \(spec : AppsSpec.Type)
+      ->  "${DebianVersions.capitalName
+               spec.debVersion} ${BuildFlags.toSuffixUppercase
+                                    spec.buildFlags}${Arch.labelSuffix
+                                                        spec.arch}"
+
+let appsSpecVariant
+    : AppsSpec.Type -> Text
+    =     \(spec : AppsSpec.Type)
+      ->  merge
+            { None = merge { Amd64 = "", Arm64 = "arm64" } spec.arch
+            , Instrumented =
+                merge
+                  { Amd64 = "instrumented", Arm64 = "instrumented-arm64" }
+                  spec.arch
+            }
+            spec.buildFlags
+
+let appsSpecTreeVariant
+    : AppsSpec.Type -> Text
+    =     \(spec : AppsSpec.Type)
+      ->  "${DebianVersions.lowerName
+               spec.debVersion}${BuildFlags.toLabelSegment
+                                   spec.buildFlags}${Arch.toSuffixLowercase
+                                                       spec.arch}"
+
+let appsBuildEnvs =
+    -- Deliberately excludes MINA_BUILD_MAINNET and the PREFORK_* pair that the
+    -- packaging envs carry: MINA_BUILD_MAINNET is read by nothing at all, and
+    -- PREFORK_LEGACY_VERSION / PREFORK_GITHASH_CONFIG are read only by
+    -- scripts/debian/builder-helpers.sh when it assembles the prefork packages.
+    -- None of them influence compilation.
+          \(spec : AppsSpec.Type)
+      ->    [ "AWS_ACCESS_KEY_ID"
+            , "AWS_SECRET_ACCESS_KEY"
+            , "MINA_BRANCH=\$BUILDKITE_BRANCH"
+            , "MINA_COMMIT_SHA1=\$BUILDKITE_COMMIT"
+            , "MINA_DEB_CODENAME=${DebianVersions.lowerName spec.debVersion}"
+            , "ARCHITECTURE=${Arch.lowerName spec.arch}"
+            ]
+          # BuildFlags.buildEnvs spec.buildFlags
+          # spec.extraBuildEnvs
+          # DebianVersions.overrideEnvs
+
 let labelSuffix
-    : MinaBuildSpec.Type -> Text
-    =     \(spec : MinaBuildSpec.Type)
+    : PackagingSpec.Type -> Text
+    =     \(spec : PackagingSpec.Type)
       ->  "${DebianVersions.capitalName
                spec.debVersion} ${BuildFlags.toSuffixUppercase
                                     spec.buildFlags}${Arch.labelSuffix
                                                         spec.arch}"
 
 let primaryNetwork
-    : MinaBuildSpec.Type -> Network.Type
-    =     \(spec : MinaBuildSpec.Type)
+    : PackagingSpec.Type -> Network.Type
+    =     \(spec : PackagingSpec.Type)
       ->  Optional/default
             Network.Type
             Network.Type.Devnet
             (List/head Network.Type (Artifact.networks spec.artifacts))
 
 let baseNameSuffix
-    : MinaBuildSpec.Type -> Text
-    =     \(spec : MinaBuildSpec.Type)
+    : PackagingSpec.Type -> Text
+    =     \(spec : PackagingSpec.Type)
       ->  "${DebianVersions.capitalName
                spec.debVersion}${BuildFlags.toSuffixUppercase
                                    spec.buildFlags}${Arch.nameSuffix spec.arch}"
 
 let nameSuffix
-    : MinaBuildSpec.Type -> Text
-    =     \(spec : MinaBuildSpec.Type)
+    : PackagingSpec.Type -> Text
+    =     \(spec : PackagingSpec.Type)
       ->  "${Network.namePrefixSegment (primaryNetwork spec)}${baseNameSuffix
                                                                  spec}"
 
 let selfName
-    : MinaBuildSpec.Type -> Text
-    = \(spec : MinaBuildSpec.Type) -> "${spec.prefix}${nameSuffix spec}"
+    : PackagingSpec.Type -> Text
+    = \(spec : PackagingSpec.Type) -> "${spec.prefix}${nameSuffix spec}"
 
 let genericBuildName
-    : MinaBuildSpec.Type -> Text
-    = \(spec : MinaBuildSpec.Type) -> "${spec.prefix}${baseNameSuffix spec}"
+    : PackagingSpec.Type -> Text
+    = \(spec : PackagingSpec.Type) -> "${spec.prefix}${baseNameSuffix spec}"
 
 let DockerService =
       { service : Docker.Type, network : Network.Type, profile : Profiles.Type }
@@ -188,9 +281,21 @@ let expandDockerServices =
                 }
                 artifact
 
+let appsVariant
+    : PackagingSpec.Type -> Text
+    =     \(spec : PackagingSpec.Type)
+      ->  merge
+            { None = merge { Amd64 = "", Arm64 = "arm64" } spec.arch
+            , Instrumented =
+                merge
+                  { Amd64 = "instrumented", Arm64 = "instrumented-arm64" }
+                  spec.arch
+            }
+            spec.buildFlags
+
 let build_artifacts
-    : MinaBuildSpec.Type -> Command.Type
-    =     \(spec : MinaBuildSpec.Type)
+    : PackagingSpec.Type -> Command.Type
+    =     \(spec : PackagingSpec.Type)
       ->  let nets = Artifact.networks spec.artifacts
 
           let debianTokens =
@@ -203,22 +308,11 @@ let build_artifacts
                       spec.artifacts
                   )
 
-          let appsCacheWrites =
-                List/map
-                  Network.Type
-                  Cmd.Type
-                  (     \(net : Network.Type)
-                    ->  Cmd.run
-                          "./buildkite/scripts/apps/write_to_cache.sh ${DebianVersions.lowerName
-                                                                          spec.debVersion} ${Network.lowerName
-                                                                                               net}-${Profiles.toSuffixLowercase
-                                                                                                        ( Profiles.fromNetwork
-                                                                                                            net
-                                                                                                        )}${BuildFlags.toLabelSegment
-                                                                                                              spec.buildFlags}${Arch.toSuffixLowercase
-                                                                                                                                  spec.arch}"
-                  )
-                  nets
+          let appsCacheWrite =
+                Cmd.run
+                  "./buildkite/scripts/apps/write_to_cache.sh ${DebianVersions.lowerName
+                                                                  spec.debVersion} ${appsVariant
+                                                                                       spec}"
 
           in  Command.build
                 Command.Config::{
@@ -239,6 +333,7 @@ let build_artifacts
                             , "ARCHITECTURE=${Arch.lowerName spec.arch}"
                             , Network.foldMinaBuildMainnetEnv nets
                             , "PREFORK_LEGACY_VERSION=${spec.deb_legacy_version}"
+                            , "PREFORK_GITHASH_CONFIG=${spec.deb_legacy_githash_config}"
                             ]
                           # BuildFlags.buildEnvs spec.buildFlags
                           # spec.extraBuildEnvs
@@ -248,8 +343,8 @@ let build_artifacts
                     # [ Cmd.run
                           "./buildkite/scripts/debian/write_to_cache.sh ${DebianVersions.lowerName
                                                                             spec.debVersion}"
+                      , appsCacheWrite
                       ]
-                    # appsCacheWrites
                 , label = "Debian: Build ${labelSuffix spec}"
                 , key = "build-deb-pkg${Optional/default Text "" spec.suffix}"
                 , target = Size.Multi
@@ -263,7 +358,7 @@ let build_artifacts
                 }
 
 let commonBuildEnvs =
-          \(spec : MinaBuildSpec.Type)
+          \(spec : PackagingSpec.Type)
       ->  let nets = Artifact.networks spec.artifacts
 
           in    [ "AWS_ACCESS_KEY_ID"
@@ -275,59 +370,31 @@ let commonBuildEnvs =
                 , "ARCHITECTURE=${Arch.lowerName spec.arch}"
                 , Network.foldMinaBuildMainnetEnv nets
                 , "PREFORK_LEGACY_VERSION=${spec.deb_legacy_version}"
+                , "PREFORK_GITHASH_CONFIG=${spec.deb_legacy_githash_config}"
                 ]
               # BuildFlags.buildEnvs spec.buildFlags
               # spec.extraBuildEnvs
               # DebianVersions.overrideEnvs
 
 let treeVariant =
-          \(spec : MinaBuildSpec.Type)
+          \(spec : PackagingSpec.Type)
       ->  "${DebianVersions.lowerName
                spec.debVersion}${BuildFlags.toLabelSegment
                                    spec.buildFlags}${Arch.toSuffixLowercase
                                                        spec.arch}"
 
 let appsJobName
-    : MinaBuildSpec.Type -> Text
-    = \(spec : MinaBuildSpec.Type) -> "${selfName spec}Apps"
-
-let primaryAppsVariant
-    : MinaBuildSpec.Type -> Text
-    =     \(spec : MinaBuildSpec.Type)
-      ->  let primary =
-                Optional/default
-                  Network.Type
-                  Network.Type.Devnet
-                  (List/head Network.Type (Artifact.networks spec.artifacts))
-
-          in  "${Network.lowerName
-                   primary}-${Profiles.toSuffixLowercase
-                                ( Profiles.fromNetwork primary
-                                )}${BuildFlags.toLabelSegment
-                                      spec.buildFlags}${Arch.toSuffixLowercase
-                                                          spec.arch}"
+    : PackagingSpec.Type -> Text
+    = \(spec : PackagingSpec.Type) -> "${selfName spec}Apps"
 
 let build_apps
-    : MinaBuildSpec.Type -> Command.Type
-    =     \(spec : MinaBuildSpec.Type)
-      ->  let nets = Artifact.networks spec.artifacts
-
-          let appsCacheWrites =
-                List/map
-                  Network.Type
-                  Cmd.Type
-                  (     \(net : Network.Type)
-                    ->  Cmd.run
-                          "./buildkite/scripts/apps/write_to_cache.sh ${DebianVersions.lowerName
-                                                                          spec.debVersion} ${Network.lowerName
-                                                                                               net}-${Profiles.toSuffixLowercase
-                                                                                                        ( Profiles.fromNetwork
-                                                                                                            net
-                                                                                                        )}${BuildFlags.toLabelSegment
-                                                                                                              spec.buildFlags}${Arch.toSuffixLowercase
-                                                                                                                                  spec.arch}"
-                  )
-                  nets
+    : AppsSpec.Type -> Command.Type
+    =     \(spec : AppsSpec.Type)
+      ->  let appsCacheWrite =
+                Cmd.run
+                  "./buildkite/scripts/apps/write_to_cache.sh ${DebianVersions.lowerName
+                                                                  spec.debVersion} ${appsSpecVariant
+                                                                                       spec}"
 
           in  Command.build
                 Command.Config::{
@@ -339,15 +406,15 @@ let build_apps
                         , arch = spec.arch
                         , submodules = True
                         }
-                        (commonBuildEnvs spec)
+                        (appsBuildEnvs spec)
                         "./buildkite/scripts/build-artifact.sh"
-                    # appsCacheWrites
-                    # [ Cmd.run
+                    # [ appsCacheWrite
+                      , Cmd.run
                           "./buildkite/scripts/apps/write_build_manifest_to_cache.sh ${DebianVersions.lowerName
-                                                                                         spec.debVersion} ${treeVariant
+                                                                                         spec.debVersion} ${appsSpecTreeVariant
                                                                                                               spec}"
                       ]
-                , label = "Build apps: ${labelSuffix spec}"
+                , label = "Build apps: ${appsLabelSuffix spec}"
                 , key = "build-apps"
                 , target = Size.Multi
                 , if_ = spec.if_
@@ -359,55 +426,60 @@ let build_apps
                   ]
                 }
 
-let build_debian
-    : MinaBuildSpec.Type -> Command.Type
-    =     \(spec : MinaBuildSpec.Type)
-      ->  let debianTokens =
-                Text/concatSep
-                  " "
-                  ( List/map
-                      Artifact.Type
-                      Text
-                      Artifact.toDebianToken
-                      spec.artifacts
-                  )
+let debianTokens
+    : PackagingSpec.Type -> Text
+    =     \(spec : PackagingSpec.Type)
+      ->  Text/concatSep
+            " "
+            (List/map Artifact.Type Text Artifact.toDebianToken spec.artifacts)
 
-          in  Command.build
-                Command.Config::{
-                , commands =
-                      Toolchain.select
-                        Toolchain.Spec::{
-                        , mode = spec.toolchainSelectMode
-                        , debVersion = spec.debVersion
-                        , arch = spec.arch
-                        , submodules = False
-                        }
-                        (commonBuildEnvs spec)
-                        "./buildkite/scripts/debian/build-from-cache.sh ${primaryAppsVariant
-                                                                            spec} ${treeVariant
-                                                                                      spec} ${debianTokens} profile_devnet_generic profile_mainnet_generic"
-                    # [ Cmd.run
-                          "./buildkite/scripts/debian/write_to_cache.sh ${DebianVersions.lowerName
-                                                                            spec.debVersion}"
-                      ]
-                , label = "Debian: Build ${labelSuffix spec}"
-                , key = "build-deb-pkg${Optional/default Text "" spec.suffix}"
-                , depends_on =
-                  [ { name = appsJobName spec, key = "build-apps" } ]
-                , target = Size.Multi
-                , if_ = spec.if_
-                , retries =
-                  [ Command.Retry::{
-                    , exit_status = Command.ExitStatus.Code +2
-                    , limit = Some 2
-                    }
+let buildDebianFromApps
+    : PackagingSpec.Type -> Text -> List Cmd.Type
+    =     \(spec : PackagingSpec.Type)
+      ->  \(tokens : Text)
+      ->  Toolchain.select
+            Toolchain.Spec::{
+            , mode = spec.toolchainSelectMode
+            , debVersion = spec.debVersion
+            , arch = spec.arch
+            , submodules = False
+            }
+            (commonBuildEnvs spec)
+            "APPS_VARIANT=${appsVariant
+                              spec} ./buildkite/scripts/debian/build-from-cache.sh ${treeVariant
+                                                                                       spec} ${tokens}"
+
+let build_debian
+    : PackagingSpec.Type -> Command.Type
+    =     \(spec : PackagingSpec.Type)
+      ->  Command.build
+            Command.Config::{
+            , commands =
+                  buildDebianFromApps
+                    spec
+                    "${debianTokens
+                         spec} profile_devnet_generic profile_mainnet_generic"
+                # [ Cmd.run
+                      "./buildkite/scripts/debian/write_to_cache.sh ${DebianVersions.lowerName
+                                                                        spec.debVersion}"
                   ]
+            , label = "Debian: Build ${labelSuffix spec}"
+            , key = "build-deb-pkg${Optional/default Text "" spec.suffix}"
+            , depends_on = [ { name = appsJobName spec, key = "build-apps" } ]
+            , target = Size.Multi
+            , if_ = spec.if_
+            , retries =
+              [ Command.Retry::{
+                , exit_status = Command.ExitStatus.Code +2
+                , limit = Some 2
                 }
+              ]
+            }
 
 let docker_step
-    : DockerService -> MinaBuildSpec.Type -> List DockerImage.ReleaseSpec.Type
+    : DockerService -> PackagingSpec.Type -> List DockerImage.ReleaseSpec.Type
     =     \(entry : DockerService)
-      ->  \(spec : MinaBuildSpec.Type)
+      ->  \(spec : PackagingSpec.Type)
       ->  let network = entry.network
 
           let profile = entry.profile
@@ -427,6 +499,13 @@ let docker_step
                       ]
 
           let genericNetwork = Network.Type.Devnet
+
+          let baseImage =
+              -- Only the services whose Dockerfile is assembled from the shared
+              -- base-deps fragment take this; the *-configured/-profiled images
+              -- are FROM an already-built mina image, and rosetta has its own
+              -- (postgres-heavy) base.
+                Some (BaseImage.imageFor spec.debVersion spec.arch)
 
           let dependsOnGeneric =
                   deps
@@ -451,11 +530,11 @@ let docker_step
                               Docker.Type.DaemonAutoHardfork
                                 { network = network }
                           , network = network
+                          , base_image = baseImage
                           , deb_codename = spec.debVersion
                           , deb_profile = profile
                           , build_flags = spec.buildFlags
                           , docker_publish = spec.docker_publish
-                          , deb_repo = DebianRepo.Type.Local
                           , deb_legacy_version = spec.deb_legacy_version
                           , size = size
                           }
@@ -472,11 +551,11 @@ let docker_step
                               Docker.Type.DaemonLegacyHardfork
                                 { network = network }
                           , network = network
+                          , base_image = baseImage
                           , deb_codename = spec.debVersion
                           , deb_profile = profile
                           , build_flags = spec.buildFlags
                           , docker_publish = spec.docker_publish
-                          , deb_repo = DebianRepo.Type.Local
                           , deb_legacy_version = spec.deb_legacy_version
                           , arch = spec.arch
                           , size = size
@@ -487,11 +566,11 @@ let docker_step
                     , deps = deps
                     , service = Docker.Type.DaemonGeneric
                     , network = genericNetwork
+                    , base_image = baseImage
                     , deb_codename = spec.debVersion
                     , deb_profile = profile
                     , build_flags = spec.buildFlags
                     , docker_publish = spec.docker_publish
-                    , deb_repo = DebianRepo.Type.Local
                     , deb_legacy_version = spec.deb_legacy_version
                     , generic = True
                     , verify = True
@@ -540,7 +619,6 @@ let docker_step
                     , deb_profile = profile
                     , build_flags = spec.buildFlags
                     , docker_publish = spec.docker_publish
-                    , deb_repo = DebianRepo.Type.Local
                     , deb_legacy_version = spec.deb_legacy_version
                     , arch = spec.arch
                     , if_ = spec.if_
@@ -556,7 +634,6 @@ let docker_step
                     , deb_profile = profile
                     , build_flags = spec.buildFlags
                     , docker_publish = spec.docker_publish
-                    , deb_repo = DebianRepo.Type.Local
                     , deb_legacy_version = spec.deb_legacy_version
                     , arch = spec.arch
                     , if_ = spec.if_
@@ -569,11 +646,11 @@ let docker_step
                           , deps = deps
                           , service = Docker.Type.Archive { network = network }
                           , network = network
+                          , base_image = baseImage
                           , deb_codename = spec.debVersion
                           , deb_profile = profile
                           , build_flags = spec.buildFlags
                           , docker_publish = spec.docker_publish
-                          , deb_repo = DebianRepo.Type.Local
                           , deb_legacy_version = spec.deb_legacy_version
                           , verify = True
                           , arch = spec.arch
@@ -590,7 +667,6 @@ let docker_step
                     , deb_profile = profile
                     , build_flags = spec.buildFlags
                     , docker_publish = spec.docker_publish
-                    , deb_repo = DebianRepo.Type.Local
                     , deb_legacy_version = spec.deb_legacy_version
                     , generic = True
                     , verify = True
@@ -620,12 +696,13 @@ let docker_step
                           }
                         ]
                 , Toolchain = [] : List DockerImage.ReleaseSpec.Type
+                , Base = [] : List DockerImage.ReleaseSpec.Type
                 }
                 entry.service
 
 let docker_commands
-    : MinaBuildSpec.Type -> List Command.Type
-    =     \(spec : MinaBuildSpec.Type)
+    : PackagingSpec.Type -> List Command.Type
+    =     \(spec : PackagingSpec.Type)
       ->  let services =
                 List/concatMap
                   Artifact.Type
@@ -649,8 +726,8 @@ let docker_commands
                 flattened_docker_steps
 
 let pipelineBuilder
-    : MinaBuildSpec.Type -> List Command.Type -> Pipeline.Config.Type
-    =     \(spec : MinaBuildSpec.Type)
+    : PackagingSpec.Type -> List Command.Type -> Pipeline.Config.Type
+    =     \(spec : PackagingSpec.Type)
       ->  \(steps : List Command.Type)
       ->  Pipeline.Config::{
           , spec = JobSpec::{
@@ -666,23 +743,26 @@ let pipelineBuilder
           }
 
 let onlyDebianPipeline
-    : MinaBuildSpec.Type -> Pipeline.Config.Type
-    =     \(spec : MinaBuildSpec.Type)
+    -- The one job that still compiles AND packages in a single step
+    -- (build_artifacts), rather than restoring the tree an app build produced.
+    -- So this is the one place PackagingSpec drives a compile too; splitting it
+    -- like the other codenames would make the name exact.
+    : PackagingSpec.Type -> Pipeline.Config.Type
+    =     \(spec : PackagingSpec.Type)
       ->  pipelineBuilder spec [ build_artifacts spec ]
 
-let pipeline
-    : MinaBuildSpec.Type -> Pipeline.Config.Type
-    =     \(spec : MinaBuildSpec.Type)
-      ->  pipelineBuilder spec ([ build_artifacts spec ] # docker_commands spec)
-
 let appsPipeline
-    : MinaBuildSpec.Type -> Pipeline.Config.Type
-    =     \(spec : MinaBuildSpec.Type)
+    : AppsSpec.Type -> Pipeline.Config.Type
+    =     \(spec : AppsSpec.Type)
       ->  Pipeline.Config::{
           , spec = JobSpec::{
             , dirtyWhen = DebianVersions.dirtyWhen spec.debVersion
             , path = "Release"
-            , name = "${appsJobName spec}"
+            , name =
+                "${spec.prefix}${spec.nameSegment}${DebianVersions.capitalName
+                                                      spec.debVersion}${BuildFlags.toSuffixUppercase
+                                                                          spec.buildFlags}${Arch.nameSuffix
+                                                                                              spec.arch}Apps"
             , tags = spec.tags
             , scope = spec.scope
             , includeIf = spec.includeIf
@@ -692,8 +772,8 @@ let appsPipeline
           }
 
 let packagePipeline
-    : MinaBuildSpec.Type -> Pipeline.Config.Type
-    =     \(spec : MinaBuildSpec.Type)
+    : PackagingSpec.Type -> Pipeline.Config.Type
+    =     \(spec : PackagingSpec.Type)
       ->  Pipeline.Config::{
           , spec = JobSpec::{
             , dirtyWhen = DebianVersions.packageDirtyWhen
@@ -707,13 +787,15 @@ let packagePipeline
           , steps = [ build_debian spec ] # docker_commands spec
           }
 
-in  { pipeline = pipeline
-    , onlyDebianPipeline = onlyDebianPipeline
+in  { onlyDebianPipeline = onlyDebianPipeline
     , appsPipeline = appsPipeline
     , packagePipeline = packagePipeline
-    , MinaBuildSpec = MinaBuildSpec
+    , PackagingSpec = PackagingSpec
+    , AppsSpec = AppsSpec
     , labelSuffix = labelSuffix
     , buildArtifacts = build_artifacts
     , buildApps = build_apps
     , buildDebian = build_debian
+    , buildDebianFromApps = buildDebianFromApps
+    , debianTokens = debianTokens
     }
