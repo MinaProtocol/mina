@@ -63,7 +63,9 @@ module Time_with_json = struct
 
   let of_yojson = function
     | `String time ->
-        Ok (Time_float_unix.of_string_abs time)
+        Ok
+          (Time_float_unix.of_string_gen
+             ~if_no_timezone:(`Use_this_one Time_float.Zone.utc) time )
     | _ ->
         Error "Trust_system.Peer_trust: Could not parse time"
 end

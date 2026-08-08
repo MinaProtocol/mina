@@ -21,7 +21,7 @@ module Stable = struct
       | `String "Unbanned" ->
           Ok Unbanned
       | `Assoc [ ("Banned_until", `String s) ] ->
-          Ok (Banned_until (Time_float_unix.of_string_abs s))
+          Ok (Banned_until (Time_float_unix.of_string s))
       | _ ->
           Error "Banned_status.of_yojson: unexpected JSON"
   end
