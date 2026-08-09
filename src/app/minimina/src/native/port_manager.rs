@@ -24,11 +24,9 @@ pub fn collect_all_ports(services: &[ServiceConfig]) -> Vec<u16> {
             ports.push(client_port + 3);
             ports.push(client_port + 4);
         }
-        if let Some(archive_port) = service.archive_port {
-            ports.push(archive_port);
-        }
         if service.service_type == ServiceType::ArchiveNode {
-            ports.push(5432);
+            ports.push(service.resolved_archive_port());
+            ports.push(crate::archive::PgConfig::default().port);
         }
     }
     ports

@@ -95,7 +95,6 @@ impl TopologyInfo {
         service_name: String,
         peer_list_file: &Path,
         client_port: u16,
-        archive_port: u16,
     ) -> ServiceConfig {
         match self {
             TopologyInfo::UptimeServiceBackend(uptime_service_info) => ServiceConfig {
@@ -128,7 +127,10 @@ impl TopologyInfo {
                         .map(|path| path.to_str().unwrap().to_string())
                         .collect(),
                 ),
-                archive_port: Some(archive_port),
+                // Left unset: resolved everywhere via
+                // `ServiceConfig::resolved_archive_port` (in-code default, not
+                // yet a user-facing topology knob).
+                archive_port: None,
                 archive_docker_image: archive_info.archive_image.clone(),
                 libp2p_keypair_path: Some(archive_info.libp2p_keyfile.clone()),
                 libp2p_peerid: Some(archive_info.libp2p_peerid.clone()),
@@ -176,19 +178,13 @@ impl Topology {
 
     pub fn services(&self, peer_list_file: &Path) -> Vec<ServiceConfig> {
         let mut client_port = 7070;
-        let archive_port = 3086;
 
         let mut services: Vec<ServiceConfig> = self
             .topology
             .iter()
             .map(|(service_name, service_info)| {
                 client_port += 5;
-                service_info.to_service_config(
-                    service_name.clone(),
-                    peer_list_file,
-                    client_port,
-                    archive_port,
-                )
+                service_info.to_service_config(service_name.clone(), peer_list_file, client_port)
             })
             .collect();
 

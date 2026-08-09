@@ -28,15 +28,24 @@ pub enum ServiceType {
     UptimeServiceBackend,
 }
 
-/// Environment shared by every daemon unit, whichever backend runs it. Both
-/// plan builders bake this into their node specs.
-pub fn daemon_env() -> Vec<(String, String)> {
+/// Passphrases for the throwaway local-network keypairs, needed by any unit
+/// that reads them (daemons, mina-archive).
+pub fn keypair_pass_env() -> Vec<(String, String)> {
     vec![
         ("MINA_PRIVKEY_PASS".into(), "naughty blue worm".into()),
         ("MINA_LIBP2P_PASS".into(), "naughty blue worm".into()),
+    ]
+}
+
+/// Environment shared by every daemon unit, whichever backend runs it. Both
+/// plan builders bake this into their node specs.
+pub fn daemon_env() -> Vec<(String, String)> {
+    let mut env = keypair_pass_env();
+    env.extend([
         ("MINA_CLIENT_TRUSTLIST".into(), "0.0.0.0/0".into()),
         ("RAYON_NUM_THREADS".into(), "2".into()),
-    ]
+    ]);
+    env
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -143,6 +152,35 @@ impl ServiceConfig {
 
         let mut base_command = self.generate_base_command();
         base_command.push("-seed".to_string());
+
+        self.add_libp2p_command(&mut base_command);
+        base_command.join(" ")
+    }
+
+    /// The archive-service port for this archive node. Single resolution point
+    /// so the archive-service unit and the daemon's `-archive-address` can never
+    /// disagree when the topology leaves the port unset.
+    pub fn resolved_archive_port(&self) -> u16 {
+        self.archive_port
+            .unwrap_or(crate::archive::DEFAULT_ARCHIVE_PORT)
+    }
+
+    /// Generate the command for the archive-node **daemon** — a normal mina
+    /// daemon that forwards blocks to the archive-service at
+    /// `<archive_service_host>:<archive_port>`.
+    pub fn generate_archive_command(&self, archive_service_host: String) -> String {
+        assert_eq!(self.service_type, ServiceType::ArchiveNode);
+        let mut base_command = self.generate_base_command();
+
+        // Handling multiple peers
+        self.add_peers_command(&mut base_command);
+
+        base_command.push("-archive-address".to_string());
+        base_command.push(format!(
+            "{}:{}",
+            archive_service_host,
+            self.resolved_archive_port()
+        ));
 
         self.add_libp2p_command(&mut base_command);
         base_command.join(" ")

@@ -3,9 +3,11 @@
 //! no lifecycle — creating, starting, and removing containers is the
 //! supervisor's job.
 
+use crate::archive::{self, PgConfig};
 use crate::directory_manager::CONFIG_DIRECTORY;
+use crate::docker::archive as docker_archive;
 use crate::service::{daemon_env, ServiceConfig, ServiceType};
-use crate::supervisor::plan::{DockerBackendSpec, DockerNodeSpec, Mount, SupervisorPlan};
+use crate::supervisor::plan::{DockerBackendSpec, DockerNodeSpec, SupervisorPlan};
 use std::io::Result;
 use std::path::{Path, PathBuf};
 
@@ -27,7 +29,8 @@ impl DockerPlanBuilder {
     /// host network dir is bind-mounted at `/local-network` and a per-service
     /// config dir at `/config-directory` (both paths the commands expect).
     ///
-    /// Archive and uptime-service backends are not yet ported to bollard.
+    /// Archive is expanded to postgres + archive-service + archive-node units;
+    /// the uptime-service backend is not yet ported to bollard.
     pub fn build_supervisor_plan(
         &self,
         services: &[ServiceConfig],
@@ -35,6 +38,48 @@ impl DockerPlanBuilder {
     ) -> Result<SupervisorPlan> {
         let network_path_str = self.network_path.to_str().unwrap().to_string();
         let mut nodes = Vec::new();
+
+        // Archive infra first (so postgres/archive-service launch before daemons):
+        // an ephemeral postgres container (POSTGRES_DB + initdb.d schema applied on
+        // first boot) and the mina-archive service. Both reachable by daemons via
+        // docker DNS on their `<name>-<network>` container name / alias. In the new
+        // spec a unit's `name` *is* the container name and network alias, so the
+        // peer/archive hostnames the commands bake in resolve directly.
+        if let Some(archive_node) = ServiceConfig::get_archive_node(services) {
+            let archive_port = archive_node.resolved_archive_port();
+            let pg_container = format!("postgres-{network_id}");
+            let svc_container = format!(
+                "{}-{network_id}",
+                archive::archive_service_unit_name(&archive_node.service_name)
+            );
+
+            // No published ports: internal-only, reached via DNS.
+            nodes.push(
+                DockerNodeSpec::new(pg_container.clone(), docker_archive::PG_IMAGE)
+                    .env(docker_archive::postgres_container_env(&PgConfig::default()))
+                    .mount_ro(
+                        self.network_path.join("postgres-initdb").to_str().unwrap(),
+                        "/docker-entrypoint-initdb.d",
+                    ),
+            );
+
+            let svc_image = archive_node.archive_docker_image.clone().ok_or_else(|| {
+                std::io::Error::new(
+                    std::io::ErrorKind::InvalidInput,
+                    format!(
+                        "missing archive docker image for '{}'",
+                        archive_node.service_name
+                    ),
+                )
+            })?;
+            let mut svc_cmd = vec!["mina-archive".to_string()];
+            svc_cmd.extend(archive::archive_service_args(&pg_container, archive_port));
+            nodes.push(
+                DockerNodeSpec::new(svc_container, svc_image)
+                    .cmd(svc_cmd)
+                    .mount_rw(network_path_str.clone(), "/local-network"),
+            );
+        }
 
         for config in services {
             let cmd_str = match config.service_type {
@@ -44,7 +89,16 @@ impl DockerPlanBuilder {
                 ServiceType::SnarkWorker => {
                     config.generate_snark_worker_command(network_id.to_string())
                 }
-                ServiceType::ArchiveNode | ServiceType::UptimeServiceBackend => {
+                ServiceType::ArchiveNode => {
+                    // The archive-node daemon forwards blocks to the archive-service
+                    // container via docker DNS.
+                    let svc_host = format!(
+                        "{}-{network_id}",
+                        archive::archive_service_unit_name(&config.service_name)
+                    );
+                    config.generate_archive_command(svc_host)
+                }
+                ServiceType::UptimeServiceBackend => {
                     return Err(std::io::Error::new(
                         std::io::ErrorKind::Unsupported,
                         format!(
@@ -78,27 +132,18 @@ impl DockerPlanBuilder {
                 )
             })?;
 
-            nodes.push(DockerNodeSpec {
-                name: container_name.clone(),
-                image,
-                entrypoint: Some(vec!["mina".to_string()]),
-                cmd: cmd_str.split_whitespace().map(str::to_string).collect(),
-                env: daemon_env(),
-                ports,
-                mounts: vec![
-                    Mount {
-                        host: network_path_str.clone(),
-                        container: "/local-network".into(),
-                        read_only: false,
-                    },
-                    Mount {
-                        host: config_dir_host.to_str().unwrap().to_string(),
-                        container: format!("/{CONFIG_DIRECTORY}"),
-                        read_only: false,
-                    },
-                ],
-                aliases: vec![container_name],
-            });
+            nodes.push(
+                DockerNodeSpec::new(container_name, image)
+                    .entrypoint(vec!["mina".to_string()])
+                    .cmd(cmd_str.split_whitespace().map(str::to_string).collect())
+                    .env(daemon_env())
+                    .ports(ports)
+                    .mount_rw(network_path_str.clone(), "/local-network")
+                    .mount_rw(
+                        config_dir_host.to_str().unwrap(),
+                        format!("/{CONFIG_DIRECTORY}"),
+                    ),
+            );
         }
 
         Ok(SupervisorPlan {

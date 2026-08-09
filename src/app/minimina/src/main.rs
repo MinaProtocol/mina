@@ -1,3 +1,4 @@
+mod archive;
 mod cli;
 mod directory_manager;
 mod docker;
@@ -17,7 +18,6 @@ use crate::{
     native::{keys::NativeKeysManager, mina_locator, plan_builder::NativePlanBuilder},
     output::{network, node},
     service::{ServiceConfig, ServiceType},
-    utils::fetch_schema,
 };
 use clap::Parser;
 use cli::{
@@ -806,7 +806,6 @@ fn generate_default_topology(
             format!("https://raw.githubusercontent.com/MinaProtocol/mina/{IMAGE_COMMIT_HASH}/src/app/archive/zkapp_tables.sql"),
             format!("https://raw.githubusercontent.com/MinaProtocol/mina/{IMAGE_COMMIT_HASH}/src/app/archive/create_schema.sql"),
         ]),
-        archive_port: Some(3086),
         ..Default::default()
     };
     vec![
@@ -1033,11 +1032,10 @@ fn create_network_docker(
     network_id: &str,
     services: &[ServiceConfig],
 ) -> Result<()> {
-    if ServiceConfig::get_archive_node(services).is_some() {
-        warn!(
-            "Archive nodes are not yet supported on the bollard docker backend; \
-             the archive node will be skipped when the network starts."
-        );
+    // Archive: stage the schema SQLs for the postgres container's initdb.d.
+    if let Some(archive_node) = ServiceConfig::get_archive_node(services) {
+        let network_path = directory_manager.network_path(network_id);
+        docker::archive::stage_schema(&network_path, archive_node)?;
     }
     if let Err(e) = directory_manager.save_network_info(network_id, services) {
         error!("Error generating network.json: {e}");
@@ -1058,43 +1056,14 @@ fn create_network_native(
     // create only prepares plan artifacts and any archive database.
     info!("Successfully prepared native network '{network_id}'!");
 
-    // Handle archive node setup with local postgres
+    // Archive: initialize an ephemeral postgres cluster under the network dir and
+    // apply the schema now, so at `network start` the supervisor just runs
+    // `postgres` on a ready datadir (no dependency on a system postgres server).
     if let Some(archive_node) = ServiceConfig::get_archive_node(services) {
-        default::LedgerGenerator::generate_replayer_input(
-            &directory_manager.network_path(network_id),
-        )?;
-
-        // Create database using local psql
-        info!("Creating archive database using local postgres...");
-        let createdb_out = std::process::Command::new("createdb")
-            .args(["-U", "postgres", "archive"])
-            .output()?;
-
-        if !createdb_out.status.success() {
-            warn!(
-                "createdb may have failed (database might already exist): {}",
-                String::from_utf8_lossy(&createdb_out.stderr)
-            );
-        }
-
-        // Apply schema scripts directly via psql
-        if let Some(scripts) = &archive_node.archive_schema_files {
-            let network_path = directory_manager.network_path(network_id);
-            for script in scripts {
-                let file_path = fetch_schema(script, network_path.clone()).unwrap();
-                info!("Applying schema script: {}", file_path.display());
-                let psql_out = std::process::Command::new("psql")
-                    .args(["-U", "postgres", "-d", "archive", "-f"])
-                    .arg(&file_path)
-                    .output()?;
-
-                if !psql_out.status.success() {
-                    warn!(
-                        "psql schema application may have failed: {}",
-                        String::from_utf8_lossy(&psql_out.stderr)
-                    );
-                }
-            }
+        let network_path = directory_manager.network_path(network_id);
+        default::LedgerGenerator::generate_replayer_input(&network_path)?;
+        if let Err(e) = native::archive::provision(&network_path, network_id, archive_node) {
+            return exit_with(format!("Failed to provision native archive postgres: {e}"));
         }
     }
 

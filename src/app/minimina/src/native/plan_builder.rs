@@ -2,9 +2,11 @@
 //! supervisor runs (one child-process unit per service). Pure "describe", no
 //! lifecycle — running, stopping, and reaping are the supervisor's job.
 
+use crate::archive;
 use crate::directory_manager::{CONFIG_DIRECTORY, LOGS_DIRECTORY};
+use crate::native::archive as native_archive;
 use crate::native::port_manager;
-use crate::service::{daemon_env, ServiceConfig, ServiceType};
+use crate::service::{daemon_env, keypair_pass_env, ServiceConfig, ServiceType};
 use crate::supervisor::plan::{NativeBackendSpec, NativeNodeSpec, SupervisorPlan};
 use log::warn;
 use std::fs;
@@ -56,6 +58,37 @@ impl NativePlanBuilder {
 
         let network_path_str = self.network_path.to_str().unwrap();
         let mut nodes = Vec::new();
+
+        // Archive: an ephemeral postgres process (its cluster is `initdb`'d and
+        // schema-applied at `network create`) + the mina-archive service, both
+        // launched before the daemons. The archive-node daemon itself is emitted
+        // by the loop below (build_command adds `-archive-address 127.0.0.1:PORT`).
+        if let Some(archive) = ServiceConfig::get_archive_node(services) {
+            let archive_port = archive.resolved_archive_port();
+            let pgdata = native_archive::pgdata_dir(&self.network_path);
+            let socket_dir = native_archive::postgres_socket_dir(network_id);
+            fs::create_dir_all(&socket_dir)?;
+            nodes.push(NativeNodeSpec {
+                name: native_archive::POSTGRES_UNIT_NAME.to_string(),
+                binary: PathBuf::from("postgres"),
+                args: native_archive::postgres_server_args(
+                    pgdata.to_str().unwrap(),
+                    socket_dir.to_str().unwrap(),
+                ),
+                env: vec![],
+                log_file: self.logs_dir().join("postgres.log"),
+            });
+
+            let svc_name = archive::archive_service_unit_name(&archive.service_name);
+            nodes.push(NativeNodeSpec {
+                name: svc_name.clone(),
+                binary: self.bin_path.join("mina-archive"),
+                args: archive::archive_service_args("localhost", archive_port),
+                env: keypair_pass_env(),
+                log_file: self.logs_dir().join(format!("{svc_name}.log")),
+            });
+        }
+
         for service in services {
             if service.service_type == ServiceType::UptimeServiceBackend {
                 warn!(
@@ -221,10 +254,8 @@ impl NativePlanBuilder {
             }
             ServiceType::ArchiveNode => {
                 self.add_peers_args(service, network_path, &mut args);
-                if let Some(archive_port) = service.archive_port {
-                    args.push("-archive-address".to_string());
-                    args.push(format!("127.0.0.1:{}", archive_port));
-                }
+                args.push("-archive-address".to_string());
+                args.push(format!("127.0.0.1:{}", service.resolved_archive_port()));
                 self.add_libp2p_args(service, network_path, &mut args);
             }
             _ => {}
