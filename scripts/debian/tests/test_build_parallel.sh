@@ -376,6 +376,74 @@ test_parallel_worker_output_is_buffered() {
   fi
 }
 
+# A worker that fails must not be lost: its exit code must reach the caller and
+# its log must still be printed. This covers the code that reads the exit code
+# of a finished worker, which cannot use "wait -n -p" (bash 5.1 only).
+#
+# build.sh must run in its own process here. build.sh has "set -e", and a
+# command that fails inside main must not stop main before it prints the log.
+# Calling main from this shell cannot show that fault: bash turns "set -e" off
+# inside a command substitution that is part of an "||" list, which is how a
+# test must capture the exit code.
+test_parallel_reports_a_failing_worker() {
+  local wrapper="${TEST_TMPDIR}/failing_worker_build.sh"
+
+  cat > "$wrapper" << 'WRAPPER'
+# shellcheck disable=SC1090
+source "${SCRIPTPATH}/build.sh"
+
+resolve_deb_output() {
+  case "$1" in
+    good) echo "good-package" ;;
+    bad) echo "bad-package" ;;
+    *) return 1 ;;
+  esac
+}
+
+resolve_and_build_package() {
+  local token="$1"
+  echo "${token}: start"
+  if [[ "$token" == "bad" ]]; then
+    echo "${token}: something went wrong" >&2
+    return 3
+  fi
+  sleep 0.05
+  echo "${token}: end"
+}
+
+main good bad
+WRAPPER
+
+  local output rc=0
+  output=$(MINA_DEB_JOBS=2 bash "$wrapper" 2>&1) || rc=$?
+
+  if [[ "$rc" -eq 0 ]]; then
+    echo "FAIL: a failing worker must make the build stop, got exit 0" >&2
+    echo "$output" >&2
+    exit 1
+  fi
+
+  # The exit code of the worker must be reported, not replaced by 0 or 1.
+  if [[ "$output" != *"--- [worker:bad] output (exit 3)"* ]]; then
+    echo "FAIL: the exit code of the failing worker was not reported" >&2
+    echo "$output" >&2
+    exit 1
+  fi
+
+  if [[ "$output" != *"bad: something went wrong"* ]]; then
+    echo "FAIL: the log of the failing worker was not printed" >&2
+    echo "$output" >&2
+    exit 1
+  fi
+
+  # The worker that succeeded must still be reported.
+  if [[ "$output" != *"--- [worker:good] output (exit 0)"* ]]; then
+    echo "FAIL: the worker that succeeded was not reported" >&2
+    echo "$output" >&2
+    exit 1
+  fi
+}
+
 ################################################################################
 # Tests: DEB_SUFFIX affects generic output name (no exit calls)
 ################################################################################
@@ -468,6 +536,7 @@ main_tests() {
 
   # MINA_DEB_JOBS>1 buffers each worker's output until that worker exits
   run_test_in_subshell test_parallel_worker_output_is_buffered
+  run_test_in_subshell test_parallel_reports_a_failing_worker
 
   # DEB_SUFFIX variants
   run_test_direct test_generic_output_with_lightnet_suffix
