@@ -61,14 +61,7 @@ module Network_config = struct
     in
     let git_commit = Mina_version.commit_id_short in
     let stack_name = "it-" ^ git_commit ^ "-" ^ test_name in
-    let all_nodes_names_list =
-      List.map block_producers ~f:(fun acct -> acct.node_name)
-      @ match snark_coordinator with None -> [] | Some n -> [ n.node_name ]
-    in
-    if List.contains_dup ~compare:String.compare all_nodes_names_list then
-      failwith
-        "All nodes in testnet must have unique names.  Check to make sure you \
-         are not using the same node_name more than once" ;
+    Local_engine_common.validate_unique_node_names test_config ;
     let genesis_ledger = Genesis_ledger.create test_config.genesis_ledger in
     let runtime_config =
       Runtime_config_builder.create ~test_config ~genesis_ledger
@@ -106,14 +99,7 @@ module Network_config = struct
       ; Base_node_config.entrypoint_volume
       ]
     in
-    let generate_random_id () =
-      let rand_char () =
-        let ascii_a = int_of_char 'a' in
-        let ascii_z = int_of_char 'z' in
-        char_of_int (ascii_a + Random.int (ascii_z - ascii_a + 1))
-      in
-      String.init 4 ~f:(fun _ -> rand_char ())
-    in
+    let generate_random_id = Local_engine_common.generate_random_id in
     let seed_config =
       let config : Seed_config.config =
         { archive_address = None

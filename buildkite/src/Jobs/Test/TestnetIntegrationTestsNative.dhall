@@ -10,29 +10,29 @@ let PipelineScope = ../../Pipeline/Scope.dhall
 
 let TestExecutive = ../../Command/TestExecutive.dhall
 
-let IntegrationImages = ../../Constants/IntegrationImages.dhall
+let DebianVersions = ../../Constants/DebianVersions.dhall
 
 let Prelude = ../../External/Prelude.dhall
 
 let List/map = Prelude.List.map
 
-let dependsOn = IntegrationImages.dependsOn
+let dependsOn = DebianVersions.dependsOn DebianVersions.DepsSpec::{=}
 
 in  Pipeline.build
       Pipeline.Config::{
       , spec = JobSpec::{
         , dirtyWhen =
           [ S.strictlyStart (S.contains "src")
-          , S.strictlyStart (S.contains "dockerfiles")
           , S.strictlyStart
-              (S.contains "buildkite/src/Jobs/Test/TestnetIntegrationTest")
+              ( S.contains
+                  "buildkite/src/Jobs/Test/TestnetIntegrationTestsNative"
+              )
           , S.strictlyStart (S.contains "buildkite/src/Command/TestExecutive")
-          , S.exactly "buildkite/src/Constants/IntegrationImages" "dhall"
           , S.strictlyStart
-              (S.contains "buildkite/scripts/run-test-executive-docker")
+              (S.contains "buildkite/scripts/run-test-executive-native")
           ]
         , path = "Test"
-        , name = "TestnetIntegrationTests"
+        , name = "TestnetIntegrationTestsNative"
         , tags =
           [ PipelineTag.Type.Long
           , PipelineTag.Type.Test
@@ -46,7 +46,7 @@ in  Pipeline.build
             TestExecutive.Type
             (     \(testName : Text)
               ->  TestExecutive.execute
-                    TestExecutive.Engine.Docker
+                    TestExecutive.Engine.Native
                     testName
                     dependsOn
             )
