@@ -24,6 +24,9 @@ in  Pipeline.build
               (S.contains "buildkite/src/Jobs/Test/TestnetIntegrationTest")
           , S.strictlyStart (S.contains "buildkite/src/Command/TestExecutive")
           , S.exactly "buildkite/src/Constants/IntegrationImages" "dhall"
+          , S.strictlyStart
+              (S.contains "buildkite/scripts/run-test-executive-local")
+          , S.strictlyStart (S.contains "buildkite/scripts/apps")
           ]
         , path = "Test"
         , name = "TestnetIntegrationTestsLong"
