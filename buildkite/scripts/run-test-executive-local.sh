@@ -74,9 +74,11 @@ DISK_PRUNE_THRESHOLD=0 ./buildkite/scripts/docker/disk-cleanup.sh
 ./buildkite/scripts/docker/load_from_cache.sh "$ARCHIVE_IMAGE" \
   || echo "cache miss for $ARCHIVE_IMAGE"
 
-source buildkite/scripts/debian/update.sh --verbose
-
-source buildkite/scripts/debian/install.sh "mina-test-executive"
+# Restore mina-test-executive and mina-logproc bare from the apps cache. Their
+# .deb comes from the packaging job, which the nightly no longer runs; the agent
+# image already carries the runtime libraries the .deb pulled in.
+./buildkite/scripts/apps/restore_app.sh test_executive.exe mina-test-executive
+./buildkite/scripts/apps/restore_app.sh logproc.exe mina-logproc
 
 # Continuously snapshot each swarm service's container logs while the test runs,
 # so the seed daemon's own output survives test_executive's teardown and can be

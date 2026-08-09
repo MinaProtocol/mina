@@ -26,6 +26,7 @@ in  Pipeline.build
           , S.exactly "buildkite/src/Constants/IntegrationImages" "dhall"
           , S.strictlyStart
               (S.contains "buildkite/scripts/run-test-executive-local")
+          , S.strictlyStart (S.contains "buildkite/scripts/apps")
           ]
         , path = "Test"
         , name = "TestnetIntegrationTests"
