@@ -269,8 +269,39 @@ main() {
     log_dir="${BUILD_DIR}/deb-build/logs"
     mkdir -p "$log_dir"
 
+    # Wait until one worker has finished, then report it in finished_pid and
+    # its exit code in status.
+    #
+    # "wait -n -p finished_pid" gives both in one step, but the -p option needs
+    # bash 5.1 and the CI agents have bash 5.0. So do it in two steps:
+    #
+    #   1. "wait -n" (bash 4.3) blocks until any worker ends. It gives the exit
+    #      code but not the PID.
+    #   2. Find which worker ended. bash takes a background child out of the
+    #      process table as soon as it ends, so "kill -0" fails for that one
+    #      only. "wait" on it then still gives its exit code, also after step 1
+    #      has already collected it.
+    #
+    # This holds no delay and does not poll, so a worker is reported at the
+    # moment it ends. A worker that an external signal stops, for example the
+    # out-of-memory killer, is found in the same way.
     reap_finished_worker() {
-      if wait -n -p finished_pid "${pids[@]}"; then
+      local candidate
+      finished_pid=""
+      while [[ -z "$finished_pid" ]]; do
+        # "|| true" because this script runs under "set -e" and a worker that
+        # fails makes "wait -n" give its non-zero exit code. The code is read
+        # again below, for the worker that is known.
+        wait -n || true
+        for candidate in "${pids[@]}"; do
+          if ! kill -0 "$candidate" 2>/dev/null; then
+            finished_pid="$candidate"
+            break
+          fi
+        done
+      done
+
+      if wait "$finished_pid"; then
         status=0
       else
         status=$?
