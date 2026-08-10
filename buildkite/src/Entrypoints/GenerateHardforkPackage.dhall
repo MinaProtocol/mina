@@ -283,7 +283,7 @@ let generateDockerForCodename =
                             , network = spec.network
                             , deb_codename = codename.DebVersion
                             , deb_install_mode =
-                                DockerImage.DebianInstallMode.DownloadOnly
+                                DockerImage.DebianInstallMode.ThroughLocalRepo
                             , deb_profile = profile
                             , deb_legacy_version = spec.deb_legacy_version
                             , deb_storage_repair_version = Some
