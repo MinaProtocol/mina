@@ -10,6 +10,9 @@ case "${1:?package name required}" in
   mina-archive*) CHECK_SCRIPT="$VERIFY_DIR/check-archive.sh" ;;
   mina-logproc)  CHECK_SCRIPT="$VERIFY_DIR/check-logproc.sh" ;;
   mina-rosetta*) CHECK_SCRIPT="$VERIFY_DIR/check-rosetta.sh" ;;
+  # The auto-hardfork image ships two runtimes behind the mina-dispatch script,
+  # so the plain daemon checks do not apply. Must stay above the mina-* catch-all.
+  mina-daemon-auto-hardfork*) CHECK_SCRIPT="$VERIFY_DIR/check-daemon-auto-hardfork.sh" ;;
   mina-*)        CHECK_SCRIPT="$VERIFY_DIR/check-daemon.sh" ;;
   *) echo "Unknown package: $1"; exit 1 ;;
 esac
