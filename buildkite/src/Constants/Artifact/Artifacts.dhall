@@ -279,9 +279,123 @@ let networks =
                 )
                 ([] : List Network.Type)
 
+let ordinal =
+          \(artifact : Artifact)
+      ->  merge
+            { Daemon = \(a : { network : Network.Type }) -> 0
+            , DaemonGeneric = 1
+            , DaemonProfiled = \(a : { profile : Profiles.Type }) -> 2
+            , DaemonLegacyHardfork = \(a : { network : Network.Type }) -> 3
+            , DaemonAutoHardfork = \(a : { network : Network.Type }) -> 4
+            , DaemonPrefork = \(a : { network : Network.Type }) -> 5
+            , DaemonPostfork = \(a : { network : Network.Type }) -> 6
+            , CreatePreforkGenesis = \(a : { network : Network.Type }) -> 7
+            , DaemonStorageToolbox = 8
+            , LogProc = 9
+            , ArchiveGeneric = 10
+            , Archive = \(a : { network : Network.Type }) -> 11
+            , RosettaGeneric = 12
+            , Rosetta = \(a : { network : Network.Type }) -> 13
+            , TestExecutive = 14
+            , TxTools = 15
+            , FunctionalTestSuite = 16
+            , DelegationVerifier = 17
+            , Toolchain = 18
+            }
+            artifact
+
+let requires =
+          \(artifact : Artifact)
+      ->  let daemonBase =
+                [ Artifact.DaemonGeneric
+                , Artifact.LogProc
+                , Artifact.DaemonStorageToolbox
+                ]
+
+          let none = [] : List Artifact
+
+          in  merge
+                { Daemon = \(a : { network : Network.Type }) -> daemonBase
+                , DaemonGeneric =
+                  [ Artifact.LogProc, Artifact.DaemonStorageToolbox ]
+                , DaemonProfiled =
+                    \(a : { profile : Profiles.Type }) -> daemonBase
+                , DaemonLegacyHardfork =
+                        \(a : { network : Network.Type })
+                    ->  [ Artifact.Daemon { network = a.network } ]
+                , DaemonAutoHardfork =
+                        \(a : { network : Network.Type })
+                    ->  [ Artifact.Daemon { network = a.network } ]
+                , DaemonPrefork = \(a : { network : Network.Type }) -> none
+                , DaemonPostfork = \(a : { network : Network.Type }) -> none
+                , CreatePreforkGenesis =
+                    \(a : { network : Network.Type }) -> none
+                , DaemonStorageToolbox = none
+                , LogProc = none
+                , ArchiveGeneric = none
+                , Archive = \(a : { network : Network.Type }) -> none
+                , RosettaGeneric = [ Artifact.LogProc ]
+                , Rosetta =
+                        \(a : { network : Network.Type })
+                    ->  [ Artifact.RosettaGeneric
+                        , Artifact.Daemon { network = a.network }
+                        , Artifact.LogProc
+                        ]
+                , TestExecutive = none
+                , TxTools = none
+                , FunctionalTestSuite = none
+                , DelegationVerifier = none
+                , Toolchain = none
+                }
+                artifact
+
+let hasOrdinal =
+          \(artifacts : List Artifact)
+      ->  \(artifact : Artifact)
+      ->  Prelude.List.any
+            Artifact
+            (     \(other : Artifact)
+              ->  Prelude.Natural.equal (ordinal other) (ordinal artifact)
+            )
+            artifacts
+
+let dedupe =
+          \(artifacts : List Artifact)
+      ->  Prelude.List.reverse
+            Artifact
+            ( Prelude.List.fold
+                Artifact
+                artifacts
+                (List Artifact)
+                (     \(artifact : Artifact)
+                  ->  \(kept : List Artifact)
+                  ->        if hasOrdinal kept artifact
+
+                      then  kept
+
+                      else  [ artifact ] # kept
+                )
+                ([] : List Artifact)
+            )
+
+let addRequired =
+          \(artifacts : List Artifact)
+      ->  dedupe
+            (   artifacts
+              # Prelude.List.concatMap Artifact Artifact requires artifacts
+            )
+
+let close =
+          \(artifacts : List Artifact)
+      ->  addRequired (addRequired (addRequired (addRequired artifacts)))
+
 in  { Type = Artifact
     , capitalName = capitalName
     , lowerName = lowerName
+    , ordinal = ordinal
+    , requires = requires
+    , dedupe = dedupe
+    , close = close
     , isNetworked = isNetworked
     , network = network
     , resolvedNetwork = resolvedNetwork
