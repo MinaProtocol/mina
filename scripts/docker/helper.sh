@@ -49,40 +49,62 @@ function export_suffixes () {
     # - generic-lightnet
     # - generic-instrumented
     # - generic-lightnet-instrumented
+    #
+    # Two suffixes come out of this, because the two docker tags carry the
+    # network differently. The readable tag has no network of its own, so its
+    # suffix supplies one. The hash tag already names the network
+    # (<githash>-<codename>-<network>...), so its suffix must not repeat it.
+    # They differ only for a profiled image, whose profile is the network name:
+    #
+    #   readable  mina-daemon:4.0.0-...-bullseye-devnet-generic
+    #   hash      mina-daemon:<githash>-bullseye-devnet-generic
     local __raw_suffix=""
+    local __raw_hash_suffix=""
     local __sep=""
 
     if [[ "${PROFILED_TAG:-0}" == "1" ]]; then
-        # Profiled daemon images: tag suffix is "${profile}-profile" for
+        # Profiled daemon images: tag suffix is "${profile}-generic" for
         # devnet/mainnet, or just "lightnet" for lightnet (no -generic).
         if [[ "${DEB_PROFILE:-}" == "lightnet" ]]; then
             __raw_suffix="lightnet"
+            __raw_hash_suffix="lightnet"
         else
             __raw_suffix="${DEB_PROFILE}-generic"
+            __raw_hash_suffix="generic"
         fi
         __sep="-"
     else
         if [[ -n "${DOCKER_DEB_SUFFIX:-}" ]]; then
             __raw_suffix="${DOCKER_DEB_SUFFIX}"
+            __raw_hash_suffix="${DOCKER_DEB_SUFFIX}"
             __sep="-"
         fi
 
         if [[ "${DEB_PROFILE:-}" == "lightnet" ]]; then
             __raw_suffix="${__raw_suffix}${__sep}lightnet"
+            __raw_hash_suffix="${__raw_hash_suffix}${__sep}lightnet"
             __sep="-"
         fi
     fi
 
     if [[ "${DEB_BUILD_FLAGS:-}" == *instrumented* ]]; then
         __raw_suffix="${__raw_suffix}${__sep}instrumented"
+        __raw_hash_suffix="${__raw_hash_suffix}${__sep}instrumented"
         __sep="-"
     fi
 
-    # COMBINED_SUFFIX: used in docker tags, has leading dash when non-empty
+    # COMBINED_SUFFIX: used in the readable docker tag, has leading dash when
+    # non-empty. HASHTAG_SUFFIX: the same for the hash tag.
     if [[ -n "${__raw_suffix}" ]]; then
         export COMBINED_SUFFIX="-${__raw_suffix}"
     else
         export COMBINED_SUFFIX=""
+    fi
+
+    if [[ -n "${__raw_hash_suffix}" ]]; then
+        export HASHTAG_SUFFIX="-${__raw_hash_suffix}"
+    else
+        export HASHTAG_SUFFIX=""
     fi
 
     # DOCKER_DEB_SUFFIX_ARG: passed to Dockerfile as build arg (no leading dash,
@@ -141,7 +163,7 @@ function export_docker_tag() {
     export TAG_VERSION_PART="${VERSION}${COMBINED_SUFFIX}${PLATFORM_SUFFIX}${CUSTOM_SUFFIX}"
     export TAG="${DOCKER_REGISTRY}/${SERVICE}:${TAG_VERSION_PART}"
     export PLATFORM_SUFFIX
-    export HASHTAG_VERSION_PART="${GITHASH}-${DEB_CODENAME##*=}-${NETWORK##*=}${COMBINED_SUFFIX}${PLATFORM_SUFFIX}${CUSTOM_SUFFIX}"
+    export HASHTAG_VERSION_PART="${GITHASH}-${DEB_CODENAME##*=}-${NETWORK##*=}${HASHTAG_SUFFIX}${PLATFORM_SUFFIX}${CUSTOM_SUFFIX}"
     export HASHTAG="${DOCKER_REGISTRY}/${SERVICE}:${HASHTAG_VERSION_PART}"
 
 }
