@@ -50,7 +50,7 @@ fi
 # forces Dune to rerun the whole test suite, including tests that already passed.
 echo "--- Run unit tests"
 time dune runtest ${FORCE_FLAG} "${path}" || \
-(./scripts/link-coredumps.sh && \
+(./scripts/tests/link-coredumps.sh && \
  echo "--- Retrying failed unit tests" && \
  time dune runtest "${path}" || \
- (./scripts/link-coredumps.sh && false))
+ (./scripts/tests/link-coredumps.sh && false))

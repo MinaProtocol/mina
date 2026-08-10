@@ -17,7 +17,7 @@ The Rosetta API test suite consists of four main scripts that work together to p
 
 **Purpose**: Core helper functions and utilities shared across all Rosetta test scripts.
 
-**Location**: `scripts/tests/rosetta-helper.sh`
+**Location**: `scripts/tests/rosetta/rosetta-helper.sh`
 
 **Key Features**:
 - Common HTTP request handling with standardized headers
@@ -47,38 +47,38 @@ The Rosetta API test suite consists of four main scripts that work together to p
 #### `test_network_status(test_data)`
 - **Purpose**: Tests `/network/status` endpoint
 - **Validation**: Ensures sync status is "Synced"
-- **Location**: `scripts/tests/rosetta-helper.sh:57-63`
+- **Location**: `scripts/tests/rosetta/rosetta-helper.sh:57-63`
 
 #### `test_network_options(test_data)`
 - **Purpose**: Tests `/network/options` endpoint  
 - **Validation**: Verifies Rosetta version is 1.4.9
-- **Location**: `scripts/tests/rosetta-helper.sh:65-71`
+- **Location**: `scripts/tests/rosetta/rosetta-helper.sh:65-71`
 
 #### `test_block(test_data)`
 - **Purpose**: Tests `/block` endpoint for specific block retrieval
 - **Validation**: Confirms returned block hash matches requested hash
-- **Location**: `scripts/tests/rosetta-helper.sh:73-79`
+- **Location**: `scripts/tests/rosetta/rosetta-helper.sh:73-79`
 
 #### `test_account_balance(test_data)`
 - **Purpose**: Tests `/account/balance` endpoint
 - **Validation**: Ensures balance structure contains MINA currency symbol
-- **Location**: `scripts/tests/rosetta-helper.sh:81-87`
+- **Location**: `scripts/tests/rosetta/rosetta-helper.sh:81-87`
 
 #### `test_payment_transaction(test_data)`
 - **Purpose**: Tests `/search/transactions` endpoint for payment transactions
 - **Validation**: Confirms transaction hash matches requested payment transaction
-- **Location**: `scripts/tests/rosetta-helper.sh:89-103`
+- **Location**: `scripts/tests/rosetta/rosetta-helper.sh:89-103`
 
 #### `test_zkapp_transaction(test_data)`
 - **Purpose**: Tests `/search/transactions` endpoint for zkApp transactions
 - **Validation**: Confirms transaction hash matches requested zkApp transaction
-- **Location**: `scripts/tests/rosetta-helper.sh:105-119`
+- **Location**: `scripts/tests/rosetta/rosetta-helper.sh:105-119`
 
 ### 2. rosetta-sanity.sh
 
 **Purpose**: Basic functionality testing of Rosetta API endpoints with predefined test data.
 
-**Location**: `scripts/tests/rosetta-sanity.sh`
+**Location**: `scripts/tests/rosetta/rosetta-sanity.sh`
 
 **Usage**:
 ```bash
@@ -137,7 +137,7 @@ The Rosetta API test suite consists of four main scripts that work together to p
 
 **Purpose**: Comprehensive performance and load testing of Rosetta API with configurable test intervals and database-driven test data.
 
-**Location**: `scripts/tests/rosetta-load.sh`
+**Location**: `scripts/tests/rosetta/rosetta-load.sh`
 
 **Key Features**:
 - **Database Integration**: Loads real test data from PostgreSQL archive database
@@ -234,7 +234,7 @@ The script loads realistic test data from the archive database:
 
 **Purpose**: End-to-end connectivity testing using Docker containers, combining sanity and load testing in a controlled environment.
 
-**Location**: `scripts/tests/rosetta-connectivity.sh`
+**Location**: `scripts/tests/rosetta/rosetta-connectivity.sh`
 
 > **Note**: this script tests a *published* `mina-rosetta` image, and is kept for
 > that purpose. CI no longer uses it. `RosettaDevnetConnect` /

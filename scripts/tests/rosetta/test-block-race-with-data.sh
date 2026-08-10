@@ -23,7 +23,7 @@ ARCHIVE_DUMP_URL="https://storage.googleapis.com/mina-archive-dumps/$DUMP_SQL.ta
 # Ledger generated from a recent mainnet's ledger with all of the stake split more or
 # less equally among two accounts (one whale key with small balance, and one plain key).
 # with lots of delegations to it and 100mln MINA balance).
-# Generated with: scripts/generate-ledger-hf-dryrun.sh -p 1 -k 1 --output-dir new-ledger
+# Generated with: scripts/hardfork/generate-ledger-hf-dryrun.sh -p 1 -k 1 --output-dir new-ledger
 #
 # After generation, `runtime-config.json` was manually extended with `proof` section
 # containing the fork config. This fork config was populated with data of the most recent

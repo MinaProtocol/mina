@@ -65,7 +65,7 @@ dune runtest src/lib/<library-name> --profile=dev
 **Run a single inline test case** (using the helper script):
 
 ```bash
-./scripts/testone.sh src/lib/<library-name>/<file>.ml [<test-name>]
+./scripts/tests/testone.sh src/lib/<library-name>/<file>.ml [<test-name>]
 ```
 
 **Tips:**
@@ -267,7 +267,7 @@ The Rosetta API has multiple test suites:
 2. **Block race test** — Races the Mina daemon, archive, and Rosetta to check for block consistency under load. Requires the daemon, archive, and Rosetta binaries and a PostgreSQL connection:
 
    ```bash
-   ./scripts/rosetta/test-block-race.sh \
+   ./scripts/tests/rosetta/test-block-race.sh \
      --mina-exe /usr/local/bin/mina \
      --archive-exe /usr/local/bin/mina-archive \
      --rosetta-exe /usr/local/bin/mina-rosetta \
@@ -286,7 +286,7 @@ The archive replayer (`mina-replayer`) replays historical blockchain transaction
 **Prerequisites:** A PostgreSQL instance with archive data and `$PG_CONN` set to the connection URI.
 
 ```bash
-./scripts/replayer-test.sh \
+./scripts/tests/replayer-test.sh \
   -i src/test/archive/sample_db/replayer_input_file.json \
   -p "$PG_CONN" \
   -a mina-replayer
@@ -319,7 +319,7 @@ To measure code coverage of the unit test suite, use the bisect_ppx-instrumented
 make test-coverage
 ```
 
-This calls `scripts/create_coverage_profiles.sh`, which runs:
+This calls `scripts/tests/create_coverage_profiles.sh`, which runs:
 
 ```bash
 dune runtest --instrument-with bisect_ppx --force src/lib --profile=dev
@@ -328,7 +328,7 @@ dune runtest --instrument-with bisect_ppx --force src/lib --profile=dev
 **Run coverage for a specific library only:**
 
 ```bash
-scripts/create_coverage_profiles.sh <library-name>
+scripts/tests/create_coverage_profiles.sh <library-name>
 ```
 
 **Generate reports after running tests with coverage:**

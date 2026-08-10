@@ -27,7 +27,7 @@ Using a tool that supports opening archives (e.g. `file-roller` on ubuntu), you 
 
 ### Generating a genesis proof in CI
 
-Pull requests on CI will run the ['Build Mina daemon debian package' job](https://github.com/MinaProtocol/mina/blob/2d99c24fec9bf5264c1f76e6ace91eb4c7625c98/buildkite/src/Jobs/Release/MinaArtifact.dhall#L52), which [uploads the genesis ledger and proof](https://github.com/MinaProtocol/mina/blob/2d99c24fec9bf5264c1f76e6ace91eb4c7625c98/scripts/upload-genesis.sh#L10) as part of the [build process](https://github.com/MinaProtocol/mina/blob/2d99c24fec9bf5264c1f76e6ace91eb4c7625c98/buildkite/scripts/build-artifact.sh#L34). So, to make this happen, you can
+Pull requests on CI will run the ['Build Mina daemon debian package' job](https://github.com/MinaProtocol/mina/blob/2d99c24fec9bf5264c1f76e6ace91eb4c7625c98/buildkite/src/Jobs/Release/MinaArtifact.dhall#L52), which [uploads the genesis ledger and proof](https://github.com/MinaProtocol/mina/blob/2d99c24fec9bf5264c1f76e6ace91eb4c7625c98/scripts/genesis/upload-genesis.sh#L10) as part of the [build process](https://github.com/MinaProtocol/mina/blob/2d99c24fec9bf5264c1f76e6ace91eb4c7625c98/buildkite/scripts/build-artifact.sh#L34). So, to make this happen, you can
 * checkout the commit you are interested in, as a new branch
   - `git checkout -b do-not-merge/generate-genesis-24a3f7 24a3f7`
 * replace `genesis_ledgers/phase_three/config.json` with your desired config

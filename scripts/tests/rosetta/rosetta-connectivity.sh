@@ -201,14 +201,14 @@ execute_script() {
 # Wait for the container to start
 sleep 5
 #run sanity test
-./scripts/tests/rosetta-sanity.sh --address "http://localhost:3087" --daemon-graphql-address "http://localhost:3085/graphql" --network $NETWORK --wait-for-sync --timeout $SYNC_TIMEOUT
+./scripts/tests/rosetta/rosetta-sanity.sh --address "http://localhost:3087" --daemon-graphql-address "http://localhost:3085/graphql" --network $NETWORK --wait-for-sync --timeout $SYNC_TIMEOUT
 
 # Run load test
 if [[ "$RUN_LOAD_TEST" == true ]]; then
         echo "Running load test for $LOAD_TEST_DURATION seconds..."
 
         # Build the command with optional parameters
-        load_test_cmd="/workdir/scripts/tests/rosetta-load.sh --address \"http://localhost:3087\" --db-conn-str $DB_CONN_STR --duration $LOAD_TEST_DURATION --network $NETWORK --perf-output-file $PERF_OUTPUT_FILE"
+        load_test_cmd="/workdir/scripts/tests/rosetta/rosetta-load.sh --address \"http://localhost:3087\" --db-conn-str $DB_CONN_STR --duration $LOAD_TEST_DURATION --network $NETWORK --perf-output-file $PERF_OUTPUT_FILE"
 
         # Add metrics mode if specified
         if [[ -n "$METRICS_MODE" ]]; then

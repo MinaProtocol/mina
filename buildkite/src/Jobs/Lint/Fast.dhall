@@ -15,8 +15,8 @@ let Docker = ../../Command/Docker/Type.dhall
 let Size = ../../Command/Size.dhall
 
 let commands =
-      [ Cmd.run "./scripts/lint_codeowners.sh"
-      , Cmd.run "./scripts/lint_rfcs.sh"
+      [ Cmd.run "./scripts/lint/lint_codeowners.sh"
+      , Cmd.run "./scripts/lint/lint_rfcs.sh"
       , Cmd.run "make check-snarky-submodule"
       ]
 
@@ -28,7 +28,7 @@ in  Pipeline.build
           , S.strictlyStart (S.contains "src/")
           , S.strictlyStart (S.contains "rfcs/")
           , S.exactly_noext "CODEOWNERS"
-          , S.exactly "scripts/check-snarky-submodule" "sh"
+          , S.exactly "scripts/lint/check-snarky-submodule" "sh"
           ]
         , path = "Lint"
         , name = "Fast"

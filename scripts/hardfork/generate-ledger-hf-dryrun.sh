@@ -523,8 +523,8 @@ if [[ ! -x "$SCRIPT_DIR/prepare-test-ledger-hf-dryrun.sh" ]]; then
     exit 1
 fi
 
-if [[ ! -x "$SCRIPT_DIR/prepare-test-ledger.sh" ]]; then
-    echo "Error: Required script not found or not executable: $SCRIPT_DIR/prepare-test-ledger.sh" >&2
+if [[ ! -x "$SCRIPT_DIR/../genesis/prepare-test-ledger.sh" ]]; then
+    echo "Error: Required script not found or not executable: $SCRIPT_DIR/../genesis/prepare-test-ledger.sh" >&2
     exit 1
 fi
 

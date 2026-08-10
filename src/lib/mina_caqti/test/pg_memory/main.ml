@@ -31,7 +31,7 @@
 
    Results can additionally be emitted as InfluxDB line protocol
    ([--influxdb-file]) using the same measurement/tag convention as
-   scripts/tests/rosetta-load.sh, so runs can be tracked on the perf infra.
+   scripts/tests/rosetta/rosetta-load.sh, so runs can be tracked on the perf infra.
 
    It needs a live PostgreSQL. Pass [--uri] or set [MINA_CAQTI_TEST_PG_URI];
    with neither, it prints a skip notice and exits 0 so it is a no-op in
@@ -413,7 +413,7 @@ let run_scenario ~uri ~iterations ~sample_every (s : scenario) =
   ; iterations
   }
 
-(* --- InfluxDB line protocol (matches scripts/tests/rosetta-load.sh) --------- *)
+(* --- InfluxDB line protocol (matches scripts/tests/rosetta/rosetta-load.sh) --------- *)
 
 (* line-protocol tag/measurement values must not contain unescaped spaces or
    commas; keep it simple and sanitise to underscores *)

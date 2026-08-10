@@ -33,7 +33,7 @@ in  { step =
                     )
                     ContainerImages.minaToolchainBullseye.amd64
                     debs
-                    "./scripts/patch-archive-test.sh"
+                    "./scripts/tests/patch-archive-test.sh"
                 , Cmd.run
                     "buildkite/scripts/upload-partial-coverage-data.sh ${key}"
                 ]

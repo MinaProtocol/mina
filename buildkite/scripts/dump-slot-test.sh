@@ -7,4 +7,4 @@ set -eox pipefail
 # apps cache (falling back to the mina-archive deb on a cache miss); both put it
 # on PATH, so this is invoked by name regardless.
 
-./scripts/dump-slot-test.sh -a mina-dump-slot-ledger -p "$PG_CONN"
+./scripts/tests/dump-slot-test.sh -a mina-dump-slot-ledger -p "$PG_CONN"

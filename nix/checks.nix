@@ -7,7 +7,7 @@ inputs: pkgs: {
     # todo: submodules :(
     buildPhase = ''
       mkdir -p src/lib/snarky
-      bash ./scripts/lint_codeowners.sh
+      bash ./scripts/lint/lint_codeowners.sh
     '';
     installPhase = "touch $out";
     meta.checkDescription = "CODEOWNERS file";
@@ -15,10 +15,10 @@ inputs: pkgs: {
   # todo: this check succeeds with 0 rfcs
   lint-rfcs = pkgs.runCommand "lint-rfcs" { meta.checkDescription = "RFCs"; } ''
     ln -s ${../rfcs} ./rfcs
-    bash ${../scripts/lint_rfcs.sh}
+    bash ${../scripts/lint/lint_rfcs.sh}
     touch $out
   '';
-  # todo: ./scripts/check-snarky-submodule.sh # submodule issue
+  # todo: ./scripts/lint/check-snarky-submodule.sh # submodule issue
   # - compare ci diff_types
   # - compare_ci_diff_binables
 
@@ -52,7 +52,7 @@ inputs: pkgs: {
     # todo: only depend on dune files
     src = ../.;
     buildInputs = [ (pkgs.python3.withPackages (p: [ p.sexpdata ])) ];
-    buildPhase = "python ./scripts/require-ppxs.py";
+    buildPhase = "python ./scripts/lint/require-ppxs.py";
     installPhase = "touch $out";
     meta.checkDescription = "that dune files are preprocessed by ppx_version";
   };
