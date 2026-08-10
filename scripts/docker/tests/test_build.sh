@@ -168,6 +168,14 @@ if [[ "${1:-}" == "network" ]]; then
     echo "172.17.0.1"
     exit 0
 fi
+# "docker manifest inspect" asks the registry whether a tag is published.
+# build.sh uses it to refuse to overwrite an image that already exists, so the
+# stub must answer truthfully: nothing is published in the tests, and the call
+# fails, unless a test asks for the tag to be there.
+if [[ "${1:-}" == "manifest" ]]; then
+    [[ -n "${STUB_TAG_IN_REGISTRY:-}" ]] && exit 0
+    exit 1
+fi
 exit 0
 STUB
     chmod +x "${STUB_DIR}/docker"
@@ -197,6 +205,8 @@ run_build() {
       BRANCH_NAME="test-branch" \
       MINA_DEB_CODENAME="bullseye" \
       KEEP_MY_TAGS_INTACT="true" \
+      STUB_TAG_IN_REGISTRY="${STUB_TAG_IN_REGISTRY:-}" \
+      FORCE_DOCKER_OVERWRITE="${FORCE_DOCKER_OVERWRITE:-}" \
       CI="" BUILDKITE="" GITHUB_ACTIONS="" \
       ./scripts/docker/build.sh "$@" ) > "${args_file}.log" 2>&1
     LAST_EXIT=$?
@@ -259,6 +269,43 @@ test_load_only_does_not_push() {
     assert_has_line "buildx still loads" "$args" "--load"
     assert_not_called "no push" "${args}.calls" "^push "
     assert_not_called "no registry tag" "${args}.calls" "^buildx imagetools"
+}
+
+# A tag that is already published is not overwritten. The check runs before the
+# build, so a build that would be refused costs nothing.
+test_published_tag_is_not_overwritten() {
+    local args="${STUB_DIR}/exists.args"
+    STUB_TAG_IN_REGISTRY="true" run_build "$args" \
+        --service mina-daemon --version 3.1.0 --network devnet \
+        --docker-registry testreg --deb-build-flags none
+
+    assert_eq "exit code" 1 "$LAST_EXIT"
+    assert_not_called "nothing is built" "${args}.calls" "^buildx build"
+    assert_not_called "nothing is pushed" "${args}.calls" "^push "
+}
+
+# FORCE_DOCKER_OVERWRITE is the way past that refusal.
+test_force_overwrite_pushes_over_a_published_tag() {
+    local args="${STUB_DIR}/force.args"
+    STUB_TAG_IN_REGISTRY="true" FORCE_DOCKER_OVERWRITE="1" run_build "$args" \
+        --service mina-daemon --version 3.1.0 --network devnet \
+        --docker-registry testreg --deb-build-flags none
+
+    assert_eq "exit code" 0 "$LAST_EXIT"
+    assert_called "push" "${args}.calls" "^push testreg/mina-daemon:3\.1\.0$"
+}
+
+# The refusal only guards a push. A load-only build never reaches the registry,
+# so it must not ask the registry anything.
+test_load_only_ignores_the_published_tag() {
+    local args="${STUB_DIR}/load-exists.args"
+    STUB_TAG_IN_REGISTRY="true" run_build "$args" \
+        --service mina-daemon --version 3.1.0 --network devnet \
+        --docker-registry testreg --deb-build-flags none --load-only
+
+    assert_eq "exit code" 0 "$LAST_EXIT"
+    assert_not_called "the registry is not asked" "${args}.calls" \
+        "^manifest inspect"
 }
 
 # The archive and the rosetta images publish one image for each network, so the
@@ -555,6 +602,9 @@ main() {
     run_test test_daemon_command
     run_test test_push_is_a_separate_docker_call
     run_test test_load_only_does_not_push
+    run_test test_published_tag_is_not_overwritten
+    run_test test_force_overwrite_pushes_over_a_published_tag
+    run_test test_load_only_ignores_the_published_tag
     run_test test_archive_tag_holds_the_network
     run_test test_rosetta_tag_holds_the_network
     run_test test_base_image_service
