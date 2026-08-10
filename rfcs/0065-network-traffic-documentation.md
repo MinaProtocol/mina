@@ -183,14 +183,14 @@ Gossip pub/sub is used for high-fanout data that every node needs to receive. No
 
 Direct RPCs are point-to-point request/response calls made over libp2p streams using the protocol identifier `coda/rpcs/0.0.1`. These are used for data that is too large or too targeted for broadcast.
 
-All RPCs are versioned using the `[%%versioned_rpc]` mechanism (see RFC 0013). Size and latency metrics for each RPC are exposed via Prometheus histograms.
+All RPCs are versioned using the `[%%versioned_rpc]` mechanism (see RFC 0013). Per-RPC latency is exposed as a Prometheus gauge, while per-RPC size metrics are exposed as Prometheus histograms.
 
-**Global RPC metrics:**
-- `Mina_Network_rpc_latency_ms` (histogram per RPC name)
-- `Mina_Network_rpc_size_bytes` (histogram per RPC name)
-- `Mina_Network_rpc_max_bytes` (histogram per RPC name)
-- `Mina_Network_rpc_avg_bytes` (histogram per RPC name)
-- `Mina_Network_rpc_latency_ms_summary` (summary)
+**RPC metrics:**
+- `Mina_Network_<rpc>_latency` (gauge)
+- `Mina_Network_<rpc>_size` (histogram)
+- `Mina_Network_<rpc>_max_size` (histogram)
+- `Mina_Network_<rpc>_avg_size` (histogram)
+- `Mina_Network_rpc_latency_ms_summary` (histogram)
 - `Mina_Network_rpc_connections_failed` (counter)
 
 The following subsections describe each RPC individually. Each has its own sent/received counters and failed-request/failed-response counters in the `Mina_Network_*` namespace.
@@ -583,7 +583,7 @@ When `--node-error-url` is configured, the daemon sends error reports with diagn
 
 **Direction:** Outbound (HTTPS POST)
 
-**Size:** Small to moderate (< 100 KB per report, depending on crash context)
+**Size:** Small to moderate (< 10 KB per report, capped by report serialization limits)
 
 **Frequency:** Event-driven (on error or crash)
 

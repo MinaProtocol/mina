@@ -148,4 +148,4 @@ Returns available completed SNARK work from the peer's SNARK pool. Used by SNARK
 
 ---
 
-For a comprehensive overview of all node network traffic including message sizes, latency requirements, bandwidth estimates, and monitoring guidance, see [RFC 0065](../../../../rfcs/0065-network-traffic-documentation.md).
+For a comprehensive overview of all node network traffic including message sizes, latency requirements, bandwidth estimates, and monitoring guidance, see [RFC 0065](../../../rfcs/0065-network-traffic-documentation.md).
