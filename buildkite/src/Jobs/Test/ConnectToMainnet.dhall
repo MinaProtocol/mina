@@ -14,20 +14,13 @@ let Network = ../../Constants/Network.dhall
 
 let DebianVersions = ../../Constants/DebianVersions.dhall
 
-let Profile = ../../Constants/Profiles.dhall
-
 let Expr = ../../Pipeline/Expr.dhall
 
 let MainlineBranch = ../../Pipeline/MainlineBranch.dhall
 
 let network = Network.Type.Mainnet
 
-let dependsOn =
-      DebianVersions.appDependsOn
-        DebianVersions.DepsSpec::{
-        , network = network
-        , profile = Profile.Type.Mainnet
-        }
+let dependsOn = DebianVersions.appDependsOn DebianVersions.DepsSpec::{=}
 
 in  Pipeline.build
       Pipeline.Config::{

@@ -144,13 +144,20 @@ let packageDirtyWhen =
       ]
 
 let appDependsOn =
+    -- spec.network and spec.profile are deliberately NOT part of the name. An
+    -- app build compiles the whole tree and its binaries carry no network (see
+    -- AppsSpec in Command/MinaArtifact.dhall), so there is exactly one app job
+    -- per codename/build-flag/arch and every consumer of it, whatever network
+    -- it packages or tests afterwards, waits on that one job. Naming a network
+    -- here used to mint a second, identical app job per network, which
+    -- recompiled the tree and then raced the first one writing the same
+    -- binaries into the same apps cache directory.
           \(spec : DepsSpec.Type)
       ->  let name =
-                "${spec.prefix}${Network.namePrefixSegment
-                                   spec.network}${capitalName
-                                                    spec.deb_version}${BuildFlags.toSuffixUppercase
-                                                                         spec.build_flag}${Arch.nameSuffix
-                                                                                             spec.arch}Apps"
+                "${spec.prefix}${capitalName
+                                   spec.deb_version}${BuildFlags.toSuffixUppercase
+                                                        spec.build_flag}${Arch.nameSuffix
+                                                                            spec.arch}Apps"
 
           in  [ { name = name, key = "build-apps" } ]
 
