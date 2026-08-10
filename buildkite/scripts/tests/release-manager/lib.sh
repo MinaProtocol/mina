@@ -515,6 +515,80 @@ test_manager_publish_rosetta_generic() {
     fi
 }
 
+# Test: Test publish operation (dry-run) for the mina-automode docker image
+#
+# mina-automode carries a docker image whose name differs from the artifact
+# name: CI publishes it as mina-daemon-auto-hardfork (see get_docker_image_name
+# in manager.sh and Docker/Package.dhall). This test pins that mapping, and the
+# "<version>-<codename>-<network>" tag shape, so a rename cannot pass silently.
+test_manager_publish_mina_automode() {
+    log_info "========================================="
+    log_info "TEST: Test manager.sh publish mina-automode docker (dry-run)"
+    log_info "========================================="
+
+    local target_version="3.3.0-test-automode-${RANDOM_SUFFIX}"
+    local expected_image="mina-daemon-auto-hardfork:${target_version}-${TEST_CODENAME}-devnet"
+
+    if "${MANAGER_SCRIPT}" publish \
+        --buildkite-build-id "test_data" \
+        --source-version "3.3.0-test-automode" \
+        --target-version "${target_version}" \
+        --channel "${TEST_COMPONENT_TEST}" \
+        --artifacts "mina-automode" \
+        --networks "devnet" \
+        --codenames "${TEST_CODENAME}" \
+        --archs "${TEST_ARCH}" \
+        --debian-repo "${TEST_BUCKET}" \
+        --backend "${BACKEND}" \
+        --only-dockers \
+        --skip-cache-invalidation \
+        --dry-run 2>&1 | tee "${TEST_TEMP_DIR}/publish_mina_automode_dry_run.log"; then
+
+        if grep -q "${expected_image}" "${TEST_TEMP_DIR}/publish_mina_automode_dry_run.log"; then
+            assert_success "Manager publish mina-automode docker (dry-run)" 0
+        else
+            log_error "Expected docker image ${expected_image} in publish output"
+            assert_success "Manager publish mina-automode docker (dry-run)" 1
+        fi
+    else
+        assert_success "Manager publish mina-automode docker (dry-run)" 1
+    fi
+}
+
+# Test: Test promote operation (dry-run) for the mina-automode docker image
+test_manager_promote_mina_automode() {
+    log_info "========================================="
+    log_info "TEST: Test manager.sh promote mina-automode docker (dry-run)"
+    log_info "========================================="
+
+    local target_version="3.3.0-automode-${RANDOM_SUFFIX}"
+    local expected_image="mina-daemon-auto-hardfork:${target_version}-${TEST_CODENAME}-devnet"
+
+    if "${MANAGER_SCRIPT}" promote \
+        --source-version "3.3.0-alpha1-compatible-918b8c0" \
+        --target-version "${target_version}" \
+        --source-channel "${TEST_COMPONENT_CI}" \
+        --target-channel "${TEST_COMPONENT_TEST}" \
+        --artifacts "mina-automode" \
+        --networks "devnet" \
+        --codenames "${TEST_CODENAME}" \
+        --arch "${TEST_ARCH}" \
+        --debian-repo "${TEST_BUCKET}" \
+        --only-dockers \
+        --skip-cache-invalidation \
+        --dry-run 2>&1 | tee "${TEST_TEMP_DIR}/promote_mina_automode_dry_run.log"; then
+
+        if grep -q "${expected_image}" "${TEST_TEMP_DIR}/promote_mina_automode_dry_run.log"; then
+            assert_success "Manager promote mina-automode docker (dry-run)" 0
+        else
+            log_error "Expected docker image ${expected_image} in promote output"
+            assert_success "Manager promote mina-automode docker (dry-run)" 1
+        fi
+    else
+        assert_success "Manager promote mina-automode docker (dry-run)" 1
+    fi
+}
+
 # Test: Test publish with mixed artifacts including mina-config (dry-run)
 test_manager_publish_mixed_with_config() {
     log_info "========================================="
@@ -609,7 +683,9 @@ run_dry_run_tests() {
     test_manager_publish_mina_config
     test_manager_publish_mina_generic
     test_manager_publish_rosetta_generic
+    test_manager_publish_mina_automode
     test_manager_publish_mixed_with_config
     test_manager_promote_mina_config
+    test_manager_promote_mina_automode
     test_manager_unknown_artifact_rejected
 }
