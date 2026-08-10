@@ -65,7 +65,52 @@ Flags are accepted per-subcommand.
 | Code | Meaning |
 |------|---------|
 | 0 | Check passed |
-| 1 | Check failed (details on stderr) |
+| 1 | Check failed |
+| 2 | Usage error (no PostgreSQL URI given) |
+
+## Output
+
+Each run prints exactly one result: one JSON object with `--json`, one line
+without it. Nothing else is written to that stream, so a probe can parse it
+without filtering.
+
+- With `--json`, the object goes to **stdout** whether the check passed or
+  failed, so a consumer reads one stream.
+- Without `--json`, the line goes to **stdout** when the check passed and to
+  **stderr** when it failed.
+- Progress messages from `wait` are logs, not results. They go to **stderr**,
+  through the standard Mina logger, and follow `--json` as well: one JSON log
+  line per poll with the flag, interpolated plain text without it.
+
+The verdict is keyed `healthy` for a single-signal check and `ready` for
+`ready` and `wait`. A check reports the metrics it measured, so a failure
+still carries its numbers:
+
+```json
+{ "healthy": false, "missing_blocks": 41, "max_missing": 10, "window": 2000,
+  "error": { "sexp": [ "Thresholds_exceeded", [ "missing blocks 41 > 10" ] ] } }
+```
+
+A check that failed before it could measure anything reports no metrics:
+
+```json
+{ "healthy": false,
+  "error": { "sexp": [ "Db_unreachable", "Failed to connect to ..." ] } }
+```
+
+`error` is the structured Mina error encoding (`Error_json`), not a bare
+string, so a consumer can branch on the reason instead of matching prose. The
+reasons are `Db_unreachable`, `Db_query_failed`, `No_blocks`,
+`Invalid_timestamp`, `Thresholds_exceeded` and `Timed_out`.
+
+`ready` and `wait` also list each breached threshold under `problems`, and
+`wait` always carries `timed_out` and `db_only`:
+
+```json
+{ "ready": false, "timed_out": true, "db_only": true,
+  "error": { "sexp": [ "Timed_out", [ "after_seconds", "600" ],
+                       [ "last_failure", [ [ "Db_query_failed", "..." ] ] ] ] } }
+```
 
 ## Kubernetes integration
 

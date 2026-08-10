@@ -16,8 +16,11 @@
   yojson
   ;; local libraries
   archive_health_queries
+  error_json
+  interpolator_lib
+  logger
   mina_caqti)
  (instrumentation
   (backend bisect_ppx))
  (preprocess
-  (pps ppx_version ppx_let ppx_deriving_yojson)))
+  (pps ppx_version ppx_let ppx_sexp_conv ppx_deriving_yojson ppx_mina)))
