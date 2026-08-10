@@ -368,6 +368,7 @@ let commonBuildEnvs =
                 , "MINA_DEB_CODENAME=${DebianVersions.lowerName
                                          spec.debVersion}"
                 , "ARCHITECTURE=${Arch.lowerName spec.arch}"
+                , "FORCE_DOCKER_OVERWRITE"
                 , Network.foldMinaBuildMainnetEnv nets
                 , "PREFORK_LEGACY_VERSION=${spec.deb_legacy_version}"
                 , "PREFORK_GITHASH_CONFIG=${spec.deb_legacy_githash_config}"
