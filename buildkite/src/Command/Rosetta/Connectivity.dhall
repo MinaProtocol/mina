@@ -114,11 +114,7 @@ let command
             , if_ = Some spec.if_
             , depends_on =
                 DebianVersions.appDependsOn
-                  DebianVersions.DepsSpec::{
-                  , deb_version = spec.dockerType
-                  , network = spec.network
-                  , profile = spec.profile
-                  }
+                  DebianVersions.DepsSpec::{ deb_version = spec.dockerType }
             }
 
 let pipeline
