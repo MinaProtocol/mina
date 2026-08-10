@@ -91,7 +91,8 @@ source ./src/test/archive/sample_db/convert_chain_to_canonical.sh "$PG_URI"
 echo "Regenerating precomputed_blocks.tar.xz"
 rm -rf precomputed_blocks || true
 mkdir precomputed_blocks
-find ~/.mina-network -name 'precomputed_blocks.log' | xargs -I ! ./scripts/mina-local-network/split_precomputed_log.sh ! precomputed_blocks
+find ~/.mina-network -name 'precomputed_blocks.log' -print0 \
+  | xargs -0 -I ! ./scripts/mina-local-network/split_precomputed_log.sh ! precomputed_blocks
 rm ./src/test/archive/sample_db/precomputed_blocks.tar.xz || true
 tar -C precomputed_blocks -cvf ./src/test/archive/sample_db/precomputed_blocks.tar.xz .
 rm -rf precomputed_blocks
