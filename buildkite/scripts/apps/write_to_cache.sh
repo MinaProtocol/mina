@@ -30,14 +30,31 @@ fi
 
 DEST="apps/${CODENAME}${VARIANT:+/${VARIANT}}"
 
-find _build -type f -name "*.exe" | while read -r entry; do
+# A failed write must fail the job. It used to be ignored: the loop below ran
+# the cache manager without checking its status, so a manager exiting 2 only
+# printed "There are some errors while copying files to cache" and the loop
+# carried on. The job went green having published an incomplete apps cache, and
+# the missing binary surfaced hours later in restore_build_tree.sh on a
+# different agent. Collect the failures and report them all at the end, so one
+# run names every entry that did not make it rather than only the first.
+failed=()
+
+cache_write() {
+  if ! ./buildkite/scripts/cache/manager.sh write-to-dir "$1" "$DEST"; then
+    failed+=("$1")
+  fi
+}
+
+# Fed by process substitution, not a pipe: a pipe would run the loop in a
+# subshell and the failures recorded in it would be lost.
+while read -r entry; do
   # Exclude files ending with ppx.exe
   if [[ "$entry" == *ppx.exe ]]; then
     continue
   fi
 
-  ./buildkite/scripts/cache/manager.sh write-to-dir "$entry" "$DEST"
-done
+  cache_write "$entry"
+done < <(find _build -type f -name "*.exe")
 
 # libp2p_helper is a Go binary (built under src/app/libp2p_helper/result/bin,
 # not a dune _build/*.exe), but the daemon needs it at runtime. Cache it
@@ -45,7 +62,7 @@ done
 # mirroring what the .deb installs.
 HELPER="src/app/libp2p_helper/result/bin/libp2p_helper"
 if [[ -f "$HELPER" ]]; then
-  ./buildkite/scripts/cache/manager.sh write-to-dir "$HELPER" "$DEST"
+  cache_write "$HELPER"
 fi
 
 # minimina is a Rust binary (built under src/app/minimina/target/release, not a
@@ -53,5 +70,11 @@ fi
 # restore it into the build tree without a separate copy of the binaries.
 MINIMINA="src/app/minimina/target/release/minimina"
 if [[ -f "$MINIMINA" ]]; then
-  ./buildkite/scripts/cache/manager.sh write-to-dir "$MINIMINA" "$DEST"
+  cache_write "$MINIMINA"
+fi
+
+if [[ ${#failed[@]} -gt 0 ]]; then
+  echo "write_to_cache: ${#failed[@]} file(s) could not be written to ${DEST}:" >&2
+  printf '  %s\n' "${failed[@]}" >&2
+  exit 1
 fi

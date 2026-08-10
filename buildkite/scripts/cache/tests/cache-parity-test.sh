@@ -105,4 +105,51 @@ cache_verb read "hardfork/ledgers/ledger_*.tar.gz" "$OUT2"
 assert_file_equals "$OUT2/ledger_a.tar.gz" "ledger-a"
 assert_file_equals "$OUT2/ledger_b.tar.gz" "ledger-b"
 
+# ------------------------------------------------------------------------------
+# write-to-dir: rewriting an entry must never make it unreadable
+# ------------------------------------------------------------------------------
+# apps/<codename> is written by the devnet AND the mainnet app build, so the
+# same entry is rewritten while other jobs read it. A copy straight onto the
+# destination truncates it first, and on the shared storage box two writers
+# racing that way have left an entry deleted and never recreated
+# ("cp: cannot create regular file '<dest>': File exists"), which surfaced much
+# later as a missing binary in restore_build_tree.sh.
+#
+# Sample the entry from a reader while a writer rewrites it: it must always be
+# the complete old or the complete new file, never short and never absent.
+#
+# Bash engine only for now. The assertion holds for any implementation that
+# renames into place, but buildkite-cache-manager ships in the release-toolkit
+# image from another repository and has not been checked, so gating it here
+# would fail a build for something this repository cannot fix.
+if [[ "$CACHE_ENGINE" == "bash" ]]; then
+  log "write-to-dir (concurrent rewrite stays readable)"
+
+  BIG="$SRC/big.bin"
+  dd if=/dev/urandom of="$BIG" bs=1M count=64 status=none
+  BIG_SIZE="$(stat -c%s "$BIG")"
+
+  cache_verb write-to-dir "$BIG" apps/
+  DEST_BIG="$CACHE_BASE_URL/$BUILDKITE_BUILD_ID/apps/big.bin"
+
+  ( for _ in 1 2 3; do cache_verb write-to-dir "$BIG" apps/ >/dev/null; done ) &
+  WRITER=$!
+
+  torn=0
+  while kill -0 "$WRITER" 2>/dev/null; do
+    if [[ ! -e "$DEST_BIG" ]] \
+      || [[ "$(stat -c%s "$DEST_BIG" 2>/dev/null || echo 0)" -ne "$BIG_SIZE" ]]; then
+      torn=$((torn + 1))
+    fi
+  done
+  wait "$WRITER"
+
+  [[ "$torn" -eq 0 ]] \
+    || fail "cache entry was absent or short in $torn samples while being rewritten"
+
+  # The temporary the writer renames from must not be left behind.
+  leftovers="$(find "$CACHE_BASE_URL/$BUILDKITE_BUILD_ID/apps" -name '.tmp.*' | wc -l)"
+  [[ "$leftovers" -eq 0 ]] || fail "$leftovers temporary file(s) left in the cache"
+fi
+
 log "All cache operations executed and verified successfully"

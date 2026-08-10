@@ -40,6 +40,48 @@ CACHE_BASE_URL="${CACHE_BASE_URL:-/var/storagebox}"
 # functions
 ################################################################################
 
+# Copy files into a cache directory without ever leaving an entry missing.
+#
+# `cp -f` is not atomic: when the destination already exists it unlinks the file
+# and creates it again. Two jobs writing the same cache entry at the same time
+# therefore race -- which is not hypothetical, apps/<codename> is written by the
+# devnet AND the mainnet app build, both producing the same basenames. The loser
+# of the race reports
+#   cp: cannot create regular file '<dest>': File exists
+# once the entry has already been unlinked, so the cache is left with a hole
+# that only surfaces much later, in a consumer such as restore_build_tree.sh.
+#
+# Copying to a unique temporary name in the destination directory and renaming
+# it into place avoids that: rename(2) inside one directory is atomic, so the
+# entry stays readable throughout and the last writer simply wins.
+function copy_into_dir(){
+    local __dest_dir="$1"; shift
+    local __flags="$1"; shift
+    local rc=0
+    local src base tmp
+
+    for src in "$@"; do
+        if [[ -d "$src" ]]; then
+            # A directory keeps the plain recursive copy: there is no atomic
+            # rename that merges a tree into an existing one.
+            # shellcheck disable=SC2086
+            cp -R ${__flags} "$src" "$__dest_dir" || rc=1
+            continue
+        fi
+
+        base="$(basename "$src")"
+        tmp="${__dest_dir}/.tmp.$$.${base}"
+        # shellcheck disable=SC2086
+        if cp -R ${__flags} "$src" "$tmp" && mv -f "$tmp" "${__dest_dir}/${base}"; then
+            continue
+        fi
+        rm -f "$tmp"
+        rc=1
+    done
+
+    return $rc
+}
+
 # Display the main help message
 function main_help(){
     echo Read/Write file or files from/to CI cache.
@@ -212,6 +254,7 @@ function write(){
     local __root="$BUILDKITE_BUILD_ID"
     local __input=""
     local __to=""
+    local __tmp=""
 
     while [ "$#" -gt 0 ]; do
         error_message="Error: a value is needed for '$1'";
@@ -256,7 +299,12 @@ function write(){
     mkdir -p "$(dirname "$__to")"
 
     echo "..Copying $__input -> $__to"
-    if ! cp -R ${EXTRA_FLAGS} "$__input" "$__to"; then
+    # Written through a temporary name and renamed, for the same reason as
+    # write-to-dir: see copy_into_dir.
+    __tmp="$(dirname "$__to")/.tmp.$$.$(basename "$__to")"
+    # shellcheck disable=SC2086
+    if ! { cp -R ${EXTRA_FLAGS} "$__input" "$__tmp" && mv -f "$__tmp" "$__to"; }; then
+        rm -f "$__tmp"
         echo -e "${RED} !! There are some errors while copying files to cache. Exiting... ${CLEAR}\n";
         exit 2
     fi
@@ -347,7 +395,8 @@ function write-to-dir(){
 
     for input_path in "${__inputs[@]}"; do
         echo "..Copying $input_path -> $__to"
-        if ! cp -R ${EXTRA_FLAGS} $input_path "$__to"; then
+        # shellcheck disable=SC2086
+        if ! copy_into_dir "$__to" "$EXTRA_FLAGS" $input_path; then
             echo -e "${RED} !! There are some errors while copying files to cache. Exiting... ${CLEAR}\n";
             exit 2
         fi
