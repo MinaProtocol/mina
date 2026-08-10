@@ -387,6 +387,47 @@ test_profiled_service_uses_its_own_dockerfile() {
     assert_has_line "dockerfile" "$args" "dockerfiles/Dockerfile-install-profile"
     assert_has_line "output tag" "$args" \
         "testreg/mina-daemon:3.0.0-test-branch-abcdefg-bullseye-devnet-generic"
+    # The hash tag already names the network, so the profile must not add it a
+    # second time. It did, and the integration tests could not find the image:
+    # they ask for "<githash>-<codename>-<network>-generic", which is also what
+    # the readable tag above says.
+    assert_has_line "hash tag names the network once" "$args" \
+        "testreg/mina-daemon:abcdefg-bullseye-devnet-generic"
+    assert_not_called "the network is not doubled" "$args" "devnet-devnet"
+
+    # The debian package inside the image is a different name: there the
+    # network is a prefix and the profile is part of the suffix, so
+    # "mina-devnet-devnet-generic" is correct and must stay.
+    assert_has_line "debian suffix keeps the profile" "$args" \
+        "deb_suffix=devnet-generic"
+}
+
+# A lightnet profiled image has no "-generic", and its suffix is the same in
+# both tags.
+test_profiled_lightnet_suffix() {
+    local args="${STUB_DIR}/profiled-lightnet.args"
+    run_build "$args" \
+        --service mina-daemon-profiled --version 3.1.0 --network devnet \
+        --docker-registry testreg --deb-profile lightnet --deb-build-flags none
+
+    assert_has_line "readable tag" "$args" \
+        "testreg/mina-daemon:3.0.0-test-branch-abcdefg-bullseye-lightnet"
+    assert_has_line "hash tag" "$args" \
+        "testreg/mina-daemon:abcdefg-bullseye-devnet-lightnet"
+}
+
+# Instrumented builds append to both suffixes, and the network still appears
+# once in the hash tag.
+test_profiled_instrumented_suffix() {
+    local args="${STUB_DIR}/profiled-instrumented.args"
+    run_build "$args" \
+        --service mina-daemon-profiled --version 3.1.0 --network devnet \
+        --docker-registry testreg --deb-build-flags instrumented
+
+    assert_has_line "readable tag" "$args" \
+        "testreg/mina-daemon:3.0.0-test-branch-abcdefg-bullseye-devnet-generic-instrumented"
+    assert_has_line "hash tag" "$args" \
+        "testreg/mina-daemon:abcdefg-bullseye-devnet-generic-instrumented"
 }
 
 test_rosetta_configured_keeps_the_rosetta_name() {
@@ -611,6 +652,8 @@ main() {
     run_test test_hardfork_targets
     run_test test_configured_service_uses_docker_tag_for_the_output
     run_test test_profiled_service_uses_its_own_dockerfile
+    run_test test_profiled_lightnet_suffix
+    run_test test_profiled_instrumented_suffix
     run_test test_rosetta_configured_keeps_the_rosetta_name
     run_test test_toolchain_joins_the_stage_files
     run_test test_delegation_verifier
