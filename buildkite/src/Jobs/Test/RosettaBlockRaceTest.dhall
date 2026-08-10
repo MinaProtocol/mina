@@ -8,10 +8,6 @@ let JobSpec = ../../Pipeline/JobSpec.dhall
 
 let DebianVersions = ../../Constants/DebianVersions.dhall
 
-let Network = ../../Constants/Network.dhall
-
-let Profiles = ../../Constants/Profiles.dhall
-
 let PipelineScope = ../../Pipeline/Scope.dhall
 
 let RosettaBlockRaceTest = ../../Command/RosettaBlockRaceTest.dhall
@@ -20,12 +16,7 @@ let Expr = ../../Pipeline/Expr.dhall
 
 let MainlineBranch = ../../Pipeline/MainlineBranch.dhall
 
-let dependsOn =
-      DebianVersions.appDependsOn
-        DebianVersions.DepsSpec::{
-        , network = Network.Type.Mainnet
-        , profile = Profiles.Type.Mainnet
-        }
+let dependsOn = DebianVersions.appDependsOn DebianVersions.DepsSpec::{=}
 
 in  Pipeline.build
       Pipeline.Config::{
