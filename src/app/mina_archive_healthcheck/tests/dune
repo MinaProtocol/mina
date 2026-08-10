@@ -18,4 +18,4 @@
  (instrumentation
   (backend bisect_ppx))
  (preprocess
-  (pps ppx_version)))
+  (pps ppx_version ppx_deriving_yojson)))

@@ -23,6 +23,22 @@ let bin =
    into a single JSON record (or single text line) without leaking. *)
 let dead_pg = "postgres://test:test@127.0.0.1:1/test"
 
+(* The envelope is the contract, so each shape is stated as a type and
+   checked by its derived [of_yojson]: an extra, missing or wrongly
+   typed field fails the parse and names itself.  [error] is typed as
+   raw JSON because it is the structured [Error_json] encoding, whose
+   inner shape is not part of the contract. *)
+module Envelope = struct
+  type probe = { healthy : bool; error : Yojson.Safe.t } [@@deriving of_yojson]
+
+  type readiness = { ready : bool; error : Yojson.Safe.t }
+  [@@deriving of_yojson]
+
+  type wait =
+    { ready : bool; timed_out : bool; db_only : bool; error : Yojson.Safe.t }
+  [@@deriving of_yojson]
+end
+
 let read_all_fd fd =
   let ic = Core_unix.in_channel_of_descr fd in
   let s = In_channel.input_all ic in
@@ -58,59 +74,50 @@ let assert_no_ocaml_exn_leak label s =
         Alcotest.failf "%s: output leaked OCaml exception syntax (%s):\n%s"
           label needle s )
 
-let contains s ~sub = String.is_substring s ~substring:sub
-
 let check_contains ~label s ~sub =
-  if not (contains s ~sub) then
+  if not (String.is_substring s ~substring:sub) then
     Alcotest.failf "%s: expected to contain %S, got:\n%s" label sub s
 
-(* Shared "exactly one JSON object on stdout" assertion.  Parses [out]
-   as a single Yojson object, returns the field list.  Guards against
-   a second JSON object being tacked on, which is the double-print
-   regression every subcommand needs to avoid. *)
+(* Parse stdout as exactly one JSON object.  A second object tacked on
+   is the double-print regression every subcommand must avoid. *)
 let parse_single_json_record ~label out err =
   let trimmed = String.strip out in
   if String.is_empty trimmed then
     Alcotest.failf "%s: stdout empty, stderr:\n%s" label err ;
-  let json =
-    try Yojson.Safe.from_string trimmed
-    with exn ->
-      Alcotest.failf "%s: stdout did not parse as JSON: %s\nstdout=%s" label
-        (Exn.to_string exn) out
-  in
-  if String.is_substring trimmed ~substring:"}\n{" then
-    Alcotest.failf
-      "%s: stdout contains multiple JSON objects separated by newlines:\n%s"
-      label out ;
-  if String.is_substring trimmed ~substring:"} {" then
-    Alcotest.failf
-      "%s: stdout contains multiple JSON objects separated by whitespace:\n%s"
-      label out ;
-  match json with
-  | `Assoc fields ->
-      fields
+  List.iter [ "}\n{"; "} {" ] ~f:(fun separator ->
+      if String.is_substring trimmed ~substring:separator then
+        Alcotest.failf "%s: stdout contains multiple JSON objects:\n%s" label
+          out ) ;
+  try Yojson.Safe.from_string trimmed
+  with exn ->
+    Alcotest.failf "%s: stdout did not parse as JSON: %s\nstdout=%s" label
+      (Exn.to_string exn) out
+
+let of_yojson_exn ~label of_yojson json =
+  match of_yojson json with
+  | Ok envelope ->
+      envelope
+  | Error where ->
+      Alcotest.failf "%s: unexpected envelope (at %s): %s" label where
+        (Yojson.Safe.to_string json)
+
+let check_error_reported ~label error =
+  match error with
+  | `Null ->
+      Alcotest.failf "%s: error field is null" label
   | _ ->
-      Alcotest.failf "%s: stdout was not a JSON object: %s" label out
-
-let check_bool_field ~label fields ~field ~expected =
-  match List.Assoc.find fields ~equal:String.equal field with
-  | Some (`Bool b) when Bool.equal b expected ->
       ()
-  | Some v ->
-      Alcotest.failf "%s: expected %s:%b, got %s" label field expected
-        (Yojson.Safe.to_string v)
-  | None ->
-      Alcotest.failf "%s: missing %S field" label field
 
-let check_string_field_present ~label fields ~field =
-  match List.Assoc.find fields ~equal:String.equal field with
-  | Some (`String _) ->
-      ()
-  | Some v ->
-      Alcotest.failf "%s: expected %s to be a string, got %s" label field
-        (Yojson.Safe.to_string v)
-  | None ->
-      Alcotest.failf "%s: missing %S field" label field
+(* Run [sub] against a dead PG in JSON mode and return its one record. *)
+let run_dead_pg_json ~sub ?(extra_args = []) () =
+  let label = sprintf "%s --json (dead PG)" sub in
+  let code, out, err =
+    run_cli ([ sub; "--postgres-uri"; dead_pg; "--json" ] @ extra_args)
+  in
+  if code = 0 then Alcotest.failf "%s: expected non-zero exit" label ;
+  assert_no_ocaml_exn_leak (label ^ " stdout") out ;
+  assert_no_ocaml_exn_leak (label ^ " stderr") err ;
+  (label, parse_single_json_record ~label out err)
 
 let all_subcommands =
   [ "db-ready"
@@ -140,94 +147,45 @@ let test_help_subs () =
       Alcotest.(check int) (sprintf "%s --help exit" sub) 0 code ;
       assert_no_ocaml_exn_leak (sprintf "%s --help stderr" sub) err )
 
-(* Single text-mode regression: db-ready against a dead PG must fail
-   non-zero without leaking raw exception syntax.  The other
-   subcommands all share the same [finish ~json ~json_error] error
-   path, so JSON-mode coverage below is sufficient and we don't
-   duplicate text-mode coverage here. *)
+(* Every subcommand reaches text output through the same [emit], so one
+   text-mode case is enough; the rest is covered in JSON mode below. *)
 let test_db_ready_dead_pg_text () =
   let code, out, err = run_cli [ "db-ready"; "--postgres-uri"; dead_pg ] in
   if code = 0 then Alcotest.failf "db-ready (dead PG): expected non-zero exit" ;
   assert_no_ocaml_exn_leak "db-ready text stdout" out ;
   assert_no_ocaml_exn_leak "db-ready text stderr" err
 
-(* Generic dead-PG JSON test: every subcommand whose top-level JSON
-   error envelope keys the failure as ["healthy": false] uses this. *)
-let test_dead_pg_healthy_false ~sub ?(extra_args = []) () =
-  let args = [ sub; "--postgres-uri"; dead_pg; "--json" ] @ extra_args in
-  let label = sprintf "%s --json (dead PG)" sub in
-  let code, out, err = run_cli args in
-  if code = 0 then Alcotest.failf "%s: expected non-zero exit" label ;
-  assert_no_ocaml_exn_leak (label ^ " stdout") out ;
-  assert_no_ocaml_exn_leak (label ^ " stderr") err ;
-  let fields = parse_single_json_record ~label out err in
-  check_bool_field ~label fields ~field:"healthy" ~expected:false ;
-  check_string_field_present ~label fields ~field:"error"
+(* A connection that never opened measured nothing, so the envelope
+   carries the verdict and the error and no metric field. *)
+let test_dead_pg_healthy_false ~sub () =
+  let label, json = run_dead_pg_json ~sub () in
+  let envelope = of_yojson_exn ~label Envelope.probe_of_yojson json in
+  Alcotest.(check bool) (label ^ ": healthy") false envelope.healthy ;
+  check_error_reported ~label envelope.error
 
-let test_db_ready_dead_pg_json () =
-  test_dead_pg_healthy_false ~sub:"db-ready" ()
-
-let test_block_height_dead_pg_json () =
-  test_dead_pg_healthy_false ~sub:"block-height" ()
-
-let test_block_recency_dead_pg_json () =
-  test_dead_pg_healthy_false ~sub:"block-recency" ()
-
-let test_missing_blocks_dead_pg_json () =
-  test_dead_pg_healthy_false ~sub:"missing-blocks" ()
-
-let test_unparented_blocks_dead_pg_json () =
-  test_dead_pg_healthy_false ~sub:"unparented-blocks" ()
-
-(* The composite [ready] envelope keys the failure as ["ready": false]
-   instead of [healthy], hence its own assertion. *)
 let test_ready_dead_pg_json () =
-  let label = "ready --json (dead PG)" in
-  let code, out, err =
-    run_cli [ "ready"; "--postgres-uri"; dead_pg; "--json" ]
-  in
-  if code = 0 then Alcotest.failf "%s: expected non-zero exit" label ;
-  assert_no_ocaml_exn_leak (label ^ " stdout") out ;
-  assert_no_ocaml_exn_leak (label ^ " stderr") err ;
-  let fields = parse_single_json_record ~label out err in
-  check_bool_field ~label fields ~field:"ready" ~expected:false ;
-  check_string_field_present ~label fields ~field:"error"
+  let label, json = run_dead_pg_json ~sub:"ready" () in
+  let envelope = of_yojson_exn ~label Envelope.readiness_of_yojson json in
+  Alcotest.(check bool) (label ^ ": ready") false envelope.ready ;
+  check_error_reported ~label envelope.error
 
 (* [wait] enters a polling loop; bound it tightly (--timeout/--interval
-   1) so the test exits quickly.  Against a dead PG the failure shape is
-   the same envelope as [ready] plus a [timed_out] boolean.
-
-   The plain and [--db-only] variants are identical apart from the flag
-   and the extra [db_only: true] field assertion, so they share this
-   body.  [--db-only] is the polling variant used by integration tests
-   and init containers: it skips recency / missing / unparented and
-   waits only for the [blocks] table to respond.  Its failure envelope
-   must carry [db_only: true] so JSON consumers can distinguish a
-   db-only timeout from a full readiness timeout. *)
+   1) so the test exits quickly.  Its envelope always carries
+   [timed_out] and [db_only], so a consumer can tell a db-only wait from
+   a full readiness wait, and a timeout from an outright connection
+   failure. *)
 let test_wait_dead_pg_json ~db_only () =
-  let label =
-    sprintf "wait%s --json (dead PG)" (if db_only then " --db-only" else "")
+  let label, json =
+    run_dead_pg_json ~sub:"wait"
+      ~extra_args:
+        ( (if db_only then [ "--db-only" ] else [])
+        @ [ "--timeout"; "1"; "--interval"; "1" ] )
+      ()
   in
-  let args =
-    [ "wait" ]
-    @ (if db_only then [ "--db-only" ] else [])
-    @ [ "--postgres-uri"
-      ; dead_pg
-      ; "--json"
-      ; "--timeout"
-      ; "1"
-      ; "--interval"
-      ; "1"
-      ]
-  in
-  let code, out, err = run_cli args in
-  if code = 0 then Alcotest.failf "%s: expected non-zero exit" label ;
-  assert_no_ocaml_exn_leak (label ^ " stdout") out ;
-  assert_no_ocaml_exn_leak (label ^ " stderr") err ;
-  let fields = parse_single_json_record ~label out err in
-  check_bool_field ~label fields ~field:"ready" ~expected:false ;
-  if db_only then check_bool_field ~label fields ~field:"db_only" ~expected:true ;
-  check_string_field_present ~label fields ~field:"error"
+  let envelope = of_yojson_exn ~label Envelope.wait_of_yojson json in
+  Alcotest.(check bool) (label ^ ": ready") false envelope.ready ;
+  Alcotest.(check bool) (label ^ ": db_only") db_only envelope.db_only ;
+  check_error_reported ~label envelope.error
 
 (* ---------- Runner ---------- *)
 
@@ -241,13 +199,21 @@ let () =
       , [ ("text format", `Quick, test_db_ready_dead_pg_text)
         ; ( "json is single well-formed record"
           , `Quick
-          , test_db_ready_dead_pg_json )
+          , test_dead_pg_healthy_false ~sub:"db-ready" )
         ] )
     ; ( "json single-record contract against dead PG"
-      , [ ("block-height", `Quick, test_block_height_dead_pg_json)
-        ; ("block-recency", `Quick, test_block_recency_dead_pg_json)
-        ; ("missing-blocks", `Quick, test_missing_blocks_dead_pg_json)
-        ; ("unparented-blocks", `Quick, test_unparented_blocks_dead_pg_json)
+      , [ ( "block-height"
+          , `Quick
+          , test_dead_pg_healthy_false ~sub:"block-height" )
+        ; ( "block-recency"
+          , `Quick
+          , test_dead_pg_healthy_false ~sub:"block-recency" )
+        ; ( "missing-blocks"
+          , `Quick
+          , test_dead_pg_healthy_false ~sub:"missing-blocks" )
+        ; ( "unparented-blocks"
+          , `Quick
+          , test_dead_pg_healthy_false ~sub:"unparented-blocks" )
         ; ("ready", `Quick, test_ready_dead_pg_json)
         ; ("wait", `Quick, test_wait_dead_pg_json ~db_only:false)
         ; ("wait --db-only", `Quick, test_wait_dead_pg_json ~db_only:true)
