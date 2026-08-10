@@ -386,7 +386,11 @@ let treeVariant =
 
 let appsJobName
     : PackagingSpec.Type -> Text
-    = \(spec : PackagingSpec.Type) -> "${selfName spec}Apps"
+    =
+      -- genericBuildName, not selfName: the app build carries no network (see
+      -- AppsSpec), so every packaging job of one codename/flags/arch shares the
+      -- single network-less app job.
+      \(spec : PackagingSpec.Type) -> "${genericBuildName spec}Apps"
 
 let build_apps
     : AppsSpec.Type -> Command.Type
