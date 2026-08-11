@@ -35,12 +35,16 @@ CLEAR='\033[0m'
 
 VERIFY_ARTIFACTS_DHALL_DEF="(./buildkite/src/Entrypoints/VerifyArtifacts.dhall)"
 
+# Everything this script prints that is not the pipeline itself must go to stderr.
+# Standard output is piped straight into "buildkite-agent pipeline upload", so a
+# stray message there is uploaded as pipeline YAML and the build fails with a
+# confusing "Config file is empty" instead of the real reason.
 function usage() {
   if [[ -n "$1" ]]; then
-    echo -e "${RED}  $1${CLEAR}\n";
+    echo -e "${RED}  $1${CLEAR}\n" >&2;
   fi
-  cat << EOF
-  VERIFY_MODE  Required. One of:
+  cat >&2 << EOF
+  VERIFY_MODE  Optional, defaults to "infra". One of:
                  infra      hourly canary: is the apt repository serving and does
                             the registry answer
                  artifacts  daily test: install every package in a clean container
@@ -52,8 +56,12 @@ EOF
   exit 1
 }
 
-if [[ -z "${VERIFY_MODE:-}" ]]; then
-  usage "VERIFY_MODE environment variable is required"
+# The canary is the safe default: it needs no other variable and no credentials,
+# so a schedule that sets nothing still does something useful.
+VERIFY_MODE="${VERIFY_MODE:-infra}"
+
+if ! command -v dhall-to-yaml > /dev/null; then
+  usage "dhall-to-yaml is not on PATH. This script must run inside the toolchain image."
 fi
 
 case "${VERIFY_MODE}" in
