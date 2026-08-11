@@ -3,11 +3,12 @@
 //! no lifecycle — creating, starting, and removing containers is the
 //! supervisor's job.
 
-use crate::archive::{self, PgConfig};
+use crate::archive;
 use crate::directory_manager::CONFIG_DIRECTORY;
-use crate::docker::archive as docker_archive;
+use crate::docker::postgres as docker_postgres;
+use crate::postgres::PgConfig;
 use crate::service::{daemon_env, ServiceConfig, ServiceType};
-use crate::supervisor::plan::{DockerBackendSpec, DockerNodeSpec, SupervisorPlan};
+use crate::supervisor::plan::{DockerBackendSpec, DockerNodeSpec, Readiness, SupervisorPlan};
 use std::io::Result;
 use std::path::{Path, PathBuf};
 
@@ -47,20 +48,25 @@ impl DockerPlanBuilder {
         // peer/archive hostnames the commands bake in resolve directly.
         if let Some(archive_node) = ServiceConfig::get_archive_node(services) {
             let archive_port = archive_node.resolved_archive_port();
-            let pg_container = format!("postgres-{network_id}");
+            let pg = PgConfig::default();
+            let pg_container = docker_postgres::container_name(network_id);
             let svc_container = format!(
                 "{}-{network_id}",
                 archive::archive_service_unit_name(&archive_node.service_name)
             );
 
-            // No published ports: internal-only, reached via DNS.
+            // No published ports: internal-only, reached via DNS — which is also
+            // why readiness is an exec rather than a connect from the host.
             nodes.push(
-                DockerNodeSpec::new(pg_container.clone(), docker_archive::PG_IMAGE)
-                    .env(docker_archive::postgres_container_env(&PgConfig::default()))
+                DockerNodeSpec::new(pg_container.clone(), docker_postgres::IMAGE)
+                    .env(docker_postgres::container_env(&pg))
                     .mount_ro(
-                        self.network_path.join("postgres-initdb").to_str().unwrap(),
+                        docker_postgres::initdb_dir(&self.network_path)
+                            .to_str()
+                            .unwrap(),
                         "/docker-entrypoint-initdb.d",
-                    ),
+                    )
+                    .wait_for(Readiness::Command(docker_postgres::readiness_command(&pg))),
             );
 
             let svc_image = archive_node.archive_docker_image.clone().ok_or_else(|| {
@@ -73,7 +79,11 @@ impl DockerPlanBuilder {
                 )
             })?;
             let mut svc_cmd = vec!["mina-archive".to_string()];
-            svc_cmd.extend(archive::archive_service_args(&pg_container, archive_port));
+            svc_cmd.extend(archive::archive_service_args(
+                &pg,
+                &pg_container,
+                archive_port,
+            ));
             nodes.push(
                 DockerNodeSpec::new(svc_container, svc_image)
                     .cmd(svc_cmd)
