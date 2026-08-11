@@ -1,3 +1,11 @@
+-- Converts a daemon .deb built by MinaArtifactBullseye into its hardfork
+-- variant, so it can only run in a stage that also runs the packaging jobs.
+--
+-- Hence the Packaging tag rather than Fast. Tagged Fast, the nightly's FastOnly
+-- stage selected it while packaging (moved to its own tag in 2ee630be3e) did
+-- not run there, so every night it sat waiting_failed on a dependency that was
+-- never scheduled -- and took the tear-down step down with it.
+
 let S = ../../Lib/SelectFiles.dhall
 
 let Pipeline = ../../Pipeline/Dsl.dhall
@@ -29,7 +37,7 @@ in  Pipeline.build
         , path = "Test"
         , name = "HardforkPackageConversion"
         , tags =
-          [ PipelineTag.Type.Fast
+          [ PipelineTag.Type.Packaging
           , PipelineTag.Type.Test
           , PipelineTag.Type.Stable
           ]
