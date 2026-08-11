@@ -48,7 +48,8 @@ function usage() {
   if [[ -n "$1" ]]; then echo "ERROR: $1"; echo; fi
   echo "Usage: $0 [options]"
   echo
-  echo "  -p, --packages    Comma list of debian packages as name=version"
+  echo "  -p, --packages    Comma list of debian packages as name=version, or a bare"
+  echo "                    name to test whatever the channel currently offers"
   echo "  -i, --images      Comma list of docker images as name=version"
   echo "  -a, --automode    Automode metapackage as name=version. Installs it with no"
   echo "                    version pin and checks both runtimes, the genesis config"
@@ -123,6 +124,16 @@ function package_kind() {
     mina-daemon)              echo "daemon" ;;
     mina-*)                   echo "daemon" ;;
     *)                        echo "unknown" ;;
+  esac
+}
+
+# A spec is "name=version" or a bare "name". A bare name means "whatever the
+# channel offers right now", which is what a recurring schedule wants: it never
+# needs editing after a release, and it tests what a user would actually get.
+function spec_version() {
+  case "$1" in
+    *=*) echo "${1#*=}" ;;
+    *)   echo "any" ;;
   esac
 }
 
@@ -347,12 +358,20 @@ else
 fi
 apt-get update -qq
 
-echo "INSTALL: apt-get install ${PACKAGE}=${VERSION}"
+# "any" installs whatever the channel currently offers, which is exactly what a
+# user gets from "apt-get install <package>". A recurring job should use it, so
+# the schedule does not carry version numbers that go stale after each release.
 if [[ "$VERSION" == "any" ]]; then
+  echo "INSTALL: apt-get install ${PACKAGE} (channel candidate)"
   apt-get install -y "${PACKAGE}"
 else
+  echo "INSTALL: apt-get install ${PACKAGE}=${VERSION}"
   apt-get install -y --allow-downgrades "${PACKAGE}=${VERSION}"
 fi
+
+# Record what was really installed, so a run that pinned nothing still says
+# exactly which version it tested.
+echo "INSTALLED-VERSION: $(dpkg-query -W -f='${Version}' "$PACKAGE" 2>/dev/null || echo unknown)"
 echo "INSTALL-OK"
 SETUP_EOF
 chmod +x "$SETUP"
@@ -398,12 +417,13 @@ function run_deb_case() {
       "$img" \
       bash -c "bash /mina/setup.sh '$pkg' '$ver' '$REPO' '$cn' '$CHANNEL' '$SIGNED' && bash /mina/check.sh '$kind' deb '$pkg' no" \
       > "$log" 2>&1; then
-    local warn
+    local warn installed
     warn=$(grep -c "CHECK-WARN" "$log" || true)
+    installed=$(grep -m1 'INSTALLED-VERSION:' "$log" | cut -d' ' -f2- || true)
     if [[ "$warn" -gt 0 ]]; then
-      record "WARN" "debian" "$cn" "$pkg" "$(grep -m1 'CHECK-WARN' "$log" | cut -c13-)"
+      record "WARN" "debian" "$cn" "$pkg" "${installed:-?} :: $(grep -m1 'CHECK-WARN' "$log" | cut -c13-)"
     else
-      record "PASS" "debian" "$cn" "$pkg" "kind=$kind"
+      record "PASS" "debian" "$cn" "$pkg" "${installed:-?} (kind=$kind)"
     fi
   else
     local reason
@@ -490,7 +510,7 @@ if [[ -n "$PACKAGES" ]]; then
   IFS=',' read -ra PKG_LIST <<< "$PACKAGES"
   for cn in "${CN_LIST[@]}"; do
     for spec in "${PKG_LIST[@]}"; do
-      printf 'run_deb_case %s %s %s\n' "$cn" "${spec%%=*}" "${spec#*=}" >> "$WORK"
+      printf 'run_deb_case %s %s %s\n' "$cn" "${spec%%=*}" "$(spec_version "$spec")" >> "$WORK"
     done
   done
 fi
@@ -499,6 +519,9 @@ if [[ -n "$IMAGES" ]]; then
   IFS=',' read -ra IMG_LIST <<< "$IMAGES"
   for cn in "${CN_LIST[@]}"; do
     for spec in "${IMG_LIST[@]}"; do
+      if [[ "$spec" != *=* ]]; then
+        usage "Docker image '$spec' needs an explicit version; a tag has no channel to resolve against."
+      fi
       printf 'run_docker_case %s %s %s\n' "$cn" "${spec%%=*}" "${spec#*=}" >> "$WORK"
     done
   done
@@ -506,7 +529,7 @@ fi
 
 if [[ -n "$AUTOMODE" ]]; then
   for cn in "${CN_LIST[@]}"; do
-    printf 'run_automode_case %s %s %s\n' "$cn" "${AUTOMODE%%=*}" "${AUTOMODE#*=}" >> "$WORK"
+    printf 'run_automode_case %s %s %s\n' "$cn" "${AUTOMODE%%=*}" "$(spec_version "$AUTOMODE")" >> "$WORK"
   done
 fi
 
