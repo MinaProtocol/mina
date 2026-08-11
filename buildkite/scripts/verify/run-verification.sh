@@ -29,7 +29,8 @@
 #
 # VERIFY_MODE=artifacts:
 #   DEBIAN_CHANNEL   single component to test     (default: alpha)
-#   PACKAGES         comma list of name=version   (optional)
+#   PACKAGES         comma list of name=version, or bare names to test whatever
+#                    the channel currently offers (optional)
 #   IMAGES           comma list of name=version   (optional)
 #   AUTOMODE         name=version                 (optional)
 #   DOCKER_SUFFIX    tag suffix after codename    (default: -devnet)
@@ -79,11 +80,19 @@ case "$VERIFY_MODE" in
     OUTPUT_DIR="${OUTPUT_DIR:-${PWD}/verification-results}"
 
     if [[ -z "${PACKAGES:-}" && -z "${IMAGES:-}" && -z "${AUTOMODE:-}" ]]; then
-      echo "ERROR: artifacts mode needs at least one of PACKAGES, IMAGES or AUTOMODE."
-      echo "       Set them on the scheduled build, for example:"
-      echo "         PACKAGES=mina-devnet=3.5.0-devnet-stop-slot-98e7835"
-      echo "         IMAGES=mina-daemon=3.5.0-devnet-stop-slot-98e7835"
-      echo "         AUTOMODE=mina-devnet-automode=4.0.0-devnet-ca2ccb1"
+      echo "ERROR: artifacts mode needs at least one of PACKAGES, IMAGES or AUTOMODE." >&2
+      echo >&2
+      echo "For a recurring schedule prefer bare package names, so the schedule never" >&2
+      echo "carries a version that goes stale after a release:" >&2
+      echo "  PACKAGES=mina-devnet,mina-archive-devnet,mina-rosetta-devnet,mina-logproc" >&2
+      echo >&2
+      echo "Pin a version only when testing one specific release:" >&2
+      echo "  PACKAGES=mina-devnet=3.5.0-devnet-stop-slot-98e7835" >&2
+      echo "  AUTOMODE=mina-devnet-automode=4.0.0-devnet-ca2ccb1" >&2
+      echo >&2
+      echo "Docker images always need an explicit version, because a tag has no" >&2
+      echo "channel to resolve against:" >&2
+      echo "  IMAGES=mina-daemon=3.5.0-devnet-stop-slot-98e7835" >&2
       exit 1
     fi
 
