@@ -34,6 +34,10 @@ describe: ## Show the deployed function
 		--project $(PROJECT) --region $(REGION) \
 		--format='table(name.basename(), status, runtime, entryPoint, updateTime)'
 
+.PHONY: test
+test: ## Run the unit tests (no dependencies needed)
+	@node $(SOURCE_DIR)test/docker-filters.test.js
+
 .PHONY: check
 check: ## Compare the deployed function with this directory
 	@$(SOURCE_DIR)check-deployed-parity.sh \
@@ -64,7 +68,7 @@ check-clean:
 	fi
 
 .PHONY: deploy
-deploy: check-env check-clean ## Deploy this directory to Google Cloud
+deploy: test check-env check-clean ## Deploy this directory to Google Cloud
 	@echo "Deploying $(FUNCTION) to $(PROJECT)/$(REGION) with runtime $(RUNTIME)"
 	@echo "From commit: $$(git -C $(SOURCE_DIR) rev-parse --short HEAD)"
 	cd $(SOURCE_DIR) && gcloud functions deploy $(FUNCTION) \

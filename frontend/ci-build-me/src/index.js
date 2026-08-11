@@ -75,35 +75,10 @@ const parseParams = (comment) => {
   return params;
 };
 
-const buildEnvFromParams = ({ arch, profile, codename }) => {
-  var filter = "DockerBuild";
+const {
+  buildEnvFromParams,
+} = require("./docker-filters.js");
 
-  // Only fall back to the unfiltered DockerBuild when the caller gave nothing.
-  // A caller that gives some of the keys keeps them: "arch=amd64" alone builds
-  // the filter DockerBuildAmd64, which is a real filter.
-  if (!arch && !profile && !codename) {
-    return { BUILDKITE_PIPELINE_FILTER: filter };
-  }
-
-  const profiles = ["devnet", "lightnet", "mainnet"];
-  const arches = ["amd64", "arm64"];
-  const codenames = ["jammy", "noble", "bullseye", "focal", "bookworm"];
-
-
-  if (arches.includes(arch)) {
-    filter += arch.charAt(0).toUpperCase() + arch.slice(1); // Amd64 / Arm64
-  }
-
-  if (profiles.includes(profile)) {
-    filter += profile.charAt(0).toUpperCase() + profile.slice(1); // Devnet / Lightnet / Mainnet
-  }
-
-  if (codenames.includes(codename)) {
-    filter += codename.charAt(0).toUpperCase() + codename.slice(1); // Jammy / Noble / Bullseye / Focal / Bookworm
-  }
-
-    return { BUILDKITE_PIPELINE_FILTER: filter, BUILDKITE_PIPELINE_FILTER_MODE: "All" };
-};
 // -------------------
 
 const handler = async (event, req) => {
@@ -348,7 +323,13 @@ const handler = async (event, req) => {
       const prData = await getRequest(req.body.issue.pull_request.url);
 
       const params = parseParams(req.body.comment.body);
-      const env = buildEnvFromParams(params);
+      const result = buildEnvFromParams(params);
+
+      if (result.error) {
+        return [result.error, result.error];
+      }
+
+      const env = result.env;
 
       const buildkite = await runBuild(
         {
