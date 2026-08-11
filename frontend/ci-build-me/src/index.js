@@ -78,7 +78,10 @@ const parseParams = (comment) => {
 const buildEnvFromParams = ({ arch, profile, codename }) => {
   var filter = "DockerBuild";
 
-  if (!arch || !profile || !codename ) {
+  // Only fall back to the unfiltered DockerBuild when the caller gave nothing.
+  // A caller that gives some of the keys keeps them: "arch=amd64" alone builds
+  // the filter DockerBuildAmd64, which is a real filter.
+  if (!arch && !profile && !codename) {
     return { BUILDKITE_PIPELINE_FILTER: filter };
   }
 
@@ -213,6 +216,42 @@ const handler = async (event, req) => {
         },
         "mina-end-to-end-nightlies",
         {}
+      );
+      return [buildkite];
+    } else {
+      return [
+        "comment author is not (publically) a member of the core team",
+        "comment author is not (publically) a member of the core team",
+      ];
+    }
+  }
+
+  // Mina CI Single Test Build section
+  //
+  // Runs one generated buildkite job and the jobs it depends on. The job name
+  // is the last word of the comment, and it must be the exact name of a job in
+  // buildkite/src/gen (the match is on the whole name, not a part of it).
+  //
+  //   !ci-single-me HardForkTestMixed
+  else if (
+    req.body.action == "created" &&
+    req.body.issue.pull_request &&
+    req.body.issue.pull_request.url &&
+    req.body.comment.body.startsWith("!ci-single-me")
+  ) {
+    const orgData = await getRequest(req.body.sender.organizations_url);
+    if (orgData.data.filter((org) => org.login == "MinaProtocol").length > 0) {
+      const prData = await getRequest(req.body.issue.pull_request.url);
+
+      const jobName = req.body.comment.body.trim().split(/\s+/).pop(); // get JobName from "!ci-single-me JobName"
+
+      const buildkite = await runBuild(
+        {
+          sender: req.body.sender,
+          pull_request: prData.data,
+        },
+        "mina-single-job",
+        { JOB_NAME: jobName }
       );
       return [buildkite];
     } else {
