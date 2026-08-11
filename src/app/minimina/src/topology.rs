@@ -173,7 +173,23 @@ impl TopologyInfo {
 impl Topology {
     pub fn new(path: &Path) -> serde_json::Result<Self> {
         let contents = std::fs::read_to_string(path).unwrap();
-        serde_json::from_str(&contents)
+        let topology: Topology = serde_json::from_str(&contents)?;
+        topology.validate()?;
+        Ok(topology)
+    }
+
+    /// Reject topologies the rest of minimina cannot build a network from, at
+    /// the point the file is read — so the complaint names the topology file
+    /// instead of surfacing later as a panic or a half-built plan.
+    fn validate(&self) -> serde_json::Result<()> {
+        use serde::de::Error;
+        let archives = self.archive_nodes().len();
+        if archives > 1 {
+            return Err(serde_json::Error::custom(format!(
+                "at most one archive node is supported, found {archives}"
+            )));
+        }
+        Ok(())
     }
 
     pub fn services(&self, peer_list_file: &Path) -> Vec<ServiceConfig> {
@@ -226,7 +242,6 @@ impl Topology {
             .collect()
     }
 
-    #[allow(dead_code)]
     fn archive_nodes(&self) -> Vec<ArchiveTopologyInfo> {
         self.topology
             .values()
@@ -586,6 +601,38 @@ mod tests {
         assert_eq!(num_bps, 4);
         assert_eq!(num_seeds, 2);
         assert_eq!(num_scs, 1);
+    }
+
+    /// A second archive node is refused where the file is read. Everything
+    /// downstream assumes one archive node — one postgres cluster, one
+    /// archive-service, one `-archive-address` — so this is the only place that
+    /// can complain while it can still point at the topology.
+    #[test]
+    fn second_archive_node_is_rejected() {
+        let path = PathBuf::from("./tests/data/large_network/topology.json");
+        let contents = std::fs::read_to_string(&path).unwrap();
+        let mut json: serde_json::Value = serde_json::from_str(&contents).unwrap();
+
+        let (name, archive) = json
+            .as_object()
+            .unwrap()
+            .iter()
+            .find(|(_, v)| v["role"] == "Archive_node")
+            .map(|(k, v)| (k.clone(), v.clone()))
+            .expect("fixture should declare an archive node");
+        json.as_object_mut()
+            .unwrap()
+            .insert(format!("{name}-second"), archive);
+
+        let dir = tempdir::TempDir::new("two-archives").unwrap();
+        let two_archives = dir.path().join("topology.json");
+        std::fs::write(&two_archives, serde_json::to_string(&json).unwrap()).unwrap();
+
+        let err = Topology::new(&two_archives).expect_err("two archive nodes must be rejected");
+        assert!(
+            err.to_string().contains("at most one archive node"),
+            "unhelpful error: {err}"
+        );
     }
 
     #[test]

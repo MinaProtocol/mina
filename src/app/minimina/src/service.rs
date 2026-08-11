@@ -348,18 +348,14 @@ impl ServiceConfig {
             .collect()
     }
 
+    /// The network's archive node, if it has one. A second archive node is
+    /// rejected when the topology is read (`Topology::validate`), so there is
+    /// nothing to check — and nothing to panic about — by the time services
+    /// exist.
     pub fn get_archive_node(services: &[Self]) -> Option<&Self> {
-        let mut archive_nodes = services
+        services
             .iter()
-            .filter(|s| s.service_type == ServiceType::ArchiveNode);
-
-        let first_node = archive_nodes.next();
-
-        if archive_nodes.next().is_some() {
-            panic!("There can only be one archive node in topology");
-        }
-
-        first_node
+            .find(|s| s.service_type == ServiceType::ArchiveNode)
     }
 
     pub fn get_uptime_service_backend(services: &[Self]) -> Option<&Self> {
