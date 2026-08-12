@@ -552,8 +552,8 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
   and simplified_node_stats =
     flag "--simplified-node-stats"
       ~aliases:[ "simplified-node-stats" ]
-      (optional_with_default true bool)
-      ~doc:"whether to report simplified node stats (default: true)"
+      (optional_with_default false bool)
+      ~doc:"whether to report simplified node stats (default: false)"
   and contact_info =
     flag "--contact-info" ~aliases:[ "contact-info" ] (optional string)
       ~doc:
