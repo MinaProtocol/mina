@@ -56,7 +56,7 @@ let lowerName =
             , DaemonAutoHardfork =
                 \(args : { network : Network.Type }) -> "daemon_auto_hardfork"
             , Archive = \(args : { network : Network.Type }) -> "archive"
-            , RosettaGeneric = "rosetta_apps_only"
+            , RosettaGeneric = "rosetta_profile"
             , Rosetta = \(args : { network : Network.Type }) -> "rosetta_config"
             , TxTools = "tx_tools"
             , DelegationVerifier = "delegation_verifier"
