@@ -50,10 +50,7 @@ let modeArtifactPaths =
           \(mode : Mode)
       ->  merge
             { Infra = [] : List SelectFiles.Type
-            , Artifacts =
-              [ SelectFiles.contains "verification-results/results.tsv"
-              , SelectFiles.contains "verification-results/logs/*.log"
-              ]
+            , Artifacts = [ SelectFiles.contains "verification-results/**/*" ]
             }
             mode
 
