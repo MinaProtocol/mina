@@ -2564,6 +2564,7 @@ let advanced ~itn_features =
     ; ("chain-id-inputs", chain_id_inputs)
     ; ("runtime-config", runtime_config)
     ; ("vrf", Cli_lib.Commands.Vrf.command_group)
+    ; ("vrf-evaluation-stream", Vrf_evaluation_stream.command)
     ; ("thread-graph", thread_graph)
     ; ("print-signature-kind", signature_kind)
     ; ("generate-hardfork-config", generate_hardfork_config)
