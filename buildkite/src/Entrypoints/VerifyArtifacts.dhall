@@ -18,6 +18,12 @@
 -- scheduled build can change the package list, the channel or the codenames
 -- without a change to this file. See buildkite/scripts/verify/run-verification.sh
 -- for the full list of variables.
+--
+-- The artifact paths hold one pattern only. SelectFiles compiles a list into an
+-- egrep alternation, "a|b", which is what dirtyWhen wants but not what the agent
+-- wants: it reads the whole alternation as one path and matches no file, so the
+-- per container logs are lost exactly when a failure needs them. The single glob
+-- takes the results file and every log below it.
 
 let Cmd = ../Lib/Cmds.dhall
 

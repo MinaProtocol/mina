@@ -127,6 +127,43 @@ function package_kind() {
   esac
 }
 
+# Runtime libraries a package needs but does not declare in its control file.
+#
+# The rosetta deb is built with the shared dependencies alone, so its Depends
+# names none of jemalloc, libpq or libffi, although both binaries it ships link
+# against all three:
+#
+#   ldd mina-rosetta -> libjemalloc.so.2, libpq.so.5, libffi.so.7
+#
+# In a clean container the binary therefore stops at the first of them:
+#
+#   error while loading shared libraries: libjemalloc.so.2
+#
+# That is a known packaging defect and it is not fixed yet. Installing the
+# libraries before the package keeps this test on the question it can answer,
+# which is whether the published binary itself runs. The docker image ships them
+# already, which is why the same check passes there.
+#
+# libffi comes in under two names, as in the daemon dependencies in
+# scripts/debian/builder-helpers.sh: libffi7 on bullseye and focal, libffi8 on
+# the newer codenames. It is usually pulled in anyway by wget or gnupg, but that
+# is a side effect of another package and not something to depend on.
+#
+# Remove the rosetta entry when the deb declares these libraries itself.
+function extra_deps() {
+  local kind="$1" codename="$2" ffi
+
+  case "$codename" in
+    bullseye|focal) ffi=libffi7 ;;
+    *)              ffi=libffi8 ;;
+  esac
+
+  case "$kind" in
+    rosetta) echo "libjemalloc2 libpq5 $ffi" ;;
+    *)       echo "" ;;
+  esac
+}
+
 # A spec is "name=version" or a bare "name". A bare name means "whatever the
 # channel offers right now", which is what a recurring schedule wants: it never
 # needs editing after a release, and it tests what a user would actually get.
@@ -135,24 +172,6 @@ function spec_version() {
     *=*) echo "${1#*=}" ;;
     *)   echo "any" ;;
   esac
-}
-
-# apt prints the useful line between its header and its own generic verdict:
-#
-#   The following packages have unmet dependencies:
-#    mina-devnet-automode : Depends: mina-devnet-prefork-mesa (= X) but Y is to be installed
-#   E: Unable to correct problems, you have held broken packages.
-#
-# Report the middle line. The trailing "E:" line names no package, and reporting
-# that instead is what made a failed scheduled run impossible to diagnose once
-# the container was gone.
-function dependency_reason() {
-  local log="$1" line
-  line=$(grep -A8 "unmet dependencies" "$log" | grep -m1 "Depends:" | sed 's/^ *//')
-  if [[ -z "$line" ]]; then
-    line=$(grep -m1 "^E: " "$log" | sed 's/^ *//')
-  fi
-  echo "${line:-see the job log}"
 }
 
 function record() {
@@ -359,11 +378,16 @@ chmod +x "$CHECKER"
 SETUP="$OUTDIR/container-setup.sh"
 cat > "$SETUP" <<'SETUP_EOF'
 #!/usr/bin/env bash
-# Args: <package> <version> <repo> <codename> <channel> <signed>
+# Args: <package> <version> <repo> <codename> <channel> <signed> [extra deps]
+#
+# extra_deps is a space separated list of distribution packages to install first.
+# It carries the runtime libraries that a mina package needs but does not declare.
+# See extra_deps() in the calling script for why each one is there.
 set -euo pipefail
 export DEBIAN_FRONTEND=noninteractive TZ=Etc/UTC
 
 PACKAGE="$1"; VERSION="$2"; REPO="$3"; CODENAME="$4"; CHANNEL="$5"; SIGNED="$6"
+EXTRA_DEPS="${7:-}"
 
 apt-get update -qq
 apt-get install -y -qq ca-certificates wget gnupg > /dev/null
@@ -375,6 +399,14 @@ else
   echo "deb [trusted=yes] https://${REPO} ${CODENAME} ${CHANNEL}" > /etc/apt/sources.list.d/mina.list
 fi
 apt-get update -qq
+
+# Undeclared runtime libraries, installed before the package so that the check
+# reports on the mina binary and not on a dependency the control file omits.
+if [[ -n "$EXTRA_DEPS" ]]; then
+  echo "PREREQ: apt-get install ${EXTRA_DEPS}"
+  # shellcheck disable=SC2086
+  apt-get install -y -qq $EXTRA_DEPS > /dev/null
+fi
 
 # "any" installs whatever the channel currently offers, which is exactly what a
 # user gets from "apt-get install <package>". A recurring job should use it, so
@@ -420,10 +452,16 @@ fi
 
 function run_deb_case() {
   local cn="$1" pkg="$2" ver="$3"
-  local img kind log
+  local img kind log extra note
   img=$(base_image "$cn")
   kind=$(package_kind "$pkg")
+  extra=$(extra_deps "$kind" "$cn")
   log="$OUTDIR/logs/deb__${cn}__${pkg}.log"
+
+  # Say in the report which libraries the test had to add, so a pass here is not
+  # read as "the package declares everything it needs".
+  note="kind=$kind"
+  if [[ -n "$extra" ]]; then note="$note, prereq=${extra// /+}"; fi
 
   if [[ -z "$img" ]]; then
     record "SKIP" "debian" "$cn" "$pkg" "unknown codename"
@@ -433,7 +471,7 @@ function run_deb_case() {
   if docker run --rm --platform "linux/$ARCH" \
       -v "$SETUP:/mina/setup.sh:ro" -v "$CHECKER:/mina/check.sh:ro" \
       "$img" \
-      bash -c "bash /mina/setup.sh '$pkg' '$ver' '$REPO' '$cn' '$CHANNEL' '$SIGNED' && bash /mina/check.sh '$kind' deb '$pkg' no" \
+      bash -c "bash /mina/setup.sh '$pkg' '$ver' '$REPO' '$cn' '$CHANNEL' '$SIGNED' '$extra' && bash /mina/check.sh '$kind' deb '$pkg' no" \
       > "$log" 2>&1; then
     local warn installed
     warn=$(grep -c "CHECK-WARN" "$log" || true)
@@ -441,12 +479,12 @@ function run_deb_case() {
     if [[ "$warn" -gt 0 ]]; then
       record "WARN" "debian" "$cn" "$pkg" "${installed:-?} :: $(grep -m1 'CHECK-WARN' "$log" | cut -c13-)"
     else
-      record "PASS" "debian" "$cn" "$pkg" "${installed:-?} (kind=$kind)"
+      record "PASS" "debian" "$cn" "$pkg" "${installed:-?} ($note)"
     fi
   else
     local reason
     if grep -q "unmet dependencies" "$log"; then
-      reason=$(dependency_reason "$log")
+      reason=$(grep -A2 "unmet dependencies" "$log" | tail -1 | sed 's/^ *//')
       record "FAIL" "debian" "$cn" "$pkg" "install: $reason"
     elif grep -q "CHECK-FAIL" "$log"; then
       record "FAIL" "debian" "$cn" "$pkg" "$(grep -m1 'CHECK-FAIL' "$log" | cut -c13-)"
@@ -505,14 +543,14 @@ function run_automode_case() {
     fi
   else
     if grep -q "unmet dependencies" "$log"; then
-      record "FAIL" "automode" "$cn" "$pkg" "unpinned install failed: $(dependency_reason "$log")"
+      record "FAIL" "automode" "$cn" "$pkg" "unpinned install failed: $(grep -A2 'unmet dependencies' "$log" | tail -1 | sed 's/^ *//')"
     else
       record "FAIL" "automode" "$cn" "$pkg" "$(grep -m1 'CHECK-FAIL' "$log" | cut -c13- || echo "see $(basename "$log")")"
     fi
   fi
 }
 
-export -f run_deb_case run_docker_case run_automode_case base_image package_kind record
+export -f run_deb_case run_docker_case run_automode_case base_image package_kind extra_deps record
 export OUTDIR RESULTS SETUP CHECKER REPO CHANNEL ARCH SIGNED DOCKER_REPO DOCKER_SUFFIX
 
 # ---------------------------------------------------------------------------
