@@ -1367,6 +1367,13 @@ let shorten_commit_id commit_id =
     (* Take the first 8 characters of the commit ID *)
     String.sub ~pos:0 ~len:min_commit_id_length commit_id
 
+(* Collector the node status service reports to when the operator does not give
+   [--node-status-url]. Reporting is on by default so that the network upgrade
+   can be followed across the stop slot; [--node-status-url none] switches it
+   off. *)
+let default_node_status_url =
+  "https://devnet-status.gcp.o1test.net/submit/stats"
+
 let start t =
   let commit_id_short = shorten_commit_id t.commit_id in
   let set_next_producer_timing timing consensus_state =
@@ -1458,8 +1465,13 @@ let start t =
         t.config.precomputed_values.genesis_constants.zkapp_cmd_limit_hardcap ) ;
   perform_compaction t.config.compile_config.compaction_interval t ;
   let () =
-    match t.config.node_status_url with
-    | Some node_status_url ->
+    match
+      Option.value ~default:default_node_status_url t.config.node_status_url
+    with
+    | "" | "none" ->
+        (* The operator opted out of node status reporting. *)
+        ()
+    | node_status_url ->
         let block_producer_public_key_base58 =
           Option.map ~f:(fun (_, pk) ->
               Public_key.Compressed.to_base58_check pk )
@@ -1488,8 +1500,6 @@ let start t =
                  t.config.precomputed_values.consensus_constants
                    .slot_duration_ms )
             ~block_producer_public_key_base58
-    | None ->
-        ()
   in
   let built_with_commit_sha =
     if t.config.uptime_send_node_commit then Some commit_id_short else None
