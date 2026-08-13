@@ -274,9 +274,59 @@ let devnet_expected : Expected.t =
    run against the config that actually ships. *)
 let devnet_config_path = "devnet.json"
 
+(* ------------------------------------------------------------------ *)
+(* mainnet                                                            *)
+(* ------------------------------------------------------------------ *)
+
+(* Mainnet's compiled constants are the ones devnet.ml includes, so the same
+   values apply. They are restated rather than shared with [devnet] above to
+   keep each network's expectations independently readable: if the two ever
+   diverge, only the affected network's block changes. *)
+let mainnet : Network_constants.t =
+  let compiled = Genesis_constants.Compiled.genesis_constants in
+  { constraint_constants =
+      { Genesis_constants.Compiled.constraint_constants with
+        block_window_duration_ms = 180_000
+      }
+  ; genesis_constants =
+      { compiled with
+        protocol =
+          { compiled.protocol with
+            k = 290
+          ; slots_per_epoch = 7140
+          ; slots_per_sub_window = 7
+          ; grace_period_slots = 2160
+          ; delta = 0
+          }
+      }
+  }
+
+(* Mainnet's genesis is 2024-06-05T00:00:00Z, two months later than devnet's,
+   so the same wall-clock schedule sits at different slot numbers. Reusing
+   devnet's 413540/413640 here would place the stop almost two months late. *)
+let mainnet_expected : Expected.t =
+  { slot_tx_end = 393800
+  ; slot_chain_end = 393900
+  ; hard_fork_genesis_slot_delta = 60
+  ; hard_fork_genesis_slot = 393960
+  ; tx_end_time = "2026-09-03T10:00:00.000000Z"
+  ; chain_end_time = "2026-09-03T15:00:00.000000Z"
+  ; hard_fork_genesis_time = "2026-09-03T18:00:00.000000Z"
+  ; empty_block_hours = 5
+  ; downtime_hours = 3
+  ; no_transaction_hours = 8
+  ; tx_end_epoch = 55
+  ; tx_end_slot_in_epoch = 1100
+  }
+
+let mainnet_config_path = "mainnet.json"
+
 let () =
   Alcotest.run "Hard fork stop slot schedule"
     [ ( "devnet"
       , suite ~network:devnet ~expected:devnet_expected
           ~config_path:devnet_config_path )
+    ; ( "mainnet"
+      , suite ~network:mainnet ~expected:mainnet_expected
+          ~config_path:mainnet_config_path )
     ]
