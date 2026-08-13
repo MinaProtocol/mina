@@ -137,6 +137,24 @@ function spec_version() {
   esac
 }
 
+# apt prints the useful line between its header and its own generic verdict:
+#
+#   The following packages have unmet dependencies:
+#    mina-devnet-automode : Depends: mina-devnet-prefork-mesa (= X) but Y is to be installed
+#   E: Unable to correct problems, you have held broken packages.
+#
+# Report the middle line. The trailing "E:" line names no package, and reporting
+# that instead is what made a failed scheduled run impossible to diagnose once
+# the container was gone.
+function dependency_reason() {
+  local log="$1" line
+  line=$(grep -A8 "unmet dependencies" "$log" | grep -m1 "Depends:" | sed 's/^ *//')
+  if [[ -z "$line" ]]; then
+    line=$(grep -m1 "^E: " "$log" | sed 's/^ *//')
+  fi
+  echo "${line:-see the job log}"
+}
+
 function record() {
   # status <tab> area <tab> codename <tab> target <tab> detail
   printf '%s\t%s\t%s\t%s\t%s\n' "$1" "$2" "$3" "$4" "$5" >> "$RESULTS"
@@ -428,7 +446,7 @@ function run_deb_case() {
   else
     local reason
     if grep -q "unmet dependencies" "$log"; then
-      reason=$(grep -A2 "unmet dependencies" "$log" | tail -1 | sed 's/^ *//')
+      reason=$(dependency_reason "$log")
       record "FAIL" "debian" "$cn" "$pkg" "install: $reason"
     elif grep -q "CHECK-FAIL" "$log"; then
       record "FAIL" "debian" "$cn" "$pkg" "$(grep -m1 'CHECK-FAIL' "$log" | cut -c13-)"
@@ -487,7 +505,7 @@ function run_automode_case() {
     fi
   else
     if grep -q "unmet dependencies" "$log"; then
-      record "FAIL" "automode" "$cn" "$pkg" "unpinned install failed: $(grep -A2 'unmet dependencies' "$log" | tail -1 | sed 's/^ *//')"
+      record "FAIL" "automode" "$cn" "$pkg" "unpinned install failed: $(dependency_reason "$log")"
     else
       record "FAIL" "automode" "$cn" "$pkg" "$(grep -m1 'CHECK-FAIL' "$log" | cut -c13- || echo "see $(basename "$log")")"
     fi
