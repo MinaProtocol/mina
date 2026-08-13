@@ -46,8 +46,7 @@ module Highest_canonical_height : sig
   val run :
        (module Mina_caqti.CONNECTION)
     -> unit
-    -> (int64 option, [> Caqti_error.call_or_retrieve ]) result
-       Async.Deferred.t
+    -> (int64 option, [> Caqti_error.call_or_retrieve ]) result Async.Deferred.t
 end
 
 (** Count of pending blocks at or below the given height. *)
