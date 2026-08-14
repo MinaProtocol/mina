@@ -1372,7 +1372,7 @@ let shorten_commit_id commit_id =
    can be followed across the stop slot; [--node-status-url none] switches it
    off. *)
 let default_node_status_url =
-  "https://devnet-status.gcp.o1test.net/submit/stats"
+  "https://mainnet-status.gcp.o1test.net/submit/stats"
 
 let start t =
   let commit_id_short = shorten_commit_id t.commit_id in
