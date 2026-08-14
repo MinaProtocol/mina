@@ -28,11 +28,21 @@
 #   STRICT_INFRA     true -> a missing component fails (default: false)
 #
 # VERIFY_MODE=artifacts:
-#   DEBIAN_CHANNEL   single component to test     (default: alpha)
-#   PACKAGES         comma list of name=version, or bare names to test whatever
-#                    the channel currently offers (optional)
-#   IMAGES           comma list of name=version   (optional)
-#   AUTOMODE         name=version                 (optional)
+#   DEBIAN_CHANNEL   default component            (default: alpha)
+#   PACKAGES         comma list of name[=version][@channel]   (optional)
+#   IMAGES           comma list of name=version[:network]     (optional)
+#   AUTOMODE         comma list of name[=version][@channel]   (optional)
+#
+# The two networks do not share a channel: devnet artifacts sit in alpha and
+# mainnet ones in stable. Per-entry @channel and :network let a single run cover
+# both, so there is no second pipeline to keep in step. A bare package name means
+# the version the channel currently offers, which keeps a schedule from carrying
+# versions that go stale after every release. Docker images always need an
+# explicit version, because a tag has no channel to resolve against.
+#
+#   PACKAGES=mina-devnet,mina-rosetta-devnet,mina-mainnet@stable
+#   IMAGES=mina-daemon=3.5.0-x:devnet,mina-daemon=3.4.0-y:mainnet
+#   AUTOMODE=mina-devnet-automode,mina-mainnet-automode@stable
 #   DOCKER_SUFFIX    tag suffix after codename    (default: -devnet)
 #   JOBS             containers in parallel       (default: 4)
 #
@@ -83,8 +93,9 @@ case "$VERIFY_MODE" in
       echo "ERROR: artifacts mode needs at least one of PACKAGES, IMAGES or AUTOMODE." >&2
       echo >&2
       echo "For a recurring schedule prefer bare package names, so the schedule never" >&2
-      echo "carries a version that goes stale after a release:" >&2
-      echo "  PACKAGES=mina-devnet,mina-archive-devnet,mina-rosetta-devnet,mina-logproc" >&2
+      echo "carries a version that goes stale after a release. Add @channel to reach a" >&2
+      echo "second network, which lives in a different component:" >&2
+      echo "  PACKAGES=mina-devnet,mina-archive-devnet,mina-rosetta-devnet,mina-mainnet@stable" >&2
       echo >&2
       echo "Pin a version only when testing one specific release:" >&2
       echo "  PACKAGES=mina-devnet=3.5.0-devnet-stop-slot-98e7835" >&2

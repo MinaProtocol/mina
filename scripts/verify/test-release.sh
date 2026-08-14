@@ -48,11 +48,16 @@ function usage() {
   if [[ -n "$1" ]]; then echo "ERROR: $1"; echo; fi
   echo "Usage: $0 [options]"
   echo
-  echo "  -p, --packages    Comma list of debian packages as name=version, or a bare"
-  echo "                    name to test whatever the channel currently offers"
-  echo "  -i, --images      Comma list of docker images as name=version"
-  echo "  -a, --automode    Automode metapackage as name=version. Installs it with no"
-  echo "                    version pin and checks both runtimes, the genesis config"
+  echo "  -p, --packages    Comma list of debian packages as name[=version][@channel]."
+  echo "                    A bare name tests whatever the channel currently offers;"
+  echo "                    @channel overrides --channel per entry, which is how one"
+  echo "                    run covers devnet (alpha) and mainnet (stable) together."
+  echo "  -i, --images      Comma list of docker images as name=version[:network]."
+  echo "                    The network is the last segment of the tag and defaults"
+  echo "                    to --suffix. A version is always required."
+  echo "  -a, --automode    Comma list of automode metapackages, same syntax as"
+  echo "                    --packages. Installs each with no version pin and checks"
+  echo "                    both runtimes, the genesis config"
   echo "                    and the dispatcher. This is the operator-facing test."
   echo "  -m, --codenames   Comma list of codenames (default: $CODENAMES)"
   echo "  -c, --channel     Debian channel/component (default: $CHANNEL)"
@@ -71,9 +76,9 @@ function usage() {
   echo
   echo "Examples:"
   echo "  $0 --list --channel alpha --codenames bullseye"
-  echo "  $0 --packages mina-devnet=3.5.0-devnet-stop-slot-98e7835 \\"
-  echo "     --images mina-daemon=3.5.0-devnet-stop-slot-98e7835 \\"
-  echo "     --automode mina-devnet-automode=4.0.0-devnet-ca2ccb1"
+  echo "  $0 --packages mina-devnet,mina-mainnet@stable \\"
+  echo "     --images mina-daemon=3.5.0-x:devnet,mina-daemon=3.4.0-y:mainnet \\"
+  echo "     --automode mina-devnet-automode,mina-mainnet-automode@stable"
   exit 1
 }
 
@@ -164,14 +169,71 @@ function extra_deps() {
   esac
 }
 
-# A spec is "name=version" or a bare "name". A bare name means "whatever the
-# channel offers right now", which is what a recurring schedule wants: it never
-# needs editing after a release, and it tests what a user would actually get.
+# A package spec is "name[=version][@channel]".
+#
+# A bare name means "whatever the channel offers right now", which is what a
+# recurring schedule wants: it never needs editing after a release, and it tests
+# what a user would actually get. The optional @channel matters because the two
+# networks do not live together -- devnet artifacts sit in alpha while mainnet
+# ones sit in stable -- so tracking both in one run needs a channel per entry.
+#
+#   mina-devnet                     -> current alpha version   (default channel)
+#   mina-mainnet@stable             -> current stable version
+#   mina-devnet=3.5.0-x             -> that exact version
+#   mina-mainnet=3.4.0-y@stable     -> that exact version from stable
+function spec_name() {
+  local s="${1%%@*}"
+  echo "${s%%=*}"
+}
+
 function spec_version() {
-  case "$1" in
-    *=*) echo "${1#*=}" ;;
+  local s="${1%%@*}"
+  case "$s" in
+    *=*) echo "${s#*=}" ;;
     *)   echo "any" ;;
   esac
+}
+
+function spec_channel() {
+  case "$1" in
+    *@*) echo "${1##*@}" ;;
+    *)   echo "$CHANNEL" ;;
+  esac
+}
+
+# An image spec is "name=version[:network]". The network is the last segment of
+# the docker tag, "<version>-<codename>-<network>", so it has to vary per entry
+# to cover devnet and mainnet in a single run. A version is always required: a
+# tag has no channel to resolve against.
+function image_version() {
+  local v="${1#*=}"
+  echo "${v%%:*}"
+}
+
+function image_network() {
+  local v="${1#*=}"
+  case "$v" in
+    *:*) echo "${v##*:}" ;;
+    *)   echo "${DOCKER_SUFFIX#-}" ;;
+  esac
+}
+
+# apt prints the useful line between its header and its own generic verdict:
+#
+#   The following packages have unmet dependencies:
+#    mina-devnet-automode : Depends: mina-devnet-prefork-mesa (= X) but Y is to be installed
+#   E: Unable to correct problems, you have held broken packages.
+#
+# Report the middle line. The trailing "E:" line names no package, and reporting
+# that instead is what made a failed scheduled run impossible to diagnose once
+# the container was gone.
+function dependency_reason() {
+  local log="$1" line
+  line=$(grep -A8 "unmet dependencies" "$log" | grep -m1 "Depends:" | sed 's/^ *//')
+  if [[ -z "$line" ]]; then
+    line=$(grep -m1 "^E: " "$log" | sed 's/^ *//')
+  fi
+  echo "${line:-see the job log}"
 }
 
 function record() {
@@ -451,12 +513,13 @@ fi
 # ---------------------------------------------------------------------------
 
 function run_deb_case() {
-  local cn="$1" pkg="$2" ver="$3"
-  local img kind log extra note
+  local cn="$1" pkg="$2" ver="$3" chan="$4"
+  local img kind log extra note target
   img=$(base_image "$cn")
   kind=$(package_kind "$pkg")
   extra=$(extra_deps "$kind" "$cn")
-  log="$OUTDIR/logs/deb__${cn}__${pkg}.log"
+  log="$OUTDIR/logs/deb__${cn}__${pkg}__${chan}.log"
+  target="${pkg}@${chan}"
 
   # Say in the report which libraries the test had to add, so a pass here is not
   # read as "the package declares everything it needs".
@@ -464,59 +527,60 @@ function run_deb_case() {
   if [[ -n "$extra" ]]; then note="$note, prereq=${extra// /+}"; fi
 
   if [[ -z "$img" ]]; then
-    record "SKIP" "debian" "$cn" "$pkg" "unknown codename"
+    record "SKIP" "debian" "$cn" "$target" "unknown codename"
     return 0
   fi
 
   if docker run --rm --platform "linux/$ARCH" \
       -v "$SETUP:/mina/setup.sh:ro" -v "$CHECKER:/mina/check.sh:ro" \
       "$img" \
-      bash -c "bash /mina/setup.sh '$pkg' '$ver' '$REPO' '$cn' '$CHANNEL' '$SIGNED' '$extra' && bash /mina/check.sh '$kind' deb '$pkg' no" \
+      bash -c "bash /mina/setup.sh '$pkg' '$ver' '$REPO' '$cn' '$chan' '$SIGNED' '$extra' && bash /mina/check.sh '$kind' deb '$pkg' no" \
       > "$log" 2>&1; then
     local warn installed
     warn=$(grep -c "CHECK-WARN" "$log" || true)
     installed=$(grep -m1 'INSTALLED-VERSION:' "$log" | cut -d' ' -f2- || true)
     if [[ "$warn" -gt 0 ]]; then
-      record "WARN" "debian" "$cn" "$pkg" "${installed:-?} :: $(grep -m1 'CHECK-WARN' "$log" | cut -c13-)"
+      record "WARN" "debian" "$cn" "$target" "${installed:-?} :: $(grep -m1 'CHECK-WARN' "$log" | cut -c13-)"
     else
-      record "PASS" "debian" "$cn" "$pkg" "${installed:-?} ($note)"
+      record "PASS" "debian" "$cn" "$target" "${installed:-?} ($note)"
     fi
   else
     local reason
     if grep -q "unmet dependencies" "$log"; then
-      reason=$(grep -A2 "unmet dependencies" "$log" | tail -1 | sed 's/^ *//')
-      record "FAIL" "debian" "$cn" "$pkg" "install: $reason"
+      reason=$(dependency_reason "$log")
+      record "FAIL" "debian" "$cn" "$target" "install: $reason"
     elif grep -q "CHECK-FAIL" "$log"; then
-      record "FAIL" "debian" "$cn" "$pkg" "$(grep -m1 'CHECK-FAIL' "$log" | cut -c13-)"
+      record "FAIL" "debian" "$cn" "$target" "$(grep -m1 'CHECK-FAIL' "$log" | cut -c13-)"
     else
-      record "FAIL" "debian" "$cn" "$pkg" "see $(basename "$log")"
+      record "FAIL" "debian" "$cn" "$target" "see $(basename "$log")"
     fi
   fi
 }
 
 function run_docker_case() {
-  local cn="$1" image="$2" ver="$3"
-  local tag kind log
-  tag="${DOCKER_REPO}/${image}:${ver}-${cn}${DOCKER_SUFFIX}"
+  local cn="$1" image="$2" ver="$3" network="$4"
+  local tag kind log target
+  tag="${DOCKER_REPO}/${image}:${ver}-${cn}-${network}"
+  target="${image}:${network}"
   case "$image" in
     mina-daemon*)  kind="daemon" ;;
     mina-archive*) kind="archive" ;;
     mina-rosetta*) kind="rosetta" ;;
     *)             kind=$(package_kind "$image") ;;
   esac
-  log="$OUTDIR/logs/docker__${cn}__${image}.log"
+  log="$OUTDIR/logs/docker__${cn}__${image}__${network}.log"
 
   if ! docker manifest inspect "$tag" > /dev/null 2>&1; then
-    record "FAIL" "docker" "$cn" "$image" "tag does not exist: $tag"
+    record "FAIL" "docker" "$cn" "$target" "tag does not exist: $tag"
     return 0
   fi
 
   if docker run --rm --platform "linux/$ARCH" --entrypoint bash \
       -v "$CHECKER:/mina/check.sh:ro" "$tag" /mina/check.sh "$kind" docker "$image" \
       > "$log" 2>&1; then
-    record "PASS" "docker" "$cn" "$image" "kind=$kind"
+    record "PASS" "docker" "$cn" "$target" "kind=$kind"
   else
-    record "FAIL" "docker" "$cn" "$image" "$(grep -m1 'CHECK-FAIL' "$log" | cut -c13- || echo "see $(basename "$log")")"
+    record "FAIL" "docker" "$cn" "$target" "$(grep -m1 'CHECK-FAIL' "$log" | cut -c13- || echo "see $(basename "$log")")"
   fi
 }
 
@@ -524,33 +588,34 @@ function run_docker_case() {
 # channel holds a higher version of a strictly pinned dependency, this fails even
 # though every individual package is sound.
 function run_automode_case() {
-  local cn="$1" pkg="$2" ver="$3"
+  local cn="$1" pkg="$2" ver="$3" chan="$4"
+  local target="${pkg}@${chan}"
   local img log
   img=$(base_image "$cn")
-  log="$OUTDIR/logs/automode__${cn}.log"
+  log="$OUTDIR/logs/automode__${cn}__${pkg}.log"
 
   if docker run --rm --platform "linux/$ARCH" \
       -v "$SETUP:/mina/setup.sh:ro" -v "$CHECKER:/mina/check.sh:ro" \
       "$img" \
-      bash -c "bash /mina/setup.sh '$pkg' '$ver' '$REPO' '$cn' '$CHANNEL' '$SIGNED' && bash /mina/check.sh dispatcher deb '$pkg' yes" \
+      bash -c "bash /mina/setup.sh '$pkg' '$ver' '$REPO' '$cn' '$chan' '$SIGNED' && bash /mina/check.sh dispatcher deb '$pkg' yes" \
       > "$log" 2>&1; then
     local warn
     warn=$(grep -c "CHECK-WARN" "$log" || true)
     if [[ "$warn" -gt 0 ]]; then
-      record "WARN" "automode" "$cn" "$pkg" "$(grep -m1 'CHECK-WARN' "$log" | cut -c13-)"
+      record "WARN" "automode" "$cn" "$target" "$(grep -m1 'CHECK-WARN' "$log" | cut -c13-)"
     else
-      record "PASS" "automode" "$cn" "$pkg" "unpinned install and both runtimes"
+      record "PASS" "automode" "$cn" "$target" "unpinned install and both runtimes"
     fi
   else
     if grep -q "unmet dependencies" "$log"; then
-      record "FAIL" "automode" "$cn" "$pkg" "unpinned install failed: $(grep -A2 'unmet dependencies' "$log" | tail -1 | sed 's/^ *//')"
+      record "FAIL" "automode" "$cn" "$target" "unpinned install failed: $(dependency_reason "$log")"
     else
-      record "FAIL" "automode" "$cn" "$pkg" "$(grep -m1 'CHECK-FAIL' "$log" | cut -c13- || echo "see $(basename "$log")")"
+      record "FAIL" "automode" "$cn" "$target" "$(grep -m1 'CHECK-FAIL' "$log" | cut -c13- || echo "see $(basename "$log")")"
     fi
   fi
 }
 
-export -f run_deb_case run_docker_case run_automode_case base_image package_kind extra_deps record
+export -f run_deb_case run_docker_case run_automode_case base_image package_kind extra_deps record dependency_reason
 export OUTDIR RESULTS SETUP CHECKER REPO CHANNEL ARCH SIGNED DOCKER_REPO DOCKER_SUFFIX
 
 # ---------------------------------------------------------------------------
@@ -566,7 +631,7 @@ if [[ -n "$PACKAGES" ]]; then
   IFS=',' read -ra PKG_LIST <<< "$PACKAGES"
   for cn in "${CN_LIST[@]}"; do
     for spec in "${PKG_LIST[@]}"; do
-      printf 'run_deb_case %s %s %s\n' "$cn" "${spec%%=*}" "$(spec_version "$spec")" >> "$WORK"
+      printf 'run_deb_case %s %s %s %s\n' "$cn" "$(spec_name "$spec")" "$(spec_version "$spec")" "$(spec_channel "$spec")" >> "$WORK"
     done
   done
 fi
@@ -578,14 +643,19 @@ if [[ -n "$IMAGES" ]]; then
       if [[ "$spec" != *=* ]]; then
         usage "Docker image '$spec' needs an explicit version; a tag has no channel to resolve against."
       fi
-      printf 'run_docker_case %s %s %s\n' "$cn" "${spec%%=*}" "${spec#*=}" >> "$WORK"
+      printf 'run_docker_case %s %s %s %s\n' "$cn" "${spec%%=*}" "$(image_version "$spec")" "$(image_network "$spec")" >> "$WORK"
     done
   done
 fi
 
+# AUTOMODE is a list like PACKAGES, so one run can cover the devnet metapackage
+# in alpha and the mainnet one in stable.
 if [[ -n "$AUTOMODE" ]]; then
+  IFS=',' read -ra AM_LIST <<< "$AUTOMODE"
   for cn in "${CN_LIST[@]}"; do
-    printf 'run_automode_case %s %s %s\n' "$cn" "${AUTOMODE%%=*}" "$(spec_version "$AUTOMODE")" >> "$WORK"
+    for spec in "${AM_LIST[@]}"; do
+      printf 'run_automode_case %s %s %s %s\n' "$cn" "$(spec_name "$spec")" "$(spec_version "$spec")" "$(spec_channel "$spec")" >> "$WORK"
+    done
   done
 fi
 
@@ -594,7 +664,7 @@ echo "Running $TOTAL cases, $JOBS at a time. Logs: $OUTDIR/logs"
 echo
 
 # shellcheck disable=SC2016
-xargs -a "$WORK" -P "$JOBS" -n 4 bash -c '"$0" "$1" "$2" "$3"' || true
+xargs -a "$WORK" -P "$JOBS" -n 5 bash -c '"$0" "$1" "$2" "$3" "$4"' || true
 
 # ---------------------------------------------------------------------------
 # Summary
