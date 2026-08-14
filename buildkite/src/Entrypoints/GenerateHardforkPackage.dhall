@@ -299,15 +299,14 @@ let generateDockerForCodename =
                             }
                           , DockerImage.ReleaseSpec::{
                             , deps = dependsOnBuildHfDebian
-                            , service = Artifacts.Type.Archive
+                            , service =
+                                Docker.Type.Archive { network = spec.network }
                             , network = spec.network
                             , deb_codename = codename.DebVersion
                             , deb_install_mode =
-                                DockerImage.DebianInstallMode.ThroughLocalRepo
+                                DockerImage.DebianInstallMode.DownloadOnly
                             , deb_profile = profile
                             , deb_legacy_version = spec.deb_legacy_version
-                            , deb_storage_repair_version = Some
-                                spec.deb_storage_repair_version
                             , size = spec.size
                             , deb_version = spec.version
                             , step_key_suffix =
