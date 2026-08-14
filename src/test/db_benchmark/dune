@@ -1,0 +1,13 @@
+(executable
+ (name db_benchmark)
+ (libraries
+  core
+  core_kernel
+  core_unix
+  core_bench
+  rocksdb
+  lmdb_storage
+  ppx_inline_test.runtime-lib)
+ (preprocess
+  (pps ppx_version ppx_jane ppx_deriving.std))
+ (modes native))
