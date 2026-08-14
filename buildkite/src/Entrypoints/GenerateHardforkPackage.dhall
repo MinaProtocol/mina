@@ -297,6 +297,22 @@ let generateDockerForCodename =
                                 "-${DebianVersions.lowerName
                                       codename.DebVersion}-docker-image"
                             }
+                          , DockerImage.ReleaseSpec::{
+                            , deps = dependsOnBuildHfDebian
+                            , service =
+                                Docker.Type.Archive { network = spec.network }
+                            , network = spec.network
+                            , deb_codename = codename.DebVersion
+                            , deb_install_mode =
+                                DockerImage.DebianInstallMode.DownloadOnly
+                            , deb_profile = profile
+                            , deb_legacy_version = spec.deb_legacy_version
+                            , size = spec.size
+                            , deb_version = spec.version
+                            , step_key_suffix =
+                                "-${DebianVersions.lowerName
+                                      codename.DebVersion}-docker-image"
+                            }
                           ]
                   , None =
                     [ DockerImage.ReleaseSpec::{
