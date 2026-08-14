@@ -69,6 +69,7 @@ let PackagingSpec =
           , buildScript : Text
           , arch : Arch.Type
           , deb_legacy_version : Text
+          , deb_storage_repair_version : Text
           , deb_legacy_githash_config : Text
           , docker_publish : DockerPublish.Type
           , suffix : Optional Text
@@ -89,7 +90,8 @@ let PackagingSpec =
           , debianRepo = DebianRepo.Type.Unstable
           , extraBuildEnvs = [] : List Text
           , suffix = None Text
-          , deb_legacy_version = "3.4.0-b3762e1"
+          , deb_legacy_version = "3.5.0-devnet-stop-slot-7a60364"
+          , deb_storage_repair_version = "3.3.0-master-35445f7"
           , deb_legacy_githash_config = ""
           , arch = Arch.Type.Amd64
           , docker_publish = DockerPublish.Type.Essential
