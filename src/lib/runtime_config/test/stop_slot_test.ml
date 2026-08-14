@@ -237,11 +237,10 @@ let suite ~network ~(expected : Expected.t) ~config_path =
    modules. The genesis timestamp is deliberately NOT set here -- it comes from
    the runtime config under test, via make_genesis_constants. *)
 let devnet : Network_constants.t =
-  let compiled = Genesis_constants.Compiled.genesis_constants in
+  let (module Compiled) = Genesis_constants.profiled () in
+  let compiled = Compiled.genesis_constants in
   { constraint_constants =
-      { Genesis_constants.Compiled.constraint_constants with
-        block_window_duration_ms = 180_000
-      }
+      { Compiled.constraint_constants with block_window_duration_ms = 180_000 }
   ; genesis_constants =
       { compiled with
         protocol =
@@ -283,11 +282,10 @@ let devnet_config_path = "devnet.json"
    keep each network's expectations independently readable: if the two ever
    diverge, only the affected network's block changes. *)
 let mainnet : Network_constants.t =
-  let compiled = Genesis_constants.Compiled.genesis_constants in
+  let (module Compiled) = Genesis_constants.profiled () in
+  let compiled = Compiled.genesis_constants in
   { constraint_constants =
-      { Genesis_constants.Compiled.constraint_constants with
-        block_window_duration_ms = 180_000
-      }
+      { Compiled.constraint_constants with block_window_duration_ms = 180_000 }
   ; genesis_constants =
       { compiled with
         protocol =
