@@ -94,10 +94,17 @@ pub fn provision(
         )));
     }
 
+    // `-l` is not just about keeping the server's log: without it the postmaster
+    // inherits our stdout and stderr, and since it outlives `pg_ctl`, waiting for
+    // those pipes to close never returns. Only visible when our own stdout is a
+    // pipe rather than a terminal — i.e. every non-interactive caller.
+    let server_log = network_path.join("postgres-provision.log");
     let start = std::process::Command::new("pg_ctl")
         .args([
             "-D",
             pgdata_str,
+            "-l",
+            &server_log.display().to_string(),
             "-o",
             &format!("-p {port} -k {sockdir} -c listen_addresses=127.0.0.1"),
             "-w",
@@ -162,4 +169,40 @@ fn init_archive_db(network_path: &Path, archive_node: &ServiceConfig, port: &str
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::service::ServiceType;
+
+    /// `provision` has to return. Under `cargo test` our stdout is a pipe, and
+    /// that is precisely the condition it used to hang on: the postmaster
+    /// inherits our stdout and outlives `pg_ctl`, so waiting for that pipe to
+    /// close never ends. Run from a terminal, the bug is invisible.
+    ///
+    /// Needs the postgres binaries on PATH; `#[ignore]`d because CI has none.
+    /// Run manually: `cargo test provision_returns -- --ignored`.
+    #[test]
+    #[ignore]
+    fn provision_returns_when_stdout_is_not_a_terminal() {
+        let dir = tempdir::TempDir::new("pg-provision-hang").unwrap();
+        let network_id = "pg-hang-test";
+        let archive_node = ServiceConfig {
+            service_type: ServiceType::ArchiveNode,
+            service_name: "archive".to_string(),
+            // No schema files: this is about starting the server, and it keeps
+            // the test off the network.
+            archive_schema_files: None,
+            ..Default::default()
+        };
+
+        provision(dir.path(), network_id, &archive_node).unwrap();
+
+        assert!(
+            pgdata_dir(dir.path()).exists(),
+            "cluster was not initialized"
+        );
+        let _ = std::fs::remove_dir_all(postgres_socket_dir(network_id));
+    }
 }
