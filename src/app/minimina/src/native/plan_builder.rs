@@ -68,25 +68,28 @@ impl NativePlanBuilder {
             let pgdata = native_archive::pgdata_dir(&self.network_path);
             let socket_dir = native_archive::postgres_socket_dir(network_id);
             fs::create_dir_all(&socket_dir)?;
-            nodes.push(NativeNodeSpec {
-                name: native_archive::POSTGRES_UNIT_NAME.to_string(),
-                binary: PathBuf::from("postgres"),
-                args: native_archive::postgres_server_args(
+            nodes.push(
+                NativeNodeSpec::new(
+                    native_archive::POSTGRES_UNIT_NAME,
+                    PathBuf::from("postgres"),
+                    self.logs_dir().join("postgres.log"),
+                )
+                .args(native_archive::postgres_server_args(
                     pgdata.to_str().unwrap(),
                     socket_dir.to_str().unwrap(),
-                ),
-                env: vec![],
-                log_file: self.logs_dir().join("postgres.log"),
-            });
+                )),
+            );
 
             let svc_name = archive::archive_service_unit_name(&archive.service_name);
-            nodes.push(NativeNodeSpec {
-                name: svc_name.clone(),
-                binary: self.bin_path.join("mina-archive"),
-                args: archive::archive_service_args("localhost", archive_port),
-                env: keypair_pass_env(),
-                log_file: self.logs_dir().join(format!("{svc_name}.log")),
-            });
+            nodes.push(
+                NativeNodeSpec::new(
+                    &svc_name,
+                    self.bin_path.join("mina-archive"),
+                    self.logs_dir().join(format!("{svc_name}.log")),
+                )
+                .args(archive::archive_service_args("localhost", archive_port))
+                .env(keypair_pass_env()),
+            );
         }
 
         for service in services {
@@ -102,15 +105,16 @@ impl NativePlanBuilder {
             let config_dir_str = config_dir.to_str().unwrap();
             let (binary, args) =
                 self.build_command(service, network_id, network_path_str, config_dir_str)?;
-            nodes.push(NativeNodeSpec {
-                name: service.service_name.clone(),
-                binary,
-                args,
-                env: daemon_env(),
-                log_file: self
-                    .logs_dir()
-                    .join(format!("{}.log", service.service_name)),
-            });
+            nodes.push(
+                NativeNodeSpec::new(
+                    &service.service_name,
+                    binary,
+                    self.logs_dir()
+                        .join(format!("{}.log", service.service_name)),
+                )
+                .args(args)
+                .env(daemon_env()),
+            );
         }
 
         Ok(SupervisorPlan {

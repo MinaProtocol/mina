@@ -8,6 +8,7 @@ use bollard::container::{
     Config, CreateContainerOptions, NetworkingConfig, RemoveContainerOptions, StopContainerOptions,
     WaitContainerOptions,
 };
+use bollard::exec::{CreateExecOptions, StartExecOptions};
 use bollard::image::CreateImageOptions;
 use bollard::network::CreateNetworkOptions;
 use bollard::secret::{EndpointSettings, HostConfig, PortBinding};
@@ -16,8 +17,13 @@ use futures_util::StreamExt;
 use log::{info, warn};
 
 use super::backend::Backend;
-use super::plan::{BackendSpec, DockerBackendSpec, DockerNodeSpec};
+use super::plan::{BackendSpec, DockerBackendSpec, DockerNodeSpec, Readiness};
 use super::run_backend;
+
+/// How long a single readiness exec is given to finish before the attempt is
+/// abandoned (the caller polls again).
+const EXEC_POLLS: u32 = 20;
+const EXEC_POLL_INTERVAL: std::time::Duration = std::time::Duration::from_millis(50);
 
 /// The docker backend owns the network-level resources: the daemon connection
 /// and the docker network (+ DNS aliases) every container attaches to.
@@ -43,6 +49,71 @@ impl BackendSpec for DockerBackendSpec {
         socket_path: &'a std::path::Path,
     ) -> std::pin::Pin<Box<dyn std::future::Future<Output = io::Result<()>> + Send + 'a>> {
         Box::pin(run_backend::<DockerBackend>(self, network_id, socket_path))
+    }
+}
+
+impl DockerBackend {
+    /// Run `cmd` inside `container` and report whether it exited 0.
+    ///
+    /// Runs the exec **detached** and polls for its exit rather than attaching
+    /// to its output. An attached exec hijacks the HTTP connection into a
+    /// bidirectional stream, and that stream does not reliably end while the
+    /// same client is holding a long-lived `wait_container` open for this very
+    /// container — which it always is, since the unit's waiter task starts
+    /// first. Detached execs stay ordinary requests, and we only need the exit
+    /// status anyway.
+    ///
+    /// Anything unexpected (transport error, still running) is reported as "not
+    /// ready" rather than an error: the caller polls, so the next attempt gets
+    /// a fresh exec.
+    async fn exec_succeeds(&self, container: &str, cmd: &[String]) -> bool {
+        let exec = match self
+            .docker
+            .create_exec(
+                container,
+                CreateExecOptions {
+                    cmd: Some(cmd.to_vec()),
+                    ..Default::default()
+                },
+            )
+            .await
+        {
+            Ok(exec) => exec,
+            Err(e) => {
+                warn!("supervisor: create_exec on '{container}' failed: {e}");
+                return false;
+            }
+        };
+
+        if let Err(e) = self
+            .docker
+            .start_exec(
+                &exec.id,
+                Some(StartExecOptions {
+                    detach: true,
+                    ..Default::default()
+                }),
+            )
+            .await
+        {
+            warn!("supervisor: start_exec on '{container}' failed: {e}");
+            return false;
+        }
+
+        // Readiness commands are quick; give this one a moment to finish and
+        // otherwise let the caller's next poll take over.
+        for _ in 0..EXEC_POLLS {
+            match self.docker.inspect_exec(&exec.id).await {
+                Ok(r) if r.running != Some(true) => return r.exit_code == Some(0),
+                Ok(_) => {}
+                Err(e) => {
+                    warn!("supervisor: inspect_exec on '{container}' failed: {e}");
+                    return false;
+                }
+            }
+            tokio::time::sleep(EXEC_POLL_INTERVAL).await;
+        }
+        false
     }
 }
 
@@ -229,6 +300,18 @@ impl Backend for DockerBackend {
                 None
             }
             None => None,
+        }
+    }
+
+    /// `TcpPort` connects from the host (so it only reaches published ports);
+    /// `Command` runs inside the container via exec, which is how an
+    /// internal-only unit gets probed at all.
+    async fn probe(&self, node: &DockerNodeSpec, readiness: &Readiness) -> bool {
+        match readiness {
+            Readiness::TcpPort(port) => tokio::net::TcpStream::connect(("127.0.0.1", *port))
+                .await
+                .is_ok(),
+            Readiness::Command(cmd) => self.exec_succeeds(&node.name, cmd).await,
         }
     }
 

@@ -19,7 +19,13 @@
 use std::future::Future;
 use std::io;
 
-use super::plan::NamedSpec;
+use super::plan::{NamedSpec, Readiness};
+use std::time::Duration;
+
+/// How long a unit may take to report ready before `network start` gives up.
+pub const READY_TIMEOUT: Duration = Duration::from_secs(60);
+/// Gap between readiness attempts.
+pub const READY_POLL: Duration = Duration::from_millis(250);
 
 /// A backend the supervisor can run a network on. Owns network-*level*
 /// resources (docker: the docker network + DNS), acquired by [`Backend::setup`]
@@ -47,6 +53,18 @@ pub trait Backend: Sized + Send + Sync + 'static {
 
     /// Await the unit's exit and return its exit code (`None` if unknown).
     fn wait(unit: &mut Self::Unit) -> impl Future<Output = Option<i32>> + Send;
+
+    /// One readiness attempt against a live unit: `true` once it is up.
+    ///
+    /// A single attempt, not a loop — the retry budget and the "did the unit
+    /// die while we waited?" check are backend-independent and live in
+    /// `super::await_ready`. A failed attempt is not an error: probes are
+    /// expected to fail while the unit is still starting.
+    fn probe(
+        &self,
+        node: &Self::NodeSpec,
+        readiness: &Readiness,
+    ) -> impl Future<Output = bool> + Send;
 
     /// Graceful stop (SIGTERM / `docker stop`).
     fn terminate(killer: &Self::Killer) -> impl Future<Output = ()> + Send;
