@@ -103,7 +103,7 @@ let evals_of_split_evals field ~zeta ~zetaw (es : _ Plonk_types.Evals.t) ~rounds
   let e = Fn.flip (actual_evaluation field ~rounds) in
   Plonk_types.Evals.map es ~f:(fun (x1, x2) -> (e zeta x1, e zetaw x2))
 
-open Composition_types.Wrap.Proof_state.Deferred_values.Plonk
+open Composition_types.Wrap_plonk_iop
 
 type 'bool all_feature_flags = 'bool Lazy.t Plonk_types.Features.Full.t
 
@@ -158,8 +158,8 @@ let scalars_env (type boolean t) (module B : Bool_intf with type t = boolean)
     (module F : Field_with_if_intf with type t = t and type bool = boolean)
     ~endo ~mds ~field_of_hex ~domain ~zk_rows ~srs_length_log2
     ({ alpha; beta; gamma; zeta; joint_combiner; feature_flags } :
-      (t, _, boolean) Minimal.t ) (e : (_ * _, _) Plonk_types.Evals.In_circuit.t)
-    =
+      (t, _, boolean) Minimal.Poly.t )
+    (e : (_ * _, _) Plonk_types.Evals.In_circuit.t) =
   let feature_flags = expand_feature_flags (module B) feature_flags in
   let witness = Vector.to_array e.w in
   let coefficients = Vector.to_array e.coefficients in
@@ -349,7 +349,8 @@ module Make (Shifted_value : Shifted_value.S) (Sc : Scalars.S) = struct
   let ft_eval0 (type t) (module F : Field_intf with type t = t) ~domain
       ~(env : t Scalars.Env.t)
       ({ alpha = _; beta; gamma; zeta; joint_combiner = _; feature_flags = _ } :
-        _ Minimal.t ) (e : (_ * _, _) Plonk_types.Evals.In_circuit.t) p_eval0 =
+        _ Minimal.Poly.t ) (e : (_ * _, _) Plonk_types.Evals.In_circuit.t)
+      p_eval0 =
     let open Plonk_types.Evals.In_circuit in
     let e0 field = fst (field e) in
     let e1 field = snd (field e) in
@@ -410,7 +411,7 @@ module Make (Shifted_value : Shifted_value.S) (Sc : Scalars.S) = struct
          ; joint_combiner
          ; feature_flags = actual_feature_flags
          } :
-          _ Minimal.t )
+          _ Minimal.Poly.t )
         (e : (_ * _, _) Plonk_types.Evals.In_circuit.t)
           (*((e0, e1) : _ Plonk_types.Evals.In_circuit.t Double.t) *) ->
       let open Plonk_types.Evals.In_circuit in

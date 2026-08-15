@@ -1,7 +1,7 @@
 type dlog_opening =
   ( Backend.Tock.Curve.Affine.t
   , Backend.Tock.Field.t )
-  Import.Types.Step.Bulletproof.t
+  Import.Types.Step_bulletproof.t
 
 module Constant : sig
   (* Out-of-circuit type for wrap proofs *)
@@ -23,7 +23,7 @@ module Checked : sig
     ; opening :
         ( Step_main_inputs.Inner_curve.t
         , Impls.Step.Other_field.t Pickles_types.Shifted_value.Type2.t )
-        Import.Types.Step.Bulletproof.t
+        Import.Types.Step_bulletproof.t
     }
   [@@deriving hlist]
 end

@@ -125,7 +125,7 @@ let run_recursive_proof_test (actual_feature_flags : Plonk_types.Features.flags)
   let deferred_values_typ =
     let open Impls.Step in
     let open Step_verifier in
-    Import.Types.Wrap.Proof_state.Deferred_values.In_circuit.typ
+    Import.Types.Wrap_proof_state.Deferred_values.In_circuit.typ
       ~feature_flags:full_features ~challenge:Challenge.typ
       ~scalar_challenge:Challenge.typ
       ~dummy_scalar_challenge:
@@ -140,12 +140,15 @@ let run_recursive_proof_test (actual_feature_flags : Plonk_types.Features.flags)
      for use in the circuit.  We change some [Opt.t] to [Option.t] because that is
      what Type.t is configured to accept. *)
   let deferred_values =
+    let plonk =
+      Import.Types.Wrap_plonk_iop.In_circuit.Constant_opt.to_in_circuit
+        deferred_values.plonk
+    in
     constant deferred_values_typ
       { deferred_values with
         plonk =
-          { deferred_values.plonk with
-            joint_combiner =
-              Opt.to_option_unsafe deferred_values.plonk.joint_combiner
+          { plonk with
+            joint_combiner = Opt.to_option_unsafe plonk.joint_combiner
           }
       }
   (* Prepare all of the evaluations (i.e. all of the columns in the proof that we open)
@@ -183,7 +186,10 @@ let run_recursive_proof_test (actual_feature_flags : Plonk_types.Features.flags)
           (module Nat.N0)
           ~step_domains:
             (`Known [ { h = Pow_2_roots_of_unity vk.domain.log_size_of_group } ])
-          ~zk_rows:3 ~sponge ~prev_challenges:[] deferred_values evals
+          ~zk_rows:3 ~sponge ~prev_challenges:[]
+          (Import.Types.Wrap_proof_state.Deferred_values.Step.of_deferred_values
+             deferred_values )
+          evals
       in
 
       (* Read the boolean result from the circuit and make it available

@@ -74,19 +74,10 @@ module For_tests_only = struct
     { x_hat_evals : Backend.Tick.Field.t array * Backend.Tick.Field.t array
     ; sponge_digest_before_evaluations : Backend.Tick.Field.t
     ; deferred_values :
-        ( ( Import.Challenge.Constant.t
-          , scalar_challenge_constant
-          , shifted_tick_field
-          , (shifted_tick_field, bool) Opt.t
-          , (scalar_challenge_constant, bool) Opt.t
-          , bool )
-          Import.Types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit.t
-        , scalar_challenge_constant
-        , shifted_tick_field
-        , scalar_challenge_constant Import.Bulletproof_challenge.t
-          Import.Types.Step_bp_vec.t
-        , Import.Branch_data.t )
-        Import.Types.Wrap.Proof_state.Deferred_values.t
+        ( shifted_tick_field
+          Import.Types.Wrap_plonk_iop.In_circuit.Constant_opt.t
+        , shifted_tick_field )
+        Import.Types.Wrap_proof_state.Deferred_values.Constant.poly_t
     }
 
   let deferred_values (type n)
@@ -118,8 +109,7 @@ module For_tests_only = struct
       Scalar_challenge.map ~f:Challenge.Constant.of_tick_field (f o)
     in
     let plonk0 =
-      { Types.Wrap.Proof_state.Deferred_values.Plonk.Minimal.alpha =
-          scalar_chal O.alpha
+      { Types.Wrap_plonk_iop.Minimal.Poly.alpha = scalar_chal O.alpha
       ; beta = O.beta o
       ; gamma = O.gamma o
       ; zeta = scalar_chal O.zeta
@@ -150,11 +140,17 @@ module For_tests_only = struct
     end in
     let domain = Domain.Pow_2_roots_of_unity step_vk.domain.log_size_of_group in
     let zetaw = Tick.Field.mul As_field.zeta step_vk.domain.group_gen in
-    let tick_plonk_minimal =
-      { plonk0 with
-        zeta = As_field.zeta
-      ; alpha = As_field.alpha
+    let tick_plonk_minimal : Types.Wrap_plonk_iop.Minimal.Tick.t =
+      (* Constructed freshly rather than as a record-update of [plonk0]
+         because [Tick.t] is a fresh record type, structurally distinct
+         from the polymorphic [Plonk.Minimal.Stable.V1.t] that [plonk0]
+         inhabits. *)
+      { alpha = As_field.alpha
+      ; beta = plonk0.beta
+      ; gamma = plonk0.gamma
+      ; zeta = As_field.zeta
       ; joint_combiner = As_field.joint_combiner
+      ; feature_flags = plonk0.feature_flags
       }
     in
     let tick_combined_evals =
@@ -199,7 +195,9 @@ module For_tests_only = struct
         ~field_of_hex:(fun s ->
           Kimchi_pasta.Pasta.Bigint256.of_hex_string s
           |> Kimchi_pasta.Pasta.Fp.of_bigint )
-        ~domain:tick_domain tick_plonk_minimal tick_combined_evals
+        ~domain:tick_domain
+        (Types.Wrap_plonk_iop.Minimal.Tick.to_stable tick_plonk_minimal)
+        tick_combined_evals
     in
     let plonk =
       let module Field = struct
@@ -207,7 +205,9 @@ module For_tests_only = struct
       end in
       Type1.derive_plonk
         (module Field)
-        ~shift:Shifts.tick1 ~env:tick_env tick_plonk_minimal tick_combined_evals
+        ~shift:Shifts.tick1 ~env:tick_env
+        (Types.Wrap_plonk_iop.Minimal.Tick.to_stable tick_plonk_minimal)
+        tick_combined_evals
     and new_bulletproof_challenges, b =
       let prechals =
         Array.map (O.opening_prechallenges o) ~f:(fun x ->
@@ -229,7 +229,7 @@ module For_tests_only = struct
       Shifted_value.Type1.of_field (module Tick.Field) ~shift:Shifts.tick1
     and chal = Challenge.Constant.of_tick_field in
     { deferred_values =
-        { Types.Wrap.Proof_state.Deferred_values.xi
+        { Types.Wrap_proof_state.Deferred_values.Poly.xi
         ; b = shift_value b
         ; bulletproof_challenges =
             Vector.of_array_and_length_exn new_bulletproof_challenges
@@ -244,7 +244,9 @@ module For_tests_only = struct
                   ~r ~xi ~zeta ~zetaw
                   ~old_bulletproof_challenges:prev_challenges ~env:tick_env
                   ~domain:tick_domain ~ft_eval1:proof.proof.openings.ft_eval1
-                  ~plonk:tick_plonk_minimal)
+                  ~plonk:
+                    (Types.Wrap_plonk_iop.Minimal.Tick.to_stable
+                       tick_plonk_minimal ))
         ; branch_data =
             { proofs_verified =
                 ( match actual_proofs_verified with
@@ -261,13 +263,15 @@ module For_tests_only = struct
                   step_vk.domain.log_size_of_group
             }
         ; plonk =
-            { plonk with
-              zeta = plonk0.zeta
-            ; alpha = plonk0.alpha
-            ; beta = chal plonk0.beta
-            ; gamma = chal plonk0.gamma
-            ; joint_combiner = Opt.of_option plonk0.joint_combiner
-            }
+            Composition_types.Wrap_plonk_iop.In_circuit.Constant_opt
+            .of_in_circuit
+              { plonk with
+                zeta = plonk0.zeta
+              ; alpha = plonk0.alpha
+              ; beta = chal plonk0.beta
+              ; gamma = chal plonk0.gamma
+              ; joint_combiner = Opt.of_option plonk0.joint_combiner
+              }
         }
     ; x_hat_evals = x_hat
     ; sponge_digest_before_evaluations = O.digest_before_evaluations o
@@ -315,7 +319,7 @@ let wrap
     in
     M.f prev_statement.messages_for_next_wrap_proof
   in
-  let prev_statement_with_hashes : _ Types.Step.Statement.t =
+  let prev_statement_with_hashes : _ Types.Step_statement.t =
     { proof_state =
         { prev_statement.proof_state with
           messages_for_next_step_proof =
@@ -457,7 +461,7 @@ let wrap
       ~actual_proofs_verified ~actual_feature_flags
   in
   [%log internal] "Wrap_compute_deferred_values_done" ;
-  let next_statement : _ Types.Wrap.Statement.In_circuit.t =
+  let next_statement : _ Types.Wrap_statement.In_circuit.t =
     let messages_for_next_wrap_proof :
         _ P.Base.Messages_for_next_proof_over_same_field.Wrap.t =
       { challenge_polynomial_commitment =
@@ -467,8 +471,12 @@ let wrap
               t.deferred_values.bulletproof_challenges )
       }
     in
+    let plonk =
+      Composition_types.Wrap_plonk_iop.In_circuit.Constant_opt.to_in_circuit
+        deferred_values.plonk
+    in
     { proof_state =
-        { deferred_values
+        { deferred_values = { deferred_values with plonk }
         ; sponge_digest_before_evaluations =
             Digest.Constant.of_tick_field sponge_digest_before_evaluations
         ; messages_for_next_wrap_proof
@@ -547,31 +555,68 @@ let wrap
           ~input_typ:input ~return_typ:Impls.Wrap.Typ.unit
           (fun x () : unit ->
             Impls.Wrap.handle (fun () : unit -> wrap_main (conv x)) handler )
-          { messages_for_next_step_proof =
-              prev_statement_with_hashes.proof_state
-                .messages_for_next_step_proof
-          ; proof_state =
-              { next_statement.proof_state with
-                messages_for_next_wrap_proof =
-                  Wrap_hack.hash_messages_for_next_wrap_proof
-                    messages_for_next_wrap_proof_prepared
-              ; deferred_values =
-                  { next_statement.proof_state.deferred_values with
-                    plonk =
-                      { next_statement.proof_state.deferred_values.plonk with
-                        joint_combiner =
-                          Opt.to_option
-                            next_statement.proof_state.deferred_values.plonk
-                              .joint_combiner
-                      }
-                  }
-              }
-          } )
+          (* Materialise [Wrap_statement.Constant.t] (with the
+             inner Plonk pinned to the [option]-shaped
+             [Plonk.In_circuit.Constant.t]) — the value-side shape that
+             [Impls.Wrap.input] now expects. *)
+          (let { Composition_types.Wrap_plonk_iop.In_circuit.alpha
+               ; beta
+               ; gamma
+               ; zeta
+               ; zeta_to_srs_length
+               ; zeta_to_domain_size
+               ; perm
+               ; feature_flags
+               ; joint_combiner
+               } =
+             next_statement.proof_state.deferred_values.plonk
+           in
+           let plonk_constant :
+               _ Composition_types.Wrap_plonk_iop.In_circuit.Constant.t =
+             { alpha
+             ; beta
+             ; gamma
+             ; zeta
+             ; zeta_to_srs_length
+             ; zeta_to_domain_size
+             ; perm
+             ; feature_flags
+             ; joint_combiner = Opt.to_option joint_combiner
+             }
+           in
+           let { Types.Wrap_proof_state.Deferred_values.Poly.xi
+               ; combined_inner_product
+               ; b
+               ; branch_data
+               ; bulletproof_challenges
+               ; plonk = _
+               } =
+             next_statement.proof_state.deferred_values
+           in
+           { Types.Wrap_statement.Constant.messages_for_next_step_proof =
+               prev_statement_with_hashes.proof_state
+                 .messages_for_next_step_proof
+           ; proof_state =
+               { deferred_values =
+                   { xi
+                   ; combined_inner_product
+                   ; b
+                   ; branch_data
+                   ; bulletproof_challenges
+                   ; plonk = plonk_constant
+                   }
+               ; sponge_digest_before_evaluations =
+                   next_statement.proof_state.sponge_digest_before_evaluations
+               ; messages_for_next_wrap_proof =
+                   Wrap_hack.hash_messages_for_next_wrap_proof
+                     messages_for_next_wrap_proof_prepared
+               }
+           } ) )
   in
   [%log internal] "Pickles_wrap_proof_done" ;
   ( { proof = Wrap_wire_proof.of_kimchi_proof next_proof.proof
     ; statement =
-        Types.Wrap.Statement.to_minimal next_statement
+        Types.Wrap_statement.to_minimal next_statement
           ~to_option:Opt.to_option_unsafe
     ; prev_evals =
         { Plonk_types.All_evals.evals =

@@ -92,10 +92,7 @@ val scalars_env :
   -> domain:< generator : 't ; vanishing_polynomial : 't -> 't ; .. >
   -> zk_rows:int
   -> srs_length_log2:int
-  -> ( 't
-     , 't
-     , 'b )
-     Composition_types.Wrap.Proof_state.Deferred_values.Plonk.Minimal.t
+  -> ('t, 't, 'b) Composition_types.Wrap_plonk_iop.Minimal.Poly.t
   -> ('t * 't, 'a) Pickles_types.Plonk_types.Evals.In_circuit.t
   -> 't Scalars.Env.t
 
@@ -104,10 +101,7 @@ module Make (Shifted_value : Pickles_types.Shifted_value.S) (_ : Scalars.S) : si
        't field
     -> domain:< shifts : 't array ; .. >
     -> env:'t Scalars.Env.t
-    -> ( 't
-       , 't
-       , 'b )
-       Composition_types.Wrap.Proof_state.Deferred_values.Plonk.Minimal.t
+    -> ('t, 't, 'b) Composition_types.Wrap_plonk_iop.Minimal.Poly.t
     -> ('t * 't, 'a) Pickles_types.Plonk_types.Evals.In_circuit.t
     -> 't array
     -> 't
@@ -117,10 +111,7 @@ module Make (Shifted_value : Pickles_types.Shifted_value.S) (_ : Scalars.S) : si
     -> (module Field_intf with type t = 't)
     -> env:'t Scalars.Env.t
     -> shift:'t Shifted_value.Shift.t
-    -> ( 't
-       , 't
-       , 'b )
-       Composition_types.Wrap.Proof_state.Deferred_values.Plonk.Minimal.t
+    -> ('t, 't, 'b) Composition_types.Wrap_plonk_iop.Minimal.Poly.t
     -> ('t * 't, 'a) Pickles_types.Plonk_types.Evals.In_circuit.t
     -> ( 't
        , 't
@@ -128,7 +119,7 @@ module Make (Shifted_value : Pickles_types.Shifted_value.S) (_ : Scalars.S) : si
        , ('t Shifted_value.t, 'b) Pickles_types.Opt.t
        , ('t, 'b) Pickles_types.Opt.t
        , 'b )
-       Composition_types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit.t
+       Composition_types.Wrap_plonk_iop.In_circuit.t
 
   val checked :
        (module Snarky_backendless.Snark_intf.Run
@@ -144,7 +135,7 @@ module Make (Shifted_value : Pickles_types.Shifted_value.S) (_ : Scalars.S) : si
          Pickles_types.Opt.t
        , ('v, 'v Snarky_backendless.Boolean.t) Pickles_types.Opt.t
        , 'v Snarky_backendless.Boolean.t )
-       Composition_types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit.t
+       Composition_types.Wrap_plonk_iop.In_circuit.t
     -> ('v * 'v, 'a) Pickles_types.Plonk_types.Evals.In_circuit.t
     -> 'v Snarky_backendless.Boolean.t
 end

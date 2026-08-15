@@ -30,9 +30,7 @@ module Constant = struct
        let beta = chal () in
        let gamma = chal () in
        let zeta = scalar_chal () in
-       let chals :
-           _ Composition_types.Wrap.Proof_state.Deferred_values.Plonk.Minimal.t
-           =
+       let chals : Composition_types.Wrap_plonk_iop.Minimal.Tock.t =
          { alpha = Common.Ipa.Wrap.endo_to_field alpha
          ; beta = Challenge.Constant.to_tock_field beta
          ; gamma = Challenge.Constant.to_tock_field gamma
@@ -80,20 +78,62 @@ module Constant = struct
                 (module Tock.Field)
                 (wrap_domains ~proofs_verified:2).h ~shifts:Common.tock_shifts
                 ~domain_generator:Tock.Field.domain_generator )
-           chals evals
+           (Composition_types.Wrap_plonk_iop.Minimal.Tock.to_stable chals)
+           evals
        in
        let plonk =
          let module Field = struct
            include Tock.Field
          end in
-         Plonk_checks.derive_plonk (module Field) ~env ~shift chals evals
-         |> Composition_types.Step.Proof_state.Deferred_values.Plonk.In_circuit
-            .of_wrap
-              ~assert_none:(fun x -> assert (Option.is_none (Opt.to_option x)))
-              ~assert_false:(fun x -> assert (not x))
+         let { Composition_types.Wrap_plonk_iop.In_circuit.alpha
+             ; beta
+             ; gamma
+             ; zeta
+             ; zeta_to_srs_length
+             ; zeta_to_domain_size
+             ; perm
+             ; feature_flags =
+                 { range_check0
+                 ; range_check1
+                 ; foreign_field_add
+                 ; foreign_field_mul
+                 ; xor
+                 ; rot
+                 ; lookup
+                 ; runtime_tables
+                 }
+             ; joint_combiner
+             } =
+           Plonk_checks.derive_plonk
+             (module Field)
+             ~env ~shift
+             (Composition_types.Wrap_plonk_iop.Minimal.Tock.to_stable chals)
+             evals
+         in
+         assert (not range_check0) ;
+         assert (not range_check1) ;
+         assert (not foreign_field_add) ;
+         assert (not foreign_field_mul) ;
+         assert (not xor) ;
+         assert (not rot) ;
+         assert (not lookup) ;
+         assert (not runtime_tables) ;
+         assert (Option.is_none (Opt.to_option joint_combiner)) ;
+         { Composition_types.Step_plonk_iop.In_circuit.alpha
+         ; beta
+         ; gamma
+         ; zeta
+         ; zeta_to_srs_length
+         ; zeta_to_domain_size
+         ; perm
+         }
+       in
+       let plonk =
+         { plonk with alpha; beta; gamma; zeta }
+         |> Composition_types.Step_plonk_iop.In_circuit.Constant.of_in_circuit
        in
        { deferred_values =
-           { plonk = { plonk with alpha; beta; gamma; zeta }
+           { plonk
            ; combined_inner_product = Shifted_value (tock ())
            ; xi = Scalar_challenge.create one_chal
            ; bulletproof_challenges = Dummy.Ipa.Wrap.challenges
@@ -105,7 +145,7 @@ module Constant = struct
 end
 
 let typ ~wrap_rounds:_ : (t, Constant.t) Typ.t =
-  Types.Step.Proof_state.Per_proof.typ
+  Types.Step_per_proof.typ
     (Shifted_value.typ Other_field.typ)
     ~assert_16_bits:(Step_verifier.assert_n_bits ~n:16)
 

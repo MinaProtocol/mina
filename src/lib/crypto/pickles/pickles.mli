@@ -146,7 +146,7 @@
     - [b]: Challenge polynomial evaluation
     - PlonK linearization scalars
 
-    In code: {!module:Wrap.Proof_state.Deferred_values}
+    In code: {!module:Wrap_proof_state.Deferred_values}
 
     {4 Messages for Next Step/Wrap Proof}
 

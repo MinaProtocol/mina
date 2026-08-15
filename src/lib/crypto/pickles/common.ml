@@ -43,10 +43,10 @@ let actual_wrap_domain_size ~log_2_domain_size =
   Pickles_base.Proofs_verified.of_int_exn d
 
 let hash_messages_for_next_step_proof ~app_state
-    (t : _ Types.Step.Proof_state.Messages_for_next_step_proof.t) =
+    (t : _ Types.Messages_for_next.Step_proof.t) =
   let g (x, y) = [ x; y ] in
   Tick_field_sponge.digest Tick_field_sponge.params
-    (Types.Step.Proof_state.Messages_for_next_step_proof.to_field_elements t ~g
+    (Types.Messages_for_next.Step_proof.to_field_elements t ~g
        ~comm:(fun (x : Tock.Curve.Affine.t array) ->
          Array.concat_map x ~f:(fun x -> Array.of_list (g x)) )
        ~app_state )
@@ -194,8 +194,7 @@ let tick_public_input_of_statement ~max_proofs_verified
 
 let ft_comm ~add:( + ) ~scale ~negate
     ~verification_key:(m : _ array Plonk_verification_key_evals.t)
-    ~(plonk : _ Types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit.t)
-    ~t_comm =
+    ~(plonk : _ Types.Wrap_plonk_iop.In_circuit.t) ~t_comm =
   let reduce_chunks comm =
     let n = Array.length comm in
     let res = ref comm.(n - 1) in

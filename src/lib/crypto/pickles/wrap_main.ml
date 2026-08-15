@@ -37,12 +37,12 @@ module Old_bulletproof_chals = struct
 end
 
 let pack_statement max_proofs_verified t =
-  let open Types.Step in
+  let open Types.Step_proof in
   Spec.pack
     (module Impl)
     (module Branch_data.Checked.Wrap)
-    (Statement.spec max_proofs_verified Backend.Tock.Rounds.n)
-    (Statement.to_data t)
+    (Statement.Wrap.spec max_proofs_verified Backend.Tock.Rounds.n)
+    (Statement.Wrap.to_data t)
 
 let shifts ~log2_size = Common.tock_shifts ~log2_size
 
@@ -89,18 +89,9 @@ let wrap_main
     (max_proofs_verified :
       (module Nat.Add.Intf with type n = max_proofs_verified) ) :
     (max_proofs_verified, max_local_max_proofs_verifieds) Requests.Wrap.t
-    * (   ( _
-          , _
-          , _ Shifted_value.Type1.t
-          , _
-          , _
-          , _
-          , _
-          , _
-          , _
-          , _
-          , _ )
-          Types.Wrap.Statement.In_circuit.t
+    * (   ( _ Shifted_value.Type1.t Types.Wrap_plonk_iop.In_circuit.Wrap.t
+          , _ Shifted_value.Type1.t )
+          Types.Wrap_statement.Wrap.t
        -> unit )
       Promise.t
       Lazy.t =
@@ -139,18 +130,9 @@ let wrap_main
              }
          ; messages_for_next_step_proof
          } :
-          ( _
-          , _
-          , _ Shifted_value.Type1.t
-          , _
-          , _
-          , _
-          , _
-          , _
-          , _
-          , _
-          , Field.t )
-          Types.Wrap.Statement.In_circuit.t ) ->
+          ( _ Shifted_value.Type1.t Types.Wrap_plonk_iop.In_circuit.Wrap.t
+          , _ Shifted_value.Type1.t )
+          Types.Wrap_statement.Wrap.t ) ->
       let logger = Context_logger.get () in
       with_label __LOC__ (fun () ->
           let which_branch' =
@@ -190,7 +172,7 @@ let wrap_main
           in
           let prev_proof_state =
             with_label __LOC__ (fun () ->
-                let open Types.Step.Proof_state in
+                let open Types.Step_proof_state in
                 let typ =
                   wrap_typ
                     ~assert_16_bits:(Wrap_verifier.assert_n_bits ~n:16)
@@ -432,7 +414,7 @@ let wrap_main
             in
             Field.Assert.equal messages_for_next_step_proof
               prev_proof_state.messages_for_next_step_proof ;
-            { Types.Step.Statement.messages_for_next_wrap_proof =
+            { Types.Step_statement.messages_for_next_wrap_proof =
                 prev_messages_for_next_wrap_proof
             ; proof_state = prev_proof_state
             }
@@ -504,7 +486,7 @@ let wrap_main
               Field.Assert.equal messages_for_next_wrap_proof_digest
                 (Wrap_hack.Checked.hash_messages_for_next_wrap_proof
                    Max_proofs_verified.n
-                   { Types.Wrap.Proof_state.Messages_for_next_wrap_proof
+                   { Types.Messages_for_next.Wrap_proof.Poly
                      .challenge_polynomial_commitment =
                        openings_proof.challenge_polynomial_commitment
                    ; old_bulletproof_challenges = new_bulletproof_challenges

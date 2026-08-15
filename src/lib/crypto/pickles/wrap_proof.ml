@@ -2,7 +2,7 @@ open Pickles_types
 open Import
 open Backend
 
-type dlog_opening = (Tock.Curve.Affine.t, Tock.Field.t) Types.Step.Bulletproof.t
+type dlog_opening = (Tock.Curve.Affine.t, Tock.Field.t) Types.Step_bulletproof.t
 
 module Constant = struct
   (* Out-of-circuit type for wrap proofs *)
@@ -23,7 +23,7 @@ module Checked = struct
     ; opening :
         ( Inner_curve.t
         , Impls.Step.Other_field.t Shifted_value.Type2.t )
-        Types.Step.Bulletproof.t
+        Types.Step_bulletproof.t
     }
   [@@deriving hlist]
 end
@@ -39,7 +39,7 @@ let typ : (Checked.t, Constant.t) Typ.t =
         ~commitment_lengths:
           (Commitment_lengths.default
              ~num_chunks:Plonk_checks.num_chunks_by_default )
-    ; Types.Step.Bulletproof.typ ~length:(Nat.to_int Tock.Rounds.n)
+    ; Types.Step_bulletproof.typ ~length:(Nat.to_int Tock.Rounds.n)
         ( Typ.transport Other_field.typ
             ~there:(fun x ->
               (* When storing, make it a shifted value *)

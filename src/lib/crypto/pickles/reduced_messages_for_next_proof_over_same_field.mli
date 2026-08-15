@@ -55,7 +55,7 @@ module Step : sig
        , ( (Backend.Tick.Field.t, 'd) Pickles_types.Vector.t
          , 'e )
          Pickles_types.Vector.t )
-       Import.Types.Step.Proof_state.Messages_for_next_step_proof.t
+       Import.Types.Messages_for_next.Step_proof.t
 end
 
 module Wrap : sig
@@ -91,7 +91,7 @@ module Wrap : sig
     , ( Challenges_vector.t
       , 'max_local_max_proofs_verified )
       Pickles_types.Vector.t )
-    Import.Types.Wrap.Proof_state.Messages_for_next_wrap_proof.t
+    Import.Types.Messages_for_next.Wrap_proof.Poly.t
 
   val prepare :
        'a t
@@ -101,7 +101,7 @@ module Wrap : sig
            Pickles_types.Vector.t
          , 'a )
          Pickles_types.Vector.t )
-       Import.Types.Wrap.Proof_state.Messages_for_next_wrap_proof.t
+       Import.Types.Messages_for_next.Wrap_proof.Poly.t
 
   module Prepared : sig
     type 'max_local_max_proofs_verified t =
@@ -109,6 +109,6 @@ module Wrap : sig
       , ( Challenges_vector.Prepared.t
         , 'max_local_max_proofs_verified )
         Pickles_types.Vector.t )
-      Import.Types.Wrap.Proof_state.Messages_for_next_wrap_proof.t
+      Import.Types.Messages_for_next.Wrap_proof.Poly.t
   end
 end
