@@ -4,11 +4,21 @@
  (instrumentation
   (backend bisect_ppx))
  (preprocess
-  (pps ppx_jane))
+  (pps ppx_jane ppx_mina))
  (libraries
   ; opam libraries
   alcotest
   alcotest-async
+  integers
+  yojson
   ; local libraries
+  currency
+  genesis_constants
   mina_base
-  mina_ledger))
+  mina_ledger
+  mina_numbers
+  mina_transaction_logic
+  random_oracle
+  signature_lib
+  with_hash
+  zkapp_command_builder))
