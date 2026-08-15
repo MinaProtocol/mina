@@ -14,6 +14,15 @@ end
 (** Module DockerContext provides an abstract type [t] representing the context for Docker operations. *)
 module DockerContext : sig
   type t
+
+  val create :
+       image:string
+    -> ?workdir:string
+    -> volumes:string list
+    -> network:string
+    -> ?rm:bool
+    -> unit
+    -> t
 end
 
 (** 

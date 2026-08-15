@@ -1,0 +1,28 @@
+(executable
+ (name auto_hardfork_restart_test)
+ (libraries
+  ;; opam libraries
+  async
+  async.async_command
+  async_kernel
+  async_unix
+  cohttp-async
+  core
+  core_kernel
+  uri
+  ;; mina libraries
+  auto_hardfork_graphql_queries
+  currency
+  error_json
+  graphql_lib
+  init
+  logger
+  mina_automation
+  mina_automation.fixture
+  mina_runtime_config
+  secrets
+  signature_lib)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_version ppx_jane ppx_compare ppx_mina)))
