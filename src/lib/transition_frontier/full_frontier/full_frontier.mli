@@ -24,8 +24,6 @@ module type CONTEXT = sig
   val consensus_constants : Consensus.Constants.t
 end
 
-include Frontier_intf.S
-
 module Protocol_states_for_root_scan_state : sig
   type t = Protocol_state.value State_hash.With_state_hashes.t State_hash.Map.t
 
@@ -35,6 +33,10 @@ module Protocol_states_for_root_scan_state : sig
     -> old_root_state:Protocol_state.value State_hash.With_state_hashes.t
     -> Protocol_state.value State_hash.With_state_hashes.t list
 end
+
+include
+  Frontier_intf.S
+    with module Protocol_states_for_root_scan_state := Protocol_states_for_root_scan_state
 
 val create :
      context:(module CONTEXT)
@@ -53,9 +55,6 @@ val close : loc:string -> t -> unit
 val root_data : t -> Root_data.t
 
 val calculate_diffs : t -> Breadcrumb.t -> Diff.Full.E.t list
-
-val protocol_states_for_root_scan_state :
-  t -> Protocol_states_for_root_scan_state.t
 
 val apply_diffs :
      t
