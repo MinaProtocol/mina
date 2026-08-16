@@ -532,9 +532,14 @@ module Make (Inputs : Intf.Inputs.DATABASE) = struct
       (Hash.hash_account account)
 
   let index_of_account_exn mdb account_id =
-    let location = location_of_account mdb account_id |> Option.value_exn in
-    let addr = Location.to_path_exn location in
-    Addr.to_int addr
+    match location_of_account mdb account_id with
+    | Some location ->
+        let addr = Location.to_path_exn location in
+        Addr.to_int addr
+    | None ->
+        failwithf "Account of ID %s not found on database ledger at %s"
+          (Account_id.sexp_of_t account_id |> Sexplib.Sexp.to_string_hum)
+          mdb.directory ()
 
   let set_at_index_exn mdb index account =
     let addr = Addr.of_int_exn ~ledger_depth:mdb.depth index in
