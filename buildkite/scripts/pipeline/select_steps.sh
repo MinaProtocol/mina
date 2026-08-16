@@ -24,6 +24,11 @@
 #   --jobs DIR         Directory of rendered pipeline YAML (buildkite/src/gen)
 #   --select PATTERN   Pattern for a step key. Give it more than once to add
 #                      steps together. A pattern may hold * and ?.
+#   --set NAME         A named group of patterns from
+#                      buildkite/src/Constants/Artifact/Sets.dhall, which is
+#                      only sugar: it becomes patterns and is then treated the
+#                      same. Give it more than once, and mix it with --select.
+#   --list-sets        Write the sets that exist and stop.
 #   --format FORMAT    plan  (default) one "<file><TAB><step key>" for each step
 #                      keys  the step keys only
 #                      files the job files only, each one time
@@ -51,7 +56,11 @@ source "${SCRIPT_DIR}/../monorepo_lib.sh"
 JOBS_DIR=""
 FORMAT="plan"
 QUIET=0
+LIST_SETS=0
 declare -a PATTERNS=()
+declare -a SETS=()
+
+SETS_DHALL="${SCRIPT_DIR}/../../src/Constants/Artifact/Sets.dhall"
 
 usage() {
     sed -n '3,45p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
@@ -66,15 +75,66 @@ fail() {
 while [[ "$#" -gt 0 ]]; do case "$1" in
     --jobs)   JOBS_DIR="${2:-}"; shift 2 ;;
     --select) PATTERNS+=("${2:-}"); shift 2 ;;
+    --set)    SETS+=("${2:-}"); shift 2 ;;
+    --list-sets) LIST_SETS=1; shift ;;
     --format) FORMAT="${2:-}"; shift 2 ;;
     --quiet)  QUIET=1; shift ;;
     -h|--help) usage 0 ;;
     *) echo "Unknown option: $1" >&2; usage 2 ;;
 esac; done
 
+# ---------------------------------------------------------------------------
+# A set is only a name for some patterns. It is read from the dhall file, so the
+# names live in one place and this script holds no copy of them.
+# ---------------------------------------------------------------------------
+
+read_sets() {
+    command -v dhall-to-json > /dev/null 2>&1 || fail "'dhall-to-json' is not installed, so --set cannot be used."
+    [[ -f "$SETS_DHALL" ]] || fail "'${SETS_DHALL}' is not there."
+    dhall-to-json <<< "(${SETS_DHALL}).sets" 2>/dev/null \
+        || fail "cannot read ${SETS_DHALL}."
+}
+
+if [[ "$LIST_SETS" -eq 1 ]]; then
+    read_sets | python3 -c '
+import json, sys
+for s in json.load(sys.stdin):
+    print("%-12s %s" % (s["name"], s["description"]))
+    print("%-12s   %s" % ("", " ".join(s["patterns"])))
+'
+    exit 0
+fi
+
+if [[ "${#SETS[@]}" -gt 0 ]]; then
+    SETS_JSON="$(read_sets)"
+    for want in "${SETS[@]}"; do
+        found="$(echo "$SETS_JSON" | python3 -c "
+import json, sys
+want = sys.argv[1]
+for s in json.load(sys.stdin):
+    if s['name'] == want:
+        print('\n'.join(s['patterns']))
+" "$want")"
+        if [[ -z "$found" ]]; then
+            {
+                echo "ERROR: there is no set called '${want}'. These exist:"
+                echo "$SETS_JSON" | python3 -c "
+import json, sys
+for s in json.load(sys.stdin):
+    print('  %-12s %s' % (s['name'], s['description']))
+"
+            } >&2
+            exit 2
+        fi
+        while IFS= read -r pattern; do
+            [[ -n "$pattern" ]] && PATTERNS+=("$pattern")
+        done <<< "$found"
+    done
+fi
+
 [[ -n "$JOBS_DIR" ]] || fail "--jobs is required."
 [[ -d "$JOBS_DIR" ]] || fail "'${JOBS_DIR}' is not a directory."
-[[ "${#PATTERNS[@]}" -gt 0 ]] || fail "give at least one --select."
+[[ "${#PATTERNS[@]}" -gt 0 ]] || fail "give at least one --select or --set."
 
 case "$FORMAT" in
     plan|keys|files) ;;
