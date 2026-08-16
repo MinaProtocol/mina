@@ -219,6 +219,32 @@ test_a_pattern_that_matches_nothing_stops() {
     fi
 }
 
+# A set is only sugar: it must give exactly what its patterns give.
+test_a_set_is_the_same_as_its_patterns() {
+    local by_set by_pattern
+    by_set="$("$SELECT" --jobs "$JOBS_DIR" --format keys --quiet --set dockers)"
+    by_pattern="$(select_keys --select '*-docker-image')"
+    assert_eq "a set and its pattern agree" "$by_pattern" "$by_set"
+}
+
+test_a_set_that_is_not_known_stops() {
+    local out status=0
+    out="$("$SELECT" --jobs "$JOBS_DIR" --format keys --set no-such-set 2>&1)" || status=$?
+    assert_eq "exit code" "2" "$status"
+    if echo "$out" | grep -q "dockers"; then
+        log_pass
+    else
+        log_fail "the message must write the sets that do exist"
+    fi
+}
+
+test_the_sets_can_be_listed() {
+    local out
+    out="$("$SELECT" --list-sets)"
+    if echo "$out" | grep -q "automode"; then log_pass; else log_fail "automode is missing"; fi
+    if echo "$out" | grep -q "docker-image"; then log_pass; else log_fail "the patterns are missing"; fi
+}
+
 test_wrong_arguments_stop() {
     local status
 
@@ -254,6 +280,9 @@ main() {
     run_test test_more_than_one_select_adds_up
     run_test test_formats
     run_test test_a_pattern_that_matches_nothing_stops
+    run_test test_a_set_is_the_same_as_its_patterns
+    run_test test_a_set_that_is_not_known_stops
+    run_test test_the_sets_can_be_listed
     run_test test_wrong_arguments_stop
 
     teardown_fixture
