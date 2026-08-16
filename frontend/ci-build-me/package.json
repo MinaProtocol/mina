@@ -7,13 +7,18 @@
     "coverage": "jest --coverage",
     "lint": "eslint src/** test/**",
     "start": "nodemon -x functions-framework --target=githubWebhookHandler",
-    "test": "jest"
+    "test": "node test/safe-input.test.js"
   },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/eddies/github-webhook-cloud-function.git"
   },
-  "keywords": ["github", "buildkite", "google cloud functions", "node"],
+  "keywords": [
+    "github",
+    "buildkite",
+    "google cloud functions",
+    "node"
+  ],
   "author": "O(1) Labs (forked from Edwin Shin)",
   "license": "ISC",
   "bugs": {
@@ -33,11 +38,16 @@
     "smee-client": "^1.1.0"
   },
   "jest": {
-    "collectCoverageFrom": ["src/**/*.js"],
+    "collectCoverageFrom": [
+      "src/**/*.js"
+    ],
     "coverageDirectory": "build/coverage",
     "testEnvironment": "node"
   },
   "nodemonConfig": {
-    "ignore": ["test/*", "docs/*"]
+    "ignore": [
+      "test/*",
+      "docs/*"
+    ]
   }
 }

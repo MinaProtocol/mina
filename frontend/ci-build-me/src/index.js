@@ -3,6 +3,7 @@ const HTTPError = require("./util/httpError");
 
 const { httpsRequest } = require("./util/httpsRequest");
 const axios = require("axios");
+const { checkArgument } = require("./safe-input.js");
 
 const apiKey = process.env.BUILDKITE_API_ACCESS_TOKEN;
 
@@ -245,13 +246,20 @@ const handler = async (event, req) => {
 
       const jobName = req.body.comment.body.trim().split(/\s+/).pop(); // get JobName from "!ci-single-me JobName"
 
+      // The name is put into a dhall expression on the agent, so it is checked
+      // before it goes anywhere. See src/safe-input.js.
+      const checked = checkArgument("!ci-single-me", jobName);
+      if (checked.error) {
+        return [checked.error, checked.error];
+      }
+
       const buildkite = await runBuild(
         {
           sender: req.body.sender,
           pull_request: prData.data,
         },
         "mina-single-job",
-        { JOB_NAME: jobName }
+        { JOB_NAME: checked.value }
       );
       return [buildkite];
     } else {
