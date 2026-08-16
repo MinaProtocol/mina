@@ -1,0 +1,70 @@
+# Example usage: 
+# docker build --build-arg refspec=compatible --build-arg commit=origin/compatible --build-arg profile=devnet -f Dockerfile-mina-daemon-slim -t mina-daemon-slim-devnet .
+ARG toolchain=gcr.io/o1labs-192920/mina-toolchain:ca666b3-bullseye-berkeley
+
+ARG base=ubuntu:noble
+
+ARG profile=mainnet 
+
+FROM ${toolchain} AS builder
+
+ARG profile
+
+USER opam
+
+WORKDIR /home/opam/mina
+
+ARG refspec=lyh/portable-build
+ARG commit=862052ba161
+
+RUN git fetch --prune origin ${refspec} \
+  && git reset --hard ${commit} \
+  && git clean -fd \
+  && git submodule sync \
+  && git submodule update --init --recursive --depth 1
+
+RUN ./scripts/build-portable.sh ${profile}
+
+FROM ${base}
+
+ARG profile
+
+# curl & ca-certificates: Mina will use curl to download ledger tar when bootstrapping
+# tzdata: Stdlib.open_in_gen expects /etc/localtime to be available
+# dumb-init: used to workaround pid 0 quirks
+RUN apt-get update \
+  && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+    curl \
+    ca-certificates \
+    tzdata \
+    dumb-init \
+  && rm -rf /var/lib/apt/lists/*
+
+ARG timezone="Asia/Shanghai"
+RUN ln -snf /usr/share/zoneinfo/$timezone /etc/localtime \
+  && echo $timezone > /etc/timezone
+
+WORKDIR /opt/mina
+
+ENV PATH="/opt/mina/bin:${PATH}"
+
+COPY scripts/healthcheck-utilities.sh /healthcheck/utilities.sh
+COPY scripts/cron_job_dump_ledger.sh /cron_job_dump_ledger.sh
+COPY scripts/daemon-entrypoint.sh /entrypoint.sh
+COPY auxiliary_entrypoints /entrypoint.d
+COPY puppeteer-context/* /
+
+ENV MINA_TIME_OFFSET 0
+
+# Copy all dyn libraries
+COPY --from=builder /home/opam/mina/_build_portable/lib lib
+COPY --from=builder /home/opam/mina/_build_portable/bin/mina-libp2p_helper bin/mina-libp2p_helper
+COPY --from=builder /home/opam/mina/_build_portable/bin/runtime_genesis_ledger bin/mina-create-genesis
+COPY --from=builder /home/opam/mina/_build_portable/bin/validate_keypair bin/mina-validate-keypair
+COPY --from=builder /home/opam/mina/_build_portable/bin/mina-standalone-snark-worker bin/mina-standalone-snark-worker
+COPY --from=builder /home/opam/mina/_build_portable/bin/mina bin/mina
+
+# Copy genesis ledgers
+COPY --from=builder /home/opam/mina/genesis_ledgers data/genesis_ledgers
+
+ENTRYPOINT ["/usr/bin/dumb-init", "/entrypoint.sh"]
