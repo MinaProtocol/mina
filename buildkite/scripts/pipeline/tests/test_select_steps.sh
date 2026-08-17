@@ -222,7 +222,7 @@ test_a_pattern_that_matches_nothing_stops() {
 # A set is only sugar: it must give exactly what its patterns give.
 test_a_set_is_the_same_as_its_patterns() {
     local by_set by_pattern
-    by_set="$("$SELECT" --jobs "$JOBS_DIR" --format keys --quiet --set dockers)"
+    by_set="$("$SELECT" --jobs "$JOBS_DIR" --format keys --quiet --set all)"
     by_pattern="$(select_keys --select '*-docker-image')"
     assert_eq "a set and its pattern agree" "$by_pattern" "$by_set"
 }
@@ -231,7 +231,7 @@ test_a_set_that_is_not_known_stops() {
     local out status=0
     out="$("$SELECT" --jobs "$JOBS_DIR" --format keys --set no-such-set 2>&1)" || status=$?
     assert_eq "exit code" "2" "$status"
-    if echo "$out" | grep -q "dockers"; then
+    if echo "$out" | grep -q "automode"; then
         log_pass
     else
         log_fail "the message must write the sets that do exist"
@@ -243,6 +243,58 @@ test_the_sets_can_be_listed() {
     out="$("$SELECT" --list-sets)"
     if echo "$out" | grep -q "automode"; then log_pass; else log_fail "automode is missing"; fi
     if echo "$out" | grep -q "docker-image"; then log_pass; else log_fail "the patterns are missing"; fi
+}
+
+# The layer decides which side of a set is read. A set names an artifact, and an
+# artifact can appear in one layer and not the other.
+test_the_layer_chooses_the_side_of_a_set() {
+    local out status=0
+
+    out="$(select_keys --layer debian --set archive)"
+    assert_eq "the debian layer asks for the packaging step" \
+        "_Package-build-deb-pkg" "$(echo "$out" | grep -c 'build-deb-pkg' > /dev/null && echo '_Package-build-deb-pkg')"
+
+    # prefork has packages and no image.
+    "$SELECT" --jobs "$JOBS_DIR" --format keys --quiet --layer docker --set prefork > /dev/null 2>&1 || status=$?
+    assert_eq "a set with no image stops" "2" "$status"
+
+    status=0
+    "$SELECT" --jobs "$JOBS_DIR" --format keys --quiet --layer debian --set prefork > /dev/null 2>&1 || status=$?
+    assert_eq "the same set is fine in the debian layer" "0" "$status"
+}
+
+test_the_debian_patterns_can_be_printed() {
+    local out
+    out="$("$SELECT" --print-debians --set prefork)"
+    if echo "$out" | grep -q "prefork_.*_genesis_ledger"; then
+        log_pass
+    else
+        log_fail "the genesis ledger package is missing from '${out}'"
+    fi
+}
+
+# The filters are put on the steps that were ASKED for, never on the ones added
+# because something needs them: keeping to one job must not throw away the
+# debian step that the chosen image is built from.
+test_a_filter_never_removes_a_dependency() {
+    local out
+    out="$(select_keys --select '*-docker-image' --job-include 'Package')"
+    assert_has "the image asked for" "$out" "_Package-archive-devnet-docker-image"
+    assert_has "the debians it needs" "$out" "_Package-build-deb-pkg"
+    assert_has "the apps job, whose name the filter rejects" "$out" "_Apps-build-apps"
+}
+
+test_a_filter_can_exclude_a_job() {
+    local out status=0
+    out="$("$SELECT" --jobs "$JOBS_DIR" --format keys --quiet \
+        --select '*-docker-image' --job-exclude 'Package' 2>&1)" || status=$?
+    assert_eq "nothing is left to choose" "1" "$status"
+}
+
+test_a_key_filter_narrows_the_network() {
+    local out
+    out="$(select_keys --select '*-docker-image' --key-include '*-devnet-*')"
+    assert_has "the devnet image" "$out" "_Package-archive-devnet-docker-image"
 }
 
 test_wrong_arguments_stop() {
@@ -283,6 +335,11 @@ main() {
     run_test test_a_set_is_the_same_as_its_patterns
     run_test test_a_set_that_is_not_known_stops
     run_test test_the_sets_can_be_listed
+    run_test test_the_layer_chooses_the_side_of_a_set
+    run_test test_the_debian_patterns_can_be_printed
+    run_test test_a_filter_never_removes_a_dependency
+    run_test test_a_filter_can_exclude_a_job
+    run_test test_a_key_filter_narrows_the_network
     run_test test_wrong_arguments_stop
 
     teardown_fixture

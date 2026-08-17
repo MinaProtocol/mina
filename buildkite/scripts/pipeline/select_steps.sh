@@ -24,16 +24,35 @@
 #   --jobs DIR         Directory of rendered pipeline YAML (buildkite/src/gen)
 #   --select PATTERN   Pattern for a step key. Give it more than once to add
 #                      steps together. A pattern may hold * and ?.
-#   --set NAME         A named group of patterns from
-#                      buildkite/src/Constants/Artifact/Sets.dhall, which is
-#                      only sugar: it becomes patterns and is then treated the
-#                      same. Give it more than once, and mix it with --select.
+#   --set NAME         An artifact of the product, from
+#                      buildkite/src/Constants/Artifact/Sets.dhall (daemon,
+#                      archive, rosetta, automode, prefork, all ...). It is only
+#                      sugar: it becomes patterns and is then treated the same.
+#                      Give it more than once, and mix it with --select.
+#   --layer LAYER      docker (default) or debian. It says which side of a set
+#                      is wanted: the images it names, or the step that builds
+#                      its packages. A set that has nothing on the chosen side
+#                      stops the run rather than building nothing.
+#   --print-debians    With --set, write the debian package patterns of those
+#                      sets and stop. This is the other half of --layer debian,
+#                      and it keeps Sets.dhall the only place the names live.
+#   --job-include GLOB Choose a step only if the name of its job matches. Use it
+#                      for codename and architecture, which are in the job name
+#                      and not in the key. Repeatable; one match is enough.
+#   --job-exclude GLOB Do not choose a step whose job name matches. Repeatable.
+#   --key-include GLOB Choose a step only if its key matches as well. Use it for
+#                      the network or the profile. Repeatable; one is enough.
+#   --print-segments   Write what network= and profile= may say, and stop.
 #   --list-sets        Write the sets that exist and stop.
 #   --format FORMAT    plan  (default) one "<file><TAB><step key>" for each step
 #                      keys  the step keys only
 #                      files the job files only, each one time
 #   --quiet            Do not write the report on stderr.
 #   -h, --help         Write this text.
+#
+# The filters are put on the steps that were ASKED for, never on the steps that
+# were added because something needs them. Narrowing to one codename must not
+# throw away the debian step that the chosen image is built from.
 #
 # A pattern is matched against the whole key and against the key without the
 # "_<JobName>-" that the renderer puts in front, so both of these choose the
@@ -57,13 +76,19 @@ JOBS_DIR=""
 FORMAT="plan"
 QUIET=0
 LIST_SETS=0
+LAYER="docker"
+PRINT_DEBIANS=0
+PRINT_SEGMENTS=0
 declare -a PATTERNS=()
 declare -a SETS=()
+declare -a JOB_INCLUDE=()
+declare -a JOB_EXCLUDE=()
+declare -a KEY_INCLUDE=()
 
 SETS_DHALL="${SCRIPT_DIR}/../../src/Constants/Artifact/Sets.dhall"
 
 usage() {
-    sed -n '3,45p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
+    sed -n '3,64p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
     exit "${1:-0}"
 }
 
@@ -76,12 +101,23 @@ while [[ "$#" -gt 0 ]]; do case "$1" in
     --jobs)   JOBS_DIR="${2:-}"; shift 2 ;;
     --select) PATTERNS+=("${2:-}"); shift 2 ;;
     --set)    SETS+=("${2:-}"); shift 2 ;;
+    --layer)  LAYER="${2:-}"; shift 2 ;;
+    --print-debians) PRINT_DEBIANS=1; shift ;;
+    --print-segments) PRINT_SEGMENTS=1; shift ;;
+    --job-include) JOB_INCLUDE+=("${2:-}"); shift 2 ;;
+    --job-exclude) JOB_EXCLUDE+=("${2:-}"); shift 2 ;;
+    --key-include) KEY_INCLUDE+=("${2:-}"); shift 2 ;;
     --list-sets) LIST_SETS=1; shift ;;
     --format) FORMAT="${2:-}"; shift 2 ;;
     --quiet)  QUIET=1; shift ;;
     -h|--help) usage 0 ;;
     *) echo "Unknown option: $1" >&2; usage 2 ;;
 esac; done
+
+case "$LAYER" in
+    docker|debian) ;;
+    *) fail "--layer must be docker or debian." ;;
+esac
 
 # ---------------------------------------------------------------------------
 # A set is only a name for some patterns. It is read from the dhall file, so the
@@ -99,37 +135,81 @@ if [[ "$LIST_SETS" -eq 1 ]]; then
     read_sets | python3 -c '
 import json, sys
 for s in json.load(sys.stdin):
-    print("%-12s %s" % (s["name"], s["description"]))
-    print("%-12s   %s" % ("", " ".join(s["patterns"])))
+    print("%-20s %s" % (s["name"], s["description"]))
+    print("%-20s   dockers: %s" % ("", " ".join(s["dockers"]) or "(none)"))
+    print("%-20s   debians: %s" % ("", " ".join(s["debians"]) or "(none)"))
 '
     exit 0
 fi
 
-if [[ "${#SETS[@]}" -gt 0 ]]; then
-    SETS_JSON="$(read_sets)"
+# A set is looked up once. Which of its two sides is read depends on the layer:
+# the docker patterns are step keys, and the debian patterns are package tokens
+# that only narrow_debian_tokens.py understands, so they leave by another door.
+expand_sets() {
+    local field="$1"
+    local sets_json want found
+    sets_json="$(read_sets)"
     for want in "${SETS[@]}"; do
-        found="$(echo "$SETS_JSON" | python3 -c "
+        found="$(echo "$sets_json" | python3 -c "
 import json, sys
-want = sys.argv[1]
+want, field = sys.argv[1], sys.argv[2]
 for s in json.load(sys.stdin):
     if s['name'] == want:
-        print('\n'.join(s['patterns']))
-" "$want")"
-        if [[ -z "$found" ]]; then
+        print('\n'.join(s[field]))
+        break
+else:
+    sys.exit(3)
+" "$want" "$field")" || {
             {
                 echo "ERROR: there is no set called '${want}'. These exist:"
-                echo "$SETS_JSON" | python3 -c "
+                echo "$sets_json" | python3 -c "
 import json, sys
 for s in json.load(sys.stdin):
-    print('  %-12s %s' % (s['name'], s['description']))
+    print('  %-20s %s' % (s['name'], s['description']))
 "
             } >&2
             exit 2
+        }
+        if [[ -z "$found" ]]; then
+            echo "ERROR: the set '${want}' builds no ${field%s} at all. Ask for it in the other layer." >&2
+            exit 2
         fi
         while IFS= read -r pattern; do
-            [[ -n "$pattern" ]] && PATTERNS+=("$pattern")
+            [[ -n "$pattern" ]] && echo "$pattern"
         done <<< "$found"
     done
+}
+
+if [[ "$PRINT_DEBIANS" -eq 1 ]]; then
+    [[ "${#SETS[@]}" -gt 0 ]] || fail "--print-debians needs at least one --set."
+    expand_sets debians
+    exit 0
+fi
+
+if [[ "$PRINT_SEGMENTS" -eq 1 ]]; then
+    command -v dhall-to-json > /dev/null 2>&1 || fail "'dhall-to-json' is not installed."
+    dhall-to-json <<< "(${SETS_DHALL}).segments" \
+        | python3 -c 'import json,sys; print("\n".join(json.load(sys.stdin)))'
+    exit 0
+fi
+
+if [[ "${#SETS[@]}" -gt 0 ]]; then
+    if [[ "$LAYER" == "debian" ]]; then
+        # Every package of a pipeline is built by one step, so the debian side of
+        # a set does not choose steps. It checks that the set HAS a debian side,
+        # and then asks for that one step; the narrowing script cuts the list
+        # down afterwards, out of --print-debians.
+        expand_sets debians > /dev/null
+        PATTERNS+=("build-deb-pkg")
+    else
+        # Captured, not read through a process substitution: expand_sets stops
+        # the run when a set has no docker side, and an exit inside a process
+        # substitution would be lost.
+        expanded="$(expand_sets dockers)"
+        while IFS= read -r pattern; do
+            [[ -n "$pattern" ]] && PATTERNS+=("$pattern")
+        done <<< "$expanded"
+    fi
 fi
 
 [[ -n "$JOBS_DIR" ]] || fail "--jobs is required."
@@ -184,20 +264,72 @@ short_key() {
 declare -A CHOSEN=()
 declare -A REASON=()
 
+# The name of the job that holds a key: "_MinaArtifactBullseye-archive-..." is
+# built by MinaArtifactBullseye. The codename and the architecture are in there
+# and nowhere else, which is why they are filtered here and not by a pattern.
+job_of() {
+    local key="$1"
+    key="${key#_}"
+    echo "${key%%-*}"
+}
+
+# True when a step may be CHOSEN. It says nothing about a step that is added
+# afterwards because something needs it.
+passes_filters() {
+    local key="$1"
+    local job pat ok
+
+    job="$(job_of "$key")"
+
+    for pat in "${JOB_EXCLUDE[@]+"${JOB_EXCLUDE[@]}"}"; do
+        # shellcheck disable=SC2053  # the pattern is meant to be a glob
+        [[ "$job" == $pat ]] && return 1
+    done
+
+    if [[ "${#JOB_INCLUDE[@]}" -gt 0 ]]; then
+        ok=1
+        for pat in "${JOB_INCLUDE[@]}"; do
+            # shellcheck disable=SC2053
+            [[ "$job" == $pat ]] && { ok=0; break; }
+        done
+        [[ "$ok" -eq 0 ]] || return 1
+    fi
+
+    if [[ "${#KEY_INCLUDE[@]}" -gt 0 ]]; then
+        ok=1
+        for pat in "${KEY_INCLUDE[@]}"; do
+            # shellcheck disable=SC2053
+            [[ "$key" == $pat ]] && { ok=0; break; }
+        done
+        [[ "$ok" -eq 0 ]] || return 1
+    fi
+
+    return 0
+}
+
 for pattern in "${PATTERNS[@]}"; do
     matched=0
+    filtered=0
     for key in "${!STEP_KEY_TO_FILE[@]}"; do
         # shellcheck disable=SC2053  # the pattern is meant to be a glob
         if [[ "$key" == $pattern || "$(short_key "$key")" == $pattern ]]; then
-            if [[ -z "${CHOSEN[$key]-}" ]]; then
-                CHOSEN["$key"]=1
-                REASON["$key"]="asked for (${pattern})"
+            if passes_filters "$key"; then
+                if [[ -z "${CHOSEN[$key]-}" ]]; then
+                    CHOSEN["$key"]=1
+                    REASON["$key"]="asked for (${pattern})"
+                fi
+                matched=1
+            else
+                filtered=1
             fi
-            matched=1
         fi
     done
     if [[ "$matched" -eq 0 ]]; then
-        report "⚠️  no step matches '${pattern}'"
+        if [[ "$filtered" -eq 1 ]]; then
+            report "⚠️  '${pattern}' matches steps, but none that the codename, architecture, network or profile allows"
+        else
+            report "⚠️  no step matches '${pattern}'"
+        fi
     fi
 done
 

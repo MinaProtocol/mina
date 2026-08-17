@@ -102,7 +102,10 @@ function read(){
     fi
 
     local __override=0
-    local __root="$BUILDKITE_BUILD_ID"
+    # MINA_READ_CACHE_ROOT lets a build read what an EARLIER build left behind,
+    # which is what "from=<build id>" asks for. It is honoured when reading and
+    # never when writing, so a build can never write into another build's root.
+    local __root="${MINA_READ_CACHE_ROOT:-$BUILDKITE_BUILD_ID}"
     local __skip_dirs_creation=0
     local __inputs=()
     local __to=""

@@ -121,26 +121,75 @@ check "and it is in no command" "0" \
     "$(echo "$out" | grep 'build-from-cache.sh' | grep -c 'archive_devnet')"
 
 echo "TEST: a name that is a set is read as a set, not as a pattern"
-# 'dockers' names a set. As a pattern it would match no key at all, so this
-# passes only if the name was expanded.
-out="$(run_selection BUILDKITE_PIPELINE_SELECTION='dockers')"
-check "it says which name was read as a set" "1" \
-    "$(echo "$out" | grep -c 'Read as a set of steps: dockers')"
+# 'all' names a set. As a pattern it would match no key at all, so this passes
+# only if the name was expanded.
+out="$(run_selection BUILDKITE_PIPELINE_SELECTION='all')"
+check "it says what was asked for" "1" \
+    "$(echo "$out" | grep -c 'Asked for: all')"
 check "both images are chosen" \
     "_Apps-build-apps _Package-archive-devnet-docker-image _Package-build-deb-pkg _Package-daemon_config-devnet-docker-image " \
     "$(echo "$out" | run_set)"
 
-echo "TEST: a set and a pattern add up"
-out="$(run_selection BUILDKITE_PIPELINE_SELECTION='debians,archive-devnet-docker-image')"
-check "the set is named" "1" "$(echo "$out" | grep -c 'Read as a set of steps: debians')"
-check "the pattern is kept too" \
+echo "TEST: a set names ONE artifact, not a layer or a tier"
+out="$(run_selection BUILDKITE_PIPELINE_SELECTION='archive')"
+check "only the archive image and what it needs" \
     "_Apps-build-apps _Package-archive-devnet-docker-image _Package-build-deb-pkg " \
+    "$(echo "$out" | run_set)"
+
+echo "TEST: a set and a pattern add up"
+out="$(run_selection BUILDKITE_PIPELINE_SELECTION='archive,daemon_config-devnet-docker-image')"
+check "both are kept" \
+    "_Apps-build-apps _Package-archive-devnet-docker-image _Package-build-deb-pkg _Package-daemon_config-devnet-docker-image " \
     "$(echo "$out" | run_set)"
 
 echo "TEST: a name that is no set is still a pattern, and a wrong one stops"
 status=0
-run_selection BUILDKITE_PIPELINE_SELECTION='dockrs' > /dev/null 2>&1 || status=$?
+run_selection BUILDKITE_PIPELINE_SELECTION='archiv' > /dev/null 2>&1 || status=$?
 check "exit code" "1" "$status"
+
+echo "TEST: the layer decides which side of a set is read"
+out="$(run_selection BUILDKITE_PIPELINE_LAYER=debian BUILDKITE_PIPELINE_SELECTION='logproc' -- --debug)"
+check "the debian step is asked for, not an image" \
+    "_Apps-build-apps _Package-build-deb-pkg " \
+    "$(echo "$out" | run_set)"
+check "the package list is cut to what was asked for" "2" \
+    "$(echo "$out" | grep -c 'build-from-cache.sh bullseye logproc')"
+
+echo "TEST: a set with nothing in the chosen layer stops the run"
+# 'prefork' builds packages and no image, so asking for it as an image is a
+# mistake worth stopping on rather than building nothing.
+status=0
+run_selection BUILDKITE_PIPELINE_LAYER=docker BUILDKITE_PIPELINE_SELECTION='prefork' > /dev/null 2>&1 || status=$?
+check "exit code" "2" "$status"
+msg="$(run_selection BUILDKITE_PIPELINE_LAYER=docker BUILDKITE_PIPELINE_SELECTION='prefork' 2>&1 || true)"
+check "it says why" "1" "$(echo "$msg" | grep -c 'builds no docker')"
+
+echo "TEST: the codename filter reads the job name, not the key"
+out="$(run_selection BUILDKITE_PIPELINE_SELECTION='all' BUILDKITE_PIPELINE_CODENAME='package')"
+check "the job whose name matches is kept" "1" "$(echo "$out" | grep -c 'would upload Package')"
+out="$(run_selection BUILDKITE_PIPELINE_SELECTION='all' BUILDKITE_PIPELINE_CODENAME='nosuchcodename' 2>&1 || true)"
+check "a codename that matches nothing stops" "1" \
+    "$(echo "$out" | grep -c 'none that the codename')"
+
+echo "TEST: the network filter reads the key, and only for images"
+out="$(run_selection BUILDKITE_PIPELINE_SELECTION='all' BUILDKITE_PIPELINE_NETWORK='devnet')"
+check "the devnet images are kept" \
+    "_Apps-build-apps _Package-archive-devnet-docker-image _Package-build-deb-pkg _Package-daemon_config-devnet-docker-image " \
+    "$(echo "$out" | run_set)"
+out="$(run_selection BUILDKITE_PIPELINE_SELECTION='all' BUILDKITE_PIPELINE_NETWORK='mainnet' 2>&1 || true)"
+check "a network with no image stops" "1" "$(echo "$out" | grep -c 'none that the codename')"
+
+echo "TEST: --from drops what it takes from the other build"
+out="$(run_selection BUILDKITE_PIPELINE_SELECTION='archive' BUILDKITE_PIPELINE_FROM_BUILD='an-older-build' -- --debug)"
+check "the apps and the debians are dropped" \
+    "_Package-archive-devnet-docker-image " \
+    "$(echo "$out" | run_set)"
+check "it says where they come from" "1" \
+    "$(echo "$out" | grep -c 'Taking the binaries and the packages from build an-older-build')"
+check "the cache root is put on the step" "1" \
+    "$(echo "$out" | grep -c 'MINA_READ_CACHE_ROOT: an-older-build')"
+check "nothing waits for a step that is not coming" "0" \
+    "$(echo "$out" | grep -c 'depends_on')"
 
 echo "TEST: with neither, the script stops rather than building everything"
 status=0
