@@ -21,7 +21,7 @@ module Missing_blocks_count = struct
 
      The count is computed purely arithmetically: the number of heights
      in the window ([window_end - window_start + 1]) minus the number of
-     blocks actually present in that range.  This avoids materialising a
+     distinct heights present in that range.  This avoids materialising a
      [generate_series] row per height and the LEFT JOIN against it.  On
      an empty [blocks] table [MIN]/[MAX] are NULL, so the whole
      expression is NULL; the outer [COALESCE(..., 0)] keeps the
@@ -40,7 +40,7 @@ module Missing_blocks_count = struct
         )
         SELECT COALESCE(
                  (window_end - window_start + 1)
-                 - (SELECT COUNT(*) FROM blocks
+                 - (SELECT COUNT(DISTINCT height) FROM blocks
                     WHERE height BETWEEN window_start AND window_end),
                  0)::int AS missing_blocks
         FROM window_bounds

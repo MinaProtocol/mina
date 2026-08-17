@@ -113,7 +113,7 @@ let start t =
   let args = Config.to_args t.config in
   let%bind _, process = Executor.run_in_background t.executor ~args () in
   (* Callers that need to gate on archive readiness should use
-     [Healthcheck.wait_db_ready] rather than relying on this fixed
+     [Archive_healthcheck.wait_db_ready] rather than relying on this fixed
      sleep — it polls the DB directly and survives schema-load
      latency variation. *)
   let%map () = after (Time.Span.of_sec 5.) in
