@@ -46,7 +46,9 @@
 #   DOCKER_SUFFIX    tag suffix after codename    (default: -devnet)
 #   JOBS             containers in parallel       (default: 4)
 #
-# At least one of PACKAGES, IMAGES or AUTOMODE must be set in artifacts mode.
+# With none of PACKAGES, IMAGES or AUTOMODE set, artifacts mode falls back to a
+# default set covering devnet (alpha) and mainnet (stable), so an unconfigured
+# daily schedule still tests both networks.
 
 set -eo pipefail
 
@@ -89,22 +91,29 @@ case "$VERIFY_MODE" in
     JOBS="${JOBS:-4}"
     OUTPUT_DIR="${OUTPUT_DIR:-${PWD}/verification-results}"
 
+    # Default coverage: both networks, no versions. Every entry is a bare name, so
+    # each resolves to whatever its channel offers on the day the schedule runs,
+    # and nothing here goes stale after a release. Devnet artifacts live in alpha
+    # and mainnet ones in stable, which is what the @stable entries are for.
+    #
+    # The prefork and postfork runtimes are not listed separately: the automode
+    # metapackage pulls both in, and installing it unpinned is the case that
+    # catches a channel unable to satisfy its own pin. That is how the devnet
+    # release broke twice in August, and the mainnet one after it.
+    #
+    # Docker images are not defaulted. A tag carries its version and has no
+    # channel to resolve against, so a schedule wanting image coverage must name
+    # the versions itself.
+    DEFAULT_PACKAGES="mina-devnet,mina-archive-devnet,mina-rosetta-devnet,mina-logproc"
+    DEFAULT_PACKAGES="${DEFAULT_PACKAGES},mina-mainnet@stable,mina-archive-mainnet@stable,mina-rosetta-mainnet@stable"
+    DEFAULT_AUTOMODE="mina-devnet-automode,mina-mainnet-automode@stable"
+
     if [[ -z "${PACKAGES:-}" && -z "${IMAGES:-}" && -z "${AUTOMODE:-}" ]]; then
-      echo "ERROR: artifacts mode needs at least one of PACKAGES, IMAGES or AUTOMODE." >&2
-      echo >&2
-      echo "For a recurring schedule prefer bare package names, so the schedule never" >&2
-      echo "carries a version that goes stale after a release. Add @channel to reach a" >&2
-      echo "second network, which lives in a different component:" >&2
-      echo "  PACKAGES=mina-devnet,mina-archive-devnet,mina-rosetta-devnet,mina-mainnet@stable" >&2
-      echo >&2
-      echo "Pin a version only when testing one specific release:" >&2
-      echo "  PACKAGES=mina-devnet=3.5.0-devnet-stop-slot-98e7835" >&2
-      echo "  AUTOMODE=mina-devnet-automode=4.0.0-devnet-ca2ccb1" >&2
-      echo >&2
-      echo "Docker images always need an explicit version, because a tag has no" >&2
-      echo "channel to resolve against:" >&2
-      echo "  IMAGES=mina-daemon=3.5.0-devnet-stop-slot-98e7835" >&2
-      exit 1
+      PACKAGES="$DEFAULT_PACKAGES"
+      AUTOMODE="$DEFAULT_AUTOMODE"
+      echo "No PACKAGES, IMAGES or AUTOMODE given; using the default both-network set:"
+      echo "  PACKAGES=$PACKAGES"
+      echo "  AUTOMODE=$AUTOMODE"
     fi
 
     ARGS=(
