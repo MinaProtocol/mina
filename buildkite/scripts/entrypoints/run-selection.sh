@@ -12,6 +12,10 @@
 #   --selection LIST   Patterns for step keys, separated by commas. This is what
 #                      the author of the comment wrote, so it is not trusted:
 #                      every pattern must match a step, or the script stops.
+#   --deb LIST         Patterns for debian package tokens, separated by commas
+#                      (prefork_*, logproc, ...). The debian step of a job is
+#                      then told to build only the packages that match.
+#                      See "Narrowing the debian step" below.
 #   --jobs DIR         Directory of rendered pipelines (buildkite/src/gen)
 #   --dry-run          Write what would be uploaded, upload nothing.
 #   --debug            Write the pruned pipeline of each job.
@@ -25,13 +29,28 @@
 # A step that waits for a step which is not uploaded waits for ever, so this
 # script never prunes a dependency away: select_steps.sh adds them, and the
 # check below fails the run if one is missing all the same.
+#
+# Narrowing the debian step
+# -------------------------
+# One step builds every debian package of a job:
+#
+#   build-from-cache.sh <variant> <token> <token> ...
+#
+# With --deb, that list is cut down to the tokens that match. It is only cut
+# down when NO docker image of that job is being built, because the images
+# install those .deb files from the build context (install-mina-debs.sh), so an
+# image whose packages were not built fails inside docker with a message about
+# a missing file. When an image survives, the whole list is kept and the reason
+# is written out.
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SELECT_STEPS="${SCRIPT_DIR}/../pipeline/select_steps.sh"
+NARROW_DEBS="${SCRIPT_DIR}/../pipeline/narrow_debian_tokens.py"
 
 SELECTION=""
+DEB_SELECTION=""
 JOBS_DIR=""
 DRY_RUN=false
 DEBUG=false
@@ -48,6 +67,7 @@ fail() {
 
 while [[ "$#" -gt 0 ]]; do case "$1" in
     --selection) SELECTION="${2:-}"; shift 2 ;;
+    --deb)       DEB_SELECTION="${2:-}"; shift 2 ;;
     --jobs)      JOBS_DIR="${2:-}"; shift 2 ;;
     --dry-run)   DRY_RUN=true; shift ;;
     --debug)     DEBUG=true; shift ;;
@@ -55,7 +75,12 @@ while [[ "$#" -gt 0 ]]; do case "$1" in
     *) echo "Unknown option: $1" >&2; usage 2 ;;
 esac; done
 
-[[ -n "$SELECTION" ]] || fail "--selection is required."
+if [[ -z "$SELECTION" && -n "$DEB_SELECTION" ]]; then
+    # Asking for packages means asking for the step that builds them.
+    SELECTION="build-deb-pkg"
+fi
+
+[[ -n "$SELECTION" ]] || fail "--selection or --deb is required."
 [[ -n "$JOBS_DIR" ]] || fail "--jobs is required."
 [[ -d "$JOBS_DIR" ]] || fail "'${JOBS_DIR}' is not a directory."
 [[ -x "$SELECT_STEPS" ]] || fail "'${SELECT_STEPS}' is not there."
@@ -139,6 +164,28 @@ for file in "${!JOB_STEPS[@]}"; do
         echo "ERROR: in job '${job_name}', these steps are waited for but not uploaded:${missing}" >&2
         echo "       select_steps.sh and this script disagree; that is a fault, not a bad request." >&2
         exit 2
+    fi
+
+    # Narrow the debian step, but only when this job builds no image: the
+    # images install those .deb files from the build context, so an image whose
+    # packages were not built fails inside docker.
+    if [[ -n "$DEB_SELECTION" && "${JOB_STEPS[$file]}" == *build-deb-pkg* ]]; then
+        if [[ "${JOB_STEPS[$file]}" == *docker-image* ]]; then
+            echo " !  ${job_name}: keeping every debian package, because this job also builds images that install them" >&2
+        else
+            declare -a deb_patterns=()
+            IFS=',' read -ra raw_debs <<< "$DEB_SELECTION"
+            for d in "${raw_debs[@]}"; do
+                d="$(echo "$d" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')"
+                [[ -n "$d" ]] && deb_patterns+=("$d")
+            done
+
+            if ! narrowed="$(echo "$pruned" | "$NARROW_DEBS" "${deb_patterns[@]}")"; then
+                echo "ERROR: in job '${job_name}', no debian package matches ${DEB_SELECTION}" >&2
+                exit 1
+            fi
+            pruned="$narrowed"
+        fi
     fi
 
     count="$(echo "$pruned" | yq -r '[.steps[]?] | length')"
