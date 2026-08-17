@@ -120,6 +120,28 @@ check "the package that was not asked for is dropped, and said so" "1" \
 check "and it is in no command" "0" \
     "$(echo "$out" | grep 'build-from-cache.sh' | grep -c 'archive_devnet')"
 
+echo "TEST: a name that is a set is read as a set, not as a pattern"
+# 'dockers' names a set. As a pattern it would match no key at all, so this
+# passes only if the name was expanded.
+out="$(run_selection BUILDKITE_PIPELINE_SELECTION='dockers')"
+check "it says which name was read as a set" "1" \
+    "$(echo "$out" | grep -c 'Read as a set of steps: dockers')"
+check "both images are chosen" \
+    "_Apps-build-apps _Package-archive-devnet-docker-image _Package-build-deb-pkg _Package-daemon_config-devnet-docker-image " \
+    "$(echo "$out" | run_set)"
+
+echo "TEST: a set and a pattern add up"
+out="$(run_selection BUILDKITE_PIPELINE_SELECTION='debians,archive-devnet-docker-image')"
+check "the set is named" "1" "$(echo "$out" | grep -c 'Read as a set of steps: debians')"
+check "the pattern is kept too" \
+    "_Apps-build-apps _Package-archive-devnet-docker-image _Package-build-deb-pkg " \
+    "$(echo "$out" | run_set)"
+
+echo "TEST: a name that is no set is still a pattern, and a wrong one stops"
+status=0
+run_selection BUILDKITE_PIPELINE_SELECTION='dockrs' > /dev/null 2>&1 || status=$?
+check "exit code" "1" "$status"
+
 echo "TEST: with neither, the script stops rather than building everything"
 status=0
 run_selection > /dev/null 2>&1 || status=$?

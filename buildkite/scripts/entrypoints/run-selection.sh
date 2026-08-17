@@ -7,11 +7,15 @@
 # those steps only. A job with no chosen step is not uploaded at all.
 #
 # Usage:
-#   run-selection.sh --selection "PATTERN[,PATTERN...]" --jobs DIR [options]
+#   run-selection.sh --selection "SET_OR_PATTERN[,...]" --jobs DIR [options]
 #
-#   --selection LIST   Patterns for step keys, separated by commas. This is what
-#                      the author of the comment wrote, so it is not trusted:
-#                      every pattern must match a step, or the script stops.
+#   --selection LIST   What to build, separated by commas. An item is either the
+#                      name of a set (dockers, daemon, archive, rosetta,
+#                      automode, apps-only, configured, debians -- see
+#                      buildkite/src/Constants/Artifact/Sets.dhall) or a pattern
+#                      for step keys. This is what the author of the comment
+#                      wrote, so it is not trusted: every item must match a step,
+#                      or the script stops.
 #                      Defaults to $BUILDKITE_PIPELINE_SELECTION, which is how
 #                      the value reaches a real build.
 #   --deb LIST         Patterns for debian package tokens, separated by commas
@@ -64,7 +68,7 @@ DRY_RUN=false
 DEBUG=false
 
 usage() {
-    sed -n '3,27p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
+    sed -n '3,32p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
     exit "${1:-0}"
 }
 
@@ -98,16 +102,32 @@ command -v yq > /dev/null 2>&1 || fail "'yq' is not installed."
 # Work out the run set
 # ---------------------------------------------------------------------------
 
+# The names of the sets, so that a word which names one is passed as a set and
+# not as a pattern. A set name holds no star and matches no step key, so the two
+# cannot be confused; an unknown name is a pattern, and select_steps.sh then
+# stops on it because it matches nothing.
+KNOWN_SETS=" $("$SELECT_STEPS" --list-sets 2>/dev/null | grep -E '^[a-z]' | awk '{print $1}' | tr '\n' ' ') "
+
 declare -a SELECT_ARGS=()
+declare -a NAMED_SETS=()
 IFS=',' read -ra RAW_PATTERNS <<< "$SELECTION"
 for pattern in "${RAW_PATTERNS[@]}"; do
     # Take the spaces off, so that "a, b" works as well as "a,b".
     pattern="$(echo "$pattern" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')"
     [[ -z "$pattern" ]] && continue
-    SELECT_ARGS+=(--select "$pattern")
+    if [[ "$KNOWN_SETS" == *" ${pattern} "* ]]; then
+        SELECT_ARGS+=(--set "$pattern")
+        NAMED_SETS+=("$pattern")
+    else
+        SELECT_ARGS+=(--select "$pattern")
+    fi
 done
 
 [[ "${#SELECT_ARGS[@]}" -gt 0 ]] || fail "--selection holds no pattern."
+
+if [[ "${#NAMED_SETS[@]}" -gt 0 ]]; then
+    echo "--- Read as a set of steps: ${NAMED_SETS[*]}"
+fi
 
 echo "--- Working out which steps to run"
 
