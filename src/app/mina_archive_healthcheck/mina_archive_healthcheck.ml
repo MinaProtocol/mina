@@ -17,6 +17,10 @@ let default_max_missing = 10
 
 let default_max_unparented = 5
 
+let default_wait_timeout = 600
+
+let default_wait_interval = 10
+
 let postgres_uri_env = "MINA_POSTGRES_URI"
 
 (* Exit 2 (usage) rather than surfacing an opaque connection failure
@@ -143,12 +147,18 @@ module Metrics = struct
     | Unparented_blocks of { unparented_blocks : int; max_unparented : int }
     | Readiness of
         { block_height : int
-        ; delay_seconds : int64
+        ; delay_seconds : int64 option
         ; missing_blocks : int
         ; unparented_blocks : int
         }
 
   let int64_json n = `Intlit (Int64.to_string n)
+
+  let optional_json_field name to_json = function
+    | None ->
+        []
+    | Some value ->
+        [ (name, to_json value) ]
 
   let to_json_fields = function
     | Db_reachable ->
@@ -170,11 +180,11 @@ module Metrics = struct
         ]
     | Readiness
         { block_height; delay_seconds; missing_blocks; unparented_blocks } ->
-        [ ("block_height", `Int block_height)
-        ; ("delay_seconds", int64_json delay_seconds)
-        ; ("missing_blocks", `Int missing_blocks)
-        ; ("unparented_blocks", `Int unparented_blocks)
-        ]
+        [ ("block_height", `Int block_height) ]
+        @ optional_json_field "delay_seconds" int64_json delay_seconds
+        @ [ ("missing_blocks", `Int missing_blocks)
+          ; ("unparented_blocks", `Int unparented_blocks)
+          ]
 
   (* The text-mode line: what was measured, against which limit. The
      same line whether the probe passed or failed. *)
@@ -193,8 +203,12 @@ module Metrics = struct
           max_unparented
     | Readiness
         { block_height; delay_seconds; missing_blocks; unparented_blocks } ->
-        sprintf "height=%d delay=%Lds missing=%d unparented=%d" block_height
-          delay_seconds missing_blocks unparented_blocks
+        let delay =
+          Option.value_map delay_seconds ~default:"n/a" ~f:(fun delay ->
+              sprintf "%Lds" delay )
+        in
+        sprintf "height=%d delay=%s missing=%d unparented=%d" block_height delay
+          missing_blocks unparented_blocks
 end
 
 type evaluation = Metrics.t option * (unit, Failure.t) Result.t
@@ -274,7 +288,15 @@ module Report = struct
         Metrics.to_text metrics
     | (Readiness | Wait _), Some metrics ->
         if passed t then banner t
-        else sprintf "%s: %s" (banner t) (Metrics.to_text metrics)
+        else
+          let failure =
+            match outcome with
+            | Ok () ->
+                ""
+            | Error failure ->
+                sprintf " (%s)" (Failure.to_string failure)
+          in
+          sprintf "%s: %s%s" (banner t) (Metrics.to_text metrics) failure
     | _, None -> (
         match outcome with
         | Ok () ->
@@ -317,16 +339,46 @@ let emit ~json report =
   if Report.passed report then Deferred.Or_error.return () else exit 1
 
 (* Nothing above this point deals in [Caqti_error]. *)
+let failure_of_caqti_call_error e = Failure.Db_query_failed (Caqti_error.show e)
+
+let failure_of_caqti_load_error = function
+  | `Load_rejected e ->
+      Failure.Db_unreachable (Caqti_error.show (`Load_rejected e))
+  | `Load_failed e ->
+      Failure.Db_unreachable (Caqti_error.show (`Load_failed e))
+  | _ ->
+      Failure.Db_unreachable "database driver failed to load"
+
+let failure_of_caqti_pool_error = function
+  | `Connect_rejected e ->
+      Failure.Db_unreachable (Caqti_error.show (`Connect_rejected e))
+  | `Connect_failed e ->
+      Failure.Db_unreachable (Caqti_error.show (`Connect_failed e))
+  | `Post_connect e ->
+      failure_of_caqti_call_error e
+  | `Encode_rejected e ->
+      Failure.Db_query_failed (Caqti_error.show (`Encode_rejected e))
+  | `Encode_failed e ->
+      Failure.Db_query_failed (Caqti_error.show (`Encode_failed e))
+  | `Request_failed e ->
+      Failure.Db_query_failed (Caqti_error.show (`Request_failed e))
+  | `Decode_rejected e ->
+      Failure.Db_query_failed (Caqti_error.show (`Decode_rejected e))
+  | `Response_failed e ->
+      Failure.Db_query_failed (Caqti_error.show (`Response_failed e))
+  | `Response_rejected e ->
+      Failure.Db_query_failed (Caqti_error.show (`Response_rejected e))
+  | _ ->
+      Failure.Db_query_failed "unknown database error"
+
 let with_pool ~postgres_uri f =
   match Mina_caqti.connect_pool ~max_size:4 (Uri.of_string postgres_uri) with
   | Error e ->
-      Deferred.return (Error (Failure.Db_unreachable (Caqti_error.show e)))
+      Deferred.return (Error (failure_of_caqti_load_error e))
   | Ok pool ->
       Mina_caqti.Pool.use f pool
       |> Deferred.map
-           ~f:
-             (Result.map_error ~f:(fun e ->
-                  Failure.Db_query_failed (Caqti_error.show e) ) )
+           ~f:(Result.map_error ~f:(fun e -> failure_of_caqti_pool_error e))
 
 let evaluation_of_result ~evaluate : (_, Failure.t) Result.t -> evaluation =
   function
@@ -375,10 +427,10 @@ let delay_of_timestamp ~now latest_ts =
           Ok (Int64.( / ) (Int64.( - ) now ts_ms) 1000L, Int64.( > ) ts_ms now)
       )
 
-let evaluate_recency ~now ~max_delay latest_ts : evaluation =
+let recency_status ~now ~max_delay latest_ts =
   match delay_of_timestamp ~now latest_ts with
   | Error failure ->
-      (None, Error failure)
+      (None, [ Failure.to_string failure ], Some failure)
   | Ok (delay_seconds, in_future) ->
       let problems =
         if in_future then [ "latest block timestamp is in the future" ]
@@ -386,8 +438,17 @@ let evaluate_recency ~now ~max_delay latest_ts : evaluation =
           [ sprintf "block delay %Lds > %ds" delay_seconds max_delay ]
         else []
       in
+      (Some delay_seconds, problems, None)
+
+let evaluate_recency ~now ~max_delay latest_ts : evaluation =
+  match recency_status ~now ~max_delay latest_ts with
+  | None, _, Some failure ->
+      (None, Error failure)
+  | Some delay_seconds, problems, _ ->
       ( Some (Metrics.Recency { delay_seconds; max_delay })
       , threshold_failure problems )
+  | None, problems, None ->
+      (None, threshold_failure problems)
 
 let evaluate_missing_blocks ~max_missing ~window missing_blocks : evaluation =
   let problems =
@@ -411,17 +472,8 @@ let evaluate_unparented_blocks ~max_unparented unparented_blocks : evaluation =
    thresholds rather than only the first. *)
 let evaluate_readiness ~now ~max_delay ~max_missing ~max_unparented
     (block_height, latest_ts, missing_blocks, unparented_blocks) : evaluation =
-  let delay_seconds, recency_problems =
-    match delay_of_timestamp ~now latest_ts with
-    | Error failure ->
-        (Int64.max_value, [ Failure.to_string failure ])
-    | Ok (delay_seconds, true) ->
-        (delay_seconds, [ "latest block timestamp is in the future" ])
-    | Ok (delay_seconds, false) ->
-        if Int64.( > ) delay_seconds (Int64.of_int max_delay) then
-          ( delay_seconds
-          , [ sprintf "block delay %Lds > %ds" delay_seconds max_delay ] )
-        else (delay_seconds, [])
+  let delay_seconds, recency_problems, _ =
+    recency_status ~now ~max_delay latest_ts
   in
   let problems =
     recency_problems
@@ -577,12 +629,16 @@ let wait_command =
      and window = missing_blocks_width_flag
      and timeout =
        flag "--timeout" ~aliases:[ "-t" ]
-         ~doc:"SECONDS Maximum time to wait (default: 600)"
-         (optional_with_default 600 int)
+         ~doc:
+           (sprintf "SECONDS Maximum time to wait (default: %d)"
+              default_wait_timeout )
+         (optional_with_default default_wait_timeout int)
      and interval =
        flag "--interval" ~aliases:[ "-i" ]
-         ~doc:"SECONDS Polling interval (default: 10)"
-         (optional_with_default 10 int)
+         ~doc:
+           (sprintf "SECONDS Polling interval (default: %d)"
+              default_wait_interval )
+         (optional_with_default default_wait_interval int)
      and db_only =
        flag "--db-only"
          ~doc:
@@ -603,15 +659,14 @@ let wait_command =
          Mina_caqti.connect_pool ~max_size:4 (Uri.of_string postgres_uri)
        with
        | Error e ->
-           emit ~json
-             (Report.fail ~kind (Failure.Db_unreachable (Caqti_error.show e)))
+           emit ~json (Report.fail ~kind (failure_of_caqti_load_error e))
        | Ok pool ->
            let run query =
              Mina_caqti.Pool.use query pool
              |> Deferred.map
                   ~f:
                     (Result.map_error ~f:(fun e ->
-                         Failure.Db_query_failed (Caqti_error.show e) ) )
+                         failure_of_caqti_pool_error e ) )
            in
            (* [--db-only] waits only for the [blocks] table to answer:
               the full check needs a non-empty table and so can never
