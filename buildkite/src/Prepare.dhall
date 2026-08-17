@@ -42,18 +42,14 @@ let config
               , Cmd.run "export BUILDKITE_PIPELINE_SCOPE=${scopeFilter}"
               , Cmd.run "export BUILDKITE_PIPELINE_FILTER_MODE=${filterMode}"
               , Cmd.quietly
-                  "./buildkite/scripts/pipeline/prepare_upload.sh '(./buildkite/src/Monorepo.dhall) { selection=(./buildkite/src/Pipeline/JobSelection.dhall).Type.${selection}, tagFilter=(./buildkite/src/Pipeline/TagFilter.dhall).Type.${tagFilter}, scopeFilter=(./buildkite/src/Pipeline/ScopeFilter.dhall).Type.${scopeFilter}, filterMode=(./buildkite/src/Pipeline/FilterMode.dhall).Type.${filterMode} }'"
+                  "./buildkite/scripts/pipeline/upload.sh '(./buildkite/src/Monorepo.dhall) { selection=(./buildkite/src/Pipeline/JobSelection.dhall).Type.${selection}, tagFilter=(./buildkite/src/Pipeline/TagFilter.dhall).Type.${tagFilter}, scopeFilter=(./buildkite/src/Pipeline/ScopeFilter.dhall).Type.${scopeFilter}, filterMode=(./buildkite/src/Pipeline/FilterMode.dhall).Type.${filterMode} }'"
               ]
             , label = "Prepare monorepo triage"
             , key = "monorepo-${selection}-${tagFilter}-${scopeFilter}"
             , target = Size.Multi
             , docker = Some Docker::{
               , image = (./Constants/ContainerImages.dhall).toolchainBase
-              , environment =
-                [ "BUILDKITE_AGENT_ACCESS_TOKEN"
-                , "BUILDKITE_PIPELINE_SELECTION"
-                , "BUILDKITE_PIPELINE_DEB_SELECTION"
-                ]
+              , environment = [ "BUILDKITE_AGENT_ACCESS_TOKEN" ]
               }
             }
         ]

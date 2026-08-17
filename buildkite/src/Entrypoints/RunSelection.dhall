@@ -1,9 +1,20 @@
--- Build only the steps that were asked for.
+-- Build the artifacts that were asked for, and nothing else.
 --
--- This is the shape RunSingleJob.dhall uses: one step, and a script does the
--- work. Nothing is chosen here, because Dhall cannot look at text: the Prelude
+-- THIS IS THE ENTRYPOINT OF AN ARTIFACT BUILD, and it is deliberately not
+-- reachable from Prepare.dhall. An artifact build and a CI run are different
+-- things: CI decides what to run by triaging a diff against tags, scopes and
+-- dirty-when, while an artifact build is started by someone who has said what
+-- they want. Putting the two behind one entrypoint would mean every ordinary CI
+-- run carried the machinery of a selection, and one stray environment variable
+-- would turn a CI run into an artifact build.
+--
+-- So a pipeline is configured with either Prepare.dhall (CI) or this file
+-- (artifacts), the same way GenerateHardforkPackage.dhall and
+-- RunSingleJob.dhall have pipelines of their own. Nothing here triages.
+--
+-- Nothing is chosen here either, because Dhall cannot look at text: the Prelude
 -- of this repository has no Text.split, and Dhall has no equality for Text at
--- all.
+-- all. One step is emitted and a script does the work.
 --
 -- The choice arrives in BUILDKITE_PIPELINE_SELECTION, a list of patterns for
 -- step keys separated by commas, and in BUILDKITE_PIPELINE_DEB_SELECTION, the
@@ -13,10 +24,18 @@
 -- step of one pipeline. select_steps.sh adds every step the chosen ones depend
 -- on.
 --
+-- Naming nothing builds the whole layer, because someone typing !ci-docker-me
+-- asked for docker images and there is no triage here to fall back on.
+--
 -- The value is written by whoever wrote the pull request comment, and it is
 -- deliberately NOT read here. Dhall can read the environment, so a value put
 -- into a dhall expression that closed its quote would evaluate on the agent.
 -- Passing it in the environment instead leaves nothing to escape from.
+--
+-- A pipeline that uses this file is configured with:
+--
+--   dhall-to-yaml --quoted <<< "./buildkite/src/Entrypoints/RunSelection.dhall" \
+--     | buildkite-agent pipeline upload
 
 let SelectFiles = ../Lib/SelectFiles.dhall
 

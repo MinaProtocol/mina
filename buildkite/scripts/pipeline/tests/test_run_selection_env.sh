@@ -191,10 +191,14 @@ check "the cache root is put on the step" "1" \
 check "nothing waits for a step that is not coming" "0" \
     "$(echo "$out" | grep -c 'depends_on')"
 
-echo "TEST: with neither, the script stops rather than building everything"
-status=0
-run_selection > /dev/null 2>&1 || status=$?
-check "exit code" "2" "$status"
+echo "TEST: naming nothing builds the whole layer"
+# There is no triage behind this entrypoint, so a comment that names nothing
+# still has to mean something: everything of the layer it asked for.
+out="$(run_selection)"
+check "it says so" "1" "$(echo "$out" | grep -c 'Nothing was named, so every docker artifact is built')"
+check "every image is chosen" \
+    "_Apps-build-apps _Package-archive-devnet-docker-image _Package-build-deb-pkg _Package-daemon_config-devnet-docker-image " \
+    "$(echo "$out" | run_set)"
 
 echo "TEST: a pattern that matches nothing stops"
 status=0
