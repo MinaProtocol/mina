@@ -30,11 +30,21 @@
 --
 -- What is NOT here, and why
 -- -------------------------
--- There is no set for "only the prefork debians", or for any other single
--- package. Every debian package of a pipeline is built by ONE step
--- (build-deb-pkg), whose command holds the whole list of packages, so a set of
--- steps cannot reach inside it. Choosing single packages needs that command to
--- be rewritten, which is a separate piece of work (A5 of the plan).
+-- **prefork.** No step key holds the word at all. The artifacts DaemonPrefork,
+-- DaemonPostfork and CreatePreforkGenesis make a debian package but NO docker
+-- image: see expandDockerServices in Command/MinaArtifact.dhall, where all
+-- three give `none`. They exist only as tokens inside the one build-deb-pkg
+-- step, and a set of steps cannot reach inside a step. A "prefork" set would
+-- have to build every debian package of the pipeline and call it prefork,
+-- which would be a lie.
+--
+-- The same holds for any other single package: every debian package of a
+-- pipeline is built by ONE step, whose command holds the whole list. Choosing
+-- single packages needs that command to be rewritten, which is a separate
+-- piece of work (A5 of the plan). When A5 lands, `prefork` becomes a real set.
+--
+-- **lightnet beyond the daemon.** Only the daemon has a lightnet image. The
+-- archive and the rosetta images are made for devnet and mainnet only.
 
 let Set = { name : Text, patterns : List Text, description : Text }
 
@@ -75,6 +85,11 @@ let sets
       , { name = "configured"
         , patterns = [ "*_config-*-docker-image" ]
         , description = "the images that hold a network config"
+        }
+      , { name = "lightnet"
+        , patterns = [ "*_profile-lightnet-docker-image" ]
+        , description =
+            "the lightnet images. Only the daemon has one: there is no lightnet archive or rosetta image"
         }
       ]
 
