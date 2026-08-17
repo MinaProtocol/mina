@@ -36,12 +36,18 @@
 #   --print-debians    With --set, write the debian package patterns of those
 #                      sets and stop. This is the other half of --layer debian,
 #                      and it keeps Sets.dhall the only place the names live.
-#   --job-include GLOB Choose a step only if the name of its job matches. Use it
-#                      for codename and architecture, which are in the job name
-#                      and not in the key. Repeatable; one match is enough.
-#   --job-exclude GLOB Do not choose a step whose job name matches. Repeatable.
-#   --key-include GLOB Choose a step only if its key matches as well. Use it for
-#                      the network or the profile. Repeatable; one is enough.
+#   --job-include LIST Choose a step only if the name of its job matches. Use it
+#                      for the codename, the architecture and the build flags,
+#                      which are in the job name and not in the key.
+#                      LIST is one or more globs separated by commas.
+#   --job-exclude LIST Do not choose a step whose job name matches any of these.
+#   --key-include LIST Choose a step only if its key matches as well. Use it for
+#                      the network or the profile.
+#
+# ONE FLAG IS ONE AXIS. Inside a flag the globs are alternatives (bullseye OR
+# jammy); between two flags they must BOTH hold (bullseye AND arm64). Passing
+# the codename and the architecture as two flags is therefore what a developer
+# means by "the arm64 build of bookworm", and not "anything bookworm or arm64".
 #   --print-segments   Write what network= and profile= may say, and stop.
 #   --list-sets        Write the sets that exist and stop.
 #   --format FORMAT    plan  (default) one "<file><TAB><step key>" for each step
@@ -275,34 +281,40 @@ job_of() {
 
 # True when a step may be CHOSEN. It says nothing about a step that is added
 # afterwards because something needs it.
+# True when SUBJECT matches any of the comma separated globs in GROUP.
+matches_any() {
+    local subject="$1" group="$2" pat
+    local -a alternatives=()
+    IFS=',' read -ra alternatives <<< "$group"
+    for pat in "${alternatives[@]+"${alternatives[@]}"}"; do
+        [[ -z "$pat" ]] && continue
+        # shellcheck disable=SC2053  # the pattern is meant to be a glob
+        if [[ "$subject" == $pat ]]; then
+            return 0
+        fi
+    done
+    return 1
+}
+
+# True when a step may be CHOSEN: it must match at least one alternative of
+# EVERY include group, and no alternative of any exclude group.
 passes_filters() {
     local key="$1"
-    local job pat ok
+    local job group
 
     job="$(job_of "$key")"
 
-    for pat in "${JOB_EXCLUDE[@]+"${JOB_EXCLUDE[@]}"}"; do
-        # shellcheck disable=SC2053  # the pattern is meant to be a glob
-        [[ "$job" == $pat ]] && return 1
+    for group in "${JOB_EXCLUDE[@]+"${JOB_EXCLUDE[@]}"}"; do
+        matches_any "$job" "$group" && return 1
     done
 
-    if [[ "${#JOB_INCLUDE[@]}" -gt 0 ]]; then
-        ok=1
-        for pat in "${JOB_INCLUDE[@]}"; do
-            # shellcheck disable=SC2053
-            [[ "$job" == $pat ]] && { ok=0; break; }
-        done
-        [[ "$ok" -eq 0 ]] || return 1
-    fi
+    for group in "${JOB_INCLUDE[@]+"${JOB_INCLUDE[@]}"}"; do
+        matches_any "$job" "$group" || return 1
+    done
 
-    if [[ "${#KEY_INCLUDE[@]}" -gt 0 ]]; then
-        ok=1
-        for pat in "${KEY_INCLUDE[@]}"; do
-            # shellcheck disable=SC2053
-            [[ "$key" == $pat ]] && { ok=0; break; }
-        done
-        [[ "$ok" -eq 0 ]] || return 1
-    fi
+    for group in "${KEY_INCLUDE[@]+"${KEY_INCLUDE[@]}"}"; do
+        matches_any "$key" "$group" || return 1
+    done
 
     return 0
 }

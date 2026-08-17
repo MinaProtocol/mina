@@ -297,6 +297,22 @@ test_a_key_filter_narrows_the_network() {
     assert_has "the devnet image" "$out" "_Package-archive-devnet-docker-image"
 }
 
+# One flag is one axis: the globs inside it are alternatives, and two flags must
+# BOTH hold. Getting this wrong turns "the arm64 build of bookworm" into
+# "anything that is bookworm or arm64", which is a much bigger build.
+test_two_filters_must_both_hold() {
+    local out status=0
+
+    out="$(select_keys --select '*-docker-image' --job-include 'Package,Nothing')"
+    assert_has "an alternative inside one flag is enough" "$out" "_Package-archive-devnet-docker-image"
+
+    # Package matches the first flag and not the second, so nothing is left.
+    "$SELECT" --jobs "$JOBS_DIR" --format keys --quiet \
+        --select '*-docker-image' --job-include 'Package' --job-include 'Nothing' \
+        > /dev/null 2>&1 || status=$?
+    assert_eq "two flags must both hold" "1" "$status"
+}
+
 test_wrong_arguments_stop() {
     local status
 
@@ -340,6 +356,7 @@ main() {
     run_test test_a_filter_never_removes_a_dependency
     run_test test_a_filter_can_exclude_a_job
     run_test test_a_key_filter_narrows_the_network
+    run_test test_two_filters_must_both_hold
     run_test test_wrong_arguments_stop
 
     teardown_fixture

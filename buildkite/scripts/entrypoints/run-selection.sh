@@ -10,8 +10,8 @@
 #   run-selection.sh --selection "SET_OR_PATTERN[,...]" --jobs DIR [options]
 #
 #   --selection LIST   What to build, separated by commas. An item is either the
-#                      name of a set (dockers, daemon, archive, rosetta,
-#                      automode, apps-only, configured, debians -- see
+#                      name of a set (daemon, archive, rosetta, automode,
+#                      prefork, logproc, all ... see
 #                      buildkite/src/Constants/Artifact/Sets.dhall) or a pattern
 #                      for step keys. This is what the author of the comment
 #                      wrote, so it is not trusted: every item must match a step,
@@ -32,6 +32,9 @@
 #   --network LIST     devnet, mainnet. Comma separated.
 #   --profile LIST     devnet, mainnet, lightnet. The same place in a step key
 #                      as the network, so the two add up.
+#   --instrumented V   true, false (the default) or both. An instrumented build
+#                      is a coverage build and is left out until it is asked
+#                      for. true builds ONLY the instrumented one.
 #   --from BUILD_ID    Take the binaries and the packages from that earlier
 #                      build instead of making them again. The steps that would
 #                      make them are dropped and the cache is read under that
@@ -43,7 +46,7 @@
 #
 # Every one of these also comes from the environment, which is how a real build
 # passes it: BUILDKITE_PIPELINE_LAYER, _CODENAME, _ARCH, _NETWORK, _PROFILE,
-# _FROM_BUILD.
+# _FROM_BUILD, _INSTRUMENTED.
 #
 # Exit codes:
 #   0  the chosen steps were uploaded (or written, with --dry-run)
@@ -85,6 +88,7 @@ CODENAMES="${BUILDKITE_PIPELINE_CODENAME:-}"
 ARCHS="${BUILDKITE_PIPELINE_ARCH:-}"
 NETWORKS="${BUILDKITE_PIPELINE_NETWORK:-}"
 PROFILES="${BUILDKITE_PIPELINE_PROFILE:-}"
+INSTRUMENTED="${BUILDKITE_PIPELINE_INSTRUMENTED:-false}"
 FROM_BUILD="${BUILDKITE_PIPELINE_FROM_BUILD:-}"
 JOBS_DIR=""
 DRY_RUN=false
@@ -108,6 +112,7 @@ while [[ "$#" -gt 0 ]]; do case "$1" in
     --arch)      ARCHS="${2:-}"; shift 2 ;;
     --network)   NETWORKS="${2:-}"; shift 2 ;;
     --profile)   PROFILES="${2:-}"; shift 2 ;;
+    --instrumented) INSTRUMENTED="${2:-}"; shift 2 ;;
     --from)      FROM_BUILD="${2:-}"; shift 2 ;;
     --jobs)      JOBS_DIR="${2:-}"; shift 2 ;;
     --dry-run)   DRY_RUN=true; shift ;;
@@ -184,31 +189,57 @@ done
 
 capitalise() { echo "$(tr '[:lower:]' '[:upper:]' <<< "${1:0:1}")${1:1}"; }
 
+# Each axis is ONE group, so the alternatives inside it are ORed and the axes
+# are ANDed: codename=bookworm arch=arm64 is the arm64 build of bookworm, not
+# everything that is either.
+group=""
 split_list "$CODENAMES"
 for item in "${SPLIT[@]+"${SPLIT[@]}"}"; do
-    SELECT_ARGS+=(--job-include "*$(capitalise "$item")*")
+    group="${group:+${group},}*$(capitalise "$item")*"
 done
+[[ -n "$group" ]] && SELECT_ARGS+=(--job-include "$group")
 
+group=""
 split_list "$ARCHS"
 for item in "${SPLIT[@]+"${SPLIT[@]}"}"; do
     case "$item" in
-        arm64) SELECT_ARGS+=(--job-include '*Arm64*') ;;
-        # No job name says amd64; the ones that are not arm64 are amd64.
-        amd64) SELECT_ARGS+=(--job-exclude '*Arm64*') ;;
+        arm64) group="${group:+${group},}*Arm64*" ;;
+        # No job name says amd64; the ones that are not arm64 are amd64. Asking
+        # for both is asking for no filter at all.
+        amd64) group="${group:+${group},}*" ;;
         *) fail "--arch must be amd64 or arm64, not '${item}'." ;;
     esac
 done
+if [[ -n "$group" ]]; then
+    if [[ "$group" == "*" ]]; then
+        SELECT_ARGS+=(--job-exclude '*Arm64*')
+    else
+        SELECT_ARGS+=(--job-include "$group")
+    fi
+fi
 
+# An instrumented build is a coverage build. It is never what is wanted unless
+# it is asked for, so it is left out until instrumented=true says otherwise.
+case "$INSTRUMENTED" in
+    true|yes|1)  SELECT_ARGS+=(--job-include '*Instrumented*') ;;
+    false|no|0)  SELECT_ARGS+=(--job-exclude '*Instrumented*') ;;
+    both|any)    ;;
+    *) fail "--instrumented must be true, false or both, not '${INSTRUMENTED}'." ;;
+esac
+
+group=""
 split_list "${NETWORKS},${PROFILES}"
 declare -a WANTED_NETWORKS=()
 for item in "${SPLIT[@]+"${SPLIT[@]}"}"; do
-    # Only an image key carries the network. One step builds every package of a
-    # job, and its key is just "build-deb-pkg", so filtering the key here would
-    # throw that step away; in the debian layer the network narrows the token
-    # list instead, below.
-    [[ "$LAYER" == "docker" ]] && SELECT_ARGS+=(--key-include "*-${item}-*")
+    group="${group:+${group},}*-${item}-*"
     WANTED_NETWORKS+=("$item")
 done
+# Only an image key carries the network. One step builds every package of a job
+# and its key is just "build-deb-pkg", so filtering the key in the debian layer
+# would throw that step away; there the network narrows the token list instead.
+if [[ -n "$group" && "$LAYER" == "docker" ]]; then
+    SELECT_ARGS+=(--key-include "$group")
+fi
 
 # ---------------------------------------------------------------------------
 # Which packages
