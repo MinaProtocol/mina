@@ -12,9 +12,12 @@
 #   --selection LIST   Patterns for step keys, separated by commas. This is what
 #                      the author of the comment wrote, so it is not trusted:
 #                      every pattern must match a step, or the script stops.
+#                      Defaults to $BUILDKITE_PIPELINE_SELECTION, which is how
+#                      the value reaches a real build.
 #   --deb LIST         Patterns for debian package tokens, separated by commas
 #                      (prefork_*, logproc, ...). The debian step of a job is
 #                      then told to build only the packages that match.
+#                      Defaults to $BUILDKITE_PIPELINE_DEB_SELECTION.
 #                      See "Narrowing the debian step" below.
 #   --jobs DIR         Directory of rendered pipelines (buildkite/src/gen)
 #   --dry-run          Write what would be uploaded, upload nothing.
@@ -49,8 +52,13 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SELECT_STEPS="${SCRIPT_DIR}/../pipeline/select_steps.sh"
 NARROW_DEBS="${SCRIPT_DIR}/../pipeline/narrow_debian_tokens.sh"
 
-SELECTION=""
-DEB_SELECTION=""
+# The patterns come from a pull request comment, so they travel in the
+# environment and never in a dhall expression. Prepare.dhall puts the value of
+# BUILDKITE_PIPELINE_SELECTION into a dhall expression for nothing else, and
+# dhall can read the environment, so a value that closed the quote would run on
+# the agent. A flag still wins, which is what the tests and a hand run use.
+SELECTION="${BUILDKITE_PIPELINE_SELECTION:-}"
+DEB_SELECTION="${BUILDKITE_PIPELINE_DEB_SELECTION:-}"
 JOBS_DIR=""
 DRY_RUN=false
 DEBUG=false
