@@ -14,6 +14,13 @@
 --              automode metapackage with no version pin. The unpinned install is
 --              the case that catches a dependency the channel cannot satisfy.
 --
+--              It covers devnet and mainnet in one run. The two do not share a
+--              channel -- devnet artifacts sit in alpha and mainnet ones in
+--              stable -- so package entries carry an optional @channel and image
+--              entries an optional :network. With no package list given at all,
+--              the step falls back to a default set spanning both networks, so
+--              an unconfigured schedule still tests both.
+--
 -- Everything else is passed through Buildkite environment variables, so a
 -- scheduled build can change the package list, the channel or the codenames
 -- without a change to this file. See buildkite/scripts/verify/run-verification.sh
