@@ -13,6 +13,7 @@
   core
   core_unix
   stdio
+  uri
   yojson)
  (deps ../mina_archive_healthcheck.exe)
  (instrumentation
