@@ -43,53 +43,38 @@ module Make_str (A : Wire_types.Concrete) = struct
 
   let name = "proof_of_stake"
 
-  let compute_delegatee_table keys ~iter_accounts =
-    let open Mina_base in
-    let outer_table = Public_key.Compressed.Table.create () in
-    iter_accounts (fun i (acct : Account.t) ->
-        if
-          Option.is_some acct.delegate
-          (* Only default tokens may delegate. *)
-          && Token_id.equal acct.token_id Token_id.default
-          && Public_key.Compressed.Set.mem keys (Option.value_exn acct.delegate)
-        then
-          Public_key.Compressed.Table.update outer_table
-            (Option.value_exn acct.delegate) ~f:(function
-            | None ->
-                Account.Index.Table.of_alist_exn [ (i, acct) ]
-            | Some table ->
-                Account.Index.Table.add_exn table ~key:i ~data:acct ;
-                table ) ) ;
-    (* TODO: this metric tracking currently assumes that the result of
-       compute_delegatee_table is called with the full set of block production
-       keypairs every time the set changes, which is true right now, but this
-       should be control flow should be refactored to make this clearer *)
-    let num_delegators =
-      Public_key.Compressed.Table.fold outer_table ~init:0
-        ~f:(fun ~key:_ ~data sum -> sum + Account.Index.Table.length data)
-    in
-    Mina_metrics.Gauge.set Mina_metrics.Consensus.staking_keypairs
-      (Float.of_int @@ Public_key.Compressed.Set.length keys) ;
-    Mina_metrics.Gauge.set Mina_metrics.Consensus.stake_delegators
-      (Float.of_int num_delegators) ;
-    outer_table
-
-  let compute_delegatee_table_ledger_root keys ledger =
-    O1trace.sync_thread "compute_delegatee_table_ledger_root" (fun () ->
-        compute_delegatee_table keys ~iter_accounts:(fun f ->
-            Mina_ledger.Ledger.Any_ledger.M.iteri
-              (Root_ledger.as_unmasked ledger) ~f:(fun i acct -> f i acct) ) )
-
-  let compute_delegatee_table_ledger_any keys ledger =
-    O1trace.sync_thread "compute_delegatee_table_ledger_any" (fun () ->
-        compute_delegatee_table keys ~iter_accounts:(fun f ->
-            Mina_ledger.Ledger.Any_ledger.M.iteri ledger ~f:(fun i acct ->
-                f i acct ) ) )
-
-  let compute_delegatee_table_genesis_ledger keys ledger =
-    O1trace.sync_thread "compute_delegatee_table_genesis_ledger" (fun () ->
-        compute_delegatee_table keys ~iter_accounts:(fun f ->
-            Mina_ledger.Ledger.iteri ledger ~f:(fun i acct -> f i acct) ) )
+  let compute_delegatee_table keys ledger =
+    O1trace.sync_thread "compute_delegatee_table" (fun () ->
+        let open Mina_base in
+        let outer_table = Public_key.Compressed.Table.create () in
+        Mina_ledger.Ledger.iteri ledger ~f:(fun i (acct : Account.t) ->
+            (* Only default tokens may delegate. *)
+            match acct.delegate with
+            | Some delegate
+              when Token_id.equal acct.token_id Token_id.default
+                   && Public_key.Compressed.Set.mem keys delegate ->
+                Public_key.Compressed.Table.update outer_table delegate
+                  ~f:(function
+                  | None ->
+                      Account.Index.Table.of_alist_exn [ (i, acct) ]
+                  | Some table ->
+                      Account.Index.Table.add_exn table ~key:i ~data:acct ;
+                      table )
+            | _ ->
+                () ) ;
+        (* TODO: this metric tracking currently assumes that the result of
+           compute_delegatee_table is called with the full set of block production
+           keypairs every time the set changes, which is true right now, but this
+           should be control flow should be refactored to make this clearer *)
+        let num_delegators =
+          Public_key.Compressed.Table.fold outer_table ~init:0
+            ~f:(fun ~key:_ ~data sum -> sum + Account.Index.Table.length data)
+        in
+        Mina_metrics.Gauge.set Mina_metrics.Consensus.staking_keypairs
+          (Float.of_int @@ Public_key.Compressed.Set.length keys) ;
+        Mina_metrics.Gauge.set Mina_metrics.Consensus.stake_delegators
+          (Float.of_int num_delegators) ;
+        outer_table )
 
   module Typ = Snark_params.Tick.Typ
 
@@ -277,9 +262,10 @@ module Make_str (A : Wire_types.Concrete) = struct
             | Genesis_epoch_ledger ledger ->
                 Genesis_ledger.Packed.t ledger
                 |> Lazy.force
-                |> compute_delegatee_table_genesis_ledger keys
+                |> compute_delegatee_table keys
             | Ledger_root ledger ->
-                compute_delegatee_table_ledger_root keys ledger
+                Mina_ledger.Root.as_masked ledger
+                |> compute_delegatee_table keys
 
           let close = function
             | Genesis_epoch_ledger _ ->
@@ -429,7 +415,12 @@ module Make_str (A : Wire_types.Concrete) = struct
       let epoch_ledger_uuids_from_file location =
         let open Yojson.Safe.Util in
         let open Result.Let_syntax in
-        let json = Yojson.Safe.from_file location in
+        let%bind json =
+          if Sys.file_exists location then Ok (Yojson.Safe.from_file location)
+          else
+            Error
+              (Printf.sprintf "epoch ledger uuids doesn't exist at %s" location)
+        in
         let uuid str =
           Result.(
             map_error
@@ -455,19 +446,12 @@ module Make_str (A : Wire_types.Concrete) = struct
                ~depth:constraint_constants.ledger_depth () ) )
         else Genesis_epoch_ledger genesis_epoch_ledger
 
-      let create ~context:(module Context : CONTEXT) ~genesis_ledger
-          ~genesis_epoch_data ~epoch_ledger_location ~genesis_state_hash
-          ~epoch_ledger_backing_type block_producer_pubkeys =
+      let create ~context:(module Context : CONTEXT)
+          ~(genesis_ledger : Genesis_ledger.Packed.t)
+          ~(genesis_epoch_data : Genesis_ledger.Packed.t Genesis_data.Epoch.t)
+          ~epoch_ledger_location ~genesis_state_hash ~epoch_ledger_backing_type
+          block_producer_pubkeys =
         let open Context in
-        (* TODO: remove this duplicate of the genesis ledger *)
-        let genesis_epoch_ledger_staking, genesis_epoch_ledger_next =
-          Option.value_map genesis_epoch_data
-            ~default:(genesis_ledger, genesis_ledger)
-            ~f:(fun { Genesis_data.Epoch.staking; next } ->
-              ( staking.ledger
-              , Option.value_map next ~default:staking.ledger ~f:(fun next ->
-                    next.ledger ) ) )
-        in
         let epoch_ledger_uuids_location = epoch_ledger_location ^ ".json" in
         let create_new_uuids () =
           let epoch_ledger_uuids =
@@ -487,78 +471,80 @@ module Make_str (A : Wire_types.Concrete) = struct
               ~directory_name:(epoch_ledger_location ^ Uuid.to_string uuid))
         in
         let epoch_ledger_uuids =
-          if Sys.file_exists epoch_ledger_uuids_location then (
-            let epoch_ledger_uuids =
-              match
-                epoch_ledger_uuids_from_file epoch_ledger_uuids_location
-              with
-              | Ok res ->
-                  res
-              | Error str ->
-                  [%log error]
-                    "Failed to read epoch ledger uuids from file $path: \
-                     $error. Creating new uuids.."
-                    ~metadata:
-                      [ ("path", `String epoch_ledger_uuids_location)
-                      ; ("error", `String str)
-                      ] ;
-                  create_new_uuids ()
-            in
-            (*If the genesis hash matches and both the files are present. If only one of them is present then it could be stale data and might cause the node to never be able to bootstrap*)
-            if
-              Mina_base.State_hash.equal epoch_ledger_uuids.genesis_state_hash
-                genesis_state_hash
-            then epoch_ledger_uuids
-            else
-              (*Clean-up outdated epoch ledgers*)
-              let staking_ledger_config =
-                ledger_config epoch_ledger_uuids.staking
-              in
-              let next_ledger_config = ledger_config epoch_ledger_uuids.next in
+          match epoch_ledger_uuids_from_file epoch_ledger_uuids_location with
+          | Ok uuids
+            when Mina_base.State_hash.equal uuids.genesis_state_hash
+                   genesis_state_hash ->
+              uuids
+          | Ok uuids ->
+              (* NOTE: Parts of state hash mismatched between on-disk epoch
+                 ledgers and expected genesis state hash. It could be staling
+                 on-disk ledger data, and might cause the node to never be able
+                 to bootstrap, clean up both ledgers here to avoid the issue. *)
+              let staking_ledger_config = ledger_config uuids.staking in
+              let next_ledger_config = ledger_config uuids.next in
               [%log info]
                 "Cleaning up old epoch ledgers with genesis state $state_hash \
                  with configs $staking and $next"
                 ~metadata:
                   [ ( "state_hash"
-                    , Mina_base.State_hash.to_yojson
-                        epoch_ledger_uuids.genesis_state_hash )
+                    , Mina_base.State_hash.to_yojson uuids.genesis_state_hash )
                   ; ( "staking"
                     , Root_ledger.Config.to_yojson staking_ledger_config )
                   ; ("next", Root_ledger.Config.to_yojson next_ledger_config)
                   ] ;
               Root_ledger.Config.delete_backing staking_ledger_config ;
               Root_ledger.Config.delete_backing next_ledger_config ;
-              create_new_uuids () )
-          else create_new_uuids ()
+              create_new_uuids ()
+          | Error e ->
+              [%log error]
+                "Failed to read epoch ledger uuids from file $path: $error. \
+                 Creating new uuids.."
+                ~metadata:
+                  [ ("path", `String epoch_ledger_uuids_location)
+                  ; ("error", `String e)
+                  ] ;
+              create_new_uuids ()
         in
         let next_epoch_ledger_config = ledger_config epoch_ledger_uuids.next in
-        let next_epoch_ledger =
+        let genesis_epoch_ledger_next =
+          match genesis_epoch_data with
+          | None ->
+              genesis_ledger
+          | Some { next = Some next; _ } ->
+              next.ledger
+          | Some { next = None; staking } ->
+              staking.ledger
+        in
+        let genesis_epoch_ledger_staking =
+          match genesis_epoch_data with
+          | None ->
+              genesis_ledger
+          | Some { staking; _ } ->
+              staking.ledger
+        in
+        let current_epoch_ledger_next =
           create_epoch_ledger ~config:next_epoch_ledger_config
             ~context:(module Context)
             ~genesis_epoch_ledger:genesis_epoch_ledger_next
         in
-        let is_next_loaded_from_genesis =
-          match next_epoch_ledger with
-          | Genesis_epoch_ledger _ ->
-              true
-          | _ ->
-              false
-        in
         let staking_epoch_ledger_config =
           ledger_config epoch_ledger_uuids.staking
         in
-        let staking_epoch_ledger =
-          (* If next epoch ledger is loaded from disk, then we know that
+        let current_epoch_ledger_staking =
+          (* HACK: If next epoch ledger is loaded from disk, then we know that
            * at least one epoch transition has happened, hence either the staking
            * ledger will also be loaded from disk or the genesis next ledger must
            * be the used.
-           *
-           * This code heavily relies on the fact that we writer only non-genesis
-           * ledgers to disk.
-           *)
+           * This code heavily relies on the fact that we write only non-genesis
+           * ledgers to disk. *)
           let genesis_epoch_ledger =
-            if is_next_loaded_from_genesis then genesis_epoch_ledger_staking
-            else genesis_epoch_ledger_next
+            match current_epoch_ledger_next with
+            | Genesis_epoch_ledger _ ->
+                genesis_epoch_ledger_staking
+            | Ledger_root _ ->
+                (* NOTE: We're in epoch 1. *)
+                genesis_epoch_ledger_next
           in
           create_epoch_ledger ~config:staking_epoch_ledger_config
             ~context:(module Context)
@@ -566,16 +552,16 @@ module Make_str (A : Wire_types.Concrete) = struct
         in
         ref
           { Data.staking_epoch_snapshot =
-              { Snapshot.ledger = staking_epoch_ledger
+              { Snapshot.ledger = current_epoch_ledger_staking
               ; delegatee_table =
                   Snapshot.Ledger_snapshot.compute_delegatee_table
-                    block_producer_pubkeys staking_epoch_ledger
+                    block_producer_pubkeys current_epoch_ledger_staking
               }
           ; next_epoch_snapshot =
-              { Snapshot.ledger = next_epoch_ledger
+              { Snapshot.ledger = current_epoch_ledger_next
               ; delegatee_table =
                   Snapshot.Ledger_snapshot.compute_delegatee_table
-                    block_producer_pubkeys next_epoch_ledger
+                    block_producer_pubkeys current_epoch_ledger_next
               }
           ; last_checked_slot_and_epoch =
               make_last_checked_slot_and_epoch_table
@@ -640,9 +626,8 @@ module Make_str (A : Wire_types.Concrete) = struct
 
       let reset_snapshot (t : t) id ledger =
         let delegatee_table =
-          compute_delegatee_table_ledger_root
-            (current_block_production_keys t)
-            ledger
+          Root_ledger.as_masked ledger
+          |> compute_delegatee_table (current_block_production_keys t)
         in
         match id with
         | Staking_epoch_snapshot ->
@@ -3073,9 +3058,9 @@ module Make_str (A : Wire_types.Concrete) = struct
                  Local_state.Snapshot.Ledger_snapshot.Ledger_root
                    (Root_ledger.create_checkpoint snarked_ledger ~config ()) )
             ; delegatee_table =
-                compute_delegatee_table_ledger_any
+                compute_delegatee_table
                   (Local_state.current_block_production_keys local_state)
-                  (Root_ledger.as_unmasked snarked_ledger)
+                  (Root_ledger.as_masked snarked_ledger)
             } ) )
 
     let should_bootstrap_len ~context:(module Context : CONTEXT) ~existing
@@ -3675,7 +3660,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         in
         let ledger = Lazy.force Genesis_ledger.t in
         let delegatee_table =
-          compute_delegatee_table_genesis_ledger block_producer_pubkeys ledger
+          compute_delegatee_table block_producer_pubkeys ledger
         in
         let epoch_snapshot =
           { Local_state.Snapshot.delegatee_table
