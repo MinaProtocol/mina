@@ -131,6 +131,15 @@ if [[ -z "$SELECTION" && -n "$DEB_SELECTION" ]]; then
     SELECTION="build-deb-pkg"
 fi
 
+if [[ -z "$SELECTION" ]]; then
+    # This entrypoint is reached only by an ARTIFACT pipeline, which is started
+    # by someone who typed !ci-docker-me or !ci-debian-me. Naming nothing means
+    # the whole layer -- there is no triage here to fall back on, and building
+    # nothing is not what the comment asked for.
+    SELECTION="all"
+    echo "--- Nothing was named, so every ${LAYER} artifact is built"
+fi
+
 # Splits "a, b,c" into SPLIT, without the spaces and without the empty items.
 split_list() {
     local raw="$1" item
