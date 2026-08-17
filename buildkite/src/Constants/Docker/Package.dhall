@@ -103,6 +103,37 @@ let isGeneric =
             }
             package
 
+let buildTier =
+    -- How deep an image sits in the FROM chain, and so the order the images
+    -- have to be built in when one agent builds several of them in a row.
+    --
+    -- Tier 0 is built out of .deb files alone. Tier 1 is FROM a tier-0 image
+    -- (the *-configured and *-profiled daemons come FROM the generic daemon,
+    -- and the configured rosetta comes FROM the generic rosetta). Tier 2 is
+    -- FROM a tier-1 image.
+    --
+    -- When the images are separate buildkite steps the same order is expressed
+    -- as depends_on, which Command/MinaArtifact.dhall builds in docker_step;
+    -- the two must agree.
+          \(package : Package)
+      ->  merge
+            { DaemonGeneric = 0
+            , DaemonProfiled = \(args : { profile : Profile.Type }) -> 1
+            , Daemon = \(args : { network : Network.Type }) -> 1
+            , DaemonLegacyHardfork = \(args : { network : Network.Type }) -> 1
+            , DaemonAutoHardfork = \(args : { network : Network.Type }) -> 2
+            , Archive = \(args : { network : Network.Type }) -> 0
+            , RosettaGeneric = 0
+            , Rosetta = \(args : { network : Network.Type }) -> 1
+            , TxTools = 0
+            , DelegationVerifier = 0
+            , Toolchain = 0
+            , Base = 0
+            }
+            package
+
+let maxBuildTier = 2
+
 let isNetworked =
           \(package : Package)
       ->  merge
@@ -378,6 +409,8 @@ in  { Type = Package
     , isGeneric = isGeneric
     , isNetworked = isNetworked
     , isProfiled = isProfiled
+    , buildTier = buildTier
+    , maxBuildTier = maxBuildTier
     , dockerName = dockerName
     , dockerNames = dockerNames
     , dockerTag = dockerTag
