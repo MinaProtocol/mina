@@ -7,7 +7,7 @@ Designed for Kubernetes exec probes, Docker HEALTHCHECK, and monitoring.
 
 | Command | Description | Exit 0 when |
 |---------|-------------|-------------|
-| `db-ready` | Check database connectivity | DB reachable |
+| `db-ready` | Check DB is reachable and schema is loaded (`blocks` queryable) | Schema queryable |
 | `block-height` | Report max block height | Always (if DB reachable) |
 | `block-recency` | Check latest block timestamp | Within `--max-delay` seconds |
 | `missing-blocks` | Count height gaps in sliding window | Count <= `--max-missing` |
