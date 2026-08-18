@@ -204,6 +204,7 @@ let run_dead_pg_json ~sub ?(extra_args = []) () =
 
 let all_subcommands =
   [ "db-ready"
+  ; "server-ready"
   ; "block-height"
   ; "block-recency"
   ; "missing-blocks"
@@ -343,6 +344,43 @@ let test_dead_pg_healthy_false ~sub () =
   let envelope = of_yojson_exn ~label Envelope.probe_of_yojson json in
   Alcotest.(check bool) (label ^ ": healthy") false envelope.healthy ;
   check_error_constructor ~label envelope.error "Db_unreachable"
+
+(* [server-ready] probes the archive's TCP port, not PostgreSQL; port 1
+   on localhost is never listening, so the connect fails fast and must
+   surface as [Server_unreachable] without leaking exception syntax. *)
+let test_server_ready_dead_port_json () =
+  let label = "server-ready --json (dead port)" in
+  let code, out, err =
+    run_cli [ "server-ready"; "--server-port"; "1"; "--json" ]
+  in
+  if code = 0 then Alcotest.failf "%s: expected non-zero exit" label ;
+  assert_no_ocaml_exn_leak (label ^ " stdout") out ;
+  assert_no_ocaml_exn_leak (label ^ " stderr") err ;
+  let json = parse_single_json_record ~label out err in
+  let envelope = of_yojson_exn ~label Envelope.probe_of_yojson json in
+  Alcotest.(check bool) (label ^ ": healthy") false envelope.healthy ;
+  check_error_constructor ~label envelope.error "Server_unreachable"
+
+(* [wait --server-port] must gate on the server socket even when the
+   DB side would pass; a dead port is checked first, so the timeout's
+   last failure is the server one. *)
+let test_wait_dead_server_port_json () =
+  let label, json =
+    run_dead_pg_json ~sub:"wait"
+      ~extra_args:
+        [ "--db-only"
+        ; "--server-port"
+        ; "1"
+        ; "--timeout"
+        ; "1"
+        ; "--interval"
+        ; "1"
+        ]
+      ()
+  in
+  let envelope = of_yojson_exn ~label Envelope.wait_of_yojson json in
+  Alcotest.(check bool) (label ^ ": ready") false envelope.ready ;
+  check_error_constructor ~label envelope.error "Server_unreachable"
 
 let test_ready_dead_pg_json () =
   let label, json = run_dead_pg_json ~sub:"ready" () in
@@ -550,6 +588,10 @@ let () =
         ; ("ready", `Quick, test_ready_dead_pg_json)
         ; ("wait", `Quick, test_wait_dead_pg_json ~db_only:false)
         ; ("wait --db-only", `Quick, test_wait_dead_pg_json ~db_only:true)
+        ; ("server-ready", `Quick, test_server_ready_dead_port_json)
+        ; ( "wait --server-port gates on the server socket"
+          , `Quick
+          , test_wait_dead_server_port_json )
         ] )
     ; ( "json envelope against test DB"
       , [ ("success paths", `Quick, test_success_envelopes_against_db)

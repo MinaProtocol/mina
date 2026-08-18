@@ -8,6 +8,7 @@ Designed for Kubernetes exec probes, Docker HEALTHCHECK, and monitoring.
 | Command | Description | Exit 0 when |
 |---------|-------------|-------------|
 | `db-ready` | Check DB is reachable and schema is loaded (`blocks` queryable) | Schema queryable |
+| `server-ready` | Check the archive server accepts TCP connections on `--server-port` | Connect accepted |
 | `block-height` | Report max block height | Always (if DB reachable) |
 | `block-recency` | Check latest block timestamp | Within `--max-delay` seconds |
 | `missing-blocks` | Count height gaps in sliding window | Count <= `--max-missing` |
@@ -35,6 +36,15 @@ mina-archive-healthcheck ready --postgres-uri postgres://... --max-delay 360 --m
 
 # Wait for archive to become ready (init container / CI)
 mina-archive-healthcheck wait --postgres-uri postgres://... --timeout 600 --interval 10
+
+# Check the archive server itself accepts connections (the DB probes
+# cannot see this: the schema answers queries before the server listens)
+mina-archive-healthcheck server-ready --server-port 3086
+
+# Gate on both: schema queryable AND server accepting connections.
+# This is the correct "safe to send blocks" gate for tests and init
+# containers — a block dispatched before the server listens is lost.
+mina-archive-healthcheck wait --db-only --server-port 3086 --postgres-uri postgres://...
 
 # Wait only for the DB schema to respond — useful for "is the archive
 # process up at all?" gates where you can't wait for ingestion (e.g. a
