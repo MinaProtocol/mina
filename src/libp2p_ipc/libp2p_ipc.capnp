@@ -85,6 +85,7 @@ struct Libp2pConfig {
   minConnections @15 :UInt32;
   knownPrivateIpNets @16 :List(Text);
   topicConfig @17 :List(TopicLevel);
+  banlistPath @18 :Text;
 }
 
 # Resource status updated
@@ -111,6 +112,21 @@ struct Duration {
 # Unix timestamp in nanoseconds
 struct UnixNano {
   nanoSec @0 :Int64;
+}
+
+# Uniform peer-list entry for both the banned and trusted collections.
+# `until == null` means manual/indefinite (operator-authored, persisted);
+# non-null `until` means an expiring auto entry (in-memory only).
+# Trusted entries always have `until == null`.
+enum PeerKind {
+  peerId @0;
+  ip @1;
+}
+
+struct PeerEntry {
+  kind @0 :PeerKind;
+  identity @1 :Text;
+  until @2 :UnixNano;   # null => manual/indefinite; trusted entries always null
 }
 
 struct PushMessageHeader {
@@ -336,8 +352,63 @@ struct Libp2pHelperInterface {
     ids @0 :List(RootBlockId);
   }
 
-  struct HeartbeatPeer {
+  # DHT peer-protection signal — refreshes routing-table protection
+  # timestamps for useful peers; NOT a connection liveness ping.
+  struct UsefulPeer {
     id @0 :PeerId;
+  }
+
+  struct BanPeer {
+    struct Request {
+      peerId @0 :PeerId;
+      ip @1 :Text;
+      manual @2 :Bool;   # true = manual/indefinite + persisted; false/omitted = auto (helper computes D(k))
+    }
+
+    struct Response {}
+  }
+
+  struct UnbanPeer {
+    struct Request {
+      peerId @0 :PeerId;
+      ip @1 :Text;
+    }
+
+    struct Response {}
+  }
+
+  struct GetBans {
+    struct Request {}
+
+    struct Response {
+      result @0 :List(PeerEntry);
+    }
+  }
+
+  struct AddTrustedPeer {
+    struct Request {
+      peerId @0 :PeerId;
+      ip @1 :Text;
+    }
+
+    struct Response {}
+  }
+
+  struct RemoveTrustedPeer {
+    struct Request {
+      peerId @0 :PeerId;
+      ip @1 :Text;
+    }
+
+    struct Response {}
+  }
+
+  struct GetTrustedPeers {
+    struct Request {}
+
+    struct Response {
+      result @0 :List(PeerEntry);
+    }
   }
 
   struct DownloadResource {
@@ -376,6 +447,12 @@ struct Libp2pHelperInterface {
       bandwidthInfo @20 :Libp2pHelperInterface.BandwidthInfo.Request;
       testDecodeBitswapBlocks @21 :Libp2pHelperInterface.TestDecodeBitswapBlocks.Request;
       testEncodeBitswapBlocks @22 :Libp2pHelperInterface.TestEncodeBitswapBlocks.Request;
+      banPeer @23 :Libp2pHelperInterface.BanPeer.Request;
+      unbanPeer @24 :Libp2pHelperInterface.UnbanPeer.Request;
+      getBans @25 :Libp2pHelperInterface.GetBans.Request;
+      addTrustedPeer @26 :Libp2pHelperInterface.AddTrustedPeer.Request;
+      removeTrustedPeer @27 :Libp2pHelperInterface.RemoveTrustedPeer.Request;
+      getTrustedPeers @28 :Libp2pHelperInterface.GetTrustedPeers.Request;
     }
   }
 
@@ -403,6 +480,12 @@ struct Libp2pHelperInterface {
       bandwidthInfo @19 :Libp2pHelperInterface.BandwidthInfo.Response;
       testDecodeBitswapBlocks @20 :Libp2pHelperInterface.TestDecodeBitswapBlocks.Response;
       testEncodeBitswapBlocks @21 :Libp2pHelperInterface.TestEncodeBitswapBlocks.Response;
+      banPeer @22 :Libp2pHelperInterface.BanPeer.Response;
+      unbanPeer @23 :Libp2pHelperInterface.UnbanPeer.Response;
+      getBans @24 :Libp2pHelperInterface.GetBans.Response;
+      addTrustedPeer @25 :Libp2pHelperInterface.AddTrustedPeer.Response;
+      removeTrustedPeer @26 :Libp2pHelperInterface.RemoveTrustedPeer.Response;
+      getTrustedPeers @27 :Libp2pHelperInterface.GetTrustedPeers.Response;
     }
   }
 
@@ -422,7 +505,7 @@ struct Libp2pHelperInterface {
       addResource @2 :Libp2pHelperInterface.AddResource;
       removeResource @3 :Libp2pHelperInterface.RemoveResource;
       downloadResource @4 :Libp2pHelperInterface.DownloadResource;
-      heartbeatPeer @5 :Libp2pHelperInterface.HeartbeatPeer;
+      usefulPeer @5 :Libp2pHelperInterface.UsefulPeer;
     }
   }
 

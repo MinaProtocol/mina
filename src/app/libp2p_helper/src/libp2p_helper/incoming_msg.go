@@ -30,6 +30,12 @@ var rpcRequestExtractors = map[ipc.Libp2pHelperInterface_RpcRequest_Which]extrac
 	ipc.Libp2pHelperInterface_RpcRequest_Which_getPeerNodeStatus:       fromGetPeerNodeStatusReq,
 	ipc.Libp2pHelperInterface_RpcRequest_Which_testDecodeBitswapBlocks: fromTestDecodeBitswapBlocksReq,
 	ipc.Libp2pHelperInterface_RpcRequest_Which_testEncodeBitswapBlocks: fromTestEncodeBitswapBlocksReq,
+	ipc.Libp2pHelperInterface_RpcRequest_Which_banPeer:                 fromBanPeerReq,
+	ipc.Libp2pHelperInterface_RpcRequest_Which_unbanPeer:               fromUnbanPeerReq,
+	ipc.Libp2pHelperInterface_RpcRequest_Which_getBans:                 fromGetBansReq,
+	ipc.Libp2pHelperInterface_RpcRequest_Which_addTrustedPeer:          fromAddTrustedPeerReq,
+	ipc.Libp2pHelperInterface_RpcRequest_Which_removeTrustedPeer:       fromRemoveTrustedPeerReq,
+	ipc.Libp2pHelperInterface_RpcRequest_Which_getTrustedPeers:         fromGetTrustedPeersReq,
 }
 
 var pushMesssageExtractors = map[ipc.Libp2pHelperInterface_PushMessage_Which]extractPushMessage{
@@ -37,7 +43,7 @@ var pushMesssageExtractors = map[ipc.Libp2pHelperInterface_PushMessage_Which]ext
 	ipc.Libp2pHelperInterface_PushMessage_Which_removeResource:   fromRemoveResourcePush,
 	ipc.Libp2pHelperInterface_PushMessage_Which_downloadResource: fromDownloadResourcePush,
 	ipc.Libp2pHelperInterface_PushMessage_Which_validation:       fromValidationPush,
-	ipc.Libp2pHelperInterface_PushMessage_Which_heartbeatPeer:    fromHeartbeatPeerPush,
+	ipc.Libp2pHelperInterface_PushMessage_Which_usefulPeer:       fromUsefulPeerPush,
 }
 
 // Handles messages coming from the OCaml process

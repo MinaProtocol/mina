@@ -213,6 +213,7 @@ let configure t ~me ~external_maddr ~maddrs ~network_id ~metrics_port
   let libp2p_config =
     Libp2p_ipc.create_libp2p_config ~private_key:(Keypair.secret me)
       ~statedir:t.conf_dir
+      ~banlist_path:(t.conf_dir ^ "/libp2p_banlist.json")
       ~listen_on:(List.map ~f:Multiaddr.to_libp2p_ipc maddrs)
       ?metrics_port
       ~external_multiaddr:(Multiaddr.to_libp2p_ipc external_maddr)

@@ -329,6 +329,8 @@ type CodaGatingState struct {
 	bannedPeers             map[peer.ID]struct{}
 	trustedPeersMutex       sync.RWMutex
 	trustedPeers            map[peer.ID]struct{}
+	banManagerMutex         sync.RWMutex
+	banManager              *BanManager
 }
 
 type CodaGatingConfig struct {
@@ -374,6 +376,28 @@ func NewCodaGatingState(config *CodaGatingConfig, knownPrivateAddrFilters *ma.Fi
 
 func (h *Helper) GatingState() *CodaGatingState {
 	return h.gatingState
+}
+
+// SetBanManager installs the BanManager consulted by the gating checks. The
+// ban manager is additive with the legacy banned/trusted lists (which remain
+// until the daemon-side lists are removed): its trusted and banned entries
+// are OR-combined with the legacy ones, trusted first.
+func (gs *CodaGatingState) SetBanManager(bm *BanManager) {
+	gs.banManagerMutex.Lock()
+	defer gs.banManagerMutex.Unlock()
+	gs.banManager = bm
+}
+
+func (gs *CodaGatingState) getBanManager() *BanManager {
+	gs.banManagerMutex.RLock()
+	defer gs.banManagerMutex.RUnlock()
+	return gs.banManager
+}
+
+// BanManager returns the ban manager consulted by the gating checks, or nil
+// if none has been installed.
+func (gs *CodaGatingState) BanManager() *BanManager {
+	return gs.getBanManager()
 }
 
 func (h *Helper) SetGatingState(gs *CodaGatingConfig) {
@@ -522,6 +546,18 @@ func (gs *CodaGatingState) checkAllowedAddr(addr ma.Multiaddr) connectionAllowan
 
 // checks if a peer is allowed to dial/accept; if the peer is in the trustlist, the address checks are overriden
 func (gs *CodaGatingState) checkAllowedPeerWithAddr(p peer.ID, addr ma.Multiaddr) connectionAllowance {
+	// The ban manager is additive with the legacy lists (which remain until
+	// the daemon-side lists are removed): trusted-first, then banned.
+	if bm := gs.getBanManager(); bm != nil {
+		if ip, err := manet.ToIP(addr); err == nil {
+			if bm.IsTrusted(p, ip.String()) {
+				return Accept
+			}
+			if bm.IsBanned(p, ip.String()) {
+				return DenyBannedPeer
+			}
+		}
+	}
 	return unlessUndecided(gs.checkPeerTrusted(p), bothAccept(gs.checkAllowedPeer(p), gs.checkAllowedAddr(addr)))
 }
 

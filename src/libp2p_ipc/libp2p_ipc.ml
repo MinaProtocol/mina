@@ -135,10 +135,10 @@ let create_peer_id peer_id =
   build' (module Builder.PeerId) (op Builder.PeerId.id_set peer_id)
 
 let create_libp2p_config ~private_key ~statedir ~listen_on ?metrics_port
-    ~external_multiaddr ~network_id ~unsafe_no_trust_ip ~flood ~direct_peers
-    ~seed_peers ~known_private_ip_nets ~peer_exchange ~peer_protection_ratio
-    ~min_connections ~max_connections ~validation_queue_size ~gating_config
-    ~topic_config () =
+    ?banlist_path ~external_multiaddr ~network_id ~unsafe_no_trust_ip ~flood
+    ~direct_peers ~seed_peers ~known_private_ip_nets ~peer_exchange
+    ~peer_protection_ratio ~min_connections ~max_connections
+    ~validation_queue_size ~gating_config ~topic_config () =
   build
     (module Builder.Libp2pConfig)
     Builder.Libp2pConfig.(
@@ -146,6 +146,7 @@ let create_libp2p_config ~private_key ~statedir ~listen_on ?metrics_port
       *> op statedir_set statedir
       *> list_op listen_on_set_list listen_on
       *> optional op metrics_port_set_exn metrics_port
+      *> optional op banlist_path_set banlist_path
       *> builder_op external_multiaddr_set_builder external_multiaddr
       *> op network_id_set network_id
       *> op unsafe_no_trust_ip_set unsafe_no_trust_ip
@@ -310,7 +311,7 @@ let create_add_resource_push_message ~tag ~data =
               Builder.Libp2pHelperInterface.AddResource.(
                 op tag_set_exn tag *> op data_set data) ))
 
-let create_heartbeat_peer_push_message ~peer_id =
+let create_useful_peer_push_message ~peer_id =
   let id =
     build'
       (module Builder.PeerId)
@@ -320,10 +321,10 @@ let create_heartbeat_peer_push_message ~peer_id =
     (module Builder.Libp2pHelperInterface.PushMessage)
     Builder.Libp2pHelperInterface.PushMessage.(
       builder_op header_set_builder (create_push_message_header ())
-      *> reader_op heartbeat_peer_set_reader
+      *> reader_op useful_peer_set_reader
            (build
-              (module Builder.Libp2pHelperInterface.HeartbeatPeer)
-              Builder.Libp2pHelperInterface.HeartbeatPeer.(
+              (module Builder.Libp2pHelperInterface.UsefulPeer)
+              Builder.Libp2pHelperInterface.UsefulPeer.(
                 builder_op id_set_builder id) ))
 
 let create_validation_push_message ~validation_id ~validation_result =

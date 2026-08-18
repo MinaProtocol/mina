@@ -57,6 +57,7 @@ val create_libp2p_config :
   -> statedir:string
   -> listen_on:multiaddr list
   -> ?metrics_port:int
+  -> ?banlist_path:string
   -> external_multiaddr:multiaddr
   -> network_id:string
   -> unsafe_no_trust_ip:bool
@@ -102,7 +103,7 @@ val create_download_resource_push_message :
 
 val create_remove_resource_push_message : ids:string list -> push_message
 
-val create_heartbeat_peer_push_message : peer_id:Peer.Id.t -> push_message
+val create_useful_peer_push_message : peer_id:Peer.Id.t -> push_message
 
 val push_message_to_outgoing_message : push_message -> outgoing_message
 
