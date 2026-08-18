@@ -501,9 +501,36 @@ let docker_step
 
           let netSeg = "-${Network.lowerName network}-docker-image"
 
+          let genericJobDebs
+              : List Command.TaggedKey.Type
+              =
+                -- Every image of a codename installs its .deb files out of ONE
+                -- directory of the build cache, which every packaging job of
+                -- that codename writes into. So a mainnet image needs the
+                -- packages of the network-less job as well as its own: the
+                -- mainnet archive image installs mina-archive-generic, and the
+                -- mainnet job builds archive_mainnet and not archive_generic.
+                --
+                -- That was already true and nothing said so. Both jobs happened
+                -- to run and the file happened to be there in time. A selection
+                -- that asks for mainnet alone does not run the other job at
+                -- all, so the package would simply not exist.
+                --
+                -- The network decides it, because dhall cannot compare the two
+                -- job names: Network.namePrefixSegment is empty for devnet, so
+                -- the devnet job IS the network-less one and needs nothing
+                -- added.
+                merge
+                  { Devnet = [] : List Command.TaggedKey.Type
+                  , Mainnet =
+                    [ { name = genericBuildName spec, key = "build-deb-pkg" } ]
+                  }
+                  (primaryNetwork spec)
+
           let deps
               : List Command.TaggedKey.Type
-              = [ { name = selfName spec, key = "build-deb-pkg" } ]
+              =   [ { name = selfName spec, key = "build-deb-pkg" } ]
+                # genericJobDebs
 
           let withDocker =
                     \(dep : Docker.Type)
