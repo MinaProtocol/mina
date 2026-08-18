@@ -4,6 +4,7 @@ const HTTPError = require("./util/httpError");
 const { httpsRequest } = require("./util/httpsRequest");
 const axios = require("axios");
 const { checkArgument } = require("./safe-input.js");
+const { parseArtifactsCommand } = require("./artifacts.js");
 
 const apiKey = process.env.BUILDKITE_API_ACCESS_TOKEN;
 
@@ -287,6 +288,55 @@ const handler = async (event, req) => {
         },
         "mina-build-debian",
         {}
+      );
+      return [buildkite];
+    } else {
+      return [
+        "comment author is not (publically) a member of the core team",
+        "comment author is not (publically) a member of the core team",
+      ];
+    }
+  }
+
+  // Mina Artifact Build section
+  //
+  // Builds artifacts: docker images, debian packages, or the app binaries they
+  // are made from. What to build is named in the comment, and nothing is
+  // triaged.
+  //
+  //   !ci-artifacts-me docker set=automode profile=devnet codename=bullseye
+  //   !ci-artifacts-me debian set=prefork codename=bullseye
+  //   !ci-artifacts-me apps codename=bullseye instrumented=true
+  //
+  // This is a NEW command with a pipeline of its own, and !ci-docker-me and
+  // !ci-debian-me below are deliberately left alone. This function serves every
+  // branch, and a buildkite pipeline runs one command for every branch alike,
+  // while the entrypoint this pipeline uploads
+  // (buildkite/src/Entrypoints/RunSelection.dhall) is on develop and on nothing
+  // else. Changing the old commands would break every pull request on
+  // compatible, on master and on the release branches. See src/artifacts.js.
+  else if (
+    req.body.action == "created" &&
+    req.body.issue.pull_request &&
+    req.body.issue.pull_request.url &&
+    req.body.comment.body.startsWith("!ci-artifacts-me")
+  ) {
+    const orgData = await getRequest(req.body.sender.organizations_url);
+    if (orgData.data.filter((org) => org.login == "MinaProtocol").length > 0) {
+      const prData = await getRequest(req.body.issue.pull_request.url);
+
+      const parsed = parseArtifactsCommand(req.body.comment.body);
+      if (parsed.error) {
+        return [parsed.error, parsed.error];
+      }
+
+      const buildkite = await runBuild(
+        {
+          sender: req.body.sender,
+          pull_request: prData.data,
+        },
+        "mina-artifacts",
+        parsed.env
       );
       return [buildkite];
     } else {
