@@ -72,3 +72,28 @@ let wait_db_ready ~postgres_uri ?(timeout = 30) ?(interval = 1) () =
       ]
   in
   Result.ignore_m result
+
+(** [wait_db_and_server_ready ~postgres_uri ~server_port ()] blocks
+    until the archive DB schema answers AND the archive server accepts
+    a TCP connection on [server_port].  Tests that send blocks to the
+    archive's RPC port must use this, not [wait_db_ready]: the schema
+    is loaded before the archive process even starts, so the DB probe
+    alone gates nothing, and a block dispatched before the server
+    listens is silently lost. *)
+let wait_db_and_server_ready ~postgres_uri ~server_port ?(timeout = 30)
+    ?(interval = 1) () =
+  let%map result =
+    run
+      [ "wait"
+      ; "--db-only"
+      ; "--postgres-uri"
+      ; postgres_uri
+      ; "--server-port"
+      ; Int.to_string server_port
+      ; "--timeout"
+      ; Int.to_string timeout
+      ; "--interval"
+      ; Int.to_string interval
+      ]
+  in
+  Result.ignore_m result

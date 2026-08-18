@@ -21,6 +21,12 @@ let default_wait_timeout = 600
 
 let default_wait_interval = 10
 
+let default_server_host = "127.0.0.1"
+
+(* Bound on a single TCP connect attempt; [wait] retries failed
+   attempts on its own --interval. *)
+let server_connect_timeout_sec = 5
+
 let postgres_uri_env = "MINA_POSTGRES_URI"
 
 (* Exit 2 (usage) rather than surfacing an opaque connection failure
@@ -84,6 +90,14 @@ let max_unparented_flag =
            default_max_unparented )
       (optional_with_default default_max_unparented int))
 
+let server_host_flag =
+  Command.Param.(
+    flag "--server-host"
+      ~doc:
+        (sprintf "HOST Archive server host to probe (default: %s)"
+           default_server_host )
+      (optional_with_default default_server_host string))
+
 let missing_blocks_width_flag =
   Command.Param.(
     flag "--window"
@@ -104,6 +118,7 @@ module Failure = struct
   type t =
     | Db_unreachable of string
     | Db_query_failed of string
+    | Server_unreachable of string
     | No_blocks
     | Invalid_timestamp of string
     | Thresholds_exceeded of string list
@@ -118,6 +133,8 @@ module Failure = struct
         sprintf "Failed to connect to PostgreSQL: %s" message
     | Db_query_failed message ->
         sprintf "Archive query failed: %s" message
+    | Server_unreachable message ->
+        sprintf "Failed to connect to archive server: %s" message
     | No_blocks ->
         "no blocks in archive database"
     | Invalid_timestamp raw ->
@@ -140,6 +157,7 @@ module Metrics = struct
      so an envelope cannot claim a field the probe never read. *)
   type t =
     | Db_reachable
+    | Server_reachable
     | Block_height of int
     | Recency of { delay_seconds : int64; max_delay : int }
     | Missing_blocks of
@@ -161,7 +179,7 @@ module Metrics = struct
         [ (name, to_json value) ]
 
   let to_json_fields = function
-    | Db_reachable ->
+    | Db_reachable | Server_reachable ->
         []
     | Block_height height ->
         [ ("block_height", `Int height) ]
@@ -189,7 +207,7 @@ module Metrics = struct
   (* The text-mode line: what was measured, against which limit. The
      same line whether the probe passed or failed. *)
   let to_text = function
-    | Db_reachable ->
+    | Db_reachable | Server_reachable ->
         "OK"
     | Block_height height ->
         Int.to_string height
@@ -379,6 +397,33 @@ let with_pool ~postgres_uri f =
       Mina_caqti.Pool.use f pool
       |> Deferred.map
            ~f:(Result.map_error ~f:(fun e -> failure_of_caqti_pool_error e))
+
+(* The archive's client-facing RPC port.  A plain TCP connect proves
+   the server is accepting connections — something no DB probe can
+   see, because the schema answers queries before the archive process
+   has started listening. *)
+let probe_server ~host ~port =
+  match%map
+    Monitor.try_with (fun () ->
+        Tcp.with_connection
+          ~timeout:(Time.Span.of_int_sec server_connect_timeout_sec)
+          (Tcp.Where_to_connect.of_host_and_port
+             (Host_and_port.create ~host ~port) )
+          (fun _socket _reader _writer -> Deferred.unit) )
+  with
+  | Ok () ->
+      Ok ()
+  | Error exn ->
+      (* Render the errno as prose: raw OCaml exception syntax must not
+         reach user-visible output (see the leak guard in tests/). *)
+      let reason =
+        match Monitor.extract_exn exn with
+        | Unix.Unix_error (err, _, _) ->
+            Unix.Error.message err
+        | exn ->
+            Exn.to_string_mach exn
+      in
+      Error (Failure.Server_unreachable (sprintf "%s:%d: %s" host port reason))
 
 let evaluation_of_result ~evaluate : (_, Failure.t) Result.t -> evaluation =
   function
@@ -590,6 +635,30 @@ let ready_command =
        in
        emit ~json report )
 
+let server_ready_command =
+  Command.async_or_error
+    ~summary:
+      "Check if the archive server accepts TCP connections (exit 0 if \
+       connected)"
+    (let%map_open.Command json = json_flag
+     and host = server_host_flag
+     and port =
+       flag "--server-port" ~doc:"PORT Archive server port to probe (e.g. 3086)"
+         (required int)
+     in
+     fun () ->
+       setup_logging ~json ;
+       let%bind outcome = probe_server ~host ~port in
+       let metrics =
+         match outcome with
+         | Ok () ->
+             Some Metrics.Server_reachable
+         | Error _ ->
+             None
+       in
+       emit ~json (Report.of_evaluation ~kind:Report.Probe (metrics, outcome))
+    )
+
 (* Both wait modes share this loop; they differ only in [attempt]. On
    expiry the last failure is wrapped in [Timed_out]. *)
 let rec poll ~start ~deadline ~interval ~kind attempt =
@@ -648,6 +717,15 @@ let wait_command =
             the schema is queryable but cannot wait for ingestion (e.g. a \
             freshly-initialized DB with no blocks yet)."
          no_arg
+     and server_host = server_host_flag
+     and server_port =
+       flag "--server-port"
+         ~doc:
+           "PORT Also require the archive server to accept a TCP connection on \
+            this port before reporting ready.  The DB probes cannot see the \
+            server: the schema answers queries before the archive process \
+            starts listening, so a block sent then is silently lost."
+         (optional int)
      in
      fun () ->
        setup_logging ~json ;
@@ -684,7 +762,22 @@ let wait_command =
                            evaluate_readiness ~now:(now_ms ()) ~max_delay
                              ~max_missing ~max_unparented answer ) )
            in
-           let%bind report = poll ~start ~deadline ~interval ~kind attempt in
+           (* Server first: it is the cheaper probe, and until it
+              listens the DB answer alone would falsely report ready. *)
+           let gated_attempt () =
+             match server_port with
+             | None ->
+                 attempt ()
+             | Some port -> (
+                 match%bind probe_server ~host:server_host ~port with
+                 | Ok () ->
+                     attempt ()
+                 | Error failure ->
+                     return (None, Error failure) )
+           in
+           let%bind report =
+             poll ~start ~deadline ~interval ~kind gated_attempt
+           in
            emit ~json report )
 
 let () =
@@ -694,6 +787,7 @@ let () =
          "Mina archive healthcheck CLI — lightweight probe commands for \
           archive node monitoring"
        [ ("db-ready", db_ready_command)
+       ; ("server-ready", server_ready_command)
        ; ("block-height", block_height_command)
        ; ("block-recency", block_recency_command)
        ; ("missing-blocks", missing_blocks_command)

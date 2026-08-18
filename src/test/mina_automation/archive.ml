@@ -112,9 +112,11 @@ let start t =
   let open Deferred.Let_syntax in
   let args = Config.to_args t.config in
   let%bind _, process = Executor.run_in_background t.executor ~args () in
-  (* Callers that need to gate on archive readiness should use
-     [Archive_healthcheck.wait_db_ready] rather than relying on this fixed
-     sleep — it polls the DB directly and survives schema-load
-     latency variation. *)
+  (* Callers that need to gate on archive readiness must use
+     [Archive_healthcheck.wait_db_and_server_ready] rather than relying
+     on this fixed sleep: on a slow agent the archive takes longer than
+     5 s to start listening, and a block sent before then is silently
+     lost.  [wait_db_ready] alone is not a gate either — the schema is
+     loaded before this process starts. *)
   let%map () = after (Time.Span.of_sec 5.) in
   Process.{ process; config = t.config }
