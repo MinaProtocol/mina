@@ -188,14 +188,6 @@ let appsBuildEnvs =
           # spec.extraBuildEnvs
           # DebianVersions.overrideEnvs
 
-let labelSuffix
-    : PackagingSpec.Type -> Text
-    =     \(spec : PackagingSpec.Type)
-      ->  "${DebianVersions.capitalName
-               spec.debVersion} ${BuildFlags.toSuffixUppercase
-                                    spec.buildFlags}${Arch.labelSuffix
-                                                        spec.arch}"
-
 let primaryNetwork
     : PackagingSpec.Type -> Network.Type
     =     \(spec : PackagingSpec.Type)
@@ -203,6 +195,24 @@ let primaryNetwork
             Network.Type
             Network.Type.Devnet
             (List/head Network.Type (Artifact.networks spec.artifacts))
+
+let labelSuffix
+    : PackagingSpec.Type -> Text
+    =
+      -- The network is named here, and not only in the name of the job, because
+      -- one codename has a devnet packaging step AND a mainnet one. Without it
+      -- both read "Debian: Build Bullseye" and the two look like the same work
+      -- done twice, which is what they are not: they build different packages.
+      --
+      -- Network.capitalName and not Network.namePrefixSegment, which is empty
+      -- for devnet: a label that says nothing is what is being fixed.
+          \(spec : PackagingSpec.Type)
+      ->  "${Network.capitalName
+               ( primaryNetwork spec
+               )} ${DebianVersions.capitalName
+                      spec.debVersion} ${BuildFlags.toSuffixUppercase
+                                           spec.buildFlags}${Arch.labelSuffix
+                                                               spec.arch}"
 
 let baseNameSuffix
     : PackagingSpec.Type -> Text
