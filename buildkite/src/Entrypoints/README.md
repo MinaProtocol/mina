@@ -19,25 +19,32 @@ the other.
 | entrypoint | pipelines | what it does |
 |---|---|---|
 | `../Prepare.dhall` | `mina`, and the nightly and release pipelines | CI. Uploads `Monorepo.dhall`, which triages. |
-| `RunSelection.dhall` | `mina-build-docker`, `mina-build-debian`, `mina-build-apps` | Artifacts. Builds what the comment named. |
+| `RunSelection.dhall` | `mina-artifacts` | Artifacts. Builds what the comment named. |
 | `RunSingleJob.dhall` | `mina-single-job` | One named job and its dependencies. |
 | `GenerateHardforkPackage.dhall` | the hardfork package pipeline | The hardfork artifacts. |
 
-## The artifact pipelines
+## The artifact pipeline
 
-All three run the same command, and differ only in the environment the
-`ci-build-me` function sets when it starts the build:
+`mina-artifacts` is one pipeline for all three layers. It is a NEW pipeline, and
+`mina-build-docker` and `mina-build-debian` are deliberately left as they are:
+a pipeline runs one command whatever branch it builds, and this entrypoint is on
+develop and on no other branch, so repointing an old pipeline would break every
+`!ci-docker-me` on compatible and on master.
+
+Its command is:
 
 ```
 dhall-to-yaml --quoted <<< "./buildkite/src/Entrypoints/RunSelection.dhall" \
   | buildkite-agent pipeline upload
 ```
 
+The `ci-build-me` function sets the environment from the comment:
+
 | comment | `BUILDKITE_PIPELINE_LAYER` | `BUILDKITE_PIPELINE_SELECTION` |
 |---|---|---|
-| `!ci-docker-me` | `docker` | what `set=` said, or `all` |
-| `!ci-debian-me` | `debian` | what `set=` said, or `all` |
-| `!ci-apps-me` | not used | `build-apps` |
+| `!ci-artifacts-me docker …` | `docker` | what `set=` said, or nothing |
+| `!ci-artifacts-me debian …` | `debian` | what `set=` said, or nothing |
+| `!ci-artifacts-me apps …` | not set | `build-apps` |
 
 The rest of a comment becomes `BUILDKITE_PIPELINE_CODENAME`, `_ARCH`,
 `_NETWORK`, `_PROFILE`, `_INSTRUMENTED`, `_FROM_BUILD` and
@@ -53,6 +60,6 @@ nothing here.
 
 ## Nothing named
 
-`!ci-docker-me` with nothing after it builds every docker image, and
-`!ci-debian-me` builds every package. There is no triage to fall back on, and
-someone who typed the command asked for a build.
+`!ci-artifacts-me docker` with nothing after it builds every docker image, and
+`!ci-artifacts-me debian` builds every package. There is no triage to fall back
+on, and someone who typed the command asked for a build.
