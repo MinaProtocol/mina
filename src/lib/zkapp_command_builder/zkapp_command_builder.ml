@@ -1,4 +1,21 @@
-(* zkapp_command_builder.ml -- combinators to build Zkapp_command.t for tests *)
+(** Combinators to build [Zkapp_command.t] for tests.
+
+    This module provides helper functions for constructing zkApp commands
+    in test code, including:
+    - [mk_forest], [mk_node]: build account update call forests
+    - [mk_account_update_body]: create account update bodies with sensible defaults
+    - [mk_zkapp_command]: assemble a complete zkApp command with dummy authorizations
+    - [replace_authorizations]: replace dummy signatures/proofs with valid ones
+
+    The [replace_authorizations] function mirrors the signing logic that is
+    verified in the transaction snark (see [Transaction_snark.Transaction_commitment]):
+    1. Compute transaction commitments via [Zkapp_command.get_transaction_commitments]
+    2. Fee payer signs the full commitment
+    3. Account updates sign either partial or full commitment based on [use_full_commitment]
+
+    The transaction snark enforces that signatures match these commitments,
+    so tests using this module verify the same signing behavior.
+*)
 
 open Core_kernel
 open Mina_base
