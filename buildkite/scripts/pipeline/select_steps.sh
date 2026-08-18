@@ -128,61 +128,80 @@ esac
 # ---------------------------------------------------------------------------
 # A set is only a name for some patterns. It is read from the dhall file, so the
 # names live in one place and this script holds no copy of them.
+#
+# dhall-to-yaml and yq, and not dhall-to-json and python3: those two are what
+# the CI toolchain image HAS. Dockerfile-toolchain-base takes only
+# ./bin/dhall-to-yaml out of the dhall-json release and installs no python, so a
+# selection that needed either died in the container with no message at all.
+# Every other script that runs there reads yaml with yq already.
+#
+# One line per set, taken apart in bash: yq gathers the results of a comma by
+# expression and not by item, so asking it for three lines per set interleaves
+# them wrongly.
 # ---------------------------------------------------------------------------
 
+SETS_FIELDS='.[] | .name + "|" + .description + "|" + (.dockers | join(" ")) + "|" + (.debians | join(" "))'
+
 read_sets() {
-    command -v dhall-to-json > /dev/null 2>&1 || fail "'dhall-to-json' is not installed, so --set cannot be used."
+    command -v dhall-to-yaml > /dev/null 2>&1 || fail "'dhall-to-yaml' is not installed, so --set cannot be used."
+    command -v yq > /dev/null 2>&1 || fail "'yq' is not installed, so --set cannot be used."
     [[ -f "$SETS_DHALL" ]] || fail "'${SETS_DHALL}' is not there."
-    dhall-to-json <<< "(${SETS_DHALL}).sets" 2>/dev/null \
+    dhall-to-yaml <<< "(${SETS_DHALL}).sets" | yq -r "$SETS_FIELDS" \
         || fail "cannot read ${SETS_DHALL}."
 }
 
+# The name and the description of every set, for a message.
+sets_summary() {
+    local name description rest
+    while IFS='|' read -r name description rest; do
+        [[ -z "$name" ]] && continue
+        printf '  %-20s %s\n' "$name" "$description"
+    done
+}
+
 if [[ "$LIST_SETS" -eq 1 ]]; then
-    read_sets | python3 -c '
-import json, sys
-for s in json.load(sys.stdin):
-    print("%-20s %s" % (s["name"], s["description"]))
-    print("%-20s   dockers: %s" % ("", " ".join(s["dockers"]) or "(none)"))
-    print("%-20s   debians: %s" % ("", " ".join(s["debians"]) or "(none)"))
-'
+    read_sets | while IFS='|' read -r name description dockers debians; do
+        [[ -z "$name" ]] && continue
+        printf '%-20s %s\n' "$name" "$description"
+        printf '%-20s   dockers: %s\n' "" "${dockers:-(none)}"
+        printf '%-20s   debians: %s\n' "" "${debians:-(none)}"
+    done
     exit 0
 fi
 
 # A set is looked up once. Which of its two sides is read depends on the layer:
 # the docker patterns are step keys, and the debian patterns are package tokens
-# that only narrow_debian_tokens.py understands, so they leave by another door.
+# that only the narrowing script understands, so they leave by another door.
 expand_sets() {
     local field="$1"
-    local sets_json want found
-    sets_json="$(read_sets)"
+    local sets_text want line found
+    sets_text="$(read_sets)"
+
     for want in "${SETS[@]}"; do
-        found="$(echo "$sets_json" | python3 -c "
-import json, sys
-want, field = sys.argv[1], sys.argv[2]
-for s in json.load(sys.stdin):
-    if s['name'] == want:
-        print('\n'.join(s[field]))
-        break
-else:
-    sys.exit(3)
-" "$want" "$field")" || {
+        line="$(printf '%s\n' "$sets_text" | grep -m1 "^${want}|" || true)"
+
+        if [[ -z "$line" ]]; then
             {
                 echo "ERROR: there is no set called '${want}'. These exist:"
-                echo "$sets_json" | python3 -c "
-import json, sys
-for s in json.load(sys.stdin):
-    print('  %-20s %s' % (s['name'], s['description']))
-"
+                printf '%s\n' "$sets_text" | sets_summary
             } >&2
             exit 2
-        }
+        fi
+
+        case "$field" in
+            dockers) found="$(printf '%s' "$line" | cut -d'|' -f3)" ;;
+            debians) found="$(printf '%s' "$line" | cut -d'|' -f4)" ;;
+            *) fail "unknown side of a set: ${field}" ;;
+        esac
+
         if [[ -z "$found" ]]; then
             echo "ERROR: the set '${want}' builds no ${field%s} at all. Ask for it in the other layer." >&2
             exit 2
         fi
-        while IFS= read -r pattern; do
+
+        tr ' ' '\n' <<< "$found" | while IFS= read -r pattern; do
             [[ -n "$pattern" ]] && echo "$pattern"
-        done <<< "$found"
+        done
     done
 }
 
@@ -193,9 +212,9 @@ if [[ "$PRINT_DEBIANS" -eq 1 ]]; then
 fi
 
 if [[ "$PRINT_SEGMENTS" -eq 1 ]]; then
-    command -v dhall-to-json > /dev/null 2>&1 || fail "'dhall-to-json' is not installed."
-    dhall-to-json <<< "(${SETS_DHALL}).segments" \
-        | python3 -c 'import json,sys; print("\n".join(json.load(sys.stdin)))'
+    command -v dhall-to-yaml > /dev/null 2>&1 || fail "'dhall-to-yaml' is not installed."
+    command -v yq > /dev/null 2>&1 || fail "'yq' is not installed."
+    dhall-to-yaml <<< "(${SETS_DHALL}).segments" | yq -r '.[]'
     exit 0
 fi
 

@@ -171,7 +171,16 @@ command -v yq > /dev/null 2>&1 || fail "'yq' is not installed."
 # not as a pattern. A set name holds no star and matches no step key, so the two
 # cannot be confused; an unknown name is a pattern, and select_steps.sh then
 # stops on it because it matches nothing.
-KNOWN_SETS=" $("$SELECT_STEPS" --list-sets 2>/dev/null | grep -E '^[a-z]' | awk '{print $1}' | tr '\n' ' ') "
+# A failure here used to be swallowed whole: the output went to /dev/null and
+# `set -euo pipefail` then stopped the script with no message and status 1,
+# which is how a binary missing from the CI image looked like nothing at all.
+if ! sets_listing="$("$SELECT_STEPS" --list-sets 2>&1)"; then
+    echo "ERROR: the sets could not be read, so a selection cannot be understood:" >&2
+    printf '%s\n' "$sets_listing" >&2
+    exit 2
+fi
+
+KNOWN_SETS=" $(printf '%s\n' "$sets_listing" | grep -E '^[a-z]' | awk '{print $1}' | tr '\n' ' ') "
 
 declare -a SELECT_ARGS=(--layer "$LAYER")
 declare -a NAMED_SETS=()
