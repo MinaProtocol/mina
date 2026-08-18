@@ -303,6 +303,20 @@ let appsVariant
             }
             spec.buildFlags
 
+let profileTents
+    : PackagingSpec.Type -> Text
+    =
+      -- The mina-<network>-generic tents this job's own artifacts call for.
+      --
+      -- Both tents used to be appended to EVERY packaging job. Two jobs of one
+      -- codename then built the same two packages and wrote them into the same
+      -- cache directory at the same time, and a codename with no mainnet job
+      -- still shipped mina-mainnet-generic, whose dependency
+      -- mina-mainnet-profile that codename never builds -- an uninstallable
+      -- package. A tent now goes with the profile it names.
+          \(spec : PackagingSpec.Type)
+      ->  Text/concatSep " " (Artifact.profileTents spec.artifacts)
+
 let build_artifacts
     : PackagingSpec.Type -> Command.Type
     =     \(spec : PackagingSpec.Type)
@@ -349,7 +363,8 @@ let build_artifacts
                           # spec.extraBuildEnvs
                           # DebianVersions.overrideEnvs
                         )
-                        "${spec.buildScript} ${debianTokens} profile_devnet_generic profile_mainnet_generic"
+                        "${spec.buildScript} ${debianTokens} ${profileTents
+                                                                 spec}"
                     # [ Cmd.run
                           "./buildkite/scripts/debian/write_to_cache.sh ${DebianVersions.lowerName
                                                                             spec.debVersion}"
@@ -472,8 +487,7 @@ let build_debian
             , commands =
                   buildDebianFromApps
                     spec
-                    "${debianTokens
-                         spec} profile_devnet_generic profile_mainnet_generic"
+                    "${debianTokens spec} ${profileTents spec}"
                 # [ Cmd.run
                       "./buildkite/scripts/debian/write_to_cache.sh ${DebianVersions.lowerName
                                                                         spec.debVersion}"
