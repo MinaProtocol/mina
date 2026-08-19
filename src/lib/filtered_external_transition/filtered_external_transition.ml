@@ -66,7 +66,7 @@ module Stable = struct
       ; protocol_state : Protocol_state.Stable.V3.t
       ; transactions : Transactions.Stable.V3.t
       ; snark_jobs : Transaction_snark_work.Info.Stable.V2.t list
-      ; proof : Proof.Stable.V2.t
+      ; proof : Proof.Stable.V3.t
       }
 
     let to_latest = Fn.id

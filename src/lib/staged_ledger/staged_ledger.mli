@@ -135,6 +135,39 @@ end
 
 module Pre_diff_info : Pre_diff_info.S
 
+module Diff_creation_diagnostics : sig
+  type discard_counters =
+    { insufficient_work : int
+    ; insufficient_space : int
+    ; insufficient_fees : int
+    ; extra_work : int
+    }
+  [@@deriving to_yojson]
+
+  type partition =
+    { partition : [ `First | `Second ]
+    ; start_commands : int
+    ; start_completed_work : int
+    ; available_slots : int
+    ; required_work_count : int
+    ; end_commands : int
+    ; end_completed_work : int
+    ; end_coinbase_parts : int
+    ; discard_counters : discard_counters
+    }
+  [@@deriving to_yojson]
+
+  type t =
+    { proof_count : int
+    ; valid_user_command_count : int
+    ; partitions : partition list
+    }
+  [@@deriving to_yojson]
+
+  val coinbase_parts :
+    Coinbase.Fee_transfer.t Staged_ledger_diff.At_most_two.t -> int
+end
+
 module Staged_ledger_error : sig
   type t =
     | Non_zero_fee_excess of
@@ -236,6 +269,26 @@ val create_diff :
   -> supercharge_coinbase:bool
   -> ( Staged_ledger_diff.With_valid_signatures_and_proofs.t
        * (User_command.Valid.t * Error.t) list
+     , Pre_diff_info.Error.t )
+     Result.t
+
+val create_diff_with_diagnostics :
+     constraint_constants:Genesis_constants.Constraint_constants.t
+  -> global_slot:Mina_numbers.Global_slot_since_genesis.t
+  -> ?log_block_creation:bool
+  -> t
+  -> coinbase_receiver:Public_key.Compressed.t
+  -> logger:Logger.t
+  -> current_state_view:Zkapp_precondition.Protocol_state.View.t
+  -> zkapp_cmd_limit:int option
+  -> transactions_by_fee:User_command.Valid.t Sequence.t
+  -> get_completed_work:
+       (   Transaction_snark_work.Statement.t
+        -> Transaction_snark_work.Checked.t option )
+  -> supercharge_coinbase:bool
+  -> ( Staged_ledger_diff.With_valid_signatures_and_proofs.t
+       * (User_command.Valid.t * Error.t) list
+       * Diff_creation_diagnostics.t
      , Pre_diff_info.Error.t )
      Result.t
 

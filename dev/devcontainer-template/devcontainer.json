@@ -1,0 +1,21 @@
+{
+  "name": "Mina toolchain (non-Nix)",
+  "dockerComposeFile": "../../dev/docker-compose.yml",
+  "service": "mina",
+  "workspaceFolder": "/mina",
+  "remoteUser": "opam",
+  "updateRemoteUserUID": false,
+  "initializeCommand": "./.devcontainer/mina/init.sh",
+  "shutdownAction": "stopCompose",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ocamllabs.ocaml-platform"
+      ],
+      "settings": {
+        "terminal.integrated.defaultProfile.linux": "bash"
+      }
+    }
+  },
+  "postCreateCommand": "bash -lc 'eval \"$(opam env)\" && opam install --yes ocaml-lsp-server || echo \"[postCreate] ocaml-lsp-server install failed; install manually if you want IDE features\"'"
+}

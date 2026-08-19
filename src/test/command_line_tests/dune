@@ -19,10 +19,14 @@
   yojson
   ;; mina libraries
   init
+  logger
   mina_automation
   mina_automation.fixture
-  mina_automation.runner)
+  mina_automation.runner
+  mina_graphql_client
+  mina_healthcheck_lib
+  sync_status)
  (instrumentation
   (backend bisect_ppx))
  (preprocess
-  (pps ppx_version ppx_jane ppx_compare)))
+  (pps ppx_version ppx_jane ppx_compare ppx_mina)))

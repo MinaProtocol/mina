@@ -18,6 +18,7 @@
   mina_graphql_client
   mina_numbers
   mina_transaction
-  signature_lib)
+  signature_lib
+  sync_status)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version ppx_let ppx_mina)))

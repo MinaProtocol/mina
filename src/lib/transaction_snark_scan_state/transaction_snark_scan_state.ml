@@ -275,7 +275,7 @@ module Stable = struct
   module V3 = struct
     type t =
       { scan_state :
-          ( Ledger_proof.Stable.V2.t
+          ( Ledger_proof.Stable.V3.t
           , Transaction_with_witness.Stable.V3.t )
           Parallel_scan.State.Stable.V1.t
       ; previous_incomplete_zkapp_updates :
@@ -287,7 +287,7 @@ module Stable = struct
 
     let hash (t : t) =
       hash_generic
-        ~ledger_proof_hash:(fun (x : Ledger_proof.Stable.V2.t) ->
+        ~ledger_proof_hash:(fun (x : Ledger_proof.Stable.V3.t) ->
           Ledger_proof_with_hash.hash x )
         ~tx_witness_hash:(fun (x : Transaction_with_witness.Stable.V3.t) ->
           Transaction_with_witness.hash x )

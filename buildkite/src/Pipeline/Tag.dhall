@@ -17,6 +17,7 @@ let Tag
       | Test
       | Stable
       | Toolchain
+      | Base
       | Docker
       | Debian
       | Hardfork
@@ -34,6 +35,7 @@ let Tag
       | Jammy
       | Archive
       | Mesa
+      | Packaging
       >
 
 let capitalName =
@@ -47,6 +49,7 @@ let capitalName =
             , Release = "Release"
             , Test = "Test"
             , Toolchain = "Toolchain"
+            , Base = "Base"
             , Hardfork = "Hardfork"
             , Stable = "Stable"
             , Promote = "Promote"
@@ -65,6 +68,7 @@ let capitalName =
             , Jammy = "Jammy"
             , Archive = "Archive"
             , Mesa = "Mesa"
+            , Packaging = "Packaging"
             }
             tag
 
@@ -79,6 +83,7 @@ let lowerName =
             , Release = "release"
             , Test = "test"
             , Toolchain = "toolchain"
+            , Base = "base"
             , Hardfork = "hardfork"
             , Stable = "stable"
             , Promote = "promote"
@@ -97,6 +102,7 @@ let lowerName =
             , Jammy = "jammy"
             , Archive = "archive"
             , Mesa = "mesa"
+            , Packaging = "packaging"
             }
             tag
 

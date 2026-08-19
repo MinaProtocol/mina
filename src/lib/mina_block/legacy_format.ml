@@ -113,10 +113,10 @@ module Staged_ledger_diff = struct
     module V2 = struct
       type t = Staged_ledger_diff.Stable.V3.t =
         { diff :
-            ( Transaction_snark_work.Stable.V2.t
+            ( Transaction_snark_work.Stable.V3.t
             , User_command.Stable.V2.t Mina_base.With_status.Stable.V2.t )
             Staged_ledger_diff.Pre_diff_two.Stable.V2.t
-            * ( Transaction_snark_work.Stable.V2.t
+            * ( Transaction_snark_work.Stable.V3.t
               , User_command.Stable.V2.t Mina_base.With_status.Stable.V2.t )
               Staged_ledger_diff.Pre_diff_one.Stable.V2.t
               option

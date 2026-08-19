@@ -1242,7 +1242,7 @@ let stop_long_running_daemon t =
       Time_ns.(diff (now ()) daemon_start_time |> Span.to_min |> Int.of_float)
     in
     [%log' info t.config.logger]
-      "Deamon has been running for $uptime mins. Stopping now..."
+      "Daemon has been running for $uptime mins. Stopping now..."
       ~metadata:[ ("uptime", `Int uptime_mins) ] ;
     Scheduler.yield ()
     >>= (fun () -> return (Async.shutdown 1))

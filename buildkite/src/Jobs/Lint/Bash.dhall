@@ -34,7 +34,9 @@ in  Pipeline.build
         [ Command.build
             Command.Config::{
             , commands =
-                RunInToolchain.runInToolchain ([] : List Text) "make check-bash"
+                RunInToolchain.runInDefaultToolchain
+                  ([] : List Text)
+                  "make check-bash"
             , label = "Bash: shellcheck"
             , key = "check-bash"
             , target = Size.Multi

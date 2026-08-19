@@ -132,7 +132,6 @@ let targetToAgent =
             , QA = toMap { qa = "true" }
             , Perf = toMap { performance = "true" }
             , Multi = toMap { generic_multi = "true" }
-            , Arm64 = toMap { arm64_static = "true" }
             }
             target
 
@@ -245,7 +244,7 @@ let build
               }
           , soft_fail = c.soft_fail
           , skip = c.skip
-          , `if` = c.if_
+          , if = c.if_
           , plugins =
               let dockerPart =
                     Optional/toList

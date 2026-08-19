@@ -8,6 +8,9 @@ type state = FullyOpen | HalfClosed of participant | FullyClosed
 
 type t
 
+type queue_release_reason =
+  [ `Lost | `Handler_done | `Handshake_failed | `Shutdown_or_release ]
+
 val state : t -> state
 
 val id : t -> Libp2p_ipc.stream_id
@@ -38,6 +41,14 @@ val remote_peer : t -> Peer.t
 val pipes : t -> string Pipe.Reader.t * string Pipe.Writer.t
 
 val data_received : t -> string -> unit
+
+val register_rpc_adapter_queue : t -> string Pipe.Reader.t -> unit
+
+val record_rpc_adapter_enqueue : t -> bytes:int -> unit
+
+val release_rpc_adapter_queue : t -> reason:queue_release_reason -> unit
+
+val release_buffers : t -> reason:queue_release_reason -> unit
 
 val reset : helper:Libp2p_helper.t -> t -> unit Deferred.Or_error.t
 

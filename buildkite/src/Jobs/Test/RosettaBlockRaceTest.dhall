@@ -6,11 +6,9 @@ let PipelineTag = ../../Pipeline/Tag.dhall
 
 let JobSpec = ../../Pipeline/JobSpec.dhall
 
-let Artifacts = ../../Constants/Artifacts.dhall
+let DebianVersions = ../../Constants/DebianVersions.dhall
 
-let Dockers = ../../Constants/DockerVersions.dhall
-
-let BuildFlags = ../../Constants/BuildFlags.dhall
+let PipelineScope = ../../Pipeline/Scope.dhall
 
 let RosettaBlockRaceTest = ../../Command/RosettaBlockRaceTest.dhall
 
@@ -18,12 +16,7 @@ let Expr = ../../Pipeline/Expr.dhall
 
 let MainlineBranch = ../../Pipeline/MainlineBranch.dhall
 
-let dependsOn =
-      Dockers.dependsOn
-        Dockers.DepsSpec::{
-        , artifact = Artifacts.Type.FunctionalTestSuite
-        , buildFlags = BuildFlags.Type.Instrumented
-        }
+let dependsOn = DebianVersions.appDependsOn DebianVersions.DepsSpec::{=}
 
 in  Pipeline.build
       Pipeline.Config::{
@@ -32,12 +25,14 @@ in  Pipeline.build
           [ S.strictlyStart (S.contains "src")
           , S.exactly "scripts/rosetta/test-block-race-with-data" "sh"
           , S.exactly "scripts/rosetta/test-block-race" "sh"
-          , S.exactly "buildkite/scripts/tests/rosetta-block-race-test" "sh"
+          , S.exactly "buildkite/scripts/tests/rosetta/block-race-test" "sh"
           , S.exactly "buildkite/src/Jobs/Test/RosettaBlockRaceTest" "dhall"
           , S.exactly "buildkite/src/Command/RosettaBlockRaceTest" "dhall"
           ]
         , path = "Test"
         , name = "RosettaBlockRaceTest"
+        , scope =
+          [ PipelineScope.Type.MainlineNightly, PipelineScope.Type.Release ]
         , excludeIf =
           [ Expr.Type.DescendantOf
               { ancestor = MainlineBranch.Type.Mesa

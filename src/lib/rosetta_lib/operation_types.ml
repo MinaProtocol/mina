@@ -11,7 +11,8 @@ type t =
   | `Fee_payment
   | `Delegate_change
   | `Zkapp_fee_payer_dec
-  | `Zkapp_balance_update ]
+  | `Zkapp_balance_update
+  | `Account_creation_fee_via_zkapp ]
 [@@deriving to_representatives, to_yojson, equal]
 
 let name = function
@@ -37,6 +38,8 @@ let name = function
       "zkapp_fee_payer_dec"
   | `Zkapp_balance_update ->
       "zkapp_balance_update"
+  | `Account_creation_fee_via_zkapp ->
+      "account_creation_fee_via_zkapp"
 
 let of_name_exn = function
   | "fee_payer_dec" ->
@@ -61,6 +64,8 @@ let of_name_exn = function
       `Zkapp_fee_payer_dec
   | "zkapp_balance_update" ->
       `Zkapp_balance_update
+  | "account_creation_fee_via_zkapp" ->
+      `Account_creation_fee_via_zkapp
   | _ ->
       failwith "Invalid name"
 

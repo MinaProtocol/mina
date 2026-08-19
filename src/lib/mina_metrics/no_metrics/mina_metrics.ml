@@ -340,6 +340,21 @@ module Network = struct
 
   let rpc_connections_failed : Counter.t = ()
 
+  let stream_queue_messages_max ~protocol:_ ~queue:_ : Gauge.t = ()
+
+  let stream_queue_messages_sum ~protocol:_ ~queue:_ : Gauge.t = ()
+
+  let stream_queue_bytes_max ~protocol:_ ~queue:_ : Gauge.t = ()
+
+  let stream_queue_bytes_sum ~protocol:_ ~queue:_ : Gauge.t = ()
+
+  let stream_queue_discarded_messages ~protocol:_ ~queue:_ ~reason:_ : Counter.t
+      =
+    ()
+
+  let stream_queue_discarded_bytes ~protocol:_ ~queue:_ ~reason:_ : Counter.t =
+    ()
+
   module Ipc_latency_histogram = Histogram
   module Rpc_latency_histogram = Histogram
   module Rpc_size_histogram = Histogram

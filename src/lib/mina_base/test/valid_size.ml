@@ -49,7 +49,8 @@ let zkapp_type_gen =
 
 let genesis_constant_error max_zkapp_segment events actions :
     Genesis_constants.t =
-  { Genesis_constants.Compiled.genesis_constants with
+  let (module G) = Genesis_constants.profiled () in
+  { G.genesis_constants with
     max_zkapp_segment_per_transaction = max_zkapp_segment
   ; max_event_elements = events
   ; max_action_elements = actions

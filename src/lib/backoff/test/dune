@@ -1,0 +1,15 @@
+(test
+ (name test_backoff)
+ (package backoff)
+ (libraries
+  alcotest
+  async
+  async_kernel
+  core
+  core_kernel
+  backoff
+  logger)
+ (preprocess
+  (pps ppx_jane))
+ (instrumentation
+  (backend bisect_ppx)))

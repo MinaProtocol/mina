@@ -4,12 +4,12 @@ open Core_kernel
 module Stable : sig
   [@@@no_toplevel_latest_type]
 
-  module V1 : sig
+  module V2 : sig
     type t =
       { id : Id.Any.Stable.V1.t
       ; data :
           ( Mina_stdlib.Time.Span.Stable.V1.t
-          , Ledger_proof.Stable.V2.t )
+          , Ledger_proof.Stable.V3.t )
           Proof_carrying_data.Stable.V1.t
       }
     [@@deriving to_yojson]

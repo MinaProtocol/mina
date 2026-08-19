@@ -22,7 +22,7 @@ module Stable : sig
 
   module V2 : sig
     type t =
-      (Single_spec.Stable.V2.t, Ledger_proof.Stable.V2.t) Poly.Stable.V1.t
+      (Single_spec.Stable.V3.t, Ledger_proof.Stable.V3.t) Poly.Stable.V1.t
 
     val to_latest : t -> t
   end

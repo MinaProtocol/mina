@@ -3,6 +3,7 @@ const HTTPError = require("./util/httpError");
 
 const { httpsRequest } = require("./util/httpsRequest");
 const axios = require("axios");
+const { checkArgument } = require("./safe-input.js");
 
 const apiKey = process.env.BUILDKITE_API_ACCESS_TOKEN;
 
@@ -78,7 +79,10 @@ const parseParams = (comment) => {
 const buildEnvFromParams = ({ arch, profile, codename }) => {
   var filter = "DockerBuild";
 
-  if (!arch || !profile || !codename ) {
+  // Only fall back to the unfiltered DockerBuild when the caller gave nothing.
+  // A caller that gives some of the keys keeps them: "arch=amd64" alone builds
+  // the filter DockerBuildAmd64, which is a real filter.
+  if (!arch && !profile && !codename) {
     return { BUILDKITE_PIPELINE_FILTER: filter };
   }
 
@@ -223,6 +227,49 @@ const handler = async (event, req) => {
     }
   }
 
+  // Mina CI Single Test Build section
+  //
+  // Runs one generated buildkite job and the jobs it depends on. The job name
+  // is the last word of the comment, and it must be the exact name of a job in
+  // buildkite/src/gen (the match is on the whole name, not a part of it).
+  //
+  //   !ci-single-me HardForkTestMixed
+  else if (
+    req.body.action == "created" &&
+    req.body.issue.pull_request &&
+    req.body.issue.pull_request.url &&
+    req.body.comment.body.startsWith("!ci-single-me")
+  ) {
+    const orgData = await getRequest(req.body.sender.organizations_url);
+    if (orgData.data.filter((org) => org.login == "MinaProtocol").length > 0) {
+      const prData = await getRequest(req.body.issue.pull_request.url);
+
+      const jobName = req.body.comment.body.trim().split(/\s+/).pop(); // get JobName from "!ci-single-me JobName"
+
+      // The name is put into a dhall expression on the agent, so it is checked
+      // before it goes anywhere. See src/safe-input.js.
+      const checked = checkArgument("!ci-single-me", jobName);
+      if (checked.error) {
+        return [checked.error, checked.error];
+      }
+
+      const buildkite = await runBuild(
+        {
+          sender: req.body.sender,
+          pull_request: prData.data,
+        },
+        "mina-single-job",
+        { JOB_NAME: checked.value }
+      );
+      return [buildkite];
+    } else {
+      return [
+        "comment author is not (publically) a member of the core team",
+        "comment author is not (publically) a member of the core team",
+      ];
+    }
+  }
+
   // Mina CI Debian Build section
   else if (
     req.body.action == "created" &&
@@ -240,6 +287,54 @@ const handler = async (event, req) => {
         },
         "mina-build-debian",
         {}
+      );
+      return [buildkite];
+    } else {
+      return [
+        "comment author is not (publically) a member of the core team",
+        "comment author is not (publically) a member of the core team",
+      ];
+    }
+  }
+
+  // Mina Base Docker Build section
+  //
+  // Rebuilds ONLY the shared mina-base images (the common base-deps layer that
+  // the daemon/archive/hardfork images are built FROM), across every codename.
+  //
+  // Has its own pipeline (mina-docker-base-build) and its own tag: the base jobs
+  // are tagged Base, not Toolchain. The base image is debian-slim + shared apt
+  // deps + the gcloud SDK, which has nothing in common with the opam toolchain,
+  // so neither should be rebuilt because the other changed. !ci-toolchain-me
+  // therefore does NOT rebuild the base images, and this does not rebuild the
+  // toolchains.
+  //
+  // BaseDockersOnly selects the Base tag (see buildkite/src/Pipeline/TagFilter.dhall),
+  // and Full skips dirty-when triage so the rebuild happens even when the PR did
+  // not touch dockerfiles/stages/1-base-deps -- which is the whole point of an
+  // on-demand rebuild command.
+  //
+  // Kept ABOVE the !ci-docker-me branch on purpose: that one matches on a
+  // prefix, so anything sharing its prefix must be handled before it.
+  else if (
+    req.body.action == "created" &&
+    req.body.issue.pull_request &&
+    req.body.issue.pull_request.url &&
+    req.body.comment.body == "!ci-docker-base-me"
+  ) {
+    const orgData = await getRequest(req.body.sender.organizations_url);
+    if (orgData.data.filter((org) => org.login == "MinaProtocol").length > 0) {
+      const prData = await getRequest(req.body.issue.pull_request.url);
+      const buildkite = await runBuild(
+        {
+          sender: req.body.sender,
+          pull_request: prData.data,
+        },
+        "mina-docker-base-build",
+        {
+          BUILDKITE_PIPELINE_FILTER: "BaseDockersOnly",
+          BUILDKITE_PIPELINE_JOB_SELECTION: "Full",
+        }
       );
       return [buildkite];
     } else {

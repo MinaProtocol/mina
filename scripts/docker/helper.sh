@@ -5,10 +5,13 @@ set -eox pipefail
 source "$(dirname "$0")/../export-git-env-vars.sh"
 
 # Array of valid service names
-export VALID_SERVICES=('mina-archive' 'mina-daemon' 'mina-daemon-generic' 'mina-daemon-configured' 'mina-daemon-legacy-hardfork' 'mina-daemon-auto-hardfork' 'mina-rosetta' 'mina-rosetta-generic' 'mina-rosetta-configured' 'mina-test-suite' 'mina-batch-txn' 'mina-zkapp-test-transaction' 'mina-toolchain' 'leaderboard' 'delegation-backend' 'mina-delegation-verifier' 'delegation-backend-toolchain')
+export VALID_SERVICES=('mina-base' 'mina-archive' 'mina-daemon' 'mina-daemon-generic' 'mina-daemon-profiled' 'mina-daemon-configured' 'mina-daemon-legacy-hardfork' 'mina-daemon-auto-hardfork' 'mina-rosetta' 'mina-rosetta-generic' 'mina-rosetta-configured' 'mina-tx-tools' 'mina-toolchain' 'leaderboard' 'delegation-backend' 'mina-delegation-verifier' 'delegation-backend-toolchain')
 
 function export_base_image () {
-    # Determine the proper image for ubuntu or debian
+    # Determine the proper image for ubuntu or debian.
+    # gar-cache rewriting is intentionally NOT done here — this file is
+    # meant to stay infra-free. The caller (see scripts/docker/build.sh)
+    # applies rewrite_via_gar_cache to ${IMAGE} after this returns.
     case "${DEB_CODENAME##*=}" in
     focal|jammy|noble)
         IMAGE="ubuntu:${DEB_CODENAME##*=}"
@@ -20,12 +23,17 @@ function export_base_image () {
         IMAGE="europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/debian:bookworm"
     ;;
     esac
-    export IMAGE="--build-arg image=${IMAGE}"
+    export IMAGE
 }
 
 function export_version () {
+    # Network-free images (the single generic daemon and the per-profile
+    # profiled daemons) must NOT carry a network segment in their semantic tag.
+    if [[ "${NETWORKLESS_TAG:-0}" == "1" ]]; then
+        return
+    fi
     case "${SERVICE}" in
-        mina-daemon|mina-archive|mina-batch-txn|mina-rosetta|mina-daemon-auto-hardfork) export VERSION="${VERSION}-${NETWORK##*=}" ;;
+        mina-daemon|mina-archive|mina-rosetta|mina-daemon-auto-hardfork) export VERSION="${VERSION}-${NETWORK##*=}" ;;
         *)  ;;
 esac
 }
@@ -41,29 +49,62 @@ function export_suffixes () {
     # - generic-lightnet
     # - generic-instrumented
     # - generic-lightnet-instrumented
+    #
+    # Two suffixes come out of this, because the two docker tags carry the
+    # network differently. The readable tag has no network of its own, so its
+    # suffix supplies one. The hash tag already names the network
+    # (<githash>-<codename>-<network>...), so its suffix must not repeat it.
+    # They differ only for a profiled image, whose profile is the network name:
+    #
+    #   readable  mina-daemon:4.0.0-...-bullseye-devnet-generic
+    #   hash      mina-daemon:<githash>-bullseye-devnet-generic
     local __raw_suffix=""
+    local __raw_hash_suffix=""
     local __sep=""
 
-    if [[ -n "${DOCKER_DEB_SUFFIX:-}" ]]; then
-        __raw_suffix="${DOCKER_DEB_SUFFIX}"
+    if [[ "${PROFILED_TAG:-0}" == "1" ]]; then
+        # Profiled daemon images: tag suffix is "${profile}-generic" for
+        # devnet/mainnet, or just "lightnet" for lightnet (no -generic).
+        if [[ "${DEB_PROFILE:-}" == "lightnet" ]]; then
+            __raw_suffix="lightnet"
+            __raw_hash_suffix="lightnet"
+        else
+            __raw_suffix="${DEB_PROFILE}-generic"
+            __raw_hash_suffix="generic"
+        fi
         __sep="-"
-    fi
+    else
+        if [[ -n "${DOCKER_DEB_SUFFIX:-}" ]]; then
+            __raw_suffix="${DOCKER_DEB_SUFFIX}"
+            __raw_hash_suffix="${DOCKER_DEB_SUFFIX}"
+            __sep="-"
+        fi
 
-    if [[ "${DEB_PROFILE:-}" == "lightnet" ]]; then
-        __raw_suffix="${__raw_suffix}${__sep}lightnet"
-        __sep="-"
+        if [[ "${DEB_PROFILE:-}" == "lightnet" ]]; then
+            __raw_suffix="${__raw_suffix}${__sep}lightnet"
+            __raw_hash_suffix="${__raw_hash_suffix}${__sep}lightnet"
+            __sep="-"
+        fi
     fi
 
     if [[ "${DEB_BUILD_FLAGS:-}" == *instrumented* ]]; then
         __raw_suffix="${__raw_suffix}${__sep}instrumented"
+        __raw_hash_suffix="${__raw_hash_suffix}${__sep}instrumented"
         __sep="-"
     fi
 
-    # COMBINED_SUFFIX: used in docker tags, has leading dash when non-empty
+    # COMBINED_SUFFIX: used in the readable docker tag, has leading dash when
+    # non-empty. HASHTAG_SUFFIX: the same for the hash tag.
     if [[ -n "${__raw_suffix}" ]]; then
         export COMBINED_SUFFIX="-${__raw_suffix}"
     else
         export COMBINED_SUFFIX=""
+    fi
+
+    if [[ -n "${__raw_hash_suffix}" ]]; then
+        export HASHTAG_SUFFIX="-${__raw_hash_suffix}"
+    else
+        export HASHTAG_SUFFIX=""
     fi
 
     # DOCKER_DEB_SUFFIX_ARG: passed to Dockerfile as build arg (no leading dash,
@@ -73,7 +114,7 @@ function export_suffixes () {
     # BUILD_FLAGS_SUFFIX_ARG: passed to Dockerfile as build arg for packages
     # that only use the build flags suffix (e.g. archive uses instrumented but not generic)
     local __build_flags="${DEB_BUILD_FLAGS:-}"
-    if [[ "$__build_flags" == "none" ]]; then
+    if [[ -z "$__build_flags" || "$__build_flags" == "none" ]]; then
         __build_flags=""
     else
         __build_flags="-${__build_flags}"
@@ -119,8 +160,10 @@ function export_docker_tag() {
 
     PLATFORM_SUFFIX="$(get_platform_suffix)"
     export CUSTOM_SUFFIX_ARG
-    export TAG="${DOCKER_REGISTRY}/${SERVICE}:${VERSION}${COMBINED_SUFFIX}${PLATFORM_SUFFIX}${CUSTOM_SUFFIX}"
+    export TAG_VERSION_PART="${VERSION}${COMBINED_SUFFIX}${PLATFORM_SUFFIX}${CUSTOM_SUFFIX}"
+    export TAG="${DOCKER_REGISTRY}/${SERVICE}:${TAG_VERSION_PART}"
     export PLATFORM_SUFFIX
-    export HASHTAG="${DOCKER_REGISTRY}/${SERVICE}:${GITHASH}-${DEB_CODENAME##*=}-${NETWORK##*=}${COMBINED_SUFFIX}${PLATFORM_SUFFIX}${CUSTOM_SUFFIX}"
+    export HASHTAG_VERSION_PART="${GITHASH}-${DEB_CODENAME##*=}-${NETWORK##*=}${HASHTAG_SUFFIX}${PLATFORM_SUFFIX}${CUSTOM_SUFFIX}"
+    export HASHTAG="${DOCKER_REGISTRY}/${SERVICE}:${HASHTAG_VERSION_PART}"
 
 }

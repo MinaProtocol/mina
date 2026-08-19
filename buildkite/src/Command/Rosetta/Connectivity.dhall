@@ -1,5 +1,3 @@
-let Cmd = ../../Lib/Cmds.dhall
-
 let B = ../../External/Buildkite.dhall
 
 let S = ../../Lib/SelectFiles.dhall
@@ -18,13 +16,13 @@ let Size = ../../Command/Size.dhall
 
 let Network = ../../Constants/Network.dhall
 
-let Artifacts = ../../Constants/Artifacts.dhall
+let Dockers = ../../Constants/Docker/Versions.dhall
 
-let Dockers = ../../Constants/DockerVersions.dhall
+let DebianVersions = ../../Constants/DebianVersions.dhall
+
+let Toolchain = ../../Constants/Toolchain.dhall
 
 let Profiles = ../../Constants/Profiles.dhall
-
-let DockerRepo = ../../Constants/DockerRepo.dhall
 
 let Expr = ../../Pipeline/Expr.dhall
 
@@ -46,7 +44,6 @@ let Spec =
           , newBlockTimeout : Natural
           , profile : Profiles.Type
           , scope : List PipelineScope.Type
-          , repo : DockerRepo.Type
           , if_ : B/If
           , excludeIf : List Expr.Type
           , includeIf : List Expr.Type
@@ -60,7 +57,6 @@ let Spec =
           , newBlockTimeout = 600
           , profile = Profiles.Type.Devnet
           , scope = PipelineScope.Full
-          , repo = DockerRepo.Type.InternalEurope
           , includeIf = [] : List Expr.Type
           , excludeIf = [] : List Expr.Type
           , if_ =
@@ -68,24 +64,44 @@ let Spec =
           }
       }
 
+let bareBinaries =
+          "mina.exe:mina"
+      ++  ",archive.exe:mina-archive"
+      ++  ",rosetta.exe:mina-rosetta"
+      ++  ",libp2p_helper:libp2p_helper"
+
+let envExports =
+          \(spec : Spec.Type)
+      ->  [ "MINA_NETWORK_DEB=${Network.lowerName spec.network}"
+          , "MINA_DEB_CODENAME=${Dockers.lowerName spec.dockerType}"
+          , "MINA_PROFILE=${Profiles.lowerName spec.profile}"
+          , "APPS_BARE_BINARIES=${bareBinaries}"
+          ]
+
+let connectivityScript =
+          \(spec : Spec.Type)
+      ->      "./buildkite/scripts/tests/rosetta/connectivity.sh"
+          ++  " --network ${Network.lowerName spec.network}"
+          ++  " --sync-timeout ${Natural/show spec.syncTimeout}"
+          ++  " --new-block-timeout ${Natural/show spec.newBlockTimeout}"
+          ++  " --run-compatibility-test develop"
+          ++  " --run-load-test"
+          ++  " --branch \\\${BUILDKITE_BRANCH}"
+          ++  " --commit \\\${BUILDKITE_COMMIT}"
+          ++  " --metrics-mode"
+          ++  " --perf-output-file /workdir/rosetta.perf"
+
 let command
     : Spec.Type -> Command.Type
     =     \(spec : Spec.Type)
       ->  Command.build
             Command.Config::{
             , commands =
-                  [ Cmd.chain
-                      [ "export MINA_DEB_CODENAME=${Dockers.lowerName
-                                                      spec.dockerType}"
-                      , "source ./buildkite/scripts/export-git-env-vars.sh"
-                      , "scripts/tests/rosetta-connectivity.sh --network ${Network.lowerName
-                                                                             spec.network} --tag \\\${MINA_DOCKER_TAG} --sync-timeout ${Natural/show
-                                                                                                                                          spec.syncTimeout} --new-block-timeout ${Natural/show
-                                                                                                                                                                                    spec.newBlockTimeout} --repo ${DockerRepo.show
-                                                                                                                                                                                                                     spec.repo} --run-compatibility-test develop --run-load-test --branch \\\${BUILDKITE_BRANCH} --commit \\\${BUILDKITE_COMMIT} --metrics-mode --perf-output-file /workdir/rosetta.perf"
-                      ]
-                  ]
-                # RunInToolchain.runInToolchain
+                  Toolchain.select
+                    Toolchain.Spec::{ debVersion = spec.dockerType }
+                    (envExports spec)
+                    (connectivityScript spec)
+                # RunInToolchain.runInDefaultToolchain
                     (Benchmarks.toEnvList Benchmarks.Type::{=})
                     "./buildkite/scripts/bench/send.sh"
             , label =
@@ -97,13 +113,8 @@ let command
             , soft_fail = Some spec.softFail
             , if_ = Some spec.if_
             , depends_on =
-                Dockers.dependsOn
-                  Dockers.DepsSpec::{
-                  , codename = spec.dockerType
-                  , network = spec.network
-                  , artifact = Artifacts.Type.Rosetta
-                  , profile = spec.profile
-                  }
+                DebianVersions.appDependsOn
+                  DebianVersions.DepsSpec::{ deb_version = spec.dockerType }
             }
 
 let pipeline
@@ -123,10 +134,12 @@ let pipeline
                   , S.exactly
                       "buildkite/src/Command/Rosetta/Connectivity"
                       "dhall"
-                  , S.exactly "scripts/tests/rosetta-connectivity" "sh"
-                  , S.exactly
-                      "buildkite/scripts/tests/rosetta-integration-tests"
-                      "sh"
+                  , S.strictlyStart
+                      (S.contains "buildkite/scripts/tests/rosetta")
+                  , S.strictlyStart (S.contains "scripts/tests/rosetta")
+                  , S.exactly "buildkite/scripts/debian/restore-or-install" "sh"
+                  , S.strictlyStart (S.contains "buildkite/scripts/apps")
+                  , S.strictlyStart (S.contains "genesis_ledgers")
                   ]
                 # spec.additionalDirtyWhen
             , path = "Test"

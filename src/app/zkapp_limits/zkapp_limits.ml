@@ -2,13 +2,14 @@
 open Core_kernel
 
 let main () =
+  let (module G) = Genesis_constants.profiled () in
   let Genesis_constants.
         { max_event_elements
         ; max_action_elements
         ; max_zkapp_segment_per_transaction
         ; _
         } =
-    Genesis_constants.Compiled.genesis_constants
+    G.genesis_constants
   in
   let values = List.init (1 + max_zkapp_segment_per_transaction) ~f:Fn.id in
   printf "max field elements for events per transaction: %d\n"
