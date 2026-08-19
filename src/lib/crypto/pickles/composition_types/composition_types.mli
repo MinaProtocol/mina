@@ -74,6 +74,10 @@ module Wrap : sig
             end
           end]
 
+          (** Wire-format polymorphic skeleton. Concrete records below name it
+              explicitly via {!Poly} rather than [include]ing it. *)
+          module Poly = Wire.Wrap.Proof_state.Deferred_values.Plonk.Minimal
+
           val map_challenges :
                ('challenge, 'scalar_challenge, 'bool) t
             -> f:('challenge -> 'challenge2)
@@ -913,20 +917,10 @@ module Step : sig
             }
           [@@deriving sexp, compare, yojson, hlist, hash, equal]
 
-          val to_wrap :
-               feature_flags:'bool Plonk_types.Features.t
-            -> ('challenge, 'scalar_challenge) t
-            -> ( 'challenge
-               , 'scalar_challenge
-               , 'bool )
-               Wrap.Proof_state.Deferred_values.Plonk.Minimal.t
+          (** Wire-format polymorphic skeleton. Concrete records below name
+              it explicitly via {!Poly} rather than [include]ing it. *)
+          module Poly = Wire.Step.Proof_state.Deferred_values.Plonk.Minimal
 
-          val of_wrap :
-               ( 'challenge
-               , 'scalar_challenge
-               , 'bool )
-               Wrap.Proof_state.Deferred_values.Plonk.Minimal.t
-            -> ('challenge, 'scalar_challenge) t
         end
 
         module In_circuit : sig
@@ -1015,7 +1009,7 @@ module Step : sig
 
       module Minimal : sig
         type ('challenge, 'scalar_challenge, 'fq, 'bulletproof_challenges) t =
-          ( ('challenge, 'scalar_challenge) Plonk.Minimal.t
+          ( ('challenge, 'scalar_challenge) Plonk.Minimal.Poly.t
           , 'scalar_challenge
           , 'fq
           , 'bulletproof_challenges )
@@ -1082,7 +1076,7 @@ module Step : sig
              , 'digest
              , 'bool )
              t =
-          ( ('challenge, 'scalar_challenge) Deferred_values.Plonk.Minimal.t
+          ( ('challenge, 'scalar_challenge) Deferred_values.Plonk.Minimal.Poly.t
           , 'scalar_challenge
           , 'fq
           , 'bulletproof_challenges

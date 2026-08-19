@@ -5,6 +5,7 @@ module Branch_data = Branch_data
 module Digest = Digest
 module Spec = Spec
 module Opt = Opt
+module Wire = Wire
 open Core_kernel
 module Step_impl = Kimchi_pasta_snarky_backend.Step_impl
 module Wrap_impl = Kimchi_pasta_snarky_backend.Wrap_impl
@@ -30,40 +31,65 @@ module Wrap = struct
         performing them directly, it exposes the values needed for those computations as a part of
         its own public-input, so that the next circuit can do them (since it will use the other curve on the cycle,
         and hence can efficiently perform computations in that scalar field). *)
+    include Wire.Wrap.Proof_state
+
     module Deferred_values = struct
+      (** All the deferred values needed, comprising values from the PLONK IOP
+          verification, values from the inner-product argument, and
+          [which_branch] which is needed to know the proper domain to use. *)
+      include Wire.Wrap.Proof_state.Deferred_values
+
       module Plonk = struct
         module Minimal = struct
-          [%%versioned
-          module Stable = struct
-            module V1 = struct
-              (** Challenges from the PLONK IOP. These, plus the evaluations that are already in the proof, are
-                  all that's needed to derive all the values in the [In_circuit] version below.
+          (** Challenges from the PLONK IOP. These, plus the evaluations that are already in the proof, are
+              all that's needed to derive all the values in the [In_circuit] version below.
 
-                  See src/lib/pickles/plonk_checks/plonk_checks.ml for the computation of the [In_circuit] value
-                  from the [Minimal] value.
-              *)
-              type ('challenge, 'scalar_challenge, 'bool) t =
-                    ( 'challenge
-                    , 'scalar_challenge
-                    , 'bool )
-                    Mina_wire_types.Pickles_composition_types.Wrap.Proof_state
-                    .Deferred_values
-                    .Plonk
-                    .Minimal
-                    .V1
-                    .t =
-                { alpha : 'scalar_challenge
-                ; beta : 'challenge
-                ; gamma : 'challenge
-                ; zeta : 'scalar_challenge
-                ; joint_combiner : 'scalar_challenge option
-                ; feature_flags : 'bool Plonk_types.Features.Stable.V1.t
-                }
-              [@@deriving sexp, compare, yojson, hlist, hash, equal]
+              See src/lib/pickles/plonk_checks/plonk_checks.ml for the computation of the [In_circuit] value
+              from the [Minimal] value.
+          *)
+          include Wire.Wrap.Proof_state.Deferred_values.Plonk.Minimal
 
-              let to_latest = Fn.id
-            end
-          end]
+          (** Wire-format polymorphic skeleton. Concrete records below name it
+              explicitly via {!Poly} rather than [include]ing it. *)
+          module Poly = Wire.Wrap.Proof_state.Deferred_values.Plonk.Minimal
+
+          (** Wire-form (out-of-circuit) instantiation. {!to_stable} /
+              {!of_stable} bridge to the [Mina_wire_types]-constrained
+              polymorphic skeleton in {!Stable.V1.t}. *)
+          module Constant = struct
+            type t =
+              { alpha : Limb_vector.Challenge.Constant.t Scalar_challenge.t
+              ; beta : Limb_vector.Challenge.Constant.t
+              ; gamma : Limb_vector.Challenge.Constant.t
+              ; zeta : Limb_vector.Challenge.Constant.t Scalar_challenge.t
+              ; joint_combiner :
+                  Limb_vector.Challenge.Constant.t Scalar_challenge.t option
+              ; feature_flags : bool Plonk_types.Features.t
+              }
+            [@@deriving sexp, compare, yojson, hlist, hash, equal]
+
+            let to_stable
+                ({ alpha; beta; gamma; zeta; joint_combiner; feature_flags } :
+                  t ) :
+                ( Limb_vector.Challenge.Constant.t
+                , Limb_vector.Challenge.Constant.t Scalar_challenge.t
+                , bool )
+                Poly.t =
+              { alpha; beta; gamma; zeta; joint_combiner; feature_flags }
+
+            let of_stable
+                ({ alpha; beta; gamma; zeta; joint_combiner; feature_flags } :
+                  ( Limb_vector.Challenge.Constant.t
+                  , Limb_vector.Challenge.Constant.t Scalar_challenge.t
+                  , bool )
+                  Poly.t ) : t =
+              { alpha; beta; gamma; zeta; joint_combiner; feature_flags }
+          end
+
+          (** Round-trip witness anchoring {!Constant} against {!Poly} until
+              downstream consumers are migrated to the fresh record. *)
+          let _ = fun (c : Constant.t) ->
+            Constant.of_stable (Constant.to_stable c)
 
           let map_challenges t ~f ~scalar =
             { t with
@@ -84,6 +110,154 @@ module Wrap = struct
               ; feature_flags : 'bool Plonk_types.Features.t
               }
           end
+
+          (** Step-circuit (Tick) instantiation of {!In_circuit.t}: the shape
+              used when the Step verifier constructs Plonk-IOP challenges
+              in-circuit. {!to_in_circuit} bridges to the polymorphic
+              {!In_circuit.t}. *)
+          module Step = struct
+            type t =
+              { alpha : Step_impl.Field.t Scalar_challenge.t
+              ; beta : Step_impl.Field.t
+              ; gamma : Step_impl.Field.t
+              ; zeta : Step_impl.Field.t Scalar_challenge.t
+              ; joint_combiner :
+                  (Step_impl.Field.t Scalar_challenge.t, Step_impl.Boolean.var) Opt.t
+              ; feature_flags : Step_impl.Boolean.var Plonk_types.Features.t
+              }
+
+            let to_in_circuit
+                ({ alpha; beta; gamma; zeta; joint_combiner; feature_flags } :
+                  t ) :
+                ( Step_impl.Field.t
+                , Step_impl.Field.t Scalar_challenge.t
+                , Step_impl.Boolean.var )
+                In_circuit.t =
+              { alpha; beta; gamma; zeta; joint_combiner; feature_flags }
+
+            let of_in_circuit
+                ({ alpha; beta; gamma; zeta; joint_combiner; feature_flags } :
+                  ( Step_impl.Field.t
+                  , Step_impl.Field.t Scalar_challenge.t
+                  , Step_impl.Boolean.var )
+                  In_circuit.t ) : t =
+              { alpha; beta; gamma; zeta; joint_combiner; feature_flags }
+          end
+
+          (** Round-trip witness anchoring {!Step} against {!In_circuit} until
+              downstream consumers are migrated to the fresh record. *)
+          let _ = fun (s : Step.t) -> Step.of_in_circuit (Step.to_in_circuit s)
+
+          (** Wrap-circuit (Tock) instantiation of {!In_circuit.t}.
+
+              Sibling of {!Step}, used when the Wrap verifier constructs
+              Plonk-IOP challenges in-circuit. Fresh record; see {!Step} for
+              the rationale. *)
+          module Wrap = struct
+            type t =
+              { alpha : Wrap_impl.Field.t Scalar_challenge.t
+              ; beta : Wrap_impl.Field.t
+              ; gamma : Wrap_impl.Field.t
+              ; zeta : Wrap_impl.Field.t Scalar_challenge.t
+              ; joint_combiner :
+                  (Wrap_impl.Field.t Scalar_challenge.t, Wrap_impl.Boolean.var) Opt.t
+              ; feature_flags : Wrap_impl.Boolean.var Plonk_types.Features.t
+              }
+
+            let to_in_circuit
+                ({ alpha; beta; gamma; zeta; joint_combiner; feature_flags } :
+                  t ) :
+                ( Wrap_impl.Field.t
+                , Wrap_impl.Field.t Scalar_challenge.t
+                , Wrap_impl.Boolean.var )
+                In_circuit.t =
+              { alpha; beta; gamma; zeta; joint_combiner; feature_flags }
+
+            let of_in_circuit
+                ({ alpha; beta; gamma; zeta; joint_combiner; feature_flags } :
+                  ( Wrap_impl.Field.t
+                  , Wrap_impl.Field.t Scalar_challenge.t
+                  , Wrap_impl.Boolean.var )
+                  In_circuit.t ) : t =
+              { alpha; beta; gamma; zeta; joint_combiner; feature_flags }
+          end
+
+          (** Round-trip witness anchoring {!Wrap} against {!In_circuit} until
+              downstream consumers are migrated to the fresh record. *)
+          let _ = fun (w : Wrap.t) -> Wrap.of_in_circuit (Wrap.to_in_circuit w)
+
+          (** Endo'd Tick-field instantiation of {!Stable.V1.t}.
+
+              The prover, after running scalar challenges through
+              {!Scalar_challenge.to_field_constant}, holds a Plonk.Minimal
+              record where every field is a plain [Tick.Field.t] — i.e.
+              both ['challenge] and ['scalar_challenge] are collapsed to
+              [Tick.Field.t]. This is the shape consumed by
+              {!Plonk_checks.scalars_env} when the prover prepares a wrap
+              proof's deferred values for verification. {!to_stable} /
+              {!of_stable} bridge to the wire-format polymorphic skeleton. *)
+          module Tick = struct
+            type t =
+              { alpha : Backend.Tick.Field.t
+              ; beta : Backend.Tick.Field.t
+              ; gamma : Backend.Tick.Field.t
+              ; zeta : Backend.Tick.Field.t
+              ; joint_combiner : Backend.Tick.Field.t option
+              ; feature_flags : bool Plonk_types.Features.t
+              }
+            [@@deriving sexp, compare, yojson, hlist, hash, equal]
+
+            (** [Poly.t] specialised to [Tick] field elements — the result
+                type of {!to_stable}, also the canonical shape consumed by
+                [Wrap.combined_inner_product]. *)
+            type poly_t = (Backend.Tick.Field.t, Backend.Tick.Field.t, bool) Poly.t
+
+            let to_stable
+                ({ alpha; beta; gamma; zeta; joint_combiner; feature_flags } :
+                  t ) : poly_t =
+              { alpha; beta; gamma; zeta; joint_combiner; feature_flags }
+
+            let of_stable
+                ({ alpha; beta; gamma; zeta; joint_combiner; feature_flags } :
+                  poly_t ) : t =
+              { alpha; beta; gamma; zeta; joint_combiner; feature_flags }
+          end
+
+          (** Round-trip witness anchoring {!Tick} against {!Poly} until
+              downstream consumers are migrated to the fresh record. *)
+          let _ = fun (t : Tick.t) -> Tick.of_stable (Tick.to_stable t)
+
+          (** Endo'd Tock-field counterpart of {!Tick}: the shape used when
+              the prover prepares a step proof's deferred values for
+              verification (e.g. dummy unfinalized values). {!to_stable} /
+              {!of_stable} bridge to the wire-format polymorphic skeleton. *)
+          module Tock = struct
+            type t =
+              { alpha : Backend.Tock.Field.t
+              ; beta : Backend.Tock.Field.t
+              ; gamma : Backend.Tock.Field.t
+              ; zeta : Backend.Tock.Field.t
+              ; joint_combiner : Backend.Tock.Field.t option
+              ; feature_flags : bool Plonk_types.Features.t
+              }
+            [@@deriving sexp, compare, yojson, hlist, hash, equal]
+
+            let to_stable
+                ({ alpha; beta; gamma; zeta; joint_combiner; feature_flags } :
+                  t ) :
+                (Backend.Tock.Field.t, Backend.Tock.Field.t, bool) Poly.t =
+              { alpha; beta; gamma; zeta; joint_combiner; feature_flags }
+
+            let of_stable
+                ({ alpha; beta; gamma; zeta; joint_combiner; feature_flags } :
+                  (Backend.Tock.Field.t, Backend.Tock.Field.t, bool) Poly.t ) :
+                t =
+              { alpha; beta; gamma; zeta; joint_combiner; feature_flags }
+          end
+
+          (** Round-trip witness anchoring {!Tock} against {!Poly} until
+              downstream consumers are migrated to the fresh record. *)
+          let _ = fun (t : Tock.t) -> Tock.of_stable (Tock.to_stable t)
         end
 
         open Pickles_types
@@ -180,108 +354,8 @@ module Wrap = struct
           }
       end
 
-      [%%versioned
-      module Stable = struct
-        [@@@no_toplevel_latest_type]
-
-        module V1 = struct
-          (** All the deferred values needed, comprising values from the PLONK IOP verification,
-    values from the inner-product argument, and [which_branch] which is needed to know
-    the proper domain to use. *)
-          type ( 'plonk
-               , 'scalar_challenge
-               , 'fp
-               , 'bulletproof_challenges
-               , 'branch_data )
-               t =
-                ( 'plonk
-                , 'scalar_challenge
-                , 'fp
-                , 'bulletproof_challenges
-                , 'branch_data )
-                Mina_wire_types.Pickles_composition_types.Wrap.Proof_state
-                .Deferred_values
-                .V1
-                .t =
-            { plonk : 'plonk
-            ; combined_inner_product : 'fp
-                  (** combined_inner_product = sum_{i < num_evaluation_points} sum_{j < num_polys} r^i xi^j f_j(pt_i) *)
-            ; b : 'fp
-                  (** b = challenge_poly plonk.zeta + r * challenge_poly (domain_generrator * plonk.zeta)
-                where challenge_poly(x) = \prod_i (1 + bulletproof_challenges.(i) * x^{2^{k - 1 - i}})
-            *)
-            ; xi : 'scalar_challenge
-                  (** The challenge used for combining polynomials *)
-            ; bulletproof_challenges : 'bulletproof_challenges
-                  (** The challenges from the inner-product argument that was partially verified. *)
-            ; branch_data : 'branch_data
-                  (** Data specific to which step branch of the proof-system was verified *)
-            }
-          [@@deriving sexp, compare, yojson, hlist, hash, equal]
-
-          let to_latest = Fn.id
-        end
-      end]
-
-      type ( 'plonk
-           , 'scalar_challenge
-           , 'fp
-           , 'bulletproof_challenges
-           , 'branch_data )
-           t =
-            ( 'plonk
-            , 'scalar_challenge
-            , 'fp
-            , 'bulletproof_challenges
-            , 'branch_data )
-            Stable.Latest.t =
-        { plonk : 'plonk
-        ; combined_inner_product : 'fp
-        ; b : 'fp
-        ; xi : 'scalar_challenge
-        ; bulletproof_challenges : 'bulletproof_challenges
-        ; branch_data : 'branch_data
-        }
-      [@@deriving sexp, compare, yojson, hlist, hash, equal]
-
       module Minimal = struct
-        [@@@warning "-27"]
-
-        [%%versioned
-        module Stable = struct
-          module V1 = struct
-            (* 'fp is unused in Minimal but kept for type compatibility with
-               In_circuit. We suppress the warning instead of using a phantom
-               type to preserve the serialization format. *)
-            type ( 'challenge
-                 , 'scalar_challenge
-                 , 'fp
-                 , 'bool
-                 , 'bulletproof_challenges
-                 , 'branch_data )
-                 t =
-                  ( 'challenge
-                  , 'scalar_challenge
-                  , 'fp
-                  , 'bool
-                  , 'bulletproof_challenges
-                  , 'branch_data )
-                  Mina_wire_types.Pickles_composition_types.Wrap.Proof_state
-                  .Deferred_values
-                  .Minimal
-                  .V1
-                  .t =
-              { plonk :
-                  ( 'challenge
-                  , 'scalar_challenge
-                  , 'bool )
-                  Plonk.Minimal.Stable.V1.t
-              ; bulletproof_challenges : 'bulletproof_challenges
-              ; branch_data : 'branch_data
-              }
-            [@@deriving sexp, compare, yojson, hash, equal]
-          end
-        end]
+        include Wire.Wrap.Proof_state.Deferred_values.Minimal
 
         let map_challenges { plonk; bulletproof_challenges; branch_data } ~f
             ~scalar =
@@ -368,22 +442,7 @@ module Wrap = struct
     (** The component of the proof accumulation state that is only computed on by the
         "wrapping" proof system, and that can be handled opaquely by any "step" circuits. *)
     module Messages_for_next_wrap_proof = struct
-      [%%versioned
-      module Stable = struct
-        module V1 = struct
-          type ('g1, 'bulletproof_challenges) t =
-                ( 'g1
-                , 'bulletproof_challenges )
-                Mina_wire_types.Pickles_composition_types.Wrap.Proof_state
-                .Messages_for_next_wrap_proof
-                .V1
-                .t =
-            { challenge_polynomial_commitment : 'g1
-            ; old_bulletproof_challenges : 'bulletproof_challenges
-            }
-          [@@deriving sexp, compare, yojson, hlist, hash, equal]
-        end
-      end]
+      include Wire.Wrap.Proof_state.Messages_for_next_wrap_proof
 
       let to_field_elements (type g f)
           { challenge_polynomial_commitment; old_bulletproof_challenges }
@@ -401,82 +460,8 @@ module Wrap = struct
           ~value_of_hlist:of_hlist
     end
 
-    [%%versioned
-    module Stable = struct
-      module V1 = struct
-        type ( 'plonk
-             , 'scalar_challenge
-             , 'fp
-             , 'messages_for_next_wrap_proof
-             , 'digest
-             , 'bp_chals
-             , 'index )
-             t =
-              ( 'plonk
-              , 'scalar_challenge
-              , 'fp
-              , 'messages_for_next_wrap_proof
-              , 'digest
-              , 'bp_chals
-              , 'index )
-              Mina_wire_types.Pickles_composition_types.Wrap.Proof_state.V1.t =
-          { deferred_values :
-              ( 'plonk
-              , 'scalar_challenge
-              , 'fp
-              , 'bp_chals
-              , 'index )
-              Deferred_values.Stable.V1.t
-          ; sponge_digest_before_evaluations : 'digest
-          ; messages_for_next_wrap_proof : 'messages_for_next_wrap_proof
-                (** Parts of the statement not needed by the other circuit. Represented as a hash inside the
-              circuit which is then "unhashed". *)
-          }
-        [@@deriving sexp, compare, yojson, hlist, hash, equal]
-      end
-    end]
-
     module Minimal = struct
-      [%%versioned
-      module Stable = struct
-        module V1 = struct
-          type ( 'challenge
-               , 'scalar_challenge
-               , 'fp
-               , 'bool
-               , 'messages_for_next_wrap_proof
-               , 'digest
-               , 'bp_chals
-               , 'index )
-               t =
-                ( 'challenge
-                , 'scalar_challenge
-                , 'fp
-                , 'bool
-                , 'messages_for_next_wrap_proof
-                , 'digest
-                , 'bp_chals
-                , 'index )
-                Mina_wire_types.Pickles_composition_types.Wrap.Proof_state
-                .Minimal
-                .V1
-                .t =
-            { deferred_values :
-                ( 'challenge
-                , 'scalar_challenge
-                , 'fp
-                , 'bool
-                , 'bp_chals
-                , 'index )
-                Deferred_values.Minimal.Stable.V1.t
-            ; sponge_digest_before_evaluations : 'digest
-            ; messages_for_next_wrap_proof : 'messages_for_next_wrap_proof
-                  (** Parts of the statement not needed by the other circuit. Represented as a hash inside the
-              circuit which is then "unhashed". *)
-            }
-          [@@deriving sexp, compare, yojson, hash, equal]
-        end
-      end]
+      include Wire.Wrap.Proof_state.Minimal
     end
 
     module In_circuit = struct
@@ -632,83 +617,10 @@ module Wrap = struct
         to parts of incompletely verified proofs.
   *)
   module Statement = struct
-    [%%versioned
-    module Stable = struct
-      module V1 = struct
-        type ( 'plonk
-             , 'scalar_challenge
-             , 'fp
-             , 'messages_for_next_wrap_proof
-             , 'digest
-             , 'messages_for_next_step_proof
-             , 'bp_chals
-             , 'index )
-             t =
-              ( 'plonk
-              , 'scalar_challenge
-              , 'fp
-              , 'messages_for_next_wrap_proof
-              , 'digest
-              , 'messages_for_next_step_proof
-              , 'bp_chals
-              , 'index )
-              Mina_wire_types.Pickles_composition_types.Wrap.Statement.V1.t =
-          { proof_state :
-              ( 'plonk
-              , 'scalar_challenge
-              , 'fp
-              , 'messages_for_next_wrap_proof
-              , 'digest
-              , 'bp_chals
-              , 'index )
-              Proof_state.Stable.V1.t
-          ; messages_for_next_step_proof : 'messages_for_next_step_proof
-          }
-        [@@deriving compare, yojson, sexp, hash, equal]
-      end
-    end]
+    include Wire.Wrap.Statement
 
     module Minimal = struct
-      [%%versioned
-      module Stable = struct
-        module V1 = struct
-          type ( 'challenge
-               , 'scalar_challenge
-               , 'fp
-               , 'bool
-               , 'messages_for_next_wrap_proof
-               , 'digest
-               , 'messages_for_next_step_proof
-               , 'bp_chals
-               , 'index )
-               t =
-                ( 'challenge
-                , 'scalar_challenge
-                , 'fp
-                , 'bool
-                , 'messages_for_next_wrap_proof
-                , 'digest
-                , 'messages_for_next_step_proof
-                , 'bp_chals
-                , 'index )
-                Mina_wire_types.Pickles_composition_types.Wrap.Statement.Minimal
-                .V1
-                .t =
-            { proof_state :
-                ( 'challenge
-                , 'scalar_challenge
-                , 'fp
-                , 'bool
-                , 'messages_for_next_wrap_proof
-                , 'digest
-                , 'bp_chals
-                , 'index )
-                Proof_state.Minimal.Stable.V1.t
-            ; messages_for_next_step_proof : 'messages_for_next_step_proof
-            }
-          [@@deriving compare, yojson, sexp, hash, equal]
-        end
-      end]
+      include Wire.Wrap.Statement.Minimal
     end
 
     module In_circuit = struct
@@ -932,39 +844,96 @@ module Step = struct
     module Deferred_values = struct
       module Plonk = struct
         module Minimal = struct
-          [%%versioned
-          module Stable = struct
-            module V1 = struct
-              (** Challenges from the PLONK IOP. These, plus the evaluations that are already in the proof, are
-                  all that's needed to derive all the values in the [In_circuit] version below.
+          (** Challenges from the PLONK IOP. These, plus the evaluations that
+              are already in the proof, are all that's needed to derive all
+              the values in the [In_circuit] version below.
 
-                  See src/lib/pickles/plonk_checks/plonk_checks.ml for the computation of the [In_circuit] value
-                  from the [Minimal] value.
-              *)
-              type ('challenge, 'scalar_challenge) t =
-                { alpha : 'scalar_challenge
-                ; beta : 'challenge
-                ; gamma : 'challenge
-                ; zeta : 'scalar_challenge
-                }
-              [@@deriving sexp, compare, yojson, hlist, hash, equal]
-            end
-          end]
+              See src/lib/pickles/plonk_checks/plonk_checks.ml for the
+              computation of the [In_circuit] value from the [Minimal] value.
+          *)
+          include Wire.Step.Proof_state.Deferred_values.Plonk.Minimal
 
-          let to_wrap ~feature_flags { alpha; beta; gamma; zeta } :
-              _ Wrap.Proof_state.Deferred_values.Plonk.Minimal.t =
-            { alpha; beta; gamma; zeta; joint_combiner = None; feature_flags }
+          (** Wire-format polymorphic skeleton. Concrete records below name
+              it explicitly via {!Poly} rather than [include]ing it. *)
+          module Poly = Wire.Step.Proof_state.Deferred_values.Plonk.Minimal
 
-          let of_wrap
-              ({ alpha
-               ; beta
-               ; gamma
-               ; zeta
-               ; joint_combiner = _
-               ; feature_flags = _
-               } :
-                _ Wrap.Proof_state.Deferred_values.Plonk.Minimal.t ) =
-            { alpha; beta; gamma; zeta }
+          (** Wire-form (out-of-circuit) instantiation. The
+              [Step.Proof_state] tree is for step proofs (Vesta/Tick curve),
+              whose challenges live in the Tock field; out of circuit those
+              challenges are carried in the [Limb_vector.Challenge.Constant]
+              form. *)
+          module Constant = struct
+            type t =
+              { alpha : Limb_vector.Challenge.Constant.t Scalar_challenge.t
+              ; beta : Limb_vector.Challenge.Constant.t
+              ; gamma : Limb_vector.Challenge.Constant.t
+              ; zeta : Limb_vector.Challenge.Constant.t Scalar_challenge.t
+              }
+            [@@deriving sexp, compare, yojson, hlist, hash, equal]
+
+            let to_minimal ({ alpha; beta; gamma; zeta } : t) :
+                ( Limb_vector.Challenge.Constant.t
+                , Limb_vector.Challenge.Constant.t Scalar_challenge.t )
+                Poly.t =
+              { alpha; beta; gamma; zeta }
+
+            let of_minimal
+                ({ alpha; beta; gamma; zeta } :
+                  ( Limb_vector.Challenge.Constant.t
+                  , Limb_vector.Challenge.Constant.t Scalar_challenge.t )
+                  Poly.t ) : t =
+              { alpha; beta; gamma; zeta }
+          end
+
+          let _ = fun (c : Constant.t) ->
+            Constant.of_minimal (Constant.to_minimal c)
+
+          (** Step-circuit (Tick) instantiation; used when the Step verifier
+              handles step proof challenges in-circuit. *)
+          module Step = struct
+            type t =
+              { alpha : Step_impl.Field.t Scalar_challenge.t
+              ; beta : Step_impl.Field.t
+              ; gamma : Step_impl.Field.t
+              ; zeta : Step_impl.Field.t Scalar_challenge.t
+              }
+
+            let to_minimal ({ alpha; beta; gamma; zeta } : t) :
+                (Step_impl.Field.t, Step_impl.Field.t Scalar_challenge.t) Poly.t
+                =
+              { alpha; beta; gamma; zeta }
+
+            let of_minimal
+                ({ alpha; beta; gamma; zeta } :
+                  (Step_impl.Field.t, Step_impl.Field.t Scalar_challenge.t)
+                  Poly.t ) : t =
+              { alpha; beta; gamma; zeta }
+          end
+
+          let _ = fun (s : Step.t) -> Step.of_minimal (Step.to_minimal s)
+
+          (** Wrap-circuit (Tock) instantiation. *)
+          module Wrap = struct
+            type t =
+              { alpha : Wrap_impl.Field.t Scalar_challenge.t
+              ; beta : Wrap_impl.Field.t
+              ; gamma : Wrap_impl.Field.t
+              ; zeta : Wrap_impl.Field.t Scalar_challenge.t
+              }
+
+            let to_minimal ({ alpha; beta; gamma; zeta } : t) :
+                (Wrap_impl.Field.t, Wrap_impl.Field.t Scalar_challenge.t) Poly.t
+                =
+              { alpha; beta; gamma; zeta }
+
+            let of_minimal
+                ({ alpha; beta; gamma; zeta } :
+                  (Wrap_impl.Field.t, Wrap_impl.Field.t Scalar_challenge.t)
+                  Poly.t ) : t =
+              { alpha; beta; gamma; zeta }
+          end
+
+          let _ = fun (w : Wrap.t) -> Wrap.of_minimal (Wrap.to_minimal w)
         end
 
         open Pickles_types
@@ -1111,7 +1080,7 @@ module Step = struct
 
       module Minimal = struct
         type ('challenge, 'scalar_challenge, 'fq, 'bulletproof_challenges) t =
-          ( ('challenge, 'scalar_challenge) Plonk.Minimal.t
+          ( ('challenge, 'scalar_challenge) Plonk.Minimal.Poly.t
           , 'scalar_challenge
           , 'fq
           , 'bulletproof_challenges )
@@ -1178,7 +1147,7 @@ module Step = struct
              , 'digest
              , 'bool )
              t =
-          ( ('challenge, 'scalar_challenge) Deferred_values.Plonk.Minimal.t
+          ( ('challenge, 'scalar_challenge) Deferred_values.Plonk.Minimal.Poly.t
           , 'scalar_challenge
           , 'fq
           , 'bulletproof_challenges
