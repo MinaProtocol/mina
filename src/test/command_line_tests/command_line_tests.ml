@@ -559,13 +559,19 @@ module MisconfiguredWalletCrashLog = struct
   type t = Mina_automation_fixture.Daemon.before_bootstrap
 
   let test_case (test : t) =
-    let daemon = Daemon.of_config test.config in
-    let%bind () = Daemon.Config.generate_keys test.config in
-    let ledger_file = test.config.dirs.conf ^/ "daemon.json" in
+    (* Use a config directory private to this test: the shared default config
+       dir is reused by every test in this binary, and a daemon booted by an
+       earlier test leaves [wallets/store] behind as a directory, which would
+       make the [write_all] below fail with [Is a directory]. *)
+    let dirs = Daemon.Config.ConfigDirs.create ~root_path:test.temp_dir () in
+    let config = Daemon.Config.create ~dirs ~config:test.config.config () in
+    let daemon = Daemon.of_config config in
+    let%bind () = Daemon.Config.generate_keys config in
+    let ledger_file = dirs.conf ^/ "daemon.json" in
     let%bind () =
       Mina_automation_fixture.Daemon.generate_random_config daemon ledger_file
     in
-    let wallets_dir = test.config.dirs.conf ^/ "wallets" in
+    let wallets_dir = dirs.conf ^/ "wallets" in
     Core.Unix.mkdir_p wallets_dir ;
     Out_channel.write_all (wallets_dir ^/ "store") ~data:"not a directory" ;
     let%bind process = Daemon.start daemon in
@@ -588,7 +594,7 @@ module MisconfiguredWalletCrashLog = struct
              (Error.createf "Daemon terminated by signal: %s"
                 (Core.Signal.to_string signal) ) )
     | `Result (Error (`Exit_non_zero _)) -> (
-        let log_file = Daemon.Config.ConfigDirs.mina_log test.config.dirs in
+        let log_file = Daemon.Config.ConfigDirs.mina_log dirs in
         match%map
           Monitor.try_with (fun () -> Reader.file_contents log_file)
         with
