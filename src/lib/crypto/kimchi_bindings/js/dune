@@ -8,6 +8,7 @@
    bindings/curve.js
    bindings/vector.js
    bindings/gate-vector.js
+   bindings/linearization.js
    bindings/oracles.js
    bindings/pickles-test.js
    bindings/proof.js
