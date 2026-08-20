@@ -13,15 +13,14 @@
 var caml_decode_linearization_tokens = function (json) {
   var decoded = JSON.parse(json);
   // A token is either an integer (constant constructor) or a block
-  // `[tag, arg, ...]`. Nested enum arguments arrive pre-encoded and contain
-  // no strings; only the `Literal` hex string needs converting.
+  // `[tag, arg, ...]`, with arguments themselves pre-encoded the same way.
+  // Strings occur at arbitrary depth (the `Literal` hex string sits inside
+  // `Constant`), so convert recursively.
   function token(t) {
+    if (typeof t === 'string') return caml_string_of_jsstring(t);
     if (typeof t === 'number') return t;
     var block = [t[0]];
-    for (var i = 1; i < t.length; i++) {
-      var arg = t[i];
-      block.push(typeof arg === 'string' ? caml_string_of_jsstring(arg) : arg);
-    }
+    for (var i = 1; i < t.length; i++) block.push(token(t[i]));
     return block;
   }
   // OCaml arrays are blocks with tag 0.
