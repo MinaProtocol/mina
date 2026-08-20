@@ -341,8 +341,8 @@ const handler = async (event, req) => {
       return [buildkite];
     } else {
       return [
-        "comment author is not (publically) a member of the core team",
-        "comment author is not (publically) a member of the core team",
+        "comment author is not (publicly) a member of the core team",
+        "comment author is not (publicly) a member of the core team",
       ];
     }
   }

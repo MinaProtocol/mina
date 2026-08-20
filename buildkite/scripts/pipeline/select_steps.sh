@@ -178,8 +178,14 @@ expand_sets() {
     sets_text="$(read_sets)"
 
     for want in "${SETS[@]}"; do
-        line="$(printf '%s\n' "$sets_text" | grep -m1 "^${want}|" || true)"
-
+        line=""
+        while IFS='|' read -r name description dockers debians; do
+            [[ -z "$name" ]] && continue
+            if [[ "$name" == "$want" ]]; then
+                line="${name}|${description}|${dockers}|${debians}"
+                break
+            fi
+        done <<< "$sets_text"
         if [[ -z "$line" ]]; then
             {
                 echo "ERROR: there is no set called '${want}'. These exist:"
