@@ -102,7 +102,10 @@ function read(){
     fi
 
     local __override=0
-    local __root="$BUILDKITE_BUILD_ID"
+    # MINA_READ_CACHE_ROOT points the read at a different cache root than this
+    # build's own, which is how artifacts kept in a non standard location are
+    # read. Only reads honour it, so a write always stays in this build's root.
+    local __root="${MINA_READ_CACHE_ROOT:-$BUILDKITE_BUILD_ID}"
     local __skip_dirs_creation=0
     local __inputs=()
     local __to=""

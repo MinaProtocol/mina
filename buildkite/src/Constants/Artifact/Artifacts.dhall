@@ -2,6 +2,8 @@ let Prelude = ../../External/Prelude.dhall
 
 let List/map = Prelude.List.map
 
+let List/concatMap = Prelude.List.concatMap
+
 let Debian = ../Debian/Package.dhall
 
 let Network = ../Network.dhall
@@ -241,6 +243,58 @@ let toDebianToken =
             (profile artifact)
             (resolvedNetwork artifact)
 
+let profileTentTokens =
+    -- The mina-<network>-generic tent, as a debian build token, for the
+    -- artifacts that have one.
+    --
+    -- The tent is an apt convenience metapackage: it holds no files and depends
+    -- on mina-generic and mina-<network>-profile, so that `apt-get install
+    -- mina-devnet-generic` gives a working daemon with the profile baked in. It
+    -- therefore belongs to the job that builds that profile, which is the job
+    -- that holds the matching DaemonProfiled artifact, and to no other.
+    --
+    -- Lightnet and Dev have no tent: they ship directly as mina-<profile>.
+          \(artifact : Artifact)
+      ->  merge
+            { Daemon = \(a : { network : Network.Type }) -> [] : List Text
+            , DaemonGeneric = [] : List Text
+            , DaemonProfiled =
+                    \(a : { profile : Profiles.Type })
+                ->  merge
+                      { Devnet = [ "profile_devnet_generic" ]
+                      , Mainnet = [ "profile_mainnet_generic" ]
+                      , Lightnet = [] : List Text
+                      , Dev = [] : List Text
+                      }
+                      a.profile
+            , DaemonLegacyHardfork =
+                \(a : { network : Network.Type }) -> [] : List Text
+            , DaemonAutoHardfork =
+                \(a : { network : Network.Type }) -> [] : List Text
+            , DaemonPrefork =
+                \(a : { network : Network.Type }) -> [] : List Text
+            , DaemonPostfork =
+                \(a : { network : Network.Type }) -> [] : List Text
+            , CreatePreforkGenesis =
+                \(a : { network : Network.Type }) -> [] : List Text
+            , DaemonStorageToolbox = [] : List Text
+            , LogProc = [] : List Text
+            , ArchiveGeneric = [] : List Text
+            , Archive = \(a : { network : Network.Type }) -> [] : List Text
+            , RosettaGeneric = [] : List Text
+            , Rosetta = \(a : { network : Network.Type }) -> [] : List Text
+            , TestExecutive = [] : List Text
+            , TxTools = [] : List Text
+            , FunctionalTestSuite = [] : List Text
+            , DelegationVerifier = [] : List Text
+            , Toolchain = [] : List Text
+            }
+            artifact
+
+let profileTents =
+          \(artifacts : List Artifact)
+      ->  List/concatMap Artifact Text profileTentTokens artifacts
+
 let networkOrdinal = \(n : Network.Type) -> merge { Devnet = 0, Mainnet = 1 } n
 
 let networks =
@@ -290,4 +344,5 @@ in  { Type = Artifact
     , toDebians = toDebians
     , toDebianToken = toDebianToken
     , networks = networks
+    , profileTents = profileTents
     }

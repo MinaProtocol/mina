@@ -7,7 +7,7 @@
     "coverage": "jest --coverage",
     "lint": "eslint src/** test/**",
     "start": "nodemon -x functions-framework --target=githubWebhookHandler",
-    "test": "node test/safe-input.test.js"
+    "test": "node test/safe-input.test.js && node test/artifacts.test.js"
   },
   "repository": {
     "type": "git",

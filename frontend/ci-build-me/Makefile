@@ -37,6 +37,7 @@ describe: ## Show the deployed function
 .PHONY: test
 test: ## Run the unit tests (no dependencies needed)
 	@node $(SOURCE_DIR)test/safe-input.test.js
+	@node $(SOURCE_DIR)test/artifacts.test.js
 
 .PHONY: check
 check: ## Compare the deployed function with this directory

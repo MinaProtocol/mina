@@ -6,11 +6,16 @@
 # One step of a job builds every debian package of that job:
 #
 #     build-from-cache.sh <variant> <token> <token> ...
+#     build-release.sh <token> <token> ...          (the job that also compiles)
 #
 # This reads a pipeline on stdin, cuts that list down to the tokens that match
 # the patterns given, and writes the pipeline out again.
 #
 #     narrow_debian_tokens.sh 'prefork_*' logproc < pipeline.yml > narrowed.yml
+#
+# A pattern that starts with "!" drops what it matches, whatever else kept it.
+# That is how network= narrows packages: asking for devnet keeps the devnet and
+# the network-less ones by adding "!*mainnet*".
 #
 # The token list is written more than once in the same step: once in the `echo
 # "-- Running: ..."` line that the log shows, and once in the command that
@@ -35,10 +40,22 @@
 
 set -euo pipefail
 
-declare -a PATTERNS=("$@")
+declare -a KEEP=()
+declare -a DROP=()
 
-if [[ "${#PATTERNS[@]}" -eq 0 ]]; then
-    echo "usage: narrow_debian_tokens.sh PATTERN [PATTERN ...]" >&2
+for pattern in "$@"; do
+    if [[ "$pattern" == '!'* ]]; then
+        DROP+=("${pattern#!}")
+    else
+        KEEP+=("$pattern")
+    fi
+done
+
+if [[ "${#KEEP[@]}" -eq 0 ]]; then
+    {
+        echo "usage: narrow_debian_tokens.sh PATTERN [PATTERN ...]"
+        echo "       a PATTERN starting with ! drops what it matches"
+    } >&2
     exit 2
 fi
 
@@ -49,21 +66,30 @@ declare -A KEPT=()
 
 wanted() {
     local token="$1" pattern
-    for pattern in "${PATTERNS[@]}"; do
+    for pattern in "${DROP[@]+"${DROP[@]}"}"; do
         # shellcheck disable=SC2053  # the pattern is meant to be a glob
+        [[ "$token" == $pattern ]] && return 1
+    done
+    for pattern in "${KEEP[@]}"; do
+        # shellcheck disable=SC2053
         [[ "$token" == $pattern ]] && return 0
     done
     return 1
 }
 
-# build-from-cache.sh <variant> <token> <token> ...
-# The first group is everything up to the token list -- which includes the
-# variant, and a variant may hold a dash (bullseye-instrumented, bullseye-arm64)
-# -- and the second is the token list itself. A token is lower case letters,
-# digits and underscores only, so the list ends at the first word that is not
-# one: the closing quote, a bracket, anything. That is how the two forms of the
-# line (the echo and the real command) both end.
-CALL='(build-from-cache\.sh[[:space:]]+[A-Za-z0-9_-]+)(([[:space:]]+[a-z0-9_]+)+)'
+# The two shapes of a call. build-from-cache.sh names the tree it restores
+# first, because the compile was somewhere else; build-release.sh compiles and
+# packages in one step, so it has no variant.
+#
+# The first group is everything up to the token list -- for build-from-cache.sh
+# that includes the variant, and a variant may hold a dash
+# (bullseye-instrumented, bullseye-arm64) -- and the second is the token list
+# itself. A token is lower case letters, digits and underscores only, so the
+# list ends at the first word that is not one: the closing quote, a bracket,
+# anything. That is how the two forms of the line (the echo and the real
+# command) both end.
+CALL_FROM_CACHE='(build-from-cache\.sh[[:space:]]+[A-Za-z0-9_-]+)(([[:space:]]+[a-z0-9_]+)+)'
+CALL_RELEASE='(build-release\.sh)(([[:space:]]+[a-z0-9_]+)+)'
 
 # Sets NARROWED to the line with its token list cut down. It assigns rather
 # than prints because a command substitution would run it in a subshell, and
@@ -71,38 +97,42 @@ CALL='(build-from-cache\.sh[[:space:]]+[A-Za-z0-9_-]+)(([[:space:]]+[a-z0-9_]+)+
 NARROWED=""
 
 narrow_line() {
-    local line="$1" head tokens whole before after result=""
+    local line="$1" regex head tokens whole before after result
     local -a wanted_tokens
     local token
 
-    while [[ "$line" =~ $CALL ]]; do
-        whole="${BASH_REMATCH[0]}"
-        head="${BASH_REMATCH[1]}"
-        tokens="${BASH_REMATCH[2]}"
+    for regex in "$CALL_FROM_CACHE" "$CALL_RELEASE"; do
+        result=""
+        while [[ "$line" =~ $regex ]]; do
+            whole="${BASH_REMATCH[0]}"
+            head="${BASH_REMATCH[1]}"
+            tokens="${BASH_REMATCH[2]}"
 
-        before="${line%%"$whole"*}"
-        after="${line#*"$whole"}"
+            before="${line%%"$whole"*}"
+            after="${line#*"$whole"}"
 
-        wanted_tokens=()
-        for token in $tokens; do
-            SEEN["$token"]=1
-            if wanted "$token"; then
-                wanted_tokens+=("$token")
-                KEPT["$token"]=1
+            wanted_tokens=()
+            for token in $tokens; do
+                SEEN["$token"]=1
+                if wanted "$token"; then
+                    wanted_tokens+=("$token")
+                    KEPT["$token"]=1
+                fi
+            done
+
+            if [[ "${#wanted_tokens[@]}" -eq 0 ]]; then
+                # Leave it alone; the caller stops the run.
+                result+="${before}${whole}"
+            else
+                result+="${before}${head} ${wanted_tokens[*]}"
             fi
+
+            line="$after"
         done
-
-        if [[ "${#wanted_tokens[@]}" -eq 0 ]]; then
-            # Leave it alone; the caller stops the run.
-            result+="${before}${whole}"
-        else
-            result+="${before}${head} ${wanted_tokens[*]}"
-        fi
-
-        line="$after"
+        line="${result}${line}"
     done
 
-    NARROWED="${result}${line}"
+    NARROWED="$line"
 }
 
 sorted() {
@@ -122,13 +152,13 @@ while IFS= read -r line || [[ -n "$line" ]]; do
 done
 
 if [[ "${#SEEN[@]}" -eq 0 ]]; then
-    echo "narrow_debian_tokens.sh: no build-from-cache.sh call was found, so nothing was narrowed." >&2
+    echo "narrow_debian_tokens.sh: no debian package list was found, so nothing was narrowed." >&2
     exit 1
 fi
 
 if [[ "${#KEPT[@]}" -eq 0 ]]; then
     {
-        echo "narrow_debian_tokens.sh: no debian package matches ${PATTERNS[*]}."
+        echo "narrow_debian_tokens.sh: no debian package matches ${KEEP[*]}${DROP[*]+", less ${DROP[*]}"}."
         echo "  These are built by this job:"
         for token in "${!SEEN[@]}"; do echo "    ${token}"; done | sort
     } >&2
