@@ -1,12 +1,12 @@
 #!/bin/bash
 set -euo pipefail
 
-# Tests for narrow_debian_tokens.py
+# Tests for narrow_debian_tokens.sh
 #
 # Usage: bash buildkite/scripts/pipeline/tests/test_narrow_debian_tokens.sh
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-NARROW="${SCRIPT_DIR}/../narrow_debian_tokens.py"
+NARROW="${SCRIPT_DIR}/../narrow_debian_tokens.sh"
 
 RUN=0; PASSED=0; FAILED=0; FAILURES=()
 
@@ -59,6 +59,19 @@ echo "TEST: a pipeline with no debian call stops"
 status=0
 echo "steps: []" | "$NARROW" 'logproc' > /dev/null 2>&1 || status=$?
 check "exit code" "1" "$status"
+
+echo "TEST: a variant that holds a dash is narrowed too"
+# bullseye-instrumented and bullseye-arm64 are real tree variants.
+dashed="$(fixture | sed 's/build-from-cache.sh bullseye /build-from-cache.sh bullseye-instrumented /g')"
+status=0
+out="$(echo "$dashed" | "$NARROW" 'logproc' 2>/dev/null)" || status=$?
+check "exit code" "0" "$status"
+check "two occurrences" "2" "$(echo "$out" | grep -c 'build-from-cache.sh bullseye-instrumented logproc"\?')"
+check "archive_devnet is gone" "0" "$(echo "$out" | grep -c 'archive_devnet' || true)"
+
+echo "TEST: nothing is written when the run has to stop"
+out="$(fixture | "$NARROW" 'no_such_package' 2>/dev/null || true)"
+check "empty stdout" "" "$out"
 
 echo "TEST: no pattern at all is refused"
 status=0

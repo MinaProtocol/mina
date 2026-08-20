@@ -47,7 +47,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SELECT_STEPS="${SCRIPT_DIR}/../pipeline/select_steps.sh"
-NARROW_DEBS="${SCRIPT_DIR}/../pipeline/narrow_debian_tokens.py"
+NARROW_DEBS="${SCRIPT_DIR}/../pipeline/narrow_debian_tokens.sh"
 
 SELECTION=""
 DEB_SELECTION=""
