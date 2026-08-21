@@ -150,11 +150,13 @@ let validate_transaction =
      let%map signature_kind = Flag.signature_kind in
      fun () ->
        let num_fails = ref 0 in
+       let num_seen = ref 0 in
        let jsons = Yojson.Safe.seq_from_channel In_channel.stdin in
        ( match
            Or_error.try_with (fun () ->
                Seq.iter
                  (fun transaction_json ->
+                   incr num_seen ;
                    match
                      Rosetta_lib.Transaction.to_mina_signed transaction_json
                    with
@@ -187,15 +189,12 @@ let validate_transaction =
        if !num_fails > 0 then (
          Format.printf "Some transactions failed to verify@." ;
          exit 1 )
-       else
-         let first = Seq.uncons jsons in
-         match first with
-         | None ->
-             Format.printf "Could not parse any transactions@." ;
-             exit 1
-         | _ ->
-             Format.printf "All transactions were valid@." ;
-             exit 0 )
+       else if !num_seen = 0 then (
+         Format.printf "Could not parse any transactions@." ;
+         exit 1 )
+       else (
+         Format.printf "All transactions were valid@." ;
+         exit 0 ) )
 
 module Vrf = struct
   let generate_witness =
