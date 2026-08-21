@@ -94,7 +94,9 @@ module Fiber = struct
         Option.iter parent ~f:(fun p -> Graph.add_edge graph p.thread.name name) ;
         fiber
 
-  let apply_to_context t ctx = Execution_context.with_local ctx ctx_id (Some t)
+  let apply_to_context t ctx =
+    let ctx = Execution_context.with_tid ctx t.id in
+    Execution_context.with_local ctx ctx_id (Some t)
 
   let of_context ctx = Execution_context.find_local ctx ctx_id
 
