@@ -27,7 +27,7 @@ from typing import Any, NoReturn, assert_never
 import analysis
 from analysis import Budget, ImpactIndex, LayeringRule, Metric, UnreferencedDep
 from errors import DepsError, ErrorCode
-from graph import DuneGraph, Edge, NodeId, SourceIndex, load_graph
+from graph import DuneGraph, Edge, NodeId, SourceIndex, load
 from report import (
     BASELINE_HINT,
     BudgetMoved,
@@ -378,8 +378,7 @@ def run(command: Command, root: Path) -> ExitCode:
             f"no such directory: {root} (run from the repository root)",
             path=root,
         )
-    graph = load_graph(root)
-    sources = SourceIndex(root)
+    graph, sources = load(root)
     match command:
         case Command.CHECK:
             return run_check(graph, sources)

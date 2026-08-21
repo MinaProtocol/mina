@@ -284,6 +284,22 @@ def opened_modules(stanza: Sequence[Sexp]) -> frozenset[str]:
     return frozenset(opened)
 
 
+def includes_subdirs(stanzas: Sequence[Sexp]) -> bool:
+    """Whether `(include_subdirs ...)` extends this stanza's sources downward.
+
+    `no` is the default and means what it says; any other mode (`unqualified`,
+    `qualified`) pulls sources from subdirectories into the same stanza, so
+    searching only the top directory would miss the code that references a
+    dependency and report it as unused.
+    """
+    for stanza in stanzas:
+        if not isinstance(stanza, list) or not stanza or stanza[0] != "include_subdirs":
+            continue
+        modes = _strings(stanza[1:])
+        return bool(modes) and modes[0] != "no"
+    return False
+
+
 def generates_ml(stanzas: Sequence[Sexp]) -> bool:
     """Whether some `(rule)` here produces a `.ml`, which makes "is this
     dependency referenced?" unanswerable without a build."""
@@ -336,6 +352,10 @@ class DuneFile:
 
     directory: str
     stanzas: tuple[Sexp, ...]
+    # `(include_subdirs unqualified|qualified)`: the stanzas here are compiled
+    # from sources in subdirectories too, so that is where to look for
+    # references.
+    include_subdirs: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -378,11 +398,13 @@ def read_dune_files(root: Path) -> list[DuneFile]:
             raise DepsError(
                 ErrorCode.DUNE_UNREADABLE, f"cannot read {path}: {error}", path=path
             ) from error
+        stanzas = tuple(parse_sexps(text, source=path))
         files.append(
             DuneFile(
                 # `.as_posix()` keeps node ids stable strings for baseline.json.
                 directory=directory.relative_to(root).as_posix(),
-                stanzas=tuple(parse_sexps(text, source=path)),
+                stanzas=stanzas,
+                include_subdirs=includes_subdirs(stanzas),
             )
         )
     return files
@@ -391,8 +413,9 @@ def read_dune_files(root: Path) -> list[DuneFile]:
 class SourceIndex:
     """OCaml source text per directory, read on demand and cached."""
 
-    def __init__(self, root: Path) -> None:
+    def __init__(self, root: Path, recursive: frozenset[str] = frozenset()) -> None:
         self._root = root
+        self._recursive = recursive
         self._cache: dict[str, str] = {}
 
     def text(self, directory: str) -> str:
@@ -400,8 +423,13 @@ class SourceIndex:
         if cached is not None:
             return cached
         chunks: list[str] = []
+        base = self._root / directory
         try:
-            entries = sorted((self._root / directory).iterdir())
+            entries = (
+                sorted(path for path in base.rglob("*") if path.is_file())
+                if directory in self._recursive
+                else sorted(base.iterdir())
+            )
         except OSError:
             entries = []
         for entry in entries:
@@ -440,14 +468,31 @@ class SourceIndex:
 # -------------------------------------------------------------------- build
 
 
+def _derived_name(public_name: str) -> str:
+    """The private name dune infers from a public one.
+
+    Dots become underscores, matching how the tree spells it by hand -- e.g.
+    `(public_name pasta_bindings.backend.native)` is `(name
+    pasta_bindings_backend_native)`.
+    """
+    return public_name.replace(".", "_")
+
+
 def _read_stanza(
     kind: StanzaKind, stanza: Sequence[Sexp], directory: str, generated: bool
 ) -> list[_RawStanza]:
     """Every node a single stanza declares, with its raw dependency names."""
+    publics = field(stanza, "public_name") or field(stanza, "public_names") or []
     names = field(stanza, "name") or field(stanza, "names")
     if not names:
+        # `(library (public_name foo))` is legal: dune derives the private name
+        # from the public one. Dropping such a stanza does not merely lose a
+        # node -- dependents' edges to it then fail to resolve and it gets
+        # recorded as an *opam package*, which is what the new-third-party-
+        # dependency check exists to notice.
+        names = [_derived_name(public) for public in _strings(publics)]
+    if not names:
         return []
-    publics = field(stanza, "public_name") or field(stanza, "public_names") or []
     dependencies = tuple(flatten_libraries(field(stanza, "libraries") or []))
     public_names = tuple(_strings(publics))
     implements = field(stanza, "implements") is not None
@@ -632,6 +677,12 @@ def build_graph(root: Path, dune_files: Iterable[DuneFile]) -> DuneGraph:
     return DuneGraph(root=root, nodes=nodes, edges=edges, external=external, collisions=collisions)
 
 
-def load_graph(root: Path) -> DuneGraph:
-    """Read `root` from disk and build the graph. The one I/O entrypoint."""
-    return build_graph(root, read_dune_files(root))
+def load(root: Path) -> tuple[DuneGraph, SourceIndex]:
+    """Read `root` from disk. The one I/O entrypoint.
+
+    The graph and the source index are built together so they cannot disagree
+    about which directories carry their sources in subdirectories.
+    """
+    dune_files = read_dune_files(root)
+    recursive = frozenset(f.directory for f in dune_files if f.include_subdirs)
+    return build_graph(root, dune_files), SourceIndex(root, recursive)
