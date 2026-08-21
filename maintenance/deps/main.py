@@ -20,12 +20,13 @@ import sys
 from collections import defaultdict
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
-from enum import Enum, IntEnum, StrEnum
+from enum import Enum, IntEnum
 from pathlib import Path
 from typing import Any, NoReturn, assert_never
 
 import analysis
 from analysis import Budget, ImpactIndex, LayeringRule, Metric, UnreferencedDep
+from errors import DepsError, ErrorCode
 from graph import DuneGraph, Edge, NodeId, SourceIndex, load_graph
 from report import (
     BASELINE_HINT,
@@ -55,22 +56,6 @@ ADVICE_TOP_ENTRYPOINTS = 20
 ADVICE_TOP_STANZAS = 10
 ADVICE_SAMPLE_DEPS = 5
 ADVICE_SAMPLE_SYMBOLS = 6
-
-
-class ErrorCode(StrEnum):
-    ROOT_NOT_A_DIRECTORY = "ROOT_NOT_A_DIRECTORY"
-    BASELINE_MISSING = "BASELINE_MISSING"
-    MALFORMED_JSON = "MALFORMED_JSON"
-
-
-class DepsError(Exception):
-    """A failure the CLI can report without a traceback."""
-
-    def __init__(self, code: ErrorCode, message: str, *, path: Path | None = None) -> None:
-        self.code = code
-        self.message = message
-        self.path = path
-        super().__init__(f"[{code.value}] {message}")
 
 
 class Command(Enum):
@@ -237,6 +222,7 @@ def collect_failures(
 
 
 def run_check(graph: DuneGraph, sources: SourceIndex) -> ExitCode:
+    warn_about_collisions(graph)
     baseline = load_baseline()
     forbidden = parse_rules(_read_json(RULES_PATH), "forbidden")
     failures = collect_failures(graph, sources, baseline, forbidden)
@@ -259,12 +245,27 @@ def run_check(graph: DuneGraph, sources: SourceIndex) -> ExitCode:
 # -------------------------------------------------------------------- advise
 
 
+def warn_about_collisions(graph: DuneGraph) -> None:
+    """Name clashes are resolved silently; say so rather than hide it."""
+    if not graph.collisions:
+        return
+    print(
+        f"warning: {len(graph.collisions)} library name(s) are declared by more than one "
+        "stanza; dependencies on them resolve to the first by directory order:",
+        file=sys.stderr,
+    )
+    for collision in graph.collisions:
+        losers = ", ".join(collision.losers)
+        print(f"  {collision.name}: {collision.winner} (over {losers})", file=sys.stderr)
+
+
 def _section(title: str) -> None:
     print(f"\n{title}")
     print("-" * len(title))
 
 
 def run_advise(graph: DuneGraph, sources: SourceIndex) -> ExitCode:
+    warn_about_collisions(graph)
     index = analysis.impact_index(graph)
     pending = parse_rules(_read_json(RULES_PATH), "pending")
 

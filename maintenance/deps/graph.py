@@ -21,6 +21,8 @@ from itertools import pairwise
 from pathlib import Path
 from typing import NewType
 
+from errors import DepsError, ErrorCode
+
 # A node id looks like `<lib|exe>:<dir under root>:<name>`. It is a distinct
 # type from a library *name* because confusing the two is a bug this tool has
 # already shipped once: a check meant to match library names was matching node
@@ -138,8 +140,14 @@ def _strip_comments(text: str) -> str:
 _TOKEN_RE = re.compile(r'\(|\)|"(?:[^"\\]|\\.)*"|[^\s()]+')
 
 
-def parse_sexps(text: str) -> list[Sexp]:
-    """Parse a dune file into a list of top-level s-expressions."""
+def parse_sexps(text: str, source: Path | None = None) -> list[Sexp]:
+    """Parse a dune file into a list of top-level s-expressions.
+
+    Unbalanced parentheses raise. Returning what had been parsed so far would
+    discard every complete stanza in the file and leave the graph quietly
+    wrong: the libraries declared there become "removed opam package" and
+    "missing entrypoint" failures blamed on whichever PR happens to run next.
+    """
     tokens = _TOKEN_RE.findall(_strip_comments(text))
     stack: list[list[Sexp]] = []
     current: list[Sexp] = []
@@ -149,13 +157,22 @@ def parse_sexps(text: str) -> list[Sexp]:
             current = []
         elif token == ")":
             if not stack:
-                # Unbalanced; give back what we have rather than crashing CI.
-                return current
+                raise DepsError(
+                    ErrorCode.DUNE_UNPARSEABLE,
+                    f"{source or '<dune>'}: unbalanced `)`",
+                    path=source,
+                )
             parent = stack.pop()
             parent.append(current)
             current = parent
         else:
             current.append(token.strip('"'))
+    if stack:
+        raise DepsError(
+            ErrorCode.DUNE_UNPARSEABLE,
+            f"{source or '<dune>'}: {len(stack)} unclosed `(`",
+            path=source,
+        )
     return current
 
 
@@ -213,6 +230,23 @@ def flatten_libraries(items: Sequence[Sexp]) -> list[str]:
     return [dep for dep in out if dep and not dep.startswith("%{")]
 
 
+def _ppx_package_names(args: Sequence[Sexp]) -> Iterator[str]:
+    """The ppx packages in a `(pps ...)` / `(backend ...)` argument list.
+
+    Everything after `--` is arguments for the ppx driver, not packages, and
+    flags and dune variables can appear before it too. Taking them all would
+    be harmless right now, but `(pps ppx_inline_test -- -inline-test-lib
+    mina_base)` is ordinary dune, and it would put `mina_base` into this
+    stanza's ppx set -- permanently hiding an unused dependency on it.
+    """
+    for name in _strings(args):
+        if name == "--":
+            return
+        if name.startswith(("-", "%{")):
+            continue
+        yield name.split(".")[0]
+
+
 def preprocessors(stanza: Sequence[Sexp]) -> frozenset[str]:
     """Ppx packages this stanza runs: `(preprocess (pps ...))`, `(instrumentation
     (backend ...))`.
@@ -229,7 +263,7 @@ def preprocessors(stanza: Sequence[Sexp]) -> frozenset[str]:
         if not isinstance(node, list) or not node:
             return
         if node[0] in ("pps", "backend"):
-            found.update(name.split(".")[0] for name in _strings(node[1:]))
+            found.update(_ppx_package_names(node[1:]))
         for item in node:
             walk(item)
 
@@ -335,15 +369,20 @@ def read_dune_files(root: Path) -> list[DuneFile]:
     """
     files: list[DuneFile] = []
     for directory in sorted(_walk_dune_dirs(root), key=Path.as_posix):
+        path = directory / "dune"
         try:
-            text = (directory / "dune").read_text(encoding="utf-8", errors="replace")
-        except OSError:
-            continue
+            text = path.read_text(encoding="utf-8", errors="replace")
+        except OSError as error:
+            # Skipping an unreadable dune silently loses every library it
+            # declares, which surfaces later as unrelated baseline failures.
+            raise DepsError(
+                ErrorCode.DUNE_UNREADABLE, f"cannot read {path}: {error}", path=path
+            ) from error
         files.append(
             DuneFile(
                 # `.as_posix()` keeps node ids stable strings for baseline.json.
                 directory=directory.relative_to(root).as_posix(),
-                stanzas=tuple(parse_sexps(text)),
+                stanzas=tuple(parse_sexps(text, source=path)),
             )
         )
     return files
@@ -448,13 +487,41 @@ def _read_all(dune_files: Iterable[DuneFile]) -> list[_RawStanza]:
     return raw
 
 
-def _build_alias(raw: Sequence[_RawStanza]) -> dict[str, NodeId]:
-    """Map every declared name to the first stanza that claimed it."""
+@dataclass(frozen=True, slots=True)
+class NameCollision:
+    """Two stanzas declared the same name; the first one sorted wins."""
+
+    name: str
+    winner: NodeId
+    losers: tuple[NodeId, ...]
+
+
+def _build_alias(
+    raw: Sequence[_RawStanza],
+) -> tuple[dict[str, NodeId], tuple[NameCollision, ...]]:
+    """Map every declared name to the first stanza that claimed it.
+
+    First-writer-wins is what dune-less resolution can offer, but it is silent:
+    `(libraries test)` would bind to whichever stanza sorted first out of the
+    several that call themselves `test`. Report the collisions so the choice is
+    at least visible.
+    """
     alias: dict[str, NodeId] = {}
+    contested: defaultdict[str, list[NodeId]] = defaultdict(list)
     for entry in raw:
         for name in entry.node.declared_names:
-            alias.setdefault(name, entry.node.id)
-    return alias
+            claimed = alias.get(name)
+            if claimed is None:
+                alias[name] = entry.node.id
+            elif claimed != entry.node.id:
+                # A stanza naming itself twice (`name` == `public_name`) is not
+                # a clash; only a *different* stanza wanting the name is.
+                contested[name].append(entry.node.id)
+    collisions = tuple(
+        NameCollision(name=name, winner=alias[name], losers=tuple(losers))
+        for name, losers in sorted(contested.items())
+    )
+    return alias, collisions
 
 
 def _resolve(
@@ -483,6 +550,8 @@ class DuneGraph:
     nodes: Mapping[NodeId, Node]
     edges: Mapping[NodeId, tuple[NodeId, ...]]
     external: Mapping[NodeId, tuple[str, ...]]
+    # Names more than one stanza claims. Not fatal, but worth printing.
+    collisions: tuple[NameCollision, ...] = ()
 
     def successors(self, node_id: NodeId) -> tuple[NodeId, ...]:
         return self.edges.get(node_id, ())
@@ -553,14 +622,14 @@ class DuneGraph:
 def build_graph(root: Path, dune_files: Iterable[DuneFile]) -> DuneGraph:
     """Resolve parsed dune files into a graph. Pure."""
     raw = _read_all(dune_files)
-    alias = _build_alias(raw)
+    alias, collisions = _build_alias(raw)
     nodes: dict[NodeId, Node] = {}
     edges: dict[NodeId, tuple[NodeId, ...]] = {}
     external: dict[NodeId, tuple[str, ...]] = {}
     for entry in raw:
         nodes[entry.node.id] = entry.node
         edges[entry.node.id], external[entry.node.id] = _resolve(entry, alias)
-    return DuneGraph(root=root, nodes=nodes, edges=edges, external=external)
+    return DuneGraph(root=root, nodes=nodes, edges=edges, external=external, collisions=collisions)
 
 
 def load_graph(root: Path) -> DuneGraph:
