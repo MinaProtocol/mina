@@ -3,6 +3,8 @@ const HTTPError = require("./util/httpError");
 
 const { httpsRequest } = require("./util/httpsRequest");
 const axios = require("axios");
+const { checkArgument } = require("./safe-input.js");
+const { parseArtifactsCommand } = require("./artifacts.js");
 
 const apiKey = process.env.BUILDKITE_API_ACCESS_TOKEN;
 
@@ -78,7 +80,10 @@ const parseParams = (comment) => {
 const buildEnvFromParams = ({ arch, profile, codename }) => {
   var filter = "DockerBuild";
 
-  if (!arch || !profile || !codename ) {
+  // Only fall back to the unfiltered DockerBuild when the caller gave nothing.
+  // A caller that gives some of the keys keeps them: "arch=amd64" alone builds
+  // the filter DockerBuildAmd64, which is a real filter.
+  if (!arch && !profile && !codename) {
     return { BUILDKITE_PIPELINE_FILTER: filter };
   }
 
@@ -223,6 +228,49 @@ const handler = async (event, req) => {
     }
   }
 
+  // Mina CI Single Test Build section
+  //
+  // Runs one generated buildkite job and the jobs it depends on. The job name
+  // is the last word of the comment, and it must be the exact name of a job in
+  // buildkite/src/gen (the match is on the whole name, not a part of it).
+  //
+  //   !ci-single-me HardForkTestMixed
+  else if (
+    req.body.action == "created" &&
+    req.body.issue.pull_request &&
+    req.body.issue.pull_request.url &&
+    req.body.comment.body.startsWith("!ci-single-me")
+  ) {
+    const orgData = await getRequest(req.body.sender.organizations_url);
+    if (orgData.data.filter((org) => org.login == "MinaProtocol").length > 0) {
+      const prData = await getRequest(req.body.issue.pull_request.url);
+
+      const jobName = req.body.comment.body.trim().split(/\s+/).pop(); // get JobName from "!ci-single-me JobName"
+
+      // The name is put into a dhall expression on the agent, so it is checked
+      // before it goes anywhere. See src/safe-input.js.
+      const checked = checkArgument("!ci-single-me", jobName);
+      if (checked.error) {
+        return [checked.error, checked.error];
+      }
+
+      const buildkite = await runBuild(
+        {
+          sender: req.body.sender,
+          pull_request: prData.data,
+        },
+        "mina-single-job",
+        { JOB_NAME: checked.value }
+      );
+      return [buildkite];
+    } else {
+      return [
+        "comment author is not (publically) a member of the core team",
+        "comment author is not (publically) a member of the core team",
+      ];
+    }
+  }
+
   // Mina CI Debian Build section
   else if (
     req.body.action == "created" &&
@@ -246,6 +294,55 @@ const handler = async (event, req) => {
       return [
         "comment author is not (publically) a member of the core team",
         "comment author is not (publically) a member of the core team",
+      ];
+    }
+  }
+
+  // Mina Artifact Build section
+  //
+  // Builds artifacts: docker images, debian packages, or the app binaries they
+  // are made from. What to build is named in the comment, and nothing is
+  // triaged.
+  //
+  //   !ci-artifacts-me docker set=automode profile=devnet codename=bullseye
+  //   !ci-artifacts-me debian set=prefork codename=bullseye
+  //   !ci-artifacts-me apps codename=bullseye instrumented=true
+  //
+  // This is a NEW command with a pipeline of its own, and !ci-docker-me and
+  // !ci-debian-me below are deliberately left alone. This function serves every
+  // branch, and a buildkite pipeline runs one command for every branch alike,
+  // while the entrypoint this pipeline uploads
+  // (buildkite/src/Entrypoints/RunSelection.dhall) is on develop and on nothing
+  // else. Changing the old commands would break every pull request on
+  // compatible, on master and on the release branches. See src/artifacts.js.
+  else if (
+    req.body.action == "created" &&
+    req.body.issue.pull_request &&
+    req.body.issue.pull_request.url &&
+    req.body.comment.body.startsWith("!ci-artifacts-me")
+  ) {
+    const orgData = await getRequest(req.body.sender.organizations_url);
+    if (orgData.data.filter((org) => org.login == "MinaProtocol").length > 0) {
+      const prData = await getRequest(req.body.issue.pull_request.url);
+
+      const parsed = parseArtifactsCommand(req.body.comment.body);
+      if (parsed.error) {
+        return [parsed.error, parsed.error];
+      }
+
+      const buildkite = await runBuild(
+        {
+          sender: req.body.sender,
+          pull_request: prData.data,
+        },
+        "mina-artifacts",
+        parsed.env
+      );
+      return [buildkite];
+    } else {
+      return [
+        "comment author is not (publicly) a member of the core team",
+        "comment author is not (publicly) a member of the core team",
       ];
     }
   }

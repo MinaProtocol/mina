@@ -4,6 +4,7 @@
  (public_name mina-command-line-tests)
  (libraries
   ;; opam libraries
+  core_unix
   core_unix.time_float_unix
   core_unix.filename_unix
   async_kernel
