@@ -11,18 +11,31 @@ import fnmatch
 import re
 from pathlib import PurePosixPath
 
-# Dependencies that legitimately never appear as a module reference: ppx
-# runtimes, C stub packages and instrumentation backends are linked for their
-# side effects.
-INVISIBLE_DEP_RE = re.compile(
-    r"(ppx|runtime|config|stubs|bindings|bisect|instrument)", re.IGNORECASE
-)
 
 # A dependency is "thin" if it is referenced this many times or fewer.
 THIN_REFERENCE_LIMIT = 12
 
 # Ignore edges below this closure impact; they are hygiene, not weight.
 IMPACT_THRESHOLD = 5
+
+
+def generated_reference(graph, nid, dep_node):
+    """True when `nid`'s preprocessor, not its source, is what uses `dep_node`.
+
+    A ppx's runtime support library (`ppx_version.runtime`,
+    `ppx_inline_test.config`) is referenced only by code the preprocessor
+    emits, so scanning the checked-in source can never find it and reporting
+    it as unused would tell people to break their build.
+
+    Decided from what the dependent's own stanza declares it runs -- so this
+    holds only for a stanza that actually invokes the ppx, and says nothing
+    about libraries whose *name* merely resembles one.
+    """
+    ppx = graph.nodes[nid].ppx
+    if not ppx:
+        return False
+    declared = [dep_node.name] + list(dep_node.public_names)
+    return any(name.split(".")[0] in ppx for name in declared)
 
 
 def entrypoints(graph):
@@ -104,7 +117,7 @@ def unreferenced_deps(graph):
             dep_node = graph.nodes[dep]
             if dep_node.implements:
                 continue
-            if INVISIBLE_DEP_RE.search(dep_node.name) or INVISIBLE_DEP_RE.search(dep):
+            if generated_reference(graph, nid, dep_node):
                 continue
             if graph.references(nid, dep_node.module_name) == 0:
                 findings.append((nid, dep))
@@ -128,7 +141,7 @@ def thin_deps(graph, index):
         dep_node = graph.nodes[dep]
         if source_node.generated or not graph.sources(source_node.directory):
             continue
-        if dep_node.implements or INVISIBLE_DEP_RE.search(dep_node.name):
+        if dep_node.implements or generated_reference(graph, source, dep_node):
             continue
         # A thin wrapper executable over its own library is not a finding.
         # (Path-relative check, not a string prefix: `app/archive` must not
