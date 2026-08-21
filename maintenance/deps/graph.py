@@ -9,6 +9,7 @@ approximate (see `KNOWN LIMITATIONS` in maintenance/README.md).
 import os
 import re
 from collections import deque
+from pathlib import Path
 
 # Directories that never contain first-party dune stanzas we care about.
 PRUNED_DIRS = {
@@ -156,16 +157,24 @@ class DuneGraph:
     # ---------------------------------------------------------------- build
 
     def _walk(self):
+        # `os.walk` rather than `Path.walk`: the latter is Python 3.12+, and the
+        # CI toolchain image is bullseye (3.9). Pruning needs the in-place
+        # `dirnames[:]` assignment either way.
         for dirpath, dirnames, filenames in os.walk(self.root):
             dirnames[:] = sorted(d for d in dirnames if d not in PRUNED_DIRS)
             if "dune" in filenames:
-                yield dirpath
+                yield Path(dirpath)
 
     def _build(self):
         alias = {}
         raw = {}
-        for dirpath in sorted(self._walk()):
-            path = os.path.join(dirpath, "dune")
+        # Sort on the posix string, not the Path: `alias.setdefault` below is
+        # first-writer-wins, so iteration order decides which stanza claims an
+        # ambiguous library name. Path ordering compares parts (and does so
+        # differently before 3.12), which would make the baseline depend on the
+        # interpreter version.
+        for dirpath in sorted(self._walk(), key=Path.as_posix):
+            path = dirpath / "dune"
             try:
                 with open(path, encoding="utf-8", errors="replace") as handle:
                     text = handle.read()
@@ -173,7 +182,8 @@ class DuneGraph:
                 continue
             stanzas = parse_sexps(text)
             generated = self._generates_ml(stanzas)
-            relative = os.path.relpath(dirpath, self.root)
+            # `.as_posix()` keeps node ids stable strings for baseline.json.
+            relative = dirpath.relative_to(self.root).as_posix()
             for stanza in stanzas:
                 if not isinstance(stanza, list) or not stanza:
                     continue
@@ -324,16 +334,16 @@ class DuneGraph:
         if directory in self._sources:
             return self._sources[directory]
         chunks = []
-        full = os.path.join(self.root, directory)
+        full = Path(self.root) / directory
         try:
-            entries = sorted(os.listdir(full))
+            entries = sorted(full.iterdir())
         except OSError:
             entries = []
         for entry in entries:
-            if not entry.endswith((".ml", ".mli", ".mll", ".mly")):
+            if entry.suffix not in (".ml", ".mli", ".mll", ".mly"):
                 continue
             try:
-                with open(os.path.join(full, entry), encoding="utf-8", errors="replace") as handle:
+                with open(entry, encoding="utf-8", errors="replace") as handle:
                     chunks.append(handle.read())
             except OSError:
                 pass
