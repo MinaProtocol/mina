@@ -14,6 +14,8 @@ let Size = ../../Command/Size.dhall
 
 let RunInToolchain = ../../Command/RunInToolchain.dhall
 
+let ContainerImages = ../../Constants/ContainerImages.dhall
+
 in  Pipeline.build
       Pipeline.Config::{
       , spec = JobSpec::{
@@ -35,11 +37,13 @@ in  Pipeline.build
         [ Command.build
             Command.Config::{
             , commands =
-                RunInToolchain.runInDefaultToolchain
-                  ([] : List Text)
-                  (     "make deps-advice | tee deps-advice.txt ; "
-                    ++  "make check-deps"
-                  )
+                RunInToolchain.runInToolchain
+                  RunInToolchain.Config::{
+                  , image = ContainerImages.minaToolchainNoble.amd64
+                  , innerScript =
+                          "make deps-advice | tee deps-advice.txt ; "
+                      ++  "make check-deps"
+                  }
             , label = "Dependency graph: budget, layering, unused deps"
             , key = "check-deps"
             , target = Size.Multi
