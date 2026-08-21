@@ -1118,15 +1118,25 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
                   get_monitors (parent :: accum) parent
             in
             let monitors = get_monitors [ monitor ] monitor in
-            (* Log the monitor chain by name. We deliberately avoid
-               [Monitor.sexp_of_t]: that is the derived-sexp dump of the
-               monitor's internals, whose shape is unstable across core versions
-               (v0.16 emits the name as a bare atom, which broke the previous
-               record-coercion and crashed the daemon on the first long cycle).
-               [Monitor.name] is the public, stable accessor and is all this
-               debug line needs. *)
+            (* Log each monitor as an object, keeping the chain in list order.
+               We deliberately avoid [Monitor.sexp_of_t]: in v0.16 it returns the
+               monitor's [descriptions], whose entries are a bare atom or a
+               (name, position) pair, rather than the derived record dump the
+               previous code coerced -- that mismatch crashed the daemon on the
+               first long async cycle. [name] and [here] are the public, stable
+               accessors; the [id] and [has_seen_error] fields the pre-v0.16
+               shape also carried are no longer exported by async. *)
             List.map monitors ~f:(fun monitor ->
-                `String (Info.to_string_hum (Async_kernel.Monitor.name monitor)) )
+                `Assoc
+                  [ ( "name"
+                    , `String
+                        (Info.to_string_hum (Async_kernel.Monitor.name monitor))
+                    )
+                  ; ( "here"
+                    , Option.value_map (Async_kernel.Monitor.here monitor)
+                        ~default:`Null ~f:(fun here ->
+                          `String (Source_code_position.to_string here) ) )
+                  ] )
           in
           let o1trace context =
             Execution_context.find_local context O1trace.local_storage_id
