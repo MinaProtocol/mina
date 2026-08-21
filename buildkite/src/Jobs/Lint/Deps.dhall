@@ -39,6 +39,7 @@ in  Pipeline.build
             , commands =
                 RunInToolchain.runInToolchain
                   RunInToolchain.Config::{
+                  , submodules = True
                   , image = ContainerImages.minaToolchainNoble.amd64
                   , innerScript =
                           "make deps-advice | tee deps-advice.txt ; "
