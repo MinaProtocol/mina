@@ -120,9 +120,11 @@ def _flatten_libs(items):
 
 
 class Node:
-    __slots__ = ("id", "kind", "directory", "name", "public_names", "generated", "implements")
+    __slots__ = ("id", "kind", "directory", "name", "public_names", "generated",
+                 "implements", "ppx")
 
-    def __init__(self, nid, kind, directory, name, public_names, generated, implements):
+    def __init__(self, nid, kind, directory, name, public_names, generated,
+                 implements, ppx):
         self.id = nid
         self.kind = kind
         self.directory = directory
@@ -135,6 +137,8 @@ class Node:
         # by linking them, so they are never named in the source of whatever
         # depends on them. They can never be reported as unused.
         self.implements = implements
+        # Ppx packages this stanza runs; see `_preprocessors`.
+        self.ppx = ppx
 
     @property
     def module_name(self):
@@ -199,11 +203,13 @@ class DuneGraph:
                 deps = _flatten_libs(field(stanza, "libraries") or [])
                 opened = self._opened_modules(stanza)
                 implements = bool(field(stanza, "implements"))
+                ppx = self._preprocessors(stanza)
                 for name in names:
                     prefix = "lib" if kind == "library" else "exe"
                     nid = "%s:%s:%s" % (prefix, relative, name)
                     self.nodes[nid] = Node(
-                        nid, kind, relative, name, publics, generated, implements
+                        nid, kind, relative, name, publics, generated,
+                        implements, ppx
                     )
                     raw[nid] = (deps, opened)
                     alias.setdefault(name, nid)
@@ -238,6 +244,32 @@ class DuneGraph:
                 if isinstance(target, str) and target.endswith((".ml", ".mli")):
                     return True
         return False
+
+    @staticmethod
+    def _preprocessors(stanza):
+        """Ppx packages this stanza runs, from `(preprocess (pps ...))` and
+        `(instrumentation (backend ...))`.
+
+        These are what makes a dependency legitimately invisible to
+        `references()`: the code that uses a ppx's runtime support library is
+        emitted by the preprocessor, so it never appears in the source we scan.
+        Names are reduced to their package (`ppx_deriving.show` -> `ppx_deriving`)
+        because that is what a runtime sublibrary hangs off.
+        """
+        found = set()
+
+        def walk(node):
+            if not isinstance(node, list) or not node:
+                return
+            if node[0] in ("pps", "backend"):
+                found.update(
+                    item.split(".")[0] for item in node[1:] if isinstance(item, str)
+                )
+            for item in node:
+                walk(item)
+
+        walk(stanza)
+        return found
 
     @staticmethod
     def _opened_modules(stanza):

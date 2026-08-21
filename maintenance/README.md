@@ -56,7 +56,12 @@ Resolution is syntactic, so it is an approximation of what dune actually does:
   something that tells people to delete code.
 - Dependencies that are never named in source are excluded rather than
   reported: implementations of virtual libraries (`(implements ...)`, chosen by
-  linking), ppx runtimes, C stub packages and instrumentation backends.
+  linking) and ppx runtime support libraries. The latter is decided from the
+  dependent's own `(preprocess (pps ...))` and `(instrumentation (backend ...))`
+  -- a stanza that runs `ppx_version` may depend on `ppx_version.runtime`
+  without ever naming it, because the preprocessor emits the code that uses it.
+  Nothing is excluded by name pattern, so an ordinary library is still reported
+  even when it is called `runtime_config` or lives under a `stubs/` directory.
 - Directories where a `(rule)` generates a `.ml` are skipped entirely for the
   unused-dependency check, since the generated text is not there to grep.
 
