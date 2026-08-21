@@ -17,6 +17,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from collections import defaultdict
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from enum import Enum, IntEnum, StrEnum
@@ -310,9 +311,9 @@ def run_advise(graph: DuneGraph, sources: SourceIndex) -> ExitCode:
         print(f"      {found.references} reference(s), uses: {shown}")
 
     _section("3. Declared, never referenced, but no weight -- hygiene only")
-    by_stanza: dict[NodeId, list[NodeId]] = {}
+    by_stanza: defaultdict[NodeId, list[NodeId]] = defaultdict(list)
     for found in free:
-        by_stanza.setdefault(found.source, []).append(found.dep)
+        by_stanza[found.source].append(found.dep)
     print(f"  {len(free)} dependencies across {len(by_stanza)} stanzas")
     worst = sorted(by_stanza.items(), key=lambda item: -len(item[1]))[:ADVICE_TOP_STANZAS]
     for node_id, deps in worst:

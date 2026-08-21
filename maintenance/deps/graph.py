@@ -12,12 +12,12 @@ else is a pure function of what they return.
 from __future__ import annotations
 
 import contextlib
-import os
 import re
-from collections import deque
+from collections import defaultdict, deque
 from collections.abc import Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass
 from enum import Enum
+from itertools import pairwise
 from pathlib import Path
 from typing import NewType
 
@@ -244,10 +244,9 @@ def opened_modules(stanza: Sequence[Sexp]) -> frozenset[str]:
         flags = field(stanza, key)
         if flags is None:
             continue
-        atoms = _atoms(flags)
-        for index, token in enumerate(atoms):
-            if token == "-open" and index + 1 < len(atoms):
-                opened.add(atoms[index + 1].split(".")[0])
+        for token, following in pairwise(_atoms(flags)):
+            if token == "-open":
+                opened.add(following.split(".")[0])
     return frozenset(opened)
 
 
@@ -317,13 +316,12 @@ class _RawStanza:
 
 
 def _walk_dune_dirs(root: Path) -> Iterator[Path]:
-    # `os.walk` rather than `Path.walk`: pruning needs the in-place
-    # `dirnames[:]` assignment, which `Path.walk` also supports but with no
-    # advantage here.
-    for dirpath, dirnames, filenames in os.walk(root):
+    # Pruning relies on `Path.walk` being top-down, so that dropping names from
+    # `dirnames` in place stops it descending into them.
+    for directory, dirnames, filenames in root.walk():
         dirnames[:] = sorted(name for name in dirnames if name not in PRUNED_DIRS)
         if "dune" in filenames:
-            yield Path(dirpath)
+            yield directory
 
 
 def read_dune_files(root: Path) -> list[DuneFile]:
@@ -538,11 +536,11 @@ class DuneGraph:
         """
         reachable = self.closure(start)
         reachable.add(start)
-        incoming: dict[NodeId, list[NodeId]] = {}
+        incoming: defaultdict[NodeId, list[NodeId]] = defaultdict(list)
         for node_id in reachable:
             for nxt in self.successors(node_id):
                 if nxt in reachable:
-                    incoming.setdefault(nxt, []).append(node_id)
+                    incoming[nxt].append(node_id)
         return sorted(
             (sources[0], node_id) for node_id, sources in incoming.items() if len(sources) == 1
         )
