@@ -33,7 +33,9 @@ let main ~archive_uri () =
       [%log info] "Querying missing blocks" ;
       let%bind missing_blocks_raw =
         match%bind
-          Mina_caqti.Pool.use (fun db -> Sql.Unparented_blocks.run db ()) pool
+          Mina_caqti.Pool.use
+            (fun db -> Sql.Unparented_blocks_detail.run db ())
+            pool
         with
         | Ok blocks ->
             return blocks
@@ -90,14 +92,25 @@ let main ~archive_uri () =
                   Core_kernel.exit 1 ) )
       in
       [%log info] "Querying for gaps in chain statuses" ;
+      (* [Highest_canonical_height] returns [None] when the archive holds
+         no canonical block.  The auditor must not silently succeed on an
+         empty canonical chain, so we fail loudly in that case rather than
+         treating it as height 0. *)
       let%bind highest_canonical =
         match%bind
           Mina_caqti.Pool.use
             (fun db -> Sql.Chain_status.run_highest_canonical db ())
             pool
         with
-        | Ok height ->
+        | Ok (Some height) ->
             return height
+        | Ok None ->
+            [%log error] "Error getting greatest height of canonical blocks"
+              ~metadata:
+                [ ( "error"
+                  , `String "no canonical blocks found in archive database" )
+                ] ;
+            Core.exit 1
         | Error msg ->
             [%log error] "Error getting greatest height of canonical blocks"
               ~metadata:[ ("error", `String (Caqti_error.show msg)) ] ;

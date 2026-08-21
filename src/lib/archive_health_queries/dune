@@ -1,0 +1,14 @@
+(library
+ (name archive_health_queries)
+ (public_name archive_health_queries)
+ (libraries
+  ;; opam libraries
+  core_kernel
+  async
+  caqti
+  ;; local libraries
+  mina_caqti)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_version)))

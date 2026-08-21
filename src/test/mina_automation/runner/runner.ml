@@ -27,10 +27,18 @@ let run (module F : Intf.Fixture) =
           return result )
 
 let run_blocking test_case () =
-  match Async.Thread_safe.block_on_async_exn (fun () -> run test_case) with
-  | Intf.Passed ->
-      ()
-  | Warning msg ->
-      Alcotest.fail msg
-  | Failed err ->
-      Alcotest.fail (Error.to_string_hum err)
+  try
+    match Async.Thread_safe.block_on_async_exn (fun () -> run test_case) with
+    | Intf.Passed ->
+        ()
+    | Warning msg ->
+        Alcotest.fail msg
+    | Failed err ->
+        Alcotest.fail (Error.to_string_hum err)
+  with exn ->
+    let backtrace = Stdlib.Printexc.get_backtrace () in
+    if String.is_empty backtrace then
+      Alcotest.failf "Unhandled exception: %s" (Exn.to_string exn)
+    else
+      Alcotest.failf "Unhandled exception: %s\nBacktrace:\n%s"
+        (Exn.to_string exn) backtrace
