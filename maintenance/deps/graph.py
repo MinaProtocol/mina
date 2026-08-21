@@ -12,6 +12,27 @@ from collections import deque
 from pathlib import Path
 
 # Directories that never contain first-party dune stanzas we care about.
+#
+# Three kinds. `_build`, `_opam` and `.git` sit outside dune's vocabulary --
+# no dune file describes them. `node_modules` and `kimchi-stubs-vendors` mirror
+# a declaration a dune file already makes: `(dirs :standard \ node_modules)` in
+# snarky, and `(data_only_dirs src kimchi-stubs-vendors)` in the kimchi stubs.
+# `docker-compose` mirrors nothing -- the three such directories under
+# `src/app` hold only compose files, so pruning them is an optimisation.
+#
+# `kimchi-stubs-vendors` is the entry that earns its keep. It is a vendored
+# Cargo registry -- ~140 third-party Rust crates, checked in so the stubs build
+# offline -- and one of them, `ocaml-interop`, ships an OCaml test harness with
+# its own `dune`. Walking into it adds `ocaml_rust_caller` to `entrypoints()`,
+# which is what the dependency budget is pinned to, and registers the Rust test
+# fixture `callable_rust` as an opam package, which trips the
+# new-external-dependency check. Neither is Mina code.
+#
+# The match is on the bare directory name at any depth, which does not scale:
+# it restates declarations the dune files already make, and misses the ones not
+# listed here (`target`, from `(dirs :standard .cargo \ target)`). Reading
+# `data_only_dirs` and `(dirs ...)` during the walk would subsume everything
+# below `.git`.
 PRUNED_DIRS = {
     "_build",
     "_opam",
