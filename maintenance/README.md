@@ -4,8 +4,14 @@
 
 `maintenance/deps` holds a dependency gate and advisor for the OCaml tree. It
 parses `dune` files directly, so it needs no opam switch, no build and no
-third-party package — only `python3`. A full scan of `src/` takes a few
-seconds, which is what makes it affordable on every PR.
+third-party package — only `python3` (3.12 or newer). A full scan of `src/`
+takes a few seconds, which is what makes it affordable on every PR.
+
+The CI job runs in the **Noble** toolchain image rather than the default
+Bullseye one, whose Python 3.9 cannot parse this code. That cannot be recorded
+as a comment next to the job: `dhall lint` strips comments, so the reason lives
+here instead. If the job is ever moved back to a Bullseye-era image it will
+fail at import, not silently misbehave.
 
 ```
 make check-deps      # the CI gate: fails when the graph regresses
@@ -33,6 +39,33 @@ so the debt that already exists does not have to be paid off first.
 When a failure is legitimate — the dependency really is needed, or the growth
 is intended — run `make deps-baseline` and commit the diff. The point is that
 the number moves in a reviewable commit instead of drifting.
+
+### Working on the checker itself
+
+The code is laid out as a functional core with a thin imperative shell:
+
+- `graph.py` — parsing and the graph model. `read_dune_files` and `SourceIndex`
+  touch the filesystem; everything else is a pure function of what they return.
+- `analysis.py` — pure analyses returning typed findings.
+- `report.py` — the closed set of things `check` can complain about, and how
+  each one reads. `render_failure` closes over the union with `assert_never`,
+  so adding a failure kind without a rendering is a type error.
+- `main.py` — the shell: argument parsing, file I/O, printing, exit codes.
+
+Lint and type-check it with:
+
+```
+ruff check maintenance/deps && ruff format --check maintenance/deps
+ty check maintenance/deps
+```
+
+Configuration lives in `maintenance/deps/pyproject.toml` and is scoped to this
+directory; the rest of the repository's Python is not held to these rules yet.
+Neither tool is in the CI image, so this is a local gate for now.
+
+Behaviour is pinned by `baseline.json`: after any change here, regenerate it
+with `make deps-baseline` and confirm the diff is empty. That is the fastest
+way to prove a refactor changed nothing.
 
 ### Adding a layering rule
 
