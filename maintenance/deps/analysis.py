@@ -9,6 +9,7 @@ be turned on.
 
 import fnmatch
 import re
+from pathlib import PurePosixPath
 
 # Dependencies that legitimately never appear as a module reference: ppx
 # runtimes, C stub packages and instrumentation backends are linked for their
@@ -34,8 +35,10 @@ def shipped_entrypoints(graph):
     result = []
     for nid in entrypoints(graph):
         directory = graph.nodes[nid].directory
-        segments = directory.split("/")
-        if segments[0] != "app":
+        # `parts` is empty for the tree root ("."), which `split("/")` used to
+        # render as ["."]; guard rather than index blindly.
+        segments = PurePosixPath(directory).parts
+        if not segments or segments[0] != "app":
             continue
         if any(s in ("test", "tests", "bench", "benchmarks") for s in segments):
             continue
@@ -128,7 +131,11 @@ def thin_deps(graph, index):
         if dep_node.implements or INVISIBLE_DEP_RE.search(dep_node.name):
             continue
         # A thin wrapper executable over its own library is not a finding.
-        if source_node.is_executable and dep_node.directory.startswith(source_node.directory):
+        # (Path-relative check, not a string prefix: `app/archive` must not
+        # swallow the sibling `app/archive_blocks`.)
+        if source_node.is_executable and PurePosixPath(
+            dep_node.directory
+        ).is_relative_to(source_node.directory):
             continue
         count = graph.references(source, dep_node.module_name)
         if count == 0 or count > THIN_REFERENCE_LIMIT:

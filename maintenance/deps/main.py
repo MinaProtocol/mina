@@ -11,23 +11,23 @@ Runs without dune, without a switch and without any opam package: it reads
 
 import argparse
 import json
-import os
 import sys
+from pathlib import Path
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+HERE = Path(__file__).resolve().parent
+sys.path.insert(0, str(HERE))
 
 import analysis  # noqa: E402
 from graph import DuneGraph  # noqa: E402
 
-HERE = os.path.dirname(os.path.abspath(__file__))
-BASELINE_PATH = os.path.join(HERE, "baseline.json")
-RULES_PATH = os.path.join(HERE, "rules.json")
+BASELINE_PATH = HERE / "baseline.json"
+RULES_PATH = HERE / "rules.json"
 
 BASELINE_HINT = "run `make deps-baseline` and commit maintenance/deps/baseline.json"
 
 
 def load_json(path, default):
-    if not os.path.exists(path):
+    if not path.exists():
         return default
     with open(path, encoding="utf-8") as handle:
         return json.load(handle)
@@ -237,11 +237,12 @@ def main(argv=None):
     parser.add_argument("--root", default="src", help="source tree to scan (default: src)")
     args = parser.parse_args(argv)
 
-    if not os.path.isdir(args.root):
-        print("error: no such directory: %s (run from the repository root)" % args.root)
+    root = Path(args.root)
+    if not root.is_dir():
+        print("error: no such directory: %s (run from the repository root)" % root)
         return 2
 
-    graph = DuneGraph(args.root)
+    graph = DuneGraph(root)
 
     if args.command == "check":
         return check(graph)
