@@ -435,7 +435,7 @@ let start ~logger ~uptime_url ~snark_worker_opt ~constraint_constants
             ; ( "boundary_time"
               , `String
                   ( Block_time.to_time_exn next_block_tm
-                  |> Time_float_unix.to_string ) )
+                  |> Time_float.to_string_utc ) )
             ] ;
         (* wait in Deferred monad *)
         let%bind () = wait_until_iteration_start next_block_tm in

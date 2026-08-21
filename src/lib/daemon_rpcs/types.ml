@@ -350,9 +350,9 @@ module Status = struct
       let ms_to_string i =
         float_of_int i |> Time_float.Span.of_ms |> Time_float.Span.to_string
       in
-      (* Time_float_unix.to_string is safe here because this is for display. *)
+      (* Time_float.to_string_utc is safe here because this is for display. *)
       let time_to_string =
-        Fn.compose Time_float_unix.to_string Block_time.to_time_exn
+        Fn.compose Time_float.to_string_utc Block_time.to_time_exn
       in
       let render conf =
         let fmt_field name op field = (name, op (Field.get field conf)) in

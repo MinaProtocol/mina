@@ -79,7 +79,7 @@ module Go_log = struct
 
   let record_to_message r =
     Logger.Message.
-      { timestamp = Time_float.of_string_with_utc_offset r.ts
+      { timestamp = Time_float_unix.of_string r.ts
       ; level = ours_of_go r.level
       ; source =
           Some

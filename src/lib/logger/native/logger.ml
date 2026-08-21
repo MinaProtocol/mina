@@ -32,7 +32,7 @@ module Time = struct
 
   let of_yojson json =
     json |> Yojson.Safe.Util.to_string
-    |> fun s -> Ok (Time_float_unix.of_string s)
+    |> fun s -> Ok (Time_float.of_string_with_utc_offset s)
 
   let pp ppf timestamp =
     (* This used to be

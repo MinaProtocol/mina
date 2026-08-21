@@ -106,9 +106,9 @@ module Make (Schema : Schema) = struct
     type t = Time_float.t
 
     let parse json =
-      Yojson.Basic.Util.to_string json |> Time_float_unix.of_string
+      Yojson.Basic.Util.to_string json |> Time_float.of_string_with_utc_offset
 
-    let serialize t = `String (Time_float_unix.to_string t)
+    let serialize t = `String (Time_float.to_string_utc t)
 
     let typ () = scalar "Time" ~coerce:serialize
   end
