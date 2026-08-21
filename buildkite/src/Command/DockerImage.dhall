@@ -32,7 +32,13 @@ let Arch = ../Constants/Arch.dhall
 
 let DebianInstallMode
     : Type
-    = < NoInstall | DownloadOnly >
+    =
+      -- Where the .deb files the image installs come from. NoInstall is for the
+      -- images that install none (base, toolchain). DownloadOnly pulls the
+      -- packaging job's debs out of the CI cache, which is what a step needs
+      -- when the debs were built on another agent. FromLocalBuild takes them
+      -- off this agent's disk, for a step that built them itself.
+      < NoInstall | DownloadOnly | FromLocalBuild >
 
 let ciDockerCacheMountedRoot = "/var/storagebox/docker-cache"
 
@@ -120,7 +126,10 @@ let stepLabel =
                                                                                                         spec.build_flags} ${Arch.capitalName
                                                                                                                               spec.arch}"
 
-let generateStep =
+let releaseCommand =
+    -- What building one image actually runs, with no buildkite step around it.
+    -- A step of its own is one way to schedule this; running several of them in
+    -- a row on one agent is another.
           \(spec : ReleaseSpec.Type)
       ->  let exportMinaDebCmd =
                 "export MINA_DEB_CODENAME=${DebianVersions.lowerName
@@ -136,6 +145,8 @@ let generateStep =
                       " && ROOT=${spec.deb_root_folder} LOCAL_DEB_FOLDER=\"dockerfiles\" ./buildkite/scripts/debian/read_all_from_cache.sh "
                   , NoInstall =
                       " && echo Skipping local debian package download "
+                  , FromLocalBuild =
+                      " && ./buildkite/scripts/debian/stage_local_debs.sh "
                   }
                   spec.deb_install_mode
 
@@ -284,28 +295,28 @@ let generateStep =
                 ++  imageNameArg
                 ++  maybeSaveToCacheArg
 
-          let commands =
-                [ Cmd.run
-                    (     exportMinaDebCmd
-                      ++  " && "
-                      ++  exportBranchNameCmd
-                      ++  " && "
-                      ++  pruneDockerImages
-                      ++  maybeFetchLocalDebs
-                      ++  " && source ./buildkite/scripts/export-git-env-vars.sh "
-                      ++  " && "
-                      ++  maybeLoadBaseImage
-                      ++  buildDockerCmd
-                      ++  maybeVerify
-                    )
-                ]
+          in  Cmd.run
+                (     exportMinaDebCmd
+                  ++  " && "
+                  ++  exportBranchNameCmd
+                  ++  " && "
+                  ++  pruneDockerImages
+                  ++  maybeFetchLocalDebs
+                  ++  " && source ./buildkite/scripts/export-git-env-vars.sh "
+                  ++  " && "
+                  ++  maybeLoadBaseImage
+                  ++  buildDockerCmd
+                  ++  maybeVerify
+                )
 
-          let target =
+let generateStep =
+          \(spec : ReleaseSpec.Type)
+      ->  let target =
                 merge { Arm64 = Size.XLarge, Amd64 = Size.XLarge } spec.arch
 
           in  Command.build
                 Command.Config::{
-                , commands = commands
+                , commands = [ releaseCommand spec ]
                 , label = "${stepLabel spec}"
                 , key = "${stepKey spec}"
                 , target = target
@@ -315,6 +326,7 @@ let generateStep =
                 }
 
 in  { generateStep = generateStep
+    , releaseCommand = releaseCommand
     , DebianInstallMode = DebianInstallMode
     , ReleaseSpec = ReleaseSpec
     , stepKey = stepKey

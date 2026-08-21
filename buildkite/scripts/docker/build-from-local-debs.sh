@@ -78,24 +78,11 @@ if [[ -z "$DOCKER_REGISTRY_ARG" ]]; then
   exit 1
 fi
 
-# scripts/docker/build.sh picks up every *.deb sitting in the docker build
-# context and stages it under _debs/, which the Dockerfiles COPY into the image
-# for install-mina-debs.sh -- no apt repo involved.
+# The docker build context. Must match the directory stage_local_debs.sh copies
+# into, because the legacy packages below land next to the freshly built ones.
 DEB_STAGE="dockerfiles"
 
-echo "--- Staging locally built debian packages into ${DEB_STAGE}"
-shopt -s nullglob
-built_debs=(_build/*.deb)
-shopt -u nullglob
-
-if [[ "${#built_debs[@]}" -eq 0 ]]; then
-  echo "No .deb files found in _build/. The debian build step must run first." >&2
-  exit 1
-fi
-
-echo "Staging ${#built_debs[@]} locally built .deb file(s):"
-printf '  %s\n' "${built_debs[@]}"
-cp "${built_debs[@]}" "${DEB_STAGE}/"
+./buildkite/scripts/debian/stage_local_debs.sh
 
 # Only images that install a package from before the fork need this: it is a
 # released artifact pinned at --legacy-version, not something this build can

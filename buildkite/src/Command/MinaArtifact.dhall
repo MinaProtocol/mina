@@ -8,6 +8,12 @@ let List/map = Prelude.List.map
 
 let List/concatMap = Prelude.List.concatMap
 
+let List/filter = Prelude.List.filter
+
+let Natural/equal = Prelude.Natural.equal
+
+let Natural/enumerate = Prelude.Natural.enumerate
+
 let Optional/default = Prelude.Optional.default
 
 let Text/concatSep = Prelude.Text.concatSep
@@ -27,6 +33,8 @@ let JobSpec = ../Pipeline/JobSpec.dhall
 let Size = ./Size.dhall
 
 let DockerImage = ./DockerImage.dhall
+
+let DockerLogin = ./DockerLogin/Type.dhall
 
 let DebianVersions = ../Constants/DebianVersions.dhall
 
@@ -758,8 +766,8 @@ let docker_step
                 }
                 entry.service
 
-let docker_commands
-    : PackagingSpec.Type -> List Command.Type
+let docker_release_specs
+    : PackagingSpec.Type -> List DockerImage.ReleaseSpec.Type
     =     \(spec : PackagingSpec.Type)
       ->  let services =
                 List/concatMap
@@ -768,20 +776,64 @@ let docker_commands
                   expandDockerServices
                   spec.artifacts
 
-          let flattened_docker_steps =
-                List/concatMap
-                  DockerService
-                  DockerImage.ReleaseSpec.Type
-                  (\(e : DockerService) -> docker_step e spec)
-                  services
-
-          in  List/map
+          in  List/concatMap
+                DockerService
                 DockerImage.ReleaseSpec.Type
-                Command.Type
-                (     \(s : DockerImage.ReleaseSpec.Type)
-                  ->  DockerImage.generateStep s
-                )
-                flattened_docker_steps
+                (\(e : DockerService) -> docker_step e spec)
+                services
+
+let docker_commands
+    : PackagingSpec.Type -> List Command.Type
+    =     \(spec : PackagingSpec.Type)
+      ->  List/map
+            DockerImage.ReleaseSpec.Type
+            Command.Type
+            (\(s : DockerImage.ReleaseSpec.Type) -> DockerImage.generateStep s)
+            (docker_release_specs spec)
+
+let assembledDockerCommands
+    : PackagingSpec.Type -> List Cmd.Type
+    =
+      -- The same image builds as docker_commands, but as plain commands for one
+      -- agent instead of one step each.
+      --
+      -- Two things change when the fan-out goes away. The debs are on local
+      -- disk already, so no step reads them back out of the cache. And the
+      -- order that depends_on carried has to be produced here, because commands
+      -- in one step run in the order they are listed: every image is built
+      -- after the images it is FROM, which is what Docker.buildTier says.
+          \(spec : PackagingSpec.Type)
+      ->  let Spec = DockerImage.ReleaseSpec.Type
+
+          let localSpecs =
+                List/map
+                  Spec
+                  Spec
+                  (     \(s : Spec)
+                    ->      s
+                        //  { deb_install_mode =
+                                DockerImage.DebianInstallMode.FromLocalBuild
+                            }
+                  )
+                  (docker_release_specs spec)
+
+          let ofTier =
+                    \(tier : Natural)
+                ->  List/filter
+                      Spec
+                      (     \(s : Spec)
+                        ->  Natural/equal (Docker.buildTier s.service) tier
+                      )
+                      localSpecs
+
+          let ordered =
+                List/concatMap
+                  Natural
+                  Spec
+                  ofTier
+                  (Natural/enumerate (Docker.maxBuildTier + 1))
+
+          in  List/map Spec Cmd.Type DockerImage.releaseCommand ordered
 
 let pipelineBuilder
     : PackagingSpec.Type -> List Command.Type -> Pipeline.Config.Type
@@ -799,6 +851,43 @@ let pipelineBuilder
             }
           , steps = steps
           }
+
+let assembleCommands
+    : PackagingSpec.Type -> List Cmd.Type
+    =
+      -- Compile, package and build every image, in that order, on one agent.
+      -- Nothing goes through the CI cache, because nothing has to: what one
+      -- part leaves on disk is what the next part reads. The fan-out instead
+      -- writes the build tree once, reads it back once, writes the deb set
+      -- once, and reads it back once per image.
+          \(spec : PackagingSpec.Type)
+      ->  artifactCommands spec # assembledDockerCommands spec
+
+let assemble
+    : PackagingSpec.Type -> Command.Type
+    =     \(spec : PackagingSpec.Type)
+      ->  Command.build
+            Command.Config::{
+            , commands = assembleCommands spec
+            , label = "Assemble: ${labelSuffix spec}"
+            , key = "assemble"
+            , target = Size.XLarge
+            , docker_login = Some DockerLogin::{=}
+            , if_ = spec.if_
+            }
+
+let assembledPipeline
+    : PackagingSpec.Type -> Pipeline.Config.Type
+    =
+      -- One job, one step, one agent. Opt-in: the fan-out stays the default for
+      -- nightly and for release, where the parallelism and the per-image retry
+      -- are worth the cache traffic.
+      --
+      -- The spec has to be self-contained, because there is no depends_on to
+      -- pull a missing image in from another job: an artifact list holding
+      -- Daemon or DaemonProfiled must hold DaemonGeneric too, and one holding
+      -- Rosetta gets RosettaGeneric on its own (see expandDockerServices).
+      \(spec : PackagingSpec.Type) -> pipelineBuilder spec [ assemble spec ]
 
 let onlyDebianPipeline
     -- The one job that still compiles AND packages in a single step
@@ -848,6 +937,9 @@ let packagePipeline
 in  { onlyDebianPipeline = onlyDebianPipeline
     , appsPipeline = appsPipeline
     , packagePipeline = packagePipeline
+    , assembledPipeline = assembledPipeline
+    , assemble = assemble
+    , assembleCommands = assembleCommands
     , PackagingSpec = PackagingSpec
     , AppsSpec = AppsSpec
     , labelSuffix = labelSuffix
