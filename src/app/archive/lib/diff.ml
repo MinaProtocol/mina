@@ -29,6 +29,20 @@ module Transition_frontier = struct
     | Root_transitioned of
         Transition_frontier.Diff.Root_transition.Lite.Stable.Latest.t
     | Bootstrap of { lost_blocks : State_hash.Stable.Latest.t list }
+    | Hardfork_config of { config_json : string }
+        (** The runtime configuration a daemon generated for a hard fork,
+            verbatim, as JSON.
+
+            Its [fork] stanza is the fork block's identity -- state hash,
+            blockchain length and global slot -- and its ledger stanzas carry
+            the hashes that locate and verify the genesis ledger. That is
+            everything the archive needs to settle the fork boundary, so this
+            is the only message the hand-over requires.
+
+            Sent by whichever daemon is running: once when the pre-fork daemon
+            generates the configuration, then repeatedly on a slow heartbeat,
+            because a single lost message would otherwise leave the archive
+            with no record of the fork at all. *)
   [@@deriving bin_io_unversioned]
 end
 
