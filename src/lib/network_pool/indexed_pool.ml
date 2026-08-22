@@ -560,7 +560,7 @@ let run : type a e.
 let remove_with_dependents_exn :
        Transaction_hash.User_command_with_valid_signature.t
     -> Sender_local_state.t ref
-    -> ( Transaction_hash.User_command_with_valid_signature.t Sequence.t
+    -> ( Transaction_hash.User_command_with_valid_signature.t list
        , Update.single
        , _ )
        Writer_result.t =
@@ -621,7 +621,7 @@ let remove_with_dependents_exn :
             assert (Currency.Amount.(equal reserved_currency' zero)) ;
             None ) )
     } ;
-  F_sequence.to_seq drop_queue
+  F_sequence.to_list drop_queue
 
 let run' t cmd x =
   run t
@@ -645,11 +645,13 @@ let drop_until_sufficient_balance :
     -> Currency.Amount.t
     -> Transaction_hash.User_command_with_valid_signature.t F_sequence.t
        * Currency.Amount.t
-       * Transaction_hash.User_command_with_valid_signature.t Sequence.t =
+       * Transaction_hash.User_command_with_valid_signature.t list =
  fun (queue, currency_reserved) current_balance ->
+  (* [dropped_so_far] is built up in reverse and flipped once on the way out,
+     so that each drop costs O(1) rather than O(dropped so far). *)
   let rec go queue' currency_reserved' dropped_so_far =
     if Currency.Amount.(currency_reserved' <= current_balance) then
-      (queue', currency_reserved', dropped_so_far)
+      (queue', currency_reserved', List.rev dropped_so_far)
     else
       let daeh, liat =
         Option.value_exn
@@ -661,9 +663,9 @@ let drop_until_sufficient_balance :
       let consumed = Option.value_exn (currency_consumed liat) in
       go daeh
         (Option.value_exn Currency.Amount.(currency_reserved' - consumed))
-        (Sequence.append dropped_so_far @@ Sequence.singleton liat)
+        (liat :: dropped_so_far)
   in
-  go queue currency_reserved Sequence.empty
+  go queue currency_reserved []
 
 (* Iterate over commands in the pool, removing them if they require too much
    currency or have too low of a nonce. An argument is provided to instruct
@@ -674,7 +676,7 @@ let revalidate :
     -> logger:Logger.t
     -> [ `Entire_pool | `Subset of Account_id.Set.t ]
     -> (Account_id.t -> Account.t)
-    -> t * Transaction_hash.User_command_with_valid_signature.t Sequence.t =
+    -> t * Transaction_hash.User_command_with_valid_signature.t list =
  fun t_initial ~logger scope f ->
   let requires_revalidation =
     match scope with
@@ -683,167 +685,176 @@ let revalidate :
     | `Subset subset ->
         Set.mem subset
   in
-  Map.fold t_initial.all_by_sender ~init:(t_initial, Sequence.empty)
-    ~f:(fun
-        ~key:sender
-        ~data:(queue, currency_reserved)
-        ((t, dropped_acc) as acc)
-      ->
-      if not (requires_revalidation sender) then acc
-      else
-        let account : Account.t = f sender in
-        let current_balance =
-          Currency.Balance.to_amount
-            (Account.liquid_balance_at_slot
-               ~global_slot:(global_slot_since_genesis t_initial.config)
-               account )
-        in
-        [%log debug]
-          "Revalidating account $account in transaction pool ($account_nonce, \
-           $account_balance)"
-          ~metadata:
-            [ ( "account"
-              , `String (Sexp.to_string @@ Account_id.sexp_of_t sender) )
-            ; ("account_nonce", `Int (Account_nonce.to_int account.nonce))
-            ; ( "account_balance"
-              , `String (Currency.Amount.to_mina_string current_balance) )
-            ] ;
-        let first_cmd = F_sequence.head_exn queue in
-        let first_nonce =
-          first_cmd
-          |> Transaction_hash.User_command_with_valid_signature.command
-          |> User_command.applicable_at_nonce
-        in
-        if
-          not
-            ( Account.has_permission_to_send account
-            && Account.has_permission_to_increment_nonce account )
-        then (
-          [%log debug]
-            "Account no longer has permission to send; dropping queue" ;
-          let dropped, t_updated = remove_with_dependents_exn' t first_cmd in
-          (t_updated, Sequence.append dropped_acc dropped) )
-        else if Account_nonce.(account.nonce < first_nonce) then (
-          [%log debug]
-            "Current account nonce precedes first nonce in queue; dropping \
-             queue" ;
-          let dropped, t_updated = remove_with_dependents_exn' t first_cmd in
-          (t_updated, Sequence.append dropped_acc dropped) )
+  (* As in [drop_until_sufficient_balance], the accumulator is kept reversed
+     and flipped once at the end. *)
+  let t, dropped_rev =
+    Map.fold t_initial.all_by_sender ~init:(t_initial, [])
+      ~f:(fun
+          ~key:sender
+          ~data:(queue, currency_reserved)
+          ((t, dropped_acc) as acc)
+        ->
+        if not (requires_revalidation sender) then acc
         else
-          (* current_nonce >= first_nonce *)
-          let first_applicable_nonce_index =
-            F_sequence.findi queue ~f:(fun cmd' ->
-                let nonce =
-                  Transaction_hash.User_command_with_valid_signature.command
-                    cmd'
-                  |> User_command.applicable_at_nonce
-                in
-                Account_nonce.equal nonce account.nonce )
-            |> Option.value ~default:(F_sequence.length queue)
+          let account : Account.t = f sender in
+          let current_balance =
+            Currency.Balance.to_amount
+              (Account.liquid_balance_at_slot
+                 ~global_slot:(global_slot_since_genesis t_initial.config)
+                 account )
           in
           [%log debug]
-            "Current account nonce succeeds first nonce in queue; splitting \
-             queue at $index"
-            ~metadata:[ ("index", `Int first_applicable_nonce_index) ] ;
-          let dropped_for_nonce, retained_for_nonce =
-            F_sequence.split_at queue first_applicable_nonce_index
+            "Revalidating account $account in transaction pool \
+             ($account_nonce, $account_balance)"
+            ~metadata:
+              [ ( "account"
+                , `String (Sexp.to_string @@ Account_id.sexp_of_t sender) )
+              ; ("account_nonce", `Int (Account_nonce.to_int account.nonce))
+              ; ( "account_balance"
+                , `String (Currency.Amount.to_mina_string current_balance) )
+              ] ;
+          let first_cmd = F_sequence.head_exn queue in
+          let first_nonce =
+            first_cmd
+            |> Transaction_hash.User_command_with_valid_signature.command
+            |> User_command.applicable_at_nonce
           in
-          let currency_reserved_partially_updated =
-            F_sequence.foldl
-              (fun c cmd ->
-                Option.value_exn
-                  Currency.Amount.(c - Option.value_exn (currency_consumed cmd)) )
-              currency_reserved dropped_for_nonce
-          in
-          let keep_queue, currency_reserved_updated, dropped_for_balance =
-            drop_until_sufficient_balance
-              (retained_for_nonce, currency_reserved_partially_updated)
-              current_balance
-          in
-          let to_drop =
-            Sequence.append
-              (F_sequence.to_seq dropped_for_nonce)
-              dropped_for_balance
-          in
-          let keeping_prefix = F_sequence.is_empty dropped_for_nonce in
-          let keeping_suffix = Sequence.is_empty dropped_for_balance in
-          (* t with all_by_sender and applicable_by_fee fields updated *)
-          let t_partially_updated =
-            match F_sequence.uncons keep_queue with
-            | _ when keeping_prefix && keeping_suffix ->
-                (* Nothing dropped, nothing needs to be updated *)
-                t
-            | None ->
-                (* We drop the entire queue, first element needs to be removed from
-                   applicable_by_fee *)
-                let t' = remove_applicable_exn t first_cmd in
-                { t' with all_by_sender = Map.remove t'.all_by_sender sender }
-            | Some _ when keeping_prefix ->
-                (* We drop only transactions from the end of queue, keeping
-                   the head untouched, no need to update applicable_by_fee *)
-                { t with
-                  all_by_sender =
-                    Map.set t.all_by_sender ~key:sender
-                      ~data:(keep_queue, currency_reserved_updated)
-                }
-            | Some (first_kept, _) ->
-                (* We need to replace old queue head with the new queue head
-                   in applicable_by_fee *)
-                let first_kept_unchecked =
-                  Transaction_hash.User_command_with_valid_signature.command
-                    first_kept
-                in
-                let t' = remove_applicable_exn t first_cmd in
-                { t' with
-                  all_by_sender =
-                    Map.set t'.all_by_sender ~key:sender
-                      ~data:(keep_queue, currency_reserved_updated)
-                ; applicable_by_fee =
-                    Applicable_by_fee.insert t'.applicable_by_fee
-                      (User_command.fee_per_wu first_kept_unchecked)
+          if
+            not
+              ( Account.has_permission_to_send account
+              && Account.has_permission_to_increment_nonce account )
+          then (
+            [%log debug]
+              "Account no longer has permission to send; dropping queue" ;
+            let dropped, t_updated = remove_with_dependents_exn' t first_cmd in
+            (t_updated, List.rev_append dropped dropped_acc) )
+          else if Account_nonce.(account.nonce < first_nonce) then (
+            [%log debug]
+              "Current account nonce precedes first nonce in queue; dropping \
+               queue" ;
+            let dropped, t_updated = remove_with_dependents_exn' t first_cmd in
+            (t_updated, List.rev_append dropped dropped_acc) )
+          else
+            (* current_nonce >= first_nonce *)
+            let first_applicable_nonce_index =
+              F_sequence.findi queue ~f:(fun cmd' ->
+                  let nonce =
+                    Transaction_hash.User_command_with_valid_signature.command
+                      cmd'
+                    |> User_command.applicable_at_nonce
+                  in
+                  Account_nonce.equal nonce account.nonce )
+              |> Option.value ~default:(F_sequence.length queue)
+            in
+            [%log debug]
+              "Current account nonce succeeds first nonce in queue; splitting \
+               queue at $index"
+              ~metadata:[ ("index", `Int first_applicable_nonce_index) ] ;
+            let dropped_for_nonce, retained_for_nonce =
+              F_sequence.split_at queue first_applicable_nonce_index
+            in
+            let currency_reserved_partially_updated =
+              F_sequence.foldl
+                (fun c cmd ->
+                  Option.value_exn
+                    Currency.Amount.(
+                      c - Option.value_exn (currency_consumed cmd) ) )
+                currency_reserved dropped_for_nonce
+            in
+            let keep_queue, currency_reserved_updated, dropped_for_balance =
+              drop_until_sufficient_balance
+                (retained_for_nonce, currency_reserved_partially_updated)
+                current_balance
+            in
+            let to_drop =
+              F_sequence.to_list dropped_for_nonce @ dropped_for_balance
+            in
+            let keeping_prefix = F_sequence.is_empty dropped_for_nonce in
+            let keeping_suffix = List.is_empty dropped_for_balance in
+            (* t with all_by_sender and applicable_by_fee fields updated *)
+            let t_partially_updated =
+              match F_sequence.uncons keep_queue with
+              | _ when keeping_prefix && keeping_suffix ->
+                  (* Nothing dropped, nothing needs to be updated *)
+                  t
+              | None ->
+                  (* We drop the entire queue, first element needs to be removed from
+                     applicable_by_fee *)
+                  let t' = remove_applicable_exn t first_cmd in
+                  { t' with all_by_sender = Map.remove t'.all_by_sender sender }
+              | Some _ when keeping_prefix ->
+                  (* We drop only transactions from the end of queue, keeping
+                     the head untouched, no need to update applicable_by_fee *)
+                  { t with
+                    all_by_sender =
+                      Map.set t.all_by_sender ~key:sender
+                        ~data:(keep_queue, currency_reserved_updated)
+                  }
+              | Some (first_kept, _) ->
+                  (* We need to replace old queue head with the new queue head
+                     in applicable_by_fee *)
+                  let first_kept_unchecked =
+                    Transaction_hash.User_command_with_valid_signature.command
                       first_kept
-                }
-          in
-          let t_updated =
-            Sequence.fold ~init:t_partially_updated
-              ~f:remove_all_by_fee_and_hash_and_expiration_exn to_drop
-          in
-          (t_updated, Sequence.append dropped_acc to_drop) )
+                  in
+                  let t' = remove_applicable_exn t first_cmd in
+                  { t' with
+                    all_by_sender =
+                      Map.set t'.all_by_sender ~key:sender
+                        ~data:(keep_queue, currency_reserved_updated)
+                  ; applicable_by_fee =
+                      Applicable_by_fee.insert t'.applicable_by_fee
+                        (User_command.fee_per_wu first_kept_unchecked)
+                        first_kept
+                  }
+            in
+            let t_updated =
+              List.fold to_drop ~init:t_partially_updated
+                ~f:remove_all_by_fee_and_hash_and_expiration_exn
+            in
+            (t_updated, List.rev_append to_drop dropped_acc) )
+  in
+  (t, List.rev dropped_rev)
 
 let expired_by_global_slot (t : t) :
-    Transaction_hash.User_command_with_valid_signature.t Sequence.t =
+    Transaction_hash.User_command_with_valid_signature.t list =
   let global_slot_since_genesis = global_slot_since_genesis t.config in
   let expired, _, _ =
     Map.split t.transactions_with_expiration global_slot_since_genesis
   in
-  Map.to_sequence expired |> Sequence.map ~f:snd
-  |> Sequence.bind
-       ~f:Transaction_hash.User_command_with_valid_signature.Set.to_sequence
+  Map.data expired
+  |> List.concat_map
+       ~f:
+         (Fn.compose Sequence.to_list
+            Transaction_hash.User_command_with_valid_signature.Set.to_sequence )
 
-let expired (t : t) :
-    Transaction_hash.User_command_with_valid_signature.t Sequence.t =
-  [ expired_by_global_slot t ] |> Sequence.of_list |> Sequence.concat
+let expired (t : t) : Transaction_hash.User_command_with_valid_signature.t list
+    =
+  List.concat [ expired_by_global_slot t ]
 
 let remove_expired t :
-    Transaction_hash.User_command_with_valid_signature.t Sequence.t * t =
-  Sequence.fold (expired t) ~init:(Sequence.empty, t) ~f:(fun acc cmd ->
-      let dropped_acc, t = acc in
-      (*[cmd] would not be in [t] if it depended on an expired transaction already handled*)
-      if
-        member t
-          (Transaction_hash.User_command_with_valid_signature.transaction_hash
-             cmd )
-      then
-        let removed, t' = remove_with_dependents_exn' t cmd in
-        (Sequence.append dropped_acc removed, t')
-      else acc )
+    Transaction_hash.User_command_with_valid_signature.t list * t =
+  let dropped_rev, t =
+    List.fold (expired t) ~init:([], t) ~f:(fun acc cmd ->
+        let dropped_acc, t = acc in
+        (*[cmd] would not be in [t] if it depended on an expired transaction already handled*)
+        if
+          member t
+            (Transaction_hash.User_command_with_valid_signature.transaction_hash
+               cmd )
+        then
+          let removed, t' = remove_with_dependents_exn' t cmd in
+          (List.rev_append removed dropped_acc, t')
+        else acc )
+  in
+  (List.rev dropped_rev, t)
 
 let remove_lowest_fee :
-    t -> Transaction_hash.User_command_with_valid_signature.t Sequence.t * t =
+    t -> Transaction_hash.User_command_with_valid_signature.t list * t =
  fun t ->
   match Map.min_elt t.all_by_fee with
   | None ->
-      (Sequence.empty, t)
+      ([], t)
   | Some (_min_fee, min_fee_set) ->
       remove_with_dependents_exn' t
       @@ Transaction_hash.User_command_with_valid_signature.Set.min_elt_exn
@@ -888,7 +899,7 @@ module Add_from_gossip_exn (M : Writer_result.S) = struct
       -> Currency.Amount.t
       -> Sender_local_state.t ref
       -> ( Transaction_hash.User_command_with_valid_signature.t
-           * Transaction_hash.User_command_with_valid_signature.t Sequence.t
+           * Transaction_hash.User_command_with_valid_signature.t list
          , Update.single
          , Command_error.t )
          M.t =
@@ -963,7 +974,7 @@ module Add_from_gossip_exn (M : Writer_result.S) = struct
         in
         by_sender :=
           { !by_sender with data = Some (F_sequence.singleton cmd, consumed) } ;
-        (cmd, Sequence.empty)
+        (cmd, [])
     | Some (queued_cmds, reserved_currency) ->
         assert (not @@ F_sequence.is_empty queued_cmds) ;
         (* C1/C1b *)
@@ -1003,7 +1014,7 @@ module Add_from_gossip_exn (M : Writer_result.S) = struct
               )
           in
           by_sender := { !by_sender with data = Some new_state } ;
-          (cmd, Sequence.empty) )
+          (cmd, []) )
         else if Account_nonce.equal queue_applicable_at_nonce current_nonce then (
           (* we're replacing a command *)
           let%bind () =
@@ -1058,20 +1069,27 @@ module Add_from_gossip_exn (M : Writer_result.S) = struct
           in
           (* check remove_exn dropped the right things *)
           assert (
-            [%equal:
-              Transaction_hash.User_command_with_valid_signature.t Sequence.t]
+            [%equal: Transaction_hash.User_command_with_valid_signature.t list]
               dropped
-              (F_sequence.to_seq drop_queue) ) ;
+              (F_sequence.to_list drop_queue) ) ;
           (* Add the new transaction *)
           let%bind cmd, _ =
             let%map v, dropped' =
               add_from_gossip_exn ~config cmd current_nonce balance by_sender
             in
             (* We've already removed them, so this should always be empty. *)
-            assert (Sequence.is_empty dropped') ;
+            assert (List.is_empty dropped') ;
             (v, dropped)
           in
-          let drop_head, drop_tail = Option.value_exn (Sequence.next dropped) in
+          let drop_head, drop_tail =
+            match dropped with
+            | [] ->
+                (* [remove_with_dependents_exn] above asserts that the queue it
+                   dropped was non-empty. *)
+                assert false
+            | drop_head :: drop_tail ->
+                (drop_head, drop_tail)
+          in
           let increment =
             Option.value_exn Currency.Fee.(fee - User_command.fee to_drop)
           in
@@ -1081,12 +1099,12 @@ module Add_from_gossip_exn (M : Writer_result.S) = struct
           *)
           let%bind increment, dropped' =
             let rec go increment dropped dropped' current_nonce : _ M.t =
-              match (Sequence.next dropped, dropped') with
-              | None, Some dropped' ->
+              match (dropped, dropped') with
+              | [], Some dropped' ->
                   return (increment, dropped')
-              | None, None ->
-                  return (increment, Sequence.empty)
-              | Some (cmd, dropped), Some _ -> (
+              | [], None ->
+                  return (increment, [])
+              | cmd :: dropped, Some _ -> (
                   let cmd_unchecked =
                     Transaction_hash.User_command_with_valid_signature.command
                       cmd
@@ -1100,14 +1118,14 @@ module Add_from_gossip_exn (M : Writer_result.S) = struct
                         (Insufficient_replace_fee
                            (`Replace_fee replace_fee, increment) )
                       |> M.of_result )
-              | Some (cmd, dropped'), None ->
+              | cmd :: dropped', None ->
                   let current_nonce = Account_nonce.succ current_nonce in
                   let by_sender_pre = !by_sender in
                   M.catch
                     (add_from_gossip_exn ~config cmd current_nonce balance
                        by_sender ) ~f:(function
                     | Ok ((_v, dropped_), ups) ->
-                        assert (Sequence.is_empty dropped_) ;
+                        assert (List.is_empty dropped_) ;
                         let%bind () = M.write_all ups in
                         go increment dropped' None current_nonce
                     | Error _err ->
@@ -1127,7 +1145,7 @@ module Add_from_gossip_exn (M : Writer_result.S) = struct
             |> M.of_result
             (* C3 *)
           in
-          (cmd, Sequence.(append (return drop_head) dropped')) )
+          (cmd, drop_head :: dropped') )
         else
           (*Invalid nonce or duplicate transaction got in- either way error*)
           M.of_result

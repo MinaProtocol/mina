@@ -58,6 +58,12 @@ val size : t -> int
 (* The least fee per weight unit of all transactions in the transaction pool *)
 val min_fee : t -> Currency.Fee_rate.t option
 
+(** The applicable commands, highest fee per weight unit first.
+
+    This is the one sequence in the interface that stays lazy: the block
+    producer takes only as long a prefix as the staged ledger has room for, so
+    forcing it would walk the whole pool on every block. Everything else here
+    returns a list. *)
 val transactions :
      logger:Logger.t
   -> t
@@ -66,11 +72,11 @@ val transactions :
 (** Remove the command from the pool with the lowest fee per wu,
     along with any others from the same account with higher nonces. *)
 val remove_lowest_fee :
-  t -> Transaction_hash.User_command_with_valid_signature.t Sequence.t * t
+  t -> Transaction_hash.User_command_with_valid_signature.t list * t
 
 (** Remove all the user commands that are expired. (Valid-until < Current-global-slot) *)
 val remove_expired :
-  t -> Transaction_hash.User_command_with_valid_signature.t Sequence.t * t
+  t -> Transaction_hash.User_command_with_valid_signature.t list * t
 
 (** Get the applicable command in the pool with the highest fee per wu *)
 val get_highest_fee :
@@ -89,7 +95,7 @@ val add_from_gossip_exn :
   -> Currency.Amount.t
   -> ( Transaction_hash.User_command_with_valid_signature.t
        * t
-       * Transaction_hash.User_command_with_valid_signature.t Sequence.t
+       * Transaction_hash.User_command_with_valid_signature.t list
      , Command_error.t )
      Result.t
 (** Returns the commands dropped as a result of adding the command, which will
@@ -129,7 +135,7 @@ val revalidate :
   -> logger:Logger.t
   -> [ `Entire_pool | `Subset of Account_id.Set.t ]
   -> (Account_id.t -> Account.t) (** Lookup an account in the new ledger *)
-  -> t * Transaction_hash.User_command_with_valid_signature.t Sequence.t
+  -> t * Transaction_hash.User_command_with_valid_signature.t list
 
 (** Get the global slot since genesis according to the pool's time controller. *)
 val global_slot_since_genesis : t -> Mina_numbers.Global_slot_since_genesis.t

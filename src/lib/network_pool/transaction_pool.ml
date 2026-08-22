@@ -459,7 +459,7 @@ struct
         the first match consumed by the emptiness test and then missing from
         the list. *)
     let remove_locally_generated t cmds =
-      Sequence.filter cmds ~f:(fun cmd ->
+      List.filter cmds ~f:(fun cmd ->
           let find_remove_bool tbl =
             Locally_generated.find_and_remove tbl cmd |> Option.is_some
           in
@@ -472,22 +472,22 @@ struct
           (* Nothing should be in both tables. *)
           assert (not (dropped_committed && dropped_uncommitted)) ;
           dropped_committed || dropped_uncommitted )
-      |> Sequence.to_list
 
     let drop_until_below_max_size :
            pool_max_size:int
         -> Indexed_pool.t
         -> Indexed_pool.t
-           * Transaction_hash.User_command_with_valid_signature.t Sequence.t =
+           * Transaction_hash.User_command_with_valid_signature.t list =
      fun ~pool_max_size pool ->
+      (* [dropped] is accumulated in reverse and flipped once on the way out. *)
       let rec go pool' dropped =
         if Indexed_pool.size pool' > pool_max_size then (
           let dropped', pool'' = Indexed_pool.remove_lowest_fee pool' in
-          assert (not (Sequence.is_empty dropped')) ;
-          go pool'' @@ Sequence.append dropped dropped' )
-        else (pool', dropped)
+          assert (not (List.is_empty dropped')) ;
+          go pool'' @@ List.rev_append dropped' dropped )
+        else (pool', List.rev dropped)
       in
-      go pool @@ Sequence.empty
+      go pool []
 
     let has_sufficient_fee ~pool_max_size pool cmd : bool =
       match Indexed_pool.min_fee pool with
@@ -617,46 +617,52 @@ struct
           ]
         "Diff: removed: $removed added: $added from best tip" ;
       let pool', dropped_backtrack =
-        List.fold (List.rev removed_commands) ~init:(t.pool, Sequence.empty)
-          ~f:(fun (pool, dropped_so_far) unhashed_cmd ->
-            let cmd =
-              Transaction_hash.User_command_with_valid_signature.create
-                unhashed_cmd.data
-            in
-            ( match
-                Locally_generated.find_and_remove t.locally_generated_committed
-                  cmd
-              with
-            | None ->
-                ()
-            | Some time_added ->
-                [%log' info t.logger]
-                  "Locally generated command $cmd committed in a block!"
-                  ~metadata:
-                    [ ( "cmd"
-                      , With_status.to_yojson User_command.Valid.to_yojson
-                          unhashed_cmd )
-                    ] ;
-                Locally_generated.add_exn t.locally_generated_uncommitted
-                  ~key:cmd ~data:time_added ) ;
-            let pool', dropped_seq =
-              match cmd |> Indexed_pool.add_from_backtrack pool with
-              | Error e ->
-                  let error_str, metadata = indexed_pool_error_log_info e in
-                  log_indexed_pool_error error_str ~metadata cmd ;
-                  (pool, Sequence.empty)
-              | Ok indexed_pool ->
-                  drop_until_below_max_size ~pool_max_size indexed_pool
-            in
-            (pool', Sequence.append dropped_so_far dropped_seq) )
+        (* Accumulated in reverse and flipped once below: appending each chunk
+           with [@] instead would be quadratic in the number of backtracked
+           commands. *)
+        let pool', dropped_rev =
+          List.fold (List.rev removed_commands) ~init:(t.pool, [])
+            ~f:(fun (pool, dropped_so_far) unhashed_cmd ->
+              let cmd =
+                Transaction_hash.User_command_with_valid_signature.create
+                  unhashed_cmd.data
+              in
+              ( match
+                  Locally_generated.find_and_remove
+                    t.locally_generated_committed cmd
+                with
+              | None ->
+                  ()
+              | Some time_added ->
+                  [%log' info t.logger]
+                    "Locally generated command $cmd committed in a block!"
+                    ~metadata:
+                      [ ( "cmd"
+                        , With_status.to_yojson User_command.Valid.to_yojson
+                            unhashed_cmd )
+                      ] ;
+                  Locally_generated.add_exn t.locally_generated_uncommitted
+                    ~key:cmd ~data:time_added ) ;
+              let pool', dropped_seq =
+                match cmd |> Indexed_pool.add_from_backtrack pool with
+                | Error e ->
+                    let error_str, metadata = indexed_pool_error_log_info e in
+                    log_indexed_pool_error error_str ~metadata cmd ;
+                    (pool, [])
+                | Ok indexed_pool ->
+                    drop_until_below_max_size ~pool_max_size indexed_pool
+              in
+              (pool', List.rev_append dropped_seq dropped_so_far) )
+        in
+        (pool', List.rev dropped_rev)
       in
-      Sequence.iter dropped_backtrack ~f:(vk_table_lift_hashed vk_table_dec) ;
+      List.iter dropped_backtrack ~f:(vk_table_lift_hashed vk_table_dec) ;
       (* Track what locally generated commands were removed from the pool
          during backtracking due to the max size constraint. *)
       let locally_generated_dropped =
-        Sequence.filter dropped_backtrack
+        List.filter dropped_backtrack
           ~f:(Locally_generated.mem t.locally_generated_uncommitted)
-        |> Sequence.to_list_rev
+        |> List.rev
       in
       if not (List.is_empty locally_generated_dropped) then
         [%log' debug t.logger]
@@ -710,8 +716,7 @@ struct
               in
               Set.add set cmd_hash )
         in
-        Sequence.to_list dropped_commands
-        |> List.partition_tf ~f:(fun cmd ->
+        List.partition_tf dropped_commands ~f:(fun cmd ->
             Set.mem command_hashes
               (Transaction_hash.User_command_with_valid_signature
                .transaction_hash cmd ) )
@@ -744,7 +749,7 @@ struct
         !"Finished handling diff. Old pool size %i, new pool size %i. Dropped \
           %i commands during backtracking to maintain max size."
         (Indexed_pool.size t.pool) (Indexed_pool.size pool'')
-        (Sequence.length dropped_backtrack) ;
+        (List.length dropped_backtrack) ;
       Mina_metrics.(
         Gauge.set Transaction_pool.pool_size
           (Float.of_int (Indexed_pool.size pool'')) ) ;
@@ -823,7 +828,7 @@ struct
                       [ ("user_command", User_command.to_yojson unchecked) ] ) ;
       (*Remove any expired user commands*)
       let expired_commands, pool = Indexed_pool.remove_expired t.pool in
-      Sequence.iter expired_commands ~f:(fun cmd ->
+      List.iter expired_commands ~f:(fun cmd ->
           [%log' debug t.logger]
             "Dropping expired user command from the pool $cmd"
             ~metadata:
@@ -929,7 +934,7 @@ struct
                        Vk_refcount_table.dec vk_table ~account_id
                          ~vk_hash:vk.hash )
                  in
-                 Sequence.iter dropped ~f:dec_vk_refcounts ;
+                 List.iter dropped ~f:dec_vk_refcounts ;
                  let dropped_locally_generated =
                    remove_locally_generated t dropped
                  in
@@ -953,7 +958,7 @@ struct
                  [%log debug]
                    !"Re-validated transaction pool after restart: dropped %i \
                      of %i previously in pool"
-                   (Sequence.length dropped) (Indexed_pool.size t.pool) ;
+                   (List.length dropped) (Indexed_pool.size t.pool) ;
                  Mina_metrics.(
                    Gauge.set Transaction_pool.pool_size
                      (Float.of_int (Indexed_pool.size new_pool)) ) ;
@@ -1348,7 +1353,7 @@ struct
                 in
                 let account = Map.find_exn fee_payer_accounts (fee_payer cmd) in
                 if already_in_pool then
-                  Ok ((cmd, pool, Sequence.empty), Command_state.Rebroadcast)
+                  Ok ((cmd, pool, []), Command_state.Rebroadcast)
                 else
                   match
                     Indexed_pool.add_from_gossip_exn pool cmd account.nonce
@@ -1380,17 +1385,14 @@ struct
         let dropped_for_add =
           List.filter_map add_results ~f:(function
             | Ok (_, dropped, Command_state.New_command) ->
-                Some (Sequence.to_list dropped)
+                Some dropped
             | Ok (_, _, Command_state.Rebroadcast) | Error _ ->
                 None )
           |> List.concat
         in
         (* drop commands from the pool to retain max size *)
         let pool, dropped_for_size =
-          let pool, dropped =
-            drop_until_below_max_size pool ~pool_max_size:t.config.pool_max_size
-          in
-          (pool, Sequence.to_list dropped)
+          drop_until_below_max_size pool ~pool_max_size:t.config.pool_max_size
         in
         (* handle drops of locally generated commands *)
         let all_dropped_cmds = dropped_for_add @ dropped_for_size in
@@ -2713,8 +2715,9 @@ let%test_module _ =
        entry, and the listing that follows then re-runs the predicate and finds
        that entry already gone. Pin both halves of the contract -- everything
        removed is reported, and nothing is left behind. *)
-    let%test_unit "removing locally generated commands reports every one of \
-                   them (user cmds)" =
+    let%test_unit
+        "removing locally generated commands reports every one of them (user \
+         cmds)" =
       Thread_safe.block_on_async_exn (fun () ->
           let%bind t = setup_test () in
           let%bind _ = add_commands t independent_cmds in
@@ -2726,8 +2729,7 @@ let%test_module _ =
           (* Guards the set comparison below against passing vacuously. *)
           assert (List.length hashed > 1) ;
           let reported =
-            Test.Resource_pool.remove_locally_generated t.txn_pool
-              (Sequence.of_list hashed)
+            Test.Resource_pool.remove_locally_generated t.txn_pool hashed
           in
           let hashes cmds =
             List.map cmds
@@ -2860,8 +2862,9 @@ let%test_module _ =
       Hashtbl.clear t.account_id_to_vks ;
       Hashtbl.clear t.vk_to_account_ids
 
-    let%test_unit "a committed vk stays reachable through the best tip ledger \
-                   once chain refcounts are gone (zkapps)" =
+    let%test_unit
+        "a committed vk stays reachable through the best tip ledger once chain \
+         refcounts are gone (zkapps)" =
       Thread_safe.block_on_async_exn (fun () ->
           let%bind t = setup_test () in
           assert_pool_txs t [] ;
@@ -2917,7 +2920,7 @@ let%test_module _ =
               (Envelope.Incoming.wrap
                  ~data:
                    [ User_command.(
-                       forget_check proof_cmd |> read_all_proofs_from_disk)
+                       forget_check proof_cmd |> read_all_proofs_from_disk )
                    ]
                  ~sender:Envelope.Sender.Local )
           with
