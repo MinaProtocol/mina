@@ -2016,7 +2016,8 @@ let%test_module _ =
                User_command.(forget_check tx |> read_all_proofs_from_disk) )
            txs )
 
-    let setup_test ?(verifier = verifier) ?permissions ?slot_tx_end () =
+    let setup_test ?(verifier = verifier) ?(pool_max_size = pool_max_size)
+        ?permissions ?slot_tx_end () =
       let frontier, best_tip_diff_w =
         Mock_transition_frontier.create ?permissions ()
       in
@@ -2830,11 +2831,11 @@ let%test_module _ =
        signature authorization. Even-index test accounts are not zkappified by
        Mock_transition_frontier.create, so for them this is the only way the vk
        can reach the ledger. *)
-    let mk_vk_setting_command ~account_idx ~nonce =
+    let mk_vk_setting_command ?(fee = minimum_fee) ~account_idx ~nonce () =
       let kp = test_keys.(account_idx) in
       let spec : Transaction_snark.For_tests.Update_states_spec.t =
         { sender = (kp, Account.Nonce.of_int nonce)
-        ; fee = Currency.Fee.of_nanomina_int_exn minimum_fee
+        ; fee = Currency.Fee.of_nanomina_int_exn fee
         ; fee_payer = None
         ; receivers = []
         ; amount = Currency.Amount.zero
@@ -2929,7 +2930,7 @@ let%test_module _ =
           [%test_eq: int] 0 (vk_table_size ()) ;
           (* Commit a vk-setting command the way a block would: apply it to the
              ledger and announce it as part of the new best tip. *)
-          let%bind setter = mk_vk_setting_command ~account_idx ~nonce:0 in
+          let%bind setter = mk_vk_setting_command ~account_idx ~nonce:0 () in
           let%bind () = advance_chain t [ setter ] in
           (* The ledger now carries the vk, and the command has left the pool.
              When this test was written the chain refs were still in place, so
@@ -2963,6 +2964,153 @@ let%test_module _ =
                  ledger holding the vk: %s"
                 (Error.to_string_hum (Intf.Verification_error.to_error e))
                 () )
+
+    let vk_table_size (t : test) =
+      Hashtbl.length t.txn_pool.verification_key_table.verification_keys
+
+    let account_id_of_idx idx =
+      Account_id.create
+        (Public_key.compress test_keys.(idx).public_key)
+        Token_id.default
+
+    (* Total refcount held against one account, across every vk. Unlike an
+       aggregate over the whole table this is deterministic, because the
+       commands below are built explicitly rather than generated. *)
+    let vk_refcount_for (t : test) ~account_idx =
+      match
+        Hashtbl.find t.txn_pool.verification_key_table.account_id_to_vks
+          (account_id_of_idx account_idx)
+      with
+      | None ->
+          0
+      | Some vks ->
+          Map.data vks |> List.fold ~init:0 ~f:( + )
+
+    (* The whole point of the effort: a command that commits and stays
+       committed must leave nothing behind in the refcount table. Before
+       refcounts were derived from pool membership, entering the best tip took
+       a reference that only a reorg would ever release, so a healthy chain
+       leaked one per zkApp command forever. *)
+    let%test_unit
+        "committing commands to the chain releases their vk refcounts (zkapps)"
+        =
+      Thread_safe.block_on_async_exn (fun () ->
+          let%bind t = setup_test () in
+          assert_pool_txs t [] ;
+          let%bind zkapp_cmds = mk_zkapp_commands_single_block 7 t.txn_pool in
+          let%bind () = add_commands' t zkapp_cmds in
+          assert_pool_txs t zkapp_cmds ;
+          (* Guards the final check against passing vacuously. *)
+          [%test_eq: int] 1 (vk_table_size t) ;
+          let%bind () = advance_chain t zkapp_cmds in
+          assert_pool_txs t [] ;
+          [%test_eq: int] 0 (vk_table_size t) ;
+          Deferred.unit )
+
+    (* A command orphaned by a reorg goes back into the pool through
+       add_from_backtrack, which took no reference of its own, so the vk of a
+       command that had been committed and was then orphaned went untracked
+       while the command sat in the pool waiting to be re-included. *)
+    let%test_unit
+        "a command returned to the pool by backtracking holds a vk refcount \
+         (zkapps)" =
+      Thread_safe.block_on_async_exn (fun () ->
+          let%bind t = setup_test () in
+          assert_pool_txs t [] ;
+          (* Even indices are not zkappified by Mock_transition_frontier, so
+             these accounts carry no verification key to begin with. *)
+          let pooled_idx = 0 and orphaned_idx = 2 in
+          let%bind pooled =
+            mk_vk_setting_command ~account_idx:pooled_idx ~nonce:0 ()
+          in
+          let%bind orphaned =
+            mk_vk_setting_command ~account_idx:orphaned_idx ~nonce:0 ()
+          in
+          let%bind () = add_commands' t [ pooled ] in
+          assert_pool_txs t [ pooled ] ;
+          [%test_eq: int] 0 (vk_refcount_for t ~account_idx:orphaned_idx) ;
+          (* [orphaned] belongs to the losing fork's chain and never passed
+             through the pool. The reorg hands it back, and
+             add_from_backtrack puts it in the pool. It is deliberately not
+             applied to the ledger: the mock frontier does not roll the ledger
+             back, so a command committed here would simply be revalidated
+             away again for a stale nonce. *)
+          let%bind () = reorg t [] [ orphaned ] in
+          assert_pool_txs t [ pooled; orphaned ] ;
+          [%test_eq: int] 1 (vk_refcount_for t ~account_idx:orphaned_idx) ;
+          Deferred.unit )
+
+    (* A pooled command can be invalidated by a *different* command committing
+       at the same nonce. Those are partitioned away from the committed ones as
+       commit conflicts, and that branch released no refcount at all. *)
+    let%test_unit
+        "a command dropped for conflicting with a committed one releases its \
+         vk refcount (zkapps)" =
+      Thread_safe.block_on_async_exn (fun () ->
+          let%bind t = setup_test () in
+          assert_pool_txs t [] ;
+          let account_idx = 0 in
+          let%bind conflicted =
+            mk_vk_setting_command ~account_idx ~nonce:0 ()
+          in
+          let%bind () = add_commands' t [ conflicted ] in
+          assert_pool_txs t [ conflicted ] ;
+          [%test_eq: int] 1 (vk_refcount_for t ~account_idx) ;
+          (* A different command from the same account at the same nonce wins
+             the race to the chain, so [conflicted] can never apply. *)
+          let committed =
+            mk_payment ~sender_idx:account_idx ~fee:minimum_fee ~nonce:0
+              ~receiver_idx:5 ~amount:20_000_000_000 ~signature_kind ()
+          in
+          commit_commands t [ committed ] ;
+          let%bind () = reorg t [ committed ] [] in
+          assert_pool_txs t [] ;
+          [%test_eq: int] 0 (vk_refcount_for t ~account_idx) ;
+          Deferred.unit )
+
+    (* The double decrement. A command dropped while backtracking was
+       decremented once for leaving the pool and again when its re-add failed,
+       so a vk shared with a command still in the pool could be evicted from
+       the table -- taking with it the Zkapp_vk_cache_tag that load_vk_cache
+       needs to verify the command that remains. *)
+    let%test_unit
+        "a failed re-add after backtracking leaves a vk another pooled command \
+         still needs (zkapps)" =
+      Thread_safe.block_on_async_exn (fun () ->
+          (* Small enough that a single backtracked command overflows it. *)
+          let%bind t = setup_test ~pool_max_size:3 () in
+          assert_pool_txs t [] ;
+          (* [victim] pays the minimum, so it is what max-size eviction takes.
+             [keeper] sets the same vk from a different account and stays, so
+             the vk must survive the eviction. *)
+          let%bind victim = mk_vk_setting_command ~account_idx:0 ~nonce:0 () in
+          let%bind keeper =
+            mk_vk_setting_command ~account_idx:2 ~nonce:0
+              ~fee:(minimum_fee * 100) ()
+          in
+          let filler =
+            mk_payment ~sender_idx:6 ~fee:(minimum_fee * 100) ~nonce:0
+              ~receiver_idx:5 ~amount:1_000_000_000 ~signature_kind ()
+          in
+          let%bind () = add_commands' t [ victim; keeper; filler ] in
+          assert_pool_txs t [ victim; keeper; filler ] ;
+          [%test_eq: int] 1 (vk_table_size t) ;
+          [%test_eq: int] 1 (vk_refcount_for t ~account_idx:0) ;
+          [%test_eq: int] 1 (vk_refcount_for t ~account_idx:2) ;
+          (* A command comes back off the losing fork and overflows the pool.
+             [victim] is evicted to make room, and cannot be re-added: the pool
+             is full and its fee is the lowest in it. *)
+          let backtracked =
+            mk_payment ~sender_idx:4 ~fee:(minimum_fee * 100) ~nonce:0
+              ~receiver_idx:5 ~amount:1_000_000_000 ~signature_kind ()
+          in
+          let%bind () = reorg t [] [ backtracked ] in
+          assert_pool_txs t [ keeper; filler; backtracked ] ;
+          [%test_eq: int] 0 (vk_refcount_for t ~account_idx:0) ;
+          (* [keeper] is still in the pool, so its vk must still be tracked. *)
+          [%test_eq: int] 1 (vk_refcount_for t ~account_idx:2) ;
+          [%test_eq: int] 1 (vk_table_size t) ;
+          Deferred.unit )
 
     let%test_unit "transaction replacement works" =
       let signature_kind = Mina_signature_kind.Testnet in
