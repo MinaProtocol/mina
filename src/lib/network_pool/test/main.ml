@@ -33,6 +33,8 @@ let () =
               `Quick nonce_invariant_violation
           ; test_case "Revalidation drops nothing unsless ledger changed" `Quick
               revalidation_drops_nothing_unless_ledger_changed
+          ; test_case "Diff reports exactly the membership change" `Quick
+              diff_reports_membership_changes
           ; test_case "Applying transactions invalidates them" `Quick
               application_invalidates_applied_transactions
           ; test_case "Transaction can be replaced by one with higher fee"

@@ -127,6 +127,22 @@ val find_by_hash :
   -> Transaction_hash.t
   -> Transaction_hash.User_command_with_valid_signature.t option
 
+(** The commands that entered and left the pool between two of its versions. *)
+module Membership_diff : sig
+  type t =
+    { added : Transaction_hash.User_command_with_valid_signature.t list
+    ; removed : Transaction_hash.User_command_with_valid_signature.t list
+    }
+end
+
+(** Commands that entered and left the pool between [before] and [after].
+
+    Costs what the difference costs rather than what the pool holds, provided
+    [after] was derived from [before] by pool operations -- the two then share
+    structure, which the underlying map diff short-circuits on. Comparing two
+    independently built pools with the same contents is not cheap. *)
+val diff : before:t -> after:t -> Membership_diff.t
+
 (** Check the contents of the pool are valid against the current ledger. Call
     this whenever the transition frontier is (re)created.
 *)

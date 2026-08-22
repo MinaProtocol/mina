@@ -949,3 +949,44 @@ let transaction_replacement_insufficient_balance () =
       assert_pool_consistency pool ;
       [%test_eq: int] (Indexed_pool.size pool) 3 ;
       [%test_eq: int] (Indexed_pool.size pool') 2 )
+
+let hash_set cmds = List.map cmds ~f:txn_hash |> Transaction_hash.Set.of_list
+
+(* [Indexed_pool.diff] is what makes the refcount table derivable from the pool
+   rather than mirrored alongside it, so pin that it reports exactly the
+   membership change, in both directions, for each operation that drops
+   commands. *)
+let diff_reports_membership_changes () =
+  Quickcheck.test ~trials:100 gen_accounts_and_transactions
+    ~f:(fun (account_map, txns) ->
+      let pool = pool_of_transactions ~init:empty ~account_map txns in
+      let check ~before ~after ~expect_removed =
+        let { Indexed_pool.Membership_diff.added; removed } =
+          Indexed_pool.diff ~before ~after
+        in
+        [%test_eq: Transaction_hash.Set.t] (hash_set removed)
+          (hash_set expect_removed) ;
+        assert (List.is_empty added) ;
+        (* Reading the same pair backwards turns removals into additions. *)
+        let { Indexed_pool.Membership_diff.added; removed } =
+          Indexed_pool.diff ~before:after ~after:before
+        in
+        [%test_eq: Transaction_hash.Set.t] (hash_set added)
+          (hash_set expect_removed) ;
+        assert (List.is_empty removed)
+      in
+      (* A pool against itself has no difference at all. *)
+      check ~before:pool ~after:pool ~expect_removed:[] ;
+      (* The generator can produce a sender with no transactions at all. *)
+      if Indexed_pool.size pool > 0 then (
+        let dropped, pool' = Indexed_pool.remove_lowest_fee pool in
+        assert (not (List.is_empty dropped)) ;
+        check ~before:pool ~after:pool' ~expect_removed:dropped ;
+        (* Revalidation against emptied accounts is a second, much larger
+           membership change, exercising the diff over many drops at once
+           rather than the single queue [remove_lowest_fee] takes. *)
+        let pool'', dropped' =
+          Indexed_pool.revalidate pool' ~logger `Entire_pool (fun _ ->
+              Account.empty )
+        in
+        check ~before:pool' ~after:pool'' ~expect_removed:dropped' ) )

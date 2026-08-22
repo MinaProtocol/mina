@@ -259,6 +259,34 @@ let find_by_hash :
     -> Transaction_hash.User_command_with_valid_signature.t option =
  fun { all_by_hash; _ } hash -> Map.find all_by_hash hash
 
+module Membership_diff = struct
+  type t =
+    { added : Transaction_hash.User_command_with_valid_signature.t list
+    ; removed : Transaction_hash.User_command_with_valid_signature.t list
+    }
+end
+
+let diff ~before ~after =
+  (* [all_by_hash] is keyed by transaction hash, so two entries under the same
+     key are the same command and never need comparing -- hence [data_equal]
+     returning true unconditionally, which also means [`Unequal] cannot arise.
+
+     [Map.symmetric_diff] short-circuits on physically equal subtrees, so this
+     costs what the difference costs rather than what the pool holds, as long
+     as [after] was derived from [before] by pool operations rather than built
+     independently. *)
+  Map.symmetric_diff before.all_by_hash after.all_by_hash
+    ~data_equal:(fun _ _ -> true)
+  |> Sequence.fold ~init:{ Membership_diff.added = []; removed = [] }
+       ~f:(fun acc (_hash, delta) ->
+         match delta with
+         | `Left cmd ->
+             { acc with removed = cmd :: acc.removed }
+         | `Right cmd ->
+             { acc with added = cmd :: acc.added }
+         | `Unequal (_, _) ->
+             acc )
+
 let global_slot_since_genesis conf =
   let current_time = Block_time.now conf.Config.time_controller in
   let current_slot =
