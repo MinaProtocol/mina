@@ -596,19 +596,15 @@ let iter = C.iter
 
 let find = C.find
 
+(* Stops at the match. [C.fold_until] escapes the underlying fold with an
+   exception, so this costs the index it returns rather than the length of the
+   sequence -- the previous version kept folding after finding, and every
+   caller in [indexed_pool] is looking for a nonce at or near the head of a
+   sender's queue. *)
 let findi t ~f =
-  match
-    C.fold t ~init:(`Not_found 0) ~f:(fun acc x ->
-        match acc with
-        | `Not_found i ->
-            if f x then `Found i else `Not_found (i + 1)
-        | `Found i ->
-            `Found i )
-  with
-  | `Not_found _ ->
-      None
-  | `Found i ->
-      Some i
+  C.fold_until t ~init:0
+    ~f:(fun i x -> if f x then Stop (Some i) else Continue (i + 1))
+    ~finish:(fun _ -> None)
 
 let to_seq : 'e t -> 'e Sequence.t = fun t -> Sequence.unfold ~init:t ~f:uncons
 
@@ -780,6 +776,18 @@ let%test_unit "list isomorphism - snoc" =
       assert_measure (Fn.const 1) xs_fseq ;
       [%test_eq: int list] xs (to_list xs_fseq) ;
       [%test_eq: int] (List.length xs) (length xs_fseq) )
+
+let%test_unit "findi matches the list implementation" =
+  Quickcheck.test
+    Quickcheck.Generator.(
+      tuple2 (big_list (Int.gen_incl 0 20)) (Int.gen_incl 0 20))
+    ~f:(fun (xs, target) ->
+      let xs_fseq = List.fold_left xs ~init:empty ~f:snoc in
+      (* Pins that the *first* match is returned, which is what the callers in
+         indexed_pool rely on and what short-circuiting must not change. *)
+      [%test_eq: int option]
+        (List.findi xs ~f:(fun _ x -> x = target) |> Option.map ~f:fst)
+        (findi xs_fseq ~f:(fun x -> x = target)) )
 
 let%test_unit "alternating cons/snoc" =
   Quickcheck.test
