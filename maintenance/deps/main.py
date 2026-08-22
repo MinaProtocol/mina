@@ -4,6 +4,7 @@
     python3 maintenance/deps/main.py check     # CI gate, fails on regression
     python3 maintenance/deps/main.py advise    # human report: what to delete
     python3 maintenance/deps/main.py baseline  # re-pin baseline.json
+    python3 maintenance/deps/main.py dot       # the graph in DOT, for graphviz
 
 Runs without dune, without a switch and without any opam package: it reads
 `dune` files directly. See maintenance/README.md for what that costs us.
@@ -65,6 +66,7 @@ class Command(Enum):
     CHECK = "check"
     ADVISE = "advise"
     BASELINE = "baseline"
+    DOT = "dot"
 
 
 class ExitCode(IntEnum):
@@ -397,10 +399,28 @@ def run_baseline(graph: DuneGraph, sources: SourceIndex) -> ExitCode:
     return ExitCode.OK
 
 
+# ----------------------------------------------------------------------------
+# dot
+
+
+def run_dot(graph: DuneGraph, around: str | None) -> ExitCode:
+    """Print the graph in DOT on stdout. Render it with `dot -Tpng`."""
+    if around is None:
+        print(analysis.to_dot(graph))
+        return ExitCode.OK
+    centre = NodeId(around)
+    if centre not in graph.nodes:
+        matches = sorted(n for n in graph.nodes if graph.nodes[n].name == around)
+        hint = f"; did you mean {matches[0]}?" if matches else ""
+        raise DepsError(ErrorCode.NO_SUCH_NODE, f"no node with id {around}{hint}")
+    print(analysis.to_dot(graph, analysis.neighbourhood(graph, centre)))
+    return ExitCode.OK
+
+
 # ----------------------------------------------------------------------- cli
 
 
-def _parse_args(argv: Sequence[str] | None) -> tuple[Command, Path]:
+def _parse_args(argv: Sequence[str] | None) -> tuple[Command, Path, str | None]:
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
@@ -408,11 +428,16 @@ def _parse_args(argv: Sequence[str] | None) -> tuple[Command, Path]:
     parser.add_argument(
         "--root", default=str(DEFAULT_ROOT), help="source tree to scan (default: src)"
     )
+    parser.add_argument(
+        "--around",
+        metavar="NODE-ID",
+        help="with `dot`, restrict to a node, what it reaches and what reaches it",
+    )
     args = parser.parse_args(argv)
-    return Command(args.command), Path(args.root)
+    return Command(args.command), Path(args.root), args.around
 
 
-def run(command: Command, root: Path) -> ExitCode:
+def run(command: Command, root: Path, around: str | None = None) -> ExitCode:
     if not root.is_dir():
         raise DepsError(
             ErrorCode.ROOT_NOT_A_DIRECTORY,
@@ -427,14 +452,16 @@ def run(command: Command, root: Path) -> ExitCode:
             return run_advise(graph, sources)
         case Command.BASELINE:
             return run_baseline(graph, sources)
+        case Command.DOT:
+            return run_dot(graph, around)
         case _ as unreachable:
             assert_never(unreachable)
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    command, root = _parse_args(argv)
+    command, root, around = _parse_args(argv)
     try:
-        return int(run(command, root))
+        return int(run(command, root, around))
     except DepsError as error:
         print(f"error: {error.message}", file=sys.stderr)
         return int(

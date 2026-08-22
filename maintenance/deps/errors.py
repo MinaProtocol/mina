@@ -19,6 +19,7 @@ class ErrorCode(StrEnum):
     MALFORMED_JSON = "MALFORMED_JSON"
     DUNE_UNPARSEABLE = "DUNE_UNPARSEABLE"
     DUNE_UNREADABLE = "DUNE_UNREADABLE"
+    NO_SUCH_NODE = "NO_SUCH_NODE"
 
 
 class DepsError(Exception):

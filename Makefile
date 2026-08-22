@@ -449,6 +449,11 @@ deps-advice: ## Report OCaml dependencies that look removable
 deps-baseline: ## Re-pin the dependency baseline after an intended change
 	python3 maintenance/deps/main.py baseline
 
+.PHONY: deps-dot
+deps-dot: ## Write the dependency graph to maintenance/deps.dot (render with graphviz)
+	python3 maintenance/deps/main.py dot > maintenance/deps.dot
+	@echo "wrote maintenance/deps.dot; render with: dot -Tpng maintenance/deps.dot > maintenance/deps.png"
+
 #######################################
 ## Bash checks
 
