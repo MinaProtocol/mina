@@ -13,7 +13,7 @@ findings. Rendering and I/O belong to the caller.
 from __future__ import annotations
 
 import fnmatch
-from collections.abc import Mapping, Sequence
+from collections.abc import Collection, Mapping, Sequence
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import PurePosixPath
@@ -271,3 +271,37 @@ def rule_violations(graph: DuneGraph, rules: Sequence[LayeringRule]) -> list[Rul
 
 def format_path(graph: DuneGraph, path: Sequence[NodeId]) -> str:
     return " -> ".join(graph.nodes[node_id].name for node_id in path)
+
+
+def neighbourhood(graph: DuneGraph, centre: NodeId) -> set[NodeId]:
+    """`centre`, everything it reaches, and everything that reaches it.
+
+    The union the old `narrow_deps.sh` built by running gvpr's `TV_fwd` and
+    `TV_rev` traversals over a rendered graph and inducing the result.
+    """
+    forward = graph.closure(centre)
+    backward = {
+        node_id for node_id in graph.nodes if node_id != centre and centre in graph.closure(node_id)
+    }
+    return {centre} | forward | backward
+
+
+def to_dot(graph: DuneGraph, nodes: Collection[NodeId] | None = None) -> str:
+    """The graph in DOT, optionally restricted to `nodes`.
+
+    Emitted rather than rendered: turning this into a picture is `dot -Tpng`'s
+    job, and keeping it out of the tool is what lets the tool stay dependency
+    free.
+    """
+    included = set(graph.nodes) if nodes is None else {n for n in nodes if n in graph.nodes}
+    lines = ["digraph deps {", "  rankdir=LR;", '  node [shape=box, fontname="monospace"];']
+    for node_id in sorted(included):
+        node = graph.nodes[node_id]
+        shape = "ellipse" if node.is_executable else "box"
+        lines.append(f'  "{node_id}" [label="{node.name}", shape={shape}];')
+    for source in sorted(included):
+        for dep in graph.successors(source):
+            if dep in included:
+                lines.append(f'  "{source}" -> "{dep}";')
+    lines.append("}")
+    return "\n".join(lines)

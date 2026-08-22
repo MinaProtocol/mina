@@ -103,14 +103,27 @@ each removal with `dune build @check` before pushing it.
 
 ## Dependency graph rendering
 
-Generate the full transitive dependency graph with `./gen_deps.sh`. This script
-will output `deps.dot` and `deps.png`. It needs `dune-deps` (`opam install
-dune-deps`) and graphviz, which is why it is not wired into CI.
+`make deps-dot` writes the graph in DOT to `maintenance/deps.dot`; render it
+with graphviz:
 
-Once `deps.dot` is generated, you can narrow the dependency graph using
-`./narrow_deps.sh <node-id>`. You can inspect `deps.dot` to find the relevant
-node id you would like to narrow the graph to. Narrowing the graph will filter
-out the graph so that it only displays nodes which are dominated by the target,
-nodes that dominate the target, and all nodes in edges between these sets. For
-example, running `./narrow_deps.sh exe:./src/app/cli/src/dune:0` will generate a
-dependency graph for the `mina.exe` executable.
+```
+make deps-dot && dot -Tpng maintenance/deps.dot > maintenance/deps.png
+```
+
+To look at one library or executable rather than all 546 stanzas, pass a node
+id and get that node, everything it reaches, and everything that reaches it:
+
+```
+python3 maintenance/deps/main.py dot --around exe:app/cli/src:mina > mina.dot
+```
+
+Node ids are the same `<lib|exe>:<dir under src>:<name>` used everywhere else
+in this directory — by `rules.json`, by `baseline.json` and by the advice
+output. Passing a bare library name reports the id you probably meant.
+
+This replaces the older `gen_deps.sh`/`narrow_deps.sh` pair, which needed
+`dune-deps` from opam plus graphviz's `gvpr`, and which spoke a different node
+id vocabulary (`exe:./src/app/cli/src/dune:0`) from the rest of the tooling.
+Only the rendering step needs graphviz now; producing the DOT needs nothing but
+`python3`.
+
