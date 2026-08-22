@@ -36,6 +36,7 @@
   logger
   transaction_snark_work
   parallel_scan
+  mina_metrics
   sgn
   ledger_proof
   genesis_constants
