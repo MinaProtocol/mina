@@ -449,6 +449,31 @@ struct
       Transition_frontier.best_tip frontier
       |> Breadcrumb.staged_ledger |> Staged_ledger.ledger
 
+    (** Remove [cmds] from both locally-generated tables, returning those that
+        were found in one of them.
+
+        The predicate mutates: [find_and_remove] deletes the entry it reports
+        on, so it has to run exactly once per command. Returning the lazy
+        [Sequence.filter] would instead re-run it on every forcing, and a
+        caller that tests the result for emptiness before listing it would see
+        the first match consumed by the emptiness test and then missing from
+        the list. *)
+    let remove_locally_generated t cmds =
+      Sequence.filter cmds ~f:(fun cmd ->
+          let find_remove_bool tbl =
+            Locally_generated.find_and_remove tbl cmd |> Option.is_some
+          in
+          let dropped_committed =
+            find_remove_bool t.locally_generated_committed
+          in
+          let dropped_uncommitted =
+            find_remove_bool t.locally_generated_uncommitted
+          in
+          (* Nothing should be in both tables. *)
+          assert (not (dropped_committed && dropped_uncommitted)) ;
+          dropped_committed || dropped_uncommitted )
+      |> Sequence.to_list
+
     let drop_until_below_max_size :
            pool_max_size:int
         -> Indexed_pool.t
@@ -906,34 +931,20 @@ struct
                  in
                  Sequence.iter dropped ~f:dec_vk_refcounts ;
                  let dropped_locally_generated =
-                   Sequence.filter dropped ~f:(fun cmd ->
-                       let find_remove_bool tbl =
-                         Locally_generated.find_and_remove tbl cmd
-                         |> Option.is_some
-                       in
-                       let dropped_committed =
-                         find_remove_bool t.locally_generated_committed
-                       in
-                       let dropped_uncommitted =
-                         find_remove_bool t.locally_generated_uncommitted
-                       in
-                       (* Nothing should be in both tables. *)
-                       assert (not (dropped_committed && dropped_uncommitted)) ;
-                       dropped_committed || dropped_uncommitted )
+                   remove_locally_generated t dropped
                  in
                  (* In this situation we don't know whether the commands aren't
                     valid against the new ledger because they were already
                     committed or because they conflict with others,
                     unfortunately. *)
-                 if not (Sequence.is_empty dropped_locally_generated) then
+                 if not (List.is_empty dropped_locally_generated) then
                    [%log info]
                      "Dropped locally generated commands $cmds from pool when \
                       transition frontier was recreated."
                      ~metadata:
                        [ ( "cmds"
                          , `List
-                             (List.map
-                                (Sequence.to_list dropped_locally_generated)
+                             (List.map dropped_locally_generated
                                 ~f:
                                   Transaction_hash
                                   .User_command_with_valid_signature
@@ -2693,6 +2704,43 @@ let%test_module _ =
             Broadcast_pipe.Writer.write t.frontier_pipe_w (Some frontier2)
           in
           assert_pool_txs t (List.drop independent_cmds 3) ;
+          Deferred.unit )
+
+    (* [remove_locally_generated] both mutates the locally-generated tables and
+       reports what it took out of them, so it has to traverse its argument
+       exactly once. A lazy filter under-reports: the caller tests the result
+       for emptiness, which consumes the first match and removes its table
+       entry, and the listing that follows then re-runs the predicate and finds
+       that entry already gone. Pin both halves of the contract -- everything
+       removed is reported, and nothing is left behind. *)
+    let%test_unit "removing locally generated commands reports every one of \
+                   them (user cmds)" =
+      Thread_safe.block_on_async_exn (fun () ->
+          let%bind t = setup_test () in
+          let%bind _ = add_commands t independent_cmds in
+          assert_pool_txs t independent_cmds ;
+          let hashed =
+            List.map independent_cmds
+              ~f:Transaction_hash.User_command_with_valid_signature.create
+          in
+          (* Guards the set comparison below against passing vacuously. *)
+          assert (List.length hashed > 1) ;
+          let reported =
+            Test.Resource_pool.remove_locally_generated t.txn_pool
+              (Sequence.of_list hashed)
+          in
+          let hashes cmds =
+            List.map cmds
+              ~f:
+                Transaction_hash.User_command_with_valid_signature
+                .transaction_hash
+            |> Transaction_hash.Set.of_list
+          in
+          [%test_eq: Transaction_hash.Set.t] (hashes hashed) (hashes reported) ;
+          [%test_eq: int] 0
+            (List.length
+               (Locally_generated.to_alist
+                  t.txn_pool.locally_generated_uncommitted ) ) ;
           Deferred.unit )
 
     let%test_unit
