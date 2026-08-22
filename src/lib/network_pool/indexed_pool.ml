@@ -154,9 +154,10 @@ module For_tests = struct
     assert (Set.equal all_by_sender all_txns) ;
     assert (Set.equal all_by_fee all_txns) ;
     assert (Set.equal all_by_sender' applicable_by_fee) ;
-    (* In each sender's queue nonces should be strictly increasing and the
-       reserved currency should be equal to the sum of amounts and fees of
-       all the commands in the queue. *)
+    (* In each sender's queue nonces should be dense -- each the successor of
+       the one before it, per the invariant block at the top of this file --
+       and the reserved currency should be equal to the sum of amounts and fees
+       of all the commands in the queue. *)
     Map.iteri pool.all_by_sender
       ~f:(fun ~key ~data:(queue, reserved_currency) ->
         [%test_pred:
@@ -176,10 +177,12 @@ module For_tests = struct
                 |> User_command.applicable_at_nonce
               in
               [%test_pred: Account_nonce.t]
-                (* Last nonce is None only at the very beginning. *)
+                (* Last nonce is None only at the very beginning. A gap here
+                   would mean the pool holds a command that cannot apply until
+                   some command it never received shows up. *)
                 (fun n ->
-                  Option.value_map last_nonce ~default:true
-                    ~f:Account_nonce.(( > ) n) )
+                  Option.value_map last_nonce ~default:true ~f:(fun last ->
+                      Account_nonce.(equal n (succ last)) ) )
                 nonce ;
               let consumed =
                 currency_consumed_unchecked
