@@ -105,7 +105,7 @@ struct
    * in before we need it. *)
   let total_queries = ref None
 
-  let trust_system = Trust_system.null ()
+  let reputation = Peer_reputation.null
 
   let () =
     Async.Scheduler.set_record_backtraces true ;
@@ -115,7 +115,7 @@ struct
     let l1, _k1 = Ledger.load_ledger 1 1 in
     let l2, _k2 = Ledger.load_ledger num_accts 2 in
     let desired_root = Ledger.merkle_root l2 in
-    let lsync = Sync_ledger.create l1 ~context:(module Context) ~trust_system in
+    let lsync = Sync_ledger.create l1 ~context:(module Context) ~reputation in
     let qr = Sync_ledger.query_reader lsync in
     let aw = Sync_ledger.answer_writer lsync in
     let seen_queries = ref [] in
@@ -123,7 +123,7 @@ struct
       Sync_responder.create l2
         (fun q -> seen_queries := q :: !seen_queries)
         ~context:(module Context)
-        ~trust_system
+        ~reputation
     in
     don't_wait_for
       (Linear_pipe.iter_unordered ~max_concurrency:3 qr
@@ -157,7 +157,7 @@ struct
     let l2, _k2 = Ledger.load_ledger num_accts 2 in
     let l3, _k3 = Ledger.load_ledger num_accts 3 in
     let desired_root = ref @@ Ledger.merkle_root l2 in
-    let lsync = Sync_ledger.create l1 ~context:(module Context) ~trust_system in
+    let lsync = Sync_ledger.create l1 ~context:(module Context) ~reputation in
     let qr = Sync_ledger.query_reader lsync in
     let aw = Sync_ledger.answer_writer lsync in
     let seen_queries = ref [] in
@@ -166,7 +166,7 @@ struct
       @@ Sync_responder.create l2
            (fun q -> seen_queries := q :: !seen_queries)
            ~context:(module Context)
-           ~trust_system
+           ~reputation
     in
     let ctr = ref 0 in
     don't_wait_for
@@ -179,7 +179,7 @@ struct
                    Sync_responder.create l3
                      (fun q -> seen_queries := q :: !seen_queries)
                      ~context:(module Context)
-                     ~trust_system ;
+                     ~reputation ;
                  desired_root := Ledger.merkle_root l3 ;
                  ignore
                    ( Sync_ledger.new_goal lsync !desired_root ~data:()
@@ -220,7 +220,7 @@ module Make_test_edge_cases (Input : Input_intf) = struct
   open Input
   module Sync_responder = Sync_ledger.Responder
 
-  let trust_system = Trust_system.null ()
+  let reputation = Peer_reputation.null
 
   let num_accts = 1026
 
@@ -259,11 +259,11 @@ module Make_test_edge_cases (Input : Input_intf) = struct
     let desired_root = Ledger.merkle_root l2 in
     let got_failure_ivar = Ivar.create () in
 
-    let lsync = Sync_ledger.create l1 ~context:(module Context) ~trust_system in
+    let lsync = Sync_ledger.create l1 ~context:(module Context) ~reputation in
     let qr = Sync_ledger.query_reader lsync in
     let aw = Sync_ledger.answer_writer lsync in
     let sr =
-      Sync_responder.create l2 ignore ~context:(module Context) ~trust_system
+      Sync_responder.create l2 ignore ~context:(module Context) ~reputation
     in
     don't_wait_for
       (Linear_pipe.iter_unordered ~max_concurrency:3 qr
@@ -303,7 +303,7 @@ module Make_test_content_length (Input : Input_intf) = struct
   open Input
   module Sync_responder = Sync_ledger.Responder
 
-  let trust_system = Trust_system.null ()
+  let reputation = Peer_reputation.null
 
   let num_accts = 1026
 
@@ -315,11 +315,11 @@ module Make_test_content_length (Input : Input_intf) = struct
     let l1, _k1 = Ledger.load_ledger 1 1 in
     let l2, _k2 = Ledger.load_ledger num_accts 2 in
     let desired_root = Ledger.merkle_root l2 in
-    let lsync = Sync_ledger.create l1 ~context:(module Context) ~trust_system in
+    let lsync = Sync_ledger.create l1 ~context:(module Context) ~reputation in
     let qr = Sync_ledger.query_reader lsync in
     let aw = Sync_ledger.answer_writer lsync in
     let sr =
-      Sync_responder.create l2 ignore ~context:(module Context) ~trust_system
+      Sync_responder.create l2 ignore ~context:(module Context) ~reputation
     in
     let adjusted = ref false in
     don't_wait_for

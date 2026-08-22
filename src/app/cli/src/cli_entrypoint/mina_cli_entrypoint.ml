@@ -1176,10 +1176,11 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
             Logger.trace logger ~module_:__MODULE__ "Creating %s at %s"
               ~location typ
           in
-          let trust_dir = chain_state_locations.trust in
-          let%bind () = Async.Unix.mkdir ~p:() trust_dir in
-          let%bind trust_system = Trust_system.create trust_dir in
-          trace_database_initialization "trust_system" __LOC__ trust_dir ;
+          (* Peer ban/trust state lives in the libp2p helper (see
+             libp2p_banlist.json in the helper state dir); the daemon-side
+             handle is bound once the helper starts. Old <conf_dir>/trust
+             directories from previous versions are left untouched. *)
+          let reputation = Peer_reputation.create () in
           let genesis_ledger_hash =
             Precomputed_values.genesis_ledger precomputed_values
             |> Lazy.force |> Mina_ledger.Ledger.merkle_root
@@ -1342,7 +1343,7 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
               ; initial_peers
               ; addrs_and_ports
               ; metrics_port = libp2p_metrics_port
-              ; trust_system
+              ; reputation
               ; flooding = Option.value ~default:false enable_flooding
               ; direct_peers
               ; peer_protection_ratio
@@ -1442,7 +1443,7 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
           let start_time = Time.now () in
           let%map mina =
             Mina_lib.create ~commit_id:Mina_version.commit_id ~wallets
-              (Mina_lib.Config.make ~logger ~pids ~trust_system ~conf_dir
+              (Mina_lib.Config.make ~logger ~pids ~reputation ~conf_dir
                  ~file_log_level ~log_level ~log_json ~chain_id
                  ~disable_node_status ~demo_mode ~coinbase_receiver ~net_config
                  ~gossip_net_params ~proposed_protocol_version_opt

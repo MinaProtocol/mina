@@ -83,14 +83,7 @@ end) : Keys_S = struct
   end)
 end
 
-(* Just a stub trust system copied from tests *)
-let trust_system =
-  let s = Trust_system.null () in
-  don't_wait_for
-    (Pipe_lib.Strict_pipe.Reader.iter
-       (Trust_system.upcall_pipe s)
-       ~f:(const Deferred.unit) ) ;
-  s
+let reputation = Peer_reputation.null
 
 module Block = struct
   type t =
@@ -388,9 +381,9 @@ let build_breadcrumb ~transactions ~context ~precomputed_values ~verifier
      with this tool as when the blockchain is started from genesis, scan state has ~750
       transaction slots empty and snark work production is necessary only after that. *)
   Frontier_base.Breadcrumb.build ~logger ~precomputed_values ~verifier
-    ~get_completed_work:(Fn.const None) ~trust_system
-    ~parent:previous.breadcrumb ~transition ~sender:None
-    ~skip_staged_ledger_verification:`All ~transition_receipt_time ()
+    ~get_completed_work:(Fn.const None) ~reputation ~parent:previous.breadcrumb
+    ~transition ~sender:None ~skip_staged_ledger_verification:`All
+    ~transition_receipt_time ()
   >>| Result.map_error ~f:(fun e ->
           let msg =
             match e with

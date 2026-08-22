@@ -140,7 +140,7 @@ let validate_transition_or_header_is_relevant
            ~context:(module Context)
            ~slot_chain_end ~frontier header_with_hash
 
-let run ~context:(module Context : CONTEXT) ~trust_system ~time_controller
+let run ~context:(module Context : CONTEXT) ~reputation ~time_controller
     ~frontier ~transition_reader ~valid_transition_writer
     ~unprocessed_transition_cache =
   let open Context in
@@ -182,15 +182,7 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~time_controller
               ~slot_chain_end b_or_h
           with
           | Ok b_or_h' ->
-              let%map () =
-                Trust_system.record_envelope_sender trust_system logger sender
-                  ( Trust_system.Actions.Sent_useful_gossip
-                  , Some
-                      ( "external transition $state_hash"
-                      , [ ("state_hash", State_hash.to_yojson transition_hash)
-                        ; ("header", Mina_block.Header.to_yojson header)
-                        ] ) )
-              in
+              Peer_reputation.useful_sender reputation sender ;
               ( match
                   Block_time.to_time_exn
                     ( Mina_block.Header.protocol_state header
@@ -206,17 +198,19 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~time_controller
               | exception _ ->
                   () ) ;
               [%log internal] "Validate_transition_done" ;
-              Writer.write valid_transition_writer (b_or_h', `Valid_cb vc)
+              Writer.write valid_transition_writer (b_or_h', `Valid_cb vc) ;
+              Deferred.unit
           | Error (`In_frontier _) | Error (`In_process _) ->
               [%log internal] "Failure"
                 ~metadata:[ ("reason", `String "In_frontier or In_process") ] ;
-              Trust_system.record_envelope_sender trust_system logger sender
-                ( Trust_system.Actions.Sent_old_gossip
-                , Some
-                    ( "external transition with state hash $state_hash"
-                    , [ ("state_hash", State_hash.to_yojson transition_hash)
-                      ; ("header", Mina_block.Header.to_yojson header)
-                      ] ) )
+              [%log debug]
+                ~metadata:
+                  [ ("state_hash", State_hash.to_yojson transition_hash)
+                  ; ("sender", Envelope.Sender.to_yojson sender)
+                  ]
+                "Peer $sender sent old gossip: external transition with state \
+                 hash $state_hash is already known" ;
+              Deferred.unit
           | Error `Disconnected ->
               [%log internal] "Failure"
                 ~metadata:[ ("reason", `String "Disconnected") ] ;
@@ -242,28 +236,27 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~time_controller
               let parent_hash =
                 Protocol_state.previous_state_hash protocol_state
               in
-              let action =
-                if
-                  is_in_root_history transition_hash
-                  || Option.is_some
-                       (Lru.find outdated_root_cache transition_hash)
-                then Trust_system.Actions.Sent_old_gossip
-                else if
-                  is_in_root_history parent_hash
-                  || Option.is_some (Lru.find outdated_root_cache parent_hash)
-                then (
-                  Lru.add outdated_root_cache ~key:transition_hash ~data:() ;
-                  Sent_useless_gossip )
-                else Disconnected_chain
-              in
-              Trust_system.record_envelope_sender trust_system logger sender
-                ( action
-                , Some
-                    ( "received transition that was not connected to our chain \
-                       from $sender"
-                    , [ ("sender", Envelope.Sender.to_yojson sender)
-                      ; ("header", Mina_block.Header.to_yojson header)
-                      ] ) )
+              (* Old/outdated gossip is tolerated (logged above); a transition
+                 on a chain disconnected from ours is a bannable offense. *)
+              if
+                is_in_root_history transition_hash
+                || Option.is_some (Lru.find outdated_root_cache transition_hash)
+              then ()
+              else if
+                is_in_root_history parent_hash
+                || Option.is_some (Lru.find outdated_root_cache parent_hash)
+              then Lru.add outdated_root_cache ~key:transition_hash ~data:()
+              else
+                Peer_reputation.ban_sender reputation ~logger
+                  ~reason:
+                    "received transition that was not connected to our chain \
+                     from $sender"
+                  ~metadata:
+                    [ ("sender", Envelope.Sender.to_yojson sender)
+                    ; ("header", Mina_block.Header.to_yojson header)
+                    ]
+                  sender ;
+              Deferred.unit
           | Error `Non_empty_staged_ledger_diff_after_stop_slot ->
               [%log error]
                 ~metadata:

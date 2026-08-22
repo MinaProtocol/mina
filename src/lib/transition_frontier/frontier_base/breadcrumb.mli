@@ -34,7 +34,7 @@ val build :
   -> logger:Logger.t
   -> precomputed_values:Precomputed_values.t
   -> verifier:Verifier.t
-  -> trust_system:Trust_system.t
+  -> reputation:Peer_reputation.t
   -> parent:t
   -> transition:Mina_block.almost_valid_block
   -> get_completed_work:
@@ -96,7 +96,7 @@ module For_tests : sig
     -> ?send_to_random_pk:bool
     -> precomputed_values:Precomputed_values.t
     -> verifier:Verifier.t
-    -> ?trust_system:Trust_system.t
+    -> ?reputation:Peer_reputation.t
     -> accounts_with_secret_keys:(Private_key.t option * Account.t) list
     -> unit
     -> (t -> t Deferred.t) Quickcheck.Generator.t
@@ -105,7 +105,7 @@ module For_tests : sig
        ?logger:Logger.t
     -> precomputed_values:Precomputed_values.t
     -> verifier:Verifier.t
-    -> ?trust_system:Trust_system.t
+    -> ?reputation:Peer_reputation.t
     -> accounts_with_secret_keys:(Private_key.t option * Account.t) list
     -> unit
     -> (t -> t) Quickcheck.Generator.t
@@ -114,7 +114,7 @@ module For_tests : sig
        ?logger:Logger.t
     -> precomputed_values:Precomputed_values.t
     -> verifier:Verifier.t
-    -> ?trust_system:Trust_system.t
+    -> ?reputation:Peer_reputation.t
     -> accounts_with_secret_keys:(Private_key.t option * Account.t) list
     -> int
     -> (t -> t list Deferred.t) Quickcheck.Generator.t
@@ -124,7 +124,7 @@ module For_tests : sig
     -> logger:Logger.t
     -> precomputed_values:Precomputed_values.t
     -> verifier:Verifier.t
-    -> trust_system:Trust_system.t
+    -> reputation:Peer_reputation.t
     -> parent:t
     -> transition:Mina_block.almost_valid_block
     -> sender:Envelope.Sender.t option

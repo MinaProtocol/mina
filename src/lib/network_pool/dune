@@ -63,7 +63,7 @@
   transition_frontier
   transition_frontier_base
   transition_frontier_extensions
-  trust_system
+  peer_reputation
   verifier
   with_hash
   zkapp_command_builder

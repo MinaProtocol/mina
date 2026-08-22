@@ -45,7 +45,7 @@
   pipe_lib
   signature_lib
   mina_runtime_config
-  trust_system
+  peer_reputation
   protocol_version
   transition_frontier_base
   transition_handler

@@ -22,7 +22,7 @@ open Network_peer
 module type CONTEXT = sig
   val logger : Logger.t
 
-  val trust_system : Trust_system.t
+  val reputation : Peer_reputation.t
 
   val precomputed_values : Precomputed_values.t
 
@@ -47,7 +47,7 @@ end
 
 type ctx = (module CONTEXT)
 
-let validate_protocol_versions ~logger ~trust_system ~rpc_name ~sender headers =
+let validate_protocol_versions ~logger ~reputation ~rpc_name ~sender headers =
   let version_errors =
     let invalid_current_versions =
       List.filter headers ~f:(fun header ->
@@ -72,54 +72,59 @@ let validate_protocol_versions ~logger ~trust_system ~rpc_name ~sender headers =
     @ List.map current_version_mismatches ~f:(fun x ->
           (`Current_version_mismatch, x) )
   in
-  let%map () =
-    (* NB: these errors aren't always accurate... sometimes we are calling this when we were
-           requested to serve an outdated block (requested vs sent) *)
-    Deferred.List.iter version_errors ~how:`Parallel
-      ~f:(fun (version_error, header) ->
-        let block_protocol_version =
-          Mina_block.Header.current_protocol_version header
-        in
-        let proposed_protocol_version =
-          Mina_block.Header.proposed_protocol_version_opt header
-        in
-        let action, error_msg, error_metadata =
-          match version_error with
-          | `Invalid_current_version ->
-              ( Trust_system.Actions.Sent_invalid_protocol_version
-              , "block with invalid current protocol version"
-              , [ ( "block_current_protocol_version"
-                  , `String (Protocol_version.to_string block_protocol_version)
-                  )
-                ] )
-          | `Invalid_next_version ->
-              ( Trust_system.Actions.Sent_invalid_protocol_version
-              , "block with invalid proposed protocol version"
-              , [ ( "block_proposed_protocol_version"
-                  , `String
-                      (Protocol_version.to_string
-                         (Option.value_exn proposed_protocol_version) ) )
-                ] )
-          | `Current_version_mismatch ->
-              ( Sent_mismatched_protocol_version
-              , "current protocol version in block does not match daemon \
-                 current protocol version"
-              , [ ( "block_current_protocol_version"
-                  , `String (Protocol_version.to_string block_protocol_version)
-                  )
-                ; ( "daemon_current_protocol_version"
-                  , `String Protocol_version.(to_string current) )
-                ] )
-        in
-        let msg =
-          Some
-            ( Printf.sprintf "$rpc_name: %s" error_msg
-            , [ ("rpc_name", `String rpc_name) ] @ error_metadata )
-        in
-        Trust_system.record_envelope_sender trust_system logger sender
-          (action, msg) )
-  in
-  List.is_empty version_errors
+  (* NB: these errors aren't always accurate... sometimes we are calling this when we were
+         requested to serve an outdated block (requested vs sent) *)
+  List.iter version_errors ~f:(fun (version_error, header) ->
+      let block_protocol_version =
+        Mina_block.Header.current_protocol_version header
+      in
+      let proposed_protocol_version =
+        Mina_block.Header.proposed_protocol_version_opt header
+      in
+      (* Invalid protocol versions are a bannable offense; a mere mismatch
+         with the daemon's version is only logged. *)
+      let bannable, error_msg, error_metadata =
+        match version_error with
+        | `Invalid_current_version ->
+            ( true
+            , "block with invalid current protocol version"
+            , [ ( "block_current_protocol_version"
+                , `String (Protocol_version.to_string block_protocol_version) )
+              ] )
+        | `Invalid_next_version ->
+            ( true
+            , "block with invalid proposed protocol version"
+            , [ ( "block_proposed_protocol_version"
+                , `String
+                    (Protocol_version.to_string
+                       (Option.value_exn proposed_protocol_version) ) )
+              ] )
+        | `Current_version_mismatch ->
+            ( false
+            , "current protocol version in block does not match daemon current \
+               protocol version"
+            , [ ( "block_current_protocol_version"
+                , `String (Protocol_version.to_string block_protocol_version) )
+              ; ( "daemon_current_protocol_version"
+                , `String Protocol_version.(to_string current) )
+              ] )
+      in
+      let reason = Printf.sprintf "$rpc_name: %s" error_msg in
+      let metadata =
+        ("rpc_name", `String rpc_name)
+        :: ("sender", Envelope.Sender.to_yojson sender)
+        :: error_metadata
+      in
+      if bannable then
+        Peer_reputation.ban_sender reputation ~logger ~reason ~metadata sender
+      else [%log warn] ~metadata "Peer $sender sent %s" reason ) ;
+  Deferred.return (List.is_empty version_errors)
+
+(* A peer asked for something we don't have. They may simply be ahead of us,
+   so this is only logged. *)
+let log_requested_unknown_item ~logger ~sender (msg, metadata) =
+  [%log debug] "Peer $sender requested an unknown item: %s" msg
+    ~metadata:(("sender", Envelope.Sender.to_yojson sender) :: metadata)
 
 [%%versioned_rpc
 module Get_some_initial_peers = struct
@@ -185,8 +190,6 @@ module Get_some_initial_peers = struct
     include T'
     include Register (T')
   end
-
-  let receipt_trust_action_message _ = ("Get_some_initial_peers query", [])
 
   let log_request_received ~logger ~sender () =
     [%log trace] "Sending some initial peers to $peer"
@@ -282,7 +285,7 @@ module Get_staged_ledger_aux_and_pending_coinbases_at_hash = struct
     include Register (T')
   end
 
-  let receipt_trust_action_message hash =
+  let unknown_item_message hash =
     ( "Staged ledger and pending coinbases at hash: $hash"
     , [ ("hash", State_hash.to_yojson hash) ] )
 
@@ -300,12 +303,10 @@ module Get_staged_ledger_aux_and_pending_coinbases_at_hash = struct
     in
     match result with
     | None ->
-        Trust_system.(
-          record_envelope_sender trust_system logger
-            (Envelope.Incoming.sender request)
-            Actions.
-              (Requested_unknown_item, Some (receipt_trust_action_message hash)))
-        >>| const None
+        log_requested_unknown_item ~logger
+          ~sender:(Envelope.Incoming.sender request)
+          (unknown_item_message hash) ;
+        return None
     | Some (scan_state, expected_merkle_root, pending_coinbases, protocol_states)
       ->
         return
@@ -395,10 +396,6 @@ module Answer_sync_ledger_query = struct
     include Register (T')
   end
 
-  let receipt_trust_action_message (_, query) =
-    ( "Answer_sync_ledger_query: $query"
-    , [ ("query", Sync_ledger.Query.to_yojson query) ] )
-
   let log_request_received ~logger:_ ~sender:_ _request = ()
 
   let response_is_successful = Result.is_ok
@@ -412,7 +409,7 @@ module Answer_sync_ledger_query = struct
       | Some frontier ->
           Sync_handler.answer_query ~frontier ledger_hash query
             ~context:(module Context)
-            ~trust_system
+            ~reputation
       | None ->
           return (Or_error.error_string "No Frontier")
     in
@@ -423,27 +420,22 @@ module Answer_sync_ledger_query = struct
               %{sexp:Ledger_hash.t}. Error: %s"
             ledger_hash (Error.to_string_hum e) )
     in
-    let%map () =
-      match result with
-      | Ok _ ->
-          return ()
-      | Error err ->
-          Trust_system.(
-            record_envelope_sender trust_system logger
-              (Envelope.Incoming.sender request)
-              Actions.
-                ( Requested_unknown_item
-                , Some
-                    ( "Sync ledger query with hash: $hash, query: $query, with \
-                       error: $error"
-                    , [ ("hash", Ledger_hash.to_yojson ledger_hash)
-                      ; ( "query"
-                        , Syncable_ledger.Query.to_yojson
-                            Mina_ledger.Ledger.Addr.to_yojson
-                            (Envelope.Incoming.data query) )
-                      ; ("error", Error_json.error_to_yojson err)
-                      ] ) ))
-    in
+    ( match result with
+    | Ok _ ->
+        ()
+    | Error err ->
+        log_requested_unknown_item ~logger
+          ~sender:(Envelope.Incoming.sender request)
+          ( "Sync ledger query with hash: $hash, query: $query, with error: \
+             $error"
+          , [ ("hash", Ledger_hash.to_yojson ledger_hash)
+            ; ( "query"
+              , Syncable_ledger.Query.to_yojson
+                  Mina_ledger.Ledger.Addr.to_yojson
+                  (Envelope.Incoming.data query) )
+            ; ("error", Error_json.error_to_yojson err)
+            ] ) ) ;
+    let%map () = return () in
     result
 
   let rate_limit_budget = (Int.pow 2 17, `Per Time.Span.minute)
@@ -515,7 +507,7 @@ module Get_transition_chain = struct
     include Register (T')
   end
 
-  let receipt_trust_action_message query =
+  let unknown_item_message query =
     ("Get_transition_chain query: $query", [ ("query", query_to_yojson query) ])
 
   let log_request_received ~logger ~sender _request =
@@ -534,7 +526,7 @@ module Get_transition_chain = struct
     match result with
     | Some blocks ->
         let%map valid_versions =
-          validate_protocol_versions ~logger ~trust_system
+          validate_protocol_versions ~logger ~reputation
             ~rpc_name:"Get_transition_chain"
             ~sender:(Envelope.Incoming.sender request)
             (List.map blocks ~f:Mina_block.header)
@@ -542,15 +534,10 @@ module Get_transition_chain = struct
         Option.some_if valid_versions
         @@ List.map ~f:Mina_block.read_all_proofs_from_disk blocks
     | None ->
-        let%map () =
-          Trust_system.(
-            record_envelope_sender trust_system logger
-              (Envelope.Incoming.sender request)
-              Actions.
-                ( Requested_unknown_item
-                , Some (receipt_trust_action_message hashes) ))
-        in
-        None
+        log_requested_unknown_item ~logger
+          ~sender:(Envelope.Incoming.sender request)
+          (unknown_item_message hashes) ;
+        return None
 
   let rate_limit_budget = (1, `Per Time.Span.second)
 
@@ -621,10 +608,6 @@ module Get_transition_knowledge = struct
     include T'
     include Register (T')
   end
-
-  let receipt_trust_action_message query =
-    ( "Get_transition_knowledge query: $query"
-    , [ ("query", query_to_yojson query) ] )
 
   let log_request_received ~logger ~sender _request =
     [%log info] "Sending transition_knowledge to $peer"
@@ -711,7 +694,7 @@ module Get_transition_chain_proof = struct
     include Register (T')
   end
 
-  let receipt_trust_action_message query =
+  let unknown_item_message query =
     ( "Get_transition_chain_proof query: $query"
     , [ ("query", query_to_yojson query) ] )
 
@@ -728,16 +711,11 @@ module Get_transition_chain_proof = struct
       let%bind.Option frontier = get_transition_frontier () in
       Transition_chain_prover.prove ~frontier hash
     in
-    let%map () =
-      if Option.is_none result then
-        Trust_system.(
-          record_envelope_sender trust_system logger
-            (Envelope.Incoming.sender request)
-            Actions.
-              (Requested_unknown_item, Some (receipt_trust_action_message hash)))
-      else return ()
-    in
-    result
+    if Option.is_none result then
+      log_requested_unknown_item ~logger
+        ~sender:(Envelope.Incoming.sender request)
+        (unknown_item_message hash) ;
+    return result
 
   let rate_limit_budget = (3, `Per Time.Span.minute)
 
@@ -807,9 +785,6 @@ module Get_completed_snarks = struct
     include T'
     include Register (T')
   end
-
-  let receipt_trust_action_message query =
-    ("Get_completed_snarks query", [ ("query", query_to_yojson query) ])
 
   let log_request_received ~logger ~sender _request =
     [%log debug] "Sending completed snarks to $peer"
@@ -917,7 +892,7 @@ module Get_ancestry = struct
     include Register (T')
   end
 
-  let receipt_trust_action_message query =
+  let unknown_item_message query =
     ("Get_ancestry query: $query", [ ("query", query_to_yojson query) ])
 
   let log_request_received ~logger ~sender _request =
@@ -938,21 +913,15 @@ module Get_ancestry = struct
     in
     match result with
     | None ->
-        let%map () =
-          Trust_system.(
-            record_envelope_sender trust_system logger
-              (Envelope.Incoming.sender request)
-              Actions.
-                ( Requested_unknown_item
-                , Some (receipt_trust_action_message consensus_state_with_hash)
-                ))
-        in
-        None
+        log_requested_unknown_item ~logger
+          ~sender:(Envelope.Incoming.sender request)
+          (unknown_item_message consensus_state_with_hash) ;
+        return None
     | Some { proof = chain, base_block; data = block } ->
         let block = Frontier_base.Breadcrumb.block block in
         let base_block = Frontier_base.Breadcrumb.block base_block in
         let%map valid_versions =
-          validate_protocol_versions ~logger ~trust_system
+          validate_protocol_versions ~logger ~reputation
             ~rpc_name:"Get_ancestry"
             ~sender:(Envelope.Incoming.sender request)
             [ Mina_block.header base_block ]
@@ -1032,8 +1001,6 @@ module Ban_notify = struct
     include T'
     include Register (T')
   end
-
-  let receipt_trust_action_message _request = ("Ban_notify query", [])
 
   let log_request_received ~logger ~sender ban_until =
     [%log warn] "Node banned by peer $peer until $ban_until"
@@ -1124,8 +1091,6 @@ module Get_best_tip = struct
     include Register (T')
   end
 
-  let receipt_trust_action_message _request = ("Get_best_tip query", [])
-
   let log_request_received ~logger ~sender _request =
     [%log debug] "Sending best_tip to $peer"
       ~metadata:[ ("peer", Peer.to_yojson sender) ]
@@ -1141,24 +1106,20 @@ module Get_best_tip = struct
     in
     match result with
     | None ->
-        let%map () =
-          Trust_system.(
-            record_envelope_sender trust_system logger
-              (Envelope.Incoming.sender request)
-              Actions.
-                (Requested_unknown_item, Some (receipt_trust_action_message ())))
-        in
-        None
+        log_requested_unknown_item ~logger
+          ~sender:(Envelope.Incoming.sender request)
+          ("Get_best_tip query", []) ;
+        return None
     | Some { data = data_block; proof = chain, proof_block } ->
         let data_block = Frontier_base.Breadcrumb.block data_block in
         let proof_block = Frontier_base.Breadcrumb.block proof_block in
         let%map data_valid_versions =
-          validate_protocol_versions ~logger ~trust_system
+          validate_protocol_versions ~logger ~reputation
             ~rpc_name:"Get_best_tip (data)"
             ~sender:(Envelope.Incoming.sender request)
             [ Mina_block.header data_block ]
         and proof_valid_versions =
-          validate_protocol_versions ~logger ~trust_system
+          validate_protocol_versions ~logger ~reputation
             ~rpc_name:"Get_best_tip (proof)"
             ~sender:(Envelope.Incoming.sender request)
             [ Mina_block.header proof_block ]

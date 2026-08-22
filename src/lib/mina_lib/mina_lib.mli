@@ -32,7 +32,7 @@ module type CONTEXT = sig
 
   val time_controller : Block_time.Controller.t
 
-  val trust_system : Trust_system.t
+  val reputation : Peer_reputation.t
 
   val consensus_local_state : Consensus.Data.Local_state.t
 
@@ -253,6 +253,8 @@ val top_level_logger : t -> Logger.t
 val config : t -> Config.t
 
 val net : t -> Mina_networking.t
+
+val ban_status_cache : t -> Peer_reputation.Ban_status_cache.t
 
 val runtime_config : t -> Runtime_config.t
 

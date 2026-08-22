@@ -17,22 +17,17 @@ type validation_error =
 [@@deriving sexp_of]
 
 let handle_validation_error ~logger ~rejected_blocks_logger ~time_received
-    ~trust_system ~sender ~header_with_hash ~delta (error : validation_error) =
-  let open Trust_system.Actions in
+    ~reputation ~sender ~header_with_hash (error : validation_error) =
   let state_hash = State_hash.With_state_hashes.state_hash header_with_hash in
   let header = With_hash.data header_with_hash in
-  let punish action message =
-    let message' =
-      "external transition with state hash $state_hash"
-      ^ Option.value_map message ~default:"" ~f:(fun (txt, _) ->
-            sprintf ", %s" txt )
-    in
-    let metadata =
-      ("state_hash", State_hash.to_yojson state_hash)
-      :: Option.value_map message ~default:[] ~f:Tuple2.get2
-    in
-    Trust_system.record_envelope_sender trust_system logger sender
-      (action, Some (message', metadata))
+  (* Bannable offenses; the helper decides the ban duration. The "Validation
+     error" log below already records every rejection, bannable or not. *)
+  let ban reason =
+    Peer_reputation.ban_sender reputation ~logger
+      ~reason:("external transition with state hash $state_hash: " ^ reason)
+      ~metadata:[ ("state_hash", State_hash.to_yojson state_hash) ]
+      sender ;
+    Deferred.unit
   in
   let metadata =
     match error with
@@ -97,40 +92,39 @@ let handle_validation_error ~logger ~rejected_blocks_logger ~time_received
       Mina_metrics.(Counter.inc_one Rejected_blocks.invalid_proof) ;
       Queue.enqueue Transition_frontier.rejected_blocks
         (state_hash, sender, time_received, `Invalid_proof) ;
-      punish Sent_invalid_proof None
+      ban "invalid proof"
   | `Invalid_delta_block_chain_proof ->
       Queue.enqueue Transition_frontier.rejected_blocks
         ( state_hash
         , sender
         , time_received
         , `Invalid_delta_transition_chain_proof ) ;
-      punish Sent_invalid_transition_chain_merkle_proof None
+      ban "invalid delta transition chain proof"
   | `Invalid_time_received `Too_early ->
       Mina_metrics.(Counter.inc_one Rejected_blocks.received_early) ;
       Queue.enqueue Transition_frontier.rejected_blocks
         (state_hash, sender, time_received, `Too_early) ;
-      punish Gossiped_future_transition None
+      ban "received before its slot"
   | `Invalid_genesis_protocol_state ->
       Queue.enqueue Transition_frontier.rejected_blocks
         (state_hash, sender, time_received, `Invalid_genesis_protocol_state) ;
-      punish Has_invalid_genesis_protocol_state None
+      ban "invalid genesis protocol state"
   | `Invalid_time_received (`Too_late slot_diff) ->
       Mina_metrics.(Counter.inc_one Rejected_blocks.received_late) ;
       Queue.enqueue Transition_frontier.rejected_blocks
         (state_hash, sender, time_received, `Too_late) ;
-      punish
-        (Gossiped_old_transition (slot_diff, delta))
-        (Some
-           ( "off by $slot_diff slots"
-           , [ ("slot_diff", `String (Int64.to_string slot_diff)) ] ) )
+      (* too old: not a bannable offense (logged above) *)
+      ignore (slot_diff : Int64.t) ;
+      Deferred.unit
   | `Invalid_protocol_version ->
       Queue.enqueue Transition_frontier.rejected_blocks
         (state_hash, sender, time_received, `Invalid_protocol_version) ;
-      punish Sent_invalid_protocol_version None
+      ban "invalid protocol version"
   | `Mismatched_protocol_version ->
       Queue.enqueue Transition_frontier.rejected_blocks
         (state_hash, sender, time_received, `Mismatched_protocol_version) ;
-      punish Sent_mismatched_protocol_version None
+      (* mismatched protocol version: not a bannable offense (logged above) *)
+      Deferred.unit
 
 module Duplicate_block_detector = struct
   (* maintain a map from block producer key, epoch, slot to state hashes *)
@@ -227,13 +221,10 @@ module Duplicate_block_detector = struct
           [%log error] ~metadata msg )
 end
 
-let validate ~signature_kind ~proof_cache_db ~logger ~trust_system ~verifier
+let validate ~signature_kind ~proof_cache_db ~logger ~reputation ~verifier
     ~initialization_finish_signal ~precomputed_values =
   let genesis_state_hash =
     (Precomputed_values.genesis_state_hashes precomputed_values).state_hash
-  in
-  let genesis_constants =
-    Precomputed_values.genesis_constants precomputed_values
   in
   let rejected_blocks_logger =
     Logger.create ~id:Logger.Logger_id.rejected_blocks ()
@@ -321,9 +312,8 @@ let validate ~signature_kind ~proof_cache_db ~logger ~trust_system ~verifier
                 let%map () =
                   Interruptible.uninterruptible
                   @@ handle_validation_error ~logger ~rejected_blocks_logger
-                       ~time_received ~trust_system ~sender
-                       ~header_with_hash:header_hashed
-                       ~delta:genesis_constants.protocol.delta error
+                       ~time_received ~reputation ~sender
+                       ~header_with_hash:header_hashed error
                 in
                 Error ()
           in

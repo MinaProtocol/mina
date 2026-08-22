@@ -86,7 +86,7 @@ let%test_module "transaction_status" =
 
     module Genesis_ledger = (val precomputed_values.genesis_ledger)
 
-    let trust_system = Trust_system.null ()
+    let reputation = Peer_reputation.null
 
     let pool_max_size = precomputed_values.genesis_constants.txpool_max_size
 
@@ -109,7 +109,7 @@ let%test_module "transaction_status" =
 
     let gen_frontier =
       Transition_frontier.For_tests.gen ~logger ~precomputed_values ~verifier
-        ~trust_system ~max_length ~size:frontier_size ()
+        ~reputation ~max_length ~size:frontier_size ()
 
     (* TODO: Generate zkApps txns *)
     let gen_user_command =
@@ -120,7 +120,7 @@ let%test_module "transaction_status" =
 
     let create_pool ~frontier_broadcast_pipe =
       let config =
-        Transaction_pool.Resource_pool.make_config ~trust_system ~pool_max_size
+        Transaction_pool.Resource_pool.make_config ~reputation ~pool_max_size
           ~verifier ~genesis_constants:precomputed_values.genesis_constants
           ~slot_tx_end:None
           ~vk_cache_db:(Zkapp_vk_cache_tag.For_tests.create_db ())

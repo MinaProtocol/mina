@@ -96,9 +96,6 @@ let%test_module "Epoch ledger sync tests" =
         Consensus.Constants.create ~constraint_constants
           ~protocol_constants:genesis_constants.protocol
       in
-      let%bind trust_system =
-        Trust_system.create (make_dirname "trust_system")
-      in
       let time_controller = Block_time.Controller.basic ~logger in
       let module Context = struct
         let logger = logger
@@ -109,7 +106,7 @@ let%test_module "Epoch ledger sync tests" =
 
         let precomputed_values = precomputed_values
 
-        let trust_system = trust_system
+        let reputation = Peer_reputation.null
 
         let time_controller = time_controller
 
@@ -211,7 +208,7 @@ let%test_module "Epoch ledger sync tests" =
       let _transaction_pool, tx_remote_sink, _tx_local_sink =
         let config =
           Network_pool.Transaction_pool.Resource_pool.make_config ~verifier
-            ~trust_system
+            ~reputation:Peer_reputation.null
             ~pool_max_size:precomputed_values.genesis_constants.txpool_max_size
             ~genesis_constants:precomputed_values.genesis_constants
             ~slot_tx_end:None
@@ -230,7 +227,7 @@ let%test_module "Epoch ledger sync tests" =
       let snark_remote_sink, snark_pool =
         let config =
           Network_pool.Snark_pool.Resource_pool.make_config ~verifier
-            ~trust_system
+            ~reputation:Peer_reputation.null
             ~disk_location:(make_dirname "snark_pool_config")
             ~proof_cache_db:(Proof_cache_tag.For_tests.create_db ())
         in
@@ -287,7 +284,7 @@ let%test_module "Epoch ledger sync tests" =
           ; initial_peers
           ; addrs_and_ports
           ; metrics_port = None
-          ; trust_system
+          ; reputation = Peer_reputation.null
           ; flooding = false
           ; direct_peers = []
           ; peer_protection_ratio = 0.2
@@ -354,7 +351,7 @@ let%test_module "Epoch ledger sync tests" =
         *)
         Transition_router.run ~sync_local_state:false ~cache_exceptions:true
           ~context:(module Context)
-          ~trust_system ~verifier ~network:mina_networking
+          ~reputation:Peer_reputation.null ~verifier ~network:mina_networking
           ~is_seed:config.is_seed ~is_demo_mode:false ~time_controller
           ~consensus_local_state
           ~persistent_root_location:(make_dirname "persistent_root_location")
@@ -381,14 +378,11 @@ let%test_module "Epoch ledger sync tests" =
     let setup_test ?(timeout_min = default_timeout_min)
         (module Context : CONTEXT) ~name ~staking_epoch_ledger
         ~next_epoch_ledger ~test_number =
-      let%bind fresh_trust_system =
-        Trust_system.create (make_dirname "trust_system")
-      in
       let open Context in
       let module Context2 = struct
         include Context
 
-        let trust_system = fresh_trust_system
+        let reputation = Peer_reputation.null
       end in
       let test_finished = ref false in
       let cleanup () = test_finished := true in
@@ -462,7 +456,7 @@ let%test_module "Epoch ledger sync tests" =
         let sync_ledger =
           Mina_ledger.Sync_ledger.Root.create
             ~context:(module Context)
-            ~trust_system:Context.trust_system root_ledger
+            ~reputation:Context.reputation root_ledger
         in
         let query_reader =
           Mina_ledger.Sync_ledger.Root.query_reader sync_ledger

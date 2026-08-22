@@ -373,12 +373,6 @@ let setup_local_server ?(client_trustlist = []) ~rest_server_port
           return
             ( Mina_commands.get_balance mina aid
             |> Participating_state.active_error ) )
-    ; implement Daemon_rpcs.Get_trust_status.rpc (fun () ip_address ->
-          return (Mina_commands.get_trust_status mina ip_address) )
-    ; implement Daemon_rpcs.Get_trust_status_all.rpc (fun () () ->
-          return (Mina_commands.get_trust_status_all mina) )
-    ; implement Daemon_rpcs.Reset_trust_status.rpc (fun () ip_address ->
-          return (Mina_commands.reset_trust_status mina ip_address) )
     ; implement Daemon_rpcs.Verify_proof.rpc (fun () (aid, tx, proof) ->
           return
             ( Mina_commands.verify_payment mina aid tx proof

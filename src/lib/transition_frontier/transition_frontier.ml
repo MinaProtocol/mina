@@ -676,7 +676,7 @@ module For_tests = struct
     let protocol_states = [] in
     (root, protocol_states)
 
-  let gen ?(logger = Logger.null ()) ~verifier ?trust_system
+  let gen ?(logger = Logger.null ()) ~verifier ?reputation
       ?consensus_local_state ~precomputed_values
       ?(create_root_and_accounts =
         ( Precomputed_values.create_root precomputed_values
@@ -700,9 +700,7 @@ module For_tests = struct
     end in
     let open Context in
     let open Quickcheck.Generator.Let_syntax in
-    let trust_system =
-      Option.value trust_system ~default:(Trust_system.null ())
-    in
+    let reputation = Option.value reputation ~default:Peer_reputation.null in
     let epoch_ledger_location =
       Filename.temp_dir_name ^/ "epoch_ledger"
       ^ (Uuid_unix.create () |> Uuid.to_string)
@@ -729,7 +727,7 @@ module For_tests = struct
           (Quickcheck_lib.gen_imperative_rose_tree
              (Quickcheck.Generator.return root)
              (Breadcrumb.For_tests.gen_non_deferred ~logger ~precomputed_values
-                ~verifier ~trust_system
+                ~verifier ~reputation
                 ~accounts_with_secret_keys:root_ledger_accounts () ) )
       in
       (root, branches, protocol_states)
@@ -790,7 +788,7 @@ module For_tests = struct
           @@ next_epoch_ledger consensus_local_state) ) ;
     frontier
 
-  let gen_with_branch ?logger ~verifier ?trust_system ?consensus_local_state
+  let gen_with_branch ?logger ~verifier ?reputation ?consensus_local_state
       ~precomputed_values
       ?(create_root_and_accounts =
         ( Precomputed_values.create_root precomputed_values
@@ -799,13 +797,13 @@ module For_tests = struct
       ~branch_size () =
     let open Quickcheck.Generator.Let_syntax in
     let%bind frontier =
-      gen ?logger ~verifier ?trust_system ?consensus_local_state
+      gen ?logger ~verifier ?reputation ?consensus_local_state
         ~precomputed_values ?gen_root_breadcrumb ~create_root_and_accounts
         ~max_length ~size:frontier_size ()
     in
     let%map make_branch =
       Breadcrumb.For_tests.gen_seq ?logger ~precomputed_values ~verifier
-        ?trust_system
+        ?reputation
         ~accounts_with_secret_keys:(snd create_root_and_accounts)
         branch_size
     in

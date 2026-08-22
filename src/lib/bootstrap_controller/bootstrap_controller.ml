@@ -32,7 +32,7 @@ type Structured_log_events.t += Bootstrap_complete
 
 type t =
   { context : (module CONTEXT)
-  ; trust_system : Trust_system.t
+  ; reputation : Peer_reputation.t
   ; verifier : Verifier.t
   ; mutable best_seen_transition : Mina_block.initial_valid_block
   ; mutable current_root : Mina_block.initial_valid_block
@@ -77,13 +77,9 @@ let worth_getting_root ({ context = (module Context); _ } as t) candidate =
 
 let received_bad_proof ({ context = (module Context); _ } as t) host e =
   let open Context in
-  Trust_system.(
-    record t.trust_system logger host
-      Actions.
-        ( Violated_protocol
-        , Some
-            ( "Bad ancestor proof: $error"
-            , [ ("error", Error_json.error_to_yojson e) ] ) ))
+  Peer_reputation.ban t.reputation ~logger ~reason:"Bad ancestor proof: $error"
+    ~metadata:[ ("error", Error_json.error_to_yojson e) ]
+    host
 
 let done_syncing_root root_sync_ledger =
   Option.is_some (Sync_ledger.Root.peek_valid_tree root_sync_ledger)
@@ -95,14 +91,7 @@ let should_sync ~root_sync_ledger t candidate_state =
 (** Update [Synced_ledger]'s target and [best_seen_transition] and [current_root] accordingly. *)
 let start_sync_job_with_peer ~sender ~root_sync_ledger
     ({ context = (module Context); _ } as t) peer_best_tip peer_root =
-  let open Context in
-  let%bind () =
-    Trust_system.(
-      record t.trust_system logger sender
-        Actions.
-          ( Fulfilled_request
-          , Some ("Received verified peer root and best tip", []) ))
-  in
+  Peer_reputation.useful t.reputation sender.Network_peer.Peer.peer_id ;
   t.best_seen_transition <- peer_best_tip ;
   t.current_root <- peer_root ;
   let blockchain_state =
@@ -191,7 +180,8 @@ let on_transition ({ context = (module Context); _ } as t) ~sender
             else
               start_sync_job_with_peer ~sender ~root_sync_ledger t best_tip root
         | Error e ->
-            return (received_bad_proof t sender e |> Fn.const `Ignored) )
+            received_bad_proof t sender e ;
+            return `Ignored )
 
 (** A helper function that wraps the calls to Sync_ledger and iterate through
     incoming transitions, add those to the transition_cache and calls
@@ -263,11 +253,11 @@ let external_transition_compare ~context:(module Context : CONTEXT) =
       else 1 )
     ~f:(With_hash.map ~f:get_consensus_state)
 
-let download_snarked_ledger ~trust_system ~preferred_peers ~transition_graph
+let download_snarked_ledger ~reputation ~preferred_peers ~transition_graph
     ~sync_ledger_reader ~context t temp_snarked_ledger =
   time_deferred
     (let root_sync_ledger =
-       Sync_ledger.Root.create temp_snarked_ledger ~context ~trust_system
+       Sync_ledger.Root.create temp_snarked_ledger ~context ~reputation
      in
      don't_wait_for
        (sync_ledger t ~preferred:preferred_peers ~root_sync_ledger
@@ -403,8 +393,8 @@ let handle_scan_state_and_aux ~logger ~expected_staged_ledger_hash
       (Some staged_ledger_construction_time, result)
 
 (** Run one bootstrap cycle *)
-let run_cycle ~context:(module Context : CONTEXT) ~trust_system ~verifier
-    ~network ~consensus_local_state ~network_transition_pipe ~preferred_peers
+let run_cycle ~context:(module Context : CONTEXT) ~reputation ~verifier ~network
+    ~consensus_local_state ~network_transition_pipe ~preferred_peers
     ~persistent_root ~persistent_frontier ~initial_root_transition ~catchup_mode
     previous_cycles =
   let open Context in
@@ -425,7 +415,7 @@ let run_cycle ~context:(module Context : CONTEXT) ~trust_system ~verifier
   let t =
     { network
     ; context = (module Context)
-    ; trust_system
+    ; reputation
     ; verifier
     ; best_seen_transition = initial_root_transition
     ; current_root = initial_root_transition
@@ -444,7 +434,7 @@ let run_cycle ~context:(module Context : CONTEXT) ~trust_system ~verifier
   let%bind sync_ledger_time, (hash, sender, expected_staged_ledger_hash) =
     download_snarked_ledger
       ~context:(module Context)
-      ~trust_system ~preferred_peers ~transition_graph ~sync_ledger_reader t
+      ~reputation ~preferred_peers ~transition_graph ~sync_ledger_reader t
       temp_snarked_ledger
   in
   Mina_metrics.(
@@ -477,19 +467,10 @@ let run_cycle ~context:(module Context : CONTEXT) ~trust_system ~verifier
     temp_persistent_root_instance ;
   match staged_ledger_aux_result with
   | Error e ->
-      let%map () =
-        Trust_system.(
-          record t.trust_system logger sender
-            Actions.
-              ( Outgoing_connection_error
-              , Some
-                  ( "Can't find scan state from the peer or received faulty \
-                     scan state from the peer."
-                  , [] ) ))
-      in
       [%log error]
         ~metadata:
           [ ("error", Error_json.error_to_yojson e)
+          ; ("peer", Network_peer.Peer.to_yojson sender)
           ; ("state_hash", State_hash.to_yojson hash)
           ; ( "expected_staged_ledger_hash"
             , Staged_ledger_hash.to_yojson expected_staged_ledger_hash )
@@ -505,15 +486,9 @@ let run_cycle ~context:(module Context : CONTEXT) ~trust_system ~verifier
         ; local_state_sync_time = None
         }
       in
-      `Repeat (this_cycle :: previous_cycles)
+      Deferred.return (`Repeat (this_cycle :: previous_cycles))
   | Ok (scan_state, pending_coinbase, new_root, protocol_states) -> (
-      let%bind () =
-        Trust_system.(
-          record t.trust_system logger sender
-            Actions.
-              ( Fulfilled_request
-              , Some ("Received valid scan state from peer", []) ))
-      in
+      Peer_reputation.useful t.reputation sender.Network_peer.Peer.peer_id ;
       let best_seen_block_with_hash, _ = t.best_seen_transition in
       let consensus_state =
         With_hash.data best_seen_block_with_hash
@@ -546,7 +521,7 @@ let run_cycle ~context:(module Context : CONTEXT) ~trust_system ~verifier
               let%map result =
                 Consensus.Hooks.sync_local_state
                   ~context:(module Context)
-                  ~local_state:consensus_local_state ~trust_system
+                  ~local_state:consensus_local_state ~reputation
                   ~glue_sync_ledger:(Mina_networking.glue_sync_ledger t.network)
                   sync_jobs
               in
@@ -678,7 +653,7 @@ let run_cycle ~context:(module Context : CONTEXT) ~trust_system ~verifier
     4. Synchronize the consensus local state if necessary.
     5. Close the old frontier and reload a new one from disk.
  *)
-let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
+let run ~context:(module Context : CONTEXT) ~reputation ~verifier ~network
     ~consensus_local_state ~network_transition_pipe ~preferred_peers
     ~persistent_root ~persistent_frontier ~initial_root_transition ~catchup_mode
     =
@@ -686,7 +661,7 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
   let run_cycle =
     run_cycle
       ~context:(module Context : CONTEXT)
-      ~trust_system ~verifier ~network ~consensus_local_state
+      ~reputation ~verifier ~network ~consensus_local_state
       ~network_transition_pipe ~preferred_peers ~persistent_root
       ~persistent_frontier ~initial_root_transition ~catchup_mode
   in
@@ -726,13 +701,7 @@ let%test_module "Bootstrap_controller tests" =
              () )
         ()
 
-    let trust_system =
-      let s = Trust_system.null () in
-      don't_wait_for
-        (Pipe_lib.Strict_pipe.Reader.iter
-           (Trust_system.upcall_pipe s)
-           ~f:(const Deferred.unit) ) ;
-      s
+    let reputation = Peer_reputation.null
 
     let precomputed_values = Lazy.force Precomputed_values.for_unit_tests
 
@@ -792,7 +761,7 @@ let%test_module "Bootstrap_controller tests" =
         |> Mina_block.Validation.reset_staged_ledger_diff_validation
       in
       { context = (module Context)
-      ; trust_system
+      ; reputation
       ; verifier
       ; best_seen_transition = transition
       ; current_root = transition
@@ -841,7 +810,7 @@ let%test_module "Bootstrap_controller tests" =
             Sync_ledger.Root.create
               (Transition_frontier.root_snarked_ledger me.state.frontier)
               ~context:(module Context)
-              ~trust_system
+              ~reputation
           in
           Async.Thread_safe.block_on_async_exn (fun () ->
               let sync_deferred =
@@ -906,7 +875,7 @@ let%test_module "Bootstrap_controller tests" =
       Block_time.Timeout.await_exn time_controller ~timeout_duration
         (run
            ~context:(module Context)
-           ~trust_system ~verifier ~network:my_net.network ~preferred_peers:[]
+           ~reputation ~verifier ~network:my_net.network ~preferred_peers:[]
            ~consensus_local_state:my_net.state.consensus_local_state
            ~network_transition_pipe ~persistent_root ~persistent_frontier
            ~catchup_mode:`Super ~initial_root_transition )

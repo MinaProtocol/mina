@@ -24,7 +24,7 @@
   error_json
   mina_net2
   block_time
-  trust_system
+  peer_reputation
   signature_lib
   with_hash
   mina_state

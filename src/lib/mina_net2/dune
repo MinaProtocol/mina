@@ -29,6 +29,7 @@
   mina_stdlib_unix
   logger
   network_peer
+  peer_reputation
   pipe_lib
   timeout_lib
   mina_metrics

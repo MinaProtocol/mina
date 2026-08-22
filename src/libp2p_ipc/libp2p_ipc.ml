@@ -229,6 +229,18 @@ let rpc_request_body_set req body =
       ignore @@ test_decode_bitswap_blocks_set_builder req b
   | TestEncodeBitswapBlocks b ->
       ignore @@ test_encode_bitswap_blocks_set_builder req b
+  | BanPeer b ->
+      ignore @@ ban_peer_set_builder req b
+  | UnbanPeer b ->
+      ignore @@ unban_peer_set_builder req b
+  | GetBans b ->
+      ignore @@ get_bans_set_builder req b
+  | AddTrustedPeer b ->
+      ignore @@ add_trusted_peer_set_builder req b
+  | RemoveTrustedPeer b ->
+      ignore @@ remove_trusted_peer_set_builder req b
+  | GetTrustedPeers b ->
+      ignore @@ get_trusted_peers_set_builder req b
   | Undefined _ ->
       failwith "cannot set undefined rpc request body"
 

@@ -17,7 +17,7 @@ module type CONTEXT = sig
   val signature_kind : Mina_signature_kind.t
 end
 
-let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
+let run ~context:(module Context : CONTEXT) ~reputation ~verifier ~network
     ~time_controller ~collected_transitions ~frontier ~get_completed_work
     ~network_transition_reader ~producer_transition_reader ~clear_reader
     ~cache_exceptions ?transaction_pool_proxy =
@@ -126,7 +126,7 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
            Deferred.return true ) ) ;
   Transition_handler.Validator.run
     ~context:(module Context)
-    ~trust_system ~time_controller ~frontier
+    ~reputation ~time_controller ~frontier
     ~transition_reader:network_transition_reader ~valid_transition_writer
     ~unprocessed_transition_cache ;
   Strict_pipe.Reader.iter_without_pushback valid_transition_reader
@@ -135,14 +135,14 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
   let clean_up_catchup_scheduler = Ivar.create () in
   Transition_handler.Processor.run
     ~context:(module Context)
-    ~time_controller ~trust_system ~verifier ~frontier ~get_completed_work
+    ~time_controller ~reputation ~verifier ~frontier ~get_completed_work
     ~primary_transition_reader ~producer_transition_reader
     ~clean_up_catchup_scheduler ~catchup_job_writer ~catchup_breadcrumbs_reader
     ~catchup_breadcrumbs_writer ~processed_transition_writer
     ?transaction_pool_proxy ;
   Ledger_catchup.run
     ~context:(module Context)
-    ~trust_system ~verifier ~network ~frontier ~catchup_job_reader
+    ~reputation ~verifier ~network ~frontier ~catchup_job_reader
     ~catchup_breadcrumbs_writer ~unprocessed_transition_cache ;
   upon (Strict_pipe.Reader.read clear_reader) (fun _ ->
       let open Strict_pipe.Writer in

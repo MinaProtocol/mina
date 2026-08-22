@@ -438,9 +438,9 @@ module Scan_state_metrics : sig
   val snark_work_required : Gauge.t
 end
 
-module Trust_system : sig
-  val banned_peers : Gauge.t
-end
+(** # of peers/IPs currently banned by the libp2p helper (mirrored by the
+    daemon's ban cache poll) *)
+val banned_peers : Gauge.t
 
 module Consensus : sig
   val vrf_evaluations : Counter.t

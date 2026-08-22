@@ -612,3 +612,162 @@ module TestEncodeBitswapBlocks = struct
       ( op Request.data_set data
       *> op Request.max_block_size_set_int max_block_size )
 end
+
+module BanPeer = struct
+  let name = "BanPeer"
+
+  module Request = struct
+    type t = Builder.Libp2pHelperInterface.BanPeer.Request.t
+
+    let to_rpc_request_body req =
+      Builder.Libp2pHelperInterface.RpcRequest.BanPeer req
+  end
+
+  module Response = struct
+    type t = Reader.Libp2pHelperInterface.BanPeer.Response.t
+
+    let of_rpc_response_body = function
+      | Reader.Libp2pHelperInterface.RpcResponseSuccess.BanPeer resp ->
+          Some resp
+      | _ ->
+          None
+  end
+
+  let create_request ~peer_id ~ip ~manual =
+    let open Builder.Libp2pHelperInterface.BanPeer in
+    build'
+      (module Request)
+      Request.(
+        builder_op peer_id_set_builder peer_id
+        *> optional op ip_set ip *> op manual_set manual)
+end
+
+module UnbanPeer = struct
+  let name = "UnbanPeer"
+
+  module Request = struct
+    type t = Builder.Libp2pHelperInterface.UnbanPeer.Request.t
+
+    let to_rpc_request_body req =
+      Builder.Libp2pHelperInterface.RpcRequest.UnbanPeer req
+  end
+
+  module Response = struct
+    type t = Reader.Libp2pHelperInterface.UnbanPeer.Response.t
+
+    let of_rpc_response_body = function
+      | Reader.Libp2pHelperInterface.RpcResponseSuccess.UnbanPeer resp ->
+          Some resp
+      | _ ->
+          None
+  end
+
+  let create_request ~peer_id ~ip =
+    let open Builder.Libp2pHelperInterface.UnbanPeer in
+    build'
+      (module Request)
+      Request.(builder_op peer_id_set_builder peer_id *> optional op ip_set ip)
+end
+
+module GetBans = struct
+  let name = "GetBans"
+
+  module Request = struct
+    type t = Builder.Libp2pHelperInterface.GetBans.Request.t
+
+    let to_rpc_request_body req =
+      Builder.Libp2pHelperInterface.RpcRequest.GetBans req
+  end
+
+  module Response = struct
+    type t = Reader.Libp2pHelperInterface.GetBans.Response.t
+
+    let of_rpc_response_body = function
+      | Reader.Libp2pHelperInterface.RpcResponseSuccess.GetBans resp ->
+          Some resp
+      | _ ->
+          None
+  end
+
+  let create_request () =
+    build' (module Builder.Libp2pHelperInterface.GetBans.Request) noop
+end
+
+module AddTrustedPeer = struct
+  let name = "AddTrustedPeer"
+
+  module Request = struct
+    type t = Builder.Libp2pHelperInterface.AddTrustedPeer.Request.t
+
+    let to_rpc_request_body req =
+      Builder.Libp2pHelperInterface.RpcRequest.AddTrustedPeer req
+  end
+
+  module Response = struct
+    type t = Reader.Libp2pHelperInterface.AddTrustedPeer.Response.t
+
+    let of_rpc_response_body = function
+      | Reader.Libp2pHelperInterface.RpcResponseSuccess.AddTrustedPeer resp ->
+          Some resp
+      | _ ->
+          None
+  end
+
+  let create_request ~peer_id ~ip =
+    let open Builder.Libp2pHelperInterface.AddTrustedPeer in
+    build'
+      (module Request)
+      Request.(builder_op peer_id_set_builder peer_id *> optional op ip_set ip)
+end
+
+module RemoveTrustedPeer = struct
+  let name = "RemoveTrustedPeer"
+
+  module Request = struct
+    type t = Builder.Libp2pHelperInterface.RemoveTrustedPeer.Request.t
+
+    let to_rpc_request_body req =
+      Builder.Libp2pHelperInterface.RpcRequest.RemoveTrustedPeer req
+  end
+
+  module Response = struct
+    type t = Reader.Libp2pHelperInterface.RemoveTrustedPeer.Response.t
+
+    let of_rpc_response_body = function
+      | Reader.Libp2pHelperInterface.RpcResponseSuccess.RemoveTrustedPeer resp
+        ->
+          Some resp
+      | _ ->
+          None
+  end
+
+  let create_request ~peer_id ~ip =
+    let open Builder.Libp2pHelperInterface.RemoveTrustedPeer in
+    build'
+      (module Request)
+      Request.(builder_op peer_id_set_builder peer_id *> optional op ip_set ip)
+end
+
+module GetTrustedPeers = struct
+  let name = "GetTrustedPeers"
+
+  module Request = struct
+    type t = Builder.Libp2pHelperInterface.GetTrustedPeers.Request.t
+
+    let to_rpc_request_body req =
+      Builder.Libp2pHelperInterface.RpcRequest.GetTrustedPeers req
+  end
+
+  module Response = struct
+    type t = Reader.Libp2pHelperInterface.GetTrustedPeers.Response.t
+
+    let of_rpc_response_body = function
+      | Reader.Libp2pHelperInterface.RpcResponseSuccess.GetTrustedPeers resp ->
+          Some resp
+      | _ ->
+          None
+  end
+
+  let create_request () =
+    build' (module Builder.Libp2pHelperInterface.GetTrustedPeers.Request) noop
+end

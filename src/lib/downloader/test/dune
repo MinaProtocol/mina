@@ -12,7 +12,7 @@
   logger
   network_peer
   pipe_lib
-  trust_system
+  peer_reputation
   downloader)
  (inline_tests
   (flags -verbose -show-counts))

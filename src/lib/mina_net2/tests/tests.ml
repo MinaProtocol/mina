@@ -42,9 +42,7 @@ let%test_module "Mina network tests" =
           ~network_id ~peer_exchange:true ~peer_protection_ratio:0.2
           ~direct_peers:[] ~seed_peers:[] ~flooding:false ~metrics_port:None
           ~unsafe_no_trust_ip:true ~max_connections:50 ~min_connections:20
-          ~validation_queue_size:150
-          ~initial_gating_config:
-            { trusted_peers = []; banned_peers = []; isolate = false }
+          ~validation_queue_size:150 ~initial_gating_config:{ isolate = false }
           ~known_private_ip_nets:[] ~topic_config:[]
         >>| Or_error.ok_exn
       in
@@ -64,9 +62,8 @@ let%test_module "Mina network tests" =
           ~direct_peers:[] ~seed_peers:[ seed_peer ] ~flooding:false
           ~min_connections:20 ~metrics_port:None ~unsafe_no_trust_ip:true
           ~max_connections:50 ~validation_queue_size:150
-          ~initial_gating_config:
-            { trusted_peers = []; banned_peers = []; isolate = false }
-          ~known_private_ip_nets:[] ~topic_config:[]
+          ~initial_gating_config:{ isolate = false } ~known_private_ip_nets:[]
+          ~topic_config:[]
         >>| Or_error.ok_exn
       and () =
         configure c ~external_maddr:(List.hd_exn maddrs) ~me:kp_c ~maddrs
@@ -74,9 +71,8 @@ let%test_module "Mina network tests" =
           ~direct_peers:[] ~seed_peers:[ seed_peer ] ~flooding:false
           ~metrics_port:None ~unsafe_no_trust_ip:true ~max_connections:50
           ~min_connections:20 ~validation_queue_size:150
-          ~initial_gating_config:
-            { trusted_peers = []; banned_peers = []; isolate = false }
-          ~known_private_ip_nets:[] ~topic_config:[]
+          ~initial_gating_config:{ isolate = false } ~known_private_ip_nets:[]
+          ~topic_config:[]
         >>| Or_error.ok_exn
       in
       let%bind () = after (Time.Span.of_sec 10.) in

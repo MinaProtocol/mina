@@ -385,7 +385,7 @@ let send_add_resource ~tag ~data =
   send_push ~name:"AddResource"
     ~msg:(Libp2p_ipc.create_add_resource_push_message ~tag ~data)
 
-let send_heartbeat ~peer_id =
+let send_useful_peer ~peer_id =
   send_push ~name:"UsefulPeer"
     ~msg:(Libp2p_ipc.create_useful_peer_push_message ~peer_id)
 

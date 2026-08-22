@@ -40,7 +40,7 @@
   transition_chain_prover
   transition_frontier
   transition_handler
-  trust_system
+  peer_reputation
   verifier
   with_hash)
  (instrumentation

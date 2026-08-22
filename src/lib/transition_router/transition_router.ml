@@ -103,7 +103,7 @@ let is_transition_for_bootstrap
           ~existing:root_consensus_state ~candidate:new_consensus_state
 
 let start_transition_frontier_controller ?transaction_pool_proxy
-    ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
+    ~context:(module Context : CONTEXT) ~reputation ~verifier ~network
     ~time_controller ~get_completed_work ~producer_transition_writer_ref
     ~verified_transition_writer ~clear_reader ~collected_transitions
     ~cache_exceptions ~network_transition_pipe ~frontier_w frontier =
@@ -127,7 +127,7 @@ let start_transition_frontier_controller ?transaction_pool_proxy
     let new_verified_transition_reader =
       Transition_frontier_controller.run ?transaction_pool_proxy
         ~context:(module Context)
-        ~trust_system ~verifier ~network ~time_controller ~collected_transitions
+        ~reputation ~verifier ~network ~time_controller ~collected_transitions
         ~frontier ~get_completed_work
         ~network_transition_reader:transition_frontier_controller_reader
         ~producer_transition_reader ~clear_reader ~cache_exceptions
@@ -139,7 +139,7 @@ let start_transition_frontier_controller ?transaction_pool_proxy
   in
   don't_wait_for start_and_iterate
 
-let start_bootstrap_controller ~context:(module Context : CONTEXT) ~trust_system
+let start_bootstrap_controller ~context:(module Context : CONTEXT) ~reputation
     ~verifier ~network ~time_controller ~get_completed_work
     ~producer_transition_writer_ref ~verified_transition_writer ~clear_reader
     ~network_transition_pipe ~consensus_local_state ~frontier_w
@@ -165,20 +165,20 @@ let start_bootstrap_controller ~context:(module Context : CONTEXT) ~trust_system
   upon
     (Bootstrap_controller.run
        ~context:(module Context)
-       ~trust_system ~verifier ~network ~consensus_local_state
+       ~reputation ~verifier ~network ~consensus_local_state
        ~network_transition_pipe ~persistent_frontier ~persistent_root
        ~initial_root_transition ~preferred_peers ~catchup_mode )
     (fun (new_frontier, collected_transitions) ->
       start_transition_frontier_controller
         ~context:(module Context)
-        ~trust_system ~verifier ~network ~time_controller ~get_completed_work
+        ~reputation ~verifier ~network ~time_controller ~get_completed_work
         ~producer_transition_writer_ref ~verified_transition_writer
         ~clear_reader ~collected_transitions ~cache_exceptions
         ~network_transition_pipe ~frontier_w new_frontier )
   |> Fn.const ()
 
 let download_best_tip ~context:(module Context : CONTEXT) ~notify_online
-    ~network ~verifier ~trust_system ~most_recent_valid_block_writer
+    ~network ~verifier ~reputation ~most_recent_valid_block_writer
     ~genesis_constants =
   let open Context in
   let num_peers = 16 in
@@ -224,15 +224,9 @@ let download_best_tip ~context:(module Context : CONTEXT) ~notify_online
                     ; ("error", Error_json.error_to_yojson e)
                     ]
                   "Peer sent us bad proof for their best tip" ;
-                let%map () =
-                  Trust_system.(
-                    record trust_system logger peer
-                      Actions.
-                        ( Violated_protocol
-                        , Some ("Peer sent us bad proof for their best tip", [])
-                        ))
-                in
-                None
+                Peer_reputation.ban reputation ~logger
+                  ~reason:"Peer sent us bad proof for their best tip" peer ;
+                return None
             | Ok (`Root _, `Best_tip candidate_best_tip) ->
                 [%log debug]
                   ~metadata:[ ("peer", Network_peer.Peer.to_yojson peer) ]
@@ -362,7 +356,7 @@ let wait_for_high_connectivity ~logger ~network ~is_seed =
           Deferred.unit )
 
 let initialize ~transaction_pool_proxy ~context:(module Context : CONTEXT)
-    ~sync_local_state ~network ~is_seed ~is_demo_mode ~verifier ~trust_system
+    ~sync_local_state ~network ~is_seed ~is_demo_mode ~verifier ~reputation
     ~time_controller ~get_completed_work ~frontier_w
     ~producer_transition_writer_ref ~clear_reader ~verified_transition_writer
     ~cache_exceptions ~most_recent_valid_block_writer ~persistent_root
@@ -381,7 +375,7 @@ let initialize ~transaction_pool_proxy ~context:(module Context : CONTEXT)
     Deferred.both
       (download_best_tip
          ~context:(module Context)
-         ~notify_online ~network ~verifier ~trust_system
+         ~notify_online ~network ~verifier ~reputation
          ~most_recent_valid_block_writer ~genesis_constants )
       (load_frontier
          ~context:(module Context)
@@ -398,7 +392,7 @@ let initialize ~transaction_pool_proxy ~context:(module Context : CONTEXT)
       in
       start_bootstrap_controller
         ~context:(module Context)
-        ~trust_system ~verifier ~network ~time_controller ~get_completed_work
+        ~reputation ~verifier ~network ~time_controller ~get_completed_work
         ~producer_transition_writer_ref ~verified_transition_writer
         ~clear_reader ~network_transition_pipe ~consensus_local_state
         ~frontier_w ~persistent_root ~persistent_frontier ~cache_exceptions
@@ -427,7 +421,7 @@ let initialize ~transaction_pool_proxy ~context:(module Context : CONTEXT)
       let%map () = Transition_frontier.close ~loc:__LOC__ frontier in
       start_bootstrap_controller
         ~context:(module Context)
-        ~trust_system ~verifier ~network ~time_controller ~get_completed_work
+        ~reputation ~verifier ~network ~time_controller ~get_completed_work
         ~producer_transition_writer_ref ~verified_transition_writer
         ~clear_reader ~network_transition_pipe ~consensus_local_state
         ~frontier_w ~initial_root_transition ~persistent_root
@@ -478,7 +472,7 @@ let initialize ~transaction_pool_proxy ~context:(module Context : CONTEXT)
                   ~local_state:consensus_local_state
                   ~glue_sync_ledger:(Mina_networking.glue_sync_ledger network)
                   ~context:(module Context)
-                  ~trust_system sync_jobs
+                  ~reputation sync_jobs
               with
               | Error e ->
                   Error.tag e ~tag:"Local state sync failed" |> Error.raise
@@ -487,7 +481,7 @@ let initialize ~transaction_pool_proxy ~context:(module Context : CONTEXT)
       in
       start_transition_frontier_controller ?transaction_pool_proxy
         ~context:(module Context)
-        ~trust_system ~verifier ~network ~time_controller ~get_completed_work
+        ~reputation ~verifier ~network ~time_controller ~get_completed_work
         ~producer_transition_writer_ref ~verified_transition_writer
         ~clear_reader ~collected_transitions ~cache_exceptions
         ~network_transition_pipe ~frontier_w frontier
@@ -535,7 +529,7 @@ let wait_till_genesis ~logger ~time_controller
    to set local state in the test
 *)
 let run ?(sync_local_state = true) ?(cache_exceptions = false)
-    ?transaction_pool_proxy ~context:(module Context : CONTEXT) ~trust_system
+    ?transaction_pool_proxy ~context:(module Context : CONTEXT) ~reputation
     ~verifier ~network ~is_seed ~is_demo_mode ~time_controller
     ~consensus_local_state ~persistent_root_location
     ~persistent_frontier_location ~get_current_frontier
@@ -593,7 +587,7 @@ let run ?(sync_local_state = true) ?(cache_exceptions = false)
         let initial_validate =
           unstage
             (Initial_validator.validate ~signature_kind ~proof_cache_db ~logger
-               ~trust_system ~verifier ~initialization_finish_signal
+               ~reputation ~verifier ~initialization_finish_signal
                ~precomputed_values )
         in
         O1trace.background_thread "initially_validate_blocks" (fun () ->
@@ -632,7 +626,7 @@ let run ?(sync_local_state = true) ?(cache_exceptions = false)
       let%map () =
         initialize ~transaction_pool_proxy ~sync_local_state ~cache_exceptions
           ~context:(module Context)
-          ~network ~is_seed ~is_demo_mode ~verifier ~trust_system
+          ~network ~is_seed ~is_demo_mode ~verifier ~reputation
           ~persistent_frontier ~persistent_root ~time_controller
           ~get_completed_work ~frontier_w ~catchup_mode
           ~producer_transition_writer_ref ~clear_reader
@@ -692,7 +686,7 @@ let run ?(sync_local_state = true) ?(cache_exceptions = false)
                         ignore
                         @@ start_bootstrap_controller
                              ~context:(module Context)
-                             ~trust_system ~verifier ~network ~time_controller
+                             ~reputation ~verifier ~network ~time_controller
                              ~get_completed_work ~producer_transition_writer_ref
                              ~cache_exceptions ~verified_transition_writer
                              ~clear_reader ~network_transition_pipe

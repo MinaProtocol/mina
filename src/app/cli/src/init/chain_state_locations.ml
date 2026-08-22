@@ -7,7 +7,6 @@ open Core
 type t =
   { chain_state : string  (** The top-level chain state directory *)
   ; mina_net : string  (** Mina networking information *)
-  ; trust : string  (** P2P trust information *)
   ; root : string  (** The root snarked ledgers *)
   ; genesis : string  (** The genesis ledgers *)
   ; frontier : string  (** The transition frontier *)
@@ -135,7 +134,6 @@ let of_config ~logger ~signature_kind ~(genesis_constants : Genesis_constants.t)
   in
   ( { chain_state
     ; mina_net = config_modifier "mina_net2"
-    ; trust = config_modifier "trust"
     ; root = config_modifier "root"
     ; genesis = config_modifier "genesis"
     ; frontier = config_modifier "frontier"

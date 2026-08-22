@@ -24,7 +24,7 @@
   allocation_functor
   genesis_constants
   transaction_snark_work
-  trust_system
+  peer_reputation
   precomputed_values
   consensus
   network_peer

@@ -16,7 +16,7 @@
   mina_stdlib
   o1trace
   mina_metrics
-  trust_system
+  peer_reputation
   staged_ledger
   precomputed_values
   data_hash_lib

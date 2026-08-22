@@ -453,7 +453,7 @@ let faulty_peer_without_punishment = log ~level:Faulty_peer
 
 let spam = log ~level:Spam ~module_:"" ~location:"" ?event_id:None
 
-(* deprecated, use Trust_system.record instead *)
+(* deprecated *)
 let faulty_peer = faulty_peer_without_punishment
 
 module Structured = struct

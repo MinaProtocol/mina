@@ -35,7 +35,7 @@
   verifier
   precomputed_values
   block_time
-  trust_system
+  peer_reputation
   with_hash
   mina_stdlib
   quickcheck_lib

@@ -240,3 +240,64 @@ module TestEncodeBitswapBlocks : sig
 
   val create_request : max_block_size:int -> data:string -> Request.t
 end
+
+module BanPeer : sig
+  include
+    Rpc_intf
+      with type Request.t = Builder.Libp2pHelperInterface.BanPeer.Request.t
+       and type Response.t = Reader.Libp2pHelperInterface.BanPeer.Response.t
+
+  val create_request :
+    peer_id:Builder.PeerId.t -> ip:string option -> manual:bool -> Request.t
+end
+
+module UnbanPeer : sig
+  include
+    Rpc_intf
+      with type Request.t = Builder.Libp2pHelperInterface.UnbanPeer.Request.t
+       and type Response.t = Reader.Libp2pHelperInterface.UnbanPeer.Response.t
+
+  val create_request : peer_id:Builder.PeerId.t -> ip:string option -> Request.t
+end
+
+module GetBans : sig
+  include
+    Rpc_intf
+      with type Request.t = Builder.Libp2pHelperInterface.GetBans.Request.t
+       and type Response.t = Reader.Libp2pHelperInterface.GetBans.Response.t
+
+  val create_request : unit -> Request.t
+end
+
+module AddTrustedPeer : sig
+  include
+    Rpc_intf
+      with type Request.t =
+        Builder.Libp2pHelperInterface.AddTrustedPeer.Request.t
+       and type Response.t =
+        Reader.Libp2pHelperInterface.AddTrustedPeer.Response.t
+
+  val create_request : peer_id:Builder.PeerId.t -> ip:string option -> Request.t
+end
+
+module RemoveTrustedPeer : sig
+  include
+    Rpc_intf
+      with type Request.t =
+        Builder.Libp2pHelperInterface.RemoveTrustedPeer.Request.t
+       and type Response.t =
+        Reader.Libp2pHelperInterface.RemoveTrustedPeer.Response.t
+
+  val create_request : peer_id:Builder.PeerId.t -> ip:string option -> Request.t
+end
+
+module GetTrustedPeers : sig
+  include
+    Rpc_intf
+      with type Request.t =
+        Builder.Libp2pHelperInterface.GetTrustedPeers.Request.t
+       and type Response.t =
+        Reader.Libp2pHelperInterface.GetTrustedPeers.Response.t
+
+  val create_request : unit -> Request.t
+end

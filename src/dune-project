@@ -226,7 +226,7 @@
 (package (name transition_frontier_persistent_root))
 (package (name transition_handler))
 (package (name transition_router))
-(package (name trust_system))
+(package (name peer_reputation))
 (package (name unsigned_extended))
 (package (name uptime_service))
 (package (name user_command_input))
