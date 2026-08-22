@@ -990,3 +990,45 @@ let diff_reports_membership_changes () =
               Account.empty )
         in
         check ~before:pool' ~after:pool'' ~expect_removed:dropped' ) )
+
+(* The subset scope iterates the subset and looks each sender up, rather than
+   folding every sender in the pool and filtering. The two must agree exactly
+   when the subset is every sender -- including on the order drops come back
+   in, since dropping one sender's queue can change the currency reserved for
+   another whose commands spend from it.
+
+   Compared on drops, size and contents rather than [Indexed_pool.equal]:
+   [equal] is not reflexive across two separately computed results here. On
+   roughly 2% of generated inputs it reports two identical `Entire_pool
+   revalidations of the same pool as different, so it cannot serve as the
+   oracle. That predates this test. *)
+let revalidate_subset_matches_entire_pool () =
+  Quickcheck.test ~trials:100 gen_accounts_and_transactions
+    ~f:(fun (account_map, txns) ->
+      let pool = pool_of_transactions ~init:empty ~account_map txns in
+      let every_sender =
+        Indexed_pool.get_all pool
+        |> List.map ~f:(fun cmd ->
+            Transaction_hash.User_command_with_valid_signature.command cmd
+            |> User_command.fee_payer )
+        |> Account_id.Set.of_list
+      in
+      (* Emptied accounts, so revalidation actually drops something. *)
+      let lookup _ = Account.empty in
+      let entire_pool, dropped_entire =
+        Indexed_pool.revalidate pool ~logger `Entire_pool lookup
+      in
+      let subset, dropped_subset =
+        Indexed_pool.revalidate pool ~logger (`Subset every_sender) lookup
+      in
+      [%test_eq: Transaction_hash.t list]
+        (List.map dropped_entire ~f:txn_hash)
+        (List.map dropped_subset ~f:txn_hash) ;
+      [%test_eq: int] (Indexed_pool.size entire_pool) (Indexed_pool.size subset) ;
+      [%test_eq: Transaction_hash.Set.t]
+        ( Indexed_pool.get_all entire_pool
+        |> List.map ~f:txn_hash |> Transaction_hash.Set.of_list )
+        ( Indexed_pool.get_all subset
+        |> List.map ~f:txn_hash |> Transaction_hash.Set.of_list ) ;
+      assert_pool_consistency entire_pool ;
+      assert_pool_consistency subset )
