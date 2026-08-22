@@ -2731,6 +2731,157 @@ let%test_module _ =
           [%test_eq: int] 0 (vk_table_size ()) ;
           Deferred.unit )
 
+    (* Build a zkApp command that Sets the shared [vk] on [account_idx] under
+       signature authorization. Even-index test accounts are not zkappified by
+       Mock_transition_frontier.create, so for them this is the only way the vk
+       can reach the ledger. *)
+    let mk_vk_setting_command ~account_idx ~nonce =
+      let kp = test_keys.(account_idx) in
+      let spec : Transaction_snark.For_tests.Update_states_spec.t =
+        { sender = (kp, Account.Nonce.of_int nonce)
+        ; fee = Currency.Fee.of_nanomina_int_exn minimum_fee
+        ; fee_payer = None
+        ; receivers = []
+        ; amount = Currency.Amount.zero
+        ; zkapp_account_keypairs = [ kp ]
+        ; memo = Signed_command_memo.create_from_string_exn "set vk"
+        ; new_zkapp_account = false
+        ; snapp_update =
+            { Account_update.Update.dummy with
+              verification_key = Zkapp_basic.Set_or_keep.Set vk
+            }
+        ; current_auth = Permissions.Auth_required.Signature
+        ; call_data = Snark_params.Tick.Field.zero
+        ; events = []
+        ; actions = []
+        ; preconditions = None
+        }
+      in
+      let%map zkapp_command =
+        Transaction_snark.For_tests.update_states ~constraint_constants spec
+      in
+      User_command.Zkapp_command
+        (Or_error.ok_exn
+           (Zkapp_command.Valid.For_tests.to_valid ~failed:false
+              ~find_vk:(fun _ _ -> Ok vk)
+              zkapp_command ) )
+
+    (* Build a command carrying a proof-authorized account update against
+       [account_idx]. Converting this to a verifiable requires finding the vk
+       for that account, which is the lookup under test. *)
+    let mk_proof_authorized_command ~account_idx ~nonce =
+      let kp = test_keys.(account_idx) in
+      let spec : Transaction_snark.For_tests.Update_states_spec.t =
+        { sender = (kp, Account.Nonce.of_int nonce)
+        ; fee = Currency.Fee.of_nanomina_int_exn minimum_fee
+        ; fee_payer = None
+        ; receivers = []
+        ; amount = Currency.Amount.zero
+        ; zkapp_account_keypairs = [ kp ]
+        ; memo = Signed_command_memo.create_from_string_exn "use vk"
+        ; new_zkapp_account = false
+        ; snapp_update =
+            { Account_update.Update.dummy with
+              zkapp_uri = Zkapp_basic.Set_or_keep.Set "https://example.com"
+            }
+        ; current_auth = Permissions.Auth_required.Proof
+        ; call_data = Snark_params.Tick.Field.zero
+        ; events = []
+        ; actions = []
+        ; preconditions = None
+        }
+      in
+      let%map zkapp_command =
+        Transaction_snark.For_tests.update_states ~constraint_constants
+          ~zkapp_prover_and_vk:(prover, Deferred.return vk)
+          spec
+      in
+      User_command.Zkapp_command
+        (Or_error.ok_exn
+           (Zkapp_command.Valid.For_tests.to_valid ~failed:false
+              ~find_vk:(fun _ _ -> Ok vk)
+              zkapp_command ) )
+
+    (* Drop every refcount the pool is holding. With an empty pool this leaves
+       exactly the chain refs taken at [handle_transition_frontier_diff_inner],
+       so clearing it reproduces the world in which those two lines are
+       deleted -- without editing the code under test. *)
+    let clear_vk_refcount_table (pool : Test.Resource_pool.t) =
+      let t = pool.verification_key_table in
+      Hashtbl.clear t.verification_keys ;
+      Hashtbl.clear t.account_id_to_vks ;
+      Hashtbl.clear t.vk_to_account_ids
+
+    let%test_unit "a committed vk stays reachable through the best tip ledger \
+                   once chain refcounts are gone (zkapps)" =
+      Thread_safe.block_on_async_exn (fun () ->
+          let%bind t = setup_test () in
+          assert_pool_txs t [] ;
+          let vk_table_size () =
+            Hashtbl.length t.txn_pool.verification_key_table.verification_keys
+          in
+          (* Even index: Mock_transition_frontier zkappifies only odd ones, so
+             this account starts with no verification key at all. *)
+          let account_idx = 2 in
+          let account_id =
+            Account_id.create
+              (Public_key.compress test_keys.(account_idx).public_key)
+              Token_id.default
+          in
+          let ledger_vk () =
+            let ledger = Option.value_exn t.txn_pool.best_tip_ledger in
+            let%bind.Option loc =
+              Mina_ledger.Ledger.location_of_account ledger account_id
+            in
+            let%bind.Option account = Mina_ledger.Ledger.get ledger loc in
+            let%bind.Option zkapp = account.zkapp in
+            zkapp.verification_key
+          in
+          (* Precondition: the vk is nowhere -- not in the ledger, not in the
+             table. Without this the test could pass vacuously. *)
+          assert (Option.is_none (ledger_vk ())) ;
+          [%test_eq: int] 0 (vk_table_size ()) ;
+          (* Commit a vk-setting command the way a block would: apply it to the
+             ledger and announce it as part of the new best tip. *)
+          let%bind setter = mk_vk_setting_command ~account_idx ~nonce:0 in
+          let%bind () = advance_chain t [ setter ] in
+          (* The ledger now carries the vk, and the command has left the pool.
+             The one table entry that remains is a chain ref and nothing else:
+             it is held only by the increment taken when the command entered
+             the best tip. Should that increment ever be removed, this expects
+             0 rather than 1, and the rest of the test is unaffected. *)
+          assert (Option.is_some (ledger_vk ())) ;
+          assert_pool_txs t [] ;
+          [%test_eq: int] 1 (vk_table_size ()) ;
+          (* Delete the chain refs. This is the counterfactual: an empty pool
+             plus an empty table is exactly the state the pool would be in if
+             the two chain-ref lines did not exist. *)
+          clear_vk_refcount_table t.txn_pool ;
+          [%test_eq: int] 0 (vk_table_size ()) ;
+          (* A proof-authorized command against that account must still
+             convert to a verifiable and pass verification, finding the vk via
+             the ledger alone. *)
+          let%bind proof_cmd =
+            mk_proof_authorized_command ~account_idx ~nonce:1
+          in
+          match%map
+            Test.Resource_pool.Diff.verify t.txn_pool
+              (Envelope.Incoming.wrap
+                 ~data:
+                   [ User_command.(
+                       forget_check proof_cmd |> read_all_proofs_from_disk)
+                   ]
+                 ~sender:Envelope.Sender.Local )
+          with
+          | Ok _ ->
+              ()
+          | Error e ->
+              failwithf
+                "proof-authorized command failed to verify with only the \
+                 ledger holding the vk: %s"
+                (Error.to_string_hum (Intf.Verification_error.to_error e))
+                () )
+
     let%test_unit "transaction replacement works" =
       let signature_kind = Mina_signature_kind.Testnet in
       Thread_safe.block_on_async_exn
