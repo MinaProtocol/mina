@@ -339,14 +339,12 @@ struct
         { verification_keys :
             (int * Zkapp_vk_cache_tag.t) Zkapp_basic.F_map.Table.t
         ; account_id_to_vks : int Zkapp_basic.F_map.Map.t Account_id.Table.t
-        ; vk_to_account_ids : int Account_id.Map.t Zkapp_basic.F_map.Table.t
         ; vk_cache_db : Zkapp_vk_cache_tag.cache_db
         }
 
       let create vk_cache_db () =
         { verification_keys = Zkapp_basic.F_map.Table.create ()
         ; account_id_to_vks = Account_id.Table.create ()
-        ; vk_to_account_ids = Zkapp_basic.F_map.Table.create ()
         ; vk_cache_db
         }
 
@@ -378,8 +376,6 @@ struct
               (count + 1, vk) ) ;
         Hashtbl.update t.account_id_to_vks account_id
           ~f:(inc_map ~default_map:Zkapp_basic.F_map.Map.empty vk.hash) ;
-        Hashtbl.update t.vk_to_account_ids vk.hash
-          ~f:(inc_map ~default_map:Account_id.Map.empty account_id) ;
         Mina_metrics.(
           Gauge.set Transaction_pool.vk_refcount_table_size
             (Float.of_int (Hashtbl.length t.verification_keys)) )
@@ -398,8 +394,6 @@ struct
                  (count', value) ) ) ;
         Hashtbl.change t.account_id_to_vks account_id
           ~f:(Option.bind ~f:(dec_map vk_hash)) ;
-        Hashtbl.change t.vk_to_account_ids vk_hash
-          ~f:(Option.bind ~f:(dec_map account_id)) ;
         Mina_metrics.(
           Gauge.set Transaction_pool.vk_refcount_table_size
             (Float.of_int (Hashtbl.length t.verification_keys)) )
@@ -472,6 +466,56 @@ struct
           (* Nothing should be in both tables. *)
           assert (not (dropped_committed && dropped_uncommitted)) ;
           dropped_committed || dropped_uncommitted )
+
+    (** The only function permitted to assign [t.pool].
+
+        Refcounts are derived from the pool here rather than restated at each
+        call site: [Indexed_pool.diff] reports exactly which commands entered
+        and left, so the table cannot drift from pool membership.
+
+        This assumes every caller reads [t.pool], derives [new_pool] from it,
+        and calls here without an intervening bind. All of them do today: [apply]
+        is documented as synchronous, and the transition frontier handlers
+        contain no [Deferred] at all. Introducing an await between the read and
+        the call would make the diff report the concurrent writer's additions as
+        removals, corrupting the refcounts silently -- so keep these paths
+        synchronous. *)
+    let set_pool t new_pool =
+      let { Indexed_pool.Membership_diff.added; removed } =
+        Indexed_pool.diff ~before:t.pool ~after:new_pool
+      in
+      let lift = Vk_refcount_table.lift_hashed t.verification_key_table in
+      (* Increment before decrementing: a vk migrating between accounts within
+         a single transition must not transiently hit zero, which would drop
+         its Zkapp_vk_cache_tag and with it the disk cache entry. *)
+      List.iter added ~f:(lift Vk_refcount_table.inc) ;
+      List.iter removed
+        ~f:
+          (lift (fun table ~account_id ~(vk : Verification_key_wire.t) ->
+               Vk_refcount_table.dec table ~account_id ~vk_hash:vk.hash ) ) ;
+      t.pool <- new_pool ;
+      let pool_size = Indexed_pool.size new_pool in
+      (* The degenerate case of the refcount invariant, cheap enough to keep on
+         in the daemon: an empty pool must hold no refcounts. The full
+         recompute costs a pass over the pool with extract_vks per command, so
+         it lives in For_tests instead. Log and meter here -- never crash a node
+         over a mempool side table. *)
+      if
+        pool_size = 0
+        && not (Hashtbl.is_empty t.verification_key_table.verification_keys)
+      then (
+        [%log' error t.logger]
+          "Verification key refcount table still holds $size keys while the \
+           transaction pool is empty"
+          ~metadata:
+            [ ( "size"
+              , `Int (Hashtbl.length t.verification_key_table.verification_keys)
+              )
+            ] ;
+        Mina_metrics.(
+          Counter.inc_one Transaction_pool.vk_refcount_leaks_detected ) ) ;
+      Mina_metrics.(
+        Gauge.set Transaction_pool.pool_size (Float.of_int pool_size) )
 
     let drop_until_below_max_size :
            pool_max_size:int
@@ -573,17 +617,10 @@ struct
          locally_generated_uncommitted to locally_generated_committed and vice
          versa so those hashtables remain in sync with reality.
 
-         Don't forget to modify the refcount table as well as remove from the
-         index pool.
+         The refcount table is not touched here: every pool assignment below
+         goes through [set_pool], which derives the refcount change from the
+         pool itself.
       *)
-      let vk_table_inc = Vk_refcount_table.inc in
-      let vk_table_dec t ~account_id ~(vk : Verification_key_wire.t) =
-        Vk_refcount_table.dec t ~account_id ~vk_hash:vk.hash
-      in
-      let vk_table_lift = Vk_refcount_table.lift t.verification_key_table in
-      let vk_table_lift_hashed =
-        Vk_refcount_table.lift_hashed t.verification_key_table
-      in
       let global_slot = Indexed_pool.global_slot_since_genesis t.pool in
       t.best_tip_ledger <- Some best_tip_ledger ;
       let pool_max_size = t.config.pool_max_size in
@@ -599,8 +636,6 @@ struct
               ]
             @ metadata )
       in
-      List.iter new_commands ~f:(vk_table_lift vk_table_inc) ;
-      List.iter removed_commands ~f:(vk_table_lift vk_table_dec) ;
       let compact_json =
         Fn.compose User_command.fee_payer_summary_json User_command.forget_check
       in
@@ -656,7 +691,6 @@ struct
         in
         (pool', List.rev dropped_rev)
       in
-      List.iter dropped_backtrack ~f:(vk_table_lift_hashed vk_table_dec) ;
       (* Track what locally generated commands were removed from the pool
          during backtracking due to the max size constraint. *)
       let locally_generated_dropped =
@@ -722,7 +756,6 @@ struct
                .transaction_hash cmd ) )
       in
       List.iter committed_commands ~f:(fun cmd ->
-          vk_table_lift_hashed vk_table_dec cmd ;
           Locally_generated.find_and_remove t.locally_generated_uncommitted cmd
           |> Option.iter ~f:(fun data ->
               Locally_generated.add_exn t.locally_generated_committed ~key:cmd
@@ -750,16 +783,12 @@ struct
           %i commands during backtracking to maintain max size."
         (Indexed_pool.size t.pool) (Indexed_pool.size pool'')
         (List.length dropped_backtrack) ;
-      Mina_metrics.(
-        Gauge.set Transaction_pool.pool_size
-          (Float.of_int (Indexed_pool.size pool'')) ) ;
-      t.pool <- pool'' ;
+      set_pool t pool'' ;
       List.iter locally_generated_dropped ~f:(fun cmd ->
           (* If the dropped transaction was included in the winning chain, it'll
              be in locally_generated_committed. If it wasn't, try re-adding to
              the pool. *)
           let remove_cmd () =
-            vk_table_lift_hashed vk_table_dec cmd ;
             assert (
               Option.is_some
               @@ Locally_generated.find_and_remove
@@ -817,11 +846,7 @@ struct
                             , Transaction_hash.User_command_with_valid_signature
                               .to_yojson cmd )
                           ] ;
-                      vk_table_lift_hashed Vk_refcount_table.inc cmd ;
-                      Mina_metrics.(
-                        Gauge.set Transaction_pool.pool_size
-                          (Float.of_int (Indexed_pool.size pool''')) ) ;
-                      t.pool <- pool''' )
+                      set_pool t pool''' )
               | None ->
                   log_and_remove "Fee_payer_account not found"
                     ~metadata:
@@ -836,15 +861,11 @@ struct
                 , Transaction_hash.User_command_with_valid_signature.to_yojson
                     cmd )
               ] ;
-          vk_table_lift_hashed vk_table_dec cmd ;
           ignore
             ( Locally_generated.find_and_remove t.locally_generated_uncommitted
                 cmd
               : (Time_float.t * [ `Batch of int ]) option ) ) ;
-      Mina_metrics.(
-        Gauge.set Transaction_pool.pool_size
-          (Float.of_int (Indexed_pool.size pool)) ) ;
-      t.pool <- pool
+      set_pool t pool
 
     let handle_transition_frontier_diff
         ( ({ new_commands; removed_commands; reorg_best_tip = _ } :
@@ -925,16 +946,6 @@ struct
                                 account"
                              (Base_ledger.get validation_ledger loc) )
                  in
-                 (* The dropped commands leave the pool here, so their vk
-                    refcounts must be decremented to match the increments
-                    made when they were added. *)
-                 let dec_vk_refcounts =
-                   Vk_refcount_table.lift_hashed t.verification_key_table
-                     (fun vk_table ~account_id ~vk ->
-                       Vk_refcount_table.dec vk_table ~account_id
-                         ~vk_hash:vk.hash )
-                 in
-                 List.iter dropped ~f:dec_vk_refcounts ;
                  let dropped_locally_generated =
                    remove_locally_generated t dropped
                  in
@@ -959,10 +970,7 @@ struct
                    !"Re-validated transaction pool after restart: dropped %i \
                      of %i previously in pool"
                    (List.length dropped) (Indexed_pool.size t.pool) ;
-                 Mina_metrics.(
-                   Gauge.set Transaction_pool.pool_size
-                     (Float.of_int (Indexed_pool.size new_pool)) ) ;
-                 t.pool <- new_pool ;
+                 set_pool t new_pool ;
                  t.best_tip_diff_relay <-
                    Some
                      (Broadcast_pipe.Reader.iter
@@ -1375,13 +1383,6 @@ struct
               | Error err ->
                   (pool, Error (cmd, err)) )
         in
-        let added_cmds =
-          List.filter_map add_results ~f:(function
-            | Ok (cmd, _, Command_state.New_command) ->
-                Some cmd
-            | Ok (_, _, Command_state.Rebroadcast) | Error _ ->
-                None )
-        in
         let dropped_for_add =
           List.filter_map add_results ~f:(function
             | Ok (_, dropped, Command_state.New_command) ->
@@ -1396,16 +1397,6 @@ struct
         in
         (* handle drops of locally generated commands *)
         let all_dropped_cmds = dropped_for_add @ dropped_for_size in
-
-        (* apply changes to the vk-refcount-table here *)
-        let () =
-          let lift = Vk_refcount_table.lift_hashed t.verification_key_table in
-          List.iter added_cmds ~f:(lift Vk_refcount_table.inc) ;
-          List.iter all_dropped_cmds
-            ~f:
-              (lift (fun t ~account_id ~vk ->
-                   Vk_refcount_table.dec t ~account_id ~vk_hash:vk.hash ) )
-        in
         let dropped_for_add_hashes =
           List.map dropped_for_add
             ~f:
@@ -1461,10 +1452,9 @@ struct
             | Error _ ->
                 () ) ;
         (* finalize the update to the pool *)
-        t.pool <- pool ;
+        set_pool t pool ;
         let pool_size_after = Indexed_pool.size pool in
         Mina_metrics.(
-          Gauge.set Transaction_pool.pool_size (Float.of_int pool_size_after) ;
           List.iter
             (List.init (max 0 (pool_size_after - pool_size_before)) ~f:Fn.id)
             ~f:(fun _ ->
@@ -1642,6 +1632,60 @@ struct
              (List.map ~f:(fun (txn, _) ->
                   Transaction_hash.User_command_with_valid_signature.command txn
                   |> User_command.read_all_proofs_from_disk ) )
+
+    module For_tests = struct
+      (** Recompute the refcount table from pool membership and check the two
+          agree. If this throws there is a bug -- the same contract as
+          [Indexed_pool.For_tests.assert_pool_consistency], which it
+          deliberately mirrors.
+
+          Living in [For_tests] is the gate: this walks the pool and runs
+          [extract_vks] per command, which is too much for the daemon on a path
+          that runs per gossip diff. [set_pool] keeps the O(1) degenerate case
+          instead. *)
+      let assert_refcount_consistency t =
+        let expected_by_account =
+          Indexed_pool.get_all t.pool
+          |> List.concat_map ~f:(fun cmd ->
+              Transaction_hash.User_command_with_valid_signature.forget_check
+                cmd
+              |> With_hash.data |> User_command.extract_vks )
+          |> List.fold ~init:Account_id.Map.empty
+               ~f:(fun acc (account_id, (vk : Verification_key_wire.t)) ->
+                 Map.update acc account_id ~f:(fun vks ->
+                     Map.update
+                       (Option.value vks ~default:Zkapp_basic.F_map.Map.empty)
+                       vk.hash ~f:(function
+                       | None ->
+                           1
+                       | Some count ->
+                           count + 1 ) ) )
+        in
+        let actual_by_account =
+          Hashtbl.to_alist t.verification_key_table.account_id_to_vks
+          |> Account_id.Map.of_alist_exn
+        in
+        assert (
+          Map.equal (Map.equal Int.equal) expected_by_account actual_by_account ) ;
+        (* [verification_keys] carries one count per vk, summed over every
+           account referencing it. *)
+        let expected_by_vk =
+          Map.fold expected_by_account ~init:Zkapp_basic.F_map.Map.empty
+            ~f:(fun ~key:_ ~data:vks acc ->
+              Map.fold vks ~init:acc ~f:(fun ~key:vk_hash ~data:count acc ->
+                  Map.update acc vk_hash ~f:(function
+                    | None ->
+                        count
+                    | Some total ->
+                        total + count ) ) )
+        in
+        let actual_by_vk =
+          Hashtbl.to_alist t.verification_key_table.verification_keys
+          |> List.map ~f:(fun (vk_hash, (count, _tag)) -> (vk_hash, count))
+          |> Zkapp_basic.F_map.Map.of_alist_exn
+        in
+        assert (Map.equal Int.equal expected_by_vk actual_by_vk)
+    end
   end
 
   include Network_pool_base.Make (Transition_frontier) (Resource_pool)
@@ -1959,6 +2003,7 @@ let%test_module _ =
 
     let assert_pool_txs test txs =
       Indexed_pool.For_tests.assert_pool_consistency test.txn_pool.pool ;
+      Test.Resource_pool.For_tests.assert_refcount_consistency test.txn_pool ;
       assert_locally_generated test.txn_pool ;
       assert_fee_wu_ordering test.txn_pool ;
       assert_user_command_sets_equal
@@ -2852,16 +2897,6 @@ let%test_module _ =
               ~find_vk:(fun _ _ -> Ok vk)
               zkapp_command ) )
 
-    (* Drop every refcount the pool is holding. With an empty pool this leaves
-       exactly the chain refs taken at [handle_transition_frontier_diff_inner],
-       so clearing it reproduces the world in which those two lines are
-       deleted -- without editing the code under test. *)
-    let clear_vk_refcount_table (pool : Test.Resource_pool.t) =
-      let t = pool.verification_key_table in
-      Hashtbl.clear t.verification_keys ;
-      Hashtbl.clear t.account_id_to_vks ;
-      Hashtbl.clear t.vk_to_account_ids
-
     let%test_unit
         "a committed vk stays reachable through the best tip ledger once chain \
          refcounts are gone (zkapps)" =
@@ -2897,17 +2932,13 @@ let%test_module _ =
           let%bind setter = mk_vk_setting_command ~account_idx ~nonce:0 in
           let%bind () = advance_chain t [ setter ] in
           (* The ledger now carries the vk, and the command has left the pool.
-             The one table entry that remains is a chain ref and nothing else:
-             it is held only by the increment taken when the command entered
-             the best tip. Should that increment ever be removed, this expects
-             0 rather than 1, and the rest of the test is unaffected. *)
+             When this test was written the chain refs were still in place, so
+             one table entry survived here and the test cleared the table by
+             hand to reach the state below. Refcounts now track pool membership
+             only, so the empty pool empties the table on its own -- what was a
+             counterfactual is the real behaviour. *)
           assert (Option.is_some (ledger_vk ())) ;
           assert_pool_txs t [] ;
-          [%test_eq: int] 1 (vk_table_size ()) ;
-          (* Delete the chain refs. This is the counterfactual: an empty pool
-             plus an empty table is exactly the state the pool would be in if
-             the two chain-ref lines did not exist. *)
-          clear_vk_refcount_table t.txn_pool ;
           [%test_eq: int] 0 (vk_table_size ()) ;
           (* A proof-authorized command against that account must still
              convert to a verifiable and pass verification, finding the vk via
