@@ -1514,6 +1514,11 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
         (* Start auto hardfork config generation if conditions are met *)
         O1trace.background_thread "auto_hardfork_config_generation" (fun () ->
             Mina_run.start_auto_hardfork_config_generation ~logger mina ) ;
+        (* On a forked network, keep offering the fork configuration to the
+           archive. It is the only message the archive's hand-over needs, so a
+           single lost delivery would leave it with no record of the fork. *)
+        O1trace.background_thread "hardfork_config_heartbeat" (fun () ->
+            Mina_run.start_hardfork_config_heartbeat ~logger mina ) ;
         (*This pipe is consumed only by integration tests*)
         don't_wait_for
           (Pipe_lib.Strict_pipe.Reader.iter_without_pushback

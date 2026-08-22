@@ -66,6 +66,11 @@ let dispatch_precomputed_block =
 let dispatch_extensional_block =
   make_dispatch_block Archive_lib.Rpc.extensional_block
 
+let dispatch_hardfork_config ?max_tries ~logger archive_location ~config_json =
+  dispatch ?max_tries ~logger archive_location
+    (Archive_lib.Diff.Transition_frontier
+       (Archive_lib.Diff.Transition_frontier.Hardfork_config { config_json }) )
+
 let transfer
     (breadcrumb_reader :
       Transition_frontier.Extensions.New_breadcrumbs.view
