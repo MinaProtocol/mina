@@ -45,6 +45,17 @@ let command_run =
             Postgres Out of Memory errors when handling very big genesis file. \
             Default is 100."
          (optional_with_default 100 int)
+     and hardfork_confirmations =
+       flag "--hardfork-confirmations"
+         ~aliases:[ "-hardfork-confirmations" ]
+         ~doc:
+           "int How many blocks must sit above the fork block before the \
+            archive settles the chain boundary after a hard fork. The fork \
+            block accumulates these during the window between slot_tx_end and \
+            slot_chain_end, when blocks are still produced but carry no \
+            transactions, so the achievable number is well below that window's \
+            length in slots. Default is 20."
+         (optional_with_default 20 int)
      in
      let runtime_config_opt =
        Option.map runtime_config_file ~f:(fun file ->
@@ -67,7 +78,8 @@ let command_run =
          ~server_port:
            (Option.value server_port.value ~default:server_port.default)
          ~delete_older_than ~runtime_config_opt ~missing_blocks_width
-         ~signature_kind:Mina_signature_kind.t_DEPRECATED )
+         ~signature_kind:Mina_signature_kind.t_DEPRECATED
+         ~hardfork_confirmations )
 
 let time_arg =
   (* Same timezone as Genesis_constants.genesis_state_timestamp. *)
