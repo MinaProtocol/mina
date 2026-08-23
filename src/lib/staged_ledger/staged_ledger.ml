@@ -1819,17 +1819,13 @@ module T = struct
           in
           ({ new_t with budget }, Some uc)
 
-    let worked_more ~constraint_constants resources =
-      (* Is the work constraint satisfied even after discarding a work bundle?
-         We reach here after having more than enough work
-      *)
-      let more_work t =
-        let slots = slots_occupied t in
-        let cw_count = t.completed_work_count in
-        cw_count > 0 && cw_count >= slots
-      in
-      let r, _ = discard_last_work ~constraint_constants resources in
-      more_work r
+    (* Is the work constraint satisfied after discarding a work bundle? Applied
+       to the result of [discard_last_work], having reached it with more than
+       enough work. *)
+    let more_work t =
+      let slots = slots_occupied t in
+      let cw_count = t.completed_work_count in
+      cw_count > 0 && cw_count >= slots
 
     let incr_coinbase_part_by ~constraint_constants t count =
       let open Or_error.Let_syntax in
@@ -1888,23 +1884,25 @@ module T = struct
         Resources.budget_sufficient resources
       then
         if Resources.space_constraint_satisfied resources then (resources, log)
-        else if Resources.worked_more ~constraint_constants resources then
-          (* There are too many fee_transfers(from the proofs) occupying the slots. discard one and check *)
-          let resources', work_opt =
+        else
+          let without_last_work =
             Resources.discard_last_work ~constraint_constants resources
           in
-          check_constraints_and_update ~constraint_constants resources'
-            (Option.value_map work_opt ~default:log ~f:(fun work ->
-                 Diff_creation_log.discard_completed_work `Extra_work work log )
-            )
-        else
-          (* Well, there's no space; discard a user command *)
-          let resources', uc_opt = Resources.discard_user_command resources in
-          check_constraints_and_update ~constraint_constants resources'
-            (Option.value_map uc_opt ~default:log ~f:(fun uc ->
-                 Diff_creation_log.discard_command `No_space
-                   (User_command.forget_check uc)
-                   log ) )
+          if Resources.more_work (fst without_last_work) then
+            (* There are too many fee_transfers(from the proofs) occupying the slots. discard one and check *)
+            let resources', work_opt = without_last_work in
+            check_constraints_and_update ~constraint_constants resources'
+              (Option.value_map work_opt ~default:log ~f:(fun work ->
+                   Diff_creation_log.discard_completed_work `Extra_work work log )
+              )
+          else
+            (* Well, there's no space; discard a user command *)
+            let resources', uc_opt = Resources.discard_user_command resources in
+            check_constraints_and_update ~constraint_constants resources'
+              (Option.value_map uc_opt ~default:log ~f:(fun uc ->
+                   Diff_creation_log.discard_command `No_space
+                     (User_command.forget_check uc)
+                     log ) )
       else
         (* insufficient budget; reduce the cost*)
         let resources', work_opt =
