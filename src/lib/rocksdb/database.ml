@@ -7,6 +7,8 @@ type t = { uuid : Uuid.Stable.V1.t; db : (Rocks.t[@sexp.opaque]) }
 let create directory =
   let opts = Rocks.Options.create () in
   Rocks.Options.set_create_if_missing opts true ;
+  Rocks.Options.set_allow_mmap_reads opts true ;
+  Rocks.Options.set_allow_mmap_writes opts true ;
   Rocks.Options.set_prefix_extractor opts
     (Rocks.Options.SliceTransform.Noop.create_no_gc ()) ;
   { uuid = Uuid_unix.create (); db = Rocks.open_db ~opts directory }
