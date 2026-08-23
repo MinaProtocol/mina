@@ -114,24 +114,29 @@ module Make (Inputs : Inputs_intf) :
         in
         Sync_ledger.Any_ledger.Responder.answer_query responder query
 
+  (* The protocol states a scan state refers to, looked up in the frontier.
+     Shared by the whole-scan-state RPC and the fragment-wise one. *)
+  let protocol_states_of_scan_state ~frontier scan_state =
+    Staged_ledger.Scan_state.required_state_hashes scan_state
+    |> State_hash.Set.to_list
+    |> List.fold_until ~init:(Some [])
+         ~f:(fun acc hash ->
+           match
+             Option.map2
+               (Transition_frontier.find_protocol_state frontier hash)
+               acc ~f:List.cons
+           with
+           | None ->
+               Stop None
+           | Some acc' ->
+               Continue (Some acc') )
+         ~finish:Fn.id
+
   let get_staged_ledger_aux_and_pending_coinbases_at_hash ~logger ~frontier
       state_hash =
     let open Option.Let_syntax in
     let protocol_states scan_state =
-      Staged_ledger.Scan_state.required_state_hashes scan_state
-      |> State_hash.Set.to_list
-      |> List.fold_until ~init:(Some [])
-           ~f:(fun acc hash ->
-             match
-               Option.map2
-                 (Transition_frontier.find_protocol_state frontier hash)
-                 acc ~f:List.cons
-             with
-             | None ->
-                 Stop None
-             | Some acc' ->
-                 Continue (Some acc') )
-           ~finish:Fn.id
+      protocol_states_of_scan_state ~frontier scan_state
     in
     match
       let%bind breadcrumb = Transition_frontier.find frontier state_hash in
@@ -165,6 +170,118 @@ module Make (Inputs : Inputs_intf) :
         , staged_ledger_target_ledger_hash root
         , pending_coinbase root
         , scan_state_protocol_states )
+
+  (** Answer one scan state sync query.
+
+      A {!Staged_ledger.Scan_state.Sync.Responder} is built over a whole scan
+      state and then answers any number of queries against it, so it is cached
+      against the state hash it was built for: a bootstrapping peer asks for
+      one manifest and then many bands and payloads, and rebuilding the index
+      for each would be the expensive way round.
+
+      Only the manifest query names a state hash. A band names its tree by
+      digest and a payload names itself, so those are looked up across the
+      cached responders. They cannot be served from the best tip instead: a
+      tree's digest covers its contents, so the best tip's trees hash
+      differently from those of the root a peer is bootstrapping to. A band
+      query is therefore only answerable by a node that has already served the
+      manifest describing it, which is why the asker pins the whole session to
+      one peer.
+
+      The cache is bounded and evicted oldest-first. Each entry is one
+      bootstrapping peer's session, and a session is short. *)
+  let scan_state_responder_cache_size = 16
+
+  let scan_state_responders :
+      Staged_ledger.Scan_state.Sync.Responder.t State_hash.Table.t =
+    State_hash.Table.create ()
+
+  let scan_state_responder_order : State_hash.t Queue.t = Queue.create ()
+
+  let scan_state_responder ~frontier state_hash =
+    match Hashtbl.find scan_state_responders state_hash with
+    | Some responder ->
+        Some responder
+    | None ->
+        let open Option.Let_syntax in
+        let%map scan_state, ledger_hash, pending_coinbase =
+          match Transition_frontier.find frontier state_hash with
+          | Some breadcrumb ->
+              let staged_ledger =
+                Transition_frontier.Breadcrumb.staged_ledger breadcrumb
+              in
+              Some
+                ( Staged_ledger.scan_state staged_ledger
+                , Staged_ledger_hash.ledger_hash
+                    (Breadcrumb.staged_ledger_hash breadcrumb)
+                , Staged_ledger.pending_coinbase_collection staged_ledger )
+          | None ->
+              let open Root_data.Historical in
+              let%map root = find_in_root_history frontier state_hash in
+              ( scan_state root
+              , staged_ledger_target_ledger_hash root
+              , pending_coinbase root )
+        in
+        let responder =
+          Staged_ledger.Scan_state.Sync.Responder.create scan_state ~ledger_hash
+            ~pending_coinbase
+        in
+        Hashtbl.set scan_state_responders ~key:state_hash ~data:responder ;
+        Queue.enqueue scan_state_responder_order state_hash ;
+        while
+          Queue.length scan_state_responder_order
+          > scan_state_responder_cache_size
+        do
+          Hashtbl.remove scan_state_responders
+            (Queue.dequeue_exn scan_state_responder_order)
+        done ;
+        responder
+
+  let answer_scan_state_query ~frontier query =
+    let open Option.Let_syntax in
+    match query with
+    | Staged_ledger.Scan_state.Sync.Query.Protocol_states state_hash ->
+        (* Which states are needed is a property of the scan state, so the
+           responder works it out rather than the asker, who does not have one
+           assembled yet. *)
+        let%bind scan_state =
+          match Transition_frontier.find frontier state_hash with
+          | Some breadcrumb ->
+              Some
+                ( Transition_frontier.Breadcrumb.staged_ledger breadcrumb
+                |> Staged_ledger.scan_state )
+          | None ->
+              Option.map
+                (find_in_root_history frontier state_hash)
+                ~f:Root_data.Historical.scan_state
+        in
+        let%map states = protocol_states_of_scan_state ~frontier scan_state in
+        Staged_ledger.Scan_state.Sync.Answer.Protocol_states states
+    | Manifest state_hash ->
+        let%bind responder = scan_state_responder ~frontier state_hash in
+        Staged_ledger.Scan_state.Sync.Responder.respond responder query
+    | Band _ ->
+        List.find_map (Hashtbl.data scan_state_responders) ~f:(fun responder ->
+            Staged_ledger.Scan_state.Sync.Responder.respond responder query )
+    | Payloads _ ->
+        (* Every responder is asked, because a payload the asker wants may sit
+           in a tree described by one session's manifest and not another's, and
+           an empty answer is indistinguishable from a refusal. *)
+        let payloads =
+          List.concat_map (Hashtbl.data scan_state_responders)
+            ~f:(fun responder ->
+              match
+                Staged_ledger.Scan_state.Sync.Responder.respond responder query
+              with
+              | Some (Staged_ledger.Scan_state.Sync.Answer.Payloads payloads) ->
+                  payloads
+              | _ ->
+                  [] )
+          |> List.dedup_and_sort ~compare:(fun (a, _) (b, _) ->
+                 String.compare a b )
+        in
+        if List.is_empty payloads then None
+        else Some (Staged_ledger.Scan_state.Sync.Answer.Payloads payloads)
 
   let get_transition_chain ~frontier hashes =
     let open Option.Let_syntax in

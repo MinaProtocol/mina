@@ -246,6 +246,15 @@ module type Sync_handler_intf = sig
        * Mina_state.Protocol_state.value list )
        Option.t
 
+  (** Answer one scan state sync query. Only the manifest and protocol states
+      queries name a state hash; bands and payloads name themselves by digest,
+      so they are looked up across the scan states a manifest has already been
+      served for. *)
+  val answer_scan_state_query :
+       frontier:transition_frontier
+    -> Staged_ledger.Scan_state.Sync.Query.t
+    -> Staged_ledger.Scan_state.Sync.Answer.t option
+
   val get_transition_chain :
        frontier:transition_frontier
     -> State_hash.t list
