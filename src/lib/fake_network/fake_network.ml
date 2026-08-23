@@ -191,6 +191,10 @@ include struct
             get_staged_ledger_aux_and_pending_coinbases_at_hash
         | Answer_sync_ledger_query ->
             answer_sync_ledger_query
+        | Answer_scan_state_query ->
+            (* no mock: tests that need scan state sync drive the responder
+               directly rather than through a fake network *)
+            None
         | Get_transition_chain ->
             get_transition_chain
         | Get_transition_knowledge ->

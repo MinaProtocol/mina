@@ -835,6 +835,28 @@ module Network = struct
     Counter.v "answer_sync_ledger_query_rpc_responses_failed" ~help ~namespace
       ~subsystem
 
+  let answer_scan_state_query_rpcs_sent =
+    let help = "# of Answer_scan_state_query rpc requests sent" in
+    let name = "answer_scan_state_query_rpcs_sent" in
+    ( Counter.v name ~help ~namespace ~subsystem
+    , Gauge.v (name ^ surfix) ~help ~namespace ~subsystem )
+
+  let answer_scan_state_query_rpcs_received =
+    let help = "# of Answer_scan_state_query rpc requests received" in
+    let name = "answer_scan_state_query_rpcs_received" in
+    ( Counter.v name ~help ~namespace ~subsystem
+    , Gauge.v (name ^ surfix) ~help ~namespace ~subsystem )
+
+  let answer_scan_state_query_rpc_requests_failed : Counter.t =
+    let help = "# of Answer_scan_state_query rpc requests failed" in
+    Counter.v "answer_scan_state_query_rpc_requests_failed" ~help ~namespace
+      ~subsystem
+
+  let answer_scan_state_query_rpc_responses_failed : Counter.t =
+    let help = "# of Answer_scan_state_query rpc requests failed to respond" in
+    Counter.v "answer_scan_state_query_rpc_responses_failed" ~help ~namespace
+      ~subsystem
+
   let get_transition_chain_rpcs_sent =
     let help = "# of Get_transition_chain rpc requests sent" in
     let name = "get_transition_chain_rpcs_sent" in

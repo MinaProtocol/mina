@@ -261,6 +261,14 @@ module Network : sig
 
   val answer_sync_ledger_query_rpc_responses_failed : Counter.t
 
+  val answer_scan_state_query_rpcs_sent : Counter.t * Gauge.t
+
+  val answer_scan_state_query_rpcs_received : Counter.t * Gauge.t
+
+  val answer_scan_state_query_rpc_requests_failed : Counter.t
+
+  val answer_scan_state_query_rpc_responses_failed : Counter.t
+
   val get_transition_chain_rpcs_sent : Counter.t * Gauge.t
 
   val get_transition_chain_rpcs_received : Counter.t * Gauge.t
