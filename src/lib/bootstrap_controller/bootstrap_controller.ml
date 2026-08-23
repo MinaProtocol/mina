@@ -299,11 +299,22 @@ let download_scan_state_in_fragments ~logger ~network ~peer_id ~state_hash
     ~expected_staged_ledger_hash ~band_height =
   let open Deferred.Or_error.Let_syntax in
   let module Sync = Staged_ledger.Scan_state.Sync in
-  let ask query =
-    Mina_networking.answer_scan_state_query network peer_id query
+  (* One call per round, not per fragment: the networking layer opens a fresh
+     stream and handshakes for each call it makes, so asking fragment by
+     fragment costs a stream apiece and eventually exhausts them. *)
+  let ask queries =
+    Mina_networking.answer_scan_state_queries network peer_id queries
+  in
+  let ask_one query =
+    match%bind ask [ query ] with
+    | [ answer ] ->
+        return answer
+    | _ ->
+        Deferred.Or_error.error_string
+          "peer answered a single scan state query with several answers"
   in
   let%bind manifest =
-    match%bind ask (Sync.Query.Manifest state_hash) with
+    match%bind ask_one (Sync.Query.Manifest state_hash) with
     | Sync.Answer.Manifest manifest ->
         return manifest
     | _ ->
@@ -337,18 +348,25 @@ let download_scan_state_in_fragments ~logger ~network ~peer_id ~state_hash
           Deferred.Or_error.error_string
             "scan state sync repeated a round of queries without progress"
         else
+          let%bind answers = ask queries in
           let%bind () =
-            Deferred.Or_error.List.iter queries ~how:`Sequential
-              ~f:(fun query ->
-                let%bind answer = ask query in
-                Deferred.return (Sync.Builder.add_answer builder ~query answer) )
+            match List.zip queries answers with
+            | Ok pairs ->
+                Deferred.return
+                  ( List.map pairs ~f:(fun (query, answer) ->
+                        Sync.Builder.add_answer builder ~query answer )
+                  |> Or_error.all_unit )
+            | Unequal_lengths ->
+                Deferred.Or_error.error_string
+                  "peer answered a different number of scan state queries than \
+                   it was asked"
           in
           drive asked
   in
   let%bind () = drive [] in
   let%bind scan_state = Deferred.return (Sync.Builder.finish builder) in
   let%map protocol_states =
-    match%bind ask (Sync.Query.Protocol_states state_hash) with
+    match%bind ask_one (Sync.Query.Protocol_states state_hash) with
     | Sync.Answer.Protocol_states states ->
         return states
     | _ ->
