@@ -623,3 +623,42 @@ CREATE TABLE hardfork_state
 , announced_at            timestamptz      NOT NULL DEFAULT now()
 , finalized_at            timestamptz
 );
+
+/* -----------------------------------------------------------------------
+   Genesis ledger accounts
+
+   The state every account was in when an era's genesis ledger was
+   established. These accounts were accessed by no transaction -- they are
+   initial conditions, not block effects -- so they do not belong in
+   accounts_accessed, which means exactly "what blocks did".
+
+   Needed because a balance query is a snapshot lookup: it finds the most
+   recent block at or below the requested height where the account appears.
+   An account untouched since its era's genesis appears in no such block, and
+   without this table the query answers zero rather than its real balance.
+
+   APPEND ONLY, keyed by the height the ledger takes effect at. A database
+   spans every era it has lived through, and a balance query at a pre-fork
+   height still needs the earlier era's genesis balance for an account that was
+   untouched throughout it. Deleting a previous era's rows makes that question
+   unanswerable forever.
+
+   Timing columns are NULL for untimed accounts.
+*/
+
+CREATE TABLE genesis_accounts
+( genesis_height           bigint  NOT NULL
+, public_key               text    NOT NULL
+, token                    text    NOT NULL
+, balance                  text    NOT NULL
+, nonce                    bigint  NOT NULL
+, initial_minimum_balance  text
+, cliff_time               bigint
+, cliff_amount             text
+, vesting_period           bigint
+, vesting_increment        text
+, PRIMARY KEY (genesis_height, public_key, token)
+);
+
+CREATE INDEX idx_genesis_accounts_lookup
+  ON genesis_accounts(public_key, token, genesis_height DESC);
