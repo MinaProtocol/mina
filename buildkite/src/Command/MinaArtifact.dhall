@@ -358,6 +358,8 @@ let build_artifacts
                             , Network.foldMinaBuildMainnetEnv nets
                             , "PREFORK_LEGACY_VERSION=${spec.deb_legacy_version}"
                             , "PREFORK_GITHASH_CONFIG=${spec.deb_legacy_githash_config}"
+                            , "MINA_DEB_RELEASE=${DebianChannel.lowerName
+                                                    spec.channel}"
                             ]
                           # BuildFlags.buildEnvs spec.buildFlags
                           # spec.extraBuildEnvs
@@ -383,6 +385,10 @@ let build_artifacts
                 }
 
 let commonBuildEnvs =
+    -- MINA_DEB_RELEASE is the channel. builder-helpers.sh writes it into every
+    -- control file as `Suite:` and defaults it to "unstable", so before it was
+    -- passed here a package built for stable still declared itself unstable,
+    -- and only the promotion step put that right.
           \(spec : PackagingSpec.Type)
       ->  let nets = Artifact.networks spec.artifacts
 
@@ -397,6 +403,7 @@ let commonBuildEnvs =
                 , Network.foldMinaBuildMainnetEnv nets
                 , "PREFORK_LEGACY_VERSION=${spec.deb_legacy_version}"
                 , "PREFORK_GITHASH_CONFIG=${spec.deb_legacy_githash_config}"
+                , "MINA_DEB_RELEASE=${DebianChannel.lowerName spec.channel}"
                 ]
               # BuildFlags.buildEnvs spec.buildFlags
               # spec.extraBuildEnvs
@@ -777,7 +784,12 @@ let docker_commands
                 DockerImage.ReleaseSpec.Type
                 Command.Type
                 (     \(s : DockerImage.ReleaseSpec.Type)
-                  ->  DockerImage.generateStep s
+                  ->  DockerImage.generateStep
+                        (     s
+                          //  { deb_release =
+                                  DebianChannel.lowerName spec.channel
+                              }
+                        )
                 )
                 flattened_docker_steps
 
