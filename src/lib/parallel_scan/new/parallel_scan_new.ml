@@ -1200,9 +1200,11 @@ module Wire = struct
           { merges :
               'merge Merge_node.Stable.V1.t
               Mina_stdlib.Bounded_types.ArrayN4000.Stable.V1.t
+              list
           ; bases :
               'base Base_node.Stable.V1.t
               Mina_stdlib.Bounded_types.ArrayN4000.Stable.V1.t
+              list
           ; filled : int
           ; level : int
           ; proved : int
@@ -1225,10 +1227,24 @@ module Wire = struct
     end
   end]
 
-  (* [ArrayN4000] bounds a tree at 4000 nodes per array, which covers a
-     transaction capacity up to 2^11. It is a ceiling to raise before the
-     capacity is, and the right kind of ceiling to have: it is what stops a
-     peer declaring an array it has no intention of sending. *)
+  (* A tree's nodes go on the wire as a list of bounded chunks rather than as
+     one array. [ArrayN4000] is what stops a peer declaring an array it has no
+     intention of sending, and that guard should not have to be relaxed every
+     time the transaction capacity goes up: a tree holds [2^k] base slots, so
+     one array per tree would exceed 4000 at a capacity of [2^12] and the
+     bound would be chasing the capacity forever. Chunking keeps the guard
+     fixed and independent of how deep the scan state is. *)
+  let wire_chunk_length = Mina_stdlib.Bounded_types.N4000.max_array_len
+
+  let chunk (a : 'a array) : 'a array list =
+    let n = Array.length a in
+    List.init
+      ((n + wire_chunk_length - 1) / wire_chunk_length)
+      ~f:(fun i ->
+        let pos = i * wire_chunk_length in
+        Array.sub a ~pos ~len:(min wire_chunk_length (n - pos)) )
+
+  let unchunk (chunks : 'a array list) : 'a array = Array.concat chunks
 
   type ('merge, 'base) t = ('merge, 'base) Stable.Latest.t =
     { trees : ('merge, 'base) Tree.Stable.Latest.t list
@@ -1242,8 +1258,8 @@ end
 let to_wire (t : ('merge, 'base) t) : ('merge, 'base) Wire.t =
   { trees =
       List.map t.trees ~f:(fun tree ->
-          { Wire.Tree.merges = tree.merges
-          ; bases = tree.bases
+          { Wire.Tree.merges = Wire.chunk tree.merges
+          ; bases = Wire.chunk tree.bases
           ; filled = tree.filled
           ; level = tree.level
           ; proved = tree.proved
@@ -1258,8 +1274,8 @@ let of_wire (w : ('merge, 'base) Wire.t) ~payload_digest : ('merge, 'base) t =
   { trees =
       List.map w.trees ~f:(fun tree ->
           Tree.rebuilt ~payload_digest
-            { Tree.merges = tree.merges
-            ; bases = tree.bases
+            { Tree.merges = Wire.unchunk tree.merges
+            ; bases = Wire.unchunk tree.bases
             ; digests = Tree.empty_digests ~depth
             ; filled = tree.filled
             ; level = tree.level
@@ -1821,6 +1837,54 @@ let%test_module "port" =
               raise_s [%message "wire round trip changed the commitment"] ;
             [%test_eq: node list] (new_nodes !t) (new_nodes back)
           done )
+
+    (* A tree wider than one wire chunk. [ArrayN4000] refuses to serialise an
+       array longer than 4000, so a capacity of 2^12 puts 4096 base slots and
+       4095 merge nodes past that bound — which is why the wire form chunks.
+       The cheap capacities above never reach it, so without this the bound is
+       only discovered by a node that cannot start. *)
+    let%test_unit "wire round trip past the chunk length" =
+      let max_base_jobs = 4096 in
+      assert (max_base_jobs > Wire.wire_chunk_length) ;
+      let t = ref (empty ~max_base_jobs ~delay:1) in
+      let counter = ref 1 in
+      for _ = 1 to 3 do
+        let data = List.init max_base_jobs ~f:(fun i -> !counter + i) in
+        counter := !counter + max_base_jobs ;
+        let work =
+          List.concat (work_for_next_update !t ~data_count:max_base_jobs)
+        in
+        let completed_jobs = List.map (of_new work) ~f:job_done in
+        let _, t' =
+          Or_error.ok_exn (update !t ~payload_digest ~data ~completed_jobs)
+        in
+        t := t'
+      done ;
+      let wire = to_wire !t in
+      let check_chunk len =
+        if len > Wire.wire_chunk_length then
+          raise_s [%message "a wire chunk exceeded the bound" ~(len : int)]
+      in
+      List.iter wire.trees ~f:(fun tree ->
+          List.iter tree.merges ~f:(fun c -> check_chunk (Array.length c)) ;
+          List.iter tree.bases ~f:(fun c -> check_chunk (Array.length c)) ) ;
+      let bytes =
+        Binable.to_string
+          ( module struct
+            type t = (int, int) Wire.Stable.V1.t [@@deriving bin_io]
+          end )
+          wire
+      in
+      let back =
+        of_wire ~payload_digest
+          (Binable.of_string
+             ( module struct
+               type t = (int, int) Wire.Stable.V1.t [@@deriving bin_io]
+             end )
+             bytes )
+      in
+      if not (Hash.equal (hash back) (hash !t)) then
+        raise_s [%message "wire round trip changed the commitment"]
 
     (* The effectful fold must visit what the pure one visits, in the same
        order — [scan_statement] composes statements along it. *)
