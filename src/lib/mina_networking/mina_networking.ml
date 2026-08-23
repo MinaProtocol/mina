@@ -368,6 +368,33 @@ let get_staged_ledger_aux_and_pending_coinbases_at_hash t inet_addr input =
     ~rpc:Rpcs.Get_staged_ledger_aux_and_pending_coinbases_at_hash
   >>|? Envelope.Incoming.data
 
+(* Pinned to one peer, unlike most of the requests here. A scan state sync is a
+   session: the manifest fixes the digests that every later answer is checked
+   against, and only the peer that served it holds a responder keyed by them.
+   Spreading the follow-up queries over random peers asks nodes about a forest
+   they have never described. Multi-peer fetching wants the downloader, which
+   can pin per band; see the sync design notes. *)
+
+(** Ask one peer a scan state sync query.
+
+    Unlike the whole-scan-state RPC this replaces, a failed call costs one
+    fragment rather than the entire state, so the caller can simply try the
+    next peer. *)
+let answer_scan_state_query t peer_id query =
+  let open Deferred.Let_syntax in
+  match%map query_peer t peer_id Rpcs.Answer_scan_state_query query with
+  | Connected { data = Ok (Some answer); _ } ->
+      Ok answer
+  | Connected { data = Ok None; _ } ->
+      Or_error.errorf
+        !"Peer %{sexp:Network_peer.Peer.Id.t} did not answer the scan state \
+          query"
+        peer_id
+  | Connected { data = Error e; _ } ->
+      Error e
+  | Failed_to_connect e ->
+      Error (Error.tag e ~tag:"failed-to-connect")
+
 let get_ancestry t inet_addr input =
   rpc_peer_then_random t inet_addr input ~rpc:Rpcs.Get_ancestry
 

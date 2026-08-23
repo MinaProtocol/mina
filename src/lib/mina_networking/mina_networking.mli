@@ -69,6 +69,12 @@ module Rpcs : sig
       Result.t
   end
 
+  module Answer_scan_state_query : sig
+    type query = Staged_ledger.Scan_state.Sync.Query.t
+
+    type response = Staged_ledger.Scan_state.Sync.Answer.t option
+  end
+
   module Get_transition_chain : sig
     type query = State_hash.t list
 
@@ -132,6 +138,8 @@ module Rpcs : sig
         : ( Answer_sync_ledger_query.query
           , Answer_sync_ledger_query.response )
           rpc
+    | Answer_scan_state_query
+        : (Answer_scan_state_query.query, Answer_scan_state_query.response) rpc
     | Get_transition_chain
         : (Get_transition_chain.query, Get_transition_chain.response) rpc
     | Get_transition_knowledge
@@ -234,6 +242,13 @@ val get_staged_ledger_aux_and_pending_coinbases_at_hash :
      * Pending_coinbase.t
      * Mina_state.Protocol_state.value list )
      Deferred.Or_error.t
+
+(** Ask one peer a scan state sync query. *)
+val answer_scan_state_query :
+     t
+  -> Peer.Id.t
+  -> Staged_ledger.Scan_state.Sync.Query.t
+  -> Staged_ledger.Scan_state.Sync.Answer.t Deferred.Or_error.t
 
 val get_completed_checked_snarks :
      t
