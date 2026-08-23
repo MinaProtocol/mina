@@ -12,20 +12,27 @@ module Scan_state : sig
   module Stable : sig
     [@@@no_toplevel_latest_type]
 
-    module V3 : sig
-      type t
+    module V4 : sig
+      type t = Transaction_snark_scan_state.Stable.V4.t
 
       val hash : t -> Staged_ledger_hash.Aux_hash.t
     end
   end]
 
-  type t
+  (* Transparent so that [Sync] below, and anything else that reaches for the
+     scan state's own interface, sees the same type. What that interface
+     exposes is governed by [Transaction_snark_scan_state]'s own mli. *)
+  type t = Transaction_snark_scan_state.t
 
   val hash : t -> Staged_ledger_hash.Aux_hash.t
 
   module Job_view : sig
     type t [@@deriving sexp, to_yojson]
   end
+
+  (** Serving and receiving a scan state in verifiable fragments. *)
+  module Sync :
+    module type of Transaction_snark_scan_state.Sync with type scan_state := t
 
   (** Space available and number of jobs required to enqueue transactions in the
       scan state.
