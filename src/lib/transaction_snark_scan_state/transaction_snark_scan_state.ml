@@ -1827,6 +1827,31 @@ module Sync = struct
 
   module Request = Parallel_scan_sync.Request
 
+  (** Where a scan state sync has got to, for [mina client status].
+
+      A sync runs inside the bootstrap controller, which has no transition
+      frontier to hang progress off the way catchup does, so the controller
+      publishes here and the daemon's status reads it. [None] means no sync is
+      running. *)
+  module Progress = struct
+    type t =
+      { bands_outstanding : int; payloads_received : int; payloads_known : int }
+
+    let current : t option ref = ref None
+
+    let report t = current := t
+
+    let get () = !current
+
+    (** As [(label, count)] pairs, which is how the daemon status already
+        renders the equivalent for catchup. *)
+    let to_entries t =
+      [ ("Bands outstanding", t.bands_outstanding)
+      ; ("Payloads received", t.payloads_received)
+      ; ("Payloads known", t.payloads_known)
+      ]
+  end
+
   (** A syncing node's side.
 
       Reception accumulates outside any scan state: the real type has
@@ -1946,6 +1971,20 @@ module Sync = struct
       in
       ( `Bands bands
       , `Payloads (payloads + Hashtbl.count t.incomplete ~f:Option.is_none) )
+
+    (** A snapshot for the daemon status. The known count grows as bands reveal
+        what is underneath them, so early in a sync it understates the work
+        left. *)
+    let progress t =
+      let `Bands bands, `Payloads _ = outstanding t in
+      let `Received received, `Known known =
+        Parallel_scan_sync.Builder.payload_progress t.inner
+      in
+      { Progress.bands_outstanding = bands
+      ; payloads_received =
+          received + Hashtbl.count t.incomplete ~f:Option.is_some
+      ; payloads_known = known + Hashtbl.length t.incomplete
+      }
 
     (** Assemble the serialised scan state, ready for
         {!write_all_proofs_to_disk}. Fails while anything is outstanding. *)

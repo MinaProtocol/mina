@@ -435,6 +435,11 @@ let get_status ~flag t =
           (List.map (Hashtbl.to_alist full.states) ~f:(fun (state, hashes) ->
                (state, State_hash.Set.length hashes) ) )
   in
+  let scan_state_sync_status =
+    Option.map
+      (Staged_ledger.Scan_state.Sync.Progress.get ())
+      ~f:Staged_ledger.Scan_state.Sync.Progress.to_entries
+  in
   let metrics =
     let open Mina_metrics.Block_producer in
     Mina_metrics.
@@ -461,6 +466,7 @@ let get_status ~flag t =
   { Daemon_rpcs.Types.Status.num_accounts
   ; sync_status
   ; catchup_status
+  ; scan_state_sync_status
   ; blockchain_length
   ; highest_block_length_received =
       (*if this function is not called until after catchup max_block_height will be 1 and most_recent_valid_transition pipe might have the genesis block as the latest transition in which case return the best tip length*)

@@ -370,6 +370,23 @@ module Sync : sig
     val respond : t -> Query.t -> Answer.t option
   end
 
+  (** Where a scan state sync has got to, for [mina client status]. A sync runs
+      inside the bootstrap controller, which has no transition frontier to hang
+      progress off the way catchup does, so the controller publishes here and
+      the daemon's status reads it. *)
+  module Progress : sig
+    type t =
+      { bands_outstanding : int; payloads_received : int; payloads_known : int }
+
+    (** [None] clears it, and means no sync is running. *)
+    val report : t option -> unit
+
+    val get : unit -> t option
+
+    (** As [(label, count)] pairs, the shape the daemon status renders. *)
+    val to_entries : t -> (string * int) list
+  end
+
   (** A syncing node's side: accumulates verified fragments and assembles a
       scan state once they are all in. *)
   module Builder : sig
@@ -395,6 +412,9 @@ module Sync : sig
     val add_answer : t -> query:Query.t -> Answer.t -> unit Or_error.t
 
     val outstanding : t -> [ `Bands of int ] * [ `Payloads of int ]
+
+    (** A snapshot for the daemon status. *)
+    val progress : t -> Progress.t
 
     (** Assemble the serialised scan state, ready for
         {!write_all_proofs_to_disk}. Fails while anything is outstanding. *)
