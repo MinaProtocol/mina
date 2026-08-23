@@ -302,8 +302,13 @@ module Sync : sig
   module Query : sig
     type t =
       | Manifest of State_hash.t
-      | Band of { tree : string; root : Address.t; height : int }
-      | Payloads of string list
+      | Band of
+          { scan_state : State_hash.t
+          ; tree : string
+          ; root : Address.t
+          ; height : int
+          }
+      | Payloads of { scan_state : State_hash.t; digests : string list }
       | Protocol_states of State_hash.t
     [@@deriving sexp]
 
@@ -315,6 +320,10 @@ module Sync : sig
         type nonrec t = t
       end
     end]
+
+    (** The scan state a query is about. Every query names one, so any peer
+        holding that root can answer it. *)
+    val scan_state : t -> State_hash.t
 
     val max_payloads_per_query : int
   end
@@ -372,6 +381,7 @@ module Sync : sig
         checked against something established here. *)
     val create :
          Manifest.t
+      -> state_hash:State_hash.t
       -> expected:Staged_ledger_hash.t
       -> band_height:int
       -> t Or_error.t

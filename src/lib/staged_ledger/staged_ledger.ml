@@ -2759,10 +2759,13 @@ let%test_module "staged ledger tests" =
           ~pending_coinbase:(Sl.pending_coinbase_collection sl)
       in
       let builder =
+        (* A responder answers from the scan state it was built over, so which
+           hash the queries name only matters to a node routing them through
+           its frontier. *)
         Or_error.ok_exn
           (Sync.Builder.create
              (Sync.Responder.manifest responder)
-             ~expected ~band_height:2 )
+             ~state_hash:State_hash.dummy ~expected ~band_height:2 )
       in
       let rec drive rounds =
         if rounds > 500 then failwith "scan state sync did not converge" ;

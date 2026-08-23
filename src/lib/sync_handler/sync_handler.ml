@@ -179,14 +179,9 @@ module Make (Inputs : Inputs_intf) :
       one manifest and then many bands and payloads, and rebuilding the index
       for each would be the expensive way round.
 
-      Only the manifest query names a state hash. A band names its tree by
-      digest and a payload names itself, so those are looked up across the
-      cached responders. They cannot be served from the best tip instead: a
-      tree's digest covers its contents, so the best tip's trees hash
-      differently from those of the root a peer is bootstrapping to. A band
-      query is therefore only answerable by a node that has already served the
-      manifest describing it, which is why the asker pins the whole session to
-      one peer.
+      Every query names the scan state it is about, so this node can answer any
+      of them for any root it still holds, whether or not it served the
+      manifest. That is what lets an asker spread a sync over several peers.
 
       The cache is bounded and evicted oldest-first. Each entry is one
       bootstrapping peer's session, and a session is short. *)
@@ -239,8 +234,9 @@ module Make (Inputs : Inputs_intf) :
 
   let answer_scan_state_query ~frontier query =
     let open Option.Let_syntax in
+    let state_hash = Staged_ledger.Scan_state.Sync.Query.scan_state query in
     match query with
-    | Staged_ledger.Scan_state.Sync.Query.Protocol_states state_hash ->
+    | Staged_ledger.Scan_state.Sync.Query.Protocol_states _ ->
         (* Which states are needed is a property of the scan state, so the
            responder works it out rather than the asker, who does not have one
            assembled yet. *)
@@ -257,31 +253,9 @@ module Make (Inputs : Inputs_intf) :
         in
         let%map states = protocol_states_of_scan_state ~frontier scan_state in
         Staged_ledger.Scan_state.Sync.Answer.Protocol_states states
-    | Manifest state_hash ->
+    | Manifest _ | Band _ | Payloads _ ->
         let%bind responder = scan_state_responder ~frontier state_hash in
         Staged_ledger.Scan_state.Sync.Responder.respond responder query
-    | Band _ ->
-        List.find_map (Hashtbl.data scan_state_responders) ~f:(fun responder ->
-            Staged_ledger.Scan_state.Sync.Responder.respond responder query )
-    | Payloads _ ->
-        (* Every responder is asked, because a payload the asker wants may sit
-           in a tree described by one session's manifest and not another's, and
-           an empty answer is indistinguishable from a refusal. *)
-        let payloads =
-          List.concat_map (Hashtbl.data scan_state_responders)
-            ~f:(fun responder ->
-              match
-                Staged_ledger.Scan_state.Sync.Responder.respond responder query
-              with
-              | Some (Staged_ledger.Scan_state.Sync.Answer.Payloads payloads) ->
-                  payloads
-              | _ ->
-                  [] )
-          |> List.dedup_and_sort ~compare:(fun (a, _) (b, _) ->
-                 String.compare a b )
-        in
-        if List.is_empty payloads then None
-        else Some (Staged_ledger.Scan_state.Sync.Answer.Payloads payloads)
 
   let get_transition_chain ~frontier hashes =
     let open Option.Let_syntax in

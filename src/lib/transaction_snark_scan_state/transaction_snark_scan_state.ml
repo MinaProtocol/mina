@@ -1641,11 +1641,15 @@ module Sync = struct
         type t =
           | Manifest of State_hash.Stable.V1.t
           | Band of
-              { tree : Mina_stdlib.Bounded_types.String.Stable.V1.t
+              { scan_state : State_hash.Stable.V1.t
+              ; tree : Mina_stdlib.Bounded_types.String.Stable.V1.t
               ; root : Address.Stable.V1.t
               ; height : int
               }
-          | Payloads of Mina_stdlib.Bounded_types.String.Stable.V1.t list
+          | Payloads of
+              { scan_state : State_hash.Stable.V1.t
+              ; digests : Mina_stdlib.Bounded_types.String.Stable.V1.t list
+              }
           | Protocol_states of State_hash.Stable.V1.t
         [@@deriving sexp]
 
@@ -1655,13 +1659,28 @@ module Sync = struct
 
     type t = Stable.Latest.t =
       | Manifest of State_hash.t
-      | Band of { tree : string; root : Address.t; height : int }
-      | Payloads of string list
+      | Band of
+          { scan_state : State_hash.t
+          ; tree : string
+          ; root : Address.t
+          ; height : int
+          }
+      | Payloads of { scan_state : State_hash.t; digests : string list }
       | Protocol_states of State_hash.t
           (** the states the scan state at this hash needs; the responder works
               out which those are, since it has the assembled scan state and the
               asker does not yet *)
     [@@deriving sexp]
+
+    (** Every query names the scan state it is about, so any peer holding that
+        root can answer it. Without this a band could only be served by a peer
+        that had already described the forest it belongs to, which pins a whole
+        sync to one peer. *)
+    let scan_state : t -> State_hash.t = function
+      | Manifest hash | Protocol_states hash ->
+          hash
+      | Band { scan_state; _ } | Payloads { scan_state; _ } ->
+          scan_state
 
     (** How many payloads one query may ask for. A responder does the work of
         serialising each, so this is the lever on how much a single message can
@@ -1790,14 +1809,14 @@ module Sync = struct
       match query with
       | Query.Manifest _ ->
           Some (Answer.Manifest (manifest t))
-      | Query.Band { tree; root; height } ->
+      | Query.Band { tree; root; height; _ } ->
           Option.map (band t ~tree ~root ~height) ~f:(fun band ->
               Answer.Band band )
       | Query.Protocol_states _ ->
           (* answered by the sync handler, which can reach the frontier; a
              responder only knows its scan state *)
           None
-      | Query.Payloads digests ->
+      | Query.Payloads { digests; _ } ->
           Some
             (Answer.Payloads
                ( List.take digests Query.max_payloads_per_query
@@ -1824,12 +1843,15 @@ module Sync = struct
       ; incomplete : (string, string option) Hashtbl.t
             (** digest -> bytes for the incomplete updates, [None] until it
                 arrives *)
+      ; state_hash : State_hash.t
+            (** carried into every query, so any peer holding this root can
+                answer it *)
       }
 
     (** Check the manifest against the staged ledger hash in the block, then
         open a builder on it. [band_height] is how much of a tree to ask a peer
         for at a time. *)
-    let create manifest ~expected ~band_height =
+    let create manifest ~state_hash ~expected ~band_height =
       let open Or_error.Let_syntax in
       (* This is the only place the chain is consulted; everything after it is
          checked against something this established. *)
@@ -1846,7 +1868,7 @@ module Sync = struct
         (* cannot fail: the digest is recomputed from this same manifest, and
            [Manifest.verify] above is what ties it to the block *)
       in
-      { inner; manifest; incomplete }
+      { inner; manifest; incomplete; state_hash }
 
     let wanted t =
       Parallel_scan_sync.Builder.wanted t.inner
@@ -1878,7 +1900,8 @@ module Sync = struct
           | Request.Band { tree; root; height } ->
               First
                 (Query.Band
-                   { tree = fst (List.nth_exn t.manifest.scan_state.trees tree)
+                   { scan_state = t.state_hash
+                   ; tree = fst (List.nth_exn t.manifest.scan_state.trees tree)
                    ; root
                    ; height
                    } )
@@ -1887,7 +1910,8 @@ module Sync = struct
       in
       bands
       @ List.map (List.chunks_of payloads ~length:Query.max_payloads_per_query)
-          ~f:(fun batch -> Query.Payloads batch)
+          ~f:(fun batch ->
+            Query.Payloads { scan_state = t.state_hash; digests = batch } )
 
     (** Take an answer, paired with the query that asked for it. The pairing is
         what tells us which tree a band belongs to — an answer does not say so
