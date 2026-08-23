@@ -1,0 +1,18 @@
+(library
+ (name scan_state_next)
+ (public_name parallel_scan.next)
+ (inline_tests
+  (flags -verbose -show-counts))
+ (libraries
+  ;; opam libraries
+  core_kernel
+  digestif
+  ;; local libraries
+  parallel_scan
+  mina_stdlib
+  ppx_version.runtime)
+ (preprocess
+  (pps ppx_jane ppx_version))
+ (instrumentation
+  (backend bisect_ppx))
+ (synopsis "Proposed reworking of the parallel scan state"))
