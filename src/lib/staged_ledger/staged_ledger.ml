@@ -1395,8 +1395,16 @@ module T = struct
       ; max_jobs : int
             (*Required amount of work for max_space that can be purchased*)
       ; commands_rev : User_command.Valid.t list
+      ; commands_count : int (*[List.length commands_rev]*)
+      ; commands_fee_sum : Fee.t Or_error.t
+            (*[command_fees commands_rev], maintained incrementally*)
       ; completed_work_rev : Transaction_snark_work.Checked.t list
+      ; completed_work_count : int (*[List.length completed_work_rev]*)
       ; fee_transfers : Fee.t Public_key.Compressed.Map.t
+      ; other_prover_count : int
+            (*number of [fee_transfers] keys other than [receiver_pk]*)
+      ; other_prover_fees : Fee.t Or_error.t
+            (*fees in [fee_transfers] owed to provers other than [receiver_pk]*)
       ; add_coinbase : bool
       ; coinbase : Coinbase.Fee_transfer.t Staged_ledger_diff.At_most_two.t
       ; supercharge_coinbase : bool
@@ -1546,6 +1554,32 @@ module T = struct
       in
       (coinbase, singles_of_remaining_work rem_cw)
 
+    let command_fees commands =
+      sum_fees commands ~f:(fun t -> User_command.(fee (forget_check t)))
+
+    let count_other_provers ~receiver_pk fee_transfers =
+      Public_key.Compressed.Map.counti fee_transfers ~f:(fun ~key ~data:_ ->
+          not (Public_key.Compressed.equal receiver_pk key) )
+
+    let sum_other_prover_fees ~receiver_pk fee_transfers =
+      let open Or_error.Let_syntax in
+      Public_key.Compressed.Map.fold fee_transfers ~init:(Ok Fee.zero)
+        ~f:(fun ~key ~data fees ->
+          let%bind others = fees in
+          if Public_key.Compressed.equal receiver_pk key then Ok others
+          else option "Fee overflow" (Fee.add others data) )
+
+    (* Install a new [fee_transfers] map, refreshing the quantities derived
+       from it. *)
+    let set_fee_transfers t fee_transfers =
+      { t with
+        fee_transfers
+      ; other_prover_count =
+          count_other_provers ~receiver_pk:t.receiver_pk fee_transfers
+      ; other_prover_fees =
+          sum_other_prover_fees ~receiver_pk:t.receiver_pk fee_transfers
+      }
+
     let init ~constraint_constants (uc_seq : User_command.Valid.t Sequence.t)
         (cw_seq : Transaction_snark_work.Checked.t Sequence.t)
         (slots, job_count) ~receiver_pk ~add_coinbase ~supercharge_coinbase
@@ -1561,10 +1595,9 @@ module T = struct
         Public_key.Compressed.Map.of_alist_reduce singles ~f:(fun f1 f2 ->
             Option.value_exn (Fee.add f1 f2) )
       in
+      let commands_fee_sum = command_fees uc_list in
       let budget =
-        Or_error.map2
-          (sum_fees uc_list ~f:(fun t ->
-               User_command.fee (User_command.forget_check t) ) )
+        Or_error.map2 commands_fee_sum
           (sum_fees
              (List.filter
                 ~f:(fun (k, _) ->
@@ -1583,8 +1616,13 @@ module T = struct
           uc_list
           (* Completed work in reverse order for faster removal of proofs if
              budget doesn't suffice *)
+      ; commands_count = List.length uc_list
+      ; commands_fee_sum
       ; completed_work_rev = List.rev cw_list
+      ; completed_work_count = List.length cw_list
       ; fee_transfers
+      ; other_prover_count = count_other_provers ~receiver_pk fee_transfers
+      ; other_prover_fees = sum_other_prover_fees ~receiver_pk fee_transfers
       ; add_coinbase
       ; supercharge_coinbase
       ; receiver_pk
@@ -1629,24 +1667,11 @@ module T = struct
         Public_key.Compressed.Map.of_alist_reduce singles ~f:(fun f1 f2 ->
             Option.value_exn (Fee.add f1 f2) )
       in
-      { t with coinbase; fee_transfers }
+      set_fee_transfers { t with coinbase } fee_transfers
 
     let rebudget t =
-      (* get the correct coinbase and calculate the fee transfers *)
-      let open Or_error.Let_syntax in
-      let payment_fees =
-        sum_fees t.commands_rev ~f:(fun t ->
-            User_command.(fee (forget_check t)) )
-      in
-      let prover_fee_others =
-        Public_key.Compressed.Map.fold t.fee_transfers ~init:(Ok Fee.zero)
-          ~f:(fun ~key ~data fees ->
-            let%bind others = fees in
-            if Public_key.Compressed.equal t.receiver_pk key then Ok others
-            else option "Fee overflow" (Fee.add others data) )
-      in
-      let revenue = payment_fees in
-      let cost = prover_fee_others in
+      let revenue = t.commands_fee_sum in
+      let cost = t.other_prover_fees in
       Or_error.map2 revenue cost ~f:(fun r c ->
           option "budget did not suffice" (Fee.sub r c) )
       |> Or_error.join
@@ -1671,23 +1696,15 @@ module T = struct
         | Ok b ->
             if Fee.(b > Fee.zero) then 1 else 0
       in
-      let other_provers =
-        Public_key.Compressed.Map.filter_keys t.fee_transfers
-          ~f:(Fn.compose not (Public_key.Compressed.equal t.receiver_pk))
-      in
-      let total_fee_transfer_pks =
-        Public_key.Compressed.Map.length other_provers + fee_for_self
-      in
-      List.length t.commands_rev
-      + ((total_fee_transfer_pks + 1) / 2)
-      + coinbase_added t
+      let total_fee_transfer_pks = t.other_prover_count + fee_for_self in
+      t.commands_count + ((total_fee_transfer_pks + 1) / 2) + coinbase_added t
 
     let space_available res =
       let slots = slots_occupied res in
       res.max_space > slots
 
     let work_done t =
-      let no_of_proof_bundles = List.length t.completed_work_rev in
+      let no_of_proof_bundles = t.completed_work_count in
       let slots = slots_occupied t in
       (* If more jobs were added in the previous diff then (
          t.max_space-t.max_jobs) slots can go for free in this diff *)
@@ -1702,7 +1719,7 @@ module T = struct
       let all_proofs = work_done t in
       (* enough work *)
       let slots = slots_occupied t in
-      let cw_count = List.length t.completed_work_rev in
+      let cw_count = t.completed_work_count in
       let enough_work = cw_count >= slots in
       (* if there are no transactions then don't need any proofs *)
       all_proofs || slots = 0 || enough_work
@@ -1718,7 +1735,11 @@ module T = struct
           let discarded = Discarded.add_completed_work t.discarded w in
           let new_t =
             reselect_coinbase_work ~constraint_constants
-              { t with completed_work_rev = rem_work; discarded }
+              { t with
+                completed_work_rev = rem_work
+              ; completed_work_count = t.completed_work_count - 1
+              ; discarded
+              }
           in
           let budget =
             match t.budget with
@@ -1739,7 +1760,7 @@ module T = struct
               ~f:(fun _ -> ft.fee)
           in
           let new_t =
-            { t with coinbase; fee_transfers = updated_fee_transfers }
+            set_fee_transfers { t with coinbase } updated_fee_transfers
           in
           let updated_budget = rebudget new_t in
           { new_t with budget = updated_budget }
@@ -1765,12 +1786,34 @@ module T = struct
           (decr_coinbase t, None)
       | uc :: rem_commands ->
           let discarded = Discarded.add_user_command t.discarded uc in
-          let new_t = { t with commands_rev = rem_commands; discarded } in
+          let uc_fee = User_command.(fee (forget_check uc)) in
+          let commands_fee_sum =
+            (* [sum_fees] folds from zero, so when the sum over [commands_rev]
+               did not overflow neither does the sum over any suffix of it, and
+               the suffix sum is exactly the total less the removed fee. The
+               fallbacks recompute so that the overflow cases stay exact. *)
+            match t.commands_fee_sum with
+            | Ok total -> (
+                match Fee.sub total uc_fee with
+                | Some rest ->
+                    Ok rest
+                | None ->
+                    command_fees rem_commands )
+            | Error _ ->
+                command_fees rem_commands
+          in
+          let new_t =
+            { t with
+              commands_rev = rem_commands
+            ; commands_count = t.commands_count - 1
+            ; commands_fee_sum
+            ; discarded
+            }
+          in
           let budget =
             match t.budget with
             | Ok b ->
-                option "Fee insufficient"
-                  (Fee.sub b User_command.(fee (forget_check uc)))
+                option "Fee insufficient" (Fee.sub b uc_fee)
             | _ ->
                 rebudget new_t
           in
@@ -1782,7 +1825,7 @@ module T = struct
       *)
       let more_work t =
         let slots = slots_occupied t in
-        let cw_count = List.length t.completed_work_rev in
+        let cw_count = t.completed_work_count in
         cw_count > 0 && cw_count >= slots
       in
       let r, _ = discard_last_work ~constraint_constants resources in
@@ -1810,6 +1853,7 @@ module T = struct
               let res' =
                 { res with
                   completed_work_rev = w :: res.completed_work_rev
+                ; completed_work_count = res.completed_work_count + 1
                 ; discarded = { res.discarded with completed_work = rem_work }
                 ; coinbase
                 }
