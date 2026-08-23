@@ -34,6 +34,8 @@ let DebianRepo = ../Constants/DebianRepo.dhall
 
 let DockerPublish = ../Constants/Docker/Publish.dhall
 
+let DockerRepo = ../Constants/DockerRepo.dhall
+
 let DebianChannel = ../Constants/DebianChannel.dhall
 
 let Profiles = ../Constants/Profiles.dhall
@@ -71,6 +73,7 @@ let PackagingSpec =
           , deb_legacy_version : Text
           , deb_legacy_githash_config : Text
           , docker_publish : DockerPublish.Type
+          , docker_repo : DockerRepo.Type
           , suffix : Optional Text
           , if_ : Optional B/If
           , includeIf : List Expr.Type
@@ -93,6 +96,7 @@ let PackagingSpec =
           , deb_legacy_githash_config = ""
           , arch = Arch.Type.Amd64
           , docker_publish = DockerPublish.Type.Essential
+          , docker_repo = DockerRepo.Type.InternalEurope
           , if_ = None B/If
           , includeIf = [] : List Expr.Type
           , excludeIf = [] : List Expr.Type
@@ -788,6 +792,7 @@ let docker_commands
                         (     s
                           //  { deb_release =
                                   DebianChannel.lowerName spec.channel
+                              , docker_repo = spec.docker_repo
                               }
                         )
                 )
