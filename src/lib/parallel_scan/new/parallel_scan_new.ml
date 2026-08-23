@@ -296,6 +296,8 @@ module Hash = struct
 
   let to_raw_string = Digestif.SHA256.to_raw_string
 
+  let of_raw_string = Digestif.SHA256.of_raw_string
+
   let sexp_of_t t = Sexp.Atom (Digestif.SHA256.to_hex t)
 
   let t_of_sexp = function
@@ -1205,6 +1207,10 @@ module Wire = struct
               'base Base_node.Stable.V1.t
               Mina_stdlib.Bounded_types.ArrayN4000.Stable.V1.t
               list
+          ; digests :
+              Mina_stdlib.Bounded_types.String.Stable.V1.t
+              Mina_stdlib.Bounded_types.ArrayN4000.Stable.V1.t
+              list
           ; filled : int
           ; level : int
           ; proved : int
@@ -1260,6 +1266,7 @@ let to_wire (t : ('merge, 'base) t) : ('merge, 'base) Wire.t =
       List.map t.trees ~f:(fun tree ->
           { Wire.Tree.merges = Wire.chunk tree.merges
           ; bases = Wire.chunk tree.bases
+          ; digests = Wire.chunk (Array.map tree.digests ~f:Hash.to_raw_string)
           ; filled = tree.filled
           ; level = tree.level
           ; proved = tree.proved
@@ -1269,18 +1276,26 @@ let to_wire (t : ('merge, 'base) t) : ('merge, 'base) Wire.t =
   ; delay = t.delay
   }
 
+(** The digests are taken from the store rather than recomputed.
+
+    Recomputing them means a SHA256 over every payload's serialisation, and a
+    base payload carries its ledger witnesses — so it is the expensive part of
+    loading a scan state, and it is work the writer already did. That is only
+    safe because this serialisation no longer crosses a trust boundary: a peer
+    supplying digests could otherwise name payloads it had not sent, which is
+    why the sync protocol recomputes each payload's digest on arrival instead
+    of believing the one it was given. *)
 let of_wire (w : ('merge, 'base) Wire.t) ~payload_digest : ('merge, 'base) t =
-  let depth = Int.ceil_log2 w.max_base_jobs in
   { trees =
       List.map w.trees ~f:(fun tree ->
-          Tree.rebuilt ~payload_digest
-            { Tree.merges = Wire.unchunk tree.merges
-            ; bases = Wire.unchunk tree.bases
-            ; digests = Tree.empty_digests ~depth
-            ; filled = tree.filled
-            ; level = tree.level
-            ; proved = tree.proved
-            } )
+          { Tree.merges = Wire.unchunk tree.merges
+          ; bases = Wire.unchunk tree.bases
+          ; digests =
+              Array.map (Wire.unchunk tree.digests) ~f:Hash.of_raw_string
+          ; filled = tree.filled
+          ; level = tree.level
+          ; proved = tree.proved
+          } )
   ; acc = w.acc
   ; acc_digest = digest_of_acc ~payload_digest w.acc
   ; max_base_jobs = w.max_base_jobs
@@ -1835,6 +1850,13 @@ let%test_module "port" =
             in
             if not (Hash.equal (hash back) (hash !t)) then
               raise_s [%message "wire round trip changed the commitment"] ;
+            (* [of_wire] believes the digests it was given rather than deriving
+               them, so the round trip alone would agree with itself even if
+               they were wrong. Recomputing is what checks them. *)
+            if
+              not (Hash.equal (hash (rebuilt back ~payload_digest)) (hash back))
+            then
+              raise_s [%message "stored digests disagree with recomputed ones"] ;
             [%test_eq: node list] (new_nodes !t) (new_nodes back)
           done )
 
@@ -1884,7 +1906,9 @@ let%test_module "port" =
              bytes )
       in
       if not (Hash.equal (hash back) (hash !t)) then
-        raise_s [%message "wire round trip changed the commitment"]
+        raise_s [%message "wire round trip changed the commitment"] ;
+      if not (Hash.equal (hash (rebuilt back ~payload_digest)) (hash back)) then
+        raise_s [%message "stored digests disagree with recomputed ones"]
 
     (* The effectful fold must visit what the pure one visits, in the same
        order — [scan_statement] composes statements along it. *)
