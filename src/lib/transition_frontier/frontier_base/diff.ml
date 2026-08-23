@@ -85,7 +85,7 @@ module Root_transition = struct
 
       module V5 = struct
         type t =
-          { new_root : Root_data.Limited.Stable.V4.t
+          { new_root : Root_data.Limited.Stable.V5.t
           ; garbage : Node_list.Lite.Stable.V1.t
           ; just_emitted_a_proof : bool
           }
