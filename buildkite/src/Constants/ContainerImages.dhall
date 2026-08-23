@@ -52,5 +52,5 @@
 , xrefcheck =
     "europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/dkhamsing/awesome_bot:latest"
 , nixos = "gcr.io/o1labs-192920/nix-unstable:1.0.0"
-, minaReleaseToolkit = "ghcr.io/minaprotocol/mina-release-toolkit:0.0.3"
+, minaReleaseToolkit = "ghcr.io/minaprotocol/mina-release-toolkit:0.0.5"
 }
