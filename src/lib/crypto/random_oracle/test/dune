@@ -1,0 +1,19 @@
+(tests
+ (names test_random_oracle test_permutation)
+ (flags
+  (:standard -warn-error +a))
+ (preprocess
+  (pps ppx_jane))
+ (package random_oracle)
+ (libraries
+  ;; opam libraries
+  alcotest
+  core_kernel
+  sexplib0
+  ;; local libraries
+  kimchi_backend
+  kimchi_pasta.basic
+  pickles
+  random_oracle
+  random_oracle.permutation
+  sponge))
