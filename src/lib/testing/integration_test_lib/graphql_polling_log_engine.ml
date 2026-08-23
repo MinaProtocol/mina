@@ -1,6 +1,6 @@
 open Async
 open Core
-module Timeout = Timeout_lib.Core_time
+module Timeout = Mina_stdlib.Timeout_lib.Core_time
 
 (** This implements Log_engine_intf for integration tests, by creating a simple system that polls a mina daemon's graphql endpoint for fetching logs*)
 

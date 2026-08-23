@@ -1,7 +1,7 @@
 open Async_kernel
 open Core_kernel
 open Pipe_lib
-module Timeout = Timeout_lib.Core_time
+module Timeout = Mina_stdlib.Timeout_lib.Core_time
 
 let broadcast_pipe_fold_until_with_timeout reader ~timeout_duration
     ~timeout_result ~init ~f =

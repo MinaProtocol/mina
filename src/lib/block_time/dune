@@ -23,7 +23,7 @@
   mina_numbers
   logger
   snark_bits
-  timeout_lib
+  mina_stdlib
   crypto_params
   snarky.backendless
   random_oracle_input
