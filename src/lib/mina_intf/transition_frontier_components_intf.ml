@@ -236,16 +236,6 @@ module type Sync_handler_intf = sig
     -> trust_system:Trust_system.t
     -> Mina_ledger.Sync_ledger.Answer.t Or_error.t Deferred.t
 
-  val get_staged_ledger_aux_and_pending_coinbases_at_hash :
-       logger:Logger.t
-    -> frontier:transition_frontier
-    -> State_hash.t
-    -> ( Staged_ledger.Scan_state.t
-       * Ledger_hash.t
-       * Pending_coinbase.t
-       * Mina_state.Protocol_state.value list )
-       Option.t
-
   (** Answer one scan state sync query. Only the manifest and protocol states
       queries name a state hash; bands and payloads name themselves by digest,
       so they are looked up across the scan states a manifest has already been

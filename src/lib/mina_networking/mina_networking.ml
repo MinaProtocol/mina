@@ -363,11 +363,6 @@ let rpc_peer_then_random (type b) t peer_id input ~rpc :
       (* Since we couldn't connect, we have no IP to ban. *)
       retry ()
 
-let get_staged_ledger_aux_and_pending_coinbases_at_hash t inet_addr input =
-  rpc_peer_then_random t inet_addr input
-    ~rpc:Rpcs.Get_staged_ledger_aux_and_pending_coinbases_at_hash
-  >>|? Envelope.Incoming.data
-
 (** Ask one peer a batch of scan state sync queries, in order.
 
     Pinned to one peer, unlike most of the requests here, and batched, unlike
