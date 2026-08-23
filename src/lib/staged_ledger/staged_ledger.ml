@@ -2737,11 +2737,11 @@ let%test_module "staged ledger tests" =
       let stable = Sl.Scan_state.read_all_proofs_from_disk live in
       let round_tripped =
         Binable.of_string
-          (module Sl.Scan_state.Stable.Latest)
-          (Binable.to_string (module Sl.Scan_state.Stable.Latest) stable)
+          (module Sl.Scan_state.Stored)
+          (Binable.to_string (module Sl.Scan_state.Stored) stable)
       in
       [%test_eq: Staged_ledger_hash.Aux_hash.t] (Sl.Scan_state.hash live)
-        (Sl.Scan_state.Stable.Latest.hash round_tripped)
+        (Sl.Scan_state.Stored.hash round_tripped)
 
     (* Sync a scan state out of one node and back into another, the way
        bootstrap will: verify the manifest against the block's commitment,
@@ -2788,7 +2788,7 @@ let%test_module "staged ledger tests" =
       let rebuilt = Or_error.ok_exn (Sync.Builder.finish builder) in
       [%test_eq: Staged_ledger_hash.Aux_hash.t]
         (Sl.Scan_state.hash source)
-        (Sl.Scan_state.Stable.Latest.hash rebuilt)
+        (Sl.Scan_state.Stored.hash rebuilt)
 
     let test_simple :
            global_slot:int

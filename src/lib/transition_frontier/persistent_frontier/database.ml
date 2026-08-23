@@ -57,13 +57,13 @@ module Schema = struct
     | Arcs : State_hash.Stable.Latest.t -> State_hash.Stable.Latest.t list t
     (* NOTE:
         The reason for storing Root_hash and Root_common separately, instead of
-        storing a complete [Root_data.Minimal.Stable.Latest.t] is that the whole
+        storing a complete [Root_data.Minimal.Stored.t] is that the whole
         Root_data is very big (~250MB+), causing a 90s bottleneck to deserialize
         the whole thing. However, most of the time we just want the hash, so we
         get away with storing the hash and common part of Root_data sepearately.
     *)
     | Root_hash : State_hash.Stable.Latest.t t
-    | Root_common : Root_data.Common.Stable.Latest.t t
+    | Root_common : Root_data.Common.Stored.t t
     | Best_tip : State_hash.Stable.Latest.t t
     | Protocol_states_for_root_scan_state
         : Mina_state.Protocol_state.Value.Stable.Latest.t list t
@@ -94,7 +94,7 @@ module Schema = struct
     | Root_hash ->
         [%bin_type_class: State_hash.Stable.Latest.t]
     | Root_common ->
-        [%bin_type_class: Root_data.Common.Stable.Latest.t]
+        [%bin_type_class: Root_data.Common.Stored.t]
     | Best_tip ->
         [%bin_type_class: State_hash.Stable.Latest.t]
     | Protocol_states_for_root_scan_state ->
@@ -262,7 +262,7 @@ let get_root t =
   | [ Some (Some_key_value (Root_hash, hash))
     ; Some (Some_key_value (Root_common, common))
     ] ->
-      Ok (Root_data.Minimal.Stable.Latest.of_limited ~common hash)
+      Ok (Root_data.Minimal.Stored.of_limited ~common hash)
   | Some _ :: _ ->
       Error (`Not_found `Root_common)
   | _ ->
@@ -408,17 +408,15 @@ let add ~arcs_cache ~transition =
     Batch.set batch ~key:(Arcs parent_hash) ~data:(hash :: parent_arcs)
 
 let move_root ~old_root_hash ~new_root ~garbage =
-  let new_root_hash =
-    (Root_data.Limited.Stable.Latest.hashes new_root).state_hash
-  in
+  let new_root_hash = (Root_data.Limited.Stored.hashes new_root).state_hash in
   fun batch ->
     Batch.set batch ~key:Root_hash ~data:new_root_hash ;
     Batch.set batch ~key:Root_common
-      ~data:(Root_data.Limited.Stable.Latest.common new_root) ;
+      ~data:(Root_data.Limited.Stored.common new_root) ;
     Batch.set batch ~key:Protocol_states_for_root_scan_state
       ~data:
         (List.map ~f:With_hash.data
-           (Root_data.Limited.Stable.Latest.protocol_states new_root) ) ;
+           (Root_data.Limited.Stored.protocol_states new_root) ) ;
     List.iter (old_root_hash :: garbage) ~f:(fun node_hash ->
         (* because we are removing entire forks of the tree, there is
          * no need to have extra logic to any remove arcs to the node

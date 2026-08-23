@@ -281,32 +281,34 @@ let hash_generic :
 (*Scan state and any zkapp updates that were applied to the to the most recent
    snarked ledger but are from the tree just before the tree corresponding to
    the snarked ledger*)
-[%%versioned
-module Stable = struct
-  [@@@no_toplevel_latest_type]
 
-  module V4 = struct
-    type t =
-      { scan_state :
-          ( Ledger_proof.Stable.V3.t
-          , Transaction_with_witness.Stable.V3.t )
-          Parallel_scan_new.Wire.Stable.V1.t
-      ; previous_incomplete_zkapp_updates :
-          Transaction_with_witness.Stable.V3.t list
-          * [ `Border_block_continued_in_the_next_tree of bool ]
-      }
+(** The stored shape: proofs read back off disk, digests carried rather than
+    derived.
 
-    let to_latest = Fn.id
+    Unversioned, because nothing untrusted parses it. A scan state reaches
+    another node through the sync protocol, in verified fragments; what remains
+    here is the frontier's own persistence, and its database carries a version
+    of its own for that. *)
+module Stored = struct
+  type t =
+    { scan_state :
+        ( Ledger_proof.Stable.V3.t
+        , Transaction_with_witness.Stable.V3.t )
+        Parallel_scan_new.Wire.t
+    ; previous_incomplete_zkapp_updates :
+        Transaction_with_witness.Stable.V3.t list
+        * [ `Border_block_continued_in_the_next_tree of bool ]
+    }
+  [@@deriving bin_io_unversioned]
 
-    let hash (t : t) =
-      hash_generic
-        ~tx_witness_hash:(fun (x : Transaction_with_witness.Stable.V3.t) ->
-          Transaction_with_witness.hash x )
-        ( Parallel_scan_new.of_wire t.scan_state
-            ~payload_digest:stable_payload_digest
-        , t.previous_incomplete_zkapp_updates )
-  end
-end]
+  let hash (t : t) =
+    hash_generic
+      ~tx_witness_hash:(fun (x : Transaction_with_witness.Stable.V3.t) ->
+        Transaction_with_witness.hash x )
+      ( Parallel_scan_new.of_wire t.scan_state
+          ~payload_digest:stable_payload_digest
+      , t.previous_incomplete_zkapp_updates )
+end
 
 type t =
   { scan_state :
@@ -2008,7 +2010,7 @@ module Sync = struct
       let%map scan_state =
         Parallel_scan_sync.Builder.finish t.inner ~merge_of_bytes ~base_of_bytes
       in
-      { Stable.Latest.scan_state = Parallel_scan_new.to_wire scan_state
+      { Stored.scan_state = Parallel_scan_new.to_wire scan_state
       ; previous_incomplete_zkapp_updates =
           ( incomplete
           , `Border_block_continued_in_the_next_tree
@@ -2018,7 +2020,7 @@ module Sync = struct
 end
 
 let write_all_proofs_to_disk ~signature_kind ~proof_cache_db
-    { Stable.Latest.scan_state = uncached
+    { Stored.scan_state = uncached
     ; previous_incomplete_zkapp_updates = tx_list, border_status
     } =
   let f1 proof =
@@ -2058,7 +2060,7 @@ let read_all_proofs_from_disk
       ~f_base:Transaction_with_witness.read_all_proofs_from_disk cached
     |> Parallel_scan_new.to_wire
   in
-  Stable.Latest.
+  Stored.
     { scan_state
     ; previous_incomplete_zkapp_updates =
         ( List.map ~f:Transaction_with_witness.read_all_proofs_from_disk tx_list

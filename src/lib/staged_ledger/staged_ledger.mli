@@ -8,16 +8,13 @@ module Ledger = Mina_ledger.Ledger
 type t
 
 module Scan_state : sig
-  [%%versioned:
-  module Stable : sig
-    [@@@no_toplevel_latest_type]
+  module Stored : sig
+    type t = Transaction_snark_scan_state.Stored.t
 
-    module V4 : sig
-      type t = Transaction_snark_scan_state.Stable.V4.t
+    include Binable.S with type t := t
 
-      val hash : t -> Staged_ledger_hash.Aux_hash.t
-    end
-  end]
+    val hash : t -> Staged_ledger_hash.Aux_hash.t
+  end
 
   (* Transparent so that [Sync] below, and anything else that reaches for the
      scan state's own interface, sees the same type. What that interface
@@ -134,10 +131,10 @@ module Scan_state : sig
   val write_all_proofs_to_disk :
        signature_kind:Mina_signature_kind.t
     -> proof_cache_db:Proof_cache_tag.cache_db
-    -> Stable.Latest.t
+    -> Stored.t
     -> t
 
-  val read_all_proofs_from_disk : t -> Stable.Latest.t
+  val read_all_proofs_from_disk : t -> Stored.t
 end
 
 module Pre_diff_info : Pre_diff_info.S

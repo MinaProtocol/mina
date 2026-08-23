@@ -5,16 +5,16 @@ open Mina_transaction
 module Ledger = Mina_ledger.Ledger
 module Parallel_scan_sync = Scan_state_next.Parallel_scan_sync
 
-[%%versioned:
-module Stable : sig
-  [@@@no_toplevel_latest_type]
+(** The stored shape: what the frontier writes to disk and passes around in its
+    own diffs. Unversioned — a scan state reaches another node through the sync
+    protocol, in verified fragments, so nothing untrusted parses this. *)
+module Stored : sig
+  type t
 
-  module V4 : sig
-    type t
+  include Binable.S with type t := t
 
-    val hash : t -> Staged_ledger_hash.Aux_hash.t
-  end
-end]
+  val hash : t -> Staged_ledger_hash.Aux_hash.t
+end
 
 type t
 
@@ -241,10 +241,10 @@ val all_work_pairs :
 val write_all_proofs_to_disk :
      signature_kind:Mina_signature_kind.t
   -> proof_cache_db:Proof_cache_tag.cache_db
-  -> Stable.Latest.t
+  -> Stored.t
   -> t
 
-val read_all_proofs_from_disk : t -> Stable.Latest.t
+val read_all_proofs_from_disk : t -> Stored.t
 
 (** Serving a scan state piece by piece, so that a bootstrapping node can fetch
     it in verifiable fragments rather than as one blob. See
@@ -418,6 +418,6 @@ module Sync : sig
 
     (** Assemble the serialised scan state, ready for
         {!write_all_proofs_to_disk}. Fails while anything is outstanding. *)
-    val finish : t -> Stable.Latest.t Or_error.t
+    val finish : t -> Stored.t Or_error.t
   end
 end
