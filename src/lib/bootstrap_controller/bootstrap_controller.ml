@@ -279,6 +279,90 @@ let download_snarked_ledger ~trust_system ~preferred_peers ~transition_graph
      Sync_ledger.Root.destroy root_sync_ledger ;
      data )
 
+(** How much of a tree to ask for in one band. A band holds
+    [2^(height+1) - 1] nodes, so this bounds a single message independently of
+    how deep the scan state is — which is the whole reason bands are addressed
+    by subtree rather than by tree. *)
+let scan_state_band_height = 3
+
+(** Fetch a scan state in verifiable fragments instead of as one blob.
+
+    Returns what the whole-scan-state RPC returned, so the rest of bootstrap is
+    unchanged — but a failure now costs one fragment rather than the entire
+    state, and every fragment is checked against the staged ledger hash in the
+    block before it is believed.
+
+    Bands are asked for at [band_height] levels at a time. See
+    [src/lib/parallel_scan/new/sync.md] for why that knob exists: it is what
+    keeps a single message bounded however deep the scan state gets. *)
+let download_scan_state_in_fragments ~logger ~network ~peer_id ~state_hash
+    ~expected_staged_ledger_hash ~band_height =
+  let open Deferred.Or_error.Let_syntax in
+  let module Sync = Staged_ledger.Scan_state.Sync in
+  let ask query =
+    Mina_networking.answer_scan_state_query network peer_id query
+  in
+  let%bind manifest =
+    match%bind ask (Sync.Query.Manifest state_hash) with
+    | Sync.Answer.Manifest manifest ->
+        return manifest
+    | _ ->
+        Deferred.Or_error.error_string
+          "peer answered a scan state manifest query with something else"
+  in
+  (* The only point at which the chain is consulted. Everything after this is
+     checked against digests this established. *)
+  let%bind builder =
+    Deferred.return
+      (Sync.Builder.create manifest ~expected:expected_staged_ledger_hash
+         ~band_height )
+  in
+  (* A round asks for everything currently wanted. Rounds repeat because a band
+     reveals the payloads beneath it and a peer may answer a payload batch
+     partially, so what is outstanding legitimately grows as well as shrinks.
+     What cannot happen twice is the same set of queries: that is a peer which
+     will not supply what it has already been asked for, and repeating only
+     wastes its time and ours. *)
+  let rec drive previous =
+    match Sync.Builder.queries builder with
+    | [] ->
+        return ()
+    | queries ->
+        let asked =
+          List.map queries ~f:(fun query ->
+              Sexp.to_string (Sync.Query.sexp_of_t query) )
+          |> List.sort ~compare:String.compare
+        in
+        if List.equal String.equal asked previous then
+          Deferred.Or_error.error_string
+            "scan state sync repeated a round of queries without progress"
+        else
+          let%bind () =
+            Deferred.Or_error.List.iter queries ~how:`Sequential
+              ~f:(fun query ->
+                let%bind answer = ask query in
+                Deferred.return (Sync.Builder.add_answer builder ~query answer) )
+          in
+          drive asked
+  in
+  let%bind () = drive [] in
+  let%bind scan_state = Deferred.return (Sync.Builder.finish builder) in
+  let%map protocol_states =
+    match%bind ask (Sync.Query.Protocol_states state_hash) with
+    | Sync.Answer.Protocol_states states ->
+        return states
+    | _ ->
+        Deferred.Or_error.error_string
+          "peer answered a protocol states query with something else"
+  in
+  [%log debug]
+    ~metadata:[ ("state_hash", State_hash.to_yojson state_hash) ]
+    "fetched scan state for $state_hash in fragments" ;
+  ( scan_state
+  , Sync.Manifest.ledger_hash manifest
+  , Sync.Manifest.pending_coinbase manifest
+  , protocol_states )
+
 let handle_scan_state_and_aux ~logger ~expected_staged_ledger_hash
     ~temp_snarked_ledger ~verifier ~constraint_constants ~signature_kind
     ~proof_cache_db t
@@ -459,8 +543,24 @@ let run_cycle ~context:(module Context : CONTEXT) ~trust_system ~verifier
     let%bind ( staged_ledger_data_download_time
              , staged_ledger_data_download_result ) =
       time_deferred
-        (Mina_networking.get_staged_ledger_aux_and_pending_coinbases_at_hash
-           t.network sender.peer_id hash )
+        (* Prefer the fragment-wise protocol; fall back to the whole-scan-state
+           RPC for peers that do not speak it yet. Once every peer does, the
+           fallback and the RPC behind it can go. *)
+        (Deferred.bind
+           (download_scan_state_in_fragments ~logger ~network:t.network
+              ~peer_id:sender.peer_id ~state_hash:hash
+              ~expected_staged_ledger_hash ~band_height:scan_state_band_height )
+           ~f:(function
+          | Ok result ->
+              Deferred.return (Ok result)
+          | Error err ->
+              [%log warn]
+                ~metadata:[ ("error", Error_json.error_to_yojson err) ]
+                "Fragment-wise scan state sync failed ($error); falling back \
+                 to the whole-scan-state RPC" ;
+              Mina_networking
+              .get_staged_ledger_aux_and_pending_coinbases_at_hash t.network
+                sender.peer_id hash ) )
     in
     match staged_ledger_data_download_result with
     | Error err ->
