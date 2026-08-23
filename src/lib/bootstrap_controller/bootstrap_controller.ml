@@ -409,8 +409,10 @@ let download_scan_state ~logger ~state_hash ~expected_staged_ledger_hash
                     Sync.Builder.add_answer builder ~query answer )
               |> Or_error.all_unit )
           in
+          Sync.Progress.report (Some (Sync.Builder.progress builder)) ;
           drive asked
   in
+  Sync.Progress.report (Some (Sync.Builder.progress builder)) ;
   let%bind () = drive [] in
   let%bind scan_state = Deferred.return (Sync.Builder.finish builder) in
   let%map protocol_states =
@@ -702,7 +704,11 @@ let run_cycle ~context:(module Context : CONTEXT) ~trust_system ~verifier
                     ~fetch:(fetch_scan_state_from_downloader ~downloader)
                 in
                 finish result )
-           ~f:(function
+           ~f:(fun outcome ->
+             (* the sync is over either way; nothing should still be reporting
+                progress for it *)
+             Staged_ledger.Scan_state.Sync.Progress.report None ;
+             match outcome with
              | Ok result ->
                  Deferred.return (Ok result)
              | Error err ->

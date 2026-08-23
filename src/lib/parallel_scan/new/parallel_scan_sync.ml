@@ -510,6 +510,13 @@ module Builder = struct
     let payloads = Hashtbl.count t.payloads ~f:Option.is_none in
     (`Bands bands, `Payloads payloads)
 
+  (** How many payloads have arrived, against how many are known to be needed.
+      The denominator grows as bands reveal what is underneath them, so early
+      on it understates the work left. *)
+  let payload_progress t =
+    let have = Hashtbl.count t.payloads ~f:Option.is_some in
+    (`Received have, `Known (Hashtbl.length t.payloads))
+
   (** Assemble the scan state. Fails while anything is still outstanding.
 
       [of_bytes] parses a payload; the two are separate because a merge payload

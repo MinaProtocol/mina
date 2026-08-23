@@ -66,6 +66,17 @@ module Shorthand = struct
       ~typ:(list (non_null string))
       a x
 
+  (** Rendered as "label: count" strings, the same shape [mina client status]
+      prints, rather than a structured type: what a scan state sync exposes is
+      still settling. *)
+  let nn_scan_state_sync_status a x =
+    reflect
+      (fun o ->
+        Option.map o
+          ~f:(List.map ~f:(fun (label, n) -> sprintf "%s: %d" label n)) )
+      ~typ:(list (non_null string))
+      a x
+
   let string a x = id ~typ:string a x
 
   module F = struct
