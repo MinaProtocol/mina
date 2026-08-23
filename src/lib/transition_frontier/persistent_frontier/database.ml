@@ -24,7 +24,12 @@ open Result.Let_syntax
 (* TODO: implement versions with module versioning. For
  * now, this is just stubbed so we can add db migrations
  * later. (#3736) *)
-let version = 3
+
+(* Bumped to 4 when the scan state changed representation: what this database
+   stores is a [Root_data.Limited.t], which carries one. An existing database
+   written by a daemon from before that change holds the old shape, and this
+   is the only thing that stops it being read back as the new one. *)
+let version = 4
 
 module Schema = struct
   module Keys = struct
