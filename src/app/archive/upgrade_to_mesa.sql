@@ -282,6 +282,30 @@ CREATE TABLE IF NOT EXISTS hardfork_state (
     finalized_at            timestamptz
 );
 
+-- 3d. `genesis_accounts`: the state every account was in when an era's genesis
+-- ledger was established. Not block effects, so not in accounts_accessed.
+-- Append only and keyed by the height the ledger takes effect at: a database
+-- spans every era it has lived through, and a balance query at a pre-fork
+-- height still needs the earlier era's genesis balance for an account that was
+-- untouched throughout it.
+
+CREATE TABLE IF NOT EXISTS genesis_accounts (
+    genesis_height           bigint  NOT NULL,
+    public_key               text    NOT NULL,
+    token                    text    NOT NULL,
+    balance                  text    NOT NULL,
+    nonce                    bigint  NOT NULL,
+    initial_minimum_balance  text,
+    cliff_time               bigint,
+    cliff_amount             text,
+    vesting_period           bigint,
+    vesting_increment        text,
+    PRIMARY KEY (genesis_height, public_key, token)
+);
+
+CREATE INDEX IF NOT EXISTS idx_genesis_accounts_lookup
+  ON genesis_accounts(public_key, token, genesis_height DESC);
+
 -- 4. Update schema_history
 
 DO $$

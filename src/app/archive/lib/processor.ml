@@ -5157,6 +5157,236 @@ module Fork_genesis_block = struct
         `Repeat () )
 end
 
+(** Load an era's genesis ledger accounts.
+
+    A balance query is a snapshot lookup: it finds the most recent block at or
+    below the requested height where the account appears. An account untouched
+    since its era's genesis appears in no such block, so without these rows the
+    query answers zero rather than the real balance -- with a 200, which for an
+    exchange is worse than an error.
+
+    Last step of the hand-over, and the only one that can fail without
+    consequence for the rest. Everything else about the fork is already correct
+    by the time this runs; if it never completes, the position is exactly what
+    it is today. *)
+module Genesis_accounts = struct
+  let insert_batch (module Conn : CONNECTION) ~genesis_height rows =
+    let open Deferred.Result.Let_syntax in
+    Mina_caqti.deferred_result_list_fold rows ~init:() ~f:(fun () row ->
+        let public_key, token, balance, nonce, timing = row in
+        let ( initial_minimum_balance
+            , cliff_time
+            , cliff_amount
+            , vesting_period
+            , vesting_increment ) =
+          match timing with
+          | None ->
+              (None, None, None, None, None)
+          | Some (imb, ct, ca, vp, vi) ->
+              (Some imb, Some ct, Some ca, Some vp, Some vi)
+        in
+        let%map () =
+          Conn.exec
+            (Mina_caqti.exec_req
+               Caqti_type.(
+                 t2
+                   (t4 int64 string string string)
+                   (t2
+                      (t3 int64 (option string) (option int64))
+                      (t3 (option string) (option int64) (option string)) ))
+               {sql| INSERT INTO genesis_accounts
+                       (genesis_height, public_key, token, balance, nonce,
+                        initial_minimum_balance, cliff_time, cliff_amount,
+                        vesting_period, vesting_increment)
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+               |sql} )
+            ( (genesis_height, public_key, token, balance)
+            , ( (nonce, initial_minimum_balance, cliff_time)
+              , (cliff_amount, vesting_period, vesting_increment) ) )
+        in
+        () )
+
+  let already_loaded (module Conn : CONNECTION) ~genesis_height =
+    Conn.find
+      (Mina_caqti.find_req Caqti_type.int64 Caqti_type.bool
+         "SELECT EXISTS (SELECT 1 FROM genesis_accounts WHERE genesis_height = \
+          ?)" )
+      genesis_height
+
+  (** Project a ledger account onto what a balance query needs.
+
+      Deliberately not a full account snapshot: this table answers "what was
+      the balance and vesting schedule", not "reconstruct the ledger". *)
+  let row_of_account (account : Mina_base.Account.t) =
+    let timing =
+      match account.timing with
+      | Mina_base.Account.Timing.Untimed ->
+          None
+      | Timed
+          { initial_minimum_balance
+          ; cliff_time
+          ; cliff_amount
+          ; vesting_period
+          ; vesting_increment
+          } ->
+          Some
+            ( Currency.Balance.to_string initial_minimum_balance
+            , Mina_numbers.Global_slot_since_genesis.to_uint32 cliff_time
+              |> Unsigned.UInt32.to_int64
+            , Currency.Amount.to_string cliff_amount
+            , Mina_numbers.Global_slot_span.to_uint32 vesting_period
+              |> Unsigned.UInt32.to_int64
+            , Currency.Amount.to_string vesting_increment )
+    in
+    ( Signature_lib.Public_key.Compressed.to_base58_check account.public_key
+    , Mina_base.Token_id.to_string account.token_id
+    , Currency.Balance.to_string account.balance
+    , Mina_base.Account.Nonce.to_uint32 account.nonce
+      |> Unsigned.UInt32.to_int64
+    , timing )
+
+  (** One attempt: resolve the ledger, enumerate it, write every row in a single
+      transaction.
+
+      Atomic on purpose. Completion is detected by the presence of any row for
+      this genesis height, so a partial write would look like a finished one --
+      all or nothing removes that failure mode and makes restarts safe without
+      any progress bookkeeping. *)
+  let attempt ~logger ~genesis_constants ~constraint_constants ~pool =
+    let open Deferred.Let_syntax in
+    match%bind
+      Mina_caqti.Pool.use (fun conn -> Hardfork_state.load_opt conn) pool
+    with
+    | Error e ->
+        return (Error (Caqti_error.show e))
+    | Ok None ->
+        return (Ok `No_fork_recorded)
+    | Ok (Some hardfork_state) -> (
+        let genesis_height =
+          Int64.( + ) hardfork_state.Hardfork_state.fork_blockchain_length 1L
+        in
+        match%bind
+          Mina_caqti.Pool.use
+            (fun conn -> already_loaded conn ~genesis_height)
+            pool
+        with
+        | Error e ->
+            return (Error (Caqti_error.show e))
+        | Ok true ->
+            return (Ok `Already_loaded)
+        | Ok false -> (
+            match%bind
+              Fork_genesis_block.build ~logger ~genesis_constants
+                ~constraint_constants
+                ~config_json:hardfork_state.Hardfork_state.config_json
+            with
+            | Error reason ->
+                return (Error (Fork_genesis_block.describe reason))
+            | Ok _ -> (
+                (* Resolve again for the ledger itself. Local and cheap: the
+                   helper cached it during the build above. *)
+                match
+                  Runtime_config.of_yojson
+                    (Yojson.Safe.from_string
+                       hardfork_state.Hardfork_state.config_json )
+                with
+                | Error msg ->
+                    return (Error msg)
+                | Ok runtime_config -> (
+                    match%bind
+                      Genesis_ledger_helper.init_from_config_file ~logger
+                        ~proof_level:Genesis_constants.Compiled.proof_level
+                        ~genesis_constants ~constraint_constants runtime_config
+                        ~cli_proof_level:None
+                    with
+                    | Error err ->
+                        return (Error (Error.to_string_hum err))
+                    | Ok precomputed_values -> (
+                        let ledger =
+                          Precomputed_values.genesis_ledger precomputed_values
+                          |> Lazy.force
+                        in
+                        let%bind account_ids =
+                          let%map s = Mina_ledger.Ledger.accounts ledger in
+                          Account_id.Set.to_list s
+                        in
+                        let rows =
+                          List.filter_map account_ids ~f:(fun acct_id ->
+                              let open Option.Let_syntax in
+                              let%bind loc =
+                                Mina_ledger.Ledger.location_of_account ledger
+                                  acct_id
+                              in
+                              let%map account =
+                                Mina_ledger.Ledger.get ledger loc
+                              in
+                              row_of_account account )
+                        in
+                        let total = List.length rows in
+                        [%log info]
+                          "Loading $count genesis accounts for the ledger at \
+                           height $height"
+                          ~metadata:
+                            [ ("count", `Int total)
+                            ; ( "height"
+                              , `String (Int64.to_string genesis_height) )
+                            ] ;
+                        let%map result =
+                          Mina_caqti.Pool.use
+                            (fun ((module Conn : CONNECTION) as conn) ->
+                              let open Deferred.Result.Let_syntax in
+                              let%bind () = Conn.start () in
+                              match%bind.Deferred
+                                insert_batch conn ~genesis_height rows
+                              with
+                              | Ok () ->
+                                  Conn.commit ()
+                              | Error e ->
+                                  let%map.Deferred (_ : _ result) =
+                                    Conn.rollback ()
+                                  in
+                                  Error e )
+                            pool
+                        in
+                        match result with
+                        | Error e ->
+                            Error (Caqti_error.show e)
+                        | Ok () ->
+                            [%log info]
+                              "Loaded $count genesis accounts at height $height"
+                              ~metadata:
+                                [ ("count", `Int total)
+                                ; ( "height"
+                                  , `String (Int64.to_string genesis_height) )
+                                ] ;
+                            Ok `Loaded ) ) ) ) )
+
+  (** Keep trying until the accounts are in place.
+
+      Slow on purpose: an attempt may fetch and materialise a ledger of tens of
+      megabytes. Nothing waits on this -- the archive is already serving, the
+      boundary is already repaired, and the only consequence of it never
+      finishing is that untouched accounts answer zero, which is the position
+      today. *)
+  let run ~logger ~genesis_constants ~constraint_constants
+      ?(interval = Time.Span.of_min 10.) ~pool () =
+    Deferred.repeat_until_finished () (fun () ->
+        let%bind () =
+          match%map
+            attempt ~logger ~genesis_constants ~constraint_constants ~pool
+          with
+          | Ok (`Loaded | `Already_loaded | `No_fork_recorded) ->
+              ()
+          | Error msg ->
+              [%log info]
+                "Cannot load the genesis accounts yet: $reason. This will be \
+                 retried."
+                ~metadata:[ ("reason", `String msg) ]
+        in
+        let%map () = after interval in
+        `Repeat () )
+end
+
 let%test_module "hard fork configuration parsing" =
   ( module struct
     let fork_hash = "3NLoKn22eMnyQ7rxh5pxB6vBA3XhSAhhrf7akdqS6HbAKD14Dh1d"
@@ -5542,6 +5772,12 @@ let setup_server ~proof_cache_db ~(genesis_constants : Genesis_constants.t)
          the pre-fork one. Independent of the repair above: neither waits on the
          other, and both are no-ops until a fork is recorded. *)
       Fork_genesis_block.run ~logger ~genesis_constants ~constraint_constants
+        ~pool ()
+      |> don't_wait_for ;
+      (* Last step of the hand-over, and the only one whose failure costs
+         nothing else: everything about the fork is already correct by the time
+         this runs. *)
+      Genesis_accounts.run ~logger ~genesis_constants ~constraint_constants
         ~pool ()
       |> don't_wait_for ;
       serve_metrics_server ~logger ~metrics_server_port ~missing_blocks_width
