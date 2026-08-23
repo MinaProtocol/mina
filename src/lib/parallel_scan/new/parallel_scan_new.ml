@@ -1181,92 +1181,51 @@ module Make_foldable (M : Monad.S) = struct
         M.return final
 end
 
-(** The serialised shape: the state without its derived digests.
+(** The stored shape.
 
-    The digests are a cache — [O(nodes)] of them per tree — and putting them on
-    the wire would be both wasteful and a thing a peer could lie about. They
-    are rebuilt by {!of_wire}, which is the same [O(forest)] pass a receiving
-    node has to do anyway, once, rather than per block.
+    This is not a wire type. The scan state is transferred between nodes by the
+    sync protocol, in verified fragments; what remains here is the whole-value
+    form the frontier writes to its persistent root and passes around in its
+    own diffs. Nothing untrusted parses it.
 
-    Rebuilding needs to know how to digest a payload, and [bin_prot] has
-    nowhere to pass that, which is why this is an explicit conversion rather
-    than a [Binable.Of_binable]. The consumer already has a boundary in exactly
-    the right place: [write_all_proofs_to_disk] turns the serialised form into
-    the live one, and knows both payload types concretely. *)
+    So it is unversioned — the persistent frontier's database carries a version
+    of its own and discards a store it cannot read — and its arrays are plain
+    and unbounded, because the bound existed to stop a peer declaring an array
+    it had no intention of sending.
+
+    Converting is explicit rather than a [Binable.Of_binable] because the live
+    form knows how to digest a payload and [bin_prot] has nowhere to pass that.
+    The consumer already has a boundary in the right place:
+    [write_all_proofs_to_disk] turns the stored form into the live one, and
+    knows both payload types concretely. *)
 module Wire = struct
   module Tree = struct
-    [%%versioned
-    module Stable = struct
-      module V1 = struct
-        type ('merge, 'base) t =
-          { merges :
-              'merge Merge_node.Stable.V1.t
-              Mina_stdlib.Bounded_types.ArrayN4000.Stable.V1.t
-              list
-          ; bases :
-              'base Base_node.Stable.V1.t
-              Mina_stdlib.Bounded_types.ArrayN4000.Stable.V1.t
-              list
-          ; digests :
-              Mina_stdlib.Bounded_types.String.Stable.V1.t
-              Mina_stdlib.Bounded_types.ArrayN4000.Stable.V1.t
-              list
-          ; filled : int
-          ; level : int
-          ; proved : int
-          }
-        [@@deriving sexp]
-      end
-    end]
+    type ('merge, 'base) t =
+      { merges : 'merge Merge_node.Stable.V1.t array
+      ; bases : 'base Base_node.Stable.V1.t array
+      ; digests : string array
+      ; filled : int
+      ; level : int
+      ; proved : int
+      }
+    [@@deriving bin_io_unversioned, sexp]
   end
 
-  [%%versioned
-  module Stable = struct
-    module V1 = struct
-      type ('merge, 'base) t =
-        { trees : ('merge, 'base) Tree.Stable.V1.t list
-        ; acc : ('merge * 'base list) option
-        ; max_base_jobs : int
-        ; delay : int
-        }
-      [@@deriving sexp]
-    end
-  end]
-
-  (* A tree's nodes go on the wire as a list of bounded chunks rather than as
-     one array. [ArrayN4000] is what stops a peer declaring an array it has no
-     intention of sending, and that guard should not have to be relaxed every
-     time the transaction capacity goes up: a tree holds [2^k] base slots, so
-     one array per tree would exceed 4000 at a capacity of [2^12] and the
-     bound would be chasing the capacity forever. Chunking keeps the guard
-     fixed and independent of how deep the scan state is. *)
-  let wire_chunk_length = Mina_stdlib.Bounded_types.N4000.max_array_len
-
-  let chunk (a : 'a array) : 'a array list =
-    let n = Array.length a in
-    List.init
-      ((n + wire_chunk_length - 1) / wire_chunk_length)
-      ~f:(fun i ->
-        let pos = i * wire_chunk_length in
-        Array.sub a ~pos ~len:(min wire_chunk_length (n - pos)) )
-
-  let unchunk (chunks : 'a array list) : 'a array = Array.concat chunks
-
-  type ('merge, 'base) t = ('merge, 'base) Stable.Latest.t =
-    { trees : ('merge, 'base) Tree.Stable.Latest.t list
+  type ('merge, 'base) t =
+    { trees : ('merge, 'base) Tree.t list
     ; acc : ('merge * 'base list) option
     ; max_base_jobs : int
     ; delay : int
     }
-  [@@deriving sexp]
+  [@@deriving bin_io_unversioned, sexp]
 end
 
 let to_wire (t : ('merge, 'base) t) : ('merge, 'base) Wire.t =
   { trees =
       List.map t.trees ~f:(fun tree ->
-          { Wire.Tree.merges = Wire.chunk tree.merges
-          ; bases = Wire.chunk tree.bases
-          ; digests = Wire.chunk (Array.map tree.digests ~f:Hash.to_raw_string)
+          { Wire.Tree.merges = tree.merges
+          ; bases = tree.bases
+          ; digests = Array.map tree.digests ~f:Hash.to_raw_string
           ; filled = tree.filled
           ; level = tree.level
           ; proved = tree.proved
@@ -1288,10 +1247,9 @@ let to_wire (t : ('merge, 'base) t) : ('merge, 'base) Wire.t =
 let of_wire (w : ('merge, 'base) Wire.t) ~payload_digest : ('merge, 'base) t =
   { trees =
       List.map w.trees ~f:(fun tree ->
-          { Tree.merges = Wire.unchunk tree.merges
-          ; bases = Wire.unchunk tree.bases
-          ; digests =
-              Array.map (Wire.unchunk tree.digests) ~f:Hash.of_raw_string
+          { Tree.merges = tree.merges
+          ; bases = tree.bases
+          ; digests = Array.map tree.digests ~f:Hash.of_raw_string
           ; filled = tree.filled
           ; level = tree.level
           ; proved = tree.proved
@@ -1836,7 +1794,7 @@ let%test_module "port" =
             let bytes =
               Binable.to_string
                 ( module struct
-                  type t = (int, int) Wire.Stable.V1.t [@@deriving bin_io]
+                  type t = (int, int) Wire.t [@@deriving bin_io]
                 end )
                 (to_wire !t)
             in
@@ -1844,7 +1802,7 @@ let%test_module "port" =
               of_wire ~payload_digest
                 (Binable.of_string
                    ( module struct
-                     type t = (int, int) Wire.Stable.V1.t [@@deriving bin_io]
+                     type t = (int, int) Wire.t [@@deriving bin_io]
                    end )
                    bytes )
             in
@@ -1860,14 +1818,13 @@ let%test_module "port" =
             [%test_eq: node list] (new_nodes !t) (new_nodes back)
           done )
 
-    (* A tree wider than one wire chunk. [ArrayN4000] refuses to serialise an
-       array longer than 4000, so a capacity of 2^12 puts 4096 base slots and
-       4095 merge nodes past that bound — which is why the wire form chunks.
-       The cheap capacities above never reach it, so without this the bound is
-       only discovered by a node that cannot start. *)
-    let%test_unit "wire round trip past the chunk length" =
+    (* A tree far wider than the small capacities above. This once hit a
+       bounded-array limit that left a node at a capacity of 2^12 unable to
+       serialise its own genesis scan state, and the cheap capacities never
+       reached it — so the failure was only discoverable by starting a node.
+       The stored form is unbounded now, but the case is worth keeping. *)
+    let%test_unit "wire round trip at a large capacity" =
       let max_base_jobs = 4096 in
-      assert (max_base_jobs > Wire.wire_chunk_length) ;
       let t = ref (empty ~max_base_jobs ~delay:1) in
       let counter = ref 1 in
       for _ = 1 to 3 do
@@ -1883,17 +1840,10 @@ let%test_module "port" =
         t := t'
       done ;
       let wire = to_wire !t in
-      let check_chunk len =
-        if len > Wire.wire_chunk_length then
-          raise_s [%message "a wire chunk exceeded the bound" ~(len : int)]
-      in
-      List.iter wire.trees ~f:(fun tree ->
-          List.iter tree.merges ~f:(fun c -> check_chunk (Array.length c)) ;
-          List.iter tree.bases ~f:(fun c -> check_chunk (Array.length c)) ) ;
       let bytes =
         Binable.to_string
           ( module struct
-            type t = (int, int) Wire.Stable.V1.t [@@deriving bin_io]
+            type t = (int, int) Wire.t [@@deriving bin_io]
           end )
           wire
       in
@@ -1901,7 +1851,7 @@ let%test_module "port" =
         of_wire ~payload_digest
           (Binable.of_string
              ( module struct
-               type t = (int, int) Wire.Stable.V1.t [@@deriving bin_io]
+               type t = (int, int) Wire.t [@@deriving bin_io]
              end )
              bytes )
       in

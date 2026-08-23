@@ -498,7 +498,7 @@ let handle_scan_state_and_aux ~logger ~expected_staged_ledger_hash
         let open Deferred.Or_error.Let_syntax in
         let received_staged_ledger_hash =
           Staged_ledger_hash.of_aux_ledger_and_coinbase_hash
-            (Staged_ledger.Scan_state.Stable.Latest.hash scan_state_uncached)
+            (Staged_ledger.Scan_state.Stored.hash scan_state_uncached)
             expected_merkle_root pending_coinbases
         in
         [%log debug]
