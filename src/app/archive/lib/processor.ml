@@ -5002,6 +5002,161 @@ module Hardfork_finaliser = struct
         `Repeat () )
 end
 
+(** Put the fork genesis block into the database.
+
+    Without it the first post-fork block is inserted with [parent_id] NULL: the
+    chain is severed at the boundary, canonicalisation cannot walk across it,
+    and the missing-block metrics misread. Nothing raises an error when that
+    happens, which is why it is worth doing automatically.
+
+    The block cannot be built from the configuration alone. Its consensus state
+    needs the genesis ledger's total currency, which no configuration carries,
+    so the ledger has to be resolved first -- locally if it is already there,
+    otherwise fetched and checked against the [s3_data_hash] the daemon
+    recorded over the tarball it produced.
+
+    That makes this the first step in the hand-over that depends on something
+    outside the archive, so it is written to assume the ledger is not there yet
+    and to keep asking. *)
+module Fork_genesis_block = struct
+  (** Resolving the ledger reaches outside the archive, so every failure here is
+      a reason to try again later rather than to give up. *)
+  type not_ready =
+    | No_fork_recorded
+    | Ledger_unavailable of string
+    | Insert_failed of string
+
+  let describe = function
+    | No_fork_recorded ->
+        "no hard fork has been recorded for this database"
+    | Ledger_unavailable msg ->
+        sprintf "the genesis ledger could not be resolved: %s" msg
+    | Insert_failed msg ->
+        sprintf "the fork genesis block could not be inserted: %s" msg
+
+  let already_present (module Conn : CONNECTION) ~state_hash =
+    let open Deferred.Result.Let_syntax in
+    let%map id =
+      Block.find_opt
+        (module Conn)
+        ~state_hash:(State_hash.of_base58_check_exn state_hash)
+    in
+    Option.is_some id
+
+  (** Resolve the ledger and build the block.
+
+      [init_from_config_file] searches the local ledger directories first and
+      falls back to the configured bucket, verifying the download before use, so
+      this is cheap on the second and later attempts. *)
+  let build ~logger ~genesis_constants ~constraint_constants ~config_json =
+    match hardfork_state_of_config ~config_json with
+    | Error msg ->
+        Deferred.return (Error (Ledger_unavailable msg))
+    | Ok _ -> (
+        match
+          Runtime_config.of_yojson (Yojson.Safe.from_string config_json)
+        with
+        | Error msg ->
+            Deferred.return (Error (Ledger_unavailable msg))
+        | Ok runtime_config -> (
+            match%map
+              Genesis_ledger_helper.init_from_config_file ~logger
+                ~proof_level:Genesis_constants.Compiled.proof_level
+                ~genesis_constants ~constraint_constants runtime_config
+                ~cli_proof_level:None
+            with
+            | Error err ->
+                Error (Ledger_unavailable (Error.to_string_hum err))
+            | Ok precomputed_values ->
+                (* Named rather than punned: a punned [hash] resolves to
+                   [With_hash.hash] instead of the bound field. *)
+                let With_hash.{ data = block; hash = the_hash }, _ =
+                  Mina_block.genesis ~precomputed_values
+                in
+                Ok
+                  ( With_hash.{ data = block; hash = the_hash }
+                  , precomputed_values.constraint_constants ) ) )
+
+  (** One attempt. Returns without doing anything once the block is in place, so
+      it is safe to call on a loop. *)
+  let attempt ~logger ~genesis_constants ~constraint_constants ~pool =
+    let open Deferred.Let_syntax in
+    match%bind
+      Mina_caqti.Pool.use (fun conn -> Hardfork_state.load_opt conn) pool
+    with
+    | Error e ->
+        return (Error (Insert_failed (Caqti_error.show e)))
+    | Ok None ->
+        return (Error No_fork_recorded)
+    | Ok (Some hardfork_state) -> (
+        (* The block has to be built before it can be named, so presence is
+           checked afterwards. That is cheap once the ledger is resolved
+           locally, which it is on every attempt after the first. *)
+        match%bind
+          build ~logger ~genesis_constants ~constraint_constants
+            ~config_json:hardfork_state.Hardfork_state.config_json
+        with
+        | Error reason ->
+            return (Error reason)
+        | Ok (genesis_block, constraint_constants) -> (
+            let state_hash =
+              State_hash.With_state_hashes.state_hash genesis_block
+              |> State_hash.to_base58_check
+            in
+            match%bind
+              Mina_caqti.Pool.use
+                (fun conn ->
+                  let open Deferred.Result.Let_syntax in
+                  match%bind already_present conn ~state_hash with
+                  | true ->
+                      return `Already_present
+                  | false ->
+                      let%map (_ : int) =
+                        Block.add_if_doesn't_exist conn ~logger
+                          ~constraint_constants genesis_block
+                          ~accounts_accessed:[] ~accounts_created:[]
+                      in
+                      `Inserted )
+                pool
+            with
+            | Error e ->
+                return (Error (Insert_failed (Caqti_error.show e)))
+            | Ok `Already_present ->
+                return (Ok `Already_present)
+            | Ok `Inserted ->
+                [%log info]
+                  "Inserted the fork genesis block $state_hash. The post-fork \
+                   chain now links to the pre-fork one."
+                  ~metadata:[ ("state_hash", `String state_hash) ] ;
+                return (Ok `Inserted) ) )
+
+  (** Keep trying until the block is in place.
+
+      Deliberately slow: each attempt may fetch a ledger of tens of megabytes,
+      so this polls in minutes rather than seconds. Nothing waits on it -- the
+      archive serves reads throughout, and the boundary repair is independent. *)
+  let run ~logger ~genesis_constants ~constraint_constants
+      ?(interval = Time.Span.of_min 5.) ~pool () =
+    Deferred.repeat_until_finished () (fun () ->
+        let%bind () =
+          match%map
+            attempt ~logger ~genesis_constants ~constraint_constants ~pool
+          with
+          | Ok `Inserted | Ok `Already_present ->
+              ()
+          | Error No_fork_recorded ->
+              (* Ordinary on a database that has never seen a fork. *)
+              ()
+          | Error reason ->
+              [%log info]
+                "Cannot insert the fork genesis block yet: $reason. This will \
+                 be retried."
+                ~metadata:[ ("reason", `String (describe reason)) ]
+        in
+        let%map () = after interval in
+        `Repeat () )
+end
+
 let%test_module "hard fork configuration parsing" =
   ( module struct
     let fork_hash = "3NLoKn22eMnyQ7rxh5pxB6vBA3XhSAhhrf7akdqS6HbAKD14Dh1d"
@@ -5382,6 +5537,12 @@ let setup_server ~proof_cache_db ~(genesis_constants : Genesis_constants.t)
          runs in the background and only ever writes chain_status. *)
       Hardfork_finaliser.run ~logger
         ~required_confirmations:hardfork_confirmations ~pool ()
+      |> don't_wait_for ;
+      (* Put the fork genesis block in place, so the post-fork chain links to
+         the pre-fork one. Independent of the repair above: neither waits on the
+         other, and both are no-ops until a fork is recorded. *)
+      Fork_genesis_block.run ~logger ~genesis_constants ~constraint_constants
+        ~pool ()
       |> don't_wait_for ;
       serve_metrics_server ~logger ~metrics_server_port ~missing_blocks_width
         ~block_window_duration_ms:constraint_constants.block_window_duration_ms
