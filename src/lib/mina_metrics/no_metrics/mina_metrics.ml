@@ -230,22 +230,6 @@ module Network = struct
 
   let get_some_initial_peers_rpc_responses_failed : Counter.t = ()
 
-  let get_staged_ledger_aux_and_pending_coinbases_at_hash_rpcs_sent :
-      Counter.t * Gauge.t =
-    ((), ())
-
-  let get_staged_ledger_aux_and_pending_coinbases_at_hash_rpcs_received :
-      Counter.t * Gauge.t =
-    ((), ())
-
-  let get_staged_ledger_aux_and_pending_coinbases_at_hash_rpc_requests_failed :
-      Counter.t =
-    ()
-
-  let get_staged_ledger_aux_and_pending_coinbases_at_hash_rpc_responses_failed :
-      Counter.t =
-    ()
-
   let answer_sync_ledger_query_rpcs_sent : Counter.t * Gauge.t = ((), ())
 
   let answer_sync_ledger_query_rpcs_received : Counter.t * Gauge.t = ((), ())

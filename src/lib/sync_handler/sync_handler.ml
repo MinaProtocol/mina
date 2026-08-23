@@ -43,13 +43,6 @@ module Make (Inputs : Inputs_intf) :
     in
     Root_history.lookup root_history state_hash
 
-  let protocol_states_in_root_history frontier state_hash =
-    let open Transition_frontier.Extensions in
-    let root_history =
-      get_extension (Transition_frontier.extensions frontier) Root_history
-    in
-    Root_history.protocol_states_for_scan_state root_history state_hash
-
   let get_ledger_by_hash ~frontier ledger_hash =
     let root_ledger =
       Root_ledger.as_unmasked
@@ -131,45 +124,6 @@ module Make (Inputs : Inputs_intf) :
            | Some acc' ->
                Continue (Some acc') )
          ~finish:Fn.id
-
-  let get_staged_ledger_aux_and_pending_coinbases_at_hash ~logger ~frontier
-      state_hash =
-    let open Option.Let_syntax in
-    let protocol_states scan_state =
-      protocol_states_of_scan_state ~frontier scan_state
-    in
-    match
-      let%bind breadcrumb = Transition_frontier.find frontier state_hash in
-      let staged_ledger =
-        Transition_frontier.Breadcrumb.staged_ledger breadcrumb
-      in
-      let scan_state = Staged_ledger.scan_state staged_ledger in
-      let staged_ledger_hash = Breadcrumb.staged_ledger_hash breadcrumb in
-      let merkle_root = Staged_ledger_hash.ledger_hash staged_ledger_hash in
-      let%map scan_state_protocol_states = protocol_states scan_state in
-      let pending_coinbase =
-        Staged_ledger.pending_coinbase_collection staged_ledger
-      in
-      [%log debug]
-        ~metadata:
-          [ ( "staged_ledger_hash"
-            , Staged_ledger_hash.to_yojson staged_ledger_hash )
-          ]
-        "sending scan state and pending coinbase" ;
-      (scan_state, merkle_root, pending_coinbase, scan_state_protocol_states)
-    with
-    | Some res ->
-        Some res
-    | None ->
-        let open Root_data.Historical in
-        let%bind root = find_in_root_history frontier state_hash in
-        let%map scan_state_protocol_states =
-          protocol_states_in_root_history frontier state_hash
-        in
-        ( scan_state root
-        , staged_ledger_target_ledger_hash root
-        , pending_coinbase root
-        , scan_state_protocol_states )
 
   (** Answer one scan state sync query.
 

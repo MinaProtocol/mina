@@ -771,48 +771,6 @@ module Network = struct
     Counter.v "get_some_initial_peers_rpc_responses_failed" ~help ~namespace
       ~subsystem
 
-  let get_staged_ledger_aux_and_pending_coinbases_at_hash_rpcs_sent =
-    let help =
-      "# of Get_staged_ledger_aux_and_pending_coinbases_at_hash rpc requests \
-       sent"
-    in
-    let name =
-      "get_staged_ledger_aux_and_pending_coinbases_at_hash_rpcs_sent"
-    in
-    ( Counter.v name ~help ~namespace ~subsystem
-    , Gauge.v (name ^ surfix) ~help ~namespace ~subsystem )
-
-  let get_staged_ledger_aux_and_pending_coinbases_at_hash_rpcs_received =
-    let help =
-      "# of Get_staged_ledger_aux_and_pending_coinbases_at_hash rpc requests \
-       received"
-    in
-    let name =
-      "get_staged_ledger_aux_and_pending_coinbases_at_hash_rpcs_received"
-    in
-    ( Counter.v name ~help ~namespace ~subsystem
-    , Gauge.v (name ^ surfix) ~help ~namespace ~subsystem )
-
-  let get_staged_ledger_aux_and_pending_coinbases_at_hash_rpc_requests_failed :
-      Counter.t =
-    let help =
-      "# of Get_staged_ledger_aux_and_pending_coinbases_at_hash rpc requests \
-       failed"
-    in
-    Counter.v
-      "get_staged_ledger_aux_and_pending_coinbases_at_hash_rpc_requests_failed"
-      ~help ~namespace ~subsystem
-
-  let get_staged_ledger_aux_and_pending_coinbases_at_hash_rpc_responses_failed :
-      Counter.t =
-    let help =
-      "# of Get_staged_ledger_aux_and_pending_coinbases_at_hash rpc requests \
-       failed to respond"
-    in
-    Counter.v
-      "get_staged_ledger_aux_and_pending_coinbases_at_hash_rpc_responses_failed"
-      ~help ~namespace ~subsystem
-
   let answer_sync_ledger_query_rpcs_sent =
     let help = "# of Answer_sync_ledger_query rpc requests sent" in
     let name = "answer_sync_ledger_query_rpcs_sent" in

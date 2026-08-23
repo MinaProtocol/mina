@@ -241,18 +241,6 @@ module Network : sig
 
   val get_some_initial_peers_rpc_responses_failed : Counter.t
 
-  val get_staged_ledger_aux_and_pending_coinbases_at_hash_rpcs_sent :
-    Counter.t * Gauge.t
-
-  val get_staged_ledger_aux_and_pending_coinbases_at_hash_rpcs_received :
-    Counter.t * Gauge.t
-
-  val get_staged_ledger_aux_and_pending_coinbases_at_hash_rpc_requests_failed :
-    Counter.t
-
-  val get_staged_ledger_aux_and_pending_coinbases_at_hash_rpc_responses_failed :
-    Counter.t
-
   val answer_sync_ledger_query_rpcs_sent : Counter.t * Gauge.t
 
   val answer_sync_ledger_query_rpcs_received : Counter.t * Gauge.t

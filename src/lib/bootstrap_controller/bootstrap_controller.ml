@@ -666,60 +666,43 @@ let run_cycle ~context:(module Context : CONTEXT) ~trust_system ~verifier
     let%bind ( staged_ledger_data_download_time
              , staged_ledger_data_download_result ) =
       time_deferred
-        (* Prefer the fragment-wise protocol; fall back to the whole-scan-state
-           RPC for peers that do not speak it yet. Once every peer does, the
-           fallback and the RPC behind it can go. *)
-        (Deferred.bind
-           (let stop = Ivar.create () in
-            let finish result = Ivar.fill_if_empty stop () ; result in
-            match scan_state_sync_strategy () with
-            | `Pinned ->
-                download_scan_state ~logger ~state_hash:hash
-                  ~expected_staged_ledger_hash
-                  ~band_height:scan_state_band_height
-                  ~fetch:
-                    (fetch_scan_state_from_peer ~network:t.network
-                       ~peer_id:sender.peer_id )
-            | `Downloader ->
-                let%bind.Deferred downloader =
-                  Scan_state_downloader.create ~stop:(Ivar.read stop) ~logger
-                    ~trust_system:t.trust_system ~preferred:[ sender ]
-                    ~max_batch_size:8
-                    ~get:(fun peer queries ->
-                      fetch_scan_state_from_peer ~network:t.network
-                        ~peer_id:peer.peer_id queries )
-                    ~peers:(fun () -> Mina_networking.peers t.network)
-                    ~knowledge_context:(Pipe_lib.Broadcast_pipe.create () |> fst)
-                      (* every peer is assumed to be able to answer; a peer
-                         that cannot simply fails and the query is retried
-                         elsewhere, which is cheaper than asking each of them
-                         what they hold *)
-                    ~knowledge:(fun () _peer -> Deferred.return `All)
-                    ()
-                in
-                let%map.Deferred result =
-                  download_scan_state ~logger ~state_hash:hash
-                    ~expected_staged_ledger_hash
-                    ~band_height:scan_state_band_height
-                    ~fetch:(fetch_scan_state_from_downloader ~downloader)
-                in
-                finish result )
-           ~f:(fun outcome ->
-             (* the sync is over either way; nothing should still be reporting
-                progress for it *)
-             Staged_ledger.Scan_state.Sync.Progress.report None ;
-             match outcome with
-             | Ok result ->
-                 Deferred.return (Ok result)
-             | Error err ->
-                 [%log warn]
-                   ~metadata:[ ("error", Error_json.error_to_yojson err) ]
-                   "Fragment-wise scan state sync failed ($error); falling \
-                    back to the whole-scan-state RPC" ;
-                 Mina_networking
-                 .get_staged_ledger_aux_and_pending_coinbases_at_hash t.network
-                   sender.peer_id hash ) )
+        (let stop = Ivar.create () in
+         let finish result = Ivar.fill_if_empty stop () ; result in
+         match scan_state_sync_strategy () with
+         | `Pinned ->
+             download_scan_state ~logger ~state_hash:hash
+               ~expected_staged_ledger_hash ~band_height:scan_state_band_height
+               ~fetch:
+                 (fetch_scan_state_from_peer ~network:t.network
+                    ~peer_id:sender.peer_id )
+         | `Downloader ->
+             let%bind.Deferred downloader =
+               Scan_state_downloader.create ~stop:(Ivar.read stop) ~logger
+                 ~trust_system:t.trust_system ~preferred:[ sender ]
+                 ~max_batch_size:8
+                 ~get:(fun peer queries ->
+                   fetch_scan_state_from_peer ~network:t.network
+                     ~peer_id:peer.peer_id queries )
+                 ~peers:(fun () -> Mina_networking.peers t.network)
+                 ~knowledge_context:(Pipe_lib.Broadcast_pipe.create () |> fst)
+                   (* every peer is assumed to be able to answer; a peer
+                      that cannot simply fails and the query is retried
+                      elsewhere, which is cheaper than asking each of them
+                      what they hold *)
+                 ~knowledge:(fun () _peer -> Deferred.return `All)
+                 ()
+             in
+             let%map.Deferred result =
+               download_scan_state ~logger ~state_hash:hash
+                 ~expected_staged_ledger_hash
+                 ~band_height:scan_state_band_height
+                 ~fetch:(fetch_scan_state_from_downloader ~downloader)
+             in
+             finish result )
     in
+    (* the sync is over either way; nothing should still be reporting progress
+       for it *)
+    Staged_ledger.Scan_state.Sync.Progress.report None ;
     match staged_ledger_data_download_result with
     | Error err ->
         Deferred.return (staged_ledger_data_download_time, (None, Error err))
