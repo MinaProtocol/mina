@@ -243,12 +243,13 @@ val get_staged_ledger_aux_and_pending_coinbases_at_hash :
      * Mina_state.Protocol_state.value list )
      Deferred.Or_error.t
 
-(** Ask one peer a scan state sync query. *)
-val answer_scan_state_query :
+(** Ask one peer a batch of scan state sync queries, answered in order over a
+    single stream. *)
+val answer_scan_state_queries :
      t
   -> Peer.Id.t
-  -> Staged_ledger.Scan_state.Sync.Query.t
-  -> Staged_ledger.Scan_state.Sync.Answer.t Deferred.Or_error.t
+  -> Staged_ledger.Scan_state.Sync.Query.t list
+  -> Staged_ledger.Scan_state.Sync.Answer.t list Deferred.Or_error.t
 
 val get_completed_checked_snarks :
      t
