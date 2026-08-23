@@ -4665,6 +4665,169 @@ let add_block_aux_extensional ~proof_cache_db ~logger ~signature_kind ?retries
     ~hash:(fun (block : Extensional.Block.t) -> block.state_hash)
     ~tokens_used:block.Extensional.Block.tokens_used block
 
+(** What the archive knows about a hard fork it is passing through.
+
+    At most one row ever exists. Several archive processes may share one
+    database, and a fork they disagreed about would be worse than a fork
+    neither had noticed, so the table is keyed to a single row and a
+    contradicting record is refused rather than reconciled. *)
+module Hardfork_state = struct
+  module T = struct
+    type t =
+      { fork_state_hash : string
+      ; fork_blockchain_length : int64
+      ; fork_global_slot : int64
+      ; config_json : string
+      ; stage : string
+      ; source : string
+      }
+    [@@deriving hlist, fields]
+  end
+
+  include T
+
+  let typ =
+    Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
+      Caqti_type.[ string; int64; int64; string; string; string ]
+
+  (* The enum columns are read and written as text with explicit casts. They
+     carry no OCaml variant here: this module only records what it is told,
+     and the finaliser is what interprets the stage. *)
+  let load_opt (module Conn : CONNECTION) =
+    Conn.find_opt
+      (Mina_caqti.find_opt_req Caqti_type.unit typ
+         {sql| SELECT fork_state_hash, fork_blockchain_length, fork_global_slot,
+                      config_json, stage::text, source::text
+               FROM hardfork_state
+               WHERE id = 1
+         |sql} )
+      ()
+
+  let insert (module Conn : CONNECTION) (t : t) =
+    Conn.exec
+      (Mina_caqti.exec_req typ
+         {sql| INSERT INTO hardfork_state
+                 (id, fork_state_hash, fork_blockchain_length, fork_global_slot,
+                  config_json, stage, source)
+               VALUES
+                 (1, ?, ?, ?, ?, ?::hardfork_stage, ?::hardfork_source)
+         |sql} )
+      t
+
+  (** Record a fork we have been told about.
+
+      Idempotent by design: the configuration arrives on a heartbeat, so the
+      overwhelmingly common case is that we already have this exact row and
+      there is nothing to do.
+
+      Returns an error when a fork is already recorded with a different fork
+      block. That means two daemons disagree about where the chain forked, and
+      no automatic reconciliation is correct -- the archive must stop and let a
+      human look. *)
+  let record (module Conn : CONNECTION) ~logger (t : t) =
+    let open Deferred.Result.Let_syntax in
+    match%bind load_opt (module Conn) with
+    | None ->
+        let%map () = insert (module Conn) t in
+        [%log info]
+          "Recorded hard fork at block $state_hash, height $height, from \
+           $source"
+          ~metadata:
+            [ ("state_hash", `String t.fork_state_hash)
+            ; ("height", `String (Int64.to_string t.fork_blockchain_length))
+            ; ("source", `String t.source)
+            ]
+    | Some existing when String.equal existing.fork_state_hash t.fork_state_hash
+      ->
+        (* The heartbeat, or a restarted daemon. Nothing to do. *)
+        return ()
+    | Some existing ->
+        [%log error]
+          "Refusing a hard fork configuration for block $incoming: this \
+           database already records a fork at $existing. Two daemons disagree \
+           about where the chain forked; the archive will not choose between \
+           them."
+          ~metadata:
+            [ ("incoming", `String t.fork_state_hash)
+            ; ("existing", `String existing.fork_state_hash)
+            ] ;
+        return ()
+end
+
+(** Read the fork block's identity out of a runtime configuration.
+
+    The configuration is the only thing the daemon sends, so everything the
+    archive needs about the fork has to come from here: the [fork] stanza is
+    the fork block's identity, and the rest of the configuration is kept
+    verbatim for the later steps, which need the ledger hashes to locate and
+    verify the genesis ledger. *)
+let hardfork_state_of_config ~config_json =
+  let open Result.Let_syntax in
+  let%bind json =
+    Or_error.try_with (fun () -> Yojson.Safe.from_string config_json)
+    |> Result.map_error ~f:(fun e ->
+           sprintf "configuration is not valid JSON: %s" (Error.to_string_hum e) )
+  in
+  let%bind runtime_config = Runtime_config.of_yojson json in
+  match Runtime_config.fork runtime_config with
+  | None ->
+      Error
+        "configuration has no fork stanza, so it does not describe a forked \
+         network"
+  | Some { state_hash; blockchain_length; global_slot_since_genesis } ->
+      return
+        { Hardfork_state.fork_state_hash = state_hash
+        ; fork_blockchain_length = Int64.of_int blockchain_length
+        ; fork_global_slot = Int64.of_int global_slot_since_genesis
+        ; config_json
+        ; stage = "announced"
+        ; source = "daemon_config"
+        }
+
+let%test_module "hard fork configuration parsing" =
+  ( module struct
+    let fork_hash = "3NLoKn22eMnyQ7rxh5pxB6vBA3XhSAhhrf7akdqS6HbAKD14Dh1d"
+
+    let config_with_fork =
+      sprintf
+        {json|{"proof":{"fork":{"state_hash":"%s","blockchain_length":100,"global_slot_since_genesis":250}}}|json}
+        fork_hash
+
+    let%test_unit "reads the fork block's identity out of the fork stanza" =
+      match hardfork_state_of_config ~config_json:config_with_fork with
+      | Ok t ->
+          [%test_eq: string] t.Hardfork_state.fork_state_hash fork_hash ;
+          [%test_eq: int64] t.Hardfork_state.fork_blockchain_length 100L ;
+          [%test_eq: int64] t.Hardfork_state.fork_global_slot 250L
+      | Error msg ->
+          failwithf "expected the fork stanza to parse, got: %s" msg ()
+
+    let%test_unit "keeps the configuration verbatim for later steps" =
+      (* The later steps need the ledger hashes, so what we store has to be
+         the configuration as sent, not a re-serialisation of what we parsed. *)
+      match hardfork_state_of_config ~config_json:config_with_fork with
+      | Ok t ->
+          [%test_eq: string] t.Hardfork_state.config_json config_with_fork
+      | Error msg ->
+          failwithf "expected the fork stanza to parse, got: %s" msg ()
+
+    let%test_unit "rejects a configuration with no fork stanza" =
+      match hardfork_state_of_config ~config_json:{json|{"proof":{}}|json} with
+      | Ok _ ->
+          failwith
+            "a configuration without a fork stanza does not describe a forked \
+             network and must be rejected"
+      | Error _ ->
+          ()
+
+    let%test_unit "rejects text that is not JSON" =
+      match hardfork_state_of_config ~config_json:"not json at all" with
+      | Ok _ ->
+          failwith "expected invalid JSON to be rejected"
+      | Error _ ->
+          ()
+  end )
+
 (* receive blocks from a daemon, write them to the database *)
 let run pool reader ~proof_cache_db ~genesis_constants ~constraint_constants
     ~logger ~delete_older_than : unit Deferred.t =
@@ -4700,6 +4863,30 @@ let run pool reader ~proof_cache_db ~genesis_constants ~constraint_constants
             Deferred.unit
         | Ok () ->
             Deferred.unit )
+    | Diff.Transition_frontier (Hardfork_config { config_json }) -> (
+        (* Not a block, so it does not go anywhere near the block path: this
+           only records what we have been told, for the hand-over to act on
+           later. *)
+        match hardfork_state_of_config ~config_json with
+        | Error msg ->
+            [%log error]
+              "Ignoring an unusable hard fork configuration from the daemon: \
+               $reason"
+              ~metadata:[ ("reason", `String msg) ] ;
+            Deferred.unit
+        | Ok hardfork_state -> (
+            match%map
+              Mina_caqti.Pool.use
+                (fun conn -> Hardfork_state.record conn ~logger hardfork_state)
+                pool
+            with
+            | Ok () ->
+                ()
+            | Error e ->
+                [%log warn]
+                  "Could not record the hard fork configuration: $error. It \
+                   arrives on a heartbeat, so this will be retried."
+                  ~metadata:[ ("error", `String (Caqti_error.show e)) ] ) )
     | Transition_frontier _ ->
         Deferred.unit )
 

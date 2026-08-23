@@ -592,3 +592,35 @@ CREATE TABLE blocks_zkapp_commands
 CREATE INDEX idx_blocks_zkapp_commands_block_id ON blocks_zkapp_commands(block_id);
 CREATE INDEX idx_blocks_zkapp_commands_zkapp_command_id ON blocks_zkapp_commands(zkapp_command_id);
 CREATE INDEX idx_blocks_zkapp_commands_sequence_no ON blocks_zkapp_commands(sequence_no);
+
+/* -----------------------------------------------------------------------
+   Hard fork state
+
+   What the archive knows about a hard fork it is passing through. At most one
+   row ever exists -- several archive processes may share one database, and
+   they must not be able to hold different opinions about the fork.
+
+   Filled from the runtime configuration a daemon generated for the fork. That
+   configuration's `fork` stanza is the fork block's identity, and its ledger
+   stanzas carry the hashes that locate and verify the genesis ledger, so it is
+   kept verbatim for the later steps of the hand-over to read.
+
+   `stage` advances in one direction only:
+     announced  -- we know a fork happened and which block it forked from
+     finalized  -- the chain boundary has been settled in this database
+*/
+
+CREATE TYPE hardfork_stage  AS ENUM ('announced', 'finalized');
+CREATE TYPE hardfork_source AS ENUM ('daemon_config', 'fork_genesis', 'operator');
+
+CREATE TABLE hardfork_state
+( id                      int              PRIMARY KEY DEFAULT 1 CHECK (id = 1)
+, fork_state_hash         text             NOT NULL
+, fork_blockchain_length  bigint           NOT NULL
+, fork_global_slot        bigint           NOT NULL
+, config_json             text             NOT NULL
+, stage                   hardfork_stage   NOT NULL
+, source                  hardfork_source  NOT NULL
+, announced_at            timestamptz      NOT NULL DEFAULT now()
+, finalized_at            timestamptz
+);
