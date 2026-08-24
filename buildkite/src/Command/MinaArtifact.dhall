@@ -34,6 +34,8 @@ let DebianRepo = ../Constants/DebianRepo.dhall
 
 let DockerPublish = ../Constants/Docker/Publish.dhall
 
+let DockerRepo = ../Constants/DockerRepo.dhall
+
 let DebianChannel = ../Constants/DebianChannel.dhall
 
 let Profiles = ../Constants/Profiles.dhall
@@ -71,6 +73,7 @@ let PackagingSpec =
           , deb_legacy_version : Text
           , deb_legacy_githash_config : Text
           , docker_publish : DockerPublish.Type
+          , docker_repo : DockerRepo.Type
           , suffix : Optional Text
           , if_ : Optional B/If
           , includeIf : List Expr.Type
@@ -93,6 +96,7 @@ let PackagingSpec =
           , deb_legacy_githash_config = ""
           , arch = Arch.Type.Amd64
           , docker_publish = DockerPublish.Type.Essential
+          , docker_repo = DockerRepo.Type.InternalEurope
           , if_ = None B/If
           , includeIf = [] : List Expr.Type
           , excludeIf = [] : List Expr.Type
@@ -358,6 +362,8 @@ let build_artifacts
                             , Network.foldMinaBuildMainnetEnv nets
                             , "PREFORK_LEGACY_VERSION=${spec.deb_legacy_version}"
                             , "PREFORK_GITHASH_CONFIG=${spec.deb_legacy_githash_config}"
+                            , "MINA_DEB_RELEASE=${DebianChannel.lowerName
+                                                    spec.channel}"
                             ]
                           # BuildFlags.buildEnvs spec.buildFlags
                           # spec.extraBuildEnvs
@@ -383,6 +389,10 @@ let build_artifacts
                 }
 
 let commonBuildEnvs =
+    -- MINA_DEB_RELEASE is the channel. builder-helpers.sh writes it into every
+    -- control file as `Suite:` and defaults it to "unstable", so before it was
+    -- passed here a package built for stable still declared itself unstable,
+    -- and only the promotion step put that right.
           \(spec : PackagingSpec.Type)
       ->  let nets = Artifact.networks spec.artifacts
 
@@ -397,6 +407,7 @@ let commonBuildEnvs =
                 , Network.foldMinaBuildMainnetEnv nets
                 , "PREFORK_LEGACY_VERSION=${spec.deb_legacy_version}"
                 , "PREFORK_GITHASH_CONFIG=${spec.deb_legacy_githash_config}"
+                , "MINA_DEB_RELEASE=${DebianChannel.lowerName spec.channel}"
                 ]
               # BuildFlags.buildEnvs spec.buildFlags
               # spec.extraBuildEnvs
@@ -777,7 +788,13 @@ let docker_commands
                 DockerImage.ReleaseSpec.Type
                 Command.Type
                 (     \(s : DockerImage.ReleaseSpec.Type)
-                  ->  DockerImage.generateStep s
+                  ->  DockerImage.generateStep
+                        (     s
+                          //  { deb_release =
+                                  DebianChannel.lowerName spec.channel
+                              , docker_repo = spec.docker_repo
+                              }
+                        )
                 )
                 flattened_docker_steps
 
