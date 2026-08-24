@@ -2125,6 +2125,78 @@ let archive_blocks =
                    path (Error.to_string_hum err) ;
                  add_to_failure_file path ) ) )
 
+let send_hardfork_config =
+  let params =
+    let open Command.Let_syntax in
+    let%map_open config_file =
+      Command.Param.anon ("config-file" %: Command.Param.string)
+    and archive_process_location = Cli_lib.Flag.Host_and_port.Daemon.archive in
+    (config_file, archive_process_location)
+  in
+  Command.async
+    ~summary:
+      "Send a hard fork runtime configuration to an archive node.\n\n\
+       The archive derives everything it needs about a fork from this one \
+       message: the config's fork stanza is the fork block's identity, and its \
+       ledger stanzas locate and verify the genesis ledger. A daemon sends it \
+       automatically when it generates the config; this does the same thing by \
+       hand, which is what makes the archive's hand-over testable without \
+       running a fork."
+    (Cli_lib.Background_daemon.graphql_init params
+       ~f:(fun _graphql_endpoint (config_file, archive_process_location) ->
+         let logger = Logger.create () in
+         let archive_process_location =
+           match archive_process_location with
+           | Some location ->
+               location
+           | None ->
+               failwith
+                 "An archive address is required: this talks to the archive \
+                  directly rather than through a daemon"
+         in
+         let%bind config_json =
+           match%map
+             Deferred.Or_error.try_with ~here:[%here] (fun () ->
+                 Reader.file_contents config_file )
+           with
+           | Ok contents ->
+               contents
+           | Error e ->
+               failwithf "Could not read %s: %s" config_file
+                 (Error.to_string_hum e) ()
+         in
+         (* Parsed here only to fail early on a file that the archive would
+            reject anyway, with a message naming the file rather than the
+            wire. *)
+         ( match
+             Or_error.try_with (fun () -> Yojson.Safe.from_string config_json)
+             |> Or_error.bind ~f:(fun json ->
+                    Runtime_config.of_yojson json
+                    |> Result.map_error ~f:Error.of_string )
+           with
+         | Error e ->
+             failwithf "%s is not a runtime configuration: %s" config_file
+               (Error.to_string_hum e) ()
+         | Ok runtime_config -> (
+             match Runtime_config.fork runtime_config with
+             | None ->
+                 failwithf
+                   "%s has no fork stanza, so it does not describe a forked \
+                    network and the archive would refuse it"
+                   config_file ()
+             | Some fork ->
+                 printf "Sending the fork at %s (height %d) to the archive\n"
+                   fork.state_hash fork.blockchain_length ) ) ;
+         match%map
+           Mina_lib.Archive_client.dispatch_hardfork_config ~logger
+             archive_process_location ~config_json
+         with
+         | Ok () ->
+             printf "Sent.\n"
+         | Error e ->
+             failwithf "Could not send to the archive: %s"
+               (Error.to_string_hum e) () ) )
+
 let receipt_chain_hash =
   let proof_cache_db = Proof_cache_tag.create_identity_db () in
   let open Command.Let_syntax in
@@ -2519,6 +2591,7 @@ let advanced ~itn_features =
     ; ("add-peers", add_peers_graphql)
     ; ("object-lifetime-statistics", object_lifetime_statistics)
     ; ("archive-blocks", archive_blocks)
+    ; ("send-hardfork-config", send_hardfork_config)
     ; ("compute-receipt-chain-hash", receipt_chain_hash)
     ; ("hash-transaction", hash_transaction)
     ; ("set-coinbase-receiver", set_coinbase_receiver_graphql)
