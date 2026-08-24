@@ -72,6 +72,10 @@ module Processor : sig
     type t
 
     val process : t -> Message.t -> string option
+
+    (** Whether this processor could emit a message logged at this level.
+        A processor that could not lets a caller skip building one. *)
+    val accepts : t -> Level.t -> bool
   end
 
   type t
@@ -147,6 +151,12 @@ val null : unit -> t
 val extend : t -> (string, Yojson.Safe.t) List.Assoc.t -> t
 
 val change_id : t -> id:string -> t
+
+(** Whether a message logged at this level could reach any consumer. Building
+    a message has a cost of its own -- a structured event is serialised before
+    it is filtered -- so this allows an expensive one to be skipped entirely.
+    Answers conservatively: [true] whenever some consumer might emit it. *)
+val would_log : t -> Level.t -> bool
 
 val raw : t -> Message.t -> unit
 
