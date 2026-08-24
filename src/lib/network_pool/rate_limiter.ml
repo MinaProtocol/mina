@@ -107,7 +107,7 @@ module Lru_table (Q : Hash_queue.S) = struct
     | Some { elts; _ } -> (
         match Queue.peek elts with
         | Some (_, time) ->
-            time
+            Time.add time interval
         | None ->
             Time.now () )
 end
