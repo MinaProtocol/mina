@@ -10,6 +10,30 @@ MINA_DEB_VERSION=${MINA_DEB_VERSION:-"0.0.0-experimental"}
 MINA_DEB_RELEASE=${MINA_DEB_RELEASE:-"unstable"}
 ARCHITECTURE=${ARCHITECTURE:-"amd64"}
 
+# MINA_DEB_RELEASE becomes the `Suite:` field of every package built here, and
+# the apt component they are published into. It can now be set by a release
+# pipeline rather than only by the job definition, so it is checked against the
+# channels that actually exist.
+#
+# The check lives here, in bash, because Dhall cannot do it: it has no Text
+# equality, so the value travels from the pipeline as an unvalidated string.
+# Without this a typo does not fail -- deb-s3 would create a component named
+# after it and publish there, and nothing downstream would notice, because the
+# package's own Suite field would agree with the typo.
+#
+# Keep in step with Channel in buildkite/src/Constants/DebianChannel.dhall.
+MINA_DEB_KNOWN_RELEASES=(
+  unstable develop compatible master itn umt umt-mainnet
+  devnet alpha beta experimental stable
+)
+if [[ ! " ${MINA_DEB_KNOWN_RELEASES[*]} " == *" ${MINA_DEB_RELEASE} "* ]]; then
+  echo "❌ MINA_DEB_RELEASE='${MINA_DEB_RELEASE}' is not a known channel." >&2
+  echo "   Known: ${MINA_DEB_KNOWN_RELEASES[*]}" >&2
+  echo "   This becomes the Suite: field and the apt component, so a name" >&2
+  echo "   that is not a real channel would publish somewhere nobody reads." >&2
+  exit 1
+fi
+
 # Helper script to include when building deb archives.
 
 echo "--- Setting up the environment to build debian packages..."

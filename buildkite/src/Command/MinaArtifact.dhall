@@ -362,7 +362,7 @@ let build_artifacts
                             , Network.foldMinaBuildMainnetEnv nets
                             , "PREFORK_LEGACY_VERSION=${spec.deb_legacy_version}"
                             , "PREFORK_GITHASH_CONFIG=${spec.deb_legacy_githash_config}"
-                            , "MINA_DEB_RELEASE=${DebianChannel.lowerName
+                            , "MINA_DEB_RELEASE=${DebianChannel.effective
                                                     spec.channel}"
                             ]
                           # BuildFlags.buildEnvs spec.buildFlags
@@ -407,7 +407,7 @@ let commonBuildEnvs =
                 , Network.foldMinaBuildMainnetEnv nets
                 , "PREFORK_LEGACY_VERSION=${spec.deb_legacy_version}"
                 , "PREFORK_GITHASH_CONFIG=${spec.deb_legacy_githash_config}"
-                , "MINA_DEB_RELEASE=${DebianChannel.lowerName spec.channel}"
+                , "MINA_DEB_RELEASE=${DebianChannel.effective spec.channel}"
                 ]
               # BuildFlags.buildEnvs spec.buildFlags
               # spec.extraBuildEnvs
@@ -791,7 +791,7 @@ let docker_commands
                   ->  DockerImage.generateStep
                         (     s
                           //  { deb_release =
-                                  DebianChannel.lowerName spec.channel
+                                  DebianChannel.effective spec.channel
                               , docker_repo = spec.docker_repo
                               }
                         )
