@@ -1555,8 +1555,9 @@ let send_resource_pool_diff_or_wait ~rl ~diff_score ~max_per_15_seconds diff =
           let%bind () =
             after
               Time.(
-                diff (now ())
-                  (Network_pool.Rate_limiter.next_expires rl (Remote us)))
+                diff
+                  (Network_pool.Rate_limiter.next_expires rl (Remote us))
+                  (now ()))
           in
           able_to_send_or_wait ()
   in
