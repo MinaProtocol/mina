@@ -361,6 +361,7 @@ MOCKEXE
     create_mock_exe "default/src/app/archive_blocks/archive_blocks.exe"
     create_mock_exe "default/src/app/extract_blocks/extract_blocks.exe"
     create_mock_exe "default/src/app/archive_hardfork_toolbox/archive_hardfork_toolbox.exe"
+    create_mock_exe "default/src/app/archive_dispatch/archive_dispatch.exe"
     create_mock_exe "default/src/app/missing_blocks_auditor/missing_blocks_auditor.exe"
     create_mock_exe "default/src/app/replayer/replayer.exe"
     create_mock_exe "default/src/app/zkapp_test_transaction/zkapp_test_transaction.exe"
@@ -923,6 +924,142 @@ test_build_archive_mainnet_deb() {
 }
 
 ################################################################################
+# Tests: Archive and Rosetta automode packages
+#
+# A hard fork replaces every archive and Rosetta binary, because each is
+# compiled against one schema era. These packages install both eras side by
+# side and let the dispatcher choose, so what the tests care about is that each
+# era's binaries land under its own runtime directory and that nothing collides
+# on the PATH.
+################################################################################
+
+test_build_archive_prefork_deb() {
+    safe_build build_archive_prefork_deb devnet || { log_fail "build exited non-zero"; return; }
+
+    load_captured_state
+    assert_eq "deb name" "mina-archive-devnet-prefork-mesa" "$CAPTURED_DEB_NAME"
+
+    # Binaries belong to the pre-fork runtime directory, never the PATH: the
+    # dispatcher is what puts anything on the PATH.
+    assert_file_captured "$CAPTURED_FILES" "usr/lib/mina/berkeley/mina-archive"
+    assert_file_captured "$CAPTURED_FILES" "usr/lib/mina/berkeley/mina-replayer"
+    assert_file_captured "$CAPTURED_FILES" "usr/lib/mina/berkeley/mina-archive-hardfork-toolbox"
+    assert_file_not_captured "$CAPTURED_FILES" "usr/local/bin/mina-archive"
+
+    # The SQL ships with the post-fork package, since the upgrade script is what
+    # moves a database between eras and must be the post-fork copy.
+    assert_file_not_captured "$CAPTURED_FILES" "etc/mina/archive/create_schema.sql"
+}
+
+test_build_archive_postfork_deb() {
+    safe_build build_archive_postfork_deb devnet || { log_fail "build exited non-zero"; return; }
+
+    load_captured_state
+    assert_eq "deb name" "mina-archive-devnet-postfork-mesa" "$CAPTURED_DEB_NAME"
+
+    # psql is how the archive applies the schema upgrade in-process.
+    assert_control_contains "$CAPTURED_CONTROL" "Depends" "postgresql-client"
+
+    assert_file_captured "$CAPTURED_FILES" "usr/lib/mina/mesa/mina-archive"
+    assert_file_captured "$CAPTURED_FILES" "usr/lib/mina/mesa/mina-replayer"
+
+    # The dispatcher and its settings.
+    assert_file_captured "$CAPTURED_FILES" "usr/local/bin/mina-archive-dispatch"
+    assert_file_captured "$CAPTURED_FILES" "etc/default/mina-archive-dispatch"
+
+    assert_file_captured "$CAPTURED_FILES" "etc/mina/archive/create_schema.sql"
+}
+
+test_archive_dispatch_settings_are_strict_key_value() {
+    safe_build build_archive_postfork_deb devnet || { log_fail "build exited non-zero"; return; }
+
+    local settings="${CAPTURE_DIR}/last_build/etc/default/mina-archive-dispatch"
+    if [[ ! -f "$settings" ]]; then
+        log_fail "dispatcher settings file not produced"
+        return
+    fi
+    local content
+    content=$(cat "$settings")
+
+    assert_contains "names the pre-fork runtime" "$content" "PREFORK_RUNTIME=berkeley"
+    assert_contains "names the post-fork runtime" "$content" "POSTFORK_RUNTIME=mesa"
+    assert_contains "names the pre-fork protocol version" "$content" "PREFORK_PROTOCOL_VERSION="
+    assert_contains "names the post-fork protocol version" "$content" "POSTFORK_PROTOCOL_VERSION="
+
+    # The dispatcher parses this itself rather than sourcing it, so anything
+    # that only a shell would understand would be read wrongly and silently.
+    if grep -qE '^\s*(export|source|\.)\s' "$settings"; then
+        log_fail "settings use shell syntax the dispatcher does not parse"
+    else
+        log_pass
+    fi
+    if grep -qE '[$][(]|[`]' "$settings"; then
+        log_fail "settings contain command substitution"
+    else
+        log_pass
+    fi
+}
+
+test_build_archive_automode_deb() {
+    safe_build build_archive_automode_deb devnet || { log_fail "build exited non-zero"; return; }
+
+    load_captured_state
+    assert_eq "deb name" "mina-archive-devnet-automode" "$CAPTURED_DEB_NAME"
+
+    # An umbrella: it carries no files, only the statement that both eras are
+    # wanted.
+    assert_control_field "$CAPTURED_CONTROL" "Architecture" "all"
+    assert_control_contains "$CAPTURED_CONTROL" "Depends" "mina-archive-devnet-postfork-mesa"
+    assert_control_contains "$CAPTURED_CONTROL" "Depends" "mina-archive-devnet-prefork-mesa"
+
+    # Installing automode over a plain archive must resolve rather than clash
+    # over /usr/local/bin.
+    assert_control_contains "$CAPTURED_CONTROL" "Conflicts" "mina-archive-devnet"
+    assert_control_contains "$CAPTURED_CONTROL" "Provides" "mina-archive-devnet"
+
+    assert_file_not_captured "$CAPTURED_FILES" "usr/local/bin/mina-archive"
+}
+
+test_build_rosetta_prefork_deb() {
+    safe_build build_rosetta_prefork_deb devnet || { log_fail "build exited non-zero"; return; }
+
+    load_captured_state
+    assert_eq "deb name" "mina-rosetta-devnet-prefork-mesa" "$CAPTURED_DEB_NAME"
+
+    assert_file_captured "$CAPTURED_FILES" "usr/lib/mina/berkeley/mina-rosetta"
+    assert_file_captured "$CAPTURED_FILES" "usr/lib/mina/berkeley/mina-ocaml-signer"
+    assert_file_not_captured "$CAPTURED_FILES" "usr/local/bin/mina-rosetta"
+}
+
+test_build_rosetta_postfork_deb() {
+    safe_build build_rosetta_postfork_deb devnet || { log_fail "build exited non-zero"; return; }
+
+    load_captured_state
+    assert_eq "deb name" "mina-rosetta-devnet-postfork-mesa" "$CAPTURED_DEB_NAME"
+
+    assert_file_captured "$CAPTURED_FILES" "usr/lib/mina/mesa/mina-rosetta"
+    assert_file_captured "$CAPTURED_FILES" "etc/mina/rosetta/rosetta-cli-config/config.json"
+
+    # Rosetta routes through the archive's dispatcher rather than shipping one:
+    # the decision and the record are identical, and two programs answering the
+    # same question from the same row could only ever disagree.
+    assert_control_contains "$CAPTURED_CONTROL" "Depends" "mina-archive-devnet-postfork-mesa"
+    assert_file_not_captured "$CAPTURED_FILES" "usr/local/bin/mina-archive-dispatch"
+    assert_file_not_captured "$CAPTURED_FILES" "etc/default/mina-archive-dispatch"
+}
+
+test_build_rosetta_automode_deb() {
+    safe_build build_rosetta_automode_deb devnet || { log_fail "build exited non-zero"; return; }
+
+    load_captured_state
+    assert_eq "deb name" "mina-rosetta-devnet-automode" "$CAPTURED_DEB_NAME"
+    assert_control_field "$CAPTURED_CONTROL" "Architecture" "all"
+    assert_control_contains "$CAPTURED_CONTROL" "Depends" "mina-rosetta-devnet-postfork-mesa"
+    assert_control_contains "$CAPTURED_CONTROL" "Depends" "mina-rosetta-devnet-prefork-mesa"
+    assert_control_contains "$CAPTURED_CONTROL" "Conflicts" "mina-rosetta-devnet"
+}
+
+################################################################################
 # Tests: Hardfork config packages
 ################################################################################
 
@@ -1264,6 +1401,13 @@ main() {
     # Archive packages
     run_test test_build_archive_devnet_deb
     run_test test_build_archive_mainnet_deb
+    run_test test_build_archive_prefork_deb
+    run_test test_build_archive_postfork_deb
+    run_test test_archive_dispatch_settings_are_strict_key_value
+    run_test test_build_archive_automode_deb
+    run_test test_build_rosetta_prefork_deb
+    run_test test_build_rosetta_postfork_deb
+    run_test test_build_rosetta_automode_deb
 
     # Hardfork config packages
     run_test test_build_daemon_devnet_hardfork_config_deb

@@ -503,6 +503,139 @@ build_rosetta_deb() {
 }
 ## END ROSETTA PACKAGE ##
 
+## ROSETTA AUTOMODE PACKAGES ##
+
+# Rosetta is era-bound for the same reason the archive is -- it links
+# archive_lib and decodes rows compiled against one schema -- so it gets the
+# same three packages.
+#
+# It routes through the archive dispatcher rather than one of its own. The
+# decision is identical (which era is the schema in), the record is identical
+# (migration_history), and two programs answering the same question from the
+# same row could only ever disagree.
+
+# Copies the Rosetta binaries into a directory, so automode packages can place
+# a whole runtime under /usr/lib/mina/<codename>/.
+copy_common_rosetta_apps() {
+  local dest="${1}"
+  local network="${2}"
+
+  local signature
+  signature=$(signature_of_network "$network")
+
+  mkdir -p "${dest}"
+
+  cp "./default/src/app/rosetta/rosetta_${signature}_signatures.exe" \
+    "${dest}/mina-rosetta"
+  cp "./default/src/app/rosetta/ocaml-signer/signer_${signature}_signatures.exe" \
+    "${dest}/mina-ocaml-signer"
+  cp ./default/src/app/rosetta/indexer_test/indexer_test.exe \
+    "${dest}/mina-rosetta-indexer-test"
+}
+
+# Adds the Rosetta commands to the archive dispatcher's symlink set.
+#
+# Separate from the archive's own symlinks because the two postfork packages
+# are installed independently, and whichever lands second must not fight the
+# first over /usr/local/bin/mina-archive-dispatch. Rosetta ships only its own
+# names and depends on the archive postfork package for the dispatcher itself.
+create_symlinks_for_rosetta_apps() {
+
+  mkdir -p "${BUILDDIR}/usr/local/bin"
+
+  for app in mina-rosetta mina-ocaml-signer mina-rosetta-indexer-test; do
+    ln -sf mina-archive-dispatch "${BUILDDIR}/usr/local/bin/${app}"
+  done
+
+  ln -sf "/usr/lib/mina/${CURRENT_CODENAME}/mina-rosetta" \
+    "${BUILDDIR}/usr/local/bin/mina-rosetta-${CURRENT_CODENAME}"
+  ln -sf "/usr/lib/mina/${POSTFORK_CODENAME}/mina-rosetta" \
+    "${BUILDDIR}/usr/local/bin/mina-rosetta-${POSTFORK_CODENAME}"
+}
+
+#
+# Builds mina-rosetta-NETWORK-prefork-POSTFORK_CODENAME
+#
+# The pre-fork Rosetta, under /usr/lib/mina/${CURRENT_CODENAME}. Built from the
+# pre-fork sources, so it is produced on the branch that holds them.
+#
+build_rosetta_prefork_deb() {
+
+  local network="$1"
+  local package_name="mina-rosetta-${network}-prefork-${POSTFORK_CODENAME}"
+
+  echo "------------------------------------------------------------"
+  echo "--- Building rosetta prefork deb for ${network}:"
+
+  create_control_file "${package_name}" "${SHARED_DEPS}" \
+    "Mina Rosetta API for the pre-fork era of ${network}" "${SUGGESTED_DEPS}"
+
+  copy_common_rosetta_apps "${AUTOMODE_CURRENT_DIR}" "${network}"
+
+  build_deb "${package_name}"
+}
+
+#
+# Builds mina-rosetta-NETWORK-postfork-POSTFORK_CODENAME
+#
+# The post-fork Rosetta, its configuration, and the symlinks that point its
+# commands at the archive dispatcher. Depends on the archive postfork package,
+# which owns the dispatcher binary and its settings.
+#
+build_rosetta_postfork_deb() {
+
+  local network="$1"
+  local package_name="mina-rosetta-${network}-postfork-${POSTFORK_CODENAME}"
+
+  echo "------------------------------------------------------------"
+  echo "--- Building rosetta postfork deb for ${network}:"
+
+  create_control_file "${package_name}" \
+    "${SHARED_DEPS}, mina-archive-${network}-postfork-${POSTFORK_CODENAME} (=${MINA_DEB_VERSION})" \
+    "Mina Rosetta API for the post-fork era of ${network}" "${SUGGESTED_DEPS}"
+
+  copy_common_rosetta_apps "${AUTOMODE_POSTFORK_DIR}" "${network}"
+  create_symlinks_for_rosetta_apps
+
+  mkdir -p "${BUILDDIR}/etc/mina/rosetta/"{rosetta-cli-config,scripts}
+  cp ../src/app/rosetta/scripts/* "${BUILDDIR}/etc/mina/rosetta/scripts"
+  cp ../src/app/rosetta/rosetta-cli-config/*.json \
+    "${BUILDDIR}/etc/mina/rosetta/rosetta-cli-config"
+  cp ../src/app/rosetta/rosetta-cli-config/*.ros \
+    "${BUILDDIR}/etc/mina/rosetta/rosetta-cli-config"
+
+  build_deb "${package_name}"
+}
+
+#
+# Builds mina-rosetta-NETWORK-automode, the umbrella package
+#
+build_rosetta_automode_deb() {
+
+  local network="$1"
+  local package_name="mina-rosetta-${network}-automode"
+
+  echo "------------------------------------------------------------"
+  echo "--- Building rosetta automode metapackage for ${network}:"
+
+  local prefork_pkg="mina-rosetta-${network}-prefork-${POSTFORK_CODENAME}"
+  local postfork_pkg="mina-rosetta-${network}-postfork-${POSTFORK_CODENAME}"
+  local prefork_version="${PREFORK_LEGACY_VERSION:-${MINA_DEB_VERSION}}"
+  local depends="${postfork_pkg} (=${MINA_DEB_VERSION}), ${prefork_pkg} (=${prefork_version})"
+
+  local saved_arch="${ARCHITECTURE}"
+  ARCHITECTURE=all
+
+  create_control_file "${package_name}" "${depends}" \
+    "Transitional metapackage for Mina ${network} Rosetta in automode (installs both runtimes)" \
+    "" "mina-rosetta-${network}" "mina-rosetta-${network}" \
+    "mina-rosetta-${network}"
+
+  build_deb "${package_name}"
+  ARCHITECTURE="${saved_arch}"
+}
+## END ROSETTA AUTOMODE PACKAGES ##
+
 ## CONFIG PACKAGE ##
 build_daemon_config_deb() {
 
@@ -901,30 +1034,42 @@ build_daemon_hardfork_config_deb() {
 # Sets up archive daemon, archive blocks tool, extract blocks tool,
 # missing blocks utilities, replayer, and SQL migration scripts.
 #
+# Copies the archive binaries into a directory.
+#
+# Takes the destination so that automode packages can place a whole runtime
+# under /usr/lib/mina/<codename>/ while ordinary packages put it on the PATH.
+# Every binary here links archive_lib and is therefore compiled against one
+# schema era, which is why a hard fork needs a second copy of all of them
+# rather than just a second archive.
+copy_common_archive_apps() {
+  local dest="${1}"
+
+  mkdir -p "${dest}"
+
+  cp ./default/src/app/archive/archive.exe \
+    "${dest}/mina-archive"
+  cp ./default/src/app/archive_blocks/archive_blocks.exe \
+    "${dest}/mina-archive-blocks"
+  cp ./default/src/app/extract_blocks/extract_blocks.exe \
+    "${dest}/mina-extract-blocks"
+  cp ./default/src/app/archive_hardfork_toolbox/archive_hardfork_toolbox.exe \
+    "${dest}/mina-archive-hardfork-toolbox"
+  cp ./default/src/app/missing_blocks_auditor/missing_blocks_auditor.exe \
+    "${dest}/mina-missing-blocks-auditor"
+  cp ./default/src/app/replayer/replayer.exe \
+    "${dest}/mina-replayer"
+  cp ./default/src/app/dump_slot_ledger/dump_slot_ledger.exe \
+    "${dest}/mina-dump-slot-ledger"
+}
+
 copy_common_archive_configs() {
   local ARCHIVE_DEB="${1}"
 
-  mkdir -p "${BUILDDIR}/usr/local/bin"
-
-  cp ./default/src/app/archive/archive.exe \
-    "${BUILDDIR}/usr/local/bin/mina-archive"
-  cp ./default/src/app/archive_blocks/archive_blocks.exe \
-    "${BUILDDIR}/usr/local/bin/mina-archive-blocks"
-  cp ./default/src/app/extract_blocks/extract_blocks.exe \
-    "${BUILDDIR}/usr/local/bin/mina-extract-blocks"
-  cp ./default/src/app/archive_hardfork_toolbox/archive_hardfork_toolbox.exe \
-    "${BUILDDIR}/usr/local/bin/mina-archive-hardfork-toolbox"
+  copy_common_archive_apps "${BUILDDIR}/usr/local/bin"
 
   mkdir -p "${BUILDDIR}/etc/mina/archive"
   cp ../scripts/archive/missing-blocks-guardian.sh \
     "${BUILDDIR}/usr/local/bin/mina-missing-blocks-guardian"
-
-  cp ./default/src/app/missing_blocks_auditor/missing_blocks_auditor.exe \
-    "${BUILDDIR}/usr/local/bin/mina-missing-blocks-auditor"
-  cp ./default/src/app/replayer/replayer.exe \
-    "${BUILDDIR}/usr/local/bin/mina-replayer"
-  cp ./default/src/app/dump_slot_ledger/dump_slot_ledger.exe \
-    "${BUILDDIR}/usr/local/bin/mina-dump-slot-ledger"
 
   rsync -Huav ../src/app/archive/*.sql "${BUILDDIR}/etc/mina/archive"
 
@@ -975,6 +1120,155 @@ build_archive_deb () {
 
 }
 ## END ARCHIVE PACKAGE ##
+
+## ARCHIVE AUTOMODE PACKAGES ##
+
+# The archive gets the same prefork/postfork/automode split the daemon has, and
+# for the same reason: every archive binary is compiled against one schema era,
+# so a fork needs both sets installed side by side with something choosing
+# between them.
+#
+# What differs is how that choice is made. The daemon dispatcher routes on a
+# marker file; the archive cannot, because its filesystem is typically
+# ephemeral and a marker would not survive the container being replaced. The
+# archive's durable state is its database, so mina-archive-dispatch reads
+# migration_history instead -- see src/app/archive_dispatch.
+
+# Installs the archive dispatcher, its settings, and one symlink per archive
+# command. After this every archive command on the PATH is the dispatcher,
+# which picks a runtime and execs the real binary.
+create_symlinks_for_archive_apps() {
+
+  mkdir -p "${BUILDDIR}/usr/local/bin"
+
+  cp ./default/src/app/archive_dispatch/archive_dispatch.exe \
+    "${BUILDDIR}/usr/local/bin/mina-archive-dispatch"
+
+  mkdir -p "${BUILDDIR}/etc/default"
+
+  # Strict KEY=value, not shell syntax: the dispatcher parses this itself
+  # rather than sourcing it, so a malformed line fails loudly instead of being
+  # silently reinterpreted.
+  #
+  # PGCONN has no sensible default -- every deployment has its own database --
+  # so it is left for the operator, and the dispatcher refuses to guess a
+  # runtime when it cannot connect.
+  cat << EOF > "${BUILDDIR}/etc/default/mina-archive-dispatch"
+RUNTIMES_BASE_PATH="/usr/lib/mina"
+PREFORK_RUNTIME=${CURRENT_CODENAME}
+POSTFORK_RUNTIME=${POSTFORK_CODENAME}
+PREFORK_PROTOCOL_VERSION=${PREFORK_PROTOCOL_VERSION:-3.0.0}
+POSTFORK_PROTOCOL_VERSION=${POSTFORK_PROTOCOL_VERSION:-4.0.0}
+# Set this to the archive database this node reads.
+PGCONN=
+EOF
+
+  for app in mina-archive mina-archive-blocks mina-extract-blocks \
+             mina-archive-hardfork-toolbox mina-missing-blocks-auditor \
+             mina-replayer mina-dump-slot-ledger; do
+    ln -sf mina-archive-dispatch "${BUILDDIR}/usr/local/bin/${app}"
+  done
+
+  # Direct handles on each runtime, for an operator who needs to bypass the
+  # dispatcher during an incident.
+  ln -sf "/usr/lib/mina/${CURRENT_CODENAME}/mina-archive" \
+    "${BUILDDIR}/usr/local/bin/mina-archive-${CURRENT_CODENAME}"
+  ln -sf "/usr/lib/mina/${POSTFORK_CODENAME}/mina-archive" \
+    "${BUILDDIR}/usr/local/bin/mina-archive-${POSTFORK_CODENAME}"
+
+  echo "------------------------------------------------------------"
+  echo "Archive dispatcher symlinks:"
+  find "${BUILDDIR}/usr/local/bin/" -type l -exec ls -la {} \;
+}
+
+#
+# Builds mina-archive-NETWORK-prefork-POSTFORK_CODENAME
+#
+# The pre-fork archive and its tools, under /usr/lib/mina/${CURRENT_CODENAME}.
+# Built from the pre-fork sources, so this one is produced on the branch that
+# holds them rather than alongside its postfork sibling.
+#
+build_archive_prefork_deb() {
+
+  local network="$1"
+  local package_name="mina-archive-${network}-prefork-${POSTFORK_CODENAME}"
+
+  echo "------------------------------------------------------------"
+  echo "--- Building archive prefork deb for ${network}:"
+
+  create_control_file "${package_name}" "${ARCHIVE_DEPS}" \
+    "Mina Archive Node and tools for the pre-fork era of ${network}"
+
+  copy_common_archive_apps "${AUTOMODE_CURRENT_DIR}"
+
+  build_deb "${package_name}"
+}
+
+#
+# Builds mina-archive-NETWORK-postfork-POSTFORK_CODENAME
+#
+# The post-fork archive and its tools, plus the dispatcher, its settings and
+# the symlinks. The SQL lives here rather than in the prefork package because
+# the upgrade script is what moves a database between the two eras, and it must
+# be the post-fork copy that runs.
+#
+build_archive_postfork_deb() {
+
+  local network="$1"
+  local package_name="mina-archive-${network}-postfork-${POSTFORK_CODENAME}"
+
+  echo "------------------------------------------------------------"
+  echo "--- Building archive postfork deb for ${network}:"
+
+  create_control_file "${package_name}" "${ARCHIVE_DEPS}, postgresql-client" \
+    "Mina Archive Node and tools for the post-fork era of ${network}"
+
+  copy_common_archive_apps "${AUTOMODE_POSTFORK_DIR}"
+  create_symlinks_for_archive_apps
+
+  mkdir -p "${BUILDDIR}/etc/mina/archive"
+  cp ../scripts/archive/missing-blocks-guardian.sh \
+    "${BUILDDIR}/usr/local/bin/mina-missing-blocks-guardian"
+  rsync -Huav ../src/app/archive/*.sql "${BUILDDIR}/etc/mina/archive"
+
+  build_deb "${package_name}"
+}
+
+#
+# Builds mina-archive-NETWORK-automode, the umbrella package
+#
+# Carries no files. Installing it is the statement that this deployment may
+# pass through a hard fork, which is what pulls in both runtimes and, in turn,
+# what turns on the parts of the archive and Rosetta that only matter then.
+#
+build_archive_automode_deb() {
+
+  local network="$1"
+  local package_name="mina-archive-${network}-automode"
+
+  echo "------------------------------------------------------------"
+  echo "--- Building archive automode metapackage for ${network}:"
+
+  local prefork_pkg="mina-archive-${network}-prefork-${POSTFORK_CODENAME}"
+  local postfork_pkg="mina-archive-${network}-postfork-${POSTFORK_CODENAME}"
+  local prefork_version="${PREFORK_LEGACY_VERSION:-${MINA_DEB_VERSION}}"
+  local depends="${postfork_pkg} (=${MINA_DEB_VERSION}), ${prefork_pkg} (=${prefork_version})"
+
+  local saved_arch="${ARCHITECTURE}"
+  ARCHITECTURE=all
+
+  # Conflicts with, replaces and provides the plain archive package, so that
+  # installing automode over an existing archive resolves rather than clashing
+  # over /usr/local/bin, and reinstalling the plain package removes automode.
+  create_control_file "${package_name}" "${depends}" \
+    "Transitional metapackage for the Mina ${network} archive in automode (installs both runtimes)" \
+    "" "mina-archive-${network}" "mina-archive-${network}" \
+    "mina-archive-${network}"
+
+  build_deb "${package_name}"
+  ARCHITECTURE="${saved_arch}"
+}
+## END ARCHIVE AUTOMODE PACKAGES ##
 
 ## ZKAPP TEST TXN ##
 

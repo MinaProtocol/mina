@@ -1,0 +1,115 @@
+ARG image=europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/debian:bullseye-slim
+FROM ${image}
+
+# The archive in automode: both schema eras installed side by side, with
+# mina-archive-dispatch choosing between them per invocation.
+#
+# It mirrors Dockerfile-mina-daemon-auto-hardfork, with one difference worth
+# knowing about. The daemon's dispatcher routes on a marker file; this one
+# routes on the archive database, because a container's filesystem does not
+# survive replacement and a marker would send a restarted archive back to the
+# pre-fork binary. So PGCONN in /etc/default/mina-archive-dispatch has to be
+# set for the image to be able to choose at all -- see the note near the end.
+
+ARG TARGETARCH
+
+ARG deb_version
+ARG deb_codename=bullseye
+ARG deb_release=unstable
+ARG network=mainnet
+ARG deb_repo="http://packages.o1test.net"
+ARG deb_legacy_version
+ARG apt_cache_url=""
+
+ARG GCLOUD_VERSION=476.0.0
+
+ENV MINA_DEB=mina-archive-${network}-postfork-mesa
+ENV MINA_LEGACY_DEB=mina-archive-${network}-prefork-mesa
+
+# The per-network config package ships the runtime config JSON and the genesis
+# ledger tarballs into /var/lib/coda, so the archive can resolve the fork
+# genesis ledger locally rather than fetching it.
+ENV MINA_CONFIG_DEB=mina-${network}-config
+
+ENV DEBIAN_FRONTEND noninteractive
+RUN echo "Building archive automode image $deb_version ($deb_codename/$deb_release) for $network"
+
+COPY scripts/archive-entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+COPY scripts/configure-apt-proxy.sh /usr/local/bin/configure-apt-proxy.sh
+RUN chmod +x /usr/local/bin/configure-apt-proxy.sh \
+  && /usr/local/bin/configure-apt-proxy.sh "$apt_cache_url" "$deb_repo"
+
+RUN apt-get update --quiet --yes \
+  && apt-get install --quiet --yes --no-install-recommends ca-certificates \
+  && rm -rf /var/lib/apt/lists/*
+
+RUN if [ -f /etc/apt/sources.list ]; then \
+  sed -i 's/http:\/\//https:\/\//g' /etc/apt/sources.list; \
+else \
+  sed -i 's/http:\/\//https:\/\//g' /etc/apt/sources.list.d/debian.sources; \
+fi
+
+RUN apt-get update --quiet --yes \
+    && apt-get upgrade --quiet --yes \
+    && apt-get install --quiet --yes --no-install-recommends \
+        procps \
+        curl \
+        jq \
+        dumb-init \
+        libgomp1 \
+        libpq-dev \
+        gnupg2 \
+        apt-transport-https \
+        dnsutils \
+        tzdata \
+        python3 \
+        postgresql \
+        postgresql-contrib \
+        apt-utils \
+        man \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN mkdir /healthcheck && curl https://raw.githubusercontent.com/MinaProtocol/mina/develop/dockerfiles/scripts/healthcheck-utilities.sh -o /healthcheck/utilities.sh
+
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+
+RUN case "${TARGETARCH}" in \
+        "amd64") GCLOUD_ARCH="x86_64" ;; \
+        "arm64") GCLOUD_ARCH="arm" ;; \
+        *) echo "Unsupported arch: ${TARGETARCH}"; exit 1 ;; \
+    esac; \
+    curl -sSfL "https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-cli-${GCLOUD_VERSION}-linux-${GCLOUD_ARCH}.tar.gz" | \
+    tar -xz -C /opt/ && \
+    /opt/google-cloud-sdk/bin/gcloud components install gke-gcloud-auth-plugin kubectl --quiet
+
+ENV PATH="/opt/google-cloud-sdk/bin:${PATH}"
+ENV USE_GKE_GCLOUD_AUTH_PLUGIN=True
+
+# The post-fork archive, which also brings the dispatcher, its settings and the
+# symlinks that put every archive command behind it.
+RUN echo "deb [trusted=yes] ${deb_repo} $deb_codename $deb_release" > /etc/apt/sources.list.d/o1.list \
+  && apt-get update --quiet --yes \
+  && apt-get install --no-install-recommends --quiet --yes --allow-downgrades \
+       "${MINA_DEB}=$deb_version" "${MINA_CONFIG_DEB}=$deb_version" \
+  && rm -rf /var/lib/apt/lists/*
+
+# The pre-fork archive. Built from the pre-fork sources on their own branch, so
+# it carries its own version rather than this image's.
+RUN echo "Installing the pre-fork archive at version $deb_legacy_version" \
+  && echo "deb [trusted=yes] ${deb_repo} ${deb_codename} ${deb_release}" > /etc/apt/sources.list.d/o1.list \
+  && apt-get update --quiet --yes \
+  && apt-get install --quiet --yes --no-install-recommends --allow-downgrades \
+       "${MINA_LEGACY_DEB}=$deb_legacy_version" \
+  && rm -rf /var/lib/apt/lists/*
+
+# The dispatcher reads the database to decide which runtime to run, and has no
+# sensible default for where that database is. Left deliberately empty: a
+# wrong guess would route silently, whereas an unset value makes the dispatcher
+# refuse and say so. Set it at deploy time, e.g.
+#   -e PGCONN=postgresql://user:pw@host:5432/archive
+# or by mounting an /etc/default/mina-archive-dispatch of your own.
+ENV PGCONN=""
+
+ENTRYPOINT ["/usr/bin/dumb-init", "/entrypoint.sh"]
