@@ -4729,11 +4729,14 @@ module Hardfork_state = struct
     match%bind load_opt (module Conn) with
     | None ->
         let%map () = insert (module Conn) t in
+        (* The state hash is formatted in rather than interpolated from the
+           metadata below: plain-text logs drop interpolated values longer than
+           50 characters, and a base58 state hash is 52. It stays in the
+           metadata as well, for readers that parse the JSON. *)
         [%log info]
           "Recorded a hard fork at height $height, from $source. The fork \
-           block's state hash is in this message's metadata: plain-text logs \
-           drop interpolated values longer than 50 characters, and a state \
-           hash is 52."
+           block is %s."
+          t.fork_state_hash
           ~metadata:
             [ ("state_hash", `String t.fork_state_hash)
             ; ("height", `String (Int64.to_string t.fork_blockchain_length))
@@ -4826,6 +4829,9 @@ module Hardfork_finaliser = struct
       principle: the archive keeps its current answer and tries again. *)
   type not_ready =
     | Fork_block_absent
+    | Fork_genesis_absent
+    | Fork_genesis_mismatch of
+        { expected_parent : string; actual_parent : string }
     | Era_genesis_absent of Hardfork_sql.Protocol_version.t
     | Too_few_confirmations of { have : int; want : int }
     | Chain_incomplete of { expected_oldest : string; actual_oldest : string }
@@ -4834,6 +4840,16 @@ module Hardfork_finaliser = struct
   let describe = function
     | Fork_block_absent ->
         "the fork block is not in this database yet"
+    | Fork_genesis_absent ->
+        "the post-fork chain's genesis block has not arrived, so the fork \
+         block is so far attested only by the configuration and nothing has \
+         corroborated it"
+    | Fork_genesis_mismatch { expected_parent; actual_parent } ->
+        sprintf
+          "a post-fork genesis block is here, but it forked from %s rather \
+           than the %s the configuration names, so this archive will not \
+           choose between them"
+          actual_parent expected_parent
     | Era_genesis_absent v ->
         sprintf
           "the fork block is here, but the database holds no genesis block for \
@@ -4919,11 +4935,30 @@ module Hardfork_finaliser = struct
                    the fork block is missing would send whoever reads the log
                    looking for the wrong thing. *)
                 return (Error (Era_genesis_absent fork_block.protocol_version))
-            | Some oldest ->
-                let%map ancestry =
+            | Some oldest -> (
+                let%bind ancestry =
                   Hardfork_sql.blocks_between_both_inclusive
                     (module Conn)
                     ~latest_block_id:fork_block.id ~oldest_block_id:oldest.id
+                in
+                (* The post-fork chain's genesis block, which has to be here
+                   before any history is rewritten.
+
+                   It corroborates the configuration: its parent hash is the
+                   fork block's, so the chain itself confirms what the daemon
+                   asserted, and the repair stops acting on a single unverified
+                   message.
+
+                   It also bounds the orphaning. blocks_to_orphan takes a
+                   fork_boundary_slot from this block; without one the bound is
+                   NULL and every same-version block off the canonical chain is
+                   orphaned however far above the fork it sits. Mesa bumps the
+                   protocol version, so that filter happens to save us -- but a
+                   fork that kept its version would have no protection at all. *)
+                let%map fork_context =
+                  Hardfork_sql.fork_block_above_height
+                    (module Conn)
+                    ~height:fork_block.height
                 in
                 (* The walk follows parent links, so a short chain means a
                    missing block rather than a shorter history. *)
@@ -4934,36 +4969,55 @@ module Hardfork_finaliser = struct
                   | b :: _ ->
                       b.Hardfork_sql.Block_info.state_hash
                 in
-                if String.equal actual_oldest oldest.state_hash then
-                  Ok (fork_block, ancestry)
-                else
+                if not (String.equal actual_oldest oldest.state_hash) then
                   Error
                     (Chain_incomplete
                        { expected_oldest = oldest.state_hash; actual_oldest } )
-        )
+                else
+                  match fork_context with
+                  | None ->
+                      Error Fork_genesis_absent
+                  | Some fc -> (
+                      match fc.Hardfork_sql.Fork_context.parent_state_hash with
+                      | Some parent
+                        when String.equal parent hardfork_state.fork_state_hash
+                        ->
+                          Ok (fork_block, ancestry, fc)
+                      | Some parent ->
+                          Error
+                            (Fork_genesis_mismatch
+                               { expected_parent =
+                                   hardfork_state.fork_state_hash
+                               ; actual_parent = parent
+                               } )
+                      | None ->
+                          (* A genesis with no parent is the chain's own first
+                             block, not a fork of ours. *)
+                          Error
+                            (Fork_genesis_mismatch
+                               { expected_parent =
+                                   hardfork_state.fork_state_hash
+                               ; actual_parent = "nothing"
+                               } ) ) ) )
 
-  let apply (module Conn : CONNECTION) ~(fork_block : Hardfork_sql.Block_info.t)
-      ~ancestry =
+  let apply (module Conn : CONNECTION) ~ancestry
+      ~(fork_context : Hardfork_sql.Fork_context.t) ~protocol_version =
     let open Deferred.Result.Let_syntax in
     let canonical_block_ids =
       List.map ancestry ~f:(fun b -> b.Hardfork_sql.Block_info.id)
     in
-    (* A fork above the target bounds what may be orphaned: blocks at or beyond
-       it are the post-fork chain and must keep their status. *)
-    let%bind fork_context =
-      Hardfork_sql.fork_block_above_height
-        (module Conn)
-        ~height:fork_block.height
-    in
+    (* The post-fork genesis bounds what may be orphaned: blocks at or beyond
+       it are the new chain and must keep their status. The check has already
+       established that this block forked from ours, so it is not re-queried
+       here -- a second lookup could see a different answer. *)
     let fork_boundary_slot =
-      Option.map fork_context ~f:(fun fc ->
-          fc.Hardfork_sql.Fork_context.fork_slot )
+      Some fork_context.Hardfork_sql.Fork_context.fork_slot
     in
     let%map () =
       Hardfork_sql.mark_pending_blocks_as_canonical_or_orphaned
         (module Conn)
         ~canonical_block_ids ~stop_at_slot:None ~fork_boundary_slot
-        ~protocol_version:fork_block.protocol_version
+        ~protocol_version
     in
     List.length canonical_block_ids
 
@@ -4990,21 +5044,29 @@ module Hardfork_finaliser = struct
                 in
                 match result with
                 | Error reason ->
+                    (* Formatted into the message rather than interpolated from
+                       metadata: plain-text logs drop interpolated values over
+                       50 characters, and every one of these reasons is longer
+                       than that. The reason is the whole point of the line. *)
                     [%log info]
-                      "Not settling the fork boundary yet: $reason. This will \
-                       be retried."
-                      ~metadata:[ ("reason", `String (describe reason)) ] ;
+                      "Not settling the fork boundary yet: %s. This will be \
+                       retried."
+                      (describe reason) ;
                     let%map (_ : bool) = unlock conn in
                     ()
-                | Ok (fork_block, ancestry) ->
-                    let%bind marked = apply conn ~fork_block ~ancestry in
+                | Ok (fork_block, ancestry, fork_context) ->
+                    let%bind marked =
+                      apply conn ~ancestry ~fork_context
+                        ~protocol_version:
+                          fork_block.Hardfork_sql.Block_info.protocol_version
+                    in
                     let%bind () = mark_finalized conn in
                     let%map (_ : bool) = unlock conn in
                     [%log info]
                       "Settled the fork boundary at height $height: $count \
                        blocks marked canonical, the rest of that protocol \
-                       version below the fork orphaned. The fork block's state \
-                       hash is in this message's metadata."
+                       version below the fork orphaned. The fork block is %s."
+                      hardfork_state.fork_state_hash
                       ~metadata:
                         [ ("state_hash", `String hardfork_state.fork_state_hash)
                         ; ( "height"

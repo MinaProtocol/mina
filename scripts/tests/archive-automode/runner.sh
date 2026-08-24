@@ -13,7 +13,11 @@
 #      strands: a band of pending blocks the archive can no longer canonicalise
 #   2. a running archive, in automode
 #   3. the configuration, sent over the archive RPC
-#   4. watch the band heal -- pending becomes canonical on the chain to the fork
+#   4. the archive records it and *declines* to repair: the fork block is so far
+#      attested only by that message, and nothing has corroborated it
+#   5. the post-fork genesis block arrives, its parent hash confirming the fork
+#      block
+#   6. now the band heals -- pending becomes canonical on the chain to the fork
 #      block, and orphaned off it
 #
 # Usage:
@@ -146,7 +150,32 @@ say "sending the fork configuration, as a daemon would"
   "${WORK}/fork_config.json" \
   --archive-address "127.0.0.1:${ARCHIVE_PORT}" 2>&1 | sed 's/^/    /'
 
-# ---------------------------------------------------------------- 5. observe
+# ------------------------------------------------- 5. it must decline, for now
+say "the archive should record the fork but decline to repair it"
+# Long enough for several passes of the finaliser's 60s loop, so this is a
+# settled refusal rather than a race.
+sleep 75
+
+STAGE=$(psql_ -c "SELECT stage FROM hardfork_state WHERE id=1;" 2>/dev/null)
+[[ "$STAGE" == "announced" ]] \
+  || fail "expected the fork to be recorded as 'announced', got '${STAGE:-none}'"
+
+STILL_PENDING=$(psql_ -c "SELECT count(*) FROM blocks WHERE chain_status='pending';")
+[[ "$STILL_PENDING" == "7" ]] \
+  || fail "the archive repaired before the post-fork genesis arrived (${STILL_PENDING} pending)"
+
+if grep -q "post-fork chain's genesis block has not arrived" "${WORK}/archive.log"; then
+  echo "    declined, and said why:"
+  grep -o "Not settling the fork boundary yet.*" "${WORK}/archive.log" | tail -1 | sed 's/^/      /'
+else
+  fail "the archive did not say it was waiting for the post-fork genesis"
+fi
+
+# ------------------------------------------------- 6. the genesis block arrives
+say "the post-fork genesis block arrives, corroborating the fork block"
+docker exec -e PGPASSWORD=pw -i "$PG_CONTAINER" psql -q -U postgres -d "$DB" \
+  < "${HERE}/fork_genesis.sql" >/dev/null || { echo "genesis insert failed"; exit 1; }
+
 say "watching the boundary settle"
 SETTLED=0
 for _ in $(seq 1 40); do
@@ -178,6 +207,12 @@ done
 
 AFTER_PENDING=$(psql_ -c "SELECT count(*) FROM blocks WHERE chain_status='pending';")
 [[ "$AFTER_PENDING" == "0" ]] || fail "${AFTER_PENDING} blocks still pending after the repair"
+
+# The post-fork genesis is the new chain, not something to sweep up. It carries
+# a different protocol version, and the boundary slot taken from it is what
+# keeps the orphaning below the fork.
+GEN=$(psql_ -c "SELECT chain_status FROM blocks WHERE state_hash='FORK_GENESIS';")
+[[ "$GEN" == "canonical" ]] || fail "the post-fork genesis is '${GEN}', expected canonical"
 
 say "archive log, hard fork lines"
 grep -iE "hard fork|fork boundary|settl|canonical" "${WORK}/archive.log" | tail -12 | sed 's/^/    /'
