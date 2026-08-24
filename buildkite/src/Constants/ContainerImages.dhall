@@ -8,11 +8,7 @@
 --       deliberately when a newer toolkit is wanted.
 -- NOTE: the amd64 mina-toolchain images are on b8d9c69 (carries the
 --       mina-bench-upload benchmark uploader), while bookworm arm64 stays on
---       ffab0f8. The mina-bench-upload install is amd64-only, so the arm64
---       image content is identical either way; ffab0f8 is already published
---       and the arm64 toolchain build under QEMU is flaky, so there is nothing
---       to gain from rebuilding it. Reunify the sha on the next full toolchain
---       bump.
+--       ffab0f8.
 -- NOTE: minaBase* are the published common base-deps images on docker.io. The tag
 --       format matches build.sh's HASHTAG for service=mina-base: <githash>-<codename>-<network>.
 --       These are frozen references, like minaToolchain*: the daemon/archive/hardfork
@@ -38,8 +34,8 @@
 , minaToolchain =
     "europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/mina-toolchain:f009c00-bullseye-devnet"
 , minaBaseBookworm =
-    { amd64 = "docker.io/minaprotocol/mina-base:86b89d0-bookworm-devnet"
-    , arm64 = "docker.io/minaprotocol/mina-base:86b89d0-bookworm-devnet-arm64"
+    { amd64 = "docker.io/minaprotocol/mina-base:4e95b64-bookworm-devnet"
+    , arm64 = "docker.io/minaprotocol/mina-base:4e95b64-bookworm-devnet-arm64"
     }
 , minaBaseBullseye.amd64 =
     "docker.io/minaprotocol/mina-base:86b89d0-bullseye-devnet"
@@ -52,5 +48,5 @@
 , xrefcheck =
     "europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/dkhamsing/awesome_bot:latest"
 , nixos = "gcr.io/o1labs-192920/nix-unstable:1.0.0"
-, minaReleaseToolkit = "ghcr.io/minaprotocol/mina-release-toolkit:0.0.3"
+, minaReleaseToolkit = "ghcr.io/minaprotocol/mina-release-toolkit:0.0.5"
 }
