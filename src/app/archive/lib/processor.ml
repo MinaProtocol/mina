@@ -4824,6 +4824,7 @@ module Hardfork_finaliser = struct
       principle: the archive keeps its current answer and tries again. *)
   type not_ready =
     | Fork_block_absent
+    | Era_genesis_absent of Hardfork_sql.Protocol_version.t
     | Too_few_confirmations of { have : int; want : int }
     | Chain_incomplete of { expected_oldest : string; actual_oldest : string }
     | Not_on_best_chain
@@ -4831,6 +4832,12 @@ module Hardfork_finaliser = struct
   let describe = function
     | Fork_block_absent ->
         "the fork block is not in this database yet"
+    | Era_genesis_absent v ->
+        sprintf
+          "the fork block is here, but the database holds no genesis block for \
+           protocol version %s -- the repair anchors on it, so the blocks \
+           below the fork cannot be walked"
+          (Hardfork_sql.Protocol_version.to_string v)
     | Too_few_confirmations { have; want } ->
         sprintf
           "the fork block has %d confirmations, fewer than the %d required" have
@@ -4887,9 +4894,12 @@ module Hardfork_finaliser = struct
                 ~v:fork_block.protocol_version
             with
             | None ->
-                (* No block of this protocol version, which cannot happen when
-                   the fork block itself is one. Treat as not ready. *)
-                return (Error Fork_block_absent)
+                (* The era's genesis block -- the one at
+                   global_slot_since_hard_fork = 0 -- is what the repair anchors
+                   on. Without it there is nothing to walk back to, and saying
+                   the fork block is missing would send whoever reads the log
+                   looking for the wrong thing. *)
+                return (Error (Era_genesis_absent fork_block.protocol_version))
             | Some oldest ->
                 let%map ancestry =
                   Hardfork_sql.blocks_between_both_inclusive

@@ -46,7 +46,10 @@ SELECT
   CASE WHEN h = 1 THEN 'GENESIS' ELSE 'B_' || lpad((h-1)::text, 3, '0') END,
   1, 1, 'vrf', 1, 1, 1, 77, ARRAY[7,7,7,7,7,7,7]::bigint[],
   '10000000000', 'jxo5pSyt16XGwA9UeuAdiFDzrwFH3smbNTJF7fxq98w1y9Jem2m',
-  h, h, h, 1, (1700000000 + h * 180)::text,
+  -- The era's genesis block is the one at global_slot_since_hard_fork = 0.
+  -- The archive marks such a block canonical on insert, and the repair anchors
+  -- on it, so the seed has to have one.
+  h, h - 1, h, 1, (1700000000 + h * 180)::text,
   (CASE WHEN h <= 5 THEN 'canonical' ELSE 'pending' END)::chain_status_type
 FROM generate_series(1, 10) AS h;
 
@@ -63,11 +66,11 @@ VALUES
   (107, 'ORPHAN_007', 6, 'B_006', 2, 2, 'vrf', 1, 1, 1, 77,
    ARRAY[7,7,7,7,7,7,7]::bigint[], '10000000000',
    'jxo5pSyt16XGwA9UeuAdiFDzrwFH3smbNTJF7fxq98w1y9Jem2m',
-   7, 7, 7, 1, '1701260000', 'pending'::chain_status_type),
+   7, 6, 7, 1, '1701260000', 'pending'::chain_status_type),
   (109, 'ORPHAN_009', 8, 'B_008', 2, 2, 'vrf', 1, 1, 1, 77,
    ARRAY[7,7,7,7,7,7,7]::bigint[], '10000000000',
    'jxo5pSyt16XGwA9UeuAdiFDzrwFH3smbNTJF7fxq98w1y9Jem2m',
-   9, 9, 9, 1, '1701260360', 'pending'::chain_status_type);
+   9, 8, 9, 1, '1701260360', 'pending'::chain_status_type);
 
 SELECT setval(pg_get_serial_sequence('blocks', 'id'), 200);
 SELECT setval(pg_get_serial_sequence('public_keys', 'id'), 200);
