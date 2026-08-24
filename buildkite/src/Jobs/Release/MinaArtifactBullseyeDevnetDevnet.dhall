@@ -17,6 +17,12 @@ in  Pipeline.build
             , Artifacts.Type.DaemonConfig
             , Artifacts.Type.DaemonAutoHardfork
             , Artifacts.Type.DaemonAutomode
+            , Artifacts.Type.ArchivePrefork
+            , Artifacts.Type.ArchiveAutoHardfork
+            , Artifacts.Type.ArchiveAutomode
+            , Artifacts.Type.RosettaPrefork
+            , Artifacts.Type.RosettaAutoHardfork
+            , Artifacts.Type.RosettaAutomode
             , Artifacts.Type.DaemonPrefork
             , Artifacts.Type.CreatePreforkGenesis
             , Artifacts.Type.LogProc
