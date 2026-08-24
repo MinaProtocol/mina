@@ -4730,8 +4730,10 @@ module Hardfork_state = struct
     | None ->
         let%map () = insert (module Conn) t in
         [%log info]
-          "Recorded hard fork at block $state_hash, height $height, from \
-           $source"
+          "Recorded a hard fork at height $height, from $source. The fork \
+           block's state hash is in this message's metadata: plain-text logs \
+           drop interpolated values longer than 50 characters, and a state \
+           hash is 52."
           ~metadata:
             [ ("state_hash", `String t.fork_state_hash)
             ; ("height", `String (Int64.to_string t.fork_blockchain_length))
@@ -4867,12 +4869,29 @@ module Hardfork_finaliser = struct
         return (Error Fork_block_absent)
     | Some fork_block -> (
         let%bind tip = Hardfork_sql.latest_state_hash (module Conn) in
+        (* The block's own slot, not the configuration's. The fork stanza's
+           global_slot_since_genesis is the slot the post-fork chain's genesis
+           is scheduled at, which sits a delta beyond the fork block -- 161
+           slots on devnet's mesa fork. Comparing that against a recorded block
+           slot never matches, and the repair would decline for ever. *)
+        let%bind fork_slot =
+          match%map
+            Hardfork_sql.block_slot_by_state_hash
+              (module Conn)
+              ~state_hash:hardfork_state.fork_state_hash
+          with
+          | Some slot ->
+              slot
+          | None ->
+              (* Cannot happen: the block was just found by the same hash. *)
+              hardfork_state.fork_global_slot
+        in
         let%bind on_best_chain =
           Hardfork_sql.is_in_best_chain
             (module Conn)
             ~tip_hash:tip ~check_hash:hardfork_state.fork_state_hash
             ~check_height:(Int64.to_int_exn fork_block.height)
-            ~check_slot:hardfork_state.fork_global_slot
+            ~check_slot:fork_slot
         in
         if not on_best_chain then return (Error Not_on_best_chain)
         else
@@ -4880,7 +4899,7 @@ module Hardfork_finaliser = struct
             Hardfork_sql.num_of_confirmations
               (module Conn)
               ~latest_state_hash:tip
-              ~fork_slot:(Int64.to_int_exn hardfork_state.fork_global_slot)
+              ~fork_slot:(Int64.to_int_exn fork_slot)
           in
           if confirmations < required_confirmations then
             return
@@ -4982,11 +5001,16 @@ module Hardfork_finaliser = struct
                     let%bind () = mark_finalized conn in
                     let%map (_ : bool) = unlock conn in
                     [%log info]
-                      "Settled the fork boundary at $state_hash: $count blocks \
-                       marked canonical, the rest of that protocol version \
-                       below the fork orphaned."
+                      "Settled the fork boundary at height $height: $count \
+                       blocks marked canonical, the rest of that protocol \
+                       version below the fork orphaned. The fork block's state \
+                       hash is in this message's metadata."
                       ~metadata:
                         [ ("state_hash", `String hardfork_state.fork_state_hash)
+                        ; ( "height"
+                          , `String
+                              (Int64.to_string
+                                 hardfork_state.fork_blockchain_length ) )
                         ; ("count", `Int marked)
                         ] ) ) )
       pool

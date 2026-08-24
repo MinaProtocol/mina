@@ -138,6 +138,24 @@ let first_block_of_protocol_version (module Conn : CONNECTION)
   in
   Conn.find_opt query v
 
+(** A block's own global slot since genesis.
+
+    Needed because the [fork] stanza of a runtime configuration does not carry
+    it: [global_slot_since_genesis] there is the slot the *new* chain's genesis
+    is scheduled at, which
+    [Mina_lib.Hardfork_config.move_hard_fork_consensus_to_scheduled_genesis]
+    deliberately moves forward from the fork block. The two differ by the hard
+    fork genesis slot delta, so anything comparing against a block's recorded
+    slot has to ask the block. *)
+let block_slot_by_state_hash (module Conn : CONNECTION) ~state_hash =
+  let query =
+    Caqti_type.(string ->? int64)
+      {%string|
+        SELECT global_slot_since_genesis FROM blocks WHERE state_hash = ? LIMIT 1;
+      |}
+  in
+  Conn.find_opt query state_hash
+
 let block_info_by_state_hash (module Conn : CONNECTION) ~state_hash =
   let query =
     Caqti_type.(string ->? Block_info.typ)
