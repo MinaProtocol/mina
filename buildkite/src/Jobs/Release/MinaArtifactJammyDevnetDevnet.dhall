@@ -19,6 +19,8 @@ in  Pipeline.build
             [ Artifacts.Type.Daemon
             , Artifacts.Type.DaemonConfig
             , Artifacts.Type.DaemonPrefork
+            , Artifacts.Type.ArchivePrefork
+            , Artifacts.Type.RosettaPrefork
             , Artifacts.Type.DaemonAutoHardfork
             , Artifacts.Type.DaemonAppsOnly
             , Artifacts.Type.LogProc

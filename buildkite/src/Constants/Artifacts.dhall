@@ -16,6 +16,8 @@ let Artifact
       | DaemonLegacyHardfork
       | DaemonAppsOnly
       | DaemonPrefork
+      | ArchivePrefork
+      | RosettaPrefork
       | DaemonAutoHardfork
       | DaemonConfig
       | LogProc
@@ -37,6 +39,8 @@ let AllButTests =
       [ Artifact.Daemon
       , Artifact.DaemonLegacyHardfork
       , Artifact.DaemonPrefork
+      , Artifact.ArchivePrefork
+      , Artifact.RosettaPrefork
       , Artifact.DaemonAutoHardfork
       , Artifact.DaemonAppsOnly
       , Artifact.DaemonConfig
@@ -69,6 +73,8 @@ let capitalName =
       ->  merge
             { Daemon = "Daemon"
             , DaemonPrefork = "DaemonPrefork"
+            , ArchivePrefork = "ArchivePrefork"
+            , RosettaPrefork = "RosettaPrefork"
             , DaemonLegacyHardfork = "DaemonLegacyHardfork"
             , DaemonAutoHardfork = "DaemonAutoHardfork"
             , DaemonAppsOnly = "DaemonAppsOnly"
@@ -94,6 +100,8 @@ let lowerName =
       ->  merge
             { Daemon = "daemon"
             , DaemonPrefork = "daemon_prefork"
+            , ArchivePrefork = "archive_prefork"
+            , RosettaPrefork = "rosetta_prefork"
             , DaemonLegacyHardfork = "daemon_hardfork"
             , DaemonAutoHardfork = "daemon_auto_hardfork"
             , DaemonAppsOnly = "daemon_apps_only"
@@ -119,6 +127,8 @@ let dockerServiceName =
       ->  merge
             { Daemon = "mina-daemon"
             , DaemonPrefork = ""
+            , ArchivePrefork = ""
+            , RosettaPrefork = ""
             , DaemonLegacyHardfork = "mina-daemon-legacy-hardfork"
             , DaemonAutoHardfork = "mina-daemon-auto-hardfork"
             , DaemonAppsOnly = "mina-daemon"
@@ -145,6 +155,8 @@ let dockerName =
             { DaemonConfig = "mina-daemon"
             , Daemon = dockerServiceName artifact
             , DaemonPrefork = dockerServiceName artifact
+            , ArchivePrefork = dockerServiceName artifact
+            , RosettaPrefork = dockerServiceName artifact
             , DaemonLegacyHardfork = dockerServiceName artifact
             , DaemonAutoHardfork = dockerServiceName artifact
             , DaemonAppsOnly = dockerServiceName artifact
@@ -178,6 +190,8 @@ let toDebianName =
       ->  merge
             { Daemon = "daemon_${Network.lowerName network}"
             , DaemonPrefork = "daemon_${Network.lowerName network}_prefork"
+            , ArchivePrefork = "archive_${Network.lowerName network}_prefork"
+            , RosettaPrefork = "rosetta_${Network.lowerName network}_prefork"
             , DaemonLegacyHardfork =
                 "daemon_${Network.lowerName network}_hardfork_config"
             , DaemonAutoHardfork = ""
@@ -211,6 +225,8 @@ let toDebianNames =
                     ->  merge
                           { Daemon = [ toDebianName a network ]
                           , DaemonPrefork = [ toDebianName a network ]
+                          , ArchivePrefork = [ toDebianName a network ]
+                          , RosettaPrefork = [ toDebianName a network ]
                           , DaemonLegacyHardfork = [ toDebianName a network ]
                           , DaemonAutoHardfork = [ toDebianName a network ]
                           , DaemonConfig = [ toDebianName a network ]
@@ -286,6 +302,8 @@ let dockerTag =
                 { Daemon =
                     "${spec.version}${network_part}${extraordinary_profile_part}${extra_build_flags_part}"
                 , DaemonPrefork = ""
+                , ArchivePrefork = ""
+                , RosettaPrefork = ""
                 , DaemonLegacyHardfork =
                     "${spec.version}${network_part}${extraordinary_profile_part}"
                 , DaemonAutoHardfork =
