@@ -779,6 +779,80 @@ test_build_archive_mainnet_deb() {
 }
 
 ################################################################################
+# Tests: archive and Rosetta prefork packages
+#
+# These hold the pre-fork era of binaries that a hard fork replaces. What the
+# tests care about is that they stay out of the way of their post-fork
+# siblings: everything under its own runtime directory, nothing on the PATH,
+# and no SQL.
+################################################################################
+
+test_build_archive_prefork_deb() {
+    safe_build build_archive_prefork_deb devnet || { log_fail "build exited non-zero"; return; }
+
+    load_captured_state
+    assert_eq "deb name" "mina-archive-devnet-prefork-mesa" "$CAPTURED_DEB_NAME"
+    assert_control_contains "$CAPTURED_CONTROL" "Depends" "libpq-dev"
+
+    assert_file_captured "$CAPTURED_FILES" "usr/lib/mina/berkeley/mina-archive"
+    assert_file_captured "$CAPTURED_FILES" "usr/lib/mina/berkeley/mina-archive-blocks"
+    assert_file_captured "$CAPTURED_FILES" "usr/lib/mina/berkeley/mina-extract-blocks"
+    assert_file_captured "$CAPTURED_FILES" "usr/lib/mina/berkeley/mina-archive-hardfork-toolbox"
+    assert_file_captured "$CAPTURED_FILES" "usr/lib/mina/berkeley/mina-missing-blocks-auditor"
+    assert_file_captured "$CAPTURED_FILES" "usr/lib/mina/berkeley/mina-replayer"
+    assert_file_captured "$CAPTURED_FILES" "usr/lib/mina/berkeley/mina-dump-slot-ledger"
+
+    # The dispatcher owns the PATH, and it ships with the post-fork package.
+    assert_file_not_captured "$CAPTURED_FILES" "usr/local/bin/mina-archive"
+    assert_file_not_captured "$CAPTURED_FILES" "usr/local/bin/mina-replayer"
+
+    # The upgrade script moves a database between eras, so it must be the
+    # post-fork copy that runs.
+    assert_file_not_captured "$CAPTURED_FILES" "etc/mina/archive/create_schema.sql"
+}
+
+test_build_rosetta_prefork_deb() {
+    safe_build build_rosetta_prefork_deb devnet || { log_fail "build exited non-zero"; return; }
+
+    load_captured_state
+    assert_eq "deb name" "mina-rosetta-devnet-prefork-mesa" "$CAPTURED_DEB_NAME"
+
+    assert_file_captured "$CAPTURED_FILES" "usr/lib/mina/berkeley/mina-rosetta"
+    assert_file_captured "$CAPTURED_FILES" "usr/lib/mina/berkeley/mina-ocaml-signer"
+    assert_file_not_captured "$CAPTURED_FILES" "usr/local/bin/mina-rosetta"
+}
+
+test_build_rosetta_prefork_mainnet_deb() {
+    safe_build build_rosetta_prefork_deb mainnet || { log_fail "build exited non-zero"; return; }
+
+    load_captured_state
+    assert_eq "deb name" "mina-rosetta-mainnet-prefork-mesa" "$CAPTURED_DEB_NAME"
+    # mainnet takes the mainnet-signature binaries, devnet the testnet ones.
+    assert_file_captured "$CAPTURED_FILES" "usr/lib/mina/berkeley/mina-rosetta"
+}
+
+test_archive_prefork_does_not_collide_with_plain_archive() {
+    # The two can be installed together: one owns /usr/local/bin, the other owns
+    # a runtime directory, and nothing appears in both.
+    safe_build build_archive_deb devnet || { log_fail "plain build exited non-zero"; return; }
+    load_captured_state
+    local plain_files="$CAPTURED_FILES"
+
+    safe_build build_archive_prefork_deb devnet || { log_fail "prefork build exited non-zero"; return; }
+    load_captured_state
+    local prefork_files="$CAPTURED_FILES"
+
+    local overlap
+    overlap=$(comm -12 <(echo "$plain_files" | sort -u) <(echo "$prefork_files" | sort -u) \
+              | grep -v '^\./DEBIAN' || true)
+    if [[ -n "$overlap" ]]; then
+        log_fail "prefork and plain archive both ship: $(echo "$overlap" | tr '\n' ' ')"
+    else
+        log_pass
+    fi
+}
+
+################################################################################
 # Tests: Hardfork config packages
 ################################################################################
 
@@ -1110,6 +1184,10 @@ main() {
     # Archive packages
     run_test test_build_archive_devnet_deb
     run_test test_build_archive_mainnet_deb
+    run_test test_build_archive_prefork_deb
+    run_test test_build_rosetta_prefork_deb
+    run_test test_build_rosetta_prefork_mainnet_deb
+    run_test test_archive_prefork_does_not_collide_with_plain_archive
 
     # Hardfork config packages
     run_test test_build_daemon_devnet_hardfork_config_deb
