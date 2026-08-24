@@ -6,9 +6,10 @@
 --       MinaProtocol/mina-release-toolkit. Pinned to a released version tag
 --       (not a moving tag like :latest) for reproducible CI; bump it
 --       deliberately when a newer toolkit is wanted.
--- NOTE: the amd64 mina-toolchain images are on b8d9c69 (carries the
---       mina-bench-upload benchmark uploader), while bookworm arm64 stays on
---       ffab0f8.
+-- NOTE: mina-toolchain and mina-base are published by DIFFERENT pipelines and
+--       their hashes move independently. mina-toolchain comes from
+--       mina-toolchains-build; mina-base from mina-docker-base-build
+--       (!ci-docker-base-me). Bumping one is never a reason to bump the other.
 -- NOTE: minaBase* are the published common base-deps images on docker.io. The tag
 --       format matches build.sh's HASHTAG for service=mina-base: <githash>-<codename>-<network>.
 --       These are frozen references, like minaToolchain*: the daemon/archive/hardfork
@@ -34,8 +35,8 @@
 , minaToolchain =
     "docker.io/minaprotocol/mina-toolchain:4e95b64-bullseye-devnet"
 , minaBaseBookworm =
-    { amd64 = "docker.io/minaprotocol/mina-base:4e95b64-bookworm-devnet"
-    , arm64 = "docker.io/minaprotocol/mina-base:4e95b64-bookworm-devnet-arm64"
+    { amd64 = "docker.io/minaprotocol/mina-base:86b89d0-bookworm-devnet"
+    , arm64 = "docker.io/minaprotocol/mina-base:86b89d0-bookworm-devnet-arm64"
     }
 , minaBaseBullseye.amd64 =
     "docker.io/minaprotocol/mina-base:86b89d0-bullseye-devnet"
