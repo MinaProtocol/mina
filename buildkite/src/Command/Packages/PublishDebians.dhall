@@ -133,13 +133,33 @@ let publishCmd
 let step
     -- NOTE: Command.Base prepends automatic retries for infrastructure exit
     -- codes (255 agent lost, 143 SIGTERM, ...) and a job can only add to that
-    -- list, not remove from it. Uploading is not idempotent: `release-manager
-    -- publish` passes --fail-if-exists, so a retry after a partial upload
-    -- fails with "package already exists" rather than finishing the job. That
-    -- is a loud, safe failure -- nothing is overwritten and nothing is
-    -- silently half-published -- but it needs a human. The real fix is to make
-    -- publish idempotent (an identical package already present is success),
-    -- which belongs in release-manager.
+    -- list, not remove from it, so this step has to survive being run twice.
+    -- Mostly it does. `release-manager publish` writes each package to the
+    -- path its name and version already determine, so a second attempt
+    -- rewrites what the first one got through and adds what it never
+    -- reached. Checked against the pinned toolkit: publishing a folder
+    -- holding one already published package and one new one exits 0 with
+    -- both listed. Exit 1 is in the retry list only with a limit of 0
+    -- (flake_retry_limit), so a publish that fails stops rather than looping.
+    --
+    -- The exception is an attempt killed while deb-s3 held the repository
+    -- lock. publish passes --lock and no --arch, so the lock is
+    -- dists/{codename}/{channel}/binary-/lockfile with the architecture
+    -- segment left empty, and nothing collects it afterwards. The next
+    -- attempt waits ten minutes on that lock and then gives up, leaving the
+    -- lock where it was, so every attempt after that costs another ten
+    -- minutes until someone deletes the key. That is the case that needs a
+    -- human, and it is what clear-s3-lockfile.sh exists for on the older
+    -- bash path.
+    --
+    -- What a second attempt does not do is notice that the bytes changed.
+    -- --fail-if-exists is passed, but it refuses only a name and version
+    -- already published under a different pool filename, which a rebuild
+    -- does not produce, and a leftover .deb-s3-temp object whose bytes
+    -- differ, which only a killed attempt leaves. A plain re-publish of
+    -- different bytes at the same version passes both and replaces what is
+    -- published silently. Guarding that belongs to release-manager and is
+    -- tracked in MinaProtocol/mina-release-toolkit#38.
     : Spec.Type -> Command.Type
     =     \(spec : Spec.Type)
       ->  Command.build
