@@ -109,3 +109,7 @@ DROP TABLE voting_for;
 DROP TABLE zkapp_field;
 
 DROP TABLE zkapp_verification_key_hashes;
+
+DROP TABLE genesis_accounts;
+
+DROP TABLE hardfork_state;
