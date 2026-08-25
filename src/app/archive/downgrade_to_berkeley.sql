@@ -220,9 +220,11 @@ END $$;
 -- 3c. Remove what the upgrade added for the automatic hard fork hand-over.
 --
 -- Unlike the changes above, this one is not lossy in the way that matters: the
--- row describes a fork a berkeley-era archive has no use for, and the daemon
--- sends its configuration again when the archive is upgraded.
+-- rows describe a fork a berkeley-era archive has no use for. The daemon sends
+-- its configuration again when the archive is upgraded, and the genesis
+-- accounts are read again from the genesis ledger.
 
+DROP TABLE IF EXISTS genesis_accounts;
 DROP TABLE IF EXISTS hardfork_state;
 DROP TYPE  IF EXISTS hardfork_source;
 
