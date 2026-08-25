@@ -6,23 +6,13 @@
 --       MinaProtocol/mina-release-toolkit. Pinned to a released version tag
 --       (not a moving tag like :latest) for reproducible CI; bump it
 --       deliberately when a newer toolkit is wanted.
--- NOTE: the mina-toolchain images are pinned to 33d64d5, the v0.16 toolchain
---       build (opam core v0.16 stack) produced by mina-toolchains-build for the
---       commit below this one, all five images (bookworm amd64+arm64, bullseye,
---       noble, jammy) on one sha. This supersedes develop's split b8d9c69
---       (amd64) / ffab0f8 (bookworm arm64) pinning, which carries the v0.14
---       opam stack and so cannot be used from this branch. develop has since
---       moved this pin again, to 4e95b64 -- still v0.14, so still unusable here.
---       Superseding the earlier cd3e35b pin from this branch: dockerfiles/
---       toolchain/3-toolchain installs mina-bench-upload by curl'ing a GitHub
---       release asset named only by MINA_RELEASE_TOOLKIT_VERSION, with no
---       checksum. The v0.0.4 asset was re-uploaded in place on 2026-08-03,
---       adding the --compare-branch flag that buildkite/scripts/bench/run.sh
---       now passes. cd3e35b was built 2026-07-29 and therefore contains the
---       pre-re-upload binary, which rejects that flag and fails every Perf job
---       with exit 2. Rebuilding is the only fix, since the version string does
---       not identify the artifact -- a toolchain image's behaviour depends on
---       the date it was built. Worth pinning that .deb by checksum separately.
+-- NOTE: minaToolchain* pin the v0.16 opam stack, so they must stay on a sha
+--       built from THIS branch: develop's pins carry v0.14 and will not build
+--       here. Rebuild with !ci-toolchain-me, then bump the sha below to the one
+--       it produced (all five images land on one sha). Do not reach for an
+--       older toolchain sha instead: 3-toolchain curls mina-bench-upload by
+--       version string with no checksum, so an image's behaviour depends on the
+--       date it was built, and rebuilding is the only fix.
 -- NOTE: mina-toolchain and mina-base are published by DIFFERENT pipelines and
 --       their hashes move independently. mina-toolchain comes from
 --       mina-toolchains-build; mina-base from mina-docker-base-build
@@ -39,18 +29,18 @@
 { toolchainBase =
     "europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/ci-toolchain-base:v4"
 , minaToolchainBookworm =
-    { amd64 = "docker.io/minaprotocol/mina-toolchain:33d64d5-bookworm-devnet"
+    { amd64 = "docker.io/minaprotocol/mina-toolchain:44e9e82-bookworm-devnet"
     , arm64 =
-        "docker.io/minaprotocol/mina-toolchain:33d64d5-bookworm-devnet-arm64"
+        "docker.io/minaprotocol/mina-toolchain:44e9e82-bookworm-devnet-arm64"
     }
 , minaToolchainBullseye.amd64 =
-    "docker.io/minaprotocol/mina-toolchain:33d64d5-bullseye-devnet"
+    "docker.io/minaprotocol/mina-toolchain:44e9e82-bullseye-devnet"
 , minaToolchainNoble.amd64 =
-    "docker.io/minaprotocol/mina-toolchain:33d64d5-noble-devnet"
+    "docker.io/minaprotocol/mina-toolchain:44e9e82-noble-devnet"
 , minaToolchainJammy.amd64 =
-    "docker.io/minaprotocol/mina-toolchain:33d64d5-jammy-devnet"
+    "docker.io/minaprotocol/mina-toolchain:44e9e82-jammy-devnet"
 , minaToolchain =
-    "docker.io/minaprotocol/mina-toolchain:33d64d5-bullseye-devnet"
+    "docker.io/minaprotocol/mina-toolchain:44e9e82-bullseye-devnet"
 , minaBaseBookworm =
     { amd64 = "docker.io/minaprotocol/mina-base:86b89d0-bookworm-devnet"
     , arm64 = "docker.io/minaprotocol/mina-base:86b89d0-bookworm-devnet-arm64"
