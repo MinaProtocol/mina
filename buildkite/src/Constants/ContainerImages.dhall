@@ -11,7 +11,8 @@
 --       commit below this one, all five images (bookworm amd64+arm64, bullseye,
 --       noble, jammy) on one sha. This supersedes develop's split b8d9c69
 --       (amd64) / ffab0f8 (bookworm arm64) pinning, which carries the v0.14
---       opam stack and so cannot be used from this branch.
+--       opam stack and so cannot be used from this branch. develop has since
+--       moved this pin again, to 4e95b64 -- still v0.14, so still unusable here.
 --       Superseding the earlier cd3e35b pin from this branch: dockerfiles/
 --       toolchain/3-toolchain installs mina-bench-upload by curl'ing a GitHub
 --       release asset named only by MINA_RELEASE_TOOLKIT_VERSION, with no
@@ -22,6 +23,10 @@
 --       with exit 2. Rebuilding is the only fix, since the version string does
 --       not identify the artifact -- a toolchain image's behaviour depends on
 --       the date it was built. Worth pinning that .deb by checksum separately.
+-- NOTE: mina-toolchain and mina-base are published by DIFFERENT pipelines and
+--       their hashes move independently. mina-toolchain comes from
+--       mina-toolchains-build; mina-base from mina-docker-base-build
+--       (!ci-docker-base-me). Bumping one is never a reason to bump the other.
 -- NOTE: minaBase* are the published common base-deps images on docker.io. The tag
 --       format matches build.sh's HASHTAG for service=mina-base: <githash>-<codename>-<network>.
 --       These are frozen references, like minaToolchain*: the daemon/archive/hardfork
@@ -61,5 +66,5 @@
 , xrefcheck =
     "europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/dkhamsing/awesome_bot:latest"
 , nixos = "gcr.io/o1labs-192920/nix-unstable:1.0.0"
-, minaReleaseToolkit = "ghcr.io/minaprotocol/mina-release-toolkit:0.0.3"
+, minaReleaseToolkit = "ghcr.io/minaprotocol/mina-release-toolkit:0.0.5"
 }
