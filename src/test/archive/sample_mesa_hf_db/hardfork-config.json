@@ -1,9 +1,0 @@
-{
-  "proof": {
-    "fork": {
-      "state_hash": "3NLwkyj6moic1DsdANXVYeuWUWHuDJGDgfz2Q9nADJpA5mBCcmQn",
-      "blockchain_length": 1748,
-      "global_slot_since_genesis": 3120
-    }
-  }
-}

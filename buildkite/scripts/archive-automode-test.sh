@@ -2,14 +2,14 @@
 
 # Archive automode component test.
 #
-# Runs the production archive against the checked-in fork-crossing database and
-# walks it through the hand-over a hard fork requires, in the order a real one
-# happens:
+# Runs the production archive against the real devnet archive as it stood at the
+# mesa hard fork, and walks it through the hand-over, in the order a real fork
+# does it:
 #
-#   1. the pre-fork archive, stranded -- canonicalisation only advances when a
+#   1. the pre-fork archive, stranded. Canonicalisation only advances when a
 #      block arrives more than k above the highest canonical one, and the
-#      pre-fork chain has stopped, so the last blocks stay pending for ever
-#   2. the schema upgrade, which is where hardfork_state comes from
+#      pre-fork chain has stopped, so the last k blocks stay pending for ever
+#   2. the schema upgrade
 #   3. the archive running in automode
 #   4. the fork configuration, sent over the archive RPC. The archive accepts
 #      it here and records it: hardfork_state gets a row
@@ -21,31 +21,30 @@
 #      fork block's. That is the corroboration
 #   7. now the repair runs, the boundary settles, and finalized_at is stamped
 #
-# The database is src/test/archive/sample_mesa_hf_db, the same dry-run fixture
-# the replayer mesa hard fork test uses. Its fork block is at height 1748, slot
-# 3059; its post-fork genesis is at 1749, slot 3120.
+# The database is devnet-archive-dump-2026-08-19_1700, taken three hours before
+# the mesa fork on 2026-08-19 and used unmodified. It is the state a real
+# archive is in when the hand-over starts: 681253 blocks, no post-fork blocks at
+# all, and 401 of them stranded pending with the fork block among them.
+#
+# Nothing about it is reconstructed. A dump taken after a fork can be made to
+# look pre-fork by deleting the new era, but the schema underneath is still the
+# post-fork one, so the upgrade in step 2 would never be exercised.
 
 set -euo pipefail
 
 ARCHIVE_APP=mina-archive
 CLIENT_APP=mina
 PG_CONN=postgres://postgres:postgres@localhost:5432/archive
-FIXTURE=src/test/archive/sample_mesa_hf_db
+FIXTURE=src/test/archive/prefork_devnet_db
 ARCHIVE_PORT=3086
 
-# The fork block, and the height it sits at. Both are properties of the
-# fixture, not of the code under test.
-FORK_HASH=3NLwkyj6moic1DsdANXVYeuWUWHuDJGDgfz2Q9nADJpA5mBCcmQn
-FORK_HEIGHT=1748
+# The fork block, and the height it sits at. Both are properties of the devnet
+# fork, not of the code under test.
+FORK_HASH=3NLYmfj4U9Fbbvruz3QJj2j8WJyjhGtq4LgYvo7oW1WZm16uEKib
+FORK_HEIGHT=545433
 
-# How many blocks must sit above the fork block before the archive settles.
-#
-# The shipped default is 20. This network cannot reach it: the fork block
-# accumulates confirmations only between slot_tx_end and slot_chain_end, and
-# stop-slot-config.json puts those 20 slots apart, which produced 14 blocks.
-# The number is lowered here to suit the fixture, not to skip the check -- 14
-# still has to clear 10 for the test to pass.
-CONFIRMATIONS=10
+# The post-fork genesis, one height above it.
+GENESIS_HASH=3NLT7n4LiVo6U4LXr9BjCEp9712fP61uXkRC6hnRnB682A8f4HrJ
 
 while [[ "$#" -gt 0 ]]; do case $1 in
   -a|--app) ARCHIVE_APP="$2"; shift;;
@@ -71,40 +70,54 @@ fail() {
   exit 1
 }
 
-echo "=== 1. the pre-fork archive"
-psql -q -v ON_ERROR_STOP=1 "$PG_CONN" -f "$FIXTURE/prefork-state.sql"
+echo "=== 1. the pre-fork archive, as devnet left it"
 q "SELECT '  ' || chain_status || ' ' || count(*) FROM blocks GROUP BY chain_status ORDER BY 1;"
 
+# The band a fork strands, and the fork block sitting in it.
 BEFORE_PENDING=$(q "SELECT count(*) FROM blocks WHERE chain_status='pending';")
 [[ "$BEFORE_PENDING" -gt 0 ]] \
-  || fail "the fixture left no stranded blocks, so there is nothing to repair"
+  || fail "the dump left no stranded blocks, so there is nothing to repair"
 
-FORK_STATUS=$(q "SELECT chain_status FROM blocks WHERE state_hash='$FORK_HASH';")
+FORK_STATUS=$(q "SELECT coalesce((SELECT chain_status::text FROM blocks WHERE state_hash='$FORK_HASH'),'absent');")
 [[ "$FORK_STATUS" == "pending" ]] \
   || fail "the fork block is '$FORK_STATUS', expected pending"
 
+# The new era must not be here yet. If it were, the archive would settle
+# straight away and step 5 would prove nothing.
+#
+# Look for a genesis block of *this* fork -- one whose parent is the fork block
+# -- not for any era genesis. This database already holds one: devnet forked to
+# berkeley at height 296372, and that block legitimately carries
+# global_slot_since_hard_fork = 0.
+NEW_ERA=$(q "SELECT count(*) FROM blocks WHERE parent_hash = '$FORK_HASH' AND global_slot_since_hard_fork = 0;")
+[[ "$NEW_ERA" == "0" ]] \
+  || fail "the dump already holds the post-fork genesis; it is not a pre-fork archive"
+
 echo
 echo "=== 2. the schema upgrade"
-# The upgrade prints a row per column it adds and a notice per column that is
-# already there, which buries everything after it. ON_ERROR_STOP still aborts on
-# a real failure, and the output is kept for when that happens.
+# devnet ran the upgrade a few hours before the fork, so this database is
+# already at 4.0.0/0.0.6 and the script takes its reapply path. That is what
+# creates hardfork_state, which the released 0.0.6 did not have.
 psql -q -v ON_ERROR_STOP=1 "$PG_CONN" \
   -f src/app/archive/upgrade_to_mesa.sql > "$WORK/upgrade.log" 2>&1 \
   || { echo "the schema upgrade failed:"; tail -20 "$WORK/upgrade.log"; exit 1; }
+
 HAVE_TABLE=$(q "SELECT to_regclass('hardfork_state') IS NOT NULL;")
 [[ "$HAVE_TABLE" == "t" ]] \
   || fail "the upgrade did not create hardfork_state"
-echo "  migration_history: $(q "SELECT protocol_version || ' ' || migration_version || ' ' || status FROM migration_history;")"
+echo "  migration_history: $(q "SELECT protocol_version || ' ' || migration_version || ' ' || status FROM migration_history ORDER BY commit_start_at DESC LIMIT 1;")"
 
 echo
 echo "=== 3. the archive, in automode"
+# No --hardfork-confirmations here: the shipped default of 20 is what a real
+# fork has to satisfy, and devnet's empty-block window left 60 blocks above the
+# fork block.
 $ARCHIVE_APP run \
   --postgres-uri "$PG_CONN" \
   --server-port "$ARCHIVE_PORT" \
-  --hardfork-confirmations "$CONFIRMATIONS" \
   > "$WORK/archive.log" 2>&1 &
 ARCHIVE_PID=$!
-for _ in $(seq 1 120); do
+for _ in $(seq 1 180); do
   grep -q "Archive process ready" "$WORK/archive.log" 2>/dev/null && break
   kill -0 "$ARCHIVE_PID" 2>/dev/null || fail "the archive exited during startup"
   sleep 1
@@ -123,7 +136,7 @@ echo "=== 5. recorded, but no history rewritten yet"
 # The repair runs on its own loop, once a minute, and decides each pass whether
 # it is safe to proceed. Waiting out several passes makes this a settled
 # position rather than a race with the first one.
-sleep 75
+sleep 150
 
 # The row is the acceptance: the archive has the fork on its books and keeps it
 # across restarts. finalized_at is what step 7 stamps, and means the repair ran
@@ -149,7 +162,10 @@ grep -o "Not settling the fork boundary yet.*" "$WORK/archive.log" | tail -1 | s
 
 echo
 echo "=== 6. the post-fork daemon feeds in its genesis block"
-psql -q -v ON_ERROR_STOP=1 "$PG_CONN" -c "INSERT INTO blocks SELECT * FROM saved_fork_genesis;"
+psql -q -v ON_ERROR_STOP=1 "$PG_CONN" -f "$FIXTURE/post-fork-genesis.sql" > /dev/null
+GENESIS_IN=$(q "SELECT count(*) FROM blocks WHERE state_hash='$GENESIS_HASH';")
+[[ "$GENESIS_IN" == "1" ]] \
+  || fail "the post-fork genesis was not inserted; its parent may be missing"
 
 echo
 echo "=== 7. now the repair runs and the boundary settles"
@@ -180,16 +196,16 @@ FORK_STATUS=$(q "SELECT chain_status FROM blocks WHERE state_hash='$FORK_HASH';"
 
 # The post-fork genesis must survive the repair. It sits above the fork block,
 # and without the boundary slot the repair takes from it, the orphaning has no
-# upper bound and sweeps up the new chain's own first block.
-#
+# upper bound and sweeps up the new chain's own first block. Ordinary
+# canonicalisation promotes it later, once k blocks build on it.
+GENESIS_STATUS=$(q "SELECT chain_status FROM blocks WHERE state_hash='$GENESIS_HASH';")
+[[ "$GENESIS_STATUS" == "pending" ]] \
+  || fail "the post-fork genesis is '$GENESIS_STATUS'; the repair should have left it alone"
+
 # The blocks the pre-fork chain produced above the fork block are the window
 # between slot_tx_end and slot_chain_end. The new chain does not build on them,
-# so they belong off the canonical chain and stay there.
-ABOVE_CANONICAL=$(q "SELECT count(*) FROM blocks WHERE height > $FORK_HEIGHT AND chain_status='canonical';")
-[[ "$ABOVE_CANONICAL" == "1" ]] \
-  || fail "expected only the post-fork genesis to be canonical above the fork, got ${ABOVE_CANONICAL}"
-
-ABOVE_PENDING=$(q "SELECT count(*) FROM blocks WHERE height > $FORK_HEIGHT AND chain_status='pending';")
+# so they belong off the canonical chain.
+ABOVE_PENDING=$(q "SELECT count(*) FROM blocks WHERE height > $FORK_HEIGHT AND chain_status='pending' AND state_hash <> '$GENESIS_HASH';")
 [[ "$ABOVE_PENDING" == "0" ]] \
   || fail "${ABOVE_PENDING} abandoned pre-fork blocks above the fork are still pending"
 

@@ -18,11 +18,8 @@ in  { step =
                 [ RunWithPostgres.runInDockerWithPostgresConn
                     ([] : List Text)
                     ( Some
-                        ( RunWithPostgres.ScriptOrArchive.Archive
-                            { Script = "mesa_hf_dry_run_db.sql"
-                            , Archive =
-                                "./src/test/archive/sample_mesa_hf_db/mesa_hf_dry_run_db.sql.tar.gz"
-                            }
+                        ( RunWithPostgres.ScriptOrArchive.OnlineTarGzDump
+                            "https://storage.googleapis.com/mina-archive-dumps/devnet-archive-dump-2026-08-19_1700.sql.tar.gz"
                         )
                     )
                     ( Artifacts.fullDockerTag
