@@ -4706,6 +4706,21 @@ module Hardfork_state = struct
          |sql} )
       ()
 
+  (** The recorded fork, if there is one and its boundary has not been settled.
+
+      The finaliser wants exactly this: a fork it still has work to do about.
+      Returning nothing once `finalized_at` is set is what stops the repair
+      running a second time. *)
+  let load_unfinalized_opt (module Conn : CONNECTION) =
+    Conn.find_opt
+      (Mina_caqti.find_opt_req Caqti_type.unit typ
+         {sql| SELECT fork_state_hash, fork_blockchain_length, fork_global_slot,
+                      config_json, source::text
+               FROM hardfork_state
+               WHERE id = 1 AND finalized_at IS NULL
+         |sql} )
+      ()
+
   let insert (module Conn : CONNECTION) (t : t) =
     Conn.exec
       (Mina_caqti.exec_req typ
@@ -4817,7 +4832,7 @@ module Hardfork_finaliser = struct
     Conn.exec
       (Mina_caqti.exec_req Caqti_type.unit
          {sql| UPDATE hardfork_state
-               SET stage = 'finalized'::hardfork_stage, finalized_at = now()
+               SET finalized_at = now()
                WHERE id = 1
          |sql} )
       ()
@@ -4946,11 +4961,12 @@ module Hardfork_finaliser = struct
     let open Deferred.Result.Let_syntax in
     Mina_caqti.Pool.use
       (fun ((module Conn : CONNECTION) as conn) ->
-        match%bind Hardfork_state.load_opt conn with
+        (* None covers both "no fork here" and "already settled". Asking for
+           the unfinished one in a single query keeps the two facts consistent
+           with each other; loading the row and then testing it separately
+           could see the boundary settled in between. *)
+        match%bind Hardfork_state.load_unfinalized_opt conn with
         | None ->
-            return ()
-        | Some hardfork_state
-          when String.equal hardfork_state.Hardfork_state.stage "finalized" ->
             return ()
         | Some hardfork_state -> (
             match%bind try_lock conn with
