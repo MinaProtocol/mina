@@ -206,7 +206,8 @@ module Make (Inputs : Inputs_intf) :
                 ~f:Root_data.Historical.scan_state
         in
         let%map states = protocol_states_of_scan_state ~frontier scan_state in
-        Staged_ledger.Scan_state.Sync.Answer.Protocol_states states
+        Staged_ledger.Scan_state.Sync.Answer.Protocol_states
+          (Array.of_list states)
     | Manifest _ | Band _ | Payloads _ ->
         let%bind responder = scan_state_responder ~frontier state_hash in
         Staged_ledger.Scan_state.Sync.Responder.respond responder query

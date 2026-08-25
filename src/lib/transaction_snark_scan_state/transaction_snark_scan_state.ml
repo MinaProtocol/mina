@@ -1571,7 +1571,8 @@ module Sync = struct
         type t =
           { scan_state : Parallel_scan_sync.Manifest.Stable.V1.t
           ; previous_incomplete :
-              Mina_stdlib.Bounded_types.String.Stable.V1.t list
+              Mina_stdlib.Bounded_types.String.Stable.V1.t
+              Mina_stdlib.Bounded_types.ArrayN4000.Stable.V1.t
           ; border_block_continued_in_the_next_tree : bool
           ; ledger_hash : Ledger_hash.Stable.V1.t
           ; pending_coinbase : Pending_coinbase.Stable.V2.t
@@ -1584,7 +1585,7 @@ module Sync = struct
 
     type t = Stable.Latest.t =
       { scan_state : Parallel_scan_sync.Manifest.t
-      ; previous_incomplete : string list
+      ; previous_incomplete : string array
       ; border_block_continued_in_the_next_tree : bool
       ; ledger_hash : Ledger_hash.t
       ; pending_coinbase : Pending_coinbase.t
@@ -1596,7 +1597,7 @@ module Sync = struct
     let aux_hash t =
       let scan_state_hash = Parallel_scan_sync.Manifest.root t.scan_state in
       let incomplete_updates =
-        List.fold ~init:(Digestif.SHA256.init ()) t.previous_incomplete
+        Array.fold ~init:(Digestif.SHA256.init ()) t.previous_incomplete
           ~f:(fun h digest -> Digestif.SHA256.feed_string h digest)
         |> Digestif.SHA256.get
       in
@@ -1650,7 +1651,9 @@ module Sync = struct
               }
           | Payloads of
               { scan_state : State_hash.Stable.V1.t
-              ; digests : Mina_stdlib.Bounded_types.String.Stable.V1.t list
+              ; digests :
+                  Mina_stdlib.Bounded_types.String.Stable.V1.t
+                  Mina_stdlib.Bounded_types.ArrayN64.Stable.V1.t
               }
           | Protocol_states of State_hash.Stable.V1.t
         [@@deriving sexp]
@@ -1667,7 +1670,7 @@ module Sync = struct
           ; root : Address.t
           ; height : int
           }
-      | Payloads of { scan_state : State_hash.t; digests : string list }
+      | Payloads of { scan_state : State_hash.t; digests : string array }
       | Protocol_states of State_hash.t
           (** the states the scan state at this hash needs; the responder works
               out which those are, since it has the assembled scan state and the
@@ -1700,10 +1703,12 @@ module Sync = struct
           | Payloads of
               ( Mina_stdlib.Bounded_types.String.Stable.V1.t
               * Mina_stdlib.Bounded_types.String.Stable.V1.t )
-              list
+              Mina_stdlib.Bounded_types.ArrayN64.Stable.V1.t
               (** digest and its bytes; a payload the responder does not hold
                   is simply absent, and the asker tries elsewhere *)
-          | Protocol_states of Mina_state.Protocol_state.Value.Stable.V3.t list
+          | Protocol_states of
+              Mina_state.Protocol_state.Value.Stable.V3.t
+              Mina_stdlib.Bounded_types.ArrayN4000.Stable.V1.t
         [@@deriving sexp]
 
         let to_latest = Fn.id
@@ -1713,8 +1718,8 @@ module Sync = struct
     type t = Stable.Latest.t =
       | Manifest of Manifest.t
       | Band of Band.t
-      | Payloads of (string * string) list
-      | Protocol_states of Mina_state.Protocol_state.value list
+      | Payloads of (string * string) array
+      | Protocol_states of Mina_state.Protocol_state.value array
     [@@deriving sexp]
   end
 
@@ -1777,7 +1782,7 @@ module Sync = struct
           { Manifest.scan_state =
               Parallel_scan_sync.Manifest.of_state t.scan_state ~payload_digest
           ; previous_incomplete =
-              List.map previous_incomplete ~f:(fun d -> d.hash)
+              Array.of_list_map previous_incomplete ~f:(fun d -> d.hash)
           ; border_block_continued_in_the_next_tree = border
           ; ledger_hash
           ; pending_coinbase
@@ -1821,8 +1826,11 @@ module Sync = struct
       | Query.Payloads { digests; _ } ->
           Some
             (Answer.Payloads
-               ( List.take digests Query.max_payloads_per_query
-               |> List.filter_map ~f:(fun digest ->
+               ( Array.sub digests ~pos:0
+                   ~len:
+                     (Int.min (Array.length digests)
+                        Query.max_payloads_per_query )
+               |> Array.filter_map ~f:(fun digest ->
                       Option.map (payload_bytes t ~digest) ~f:(fun bytes ->
                           (digest, bytes) ) ) ) )
   end
@@ -1884,7 +1892,7 @@ module Sync = struct
          checked against something this established. *)
       let%map () = Manifest.verify manifest ~expected in
       let incomplete = Hashtbl.create (module String) in
-      List.iter manifest.previous_incomplete ~f:(fun digest ->
+      Array.iter manifest.previous_incomplete ~f:(fun digest ->
           if not (Hashtbl.mem incomplete digest) then
             Hashtbl.set incomplete ~key:digest ~data:None ) ;
       let inner =
@@ -1938,7 +1946,8 @@ module Sync = struct
       bands
       @ List.map (List.chunks_of payloads ~length:Query.max_payloads_per_query)
           ~f:(fun batch ->
-            Query.Payloads { scan_state = t.state_hash; digests = batch } )
+            Query.Payloads
+              { scan_state = t.state_hash; digests = Array.of_list batch } )
 
     (** Take an answer, paired with the query that asked for it. The pairing is
         what tells us which tree a band belongs to — an answer does not say so
@@ -1959,8 +1968,8 @@ module Sync = struct
           in
           add_band t ~tree:index band
       | Query.Payloads _, Answer.Payloads payloads ->
-          List.map payloads ~f:(fun (_digest, bytes) -> add_payload t ~bytes)
-          |> Or_error.all_unit
+          Array.map payloads ~f:(fun (_digest, bytes) -> add_payload t ~bytes)
+          |> Array.to_list |> Or_error.all_unit
       | Query.Manifest _, Answer.Manifest _ ->
           (* the builder was created from a manifest; it never asks for one *)
           Ok ()
@@ -1999,7 +2008,8 @@ module Sync = struct
         Binable.of_string (module Transaction_with_witness.Stable.Latest)
       in
       let%bind incomplete =
-        List.map t.manifest.previous_incomplete ~f:(fun digest ->
+        List.map (Array.to_list t.manifest.previous_incomplete)
+          ~f:(fun digest ->
             match Hashtbl.find t.incomplete digest with
             | Some (Some bytes) ->
                 Ok (base_of_bytes bytes)

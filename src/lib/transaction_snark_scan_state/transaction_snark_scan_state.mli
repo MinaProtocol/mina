@@ -308,7 +308,7 @@ module Sync : sig
           ; root : Address.t
           ; height : int
           }
-      | Payloads of { scan_state : State_hash.t; digests : string list }
+      | Payloads of { scan_state : State_hash.t; digests : string array }
       | Protocol_states of State_hash.t
     [@@deriving sexp]
 
@@ -332,8 +332,8 @@ module Sync : sig
     type t =
       | Manifest of Manifest.t
       | Band of Band.t
-      | Payloads of (string * string) list
-      | Protocol_states of Mina_state.Protocol_state.value list
+      | Payloads of (string * string) array
+      | Protocol_states of Mina_state.Protocol_state.value array
     [@@deriving sexp]
 
     [%%versioned:
