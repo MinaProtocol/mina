@@ -81,3 +81,35 @@ As a result archive database will now have blocks which are a part of chain from
 Replayer component tests uses postgres database only. It need to be accessible from host machine
 
 
+
+## Archive automode component test
+
+`sample_mesa_hf_db` also drives a second component test, which exercises the
+archive's automatic hard fork hand-over rather than the replayer:
+
+```
+./buildkite/scripts/archive-automode-test.sh --pg {connection_string}
+```
+
+The database is useful here because it crosses a fork. It holds berkeley blocks
+up to height 1761 and mesa blocks from 1749, with the fork block at height 1748,
+slot 3059, and the post-fork genesis at 1749, slot 3120.
+
+The test rebuilds the pre-fork archive out of it (`prefork-state.sql` removes
+the new era and sets the post-fork genesis aside), runs
+`src/app/archive/upgrade_to_mesa.sql`, starts the archive, and sends the fork
+configuration over the archive RPC with `mina advanced send-hardfork-config`.
+
+It then checks two things in order. With no post-fork genesis block present the
+archive must record the fork and **change nothing**: the fork block is so far
+attested only by that one message. Once the genesis block is put back, the
+stranded band must heal -- every block up to the fork canonical, the blocks off
+that chain orphaned, and the post-fork genesis left alone.
+
+### Confirmations
+
+The archive requires blocks above the fork block before it settles, 20 by
+default. This network cannot supply that many: `stop-slot-config.json` puts
+`slot_tx_end` and `slot_chain_end` 20 slots apart, and that window produced 14
+blocks. The test therefore passes `--hardfork-confirmations 10`, which the
+fixture clears with room to spare.
