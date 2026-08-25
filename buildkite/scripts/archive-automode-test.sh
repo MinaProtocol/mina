@@ -11,12 +11,14 @@
 #      pre-fork chain has stopped, so the last blocks stay pending for ever
 #   2. the schema upgrade, which is where hardfork_state comes from
 #   3. the archive running in automode
-#   4. the fork configuration, sent over the archive RPC
-#   5. the archive records it and declines: the fork block is so far attested
-#      only by that message and nothing has corroborated it
+#   4. the fork configuration, sent over the archive RPC. The archive accepts
+#      it here and records it: hardfork_state gets a row, stage 'announced'
+#   5. no history is rewritten yet, though. Accepting the announcement and
+#      acting on it are separate: the fork block is so far attested only by
+#      that one message, and nothing has corroborated it
 #   6. the post-fork daemon feeds in its genesis block, whose parent hash is the
-#      fork block's
-#   7. the boundary settles
+#      fork block's. That is the corroboration
+#   7. now the repair runs and the boundary settles, stage 'finalized'
 #
 # The database is src/test/archive/sample_mesa_hf_db, the same dry-run fixture
 # the replayer mesa hard fork test uses. Its fork block is at height 1748, slot
@@ -110,28 +112,34 @@ grep -q "Archive process ready" "$WORK/archive.log" \
   || fail "the archive never became ready"
 
 echo
-echo "=== 4. the fork configuration, over the archive RPC"
+echo "=== 4. the fork configuration, over the archive RPC -- accepted here"
 $CLIENT_APP advanced send-hardfork-config \
   "$FIXTURE/hardfork-config.json" \
   --archive-address "127.0.0.1:${ARCHIVE_PORT}"
 
 echo
-echo "=== 5. it must decline: the post-fork genesis is not here yet"
-# Long enough for several passes of the finaliser's 60s loop, so this is a
-# settled refusal and not a race with the first pass.
+echo "=== 5. recorded, but no history rewritten yet"
+# The repair runs on its own loop, once a minute, and decides each pass whether
+# it is safe to proceed. Waiting out several passes makes this a settled
+# position rather than a race with the first one.
 sleep 75
 
+# 'announced' is the accepted state: the archive has the fork on its books and
+# will keep it across restarts. 'finalized' is what step 7 produces, and means
+# the repair ran as well.
 STAGE=$(q "SELECT stage FROM hardfork_state WHERE id=1;")
 [[ "$STAGE" == "announced" ]] \
   || fail "expected the fork to be recorded as 'announced', got '${STAGE:-nothing}'"
+echo "  accepted:  hardfork_state stage = $STAGE"
 
 STILL_PENDING=$(q "SELECT count(*) FROM blocks WHERE chain_status='pending';")
 [[ "$STILL_PENDING" == "$BEFORE_PENDING" ]] \
   || fail "the archive rewrote history before the post-fork genesis arrived (${BEFORE_PENDING} pending, now ${STILL_PENDING})"
+echo "  unchanged: $STILL_PENDING blocks still pending, as before"
 
 grep -q "post-fork chain's genesis block has not arrived" "$WORK/archive.log" \
   || fail "the archive did not say it was waiting for the post-fork genesis"
-echo "  declined, and said why:"
+echo "  waiting because:"
 grep -o "Not settling the fork boundary yet.*" "$WORK/archive.log" | tail -1 | sed 's/^/    /'
 
 echo
@@ -139,7 +147,7 @@ echo "=== 6. the post-fork daemon feeds in its genesis block"
 psql -q -v ON_ERROR_STOP=1 "$PG_CONN" -c "INSERT INTO blocks SELECT * FROM saved_fork_genesis;"
 
 echo
-echo "=== 7. the boundary settles"
+echo "=== 7. now the repair runs and the boundary settles"
 for _ in $(seq 1 60); do
   STAGE=$(q "SELECT stage FROM hardfork_state WHERE id=1;")
   [[ "$STAGE" == "finalized" ]] && break
