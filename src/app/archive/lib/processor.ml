@@ -4971,7 +4971,21 @@ module Hardfork_finaliser = struct
         | Some hardfork_state -> (
             match%bind try_lock conn with
             | false ->
-                (* Another archive process is repairing the same database. *)
+                (* Normally another archive process is repairing the same
+                   database. But the lock belongs to a Postgres session, not to
+                   a process, and a session outlives an archive that was killed
+                   mid-repair: the backend carries on with the UPDATE and keeps
+                   the lock. An archive restarted into that state would find
+                   itself unable to do anything, so say so rather than return
+                   in silence. *)
+                [%log info]
+                  "Not settling the fork boundary yet: another session \
+                   holds                    the repair lock. If no other \
+                   archive is running against                    this \
+                   database, look for a leftover backend: SELECT \
+                   pid,                    query FROM pg_stat_activity JOIN \
+                   pg_locks USING (pid) WHERE                    locktype = \
+                   'advisory'. This will be retried." ;
                 return ()
             | true -> (
                 let%bind result =
