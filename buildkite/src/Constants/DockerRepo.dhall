@@ -14,38 +14,47 @@ let show =
             }
             repo
 
-let publicOverride
-    : Optional Text
+let envOverride
+    : Optional Repo
     =
-      -- Set by a release pipeline to send its images to the public registry.
+      -- The registry a release pipeline pushes to, if it says.
       --
       -- It has to be an environment variable rather than a field on the job,
       -- because the packaging jobs are shared: nightly and a release pipeline
       -- run the very same MinaArtifact* jobs and must push to different
       -- registries. A field could only give one answer for both.
       --
-      -- Presence is the whole signal and the value is ignored, deliberately.
-      -- Dhall has no Text equality, so a variable carrying a registry NAME
-      -- could not be matched against the alternatives of this union without
-      -- splicing it in as source. A flag cannot be misspelled into a
-      -- different destination -- the only two outcomes are set and unset.
-      Some env:MINA_RELEASE_PUBLIC_DOCKER as Text ? None Text
+      -- The variable holds a Dhall value, spelled out in full:
+      --
+      --   MINA_RELEASE_DOCKER_REPO='< Internal | InternalEurope | Public >.Public'
+      --
+      -- Verbose, and deliberately so. Dhall 1.30 has no Text equality, so a
+      -- plain word cannot be turned into one of these alternatives at all,
+      -- and a plain registry address would be an unchecked string pointing
+      -- anywhere. Written this way the value is type checked when the
+      -- pipeline renders, and both ways of getting it wrong are loud:
+      --
+      --   .Pubic                  -> Missing constructor: Pubic
+      --   < Foo | Bar >.Foo       -> Expression doesn't match annotation
+      --
+      -- WARNING: do not write an import here. A path is resolved relative to
+      -- neither the repository root nor this file, so it fails to resolve,
+      -- the ? below treats that as absent, and the release pushes to the
+      -- job's default registry with no warning at all. The alternatives must
+      -- be spelled out, and they must match Repo above exactly -- adding an
+      -- alternative there is a change every release pipeline has to be told
+      -- about, which is why it errors rather than passing silently.
+      Some (env:MINA_RELEASE_DOCKER_REPO : Repo) ? None Repo
 
 let effective
     : Repo -> Repo
     =
-      -- The registry to push to: public when the pipeline asked for it, else
-      -- whatever the job declares.
-          \(declared : Repo)
-      ->  Prelude.Optional.fold
-            Text
-            publicOverride
-            Repo
-            (\(_ : Text) -> Repo.Public)
-            declared
+      -- The registry to push to: what the pipeline asked for, else what the
+      -- job declares.
+      \(declared : Repo) -> Prelude.Optional.default Repo declared envOverride
 
 in  { Type = Repo
     , show = show
-    , publicOverride = publicOverride
+    , envOverride = envOverride
     , effective = effective
     }
