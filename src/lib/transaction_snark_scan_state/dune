@@ -37,7 +37,7 @@
   transaction_snark_work
   parallel_scan
   mina_metrics
-  scan_state_next
+  parallel_scan.sync
   sgn
   ledger_proof
   genesis_constants

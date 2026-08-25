@@ -6,6 +6,9 @@ let%test_module "state operations" =
     let job_done (job : (int, int) Available_job.t) : int =
       match job with Base i -> i | Merge (i, j) -> i + j
 
+    let payload_digest : (int, int) Payload_digest.t =
+      { merge = Int.to_string; base = Int.to_string }
+
     (* --- empty state properties --- *)
     let%test_unit "empty state free_space matches max_base_jobs" =
       let s = empty ~max_base_jobs:16 ~delay:2 in
@@ -18,10 +21,6 @@ let%test_module "state operations" =
     let%test_unit "empty state free space equals max_base_jobs" =
       let s = empty ~max_base_jobs:32 ~delay:0 in
       [%test_eq: int] (free_space s) 32
-
-    let%test_unit "empty state sequence number is zero" =
-      let s = empty ~max_base_jobs:8 ~delay:1 in
-      [%test_eq: int] (current_job_sequence_number s) 0
 
     let%test_unit "empty state has no pending data" =
       let s = empty ~max_base_jobs:8 ~delay:1 in
@@ -39,7 +38,10 @@ let%test_module "state operations" =
       let data = [ 1; 2; 3 ] in
       let jobs = List.concat (jobs_for_slots s ~slots:(List.length data)) in
       let completed = List.map jobs ~f:job_done in
-      let _, s' = Or_error.ok_exn (update ~data ~completed_jobs:completed s) in
+      let _, s' =
+        Or_error.ok_exn
+          (update ~payload_digest ~data ~completed_jobs:completed s)
+      in
       [%test_eq: int] (free_space s') 8
 
     (* --- partition_if_overflowing --- *)
@@ -48,34 +50,33 @@ let%test_module "state operations" =
       let p = partition_if_overflowing s in
       assert (Int.( > ) (fst p.first) 0)
 
-    (* --- sequence number increases --- *)
-    let%test_unit "sequence number increases after update" =
-      let s = empty ~max_base_jobs:4 ~delay:0 in
-      let data = [ 1; 2; 3; 4 ] in
-      let jobs = List.concat (jobs_for_slots s ~slots:(List.length data)) in
-      let completed = List.map jobs ~f:job_done in
-      let _, s' = Or_error.ok_exn (update ~data ~completed_jobs:completed s) in
-      assert (current_job_sequence_number s' > current_job_sequence_number s)
-
-    (* --- State.map --- *)
-    let%test_unit "State.map preserves structure" =
+    (* --- map --- *)
+    let%test_unit "map preserves structure" =
       let s = empty ~max_base_jobs:4 ~delay:1 in
       let data = [ 10; 20; 30; 40 ] in
       let jobs = List.concat (jobs_for_slots s ~slots:(List.length data)) in
       let completed = List.map jobs ~f:job_done in
-      let _, s' = Or_error.ok_exn (update ~data ~completed_jobs:completed s) in
-      let s_mapped = State.map s' ~f1:(fun x -> x * 2) ~f2:(fun x -> x * 2) in
+      let _, s' =
+        Or_error.ok_exn
+          (update ~payload_digest ~data ~completed_jobs:completed s)
+      in
+      let s_mapped =
+        map s' ~f_merge:(fun x -> x * 2) ~f_base:(fun x -> x * 2)
+      in
       [%test_eq: int] (free_space s_mapped) (free_space s')
 
-    (* --- State.hash determinism --- *)
-    let%test_unit "State.hash is deterministic" =
+    (* --- hash determinism --- *)
+    let%test_unit "hash is deterministic" =
       let s = empty ~max_base_jobs:4 ~delay:1 in
       let data = [ 1; 2; 3; 4 ] in
       let jobs = List.concat (jobs_for_slots s ~slots:(List.length data)) in
       let completed = List.map jobs ~f:job_done in
-      let _, s' = Or_error.ok_exn (update ~data ~completed_jobs:completed s) in
-      let h1 = State.hash s' Int.to_string Int.to_string in
-      let h2 = State.hash s' Int.to_string Int.to_string in
+      let _, s' =
+        Or_error.ok_exn
+          (update ~payload_digest ~data ~completed_jobs:completed s)
+      in
+      let h1 = hash s' in
+      let h2 = hash s' in
       assert (Digestif.SHA256.equal h1 h2)
 
     (* --- all_jobs / jobs_for_next_update --- *)
@@ -90,7 +91,8 @@ let%test_module "state operations" =
       let jobs = jobs_for_slots s ~slots:(List.length data) in
       let completed = List.map (List.concat jobs) ~f:job_done in
       let (_ : _ option * _) =
-        Or_error.ok_exn (update ~data ~completed_jobs:completed s)
+        Or_error.ok_exn
+          (update ~payload_digest ~data ~completed_jobs:completed s)
       in
       ()
 
@@ -100,9 +102,12 @@ let%test_module "state operations" =
       let data = [ 1; 2; 3; 4 ] in
       let jobs = List.concat (jobs_for_slots s ~slots:(List.length data)) in
       let completed = List.map jobs ~f:job_done in
-      let _, s' = Or_error.ok_exn (update ~data ~completed_jobs:completed s) in
+      let _, s' =
+        Or_error.ok_exn
+          (update ~payload_digest ~data ~completed_jobs:completed s)
+      in
       let base_count =
-        State.fold_chronological s' ~init:0
+        fold_chronological s' ~init:0
           ~f_merge:(fun acc _ -> acc)
           ~f_base:(fun acc _ -> acc + 1)
       in
@@ -111,7 +116,9 @@ let%test_module "state operations" =
     (* --- update with empty data --- *)
     let%test_unit "update with empty data and empty completed_jobs" =
       let s = empty ~max_base_jobs:4 ~delay:1 in
-      let _, s' = Or_error.ok_exn (update ~data:[] ~completed_jobs:[] s) in
+      let _, s' =
+        Or_error.ok_exn (update ~payload_digest ~data:[] ~completed_jobs:[] s)
+      in
       [%test_eq: int] (free_space s') (free_space s)
 
     (* --- multiple updates produce result --- *)
@@ -129,7 +136,8 @@ let%test_module "state operations" =
             in
             let completed = List.map jobs ~f:job_done in
             let result_opt, state' =
-              Or_error.ok_exn (update ~data ~completed_jobs:completed state)
+              Or_error.ok_exn
+                (update ~payload_digest ~data ~completed_jobs:completed state)
             in
             if Option.is_some result_opt then got_result := true ;
             state' )

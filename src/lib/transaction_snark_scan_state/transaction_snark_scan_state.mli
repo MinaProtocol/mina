@@ -3,7 +3,6 @@ open Async_kernel
 open Mina_base
 open Mina_transaction
 module Ledger = Mina_ledger.Ledger
-module Parallel_scan_sync = Scan_state_next.Parallel_scan_sync
 
 (** The stored shape: what the frontier writes to disk and passes around in its
     own diffs. Unversioned — a scan state reaches another node through the sync
