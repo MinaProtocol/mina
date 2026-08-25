@@ -100,11 +100,21 @@ the new era and sets the post-fork genesis aside), runs
 `src/app/archive/upgrade_to_mesa.sql`, starts the archive, and sends the fork
 configuration over the archive RPC with `mina advanced send-hardfork-config`.
 
-It then checks two things in order. With no post-fork genesis block present the
-archive must record the fork and **change nothing**: the fork block is so far
-attested only by that one message. Once the genesis block is put back, the
-stranded band must heal -- every block up to the fork canonical, the blocks off
-that chain orphaned, and the post-fork genesis left alone.
+It then checks two things in order, and the distinction between them is the
+point of the test.
+
+The archive **accepts the configuration as soon as it arrives**: it writes a
+`hardfork_state` row with stage `announced`, which it keeps across restarts.
+Accepting the announcement and acting on it are separate, though. While no
+post-fork genesis block is present the archive must **change no block**, because
+the fork block is so far attested only by that one message and nothing has
+corroborated it.
+
+Once the genesis block is put back -- its parent hash is the fork block's, so
+the chain itself now confirms what the daemon said -- the repair runs and the
+stage becomes `finalized`. The stranded band must then heal: every block up to
+the fork canonical, the blocks off that chain orphaned, and the post-fork
+genesis left alone.
 
 ### Confirmations
 
