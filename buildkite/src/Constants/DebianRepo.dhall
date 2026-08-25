@@ -8,7 +8,10 @@ let Optional/toList = Prelude.Optional.toList
 
 let DebianRepo
     : Type
-    = < Unstable | Nightly | Stable >
+    = -- O1Test is packages.o1test.net: one unsigned repository carrying every
+      -- channel, and the one the release pipelines publish to. The three
+      -- minaprotocol.com repositories are signed and split by channel.
+      < Unstable | Nightly | Stable | O1Test >
 
 let address =
           \(repo : DebianRepo)
@@ -16,6 +19,7 @@ let address =
             { Unstable = "https://unstable.apt.packages.minaprotocol.com"
             , Nightly = "https://nightly.apt.packages.minaprotocol.com"
             , Stable = "https://stable.apt.packages.minaprotocol.com"
+            , O1Test = "https://packages.o1test.net"
             }
             repo
 
@@ -25,6 +29,7 @@ let bucket =
             { Unstable = Some "unstable.apt.packages.minaprotocol.com"
             , Nightly = Some "nightly.apt.packages.minaprotocol.com"
             , Stable = Some "stable.apt.packages.minaprotocol.com"
+            , O1Test = Some "packages.o1test.net"
             }
             repo
 
@@ -56,12 +61,15 @@ let keyId =
             { Unstable = Some "386E9DAC378726A48ED5CE56ADB30D9ACE02F414"
             , Nightly = Some "386E9DAC378726A48ED5CE56ADB30D9ACE02F414"
             , Stable = Some "386E9DAC378726A48ED5CE56ADB30D9ACE02F414"
+            , O1Test = None Text
             }
             repo
 
 let isSigned =
           \(repo : DebianRepo)
-      ->  merge { Unstable = True, Nightly = True, Stable = True } repo
+      ->  merge
+            { Unstable = True, Nightly = True, Stable = True, O1Test = False }
+            repo
 
 let keyAddress =
           \(repo : DebianRepo)
@@ -71,6 +79,7 @@ let keyAddress =
                 { Unstable = Some (address repo ++ keyPath)
                 , Nightly = Some (address repo ++ keyPath)
                 , Stable = Some (address repo ++ keyPath)
+                , O1Test = None Text
                 }
                 repo
 
