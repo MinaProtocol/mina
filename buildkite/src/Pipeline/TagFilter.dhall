@@ -18,6 +18,7 @@ let Filter
       | DebianBuild
       | DockerBuild
       | Packaging
+      | Publish
       | Rosetta
       | Hardfork
       | AllDockersAndDebians
@@ -61,6 +62,7 @@ let tags
             , DebianBuild = [ Tag.Type.Debian ]
             , DockerBuild = [ Tag.Type.Docker ]
             , Packaging = [ Tag.Type.Packaging ]
+            , Publish = [ Tag.Type.Publish ]
             , AllTests = [ Tag.Type.Lint, Tag.Type.Release, Tag.Type.Test ]
             , Release = [ Tag.Type.Release ]
             , Promote = [ Tag.Type.Promote ]
@@ -216,6 +218,7 @@ let show
             , DebianBuild = "DebianBuild"
             , DockerBuild = "DockerBuild"
             , Packaging = "Packaging"
+            , Publish = "Publish"
             , Rosetta = "Rosetta"
             , Hardfork = "Hardfork"
             , AllDockersAndDebians = "AllDockersAndDebians"
