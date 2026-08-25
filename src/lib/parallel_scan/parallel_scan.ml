@@ -1062,6 +1062,8 @@ let next_on_new_tree t = free_space_on_current_tree t = t.max_base_jobs
 (** All the transactions still in the forest, oldest tree first. *)
 let pending_data t = List.rev_map t.trees ~f:Tree.base_jobs
 
+let trees t = t.trees
+
 (** Each tree's nodes, oldest tree first. Replaces
     [view_jobs_with_position]. *)
 let job_views t ~f_merge ~f_base =
@@ -1647,3 +1649,44 @@ let%test_module "port" =
       in
       [%test_eq: int] stopped 3
   end )
+
+module Private = struct
+  let digest_fields = digest_fields
+
+  let digest_of_acc = digest_of_acc
+
+  let trees t = t.trees
+
+  let create ~trees ~acc ~payload_digest ~max_base_jobs ~delay =
+    { trees
+    ; acc
+    ; acc_digest = digest_of_acc ~payload_digest acc
+    ; max_base_jobs
+    ; delay
+    }
+
+  let acc t = t.acc
+
+  let max_base_jobs t = t.max_base_jobs
+
+  let delay t = t.delay
+
+  module Tree = struct
+    include Tree
+
+    let filled (t : _ Tree.t) = t.filled
+
+    let level (t : _ Tree.t) = t.level
+
+    let proved (t : _ Tree.t) = t.proved
+
+    let bases (t : _ Tree.t) = t.bases
+
+    let merges (t : _ Tree.t) = t.merges
+
+    let digests (t : _ Tree.t) = t.digests
+
+    let create ~merges ~bases ~digests ~filled ~level ~proved : _ Tree.t =
+      { merges; bases; digests; filled; level; proved }
+  end
+end
