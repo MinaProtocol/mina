@@ -104,15 +104,15 @@ It then checks two things in order, and the distinction between them is the
 point of the test.
 
 The archive **accepts the configuration as soon as it arrives**: it writes a
-`hardfork_state` row with stage `announced`, which it keeps across restarts.
-Accepting the announcement and acting on it are separate, though. While no
-post-fork genesis block is present the archive must **change no block**, because
-the fork block is so far attested only by that one message and nothing has
-corroborated it.
+`hardfork_state` row, which it keeps across restarts. Accepting the
+announcement and acting on it are separate, though. While no post-fork genesis
+block is present the archive must **change no block**, because the fork block is
+so far attested only by that one message and nothing has corroborated it. Its
+`finalized_at` stays NULL for as long as that holds.
 
 Once the genesis block is put back -- its parent hash is the fork block's, so
-the chain itself now confirms what the daemon said -- the repair runs and the
-stage becomes `finalized`. The stranded band must then heal: every block up to
+the chain itself now confirms what the daemon said -- the repair runs and
+`finalized_at` is stamped. The stranded band must then heal: every block up to
 the fork canonical, the blocks off that chain orphaned, and the post-fork
 genesis left alone.
 

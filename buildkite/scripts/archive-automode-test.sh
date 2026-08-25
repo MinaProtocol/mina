@@ -12,13 +12,14 @@
 #   2. the schema upgrade, which is where hardfork_state comes from
 #   3. the archive running in automode
 #   4. the fork configuration, sent over the archive RPC. The archive accepts
-#      it here and records it: hardfork_state gets a row, stage 'announced'
+#      it here and records it: hardfork_state gets a row
 #   5. no history is rewritten yet, though. Accepting the announcement and
 #      acting on it are separate: the fork block is so far attested only by
-#      that one message, and nothing has corroborated it
+#      that one message, and nothing has corroborated it. finalized_at stays
+#      NULL while that is the case
 #   6. the post-fork daemon feeds in its genesis block, whose parent hash is the
 #      fork block's. That is the corroboration
-#   7. now the repair runs and the boundary settles, stage 'finalized'
+#   7. now the repair runs, the boundary settles, and finalized_at is stamped
 #
 # The database is src/test/archive/sample_mesa_hf_db, the same dry-run fixture
 # the replayer mesa hard fork test uses. Its fork block is at height 1748, slot
@@ -124,13 +125,17 @@ echo "=== 5. recorded, but no history rewritten yet"
 # position rather than a race with the first one.
 sleep 75
 
-# 'announced' is the accepted state: the archive has the fork on its books and
-# will keep it across restarts. 'finalized' is what step 7 produces, and means
-# the repair ran as well.
-STAGE=$(q "SELECT stage FROM hardfork_state WHERE id=1;")
-[[ "$STAGE" == "announced" ]] \
-  || fail "expected the fork to be recorded as 'announced', got '${STAGE:-nothing}'"
-echo "  accepted:  hardfork_state stage = $STAGE"
+# The row is the acceptance: the archive has the fork on its books and keeps it
+# across restarts. finalized_at is what step 7 stamps, and means the repair ran
+# as well.
+RECORDED=$(q "SELECT count(*) FROM hardfork_state WHERE id=1;")
+[[ "$RECORDED" == "1" ]] \
+  || fail "the archive did not record the fork it was sent"
+echo "  accepted:  hardfork_state has the fork on record"
+
+SETTLED_AT=$(q "SELECT coalesce(finalized_at::text,'') FROM hardfork_state WHERE id=1;")
+[[ -z "$SETTLED_AT" ]] \
+  || fail "the boundary was settled at ${SETTLED_AT}, before the post-fork genesis arrived"
 
 STILL_PENDING=$(q "SELECT count(*) FROM blocks WHERE chain_status='pending';")
 [[ "$STILL_PENDING" == "$BEFORE_PENDING" ]] \
@@ -149,12 +154,13 @@ psql -q -v ON_ERROR_STOP=1 "$PG_CONN" -c "INSERT INTO blocks SELECT * FROM saved
 echo
 echo "=== 7. now the repair runs and the boundary settles"
 for _ in $(seq 1 60); do
-  STAGE=$(q "SELECT stage FROM hardfork_state WHERE id=1;")
-  [[ "$STAGE" == "finalized" ]] && break
+  SETTLED_AT=$(q "SELECT coalesce(finalized_at::text,'') FROM hardfork_state WHERE id=1;")
+  [[ -n "$SETTLED_AT" ]] && break
   sleep 5
 done
-[[ "$STAGE" == "finalized" ]] \
-  || fail "the boundary never settled; stage is '${STAGE:-nothing}'"
+[[ -n "$SETTLED_AT" ]] \
+  || fail "the boundary never settled; finalized_at is still NULL"
+echo "  settled at $SETTLED_AT"
 
 q "SELECT '  ' || chain_status || ' ' || count(*) FROM blocks GROUP BY chain_status ORDER BY 1;"
 
