@@ -135,7 +135,7 @@ let report_test_errors ~log_error_set ~internal_error_set =
             color_eprintf
               (color_of_severity severity)
               "        [%s] %s\n"
-              (Time_float.to_string_utc error_message.timestamp)
+              (Time_float_unix.to_string error_message.timestamp)
               (Yojson.Safe.to_string (Logger.Message.to_yojson error_message)) ) ;
         Print.eprintf "\n" )
   in
@@ -163,7 +163,7 @@ let report_test_errors ~log_error_set ~internal_error_set =
               color_eprintf
                 (color_of_severity severity)
                 "    [%s] %s\n"
-                (Time_float.to_string_utc occurrence_time)
+                (Time_float_unix.to_string occurrence_time)
                 (Error.to_string_hum error) ) ) ;
       (* report non-contextualized internal errors *)
       List.iter internal_errors.from_current_context
@@ -171,7 +171,7 @@ let report_test_errors ~log_error_set ~internal_error_set =
           color_eprintf
             (color_of_severity severity)
             "[%s] %s\n"
-            (Time_float.to_string_utc occurrence_time)
+            (Time_float_unix.to_string occurrence_time)
             (Error.to_string_hum error) ) ;
       (* determine if test is passed/failed and exit accordingly *)
       let test_failed =

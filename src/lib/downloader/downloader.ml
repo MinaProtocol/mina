@@ -890,7 +890,7 @@ end = struct
                ~f:(fun (h, (p, _, start)) ->
                  `Assoc
                    [ ("hash", Key.to_yojson h)
-                   ; ("start", `String (Time_float.to_string_utc start))
+                   ; ("start", `String (Time_float_unix.to_string start))
                    ; ( "time_since_start"
                      , `String
                          (Time_float.Span.to_string_hum

@@ -1912,8 +1912,8 @@ let%test_module _ =
               both locally generated committed and uncommitted with times %s \
               and %s"
             key
-            (Time_float.to_string_utc committed)
-            (Time_float.to_string_utc uncommitted)
+            (Time_float_unix.to_string committed)
+            (Time_float_unix.to_string uncommitted)
             () ) ;
       Locally_generated.iteri pool.locally_generated_uncommitted
         ~f:(fun ~key ~data:_ ->
@@ -2695,8 +2695,9 @@ let%test_module _ =
           assert_pool_txs t (List.drop independent_cmds 3) ;
           Deferred.unit )
 
-    let%test_unit "vk refcounts are decremented for commands dropped when the \
-                   transition frontier is recreated (zkapps)" =
+    let%test_unit
+        "vk refcounts are decremented for commands dropped when the transition \
+         frontier is recreated (zkapps)" =
       Thread_safe.block_on_async_exn (fun () ->
           (* Set up initial frontier *)
           let%bind t = setup_test () in

@@ -393,7 +393,7 @@ let start ~commit_id ~logger ~node_status_url ~transition_frontier ~sync_status
                     { hash
                     ; sender
                     ; received_at =
-                        Time_float.to_string_utc
+                        Time_float_unix.to_string
                           (Block_time.to_time_exn received_at)
                     ; is_valid = false
                     ; reason_for_rejection = Some reason_for_rejection
@@ -403,7 +403,7 @@ let start ~commit_id ~logger ~node_status_url ~transition_frontier ~sync_status
                       { hash
                       ; sender
                       ; received_at =
-                          Time_float.to_string_utc
+                          Time_float_unix.to_string
                             (Block_time.to_time_exn received_at)
                       ; is_valid = true
                       ; reason_for_rejection = None
