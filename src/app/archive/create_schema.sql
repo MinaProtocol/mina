@@ -605,12 +605,12 @@ CREATE INDEX idx_blocks_zkapp_commands_sequence_no ON blocks_zkapp_commands(sequ
    stanzas carry the hashes that locate and verify the genesis ledger, so it is
    kept verbatim for the later steps of the hand-over to read.
 
-   `stage` advances in one direction only:
-     announced  -- we know a fork happened and which block it forked from
-     finalized  -- the chain boundary has been settled in this database
+   How far the hand-over has got is `finalized_at`: NULL while the fork is
+   known but the chain boundary has not been settled, a timestamp once it has.
+   A separate stage column would carry the same one bit a second time, and the
+   two could then disagree.
 */
 
-CREATE TYPE hardfork_stage  AS ENUM ('announced', 'finalized');
 CREATE TYPE hardfork_source AS ENUM ('daemon_config', 'fork_genesis', 'operator');
 
 CREATE TABLE hardfork_state
@@ -619,7 +619,6 @@ CREATE TABLE hardfork_state
 , fork_blockchain_length  bigint           NOT NULL
 , fork_global_slot        bigint           NOT NULL
 , config_json             text             NOT NULL
-, stage                   hardfork_stage   NOT NULL
 , source                  hardfork_source  NOT NULL
 , announced_at            timestamptz      NOT NULL DEFAULT now()
 , finalized_at            timestamptz

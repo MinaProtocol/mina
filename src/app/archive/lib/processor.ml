@@ -4678,7 +4678,6 @@ module Hardfork_state = struct
       ; fork_blockchain_length : int64
       ; fork_global_slot : int64
       ; config_json : string
-      ; stage : string
       ; source : string
       }
     [@@deriving hlist, fields]
@@ -4688,16 +4687,20 @@ module Hardfork_state = struct
 
   let typ =
     Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
-      Caqti_type.[ string; int64; int64; string; string; string ]
+      Caqti_type.[ string; int64; int64; string; string ]
 
-  (* The enum columns are read and written as text with explicit casts. They
-     carry no OCaml variant here: this module only records what it is told,
-     and the finaliser is what interprets the stage. *)
+  (* `source` is an enum column, read and written as text with an explicit
+     cast. It carries no OCaml variant here: this module records what it is
+     told and interprets none of it.
+
+     There is no column for how far the hand-over has got. `finalized_at` is
+     that: NULL until the boundary is settled, a timestamp afterwards. A
+     separate stage column would hold the same one bit a second time. *)
   let load_opt (module Conn : CONNECTION) =
     Conn.find_opt
       (Mina_caqti.find_opt_req Caqti_type.unit typ
          {sql| SELECT fork_state_hash, fork_blockchain_length, fork_global_slot,
-                      config_json, stage::text, source::text
+                      config_json, source::text
                FROM hardfork_state
                WHERE id = 1
          |sql} )
@@ -4708,9 +4711,9 @@ module Hardfork_state = struct
       (Mina_caqti.exec_req typ
          {sql| INSERT INTO hardfork_state
                  (id, fork_state_hash, fork_blockchain_length, fork_global_slot,
-                  config_json, stage, source)
+                  config_json, source)
                VALUES
-                 (1, ?, ?, ?, ?, ?::hardfork_stage, ?::hardfork_source)
+                 (1, ?, ?, ?, ?, ?::hardfork_source)
          |sql} )
       t
 
@@ -4780,7 +4783,6 @@ let hardfork_state_of_config ~config_json =
         ; fork_blockchain_length = Int64.of_int blockchain_length
         ; fork_global_slot = Int64.of_int global_slot_since_genesis
         ; config_json
-        ; stage = "announced"
         ; source = "daemon_config"
         }
 
