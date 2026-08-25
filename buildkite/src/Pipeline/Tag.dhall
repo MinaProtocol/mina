@@ -36,6 +36,7 @@ let Tag
       | Archive
       | Mesa
       | Packaging
+      | Publish
       >
 
 let capitalName =
@@ -69,6 +70,7 @@ let capitalName =
             , Archive = "Archive"
             , Mesa = "Mesa"
             , Packaging = "Packaging"
+            , Publish = "Publish"
             }
             tag
 
@@ -103,6 +105,7 @@ let lowerName =
             , Archive = "archive"
             , Mesa = "mesa"
             , Packaging = "packaging"
+            , Publish = "publish"
             }
             tag
 
