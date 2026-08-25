@@ -246,8 +246,8 @@ val write_all_proofs_to_disk :
 val read_all_proofs_from_disk : t -> Stored.t
 
 (** Serving a scan state piece by piece, so that a bootstrapping node can fetch
-    it in verifiable fragments rather than as one blob. See
-    [src/lib/parallel_scan/new/sync.md]. *)
+    it in verifiable fragments rather than as one blob. The protocol itself is
+    {!Parallel_scan_sync}; this wires it to the transaction scan state. *)
 module Sync : sig
   (** The scan state being served, named before [Responder.t] shadows it. *)
   type nonrec scan_state = t
