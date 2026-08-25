@@ -156,9 +156,15 @@ say "the archive should record the fork but decline to repair it"
 # settled refusal rather than a race.
 sleep 75
 
-STAGE=$(psql_ -c "SELECT stage FROM hardfork_state WHERE id=1;" 2>/dev/null)
-[[ "$STAGE" == "announced" ]] \
-  || fail "expected the fork to be recorded as 'announced', got '${STAGE:-none}'"
+# The fork is on the books -- a row exists -- but the repair has not run, so
+# finalized_at is still NULL.
+RECORDED=$(psql_ -c "SELECT count(*) FROM hardfork_state WHERE id=1;" 2>/dev/null)
+[[ "$RECORDED" == "1" ]] \
+  || fail "the archive did not record the fork it was sent"
+
+SETTLED_AT=$(psql_ -c "SELECT coalesce(finalized_at::text,'') FROM hardfork_state WHERE id=1;" 2>/dev/null)
+[[ -z "$SETTLED_AT" ]] \
+  || fail "the boundary was settled at ${SETTLED_AT}, before the post-fork genesis arrived"
 
 STILL_PENDING=$(psql_ -c "SELECT count(*) FROM blocks WHERE chain_status='pending';")
 [[ "$STILL_PENDING" == "7" ]] \
@@ -179,19 +185,19 @@ docker exec -e PGPASSWORD=pw -i "$PG_CONTAINER" psql -q -U postgres -d "$DB" \
 say "watching the boundary settle"
 SETTLED=0
 for _ in $(seq 1 40); do
-  STAGE=$(psql_ -c "SELECT stage FROM hardfork_state WHERE id=1;" 2>/dev/null)
-  if [[ "$STAGE" == "finalized" ]]; then SETTLED=1; break; fi
+  SETTLED_AT=$(psql_ -c "SELECT coalesce(finalized_at::text,'') FROM hardfork_state WHERE id=1;" 2>/dev/null)
+  if [[ -n "$SETTLED_AT" ]]; then SETTLED=1; break; fi
   sleep 2
 done
 
 echo "hardfork_state:"
-psql_ -c "SELECT stage, source, fork_state_hash, fork_blockchain_length FROM hardfork_state;" | sed 's/^/    /'
+psql_ -c "SELECT source, fork_state_hash, fork_blockchain_length, finalized_at FROM hardfork_state;" | sed 's/^/    /'
 echo "chain_status after:"
 psql_ -c "SELECT chain_status, count(*) FROM blocks GROUP BY 1 ORDER BY 1;" | sed 's/^/    /'
 echo "per block:"
 psql_ -c "SELECT height, state_hash, chain_status FROM blocks ORDER BY height, state_hash;" | sed 's/^/    /'
 
-[[ "$SETTLED" -eq 1 ]] || fail "the boundary never settled (hardfork_state.stage is '${STAGE:-none}')"
+[[ "$SETTLED" -eq 1 ]] || fail "the boundary never settled (hardfork_state.finalized_at is still NULL)"
 
 # The chain up to the fork block is canonical.
 for h in 6 7 8 9 10; do
