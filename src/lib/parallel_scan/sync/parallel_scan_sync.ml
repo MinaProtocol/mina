@@ -1,7 +1,7 @@
-(** The scan state sync protocol, over the types in {!Parallel_scan_new}.
+(** The scan state sync protocol, over the types in {!Parallel_scan}.
 
     See [sync.md] for why this shape and not another. In short: the block
-    header commits to the scan state, {!Parallel_scan_new.hash} is a Merkle
+    header commits to the scan state, {!Parallel_scan.hash} is a Merkle
     tree whose shape is the scan state itself, and so a peer can be made to
     prove every piece it sends against something the chain already vouches for.
     Nothing here needs to trust a peer, and no piece is larger than the caller
@@ -22,7 +22,7 @@
     structure has to be reconstructed and checked. *)
 
 open Core_kernel
-open Parallel_scan_new
+open Parallel_scan
 
 (* Digests travel as their raw bytes. The scan state's own [Hash.t] is a
    [Digestif] value, which is convenient in memory and awkward on a wire;
@@ -35,7 +35,7 @@ let raw = Hash.to_raw_string
 let unraw = Digestif.SHA256.of_raw_string
 
 (** Where a node sits in a tree: [level] counts from the root, [index] from the
-    left within that level. This is {!Parallel_scan_new.Tree.slot} split into
+    left within that level. This is {!Parallel_scan.Tree.slot} split into
     its two components, because a band is addressed by subtree rather than by
     array offset. *)
 module Address = struct
@@ -80,7 +80,7 @@ end
 (** The whole forest in about two kilobytes: one digest and three integers per
     tree, plus the parameters and the emitted value.
 
-    This is exactly the input to {!Parallel_scan_new.hash}, so {!verify}
+    This is exactly the input to {!Parallel_scan.hash}, so {!verify}
     recomputes the commitment from it and compares against the block. A peer
     that lies about any of it is caught before a single payload is fetched. *)
 module Manifest = struct
@@ -113,7 +113,7 @@ module Manifest = struct
     }
   [@@deriving sexp]
 
-  let of_state (t : _ Parallel_scan_new.t) ~payload_digest =
+  let of_state (t : _ Parallel_scan.t) ~payload_digest =
     { max_base_jobs = t.max_base_jobs
     ; delay = t.delay
     ; acc =
@@ -126,7 +126,7 @@ module Manifest = struct
     }
 
   (** The commitment this manifest describes. Mirrors
-      {!Parallel_scan_new.hash}; the [identity_digest] is because the manifest
+      {!Parallel_scan.hash}; the [identity_digest] is because the manifest
       already holds payload digests rather than payloads. *)
   let root t =
     let acc_digest =
@@ -337,7 +337,7 @@ end
     everything is in.
 
     The accumulation deliberately does not happen in a
-    {!Parallel_scan_new.t}: that type has invariants — one live level per tree,
+    {!Parallel_scan.t}: that type has invariants — one live level per tree,
     cursors consistent with the node contents — which a half-received state
     violates. Reception fills option arrays and only builds the real thing at
     the end. *)
@@ -521,7 +521,7 @@ module Builder = struct
 
       [of_bytes] parses a payload; the two are separate because a merge payload
       and a base payload are different types. Assembly itself is
-      {!Parallel_scan_new.map} over the received skeleton — the same function
+      {!Parallel_scan.map} over the received skeleton — the same function
       that produced it, run backwards. *)
   let finish t ~merge_of_bytes ~base_of_bytes =
     let open Or_error.Let_syntax in
@@ -596,7 +596,7 @@ let%test_module "sync" =
     (* A producer: everything a peer would answer from, and nothing else. *)
     module Peer = struct
       type t =
-        { skeleton : (string, string) Parallel_scan_new.t
+        { skeleton : (string, string) Parallel_scan.t
         ; bytes_of_digest : (string, string) Hashtbl.t
         }
 

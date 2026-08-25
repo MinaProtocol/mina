@@ -3,28 +3,15 @@
  (public_name parallel_scan)
  (inline_tests
   (flags -verbose -show-counts))
- (library_flags -linkall)
  (libraries
   ;; opam libraries
-  ppx_inline_test.config
-  base
   core_kernel
-  sexplib0
-  async
   digestif
-  core
-  lens
-  async_kernel
-  bin_prot.shape
-  base.caml
-  async_unix
   ;; local libraries
-  mina_metrics
   mina_stdlib
-  pipe_lib
   ppx_version.runtime)
  (preprocess
-  (pps ppx_jane ppx_mina ppx_version ppx_compare lens.ppx_deriving))
+  (pps ppx_jane ppx_version))
  (instrumentation
   (backend bisect_ppx))
  (synopsis "Parallel scan over an infinite stream (incremental map-reduce)"))

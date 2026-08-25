@@ -5,8 +5,6 @@ open Mina_transaction
 open Currency
 module Ledger = Mina_ledger.Ledger
 module Sparse_ledger = Mina_ledger.Sparse_ledger
-module Parallel_scan_new = Scan_state_next.Parallel_scan_new
-module Parallel_scan_sync = Scan_state_next.Parallel_scan_sync
 
 module type Monad_with_Or_error_intf = sig
   type 'a t
@@ -161,13 +159,13 @@ module Available_job = struct
   type t =
     ( Ledger_proof_with_hash.t
     , Transaction_with_witness.t )
-    Parallel_scan_new.Available_job.t
+    Parallel_scan.Available_job.t
 end
 
-module Space_partition = Parallel_scan_new.Space_partition
+module Space_partition = Parallel_scan.Space_partition
 
 module Job_view = struct
-  type t = Transaction_snark.Statement.t Parallel_scan_new.Job_view.t
+  type t = Transaction_snark.Statement.t Parallel_scan.Job_view.t
   [@@deriving sexp]
 
   let to_yojson ({ value; position } : t) : Yojson.Safe.t =
@@ -221,8 +219,7 @@ module Job_view = struct
                   [ statement_to_yojson job
                   ; `Assoc
                       [ ( "Status"
-                        , `String
-                            (Parallel_scan_new.Job_status.to_string status) )
+                        , `String (Parallel_scan.Job_status.to_string status) )
                       ]
                   ] )
             ]
@@ -238,7 +235,7 @@ type job = Available_job.t
 let payload_digest :
     ( Ledger_proof_with_hash.t
     , Transaction_with_witness.t )
-    Parallel_scan_new.Payload_digest.t =
+    Parallel_scan.Payload_digest.t =
   { merge = (fun (x : Ledger_proof_with_hash.t) -> x.hash)
   ; base = (fun (x : Transaction_with_witness.t) -> x.hash)
   }
@@ -246,7 +243,7 @@ let payload_digest :
 let stable_payload_digest :
     ( Ledger_proof.Stable.V3.t
     , Transaction_with_witness.Stable.V3.t )
-    Parallel_scan_new.Payload_digest.t =
+    Parallel_scan.Payload_digest.t =
   { merge = Ledger_proof_with_hash.hash; base = Transaction_with_witness.hash }
 
 (* The scan state's own commitment needs no callbacks: it is a Merkle tree
@@ -256,11 +253,11 @@ let stable_payload_digest :
 let hash_generic :
     type a b.
        tx_witness_hash:(b -> string)
-    -> (a, b) Parallel_scan_new.t
+    -> (a, b) Parallel_scan.t
        * (b list * [ `Border_block_continued_in_the_next_tree of bool ])
     -> Staged_ledger_hash.Aux_hash.t =
  fun ~tx_witness_hash (parallel_scan_state, previous_incomplete_zkapp_updates) ->
-  let state_hash = Parallel_scan_new.hash parallel_scan_state in
+  let state_hash = Parallel_scan.hash parallel_scan_state in
   let ( previous_incomplete_zkapp_updates
       , `Border_block_continued_in_the_next_tree continue_in_next_tree ) =
     previous_incomplete_zkapp_updates
@@ -294,7 +291,7 @@ module Stored = struct
     { scan_state :
         ( Ledger_proof.Stable.V3.t
         , Transaction_with_witness.Stable.V3.t )
-        Parallel_scan_new.Wire.t
+        Parallel_scan.Wire.t
     ; previous_incomplete_zkapp_updates :
         Transaction_with_witness.Stable.V3.t list
         * [ `Border_block_continued_in_the_next_tree of bool ]
@@ -305,14 +302,13 @@ module Stored = struct
     hash_generic
       ~tx_witness_hash:(fun (x : Transaction_with_witness.Stable.V3.t) ->
         Transaction_with_witness.hash x )
-      ( Parallel_scan_new.of_wire t.scan_state
-          ~payload_digest:stable_payload_digest
+      ( Parallel_scan.of_wire t.scan_state ~payload_digest:stable_payload_digest
       , t.previous_incomplete_zkapp_updates )
 end
 
 type t =
   { scan_state :
-      (Ledger_proof_with_hash.t, Transaction_with_witness.t) Parallel_scan_new.t
+      (Ledger_proof_with_hash.t, Transaction_with_witness.t) Parallel_scan.t
   ; previous_incomplete_zkapp_updates :
       Transaction_with_witness.t list
       * [ `Border_block_continued_in_the_next_tree of bool ]
@@ -424,7 +420,7 @@ module Make_statement_scanner (Verifier : sig
     -> unit Or_error.t Deferred.Or_error.t
 end) =
 struct
-  module Fold = Parallel_scan_new.Make_foldable (Deferred)
+  module Fold = Parallel_scan.Make_foldable (Deferred)
 
   module Timer = struct
     module Info = struct
@@ -536,7 +532,7 @@ struct
     in
     let fold_step_a (acc_statement, acc_pc) job =
       match job with
-      | Parallel_scan_new.Merge_node.Part merge ->
+      | Parallel_scan.Merge_node.Part merge ->
           let statement = merge_to_statement merge in
           let%map acc_stmt =
             merge_acc ~proofs:[ merge ] acc_statement statement
@@ -599,10 +595,10 @@ struct
     in
     let fold_step_d (acc_statement, acc_pc) job =
       match job with
-      | Parallel_scan_new.Base_node.Empty ->
+      | Parallel_scan.Base_node.Empty ->
           return (acc_statement, acc_pc)
       | Full
-          { status = Parallel_scan_new.Job_status.Done
+          { status = Parallel_scan.Job_status.Done
           ; job = (transaction : Transaction_with_witness.t)
           ; _
           } ->
@@ -745,7 +741,7 @@ let statement_of_job : job -> Transaction_snark.Statement.t option = function
 
 let create ~work_delay ~transaction_capacity_log_2 : t =
   let k = Int.pow 2 transaction_capacity_log_2 in
-  { scan_state = Parallel_scan_new.empty ~delay:work_delay ~max_base_jobs:k
+  { scan_state = Parallel_scan.empty ~delay:work_delay ~max_base_jobs:k
   ; previous_incomplete_zkapp_updates =
       ([], `Border_block_continued_in_the_next_tree false)
   }
@@ -873,14 +869,14 @@ let extract_txn_and_global_slot (txn_with_witness : Transaction_with_witness.t)
 
 let latest_ledger_proof t =
   let%map.Option { data = proof; _ }, _ =
-    Parallel_scan_new.last_emitted_value t.scan_state
+    Parallel_scan.last_emitted_value t.scan_state
   in
   proof
 
 let latest_ledger_proof_and_txs' t =
   let open Option.Let_syntax in
   let%map proof, txns_with_witnesses =
-    Parallel_scan_new.last_emitted_value t.scan_state
+    Parallel_scan.last_emitted_value t.scan_state
   in
   let ( previous_incomplete
       , `Border_block_continued_in_the_next_tree continued_in_next_tree ) =
@@ -935,12 +931,12 @@ let staged_transactions t =
   let txns =
     if continued_in_next_tree then
       Transactions_ordered.first_and_second_pass_transactions_per_forest
-        (Parallel_scan_new.pending_data t.scan_state)
+        (Parallel_scan.pending_data t.scan_state)
         ~previous_incomplete
     else
       let txns =
         Transactions_ordered.first_and_second_pass_transactions_per_forest
-          (Parallel_scan_new.pending_data t.scan_state)
+          (Parallel_scan.pending_data t.scan_state)
           ~previous_incomplete:[]
       in
       if List.is_empty previous_incomplete then txns
@@ -1270,17 +1266,17 @@ let get_staged_ledger_async ?async_batch_size ~ledger ~get_protocol_state
     ~ledger ~get_protocol_state ~apply_first_pass ~apply_second_pass
     ~apply_first_pass_sparse_ledger ~signature_kind
 
-let free_space t = Parallel_scan_new.free_space t.scan_state
+let free_space t = Parallel_scan.free_space t.scan_state
 
 (*This needs to be grouped like in work_to_do function. Group of two jobs per list and not group of two jobs after concatenating the lists*)
-let all_jobs t = Parallel_scan_new.all_jobs t.scan_state
+let all_jobs t = Parallel_scan.all_jobs t.scan_state
 
-let next_on_new_tree t = Parallel_scan_new.next_on_new_tree t.scan_state
+let next_on_new_tree t = Parallel_scan.next_on_new_tree t.scan_state
 
 let partition_if_overflowing t =
   let bundle_count work_count = (work_count + 1) / 2 in
   let { Space_partition.first = slots, job_count; second } =
-    Parallel_scan_new.partition_if_overflowing t.scan_state
+    Parallel_scan.partition_if_overflowing t.scan_state
   in
   { Space_partition.first = (slots, bundle_count job_count)
   ; second =
@@ -1294,7 +1290,7 @@ let snark_job_list_json t =
       Ledger_proof.Cached.statement a.data
     in
     let fd (d : Transaction_with_witness.t) = d.statement in
-    Parallel_scan_new.job_views t.scan_state ~f_merge:fa ~f_base:fd
+    Parallel_scan.job_views t.scan_state ~f_merge:fa ~f_base:fd
   in
   Yojson.Safe.to_string
     (`List
@@ -1314,17 +1310,17 @@ let all_work_statements_exn t : Transaction_snark_work.Statement.t list =
                  stmt ) ) )
 
 let required_work_pairs t ~slots =
-  let work_list = Parallel_scan_new.jobs_for_slots t.scan_state ~slots in
+  let work_list = Parallel_scan.jobs_for_slots t.scan_state ~slots in
   List.concat_map work_list ~f:(fun works -> One_or_two.group_list works)
 
 let k_work_pairs_for_new_diff t ~k =
-  let work_list = Parallel_scan_new.jobs_for_next_update t.scan_state in
+  let work_list = Parallel_scan.jobs_for_next_update t.scan_state in
   List.(
     take (concat_map work_list ~f:(fun works -> One_or_two.group_list works)) k)
 
 (*Always the same pairing of jobs*)
 let work_statements_for_new_diff t : Transaction_snark_work.Statement.t list =
-  let work_list = Parallel_scan_new.jobs_for_next_update t.scan_state in
+  let work_list = Parallel_scan.jobs_for_next_update t.scan_state in
   List.concat_map work_list ~f:(fun work_seq ->
       One_or_two.group_list
         (List.map work_seq ~f:(fun job ->
@@ -1336,7 +1332,7 @@ let work_statements_for_new_diff t : Transaction_snark_work.Statement.t list =
 
 let single_spec_of_job ~get_state :
     job -> Snark_work_lib.Spec.Single.t Or_error.t = function
-  | Parallel_scan_new.Available_job.Base
+  | Parallel_scan.Available_job.Base
       { transaction_with_status
       ; statement
       ; state_hash
@@ -1399,10 +1395,10 @@ let all_work_pairs t
    business, which is why it no longer needs to know that Prometheus exists. *)
 let update_metrics t =
   Or_error.try_with (fun () ->
-      List.iteri (Parallel_scan_new.metrics t.scan_state)
+      List.iteri (Parallel_scan.metrics t.scan_state)
         ~f:(fun
              i
-             { Parallel_scan_new.Tree_metrics.available_space
+             { Parallel_scan.Tree_metrics.available_space
              ; base_jobs_todo
              ; merge_jobs_todo
              }
@@ -1433,8 +1429,8 @@ let fill_work_and_enqueue_transactions t ~logger transactions work =
   in
   let work_list = List.concat_map ~f:deconstruct_work work in
   let%bind proof_opt, updated_scan_state =
-    Parallel_scan_new.update t.scan_state ~payload_digest
-      ~completed_jobs:work_list ~data:transactions
+    Parallel_scan.update t.scan_state ~payload_digest ~completed_jobs:work_list
+      ~data:transactions
   in
   [%log internal] "@metadata"
     ~metadata:
@@ -1734,9 +1730,9 @@ module Sync = struct
       | Base of Transaction_with_witness.t
 
     type nonrec t =
-      { skeleton : (string, string) Parallel_scan_new.t
+      { skeleton : (string, string) Parallel_scan.t
       ; trees_by_digest :
-          (string, (string, string) Parallel_scan_new.Tree.t) Hashtbl.t
+          (string, (string, string) Parallel_scan.Tree.t) Hashtbl.t
       ; manifest : Manifest.t
       ; payloads : (string, payload) Hashtbl.t
       }
@@ -1744,10 +1740,10 @@ module Sync = struct
     let create (t : scan_state) ~ledger_hash ~pending_coinbase =
       let payloads = Hashtbl.create (module String) in
       let note key data = Hashtbl.set payloads ~key ~data in
-      Parallel_scan_new.fold_chronological t.scan_state ~init:()
+      Parallel_scan.fold_chronological t.scan_state ~init:()
         ~f_merge:(fun () node ->
           match node with
-          | Parallel_scan_new.Merge_node.Empty ->
+          | Parallel_scan.Merge_node.Empty ->
               ()
           | Part x ->
               note x.hash (Merge x)
@@ -1756,11 +1752,11 @@ module Sync = struct
               note right.hash (Merge right) )
         ~f_base:(fun () node ->
           match node with
-          | Parallel_scan_new.Base_node.Empty ->
+          | Parallel_scan.Base_node.Empty ->
               ()
           | Full { job; _ } ->
               note job.hash (Base job) ) ;
-      Option.iter (Parallel_scan_new.last_emitted_value t.scan_state)
+      Option.iter (Parallel_scan.last_emitted_value t.scan_state)
         ~f:(fun (proof, data) ->
           note proof.hash (Merge proof) ;
           List.iter data ~f:(fun d -> note d.hash (Base d)) ) ;
@@ -1768,13 +1764,12 @@ module Sync = struct
         t.previous_incomplete_zkapp_updates
       in
       List.iter previous_incomplete ~f:(fun d -> note d.hash (Base d)) ;
-      let skeleton = Parallel_scan_new.skeleton t.scan_state ~payload_digest in
+      let skeleton = Parallel_scan.skeleton t.scan_state ~payload_digest in
       let trees_by_digest = Hashtbl.create (module String) in
       List.iter skeleton.trees ~f:(fun tree ->
           Hashtbl.set trees_by_digest
             ~key:
-              (Digestif.SHA256.to_raw_string
-                 (Parallel_scan_new.Tree.digest tree) )
+              (Digestif.SHA256.to_raw_string (Parallel_scan.Tree.digest tree))
             ~data:tree ) ;
       { skeleton
       ; trees_by_digest
@@ -2020,7 +2015,7 @@ module Sync = struct
       let%map scan_state =
         Parallel_scan_sync.Builder.finish t.inner ~merge_of_bytes ~base_of_bytes
       in
-      { Stored.scan_state = Parallel_scan_new.to_wire scan_state
+      { Stored.scan_state = Parallel_scan.to_wire scan_state
       ; previous_incomplete_zkapp_updates =
           ( incomplete
           , `Border_block_continued_in_the_next_tree
@@ -2044,8 +2039,8 @@ let write_all_proofs_to_disk ~signature_kind ~proof_cache_db
      payload digests — the cached and uncached representations carry the same
      [hash] — so the digests survive the change of representation. *)
   { scan_state =
-      Parallel_scan_new.of_wire uncached ~payload_digest:stable_payload_digest
-      |> Parallel_scan_new.map ~f_merge:f1
+      Parallel_scan.of_wire uncached ~payload_digest:stable_payload_digest
+      |> Parallel_scan.map ~f_merge:f1
            ~f_base:
              (Transaction_with_witness.write_all_proofs_to_disk ~signature_kind
                 ~proof_cache_db )
@@ -2066,9 +2061,9 @@ let read_all_proofs_from_disk
     Ledger_proof.Cached.read_proof_from_disk proof
   in
   let scan_state =
-    Parallel_scan_new.map ~f_merge:f1
+    Parallel_scan.map ~f_merge:f1
       ~f_base:Transaction_with_witness.read_all_proofs_from_disk cached
-    |> Parallel_scan_new.to_wire
+    |> Parallel_scan.to_wire
   in
   Stored.
     { scan_state
