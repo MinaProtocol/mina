@@ -418,7 +418,7 @@ let download_scan_state ~logger ~state_hash ~expected_staged_ledger_hash
   let%map protocol_states =
     match%bind fetch_one (Sync.Query.Protocol_states state_hash) with
     | Sync.Answer.Protocol_states states ->
-        return states
+        return (Array.to_list states)
     | _ ->
         Deferred.Or_error.error_string
           "peer answered a protocol states query with something else"
