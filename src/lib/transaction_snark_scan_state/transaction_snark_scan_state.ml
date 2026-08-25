@@ -1766,7 +1766,7 @@ module Sync = struct
       List.iter previous_incomplete ~f:(fun d -> note d.hash (Base d)) ;
       let skeleton = Parallel_scan.skeleton t.scan_state ~payload_digest in
       let trees_by_digest = Hashtbl.create (module String) in
-      List.iter skeleton.trees ~f:(fun tree ->
+      List.iter (Parallel_scan.trees skeleton) ~f:(fun tree ->
           Hashtbl.set trees_by_digest
             ~key:
               (Digestif.SHA256.to_raw_string (Parallel_scan.Tree.digest tree))

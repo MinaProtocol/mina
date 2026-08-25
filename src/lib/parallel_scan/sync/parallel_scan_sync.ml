@@ -23,6 +23,7 @@
 
 open Core_kernel
 open Parallel_scan
+module Tree = Parallel_scan.Private.Tree
 
 (* Digests travel as their raw bytes. The scan state's own [Hash.t] is a
    [Digestif] value, which is convenient in memory and awkward on a wire;
@@ -74,7 +75,10 @@ module Cursors = struct
   [@@deriving compare, equal, sexp]
 
   let of_tree (tree : _ Tree.t) =
-    { filled = tree.filled; level = tree.level; proved = tree.proved }
+    { filled = Parallel_scan.Private.Tree.filled tree
+    ; level = Parallel_scan.Private.Tree.level tree
+    ; proved = Parallel_scan.Private.Tree.proved tree
+    }
 end
 
 (** The whole forest in about two kilobytes: one digest and three integers per
@@ -114,26 +118,25 @@ module Manifest = struct
   [@@deriving sexp]
 
   let of_state (t : _ Parallel_scan.t) ~payload_digest =
-    { max_base_jobs = t.max_base_jobs
-    ; delay = t.delay
+    { max_base_jobs = Parallel_scan.Private.max_base_jobs t
+    ; delay = Parallel_scan.Private.delay t
     ; acc =
-        Option.map t.acc ~f:(fun (proof, data) ->
+        Option.map (Parallel_scan.Private.acc t) ~f:(fun (proof, data) ->
             ( payload_digest.Payload_digest.merge proof
             , List.map data ~f:payload_digest.Payload_digest.base ) )
     ; trees =
-        List.rev_map t.trees ~f:(fun tree ->
+        List.rev_map (Parallel_scan.Private.trees t) ~f:(fun tree ->
             (raw (Tree.digest tree), Cursors.of_tree tree) )
     }
 
   (** The commitment this manifest describes. Mirrors
       {!Parallel_scan.hash}; the [identity_digest] is because the manifest
       already holds payload digests rather than payloads. *)
-  let root t =
+  let root (t : t) =
     let acc_digest =
-      digest_of_acc ~payload_digest:identity_digest
-        (Option.map t.acc ~f:(fun (proof, data) -> (proof, data)))
+      Parallel_scan.Private.digest_of_acc ~payload_digest:identity_digest t.acc
     in
-    digest_fields
+    Parallel_scan.Private.digest_fields
       ( [ "scan_state"
         ; Int.to_string t.max_base_jobs
         ; Int.to_string t.delay
@@ -294,8 +297,12 @@ module Band = struct
     let depth = Tree.depth tree in
     let bottom = root.Address.level + height in
     let node ~absolute ~index =
-      if absolute = depth then Base tree.bases.(index)
-      else Merge tree.merges.(Tree.slot ~level:absolute ~index)
+      if absolute = depth then
+        Base (Parallel_scan.Private.Tree.bases tree).(index)
+      else
+        Merge
+          (Parallel_scan.Private.Tree.merges tree).(Tree.slot ~level:absolute
+                                                      ~index)
     in
     let nodes =
       Array.init (node_count ~height) ~f:(fun _ -> Merge Merge_node.Empty)
@@ -316,8 +323,9 @@ module Band = struct
         Array.init
           (1 lsl (height + 1))
           ~f:(fun index ->
-            raw tree.digests.(Tree.slot ~level:absolute ~index:(first + index))
-            )
+            raw
+              (Tree.digests tree).(Tree.slot ~level:absolute
+                                     ~index:(first + index)) )
     in
     { root; height; nodes; boundary }
 end
@@ -450,7 +458,7 @@ module Builder = struct
         let%bind () = Band.check_shape band ~depth:t.depth in
         let node_root = Band.root_digest band ~depth:t.depth in
         let recomputed =
-          digest_fields
+          Parallel_scan.Private.digest_fields
             [ "tree"
             ; Hash.to_raw_string node_root
             ; Int.to_string entry.cursors.filled
@@ -553,13 +561,11 @@ module Builder = struct
                |> Or_error.all
              in
              let tree =
-               { Tree.merges = Array.of_list merges
-               ; bases = Array.of_list bases
-               ; digests = Tree.empty_digests ~depth:t.depth
-               ; filled = entry.cursors.filled
-               ; level = entry.cursors.level
-               ; proved = entry.cursors.proved
-               }
+               Tree.create ~merges:(Array.of_list merges)
+                 ~bases:(Array.of_list bases)
+                 ~digests:(Tree.empty_digests ~depth:t.depth)
+                 ~filled:entry.cursors.filled ~level:entry.cursors.level
+                 ~proved:entry.cursors.proved
              in
              Tree.rebuilt tree ~payload_digest:identity_digest )
       |> Or_error.all
@@ -568,12 +574,10 @@ module Builder = struct
       Option.map t.manifest.acc ~f:(fun (proof, data) -> (proof, data))
     in
     let skeleton =
-      { trees = List.rev trees (* the manifest is oldest first *)
-      ; acc
-      ; acc_digest = digest_of_acc ~payload_digest:identity_digest acc
-      ; max_base_jobs = t.manifest.max_base_jobs
-      ; delay = t.manifest.delay
-      }
+      Parallel_scan.Private.create
+        ~trees:(List.rev trees) (* the manifest is oldest first *)
+        ~acc ~payload_digest:identity_digest
+        ~max_base_jobs:t.manifest.max_base_jobs ~delay:t.manifest.delay
     in
     let fetch of_bytes digest =
       of_bytes (Option.value_exn (Hashtbl.find_exn t.payloads digest))
@@ -621,7 +625,7 @@ let%test_module "sync" =
                 ()
             | Full { job; _ } ->
                 note (payload_digest.base job) (Int.to_string job) ) ;
-        Option.iter state.acc ~f:(fun (proof, data) ->
+        Option.iter (Parallel_scan.Private.acc state) ~f:(fun (proof, data) ->
             note (payload_digest.merge proof) (Int.to_string proof) ;
             List.iter data ~f:(fun d ->
                 note (payload_digest.base d) (Int.to_string d) ) ) ;
@@ -629,7 +633,8 @@ let%test_module "sync" =
 
       (* the manifest is oldest first; [trees] is newest first *)
       let tree t ~index =
-        List.nth_exn t.skeleton.trees (List.length t.skeleton.trees - 1 - index)
+        let trees = Parallel_scan.Private.trees t.skeleton in
+        List.nth_exn trees (List.length trees - 1 - index)
 
       let band t ~index ~root ~height =
         Band.of_tree (tree t ~index) ~root ~height
@@ -691,9 +696,7 @@ let%test_module "sync" =
       for _ = 1 to blocks do
         let data = List.init max_base_jobs ~f:(fun i -> !counter + i) in
         counter := !counter + max_base_jobs ;
-        let work =
-          List.concat (work_for_next_update !t ~data_count:max_base_jobs)
-        in
+        let work = List.concat (jobs_for_slots !t ~slots:max_base_jobs) in
         let completed_jobs = List.map work ~f:job_done in
         let _, t' =
           Or_error.ok_exn (update !t ~payload_digest ~data ~completed_jobs)
@@ -721,7 +724,9 @@ let%test_module "sync" =
                     "synced state has a different commitment" (band_height : int)] ;
               [%test_eq: int list list] (pending_data state)
                 (pending_data synced) ;
-              [%test_eq: (int * int list) option] state.acc synced.acc ) )
+              [%test_eq: (int * int list) option]
+                (Parallel_scan.Private.acc state)
+                (Parallel_scan.Private.acc synced) ) )
 
     let%test_unit "a tampered manifest is rejected" =
       let state = populated ~max_base_jobs:4 ~delay:1 ~blocks:20 in
@@ -777,7 +782,8 @@ let%test_module "sync" =
       in
       let swap_boundary (band : Band.t) =
         let boundary = Array.copy band.boundary in
-        boundary.(0) <- raw (digest_fields [ "not the right digest" ]) ;
+        boundary.(0) <-
+          raw (Parallel_scan.Private.digest_fields [ "not the right digest" ]) ;
         { band with boundary }
       in
       let wrong_shape (band : Band.t) =
