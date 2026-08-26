@@ -955,6 +955,85 @@ let upgrade_old_config ~logger filename json =
       (* This error will get handled properly elsewhere, do nothing here. *)
       return json
 
+let%test_module "Genesis ledger cache" =
+  ( module struct
+    let logger = Logger.null ()
+
+    let constraint_constants =
+      Genesis_constants.For_unit_tests.Constraint_constants.t
+
+    (* [Sample_keypairs] puts the genesis winner first, so the unit test ledger
+       already contains it -- and [add_genesis_winner_account] is a no-op when
+       the winner is already the first account. Drop it, so that toggling the
+       flag genuinely changes the accounts this config describes. *)
+    let runtime_accounts =
+      lazy
+        (let module L = (val Genesis_ledger.for_unit_tests) in
+        List.map
+          (List.tl_exn (Lazy.force L.accounts))
+          ~f:(fun (sk, account) -> Accounts.Single.of_account account sk) )
+
+    let config ~add_genesis_winner : Runtime_config.Ledger.t =
+      { base = Accounts (Lazy.force runtime_accounts)
+      ; num_accounts = None
+      ; balances = []
+      ; hash = None
+      ; s3_data_hash = None
+      ; name = None
+      ; add_genesis_winner = Some add_genesis_winner
+      }
+
+    let load_root ~genesis_dir ~add_genesis_winner =
+      let%map packed, _config, _path =
+        Ledger.load ~proof_level:Check ~genesis_dir ~logger
+          ~constraint_constants ~genesis_backing_type:Stable_db
+          (config ~add_genesis_winner)
+        >>| Or_error.ok_exn
+      in
+      Mina_ledger.Ledger.merkle_root
+        (Lazy.force (Genesis_ledger.Packed.t packed))
+
+    let assert_roots_differ without_winner with_winner =
+      [%test_pred: Ledger_hash.t * Ledger_hash.t]
+        (fun (without_winner, with_winner) ->
+          not (Ledger_hash.equal without_winner with_winner) )
+        (without_winner, with_winner)
+
+    (* Baseline: the genesis winner account changes the contents of the ledger,
+       and so its root hash, the genesis state hash derived from it, and the
+       chain id derived from that. Two nodes that disagree on the flag are on
+       different chains. *)
+    let%test_unit "add_genesis_winner changes the ledger built from a config" =
+      Async.Thread_safe.block_on_async_exn (fun () ->
+          Mina_stdlib_unix.File_system.with_temp_dir
+            "/tmp/mina-genesis-ledger-cache-test" ~f:(fun dir ->
+              let%bind without_winner =
+                load_root ~genesis_dir:(dir ^/ "without")
+                  ~add_genesis_winner:false
+              in
+              let%map with_winner =
+                load_root ~genesis_dir:(dir ^/ "with") ~add_genesis_winner:true
+              in
+              assert_roots_differ without_winner with_winner ) )
+
+    (* A node that already has a cached ledger must not keep loading the old one
+       after the flag is toggled: it would silently run on a different chain id
+       than a node building the ledger fresh, with nothing in either node's logs
+       to say so. *)
+    let%test_unit "toggling add_genesis_winner is not masked by a cached ledger"
+        =
+      Async.Thread_safe.block_on_async_exn (fun () ->
+          Mina_stdlib_unix.File_system.with_temp_dir
+            "/tmp/mina-genesis-ledger-cache-test" ~f:(fun genesis_dir ->
+              let%bind without_winner =
+                load_root ~genesis_dir ~add_genesis_winner:false
+              in
+              let%map with_winner =
+                load_root ~genesis_dir ~add_genesis_winner:true
+              in
+              assert_roots_differ without_winner with_winner ) )
+  end )
+
 let%test_module "Account config test" =
   ( module struct
     let%test_unit "Runtime config <=> Account" =
