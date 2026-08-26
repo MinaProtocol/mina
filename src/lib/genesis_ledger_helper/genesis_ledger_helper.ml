@@ -105,9 +105,31 @@ module Ledger = struct
     in
     hash_filename hash ~ledger_name_prefix ~account_hash
 
+  (* Whether the genesis winner account is prepended to a ledger's accounts.
+     We allow configurations to explicitly override adding the genesis winner,
+     so that we can guarantee a certain ledger layout for integration tests.
+     If the configuration does not include this setting, we add the genesis
+     winner when we have [proof_level = Full] so that we can create a genesis
+     proof. For all other proof levels, we do not add the winner.
+
+     This is the single source of truth for that decision: it shapes the
+     contents of the generated ledger (see [add_genesis_winner_account]), so it
+     must also be part of the cache filename computed by [named_filename].
+     Otherwise two ledgers with different contents share a cache entry, and a
+     node with a pre-existing cache silently loads a different ledger -- and so
+     computes a different chain id -- than a node without one. *)
+  let add_genesis_winner ~(proof_level : Genesis_constants.Proof_level.t)
+      (config : Runtime_config.Ledger.t) =
+    match config.add_genesis_winner with
+    | Some add_genesis_winner ->
+        add_genesis_winner
+    | None ->
+        Genesis_constants.Proof_level.equal Full proof_level
+
   let named_filename
       ~(constraint_constants : Genesis_constants.Constraint_constants.t)
-      ~num_accounts ~balances ~ledger_name_prefix ?other_data name =
+      ~num_accounts ~balances ~add_genesis_winner ~ledger_name_prefix
+      ?other_data name =
     let str =
       String.concat
         [ Int.to_string constraint_constants.ledger_depth
@@ -120,6 +142,8 @@ module Ledger = struct
         ; (* Distinguish ledgers when the account record layout has changed. *)
           Bin_prot.Writer.to_string Mina_base.Account.Stable.Latest.bin_writer_t
             Mina_base.Account.empty
+        ; (* Distinguish ledgers that differ by the genesis winner account. *)
+          Bool.to_string add_genesis_winner
         ]
     in
     let str =
@@ -133,8 +157,8 @@ module Ledger = struct
     Runtime_config.Accounts.to_yojson accounts
     |> Yojson.Safe.to_string |> Blake2.digest_string |> Blake2.to_hex
 
-  let find_tar ~logger ~genesis_dir ~constraint_constants ~ledger_name_prefix
-      (config : Runtime_config.Ledger.t) =
+  let find_tar ~logger ~genesis_dir ~constraint_constants ~add_genesis_winner
+      ~ledger_name_prefix (config : Runtime_config.Ledger.t) =
     let search_paths = Cache_dir.possible_paths "" @ [ genesis_dir ] in
     let ledger_file_exists filename path =
       let full_path = path ^/ filename in
@@ -209,7 +233,7 @@ module Ledger = struct
           let named_filename =
             named_filename ~constraint_constants
               ~num_accounts:config.num_accounts ~balances:config.balances
-              ~ledger_name_prefix ?other_data name
+              ~add_genesis_winner ~ledger_name_prefix ?other_data name
           in
           search_local_and_s3 named_filename
         in
@@ -218,7 +242,7 @@ module Ledger = struct
             let named_filename =
               named_filename ~constraint_constants
                 ~num_accounts:config.num_accounts ~balances:config.balances
-                ~ledger_name_prefix name
+                ~add_genesis_winner ~ledger_name_prefix name
             in
             search_local named_filename
         | Accounts accounts, _ ->
@@ -301,22 +325,7 @@ module Ledger = struct
     in
 
     let add_genesis_winner_account accounts =
-      (* We allow configurations to explicitly override adding the genesis
-         winner, so that we can guarantee a certain ledger layout for
-         integration tests.
-         If the configuration does not include this setting, we add the
-         genesis winner when we have [proof_level = Full] so that we can
-         create a genesis proof. For all other proof levels, we do not add
-         the winner.
-      *)
-      let add_genesis_winner_account =
-        match config.add_genesis_winner with
-        | Some add_genesis_winner ->
-            add_genesis_winner
-        | None ->
-            Genesis_constants.Proof_level.equal Full proof_level
-      in
-      if add_genesis_winner_account then
+      if add_genesis_winner ~proof_level config then
         let genesis_winner_pk, _ =
           Mina_state.Consensus_state_hooks.genesis_winner
         in
@@ -376,8 +385,8 @@ module Ledger = struct
       let logger = logger
     end) )
 
-  let report_no_genesis_ledger ~constraint_constants ~ledger_name_prefix ~logger
-      ~(config : Runtime_config.Ledger.t) () =
+  let report_no_genesis_ledger ~constraint_constants ~add_genesis_winner
+      ~ledger_name_prefix ~logger ~(config : Runtime_config.Ledger.t) () =
     match config.base with
     | Accounts _ ->
         assert false
@@ -393,7 +402,8 @@ module Ledger = struct
     | Named ledger_name ->
         let ledger_filename =
           named_filename ~constraint_constants ~num_accounts:config.num_accounts
-            ~balances:config.balances ~ledger_name_prefix ledger_name
+            ~balances:config.balances ~add_genesis_winner ~ledger_name_prefix
+            ledger_name
         in
         [%log error]
           "Bad config $config: $ledger named $ledger_name is not built in, and \
@@ -420,6 +430,34 @@ module Ledger = struct
      of direct unpacked genesis ledger loading, or remove this *)
   [@@warning "-37"]
 
+  (* Check a ledger loaded from a cached tar file against the root hash the
+     config expects, so that a cache entry whose contents do not match the
+     config it was looked up with fails loudly instead of silently starting a
+     divergent chain. *)
+  let verify_expected_root_hash ~(config : Runtime_config.Ledger.t) ~logger
+      ~path ledger_root =
+    match Option.map config.hash ~f:Ledger_hash.of_base58_check_exn with
+    | Some expected_merkle_root ->
+        if not (Ledger_hash.equal ledger_root expected_merkle_root) then (
+          [%log error]
+            "Ledger root hash $root_hash loaded from $path does not match root \
+             hash expected from the config file: $expected_root_hash"
+            ~metadata:
+              [ ("root_hash", Ledger_hash.to_yojson ledger_root)
+              ; ("path", `String path)
+              ; ( "expected_root_hash"
+                , Ledger_hash.to_yojson expected_merkle_root )
+              ] ;
+          failwith "Ledger root mismatch" )
+    | None ->
+        [%log warn]
+          "Config file did not specify expected hash for ledger loaded from \
+           $path"
+          ~metadata:
+            [ ("path", `String path)
+            ; ("root_hash", Ledger_hash.to_yojson ledger_root)
+            ]
+
   let load_extracted_ledger ~(config : Runtime_config.Ledger.t) ~logger
       ~(constraint_constants : Genesis_constants.Constraint_constants.t)
       ~extracted_path ~genesis_backing_type : Genesis_ledger.Packed.t =
@@ -434,32 +472,8 @@ module Ledger = struct
              Root_ledger.create ~logger ~config:genesis_config
                ~depth:constraint_constants.ledger_depth ()
            in
-           let ledger_root = Root_ledger.merkle_root ledger in
-           let expected_merkle_root =
-             Option.map config.hash ~f:Ledger_hash.of_base58_check_exn
-           in
-           ( match expected_merkle_root with
-           | Some expected_merkle_root ->
-               if not (Ledger_hash.equal ledger_root expected_merkle_root) then (
-                 [%log error]
-                   "Ledger root hash $root_hash loaded from $path does not \
-                    match root hash expected from the config file: \
-                    $expected_root_hash"
-                   ~metadata:
-                     [ ("root_hash", Ledger_hash.to_yojson ledger_root)
-                     ; ("path", `String extracted_path)
-                     ; ( "expected_root_hash"
-                       , Ledger_hash.to_yojson expected_merkle_root )
-                     ] ;
-                 failwith "Ledger root mismatch" )
-           | None ->
-               [%log warn]
-                 "Config file did not specify expected hash for ledger loaded \
-                  from $path"
-                 ~metadata:
-                   [ ("path", `String extracted_path)
-                   ; ("root_hash", Ledger_hash.to_yojson ledger_root)
-                   ] ) ;
+           verify_expected_root_hash ~config ~logger ~path:extracted_path
+             (Root_ledger.merkle_root ledger) ;
            ledger )
 
       let depth = constraint_constants.ledger_depth
@@ -467,8 +481,9 @@ module Ledger = struct
 
   let load_ledger_by_spec ~genesis_dir ~logger
       ~(constraint_constants : Genesis_constants.Constraint_constants.t)
-      ~ledger_name_prefix ~(load_ledger_spec : load_ledger_spec)
-      ~genesis_backing_type ~(config : Runtime_config.Ledger.t) =
+      ~add_genesis_winner ~ledger_name_prefix
+      ~(load_ledger_spec : load_ledger_spec) ~genesis_backing_type
+      ~(config : Runtime_config.Ledger.t) =
     match load_ledger_spec with
     | AccountsOnly { accounts } -> (
         let packed =
@@ -504,7 +519,7 @@ module Ledger = struct
               genesis_dir
               ^/ named_filename ~constraint_constants
                    ~num_accounts:config.num_accounts ~balances:config.balances
-                   ~ledger_name_prefix ?other_data name
+                   ~add_genesis_winner ~ledger_name_prefix ?other_data name
             in
             (* Delete the file if it already exists. *)
             let%bind () =
@@ -546,6 +561,13 @@ module Ledger = struct
             let logger = logger
           end) )
         in
+        (* [Genesis_ledger.Make] ignores [accounts] when the ledger is backed by
+           a directory, so the cached tar is what actually gets loaded here.
+           Check it against the config rather than trusting the cache key. *)
+        Option.iter config.hash ~f:(fun (_ : string) ->
+            verify_expected_root_hash ~config ~logger ~path:extracted_path
+              (Mina_ledger.Ledger.merkle_root
+                 (Lazy.force (Genesis_ledger.Packed.t packed)) ) ) ;
         (packed, config, extracted_path)
     | Extracted { extracted_path } ->
         let packed =
@@ -580,13 +602,14 @@ module Ledger = struct
       ~genesis_backing_type ?(ledger_name_prefix = "genesis_ledger")
       ?overwrite_version (config : Runtime_config.Ledger.t) =
     Monitor.try_with_join_or_error ~here:[%here] (fun () ->
+        let add_genesis_winner = add_genesis_winner ~proof_level config in
         let padded_accounts_opt =
           padded_accounts_from_runtime_config_opt ~logger ~proof_level
             ~ledger_name_prefix ?overwrite_version config
         in
         let%bind tar_file =
           find_tar ~logger ~genesis_dir ~constraint_constants
-            ~ledger_name_prefix config
+            ~add_genesis_winner ~ledger_name_prefix config
         in
         let extracted_path_of_tar_file tar_file =
           let extracted_folder =
@@ -600,7 +623,7 @@ module Ledger = struct
               return
               @@ Error
                    (report_no_genesis_ledger ~constraint_constants
-                      ~ledger_name_prefix ~logger ~config () )
+                      ~add_genesis_winner ~ledger_name_prefix ~logger ~config () )
           | Some tar_file, Some accounts ->
               let extracted_path = extracted_path_of_tar_file tar_file in
               Deferred.Or_error.return
@@ -612,7 +635,8 @@ module Ledger = struct
               Deferred.Or_error.return (Tar { tar_file; extracted_path })
         in
         load_ledger_by_spec ~genesis_dir ~logger ~constraint_constants
-          ~ledger_name_prefix ~config ~load_ledger_spec ~genesis_backing_type )
+          ~add_genesis_winner ~ledger_name_prefix ~config ~load_ledger_spec
+          ~genesis_backing_type )
 end
 
 module Epoch_data = struct
@@ -1032,6 +1056,55 @@ let%test_module "Genesis ledger cache" =
                 load_root ~genesis_dir ~add_genesis_winner:true
               in
               assert_roots_differ without_winner with_winner ) )
+  end )
+
+let%test_module "Genesis ledger cache filename" =
+  ( module struct
+    let config ?add_genesis_winner () : Runtime_config.Ledger.t =
+      { base = Named "test"
+      ; num_accounts = None
+      ; balances = []
+      ; hash = None
+      ; s3_data_hash = None
+      ; name = Some "test"
+      ; add_genesis_winner
+      }
+
+    let filename ~proof_level config =
+      Ledger.named_filename
+        ~constraint_constants:
+          Genesis_constants.For_unit_tests.Constraint_constants.t
+        ~num_accounts:config.Runtime_config.Ledger.num_accounts
+        ~balances:config.balances
+        ~add_genesis_winner:(Ledger.add_genesis_winner ~proof_level config)
+        ~ledger_name_prefix:"genesis_ledger" "test"
+
+    (* Regression test: the genesis winner account changes the contents of the
+       generated ledger, so ledgers that differ by it must not share a cache
+       entry. Two nodes that disagree here compute different chain ids. *)
+    let%test_unit "add_genesis_winner distinguishes cache filenames" =
+      let with_winner =
+        filename ~proof_level:Check (config ~add_genesis_winner:true ())
+      in
+      let without_winner =
+        filename ~proof_level:Check (config ~add_genesis_winner:false ())
+      in
+      [%test_pred: string * string]
+        (fun (a, b) -> not (String.equal a b))
+        (with_winner, without_winner)
+
+    (* The flag defaults to [proof_level = Full], so the proof level alone can
+       change the ledger's contents even when the config is untouched. *)
+    let%test_unit "unset add_genesis_winner tracks the proof level" =
+      let full = filename ~proof_level:Full (config ()) in
+      let check = filename ~proof_level:Check (config ()) in
+      [%test_pred: string * string]
+        (fun (a, b) -> not (String.equal a b))
+        (full, check) ;
+      [%test_eq: string] full
+        (filename ~proof_level:Full (config ~add_genesis_winner:true ())) ;
+      [%test_eq: string] check
+        (filename ~proof_level:Check (config ~add_genesis_winner:false ()))
   end )
 
 let%test_module "Account config test" =
