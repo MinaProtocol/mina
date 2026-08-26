@@ -1370,29 +1370,41 @@ module T = struct
   module Resources = struct
     module Discarded = struct
       type t =
-        { commands_rev : User_command.Valid.t Sequence.t
-        ; completed_work : Transaction_snark_work.Checked.t Sequence.t
+        { commands_rev_of_discard_order : User_command.Valid.t list
+              (* Discarded commands, most recently discarded first.
+                 [commands_in_discard_order] restores the order in which they
+                 were discarded. *)
+        ; completed_work : Transaction_snark_work.Checked.t list
+              (* Discarded work bundles, most recently discarded first. This is
+                 the order in which [incr_coinbase_part_by] takes them back. *)
         }
 
       let add_user_command t uc =
         { t with
-          commands_rev = Sequence.append t.commands_rev (Sequence.singleton uc)
+          commands_rev_of_discard_order = uc :: t.commands_rev_of_discard_order
         }
 
       let add_completed_work t cw =
-        { t with
-          completed_work =
-            Sequence.append (Sequence.singleton cw) t.completed_work
-        }
+        { t with completed_work = cw :: t.completed_work }
+
+      let commands_in_discard_order t = List.rev t.commands_rev_of_discard_order
     end
 
     type t =
       { max_space : int (*max space available currently*)
       ; max_jobs : int
             (*Required amount of work for max_space that can be purchased*)
-      ; commands_rev : User_command.Valid.t Sequence.t
-      ; completed_work_rev : Transaction_snark_work.Checked.t Sequence.t
+      ; commands_rev : User_command.Valid.t list
+      ; commands_count : int (*[List.length commands_rev]*)
+      ; commands_fee_sum : Fee.t Or_error.t
+            (*[command_fees commands_rev], maintained incrementally*)
+      ; completed_work_rev : Transaction_snark_work.Checked.t list
+      ; completed_work_count : int (*[List.length completed_work_rev]*)
       ; fee_transfers : Fee.t Public_key.Compressed.Map.t
+      ; other_prover_count : int
+            (*number of [fee_transfers] keys other than [receiver_pk]*)
+      ; other_prover_fees : Fee.t Or_error.t
+            (*fees in [fee_transfers] owed to provers other than [receiver_pk]*)
       ; add_coinbase : bool
       ; coinbase : Coinbase.Fee_transfer.t Staged_ledger_diff.At_most_two.t
       ; supercharge_coinbase : bool
@@ -1413,10 +1425,9 @@ module T = struct
         Fee.(fee > Fee.zero)
         (Coinbase.Fee_transfer.create ~receiver_pk ~fee)
 
-    let cheapest_two_work (works : Transaction_snark_work.Checked.t Sequence.t)
-        =
+    let cheapest_two_work (works : Transaction_snark_work.Checked.t list) =
       let open Transaction_snark_work.Checked in
-      Sequence.fold works ~init:(None, None) ~f:(fun (w1, w2) w ->
+      List.fold works ~init:(None, None) ~f:(fun (w1, w2) w ->
           match (w1, w2) with
           | None, _ ->
               (Some w, None)
@@ -1430,13 +1441,13 @@ module T = struct
 
     let coinbase_work
         ~(constraint_constants : Genesis_constants.Constraint_constants.t)
-        ?(is_two = false) (works : Transaction_snark_work.Checked.t Sequence.t)
+        ?(is_two = false) (works : Transaction_snark_work.Checked.t list)
         ~is_coinbase_receiver_new ~supercharge_coinbase =
       let open Option.Let_syntax in
       let min1, min2 = cheapest_two_work works in
       let diff ws ws' =
-        Sequence.filter ws ~f:(fun w ->
-            Sequence.mem ws'
+        List.filter ws ~f:(fun w ->
+            List.mem ws'
               (Transaction_snark_work.Checked.statement w)
               ~equal:Transaction_snark_work.Statement.equal
             |> not )
@@ -1465,7 +1476,7 @@ module T = struct
                 Staged_ledger_diff.At_most_two.Two
                   (Option.map (coinbase_ft w) ~f:(fun ft -> (ft, None)))
               in
-              Some (cb, diff works (Sequence.of_list [ stmt w ]))
+              Some (cb, diff works [ stmt w ])
             else
               let cb = Staged_ledger_diff.At_most_two.Two None in
               Some (cb, works)
@@ -1488,7 +1499,7 @@ module T = struct
                    the transaction fees. So having it as coinbase ft will at least
                    reduce the slots occupied by fee transfers *)
               in
-              (cb, diff works (Sequence.of_list [ stmt w1; stmt w2 ]))
+              (cb, diff works [ stmt w1; stmt w2 ])
             else if
               Amount.(of_fee (Transaction_snark_work.Checked.fee w1) <= budget)
             then
@@ -1496,7 +1507,7 @@ module T = struct
                 Staged_ledger_diff.At_most_two.Two
                   (Option.map (coinbase_ft w1) ~f:(fun ft -> (ft, None)))
               in
-              (cb, diff works (Sequence.of_list [ stmt w1 ]))
+              (cb, diff works [ stmt w1 ])
             else
               let cb = Staged_ledger_diff.At_most_two.Two None in
               (cb, works)
@@ -1505,22 +1516,29 @@ module T = struct
             if Amount.(of_fee (Transaction_snark_work.Checked.fee w) <= budget)
             then
               let cb = Staged_ledger_diff.At_most_two.One (coinbase_ft w) in
-              (cb, diff works (Sequence.of_list [ stmt w ]))
+              (cb, diff works [ stmt w ])
             else
               let cb = Staged_ledger_diff.At_most_two.One None in
               (cb, works) )
 
-    let init_coinbase_and_fee_transfers ~constraint_constants cw_seq
+    let cw_unchecked work = List.map work ~f:Transaction_snark_work.forget
+
+    (* The fee transfers owed to the provers of [rem_cw], as an association
+       list. Provers may occur more than once. *)
+    let singles_of_remaining_work rem_cw =
+      List.filter_map (cw_unchecked rem_cw)
+        ~f:(fun { Transaction_snark_work.fee; prover; _ } ->
+          if Fee.equal fee Fee.zero then None else Some (prover, fee) )
+      |> List.rev
+
+    let init_coinbase_and_fee_transfers ~constraint_constants cw_list
         ~add_coinbase ~job_count ~slots ~is_coinbase_receiver_new
         ~supercharge_coinbase =
-      let cw_unchecked work =
-        Sequence.map work ~f:Transaction_snark_work.forget
-      in
       let coinbase, rem_cw =
         match
           ( add_coinbase
-          , coinbase_work ~constraint_constants cw_seq ~is_coinbase_receiver_new
-              ~supercharge_coinbase )
+          , coinbase_work ~constraint_constants cw_list
+              ~is_coinbase_receiver_new ~supercharge_coinbase )
         with
         | true, Some (ft, rem_cw) ->
             (ft, rem_cw)
@@ -1529,36 +1547,47 @@ module T = struct
             if job_count = 0 || slots - job_count >= 1 then
               (* Either no jobs are required or there is a free slot that can be
                  filled without having to include any work *)
-              (One None, cw_seq)
-            else (Zero, cw_seq)
+              (One None, cw_list)
+            else (Zero, cw_list)
         | _ ->
-            (Zero, cw_seq)
+            (Zero, cw_list)
       in
-      let rem_cw = cw_unchecked rem_cw in
-      let singles =
-        Sequence.filter_map rem_cw
-          ~f:(fun { Transaction_snark_work.fee; prover; _ } ->
-            if Fee.equal fee Fee.zero then None else Some (prover, fee) )
-        |> Sequence.to_list_rev
-      in
-      (coinbase, singles)
+      (coinbase, singles_of_remaining_work rem_cw)
+
+    let command_fees commands =
+      sum_fees commands ~f:(fun t -> User_command.(fee (forget_check t)))
+
+    let count_other_provers ~receiver_pk fee_transfers =
+      Public_key.Compressed.Map.counti fee_transfers ~f:(fun ~key ~data:_ ->
+          not (Public_key.Compressed.equal receiver_pk key) )
+
+    let sum_other_prover_fees ~receiver_pk fee_transfers =
+      let open Or_error.Let_syntax in
+      Public_key.Compressed.Map.fold fee_transfers ~init:(Ok Fee.zero)
+        ~f:(fun ~key ~data fees ->
+          let%bind others = fees in
+          if Public_key.Compressed.equal receiver_pk key then Ok others
+          else option "Fee overflow" (Fee.add others data) )
+
+    (* Install a new [fee_transfers] map, refreshing the quantities derived
+       from it. *)
+    let set_fee_transfers t fee_transfers =
+      { t with
+        fee_transfers
+      ; other_prover_count =
+          count_other_provers ~receiver_pk:t.receiver_pk fee_transfers
+      ; other_prover_fees =
+          sum_other_prover_fees ~receiver_pk:t.receiver_pk fee_transfers
+      }
 
     let init ~constraint_constants (uc_seq : User_command.Valid.t Sequence.t)
         (cw_seq : Transaction_snark_work.Checked.t Sequence.t)
         (slots, job_count) ~receiver_pk ~add_coinbase ~supercharge_coinbase
         logger ~is_coinbase_receiver_new =
-      let seq_rev seq =
-        let rec go seq rev_seq =
-          match Sequence.next seq with
-          | Some (w, rem_seq) ->
-              go rem_seq (Sequence.append (Sequence.singleton w) rev_seq)
-          | None ->
-              rev_seq
-        in
-        go seq Sequence.empty
-      in
+      let uc_list = Sequence.to_list uc_seq in
+      let cw_list = Sequence.to_list cw_seq in
       let coinbase, singles =
-        init_coinbase_and_fee_transfers ~constraint_constants cw_seq
+        init_coinbase_and_fee_transfers ~constraint_constants cw_list
           ~add_coinbase ~job_count ~slots ~is_coinbase_receiver_new
           ~supercharge_coinbase
       in
@@ -1566,10 +1595,9 @@ module T = struct
         Public_key.Compressed.Map.of_alist_reduce singles ~f:(fun f1 f2 ->
             Option.value_exn (Fee.add f1 f2) )
       in
+      let commands_fee_sum = command_fees uc_list in
       let budget =
-        Or_error.map2
-          (sum_fees (Sequence.to_list uc_seq) ~f:(fun t ->
-               User_command.fee (User_command.forget_check t) ) )
+        Or_error.map2 commands_fee_sum
           (sum_fees
              (List.filter
                 ~f:(fun (k, _) ->
@@ -1580,18 +1608,21 @@ module T = struct
         |> Or_error.join
       in
       let discarded =
-        { Discarded.completed_work = Sequence.empty
-        ; commands_rev = Sequence.empty
-        }
+        { Discarded.completed_work = []; commands_rev_of_discard_order = [] }
       in
       { max_space = slots
       ; max_jobs = job_count
       ; commands_rev =
-          uc_seq
+          uc_list
           (* Completed work in reverse order for faster removal of proofs if
              budget doesn't suffice *)
-      ; completed_work_rev = seq_rev cw_seq
+      ; commands_count = List.length uc_list
+      ; commands_fee_sum
+      ; completed_work_rev = List.rev cw_list
+      ; completed_work_count = List.length cw_list
       ; fee_transfers
+      ; other_prover_count = count_other_provers ~receiver_pk fee_transfers
+      ; other_prover_fees = sum_other_prover_fees ~receiver_pk fee_transfers
       ; add_coinbase
       ; supercharge_coinbase
       ; receiver_pk
@@ -1603,9 +1634,6 @@ module T = struct
       }
 
     let reselect_coinbase_work ~constraint_constants t =
-      let cw_unchecked work =
-        Sequence.map work ~f:Transaction_snark_work.forget
-      in
       let coinbase, rem_cw =
         match t.coinbase with
         | Staged_ledger_diff.At_most_two.Zero ->
@@ -1634,35 +1662,16 @@ module T = struct
             | Some (fts', rem_cw) ->
                 (fts', rem_cw) )
       in
-      let rem_cw = cw_unchecked rem_cw in
-      let singles =
-        Sequence.filter_map rem_cw
-          ~f:(fun { Transaction_snark_work.fee; prover; _ } ->
-            if Fee.equal fee Fee.zero then None else Some (prover, fee) )
-        |> Sequence.to_list_rev
-      in
+      let singles = singles_of_remaining_work rem_cw in
       let fee_transfers =
         Public_key.Compressed.Map.of_alist_reduce singles ~f:(fun f1 f2 ->
             Option.value_exn (Fee.add f1 f2) )
       in
-      { t with coinbase; fee_transfers }
+      set_fee_transfers { t with coinbase } fee_transfers
 
     let rebudget t =
-      (* get the correct coinbase and calculate the fee transfers *)
-      let open Or_error.Let_syntax in
-      let payment_fees =
-        sum_fees (Sequence.to_list t.commands_rev) ~f:(fun t ->
-            User_command.(fee (forget_check t)) )
-      in
-      let prover_fee_others =
-        Public_key.Compressed.Map.fold t.fee_transfers ~init:(Ok Fee.zero)
-          ~f:(fun ~key ~data fees ->
-            let%bind others = fees in
-            if Public_key.Compressed.equal t.receiver_pk key then Ok others
-            else option "Fee overflow" (Fee.add others data) )
-      in
-      let revenue = payment_fees in
-      let cost = prover_fee_others in
+      let revenue = t.commands_fee_sum in
+      let cost = t.other_prover_fees in
       Or_error.map2 revenue cost ~f:(fun r c ->
           option "budget did not suffice" (Fee.sub r c) )
       |> Or_error.join
@@ -1687,23 +1696,15 @@ module T = struct
         | Ok b ->
             if Fee.(b > Fee.zero) then 1 else 0
       in
-      let other_provers =
-        Public_key.Compressed.Map.filter_keys t.fee_transfers
-          ~f:(Fn.compose not (Public_key.Compressed.equal t.receiver_pk))
-      in
-      let total_fee_transfer_pks =
-        Public_key.Compressed.Map.length other_provers + fee_for_self
-      in
-      Sequence.length t.commands_rev
-      + ((total_fee_transfer_pks + 1) / 2)
-      + coinbase_added t
+      let total_fee_transfer_pks = t.other_prover_count + fee_for_self in
+      t.commands_count + ((total_fee_transfer_pks + 1) / 2) + coinbase_added t
 
     let space_available res =
       let slots = slots_occupied res in
       res.max_space > slots
 
     let work_done t =
-      let no_of_proof_bundles = Sequence.length t.completed_work_rev in
+      let no_of_proof_bundles = t.completed_work_count in
       let slots = slots_occupied t in
       (* If more jobs were added in the previous diff then (
          t.max_space-t.max_jobs) slots can go for free in this diff *)
@@ -1718,7 +1719,7 @@ module T = struct
       let all_proofs = work_done t in
       (* enough work *)
       let slots = slots_occupied t in
-      let cw_count = Sequence.length t.completed_work_rev in
+      let cw_count = t.completed_work_count in
       let enough_work = cw_count >= slots in
       (* if there are no transactions then don't need any proofs *)
       all_proofs || slots = 0 || enough_work
@@ -1726,15 +1727,19 @@ module T = struct
     let available_space t = t.max_space - slots_occupied t
 
     let discard_last_work ~constraint_constants t =
-      match Sequence.next t.completed_work_rev with
-      | None ->
+      match t.completed_work_rev with
+      | [] ->
           (t, None)
-      | Some (w, rem_seq) ->
+      | w :: rem_work ->
           let to_be_discarded = Transaction_snark_work.forget w in
           let discarded = Discarded.add_completed_work t.discarded w in
           let new_t =
             reselect_coinbase_work ~constraint_constants
-              { t with completed_work_rev = rem_seq; discarded }
+              { t with
+                completed_work_rev = rem_work
+              ; completed_work_count = t.completed_work_count - 1
+              ; discarded
+              }
           in
           let budget =
             match t.budget with
@@ -1755,7 +1760,7 @@ module T = struct
               ~f:(fun _ -> ft.fee)
           in
           let new_t =
-            { t with coinbase; fee_transfers = updated_fee_transfers }
+            set_fee_transfers { t with coinbase } updated_fee_transfers
           in
           let updated_budget = rebudget new_t in
           { new_t with budget = updated_budget }
@@ -1774,35 +1779,53 @@ module T = struct
         | Two (Some (ft1, Some ft2)) ->
             update_fee_transfers t ft2 (One (Some ft1))
       in
-      match Sequence.next t.commands_rev with
-      | None ->
+      match t.commands_rev with
+      | [] ->
           (* If we have reached here then it means we couldn't afford a slot for
              coinbase as well *)
           (decr_coinbase t, None)
-      | Some (uc, rem_seq) ->
+      | uc :: rem_commands ->
           let discarded = Discarded.add_user_command t.discarded uc in
-          let new_t = { t with commands_rev = rem_seq; discarded } in
+          let uc_fee = User_command.(fee (forget_check uc)) in
+          let commands_fee_sum =
+            (* [sum_fees] folds from zero, so when the sum over [commands_rev]
+               did not overflow neither does the sum over any suffix of it, and
+               the suffix sum is exactly the total less the removed fee. The
+               fallbacks recompute so that the overflow cases stay exact. *)
+            match t.commands_fee_sum with
+            | Ok total -> (
+                match Fee.sub total uc_fee with
+                | Some rest ->
+                    Ok rest
+                | None ->
+                    command_fees rem_commands )
+            | Error _ ->
+                command_fees rem_commands
+          in
+          let new_t =
+            { t with
+              commands_rev = rem_commands
+            ; commands_count = t.commands_count - 1
+            ; commands_fee_sum
+            ; discarded
+            }
+          in
           let budget =
             match t.budget with
             | Ok b ->
-                option "Fee insufficient"
-                  (Fee.sub b User_command.(fee (forget_check uc)))
+                option "Fee insufficient" (Fee.sub b uc_fee)
             | _ ->
                 rebudget new_t
           in
           ({ new_t with budget }, Some uc)
 
-    let worked_more ~constraint_constants resources =
-      (* Is the work constraint satisfied even after discarding a work bundle?
-         We reach here after having more than enough work
-      *)
-      let more_work t =
-        let slots = slots_occupied t in
-        let cw_count = Sequence.length t.completed_work_rev in
-        cw_count > 0 && cw_count >= slots
-      in
-      let r, _ = discard_last_work ~constraint_constants resources in
-      more_work r
+    (* Is the work constraint satisfied after discarding a work bundle? Applied
+       to the result of [discard_last_work], having reached it with more than
+       enough work. *)
+    let more_work t =
+      let slots = slots_occupied t in
+      let cw_count = t.completed_work_count in
+      cw_count > 0 && cw_count >= slots
 
     let incr_coinbase_part_by ~constraint_constants t count =
       let open Or_error.Let_syntax in
@@ -1818,22 +1841,21 @@ module T = struct
       in
       let by_one res =
         let res' =
-          match Sequence.next res.discarded.completed_work with
+          match res.discarded.completed_work with
           (* Add one from the discarded list to [completed_work_rev] and then
              select a work from [completed_work_rev] except the one already used *)
-          | Some (w, rem_work) ->
+          | w :: rem_work ->
               let%map coinbase = incr res.coinbase in
               let res' =
                 { res with
-                  completed_work_rev =
-                    Sequence.append (Sequence.singleton w)
-                      res.completed_work_rev
+                  completed_work_rev = w :: res.completed_work_rev
+                ; completed_work_count = res.completed_work_count + 1
                 ; discarded = { res.discarded with completed_work = rem_work }
                 ; coinbase
                 }
               in
               reselect_coinbase_work ~constraint_constants res'
-          | None ->
+          | [] ->
               let%bind coinbase = incr res.coinbase in
               let res = { res with coinbase } in
               if work_done res then Ok res
@@ -1862,23 +1884,25 @@ module T = struct
         Resources.budget_sufficient resources
       then
         if Resources.space_constraint_satisfied resources then (resources, log)
-        else if Resources.worked_more ~constraint_constants resources then
-          (* There are too many fee_transfers(from the proofs) occupying the slots. discard one and check *)
-          let resources', work_opt =
+        else
+          let without_last_work =
             Resources.discard_last_work ~constraint_constants resources
           in
-          check_constraints_and_update ~constraint_constants resources'
-            (Option.value_map work_opt ~default:log ~f:(fun work ->
-                 Diff_creation_log.discard_completed_work `Extra_work work log )
-            )
-        else
-          (* Well, there's no space; discard a user command *)
-          let resources', uc_opt = Resources.discard_user_command resources in
-          check_constraints_and_update ~constraint_constants resources'
-            (Option.value_map uc_opt ~default:log ~f:(fun uc ->
-                 Diff_creation_log.discard_command `No_space
-                   (User_command.forget_check uc)
-                   log ) )
+          if Resources.more_work (fst without_last_work) then
+            (* There are too many fee_transfers(from the proofs) occupying the slots. discard one and check *)
+            let resources', work_opt = without_last_work in
+            check_constraints_and_update ~constraint_constants resources'
+              (Option.value_map work_opt ~default:log ~f:(fun work ->
+                   Diff_creation_log.discard_completed_work `Extra_work work log )
+              )
+          else
+            (* Well, there's no space; discard a user command *)
+            let resources', uc_opt = Resources.discard_user_command resources in
+            check_constraints_and_update ~constraint_constants resources'
+              (Option.value_map uc_opt ~default:log ~f:(fun uc ->
+                   Diff_creation_log.discard_command `No_space
+                     (User_command.forget_check uc)
+                     log ) )
       else
         (* insufficient budget; reduce the cost*)
         let resources', work_opt =
@@ -1909,8 +1933,8 @@ module T = struct
         in
         let log =
           Diff_creation_log.init
-            ~completed_work:init_resources.completed_work_rev
-            ~commands:init_resources.commands_rev
+            ~completed_work:(Sequence.of_list init_resources.completed_work_rev)
+            ~commands:(Sequence.of_list init_resources.commands_rev)
             ~coinbase:init_resources.coinbase ~partition
             ~available_slots:(fst slot_job_count)
             ~required_work_count:(snd slot_job_count)
@@ -1937,9 +1961,8 @@ module T = struct
                 Zero
           in
           (* We have to reverse here because we only know they work in THIS order *)
-          { Staged_ledger_diff.Pre_diff_one.commands =
-              Sequence.to_list_rev res.commands_rev
-          ; completed_works = Sequence.to_list_rev res.completed_work_rev
+          { Staged_ledger_diff.Pre_diff_one.commands = List.rev res.commands_rev
+          ; completed_works = List.rev res.completed_work_rev
           ; coinbase = to_at_most_one res.coinbase
           ; internal_command_statuses =
               [] (*updated later based on application result*)
@@ -1950,16 +1973,18 @@ module T = struct
         , User_command.Valid.t )
         Staged_ledger_diff.Pre_diff_two.t =
       (* We have to reverse here because we only know they work in THIS order *)
-      { commands = Sequence.to_list_rev res.commands_rev
-      ; completed_works = Sequence.to_list_rev res.completed_work_rev
+      { commands = List.rev res.commands_rev
+      ; completed_works = List.rev res.completed_work_rev
       ; coinbase = res.coinbase
       ; internal_command_statuses =
           [] (*updated later based on application result*)
       }
     in
     let end_log ((res : Resources.t), (log : Diff_creation_log.t)) =
-      Diff_creation_log.end_log log ~completed_work:res.completed_work_rev
-        ~commands:res.commands_rev ~coinbase:res.coinbase
+      Diff_creation_log.end_log log
+        ~completed_work:(Sequence.of_list res.completed_work_rev)
+        ~commands:(Sequence.of_list res.commands_rev)
+        ~coinbase:res.coinbase
     in
     let make_diff res1 = function
       | Some res2 ->
@@ -1968,11 +1993,11 @@ module T = struct
       | None ->
           ((pre_diff_with_two (fst res1), None), [ end_log res1 ])
     in
-    let has_no_commands (res : Resources.t) =
-      Sequence.length res.commands_rev = 0
-    in
+    let has_no_commands (res : Resources.t) = List.is_empty res.commands_rev in
     let second_pre_diff (res : Resources.t) partition ~add_coinbase work =
-      one_prediff ~constraint_constants work res.discarded.commands_rev
+      one_prediff ~constraint_constants work
+        (Sequence.of_list
+           (Resources.Discarded.commands_in_discard_order res.discarded) )
         ~receiver partition ~add_coinbase logger ~is_coinbase_receiver_new
         ~supercharge_coinbase `Second
     in
@@ -2028,7 +2053,7 @@ module T = struct
             ~supercharge_coinbase `First
         in
         let res1, res2 =
-          if Sequence.is_empty res.commands_rev then
+          if List.is_empty res.commands_rev then
             let res = try_with_coinbase () in
             (res, None)
           else
