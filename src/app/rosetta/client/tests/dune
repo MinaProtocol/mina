@@ -1,0 +1,25 @@
+;; Hermetic alcotest smoke tests for rosetta-client.
+;;
+;; These exercise only subcommands that don't need a running Rosetta
+;; server: --help for each subgroup and the clean error paths of the
+;; HTTP and JSON-validation code.
+
+(test
+ (name test_rosetta_client)
+ (libraries
+  ;; opam libraries
+  alcotest
+  core
+  core_kernel
+  core_unix
+  core_unix.filename_unix
+  core_unix.sys_unix
+  stdio
+  yojson
+  ;; mina libraries
+  rosetta_client)
+ (deps ../rosetta_client_cli.exe)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_version)))
