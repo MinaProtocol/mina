@@ -7,8 +7,8 @@ subcommand maps to a single endpoint, auto-injects
 `network_identifier`, and prints the response as JSON (pretty by default,
 `--compact` for one-line output).
 
-For readiness probes, a sibling `rosetta-healthcheck` binary built on the
-same library follows in a separate change.
+For readiness probes, see the sibling
+[`rosetta-healthcheck`](../healthcheck/README.md) binary.
 
 ## Subcommand tree
 
@@ -58,9 +58,9 @@ Every leaf command accepts:
 
 A flag always wins over its environment variable.  Export the variables
 to talk to the same server repeatedly without repeating the flags; the
-same three variables are read by every binary built on
-`Rosetta_client`.  Their fallback values live in
-`Rosetta_client.Defaults`, so those binaries cannot drift apart.
+same three variables are read by `rosetta-healthcheck`.  Their fallback
+values live in `Rosetta_client.Defaults`, so the two binaries cannot
+drift apart.
 
 ## Examples
 
@@ -99,11 +99,15 @@ produced by the `Rosetta_client.Errors` module and is guaranteed to:
 - Never dump multi-kilobyte HTTP bodies verbatim; Rosetta error envelopes
   are parsed and rendered as `HTTP <code>: <message>`.
 
-## Layout
+## Relationship to `rosetta-healthcheck`
 
-The HTTP client, the typed Rosetta API surface and the shared defaults
-live in the `rosetta_client` library (`src/lib/rosetta_client/`), so any
-other binary can reuse them.
+- **This tool** — Arbitrary Rosetta API calls for debugging, scripting, and
+  day-to-day operations.
+- **`rosetta-healthcheck`** — Composite readiness (`ready` / `wait`),
+  tip-recency / connectivity probes.
+
+Both binaries share the same underlying HTTP library
+(`src/lib/rosetta_client/`).
 
 Inside this binary, `rosetta_client_cli.ml` holds the flags, the
 subcommand tree and the output; `payload.ml` holds the decoding of the
