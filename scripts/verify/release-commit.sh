@@ -27,6 +27,7 @@ SCRIPTPATH="$( cd "$(dirname "$0")" ; pwd -P )"
 
 CLEAR='\033[0m'
 RED='\033[0;31m'
+YELLOW='\033[0;33m'
 GREEN='\033[0;32m'
 
 # Sourced for GITTAG / GITHASH / GITHASH_CONFIG, so the tag logic and the
@@ -34,6 +35,27 @@ GREEN='\033[0;32m'
 # recomputes them.
 # shellcheck disable=SC1090,SC1091
 source "${SCRIPTPATH}/../export-git-env-vars.sh"
+
+# Rehearsal escape hatch.
+#
+# A pipeline being tried out on a branch has no release tag on it, and this
+# check is the first thing that runs, so nothing downstream can be exercised
+# until it passes. MINA_RELEASE_ALLOW_UNTAGGED=1 turns the refusal into a
+# warning so the rest of the pipeline can be rehearsed.
+#
+# It says loudly what it costs, because the cost is easy to forget: the
+# version still falls back to the most recent tag reachable from HEAD, so the
+# packages this build produces claim a release they are not. That is tolerable
+# in a throwaway channel and is exactly the mislabelling this check exists to
+# stop everywhere else. It must never be set on a pipeline that publishes to
+# alpha, beta or stable.
+if [[ "${MINA_RELEASE_ALLOW_UNTAGGED:-0}" == "1" ]]; then
+    echo -e "${YELLOW}⚠️  MINA_RELEASE_ALLOW_UNTAGGED is set: the tag check is a warning.${CLEAR}" >&2
+    echo "    Version would be ${GITTAG}-${GITHASH}, taken from the most recent" >&2
+    echo "    tag reachable from HEAD rather than from a tag on this commit." >&2
+    echo "    Packages built here claim a release they are not. Rehearsal only." >&2
+    exit 0
+fi
 
 if [[ -n "${OVERRIDE_TAG:-}" ]]; then
     echo -e "${RED}❌ ERROR: OVERRIDE_TAG is set (${OVERRIDE_TAG}).${CLEAR}" >&2
