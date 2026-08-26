@@ -530,6 +530,9 @@ val finalize_other_proof :
     combines the verification keys so that only the active branch's key
     contributes to the verification.
 
+    Commitment arrays can have different chunk counts across branches. Missing
+    chunks are treated as zero contribution while selecting the active branch.
+
     {3 Implementation Details}
 
     The function handles optional commitments (for features like lookups)

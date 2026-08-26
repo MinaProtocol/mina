@@ -57,7 +57,16 @@ struct
 
   let f full_signature num_choices choices_length ~feature_flags ~num_chunks
       ~max_proofs_verified =
-    Common.wrap_domains
-      ~proofs_verified:(Nat.to_int (Nat.Add.n max_proofs_verified))
+    let { Full_signature.padded; maxes = _ } = full_signature in
+    let max_local_proofs_verified =
+      Vector.fold padded ~init:0 ~f:(fun acc local_maxes ->
+          Vector.fold local_maxes ~init:acc ~f:Int.max )
+    in
+    let proofs_verified =
+      Int.max
+        (Nat.to_int (Nat.Add.n max_proofs_verified))
+        max_local_proofs_verified
+    in
+    Common.wrap_domains ~proofs_verified
 end
 [@@warning "-60"]
