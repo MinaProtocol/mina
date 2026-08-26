@@ -2187,8 +2187,11 @@ let send_hardfork_config =
              | Some fork ->
                  printf "Sending the fork at %s (height %d) to the archive\n"
                    fork.state_hash fork.blockchain_length ) ) ;
+         (* One attempt. The daemon retries because it is on a heartbeat and
+            nobody is watching; someone running this by hand wants an answer,
+            not the same failure logged five times. *)
          match%map
-           Mina_lib.Archive_client.dispatch_hardfork_config ~logger
+           Mina_lib.Archive_client.dispatch_hardfork_config ~max_tries:1 ~logger
              archive_process_location ~config_json
          with
          | Ok () ->
