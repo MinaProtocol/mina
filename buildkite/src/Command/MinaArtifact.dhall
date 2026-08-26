@@ -408,6 +408,7 @@ let commonBuildEnvs =
                 , "PREFORK_LEGACY_VERSION=${spec.deb_legacy_version}"
                 , "PREFORK_GITHASH_CONFIG=${spec.deb_legacy_githash_config}"
                 , "MINA_DEB_RELEASE=${DebianChannel.effective spec.channel}"
+                , "MINA_APPS_CACHE_ROOT"
                 ]
               # BuildFlags.buildEnvs spec.buildFlags
               # spec.extraBuildEnvs
