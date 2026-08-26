@@ -1,10 +1,34 @@
 #!/usr/bin/env bash
 
-# Helper functions for Rosetta API sanity and load tests
+# Helper functions for Rosetta API sanity and load tests.
 
+# network_identifier.blockchain, for the raw curl calls below.  It is
+# "mina" on every Mina network, which is also what rosetta-client
+# defaults to, so rosetta-client calls do not pass it at all.
 readonly BLOCKCHAIN="mina"
 
 readonly DEFAULT_HEADERS=(--header "Accept: application/json" --header "Content-Type: application/json")
+
+# Seconds allowed for one rosetta-client request.  The curl calls these
+# tests used before had no timeout at all, and rosetta-load.sh exists to
+# put the server under load, where a /search/transactions sweep can take
+# minutes; the CLI's own 30s default would turn that load into a test
+# failure.  300s is the http_timeout the rosetta-cli audit config uses
+# against the same server.
+readonly ROSETTA_CLIENT_TIMEOUT="${ROSETTA_CLIENT_TIMEOUT:-300}"
+
+# Every test below shells out to rosetta-client, so check for it once,
+# here, while this file is being sourced.  It cannot be checked inside
+# the test functions: those run inside a command substitution, where an
+# exit leaves only the subshell and the message would be captured as the
+# response rather than shown.
+if ! command -v rosetta-client > /dev/null 2>&1; then
+    echo "❌  rosetta-client is not on PATH." >&2
+    echo "    It ships in the mina-rosetta Debian package as" >&2
+    echo "    /usr/local/bin/rosetta-client, or build it with:" >&2
+    echo "        dune build src/app/rosetta/client/rosetta_client_cli.exe" >&2
+    exit 1
+fi
 
 function assert() {
     local __response=$1
@@ -116,17 +140,33 @@ function wait_for_sync() {
     done
 }
 
-function test_network_status() {
+# Runs rosetta-client against the Rosetta instance named by the test data
+# array.  rosetta-client reads the connection details from the
+# environment, so no call site below repeats --rosetta-uri or --network.
+# The blockchain is left unset: rosetta-client already defaults it to
+# "mina".
+#
+# Arguments:
+#   $1 - test data array name (passed by reference)
+#   $@ - rosetta-client subcommand and its flags
+function rosetta_client() {
     declare -n __test_data=$1
-    assert "$(curl --no-progress-meter --request POST "${__test_data[address]}/network/status" "${DEFAULT_HEADERS[@]}" --data-raw "{\"network_identifier\":{\"blockchain\":\"$BLOCKCHAIN\",\"network\":\"${__test_data[id]}\"}}" | jq)" \
+    shift
+
+    MINA_ROSETTA_URI="${__test_data[address]}" \
+    MINA_ROSETTA_NETWORK="${__test_data[id]}" \
+        rosetta-client --timeout "${ROSETTA_CLIENT_TIMEOUT}" "$@"
+}
+
+function test_network_status() {
+    assert "$(rosetta_client "$1" network status --compact)" \
         '.sync_status.stage == "Synced"' \
         "   ✅  Rosetta is synced" \
         "   ❌  Rosetta is not synced"
 }
 
 function test_network_options() {
-    declare -n __test_data=$1
-    assert "$(curl --no-progress-meter --request POST "${__test_data[address]}/network/options" "${DEFAULT_HEADERS[@]}" --data-raw "{\"network_identifier\":{\"blockchain\":\"$BLOCKCHAIN\",\"network\":\"${__test_data[id]}\"}}" | jq)" \
+    assert "$(rosetta_client "$1" network options --compact)" \
         '.version.rosetta_version == "1.4.9"' \
         "   ✅  Rosetta Version is correct" \
         "   ❌  Invalid Rosetta Version (expected 1.4.9)"
@@ -134,7 +174,9 @@ function test_network_options() {
 
 function test_block() {
     declare -n __test_data=$1
-    assert "$(curl --no-progress-meter --request POST "${__test_data[address]}/block" "${DEFAULT_HEADERS[@]}" --data-raw "{\"network_identifier\":{\"blockchain\":\"$BLOCKCHAIN\",\"network\":\"${__test_data[id]}\"},\"block_identifier\":{\"hash\":\"${__test_data[block]}\"}}" | jq)" \
+    assert "$(rosetta_client "$1" block get \
+        --hash "${__test_data[block]}" \
+        --compact)" \
         ".block.block_identifier.hash == \"${__test_data[block]}\" " \
         "   ✅  Block hash correct" \
         "   ❌  Block hash incorrect or not found (expected ${__test_data[block]})"
@@ -142,7 +184,9 @@ function test_block() {
 
 function test_account_balance() {
     declare -n __test_data=$1
-    assert "$(curl --no-progress-meter --request POST "${__test_data[address]}/account/balance" "${DEFAULT_HEADERS[@]}" --data-raw "{\"network_identifier\":{\"blockchain\":\"$BLOCKCHAIN\",\"network\":\"${__test_data[id]}\"},\"account_identifier\":{\"address\":\"${__test_data[account]}\"}}" | jq)" \
+    assert "$(rosetta_client "$1" account balance \
+        --address "${__test_data[account]}" \
+        --compact)" \
         '.balances[0].currency.symbol == "MINA"' \
         "   ✅  Account: Balance ok" \
         "   ❌  Account: Invalid balance structure or balance not found"
@@ -150,15 +194,9 @@ function test_account_balance() {
 
 function test_payment_transaction() {
     declare -n __test_data=$1
-    assert "$(curl --no-progress-meter --location "${__test_data[address]}/search/transactions" --header 'Content-Type: application/json' --data "{
-        \"network_identifier\": {
-            \"blockchain\": \"$BLOCKCHAIN\",
-            \"network\": \"${__test_data[id]}\"
-        },
-        \"transaction_identifier\": {
-            \"hash\": \"${__test_data[payment_transaction]}\"
-        }
-    }" | jq)" \
+    assert "$(rosetta_client "$1" search transactions \
+        --tx-hash "${__test_data[payment_transaction]}" \
+        --compact)" \
         ".transactions[0].transaction.transaction_identifier.hash == \"${__test_data[payment_transaction]}\" " \
         "   ✅  Payment transaction found" \
         "   ❌  Payment transaction not found (expected ${__test_data[payment_transaction]})"
@@ -166,15 +204,9 @@ function test_payment_transaction() {
 
 function test_zkapp_transaction() {
     declare -n __test_data=$1
-    assert "$(curl --no-progress-meter --location "${__test_data[address]}/search/transactions" --header 'Content-Type: application/json' --data "{
-        \"network_identifier\": {
-            \"blockchain\": \"$BLOCKCHAIN\",
-            \"network\": \"${__test_data[id]}\"
-        },
-        \"transaction_identifier\": {
-            \"hash\": \"${__test_data[zkapp_transaction]}\"
-        }
-    }" | jq)" \
+    assert "$(rosetta_client "$1" search transactions \
+        --tx-hash "${__test_data[zkapp_transaction]}" \
+        --compact)" \
         ".transactions[0].transaction.transaction_identifier.hash == \"${__test_data[zkapp_transaction]}\" " \
         "   ✅  Zkapp transaction found" \
         "   ❌  Zkapp transaction not found (expected ${__test_data[zkapp_transaction]})"
