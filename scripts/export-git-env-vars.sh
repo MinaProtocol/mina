@@ -1,6 +1,15 @@
 #!/bin/bash
 set -euo pipefail
 
+# Defaulted here rather than further down, where it used to be, because
+# MINA_DOCKER_TAG is built from it well before that point. Under `set -u` a
+# caller that had not set it aborted on the unbound variable instead of
+# getting the default the script clearly intends to provide. Every caller
+# reached this script through buildkite/scripts/export-git-env-vars.sh, which
+# sets it first, so nothing ever ran into it until a script sourced this one
+# directly.
+MINA_DEB_CODENAME=${MINA_DEB_CODENAME:-bullseye}
+
 # If enabled, keep my tags intact, it won't run git fetch --prune
 KEEP_MY_TAGS_INTACT=${KEEP_MY_TAGS_INTACT:-1}
 
