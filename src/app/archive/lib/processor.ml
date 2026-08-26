@@ -5113,32 +5113,49 @@ let run pool reader ~proof_cache_db ~genesis_constants ~constraint_constants
             Deferred.unit
         | Ok () ->
             Deferred.unit )
-    | Diff.Transition_frontier (Hardfork_config { config_json }) -> (
-        (* Not a block, so it does not go anywhere near the block path: this
-           only records what we have been told, for the hand-over to act on
-           later. *)
-        match hardfork_state_of_config ~config_json with
-        | Error msg ->
-            [%log error]
-              "Ignoring an unusable hard fork configuration from the daemon: \
-               $reason"
-              ~metadata:[ ("reason", `String msg) ] ;
-            Deferred.unit
-        | Ok hardfork_state -> (
-            match%map
-              Mina_caqti.Pool.use
-                (fun conn -> Hardfork_state.record conn ~logger hardfork_state)
-                pool
-            with
-            | Ok () ->
-                ()
-            | Error e ->
-                [%log warn]
-                  "Could not record the hard fork configuration: $error. It \
-                   arrives on a heartbeat, so this will be retried."
-                  ~metadata:[ ("error", `String (Caqti_error.show e)) ] ) )
+    | Diff.Transition_frontier (Hardfork_config _) ->
+        (* Answered at the RPC layer instead, so that the reply means the row
+           is written. See [record_hardfork_config]. *)
+        Deferred.unit
     | Transition_frontier _ ->
         Deferred.unit )
+
+(** Record a hard fork configuration the daemon sent us.
+
+    Called straight from the RPC handler rather than through the block pipe,
+    and that is the whole point. A [Synchronous] strict pipe releases its
+    writer as soon as the reader takes the message off it, before the reader
+    has done anything with it, so a reply sent that way tells the daemon only
+    that the archive queued something. The daemon exits moments after this
+    call, so the reply has to mean the row is committed.
+
+    For the same reason a failure raises rather than logs. The response type
+    is [unit], so raising is the only way to say no, and the daemon's dispatch
+    surfaces it as an error. A configuration it cannot parse is worth refusing
+    loudly: the archive would otherwise sit there with no record of the fork
+    while the daemon believed the hand-over had started. *)
+let record_hardfork_config ~logger ~pool ~config_json =
+  match hardfork_state_of_config ~config_json with
+  | Error msg ->
+      [%log error]
+        "Refusing an unusable hard fork configuration from the daemon: $reason"
+        ~metadata:[ ("reason", `String msg) ] ;
+      failwithf "unusable hard fork configuration: %s" msg ()
+  | Ok hardfork_state -> (
+      match%map
+        Mina_caqti.Pool.use
+          (fun conn -> Hardfork_state.record conn ~logger hardfork_state)
+          pool
+      with
+      | Ok () ->
+          ()
+      | Error e ->
+          let msg = Caqti_error.show e in
+          [%log warn]
+            "Could not record the hard fork configuration: $error. The daemon \
+             is told, so it can try again."
+            ~metadata:[ ("error", `String msg) ] ;
+          failwithf "could not record the hard fork configuration: %s" msg () )
 
 (* [add_genesis_accounts] is called when starting the archive process *)
 let add_genesis_accounts ~logger ~(runtime_config_opt : Runtime_config.t option)
@@ -5314,17 +5331,6 @@ let setup_server ~proof_cache_db ~(genesis_constants : Genesis_constants.t)
   let extensional_block_reader, extensional_block_writer =
     Strict_pipe.create ~name:"extensional_archive_block" Synchronous
   in
-  let implementations =
-    [ Async.Rpc.Rpc.implement Archive_rpc.t (fun () archive_diff ->
-          Strict_pipe.Writer.write writer archive_diff )
-    ; Async.Rpc.Rpc.implement Archive_rpc.precomputed_block
-        (fun () precomputed_block ->
-          Strict_pipe.Writer.write precomputed_block_writer precomputed_block )
-    ; Async.Rpc.Rpc.implement Archive_rpc.extensional_block
-        (fun () extensional_block ->
-          Strict_pipe.Writer.write extensional_block_writer extensional_block )
-    ]
-  in
   match Mina_caqti.connect_pool ~max_size:30 postgres_address with
   | Error e ->
       [%log error]
@@ -5332,6 +5338,26 @@ let setup_server ~proof_cache_db ~(genesis_constants : Genesis_constants.t)
         ~metadata:[ ("error", `String (Caqti_error.show e)) ] ;
       Deferred.unit
   | Ok pool ->
+      (* Bound here rather than above the pool: the hard fork configuration is
+         answered against the database inside the handler, so the handler needs
+         the pool. *)
+      let implementations =
+        [ Async.Rpc.Rpc.implement Archive_rpc.t (fun () archive_diff ->
+              match archive_diff with
+              | Diff.Transition_frontier (Hardfork_config { config_json }) ->
+                  record_hardfork_config ~logger ~pool ~config_json
+              | _ ->
+                  Strict_pipe.Writer.write writer archive_diff )
+        ; Async.Rpc.Rpc.implement Archive_rpc.precomputed_block
+            (fun () precomputed_block ->
+              Strict_pipe.Writer.write precomputed_block_writer
+                precomputed_block )
+        ; Async.Rpc.Rpc.implement Archive_rpc.extensional_block
+            (fun () extensional_block ->
+              Strict_pipe.Writer.write extensional_block_writer
+                extensional_block )
+        ]
+      in
       let%bind () =
         add_genesis_accounts pool ~logger ~genesis_constants
           ~constraint_constants ~runtime_config_opt ~chunks_length
