@@ -45,8 +45,6 @@ let global_slot_span = Scalars.GlobalSlotSpan.typ ()
 
 let length = Scalars.Length.typ ()
 
-let span = Scalars.Span.typ ()
-
 let ledger_hash = Scalars.LedgerHash.typ ()
 
 let state_hash = Scalars.StateHash.typ ()
@@ -71,13 +69,278 @@ let account_id : (Mina_lib.t, Account_id.t option) typ =
           ~resolve:(fun _ id -> Mina_base.Account_id.token_id id)
       ] )
 
-let sync_status : (Mina_lib.t, Sync_status.t option) typ =
-  enum "SyncStatus" ~doc:"Sync status of daemon"
-    ~values:
-      (List.map Sync_status.all ~f:(fun status ->
-           enum_value
-             (String.map ~f:Char.uppercase @@ Sync_status.to_string status)
-             ~value:status ) )
+module type DAEMON_STATUS_CTX = sig
+  type t
+
+  val consensus_constants : t -> Consensus.Constants.t
+end
+
+(* Functor producing the daemonStatus subtree, parameterized over the
+   context type. The only context-dependent piece is [consensus_constants]
+   (used by [ConsensusTime.startTime/endTime] and [BlockProducerTimings]).
+   Real daemon and test mock share these type definitions by instantiating
+   this functor with their own context. *)
+module Make_daemon_status (Ctx : DAEMON_STATUS_CTX) = struct
+  let uint32 : (Ctx.t, _) typ = Scalars.UInt32.typ ()
+
+  let block_time : (Ctx.t, _) typ = Scalars.BlockTime.typ ()
+
+  let span : (Ctx.t, _) typ = Scalars.Span.typ ()
+
+  let global_slot_since_hard_fork : (Ctx.t, _) typ =
+    Scalars.GlobalSlotSinceHardFork.typ ()
+
+  let global_slot_since_genesis : (Ctx.t, _) typ =
+    Scalars.GlobalSlotSinceGenesis.typ ()
+
+  let sync_status : (Ctx.t, Sync_status.t option) typ =
+    enum "SyncStatus" ~doc:"Sync status of daemon"
+      ~values:
+        (List.map Sync_status.all ~f:(fun status ->
+             enum_value
+               (String.map ~f:Char.uppercase @@ Sync_status.to_string status)
+               ~value:status ) )
+
+  let consensus_time =
+    let module C = Consensus.Data.Consensus_time in
+    obj "ConsensusTime" ~fields:(fun _ ->
+        [ field "epoch" ~typ:(non_null uint32)
+            ~args:Arg.[]
+            ~resolve:(fun _ global_slot -> C.epoch global_slot)
+        ; field "slot" ~typ:(non_null uint32)
+            ~args:Arg.[]
+            ~resolve:(fun _ global_slot -> C.slot global_slot)
+        ; field "globalSlot"
+            ~typ:(non_null global_slot_since_hard_fork)
+            ~args:Arg.[]
+            ~resolve:(fun _ (global_slot : Consensus.Data.Consensus_time.t) ->
+              C.to_global_slot global_slot )
+        ; field "startTime" ~typ:(non_null block_time)
+            ~args:Arg.[]
+            ~resolve:(fun { ctx; _ } global_slot ->
+              C.start_time ~constants:(Ctx.consensus_constants ctx) global_slot
+              )
+        ; field "endTime" ~typ:(non_null block_time)
+            ~args:Arg.[]
+            ~resolve:(fun { ctx; _ } global_slot ->
+              C.end_time ~constants:(Ctx.consensus_constants ctx) global_slot )
+        ] )
+
+  let consensus_time_with_global_slot_since_genesis =
+    obj "ConsensusTimeGlobalSlot"
+      ~doc:"Consensus time and the corresponding global slot since genesis"
+      ~fields:(fun _ ->
+        [ field "consensusTime" ~typ:(non_null consensus_time)
+            ~doc:
+              "Time in terms of slot number in an epoch, start and end time of \
+               the slot since UTC epoch"
+            ~args:Arg.[]
+            ~resolve:(fun _ (time, _) -> time)
+        ; field "globalSlotSinceGenesis"
+            ~args:Arg.[]
+            ~typ:(non_null global_slot_since_genesis)
+            ~resolve:(fun _ (_, slot) -> slot)
+        ] )
+
+  let block_producer_timing :
+      (_, Daemon_rpcs.Types.Status.Next_producer_timing.t option) typ =
+    obj "BlockProducerTimings" ~fields:(fun _ ->
+        let of_time ~consensus_constants =
+          Consensus.Data.Consensus_time.of_time_exn
+            ~constants:consensus_constants
+        in
+        [ field "times"
+            ~typ:(non_null @@ list @@ non_null consensus_time)
+            ~doc:"Next block production time"
+            ~args:Arg.[]
+            ~resolve:(fun { ctx; _ }
+                          { Daemon_rpcs.Types.Status.Next_producer_timing.timing
+                          ; _
+                          } ->
+              let consensus_constants = Ctx.consensus_constants ctx in
+              match timing with
+              | Daemon_rpcs.Types.Status.Next_producer_timing.Check_again _ ->
+                  []
+              | Evaluating_vrf _last_checked_slot ->
+                  []
+              | Produce info ->
+                  [ of_time info.time ~consensus_constants ]
+              | Produce_now info ->
+                  [ of_time ~consensus_constants info.time ] )
+        ; field "globalSlotSinceGenesis"
+            ~typ:(non_null @@ list @@ non_null global_slot_since_genesis)
+            ~doc:"Next block production global-slot-since-genesis "
+            ~args:Arg.[]
+            ~resolve:(fun _
+                          { Daemon_rpcs.Types.Status.Next_producer_timing.timing
+                          ; _
+                          } ->
+              match timing with
+              | Daemon_rpcs.Types.Status.Next_producer_timing.Check_again _ ->
+                  []
+              | Evaluating_vrf _last_checked_slot ->
+                  []
+              | Produce info ->
+                  [ info.for_slot.global_slot_since_genesis ]
+              | Produce_now info ->
+                  [ info.for_slot.global_slot_since_genesis ] )
+        ; field "generatedFromConsensusAt"
+            ~typ:(non_null consensus_time_with_global_slot_since_genesis)
+            ~doc:
+              "Consensus time of the block that was used to determine the next \
+               block production time"
+            ~args:Arg.[]
+            ~resolve:(fun { ctx; _ }
+                          { Daemon_rpcs.Types.Status.Next_producer_timing
+                            .generated_from_consensus_at =
+                              { slot; global_slot_since_genesis }
+                          ; _
+                          } ->
+              let consensus_constants = Ctx.consensus_constants ctx in
+              ( Consensus.Data.Consensus_time.of_global_slot
+                  ~constants:consensus_constants slot
+              , global_slot_since_genesis ) )
+        ] )
+
+  module DaemonStatus = struct
+    type t = Daemon_rpcs.Types.Status.t
+
+    let interval : (_, (Time.Span.t * Time.Span.t) option) typ =
+      obj "Interval" ~fields:(fun _ ->
+          [ field "start" ~typ:(non_null span)
+              ~args:Arg.[]
+              ~resolve:(fun _ (start, _) -> start)
+          ; field "stop" ~typ:(non_null span)
+              ~args:Arg.[]
+              ~resolve:(fun _ (_, end_) -> end_)
+          ] )
+
+    let histogram : (_, Perf_histograms.Report.t option) typ =
+      obj "Histogram" ~fields:(fun _ ->
+          let open Reflection.Shorthand in
+          List.rev
+          @@ Perf_histograms.Report.Fields.fold ~init:[]
+               ~values:(id ~typ:Schema.(non_null (list (non_null int))))
+               ~intervals:(id ~typ:(non_null (list (non_null interval))))
+               ~underflow:nn_int ~overflow:nn_int )
+
+    module Rpc_timings = Daemon_rpcs.Types.Status.Rpc_timings
+    module Rpc_pair = Rpc_timings.Rpc_pair
+
+    let rpc_pair : (_, Perf_histograms.Report.t option Rpc_pair.t option) typ =
+      let h = Reflection.Shorthand.id ~typ:histogram in
+      obj "RpcPair" ~fields:(fun _ ->
+          List.rev @@ Rpc_pair.Fields.fold ~init:[] ~dispatch:h ~impl:h )
+
+    let rpc_timings : (_, Rpc_timings.t option) typ =
+      let fd = Reflection.Shorthand.id ~typ:(non_null rpc_pair) in
+      obj "RpcTimings" ~fields:(fun _ ->
+          List.rev
+          @@ Rpc_timings.Fields.fold ~init:[] ~get_staged_ledger_aux:fd
+               ~answer_sync_ledger_query:fd ~get_ancestry:fd
+               ~get_transition_chain_proof:fd ~get_transition_chain:fd )
+
+    module Histograms = Daemon_rpcs.Types.Status.Histograms
+
+    let histograms : (_, Histograms.t option) typ =
+      let h = Reflection.Shorthand.id ~typ:histogram in
+      obj "Histograms" ~fields:(fun _ ->
+          let open Reflection.Shorthand in
+          List.rev
+          @@ Histograms.Fields.fold ~init:[]
+               ~rpc_timings:(id ~typ:(non_null rpc_timings))
+               ~external_transition_latency:h
+               ~accepted_transition_local_latency:h
+               ~accepted_transition_remote_latency:h
+               ~snark_worker_zkapp_transition_time:h
+               ~snark_worker_nonzkapp_transition_time:h
+               ~snark_worker_merge_time:h )
+
+    let consensus_configuration : (_, Consensus.Configuration.t option) typ =
+      obj "ConsensusConfiguration" ~fields:(fun _ ->
+          let open Reflection.Shorthand in
+          List.rev
+          @@ Consensus.Configuration.Fields.fold ~init:[] ~delta:nn_int
+               ~k:nn_int ~slots_per_epoch:nn_int ~slot_duration:nn_int
+               ~epoch_duration:nn_int ~acceptable_network_delay:nn_int
+               ~genesis_state_timestamp:nn_time )
+
+    let peer : (_, Network_peer.Peer.Display.t option) typ =
+      obj "Peer" ~fields:(fun _ ->
+          let open Reflection.Shorthand in
+          List.rev
+          @@ Network_peer.Peer.Display.Fields.fold ~init:[] ~host:nn_string
+               ~libp2p_port:nn_int ~peer_id:nn_string )
+
+    let addrs_and_ports : (_, Node_addrs_and_ports.Display.t option) typ =
+      obj "AddrsAndPorts" ~fields:(fun _ ->
+          let open Reflection.Shorthand in
+          List.rev
+          @@ Node_addrs_and_ports.Display.Fields.fold ~init:[]
+               ~external_ip:nn_string ~bind_ip:nn_string ~client_port:nn_int
+               ~libp2p_port:nn_int ~peer:(id ~typ:peer) )
+
+    let metrics : (_, Daemon_rpcs.Types.Status.Metrics.t option) typ =
+      obj "Metrics" ~fields:(fun _ ->
+          let open Reflection.Shorthand in
+          List.rev
+          @@ Daemon_rpcs.Types.Status.Metrics.Fields.fold ~init:[]
+               ~block_production_delay:nn_int_list
+               ~transaction_pool_diff_received:nn_int
+               ~transaction_pool_diff_broadcasted:nn_int
+               ~transactions_added_to_pool:nn_int ~transaction_pool_size:nn_int
+               ~snark_pool_diff_received:nn_int
+               ~snark_pool_diff_broadcasted:nn_int ~pending_snark_work:nn_int
+               ~snark_pool_size:nn_int )
+
+    let t : (_, Daemon_rpcs.Types.Status.t option) typ =
+      obj "DaemonStatus" ~fields:(fun _ ->
+          let open Reflection.Shorthand in
+          List.rev
+          @@ Daemon_rpcs.Types.Status.Fields.fold ~init:[] ~num_accounts:int
+               ~catchup_status:nn_catchup_status ~chain_id:nn_string
+               ~next_block_production:(id ~typ:block_producer_timing)
+               ~blockchain_length:int ~uptime_secs:nn_int
+               ~ledger_merkle_root:string ~state_hash:string
+               ~commit_id:nn_string ~conf_dir:nn_string
+               ~peers:(id ~typ:(non_null (list (non_null peer))))
+               ~user_commands_sent:nn_int ~snark_worker:string
+               ~snark_work_fee:nn_int
+               ~sync_status:(id ~typ:(non_null sync_status))
+               ~block_production_keys:
+                 (id ~typ:(non_null @@ list (non_null Schema.string)))
+               ~coinbase_receiver:(id ~typ:Schema.string)
+               ~histograms:(id ~typ:histograms)
+               ~consensus_time_best_tip:(id ~typ:consensus_time)
+               ~global_slot_since_genesis_best_tip:int
+               ~consensus_time_now:(id ~typ:Schema.(non_null consensus_time))
+               ~consensus_mechanism:nn_string
+               ~addrs_and_ports:(id ~typ:(non_null addrs_and_ports))
+               ~consensus_configuration:
+                 (id ~typ:(non_null consensus_configuration))
+               ~highest_block_length_received:nn_int
+               ~highest_unvalidated_block_length_received:nn_int
+               ~metrics:(id ~typ:(non_null metrics)) )
+  end
+end
+
+module Real_daemon_status = Make_daemon_status (struct
+  type t = Mina_lib.t
+
+  let consensus_constants mina =
+    (Mina_lib.config mina).precomputed_values.consensus_constants
+end)
+
+let sync_status = Real_daemon_status.sync_status
+
+let consensus_time = Real_daemon_status.consensus_time
+
+let consensus_time_with_global_slot_since_genesis =
+  Real_daemon_status.consensus_time_with_global_slot_since_genesis
+
+let block_producer_timing = Real_daemon_status.block_producer_timing
+
+module DaemonStatus = Real_daemon_status.DaemonStatus
 
 let transaction_status :
     (Mina_lib.t, Transaction_inclusion_status.State.t option) typ =
@@ -96,115 +359,6 @@ let transaction_status :
                through consensus or has been dropped"
         ]
 
-let consensus_time =
-  let module C = Consensus.Data.Consensus_time in
-  obj "ConsensusTime" ~fields:(fun _ ->
-      [ field "epoch" ~typ:(non_null uint32)
-          ~args:Arg.[]
-          ~resolve:(fun _ global_slot -> C.epoch global_slot)
-      ; field "slot" ~typ:(non_null uint32)
-          ~args:Arg.[]
-          ~resolve:(fun _ global_slot -> C.slot global_slot)
-      ; field "globalSlot"
-          ~typ:(non_null global_slot_since_hard_fork)
-          ~args:Arg.[]
-          ~resolve:(fun _ (global_slot : Consensus.Data.Consensus_time.t) ->
-            C.to_global_slot global_slot )
-      ; field "startTime" ~typ:(non_null block_time)
-          ~args:Arg.[]
-          ~resolve:(fun { ctx = mina; _ } global_slot ->
-            let constants =
-              (Mina_lib.config mina).precomputed_values.consensus_constants
-            in
-            C.start_time ~constants global_slot )
-      ; field "endTime" ~typ:(non_null block_time)
-          ~args:Arg.[]
-          ~resolve:(fun { ctx = mina; _ } global_slot ->
-            let constants =
-              (Mina_lib.config mina).precomputed_values.consensus_constants
-            in
-            C.end_time ~constants global_slot )
-      ] )
-
-let consensus_time_with_global_slot_since_genesis =
-  obj "ConsensusTimeGlobalSlot"
-    ~doc:"Consensus time and the corresponding global slot since genesis"
-    ~fields:(fun _ ->
-      [ field "consensusTime" ~typ:(non_null consensus_time)
-          ~doc:
-            "Time in terms of slot number in an epoch, start and end time of \
-             the slot since UTC epoch"
-          ~args:Arg.[]
-          ~resolve:(fun _ (time, _) -> time)
-      ; field "globalSlotSinceGenesis"
-          ~args:Arg.[]
-          ~typ:(non_null global_slot_since_genesis)
-          ~resolve:(fun _ (_, slot) -> slot)
-      ] )
-
-let block_producer_timing :
-    (_, Daemon_rpcs.Types.Status.Next_producer_timing.t option) typ =
-  obj "BlockProducerTimings" ~fields:(fun _ ->
-      let of_time ~consensus_constants =
-        Consensus.Data.Consensus_time.of_time_exn ~constants:consensus_constants
-      in
-      [ field "times"
-          ~typ:(non_null @@ list @@ non_null consensus_time)
-          ~doc:"Next block production time"
-          ~args:Arg.[]
-          ~resolve:(fun { ctx = mina; _ }
-                        { Daemon_rpcs.Types.Status.Next_producer_timing.timing
-                        ; _
-                        } ->
-            let consensus_constants =
-              (Mina_lib.config mina).precomputed_values.consensus_constants
-            in
-            match timing with
-            | Daemon_rpcs.Types.Status.Next_producer_timing.Check_again _ ->
-                []
-            | Evaluating_vrf _last_checked_slot ->
-                []
-            | Produce info ->
-                [ of_time info.time ~consensus_constants ]
-            | Produce_now info ->
-                [ of_time ~consensus_constants info.time ] )
-      ; field "globalSlotSinceGenesis"
-          ~typ:(non_null @@ list @@ non_null global_slot_since_genesis)
-          ~doc:"Next block production global-slot-since-genesis "
-          ~args:Arg.[]
-          ~resolve:(fun _
-                        { Daemon_rpcs.Types.Status.Next_producer_timing.timing
-                        ; _
-                        } ->
-            match timing with
-            | Daemon_rpcs.Types.Status.Next_producer_timing.Check_again _ ->
-                []
-            | Evaluating_vrf _last_checked_slot ->
-                []
-            | Produce info ->
-                [ info.for_slot.global_slot_since_genesis ]
-            | Produce_now info ->
-                [ info.for_slot.global_slot_since_genesis ] )
-      ; field "generatedFromConsensusAt"
-          ~typ:(non_null consensus_time_with_global_slot_since_genesis)
-          ~doc:
-            "Consensus time of the block that was used to determine the next \
-             block production time"
-          ~args:Arg.[]
-          ~resolve:(fun { ctx = mina; _ }
-                        { Daemon_rpcs.Types.Status.Next_producer_timing
-                          .generated_from_consensus_at =
-                            { slot; global_slot_since_genesis }
-                        ; _
-                        } ->
-            let consensus_constants =
-              (Mina_lib.config mina).precomputed_values.consensus_constants
-            in
-            ( Consensus.Data.Consensus_time.of_global_slot
-                ~constants:consensus_constants slot
-            , global_slot_since_genesis ) )
-      ] )
-
 let merkle_path_element :
     ( _
     , [ `Left of Snark_params.Tick.Field.t
@@ -221,125 +375,6 @@ let merkle_path_element :
           ~resolve:(fun _ x ->
             match x with `Left _ -> None | `Right h -> Some h )
       ] )
-
-module DaemonStatus = struct
-  type t = Daemon_rpcs.Types.Status.t
-
-  let interval : (_, (Time.Span.t * Time.Span.t) option) typ =
-    obj "Interval" ~fields:(fun _ ->
-        [ field "start" ~typ:(non_null span)
-            ~args:Arg.[]
-            ~resolve:(fun _ (start, _) -> start)
-        ; field "stop" ~typ:(non_null span)
-            ~args:Arg.[]
-            ~resolve:(fun _ (_, end_) -> end_)
-        ] )
-
-  let histogram : (_, Perf_histograms.Report.t option) typ =
-    obj "Histogram" ~fields:(fun _ ->
-        let open Reflection.Shorthand in
-        List.rev
-        @@ Perf_histograms.Report.Fields.fold ~init:[]
-             ~values:(id ~typ:Schema.(non_null (list (non_null int))))
-             ~intervals:(id ~typ:(non_null (list (non_null interval))))
-             ~underflow:nn_int ~overflow:nn_int )
-
-  module Rpc_timings = Daemon_rpcs.Types.Status.Rpc_timings
-  module Rpc_pair = Rpc_timings.Rpc_pair
-
-  let rpc_pair : (_, Perf_histograms.Report.t option Rpc_pair.t option) typ =
-    let h = Reflection.Shorthand.id ~typ:histogram in
-    obj "RpcPair" ~fields:(fun _ ->
-        List.rev @@ Rpc_pair.Fields.fold ~init:[] ~dispatch:h ~impl:h )
-
-  let rpc_timings : (_, Rpc_timings.t option) typ =
-    let fd = Reflection.Shorthand.id ~typ:(non_null rpc_pair) in
-    obj "RpcTimings" ~fields:(fun _ ->
-        List.rev
-        @@ Rpc_timings.Fields.fold ~init:[] ~get_staged_ledger_aux:fd
-             ~answer_sync_ledger_query:fd ~get_ancestry:fd
-             ~get_transition_chain_proof:fd ~get_transition_chain:fd )
-
-  module Histograms = Daemon_rpcs.Types.Status.Histograms
-
-  let histograms : (_, Histograms.t option) typ =
-    let h = Reflection.Shorthand.id ~typ:histogram in
-    obj "Histograms" ~fields:(fun _ ->
-        let open Reflection.Shorthand in
-        List.rev
-        @@ Histograms.Fields.fold ~init:[]
-             ~rpc_timings:(id ~typ:(non_null rpc_timings))
-             ~external_transition_latency:h ~accepted_transition_local_latency:h
-             ~accepted_transition_remote_latency:h
-             ~snark_worker_zkapp_transition_time:h
-             ~snark_worker_nonzkapp_transition_time:h ~snark_worker_merge_time:h )
-
-  let consensus_configuration : (_, Consensus.Configuration.t option) typ =
-    obj "ConsensusConfiguration" ~fields:(fun _ ->
-        let open Reflection.Shorthand in
-        List.rev
-        @@ Consensus.Configuration.Fields.fold ~init:[] ~delta:nn_int ~k:nn_int
-             ~slots_per_epoch:nn_int ~slot_duration:nn_int
-             ~epoch_duration:nn_int ~acceptable_network_delay:nn_int
-             ~genesis_state_timestamp:nn_time )
-
-  let peer : (_, Network_peer.Peer.Display.t option) typ =
-    obj "Peer" ~fields:(fun _ ->
-        let open Reflection.Shorthand in
-        List.rev
-        @@ Network_peer.Peer.Display.Fields.fold ~init:[] ~host:nn_string
-             ~libp2p_port:nn_int ~peer_id:nn_string )
-
-  let addrs_and_ports : (_, Node_addrs_and_ports.Display.t option) typ =
-    obj "AddrsAndPorts" ~fields:(fun _ ->
-        let open Reflection.Shorthand in
-        List.rev
-        @@ Node_addrs_and_ports.Display.Fields.fold ~init:[]
-             ~external_ip:nn_string ~bind_ip:nn_string ~client_port:nn_int
-             ~libp2p_port:nn_int ~peer:(id ~typ:peer) )
-
-  let metrics : (_, Daemon_rpcs.Types.Status.Metrics.t option) typ =
-    obj "Metrics" ~fields:(fun _ ->
-        let open Reflection.Shorthand in
-        List.rev
-        @@ Daemon_rpcs.Types.Status.Metrics.Fields.fold ~init:[]
-             ~block_production_delay:nn_int_list
-             ~transaction_pool_diff_received:nn_int
-             ~transaction_pool_diff_broadcasted:nn_int
-             ~transactions_added_to_pool:nn_int ~transaction_pool_size:nn_int
-             ~snark_pool_diff_received:nn_int
-             ~snark_pool_diff_broadcasted:nn_int ~pending_snark_work:nn_int
-             ~snark_pool_size:nn_int )
-
-  let t : (_, Daemon_rpcs.Types.Status.t option) typ =
-    obj "DaemonStatus" ~fields:(fun _ ->
-        let open Reflection.Shorthand in
-        List.rev
-        @@ Daemon_rpcs.Types.Status.Fields.fold ~init:[] ~num_accounts:int
-             ~catchup_status:nn_catchup_status ~chain_id:nn_string
-             ~next_block_production:(id ~typ:block_producer_timing)
-             ~blockchain_length:int ~uptime_secs:nn_int
-             ~ledger_merkle_root:string ~state_hash:string ~commit_id:nn_string
-             ~conf_dir:nn_string
-             ~peers:(id ~typ:(non_null (list (non_null peer))))
-             ~user_commands_sent:nn_int ~snark_worker:string
-             ~snark_work_fee:nn_int
-             ~sync_status:(id ~typ:(non_null sync_status))
-             ~block_production_keys:
-               (id ~typ:(non_null @@ list (non_null Schema.string)))
-             ~coinbase_receiver:(id ~typ:Schema.string)
-             ~histograms:(id ~typ:histograms)
-             ~consensus_time_best_tip:(id ~typ:consensus_time)
-             ~global_slot_since_genesis_best_tip:int
-             ~consensus_time_now:(id ~typ:Schema.(non_null consensus_time))
-             ~consensus_mechanism:nn_string
-             ~addrs_and_ports:(id ~typ:(non_null addrs_and_ports))
-             ~consensus_configuration:
-               (id ~typ:(non_null consensus_configuration))
-             ~highest_block_length_received:nn_int
-             ~highest_unvalidated_block_length_received:nn_int
-             ~metrics:(id ~typ:(non_null metrics)) )
-end
 
 module Itn = struct
   let auth =
