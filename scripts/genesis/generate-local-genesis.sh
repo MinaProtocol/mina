@@ -4,7 +4,7 @@
 # Requires: mina binary (or nix to build it), jq
 #
 # Usage:
-#   ./scripts/generate-local-genesis.sh --mina-binary /path/to/mina --output-dir /tmp/my-genesis
+#   ./scripts/genesis/generate-local-genesis.sh --mina-binary /path/to/mina --output-dir /tmp/my-genesis
 #
 # If --mina-binary is not provided, builds via nix.
 # Produces:

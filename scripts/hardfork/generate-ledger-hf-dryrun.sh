@@ -448,7 +448,7 @@ ensure_binary() {
     
     echo "Building $binary_name..."
     local nix_result
-    nix_result=$(nix build --no-link --print-out-paths "$(dirname "$SCRIPT_DIR")?submodules=1"#"$nix_target")
+    nix_result=$(nix build --no-link --print-out-paths "$(dirname "$SCRIPT_DIR")?submodules=1#$nix_target")
     local new_binary_path="$nix_result/bin/$binary_name"
     
     if [[ ! -x "$new_binary_path" ]]; then
@@ -523,8 +523,8 @@ if [[ ! -x "$SCRIPT_DIR/prepare-test-ledger-hf-dryrun.sh" ]]; then
     exit 1
 fi
 
-if [[ ! -x "$SCRIPT_DIR/prepare-test-ledger.sh" ]]; then
-    echo "Error: Required script not found or not executable: $SCRIPT_DIR/prepare-test-ledger.sh" >&2
+if [[ ! -x "$SCRIPT_DIR/../genesis/prepare-test-ledger.sh" ]]; then
+    echo "Error: Required script not found or not executable: $SCRIPT_DIR/../genesis/prepare-test-ledger.sh" >&2
     exit 1
 fi
 

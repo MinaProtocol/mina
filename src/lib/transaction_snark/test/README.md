@@ -59,7 +59,7 @@ For a concrete example, see commit
 
 Then, to update the cache for a set of tests, we can run the tests to update
 their contents. For example, to update the tests in all of the directories
-containing a `proof_cache.json` file, we can run: `./scripts/regenerate-proof-cache.sh`
+containing a `proof_cache.json` file, we can run: `./scripts/tests/regenerate-proof-cache.sh`
 
 **In case an error *is* generated, you should not commit the cache before making
 the test deterministic.**

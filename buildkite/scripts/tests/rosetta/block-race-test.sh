@@ -17,7 +17,7 @@ chmod 700 "$LEDGER_DIR"
 
 sudo apt-get install -y python3
 
-./scripts/rosetta/test-block-race.sh \
+./scripts/tests/rosetta/test-block-race.sh \
                       --mina-exe /usr/local/bin/mina \
                       --archive-exe /usr/local/bin/mina-archive \
                       --rosetta-exe /usr/local/bin/mina-rosetta \

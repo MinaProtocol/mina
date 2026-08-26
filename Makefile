@@ -111,8 +111,8 @@ prepare: add-o1labs-opam-repo
 	echo "Go version $$GO_VERSION detected (requirement: $$REQUIRED_GO_VERSION or newer (only minor))"
 	opam switch import --switch mina --yes opam.export
 	eval $(opam env --switch=mina --set-switch)
-	chmod +x scripts/pin-external-packages.sh
-	./scripts/pin-external-packages.sh
+	chmod +x scripts/build/pin-external-packages.sh
+	./scripts/build/pin-external-packages.sh
 	@echo "Environment prepared. You can now run 'make build' to build the project."
 
 
@@ -132,7 +132,7 @@ clean: ## Remove build artifacts
 
 .PHONY: switch
 switch: ## Set up the opam switch
-	./scripts/update-opam-switch.sh
+	./scripts/build/update-opam-switch.sh
 
 .PHONY: ocaml_version
 ocaml_version: switch ## Check OCaml version
@@ -432,7 +432,7 @@ check-format: ocaml_checks ## Check formatting of OCaml code
 
 .PHONY: check-snarky-submodule
 check-snarky-submodule: ## Check the snarky submodule
-	./scripts/check-snarky-submodule.sh
+	./scripts/lint/check-snarky-submodule.sh
 
 #######################################
 ## Bash checks
@@ -522,7 +522,7 @@ benchmarks: ocaml_checks ## Build benchmarking tools
 .PHONY: test-coverage
 test-coverage: SHELL := /bin/bash
 test-coverage: libp2p_helper ## Run tests with coverage instrumentation
-	scripts/create_coverage_profiles.sh
+	scripts/tests/create_coverage_profiles.sh
 
 .PHONY: coverage-html
 coverage-html: ## Generate HTML report from coverage data
@@ -1003,4 +1003,4 @@ postgres-clean:
 regenerate-archive: ## Regenerate archive database with test data
 	@echo "Regenerating archive database using configured PG variables"
 	@PG_USER=$(PG_USER) PG_PW=$(PG_PW) PG_DB=$(PG_DB) PG_HOST=$(PG_HOST) PG_PORT=$(PG_PORT) \
-	./scripts/regenerate-archive.sh
+	./scripts/tests/regenerate-archive.sh

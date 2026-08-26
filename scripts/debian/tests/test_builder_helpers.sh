@@ -392,8 +392,8 @@ MOCKEXE
     create_mock_exe "scripts/rocksdb/convert-to-legacy.sh" "$PROJECT_ROOT"
 
     # systemd service template
-    mkdir -p "${PROJECT_ROOT}/scripts"
-    cat > "${PROJECT_ROOT}/scripts/mina.service" << 'SVCEOF'
+    mkdir -p "${PROJECT_ROOT}/scripts/debian"
+    cat > "${PROJECT_ROOT}/scripts/debian/mina.service" << 'SVCEOF'
 [Unit]
 Description=Mina Daemon Service
 After=network.target

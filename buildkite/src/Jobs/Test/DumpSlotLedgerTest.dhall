@@ -24,7 +24,7 @@ in  Pipeline.build
           , S.exactly "buildkite/scripts/dump-slot-test" "sh"
           , S.exactly "buildkite/src/Jobs/Test/DumpSlotLedgerTest" "dhall"
           , S.exactly "buildkite/src/Command/DumpSlotLedgerTest" "dhall"
-          , S.exactly "scripts/dump-slot-test" "sh"
+          , S.exactly "scripts/tests/dump-slot-test" "sh"
           ]
         , path = "Test"
         , name = "DumpSlotLedgerTest"

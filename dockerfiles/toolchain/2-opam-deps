@@ -54,5 +54,5 @@ RUN opam update && \
 # TODO: Would be really nice to pull this script, the git submodules, and opam.export exclusively in this stage
 # Remove .ppx and the .ppx-cache so they can be built on each run
 RUN eval "$(opam config env)" \
-  && scripts/pin-external-packages.sh \
+  && scripts/build/pin-external-packages.sh \
   && opam clean --logs -cs --quiet

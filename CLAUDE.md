@@ -35,7 +35,7 @@ Mina Protocol is a lightweight blockchain that maintains constant size by using 
 - `dune runtest src/lib/<library>` - Run tests for a specific library
 - `dune runtest src/lib --profile=dev` - Run all tests under src/lib
 - `dune exec src/lib/<library>/test/main.exe` - Run tests using explicit executable
-- `./scripts/testone.sh <test-file> [test-name]` - Run a single test file
+- `./scripts/tests/testone.sh <test-file> [test-name]` - Run a single test file
 
 ### CI Test Execution
 - `./buildkite/scripts/unit-test.sh <profile> <path>` - Run tests as done in CI (builds first, retries failures once)
@@ -66,7 +66,7 @@ Note: There is no `make test` target. Use `dune runtest` directly.
 - `make update-graphql` - Update GraphQL schema
 
 ### Dependency Management
-- `./scripts/update-opam-switch.sh` - Update/create the opam switch
+- `./scripts/build/update-opam-switch.sh` - Update/create the opam switch
 
 ## Project Structure
 
@@ -172,7 +172,7 @@ dune runtest src/lib/mina_lib
 (ulimit -s 65532 || true) && (ulimit -n 10240 || true) && dune runtest src/lib
 
 # Run a single test
-./scripts/testone.sh src/lib/mina_lib/test.ml
+./scripts/tests/testone.sh src/lib/mina_lib/test.ml
 ```
 
 ### Adding Dependencies
