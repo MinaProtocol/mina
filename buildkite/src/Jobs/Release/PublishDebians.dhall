@@ -8,9 +8,10 @@
 -- It is what the pipeline exists to do, and the scope keeps it out of every
 -- other pipeline.
 --
--- The channel and the repository are read from the environment via
--- DebianChannel.effective, so the three release pipelines share this one job
--- and differ only in what they set.
+-- The channel is read from the environment via DebianChannel.effective, and
+-- the codenames are discovered from the cache by the read script, so the three
+-- release pipelines share this one job and differ only in the channel they
+-- set. Nothing here has to be kept in step with the packaging stage.
 
 let S = ../../Lib/SelectFiles.dhall
 
@@ -23,8 +24,6 @@ let PipelineScope = ../../Pipeline/Scope.dhall
 let JobSpec = ../../Pipeline/JobSpec.dhall
 
 let PublishDebians = ../../Command/Packages/PublishDebians.dhall
-
-let DebianVersions = ../../Constants/DebianVersions.dhall
 
 let DebianRepo = ../../Constants/DebianRepo.dhall
 
@@ -40,7 +39,6 @@ in  Pipeline.build
       , steps =
         [ PublishDebians.step
             PublishDebians.Spec::{
-            , codenames = [ DebianVersions.DebVersion.Bullseye ]
             , debianRepo = DebianRepo.Type.O1Test
             , label = "Publish: debians"
             , key = "publish-debians"

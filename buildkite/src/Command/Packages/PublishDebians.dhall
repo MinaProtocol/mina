@@ -18,12 +18,6 @@
 -- the packaging stage, waits, then uploads this one, so a failed test or a
 -- failed package build means this step is never reached.
 
-let Prelude = ../../External/Prelude.dhall
-
-let List/map = Prelude.List.map
-
-let Text/concatSep = Prelude.Text.concatSep
-
 let Cmd = ../../Lib/Cmds.dhall
 
 let Command = ../Base.dhall
@@ -40,20 +34,16 @@ let DebianChannel = ../../Constants/DebianChannel.dhall
 
 let DebianRepo = ../../Constants/DebianRepo.dhall
 
-let DebianVersions = ../../Constants/DebianVersions.dhall
-
 let Spec =
       { Type =
-          { codenames : List DebianVersions.DebVersion
-          , channel : DebianChannel.Type
+          { channel : DebianChannel.Type
           , debianRepo : DebianRepo.Type
           , verify : Bool
           , label : Text
           , key : Text
           }
       , default =
-          { codenames = [ DebianVersions.DebVersion.Bullseye ]
-          , channel = DebianChannel.Type.Unstable
+          { channel = DebianChannel.Type.Unstable
           , debianRepo = DebianRepo.Type.Unstable
           , verify = True
           , label = "Publish debians"
@@ -64,44 +54,21 @@ let Spec =
 let debsFolder = "_publish"
 
 let readFromCache
-    : Spec.Type -> List Cmd.Type
+    : Cmd.Type
     =
-      -- One read per codename, into its own folder.
-      --
-      -- read_all_from_cache.sh puts the packages of ONE codename flat into
-      -- LOCAL_DEB_FOLDER, and `release-manager publish` wants a
-      -- {codename}/*.deb tree, so the codename is the folder rather than
-      -- something the publish step has to reconstruct from file names.
-          \(spec : Spec.Type)
-      ->  List/map
-            DebianVersions.DebVersion
-            Cmd.Type
-            (     \(codename : DebianVersions.DebVersion)
-              ->  let lower = DebianVersions.lowerName codename
-
-                  in  Cmd.run
-                        (     "MINA_DEB_CODENAME=${lower}"
-                          ++  " ROOT=\\\${BUILDKITE_BUILD_ID}"
-                          ++  " LOCAL_DEB_FOLDER=${debsFolder}/${lower}"
-                          ++  " ./buildkite/scripts/debian/read_all_from_cache.sh"
-                        )
-            )
-            spec.codenames
+      -- The codenames are discovered from the cache, not listed here. The
+      -- packaging stage decides which exist -- five for a devnet release, one
+      -- for mainnet -- and a list in this file would be a second statement of
+      -- that, free to drift. Drift would be quiet in the worst direction: a
+      -- codename missing from the list is built, cached, and never published,
+      -- with nothing to report it.
+      Cmd.run
+        "./buildkite/scripts/debian/read_all_codenames_from_cache.sh ${debsFolder}"
 
 let publishCmd
     : Spec.Type -> Cmd.Type
     =     \(spec : Spec.Type)
-      ->  let codenames =
-                Text/concatSep
-                  ","
-                  ( List/map
-                      DebianVersions.DebVersion
-                      Text
-                      DebianVersions.lowerName
-                      spec.codenames
-                  )
-
-          let verifyArg = if spec.verify then " --verify" else ""
+      ->  let verifyArg = if spec.verify then " --verify" else ""
 
           let signArg =
                 merge
@@ -122,7 +89,6 @@ let publishCmd
                   ++  "gpg --import /var/secrets/debian/key.gpg && "
                   ++  "release-manager publish"
                   ++  " --source-folder ${debsFolder}"
-                  ++  " --codenames ${codenames}"
                   ++  " --channel ${DebianChannel.effective spec.channel}"
                   ++  " --debian-repo ${DebianRepo.bucket_or_default
                                           spec.debianRepo}"
@@ -165,9 +131,10 @@ let step
       ->  Command.build
             Command.Config::{
             , commands =
-                  [ FixPermissions.command Arch.Type.Amd64 ]
-                # readFromCache spec
-                # [ publishCmd spec ]
+              [ FixPermissions.command Arch.Type.Amd64
+              , readFromCache
+              , publishCmd spec
+              ]
             , label = spec.label
             , key = spec.key
             , target = Size.Small
