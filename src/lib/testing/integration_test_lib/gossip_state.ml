@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 
 module By_direction = struct
   type 'a t = { sent : 'a; received : 'a } [@@deriving to_yojson, fields]

@@ -17,32 +17,31 @@ type ('branch_data, 'f) branch_data =
 (** Basic types *)
 type (_, _, _) basic =
   | Unit : (unit, unit, < .. >) basic
-  | Field
-      : ('field1, 'field2, < field1 : 'field1 ; field2 : 'field2 ; .. >) basic
+  | Field :
+      ('field1, 'field2, < field1 : 'field1 ; field2 : 'field2 ; .. >) basic
   | Bool : ('bool1, 'bool2, < bool1 : 'bool1 ; bool2 : 'bool2 ; .. >) basic
-  | Digest
-      : ( 'digest1
-        , 'digest2
-        , < digest1 : 'digest1 ; digest2 : 'digest2 ; .. > )
-        basic
-  | Challenge
-      : ( 'challenge1
-        , 'challenge2
-        , < challenge1 : 'challenge1 ; challenge2 : 'challenge2 ; .. > )
-        basic
-  | Bulletproof_challenge
-      : ( 'bp_chal1
-        , 'bp_chal2
-        , < bulletproof_challenge1 : 'bp_chal1
-          ; bulletproof_challenge2 : 'bp_chal2
-          ; .. > )
-        basic
-  | Branch_data
-      : ( 'branch_data1
-        , 'branch_data2
-        , < branch_data1 : 'branch_data1 ; branch_data2 : 'branch_data2 ; .. >
-        )
-        basic
+  | Digest :
+      ( 'digest1
+      , 'digest2
+      , < digest1 : 'digest1 ; digest2 : 'digest2 ; .. > )
+      basic
+  | Challenge :
+      ( 'challenge1
+      , 'challenge2
+      , < challenge1 : 'challenge1 ; challenge2 : 'challenge2 ; .. > )
+      basic
+  | Bulletproof_challenge :
+      ( 'bp_chal1
+      , 'bp_chal2
+      , < bulletproof_challenge1 : 'bp_chal1
+        ; bulletproof_challenge2 : 'bp_chal2
+        ; .. > )
+      basic
+  | Branch_data :
+      ( 'branch_data1
+      , 'branch_data2
+      , < branch_data1 : 'branch_data1 ; branch_data2 : 'branch_data2 ; .. > )
+      basic
 
 (** Compound types. These are built from Basic types described above *)
 module rec T : sig

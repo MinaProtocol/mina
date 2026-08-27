@@ -164,7 +164,7 @@
     the tests. What is left in the consumer is the JSON rendering and the
     gauge-setting; see the note at the foot of the file. *)
 
-open Core_kernel
+open Core
 
 module Job_status = struct
   [%%versioned
@@ -495,18 +495,18 @@ module Tree = struct
     else if level = depth t then
       Array.to_list t.bases
       |> List.filter_map ~f:(function
-           | Base_node.Full { job; status = Todo } ->
-               Some (Available_job.Base job)
-           | Full { status = Done; _ } | Empty ->
-               None )
+        | Base_node.Full { job; status = Todo } ->
+            Some (Available_job.Base job)
+        | Full { status = Done; _ } | Empty ->
+            None )
     else
       List.init (nodes_at_level t ~level) ~f:(fun index ->
           t.merges.(slot ~level ~index) )
       |> List.filter_map ~f:(function
-           | Merge_node.Full { left; right } ->
-               Some (Available_job.Merge (left, right))
-           | Part _ | Empty ->
-               None )
+        | Merge_node.Full { left; right } ->
+            Some (Available_job.Merge (left, right))
+        | Part _ | Empty ->
+            None )
 
   (** Recompute the digests of [from .. until] at [level] and of every
       ancestor of that range, up to the root. Mutates [t.digests], so the
@@ -602,7 +602,8 @@ module Tree = struct
         | _ ->
             failwith "parallel_scan: results arrived out of order"
       in
-      merges.(parent) <- node ; `Placed
+      merges.(parent) <- node ;
+      `Placed
 
   (** Consume [results], in order, as the results of the jobs this tree is
       offering. Advances to the next level when the current one runs out, and
@@ -681,29 +682,29 @@ module Tree = struct
     let merges =
       Array.to_list t.merges
       |> List.mapi ~f:(fun position node ->
-             let value =
-               match node with
-               | Merge_node.Empty ->
-                   Job_view.Node.Merge_empty
-               | Part x ->
-                   Merge_part (f_merge x)
-               | Full { left; right } ->
-                   Merge_full { left = f_merge left; right = f_merge right }
-             in
-             { Job_view.position; value } )
+          let value =
+            match node with
+            | Merge_node.Empty ->
+                Job_view.Node.Merge_empty
+            | Part x ->
+                Merge_part (f_merge x)
+            | Full { left; right } ->
+                Merge_full { left = f_merge left; right = f_merge right }
+          in
+          { Job_view.position; value } )
     in
     let offset = Array.length t.merges in
     let bases =
       Array.to_list t.bases
       |> List.mapi ~f:(fun i node ->
-             let value =
-               match node with
-               | Base_node.Empty ->
-                   Job_view.Node.Base_empty
-               | Full { job; status } ->
-                   Base_full { job = f_base job; status }
-             in
-             { Job_view.position = offset + i; value } )
+          let value =
+            match node with
+            | Base_node.Empty ->
+                Job_view.Node.Base_empty
+            | Full { job; status } ->
+                Base_full { job = f_base job; status }
+          in
+          { Job_view.position = offset + i; value } )
     in
     merges @ bases
 
@@ -728,10 +729,10 @@ module Tree = struct
   let base_jobs t =
     Array.to_list t.bases
     |> List.filter_map ~f:(function
-         | Base_node.Full { job; _ } ->
-             Some job
-         | Empty ->
-             None )
+      | Base_node.Full { job; _ } ->
+          Some job
+      | Empty ->
+          None )
 end
 
 (** The forest.
@@ -818,7 +819,7 @@ let hash t =
       ]
     (* oldest tree first, matching [pending_data] and [fold_chronological] *)
     @ List.rev_map t.trees ~f:(fun tree ->
-          Hash.to_raw_string (Tree.digest tree) ) )
+        Hash.to_raw_string (Tree.digest tree) ) )
 
 (** Rebuild every cached digest from the state itself.
 
@@ -1084,9 +1085,9 @@ let partition_if_overflowing t : Space_partition.t =
   { first = (space, List.length (work_at t ~prepends:0))
   ; second =
       ( if space < t.max_base_jobs then
-        let slots = t.max_base_jobs - space in
-        Some (slots, min (List.length (work_at t ~prepends:1)) (2 * slots))
-      else None )
+          let slots = t.max_base_jobs - space in
+          Some (slots, min (List.length (work_at t ~prepends:1)) (2 * slots))
+        else None )
   }
 
 (** Change the representation of the payloads, keeping the commitment.

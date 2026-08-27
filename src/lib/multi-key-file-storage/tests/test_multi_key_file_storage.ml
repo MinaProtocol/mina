@@ -1,12 +1,13 @@
-open Core_kernel
+open Core
 open Multi_key_file_storage
 
 (* Helper to create temp file names *)
-let temp_filename prefix = Core.Filename.temp_file prefix ".db"
+let temp_filename prefix = Filename_unix.temp_file prefix ".db"
 
 (* Helper to clean up temp files *)
 let cleanup_file filename =
-  try if Sys.file_exists filename then Sys.remove filename with _exn -> ()
+  try if Sys_unix.file_exists_exn filename then Sys_unix.remove filename
+  with _exn -> ()
 
 let simplest_test (type fkey) (module M : S with type filename_key = fkey)
     (filename_key : fkey) =
@@ -127,7 +128,7 @@ let expanded_read_ops_group ?length () =
   let%bind.Q group = list_gen Write_and_test_later.gen in
   let sz = List.length group in
   let%map.Q expansions = Q.list_with_length ~length:sz @@ Q.int_inclusive 1 4 in
-  let expansions_total = List.sum (module Int) ~f:ident expansions in
+  let expansions_total = List.sum (module Int) ~f:Fn.id expansions in
   ( expansions_total
   , fun writer ->
       let read_ops = List.map ~f:(fun f -> f writer) group in
@@ -181,7 +182,7 @@ let op_groups ?length n =
     Q.list_with_length ~length:n @@ expanded_read_ops_group ?length ()
   in
   let total_size = List.sum (module Int) ~f:fst size_and_group_lst in
-  let%map.Q permutation = Q.list_permutations (List.init total_size ~f:ident) in
+  let%map.Q permutation = Q.list_permutations (List.init total_size ~f:Fn.id) in
   let consumers =
     List.map ~f:snd size_and_group_lst
     |> Mina_stdlib.Nonempty_list.of_list_opt

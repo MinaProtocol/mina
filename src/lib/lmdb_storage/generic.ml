@@ -1,5 +1,5 @@
 (* Only show stdout for failed inline tests. *)
-open Core_kernel
+open Core
 
 module type Db = sig
   module T : sig
@@ -68,16 +68,16 @@ module Base (F_func : F) = struct
   let create dir =
     let pagesize =
       Option.(
-        value ~default:4096 (Core.Unix.(sysconf PAGESIZE) >>= Int64.to_int))
+        value ~default:4096 (Core_unix.(sysconf PAGESIZE) >>= Int64.to_int) )
     in
     let max_maps = ref 0 in
     let mk_map ?name key value =
       max_maps := !max_maps + 1 ;
       ref
         (`Uninitialized
-          { initialize =
-              (fun ?txn -> Lmdb.Map.open_existing ?txn ?name Nodup ~key ~value)
-          } )
+           { initialize =
+               (fun ?txn -> Lmdb.Map.open_existing ?txn ?name Nodup ~key ~value)
+           } )
     in
     let h = F.mk_maps { create = mk_map } in
     ({ max_maps = !max_maps; env = ref None; dir; pagesize }, h)
@@ -87,11 +87,14 @@ module Base (F_func : F) = struct
       Lmdb.Env.create ~flags:env_flags ~max_maps
         ~map_size:F.config.initial_mmap_size perm dir
     in
-    if Sys.file_exists dir then Some (create_do ())
-    else if force then (
-      Core.Unix.mkdir_p ~perm:0777 dir ;
-      Some (create_do ()) )
-    else None
+    match Sys_unix.file_exists dir with
+    | `Yes ->
+        Some (create_do ())
+    | _ when force ->
+        Core_unix.mkdir_p ~perm:0777 dir ;
+        Some (create_do ())
+    | _ ->
+        None
 
   let roundup multiple value =
     multiple
@@ -101,11 +104,12 @@ module Base (F_func : F) = struct
   let next_size ~pagesize map_size =
     let default = map_size + F.config.mmap_growth_max_step in
     roundup pagesize @@ Option.value ~default
-    @@ let%bind.Option next =
-         Float.of_int map_size *. F.config.mmap_growth_factor |> Float.iround_up
-       in
-       let%map.Option () = Option.some_if (next < default) () in
-       next
+    @@
+    let%bind.Option next =
+      Float.of_int map_size *. F.config.mmap_growth_factor |> Float.iround_up
+    in
+    let%map.Option () = Option.some_if (next < default) () in
+    next
 
   let with_env ?(force = false) ~perm ~default ~f:unwrapped_f t =
     let rec f env =
@@ -138,7 +142,7 @@ module Base (F_func : F) = struct
         db
 
   let get_impl ?txn ~env lazy_db key =
-    try Lmdb.Map.get ?txn (init_db ?txn ~env lazy_db) key |> Some
+    try Some (Lmdb.Map.get ?txn (init_db ?txn ~env lazy_db) key)
     with Lmdb.Not_found -> None
 
   let set_impl ?txn ~env lazy_db key value =

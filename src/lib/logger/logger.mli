@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 
 type t [@@deriving bin_io]
 
@@ -20,7 +20,7 @@ module Level : sig
 end
 
 module Time : sig
-  include module type of Time
+  include module type of Time_float
 
   val to_yojson : t -> Yojson.Safe.t
 

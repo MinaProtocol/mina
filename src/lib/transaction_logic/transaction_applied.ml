@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Mina_base
 open Signature_lib
 open Mina_transaction
@@ -280,7 +280,7 @@ let supply_increase :
     (* int type is OK, no danger of overflow *)
     Currency.Amount.(
       Signed.of_unsigned
-      @@ of_nanomina_int_exn (account_creation_fee_int * num_accounts_created))
+      @@ of_nanomina_int_exn (account_creation_fee_int * num_accounts_created) )
   in
   let txn : Transaction.t =
     match t.varying with
@@ -312,7 +312,7 @@ let supply_increase :
       [ burned_tokens; account_creation_fees ]
   in
   Option.value_map total ~default:(Or_error.error_string "overflow")
-    ~f:(fun v -> Ok v)
+    ~f:(fun v -> Ok v )
 
 let transaction : t -> Transaction.t =
  fun { varying; _ } ->

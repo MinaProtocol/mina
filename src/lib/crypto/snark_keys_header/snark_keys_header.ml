@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 
 (** The string that preceeds the JSON header, to identify the file kind before
     attempting to parse it.
@@ -19,10 +19,10 @@ module UInt64 = struct
     | `String x ->
         Or_error.try_with (fun () -> Unsigned.UInt64.of_string x)
         |> Result.map_error ~f:(fun err ->
-               sprintf
-                 "Snark_keys_header.UInt64.of_yojson: Could not parse string \
-                  as UInt64: %s"
-                 (Error.to_string_hum err) )
+            sprintf
+              "Snark_keys_header.UInt64.of_yojson: Could not parse string as \
+               UInt64: %s"
+              (Error.to_string_hum err) )
     | _ ->
         Error "Snark_keys_header.UInt64.of_yojson: Expected a string"
 
@@ -146,67 +146,68 @@ let parse_prefix (lexbuf : Lexing.lexbuf) =
       Error.tag_arg err "Could not read prefix" ("prefix", prefix)
         [%sexp_of: string * string] )
   @@ Or_error.try_with_join (fun () ->
-         (* This roughly mirrors the behavior of [Yojson.Safe.read_ident],
+      (* This roughly mirrors the behavior of [Yojson.Safe.read_ident],
             except that we have a known fixed length to parse, and that it is a
             failure to read any string except the prefix. We manually update
             the lexbuf to be consistent with the output of this function.
          *)
-         (* Manually step the lexbuffer forward to the [lex_curr_pos], so that
+      (* Manually step the lexbuffer forward to the [lex_curr_pos], so that
             [refill_buf] will know that we're only interested in buffer
             contents from that position onwards.
          *)
-         lexbuf.lex_start_pos <- lexbuf.lex_curr_pos ;
-         lexbuf.lex_last_pos <- lexbuf.lex_curr_pos ;
-         lexbuf.lex_start_p <- lexbuf.lex_curr_p ;
-         let%bind () =
-           (* Read more if the buffer doesn't contain the whole prefix. *)
-           if lexbuf.lex_buffer_len - lexbuf.lex_curr_pos >= prefix_len then
-             return ()
-           else if lexbuf.lex_eof_reached then
-             Or_error.error_string "Unexpected end-of-file"
-           else (
-             lexbuf.refill_buff lexbuf ;
-             if lexbuf.lex_buffer_len - lexbuf.lex_curr_pos >= prefix_len then
-               return ()
-             else if lexbuf.lex_eof_reached then
-               Or_error.error_string "Unexpected end-of-file"
-             else
-               Or_error.error_string
-                 "Unexpected short read: broken lexbuffer or end-of-file" )
-         in
-         let read_prefix =
-           Lexing.sub_lexeme lexbuf lexbuf.lex_curr_pos
-             (lexbuf.lex_curr_pos + prefix_len)
-         in
-         let%map () =
-           if String.equal prefix read_prefix then return ()
-           else
-             Or_error.error "Incorrect prefix"
-               ("read prefix", read_prefix)
-               [%sexp_of: string * string]
-         in
-         (* Update the positions to match our end state *)
-         lexbuf.lex_curr_pos <- lexbuf.lex_curr_pos + prefix_len ;
-         lexbuf.lex_last_pos <- lexbuf.lex_last_pos ;
-         lexbuf.lex_curr_p <-
-           { lexbuf.lex_curr_p with
-             pos_bol = lexbuf.lex_curr_p.pos_bol + prefix_len
-           ; pos_cnum = lexbuf.lex_curr_p.pos_cnum + prefix_len
-           } ;
-         (* This matches the action given by [Yojson.Safe.read_ident]. *)
-         lexbuf.lex_last_action <- 1 )
+      lexbuf.lex_start_pos <- lexbuf.lex_curr_pos ;
+      lexbuf.lex_last_pos <- lexbuf.lex_curr_pos ;
+      lexbuf.lex_start_p <- lexbuf.lex_curr_p ;
+      let%bind () =
+        (* Read more if the buffer doesn't contain the whole prefix. *)
+        if lexbuf.lex_buffer_len - lexbuf.lex_curr_pos >= prefix_len then
+          return ()
+        else if lexbuf.lex_eof_reached then
+          Or_error.error_string "Unexpected end-of-file"
+        else (
+          lexbuf.refill_buff lexbuf ;
+          if lexbuf.lex_buffer_len - lexbuf.lex_curr_pos >= prefix_len then
+            return ()
+          else if lexbuf.lex_eof_reached then
+            Or_error.error_string "Unexpected end-of-file"
+          else
+            Or_error.error_string
+              "Unexpected short read: broken lexbuffer or end-of-file" )
+      in
+      let read_prefix =
+        Lexing.sub_lexeme lexbuf lexbuf.lex_curr_pos
+          (lexbuf.lex_curr_pos + prefix_len)
+      in
+      let%map () =
+        if String.equal prefix read_prefix then return ()
+        else
+          Or_error.error "Incorrect prefix"
+            ("read prefix", read_prefix)
+            [%sexp_of: string * string]
+      in
+      (* Update the positions to match our end state *)
+      lexbuf.lex_curr_pos <- lexbuf.lex_curr_pos + prefix_len ;
+      lexbuf.lex_last_pos <- lexbuf.lex_last_pos ;
+      lexbuf.lex_curr_p <-
+        { lexbuf.lex_curr_p with
+          pos_bol = lexbuf.lex_curr_p.pos_bol + prefix_len
+        ; pos_cnum = lexbuf.lex_curr_p.pos_cnum + prefix_len
+        } ;
+      (* This matches the action given by [Yojson.Safe.read_ident]. *)
+      lexbuf.lex_last_action <- 1 )
 
 let parse_lexbuf (lexbuf : Lexing.lexbuf) =
   let open Or_error.Let_syntax in
   Result.map_error ~f:(Error.tag ~tag:"Failed to read snark key header")
-  @@ let%bind () = parse_prefix lexbuf in
-     Or_error.try_with (fun () ->
-         let yojson_parsebuffer = Yojson.init_lexer () in
-         (* We use [read_t] here rather than one of the alternatives to avoid
+  @@
+  let%bind () = parse_prefix lexbuf in
+  Or_error.try_with (fun () ->
+      let yojson_parsebuffer = Yojson.init_lexer () in
+      (* We use [read_t] here rather than one of the alternatives to avoid
             'greedy' parsing that will attempt to continue and read the file's
             contents beyond the header.
          *)
-         Yojson.Safe.read_t yojson_parsebuffer lexbuf )
+      Yojson.Safe.read_t yojson_parsebuffer lexbuf )
 
 let write_with_header ~expected_max_size_log2 ~append_data header filename =
   (* In order to write the correct length here, we provide the maximum expected

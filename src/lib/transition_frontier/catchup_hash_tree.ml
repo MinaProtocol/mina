@@ -1,7 +1,6 @@
-open Core_kernel
+open Core
 open Mina_base
 open Frontier_base
-
 module Catchup_job_id = Unique_id.Int ()
 
 module Node = struct
@@ -41,7 +40,7 @@ module State_hash_table = struct
 
   let to_yojson f t : Yojson.Safe.t =
     `Assoc
-      (List.map (State_hash.Table.to_alist t) ~f:(fun (h, x) ->
+      (List.map (Hashtbl.to_alist t) ~f:(fun (h, x) ->
            (State_hash.to_base58_check h, f x) ) )
 end
 

@@ -6,6 +6,13 @@
 --       MinaProtocol/mina-release-toolkit. Pinned to a released version tag
 --       (not a moving tag like :latest) for reproducible CI; bump it
 --       deliberately when a newer toolkit is wanted.
+-- NOTE: minaToolchain* pin the v0.16 opam stack, so they must stay on a sha
+--       built from THIS branch: develop's pins carry v0.14 and will not build
+--       here. Rebuild with !ci-toolchain-me, then bump the sha below to the one
+--       it produced (all five images land on one sha). Do not reach for an
+--       older toolchain sha instead: 3-toolchain curls mina-bench-upload by
+--       version string with no checksum, so an image's behaviour depends on the
+--       date it was built, and rebuilding is the only fix.
 -- NOTE: mina-toolchain and mina-base are published by DIFFERENT pipelines and
 --       their hashes move independently. mina-toolchain comes from
 --       mina-toolchains-build; mina-base from mina-docker-base-build
@@ -22,18 +29,18 @@
 { toolchainBase =
     "europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/ci-toolchain-base:v4"
 , minaToolchainBookworm =
-    { amd64 = "docker.io/minaprotocol/mina-toolchain:4e95b64-bookworm-devnet"
+    { amd64 = "docker.io/minaprotocol/mina-toolchain:44e9e82-bookworm-devnet"
     , arm64 =
-        "docker.io/minaprotocol/mina-toolchain:4e95b64-bookworm-devnet-arm64"
+        "docker.io/minaprotocol/mina-toolchain:44e9e82-bookworm-devnet-arm64"
     }
 , minaToolchainBullseye.amd64 =
-    "docker.io/minaprotocol/mina-toolchain:4e95b64-bullseye-devnet"
+    "docker.io/minaprotocol/mina-toolchain:44e9e82-bullseye-devnet"
 , minaToolchainNoble.amd64 =
-    "docker.io/minaprotocol/mina-toolchain:4e95b64-noble-devnet"
+    "docker.io/minaprotocol/mina-toolchain:44e9e82-noble-devnet"
 , minaToolchainJammy.amd64 =
-    "docker.io/minaprotocol/mina-toolchain:4e95b64-jammy-devnet"
+    "docker.io/minaprotocol/mina-toolchain:44e9e82-jammy-devnet"
 , minaToolchain =
-    "docker.io/minaprotocol/mina-toolchain:4e95b64-bullseye-devnet"
+    "docker.io/minaprotocol/mina-toolchain:44e9e82-bullseye-devnet"
 , minaBaseBookworm =
     { amd64 = "docker.io/minaprotocol/mina-base:86b89d0-bookworm-devnet"
     , arm64 = "docker.io/minaprotocol/mina-base:86b89d0-bookworm-devnet-arm64"

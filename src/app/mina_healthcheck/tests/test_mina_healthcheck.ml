@@ -33,13 +33,15 @@ let read_all_fd fd =
    captured because the [wait --timeout] regression guard turns on a
    ceiling check. *)
 let run_cli args =
-  let start = Time.now () in
+  let start = Time_float.now () in
   let pi = Core_unix.create_process ~prog:bin ~args in
   Core_unix.close pi.stdin ;
   let out = read_all_fd pi.stdout in
   let err = read_all_fd pi.stderr in
   let status = Core_unix.waitpid pi.pid in
-  let elapsed = Time.Span.to_sec (Time.diff (Time.now ()) start) in
+  let elapsed =
+    Time_float.Span.to_sec (Time_float.diff (Time_float.now ()) start)
+  in
   let code =
     match status with
     | Ok () ->
@@ -47,7 +49,7 @@ let run_cli args =
     | Error (`Exit_non_zero n) ->
         n
     | Error (`Signal s) ->
-        128 + Signal.to_system_int s
+        128 + Signal_unix.to_system_int s
   in
   (code, out, err, elapsed)
 

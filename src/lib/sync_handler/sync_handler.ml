@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Async
 open Mina_base
 module Ledger = Mina_ledger.Ledger
@@ -111,7 +111,7 @@ module Make (Inputs : Inputs_intf) :
      Shared by the whole-scan-state RPC and the fragment-wise one. *)
   let protocol_states_of_scan_state ~frontier scan_state =
     Staged_ledger.Scan_state.required_state_hashes scan_state
-    |> State_hash.Set.to_list
+    |> Set.to_list
     |> List.fold_until ~init:(Some [])
          ~f:(fun acc hash ->
            match
@@ -228,7 +228,7 @@ module Make (Inputs : Inputs_intf) :
       let%map validated_transition =
         Option.merge
           Transition_frontier.(
-            find frontier hash >>| Breadcrumb.validated_transition)
+            find frontier hash >>| Breadcrumb.validated_transition )
           ( find_in_root_history frontier hash
           >>| Root_data.Historical.transition )
           ~f:Fn.const
@@ -288,8 +288,8 @@ module Make (Inputs : Inputs_intf) :
       let open Context in
       let open Deferred.Result.Let_syntax in
       (*TODO: use precomputed_values.genesis_constants that's already passed*)
-      let%bind ( (`Root _, `Best_tip (best_tip_transition, _)) as
-               verified_witness ) =
+      let%bind
+          ((`Root _, `Best_tip (best_tip_transition, _)) as verified_witness) =
         Best_tip_prover.verify ~verifier
           ~genesis_constants:precomputed_values.genesis_constants
           ~precomputed_values peer_root

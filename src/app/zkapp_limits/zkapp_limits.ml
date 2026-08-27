@@ -1,5 +1,5 @@
 (*All the limits set for zkApp transactions*)
-open Core_kernel
+open Core
 
 let main () =
   let (module G) = Genesis_constants.profiled () in

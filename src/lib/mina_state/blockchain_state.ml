@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Mina_base
 open Snark_params.Tick
 open Currency
@@ -203,7 +203,7 @@ let display
   ; timestamp =
       ( match Block_time.to_time_exn timestamp with
       | t ->
-          Time.to_string_trimmed ~zone:Time.Zone.utc t
+          Time_float.to_string_trimmed ~zone:Time_float.Zone.utc t
       | exception _ ->
           Block_time.to_string_exn timestamp )
   ; body_reference =

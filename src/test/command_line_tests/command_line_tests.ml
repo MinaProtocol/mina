@@ -48,7 +48,10 @@ module DaemonRecover = struct
      let%map () = Daemon.Client.stop_daemon process.client in
      Ok () )
     >>| function
-    | Ok () -> Mina_automation_fixture.Intf.Passed | Error err -> Failed err
+    | Ok () ->
+        Mina_automation_fixture.Intf.Passed
+    | Error err ->
+        Failed err
 end
 
 let contain_log_output output =
@@ -57,22 +60,22 @@ let contain_log_output output =
 let log_contains_structured_async_exception logs =
   String.split_lines logs
   |> List.exists ~f:(fun line ->
-         match Yojson.Safe.from_string line with
-         | exception _ ->
-             false
-         | json -> (
-             match Yojson.Safe.Util.member "message" json with
-             | `String "Unhandled Async exception: $exn" -> (
-                 match
-                   Yojson.Safe.Util.member "metadata" json
-                   |> Yojson.Safe.Util.member "exn"
-                 with
-                 | `Null ->
-                     false
-                 | _ ->
-                     true )
-             | _ ->
-                 false ) )
+      match Yojson.Safe.from_string line with
+      | exception _ ->
+          false
+      | json -> (
+          match Yojson.Safe.Util.member "message" json with
+          | `String "Unhandled Async exception: $exn" -> (
+              match
+                Yojson.Safe.Util.member "metadata" json
+                |> Yojson.Safe.Util.member "exn"
+              with
+              | `Null ->
+                  false
+              | _ ->
+                  true )
+          | _ ->
+              false ) )
 
 module LedgerHash = struct
   type t = Mina_automation_fixture.Daemon.before_bootstrap
@@ -206,7 +209,7 @@ module AdvancedCompileTimeConstants = struct
     let config_content =
       Printf.sprintf "{ \"ledger\":{ \"accounts\":%s } }" config_content
     in
-    let temp_file = Filename.temp_file "commandline" "ledger.json" in
+    let temp_file = Filename_unix.temp_file "commandline" "ledger.json" in
     Yojson.Safe.from_string config_content |> Yojson.Safe.to_file temp_file ;
     let%map output =
       Daemon.Client.advanced_compile_time_constants client
@@ -309,15 +312,16 @@ module AutoHardforkConfigGeneration = struct
         ~error:"Generated config missing genesis_state_timestamp"
     in
     (* Parse timestamps and calculate expected offset *)
-    let old_time = Time.of_string old_genesis_timestamp in
-    let new_time = Time.of_string new_genesis_timestamp in
+    let old_time = Time_float_unix.of_string old_genesis_timestamp in
+    let new_time = Time_float_unix.of_string new_genesis_timestamp in
     let expected_offset_ms =
       Int64.( * )
         (Int64.of_int expected_fork_slot)
         (Int64.of_int slot_duration_ms)
     in
     let actual_offset_ms =
-      Time.diff new_time old_time |> Time.Span.to_ms |> Int64.of_float
+      Time_float.diff new_time old_time
+      |> Time_float.Span.to_ms |> Int64.of_float
     in
     (* Verify timestamp offset *)
     if Int64.( <> ) actual_offset_ms expected_offset_ms then
@@ -404,8 +408,9 @@ module AutoHardforkConfigGeneration = struct
       now_unix_ts - (now_unix_ts mod 60) + (delay_minutes * 60)
     in
     let genesis_timestamp =
-      Time.of_span_since_epoch (Time.Span.of_int_sec genesis_unix_ts)
-      |> Time.to_string_iso8601_basic ~zone:Time.Zone.utc
+      Time_float.of_span_since_epoch
+        (Time_float.Span.of_int_sec genesis_unix_ts)
+      |> Time_float.to_string_iso8601_basic ~zone:Time_float.Zone.utc
     in
     let genesis : Runtime_config.Genesis.t =
       { k = None
@@ -462,8 +467,8 @@ module AutoHardforkConfigGeneration = struct
     let conf_dir = test.config.dirs.conf in
     let auto_fork_dir = conf_dir ^/ "auto-fork-mesa-devnet" in
     let activated = auto_fork_dir ^/ "activated" in
-    let start_time = Core.Time.now () in
-    let timeout = Core.Time.Span.of_min 10. in
+    let start_time = Time_float.now () in
+    let timeout = Time_float.Span.of_min 10. in
     let rec poll_for_activated () =
       let%bind.Deferred activated_exists = Sys.file_exists activated in
       match activated_exists with
@@ -471,12 +476,12 @@ module AutoHardforkConfigGeneration = struct
           Deferred.return `Success
       | `No | `Unknown ->
           if
-            Core.Time.Span.( > )
-              (Core.Time.diff (Core.Time.now ()) start_time)
+            Time_float.Span.( > )
+              (Time_float.diff (Time_float.now ()) start_time)
               timeout
           then Deferred.return `Timeout
           else
-            let%bind.Deferred () = Async.after (Core.Time.Span.of_sec 5.) in
+            let%bind.Deferred () = Async.after (Time_float.Span.of_sec 5.) in
             poll_for_activated ()
     in
     let%bind.Deferred result = poll_for_activated () in
@@ -489,7 +494,8 @@ module AutoHardforkConfigGeneration = struct
     | `Success -> (
         (* Wait for daemon to auto-shutdown after generating hardfork config *)
         match%bind.Deferred
-          Async.Clock.with_timeout (Core.Time.Span.of_min 5.)
+          Async.Clock.with_timeout
+            (Time_float.Span.of_min 5.)
             (Process.wait process.process)
         with
         | `Timeout ->
@@ -535,7 +541,8 @@ module HardforkStateDirMismatch = struct
         daemon
     in
     match%bind
-      Async.Clock.with_timeout (Core.Time.Span.of_sec 5.)
+      Async.Clock.with_timeout
+        (Time_float.Span.of_sec 5.)
         (Process.wait process.process)
     with
     | `Timeout ->
@@ -572,12 +579,12 @@ module MisconfiguredWalletCrashLog = struct
       Mina_automation_fixture.Daemon.generate_random_config daemon ledger_file
     in
     let wallets_dir = dirs.conf ^/ "wallets" in
-    Core.Unix.mkdir_p wallets_dir ;
+    Core_unix.mkdir_p wallets_dir ;
     Out_channel.write_all (wallets_dir ^/ "store") ~data:"not a directory" ;
     let%bind process = Daemon.start daemon in
     match%bind
       Async.Clock.with_timeout
-        (Core.Time.Span.of_sec 15.)
+        (Time_float.Span.of_sec 15.)
         (Process.wait process.process)
     with
     | `Timeout ->
@@ -780,7 +787,7 @@ module PeerListUrlInvalidScheme = struct
     in
     match%bind
       Async.Clock.with_timeout
-        (Core.Time.Span.of_sec 30.)
+        (Time_float.Span.of_sec 30.)
         (Process.wait process.process)
     with
     | `Timeout ->
@@ -817,7 +824,7 @@ module PeerListUrlNoScheme = struct
     let%bind process = Daemon.start ~peer_list_url:"not-a-url-at-all" daemon in
     match%bind
       Async.Clock.with_timeout
-        (Core.Time.Span.of_sec 30.)
+        (Time_float.Span.of_sec 30.)
         (Process.wait process.process)
     with
     | `Timeout ->
@@ -858,10 +865,11 @@ module PeerListUrlHttpWarning = struct
     in
     (* The daemon should not crash immediately from URL validation.
        Give it a few seconds to get past the peer-list-url check. *)
-    let%bind () = after (Core.Time.Span.of_sec 10.) in
+    let%bind () = after (Time_float.Span.of_sec 10.) in
     (* Check if the process is still running *)
     let%bind process_status =
-      Async.Clock.with_timeout (Core.Time.Span.of_sec 1.)
+      Async.Clock.with_timeout
+        (Time_float.Span.of_sec 1.)
         (Process.wait process.process)
     in
     let%bind () =
@@ -910,10 +918,11 @@ module PeerListUrlValidHttps = struct
     in
     (* The daemon should not crash immediately from URL validation.
        Give it a few seconds to get past the peer-list-url check. *)
-    let%bind () = after (Core.Time.Span.of_sec 5.) in
+    let%bind () = after (Time_float.Span.of_sec 5.) in
     (* Check if the process is still running *)
     match%bind
-      Async.Clock.with_timeout (Core.Time.Span.of_sec 1.)
+      Async.Clock.with_timeout
+        (Time_float.Span.of_sec 1.)
         (Process.wait process.process)
     with
     | `Timeout ->
@@ -972,8 +981,8 @@ module NodeStatusReport = struct
 
   (** Poll [/collected-status] until at least one payload arrives. *)
   let poll_for_status ~port ~timeout_min =
-    let start_time = Core.Time.now () in
-    let timeout = Core.Time.Span.of_min timeout_min in
+    let start_time = Time_float.now () in
+    let timeout = Time_float.Span.of_min timeout_min in
     let rec go () =
       let%bind statuses_result =
         Node_status_mock_server.collected_status ~port
@@ -986,13 +995,13 @@ module NodeStatusReport = struct
             )
       | Ok [] ->
           if
-            Core.Time.Span.( > )
-              (Core.Time.diff (Core.Time.now ()) start_time)
+            Time_float.Span.( > )
+              (Time_float.diff (Time_float.now ()) start_time)
               timeout
           then
             Deferred.return (Error "Timed out waiting for node status reports")
           else
-            let%bind () = after (Core.Time.Span.of_sec 5.) in
+            let%bind () = after (Time_float.Span.of_sec 5.) in
             go ()
       | Ok (hd :: rest) ->
           Deferred.return (Ok (Mina_stdlib.Nonempty_list.init hd rest))
@@ -1166,13 +1175,16 @@ module HealthcheckUnreachable = struct
   let test_case (_test : t) =
     let unreachable_uri = Uri.of_string "http://127.0.0.1:1/graphql" in
     let deadline =
-      Time.add (Time.now ()) (Time.Span.of_sec inner_deadline_secs)
+      Time_float.add (Time_float.now ())
+        (Time_float.Span.of_sec inner_deadline_secs)
     in
-    let start = Time.now () in
+    let start = Time_float.now () in
     let%map result =
       GC.get_sync_status ~deadline ~logger:hc_logger unreachable_uri
     in
-    let elapsed = Time.Span.to_sec (Time.diff (Time.now ()) start) in
+    let elapsed =
+      Time_float.Span.to_sec (Time_float.diff (Time_float.now ()) start)
+    in
     match result with
     | Ok _ ->
         Mina_automation_fixture.Intf.Failed

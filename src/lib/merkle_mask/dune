@@ -27,7 +27,6 @@
   base.caml
   bitstring
   core
-  core.uuid
   core_kernel
   core_kernel.uuid
   integers
@@ -41,10 +40,13 @@
   visualization)
  (preprocess
   (pps
+   ppx_assert
    ppx_compare
+   ppx_custom_printf
    ppx_deriving.show
    ppx_deriving_yojson
-   ppx_jane
+   ppx_here
+   ppx_let
    ppx_mina
    ppx_version))
  (instrumentation

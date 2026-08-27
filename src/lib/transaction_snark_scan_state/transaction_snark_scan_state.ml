@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Async
 open Mina_base
 open Mina_transaction
@@ -250,13 +250,13 @@ let stable_payload_digest :
    whose digests the structure already maintains. [tx_witness_hash] is still
    needed for [previous_incomplete_zkapp_updates], which sits alongside the
    scan state rather than in it. *)
-let hash_generic :
-    type a b.
+let hash_generic : type a b.
        tx_witness_hash:(b -> string)
     -> (a, b) Parallel_scan.t
        * (b list * [ `Border_block_continued_in_the_next_tree of bool ])
     -> Staged_ledger_hash.Aux_hash.t =
- fun ~tx_witness_hash (parallel_scan_state, previous_incomplete_zkapp_updates) ->
+ fun ~tx_witness_hash
+     (parallel_scan_state, previous_incomplete_zkapp_updates) ->
   let state_hash = Parallel_scan.hash parallel_scan_state in
   let ( previous_incomplete_zkapp_updates
       , `Border_block_continued_in_the_next_tree continue_in_next_tree ) =
@@ -264,7 +264,7 @@ let hash_generic :
   in
   let incomplete_updates =
     List.fold ~init:(Digestif.SHA256.init ()) previous_incomplete_zkapp_updates
-      ~f:(fun h t -> Digestif.SHA256.feed_string h (tx_witness_hash t))
+      ~f:(fun h t -> Digestif.SHA256.feed_string h (tx_witness_hash t) )
     |> Digestif.SHA256.get
   in
   let continue_in_next_tree =
@@ -272,7 +272,7 @@ let hash_generic :
   in
   [ state_hash; incomplete_updates; continue_in_next_tree ]
   |> List.fold ~init:(Digestif.SHA256.init ()) ~f:(fun h t ->
-         Digestif.SHA256.feed_string h (Digestif.SHA256.to_raw_string t) )
+      Digestif.SHA256.feed_string h (Digestif.SHA256.to_raw_string t) )
   |> Digestif.SHA256.get |> Staged_ledger_hash.Aux_hash.of_sha256
 
 (*Scan state and any zkapp updates that were applied to the to the most recent
@@ -346,9 +346,10 @@ let create_expected_statement ~constraint_constants
   let%bind protocol_state = get_state (fst state_hash) in
   let state_view = Mina_state.Protocol_state.Body.view protocol_state.body in
   let empty_local_state = Mina_state.Local_state.empty () in
-  let%bind ( target_first_pass_merkle_root
-           , target_second_pass_merkle_root
-           , supply_increase ) =
+  let%bind
+      ( target_first_pass_merkle_root
+      , target_second_pass_merkle_root
+      , supply_increase ) =
     let%bind first_pass_ledger_after_apply, partially_applied_transaction =
       Sparse_ledger.apply_transaction_first_pass ~constraint_constants
         ~global_slot:block_global_slot ~txn_state_view:state_view
@@ -425,9 +426,9 @@ struct
   module Timer = struct
     module Info = struct
       module Time_span = struct
-        type t = Time.Span.t
+        type t = Time_float.Span.t
 
-        let to_yojson t = `Float (Time.Span.to_ms t)
+        let to_yojson t = `Float (Time_float.Span.to_ms t)
       end
 
       type t =
@@ -441,10 +442,10 @@ struct
       let singleton time = { total = time; count = 1; max = time; min = time }
 
       let update (t : t) time =
-        { total = Time.Span.( + ) t.total time
+        { total = Time_float.Span.( + ) t.total time
         ; count = t.count + 1
-        ; min = Time.Span.min t.min time
-        ; max = Time.Span.max t.max time
+        ; min = Time_float.Span.min t.min time
+        ; max = Time_float.Span.max t.max time
         }
     end
 
@@ -453,9 +454,9 @@ struct
     let create ~logger () : t = { table = String.Table.create (); logger }
 
     let time (t : t) label f =
-      let start = Time.now () in
+      let start = Time_float.now () in
       let x = f () in
-      let elapsed = Time.(diff (now ()) start) in
+      let elapsed = Time_float.(diff (now ()) start) in
       Hashtbl.update t.table label ~f:(function
         | None ->
             Info.singleton elapsed
@@ -688,7 +689,7 @@ struct
         Error e
     | Error `Empty ->
         Option.value_map ~default:(Ok ()) last_proof_statement
-          ~f:(fun statement -> check_registers statement.target registers_end)
+          ~f:(fun statement -> check_registers statement.target registers_end )
     | Ok
         ( { fee_excess = { fee_token_l; fee_excess_l; fee_token_r; fee_excess_r }
           ; source = _
@@ -793,9 +794,9 @@ module Transactions_ordered = struct
               List.fold ~init:([], [], target_first_pass_ledger)
                 txns_with_witnesses
                 ~f:(fun
-                     (first_pass_txns, second_pass_txns, _old_root)
-                     (txn_with_witness : Transaction_with_witness.t)
-                   ->
+                    (first_pass_txns, second_pass_txns, _old_root)
+                    (txn_with_witness : Transaction_with_witness.t)
+                  ->
                   let txn = txn_with_witness.transaction_with_status.data in
                   let target_first_pass_ledger =
                     txn_with_witness.statement.target.first_pass_ledger
@@ -1005,7 +1006,7 @@ let apply_ordered_txns_stepwise ?(stop_at_first_pass = false) ordered_txns
         if Transaction_status.equal expected_status status then
           Ok
             (`Continue
-              (fun () -> apply_txns_second_pass ~k partially_applied_txns') )
+               (fun () -> apply_txns_second_pass ~k partially_applied_txns') )
         else
           Or_error.errorf
             !"Transaction produced unxpected application status. Expected \
@@ -1294,8 +1295,8 @@ let snark_job_list_json t =
   in
   Yojson.Safe.to_string
     (`List
-      (List.map all_jobs ~f:(fun tree ->
-           `List (List.map tree ~f:Job_view.to_yojson) ) ) )
+       (List.map all_jobs ~f:(fun tree ->
+            `List (List.map tree ~f:Job_view.to_yojson) ) ) )
 
 (*Always the same pairing of jobs*)
 let all_work_statements_exn t : Transaction_snark_work.Statement.t list =
@@ -1316,7 +1317,7 @@ let required_work_pairs t ~slots =
 let k_work_pairs_for_new_diff t ~k =
   let work_list = Parallel_scan.jobs_for_next_update t.scan_state in
   List.(
-    take (concat_map work_list ~f:(fun works -> One_or_two.group_list works)) k)
+    take (concat_map work_list ~f:(fun works -> One_or_two.group_list works)) k )
 
 (*Always the same pairing of jobs*)
 let work_statements_for_new_diff t : Transaction_snark_work.Statement.t list =
@@ -1397,21 +1398,21 @@ let update_metrics t =
   Or_error.try_with (fun () ->
       List.iteri (Parallel_scan.metrics t.scan_state)
         ~f:(fun
-             i
-             { Parallel_scan.Tree_metrics.available_space
-             ; base_jobs_todo
-             ; merge_jobs_todo
-             }
-           ->
+            i
+            { Parallel_scan.Tree_metrics.available_space
+            ; base_jobs_todo
+            ; merge_jobs_todo
+            }
+          ->
           let name = sprintf "tree%d" i in
           Mina_metrics.(
-            Gauge.set (Scan_state_metrics.scan_state_available_space ~name))
+            Gauge.set (Scan_state_metrics.scan_state_available_space ~name) )
             (Float.of_int available_space) ;
           Mina_metrics.(
-            Gauge.set (Scan_state_metrics.scan_state_base_snarks ~name))
+            Gauge.set (Scan_state_metrics.scan_state_base_snarks ~name) )
             (Float.of_int base_jobs_todo) ;
           Mina_metrics.(
-            Gauge.set (Scan_state_metrics.scan_state_merge_snarks ~name))
+            Gauge.set (Scan_state_metrics.scan_state_merge_snarks ~name) )
             (Float.of_int merge_jobs_todo) ) )
 
 let fill_work_and_enqueue_transactions t ~logger transactions work =
@@ -1456,7 +1457,8 @@ let fill_work_and_enqueue_transactions t ~logger transactions work =
             ~default:
               (curr_stmt, ([], `Border_block_continued_in_the_next_tree false))
             old_proof_and_incomplete_zkapp_updates
-            ~f:(fun ({ data = p'; _ }, incomplete_zkapp_updates_from_old_proof) ->
+            ~f:(fun
+                ({ data = p'; _ }, incomplete_zkapp_updates_from_old_proof) ->
               ( Ledger_proof.Cached.statement p'
               , incomplete_zkapp_updates_from_old_proof ) )
         in
@@ -1501,7 +1503,7 @@ let check_required_protocol_states t ~protocol_states =
   let open Or_error.Let_syntax in
   let required_state_hashes = required_state_hashes t in
   let check_length states =
-    let required = State_hash.Set.length required_state_hashes in
+    let required = Set.length required_state_hashes in
     let received = List.length states in
     if required = received then Or_error.return ()
     else
@@ -1514,14 +1516,12 @@ let check_required_protocol_states t ~protocol_states =
   let received_state_map =
     List.fold protocol_states ~init:Mina_base.State_hash.Map.empty
       ~f:(fun m ps ->
-        State_hash.Map.set m
-          ~key:(State_hash.With_state_hashes.state_hash ps)
-          ~data:ps )
+        Map.set m ~key:(State_hash.With_state_hashes.state_hash ps) ~data:ps )
   in
   let protocol_states_assoc =
     List.filter_map
-      (State_hash.Set.to_list required_state_hashes)
-      ~f:(State_hash.Map.find received_state_map)
+      (Set.to_list required_state_hashes)
+      ~f:(Map.find received_state_map)
   in
   let%map () = check_length protocol_states_assoc in
   protocol_states_assoc
@@ -1594,7 +1594,7 @@ module Sync = struct
       let scan_state_hash = Parallel_scan_sync.Manifest.root t.scan_state in
       let incomplete_updates =
         Array.fold ~init:(Digestif.SHA256.init ()) t.previous_incomplete
-          ~f:(fun h digest -> Digestif.SHA256.feed_string h digest)
+          ~f:(fun h digest -> Digestif.SHA256.feed_string h digest )
         |> Digestif.SHA256.get
       in
       let continued =
@@ -1603,7 +1603,7 @@ module Sync = struct
       in
       [ scan_state_hash; incomplete_updates; continued ]
       |> List.fold ~init:(Digestif.SHA256.init ()) ~f:(fun h d ->
-             Digestif.SHA256.feed_string h (Digestif.SHA256.to_raw_string d) )
+          Digestif.SHA256.feed_string h (Digestif.SHA256.to_raw_string d) )
       |> Digestif.SHA256.get |> Staged_ledger_hash.Aux_hash.of_sha256
 
     let ledger_hash t = t.ledger_hash
@@ -1826,8 +1826,8 @@ module Sync = struct
                      (Int.min (Array.length digests)
                         Query.max_payloads_per_query )
                |> Array.filter_map ~f:(fun digest ->
-                      Option.map (payload_bytes t ~digest) ~f:(fun bytes ->
-                          (digest, bytes) ) ) ) )
+                   Option.map (payload_bytes t ~digest) ~f:(fun bytes ->
+                       (digest, bytes) ) ) ) )
   end
 
   module Request = Parallel_scan_sync.Request
@@ -1904,8 +1904,7 @@ module Sync = struct
       Parallel_scan_sync.Builder.wanted t.inner
       @ ( Hashtbl.to_alist t.incomplete
         |> List.filter_map ~f:(fun (digest, bytes) ->
-               Option.some_if (Option.is_none bytes) (Request.Payload digest) )
-        )
+            Option.some_if (Option.is_none bytes) (Request.Payload digest) ) )
 
     let add_band t ~tree band =
       Parallel_scan_sync.Builder.add_band t.inner ~tree band

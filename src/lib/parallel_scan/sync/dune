@@ -5,14 +5,22 @@
   (flags -verbose -show-counts))
  (libraries
   ;; opam libraries
-  core_kernel
+  core
   digestif
   ;; local libraries
   mina_stdlib
   parallel_scan
   ppx_version.runtime)
  (preprocess
-  (pps ppx_jane ppx_version))
+  (pps
+   ppx_assert
+   ppx_compare
+   ppx_hash
+   ppx_inline_test
+   ppx_let
+   ppx_sexp_conv
+   ppx_sexp_message
+   ppx_version))
  (instrumentation
   (backend bisect_ppx))
  (synopsis "Fragment-wise synchronisation of a parallel scan state"))

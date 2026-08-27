@@ -433,7 +433,7 @@ let get_status ~flag t =
     | Full full ->
         Some
           (List.map (Hashtbl.to_alist full.states) ~f:(fun (state, hashes) ->
-               (state, State_hash.Set.length hashes) ) )
+               (state, Set.length hashes) ) )
   in
   let scan_state_sync_status =
     Option.map
@@ -486,7 +486,7 @@ let get_status ~flag t =
   ; snark_worker
   ; snark_work_fee
   ; block_production_keys =
-      Public_key.Compressed.Set.to_list block_production_keys
+      Set.to_list block_production_keys
       |> List.map ~f:Public_key.Compressed.to_base58_check
   ; coinbase_receiver =
       Option.map ~f:Public_key.Compressed.to_base58_check coinbase_receiver

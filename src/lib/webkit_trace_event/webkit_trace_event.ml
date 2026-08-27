@@ -3,7 +3,7 @@
   https://docs.google.com/document/d/1CvAClvFfyA5R-PhYUmn5OOQtYMH4h6I0nSsKchNAySU/
 *)
 
-open Core_kernel
+open Core
 
 type event_kind =
   | New_thread

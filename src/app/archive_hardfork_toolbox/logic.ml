@@ -438,10 +438,9 @@ let convert_chain_to_canonical ~postgres_uri ?target_block_hash ?fork_height
         (Sql.blocks_to_orphan ~canonical_block_ids ~stop_at_slot
            ~fork_boundary_slot ~protocol_version:expected_protocol_version )
   in
-  let%bind ( canonical_count
-           , pending_to_canonical
-           , orphaned_count
-           , pending_to_orphaned ) =
+  let%bind
+      canonical_count, pending_to_canonical, orphaned_count, pending_to_orphaned
+      =
     query_db
       ~f:
         (Sql.conversion_summary_counts ~canonical_block_ids ~stop_at_slot
@@ -459,8 +458,8 @@ let convert_chain_to_canonical ~postgres_uri ?target_block_hash ?fork_height
         ; untouched = false
         ; reason =
             ( if String.equal hash latest_block_state_hash then
-              "fork parent (target)"
-            else "on chain to target" )
+                "fork parent (target)"
+              else "on chain to target" )
         } )
   in
   let orphan_changes =

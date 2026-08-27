@@ -5,7 +5,7 @@
     Subject:    Test signaturtes.
  *)
 
-open Core_kernel
+open Core
 open Mina_base
 open Signature
 

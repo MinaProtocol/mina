@@ -12,7 +12,7 @@
    All types are versioned, because Works distributed by the Selector would need
    to be passed around the network between Coordinater and Snark Worker.
  *)
-open Core_kernel
+open Core
 
 module Single = struct
   module Spec = Single_spec

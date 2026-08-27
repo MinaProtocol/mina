@@ -2,8 +2,8 @@ module Scalars = Graphql_lib.Scalars
 module Serializing = Graphql_lib.Serializing
 
 module Get_all_transactions =
-[%graphql
-{|
+  [%graphql
+  {|
     query all_transactions {
       pooledUserCommands(publicKey: null) {
         hash @ppxCustom(module: "Scalars.String_json")
@@ -12,8 +12,8 @@ module Get_all_transactions =
 |}]
 
 module Get_transactions_by_hash =
-[%graphql
-{|
+  [%graphql
+  {|
     query all_transactions_by_hash($hashes: [String!]) {
       pooledUserCommands(hashes: $hashes) {
         hash @ppxCustom(module: "Scalars.String_json")
@@ -41,7 +41,7 @@ module Get_transactions_by_hash =
 module Mina_currency = Currency
 
 (* Avoid shadowing graphql_ppx functions *)
-open Core_kernel
+open Core
 open Async
 open Rosetta_lib
 open Rosetta_models
@@ -159,7 +159,7 @@ module Transaction = struct
           (fun ~hash ->
             Graphql.query ~minimum_user_command_fee
               Get_transactions_by_hash.(
-                make @@ makeVariables ~hashes:[| hash |] ())
+                make @@ makeVariables ~hashes:[| hash |] () )
               graphql_uri )
       ; validate_network_choice = Network.Validate_choice.Real.validate
       }
@@ -216,7 +216,7 @@ module Transaction = struct
                  method pooledUserCommands =
                    User_command_info.dummies
                    |> List.map ~f:(fun info ->
-                          `UserCommand (obj_of_user_command_info info) )
+                       `UserCommand (obj_of_user_command_info info) )
                    |> List.to_array
                end )
       ; validate_network_choice = Network.Validate_choice.Mock.succeed

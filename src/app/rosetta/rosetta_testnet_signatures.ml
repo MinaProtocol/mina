@@ -5,7 +5,7 @@ let () =
   let (module G) = Genesis_constants.profiled () in
   let genesis_constants = G.genesis_constants in
   let constraint_constants = G.constraint_constants in
-  Command.run
+  Command_unix.run
     (Command.async ~summary:"Run Rosetta process on top of Mina"
        (command ~signature_kind:Mina_signature_kind.Testnet ()
           ~account_creation_fee:constraint_constants.account_creation_fee

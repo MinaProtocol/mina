@@ -208,8 +208,8 @@ module Worker_state = struct
                        ~constraint_constants ~pending_coinbase )
                   next_state
                 |> Or_error.map ~f:(fun () ->
-                       Blockchain_snark.Blockchain.create ~state:next_state
-                         ~proof:(Lazy.force Mina_base.Proof.blockchain_dummy) )
+                    Blockchain_snark.Blockchain.create ~state:next_state
+                      ~proof:(Lazy.force Mina_base.Proof.blockchain_dummy) )
               in
               Or_error.iter_error res ~f:(fun e ->
                   [%log error]
@@ -290,7 +290,7 @@ module Functions = struct
 
   let verify_blockchain =
     create Blockchain.Stable.Latest.bin_t
-      [%bin_type_class: unit Core_kernel.Or_error.Stable.V2.t] (fun w chain ->
+      [%bin_type_class: unit Core.Or_error.Stable.V2.t] (fun w chain ->
         let (module W) = Worker_state.get w in
         W.verify
           (Blockchain_snark.Blockchain.state chain)
@@ -348,9 +348,10 @@ module Worker = struct
     end
 
     module Functions
-        (C : Rpc_parallel.Creator
-               with type worker_state := Worker_state.t
-                and type connection_state := Connection_state.t) =
+        (C :
+          Rpc_parallel.Creator
+            with type worker_state := Worker_state.t
+             and type connection_state := Connection_state.t) =
     struct
       let functions =
         let f (i, o, f) =
@@ -432,7 +433,8 @@ let create ~logger ?(enable_internal_tracing = false) ?internal_trace_filename
   in
   let%map connection, process =
     (* HACK: Need to make connection_timeout long since creating a prover can take a long time*)
-    Worker.spawn_in_foreground_exn ~connection_timeout:(Time.Span.of_min 1.)
+    Worker.spawn_in_foreground_exn
+      ~connection_timeout:(Time_float.Span.of_min 1.)
       ~on_failure ~shutdown_on:Connection_closed ~connection_state_init_arg:()
       { conf_dir
       ; enable_internal_tracing
@@ -553,7 +555,7 @@ let extend_blockchain { connection; logger; _ } chain next_state block
 let prove t ~prev_state ~prev_state_proof ~next_state
     (transition : Internal_transition.t) pending_coinbase =
   let open Deferred.Or_error.Let_syntax in
-  let start_time = Core.Time.now () in
+  let start_time = Time_float.now () in
   let%map chain =
     extend_blockchain t
       (Blockchain.create ~proof:prev_state_proof ~state:prev_state)
@@ -565,7 +567,7 @@ let prove t ~prev_state ~prev_state_proof ~next_state
   in
   Mina_metrics.(
     Gauge.set Cryptography.blockchain_proving_time_ms
-      (Core.Time.Span.to_ms @@ Core.Time.diff (Core.Time.now ()) start_time)) ;
+      (Time_float.Span.to_ms @@ Time_float.diff (Time_float.now ()) start_time) ) ;
   Blockchain_snark.Blockchain.proof chain
 
 let create_genesis_block_inputs (genesis_inputs : Genesis_proof.Inputs.t) =
@@ -631,7 +633,7 @@ let create_genesis_block_locally (worker_state : Worker_state.t)
     ledger_proof_opt prover_state pending_coinbase
 
 let create_genesis_block t (genesis_inputs : Genesis_proof.Inputs.t) =
-  let start_time = Core.Time.now () in
+  let start_time = Time_float.now () in
   let ( blockchain
       , protocol_state
       , snark_transition
@@ -646,7 +648,7 @@ let create_genesis_block t (genesis_inputs : Genesis_proof.Inputs.t) =
   in
   Mina_metrics.(
     Gauge.set Cryptography.blockchain_proving_time_ms
-      (Core.Time.Span.to_ms @@ Core.Time.diff (Core.Time.now ()) start_time)) ;
+      (Time_float.Span.to_ms @@ Time_float.diff (Time_float.now ()) start_time) ) ;
   chain
 
 let toggle_internal_tracing { connection; _ } enabled =

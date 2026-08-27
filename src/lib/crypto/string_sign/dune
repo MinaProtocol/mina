@@ -20,5 +20,5 @@
  (instrumentation
   (backend bisect_ppx))
  (preprocess
-  (pps ppx_mina ppx_jane ppx_version))
+  (pps ppx_mina ppx_version))
  (synopsis "Schnorr signatures for strings"))

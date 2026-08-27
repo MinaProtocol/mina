@@ -1,5 +1,5 @@
 (* state_hash.ml *)
-open Core_kernel
+open Core
 module T = Data_hash_lib.State_hash
 include T
 

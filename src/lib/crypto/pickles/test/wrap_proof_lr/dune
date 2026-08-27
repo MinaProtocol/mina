@@ -1,11 +1,11 @@
 (test
  (name test_wrap_proof_lr)
- (flags (:standard) -open Core_kernel -open Pickles)
+ (flags (:standard) -open Core -open Pickles)
  (preprocess
   (pps ppx_jane))
  (libraries
   alcotest
-  core_kernel
+  core
   kimchi_backend
   kimchi_backend_common
   pickles

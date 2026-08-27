@@ -25,8 +25,8 @@ let list_argument_test () =
   let query = "{ bool_list(x: [false, true]) }" in
   test_query query
     (`Assoc
-      [ ("data", `Assoc [ ("bool_list", `List [ `Bool false; `Bool true ]) ]) ]
-      )
+       [ ("data", `Assoc [ ("bool_list", `List [ `Bool false; `Bool true ]) ]) ]
+    )
 
 let input_object_argument_test () =
   let query =
@@ -44,17 +44,17 @@ let null_for_required_argument_test () =
   let query = "{ input_obj(x: null) }" in
   test_query query
     (`Assoc
-      [ ( "errors"
-        , `List
-            [ `Assoc
-                [ ( "message"
-                  , `String
-                      "Argument `x` of type `person!` expected on field \
-                       `input_obj`, found null." )
-                ]
-            ] )
-      ; ("data", `Null)
-      ] )
+       [ ( "errors"
+         , `List
+             [ `Assoc
+                 [ ( "message"
+                   , `String
+                       "Argument `x` of type `person!` expected on field \
+                        `input_obj`, found null." )
+                 ]
+             ] )
+       ; ("data", `Null)
+       ] )
 
 let missing_optional_argument_test () =
   let query = "{ string }" in
@@ -64,17 +64,17 @@ let missing_required_argument_test () =
   let query = "{ input_obj }" in
   test_query query
     (`Assoc
-      [ ( "errors"
-        , `List
-            [ `Assoc
-                [ ( "message"
-                  , `String
-                      "Argument `x` of type `person!` expected on field \
-                       `input_obj`, but not provided." )
-                ]
-            ] )
-      ; ("data", `Null)
-      ] )
+       [ ( "errors"
+         , `List
+             [ `Assoc
+                 [ ( "message"
+                   , `String
+                       "Argument `x` of type `person!` expected on field \
+                        `input_obj`, but not provided." )
+                 ]
+             ] )
+       ; ("data", `Null)
+       ] )
 
 let input_coercion_single_value_to_list_test () =
   let query = "{ bool_list(x: false) }" in

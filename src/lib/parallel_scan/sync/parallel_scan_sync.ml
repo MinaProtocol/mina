@@ -21,7 +21,7 @@
     to {!Builder.add_payload}. What this module owns is the part where the
     structure has to be reconstructed and checked. *)
 
-open Core_kernel
+open Core
 open Parallel_scan
 module Tree = Parallel_scan.Private.Tree
 
@@ -409,18 +409,18 @@ module Builder = struct
     let bands =
       Array.to_list t.trees
       |> List.concat_mapi ~f:(fun tree entry ->
-             Hashtbl.keys entry.wanted
-             |> List.map ~f:(fun root ->
-                    Request.Band
-                      { tree
-                      ; root
-                      ; height = Int.min t.band_height (t.depth - root.level)
-                      } ) )
+          Hashtbl.keys entry.wanted
+          |> List.map ~f:(fun root ->
+              Request.Band
+                { tree
+                ; root
+                ; height = Int.min t.band_height (t.depth - root.level)
+                } ) )
     in
     let payloads =
       Hashtbl.to_alist t.payloads
       |> List.filter_map ~f:(fun (digest, bytes) ->
-             Option.some_if (Option.is_none bytes) (Request.Payload digest) )
+          Option.some_if (Option.is_none bytes) (Request.Payload digest) )
     in
     bands @ payloads
 
@@ -543,31 +543,31 @@ module Builder = struct
     let%map trees =
       Array.to_list t.trees
       |> List.map ~f:(fun entry ->
-             let%map merges =
-               Array.to_list entry.merges
-               |> List.map ~f:(function
-                    | Some node ->
-                        Ok node
-                    | None ->
-                        Or_error.error_string "a merge node never arrived" )
-               |> Or_error.all
-             and bases =
-               Array.to_list entry.bases
-               |> List.map ~f:(function
-                    | Some node ->
-                        Ok node
-                    | None ->
-                        Or_error.error_string "a base node never arrived" )
-               |> Or_error.all
-             in
-             let tree =
-               Tree.create ~merges:(Array.of_list merges)
-                 ~bases:(Array.of_list bases)
-                 ~digests:(Tree.empty_digests ~depth:t.depth)
-                 ~filled:entry.cursors.filled ~level:entry.cursors.level
-                 ~proved:entry.cursors.proved
-             in
-             Tree.rebuilt tree ~payload_digest:identity_digest )
+          let%map merges =
+            Array.to_list entry.merges
+            |> List.map ~f:(function
+              | Some node ->
+                  Ok node
+              | None ->
+                  Or_error.error_string "a merge node never arrived" )
+            |> Or_error.all
+          and bases =
+            Array.to_list entry.bases
+            |> List.map ~f:(function
+              | Some node ->
+                  Ok node
+              | None ->
+                  Or_error.error_string "a base node never arrived" )
+            |> Or_error.all
+          in
+          let tree =
+            Tree.create ~merges:(Array.of_list merges)
+              ~bases:(Array.of_list bases)
+              ~digests:(Tree.empty_digests ~depth:t.depth)
+              ~filled:entry.cursors.filled ~level:entry.cursors.level
+              ~proved:entry.cursors.proved
+          in
+          Tree.rebuilt tree ~payload_digest:identity_digest )
       |> Or_error.all
     in
     let acc =

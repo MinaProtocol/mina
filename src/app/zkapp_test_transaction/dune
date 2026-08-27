@@ -8,6 +8,7 @@
   base
   core_kernel
   core
+  core_unix.command_unix
   async_kernel
   zkapp_test_transaction_lib
   async

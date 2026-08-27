@@ -13,7 +13,7 @@
     caller may do is add to it, take work from it, fold over it, and turn it
     into a form that can be stored or synced. *)
 
-open Core_kernel
+open Core
 
 module Job_status : sig
   type t = Todo | Done [@@deriving equal, sexp]

@@ -1,7 +1,7 @@
 (* NOTE: This code is based on src/lib/logger/file_system/logger_file_system.ml *)
 
 open Core
-open Core.Unix
+open Core_unix
 
 let log_perm = 0o644
 
@@ -64,9 +64,10 @@ let transport t lines =
     (* Log the rotation event so that external event stream consumers are aware of it *)
     write_lines t
       (Yojson.Safe.to_string ~std:true
-         (`Assoc [ ("rotated_log_end", `Float (Unix.gettimeofday ())) ]) ) ;
+         (`Assoc [ ("rotated_log_end", `Float (Core_unix.gettimeofday ())) ]) ) ;
     rotate t ;
     write_lines t
       (Yojson.Safe.to_string ~std:true
-         (`Assoc [ ("rotated_log_start", `Float (Unix.gettimeofday ())) ]) ) ) ;
+         (`Assoc [ ("rotated_log_start", `Float (Core_unix.gettimeofday ())) ]) )
+    ) ;
   write_lines t lines
