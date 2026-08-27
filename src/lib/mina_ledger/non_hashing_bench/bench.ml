@@ -73,40 +73,40 @@ let payments ~n_txns ~creating keys unfunded =
   let nonces = Array.create ~len:n 0 in
   List.init n_txns ~f:Fn.id
   |> List.map ~f:(fun i ->
-         let s = i % n in
-         let r = (i + 1 + (i / n)) % n in
-         let sender : Signature_lib.Keypair.t = keys.(s) in
-         let sender_pk = Signature_lib.Public_key.compress sender.public_key in
-         let kind = if i % 8 = 0 then i / 8 % 4 else 0 in
-         let receiver_pk =
-           if creating || kind = 3 then
-             Signature_lib.Public_key.compress
-               unfunded.(i % Array.length unfunded)
-                 .Signature_lib.Keypair.public_key
-           else
-             Signature_lib.Public_key.compress
-               keys.(r).Signature_lib.Keypair.public_key
-         in
-         let nonce =
-           Mina_numbers.Account_nonce.of_int
-             (if kind = 1 then nonces.(s) + 7 else nonces.(s))
-         in
-         if kind <> 1 && kind <> 2 then nonces.(s) <- nonces.(s) + 1 ;
-         let amount =
-           if kind = 2 then Currency.Amount.of_mina_int_exn 100_000_000
-           else Currency.Amount.of_mina_int_exn 10
-         in
-         let payload =
-           Signed_command_payload.create
-             ~fee:(Currency.Fee.of_mina_int_exn 1)
-             ~fee_payer_pk:sender_pk ~nonce ~valid_until:None
-             ~memo:Signed_command_memo.dummy
-             ~body:(Signed_command_payload.Body.Payment { receiver_pk; amount })
-         in
-         let cmd : Signed_command.t =
-           { payload; signer = sender.public_key; signature = Signature.dummy }
-         in
-         Mina_transaction.Transaction.Command (User_command.Signed_command cmd) )
+      let s = i % n in
+      let r = (i + 1 + (i / n)) % n in
+      let sender : Signature_lib.Keypair.t = keys.(s) in
+      let sender_pk = Signature_lib.Public_key.compress sender.public_key in
+      let kind = if i % 8 = 0 then i / 8 % 4 else 0 in
+      let receiver_pk =
+        if creating || kind = 3 then
+          Signature_lib.Public_key.compress
+            unfunded.(i % Array.length unfunded)
+              .Signature_lib.Keypair.public_key
+        else
+          Signature_lib.Public_key.compress
+            keys.(r).Signature_lib.Keypair.public_key
+      in
+      let nonce =
+        Mina_numbers.Account_nonce.of_int
+          (if kind = 1 then nonces.(s) + 7 else nonces.(s))
+      in
+      if kind <> 1 && kind <> 2 then nonces.(s) <- nonces.(s) + 1 ;
+      let amount =
+        if kind = 2 then Currency.Amount.of_mina_int_exn 100_000_000
+        else Currency.Amount.of_mina_int_exn 10
+      in
+      let payload =
+        Signed_command_payload.create
+          ~fee:(Currency.Fee.of_mina_int_exn 1)
+          ~fee_payer_pk:sender_pk ~nonce ~valid_until:None
+          ~memo:Signed_command_memo.dummy
+          ~body:(Signed_command_payload.Body.Payment { receiver_pk; amount })
+      in
+      let cmd : Signed_command.t =
+        { payload; signer = sender.public_key; signature = Signature.dummy }
+      in
+      Mina_transaction.Transaction.Command (User_command.Signed_command cmd) )
 
 let apply l txn =
   Ledger.apply_transaction_first_pass ~signature_kind l ~constraint_constants
@@ -137,7 +137,7 @@ let outcome_non_hashing = function
       (false, rejected e)
   | Ok
       (Non_hashing_ledger.Transaction_partially_applied.Signed_command
-        { applied; _ } ) ->
+         { applied; _ } ) ->
       (true, accepted applied.common.user_command.With_status.status)
   | Ok _ ->
       (true, "accept: non-payment")
@@ -181,10 +181,10 @@ let over_real_ledger l =
       (fun keys ->
         Array.to_list keys
         |> List.map ~f:(fun kp ->
-               describe_account
-                 (Option.bind
-                    (Ledger.location_of_account l (account_id kp))
-                    ~f:(Ledger.get l) ) ) )
+            describe_account
+              (Option.bind
+                 (Ledger.location_of_account l (account_id kp))
+                 ~f:(Ledger.get l) ) ) )
   }
 
 (* The same, over a ledger that maintains no merkle hashes. *)
@@ -206,10 +206,10 @@ let over_non_hashing_ledger l =
       (fun keys ->
         Array.to_list keys
         |> List.map ~f:(fun kp ->
-               describe_account
-                 (Option.bind
-                    (Non_hashing_ledger.location_of_account nl (account_id kp))
-                    ~f:(Non_hashing_ledger.get nl) ) ) )
+            describe_account
+              (Option.bind
+                 (Non_hashing_ledger.location_of_account nl (account_id kp))
+                 ~f:(Non_hashing_ledger.get nl) ) ) )
   }
 
 let time f =
@@ -279,7 +279,7 @@ let main ~depth ~n_accounts ~n_txns ~with_db =
   populate ephemeral keys ;
   go ~label:"ephemeral (in-memory)" ephemeral ;
   if with_db then (
-    let dir = Filename.temp_dir "hashless-bench" "" in
+    let dir = Filename_unix.temp_dir "hashless-bench" "" in
     let db = Ledger.create ~directory_name:dir ~depth () in
     populate db keys ;
     (* Flush the accounts and hashes down to RocksDB so that reads from the

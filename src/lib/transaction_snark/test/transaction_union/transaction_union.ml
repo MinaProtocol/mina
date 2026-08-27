@@ -110,7 +110,7 @@ let%test_module "Transaction union tests" =
       let source_stack =
         if carryforward then
           Pending_coinbase.Stack.(
-            push_state state_body_hash global_slot pending_coinbase_init)
+            push_state state_body_hash global_slot pending_coinbase_init )
         else pending_coinbase_init
       in
       let pending_coinbase_stack_target =
@@ -317,10 +317,10 @@ let%test_module "Transaction union tests" =
                     let ft : Fee_transfer.t =
                       Or_error.ok_exn @@ Fee_transfer.of_singles
                       @@ One_or_two.map receiver ~f:(fun receiver ->
-                             Fee_transfer.Single.create
-                               ~receiver_pk:receiver.account.public_key
-                               ~fee:(Currency.Fee.of_nanomina_int_exn fee)
-                               ~fee_token:receiver.account.token_id )
+                          Fee_transfer.Single.create
+                            ~receiver_pk:receiver.account.public_key
+                            ~fee:(Currency.Fee.of_nanomina_int_exn fee)
+                            ~fee_token:receiver.account.token_id )
                     in
                     txns @ [ ft ] )
               in
@@ -489,7 +489,7 @@ let%test_module "Transaction union tests" =
                 let previous_stack = pending_coinbase_stack_state1.pc.target in
                 let stack_with_state2 =
                   Pending_coinbase.Stack.(
-                    push_state state_body_hash2 global_slot2 previous_stack)
+                    push_state state_body_hash2 global_slot2 previous_stack )
                 in
                 (* No coinbase to add. *)
                 let source_stack, target_stack, init_stack, state_body2 =
@@ -560,9 +560,9 @@ let%test_module "Transaction union tests" =
                   T.verify_against_digest proof13 )
               |> Result.ok_exn |> Or_error.ok_exn ) )
 
-    let%test_unit "base_and_merge: transactions in one block (t1,t2 in b1), \
-                   carryforward the state from a previous transaction t0 in b1"
-        =
+    let%test_unit
+        "base_and_merge: transactions in one block (t1,t2 in b1), carryforward \
+         the state from a previous transaction t0 in b1" =
       let state_hash_and_body1 = (state_body_hash, state_body) in
       test_base_and_merge ~state_hash_and_body1
         ~state_hash_and_body2:state_hash_and_body1 ~carryforward1:true
@@ -570,17 +570,17 @@ let%test_module "Transaction union tests" =
 
     (* No new state body, carryforward the stack from the previous transaction*)
 
-    let%test_unit "base_and_merge: transactions in one block (t1,t2 in b1), \
-                   don't carryforward the state from a previous transaction t0 \
-                   in b1" =
+    let%test_unit
+        "base_and_merge: transactions in one block (t1,t2 in b1), don't \
+         carryforward the state from a previous transaction t0 in b1" =
       let state_hash_and_body1 = (state_body_hash, state_body) in
       test_base_and_merge ~state_hash_and_body1
         ~state_hash_and_body2:state_hash_and_body1 ~carryforward1:false
         ~carryforward2:true
 
-    let%test_unit "base_and_merge: transactions in two different blocks (t1,t2 \
-                   in b1, b2 resp.), carryforward the state from a previous \
-                   transaction t0 in b1" =
+    let%test_unit
+        "base_and_merge: transactions in two different blocks (t1,t2 in b1, b2 \
+         resp.), carryforward the state from a previous transaction t0 in b1" =
       let state_hash_and_body1 =
         let open Staged_ledger_diff in
         let state_body0 =
@@ -605,9 +605,10 @@ let%test_module "Transaction union tests" =
 
     (*t2 is in a new state, therefore do not carryforward the previous state*)
 
-    let%test_unit "base_and_merge: transactions in two different blocks (t1,t2 \
-                   in b1, b2 resp.), don't carryforward the state from a \
-                   previous transaction t0 in b1" =
+    let%test_unit
+        "base_and_merge: transactions in two different blocks (t1,t2 in b1, b2 \
+         resp.), don't carryforward the state from a previous transaction t0 \
+         in b1" =
       let state_hash_and_body1 =
         let state_body0 =
           let open Staged_ledger_diff in
@@ -2372,8 +2373,8 @@ let%test_module "legacy transactions using zkApp accounts" =
                     ~new_kp ~spec ledger ;
                   Async.Deferred.return () ) ) )
 
-    let%test_unit "Successful stake delegation from zkapp accounts- \
-                   receive=Proof" =
+    let%test_unit
+        "Successful stake delegation from zkapp accounts- receive=Proof" =
       let open Mina_transaction_logic.For_tests in
       Quickcheck.test ~trials:5 U.gen_snapp_ledger
         ~f:(fun ({ init_ledger; specs }, new_kp) ->

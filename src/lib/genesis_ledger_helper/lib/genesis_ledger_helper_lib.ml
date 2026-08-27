@@ -128,7 +128,7 @@ module Accounts = struct
               if
                 Mina_stdlib.List.Length.Compare.(
                   app_state
-                  = Pickles_types.Nat.to_int Zkapp_state.Max_state_size.n)
+                  = Pickles_types.Nat.to_int Zkapp_state.Max_state_size.n )
               then Ok (Zkapp_state.V.of_list_exn app_state)
               else
                 Or_error.errorf
@@ -144,7 +144,7 @@ module Accounts = struct
             let%map action_state =
               if
                 Mina_stdlib.List.Length.Compare.(
-                  action_state = Pickles_types.Nat.to_int Pickles_types.Nat.N5.n)
+                  action_state = Pickles_types.Nat.to_int Pickles_types.Nat.N5.n )
               then Ok (Pickles_types.Vector.Vector_5.of_list_exn action_state)
               else
                 Or_error.errorf
@@ -261,15 +261,15 @@ module Accounts = struct
       let zkapp =
         Option.map account.zkapp
           ~f:(fun
-               { app_state
-               ; verification_key
-               ; zkapp_version
-               ; action_state
-               ; last_action_slot
-               ; proved_state
-               ; zkapp_uri
-               }
-             ->
+              { app_state
+              ; verification_key
+              ; zkapp_version
+              ; action_state
+              ; last_action_slot
+              ; proved_state
+              ; zkapp_uri
+              }
+            ->
             let app_state = Zkapp_state.V.to_list app_state in
             let verification_key =
               Option.map verification_key ~f:With_hash.data
@@ -441,13 +441,12 @@ let make_constraint_constants
             - At least 3 ensures a transaction per block and the staged-ledger
               unit tests pass.
         *)
-        1
-        + Core_kernel.Int.ceil_log2 (max_user_commands_per_block + max_coinbases)
+        1 + Core.Int.ceil_log2 (max_user_commands_per_block + max_coinbases)
     | None ->
         default.transaction_capacity_log_2
   in
   let pending_coinbase_depth =
-    Core_kernel.Int.ceil_log2
+    Core.Int.ceil_log2
       (((transaction_capacity_log_2 + 1) * (work_delay + 1)) + 1)
   in
   { sub_windows_per_window =

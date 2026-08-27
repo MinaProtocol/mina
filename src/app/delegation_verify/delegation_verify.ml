@@ -31,14 +31,14 @@ let block_dir_flag =
   let open Command.Param in
   flag "--block-dir" ~aliases:[ "-block-dir" ]
     ~doc:"the path to the directory containing blocks for the submission"
-    (required Filename.arg_type)
+    (required Filename_unix.arg_type)
 
 let cassandra_executable_flag =
   let open Command.Param in
   flag "--executable"
     ~aliases:[ "-executable"; "--cqlsh"; "-cqlsh" ]
     ~doc:"the path to the cqlsh executable"
-    (optional Filename.arg_type)
+    (optional Filename_unix.arg_type)
 
 let timestamp =
   let open Command.Param in
@@ -163,7 +163,7 @@ let filesystem_command =
   Command.async ~summary:"Verify submissions and block read from the filesystem"
     Command.Let_syntax.(
       let%map_open block_dir = block_dir_flag
-      and inputs = anon (sequence ("filename" %: Filename.arg_type))
+      and inputs = anon (sequence ("filename" %: Filename_unix.arg_type))
       and no_checks = no_checks_flag
       and config_file = config_flag
       and signature_kind = Cli_lib.Flag.signature_kind in
@@ -194,7 +194,7 @@ let filesystem_command =
             Deferred.unit
         | Error e ->
             Output.display_error @@ Error.to_string_hum e ;
-            exit 1)
+            exit 1 )
 
 let cassandra_command =
   Command.async ~summary:"Verify submissions and block read from Cassandra"
@@ -238,7 +238,7 @@ let cassandra_command =
             Deferred.unit
         | Error e ->
             Output.display_error @@ Error.to_string_hum e ;
-            exit 1)
+            exit 1 )
 
 let stdin_command =
   Command.async
@@ -272,7 +272,7 @@ let stdin_command =
             Deferred.unit
         | Error e ->
             Output.display_error @@ Error.to_string_hum e ;
-            exit 1)
+            exit 1 )
 
 let command =
   Command.group
@@ -282,4 +282,4 @@ let command =
     ; ("stdin", stdin_command)
     ]
 
-let () = Async.Command.run command
+let () = Command_unix.run command

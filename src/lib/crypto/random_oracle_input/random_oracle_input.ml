@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 
 module Chunked = struct
   (** The input for a random oracle, formed of full field elements and 'chunks'
@@ -194,7 +194,7 @@ module Legacy = struct
       let run p cs =
         p cs
         |> M.bind ~f:(fun (a, cs') ->
-               match cs' with [] -> M.return a | _ -> M.fail `Expected_eof )
+            match cs' with [] -> M.return a | _ -> M.fail `Expected_eof )
 
       let fail why _ = M.fail why
 
@@ -315,16 +315,16 @@ module Legacy = struct
     let string_of_field xs =
       List.chunks_of xs ~length:8
       |> List.map ~f:(fun xs ->
-             let rec go i acc = function
-               | [] ->
-                   acc
-               | b :: bs ->
-                   go (i + 1) ((acc * 2) + if b then 1 else 0) bs
-             in
-             let pad = List.init (8 - List.length xs) ~f:(Fn.const false) in
-             let combined = xs @ pad in
-             assert (List.length combined = 8) ;
-             go 0 0 combined )
+          let rec go i acc = function
+            | [] ->
+                acc
+            | b :: bs ->
+                go (i + 1) ((acc * 2) + if b then 1 else 0) bs
+          in
+          let pad = List.init (8 - List.length xs) ~f:(Fn.const false) in
+          let combined = xs @ pad in
+          assert (List.length combined = 8) ;
+          go 0 0 combined )
       |> List.map ~f:Char.of_int_exn
       |> String.of_char_list
 
@@ -401,7 +401,7 @@ module Legacy = struct
         let field = gen_field ~size_in_bits in
         Quickcheck.test ~trials:300
           Quickcheck.Generator.(
-            tuple2 (gen_input ~size_in_bits ()) (tuple2 field field))
+            tuple2 (gen_input ~size_in_bits ()) (tuple2 field field) )
           ~f:(fun ((_, input), (x, y)) ->
             let middle = [| x; y |] in
             let expected =
@@ -431,14 +431,14 @@ module Legacy = struct
           ~f:(fun (_, input) ->
             let serialized =
               Coding.(
-                serialize ~string_of_field ~to_bool:Fn.id ~of_bool:Fn.id input)
+                serialize ~string_of_field ~to_bool:Fn.id ~of_bool:Fn.id input )
             in
             let deserialized =
               Coding.(
                 deserialize
                   (String.to_list serialized)
                   ~field_of_string:(field_of_string ~size_in_bits)
-                  ~of_bool:Fn.id)
+                  ~of_bool:Fn.id )
             in
             let normalized t =
               { t with

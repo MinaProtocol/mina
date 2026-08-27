@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Async_kernel
 open Mina_base
 open Mina_state
@@ -25,7 +25,7 @@ let handle_validation_error ~logger ~rejected_blocks_logger ~time_received
     let message' =
       "external transition with state hash $state_hash"
       ^ Option.value_map message ~default:"" ~f:(fun (txt, _) ->
-            sprintf ", %s" txt )
+          sprintf ", %s" txt )
     in
     let metadata =
       ("state_hash", State_hash.to_yojson state_hash)
@@ -69,9 +69,9 @@ let handle_validation_error ~logger ~rejected_blocks_logger ~time_received
     [ ("state_hash", State_hash.to_yojson state_hash)
     ; ( "time_received"
       , `String
-          (Time.to_string_abs
+          (Time_float.to_string_abs
              (Block_time.to_time_exn time_received)
-             ~zone:Time.Zone.utc ) )
+             ~zone:Time_float.Zone.utc ) )
     ]
     @ metadata
   in
@@ -213,9 +213,9 @@ module Duplicate_block_detector = struct
               , State_hash.to_yojson protocol_state_hash )
             ; ( "time_received"
               , `String
-                  (Time.to_string_abs
+                  (Time_float.to_string_abs
                      (Block_time.to_time_exn time_received)
-                     ~zone:Time.Zone.utc ) )
+                     ~zone:Time_float.Zone.utc ) )
             ]
           in
           let msg : (_, unit, string, unit) format4 =
@@ -257,78 +257,81 @@ let validate ~signature_kind ~proof_cache_db ~logger ~trust_system ~verifier
         Mina_metrics.Transition_frontier
         .update_max_unvalidated_blocklength_observed blockchain_length ;
         ( if not (Mina_net2.Validation_callback.is_expired valid_cb) then (
-          let header_hashed =
-            With_hash.of_data header
-              ~hash_data:
-                (Fn.compose Protocol_state.hashes Header.protocol_state)
-          in
-          Duplicate_block_detector.check ~precomputed_values
-            ~rejected_blocks_logger ~time_received duplicate_checker logger
-            header_hashed ;
-          let computation =
-            let open Interruptible.Let_syntax in
-            let defer f x =
-              Interruptible.uninterruptible @@ Deferred.return (f x)
+            let header_hashed =
+              With_hash.of_data header
+                ~hash_data:
+                  (Fn.compose Protocol_state.hashes Header.protocol_state)
             in
-            let%bind () =
-              Interruptible.lift Deferred.unit
-                (Mina_net2.Validation_callback.await_timeout valid_cb)
+            Duplicate_block_detector.check ~precomputed_values
+              ~rejected_blocks_logger ~time_received duplicate_checker logger
+              header_hashed ;
+            let computation =
+              let open Interruptible.Let_syntax in
+              let defer f x =
+                Interruptible.uninterruptible @@ Deferred.return (f x)
+              in
+              let%bind () =
+                Interruptible.lift Deferred.unit
+                  (Mina_net2.Validation_callback.await_timeout valid_cb)
+              in
+              match%bind
+                let open Interruptible.Result.Let_syntax in
+                Validation.(
+                  wrap_header header_hashed
+                  |> defer
+                       (validate_time_received ~precomputed_values
+                          ~time_received )
+                  >>= defer
+                        (validate_genesis_protocol_state ~genesis_state_hash)
+                  >>= Fn.compose Interruptible.uninterruptible
+                        (validate_single_proof ~verifier ~genesis_state_hash)
+                  >>= defer validate_delta_block_chain
+                  >>= defer validate_protocol_versions )
+              with
+              | Ok verified_header ->
+                  [%log internal] "Initial_validation_done" ;
+                  let body b =
+                    Mina_block.Stable.Latest.body b
+                    |> Staged_ledger_diff.Body.write_all_proofs_to_disk
+                         ~signature_kind ~proof_cache_db
+                  in
+                  let b_or_h' =
+                    match b_or_h with
+                    | `Block b_env ->
+                        `Block
+                          (Envelope.Incoming.map
+                             ~f:
+                               (Fn.compose
+                                  (Mina_block.Validation.with_body
+                                     verified_header )
+                                  body )
+                             b_env )
+                    | `Header h_env ->
+                        `Header
+                          (Envelope.Incoming.map ~f:(Fn.const verified_header)
+                             h_env )
+                  in
+                  Mina_metrics.Transition_frontier
+                  .update_max_blocklength_observed blockchain_length ;
+                  Queue.enqueue Transition_frontier.validated_blocks
+                    ( State_hash.With_state_hashes.state_hash header_hashed
+                    , sender
+                    , time_received ) ;
+                  return (Ok (b_or_h', `Valid_cb valid_cb))
+              | Error error ->
+                  Mina_net2.Validation_callback.fire_if_not_already_fired
+                    valid_cb `Reject ;
+                  let%map () =
+                    Interruptible.uninterruptible
+                    @@ handle_validation_error ~logger ~rejected_blocks_logger
+                         ~time_received ~trust_system ~sender
+                         ~header_with_hash:header_hashed
+                         ~delta:genesis_constants.protocol.delta error
+                  in
+                  Error ()
             in
-            match%bind
-              let open Interruptible.Result.Let_syntax in
-              Validation.(
-                wrap_header header_hashed
-                |> defer
-                     (validate_time_received ~precomputed_values ~time_received)
-                >>= defer (validate_genesis_protocol_state ~genesis_state_hash)
-                >>= Fn.compose Interruptible.uninterruptible
-                      (validate_single_proof ~verifier ~genesis_state_hash)
-                >>= defer validate_delta_block_chain
-                >>= defer validate_protocol_versions)
-            with
-            | Ok verified_header ->
-                [%log internal] "Initial_validation_done" ;
-                let body b =
-                  Mina_block.Stable.Latest.body b
-                  |> Staged_ledger_diff.Body.write_all_proofs_to_disk
-                       ~signature_kind ~proof_cache_db
-                in
-                let b_or_h' =
-                  match b_or_h with
-                  | `Block b_env ->
-                      `Block
-                        (Envelope.Incoming.map
-                           ~f:
-                             (Fn.compose
-                                (Mina_block.Validation.with_body verified_header)
-                                body )
-                           b_env )
-                  | `Header h_env ->
-                      `Header
-                        (Envelope.Incoming.map ~f:(Fn.const verified_header)
-                           h_env )
-                in
-                Mina_metrics.Transition_frontier.update_max_blocklength_observed
-                  blockchain_length ;
-                Queue.enqueue Transition_frontier.validated_blocks
-                  ( State_hash.With_state_hashes.state_hash header_hashed
-                  , sender
-                  , time_received ) ;
-                return (Ok (b_or_h', `Valid_cb valid_cb))
-            | Error error ->
-                Mina_net2.Validation_callback.fire_if_not_already_fired valid_cb
-                  `Reject ;
-                let%map () =
-                  Interruptible.uninterruptible
-                  @@ handle_validation_error ~logger ~rejected_blocks_logger
-                       ~time_received ~trust_system ~sender
-                       ~header_with_hash:header_hashed
-                       ~delta:genesis_constants.protocol.delta error
-                in
-                Error ()
-          in
-          Interruptible.force computation )
-        else Deferred.Result.fail () )
+            Interruptible.force computation )
+          else Deferred.Result.fail () )
         >>| function
         | Ok (Ok res) ->
             Ok res
@@ -342,9 +345,9 @@ let validate ~signature_kind ~proof_cache_db ~logger ~trust_system ~verifier
               [ ("state_hash", State_hash.to_yojson state_hash)
               ; ( "time_received"
                 , `String
-                    (Time.to_string_abs
+                    (Time_float.to_string_abs
                        (Block_time.to_time_exn time_received)
-                       ~zone:Time.Zone.utc ) )
+                       ~zone:Time_float.Zone.utc ) )
               ]
             in
             [%log error] ~metadata

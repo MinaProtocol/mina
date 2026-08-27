@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 
 type 'a t = T of 'a * 'a t list
 

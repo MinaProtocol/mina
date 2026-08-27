@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Async
 open Block
 open Rosetta_lib
@@ -9,8 +9,8 @@ open Rosetta_models
 module Scalars = Graphql_lib.Scalars
 
 module Get_balance =
-[%graphql
-{|
+  [%graphql
+  {|
     query get_balance($public_key: PublicKey!, $token_id: TokenId) {
       account(publicKey: $public_key, token: $token_id) {
         balance {
@@ -131,12 +131,12 @@ module Sql = struct
       in
       Option.map row_opt
         ~f:(fun
-             ( ( block_height
-               , block_global_slot_since_genesis
-               , total_balance
-               , nonce )
-             , timing_id )
-           ->
+            ( ( block_height
+              , block_global_slot_since_genesis
+              , total_balance
+              , nonce )
+            , timing_id )
+          ->
           ( { block_height
             ; block_global_slot_since_genesis
             ; total_balance
@@ -336,9 +336,10 @@ module Sql = struct
        balance will still be the balance at the block
        identifier. For vesting accounts we'll also compute how much
        extra balance has accumulated in between the blocks. *)
-    let%bind ( requested_block_height
-             , requested_block_global_slot_since_genesis
-             , requested_block_hash ) =
+    let%bind
+        ( requested_block_height
+        , requested_block_global_slot_since_genesis
+        , requested_block_hash ) =
       match%bind
         Sql.Block.run (module Conn) block_query
         |> Errors.Lift.sql ~context:"Finding specified block"
@@ -426,7 +427,7 @@ module Balance = struct
                            `String s
                        | None ->
                            `Null )
-                     ())
+                     () )
               graphql_uri )
       ; db_block_identifier_and_balance_info =
           (fun ~block_query ~address ~token_id ->
@@ -529,11 +530,12 @@ module Balance = struct
       let%bind block_query =
         Query.of_partial_identifier' req.block_identifier
       in
-      let%bind ( block_identifier
-               , liquid_balance
-               , total_balance
-               , nonce
-               , created_via_historical_lookup ) =
+      let%bind
+          ( block_identifier
+          , liquid_balance
+          , total_balance
+          , nonce
+          , created_via_historical_lookup ) =
         match block_query with
         | Some _ ->
             let%map block_identifier, { liquid_balance; total_balance }, nonce =
@@ -572,8 +574,8 @@ module Balance = struct
                 M.fail
                   (Errors.create
                      (`Exception
-                       "Error getting balance from GraphQL (node still \
-                        bootstrapping?)" ) ) )
+                        "Error getting balance from GraphQL (node still \
+                         bootstrapping?)" ) ) )
       in
       let%map balance_amount =
         make_balance_amount ~liquid_balance ~total_balance
@@ -583,10 +585,10 @@ module Balance = struct
       ; metadata =
           Some
             (`Assoc
-              [ ( "created_via_historical_lookup"
-                , `Bool created_via_historical_lookup )
-              ; ("nonce", `String nonce)
-              ] )
+               [ ( "created_via_historical_lookup"
+                 , `Bool created_via_historical_lookup )
+               ; ("nonce", `String nonce)
+               ] )
       }
   end
 
@@ -621,18 +623,18 @@ module Balance = struct
                      ; metadata =
                          Some
                            (`Assoc
-                             [ ("locked_balance", `Intlit "0")
-                             ; ("liquid_balance", `Intlit "66000")
-                             ; ("total_balance", `Intlit "66000")
-                             ] )
+                              [ ("locked_balance", `Intlit "0")
+                              ; ("liquid_balance", `Intlit "66000")
+                              ; ("total_balance", `Intlit "66000")
+                              ] )
                      }
                    ]
                ; metadata =
                    Some
                      (`Assoc
-                       [ ("created_via_historical_lookup", `Bool false)
-                       ; ("nonce", `String "2")
-                       ] )
+                        [ ("created_via_historical_lookup", `Bool false)
+                        ; ("nonce", `String "2")
+                        ] )
                } )
 
       let%test_unit "account exists historical lookup" =
@@ -665,18 +667,18 @@ module Balance = struct
                      ; metadata =
                          Some
                            (`Assoc
-                             [ ("locked_balance", `Intlit "0")
-                             ; ("liquid_balance", `Intlit "0")
-                             ; ("total_balance", `Intlit "0")
-                             ] )
+                              [ ("locked_balance", `Intlit "0")
+                              ; ("liquid_balance", `Intlit "0")
+                              ; ("total_balance", `Intlit "0")
+                              ] )
                      }
                    ]
                ; metadata =
                    Some
                      (`Assoc
-                       [ ("created_via_historical_lookup", `Bool true)
-                       ; ("nonce", `String "0")
-                       ] )
+                        [ ("created_via_historical_lookup", `Bool true)
+                        ; ("nonce", `String "0")
+                        ] )
                } )
     end )
 end

@@ -98,7 +98,7 @@ type readiness_response =
 val check_peer_count :
      ?num_tries:int
   -> ?retry_delay_sec:float
-  -> ?deadline:Core.Time.t
+  -> ?deadline:Core.Time_float.t
   -> logger:Logger.t
   -> Uri.t
   -> min_peers:int
@@ -112,7 +112,7 @@ val check_peer_count :
 val check_chain_length :
      ?num_tries:int
   -> ?retry_delay_sec:float
-  -> ?deadline:Core.Time.t
+  -> ?deadline:Core.Time_float.t
   -> logger:Logger.t
   -> Uri.t
   -> (bool * int option * int option) Deferred.Or_error.t

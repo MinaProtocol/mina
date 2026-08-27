@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Mina_base
 
 (* TODO: abstract stackdriver specific log details *)
@@ -11,7 +11,7 @@ let or_error_list_fold ls ~init ~f =
       f acc el )
 
 let get_metadata (message : Logger.Message.t) key =
-  match String.Map.find message.metadata key with
+  match Map.find message.metadata key with
   | Some x ->
       Or_error.return x
   | None ->
@@ -426,16 +426,16 @@ type 'a t =
   | Log_error : Log_error.t t
   | Node_initialization : Node_initialization.t t
   | Node_offline : Node_offline.t t
-  | Transition_frontier_diff_application
-      : Transition_frontier_diff_application.t t
+  | Transition_frontier_diff_application :
+      Transition_frontier_diff_application.t t
   | Block_produced : Block_produced.t t
   | Breadcrumb_added : Breadcrumb_added.t t
   | Block_gossip : Gossip.Block.t t
   | Snark_work_gossip : Gossip.Snark_work.t t
   | Transactions_gossip : Gossip.Transactions.t t
   | Snark_work_failed : Snark_work_failed.t t
-  | Transition_frontier_loaded_from_persistence
-      : Transition_frontier_loaded_from_persistence.t t
+  | Transition_frontier_loaded_from_persistence :
+      Transition_frontier_loaded_from_persistence.t t
   | Persisted_frontier_loaded : Persisted_frontier_loaded.t t
   | Persisted_frontier_fresh_boot : Persisted_frontier_fresh_boot.t t
   | Persisted_frontier_dropped : Persisted_frontier_dropped.t t
@@ -603,13 +603,12 @@ let structured_events_table =
   let open Option.Let_syntax in
   all_event_types
   |> List.filter_map ~f:(fun t ->
-         let%map event_id = to_structured_event_id t in
-         (Structured_log_events.string_of_id event_id, t) )
+      let%map event_id = to_structured_event_id t in
+      (Structured_log_events.string_of_id event_id, t) )
   |> String.Table.of_alist_exn
 
 let of_structured_event_id id =
-  Structured_log_events.string_of_id id
-  |> String.Table.find structured_events_table
+  Structured_log_events.string_of_id id |> Hashtbl.find structured_events_table
 
 let to_puppeteer_event_string event_type =
   let (Event_type t) = event_type in
@@ -620,11 +619,11 @@ let puppeteer_events_table =
   let open Option.Let_syntax in
   all_event_types
   |> List.filter_map ~f:(fun t ->
-         let%map event_id = to_puppeteer_event_string t in
-         (event_id, t) )
+      let%map event_id = to_puppeteer_event_string t in
+      (event_id, t) )
   |> String.Table.of_alist_exn
 
-let of_puppeteer_event_string id = String.Table.find puppeteer_events_table id
+let of_puppeteer_event_string id = Hashtbl.find puppeteer_events_table id
 
 let parse_error_log (message : Logger.Message.t) =
   let open Or_error.Let_syntax in

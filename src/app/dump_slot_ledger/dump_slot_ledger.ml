@@ -66,7 +66,7 @@ module Database = struct
     in
     custom ~encode ~decode
       Utils.(
-        tup8 (option string) int string int string string (option string) string)
+        tup8 (option string) int string int string string (option string) string )
 end
 
 let json_error msg =
@@ -161,4 +161,4 @@ let command =
      in
      fun () -> dump_slot slot postgres.value )
 
-let () = Command.run command
+let () = Command_unix.run command

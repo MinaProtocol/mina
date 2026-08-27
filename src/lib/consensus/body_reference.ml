@@ -6,7 +6,7 @@
     allow us to upgrade block gossip to happen over Bitswap in a future
     soft fork release.*)
 
-open Core_kernel
+open Core
 open Snark_params.Tick
 open Fold_lib
 open Mina_base_util

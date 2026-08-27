@@ -10,7 +10,7 @@ let within_mask l ~f =
   let r = f mask in
   if Result.is_ok r then Non_hashing_ledger.commit mask ;
   ignore
-    ( Non_hashing_ledger.unregister_mask_exn ~loc:Caml.__LOC__ mask
+    ( Non_hashing_ledger.unregister_mask_exn ~loc:Stdlib.__LOC__ mask
       : Non_hashing_ledger.unattached_mask ) ;
   r
 

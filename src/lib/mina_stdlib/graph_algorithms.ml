@@ -1,5 +1,5 @@
 module Nat = Nat
-open Core_kernel
+open Core
 
 type 'a adjacency_list = ('a * 'a list) list
 
@@ -60,12 +60,12 @@ module Make (V : Comparable.S) = struct
   let rec connectivity (g : G.t) : Nat.t =
     lazy
       ( if not (connected g) then Z
-      else
-        S
-          ( lazy
-            (Nat.min
-               (List.map (Map.keys g) ~f:(fun v ->
-                    connectivity (remove_vertex g v) ) ) ) ) )
+        else
+          S
+            ( lazy
+              (Nat.min
+                 (List.map (Map.keys g) ~f:(fun v ->
+                      connectivity (remove_vertex g v) ) ) ) ) )
 end
 
 let connectivity (type a) (module V : Comparable.S with type t = a)

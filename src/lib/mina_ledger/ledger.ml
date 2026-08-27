@@ -1129,10 +1129,10 @@ let%test_unit "user_command application on converting ledger" =
                     (Account.Hardfork.migrate_to_mesa
                        ~hardfork_slot:
                          Mina_numbers.Global_slot_since_genesis.zero account )
-                    account_converted) ) ) ;
+                    account_converted ) ) ) ;
           (* Assert that the converted ledger doesn't have anything "extra" compared to the primary ledger *)
           Hardfork_db.iteri cl ~f:(fun index account_converted ->
               let account = L.get_at_index_exn l index in
               assert (
                 Mina_base.Account.Key.(
-                  equal account.public_key account_converted.public_key) ) ) ) )
+                  equal account.public_key account_converted.public_key ) ) ) ) )

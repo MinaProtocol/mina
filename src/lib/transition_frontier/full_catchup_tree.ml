@@ -148,14 +148,14 @@ let add_state states (node : Node.t) =
     | None ->
         State_hash.Set.singleton node.state_hash
     | Some hashes ->
-        State_hash.Set.add hashes node.state_hash )
+        Set.add hashes node.state_hash )
 
 let remove_state states (node : Node.t) =
   Hashtbl.update states (Node.State.enum node.state) ~f:(function
     | None ->
         State_hash.Set.empty
     | Some hashes ->
-        State_hash.Set.remove hashes node.state_hash )
+        Set.remove hashes node.state_hash )
 
 (* Invariant: The length of the path from each best tip to its oldest
    ancestor is at most k *)
@@ -201,7 +201,7 @@ let to_yojson =
   fun (t : t) ->
     T.to_yojson
     @@ List.map (Hashtbl.to_alist t.states) ~f:(fun (state, hashes) ->
-           (state, (State_hash.Set.length hashes, State_hash.Set.to_list hashes)) )
+        (state, (Set.length hashes, Set.to_list hashes)) )
 
 type job_states =
   { finished : int

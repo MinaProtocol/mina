@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 
 module Make (M : sig
   type t = Int.t [@@deriving version { unnumbered }]

@@ -2,6 +2,7 @@
  (name archive_lib)
  (public_name archive_lib)
  (libraries
+  core_unix
   ;;opam libraries
   async
   async.async_rpc

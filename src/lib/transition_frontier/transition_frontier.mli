@@ -115,7 +115,7 @@ val validated_blocks :
   (State_hash.t * Network_peer.Envelope.Sender.t * Block_time.t) Core.Queue.t
 
 module For_tests : sig
-  open Core_kernel
+  open Core
   open Signature_lib
 
   val gen_genesis_breadcrumb :

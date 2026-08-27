@@ -152,10 +152,10 @@ end
 
 module For_itn_logger : sig
   val post_process_message :
-       timestamp:Core.Time.t
+       timestamp:Core.Time_float.t
     -> message:string
     -> metadata:(string * Yojson.Safe.t) list
-    -> (Core.Time.t * string * (string * Yojson.Safe.t) list) list
+    -> (Core.Time_float.t * string * (string * Yojson.Safe.t) list) list
 end
 
 module Context_call : module type of Internal_tracing_context_call

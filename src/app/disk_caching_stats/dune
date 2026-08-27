@@ -35,6 +35,7 @@
   bigarray-compat
   ; --
   core
+  core_unix.time_float_unix
   core_kernel
   base
   base.caml

@@ -12,7 +12,6 @@
   core_kernel
   core
   async_kernel
-  core.uuid
   base.caml
   sexplib0
   digestif
@@ -50,11 +49,12 @@
   (backend bisect_ppx))
  (preprocess
   (pps
-   ppx_mina
-   ppx_jane
-   ppx_version
+   ppx_assert
+   ppx_compare
+   ppx_custom_printf
+   ppx_deriving_yojson
+   ppx_here
    ppx_inline_test
    ppx_let
-   ppx_deriving.std
-   ppx_deriving_yojson
-   ppx_custom_printf)))
+   ppx_mina
+   ppx_version)))

@@ -4,7 +4,6 @@
  (flags :standard -short-paths)
  (libraries
   ;; opam libraries
-  core_kernel
   ;; local libraries
   crypto_params
   snarky.backendless

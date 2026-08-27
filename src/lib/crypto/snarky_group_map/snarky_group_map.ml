@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 module Params = Group_map.Params
 
 let to_group (type t)
