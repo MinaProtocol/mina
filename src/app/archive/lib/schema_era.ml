@@ -141,10 +141,15 @@ let watch ~logger ~pool ?(interval = Time.Span.of_sec 10.) () =
         | Ok (Matches | No_record) ->
             ()
         | Ok ((Differs _ | Migration_in_progress _) as verdict) ->
+            (* Formatted in rather than interpolated from metadata: plain
+               text logs drop interpolated values longer than fifty characters,
+               and every one of these reasons is longer. The reason is the
+               whole point of the line -- it is the last thing this process
+               says. *)
             [%log info]
-              "Standing down: $reason. Exiting cleanly so the runtime matching \
-               this schema can take over."
-              ~metadata:[ ("reason", `String (describe verdict)) ] ;
+              "Standing down: %s. Exiting cleanly so the runtime matching this \
+               schema can take over."
+              (describe verdict) ;
             (* Give the log a chance to flush before the process goes. *)
             don't_wait_for
               (let%bind () = after (Time.Span.of_sec 1.) in
