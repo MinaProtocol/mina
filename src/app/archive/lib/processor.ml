@@ -4979,13 +4979,11 @@ module Hardfork_finaliser = struct
                    itself unable to do anything, so say so rather than return
                    in silence. *)
                 [%log info]
-                  "Not settling the fork boundary yet: another session \
-                   holds                    the repair lock. If no other \
-                   archive is running against                    this \
-                   database, look for a leftover backend: SELECT \
-                   pid,                    query FROM pg_stat_activity JOIN \
-                   pg_locks USING (pid) WHERE                    locktype = \
-                   'advisory'. This will be retried." ;
+                  "Not settling the fork boundary yet: another session holds \
+                   the repair lock. If no other archive is running against \
+                   this database, look for a leftover backend: SELECT pid, \
+                   query FROM pg_stat_activity JOIN pg_locks USING (pid) WHERE \
+                   locktype = 'advisory'. This will be retried." ;
                 return ()
             | true -> (
                 let%bind result =
@@ -4994,9 +4992,9 @@ module Hardfork_finaliser = struct
                 match result with
                 | Error reason ->
                     [%log info]
-                      "Not settling the fork boundary yet: $reason. This will \
-                       be retried."
-                      ~metadata:[ ("reason", `String (describe reason)) ] ;
+                      "Not settling the fork boundary yet: %s. This will be \
+                       retried."
+                      (describe reason) ;
                     let%map (_ : bool) = unlock conn in
                     ()
                 | Ok (fork_block, ancestry) ->
