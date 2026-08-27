@@ -5202,64 +5202,85 @@ module Fork_genesis_block = struct
     | Ok None ->
         return (Error No_fork_recorded)
     | Ok (Some hardfork_state) -> (
-        (* The block has to be built before it can be named, so presence is
-           checked afterwards. That is cheap once the ledger is resolved
-           locally, which it is on every attempt after the first. *)
-        match%bind
-          build ~logger ~genesis_constants ~constraint_constants
-            ~config_json:hardfork_state.Hardfork_state.config_json
-        with
-        | Error reason ->
-            return (Error reason)
-        | Ok (genesis_block, constraint_constants) -> (
-            let state_hash =
-              State_hash.With_state_hashes.state_hash genesis_block
-              |> State_hash.to_base58_check
-            in
-            match%bind
-              Mina_caqti.Pool.use
-                (fun conn ->
-                  let open Deferred.Result.Let_syntax in
-                  match%bind already_present conn ~state_hash with
-                  | true ->
-                      return `Already_present
-                  | false ->
-                      let%bind block_id =
-                        Block.add_if_doesn't_exist conn ~logger
-                          ~constraint_constants genesis_block
-                          ~accounts_accessed:[] ~accounts_created:[]
-                      in
-                      (* Adopt the children that got here first.
+        (* Look for the block before building one.
 
-                         The post-fork chain's second block reaches the archive
-                         over the ordinary block path within minutes of the
-                         fork, while this insert waits on a ledger from S3. So
-                         the usual order is child first, and a block whose
-                         parent is absent is stored with parent_id NULL. The
-                         ordinary path repairs that for itself -- every insert
-                         calls set_parent_id_if_null -- but this one does not
-                         go through it, so without this the boundary stays
-                         severed however long the block sits here. *)
-                      let%map () =
-                        Block.set_parent_id_if_null conn
-                          ~parent_hash:
-                            (State_hash.With_state_hashes.state_hash
-                               genesis_block )
-                          ~parent_id:block_id
-                      in
-                      `Inserted )
-                pool
+           Building means resolving the genesis ledger, and resolving it means
+           opening it as a RocksDB, which this process then holds. A second
+           attempt finds the lock taken and fails with "No locks available", so
+           an attempt that builds every time works exactly once and then never
+           again. It also means an archive that has long since inserted the
+           block would go on materialising a ledger of tens of megabytes for
+           the rest of its life.
+
+           The block is recognisable without building it: an era genesis is the
+           block above the fork with global_slot_since_hard_fork = 0. *)
+        match%bind
+          Mina_caqti.Pool.use
+            (fun conn ->
+              Hardfork_sql.fork_block_above_height conn
+                ~height:hardfork_state.Hardfork_state.fork_blockchain_length )
+            pool
+        with
+        | Error e ->
+            return (Error (Insert_failed (Caqti_error.show e)))
+        | Ok (Some _) ->
+            return (Ok `Already_present)
+        | Ok None -> (
+            match%bind
+              build ~logger ~genesis_constants ~constraint_constants
+                ~config_json:hardfork_state.Hardfork_state.config_json
             with
-            | Error e ->
-                return (Error (Insert_failed (Caqti_error.show e)))
-            | Ok `Already_present ->
-                return (Ok `Already_present)
-            | Ok `Inserted ->
-                [%log info]
-                  "Inserted the fork genesis block $state_hash. The post-fork \
-                   chain now links to the pre-fork one."
-                  ~metadata:[ ("state_hash", `String state_hash) ] ;
-                return (Ok `Inserted) ) )
+            | Error reason ->
+                return (Error reason)
+            | Ok (genesis_block, constraint_constants) -> (
+                let state_hash =
+                  State_hash.With_state_hashes.state_hash genesis_block
+                  |> State_hash.to_base58_check
+                in
+                match%bind
+                  Mina_caqti.Pool.use
+                    (fun conn ->
+                      let open Deferred.Result.Let_syntax in
+                      match%bind already_present conn ~state_hash with
+                      | true ->
+                          return `Already_present
+                      | false ->
+                          let%bind block_id =
+                            Block.add_if_doesn't_exist conn ~logger
+                              ~constraint_constants genesis_block
+                              ~accounts_accessed:[] ~accounts_created:[]
+                          in
+                          (* Adopt the children that got here first.
+
+                             The post-fork chain's second block reaches the archive
+                             over the ordinary block path within minutes of the
+                             fork, while this insert waits on a ledger from S3. So
+                             the usual order is child first, and a block whose
+                             parent is absent is stored with parent_id NULL. The
+                             ordinary path repairs that for itself -- every insert
+                             calls set_parent_id_if_null -- but this one does not
+                             go through it, so without this the boundary stays
+                             severed however long the block sits here. *)
+                          let%map () =
+                            Block.set_parent_id_if_null conn
+                              ~parent_hash:
+                                (State_hash.With_state_hashes.state_hash
+                                   genesis_block )
+                              ~parent_id:block_id
+                          in
+                          `Inserted )
+                    pool
+                with
+                | Error e ->
+                    return (Error (Insert_failed (Caqti_error.show e)))
+                | Ok `Already_present ->
+                    return (Ok `Already_present)
+                | Ok `Inserted ->
+                    [%log info]
+                      "Inserted the fork genesis block $state_hash. The \
+                       post-fork chain now links to the pre-fork one."
+                      ~metadata:[ ("state_hash", `String state_hash) ] ;
+                    return (Ok `Inserted) ) ) )
 end
 
 (** Load an era's genesis ledger accounts.
