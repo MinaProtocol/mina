@@ -9,8 +9,8 @@ module Encoders = Mina_graphql.Types.Input
 module Scalars = Graphql_lib.Scalars
 
 module Unlock_account =
-[%graphql
-({|
+  [%graphql
+  ({|
   mutation ($password: String!, $public_key: PublicKey!) @encoders(module: "Encoders"){
     unlockAccount(input: {password: $password, publicKey: $public_key }) {
       account {
@@ -19,11 +19,11 @@ module Unlock_account =
     }
   }
 |}
-[@encoders Encoders] )]
+  [@encoders Encoders] )]
 
 module Send_test_payments =
-[%graphql
-{|
+  [%graphql
+  {|
   mutation ($senders: [PrivateKey!]!,
   $receiver: PublicKey!,
   $amount: UInt64!,
@@ -38,8 +38,8 @@ module Send_test_payments =
 |}]
 
 module Send_payment =
-[%graphql
-{|
+  [%graphql
+  {|
  mutation ($input: SendPaymentInput!)@encoders(module: "Encoders"){
     sendPayment(input: $input){
         payment {
@@ -52,8 +52,8 @@ module Send_payment =
 |}]
 
 module Send_payment_with_raw_sig =
-[%graphql
-{|
+  [%graphql
+  {|
  mutation (
  $input:SendPaymentInput!,
  $rawSignature: String!
@@ -74,8 +74,8 @@ module Send_payment_with_raw_sig =
 |}]
 
 module Send_delegation =
-[%graphql
-{|
+  [%graphql
+  {|
   mutation ($input: SendDelegationInput!) @encoders(module: "Encoders"){
     sendDelegation(input:$input){
         delegation {
@@ -88,8 +88,8 @@ module Send_delegation =
 |}]
 
 module Set_snark_worker =
-[%graphql
-{|
+  [%graphql
+  {|
   mutation ($input: SetSnarkWorkerInput! ) @encoders(module: "Encoders"){
     setSnarkWorker(input:$input){
       lastSnarkWorker
@@ -98,8 +98,8 @@ module Set_snark_worker =
 |}]
 
 module Set_snark_work_fee =
-[%graphql
-{|
+  [%graphql
+  {|
   mutation ($fee: UInt64!) @encoders(module: "Encoders"){
     setSnarkWorkFee(input: {fee: $fee}) {
       lastFee
@@ -108,8 +108,8 @@ module Set_snark_work_fee =
 |}]
 
 module Get_account_data =
-[%graphql
-{|
+  [%graphql
+  {|
   query ($public_key: PublicKey!) @encoders(module: "Encoders"){
     account(publicKey: $public_key) {
       nonce
@@ -128,8 +128,8 @@ module Send_test_zkapp = Generated_graphql_queries.Send_test_zkapp
 module Pooled_zkapp_commands = Generated_graphql_queries.Pooled_zkapp_commands
 
 module Query_peer_id =
-[%graphql
-{|
+  [%graphql
+  {|
   query {
     daemonStatus {
       addrsAndPorts {
@@ -144,8 +144,8 @@ module Query_peer_id =
 |}]
 
 module Global_slot_since_hard_fork =
-[%graphql
-{|
+  [%graphql
+  {|
   query {
     daemonStatus {
       consensusTimeNow {
@@ -156,7 +156,7 @@ module Global_slot_since_hard_fork =
 |}]
 
 module Best_chain =
-(* "slot" is serialized using Graphql_lib.Scalars.Slot
+  (* "slot" is serialized using Graphql_lib.Scalars.Slot
    to use that, we'd need to add the 'consensus' library,
    which seems an undesirable dependency
 
@@ -165,8 +165,8 @@ module Best_chain =
    that benign mismatch could be avoided by changing the encoding type
    in proof_of_stake.ml
 *)
-[%graphql
-{|
+  [%graphql
+  {|
   query ($max_length: Int) @encoders(module: "Encoders"){
     bestChain (maxLength: $max_length) {
       stateHash @ppxCustom(module: "Graphql_lib.Scalars.String_json")
@@ -186,8 +186,8 @@ module Best_chain =
 |}]
 
 module Query_metrics =
-[%graphql
-{|
+  [%graphql
+  {|
   query {
     daemonStatus {
       metrics {
@@ -220,16 +220,16 @@ module Genesis_ledger_export = [%graphql {|
 |}]
 
 module StartFilteredLog =
-[%graphql
-{|
+  [%graphql
+  {|
   mutation ($filter: [String!]!) @encoders(module: "Encoders"){
     startFilteredLog(filter: $filter)
   }
 |}]
 
 module GetFilteredLogEntries =
-[%graphql
-{|
+  [%graphql
+  {|
   query ($offset: Int!) @encoders(module: "Encoders"){
     getFilteredLogEntries(offset: $offset) {
         logMessages,
@@ -239,8 +239,8 @@ module GetFilteredLogEntries =
 |}]
 
 module Account =
-[%graphql
-{|
+  [%graphql
+  {|
   query ($public_key: PublicKey!, $token: UInt64) {
     account (publicKey : $public_key, token : $token) {
       balance { liquid
@@ -285,9 +285,50 @@ module Account =
   }
 |}]
 
+module Sync_status = [%graphql {|
+  query {
+    syncStatus
+  }
+|}]
+
+module Daemon_status =
+  [%graphql
+  {|
+  query {
+    daemonStatus {
+      syncStatus
+      blockchainLength
+      highestBlockLengthReceived
+      uptimeSecs
+      stateHash
+      commitId
+      peers {
+        peerId
+        host
+        libp2pPort
+      }
+    }
+  }
+|}]
+
+module Daemon_readiness =
+  [%graphql
+  {|
+  query {
+    daemonStatus {
+      syncStatus
+      blockchainLength
+      highestBlockLengthReceived
+      peers {
+        peerId
+      }
+    }
+  }
+|}]
+
 module Best_chain_for_slot_end_test =
-[%graphql
-{|
+  [%graphql
+  {|
     query ($max_length: Int) @encoders(module: "Encoders") {
       bestChain(maxLength: $max_length) {
         stateHash @ppxCustom(module: "Graphql_lib.Scalars.String_json")

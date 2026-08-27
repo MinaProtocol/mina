@@ -1,0 +1,27 @@
+(executable
+ (package mina_archive_healthcheck)
+ (name mina_archive_healthcheck)
+ (public_name mina-archive-healthcheck)
+ (libraries
+  ;; opam libraries
+  core
+  core_unix.command_unix
+  async
+  async_kernel
+  async_unix
+  async.async_command
+  uri
+  caqti
+  caqti-async
+  caqti-driver-postgresql
+  yojson
+  ;; local libraries
+  archive_health_queries
+  error_json
+  interpolator_lib
+  logger
+  mina_caqti)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_version ppx_let ppx_sexp_conv ppx_deriving_yojson ppx_mina)))

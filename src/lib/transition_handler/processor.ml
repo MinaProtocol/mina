@@ -6,7 +6,7 @@
  *  and breadcrumb rose trees (via the catchup pipe).
  *)
 
-open Core_kernel
+open Core
 open Async_kernel
 open Pipe_lib.Strict_pipe
 open Mina_base
@@ -133,8 +133,7 @@ let process_transition ~context:(module Context : CONTEXT) ~trust_system
     Protocol_state.previous_state_hash (Header.protocol_state header)
   in
   let root_consensus_state =
-    Transition_frontier.(
-      Breadcrumb.consensus_state_with_hashes @@ root frontier)
+    Transition_frontier.(Breadcrumb.consensus_state_with_hashes @@ root frontier)
   in
   let metadata = [ ("state_hash", State_hash.to_yojson transition_hash) ] in
   let state_hash = transition_hash in
@@ -163,7 +162,7 @@ let process_transition ~context:(module Context : CONTEXT) ~trust_system
       match
         Mina_block.Validation.validate_frontier_dependencies
           ~context:(module Context)
-          ~root_consensus_state ~is_block_in_frontier ~to_header:ident
+          ~root_consensus_state ~is_block_in_frontier ~to_header:Fn.id
           (Envelope.Incoming.data env)
       with
       | Ok _ | Error `Parent_missing_from_frontier ->
@@ -292,7 +291,7 @@ let process_transition ~context:(module Context : CONTEXT) ~trust_system
       in
       Mina_metrics.(
         Counter.inc_one
-          Transition_frontier_controller.breadcrumbs_built_by_processor) ;
+          Transition_frontier_controller.breadcrumbs_built_by_processor ) ;
       let%map.Deferred result =
         add_and_finalize ~logger ~frontier ~catchup_scheduler
           ~processed_transition_writer ~only_if_present:false ~time_controller
@@ -353,15 +352,15 @@ let run ~context:(module Context : CONTEXT) ~verifier ~trust_system
   O1trace.background_thread "process_blocks" (fun () ->
       Reader.Merge.iter
         (* It is fine to skip the cache layer on blocks produced by this node
-           * because it is extraordinarily unlikely we would write an internal bug
-           * triggering this case, and the external case (where we received an
-           * identical external transition from the network) can happen iff there
-           * is another node with the exact same private key and view of the
-           * transaction pool. *)
+         * because it is extraordinarily unlikely we would write an internal bug
+         * triggering this case, and the external case (where we received an
+         * identical external transition from the network) can happen iff there
+         * is another node with the exact same private key and view of the
+         * transaction pool. *)
         [ Reader.map producer_transition_reader ~f:(fun breadcrumb ->
               Mina_metrics.(
                 Gauge.inc_one
-                  Transition_frontier_controller.transitions_being_processed) ;
+                  Transition_frontier_controller.transitions_being_processed ) ;
               `Local_breadcrumb (Cached.pure breadcrumb) )
         ; Reader.map catchup_breadcrumbs_reader
             ~f:(fun (cb, catchup_breadcrumbs_callback) ->
@@ -377,12 +376,12 @@ let run ~context:(module Context : CONTEXT) ~verifier ~trust_system
                   (breadcrumb_subtrees, subsequent_callback_action) -> (
                   ( match%map
                       Deferred.Or_error.List.iter breadcrumb_subtrees
-                        ~f:(fun subtree ->
+                        ~how:`Sequential ~f:(fun subtree ->
                           Mina_stdlib.Rose_tree.Deferred.Or_error.iter
                             subtree
                             (* It could be the case that by the time we try and
-                               * add the breadcrumb, it's no longer relevant when
-                               * we're catching up *) ~f:(fun (b, valid_cb) ->
+                             * add the breadcrumb, it's no longer relevant when
+                             * we're catching up *) ~f:(fun (b, valid_cb) ->
                               let state_hash =
                                 Frontier_base.Breadcrumb.state_hash
                                   (Cached.peek b)
@@ -404,21 +403,22 @@ let run ~context:(module Context : CONTEXT) ~verifier ~trust_system
                                   [%log internal] "Breadcrumb_integrated" ) ;
                               result ) )
                     with
-                  | Ok () ->
-                      ()
-                  | Error err ->
-                      List.iter breadcrumb_subtrees ~f:(fun tree ->
-                          Mina_stdlib.Rose_tree.iter tree
-                            ~f:(fun (cached_breadcrumb, _vc) ->
-                              let (_ : Transition_frontier.Breadcrumb.t) =
-                                Cached.invalidate_with_failure cached_breadcrumb
-                              in
-                              () ) ) ;
-                      [%log error]
-                        "Error, failed to attach all catchup breadcrumbs to \
-                         transition frontier: $error"
-                        ~metadata:[ ("error", Error_json.error_to_yojson err) ]
-                  )
+                    | Ok () ->
+                        ()
+                    | Error err ->
+                        List.iter breadcrumb_subtrees ~f:(fun tree ->
+                            Mina_stdlib.Rose_tree.iter tree
+                              ~f:(fun (cached_breadcrumb, _vc) ->
+                                let (_ : Transition_frontier.Breadcrumb.t) =
+                                  Cached.invalidate_with_failure
+                                    cached_breadcrumb
+                                in
+                                () ) ) ;
+                        [%log error]
+                          "Error, failed to attach all catchup breadcrumbs to \
+                           transition frontier: $error"
+                          ~metadata:
+                            [ ("error", Error_json.error_to_yojson err) ] )
                   >>| fun () ->
                   match subsequent_callback_action with
                   | `Ledger_catchup decrement_signal ->
@@ -446,7 +446,7 @@ let run ~context:(module Context : CONTEXT) ~verifier ~trust_system
                   in
                   Perf_histograms.add_span
                     ~name:"accepted_transition_local_latency"
-                    (Core_kernel.Time.diff
+                    (Time_float.diff
                        Block_time.(now time_controller |> to_time_exn)
                        transition_time ) ;
                   let%map () =
@@ -473,7 +473,7 @@ let run ~context:(module Context : CONTEXT) ~verifier ~trust_system
                   in
                   Mina_metrics.(
                     Gauge.dec_one
-                      Transition_frontier_controller.transitions_being_processed)
+                      Transition_frontier_controller.transitions_being_processed )
               | `Partially_valid_transition (block_or_header, `Valid_cb valid_cb)
                 ->
                   process_transition ~block_or_header ~valid_cb
@@ -597,9 +597,9 @@ let%test_module "Transition_handler.Processor tests" =
                     (Strict_pipe.Reader.fold_until processed_transition_reader
                        ~init:branch
                        ~f:(fun
-                            remaining_breadcrumbs
-                            (`Transition newly_added_transition, _, _)
-                          ->
+                           remaining_breadcrumbs
+                           (`Transition newly_added_transition, _, _)
+                         ->
                          Deferred.return
                            ( match remaining_breadcrumbs with
                            | next_expected_breadcrumb :: tail ->

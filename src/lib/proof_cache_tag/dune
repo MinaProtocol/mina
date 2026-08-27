@@ -10,6 +10,6 @@
   disk_cache
   pickles)
  (preprocess
-  (pps ppx_mina ppx_version ppx_jane))
+  (pps ppx_deriving_yojson ppx_mina ppx_sexp_conv ppx_version))
  (instrumentation
   (backend bisect_ppx)))

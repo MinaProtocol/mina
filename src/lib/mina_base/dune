@@ -11,7 +11,6 @@
   base.base_internalhash_types
   base.caml
   base_quickcheck
-  base_quickcheck.ppx_quickcheck
   bin_prot.shape
   core_kernel
   core_kernel.uuid
@@ -19,7 +18,7 @@
   integers
   ppx_inline_test.config
   result
-  sexp_diff_kernel
+  sexp_diff
   sexplib0
   yojson
   ;; local libraries

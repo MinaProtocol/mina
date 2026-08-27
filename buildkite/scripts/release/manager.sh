@@ -14,6 +14,12 @@
 # - PERSIST: Archive artifacts to long-term storage backends
 #
 # Supported artifacts: mina-daemon, mina-archive, mina-rosetta, mina-logproc, mina-config, mina-automode, mina-prefork, mina-postfork, mina-generic, rosetta-generic, mina-postfork-mesa, mina-prefork-mesa, minimina
+#
+# Artifacts that carry a docker image as well as a debian package:
+#   mina-daemon (mina-daemon), mina-generic (mina-daemon), mina-archive (mina-archive),
+#   mina-rosetta / rosetta-generic (mina-rosetta), mina-automode (mina-daemon-auto-hardfork)
+# See get_docker_image_name for the artifact -> image name mapping.
+#
 # Supported networks: devnet, mainnet
 # Supported platforms: Debian (bullseye, focal), Docker (GCR, Docker.io)
 # Supported channels: unstable, alpha, beta, stable
@@ -248,14 +254,9 @@ function get_artifact_with_suffix() {
             echo "mina-$__network-postfork-mesa"
         ;;
         mina-generic)
-            case $__profile in
-                lightnet)
-                    echo "mina-$__network-generic-lightnet"
-                ;;
-                *)
-                    echo "mina-$__network-generic"
-                ;;
-            esac
+            # Single network/profile-agnostic daemon package; the profile
+            # (incl. lightnet) is selected at runtime via MINA_PROFILE.
+            echo "mina-generic"
         ;;
         rosetta-generic)
             echo "mina-rosetta-$__network-generic"
@@ -306,6 +307,13 @@ function get_docker_image_name() {
         ;;
         rosetta-generic)
             echo "mina-rosetta"
+        ;;
+        mina-automode)
+            # The automode image is built by the DaemonAutoHardfork artifact
+            # (buildkite/src/Constants/Docker/Package.dhall), which names it
+            # mina-daemon-auto-hardfork. Its tag is
+            # "<version>-<codename>-<network>", the same shape as mina-daemon.
+            echo "mina-daemon-auto-hardfork"
         ;;
         *)
             echo "$__artifact"
@@ -1089,7 +1097,31 @@ function publish(){
                                     fi
                                 done
                             ;;
-                            mina-automode|mina-prefork|mina-postfork)
+                            mina-automode)
+                                for network in "${__networks_arr[@]}"; do
+                                    if [[ $__only_dockers == 0 ]]; then
+                                        publish_debian $artifact \
+                                                $__codename \
+                                                $__source_version \
+                                                $__target_version \
+                                                $__channel \
+                                                $network \
+                                                $__profile \
+                                                $__verify \
+                                                $__dry_run \
+                                                $__backend \
+                                                $__debian_repo \
+                                                "$__arch" \
+                                                "$__force_upload_debians" \
+                                                "$__debian_sign_key"
+                                    fi
+
+                                    if [[ $__only_debians == 0 ]]; then
+                                        promote_and_verify_docker $artifact $__source_version $__target_version $__codename $network $__profile $__source_docker_repo $__target_docker_repo $__verify $__arch $__dry_run
+                                    fi
+                                done
+                            ;;
+                            mina-prefork|mina-postfork)
                                 for network in "${__networks_arr[@]}"; do
                                     if [[ $__only_dockers == 0 ]]; then
                                         publish_debian $artifact \
@@ -1544,7 +1576,30 @@ function promote(){
                                 fi
                             done
                         ;;
-                        mina-automode|mina-prefork|mina-postfork)
+                        mina-automode)
+                            for network in "${__networks_arr[@]}"; do
+                                if [[ $__only_dockers == 0 ]]; then
+                                    promote_debian $artifact \
+                                        $__codename \
+                                        $__source_version \
+                                        $__target_version \
+                                        $__source_channel \
+                                        $__target_channel \
+                                        $network \
+                                        "$__profile" \
+                                        $__verify \
+                                        $__dry_run \
+                                        $__debian_repo \
+                                        "$__arch" \
+                                        $__debian_sign_key
+                                fi
+
+                                if [[ $__only_debians == 0 ]]; then
+                                    promote_and_verify_docker $artifact $__source_version $__target_version $__codename $network $__profile $__source_docker_repo $__target_docker_repo $__verify $__arch $__dry_run
+                                fi
+                            done
+                        ;;
+                        mina-prefork|mina-postfork)
                             for network in "${__networks_arr[@]}"; do
                                 if [[ $__only_dockers == 0 ]]; then
                                     promote_debian $artifact \
@@ -1666,8 +1721,14 @@ function combine_docker_suffixes() {
     local __profile=$2
     local __build_flag=$3
     local __generic=${4:-0}
+    # When set, omit the network segment. Used for the single network-free
+    # generic daemon image whose tag is "<version>-generic" (no network).
+    local __networkless=${5:-0}
 
-    local __parts=("${network}")
+    local __parts=()
+    if [[ "$__networkless" != "1" ]]; then
+        __parts+=("${network}")
+    fi
 
     if [[ "$__generic" == "1" ]]; then
         __parts+=("generic")
@@ -1926,7 +1987,11 @@ function verify(){
                                     __artifact_full_name=$(get_artifact_with_suffix $artifact $network $__profile)
 
                                     local __docker_suffix_combined
-                                    __docker_suffix_combined=$(combine_docker_suffixes "$network" "$__profile" "$__build_flag" "$__generic")
+                                    # The generic daemon image is network-free
+                                    # ("<version>-generic"); pass networkless so the
+                                    # verify tag matches. Configured daemon (non-generic)
+                                    # keeps its network segment.
+                                    __docker_suffix_combined=$(combine_docker_suffixes "$network" "$__profile" "$__build_flag" "$__generic" "$__generic")
 
 
                                 if [[ $__only_dockers == 0 ]]; then
@@ -1984,7 +2049,50 @@ function verify(){
                                     fi
                                 done
                             ;;
-                            mina-automode|mina-prefork|mina-postfork)
+                            mina-automode)
+                                for network in "${__networks_arr[@]}"; do
+                                    local __artifact_full_name
+                                    __artifact_full_name=$(get_artifact_with_suffix $artifact $network)
+
+                                    local __docker_name
+                                    __docker_name=$(get_docker_image_name $artifact)
+
+                                    local __docker_suffix_combined
+                                    __docker_suffix_combined=$(combine_docker_suffixes "$network" "$__profile" "$__build_flag" "$__generic")
+
+                                    if [[ $__only_dockers == 0 ]]; then
+                                        echo "     📋  Verifying: $__artifact_full_name debian on $__channel channel with $__version version for $__codename codename"
+                                        echo ""
+
+                                        prefix_cmd "$SUBCOMMAND_TAB" $SCRIPTPATH/../../../scripts/debian/verify.sh \
+                                            -p $__artifact_full_name \
+                                            --version $__version \
+                                            -m $__codename \
+                                            -r $__debian_repo \
+                                            -c $__channel \
+                                            -a "$__arch" \
+                                            ${__signed_debian_repo:+--signed}
+
+                                        echo ""
+                                    fi
+
+                                    if [[ $__only_debians == 0 ]]; then
+                                        echo "      📋  Verifying: $__docker_name docker on $(calculate_docker_tag "$__docker_repo" $artifact $__version $__codename "$network" "$__profile")"
+                                        echo ""
+
+                                        prefix_cmd "$SUBCOMMAND_TAB" $SCRIPTPATH/../../../scripts/docker/verify.sh \
+                                            -p "$__docker_name" \
+                                            -v $__version \
+                                            -c "$__codename" \
+                                            -s "$__docker_suffix_combined" \
+                                            -r "$__docker_repo" \
+                                            -a "$__arch"
+
+                                        echo ""
+                                    fi
+                                done
+                            ;;
+                            mina-prefork|mina-postfork)
                                 for network in "${__networks_arr[@]}"; do
                                     local __artifact_full_name
                                     __artifact_full_name=$(get_artifact_with_suffix $artifact $network)
@@ -3404,9 +3512,12 @@ function progress(){
 
         for artifact in "${__artifacts_arr[@]}"; do
             # Skip artifacts that have no docker image
-            if [[ "$artifact" == "mina-logproc" || "$artifact" == "minimina" || "$artifact" == "mina-config" || "$artifact" == "mina-automode" || "$artifact" == "mina-prefork" || "$artifact" == "mina-postfork" || "$artifact" == "mina-postfork-mesa" || "$artifact" == "mina-prefork-mesa" ]]; then
+            if [[ "$artifact" == "mina-logproc" || "$artifact" == "minimina" || "$artifact" == "mina-config" || "$artifact" == "mina-prefork" || "$artifact" == "mina-postfork" || "$artifact" == "mina-postfork-mesa" || "$artifact" == "mina-prefork-mesa" ]]; then
                 continue
             fi
+
+            local docker_name
+            docker_name=$(get_docker_image_name "$artifact")
 
             for codename in "${__codenames_arr[@]}"; do
                 # Determine architectures based on codename
@@ -3425,11 +3536,11 @@ function progress(){
                     local tag="$__version-$codename$network_suffix$arch_suffix"
 
                     ((total_docker_checks=total_docker_checks+1))
-                    if check_docker_image "$docker_repo" "$artifact" "$tag"; then
-                        echo "    ✅  $artifact:$tag"
+                    if check_docker_image "$docker_repo" "$docker_name" "$tag"; then
+                        echo "    ✅  $docker_name:$tag"
                         ((passed_docker_checks=passed_docker_checks+1))
                     else
-                        echo "    ❌  $artifact:$tag - MISSING"
+                        echo "    ❌  $docker_name:$tag - MISSING"
                     fi
                 done
             done

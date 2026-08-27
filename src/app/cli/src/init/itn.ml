@@ -12,8 +12,8 @@ let create_accounts ~(genesis_constants : Genesis_constants.t)
   (* 30 receiving account updates, one sender, one fee payer => 16 segments *)
   let keys_per_zkapp = 30 in
   let zkapps_per_block = 10 in
-  let pk_check_wait = Time.Span.of_sec 10. in
-  let pk_check_timeout = Time.Span.of_min 30. in
+  let pk_check_wait = Time_float.Span.of_sec 10. in
+  let pk_check_timeout = Time_float.Span.of_min 30. in
   let min_fee =
     Currency.Fee.to_nanomina_int genesis_constants.minimum_user_command_fee
   in
@@ -83,7 +83,7 @@ let create_accounts ~(genesis_constants : Genesis_constants.t)
     List.init num_accounts ~f:(fun _n -> Signature_lib.Keypair.create ())
   in
   let%bind () =
-    Deferred.List.iteri keypairs ~f:(fun i kp ->
+    Deferred.List.iteri keypairs ~how:`Sequential ~f:(fun i kp ->
         let privkey_path = sprintf "%s-%d" key_prefix i in
         let pk =
           Signature_lib.Public_key.compress kp.public_key
@@ -183,7 +183,7 @@ let create_accounts ~(genesis_constants : Genesis_constants.t)
   in
   (* TODO do not compute hashes and remove Zkapp_command.read_all_proofs_from_disk *)
   let zkapps_batches = List.chunks_of zkapps ~length:zkapps_per_block in
-  Deferred.List.iter zkapps_batches ~f:(fun zkapps_batch ->
+  Deferred.List.iter ~how:`Sequential zkapps_batches ~f:(fun zkapps_batch ->
       Format.printf "Processing batch of %d zkApps@." (List.length zkapps_batch) ;
       List.iteri zkapps_batch ~f:(fun i zkapp ->
           let txn_hash =
@@ -242,7 +242,7 @@ let create_accounts ~(genesis_constants : Genesis_constants.t)
         List.map zkapps_batch ~f:(fun zkapp ->
             let acct_update_pks =
               List.map (Zkapp_command.Call_forest.to_list zkapp.account_updates)
-                ~f:(fun acct_update -> acct_update.body.public_key)
+                ~f:(fun acct_update -> acct_update.body.public_key )
             in
             zkapp.fee_payer.body.public_key :: acct_update_pks )
         |> List.concat
@@ -284,5 +284,5 @@ let create_accounts ~(genesis_constants : Genesis_constants.t)
           Format.eprintf
             "Timed out (%s) waiting to find batch public keys in daemon \
              ledger@."
-            (Time.Span.to_string pk_check_timeout) ;
+            (Time_float.Span.to_string pk_check_timeout) ;
           exit 1 )

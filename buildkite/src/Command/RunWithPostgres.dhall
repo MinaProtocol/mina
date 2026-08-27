@@ -135,6 +135,7 @@ let runInDockerWithPostgresConn
           in  Cmd.chain
                 (   [ "( docker stop ${postgresDockerName} && docker rm ${postgresDockerName} ) || true"
                     , "source buildkite/scripts/export-git-env-vars.sh"
+                    , "./buildkite/scripts/docker/disk-cleanup.sh || true"
                     , "docker run --network host --volume ${outerDir}:/workdir --workdir /workdir --name ${postgresDockerName} -d -e POSTGRES_USER=${user} -e POSTGRES_PASSWORD=${password} -e POSTGRES_DB=${dbName} ${dockerVersion}"
                     , "sleep 5"
                     ]
@@ -227,11 +228,12 @@ let runInToolchainWithPostgresAndDebs
                   initScript
 
           let installAndRun =
-                "sudo chown -R opam . && ./buildkite/scripts/debian/install.sh ${debs} 1 && ${innerScript}"
+                "sudo chown -R opam . && ./buildkite/scripts/debian/restore-or-install.sh ${debs} 1 && ${innerScript}"
 
           in  Cmd.chain
                 (   [ "( docker stop ${postgresDockerName} && docker rm ${postgresDockerName} ) || true"
                     , "source buildkite/scripts/export-git-env-vars.sh"
+                    , "./buildkite/scripts/docker/disk-cleanup.sh || true"
                     , "docker run --network host --volume ${outerDir}:/workdir --workdir /workdir --name ${postgresDockerName} -d -e POSTGRES_USER=${user} -e POSTGRES_PASSWORD=${password} -e POSTGRES_DB=${dbName} ${dockerVersion}"
                     , "sleep 5"
                     ]

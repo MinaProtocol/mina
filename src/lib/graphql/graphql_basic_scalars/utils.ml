@@ -28,18 +28,20 @@ module type Json_intf_any_typ = sig
   val typ : unit -> ('a, t option) typ
 end
 
-module Make_scalar_using_to_string (T : sig
-  type t
+module Make_scalar_using_to_string
+    (T : sig
+      type t
 
-  val to_string : t -> string
+      val to_string : t -> string
 
-  val of_string : string -> t
-end) (Scalar : sig
-  val name : string
+      val of_string : string -> t
+    end)
+    (Scalar : sig
+      val name : string
 
-  val doc : string
-end)
-(Schema : Schema) :
+      val doc : string
+    end)
+    (Schema : Schema) :
   Json_intf_any_typ
     with type ('a, 'b) typ := ('a, 'b) Schema.typ
     with type t = T.t = struct
@@ -52,18 +54,20 @@ end)
   let typ () = Schema.scalar Scalar.name ~doc:Scalar.doc ~coerce:serialize
 end
 
-module Make_scalar_using_base58_check (T : sig
-  type t
+module Make_scalar_using_base58_check
+    (T : sig
+      type t
 
-  val to_base58_check : t -> string
+      val to_base58_check : t -> string
 
-  val of_base58_check_exn : string -> t
-end) (Scalar : sig
-  val name : string
+      val of_base58_check_exn : string -> t
+    end)
+    (Scalar : sig
+      val name : string
 
-  val doc : string
-end)
-(Schema : Schema) :
+      val doc : string
+    end)
+    (Schema : Schema) :
   Json_intf_any_typ
     with type ('a, 'b) typ := ('a, 'b) Schema.typ
     with type t = T.t = struct
@@ -76,26 +80,27 @@ end)
   let typ () = Schema.scalar Scalar.name ~doc:Scalar.doc ~coerce:serialize
 end
 
-module Make_scalar_using_base64 (T : sig
-  type t
+module Make_scalar_using_base64
+    (T : sig
+      type t
 
-  val to_base64 : t -> string
+      val to_base64 : t -> string
 
-  val of_base64 : string -> t Core_kernel.Or_error.t
-end) (Scalar : sig
-  val name : string
+      val of_base64 : string -> t Core.Or_error.t
+    end)
+    (Scalar : sig
+      val name : string
 
-  val doc : string
-end)
-(Schema : Schema) :
+      val doc : string
+    end)
+    (Schema : Schema) :
   Json_intf_any_typ
     with type ('a, 'b) typ := ('a, 'b) Schema.typ
     with type t = T.t = struct
   type t = T.t
 
   let parse json =
-    Yojson.Basic.Util.to_string json
-    |> T.of_base64 |> Core_kernel.Or_error.ok_exn
+    Yojson.Basic.Util.to_string json |> T.of_base64 |> Core.Or_error.ok_exn
 
   let serialize x = `String (T.to_base64 x)
 

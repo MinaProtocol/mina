@@ -1,5 +1,5 @@
 open Signature_lib
-open Core_kernel
+open Core
 open Mina_base
 open Integration_test_lib
 module Impl = Pickles.Impls.Step
@@ -77,10 +77,10 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       requires_graphql = true
     ; genesis_ledger =
         (let open Test_account in
-        [ create ~account_name:"whale1-key" ~balance:"9000000000" ()
-        ; create ~account_name:"whale2-key" ~balance:"1000000000" ()
-        ; create ~account_name:"snark-node-key" ~balance:"100" ()
-        ])
+         [ create ~account_name:"whale1-key" ~balance:"9000000000" ()
+         ; create ~account_name:"whale2-key" ~balance:"1000000000" ()
+         ; create ~account_name:"snark-node-key" ~balance:"100" ()
+         ] )
     ; block_producers =
         [ { node_name = "whale1"; account_name = "whale1-key" }
         ; { node_name = "whale2"; account_name = "whale2-key" }
@@ -103,7 +103,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       section_hard "Wait for nodes to initialize"
         (wait_for t
            (Wait_condition.nodes_to_initialize
-              (Core.String.Map.data (Network.all_mina_nodes network)) ) )
+              (Core.Map.data (Network.all_mina_nodes network)) ) )
     in
     let whale1 = Network.block_producer_exn network "whale1" in
     let%bind whale1_pk = pub_key_of_node whale1 in
@@ -302,10 +302,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       call_forest_to_zkapp ~call_forest:call_forest_update_vk2
         ~nonce:Account.Nonce.(of_int 1)
     in
-    let%bind ( invalid_zkapp_command_set_vk_perm_proof
-             , invalid_zkapp_command_set_vk_perm_impossible
-             , zkapp_command_set_vk_perm_proof
-             , zkapp_command_set_vk_perm_impossible ) =
+    let%bind
+        ( invalid_zkapp_command_set_vk_perm_proof
+        , invalid_zkapp_command_set_vk_perm_impossible
+        , zkapp_command_set_vk_perm_proof
+        , zkapp_command_set_vk_perm_impossible ) =
       let invalid_snapp_update_proof =
         { Account_update.Update.dummy with
           permissions =
@@ -403,9 +404,10 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       , update_vk_perm_proof
       , update_vk_perm_impossible )
     in
-    let%bind ( failed_zkapp_command_set_vk_signature_1
-             , failed_zkapp_command_set_vk_signature_2
-             , zkapp_command_set_vk_proof ) =
+    let%bind
+        ( failed_zkapp_command_set_vk_signature_1
+        , failed_zkapp_command_set_vk_signature_2
+        , zkapp_command_set_vk_proof ) =
       let fee = Currency.Fee.of_nanomina_int_exn 1_000_000 in
       let amount = Currency.Amount.zero in
       let memo = Signed_command_memo.dummy in

@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 
 (* a signature *)
 module type Some_intf = sig

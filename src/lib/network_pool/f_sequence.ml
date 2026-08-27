@@ -61,8 +61,7 @@ module Digit = struct
       makes the typechecker understand existentials under or-patterns isn't
       in our compiler version. (ocaml/ocaml#2110)
   *)
-  let addable_elim :
-      type a r.
+  let addable_elim : type a r.
          ((addable, r, 'e) t -> 'o) (** Function handling addable case *)
       -> ((not_addable, removable, 'e) t -> 'o)
          (** Function handling non-addable case *)
@@ -71,8 +70,7 @@ module Digit = struct
    fun f g t ->
     match t with One _ -> f t | Two _ -> f t | Three _ -> f t | Four _ -> g t
 
-  let removable_elim :
-      type a r.
+  let removable_elim : type a r.
          ((a, removable, 'e) t -> 'o) (** Function handling removable case*)
       -> ((addable, not_removable, 'e) t -> 'o)
          (** Function handling non-removable case *)
@@ -185,8 +183,7 @@ module Digit = struct
    fun measure' -> foldl (fun m e -> m + measure' e) 0
 
   (** Split a digit by measure. Again see below. *)
-  let split :
-      type a r.
+  let split : type a r.
          ('e -> int)
       -> int
       -> int
@@ -196,8 +193,7 @@ module Digit = struct
     (* Addable inputs go to addable outputs, but non-addable inputs may go to
        either. We use a separate function for addables to represent this and
        minimizing the amount of Obj.magicking we need to do. *)
-    let rec split_addable :
-        type r.
+    let rec split_addable : type r.
            int
         -> (addable, r, 'e) t
         -> (addable, 'e) t_any_r option * 'e * (addable, 'e) t_any_r option =
@@ -255,9 +251,9 @@ module Digit = struct
   let%test_unit "Digit.split preserves contents and order" =
     Quickcheck.test
       (let open Quickcheck.Generator.Let_syntax in
-      let%bind (Mk_any_ar dig as dig') = gen_any_ar in
-      let%bind idx = Int.gen_incl 1 (List.length @@ to_list dig) in
-      return (dig', idx))
+       let%bind (Mk_any_ar dig as dig') = gen_any_ar in
+       let%bind idx = Int.gen_incl 1 (List.length @@ to_list dig) in
+       return (dig', idx) )
       ~f:(fun (Mk_any_ar dig, target) ->
         let lhs_opt, m, rhs_opt = split Fn.id target 0 dig in
         let lhs', rhs' = (opt_to_list lhs_opt, opt_to_list rhs_opt) in
@@ -271,9 +267,9 @@ module Digit = struct
           Int.sexp_of_t
           (to_list dig, idx) )
       (let open Quickcheck.Generator.Let_syntax in
-      let%bind (Mk_any_ar dig) = gen_any_ar in
-      let%bind idx = Int.gen_incl 1 (List.length @@ to_list dig) in
-      return (Mk_any_ar dig, idx))
+       let%bind (Mk_any_ar dig) = gen_any_ar in
+       let%bind idx = Int.gen_incl 1 (List.length @@ to_list dig) in
+       return (Mk_any_ar dig, idx) )
       ~f:(fun (Mk_any_ar dig, idx) ->
         let as_list = to_list dig in
         let lhs_list = List.take as_list (idx - 1) in
@@ -788,7 +784,7 @@ let%test_unit "list isomorphism - snoc" =
 let%test_unit "alternating cons/snoc" =
   Quickcheck.test
     Quickcheck.Generator.(
-      big_list @@ variant2 (Int.gen_incl 0 500) (Int.gen_incl 0 500))
+      big_list @@ variant2 (Int.gen_incl 0 500) (Int.gen_incl 0 500) )
     ~f:(fun cmds ->
       let rec go list fseq cmds_acc =
         match cmds_acc with
@@ -814,12 +810,12 @@ let%test_unit "split properties" =
     Quickcheck.Shrinker.create (fun (xs, idx) ->
         Sequence.append
           ( if List.length xs - 1 > idx then
-            Sequence.singleton (List.tl_exn xs, idx)
-          else Sequence.empty )
+              Sequence.singleton (List.tl_exn xs, idx)
+            else Sequence.empty )
           ( Sequence.range ~start:`inclusive ~stop:`inclusive 1 5
           |> Sequence.filter_map ~f:(fun offset ->
-                 let res = idx - offset in
-                 if res >= 0 then Some (xs, res) else None ) ) )
+              let res = idx - offset in
+              if res >= 0 then Some (xs, res) else None ) ) )
   in
   Quickcheck.test gen ~shrink_attempts:`Exhaustive
     ~sexp_of:[%sexp_of: int list * int] ~shrinker ~f:(fun (xs, idx) ->

@@ -13,7 +13,7 @@ let () = Pickles.Backend.Tock.Keypair.set_urs_info []
 
 let () = Pickles.Backend.Tick.Keypair.set_urs_info []
 
-let () = Core_kernel.Backtrace.elide := false
+let () = Core.Backtrace.elide := false
 
 open Impls.Step
 
@@ -42,7 +42,7 @@ let dummy_constraints () =
     ignore
       ( Step_verifier.Scalar_challenge.endo g ~num_bits:4
           (Kimchi_backend_common.Scalar_challenge.create x)
-        : Field.t * Field.t ))
+        : Field.t * Field.t ) )
 
 module No_recursion = struct
   let tag, _, p, Provers.[ step ] =

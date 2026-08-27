@@ -14,10 +14,7 @@ fn mina_command_error(mina_bin: &Path, service_name: &str, e: io::Error) -> io::
             ),
         )
     } else {
-        io::Error::other(format!(
-            "Failed to run mina for {}: {}",
-            service_name, e
-        ))
+        io::Error::other(format!("Failed to run mina for {}: {}", service_name, e))
     }
 }
 

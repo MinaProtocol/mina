@@ -1,6 +1,6 @@
 (* sql.ml -- (Postgresql) SQL queries for replayer *)
 
-open Core_kernel
+open Core
 
 module Block_info = struct
   type t =
@@ -144,7 +144,10 @@ module Block = struct
 
   let state_hashes_by_slot_query =
     Mina_caqti.collect_req Caqti_type.int64 Caqti_type.string
-      {sql| SELECT state_hash FROM blocks WHERE global_slot_since_genesis = $1 |sql}
+      {sql| SELECT state_hash FROM blocks
+            WHERE global_slot_since_genesis = $1
+            AND chain_status = 'canonical'
+      |sql}
 
   let get_state_hashes_by_slot (module Conn : Mina_caqti.CONNECTION) slot =
     Conn.collect_list state_hashes_by_slot_query slot

@@ -82,7 +82,7 @@ module Impl = struct
               ( "all_inputs"
               , Zkapp_command_inputs.(
                   read_all_proofs_from_disk all_inputs
-                  |> Stable.Latest.to_yojson) )
+                  |> Stable.Latest.to_yojson ) )
               :: metadata_without_all_inputs
         in
         [%log fatal]
@@ -114,7 +114,7 @@ module Impl = struct
               ( "all_inputs"
               , Zkapp_command_inputs.(
                   read_all_proofs_from_disk all_inputs
-                  |> Stable.Latest.to_yojson) )
+                  |> Stable.Latest.to_yojson ) )
               :: metadata_without_all_inputs
         in
 
@@ -123,7 +123,7 @@ module Impl = struct
         Error e
 
   let measure_runtime ~logger ~(spec_json : (string * Yojson.Safe.t) Lazy.t) k =
-    let start = Time.now () in
+    let start = Time_float.now () in
     match%map.Async.Deferred Monitor.try_with_join_or_error ~here:[%here] k with
     | Error e ->
         [%log error] "SNARK worker failed: $error"
@@ -131,7 +131,7 @@ module Impl = struct
             [ ("error", Error_json.error_to_yojson e); Lazy.force spec_json ] ;
         Error e
     | Ok res ->
-        let elapsed = Time.abs_diff (Time.now ()) start in
+        let elapsed = Time_float.abs_diff (Time_float.now ()) start in
         Ok (res, elapsed)
 
   let perform_single_untimed ~(m : (module Worker_state.S)) ~logger
@@ -190,7 +190,7 @@ module Impl = struct
                       ; ( "inputs"
                         , Zkapp_command_inputs.(
                             witnesses_specs_stmts |> read_all_proofs_from_disk
-                            |> Stable.Latest.to_yojson) )
+                            |> Stable.Latest.to_yojson ) )
                       ] ;
                   Deferred.return
                     (Or_error.error_string
@@ -256,7 +256,7 @@ module Impl = struct
         Deferred.Or_error.return
         @@ ( Transaction_snark.create ~statement:{ stmt with sok_digest }
                ~proof:(Lazy.force Proof.transaction_dummy)
-           , Time.Span.zero )
+           , Time_float.Span.zero )
 
   (* TODO: remove this after whole snark worker PR series had been merged *)
   let perform (s : Worker_state.t) public_key
@@ -272,18 +272,18 @@ module Impl = struct
         , (time, match w with Transition _ -> `Transition | Merge _ -> `Merge)
         ) )
     |> Deferred.Or_error.map ~f:(function
-         | `One (proof1, metrics1) ->
-             { Work.Work.Result.proofs = `One proof1
-             ; metrics = `One metrics1
-             ; spec
-             ; prover = public_key
-             }
-         | `Two ((proof1, metrics1), (proof2, metrics2)) ->
-             { Work.Work.Result.proofs = `Two (proof1, proof2)
-             ; metrics = `Two (metrics1, metrics2)
-             ; spec
-             ; prover = public_key
-             } )
+      | `One (proof1, metrics1) ->
+          { Work.Work.Result.proofs = `One proof1
+          ; metrics = `One metrics1
+          ; spec
+          ; prover = public_key
+          }
+      | `Two ((proof1, metrics1), (proof2, metrics2)) ->
+          { Work.Work.Result.proofs = `Two (proof1, proof2)
+          ; metrics = `Two (metrics1, metrics2)
+          ; spec
+          ; prover = public_key
+          } )
 
   let perform_partitioned
       ~state:
@@ -350,7 +350,7 @@ module Impl = struct
             in
             { Proof_carrying_data.data = elapsed; proof } )
     | Worker_state.Check | Worker_state.No_check ->
-        let elapsed = Time.Span.zero in
+        let elapsed = Time_float.Span.zero in
         let statement =
           Work.Spec.Partitioned.Stable.Latest.statement partitioned_spec
         in

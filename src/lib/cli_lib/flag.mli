@@ -43,7 +43,7 @@ module Uri : sig
   end
 
   module Archive : sig
-    val postgres : Uri.t Types.with_name Command.Param.t
+    val postgres : Uri.t Types.with_name Command.Param.t Lazy.t
   end
 end
 

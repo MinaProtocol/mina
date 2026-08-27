@@ -13,7 +13,7 @@ let reflect f ~typ acc x =
   let new_name = underToCamel (Field.name x) in
   Schema.(
     field new_name ~typ ~args:Arg.[] ~resolve:(fun _ v -> f (Field.get x v))
-    :: acc)
+    :: acc )
 
 module Shorthand = struct
   open Schema
@@ -56,7 +56,7 @@ module Shorthand = struct
       ~typ:
         (obj "CatchupStatus"
            ~doc:"Number of blocks in the ledger-catchup pipeline, by job state"
-           ~fields:(fun _ ->
+           ~fields:
              [ count_field "finished" Enum.Finished
              ; count_field "failed" Enum.Failed
              ; count_field "toDownload" Enum.To_download
@@ -65,7 +65,7 @@ module Shorthand = struct
              ; count_field "waitForParent" Enum.Wait_for_parent
              ; count_field "toBuildBreadcrumb" Enum.To_build_breadcrumb
              ; count_field "root" Enum.Root
-             ] ) )
+             ] )
       a x
 
   let string a x = id ~typ:string a x

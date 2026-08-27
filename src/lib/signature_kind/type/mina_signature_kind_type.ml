@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 
 type t = Testnet | Mainnet | Other_network of string
 [@@deriving bin_io_unversioned, to_yojson]

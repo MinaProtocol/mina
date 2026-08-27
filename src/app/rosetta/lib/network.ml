@@ -2,8 +2,8 @@ module Serializing = Graphql_lib.Serializing
 module Scalars = Graphql_lib.Scalars
 
 module Get_genesis_block_identifier =
-[%graphql
-{|
+  [%graphql
+  {|
   query {
     genesisBlock {
       stateHash @ppxCustom(module: "Scalars.String_json")
@@ -17,8 +17,8 @@ module Get_genesis_block_identifier =
 |}]
 
 module Get_status =
-[%graphql
-{|
+  [%graphql
+  {|
   query {
     bestChain(maxLength: 1) {
       stateHash @ppxCustom(module: "Scalars.String_json")
@@ -41,7 +41,7 @@ module Get_status =
 |}]
 
 (** Open after GraphQL query, to avoid shadowing functions used by the PPX *)
-open Core_kernel
+open Core
 
 module Mina_currency = Currency
 open Async
@@ -282,9 +282,10 @@ module Status = struct
       let genesis_block_state_hash =
         res.genesis_block_identifier.genesisBlock.stateHash
       in
-      let%bind ( latest_db_block_height
-               , latest_db_block_hash
-               , latest_db_block_timestamp ) =
+      let%bind
+          ( latest_db_block_height
+          , latest_db_block_hash
+          , latest_db_block_timestamp ) =
         env.db_latest_block ()
       in
       let%map oldest_db_block_height, oldest_db_block_hash =
@@ -297,11 +298,11 @@ module Status = struct
           Block_identifier.create genesis_block_height genesis_block_state_hash
       ; oldest_block_identifier =
           ( if String.equal oldest_db_block_hash genesis_block_state_hash then
-            None
-          else
-            Some
-              (Block_identifier.create oldest_db_block_height
-                 oldest_db_block_hash ) )
+              None
+            else
+              Some
+                (Block_identifier.create oldest_db_block_height
+                   oldest_db_block_hash ) )
       ; peers =
           (let peer_objs = res.status.daemonStatus.peers |> Array.to_list in
            List.map peer_objs ~f:(fun po -> po.peerId |> Peer.create) )
@@ -333,17 +334,17 @@ module Status = struct
         ; status =
             { bestChain =
                 ( if best_chain_missing then None
-                else
-                  Some
-                    [| { stateHash = "STATE_HASH_TIP"
-                       ; protocolState =
-                           { blockchainState =
-                               { utcDate = Int64.of_int_exn 1_594_854_566 }
-                           ; consensusState =
-                               { blockHeight = Int64.of_int_exn 4 }
-                           }
-                       }
-                    |] )
+                  else
+                    Some
+                      [| { stateHash = "STATE_HASH_TIP"
+                         ; protocolState =
+                             { blockchainState =
+                                 { utcDate = Int64.of_int_exn 1_594_854_566 }
+                             ; consensusState =
+                                 { blockHeight = Int64.of_int_exn 4 }
+                             }
+                         }
+                      |] )
             ; daemonStatus = { peers = [| { peerId = "dev.o1test.net" } |] }
             ; syncStatus = `SYNCED
             ; initialPeers = [||]
@@ -420,8 +421,7 @@ module Status = struct
         ; db_latest_block =
             (fun () ->
               Result.return
-                (Int64.of_int_exn 10000, "ANOTHER_HASH", Int64.of_int_exn 20000)
-              )
+                (Int64.of_int_exn 10000, "ANOTHER_HASH", Int64.of_int_exn 20000) )
         }
 
       let%test_unit "oldest block is different" =

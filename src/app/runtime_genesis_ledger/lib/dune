@@ -1,0 +1,13 @@
+(library
+ (name runtime_genesis_ledger_lib)
+ (libraries
+  ;;local libraries
+  currency
+  mina_base
+  mina_numbers)
+ (inline_tests
+  (flags -verbose -show-counts))
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_jane ppx_mina ppx_version)))

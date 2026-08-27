@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Mina_base
 
 module At_most_two = struct
@@ -145,7 +145,7 @@ module Pre_diff_with_at_most_two_coinbase = struct
 
     module V3 = struct
       type t =
-        ( Transaction_snark_work.Stable.V2.t
+        ( Transaction_snark_work.Stable.V3.t
         , User_command.Stable.V3.t With_status.Stable.V2.t )
         Pre_diff_two.Stable.V2.t
       [@@deriving equal, sexp, yojson]
@@ -179,7 +179,7 @@ module Pre_diff_with_at_most_one_coinbase = struct
 
     module V3 = struct
       type t =
-        ( Transaction_snark_work.Stable.V2.t
+        ( Transaction_snark_work.Stable.V3.t
         , User_command.Stable.V3.t With_status.Stable.V2.t )
         Pre_diff_one.Stable.V2.t
       [@@deriving equal, sexp, yojson]
@@ -224,7 +224,7 @@ module Diff = struct
     match
       ( first_pre_diff.Pre_diff_two.coinbase
       , Option.value_map second_pre_diff_opt ~default:At_most_one.Zero
-          ~f:(fun d -> d.Pre_diff_one.coinbase) )
+          ~f:(fun d -> d.Pre_diff_one.coinbase ) )
     with
     | At_most_two.Zero, At_most_one.Zero ->
         Some Currency.Amount.zero
@@ -294,7 +294,7 @@ module Stable = struct
     let completed_works (t : t) =
       (fst t.diff).completed_works
       @ Option.value_map (snd t.diff) ~default:[] ~f:(fun d ->
-            d.completed_works )
+          d.completed_works )
   end
 end]
 
@@ -370,7 +370,7 @@ module With_valid_signatures = struct
     match
       ( first_pre_diff.coinbase
       , Option.value_map second_pre_diff_opt ~default:At_most_one.Zero
-          ~f:(fun d -> d.coinbase) )
+          ~f:(fun d -> d.coinbase ) )
     with
     | At_most_two.Zero, At_most_one.Zero ->
         Some Currency.Amount.zero

@@ -21,13 +21,13 @@ let Size = ../../Command/Size.dhall
 let RunWithPostgres = ../../Command/RunWithPostgres.dhall
 
 let dependsOn =
-      DebianVersions.dependsOn
+      DebianVersions.appDependsOn
         DebianVersions.DepsSpec::{ build_flag = BuildFlags.Type.Instrumented }
 
 let key = "archive-hardfork-toolbox-test"
 
 let debs =
-      "mina-devnet-instrumented,mina-archive-devnet-instrumented,mina-rosetta-devnet"
+      "mina-archive-generic-instrumented,mina-devnet-profile,mina-archive-devnet-instrumented"
 
 in  Pipeline.build
       Pipeline.Config::{
@@ -56,7 +56,9 @@ in  Pipeline.build
             Command.Config::{
             , commands =
               [ RunWithPostgres.runInToolchainWithPostgresAndDebs
-                  ([] : List Text)
+                  [ "APPS_BUILD_FLAG=instrumented"
+                  , "APPS_BARE_BINARIES=archive_hardfork_toolbox.exe:mina-archive-hardfork-toolbox"
+                  ]
                   ( Some
                       ( RunWithPostgres.ScriptOrArchive.Archive
                           { Script = "post_upgrade_archive.sql"
@@ -73,7 +75,9 @@ in  Pipeline.build
               , Cmd.run
                   "buildkite/scripts/upload-partial-coverage-data.sh ${key}"
               , RunWithPostgres.runInToolchainWithPostgresAndDebs
-                  ([] : List Text)
+                  [ "APPS_BUILD_FLAG=instrumented"
+                  , "APPS_BARE_BINARIES=archive_hardfork_toolbox.exe:mina-archive-hardfork-toolbox"
+                  ]
                   ( Some
                       ( RunWithPostgres.ScriptOrArchive.Archive
                           { Script = "hf_archive.sql"

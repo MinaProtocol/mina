@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Async_kernel
 
 module F (Db : Lmdb_storage.Generic.Db) = struct
@@ -183,8 +183,7 @@ let test_ro_txn_scope () =
           |> Option.value_exn ~message:"empty hash table"
         in
         getter.get ro_db first_key
-        |> Option.value_exn ~message:"cannot fetch first key from hm after iter"
-        )
+        |> Option.value_exn ~message:"cannot fetch first key from hm after iter" )
       ro_env
     |> Option.value_exn ~message:"cannot fetch first key from hm after iter"
   in
@@ -197,11 +196,11 @@ let test_ro_txn_scope () =
      in
      let list2 =
        List.sort (Hashtbl.to_alist hm_from_iter)
-         ~compare:(fun (k1, _) (k2, _) -> Int.compare k1 k2)
+         ~compare:(fun (k1, _) (k2, _) -> Int.compare k1 k2 )
      in
      List.length list1 = List.length list2
      && List.for_all2_exn list1 list2 ~f:(fun (k1, v1) (k2, v2) ->
-            k1 = k2 && Bigstring.equal v1 v2 ) ) ;
+         k1 = k2 && Bigstring.equal v1 v2 ) ) ;
   Deferred.return ()
 
 (* Test for read-write transaction scope operations *)
@@ -256,10 +255,10 @@ let test_iter_operations () =
 
   List.range 1 7
   |> List.iter ~f:(fun i ->
-         let data =
-           Char.of_int_exn (64 + i) |> Char.to_string |> Bigstring.of_string
-         in
-         Rw.set ~env db i data ) ;
+      let data =
+        Char.of_int_exn (64 + i) |> Char.to_string |> Bigstring.of_string
+      in
+      Rw.set ~env db i data ) ;
 
   (* `Stop and `Continue on read write iter_ro *)
   let counter = ref 0 in

@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Mina_stdlib
 
 module Poly = struct
@@ -402,7 +402,7 @@ let to_valid_unsafe (t : t) =
 
 let filter_by_participant (commands : t list) public_key =
   List.filter commands ~f:(fun user_command ->
-      Core_kernel.List.exists
+      List.exists
         (accounts_referenced user_command)
         ~f:
           (Fn.compose

@@ -47,8 +47,9 @@ module For_tests = struct
       ?(conf_dir = None) ?(commit_id = "not specified for unit tests") () =
     let open Async.Deferred.Let_syntax in
     let signature_kind = Mina_signature_kind.Testnet in
-    let%bind ( `Blockchain blockchain_verification_key
-             , `Transaction transaction_verification_key ) =
+    let%bind
+        ( `Blockchain blockchain_verification_key
+        , `Transaction transaction_verification_key ) =
       get_verification_keys_eagerly ~constraint_constants ~proof_level
         ~signature_kind
     in

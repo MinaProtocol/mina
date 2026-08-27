@@ -119,7 +119,7 @@ module Pubsub = struct
     let topic_subscription_already_exists =
       Hashtbl.data t.subscriptions
       |> List.exists ~f:(fun (Subscription.E sub') ->
-             String.equal (Subscription.topic sub') topic )
+          String.equal (Subscription.topic sub') topic )
     in
     if topic_subscription_already_exists then
       Deferred.Or_error.errorf "already subscribed to topic %s" topic
@@ -185,7 +185,7 @@ let list_peers t =
       (* FIXME #4039: filter_map shouldn't be necessary *)
       peers
       |> List.map ~f:Libp2p_ipc.unsafe_parse_peer
-      |> List.filter ~f:(fun peer -> not (Int.equal peer.libp2p_port 0))
+      |> List.filter ~f:(fun peer -> not (Int.equal peer.Peer.libp2p_port 0))
   | Error error ->
       [%log' error t.logger]
         "Encountered $error while asking libp2p_helper for peers"
@@ -220,7 +220,7 @@ let configure t ~me ~external_maddr ~maddrs ~network_id ~metrics_port
       ~direct_peers:(List.map ~f:Multiaddr.to_libp2p_ipc direct_peers)
       ~seed_peers:(List.map ~f:Multiaddr.to_libp2p_ipc seed_peers)
       ~known_private_ip_nets:
-        (List.map ~f:Core.Unix.Cidr.to_string known_private_ip_nets)
+        (List.map ~f:Core_unix.Cidr.to_string known_private_ip_nets)
       ~peer_exchange ~peer_protection_ratio ~min_connections ~max_connections
       ~validation_queue_size
       ~gating_config:(gating_config_to_helper_format initial_gating_config)
@@ -279,10 +279,13 @@ let close_protocol ?(reset_existing_streams = false) t ~protocol =
       (module Libp2p_ipc.Rpcs.RemoveStreamHandler)
       (Libp2p_ipc.Rpcs.RemoveStreamHandler.create_request ~protocol)
   in
-  if reset_existing_streams then
-    Hashtbl.filter_inplace t.streams ~f:(fun stream ->
-        if not (String.equal (Libp2p_stream.protocol stream) protocol) then true
-        else (
+  ( if reset_existing_streams then
+      let streams_to_reset =
+        Hashtbl.data t.streams
+        |> List.filter ~f:(fun stream ->
+            String.equal (Libp2p_stream.protocol stream) protocol )
+      in
+      List.iter streams_to_reset ~f:(fun stream ->
           don't_wait_for
             (* TODO: this probably needs to be more thorough than a reset. Also force the write pipe closed? *)
             ( match%map Libp2p_stream.reset ~helper:t.helper stream with
@@ -292,7 +295,7 @@ let close_protocol ?(reset_existing_streams = false) t ~protocol =
                 [%log' error t.logger]
                   "failed to reset stream while closing protocol: $error"
                   ~metadata:[ ("error", `String (Error.to_string_hum e)) ] ) ;
-          false ) ) ;
+          Libp2p_stream.release_buffers stream ~reason:`Shutdown_or_release ) ) ;
   match result with
   | Ok _ ->
       Hashtbl.remove t.protocol_handlers protocol
@@ -405,14 +408,15 @@ let handle_push_message t push_message =
           match Hashtbl.find t.subscriptions subscription_id with
           | Some (Subscription.E sub) ->
               upon
-                (O1trace.thread "validate_libp2p_gossip" (fun () ->
-                     Subscription.handle_and_validate sub ~validation_expiration
-                       ~sender ~data ) )
+                (Monitor.try_with ~rest:`Log (fun () ->
+                     O1trace.thread "validate_libp2p_gossip" (fun () ->
+                         Subscription.handle_and_validate sub
+                           ~validation_expiration ~sender ~data ) ) )
                 (function
-                  | `Validation_timeout ->
+                  | Ok `Validation_timeout ->
                       [%log' warn t.logger]
                         "validation callback timed out before we could respond"
-                  | `Decoding_error e ->
+                  | Ok (`Decoding_error e) ->
                       [%log' error t.logger]
                         "failed to decode message published on subscription \
                          $topic ($subscription_id): $error"
@@ -425,9 +429,23 @@ let handle_push_message t push_message =
                           ] ;
                       Libp2p_helper.send_validation t.helper ~validation_id
                         ~validation_result:ValidationResult.Reject
-                  | `Validation_result validation_result ->
+                  | Ok (`Validation_result validation_result) ->
                       Libp2p_helper.send_validation t.helper ~validation_id
-                        ~validation_result )
+                        ~validation_result
+                  | Error exn ->
+                      [%log' error t.logger]
+                        "uncaught exception while validating gossip on \
+                         subscription $topic ($subscription_id); rejecting the \
+                         message: $error"
+                        ~metadata:
+                          [ ("topic", `String (Subscription.topic sub))
+                          ; ( "subscription_id"
+                            , `String
+                                (Subscription.Id.to_string subscription_id) )
+                          ; ("error", `String (Exn.to_string exn))
+                          ] ;
+                      Libp2p_helper.send_validation t.helper ~validation_id
+                        ~validation_result:ValidationResult.Reject )
           | None ->
               [%log' error t.logger]
                 "asked to validate message for unregistered subscription id \
@@ -450,7 +468,7 @@ let handle_push_message t push_message =
               t.all_peers_seen <- Some all_peers_seen ;
               Mina_metrics.(
                 Gauge.set Network.all_peers
-                  (Set.length all_peers_seen |> Int.to_float)) ) ;
+                  (Set.length all_peers_seen |> Int.to_float) ) ) ;
           let stream =
             Libp2p_stream.create_from_existing ~logger:t.logger ~helper:t.helper
               ~stream_id ~protocol ~peer ~release_stream:(release_stream t)
@@ -471,7 +489,7 @@ let handle_push_message t push_message =
                     *)
                     match%map
                       Monitor.try_with ~here:[%here] ~extract_exn:true
-                        (fun () -> ph.handler stream)
+                        (fun () -> ph.handler stream )
                     with
                     | Ok () ->
                         ()
@@ -496,16 +514,18 @@ let handle_push_message t push_message =
                              if Or_error.is_ok result then
                                Hashtbl.remove t.protocol_handlers protocol ) ;
                           raise handler_exn ) ) )
-              else
+              else (
                 (* silently ignore new streams for closed protocol handlers.
-                    these are buffered stream open RPCs that were enqueued before
-                    our close went into effect. *)
-                (* TODO: we leak the new pipes here*)
+                   these are buffered stream open RPCs that were enqueued before
+                   our close went into effect. *)
+                Libp2p_stream.release_buffers stream
+                  ~reason:`Shutdown_or_release ;
                 [%log' warn t.logger]
                   "incoming stream for protocol that is being closed after \
-                   error"
+                   error" )
           | None ->
               (* TODO: punish *)
+              Libp2p_stream.release_buffers stream ~reason:`Shutdown_or_release ;
               [%log' error t.logger]
                 "incoming stream for protocol we don't know about?" )
   (* Received a message on some stream *)
@@ -533,11 +553,7 @@ let handle_push_message t push_message =
           let stream_id_str = Libp2p_ipc.stream_id_to_string stream_id in
           ( match Hashtbl.find t.streams stream_id_str with
           | Some stream ->
-              let (`Stream_should_be_released should_release) =
-                Libp2p_stream.stream_closed ~logger:t.logger ~who_closed:Them
-                  stream
-              in
-              if should_release then Hashtbl.remove t.streams stream_id_str ;
+              Libp2p_stream.release_buffers stream ~reason:`Lost ;
               log_stream_table_stats t
           | None ->
               () ) ;
@@ -559,7 +575,8 @@ let handle_push_message t push_message =
                 Libp2p_stream.stream_closed ~logger:t.logger ~who_closed:Them
                   stream
               in
-              if should_release then Hashtbl.remove t.streams stream_id_str ;
+              if should_release then
+                Libp2p_stream.release_buffers stream ~reason:`Handler_done ;
               log_stream_table_stats t
           | None ->
               [%log' error t.logger]
@@ -606,30 +623,30 @@ let create ?(allow_multiple_instances = false) ~all_peers_seen_metric ~logger
   in
   (push_message_handler := fun msg -> handle_push_message t msg) ;
   ( if all_peers_seen_metric then
-    let log_all_peers_interval = Time.Span.of_hr 2.0 in
-    let log_message_batch_size = 50 in
-    every log_all_peers_interval (fun () ->
-        Option.iter t.all_peers_seen ~f:(fun all_peers_seen ->
-            let num_batches, num_in_batch, batches, batch =
-              Set.fold_right all_peers_seen ~init:(0, 0, [], [])
-                ~f:(fun peer (num_batches, num_in_batch, batches, batch) ->
-                  if num_in_batch >= log_message_batch_size then
-                    (num_batches + 1, 1, batch :: batches, [ peer ])
-                  else (num_batches, num_in_batch + 1, batches, peer :: batch) )
-            in
-            let num_batches, batches =
-              if num_in_batch > 0 then (num_batches + 1, batch :: batches)
-              else (num_batches, batches)
-            in
-            List.iteri batches ~f:(fun batch_num batch ->
-                [%log info]
-                  "All peers seen by this node, batch $batch_num/$num_batches"
-                  ~metadata:
-                    [ ("batch_num", `Int batch_num)
-                    ; ("num_batches", `Int num_batches)
-                    ; ( "peers"
-                      , `List (List.map ~f:Peer_without_id.to_yojson batch) )
-                    ] ) ) ) ) ;
+      let log_all_peers_interval = Time_float.Span.of_hr 2.0 in
+      let log_message_batch_size = 50 in
+      every log_all_peers_interval (fun () ->
+          Option.iter t.all_peers_seen ~f:(fun all_peers_seen ->
+              let num_batches, num_in_batch, batches, batch =
+                Set.fold_right all_peers_seen ~init:(0, 0, [], [])
+                  ~f:(fun peer (num_batches, num_in_batch, batches, batch) ->
+                    if num_in_batch >= log_message_batch_size then
+                      (num_batches + 1, 1, batch :: batches, [ peer ])
+                    else (num_batches, num_in_batch + 1, batches, peer :: batch) )
+              in
+              let num_batches, batches =
+                if num_in_batch > 0 then (num_batches + 1, batch :: batches)
+                else (num_batches, batches)
+              in
+              List.iteri batches ~f:(fun batch_num batch ->
+                  [%log info]
+                    "All peers seen by this node, batch $batch_num/$num_batches"
+                    ~metadata:
+                      [ ("batch_num", `Int batch_num)
+                      ; ("num_batches", `Int num_batches)
+                      ; ( "peers"
+                        , `List (List.map ~f:Peer_without_id.to_yojson batch) )
+                      ] ) ) ) ) ;
   Deferred.Or_error.return t
 
 let send_heartbeat t peer_id = Libp2p_helper.send_heartbeat ~peer_id t.helper

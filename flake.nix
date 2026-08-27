@@ -30,7 +30,7 @@
   inputs.describe-dune.inputs.nixpkgs.follows = "nixpkgs";
   inputs.describe-dune.inputs.flake-utils.follows = "utils";
 
-  inputs.o1-opam-repository.url = "github:o1-labs/opam-repository/dd90c5c72b7b7caeca3db3224b2503924deea08a";
+  inputs.o1-opam-repository.url = "github:o1-labs/opam-repository/2bb1c7f64e025320b1ff242ca99a9dc23a4924c0";
   inputs.o1-opam-repository.flake = false;
 
   # The version must be the same as the version used in:
@@ -39,7 +39,7 @@
   #   `nix flake update opam-repository`).
   # - scripts/update-opam-switch.sh
   inputs.opam-repository.url =
-    "github:ocaml/opam-repository/08d8c16c16dc6b23a5278b06dff0ac6c7a217356";
+    "github:ocaml/opam-repository/3e41859015888fe8240e84dfc5f31bfa12a557e8";
   inputs.opam-repository.flake = false;
 
   inputs.nixpkgs-mozilla.url = "github:mozilla/nixpkgs-mozilla";
@@ -409,7 +409,7 @@
             zkapp-cli hardfork_test;
           inherit (dockerImages)
             mina-image-slim mina-image-full mina-archive-image-full
-            mina-image-instr-full;
+            mina-image-devnet-generic mina-archive-image-devnet;
           mina-deb = debianPackages.mina;
           impure-shell = (import ./nix/impure-shell.nix pkgs).inputDerivation;
         }) // {

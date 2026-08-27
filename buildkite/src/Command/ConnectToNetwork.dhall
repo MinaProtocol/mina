@@ -4,6 +4,8 @@ let Command = ./Base.dhall
 
 let Size = ./Size.dhall
 
+let SelectFiles = ../Lib/SelectFiles.dhall
+
 let DebianVersions = ../Constants/DebianVersions.dhall
 
 let RunInToolchain = ./RunInToolchain.dhall
@@ -33,7 +35,7 @@ in  { Spec = Spec
         ->  Command.build
               Command.Config::{
               , commands =
-                  RunInToolchain.runInToolchain
+                  RunInToolchain.runInDefaultToolchain
                     DebianVersions.overrideEnvs
                     "./buildkite/scripts/connect/connect-to-network.sh --mina-debian-network ${spec.mina_suffix} --network-name ${spec.testnet} --wait-between-polling ${spec.wait_between_graphql_poll} --sync-timeout ${spec.sync_timeout} --peer-list-url ${spec.peer_list_url}"
               , label = "Connect to ${spec.testnet}"
@@ -41,5 +43,7 @@ in  { Spec = Spec
               , key = "connect-to-${spec.testnet}"
               , target = Size.Large
               , depends_on = spec.dependsOn
+              , artifact_paths =
+                [ SelectFiles.contains "test_output/artifacts/*" ]
               }
     }

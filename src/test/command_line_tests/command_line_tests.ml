@@ -48,11 +48,34 @@ module DaemonRecover = struct
      let%map () = Daemon.Client.stop_daemon process.client in
      Ok () )
     >>| function
-    | Ok () -> Mina_automation_fixture.Intf.Passed | Error err -> Failed err
+    | Ok () ->
+        Mina_automation_fixture.Intf.Passed
+    | Error err ->
+        Failed err
 end
 
 let contain_log_output output =
   String.is_substring ~substring:"{\"timestamp\":" output
+
+let log_contains_structured_async_exception logs =
+  String.split_lines logs
+  |> List.exists ~f:(fun line ->
+      match Yojson.Safe.from_string line with
+      | exception _ ->
+          false
+      | json -> (
+          match Yojson.Safe.Util.member "message" json with
+          | `String "Unhandled Async exception: $exn" -> (
+              match
+                Yojson.Safe.Util.member "metadata" json
+                |> Yojson.Safe.Util.member "exn"
+              with
+              | `Null ->
+                  false
+              | _ ->
+                  true )
+          | _ ->
+              false ) )
 
 module LedgerHash = struct
   type t = Mina_automation_fixture.Daemon.before_bootstrap
@@ -186,7 +209,7 @@ module AdvancedCompileTimeConstants = struct
     let config_content =
       Printf.sprintf "{ \"ledger\":{ \"accounts\":%s } }" config_content
     in
-    let temp_file = Filename.temp_file "commandline" "ledger.json" in
+    let temp_file = Filename_unix.temp_file "commandline" "ledger.json" in
     Yojson.Safe.from_string config_content |> Yojson.Safe.to_file temp_file ;
     let%map output =
       Daemon.Client.advanced_compile_time_constants client
@@ -289,15 +312,16 @@ module AutoHardforkConfigGeneration = struct
         ~error:"Generated config missing genesis_state_timestamp"
     in
     (* Parse timestamps and calculate expected offset *)
-    let old_time = Time.of_string old_genesis_timestamp in
-    let new_time = Time.of_string new_genesis_timestamp in
+    let old_time = Time_float_unix.of_string old_genesis_timestamp in
+    let new_time = Time_float_unix.of_string new_genesis_timestamp in
     let expected_offset_ms =
       Int64.( * )
         (Int64.of_int expected_fork_slot)
         (Int64.of_int slot_duration_ms)
     in
     let actual_offset_ms =
-      Time.diff new_time old_time |> Time.Span.to_ms |> Int64.of_float
+      Time_float.diff new_time old_time
+      |> Time_float.Span.to_ms |> Int64.of_float
     in
     (* Verify timestamp offset *)
     if Int64.( <> ) actual_offset_ms expected_offset_ms then
@@ -384,8 +408,9 @@ module AutoHardforkConfigGeneration = struct
       now_unix_ts - (now_unix_ts mod 60) + (delay_minutes * 60)
     in
     let genesis_timestamp =
-      Time.of_span_since_epoch (Time.Span.of_int_sec genesis_unix_ts)
-      |> Time.to_string_iso8601_basic ~zone:Time.Zone.utc
+      Time_float.of_span_since_epoch
+        (Time_float.Span.of_int_sec genesis_unix_ts)
+      |> Time_float.to_string_iso8601_basic ~zone:Time_float.Zone.utc
     in
     let genesis : Runtime_config.Genesis.t =
       { k = None
@@ -442,8 +467,8 @@ module AutoHardforkConfigGeneration = struct
     let conf_dir = test.config.dirs.conf in
     let auto_fork_dir = conf_dir ^/ "auto-fork-mesa-devnet" in
     let activated = auto_fork_dir ^/ "activated" in
-    let start_time = Core.Time.now () in
-    let timeout = Core.Time.Span.of_min 10. in
+    let start_time = Time_float.now () in
+    let timeout = Time_float.Span.of_min 10. in
     let rec poll_for_activated () =
       let%bind.Deferred activated_exists = Sys.file_exists activated in
       match activated_exists with
@@ -451,12 +476,12 @@ module AutoHardforkConfigGeneration = struct
           Deferred.return `Success
       | `No | `Unknown ->
           if
-            Core.Time.Span.( > )
-              (Core.Time.diff (Core.Time.now ()) start_time)
+            Time_float.Span.( > )
+              (Time_float.diff (Time_float.now ()) start_time)
               timeout
           then Deferred.return `Timeout
           else
-            let%bind.Deferred () = Async.after (Core.Time.Span.of_sec 5.) in
+            let%bind.Deferred () = Async.after (Time_float.Span.of_sec 5.) in
             poll_for_activated ()
     in
     let%bind.Deferred result = poll_for_activated () in
@@ -469,7 +494,8 @@ module AutoHardforkConfigGeneration = struct
     | `Success -> (
         (* Wait for daemon to auto-shutdown after generating hardfork config *)
         match%bind.Deferred
-          Async.Clock.with_timeout (Core.Time.Span.of_min 5.)
+          Async.Clock.with_timeout
+            (Time_float.Span.of_min 5.)
             (Process.wait process.process)
         with
         | `Timeout ->
@@ -515,7 +541,8 @@ module HardforkStateDirMismatch = struct
         daemon
     in
     match%bind
-      Async.Clock.with_timeout (Core.Time.Span.of_sec 5.)
+      Async.Clock.with_timeout
+        (Time_float.Span.of_sec 5.)
         (Process.wait process.process)
     with
     | `Timeout ->
@@ -533,6 +560,65 @@ module HardforkStateDirMismatch = struct
           (Mina_automation_fixture.Intf.Failed
              (Error.createf "Daemon terminated by signal: %s"
                 (Core.Signal.to_string signal) ) )
+end
+
+module MisconfiguredWalletCrashLog = struct
+  type t = Mina_automation_fixture.Daemon.before_bootstrap
+
+  let test_case (test : t) =
+    (* Use a config directory private to this test: the shared default config
+       dir is reused by every test in this binary, and a daemon booted by an
+       earlier test leaves [wallets/store] behind as a directory, which would
+       make the [write_all] below fail with [Is a directory]. *)
+    let dirs = Daemon.Config.ConfigDirs.create ~root_path:test.temp_dir () in
+    let config = Daemon.Config.create ~dirs ~config:test.config.config () in
+    let daemon = Daemon.of_config config in
+    let%bind () = Daemon.Config.generate_keys config in
+    let ledger_file = dirs.conf ^/ "daemon.json" in
+    let%bind () =
+      Mina_automation_fixture.Daemon.generate_random_config daemon ledger_file
+    in
+    let wallets_dir = dirs.conf ^/ "wallets" in
+    Core_unix.mkdir_p wallets_dir ;
+    Out_channel.write_all (wallets_dir ^/ "store") ~data:"not a directory" ;
+    let%bind process = Daemon.start daemon in
+    match%bind
+      Async.Clock.with_timeout
+        (Time_float.Span.of_sec 15.)
+        (Process.wait process.process)
+    with
+    | `Timeout ->
+        let%map _ = Daemon.Process.force_kill process in
+        Mina_automation_fixture.Intf.Failed
+          (Error.of_string "Daemon did not exit within 15 seconds")
+    | `Result (Ok ()) ->
+        Deferred.return
+          (Mina_automation_fixture.Intf.Failed
+             (Error.of_string "Daemon exited with code 0, expected non-zero") )
+    | `Result (Error (`Signal signal)) ->
+        Deferred.return
+          (Mina_automation_fixture.Intf.Failed
+             (Error.createf "Daemon terminated by signal: %s"
+                (Core.Signal.to_string signal) ) )
+    | `Result (Error (`Exit_non_zero _)) -> (
+        let log_file = Daemon.Config.ConfigDirs.mina_log dirs in
+        match%map
+          Monitor.try_with (fun () -> Reader.file_contents log_file)
+        with
+        | Error exn ->
+            Mina_automation_fixture.Intf.Failed
+              (Error.createf "Could not read daemon log %s: %s" log_file
+                 (Exn.to_string exn) )
+        | Ok logs ->
+            if log_contains_structured_async_exception logs then
+              Mina_automation_fixture.Intf.Passed
+            else
+              Failed
+                (Error.createf
+                   "Daemon log did not contain structured unhandled async \
+                    exception metadata. Logs:\n\
+                    %s"
+                   logs ) )
 end
 
 module ConfigFileOverride = struct
@@ -701,7 +787,7 @@ module PeerListUrlInvalidScheme = struct
     in
     match%bind
       Async.Clock.with_timeout
-        (Core.Time.Span.of_sec 30.)
+        (Time_float.Span.of_sec 30.)
         (Process.wait process.process)
     with
     | `Timeout ->
@@ -738,7 +824,7 @@ module PeerListUrlNoScheme = struct
     let%bind process = Daemon.start ~peer_list_url:"not-a-url-at-all" daemon in
     match%bind
       Async.Clock.with_timeout
-        (Core.Time.Span.of_sec 30.)
+        (Time_float.Span.of_sec 30.)
         (Process.wait process.process)
     with
     | `Timeout ->
@@ -779,10 +865,11 @@ module PeerListUrlHttpWarning = struct
     in
     (* The daemon should not crash immediately from URL validation.
        Give it a few seconds to get past the peer-list-url check. *)
-    let%bind () = after (Core.Time.Span.of_sec 10.) in
+    let%bind () = after (Time_float.Span.of_sec 10.) in
     (* Check if the process is still running *)
     let%bind process_status =
-      Async.Clock.with_timeout (Core.Time.Span.of_sec 1.)
+      Async.Clock.with_timeout
+        (Time_float.Span.of_sec 1.)
         (Process.wait process.process)
     in
     let%bind () =
@@ -831,10 +918,11 @@ module PeerListUrlValidHttps = struct
     in
     (* The daemon should not crash immediately from URL validation.
        Give it a few seconds to get past the peer-list-url check. *)
-    let%bind () = after (Core.Time.Span.of_sec 5.) in
+    let%bind () = after (Time_float.Span.of_sec 5.) in
     (* Check if the process is still running *)
     match%bind
-      Async.Clock.with_timeout (Core.Time.Span.of_sec 1.)
+      Async.Clock.with_timeout
+        (Time_float.Span.of_sec 1.)
         (Process.wait process.process)
     with
     | `Timeout ->
@@ -893,8 +981,8 @@ module NodeStatusReport = struct
 
   (** Poll [/collected-status] until at least one payload arrives. *)
   let poll_for_status ~port ~timeout_min =
-    let start_time = Core.Time.now () in
-    let timeout = Core.Time.Span.of_min timeout_min in
+    let start_time = Time_float.now () in
+    let timeout = Time_float.Span.of_min timeout_min in
     let rec go () =
       let%bind statuses_result =
         Node_status_mock_server.collected_status ~port
@@ -907,13 +995,13 @@ module NodeStatusReport = struct
             )
       | Ok [] ->
           if
-            Core.Time.Span.( > )
-              (Core.Time.diff (Core.Time.now ()) start_time)
+            Time_float.Span.( > )
+              (Time_float.diff (Time_float.now ()) start_time)
               timeout
           then
             Deferred.return (Error "Timed out waiting for node status reports")
           else
-            let%bind () = after (Core.Time.Span.of_sec 5.) in
+            let%bind () = after (Time_float.Span.of_sec 5.) in
             go ()
       | Ok (hd :: rest) ->
           Deferred.return (Ok (Mina_stdlib.Nonempty_list.init hd rest))
@@ -991,6 +1079,126 @@ module NodeStatusReport = struct
             Deferred.unit
         | Some mock ->
             Node_status_mock_server.stop mock )
+end
+
+(** Healthcheck integration test: starts a daemon, performs an initial
+    readiness check (which may or may not show not-ready depending on
+    bootstrap speed), then uses healthcheck_lib to wait for the daemon
+    to become ready and verifies all checks pass. *)
+module HealthcheckBootstrapLifecycle = struct
+  module HC = Mina_healthcheck_lib
+  module GC = Mina_graphql_client.Client
+
+  let hc_logger = Logger.create ()
+
+  type t = Mina_automation_fixture.Daemon.before_bootstrap
+
+  let start_daemon (test : t) =
+    let daemon = Daemon.of_config test.config in
+    let%bind () = Daemon.Config.generate_keys test.config in
+    let ledger_file = test.config.dirs.conf ^/ "daemon.json" in
+    let%bind () =
+      Mina_automation_fixture.Daemon.generate_random_config daemon ledger_file
+    in
+    let%map _process = Daemon.start daemon in
+    Uri.make ~scheme:"http" ~host:"localhost" ~port:test.config.rest_port
+      ~path:"/graphql" ()
+
+  (** Check readiness before bootstrap.  In demo-mode with a small ledger the
+      node may already be SYNCED by the time GraphQL becomes reachable, so we
+      treat "already ready" as acceptable rather than a hard failure. *)
+  let check_pre_bootstrap_readiness node_uri =
+    let%map pre = GC.get_readiness ~logger:hc_logger node_uri ~min_peers:0 in
+    match pre with
+    | Error e ->
+        Or_error.errorf "pre-bootstrap readiness check errored: %s"
+          (Error.to_string_hum e)
+    | Ok r when r.ready ->
+        [%log' info hc_logger]
+          "Pre-bootstrap: node already ready (fast bootstrap in demo mode)" ;
+        Ok ()
+    | Ok _ ->
+        [%log' info hc_logger] "Pre-bootstrap not_ready=true" ;
+        Ok ()
+
+  let assert_synced node_uri =
+    let open Deferred.Or_error.Let_syntax in
+    let%bind ds = GC.get_daemon_status ~logger:hc_logger node_uri in
+    [%log' info hc_logger] "Post-bootstrap sync=%s peers=%d"
+      (Sync_status.to_string ds.sync_status)
+      ds.peer_count ;
+    if not (Sync_status.equal ds.sync_status `Synced) then
+      Deferred.Or_error.errorf "expected SYNCED, got %s"
+        (Sync_status.to_string ds.sync_status)
+    else Deferred.Or_error.return ()
+
+  let test_case (test : t) =
+    let open Mina_automation_fixture.Intf in
+    let run () =
+      let open Deferred.Or_error.Let_syntax in
+      let%bind node_uri = Deferred.map (start_daemon test) ~f:Or_error.return in
+      let%bind _initial =
+        HC.wait_for_graphql ~logger:hc_logger node_uri ~timeout:120 ~interval:5
+      in
+      let%bind () = check_pre_bootstrap_readiness node_uri in
+      let%bind _ready =
+        HC.wait_for_ready ~logger:hc_logger node_uri ~min_peers:0 ~timeout:300
+          ~interval:5
+      in
+      assert_synced node_uri
+    in
+    match%map run () with Ok () -> Passed | Error e -> Failed e
+end
+
+(** Healthcheck negative test: verifies failure for an unreachable
+    daemon AND that the [?deadline] parameter actually bounds the call.
+    Without the deadline plumbing through to [exec_graphql_request],
+    each call retries 10 times with 30s sleeps and takes ~5 minutes —
+    the bug Luis flagged on PR #18746 where [wait --timeout 30] took
+    300s instead of 30s. *)
+module HealthcheckUnreachable = struct
+  module GC = Mina_graphql_client.Client
+
+  let hc_logger = Logger.create ()
+
+  type t = Mina_automation_fixture.Daemon.before_bootstrap
+
+  (* 5s deadline on the inner call, 15s wall-clock ceiling on the test
+     itself.  CI hosts can be slow but if this assertion fails it
+     means the deadline parameter no longer reaches the retry loop —
+     a regression we want to catch loudly, not paper over with a
+     bigger margin. *)
+  let inner_deadline_secs = 5.0
+
+  let max_wall_clock_secs = 15.0
+
+  let test_case (_test : t) =
+    let unreachable_uri = Uri.of_string "http://127.0.0.1:1/graphql" in
+    let deadline =
+      Time_float.add (Time_float.now ())
+        (Time_float.Span.of_sec inner_deadline_secs)
+    in
+    let start = Time_float.now () in
+    let%map result =
+      GC.get_sync_status ~deadline ~logger:hc_logger unreachable_uri
+    in
+    let elapsed =
+      Time_float.Span.to_sec (Time_float.diff (Time_float.now ()) start)
+    in
+    match result with
+    | Ok _ ->
+        Mina_automation_fixture.Intf.Failed
+          (Error.of_string "expected failure for unreachable daemon")
+    | Error _ when Float.( > ) elapsed max_wall_clock_secs ->
+        Mina_automation_fixture.Intf.Failed
+          (Error.createf
+             "deadline parameter not honored: get_sync_status against an \
+              unreachable URI took %.2fs (deadline was %.0fs, wall-clock \
+              ceiling %.0fs).  Likely cause: ?deadline is not threaded through \
+              to exec_graphql_request's retry loop."
+             elapsed inner_deadline_secs max_wall_clock_secs )
+    | Error _ ->
+        Mina_automation_fixture.Intf.Passed
 end
 
 let () =
@@ -1079,6 +1287,16 @@ let () =
                         .Make_FixtureWithoutBootstrap
                           (HardforkStateDirMismatch) ) )
         ] )
+    ; ( "misconfigured-wallet-crash-log"
+      , [ test_case
+            "The mina daemon logs structured metadata for a misconfigured \
+             wallet"
+            `Quick
+            (Mina_automation_runner.Runner.run_blocking
+               ( module Mina_automation_fixture.Daemon
+                        .Make_FixtureWithoutBootstrap
+                          (MisconfiguredWalletCrashLog) ) )
+        ] )
     ; ( "config-file-override"
       , [ test_case "Multiple --config-file flags merge/override configs" `Slow
             (Mina_automation_runner.Runner.run_blocking
@@ -1131,5 +1349,20 @@ let () =
                ( module Mina_automation_fixture.Daemon
                         .Make_FixtureWithoutBootstrap
                           (NodeStatusReport) ) )
+        ] )
+    ; ( "healthcheck"
+      , [ test_case "Healthcheck lifecycle: readiness check then wait for ready"
+            `Quick
+            (Mina_automation_runner.Runner.run_blocking
+               ( module Mina_automation_fixture.Daemon
+                        .Make_FixtureWithoutBootstrap
+                          (HealthcheckBootstrapLifecycle) ) )
+        ] )
+    ; ( "healthcheck-unreachable"
+      , [ test_case "Healthcheck reports failure for unreachable daemon" `Quick
+            (Mina_automation_runner.Runner.run_blocking
+               ( module Mina_automation_fixture.Daemon
+                        .Make_FixtureWithoutBootstrap
+                          (HealthcheckUnreachable) ) )
         ] )
     ]

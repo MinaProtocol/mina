@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Rosetta_models
 
 module Token_id = struct

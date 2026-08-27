@@ -1,6 +1,6 @@
 (* location_intf.ml -- interface file for Location *)
 
-open Core_kernel
+open Core
 
 module type S = sig
   module Addr : module type of Merkle_address

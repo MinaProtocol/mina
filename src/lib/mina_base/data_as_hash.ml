@@ -24,8 +24,7 @@ let lazy_optional_typ ~hash ~non_preimage ~dummy_value =
   Typ.transport
     Typ.(Field.typ * prover_value ())
     ~there:(function
-      | None -> (Lazy.force non_preimage, dummy_value) | Some s -> (hash s, s)
-      )
+      | None -> (Lazy.force non_preimage, dummy_value) | Some s -> (hash s, s) )
     ~back:(fun (_, s) -> Some s)
 
 let to_input (x, _) = Random_oracle_input.Chunked.field x
@@ -41,7 +40,7 @@ let if_ b ~then_ ~else_ =
             let prover_value =
               if read Boolean.typ b then snd then_ else snd else_
             in
-            read (Typ.prover_value ()) prover_value)
+            read (Typ.prover_value ()) prover_value )
   in
   (hash, prover_value)
 

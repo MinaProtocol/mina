@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Snark_params.Tick
 open Signature_lib
 module A = Account
@@ -585,7 +585,7 @@ module Account = struct
   let digest t =
     Random_oracle.(
       hash ~init:Hash_prefix.zkapp_precondition_account
-        (pack_input (to_input t)))
+        (pack_input (to_input t)) )
 
   module Checked = struct
     type t =
@@ -644,7 +644,7 @@ module Account = struct
           .Account_receipt_chain_hash_precondition_unsatisfied
         , Eq_data.(
             check_checked Tc.receipt_chain_hash receipt_chain_hash
-              a.receipt_chain_hash) )
+              a.receipt_chain_hash ) )
       ; ( Transaction_status.Failure.Account_delegate_precondition_unsatisfied
         , Eq_data.(check_checked (Tc.public_key ()) delegate a.delegate) )
       ]
@@ -656,19 +656,19 @@ module Account = struct
                   (map a.zkapp.action_state
                      ~f:
                        Eq_data.(
-                         check_checked (Lazy.force Tc.action_state) action_state) ))
+                         check_checked (Lazy.force Tc.action_state) action_state ) ) )
           )
         ]
       @ ( Vector.(
             to_list
-              (map2 state a.zkapp.app_state ~f:Eq_data.(check_checked Tc.field)))
+              (map2 state a.zkapp.app_state ~f:Eq_data.(check_checked Tc.field)) )
         |> List.mapi ~f:(fun i check ->
-               let failure =
-                 Transaction_status.Failure
-                 .Account_app_state_precondition_unsatisfied
-                   i
-               in
-               (failure, check) ) )
+            let failure =
+              Transaction_status.Failure
+              .Account_app_state_precondition_unsatisfied
+                i
+            in
+            (failure, check) ) )
       @ [ ( Transaction_status.Failure
             .Account_proved_state_precondition_unsatisfied
           , Eq_data.(check_checked Tc.boolean proved_state a.zkapp.proved_state)
@@ -686,7 +686,7 @@ module Account = struct
     let digest (t : t) =
       Random_oracle.Checked.(
         hash ~init:Hash_prefix.zkapp_precondition_account
-          (pack_input (to_input t)))
+          (pack_input (to_input t)) )
   end
 
   let typ () : (Checked.t, t) Typ.t =
@@ -723,12 +723,12 @@ module Account = struct
         .Account_receipt_chain_hash_precondition_unsatisfied
       , Eq_data.(
           check ~label:"receipt_chain_hash" Tc.receipt_chain_hash
-            receipt_chain_hash a.receipt_chain_hash) )
+            receipt_chain_hash a.receipt_chain_hash ) )
     ; ( Transaction_status.Failure.Account_delegate_precondition_unsatisfied
       , let tc = Eq_data.Tc.public_key () in
         Eq_data.(
           check ~label:"delegate" tc delegate
-            (Option.value ~default:tc.default a.delegate)) )
+            (Option.value ~default:tc.default a.delegate) ) )
     ]
     @
     let zkapp = Option.value ~default:Zkapp_account.default a.zkapp in
@@ -736,7 +736,7 @@ module Account = struct
       , match
           List.find (Vector.to_list zkapp.action_state) ~f:(fun state ->
               Eq_data.(
-                check (Lazy.force Tc.action_state) ~label:"" action_state state)
+                check (Lazy.force Tc.action_state) ~label:"" action_state state )
               |> Or_error.is_ok )
         with
         | None ->
@@ -752,13 +752,12 @@ module Account = struct
             .Account_app_state_precondition_unsatisfied
               i
           in
-          (failure, Eq_data.(check Tc.field ~label:(sprintf "state[%d]" i) c v))
-          )
+          (failure, Eq_data.(check Tc.field ~label:(sprintf "state[%d]" i) c v)) )
     @ [ ( Transaction_status.Failure
           .Account_proved_state_precondition_unsatisfied
         , Eq_data.(
             check ~label:"proved_state" Tc.boolean proved_state
-              zkapp.proved_state) )
+              zkapp.proved_state ) )
       ]
     @ [ ( Transaction_status.Failure.Account_is_new_precondition_unsatisfied
         , Eq_data.(check ~label:"is_new" Tc.boolean is_new new_account) )
@@ -1045,7 +1044,7 @@ module Protocol_state = struct
   let digest t =
     Random_oracle.(
       hash ~init:Hash_prefix.zkapp_precondition_protocol_state
-        (pack_input (to_input t)))
+        (pack_input (to_input t)) )
 
   module View = struct
     [%%versioned
@@ -1151,7 +1150,7 @@ module Protocol_state = struct
     let digest t =
       Random_oracle.Checked.(
         hash ~init:Hash_prefix.zkapp_precondition_protocol_state
-          (pack_input (to_input t)))
+          (pack_input (to_input t)) )
 
     let check
         (* Bind all the fields explicity so we make sure they are all used. *)
@@ -1174,9 +1173,9 @@ module Protocol_state = struct
       let epoch_data
           ({ ledger; seed; start_checkpoint; lock_checkpoint; epoch_length } :
             _ Epoch_data.Poly.t ) (t : _ Epoch_data.Poly.t) =
-        ignore seed ;
         epoch_ledger ledger t.ledger
-        @ [ Hash.(check_checked Tc.state_hash)
+        @ [ Hash.(check_checked Tc.epoch_seed) seed t.seed
+          ; Hash.(check_checked Tc.state_hash)
               start_checkpoint t.start_checkpoint
           ; Hash.(check_checked Tc.state_hash) lock_checkpoint t.lock_checkpoint
           ; Numeric.(Checked.check Tc.length) epoch_length t.epoch_length
@@ -1294,7 +1293,7 @@ module Protocol_state = struct
           _ Epoch_data.Poly.t ) (t : _ Epoch_data.Poly.t) =
       let l s = sprintf "%s_%s" label s in
       let%bind () = epoch_ledger ledger t.ledger in
-      ignore seed ;
+      let%bind () = Hash.(check ~label:(l "seed") Tc.epoch_seed) seed t.seed in
       let%bind () =
         Hash.(check ~label:(l "start_check_point") Tc.state_hash)
           start_checkpoint t.start_checkpoint
@@ -1601,7 +1600,7 @@ let to_input ({ self_predicate; other; fee_payer; protocol_state_predicate } : t
 
 let digest t =
   Random_oracle.(
-    hash ~init:Hash_prefix.zkapp_precondition (pack_input (to_input t)))
+    hash ~init:Hash_prefix.zkapp_precondition (pack_input (to_input t)) )
 
 let accept : t =
   { self_predicate = Account.accept
@@ -1630,7 +1629,7 @@ module Checked = struct
 
   let digest t =
     Random_oracle.Checked.(
-      hash ~init:Hash_prefix.zkapp_precondition (pack_input (to_input t)))
+      hash ~init:Hash_prefix.zkapp_precondition (pack_input (to_input t)) )
 end
 
 let typ () : (Checked.t, Stable.Latest.t) Typ.t =

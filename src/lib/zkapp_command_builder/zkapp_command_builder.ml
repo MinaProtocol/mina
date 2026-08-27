@@ -1,6 +1,6 @@
 (* zkapp_command_builder.ml -- combinators to build Zkapp_command.t for tests *)
 
-open Core_kernel
+open Core
 open Mina_base
 
 let mk_forest ps :
@@ -100,8 +100,7 @@ let replace_authorizations ?prover ~keymap (zkapp_command : Zkapp_command.t) :
       (Random_oracle.Input.Chunked.field commitment)
   in
   let fee_payer_sk =
-    Signature_lib.Public_key.Compressed.Map.find_exn keymap
-      zkapp_command.fee_payer.body.public_key
+    Map.find_exn keymap zkapp_command.fee_payer.body.public_key
   in
   let fee_payer_signature =
     sign_for_account_update ~use_full_commitment:true fee_payer_sk
@@ -112,16 +111,14 @@ let replace_authorizations ?prover ~keymap (zkapp_command : Zkapp_command.t) :
   let open Async_kernel.Deferred.Let_syntax in
   let%map account_updates_with_valid_authorizations =
     Zkapp_command.Call_forest.deferred_mapi zkapp_command.account_updates
-      ~f:(fun _ndx ({ body; authorization; aux } : _ Account_update.Poly.t) tree
-         ->
+      ~f:(fun
+          _ndx ({ body; authorization; aux } : _ Account_update.Poly.t) tree ->
         let%map valid_authorization =
           match authorization with
           | Control.Poly.Signature _dummy ->
               let pk = body.Account_update.Body.public_key in
               let sk =
-                match
-                  Signature_lib.Public_key.Compressed.Map.find keymap pk
-                with
+                match Map.find keymap pk with
                 | Some sk ->
                     sk
                 | None ->

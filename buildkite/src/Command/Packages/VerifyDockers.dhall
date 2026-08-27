@@ -4,13 +4,9 @@ let Extensions = ../../Lib/Extensions.dhall
 
 let join = Extensions.join
 
-let Artifacts = ../../Constants/Artifacts.dhall
-
-let Package = ../../Constants/DebianPackage.dhall
+let Docker = ../../Constants/Docker/Package.dhall
 
 let Network = ../../Constants/Network.dhall
-
-let Artifact = ../../Constants/Artifacts.dhall
 
 let DebianVersions = ../../Constants/DebianVersions.dhall
 
@@ -24,7 +20,7 @@ let DockerRepo = ../../Constants/DockerRepo.dhall
 
 let Spec =
       { Type =
-          { artifacts : List Artifact.Type
+          { artifacts : List Docker.Type
           , networks : List Network.Type
           , version : Text
           , codenames : List DebianVersions.DebVersion
@@ -36,7 +32,7 @@ let Spec =
           , generic : Bool
           }
       , default =
-          { artifacts = [] : List Package.Type
+          { artifacts = [] : List Docker.Type
           , networks = [ Network.Type.Mainnet, Network.Type.Devnet ]
           , codenames =
             [ DebianVersions.DebVersion.Focal
@@ -53,7 +49,7 @@ let Spec =
 
 let joinArtifacts
     : Spec.Type -> Text
-    = \(spec : Spec.Type) -> join "," (Artifacts.dockerNames spec.artifacts)
+    = \(spec : Spec.Type) -> join "," (Docker.dockerNames spec.artifacts)
 
 let joinNetworks
     : Spec.Type -> Text

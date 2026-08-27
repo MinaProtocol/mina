@@ -8,7 +8,7 @@ let JobSpec = ../../Pipeline/JobSpec.dhall
 
 let DebianVersions = ../../Constants/DebianVersions.dhall
 
-let BuildFlags = ../../Constants/BuildFlags.dhall
+let PipelineScope = ../../Pipeline/Scope.dhall
 
 let RosettaBlockRaceTest = ../../Command/RosettaBlockRaceTest.dhall
 
@@ -16,9 +16,7 @@ let Expr = ../../Pipeline/Expr.dhall
 
 let MainlineBranch = ../../Pipeline/MainlineBranch.dhall
 
-let dependsOn =
-      DebianVersions.dependsOn
-        DebianVersions.DepsSpec::{ build_flag = BuildFlags.Type.Instrumented }
+let dependsOn = DebianVersions.appDependsOn DebianVersions.DepsSpec::{=}
 
 in  Pipeline.build
       Pipeline.Config::{
@@ -33,6 +31,8 @@ in  Pipeline.build
           ]
         , path = "Test"
         , name = "RosettaBlockRaceTest"
+        , scope =
+          [ PipelineScope.Type.MainlineNightly, PipelineScope.Type.Release ]
         , excludeIf =
           [ Expr.Type.DescendantOf
               { ancestor = MainlineBranch.Type.Mesa

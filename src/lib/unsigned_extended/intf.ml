@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 
 type uint64 = Unsigned.uint64
 

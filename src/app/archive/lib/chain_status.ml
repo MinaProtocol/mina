@@ -1,6 +1,6 @@
 (* chain_status.ml *)
 
-open Core_kernel
+open Core
 
 [%%versioned
 module Stable = struct

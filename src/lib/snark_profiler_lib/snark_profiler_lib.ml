@@ -163,8 +163,10 @@ module Transaction_key = struct
     List.fold
       ~init:({ proof_segments = 0; signed_single = 0; signed_pair = 0 } : t)
       segments
-      ~f:(fun ({ proof_segments; signed_single; signed_pair } as acc)
-              (_, segment, _) ->
+      ~f:(fun
+          ({ proof_segments; signed_single; signed_pair } as acc)
+          (_, segment, _)
+        ->
         match segment with
         | Transaction_snark.Zkapp_command_segment.Basic.Proved ->
             { acc with proof_segments = proof_segments + 1 }
@@ -175,12 +177,13 @@ module Transaction_key = struct
 end
 
 module Time_values = struct
-  type t = { verification_time : Time.Span.t; proving_time : Time.Span.t }
+  type t =
+    { verification_time : Time_float.Span.t; proving_time : Time_float.Span.t }
   [@@deriving hash, sexp, compare]
 
   let empty =
-    { verification_time = Time.Span.of_sec 0.
-    ; proving_time = Time.Span.of_sec 0.
+    { verification_time = Time_float.Span.of_sec 0.
+    ; proving_time = Time_float.Span.of_sec 0.
     }
 end
 
@@ -208,7 +211,7 @@ let create_ledger_and_zkapps ?(min_num_updates = 1) ?(num_proof_updates = 0)
   let keymap =
     List.fold ~init:Public_key.Compressed.Map.empty keypairs_in_ledger
       ~f:(fun m kp ->
-        Public_key.Compressed.Map.add_exn m
+        Map.add_exn m
           ~key:(Public_key.compress kp.public_key)
           ~data:kp.private_key )
   in
@@ -320,8 +323,8 @@ let create_ledger_and_zkapps ?(min_num_updates = 1) ?(num_proof_updates = 0)
               (kp, amount) )
       ; amount =
           ( if receiver_count > 0 then
-            Currency.Amount.scale amount receiver_count |> Option.value_exn
-          else Currency.Amount.zero )
+              Currency.Amount.scale amount receiver_count |> Option.value_exn
+            else Currency.Amount.zero )
       ; zkapp_account_keypairs = List.take keypairs_in_ledger num_proof_updates
       ; memo = Signed_command_memo.create_from_string_exn "blah"
       ; new_zkapp_account = false
@@ -353,7 +356,7 @@ let create_ledger_and_zkapps ?(min_num_updates = 1) ?(num_proof_updates = 0)
       generate_zkapp ~num_proof_updates:0 ~num_updates:(num_updates + 1) acc
         nonce
     else
-      let start = Time.now () in
+      let start = Time_float.now () in
       let empty_sender, spec =
         test_spec nonce ~num_proof_updates ~num_updates
       in
@@ -389,7 +392,7 @@ let create_ledger_and_zkapps ?(min_num_updates = 1) ?(num_proof_updates = 0)
           %!"
         (List.length other_parties + 1)
         (List.length proof_parties)
-        Time.(Span.to_sec (diff (now ()) start)) ;
+        Time_float.(Span.to_sec (diff (now ()) start)) ;
       let%bind.Async.Deferred permutations =
         permute proof_parties (signature_parties @ no_auths) [] []
         |> Async.Deferred.List.filter_mapi ~how:`Sequential
@@ -413,8 +416,7 @@ let create_ledger_and_zkapps ?(min_num_updates = 1) ?(num_proof_updates = 0)
                      | None_given ->
                          acc ^ "N" )
                in
-               if Transaction_key.Table.mem transaction_combinations combination
-               then (
+               if Hashtbl.mem transaction_combinations combination then (
                  printf "Skipping %s\n%!" perm_string ;
                  Async.Deferred.return None )
                else (
@@ -428,8 +430,7 @@ let create_ledger_and_zkapps ?(min_num_updates = 1) ?(num_proof_updates = 0)
                    Zkapp_command_builder.replace_authorizations ~prover ~keymap
                      p
                  in
-                 Transaction_key.Table.add_exn transaction_combinations
-                   ~key:combination
+                 Hashtbl.add_exn transaction_combinations ~key:combination
                    ~data:(p, Time_values.empty, perm_string) ;
                  Some p ) )
       in
@@ -443,10 +444,10 @@ let create_ledger_and_zkapps ?(min_num_updates = 1) ?(num_proof_updates = 0)
   (ledger, zkapp)
 
 let time thunk =
-  let start = Time.now () in
+  let start = Time_float.now () in
   let x = thunk () in
-  let stop = Time.now () in
-  (Time.diff stop start, x)
+  let stop = Time_float.now () in
+  (Time_float.diff stop start, x)
 
 let rec pair_up = function
   | [] ->
@@ -503,7 +504,7 @@ let pending_coinbase_stack_target ~genesis_constants ~constraint_constants
         @@ state_body_hash ~genesis_constants ~constraint_constants ~logger )
         ( Lazy.force
         @@ curr_state_view ~genesis_constants ~constraint_constants ~logger )
-          .global_slot_since_genesis stack)
+          .global_slot_since_genesis stack )
   in
   let target =
     match t with
@@ -515,7 +516,7 @@ let pending_coinbase_stack_target ~genesis_constants ~constraint_constants
   target
 
 let format_time_span ts =
-  sprintf !"Total time was: %{Time.Span.to_string_hum}" ts
+  sprintf !"Total time was: %{Time_float.Span.to_string_hum}" ts
 
 let apply_transactions_and_keep_intermediate_ledgers
     ~(constraint_constants : Genesis_constants.Constraint_constants.t)
@@ -569,21 +570,24 @@ let profile_user_command (module T : Transaction_snark.S) ~genesis_constants
     List.zip_exn first_pass_target_ledgers applied_txns
     |> Async.Deferred.List.fold
          ~init:
-           ((Time.Span.zero, sparse_ledger0, Pending_coinbase.Stack.empty), [])
-         ~f:(fun ((max_span, source_ledger, coinbase_stack_source), proofs)
-                 (target_ledger, applied) ->
+           ( (Time_float.Span.zero, sparse_ledger0, Pending_coinbase.Stack.empty)
+           , [] )
+         ~f:(fun
+             ((max_span, source_ledger, coinbase_stack_source), proofs)
+             (target_ledger, applied)
+           ->
            let txn =
              Mina_transaction_logic.Transaction_applied.transaction applied
            in
            (* the txn was already valid before apply, we are just recasting it here after application *)
            let (`If_this_is_used_it_should_have_a_comment_justifying_it
-                 valid_txn ) =
+                  valid_txn ) =
              Transaction.to_valid_unsafe txn
            in
            let coinbase_stack_target =
              pending_coinbase_stack_target txn coinbase_stack_source ~logger
            in
-           let tm0 = Core.Unix.gettimeofday () in
+           let tm0 = Core_unix.gettimeofday () in
            let target_hash = Sparse_ledger.merkle_root target_ledger in
            let%map proof =
              T.of_non_zkapp_command_transaction
@@ -625,9 +629,9 @@ let profile_user_command (module T : Transaction_snark.S) ~genesis_constants
                }
                (unstage (Sparse_ledger.handler source_ledger))
            in
-           let tm1 = Core.Unix.gettimeofday () in
-           let span = Time.Span.of_sec (tm1 -. tm0) in
-           ( ( Time.Span.max span max_span
+           let tm1 = Core_unix.gettimeofday () in
+           let span = Time_float.Span.of_sec (tm1 -. tm0) in
+           ( ( Time_float.Span.max span max_span
              , target_ledger
              , coinbase_stack_target ~genesis_constants ~constraint_constants )
            , proof :: proofs ) )
@@ -638,9 +642,10 @@ let profile_user_command (module T : Transaction_snark.S) ~genesis_constants
         Async.Deferred.return serial_time
     | _ ->
         let%bind layer_time, new_proofs_rev =
-          Async.Deferred.List.fold (pair_up proofs) ~init:(Time.Span.zero, [])
+          Async.Deferred.List.fold (pair_up proofs)
+            ~init:(Time_float.Span.zero, [])
             ~f:(fun (max_time, proofs) (x, y) ->
-              let tm0 = Core.Unix.gettimeofday () in
+              let tm0 = Core_unix.gettimeofday () in
               let%map proof =
                 match%map
                   T.merge ~sok_digest:Sok_message.Digest.default x y
@@ -650,12 +655,12 @@ let profile_user_command (module T : Transaction_snark.S) ~genesis_constants
                 | Error _ ->
                     failwith "merge failed"
               in
-              let tm1 = Core.Unix.gettimeofday () in
-              let pair_time = Time.Span.of_sec (tm1 -. tm0) in
-              (Time.Span.max max_time pair_time, proof :: proofs) )
+              let tm1 = Core_unix.gettimeofday () in
+              let pair_time = Time_float.Span.of_sec (tm1 -. tm0) in
+              (Time_float.Span.max max_time pair_time, proof :: proofs) )
         in
         merge_all
-          (Time.Span.( + ) serial_time layer_time)
+          (Time_float.Span.( + ) serial_time layer_time)
           (List.rev new_proofs_rev)
   in
   let%map total_time = merge_all base_proof_time (List.rev base_proofs_rev) in
@@ -665,17 +670,18 @@ let profile_zkapps
     ~(constraint_constants : Genesis_constants.Constraint_constants.t) ~verifier
     ~signature_kind ledger zkapp_commands =
   let open Async.Deferred.Let_syntax in
-  let tm0 = Core.Unix.gettimeofday () in
+  let tm0 = Core_unix.gettimeofday () in
   let%map () =
     let num_zkapp_commands = List.length zkapp_commands in
-    Async.Deferred.List.iteri zkapp_commands ~f:(fun ndx zkapp_command ->
+    Async.Deferred.List.iteri ~how:`Sequential zkapp_commands
+      ~f:(fun ndx zkapp_command ->
         let account_updates =
           Zkapp_command.account_updates_list zkapp_command
         in
         printf "Processing zkApp %d of %d, other_parties length: %d\n" (ndx + 1)
           num_zkapp_commands
           (List.length account_updates) ;
-        let v_start_time = Time.now () in
+        let v_start_time = Time_float.now () in
         let%bind res =
           Verifier.verify_commands verifier
             [ { With_status.data =
@@ -703,13 +709,13 @@ let profile_zkapps
               | _ ->
                   (pc, sc) )
         in
-        let verification_time = Time.(diff (now ()) v_start_time) in
+        let verification_time = Time_float.(diff (now ()) v_start_time) in
         printf
           !"Verifying zkapp with %d signatures and %d proofs took %f secs\n%!"
           signature_count proof_count
-          (Time.Span.to_sec verification_time) ;
+          (Time_float.Span.to_sec verification_time) ;
         let _a = Or_error.ok_exn res in
-        let tm_zkapp0 = Core.Unix.gettimeofday () in
+        let tm_zkapp0 = Core_unix.gettimeofday () in
         (*verify*)
         let%map () =
           let mask = Mina_ledger.Ledger.copy ledger in
@@ -725,20 +731,20 @@ let profile_zkapps
               printf "zkApp failed, exiting ...\n" ;
               exit 1
         in
-        let tm_zkapp1 = Core.Unix.gettimeofday () in
-        let zkapp_span = Time.Span.of_sec (tm_zkapp1 -. tm_zkapp0) in
+        let tm_zkapp1 = Core_unix.gettimeofday () in
+        let zkapp_span = Time_float.Span.of_sec (tm_zkapp1 -. tm_zkapp0) in
         let time_values =
           { Time_values.verification_time; proving_time = zkapp_span }
         in
         let combination =
           Transaction_key.of_zkapp_command ~ledger ~signature_kind zkapp_command
         in
-        Transaction_key.Table.change transaction_combinations
+        Hashtbl.change transaction_combinations
           (combination ~constraint_constants) ~f:(fun data_opt ->
             let txn, _, perm_string = Option.value_exn data_opt in
             Some (txn, time_values, perm_string) ) ;
         printf
-          !"Time for zkApp %d: %{Time.Span.to_string_hum}\n"
+          !"Time for zkApp %d: %{Time_float.Span.to_string_hum}\n"
           (ndx + 1) zkapp_span )
   in
   printf
@@ -746,31 +752,25 @@ let profile_zkapps
      verification time (sec)| Transaction proving time (sec)|Permutation|\n\
     \ |--|--|--|--|--|--|--|\n" ;
   List.iteri
-    ( Transaction_key.Table.to_alist transaction_combinations
+    ( Hashtbl.to_alist transaction_combinations
     |> List.sort ~compare:(fun (k1, _) (k2, _) ->
-           let total_updates (k : Transaction_key.t) =
-             k.proof_segments + (2 * k.signed_pair) + k.signed_single
-           in
-           let total_compare =
-             Int.compare (total_updates k1) (total_updates k2)
-           in
-           let proof_compare =
-             Int.compare k1.proof_segments k2.proof_segments
-           in
-           let signed_pair_compare =
-             Int.compare k1.signed_pair k2.signed_pair
-           in
-           if total_compare <> 0 then total_compare
-           else if proof_compare <> 0 then proof_compare
-           else signed_pair_compare ) )
+        let total_updates (k : Transaction_key.t) =
+          k.proof_segments + (2 * k.signed_pair) + k.signed_single
+        in
+        let total_compare = Int.compare (total_updates k1) (total_updates k2) in
+        let proof_compare = Int.compare k1.proof_segments k2.proof_segments in
+        let signed_pair_compare = Int.compare k1.signed_pair k2.signed_pair in
+        if total_compare <> 0 then total_compare
+        else if proof_compare <> 0 then proof_compare
+        else signed_pair_compare ) )
     ~f:(fun i (k, (_, t, perm)) ->
       printf "| %d| %d| %d| %d| %f| %f| %s|\n" (i + 1) k.proof_segments
         k.signed_pair k.signed_single
-        (Time.Span.to_sec t.verification_time)
-        (Time.Span.to_sec t.proving_time)
+        (Time_float.Span.to_sec t.verification_time)
+        (Time_float.Span.to_sec t.proving_time)
         perm ) ;
-  let tm1 = Core.Unix.gettimeofday () in
-  let total_time = Time.Span.of_sec (tm1 -. tm0) in
+  let tm1 = Core_unix.gettimeofday () in
+  let total_time = Time_float.Span.of_sec (tm1 -. tm0) in
   format_time_span total_time
 
 let check_base_snarks ~genesis_constants ~constraint_constants ~logger
@@ -799,7 +799,7 @@ let check_base_snarks ~genesis_constants ~constraint_constants ~logger
              in
              (* the txn was already valid before apply, we are just recasting it here after application *)
              let (`If_this_is_used_it_should_have_a_comment_justifying_it
-                   valid_txn ) =
+                    valid_txn ) =
                Transaction.to_valid_unsafe txn
              in
              let coinbase_stack_target =
@@ -864,7 +864,7 @@ let generate_base_snarks_witness ~genesis_constants ~constraint_constants
              in
              (* the txn was already valid before apply, we are just recasting it here after application *)
              let (`If_this_is_used_it_should_have_a_comment_justifying_it
-                   valid_txn ) =
+                    valid_txn ) =
                Transaction.to_valid_unsafe txn
              in
              let coinbase_stack_target =

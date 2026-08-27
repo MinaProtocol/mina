@@ -2,13 +2,9 @@ module Scalars = Graphql_lib.Scalars
 module Serializing = Graphql_lib.Serializing
 
 module Get_all_transactions =
-[%graphql
-{|
+  [%graphql
+  {|
     query all_transactions {
-      initialPeers
-      daemonStatus {
-        chainId
-      }
       pooledUserCommands(publicKey: null) {
         hash @ppxCustom(module: "Scalars.String_json")
       }
@@ -16,14 +12,9 @@ module Get_all_transactions =
 |}]
 
 module Get_transactions_by_hash =
-[%graphql
-{|
+  [%graphql
+  {|
     query all_transactions_by_hash($hashes: [String!]) {
-      initialPeers
-      daemonStatus {
-        chainId
-        peers { host }
-      }
       pooledUserCommands(hashes: $hashes) {
         hash @ppxCustom(module: "Scalars.String_json")
         amount @ppxCustom(module: "Scalars.UInt64")
@@ -50,7 +41,7 @@ module Get_transactions_by_hash =
 module Mina_currency = Currency
 
 (* Avoid shadowing graphql_ppx functions *)
-open Core_kernel
+open Core
 open Async
 open Rosetta_lib
 open Rosetta_models
@@ -94,8 +85,6 @@ module All = struct
             Result.return
               { Get_all_transactions.pooledUserCommands =
                   [| { hash = "TXN_1" }; { hash = "TXN_2" } |]
-              ; initialPeers = [||]
-              ; daemonStatus = { chainId = "dummy" }
               } )
       ; validate_network_choice = Network.Validate_choice.Mock.succeed
       }
@@ -170,7 +159,7 @@ module Transaction = struct
           (fun ~hash ->
             Graphql.query ~minimum_user_command_fee
               Get_transactions_by_hash.(
-                make @@ makeVariables ~hashes:[| hash |] ())
+                make @@ makeVariables ~hashes:[| hash |] () )
               graphql_uri )
       ; validate_network_choice = Network.Validate_choice.Real.validate
       }
@@ -227,7 +216,7 @@ module Transaction = struct
                  method pooledUserCommands =
                    User_command_info.dummies
                    |> List.map ~f:(fun info ->
-                          `UserCommand (obj_of_user_command_info info) )
+                       `UserCommand (obj_of_user_command_info info) )
                    |> List.to_array
                end )
       ; validate_network_choice = Network.Validate_choice.Mock.succeed

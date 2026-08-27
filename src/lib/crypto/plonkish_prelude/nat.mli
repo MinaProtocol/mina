@@ -43,7 +43,7 @@ module Add : sig
 
     type n
 
-    val eq : (n, z plus_n) Core_kernel.Type_equal.t
+    val eq : (n, z plus_n) Core.Type_equal.t
 
     val n : z plus_n t
 
@@ -187,7 +187,7 @@ val of_int : int -> e
 
 val lte_exn : 'a nat -> 'b nat -> ('a, 'b) Lte.t
 
-val eq_exn : 'n 'm. 'n nat -> 'm nat -> ('n, 'm) Core_kernel.Type_equal.t
+val eq_exn : 'n 'm. 'n nat -> 'm nat -> ('n, 'm) Core.Type_equal.t
 
 val compare :
   'n 'm. 'n t -> 'm t -> [ `Lte of ('n, 'm) Lte.t | `Gt of ('n, 'm) Lte.t Not.t ]

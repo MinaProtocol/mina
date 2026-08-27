@@ -8,7 +8,7 @@ let dispatch rpc shutdown_on_disconnect query address =
   let%map res =
     Rpc.Connection.with_client
       ~handshake_timeout:
-        (Time.Span.of_sec
+        (Time_float.Span.of_sec
            Node_config_unconfigurable_constants.rpc_handshake_timeout_sec )
       ~heartbeat_config:
         (Rpc.Connection.Heartbeat_config.create
@@ -42,24 +42,13 @@ let main ~logger ~proof_level ~constraint_constants ~signature_kind
     Prod.Impl.Worker_state.create ~constraint_constants ~proof_level
       ~signature_kind ()
   in
-  let wait ?(sec = 0.5) () = after (Time.Span.of_sec sec) in
-  (* retry interval with jitter *)
-  let retry_pause sec = Random.float_range (sec -. 2.0) (sec +. 2.0) in
-  let log_and_retry label error sec k =
-    let error_str = Error.to_string_hum error in
-    (* HACK: the bind before the call to go () produces an evergrowing
-         backtrace history which takes forever to print and fills our disks.
-         If the string becomes too long, chop off the first 10 lines and include
-         only that *)
-    ( if String.length error_str < 4096 then
-      [%log error] !"Error %s: %{sexp:Error.t}" label error
-    else
-      let lines = String.split ~on:'\n' error_str in
-      [%log error] !"Error %s: %s" label
-        (String.concat ~sep:"\\n" (List.take lines 10)) ) ;
-    let%bind () = wait ~sec () in
-    (* FIXME: Use a backoff algo here *)
-    k ()
+  let retry_strategy =
+    Backoff.Strategy.create ~base:(Time_ns.Span.of_sec 10.0)
+      ~max_delay:(Time_ns.Span.of_sec 120.0)
+      ()
+  in
+  let retry_forever ~f =
+    Backoff.Deferred.retry ~log_errors:true retry_strategy ~logger ~f
   in
   let rec go () =
     let%bind daemon_address =
@@ -80,20 +69,20 @@ let main ~logger ~proof_level ~constraint_constants ~signature_kind
       !"Snark worker using daemon $addr"
       ~metadata:[ ("addr", `String (Host_and_port.to_string daemon_address)) ] ;
     match%bind
-      dispatch Rpc_get_work.Stable.Latest.rpc shutdown_on_disconnect ()
-        daemon_address
+      retry_forever ~f:(fun () ->
+          dispatch Rpc_get_work.Stable.Latest.rpc shutdown_on_disconnect ()
+            daemon_address )
     with
-    | Error e ->
-        log_and_retry "getting work" e (retry_pause 10.) go
+    | Error _ ->
+        go ()
     | Ok None ->
         let random_delay =
           Prod.Impl.Worker_state.worker_wait_time
           +. (0.5 *. Random.float Prod.Impl.Worker_state.worker_wait_time)
         in
-        (* No work to be done -- quietly take a brief nap *)
         [%log info] "No jobs available. Napping for $time seconds"
           ~metadata:[ ("time", `Float random_delay) ] ;
-        let%bind () = wait ~sec:random_delay () in
+        let%bind () = after (Time_float.Span.of_sec random_delay) in
         go ()
     | Ok (Some partitioned_spec) -> (
         let address_json =
@@ -108,26 +97,32 @@ let main ~logger ~proof_level ~constraint_constants ~signature_kind
           "SNARK work $work_ids received from $address. Starting proof \
            generation"
           ~metadata:[ address_json; work_ids_json ] ;
-        let%bind () = wait () in
-        (* Pause to wait for stdout to flush *)
         let id = Spec.Partitioned.Poly.get_id partitioned_spec in
         match%bind
-          Prod.Impl.perform_partitioned ~state ~spec:partitioned_spec
-        with
-        | Error e ->
-            let%bind () =
-              match%map
-                dispatch Rpc_failed_to_generate_snark.Stable.Latest.rpc
-                  shutdown_on_disconnect (e, id) daemon_address
+          retry_forever ~f:(fun () ->
+              match%bind
+                Prod.Impl.perform_partitioned ~state ~spec:partitioned_spec
               with
               | Error e ->
-                  [%log error]
-                    "Couldn't inform the daemon about the snark work failure"
-                    ~metadata:[ ("error", Error_json.error_to_yojson e) ]
-              | Ok () ->
-                  ()
-            in
-            log_and_retry "performing work" e (retry_pause 10.) go
+                  let%bind () =
+                    match%map
+                      dispatch Rpc_failed_to_generate_snark.Stable.Latest.rpc
+                        shutdown_on_disconnect (e, id) daemon_address
+                    with
+                    | Error e ->
+                        [%log error]
+                          "Couldn't inform the daemon about the snark work \
+                           failure"
+                          ~metadata:[ ("error", Error_json.error_to_yojson e) ]
+                    | Ok () ->
+                        ()
+                  in
+                  return (Error e)
+              | Ok data ->
+                  return (Ok data) )
+        with
+        | Error _ ->
+            go ()
         | Ok ({ data = elapsed; _ } as data) ->
             let wire_result = Result.Partitioned.Stable.Latest.{ id; data } in
             ( match partitioned_spec with
@@ -137,14 +132,14 @@ let main ~logger ~proof_level ~constraint_constants ~signature_kind
                 { spec = sub_zkapp_spec; _ } ->
                 Metrics.emit_subzkapp_metrics ~logger ~sub_zkapp_spec ~elapsed
             ) ;
-            let rec submit_work () =
+            let submit_work () =
               match%bind
-                dispatch Rpc_submit_work.Stable.Latest.rpc
-                  shutdown_on_disconnect wire_result daemon_address
+                retry_forever ~f:(fun () ->
+                    dispatch Rpc_submit_work.Stable.Latest.rpc
+                      shutdown_on_disconnect wire_result daemon_address )
               with
-              | Error e ->
-                  log_and_retry "submitting work" e (retry_pause 10.)
-                    submit_work
+              | Error _ ->
+                  go ()
               | Ok `Ok ->
                   [%log info]
                     "Submitted completed SNARK work $work_ids to $address"
@@ -169,48 +164,50 @@ let command_from_rpcs ~commit_id ~proof_level:default_proof_level
     ~constraint_constants =
   Command.async ~summary:"Snark worker"
     (let open Command.Let_syntax in
-    let%map_open daemon_port =
-      flag "--daemon-address" ~aliases:[ "daemon-address" ]
-        (required (Arg_type.create Host_and_port.of_string))
-        ~doc:"HOST-AND-PORT address daemon is listening on"
-    and proof_level =
-      flag "--proof-level" ~aliases:[ "proof-level" ]
-        (optional (Arg_type.create Genesis_constants.Proof_level.of_string))
-        ~doc:"full|check|none"
-    and shutdown_on_disconnect =
-      flag "--shutdown-on-disconnect"
-        ~aliases:[ "shutdown-on-disconnect" ]
-        (optional bool)
-        ~doc:"true|false Shutdown when disconnected from daemon (default:true)"
-    and log_json = Cli_lib.Flag.Log.json
-    and log_level = Cli_lib.Flag.Log.level
-    and file_log_level = Cli_lib.Flag.Log.file_log_level
-    and conf_dir = Cli_lib.Flag.conf_dir in
-    fun () ->
-      let signature_kind = Mina_signature_kind.t_DEPRECATED in
-      let logger =
-        Logger.create () ~metadata:[ ("process", `String "Snark Worker") ]
-      in
-      let proof_level = Option.value ~default:default_proof_level proof_level in
-      Cli_lib.Stdout_log.setup log_json log_level ;
-      Option.value_map ~default:() conf_dir ~f:(fun conf_dir ->
-          let logrotate_max_size = 1024 * 10 in
-          let logrotate_num_rotate = 1 in
-          Logger.Consumer_registry.register ~commit_id
-            ~id:Logger.Logger_id.snark_worker
-            ~processor:(Logger.Processor.raw ~log_level:file_log_level ())
-            ~transport:
-              (Logger_file_system.dumb_logrotate ~directory:conf_dir
-                 ~log_filename:"mina-snark-worker.log"
-                 ~max_size:logrotate_max_size ~num_rotate:logrotate_num_rotate )
-            () ) ;
-      Signal.handle [ Signal.term ] ~f:(fun _signal ->
-          [%log info]
-            !"Received signal to terminate. Aborting snark worker process" ;
-          Core.exit 0 ) ;
-      main ~logger ~proof_level ~constraint_constants ~signature_kind
-        daemon_port
-        (Option.value ~default:true shutdown_on_disconnect))
+     let%map_open daemon_port =
+       flag "--daemon-address" ~aliases:[ "daemon-address" ]
+         (required (Arg_type.create Host_and_port.of_string))
+         ~doc:"HOST-AND-PORT address daemon is listening on"
+     and proof_level =
+       flag "--proof-level" ~aliases:[ "proof-level" ]
+         (optional (Arg_type.create Genesis_constants.Proof_level.of_string))
+         ~doc:"full|check|none"
+     and shutdown_on_disconnect =
+       flag "--shutdown-on-disconnect"
+         ~aliases:[ "shutdown-on-disconnect" ]
+         (optional bool)
+         ~doc:"true|false Shutdown when disconnected from daemon (default:true)"
+     and log_json = Cli_lib.Flag.Log.json
+     and log_level = Cli_lib.Flag.Log.level
+     and file_log_level = Cli_lib.Flag.Log.file_log_level
+     and conf_dir = Cli_lib.Flag.conf_dir in
+     fun () ->
+       let signature_kind = Mina_signature_kind.t_DEPRECATED in
+       let logger =
+         Logger.create () ~metadata:[ ("process", `String "Snark Worker") ]
+       in
+       let proof_level =
+         Option.value ~default:default_proof_level proof_level
+       in
+       Cli_lib.Stdout_log.setup log_json log_level ;
+       Option.value_map ~default:() conf_dir ~f:(fun conf_dir ->
+           let logrotate_max_size = 1024 * 10 in
+           let logrotate_num_rotate = 1 in
+           Logger.Consumer_registry.register ~commit_id
+             ~id:Logger.Logger_id.snark_worker
+             ~processor:(Logger.Processor.raw ~log_level:file_log_level ())
+             ~transport:
+               (Logger_file_system.dumb_logrotate ~directory:conf_dir
+                  ~log_filename:"mina-snark-worker.log"
+                  ~max_size:logrotate_max_size ~num_rotate:logrotate_num_rotate )
+             () ) ;
+       Signal.handle [ Signal.term ] ~f:(fun _signal ->
+           [%log info]
+             !"Received signal to terminate. Aborting snark worker process" ;
+           Core.exit 0 ) ;
+       main ~logger ~proof_level ~constraint_constants ~signature_kind
+         daemon_port
+         (Option.value ~default:true shutdown_on_disconnect) )
 
 let arguments ~proof_level ~daemon_address ~shutdown_on_disconnect ~conf_dir
     ~log_json ~log_level ~file_log_level =
