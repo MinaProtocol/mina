@@ -5143,10 +5143,28 @@ module Fork_genesis_block = struct
                   | true ->
                       return `Already_present
                   | false ->
-                      let%map (_ : int) =
+                      let%bind block_id =
                         Block.add_if_doesn't_exist conn ~logger
                           ~constraint_constants genesis_block
                           ~accounts_accessed:[] ~accounts_created:[]
+                      in
+                      (* Adopt the children that got here first.
+
+                         The post-fork chain's second block reaches the archive
+                         over the ordinary block path within minutes of the
+                         fork, while this insert waits on a ledger from S3. So
+                         the usual order is child first, and a block whose
+                         parent is absent is stored with parent_id NULL. The
+                         ordinary path repairs that for itself -- every insert
+                         calls set_parent_id_if_null -- but this one does not
+                         go through it, so without this the boundary stays
+                         severed however long the block sits here. *)
+                      let%map () =
+                        Block.set_parent_id_if_null conn
+                          ~parent_hash:
+                            (State_hash.With_state_hashes.state_hash
+                               genesis_block )
+                          ~parent_id:block_id
                       in
                       `Inserted )
                 pool
@@ -5162,14 +5180,31 @@ module Fork_genesis_block = struct
                   ~metadata:[ ("state_hash", `String state_hash) ] ;
                 return (Ok `Inserted) ) )
 
+  (** How long the ledger is expected to take to appear, and how often to look
+      while that is still the expectation.
+
+      The daemon writes the tarballs as it generates the configuration, and
+      something else puts them where this archive can fetch them. That upload
+      is not instant and it is not this archive's to observe, so the first
+      stretch is treated as ordinary waiting. *)
+  let brisk_interval = Time.Span.of_sec 30.
+
+  let brisk_for = Time.Span.of_min 15.
+
+  let patient_interval = Time.Span.of_min 5.
+
   (** Keep trying until the block is in place.
 
-      Deliberately slow: each attempt may fetch a ledger of tens of megabytes,
-      so this polls in minutes rather than seconds. Nothing waits on it -- the
-      archive serves reads throughout, and the boundary repair is independent. *)
-  let run ~logger ~genesis_constants ~constraint_constants
-      ?(interval = Time.Span.of_min 5.) ~pool () =
+      Never gives up. Stopping would leave the archive permanently without the
+      fork genesis block, and nothing would say so; an upload that arrives an
+      hour late should still be picked up. What changes with time is the noise:
+      for the first [brisk_for] this is expected waiting and is logged as such,
+      and after that it is something an operator should look at. *)
+  let run ~logger ~genesis_constants ~constraint_constants ~pool () =
+    let started = Time.now () in
     Deferred.repeat_until_finished () (fun () ->
+        let waited = Time.diff (Time.now ()) started in
+        let still_expected = Time.Span.( < ) waited brisk_for in
         let%bind () =
           match%map
             attempt ~logger ~genesis_constants ~constraint_constants ~pool
@@ -5179,13 +5214,22 @@ module Fork_genesis_block = struct
           | Error No_fork_recorded ->
               (* Ordinary on a database that has never seen a fork. *)
               ()
-          | Error reason ->
+          | Error reason when still_expected ->
               [%log info]
-                "Cannot insert the fork genesis block yet: $reason. This will \
-                 be retried."
-                ~metadata:[ ("reason", `String (describe reason)) ]
+                "Cannot insert the fork genesis block yet: %s. This will be \
+                 retried."
+                (describe reason)
+          | Error reason ->
+              [%log warn]
+                "Still cannot insert the fork genesis block after %s: %s. The \
+                 genesis ledger has not arrived. This will keep being retried, \
+                 and will succeed on its own once the ledger is uploaded."
+                (Time.Span.to_string_hum waited)
+                (describe reason)
         in
-        let%map () = after interval in
+        let%map () =
+          after (if still_expected then brisk_interval else patient_interval)
+        in
         `Repeat () )
 end
 
