@@ -56,9 +56,22 @@ let verdict_of_row ~mine row =
       else Differs { schema = protocol_version; mine }
 
 let check (module Conn : Mina_caqti.CONNECTION) =
-  let open Deferred.Result.Let_syntax in
-  let%map row = Hardfork_sql.fetch_latest_migration_history (module Conn) in
-  verdict_of_row ~mine:my_protocol_version row
+  let open Deferred.Let_syntax in
+  match%map Hardfork_sql.fetch_latest_migration_history (module Conn) with
+  | Ok row ->
+      Ok (verdict_of_row ~mine:my_protocol_version row)
+  | Error e ->
+      (* No such table is not a failure to ask, it is an answer: this database
+         has never been migrated, which is the ordinary state of one that has
+         never been through a fork. create_schema.sql does not create
+         migration_history -- only the upgrade does -- so treating its absence
+         as an error would warn every interval, for ever, on every archive that
+         has never forked. The dispatcher reads the same absence the same way,
+         and the two must not disagree. *)
+      let msg = Caqti_error.show e in
+      if String.is_substring msg ~substring:"migration_history" then
+        Ok No_record
+      else Error e
 
 let%test_module "schema era verdicts" =
   ( module struct
@@ -128,10 +141,15 @@ let watch ~logger ~pool ?(interval = Time.Span.of_sec 10.) () =
         | Ok (Matches | No_record) ->
             ()
         | Ok ((Differs _ | Migration_in_progress _) as verdict) ->
+            (* Formatted in rather than interpolated from metadata: plain
+               text logs drop interpolated values longer than fifty characters,
+               and every one of these reasons is longer. The reason is the
+               whole point of the line -- it is the last thing this process
+               says. *)
             [%log info]
-              "Standing down: $reason. Exiting cleanly so the runtime matching \
-               this schema can take over."
-              ~metadata:[ ("reason", `String (describe verdict)) ] ;
+              "Standing down: %s. Exiting cleanly so the runtime matching this \
+               schema can take over."
+              (describe verdict) ;
             (* Give the log a chance to flush before the process goes. *)
             don't_wait_for
               (let%bind () = after (Time.Span.of_sec 1.) in
