@@ -44,11 +44,11 @@ module type CONTEXT = sig
 
   val commit_id : string
 
-  val vrf_poll_interval : Time.Span.t
+  val vrf_poll_interval : Time_float.Span.t
 
   val zkapp_cmd_limit : int option ref
 
-  val compaction_interval : Time.Span.t option
+  val compaction_interval : Time_float.Span.t option
 
   val ledger_sync_config : Syncable_ledger.daemon_config
 

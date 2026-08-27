@@ -1,6 +1,6 @@
 (* uptime_snark_worker.ml *)
 
-open Core_kernel
+open Core
 open Async
 open Mina_base
 
@@ -19,10 +19,11 @@ let extract_terminal_zk_segment ~(m : (module Transaction_snark.S)) ~witness
            Work_partitioner.Snark_worker_shared.Failed_to_generate_inputs
            .error_of_t
     |> Result.map ~f:(function x ->
-           Work_partitioner.Snark_worker_shared.Zkapp_command_inputs
-           .read_all_proofs_from_disk x
-           |> Mina_stdlib.Nonempty_list.find ~f:(function _, _, s ->
-                  Ledger_hash.(s.target.second_pass_ledger = staged_ledger_hash) ) )
+        Work_partitioner.Snark_worker_shared.Zkapp_command_inputs
+        .read_all_proofs_from_disk x
+        |> Mina_stdlib.Nonempty_list.find ~f:(function
+            | _, _, (s : Transaction_snark.Statement.With_sok.t) ->
+            Ledger_hash.(s.target.second_pass_ledger = staged_ledger_hash) ) )
   in
   match final_segment with
   | Some res ->
@@ -41,7 +42,7 @@ module Worker = struct
       { perform_single :
           ( 'w
           , Sok_message.t * Snark_work_lib.Spec.Single.Stable.Latest.t
-          , (Ledger_proof.t * Time.Span.t) Or_error.t )
+          , (Ledger_proof.t * Time_float.Span.t) Or_error.t )
           F.t
       ; perform_partitioned :
           ( 'w
@@ -49,7 +50,7 @@ module Worker = struct
             * Mina_state.Snarked_ledger_state.Stable.Latest.t
             * Zkapp_command.Stable.Latest.t
             * Staged_ledger_hash.t
-          , (Ledger_proof.t * Time.Span.t) Or_error.t )
+          , (Ledger_proof.t * Time_float.Span.t) Or_error.t )
           F.t
       }
 
@@ -69,9 +70,10 @@ module Worker = struct
     end
 
     module Functions
-        (C : Rpc_parallel.Creator
-               with type worker_state := Worker_state.t
-                and type connection_state := Connection_state.t) =
+        (C :
+          Rpc_parallel.Creator
+            with type worker_state := Worker_state.t
+             and type connection_state := Connection_state.t) =
     struct
       let perform_single (state : Worker_state.t) (message, single_spec) =
         Impl.perform_single ~message state single_spec
@@ -123,7 +125,7 @@ module Worker = struct
                   Sok_message.Stable.Latest.t
                   * Snark_work_lib.Spec.Single.Stable.Latest.t]
               , [%bin_type_class:
-                  (Ledger_proof.Stable.Latest.t * Time.Span.t) Or_error.t]
+                  (Ledger_proof.Stable.Latest.t * Time_float.Span.t) Or_error.t]
               , perform_single )
         ; perform_partitioned =
             f
@@ -133,7 +135,7 @@ module Worker = struct
                   * Zkapp_command.Stable.Latest.t
                   * Staged_ledger_hash.Stable.Latest.t]
               , [%bin_type_class:
-                  (Ledger_proof.Stable.Latest.t * Time.Span.t) Or_error.t]
+                  (Ledger_proof.Stable.Latest.t * Time_float.Span.t) Or_error.t]
               , perform_partitioned )
         }
 
@@ -160,7 +162,8 @@ let create ~logger ~constraint_constants ~pids : t Deferred.t =
   in
   [%log info] "Starting a new uptime service SNARK worker process" ;
   let%map connection, process =
-    Worker.spawn_in_foreground_exn ~connection_timeout:(Time.Span.of_min 1.)
+    Worker.spawn_in_foreground_exn
+      ~connection_timeout:(Time_float.Span.of_min 1.)
       ~on_failure ~shutdown_on:Connection_closed ~connection_state_init_arg:()
       (logger, constraint_constants)
   in

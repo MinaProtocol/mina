@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 
 module Make (Inputs : Intf.Inputs.DATABASE) = struct
   (* The max depth of a merkle tree can never be greater than 253,
@@ -60,7 +60,7 @@ module Make (Inputs : Intf.Inputs.DATABASE) = struct
           name
     in
     if fresh then Mina_stdlib_unix.File_system.rmrf directory ;
-    Unix.mkdir_p directory ;
+    Core_unix.mkdir_p directory ;
     let kvdb = Kvdb.create directory in
     { uuid
     ; kvdb
@@ -260,9 +260,9 @@ module Make (Inputs : Intf.Inputs.DATABASE) = struct
               Location.next prev_account_location
               |> Result.of_option ~error:Db_error.Out_of_leaves
               |> Result.map ~f:(fun next_account_location ->
-                     set_raw mdb location
-                       (Location.serialize ~ledger_depth next_account_location) ;
-                     next_account_location ) )
+                  set_raw mdb location
+                    (Location.serialize ~ledger_depth next_account_location) ;
+                  next_account_location ) )
 
     let allocate mdb key =
       let location_result = increment_last_account_location mdb in
@@ -272,7 +272,7 @@ module Make (Inputs : Intf.Inputs.DATABASE) = struct
     let last_location mdb =
       last_location_key () |> get_raw mdb
       |> Option.bind ~f:(fun data ->
-             Location.parse ~ledger_depth:mdb.depth data |> Result.ok )
+          Location.parse ~ledger_depth:mdb.depth data |> Result.ok )
 
     let last_location_address mdb =
       Option.map (last_location mdb) ~f:Location.to_path_exn
@@ -332,10 +332,10 @@ module Make (Inputs : Intf.Inputs.DATABASE) = struct
           Sequence.folding_map (all_accounts t) ~init:Token_id.Set.empty
             ~f:(fun (seen : Token_id.Set.t) (a : Account.t) ->
               let token = Account.token a in
-              let already_seen = Token_id.Set.mem seen token in
+              let already_seen = Set.mem seen token in
               (Set.add seen token, (already_seen, token)) )
           |> Sequence.filter_map ~f:(fun (already_seen, token) ->
-                 if already_seen then None else Some token )
+              if already_seen then None else Some token )
         in
         Sequence.filter_map deduped_tokens ~f:(fun token ->
             Option.map (get t token) ~f:(fun owner -> (token, owner)) )
@@ -434,7 +434,7 @@ module Make (Inputs : Intf.Inputs.DATABASE) = struct
   let token_owners (t : t) : Account_id.Set.t =
     Tokens.Owner.all_owners t
     |> Sequence.fold ~init:Account_id.Set.empty ~f:(fun acc (_, owner) ->
-           Set.add acc owner )
+        Set.add acc owner )
 
   let token_owner = Tokens.Owner.get
 
@@ -609,7 +609,7 @@ module Make (Inputs : Intf.Inputs.DATABASE) = struct
         let last = Addr.to_int last_addr in
         Sequence.range ~stop:`inclusive 0 last
         (* filter out indices corresponding to ignored accounts *)
-        |> Sequence.filter ~f:(fun loc -> not (Int.Set.mem ignored_indices loc))
+        |> Sequence.filter ~f:(fun loc -> not (Set.mem ignored_indices loc))
         |> Sequence.map ~f:(get_at_index_exn t)
         |> Sequence.foldi ~init ~f:f'
 
@@ -656,7 +656,7 @@ module Make (Inputs : Intf.Inputs.DATABASE) = struct
     snd @@ List.fold_map ~init:hashes ~f:compute_path list_of_dependencies
 
   let merkle_path_batch =
-    path_batch_impl ~expand_query:ident
+    path_batch_impl ~expand_query:Fn.id
       ~compute_path:(fun all_hashes loc_and_dir_list ->
         let len = List.length loc_and_dir_list in
         let sibling_hashes, rest_hashes = List.split_n all_hashes len in

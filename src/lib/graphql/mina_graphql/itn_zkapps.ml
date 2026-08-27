@@ -16,23 +16,23 @@ let deploy_zkapps ~scheduler_tbl ~mina ~ledger ~deployment_fee ~max_cost
   in
   let num_fee_payers = Array.length fee_payer_array in
   let finished () =
-    if Time.(now () >= stop_time) then (
+    if Time_float.(now () >= stop_time) then (
       [%log info]
         "Scheduled zkapp commands with handle %s has expired, stop deployment \
          of zkapp accounts"
         (Uuid.to_string uuid) ;
-      Uuid.Table.remove scheduler_tbl uuid ;
+      Hashtbl.remove scheduler_tbl uuid ;
       true )
     else if Ivar.is_full stop_signal then (
       [%log info]
         "Scheduled zkapp commands with handle %s received stop signal, stop \
          deployment of zkapp accounts"
         (Uuid.to_string uuid) ;
-      Uuid.Table.remove scheduler_tbl uuid ;
+      Hashtbl.remove scheduler_tbl uuid ;
       true )
     else false
   in
-  Deferred.List.iteri keypairs ~f:(fun i kp ->
+  Deferred.List.iteri ~how:`Sequential keypairs ~f:(fun i kp ->
       let ndx = i mod num_fee_payers in
       if finished () then Deferred.unit
       else
@@ -57,14 +57,14 @@ let deploy_zkapps ~scheduler_tbl ~mina ~ledger ~deployment_fee ~max_cost
             ~signature_kind:Testnet
             ~permissions:
               ( if max_cost then
-                { Permissions.user_default with
-                  set_verification_key =
-                    ( Permissions.Auth_required.Proof
-                    , Mina_numbers.Txn_version.current )
-                ; edit_state = Permissions.Auth_required.Proof
-                ; edit_action_state = Proof
-                }
-              else Permissions.user_default )
+                  { Permissions.user_default with
+                    set_verification_key =
+                      ( Permissions.Auth_required.Proof
+                      , Mina_numbers.Txn_version.current )
+                  ; edit_state = Permissions.Auth_required.Proof
+                  ; edit_action_state = Proof
+                  }
+                else Permissions.user_default )
             spec
         in
         let%bind zkapp_command = zkapp_command in
@@ -107,15 +107,15 @@ let rec wait_until_zkapps_deployed ?(deployed = false) ~scheduler_tbl ~mina
     ~(fee_payer_array : Signature_lib.Keypair.t Array.t) ~constraint_constants
     ~logger ~uuid ~stop_signal ~stop_time ~memo_prefix ~wait_span
     (keypairs : Signature_lib.Keypair.t list) =
-  if Time.( >= ) (Time.now ()) stop_time then (
+  if Time_float.( >= ) (Time_float.now ()) stop_time then (
     [%log info] "Scheduled zkApp commands with handle %s has expired"
       (Uuid.to_string uuid) ;
-    Uuid.Table.remove scheduler_tbl uuid ;
+    Hashtbl.remove scheduler_tbl uuid ;
     return None )
   else if Ivar.is_full stop_signal then (
     [%log info] "Stopping scheduled zkApp commands with handle %s"
       (Uuid.to_string uuid) ;
-    Uuid.Table.remove scheduler_tbl uuid ;
+    Hashtbl.remove scheduler_tbl uuid ;
     return None )
   else if all_zkapps_deployed ~ledger keypairs then (
     [%log info] "All zkApp accounts are deployed" ;
@@ -135,13 +135,13 @@ let rec wait_until_zkapps_deployed ?(deployed = false) ~scheduler_tbl ~mina
     let%bind () =
       (* Checking three times per block window to avoid unnecessary waiting after the block is created *)
       Async.after
-        (Time.Span.of_ms
+        (Time_float.Span.of_ms
            (Float.of_int constraint_constants.block_window_duration_ms /. 3.0) )
     in
     let ledger =
       Utils.get_ledger_and_breadcrumb mina
       |> Option.value_map ~default:ledger ~f:(fun (new_ledger, _) ->
-             new_ledger )
+          new_ledger )
     in
     wait_until_zkapps_deployed ~scheduler_tbl ~deployed:true ~mina ~ledger
       ~deployment_fee ~max_cost ~init_balance ~fee_payer_array
@@ -150,12 +150,11 @@ let rec wait_until_zkapps_deployed ?(deployed = false) ~scheduler_tbl ~mina
 
 let insert_account_queue ~account_queue ~account_queue_size ~account_state_tbl
     id =
-  let a = Account_id.Table.find_and_remove account_state_tbl id in
+  let a = Hashtbl.find_and_remove account_state_tbl id in
   Queue.enqueue account_queue (Option.value_exn a) ;
   if Queue.length account_queue > account_queue_size then
     let a, role = Queue.dequeue_exn account_queue in
-    Account_id.Table.add_exn account_state_tbl ~key:(Account.identifier a)
-      ~data:(a, role)
+    Hashtbl.add_exn account_state_tbl ~key:(Account.identifier a) ~data:(a, role)
   else ()
 
 let send_zkapps ~(genesis_constants : Genesis_constants.t)
@@ -163,10 +162,10 @@ let send_zkapps ~(genesis_constants : Genesis_constants.t)
     ~fee_payer_array ~tm_end ~scheduler_tbl ~uuid ~keymap ~unused_pks
     ~stop_signal ~mina ~zkapp_command_details ~wait_span ~logger
     ~account_state_tbl init_tm_next init_counter =
-  let wait_span_ms = Time.Span.to_ms wait_span |> int_of_float in
+  let wait_span_ms = Time_float.Span.to_ms wait_span |> int_of_float in
   let repeat tm_next counter =
     let%map () = Async_unix.at tm_next in
-    let open Time in
+    let open Time_float in
     let next_tm_next = add tm_next wait_span in
     let now = now () in
     let next_tm_next =
@@ -193,15 +192,15 @@ let send_zkapps ~(genesis_constants : Genesis_constants.t)
   Deferred.repeat_until_finished (init_tm_next, init_counter)
   @@ fun (tm_next, counter) ->
   let ndx = counter mod num_fee_payers in
-  if Time.( >= ) (Time.now ()) tm_end then (
+  if Time_float.( >= ) (Time_float.now ()) tm_end then (
     [%log info] "Scheduled zkApp commands with handle %s has expired"
       (Uuid.to_string uuid) ;
-    Uuid.Table.remove scheduler_tbl uuid ;
+    Hashtbl.remove scheduler_tbl uuid ;
     Deferred.return (`Finished ()) )
   else if Ivar.is_full stop_signal then (
     [%log info] "Stopping scheduled zkApp commands with handle %s"
       (Uuid.to_string uuid) ;
-    Uuid.Table.remove scheduler_tbl uuid ;
+    Hashtbl.remove scheduler_tbl uuid ;
     Deferred.return (`Finished ()) )
   else
     let fee_payer : Signature_lib.Keypair.t = fee_payer_array.(ndx) in
@@ -214,13 +213,15 @@ let send_zkapps ~(genesis_constants : Genesis_constants.t)
             "Failed to fetch the best tip ledger, skip this round, we will try \
              again at $time"
             ~metadata:
-              [ ("time", `String (Time.to_string_fix_proto `Local tm_next)) ] ;
+              [ ( "time"
+                , `String (Time_float_unix.to_string_fix_proto `Local tm_next)
+                )
+              ] ;
           Result.return None
       | Some (ledger, _) ->
           let number_of_accounts_generated =
             let f = function _, `New_account -> true | _ -> false in
-            Account_id.Table.count ~f account_state_tbl
-            + Queue.count ~f account_queue
+            Hashtbl.count ~f account_state_tbl + Queue.count ~f account_queue
           in
           let generate_new_accounts =
             number_of_accounts_generated
@@ -238,32 +239,33 @@ let send_zkapps ~(genesis_constants : Genesis_constants.t)
           Option.some
           @@ Quickcheck.Generator.generate
                ( if zkapp_command_details.max_cost then
-                 Mina_generators.Zkapp_command_generators
-                 .gen_max_cost_zkapp_command_from ~memo
-                   ~fee_range:
-                     ( zkapp_command_details.min_fee
-                     , zkapp_command_details.max_fee )
-                   ~fee_payer_pk ~account_state_tbl ~vk
-                   ~genesis_constants:
-                     (Mina_lib.config mina).precomputed_values.genesis_constants
-                   ()
-               else
-                 Mina_generators.Zkapp_command_generators.gen_zkapp_command_from
-                   ~memo
-                   ?max_account_updates:
-                     zkapp_command_details.max_account_updates
-                   ~no_account_precondition:
-                     zkapp_command_details.no_precondition
-                   ~fee_range:
-                     ( zkapp_command_details.min_fee
-                     , zkapp_command_details.max_fee )
-                   ~balance_change_range:
-                     zkapp_command_details.balance_change_range
-                   ~ignore_sequence_events_precond:true ~no_token_accounts:true
-                   ~limited:true ~fee_payer_keypair:fee_payer ~keymap
-                   ~account_state_tbl ~generate_new_accounts ~ledger ~vk
-                   ~available_public_keys:unused_pks ~genesis_constants
-                   ~constraint_constants () )
+                   Mina_generators.Zkapp_command_generators
+                   .gen_max_cost_zkapp_command_from ~memo
+                     ~fee_range:
+                       ( zkapp_command_details.min_fee
+                       , zkapp_command_details.max_fee )
+                     ~fee_payer_pk ~account_state_tbl ~vk
+                     ~genesis_constants:
+                       (Mina_lib.config mina).precomputed_values
+                         .genesis_constants ()
+                 else
+                   Mina_generators.Zkapp_command_generators
+                   .gen_zkapp_command_from ~memo
+                     ?max_account_updates:
+                       zkapp_command_details.max_account_updates
+                     ~no_account_precondition:
+                       zkapp_command_details.no_precondition
+                     ~fee_range:
+                       ( zkapp_command_details.min_fee
+                       , zkapp_command_details.max_fee )
+                     ~balance_change_range:
+                       zkapp_command_details.balance_change_range
+                     ~ignore_sequence_events_precond:true
+                     ~no_token_accounts:true ~limited:true
+                     ~fee_payer_keypair:fee_payer ~keymap ~account_state_tbl
+                     ~generate_new_accounts ~ledger ~vk
+                     ~available_public_keys:unused_pks ~genesis_constants
+                     ~constraint_constants () )
                ~size:1
                ~random:(Splittable_random.State.create Random.State.default)
     in

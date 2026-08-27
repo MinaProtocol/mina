@@ -17,6 +17,7 @@
   yojson
   sodium
   core
+  core_unix
   async_unix
   ppx_deriving_yojson.runtime
   async

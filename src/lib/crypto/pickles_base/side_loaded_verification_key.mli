@@ -42,8 +42,8 @@ val wrap_index_to_input :
 
 val index_to_field_elements :
      'a Pickles_types.Plonk_verification_key_evals.t
-  -> g:('a -> 'b Core_kernel.Array.t)
-  -> 'b Core_kernel.Array.t
+  -> g:('a -> 'b Core.Array.t)
+  -> 'b Core.Array.t
 
 val to_input :
      field_of_int:(int -> 'a)

@@ -3,7 +3,14 @@
  (name generate_keypair)
  (public_name mina-generate-keypair)
  (modes native)
- (libraries async async_unix cli_lib core_kernel mina_version)
+ (libraries
+  async
+  async_unix
+  cli_lib
+  core
+  core_kernel
+  core_unix.command_unix
+  mina_version)
  (instrumentation
   (backend bisect_ppx))
  (preprocess

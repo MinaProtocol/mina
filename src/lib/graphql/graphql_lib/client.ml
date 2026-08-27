@@ -78,7 +78,7 @@ let query_json' query_obj uri =
           ~body:(Cohttp_async.Body.of_string body_string)
           uri )
     |> Deferred.Result.map_error ~f:(fun e ->
-           `Failed_request (Error.to_string_hum e) )
+        `Failed_request (Error.to_string_hum e) )
   in
   let%bind body_str =
     Cohttp_async.Body.to_string body |> Deferred.map ~f:Result.return
@@ -93,16 +93,16 @@ let query_json' query_obj uri =
         Deferred.return
           (Error
              (`Failed_request
-               (Printf.sprintf "Status code %d -- %s" code body_str) ) )
+                (Printf.sprintf "Status code %d -- %s" code body_str) ) )
   in
   let open Yojson.Basic.Util in
   ( match (member "errors" body_json, member "data" body_json) with
-  | `Null, `Null ->
-      Error (`Graphql_error "Empty response from graphql query")
-  | error, `Null ->
-      Error (`Graphql_error (graphql_error_to_string error))
-  | _, raw_json ->
-      Ok raw_json )
+    | `Null, `Null ->
+        Error (`Graphql_error "Empty response from graphql query")
+    | error, `Null ->
+        Error (`Graphql_error (graphql_error_to_string error))
+    | _, raw_json ->
+        Ok raw_json )
   |> Deferred.return
 
 (* safe *)
@@ -115,11 +115,11 @@ let query query_obj uri =
   let%bind raw_json = query_json' query_obj uri in
   Result.try_with (fun () -> query_obj#parse raw_json)
   |> Result.map_error ~f:(fun e ->
-         `Graphql_error
-           (Printf.sprintf
-              "Problem parsing graphql response\n\
-               Error message: %s, response: %s" (Exn.to_string e)
-              (Yojson.Basic.to_string raw_json) ) )
+      `Graphql_error
+        (Printf.sprintf
+           "Problem parsing graphql response\nError message: %s, response: %s"
+           (Exn.to_string e)
+           (Yojson.Basic.to_string raw_json) ) )
   |> Deferred.return
 
 let query_exn' ~f query_obj port =

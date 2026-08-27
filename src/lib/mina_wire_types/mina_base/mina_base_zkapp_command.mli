@@ -47,8 +47,9 @@ end
 module type Digest_local_sig = Signature(Digest_types).S
 
 module Digest_make
-    (Signature : Digest_local_sig) (F : functor (A : Digest_concrete) ->
-      Signature(A).S) : Signature(Digest_M).S
+    (Signature : Digest_local_sig)
+    (F : functor (A : Digest_concrete) -> Signature(A).S) :
+  Signature(Digest_M).S
 
 module Call_forest : sig
   module Digest :

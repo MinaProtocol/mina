@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Async
 open Currency
 open Signature_lib
@@ -166,13 +166,13 @@ module Make (Inputs : Intf.Ledger_input_intf) : Intf.S = struct
           Root_ledger.as_masked ledger
     in
     ( if insert_accounts then
-      let addrs_and_accounts =
-        let ledger_depth = Ledger.depth masked in
-        Lazy.force accounts
-        |> List.mapi ~f:(fun i (_, acct) ->
-               (Ledger.Addr.of_int_exn ~ledger_depth i, acct) )
-      in
-      Ledger.set_batch_accounts masked addrs_and_accounts ) ;
+        let addrs_and_accounts =
+          let ledger_depth = Ledger.depth masked in
+          Lazy.force accounts
+          |> List.mapi ~f:(fun i (_, acct) ->
+              (Ledger.Addr.of_int_exn ~ledger_depth i, acct) )
+        in
+        Ledger.set_batch_accounts masked addrs_and_accounts ) ;
     (ledger, masked)
 
   let t = Lazy.map ~f:snd backing_ledger

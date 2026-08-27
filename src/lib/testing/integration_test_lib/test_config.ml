@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 
 module Container_images = struct
   type t =
@@ -197,7 +197,7 @@ let transaction_capacity_log_2 (config : t) =
           - At least 3 ensures a transaction per block and the staged-ledger
             unit tests pass.
       *)
-      1 + Core_kernel.Int.ceil_log2 (max_user_commands_per_block + max_coinbases)
+      1 + Core.Int.ceil_log2 (max_user_commands_per_block + max_coinbases)
 
 let transaction_capacity config =
   let i = transaction_capacity_log_2 config in

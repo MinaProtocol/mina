@@ -11,7 +11,9 @@
   caqti-async
   caqti-driver-postgresql
   async
+  core
   core_kernel
+  core_unix.command_unix
   caqti
   async_kernel
   uri

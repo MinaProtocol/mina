@@ -73,10 +73,10 @@ let verify_balance_changes ~txn ~ledger accounts =
   List.for_all accounts
     ~f:
       (verify_account_updates ~txn ~ledger ~f:(fun balance_change -> function
-         | Some orig, Some updt ->
-             verify_balance_change ~balance_change orig updt
-         | _ ->
-             false ) )
+        | Some orig, Some updt ->
+            verify_balance_change ~balance_change orig updt
+        | _ ->
+            false ))
 
 let verify_balances_unchanged ~(ledger : Helpers.Ledger.t)
     ~(txn : Mina_transaction_logic.Transaction_applied.Zkapp_command_applied.t)

@@ -60,9 +60,9 @@ let test_db () =
           let enumerate_dir_combinations max_depth =
             Sequence.range 0 (max_depth - 1)
             |> Sequence.fold ~init:[ [] ] ~f:(fun acc _ ->
-                   acc
-                   @ List.map acc ~f:(List.cons Mina_stdlib.Direction.Left)
-                   @ List.map acc ~f:(List.cons Mina_stdlib.Direction.Right) )
+                acc
+                @ List.map acc ~f:(List.cons Mina_stdlib.Direction.Left)
+                @ List.map acc ~f:(List.cons Mina_stdlib.Direction.Right) )
           in
           List.iter accounts ~f:(fun account ->
               let account_id = Account.identifier account in

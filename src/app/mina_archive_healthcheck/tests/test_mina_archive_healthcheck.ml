@@ -106,7 +106,7 @@ let run_program ~prog args =
     | Error (`Exit_non_zero n) ->
         n
     | Error (`Signal s) ->
-        128 + Signal.to_system_int s
+        128 + Signal_unix.to_system_int s
   in
   (code, out, err)
 
@@ -117,7 +117,12 @@ let run_cli args = run_program ~prog:bin args
    [Unix_error] propagating unwrapped through stderr on
    ECONNREFUSED. *)
 let assert_no_ocaml_exn_leak label s =
-  let needles = [ "Unix_error"; "(Unix."; "Core.Unix"; "Caqti_error" ] in
+  (* [Core_unix] as well as [Core.Unix]: core v0.16 split the unix parts of
+     [Core] into a separate [Core_unix] library, so an unwrapped exception
+     now renders with the new module path. *)
+  let needles =
+    [ "Unix_error"; "(Unix."; "Core.Unix"; "Core_unix"; "Caqti_error" ]
+  in
   List.iter needles ~f:(fun needle ->
       if String.is_substring s ~substring:needle then
         Alcotest.failf "%s: output leaked OCaml exception syntax (%s):\n%s"
@@ -171,7 +176,7 @@ let rec json_contains_string (json : Yojson.Safe.t) expected =
   | `Variant (tag, payload) ->
       String.equal tag expected
       || Option.exists payload ~f:(fun json ->
-             json_contains_string json expected )
+          json_contains_string json expected )
   | `Bool _ | `Float _ | `Int _ | `Intlit _ | `Null ->
       false
 
@@ -216,7 +221,8 @@ let all_subcommands =
 let test_postgres_env = "MINA_TEST_POSTGRES"
 
 let current_epoch_ms () =
-  Time.now () |> Time.to_span_since_epoch |> Time.Span.to_ms |> Int64.of_float
+  Time_float.now () |> Time_float.to_span_since_epoch |> Time_float.Span.to_ms
+  |> Int64.of_float
 
 let quote_ident s =
   "\"" ^ String.substr_replace_all s ~pattern:"\"" ~with_:"\"\"" ^ "\""

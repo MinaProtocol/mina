@@ -204,7 +204,7 @@ module Instance = struct
       Full_frontier.apply_diffs frontier [ diff ] ~has_long_catchup_job:false
         ~enable_epoch_ledger_sync:
           ( if ignore_consensus_local_state then `Disabled
-          else `Enabled root_ledger )
+            else `Enabled root_ledger )
     in
     [%log internal] "Apply_full_frontier_diffs_done" ;
     [%log internal] "Notify_frontier_extensions" ;
@@ -261,18 +261,18 @@ module Instance = struct
     (* read basic information from the database *)
     let%bind root, root_transition, best_tip, protocol_states, root_hash =
       (let open Result.Let_syntax in
-      let%bind root = Database.get_root t.db in
-      let root_hash = Root_data.Minimal.Stable.Latest.hash root in
-      let%bind root_transition =
-        Database.get_transition t.db ~signature_kind ~proof_cache_db root_hash
-      in
-      let%bind best_tip = Database.get_best_tip t.db in
-      let%map protocol_states =
-        Database.get_protocol_states_for_root_scan_state t.db
-      in
-      (root, root_transition, best_tip, protocol_states, root_hash))
+       let%bind root = Database.get_root t.db in
+       let root_hash = Root_data.Minimal.Stable.Latest.hash root in
+       let%bind root_transition =
+         Database.get_transition t.db ~signature_kind ~proof_cache_db root_hash
+       in
+       let%bind best_tip = Database.get_best_tip t.db in
+       let%map protocol_states =
+         Database.get_protocol_states_for_root_scan_state t.db
+       in
+       (root, root_transition, best_tip, protocol_states, root_hash) )
       |> Result.map_error ~f:(fun err ->
-             `Failure (Database.Error.not_found_message err) )
+          `Failure (Database.Error.not_found_message err) )
       |> Deferred.return
     in
     let root_genesis_state_hash =
@@ -348,7 +348,7 @@ module Instance = struct
                   ( "error rebuilding transition frontier from persistence: "
                   ^ msg )
             | `Not_found _ as err ->
-                `Failure (Database.Error.not_found_message err) ) )
+                `Failure (Database.Error.not_found_message err) ))
     in
     (root_ledger, best_tip, frontier, extensions)
 end

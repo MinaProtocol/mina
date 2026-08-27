@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 
 module Stable : sig
   module V1 : sig

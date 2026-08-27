@@ -53,7 +53,7 @@ let name { name; _ } = name
 let load_state thread id = Univ_map.find thread.state id
 
 let set_state thread id value =
-  thread.state <- Univ_map.set thread.state id value
+  thread.state <- Univ_map.set thread.state ~key:id ~data:value
 
 let iter_threads ~f = Hashtbl.iter threads ~f
 
@@ -79,7 +79,7 @@ module Fiber = struct
   let rec fiber_key name parent =
     name
     :: Option.value_map parent ~default:[] ~f:(fun p ->
-           fiber_key p.thread.name p.parent )
+        fiber_key p.thread.name p.parent )
 
   let register name parent =
     let key = fiber_key name parent in

@@ -1,5 +1,5 @@
 open Async_kernel
-open Core_kernel
+open Core
 open Pipe_lib
 open Network_peer
 
@@ -37,8 +37,9 @@ let%test_module "network pool test" =
       Mock_snark_pool.Resource_pool.make_config ~verifier ~trust_system
         ~disk_location:"/tmp/snark-pool" ~proof_cache_db
 
-    let%test_unit "Work that gets fed into apply_and_broadcast will be \
-                   received in the pool's reader" =
+    let%test_unit
+        "Work that gets fed into apply_and_broadcast will be received in the \
+         pool's reader" =
       let tf = Mocks.Transition_frontier.create [] in
       let frontier_broadcast_pipe_r, _ = Broadcast_pipe.create (Some tf) in
       let work =
@@ -95,8 +96,9 @@ let%test_module "network pool test" =
           | None ->
               failwith "There should have been a proof here" )
 
-    let%test_unit "when creating a network, the incoming diffs and local diffs \
-                   in the reader pipes will automatically get process" =
+    let%test_unit
+        "when creating a network, the incoming diffs and local diffs in the \
+         reader pipes will automatically get process" =
       let work_count = 10 in
       let works =
         Quickcheck.random_sequence ~seed:(`Deterministic "works")
@@ -137,15 +139,15 @@ let%test_module "network pool test" =
         in
         List.map (List.take works per_reader) ~f:create_work
         |> List.map ~f:(fun work ->
-               ( Envelope.Incoming.local work
-               , Mina_net2.Validation_callback.create_without_expiration () ) )
+            ( Envelope.Incoming.local work
+            , Mina_net2.Validation_callback.create_without_expiration () ) )
         |> List.iter ~f:(fun diff ->
-               Mock_snark_pool.Remote_sink.push remote_sink diff
-               |> Deferred.don't_wait_for ) ;
+            Mock_snark_pool.Remote_sink.push remote_sink diff
+            |> Deferred.don't_wait_for ) ;
         List.map (List.drop works per_reader) ~f:create_work
         |> List.iter ~f:(fun diff ->
-               Mock_snark_pool.Local_sink.push local_sink (diff, Fn.const ())
-               |> Deferred.don't_wait_for ) ;
+            Mock_snark_pool.Local_sink.push local_sink (diff, Fn.const ())
+            |> Deferred.don't_wait_for ) ;
         let%bind () = Mocks.Transition_frontier.refer_statements tf works in
         don't_wait_for
         @@ Linear_pipe.iter (Mock_snark_pool.broadcasts network_pool)

@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 module Field = Snark_params.Tick.Field
 module Token_id = Mina_base.Token_id
 
@@ -77,7 +77,7 @@ module Unsigned = struct
             ~error:
               (Errors.create
                  (`Operations_not_valid
-                   [ Errors.Partial_reason.Amount_not_some ] ) )
+                    [ Errors.Partial_reason.Amount_not_some ] ) )
         in
         let payment =
           { Rendered.Payment.to_ = un_pk command.receiver
@@ -165,18 +165,17 @@ module Unsigned = struct
         (String.to_list
            (Option.value_exn (Hex.Safe.of_hex r.random_oracle_input)) )
       |> Result.map_error ~f:(fun e ->
-             let parse_context =
-               match e with
-               | `Expected_eof ->
-                   "Extra bytes at the end of input"
-               | `Unexpected_eof ->
-                   "Unexpected end of bytes stream"
-             in
-             Errors.create
-               ~context:
-                 (sprintf "Random oracle input deserialization: %s"
-                    parse_context )
-               (`Json_parse None) )
+          let parse_context =
+            match e with
+            | `Expected_eof ->
+                "Extra bytes at the end of input"
+            | `Unexpected_eof ->
+                "Unexpected end of bytes stream"
+          in
+          Errors.create
+            ~context:
+              (sprintf "Random oracle input deserialization: %s" parse_context)
+            (`Json_parse None) )
     in
     match (r.payment, r.stake_delegation) with
     | Some payment, None ->
@@ -235,14 +234,13 @@ module Signed = struct
             try
               return
               @@ List.filter l ~f:(fun (field, json) ->
-                     if List.mem ~equal:String.equal deprecated_fields field
-                     then
-                       match json with
-                       | `Null ->
-                           false
-                       | _ ->
-                           raise (Non_null field)
-                     else true )
+                  if List.mem ~equal:String.equal deprecated_fields field then
+                    match json with
+                    | `Null ->
+                        false
+                    | _ ->
+                        raise (Non_null field)
+                  else true )
             with Non_null field ->
               Error (sprintf "Found non-null deprecated field '%s'" field)
           in

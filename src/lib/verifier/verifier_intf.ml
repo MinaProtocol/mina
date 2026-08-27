@@ -1,5 +1,5 @@
 open Async_kernel
-open Core_kernel
+open Core
 
 module Base = struct
   module type S = sig

@@ -1,7 +1,7 @@
 (* test_common.ml -- code common to tests *)
 
 open Integration_test_lib
-open Core_kernel
+open Core
 open Async
 open Mina_transaction
 
@@ -158,12 +158,10 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let check_peer_connected_to_all_others ~nodes_by_peer_id ~peer_id
         ~connected_peers =
       let get_node_infra_id p =
-        p
-        |> String.Map.find_exn nodes_by_peer_id
-        |> Engine.Network.Node.infra_id
+        p |> Map.find_exn nodes_by_peer_id |> Engine.Network.Node.infra_id
       in
       let expected_peers =
-        nodes_by_peer_id |> String.Map.keys
+        nodes_by_peer_id |> Map.keys
         |> List.filter ~f:(fun p -> not (String.equal p peer_id))
       in
       Malleable_error.List.iter expected_peers ~f:(fun p ->

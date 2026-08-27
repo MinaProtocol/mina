@@ -1,6 +1,6 @@
 (* missing_blocks_auditor.ml *)
 
-open Core_kernel
+open Core
 open Async
 
 (* bits in error code *)
@@ -69,7 +69,7 @@ let main ~archive_uri () =
           return @@ [%log info] "There are no missing blocks in the archive db"
         else (
           add_error missing_blocks_error ;
-          Deferred.List.iter missing_blocks
+          Deferred.List.iter ~how:`Sequential missing_blocks
             ~f:(fun (block_id, state_hash, height, parent_hash) ->
               match%map
                 Mina_caqti.Pool.use
@@ -89,7 +89,7 @@ let main ~archive_uri () =
               | Error msg ->
                   [%log error] "Error getting missing blocks gap"
                     ~metadata:[ ("error", `String (Caqti_error.show msg)) ] ;
-                  Core_kernel.exit 1 ) )
+                  Core.exit 1 ) )
       in
       [%log info] "Querying for gaps in chain statuses" ;
       (* [Highest_canonical_height] returns [None] when the archive holds
@@ -192,15 +192,15 @@ let main ~archive_uri () =
 
 let () =
   Command.(
-    run
+    Command_unix.run
       (let open Let_syntax in
-      Command.async
-        ~summary:"Report state hashes of blocks missing from archive database"
-        (let%map archive_uri =
-           Param.flag "--archive-uri"
-             ~doc:
-               "URI URI for connecting to the archive database (e.g., \
-                postgres://$USER@localhost:5432/archiver)"
-             Param.(required string)
-         in
-         main ~archive_uri )))
+       Command.async
+         ~summary:"Report state hashes of blocks missing from archive database"
+         (let%map archive_uri =
+            Param.flag "--archive-uri"
+              ~doc:
+                "URI URI for connecting to the archive database (e.g., \
+                 postgres://$USER@localhost:5432/archiver)"
+              Param.(required string)
+          in
+          main ~archive_uri ) ) )

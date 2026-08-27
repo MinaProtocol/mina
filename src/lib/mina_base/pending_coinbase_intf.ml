@@ -21,7 +21,7 @@
     done for the blockchain snark
 *)
 
-open Core_kernel
+open Core
 open Snark_params
 open Snarky_backendless
 open Tick

@@ -36,7 +36,7 @@ struct
   [@@deriving sexp]
 
   let to_alist t =
-    let unsorted = Bigstring_frozen.Table.to_alist t.table in
+    let unsorted = Hashtbl.to_alist t.table in
     (* sort by key *)
     List.sort
       ~compare:(fun (k1, _) (k2, _) -> Bigstring_frozen.compare k1 k2)
@@ -48,29 +48,28 @@ struct
     { uuid = Uuid_unix.create (); table = Bigstring_frozen.Table.create () }
 
   let create_checkpoint t _ =
-    { uuid = Uuid_unix.create (); table = Bigstring_frozen.Table.copy t.table }
+    { uuid = Uuid_unix.create (); table = Hashtbl.copy t.table }
 
   let close _ = ()
 
-  let get t ~key = Bigstring_frozen.Table.find t.table key
+  let get t ~key = Hashtbl.find t.table key
 
-  let get_batch t ~keys = List.map keys ~f:(Bigstring_frozen.Table.find t.table)
+  let get_batch t ~keys = List.map keys ~f:(Hashtbl.find t.table)
 
-  let set t ~key ~data = Bigstring_frozen.Table.set t.table ~key ~data
+  let set t ~key ~data = Hashtbl.set t.table ~key ~data
 
   let set_batch t ?(remove_keys = []) ~key_data_pairs =
     List.iter key_data_pairs ~f:(fun (key, data) -> set t ~key ~data) ;
-    List.iter remove_keys ~f:(fun key ->
-        Bigstring_frozen.Table.remove t.table key )
+    List.iter remove_keys ~f:(fun key -> Hashtbl.remove t.table key)
 
-  let remove t ~key = Bigstring_frozen.Table.remove t.table key
+  let remove t ~key = Hashtbl.remove t.table key
 
   let make_checkpoint _ _ = ()
 
   let foldi t ~init ~f =
     let i = ref (-1) in
     let f ~key ~data accum = incr i ; f !i accum ~key ~data in
-    Bigstring_frozen.Table.fold t.table ~init ~f
+    Hashtbl.fold t.table ~init ~f
 
   (* Relying on {!val:to_alist} is probably enough for testing purposes. *)
   let fold_until t ~init ~f ~finish =
@@ -121,10 +120,9 @@ module Account_id : sig
 
   val gen_accounts : int -> t list
 
-  val eq :
-    (Mina_wire_types.Mina_base_account_id.M.V2.t, t) Core_kernel.Type_equal.t
+  val eq : (Mina_wire_types.Mina_base_account_id.M.V2.t, t) Type_equal.t
 
-  val eq2 : (Mina_base.Account_id.t, t) Core_kernel.Type_equal.t
+  val eq2 : (Mina_base.Account_id.t, t) Type_equal.t
 end = struct
   [%%versioned
   module Stable = struct
@@ -157,9 +155,9 @@ end = struct
     Quickcheck.random_value
       (Quickcheck.Generator.list_with_length num_accounts gen)
 
-  let eq = Core_kernel.Type_equal.T
+  let eq = Type_equal.T
 
-  let eq2 = Core_kernel.Type_equal.T
+  let eq2 = Type_equal.T
 end
 
 module Account : sig
@@ -245,10 +243,11 @@ module Hash = struct
 end
 
 module Make_base_inputs
-    (Account : Merkle_ledger.Intf.Account
-                 with type account_id := Account_id.t
-                  and type token_id := Token_id.t
-                  and type balance := Balance.t)
+    (Account :
+      Merkle_ledger.Intf.Account
+        with type account_id := Account_id.t
+         and type token_id := Token_id.t
+         and type balance := Balance.t)
     (Hash : Merkle_ledger.Intf.Hash with type account := Account.t) =
 struct
   module Key = Key

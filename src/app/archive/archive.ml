@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Async
 
 let () =
@@ -12,5 +12,5 @@ let () =
   | [| _archive_exe; version |] when is_version_cmd version ->
       Mina_version.print_version ()
   | _ ->
-      Command.run
+      Command_unix.run
         (Command.group ~summary:"Archive node commands" Archive_cli.commands)
