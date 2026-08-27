@@ -62,8 +62,7 @@ let upgrades_schema = function
 
 let%test_unit "every strategy survives a round trip through its name" =
   List.iter all ~f:(fun t ->
-      [%test_eq: string] (to_string t)
-        (to_string (of_string_exn (to_string t))) )
+      [%test_eq: string] (to_string t) (to_string (of_string_exn (to_string t))) )
 
 let%test_unit "an unknown name is rejected, and says what it expected" =
   match of_string "migrate" with
@@ -73,9 +72,5 @@ let%test_unit "an unknown name is rejected, and says what it expected" =
       assert (String.is_substring msg ~substring:"migrate-exit")
 
 let%test_unit "only migrate-exit upgrades, and keep-running alone stays" =
-  [%test_eq: bool list]
-    (List.map all ~f:exits)
-    [ false; true; true ] ;
-  [%test_eq: bool list]
-    (List.map all ~f:upgrades_schema)
-    [ false; false; true ]
+  [%test_eq: bool list] (List.map all ~f:exits) [ false; true; true ] ;
+  [%test_eq: bool list] (List.map all ~f:upgrades_schema) [ false; false; true ]
