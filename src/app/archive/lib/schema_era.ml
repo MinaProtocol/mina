@@ -20,8 +20,7 @@ open Core
 open Async
 
 type verdict =
-  | Matches
-      (** The schema is the era this binary was built for. Carry on. *)
+  | Matches  (** The schema is the era this binary was built for. Carry on. *)
   | Differs of { schema : string; mine : string }
       (** The schema belongs to another era. Nothing this binary reads can be
           trusted, so it should stand down rather than answer. *)
@@ -52,8 +51,7 @@ let verdict_of_row ~mine row =
   | None ->
       No_record
   | Some (status, protocol_version, _migration_version) ->
-      if not (String.equal status "applied") then
-        Migration_in_progress status
+      if not (String.equal status "applied") then Migration_in_progress status
       else if String.equal protocol_version mine then Matches
       else Differs { schema = protocol_version; mine }
 
