@@ -31,6 +31,27 @@ let command_run =
      and runtime_config_file =
        flag "--config-file" ~aliases:[ "-config-file" ] (optional string)
          ~doc:"PATH to the configuration file containing the genesis ledger"
+     and hardfork_handling =
+       flag "--hardfork-handling" ~aliases:[ "-hardfork-handling" ]
+         ~doc:
+           "keep-running|exit|migrate-exit What to do once a daemon tells this \
+            archive about a hard fork. The work on the other side of a fork \
+            belongs to the post-fork binary, which this process is not, so \
+            stopping is how the dispatcher gets to choose the successor. \
+            'exit' leaves the schema to somebody else; 'migrate-exit' upgrades \
+            it first. Default is keep-running, so upgrading the binary does \
+            not by itself change when an archive stops."
+         (optional_with_default Archive_lib.Hardfork_handling.Keep_running
+            (Command.Arg_type.map Command.Param.string
+               ~f:Archive_lib.Hardfork_handling.of_string_exn ) )
+     and schema_upgrade_script =
+       flag "--schema-upgrade-script"
+         ~aliases:[ "-schema-upgrade-script" ]
+         ~doc:
+           "PATH The script --hardfork-handling migrate-exit runs against this \
+            archive's database before it stops (default \
+            /etc/mina/archive/upgrade_to_mesa.sql)"
+         (optional_with_default "/etc/mina/archive/upgrade_to_mesa.sql" string)
      and delete_older_than =
        flag "--delete-older-than" ~aliases:[ "-delete-older-than" ]
          (optional int)
@@ -67,7 +88,8 @@ let command_run =
          ~server_port:
            (Option.value server_port.value ~default:server_port.default)
          ~delete_older_than ~runtime_config_opt ~missing_blocks_width
-         ~signature_kind:Mina_signature_kind.t_DEPRECATED )
+         ~signature_kind:Mina_signature_kind.t_DEPRECATED ~hardfork_handling
+         ~schema_upgrade_script )
 
 let time_arg =
   (* Same timezone as Genesis_constants.genesis_state_timestamp. *)
