@@ -2199,8 +2199,6 @@ module T = struct
                 ~txn_state_view:current_state_view
                 ~signature_kind:Mina_signature_kind.t_DEPRECATED
             in
-            (* Transactions in reverse order for faster removal if there is no
-               space when creating the diff *)
             (* How many commands can survive packing, given the work we
                actually hold. Applying more than this is wasted: every extra
                candidate is applied to the validating ledger and then discarded
@@ -2218,11 +2216,11 @@ module T = struct
                discards, so the limit has to be the sum across partitions --
                bounding by the first alone would starve the second. The margin
                covers the coinbase slots, which are not commands. *)
-            let command_bound (max_space, max_jobs) cw_count =
-              if cw_count >= max_jobs then max_space
-              else Int.max (max_space - max_jobs) cw_count
-            in
             let candidate_limit =
+              let command_bound (max_space, max_jobs) cw_count =
+                if cw_count >= max_jobs then max_space
+                else Int.max (max_space - max_jobs) cw_count
+              in
               let first_work = snd partitions.first in
               let bound_first =
                 command_bound partitions.first
@@ -2240,6 +2238,8 @@ module T = struct
                 (Scan_state.free_space t.scan_state)
                 (bound_first + bound_second + 2)
             in
+            (* Transactions in reverse order for faster removal if there is no
+               space when creating the diff *)
             let valid_on_this_ledger, invalid_on_this_ledger =
               Sequence.fold_until transactions_by_fee
                 ~init:
