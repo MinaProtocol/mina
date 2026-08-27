@@ -15,5 +15,5 @@
  (instrumentation
   (backend bisect_ppx))
  (preprocess
-  (pps ppx_here ppx_jane ppx_let ppx_mina ppx_version))
+  (pps ppx_compare ppx_here ppx_let ppx_mina ppx_version))
  (synopsis "Mina standard library Unix utilities"))

@@ -7,7 +7,7 @@ open Network_peer
 *)
 
 (* The interval over which we limit the max number of actions performed. *)
-let interval = Time.Span.of_min 5.
+let interval = Time_float.Span.of_min 5.
 
 (* An abelian group with a subset of non_negative elements. This is here in
    case we want to generalize to more nuanced kinds of score than numerical
@@ -41,7 +41,9 @@ module Record = struct
   (* For a given peer, all of the actions within [interval] that peer has performed,
      along with the remaining capacity for actions. *)
   type t =
-    { mutable remaining_capacity : Score.t; elts : (Score.t * Time.t) Queue.t }
+    { mutable remaining_capacity : Score.t
+    ; elts : (Score.t * Time_float_unix.t) Queue.t
+    }
   [@@deriving sexp]
 
   let clear_old_entries r ~now =
@@ -51,17 +53,17 @@ module Record = struct
           ()
       | Some (n, t) ->
           let is_old =
-            let age = Time.diff now t in
-            Time.Span.(age > interval)
+            let age = Time_float.diff now t in
+            Time_float.Span.(age > interval)
           in
           if is_old then (
             r.remaining_capacity <- Score.(r.remaining_capacity + n) ;
-            ignore (Queue.dequeue_exn r.elts : int * Time.t) ;
+            ignore (Queue.dequeue_exn r.elts : int * Time_float.t) ;
             go () )
     in
     go ()
 
-  let add (r : t) ~(now : Time.t) ~(score : Score.t) =
+  let add (r : t) ~(now : Time_float.t) ~(score : Score.t) =
     let new_score = Score.(r.remaining_capacity - score) in
     if Score.is_non_negative new_score then (
       Queue.enqueue r.elts (score, now) ;
@@ -103,17 +105,17 @@ module Lru_table (Q : Hash_queue.S) = struct
   let next_expires ({ table; _ } : t) (k : Q.key) =
     match Q.lookup table k with
     | None ->
-        Time.now ()
+        Time_float.now ()
     | Some { elts; _ } -> (
         match Queue.peek elts with
         | Some (_, time) ->
-            Time.add time interval
+            Time_float.add time interval
         | None ->
-            Time.now () )
+            Time_float.now () )
 end
 
 module Ip = struct
-  module Hash_queue = Hash_queue.Make (Unix.Inet_addr)
+  module Hash_queue = Hash_queue.Make (Core_unix.Inet_addr)
   module Lru = Lru_table (Hash_queue)
 end
 
@@ -126,8 +128,9 @@ type t = { by_ip : Ip.Lru.t; by_peer_id : Peer_id.Lru.t } [@@deriving sexp_of]
 
 let create ~capacity:(capacity, `Per t) =
   let initial_capacity =
-    let max_per_second = Float.of_int capacity /. Time.Span.to_sec t in
-    Float.round_up (max_per_second *. Time.Span.to_sec interval) |> Float.to_int
+    let max_per_second = Float.of_int capacity /. Time_float.Span.to_sec t in
+    Float.round_up (max_per_second *. Time_float.Span.to_sec interval)
+    |> Float.to_int
   in
   { by_ip = Ip.Lru.create ~initial_capacity
   ; by_peer_id = Peer_id.Lru.create ~initial_capacity
@@ -152,7 +155,7 @@ let add { by_ip; by_peer_id } (sender : Envelope.Sender.t) ~now ~score =
 let next_expires { by_peer_id; _ } (sender : Envelope.Sender.t) =
   match sender with
   | Local ->
-      Time.now ()
+      Time_float.now ()
   | Remote { peer_id; _ } ->
       Peer_id.Lru.next_expires by_peer_id peer_id
 
@@ -168,7 +171,7 @@ let summary ({ by_ip; by_peer_id } : t) =
   to_yojson
     { by_ip =
         Ip.Hash_queue.foldi by_ip.table ~init:[] ~f:(fun acc ~key ~data ->
-            ( Unix.Inet_addr.to_string key
+            ( Core_unix.Inet_addr.to_string key
             , { capacity_used = by_ip.initial_capacity - data.remaining_capacity
               } )
             :: acc )
@@ -186,7 +189,7 @@ let%test_module "backoff" =
   ( module struct
     let sender : Envelope.Sender.t =
       Remote
-        { host = Unix.Inet_addr.of_string "127.0.0.1"
+        { host = Core_unix.Inet_addr.of_string "127.0.0.1"
         ; libp2p_port = 0
         ; peer_id = ""
         }
@@ -204,7 +207,7 @@ let%test_module "backoff" =
 
     (* start from the epoch rather than the current time: the arithmetic below
        is then exact, where spans against a present-day timestamp are not *)
-    let start = Time.epoch
+    let start = Time_float.epoch
 
     (* The first operation by a sender only creates its record, and records no
        entry against it; the entry carrying a timestamp is the second. Fill a
@@ -217,28 +220,31 @@ let%test_module "backoff" =
 
     let%test_unit "an entry expires an interval after it was added" =
       let t = at_capacity_since_start () in
-      [%test_eq: Time.t] (next_expires t sender) (Time.add start interval)
+      [%test_eq: Time_float_unix.t] (next_expires t sender)
+        (Time_float.add start interval)
 
     let%test_unit "a sender over capacity waits out the rest of the interval" =
       let t = at_capacity_since_start () in
-      let elapsed = Time.Span.scale interval 0.25 in
-      let now = Time.add start elapsed in
+      let elapsed = Time_float.Span.scale interval 0.25 in
+      let now = Time_float.add start elapsed in
       ( match add t sender ~now ~score:1 with
       | `Capacity_exceeded ->
           ()
       | `Within_capacity ->
           failwith "expected the sender to be over capacity" ) ;
       (* what is left of the interval, not the age of the entry *)
-      [%test_eq: Time.Span.t]
-        (Time.diff (next_expires t sender) now)
-        (Time.Span.( - ) interval elapsed)
+      [%test_eq: Time_float_unix.Span.t]
+        (Time_float.diff (next_expires t sender) now)
+        (Time_float.Span.( - ) interval elapsed)
 
     let%test_unit "the wait is positive and never exceeds the interval" =
       let t = at_capacity_since_start () in
       List.iter [ 0.; 0.5; 0.9 ] ~f:(fun fraction ->
-          let now = Time.add start (Time.Span.scale interval fraction) in
-          let wait = Time.diff (next_expires t sender) now in
-          [%test_pred: Time.Span.t]
-            (fun wait -> Time.Span.(wait > zero && wait <= interval))
+          let now =
+            Time_float.add start (Time_float.Span.scale interval fraction)
+          in
+          let wait = Time_float.diff (next_expires t sender) now in
+          [%test_pred: Time_float_unix.Span.t]
+            (fun wait -> Time_float.Span.(wait > zero && wait <= interval))
             wait )
   end )

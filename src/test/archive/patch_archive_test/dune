@@ -5,6 +5,7 @@
  (libraries
   async
   async.async_command
+  core_unix.command_unix
   core_kernel
   caqti
   caqti-async

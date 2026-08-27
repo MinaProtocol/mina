@@ -1,11 +1,13 @@
 (* This VRF is based on the one described in appendix C of https://eprint.iacr.org/2017/573.pdf *)
 
 module Make
-    (Impl : Snarky_backendless.Snark_intf.S) (Scalar : sig
+    (Impl : Snarky_backendless.Snark_intf.S)
+    (Scalar : sig
       type value
 
       type var
-    end) (Group : sig
+    end)
+    (Group : sig
       open Impl
 
       type value
@@ -38,7 +40,8 @@ module Make
           -> init:'shifted
           -> 'shifted Checked.t
       end
-    end) (Message : sig
+    end)
+    (Message : sig
       type value
 
       type var
@@ -51,7 +54,8 @@ module Make
       module Checked : sig
         val hash_to_group : var -> Group.var Impl.Checked.t
       end
-    end) (Output_hash : sig
+    end)
+    (Output_hash : sig
       type t
 
       type var

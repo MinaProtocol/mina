@@ -22,7 +22,7 @@ let sexp_record_to_yojson (sexp : Sexp.t) : Yojson.Safe.t =
           | List [ Atom label; value ] ->
               (label, sexp_to_yojson value)
           | _ ->
-              fail () ) )
+              fail () ))
   | _ ->
       fail ()
 

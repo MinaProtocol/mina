@@ -98,13 +98,13 @@ let restore_cmd =
            let%bind () =
              Reader.lines reader
              |> Pipe.iter_without_pushback ~f:(fun line ->
-                    try
-                      let kv = kv_of_line line in
-                      Queue.enqueue buffer kv ;
-                      if Queue.length buffer >= chunk_size then process_batch ()
-                    with e ->
-                      failwithf "Can't parse data line `%s` in dump file: %s"
-                        line (Exn.to_string e) () )
+                 try
+                   let kv = kv_of_line line in
+                   Queue.enqueue buffer kv ;
+                   if Queue.length buffer >= chunk_size then process_batch ()
+                 with e ->
+                   failwithf "Can't parse data line `%s` in dump file: %s" line
+                     (Exn.to_string e) () )
            in
            if not (Queue.is_empty buffer) then process_batch () ;
            printf "Restore complete: %s\n" db_path ;
@@ -117,4 +117,4 @@ let main =
   Command.group ~summary:"RocksDB Hex Dump/Restore Tool"
     [ ("dump", dump_cmd); ("restore", restore_cmd) ]
 
-let () = Command.run main
+let () = Command_unix.run main

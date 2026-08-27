@@ -1,12 +1,12 @@
 open Async
-open Core_kernel
+open Core
 open Network_peer
 open Pipe_lib
 
-type ban_creator = { banned_peer : Peer.t; banned_until : Time.t }
+type ban_creator = { banned_peer : Peer.t; banned_until : Time_float.t }
 [@@deriving fields]
 
-type ban_notification = { banned_peer : Peer.t; banned_until : Time.t }
+type ban_notification = { banned_peer : Peer.t; banned_until : Time_float.t }
 
 type ('query, 'response) rpc_fn =
   version:int -> 'query Envelope.Incoming.t -> 'response Deferred.t
@@ -56,7 +56,7 @@ module type RPC_IMPLEMENTATION = sig
 
   val rate_limit_cost : query -> int
 
-  val rate_limit_budget : int * [ `Per of Time.Span.t ]
+  val rate_limit_budget : int * [ `Per of Time_float.Span.t ]
 end
 
 type ('ctx, 'query, 'response) rpc_implementation =
@@ -116,7 +116,7 @@ module type GOSSIP_NET = sig
   val query_peer' :
        ?how:Monad_sequence.how
     -> ?heartbeat_timeout:Time_ns.Span.t
-    -> ?timeout:Time.Span.t
+    -> ?timeout:Time_float.Span.t
     -> t
     -> Peer.Id.t
     -> ('q, 'r) Rpc_interface.rpc
@@ -125,7 +125,7 @@ module type GOSSIP_NET = sig
 
   val query_peer :
        ?heartbeat_timeout:Time_ns.Span.t
-    -> ?timeout:Time.Span.t
+    -> ?timeout:Time_float.Span.t
     -> t
     -> Peer.Id.t
     -> ('q, 'r) Rpc_interface.rpc

@@ -62,7 +62,7 @@ module Make (Info : Ppxinfo) = struct
   let ext_explicit_logger =
     Extension.declare (prime Info.name) Extension.Context.expression
       Ast_pattern.(
-        pstr (pstr_eval (pexp_apply (pexp_ident __) (__ ^:: nil)) nil ^:: nil))
+        pstr (pstr_eval (pexp_apply (pexp_ident __) (__ ^:: nil)) nil ^:: nil) )
       expand_explicit_logger
 
   let () =

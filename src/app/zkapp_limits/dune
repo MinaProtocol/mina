@@ -6,6 +6,7 @@
   ;; opam libraries
   base
   base.caml
+  core
   core_kernel
   ;; local libraries
   mina_base

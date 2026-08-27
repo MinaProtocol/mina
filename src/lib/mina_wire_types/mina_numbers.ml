@@ -16,7 +16,8 @@ module Account_nonce = struct
   module type Local_sig = Signature(Types).S
 
   module Make
-      (Signature : Local_sig) (F : functor (A : Concrete) -> Signature(A).S) =
+      (Signature : Local_sig)
+      (F : functor (A : Concrete) -> Signature(A).S) =
     F (M)
   include M
 end
@@ -37,7 +38,8 @@ module Txn_version = struct
   module type Local_sig = Signature(Types).S
 
   module Make
-      (Signature : Local_sig) (F : functor (A : Concrete) -> Signature(A).S) =
+      (Signature : Local_sig)
+      (F : functor (A : Concrete) -> Signature(A).S) =
     F (M)
   include M
 end
@@ -58,7 +60,8 @@ module Global_slot_legacy = struct
   module type Local_sig = Signature(Types).S
 
   module Make
-      (Signature : Local_sig) (F : functor (A : Concrete) -> Signature(A).S) =
+      (Signature : Local_sig)
+      (F : functor (A : Concrete) -> Signature(A).S) =
     F (M)
   include M
 end
@@ -81,7 +84,8 @@ module Global_slot_since_genesis = struct
   module type Local_sig = Signature(Types).S
 
   module Make
-      (Signature : Local_sig) (F : functor (A : Concrete) -> Signature(A).S) =
+      (Signature : Local_sig)
+      (F : functor (A : Concrete) -> Signature(A).S) =
     F (M)
   include M
 end
@@ -104,7 +108,8 @@ module Global_slot_since_hard_fork = struct
   module type Local_sig = Signature(Types).S
 
   module Make
-      (Signature : Local_sig) (F : functor (A : Concrete) -> Signature(A).S) =
+      (Signature : Local_sig)
+      (F : functor (A : Concrete) -> Signature(A).S) =
     F (M)
   include M
 end
@@ -127,7 +132,8 @@ module Global_slot_span = struct
   module type Local_sig = Signature(Types).S
 
   module Make
-      (Signature : Local_sig) (F : functor (A : Concrete) -> Signature(A).S) =
+      (Signature : Local_sig)
+      (F : functor (A : Concrete) -> Signature(A).S) =
     F (M)
   include M
 end
@@ -148,7 +154,8 @@ module Length = struct
   module type Local_sig = Signature(Types).S
 
   module Make
-      (Signature : Local_sig) (F : functor (A : Concrete) -> Signature(A).S) =
+      (Signature : Local_sig)
+      (F : functor (A : Concrete) -> Signature(A).S) =
     F (M)
   include M
 end
@@ -169,7 +176,8 @@ module Index = struct
   module type Local_sig = Signature(Types).S
 
   module Make
-      (Signature : Local_sig) (F : functor (A : Concrete) -> Signature(A).S) =
+      (Signature : Local_sig)
+      (F : functor (A : Concrete) -> Signature(A).S) =
     F (M)
   include M
 end

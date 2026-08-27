@@ -12,6 +12,7 @@
   alcotest
   core
   core_unix
+  core_unix.signal_unix
   stdio
   yojson)
  (deps ../mina_healthcheck.exe)

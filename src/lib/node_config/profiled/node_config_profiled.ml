@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 
 (* This is for backward compatibility, when everyone migrate to the "unprofiled"
    build and set MINA_PROFILE on their own, we should be able to remove this. *)
@@ -7,7 +7,7 @@ let of_disk =
   with _ -> None
 
 (* This should be the preferred way to resolve node profile, at least for now. *)
-let of_runtime_env = Sys.getenv_opt "MINA_PROFILE"
+let of_runtime_env = Sys.getenv "MINA_PROFILE"
 
 let profile_to_use =
   match

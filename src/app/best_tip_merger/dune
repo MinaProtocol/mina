@@ -6,6 +6,7 @@
  (libraries
   ;; opam libraries
   async.async_command
+  core_unix.command_unix
   async_kernel
   stdio
   base.caml

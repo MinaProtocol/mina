@@ -219,6 +219,7 @@ module type Concrete =
 module type Local_sig = Signature(Types).S
 
 module Make
-    (Signature : Local_sig) (F : functor (A : Concrete) -> Signature(A).S) =
+    (Signature : Local_sig)
+    (F : functor (A : Concrete) -> Signature(A).S) =
   F (M)
 include M

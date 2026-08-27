@@ -36,7 +36,7 @@ let must_send_payment_with_raw_sig ~logger node_uri ~sender_pub_key
     ~(valid_until : Mina_numbers.Global_slot_since_genesis.t) ~raw_signature =
   send_payment_with_raw_sig ~logger node_uri ~sender_pub_key ~receiver_pub_key
     ~amount ~fee ~nonce ~memo
-    ~(valid_until : Mina_numbers.Global_slot_since_genesis.t)
+    ~valid_until:(valid_until : Mina_numbers.Global_slot_since_genesis.t)
     ~raw_signature
   |> lift
 

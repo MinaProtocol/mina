@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 
 (* (generated) deriving version and bin_io both appear; OK outside functor body *)
 

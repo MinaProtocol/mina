@@ -164,10 +164,10 @@ module Decoders = struct
   let monomorphic_list (element : 'elt decoder) (count : int) :
       'elt list decoder =
     let (Decoder
-          { size = elt_size
-          ; initial_state = elt_initial_state
-          ; read = read_elt
-          } ) =
+           { size = elt_size
+           ; initial_state = elt_initial_state
+           ; read = read_elt
+           } ) =
       element
     in
     let open struct
@@ -398,9 +398,9 @@ module Fragment_stream = struct
       t.buffered_size <- t.buffered_size - delta_read ;
       t.first_fragment_offset <-
         ( if delta_read = len then (
-          ignore (Queue.dequeue_exn t.buffered_fragments : bytes) ;
-          0 )
-        else t.first_fragment_offset + delta_read ) ;
+            ignore (Queue.dequeue_exn t.buffered_fragments : bytes) ;
+            0 )
+          else t.first_fragment_offset + delta_read ) ;
       let acc' = frag :: acc in
       if amount_read' = amount_to_read then acc'
       else dequeue_fragments acc' amount_read'
@@ -413,7 +413,7 @@ module Fragment_stream = struct
     in
     let end_offset =
       ( if t.first_fragment_offset = 0 then Bytes.length last_fragment
-      else t.first_fragment_offset )
+        else t.first_fragment_offset )
       - 1
     in
     { Fragment_view.fragments; start_offset; end_offset }

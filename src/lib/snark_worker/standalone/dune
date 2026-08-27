@@ -12,6 +12,7 @@
   base.caml
   core
   core_kernel
+  core_unix.command_unix
   sexplib0
   uri
   ;; local libraries

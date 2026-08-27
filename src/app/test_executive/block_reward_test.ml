@@ -23,7 +23,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       requires_graphql = true
     ; genesis_ledger =
         (let open Test_account in
-        [ create ~account_name:"node-key" ~balance:"1000" () ])
+         [ create ~account_name:"node-key" ~balance:"1000" () ] )
     ; block_producers = [ { node_name = "node"; account_name = "node-key" } ]
     }
 
@@ -33,8 +33,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let all_mina_nodes = Network.all_mina_nodes network in
     let%bind () =
       wait_for t
-        (Wait_condition.nodes_to_initialize
-           (Core.String.Map.data all_mina_nodes) )
+        (Wait_condition.nodes_to_initialize (Core.Map.data all_mina_nodes))
     in
     let constraint_constants = Network.constraint_constants network in
     let node = Network.block_producer_exn network "node" in

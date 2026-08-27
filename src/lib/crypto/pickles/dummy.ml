@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Pickles_types
 open Backend
 open Composition_types
@@ -7,17 +7,17 @@ open Common
 let evals =
   lazy
     (let open Plonk_types in
-    let e =
-      Evals.map Evaluation_lengths.default ~f:(fun n ->
-          let a () = Array.create ~len:n (Ro.tock ()) in
-          (a (), a ()) )
-    in
-    let ex =
-      { All_evals.With_public_input.evals = e
-      ; public_input = ([| Ro.tock () |], [| Ro.tock () |])
-      }
-    in
-    { All_evals.ft_eval1 = Ro.tock (); evals = ex })
+     let e =
+       Evals.map Evaluation_lengths.default ~f:(fun n ->
+           let a () = Array.create ~len:n (Ro.tock ()) in
+           (a (), a ()) )
+     in
+     let ex =
+       { All_evals.With_public_input.evals = e
+       ; public_input = ([| Ro.tock () |], [| Ro.tock () |])
+       }
+     in
+     { All_evals.ft_eval1 = Ro.tock (); evals = ex } )
 
 let evals_combined =
   lazy

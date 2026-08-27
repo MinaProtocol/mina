@@ -13,7 +13,7 @@ let reflect f ~typ acc x =
   let new_name = underToCamel (Field.name x) in
   Schema.(
     field new_name ~typ ~args:Arg.[] ~resolve:(fun _ v -> f (Field.get x v))
-    :: acc)
+    :: acc )
 
 module Shorthand = struct
   open Schema
@@ -62,7 +62,7 @@ module Shorthand = struct
               | To_build_breadcrumb, _ ->
                   "to_build_breadcrumb"
               | Root, _ ->
-                  "root" ) ) )
+                  "root" )) )
       ~typ:(list (non_null string))
       a x
 

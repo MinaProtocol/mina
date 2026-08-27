@@ -6,13 +6,17 @@
 --       MinaProtocol/mina-release-toolkit. Pinned to a released version tag
 --       (not a moving tag like :latest) for reproducible CI; bump it
 --       deliberately when a newer toolkit is wanted.
--- NOTE: the amd64 mina-toolchain images are on b8d9c69 (carries the
---       mina-bench-upload benchmark uploader), while bookworm arm64 stays on
---       ffab0f8. The mina-bench-upload install is amd64-only, so the arm64
---       image content is identical either way; ffab0f8 is already published
---       and the arm64 toolchain build under QEMU is flaky, so there is nothing
---       to gain from rebuilding it. Reunify the sha on the next full toolchain
---       bump.
+-- NOTE: minaToolchain* pin the v0.16 opam stack, so they must stay on a sha
+--       built from THIS branch: develop's pins carry v0.14 and will not build
+--       here. Rebuild with !ci-toolchain-me, then bump the sha below to the one
+--       it produced (all five images land on one sha). Do not reach for an
+--       older toolchain sha instead: 3-toolchain curls mina-bench-upload by
+--       version string with no checksum, so an image's behaviour depends on the
+--       date it was built, and rebuilding is the only fix.
+-- NOTE: mina-toolchain and mina-base are published by DIFFERENT pipelines and
+--       their hashes move independently. mina-toolchain comes from
+--       mina-toolchains-build; mina-base from mina-docker-base-build
+--       (!ci-docker-base-me). Bumping one is never a reason to bump the other.
 -- NOTE: minaBase* are the published common base-deps images on docker.io. The tag
 --       format matches build.sh's HASHTAG for service=mina-base: <githash>-<codename>-<network>.
 --       These are frozen references, like minaToolchain*: the daemon/archive/hardfork
@@ -25,18 +29,18 @@
 { toolchainBase =
     "europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/ci-toolchain-base:v4"
 , minaToolchainBookworm =
-    { amd64 = "docker.io/minaprotocol/mina-toolchain:b8d9c69-bookworm-devnet"
+    { amd64 = "docker.io/minaprotocol/mina-toolchain:44e9e82-bookworm-devnet"
     , arm64 =
-        "docker.io/minaprotocol/mina-toolchain:ffab0f8-bookworm-devnet-arm64"
+        "docker.io/minaprotocol/mina-toolchain:44e9e82-bookworm-devnet-arm64"
     }
 , minaToolchainBullseye.amd64 =
-    "docker.io/minaprotocol/mina-toolchain:b8d9c69-bullseye-devnet"
+    "docker.io/minaprotocol/mina-toolchain:44e9e82-bullseye-devnet"
 , minaToolchainNoble.amd64 =
-    "docker.io/minaprotocol/mina-toolchain:b8d9c69-noble-devnet"
+    "docker.io/minaprotocol/mina-toolchain:44e9e82-noble-devnet"
 , minaToolchainJammy.amd64 =
-    "docker.io/minaprotocol/mina-toolchain:b8d9c69-jammy-devnet"
+    "docker.io/minaprotocol/mina-toolchain:44e9e82-jammy-devnet"
 , minaToolchain =
-    "docker.io/minaprotocol/mina-toolchain:b8d9c69-bullseye-devnet"
+    "docker.io/minaprotocol/mina-toolchain:44e9e82-bullseye-devnet"
 , minaBaseBookworm =
     { amd64 = "docker.io/minaprotocol/mina-base:86b89d0-bookworm-devnet"
     , arm64 = "docker.io/minaprotocol/mina-base:86b89d0-bookworm-devnet-arm64"
@@ -52,5 +56,5 @@
 , xrefcheck =
     "europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/dkhamsing/awesome_bot:latest"
 , nixos = "gcr.io/o1labs-192920/nix-unstable:1.0.0"
-, minaReleaseToolkit = "ghcr.io/minaprotocol/mina-release-toolkit:0.0.3"
+, minaReleaseToolkit = "ghcr.io/minaprotocol/mina-release-toolkit:0.0.5"
 }

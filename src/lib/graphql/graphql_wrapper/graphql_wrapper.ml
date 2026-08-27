@@ -53,7 +53,7 @@ module Make (Schema : Graphql_intf.Schema) = struct
           { name : string
           ; doc : string option
           ; typ : ('obj_arg option, 'a) arg_typ
-          ; default : 'obj_arg
+          ; default : Graphql_parser.const_value
           }
           -> ('obj_arg, 'a) arg
 
@@ -82,8 +82,7 @@ module Make (Schema : Graphql_intf.Schema) = struct
              args
 
     (** [field_to_json] builds the serializer function for a field, based on the list of its arguments.*)
-    let rec field_to_json :
-        type ctx out arg field_to_json obj_to_json.
+    let rec field_to_json : type ctx out arg field_to_json obj_to_json.
            string
         -> (ctx, out, arg, field_to_json, obj_to_json) args
         -> (string * Yojson.Basic.t) list
@@ -98,8 +97,7 @@ module Make (Schema : Graphql_intf.Schema) = struct
           fun x -> field_to_json field_name t ((name, typ.to_json x) :: acc)
 
     (** [arg_obj_to_json] builds the serializer function for an obj argument, based on the list of its fields.*)
-    let rec arg_obj_to_json :
-        type ctx out arg field_to_json obj_to_json.
+    let rec arg_obj_to_json : type ctx out arg field_to_json obj_to_json.
            (ctx, out, arg, field_to_json, obj_to_json) args
         -> (string * Yojson.Basic.t) list
         -> obj_to_json =
@@ -288,6 +286,8 @@ module Make (Schema : Graphql_intf.Schema) = struct
   (** The [Propagated] module contains the parts of the Schema we do not modify *)
   module Propagated = struct
     let obj = Schema.obj
+
+    let fix = Schema.fix
 
     let schema = Schema.schema
 

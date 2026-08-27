@@ -28,7 +28,7 @@
     fork base is 445860, so the hard fork genesis slot expressed in that other
     counter is 445860 + 413700 = 859560. *)
 
-open Core_kernel
+open Core
 
 (** The compiled constants of the network under test. *)
 module Network_constants = struct
@@ -106,7 +106,7 @@ module Schedule = struct
   (** Formatted the same way the daemon logs it in [mina_run.ml]. *)
   let time_of_slot t slot =
     Block_time.to_time_exn (block_time_of_slot t slot)
-    |> Time.to_string_iso8601_basic ~zone:Time.Zone.utc
+    |> Time_float.to_string_iso8601_basic ~zone:Time_float.Zone.utc
 
   let hours_between t ~from_slot ~to_slot =
     let span =

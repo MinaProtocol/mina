@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Async_kernel
 
 (** A strategy for computing exponential backoff delays with full jitter.

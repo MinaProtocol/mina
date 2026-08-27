@@ -1,5 +1,5 @@
 (* TODO: check if this is needed *)
-open Core_kernel
+open Core
 open Mina_base
 open Mina_state
 
