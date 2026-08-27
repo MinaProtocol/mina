@@ -147,7 +147,7 @@ module type S = sig
          merkle_tree
       -> (query -> unit)
       -> context:(module CONTEXT)
-      -> trust_system:Trust_system.t
+      -> reputation:Peer_reputation.t
       -> t
 
     val answer_query :
@@ -157,7 +157,7 @@ module type S = sig
   val create :
        merkle_tree
     -> context:(module CONTEXT)
-    -> trust_system:Trust_system.t
+    -> reputation:Peer_reputation.t
     -> 'a t
 
   val answer_writer :
@@ -296,22 +296,23 @@ end = struct
       { mt : MT.t
       ; f : query -> unit
       ; context : (module CONTEXT)
-      ; trust_system : Trust_system.t
+      ; reputation : Peer_reputation.t
       }
 
     let create :
            MT.t
         -> (query -> unit)
         -> context:(module CONTEXT)
-        -> trust_system:Trust_system.t
+        -> reputation:Peer_reputation.t
         -> t =
-     fun mt f ~context ~trust_system -> { mt; f; context; trust_system }
+     fun mt f ~context ~reputation -> { mt; f; context; reputation }
 
+    (* Every malformed query below is a protocol violation: the sender gets
+       banned (the helper decides for how long). *)
     let answer_query :
         t -> query Envelope.Incoming.t -> answer Or_error.t Deferred.t =
-     fun { mt; f; context; trust_system } query_envelope ->
+     fun { mt; f; context; reputation } query_envelope ->
       let open (val context) in
-      let open Trust_system in
       let ledger_depth = MT.depth mt in
       let sender = Envelope.Incoming.sender query_envelope in
       let query = Envelope.Incoming.data query_envelope in
@@ -321,10 +322,8 @@ end = struct
         | What_contents a ->
             if Addr.height ~ledger_depth a > account_subtree_height then
               Either.Second
-                ( Actions.Violated_protocol
-                , Some
-                    ( "Requested too big of a subtree at once"
-                    , [ ("addr", Addr.to_yojson a) ] ) )
+                ( "Requested too big of a subtree at once"
+                , [ ("addr", Addr.to_yojson a) ] )
             else
               let addresses_and_accounts =
                 List.sort ~compare:(fun (addr1, _) (addr2, _) ->
@@ -337,10 +336,7 @@ end = struct
                 (* Peer should know what portions of the tree are full from the
                    Num_accounts query. *)
                 Either.Second
-                  ( Actions.Violated_protocol
-                  , Some
-                      ("Requested empty subtree", [ ("addr", Addr.to_yojson a) ])
-                  )
+                  ("Requested empty subtree", [ ("addr", Addr.to_yojson a) ])
               else
                 let first_address, rest_address =
                   (List.hd_exn addresses, List.tl_exn addresses)
@@ -402,39 +398,30 @@ end = struct
                       "When handling What_child_hashes request, the following \
                        error happended: $error" ;
                     Either.Second
-                      ( Actions.Violated_protocol
-                      , Some
-                          ( "Invalid address in What_child_hashes request"
-                          , [ ("addr", Addr.to_yojson a) ] ) ) )
+                      ( "Invalid address in What_child_hashes request"
+                      , [ ("addr", Addr.to_yojson a) ] ) )
             | _ ->
                 [%log error]
                   "When handling What_child_hashes request, the depth was \
                    outside the valid range" ;
                 Either.Second
-                  ( Actions.Violated_protocol
-                  , Some
-                      ( "Invalid depth requested in What_child_hashes request"
-                      , [ ("addr", Addr.to_yojson a) ] ) ) )
+                  ( "Invalid depth requested in What_child_hashes request"
+                  , [ ("addr", Addr.to_yojson a) ] ) )
       in
 
       match response_or_punish with
       | Either.First answer ->
           Deferred.return @@ Ok answer
-      | Either.Second action ->
-          let%map _ =
-            record_envelope_sender trust_system logger sender action
-          in
-          let err =
-            Option.value_map ~default:"Violated protocol" (snd action) ~f:fst
-          in
-          Or_error.error_string err
+      | Either.Second (reason, metadata) ->
+          Peer_reputation.ban_sender reputation ~logger ~reason ~metadata sender ;
+          Deferred.return (Or_error.error_string reason)
   end
 
   type 'a t =
     { mutable desired_root : Root_hash.t option
     ; mutable auxiliary_data : 'a option
     ; tree : MT.t
-    ; trust_system : Trust_system.t
+    ; reputation : Peer_reputation.t
     ; answers :
         (Root_hash.t * query * answer Envelope.Incoming.t) Linear_pipe.Reader.t
     ; answer_writer :
@@ -707,18 +694,21 @@ end = struct
         [%log debug] "Got sync response when we're already finished syncing" ;
         Deferred.unit )
       else
-        let open Trust_system in
         (* If a peer misbehaves we still need the information we asked them for,
            so requeue in that case. *)
         let requeue_query () =
           Linear_pipe.write_without_pushback_if_open t.queries (root_hash, query)
         in
         let credit_fulfilled_request () =
-          record_envelope_sender t.trust_system logger sender
-            ( Actions.Fulfilled_request
-            , Some
-                ( "sync ledger query $query"
-                , [ ("query", Query.to_yojson Addr.to_yojson query) ] ) )
+          Peer_reputation.useful_sender t.reputation sender ;
+          Deferred.unit
+        in
+        (* Bad answers are protocol violations: ban the sender (the helper
+           decides for how long). *)
+        let ban ~reason ~metadata =
+          Peer_reputation.ban_sender t.reputation ~logger ~reason ~metadata
+            sender ;
+          Deferred.unit
         in
         let%bind _ =
           match (query, answer) with
@@ -728,29 +718,27 @@ end = struct
                   credit_fulfilled_request ()
               | `Hash_mismatch (expected, actual) ->
                   let%map () =
-                    record_envelope_sender t.trust_system logger sender
-                      ( Actions.Sent_bad_hash
-                      , Some
-                          ( "sent accounts $accounts for address $addr, they \
-                             hash to $actual but we expected $expected"
-                          , [ ( "accounts"
-                              , `List (List.map ~f:Account.to_yojson leaves) )
-                            ; ("addr", Addr.to_yojson addr)
-                            ; ("actual", Hash.to_yojson actual)
-                            ; ("expected", Hash.to_yojson expected)
-                            ] ) )
+                    ban
+                      ~reason:
+                        "sent accounts $accounts for address $addr, they hash \
+                         to $actual but we expected $expected"
+                      ~metadata:
+                        [ ( "accounts"
+                          , `List (List.map ~f:Account.to_yojson leaves) )
+                        ; ("addr", Addr.to_yojson addr)
+                        ; ("actual", Hash.to_yojson actual)
+                        ; ("expected", Hash.to_yojson expected)
+                        ]
                   in
                   requeue_query ()
               | `Content_length_mismatch (received, capacity) ->
                   let%map () =
-                    record_envelope_sender t.trust_system logger sender
-                      ( Actions.Violated_protocol
-                      , Some
-                          ( "unexpected number of accounts for $addr"
-                          , [ ("received", `Int received)
-                            ; ("capacity", `Int capacity)
-                            ; ("addr", Addr.to_yojson addr)
-                            ] ) )
+                    ban ~reason:"unexpected number of accounts for $addr"
+                      ~metadata:
+                        [ ("received", `Int received)
+                        ; ("capacity", `Int capacity)
+                        ; ("addr", Addr.to_yojson addr)
+                        ]
                   in
                   requeue_query () )
           | Query.Num_accounts, Answer.Num_accounts (count, content_root) -> (
@@ -759,30 +747,30 @@ end = struct
                   credit_fulfilled_request ()
               | `Depth_mismatch ledger_depth ->
                   let%map () =
-                    record_envelope_sender t.trust_system logger sender
-                      ( Actions.Violated_protocol
-                      , Some
-                          ( "Claimed num_accounts $count, but a ledger of \
-                             depth $ledger_depth holds at most 2^$ledger_depth \
-                             accounts; impossible count"
-                          , [ ("count", `Int count)
-                            ; ("ledger_depth", `Int ledger_depth)
-                            ] ) )
+                    ban
+                      ~reason:
+                        "Claimed num_accounts $count, but a ledger of depth \
+                         $ledger_depth holds at most 2^$ledger_depth accounts; \
+                         impossible count"
+                      ~metadata:
+                        [ ("count", `Int count)
+                        ; ("ledger_depth", `Int ledger_depth)
+                        ]
                   in
                   requeue_query ()
               | `Hash_mismatch (expected, actual) ->
                   let%map () =
-                    record_envelope_sender t.trust_system logger sender
-                      ( Actions.Sent_bad_hash
-                      , Some
-                          ( "Claimed num_accounts $count, content root hash \
-                             $content_root_hash, that implies a root hash of \
-                             $actual, we expected $expected"
-                          , [ ("count", `Int count)
-                            ; ("content_root_hash", Hash.to_yojson content_root)
-                            ; ("actual", Hash.to_yojson actual)
-                            ; ("expected", Hash.to_yojson expected)
-                            ] ) )
+                    ban
+                      ~reason:
+                        "Claimed num_accounts $count, content root hash \
+                         $content_root_hash, that implies a root hash of \
+                         $actual, we expected $expected"
+                      ~metadata:
+                        [ ("count", `Int count)
+                        ; ("content_root_hash", Hash.to_yojson content_root)
+                        ; ("actual", Hash.to_yojson actual)
+                        ; ("expected", Hash.to_yojson expected)
+                        ]
                   in
                   requeue_query () )
           | ( Query.What_child_hashes (address, requested_depth)
@@ -790,26 +778,24 @@ end = struct
               match add_subtree t address hashes requested_depth with
               | `Hash_mismatch (expected, actual) ->
                   let%map () =
-                    record_envelope_sender t.trust_system logger sender
-                      ( Actions.Sent_bad_hash
-                      , Some
-                          ( "hashes sent for subtree on address $address merge \
-                             to $actual_merge but we expected $expected_merge"
-                          , [ ("actual_merge", Hash.to_yojson actual)
-                            ; ("expected_merge", Hash.to_yojson expected)
-                            ] ) )
+                    ban
+                      ~reason:
+                        "hashes sent for subtree on address $address merge to \
+                         $actual_merge but we expected $expected_merge"
+                      ~metadata:
+                        [ ("actual_merge", Hash.to_yojson actual)
+                        ; ("expected_merge", Hash.to_yojson expected)
+                        ]
                   in
                   requeue_query ()
               | `Invalid_length ->
                   let%map () =
-                    record_envelope_sender t.trust_system logger sender
-                      ( Actions.Sent_bad_hash
-                      , Some
-                          ( "hashes sent for subtree on address $address must \
-                             be a power of 2 in the range 2-2^$depth"
-                          , [ ( "depth"
-                              , `Int ledger_sync_config.max_subtree_depth )
-                            ] ) )
+                    ban
+                      ~reason:
+                        "hashes sent for subtree on address $address must be a \
+                         power of 2 in the range 2-2^$depth"
+                      ~metadata:
+                        [ ("depth", `Int ledger_sync_config.max_subtree_depth) ]
                   in
                   requeue_query ()
               | `Good children_to_verify ->
@@ -818,16 +804,16 @@ end = struct
                   credit_fulfilled_request () )
           | query, answer ->
               let%map () =
-                record_envelope_sender t.trust_system logger sender
-                  ( Actions.Violated_protocol
-                  , Some
-                      ( "Answered question we didn't ask! Query was $query \
-                         answer was $answer"
-                      , [ ("query", Query.to_yojson Addr.to_yojson query)
-                        ; ( "answer"
-                          , Answer.to_yojson Hash.to_yojson Account.to_yojson
-                              answer )
-                        ] ) )
+                ban
+                  ~reason:
+                    "Answered question we didn't ask! Query was $query answer \
+                     was $answer"
+                  ~metadata:
+                    [ ("query", Query.to_yojson Addr.to_yojson query)
+                    ; ( "answer"
+                      , Answer.to_yojson Hash.to_yojson Account.to_yojson answer
+                      )
+                    ]
               in
               requeue_query ()
         in
@@ -904,14 +890,14 @@ end = struct
     ignore (new_goal t rh ~data ~equal : [ `New | `Repeat | `Update_data ]) ;
     wait_until_valid t rh
 
-  let create mt ~context ~trust_system =
+  let create mt ~context ~reputation =
     let qr, qw = Linear_pipe.create () in
     let ar, aw = Linear_pipe.create () in
     let t =
       { desired_root = None
       ; auxiliary_data = None
       ; tree = mt
-      ; trust_system
+      ; reputation
       ; answers = ar
       ; answer_writer = aw
       ; queries = qw

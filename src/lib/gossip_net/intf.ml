@@ -1,12 +1,6 @@
 open Async
 open Core_kernel
 open Network_peer
-open Pipe_lib
-
-type ban_creator = { banned_peer : Peer.t; banned_until : Time.t }
-[@@deriving fields]
-
-type ban_notification = { banned_peer : Peer.t; banned_until : Time.t }
 
 type ('query, 'response) rpc_fn =
   version:int -> 'query Envelope.Incoming.t -> 'response Deferred.t
@@ -46,9 +40,6 @@ module type RPC_IMPLEMENTATION = sig
     -> response Deferred.Or_error.t
 
   val log_request_received : logger:Logger.t -> sender:Peer.t -> query -> unit
-
-  val receipt_trust_action_message :
-    query -> string * (string, Yojson.Safe.t) List.Assoc.t
 
   val handle_request : ctx -> (query, response) rpc_fn
 
@@ -159,6 +150,4 @@ module type GOSSIP_NET = sig
   val on_first_connect : t -> f:(unit -> 'a) -> 'a Deferred.t
 
   val on_first_high_connectivity : t -> f:(unit -> 'a) -> 'a Deferred.t
-
-  val ban_notification_reader : t -> ban_notification Linear_pipe.Reader.t
 end

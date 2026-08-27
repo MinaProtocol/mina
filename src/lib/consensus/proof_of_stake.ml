@@ -2602,7 +2602,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                    } ) )
 
     let sync_local_state ~context:(module Context : CONTEXT_WITH_LEDGER_SYNC)
-        ~trust_system ~local_state ~glue_sync_ledger requested_syncs =
+        ~reputation ~local_state ~glue_sync_ledger requested_syncs =
       let open Context in
       let open Local_state in
       let open Snapshot in
@@ -2679,7 +2679,7 @@ module Make_str (A : Wire_types.Concrete) = struct
               let sync_ledger =
                 Mina_ledger.Sync_ledger.Root.create
                   ~context:(module Context)
-                  ~trust_system root_ledger
+                  ~reputation root_ledger
               in
               let query_reader =
                 Mina_ledger.Sync_ledger.Root.query_reader sync_ledger

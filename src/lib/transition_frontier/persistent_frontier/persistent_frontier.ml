@@ -243,7 +243,7 @@ module Instance = struct
     let transition_receipt_time = None in
     Breadcrumb.build ~skip_staged_ledger_verification:`All
       ~logger:t.factory.logger ~precomputed_values ~verifier:t.factory.verifier
-      ~trust_system:(Trust_system.null ()) ~parent ~transition
+      ~reputation:Peer_reputation.null ~parent ~transition
       ~get_completed_work:(Fn.const None) ~sender:None ~transition_receipt_time
       ()
 

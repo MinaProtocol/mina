@@ -98,13 +98,13 @@ let%test_module "all-ipc test" =
             raise (UnexpectedGossipSender (expected_sender, p.peer_id)) ) ;
       Validation_callback.fire_if_not_already_fired cb vr
 
-    let mk_banning_gating_config peer_id =
-      let fake_peer =
-        Network_peer.Peer.create
-          (Unix.Inet_addr.of_string "8.8.8.8")
-          ~libp2p_port:9999 ~peer_id
-      in
-      { trusted_peers = []; banned_peers = [ fake_peer ]; isolate = false }
+    (* Manual ban of a peer id in [node]'s helper; the helper disconnects the
+       peer and gates further connections. *)
+    let ban_peer_id node peer_id =
+      ban_peer node ~manual:true
+        ~peer_id:(Network_peer.Peer.Id.unsafe_of_string peer_id)
+        ~ip:None
+      >>| Or_error.ok_exn
 
     type addrs =
       { a_addr : Multiaddr.t
@@ -328,10 +328,8 @@ let%test_module "all-ipc test" =
             && List.fold peers ~init:false ~f:(fun acc p ->
                    acc || String.equal p.peer_id pid ) ) ) ;
 
-      (* Ban Carol in Alice's gating config *)
-      let%bind _ =
-        set_connection_gating_config a (mk_banning_gating_config ad.c_peerid)
-      in
+      (* Ban Carol in Alice's helper *)
+      let%bind () = ban_peer_id a ad.c_peerid in
 
       (* Wait for Carol to disconnect. This will deadlock Alice and Carol
          unless new gating config is put into effect and Carol becomes banned. *)
@@ -525,8 +523,7 @@ let%test_module "all-ipc test" =
               raise UnexpectedState )
       |> or_timeout ~msg:"Carol: wait for Alice to disconnect"
 
-    let def_gating_config =
-      { trusted_peers = []; banned_peers = []; isolate = false }
+    let def_gating_config = { isolate = false }
 
     let setup_node ?keypair ?(seed_peers = [])
         ?(gating_config = def_gating_config) ?(ignore_advertise_error = false)
@@ -601,11 +598,11 @@ let%test_module "all-ipc test" =
       (* Configuration *)
       let%bind b, b_peerid, b_addr, b_shutdown =
         setup_node "bob" (* ~ignore_advertise_error:true *)
-          ~seed_peers:[ y_addr ]
-          ~gating_config:(mk_banning_gating_config c_peerid)
-          ~on_peer_connected:(on_connected b_pipe)
+          ~seed_peers:[ y_addr ] ~on_peer_connected:(on_connected b_pipe)
           ~on_peer_disconnected:(on_disconnected b_pipe)
       in
+      (* Bob bans Carol before she comes online *)
+      let%bind () = ban_peer_id b c_peerid in
       let c_pipe = Pipe.create () in
       (* Configuration *)
       let%bind c, _, c_addr, c_shutdown =

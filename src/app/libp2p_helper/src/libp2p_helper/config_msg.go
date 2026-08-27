@@ -4,6 +4,7 @@ import (
 	cryptorand "crypto/rand"
 	"fmt"
 	gonet "net"
+	"path/filepath"
 	"sync"
 	"time"
 
@@ -446,6 +447,25 @@ func (msg ConfigureReq) handle(app *app, seqno uint64) (*capnp.Message, func()) 
 	app.P2p = helper
 	app.bitswapCtx.engine = helper.Bitswap
 	app.bitswapCtx.storage = helper.BitswapStorage
+
+	// Load the ban manager from the banlist path delivered by the daemon
+	// (falling back to the state dir) and wire it into the gating state so
+	// gating sees it immediately.
+	banlistPath := filepath.Join(stateDir, "libp2p_banlist.json")
+	if m.HasBanlistPath() {
+		p, err := m.BanlistPath()
+		if err != nil {
+			return mkRpcRespError(seqno, badRPC(err))
+		}
+		if p != "" {
+			banlistPath = p
+		}
+	}
+	banManager, err := codanet.NewBanManager(banlistPath, app.P2p.Logger)
+	if err != nil {
+		return mkRpcRespError(seqno, badRPC(err))
+	}
+	helper.GatingState().SetBanManager(banManager)
 
 	opts := []pubsub.Option{
 		pubsub.WithFloodPublish(m.Flood()),

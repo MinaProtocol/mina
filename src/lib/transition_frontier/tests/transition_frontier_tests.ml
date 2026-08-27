@@ -20,10 +20,10 @@ let%test_module "Root_history and Transition_frontier" =
 
     let create_root_frontier = create_root_frontier accounts_with_secret_keys
 
-    let create_breadcrumbs ~logger ~pids ~trust_system ~size root =
+    let create_breadcrumbs ~logger ~pids ~reputation ~size root =
       Deferred.all
       @@ Quickcheck.random_value
-           (gen_linear_breadcrumbs ~logger ~pids ~trust_system ~size
+           (gen_linear_breadcrumbs ~logger ~pids ~reputation ~size
               ~accounts_with_secret_keys root)
 
     let breadcrumb_trail_equals =
@@ -35,7 +35,7 @@ let%test_module "Root_history and Transition_frontier" =
 
     let pids = Child_processes.Termination.create_pid_table ()
 
-    let trust_system = Trust_system.null ()
+    let reputation = Peer_reputation.null
 
     let%test "If a transition does not exists in the transition_frontier or \
               in the root_history, then we should not get an answer" =
@@ -45,7 +45,7 @@ let%test_module "Root_history and Transition_frontier" =
           let%bind frontier = create_root_frontier ~logger ~pids in
           let root = Transition_frontier.root frontier in
           let%bind breadcrumbs =
-            create_breadcrumbs ~logger ~pids ~trust_system ~size:max_length
+            create_breadcrumbs ~logger ~pids ~reputation ~size:max_length
               root
           in
           let last_breadcrumb, breadcrumbs_to_add =
@@ -74,7 +74,7 @@ let%test_module "Root_history and Transition_frontier" =
           let%bind frontier = create_root_frontier ~logger ~pids in
           let root = Transition_frontier.root frontier in
           let%bind breadcrumbs =
-            create_breadcrumbs ~logger ~pids ~trust_system ~size:max_length
+            create_breadcrumbs ~logger ~pids ~reputation ~size:max_length
               root
           in
           let%map () =
@@ -107,7 +107,7 @@ let%test_module "Root_history and Transition_frontier" =
           let query_index = 1 in
           let size = max_length + query_index + 2 in
           let%bind breadcrumbs =
-            create_breadcrumbs ~logger ~pids ~trust_system ~size root
+            create_breadcrumbs ~logger ~pids ~reputation ~size root
           in
           let%map () =
             Deferred.List.iter breadcrumbs ~f:(fun breadcrumb ->
@@ -135,12 +135,12 @@ let%test_module "Root_history and Transition_frontier" =
           print_heartbeat hb_logger |> don't_wait_for ;
           let%bind frontier = create_root_frontier ~logger ~pids in
           let%bind () =
-            add_linear_breadcrumbs ~logger ~pids ~trust_system ~size:max_length
+            add_linear_breadcrumbs ~logger ~pids ~reputation ~size:max_length
               ~accounts_with_secret_keys ~frontier
               ~parent:(Transition_frontier.root frontier)
           in
           let add_child =
-            add_child ~logger ~trust_system ~accounts_with_secret_keys
+            add_child ~logger ~reputation ~accounts_with_secret_keys
               ~frontier
           in
           let%bind soon_garbage =
@@ -168,7 +168,7 @@ let%test_module "Root_history and Transition_frontier" =
           let%map () =
             build_frontier_randomly frontier
               ~gen_root_breadcrumb_builder:
-                (gen_linear_breadcrumbs ~logger ~pids ~trust_system ~size
+                (gen_linear_breadcrumbs ~logger ~pids ~reputation ~size
                    ~accounts_with_secret_keys)
           in
           assert (
@@ -191,14 +191,14 @@ let%test_module "Root_history and Transition_frontier" =
             Quickcheck.random_value (Int.gen_incl 1 (2 * max_length))
           in
           let%bind root_history_breadcrumbs =
-            create_breadcrumbs ~logger ~pids ~trust_system
+            create_breadcrumbs ~logger ~pids ~reputation
               ~size:num_root_history_breadcrumbs root
           in
           let most_recent_breadcrumb_in_root_history_breadcrumb =
             List.last_exn root_history_breadcrumbs
           in
           let%bind transition_frontier_breadcrumbs =
-            create_breadcrumbs ~logger ~pids ~trust_system ~size:max_length
+            create_breadcrumbs ~logger ~pids ~reputation ~size:max_length
               most_recent_breadcrumb_in_root_history_breadcrumb
           in
           let random_breadcrumb_index =

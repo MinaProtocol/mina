@@ -35,7 +35,7 @@ val send_validation :
 
 val send_add_resource : tag:Bitswap_tag.t -> data:string -> t -> unit
 
-val send_heartbeat : peer_id:Network_peer.Peer.Id.t -> t -> unit
+val send_useful_peer : peer_id:Network_peer.Peer.Id.t -> t -> unit
 
 val test_with_libp2p_helper :
      ?logger:Logger.t

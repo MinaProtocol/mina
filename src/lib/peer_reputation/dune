@@ -1,0 +1,31 @@
+(library
+ (name peer_reputation)
+ (public_name peer_reputation)
+ (libraries
+  ;; opam libraries
+  core
+  core_kernel
+  async
+  async_kernel
+  base.caml
+  base.base_internalhash_types
+  bin_prot.shape
+  sexplib0
+  result
+  yojson
+  ppx_inline_test.config
+  ;; local libraries
+  logger
+  error_json
+  network_peer
+  mina_metrics
+  ppx_version.runtime
+  mina_stdlib)
+ (inline_tests
+  (flags -verbose -show-counts))
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_mina ppx_version ppx_jane ppx_deriving.std ppx_deriving_yojson))
+ (synopsis
+  "Thin daemon-side handle to the libp2p helper's peer ban/trust machinery"))

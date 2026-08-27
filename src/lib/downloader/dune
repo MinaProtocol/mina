@@ -13,7 +13,7 @@
   network_peer
   o1trace
   pipe_lib
-  trust_system)
+  peer_reputation)
  (instrumentation
   (backend bisect_ppx))
  (preprocess

@@ -96,9 +96,9 @@ module Make (Inputs : Inputs_intf) :
       -> Ledger_hash.t
       -> Sync_ledger.Query.t Envelope.Incoming.t
       -> context:(module CONTEXT)
-      -> trust_system:Trust_system.t
+      -> reputation:Peer_reputation.t
       -> Sync_ledger.Answer.t Or_error.t Deferred.t =
-   fun ~frontier hash query ~context:(module Context) ~trust_system ->
+   fun ~frontier hash query ~context:(module Context) ~reputation ->
     match get_ledger_by_hash ~frontier hash with
     | None ->
         return
@@ -110,7 +110,7 @@ module Make (Inputs : Inputs_intf) :
         let responder =
           Sync_ledger.Any_ledger.Responder.create ledger ignore
             ~context:(module Context)
-            ~trust_system
+            ~reputation
         in
         Sync_ledger.Any_ledger.Responder.answer_query responder query
 
@@ -289,7 +289,7 @@ let%test_module "Sync_handler" =
 
     let pids = Child_processes.Termination.create_pid_table ()
 
-    let trust_system = Trust_system.null ()
+    let reputation = Peer_reputation.null
 
     let f_with_verifier ~f ~logger ~pids =
       let%map verifier = Verifier.create ~logger ~pids in
@@ -311,7 +311,7 @@ let%test_module "Sync_handler" =
               in
               let desired_root = Ledger.merkle_root source_ledger in
               let sync_ledger =
-                Sync_ledger.Mask.create dest_ledger ~logger ~trust_system
+                Sync_ledger.Mask.create dest_ledger ~logger ~reputation
               in
               let query_reader = Sync_ledger.Mask.query_reader sync_ledger in
               let answer_writer = Sync_ledger.Mask.answer_writer sync_ledger in
@@ -361,7 +361,7 @@ let%test_module "Sync_handler" =
           let%bind () =
             build_frontier_randomly frontier
               ~gen_root_breadcrumb_builder:
-                (gen_linear_breadcrumbs ~logger ~pids ~trust_system
+                (gen_linear_breadcrumbs ~logger ~pids ~reputation
                    ~size:num_breadcrumbs
                    ~accounts_with_secret_keys:Test_genesis_ledger.accounts)
           in

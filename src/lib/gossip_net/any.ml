@@ -76,9 +76,6 @@ module Make (Rpc_interface : RPC_INTERFACE) :
   let on_first_high_connectivity (Any ((module M), t)) =
     M.on_first_high_connectivity t
 
-  let ban_notification_reader (Any ((module M), t)) =
-    M.ban_notification_reader t
-
   let connection_gating (Any ((module M), t)) = M.connection_gating t
 
   let set_connection_gating ?clean_added_peers (Any ((module M), t)) config =

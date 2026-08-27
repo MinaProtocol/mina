@@ -1,6 +1,5 @@
 open Async_kernel
 open Core
-open Pipe_lib
 open Network_peer
 open Intf
 
@@ -137,8 +136,6 @@ module Make (Rpc_interface : RPC_INTERFACE) :
       ; peer_table : (Peer.Id.t, Peer.t) Hashtbl.t
       ; initial_peers : Peer.t list
       ; connection_gating : Mina_net2.connection_gating ref
-      ; ban_notification_reader : ban_notification Linear_pipe.Reader.t
-      ; ban_notification_writer : ban_notification Linear_pipe.Writer.t
       }
 
     let rpc_hook ~rpc_mocks ctx t =
@@ -179,9 +176,6 @@ module Make (Rpc_interface : RPC_INTERFACE) :
       let peer_table = Hashtbl.create (module Peer.Id) in
       List.iter initial_peers ~f:(fun peer ->
           Hashtbl.add_exn peer_table ~key:peer.peer_id ~data:peer ) ;
-      let ban_notification_reader, ban_notification_writer =
-        Linear_pipe.create ()
-      in
       let time_controller =
         Block_time.Controller.basic ~logger:(Logger.create ())
       in
@@ -190,12 +184,7 @@ module Make (Rpc_interface : RPC_INTERFACE) :
         ; local_ip
         ; peer_table
         ; initial_peers
-        ; connection_gating =
-            ref
-              Mina_net2.
-                { banned_peers = []; trusted_peers = []; isolate = false }
-        ; ban_notification_reader
-        ; ban_notification_writer
+        ; connection_gating = ref Mina_net2.{ isolate = false }
         ; time_controller
         }
       in
@@ -237,9 +226,6 @@ module Make (Rpc_interface : RPC_INTERFACE) :
     let on_first_connect _ ~f = Deferred.return (f ())
 
     let on_first_high_connectivity _ ~f:_ = Deferred.never ()
-
-    let ban_notification_reader { ban_notification_reader; _ } =
-      ban_notification_reader
 
     let query_peer ?heartbeat_timeout:_ ?timeout:_ t peer rpc query =
       Network.call_rpc t.network t.peer_table ~sender_id:t.local_ip.peer_id

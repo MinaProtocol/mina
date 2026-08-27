@@ -94,7 +94,7 @@ struct
 
       module Config = struct
         type t =
-          { trust_system : (Trust_system.t[@sexp.opaque])
+          { reputation : (Peer_reputation.t[@sexp.opaque])
           ; verifier : (Verifier.t[@sexp.opaque])
           ; disk_location : string
           ; proof_cache_db : Proof_cache_tag.cache_db
@@ -322,10 +322,6 @@ struct
         let { Priced_proof.proof = proofs; fee = { prover; fee } } =
           priced_proof
         in
-        let trust_record =
-          Trust_system.record_envelope_sender t.config.trust_system t.logger
-            sender
-        in
         let is_local = Envelope.Sender.(equal Local sender) in
         let metadata =
           [ ("prover", Signature_lib.Public_key.Compressed.to_yojson prover)
@@ -343,10 +339,10 @@ struct
           [%log' error t.logger] ~metadata
             "Error verifying transaction snark from $sender: $error" ;
           if punish && not is_local then
-            trust_record
-              ( Trust_system.Actions.Sent_invalid_proof
-              , Some ("Error verifying transaction snark: $error", metadata) )
-          else Deferred.return ()
+            Peer_reputation.ban_sender t.config.reputation ~logger:t.logger
+              ~reason:"Error verifying transaction snark: $error" ~metadata
+              sender ;
+          Deferred.return ()
         in
         let message = Mina_base.Sok_message.create ~fee ~prover in
         let verify proofs =
@@ -571,7 +567,7 @@ let%test_module "random set test" =
     module Mock_snark_pool =
       Make (Mocks.Base_ledger) (Mocks.Staged_ledger) (Mocks.Transition_frontier)
 
-    let trust_system = Mocks.trust_system
+    let reputation = Mocks.reputation
 
     let precomputed_values = Lazy.force Precomputed_values.for_unit_tests
 
@@ -628,7 +624,7 @@ let%test_module "random set test" =
           Error (`Other (Error.of_string "Invalid diff"))
 
     let config =
-      Mock_snark_pool.Resource_pool.make_config ~verifier ~trust_system
+      Mock_snark_pool.Resource_pool.make_config ~verifier ~reputation
         ~disk_location:"/tmp/snark-pool" ~proof_cache_db
 
     let gen ?length () =

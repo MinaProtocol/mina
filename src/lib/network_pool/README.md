@@ -41,7 +41,7 @@ The transaction pool is implemented as two layered components:
 │  ─ accepts/rejects gossip diffs (verify → apply)                │
 │  ─ responds to transition frontier diffs                        │
 │  ─ tracks locally generated commands                            │
-│  ─ punishes misbehaving peers via the trust system              │
+│  ─ bans misbehaving peers via the libp2p helper                 │
 │                                                                 │
 │   ┌─────────────────────────────────────────────────────────┐   │
 │   │  Indexed_pool  (indexed_pool.ml)                        │   │
@@ -110,7 +110,7 @@ in two asynchronous phases:
    senders are registered in `locally_generated_uncommitted`.
 
 If verification fails (bad signature or invalid proof), the sending peer is
-penalised via the trust system.
+banned via `Peer_reputation` (the libp2p helper owns the ban state).
 
 ### Replacing a Transaction
 
@@ -230,9 +230,9 @@ denial-of-service attacks:
 2. **Pool size cap**: `pool_max_size` bounds memory usage. Low-fee transactions
    are evicted when the cap is reached, making it expensive to fill the pool
    with junk.
-3. **Trust system**: Peers that send invalid proofs or other provably malicious
-   diffs are penalised via `Trust_system.record_envelope_sender`. Repeated
-   violations lead to the peer being ignored.
+3. **Peer bans**: Peers that send invalid proofs or other provably malicious
+   diffs are banned via `Peer_reputation.ban_sender`; the libp2p helper
+   computes the ban duration and gates the connection.
 4. **Replace-by-fee cost**: Replacing an existing transaction requires a fee
    premium (`replace_fee`), preventing cheap churn attacks.
 5. **Currency reservation**: The pool tracks the total currency reserved per
@@ -360,7 +360,7 @@ and the rest of the daemon, see
 - A gossip-network sink that receives diffs from peers, verifies them, and
   applies them to the resource pool.
 - Periodic re-broadcast of locally-generated resources.
-- Rate limiting and trust-system integration.
+- Rate limiting and peer-ban integration.
 
 ## `batcher.ml`
 

@@ -23,7 +23,7 @@
   consensus
   logger
   error_json
-  trust_system
+  peer_reputation
   mina_block
   mina_state
   transition_frontier_persistent_frontier

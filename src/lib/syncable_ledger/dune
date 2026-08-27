@@ -13,7 +13,7 @@
   core
   async
   ;; local libraries
-  trust_system
+  peer_reputation
   logger
   merkle_ledger
   pipe_lib

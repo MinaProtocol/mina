@@ -73,7 +73,7 @@
   snark_bits
   sparse_ledger_lib
   syncable_ledger
-  trust_system
+  peer_reputation
   mina_base.import
   ppx_version.runtime
   internal_tracing

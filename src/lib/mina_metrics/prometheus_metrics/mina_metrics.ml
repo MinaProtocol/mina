@@ -1337,13 +1337,11 @@ module Scan_state_metrics = struct
     Gauge.v "snark_work_required" ~help ~namespace ~subsystem
 end
 
-module Trust_system = struct
-  let subsystem = "Trust_system"
-
-  let banned_peers : Gauge.t =
-    let help = "# of banned ip addresses" in
-    Gauge.v "banned_peers" ~help ~namespace ~subsystem
-end
+let banned_peers : Gauge.t =
+  let help =
+    "# of peers and IP addresses currently banned by the libp2p helper"
+  in
+  Gauge.v "banned_peers" ~help ~namespace
 
 module Consensus = struct
   let subsystem = "Consensus"

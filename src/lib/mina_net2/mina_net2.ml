@@ -30,36 +30,14 @@ module Peer_without_id = struct
     { libp2p_port; host = Unix.Inet_addr.to_string host }
 end
 
-(* TODO: connection gating info is currently stored in to places, that needs to be fixed... *)
-type connection_gating =
-  { banned_peers : Peer.t list; trusted_peers : Peer.t list; isolate : bool }
+(* Banned/trusted lists are owned by the libp2p helper (see [ban_peer] etc.);
+   the daemon only controls isolation here. *)
+type connection_gating = { isolate : bool }
 
 let gating_config_to_helper_format ?(clean_added_peers = false)
     (config : connection_gating) =
-  let trusted_ips =
-    List.map ~f:(fun p -> Unix.Inet_addr.to_string p.host) config.trusted_peers
-  in
-  let banned_ips =
-    let trusted = String.Set.of_list trusted_ips in
-    List.filter_map
-      ~f:(fun p ->
-        let p = Unix.Inet_addr.to_string p.host in
-        (* Trusted peers cannot be banned. *)
-        if Set.mem trusted p then None else Some p )
-      config.banned_peers
-  in
-  let banned_peers =
-    List.map
-      ~f:(fun p -> Libp2p_ipc.create_peer_id p.peer_id)
-      config.banned_peers
-  in
-  let trusted_peers =
-    List.map
-      ~f:(fun p -> Libp2p_ipc.create_peer_id p.peer_id)
-      config.trusted_peers
-  in
-  Libp2p_ipc.create_gating_config ~clean_added_peers ~banned_ips ~banned_peers
-    ~trusted_ips ~trusted_peers ~isolate:config.isolate
+  Libp2p_ipc.create_gating_config ~clean_added_peers ~banned_ips:[]
+    ~banned_peers:[] ~trusted_ips:[] ~trusted_peers:[] ~isolate:config.isolate
 
 module For_tests = struct
   module Helper = Libp2p_helper
@@ -69,8 +47,7 @@ module For_tests = struct
   let multiaddr_to_libp2p_ipc = Multiaddr.to_libp2p_ipc
 
   let empty_libp2p_ipc_gating_config =
-    gating_config_to_helper_format
-      { banned_peers = []; trusted_peers = []; isolate = false }
+    gating_config_to_helper_format { isolate = false }
 end
 
 type protocol_handler =
@@ -92,12 +69,9 @@ type t =
   ; protocol_handlers : protocol_handler String.Table.t
   ; mutable connection_gating : connection_gating
   ; mutable all_peers_seen : Peer_without_id.Set.t option
-  ; mutable banned_ips : Unix.Inet_addr.t list
   ; peer_connected_callback : string -> unit
   ; peer_disconnected_callback : string -> unit
   }
-
-let banned_ips t = t.banned_ips
 
 let connection_gating_config t = t.connection_gating
 
@@ -213,6 +187,7 @@ let configure t ~me ~external_maddr ~maddrs ~network_id ~metrics_port
   let libp2p_config =
     Libp2p_ipc.create_libp2p_config ~private_key:(Keypair.secret me)
       ~statedir:t.conf_dir
+      ~banlist_path:(t.conf_dir ^ "/libp2p_banlist.json")
       ~listen_on:(List.map ~f:Multiaddr.to_libp2p_ipc maddrs)
       ?metrics_port
       ~external_multiaddr:(Multiaddr.to_libp2p_ipc external_maddr)
@@ -606,9 +581,7 @@ let create ?(allow_multiple_instances = false) ~all_peers_seen_metric ~logger
     { helper
     ; conf_dir
     ; logger
-    ; banned_ips = []
-    ; connection_gating =
-        { banned_peers = []; trusted_peers = []; isolate = false }
+    ; connection_gating = { isolate = false }
     ; my_keypair = Ivar.create ()
     ; subscriptions = Subscription.Id.Table.create ()
     ; streams = String.Table.create ()
@@ -649,4 +622,108 @@ let create ?(allow_multiple_instances = false) ~all_peers_seen_metric ~logger
                     ] ) ) ) ) ;
   Deferred.Or_error.return t
 
-let send_heartbeat t peer_id = Libp2p_helper.send_heartbeat ~peer_id t.helper
+let useful_peer t peer_id = Libp2p_helper.send_useful_peer ~peer_id t.helper
+
+let peer_id_and_ip ~peer_id ~ip =
+  ( Libp2p_ipc.create_peer_id (Peer.Id.to_string peer_id)
+  , Option.map ip ~f:Unix.Inet_addr.to_string )
+
+let ban_peer t ~manual ~peer_id ~ip =
+  let peer_id, ip = peer_id_and_ip ~peer_id ~ip in
+  Libp2p_ipc.Rpcs.BanPeer.create_request ~peer_id ~ip ~manual
+  |> Libp2p_helper.do_rpc t.helper (module Libp2p_ipc.Rpcs.BanPeer)
+  |> Deferred.Or_error.ignore_m
+
+let unban_peer t ~peer_id ~ip =
+  let peer_id, ip = peer_id_and_ip ~peer_id ~ip in
+  Libp2p_ipc.Rpcs.UnbanPeer.create_request ~peer_id ~ip
+  |> Libp2p_helper.do_rpc t.helper (module Libp2p_ipc.Rpcs.UnbanPeer)
+  |> Deferred.Or_error.ignore_m
+
+let add_trusted_peer t ~peer_id ~ip =
+  let peer_id, ip = peer_id_and_ip ~peer_id ~ip in
+  Libp2p_ipc.Rpcs.AddTrustedPeer.create_request ~peer_id ~ip
+  |> Libp2p_helper.do_rpc t.helper (module Libp2p_ipc.Rpcs.AddTrustedPeer)
+  |> Deferred.Or_error.ignore_m
+
+let remove_trusted_peer t ~peer_id ~ip =
+  let peer_id, ip = peer_id_and_ip ~peer_id ~ip in
+  Libp2p_ipc.Rpcs.RemoveTrustedPeer.create_request ~peer_id ~ip
+  |> Libp2p_helper.do_rpc t.helper (module Libp2p_ipc.Rpcs.RemoveTrustedPeer)
+  |> Deferred.Or_error.ignore_m
+
+let parse_peer_entries entries : Peer_reputation.Entry.t list =
+  let open Libp2p_ipc.Reader in
+  List.filter_map entries ~f:(fun entry ->
+      let kind =
+        match PeerEntry.kind_get entry with
+        | PeerKind.PeerId ->
+            Some Peer_reputation.Kind.Peer_id
+        | PeerKind.Ip ->
+            Some Peer_reputation.Kind.Ip
+        | PeerKind.Undefined _ ->
+            None
+      in
+      Option.map kind ~f:(fun kind ->
+          let until =
+            if PeerEntry.has_until entry then
+              Some
+                ( PeerEntry.until_get entry |> Libp2p_ipc.unix_nano_to_time_span
+                |> Time_ns.to_time_float_round_nearest )
+            else None
+          in
+          { Peer_reputation.Entry.kind
+          ; identity = PeerEntry.identity_get entry
+          ; until
+          } ) )
+
+let bans t =
+  let open Deferred.Or_error.Let_syntax in
+  let%map resp =
+    Libp2p_ipc.Rpcs.GetBans.create_request ()
+    |> Libp2p_helper.do_rpc t.helper (module Libp2p_ipc.Rpcs.GetBans)
+  in
+  Libp2p_ipc.Reader.Libp2pHelperInterface.GetBans.Response.result_get_list resp
+  |> parse_peer_entries
+
+let trusted_peers t =
+  let open Deferred.Or_error.Let_syntax in
+  let%map resp =
+    Libp2p_ipc.Rpcs.GetTrustedPeers.create_request ()
+    |> Libp2p_helper.do_rpc t.helper (module Libp2p_ipc.Rpcs.GetTrustedPeers)
+  in
+  Libp2p_ipc.Reader.Libp2pHelperInterface.GetTrustedPeers.Response
+  .result_get_list resp
+  |> parse_peer_entries
+
+let peer_reputation_impl ~(get : unit -> t Deferred.t option) :
+    Peer_reputation.impl =
+  let with_net2 f =
+    match get () with
+    | Some net2 ->
+        net2 >>= f
+    | None ->
+        Deferred.Or_error.error_string
+          "libp2p helper not available (restarting?)"
+  in
+  { ban =
+      (fun ~manual ~peer_id ~ip ->
+        with_net2 (fun net2 -> ban_peer net2 ~manual ~peer_id ~ip) )
+  ; unban =
+      (fun ~peer_id ~ip -> with_net2 (fun net2 -> unban_peer net2 ~peer_id ~ip))
+  ; bans = (fun () -> with_net2 bans)
+  ; trust =
+      (fun ~peer_id ~ip ->
+        with_net2 (fun net2 -> add_trusted_peer net2 ~peer_id ~ip) )
+  ; untrust =
+      (fun ~peer_id ~ip ->
+        with_net2 (fun net2 -> remove_trusted_peer net2 ~peer_id ~ip) )
+  ; trusted = (fun () -> with_net2 trusted_peers)
+  ; useful =
+      (fun ~peer_id ->
+        match get () with
+        | Some net2 ->
+            don't_wait_for (net2 >>| fun net2 -> useful_peer net2 peer_id)
+        | None ->
+            () )
+  }

@@ -169,16 +169,19 @@ func (msg ListPeersReq) handle(app *app, seqno uint64) (*capnp.Message, func()) 
 	})
 }
 
-type HeartbeatPeerPushT = ipc.Libp2pHelperInterface_HeartbeatPeer
-type HeartbeatPeerPush HeartbeatPeerPushT
+// UsefulPeerPush handles the UsefulPeer push message: a DHT peer-protection
+// signal that refreshes routing-table protection timestamps for useful peers.
+// It is NOT a connection liveness ping.
+type UsefulPeerPushT = ipc.Libp2pHelperInterface_UsefulPeer
+type UsefulPeerPush UsefulPeerPushT
 
-func fromHeartbeatPeerPush(m ipcPushMessage) (pushMessage, error) {
-	i, err := m.HeartbeatPeer()
-	return HeartbeatPeerPush(i), err
+func fromUsefulPeerPush(m ipcPushMessage) (pushMessage, error) {
+	i, err := m.UsefulPeer()
+	return UsefulPeerPush(i), err
 }
 
-func (m HeartbeatPeerPush) handle(app *app) {
-	id1, err := HeartbeatPeerPushT(m).Id()
+func (m UsefulPeerPush) handle(app *app) {
+	id1, err := UsefulPeerPushT(m).Id()
 	var id2 string
 	var peerID peer.ID
 	if err == nil {
@@ -188,7 +191,7 @@ func (m HeartbeatPeerPush) handle(app *app) {
 		peerID, err = peer.Decode(id2)
 	}
 	if err != nil {
-		app.P2p.Logger.Errorf("HeartbeatPeerPush.handle: error %s", err)
+		app.P2p.Logger.Errorf("UsefulPeerPush.handle: error %s", err)
 		return
 	}
 	app.P2p.HeartbeatPeer(peerID)

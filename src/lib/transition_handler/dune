@@ -19,7 +19,7 @@
   error_json
   data_hash_lib
   block_time
-  trust_system
+  peer_reputation
   o1trace
   transition_frontier_base
   cache_lib

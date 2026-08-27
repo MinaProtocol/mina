@@ -5,7 +5,7 @@ open Cache_lib
 open Network_peer
 
 let build_subtrees_of_breadcrumbs ~logger ~precomputed_values ~verifier
-    ~trust_system ~frontier ~initial_hash subtrees_of_enveloped_transitions =
+    ~reputation ~frontier ~initial_hash subtrees_of_enveloped_transitions =
   let missing_parent_msg =
     Printf.sprintf
       "Transition frontier already garbage-collected the parent of %s"
@@ -97,7 +97,7 @@ let build_subtrees_of_breadcrumbs ~logger ~precomputed_values ~verifier
                 match%bind
                   Deferred.Or_error.try_with ~here:[%here] (fun () ->
                       Transition_frontier.Breadcrumb.build ~logger
-                        ~precomputed_values ~verifier ~trust_system ~parent
+                        ~precomputed_values ~verifier ~reputation ~parent
                         ~transition:mostly_validated_transition
                         ~get_completed_work:(Fn.const None)
                         ~sender:(Some sender) ~transition_receipt_time () )
@@ -141,24 +141,17 @@ let build_subtrees_of_breadcrumbs ~logger ~precomputed_values ~verifier
                               | Remote peer ->
                                   Set.add inet_addrs peer )
                         in
-                        let ip_addresses = Set.to_list ip_address_set in
-                        let trust_system_record_invalid msg error =
-                          let%map () =
-                            Deferred.List.iter ip_addresses ~f:(fun ip_addr ->
-                                Trust_system.record trust_system logger ip_addr
-                                  ( Trust_system.Actions
-                                    .Gossiped_invalid_transition
-                                  , Some (msg, []) ) )
-                          in
-                          Error error
+                        let ban_all reason error =
+                          Set.iter ip_address_set ~f:(fun peer ->
+                              Peer_reputation.ban reputation ~logger ~reason
+                                peer ) ;
+                          Deferred.return (Error error)
                         in
                         match err with
                         | `Invalid_staged_ledger_hash error ->
-                            trust_system_record_invalid
-                              "invalid staged ledger hash" error
+                            ban_all "invalid staged ledger hash" error
                         | `Invalid_staged_ledger_diff error ->
-                            trust_system_record_invalid
-                              "invalid staged ledger diff" error
+                            ban_all "invalid staged ledger diff" error
                         | `Fatal_error exn ->
                             Deferred.return (Or_error.of_exn exn) ) ) )
             |> Cached.sequence_deferred

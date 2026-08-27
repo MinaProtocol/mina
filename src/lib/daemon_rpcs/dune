@@ -41,7 +41,7 @@
   sync_status
   transaction_inclusion_status
   transition_frontier
-  trust_system
+  peer_reputation
   user_command_input)
  (preprocess
   (pps

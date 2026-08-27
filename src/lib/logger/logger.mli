@@ -169,7 +169,8 @@ val spam :
   -> ('a, unit, string, unit) format4
   -> 'a
 
-val faulty_peer : _ log_function [@@deprecated "use Trust_system.record"]
+val faulty_peer : _ log_function
+  [@@deprecated "use Peer_reputation.ban for bannable offenses"]
 
 val faulty_peer_without_punishment : _ log_function
 

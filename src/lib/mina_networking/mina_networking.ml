@@ -31,7 +31,7 @@ type Structured_log_events.t +=
 module type CONTEXT = sig
   val logger : Logger.t
 
-  val trust_system : Trust_system.t
+  val reputation : Peer_reputation.t
 
   val time_controller : Block_time.Controller.t
 
@@ -71,7 +71,7 @@ end
 
 type t =
   { logger : Logger.t
-  ; trust_system : Trust_system.t
+  ; reputation : Peer_reputation.t
   ; gossip_net : Gossip_net.Any.t
   }
 [@@deriving fields]
@@ -108,7 +108,7 @@ let create (module Context : CONTEXT) (config : Config.t) ~sinks
           (Gossip_net.Message.Any_sinks ((module Sinks), sinks)) )
   in
   gossip_net_ref := Some gossip_net ;
-  let network = { gossip_net; logger; trust_system } in
+  let network = { gossip_net; logger; reputation } in
   (* The node status RPC is implemented directly in go, serving a string which
      is periodically updated. This is so that one can make this RPC on a node even
      if that node is at its connection limit. *)
@@ -162,8 +162,6 @@ include struct
   let add_peer = lift add_peer
 
   let initial_peers = lift initial_peers
-
-  let ban_notification_reader = lift ban_notification_reader
 
   let random_peers = lift random_peers
 
@@ -293,14 +291,7 @@ let try_non_preferred_peers (type b) t input peers ~rpc :
           in
           match response_or_error with
           | Connected ({ data = Ok (Some data); _ } as envelope) ->
-              let%bind () =
-                Trust_system.(
-                  record t.trust_system t.logger peer
-                    Actions.
-                      ( Fulfilled_request
-                      , Some ("Nonpreferred peer returned valid response", [])
-                      ))
-              in
+              Peer_reputation.useful t.reputation peer.peer_id ;
               return (Ok (Envelope.Incoming.map envelope ~f:(Fn.const data)))
           | Connected { data = Ok None; _ } ->
               loop remaining_peers (2 * num_peers)
@@ -317,47 +308,19 @@ let rpc_peer_then_random (type b) t peer_id input ~rpc :
   in
   match%bind query_peer t peer_id rpc input with
   | Connected { data = Ok (Some response); sender; _ } ->
-      let%bind () =
-        match sender with
-        | Local ->
-            return ()
-        | Remote peer ->
-            Trust_system.(
-              record t.trust_system t.logger peer
-                Actions.
-                  ( Fulfilled_request
-                  , Some ("Preferred peer returned valid response", []) ))
-      in
+      Peer_reputation.useful_sender t.reputation sender ;
       return (Ok (Envelope.Incoming.wrap ~data:response ~sender))
   | Connected { data = Ok None; sender; _ } ->
-      let%bind () =
-        match sender with
-        | Remote peer ->
-            Trust_system.(
-              record t.trust_system t.logger peer
-                Actions.
-                  ( No_reply_from_preferred_peer
-                  , Some ("When querying preferred peer, got no response", [])
-                  ))
-        | Local ->
-            return ()
-      in
+      [%log' debug t.logger]
+        "When querying preferred peer $sender, got no response"
+        ~metadata:[ ("sender", Envelope.Sender.to_yojson sender) ] ;
       retry ()
   | Connected { data = Error e; sender; _ } ->
-      (* FIXME #4094: determine if more specific actions apply here *)
-      let%bind () =
-        match sender with
-        | Remote peer ->
-            Trust_system.(
-              record t.trust_system t.logger peer
-                Actions.
-                  ( Outgoing_connection_error
-                  , Some
-                      ( "Error while doing RPC"
-                      , [ ("error", Error_json.error_to_yojson e) ] ) ))
-        | Local ->
-            return ()
-      in
+      [%log' debug t.logger] "Error while doing RPC to $sender: $error"
+        ~metadata:
+          [ ("sender", Envelope.Sender.to_yojson sender)
+          ; ("error", Error_json.error_to_yojson e)
+          ] ;
       retry ()
   | Failed_to_connect _ ->
       (* Since we couldn't connect, we have no IP to ban. *)
@@ -435,7 +398,7 @@ let glue_sync_ledger :
     Sl_downloader.create ~preferred ~max_batch_size:100
       ~peers:(fun () -> peers t)
       ~knowledge_context:root_hash_r ~knowledge ~stop:global_stop
-      ~logger:t.logger ~trust_system:t.trust_system
+      ~logger:t.logger ~reputation:t.reputation
       ~get:(fun (peer : Peer.t) qs ->
         List.iter qs ~f:(fun (h, _) ->
             if

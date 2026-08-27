@@ -19,7 +19,7 @@ type t =
   ; chain_id : string
   ; logger : Logger.t
   ; pids : Child_processes.Termination.t
-  ; trust_system : Trust_system.t
+  ; reputation : Peer_reputation.t
   ; monitor : Monitor.t option
   ; disable_node_status : bool
   ; block_production_keypairs : Keypair.And_compressed_pk.Set.t

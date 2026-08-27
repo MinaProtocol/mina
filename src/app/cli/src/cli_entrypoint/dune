@@ -63,7 +63,7 @@
   mina_net2
   block_time
   mina_runtime_config
-  trust_system
+  peer_reputation
   protocol_version
   coda_genesis_proof
   with_hash

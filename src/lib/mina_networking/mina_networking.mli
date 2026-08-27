@@ -18,7 +18,7 @@ type Structured_log_events.t +=
 module type CONTEXT = sig
   val logger : Logger.t
 
-  val trust_system : Trust_system.t
+  val reputation : Peer_reputation.t
 
   val time_controller : Block_time.Controller.t
 
@@ -283,9 +283,6 @@ val set_connection_gating_config :
   -> ?clean_added_peers:bool
   -> Mina_net2.connection_gating
   -> Mina_net2.connection_gating Deferred.t
-
-val ban_notification_reader :
-  t -> Gossip_net.ban_notification Linear_pipe.Reader.t
 
 val create :
      (module CONTEXT)

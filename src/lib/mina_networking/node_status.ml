@@ -15,8 +15,7 @@ module Stable = struct
       ; peers : Peer.Stable.V1.t list
       ; block_producers : Signature_lib.Public_key.Compressed.Stable.V1.t list
       ; protocol_state_hash : State_hash.Stable.V1.t
-      ; ban_statuses :
-          (Peer.Stable.V1.t * Trust_system.Peer_status.Stable.V1.t) list
+      ; ban_statuses : Peer_reputation.Ban_status_cache.Snapshot.Stable.V1.t
       ; k_block_hashes_and_timestamps :
           (State_hash.Stable.V1.t * Mina_stdlib.Bounded_types.String.Stable.V1.t)
           list
@@ -40,8 +39,7 @@ module Stable = struct
       ; peers : Peer.Stable.V1.t list
       ; block_producers : Signature_lib.Public_key.Compressed.Stable.V1.t list
       ; protocol_state_hash : State_hash.Stable.V1.t
-      ; ban_statuses :
-          (Peer.Stable.V1.t * Trust_system.Peer_status.Stable.V1.t) list
+      ; ban_statuses : Peer_reputation.Ban_status_cache.Snapshot.Stable.V1.t
       ; k_block_hashes_and_timestamps :
           (State_hash.Stable.V1.t * Mina_stdlib.Bounded_types.String.Stable.V1.t)
           list

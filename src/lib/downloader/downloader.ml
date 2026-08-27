@@ -87,7 +87,7 @@ end) : sig
     -> max_batch_size:int
     -> stop:unit Deferred.t
     -> logger:Logger.t
-    -> trust_system:Trust_system.t
+    -> reputation:Peer_reputation.t
     -> get:(Peer.t -> Key.t list -> Result.t list Deferred.Or_error.t)
     -> knowledge_context:Knowledge_context.t Broadcast_pipe.Reader.t
     -> knowledge:
@@ -632,7 +632,7 @@ end = struct
           (* buffer of length 0 *)
     ; got_new_peers_r : unit Strict_pipe.Reader.t
     ; logger : Logger.t
-    ; trust_system : Trust_system.t
+    ; reputation : Peer_reputation.t
     ; stop : unit Deferred.t
     ; post_stall_retry_delay : Time.Span.t
     ; no_progress_recheck_delay : Time.Span.t
@@ -741,7 +741,7 @@ end = struct
         ; downloading
         ; max_batch_size = _
         ; logger = _
-        ; trust_system = _
+        ; reputation = _
         ; stop = _
         ; post_stall_retry_delay = _
         ; no_progress_recheck_delay = _
@@ -844,11 +844,13 @@ end = struct
                 List.iter rs ~f:(fun r ->
                     match Hashtbl.find jobs (Result.key r) with
                     | None ->
-                        (* Got something we didn't ask for. *)
-                        Trust_system.(
-                          record t.trust_system t.logger peer
-                            Actions.(Violated_protocol, None))
-                        |> don't_wait_for
+                        (* Got something we didn't ask for: protocol
+                           violation, ban. *)
+                        Peer_reputation.ban t.reputation ~logger:t.logger
+                          ~reason:
+                            "Downloader: peer sent a result we didn't ask for"
+                          ~metadata:[ ("key", Key.to_yojson (Result.key r)) ]
+                          peer
                     | Some j ->
                         Hashtbl.remove jobs j.key ;
                         job_finished t j
@@ -988,7 +990,7 @@ end = struct
       ?(post_stall_retry_delay = Time.Span.of_min 1.)
       ?(no_progress_recheck_delay = Time.Span.of_min 1.)
       ?(peer_refresh_interval = Time.Span.of_min 1.) ~max_batch_size ~stop
-      ~logger ~trust_system ~get ~knowledge_context ~knowledge ~peers ~preferred
+      ~logger ~reputation ~get ~knowledge_context ~knowledge ~peers ~preferred
       () =
     let%map all_peers = peers () in
     let pipe ~name c =
@@ -1010,7 +1012,7 @@ end = struct
       ; get
       ; max_batch_size
       ; logger
-      ; trust_system
+      ; reputation
       ; downloading = Key.Table.create ()
       ; stop
       ; post_stall_retry_delay

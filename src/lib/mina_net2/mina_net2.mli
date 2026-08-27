@@ -143,11 +143,12 @@ val create :
   -> unit
   -> t Deferred.Or_error.t
 
-(** State for the connection gateway. It will disallow connections from IPs
-    or peer IDs in [banned_peers], except for those listed in [trusted_peers]. If
-    [isolate] is true, only connections to [trusted_peers] are allowed. *)
-type connection_gating =
-  { banned_peers : Peer.t list; trusted_peers : Peer.t list; isolate : bool }
+(** State for the connection gateway. If [isolate] is true, only connections
+    to peers the helper considers trusted (added/seed peers and its trusted
+    list) are allowed. Banned/trusted lists themselves live in the helper; see
+    [ban_peer], [unban_peer], [add_trusted_peer], [remove_trusted_peer],
+    [bans], [trusted_peers]. *)
+type connection_gating = { isolate : bool }
 
 (** Configure the network connection.
   *
@@ -392,7 +393,43 @@ val set_connection_gating_config :
 
 val connection_gating_config : t -> connection_gating
 
-(** List of currently banned IPs. *)
-val banned_ips : t -> Unix.Inet_addr.t list
+(** Tell the helper a peer sent us useful data (DHT peer-protection
+    signal). *)
+val useful_peer : t -> Peer.Id.t -> unit
 
-val send_heartbeat : t -> Peer.Id.t -> unit
+(** Ban a peer (and optionally its IP). [manual = false] is an automatic ban
+    whose duration the helper computes from its strike count for the peer;
+    [manual = true] is an indefinite, persisted operator ban. *)
+val ban_peer :
+     t
+  -> manual:bool
+  -> peer_id:Peer.Id.t
+  -> ip:Unix.Inet_addr.t option
+  -> unit Deferred.Or_error.t
+
+val unban_peer :
+     t
+  -> peer_id:Peer.Id.t
+  -> ip:Unix.Inet_addr.t option
+  -> unit Deferred.Or_error.t
+
+val add_trusted_peer :
+     t
+  -> peer_id:Peer.Id.t
+  -> ip:Unix.Inet_addr.t option
+  -> unit Deferred.Or_error.t
+
+val remove_trusted_peer :
+     t
+  -> peer_id:Peer.Id.t
+  -> ip:Unix.Inet_addr.t option
+  -> unit Deferred.Or_error.t
+
+val bans : t -> Peer_reputation.Entry.t list Deferred.Or_error.t
+
+val trusted_peers : t -> Peer_reputation.Entry.t list Deferred.Or_error.t
+
+(** A [Peer_reputation] backend over a (possibly restarting) helper instance.
+    [get] returns [None] while no instance is available. *)
+val peer_reputation_impl :
+  get:(unit -> t Deferred.t option) -> Peer_reputation.impl

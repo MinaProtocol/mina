@@ -25,7 +25,7 @@ end
 
 val run :
      context:(module CONTEXT)
-  -> trust_system:Trust_system.t
+  -> reputation:Peer_reputation.t
   -> verifier:Verifier.t
   -> network:Mina_networking.t
   -> frontier:Transition_frontier.t

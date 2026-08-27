@@ -34,7 +34,7 @@
   node_addrs_and_ports
   mina_numbers
   participating_state
-  trust_system
+  peer_reputation
   network_pool
   merkle_list_verifier
   genesis_constants

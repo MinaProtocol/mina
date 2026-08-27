@@ -261,7 +261,7 @@ module type Snark_resource_pool_intf = sig
   val proof_cache_db : t -> Proof_cache_tag.cache_db
 
   val make_config :
-       trust_system:Trust_system.t
+       reputation:Peer_reputation.t
     -> verifier:Verifier.t
     -> disk_location:string
     -> proof_cache_db:Proof_cache_tag.cache_db
@@ -400,7 +400,7 @@ module type Transaction_resource_pool_intf = sig
   include Resource_pool_base_intf with type t := t
 
   val make_config :
-       trust_system:Trust_system.t
+       reputation:Peer_reputation.t
     -> pool_max_size:int
     -> verifier:Verifier.t
     -> genesis_constants:Genesis_constants.t

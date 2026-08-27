@@ -855,7 +855,7 @@ let genesis_breadcrumb_creator ~context:(module Context : CONTEXT) prover =
       go max_num_retries )
 
 let produce ~genesis_breadcrumb ~context:(module Context : CONTEXT) ~prover
-    ~verifier ~trust_system ~get_completed_work ~transaction_resource_pool
+    ~verifier ~reputation ~get_completed_work ~transaction_resource_pool
     ~frontier_reader ~time_controller ~transition_writer ~log_block_creation
     ~block_reward_threshold ~block_produced_bvar ~slot_tx_end ~slot_chain_end
     ~net ~zkapp_cmd_limit_hardcap ivar
@@ -1101,7 +1101,7 @@ let produce ~genesis_breadcrumb ~context:(module Context : CONTEXT) ~prover
                 time ~logger ~time_controller
                   "Build breadcrumb on produced block" (fun () ->
                     Breadcrumb.build ~logger ~precomputed_values ~verifier
-                      ~get_completed_work:(Fn.const None) ~trust_system
+                      ~get_completed_work:(Fn.const None) ~reputation
                       ~parent:crumb ~transition
                       ~sender:None (* Consider skipping `All here *)
                       ~skip_staged_ledger_verification:`Proofs
@@ -1409,8 +1409,8 @@ let iteration ~schedule_next_vrf_check ~produce_block_now
             schedule_block_production (scheduled_time, data, winner_pk) )
 
 let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
-    ~trust_system ~get_completed_work ~transaction_resource_pool
-    ~time_controller ~consensus_local_state ~coinbase_receiver ~frontier_reader
+    ~reputation ~get_completed_work ~transaction_resource_pool ~time_controller
+    ~consensus_local_state ~coinbase_receiver ~frontier_reader
     ~transition_writer ~set_next_producer_timing ~log_block_creation
     ~block_reward_threshold ~block_produced_bvar ~vrf_evaluation_state ~net
     ~zkapp_cmd_limit_hardcap =
@@ -1428,7 +1428,7 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
       let produce =
         produce ~genesis_breadcrumb
           ~context:(module Context : CONTEXT)
-          ~prover ~verifier ~trust_system ~get_completed_work
+          ~prover ~verifier ~reputation ~get_completed_work
           ~transaction_resource_pool ~frontier_reader ~time_controller
           ~transition_writer ~log_block_creation ~block_reward_threshold
           ~block_produced_bvar ~slot_tx_end ~slot_chain_end ~net
@@ -1560,7 +1560,7 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
               ~f:(fun _ -> start ())
             : unit Block_time.Timeout.t ) )
 
-let run_precomputed ~context:(module Context : CONTEXT) ~verifier ~trust_system
+let run_precomputed ~context:(module Context : CONTEXT) ~verifier ~reputation
     ~time_controller ~frontier_reader ~transition_writer ~precomputed_blocks =
   let open Context in
   let rejected_blocks_logger =
@@ -1693,8 +1693,8 @@ let run_precomputed ~context:(module Context : CONTEXT) ~verifier ~trust_system
             time ~logger ~time_controller
               "Build breadcrumb on produced block (precomputed)" (fun () ->
                 Breadcrumb.build ~logger ~precomputed_values ~verifier
-                  ~get_completed_work:(Fn.const None) ~trust_system
-                  ~parent:crumb ~transition ~sender:None
+                  ~get_completed_work:(Fn.const None) ~reputation ~parent:crumb
+                  ~transition ~sender:None
                   ~skip_staged_ledger_verification:`Proofs
                   ~transition_receipt_time ()
                 |> Deferred.Result.map_error ~f:(function

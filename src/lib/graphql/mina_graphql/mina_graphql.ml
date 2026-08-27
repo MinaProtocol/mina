@@ -331,23 +331,6 @@ module Mutations = struct
             in
             Ok (pk, false) )
 
-  let reset_trust_status =
-    io_field "resetTrustStatus"
-      ~doc:"Reset trust status for all peers at a given IP address"
-      ~typ:(list (non_null Types.Payload.trust_status))
-      ~args:
-        Arg.
-          [ arg "input"
-              ~typ:(non_null Types.Input.ResetTrustStatusInput.arg_typ)
-          ]
-      ~resolve:(fun { ctx = mina; _ } () ip_address_input ->
-        let open Deferred.Result.Let_syntax in
-        let%map ip_address =
-          Deferred.return
-          @@ Types.Arguments.ip_address ~name:"ip_address" ip_address_input
-        in
-        Some (Mina_commands.reset_trust_status mina ip_address) )
-
   let send_user_command mina user_command_input =
     match
       Mina_commands.setup_and_submit_user_command mina user_command_input
@@ -884,26 +867,108 @@ module Mutations = struct
         Mina_lib.set_snark_work_fee mina fee ;
         last_fee )
 
-  let set_connection_gating_config =
-    io_field "setConnectionGatingConfig"
+  let set_isolate =
+    io_field "setIsolate"
       ~args:
         Arg.
-          [ arg "input"
-              ~typ:(non_null Types.Input.SetConnectionGatingConfigInput.arg_typ)
+          [ arg "isolate"
+              ~doc:
+                "If true, only connections to trusted peers are allowed; \
+                 otherwise normal gating applies"
+              ~typ:(non_null bool)
+          ]
+      ~doc:"Enable or disable network isolation mode" ~typ:(non_null string)
+      ~resolve:(fun { ctx = mina; _ } () isolate ->
+        let open Deferred.Let_syntax in
+        let%map _config =
+          Mina_networking.set_connection_gating_config (Mina_lib.net mina)
+            Mina_net2.{ isolate }
+        in
+        Ok "success" )
+
+  (* Operator ban/trust surface; the libp2p helper owns the lists. *)
+  let reputation_target ~peer_id ~ip k =
+    match
+      Option.map ip ~f:(fun ip -> Types.Arguments.ip_address ~name:"ip" ip)
+    with
+    | Some (Error e) ->
+        Deferred.return (Error e)
+    | Some (Ok addr) ->
+        k
+          ~peer_id:(Network_peer.Peer.Id.unsafe_of_string peer_id)
+          ~ip:(Some addr)
+    | None ->
+        k ~peer_id:(Network_peer.Peer.Id.unsafe_of_string peer_id) ~ip:None
+
+  let reputation_result d =
+    Deferred.map d ~f:(function
+      | Ok () ->
+          Ok "success"
+      | Error e ->
+          Error (Error.to_string_hum e) )
+
+  let reputation_of mina = (Mina_lib.config mina).reputation
+
+  let ban_peer =
+    io_field "banPeer"
+      ~args:
+        Arg.
+          [ arg "peerId" ~doc:"libp2p peer ID to ban" ~typ:(non_null string)
+          ; arg "ip" ~doc:"IP address to ban alongside the peer ID" ~typ:string
           ]
       ~doc:
-        "Set the connection gating config, returning the current config after \
-         the application (which may have failed)"
-      ~typ:(non_null Types.Payload.set_connection_gating_config)
-      ~resolve:(fun { ctx = mina; _ } () config ->
-        let open Deferred.Result.Let_syntax in
-        let%bind config, `Clean_added_peers clean_added_peers =
-          Deferred.return config
-        in
-        let open Deferred.Let_syntax in
-        Mina_networking.set_connection_gating_config ?clean_added_peers
-          (Mina_lib.net mina) config
-        >>| Result.return )
+        "Manually ban a peer (indefinite; persists across daemon restarts \
+         until unbanned)"
+      ~typ:(non_null string)
+      ~resolve:(fun { ctx = mina; _ } () peer_id ip ->
+        reputation_target ~peer_id ~ip (fun ~peer_id ~ip ->
+            reputation_result
+              (Peer_reputation.ban_manual (reputation_of mina) ~peer_id ~ip) )
+        )
+
+  let unban_peer =
+    io_field "unbanPeer"
+      ~args:
+        Arg.
+          [ arg "peerId" ~doc:"libp2p peer ID to unban" ~typ:(non_null string)
+          ; arg "ip" ~doc:"IP address to unban alongside the peer ID"
+              ~typ:string
+          ]
+      ~doc:"Remove a peer from the ban list" ~typ:(non_null string)
+      ~resolve:(fun { ctx = mina; _ } () peer_id ip ->
+        reputation_target ~peer_id ~ip (fun ~peer_id ~ip ->
+            reputation_result
+              (Peer_reputation.unban (reputation_of mina) ~peer_id ~ip) ) )
+
+  let add_trusted_peer =
+    io_field "addTrustedPeer"
+      ~args:
+        Arg.
+          [ arg "peerId" ~doc:"libp2p peer ID to trust" ~typ:(non_null string)
+          ; arg "ip" ~doc:"IP address to trust alongside the peer ID"
+              ~typ:string
+          ]
+      ~doc:"Add a peer to the trusted list (trusted peers are never gated)"
+      ~typ:(non_null string)
+      ~resolve:(fun { ctx = mina; _ } () peer_id ip ->
+        reputation_target ~peer_id ~ip (fun ~peer_id ~ip ->
+            reputation_result
+              (Peer_reputation.trust (reputation_of mina) ~peer_id ~ip) ) )
+
+  let remove_trusted_peer =
+    io_field "removeTrustedPeer"
+      ~args:
+        Arg.
+          [ arg "peerId" ~doc:"libp2p peer ID to remove from the trusted list"
+              ~typ:(non_null string)
+          ; arg "ip" ~doc:"IP address to remove alongside the peer ID"
+              ~typ:string
+          ]
+      ~doc:"Remove a peer from the trusted list" ~typ:(non_null string)
+      ~resolve:(fun { ctx = mina; _ } () peer_id ip ->
+        reputation_target ~peer_id ~ip (fun ~peer_id ~ip ->
+            reputation_result
+              (Peer_reputation.untrust (reputation_of mina) ~peer_id ~ip) ) )
 
   let add_peer =
     io_field "addPeers"
@@ -1032,7 +1097,11 @@ module Mutations = struct
     ; set_coinbase_receiver
     ; set_snark_worker
     ; set_snark_work_fee
-    ; set_connection_gating_config
+    ; set_isolate
+    ; ban_peer
+    ; unban_peer
+    ; add_trusted_peer
+    ; remove_trusted_peer
     ; add_peer
     ; archive_precomputed_block
     ; archive_extensional_block
@@ -1421,76 +1490,6 @@ module Mutations = struct
                    (sprintf "Not a valid scheduled transactions handle: %s"
                       handle ) )
 
-    let update_gating =
-      io_field "updateGating"
-        ~args:
-          Arg.
-            [ arg "input" ~doc:"Gating update"
-                ~typ:(non_null Types.Input.Itn.GatingUpdate.arg_typ)
-            ]
-        ~typ:(non_null string)
-        ~resolve:(fun { ctx = with_seq_no, mina; _ } () input ->
-          O1trace.thread "itn_update_gating"
-          @@ fun () ->
-          if not with_seq_no then return @@ Error "Missing sequence information"
-          else
-            let%bind.Deferred.Result { trusted_peers
-                                     ; banned_peers
-                                     ; isolate
-                                     ; clean_added_peers
-                                     ; added_peers
-                                     } =
-              Deferred.return input
-            in
-            let config = Mina_net2.{ trusted_peers; banned_peers; isolate } in
-            let net = Mina_lib.net mina in
-            let%bind _new_gating_config =
-              Mina_networking.set_connection_gating_config ~clean_added_peers
-                net config
-            in
-            let%bind failures =
-              (* Add all peers *)
-              Deferred.List.filter_map added_peers ~f:(fun peer ->
-                  match%map.Deferred
-                    Mina_networking.add_peer net peer ~is_seed:false
-                  with
-                  | Ok () ->
-                      None
-                  | Error err ->
-                      Some (Error.to_string_hum err) )
-            in
-            if List.is_empty failures then Deferred.Result.return "success"
-            else
-              let%bind.Deferred.Result { trusted_peers
-                                       ; banned_peers
-                                       ; isolate
-                                       ; clean_added_peers
-                                       ; added_peers
-                                       } =
-                Deferred.return input
-              in
-              let config = Mina_net2.{ trusted_peers; banned_peers; isolate } in
-              let net = Mina_lib.net mina in
-              let%bind _new_gating_config =
-                Mina_networking.set_connection_gating_config ~clean_added_peers
-                  net config
-              in
-              let%bind failures =
-                (* Add all peers *)
-                Deferred.List.filter_map added_peers ~f:(fun peer ->
-                    match%map.Deferred
-                      Mina_networking.add_peer net peer ~is_seed:false
-                    with
-                    | Ok () ->
-                        None
-                    | Error err ->
-                        Some (Error.to_string_hum err) )
-              in
-              if List.is_empty failures then Deferred.Result.return "success"
-              else
-                Deferred.Result.failf "failed to add peers: %s"
-                  (String.concat ~sep:", " failures) )
-
     let flush_internal_logs =
       io_field "flushInternalLogs"
         ~doc:"Returns number of logs deleted from queue"
@@ -1653,7 +1652,6 @@ module Mutations = struct
       [ schedule_payments
       ; schedule_zkapp_commands
       ; stop_scheduled_transactions
-      ; update_gating
       ; flush_internal_logs
       ; stop_daemon
       ; zkapp_cmd_limit
@@ -1851,25 +1849,30 @@ module Queries = struct
       ~typ:(non_null Types.DaemonStatus.t) ~resolve:(fun { ctx = mina; _ } () ->
         Mina_commands.get_status ~flag:`Performance mina >>| Result.return )
 
-  let trust_status =
-    field "trustStatus"
-      ~typ:(list (non_null Types.Payload.trust_status))
-      ~args:Arg.[ arg "ipAddress" ~typ:(non_null string) ]
-      ~doc:"Trust status for an IPv4 or IPv6 address"
-      ~resolve:(fun { ctx = mina; _ } () (ip_addr_string : string) ->
-        match Types.Arguments.ip_address ~name:"ipAddress" ip_addr_string with
-        | Ok ip_addr ->
-            Some (Mina_commands.get_trust_status mina ip_addr)
-        | Error _ ->
-            None )
-
-  let trust_status_all =
-    field "trustStatusAll"
-      ~typ:(non_null @@ list @@ non_null Types.Payload.trust_status)
+  let bans =
+    io_field "bans"
+      ~typ:(non_null @@ list @@ non_null Types.Payload.ban_entry)
       ~args:Arg.[]
-      ~doc:"IP address and trust status for all peers"
+      ~doc:
+        "Peers and IPs currently banned by the libp2p helper (from the \
+         daemon's ban cache; refreshed every poll)"
       ~resolve:(fun { ctx = mina; _ } () ->
-        Mina_commands.get_trust_status_all mina )
+        Deferred.return
+          (Ok
+             (Peer_reputation.Ban_status_cache.entries
+                (Mina_lib.ban_status_cache mina) ) ) )
+
+  let trusted_peers =
+    io_field "trustedPeers"
+      ~typ:(non_null @@ list @@ non_null Types.Payload.ban_entry)
+      ~args:Arg.[]
+      ~doc:"Peers and IPs the libp2p helper treats as trusted (never gated)"
+      ~resolve:(fun { ctx = mina; _ } () ->
+        let open Deferred.Let_syntax in
+        let%map result =
+          Peer_reputation.trusted (Mina_lib.config mina).reputation
+        in
+        Result.map_error result ~f:Error.to_string_hum )
 
   let version =
     field "version" ~typ:string
@@ -2847,8 +2850,8 @@ module Queries = struct
     ; pooled_user_commands
     ; pooled_zkapp_commands
     ; transaction_status
-    ; trust_status
-    ; trust_status_all
+    ; bans
+    ; trusted_peers
     ; snark_pool
     ; pending_snark_work
     ; snark_work_range

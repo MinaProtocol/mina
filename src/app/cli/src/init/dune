@@ -93,7 +93,7 @@
   transaction_protocol_state
   test_util
   daemon_rpcs
-  trust_system
+  peer_reputation
   secrets
   participating_state
   staged_ledger

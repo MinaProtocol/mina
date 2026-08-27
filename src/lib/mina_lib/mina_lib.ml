@@ -124,6 +124,7 @@ type t =
   ; commit_id : string
   ; proof_cache_db : Proof_cache_tag.cache_db
   ; signature_kind : Mina_signature_kind.t
+  ; ban_status_cache : Peer_reputation.Ban_status_cache.t
   }
 [@@deriving fields]
 
@@ -1291,7 +1292,7 @@ module type CONTEXT = sig
 
   val time_controller : Block_time.Controller.t
 
-  val trust_system : Trust_system.t
+  val reputation : Peer_reputation.t
 
   val consensus_local_state : Consensus.Data.Local_state.t
 
@@ -1323,7 +1324,7 @@ let context ~commit_id ~proof_cache_db ~signature_kind (config : Config.t) :
 
     let time_controller = config.time_controller
 
-    let trust_system = config.trust_system
+    let reputation = config.reputation
 
     let consensus_local_state = config.consensus_local_state
 
@@ -1439,7 +1440,7 @@ let start t =
       ~context:(module Context)
       ~vrf_evaluator:t.processes.vrf_evaluator ~verifier:t.processes.verifier
       ~set_next_producer_timing ~prover:t.processes.prover
-      ~trust_system:t.config.trust_system
+      ~reputation:t.config.reputation
       ~transaction_resource_pool:
         (Network_pool.Transaction_pool.resource_pool
            t.components.transaction_pool )
@@ -1517,7 +1518,7 @@ let start_with_precomputed_blocks t blocks =
   let%bind () =
     Block_producer.run_precomputed
       ~context:(module Context)
-      ~verifier:t.processes.verifier ~trust_system:t.config.trust_system
+      ~verifier:t.processes.verifier ~reputation:t.config.reputation
       ~time_controller:t.config.time_controller
       ~frontier_reader:t.components.transition_frontier
       ~transition_writer:t.pipes.producer_transition_writer
@@ -1769,6 +1770,13 @@ let create ~commit_id ?wallets (config : Config.t) =
   let consensus_constants = config.precomputed_values.consensus_constants in
   let block_window_duration = config.compile_config.block_window_duration in
   let monitor = Option.value ~default:(Monitor.create ()) config.monitor in
+  (* Mirror of the libp2p helper's ban lists, rebuilt every poll; feeds
+     node-status ban_statuses, the banned_peers gauge and GraphQL. *)
+  let ban_status_cache =
+    Peer_reputation.Ban_status_cache.create ~logger:config.logger
+      config.reputation
+  in
+  Peer_reputation.Ban_status_cache.start ban_status_cache ;
   Async.Scheduler.within' ~monitor (fun () ->
       let set_itn_data (type t) (module M : Itn_settable with type t = t) (t : t)
           =
@@ -2029,7 +2037,7 @@ let create ~commit_id ?wallets (config : Config.t) =
                     |> Set.to_list
                   in
                   let ban_statuses =
-                    Trust_system.Peer_trust.peer_statuses config.trust_system
+                    Peer_reputation.Ban_status_cache.snapshot ban_status_cache
                   in
                   let git_commit = commit_id_short in
                   let uptime_minutes =
@@ -2078,7 +2086,7 @@ let create ~commit_id ?wallets (config : Config.t) =
           in
           let txn_pool_config =
             Network_pool.Transaction_pool.Resource_pool.make_config ~verifier
-              ~trust_system:config.trust_system
+              ~reputation:config.reputation
               ~pool_max_size:
                 config.precomputed_values.genesis_constants.txpool_max_size
               ~genesis_constants:config.precomputed_values.genesis_constants
@@ -2115,7 +2123,7 @@ let create ~commit_id ?wallets (config : Config.t) =
           in
           let snark_pool_config =
             Network_pool.Snark_pool.Resource_pool.make_config ~verifier
-              ~trust_system:config.trust_system
+              ~reputation:config.reputation
               ~disk_location:config.snark_pool_disk_location ~proof_cache_db
           in
           let snark_pool, snark_remote_sink, snark_local_sink =
@@ -2232,7 +2240,7 @@ let create ~commit_id ?wallets (config : Config.t) =
           let valid_transitions, initialization_finish_signal =
             Transition_router.run
               ~context:(module Context)
-              ~trust_system:config.trust_system ~verifier ~network:net
+              ~reputation:config.reputation ~verifier ~network:net
               ~is_seed:config.net_config.is_seed ~is_demo_mode:config.demo_mode
               ~time_controller:config.time_controller
               ~consensus_local_state:config.consensus_local_state
@@ -2370,23 +2378,6 @@ let create ~commit_id ?wallets (config : Config.t) =
                           [%log' warn config.logger] ~metadata
                             "Not rebroadcasting block $state_hash because it \
                              was received $timing" ) ) ) ;
-          (* FIXME #4093: augment ban_notifications with a Peer.ID so we can implement ban_notify
-             trace_task "ban notification loop" (fun () ->
-              Linear_pipe.iter (Mina_networking.ban_notification_reader net)
-                ~f:(fun notification ->
-                  let open Gossip_net in
-                  let peer = notification.banned_peer in
-                  let banned_until = notification.banned_until in
-                  (* if RPC call fails, will be logged in gossip net code *)
-                  let%map _ =
-                    Mina_networking.ban_notify net peer banned_until
-                  in
-                  () ) ) ; *)
-          don't_wait_for
-            (Linear_pipe.iter
-               (Mina_networking.ban_notification_reader net)
-               ~f:(Fn.const Deferred.unit) ) ;
-
           let%map wallets =
             match wallets with
             | Some wallets ->
@@ -2604,6 +2595,7 @@ let create ~commit_id ?wallets (config : Config.t) =
           ; commit_id
           ; proof_cache_db
           ; signature_kind
+          ; ban_status_cache
           } ) )
 
 let net { components = { net; _ }; _ } = net

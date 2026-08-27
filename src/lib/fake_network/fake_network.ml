@@ -69,12 +69,12 @@ let setup (type n) ~context:(module Context : CONTEXT)
   let fake_gossip_network =
     Gossip_net.Fake.create_network (Vect.to_list peers)
   in
-  let context trust_system consensus_local_state :
-      (module Mina_networking.CONTEXT) =
+  let context reputation consensus_local_state : (module Mina_networking.CONTEXT)
+      =
     ( module struct
       include Context
 
-      let trust_system = trust_system
+      let reputation = reputation
 
       let time_controller = time_controller
 
@@ -106,15 +106,11 @@ let setup (type n) ~context:(module Context : CONTEXT)
   let get_node_status _ = Deferred.Or_error.error_string "unimplemented" in
   let peer_networks =
     Vect.map2 peers states ~f:(fun peer state ->
-        let trust_system = Trust_system.null () in
-        don't_wait_for
-          (Pipe_lib.Strict_pipe.Reader.iter
-             Trust_system.(upcall_pipe trust_system)
-             ~f:(const Deferred.unit) ) ;
+        let reputation = Peer_reputation.null in
         let network =
           Thread_safe.block_on_async_exn (fun () ->
               Mina_networking.create
-                (context trust_system state.consensus_local_state)
+                (context reputation state.consensus_local_state)
                 (config state.rpc_mocks peer)
                 ~sinks:
                   ( Transition_handler.Block_sink.void

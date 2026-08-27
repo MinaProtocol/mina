@@ -103,8 +103,8 @@ let add_and_finalize ~logger ~frontier ~catchup_scheduler
     Catchup_scheduler.notify catchup_scheduler
       ~hash:(Mina_block.Validated.state_hash transition) )
 
-let process_transition ~context:(module Context : CONTEXT) ~trust_system
-    ~verifier ~get_completed_work ~frontier ~catchup_scheduler
+let process_transition ~context:(module Context : CONTEXT) ~reputation ~verifier
+    ~get_completed_work ~frontier ~catchup_scheduler
     ~processed_transition_writer ~time_controller ~block_or_header ~valid_cb
     ?transaction_pool_proxy =
   let is_block_in_frontier =
@@ -149,12 +149,12 @@ let process_transition ~context:(module Context : CONTEXT) ~trust_system
   let handle_not_selected () =
     [%log internal] "Failure"
       ~metadata:[ ("reason", `String "Not_selected_over_frontier_root") ] ;
-    Trust_system.record_envelope_sender trust_system logger sender
-      ( Trust_system.Actions.Gossiped_invalid_transition
-      , Some
-          ( "The transition with hash $state_hash was not selected over the \
-             transition frontier root"
-          , metadata ) )
+    Peer_reputation.ban_sender reputation ~logger
+      ~reason:
+        "The transition with hash $state_hash was not selected over the \
+         transition frontier root"
+      ~metadata sender ;
+    Deferred.unit
   in
   match block_or_header with
   | `Header env -> (
@@ -264,10 +264,10 @@ let process_transition ~context:(module Context : CONTEXT) ~trust_system
         cached_transform_deferred_result cached_initially_validated_transition
           ~transform_cached:(fun _ ->
             Transition_frontier.Breadcrumb.build ~logger ~precomputed_values
-              ~verifier ~get_completed_work ~trust_system
-              ~transition_receipt_time ~sender:(Some sender)
-              ~parent:parent_breadcrumb ~transition:mostly_validated_transition
-              ?transaction_pool_proxy (* TODO: Can we skip here? *) () )
+              ~verifier ~get_completed_work ~reputation ~transition_receipt_time
+              ~sender:(Some sender) ~parent:parent_breadcrumb
+              ~transition:mostly_validated_transition ?transaction_pool_proxy
+              (* TODO: Can we skip here? *) () )
           ~transform_result:(function
             | Error (`Invalid_staged_ledger_hash error)
             | Error (`Invalid_staged_ledger_diff error) ->
@@ -306,7 +306,7 @@ let process_transition ~context:(module Context : CONTEXT) ~trust_system
             ~metadata:[ ("reason", `String (Error.to_string_hum err)) ] ) ;
       Result.return result
 
-let run ~context:(module Context : CONTEXT) ~verifier ~trust_system
+let run ~context:(module Context : CONTEXT) ~verifier ~reputation
     ~time_controller ~frontier ~get_completed_work
     ~(primary_transition_reader :
        ( [ `Block of
@@ -336,7 +336,7 @@ let run ~context:(module Context : CONTEXT) ~verifier ~trust_system
        Writer.t ) ~processed_transition_writer ?transaction_pool_proxy =
   let open Context in
   let catchup_scheduler =
-    Catchup_scheduler.create ~logger ~precomputed_values ~verifier ~trust_system
+    Catchup_scheduler.create ~logger ~precomputed_values ~verifier ~reputation
       ~frontier ~time_controller ~catchup_job_writer ~catchup_breadcrumbs_writer
       ~clean_up_signal:clean_up_catchup_scheduler
   in
@@ -347,7 +347,7 @@ let run ~context:(module Context : CONTEXT) ~verifier ~trust_system
   let process_transition =
     process_transition
       ~context:(module Context)
-      ~get_completed_work ~trust_system ~verifier ~frontier ~catchup_scheduler
+      ~get_completed_work ~reputation ~verifier ~frontier ~catchup_scheduler
       ~processed_transition_writer ~time_controller
   in
   O1trace.background_thread "process_blocks" (fun () ->
@@ -513,7 +513,7 @@ let%test_module "Transition_handler.Processor tests" =
 
     let time_controller = Block_time.Controller.basic ~logger
 
-    let trust_system = Trust_system.null ()
+    let reputation = Peer_reputation.null
 
     let verifier =
       Async.Thread_safe.block_on_async_exn (fun () ->
@@ -578,7 +578,7 @@ let%test_module "Transition_handler.Processor tests" =
                 run
                   ~context:(module Context)
                   ~time_controller ~verifier ~get_completed_work:(Fn.const None)
-                  ~trust_system ~clean_up_catchup_scheduler ~frontier
+                  ~reputation ~clean_up_catchup_scheduler ~frontier
                   ~primary_transition_reader:valid_transition_reader
                   ~producer_transition_reader ~catchup_job_writer
                   ~catchup_breadcrumbs_reader ~catchup_breadcrumbs_writer

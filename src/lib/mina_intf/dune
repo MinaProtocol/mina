@@ -22,7 +22,7 @@
   network_peer
   network_pool
   logger
-  trust_system
+  peer_reputation
   block_time
   verifier
   mina_stdlib

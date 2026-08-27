@@ -19,7 +19,7 @@
   data_hash_lib
   precomputed_values
   genesis_constants
-  trust_system
+  peer_reputation
   transition_frontier_extensions
   transition_frontier_base
   consensus

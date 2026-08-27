@@ -44,7 +44,7 @@
   mina_networking
   consensus.vrf
   vrf_evaluator
-  trust_system
+  peer_reputation
   with_hash
   data_hash_lib
   staged_ledger

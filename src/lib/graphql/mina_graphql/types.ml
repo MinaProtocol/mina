@@ -2308,32 +2308,31 @@ module Payload = struct
             ~resolve:(fun _ _ -> true)
         ] )
 
-  let time_of_banned_status = function
-    | Trust_system.Banned_status.Unbanned ->
-        None
-    | Banned_until tm ->
-        Some tm
-
-  let trust_status =
-    obj "TrustStatusPayload" ~fields:(fun _ ->
-        let open Trust_system.Peer_status in
-        [ field "ipAddr"
-            ~typ:(non_null @@ Graphql_basic_scalars.InetAddr.typ ())
-            ~doc:"IP address"
+  (* A banned or trusted entry as reported by the libp2p helper. *)
+  let ban_entry : (Mina_lib.t, Peer_reputation.Entry.t option) typ =
+    let ban_kind =
+      enum "BanKind" ~doc:"Whether a ban entry identifies a peer ID or an IP"
+        ~values:
+          [ enum_value "PEER_ID" ~value:Peer_reputation.Kind.Peer_id
+          ; enum_value "IP" ~value:Peer_reputation.Kind.Ip
+          ]
+    in
+    obj "BanEntry" ~fields:(fun _ ->
+        [ field "kind" ~typ:(non_null ban_kind)
+            ~doc:"Whether this entry is a peer ID or an IP address"
             ~args:Arg.[]
-            ~resolve:(fun (_ : Mina_lib.t resolve_info) (peer, _) ->
-              peer.Network_peer.Peer.host )
-        ; field "peerId" ~typ:(non_null string) ~doc:"libp2p Peer ID"
+            ~resolve:(fun _ (e : Peer_reputation.Entry.t) -> e.kind)
+        ; field "identity" ~typ:(non_null string)
+            ~doc:"The base58 peer ID or IP address"
             ~args:Arg.[]
-            ~resolve:(fun _ (peer, __) -> peer.Network_peer.Peer.peer_id)
-        ; field "trust" ~typ:(non_null float) ~doc:"Trust score"
-            ~args:Arg.[]
-            ~resolve:(fun _ (_, { trust; _ }) -> trust)
-        ; field "bannedStatus"
+            ~resolve:(fun _ (e : Peer_reputation.Entry.t) -> e.identity)
+        ; field "bannedUntil"
             ~typ:(Graphql_basic_scalars.Time.typ ())
-            ~doc:"Banned status"
+            ~doc:
+              "Expiry of an automatic ban; null for manual/indefinite entries \
+               (trusted entries are always null)"
             ~args:Arg.[]
-            ~resolve:(fun _ (_, { banned; _ }) -> time_of_banned_status banned)
+            ~resolve:(fun _ (e : Peer_reputation.Entry.t) -> e.until)
         ] )
 
   let send_payment =
@@ -2422,21 +2421,10 @@ module Payload = struct
             ~resolve:(fun _ -> Fn.id)
         ] )
 
-  let set_connection_gating_config =
+  let set_connection_gating_config :
+      (Mina_lib.t, Mina_net2.connection_gating option) typ =
     obj "SetConnectionGatingConfigPayload" ~fields:(fun _ ->
-        [ field "trustedPeers"
-            ~typ:(non_null (list (non_null peer)))
-            ~doc:"Peers we will always allow connections from"
-            ~args:Arg.[]
-            ~resolve:(fun _ config -> config.Mina_net2.trusted_peers)
-        ; field "bannedPeers"
-            ~typ:(non_null (list (non_null peer)))
-            ~doc:
-              "Peers we will never allow connections from (unless they are \
-               also trusted!)"
-            ~args:Arg.[]
-            ~resolve:(fun _ config -> config.Mina_net2.banned_peers)
-        ; field "isolate" ~typ:(non_null bool)
+        [ field "isolate" ~typ:(non_null bool)
             ~doc:
               "If true, no connections will be allowed unless they are from a \
                trusted peer"
@@ -3158,15 +3146,6 @@ module Input = struct
         ~split:Fn.id
   end
 
-  module ResetTrustStatusInput = struct
-    type input = string
-
-    let arg_typ =
-      obj "ResetTrustStatusInput" ~coerce:Fn.id
-        ~fields:[ arg "ipAddress" ~typ:(non_null string) ]
-        ~split:Fn.id
-  end
-
   module BlockFilterInput = struct
     type input = PublicKey.input
 
@@ -3234,47 +3213,6 @@ module Input = struct
                     stop doing any snark work. %s"
                    Cli_lib.Default.receiver_key_warning )
           ]
-  end
-
-  module SetConnectionGatingConfigInput = struct
-    type input =
-      Mina_net2.connection_gating * [ `Clean_added_peers of bool option ]
-
-    let arg_typ :
-        ( ( Mina_net2.connection_gating * [ `Clean_added_peers of bool option ]
-          , string )
-          result
-          option
-        , input option )
-        arg_typ =
-      obj "SetConnectionGatingConfigInput"
-        ~coerce:(fun trusted_peers banned_peers isolate clean_added_peers ->
-          let open Result.Let_syntax in
-          let%bind trusted_peers = Result.all trusted_peers in
-          let%map banned_peers = Result.all banned_peers in
-          ( Mina_net2.{ isolate; trusted_peers; banned_peers }
-          , `Clean_added_peers clean_added_peers ) )
-        ~split:(fun f ((t, `Clean_added_peers clean_added_peers) : input) ->
-          f t.trusted_peers t.banned_peers t.isolate clean_added_peers )
-        ~fields:
-          Arg.
-            [ arg "trustedPeers"
-                ~typ:(non_null (list (non_null NetworkPeer.arg_typ)))
-                ~doc:"Peers we will always allow connections from"
-            ; arg "bannedPeers"
-                ~typ:(non_null (list (non_null NetworkPeer.arg_typ)))
-                ~doc:
-                  "Peers we will never allow connections from (unless they are \
-                   also trusted!)"
-            ; arg "isolate" ~typ:(non_null bool)
-                ~doc:
-                  "If true, no connections will be allowed unless they are \
-                   from a trusted peer"
-            ; arg "cleanAddedPeers" ~typ:bool
-                ~doc:
-                  "If true, resets added peers to an empty list (including \
-                   seeds)"
-            ]
   end
 
   module Itn = struct
@@ -3443,55 +3381,6 @@ module Input = struct
                      will have (2*maxAccountUpdates+2) account updates \
                      (including balancing and fee payer)"
                   ~typ:int
-              ]
-    end
-
-    module GatingUpdate = struct
-      type input =
-        { trusted_peers : Network_peer.Peer.t list
-        ; banned_peers : Network_peer.Peer.t list
-        ; isolate : bool
-        ; clean_added_peers : bool
-        ; added_peers : Network_peer.Peer.t list
-        }
-
-      let arg_typ =
-        obj "GatingUpdate" ~doc:"Update to gating config and added peers"
-          ~coerce:(fun trusted_peers banned_peers isolate clean_added_peers
-                       added_peers ->
-            let%bind.Result trusted_peers = Result.all trusted_peers in
-            let%bind.Result banned_peers = Result.all banned_peers in
-            let%map.Result added_peers = Result.all added_peers in
-            { trusted_peers
-            ; banned_peers
-            ; isolate
-            ; clean_added_peers
-            ; added_peers
-            } )
-          ~split:(fun f (t : input) ->
-            f t.trusted_peers t.banned_peers t.isolate t.clean_added_peers
-              t.added_peers )
-          ~fields:
-            Arg.
-              [ arg "trustedPeers"
-                  ~typ:(non_null (list (non_null NetworkPeer.arg_typ)))
-                  ~doc:"Peers we will always allow connections from"
-              ; arg "bannedPeers"
-                  ~typ:(non_null (list (non_null NetworkPeer.arg_typ)))
-                  ~doc:
-                    "Peers we will never allow connections from (unless they \
-                     are also trusted!)"
-              ; arg "isolate" ~typ:(non_null bool)
-                  ~doc:
-                    "If true, no connections will be allowed unless they are \
-                     from a trusted peer"
-              ; arg "cleanAddedPeers" ~typ:(non_null bool)
-                  ~doc:
-                    "If true, resets added peers to an empty list (including \
-                     seeds)"
-              ; arg "addedPeers"
-                  ~typ:(non_null (list (non_null NetworkPeer.arg_typ)))
-                  ~doc:"Peers to connect to"
               ]
     end
   end

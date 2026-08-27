@@ -55,7 +55,7 @@ module D = Downloader.Make (Key) (Attempt) (Result) (Knowledge_context)
 let%test_unit "[`No_peers] state wakes on a useful_peers signal" =
   Thread_safe.block_on_async_exn (fun () ->
       let logger = Logger.null () in
-      let trust_system = Trust_system.null () in
+      let reputation = Peer_reputation.null in
       let stop = Ivar.create () in
       let peer =
         Peer.create
@@ -65,7 +65,7 @@ let%test_unit "[`No_peers] state wakes on a useful_peers signal" =
       in
       let knowledge_context, _knowledge_w = Broadcast_pipe.create () in
       let%bind downloader =
-        D.create ~max_batch_size:1 ~stop:(Ivar.read stop) ~logger ~trust_system
+        D.create ~max_batch_size:1 ~stop:(Ivar.read stop) ~logger ~reputation
           ~get:(fun _peer keys -> Deferred.Or_error.return keys)
           ~knowledge_context
           ~knowledge:(fun () _peer -> Deferred.return (`Some []))
@@ -109,7 +109,7 @@ let%test_unit "[`No_peers] state wakes on a useful_peers signal" =
 let%test_unit "[`No_peers] self-heals through `Stalled`/reset_knowledge" =
   Thread_safe.block_on_async_exn (fun () ->
       let logger = Logger.null () in
-      let trust_system = Trust_system.null () in
+      let reputation = Peer_reputation.null in
       let stop = Ivar.create () in
       let peer =
         Peer.create
@@ -123,7 +123,7 @@ let%test_unit "[`No_peers] self-heals through `Stalled`/reset_knowledge" =
         D.create ~ignore_period:(Time.Span.of_ms 200.)
           ~post_stall_retry_delay:(Time.Span.of_ms 200.)
           ~peer_refresh_interval:(Time.Span.of_ms 100.) ~max_batch_size:1
-          ~stop:(Ivar.read stop) ~logger ~trust_system
+          ~stop:(Ivar.read stop) ~logger ~reputation
           ~get:(fun _peer keys ->
             incr download_attempts ;
             if !download_attempts = 1 then

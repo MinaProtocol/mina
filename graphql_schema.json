@@ -286,160 +286,6 @@
         },
         {
           "kind": "INPUT_OBJECT",
-          "name": "SetConnectionGatingConfigInput",
-          "description": null,
-          "fields": [
-            {
-              "name": "cleanAddedPeers",
-              "description":
-                "If true, resets added peers to an empty list (including seeds)",
-              "args": [],
-              "type": { "kind": "SCALAR", "name": "Boolean", "ofType": null },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "isolate",
-              "description":
-                "If true, no connections will be allowed unless they are from a trusted peer",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "Boolean",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "bannedPeers",
-              "description":
-                "Peers we will never allow connections from (unless they are also trusted!)",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "LIST",
-                  "name": null,
-                  "ofType": {
-                    "kind": "NON_NULL",
-                    "name": null,
-                    "ofType": {
-                      "kind": "INPUT_OBJECT",
-                      "name": "NetworkPeer",
-                      "ofType": null
-                    }
-                  }
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "trustedPeers",
-              "description": "Peers we will always allow connections from",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "LIST",
-                  "name": null,
-                  "ofType": {
-                    "kind": "NON_NULL",
-                    "name": null,
-                    "ofType": {
-                      "kind": "INPUT_OBJECT",
-                      "name": "NetworkPeer",
-                      "ofType": null
-                    }
-                  }
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            }
-          ],
-          "inputFields": [
-            {
-              "name": "cleanAddedPeers",
-              "description":
-                "If true, resets added peers to an empty list (including seeds)",
-              "type": { "kind": "SCALAR", "name": "Boolean", "ofType": null },
-              "defaultValue": null
-            },
-            {
-              "name": "isolate",
-              "description":
-                "If true, no connections will be allowed unless they are from a trusted peer",
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "Boolean",
-                  "ofType": null
-                }
-              },
-              "defaultValue": null
-            },
-            {
-              "name": "bannedPeers",
-              "description":
-                "Peers we will never allow connections from (unless they are also trusted!)",
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "LIST",
-                  "name": null,
-                  "ofType": {
-                    "kind": "NON_NULL",
-                    "name": null,
-                    "ofType": {
-                      "kind": "INPUT_OBJECT",
-                      "name": "NetworkPeer",
-                      "ofType": null
-                    }
-                  }
-                }
-              },
-              "defaultValue": null
-            },
-            {
-              "name": "trustedPeers",
-              "description": "Peers we will always allow connections from",
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "LIST",
-                  "name": null,
-                  "ofType": {
-                    "kind": "NON_NULL",
-                    "name": null,
-                    "ofType": {
-                      "kind": "INPUT_OBJECT",
-                      "name": "NetworkPeer",
-                      "ofType": null
-                    }
-                  }
-                }
-              },
-              "defaultValue": null
-            }
-          ],
-          "interfaces": null,
-          "enumValues": null,
-          "possibleTypes": null
-        },
-        {
-          "kind": "INPUT_OBJECT",
           "name": "SetSnarkWorkFee",
           "description": null,
           "fields": [
@@ -5320,19 +5166,19 @@
               "deprecationReason": null
             },
             {
-              "name": "setConnectionGatingConfig",
-              "description":
-                "Set the connection gating config, returning the current config after the application (which may have failed)",
+              "name": "setIsolate",
+              "description": "Enable or disable network isolation mode",
               "args": [
                 {
-                  "name": "input",
-                  "description": null,
+                  "name": "isolate",
+                  "description":
+                    "If true, only connections to trusted peers are allowed; otherwise normal gating applies",
                   "type": {
                     "kind": "NON_NULL",
                     "name": null,
                     "ofType": {
-                      "kind": "INPUT_OBJECT",
-                      "name": "SetConnectionGatingConfigInput",
+                      "kind": "SCALAR",
+                      "name": "Boolean",
                       "ofType": null
                     }
                   },
@@ -5343,8 +5189,175 @@
                 "kind": "NON_NULL",
                 "name": null,
                 "ofType": {
-                  "kind": "OBJECT",
-                  "name": "SetConnectionGatingConfigPayload",
+                  "kind": "SCALAR",
+                  "name": "String",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "banPeer",
+              "description":
+                "Manually ban a peer (indefinite; persists across daemon restarts until unbanned)",
+              "args": [
+                {
+                  "name": "ip",
+                  "description": "IP address to ban alongside the peer ID",
+                  "type": {
+                    "kind": "SCALAR",
+                    "name": "String",
+                    "ofType": null
+                  },
+                  "defaultValue": null
+                },
+                {
+                  "name": "peerId",
+                  "description": "libp2p peer ID to ban",
+                  "type": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "SCALAR",
+                      "name": "String",
+                      "ofType": null
+                    }
+                  },
+                  "defaultValue": null
+                }
+              ],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "String",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "unbanPeer",
+              "description": "Remove a peer from the ban list",
+              "args": [
+                {
+                  "name": "ip",
+                  "description": "IP address to unban alongside the peer ID",
+                  "type": {
+                    "kind": "SCALAR",
+                    "name": "String",
+                    "ofType": null
+                  },
+                  "defaultValue": null
+                },
+                {
+                  "name": "peerId",
+                  "description": "libp2p peer ID to unban",
+                  "type": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "SCALAR",
+                      "name": "String",
+                      "ofType": null
+                    }
+                  },
+                  "defaultValue": null
+                }
+              ],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "String",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "addTrustedPeer",
+              "description":
+                "Add a peer to the trusted list (trusted peers are never gated)",
+              "args": [
+                {
+                  "name": "ip",
+                  "description": "IP address to trust alongside the peer ID",
+                  "type": {
+                    "kind": "SCALAR",
+                    "name": "String",
+                    "ofType": null
+                  },
+                  "defaultValue": null
+                },
+                {
+                  "name": "peerId",
+                  "description": "libp2p peer ID to trust",
+                  "type": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "SCALAR",
+                      "name": "String",
+                      "ofType": null
+                    }
+                  },
+                  "defaultValue": null
+                }
+              ],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "String",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "removeTrustedPeer",
+              "description": "Remove a peer from the trusted list",
+              "args": [
+                {
+                  "name": "ip",
+                  "description": "IP address to remove alongside the peer ID",
+                  "type": {
+                    "kind": "SCALAR",
+                    "name": "String",
+                    "ofType": null
+                  },
+                  "defaultValue": null
+                },
+                {
+                  "name": "peerId",
+                  "description":
+                    "libp2p peer ID to remove from the trusted list",
+                  "type": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "SCALAR",
+                      "name": "String",
+                      "ofType": null
+                    }
+                  },
+                  "defaultValue": null
+                }
+              ],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "String",
                   "ofType": null
                 }
               },
@@ -6014,6 +6027,16 @@
               "defaultValue": null
             }
           ],
+          "interfaces": null,
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "SCALAR",
+          "name": "Float",
+          "description": null,
+          "fields": null,
+          "inputFields": null,
           "interfaces": null,
           "enumValues": null,
           "possibleTypes": null
@@ -7064,30 +7087,44 @@
           "possibleTypes": null
         },
         {
-          "kind": "SCALAR",
-          "name": "Float",
-          "description": null,
+          "kind": "ENUM",
+          "name": "BanKind",
+          "description": "Whether a ban entry identifies a peer ID or an IP",
           "fields": null,
           "inputFields": null,
           "interfaces": null,
-          "enumValues": null,
+          "enumValues": [
+            {
+              "name": "PEER_ID",
+              "description": null,
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "IP",
+              "description": null,
+              "isDeprecated": false,
+              "deprecationReason": null
+            }
+          ],
           "possibleTypes": null
         },
         {
           "kind": "OBJECT",
-          "name": "TrustStatusPayload",
+          "name": "BanEntry",
           "description": null,
           "fields": [
             {
-              "name": "ipAddr",
-              "description": "IP address",
+              "name": "kind",
+              "description":
+                "Whether this entry is a peer ID or an IP address",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
                 "ofType": {
-                  "kind": "SCALAR",
-                  "name": "InetAddr",
+                  "kind": "ENUM",
+                  "name": "BanKind",
                   "ofType": null
                 }
               },
@@ -7095,8 +7132,8 @@
               "deprecationReason": null
             },
             {
-              "name": "peerId",
-              "description": "libp2p Peer ID",
+              "name": "identity",
+              "description": "The base58 peer ID or IP address",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -7111,24 +7148,9 @@
               "deprecationReason": null
             },
             {
-              "name": "trust",
-              "description": "Trust score",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "Float",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "bannedStatus",
-              "description": "Banned status",
+              "name": "bannedUntil",
+              "description":
+                "Expiry of an automatic ban; null for manual/indefinite entries (trusted entries are always null)",
               "args": [],
               "type": { "kind": "SCALAR", "name": "Time", "ofType": null },
               "isDeprecated": false,
@@ -12099,124 +12121,10 @@
           "possibleTypes": null
         },
         {
-          "kind": "SCALAR",
-          "name": "InetAddr",
-          "description": "network address",
-          "fields": null,
-          "inputFields": null,
-          "interfaces": null,
-          "enumValues": null,
-          "possibleTypes": null
-        },
-        {
-          "kind": "OBJECT",
-          "name": "NetworkPeerPayload",
-          "description": null,
-          "fields": [
-            {
-              "name": "peerId",
-              "description": "base58-encoded peer ID",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "String",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "host",
-              "description": "IP address of the remote host",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "InetAddr",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "libp2pPort",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": { "kind": "SCALAR", "name": "Int", "ofType": null }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            }
-          ],
-          "inputFields": null,
-          "interfaces": [],
-          "enumValues": null,
-          "possibleTypes": null
-        },
-        {
           "kind": "OBJECT",
           "name": "SetConnectionGatingConfigPayload",
           "description": null,
           "fields": [
-            {
-              "name": "trustedPeers",
-              "description": "Peers we will always allow connections from",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "LIST",
-                  "name": null,
-                  "ofType": {
-                    "kind": "NON_NULL",
-                    "name": null,
-                    "ofType": {
-                      "kind": "OBJECT",
-                      "name": "NetworkPeerPayload",
-                      "ofType": null
-                    }
-                  }
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "bannedPeers",
-              "description":
-                "Peers we will never allow connections from (unless they are also trusted!)",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "LIST",
-                  "name": null,
-                  "ofType": {
-                    "kind": "NON_NULL",
-                    "name": null,
-                    "ofType": {
-                      "kind": "OBJECT",
-                      "name": "NetworkPeerPayload",
-                      "ofType": null
-                    }
-                  }
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
             {
               "name": "isolate",
               "description":
@@ -15413,43 +15321,9 @@
               "deprecationReason": null
             },
             {
-              "name": "trustStatus",
-              "description": "Trust status for an IPv4 or IPv6 address",
-              "args": [
-                {
-                  "name": "ipAddress",
-                  "description": null,
-                  "type": {
-                    "kind": "NON_NULL",
-                    "name": null,
-                    "ofType": {
-                      "kind": "SCALAR",
-                      "name": "String",
-                      "ofType": null
-                    }
-                  },
-                  "defaultValue": null
-                }
-              ],
-              "type": {
-                "kind": "LIST",
-                "name": null,
-                "ofType": {
-                  "kind": "NON_NULL",
-                  "name": null,
-                  "ofType": {
-                    "kind": "OBJECT",
-                    "name": "TrustStatusPayload",
-                    "ofType": null
-                  }
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "trustStatusAll",
-              "description": "IP address and trust status for all peers",
+              "name": "bans",
+              "description":
+                "Peers and IPs currently banned by the libp2p helper (from the daemon's ban cache; refreshed every poll)",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -15462,7 +15336,32 @@
                     "name": null,
                     "ofType": {
                       "kind": "OBJECT",
-                      "name": "TrustStatusPayload",
+                      "name": "BanEntry",
+                      "ofType": null
+                    }
+                  }
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "trustedPeers",
+              "description":
+                "Peers and IPs the libp2p helper treats as trusted (never gated)",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "LIST",
+                  "name": null,
+                  "ofType": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "OBJECT",
+                      "name": "BanEntry",
                       "ofType": null
                     }
                   }

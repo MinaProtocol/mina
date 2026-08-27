@@ -7,13 +7,6 @@ open Intf
 type ('q, 'r) dispatch =
   Versioned_rpc.Connection_with_menu.t -> 'q -> 'r Deferred.Or_error.t
 
-module Connection_with_state = struct
-  type t = Banned | Allowed of Rpc.Connection.t Ivar.t
-
-  let value_map ~when_allowed ~when_banned t =
-    match t with Allowed c -> when_allowed c | _ -> when_banned
-end
-
 type pubsub_topic_mode_t = RO | RW | N
 
 let v1_topic_block = "mina/block/1.0.0"
@@ -37,7 +30,7 @@ module Config = struct
     ; logger : Logger.t
     ; unsafe_no_trust_ip : bool
     ; isolate : bool
-    ; trust_system : Trust_system.t
+    ; reputation : Peer_reputation.t
     ; flooding : bool
     ; direct_peers : Mina_net2.Multiaddr.t list
     ; peer_exchange : bool
@@ -114,12 +107,8 @@ let on_gossip_decode_failure (config : Config.t) envelope (err : Error.t) =
     ; ("error", Error_json.error_to_yojson err)
     ]
   in
-  Trust_system.(
-    record config.trust_system config.logger peer
-      Actions.
-        (Decoding_failed, Some ("failed to decode gossip message", metadata)))
-  |> don't_wait_for ;
-  ()
+  Peer_reputation.ban config.reputation ~logger:config.logger
+    ~reason:"failed to decode gossip message" ~metadata peer
 
 module Make (Rpc_interface : RPC_INTERFACE) :
   S with module Rpc_interface := Rpc_interface = struct
@@ -130,13 +119,12 @@ module Make (Rpc_interface : RPC_INTERFACE) :
       ; net2 : Mina_net2.t Deferred.t ref
       ; first_peer_ivar : unit Ivar.t
       ; high_connectivity_ivar : unit Ivar.t
-      ; ban_reader : Intf.ban_notification Linear_pipe.Reader.t
       ; publish_functions : publish_functions ref
       ; restart_helper : unit -> unit
       }
 
     (* TODO: should we share this with the Fake network impl? *)
-    let setup_rpc (type query response) ctx logger trust_system
+    let setup_rpc (type query response) ctx logger
         (rpc : (query, response) Rpc_interface.rpc) =
       let (module Impl) = Rpc_interface.implementation rpc in
       let log_rate_limiter_occasionally rl =
@@ -168,14 +156,6 @@ module Make (Rpc_interface : RPC_INTERFACE) :
                 Impl.log_request_received ~logger ~sender:peer request ;
                 let request_env =
                   Envelope.Incoming.wrap_peer ~data:request ~sender:peer
-                in
-                let sender = Envelope.Incoming.sender request_env in
-                let%bind () =
-                  let msg = Impl.receipt_trust_action_message request in
-                  (* TODO: kill trust system (#11723) *)
-                  Trust_system.(
-                    record_envelope_sender trust_system logger sender
-                      Actions.(Made_request, Some msg))
                 in
                 let%map response =
                   Impl.handle_request ctx ~version request_env
@@ -338,40 +318,23 @@ module Make (Rpc_interface : RPC_INTERFACE) :
                 ~max_connections:config.max_connections
                 ~validation_queue_size:config.validation_queue_size
                 ~known_private_ip_nets:config.known_private_ip_nets
-                ~initial_gating_config:
-                  Mina_net2.
-                    { banned_peers =
-                        Trust_system.peer_statuses config.trust_system
-                        |> List.filter_map ~f:(fun (peer, status) ->
-                               match status.banned with
-                               | Banned_until _ ->
-                                   Some peer
-                               | _ ->
-                                   None )
-                    ; trusted_peers =
-                        List.filter_map ~f:Mina_net2.Multiaddr.to_peer
-                          config.initial_peers
-                    ; isolate = config.isolate
-                    }
+                ~initial_gating_config:Mina_net2.{ isolate = config.isolate }
                 ~topic_config:[ [ v0_topic ]; v1_topics ]
             in
             let implementation_list =
               List.bind Rpc_interface.all_rpcs ~f:(fun (Rpc rpc) ->
-                  setup_rpc ctx config.logger config.trust_system rpc )
+                  setup_rpc ctx config.logger rpc )
             in
             let implementations =
               let handle_unknown_rpc conn_state ~rpc_tag ~version =
-                Deferred.don't_wait_for
-                  Trust_system.(
-                    record config.trust_system config.logger conn_state
-                      Actions.
-                        ( Unknown_rpc
-                        , Some
-                            ( "Attempt to make unknown (fixed-version) RPC \
-                               call \"$rpc\" with version $version"
-                            , [ ("rpc", `String rpc_tag)
-                              ; ("version", `Int version)
-                              ] ) )) ;
+                [%log' warn config.logger]
+                  "Peer $peer attempted to make unknown (fixed-version) RPC \
+                   call \"$rpc\" with version $version"
+                  ~metadata:
+                    [ ("peer", Peer.to_yojson conn_state)
+                    ; ("rpc", `String rpc_tag)
+                    ; ("version", `Int version)
+                    ] ;
                 `Close_connection
               in
               Rpc.Implementations.create_exn
@@ -402,16 +365,14 @@ module Make (Rpc_interface : RPC_INTERFACE) :
                           cleanup ~reason:`Handshake_failed ;
                           don't_wait_for
                             (Mina_net2.reset_stream net2 stream >>| ignore) ;
-                          Trust_system.(
-                            record config.trust_system config.logger peer
-                              Actions.
-                                ( Incoming_connection_error
-                                , Some
-                                    ( "Handshake error: $exn"
-                                    , [ ( "exn"
-                                        , `String
-                                            (Exn.to_string handshake_error) )
-                                      ] ) ))
+                          [%log' debug config.logger]
+                            "Handshake error on incoming stream from $peer: \
+                             $exn"
+                            ~metadata:
+                              [ ("peer", Peer.to_yojson peer)
+                              ; ("exn", `String (Exn.to_string handshake_error))
+                              ] ;
+                          Deferred.unit
                       | Ok rpc_connection -> (
                           let%bind () =
                             Async_rpc_kernel.Rpc.Connection.close_finished
@@ -647,64 +608,12 @@ module Make (Rpc_interface : RPC_INTERFACE) :
                restart_libp2p () ; !net2_ref >>| ignore ) ) ;
         start_libp2p ()
       in
-      let ban_configuration =
-        ref { Mina_net2.banned_peers = []; trusted_peers = []; isolate = false }
-      in
-      let send_heartbeat peer =
-        O1trace.thread "execute_heartbeat" (fun () ->
-            let n_def = !net2_ref in
-            if Deferred.is_determined n_def then
-              let%map net2 = n_def in
-              Mina_net2.send_heartbeat net2 peer.Network_peer.Peer.peer_id
-            else Deferred.unit )
-      in
-      let do_ban (banned_peer, expiration) =
-        O1trace.thread "execute_gossip_net_bans" (fun () ->
-            don't_wait_for
-              ( Clock.at expiration
-              >>= fun () ->
-              let%bind net2 = !net2_ref in
-              ban_configuration :=
-                { !ban_configuration with
-                  banned_peers =
-                    List.filter !ban_configuration.banned_peers ~f:(fun p ->
-                        not (Peer.equal p banned_peer) )
-                } ;
-              Mina_net2.set_connection_gating_config net2 !ban_configuration
-              |> Deferred.ignore_m ) ;
-            (let%bind net2 = !net2_ref in
-             ban_configuration :=
-               { !ban_configuration with
-                 banned_peers = banned_peer :: !ban_configuration.banned_peers
-               } ;
-             Mina_net2.set_connection_gating_config net2 !ban_configuration )
-            |> Deferred.ignore_m )
-      in
-      let%map () =
-        Deferred.List.iter (Trust_system.peer_statuses config.trust_system)
-          ~f:(function
-          | ( addr
-            , { banned = Trust_system.Banned_status.Banned_until expiration; _ }
-            ) ->
-              do_ban (addr, expiration)
-          | _ ->
-              Deferred.unit )
-      in
-      let handle_trust_system_upcall upcall =
-        match upcall with
-        | `Ban u ->
-            do_ban u
-        | `Heartbeat peer ->
-            send_heartbeat peer
-      in
-      let ban_reader, ban_writer = Linear_pipe.create () in
-      don't_wait_for
-        (let%map () =
-           Strict_pipe.Reader.iter
-             (Trust_system.upcall_pipe config.trust_system)
-             ~f:handle_trust_system_upcall
-         in
-         Linear_pipe.close ban_writer ) ;
+      (* Bind the daemon-side reputation handle to this helper instance
+         (which may be restarted; always resolve through [net2_ref]). *)
+      Peer_reputation.bind config.reputation
+        (Mina_net2.peer_reputation_impl ~get:(fun () ->
+             let n = !net2_ref in
+             if Deferred.is_determined n then Some n else None ) ) ;
       let t =
         { config
         ; added_seeds
@@ -712,7 +621,6 @@ module Make (Rpc_interface : RPC_INTERFACE) :
         ; first_peer_ivar
         ; high_connectivity_ivar
         ; publish_functions = pfs_ref
-        ; ban_reader
         ; restart_helper = (fun () -> Strict_pipe.Writer.write restarts_w ())
         }
       in
@@ -726,7 +634,7 @@ module Make (Rpc_interface : RPC_INTERFACE) :
                   ~f:
                     (Fn.compose Mina_net2.Multiaddr.of_string
                        Peer.to_multiaddr_string ) ) ) ;
-      t
+      return t
 
     let set_node_status t data =
       !(t.net2) >>= Fn.flip Mina_net2.set_node_status data
@@ -805,16 +713,14 @@ module Make (Rpc_interface : RPC_INTERFACE) :
               ~on_handshake_error:
                 (`Call
                   (fun exn ->
-                    let%map () =
-                      Trust_system.(
-                        record t.config.trust_system t.config.logger peer
-                          Actions.
-                            ( Outgoing_connection_error
-                            , Some
-                                ( "Handshake error: $exn"
-                                , [ ("exn", `String (Exn.to_string exn)) ] ) ))
-                    in
-                    Or_error.error_string "handshake error" ) ) )
+                    [%log' debug t.config.logger]
+                      "Handshake error on outgoing RPC to $peer: $exn"
+                      ~metadata:
+                        [ ("peer", Peer.to_yojson peer)
+                        ; ("exn", `String (Exn.to_string exn))
+                        ] ;
+                    Deferred.return (Or_error.error_string "handshake error") )
+                  ) )
         >>= function
         | Ok (Ok result) ->
             (* call succeeded, result is valid *)
@@ -839,25 +745,9 @@ module Make (Rpc_interface : RPC_INTERFACE) :
                   ; _rpc_version
                   ] ) ->
                 Mina_metrics.(Counter.inc_one Network.rpc_connections_failed) ;
-                let%map () =
-                  Trust_system.(
-                    record t.config.trust_system t.config.logger peer
-                      Actions.
-                        ( Outgoing_connection_error
-                        , Some ("Closed connection", []) ))
-                in
-                Error err
+                Deferred.return (Error err)
             | _ ->
-                let%map () =
-                  Trust_system.(
-                    record t.config.trust_system t.config.logger peer
-                      Actions.
-                        ( Outgoing_connection_error
-                        , Some
-                            ( "RPC call failed, reason: $exn"
-                            , [ ("exn", Error_json.error_to_yojson err) ] ) ))
-                in
-                Error err )
+                Deferred.return (Error err) )
         | Error monitor_exn ->
             (* call itself failed *)
             (* TODO: learn what other exceptions are raised here *)
@@ -990,8 +880,6 @@ module Make (Rpc_interface : RPC_INTERFACE) :
 
     let on_first_high_connectivity t ~f =
       Deferred.map (Ivar.read t.high_connectivity_ivar) ~f
-
-    let ban_notification_reader t = t.ban_reader
 
     let connection_gating t =
       let%map net2 = !(t.net2) in
