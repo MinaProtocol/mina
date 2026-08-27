@@ -5143,10 +5143,28 @@ module Fork_genesis_block = struct
                   | true ->
                       return `Already_present
                   | false ->
-                      let%map (_ : int) =
+                      let%bind block_id =
                         Block.add_if_doesn't_exist conn ~logger
                           ~constraint_constants genesis_block
                           ~accounts_accessed:[] ~accounts_created:[]
+                      in
+                      (* Adopt the children that got here first.
+
+                         The post-fork chain's second block reaches the archive
+                         over the ordinary block path within minutes of the
+                         fork, while this insert waits on a ledger from S3. So
+                         the usual order is child first, and a block whose
+                         parent is absent is stored with parent_id NULL. The
+                         ordinary path repairs that for itself -- every insert
+                         calls set_parent_id_if_null -- but this one does not
+                         go through it, so without this the boundary stays
+                         severed however long the block sits here. *)
+                      let%map () =
+                        Block.set_parent_id_if_null conn
+                          ~parent_hash:
+                            (State_hash.With_state_hashes.state_hash
+                               genesis_block )
+                          ~parent_id:block_id
                       in
                       `Inserted )
                 pool
@@ -5162,14 +5180,31 @@ module Fork_genesis_block = struct
                   ~metadata:[ ("state_hash", `String state_hash) ] ;
                 return (Ok `Inserted) ) )
 
+  (** How long the ledger is expected to take to appear, and how often to look
+      while that is still the expectation.
+
+      The daemon writes the tarballs as it generates the configuration, and
+      something else puts them where this archive can fetch them. That upload
+      is not instant and it is not this archive's to observe, so the first
+      stretch is treated as ordinary waiting. *)
+  let brisk_interval = Time.Span.of_sec 30.
+
+  let brisk_for = Time.Span.of_min 15.
+
+  let patient_interval = Time.Span.of_min 5.
+
   (** Keep trying until the block is in place.
 
-      Deliberately slow: each attempt may fetch a ledger of tens of megabytes,
-      so this polls in minutes rather than seconds. Nothing waits on it -- the
-      archive serves reads throughout, and the boundary repair is independent. *)
-  let run ~logger ~genesis_constants ~constraint_constants
-      ?(interval = Time.Span.of_min 5.) ~pool () =
+      Never gives up. Stopping would leave the archive permanently without the
+      fork genesis block, and nothing would say so; an upload that arrives an
+      hour late should still be picked up. What changes with time is the noise:
+      for the first [brisk_for] this is expected waiting and is logged as such,
+      and after that it is something an operator should look at. *)
+  let run ~logger ~genesis_constants ~constraint_constants ~pool () =
+    let started = Time.now () in
     Deferred.repeat_until_finished () (fun () ->
+        let waited = Time.diff (Time.now ()) started in
+        let still_expected = Time.Span.( < ) waited brisk_for in
         let%bind () =
           match%map
             attempt ~logger ~genesis_constants ~constraint_constants ~pool
@@ -5179,13 +5214,22 @@ module Fork_genesis_block = struct
           | Error No_fork_recorded ->
               (* Ordinary on a database that has never seen a fork. *)
               ()
-          | Error reason ->
+          | Error reason when still_expected ->
               [%log info]
-                "Cannot insert the fork genesis block yet: $reason. This will \
-                 be retried."
-                ~metadata:[ ("reason", `String (describe reason)) ]
+                "Cannot insert the fork genesis block yet: %s. This will be \
+                 retried."
+                (describe reason)
+          | Error reason ->
+              [%log warn]
+                "Still cannot insert the fork genesis block after %s: %s. The \
+                 genesis ledger has not arrived. This will keep being retried, \
+                 and will succeed on its own once the ledger is uploaded."
+                (Time.Span.to_string_hum waited)
+                (describe reason)
         in
-        let%map () = after interval in
+        let%map () =
+          after (if still_expected then brisk_interval else patient_interval)
+        in
         `Repeat () )
 end
 
@@ -5519,7 +5563,7 @@ let run pool reader ~proof_cache_db ~genesis_constants ~constraint_constants
     surfaces it as an error. A configuration it cannot parse is worth refusing
     loudly: the archive would otherwise sit there with no record of the fork
     while the daemon believed the hand-over had started. *)
-let record_hardfork_config ~logger ~pool ~config_json =
+let record_hardfork_config ~logger ~pool ~config_json ~recorded =
   match hardfork_state_of_config ~config_json with
   | Error msg ->
       [%log error]
@@ -5533,7 +5577,10 @@ let record_hardfork_config ~logger ~pool ~config_json =
           pool
       with
       | Ok () ->
-          ()
+          (* Filled after the write, so whatever watches this cannot act on a
+             fork that is not yet on record. Idempotent: the configuration
+             arrives on a heartbeat and this may be the tenth time. *)
+          Ivar.fill_if_empty recorded ()
       | Error e ->
           let msg = Caqti_error.show e in
           [%log warn]
@@ -5701,11 +5748,64 @@ let serve_metrics_server ~logger ~metrics_server_port ~missing_blocks_width
       Deferred.forever () serve
 
 (* for running the archive process *)
+
+(** Run the schema upgrade script against this archive's database.
+
+    Shelled out to psql rather than run through the connection pool: the script
+    is many statements, and the driver speaks the extended query protocol,
+    which carries one statement per request. psql ships in the archive image
+    alongside the scripts it runs. *)
+let upgrade_schema ~logger ~postgres_address ~script =
+  let uri = Uri.to_string postgres_address in
+  match%map
+    Process.run ~prog:"psql"
+      ~args:[ uri; "-v"; "ON_ERROR_STOP=1"; "-q"; "-f"; script ]
+      ()
+  with
+  | Ok (_ : string) ->
+      [%log info] "Upgraded the archive schema using %s." script ;
+      Ok ()
+  | Error e ->
+      let msg = Error.to_string_hum e in
+      [%log error]
+        "Could not upgrade the archive schema using %s: %s. The database is \
+         left as it was, and this process is stopping so that nothing runs \
+         against a schema it does not match."
+        script msg ;
+      Error msg
+
+(** Stop, once the fork is recorded, so the dispatcher can start the successor.
+
+    The reply to the daemon goes out when the RPC handler returns, and nothing
+    reports when it has reached the wire, so this waits a moment before pulling
+    the process down. That grace is a courtesy rather than a correctness
+    measure: the row was committed before the handler returned, so a reply lost
+    to an early exit costs the daemon a log line and nothing else. *)
+let hand_over ~logger ~postgres_address ~hardfork_handling
+    ~schema_upgrade_script ~requested =
+  let open Hardfork_handling in
+  if not (exits hardfork_handling) then Deferred.unit
+  else
+    let%bind () = Ivar.read requested in
+    let%bind () = after (Time.Span.of_sec 5.) in
+    let%bind upgraded =
+      if upgrades_schema hardfork_handling then
+        upgrade_schema ~logger ~postgres_address ~script:schema_upgrade_script
+      else Deferred.return (Ok ())
+    in
+    let code = match upgraded with Ok () -> 0 | Error _ -> 1 in
+    [%log info]
+      "Stopping after recording the hard fork, as --hardfork-handling %s asks. \
+       The dispatcher decides which archive runs next."
+      (to_string hardfork_handling) ;
+    let%bind () = Writer.flushed (Lazy.force Writer.stderr) in
+    exit code
+
 let setup_server ~proof_cache_db ~(genesis_constants : Genesis_constants.t)
     ~(constraint_constants : Genesis_constants.Constraint_constants.t)
     ~metrics_server_port ~logger ~postgres_address ~server_port ~chunks_length
     ~delete_older_than ~runtime_config_opt ~missing_blocks_width ~signature_kind
-    ~hardfork_confirmations =
+    ~hardfork_confirmations ~hardfork_handling ~schema_upgrade_script =
   let where_to_listen =
     Async.Tcp.Where_to_listen.bind_to All_addresses (On_port server_port)
   in
@@ -5723,6 +5823,11 @@ let setup_server ~proof_cache_db ~(genesis_constants : Genesis_constants.t)
         ~metadata:[ ("error", `String (Caqti_error.show e)) ] ;
       Deferred.unit
   | Ok pool ->
+      (* Filled by the RPC handler once a fork is on record. *)
+      let recorded = Ivar.create () in
+      hand_over ~logger ~postgres_address ~hardfork_handling
+        ~schema_upgrade_script ~requested:recorded
+      |> don't_wait_for ;
       (* Bound here rather than above the pool: the hard fork configuration is
          answered against the database inside the handler, so the handler needs
          the pool. *)
@@ -5730,7 +5835,7 @@ let setup_server ~proof_cache_db ~(genesis_constants : Genesis_constants.t)
         [ Async.Rpc.Rpc.implement Archive_rpc.t (fun () archive_diff ->
               match archive_diff with
               | Diff.Transition_frontier (Hardfork_config { config_json }) ->
-                  record_hardfork_config ~logger ~pool ~config_json
+                  record_hardfork_config ~logger ~pool ~config_json ~recorded
               | _ ->
                   Strict_pipe.Writer.write writer archive_diff )
         ; Async.Rpc.Rpc.implement Archive_rpc.precomputed_block
