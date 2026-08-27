@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Async
 open Rosetta_lib
 
@@ -11,12 +11,12 @@ let parse_response_body ~status_code body_str =
           (Errors.create
              ~context:"Can't parse mina daemon's GraphQL response as json"
              (`Graphql_mina_query
-               (Printf.sprintf "Can't parse as json: %s" body_str) ) ) )
+                (Printf.sprintf "Can't parse as json: %s" body_str) ) ) )
   | code ->
       Error
         (Errors.create ~context:"Response from Mina Daemon is not a 200"
            (`Graphql_mina_query
-             (Printf.sprintf "Status code %d -- %s" code body_str) ) )
+              (Printf.sprintf "Status code %d -- %s" code body_str) ) )
 
 let graphql_error_to_string e =
   let error_obj_to_string obj =
@@ -57,8 +57,8 @@ let query ~minimum_user_command_fee query_obj uri =
           ~body:(Cohttp_async.Body.of_string body_string)
           uri )
     |> Deferred.Result.map_error ~f:(fun e ->
-           Errors.create ~context:"Internal POST to Mina Daemon failed"
-             (`Graphql_mina_query (Error.to_string_hum e)) )
+        Errors.create ~context:"Internal POST to Mina Daemon failed"
+          (`Graphql_mina_query (Error.to_string_hum e)) )
   in
   let%bind body_str =
     Cohttp_async.Body.to_string body |> Deferred.map ~f:Result.return
@@ -72,24 +72,25 @@ let query ~minimum_user_command_fee query_obj uri =
   in
   let open Yojson.Basic.Util in
   ( match (member "errors" body_json, member "data" body_json) with
-  | `Null, `Null ->
-      Error
-        (Errors.create ~context:"Empty response from Mina Daemon"
-           (`Graphql_mina_query "Empty response") )
-  | error, `Null ->
-      Errors.Transaction_submit.of_request_error ~minimum_user_command_fee
-        (graphql_error_to_string error)
-      |> Option.value
-           ~default:
-             (Errors.create ~context:"Explicit error response from Mina Daemon"
-                (`Graphql_mina_query (graphql_error_to_string error)) )
-      |> Result.fail
-  | _, raw_json ->
-      Result.try_with (fun () -> query_obj#parse raw_json)
-      |> Result.map_error ~f:(fun e ->
-             Errors.create
-               ~context:"JSON parse error in response from Mina Daemon"
-               (`Graphql_mina_query
+    | `Null, `Null ->
+        Error
+          (Errors.create ~context:"Empty response from Mina Daemon"
+             (`Graphql_mina_query "Empty response") )
+    | error, `Null ->
+        Errors.Transaction_submit.of_request_error ~minimum_user_command_fee
+          (graphql_error_to_string error)
+        |> Option.value
+             ~default:
+               (Errors.create
+                  ~context:"Explicit error response from Mina Daemon"
+                  (`Graphql_mina_query (graphql_error_to_string error)) )
+        |> Result.fail
+    | _, raw_json ->
+        Result.try_with (fun () -> query_obj#parse raw_json)
+        |> Result.map_error ~f:(fun e ->
+            Errors.create
+              ~context:"JSON parse error in response from Mina Daemon"
+              (`Graphql_mina_query
                  (Printf.sprintf "Error parsing graphql response: %s"
                     (Exn.to_string e) ) ) ) )
   |> Deferred.return

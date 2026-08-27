@@ -52,7 +52,8 @@ module type Local_sig = Signature(Types).S
     module and (ii) a functor which takes the concrete types defined here and
     make the actual full module, adding type equalities where needed. *)
 module Make
-    (Signature : Local_sig) (F : functor (A : Concrete) -> Signature(A).S) =
+    (Signature : Local_sig)
+    (F : functor (A : Concrete) -> Signature(A).S) =
   F (M)
 
 (** Finally, we include our module to make the types available to everyone (they

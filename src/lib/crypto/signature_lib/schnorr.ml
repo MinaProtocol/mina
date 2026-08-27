@@ -1,5 +1,5 @@
 module Bignum_bigint = Bigint
-open Core_kernel
+open Core
 
 module type Message_intf = sig
   type field
@@ -141,7 +141,8 @@ module type S = sig
 end
 
 module Make
-    (Impl : Snarky_backendless.Snark_intf.S) (Curve : sig
+    (Impl : Snarky_backendless.Snark_intf.S)
+    (Curve : sig
       open Impl
 
       module Scalar : sig
@@ -184,15 +185,16 @@ module Make
 
       val to_affine_exn : t -> Field.t * Field.t
     end)
-    (Message : Message_intf
-                 with type boolean_var := Impl.Boolean.var
-                  and type curve_scalar_var := Curve.Scalar.var
-                  and type curve_scalar := Curve.Scalar.t
-                  and type curve := Curve.t
-                  and type curve_var := Curve.var
-                  and type field := Impl.Field.t
-                  and type field_var := Impl.Field.Var.t
-                  and type 'a checked := 'a Impl.Checked.t) :
+    (Message :
+      Message_intf
+        with type boolean_var := Impl.Boolean.var
+         and type curve_scalar_var := Curve.Scalar.var
+         and type curve_scalar := Curve.Scalar.t
+         and type curve := Curve.t
+         and type curve_var := Curve.var
+         and type field := Impl.Field.t
+         and type field_var := Impl.Field.Var.t
+         and type 'a checked := 'a Impl.Checked.t) :
   S
     with module Impl := Impl
      and type curve := Curve.t
@@ -536,7 +538,7 @@ let%test_unit "schnorr checked + unchecked" =
       (Tick.Test.test_equal ~sexp_of_t:[%sexp_of: bool] ~equal:Bool.equal
          Tick.Typ.(
            tuple3 Tick.Inner_curve.typ (legacy_message_typ ())
-             Legacy.Signature.typ)
+             Legacy.Signature.typ )
          Tick.Boolean.typ
          (fun (public_key, msg, s) ->
            let open Tick.Checked in
@@ -558,7 +560,7 @@ let%test_unit "schnorr checked + unchecked" =
       (Tick.Test.test_equal ~sexp_of_t:[%sexp_of: bool] ~equal:Bool.equal
          Tick.Typ.(
            tuple3 Tick.Inner_curve.typ (chunked_message_typ ())
-             Chunked.Signature.typ)
+             Chunked.Signature.typ )
          Tick.Boolean.typ
          (fun (public_key, msg, s) ->
            let open Tick.Checked in

@@ -146,8 +146,8 @@ let%test_module "Roundtrip tests" =
           include Mina_base.Zkapp_basic.F
 
           let gen =
-            Core_kernel.Int.quickcheck_generator
-            |> Core_kernel.Quickcheck.Generator.map ~f:Pasta_bindings.Fp.of_int
+            Core.Int.quickcheck_generator
+            |> Core.Quickcheck.Generator.map ~f:Pasta_bindings.Fp.of_int
         end
 
         include Make_test (FieldElem) (FieldElem_gen)

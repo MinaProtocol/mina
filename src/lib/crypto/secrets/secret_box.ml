@@ -108,15 +108,15 @@ let decrypt ~(password : Bytes.t)
   if not (String.equal box_primitive Secret_box.primitive) then
     Error
       (`Corrupted_privkey
-        (Error.createf
-           !"don't know how to handle a %s secret_box"
-           box_primitive ) )
+         (Error.createf
+            !"don't know how to handle a %s secret_box"
+            box_primitive ) )
   else if not (String.equal pw_primitive Password_hash.primitive) then
     Error
       (`Corrupted_privkey
-        (Error.createf
-           !"don't know how to handle a %s password_hash"
-           pw_primitive ) )
+         (Error.createf
+            !"don't know how to handle a %s password_hash"
+            pw_primitive ) )
   else
     let nonce = Secret_box.Bytes.to_nonce nonce in
     let salt = Password_hash.Bytes.to_salt pwsalt in

@@ -22,9 +22,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       requires_graphql = true
     ; genesis_ledger =
         (let open Test_account in
-        [ create ~account_name:"node-a-key" ~balance:"1000" ()
-        ; create ~account_name:"node-b-key" ~balance:"1000" ()
-        ])
+         [ create ~account_name:"node-a-key" ~balance:"1000" ()
+         ; create ~account_name:"node-b-key" ~balance:"1000" ()
+         ] )
     ; block_producers =
         [ { node_name = "node-a"; account_name = "node-a-key" }
         ; { node_name = "node-b"; account_name = "node-b-key" }
@@ -38,7 +38,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let%bind () =
       wait_for t
         (Wait_condition.nodes_to_initialize
-           (Core.String.Map.data (Network.all_mina_nodes network)) )
+           (Core.Map.data (Network.all_mina_nodes network)) )
     in
     [%log info] "gossip_consistency test: done waiting for initializations" ;
     let receiver_bp = Network.block_producer_exn network "node-a" in

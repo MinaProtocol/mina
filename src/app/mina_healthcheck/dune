@@ -3,6 +3,7 @@
  (package mina_healthcheck)
  (public_name mina-healthcheck)
  (libraries
+  core_unix.command_unix
   ;; opam libraries
   async
   async_kernel

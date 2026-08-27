@@ -5,7 +5,7 @@ let echo : 'a. unit Schema.resolve_info -> unit -> 'a -> 'a = fun _ _ x -> x
 
 let echo_field name field_typ arg_typ =
   Schema.(
-    field name ~typ:field_typ ~args:Arg.[ arg "x" ~typ:arg_typ ] ~resolve:echo)
+    field name ~typ:field_typ ~args:Arg.[ arg "x" ~typ:arg_typ ] ~resolve:echo )
 
 type colors = Red | Green | Blue
 
@@ -29,7 +29,7 @@ let person_arg =
         ; arg "last_name" ~typ:(non_null string)
         ]
       ~coerce:(fun title first last -> (title, first, last))
-      ~split:(fun f (title, first, last) -> f title first last))
+      ~split:(fun f (title, first, last) -> f title first last) )
 
 let schema =
   Schema.(
@@ -47,9 +47,9 @@ let schema =
       ; field "sum_defaults" ~typ:int
           ~args:
             Arg.
-              [ arg' "x" ~typ:string ~default:"42"
-              ; arg' "y" ~typ:int ~default:3
+              [ arg' "x" ~typ:string ~default:(`String "42")
+              ; arg' "y" ~typ:int ~default:(`Int 3)
               ]
           ~resolve:(fun _ () x y ->
             try Some (int_of_string x + y) with _ -> None )
-      ])
+      ] )

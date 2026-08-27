@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Rosetta_coding.Coding
 module Field = Snark_params.Tick.Field
 module Scalar = Snark_params.Tick.Inner_curve.Scalar

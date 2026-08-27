@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 module Bignum_bigint = Snarky_backendless.Backend_extended.Bignum_bigint
 module Snark_intf = Snarky_backendless.Snark_intf
 module Circuit = Kimchi_pasta_snarky_backend.Step_impl
@@ -259,7 +259,7 @@ let theta (state : Circuit.Field.t State.matrix) : Circuit.Field.t State.matrix
           bxor64
             (* using (x + m mod m) to avoid negative values *)
             state_c.((x + keccak_dim - 1) mod keccak_dim)
-            (rot64 state_c.((x + 1) mod keccak_dim) 1 Left)) )
+            (rot64 state_c.((x + 1) mod keccak_dim) 1 Left) ) )
   in
   (* for all x in {0..4} and y in {0..4}: E[x,y] = A[x,y] xor D[x] *)
   (* return E *)
@@ -304,7 +304,7 @@ let chi (state : Circuit.Field.t State.matrix) : Circuit.Field.t State.matrix =
             state_b.(x).(y)
             (band64
                (bnot64_unchecked state_b.((x + 1) mod 5).(y))
-               state_b.((x + 2) mod 5).(y) ))
+               state_b.((x + 2) mod 5).(y) ) )
     done
   done ;
   (* We can use unchecked NOT because the length of the input is constrained to be
@@ -435,9 +435,7 @@ let sponge (padded_message : Circuit.Field.t list) ~(length : int)
 let check_bytes (inputs : Circuit.Field.t list) : unit =
   let open Circuit in
   (* Create a second list of shifted inputs with 4 more bits*)
-  let shifted =
-    Core_kernel.List.map ~f:(fun x -> Field.(of_int 16 * x)) inputs
-  in
+  let shifted = Core.List.map ~f:(fun x -> Field.(of_int 16 * x)) inputs in
   (* We need to lookup that both the inputs and the shifted values are less than 12 bits *)
   (* Altogether means that it was less than 8 bits *)
   let lookups = inputs @ shifted in

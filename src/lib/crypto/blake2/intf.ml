@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 
 module type S = sig
   val digest_size_in_bits : int

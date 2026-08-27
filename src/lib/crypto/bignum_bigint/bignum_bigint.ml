@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 include Bigint
 
 let of_bool (b : bool) : t = if b then one else zero

@@ -116,7 +116,8 @@ module For_logger = struct
         `List
           [ `String checkpoint
           ; `Float
-              (Time.Span.to_sec @@ Logger.Time.to_span_since_epoch timestamp)
+              ( Time_float.Span.to_sec
+              @@ Logger.Time.to_span_since_epoch timestamp )
           ]
 
       let checkpoint_metadata metadata =
@@ -129,16 +130,16 @@ module For_logger = struct
         `Assoc
           [ ( "internal_tracing_enabled"
             , `Float
-                (Time.Span.to_sec @@ Logger.Time.to_span_since_epoch timestamp)
-            )
+                ( Time_float.Span.to_sec
+                @@ Logger.Time.to_span_since_epoch timestamp ) )
           ]
 
       let internal_tracing_disabled timestamp =
         `Assoc
           [ ( "internal_tracing_disabled"
             , `Float
-                (Time.Span.to_sec @@ Logger.Time.to_span_since_epoch timestamp)
-            )
+                ( Time_float.Span.to_sec
+                @@ Logger.Time.to_span_since_epoch timestamp ) )
           ]
 
       let mina_node_metadata metadata =
@@ -146,7 +147,7 @@ module For_logger = struct
 
       let produced_block_state_hash metadata =
         let state_hash =
-          Option.value ~default:`Null (String.Map.find metadata "state_hash")
+          Option.value ~default:`Null (Map.find metadata "state_hash")
         in
         `Assoc [ ("produced_block_state_hash", state_hash) ]
 
@@ -189,7 +190,7 @@ module For_logger = struct
         | checkpoint ->
             let checkpoint_event_json = Event.checkpoint checkpoint timestamp in
             let metadata_event_json =
-              if String.Map.is_empty metadata then []
+              if Map.is_empty metadata then []
               else [ Event.checkpoint_metadata metadata ]
             in
             handling_current_block_id_change
@@ -238,8 +239,8 @@ module For_itn_logger = struct
         For_logger.Processor.expand_log_message ~last_block_id ~last_call_id
           ~timestamp ~message ~metadata
       in
-      let log_messages : (Time.t * string * (string * Yojson.Safe.t) list) list
-          =
+      let log_messages :
+          (Time_float.t * string * (string * Yojson.Safe.t) list) list =
         List.filter_map json_lines ~f:(function
           | `List [ `String checkpoint; _ ] ->
               Some (timestamp, checkpoint, [])

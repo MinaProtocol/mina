@@ -3,6 +3,8 @@
  (public_name cli.mina_cli_entrypoint)
  (modes native)
  (libraries
+  core_unix.sys_unix
+  core_unix.command_unix
   ;;opam libraries
   async
   async_kernel
@@ -14,7 +16,7 @@
   bin_prot.shape
   core_kernel
   core
-  core.daemon
+  core_unix.daemon
   init
   memtrace
   result

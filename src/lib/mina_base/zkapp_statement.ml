@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Snark_params.Tick
 
 module Poly = struct
@@ -53,7 +53,7 @@ let zkapp_statements_of_forest (type account_update)
     (forest : (account_update, _, _) Zkapp_command.Call_forest.t) :
     (account_update * t, _, _) Zkapp_command.Call_forest.t =
   Zkapp_command.Call_forest.mapi_with_trees forest
-    ~f:(fun _i account_update tree -> (account_update, of_tree tree))
+    ~f:(fun _i account_update tree -> (account_update, of_tree tree) )
 
 module Checked = struct
   type t = Zkapp_command.Transaction_commitment.Checked.t Poly.t

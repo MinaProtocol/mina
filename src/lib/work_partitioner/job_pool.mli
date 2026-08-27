@@ -1,6 +1,6 @@
-open Core_kernel
+open Core
 
-type 'a scheduled = { job : 'a; scheduled : Time.t }
+type 'a scheduled = { job : 'a; scheduled : Time_float.t }
 
 module Make (Id : Hashtbl.Key) (Spec : T) : sig
   type job = (Spec.t, Id.t) Snark_work_lib.With_job_meta.t

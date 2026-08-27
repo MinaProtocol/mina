@@ -535,8 +535,8 @@ let zkapp_command_to_transaction ~proof_cache_db ~logger ~pool
      genesis %Ld, and sequence number %d to transaction"
     nonce_str cmd.global_slot_since_genesis cmd.sequence_no ;
   let%bind (account_updates : Account_update.Simple.t list) =
-    Deferred.List.map (Array.to_list cmd.zkapp_account_updates_ids)
-      ~f:(fun id ->
+    Deferred.List.map ~how:`Sequential
+      (Array.to_list cmd.zkapp_account_updates_ids) ~f:(fun id ->
         let%bind { body_id } =
           query_db ~f:(fun db -> Processor.Zkapp_account_update.load db id)
         in
@@ -589,7 +589,7 @@ let try_slot ~logger pool slot =
     if tries_left <= 0 then (
       [%log fatal] "Could not find canonical chain after trying %d slots"
         num_tries ;
-      Core_kernel.exit 1 ) ;
+      Core.exit 1 ) ;
     match%bind find_canonical_chain ~logger pool slot with
     | None ->
         go ~slot:(Int64.pred slot) ~tries_left:(tries_left - 1)
@@ -663,17 +663,17 @@ let apply_hard_fork_migration ~logger
     ~hard_fork_target =
   [%log info] "Applying hard fork migration to produce post-fork input" ;
   (* Get the last block's slots from global_slot_hashes_tbl *)
-  let slots = Int64.Table.keys global_slot_hashes_tbl in
+  let slots = Hashtbl.keys global_slot_hashes_tbl in
   let last_slot_since_genesis =
     match List.max_elt slots ~compare:Int64.compare with
     | Some s ->
         s
     | None ->
         [%log fatal] "No blocks found in global slot hashes table" ;
-        Core_kernel.exit 1
+        Core.exit 1
   in
   let _state_hash, _ledger_hash, _snarked_hash, last_slot_since_hard_fork =
-    Int64.Table.find_exn global_slot_hashes_tbl last_slot_since_genesis
+    Hashtbl.find_exn global_slot_hashes_tbl last_slot_since_genesis
   in
   (* Convert int64 slots to typed slots *)
   let block_global_slot =
@@ -770,14 +770,14 @@ let apply_hard_fork_migration ~logger
 
 let fail_with_broken_chain_to_genesis ~logger pool ~target_state_hash
     ~global_slot_hashes_tbl =
-  let slots = Int64.Table.keys global_slot_hashes_tbl in
+  let slots = Hashtbl.keys global_slot_hashes_tbl in
   let chain_oldest_slot =
     Option.value ~default:Int64.minus_one
       (List.min_elt slots ~compare:Int64.compare)
   in
   let chain_oldest_state_hash =
-    Option.value_map (Int64.Table.find global_slot_hashes_tbl chain_oldest_slot)
-      ~default:"<none>" ~f:(fun (sh, _, _, _) -> State_hash.to_base58_check sh)
+    Option.value_map (Hashtbl.find global_slot_hashes_tbl chain_oldest_slot)
+      ~default:"<none>" ~f:(fun (sh, _, _, _) -> State_hash.to_base58_check sh )
   in
   let%bind chain_oldest_parent_state_hash =
     match%map
@@ -813,7 +813,7 @@ let fail_with_broken_chain_to_genesis ~logger pool ~target_state_hash
         , `String chain_oldest_parent_state_hash )
       ; ("chain_oldest_height", `String (Int64.to_string chain_oldest_height))
       ] ;
-  Core_kernel.exit 1
+  Core.exit 1
 
 let hard_fork_params ~logger ~stop_slot_config_file ~hard_fork_output_file =
   match stop_slot_config_file with
@@ -826,7 +826,7 @@ let hard_fork_params ~logger ~stop_slot_config_file ~hard_fork_output_file =
         | Error msg ->
             [%log fatal] "Could not parse hard fork config $file: $error"
               ~metadata:[ ("file", `String file); ("error", `String msg) ] ;
-            Core_kernel.exit 1
+            Core.exit 1
       in
       let genesis_slot =
         Runtime_config.scheduled_hard_fork_genesis_slot hf_runtime_config
@@ -850,13 +850,13 @@ let hard_fork_params ~logger ~stop_slot_config_file ~hard_fork_output_file =
           [%log fatal]
             "Hard fork config must have daemon.slot_chain_end and \
              daemon.hard_fork_genesis_slot_delta" ;
-          Core_kernel.exit 1 )
+          Core.exit 1 )
   | None ->
       if Option.is_some hard_fork_output_file then (
         [%log fatal]
           "--stop-slot-config-file is required when --hard-fork-output-file is \
            set" ;
-        Core_kernel.exit 1 ) ;
+        Core.exit 1 ) ;
       None
 
 (* When producing a hard fork checkpoint, filter out blocks at or beyond
@@ -913,7 +913,7 @@ let filter_block_infos_for_hard_fork ~logger ~target_state_hash
             "No blocks remain after filtering at slot_chain_end; original \
              target was $old_target"
             ~metadata:[ ("old_target", `String target_state_hash) ] ;
-          Core_kernel.exit 1 ) ;
+          Core.exit 1 ) ;
       block_infos
   | None ->
       block_infos
@@ -943,7 +943,7 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
           "Unknown --hard-fork-target value: $value (expected mesa or \
            compatible)"
           ~metadata:[ ("value", `String other) ] ;
-        Core_kernel.exit 1
+        Core.exit 1
   in
   let hard_fork_params_opt =
     hard_fork_params ~logger ~stop_slot_config_file ~hard_fork_output_file
@@ -1033,16 +1033,16 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
             let ids = List.map block_infos ~f:(fun { id; _ } -> id) in
             (* build mapping from global slots to state and ledger hashes *)
             let%bind () =
-              Deferred.List.iter block_infos
+              Deferred.List.iter ~how:`Sequential block_infos
                 ~f:(fun
-                     { global_slot_since_genesis
-                     ; global_slot_since_hard_fork
-                     ; state_hash
-                     ; ledger_hash
-                     ; snarked_ledger_hash_id
-                     ; _
-                     }
-                   ->
+                    { global_slot_since_genesis
+                    ; global_slot_since_hard_fork
+                    ; state_hash
+                    ; ledger_hash
+                    ; snarked_ledger_hash_id
+                    ; _
+                    }
+                  ->
                   let%map snarked_hash =
                     query_db ~f:(fun db ->
                         Sql.Snarked_ledger_hashes.run db snarked_ledger_hash_id )
@@ -1064,11 +1064,11 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
              assumption: genesis block occupies global slot 0
 
              if nonzero start slot, can't assume there's a block at that slot *)
-          if Int64.Table.mem global_slot_hashes_tbl Int64.zero then (
+          if Hashtbl.mem global_slot_hashes_tbl Int64.zero then (
             [%log info]
               "Block chain leading to target state hash includes genesis \
                block, length = %d"
-              (Int.Set.length block_ids) ;
+              (Set.length block_ids) ;
             Deferred.unit )
           else
             fail_with_broken_chain_to_genesis ~logger pool ~target_state_hash
@@ -1079,12 +1079,12 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
       let staking_epoch_ledger = ref ledger in
       let next_epoch_ledger = ref ledger in
       let%bind staking_seed, next_seed =
-        let slots = Int64.Table.keys global_slot_hashes_tbl in
+        let slots = Hashtbl.keys global_slot_hashes_tbl in
         let least_slot =
           Option.value_exn @@ List.min_elt slots ~compare:Int64.compare
         in
         let state_hash, _ledger_hash, _snarked_hash, _slot_since_hf =
-          Int64.Table.find_exn global_slot_hashes_tbl least_slot
+          Hashtbl.find_exn global_slot_hashes_tbl least_slot
         in
         let%bind { staking_epoch_data_id; next_epoch_data_id; _ } =
           let%bind block_id =
@@ -1138,7 +1138,7 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
         (List.length zkapp_cmd_ids) ;
       [%log info] "Loading internal commands" ;
       let%bind unsorted_internal_cmds_list =
-        Deferred.List.map internal_cmd_ids ~f:(fun id ->
+        Deferred.List.map ~how:`Sequential internal_cmd_ids ~f:(fun id ->
             let open Deferred.Let_syntax in
             match%map
               Mina_caqti.Pool.use
@@ -1162,7 +1162,7 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
       (* filter out internal commands in blocks not along chain from target state hash *)
       let filtered_internal_cmds =
         List.filter unsorted_internal_cmds ~f:(fun cmd ->
-            Int.Set.mem block_ids cmd.block_id )
+            Set.mem block_ids cmd.block_id )
       in
       [%log info] "Will replay %d internal commands"
         (List.length filtered_internal_cmds) ;
@@ -1190,12 +1190,12 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
       (* populate cache of fee transfer via coinbase items *)
       [%log info] "Populating fee transfer via coinbase cache" ;
       let%bind () =
-        Deferred.List.iter sorted_internal_cmds
+        Deferred.List.iter ~how:`Sequential sorted_internal_cmds
           ~f:(cache_fee_transfer_via_coinbase pool)
       in
       [%log info] "Loading user commands" ;
       let%bind (unsorted_user_cmds_list : Sql.User_command.t list list) =
-        Deferred.List.map user_cmd_ids ~f:(fun id ->
+        Deferred.List.map ~how:`Sequential user_cmd_ids ~f:(fun id ->
             let open Deferred.Let_syntax in
             match%map
               Mina_caqti.Pool.use (fun db -> Sql.User_command.run db id) pool
@@ -1213,7 +1213,7 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
       (* filter out user commands in blocks not along chain from target state hash *)
       let filtered_user_cmds =
         List.filter unsorted_user_cmds ~f:(fun cmd ->
-            Int.Set.mem block_ids cmd.block_id )
+            Set.mem block_ids cmd.block_id )
       in
       [%log info] "Will replay %d user commands"
         (List.length filtered_user_cmds) ;
@@ -1226,7 +1226,7 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
       in
       [%log info] "Loading zkApp commands" ;
       let%bind unsorted_zkapp_cmds_list =
-        Deferred.List.map zkapp_cmd_ids ~f:(fun id ->
+        Deferred.List.map ~how:`Sequential zkapp_cmd_ids ~f:(fun id ->
             let open Deferred.Let_syntax in
             match%map
               Mina_caqti.Pool.use (fun db -> Sql.Zkapp_command.run db id) pool
@@ -1245,7 +1245,7 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
         List.filter unsorted_zkapp_cmds ~f:(fun (cmd : Sql.Zkapp_command.t) ->
             Int64.( >= ) cmd.global_slot_since_genesis
               input.start_slot_since_genesis
-            && Int.Set.mem block_ids cmd.block_id )
+            && Set.mem block_ids cmd.block_id )
       in
       [%log info] "Will replay %d zkApp commands"
         (List.length filtered_zkapp_cmds) ;
@@ -1409,7 +1409,7 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
                   , `String (Int64.to_string last_global_slot_since_genesis) )
                 ]
               last_global_slot_since_genesis ;
-            if continue_on_error then incr error_count else Core_kernel.exit 1 )
+            if continue_on_error then incr error_count else Core.exit 1 )
         in
         let check_account_accessed state_hash =
           [%log spam] "Checking accounts accessed in block just processed"
@@ -1449,14 +1449,13 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
                       )
                     ; ("block_id", `Int last_block_id)
                     ] ;
-                if continue_on_error then incr error_count
-                else Core_kernel.exit 1 ) ) ;
+                if continue_on_error then incr error_count else Core.exit 1 ) ) ;
           [%log spam]
             "Verifying accounts accessed in block with global slot since \
              genesis %Ld"
             last_global_slot_since_genesis ;
           let%map accounts_accessed =
-            Deferred.List.map accounts_accessed_db
+            Deferred.List.map ~how:`Sequential accounts_accessed_db
               ~f:(Archive_lib.Load_data.get_account_accessed ~pool)
           in
           List.iter accounts_accessed ~f:(fun (index, account) ->
@@ -1473,15 +1472,13 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
                     [ ("index_in_ledger", `Int index_in_ledger)
                     ; ("index_in_account_accessed", `Int index)
                     ] ;
-                if continue_on_error then incr error_count
-                else Core_kernel.exit 1 ) ;
+                if continue_on_error then incr error_count else Core.exit 1 ) ;
               match Ledger.location_of_account ledger account_id with
               | None ->
                   [%log error] "Accessed account not in ledger"
                     ~metadata:
                       [ ("account_id", Account_id.to_yojson account_id) ] ;
-                  if continue_on_error then incr error_count
-                  else Core_kernel.exit 1
+                  if continue_on_error then incr error_count else Core.exit 1
               | Some loc ->
                   let account_in_ledger =
                     match Ledger.get ledger loc with
@@ -1502,8 +1499,8 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
                           , Account.to_yojson account_in_ledger )
                         ; ("account_in_database", Account.to_yojson account)
                         ] ;
-                    if continue_on_error then incr error_count
-                    else Core_kernel.exit 1 ) )
+                    if continue_on_error then incr error_count else Core.exit 1
+                    ) )
         in
         let log_state_hash_on_next_slot curr_global_slot_since_genesis =
           match get_slot_hashes curr_global_slot_since_genesis with
@@ -1603,7 +1600,7 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
                 in
                 let apply_transaction_phases txns =
                   let%bind phase_1s =
-                    Deferred.List.mapi txns ~f:(fun n txn ->
+                    Deferred.List.mapi ~how:`Sequential txns ~f:(fun n txn ->
                         match
                           Ledger.apply_transaction_first_pass ~signature_kind
                             ~constraint_constants
@@ -1642,7 +1639,8 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
                                 ] ;
                             Error.raise err )
                   in
-                  Deferred.List.iter phase_1s ~f:(fun partial ->
+                  Deferred.List.iter ~how:`Sequential phase_1s
+                    ~f:(fun partial ->
                       match
                         Ledger.apply_transaction_second_pass ledger partial
                       with
@@ -1680,41 +1678,45 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
                 apply_transaction_phases (List.rev block_txns)
               in
               ( if
-                Frozen_ledger_hash.equal snarked_hash
-                  (First_pass_ledger_hashes.get_last_snarked_hash ())
-              then
-                [%log spam]
-                  "Snarked ledger hash same as in the preceding block, not \
-                   checking it again"
-              else if
-              Frozen_ledger_hash.equal snarked_hash genesis_snarked_ledger_hash
-            then
-                [%log spam] "Snarked ledger hash is genesis snarked ledger hash"
-              else
-                match First_pass_ledger_hashes.find snarked_hash with
-                | None ->
-                    if not !found_snarked_ledger_hash then (
-                      [%log info]
-                        "Current snarked ledger hash not among first-pass \
-                         ledger hashes, but we haven't yet found one. The \
-                         transaction that created this ledger hash might have \
-                         been in an older replayer run that created a \
-                         checkpoint file without saved first-pass ledger \
+                  Frozen_ledger_hash.equal snarked_hash
+                    (First_pass_ledger_hashes.get_last_snarked_hash ())
+                then
+                  [%log spam]
+                    "Snarked ledger hash same as in the preceding block, not \
+                     checking it again"
+                else if
+                  Frozen_ledger_hash.equal snarked_hash
+                    genesis_snarked_ledger_hash
+                then
+                  [%log spam]
+                    "Snarked ledger hash is genesis snarked ledger hash"
+                else
+                  match First_pass_ledger_hashes.find snarked_hash with
+                  | None ->
+                      if not !found_snarked_ledger_hash then (
+                        [%log info]
+                          "Current snarked ledger hash not among first-pass \
+                           ledger hashes, but we haven't yet found one. The \
+                           transaction that created this ledger hash might \
+                           have been in an older replayer run that created a \
+                           checkpoint file without saved first-pass ledger \
+                           hashes" ;
+                        First_pass_ledger_hashes.set_last_snarked_hash
+                          snarked_hash )
+                      else (
+                        [%log error]
+                          "Current snarked ledger hash does not appear among \
+                           first-pass ledger hashes" ;
+                        if continue_on_error then incr error_count
+                        else Core.exit 1 )
+                  | Some (_hash, n) ->
+                      [%log spam]
+                        "Found snarked ledger hash among first-pass ledger \
                          hashes" ;
+                      found_snarked_ledger_hash := true ;
                       First_pass_ledger_hashes.set_last_snarked_hash
-                        snarked_hash )
-                    else (
-                      [%log error]
-                        "Current snarked ledger hash does not appear among \
-                         first-pass ledger hashes" ;
-                      if continue_on_error then incr error_count
-                      else Core_kernel.exit 1 )
-                | Some (_hash, n) ->
-                    [%log spam]
-                      "Found snarked ledger hash among first-pass ledger hashes" ;
-                    found_snarked_ledger_hash := true ;
-                    First_pass_ledger_hashes.set_last_snarked_hash snarked_hash ;
-                    First_pass_ledger_hashes.flush_older_than n ) ;
+                        snarked_hash ;
+                      First_pass_ledger_hashes.flush_older_than n ) ;
               if List.is_empty block_txns then (
                 [%log spam]
                   "No transactions to run for block with state hash $state_hash"
@@ -2036,7 +2038,7 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
                 in
                 return
                 @@ Out_channel.with_file output_file ~f:(fun oc ->
-                       Yojson.Safe.to_channel oc output ) )
+                    Yojson.Safe.to_channel oc output ) )
               else (
                 [%log error] "There were %d errors, not writing output"
                   !error_count ;
@@ -2047,69 +2049,70 @@ let () =
   let constraint_constants = G.constraint_constants in
   let proof_level = Genesis_constants.Proof_level.Full in
   Command.(
-    run
+    Command_unix.run
       (let open Let_syntax in
-      Command.async ~summary:"Replay transactions from Mina archive database"
-        (let%map input_file =
-           Param.flag "--input-file"
-             ~doc:"file File containing the starting ledger"
-             Param.(required string)
-         and output_file_opt =
-           Param.flag "--output-file"
-             ~doc:"file File containing the resulting ledger"
-             Param.(optional string)
-         and archive_uri =
-           Param.flag "--archive-uri"
-             ~doc:
-               "URI URI for connecting to the archive database (e.g., \
-                postgres://$USER@localhost:5432/archiver)"
-             Param.(required string)
-         and continue_on_error =
-           Param.flag "--continue-on-error"
-             ~doc:"Continue processing after errors" Param.no_arg
-         and checkpoint_interval =
-           Param.flag "--checkpoint-interval"
-             ~doc:"NN Write checkpoint file every NN slots"
-             Param.(optional int)
-         and checkpoint_output_folder_opt =
-           Param.flag "--checkpoint-output-folder"
-             ~doc:"file Folder containing the resulting checkpoints"
-             Param.(optional string)
-         and genesis_dir_opt =
-           Param.flag "--genesis-ledger-dir"
-             ~doc:"DIR Directory that contains the genesis ledger"
-             Param.(optional string)
-         and checkpoint_file_prefix =
-           Param.flag "--checkpoint-file-prefix"
-             ~doc:"string Checkpoint file prefix (default: 'replayer')"
-             Param.(optional_with_default "replayer" string)
-         and stop_slot_config_file =
-           Param.flag "--stop-slot-config-file"
-             ~doc:
-               "PATH Runtime config file with daemon.slot_chain_end and \
-                daemon.hard_fork_genesis_slot_delta. When provided, the \
-                replayer stops at the hard fork boundary. Required with \
-                --hard-fork-output-file."
-             Param.(optional string)
-         and hard_fork_output_file =
-           Param.flag "--hard-fork-output-file"
-             ~doc:
-               "PATH Output file for the post-fork replayer input. Enables \
-                hard fork migration when provided."
-             Param.(optional string)
-         and hard_fork_target =
-           Param.flag "--hard-fork-target"
-             ~doc:
-               "mesa|compatible Hard fork target. Controls what migration if \
-                any will be performed when producing the post-fork replayer \
-                input. (default: mesa)"
-             Param.(optional_with_default "mesa" string)
-         and log_json = Cli_lib.Flag.Log.json
-         and log_level = Cli_lib.Flag.Log.level
-         and file_log_level = Cli_lib.Flag.Log.file_log_level
-         and log_filename = Cli_lib.Flag.Log.file in
-         main ~input_file ~output_file_opt ~archive_uri ~checkpoint_interval
-           ~continue_on_error ~checkpoint_output_folder_opt
-           ~checkpoint_file_prefix ~genesis_dir_opt ~stop_slot_config_file
-           ~hard_fork_output_file ~hard_fork_target ~log_json ~log_level
-           ~file_log_level ~log_filename ~constraint_constants ~proof_level )))
+       Command.async ~summary:"Replay transactions from Mina archive database"
+         (let%map input_file =
+            Param.flag "--input-file"
+              ~doc:"file File containing the starting ledger"
+              Param.(required string)
+          and output_file_opt =
+            Param.flag "--output-file"
+              ~doc:"file File containing the resulting ledger"
+              Param.(optional string)
+          and archive_uri =
+            Param.flag "--archive-uri"
+              ~doc:
+                "URI URI for connecting to the archive database (e.g., \
+                 postgres://$USER@localhost:5432/archiver)"
+              Param.(required string)
+          and continue_on_error =
+            Param.flag "--continue-on-error"
+              ~doc:"Continue processing after errors" Param.no_arg
+          and checkpoint_interval =
+            Param.flag "--checkpoint-interval"
+              ~doc:"NN Write checkpoint file every NN slots"
+              Param.(optional int)
+          and checkpoint_output_folder_opt =
+            Param.flag "--checkpoint-output-folder"
+              ~doc:"file Folder containing the resulting checkpoints"
+              Param.(optional string)
+          and genesis_dir_opt =
+            Param.flag "--genesis-ledger-dir"
+              ~doc:"DIR Directory that contains the genesis ledger"
+              Param.(optional string)
+          and checkpoint_file_prefix =
+            Param.flag "--checkpoint-file-prefix"
+              ~doc:"string Checkpoint file prefix (default: 'replayer')"
+              Param.(optional_with_default "replayer" string)
+          and stop_slot_config_file =
+            Param.flag "--stop-slot-config-file"
+              ~doc:
+                "PATH Runtime config file with daemon.slot_chain_end and \
+                 daemon.hard_fork_genesis_slot_delta. When provided, the \
+                 replayer stops at the hard fork boundary. Required with \
+                 --hard-fork-output-file."
+              Param.(optional string)
+          and hard_fork_output_file =
+            Param.flag "--hard-fork-output-file"
+              ~doc:
+                "PATH Output file for the post-fork replayer input. Enables \
+                 hard fork migration when provided."
+              Param.(optional string)
+          and hard_fork_target =
+            Param.flag "--hard-fork-target"
+              ~doc:
+                "mesa|compatible Hard fork target. Controls what migration if \
+                 any will be performed when producing the post-fork replayer \
+                 input. (default: mesa)"
+              Param.(optional_with_default "mesa" string)
+          and log_json = Cli_lib.Flag.Log.json
+          and log_level = Cli_lib.Flag.Log.level
+          and file_log_level = Cli_lib.Flag.Log.file_log_level
+          and log_filename = Cli_lib.Flag.Log.file in
+          main ~input_file ~output_file_opt ~archive_uri ~checkpoint_interval
+            ~continue_on_error ~checkpoint_output_folder_opt
+            ~checkpoint_file_prefix ~genesis_dir_opt ~stop_slot_config_file
+            ~hard_fork_output_file ~hard_fork_target ~log_json ~log_level
+            ~file_log_level ~log_filename ~constraint_constants ~proof_level )
+      ) )

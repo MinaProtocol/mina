@@ -1,6 +1,6 @@
 (* payment_payload.ml *)
 
-open Core_kernel
+open Core
 open Signature_lib
 module Amount = Currency.Amount
 module Fee = Currency.Fee

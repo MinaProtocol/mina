@@ -145,7 +145,7 @@ let load_config_exn config_file =
   let config =
     Runtime_config.of_yojson config_json
     |> Result.map_error ~f:(fun err ->
-           Failure ("Could not parse configuration: " ^ err) )
+        Failure ("Could not parse configuration: " ^ err) )
     |> Result.ok_exn
   in
   let config = sanitize_runtime_config config in
@@ -244,7 +244,7 @@ let main ~(constraint_constants : Genesis_constants.Constraint_constants.t)
 let () =
   let (module G) = Genesis_constants.profiled () in
   let constraint_constants = G.constraint_constants in
-  Command.run
+  Command_unix.run
     (Command.async
        ~summary:
          "Generate the genesis ledger and genesis proof for a given \
@@ -299,4 +299,4 @@ let () =
          in
          main ~constraint_constants ~config_file ~genesis_dir ~hash_output_file
            ~ignore_missing_fields ~pad_app_state ~identity_conversion
-           ~prefork_genesis_config) )
+           ~prefork_genesis_config ) )

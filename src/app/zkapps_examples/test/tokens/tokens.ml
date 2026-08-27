@@ -1,5 +1,5 @@
 open Transaction_snark_tests.Util
-open Core_kernel
+open Core
 open Mina_base
 open Signature_lib
 module Impl = Pickles.Impls.Step
@@ -230,8 +230,8 @@ let%test_module "Tokens test" =
       in
       ignore account
 
-    let%test_unit "Initialize, mint, transfer recursive succeeds, ignores \
-                   non-token" =
+    let%test_unit
+        "Initialize, mint, transfer recursive succeeds, ignores non-token" =
       let subtree =
         []
         |> Zkapp_command.Call_forest.cons ~signature_kind
@@ -358,8 +358,8 @@ let%test_module "Tokens test" =
       in
       ignore account
 
-    let%test_unit "Initialize, mint, transfer two and non-token without auth \
-                   fails" =
+    let%test_unit
+        "Initialize, mint, transfer two and non-token without auth fails" =
       let subtree =
         []
         |> Zkapp_command.Call_forest.cons ~signature_kind

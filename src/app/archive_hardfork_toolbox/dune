@@ -2,6 +2,8 @@
  (name archive_hardfork_toolbox_lib)
  (public_name archive_hardfork_toolbox.lib)
  (libraries
+  core_unix.time_float_unix
+  core_unix.command_unix
   ;; opam libraries
   async_unix
   core

@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Snark_bits
 open Snark_params
 open Tick
@@ -243,14 +243,16 @@ module Make_str (A : Wire_types.Concrete) = struct
               match kind with
               | `Add ->
                   if Int.(Field.compare t (Lazy.force modulus_as_field) < 0)
-                  then (* Within range. *)
+                  then
+                    (* Within range. *)
                     Field.zero
                   else
                     (* Overflowed. We compensate by subtracting [modulus_as_field]. *)
                     Field.(negate one)
               | `Sub ->
                   if Int.(Field.compare t (Lazy.force modulus_as_field) < 0)
-                  then (* Within range. *)
+                  then
+                    (* Within range. *)
                     Field.zero
                   else
                     (* Underflowed, but appears as an overflow because of wrapping in
@@ -269,7 +271,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                     Field.zero
                   else if
                     Int.(
-                      Field.compare t (Lazy.force double_modulus_as_field) < 0)
+                      Field.compare t (Lazy.force double_modulus_as_field) < 0 )
                   then
                     (* 2. we are in the range
                           [modulus_as_field <= t < 2 * modulus_as_field],
@@ -282,7 +284,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                           underflow of a subtraction, and we should compensate by
                           adding [modulus_as_field].
                     *)
-                    Field.one)
+                    Field.one )
       in
       let%bind out_of_range =
         match kind with
@@ -378,8 +380,7 @@ module Make_str (A : Wire_types.Concrete) = struct
        being converted and hence overflow cannot happen. *)
     let of_nanomina_int i = if Int.(i >= 0) then Some (of_int i) else None
 
-    let of_mina_int i =
-      Option.(of_nanomina_int i >>= Fn.flip scale unit_to_nano)
+    let of_mina_int i = Option.(of_nanomina_int i >>= Fn.flip scale unit_to_nano)
 
     let of_nanomina_int_exn i =
       match of_nanomina_int i with
@@ -467,7 +468,7 @@ module Make_str (A : Wire_types.Concrete) = struct
       let to_input { sgn; magnitude } =
         Random_oracle.Input.Chunked.(
           append (to_input magnitude)
-            (packed (Field.project [ sgn_to_bool sgn ], 1)))
+            (packed (Field.project [ sgn_to_bool sgn ], 1)) )
 
       let to_input_legacy t = Random_oracle.Input.Legacy.bitstring (to_bits t)
 
@@ -481,12 +482,12 @@ module Make_str (A : Wire_types.Concrete) = struct
             let c = compare_magnitude x.magnitude y.magnitude in
             Some
               ( if Int.( < ) c 0 then
-                create ~sgn:y.sgn
-                  ~magnitude:Unsigned.Infix.(y.magnitude - x.magnitude)
-              else if Int.( > ) c 0 then
-                create ~sgn:x.sgn
-                  ~magnitude:Unsigned.Infix.(x.magnitude - y.magnitude)
-              else zero )
+                  create ~sgn:y.sgn
+                    ~magnitude:Unsigned.Infix.(y.magnitude - x.magnitude)
+                else if Int.( > ) c 0 then
+                  create ~sgn:x.sgn
+                    ~magnitude:Unsigned.Infix.(x.magnitude - y.magnitude)
+                else zero )
 
       let add_flagged (x : t) (y : t) : t * [ `Overflow of bool ] =
         match (x.sgn, y.sgn) with
@@ -496,12 +497,12 @@ module Make_str (A : Wire_types.Concrete) = struct
         | Pos, Neg | Neg, Pos ->
             let c = compare_magnitude x.magnitude y.magnitude in
             ( ( if Int.( < ) c 0 then
-                create ~sgn:y.sgn
-                  ~magnitude:Unsigned.Infix.(y.magnitude - x.magnitude)
-              else if Int.( > ) c 0 then
-                create ~sgn:x.sgn
-                  ~magnitude:Unsigned.Infix.(x.magnitude - y.magnitude)
-              else zero )
+                  create ~sgn:y.sgn
+                    ~magnitude:Unsigned.Infix.(y.magnitude - x.magnitude)
+                else if Int.( > ) c 0 then
+                  create ~sgn:x.sgn
+                    ~magnitude:Unsigned.Infix.(x.magnitude - y.magnitude)
+                else zero )
             , `Overflow false )
 
       let negate t =
@@ -565,7 +566,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           let%map { magnitude; sgn } = repr t in
           let mag = var_to_input magnitude in
           Random_oracle.Input.Chunked.(
-            append mag (packed ((Sgn.Checked.is_pos sgn :> Field.Var.t), 1)))
+            append mag (packed ((Sgn.Checked.is_pos sgn :> Field.Var.t), 1)) )
 
         let to_input_legacy t =
           let to_bits { magnitude; sgn } =
@@ -624,20 +625,20 @@ module Make_str (A : Wire_types.Concrete) = struct
             exists Sgn.typ
               ~compute:
                 (let open As_prover in
-                let%map x = read typ x and y = read typ y in
-                match add x y with
-                | Some r ->
-                    r.sgn
-                | None -> (
-                    match (x.sgn, y.sgn) with
-                    | Sgn.Neg, Sgn.Neg ->
-                        (* Ensure that we provide a value in the range
+                 let%map x = read typ x and y = read typ y in
+                 match add x y with
+                 | Some r ->
+                     r.sgn
+                 | None -> (
+                     match (x.sgn, y.sgn) with
+                     | Sgn.Neg, Sgn.Neg ->
+                         (* Ensure that we provide a value in the range
                            [-modulus_as_field < magnitude < 2*modulus_as_field]
                            for [range_check_flagged].
                         *)
-                        Sgn.Neg
-                    | _ ->
-                        Sgn.Pos ))
+                         Sgn.Neg
+                     | _ ->
+                         Sgn.Pos ) )
           in
           let value = Field.Var.add xv yv in
           let%bind magnitude =
@@ -663,8 +664,9 @@ module Make_str (A : Wire_types.Concrete) = struct
             exists Sgn.typ
               ~compute:
                 (let open As_prover in
-                let%map x = read typ x and y = read typ y in
-                Option.value_map (add x y) ~default:Sgn.Pos ~f:(fun r -> r.sgn))
+                 let%map x = read typ x and y = read typ y in
+                 Option.value_map (add x y) ~default:Sgn.Pos ~f:(fun r -> r.sgn)
+                )
           in
           let%bind res_value = seal (Field.Var.add xv yv) in
           let%bind magnitude =
@@ -859,14 +861,14 @@ module Make_str (A : Wire_types.Concrete) = struct
                              (sprintf
                                 !"formatting: num=%{Unsigned} middle=%{String} \
                                   after=%{Unsigned}"
-                                num (to_mina_string num) after_format ) ))
+                                num (to_mina_string num) after_format ) ) )
                 | exception e ->
                     let err = Error.of_exn e in
                     Error.(
                       raise
                         (tag
                            ~tag:(sprintf !"formatting: num=%{Unsigned}" num)
-                           err )) )
+                           err ) ) )
 
           let%test_unit "formatting_trailing_zeros" =
             let generator = gen_incl Unsigned.zero Unsigned.max_int in
@@ -880,7 +882,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                       (of_string
                          (sprintf
                             !"formatting: num=%{Unsigned} formatted=%{String}"
-                            num (to_mina_string num) ) )) )
+                            num (to_mina_string num) ) ) ) )
         end )
     end
   end
@@ -1125,7 +1127,7 @@ module Make_str (A : Wire_types.Concrete) = struct
 
     let of_q_exn q = Option.value_exn (of_q q)
 
-    let to_q = ident
+    let to_q = Fn.id
 
     let make fee weight = of_q @@ Q.make (uint64_to_z fee) (Z.of_int weight)
 
@@ -1219,7 +1221,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         let sub_flagged_checked =
           let f (x, y) =
             Tick.Checked.map (M.Checked.sub_flagged x y)
-              ~f:(fun (r, `Underflow u) -> (r, u))
+              ~f:(fun (r, `Underflow u) -> (r, u) )
           in
           Test_util.checked_to_unchecked (Typ.tuple2 typ typ)
             (Typ.tuple2 typ Boolean.typ)
