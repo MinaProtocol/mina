@@ -476,21 +476,27 @@ let add_breadcrumb_exn t breadcrumb =
       ; ("n", `Int (Full_frontier.size t.full_frontier))
       ]
     "POST: ($state_hash, $n)" ;
-  let user_cmds =
-    Mina_block.Validated.valid_commands
-    @@ Breadcrumb.validated_transition breadcrumb
-  in
-  let tx_hash_json command =
-    User_command.forget_check command
-    |> Mina_transaction.Transaction_hash.hash_command_with_hashes
-    |> Mina_transaction.Transaction_hash.to_yojson
-  in
-  [%str_log' trace t.logger] Added_breadcrumb_user_commands
-    ~metadata:
-      [ ( "user_commands"
-        , `List (List.map user_cmds ~f:(With_status.to_yojson tx_hash_json)) )
-      ; ("state_hash", State_hash.to_yojson (Breadcrumb.state_hash breadcrumb))
-      ] ;
+  (* hashing a command means serialising it and taking a Blake2 digest, and
+     rendering the hash means a base58 encoding on top; at a block's worth of
+     commands that is not worth paying when nothing will read it *)
+  ( if Logger.would_log t.logger Logger.Level.Trace then
+      let user_cmds =
+        Mina_block.Validated.valid_commands
+        @@ Breadcrumb.validated_transition breadcrumb
+      in
+      let tx_hash_json command =
+        User_command.forget_check command
+        |> Mina_transaction.Transaction_hash.hash_command_with_hashes
+        |> Mina_transaction.Transaction_hash.to_yojson
+      in
+      [%str_log' trace t.logger] Added_breadcrumb_user_commands
+        ~metadata:
+          [ ( "user_commands"
+            , `List (List.map user_cmds ~f:(With_status.to_yojson tx_hash_json))
+            )
+          ; ( "state_hash"
+            , State_hash.to_yojson (Breadcrumb.state_hash breadcrumb) )
+          ] ) ;
   let lite_diffs =
     List.map diffs_with_mutants
       ~f:Diff.(fun (Full.With_mutant.E (diff, _)) -> Lite.E.E (to_lite diff))

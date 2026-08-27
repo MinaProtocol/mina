@@ -145,6 +145,10 @@ module Processor = struct
     type t
 
     val process : t -> Message.t -> string option
+
+    (** Whether this processor could emit a message logged at this level.
+        A processor that could not lets a caller skip building one. *)
+    val accepts : t -> Level.t -> bool
   end
 
   type t = T : (module S with type t = 't) * 't -> t
@@ -155,6 +159,8 @@ module Processor = struct
     type t = Level.t
 
     let create ~log_level = log_level
+
+    let accepts log_level level = Level.compare level log_level >= 0
 
     let process log_level (msg : Message.t) =
       if Level.compare msg.level log_level < 0 then None
@@ -177,6 +183,10 @@ module Processor = struct
 
     let create (set : t) = set
 
+    (* selects on the event's identity rather than its level, so a message at
+       any level may be emitted *)
+    let accepts _ _ = true
+
     let process (set : t) (message : Message.t) : string option =
       let%bind.Option event_id = message.event_id in
       let%map.Option () = if Set.mem set event_id then Some () else None in
@@ -188,6 +198,8 @@ module Processor = struct
       { log_level : Level.t; config : Interpolator_lib.Interpolator.config }
 
     let create ~log_level ~config = { log_level; config }
+
+    let accepts { log_level; _ } level = Level.compare level log_level >= 0
 
     let process { log_level; config } (msg : Message.t) =
       let open Message in
@@ -280,14 +292,22 @@ module Consumer_registry = struct
   let register ?commit_id ~(id : id) ~processor ~transport () =
     Hashtbl.add_multi t ~key:id ~data:{ processor; transport; commit_id }
 
+  let consumers_for ~id =
+    match Hashtbl.find t id with
+    | Some consumers ->
+        consumers
+    | None ->
+        [ Lazy.force default_consumer ]
+
+  (* a message reaches every consumer, so any one of them accepting it is
+     reason enough to build it *)
+  let accepts ~id level =
+    List.exists (consumers_for ~id)
+      ~f:(fun { processor = Processor.T ((module Processor), processor); _ } ->
+        Processor.accepts processor level )
+
   let rec broadcast_log_message ~id msg =
-    let consumers =
-      match Hashtbl.find t id with
-      | Some consumers ->
-          consumers
-      | None ->
-          [ Lazy.force default_consumer ]
-    in
+    let consumers = consumers_for ~id in
     List.iter consumers ~f:(fun consumer ->
         let { processor = Processor.T ((module Processor), processor)
             ; transport = Transport.T ((module Transport), transport)
@@ -339,6 +359,8 @@ type t =
 [@@deriving bin_io_unversioned]
 
 let metadata t = t.metadata
+
+let would_log t level = (not t.null) && Consumer_registry.accepts ~id:t.id level
 
 let create ?(metadata = []) ?(id = "default") ?(itn_features = false) () =
   { null = false

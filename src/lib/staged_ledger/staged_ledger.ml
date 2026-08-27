@@ -215,15 +215,16 @@ module T = struct
             Time_float.abs_diff (Time_float.now ()) start
             |> Time_float.Span.to_ms
           in
-          [%log trace]
-            ~metadata:
-              [ ( "work_id"
-                , `List
-                    (List.map proofs ~f:(fun (_, s) ->
-                         `Int (Transaction_snark.Statement.hash s) ) ) )
-              ; ("time", `Float time_ms)
-              ]
-            "Verification in apply_diff for work $work_id took $time ms" ;
+          if Logger.would_log logger Logger.Level.Trace then
+            [%log trace]
+              ~metadata:
+                [ ( "work_id"
+                  , `List
+                      (List.map proofs ~f:(fun (_, s) ->
+                           `Int (Transaction_snark.Statement.hash s) ) ) )
+                ; ("time", `Float time_ms)
+                ]
+              "Verification in apply_diff for work $work_id took $time ms" ;
           Ok b
       | Error e ->
           [%log fatal]
