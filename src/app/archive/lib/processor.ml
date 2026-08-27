@@ -4706,6 +4706,21 @@ module Hardfork_state = struct
          |sql} )
       ()
 
+  (** The recorded fork, if there is one and its boundary has not been settled.
+
+      The finaliser wants exactly this: a fork it still has work to do about.
+      Returning nothing once `finalized_at` is set is what stops the repair
+      running a second time. *)
+  let load_unfinalized_opt (module Conn : CONNECTION) =
+    Conn.find_opt
+      (Mina_caqti.find_opt_req Caqti_type.unit typ
+         {sql| SELECT fork_state_hash, fork_blockchain_length, fork_global_slot,
+                      config_json, source::text
+               FROM hardfork_state
+               WHERE id = 1 AND finalized_at IS NULL
+         |sql} )
+      ()
+
   let insert (module Conn : CONNECTION) (t : t) =
     Conn.exec
       (Mina_caqti.exec_req typ
@@ -4785,6 +4800,237 @@ let hardfork_state_of_config ~config_json =
         ; config_json
         ; source = "daemon_config"
         }
+
+(** Settle the chain boundary a hard fork leaves behind.
+
+    After a fork the last blocks before it are stuck: canonicalisation only
+    advances when a new block arrives more than [k] above the highest canonical
+    one, and the pre-fork chain has stopped. Nothing repairs that on its own, so
+    the archive does it once, against the fork block the configuration names.
+
+    Every check below is a reason to come back later rather than to fail. The
+    only mutation is [chain_status], and it is the same mutation an operator
+    would apply by hand with [convert-chain-to-canonical]. *)
+module Hardfork_finaliser = struct
+  (* Advisory lock key. Several archive processes may share one database and
+     must not repair the boundary concurrently. *)
+  let lock_key = 0x4d494e41_48465250L (* "MINA" "HFRP" *)
+
+  let try_lock (module Conn : CONNECTION) =
+    Conn.find
+      (Mina_caqti.find_req Caqti_type.int64 Caqti_type.bool
+         "SELECT pg_try_advisory_lock(?)" )
+      lock_key
+
+  let unlock (module Conn : CONNECTION) =
+    Conn.find
+      (Mina_caqti.find_req Caqti_type.int64 Caqti_type.bool
+         "SELECT pg_advisory_unlock(?)" )
+      lock_key
+
+  let mark_finalized (module Conn : CONNECTION) =
+    Conn.exec
+      (Mina_caqti.exec_req Caqti_type.unit
+         {sql| UPDATE hardfork_state
+               SET finalized_at = now()
+               WHERE id = 1
+         |sql} )
+      ()
+
+  (** Why the boundary could not be settled yet. All of these are transient in
+      principle: the archive keeps its current answer and tries again. *)
+  type not_ready =
+    | Fork_block_absent
+    | Too_few_confirmations of { have : int; want : int }
+    | Chain_incomplete of { expected_oldest : string; actual_oldest : string }
+    | Not_on_best_chain
+
+  let describe = function
+    | Fork_block_absent ->
+        "the fork block is not in this database yet"
+    | Too_few_confirmations { have; want } ->
+        sprintf
+          "the fork block has %d confirmations, fewer than the %d required" have
+          want
+    | Chain_incomplete { expected_oldest; actual_oldest } ->
+        sprintf
+          "the chain back from the fork block stops at %s instead of reaching \
+           %s, so blocks are missing"
+          actual_oldest expected_oldest
+    | Not_on_best_chain ->
+        "the fork block is not on the chain this archive believes is best"
+
+  (** Everything that must hold before we rewrite any [chain_status].
+
+      Deliberately conservative: a gap in the ancestry means the repair would
+      canonicalise the wrong set, so it refuses rather than guessing. Backfill
+      the missing blocks and the next attempt proceeds. *)
+  let check ~required_confirmations (module Conn : CONNECTION)
+      ~(hardfork_state : Hardfork_state.t) =
+    let open Deferred.Result.Let_syntax in
+    match%bind
+      Hardfork_sql.block_info_by_state_hash
+        (module Conn)
+        ~state_hash:hardfork_state.fork_state_hash
+    with
+    | None ->
+        return (Error Fork_block_absent)
+    | Some fork_block -> (
+        let%bind tip = Hardfork_sql.latest_state_hash (module Conn) in
+        let%bind on_best_chain =
+          Hardfork_sql.is_in_best_chain
+            (module Conn)
+            ~tip_hash:tip ~check_hash:hardfork_state.fork_state_hash
+            ~check_height:(Int64.to_int_exn fork_block.height)
+            ~check_slot:hardfork_state.fork_global_slot
+        in
+        if not on_best_chain then return (Error Not_on_best_chain)
+        else
+          let%bind confirmations =
+            Hardfork_sql.num_of_confirmations
+              (module Conn)
+              ~latest_state_hash:tip
+              ~fork_slot:(Int64.to_int_exn hardfork_state.fork_global_slot)
+          in
+          if confirmations < required_confirmations then
+            return
+              (Error
+                 (Too_few_confirmations
+                    { have = confirmations; want = required_confirmations } ) )
+          else
+            match%bind
+              Hardfork_sql.first_block_of_protocol_version
+                (module Conn)
+                ~v:fork_block.protocol_version
+            with
+            | None ->
+                (* No block of this protocol version, which cannot happen when
+                   the fork block itself is one. Treat as not ready. *)
+                return (Error Fork_block_absent)
+            | Some oldest ->
+                let%map ancestry =
+                  Hardfork_sql.blocks_between_both_inclusive
+                    (module Conn)
+                    ~latest_block_id:fork_block.id ~oldest_block_id:oldest.id
+                in
+                (* The walk follows parent links, so a short chain means a
+                   missing block rather than a shorter history. *)
+                let actual_oldest =
+                  match ancestry with
+                  | [] ->
+                      "nothing"
+                  | b :: _ ->
+                      b.Hardfork_sql.Block_info.state_hash
+                in
+                if String.equal actual_oldest oldest.state_hash then
+                  Ok (fork_block, ancestry)
+                else
+                  Error
+                    (Chain_incomplete
+                       { expected_oldest = oldest.state_hash; actual_oldest } )
+        )
+
+  let apply (module Conn : CONNECTION) ~(fork_block : Hardfork_sql.Block_info.t)
+      ~ancestry =
+    let open Deferred.Result.Let_syntax in
+    let canonical_block_ids =
+      List.map ancestry ~f:(fun b -> b.Hardfork_sql.Block_info.id)
+    in
+    (* A fork above the target bounds what may be orphaned: blocks at or beyond
+       it are the post-fork chain and must keep their status. *)
+    let%bind fork_context =
+      Hardfork_sql.fork_block_above_height
+        (module Conn)
+        ~height:fork_block.height
+    in
+    let fork_boundary_slot =
+      Option.map fork_context ~f:(fun fc ->
+          fc.Hardfork_sql.Fork_context.fork_slot )
+    in
+    let%map () =
+      Hardfork_sql.mark_pending_blocks_as_canonical_or_orphaned
+        (module Conn)
+        ~canonical_block_ids ~stop_at_slot:None ~fork_boundary_slot
+        ~protocol_version:fork_block.protocol_version
+    in
+    List.length canonical_block_ids
+
+  (** One attempt. Safe to call repeatedly: it returns immediately when there is
+      no fork recorded, or when the boundary is already settled. *)
+  let attempt ~logger ~required_confirmations ~pool =
+    let open Deferred.Result.Let_syntax in
+    Mina_caqti.Pool.use
+      (fun ((module Conn : CONNECTION) as conn) ->
+        (* None covers both "no fork here" and "already settled". Asking for
+           the unfinished one in a single query keeps the two facts consistent
+           with each other; loading the row and then testing it separately
+           could see the boundary settled in between. *)
+        match%bind Hardfork_state.load_unfinalized_opt conn with
+        | None ->
+            return ()
+        | Some hardfork_state -> (
+            match%bind try_lock conn with
+            | false ->
+                (* Normally another archive process is repairing the same
+                   database. But the lock belongs to a Postgres session, not to
+                   a process, and a session outlives an archive that was killed
+                   mid-repair: the backend carries on with the UPDATE and keeps
+                   the lock. An archive restarted into that state would find
+                   itself unable to do anything, so say so rather than return
+                   in silence. *)
+                [%log info]
+                  "Not settling the fork boundary yet: another session holds \
+                   the repair lock. If no other archive is running against \
+                   this database, look for a leftover backend: SELECT pid, \
+                   query FROM pg_stat_activity JOIN pg_locks USING (pid) WHERE \
+                   locktype = 'advisory'. This will be retried." ;
+                return ()
+            | true -> (
+                let%bind result =
+                  check ~required_confirmations conn ~hardfork_state
+                in
+                match result with
+                | Error reason ->
+                    [%log info]
+                      "Not settling the fork boundary yet: %s. This will be \
+                       retried."
+                      (describe reason) ;
+                    let%map (_ : bool) = unlock conn in
+                    ()
+                | Ok (fork_block, ancestry) ->
+                    let%bind marked = apply conn ~fork_block ~ancestry in
+                    let%bind () = mark_finalized conn in
+                    let%map (_ : bool) = unlock conn in
+                    [%log info]
+                      "Settled the fork boundary at $state_hash: $count blocks \
+                       marked canonical, the rest of that protocol version \
+                       below the fork orphaned."
+                      ~metadata:
+                        [ ("state_hash", `String hardfork_state.fork_state_hash)
+                        ; ("count", `Int marked)
+                        ] ) ) )
+      pool
+
+  (** Keep attempting until the boundary is settled.
+
+      Runs in the background while the archive serves reads. The repair only
+      writes [chain_status], so there is nothing to coordinate with ingest. *)
+  let run ~logger ~required_confirmations ?(interval = Time.Span.of_sec 60.)
+      ~pool () =
+    Deferred.repeat_until_finished () (fun () ->
+        let%bind () =
+          match%map attempt ~logger ~required_confirmations ~pool with
+          | Ok () ->
+              ()
+          | Error e ->
+              [%log warn]
+                "Could not settle the fork boundary: $error. This will be \
+                 retried."
+                ~metadata:[ ("error", `String (Caqti_error.show e)) ]
+        in
+        let%map () = after interval in
+        `Repeat () )
+end
 
 let%test_module "hard fork configuration parsing" =
   ( module struct
@@ -5128,7 +5374,7 @@ let setup_server ~proof_cache_db ~(genesis_constants : Genesis_constants.t)
     ~(constraint_constants : Genesis_constants.Constraint_constants.t)
     ~metrics_server_port ~logger ~postgres_address ~server_port ~chunks_length
     ~delete_older_than ~runtime_config_opt ~missing_blocks_width ~signature_kind
-    ~hardfork_handling ~schema_upgrade_script =
+    ~hardfork_confirmations ~hardfork_handling ~schema_upgrade_script =
   let where_to_listen =
     Async.Tcp.Where_to_listen.bind_to All_addresses (On_port server_port)
   in
@@ -5248,6 +5494,12 @@ let setup_server ~proof_cache_db ~(genesis_constants : Genesis_constants.t)
                      Deferred.unit ) ) )
       |> don't_wait_for ;
       (*Update archive metrics*)
+      (* Settle the fork boundary, if a fork has been recorded. A no-op on a
+         database that has never seen one, so it needs no flag to disable: it
+         runs in the background and only ever writes chain_status. *)
+      Hardfork_finaliser.run ~logger
+        ~required_confirmations:hardfork_confirmations ~pool ()
+      |> don't_wait_for ;
       serve_metrics_server ~logger ~metrics_server_port ~missing_blocks_width
         ~block_window_duration_ms:constraint_constants.block_window_duration_ms
         pool
