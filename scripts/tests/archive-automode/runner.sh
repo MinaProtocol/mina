@@ -13,10 +13,10 @@
 #      strands: a band of pending blocks the archive can no longer canonicalise
 #   2. a running archive, in automode
 #   3. the configuration, sent over the archive RPC
-#   4. the archive records it and *declines* to repair: the fork block is so far
-#      attested only by that message, and nothing has corroborated it
-#   5. the post-fork genesis block arrives, its parent hash confirming the fork
-#      block
+#   4. the archive records it and *declines* to repair: the hand-over begins
+#      with the genesis block, and this seed gives it no ledger to build one
+#   5. the post-fork genesis block arrives another way, which is enough -- the
+#      hand-over needs the block to exist, not to have built it itself
 #   6. now the band heals -- pending becomes canonical on the chain to the fork
 #      block, and orphaned off it
 #
@@ -170,11 +170,16 @@ STILL_PENDING=$(psql_ -c "SELECT count(*) FROM blocks WHERE chain_status='pendin
 [[ "$STILL_PENDING" == "7" ]] \
   || fail "the archive repaired before the post-fork genesis arrived (${STILL_PENDING} pending)"
 
-if grep -q "post-fork chain's genesis block has not arrived" "${WORK}/archive.log"; then
+# The hand-over stops at its first step, which is the genesis block, and that
+# step needs a ledger this seed does not provide. So the refusal names the
+# ledger rather than the block: the archive is not waiting for someone to
+# deliver a genesis, it is waiting for the means to build one.
+if grep -q "waiting on the genesis ledger" "${WORK}/archive.log"; then
   echo "    declined, and said why:"
-  grep -o "Not settling the fork boundary yet.*" "${WORK}/archive.log" | tail -1 | sed 's/^/      /'
+  grep -o "The hand-over is waiting on the genesis ledger.*" "${WORK}/archive.log" \
+    | tail -1 | cut -c1-140 | sed 's/^/      /'
 else
-  fail "the archive did not say it was waiting for the post-fork genesis"
+  fail "the archive did not say it was waiting for the genesis ledger"
 fi
 
 # ------------------------------------------------- 6. the genesis block arrives
