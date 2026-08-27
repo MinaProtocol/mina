@@ -14,12 +14,13 @@
 #   4. the fork configuration, sent over the archive RPC. The archive accepts
 #      it here and records it: hardfork_state gets a row
 #   5. no history is rewritten yet, though. Accepting the announcement and
-#      acting on it are separate: the fork block is so far attested only by
-#      that one message, and nothing has corroborated it. finalized_at stays
-#      NULL while that is the case
-#   6. the post-fork daemon feeds in its genesis block, whose parent hash is the
-#      fork block's. That is the corroboration
-#   7. now the repair runs, the boundary settles, and finalized_at is stamped
+#      acting on it are separate, and the hand-over runs in order: the genesis
+#      block first, and that needs a ledger. finalized_at stays NULL until it
+#      has one -- including the boundary repair, which needs no ledger of its
+#      own and waits anyway, so that the database is never half-repaired
+#   6. the post-fork genesis block arrives, which is what the hand-over was
+#      waiting for
+#   7. now the rest runs, the boundary settles, and finalized_at is stamped
 #
 # The database is devnet-archive-dump-2026-08-19_1700, taken three hours before
 # the mesa fork on 2026-08-19 and used unmodified. It is the state a real
@@ -155,10 +156,15 @@ STILL_PENDING=$(q "SELECT count(*) FROM blocks WHERE chain_status='pending';")
   || fail "the archive rewrote history before the post-fork genesis arrived (${BEFORE_PENDING} pending, now ${STILL_PENDING})"
 echo "  unchanged: $STILL_PENDING blocks still pending, as before"
 
-grep -q "post-fork chain's genesis block has not arrived" "$WORK/archive.log" \
-  || fail "the archive did not say it was waiting for the post-fork genesis"
+# The hand-over begins with the genesis block, and that step needs a ledger this
+# archive has no way to fetch here. So the refusal names the ledger: it is not
+# waiting for someone to deliver a genesis block, it is waiting for the means to
+# build one. Nothing later in the sequence runs until it has it.
+grep -q "waiting on the genesis ledger" "$WORK/archive.log" \
+  || fail "the archive did not say it was waiting for the genesis ledger"
 echo "  waiting because:"
-grep -o "Not settling the fork boundary yet.*" "$WORK/archive.log" | tail -1 | sed 's/^/    /'
+grep -o "The hand-over is waiting on the genesis ledger.*" "$WORK/archive.log" \
+  | tail -1 | cut -c1-140 | sed 's/^/    /'
 
 echo
 echo "=== 6. the post-fork daemon feeds in its genesis block"
