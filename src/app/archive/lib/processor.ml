@@ -4801,6 +4801,16 @@ let hardfork_state_of_config ~config_json =
         ; source = "daemon_config"
         }
 
+(** Make text safe to put inside a log message.
+
+    The logger reads [$name] in a message as an interpolation placeholder and
+    refuses to emit a message whose placeholders have no matching metadata. Text
+    that came from somewhere else is data, not a template, and Postgres error
+    text in particular quotes the statement it failed on -- [$1], [$2] and all.
+    Formatting one of those into a message turns the whole line into "invalid
+    log call", losing exactly the diagnostic that was worth having. *)
+let for_log_message = String.tr ~target:'$' ~replacement:'.'
+
 (** Settle the chain boundary a hard fork leaves behind.
 
     After a fork the last blocks before it are stuck: canonicalisation only
@@ -4994,7 +5004,7 @@ module Hardfork_finaliser = struct
                     [%log info]
                       "Not settling the fork boundary yet: %s. This will be \
                        retried."
-                      (describe reason) ;
+                      (for_log_message (describe reason)) ;
                     let%map (_ : bool) = unlock conn in
                     ()
                 | Ok (fork_block, ancestry) ->
@@ -5244,14 +5254,14 @@ module Fork_genesis_block = struct
               [%log info]
                 "Cannot insert the fork genesis block yet: %s. This will be \
                  retried."
-                (describe reason)
+                (for_log_message (describe reason))
           | Error reason ->
               [%log warn]
                 "Still cannot insert the fork genesis block after %s: %s. The \
                  genesis ledger has not arrived. This will keep being retried, \
                  and will succeed on its own once the ledger is uploaded."
                 (Time.Span.to_string_hum waited)
-                (describe reason)
+                (for_log_message (describe reason))
         in
         let%map () =
           after (if still_expected then brisk_interval else patient_interval)
