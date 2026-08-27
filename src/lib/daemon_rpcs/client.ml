@@ -9,12 +9,12 @@ let print_rpc_error error =
 let dispatch rpc query (host_and_port : Host_and_port.t) =
   Deferred.Or_error.try_with_join ~here:[%here] (fun () ->
       Tcp.with_connection (Tcp.Where_to_connect.of_host_and_port host_and_port)
-        ~timeout:(Time.Span.of_sec 1.) (fun _ r w ->
+        ~timeout:(Time_float.Span.of_sec 1.) (fun _ r w ->
           let open Deferred.Let_syntax in
           match%bind
             Rpc.Connection.create
               ~handshake_timeout:
-                (Time.Span.of_sec
+                (Time_float.Span.of_sec
                    Node_config_unconfigurable_constants
                    .rpc_handshake_timeout_sec )
               ~heartbeat_config:

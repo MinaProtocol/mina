@@ -66,7 +66,7 @@ module Database = struct
     in
     custom ~encode ~decode
       Utils.(
-        tup8 (option string) int string int string string (option string) string)
+        tup8 (option string) int string int string string (option string) string )
 end
 
 let json_error msg =
@@ -152,7 +152,8 @@ let command =
     ~summary:
       "Prints out the ledger for a given slot for debugging purposes. \n\
       \  It requires an archive db url and a slot number"
-    (let%map_open.Command postgres = Cli_lib.Flag.Uri.Archive.postgres
+    (let%map_open.Command postgres =
+       Lazy.force Cli_lib.Flag.Uri.Archive.postgres
      and slot =
        flag "--slot" ~aliases:[ "slot" ]
          ~doc:"the global slot since genesis that you would like to dump"
@@ -160,4 +161,4 @@ let command =
      in
      fun () -> dump_slot slot postgres.value )
 
-let () = Command.run command
+let () = Command_unix.run command

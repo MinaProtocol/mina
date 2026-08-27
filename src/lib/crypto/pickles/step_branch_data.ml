@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Pickles_types
 open Hlist
 open Import
@@ -96,8 +96,7 @@ module Make (Inductive_rule : Inductive_rule.Intf) = struct
     Timer.clock __LOC__ ;
     let module HT = H4.T (Tag) in
     let (T (self_width, proofs_verified)) = HT.length rule.prevs in
-    let rec extract_lengths :
-        type a b n m k.
+    let rec extract_lengths : type a b n m k.
         (a, b, n, m) HT.t -> (a, k) Length.t -> n H1.T(Nat).t * (n, k) Length.t
         =
      fun ts len ->
@@ -140,8 +139,7 @@ module Make (Inductive_rule : Inductive_rule.Intf) = struct
       else (Types_map.feature_flags d, Types_map.num_chunks d)
     in
     let prev_requests =
-      let make_one :
-          type w.
+      let make_one : type w.
              w Nat.t
           -> Opt.Flag.t Plonk_types.Features.Full.t
           -> int
@@ -160,8 +158,7 @@ module Make (Inductive_rule : Inductive_rule.Intf) = struct
                    end)
                    () )
       in
-      let rec go :
-          type pvars pvals ws hs.
+      let rec go : type pvars pvals ws hs.
              (pvars, pvals, ws, hs) H4.T(Tag).t
           -> ws H1.T(Nat).t
           -> ws H1.T(Requests.Prev_request_packed).t =
@@ -193,8 +190,7 @@ module Make (Inductive_rule : Inductive_rule.Intf) = struct
     *)
     let module Optional_wrap_key = Types_map.For_step.Optional_wrap_key in
     let known_wrap_keys =
-      let rec go :
-          type a1 a2 n m.
+      let rec go : type a1 a2 n m.
           (a1, a2, n, m) H4.T(Tag).t -> m H1.T(Optional_wrap_key).t Promise.t =
         function
         | [] ->

@@ -4,7 +4,7 @@ set -eo pipefail
 
 buildkite/scripts/debian/update.sh --verbose
 
-TESTNET_NAME="devnet-generic"
+TESTNET_NAME="generic"
 
 git config --global --add safe.directory /workdir
 source buildkite/scripts/export-git-env-vars.sh
@@ -13,7 +13,7 @@ source buildkite/scripts/export-git-env-vars.sh
 # freshly-built bare binary from the apps cache is sufficient; no debian package
 # (and its config/genesis payload) is required. Fall back to the .deb when the
 # bare binary is unavailable. Either way `mina` ends up on PATH.
-if ./buildkite/scripts/apps/restore_binary.sh devnet; then
+if ./buildkite/scripts/apps/restore_binary.sh; then
   echo "Using bare mina from apps cache"
 else
   echo "Using debian-installed mina"

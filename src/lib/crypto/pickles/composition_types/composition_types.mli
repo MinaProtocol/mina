@@ -438,7 +438,7 @@ module Wrap : sig
       val to_field_elements :
            ('g, (('f, 'a) Vector.t, 'b) Vector.t) t
         -> g1:('g -> 'f list)
-        -> 'f Core_kernel.Array.t
+        -> 'f Core.Array.t
 
       val wrap_typ :
            ('a, 'b) Wrap_impl.Typ.t
@@ -591,16 +591,16 @@ module Wrap : sig
 
     val to_field_elements :
          ('a, 'b, ('g, 'c) Vector.t, (('f, 'd) Vector.t, 'c) Vector.t) t
-      -> app_state:('b -> 'f Core_kernel.Array.t)
-      -> comm:('a -> 'f Core_kernel.Array.t)
+      -> app_state:('b -> 'f Core.Array.t)
+      -> comm:('a -> 'f Core.Array.t)
       -> g:('g -> 'f list)
-      -> 'f Core_kernel.Array.t
+      -> 'f Core.Array.t
 
     val to_field_elements_without_index :
          ('a, 'b, ('g, 'c) Vector.t, (('f, 'd) Vector.t, 'c) Vector.t) t
-      -> app_state:('b -> 'f Core_kernel.Array.t)
+      -> app_state:('b -> 'f Core.Array.t)
       -> g:('g -> 'f list)
-      -> 'f Core_kernel.Array.t
+      -> 'f Core.Array.t
   end
 
   module Lookup_parameters : sig

@@ -12,7 +12,8 @@ open Common
 
 module Make
     (Inductive_rule : Inductive_rule.Intf with type 'a proof = 'a Proof.t)
-    (A : T0) (A_value : sig
+    (A : T0)
+    (A_value : sig
       type t
     end)
     (Max_proofs_verified : Nat.Add.Intf_transparent) =
@@ -119,8 +120,7 @@ struct
     let challenge_polynomial =
       Wrap_verifier.challenge_polynomial (module Backend.Tock.Field)
     in
-    let expand_proof :
-        type var value local_max_proofs_verified m.
+    let expand_proof : type var value local_max_proofs_verified m.
            Impls.Wrap.Verification_key.t
         -> _ array Plonk_verification_key_evals.t
         -> value
@@ -162,7 +162,7 @@ struct
         let zeta = to_field plonk0.zeta in
         let zetaw =
           Tick.Field.(
-            zeta * domain_generator ~log2_size:(Domain.log2_size domain))
+            zeta * domain_generator ~log2_size:(Domain.log2_size domain) )
         in
         let combined_evals =
           Plonk_checks.evals_of_split_evals
@@ -317,7 +317,11 @@ struct
           |> Wrap_hack.pad_accumulator )
           public_input proof
       in
-      let ((x_hat_1, _x_hat_2) as x_hat) = O.(p_eval_1 o, p_eval_2 o) in
+      (* Wrap proofs are nc = 1 by design (fixed-size circuit), so taking chunk 0
+         here recovers the full eval. *)
+      let ((x_hat_1, _x_hat_2) as x_hat) =
+        O.((p_eval_1 o).(0), (p_eval_2 o).(0))
+      in
       let scalar_chal f =
         Scalar_challenge.map ~f:Challenge.Constant.of_tock_field (f o)
       in
@@ -572,8 +576,7 @@ struct
     let compute_prev_proof_parts prev_proof_requests =
       [%log internal] "Step_compute_prev_proof_parts" ;
       let%map.Promise prevs =
-        let rec go :
-            type vars values ns ms.
+        let rec go : type vars values ns ms.
                (vars, values, ns, ms) H4.T(Tag).t
             -> (vars, values, ns) H3.T(Types_map.Basic).t Promise.t = function
           | [] ->
@@ -591,8 +594,7 @@ struct
           , prev_proofs'
           , actual_wrap_domains'
           , prev_responders' ) =
-        let[@warning "-4"] rec go :
-            type vars values ns ms k.
+        let[@warning "-4"] rec go : type vars values ns ms k.
                (vars, values, ns, ms) H4.T(Tag).t
             -> (vars, values, ns) H3.T(Types_map.Basic).t
             -> ( values
@@ -671,8 +673,7 @@ struct
     end in
     let extract_from_proofs (type res)
         (module Extract : Extract.S with type res = res) =
-      let rec go :
-          type vars values ns ms len.
+      let rec go : type vars values ns ms len.
              ns H1.T(Proof).t
           -> (values, vars, ns, ms) H4.T(Tag).t
           -> (vars, len) Length.t
@@ -792,10 +793,10 @@ struct
                { Tick.Proof.Challenge_polynomial.commitment
                ; challenges = Vector.to_array chals
                } )
-           |> to_list) )
+           |> to_list ) )
     in
-    let%map.Promise ( (next_proof : Tick.Proof.with_public_evals)
-                    , _next_statement_hashed ) =
+    let%map.Promise
+        (next_proof : Tick.Proof.with_public_evals), _next_statement_hashed =
       let (T (input, _conv, conv_inv)) =
         Impls.Step.input ~proofs_verified:Max_proofs_verified.n
       in
@@ -859,8 +860,7 @@ struct
         end )
     in
     let messages_for_next_wrap_proof =
-      let rec go :
-          type a.
+      let rec go : type a.
              a H1.T(Proof).t
           -> a H1.T(Proof.Base.Messages_for_next_proof_over_same_field.Wrap).t =
         function

@@ -85,13 +85,12 @@ module Params = struct
     if body = "" then empty
     else
       let json = Yojson.Basic.from_string body in
-      { query =
-          Yojson.Basic.Util.(json |> member "query" |> to_option to_string)
+      { query = Yojson.Basic.Util.(json |> member "query" |> to_option to_string)
       ; variables =
           Yojson.Basic.Util.(json |> member "variables" |> to_option to_assoc)
       ; operation_name =
           Yojson.Basic.Util.(
-            json |> member "operationName" |> to_option to_string)
+            json |> member "operationName" |> to_option to_string )
       }
 
   let of_graphql_body body =
@@ -138,7 +137,7 @@ module Make
     (Io : Cohttp.S.IO with type 'a t = 'a Schema.Io.t)
     (Body : HttpBody with type +'a io := 'a Schema.Io.t) =
 struct
-  module Ws = Websocket.Connection.Make (Io)
+  module Ws = Graphql_websocket.Connection.Make (Io)
   module Websocket_transport = Websocket_handler.Make (Schema.Io) (Ws)
 
   let ( >>= ) = Io.( >>= )

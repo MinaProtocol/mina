@@ -25,5 +25,5 @@ in  Pipeline.build
           , PipelineTag.Type.Debian
           ]
         }
-      , steps = [ DebianModifications.step ]
+      , steps = [ DebianModifications.step, DebianModifications.debToolkitStep ]
       }

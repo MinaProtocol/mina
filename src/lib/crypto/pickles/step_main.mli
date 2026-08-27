@@ -60,5 +60,5 @@ module Make (Inductive_rule : Inductive_rule.Intf) : sig
            )
            Import.Types.Step.Statement.t
            Promise.t )
-       Core_kernel.Staged.t
+       Core.Staged.t
 end

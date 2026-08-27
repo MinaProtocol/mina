@@ -11,7 +11,7 @@ let ContainerImages = ../Constants/ContainerImages.dhall
 let key = "replayer-test"
 
 let debs =
-      "mina-devnet-instrumented,mina-archive-devnet-instrumented,mina-rosetta-devnet"
+      "mina-generic-instrumented,mina-archive-generic-instrumented,mina-devnet-profile,mina-archive-devnet-instrumented"
 
 in  { step =
             \(dependsOn : List Command.TaggedKey.Type)
@@ -19,7 +19,9 @@ in  { step =
               Command.Config::{
               , commands =
                 [ RunWithPostgres.runInToolchainWithPostgresAndDebs
-                    ([] : List Text)
+                    [ "APPS_BUILD_FLAG=instrumented"
+                    , "APPS_BARE_BINARIES=replayer.exe:mina-replayer"
+                    ]
                     ( Some
                         ( RunWithPostgres.ScriptOrArchive.Script
                             "./src/test/archive/sample_db/archive_db.sql"

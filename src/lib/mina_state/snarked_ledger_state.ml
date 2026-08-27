@@ -331,7 +331,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                 !"Generating checked top hash from:@.%{sexp: Field.t \
                   Random_oracle.Input.Chunked.t}@."
                 input
-            else return ())
+            else return () )
       in
       input
 

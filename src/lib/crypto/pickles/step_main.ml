@@ -113,7 +113,7 @@ module Make (Inductive_rule : Inductive_rule.Intf) = struct
             let must_verify = read Boolean.typ must_verify in
             printf "finalized: %b\n%!" finalized ;
             printf "verified: %b\n%!" verified ;
-            printf "must_verify: %b\n\n%!" must_verify) ;
+            printf "must_verify: %b\n\n%!" must_verify ) ;
     (chals, Boolean.(verified &&& finalized ||| not must_verify))
 
   (* The SNARK function corresponding to the input inductive rule. *)
@@ -178,8 +178,8 @@ module Make (Inductive_rule : Inductive_rule.Intf) = struct
    fun (module Req) max_proofs_verified ~self_branches ~prev_requests
        ~local_signature_length ~proofs_verified ~lte ~public_input
        ~auxiliary_typ ~basic ~known_wrap_keys ~self rule ->
-    let (input_typ, output_typ)
-          : (a_var, a_value) Typ.t * (ret_var, ret_value) Typ.t =
+    let (input_typ, output_typ) :
+        (a_var, a_value) Typ.t * (ret_var, ret_value) Typ.t =
       match public_input with
       | Input typ ->
           (typ, Typ.unit)
@@ -191,15 +191,17 @@ module Make (Inductive_rule : Inductive_rule.Intf) = struct
     let main () : _ Types.Step.Statement.t Promise.t =
       let open Impls.Step in
       let logger = Context_logger.get () in
-      let module Max_proofs_verified = ( val max_proofs_verified : Nat.Add.Intf
-                                           with type n = max_proofs_verified )
+      let module Max_proofs_verified =
+        ( val max_proofs_verified
+            : Nat.Add.Intf with type n = max_proofs_verified )
       in
       let T = Max_proofs_verified.eq in
       let app_state = exists input_typ ~request:(fun () -> Req.App_state) in
-      let%bind.Promise { Inductive_rule.previous_proof_statements
-                       ; public_output = ret_var
-                       ; auxiliary_output = auxiliary_var
-                       } =
+      let%bind.Promise
+          { Inductive_rule.previous_proof_statements
+          ; public_output = ret_var
+          ; auxiliary_output = auxiliary_var
+          } =
         (* Run the application logic of the rule on the predecessor statements *)
         with_label "rule_main" (fun () ->
             rule.main { public_input = app_state } )
@@ -222,8 +224,7 @@ module Make (Inductive_rule : Inductive_rule.Intf) = struct
           let%map.Promise () =
             Async_promise.unit_request (fun () ->
                 let previous_proof_statements =
-                  let rec go :
-                      type prev_vars prev_values ns1 ns2.
+                  let rec go : type prev_vars prev_values ns1 ns2.
                          ( prev_vars
                          , ns1 )
                          H2.T(Inductive_rule.Previous_proof_statement).t
@@ -240,8 +241,11 @@ module Make (Inductive_rule : Inductive_rule.Intf) = struct
                       , tag :: tags ) ->
                         let public_input =
                           (fun (type var value n m)
-                               (tag : (var, value, n, m) Tag.t) (var : var) :
-                               value ->
+                            (tag : (var, value, n, m) Tag.t)
+                            (var : var)
+                            :
+                            value
+                          ->
                             let typ : (var, value) Typ.t =
                               match
                                 Type_equal.Id.same_witness self.id tag.id
@@ -279,8 +283,7 @@ module Make (Inductive_rule : Inductive_rule.Intf) = struct
                width comparison. Co-walks the predecessors' [Tag]s only to
                recover the per-proof type indices; the witness [Typ] itself
                comes from each [Prev_request]. *)
-            let rec exists_prevs :
-                type pvars pvals ns1 ns2.
+            let rec exists_prevs : type pvars pvals ns1 ns2.
                    (pvars, pvals, ns1, ns2) H4.T(Tag).t
                 -> ns1 H1.T(Requests.Prev_request_packed).t
                 -> (pvars, ns1, ns2) H3.T(Per_proof_witness.No_app_state).t =
@@ -300,8 +303,7 @@ module Make (Inductive_rule : Inductive_rule.Intf) = struct
             (* One [Unfinalized.typ] per predecessor, fired from each
                predecessor's own [Unfinalized] request — a fold over
                [prev_requests]. *)
-            let rec exists_unfinalized :
-                type ws n.
+            let rec exists_unfinalized : type ws n.
                    ws H1.T(Requests.Prev_request_packed).t
                 -> (ws, n) Hlist.Length.t
                 -> (Unfinalized.t, n) Vector.t =
@@ -313,7 +315,7 @@ module Make (Inductive_rule : Inductive_rule.Intf) = struct
                   let (module M) = req in
                   let v =
                     exists (Unfinalized.typ ~wrap_rounds:Backend.Tock.Rounds.n)
-                      ~request:(fun () -> M.Unfinalized)
+                      ~request:(fun () -> M.Unfinalized )
                   in
                   v :: exists_unfinalized reqs len
             in
@@ -326,8 +328,7 @@ module Make (Inductive_rule : Inductive_rule.Intf) = struct
             let (Nat.Lte.Complement (_gap, gap_adds)) =
               Nat.Lte.complement lte Max_proofs_verified.n
             in
-            let rec exists_messages :
-                type gap ws n total.
+            let rec exists_messages : type gap ws n total.
                    (gap, n, total) Nat.Adds.t
                 -> (ws, n) Hlist.Length.t
                 -> ws H1.T(Requests.Prev_request_packed).t
@@ -356,8 +357,7 @@ module Make (Inductive_rule : Inductive_rule.Intf) = struct
           [%log internal] "Step_compute_bulletproof_challenges" ;
           let bulletproof_challenges =
             with_label "prevs_verified" (fun () ->
-                let rec go :
-                    type vars vals ns1 ns2 n.
+                let rec go : type vars vals ns1 ns2 n.
                        (vars, ns1, ns2) H3.T(Per_proof_witness.No_app_state).t
                     -> (vars, vals, ns1, ns2) H4.T(Types_map.For_step).t
                     -> vars H1.T(E01(Digest)).t
@@ -426,8 +426,7 @@ module Make (Inductive_rule : Inductive_rule.Intf) = struct
                       ; zk_rows = basic.zk_rows
                       }
                     in
-                    let rec go :
-                        type a1 a2 n m.
+                    let rec go : type a1 a2 n m.
                            (a1, a2, n, m) H4.T(Tag).t
                         -> m H1.T(Types_map.For_step.Optional_wrap_key).t
                         -> (a1, a2, n, m) H4.T(Types_map.For_step).t =
@@ -468,8 +467,7 @@ module Make (Inductive_rule : Inductive_rule.Intf) = struct
                   (Per_proof_witness.No_app_state)
                   (E03 (Step_verifier.Inner_curve))
                   (struct
-                    let f :
-                        type a b c.
+                    let f : type a b c.
                            (a, b, c) Per_proof_witness.No_app_state.t
                         -> Step_verifier.Inner_curve.t =
                      fun acc ->

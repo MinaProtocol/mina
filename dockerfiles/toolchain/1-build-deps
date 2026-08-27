@@ -11,7 +11,6 @@ FROM ${image} AS build-deps
 ARG TARGETARCH
 
 ARG apt_cache_url
-ARG deb_repo=""
 
 # OCaml Version
 # The version must be the same as the version used in:
@@ -28,8 +27,8 @@ ARG OPAM_VERSION=2.3.0
 # - flake.nix (and flake.lock after running
 #   `nix flake update opam-repository`).
 # - scripts/update_opam_switch.sh
-ARG OPAM_REPOSITORY_COMMIT=08d8c16c16dc6b23a5278b06dff0ac6c7a217356
-ARG O1LABS_OPAM_REPOSITORY_COMMIT=dd90c5c72b7b7caeca3db3224b2503924deea08a
+ARG OPAM_REPOSITORY_COMMIT=3e41859015888fe8240e84dfc5f31bfa12a557e8
+ARG O1LABS_OPAM_REPOSITORY_COMMIT=2bb1c7f64e025320b1ff242ca99a9dc23a4924c0
 
 # Golang version number used to detemine tarball name
 ARG GO_VERSION=1.19.11
@@ -53,10 +52,10 @@ ARG RUST_NIGHTLY=2024-09-05
 ENV DEBIAN_FRONTEND=noninteractive
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
-# Optional: configure APT caching proxy (bypass proxy for deb_repo)
+# Optional: configure APT caching proxy
 COPY scripts/configure-apt-proxy.sh /usr/local/bin/configure-apt-proxy.sh
 RUN chmod +x /usr/local/bin/configure-apt-proxy.sh \
-  && /usr/local/bin/configure-apt-proxy.sh "$apt_cache_url" "$deb_repo"
+  && /usr/local/bin/configure-apt-proxy.sh "$apt_cache_url"
 
 RUN CODENAME=$(grep "VERSION_CODENAME" /etc/os-release | cut -d= -f2); \
   case "${CODENAME}" in \
@@ -80,6 +79,7 @@ RUN CODENAME=$(grep "VERSION_CODENAME" /etc/os-release | cut -d= -f2); \
   libgmp-dev \
   libgmp3-dev \
   libjemalloc-dev \
+  libkrb5-dev \
   liblmdb-dev \
   liblmdb0 \
   libpq-dev \
@@ -136,8 +136,6 @@ RUN curl -s "https://dl.google.com/go/go${GO_VERSION}.linux-${TARGETARCH}.tar.gz
 # For more about rustup-init see: https://github.com/rust-lang/rustup/blob/master/README.md
 # As opposed to introducing another shell script here (that mostly just determines the platform)
 # we just download the binary for the only platform we care about in this docker environment
-# In addition to that, we also install cargo-xtask as it is used to build the
-# WebAssembly artefacts.
 USER opam
 RUN case "${TARGETARCH}" in \
         "amd64") RUSTUP_ARCH="x86_64" ;; \
@@ -158,7 +156,6 @@ RUN case "${TARGETARCH}" in \
     --component rust-src \
     --target wasm32-unknown-unknown \
     --no-self-update \
-  && "$HOME/.cargo/bin/cargo" install cargo-xtask \
   && rm /tmp/rustup-init
 USER root
 

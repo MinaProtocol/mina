@@ -1,7 +1,7 @@
 open Pipe_lib
 open Async_kernel
 open Network_peer
-open Core_kernel
+open Core
 
 module type BC_ext = sig
   include Intf.Broadcast_callback
@@ -31,9 +31,10 @@ end
 
 module Base
     (Diff : Intf.Resource_pool_diff_intf)
-    (BC : BC_ext
-            with type resource_pool_diff = Diff.t
-             and type rejected_diff = Diff.rejected)
+    (BC :
+      BC_ext
+        with type resource_pool_diff = Diff.t
+         and type rejected_diff = Diff.rejected)
     (Msg : sig
       type raw_msg
 
@@ -79,7 +80,7 @@ module Base
     match unwrap m with
     | env, cb ->
         Mina_metrics.(
-          Counter.inc_one Pipe.Drop_on_overflow.verified_network_pool_diffs) ;
+          Counter.inc_one Pipe.Drop_on_overflow.verified_network_pool_diffs ) ;
         let diff = Envelope.Incoming.data env in
         [%log' warn logger] "Dropping verified diff $diff due to pipe overflow"
           ~metadata:[ ("diff", `String Diff.(t_of_verified diff |> summary)) ] ;
@@ -102,7 +103,7 @@ module Base
           in
           [%log debug] "Verifying $diff from $sender" ~metadata ;
           match
-            Rate_limiter.add rl env.sender ~now:(Time.now ())
+            Rate_limiter.add rl env.sender ~now:(Time_float.now ())
               ~score:(Diff.score env.data)
           with
           | `Capacity_exceeded ->
@@ -143,50 +144,65 @@ module Base
         ; throttle
         ; on_push
         ; log_gossip_heard
-        } ->
+        } -> (
         O1trace.sync_thread (sprintf "handle_%s_gossip" trace_label)
         @@ fun () ->
-        let%bind () = on_push () in
-        let env' = Msg.convert msg in
-        let cb' = Msg.convert_callback cb in
-        Diff.log_internal ~logger "received" env' ;
-        ( match cb' with
-        | BC.External cb'' ->
-            Diff.update_metrics env' cb'' ~log_gossip_heard ~logger ;
+        let handle () =
+          let%bind () = on_push () in
+          let env' = Msg.convert msg in
+          let cb' = Msg.convert_callback cb in
+          Diff.log_internal ~logger "received" env' ;
+          ( match cb' with
+          | BC.External cb'' ->
+              Diff.update_metrics env' cb'' ~log_gossip_heard ~logger ;
+              don't_wait_for
+                ( match%map Mina_net2.Validation_callback.await cb'' with
+                | None ->
+                    let diff = Envelope.Incoming.data env' in
+                    [%log error]
+                      !"Validation timed out on %s"
+                      Diff.label
+                      ~metadata:[ ("diff", `String (Diff.summary diff)) ]
+                | Some _ ->
+                    () )
+          | _ ->
+              () ) ;
+          if Throttle.num_jobs_waiting_to_start throttle > max_waiting_jobs then (
+            Diff.log_internal ~logger "rejected" ~reason:"throttle_full" env' ;
+            [%log warn] "Ignoring push to %s: throttle is full" trace_label )
+          else
             don't_wait_for
-              ( match%map Mina_net2.Validation_callback.await cb'' with
-              | None ->
-                  let diff = Envelope.Incoming.data env' in
-                  [%log error]
-                    !"Validation timed out on %s"
-                    Diff.label
-                    ~metadata:[ ("diff", `String (Diff.summary diff)) ]
-              | Some _ ->
-                  () )
-        | _ ->
-            () ) ;
-        if Throttle.num_jobs_waiting_to_start throttle > max_waiting_jobs then (
-          Diff.log_internal ~logger "rejected" ~reason:"throttle_full" env' ;
-          [%log warn] "Ignoring push to %s: throttle is full" trace_label )
-        else
-          don't_wait_for
-            (Throttle.enqueue throttle (fun () ->
-                 match%bind
-                   verify_impl ~logger ~trace_label pool rl env' cb'
-                 with
-                 | None ->
-                     [%log debug] "Received unverified gossip on %s" trace_label
-                       ~metadata:
-                         [ ("sender", Envelope.Sender.to_yojson env'.sender)
-                         ; ( "received_at"
-                           , `String (Time.to_string env'.received_at) )
-                         ] ;
-                     Deferred.unit
-                 | Some verified_env ->
-                     let m' = wrap (verified_env, cb') in
-                     Option.value ~default:Deferred.unit
-                       (Strict_pipe.Writer.write w m') ) ) ;
-        Deferred.unit
+              (Throttle.enqueue throttle (fun () ->
+                   match%bind
+                     verify_impl ~logger ~trace_label pool rl env' cb'
+                   with
+                   | None ->
+                       [%log debug] "Received unverified gossip on %s"
+                         trace_label
+                         ~metadata:
+                           [ ("sender", Envelope.Sender.to_yojson env'.sender)
+                           ; ( "received_at"
+                             , `String
+                                 (Time_float.to_string_utc env'.received_at) )
+                           ] ;
+                       Deferred.unit
+                   | Some verified_env ->
+                       let m' = wrap (verified_env, cb') in
+                       Option.value ~default:Deferred.unit
+                         (Strict_pipe.Writer.write w m') ) ) ;
+          Deferred.unit
+        in
+        match%map Monitor.try_with ~run:`Now ~rest:`Log handle with
+        | Ok () ->
+            ()
+        | Error exn ->
+            [%log error]
+              "Dropping gossiped diff: uncaught exception during \
+               pre-verification handling: $error"
+              ~metadata:
+                [ ("error", `String (Exn.to_string exn))
+                ; ("label", `String trace_label)
+                ] )
     | Void ->
         Deferred.unit
 
@@ -201,7 +217,7 @@ module Base
 
     let rate_limiter =
       Rate_limiter.create
-        ~capacity:(Diff.max_per_15_seconds, `Per (Time.Span.of_sec 15.0))
+        ~capacity:(Diff.max_per_15_seconds, `Per (Time_float.Span.of_sec 15.0))
     in
     let throttle =
       Throttle.create ~continue_on_error:true ~max_concurrent_jobs
@@ -225,9 +241,10 @@ end
 
 module Local_sink
     (Diff : Intf.Resource_pool_diff_intf)
-    (BC : BC_ext
-            with type resource_pool_diff = Diff.t
-             and type rejected_diff = Diff.rejected) :
+    (BC :
+      BC_ext
+        with type resource_pool_diff = Diff.t
+         and type rejected_diff = Diff.rejected) :
   Pool_sink
     with type pool := Diff.pool
      and type unwrapped_t = Diff.verified Envelope.Incoming.t * BC.t
@@ -256,9 +273,10 @@ module Local_sink
 
 module Remote_sink
     (Diff : Intf.Resource_pool_diff_intf)
-    (BC : BC_ext
-            with type resource_pool_diff = Diff.t
-             and type rejected_diff = Diff.rejected) :
+    (BC :
+      BC_ext
+        with type resource_pool_diff = Diff.t
+         and type rejected_diff = Diff.rejected) :
   Pool_sink
     with type pool := Diff.pool
      and type unwrapped_t = Diff.verified Envelope.Incoming.t * BC.t

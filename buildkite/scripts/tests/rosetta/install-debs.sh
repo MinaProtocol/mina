@@ -1,8 +1,9 @@
 #!/bin/bash
 
-# Installs the debian packages needed by the rosetta integration / indexer
-# tests on the host where the test script is running. Replaces the previous
-# pattern of running the tests inside the prebuilt mina-rosetta docker image.
+# Installs the debian packages needed by the rosetta integration / indexer /
+# connectivity tests on the host where the test script is running. Replaces the
+# previous pattern of running the tests inside the prebuilt mina-rosetta docker
+# image.
 #
 # Pulls the freshly-built debs out of the buildkite cache (per
 # buildkite/scripts/debian/install.sh) and installs them directly as local
@@ -23,11 +24,21 @@ NETWORK="${MINA_NETWORK_DEB:-devnet}"
 # devnet runtime config (which carries epoch_data for an epoch ledger we
 # don't ship) on top of our --config-file, and starts cleanly against the
 # test's hand-rolled testnet.json.
+# Profile leaf package name for the current network (debs must include the full
+# mina dependency closure since install.sh has no apt repo to resolve deps).
+case "${NETWORK}" in
+  mainnet) PROFILE_DEB="mina-mainnet-profile" ;;
+  *) PROFILE_DEB="mina-devnet-profile" ;;
+esac
+
 DEBS=(
-  "mina-${NETWORK}-generic"
+  "mina-generic"
   "mina-archive-${NETWORK}"
   "mina-rosetta-${NETWORK}"
-  "mina-zkapp-test-transaction"
+  "mina-archive-generic"
+  "mina-rosetta-generic"
+  "${PROFILE_DEB}"
+  "mina-tx-tools"
 )
 
 DEBS_CSV="$(IFS=,; echo "${DEBS[*]}")"
@@ -35,4 +46,10 @@ DEBS_CSV="$(IFS=,; echo "${DEBS[*]}")"
 # Run the installer in a child process (not `source`d) so its strict-mode
 # flags (`set -u`, custom `PS4`) don't leak back into the calling shell. Use
 # sudo (toolchain image runs as opam user with NOPASSWD sudo).
-bash ./buildkite/scripts/debian/install.sh "${DEBS_CSV}" 1
+#
+# restore-or-install.sh is a drop-in for debian/install.sh: when
+# APPS_BARE_BINARIES is set it restores the freshly dune-built executables from
+# the apps cache (skipping the deb install, so no prebuilt mina-rosetta docker
+# image / published debs are needed); when it is unset (or a cache miss occurs)
+# it falls back to installing the debs above, preserving the previous behaviour.
+bash ./buildkite/scripts/debian/restore-or-install.sh "${DEBS_CSV}" 1

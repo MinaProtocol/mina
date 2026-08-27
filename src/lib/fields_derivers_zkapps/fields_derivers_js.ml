@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Fieldslib
 
 module Js_layout = struct

@@ -137,8 +137,7 @@ let rec core_type ~loc (typ : core_type) : expression =
                           [%expr
                             Stdlib.List.rev_map
                               (fun e ->
-                                [%e pexp_variant ~loc name.txt (Some [%expr e])]
-                                )
+                                [%e pexp_variant ~loc name.txt (Some [%expr e])] )
                               (Stdlib.Lazy.force [%e core_type ~loc typ])]
                       | Rtag _ ->
                           Location.raise_errorf ~loc:typ.ptyp_loc

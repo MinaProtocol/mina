@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 
 module Helper = struct
   open Mina_base
@@ -20,7 +20,7 @@ module Helper = struct
         Account_update.Poly.of_yojson Account_update.Body.of_yojson
           (Control.Poly.of_yojson proof_of_yojson Signature.of_yojson)
           t
-        >|= reset_aux)
+        >|= reset_aux )
     in
     User_command.Poly.of_yojson Signed_command.of_yojson
     @@ Zkapp_command.with_forest_of_yojson update_of_yojson
@@ -57,7 +57,7 @@ module User_command = struct
                      Zkapp_command.(
                        Call_forest.accumulate_hashes
                          ~hash_account_update:
-                           (Digest.Account_update.create ~signature_kind))
+                           (Digest.Account_update.create ~signature_kind) )
                        account_updates
                  } )
 
@@ -113,17 +113,17 @@ module Staged_ledger_diff = struct
     module V2 = struct
       type t = Staged_ledger_diff.Stable.V3.t =
         { diff :
-            ( Transaction_snark_work.Stable.V2.t
+            ( Transaction_snark_work.Stable.V3.t
             , User_command.Stable.V2.t Mina_base.With_status.Stable.V2.t )
             Staged_ledger_diff.Pre_diff_two.Stable.V2.t
-            * ( Transaction_snark_work.Stable.V2.t
+            * ( Transaction_snark_work.Stable.V3.t
               , User_command.Stable.V2.t Mina_base.With_status.Stable.V2.t )
               Staged_ledger_diff.Pre_diff_one.Stable.V2.t
               option
         }
       [@@deriving sexp, yojson]
 
-      let to_latest = ident
+      let to_latest = Fn.id
     end
   end]
 end

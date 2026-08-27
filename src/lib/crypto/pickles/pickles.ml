@@ -24,7 +24,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
   module Common = Common
   module Scalar_challenge = Scalar_challenge
   module SC = Scalar_challenge
-  open Core_kernel
+  open Core
   open Async_kernel
   open Import
   open Pickles_types
@@ -278,7 +278,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
       in
       (* TODO: This should be the actual max width on a per proof basis *)
       let max_proofs_verified =
-        (module Verification_key.Max_width : Nat.Intf
+        ( module Verification_key.Max_width : Nat.Intf
           with type n = Verification_key.Max_width.n )
       in
       with_return (fun { return } ->
@@ -326,8 +326,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
       ~max_proofs_verified ~name ~choices () =
     let choices ~self =
       let choices = choices ~self in
-      let rec go :
-          type length a b c d e f g h i j.
+      let rec go : type length a b c d e f g h i j.
              ( length
              , a
              , b
@@ -369,8 +368,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
         ?override_wrap_domain ?num_chunks ?lazy_mode ~public_input
         ~auxiliary_typ ~max_proofs_verified ~name ~choices ()
     in
-    let rec adjust_provers :
-        type a1 a2 a3 s1 s2_inner.
+    let rec adjust_provers : type a1 a2 a3 s1 s2_inner.
            (a1, a2, a3, s1, s2_inner Promise.t) H3_2.T(Prover).t
         -> (a1, a2, a3, s1, s2_inner Deferred.t) H3_2.T(Prover).t = function
       | [] ->
@@ -387,8 +385,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
       ~max_proofs_verified ~name ~choices () =
     let choices ~self =
       let choices = choices ~self in
-      let rec go :
-          type length a b c d e f g h i j.
+      let rec go : type length a b c d e f g h i j.
              ( length
              , a
              , b
@@ -435,8 +432,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
         ?override_wrap_domain ?num_chunks ?lazy_mode ~public_input
         ~auxiliary_typ ~max_proofs_verified ~name ~choices ()
     in
-    let rec adjust_provers :
-        type a1 a2 a3 s1 s2_inner.
+    let rec adjust_provers : type a1 a2 a3 s1 s2_inner.
            (a1, a2, a3, s1, s2_inner Promise.t) H3_2.T(Prover).t
         -> (a1, a2, a3, s1, s2_inner Deferred.t) H3_2.T(Prover).t = function
       | [] ->
@@ -546,8 +542,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                           Nat.to_int M.n
                     end)
 
-                let f :
-                    type a b c d.
+                let f : type a b c d.
                     (a, b, c, d) IR.t -> Local_max_proofs_verifieds.t =
                  fun rule ->
                   let (T (_, l)) = HT.length rule.prevs in
@@ -930,8 +925,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                              .Prepared)
                             (E01 (Tick.Curve.Affine))
                             (struct
-                              let f :
-                                  type n.
+                              let f : type n.
                                      n
                                      P.Base
                                      .Messages_for_next_proof_over_same_field
@@ -953,7 +947,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                               { Tick.Proof.Challenge_polynomial.commitment
                               ; challenges = Vector.to_array cs
                               } )
-                          |> to_list)
+                          |> to_list )
                         public_input proof
                     in
                     let x_hat = O.(p_eval_1 o, p_eval_2 o) in
@@ -1074,9 +1068,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                           ~actual_proofs_verified:
                             (Nat.Add.create actual_proofs_verified)
                           { evals = proof.proof.openings.evals
-                          ; public_input =
-                              (let x1, x2 = x_hat in
-                               ([| x1 |], [| x2 |]) )
+                          ; public_input = x_hat
                           }
                           ~r ~xi ~zeta ~zetaw
                           ~old_bulletproof_challenges:prev_challenges
@@ -1219,9 +1211,12 @@ module Make_str (_ : Wire_types.Concrete) = struct
                       in
                       Common.time "wrap proof" (fun () ->
                           Impls.Wrap.generate_witness_conv
-                            ~f:(fun { Impls.Wrap.Proof_inputs.auxiliary_inputs
-                                    ; public_inputs
-                                    } () ->
+                            ~f:(fun
+                                { Impls.Wrap.Proof_inputs.auxiliary_inputs
+                                ; public_inputs
+                                }
+                                ()
+                              ->
                               Backend.Tock.Proof.create_async
                                 ~primary:public_inputs
                                 ~auxiliary:auxiliary_inputs pk
@@ -1270,9 +1265,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                             ~to_option:Opt.to_option next_statement
                       ; prev_evals =
                           { Plonk_types.All_evals.evals =
-                              { public_input =
-                                  (let x1, x2 = x_hat in
-                                   ([| x1 |], [| x2 |]) )
+                              { public_input = x_hat
                               ; evals = proof.proof.openings.evals
                               }
                           ; ft_eval1 = proof.proof.openings.ft_eval1
@@ -1360,7 +1353,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
       let%test "should not be able to verify invalid proof" =
         Or_error.is_error
         @@ Promise.block_on_async_exn (fun () ->
-               Proof.verify [ proof_with_stmt ] )
+            Proof.verify [ proof_with_stmt ] )
 
       module Recurse_on_bad_proof = struct
         open Impls.Step
@@ -1414,8 +1407,9 @@ module Make_str (_ : Wire_types.Concrete) = struct
         module Proof = (val p)
       end
 
-      let%test "should not be able to create a recursive proof from an invalid \
-                proof" =
+      let%test
+          "should not be able to create a recursive proof from an invalid proof"
+          =
         try
           let (), (), proof =
             Promise.block_on_async_exn (fun () ->
@@ -1425,7 +1419,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
           in
           Or_error.is_error
           @@ Promise.block_on_async_exn (fun () ->
-                 Recurse_on_bad_proof.Proof.verify_promise [ ((), proof) ] )
+              Recurse_on_bad_proof.Proof.verify_promise [ ((), proof) ] )
         with _ -> true
     end )
 
@@ -1463,12 +1457,12 @@ module Make_str (_ : Wire_types.Concrete) = struct
             |> Yojson.Safe.Util.member "multiple"
             |> Yojson.Safe.Util.to_list
             |> List.find_exn ~f:(fun json ->
-                   let error =
-                     json
-                     |> Yojson.Safe.Util.member "string"
-                     |> Yojson.Safe.Util.to_string
-                   in
-                   String.equal error "domain size is small enough" )
+                let error =
+                  json
+                  |> Yojson.Safe.Util.member "string"
+                  |> Yojson.Safe.Util.to_string
+                in
+                String.equal error "domain size is small enough" )
             |> fun _ -> ()
         end) )
     end )
@@ -1502,7 +1496,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
           ignore
             ( Step_verifier.Scalar_challenge.endo g ~num_bits:4
                 (Kimchi_backend_common.Scalar_challenge.create x)
-              : Field.t * Field.t ))
+              : Field.t * Field.t ) )
 
       module No_recursion = struct
         let tag, _, p, Provers.[ step ] =
@@ -1810,7 +1804,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
           ignore
             ( Step_verifier.Scalar_challenge.endo g ~num_bits:4
                 (Kimchi_backend_common.Scalar_challenge.create x)
-              : Field.t * Field.t ))
+              : Field.t * Field.t ) )
 
       module No_recursion = struct
         let tag, _, p, Provers.[ step ] =

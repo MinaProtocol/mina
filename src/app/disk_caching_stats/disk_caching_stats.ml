@@ -244,7 +244,7 @@ module Values (S : Sample) = struct
         Some
           { app_state =
               Pickles_types.Vector.init Mina_base.Zkapp_state.Max_state_size.n
-                ~f:(fun _ -> field ())
+                ~f:(fun _ -> field () )
           ; verification_key = Some (verification_key ())
           ; zkapp_uri = zkapp_uri ()
           ; zkapp_version = zkapp_version ()
@@ -264,7 +264,7 @@ module Values (S : Sample) = struct
     in
     List.init n ~f:Fn.id
     |> List.iter ~f:(fun i ->
-           Mina_ledger.Ledger.set_at_index_exn ledger i (account ()) ) ;
+        Mina_ledger.Ledger.set_at_index_exn ledger i (account ()) ) ;
     ledger
 
   let ledger_witness ~config n : Mina_ledger.Sparse_ledger.t =
@@ -306,7 +306,8 @@ module Values (S : Sample) = struct
         ; update =
             { app_state =
                 Pickles_types.Vector.init Mina_base.Zkapp_state.Max_state_size.n
-                  ~f:(fun _ -> Mina_base.Zkapp_basic.Set_or_keep.Set (field ()))
+                  ~f:(fun _ ->
+                    Mina_base.Zkapp_basic.Set_or_keep.Set (field ()) )
             ; delegate = Set (public_key ())
             ; verification_key = Set (verification_key ())
             ; permissions = Set (permissions ())
@@ -343,8 +344,8 @@ module Values (S : Sample) = struct
     ; account_updates =
         List.init Params.max_zkapp_txn_account_updates ~f:(Fn.const ())
         |> List.fold_left ~init:[] ~f:(fun acc () ->
-               Mina_base.Zkapp_command.Call_forest.cons ~signature_kind:Testnet
-                 (zkapp_account_update ()) acc )
+            Mina_base.Zkapp_command.Call_forest.cons ~signature_kind:Testnet
+              (zkapp_account_update ()) acc )
     ; memo = signed_command_memo ()
     }
 
@@ -459,7 +460,7 @@ module Sizes (S : Sample) = struct
   module Values = Values (S)
 
   let count (type a) (x : a) =
-    Obj.(reachable_words @@ repr x) * (Sys.word_size / 8)
+    Obj.(reachable_words @@ repr x) * (Stdlib.Sys.word_size / 8)
 
   let verification_key = count @@ Values.verification_key ()
 
@@ -498,7 +499,7 @@ module Sizes (S : Sample) = struct
     }
 
   let post_fix =
-    let cache_ref_size = Sys.word_size / 8 in
+    let cache_ref_size = Stdlib.Sys.word_size / 8 in
     (* ledger witness (x2) + toplevel accounts list on applied command *)
     let num_accounts_in_zkapp_command_base_work =
       Params.max_accounts_modified_per_zkapp_command * 3
@@ -548,29 +549,33 @@ module Timer : sig
 
   val time : t -> (unit -> 'a) -> 'a
 
-  val total : t -> Time.Span.t
+  val total : t -> Time_float.Span.t
 
-  val average : t -> Time.Span.t
+  val average : t -> Time_float.Span.t
 end = struct
-  type t = { mutable total : Time.Span.t; mutable samples : int }
+  type t = { mutable total : Time_float.Span.t; mutable samples : int }
   [@@deriving fields]
 
-  let init () = { total = Time.Span.zero; samples = 0 }
+  let init () = { total = Time_float.Span.zero; samples = 0 }
 
   let time t f =
-    let start = Time.now () in
+    let start = Time_float_unix.now () in
     let x = f () in
-    let elapsed = Time.(abs_diff (now ()) start) in
-    t.total <- Time.Span.(t.total + elapsed) ;
+    let elapsed = Time_float_unix.(abs_diff (now ()) start) in
+    t.total <- Time_float.Span.(t.total + elapsed) ;
     t.samples <- t.samples + 1 ;
     x
 
   let average t =
-    Time.Span.of_ns (Time.Span.to_ns t.total /. Int.to_float t.samples)
+    Time_float.Span.of_ns
+      (Time_float.Span.to_ns t.total /. Int.to_float t.samples)
 end
 
 type serial_bench_measurements =
-  { write : Time.Span.t; read : Time.Span.t; hash : Time.Span.t }
+  { write : Time_float.Span.t
+  ; read : Time_float.Span.t
+  ; hash : Time_float.Span.t
+  }
 
 let print_header name =
   Printf.printf
@@ -581,7 +586,7 @@ let print_header name =
 
 let print_timer name timer =
   Printf.printf
-    !"%s: %{Time.Span} (total: %{Time.Span})\n"
+    !"%s: %{Time_float.Span} (total: %{Time_float.Span})\n"
     name (Timer.average timer) (Timer.total timer)
 
 let serial_bench (type a) ~(name : string)
@@ -716,8 +721,9 @@ let compute_ram_usage ~config (sizes : size_params) =
 let () =
   Async.Thread_safe.block_on_async_exn
   @@ fun () ->
-  let genesis_constants = Genesis_constants.Compiled.genesis_constants in
-  let constraint_constants = Genesis_constants.Compiled.constraint_constants in
+  let (module G) = Genesis_constants.profiled () in
+  let genesis_constants = G.genesis_constants in
+  let constraint_constants = G.constraint_constants in
   let config = { constraint_constants; genesis_constants } in
   let%bind.Async_kernel.Deferred _, generated_zkapps =
     let num_updates = 1 in
@@ -781,63 +787,63 @@ let () =
   Printf.printf "\n" ;
   print_header "SERIALIZATION OVERHEAD ESTIMATES" ;
   Printf.printf
-    !"zkapp command ingest = %{Time.Span}\n"
-    (Time.Span.of_ns
+    !"zkapp command ingest = %{Time_float.Span}\n"
+    (Time_float.Span.of_ns
        ( Int.to_float Params.max_zkapp_txn_account_updates
-       *. Time.Span.to_ns
-            Time.Span.(
+       *. Time_float.Span.to_ns
+            Time_float.Span.(
               side_loaded_proof_serial_times.write
               + side_loaded_proof_serial_times.hash
               + verification_key_serial_times.write
-              + verification_key_serial_times.hash) ) ) ;
+              + verification_key_serial_times.hash ) ) ) ;
   Printf.printf
-    !"snark work ingest = %{Time.Span}\n"
-    (Time.Span.of_ns
+    !"snark work ingest = %{Time_float.Span}\n"
+    (Time_float.Span.of_ns
        ( 2.0
-       *. Time.Span.to_ns
-            Time.Span.(
-              ledger_proof_serial_times.write + ledger_proof_serial_times.hash)
+       *. Time_float.Span.to_ns
+            Time_float.Span.(
+              ledger_proof_serial_times.write + ledger_proof_serial_times.hash )
        ) ) ;
   Printf.printf
-    !"block ingest = %{Time.Span}\n"
+    !"block ingest = %{Time_float.Span}\n"
     (let zkapps =
-       Time.Span.of_ns
+       Time_float.Span.of_ns
          ( Int.to_float
              ( Params.max_zkapp_commands_per_block
              * Params.max_zkapp_txn_account_updates )
-         *. Time.Span.to_ns
-              Time.Span.(
+         *. Time_float.Span.to_ns
+              Time_float.Span.(
                 side_loaded_proof_serial_times.write
                 + side_loaded_proof_serial_times.hash
                 + verification_key_serial_times.write
-                + verification_key_serial_times.hash) )
+                + verification_key_serial_times.hash ) )
      in
      let snark_works =
-       Time.Span.of_ns
+       Time_float.Span.of_ns
          ( 2.0
          *. Int.to_float Params.max_zkapp_commands_per_block
-         *. Time.Span.to_ns
-              Time.Span.(
-                ledger_proof_serial_times.write + ledger_proof_serial_times.hash)
+         *. Time_float.Span.to_ns
+              Time_float.Span.(
+                ledger_proof_serial_times.write + ledger_proof_serial_times.hash )
          )
      in
-     Time.Span.(zkapps + snark_works) ) ;
+     Time_float.Span.(zkapps + snark_works) ) ;
   Printf.printf
-    !"block production = %{Time.Span}\n"
+    !"block production = %{Time_float.Span}\n"
     (let zkapps =
-       Time.Span.of_ns
+       Time_float.Span.of_ns
          ( Int.to_float
              ( Params.max_zkapp_commands_per_block
              * Params.max_zkapp_txn_account_updates )
-         *. Time.Span.to_ns
-              Time.Span.(
+         *. Time_float.Span.to_ns
+              Time_float.Span.(
                 side_loaded_proof_serial_times.read
-                + verification_key_serial_times.read) )
+                + verification_key_serial_times.read ) )
      in
      let snark_works =
-       Time.Span.of_ns
+       Time_float.Span.of_ns
          ( 2.0
          *. Int.to_float Params.max_zkapp_commands_per_block
-         *. Time.Span.to_ns ledger_proof_serial_times.read )
+         *. Time_float.Span.to_ns ledger_proof_serial_times.read )
      in
-     Time.Span.(zkapps + snark_works) )
+     Time_float.Span.(zkapps + snark_works) )

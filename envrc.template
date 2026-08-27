@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+
+# 1. Initialise submodules lazily (shallow, single-branch, parallel).
+if ! git submodule status &>/dev/null || git submodule status | grep -q '^-'; then
+  git submodule update --init --recursive --depth 1 --single-branch --jobs "$(nproc)"
+fi
+
+# 2. Enter the Nix flake dev-shell with LSP tooling.
+use flake "git+file://$PWD?submodules=1#with-lsp"

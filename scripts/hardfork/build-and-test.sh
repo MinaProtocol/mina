@@ -52,6 +52,8 @@ if [[ -z "$PREFORK" ]]; then
   usage "Error: --fork-from must be provided."
 fi
 
+export MINA_PROFILE="devnet"
+
 NIX_OPTS=( --accept-flake-config --experimental-features 'nix-command flakes' )
 
 if [[ -n "${NIX_CACHE_NAR_SECRET:-}" ]]; then

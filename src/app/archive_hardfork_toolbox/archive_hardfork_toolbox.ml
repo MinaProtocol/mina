@@ -13,16 +13,17 @@ let run_check_and_exit check_fn () =
 let fork_state_hash =
   Command.Param.(
     flag "--fork-state-hash" (required string)
-      ~doc:"String Hash of the fork state")
+      ~doc:"String Hash of the fork state" )
 
 let fork_slot =
   Command.Param.(
     flag "--fork-slot" (required int)
-      ~doc:"Int64 Global slot since genesis of the fork block")
+      ~doc:"Int64 Global slot since genesis of the fork block" )
 
 let is_in_best_chain_command =
   Async.Command.async ~summary:"Verify fork block is in best chain"
-    (let%map_open.Command { value = postgres_uri; _ } = Uri.Archive.postgres
+    (let%map_open.Command { value = postgres_uri; _ } =
+       Lazy.force Uri.Archive.postgres
      and fork_state_hash = fork_state_hash
      and fork_height =
        Command.Param.(flag "--fork-height" (required int))
@@ -36,7 +37,8 @@ let is_in_best_chain_command =
 let confirmations_command =
   Async.Command.async
     ~summary:"Verify number of confirmations for the fork block"
-    (let%map_open.Command { value = postgres_uri; _ } = Uri.Archive.postgres
+    (let%map_open.Command { value = postgres_uri; _ } =
+       Lazy.force Uri.Archive.postgres
      and latest_state_hash =
        Command.Param.(flag "--latest-state-hash" (required string))
          ~doc:"String Hash of the latest state"
@@ -52,7 +54,8 @@ let confirmations_command =
 
 let no_commands_after_command =
   Async.Command.async ~summary:"Verify no commands after the fork block"
-    (let%map_open.Command { value = postgres_uri; _ } = Uri.Archive.postgres
+    (let%map_open.Command { value = postgres_uri; _ } =
+       Lazy.force Uri.Archive.postgres
      and fork_state_hash = fork_state_hash
      and fork_slot = fork_slot in
 
@@ -62,7 +65,8 @@ let no_commands_after_command =
 let verify_upgrade_command =
   Async.Command.async
     ~summary:"Verify upgrade from pre-fork to post-fork schema"
-    (let%map_open.Command { value = postgres_uri; _ } = Uri.Archive.postgres
+    (let%map_open.Command { value = postgres_uri; _ } =
+       Lazy.force Uri.Archive.postgres
      and expected_protocol_version =
        Command.Param.(flag "--protocol-version" (required string))
          ~doc:"String Protocol Version to upgrade to (e.g. 3.2.0 etc)"
@@ -76,7 +80,8 @@ let verify_upgrade_command =
 
 let validate_fork_command =
   Async.Command.async ~summary:"Validate fork block and its ancestors"
-    (let%map_open.Command { value = postgres_uri; _ } = Uri.Archive.postgres
+    (let%map_open.Command { value = postgres_uri; _ } =
+       Lazy.force Uri.Archive.postgres
      and fork_state_hash = fork_state_hash
      and fork_slot = fork_slot in
      run_check_and_exit
@@ -86,27 +91,47 @@ let convert_chain_to_canonical_command =
   Async.Command.async_or_error
     ~summary:
       "Mark the chain leading to the target block as canonical for a protocol \
-       version"
-    (let%map_open.Command { value = postgres_uri; _ } = Uri.Archive.postgres
-     and latest_block_state_hash =
-       Command.Param.(flag "--target-block-hash" (required string))
-         ~doc:"String State hash of block that should remain canonical"
-     and expected_protocol_version_str =
-       Command.Param.(flag "--protocol-version" (required string))
+       version. With no target/protocol flags, auto-detects the latest \
+       hard-fork boundary."
+    (let%map_open.Command { value = postgres_uri; _ } =
+       Lazy.force Uri.Archive.postgres
+     and target_block_hash =
+       Command.Param.(flag "--target-block-hash" (optional string))
          ~doc:
-           "String Protocol version in format <transaction>.<network>.<patch>"
+           "String State hash of block that should remain canonical (default: \
+            parent of the latest hard-fork block)"
+     and fork_height =
+       Command.Param.(flag "--fork-height" (optional int))
+         ~doc:
+           "Int Height of the block that should remain canonical (alternative \
+            to --target-block-hash)"
+     and protocol_version_str =
+       Command.Param.(flag "--protocol-version" (optional string))
+         ~doc:
+           "String Protocol version in format <transaction>.<network>.<patch> \
+            (default: the target block's own protocol version)"
      and stop_at_slot =
        Command.Param.(flag "--stop-at-slot" (optional int))
          ~doc:
            "Int If provided, stops marking blocks as canonical when that's \
             older than this global slot since genesis slot"
+     and dry_run =
+       Command.Param.(flag "--dry-run" no_arg)
+         ~doc:
+           "Print the blocks that would change and a summary without writing \
+            any changes"
+     and json =
+       Command.Param.(flag "--json" no_arg)
+         ~doc:"Emit the change plan as JSON instead of a human-readable table"
      in
-     convert_chain_to_canonical ~postgres_uri ~latest_block_state_hash
-       ~expected_protocol_version_str ~stop_at_slot )
+     convert_chain_to_canonical ~postgres_uri ?target_block_hash ?fork_height
+       ?protocol_version_str ~json ~stop_at_slot ~dry_run )
 
 let fetch_last_filled_block_command =
   Async.Command.async ~summary:"Select last filled block"
-    (let%map_open.Command { value = postgres_uri; _ } = Uri.Archive.postgres in
+    (let%map_open.Command { value = postgres_uri; _ } =
+       Lazy.force Uri.Archive.postgres
+     in
      fetch_last_filled_block ~postgres_uri )
 
 let run_all_verifications_command =
@@ -119,7 +144,8 @@ let run_all_verifications_command =
        protocol_version, required_confirmations (default 290), \
        migration_version (default 0.0.5). Individual CLI flags override config \
        values."
-    (let%map_open.Command { value = postgres_uri; _ } = Uri.Archive.postgres
+    (let%map_open.Command { value = postgres_uri; _ } =
+       Lazy.force Uri.Archive.postgres
      and runtime_config_path =
        Command.Param.(flag "--runtime-config" (required string))
          ~doc:
@@ -203,6 +229,26 @@ let run_all_verifications_command =
             ~expected_protocol_version ~expected_migration_version )
          () )
 
+let populate_genesis_accounts_command =
+  Async.Command.async
+    ~summary:
+      "Populate accounts_accessed for the genesis block (including a fork \
+       genesis) from the runtime config's genesis ledger. Repairs a hardfork \
+       archive whose fork genesis block is missing its ledger accounts."
+    (let%map_open.Command { value = postgres_uri; _ } =
+       Lazy.force Uri.Archive.postgres
+     and runtime_config_file =
+       Command.Param.(flag "--config-file" (required string))
+         ~doc:"PATH runtime config file containing the (fork) genesis ledger"
+     and chunks_length =
+       Command.Param.(flag "--chunks-length" (optional_with_default 100 int))
+         ~doc:
+           "Int number of accounts to insert per transaction, to avoid \
+            Postgres OOM on large ledgers (default 100)"
+     in
+     populate_genesis_accounts ~postgres_uri ~runtime_config_file ~chunks_length
+    )
+
 (* TODO: consider refactor these commands to reuse queries in the future. *)
 let commands =
   [ ( "fork-candidate"
@@ -217,9 +263,10 @@ let commands =
   ; ("validate-fork", validate_fork_command)
   ; ("convert-chain-to-canonical", convert_chain_to_canonical_command)
   ; ("run-all-verifications", run_all_verifications_command)
+  ; ("populate-genesis-accounts", populate_genesis_accounts_command)
   ]
 
 let () =
-  Async_command.run
+  Command_unix.run
     (Async_command.group ~summary:"Archive hardfork toolbox"
        ~preserve_subcommand_order:() commands )

@@ -77,7 +77,10 @@ module Make_FixtureWithBootstrap (M : TestCaseWithBootstrap) :
     let%bind.Deferred archive = Archive.start executor in
     [%log info] "Archive started successfully" ;
     return
-      { archive; network_data; temp_dir = Filename.temp_dir "archive_test" "" }
+      { archive
+      ; network_data
+      ; temp_dir = Filename_unix.temp_dir "archive_test" ""
+      }
 
   let teardown t =
     let open Deferred.Or_error.Let_syntax in
@@ -122,7 +125,10 @@ module Make_FixtureWithoutBootstrap (M : TestCaseWithoutBootstrap) :
       setup_connection ~network_data ~postgres_uri ()
     in
     return
-      { config; network_data; temp_dir = Filename.temp_dir "archive_test" "" }
+      { config
+      ; network_data
+      ; temp_dir = Filename_unix.temp_dir "archive_test" ""
+      }
 
   let teardown _t = Deferred.Or_error.ok_unit
 

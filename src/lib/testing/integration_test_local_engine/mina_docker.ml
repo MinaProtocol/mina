@@ -218,9 +218,7 @@ module Network_config = struct
     let block_producer_configs =
       List.map block_producers ~f:(fun node ->
           let keypair =
-            match
-              Core.String.Map.find genesis_ledger.keypairs node.account_name
-            with
+            match Core.Map.find genesis_ledger.keypairs node.account_name with
             | Some keypair ->
                 keypair
             | None ->
@@ -265,7 +263,7 @@ module Network_config = struct
       | Some snark_coordinator_node ->
           let network_kp =
             match
-              String.Map.find genesis_ledger.keypairs
+              Map.find genesis_ledger.keypairs
                 snark_coordinator_node.account_name
             with
             | Some acct ->
@@ -291,8 +289,8 @@ module Network_config = struct
           let daemon_port =
             coordinator_ports
             |> List.find_exn ~f:(fun p ->
-                   p.target
-                   = Docker_node_config.PortManager.mina_internal_client_port )
+                p.target
+                = Docker_node_config.PortManager.mina_internal_client_port )
           in
           let snark_node_service_name = snark_coordinator_node.node_name in
           let worker_node_config : Snark_worker_config.config =
@@ -387,7 +385,7 @@ module Network_config = struct
       match network_config.docker.snark_coordinator_config with
       | Some snark_coordinator_config ->
           List.map snark_coordinator_config.config.worker_nodes
-            ~f:(fun config -> (config.service_name, config.docker_config))
+            ~f:(fun config -> (config.service_name, config.docker_config) )
           |> StringMap.of_alist_exn
       | None ->
           StringMap.empty
@@ -496,12 +494,12 @@ module Network_manager = struct
     let%bind () = Unix.mkdir kps_base_path in
     [%log info] "Writing genesis keys to %s" kps_base_path ;
     let%bind () =
-      Core.String.Map.iter network_config.genesis_keypairs ~f:(fun kp ->
+      Core.Map.iter network_config.genesis_keypairs ~f:(fun kp ->
           let keypath = String.concat [ kps_base_path; "/"; kp.keypair_name ] in
           Out_channel.with_file ~fail_if_exists:true keypath ~f:(fun ch ->
               kp.private_key |> Out_channel.output_string ch ) ;
           Out_channel.with_file ~fail_if_exists:true (keypath ^ ".pub")
-            ~f:(fun ch -> kp.public_key |> Out_channel.output_string ch) ;
+            ~f:(fun ch -> kp.public_key |> Out_channel.output_string ch ) ;
           ignore
             (Util.run_cmd_exn kps_base_path "chmod" [ "600"; kp.keypair_name ]) )
       |> Deferred.return
@@ -524,7 +522,6 @@ module Network_manager = struct
        context)" ;
     let entrypoint_filename, entrypoint_script =
       Docker_node_config.Base_node_config.entrypoint_script
-        network_config.commit_id
     in
     Out_channel.with_file ~fail_if_exists:true
       (docker_dir ^/ entrypoint_filename) ~f:(fun ch ->
@@ -536,10 +533,11 @@ module Network_manager = struct
       Docker_node_config.Archive_node_config.archive_entrypoint_script
     in
     Out_channel.with_file ~fail_if_exists:true (docker_dir ^/ archive_filename)
-      ~f:(fun ch -> archive_script |> Out_channel.output_string ch) ;
+      ~f:(fun ch -> archive_script |> Out_channel.output_string ch ) ;
     ignore (Util.run_cmd_exn docker_dir "chmod" [ "+x"; archive_filename ]) ;
     let%bind _ =
-      Deferred.List.iter network_config.docker.mina_archive_schema_aux_files
+      Deferred.List.iter ~how:`Sequential
+        network_config.docker.mina_archive_schema_aux_files
         ~f:(fun schema_url ->
           let filename = Filename.basename schema_url in
           [%log info] "Downloading %s" schema_url ;
@@ -675,8 +673,11 @@ module Network_manager = struct
     , archive_workloads )
 
   let poll_until_stack_deployed ~logger =
-    let poll_interval = Time.Span.of_sec 15.0 in
-    let max_polls = 60 (* 15 mins *) in
+    let poll_interval = Time_float.Span.of_sec 15.0 in
+    let max_polls =
+      60
+      (* 15 mins *)
+    in
     let get_service_statuses () =
       let%bind output =
         Util.run_cmd_exn "/" "docker"
@@ -685,11 +686,11 @@ module Network_manager = struct
       return
         ( output |> String.split_lines
         |> List.map ~f:(fun line ->
-               match String.split ~on:':' line with
-               | [ name; replicas ] ->
-                   (String.strip name, String.strip replicas)
-               | _ ->
-                   failwith "Unexpected format for docker service output" ) )
+            match String.split ~on:':' line with
+            | [ name; replicas ] ->
+                (String.strip name, String.strip replicas)
+            | _ ->
+                failwith "Unexpected format for docker service output" ) )
     in
     let rec poll n =
       [%log debug] "Checking Docker service statuses, n=%d" n ;
@@ -755,11 +756,11 @@ module Network_manager = struct
     in
     let services_by_id =
       let all_workloads =
-        Core.String.Map.data seed_workloads
-        @ Core.String.Map.data snark_coordinator_workloads
-        @ Core.String.Map.data snark_worker_workloads
-        @ Core.String.Map.data block_producer_workloads
-        @ Core.String.Map.data archive_workloads
+        Core.Map.data seed_workloads
+        @ Core.Map.data snark_coordinator_workloads
+        @ Core.Map.data snark_worker_workloads
+        @ Core.Map.data block_producer_workloads
+        @ Core.Map.data archive_workloads
       in
       all_workloads
       |> List.map ~f:(fun w -> (w.service_name, w))
@@ -814,26 +815,26 @@ module Network_manager = struct
       let%map node =
         Docker_network.Service_to_deploy.get_node_from_service data
       in
-      Core.String.Map.add_exn mp ~key ~data:node
+      Core.Map.add_exn mp ~key ~data:node
     in
     let%map seeds =
-      Core.String.Map.fold t.seed_workloads
+      Core.Map.fold t.seed_workloads
         ~init:(Malleable_error.return Core.String.Map.empty)
         ~f:func_for_fold
     and block_producers =
-      Core.String.Map.fold t.block_producer_workloads
+      Core.Map.fold t.block_producer_workloads
         ~init:(Malleable_error.return Core.String.Map.empty)
         ~f:func_for_fold
     and snark_coordinators =
-      Core.String.Map.fold t.snark_coordinator_workloads
+      Core.Map.fold t.snark_coordinator_workloads
         ~init:(Malleable_error.return Core.String.Map.empty)
         ~f:func_for_fold
     and snark_workers =
-      Core.String.Map.fold t.snark_worker_workloads
+      Core.Map.fold t.snark_worker_workloads
         ~init:(Malleable_error.return Core.String.Map.empty)
         ~f:func_for_fold
     and archive_nodes =
-      Core.String.Map.fold t.archive_workloads
+      Core.Map.fold t.archive_workloads
         ~init:(Malleable_error.return Core.String.Map.empty)
         ~f:func_for_fold
     in
@@ -854,13 +855,13 @@ module Network_manager = struct
     [%log info] "Network deployed" ;
     [%log info] "testnet namespace: %s" t.stack_name ;
     [%log info] "snark coordinators: %s"
-      (nodes_to_string (Core.String.Map.data network.snark_coordinators)) ;
+      (nodes_to_string (Core.Map.data network.snark_coordinators)) ;
     [%log info] "snark workers: %s"
-      (nodes_to_string (Core.String.Map.data network.snark_workers)) ;
+      (nodes_to_string (Core.Map.data network.snark_workers)) ;
     [%log info] "block producers: %s"
-      (nodes_to_string (Core.String.Map.data network.block_producers)) ;
+      (nodes_to_string (Core.Map.data network.block_producers)) ;
     [%log info] "archive nodes: %s"
-      (nodes_to_string (Core.String.Map.data network.archive_nodes)) ;
+      (nodes_to_string (Core.Map.data network.archive_nodes)) ;
     network
 
   let destroy t =

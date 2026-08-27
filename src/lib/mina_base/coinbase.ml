@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Mina_base_import
 
 (** See documentation of the {!Mina_wire_types} library *)
@@ -66,7 +66,7 @@ module Make_str (A : Wire_types.Concrete) = struct
 
   let accounts_referenced t =
     List.map (account_access_statuses t Transaction_status.Applied)
-      ~f:(fun (acct_id, _status) -> acct_id)
+      ~f:(fun (acct_id, _status) -> acct_id )
 
   let is_valid { amount; fee_transfer; _ } =
     match fee_transfer with

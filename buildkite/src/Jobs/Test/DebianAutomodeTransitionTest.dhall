@@ -10,7 +10,15 @@ let Command = ../../Command/Base.dhall
 
 let RunInToolchain = ../../Command/RunInToolchain.dhall
 
+let ContainerImages = ../../Constants/ContainerImages.dhall
+
 let DebianVersions = ../../Constants/DebianVersions.dhall
+
+let ArtifactPipelines = ../../Command/MinaArtifact.dhall
+
+let Artifacts = ../../Constants/Artifact/Artifacts.dhall
+
+let Profiles = ../../Constants/Profiles.dhall
 
 let Network = ../../Constants/Network.dhall
 
@@ -18,12 +26,35 @@ let Docker = ../../Command/Docker/Type.dhall
 
 let Size = ../../Command/Size.dhall
 
+let devnet = Network.Type.Devnet
+
+let profile = Profiles.Type.Devnet
+
+let debVersion = DebianVersions.DebVersion.Bullseye
+
 let dependsOnDevnet =
-      DebianVersions.dependsOn
+      DebianVersions.appDependsOn
         DebianVersions.DepsSpec::{
-        , deb_version = DebianVersions.DebVersion.Bullseye
-        , network = Network.Type.Devnet
+        , deb_version = debVersion
+        , network = devnet
+        , profile = profile
         }
+
+let buildSpec =
+      ArtifactPipelines.PackagingSpec::{
+      , artifacts =
+        [ Artifacts.Type.DaemonGeneric
+        , Artifacts.Type.Daemon { network = devnet }
+        , Artifacts.Type.DaemonPostfork { network = devnet }
+        , Artifacts.Type.LogProc
+        , Artifacts.Type.DaemonProfiled { profile = profile }
+        ]
+      , debVersion = debVersion
+      }
+
+let debianTokens =
+      "${ArtifactPipelines.debianTokens
+           buildSpec} daemon_devnet_automode profile_devnet_generic"
 
 let buildTestCmd
     : Text -> Text -> List { name : Text, key : Text } -> Size -> Command.Type
@@ -36,13 +67,20 @@ let buildTestCmd
           in  Command.build
                 Command.Config::{
                 , commands =
-                    RunInToolchain.runInToolchainBullseye
-                      ([] : List Text)
-                      ''
-                      ./buildkite/scripts/tests/debian-automode-transition-test.sh \
-                        --codename bullseye \
-                        --network ${network}
-                      ''
+                      ArtifactPipelines.buildDebianFromApps
+                        buildSpec
+                        debianTokens
+                    # RunInToolchain.runInToolchain
+                        RunInToolchain.Config::{
+                        , image = ContainerImages.minaToolchainBullseye.amd64
+                        , environment = [ "LOCAL_DEB_SOURCE_DIR=_build" ]
+                        , innerScript =
+                            ''
+                            ./buildkite/scripts/tests/debian-automode-transition-test.sh \
+                              --codename bullseye \
+                              --network ${network}
+                            ''
+                        }
                 , label =
                     "Debian automode transition test (bullseye, ${network})"
                 , key = key
@@ -58,6 +96,10 @@ let dirtyWhen =
       , S.exactly "buildkite/scripts/tests/debian-automode-transition-test" "sh"
       , S.strictlyStart (S.contains "scripts/debian")
       , S.exactly "buildkite/scripts/cache/manager" "sh"
+      , S.exactly "buildkite/scripts/debian/fetch_debs" "sh"
+      , S.exactly "buildkite/scripts/debian/build-from-cache" "sh"
+      , S.exactly "buildkite/src/Command/MinaArtifact" "dhall"
+      , S.strictlyStart (S.contains "buildkite/scripts/apps")
       ]
 
 in  Pipeline.build

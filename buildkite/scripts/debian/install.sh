@@ -41,6 +41,11 @@ fi
 LOCAL_DEB_FOLDER=debs
 mkdir -p $LOCAL_DEB_FOLDER
 
+# fetch_deb honours LOCAL_DEB_SOURCE_DIR, so a caller that packaged the debs
+# itself in this job installs those instead of the packaging job's cached ones.
+# shellcheck source=buildkite/scripts/debian/fetch_debs.sh
+source ./buildkite/scripts/debian/fetch_debs.sh
+
 # Download required debians from bucket locally
 if [ -z "$DEBS" ]; then 
     echo "DEBS env var is empty. It should contain comma separated names of debians to install"
@@ -48,29 +53,55 @@ if [ -z "$DEBS" ]; then
 else
   # shellcheck disable=SC2206
   debs=(${DEBS//,/ })
+  # Install a single profile package (devnet) as the on-disk default profile
+  # only when installing a bare mina-generic package without a concrete profile
+  # package.
+  # The per-profile leaf packages (mina-devnet-profile, mina-mainnet-profile,
+  # mina-lightnet, mina-dev) all ship /etc/coda/build_config/PROFILE and are
+  # therefore mutually exclusive (installing more than one collides in dpkg).
+  # The convenience tent mina-${profile}-generic depends on this leaf package
+  # plus mina-generic.
+  # The daemon resolves its profile from MINA_PROFILE first and only falls back to
+  # this file, so tests needing a different profile (e.g. single-node-tests) set
+  # MINA_PROFILE themselves and override the devnet default.
+  generic_profile_needed=0
+  concrete_profile_present=0
   for i in "${debs[@]}"; do
     case $i in
-      mina-devnet-generic*)
+      mina-generic*)
+        generic_profile_needed=1
+      ;;
+      mina-devnet|mina-mainnet|mina-devnet-generic|mina-mainnet-generic|mina-devnet-profile|mina-mainnet-profile|mina-lightnet|mina-dev)
+        concrete_profile_present=1
+      ;;
+    esac
+  done
+  if [ "$generic_profile_needed" == "1" ] && [ "$concrete_profile_present" == "0" ]; then
+    fetch_deb $LOCAL_DEB_FOLDER "debians/$MINA_DEB_CODENAME/mina-devnet-profile_*"
+  fi
+  for i in "${debs[@]}"; do
+    case $i in
+      mina-generic*)
         # Download mina-logproc too
-          ./buildkite/scripts/cache/manager.sh read --root "$ROOT" "debians/$MINA_DEB_CODENAME/mina-logproc*" $LOCAL_DEB_FOLDER
+          fetch_deb $LOCAL_DEB_FOLDER "debians/$MINA_DEB_CODENAME/mina-logproc*"
       ;;
       mina-devnet|mina-mainnet|mina-mesa)
         # Download mina-logproc and sub debians (apps and config) too
-          ./buildkite/scripts/cache/manager.sh read --root "$ROOT" "debians/$MINA_DEB_CODENAME/mina-logproc*" $LOCAL_DEB_FOLDER
-          ./buildkite/scripts/cache/manager.sh read --root "$ROOT" "debians/$MINA_DEB_CODENAME/${i}-config*" $LOCAL_DEB_FOLDER
+          fetch_deb $LOCAL_DEB_FOLDER "debians/$MINA_DEB_CODENAME/mina-logproc*"
+          fetch_deb $LOCAL_DEB_FOLDER "debians/$MINA_DEB_CODENAME/${i}-config*"
       ;;
       mina-devnet-instrumented|mina-mainnet-instrumented|mina-mesa-instrumented)
         # Instrumented daemon depends on mina-logproc and the non-instrumented
         # network-config deb (config files are the same for both flavors).
           network_pkg=${i%-instrumented}
-          ./buildkite/scripts/cache/manager.sh read --root "$ROOT" "debians/$MINA_DEB_CODENAME/mina-logproc*" $LOCAL_DEB_FOLDER
-          ./buildkite/scripts/cache/manager.sh read --root "$ROOT" "debians/$MINA_DEB_CODENAME/${network_pkg}-config*" $LOCAL_DEB_FOLDER
+          fetch_deb $LOCAL_DEB_FOLDER "debians/$MINA_DEB_CODENAME/mina-logproc*"
+          fetch_deb $LOCAL_DEB_FOLDER "debians/$MINA_DEB_CODENAME/${network_pkg}-config*"
       ;;
       mina-*-prefork*)
         # Download mina-logproc legacy too
-        ./buildkite/scripts/cache/manager.sh read --root "legacy" "debians/$MINA_DEB_CODENAME/${i}*" $LOCAL_DEB_FOLDER
+        fetch_legacy_deb $LOCAL_DEB_FOLDER "debians/$MINA_DEB_CODENAME/${i}*"
     esac
-    ./buildkite/scripts/cache/manager.sh read --root "$ROOT" "debians/$MINA_DEB_CODENAME/${i}_${VERSION}_*" $LOCAL_DEB_FOLDER
+    fetch_deb $LOCAL_DEB_FOLDER "debians/$MINA_DEB_CODENAME/${i}_${VERSION}_*"
   done
 fi
 

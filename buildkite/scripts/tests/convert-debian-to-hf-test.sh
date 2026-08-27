@@ -21,7 +21,10 @@ buildkite/scripts/debian/update.sh --verbose
 git config --global --add safe.directory /workdir
 source buildkite/scripts/export-git-env-vars.sh
 
-source buildkite/scripts/debian/install.sh "mina-${NETWORK_NAME}" 1
+# The daemon binary (and mina-create-genesis, needed by the conversion below)
+# now lives in the split-out mina-generic package, not the old
+# monolithic mina-${NETWORK} metapackage.
+source buildkite/scripts/debian/install.sh "mina-generic" 1
 
 
 # Step 1: Get test debian package from cache

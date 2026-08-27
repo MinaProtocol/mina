@@ -10,60 +10,60 @@ let schema_not_deprecated_test () =
         [ field "not-deprecated" ~deprecated:NotDeprecated ~typ:string
             ~args:Arg.[]
             ~resolve:(fun _ _ -> Some "")
-        ])
+        ] )
   in
   let query =
     "{ __schema { queryType { fields { isDeprecated deprecationReason } } } }"
   in
   test_query schema query
     (`Assoc
-      [ ( "data"
-        , `Assoc
-            [ ( "__schema"
-              , `Assoc
-                  [ ( "queryType"
-                    , `Assoc
-                        [ ( "fields"
-                          , `List
-                              [ `Assoc
-                                  [ ("isDeprecated", `Bool false)
-                                  ; ("deprecationReason", `Null)
-                                  ]
-                              ] )
-                        ] )
-                  ] )
-            ] )
-      ] )
+       [ ( "data"
+         , `Assoc
+             [ ( "__schema"
+               , `Assoc
+                   [ ( "queryType"
+                     , `Assoc
+                         [ ( "fields"
+                           , `List
+                               [ `Assoc
+                                   [ ("isDeprecated", `Bool false)
+                                   ; ("deprecationReason", `Null)
+                                   ]
+                               ] )
+                         ] )
+                   ] )
+             ] )
+       ] )
 
 let schema_default_deprecation_test () =
   let schema =
     Schema.(
       schema
         [ field "default" ~typ:string ~args:Arg.[] ~resolve:(fun _ _ -> Some "")
-        ])
+        ] )
   in
   let query =
     "{ __schema { queryType { fields { isDeprecated deprecationReason } } } }"
   in
   test_query schema query
     (`Assoc
-      [ ( "data"
-        , `Assoc
-            [ ( "__schema"
-              , `Assoc
-                  [ ( "queryType"
-                    , `Assoc
-                        [ ( "fields"
-                          , `List
-                              [ `Assoc
-                                  [ ("isDeprecated", `Bool false)
-                                  ; ("deprecationReason", `Null)
-                                  ]
-                              ] )
-                        ] )
-                  ] )
-            ] )
-      ] )
+       [ ( "data"
+         , `Assoc
+             [ ( "__schema"
+               , `Assoc
+                   [ ( "queryType"
+                     , `Assoc
+                         [ ( "fields"
+                           , `List
+                               [ `Assoc
+                                   [ ("isDeprecated", `Bool false)
+                                   ; ("deprecationReason", `Null)
+                                   ]
+                               ] )
+                         ] )
+                   ] )
+             ] )
+       ] )
 
 let schema_deprecated_without_reason_test () =
   let schema =
@@ -73,30 +73,30 @@ let schema_deprecated_without_reason_test () =
             ~typ:string
             ~args:Arg.[]
             ~resolve:(fun _ _ -> Some "")
-        ])
+        ] )
   in
   let query =
     "{ __schema { queryType { fields { isDeprecated deprecationReason } } } }"
   in
   test_query schema query
     (`Assoc
-      [ ( "data"
-        , `Assoc
-            [ ( "__schema"
-              , `Assoc
-                  [ ( "queryType"
-                    , `Assoc
-                        [ ( "fields"
-                          , `List
-                              [ `Assoc
-                                  [ ("isDeprecated", `Bool true)
-                                  ; ("deprecationReason", `Null)
-                                  ]
-                              ] )
-                        ] )
-                  ] )
-            ] )
-      ] )
+       [ ( "data"
+         , `Assoc
+             [ ( "__schema"
+               , `Assoc
+                   [ ( "queryType"
+                     , `Assoc
+                         [ ( "fields"
+                           , `List
+                               [ `Assoc
+                                   [ ("isDeprecated", `Bool true)
+                                   ; ("deprecationReason", `Null)
+                                   ]
+                               ] )
+                         ] )
+                   ] )
+             ] )
+       ] )
 
 let schema_deprecated_with_reason_test () =
   let schema =
@@ -106,31 +106,31 @@ let schema_deprecated_with_reason_test () =
             ~deprecated:(Deprecated (Some "deprecation reason")) ~typ:string
             ~args:Arg.[]
             ~resolve:(fun _ _ -> Some "")
-        ])
+        ] )
   in
   let query =
     "{ __schema { queryType { fields { isDeprecated deprecationReason } } } }"
   in
   test_query schema query
     (`Assoc
-      [ ( "data"
-        , `Assoc
-            [ ( "__schema"
-              , `Assoc
-                  [ ( "queryType"
-                    , `Assoc
-                        [ ( "fields"
-                          , `List
-                              [ `Assoc
-                                  [ ("isDeprecated", `Bool true)
-                                  ; ( "deprecationReason"
-                                    , `String "deprecation reason" )
-                                  ]
-                              ] )
-                        ] )
-                  ] )
-            ] )
-      ] )
+       [ ( "data"
+         , `Assoc
+             [ ( "__schema"
+               , `Assoc
+                   [ ( "queryType"
+                     , `Assoc
+                         [ ( "fields"
+                           , `List
+                               [ `Assoc
+                                   [ ("isDeprecated", `Bool true)
+                                   ; ( "deprecationReason"
+                                     , `String "deprecation reason" )
+                                   ]
+                               ] )
+                         ] )
+                   ] )
+             ] )
+       ] )
 
 let schema_deduplicates_argument_types_test () =
   let schema =
@@ -140,23 +140,23 @@ let schema_deduplicates_argument_types_test () =
             ~args:
               Arg.[ arg "x" ~typ:(non_null int); arg "y" ~typ:(non_null int) ]
             ~resolve:(fun _ _ x y -> x + y)
-        ])
+        ] )
   in
   let query = "{ __schema { types { name } } }" in
   test_query schema query
     (`Assoc
-      [ ( "data"
-        , `Assoc
-            [ ( "__schema"
-              , `Assoc
-                  [ ( "types"
-                    , `List
-                        [ `Assoc [ ("name", `String "Int") ]
-                        ; `Assoc [ ("name", `String "query") ]
-                        ] )
-                  ] )
-            ] )
-      ] )
+       [ ( "data"
+         , `Assoc
+             [ ( "__schema"
+               , `Assoc
+                   [ ( "types"
+                     , `List
+                         [ `Assoc [ ("name", `String "Int") ]
+                         ; `Assoc [ ("name", `String "query") ]
+                         ] )
+                   ] )
+             ] )
+       ] )
 
 let type_test () =
   let query =
@@ -173,12 +173,12 @@ let type_test () =
   in
   test_query Test_schema.schema query
     (`Assoc
-      [ ( "data"
-        , `Assoc
-            [ ("role_type", `Assoc [ ("name", `String "role") ])
-            ; ("user_type", `Assoc [ ("name", `String "user") ])
-            ] )
-      ] )
+       [ ( "data"
+         , `Assoc
+             [ ("role_type", `Assoc [ ("name", `String "role") ])
+             ; ("user_type", `Assoc [ ("name", `String "user") ])
+             ] )
+       ] )
 
 let () =
   Alcotest.run "GraphQL Introspection Tests"

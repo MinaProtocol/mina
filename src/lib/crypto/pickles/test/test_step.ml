@@ -32,8 +32,7 @@ let test_scale_fast_2 () =
         (Typ.tuple2 G.typ Field.typ)
         G.typ
         (fun (g, s) ->
-          make_checked (fun () -> Ops.scale_fast2' ~num_bits:n (module F) g s)
-          )
+          make_checked (fun () -> Ops.scale_fast2' ~num_bits:n (module F) g s) )
         (fun (g, _) ->
           let x =
             let chunks_needed = Ops.chunks_needed ~num_bits:(n - 1) in
@@ -72,8 +71,7 @@ let test_scale_fast_2_small () =
         (Typ.tuple2 G.typ Field.typ)
         G.typ
         (fun (g, s) ->
-          make_checked (fun () -> Ops.scale_fast2' ~num_bits:n (module F) g s)
-          )
+          make_checked (fun () -> Ops.scale_fast2' ~num_bits:n (module F) g s) )
         (fun (g, _) ->
           let x =
             let chunks_needed = Ops.chunks_needed ~num_bits:(n - 1) in
