@@ -10,15 +10,9 @@ let PipelineScope = ../../Pipeline/Scope.dhall
 
 let TestExecutive = ../../Command/TestExecutive.dhall
 
-let Dockers = ../../Constants/DockerVersions.dhall
+let IntegrationImages = ../../Constants/IntegrationImages.dhall
 
-let Artifacts = ../../Constants/Artifacts.dhall
-
-let dependsOn =
-        Dockers.dependsOn
-          Dockers.DepsSpec::{ artifact = Artifacts.Type.DaemonAppsOnly }
-      # Dockers.dependsOn
-          Dockers.DepsSpec::{ artifact = Artifacts.Type.Archive }
+let dependsOn = IntegrationImages.dependsOn
 
 in  Pipeline.build
       Pipeline.Config::{
@@ -29,8 +23,10 @@ in  Pipeline.build
           , S.strictlyStart
               (S.contains "buildkite/src/Jobs/Test/TestnetIntegrationTest")
           , S.strictlyStart (S.contains "buildkite/src/Command/TestExecutive")
+          , S.exactly "buildkite/src/Constants/IntegrationImages" "dhall"
           , S.strictlyStart
               (S.contains "buildkite/scripts/run-test-executive-local")
+          , S.strictlyStart (S.contains "buildkite/scripts/apps")
           ]
         , path = "Test"
         , name = "TestnetIntegrationTests"

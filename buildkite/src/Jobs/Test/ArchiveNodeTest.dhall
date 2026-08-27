@@ -13,7 +13,7 @@ let DebianVersions = ../../Constants/DebianVersions.dhall
 let BuildFlags = ../../Constants/BuildFlags.dhall
 
 let dependsOn =
-      DebianVersions.dependsOn
+      DebianVersions.appDependsOn
         DebianVersions.DepsSpec::{ build_flag = BuildFlags.Type.Instrumented }
 
 in  Pipeline.build
@@ -28,7 +28,6 @@ in  Pipeline.build
           , S.exactly "buildkite/src/Command/Bench/Base" "dhall"
           , S.exactly "buildkite/scripts/bench/install" "sh"
           , S.exactly "buildkite/scripts/bench/run" "sh"
-          , S.contains "scripts/benchmark"
           , S.exactly "buildkite/src/Jobs/Bench/ArchiveStable" "dhall"
           , S.exactly "buildkite/src/Jobs/Bench/ArchiveUnstable" "dhall"
           ]

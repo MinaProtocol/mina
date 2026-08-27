@@ -21,8 +21,8 @@ module Branch_data : sig
   module type Local_sig = Signature(Types).S
 
   module Make
-      (Signature : Local_sig) (_ : functor (A : Concrete) -> Signature(A).S) :
-    Signature(M).S
+      (Signature : Local_sig)
+      (_ : functor (A : Concrete) -> Signature(A).S) : Signature(M).S
 
   include Types.S with module Domain_log2 = M.Domain_log2 and module V1 = M.V1
 end

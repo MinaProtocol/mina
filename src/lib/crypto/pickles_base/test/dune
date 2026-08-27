@@ -1,9 +1,7 @@
 (tests
  (names main)
  (flags
-  (:standard -warn-error +a)
-  -open
-  Core_kernel)
+  (:standard -warn-error +a))
  (preprocess
   (pps ppx_jane))
  (libraries

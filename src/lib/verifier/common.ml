@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Mina_base
 
 type invalid =
@@ -58,7 +58,7 @@ let collect_vk_assumption
   | Proof _, Proof _, None ->
       Error
         (`Missing_verification_key
-          [ Account_id.public_key @@ Account_update.account_id p ] )
+           [ Account_id.public_key @@ Account_update.account_id p ] )
   | Proof pi, Proof vk_hash, Some (vk : _ With_hash.t) ->
       if
         (* check that vk expected for proof is the one being used *)
@@ -67,7 +67,7 @@ let collect_vk_assumption
       else
         Error
           (`Unexpected_verification_key
-            [ Account_id.public_key @@ Account_update.account_id p ] )
+             [ Account_id.public_key @@ Account_update.account_id p ] )
   | _ ->
       Ok None
 
@@ -119,19 +119,19 @@ let check_signatures_of_zkapp_command ~signature_kind
   (* Check signatures *)
   Zkapp_command.Call_forest.to_list zkapp_command.account_updates
   |> List.fold_result ~init:() ~f:(fun () p ->
-         let commitment =
-           if Account_update.use_full_commitment p then full_tx_commitment
-           else tx_commitment
-         in
-         match (p.authorization, p.body.authorization_kind) with
-         | Control.Poly.Signature s, Signature ->
-             check_signature s p.body.public_key commitment
-         | None_given, None_given | Proof _, Proof _ ->
-             Ok ()
-         | _ ->
-             Error
-               (`Mismatched_authorization_kind
-                 [ Account_id.public_key @@ Account_update.account_id p ] ) )
+      let commitment =
+        if Account_update.use_full_commitment p then full_tx_commitment
+        else tx_commitment
+      in
+      match (p.authorization, p.body.authorization_kind) with
+      | Control.Poly.Signature s, Signature ->
+          check_signature s p.body.public_key commitment
+      | None_given, None_given | Proof _, Proof _ ->
+          Ok ()
+      | _ ->
+          Error
+            (`Mismatched_authorization_kind
+               [ Account_id.public_key @@ Account_update.account_id p ] ) )
 
 let check ~signature_kind (cmd : _ With_status.t) :
     ([ `Assuming of _ list ], invalid) Result.t =

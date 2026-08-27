@@ -128,12 +128,13 @@ CREATE TABLE zkapp_field
    The elements of the array are NOT NULL (not enforced by Postgresql)
 
 */
+/* No UNIQUE/index on element_ids: a btree key over the unbounded int[] overflows
+   Postgres' 2704-byte limit for max-cost zkApps. Rows are not content-deduplicated;
+   identical arrays simply yield distinct rows. */
 CREATE TABLE zkapp_field_array
 ( id                       serial  PRIMARY KEY
-, element_ids              int[]   NOT NULL UNIQUE
+, element_ids              int[]   NOT NULL
 );
-
-CREATE INDEX idx_zkapp_field_array_element_ids ON zkapp_field_array(element_ids);
 
 /* Fixed-width arrays of algebraic fields, given as id's from
    zkapp_field
@@ -226,12 +227,11 @@ CREATE TABLE zkapp_action_states
 /* the element_ids are non-NULL, and refer to zkapp_field_array
    they represent a list of arrays of field elements
 */
+/* No UNIQUE/index on element_ids (see zkapp_field_array): not content-deduplicated. */
 CREATE TABLE zkapp_events
 ( id                       serial           PRIMARY KEY
-, element_ids              int[]            NOT NULL UNIQUE
+, element_ids              int[]            NOT NULL
 );
-
-CREATE INDEX idx_zkapp_events_element_ids ON zkapp_events(element_ids);
 
 /* field elements derived from verification keys */
 CREATE TABLE zkapp_verification_key_hashes
@@ -405,8 +405,8 @@ CREATE TABLE zkapp_account_update_body
 , update_id                             int             NOT NULL  REFERENCES zkapp_updates(id)
 , balance_change                        text            NOT NULL
 , increment_nonce                       boolean         NOT NULL
-, events_id                             int             NOT NULL  REFERENCES zkapp_events(id)
-, actions_id                            int             NOT NULL  REFERENCES zkapp_events(id)
+, events_id                             int                       REFERENCES zkapp_events(id)
+, actions_id                            int                       REFERENCES zkapp_events(id)
 , call_data_id                          int             NOT NULL  REFERENCES zkapp_field(id)
 , call_depth                            int             NOT NULL
 , zkapp_network_precondition_id         int             NOT NULL  REFERENCES zkapp_network_precondition(id)

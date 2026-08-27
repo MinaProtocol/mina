@@ -11,7 +11,7 @@ let ContainerImages = ../Constants/ContainerImages.dhall
 let key = "patch-archive-test"
 
 let debs =
-      "mina-test-suite,mina-devnet-generic-instrumented,mina-archive-devnet-instrumented"
+      "mina-test-suite,mina-generic-instrumented,mina-archive-generic-instrumented,mina-devnet-profile,mina-archive-devnet-instrumented"
 
 in  { step =
             \(dependsOn : List Command.TaggedKey.Type)
@@ -20,7 +20,11 @@ in  { step =
               , commands =
                 [ RunWithPostgres.runInToolchainWithPostgresAndDebs
                     [ "PATCH_ARCHIVE_TEST_APP=mina-patch-archive-test"
-                    , "NETWORK_DATA_FOLDER=/etc/mina/test/archive/sample_db"
+                    , "NETWORK_DATA_FOLDER=src/test/archive/sample_db"
+                    , "APPS_BUILD_FLAG=instrumented"
+                    , "MINA_PROFILE=devnet"
+                    , "APPS_BARE_BINARIES=patch_archive_test.exe:mina-patch-archive-test,extract_blocks.exe:mina-extract-blocks,missing_blocks_auditor.exe:mina-missing-blocks-auditor,archive_blocks.exe:mina-archive-blocks,replayer.exe:mina-replayer,mina.exe:mina,runtime_genesis_ledger.exe:mina-create-genesis"
+                    , "APPS_BARE_SCRIPTS=scripts/archive/missing-blocks-guardian.sh:mina-missing-blocks-guardian"
                     ]
                     ( Some
                         ( RunWithPostgres.ScriptOrArchive.Script

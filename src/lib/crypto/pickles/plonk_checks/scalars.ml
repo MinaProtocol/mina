@@ -30,7 +30,7 @@ module Gate_type = struct
     [@@deriving hash, eq, compare, sexp]
   end
 
-  include Core_kernel.Hashable.Make (T)
+  include Core.Hashable.Make (T)
   include T
 end
 
@@ -44,12 +44,12 @@ module Lookup_pattern = struct
     [@@deriving hash, eq, compare, sexp]
   end
 
-  include Core_kernel.Hashable.Make (T)
+  include Core.Hashable.Make (T)
   include T
 end
 
 module Column = struct
-  open Core_kernel
+  open Core
 
   module T = struct
     type t =

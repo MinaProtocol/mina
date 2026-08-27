@@ -1,6 +1,6 @@
 (* encoders.ml -- encode internal values to Yojson.Basic.t *)
 
-let optional = Core_kernel.Option.value_map ~default:`Null
+let optional = Core.Option.value_map ~default:`Null
 
 let uint64 value = `String (Unsigned.UInt64.to_string value)
 

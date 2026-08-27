@@ -53,10 +53,10 @@ let command_run =
      in
      fun () ->
        let logger = Logger.create () in
-       let genesis_constants = Genesis_constants.Compiled.genesis_constants in
-       let constraint_constants =
-         Genesis_constants.Compiled.constraint_constants
-       in
+
+       let (module G) = Genesis_constants.profiled () in
+       let genesis_constants = G.genesis_constants in
+       let constraint_constants = G.constraint_constants in
        Stdout_log.setup log_json log_level ;
        let proof_cache_db = Proof_cache_tag.create_identity_db () in
        [%log info] "Starting archive process; built with commit $commit"
@@ -71,9 +71,10 @@ let command_run =
 
 let time_arg =
   (* Same timezone as Genesis_constants.genesis_state_timestamp. *)
-  let default_timezone = Core.Time.Zone.of_utc_offset ~hours:(-8) in
+  let default_timezone = Core.Time_float.Zone.of_utc_offset ~hours:(-8) in
   Command.Arg_type.create
-    (Time.of_string_gen ~if_no_timezone:(`Use_this_one default_timezone))
+    (Time_float_unix.of_string_gen
+       ~if_no_timezone:(`Use_this_one default_timezone) )
 
 let command_prune =
   let open Command.Let_syntax in

@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Async
 module Mina_currency = Currency
 open Rosetta_lib
@@ -257,20 +257,19 @@ module Sql = struct
     let gen_filter (op_1, op_2, null_cmp) l =
       String.concat ~sep:[%string " %{op_1} "]
       @@ List.map l ~f:(function
-           | ((_, (_, n, typ)) :: _) :: _ as field_n_l ->
-               let filters =
-                 String.concat ~sep:" OR "
-                 @@ List.map field_n_l ~f:(fun l ->
-                        String.concat ~sep:" AND "
-                        @@ List.map l ~f:(fun (field', (cmp_op, n', cast)) ->
-                               [%string
-                                 "%{field'} %{cmp_op} CAST($%{n'#Int} AS \
-                                  %{cast})"] ) )
-               in
-               [%string
-                 "($%{n#Int}::%{typ} %{null_cmp} NULL %{op_2} (%{filters}))"]
-           | _ ->
-               "" )
+        | ((_, (_, n, typ)) :: _) :: _ as field_n_l ->
+            let filters =
+              String.concat ~sep:" OR "
+              @@ List.map field_n_l ~f:(fun l ->
+                  String.concat ~sep:" AND "
+                  @@ List.map l ~f:(fun (field', (cmp_op, n', cast)) ->
+                      [%string
+                        "%{field'} %{cmp_op} CAST($%{n'#Int} AS %{cast})"] ) )
+            in
+            [%string
+              "($%{n#Int}::%{typ} %{null_cmp} NULL %{op_2} (%{filters}))"]
+        | _ ->
+            "" )
     in
     let block_filter =
       gen_filter
@@ -304,7 +303,8 @@ module Sql = struct
     let ppf = Format.formatter_of_buffer buffer in
     let () =
       Option.value_map params ~default:(Caqti_request.pp ppf req)
-        ~f:(fun params -> Caqti_request.make_pp_with_param () ppf (req, params))
+        ~f:(fun params ->
+          Caqti_request.make_pp_with_param () ppf (req, params) )
     in
     let () = Format.pp_print_flush ppf () in
     Buffer.contents buffer
@@ -339,7 +339,7 @@ module Sql = struct
         List.map
           ( "id"
           :: Archive_lib.Processor.User_command.Signed_command.Fields.names )
-          ~f:(fun n -> "u." ^ n)
+          ~f:(fun n -> "u." ^ n )
 
       let fields =
         String.concat ~sep:"," @@ fields'
@@ -378,6 +378,7 @@ module Sql = struct
             | `Fee_payer_dec
             | `Account_creation_fee_via_payment
             | `Account_creation_fee_via_fee_receiver
+            | `Account_creation_fee_via_zkapp
             | `Zkapp_fee_payer_dec
             | `Zkapp_balance_update
             | `Fee_receiver_inc
@@ -702,6 +703,7 @@ module Sql = struct
           | `Account_creation_fee_via_fee_receiver ->
               "ac.creation_fee IS NOT NULL"
           | `Account_creation_fee_via_payment
+          | `Account_creation_fee_via_zkapp
           | `Payment_source_dec
           | `Payment_receiver_inc
           | `Fee_payment
@@ -846,12 +848,44 @@ module Sql = struct
               ON zfpb.public_key_id = pk_fee_payer.id
             INNER JOIN blocks b
               ON bzc.block_id = b.id
+            -- Expand the account-updates array positionally so a repeated
+            -- account-update id yields one row per occurrence (see block.ml);
+            -- `= ANY(array)` would collapse repeats and drop balance-change ops.
+            LEFT JOIN LATERAL
+              unnest (zc.zkapp_account_updates_ids) WITH ORDINALITY
+                AS au_ref (au_id, au_ord) ON true
             LEFT JOIN zkapp_account_update zau
-              ON zau.id = ANY (zc.zkapp_account_updates_ids)
+              ON zau.id = au_ref.au_id
             INNER JOIN zkapp_account_update_body zaub
               ON zaub.id = zau.body_id
             INNER JOIN account_identifiers ai_update_body
               ON zaub.account_identifier_id = ai_update_body.id
+            -- Bill one creation fee per created account, on the first eligible
+            -- (command, array position) pair (see block.ml).
+            LEFT JOIN accounts_created ac
+                ON bzc.block_id = ac.block_id
+                AND ai_update_body.id = ac.account_identifier_id
+                AND bzc.status = 'applied'
+                AND zaub.implicit_account_creation_fee
+                AND NOT EXISTS (
+                  SELECT 1
+                  FROM blocks_zkapp_commands bzc2
+                  INNER JOIN zkapp_commands zc2
+                    ON zc2.id = bzc2.zkapp_command_id
+                  CROSS JOIN LATERAL
+                    unnest (zc2.zkapp_account_updates_ids) WITH ORDINALITY
+                      AS au_ref2 (au_id, au_ord)
+                  INNER JOIN zkapp_account_update zau2
+                    ON zau2.id = au_ref2.au_id
+                  INNER JOIN zkapp_account_update_body zaub2
+                    ON zaub2.id = zau2.body_id
+                  WHERE bzc2.block_id = bzc.block_id
+                    AND bzc2.status = 'applied'
+                    AND zaub2.implicit_account_creation_fee
+                    AND zaub2.account_identifier_id = ai_update_body.id
+                    AND (bzc2.sequence_no, zc2.id, au_ref2.au_ord)
+                        < (bzc.sequence_no, zc.id, au_ref.au_ord)
+                )
             INNER JOIN public_keys pk_update_body
               ON ai_update_body.public_key_id = pk_update_body.id
             INNER JOIN tokens token_update_body
@@ -896,6 +930,8 @@ module Sql = struct
               "TRUE"
           | `Zkapp_balance_update ->
               "zaub.id IS NOT NULL"
+          | `Account_creation_fee_via_zkapp ->
+              "ac.creation_fee IS NOT NULL"
           | `Fee_payer_dec
           | `Fee_receiver_inc
           | `Coinbase_inc
@@ -971,38 +1007,22 @@ module Sql = struct
         let map ~f l =
           map ~f:List.rev
           @@ List.fold_result l ~init:[] ~f:(fun acc x ->
-                 f x >>| fun x -> x :: acc )
+              f x >>| fun x -> x :: acc )
       end
     end in
     let module M = Deferred.Result in
     let open M.Let_syntax in
     let offset = query.Transaction_query.offset in
     let limit = query.limit in
-    let%bind user_commands_count, raw_user_commands =
-      User_commands.run ~logger ~offset ~limit (module Conn) query
-      |> Errors.Lift.sql ~context:"Finding user commands with transaction query"
+    let%bind internal_commands_count, raw_internal_commands =
+      Internal_commands.run (module Conn) ~logger ~offset ~limit query
+      |> Errors.Lift.sql ~context:"Finding internal commands within block"
     in
 
     (* user_command_count is a total number of user commands disregard limit & offset paramaters
        therefore we need to calculate the real length of user commands.
        The same for internal commands and zkapp commands
     *)
-    let fetched_user_command_length =
-      List.length raw_user_commands |> Int64.of_int_exn
-    in
-
-    let offset =
-      Option.map offset ~f:(fun offset ->
-          Int64.(max 0L (offset - user_commands_count)) )
-    in
-    let limit =
-      Option.map limit ~f:(fun limit ->
-          Int64.(max 0L (limit - fetched_user_command_length)) )
-    in
-    let%bind internal_commands_count, raw_internal_commands =
-      Internal_commands.run (module Conn) ~logger ~offset ~limit query
-      |> Errors.Lift.sql ~context:"Finding internal commands within block"
-    in
     let fetched_internal_command_length =
       List.length raw_internal_commands |> Int64.of_int_exn
     in
@@ -1014,6 +1034,22 @@ module Sql = struct
     let limit =
       Option.map limit ~f:(fun limit ->
           Int64.(max 0L (limit - fetched_internal_command_length)) )
+    in
+    let%bind user_commands_count, raw_user_commands =
+      User_commands.run ~logger ~offset ~limit (module Conn) query
+      |> Errors.Lift.sql ~context:"Finding user commands with transaction query"
+    in
+    let fetched_user_command_length =
+      List.length raw_user_commands |> Int64.of_int_exn
+    in
+
+    let offset =
+      Option.map offset ~f:(fun offset ->
+          Int64.(max 0L (offset - user_commands_count)) )
+    in
+    let limit =
+      Option.map limit ~f:(fun limit ->
+          Int64.(max 0L (limit - fetched_user_command_length)) )
     in
     let%bind zkapp_commands_count, raw_zkapp_commands =
       Zkapp_commands.run (module Conn) ~logger ~offset ~limit query
@@ -1030,7 +1066,7 @@ module Sql = struct
     let zkapp_commands = Zkapp_commands.to_command_infos raw_zkapp_commands in
     { total_count =
         Int64.(
-          user_commands_count + internal_commands_count + zkapp_commands_count)
+          user_commands_count + internal_commands_count + zkapp_commands_count )
     ; Transactions_info.internal_commands
     ; user_commands
     ; zkapp_commands

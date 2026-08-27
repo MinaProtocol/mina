@@ -15,6 +15,7 @@
   bin_prot.shape
   core
   core_kernel
+  core_unix.time_float_unix
   ppx_deriving_yojson.runtime
   sexplib0
   yojson

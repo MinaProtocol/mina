@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # Integration test for the full automode transition lifecycle:
-#   mina-devnet-generic (v1) → mina-devnet-automode (v2) → mina-devnet-generic (v3)
+#   mina-generic (v1) → mina-devnet-automode (v2) → mina-generic (v3)
 #
 # In the split package layout the "normal" daemon is mina-NETWORK-generic
 # (binaries, owns /usr/local/bin/mina) + mina-NETWORK-config (config + service).
@@ -30,6 +30,12 @@ export DEBIAN_FRONTEND=noninteractive
 
 git config --global --add safe.directory /workdir
 source buildkite/scripts/export-git-env-vars.sh
+
+# Where the debs under test come from: this build's cache by default, or a
+# directory of debs the job packaged itself when LOCAL_DEB_SOURCE_DIR is set.
+# The prefork deb always comes from the persistent legacy cache root.
+# shellcheck source=buildkite/scripts/debian/fetch_debs.sh
+source ./buildkite/scripts/debian/fetch_debs.sh
 
 SESSION_DIR="./scripts/debian/session"
 
@@ -95,12 +101,17 @@ else
     SUDO="sudo"
 fi
 
-# In the split layout the normal daemon binaries live in mina-NETWORK-generic
-# (not the legacy monolithic mina-NETWORK), so that is the package we install,
-# reversion and assert on for the v1/v3 "normal" states.
-PKG_DAEMON="mina-${NETWORK}-generic"
+# In the split layout the normal daemon binaries live in the network-free
+# mina-generic package (not the legacy monolithic mina-NETWORK), so that is the
+# package we install, reversion and assert on for the v1/v3 "normal" states. The
+# per-profile generic layer (mina-NETWORK-generic) ships only the PROFILE hint.
+PKG_DAEMON="mina-generic"
 PKG_AUTOMODE="mina-${NETWORK}-automode"
 PKG_CONFIG="mina-${NETWORK}-config"
+# Profile leaf package (just the PROFILE hint, no deps).
+# PKG_PROFILE is the profile tent (depends on mina-generic + profile leaf).
+PKG_PROFILE="mina-${NETWORK}-generic"
+PKG_PROFILE_LEAF="mina-${NETWORK}-profile"
 PKG_POSTFORK="mina-${NETWORK}-postfork-mesa"
 PKG_PREFORK="mina-${NETWORK}-prefork-mesa"
 
@@ -126,16 +137,18 @@ DAEMON_PATHS=(
 log_info "=== Step 1: Download debs from cache ==="
 
 # Download all relevant debs for this codename
-./buildkite/scripts/cache/manager.sh read "debians/${CODENAME}/${PKG_DAEMON}_*" "${DEB_DIR}"
-./buildkite/scripts/cache/manager.sh read "debians/${CODENAME}/${PKG_AUTOMODE}_*" "${DEB_DIR}"
-./buildkite/scripts/cache/manager.sh read "debians/${CODENAME}/${PKG_CONFIG}_*" "${DEB_DIR}"
-./buildkite/scripts/cache/manager.sh read "debians/${CODENAME}/${PKG_POSTFORK}_*" "${DEB_DIR}"
-./buildkite/scripts/cache/manager.sh read "debians/${CODENAME}/mina-logproc_*" "${DEB_DIR}"
+fetch_deb "${DEB_DIR}" "debians/${CODENAME}/${PKG_DAEMON}_*"
+fetch_deb "${DEB_DIR}" "debians/${CODENAME}/${PKG_AUTOMODE}_*"
+fetch_deb "${DEB_DIR}" "debians/${CODENAME}/${PKG_CONFIG}_*"
+fetch_deb "${DEB_DIR}" "debians/${CODENAME}/${PKG_POSTFORK}_*"
+fetch_deb "${DEB_DIR}" "debians/${CODENAME}/mina-logproc_*"
 
 # Download the legacy prefork deb from the persistent legacy cache.
 # The automode metapackage depends on prefork at PREFORK_LEGACY_VERSION (not the
 # current build version), so we need the real legacy deb to satisfy that constraint.
-./buildkite/scripts/cache/manager.sh read --root "legacy" "debians/${CODENAME}/${PKG_PREFORK}_*" "${DEB_DIR}"
+fetch_deb "${DEB_DIR}" "debians/${CODENAME}/${PKG_PROFILE}_*"
+fetch_deb "${DEB_DIR}" "debians/${CODENAME}/${PKG_PROFILE_LEAF}_*"
+fetch_legacy_deb "${DEB_DIR}" "debians/${CODENAME}/${PKG_PREFORK}_*"
 
 log_info "Downloaded debs:"
 ls -la "${DEB_DIR}"/*.deb
@@ -152,13 +165,9 @@ ORIG_AUTOMODE_DEB=$(ls "${DEB_DIR}"/${PKG_AUTOMODE}_*.deb | head -1)
 ORIG_CONFIG_DEB=$(ls "${DEB_DIR}"/${PKG_CONFIG}_*.deb | head -1)
 ORIG_POSTFORK_DEB=$(ls "${DEB_DIR}"/${PKG_POSTFORK}_*.deb | head -1)
 ORIG_LOGPROC_DEB=$(ls "${DEB_DIR}"/mina-logproc_*.deb | head -1)
-
-# The prefork debs come from the legacy cache at their original versions.
-# Copy all of them into the repo — no reversioning needed since the automode
-# metapackage already references the legacy version in its dependency.
-# We must include all variants so the correct one satisfying the dependency
-# constraint (>= PREFORK_LEGACY_VERSION) is available.
-cp "${DEB_DIR}"/${PKG_PREFORK}_*.deb "${REPO_DIR}/"
+ORIG_PREFORK_DEB=$(ls "${DEB_DIR}"/${PKG_PREFORK}_*.deb | head -1)
+ORIG_PROFILE_DEB=$(ls "${DEB_DIR}"/${PKG_PROFILE}_*.deb | head -1)
+ORIG_PROFILE_LEAF_DEB=$(ls "${DEB_DIR}"/${PKG_PROFILE_LEAF}_*.deb | head -1)
 
 reversion_deb() {
     local input_deb="$1"
@@ -173,26 +182,81 @@ reversion_deb() {
     rm -rf "${session_dir}"
 }
 
+# Extract the exact ('=') version a deb pins a given dependency to.
+# dpkg exposes whole control fields (dpkg-deb -f Depends) but has no built-in
+# way to pull out the version constraint of a single dependency, so we split the
+# comma-separated Depends list and read the "pkg (= version)" entry ourselves.
+dep_pinned_version() {
+    local deb="$1" pkg="$2"
+    dpkg-deb -f "${deb}" Depends \
+        | tr ',' '\n' \
+        | sed -n "s/.*${pkg} *(= *\([^)]*\)).*/\1/p" \
+        | tr -d ' '
+}
+
+reversion_legacy_daemon_deb() {
+    local input_deb="$1"
+    local new_version="$2"
+    local output_deb="$3"
+    local session_dir="${WORKDIR}/session_tmp"
+
+    rm -rf "${session_dir}"
+    "${SESSION_DIR}/deb-session-open.sh" "${input_deb}" "${session_dir}"
+    "${SESSION_DIR}/deb-session-reversion.sh" --update-deps "${session_dir}" "${new_version}"
+    sed -i -E "s/, ${PKG_PROFILE} \\([^)]*\\)//" "${session_dir}/control/control"
+    if grep -q "^Depends:.*${PKG_PROFILE}" "${session_dir}/control/control"; then
+        log_error "Legacy ${PKG_DAEMON} package should not depend on ${PKG_PROFILE}"
+        grep -E "^(Package|Version|Depends):" "${session_dir}/control/control" || true
+        exit 1
+    fi
+    "${SESSION_DIR}/deb-session-save.sh" "${session_dir}" "${output_deb}"
+    rm -rf "${session_dir}"
+}
+
 V1="1.0.0-transition-test"
 V2="2.0.0-transition-test"
 V3="3.0.0-transition-test"
 
 # V1: generic daemon + config + logproc (pre-hardfork)
 reversion_deb "${ORIG_DAEMON_DEB}"  "${V1}" "${REPO_DIR}/${PKG_DAEMON}_${V1}_amd64.deb"
+# V1: mina-devnet + config + logproc (pre-hardfork, before profile packages)
+reversion_legacy_daemon_deb "${ORIG_DAEMON_DEB}" "${V1}" "${REPO_DIR}/${PKG_DAEMON}_${V1}_amd64.deb"
 reversion_deb "${ORIG_CONFIG_DEB}"  "${V1}" "${REPO_DIR}/${PKG_CONFIG}_${V1}_all.deb"
 reversion_deb "${ORIG_LOGPROC_DEB}" "${V1}" "${REPO_DIR}/mina-logproc_${V1}_amd64.deb"
 
+# The automode metapackage pins prefork to an EXACT version — the legacy
+# PREFORK_LEGACY_VERSION baked in at build time, which is NOT rewritten when the
+# metapackage is reversioned (deb-session-reversion only rewrites deps that
+# reference the package's own old version, i.e. postfork). The prefork deb in
+# the legacy cache may carry a different (newer) version, so we reversion it to
+# exactly the version the metapackage depends on, otherwise the '=' pin can't be
+# satisfied. Derive that version straight from the metapackage's Depends field.
+EXPECTED_PREFORK_VERSION=$(dep_pinned_version "${ORIG_AUTOMODE_DEB}" "${PKG_PREFORK}")
+if [[ -z "${EXPECTED_PREFORK_VERSION}" ]]; then
+    log_error "Could not determine pinned prefork version from ${ORIG_AUTOMODE_DEB} Depends"
+    exit 1
+fi
+
+# Report exactly which version we pin to, alongside the legacy cache deb's own
+# version, so the reversion is auditable. When the two already match the
+# reversion is a no-op; otherwise it aligns the legacy deb with the '=' pin.
+LEGACY_PREFORK_VERSION=$(dpkg-deb -f "${ORIG_PREFORK_DEB}" Version)
+log_info "Automode pins ${PKG_PREFORK} to exact version: ${EXPECTED_PREFORK_VERSION} (legacy cache deb is ${LEGACY_PREFORK_VERSION})"
+reversion_deb "${ORIG_PREFORK_DEB}" "${EXPECTED_PREFORK_VERSION}" \
+    "${REPO_DIR}/${PKG_PREFORK}_${EXPECTED_PREFORK_VERSION}_amd64.deb"
+
 # V2: automode + postfork + config + logproc (hardfork)
-# Note: prefork is already in REPO_DIR from the legacy cache (not reversioned)
 reversion_deb "${ORIG_AUTOMODE_DEB}" "${V2}" "${REPO_DIR}/${PKG_AUTOMODE}_${V2}_all.deb"
 reversion_deb "${ORIG_POSTFORK_DEB}" "${V2}" "${REPO_DIR}/${PKG_POSTFORK}_${V2}_amd64.deb"
 reversion_deb "${ORIG_CONFIG_DEB}"   "${V2}" "${REPO_DIR}/${PKG_CONFIG}_${V2}_all.deb"
 reversion_deb "${ORIG_LOGPROC_DEB}"  "${V2}" "${REPO_DIR}/mina-logproc_${V2}_amd64.deb"
 
-# V3: generic daemon + config + logproc (post-hardfork, back to normal)
+# V3: generic daemon + config + profile + logproc (post-hardfork, back to normal)
 reversion_deb "${ORIG_DAEMON_DEB}"  "${V3}" "${REPO_DIR}/${PKG_DAEMON}_${V3}_amd64.deb"
 reversion_deb "${ORIG_CONFIG_DEB}"  "${V3}" "${REPO_DIR}/${PKG_CONFIG}_${V3}_all.deb"
 reversion_deb "${ORIG_LOGPROC_DEB}" "${V3}" "${REPO_DIR}/mina-logproc_${V3}_amd64.deb"
+reversion_deb "${ORIG_PROFILE_DEB}" "${V3}" "${REPO_DIR}/${PKG_PROFILE}_${V3}_amd64.deb"
+reversion_deb "${ORIG_PROFILE_LEAF_DEB}" "${V3}" "${REPO_DIR}/${PKG_PROFILE_LEAF}_${V3}_amd64.deb"
 
 log_info "Versioned packages:"
 ls -la "${REPO_DIR}"/*.deb
@@ -231,10 +295,21 @@ V2_DEBS=(
     "${PREFORK_DEBS[@]}"
 )
 
-# V3: mina-devnet + config + logproc (post-hardfork, back to normal)
+# V3: mina-generic + config + profile + logproc (post-hardfork, back to normal)
+#
+# The network-free mina-generic daemon deliberately carries NO hard dependency
+# on a network profile package: the same deb is reused for every network, and
+# the generic docker image must be installable on its own (see commit dropping
+# the profile dependency from the generic/archive packages). Instead, the
+# profile is layered on top per-network — exactly how the "one generic + per
+# profile profiled" docker images are assembled. The transition test mirrors
+# that real deployment shape by co-installing the matching profile package
+# alongside generic + config in the final post-hardfork state.
 V3_DEBS=(
     "${REPO_DIR}/${PKG_DAEMON}_${V3}_amd64.deb"
     "${REPO_DIR}/${PKG_CONFIG}_${V3}_all.deb"
+    "${REPO_DIR}/${PKG_PROFILE}_${V3}_amd64.deb"
+    "${REPO_DIR}/${PKG_PROFILE_LEAF}_${V3}_amd64.deb"
     "${REPO_DIR}/mina-logproc_${V3}_amd64.deb"
 )
 
@@ -251,6 +326,12 @@ $SUDO apt-get install -y --allow-downgrades --no-install-recommends "${V1_DEBS[@
 
 log_info "Installed ${PKG_DAEMON} v1"
 dpkg -l "${PKG_DAEMON}" 2>/dev/null | tail -1
+
+if dpkg -l "${PKG_PROFILE}" 2>/dev/null | grep -q "^ii"; then
+    log_error "${PKG_PROFILE} should not be installed in v1"
+    exit 1
+fi
+log_info "PASS: ${PKG_PROFILE} is not installed in v1"
 
 # Verify mina binary is a real file (not a symlink to dispatcher)
 if [[ -L "/usr/local/bin/mina" ]]; then
@@ -291,6 +372,7 @@ log_info "Package state after automode install:"
 dpkg -l "${PKG_AUTOMODE}" 2>/dev/null | tail -1 || true
 dpkg -l "${PKG_POSTFORK}" 2>/dev/null | tail -1 || true
 dpkg -l "${PKG_PREFORK}" 2>/dev/null | tail -1 || true
+dpkg -l "${PKG_PROFILE}" 2>/dev/null | tail -1 || true
 dpkg -l "${PKG_DAEMON}" 2>/dev/null | tail -1 || true
 
 # the generic daemon should be removed (replaced by automode)
@@ -343,6 +425,12 @@ if ! dpkg -l "${PKG_DAEMON}" 2>/dev/null | grep -q "^ii"; then
     exit 1
 fi
 log_info "PASS: ${PKG_DAEMON} v3 installed"
+
+if ! dpkg -l "${PKG_PROFILE}" 2>/dev/null | grep -q "^ii"; then
+    log_error "${PKG_PROFILE} should be installed alongside ${PKG_DAEMON} v3 in the post-hardfork state"
+    exit 1
+fi
+log_info "PASS: ${PKG_PROFILE} installed (layered on top of the generic daemon)"
 
 # Automode metapackage should be gone
 if dpkg -l "${PKG_AUTOMODE}" 2>/dev/null | grep -q "^ii"; then

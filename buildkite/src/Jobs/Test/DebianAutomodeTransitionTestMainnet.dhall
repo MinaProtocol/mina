@@ -1,3 +1,12 @@
+-- Installs and upgrades the mainnet .debs built by MinaArtifactMainnetBullseye,
+-- so it belongs to the stage that builds them.
+--
+-- Hence the Packaging tag rather than Long: the nightly's LongAndVeryLong stage
+-- used to select it while packaging did not run there, leaving it
+-- waiting_failed on a dependency that was never scheduled. The devnet variant
+-- of this test does not need the tag because it restores bare binaries from the
+-- apps cache (appDependsOn) instead of installing a .deb.
+
 let PipelineTag = ../../Pipeline/Tag.dhall
 
 let PipelineScope = ../../Pipeline/Scope.dhall
@@ -12,6 +21,8 @@ let Command = ../../Command/Base.dhall
 
 let RunInToolchain = ../../Command/RunInToolchain.dhall
 
+let ContainerImages = ../../Constants/ContainerImages.dhall
+
 let DebianVersions = ../../Constants/DebianVersions.dhall
 
 let Network = ../../Constants/Network.dhall
@@ -23,12 +34,16 @@ let Size = ../../Command/Size.dhall
 let Profiles = ../../Constants/Profiles.dhall
 
 let dependsOnMainnet =
-      DebianVersions.dependsOn
-        DebianVersions.DepsSpec::{
-        , deb_version = DebianVersions.DebVersion.Bullseye
-        , network = Network.Type.Mainnet
-        , profile = Profiles.Type.Mainnet
-        }
+        DebianVersions.dependsOn
+          DebianVersions.DepsSpec::{
+          , deb_version = DebianVersions.DebVersion.Bullseye
+          , network = Network.Type.Mainnet
+          , profile = Profiles.Type.Mainnet
+          }
+      # DebianVersions.dependsOn
+          DebianVersions.DepsSpec::{
+          , deb_version = DebianVersions.DebVersion.Bullseye
+          }
 
 let dirtyWhen =
       [ S.strictlyStart (S.contains "src")
@@ -49,7 +64,7 @@ in  Pipeline.build
         , name = "DebianAutomodeTransitionTestMainnet"
         , scope = [ PipelineScope.Type.MainlineNightly ]
         , tags =
-          [ PipelineTag.Type.Long
+          [ PipelineTag.Type.Packaging
           , PipelineTag.Type.Test
           , PipelineTag.Type.Stable
           ]
@@ -58,13 +73,16 @@ in  Pipeline.build
         [ Command.build
             Command.Config::{
             , commands =
-                RunInToolchain.runInToolchainBullseye
-                  ([] : List Text)
-                  ''
-                  ./buildkite/scripts/tests/debian-automode-transition-test.sh \
-                    --codename bullseye \
-                    --network mainnet
-                  ''
+                RunInToolchain.runInToolchain
+                  RunInToolchain.Config::{
+                  , image = ContainerImages.minaToolchainBullseye.amd64
+                  , innerScript =
+                      ''
+                      ./buildkite/scripts/tests/debian-automode-transition-test.sh \
+                        --codename bullseye \
+                        --network mainnet
+                      ''
+                  }
             , label = "Debian automode transition test (bullseye, mainnet)"
             , key = "debian-automode-transition-test-mainnet"
             , target = Size.Large

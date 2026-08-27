@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Async
 
 let handle_nicely (type a) (f : unit -> a Deferred.t) () : a Deferred.t =

@@ -349,6 +349,10 @@ MOCKEXE
     create_mock_exe "default/src/app/rosetta/rosetta_testnet_signatures.exe"
     create_mock_exe "default/src/app/rosetta/ocaml-signer/signer_mainnet_signatures.exe"
     create_mock_exe "default/src/app/rosetta/ocaml-signer/signer_testnet_signatures.exe"
+    # Unified (profile-dispatched-at-runtime) rosetta binaries used by the
+    # build_rosetta_deb / build_rosetta_generic_deb functions.
+    create_mock_exe "default/src/app/rosetta/rosetta.exe"
+    create_mock_exe "default/src/app/rosetta/ocaml-signer/signer.exe"
     create_mock_exe "default/src/app/rosetta/indexer_test/indexer_test.exe"
     create_mock_exe "default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe"
     create_mock_exe "default/src/app/generate_keypair/generate_keypair.exe"
@@ -384,6 +388,9 @@ MOCKEXE
     # archive scripts
     create_mock_exe "scripts/archive/missing-blocks-guardian.sh" "$PROJECT_ROOT"
 
+    # rocksdb storage converter (packaged by the storage toolbox deb)
+    create_mock_exe "scripts/rocksdb/convert-to-legacy.sh" "$PROJECT_ROOT"
+
     # systemd service template
     mkdir -p "${PROJECT_ROOT}/scripts"
     cat > "${PROJECT_ROOT}/scripts/mina.service" << 'SVCEOF'
@@ -405,7 +412,6 @@ SVCEOF
     mkdir -p "${PROJECT_ROOT}/genesis_ledgers"
     echo '{"genesis": "mainnet"}' > "${PROJECT_ROOT}/genesis_ledgers/mainnet.json"
     echo '{"genesis": "devnet"}' > "${PROJECT_ROOT}/genesis_ledgers/devnet.json"
-    echo '{"genesis": "mesa"}' > "${PROJECT_ROOT}/genesis_ledgers/mesa.json"
 
     # rosetta scripts and configs
     create_mock_exe "src/app/rosetta/scripts/run.sh" "$PROJECT_ROOT"
@@ -494,6 +500,28 @@ test_build_logproc_deb() {
     assert_file_captured "$CAPTURED_FILES" "DEBIAN/control"
 }
 
+test_build_daemon_storage_toolbox_deb() {
+    safe_build build_daemon_storage_toolbox_deb || { log_fail "build exited non-zero"; return; }
+    load_captured_state
+    assert_eq "deb name" "mina-daemon-storage-toolbox" "$CAPTURED_DEB_NAME"
+    assert_control_field "$CAPTURED_CONTROL" "Package" "mina-daemon-storage-toolbox"
+
+    # Downgrade-safety. The connect test downgrades to a stable release and back,
+    # which requires the storage toolbox debs to be installable over/alongside a
+    # different version. That works because:
+    #   1. the scanner lives at a version-namespaced path
+    #      (/usr/lib/mina/storage/<rocksdb>/<mina>/), so an older toolbox installs
+    #      to a *different* path and never file-conflicts with a newer one; and
+    #   2. there is no Breaks / Conflicts / Replaces constraint that dpkg would
+    #      use to refuse installing an older storage toolbox.
+    # (ROCKSDB_VERSION 10.5.2 is hardcoded in build_daemon_storage_toolbox_deb.)
+    assert_file_captured "$CAPTURED_FILES" "usr/lib/mina/storage/10.5.2/${GITTAG}/mina-rocksdb-scanner"
+    assert_file_captured "$CAPTURED_FILES" "usr/local/bin/mina-storage-converter"
+    assert_control_no_field "$CAPTURED_CONTROL" "Breaks"
+    assert_control_no_field "$CAPTURED_CONTROL" "Conflicts"
+    assert_control_no_field "$CAPTURED_CONTROL" "Replaces"
+}
+
 test_build_test_executive_deb() {
     safe_build build_test_executive_deb || { log_fail "build exited non-zero"; return; }
 
@@ -509,15 +537,24 @@ test_build_test_executive_deb() {
     assert_file_captured "$CAPTURED_FILES" "usr/local/bin/mina-test-executive"
 }
 
-test_build_batch_txn_deb() {
-    safe_build build_batch_txn_deb || { log_fail "build exited non-zero"; return; }
+test_build_tx_tools_deb() {
+    # Real package containing both tx-tooling binaries.
+    safe_build build_tx_tools_deb || { log_fail "build exited non-zero"; return; }
 
     load_captured_state
-    assert_eq "deb name" "mina-batch-txn" "$CAPTURED_DEB_NAME"
-    assert_control_field "$CAPTURED_CONTROL" "Package" "mina-batch-txn"
+    assert_eq "deb name" "mina-tx-tools" "$CAPTURED_DEB_NAME"
+    assert_control_field "$CAPTURED_CONTROL" "Package" "mina-tx-tools"
     assert_control_contains "$CAPTURED_CONTROL" "Depends" "libssl1.1"
 
     assert_file_captured "$CAPTURED_FILES" "usr/local/bin/mina-batch-txn"
+    assert_file_captured "$CAPTURED_FILES" "usr/local/bin/mina-zkapp-test-transaction"
+
+    # Must Replaces/Breaks the older standalone mina-batch-txn and
+    # mina-zkapp-test-transaction so apt can take over their binaries on upgrade.
+    assert_control_contains "$CAPTURED_CONTROL" "Replaces" "mina-batch-txn"
+    assert_control_contains "$CAPTURED_CONTROL" "Replaces" "mina-zkapp-test-transaction"
+    assert_control_contains "$CAPTURED_CONTROL" "Breaks" "mina-batch-txn"
+    assert_control_contains "$CAPTURED_CONTROL" "Breaks" "mina-zkapp-test-transaction"
 }
 
 ################################################################################
@@ -556,12 +593,8 @@ test_build_rosetta_mainnet_deb() {
     load_captured_state
     assert_eq "deb name" "mina-rosetta-mainnet" "$CAPTURED_DEB_NAME"
     assert_control_field "$CAPTURED_CONTROL" "Package" "mina-rosetta-mainnet"
-    assert_control_contains "$CAPTURED_CONTROL" "Depends" "libssl1.1"
-    assert_control_contains "$CAPTURED_CONTROL" "Suggests" "jq"
-    assert_control_contains "$CAPTURED_CONTROL" "Suggests" "curl"
-
-    assert_rosetta_binaries "$CAPTURED_FILES"
-    assert_rosetta_configs "$CAPTURED_FILES"
+    assert_control_contains "$CAPTURED_CONTROL" "Depends" "mina-rosetta-generic"
+    assert_control_contains "$CAPTURED_CONTROL" "Depends" "mina-mainnet-profile"
 }
 
 test_build_rosetta_devnet_deb() {
@@ -570,44 +603,13 @@ test_build_rosetta_devnet_deb() {
     load_captured_state
     assert_eq "deb name" "mina-rosetta-devnet" "$CAPTURED_DEB_NAME"
     assert_control_field "$CAPTURED_CONTROL" "Package" "mina-rosetta-devnet"
-    assert_control_contains "$CAPTURED_CONTROL" "Suggests" "jq"
-
-    assert_rosetta_binaries "$CAPTURED_FILES"
-    assert_rosetta_configs "$CAPTURED_FILES"
+    assert_control_contains "$CAPTURED_CONTROL" "Depends" "mina-rosetta-generic"
+    assert_control_contains "$CAPTURED_CONTROL" "Depends" "mina-devnet-profile"
 }
 
 ################################################################################
 # Tests: Daemon packages
 ################################################################################
-
-test_build_daemon_mainnet_deb() {
-    safe_build build_daemon_deb mainnet || { log_fail "build exited non-zero"; return; }
-
-    load_captured_state
-    assert_eq "deb name" "mina-mainnet" "$CAPTURED_DEB_NAME"
-
-    # Control file
-    assert_control_field "$CAPTURED_CONTROL" "Package" "mina-mainnet"
-    assert_control_contains "$CAPTURED_CONTROL" "Depends" "libssl1.1"
-    assert_control_contains "$CAPTURED_CONTROL" "Depends" "libffi7"
-    assert_control_contains "$CAPTURED_CONTROL" "Depends" "libjemalloc2"
-    assert_control_contains "$CAPTURED_CONTROL" "Depends" "mina-logproc"
-    assert_control_contains "$CAPTURED_CONTROL" "Depends" "mina-mainnet-config"
-    assert_control_contains "$CAPTURED_CONTROL" "Suggests" "jq"
-    assert_control_contains "$CAPTURED_CONTROL" "Replaces" "mina-mainnet"
-    assert_control_has_field "$CAPTURED_CONTROL" "Breaks"
-
-    # Daemon binaries (mainnet signatures)
-    assert_common_daemon_binaries "$CAPTURED_FILES"
-    # Daemon utils
-    assert_daemon_utils "$CAPTURED_FILES"
-
-    # mina.service is shipped by mina-mainnet-config, not the daemon package
-    assert_file_not_captured "$CAPTURED_FILES" "usr/lib/systemd/user/mina.service"
-
-    # Bash completion was generated
-    assert_captured_file_contains "$CAPTURED_LAST_BUILD_DIR" "etc/bash_completion.d/mina" "mock bash completion"
-}
 
 test_build_daemon_mainnet_config_deb() {
     safe_build build_daemon_config_deb mainnet || { log_fail "build exited non-zero"; return; }
@@ -638,24 +640,6 @@ test_build_daemon_mainnet_config_deb() {
     assert_captured_file_contains "$CAPTURED_LAST_BUILD_DIR" \
         "usr/lib/systemd/user/mina.service" \
         "https://storage.googleapis.com/mina-seed-lists/mainnet_seeds.txt"
-}
-
-test_build_daemon_devnet_deb() {
-    safe_build build_daemon_deb devnet || { log_fail "build exited non-zero"; return; }
-
-    load_captured_state
-    assert_eq "deb name" "mina-devnet" "$CAPTURED_DEB_NAME"
-    assert_control_field "$CAPTURED_CONTROL" "Package" "mina-devnet"
-    assert_control_contains "$CAPTURED_CONTROL" "Depends" "mina-devnet-config"
-    assert_control_contains "$CAPTURED_CONTROL" "Depends" "mina-logproc"
-    assert_control_contains "$CAPTURED_CONTROL" "Suggests" "jq"
-    assert_control_contains "$CAPTURED_CONTROL" "Replaces" "mina-devnet"
-
-    assert_common_daemon_binaries "$CAPTURED_FILES"
-    assert_daemon_utils "$CAPTURED_FILES"
-
-    # mina.service is shipped by mina-devnet-config, not the daemon package
-    assert_file_not_captured "$CAPTURED_FILES" "usr/lib/systemd/user/mina.service"
 }
 
 test_build_daemon_devnet_config_deb() {
@@ -792,23 +776,64 @@ test_build_daemon_postfork_deb_without_prefork_version() {
 }
 
 test_build_daemon_postfork_deb_unresolvable_prefork_hash() {
-    # When the prefork hash can't be resolved by git, warn but don't fail
+    # When the prefork commit does not exist in this repo, git cannot resolve
+    # the 7-char version hash back to the 8-char config hash, and no
+    # PREFORK_GITHASH_CONFIG override is set. We must warn but not fail, and
+    # ship no config (we can't guess the missing 8th char of the hash).
     export PREFORK_LEGACY_VERSION="3.3.0-compatible-badhash"
+    unset PREFORK_GITHASH_CONFIG 2>/dev/null || true
 
     safe_build build_daemon_postfork_deb devnet || { log_fail "build exited non-zero"; return; }
 
     load_captured_state
 
     # No config files — postfork config comes from config package,
-    # and prefork config can't be shipped because hash is unresolvable
+    # and prefork config can't be shipped because the hash is unresolvable
     local config_count
     config_count=$(echo "$CAPTURED_FILES" | grep -c "config_" || true)
     if [[ "$config_count" -eq 0 ]]; then
         log_pass
     else
-        log_fail "Expected 0 config_*.json (unresolvable prefork hash), got ${config_count}"
+        log_fail "Expected 0 config_*.json (unresolvable prefork hash, no override), got ${config_count}"
     fi
 
+    unset PREFORK_LEGACY_VERSION
+}
+
+test_build_daemon_postfork_deb_prefork_githash_override() {
+    # When the prefork commit is not in this repo (git can't resolve the short
+    # hash), the pipeline supplies the full 8-char config hash directly via the
+    # PREFORK_GITHASH_CONFIG override. The prefork config must then ship under
+    # that exact filename, bypassing git resolution entirely.
+    export PREFORK_LEGACY_VERSION="3.3.0-compatible-badhash"
+    export PREFORK_GITHASH_CONFIG="abadcafe"
+
+    safe_build build_daemon_postfork_deb devnet || { log_fail "build exited non-zero"; return; }
+
+    load_captured_state
+
+    # Postfork config still comes from the config package, not here
+    assert_file_not_captured "$CAPTURED_FILES" "var/lib/coda/config_${EXPECTED_GITHASH_CONFIG}.json"
+
+    # Prefork config shipped under the override hash (full 8-char), and no
+    # attempt made to ship the unresolvable version hash
+    assert_file_captured "$CAPTURED_FILES" "var/lib/coda/config_abadcafe.json"
+    assert_file_not_captured "$CAPTURED_FILES" "var/lib/coda/config_badhash.json"
+
+    # Exactly one config file (the prefork override), nothing else
+    local config_count
+    config_count=$(echo "$CAPTURED_FILES" | grep -c "config_" || true)
+    if [[ "$config_count" -eq 1 ]]; then
+        log_pass
+    else
+        log_fail "Expected 1 config_*.json (prefork githash override), got ${config_count}"
+    fi
+
+    # Prefork config should have the correct network content
+    assert_captured_file_contains "$CAPTURED_LAST_BUILD_DIR" \
+        "var/lib/coda/config_abadcafe.json" "devnet"
+
+    unset PREFORK_GITHASH_CONFIG
     unset PREFORK_LEGACY_VERSION
 }
 
@@ -823,10 +848,11 @@ test_build_daemon_devnet_automode_deb() {
     assert_eq "deb name" "mina-devnet-automode" "$CAPTURED_DEB_NAME"
     assert_control_field "$CAPTURED_CONTROL" "Package" "mina-devnet-automode"
     assert_control_field "$CAPTURED_CONTROL" "Architecture" "amd64"
-    assert_control_contains "$CAPTURED_CONTROL" "Depends" "mina-devnet-postfork-mesa"
-    assert_control_contains "$CAPTURED_CONTROL" "Depends" "mina-devnet-prefork-mesa"
+    # Prefork/postfork runtimes and config are pinned to the exact build version
+    assert_control_contains "$CAPTURED_CONTROL" "Depends" "mina-devnet-postfork-mesa (=${EXPECTED_VERSION})"
+    assert_control_contains "$CAPTURED_CONTROL" "Depends" "mina-devnet-prefork-mesa (=${EXPECTED_VERSION})"
     # Pulls the config package so a standalone automode install gets mina.service
-    assert_control_contains "$CAPTURED_CONTROL" "Depends" "mina-devnet-config"
+    assert_control_contains "$CAPTURED_CONTROL" "Depends" "mina-devnet-config (=${EXPECTED_VERSION})"
     assert_control_contains "$CAPTURED_CONTROL" "Replaces" "mina-devnet"
     assert_control_contains "$CAPTURED_CONTROL" "Breaks" "mina-devnet"
     assert_control_contains "$CAPTURED_CONTROL" "Provides" "mina-devnet"
@@ -843,10 +869,11 @@ test_build_daemon_mainnet_automode_deb() {
     assert_eq "deb name" "mina-mainnet-automode" "$CAPTURED_DEB_NAME"
     assert_control_field "$CAPTURED_CONTROL" "Package" "mina-mainnet-automode"
     assert_control_field "$CAPTURED_CONTROL" "Architecture" "amd64"
-    assert_control_contains "$CAPTURED_CONTROL" "Depends" "mina-mainnet-postfork-mesa"
-    assert_control_contains "$CAPTURED_CONTROL" "Depends" "mina-mainnet-prefork-mesa"
+    # Prefork/postfork runtimes and config are pinned to the exact build version
+    assert_control_contains "$CAPTURED_CONTROL" "Depends" "mina-mainnet-postfork-mesa (=${EXPECTED_VERSION})"
+    assert_control_contains "$CAPTURED_CONTROL" "Depends" "mina-mainnet-prefork-mesa (=${EXPECTED_VERSION})"
     # Pulls the config package so a standalone automode install gets mina.service
-    assert_control_contains "$CAPTURED_CONTROL" "Depends" "mina-mainnet-config"
+    assert_control_contains "$CAPTURED_CONTROL" "Depends" "mina-mainnet-config (=${EXPECTED_VERSION})"
     assert_control_contains "$CAPTURED_CONTROL" "Replaces" "mina-mainnet"
     assert_control_contains "$CAPTURED_CONTROL" "Breaks" "mina-mainnet"
     assert_control_contains "$CAPTURED_CONTROL" "Provides" "mina-mainnet"
@@ -863,15 +890,17 @@ test_build_daemon_devnet_generic_deb() {
     safe_build build_daemon_generic_deb devnet || { log_fail "build exited non-zero"; return; }
 
     load_captured_state
-    assert_eq "deb name" "mina-devnet-generic" "$CAPTURED_DEB_NAME"
-    assert_control_field "$CAPTURED_CONTROL" "Package" "mina-devnet-generic"
+    assert_eq "deb name" "mina-generic" "$CAPTURED_DEB_NAME"
+    assert_control_field "$CAPTURED_CONTROL" "Package" "mina-generic"
     assert_control_contains "$CAPTURED_CONTROL" "Depends" "libssl1.1"
     assert_control_contains "$CAPTURED_CONTROL" "Depends" "mina-logproc"
     assert_control_contains "$CAPTURED_CONTROL" "Suggests" "jq"
-    assert_control_contains "$CAPTURED_CONTROL" "Replaces" "mina-devnet"
-    # Shares /usr/local/bin/mina and bash completion with the postfork package
-    assert_control_contains "$CAPTURED_CONTROL" "Replaces" "mina-devnet-postfork-mesa"
-    assert_control_contains "$CAPTURED_CONTROL" "Breaks" "mina-devnet-postfork-mesa"
+    # The plain generic already carries the mina-generic name, so it needs no
+    # Provides (only the flavored variants provide the virtual name).
+    assert_control_no_field "$CAPTURED_CONTROL" "Provides"
+    # The generic package is network-agnostic: it carries no network-specific
+    # Replaces/Breaks (it neither replaces nor conflicts with mina-<network> or
+    # the per-network postfork packages).
 
     assert_common_daemon_binaries "$CAPTURED_FILES"
     assert_daemon_utils "$CAPTURED_FILES"
@@ -888,15 +917,14 @@ test_build_daemon_mainnet_generic_deb() {
     safe_build build_daemon_generic_deb mainnet || { log_fail "build exited non-zero"; return; }
 
     load_captured_state
-    assert_eq "deb name" "mina-mainnet-generic" "$CAPTURED_DEB_NAME"
-    assert_control_field "$CAPTURED_CONTROL" "Package" "mina-mainnet-generic"
+    assert_eq "deb name" "mina-generic" "$CAPTURED_DEB_NAME"
+    assert_control_field "$CAPTURED_CONTROL" "Package" "mina-generic"
     assert_control_contains "$CAPTURED_CONTROL" "Depends" "libssl1.1"
     assert_control_contains "$CAPTURED_CONTROL" "Depends" "mina-logproc"
     assert_control_contains "$CAPTURED_CONTROL" "Suggests" "jq"
-    assert_control_contains "$CAPTURED_CONTROL" "Replaces" "mina-mainnet"
-    # Shares /usr/local/bin/mina and bash completion with the postfork package
-    assert_control_contains "$CAPTURED_CONTROL" "Replaces" "mina-mainnet-postfork-mesa"
-    assert_control_contains "$CAPTURED_CONTROL" "Breaks" "mina-mainnet-postfork-mesa"
+    # The generic package is network-agnostic: it carries no network-specific
+    # Replaces/Breaks (it neither replaces nor conflicts with mina-<network> or
+    # the per-network postfork packages).
 
     assert_common_daemon_binaries "$CAPTURED_FILES"
     assert_daemon_utils "$CAPTURED_FILES"
@@ -910,6 +938,47 @@ test_build_daemon_mainnet_generic_deb() {
 }
 
 ################################################################################
+# Tests: Profile packages
+################################################################################
+
+# The profile package ships only the PROFILE hint file and carries no binaries;
+# it must depend on the network-free mina-generic package (which owns the
+# daemon binaries that dispatch the profile at runtime).
+
+test_build_profile_lightnet_deb() {
+    safe_build build_profile_deb lightnet || { log_fail "build exited non-zero"; return; }
+
+    load_captured_state
+    assert_eq "deb name" "mina-lightnet" "$CAPTURED_DEB_NAME"
+    assert_control_field "$CAPTURED_CONTROL" "Package" "mina-lightnet"
+
+    # Profile packages carry only the PROFILE hint, no deps
+    assert_file_captured "$CAPTURED_FILES" "etc/coda/build_config/PROFILE"
+    assert_captured_file_contains "$CAPTURED_LAST_BUILD_DIR" "etc/coda/build_config/PROFILE" "lightnet"
+    assert_file_not_captured "$CAPTURED_FILES" "usr/local/bin/mina"
+
+    # mina-lightnet is the profile package's own name, so it carries no Breaks
+    # against itself (devnet/mainnet carry the -profile suffix and Break the
+    # legacy monolithic name instead).
+    assert_control_no_field "$CAPTURED_CONTROL" "Breaks"
+}
+
+test_build_profile_devnet_deb() {
+    safe_build build_profile_deb devnet || { log_fail "build exited non-zero"; return; }
+
+    load_captured_state
+    assert_eq "deb name" "mina-devnet-profile" "$CAPTURED_DEB_NAME"
+    assert_control_field "$CAPTURED_CONTROL" "Package" "mina-devnet-profile"
+
+    assert_file_captured "$CAPTURED_FILES" "etc/coda/build_config/PROFILE"
+    assert_captured_file_contains "$CAPTURED_LAST_BUILD_DIR" "etc/coda/build_config/PROFILE" "devnet"
+    assert_file_not_captured "$CAPTURED_FILES" "usr/local/bin/mina"
+
+    # The -generic profile package supersedes the legacy monolithic mina-devnet
+    assert_control_contains "$CAPTURED_CONTROL" "Breaks" "mina-devnet"
+}
+
+################################################################################
 # Tests: Archive packages
 ################################################################################
 
@@ -919,16 +988,8 @@ test_build_archive_devnet_deb() {
     load_captured_state
     assert_eq "deb name" "mina-archive-devnet" "$CAPTURED_DEB_NAME"
     assert_control_field "$CAPTURED_CONTROL" "Package" "mina-archive-devnet"
-    assert_control_contains "$CAPTURED_CONTROL" "Depends" "libssl1.1"
-    assert_control_contains "$CAPTURED_CONTROL" "Depends" "libpq-dev"
-    assert_control_contains "$CAPTURED_CONTROL" "Depends" "libjemalloc2"
-    # Archive packages should NOT depend on DAEMON_DEPS
-    assert_not_contains "archive deps no libffi" "$CAPTURED_CONTROL" "libffi"
-
-    assert_archive_binaries "$CAPTURED_FILES"
-    # SQL migration scripts
-    assert_file_captured "$CAPTURED_FILES" "etc/mina/archive/create_schema.sql"
-    assert_file_captured "$CAPTURED_FILES" "etc/mina/archive/migrations.sql"
+    assert_control_contains "$CAPTURED_CONTROL" "Depends" "mina-archive-generic"
+    assert_control_contains "$CAPTURED_CONTROL" "Depends" "mina-devnet-profile"
 }
 
 test_build_archive_mainnet_deb() {
@@ -937,11 +998,8 @@ test_build_archive_mainnet_deb() {
     load_captured_state
     assert_eq "deb name" "mina-archive-mainnet" "$CAPTURED_DEB_NAME"
     assert_control_field "$CAPTURED_CONTROL" "Package" "mina-archive-mainnet"
-    assert_control_contains "$CAPTURED_CONTROL" "Depends" "libpq-dev"
-
-    assert_archive_binaries "$CAPTURED_FILES"
-    assert_file_captured "$CAPTURED_FILES" "etc/mina/archive/create_schema.sql"
-    assert_file_captured "$CAPTURED_FILES" "etc/mina/archive/migrations.sql"
+    assert_control_contains "$CAPTURED_CONTROL" "Depends" "mina-archive-generic"
+    assert_control_contains "$CAPTURED_CONTROL" "Depends" "mina-mainnet-profile"
 }
 
 ################################################################################
@@ -1065,19 +1123,6 @@ test_hardfork_config_deb_restores_architecture() {
 # Tests: Utility packages
 ################################################################################
 
-test_build_zkapp_test_transaction_deb() {
-    safe_build build_zkapp_test_transaction_deb || { log_fail "build exited non-zero"; return; }
-
-    load_captured_state
-    assert_eq "deb name" "mina-zkapp-test-transaction" "$CAPTURED_DEB_NAME"
-    assert_control_field "$CAPTURED_CONTROL" "Package" "mina-zkapp-test-transaction"
-    assert_control_contains "$CAPTURED_CONTROL" "Depends" "libssl1.1"
-    assert_control_contains "$CAPTURED_CONTROL" "Depends" "libffi7"
-    assert_control_no_field "$CAPTURED_CONTROL" "Suggests"
-
-    assert_file_captured "$CAPTURED_FILES" "usr/local/bin/mina-zkapp-test-transaction"
-}
-
 test_build_delegation_verify_deb() {
     safe_build build_delegation_verify_deb || { log_fail "build exited non-zero"; return; }
 
@@ -1127,20 +1172,6 @@ test_build_prefork_testnet_generic_genesis_ledger_deb() {
 # Tests: Naming variants (lightnet, instrumented)
 ################################################################################
 
-test_build_daemon_devnet_lightnet_naming() {
-    # Simulate lightnet profile naming
-    local saved_name="${MINA_DEB_NAME}"
-    MINA_DEB_NAME="mina-devnet-lightnet"
-
-    safe_build build_daemon_deb devnet || { log_fail "build exited non-zero"; return; }
-
-    load_captured_state
-    assert_eq "deb name" "mina-devnet-lightnet" "$CAPTURED_DEB_NAME"
-    assert_control_field "$CAPTURED_CONTROL" "Package" "mina-devnet-lightnet"
-
-    MINA_DEB_NAME="${saved_name}"
-}
-
 test_build_daemon_devnet_generic_lightnet_naming() {
     local saved_suffix="${DEB_SUFFIX}"
     DEB_SUFFIX="lightnet"
@@ -1148,8 +1179,11 @@ test_build_daemon_devnet_generic_lightnet_naming() {
     safe_build build_daemon_generic_deb devnet || { log_fail "build exited non-zero"; return; }
 
     load_captured_state
-    assert_eq "deb name" "mina-devnet-generic-lightnet" "$CAPTURED_DEB_NAME"
-    assert_control_field "$CAPTURED_CONTROL" "Package" "mina-devnet-generic-lightnet"
+    assert_eq "deb name" "mina-generic-lightnet" "$CAPTURED_DEB_NAME"
+    assert_control_field "$CAPTURED_CONTROL" "Package" "mina-generic-lightnet"
+    # A flavored generic must Provide the flavor-neutral mina-generic so it can
+    # satisfy the profile packages' dependency.
+    assert_control_contains "$CAPTURED_CONTROL" "Provides" "mina-generic"
 
     DEB_SUFFIX="${saved_suffix}"
 }
@@ -1165,19 +1199,6 @@ test_build_archive_devnet_suffix_naming() {
     assert_control_field "$CAPTURED_CONTROL" "Package" "mina-archive-devnet-lightnet"
 
     MINA_ARCHIVE_DEB_NAME="${saved_name}"
-}
-
-test_build_daemon_devnet_instrumented_naming() {
-    local saved_name="${MINA_DEB_NAME}"
-    MINA_DEB_NAME="mina-devnet-instrumented"
-
-    safe_build build_daemon_deb devnet || { log_fail "build exited non-zero"; return; }
-
-    load_captured_state
-    assert_eq "deb name" "mina-devnet-instrumented" "$CAPTURED_DEB_NAME"
-    assert_control_field "$CAPTURED_CONTROL" "Package" "mina-devnet-instrumented"
-
-    MINA_DEB_NAME="${saved_name}"
 }
 
 ################################################################################
@@ -1216,7 +1237,7 @@ test_codename_noble_archive_deps() {
     local saved_archive="${ARCHIVE_DEPS}"
     ARCHIVE_DEPS="${NOBLE_ARCHIVE_DEPS}"
 
-    safe_build build_archive_deb devnet || { log_fail "build exited non-zero"; return; }
+    safe_build build_archive_generic_deb || { log_fail "build exited non-zero"; return; }
 
     load_captured_state
     assert_control_contains "$CAPTURED_CONTROL" "Depends" "libssl3t64"
@@ -1259,8 +1280,9 @@ main() {
 
     # Simple packages
     run_test test_build_logproc_deb
+    run_test test_build_daemon_storage_toolbox_deb
     run_test test_build_test_executive_deb
-    run_test test_build_batch_txn_deb
+    run_test test_build_tx_tools_deb
 
     # Multi-binary packages
     run_test test_build_functional_test_suite_deb
@@ -1270,9 +1292,7 @@ main() {
     run_test test_build_rosetta_devnet_deb
 
     # Daemon packages
-    run_test test_build_daemon_mainnet_deb
     run_test test_build_daemon_mainnet_config_deb
-    run_test test_build_daemon_devnet_deb
     run_test test_build_daemon_devnet_config_deb
 
     # Prefork packages
@@ -1286,6 +1306,7 @@ main() {
     run_test test_build_daemon_mainnet_postfork_deb
     run_test test_build_daemon_postfork_deb_without_prefork_version
     run_test test_build_daemon_postfork_deb_unresolvable_prefork_hash
+    run_test test_build_daemon_postfork_deb_prefork_githash_override
 
     # Automode metapackages
     run_test test_build_daemon_devnet_automode_deb
@@ -1294,6 +1315,10 @@ main() {
     # Generic packages
     run_test test_build_daemon_devnet_generic_deb
     run_test test_build_daemon_mainnet_generic_deb
+
+    # Profile packages
+    run_test test_build_profile_lightnet_deb
+    run_test test_build_profile_devnet_deb
 
     # Archive packages
     run_test test_build_archive_devnet_deb
@@ -1304,14 +1329,11 @@ main() {
     run_test test_build_daemon_mainnet_hardfork_config_deb
 
     # Utility packages
-    run_test test_build_zkapp_test_transaction_deb
     run_test test_build_delegation_verify_deb
 
     # Naming variants
-    run_test test_build_daemon_devnet_lightnet_naming
     run_test test_build_daemon_devnet_generic_lightnet_naming
     run_test test_build_archive_devnet_suffix_naming
-    run_test test_build_daemon_devnet_instrumented_naming
 
     # Codename dependency variants
     run_test test_codename_noble_deps

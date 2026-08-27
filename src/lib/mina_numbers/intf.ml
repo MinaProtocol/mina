@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Fold_lib
 open Tuple_lib
 open Unsigned

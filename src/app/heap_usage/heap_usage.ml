@@ -5,7 +5,7 @@ open Async
 
 let print_heap_usage name v =
   (* word_size is in bits *)
-  let bytes_per_word = Sys.word_size / 8 in
+  let bytes_per_word = Stdlib.Sys.word_size / 8 in
   let repr = Obj.repr v in
   (* reachable_words may be 0 so it doesn't include size *)
   let words = Obj.size repr + Obj.reachable_words repr in
@@ -17,7 +17,8 @@ let initialize_proof_cache_db ~logger conf_dir =
   let proof_cache_location = conf_dir ^/ "proof_cache" in
   let%map res = Proof_cache_tag.create_db ~logger proof_cache_location in
   Result.(
-    map_error ~f:(fun (`Initialization_error e) -> Error.to_exn e) res |> ok_exn)
+    map_error ~f:(fun (`Initialization_error e) -> Core.Error.to_exn e) res
+    |> ok_exn )
 
 (* NOTE: Some of these values are dependant on a stateful zkapp_command value
    threaded through as an argument. It's important to not recreate it.
@@ -53,12 +54,13 @@ let main ~genesis_constants ~constraint_constants conf_dir : unit Deferred.t =
   print_heap_usage "Transaction_snark.Statement.t" transaction_snark_statement
 
 let () =
-  let genesis_constants = Genesis_constants.Compiled.genesis_constants in
-  let constraint_constants = Genesis_constants.Compiled.constraint_constants in
-  Command.(
-    run
-      (async ~summary:"Print heap usage of selected Mina data structures"
-         (let%map.Command () = Let_syntax.return () in
-          fun () ->
-            Mina_stdlib_unix.File_system.with_temp_dir "mina-heap-usage"
-              ~f:(main ~genesis_constants ~constraint_constants) ) ))
+  let (module G) = Genesis_constants.profiled () in
+  let genesis_constants = G.genesis_constants in
+  let constraint_constants = G.constraint_constants in
+  Command_unix.run
+    Command.(
+      async ~summary:"Print heap usage of selected Mina data structures"
+        (let%map.Command () = Let_syntax.return () in
+         fun () ->
+           Mina_stdlib_unix.File_system.with_temp_dir "mina-heap-usage"
+             ~f:(main ~genesis_constants ~constraint_constants) ) )

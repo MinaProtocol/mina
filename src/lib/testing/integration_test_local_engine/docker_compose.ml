@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Integration_test_lib
 
 module Dockerfile = struct
@@ -31,7 +31,7 @@ module Dockerfile = struct
               fun j ->
                 match j with
                 | Some v ->
-                    `List (List.map (fun s -> `String s) v)
+                    `List (List.map ~f:(fun s -> `String s) v)
                 | None ->
                     `Null]
       ; ports : Port.t list

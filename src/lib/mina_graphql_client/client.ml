@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Async
 open Mina_base
 open Mina_transaction
@@ -32,71 +32,54 @@ let exec_graphql_request ?(num_tries = 10) ?(retry_delay_sec = 30.0)
      $init_delay sec"
     ~metadata ;
   let past_deadline () =
-    match deadline with None -> false | Some d -> Time.( >= ) (Time.now ()) d
-  in
-  let bounded_sleep span =
     match deadline with
     | None ->
-        span
+        false
     | Some d ->
-        let remaining = Time.diff d (Time.now ()) in
-        if Time.Span.( <= ) remaining Time.Span.zero then Time.Span.zero
-        else Time.Span.min span remaining
+        Time_float_unix.( >= ) (Time_float_unix.now ()) d
   in
   let deadline_failure_msg () =
     sprintf
       "GraphQL \"%s\" to \"%s\" request hit caller's deadline before succeeding"
       query_name (Uri.to_string node_uri)
   in
-  let rec retry n =
-    if past_deadline () then (
-      [%log error] "$query to $uri exhausted caller's deadline" ~metadata ;
-      Deferred.Or_error.error_string (deadline_failure_msg ()) )
-    else if n <= 0 then (
-      [%log error]
-        "GraphQL request \"$query\" to \"$uri\" failed too many times" ~metadata ;
-      Deferred.Or_error.errorf
-        "GraphQL \"%s\" to \"%s\" request failed too many times" query_name
-        (Uri.to_string node_uri) )
-    else
-      match%bind Queries.Client.query query_obj node_uri with
-      | Ok result ->
-          [%log info] "GraphQL request \"$query\" to \"$uri\" succeeded"
-            ~metadata ;
-          Deferred.Or_error.return result
-      | Error (`Failed_request err_string) ->
-          [%log warn]
-            "GraphQL request \"$query\" to \"$uri\" failed: \"$error\" \
-             ($num_tries attempts left)"
-            ~metadata:
-              ( metadata
-              @ [ ("error", `String err_string); ("num_tries", `Int (n - 1)) ]
-              ) ;
-          (* Skip the retry sleep when this was the last attempt — otherwise
-             a [num_tries=1] caller burns [retry_delay_sec] (~30s by default)
-             waiting for a retry that will never happen.  This matters for
-             the one-shot CLI subcommands, which set [num_tries:1] precisely
-             to fail fast against an unreachable daemon. *)
-          if n - 1 <= 0 then
-            Deferred.Or_error.errorf
-              "GraphQL \"%s\" to \"%s\" request failed too many times: %s"
-              query_name (Uri.to_string node_uri) err_string
-          else if past_deadline () then
-            Deferred.Or_error.error_string (deadline_failure_msg ())
-          else
-            let%bind () =
-              after (bounded_sleep (Time.Span.of_sec retry_delay_sec))
-            in
-            retry (n - 1)
-      | Error (`Graphql_error err_string) ->
-          [%log error]
-            "GraphQL request \"$query\" to \"$uri\" returned an error: \
-             \"$error\" (this is a graphql error so not retrying)"
-            ~metadata:(metadata @ [ ("error", `String err_string) ]) ;
-          Deferred.Or_error.error_string err_string
+  let%bind () = after (Time_float_unix.Span.of_sec initial_delay_sec) in
+  let strategy =
+    Backoff.Strategy.create
+      ~base:(Time_ns.Span.of_sec retry_delay_sec)
+      ~max_delay:(Time_ns.Span.of_sec retry_delay_sec)
+      ~max_attempts:num_tries ()
   in
-  let%bind () = after (bounded_sleep (Time.Span.of_sec initial_delay_sec)) in
-  retry num_tries
+  let retry () =
+    Backoff.Deferred.retry ~log_errors:true strategy ~logger ~f:(fun () ->
+        match%bind Queries.Client.query query_obj node_uri with
+        | Ok result ->
+            return (Ok (Ok result))
+        | Error (`Failed_request err) ->
+            return (Error (Error.of_string err))
+        | Error (`Graphql_error err) ->
+            return (Ok (Error (Error.of_string err))) )
+  in
+  let result =
+    match deadline with
+    | None ->
+        retry ()
+    | Some d -> (
+        if past_deadline () then
+          Deferred.return (Error (Error.of_string (deadline_failure_msg ())))
+        else
+          let remaining = Time_float_unix.diff d (Time_float_unix.now ()) in
+          match%map Clock.with_timeout remaining (retry ()) with
+          | `Timeout ->
+              Error (Error.of_string (deadline_failure_msg ()))
+          | `Result r ->
+              r )
+  in
+  match%map result with
+  | Ok (Ok r) ->
+      Ok r
+  | Ok (Error err) | Error err ->
+      Error err
 
 let get_peer_id ~logger node_uri =
   let open Deferred.Or_error.Let_syntax in
@@ -261,7 +244,7 @@ let get_account ~logger node_uri ~account_id =
       @@ makeVariables
            ~public_key:(Graphql_lib.Encoders.public_key pk)
            ~token:(Graphql_lib.Encoders.token token)
-           ())
+           () )
   in
   exec_graphql_request ~logger ~node_uri ~query_name:"get_account_graphql"
     get_account_obj
@@ -509,7 +492,7 @@ let send_online_payment ?(node_password = default_node_password) ~logger
     let unlock_account_obj =
       Queries.Unlock_account.(
         make
-        @@ makeVariables ~password:node_password ~public_key:sender_pub_key ())
+        @@ makeVariables ~password:node_password ~public_key:sender_pub_key () )
     in
     exec_graphql_request ~logger ~node_uri ~initial_delay_sec:0.
       ~query_name:"unlock_sender_account_graphql" unlock_account_obj
@@ -557,7 +540,7 @@ let send_zkapp_batch ~logger node_uri
   let send_zkapp_graphql () =
     let send_zkapp_obj =
       Queries.Send_test_zkapp.(
-        make @@ makeVariables ~zkapp_commands:zkapp_commands_json ())
+        make @@ makeVariables ~zkapp_commands:zkapp_commands_json () )
     in
     exec_graphql_request ~logger ~node_uri ~query_name:"send_zkapp_graphql"
       send_zkapp_obj
@@ -605,7 +588,7 @@ let get_pooled_zkapp_commands ~logger node_uri
     let get_pooled_zkapp_commands =
       Queries.Pooled_zkapp_commands.(
         make
-        @@ makeVariables ~public_key:(Graphql_lib.Encoders.public_key pk) ())
+        @@ makeVariables ~public_key:(Graphql_lib.Encoders.public_key pk) () )
     in
     exec_graphql_request ~logger ~node_uri
       ~query_name:"get_pooled_zkapp_commands" get_pooled_zkapp_commands
@@ -642,7 +625,7 @@ let send_delegation ?(node_password = default_node_password) ~logger node_uri
     let unlock_account_obj =
       Queries.Unlock_account.(
         make
-        @@ makeVariables ~password:node_password ~public_key:sender_pub_key ())
+        @@ makeVariables ~password:node_password ~public_key:sender_pub_key () )
     in
     exec_graphql_request ~logger ~node_uri
       ~query_name:"unlock_sender_account_graphql" unlock_account_obj
@@ -774,7 +757,7 @@ let send_test_payments ~(repeat_count : Unsigned.UInt32.t)
         @@ makeVariables ~senders ~receiver:receiver_pub_key
              ~amount:(Currency.Amount.to_uint64 amount)
              ~fee:(Currency.Fee.to_uint64 fee)
-             ~repeat_count ~repeat_delay_ms ())
+             ~repeat_count ~repeat_delay_ms () )
     in
     exec_graphql_request ~logger ~node_uri ~query_name:"send_payment_graphql"
       send_payment_obj
@@ -824,7 +807,7 @@ let set_snark_work_fee ~logger node_uri ~new_snark_work_fee =
     let set_snark_work_fee_obj =
       Queries.Set_snark_work_fee.(
         make
-        @@ makeVariables ~fee:(Unsigned.UInt64.of_int new_snark_work_fee) ())
+        @@ makeVariables ~fee:(Unsigned.UInt64.of_int new_snark_work_fee) () )
     in
     exec_graphql_request ~logger ~node_uri
       ~query_name:"set_snark_work_fee_graphql" set_snark_work_fee_obj
@@ -902,7 +885,7 @@ let get_filtered_log_entries ~last_log_index_seen node_uri =
   let open Deferred.Or_error.Let_syntax in
   let query_obj =
     Queries.GetFilteredLogEntries.(
-      make @@ makeVariables ~offset:last_log_index_seen ())
+      make @@ makeVariables ~offset:last_log_index_seen () )
   in
   let%bind query_result_obj =
     exec_graphql_request ~logger:(Logger.null ()) ~retry_delay_sec:10.0
@@ -917,18 +900,19 @@ let get_filtered_log_entries ~last_log_index_seen node_uri =
 let poll_filtered_log_entries ?(initial_delay_sec = 0.) ~poll_interval_sec
     ?timeout_sec ~on_entries ~on_error node_uri =
   let open Deferred.Let_syntax in
-  let%bind () = after (Time.Span.of_sec initial_delay_sec) in
+  let%bind () = after (Time_float_unix.Span.of_sec initial_delay_sec) in
   let deadline =
     Option.map timeout_sec ~f:(fun t ->
-        Time.add (Time.now ()) (Time.Span.of_sec t) )
+        Time_float_unix.add (Time_float_unix.now ())
+          (Time_float_unix.Span.of_sec t) )
   in
   let rec loop ~last_log_index_seen =
     match deadline with
-    | Some d when Time.( >= ) (Time.now ()) d ->
+    | Some d when Time_float_unix.( >= ) (Time_float_unix.now ()) d ->
         Deferred.Or_error.error_string
           "Timed out polling for filtered log entries"
     | _ -> (
-        let%bind () = after (Time.Span.of_sec poll_interval_sec) in
+        let%bind () = after (Time_float_unix.Span.of_sec poll_interval_sec) in
         let%bind result =
           get_filtered_log_entries ~last_log_index_seen node_uri
         in
@@ -968,15 +952,15 @@ let get_detailed_best_chain ?max_length ~logger node_uri =
   | Some chain ->
       return
       @@ List.map (Array.to_list chain) ~f:(fun block ->
-             Types.
-               { state_hash = block.stateHash
-               ; command_transaction_count = block.commandTransactionCount
-               ; coinbase = block.transactions.coinbase
-               ; snark_work_count = block.snarkJobs |> Array.length
-               ; slot = block.protocolState.consensusState.slot
-               ; slot_since_genesis =
-                   block.protocolState.consensusState.slotSinceGenesis
-               } )
+          Types.
+            { state_hash = block.stateHash
+            ; command_transaction_count = block.commandTransactionCount
+            ; coinbase = block.transactions.coinbase
+            ; snark_work_count = block.snarkJobs |> Array.length
+            ; slot = block.protocolState.consensusState.slot
+            ; slot_since_genesis =
+                block.protocolState.consensusState.slotSinceGenesis
+            } )
 
 (** Convert the graphql_ppx sync status variant to [Sync_status.t]. *)
 let parse_sync_status = function
@@ -1020,7 +1004,7 @@ let get_daemon_status ?num_tries ?retry_delay_sec ?deadline ~logger node_uri =
   let peers =
     ds.peers |> Array.to_list
     |> List.map ~f:(fun (p : Queries.Daemon_status.t_daemonStatus_peers) ->
-           { Types.peer_id = p.peerId; host = p.host; port = p.libp2pPort } )
+        { Types.peer_id = p.peerId; host = p.host; port = p.libp2pPort } )
   in
   Types.
     { sync_status = parse_sync_status ds.syncStatus

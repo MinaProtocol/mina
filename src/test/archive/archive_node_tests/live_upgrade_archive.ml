@@ -33,7 +33,7 @@ let test_case (test_data : t) =
     |> Option.value_exn ~message:"Failed to find upgrade script"
   in
   let upgrade_script_finished = Ivar.create () in
-  (let%bind () = after (Time.Span.of_min (Random.float_range 0. 5.)) in
+  (let%bind () = after (Time_float.Span.of_min (Random.float_range 0. 5.)) in
    [%log info] "Starting upgrade script" ;
    let%map result =
      Psql.run_script ~connection:(Psql.Conn_str archive_uri) upgrade_path
@@ -44,6 +44,11 @@ let test_case (test_data : t) =
   |> Deferred.don't_wait_for ;
   Archive.Process.start_logging test_data.archive ~log_file ;
 
+  let%bind () =
+    Archive_healthcheck.wait_db_and_server_ready ~postgres_uri:archive_uri
+      ~server_port:test_data.archive.config.server_port ()
+    >>| Or_error.ok_exn
+  in
   let%bind () =
     Daemon.archive_blocks_from_files daemon.executor
       ~archive_address:test_data.archive.config.server_port ~format:`Precomputed

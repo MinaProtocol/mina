@@ -5,6 +5,7 @@
  (modules rosetta)
  (modes native)
  (libraries
+  core_unix.command_unix
   lib
   async
   core_kernel

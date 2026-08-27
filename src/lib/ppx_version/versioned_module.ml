@@ -1,6 +1,6 @@
 (* versioned_module.ml -- modules with versioned types *)
 
-open Core_kernel
+open Core
 open Ppxlib
 open Versioned_util
 
@@ -195,7 +195,7 @@ let rec add_deriving ~loc ~version_option attributes : attributes =
   | attr :: attributes -> (
       let idents =
         Ast_pattern.(
-          attribute ~name:(string "deriving") ~payload:(single_expr_payload __))
+          attribute ~name:(string "deriving") ~payload:(single_expr_payload __) )
       in
       match parse_opt idents loc attr (fun l -> Some l) with
       | None ->
@@ -603,7 +603,7 @@ let version_type ~version_option ~all_version_tagged ~top_version_tag
     let mk_field fld e =
       Ast_builder.(
         pexp_field e
-          (Located.mk (Ldot (Ldot (Lident "Bin_prot", "Type_class"), fld))))
+          (Located.mk (Ldot (Ldot (Lident "Bin_prot", "Type_class"), fld))) )
     in
     let open Ast_builder in
     let yojson_tag_shadows =
@@ -620,7 +620,7 @@ let version_type ~version_option ~all_version_tagged ~top_version_tag
                 if n = [%e eint version] then of_yojson data_json
                 else
                   Ppx_deriving_yojson_runtime.Result.Error
-                    (Core_kernel.sprintf "In JSON, expected version %d, got %d"
+                    (sprintf "In JSON, expected version %d, got %d"
                        [%e eint version] n )
             | _ ->
                 Ppx_deriving_yojson_runtime.Result.Error
@@ -679,12 +679,9 @@ let version_type ~version_option ~all_version_tagged ~top_version_tag
                         [%e apply_args [%expr bin_read_t_tagged]] buf ~pos_ref
                       in
                       (* sanity check *)
-                      if
-                        not
-                          (Core_kernel.Int.equal read_version [%e eint version])
-                      then
+                      if not (Int.equal read_version [%e eint version]) then
                         failwith
-                          (Core_kernel.sprintf
+                          (sprintf
                              "bin_read_t: version read %d does not match \
                               expected version %d"
                              read_version [%e eint version] ) ;
@@ -700,12 +697,9 @@ let version_type ~version_option ~all_version_tagged ~top_version_tag
                           buf ~pos_ref i
                       in
                       (* sanity check *)
-                      if
-                        not
-                          (Core_kernel.Int.equal read_version [%e eint version])
-                      then
+                      if not (Int.equal read_version [%e eint version]) then
                         failwith
-                          (Core_kernel.sprintf
+                          (sprintf
                              "__bin_read_t__: version read %d does not match \
                               expected version %d"
                              read_version version ) ;
@@ -939,7 +933,7 @@ let version_type ~version_option ~all_version_tagged ~top_version_tag
             [%str
               let (_ : _) =
                 let path =
-                  Core_kernel.sprintf "%s:%s.%s" __FILE__ __FUNCTION__
+                  sprintf "%s:%s.%s" __FILE__ __FUNCTION__
                     [%e estring ty_decl.ptype_name.txt]
                 in
                 Ppx_version_runtime.Shapes.register path bin_shape_t
@@ -955,7 +949,7 @@ let version_type ~version_option ~all_version_tagged ~top_version_tag
       (empty_params, [ t ], extra_stris)
   | Pstr_module
       ( { pmb_expr = { pmod_desc = Pmod_structure (stri :: str); _ } as pmod; _ }
-      as pmb ) ->
+        as pmb ) ->
       ( empty_params
       , [ { stri with
             pstr_desc =
@@ -999,7 +993,7 @@ let convert_module_stri ~version_option ~top_version_tag ~json_version_tag
     last_version modl_stri =
   let module_pattern =
     Ast_pattern.(
-      pstr_module (module_binding ~name:(some __') ~expr:(pmod_structure __')))
+      pstr_module (module_binding ~name:(some __') ~expr:(pmod_structure __')) )
   in
   let loc = modl_stri.pstr_loc in
   let name, str =
@@ -1080,9 +1074,9 @@ let convert_modbody ~loc ~version_option body =
   let _, rev_str, type_stri, top_tag_convs, all_tag_convs, json_tag_convs =
     List.fold ~init:(None, [], None, [], [], []) body_no_attrs
       ~f:(fun
-           (version, rev_str, type_stri, top_taggeds, all_taggeds, json_taggeds)
-           stri
-         ->
+          (version, rev_str, type_stri, top_taggeds, all_taggeds, json_taggeds)
+          stri
+        ->
         let version, stri, should_convert, current_type_stri, is_all_tagged =
           convert_module_stri ~version_option ~top_version_tag ~json_version_tag
             version stri
@@ -1159,10 +1153,7 @@ let convert_modbody ~loc ~version_option body =
                      values do not convert to [Latest.t].
                   *)
                   let (top_tag_versions :
-                        ( int
-                        * (   Core_kernel.Bigstring.t
-                           -> pos_ref:int ref
-                           -> Latest.t ) )
+                        (int * (Bigstring.t -> pos_ref:int ref -> Latest.t))
                         array ) =
                     [%e
                       let open Ast_builder in
@@ -1197,7 +1188,6 @@ let convert_modbody ~loc ~version_option body =
                 [%stri
                   (** deserializes data to the latest module version's type *)
                   let bin_read_top_tagged_to_latest buf ~pos_ref =
-                    let open Core_kernel in
                     (* Rely on layout, assume that the first element of the record is
                        at pos_ref in the buffer
                        The reader `f` will re-read the version, so we save the
@@ -1233,10 +1223,7 @@ let convert_modbody ~loc ~version_option body =
                      values do not convert to [Latest.t].
                   *)
                   let (all_tag_versions :
-                        ( int
-                        * (   Core_kernel.Bigstring.t
-                           -> pos_ref:int ref
-                           -> Latest.t ) )
+                        (int * (Bigstring.t -> pos_ref:int ref -> Latest.t))
                         array ) =
                     [%e
                       let open Ast_builder in
@@ -1271,7 +1258,6 @@ let convert_modbody ~loc ~version_option body =
                 [%stri
                   (** deserializes data to the latest module version's type *)
                   let bin_read_all_tagged_to_latest buf ~pos_ref =
-                    let open Core_kernel in
                     (* Rely on layout, assume that the first element of the record is
                        at pos_ref in the buffer
                        The reader `f` will re-read the version, so we save the
@@ -1304,9 +1290,7 @@ let convert_modbody ~loc ~version_option body =
               let json_tag_versions =
                 [%stri
                   let (json_tag_versions :
-                        ( int
-                        * (Yojson.Safe.t -> Latest.t Core_kernel.Or_error.t) )
-                        array ) =
+                        (int * (Yojson.Safe.t -> Latest.t Or_error.t)) array ) =
                     [%e
                       let open Ast_builder in
                       pexp_array
@@ -1351,7 +1335,7 @@ let convert_modbody ~loc ~version_option body =
                 [%stri
                   (** deserializes JSON to the latest module version's type *)
                   let of_yojson_to_latest (json : Yojson.Safe.t) :
-                      Latest.t Core_kernel.Or_error.t =
+                      Latest.t Or_error.t =
                     match json with
                     | `Assoc [ ("version", `Int version); ("data", _) ] -> (
                         match
@@ -1425,14 +1409,12 @@ let convert_rpc_version (stri : structure_item) =
     [%str
       let (_ : _) =
         let query_path =
-          Core_kernel.sprintf "%s:%s.%s" __FILE__ __FUNCTION__
-            [%e estring "query"]
+          sprintf "%s:%s.%s" __FILE__ __FUNCTION__ [%e estring "query"]
         in
         Ppx_version_runtime.Shapes.register query_path bin_shape_query
           [%e estring query_ty_decl_str] ;
         let response_path =
-          Core_kernel.sprintf "%s:%s.%s" __FILE__ __FUNCTION__
-            [%e estring "response"]
+          sprintf "%s:%s.%s" __FILE__ __FUNCTION__ [%e estring "response"]
         in
         Ppx_version_runtime.Shapes.register response_path bin_shape_response
           [%e estring response_ty_decl_str]]
@@ -1460,16 +1442,16 @@ let convert_rpc_version (stri : structure_item) =
       match pmb_expr with
       | { pmod_desc =
             Pmod_structure
-              (( { pstr_desc =
-                     Pstr_module
-                       ( { pmb_name = { txt = Some "T"; _ }
-                         ; pmb_expr =
-                             { pmod_desc = Pmod_structure str_items; _ } as
-                             inner_mod_expr
-                         ; _
-                         } as inner_mod_binding )
-                 ; _
-                 } as inner_str_item )
+              ( ( { pstr_desc =
+                      Pstr_module
+                        ( { pmb_name = { txt = Some "T"; _ }
+                          ; pmb_expr =
+                              { pmod_desc = Pmod_structure str_items; _ } as
+                              inner_mod_expr
+                          ; _
+                          } as inner_mod_binding )
+                  ; _
+                  } as inner_str_item )
               :: other_mods )
         ; _
         } as mod_expr ->
@@ -1801,7 +1783,7 @@ let version_module_decl ~loc ~path:_ modname signature =
                 if json_version_tag then
                   [ [%sigi:
                       val of_yojson_to_latest :
-                        Yojson.Safe.t -> Latest.t Core_kernel.Or_error.t]
+                        Yojson.Safe.t -> Latest.t Or_error.t]
                   ]
                 else []
               in
@@ -1811,7 +1793,7 @@ let version_module_decl ~loc ~path:_ modname signature =
                       val bin_read_top_tagged_to_latest :
                            Bin_prot.Common.buf
                         -> pos_ref:int ref
-                        -> Latest.t Core_kernel.Or_error.t]
+                        -> Latest.t Or_error.t]
                   ]
                 else []
               in
@@ -1821,7 +1803,7 @@ let version_module_decl ~loc ~path:_ modname signature =
                       val bin_read_all_tagged_to_latest :
                            Bin_prot.Common.buf
                         -> pos_ref:int ref
-                        -> Latest.t Core_kernel.Or_error.t]
+                        -> Latest.t Or_error.t]
                   ]
                 else []
               in
@@ -1860,34 +1842,34 @@ let () =
       pstr
         ( pstr_module
             (module_binding ~name:(some __') ~expr:(pmod_structure __'))
-        ^:: nil ))
+        ^:: nil ) )
   in
   let module_extension =
     Extension.(
       declare "versioned" Context.structure_item module_ast_pattern
-        (version_module ~version_option:No_version_option))
+        (version_module ~version_option:No_version_option) )
   in
   let module_extension_binable =
     Extension.(
       declare "versioned_binable" Context.structure_item module_ast_pattern
-        (version_module ~version_option:Binable))
+        (version_module ~version_option:Binable) )
   in
   let module_extension_rpc =
     Extension.(
       declare "versioned_rpc" Context.structure_item module_ast_pattern
-        version_rpc_module)
+        version_rpc_module )
   in
   let module_decl_ast_pattern =
     Ast_pattern.(
       psig
         ( psig_module
             (module_declaration ~name:(some __') ~type_:(pmty_signature __'))
-        ^:: nil ))
+        ^:: nil ) )
   in
   let module_decl_extension =
     Extension.(
       declare "versioned" Context.signature_item module_decl_ast_pattern
-        version_module_decl)
+        version_module_decl )
   in
   let module_rule = Context_free.Rule.extension module_extension in
   let module_rule_binable =
@@ -1900,10 +1882,10 @@ let () =
   in
   Driver.register_transformation "ppx_version/versioned_module" ~rules ;
   Ppxlib.Driver.add_arg "--no-toplevel-latest-type"
-    (Caml.Arg.Unit (fun () -> no_toplevel_latest_type := true))
+    (Stdlib.Arg.Unit (fun () -> no_toplevel_latest_type := true))
     ~doc:"Disable the toplevel type t declaration for versioned type modules" ;
   Ppxlib.Driver.add_arg "--toplevel-latest-type"
-    (Caml.Arg.Bool (fun b -> no_toplevel_latest_type := not b))
+    (Stdlib.Arg.Bool (fun b -> no_toplevel_latest_type := not b))
     ~doc:
       "Enable or disable the toplevel type t declaration for versioned type \
        modules"

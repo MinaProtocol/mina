@@ -9,7 +9,6 @@
   async_kernel
   async_unix
   core
-  core.time_stamp_counter
   core_kernel
   sexplib0
   ;; local libraries

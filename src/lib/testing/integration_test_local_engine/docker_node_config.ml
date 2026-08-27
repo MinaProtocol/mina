@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Async
 open Integration_test_lib
 open Docker_compose
@@ -148,6 +148,15 @@ module Base_node_config = struct
     ; ("MINA_PRIVKEY_PASS", "naughty blue worm")
     ; ("MINA_LIBP2P_PASS", "")
     ; ("LIBP2P_ENABLE_MDNS", "true")
+      (* The engine runs with full proofs (proof.level = Full in the injected
+         runtime config). Node_config resolves the "compile-time" proof level at
+         runtime from MINA_PROFILE (highest priority) ->
+         /etc/coda/build_config/PROFILE -> default "dev" (= Check). The
+         profile-generic daemon layer ships only a PROFILE hint file which the
+         daemon container does not reliably pick up, so we set the env explicitly
+         to guarantee devnet (= Full) and avoid the "Proof level full is not
+         compatible with compile-time proof level check" crash. *)
+    ; ("MINA_PROFILE", "devnet")
     ]
 
   let to_list t =

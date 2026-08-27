@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 
 module Make (Inputs : Intf.Inputs.Intf) : sig
   include
@@ -159,7 +159,7 @@ end = struct
            (range first_index last_index) )
         (init
            (1 lsl Addr.height ~ledger_depth:t.depth addr)
-           ~f:(Fn.const Account.empty) ))
+           ~f:(Fn.const Account.empty) ) )
 
   let set_all_accounts_rooted_at_exn _t =
     failwith "set_all_accounts_rooted_at_exn: null ledgers cannot be mutated"

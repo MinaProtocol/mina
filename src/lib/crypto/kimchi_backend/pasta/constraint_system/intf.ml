@@ -4,7 +4,7 @@
     over the Pasta curves (Pallas and Vesta). It provides functionality for
     building, managing, and finalizing constraint systems. *)
 
-open Core_kernel
+open Core
 
 (** Basic accessors for constraint system properties.
 

@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Sync_status
 
 (* Test helper to check round-trip conversion *)
@@ -37,7 +37,7 @@ let test_json_conversion () =
       | Error e ->
           failwith e
       | Ok x ->
-          x ) )
+          x ))
 
 (* Individual JSON conversion tests for better error reporting *)
 let test_json_conversions_individual () =

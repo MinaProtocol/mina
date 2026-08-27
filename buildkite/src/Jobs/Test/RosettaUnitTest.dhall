@@ -17,4 +17,5 @@ in  SimpleUnitTestJob.build
         , PipelineTag.Type.Rosetta
         ]
       , cmdTarget = Size.Small
+      , submodules = True
       }

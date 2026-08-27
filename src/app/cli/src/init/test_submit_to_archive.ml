@@ -147,7 +147,7 @@ module Block = struct
     let breadcrumb =
       Frontier_base.Breadcrumb.create ~validated_transition:validated
         ~staged_ledger
-        ~transition_receipt_time:(Some (Time.now ()))
+        ~transition_receipt_time:(Some (Time_float.now ()))
         ~just_emitted_a_proof:false ~accounts_created
     in
     (* Block proof contained in genesis header is just a stub.
@@ -237,7 +237,7 @@ let find_winning_slots ~context:(module Context : Consensus.Intf.CONTEXT)
       Consensus.Data.Vrf.check
         ~context:(module Context)
         ~global_slot ~seed:epoch_seed
-        ~get_delegators:(Public_key.Compressed.Table.find delegatee_table)
+        ~get_delegators:(Hashtbl.find delegatee_table)
         ~producer_private_key:keypair.private_key
         ~producer_public_key:public_key_compressed
         ~total_stake:epoch_ledger.total_currency
@@ -250,9 +250,8 @@ let find_winning_slots ~context:(module Context : Consensus.Intf.CONTEXT)
         (* Not a winning slot, try next one *)
         `Repeat (current_slot + 1, found_slots, attempts_left - 1)
     | Ok
-        (Some
-          (`Vrf_eval _vrf_eval, `Vrf_output vrf_result, `Delegator delegator) )
-      ->
+        (Some (`Vrf_eval _vrf_eval, `Vrf_output vrf_result, `Delegator delegator)
+          ) ->
         (* Copied from VRF evaluator *)
         [%log info] "Found winning slot at global slot %d" current_slot ;
         let slot_won =
@@ -294,7 +293,7 @@ let build_breadcrumb ~transactions ~context ~precomputed_values ~verifier
   let scheduled_time =
     Consensus.Data.Consensus_time.(
       start_time ~constants:consensus_constants
-        (of_global_slot ~constants:consensus_constants slot_won.global_slot))
+        (of_global_slot ~constants:consensus_constants slot_won.global_slot) )
   in
   Block_time.Controller.set_time_offset
     ( Block_time.Span.to_time_span
@@ -317,7 +316,7 @@ let build_breadcrumb ~transactions ~context ~precomputed_values ~verifier
       ~signature_kind:Testnet
     |> Interruptible.force
     >>| Result.map_error ~f:(fun () ->
-            Error.of_string "unexpected interruption" )
+        Error.of_string "unexpected interruption" )
     >>| Or_error.ok_exn
     >>| Option.value_exn ?here:None ?error:None
           ~message:"generate_next_state failed"
@@ -379,7 +378,7 @@ let build_breadcrumb ~transactions ~context ~precomputed_values ~verifier
          ~f:(const (Error.of_string "failed to validate just created block"))
     |> Or_error.ok_exn
   in
-  let transition_receipt_time = Some (Time.now ()) in
+  let transition_receipt_time = Some (Time_float.now ()) in
   [%log info] "Building breadcrumb" ;
   (* Create breadcrumb using parent and the new block transition that we just generated.
      Most of the logic of the function call below is for updating the staged ledger. *)
@@ -392,17 +391,16 @@ let build_breadcrumb ~transactions ~context ~precomputed_values ~verifier
     ~parent:previous.breadcrumb ~transition ~sender:None
     ~skip_staged_ledger_verification:`All ~transition_receipt_time ()
   >>| Result.map_error ~f:(fun e ->
-          let msg =
-            match e with
-            | `Fatal_error exn ->
-                Exn.to_string exn
-            | `Invalid_staged_ledger_diff err | `Invalid_staged_ledger_hash err
-              ->
-                Error.to_string_hum err
-          in
-          [%log error] "failed to build breadcrumb: $error"
-            ~metadata:[ ("error", `String msg) ] ;
-          Error.of_string msg )
+      let msg =
+        match e with
+        | `Fatal_error exn ->
+            Exn.to_string exn
+        | `Invalid_staged_ledger_diff err | `Invalid_staged_ledger_hash err ->
+            Error.to_string_hum err
+      in
+      [%log error] "failed to build breadcrumb: $error"
+        ~metadata:[ ("error", `String msg) ] ;
+      Error.of_string msg )
   >>| Or_error.ok_exn
 
 let mk_payment ~(valid_until : Mina_numbers.Global_slot_since_genesis.t)
@@ -447,7 +445,7 @@ let create_zkapp_accounts_tx
           @@ Account.gen_zkapp_account_with_private_key
                ~token_id:Token_id.default ~balance:initial_balance
         in
-        Account_id.Table.set account_state_tbl
+        Hashtbl.set account_state_tbl
           ~key:(Account.identifier zkapp_account)
           ~data:(zkapp_account, `Ordinary_participant) ;
         Keypair.of_private_key_exn sk )
@@ -496,7 +494,7 @@ let generate_txs ~valid_until ~nonce_ref ~n_zkapp_txs ~n_payments ~n_blocks
                 (Public_key.compress fee_payer_keypair.public_key)
                 Token_id.default
             in
-            Account_id.Table.change account_state_tbl fee_payer_id
+            Hashtbl.change account_state_tbl fee_payer_id
               ~f:
                 (Option.map ~f:(fun ((a : Account.t), role) ->
                      ({ a with nonce = !nonce_ref }, role) ) ) ;
@@ -548,7 +546,7 @@ let generate_txs ~valid_until ~nonce_ref ~n_zkapp_txs ~n_payments ~n_blocks
         in
         (* This is used in the context of a test, and we know that the command is valid *)
         let (`If_this_is_used_it_should_have_a_comment_justifying_it
-              valid_command ) =
+               valid_command ) =
           User_command.to_valid_unsafe command
         in
         valid_command )
@@ -602,9 +600,11 @@ let load_and_initialize_config ~genesis_dir ~logger ~config_file =
     |> Result.map_error ~f:Error.of_string
     |> Or_error.ok_exn
   in
-  let genesis_constants = Genesis_constants.Compiled.genesis_constants in
-  let constraint_constants = Genesis_constants.Compiled.constraint_constants in
-  let proof_level = Genesis_constants.Compiled.proof_level in
+
+  let (module G) = Genesis_constants.profiled () in
+  let genesis_constants = G.genesis_constants in
+  let constraint_constants = G.constraint_constants in
+  let proof_level = G.proof_level in
   Genesis_ledger_helper.init_from_config_file ~genesis_constants
     ~constraint_constants ~logger ~proof_level ~cli_proof_level:None
     ~genesis_dir runtime_config
@@ -679,12 +679,11 @@ let generate_all_transactions ~(precomputed_values : Precomputed_values.t)
         if Account_id.equal account_id signer_account_id then `Fee_payer
         else `Ordinary_participant
       in
-      Account_id.Table.set account_state_tbl ~key:account_id
-        ~data:(account, role) ) ;
+      Hashtbl.set account_state_tbl ~key:account_id ~data:(account, role) ) ;
   let vk =
     let data =
       Pickles.Side_loaded.Verification_key.(
-        dummy |> to_base58_check |> of_base58_check_exn)
+        dummy |> to_base58_check |> of_base58_check_exn )
     in
     let hash = Zkapp_account.digest_vk data in
     { With_hash.data; hash }
@@ -775,23 +774,23 @@ let run ~logger ~keypair ~archive_node_port ~config_file ~n_zkapp_txs
   in
 
   ( if max_cost then
-    let found =
-      List.exists all_transactions ~f:(fun txs ->
-          List.exists txs ~f:(fun cmd ->
-              match (User_command.forget_check cmd : User_command.t) with
-              | Zkapp_command zkapp_cmd
-                when List.length
-                       (Zkapp_command.Call_forest.to_list
-                          zkapp_cmd.account_updates )
-                     = 15 ->
-                  assert_max_cost_zkapp ~logger
-                    ~genesis_constants:precomputed_values.genesis_constants
-                    zkapp_cmd ;
-                  true
-              | _ ->
-                  false ) )
-    in
-    if not found then failwith "No max-cost zkapp transaction found" ) ;
+      let found =
+        List.exists all_transactions ~f:(fun txs ->
+            List.exists txs ~f:(fun cmd ->
+                match (User_command.forget_check cmd : User_command.t) with
+                | Zkapp_command zkapp_cmd
+                  when List.length
+                         (Zkapp_command.Call_forest.to_list
+                            zkapp_cmd.account_updates )
+                       = 15 ->
+                    assert_max_cost_zkapp ~logger
+                      ~genesis_constants:precomputed_values.genesis_constants
+                      zkapp_cmd ;
+                    true
+                | _ ->
+                    false ) )
+      in
+      if not found then failwith "No max-cost zkapp transaction found" ) ;
 
   (* Section 6: Create blocks *)
   [%log info] "Creating %d blocks" (List.length winning_slots) ;
@@ -805,7 +804,7 @@ let run ~logger ~keypair ~archive_node_port ~config_file ~n_zkapp_txs
     match archive_node_port with
     | Some port ->
         [%log info] "Submit blocks to archive at port %d" port ;
-        Deferred.List.iter diffs ~f:(fun diff ->
+        Deferred.List.iter ~how:`Sequential diffs ~f:(fun diff ->
             (* Copied from archive_client.ml *)
             Daemon_rpcs.Client.dispatch Archive_lib.Rpc.t
               (Transition_frontier diff)
@@ -849,78 +848,80 @@ let command =
       "Generate blocks with zkApp transactions and payments. Optionally submit \
        to archive node or save to file for analysis."
     (let open Command.Let_syntax in
-    let%map_open archive_node_port =
-      flag "--archive-node-port"
-        ~doc:"PORT Archive node's daemon port to submit blocks to (optional)"
-        (optional int)
-    and config_file =
-      flag "--config-file" ~doc:"FILE Path to the runtime configuration file"
-        (required string)
-    and genesis_dir =
-      flag "--genesis-dir" ~doc:"FILE Path to the genesis ledger directory"
-        (optional string)
-    and privkey_path = Flag.privkey_read_path
-    and n_zkapp_txs =
-      flag "--num-zkapp-txs"
-        ~doc:
-          "NUM Number of zkApp transactions (each creating 9 account updates \
-           with 8 new accounts)"
-        (required int)
-    and n_payments =
-      flag "--num-payments"
-        ~doc:"NUM Number of payment transactions to non-existing accounts"
-        (required int)
-    and n_blocks =
-      flag "--num-blocks" ~doc:"NUM Number of blocks to generate" (required int)
-    and max_cost =
-      flag "--max-cost" ~doc:" Generate maximum cost zkApp transactions" no_arg
-    and output_file =
-      flag "--output-file"
-        ~doc:
-          "FILE Write generated blocks to JSON file (useful when not \
-           submitting to archive)"
-        (optional string)
-    in
-    Exceptions.handle_nicely
-    @@ fun () ->
-    let open Deferred.Let_syntax in
-    let logger = Logger.create ~id:Logger.Logger_id.mina () in
-    let metadata =
-      [ ("config_file", `String config_file)
-      ; ("n_zkapp_txs", `Int n_zkapp_txs)
-      ; ("n_payments", `Int n_payments)
-      ; ("n_blocks", `Int n_blocks)
-      ; ("max_cost", `Bool max_cost)
-      ; ("archive_node_port", [%to_yojson: int option] archive_node_port)
-      ; ("output_file", [%to_yojson: int option] archive_node_port)
-      ]
-    in
-    [%log info] "Starting submit-to-archive test" ~metadata ;
-    [%log info] "Loading keypair from %s" privkey_path ;
-    let%bind keypair =
-      Secrets.Keypair.Terminal_stdin.read_exn ~which:"Mina keypair" privkey_path
-    in
-    [%log info] "Loading configuration from %s" config_file ;
-    Logger.Consumer_registry.register ~commit_id:"" ~id:Logger.Logger_id.mina
-      ~processor:Internal_tracing.For_logger.processor
-      ~transport:
-        (Internal_tracing.For_logger.json_lines_rotate_transport
-           ~directory:"internal-tracing" () )
-      () ;
-    let log_processor =
-      Logger.Processor.pretty ~log_level:Info
-        ~config:
-          { Interpolator_lib.Interpolator.mode = After
-          ; max_interpolation_length = 50
-          ; pretty_print = true
-          }
-    in
-    Logger.Consumer_registry.register ~commit_id:Mina_version.commit_id
-      ~id:Logger.Logger_id.mina ~processor:log_processor
-      ~transport:(Logger.Transport.stdout ())
-      () ;
-    let%bind () = Internal_tracing.toggle ~commit_id:"" ~logger `Enabled in
-    let genesis_dir = Option.value ~default:"genesis" genesis_dir in
+     let%map_open archive_node_port =
+       flag "--archive-node-port"
+         ~doc:"PORT Archive node's daemon port to submit blocks to (optional)"
+         (optional int)
+     and config_file =
+       flag "--config-file" ~doc:"FILE Path to the runtime configuration file"
+         (required string)
+     and genesis_dir =
+       flag "--genesis-dir" ~doc:"FILE Path to the genesis ledger directory"
+         (optional string)
+     and privkey_path = Flag.privkey_read_path
+     and n_zkapp_txs =
+       flag "--num-zkapp-txs"
+         ~doc:
+           "NUM Number of zkApp transactions (each creating 9 account updates \
+            with 8 new accounts)"
+         (required int)
+     and n_payments =
+       flag "--num-payments"
+         ~doc:"NUM Number of payment transactions to non-existing accounts"
+         (required int)
+     and n_blocks =
+       flag "--num-blocks" ~doc:"NUM Number of blocks to generate"
+         (required int)
+     and max_cost =
+       flag "--max-cost" ~doc:" Generate maximum cost zkApp transactions" no_arg
+     and output_file =
+       flag "--output-file"
+         ~doc:
+           "FILE Write generated blocks to JSON file (useful when not \
+            submitting to archive)"
+         (optional string)
+     in
+     Exceptions.handle_nicely
+     @@ fun () ->
+     let open Deferred.Let_syntax in
+     let logger = Logger.create ~id:Logger.Logger_id.mina () in
+     let metadata =
+       [ ("config_file", `String config_file)
+       ; ("n_zkapp_txs", `Int n_zkapp_txs)
+       ; ("n_payments", `Int n_payments)
+       ; ("n_blocks", `Int n_blocks)
+       ; ("max_cost", `Bool max_cost)
+       ; ("archive_node_port", [%to_yojson: int option] archive_node_port)
+       ; ("output_file", [%to_yojson: int option] archive_node_port)
+       ]
+     in
+     [%log info] "Starting submit-to-archive test" ~metadata ;
+     [%log info] "Loading keypair from %s" privkey_path ;
+     let%bind keypair =
+       Secrets.Keypair.Terminal_stdin.read_exn ~which:"Mina keypair"
+         privkey_path
+     in
+     [%log info] "Loading configuration from %s" config_file ;
+     Logger.Consumer_registry.register ~commit_id:"" ~id:Logger.Logger_id.mina
+       ~processor:Internal_tracing.For_logger.processor
+       ~transport:
+         (Internal_tracing.For_logger.json_lines_rotate_transport
+            ~directory:"internal-tracing" () )
+       () ;
+     let log_processor =
+       Logger.Processor.pretty ~log_level:Info
+         ~config:
+           { Interpolator_lib.Interpolator.mode = After
+           ; max_interpolation_length = 50
+           ; pretty_print = true
+           }
+     in
+     Logger.Consumer_registry.register ~commit_id:Mina_version.commit_id
+       ~id:Logger.Logger_id.mina ~processor:log_processor
+       ~transport:(Logger.Transport.stdout ())
+       () ;
+     let%bind () = Internal_tracing.toggle ~commit_id:"" ~logger `Enabled in
+     let genesis_dir = Option.value ~default:"genesis" genesis_dir in
 
-    run ~logger ~keypair ~archive_node_port ~config_file ~n_zkapp_txs
-      ~n_payments ~n_blocks ~max_cost ~output_file ~genesis_dir)
+     run ~logger ~keypair ~archive_node_port ~config_file ~n_zkapp_txs
+       ~n_payments ~n_blocks ~max_cost ~output_file ~genesis_dir )

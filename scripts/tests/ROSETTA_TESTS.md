@@ -236,6 +236,12 @@ The script loads realistic test data from the archive database:
 
 **Location**: `scripts/tests/rosetta-connectivity.sh`
 
+> **Note**: this script tests a *published* `mina-rosetta` image, and is kept for
+> that purpose. CI no longer uses it. `RosettaDevnetConnect` /
+> `RosettaMainnetConnect` run `buildkite/scripts/tests/rosetta/connectivity.sh`
+> instead, which stands the same stack up from bare binaries and the in-repo
+> genesis ledger — see section 5.
+
 **Key Features**:
 - **Docker Integration**: Automatically spins up Rosetta containers
 - **Network Support**: Both mainnet and devnet configurations  
@@ -288,6 +294,35 @@ The script loads realistic test data from the archive database:
 
 # Custom timeout for slow environments
 ./rosetta-connectivity.sh --tag 3.0.3-bullseye-devnet-generic --timeout 1800
+```
+
+### 5. buildkite/scripts/tests/rosetta/connectivity.sh
+
+**Purpose**: The connectivity test as CI runs it — same assertions as
+`rosetta-connectivity.sh`, but with no docker image involved.
+
+**Location**: `buildkite/scripts/tests/rosetta/connectivity.sh`
+
+Everything the `mina-rosetta` image used to supply comes from the repository or
+the CI apps cache instead:
+
+| From the image | From the repo / apps cache |
+| --- | --- |
+| `mina`, `mina-archive`, `mina-rosetta`, `libp2p_helper` | apps cache, via `buildkite/scripts/debian/restore-or-install.sh` |
+| `/var/lib/coda/<network>.json` | `genesis_ledgers/<network>.json` (the config deb copies this file verbatim) |
+| `/etc/mina/archive/create_schema.sql` | `src/app/archive/create_schema.sql` |
+| `/etc/mina/archive/{upgrade_to_mesa,downgrade_to_berkeley}.sql` | `src/app/archive/*.sql` |
+| postgres cluster baked into the image | a cluster created by the script |
+
+The process layout (rosetta online + offline, archive, daemon on localhost) is
+the one `src/app/rosetta/scripts/docker-start.sh` sets up inside the image, so
+`rosetta-sanity.sh` and `rosetta-load.sh` are called unchanged — directly,
+rather than through `docker exec`.
+
+**Usage**:
+```bash
+./buildkite/scripts/tests/rosetta/connectivity.sh --network devnet \
+  [--sync-timeout 1500] [--run-load-test] [--run-compatibility-test develop]
 ```
 
 ## Integration and Dependencies

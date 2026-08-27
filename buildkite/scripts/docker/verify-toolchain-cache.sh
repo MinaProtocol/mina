@@ -1,11 +1,15 @@
 #!/usr/bin/env bash
 
-# Nightly validation that the mina-toolchain docker images cached on the Hetzner
+# Nightly validation that long-lived docker images cached on the Hetzner
 # storagebox are byte-for-byte equivalent to the same images on docker.io.
 #
-# The toolchain image is produced infrequently and is the only artifact we host
-# on docker.io directly. Build jobs save a copy of the freshly-built image to
-# the shared CI cache so the rest of the pipeline can load it without paying
+# By default this validates the mina-toolchain image, but it is generic over the
+# SERVICE env var: set SERVICE=mina-base to validate the shared common base layer
+# instead (the only other artifact we host on docker.io directly for reference).
+#
+# These images are produced infrequently and are the artifacts we host on
+# docker.io directly. Build jobs save a copy of the freshly-built image to the
+# shared CI cache so the rest of the pipeline can load it without paying
 # docker.io pull cost. This script keeps the two in sync: if a cached image
 # diverges from docker.io (corruption, manual overwrite, partial upload,
 # missing entry), we pull from docker.io and replace the cache entry.
@@ -32,7 +36,7 @@ fi
 shopt -s nullglob
 files=("$CACHE_DIR"/*.tar.zst)
 if (( ${#files[@]} == 0 )); then
-  echo "No cached toolchain images found in ${CACHE_DIR}."
+  echo "No cached ${SERVICE} images found in ${CACHE_DIR}."
   exit 0
 fi
 

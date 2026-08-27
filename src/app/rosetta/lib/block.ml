@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Async
 module Mina_currency = Currency
 open Rosetta_lib
@@ -323,7 +323,7 @@ module Sql = struct
 
     let typ =
       Caqti_type.(
-        t3 int Archive_lib.Processor.User_command.Signed_command.typ Extras.typ)
+        t3 int Archive_lib.Processor.User_command.Signed_command.typ Extras.typ )
 
     let fields =
       String.concat ~sep:","
@@ -597,15 +597,17 @@ module Sql = struct
         { body : Archive_lib.Processor.Zkapp_account_update_body.t
         ; account : string
         ; token : string
+        ; creation_fee : int64 option
         }
       [@@deriving hlist]
 
       let fields =
         String.concat ~sep:","
         @@ List.map Archive_lib.Processor.Zkapp_account_update_body.Fields.names
-             ~f:(fun n -> "zaub." ^ n)
+             ~f:(fun n -> "zaub." ^ n )
         @ [ "pk_update_body.value as account"
           ; "token_update_body.value as token"
+          ; "ac.creation_fee"
           ]
 
       let account t = `Pk t.account
@@ -618,6 +620,7 @@ module Sql = struct
             [ Archive_lib.Processor.Zkapp_account_update_body.typ
             ; string
             ; string
+            ; option int64
             ]
     end
 
@@ -659,19 +662,60 @@ module Sql = struct
            ON zfpb.public_key_id = pk_fee_payer.id
          INNER JOIN blocks b
            ON bzc.block_id = b.id
+         -- Expand the account-updates array positionally: an id may appear more
+         -- than once (identical updates share a single zkapp_account_update row),
+         -- and each occurrence is a distinct on-chain application. `= ANY(array)`
+         -- would collapse repeats to one row, dropping (N-1) balance-change ops.
+         -- LATERAL ... ON true keeps fee-payer-only commands (empty/NULL array).
+         LEFT JOIN LATERAL
+           unnest (zc.zkapp_account_updates_ids) WITH ORDINALITY
+             AS au_ref (au_id, au_ord) ON true
          LEFT JOIN zkapp_account_update zau
-           ON zau.id = ANY (zc.zkapp_account_updates_ids)
+           ON zau.id = au_ref.au_id
          LEFT JOIN zkapp_account_update_body zaub
            ON zaub.id = zau.body_id
          LEFT JOIN account_identifiers ai_update_body
            ON zaub.account_identifier_id = ai_update_body.id
+         -- The ledger charges the creation fee once per account it creates, but
+         -- the creating update surfaces on more than one row here: identical
+         -- updates share a single zkapp_account_update row, so it can appear
+         -- under several applied commands of the block, and a command's array
+         -- may repeat its id -- each repeat being expanded to its own row by
+         -- the unnest above. Bill the first such row only, ordering by
+         -- (command, position in the array); the subquery therefore has to
+         -- expand the array positionally too, or repeats would be invisible to
+         -- it and every repeat would be billed.
+         LEFT JOIN accounts_created ac
+           ON bzc.block_id = ac.block_id
+           AND ai_update_body.id = ac.account_identifier_id
+           AND bzc.status = 'applied'
+           AND zaub.implicit_account_creation_fee
+           AND NOT EXISTS (
+             SELECT 1
+             FROM blocks_zkapp_commands bzc2
+             INNER JOIN zkapp_commands zc2
+               ON zc2.id = bzc2.zkapp_command_id
+             CROSS JOIN LATERAL
+               unnest (zc2.zkapp_account_updates_ids) WITH ORDINALITY
+                 AS au_ref2 (au_id, au_ord)
+             INNER JOIN zkapp_account_update zau2
+               ON zau2.id = au_ref2.au_id
+             INNER JOIN zkapp_account_update_body zaub2
+               ON zaub2.id = zau2.body_id
+             WHERE bzc2.block_id = bzc.block_id
+               AND bzc2.status = 'applied'
+               AND zaub2.implicit_account_creation_fee
+               AND zaub2.account_identifier_id = ai_update_body.id
+               AND (bzc2.sequence_no, zc2.id, au_ref2.au_ord)
+                   < (bzc.sequence_no, zc.id, au_ref.au_ord)
+           )
          LEFT JOIN public_keys pk_update_body
            ON ai_update_body.public_key_id = pk_update_body.id
          LEFT JOIN tokens token_update_body
            ON token_update_body.id = ai_update_body.token_id
          WHERE bzc.block_id = ?
           AND (token_update_body.value = ? OR token_update_body.id IS NULL)
-         ORDER BY zc.id, bzc.sequence_no
+         ORDER BY zc.id, bzc.sequence_no, au_ref.au_ord
       |}]
 
     let query =
@@ -750,6 +794,8 @@ module Sql = struct
           ; use_full_commitment = body.use_full_commitment
           ; status
           ; token = Zkapp_account_update.token upd
+          ; creation_fee =
+              Option.map upd.creation_fee ~f:Unsigned.UInt64.of_int64
           } )
 
     let account_updates_and_command_to_info account_updates
@@ -796,7 +842,7 @@ module Sql = struct
         let map ~f l =
           map ~f:List.rev
           @@ List.fold_result l ~init:[] ~f:(fun acc x ->
-                 f x >>| fun x -> x :: acc )
+              f x >>| fun x -> x :: acc )
       end
     end in
     let open Deferred.Result.Let_syntax in
@@ -846,65 +892,58 @@ module Sql = struct
     let%map user_commands =
       Deferred.return
       @@ Result.List.map raw_user_commands ~f:(fun (_, uc, extras) ->
-             let open Result.Let_syntax in
-             let%bind kind =
-               match
-                 uc
-                   .Archive_lib.Processor.User_command.Signed_command
-                    .command_type
-               with
-               | "payment" ->
-                   return `Payment
-               | "delegation" ->
-                   return `Delegation
-               | other ->
-                   Result.fail
-                     (Errors.create
-                        ~context:
-                          (sprintf
-                             "The archive database is storing user commands \
-                              with %s; this is not a known type. Please report \
-                              a bug!"
-                             other )
-                        `Invariant_violation )
-             in
-             let fee_token = Mina_base.Token_id.(to_string default) in
-             let token = Mina_base.Token_id.(to_string default) in
-             let%map failure_status =
-               match User_commands.Extras.failure_reason extras with
-               | None -> (
-                   match
-                     User_commands.Extras.account_creation_fee_paid extras
-                   with
-                   | None ->
-                       return
-                       @@ `Applied
-                            User_command_info.Account_creation_fees_paid
-                            .By_no_one
-                   | Some receiver ->
-                       return
-                       @@ `Applied
-                            (User_command_info.Account_creation_fees_paid
-                             .By_receiver
-                               (Unsigned.UInt64.of_int64 receiver) ) )
-               | Some status ->
-                   return @@ `Failed status
-             in
-             { User_command_info.kind
-             ; fee_payer = User_commands.Extras.fee_payer extras
-             ; source = User_commands.Extras.source extras
-             ; receiver = User_commands.Extras.receiver extras
-             ; fee_token = `Token_id fee_token
-             ; token = `Token_id token
-             ; nonce = Unsigned.UInt32.of_int64 uc.nonce
-             ; amount = Option.map ~f:Unsigned.UInt64.of_string uc.amount
-             ; fee = Unsigned.UInt64.of_string uc.fee
-             ; hash = uc.hash
-             ; failure_status = Some failure_status
-             ; valid_until =
-                 Option.map ~f:Unsigned.UInt32.of_int64 uc.valid_until
-             ; memo = (if String.equal uc.memo "" then None else Some uc.memo)
-             } )
+          let open Result.Let_syntax in
+          let%bind kind =
+            match
+              uc.Archive_lib.Processor.User_command.Signed_command.command_type
+            with
+            | "payment" ->
+                return `Payment
+            | "delegation" ->
+                return `Delegation
+            | other ->
+                Result.fail
+                  (Errors.create
+                     ~context:
+                       (sprintf
+                          "The archive database is storing user commands with \
+                           %s; this is not a known type. Please report a bug!"
+                          other )
+                     `Invariant_violation )
+          in
+          let fee_token = Mina_base.Token_id.(to_string default) in
+          let token = Mina_base.Token_id.(to_string default) in
+          let%map failure_status =
+            match User_commands.Extras.failure_reason extras with
+            | None -> (
+                match User_commands.Extras.account_creation_fee_paid extras with
+                | None ->
+                    return
+                    @@ `Applied
+                         User_command_info.Account_creation_fees_paid.By_no_one
+                | Some receiver ->
+                    return
+                    @@ `Applied
+                         (User_command_info.Account_creation_fees_paid
+                          .By_receiver
+                            (Unsigned.UInt64.of_int64 receiver) ) )
+            | Some status ->
+                return @@ `Failed status
+          in
+          { User_command_info.kind
+          ; fee_payer = User_commands.Extras.fee_payer extras
+          ; source = User_commands.Extras.source extras
+          ; receiver = User_commands.Extras.receiver extras
+          ; fee_token = `Token_id fee_token
+          ; token = `Token_id token
+          ; nonce = Unsigned.UInt32.of_int64 uc.nonce
+          ; amount = Option.map ~f:Unsigned.UInt64.of_string uc.amount
+          ; fee = Unsigned.UInt64.of_string uc.fee
+          ; hash = uc.hash
+          ; failure_status = Some failure_status
+          ; valid_until = Option.map ~f:Unsigned.UInt32.of_int64 uc.valid_until
+          ; memo = (if String.equal uc.memo "" then None else Some uc.memo)
+          } )
     in
     let zkapp_commands = Zkapp_commands.to_command_infos raw_zkapp_commands in
     { Block_info.block_identifier =

@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 
 module type Iso_intf = sig
   type original
@@ -132,7 +132,8 @@ end) =
 struct
   let to_base64 (t : T.t) : string =
     Binable.to_string (module T) t
-    |> (* raises only on errors from invalid optional arguments *)
+    |>
+    (* raises only on errors from invalid optional arguments *)
     Base64.encode_exn
 
   let of_base64 b64 : T.t Or_error.t =

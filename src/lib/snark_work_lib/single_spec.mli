@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 
 module Poly : sig
   [%%versioned:
@@ -31,10 +31,10 @@ end
 module Stable : sig
   [@@@no_toplevel_latest_type]
 
-  module V2 : sig
+  module V3 : sig
     type t =
       ( Transaction_witness.Stable.V3.t
-      , Ledger_proof.Stable.V2.t )
+      , Ledger_proof.Stable.V3.t )
       Poly.Stable.V2.t
     [@@deriving sexp, yojson]
 

@@ -12,7 +12,7 @@ module T = struct
     { validated_transition : Mina_block.Validated.t
     ; staged_ledger : Staged_ledger.t
     ; just_emitted_a_proof : bool
-    ; transition_receipt_time : Time.t option
+    ; transition_receipt_time : Time_float.t option
     ; staged_ledger_hash : Staged_ledger_hash.t
     ; accounts_created : Account_id.t list
     }
@@ -22,7 +22,7 @@ module T = struct
        validated_transition:Mina_block.Validated.t
     -> staged_ledger:Staged_ledger.t
     -> just_emitted_a_proof:bool
-    -> transition_receipt_time:Time.t option
+    -> transition_receipt_time:Time_float.t option
     -> accounts_created:Account_id.t list
     -> 'a
 
@@ -69,7 +69,8 @@ module T = struct
       ; ( "transition_receipt_time"
         , `String
             (Option.value_map transition_receipt_time ~default:"<not available>"
-               ~f:(Time.to_string_iso8601_basic ~zone:Time.Zone.utc) ) )
+               ~f:(Time_float.to_string_iso8601_basic ~zone:Time_float.Zone.utc) )
+        )
       ]
 end
 
@@ -154,7 +155,7 @@ let build ?skip_staged_ledger_verification ?transaction_pool_proxy ~logger
             | Some (Envelope.Sender.Remote peer) ->
                 Trust_system.(
                   record trust_system logger peer
-                    Actions.(Gossiped_invalid_transition, Some (message, [])))
+                    Actions.(Gossiped_invalid_transition, Some (message, [])) )
           in
           Error (`Invalid_staged_ledger_diff (Error.of_string message))
       | Error (`Invalid_staged_ledger_diff errors) ->
@@ -164,7 +165,7 @@ let build ?skip_staged_ledger_verification ?transaction_pool_proxy ~logger
                 | `Incorrect_target_staged_ledger_hash ->
                     "staged ledger hash"
                 | `Incorrect_target_snarked_ledger_hash ->
-                    "snarked ledger hash" ) )
+                    "snarked ledger hash" ))
           in
           let message = "invalid staged ledger diff: incorrect " ^ reasons in
           let%map () =
@@ -174,7 +175,7 @@ let build ?skip_staged_ledger_verification ?transaction_pool_proxy ~logger
             | Some (Envelope.Sender.Remote peer) ->
                 Trust_system.(
                   record trust_system logger peer
-                    Actions.(Gossiped_invalid_transition, Some (message, [])))
+                    Actions.(Gossiped_invalid_transition, Some (message, [])) )
           in
           Error (`Invalid_staged_ledger_hash (Error.of_string message))
       | Error (`Staged_ledger_application_failed staged_ledger_error) ->
@@ -218,8 +219,8 @@ let build ?skip_staged_ledger_verification ?transaction_pool_proxy ~logger
           in
           Error
             (`Invalid_staged_ledger_diff
-              (Staged_ledger.Staged_ledger_error.to_error staged_ledger_error)
-              ) )
+               (Staged_ledger.Staged_ledger_error.to_error staged_ledger_error)
+            ) )
 
 let block_with_hash =
   Fn.compose Mina_block.Validated.forget validated_transition
@@ -240,8 +241,8 @@ let consensus_state = Fn.compose Protocol_state.consensus_state protocol_state
 let consensus_state_with_hashes breadcrumb =
   breadcrumb |> block_with_hash
   |> With_hash.map ~f:(fun block ->
-         block |> Mina_block.header |> Mina_block.Header.protocol_state
-         |> Protocol_state.consensus_state )
+      block |> Mina_block.header |> Mina_block.Header.protocol_state
+      |> Protocol_state.consensus_state )
 
 let parent_hash b = b |> protocol_state |> Protocol_state.previous_state_hash
 
@@ -370,7 +371,7 @@ module For_tests = struct
       in
       let _, largest_account =
         List.max_elt accounts_with_secret_keys
-          ~compare:(fun (_, acc1) (_, acc2) -> Account.compare acc1 acc2)
+          ~compare:(fun (_, acc1) (_, acc2) -> Account.compare acc1 acc2 )
         |> Option.value_exn
       in
       let largest_account_public_key = Account.public_key largest_account in
@@ -419,10 +420,11 @@ module For_tests = struct
       let body =
         Mina_block.Body.create @@ Staged_ledger_diff.forget staged_ledger_diff
       in
-      let%bind ( `Ledger_proof ledger_proof_opt
-               , `Staged_ledger transitioned_staged_ledger
-               , `Accounts_created _
-               , `Pending_coinbase_update _ ) =
+      let%bind
+          ( `Ledger_proof ledger_proof_opt
+          , `Staged_ledger transitioned_staged_ledger
+          , `Accounts_created _
+          , `Pending_coinbase_update _ ) =
         match%bind
           Staged_ledger.apply_diff_unchecked parent_staged_ledger
             ~global_slot:current_global_slot ~coinbase_receiver ~logger
@@ -506,7 +508,7 @@ module For_tests = struct
                previous_state_hashes.state_hash )
           (`This_block_is_trusted_to_be_safe block)
       in
-      let transition_receipt_time = Some (Time.now ()) in
+      let transition_receipt_time = Some (Time_float.now ()) in
       match%map
         build ~logger ~precomputed_values ~trust_system ~verifier
           ~get_completed_work:(Fn.const None) ~parent:parent_breadcrumb
@@ -563,8 +565,8 @@ module For_tests = struct
       ~sender:_ ~transition_receipt_time:_ () :
       ( t
       , [> `Fatal_error of exn
-        | `Invalid_staged_ledger_diff of Core_kernel.Error.t
-        | `Invalid_staged_ledger_hash of Core_kernel.Error.t ] )
+        | `Invalid_staged_ledger_diff of Error.t
+        | `Invalid_staged_ledger_hash of Error.t ] )
       result
       Async_kernel.Deferred.t =
     Deferred.return

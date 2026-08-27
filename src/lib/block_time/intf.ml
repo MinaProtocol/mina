@@ -1,9 +1,12 @@
 module type S = sig
   open Async_kernel
-  open Core_kernel
+  open Core
   open Snark_params
   open Snark_bits
 
+  (** Unsigned uint64 milliseconds since epoch.  All uint64-domain operations
+      are total; only conversion to float-backed [Core.Time.t] is partial
+      (values >= 2^63), isolated in {!to_time_opt}. *)
   module Time : sig
     type t [@@deriving sexp, compare, yojson]
 
@@ -26,12 +29,12 @@ module type S = sig
           [disable_setting_offset] must not have been called, otherwise this
           raises a [Failure].
       *)
-      val set_time_offset : Time.Span.t -> unit
+      val set_time_offset : Time_float.Span.t -> unit
 
       (** Get the current time offset, either from the [MINA_TIME_OFFSET]
           environment variable, or as last set by [set_time_offset].
       *)
-      val get_time_offset : logger:Logger.t -> Time.Span.t
+      val get_time_offset : logger:Logger.t -> Time_float.Span.t
 
       (** Disallow setting the time offset. This should be run at every
           entrypoint which does not explicitly need to update the time offset.
@@ -102,9 +105,10 @@ module type S = sig
         end
       end
 
-      val of_time_span : Time.Span.t -> t
+      val of_time_span : Time_float.Span.t -> t
 
-      val to_time_span : t -> Time.Span.t
+      (** Lossy for large spans; never raises. *)
+      val to_time_span : t -> Time_float.Span.t
 
       module Bits : Bits_intf.Convertible_bits with type t := t
 
@@ -113,9 +117,9 @@ module type S = sig
           with type Unpacked.value = t
            and type Packed.value = t
 
-      val to_time_ns_span : t -> Core_kernel.Time_ns.Span.t
+      val to_time_ns_span : t -> Time_ns.Span.t
 
-      val of_time_ns_span : Core_kernel.Time_ns.Span.t -> t
+      val of_time_ns_span : Time_ns.Span.t -> t
 
       val to_string_hum : t -> string
 
@@ -181,9 +185,13 @@ module type S = sig
 
     val modulus : t -> Span.t -> Span.t
 
-    val of_time : Time.t -> t
+    val of_time : Time_float.t -> t
 
-    val to_time_exn : t -> Time.t
+    (** [None] when [t >= 2^63] (unrepresentable as [Time_float.t]). *)
+    val to_time_opt : t -> Time_float.t option
+
+    (** Raises when [t >= 2^63]. *)
+    val to_time_exn : t -> Time_float.t
 
     val now : Controller.t -> t
 
@@ -197,14 +205,16 @@ module type S = sig
 
     val of_time_ns : Time_ns.t -> t
 
+    (** Total; the [_exn] suffix is retained to avoid a rename. *)
     val to_string_exn : t -> string
 
-    (** Strip time offset *)
+    (** Strip time offset.  Total; never raises. *)
     val to_string_system_time_exn : Controller.t -> t -> string
 
     (** Strip time offset *)
     val to_system_time : Controller.t -> t -> t
 
+    (** Parse unsigned decimal; rejects leading '-'. *)
     val of_string_exn : string -> t
 
     val gen_incl : t -> t -> t Quickcheck.Generator.t

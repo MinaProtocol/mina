@@ -21,6 +21,13 @@ source "${SCRIPTPATH}"/helper.sh
 # shellcheck disable=SC1090,SC1091
 source "${SCRIPTPATH}"/../../buildkite/scripts/docker/gar-cache.sh
 
+# Several services assemble their Dockerfile by concatenating staged fragments
+# into a temp file (see the SERVICE case below); they all assign the same
+# variable, so one trap cleans up whichever branch ran -- including on the early
+# `exit 1` paths and on a failed docker build, where a tail-of-script rm would be
+# skipped and leak the file. Expands to a no-op rm when no temp file was made.
+trap 'rm -f "${TEMP_DOCKERFILE:-}"' EXIT
+
 function usage() {
   if [[ -n "$1" ]]; then
     echo -e "${RED}☞  $1${CLEAR}\n";
@@ -38,6 +45,7 @@ function usage() {
   echo "      --deb-profile         The profile string for the debian package to install"
   echo "      --deb-build-flags     The build-flags string for the debian package to install"
   echo "      --deb-suffix          The debian suffix to use for the docker image"
+  echo "      --base-image          (Optional) Published mina-base image to use for the shared base-deps stage of a staged build, instead of rebuilding that stage inline. Ignored when the image is not present locally."
   echo "  -c, --cache-from          Docker cache source image(s) to use for build caching"
   echo "      --custom-suffix       A custom suffix to append to the docker tag (e.g. -instrumented)"
   echo "      --custom-arg          Custom build arg to pass to docker build (e.g. --build-arg my_arg=value)"
@@ -79,16 +87,13 @@ while [[ "$#" -gt 0 ]]; do case $1 in
   --deb-release) INPUT_RELEASE="$2"; shift;;
   --deb-version) DEB_VERSION="$2"; shift;;
   --deb-legacy-version) INPUT_LEGACY_VERSION="$2"; shift;;
-  --deb-storage-repair-version) INPUT_STORAGE_REPAIR_VERSION="$2"; shift;;
   --deb-profile) DEB_PROFILE="$2"; shift;;
-  --deb-repo) INPUT_REPO="$2"; shift;;
   --deb-arch) DEB_ARCH="$2"; shift;;
   --deb-build-flags) DEB_BUILD_FLAGS="$2"; shift;;
   --deb-suffix) export DOCKER_DEB_SUFFIX="$2"; shift;;
-  --deb-repo-key)
-      # shellcheck disable=SC2034
-      DEB_REPO_KEY="$2"; shift;;
   --custom-arg) CUSTOM_ARG="$2"; shift;;
+  --docker-target) INPUT_DOCKER_TARGET="$2"; shift;;
+  --base-image) INPUT_BASE_IMAGE="$2"; shift;;
   *) echo "Unknown parameter passed: $1"; exit 1;;
 esac; shift; done
 
@@ -118,13 +123,6 @@ if [[ -z "${INPUT_BRANCH:-}" ]]; then
   BRANCH="--build-arg MINA_BRANCH=compatible"
 else
   BRANCH="--build-arg MINA_BRANCH=$INPUT_BRANCH"
-fi
-
-if [[ -z "${INPUT_STORAGE_REPAIR_VERSION:-}" ]]; then
-  echo "Debian storage repair version is not set. Using the default (unset)"
-  DEB_STORAGE_REPAIR_VERSION=""
-else
-  DEB_STORAGE_REPAIR_VERSION="--build-arg deb_storage_repair_version=$INPUT_STORAGE_REPAIR_VERSION"
 fi
 
 if [[ -z "${MINA_REPO:-}" ]]; then
@@ -205,27 +203,14 @@ else
   CACHE="--cache-from $INPUT_CACHE"
 fi
 
-if [[ -z "${INPUT_REPO:-}" ]]; then
-  echo "Debian repository is not set. Using the default (http://localhost:8080)"
-  DEB_REPO="--build-arg deb_repo=http://localhost:8080"
-else
-  echo "Using provided Debian repository: $INPUT_REPO"
-  DEB_REPO="--build-arg deb_repo=$INPUT_REPO"
-fi
-
-GW=$(docker network inspect bridge --format '{{(index .IPAM.Config 0).Gateway}}')
-LOCALHOST_REPLACEMENT=$GW
-if [[ -z "${INPUT_REPO:-}" ]]; then
-  echo "Debian repository is not set. Using the default (http://$LOCALHOST_REPLACEMENT:8080)"
-  DEB_REPO="--build-arg deb_repo=http://$LOCALHOST_REPLACEMENT:8080"
-else
-  echo "Converting localhost to $LOCALHOST_REPLACEMENT in repository URL"
-  CONVERTED_REPO=$(echo "$INPUT_REPO" | sed "s/localhost/$LOCALHOST_REPLACEMENT/g")
-  DEB_REPO="--build-arg deb_repo=$CONVERTED_REPO"
-fi
-
+# The mina packages are installed from the .deb files staged into the build
+# context (see the _debs staging below), never from an apt repository, so the
+# build takes no Debian repository argument at all. The only URL left to pass in
+# is the optional apt cache proxy, and "localhost" in it must be rewritten to the
+# docker bridge gateway: the host resolves it, the build container does not.
 APT_CACHE_ARG=""
 if [[ -n "${APT_CACHE_PROXY:-}" ]]; then
+  LOCALHOST_REPLACEMENT=$(docker network inspect bridge --format '{{(index .IPAM.Config 0).Gateway}}')
   CONVERTED_PROXY=$(echo "$APT_CACHE_PROXY" | sed "s/localhost/$LOCALHOST_REPLACEMENT/g")
   # Probe proxy reachability before passing to Docker build; fall back to direct if unreachable
   if curl -so /dev/null --connect-timeout 2 --max-time 4 "$CONVERTED_PROXY" 2>/dev/null; then
@@ -244,14 +229,81 @@ export_base_image
 IMAGE="$(rewrite_via_gar_cache "${IMAGE}")"
 export IMAGE="--build-arg image=${IMAGE}"
 
+# --base-image lets a staged build reuse the PUBLISHED mina-base image for its
+# shared base-deps stage instead of re-executing that stage, which is the
+# expensive part of the build (apt-get update/upgrade + the gcloud SDK tarball).
+# The CI step preloads the image from the storagebox cache with
+# load_from_cache.sh; we only consult the local docker daemon here.
+#
+# Availability is deliberately soft: if the image is not present -- nothing
+# published for this pin yet, a cold/janitored cache, or any local build -- we
+# inline the fragment exactly as before. That keeps the build correct in every
+# environment and costs only the speedup, rather than making every daemon and
+# archive build hard-depend on a cache entry existing.
+STAGED_BASE_IMAGE=""
+if [[ -n "${INPUT_BASE_IMAGE:-}" ]]; then
+  if docker image inspect "${INPUT_BASE_IMAGE}" >/dev/null 2>&1; then
+    STAGED_BASE_IMAGE="${INPUT_BASE_IMAGE}"
+    echo "Reusing published base image ${STAGED_BASE_IMAGE} for the base-deps stage"
+  else
+    echo "WARNING: base image ${INPUT_BASE_IMAGE} not available locally; building the base-deps stage inline"
+  fi
+fi
+
+# Assemble a staged Dockerfile into $1 from the shared base-deps stage followed
+# by the fragments listed in $2... The base-deps stage is either the published
+# image (one FROM, reusing the existing --build-arg image plumbing so the
+# reference is never baked into a Dockerfile) or the inlined fragment.
+function assemble_staged_dockerfile () {
+  local out="$1"
+  shift
+  if [[ -n "$STAGED_BASE_IMAGE" ]]; then
+    printf 'ARG image\nFROM ${image} AS base-deps\n' > "$out"
+    export IMAGE="--build-arg image=${STAGED_BASE_IMAGE}"
+  else
+    cat dockerfiles/stages/1-base-deps > "$out"
+  fi
+  cat "$@" >> "$out"
+}
+
 CUSTOM_ARG=${CUSTOM_ARG:-""}
 
+# Network segment of the generic base image that the install-config FROM line
+# pulls. Empty for the daemon (network-free generic), "-<network>" for rosetta
+# (per-network generic). Set per-service below.
+GENERIC_NETWORK_SEG=""
+
+# Target stage to stop at for staged (multi-fragment) Dockerfiles. Each staged
+# service sets a sensible default below; --docker-target overrides it. Empty
+# means "build the final stage" (no --target passed to buildx).
+DOCKER_TARGET="${INPUT_DOCKER_TARGET:-}"
+
 case "${SERVICE}" in
+    mina-base)
+        # Build ONLY the shared, mina-unrelated common base layer. This image is
+        # published to docker.io as a reference image and saved/loaded via the CI cache.
+        TEMP_DOCKERFILE=$(mktemp "${TMPDIR:-/tmp}"/Dockerfile-mina-base.XXXXXX)
+        cat dockerfiles/stages/1-base-deps > "$TEMP_DOCKERFILE"
+        DOCKERFILE_PATH="$TEMP_DOCKERFILE"
+        DOCKER_TARGET="${INPUT_DOCKER_TARGET:-base-deps}"
+        ;;
     mina-archive)
-        DOCKERFILE_PATH="dockerfiles/Dockerfile-mina-archive"
+        # Staged build: shared base-deps + archive-specific stage.
+        TEMP_DOCKERFILE=$(mktemp "${TMPDIR:-/tmp}"/Dockerfile-mina-archive.XXXXXX)
+        assemble_staged_dockerfile "$TEMP_DOCKERFILE" dockerfiles/stages/archive/2-mina-archive
+        DOCKERFILE_PATH="$TEMP_DOCKERFILE"
+        DOCKER_TARGET="${INPUT_DOCKER_TARGET:-mina-archive}"
         ;;
     mina-daemon)
-        DOCKERFILE_PATH="dockerfiles/Dockerfile-mina-daemon"
+        # Staged build: shared base-deps + daemon stage + opt-in prefork-genesis stage.
+        # Default target is the daemon stage (the CONFIGLESS generic daemon, tagged
+        # "<version>-generic" with no network segment); the prefork-genesis layer is
+        # opt-in via --docker-target mina-daemon-prefork-genesis.
+        TEMP_DOCKERFILE=$(mktemp "${TMPDIR:-/tmp}"/Dockerfile-mina-daemon.XXXXXX)
+        assemble_staged_dockerfile "$TEMP_DOCKERFILE" dockerfiles/stages/daemon/2-mina-daemon dockerfiles/stages/daemon/3-prefork-genesis
+        DOCKERFILE_PATH="$TEMP_DOCKERFILE"
+        DOCKER_TARGET="${INPUT_DOCKER_TARGET:-mina-daemon}"
+        export NETWORKLESS_TAG=1
         ;;
     mina-daemon-configured)
         DOCKERFILE_PATH="dockerfiles/Dockerfile-install-config"
@@ -260,8 +312,25 @@ case "${SERVICE}" in
         # Override VERSION_ARG to keep it, then set VERSION to current commit for output tags.
         VERSION_ARG_OVERRIDE="--build-arg version=$VERSION"
         ;;
+    mina-daemon-profiled)
+        # Profiled image = the network-free generic base + a baked profile hint
+        # package (mina-${profile}-profile, or mina-lightnet / mina-dev).
+        # Layered like the configured image.
+        DOCKERFILE_PATH="dockerfiles/Dockerfile-install-profile"
+        SERVICE="mina-daemon"
+        VERSION_ARG_OVERRIDE="--build-arg version=$VERSION"
+        # Tag is "<version>-<profile>-generic" (devnet/mainnet) or "<version>-lightnet"
+        # (lightnet); no network segment.
+        export NETWORKLESS_TAG=1
+        export PROFILED_TAG=1
+        ;;
     mina-daemon-legacy-hardfork)
-        DOCKERFILE_PATH="dockerfiles/Dockerfile-mina-daemon"
+        # Same staged daemon assembly as mina-daemon, but the legacy-hardfork image
+        # needs the prefork-genesis layer, so default to that (opt-in) stage.
+        TEMP_DOCKERFILE=$(mktemp "${TMPDIR:-/tmp}"/Dockerfile-mina-daemon-legacy.XXXXXX)
+        assemble_staged_dockerfile "$TEMP_DOCKERFILE" dockerfiles/stages/daemon/2-mina-daemon dockerfiles/stages/daemon/3-prefork-genesis
+        DOCKERFILE_PATH="$TEMP_DOCKERFILE"
+        DOCKER_TARGET="${INPUT_DOCKER_TARGET:-mina-daemon-prefork-genesis}"
         ;;
     mina-daemon-auto-hardfork)
         if [[ -z "$INPUT_LEGACY_VERSION" ]]; then
@@ -269,27 +338,32 @@ case "${SERVICE}" in
           echo "Please provide the --deb-legacy-version argument."
           exit 1
         fi
-        DOCKERFILE_PATH="dockerfiles/Dockerfile-mina-daemon-auto-hardfork"
+        # Staged build: shared base-deps + the auto-hardfork stage (postfork
+        # metapackage at deb_version + legacy prefork at deb_legacy_version).
+        TEMP_DOCKERFILE=$(mktemp "${TMPDIR:-/tmp}"/Dockerfile-mina-daemon-auto-hardfork.XXXXXX)
+        assemble_staged_dockerfile "$TEMP_DOCKERFILE" dockerfiles/stages/daemon/4-auto-hardfork
+        DOCKERFILE_PATH="$TEMP_DOCKERFILE"
+        DOCKER_TARGET="${INPUT_DOCKER_TARGET:-mina-daemon-auto-hardfork}"
         ;;
     mina-toolchain)
         # Create temp combined Dockerfile so we can use a build context (needed for COPY)
-        TEMP_DOCKERFILE=$(mktemp /tmp/Dockerfile-toolchain.XXXXXX)
+        TEMP_DOCKERFILE=$(mktemp "${TMPDIR:-/tmp}"/Dockerfile-toolchain.XXXXXX)
         cat dockerfiles/toolchain/1-build-deps dockerfiles/toolchain/2-opam-deps dockerfiles/toolchain/3-toolchain > "$TEMP_DOCKERFILE"
         DOCKERFILE_PATH="$TEMP_DOCKERFILE"
         ;;
-    mina-batch-txn)
-        DOCKERFILE_PATH="dockerfiles/Dockerfile-txn-burst"
-        ;;
     mina-rosetta)
-        DOCKERFILE_PATH="dockerfiles/Dockerfile-mina-rosetta"
+        # Staged build: rosetta's own heavy base + mina-rosetta stage.
+        TEMP_DOCKERFILE=$(mktemp "${TMPDIR:-/tmp}"/Dockerfile-mina-rosetta.XXXXXX)
+        cat dockerfiles/stages/rosetta/1-base-deps dockerfiles/stages/rosetta/2-mina-rosetta > "$TEMP_DOCKERFILE"
+        DOCKERFILE_PATH="$TEMP_DOCKERFILE"
+        DOCKER_TARGET="${INPUT_DOCKER_TARGET:-mina-rosetta}"
         ;;
     mina-rosetta-configured)
         DOCKERFILE_PATH="dockerfiles/Dockerfile-install-config"
         SERVICE="mina-rosetta"
         VERSION_ARG_OVERRIDE="--build-arg version=$VERSION"
-        ;;
-    mina-zkapp-test-transaction)
-        DOCKERFILE_PATH="dockerfiles/Dockerfile-zkapp-test-transaction"
+        # The rosetta generic base image is still per-network ("<version>-<network>-generic").
+        GENERIC_NETWORK_SEG="-${INPUT_NETWORK}"
         ;;
     delegation-backend)
         DOCKERFILE_PATH="dockerfiles/Dockerfile-delegation-backend"
@@ -348,23 +422,54 @@ export_docker_tag
 # Dockerfile-install-config:16 is
 #   FROM ${docker_repo}/${image_name}:${version}-${network}-generic${build_flags_suffix}${custom_suffix}
 # so we reconstruct that ref from build-args available here.
-if [[ "${DOCKERFILE_PATH}" == "dockerfiles/Dockerfile-install-config" ]]; then
+if [[ "${DOCKERFILE_PATH}" == "dockerfiles/Dockerfile-install-config" || "${DOCKERFILE_PATH}" == "dockerfiles/Dockerfile-install-profile" ]]; then
     _dep_image_name="${IMAGE_NAME:-mina-daemon}"
     _dep_version="${VERSION_ARG#--build-arg version=}"
-    _dep_network="${INPUT_NETWORK:-devnet}"
     # BUILD_FLAGS_SUFFIX_ARG is set by export_suffixes (called inside
     # export_docker_tag) and looks like "--build-arg build_flags_suffix=-instrumented".
     _dep_build_flags="${BUILD_FLAGS_SUFFIX_ARG#--build-arg build_flags_suffix=}"
     _dep_custom="${CUSTOM_SUFFIX_ARG#--build-arg custom_suffix=}"
-    _dep_tag="${_dep_version}-${_dep_network}-generic${_dep_build_flags}${_dep_custom}"
+    # The daemon generic base is network-free ("<version>-generic"); the rosetta
+    # generic base is per-network ("<version>-<network>-generic"). GENERIC_NETWORK_SEG
+    # is "" for daemon and "-<network>" for rosetta.
+    _dep_tag="${_dep_version}${GENERIC_NETWORK_SEG}-generic${_dep_build_flags}${_dep_custom}"
     _rewritten_repo="$(rewrite_docker_repo_via_gar_cache "${DOCKER_REGISTRY}" "${_dep_image_name}" "${_dep_tag}")"
     DOCKER_REPO_ARG="--build-arg docker_repo=${_rewritten_repo}"
-    unset _dep_image_name _dep_version _dep_network _dep_build_flags _dep_custom _dep_tag _rewritten_repo
+    unset _dep_image_name _dep_version _dep_build_flags _dep_custom _dep_tag _rewritten_repo
+fi
+
+# FORCE_DOCKER_OVERWRITE — when set (to any non-empty value), allows pushing a
+# Docker image even if the tag already exists in the remote registry. Without it
+# the script errors out to prevent silent overwrites (e.g. a hardfork build
+# accidentally replacing a release devnet image). The variable is expected to be
+# set at the Buildkite pipeline level so that hardfork pipelines can opt in while
+# regular release pipelines remain protected.
+# Checked before the build so we fail fast rather than after a long buildx run.
+if [[ "${DOCKER_ACTION}" == "push" ]]; then
+  if docker manifest inspect "$TAG" > /dev/null 2>&1; then
+    if [[ -n "${FORCE_DOCKER_OVERWRITE:-}" ]]; then
+      echo "⚠️  Image $TAG already exists in the registry. Overwriting (FORCE_DOCKER_OVERWRITE is set)."
+    else
+      echo "❌ Image $TAG already exists in the registry. Refusing to overwrite."
+      echo "   To overwrite, set FORCE_DOCKER_OVERWRITE=1"
+      exit 1
+    fi
+  fi
 fi
 
 BUILD_NETWORK="--allow=network.host"
 
-docker buildx build --load --network=host --progress=plain $PLATFORM $DOCKER_REPO_ARG $NO_CACHE $BUILD_NETWORK $CACHE $NETWORK $IMAGE $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $DOCKER_DEB_SUFFIX_ARG $BUILD_FLAGS_SUFFIX_ARG $DEB_REPO $APT_CACHE_ARG $BRANCH $REPO $LEGACY_VERSION $CUSTOM_SUFFIX_ARG $CUSTOM_ARG $DEB_ARCH $DEB_STORAGE_REPAIR_VERSION $IMAGE_NAME_ARG $VERSION_ARG "$DOCKER_CONTEXT" -t "$TAG" -t "$HASHTAG" -f $DOCKERFILE_PATH
+TARGET_ARG=""
+if [[ -n "${DOCKER_TARGET:-}" ]]; then
+  TARGET_ARG="--target ${DOCKER_TARGET}"
+fi
+
+docker buildx build --load --network=host --progress=plain $PLATFORM $TARGET_ARG $DOCKER_REPO_ARG $NO_CACHE $BUILD_NETWORK $CACHE $NETWORK $IMAGE $DEB_CODENAME $DEB_RELEASE $DEB_VERSION --build-arg deb_profile="$DEB_PROFILE" --build-arg generic_network="$GENERIC_NETWORK_SEG" $DOCKER_DEB_SUFFIX_ARG $BUILD_FLAGS_SUFFIX_ARG $APT_CACHE_ARG $BRANCH $REPO $LEGACY_VERSION $CUSTOM_SUFFIX_ARG $CUSTOM_ARG $DEB_ARCH $IMAGE_NAME_ARG $VERSION_ARG "$DOCKER_CONTEXT" -t "$TAG" -t "$HASHTAG" -f $DOCKERFILE_PATH
+
+# Local hash tag: --save-to-ci-cache saves it, and --load-only consumers look
+# the image up by it. Also set by buildx above, and re-asserted here because the
+# local image store is not stable on agents shared between concurrent jobs.
+docker tag "$TAG" "$HASHTAG"
 
 if [[ -n "${SAVE_TO_CI_CACHE_ROOT:-}" ]]; then
 
@@ -391,14 +496,20 @@ fi
 
 if [[ "$DOCKER_ACTION" == "push" ]]; then
   docker push "$TAG"
-  docker push "$HASHTAG"
+
+  # The hash tag is an alias for a manifest that is now in the registry, so add
+  # it there instead of pushing the local tag again. A second `docker push`
+  # re-reads the local image store, which is not stable on agents shared between
+  # concurrent jobs, and fails with "tag does not exist" when the tag is evicted
+  # during the (multi-GB, multi-minute) push above.
+  #
+  # This publishes the hash tag as a single-entry manifest list, so it does not
+  # share a top-level digest with $TAG; both resolve to the same image, and
+  # consumers pull/run it, which handles a list transparently.
+  echo "📎 Tagging pushed image as ${HASHTAG} (registry-side)"
+  docker buildx imagetools create --tag "$HASHTAG" "$TAG"
 else
   echo "Skipping push to remote registry, image loaded to local docker daemon only."
-fi
-
-# Clean up temp Dockerfile if one was created
-if [[ -n "${TEMP_DOCKERFILE:-}" ]]; then
-  rm -f "$TEMP_DOCKERFILE"
 fi
 
 echo "✅ Docker image for service ${SERVICE} built successfully."

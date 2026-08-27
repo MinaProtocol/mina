@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Yojson.Safe.Util
 open Mina_base
 

@@ -1,5 +1,5 @@
 open Async_kernel
-open Core_kernel
+open Core
 open Mina_base
 open Mina_transaction
 open Pipe_lib
@@ -149,7 +149,7 @@ module type Resource_pool_intf = sig
       remove it from the set of potentially-rebroadcastable item.
   *)
   val get_rebroadcastable :
-    t -> has_timed_out:(Time.t -> [ `Timed_out | `Ok ]) -> Diff.t list
+    t -> has_timed_out:(Time_float.t -> [ `Timed_out | `Ok ]) -> Diff.t list
 end
 
 module type Broadcast_callback = sig
@@ -224,7 +224,7 @@ module type Network_pool_base_intf = sig
     -> logger:Logger.t
     -> log_gossip_heard:bool
     -> on_remote_push:(unit -> unit Deferred.t)
-    -> block_window_duration:Time.Span.t
+    -> block_window_duration:Time_float.Span.t
     -> t * Remote_sink.t * Local_sink.t
 
   val of_resource_pool_and_diffs :
@@ -234,7 +234,7 @@ module type Network_pool_base_intf = sig
     -> tf_diffs:transition_frontier_diff Strict_pipe.Reader.t
     -> log_gossip_heard:bool
     -> on_remote_push:(unit -> unit Deferred.t)
-    -> block_window_duration:Time.Span.t
+    -> block_window_duration:Time_float.Span.t
     -> t * Remote_sink.t * Local_sink.t
 
   val resource_pool : t -> resource_pool
@@ -300,7 +300,7 @@ end
 module type Snark_pool_diff_intf = sig
   type resource_pool
 
-  type t = Mina_wire_types.Network_pool.Snark_pool.Diff_versioned.V2.t =
+  type t = Mina_wire_types.Network_pool.Snark_pool.Diff_versioned.V3.t =
     | Add_solved_work of
         Transaction_snark_work.Statement.t
         * Ledger_proof.t One_or_two.t Priced_proof.t
@@ -314,11 +314,11 @@ module type Snark_pool_diff_intf = sig
       | Empty
 
     val read_all_proofs_from_disk :
-      t -> Mina_wire_types.Network_pool.Snark_pool.Diff_versioned.V2.t
+      t -> Mina_wire_types.Network_pool.Snark_pool.Diff_versioned.V3.t
 
     val write_all_proofs_to_disk :
          proof_cache_db:Proof_cache_tag.cache_db
-      -> Mina_wire_types.Network_pool.Snark_pool.Diff_versioned.V2.t
+      -> Mina_wire_types.Network_pool.Snark_pool.Diff_versioned.V3.t
       -> t
   end
 

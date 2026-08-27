@@ -78,7 +78,13 @@ export PG_CONN=postgres://${POSTGRES_USERNAME}:${POSTGRES_USERNAME}@127.0.0.1:54
 
 # Mina Archive variables
 export MINA_ARCHIVE_PORT=${MINA_ARCHIVE_PORT:=3086}
-export MINA_ARCHIVE_SQL_SCHEMA_PATH=${MINA_ARCHIVE_SQL_SCHEMA_PATH:=/etc/mina/archive/create_schema.sql}
+# Prefer the deb-installed schema; fall back to the in-repo copy when running
+# from bare binaries (no mina-archive deb present).
+DEB_ARCHIVE_SQL_SCHEMA_PATH=/etc/mina/archive/create_schema.sql
+if [ ! -f "$DEB_ARCHIVE_SQL_SCHEMA_PATH" ]; then
+  DEB_ARCHIVE_SQL_SCHEMA_PATH=./src/app/archive/create_schema.sql
+fi
+export MINA_ARCHIVE_SQL_SCHEMA_PATH=${MINA_ARCHIVE_SQL_SCHEMA_PATH:=$DEB_ARCHIVE_SQL_SCHEMA_PATH}
 
 # Mina Rosetta variables
 export MINA_ROSETTA_ONLINE_PORT=${MINA_ROSETTA_ONLINE_PORT:=3087}
@@ -100,7 +106,13 @@ export MINA_GRAPHQL_PORT=${MINA_GRAPHQL_PORT:=3085}
 # Files from ROSETTA_CLI_CONFIG_FILES will be read from
 # ROSETTA_CONFIGURATION_INPUT_DIR and some placeholders will be
 # substituted.
-ROSETTA_CONFIGURATION_INPUT_DIR=${ROSETTA_CONFIGURATION_INPUT_DIR:=/etc/mina/rosetta/rosetta-cli-config}
+# Prefer the deb-installed rosetta-cli-config templates; fall back to the
+# in-repo copies when running from bare binaries (no mina-rosetta deb present).
+DEB_ROSETTA_CONFIGURATION_INPUT_DIR=/etc/mina/rosetta/rosetta-cli-config
+if [ ! -d "$DEB_ROSETTA_CONFIGURATION_INPUT_DIR" ]; then
+  DEB_ROSETTA_CONFIGURATION_INPUT_DIR=./src/app/rosetta/rosetta-cli-config
+fi
+ROSETTA_CONFIGURATION_INPUT_DIR=${ROSETTA_CONFIGURATION_INPUT_DIR:=$DEB_ROSETTA_CONFIGURATION_INPUT_DIR}
 ROSETTA_CLI_CONFIG_FILES=${ROSETTA_CLI_CONFIG_FILES:="config.json mina.ros"}
 ROSETTA_CLI_MAIN_CONFIG_FILE=${ROSETTA_CLI_MAIN_CONFIG_FILE:="config.json"}
 
@@ -211,7 +223,13 @@ sudo pg_ctlcluster ${POSTGRES_VERSION} main start || true
 sudo pg_dropcluster --stop ${POSTGRES_VERSION} main || true
 sudo mkdir -p ${POSTGRES_DATA_DIR}
 sudo chown postgres:postgres ${POSTGRES_DATA_DIR}
-sudo pg_createcluster --start -d ${POSTGRES_DATA_DIR} --createclusterconf /etc/mina/rosetta/scripts/postgresql.conf ${POSTGRES_VERSION} main
+# Prefer the deb-installed postgres cluster config; fall back to the in-repo
+# copy when running from bare binaries (no mina-rosetta deb present).
+POSTGRES_CLUSTER_CONF=${POSTGRES_CLUSTER_CONF:=/etc/mina/rosetta/scripts/postgresql.conf}
+if [ ! -f "$POSTGRES_CLUSTER_CONF" ]; then
+  POSTGRES_CLUSTER_CONF=./src/app/rosetta/scripts/postgresql.conf
+fi
+sudo pg_createcluster --start -d ${POSTGRES_DATA_DIR} --createclusterconf "${POSTGRES_CLUSTER_CONF}" ${POSTGRES_VERSION} main
 sudo -u postgres psql --command "CREATE USER ${POSTGRES_USERNAME} WITH SUPERUSER PASSWORD '${POSTGRES_USERNAME}';"
 sudo -u postgres createdb -O ${POSTGRES_USERNAME} ${POSTGRES_DBNAME}
 psql -f "${MINA_ARCHIVE_SQL_SCHEMA_PATH}" "${PG_CONN}"
