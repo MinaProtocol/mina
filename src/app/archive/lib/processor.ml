@@ -4801,6 +4801,16 @@ let hardfork_state_of_config ~config_json =
         ; source = "daemon_config"
         }
 
+(** Make text safe to put inside a log message.
+
+    The logger reads [$name] in a message as an interpolation placeholder and
+    refuses to emit a message whose placeholders have no matching metadata. Text
+    that came from somewhere else is data, not a template, and Postgres error
+    text in particular quotes the statement it failed on -- [$1], [$2] and all.
+    Formatting one of those into a message turns the whole line into "invalid
+    log call", losing exactly the diagnostic that was worth having. *)
+let for_log_message = String.tr ~target:'$' ~replacement:'.'
+
 (** Settle the chain boundary a hard fork leaves behind.
 
     After a fork the last blocks before it are stuck: canonicalisation only
@@ -4994,7 +5004,7 @@ module Hardfork_finaliser = struct
                     [%log info]
                       "Not settling the fork boundary yet: %s. This will be \
                        retried."
-                      (describe reason) ;
+                      (for_log_message (describe reason)) ;
                     let%map (_ : bool) = unlock conn in
                     ()
                 | Ok (fork_block, ancestry) ->
@@ -5438,7 +5448,7 @@ module Hand_over = struct
         (* Ordinary on a database that has never seen a fork. *)
         return ()
     | Error reason ->
-        let detail = Fork_genesis_block.describe reason in
+        let detail = for_log_message (Fork_genesis_block.describe reason) in
         if still_expected then
           [%log info]
             "The hand-over is waiting on the genesis ledger: %s. Nothing else \
@@ -5475,7 +5485,7 @@ module Hand_over = struct
         | Error msg ->
             [%log info]
               "Cannot load the genesis accounts yet: %s. This will be retried."
-              msg )
+              (for_log_message msg) )
 
   (** Keep going until there is nothing left to do.
 
