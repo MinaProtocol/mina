@@ -15,6 +15,11 @@
 # path leaves behind -- removes the genesis, and lets the archive insert it
 # again. The child's parent_id must end up as the genesis's id.
 #
+# Then the same question for the other path that inserts a genesis block: the
+# one --config-file takes at startup. It has the same gap for the same reason,
+# and an archive that ingested blocks before it was given a configuration is
+# exactly where it bites.
+#
 # Hermetic: the configuration carries its ledger as inline accounts, so nothing
 # is fetched. Needs docker and a built archive.exe.
 
@@ -149,8 +154,49 @@ echo "  the genesis's block id:   ${GENID:-absent}"
 
 echo
 if [[ -n "$GENID" && "$LINKED" == "$GENID" ]]; then
-  echo "=== PASS: the genesis adopted the child"
+  echo "  ok: the genesis adopted the child"
 else
   echo "=== FAIL: the child's parent_id is $LINKED, the genesis is ${GENID:-absent}"
+  exit 1
+fi
+
+echo
+echo "=== pass 3: the same, through --config-file at startup"
+# That path resolves the configuration and inserts the genesis itself, with no
+# fork recorded anywhere. Clear the fork record so nothing else can do the work,
+# and orphan the child again.
+q "DELETE FROM hardfork_state;" >/dev/null
+q "UPDATE blocks SET parent_id = NULL WHERE state_hash='ORPHANED_CHILD_OF_THE_GENESIS';" >/dev/null
+q "DELETE FROM blocks WHERE state_hash = '$GEN';" >/dev/null
+
+BEFORE=$(q "SELECT coalesce(parent_id::text,'NULL') FROM blocks WHERE state_hash='ORPHANED_CHILD_OF_THE_GENESIS';")
+echo "  child's parent_id before: $BEFORE"
+[[ "$BEFORE" == "NULL" ]] || { echo "=== FAIL: the child was not left unlinked"; exit 1; }
+
+"$ARCHIVE" run --postgres-uri "$CONN" --server-port 3113 --config-file "$CONF" \
+  > "$WORK/c.log" 2>&1 &
+APID=$!
+for _ in $(seq 1 120); do
+  grep -q "Archive process ready" "$WORK/c.log" 2>/dev/null && break
+  kill -0 "$APID" 2>/dev/null || break
+  sleep 1
+done
+LINKED3=NULL
+for _ in $(seq 1 30); do
+  LINKED3=$(q "SELECT coalesce(parent_id::text,'NULL') FROM blocks WHERE state_hash='ORPHANED_CHILD_OF_THE_GENESIS';")
+  [[ "$LINKED3" != "NULL" ]] && break
+  sleep 2
+done
+kill "$APID" 2>/dev/null; APID=""
+
+GENID3=$(q "SELECT id FROM blocks WHERE state_hash='$GEN';")
+echo "  child's parent_id after:  $LINKED3"
+echo "  the genesis's block id:   ${GENID3:-absent}"
+
+echo
+if [[ -n "$GENID3" && "$LINKED3" == "$GENID3" ]]; then
+  echo "=== PASS: both paths adopt the child"
+else
+  echo "=== FAIL: --config-file left the child at $LINKED3, the genesis is ${GENID3:-absent}"
   exit 1
 fi
