@@ -217,6 +217,15 @@ BEGIN
     RAISE NOTICE 'downgrade: leaving zkapp_{events,field_array}.element_ids without UNIQUE/index and events_id/actions_id nullable (cannot be safely restored on post-fix data)';
 END $$;
 
+-- 3c. Remove what the upgrade added for the automatic hard fork hand-over.
+--
+-- Unlike the changes above, this one is not lossy in the way that matters: the
+-- row describes a fork a berkeley-era archive has no use for, and the daemon
+-- sends its configuration again when the archive is upgraded.
+
+DROP TABLE IF EXISTS hardfork_state;
+DROP TYPE  IF EXISTS hardfork_source;
+
 -- 4. Update schema_history
 
 DO $$

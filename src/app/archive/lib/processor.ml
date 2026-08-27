@@ -4665,6 +4665,171 @@ let add_block_aux_extensional ~proof_cache_db ~logger ~signature_kind ?retries
     ~hash:(fun (block : Extensional.Block.t) -> block.state_hash)
     ~tokens_used:block.Extensional.Block.tokens_used block
 
+(** What the archive knows about a hard fork it is passing through.
+
+    At most one row ever exists. Several archive processes may share one
+    database, and a fork they disagreed about would be worse than a fork
+    neither had noticed, so the table is keyed to a single row and a
+    contradicting record is refused rather than reconciled. *)
+module Hardfork_state = struct
+  module T = struct
+    type t =
+      { fork_state_hash : string
+      ; fork_blockchain_length : int64
+      ; fork_global_slot : int64
+      ; config_json : string
+      ; source : string
+      }
+    [@@deriving hlist, fields]
+  end
+
+  include T
+
+  let typ =
+    Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
+      Caqti_type.[ string; int64; int64; string; string ]
+
+  (* `source` is an enum column, read and written as text with an explicit
+     cast. It carries no OCaml variant here: this module records what it is
+     told and interprets none of it.
+
+     There is no column for how far the hand-over has got. `finalized_at` is
+     that: NULL until the boundary is settled, a timestamp afterwards. A
+     separate stage column would hold the same one bit a second time. *)
+  let load_opt (module Conn : CONNECTION) =
+    Conn.find_opt
+      (Mina_caqti.find_opt_req Caqti_type.unit typ
+         {sql| SELECT fork_state_hash, fork_blockchain_length, fork_global_slot,
+                      config_json, source::text
+               FROM hardfork_state
+               WHERE id = 1
+         |sql} )
+      ()
+
+  let insert (module Conn : CONNECTION) (t : t) =
+    Conn.exec
+      (Mina_caqti.exec_req typ
+         {sql| INSERT INTO hardfork_state
+                 (id, fork_state_hash, fork_blockchain_length, fork_global_slot,
+                  config_json, source)
+               VALUES
+                 (1, ?, ?, ?, ?, ?::hardfork_source)
+         |sql} )
+      t
+
+  (** Record a fork we have been told about.
+
+      Idempotent by design: the configuration arrives on a heartbeat, so the
+      overwhelmingly common case is that we already have this exact row and
+      there is nothing to do.
+
+      Returns an error when a fork is already recorded with a different fork
+      block. That means two daemons disagree about where the chain forked, and
+      no automatic reconciliation is correct -- the archive must stop and let a
+      human look. *)
+  let record (module Conn : CONNECTION) ~logger (t : t) =
+    let open Deferred.Result.Let_syntax in
+    match%bind load_opt (module Conn) with
+    | None ->
+        let%map () = insert (module Conn) t in
+        [%log info]
+          "Recorded hard fork at block $state_hash, height $height, from \
+           $source"
+          ~metadata:
+            [ ("state_hash", `String t.fork_state_hash)
+            ; ("height", `String (Int64.to_string t.fork_blockchain_length))
+            ; ("source", `String t.source)
+            ]
+    | Some existing when String.equal existing.fork_state_hash t.fork_state_hash
+      ->
+        (* The heartbeat, or a restarted daemon. Nothing to do. *)
+        return ()
+    | Some existing ->
+        [%log error]
+          "Refusing a hard fork configuration for block $incoming: this \
+           database already records a fork at $existing. Two daemons disagree \
+           about where the chain forked; the archive will not choose between \
+           them."
+          ~metadata:
+            [ ("incoming", `String t.fork_state_hash)
+            ; ("existing", `String existing.fork_state_hash)
+            ] ;
+        return ()
+end
+
+(** Read the fork block's identity out of a runtime configuration.
+
+    The configuration is the only thing the daemon sends, so everything the
+    archive needs about the fork has to come from here: the [fork] stanza is
+    the fork block's identity, and the rest of the configuration is kept
+    verbatim for the later steps, which need the ledger hashes to locate and
+    verify the genesis ledger. *)
+let hardfork_state_of_config ~config_json =
+  let open Result.Let_syntax in
+  let%bind json =
+    Or_error.try_with (fun () -> Yojson.Safe.from_string config_json)
+    |> Result.map_error ~f:(fun e ->
+           sprintf "configuration is not valid JSON: %s" (Error.to_string_hum e) )
+  in
+  let%bind runtime_config = Runtime_config.of_yojson json in
+  match Runtime_config.fork runtime_config with
+  | None ->
+      Error
+        "configuration has no fork stanza, so it does not describe a forked \
+         network"
+  | Some { state_hash; blockchain_length; global_slot_since_genesis } ->
+      return
+        { Hardfork_state.fork_state_hash = state_hash
+        ; fork_blockchain_length = Int64.of_int blockchain_length
+        ; fork_global_slot = Int64.of_int global_slot_since_genesis
+        ; config_json
+        ; source = "daemon_config"
+        }
+
+let%test_module "hard fork configuration parsing" =
+  ( module struct
+    let fork_hash = "3NLoKn22eMnyQ7rxh5pxB6vBA3XhSAhhrf7akdqS6HbAKD14Dh1d"
+
+    let config_with_fork =
+      sprintf
+        {json|{"proof":{"fork":{"state_hash":"%s","blockchain_length":100,"global_slot_since_genesis":250}}}|json}
+        fork_hash
+
+    let%test_unit "reads the fork block's identity out of the fork stanza" =
+      match hardfork_state_of_config ~config_json:config_with_fork with
+      | Ok t ->
+          [%test_eq: string] t.Hardfork_state.fork_state_hash fork_hash ;
+          [%test_eq: int64] t.Hardfork_state.fork_blockchain_length 100L ;
+          [%test_eq: int64] t.Hardfork_state.fork_global_slot 250L
+      | Error msg ->
+          failwithf "expected the fork stanza to parse, got: %s" msg ()
+
+    let%test_unit "keeps the configuration verbatim for later steps" =
+      (* The later steps need the ledger hashes, so what we store has to be
+         the configuration as sent, not a re-serialisation of what we parsed. *)
+      match hardfork_state_of_config ~config_json:config_with_fork with
+      | Ok t ->
+          [%test_eq: string] t.Hardfork_state.config_json config_with_fork
+      | Error msg ->
+          failwithf "expected the fork stanza to parse, got: %s" msg ()
+
+    let%test_unit "rejects a configuration with no fork stanza" =
+      match hardfork_state_of_config ~config_json:{json|{"proof":{}}|json} with
+      | Ok _ ->
+          failwith
+            "a configuration without a fork stanza does not describe a forked \
+             network and must be rejected"
+      | Error _ ->
+          ()
+
+    let%test_unit "rejects text that is not JSON" =
+      match hardfork_state_of_config ~config_json:"not json at all" with
+      | Ok _ ->
+          failwith "expected invalid JSON to be rejected"
+      | Error _ ->
+          ()
+  end )
+
 (* receive blocks from a daemon, write them to the database *)
 let run pool reader ~proof_cache_db ~genesis_constants ~constraint_constants
     ~logger ~delete_older_than : unit Deferred.t =
@@ -4700,8 +4865,52 @@ let run pool reader ~proof_cache_db ~genesis_constants ~constraint_constants
             Deferred.unit
         | Ok () ->
             Deferred.unit )
+    | Diff.Transition_frontier (Hardfork_config _) ->
+        (* Answered at the RPC layer instead, so that the reply means the row
+           is written. See [record_hardfork_config]. *)
+        Deferred.unit
     | Transition_frontier _ ->
         Deferred.unit )
+
+(** Record a hard fork configuration the daemon sent us.
+
+    Called straight from the RPC handler rather than through the block pipe,
+    and that is the whole point. A [Synchronous] strict pipe releases its
+    writer as soon as the reader takes the message off it, before the reader
+    has done anything with it, so a reply sent that way tells the daemon only
+    that the archive queued something. The daemon exits moments after this
+    call, so the reply has to mean the row is committed.
+
+    For the same reason a failure raises rather than logs. The response type
+    is [unit], so raising is the only way to say no, and the daemon's dispatch
+    surfaces it as an error. A configuration it cannot parse is worth refusing
+    loudly: the archive would otherwise sit there with no record of the fork
+    while the daemon believed the hand-over had started. *)
+let record_hardfork_config ~logger ~pool ~config_json ~recorded =
+  match hardfork_state_of_config ~config_json with
+  | Error msg ->
+      [%log error]
+        "Refusing an unusable hard fork configuration from the daemon: $reason"
+        ~metadata:[ ("reason", `String msg) ] ;
+      failwithf "unusable hard fork configuration: %s" msg ()
+  | Ok hardfork_state -> (
+      match%map
+        Mina_caqti.Pool.use
+          (fun conn -> Hardfork_state.record conn ~logger hardfork_state)
+          pool
+      with
+      | Ok () ->
+          (* Filled after the write, so whatever watches this cannot act on a
+             fork that is not yet on record. Idempotent: the configuration
+             arrives on a heartbeat and this may be the tenth time. *)
+          Ivar.fill_if_empty recorded ()
+      | Error e ->
+          let msg = Caqti_error.show e in
+          [%log warn]
+            "Could not record the hard fork configuration: $error. The daemon \
+             is told, so it can try again."
+            ~metadata:[ ("error", `String msg) ] ;
+          failwithf "could not record the hard fork configuration: %s" msg () )
 
 (* [add_genesis_accounts] is called when starting the archive process *)
 let add_genesis_accounts ~logger ~(runtime_config_opt : Runtime_config.t option)
@@ -4862,11 +5071,64 @@ let serve_metrics_server ~logger ~metrics_server_port ~missing_blocks_width
       Deferred.forever () serve
 
 (* for running the archive process *)
+
+(** Run the schema upgrade script against this archive's database.
+
+    Shelled out to psql rather than run through the connection pool: the script
+    is many statements, and the driver speaks the extended query protocol,
+    which carries one statement per request. psql ships in the archive image
+    alongside the scripts it runs. *)
+let upgrade_schema ~logger ~postgres_address ~script =
+  let uri = Uri.to_string postgres_address in
+  match%map
+    Process.run ~prog:"psql"
+      ~args:[ uri; "-v"; "ON_ERROR_STOP=1"; "-q"; "-f"; script ]
+      ()
+  with
+  | Ok (_ : string) ->
+      [%log info] "Upgraded the archive schema using %s." script ;
+      Ok ()
+  | Error e ->
+      let msg = Error.to_string_hum e in
+      [%log error]
+        "Could not upgrade the archive schema using %s: %s. The database is \
+         left as it was, and this process is stopping so that nothing runs \
+         against a schema it does not match."
+        script msg ;
+      Error msg
+
+(** Stop, once the fork is recorded, so the dispatcher can start the successor.
+
+    The reply to the daemon goes out when the RPC handler returns, and nothing
+    reports when it has reached the wire, so this waits a moment before pulling
+    the process down. That grace is a courtesy rather than a correctness
+    measure: the row was committed before the handler returned, so a reply lost
+    to an early exit costs the daemon a log line and nothing else. *)
+let hand_over ~logger ~postgres_address ~hardfork_handling
+    ~schema_upgrade_script ~requested =
+  let open Hardfork_handling in
+  if not (exits hardfork_handling) then Deferred.unit
+  else
+    let%bind () = Ivar.read requested in
+    let%bind () = after (Time.Span.of_sec 5.) in
+    let%bind upgraded =
+      if upgrades_schema hardfork_handling then
+        upgrade_schema ~logger ~postgres_address ~script:schema_upgrade_script
+      else Deferred.return (Ok ())
+    in
+    let code = match upgraded with Ok () -> 0 | Error _ -> 1 in
+    [%log info]
+      "Stopping after recording the hard fork, as --hardfork-handling %s asks. \
+       The dispatcher decides which archive runs next."
+      (to_string hardfork_handling) ;
+    let%bind () = Writer.flushed (Lazy.force Writer.stderr) in
+    exit code
+
 let setup_server ~proof_cache_db ~(genesis_constants : Genesis_constants.t)
     ~(constraint_constants : Genesis_constants.Constraint_constants.t)
     ~metrics_server_port ~logger ~postgres_address ~server_port ~chunks_length
     ~delete_older_than ~runtime_config_opt ~missing_blocks_width ~signature_kind
-    =
+    ~hardfork_handling ~schema_upgrade_script =
   let where_to_listen =
     Async.Tcp.Where_to_listen.bind_to All_addresses (On_port server_port)
   in
@@ -4877,17 +5139,6 @@ let setup_server ~proof_cache_db ~(genesis_constants : Genesis_constants.t)
   let extensional_block_reader, extensional_block_writer =
     Strict_pipe.create ~name:"extensional_archive_block" Synchronous
   in
-  let implementations =
-    [ Async.Rpc.Rpc.implement Archive_rpc.t (fun () archive_diff ->
-          Strict_pipe.Writer.write writer archive_diff )
-    ; Async.Rpc.Rpc.implement Archive_rpc.precomputed_block
-        (fun () precomputed_block ->
-          Strict_pipe.Writer.write precomputed_block_writer precomputed_block )
-    ; Async.Rpc.Rpc.implement Archive_rpc.extensional_block
-        (fun () extensional_block ->
-          Strict_pipe.Writer.write extensional_block_writer extensional_block )
-    ]
-  in
   match Mina_caqti.connect_pool ~max_size:30 postgres_address with
   | Error e ->
       [%log error]
@@ -4895,6 +5146,31 @@ let setup_server ~proof_cache_db ~(genesis_constants : Genesis_constants.t)
         ~metadata:[ ("error", `String (Caqti_error.show e)) ] ;
       Deferred.unit
   | Ok pool ->
+      (* Filled by the RPC handler once a fork is on record. *)
+      let recorded = Ivar.create () in
+      hand_over ~logger ~postgres_address ~hardfork_handling
+        ~schema_upgrade_script ~requested:recorded
+      |> don't_wait_for ;
+      (* Bound here rather than above the pool: the hard fork configuration is
+         answered against the database inside the handler, so the handler needs
+         the pool. *)
+      let implementations =
+        [ Async.Rpc.Rpc.implement Archive_rpc.t (fun () archive_diff ->
+              match archive_diff with
+              | Diff.Transition_frontier (Hardfork_config { config_json }) ->
+                  record_hardfork_config ~logger ~pool ~config_json ~recorded
+              | _ ->
+                  Strict_pipe.Writer.write writer archive_diff )
+        ; Async.Rpc.Rpc.implement Archive_rpc.precomputed_block
+            (fun () precomputed_block ->
+              Strict_pipe.Writer.write precomputed_block_writer
+                precomputed_block )
+        ; Async.Rpc.Rpc.implement Archive_rpc.extensional_block
+            (fun () extensional_block ->
+              Strict_pipe.Writer.write extensional_block_writer
+                extensional_block )
+        ]
+      in
       let%bind () =
         add_genesis_accounts pool ~logger ~genesis_constants
           ~constraint_constants ~runtime_config_opt ~chunks_length
