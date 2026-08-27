@@ -29,7 +29,7 @@ let wait_for_best_tip ~logger ~slot_tx_end mina =
       match Mina_lib.best_tip mina with
       | `Bootstrapping ->
           [%log debug] "Node is bootstrapping, waiting 15s before retry" ;
-          let%map () = after (Time.Span.of_sec 15.0) in
+          let%map () = after (Time_float.Span.of_sec 15.0) in
           `Repeat ()
       | `Active breadcrumb ->
           let protocol_state =
@@ -65,7 +65,7 @@ let wait_for_best_tip ~logger ~slot_tx_end mina =
               (Global_slot_since_hard_fork.to_string slot_tx_end)
               (Length.to_string blockchain_length)
               (Mina_base.State_hash.to_base58_check state_hash) ;
-            let%map () = after (Time.Span.of_sec 15.0) in
+            let%map () = after (Time_float.Span.of_sec 15.0) in
             `Repeat () ) )
 
 let start_auto_hardfork_config_generation ~logger mina =
@@ -87,11 +87,11 @@ let start_auto_hardfork_config_generation ~logger mina =
           let chain_end_time =
             Consensus.Data.Consensus_time.(
               start_time ~constants:consensus_constants
-                (of_global_slot ~constants:consensus_constants slot_chain_end))
+                (of_global_slot ~constants:consensus_constants slot_chain_end) )
           in
           let chain_end_time_str =
             Block_time.to_time_exn chain_end_time
-            |> Time.to_string_iso8601_basic ~zone:Time.Zone.utc
+            |> Time_float.to_string_iso8601_basic ~zone:Time_float.Zone.utc
           in
           [%log info]
             "Auto HF: spawning background thread to wait for hardfork config \
@@ -240,18 +240,18 @@ let log_shutdown ~conf_dir ~top_logger coda_ref =
             (Visualization_message.bootstrap "transition frontier") )
 
 let remove_prev_crash_reports ~conf_dir =
-  Core.Sys.command (sprintf "rm -rf %s/coda_crash_report*" conf_dir)
+  Sys_unix.command (sprintf "rm -rf %s/coda_crash_report*" conf_dir)
 
 let summary exn_json =
-  let uname = Core.Unix.uname () in
+  let uname = Core_unix.uname () in
   let daemon_command =
     sprintf !"Command: %{sexp: string array}" (Sys.get_argv ())
   in
   `Assoc
     [ ("OS_type", `String Sys.os_type)
-    ; ("Release", `String (Core.Unix.Utsname.release uname))
-    ; ("Machine", `String (Core.Unix.Utsname.machine uname))
-    ; ("Sys_name", `String (Core.Unix.Utsname.sysname uname))
+    ; ("Release", `String (Core_unix.Utsname.release uname))
+    ; ("Machine", `String (Core_unix.Utsname.machine uname))
+    ; ("Sys_name", `String (Core_unix.Utsname.sysname uname))
     ; ("Exception", exn_json)
     ; ("Command", `String daemon_command)
     ; ("Coda_commit", `String Mina_version.commit_id)
@@ -269,9 +269,11 @@ let make_report exn_json ~conf_dir ~top_logger coda_ref =
   (* TEMP MAKE REPORT TRACE *)
   [%log' trace top_logger] "make_report: enter" ;
   ignore (remove_prev_crash_reports ~conf_dir : int) ;
-  let crash_time = Time.to_filename_string ~zone:Time.Zone.utc (Time.now ()) in
+  let crash_time =
+    Time_float.to_filename_string ~zone:Time_float.Zone.utc (Time_float.now ())
+  in
   let temp_config = conf_dir ^/ "coda_crash_report_" ^ crash_time in
-  let () = Core.Unix.mkdir temp_config in
+  let () = Core_unix.mkdir temp_config in
   (*Transition frontier and ledger visualization*)
   log_shutdown ~conf_dir:temp_config ~top_logger coda_ref ;
   let report_file = temp_config ^ ".tar.gz" in
@@ -284,7 +286,7 @@ let make_report exn_json ~conf_dir ~top_logger coda_ref =
   (*coda logs*)
   let coda_log = conf_dir ^/ "mina.log" in
   let () =
-    match Core.Sys.file_exists coda_log with
+    match Sys_unix.file_exists coda_log with
     | `Yes ->
         let coda_short_log = temp_config ^/ "coda_short.log" in
         (*get the last 4MB of the log*)
@@ -307,9 +309,9 @@ let make_report exn_json ~conf_dir ~top_logger coda_ref =
   let daemon_config = conf_dir ^/ "daemon.json" in
   let eq = [%equal: [ `Yes | `Unknown | `No ]] in
   let () =
-    if eq (Core.Sys.file_exists daemon_config) `Yes then
+    if eq (Sys_unix.file_exists daemon_config) `Yes then
       ignore
-        ( Core.Sys.command
+        ( Sys_unix.command
             (sprintf "cp %s %s" daemon_config (temp_config ^/ "daemon.json"))
           : int )
   in
@@ -323,13 +325,13 @@ let make_report exn_json ~conf_dir ~top_logger coda_ref =
     ; "daemon.json"
     ]
     |> List.filter ~f:(fun f ->
-           eq (Core.Sys.file_exists (temp_config ^/ f)) `Yes )
+        eq (Sys_unix.file_exists (temp_config ^/ f)) `Yes )
   in
   let files = tmp_files |> String.concat ~sep:" " in
   let tar_command =
     sprintf "tar  -C %s -czf %s %s" temp_config report_file files
   in
-  let exit = Core.Sys.command tar_command in
+  let exit = Sys_unix.command tar_command in
   if exit = 2 then (
     [%log' fatal top_logger] "Error making the crash report. Exit code: %d" exit ;
     None )
@@ -468,18 +470,18 @@ let setup_local_server ?(client_trustlist = []) ~rest_server_port
     ; implement Daemon_rpcs.Add_trustlist.rpc (fun () cidr ->
           return
             (let cidr_str = Unix.Cidr.to_string cidr in
-             if Unix.Cidr.Set.mem !client_trustlist cidr then
+             if Set.mem !client_trustlist cidr then
                Or_error.errorf "%s already present in trustlist" cidr_str
              else (
-               client_trustlist := Unix.Cidr.Set.add !client_trustlist cidr ;
+               client_trustlist := Set.add !client_trustlist cidr ;
                Ok () ) ) )
     ; implement Daemon_rpcs.Remove_trustlist.rpc (fun () cidr ->
           return
             (let cidr_str = Unix.Cidr.to_string cidr in
-             if not @@ Unix.Cidr.Set.mem !client_trustlist cidr then
+             if not @@ Set.mem !client_trustlist cidr then
                Or_error.errorf "%s not present in trustlist" cidr_str
              else (
-               client_trustlist := Unix.Cidr.Set.remove !client_trustlist cidr ;
+               client_trustlist := Set.remove !client_trustlist cidr ;
                Ok () ) ) )
     ; implement Daemon_rpcs.Get_trustlist.rpc (fun () () ->
           return (Set.to_list !client_trustlist) )
@@ -512,7 +514,7 @@ let setup_local_server ?(client_trustlist = []) ~rest_server_port
                 ~metadata:
                   [ ( "work_id"
                     , Snark_work_lib.(
-                        Spec.Partitioned.Poly.get_id spec |> Id.Any.to_yojson)
+                        Spec.Partitioned.Poly.get_id spec |> Id.Any.to_yojson )
                     )
                   ] ;
 
@@ -535,7 +537,7 @@ let setup_local_server ?(client_trustlist = []) ~rest_server_port
           [%log debug] "received completed work from a snark worker"
             ~metadata:[ ("work_id", Snark_work_lib.Id.Any.to_yojson result.id) ] ;
           Mina_metrics.(
-            Counter.inc_one Snark_work.completed_snark_work_received_rpc) ;
+            Counter.inc_one Snark_work.completed_snark_work_received_rpc ) ;
           Deferred.return @@ Mina_lib.add_work mina result )
     ; implement Snark_worker.Rpcs.Failed_to_generate_snark.Stable.Latest.rpc
         (fun () (error, _) ->
@@ -570,13 +572,13 @@ let setup_local_server ?(client_trustlist = []) ~rest_server_port
       Server.create_expert
         ~on_handler_error:
           (`Call
-            (fun _net exn ->
-              [%log error]
-                "Exception while handling REST server request: $error"
-                ~metadata:
-                  [ ("error", `String (Exn.to_string_mach exn))
-                  ; ("context", `String "rest_server")
-                  ] ) )
+             (fun _net exn ->
+               [%log error]
+                 "Exception while handling REST server request: $error"
+                 ~metadata:
+                   [ ("error", `String (Exn.to_string_mach exn))
+                   ; ("context", `String "rest_server")
+                   ] ) )
         (Tcp.Where_to_listen.bind_to bind_to_address (On_port port))
         (fun ~body _sock req ->
           let uri = Cohttp.Request.uri req in
@@ -607,11 +609,11 @@ let setup_local_server ?(client_trustlist = []) ~rest_server_port
               status `Performance >>| lift
           | _ ->
               Server.respond_string ~status:`Not_found "Route not found"
-              >>| lift ))
+              >>| lift ) )
     |> Deferred.map ~f:(fun _ ->
-           [%log info]
-             !"Created %s at: http://localhost:%i/graphql"
-             server_description port )
+        [%log info]
+          !"Created %s at: http://localhost:%i/graphql"
+          server_description port )
   in
   let create_graphql_server =
     create_graphql_server_with_auth
@@ -622,7 +624,7 @@ let setup_local_server ?(client_trustlist = []) ~rest_server_port
       create_graphql_server
         ~bind_to_address:
           Tcp.Bind_to_address.(
-            if insecure_rest_server then All_addresses else Localhost)
+            if insecure_rest_server then All_addresses else Localhost )
         ~schema:Mina_graphql.schema ~server_description:"GraphQL server"
         ~require_auth:false rest_server_port ) ;
   (* Second graphql server with limited queries exposed *)
@@ -631,7 +633,7 @@ let setup_local_server ?(client_trustlist = []) ~rest_server_port
           create_graphql_server
             ~bind_to_address:
               Tcp.Bind_to_address.(
-                if open_limited_graphql_port then All_addresses else Localhost)
+                if open_limited_graphql_port then All_addresses else Localhost )
             ~schema:Mina_graphql.schema_limited
             ~server_description:"GraphQL server with limited queries"
             ~require_auth:false rest_server_port ) ) ;
@@ -644,7 +646,7 @@ let setup_local_server ?(client_trustlist = []) ~rest_server_port
               ?auth_keys
               ~bind_to_address:
                 Tcp.Bind_to_address.(
-                  if insecure_rest_server then All_addresses else Localhost)
+                  if insecure_rest_server then All_addresses else Localhost )
               ~schema:Mina_graphql.schema_itn
               ~server_description:"GraphQL server for ITN queries"
               ~require_auth:true rest_server_port ) ) ;
@@ -657,13 +659,13 @@ let setup_local_server ?(client_trustlist = []) ~rest_server_port
         (Tcp.Server.create
            ~on_handler_error:
              (`Call
-               (fun _net exn ->
-                 [%log error]
-                   "Exception while handling TCP server request: $error"
-                   ~metadata:
-                     [ ("error", `String (Exn.to_string_mach exn))
-                     ; ("context", `String "rpc_tcp_server")
-                     ] ) )
+                (fun _net exn ->
+                  [%log error]
+                    "Exception while handling TCP server request: $error"
+                    ~metadata:
+                      [ ("error", `String (Exn.to_string_mach exn))
+                      ; ("context", `String "rpc_tcp_server")
+                      ] ) )
            where_to_listen
            (fun address reader writer ->
              let address = Socket.Address.Inet.addr address in
@@ -685,11 +687,11 @@ let setup_local_server ?(client_trustlist = []) ~rest_server_port
                    (Rpc.Connection.Heartbeat_config.create
                       ~timeout:
                         (Time_ns.Span.of_sec
-                           (Time.Span.to_sec
+                           (Time_float.Span.to_sec
                               compile_config.rpc_heartbeat_timeout ) )
                       ~send_every:
                         (Time_ns.Span.of_sec
-                           (Time.Span.to_sec
+                           (Time_float.Span.to_sec
                               compile_config.rpc_heartbeat_send_every ) )
                       () )
                  reader writer
@@ -700,17 +702,17 @@ let setup_local_server ?(client_trustlist = []) ~rest_server_port
                  ~connection_state:(fun _ -> ())
                  ~on_handshake_error:
                    (`Call
-                     (fun exn ->
-                       [%log warn]
-                         "Handshake error while handling RPC server request \
-                          from $address"
-                         ~metadata:
-                           [ ("error", `String (Exn.to_string_mach exn))
-                           ; ("context", `String "rpc_server")
-                           ; ( "address"
-                             , `String (Unix.Inet_addr.to_string address) )
-                           ] ;
-                       Deferred.unit ) ) ) ) )
+                      (fun exn ->
+                        [%log warn]
+                          "Handshake error while handling RPC server request \
+                           from $address"
+                          ~metadata:
+                            [ ("error", `String (Exn.to_string_mach exn))
+                            ; ("context", `String "rpc_server")
+                            ; ( "address"
+                              , `String (Unix.Inet_addr.to_string address) )
+                            ] ;
+                        Deferred.unit ) ) ) ) )
 
 let coda_crash_message ~log_issue ~action ~error =
   let followup =
@@ -750,7 +752,8 @@ let handle_crash e ~time_controller ~conf_dir ~child_pids ~top_logger coda_ref =
   (* this circumvents using Child_processes.kill, and instead sends SIGKILL to all children *)
   Hashtbl.keys child_pids
   |> List.iter ~f:(fun pid ->
-         ignore (Signal.send Signal.kill (`Pid pid) : [ `No_such_process | `Ok ]) ) ;
+      ignore
+        (Signal_unix.send Signal.kill (`Pid pid) : [ `No_such_process | `Ok ]) ) ;
   let exn_json = Error_json.error_to_yojson (Error.of_exn ~backtrace:`Get e) in
   [%log' fatal top_logger]
     "Unhandled top-level exception: $exn\nGenerating crash report"
@@ -769,7 +772,7 @@ let handle_crash e ~time_controller ~conf_dir ~child_pids ~top_logger coda_ref =
           with exn -> return (Error (Error.of_exn exn)) )
     with
     | `Ok (Ok (Some (report_file, temp_config))) ->
-        ( try ignore (Core.Sys.command (sprintf "rm -rf %s" temp_config) : int)
+        ( try ignore (Sys_unix.command (sprintf "rm -rf %s" temp_config) : int)
           with _ -> () ) ;
         sprintf "attach the crash report %s" report_file
     | `Ok (Ok None) ->
@@ -865,4 +868,4 @@ let handle_shutdown ~monitor ~time_controller ~conf_dir ~child_pids ~top_logger
           !"Mina process was interrupted by $signal"
           ~metadata:[ ("signal", `String (to_string signal)) ] ;
         (* causes async shutdown and at_exit handlers to run *)
-        Async.shutdown 130 ))
+        Async.shutdown 130 ) )

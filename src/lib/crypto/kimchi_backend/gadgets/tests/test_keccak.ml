@@ -5,7 +5,7 @@
     Invocation: dune exec \
       src/lib/crypto/kimchi_backend/gadgets/tests/test_keccak.exe *)
 
-open Core_kernel
+open Core
 open Kimchi_gadgets
 open Kimchi_gadgets_test_runner
 

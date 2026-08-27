@@ -22,12 +22,12 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       requires_graphql = true
     ; genesis_ledger =
         (let open Test_account in
-        [ create ~account_name:"node-a-key" ~balance:"8000000000" ()
-        ; create ~account_name:"node-b-key" ~balance:"1000000" ()
-        ; create ~account_name:"fish1" ~balance:"3000" ()
-        ; create ~account_name:"fish2" ~balance:"3000" ()
-        ; create ~account_name:"snark-node-key" ~balance:"0" ()
-        ])
+         [ create ~account_name:"node-a-key" ~balance:"8000000000" ()
+         ; create ~account_name:"node-b-key" ~balance:"1000000" ()
+         ; create ~account_name:"fish1" ~balance:"3000" ()
+         ; create ~account_name:"fish2" ~balance:"3000" ()
+         ; create ~account_name:"snark-node-key" ~balance:"0" ()
+         ] )
     ; block_producers =
         [ { node_name = "node-a"; account_name = "node-a-key" }
         ; { node_name = "node-b"; account_name = "node-b-key" }
@@ -90,7 +90,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let open Malleable_error.Let_syntax in
     let logger = Logger.create () in
     let block_producer_nodes =
-      Network.block_producers network |> Core.String.Map.data
+      Network.block_producers network |> Core.Map.data
     in
     let node = Network.block_producer_exn network "node-a" in
     let fish1_kp = (Network.genesis_keypair_exn network "fish1").keypair in
@@ -129,12 +129,12 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
            (List.filter
               ~f:(fun n ->
                 String.(Network.Node.id n <> Network.Node.id first_bp) )
-              (Core.String.Map.data (Network.all_mina_nodes network)) ) )
+              (Core.Map.data (Network.all_mina_nodes network)) ) )
     in
     let keymap =
       List.fold [ fish1_kp ] ~init:Signature_lib.Public_key.Compressed.Map.empty
         ~f:(fun map { private_key; public_key } ->
-          Signature_lib.Public_key.Compressed.Map.add_exn map
+          Map.add_exn map
             ~key:(Signature_lib.Public_key.compress public_key)
             ~data:private_key )
     in
@@ -388,8 +388,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
          ~metadata:[ ("state_hash", State_hash.to_yojson proof_state_hash) ] ;
        let%bind logs =
          Network.Node.run_replayer ~target_state_hash:proof_state_hash ~logger
-           ( List.hd_exn
-           @@ (Network.archive_nodes network |> Core.String.Map.data) )
+           (List.hd_exn @@ (Network.archive_nodes network |> Core.Map.data))
        in
        let%bind n = check_replayer_logs ~logger logs in
        let ns = network_state t in

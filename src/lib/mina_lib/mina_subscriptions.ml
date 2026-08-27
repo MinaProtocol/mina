@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Async_kernel
 open Pipe_lib
 open Mina_base
@@ -29,15 +29,14 @@ type t =
 let add_new_subscription (t : t) ~pk =
   (* add a new subscribed block user for this pk if we're not already tracking it *)
   ignore
-    ( Optional_public_key.Table.find_or_add t.subscribed_block_users (Some pk)
-        ~default:(fun () -> [ Pipe.create () ])
+    ( Hashtbl.find_or_add t.subscribed_block_users (Some pk) ~default:(fun () ->
+          [ Pipe.create () ] )
       : (Filtered_external_transition.t, State_hash.t) With_hash.t
         reader_and_writer
         list ) ;
   (* add a new payment user if we're not already tracking it *)
   ignore
-    ( Public_key.Compressed.Table.find_or_add t.subscribed_payment_users pk
-        ~default:Pipe.create
+    ( Hashtbl.find_or_add t.subscribed_payment_users pk ~default:Pipe.create
       : Signed_command.t reader_and_writer )
 
 let create ~logger ~constraint_constants ~wallets ~new_blocks
@@ -46,14 +45,14 @@ let create ~logger ~constraint_constants ~wallets ~new_blocks
   let subscribed_block_users =
     Optional_public_key.Table.of_alist_multi
     @@ List.map (Secrets.Wallets.pks wallets) ~f:(fun wallet ->
-           let reader, writer = Pipe.create () in
-           (Some wallet, (reader, writer)) )
+        let reader, writer = Pipe.create () in
+        (Some wallet, (reader, writer)) )
   in
   let subscribed_payment_users =
     Public_key.Compressed.Table.of_alist_exn
     @@ List.map (Secrets.Wallets.pks wallets) ~f:(fun wallet ->
-           let reader, writer = Pipe.create () in
-           (wallet, (reader, writer)) )
+        let reader, writer = Pipe.create () in
+        (wallet, (reader, writer)) )
   in
   let update_payment_subscriptions filtered_external_transition participants =
     Set.iter participants ~f:(fun participant ->
@@ -62,12 +61,14 @@ let create ~logger ~constraint_constants ~wallets ~new_blocks
             let user_commands =
               filtered_external_transition
               |> Filtered_external_transition.commands
-              |> List.map ~f:(fun { With_status.data; _ } -> data.data)
+              |> List.map
+                   ~f:(fun { With_status.data = { With_hash.data; _ }; _ } ->
+                     data )
               |> List.filter_map ~f:(function
-                   | User_command.Signed_command c ->
-                       Some c
-                   | Zkapp_command _ ->
-                       None )
+                | User_command.Signed_command c ->
+                    Some c
+                | Zkapp_command _ ->
+                    None )
               |> Fn.flip Signed_command.filter_by_participant participant
             in
             List.iter user_commands ~f:(fun user_command ->
@@ -110,7 +111,7 @@ let create ~logger ~constraint_constants ~wallets ~new_blocks
   in
   Option.iter gcloud_keyfile ~f:(fun path ->
       ignore
-        ( Core.Sys.command
+        ( Sys_unix.command
             (sprintf "gcloud auth activate-service-account --key-file=%s" path)
           : int ) ) ;
   O1trace.background_thread "process_new_block_subscriptions" (fun () ->
@@ -153,103 +154,104 @@ let create ~logger ~constraint_constants ~wallets ~new_blocks
                           ~metadata:
                             [ ( "time"
                               , `Float
-                                  Time.(
+                                  Time_float.(
                                     Span.to_ms
                                       (diff (now ())
-                                         (Block_time.to_time_exn scheduled_time) ))
+                                         (Block_time.to_time_exn scheduled_time) ) )
                               )
                             ] ;
                         Mina_block.Precomputed.to_yojson precomputed_block )
                    in
                    ( if upload_blocks_to_gcloud then
-                     let json =
-                       Yojson.Safe.to_string (Lazy.force precomputed_block)
-                     in
-                     let network =
-                       match Core.Sys.getenv "NETWORK_NAME" with
-                       | Some network ->
-                           Some network
-                       | _ ->
-                           [%log warn]
-                             "NETWORK_NAME environment variable not set. Must \
-                              be set to use upload_blocks_to_gcloud" ;
-                           None
-                     in
-                     let bucket =
-                       match Core.Sys.getenv "GCLOUD_BLOCK_UPLOAD_BUCKET" with
-                       | Some bucket ->
-                           Some bucket
-                       | _ ->
-                           [%log warn]
-                             "GCLOUD_BLOCK_UPLOAD_BUCKET environment variable \
-                              not set. Must be set to use \
-                              upload_blocks_to_gcloud" ;
-                           None
-                     in
-                     match (gcloud_keyfile, network, bucket) with
-                     | Some _, Some network, Some bucket ->
-                         let hash_string = State_hash.to_base58_check hash in
-                         let height =
-                           Mina_block.blockchain_length new_block_no_hash
-                           |> Mina_numbers.Length.to_string
-                         in
-                         let name =
-                           sprintf "%s-%s-%s.json" network height hash_string
-                         in
-                         (* TODO: Use a pipe to queue this if these are building up *)
-                         don't_wait_for
-                           ( Mina_metrics.(
-                               Gauge.inc_one
-                                 Block_latency.Upload_to_gcloud
-                                 .upload_to_gcloud_blocks) ;
-                             let tmp_file =
-                               Core.Filename.temp_file ~in_dir:"/tmp"
-                                 "upload_block_file" ""
-                             in
-                             let f = Stdlib.open_out tmp_file in
-                             fprintf f "%s" json ;
-                             Stdlib.close_out f ;
-                             let command =
-                               Printf.sprintf "gsutil cp -n %s gs://%s/%s"
-                                 tmp_file bucket name
-                             in
-                             let%map output =
-                               (* This double-wrapping of [try_with]s is protection
+                       let json =
+                         Yojson.Safe.to_string (Lazy.force precomputed_block)
+                       in
+                       let network =
+                         match Core.Sys.getenv "NETWORK_NAME" with
+                         | Some network ->
+                             Some network
+                         | _ ->
+                             [%log warn]
+                               "NETWORK_NAME environment variable not set. \
+                                Must be set to use upload_blocks_to_gcloud" ;
+                             None
+                       in
+                       let bucket =
+                         match Core.Sys.getenv "GCLOUD_BLOCK_UPLOAD_BUCKET" with
+                         | Some bucket ->
+                             Some bucket
+                         | _ ->
+                             [%log warn]
+                               "GCLOUD_BLOCK_UPLOAD_BUCKET environment \
+                                variable not set. Must be set to use \
+                                upload_blocks_to_gcloud" ;
+                             None
+                       in
+                       match (gcloud_keyfile, network, bucket) with
+                       | Some _, Some network, Some bucket ->
+                           let hash_string = State_hash.to_base58_check hash in
+                           let height =
+                             Mina_block.blockchain_length new_block_no_hash
+                             |> Mina_numbers.Length.to_string
+                           in
+                           let name =
+                             sprintf "%s-%s-%s.json" network height hash_string
+                           in
+                           (* TODO: Use a pipe to queue this if these are building up *)
+                           don't_wait_for
+                             ( Mina_metrics.(
+                                 Gauge.inc_one
+                                   Block_latency.Upload_to_gcloud
+                                   .upload_to_gcloud_blocks ) ;
+                               let tmp_file =
+                                 Filename_unix.temp_file ~in_dir:"/tmp"
+                                   "upload_block_file" ""
+                               in
+                               let f = Stdlib.open_out tmp_file in
+                               fprintf f "%s" json ;
+                               Stdlib.close_out f ;
+                               let command =
+                                 Printf.sprintf "gsutil cp -n %s gs://%s/%s"
+                                   tmp_file bucket name
+                               in
+                               let%map output =
+                                 (* This double-wrapping of [try_with]s is protection
                                   against both immediate exceptions in process setup
                                   and exceptions in the 'deferred' part of setup.
                                   We also attach 'tags' to the errors below, so that we
                                   we have information about which of these different
                                   kinds of exception were seen, if any.
                                *)
-                               Deferred.Or_error.try_with_join ~here:[%here]
-                                 (fun () ->
-                                   Or_error.try_with (fun () ->
-                                       Async.Process.run () ~prog:"bash"
-                                         ~args:[ "-c"; command ]
-                                       |> Deferred.Result.map_error
-                                            ~f:(Error.tag ~tag:__LOC__) )
-                                   |> Result.map_error
-                                        ~f:(Error.tag ~tag:__LOC__)
-                                   |> Deferred.return |> Deferred.Or_error.join )
-                             in
-                             ( match output with
-                             | Ok _result ->
-                                 ()
-                             | Error e ->
-                                 [%log warn]
-                                   ~metadata:
-                                     [ ("error", Error_json.error_to_yojson e)
-                                     ; ("command", `String command)
-                                     ]
-                                   "Uploading block to gcloud with command \
-                                    $command failed: $error" ) ;
-                             Sys.remove tmp_file ;
-                             Mina_metrics.(
-                               Gauge.dec_one
-                                 Block_latency.Upload_to_gcloud
-                                 .upload_to_gcloud_blocks) )
-                     | _ ->
-                         () ) ;
+                                 Deferred.Or_error.try_with_join ~here:[%here]
+                                   (fun () ->
+                                     Or_error.try_with (fun () ->
+                                         Async.Process.run () ~prog:"bash"
+                                           ~args:[ "-c"; command ]
+                                         |> Deferred.Result.map_error
+                                              ~f:(Error.tag ~tag:__LOC__) )
+                                     |> Result.map_error
+                                          ~f:(Error.tag ~tag:__LOC__)
+                                     |> Deferred.return
+                                     |> Deferred.Or_error.join )
+                               in
+                               ( match output with
+                               | Ok _result ->
+                                   ()
+                               | Error e ->
+                                   [%log warn]
+                                     ~metadata:
+                                       [ ("error", Error_json.error_to_yojson e)
+                                       ; ("command", `String command)
+                                       ]
+                                     "Uploading block to gcloud with command \
+                                      $command failed: $error" ) ;
+                               Sys_unix.remove tmp_file ;
+                               Mina_metrics.(
+                                 Gauge.dec_one
+                                   Block_latency.Upload_to_gcloud
+                                   .upload_to_gcloud_blocks ) )
+                       | _ ->
+                           () ) ;
                    Option.iter path ~f:(fun (`Path path) ->
                        Out_channel.with_file ~append:true path
                          ~f:(fun out_channel ->
@@ -281,9 +283,9 @@ let create ~logger ~constraint_constants ~wallets ~new_blocks
                 else
                   Filtered_external_transition.of_transition new_block_no_hash
                     (`Some
-                      ( Public_key.Compressed.Set.of_list
-                      @@ List.filter_opt (Hashtbl.keys subscribed_block_users)
-                      ) )
+                       ( Public_key.Compressed.Set.of_list
+                       @@ List.filter_opt (Hashtbl.keys subscribed_block_users)
+                       ) )
                     verified_transactions
               in
               let participants =
@@ -324,7 +326,7 @@ let create ~logger ~constraint_constants ~wallets ~new_blocks
               let best_tip_diff_pipe =
                 Transition_frontier.(
                   Extensions.(
-                    get_view_pipe (extensions transition_frontier) Best_tip_diff))
+                    get_view_pipe (extensions transition_frontier) Best_tip_diff ) )
               in
               Broadcast_pipe.Reader.iter best_tip_diff_pipe
                 ~f:(fun { reorg_best_tip; _ } ->

@@ -1,6 +1,6 @@
 (* exit_handlers -- coordinated, tiered daemon shutdown *)
 
-open Core_kernel
+open Core
 open Async_kernel
 open Async_unix
 
@@ -19,12 +19,12 @@ let handlers : (shutdown_tier * (unit -> unit Deferred.t)) list ref = ref []
 let initialized = ref false
 
 let run_shutdown_handlers () =
-  Deferred.List.iter all_of_shutdown_tier ~f:(fun tier ->
+  Deferred.List.iter ~how:`Sequential all_of_shutdown_tier ~f:(fun tier ->
       let tier_handlers =
         List.filter_map (List.rev !handlers) ~f:(fun (t, f) ->
             if equal_shutdown_tier t tier then Some f else None )
       in
-      Deferred.List.iter tier_handlers ~f:(fun f -> f ()) )
+      Deferred.List.iter ~how:`Sequential tier_handlers ~f:(fun f -> f ()) )
 
 let ensure_shutdown_hook_registered () =
   if not !initialized then (

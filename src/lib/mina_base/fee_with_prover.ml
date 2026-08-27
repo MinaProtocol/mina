@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Signature_lib
 
 [%%versioned
@@ -32,4 +32,4 @@ include Comparable.Make (Stable.V1.T)
 
 let gen =
   Quickcheck.Generator.map2 Currency.Fee.gen Public_key.Compressed.gen
-    ~f:(fun fee prover -> { fee; prover })
+    ~f:(fun fee prover -> { fee; prover } )

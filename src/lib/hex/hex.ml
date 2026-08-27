@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 
 module Digit = struct
   (* A number between 0 and 15 *)
@@ -166,9 +166,12 @@ let encode ?(reverse = false) t =
         let byte = i / 2 in
         Char.to_int t.[if reverse then n - 1 - byte else byte]
       in
-      let c = if i mod 2 = 0 then (* hi *)
-                c lsr 4 else (* lo *)
-                          c in
+      let c =
+        if i mod 2 = 0 then (* hi *)
+          c lsr 4
+        else (* lo *)
+          c
+      in
       hex_char_of_int_exn (c land 15) )
 
 let%test_unit "decode" =
@@ -186,18 +189,18 @@ module Safe = struct
   let to_hex (data : string) : string =
     String.to_list data
     |> List.map ~f:(fun c ->
-           let charify u4 =
-             match u4 with
-             | x when x <= 9 && x >= 0 ->
-                 Char.(of_int_exn @@ (x + to_int '0'))
-             | x when x <= 15 && x >= 10 ->
-                 Char.(of_int_exn @@ (x - 10 + to_int 'A'))
-             | _ ->
-                 failwith "Unexpected u4 has only 4bits of information"
-           in
-           let high = charify @@ ((Char.to_int c land 0xF0) lsr 4) in
-           let lo = charify (Char.to_int c land 0x0F) in
-           String.of_char_list [ high; lo ] )
+        let charify u4 =
+          match u4 with
+          | x when x <= 9 && x >= 0 ->
+              Char.(of_int_exn @@ (x + to_int '0'))
+          | x when x <= 15 && x >= 10 ->
+              Char.(of_int_exn @@ (x - 10 + to_int 'A'))
+          | _ ->
+              failwith "Unexpected u4 has only 4bits of information"
+        in
+        let high = charify @@ ((Char.to_int c land 0xF0) lsr 4) in
+        let lo = charify (Char.to_int c land 0x0F) in
+        String.of_char_list [ high; lo ] )
     |> String.concat
 
   let%test_unit "to_hex sane" =
@@ -224,12 +227,12 @@ module Safe = struct
     in
     String.to_list hex |> List.chunks_of ~length:2
     |> List.fold_result ~init:[] ~f:(fun acc chunk ->
-           match chunk with
-           | [ a; b ] when Char.is_alphanum a && Char.is_alphanum b ->
-               Or_error.return
-               @@ (Char.((to_u4 a lsl 4) lor to_u4 b |> of_int_exn) :: acc)
-           | _ ->
-               Or_error.error_string "invalid hex" )
+        match chunk with
+        | [ a; b ] when Char.is_alphanum a && Char.is_alphanum b ->
+            Or_error.return
+            @@ (Char.((to_u4 a lsl 4) lor to_u4 b |> of_int_exn) :: acc)
+        | _ ->
+            Or_error.error_string "invalid hex" )
     |> Or_error.ok
     |> Option.map ~f:(Fn.compose String.of_char_list List.rev)
 

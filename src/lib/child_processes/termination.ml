@@ -3,7 +3,7 @@
 *)
 
 open Async
-open Core_kernel
+open Core
 include Hashable.Make_binable (Pid)
 
 type process_kind =
@@ -20,9 +20,9 @@ type t = process_kind Pid.Table.t
 let create_pid_table () : t = Pid.Table.create ()
 
 let register_process (t : t) process kind =
-  Pid.Table.add_exn t ~key:(Process.pid process) ~data:kind
+  Hashtbl.add_exn t ~key:(Process.pid process) ~data:kind
 
-let remove : t -> Pid.t -> unit = Pid.Table.remove
+let remove : t -> Pid.t -> unit = Hashtbl.remove
 
 (** for some signals that cause termination, offer a possible explanation *)
 let get_signal_cause_opt =
@@ -33,8 +33,8 @@ let get_signal_cause_opt =
     ; (int, "Process interrupted by user or other program")
     ]
     ~f:(fun (signal, msg) ->
-      Base.ignore (Table.add signal_causes_tbl ~key:signal ~data:msg) ) ;
-  fun signal -> Signal.Table.find signal_causes_tbl signal
+      Base.ignore (Hashtbl.add signal_causes_tbl ~key:signal ~data:msg) ) ;
+  fun signal -> Hashtbl.find signal_causes_tbl signal
 
 (** wait for a [process], which may resolve immediately or in a Deferred.t,
     log any errors, attributing the source to the provided [module] and [location]
@@ -53,11 +53,11 @@ let wait_for_process_log_errors ~logger process ~module_ ~location ~here =
           Monitor.try_with ~here ~run:`Now
             ~rest:
               (`Call
-                (fun exn ->
-                  let err = Error.of_exn exn in
-                  Logger.error logger ~module_ ~location
-                    "Saw a deferred exception $exn after waiting for process"
-                    ~metadata:[ ("exn", Error_json.error_to_yojson err) ] ) )
+                 (fun exn ->
+                   let err = Error.of_exn exn in
+                   Logger.error logger ~module_ ~location
+                     "Saw a deferred exception $exn after waiting for process"
+                     ~metadata:[ ("exn", Error_json.error_to_yojson err) ] ) )
             (fun () -> Process.wait process)
         in
         don't_wait_for
@@ -104,12 +104,12 @@ let wait_safe ~logger process ~module_ ~location ~here =
           Monitor.try_with ~here ~run:`Now
             ~rest:
               (`Call
-                (fun exn ->
-                  Logger.warn logger ~module_ ~location
-                    "Saw an error from Process.wait in wait_safe: $err"
-                    ~metadata:
-                      [ ("err", Error_json.error_to_yojson (Error.of_exn exn)) ]
-                  ) )
+                 (fun exn ->
+                   Logger.warn logger ~module_ ~location
+                     "Saw an error from Process.wait in wait_safe: $err"
+                     ~metadata:
+                       [ ("err", Error_json.error_to_yojson (Error.of_exn exn))
+                       ] ) )
             (fun () -> Process.wait process)
         in
         Deferred.Result.map_error ~f:Error.of_exn deferred_wait )

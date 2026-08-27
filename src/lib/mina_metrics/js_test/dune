@@ -6,4 +6,4 @@
   (backend bisect_ppx))
  (preprocess
   (pps ppx_version))
- (forbidden_libraries async core re2))
+ (forbidden_libraries async core_unix re2))

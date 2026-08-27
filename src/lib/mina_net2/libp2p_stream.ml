@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Async_kernel
 open Network_peer
 
@@ -23,7 +23,7 @@ type queue_release_reason =
 
 module Queue_metrics = struct
   let env_var ~name ~default =
-    match Sys.getenv_opt name with
+    match Sys.getenv name with
     | None ->
         default
     | Some value -> (
@@ -34,7 +34,7 @@ module Queue_metrics = struct
           failwithf "%s must be a positive integer, got %S" name value () )
 
   let env_var_float ~name ~default ~min =
-    match Sys.getenv_opt name with
+    match Sys.getenv name with
     | None ->
         default
     | Some value -> (
@@ -159,7 +159,7 @@ module Queue_metrics = struct
         (Float.of_int max_bytes) ;
       Gauge.set
         (Network.stream_queue_bytes_sum ~protocol ~queue)
-        (Float.of_int sum_bytes))
+        (Float.of_int sum_bytes) )
 
   let recompute_gauges () =
     Hashtbl.iter_keys known_labels ~f:(fun key ->
@@ -271,7 +271,7 @@ module Queue_metrics = struct
           (Float.of_int messages) ;
         Counter.inc
           (Network.stream_queue_discarded_bytes ~protocol ~queue ~reason)
-          (Float.of_int bytes)) ;
+          (Float.of_int bytes) ) ;
       if messages > 0 || bytes > 0 then
         [%log' info entry.logger] "released queued libp2p stream data"
           ~metadata:
@@ -511,7 +511,7 @@ let create_from_existing ~logger ~helper ~stream_id ~protocol ~peer
         else
           let parts = split_string msg ~every:max_chunk_size in
           match%map
-            Deferred.Or_error.List.iter parts ~f:(fun data ->
+            Deferred.Or_error.List.iter parts ~how:`Sequential ~f:(fun data ->
                 Deferred.Or_error.ignore_m
                 @@ Libp2p_helper.do_rpc helper
                      (module Libp2p_ipc.Rpcs.SendStream)

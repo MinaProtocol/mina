@@ -3,7 +3,7 @@
  (flags
   (:standard -warn-error +a)
   -open
-  Core_kernel
+  Core
   -open
   Pickles_graphql)
  (package graphql_lib)
@@ -12,7 +12,7 @@
  (libraries
   ; opam libraries
   alcotest
-  core_kernel
+  core
   sexplib0
   ; local libraries
   kimchi_pasta

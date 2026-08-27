@@ -35,11 +35,11 @@ let test_finalize_and_get_gates_with_lookup_tables () =
   in
   let () =
     Tick.R1CS_constraint_system.(
-      add_constraint cs (AddFixedLookupTable { id = 1l; data = xor_table }))
+      add_constraint cs (AddFixedLookupTable { id = 1l; data = xor_table }) )
   in
   let () =
     Tick.R1CS_constraint_system.(
-      add_constraint cs (AddFixedLookupTable { id = 2l; data = and_table }))
+      add_constraint cs (AddFixedLookupTable { id = 2l; data = and_table }) )
   in
   let () = Tick.R1CS_constraint_system.set_primary_input_size cs 1 in
   let _gates, lts, _rt =
@@ -58,7 +58,7 @@ let test_finalize_and_get_gates_with_runtime_table_cfg () =
     Tick.R1CS_constraint_system.(
       add_constraint cs
         (AddRuntimeTableCfg
-           { id = 1l; first_column = indexed_runtime_table_cfg } ))
+           { id = 1l; first_column = indexed_runtime_table_cfg } ) )
   in
   let () = Tick.R1CS_constraint_system.set_primary_input_size cs 1 in
   let _aux = Tick.R1CS_constraint_system.set_auxiliary_input_size cs 1 in
@@ -209,30 +209,30 @@ let test_compute_witness_returns_correctly_filled_runtime_tables_multiple_lookup
           (AddRuntimeTableCfg { id = Int32.of_int table_id; first_column }) ;
         ignore
         @@ List.init m (fun i ->
-               let j = (2 * i) + 1 in
-               let idx = Random.int n in
-               let v = Tick.Field.random () in
-               external_values.(j) <- Tick.Field.of_int idx ;
-               external_values.(j + 1) <- v ;
-               exp_rt_data.(idx) <- v ;
-               let vidx =
-                 Impl.exists Impl.Field.typ ~compute:(fun () ->
-                     external_values.(j) )
-               in
-               let vv =
-                 Impl.exists Impl.Field.typ ~compute:(fun () ->
-                     external_values.(j + 1) )
-               in
-               add_constraint
-                 (Lookup
-                    { w0 = vtable_id
-                    ; w1 = vidx
-                    ; w2 = vv
-                    ; w3 = vidx
-                    ; w4 = vv
-                    ; w5 = vidx
-                    ; w6 = vv
-                    } ) ) )
+            let j = (2 * i) + 1 in
+            let idx = Random.int n in
+            let v = Tick.Field.random () in
+            external_values.(j) <- Tick.Field.of_int idx ;
+            external_values.(j + 1) <- v ;
+            exp_rt_data.(idx) <- v ;
+            let vidx =
+              Impl.exists Impl.Field.typ ~compute:(fun () ->
+                  external_values.(j) )
+            in
+            let vv =
+              Impl.exists Impl.Field.typ ~compute:(fun () ->
+                  external_values.(j + 1) )
+            in
+            add_constraint
+              (Lookup
+                 { w0 = vtable_id
+                 ; w1 = vidx
+                 ; w2 = vv
+                 ; w3 = vidx
+                 ; w4 = vv
+                 ; w5 = vidx
+                 ; w6 = vv
+                 } ) ) )
   in
   let _ = Tick.R1CS_constraint_system.finalize cs in
   let _witnesses, runtime_tables =
@@ -434,7 +434,7 @@ let test_cannot_finalize_twice_the_fixed_lookup_tables () =
   let () =
     Tick.R1CS_constraint_system.(
       add_constraint cs
-        (AddFixedLookupTable { id = 1l; data = [| indexes; values |] }))
+        (AddFixedLookupTable { id = 1l; data = [| indexes; values |] }) )
   in
   let () = Tick.R1CS_constraint_system.finalize_fixed_lookup_tables cs in
   Alcotest.check_raises "Finalize a second time the fixed lookup tables"
@@ -448,13 +448,13 @@ let test_cannot_finalize_twice_the_runtime_table_cfgs () =
   let cs = Tick.R1CS_constraint_system.create () in
   let () =
     Tick.R1CS_constraint_system.(
-      add_constraint cs (AddRuntimeTableCfg { id = 1l; first_column }))
+      add_constraint cs (AddRuntimeTableCfg { id = 1l; first_column }) )
   in
   let () = Tick.R1CS_constraint_system.finalize_runtime_lookup_tables cs in
   Alcotest.check_raises
     "Runtime table configurations have already been finalized"
     (Failure "Runtime table configurations have already been finalized")
-    (fun () -> Tick.R1CS_constraint_system.finalize_runtime_lookup_tables cs)
+    (fun () -> Tick.R1CS_constraint_system.finalize_runtime_lookup_tables cs )
 
 let () =
   let open Alcotest in
@@ -470,8 +470,8 @@ let () =
             test_compute_witness_returns_correctly_filled_runtime_tables_multiple_lookup
         ; test_case
             "Compute witness with runtime lookup at same index with\n\
-            \          different values" `Quick
-            test_compute_witness_with_lookup_to_the_same_idx_twice
+            \          different values"
+            `Quick test_compute_witness_with_lookup_to_the_same_idx_twice
         ; test_case
             "Compute witness with lookups within a runtime table and a fixed \
              lookup table, not sharing the same ID"

@@ -1,5 +1,5 @@
 open Pickles_types
-open Core_kernel
+open Core
 open Import
 open Backend
 module Wrap_impl = Kimchi_pasta_snarky_backend.Wrap_impl
@@ -52,7 +52,8 @@ module Step = struct
 
     module Constant = Tock.Field
 
-    type t = (* Low bits, high bit *)
+    type t =
+      (* Low bits, high bit *)
       Field.t * Boolean.var
 
     let forbidden_shifted_values =

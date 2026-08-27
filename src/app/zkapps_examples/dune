@@ -5,6 +5,7 @@
   ;; opam libraries
   async_kernel
   base
+  core
   core_kernel
   ;; local libraries
   crypto_params

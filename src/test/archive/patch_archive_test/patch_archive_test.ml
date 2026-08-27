@@ -27,7 +27,7 @@ module Network_Data = struct
     }
 end
 
-open Core_kernel
+open Core
 open Async
 open Mina_automation
 
@@ -79,8 +79,8 @@ let main ~db_uri ~network_data_folder () =
 
   let%bind extensional_files =
     Sys.ls_dir output_folder
-    >>= Deferred.List.map ~f:(fun e ->
-            Deferred.return (output_folder ^ "/" ^ e) )
+    >>= Deferred.List.map ~how:`Sequential ~f:(fun e ->
+        Deferred.return (output_folder ^ "/" ^ e) )
   in
   let extensional_files = Utils.sort_archive_files extensional_files in
 
@@ -154,9 +154,9 @@ let main ~db_uri ~network_data_folder () =
   Deferred.unit
 
 let () =
-  Command.(
-    run
-      (let open Let_syntax in
+  Command_unix.run
+    Command.(
+      let open Let_syntax in
       async ~summary:"Test patching of blocks in an archive database"
         (let%map db_uri =
            Param.flag "--source-uri"
@@ -167,10 +167,10 @@ let () =
          and network_data_folder =
            Param.(
              flag "--network-data-folder" ~aliases:[ "network-data-folder" ]
-               Param.(required string))
+               Param.(required string) )
              ~doc:
                "Path Path to folder containing network data. Usually it's sql \
                 for db import, genesis ledger and zipped precomputed blocks \
                 archive"
          in
-         main ~db_uri ~network_data_folder )))
+         main ~db_uri ~network_data_folder ) )

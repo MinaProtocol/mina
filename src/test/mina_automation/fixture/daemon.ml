@@ -70,7 +70,7 @@ module Make_FixtureWithBootstrap (M : TestCaseWithBootstrap) :
     let%bind daemon = Daemon.start executor in
     [%log info] "Daemon started successfully" ;
     Deferred.Or_error.return
-      { daemon; temp_dir = Filename.temp_dir "daemon_test" "" }
+      { daemon; temp_dir = Filename_unix.temp_dir "daemon_test" "" }
 
   let teardown t =
     let open Deferred.Or_error.Let_syntax in
@@ -97,7 +97,7 @@ module Make_FixtureWithoutBootstrap (M : TestCaseWithoutBootstrap) :
   let setup () =
     Deferred.Or_error.return
       { config = Daemon.Config.default ()
-      ; temp_dir = Filename.temp_dir "daemon_test" ""
+      ; temp_dir = Filename_unix.temp_dir "daemon_test" ""
       }
 
   let teardown _t = Deferred.Or_error.ok_unit

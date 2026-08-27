@@ -1,5 +1,5 @@
 open Pickles_types
-open Core_kernel
+open Core
 module Limbs = Nat.N4
 
 module Constant = struct

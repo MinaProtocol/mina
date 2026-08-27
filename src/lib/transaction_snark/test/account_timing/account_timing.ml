@@ -63,7 +63,7 @@ let%test_module "account timing check" =
           as_prover
             As_prover.(
               let%map checked_timing = read Account.Timing.typ checked_timing in
-              assert (Account.Timing.equal checked_timing unchecked_timing))
+              assert (Account.Timing.equal checked_timing unchecked_timing) )
         in
         let%map equal_balances_checked =
           Balance.Checked.equal checked_min_balance
@@ -354,7 +354,7 @@ let%test_module "account timing check" =
         let stack_with_state =
           Pending_coinbase.Stack.(
             push_state state_body_hash txn_global_slot
-              Pending_coinbase.Stack.empty)
+              Pending_coinbase.Stack.empty )
         in
         match transaction with
         | Coinbase c ->
@@ -433,13 +433,13 @@ let%test_module "account timing check" =
                               Transaction_status.Failure.(
                                 equal
                                   (List.concat failuress |> List.hd_exn)
-                                  expected_failure)
+                                  expected_failure )
                           then
                             failwithf
                               "Expected transaction to fail with %s but failed \
                                with %s"
                               Transaction_status.Failure.(
-                                to_string expected_failure)
+                                to_string expected_failure )
                               failures_str ()
                       | None ->
                           failwithf
@@ -498,13 +498,13 @@ let%test_module "account timing check" =
         let%map user_commands =
           Quickcheck.Generator.all
           @@ List.map keypairss ~f:(fun (kp1, kp2) ->
-                 let%map payment =
-                   Signed_command.Gen.payment ~sign_type:(`Real signature_kind)
-                     ~key_gen:(return (kp1, kp2))
-                     ~min_amount:amount ~max_amount:amount ~fee_range:0 ()
-                 in
-                 ( Mina_transaction.Transaction.Command (Signed_command payment)
-                   : Mina_transaction.Transaction.t ) )
+              let%map payment =
+                Signed_command.Gen.payment ~sign_type:(`Real signature_kind)
+                  ~key_gen:(return (kp1, kp2))
+                  ~min_amount:amount ~max_amount:amount ~fee_range:0 ()
+              in
+              ( Mina_transaction.Transaction.Command (Signed_command payment)
+                : Mina_transaction.Transaction.t ) )
         in
         (ledger_init_state, user_commands)
       in
@@ -931,8 +931,9 @@ let%test_module "account timing check" =
                     (Signed_command user_command)
                 ] ) )
 
-    let%test_unit "Payment- sufficient amount; fee payer goes from timed to \
-                   untimed; receiver remains untimed" =
+    let%test_unit
+        "Payment- sufficient amount; fee payer goes from timed to untimed; \
+         receiver remains untimed" =
       let gen =
         let open Quickcheck.Generator.Let_syntax in
         let sender_index = 0 in
@@ -968,8 +969,8 @@ let%test_module "account timing check" =
       Quickcheck.test
         ~seed:
           (`Deterministic
-            "Payment- sufficient amount; fee payer goes from timed to untimed; \
-             receiver remains untimed" ) ~trials:1 gen
+             "Payment- sufficient amount; fee payer goes from timed to \
+              untimed; receiver remains untimed" ) ~trials:1 gen
         ~f:(fun (ledger_init_state, user_command) ->
           Mina_ledger.Ledger.with_ephemeral_ledger
             ~depth:constraint_constants.ledger_depth ~f:(fun ledger ->
@@ -981,8 +982,9 @@ let%test_module "account timing check" =
                     (Signed_command user_command)
                 ] ) )
 
-    let%test_unit "Payment- sufficient amount; receiver goes from timed to \
-                   untimed; fee payer remains untimed" =
+    let%test_unit
+        "Payment- sufficient amount; receiver goes from timed to untimed; fee \
+         payer remains untimed" =
       let gen =
         let open Quickcheck.Generator.Let_syntax in
         let receiver_index = 1 in
@@ -1018,8 +1020,8 @@ let%test_module "account timing check" =
       Quickcheck.test
         ~seed:
           (`Deterministic
-            "Payment- sufficient amount; receiver goes from timed to untimed; \
-             fee payer remains untimed" ) ~trials:1 gen
+             "Payment- sufficient amount; receiver goes from timed to untimed; \
+              fee payer remains untimed" ) ~trials:1 gen
         ~f:(fun (ledger_init_state, user_command) ->
           Mina_ledger.Ledger.with_ephemeral_ledger
             ~depth:constraint_constants.ledger_depth ~f:(fun ledger ->
@@ -1069,8 +1071,7 @@ let%test_module "account timing check" =
           in
           let%bind balance =
             unless_fixed ?fixed:balance
-              Balance.(
-                gen_incl (of_mina_int_exn 1_000) (of_mina_int_exn 50_000))
+              Balance.(gen_incl (of_mina_int_exn 1_000) (of_mina_int_exn 50_000))
           in
           let%bind init_min_bal =
             unless_fixed ?fixed:init_min_bal
@@ -1091,7 +1092,7 @@ let%test_module "account timing check" =
           let to_vest =
             Amount.(
               Option.value ~default:zero @@ (init_min_amt - cliff_amt)
-              |> to_nanomina_int)
+              |> to_nanomina_int )
           in
           (* A numeric trick to get the division result rounded up instead of down. *)
           let div_rnd_up num denom = (num + denom - 1) / denom in
@@ -1100,7 +1101,7 @@ let%test_module "account timing check" =
               Amount.(
                 gen_incl
                   (of_nanomina_int_exn @@ div_rnd_up to_vest 100)
-                  (of_nanomina_int_exn @@ div_rnd_up to_vest 10))
+                  (of_nanomina_int_exn @@ div_rnd_up to_vest 10) )
           in
           let vest_time =
             if Amount.(vest_incr > zero) then
@@ -1113,7 +1114,7 @@ let%test_module "account timing check" =
               Global_slot_since_genesis.(
                 gen_incl
                   (of_int @@ Int.max 0 (to_int cliff_time - vest_time))
-                  (of_int @@ (to_int cliff_time + (2 * vest_time))))
+                  (of_int @@ (to_int cliff_time + (2 * vest_time))) )
           in
           let available_funds =
             let open Currency in
@@ -1329,7 +1330,8 @@ let%test_module "account timing check" =
         (zkapp_commands : Zkapp_command.t list) =
       Async.Thread_safe.block_on_async_exn
       @@ fun () ->
-      Async.Deferred.List.iter zkapp_commands ~f:(fun zkapp_command ->
+      Async.Deferred.List.iter zkapp_commands ~how:`Sequential
+        ~f:(fun zkapp_command ->
           Transaction_snark_tests.Util.check_zkapp_command_with_merges_exn
             ~global_slot:slot ledger [ zkapp_command ] )
 
@@ -1518,8 +1520,7 @@ let%test_module "account timing check" =
               let result =
                 Mina_ledger.Ledger.apply_zkapp_command_unchecked ~signature_kind
                   ~constraint_constants
-                  ~global_slot:
-                    Mina_numbers.Global_slot_since_genesis.(succ zero)
+                  ~global_slot:Mina_numbers.Global_slot_since_genesis.(succ zero)
                   ~state_view:Transaction_snark_tests.Util.genesis_state_view
                   ledger zkapp_command
               in
@@ -1600,8 +1601,7 @@ let%test_module "account timing check" =
               match
                 Mina_ledger.Ledger.apply_zkapp_command_unchecked ~signature_kind
                   ~constraint_constants
-                  ~global_slot:
-                    Mina_numbers.Global_slot_since_genesis.(succ zero)
+                  ~global_slot:Mina_numbers.Global_slot_since_genesis.(succ zero)
                   ~state_view:Transaction_snark_tests.Util.genesis_state_view
                   ledger zkapp_command
               with
@@ -1641,7 +1641,7 @@ let%test_module "account timing check" =
               Currency.Amount.(
                 add
                   (of_nanomina_int_exn balance)
-                  (of_fee constraint_constants.account_creation_fee))
+                  (of_fee constraint_constants.account_creation_fee) )
         ; zkapp_account_keypairs = [ zkapp_keypair ]
         ; memo =
             Signed_command_memo.create_from_string_exn
@@ -1689,7 +1689,7 @@ let%test_module "account timing check" =
       Quickcheck.test
         ~seed:
           (`Deterministic
-            "zkapp command, timed account creation, min_balance > balance" )
+             "zkapp command, timed account creation, min_balance > balance" )
         ~sexp_of:[%sexp_of: Mina_ledger.Ledger.init_state * Zkapp_command.t]
         ~trials:1
         (gen_untimed_account_and_create_timed_account ~balance:100_000_000
@@ -1702,8 +1702,7 @@ let%test_module "account timing check" =
               let result =
                 Mina_ledger.Ledger.apply_zkapp_command_unchecked ~signature_kind
                   ~constraint_constants
-                  ~global_slot:
-                    Mina_numbers.Global_slot_since_genesis.(succ zero)
+                  ~global_slot:Mina_numbers.Global_slot_since_genesis.(succ zero)
                   ~state_view:Transaction_snark_tests.Util.genesis_state_view
                   ledger zkapp_command
               in
@@ -1715,7 +1714,7 @@ let%test_module "account timing check" =
       Quickcheck.test
         ~seed:
           (`Deterministic
-            "zkApp command, account creation, min_balance = balance" )
+             "zkApp command, account creation, min_balance = balance" )
         ~sexp_of:[%sexp_of: Mina_ledger.Ledger.init_state * Zkapp_command.t]
         ~trials:1
         (gen_untimed_account_and_create_timed_account
@@ -1733,7 +1732,7 @@ let%test_module "account timing check" =
       Quickcheck.test
         ~seed:
           (`Deterministic
-            "zkapp command, account creation, min_balance < balace" )
+             "zkapp command, account creation, min_balance < balace" )
         ~sexp_of:[%sexp_of: Mina_ledger.Ledger.init_state * Zkapp_command.t]
         ~trials:1
         (gen_untimed_account_and_create_timed_account
@@ -2139,7 +2138,7 @@ let%test_module "account timing check" =
                 ledger_init_state ;
               apply_zkapp_commands_at_slot ledger
                 Mina_numbers.Global_slot_since_genesis.(
-                  of_int (100_000 + 10_000))
+                  of_int (100_000 + 10_000) )
                 [ zkapp_command ] ) )
 
     (* same as previous test, amount is incremented by 1 *)
@@ -2284,8 +2283,8 @@ let%test_module "account timing check" =
           Async.Quickcheck.async_test
             ~seed:
               (`Deterministic
-                "zkapp command, create timed account with wrong authorization"
-                )
+                 "zkapp command, create timed account with wrong authorization"
+              )
             ~sexp_of:[%sexp_of: Mina_ledger.Ledger.init_state * Zkapp_command.t]
             ~trials:1 gen
             ~f:(fun (ledger_init_state, create_timed_account_zkapp_command) ->
@@ -2359,7 +2358,7 @@ let%test_module "account timing check" =
           Async.Quickcheck.async_test
             ~seed:
               (`Deterministic
-                "zkapp command, change untimed account to timed account" )
+                 "zkapp command, change untimed account to timed account" )
             ~sexp_of:[%sexp_of: Mina_ledger.Ledger.init_state * Zkapp_command.t]
             ~trials:1 gen
             ~f:(fun (ledger_init_state, update_timing_zkapp_command) ->
@@ -2444,7 +2443,7 @@ let%test_module "account timing check" =
               Async.Quickcheck.async_test
                 ~seed:
                   (`Deterministic
-                    "zkapp command, invalid update for timed account" )
+                     "zkapp command, invalid update for timed account" )
                 ~sexp_of:
                   [%sexp_of: Mina_ledger.Ledger.init_state * Zkapp_command.t]
                 ~trials:1 gen

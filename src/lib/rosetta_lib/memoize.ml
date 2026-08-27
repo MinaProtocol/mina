@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Async_kernel
 
 let ignores_args : ('a -> 'b) -> 'a -> 'b =

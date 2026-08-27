@@ -23,4 +23,4 @@
  ;; build-ordering constraint.
  (deps ../../../app/mina_archive_healthcheck/mina_archive_healthcheck.exe)
  (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_version ppx_jane ppx_mina ppx_compare)))
+ (preprocess (pps ppx_compare ppx_here ppx_let ppx_mina ppx_version)))

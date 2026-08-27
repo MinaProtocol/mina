@@ -47,7 +47,7 @@ module Block_info = struct
       Ok { id; height; state_hash; protocol_version }
     in
     Caqti_type.(
-      custom ~encode ~decode (t4 int int64 string Protocol_version.typ))
+      custom ~encode ~decode (t4 int int64 string Protocol_version.typ) )
 end
 
 let chain_of_query_templated ~start_condition ~join_condition =
@@ -199,7 +199,7 @@ module Fork_context = struct
     in
     Caqti_type.(
       custom ~encode ~decode
-        (t2 (t3 string int64 int64) (t3 string (option string) (option int64))))
+        (t2 (t3 string int64 int64) (t3 string (option string) (option int64))) )
 end
 
 (* The first hard-fork block (global_slot_since_hard_fork = 0) strictly above the
@@ -233,7 +233,7 @@ let blocks_to_orphan (module Conn : CONNECTION) ~canonical_block_ids
     Caqti_type.(
       t4 (option int) Mina_caqti.array_int_typ Protocol_version.typ
         (option int64)
-      ->* t3 int64 string string)
+      ->* t3 int64 string string )
       {%string|
         SELECT height, state_hash, chain_status::text
         FROM blocks
@@ -270,7 +270,7 @@ let conversion_summary_counts (module Conn : CONNECTION) ~canonical_block_ids
     Caqti_type.(
       t4 (option int) Mina_caqti.array_int_typ Protocol_version.typ
         (option int64)
-      ->! t4 int int int int)
+      ->! t4 int int int int )
       {%string|
         SELECT
           COUNT(*) FILTER (WHERE id = ANY($2::int[]))::int,
@@ -320,7 +320,7 @@ let mark_pending_blocks_as_canonical_or_orphaned (module Conn : CONNECTION)
     Caqti_type.(
       t4 (option int) Mina_caqti.array_int_typ Protocol_version.typ
         (option int64)
-      ->. Caqti_type.unit)
+      ->. Caqti_type.unit )
       {%string|
         UPDATE blocks
         SET chain_status = CASE

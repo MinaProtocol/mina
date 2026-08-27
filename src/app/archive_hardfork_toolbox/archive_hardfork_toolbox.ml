@@ -13,12 +13,12 @@ let run_check_and_exit check_fn () =
 let fork_state_hash =
   Command.Param.(
     flag "--fork-state-hash" (required string)
-      ~doc:"String Hash of the fork state")
+      ~doc:"String Hash of the fork state" )
 
 let fork_slot =
   Command.Param.(
     flag "--fork-slot" (required int)
-      ~doc:"Int64 Global slot since genesis of the fork block")
+      ~doc:"Int64 Global slot since genesis of the fork block" )
 
 let is_in_best_chain_command =
   Async.Command.async ~summary:"Verify fork block is in best chain"
@@ -267,6 +267,6 @@ let commands =
   ]
 
 let () =
-  Async_command.run
+  Command_unix.run
     (Async_command.group ~summary:"Archive hardfork toolbox"
        ~preserve_subcommand_order:() commands )

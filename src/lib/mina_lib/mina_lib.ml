@@ -152,8 +152,8 @@ let client_port t =
 
 (* Get the most recently set public keys  *)
 let block_production_pubkeys t : Public_key.Compressed.Set.t =
-  t.config.block_production_keypairs |> Keypair.And_compressed_pk.Set.to_list
-  |> List.map ~f:snd |> Public_key.Compressed.Set.of_list
+  t.config.block_production_keypairs |> Set.to_list |> List.map ~f:snd
+  |> Public_key.Compressed.Set.of_list
 
 let coinbase_receiver t = !(t.coinbase_receiver)
 
@@ -306,7 +306,7 @@ module Snark_worker = struct
           "Killing snark worker process with pid: $snark_worker_pid"
           ~metadata:
             [ ("snark_worker_pid", `Int (Pid.to_int (Process.pid process))) ] ;
-        Signal.send_exn Signal.term (`Pid (Process.pid process)) ;
+        Signal_unix.send_exn Signal.term (`Pid (Process.pid process)) ;
         Mina_metrics.Process_memory.Snark_worker.clear_pid () ;
         if should_wait_kill then Ivar.read kill_ivar else Deferred.unit
     | `Off _ ->
@@ -411,12 +411,10 @@ let get_node_state t =
   let peer_id = (Node_addrs_and_ports.to_peer_exn addrs_and_ports).peer_id in
   let ip_address =
     Node_addrs_and_ports.external_ip addrs_and_ports
-    |> Core.Unix.Inet_addr.to_string
+    |> Core_unix.Inet_addr.to_string
   in
   let public_key =
-    let key_list =
-      block_production_pubkeys t |> Public_key.Compressed.Set.to_list
-    in
+    let key_list = block_production_pubkeys t |> Set.to_list in
     if List.is_empty key_list then None else Some (List.hd_exn key_list)
   in
   let catchup_job_states =
@@ -432,9 +430,9 @@ let get_node_state t =
   let block_height_at_best_tip =
     best_tip t
     |> Participating_state.map ~f:(fun b ->
-           Transition_frontier.Breadcrumb.consensus_state b
-           |> Consensus.Data.Consensus_state.blockchain_length
-           |> Mina_numbers.Length.to_uint32 )
+        Transition_frontier.Breadcrumb.consensus_state b
+        |> Consensus.Data.Consensus_state.blockchain_length
+        |> Mina_numbers.Length.to_uint32 )
     |> Participating_state.map ~f:Unsigned.UInt32.to_int
     |> Participating_state.active
   in
@@ -442,10 +440,10 @@ let get_node_state t =
     sync_status t |> Mina_incremental.Status.Observer.value_exn
   in
   let uptime_of_node =
-    Time.(
+    Time_float.(
       Span.to_string_hum
-      @@ Time.diff (now ())
-           (Time_ns.to_time_float_round_nearest_microsecond daemon_start_time))
+      @@ Time_float.diff (now ())
+           (Time_ns.to_time_float_round_nearest_microsecond daemon_start_time) )
   in
   let%map hardware_info = Conf_dir.get_hw_info () in
   { Node_error_service.peer_id
@@ -476,10 +474,10 @@ let create_sync_status_observer ~logger ~genesis_timestamp ~is_seed ~demo_mode
     ~net ~transition_frontier_and_catchup_signal_incr ~online_status_incr
     ~first_connection_incr ~first_message_incr =
   let open Mina_incremental.Status in
-  let restart_delay = Time.Span.of_min 5. in
-  let offline_shutdown_delay = Time.Span.of_min 25. in
+  let restart_delay = Time_float.Span.of_min 5. in
+  let offline_shutdown_delay = Time_float.Span.of_min 25. in
   let genesis_timestamp = Genesis_constants.to_time genesis_timestamp in
-  let after_genesis () = Time.(( >= ) (now ())) genesis_timestamp in
+  let after_genesis () = Time_float.(( >= ) (now ())) genesis_timestamp in
   let incremental_status =
     map4 online_status_incr transition_frontier_and_catchup_signal_incr
       first_connection_incr first_message_incr
@@ -491,30 +489,31 @@ let create_sync_status_observer ~logger ~genesis_timestamp ~is_seed ~demo_mode
           | `Offline ->
               (* nothing to do if offline before genesis *)
               ( if after_genesis () then
-                match !next_helper_restart with
-                | None ->
-                    next_helper_restart :=
-                      Some
-                        (Async.Clock.Event.run_after restart_delay
-                           (fun () ->
-                             [%log info]
-                               "Offline for too long; restarting libp2p_helper" ;
-                             Mina_networking.restart_helper net ;
-                             next_helper_restart := None ;
-                             if not is_seed then
-                               match !offline_shutdown with
-                               | None ->
-                                   offline_shutdown :=
-                                     Some
-                                       (Async.Clock.Event.run_after
-                                          offline_shutdown_delay
-                                          (fun () -> raise Offline_shutdown)
-                                          () )
-                               | Some _ ->
-                                   () )
-                           () )
-                | Some _ ->
-                    () ) ;
+                  match !next_helper_restart with
+                  | None ->
+                      next_helper_restart :=
+                        Some
+                          (Async.Clock.Event.run_after restart_delay
+                             (fun () ->
+                               [%log info]
+                                 "Offline for too long; restarting \
+                                  libp2p_helper" ;
+                               Mina_networking.restart_helper net ;
+                               next_helper_restart := None ;
+                               if not is_seed then
+                                 match !offline_shutdown with
+                                 | None ->
+                                     offline_shutdown :=
+                                       Some
+                                         (Async.Clock.Event.run_after
+                                            offline_shutdown_delay
+                                            (fun () -> raise Offline_shutdown)
+                                            () )
+                                 | Some _ ->
+                                     () )
+                             () )
+                  | Some _ ->
+                      () ) ;
               let is_empty = function `Empty -> true | _ -> false in
               if is_empty first_connection then (
                 [%str_log info] Connecting ;
@@ -547,90 +546,95 @@ let create_sync_status_observer ~logger ~genesis_timestamp ~is_seed ~demo_mode
   let observer = observe incremental_status in
   (* monitor Mina status, issue a warning if offline for too long (unless we are a seed node) *)
   ( if not is_seed then
-    let offline_timeout_min = 15.0 in
-    let offline_timeout_duration = Time.Span.of_min offline_timeout_min in
-    let offline_timeout = ref None in
-    let offline_warned = ref false in
-    let bootstrap_timeout_min = 120.0 in
-    let bootstrap_timeout_duration = Time.Span.of_min bootstrap_timeout_min in
-    let bootstrap_timeout = ref None in
-    let log_offline_warning _tm =
-      [%log error]
-        "Daemon has not received any gossip messages for %0.0f minutes; check \
-         the daemon's external port forwarding, if needed"
-        offline_timeout_min ;
-      offline_warned := true
-    in
-    let start_offline_timeout () =
-      match !offline_timeout with
-      | Some _ ->
-          ()
-      | None ->
-          offline_timeout :=
-            Some
-              (Timeout.create () offline_timeout_duration ~f:log_offline_warning)
-    in
-    let stop_offline_timeout () =
-      match !offline_timeout with
-      | Some timeout ->
-          if !offline_warned then (
-            [%log info]
-              "Daemon had been offline (no gossip messages received), now back \
-               online" ;
-            offline_warned := false ) ;
-          Timeout.cancel () timeout () ;
-          offline_timeout := None
-      | None ->
-          ()
-    in
-    let log_bootstrap_error_and_restart _tm =
-      [%log error] "Daemon has been in bootstrap for %0.0f minutes"
-        bootstrap_timeout_min ;
-      raise Bootstrap_stuck_shutdown
-    in
-    let start_bootstrap_timeout () =
-      match !bootstrap_timeout with
-      | Some _ ->
-          ()
-      | None ->
-          (* don't check bootstrap timeout before genesis *)
-          if after_genesis () then
-            bootstrap_timeout :=
+      let offline_timeout_min = 15.0 in
+      let offline_timeout_duration =
+        Time_float.Span.of_min offline_timeout_min
+      in
+      let offline_timeout = ref None in
+      let offline_warned = ref false in
+      let bootstrap_timeout_min = 120.0 in
+      let bootstrap_timeout_duration =
+        Time_float.Span.of_min bootstrap_timeout_min
+      in
+      let bootstrap_timeout = ref None in
+      let log_offline_warning _tm =
+        [%log error]
+          "Daemon has not received any gossip messages for %0.0f minutes; \
+           check the daemon's external port forwarding, if needed"
+          offline_timeout_min ;
+        offline_warned := true
+      in
+      let start_offline_timeout () =
+        match !offline_timeout with
+        | Some _ ->
+            ()
+        | None ->
+            offline_timeout :=
               Some
-                (Timeout.create () bootstrap_timeout_duration
-                   ~f:log_bootstrap_error_and_restart )
-    in
-    let stop_bootstrap_timeout () =
-      match !bootstrap_timeout with
-      | Some timeout ->
-          Timeout.cancel () timeout () ;
-          bootstrap_timeout := None
-      | None ->
-          ()
-    in
-    let handle_status_change (sync_status : Sync_status.t) =
-      ( match sync_status with
-      | `Offline ->
-          start_offline_timeout ()
-      | _ ->
-          stop_offline_timeout () ) ;
-      match sync_status with
-      | `Bootstrap ->
-          start_bootstrap_timeout ()
-      | _ ->
-          stop_bootstrap_timeout ()
-    in
-    Observer.on_update_exn observer ~f:(function
-      | Initialized sync_status ->
-          handle_status_change sync_status
-      | Changed (_old_sync_status, new_sync_status) ->
-          handle_status_change new_sync_status
-      | Invalidated ->
-          () ) ) ;
+                (Timeout.create () offline_timeout_duration
+                   ~f:log_offline_warning )
+      in
+      let stop_offline_timeout () =
+        match !offline_timeout with
+        | Some timeout ->
+            if !offline_warned then (
+              [%log info]
+                "Daemon had been offline (no gossip messages received), now \
+                 back online" ;
+              offline_warned := false ) ;
+            Timeout.cancel () timeout () ;
+            offline_timeout := None
+        | None ->
+            ()
+      in
+      let log_bootstrap_error_and_restart _tm =
+        [%log error] "Daemon has been in bootstrap for %0.0f minutes"
+          bootstrap_timeout_min ;
+        raise Bootstrap_stuck_shutdown
+      in
+      let start_bootstrap_timeout () =
+        match !bootstrap_timeout with
+        | Some _ ->
+            ()
+        | None ->
+            (* don't check bootstrap timeout before genesis *)
+            if after_genesis () then
+              bootstrap_timeout :=
+                Some
+                  (Timeout.create () bootstrap_timeout_duration
+                     ~f:log_bootstrap_error_and_restart )
+      in
+      let stop_bootstrap_timeout () =
+        match !bootstrap_timeout with
+        | Some timeout ->
+            Timeout.cancel () timeout () ;
+            bootstrap_timeout := None
+        | None ->
+            ()
+      in
+      let handle_status_change (sync_status : Sync_status.t) =
+        ( match sync_status with
+        | `Offline ->
+            start_offline_timeout ()
+        | _ ->
+            stop_offline_timeout () ) ;
+        match sync_status with
+        | `Bootstrap ->
+            start_bootstrap_timeout ()
+        | _ ->
+            stop_bootstrap_timeout ()
+      in
+      Observer.on_update_exn observer ~f:(function
+        | Initialized sync_status ->
+            handle_status_change sync_status
+        | Changed (_old_sync_status, new_sync_status) ->
+            handle_status_change new_sync_status
+        | Invalidated ->
+            () ) ) ;
   (* recompute Mina status on an interval *)
   let stabilize () = O1trace.sync_thread "stabilize_sync_status" stabilize in
   stabilize () ;
-  every (Time.Span.of_sec 15.0) ~stop:(never ()) stabilize ;
+  every (Time_float.Span.of_sec 15.0) ~stop:(never ()) stabilize ;
   observer
 
 let sync_status t = t.sync_status
@@ -739,12 +743,11 @@ let get_snarked_ledger_full t state_hash_opt =
                 (Staged_ledger.scan_state
                    (Transition_frontier.Breadcrumb.staged_ledger b) )
               |> Deferred.Result.map_error ~f:(fun e ->
-                     Error.createf
-                       "Failed to apply proof transactions for state_hash:%s : \
-                        %s"
-                       (State_hash.to_base58_check
-                          (Transition_frontier.Breadcrumb.state_hash b) )
-                       (Error.to_string_hum e) )
+                  Error.createf
+                    "Failed to apply proof transactions for state_hash:%s : %s"
+                    (State_hash.to_base58_check
+                       (Transition_frontier.Breadcrumb.state_hash b) )
+                    (Error.to_string_hum e) )
             else return () )
       in
       let snarked_ledger_hash =
@@ -906,7 +909,7 @@ let add_complete_work ~logger ~fee ~prover
       |> List.length
     in
     Mina_metrics.(
-      Gauge.set Snark_work.pending_snark_work (Int.to_float pending_work))
+      Gauge.set Snark_work.pending_snark_work (Int.to_float pending_work) )
   in
   let proofs = One_or_two.map ~f:(fun { proof; _ } -> proof) results in
   let fee_with_prover = Fee_with_prover.{ fee; prover } in
@@ -922,8 +925,8 @@ let add_complete_work ~logger ~fee ~prover
       ] ;
   Or_error.try_with update_metrics
   |> Result.iter_error ~f:(fun err ->
-         [%log warn] "Failed to update metrics on adding work"
-           ~metadata:[ ("error", Error_json.error_to_yojson err) ] ) ;
+      [%log warn] "Failed to update metrics on adding work"
+        ~metadata:[ ("error", Error_json.error_to_yojson err) ] ) ;
   Network_pool.Snark_pool.(
     Local_sink.push t.pipes.snark_local_sink
       ( Add_solved_work
@@ -938,7 +941,7 @@ let add_complete_work ~logger ~fee ~prover
                 [ ( "work_ids"
                   , Transaction_snark_work.Statement.compact_json stmts )
                 ; ("error", Error_json.error_to_yojson err)
-                ] ) ))
+                ] ) ) )
   |> Deferred.don't_wait_for
 
 let add_work t (work : Snark_work_lib.Result.Partitioned.Stable.Latest.t) =
@@ -1090,7 +1093,7 @@ let next_epoch_ledger t =
   in
   if
     Mina_numbers.Length.(
-      equal root_epoch best_tip_epoch || equal best_tip_epoch zero)
+      equal root_epoch best_tip_epoch || equal best_tip_epoch zero )
   then
     (*root is in the same epoch as the best tip and so the next epoch ledger in the local state will be updated by Proof_of_stake.frontier_root_transition. Next epoch ledger in genesis epoch is the genesis ledger*)
     `Finalized
@@ -1101,9 +1104,7 @@ let next_epoch_ledger t =
     `Notfinalized
 
 let find_delegators table pk =
-  Option.value_map
-    (Public_key.Compressed.Table.find table pk)
-    ~default:[] ~f:Mina_base.Account.Index.Table.data
+  Option.value_map (Hashtbl.find table pk) ~default:[] ~f:Hashtbl.data
 
 let current_epoch_delegators t ~pk =
   let open Option.Let_syntax in
@@ -1144,33 +1145,37 @@ let perform_compaction compaction_interval t =
         | None ->
             6000.
       in
-      let span ?(incr = 0.) ms = Float.(of_int ms +. incr) |> Time.Span.of_ms in
+      let span ?(incr = 0.) ms =
+        Float.(of_int ms +. incr) |> Time_float.Span.of_ms
+      in
       let interval_configured =
         match Sys.getenv "MINA_COMPACTION_INTERVAL_MS" with
         | Some ms ->
-            Time.Span.of_ms (Float.of_string ms)
+            Time_float.Span.of_ms (Float.of_string ms)
         | None ->
             compaction_interval_compiled
       in
-      if Time.Span.(interval_configured <= of_ms expected_time_for_compaction)
+      if
+        Time_float.Span.(
+          interval_configured <= of_ms expected_time_for_compaction )
       then (
         [%log' fatal t.config.logger]
           "Time between compactions %f should be greater than the expected \
            time for compaction %f"
-          (Time.Span.to_ms interval_configured)
+          (Time_float.Span.to_ms interval_configured)
           expected_time_for_compaction ;
         failwith
           (sprintf
              "Time between compactions %f should be greater than the expected \
               time for compaction %f"
-             (Time.Span.to_ms interval_configured)
+             (Time_float.Span.to_ms interval_configured)
              expected_time_for_compaction ) ) ;
       let call_compact () =
-        let start = Time.now () in
+        let start = Time_float.now () in
         Gc.compact () ;
-        let span = Time.diff (Time.now ()) start in
+        let span = Time_float.diff (Time_float.now ()) start in
         [%log' debug t.config.logger]
-          ~metadata:[ ("time", `Float (Time.Span.to_ms span)) ]
+          ~metadata:[ ("time", `Float (Time_float.Span.to_ms span)) ]
           "Gc.compact took $time ms"
       in
       let rec perform interval =
@@ -1195,7 +1200,7 @@ let check_and_stop_daemon t ~wait =
   let uptime_mins =
     Time_ns.(diff (now ()) daemon_start_time |> Span.to_min |> Int.of_float)
   in
-  let max_catchup_time = Time.Span.of_hr 1. in
+  let max_catchup_time = Time_float.Span.of_hr 1. in
   if uptime_mins <= wait then
     `Check_in
       (Block_time.Span.to_time_span
@@ -1212,19 +1217,19 @@ let check_and_stop_daemon t ~wait =
             let tm = Block_time.to_time_exn tm in
             (*Assuming it takes at most 1hr to bootstrap and catchup*)
             let next_block =
-              Time.add tm
+              Time_float.add tm
                 (Block_time.Span.to_time_span
                    t.config.precomputed_values.consensus_constants
                      .slot_duration_ms )
             in
-            let wait_for = Time.(diff next_block (now ())) in
-            if Time.Span.(wait_for > max_catchup_time) then `Now
+            let wait_for = Time_float.(diff next_block (now ())) in
+            if Time_float.Span.(wait_for > max_catchup_time) then `Now
             else `Check_in wait_for
         | Evaluating_vrf _last_checked_slot ->
             let vrf_poll_interval =
               (config t).compile_config.vrf_poll_interval
             in
-            `Check_in (Core.Time.Span.scale vrf_poll_interval 2.0) )
+            `Check_in (Core.Time_float.Span.scale vrf_poll_interval 2.0) )
 
 let stop_long_running_daemon t =
   (* The Random.int upper bound is exclusive *)
@@ -1256,7 +1261,7 @@ let stop_long_running_daemon t =
         | `Check_in tm ->
             go tm )
   in
-  go (Time.Span.of_ms (wait_mins * 60 * 1000 |> Float.of_int))
+  go (Time_float.Span.of_ms (wait_mins * 60 * 1000 |> Float.of_int))
 
 let offline_time
     { Genesis_constants.Constraint_constants.block_window_duration_ms; _ } =
@@ -1303,11 +1308,11 @@ module type CONTEXT = sig
 
   val commit_id : string
 
-  val vrf_poll_interval : Time.Span.t
+  val vrf_poll_interval : Time_float.Span.t
 
   val zkapp_cmd_limit : int option ref
 
-  val compaction_interval : Time.Span.t option
+  val compaction_interval : Time_float.Span.t option
 
   val ledger_sync_config : Syncable_ledger.daemon_config
 
@@ -1427,35 +1432,33 @@ let start t =
     t.block_production_status := block_production_status ;
     t.next_producer_timing <- Some next_producer_timing
   in
-  ( if
-    not
-      (Keypair.And_compressed_pk.Set.is_empty t.config.block_production_keypairs)
-  then
-    let module Context =
-    ( val context ~proof_cache_db:t.proof_cache_db ~commit_id:t.commit_id
-            ~signature_kind:t.signature_kind t.config )
-    in
-    Block_producer.run
-      ~context:(module Context)
-      ~vrf_evaluator:t.processes.vrf_evaluator ~verifier:t.processes.verifier
-      ~set_next_producer_timing ~prover:t.processes.prover
-      ~trust_system:t.config.trust_system
-      ~transaction_resource_pool:
-        (Network_pool.Transaction_pool.resource_pool
-           t.components.transaction_pool )
-      ~get_completed_work:
-        (Network_pool.Snark_pool.get_completed_work t.components.snark_pool)
-      ~time_controller:t.config.time_controller
-      ~coinbase_receiver:t.coinbase_receiver
-      ~consensus_local_state:t.config.consensus_local_state
-      ~frontier_reader:t.components.transition_frontier
-      ~transition_writer:t.pipes.producer_transition_writer
-      ~log_block_creation:t.config.log_block_creation
-      ~block_reward_threshold:t.config.block_reward_threshold
-      ~block_produced_bvar:t.components.block_produced_bvar
-      ~vrf_evaluation_state:t.vrf_evaluation_state ~net:t.components.net
-      ~zkapp_cmd_limit_hardcap:
-        t.config.precomputed_values.genesis_constants.zkapp_cmd_limit_hardcap ) ;
+  ( if not (Set.is_empty t.config.block_production_keypairs) then
+      let module Context =
+        ( val context ~proof_cache_db:t.proof_cache_db ~commit_id:t.commit_id
+                ~signature_kind:t.signature_kind t.config )
+      in
+      Block_producer.run
+        ~context:(module Context)
+        ~vrf_evaluator:t.processes.vrf_evaluator ~verifier:t.processes.verifier
+        ~set_next_producer_timing ~prover:t.processes.prover
+        ~trust_system:t.config.trust_system
+        ~transaction_resource_pool:
+          (Network_pool.Transaction_pool.resource_pool
+             t.components.transaction_pool )
+        ~get_completed_work:
+          (Network_pool.Snark_pool.get_completed_work t.components.snark_pool)
+        ~time_controller:t.config.time_controller
+        ~coinbase_receiver:t.coinbase_receiver
+        ~consensus_local_state:t.config.consensus_local_state
+        ~frontier_reader:t.components.transition_frontier
+        ~transition_writer:t.pipes.producer_transition_writer
+        ~log_block_creation:t.config.log_block_creation
+        ~block_reward_threshold:t.config.block_reward_threshold
+        ~block_produced_bvar:t.components.block_produced_bvar
+        ~vrf_evaluation_state:t.vrf_evaluation_state ~net:t.components.net
+        ~zkapp_cmd_limit_hardcap:
+          t.config.precomputed_values.genesis_constants.zkapp_cmd_limit_hardcap
+  ) ;
   perform_compaction t.config.compile_config.compaction_interval t ;
   let () =
     match t.config.node_status_url with
@@ -1463,8 +1466,7 @@ let start t =
         let block_producer_public_key_base58 =
           Option.map ~f:(fun (_, pk) ->
               Public_key.Compressed.to_base58_check pk )
-          @@ Keypair.And_compressed_pk.Set.choose
-               t.config.block_production_keypairs
+          @@ Set.choose t.config.block_production_keypairs
         in
         if t.config.simplified_node_stats then
           Node_status_service.start_simplified ~commit_id:t.commit_id
@@ -1511,8 +1513,8 @@ let start t =
 
 let start_with_precomputed_blocks t blocks =
   let module Context =
-  ( val context ~proof_cache_db:t.proof_cache_db ~commit_id:t.commit_id
-          ~signature_kind:t.signature_kind t.config )
+    ( val context ~proof_cache_db:t.proof_cache_db ~commit_id:t.commit_id
+            ~signature_kind:t.signature_kind t.config )
   in
   let%bind () =
     Block_producer.run_precomputed
@@ -1538,7 +1540,8 @@ let send_resource_pool_diff_or_wait ~rl ~diff_score ~max_per_15_seconds diff =
   let score = diff_score diff in
   let rec able_to_send_or_wait () =
     match
-      Network_pool.Rate_limiter.add rl (Remote us) ~now:(Time.now ()) ~score
+      Network_pool.Rate_limiter.add rl (Remote us) ~now:(Time_float.now ())
+        ~score
     with
     | `Within_capacity ->
         Deferred.return ()
@@ -1547,16 +1550,16 @@ let send_resource_pool_diff_or_wait ~rl ~diff_score ~max_per_15_seconds diff =
           (* This will never pass the rate limiting; pass it on
                              to progress in the queue. *)
           ignore
-            ( Network_pool.Rate_limiter.add rl (Remote us) ~now:(Time.now ())
-                ~score:0
+            ( Network_pool.Rate_limiter.add rl (Remote us)
+                ~now:(Time_float.now ()) ~score:0
               : [ `Within_capacity | `Capacity_exceeded ] ) ;
           Deferred.return () )
         else
           let%bind () =
             after
-              Time.(
+              Time_float.(
                 diff (now ())
-                  (Network_pool.Rate_limiter.next_expires rl (Remote us)))
+                  (Network_pool.Rate_limiter.next_expires rl (Remote us)) )
           in
           able_to_send_or_wait ()
   in
@@ -1603,13 +1606,13 @@ let fetch_completed_snarks (module Context : CONTEXT) snark_pool network
   let%bind all_peers = Mina_networking.peers network in
   let peer_limit = 5 in
   let limited_peers = List.take all_peers peer_limit in
-  let check_every = Time.Span.of_ms 20. in
-  let log_every = Time.Span.of_sec 10. in
-  let log_rate = Time.Span.( // ) log_every check_every |> Float.to_int in
+  let check_every = Time_float.Span.of_ms 20. in
+  let log_every = Time_float.Span.of_sec 10. in
+  let log_rate = Time_float.Span.( // ) log_every check_every |> Float.to_int in
 
   (* Keep reading from the transition frontier until it has caught up to the most valid block from the network.
-     * This is to ensure that the snarks are verified and added to the pool in the correct order
-  *)
+   * This is to ensure that the snarks are verified and added to the pool in the correct order
+   *)
   let rec wait_for_new_top_block received_block iteration_count =
     let frontier = get_current_frontier () in
     match frontier with
@@ -1654,7 +1657,7 @@ let fetch_completed_snarks (module Context : CONTEXT) snark_pool network
   in
   let%bind () = wait_for_new_top_block received_block log_rate in
 
-  Deferred.List.iter
+  Deferred.List.iter ~how:`Sequential
     ~f:(fun peer ->
       [%log debug] "PEER IS: Fetching completed snarks from peer: $peer"
         ~metadata:[ ("peer", Network_peer.Peer.to_yojson peer) ] ;
@@ -1685,7 +1688,7 @@ let fetch_completed_snarks (module Context : CONTEXT) snark_pool network
 
       (* verify the snarks and add them to the pool *)
       let%bind () =
-        Deferred.List.iter completed_works ~f:(fun work ->
+        Deferred.List.iter ~how:`Sequential completed_works ~f:(fun work ->
             (* proofs should be verified in apply and broadcast *)
             let statement =
               Transaction_snark_work.Stable.Latest.statement work
@@ -1731,7 +1734,7 @@ let fetch_completed_snarks (module Context : CONTEXT) snark_pool network
                          ~f:
                            (Resource_pool.Diff.Cached.write_all_proofs_to_disk
                               ~proof_cache_db )
-                         msg ))
+                         msg ) )
             | Error e ->
                 [%log info]
                   ~metadata:
@@ -1803,17 +1806,19 @@ let create ~commit_id ?wallets (config : Config.t) =
           let%bind proof_cache_db = initialize_proof_cache_db config in
           let%bind zkapp_vk_cache_db = initialize_zkapp_vk_cache_db config in
           let module Context =
-          (val context ~proof_cache_db ~commit_id ~signature_kind config)
+            (val context ~proof_cache_db ~commit_id ~signature_kind config)
           in
           let%bind prover =
             Monitor.try_with ~here:[%here]
               ~rest:
                 (`Call
-                  (fun exn ->
-                    let err = Error.of_exn ~backtrace:`Get exn in
-                    [%log' warn config.logger]
-                      "unhandled exception from daemon-side prover server: $exn"
-                      ~metadata:[ ("exn", Error_json.error_to_yojson err) ] ) )
+                   (fun exn ->
+                     let err = Error.of_exn ~backtrace:`Get exn in
+                     [%log' warn config.logger]
+                       "unhandled exception from daemon-side prover server: \
+                        $exn"
+                       ~metadata:[ ("exn", Error_json.error_to_yojson err) ] )
+                )
               (fun () ->
                 O1trace.thread "manage_prover_subprocess" (fun () ->
                     let%bind prover =
@@ -1833,12 +1838,13 @@ let create ~commit_id ?wallets (config : Config.t) =
             Monitor.try_with ~here:[%here]
               ~rest:
                 (`Call
-                  (fun exn ->
-                    let err = Error.of_exn ~backtrace:`Get exn in
-                    [%log' warn config.logger]
-                      "unhandled exception from daemon-side verifier server: \
-                       $exn"
-                      ~metadata:[ ("exn", Error_json.error_to_yojson err) ] ) )
+                   (fun exn ->
+                     let err = Error.of_exn ~backtrace:`Get exn in
+                     [%log' warn config.logger]
+                       "unhandled exception from daemon-side verifier server: \
+                        $exn"
+                       ~metadata:[ ("exn", Error_json.error_to_yojson err) ] )
+                )
               (fun () ->
                 O1trace.thread "manage_verifier_subprocess" (fun () ->
                     let%bind blockchain_verification_key =
@@ -1883,12 +1889,13 @@ let create ~commit_id ?wallets (config : Config.t) =
             Monitor.try_with ~here:[%here]
               ~rest:
                 (`Call
-                  (fun exn ->
-                    let err = Error.of_exn ~backtrace:`Get exn in
-                    [%log' warn config.logger]
-                      "unhandled exception from daemon-side vrf evaluator \
-                       server: $exn"
-                      ~metadata:[ ("exn", Error_json.error_to_yojson err) ] ) )
+                   (fun exn ->
+                     let err = Error.of_exn ~backtrace:`Get exn in
+                     [%log' warn config.logger]
+                       "unhandled exception from daemon-side vrf evaluator \
+                        server: $exn"
+                       ~metadata:[ ("exn", Error_json.error_to_yojson err) ] )
+                )
               (fun () ->
                 O1trace.thread "manage_vrf_evaluator_subprocess" (fun () ->
                     Vrf_evaluator.create ~commit_id ~constraint_constants
@@ -1914,14 +1921,14 @@ let create ~commit_id ?wallets (config : Config.t) =
                 Monitor.try_with ~here:[%here]
                   ~rest:
                     (`Call
-                      (fun exn ->
-                        let err = Error.of_exn ~backtrace:`Get exn in
-                        [%log' fatal config.logger]
-                          "unhandled exception when creating uptime service \
-                           SNARK worker: $exn, terminating daemon"
-                          ~metadata:[ ("exn", Error_json.error_to_yojson err) ] ;
-                        (* make sure Async shutdown handlers are called *)
-                        don't_wait_for (Async.exit 1) ) )
+                       (fun exn ->
+                         let err = Error.of_exn ~backtrace:`Get exn in
+                         [%log' fatal config.logger]
+                           "unhandled exception when creating uptime service \
+                            SNARK worker: $exn, terminating daemon"
+                           ~metadata:[ ("exn", Error_json.error_to_yojson err) ] ;
+                         (* make sure Async shutdown handlers are called *)
+                         don't_wait_for (Async.exit 1) ) )
                   (fun () ->
                     O1trace.thread "manage_uptime_snark_worker_subprocess"
                       (fun () ->
@@ -1934,7 +1941,7 @@ let create ~commit_id ?wallets (config : Config.t) =
           log_snark_coordinator_warning config snark_worker ;
           Protocol_version.set_proposed_opt config.proposed_protocol_version_opt ;
           let log_rate_limiter_occasionally rl ~label =
-            let t = Time.Span.of_min 1. in
+            let t = Time_float.Span.of_min 1. in
             every t (fun () ->
                 [%log' debug config.logger]
                   ~metadata:
@@ -2006,8 +2013,8 @@ let create ~commit_id ?wallets (config : Config.t) =
                                    .transition_receipt_time bc )
                                   ~default:"no timestamp available"
                                   ~f:
-                                    (Time.to_string_iso8601_basic
-                                       ~zone:Time.Zone.utc ) ) )
+                                    (Time_float.to_string_iso8601_basic
+                                       ~zone:Time_float.Zone.utc ) ) )
                         in
                         ( protocol_state_hash
                         , Some tip
@@ -2033,9 +2040,10 @@ let create ~commit_id ?wallets (config : Config.t) =
                   in
                   let git_commit = commit_id_short in
                   let uptime_minutes =
-                    let now = Time.now () in
+                    let now = Time_float.now () in
                     let minutes_float =
-                      Time.diff now config.start_time |> Time.Span.to_min
+                      Time_float.diff now config.start_time
+                      |> Time_float.Span.to_min
                     in
                     (* if rounding fails, just convert *)
                     Option.value_map
@@ -2150,7 +2158,8 @@ let create ~commit_id ?wallets (config : Config.t) =
           let work_partitioner =
             Work_partitioner.create ~signature_kind
               ~reassignment_timeout:
-                (Time.Span.of_ms (Float.of_int config.work_reassignment_wait))
+                (Time_float.Span.of_ms
+                   (Float.of_int config.work_reassignment_wait) )
               ~logger:config.logger ~proof_cache_db
           in
           let sinks = (block_sink, tx_remote_sink, snark_remote_sink) in
@@ -2257,7 +2266,7 @@ let create ~commit_id ?wallets (config : Config.t) =
             let api_pipe, new_blocks_pipe =
               Strict_pipe.Reader.(
                 Fork.two
-                  (map downstream_pipe ~f:(fun (`Transition t, _, _) -> t)))
+                  (map downstream_pipe ~f:(fun (`Transition t, _, _) -> t)) )
             in
             (network_pipe, api_pipe, new_blocks_pipe)
           in
@@ -2285,8 +2294,8 @@ let create ~commit_id ?wallets (config : Config.t) =
               Strict_pipe.Reader.iter_without_pushback
                 valid_transitions_for_network
                 ~f:(fun
-                     (`Transition transition, `Source source, `Valid_cb valid_cb)
-                   ->
+                    (`Transition transition, `Source source, `Valid_cb valid_cb)
+                  ->
                   let hash =
                     Mina_block.Validated.forget transition
                     |> State_hash.With_state_hashes.state_hash
@@ -2539,7 +2548,7 @@ let create ~commit_id ?wallets (config : Config.t) =
                       (Option.value_exn !sync_status_ref)
                   with
                   | Ok (`Offline as s) | Ok (`Bootstrap as s) ->
-                      let%bind () = after (Time.Span.of_sec 1.) in
+                      let%bind () = after (Time_float.Span.of_sec 1.) in
                       last_sync_status := s ;
                       loop ()
                   | Ok `Synced
@@ -2559,7 +2568,7 @@ let create ~commit_id ?wallets (config : Config.t) =
                   | Ok (`Listening as s)
                   | Ok (`Connecting as s)
                   | Ok (`Synced as s) ->
-                      let%bind () = after (Time.Span.of_sec 1.) in
+                      let%bind () = after (Time_float.Span.of_sec 1.) in
                       last_sync_status := s ;
                       loop ()
                   | Error _e ->
@@ -2653,15 +2662,15 @@ let best_chain_block_by_height (t : t) height =
   let%bind transition_frontier = get_transition_frontier t in
   Transition_frontier.best_tip_path transition_frontier
   |> List.find ~f:(fun bc ->
-         let validated_transition =
-           Transition_frontier.Breadcrumb.validated_transition bc
-         in
-         let block_height =
-           Mina_block.(
-             blockchain_length @@ With_hash.data
-             @@ Validated.forget validated_transition)
-         in
-         Unsigned.UInt32.equal block_height height )
+      let validated_transition =
+        Transition_frontier.Breadcrumb.validated_transition bc
+      in
+      let block_height =
+        Mina_block.(
+          blockchain_length @@ With_hash.data
+          @@ Validated.forget validated_transition )
+      in
+      Unsigned.UInt32.equal block_height height )
   |> Result.of_option
        ~error:
          (Error.createf
@@ -2859,9 +2868,9 @@ module Hardfork_config = struct
   let genesis_timestamp_str ~consensus_constants global_slot =
     Consensus.Data.Consensus_time.(
       start_time ~constants:consensus_constants
-        (of_global_slot ~constants:consensus_constants global_slot))
+        (of_global_slot ~constants:consensus_constants global_slot) )
     |> Block_time.to_time_exn
-    |> Time.to_string_iso8601_basic ~zone:Time.Zone.utc
+    |> Time_float.to_string_iso8601_basic ~zone:Time_float.Zone.utc
 
   (** Compute the hard fork slot. This will be derived from the stop slots and
       hard fork genesis slot delta in the runtime config, if those have been set
@@ -2964,7 +2973,7 @@ module Hardfork_config = struct
   (** Copy the roots of the [source_ledgers] and gather the stable ledger
       diffs from the [source_ledgers] to their roots *)
   let copy_genesis_roots_and_diffs ~source_ledgers parent_directory =
-    Core.Unix.mkdir_p parent_directory ;
+    Core_unix.mkdir_p parent_directory ;
     let genesis_ledger_data =
       let directory_name = parent_directory ^/ "genesis_ledger" in
       let root =
@@ -3068,7 +3077,7 @@ module Hardfork_config = struct
       ~logger ~target_dir genesis_ledger genesis_staking_ledger
       genesis_next_epoch_ledger =
     let open Deferred.Or_error.Let_syntax in
-    Core.Unix.mkdir_p target_dir ;
+    Core_unix.mkdir_p target_dir ;
     let%bind genesis_ledger_config =
       generate_tar_and_config ~generate_tar ~get_directory ~get_root_hash
         ~logger ~target_dir ~ledger_name_prefix:"genesis_ledger" genesis_ledger
@@ -3111,7 +3120,7 @@ module Hardfork_config = struct
     let open Deferred.Or_error.Let_syntax in
     [%log debug]
       "Generating database files and daemon.json for stable hard fork config" ;
-    Core.Unix.mkdir_p config_dir ;
+    Core_unix.mkdir_p config_dir ;
     let genesis_dir = config_dir ^/ "genesis" in
     let%bind genesis_config =
       generate_tars_and_configs
@@ -3133,7 +3142,7 @@ module Hardfork_config = struct
     let open Deferred.Or_error.Let_syntax in
     [%log debug]
       "Generating database files and daemon.json for migrated hard fork config" ;
-    Core.Unix.mkdir_p config_dir ;
+    Core_unix.mkdir_p config_dir ;
     let genesis_dir = config_dir ^/ "genesis" in
     let%bind genesis_config =
       generate_tars_and_configs
@@ -3192,12 +3201,12 @@ module Hardfork_config = struct
     let%bind.Deferred genesis_ledger_legacy, genesis_ledger_migrated =
       migrate_and_apply genesis_ledger_data
     in
-    let%bind.Deferred ( genesis_staking_ledger_legacy
-                      , genesis_staking_ledger_migrated ) =
+    let%bind.Deferred
+        genesis_staking_ledger_legacy, genesis_staking_ledger_migrated =
       migrate_and_apply genesis_staking_ledger_data
     in
-    let%bind.Deferred ( genesis_next_epoch_ledger_legacy
-                      , genesis_next_epoch_ledger_migrated ) =
+    let%bind.Deferred
+        genesis_next_epoch_ledger_legacy, genesis_next_epoch_ledger_migrated =
       migrate_and_apply genesis_next_epoch_ledger_data
     in
     [%log debug] "Writing hard fork config directories" ;
@@ -3221,7 +3230,7 @@ module Hardfork_config = struct
     let activated_file_name = directory_name ^/ "activated" in
     let%map () =
       Async.Writer.with_file ~exclusive:true activated_file_name
-        ~f:(fun writer -> return (Async.Writer.writef writer ""))
+        ~f:(fun writer -> return (Async.Writer.writef writer "") )
     in
     [%log debug]
       "Successfully generated and activated reference hard fork config"

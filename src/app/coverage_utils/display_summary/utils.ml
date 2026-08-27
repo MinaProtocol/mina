@@ -13,7 +13,7 @@ let run_string prog args =
           Format.(
             pp_print_list
               ~pp_sep:(fun fmt () -> pp_print_string fmt "; ")
-              pp_print_string)
+              pp_print_string )
           (Array.to_list args)
       in
       exit 1

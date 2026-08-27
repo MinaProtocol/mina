@@ -35,7 +35,7 @@ let less_than_bits ?(bits = 12) (value : Circuit.Field.t) : unit =
      (because moving shift to the right hand side that gives value < 2^x) *)
   let shift =
     exists Field.typ ~compute:(fun () ->
-        let power = Core_kernel.Int.pow 2 (12 - bits) in
+        let power = Core.Int.pow 2 (12 - bits) in
         Field.Constant.of_int power )
   in
   three_12bit value Field.(value * shift) Field.zero ;

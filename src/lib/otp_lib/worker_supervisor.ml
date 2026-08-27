@@ -5,7 +5,7 @@
  *)
 
 open Async_kernel
-open Core_kernel
+open Core
 
 (** The interface shared by both the worker and the supervisor which wraps it. *)
 module type Base_intf = sig

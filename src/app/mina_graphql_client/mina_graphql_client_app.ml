@@ -5,14 +5,14 @@ let graphql_uri_flag =
   Command.Param.(
     flag "--graphql-uri"
       ~doc:"URI GraphQL endpoint URI (default: http://127.0.0.1:3085/graphql)"
-      (optional_with_default "http://127.0.0.1:3085/graphql" string))
+      (optional_with_default "http://127.0.0.1:3085/graphql" string) )
 
 let node_password_flag =
   Command.Param.(
     flag "--node-password"
       ~doc:"PASSWORD Node wallet password (default: test password)"
       (optional_with_default Mina_graphql_client.Client.default_node_password
-         string ))
+         string ) )
 
 let peer_command =
   Command.async ~summary:"Query peer ID and connected peers"
@@ -102,8 +102,8 @@ let best_chain_command =
          | Ok blocks ->
              `List
                (List.map blocks
-                  ~f:(fun (block : Mina_graphql_client.Types.best_chain_block)
-                     ->
+                  ~f:(fun
+                      (block : Mina_graphql_client.Types.best_chain_block) ->
                     `Assoc
                       [ ("height", Mina_numbers.Length.to_yojson block.height)
                       ; ( "global_slot_since_hard_fork"
@@ -416,7 +416,7 @@ let () =
     ~processor:(Logger.Processor.raw ())
     ~transport:(Logger.Transport.raw (fun s -> Core.prerr_endline s))
     () ;
-  Command.run
+  Command_unix.run
     (Command.group ~summary:"Mina GraphQL client utility"
        [ ("peer", peer_command)
        ; ("account", account_command)

@@ -1,7 +1,7 @@
 (* mina_caqti.ml -- Mina helpers for the Caqti database bindings *)
 
 open Async
-open Core_kernel
+open Core
 open Mina_base
 
 (* custom Caqti types for generating type annotations on queries *)
@@ -21,7 +21,8 @@ module type CONNECTION = sig
 end
 
 module Wrap
-    (Conn : Caqti_async.CONNECTION) (Arg : sig
+    (Conn : Caqti_async.CONNECTION)
+    (Arg : sig
       val source : Uri.t
     end) : CONNECTION = struct
   include Conn
@@ -56,7 +57,7 @@ let connect_pool ?max_size uri =
     Caqti_async.connect_pool
       ~pool_config:
         Caqti_pool_config.(
-          merge_left (default_from_env ()) (create ?max_size:size ()))
+          merge_left (default_from_env ()) (create ?max_size:size ()) )
       uri
   in
   Pool.wrap ~source:uri pool
@@ -71,33 +72,31 @@ module Type_spec = struct
     | ( :: ) : 'c Caqti_type.t * ('a, 'b) t -> ('c -> 'a, 'c * 'b) t
 
   let rec to_rep : 'hlist 'tuple. ('hlist, 'tuple) t -> 'tuple Caqti_type.t =
-    fun (type hlist tuple) (spec : (hlist, tuple) t) ->
-     match spec with
-     | [] ->
-         (Caqti_type.unit : tuple Caqti_type.t)
-     | rep :: spec ->
-         Caqti_type.t2 rep (to_rep spec)
+   fun (type hlist tuple) (spec : (hlist, tuple) t) ->
+    match spec with
+    | [] ->
+        (Caqti_type.unit : tuple Caqti_type.t)
+    | rep :: spec ->
+        Caqti_type.t2 rep (to_rep spec)
 
   let rec hlist_to_tuple :
-            'hlist 'tuple.
-            ('hlist, 'tuple) t -> (unit, 'hlist) H_list.t -> 'tuple =
-    fun (type hlist tuple) (spec : (hlist, tuple) t)
-        (l : (unit, hlist) H_list.t) ->
-     match (spec, l) with
-     | [], [] ->
-         (() : tuple)
-     | _ :: spec, x :: l ->
-         ((x, hlist_to_tuple spec l) : tuple)
+      'hlist 'tuple. ('hlist, 'tuple) t -> (unit, 'hlist) H_list.t -> 'tuple =
+   fun (type hlist tuple) (spec : (hlist, tuple) t)
+       (l : (unit, hlist) H_list.t) ->
+    match (spec, l) with
+    | [], [] ->
+        (() : tuple)
+    | _ :: spec, x :: l ->
+        ((x, hlist_to_tuple spec l) : tuple)
 
   let rec tuple_to_hlist :
-            'hlist 'tuple.
-            ('hlist, 'tuple) t -> 'tuple -> (unit, 'hlist) H_list.t =
-    fun (type hlist tuple) (spec : (hlist, tuple) t) (t : tuple) ->
-     match (spec, t) with
-     | [], () ->
-         ([] : (unit, hlist) H_list.t)
-     | _ :: spec, (x, t) ->
-         x :: tuple_to_hlist spec t
+      'hlist 'tuple. ('hlist, 'tuple) t -> 'tuple -> (unit, 'hlist) H_list.t =
+   fun (type hlist tuple) (spec : (hlist, tuple) t) (t : tuple) ->
+    match (spec, t) with
+    | [], () ->
+        ([] : (unit, hlist) H_list.t)
+    | _ :: spec, (x, t) ->
+        x :: tuple_to_hlist spec t
 
   let custom_type ~to_hlist ~of_hlist tys =
     let encode t = Ok (hlist_to_tuple tys (to_hlist t)) in
@@ -113,30 +112,30 @@ module Vector = struct
         -> ('elem, 'elem -> 'fun_t, 'elem * 'tup_t, 'n Pickles_types.Nat.s) t
 
   let rec vec_to_hlist :
-            'elem 'hlist 'tup 'n.
-               ('elem, 'hlist, 'tup, 'n) t
-            -> ('elem, 'n) Pickles_types.Vector.t
-            -> (unit, 'hlist) H_list.t =
-    fun (type elem hlist tup n) (spec : (elem, hlist, tup, n) t)
-        (v : (elem, n) Pickles_types.Vector.t) ->
-     match (spec, v) with
-     | [], [] ->
-         ([] : (unit, hlist) H_list.t)
-     | _ :: spec, x :: v ->
-         x :: vec_to_hlist spec v
+      'elem 'hlist 'tup 'n.
+         ('elem, 'hlist, 'tup, 'n) t
+      -> ('elem, 'n) Pickles_types.Vector.t
+      -> (unit, 'hlist) H_list.t =
+   fun (type elem hlist tup n) (spec : (elem, hlist, tup, n) t)
+       (v : (elem, n) Pickles_types.Vector.t) ->
+    match (spec, v) with
+    | [], [] ->
+        ([] : (unit, hlist) H_list.t)
+    | _ :: spec, x :: v ->
+        x :: vec_to_hlist spec v
 
   let rec hlist_to_vec :
-            'elem 'hlist 'tup 'n.
-               ('elem, 'hlist, 'tup, 'n) t
-            -> (unit, 'hlist) H_list.t
-            -> ('elem, 'n) Pickles_types.Vector.t =
-    fun (type elem hlist tup n) (spec : (elem, hlist, tup, n) t)
-        (l : (unit, hlist) H_list.t) ->
-     match (spec, l) with
-     | _ :: spec, x :: l ->
-         (x :: hlist_to_vec spec l : (elem, n) Pickles_types.Vector.t)
-     | [], [] ->
-         []
+      'elem 'hlist 'tup 'n.
+         ('elem, 'hlist, 'tup, 'n) t
+      -> (unit, 'hlist) H_list.t
+      -> ('elem, 'n) Pickles_types.Vector.t =
+   fun (type elem hlist tup n) (spec : (elem, hlist, tup, n) t)
+       (l : (unit, hlist) H_list.t) ->
+    match (spec, l) with
+    | _ :: spec, x :: l ->
+        (x :: hlist_to_vec spec l : (elem, n) Pickles_types.Vector.t)
+    | [], [] ->
+        []
 
   module type Intf = sig
     (** defines a function type, like ['elem -> 'elem -> ... -> 'elem -> unit] *)
@@ -152,9 +151,8 @@ module Vector = struct
     val type_spec : 'elem Caqti_type.t -> ('elem fun_t, 'elem tup_t) Type_spec.t
   end
 
-  let rec spec_of_nat :
-      type n. n Plonkish_prelude.Nat.nat -> (module Intf with type n = n) =
-    function
+  let rec spec_of_nat : type n.
+      n Plonkish_prelude.Nat.nat -> (module Intf with type n = n) = function
     | Z ->
         let module N = struct
           type 'elem fun_t = unit
@@ -177,8 +175,7 @@ module Vector = struct
 
           type n = Prev.n Pickles_types.Nat.s
 
-          let spec :
-              type elem.
+          let spec : type elem.
               elem Caqti_type.t -> (elem, elem fun_t, elem tup_t, n) t =
            fun t -> t :: Prev.spec t
 
@@ -188,8 +185,7 @@ module Vector = struct
         end in
         (module N : Intf with type n = n)
 
-  let typ :
-      type elem n.
+  let typ : type elem n.
          elem Caqti_type.t * n Plonkish_prelude.Nat.nat
       -> (elem, n) Pickles_types.Vector.vec Caqti_type.t =
    fun (elem, n) ->
@@ -452,7 +448,7 @@ let insert_multi_into_col ~(table_name : string)
   in
   Conn.collect_list
     Caqti_request.Infix.(
-      (Caqti_type.unit ->* Caqti_type.(t2 (snd col) int)) search)
+      (Caqti_type.unit ->* Caqti_type.(t2 (snd col) int)) search )
     ()
 
 (* Like the [None] branch of [select_insert_into_cols]: always INSERT and return

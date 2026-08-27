@@ -96,7 +96,7 @@ val typ : (Checked.t, t) Impls.Step.Typ.t
 
 val to_yojson : t -> [> `String of string ]
 
-val of_yojson : Yojson.Safe.t -> (t, string) Core_kernel.Result.t
+val of_yojson : Yojson.Safe.t -> (t, string) Core.Result.t
 
 module Domain : sig
   type 'a t = Pow_2_roots_of_unity of 'a [@@deriving sexp]

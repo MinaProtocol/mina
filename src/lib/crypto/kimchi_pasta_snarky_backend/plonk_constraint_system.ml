@@ -47,7 +47,7 @@ end
 
 (** A row indexing in a constraint system. *)
 module Row = struct
-  open Core_kernel
+  open Core
 
   (** Either a public input row,
       or a non-public input row that starts at index 0.
@@ -67,7 +67,7 @@ end
 
 (** A position represents the position of a cell in the constraint system. *)
 module Position = struct
-  open Core_kernel
+  open Core
 
   (** A position is a row and a column. *)
   type 'row t = { row : 'row; col : int } [@@deriving hash, sexp, compare]
@@ -102,7 +102,7 @@ end
 
 (** A gate. *)
 module Gate_spec = struct
-  open Core_kernel
+  open Core
 
   (* TODO: split kind/coeffs from row/wired_to *)
 
@@ -146,7 +146,7 @@ end
 (** The PLONK constraints. *)
 module Plonk_constraint = struct
   module T = struct
-    open Core_kernel
+    open Core
 
     type ('field_var, 'fp) basic =
       | Boolean of 'field_var
@@ -339,7 +339,7 @@ module Plonk_constraint = struct
   include T
 
   module Make (Fp : Field.S) = struct
-    open Core_kernel
+    open Core
     include T
 
     type t = (Fp.t Snarky_backendless.Cvar.t, Fp.t) basic [@@deriving sexp]
@@ -685,18 +685,18 @@ module Plonk_constraint = struct
           Format.(
             asprintf "Equal %s %s"
               (Fp.to_string (get_value var1))
-              (Fp.to_string (get_value var2)))
+              (Fp.to_string (get_value var2)) )
       | Square (var1, var2) ->
           Format.(
             asprintf "Square %s %s"
               (Fp.to_string (get_value var1))
-              (Fp.to_string (get_value var2)))
+              (Fp.to_string (get_value var2)) )
       | R1CS (var1, var2, var3) ->
           Format.(
             asprintf "R1CS %s %s %s"
               (Fp.to_string (get_value var1))
               (Fp.to_string (get_value var2))
-              (Fp.to_string (get_value var3)))
+              (Fp.to_string (get_value var3)) )
       | _ ->
           Format.asprintf !"%{sexp:(Fp.t, Fp.t) basic}" (map basic ~f:get_value)
 
@@ -753,10 +753,10 @@ module type Snark_intf = sig
         (field Snarky_backendless.Cvar.t, field) Plonk_constraint.basic
 end
 
-module Internal_var = Core_kernel.Unique_id.Int ()
+module Internal_var = Core.Unique_id.Int ()
 
 module V = struct
-  open Core_kernel
+  open Core
 
   module T = struct
     (** Variables linking uses of the same data between different gates.
@@ -787,7 +787,7 @@ end
 type ('f, 'rust_gates) circuit =
   | Unfinalized_rev of (unit, 'f) Gate_spec.t list
       (** A circuit still being written. *)
-  | Compiled of Core_kernel.Md5.t * 'rust_gates
+  | Compiled of Core.Md5.t * 'rust_gates
       (** Once finalized, a circuit is represented as a digest
     and a list of gates that corresponds to the circuit.
   *)
@@ -827,9 +827,9 @@ type ('f, 'rust_gates) t =
     mutable next_row : int
   ; (* The size of the public input (which fills the first rows of our
        constraint system. *)
-    public_input_size : int Core_kernel.Set_once.t
+    public_input_size : int Core.Set_once.t
   ; (* The number of previous recursion challenges. *)
-    prev_challenges : int Core_kernel.Set_once.t
+    prev_challenges : int Core.Set_once.t
   ; (* Whatever is not public input. *)
     mutable auxiliary_input_size : int
   ; (* Queue (of size 1) of generic gate. *)
@@ -838,7 +838,7 @@ type ('f, 'rust_gates) t =
   ; (* V.t's corresponding to constant values. We reuse them so we don't need to
        use a fresh generic constraint each time to create a constant.
     *)
-    cached_constants : ('f, V.t) Core_kernel.Hashtbl.t
+    cached_constants : ('f, V.t) Core.Hashtbl.t
         (* The [equivalence_classes] field keeps track of the positions which must be
            enforced to be equivalent due to the fact that they correspond to
            the same V.t value.
@@ -850,7 +850,7 @@ type ('f, 'rust_gates) t =
            their equivalence classes in the [equivalence_classes] table into a
            single equivalence class, so that the permutation argument enforces
            these desired equalities as well. *)
-  ; union_finds : V.t Core_kernel.Union_find.t V.Table.t
+  ; union_finds : V.t Core.Union_find.t V.Table.t
   }
 
 let get_public_input_size sys = sys.public_input_size
@@ -860,7 +860,7 @@ let get_rows_len sys = List.length sys.rows_rev
 let get_prev_challenges sys = sys.prev_challenges
 
 let set_prev_challenges sys challenges =
-  Core_kernel.Set_once.set_exn sys.prev_challenges [%here] challenges
+  Core.Set_once.set_exn sys.prev_challenges [%here] challenges
 
 let get_concatenated_fixed_lookup_table_size sys =
   match sys.fixed_lookup_tables with
@@ -891,8 +891,7 @@ let finalize_fixed_lookup_tables sys =
   match sys.fixed_lookup_tables with
   | Unfinalized_fixed_lookup_tables_rev fixed_lt_rev ->
       sys.fixed_lookup_tables <-
-        Compiled_fixed_lookup_tables
-          (Core_kernel.Array.of_list_rev fixed_lt_rev)
+        Compiled_fixed_lookup_tables (Core.Array.of_list_rev fixed_lt_rev)
   | Compiled_fixed_lookup_tables _ ->
       failwith "Fixed lookup tables have already been finalized"
 
@@ -900,7 +899,7 @@ let finalize_runtime_lookup_tables sys =
   match sys.runtime_tables_cfg with
   | Unfinalized_runtime_tables_cfg_rev rt_cfgs_rev ->
       sys.runtime_tables_cfg <-
-        Compiled_runtime_tables_cfg (Core_kernel.Array.of_list_rev rt_cfgs_rev)
+        Compiled_runtime_tables_cfg (Core.Array.of_list_rev rt_cfgs_rev)
   | Compiled_runtime_tables_cfg _ ->
       failwith "Runtime table configurations have already been finalized"
 
@@ -920,11 +919,12 @@ module Make
        FFI boundary, where then it gets converted to a `Vec<Gate>`; it's more
        efficient to just create the `Vec<Gate>` directly.
     *)
-    (Gates : Gate_vector_intf with type field := Fp.t)
+     (Gates :
+      Gate_vector_intf with type field := Fp.t)
     (Params : sig
       val params : Fp.t Params.t
     end) : sig
-  open Core_kernel
+  open Core
 
   type nonrec t = (Fp.t, Gates.t) t
 
@@ -1007,7 +1007,7 @@ module Make
 
   val dump_extra_circuit_data : t -> string -> unit
 end = struct
-  open Core_kernel
+  open Core
   module Constraint = Plonk_constraint.Make (Fp)
 
   type constraint_ = Constraint.t
@@ -1020,7 +1020,7 @@ end = struct
     end
 
     include T
-    include Core_kernel.Hashable.Make (T)
+    include Core.Hashable.Make (T)
   end
 
   type nonrec t = (Fp.t, Gates.t) t
@@ -1038,7 +1038,7 @@ end = struct
       end
 
       include T
-      include Core_kernel.Hashable.Make (T)
+      include Core.Hashable.Make (T)
     end in
     let equivalence_classes = V.Table.create () in
     Hashtbl.iteri sys.equivalence_classes ~f:(fun ~key ~data ->
@@ -1129,7 +1129,7 @@ end = struct
                        This handles the case that the first column has
                        duplicated index values.
                     *)
-                    @@ MapRuntimeTable.Table.add map_runtime_tables ~key:(id, v)
+                    @@ Hashtbl.add map_runtime_tables ~key:(id, v)
                          ~data:(i, rt_idx) ;
                     (* default padding value for lookup *)
                     Fp.zero )
@@ -1155,9 +1155,7 @@ end = struct
            same ID, the lookups in fixed lookup tables will return None.
            See https://github.com/MinaProtocol/mina/issues/14016
         *)
-        let v =
-          MapRuntimeTable.Table.find map_runtime_tables (id_int32, vidx)
-        in
+        let v = Hashtbl.find map_runtime_tables (id_int32, vidx) in
         if Option.is_some v then
           let i, rt_idx = Option.value_exn v in
           let rt = runtime_tables.(rt_idx) in
@@ -1242,7 +1240,7 @@ end = struct
       (so at the start of the public-input rows). *)
   let wire' sys key row (col : int) =
     ignore (union_find sys key : V.t Union_find.t) ;
-    V.Table.add_multi sys.equivalence_classes ~key ~data:{ row; col }
+    Hashtbl.add_multi sys.equivalence_classes ~key ~data:{ row; col }
 
   (* TODO: rename to wire_abs and wire_rel? or wire_public and
      wire_after_public? or force a single use function that takes a Row.t? *)
@@ -1426,7 +1424,7 @@ end = struct
     let c, terms =
       Fp.(
         Snarky_backendless.Cvar.to_constant_and_terms ~add ~mul ~zero:(of_int 0)
-          ~equal ~one:(of_int 1))
+          ~equal ~one:(of_int 1) )
         x
     in
     (* Note: [(c, 0)] represents the field element [c] multiplied by the 0th
@@ -1498,7 +1496,7 @@ end = struct
     let constant, terms =
       Fp.(
         Snarky_backendless.Cvar.to_constant_and_terms ~add ~mul ~zero ~equal
-          ~one)
+          ~one )
         x
     in
     let terms = accumulate_terms terms in
@@ -1650,9 +1648,11 @@ end = struct
             if Fp.equal s1 s2 then (
               if not (Fp.equal s1 Fp.zero) then
                 Union_find.union (union_find sys x1) (union_find sys x2) )
-            else if (* s1 x1 - s2 x2 = 0
+            else if
+              (* s1 x1 - s2 x2 = 0
           *)
-                    not (Fp.equal s1 s2) then
+              not (Fp.equal s1 s2)
+            then
               add_generic_constraint ~l:x1 ~r:x2
                 [| s1; Fp.(negate s2); Fp.zero; Fp.zero; Fp.zero |]
                 sys
@@ -2452,24 +2452,30 @@ end = struct
     let rows_rev_name = base_path ^ "_rows_rev.bin" in
     let internal_vars_name = base_path ^ "_internal_vars.bin" in
     let gates_json_name = base_path ^ "_gates.json" in
-    if Sys.file_exists rows_rev_name then Sys.remove rows_rev_name ;
-    if Sys.file_exists internal_vars_name then Sys.remove internal_vars_name ;
-    if Sys.file_exists gates_json_name then Sys.remove gates_json_name ;
+    let remove_if_exist file =
+      match Sys_unix.file_exists file with
+      | `Yes ->
+          Sys_unix.remove file
+      | _ ->
+          ()
+    in
+    remove_if_exist rows_rev_name ;
+    remove_if_exist internal_vars_name ;
+    remove_if_exist gates_json_name ;
 
     let table : concrete_rows_rev = sys.rows_rev in
     let size = bin_size_concrete_rows_rev table in
     let buf = Bigstring.create size in
     ignore (bin_write_concrete_rows_rev buf ~pos:0 table : int) ;
-    Core_kernel.Out_channel.write_all rows_rev_name
-      ~data:(Bigstring.to_string buf) ;
+    Core.Out_channel.write_all rows_rev_name ~data:(Bigstring.to_string buf) ;
 
     let table : concrete_table = sys.internal_vars in
     let size = bin_size_concrete_table table in
     let buf = Bigstring.create size in
     ignore (bin_write_concrete_table buf ~pos:0 table : int) ;
-    Core_kernel.Out_channel.write_all internal_vars_name
+    Core.Out_channel.write_all internal_vars_name
       ~data:(Bigstring.to_string buf) ;
 
     let gates_json = to_json sys in
-    Core_kernel.Out_channel.write_all gates_json_name ~data:gates_json
+    Core.Out_channel.write_all gates_json_name ~data:gates_json
 end

@@ -5,7 +5,7 @@
    proofs suffice. A baseline witness that the circuit itself produces is
    accepted; a variant witness is rejected. *)
 
-open Core_kernel
+open Core
 module Blockchain_snark = Blockchain_snark.Blockchain_snark_state
 
 module G = (val Genesis_constants.profiled ())

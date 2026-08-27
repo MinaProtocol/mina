@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Mina_base
 
 type count_and_fee = int * Currency.Fee.t [@@deriving sexp, to_yojson]
