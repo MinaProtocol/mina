@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 
 [%%versioned
 module Stable = struct
@@ -22,5 +22,5 @@ end]
 
 type t =
   { id : Id.Any.t
-  ; data : (Core.Time.Span.t, Ledger_proof.Cached.t) Proof_carrying_data.t
+  ; data : (Time_float.Span.t, Ledger_proof.Cached.t) Proof_carrying_data.t
   }

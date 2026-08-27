@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 module Js = Js_of_ocaml.Js
 module Field = Pickles.Impls.Step.Field.Constant
 
@@ -8,7 +8,7 @@ external get_ts_bindings : unit -> Js.Unsafe.any Js.Optdef.t = "getTsBindings"
 let ( |. ) (value : _ Js.Optdef.t) (key : string) =
   Js.(
     if phys_equal value undefined then undefined
-    else Unsafe.get value (string key))
+    else Unsafe.get value (string key) )
 
 let lookup kind prefix =
   get_ts_bindings () |. kind |. prefix |> Js.Optdef.to_option

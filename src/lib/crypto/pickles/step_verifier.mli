@@ -381,7 +381,7 @@ val finalize_other_proof :
      , Impl.Boolean.var )
      Import.Types.Wrap.Proof_state.Deferred_values.In_circuit.t
   -> ( Impl.Field.t
-     , Impl.Field.t Core_kernel.Array.t
+     , Impl.Field.t Core.Array.t
      , Impl.Boolean.var )
      Pickles_types.Plonk_types.All_evals.In_circuit.t
   -> Impl.Boolean.var * (Impl.Field.t, 'c) Pickles_types.Vector.t
@@ -424,7 +424,7 @@ val hash_messages_for_next_step_proof :
            Pickles_types.Vector.t )
          Import.Types.Step.Proof_state.Messages_for_next_step_proof.t
       -> Impl.Field.t )
-     Core_kernel.Staged.t
+     Core.Staged.t
 
 (** [hash_messages_for_next_step_proof_opt] is a variant of
     {!hash_messages_for_next_step_proof} that supports optional/masked proofs.
@@ -463,7 +463,7 @@ val hash_messages_for_next_step_proof_opt :
              , 'b )
              Pickles_types.Vector.t
         -> Impl.Field.t )
-       Core_kernel.Staged.t
+       Core.Staged.t
 
 (** [verify] generates constraints for full incremental verification of a wrap
     proof within a step circuit.

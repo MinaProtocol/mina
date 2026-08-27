@@ -2,7 +2,7 @@
 
 (* see RFC 0049 for details *)
 
-open Core_kernel
+open Core
 module Wire_types = Mina_wire_types.Protocol_version
 
 module Make_sig (A : Wire_types.Types.S) = struct

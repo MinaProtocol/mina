@@ -1,5 +1,3 @@
-open Core_kernel
-
 [%%versioned:
 module Stable : sig
   module V1 : sig

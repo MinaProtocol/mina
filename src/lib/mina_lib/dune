@@ -11,6 +11,10 @@
   sexplib0
   archive_lib
   core
+  core_unix
+  core_unix.filename_unix
+  core_unix.signal_unix
+  core_unix.sys_unix
   async
   incremental
   core_kernel
@@ -103,5 +107,18 @@
  (instrumentation
   (backend bisect_ppx))
  (preprocess
-  (pps ppx_jane ppx_mina ppx_version ppx_inline_test ppx_deriving.std))
+  (pps 
+    ppx_bin_prot 
+    ppx_compare 
+    ppx_custom_printf
+    ppx_deriving.std 
+    ppx_deriving_yojson 
+    ppx_fields_conv 
+    ppx_hash 
+    ppx_here
+    ppx_inline_test 
+    ppx_let
+    ppx_mina 
+    ppx_sexp_conv 
+    ppx_version))
  (synopsis "Mina gut layer"))

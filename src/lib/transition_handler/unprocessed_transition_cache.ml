@@ -3,7 +3,7 @@
  * frontier. This is used in order to drop duplicate transitions which are still
  * being handled by various threads in the transition frontier controller. *)
 
-open Core_kernel
+open Core
 open Mina_base
 open Network_peer
 
@@ -32,11 +32,11 @@ module Registry = struct
 
   let element_added _ =
     Mina_metrics.(
-      Gauge.inc_one Transition_frontier_controller.transitions_being_processed)
+      Gauge.inc_one Transition_frontier_controller.transitions_being_processed )
 
   let element_removed _ _ =
     Mina_metrics.(
-      Gauge.dec_one Transition_frontier_controller.transitions_being_processed)
+      Gauge.dec_one Transition_frontier_controller.transitions_being_processed )
 end
 
 include Cache_lib.Transmuter_cache.Make (Transmuter) (Registry) (Name)

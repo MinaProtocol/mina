@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Async
 
 module Git_sha = struct
@@ -47,14 +47,14 @@ module Status = struct
     let msgs =
       List.map best ~f:(fun (v, (lo, hi)) ->
           Printf.sprintf
-            !"(%{sexp: Time.Span.t}, %{sexp: Time.Span.t}): %d"
+            !"(%{sexp: Time_float.Span.t}, %{sexp: Time_float.Span.t}): %d"
             lo hi v )
     in
     let total = List.sum (module Int) values ~f:Fn.id in
     List.fold msgs
       ~init:
         (Printf.sprintf "\n\tTotal: %d (overflow:%d) (underflow:%d)\n\t" total
-           overflow underflow ) ~f:(fun acc x -> acc ^ "\n\t" ^ x)
+           overflow underflow ) ~f:(fun acc x -> acc ^ "\n\t" ^ x )
     ^ "\n\t..."
 
   module Rpc_timings = struct
@@ -166,8 +166,7 @@ module Status = struct
             | None ->
                 acc
             | Some report ->
-                ("Snark Worker Merge (hist.)", summarize_report report) :: acc
-            )
+                ("Snark Worker Merge (hist.)", summarize_report report) :: acc )
       in
       digest_entries ~title:"Performance Histograms" entries
   end
@@ -255,7 +254,7 @@ module Status = struct
 
     let uptime_secs =
       map_entry "Local uptime" ~f:(fun secs ->
-          Time.Span.to_string (Time.Span.of_int_sec secs) )
+          Time_float.Span.to_string (Time_float.Span.of_int_sec secs) )
 
     let ledger_merkle_root = string_option_entry "Ledger Merkle root"
 
@@ -349,10 +348,12 @@ module Status = struct
 
     let consensus_configuration =
       let ms_to_string i =
-        float_of_int i |> Time.Span.of_ms |> Time.Span.to_string
+        float_of_int i |> Time_float.Span.of_ms |> Time_float.Span.to_string
       in
-      (* Time.to_string is safe here because this is for display. *)
-      let time_to_string = Fn.compose Time.to_string Block_time.to_time_exn in
+      (* Time_float.to_string_utc is safe here because this is for display. *)
+      let time_to_string =
+        Fn.compose Time_float.to_string_utc Block_time.to_time_exn
+      in
       let render conf =
         let fmt_field name op field = (name, op (Field.get field conf)) in
         Consensus.Configuration.Fields.to_list

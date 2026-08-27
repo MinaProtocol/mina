@@ -1,11 +1,10 @@
 open Async_kernel
-open Core_kernel
+open Core
 module Timeout = Timeout_lib.Core_time
 
 module Make (Engine : Intf.Engine.S) () :
   Intf.Dsl.Event_router_intf with module Engine := Engine = struct
   module Node = Engine.Network.Node
-
   module Event_handler_id = Unique_id.Int ()
 
   type ('a, 'b) handler_func =
@@ -29,16 +28,16 @@ module Make (Engine : Intf.Engine.S) () :
 
   let unregister_event_handlers_by_id handlers event_type ids =
     handlers :=
-      Event_type.Map.update !handlers event_type ~f:(fun registered_handlers ->
+      Map.update !handlers event_type ~f:(fun registered_handlers ->
           registered_handlers |> Option.value ~default:[]
           |> List.filter ~f:(fun (Event_handler (registered_id, _, _, _)) ->
-                 not (List.mem ids registered_id ~equal:Event_handler_id.equal) ) )
+              not (List.mem ids registered_id ~equal:Event_handler_id.equal) ) )
 
   let dispatch_event handlers node event =
     let open Event_type in
     let open Deferred.Let_syntax in
     let event_handlers =
-      Map.find !handlers (type_of_event event) |> Option.value ~default:[]
+      Core.Map.find !handlers (type_of_event event) |> Option.value ~default:[]
     in
     (* This loop cannot directly mutate or recompute the handlers. Doing so will introduce a race condition. *)
     let%map ids_to_remove =
@@ -46,10 +45,10 @@ module Make (Engine : Intf.Engine.S) () :
           (* assuming the dispatch for `f` is already parallel, and not the execution of the deferred it returns *)
           let (Event (event_type, event_data)) = event in
           let (Event_handler
-                ( handler_id
-                , handler_finished_ivar
-                , handler_type
-                , handler_callback ) ) =
+                 ( handler_id
+                 , handler_finished_ivar
+                 , handler_type
+                 , handler_callback ) ) =
             handler
           in
           match%map
@@ -83,8 +82,7 @@ module Make (Engine : Intf.Engine.S) () :
     let handler_id = Event_handler_id.create () in
     let finished_ivar = Ivar.create () in
     let handler = Event_handler (handler_id, finished_ivar, event_type, f) in
-    t.handlers :=
-      Event_type.Map.add_multi !(t.handlers) ~key:event_type_ex ~data:handler ;
+    t.handlers := Map.add_multi !(t.handlers) ~key:event_type_ex ~data:handler ;
     Event_subscription (handler_id, finished_ivar, event_type)
 
   (* TODO: On cancellation, should we notify active subscriptions? Would involve changing await type to option or result. *)

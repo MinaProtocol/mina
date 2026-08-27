@@ -1,6 +1,6 @@
 (* zkapp_command_logic.ml *)
 
-open Core_kernel
+open Core
 open Mina_base
 
 module type Iffable = sig
@@ -188,7 +188,7 @@ module type Valid_while_precondition_intf = sig
 end
 
 module Local_state = struct
-  open Core_kernel
+  open Core
 
   [%%versioned
   module Stable = struct
@@ -821,6 +821,7 @@ module type Inputs_intf = sig
        and type index := Index.t)
 
   and Verification_key : (Iffable with type bool := Bool.t)
+
   and Verification_key_hash :
     (Verification_key_hash_intf with type bool := Bool.t)
 
@@ -971,7 +972,7 @@ module type Inputs_intf = sig
 end
 
 module Start_data = struct
-  open Core_kernel
+  open Core
 
   [%%versioned
   module Stable = struct
@@ -1294,7 +1295,7 @@ module Make (Inputs : Inputs_intf) = struct
         let account_update_token_id = Account_update.token_id account_update in
         Bool.(
           account_is_new
-          &&& Token_id.equal account_update_token_id Token_id.default)
+          &&& Token_id.equal account_update_token_id Token_id.default )
       in
       (* in-SNARK, a new account has the empty public key here
          in that case, use the public key from the account update, not the account
@@ -1310,7 +1311,7 @@ module Make (Inputs : Inputs_intf) = struct
         (not (Account_update.is_proved account_update))
         ||| Verification_key_hash.equal
               (Account.verification_key_hash a)
-              (Account_update.verification_key_hash account_update))
+              (Account_update.verification_key_hash account_update) )
     in
     let local_state =
       Local_state.add_check local_state Unexpected_verification_key_hash
@@ -1360,7 +1361,7 @@ module Make (Inputs : Inputs_intf) = struct
     let local_state =
       Local_state.add_check local_state Fee_payer_nonce_must_increase
         Inputs.Bool.(
-          Inputs.Account_update.increment_nonce account_update ||| not is_start')
+          Inputs.Account_update.increment_nonce account_update ||| not is_start' )
     in
     let local_state =
       Local_state.add_check local_state Fee_payer_must_be_signed
@@ -1374,19 +1375,19 @@ module Make (Inputs : Inputs_intf) = struct
       let increments_nonce_and_constrains_its_old_value =
         Inputs.Bool.(
           Inputs.Account_update.increment_nonce account_update
-          &&& precondition_has_constant_nonce)
+          &&& precondition_has_constant_nonce )
       in
       let depends_on_the_fee_payers_nonce_and_isnt_the_fee_payer =
         Inputs.Bool.(
           Inputs.Account_update.use_full_commitment account_update
-          &&& not is_start')
+          &&& not is_start' )
       in
       let does_not_use_a_signature = Inputs.Bool.not signature_verifies in
       Local_state.add_check local_state Zkapp_command_replay_check_failed
         Inputs.Bool.(
           increments_nonce_and_constrains_its_old_value
           ||| depends_on_the_fee_payers_nonce_and_isnt_the_fee_payer
-          ||| does_not_use_a_signature)
+          ||| does_not_use_a_signature )
     in
     let a = Account.set_token_id a (Account_update.token_id account_update) in
     let account_update_token = Account_update.token_id account_update in
@@ -1405,7 +1406,7 @@ module Make (Inputs : Inputs_intf) = struct
         Local_state.add_check local_state Update_not_permitted_timing
           Bool.(
             Set_or_keep.is_keep timing
-            ||| (account_is_untimed &&& has_permission))
+            ||| (account_is_untimed &&& has_permission) )
       in
       let timing =
         Set_or_keep.set_or_keep ~if_:Timing.if_ timing (Account.timing a)
@@ -1427,7 +1428,7 @@ module Make (Inputs : Inputs_intf) = struct
       Local_state.add_check local_state Cannot_pay_creation_fee_in_token
         Bool.(
           (not implicit_account_creation_fee)
-          ||| account_update_token_is_default)
+          ||| account_update_token_is_default )
     in
     (* Compute the change to the account balance. *)
     let local_state, actual_balance_change =
@@ -1453,7 +1454,7 @@ module Make (Inputs : Inputs_intf) = struct
           Bool.(
             not
               ( pay_creation_fee
-              &&& (creation_overflow ||| Amount.Signed.is_neg balance_change) ))
+              &&& (creation_overflow ||| Amount.Signed.is_neg balance_change) ) )
       in
       (local_state, balance_change)
     in
@@ -1521,7 +1522,7 @@ module Make (Inputs : Inputs_intf) = struct
           Bool.(
             has_permission
             ||| Amount.Signed.(
-                  equal (of_unsigned Amount.zero) actual_balance_change))
+                  equal (of_unsigned Amount.zero) actual_balance_change ) )
       in
       let a = Account.set_balance balance a in
       (a, local_state)
@@ -1729,7 +1730,7 @@ module Make (Inputs : Inputs_intf) = struct
         Local_state.add_check local_state Update_not_permitted_delegate
           Bool.(
             Set_or_keep.is_keep delegate
-            ||| (has_permission &&& account_update_token_is_default))
+            ||| (has_permission &&& account_update_token_is_default) )
       in
       let delegate =
         Set_or_keep.set_or_keep ~if_:Public_key.if_ delegate base_delegate
@@ -1779,7 +1780,7 @@ module Make (Inputs : Inputs_intf) = struct
         let old_hash = Account.receipt_chain_hash a in
         Receipt_chain_hash.if_
           (let open Inputs.Bool in
-          signature_verifies ||| proof_verifies)
+           signature_verifies ||| proof_verifies )
           ~then_:
             (let elt =
                local_state.full_transaction_commitment
@@ -1835,7 +1836,7 @@ module Make (Inputs : Inputs_intf) = struct
         assert_ ~pos:__POS__
           ( (not is_start')
           ||| ( account_update_token_is_default
-              &&& Amount.Signed.is_non_neg local_delta ) )) ;
+              &&& Amount.Signed.is_non_neg local_delta ) ) ) ;
       let new_local_fee_excess, `Overflow overflow =
         Amount.Signed.add_flagged local_state.excess local_delta
       in
@@ -1939,7 +1940,7 @@ module Make (Inputs : Inputs_intf) = struct
     Bool.(
       assert_with_failure_status_tbl ~pos:__POS__
         ((not is_start') ||| local_state.success)
-        local_state.failure_status_tbl) ;
+        local_state.failure_status_tbl ) ;
     (* If we are the fee payer (is_start' = true), push the first pass ledger
        and set the local ledger to be the second pass ledger in preparation for
        the children.
@@ -1968,7 +1969,7 @@ module Make (Inputs : Inputs_intf) = struct
         [ not is_last_account_update
         ; local_state.will_succeed
         ; not local_state.success
-        ]) ;
+        ] ) ;
     (* If this is the last party and there were no failures, update the second
        pass ledger and the supply increase.
     *)

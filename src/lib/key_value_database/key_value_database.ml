@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 
 module Monad = struct
   module type S = sig
@@ -77,7 +77,8 @@ module Intf = struct
 end
 
 module Make_mock
-    (Key : Hashable.S) (Value : sig
+    (Key : Hashable.S)
+    (Value : sig
       type t
     end) :
   Intf.Mock
@@ -88,30 +89,30 @@ module Make_mock
   type t = Value.t Key.Table.t
 
   let to_sexp t ~key_sexp ~value_sexp =
-    Key.Table.to_alist t
+    Hashtbl.to_alist t
     |> List.map ~f:(fun (key, value) ->
-           [%sexp_of: Sexp.t * Sexp.t] (key_sexp key, value_sexp value) )
+        [%sexp_of: Sexp.t * Sexp.t] (key_sexp key, value_sexp value) )
     |> [%sexp_of: Sexp.t list]
 
   let create _ = Key.Table.create ()
 
-  let get t ~key = Key.Table.find t key
+  let get t ~key = Hashtbl.find t key
 
-  let get_batch t ~keys = List.map keys ~f:(Key.Table.find t)
+  let get_batch t ~keys = List.map keys ~f:(Hashtbl.find t)
 
-  let set = Key.Table.set
+  let set = Hashtbl.set
 
-  let remove t ~key = Key.Table.remove t key
+  let remove t ~key = Hashtbl.remove t key
 
   let close _ = ()
 
   let random_key t =
-    let keys = Key.Table.keys t in
+    let keys = Hashtbl.keys t in
     List.random_element keys
 
   let set_batch t ?(remove_keys = []) ~update_pairs =
     List.iter update_pairs ~f:(fun (key, data) -> set t ~key ~data) ;
     List.iter remove_keys ~f:(fun key -> remove t ~key)
 
-  let to_alist = Key.Table.to_alist
+  let to_alist = Hashtbl.to_alist
 end

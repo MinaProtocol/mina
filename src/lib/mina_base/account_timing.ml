@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Snark_params
 open Tick
 open Currency
@@ -227,7 +227,8 @@ let typ : (var, t) Typ.t =
         ; cliff_amount
         ; vesting_period
         ; vesting_increment
-        ] ->
+        ]
+    ->
       if is_timed then
         Timed
           { initial_minimum_balance
@@ -350,7 +351,7 @@ module Slot_reduction_update = struct
   let clamp_uint64_to_uint32 x =
     UInt64.(
       if compare x (of_uint32 UInt32.max_int) <= 0 then to_uint32 x
-      else UInt32.max_int)
+      else UInt32.max_int )
 
   let of_record (t : as_record) : t =
     { is_timed = ()
@@ -406,7 +407,7 @@ module Slot_reduction_update = struct
              will necessarily be well below UInt64.max_int, because division by
              t.vesting_increment will have decreased balance_to_unlock by a
              factor of at least two. *)
-          Some Infix.(full_increment_iterations + one))
+          Some Infix.(full_increment_iterations + one) )
 
   (** True if an account has started vesting but the slot at which it completes
      vesting is still in the future *)
@@ -422,7 +423,7 @@ module Slot_reduction_update = struct
           compare global_slot t.cliff_time >= 0
           && compare iterations
                Infix.((global_slot - t.cliff_time) / t.vesting_period)
-             > 0)
+             > 0 )
 
   (** True if an account has not started vesting *)
   let not_yet_vesting ~global_slot (t : t) =
@@ -497,12 +498,12 @@ module Slot_reduction_update = struct
               hardfork_slot
               + of_int 2
                 * ( t.vesting_period
-                  - ((hardfork_slot - t.cliff_time) mod t.vesting_period) ))
+                  - ((hardfork_slot - t.cliff_time) mod t.vesting_period) ) )
         ; cliff_amount = t.vesting_increment
         ; vesting_period =
             (* vesting_period is in the uint32 range, so this will not wrap *)
             Infix.(of_int 2 * t.vesting_period)
-        })
+        } )
 
   (** Apply the hardfork adjustment to the given timing, doing nothing if it is
       not actively vesting *)
@@ -518,5 +519,5 @@ end
 let slot_reduction_update ~hardfork_slot (t : as_record) =
   if t.is_timed then
     Slot_reduction_update.(
-      t |> of_record |> hardfork_adjustment ~hardfork_slot |> to_record)
+      t |> of_record |> hardfork_adjustment ~hardfork_slot |> to_record )
   else t

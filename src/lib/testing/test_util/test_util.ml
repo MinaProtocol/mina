@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Fold_lib
 
 module Make (Impl : Snarky_backendless.Snark_intf.S) = struct
@@ -48,12 +48,12 @@ module Make (Impl : Snarky_backendless.Snark_intf.S) = struct
         Char.of_int_exn (Random.int_incl 0 255) )
 
   let with_randomness r f =
-    let s = Caml.Random.get_state () in
+    let s = Stdlib.Random.get_state () in
     Random.init r ;
     try
       let x = f () in
-      Caml.Random.set_state s ; x
-    with e -> Caml.Random.set_state s ; raise e
+      Stdlib.Random.set_state s ; x
+    with e -> Stdlib.Random.set_state s ; raise e
 
   (** utility function to print digests to put in tests, see `check_serialization' below *)
   let print_digest digest = printf "\"" ; printf "%s" digest ; printf "\"\n%!"

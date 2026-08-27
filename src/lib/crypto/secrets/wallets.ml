@@ -18,13 +18,13 @@ let get_privkey_filename public_key =
 let get_path { path; cache } public_key =
   (* TODO: Do we need to version this? *)
   let filename =
-    Public_key.Compressed.Table.find cache public_key
+    Hashtbl.find cache public_key
     |> Option.bind ~f:(function
-         | Locked file | Unlocked (file, _) ->
-             Option.return file
-         | Hd_account _ ->
-             Option.return
-               (Public_key.Compressed.to_base58_check public_key ^ ".index") )
+      | Locked file | Unlocked (file, _) ->
+          Option.return file
+      | Hd_account _ ->
+          Option.return
+            (Public_key.Compressed.to_base58_check public_key ^ ".index") )
     |> Option.value ~default:(get_privkey_filename public_key)
   in
   path ^/ filename
@@ -48,11 +48,11 @@ let reload ~logger { cache; path } : unit Deferred.t =
   let logger =
     Logger.extend logger [ ("wallets_context", `String "Wallets.get") ]
   in
-  Public_key.Compressed.Table.clear cache ;
+  Hashtbl.clear cache ;
   let%bind () = Mina_stdlib_unix.File_system.create_dir path in
   let%bind files = Sys.readdir path >>| Array.to_list in
   let%bind () =
-    Deferred.List.iter files ~f:(fun file ->
+    Deferred.List.iter files ~how:`Sequential ~f:(fun file ->
         match String.chop_suffix file ~suffix:".pub" with
         | Some sk_filename -> (
             let%map lines = Reader.file_lines (path ^/ file) in
@@ -60,9 +60,8 @@ let reload ~logger { cache; path } : unit Deferred.t =
             | public_key :: _ ->
                 decode_public_key public_key file path logger
                 |> Option.iter ~f:(fun pk ->
-                       ignore
-                       @@ Public_key.Compressed.Table.add cache ~key:pk
-                            ~data:(Locked sk_filename) )
+                    ignore
+                    @@ Hashtbl.add cache ~key:pk ~data:(Locked sk_filename) )
             | _ ->
                 () )
         | None -> (
@@ -73,12 +72,11 @@ let reload ~logger { cache; path } : unit Deferred.t =
                 | hd_index :: _ ->
                     decode_public_key public_key file path logger
                     |> Option.iter ~f:(fun pk ->
-                           ignore
-                           @@ Public_key.Compressed.Table.add cache ~key:pk
-                                ~data:
-                                  (Hd_account
-                                     (Mina_numbers.Hd_index.of_string hd_index)
-                                  ) )
+                        ignore
+                        @@ Hashtbl.add cache ~key:pk
+                             ~data:
+                               (Hd_account
+                                  (Mina_numbers.Hd_index.of_string hd_index) ) )
                 | _ ->
                     () )
             | None ->
@@ -101,7 +99,7 @@ let import_keypair_helper t keypair write_keypair =
   let%bind () = write_keypair privkey_path in
   let%map () = Unix.chmod privkey_path ~perm:0o600 in
   ignore
-    ( Public_key.Compressed.Table.add t.cache ~key:compressed_pk
+    ( Hashtbl.add t.cache ~key:compressed_pk
         ~data:(Unlocked (get_privkey_filename compressed_pk, keypair))
       : [ `Duplicate | `Ok ] ) ;
   compressed_pk
@@ -135,8 +133,7 @@ let create_hd_account t ~hd_index :
     Unix.chmod index_path ~perm:0o600 |> Deferred.map ~f:Result.return
   in
   ignore
-    ( Public_key.Compressed.Table.add t.cache ~key:compressed_pk
-        ~data:(Hd_account hd_index)
+    ( Hashtbl.add t.cache ~key:compressed_pk ~data:(Hd_account hd_index)
       : [ `Duplicate | `Ok ] ) ;
   compressed_pk
 
@@ -147,37 +144,37 @@ let delete ({ cache; _ } as t : t) (pk : Public_key.Compressed.t) :
       Unix.remove (get_path t pk) )
   |> Deferred.Result.map_error ~f:(fun _ -> `Not_found)
 
-let pks ({ cache; _ } : t) = Public_key.Compressed.Table.keys cache
+let pks ({ cache; _ } : t) = Hashtbl.keys cache
 
 let find_unlocked ({ cache; _ } : t) ~needle =
-  Public_key.Compressed.Table.find cache needle
+  Hashtbl.find cache needle
   |> Option.bind ~f:(function
-       | Locked _ ->
-           None
-       | Unlocked (_, kp) ->
-           Some kp
-       | Hd_account _ ->
-           None )
+    | Locked _ ->
+        None
+    | Unlocked (_, kp) ->
+        Some kp
+    | Hd_account _ ->
+        None )
 
 let find_identity ({ cache; _ } : t) ~needle =
-  Public_key.Compressed.Table.find cache needle
+  Hashtbl.find cache needle
   |> Option.bind ~f:(function
-       | Locked _ ->
-           None
-       | Unlocked (_, kp) ->
-           Some (`Keypair kp)
-       | Hd_account index ->
-           Some (`Hd_index index) )
+    | Locked _ ->
+        None
+    | Unlocked (_, kp) ->
+        Some (`Keypair kp)
+    | Hd_account index ->
+        Some (`Hd_index index) )
 
 let check_locked { cache; _ } ~needle =
-  Public_key.Compressed.Table.find cache needle
+  Hashtbl.find cache needle
   |> Option.map ~f:(function
-       | Locked _ ->
-           true
-       | Unlocked _ ->
-           false
-       | Hd_account _ ->
-           true )
+    | Locked _ ->
+        true
+    | Unlocked _ ->
+        false
+    | Hd_account _ ->
+        true )
 
 let unlock { cache; path } ~needle ~password =
   let unlock_keypair = function
@@ -185,21 +182,20 @@ let unlock { cache; path } ~needle ~password =
         Secret_keypair.read ~privkey_path:(path ^/ file) ~password
         |> Deferred.Result.map_error ~f:(fun e -> `Key_read_error e)
         |> Deferred.Result.map ~f:(fun kp ->
-               Public_key.Compressed.Table.set cache ~key:needle
-                 ~data:(Unlocked (file, kp)) )
+            Hashtbl.set cache ~key:needle ~data:(Unlocked (file, kp)) )
         |> Deferred.Result.ignore_m
     | Unlocked _ ->
         Deferred.Result.return ()
     | Hd_account _ ->
         Deferred.Result.return ()
   in
-  Public_key.Compressed.Table.find cache needle
+  Hashtbl.find cache needle
   |> Result.of_option ~error:`Not_found
   |> Deferred.return
   |> Deferred.Result.bind ~f:unlock_keypair
 
 let lock { cache; _ } ~needle =
-  Public_key.Compressed.Table.change cache needle ~f:(function
+  Hashtbl.change cache needle ~f:(function
     | Some (Unlocked (file, _)) ->
         Some (Locked file)
     | k ->
@@ -225,7 +221,7 @@ let%test_module "wallets" =
               let%bind wallets = load ~logger ~disk_location:path in
               let%map pk = generate_new wallets ~password in
               let keys = Set.of_list (pks wallets) in
-              assert (Set.mem keys pk) ;
+              assert (Core.Set.mem keys pk) ;
               assert (find_unlocked wallets ~needle:pk |> Option.is_some) ) )
 
     let%test_unit "get from existing file system not-scratch" =
@@ -237,11 +233,11 @@ let%test_module "wallets" =
               let%bind pk1 = generate_new wallets ~password in
               let%bind pk2 = generate_new wallets ~password in
               let keys = Set.of_list (pks wallets) in
-              assert (Set.mem keys pk1 && Set.mem keys pk2) ;
+              assert (Core.Set.mem keys pk1 && Core.Set.mem keys pk2) ;
               (* Get wallets again from scratch *)
               let%map wallets = load ~logger ~disk_location:path in
               let keys = Set.of_list (pks wallets) in
-              assert (Set.mem keys pk1 && Set.mem keys pk2) ) )
+              assert (Core.Set.mem keys pk1 && Core.Set.mem keys pk2) ) )
 
     let%test_unit "create wallet then delete it" =
       Async.Thread_safe.block_on_async_exn (fun () ->
@@ -250,12 +246,10 @@ let%test_module "wallets" =
               let%bind wallets = load ~logger ~disk_location:path in
               let%bind pk = generate_new wallets ~password in
               let keys = Set.of_list (pks wallets) in
-              assert (Set.mem keys pk) ;
+              assert (Core.Set.mem keys pk) ;
               match%map delete wallets pk with
               | Ok () ->
-                  assert (
-                    Option.is_none
-                    @@ Public_key.Compressed.Table.find wallets.cache pk )
+                  assert (Option.is_none @@ Hashtbl.find wallets.cache pk)
               | Error _ ->
                   failwith "unexpected" ) )
 

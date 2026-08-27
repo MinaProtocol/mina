@@ -8,6 +8,7 @@
   sexplib0
   result
   async.async_command
+  core_unix.command_unix
   async
   base.caml
   bin_prot.shape

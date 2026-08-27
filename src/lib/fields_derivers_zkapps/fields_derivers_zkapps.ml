@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 module Field = Snark_params.Tick.Field
 
 module Make (Schema : Graphql_intf.Schema) = struct
@@ -150,8 +150,7 @@ module Make (Schema : Graphql_intf.Schema) = struct
         | `String x ->
             of_string x
         | _ ->
-            raise (Fields_derivers_json.Of_yojson.Invalid_json_scalar `String)
-        )
+            raise (Fields_derivers_json.Of_yojson.Invalid_json_scalar `String) )
       ~contramap:(fun x -> `String (to_string x))
 
   let uint64 obj : _ Unified_input.t =
@@ -409,7 +408,7 @@ module Make (Schema : Graphql_intf.Schema) = struct
           field "query" ~typ:(non_null typ)
             ~args:Arg.[]
             ~doc:"sample query"
-            ~resolve:(fun _ _ -> ()))
+            ~resolve:(fun _ _ -> ()) )
       in
       let schema =
         Schema.(schema [ query_top_level ] ~mutations:[] ~subscriptions:[])
@@ -467,17 +466,17 @@ module Make (Schema : Graphql_intf.Schema) = struct
                 ~doc:"sample args query"
                 ~resolve:(fun { ctx; _ } () (input : 'a) ->
                   ctx := Some input ;
-                  0 ))
+                  0 ) )
           in
           let out_schema : ('a option ref, unit) Schema.field =
             Schema.(
               field "out" ~typ:(typ deriver)
                 ~args:Arg.[]
                 ~doc:"sample query"
-                ~resolve:(fun { ctx; _ } () -> Option.value_exn !ctx))
+                ~resolve:(fun { ctx; _ } () -> Option.value_exn !ctx) )
           in
           Schema.(
-            schema [ in_schema; out_schema ] ~mutations:[] ~subscriptions:[])
+            schema [ in_schema; out_schema ] ~mutations:[] ~subscriptions:[] )
         in
         let ctx = ref None in
         let open M in
@@ -564,7 +563,7 @@ let verification_key_with_hash obj =
     in
     Pickles.Side_loaded.Verification_key.(
       iso_string obj ~name:"VerificationKey" ~js_type:String
-        ~to_string:to_base64 ~of_string ~doc:"Verification key in Base64 format")
+        ~to_string:to_base64 ~of_string ~doc:"Verification key in Base64 format" )
   in
   let ( !. ) =
     ( !. ) ~t_fields_annots:With_hash.Stable.Latest.t_fields_annots

@@ -58,4 +58,4 @@
  (instrumentation
   (backend bisect_ppx))
  (preprocess
-  (pps ppx_mina ppx_version ppx_jane)))
+  (pps ppx_assert ppx_custom_printf ppx_let ppx_here ppx_inline_test ppx_mina ppx_version)))

@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 
 (** The type of structured log events.
 

@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Pickles_types
 open Pickles.Impls.Step
 
@@ -7,7 +7,7 @@ let () = Pickles.Backend.Tick.Keypair.set_urs_info []
 let () = Pickles.Backend.Tock.Keypair.set_urs_info []
 
 let test () =
-  let t11 = Sys.time () in
+  let t11 = Time_ns.now () in
   let _tag, _cache_handle, proof, Pickles.Provers.[ prove ] =
     Pickles.compile ~public_input:(Pickles.Inductive_rule.Input Typ.unit)
       ~auxiliary_typ:Typ.unit
@@ -56,15 +56,17 @@ let test () =
         ] )
       ()
   in
-  Printf.printf "compile time: %fs\n" ((Sys.time () -. t11) /. 10.0) ;
+  Printf.printf "compile time: %s\n"
+    Time_ns.(diff (now ()) t11 |> Span.to_string_hum) ;
 
   let module Proof = (val proof) in
   let test_prove () =
-    let t1 = Sys.time () in
+    let t1 = Time_ns.now () in
     let public_input, (), proof =
       Async.Thread_safe.block_on_async_exn (fun () -> prove ())
     in
-    Printf.printf "Proving time: %fs\n" ((Sys.time () -. t1) /. 10.0) ;
+    Printf.printf "Proving time: %s\n"
+      Time_ns.(diff (now ()) t1 |> Span.to_string_hum) ;
     Or_error.ok_exn
       (Async.Thread_safe.block_on_async_exn (fun () ->
            Proof.verify [ (public_input, proof) ] ) )
@@ -72,6 +74,7 @@ let test () =
   test_prove ()
 
 let () =
-  let t = Sys.time () in
+  let t = Time_ns.now () in
   test () ;
-  Printf.printf "Execution time: %fs\n" ((Sys.time () -. t) /. 10.0)
+  Printf.printf "Execution time: %s\n"
+    Time_ns.(diff (now ()) t |> Span.to_string_hum)

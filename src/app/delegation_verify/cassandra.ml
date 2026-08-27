@@ -46,8 +46,7 @@ let query ~conf q =
     optional conf.credentials ~f:(fun { username; password } ->
         [ "--username"; username; "--password"; password ] )
     @ optional conf.connection ~f:(fun { hostname; port; use_ssl } ->
-          (if use_ssl then [ "--ssl" ] else [])
-          @ [ hostname; Int.to_string port ] )
+        (if use_ssl then [ "--ssl" ] else []) @ [ hostname; Int.to_string port ] )
   in
   Process.run_lines ~prog:conf.executable ~stdin:q ~args ()
 
@@ -63,16 +62,16 @@ let select ~conf ~parse ~fields ?where from =
   List.slice data 3 (-2) (* skip header and footer *)
   |> List.filter ~f:(fun s -> not (String.is_empty s))
   |> List.fold_right ~init:(Ok []) ~f:(fun line acc ->
-         let open Or_error.Let_syntax in
-         let%bind l = acc in
-         try
-           let j = Yojson.Safe.from_string line in
-           match parse j with
-           | Ppx_deriving_yojson_runtime.Result.Ok s ->
-               Ok (s :: l)
-           | Ppx_deriving_yojson_runtime.Result.Error e ->
-               Or_error.error_string e
-         with Yojson.Json_error e -> Or_error.error_string e )
+      let open Or_error.Let_syntax in
+      let%bind l = acc in
+      try
+        let j = Yojson.Safe.from_string line in
+        match parse j with
+        | Ppx_deriving_yojson_runtime.Result.Ok s ->
+            Ok (s :: l)
+        | Ppx_deriving_yojson_runtime.Result.Error e ->
+            Or_error.error_string e
+      with Yojson.Json_error e -> Or_error.error_string e )
   |> Deferred.return
 
 let update ~conf ~table ~where updates =

@@ -3,6 +3,7 @@
  (package mina_graphql_client_app)
  (public_name mina-graphql-client)
  (libraries
+  core_unix.command_unix
   ;; opam libraries
   async
   async_kernel

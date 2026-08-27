@@ -43,8 +43,8 @@ let%test_module "supply_increase" =
        When it's non-empty, the values are different and thus difficult to confirm using property-based testing.
        Also, because of the particular input type chosen (of data type command ) this also simplifies things somewhat,
        whereas other types (i.e. fee_transfer and coinbase) produce numerical values other than zero in the calculation. *)
-    let%test_unit "supply_increase_command_input_always_gives_zero_when_no_account_ids"
-        =
+    let%test_unit
+        "supply_increase_command_input_always_gives_zero_when_no_account_ids" =
       Quickcheck.test generator ~f:(fun payload ->
           [%test_eq: signed_amount Or_error.t]
             (Or_error.return @@ Currency.Amount.Signed.zero)

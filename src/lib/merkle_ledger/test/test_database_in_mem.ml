@@ -46,10 +46,11 @@ module type Account_Db =
 module type DB = Account_Db with type account := Account.t
 
 module Make_inputs
-    (Account : Merkle_ledger.Intf.Account
-                 with type account_id := Account_id.t
-                  and type token_id := Token_id.t
-                  and type balance := Balance.t)
+    (Account :
+      Merkle_ledger.Intf.Account
+        with type account_id := Account_id.t
+         and type token_id := Token_id.t
+         and type balance := Balance.t)
     (Hash : Merkle_ledger.Intf.Hash with type account := Account.t) =
 struct
   include Test_stubs.Make_base_inputs (Account) (Hash)
@@ -197,15 +198,15 @@ module Make (Test : Test_intf) = struct
             let accounts = Quickcheck.random_value accounts_gen in
             Sequence.of_list accounts
             |> Sequence.iter ~f:(fun account ->
-                   let account_id = Account.identifier account in
-                   let _, location =
-                     MT.get_or_create_account mdb account_id account
-                     |> Or_error.ok_exn
-                   in
-                   let location' =
-                     MT.location_of_account mdb account_id |> Option.value_exn
-                   in
-                   assert ([%equal: Location.t] location location') ) ) )
+                let account_id = Account.identifier account in
+                let _, location =
+                  MT.get_or_create_account mdb account_id account
+                  |> Or_error.ok_exn
+                in
+                let location' =
+                  MT.location_of_account mdb account_id |> Option.value_exn
+                in
+                assert ([%equal: Location.t] location location') ) ) )
 
   let random_accounts max_height =
     let num_accounts = 1 lsl max_height in
@@ -215,15 +216,15 @@ module Make (Test : Test_intf) = struct
   let populate_db mdb max_height =
     random_accounts max_height
     |> List.iter ~f:(fun account ->
-           let action, location =
-             MT.get_or_create_account mdb (Account.identifier account) account
-             |> Or_error.ok_exn
-           in
-           match action with
-           | `Added ->
-               ()
-           | `Existed ->
-               MT.set mdb location account )
+        let action, location =
+          MT.get_or_create_account mdb (Account.identifier account) account
+          |> Or_error.ok_exn
+        in
+        match action with
+        | `Added ->
+            ()
+        | `Existed ->
+            MT.set mdb location account )
 
   let () =
     add_test
@@ -409,11 +410,11 @@ module Make (Test : Test_intf) = struct
             assert (
               Sequence.of_list accounts
               |> Sequence.for_all ~f:(fun account ->
-                     let indexed_account =
-                       MT.index_of_account_exn mdb (Account.identifier account)
-                       |> MT.get_at_index_exn mdb
-                     in
-                     Account.equal account indexed_account ) ) ) )
+                  let indexed_account =
+                    MT.index_of_account_exn mdb (Account.identifier account)
+                    |> MT.get_at_index_exn mdb
+                  in
+                  Account.equal account indexed_account ) ) ) )
 
   let test_subtree_range mdb ~f max_height =
     populate_db mdb max_height ;

@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Currency
 
 module Test_inputs = struct
@@ -72,12 +72,12 @@ module Test_inputs = struct
 
     type t = Currency.Fee.t Work.Table.t
 
-    let get_completed_work (t : t) = Work.Table.find t
+    let get_completed_work (t : t) = Hashtbl.find t
 
     let create () = Work.Table.create ()
 
     let add_snark t ~work ~fee =
-      Work.Table.update t work ~f:(function
+      Hashtbl.update t work ~f:(function
         | None ->
             fee
         | Some fee' ->

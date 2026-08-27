@@ -11,7 +11,7 @@
    graphql_ppx -- %{read-lines:../../graphql-ppx-config.inc}))
  (libraries
   ;; opam libraries
-  async async_kernel core_kernel core uri integers result
+  async async_kernel core_kernel core core_unix.time_float_unix uri integers result
   cohttp cohttp-async yojson ppx_deriving_yojson.runtime
   ;; local libraries
   backoff

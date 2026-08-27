@@ -28,7 +28,7 @@ module Missing_blocks_count = struct
      mli contract (returns 0, never NULL). *)
   let query missing_blocks_width =
     Mina_caqti.find_req Caqti_type.unit Caqti_type.int
-      (Core_kernel.sprintf
+      (Core.sprintf
          {sql|
         WITH extremes AS (
           SELECT MIN(height) AS min_block, MAX(height) AS max_block

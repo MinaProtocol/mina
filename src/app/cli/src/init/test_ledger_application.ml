@@ -1,6 +1,6 @@
 (* test_ledger_application.ml -- code to test application of transactions to a specific ledger *)
 
-open Core_kernel
+open Core
 open Async_kernel
 open Mina_ledger
 open Mina_base
@@ -33,8 +33,9 @@ let mk_tx ~transfer_parties_get_actions_events ~event_elements ~action_elements
       let open Base_quickcheck.Generator.Let_syntax in
       let%bind receivers =
         Base_quickcheck.Generator.list_with_length ~length:num_acc_updates
-        @@ let%map kp = Signature_lib.Keypair.gen in
-           (First kp, Currency.Amount.zero)
+        @@
+        let%map kp = Signature_lib.Keypair.gen in
+        (First kp, Currency.Amount.zero)
       in
       let%bind events =
         Quickcheck.Generator.list_with_length event_elements generate_event
@@ -62,7 +63,7 @@ let mk_tx ~transfer_parties_get_actions_events ~event_elements ~action_elements
         Currency.Amount.(
           scale
             (of_fee constraint_constants.account_creation_fee)
-            num_acc_updates)
+            num_acc_updates )
         |> Option.value_exn ~here:[%here]
     ; zkapp_account_keypairs
     ; memo = Signed_command_memo.empty
@@ -148,12 +149,12 @@ let apply_txs ~transfer_parties_get_actions_events ~action_elements
   in
   let accounts_accessed =
     List.fold_left ~init:Account_id.Set.empty zkapps ~f:(fun set txn ->
-        Account_id.Set.(
-          union set (of_list (Zkapp_command.accounts_referenced txn))) )
+        Set.union set
+          (Account_id.Set.of_list (Zkapp_command.accounts_referenced txn)) )
     |> Set.to_list
   in
   Ledger.unsafe_preload_accounts_from_parent ledger accounts_accessed ;
-  let start = Time.now () in
+  let start = Time_float_unix.now () in
   match%map
     Staged_ledger.Test_helpers.update_coinbase_stack_and_get_data_impl
       ~first_partition_slots ~is_new_stack:(not no_new_stack)
@@ -164,11 +165,11 @@ let apply_txs ~transfer_parties_get_actions_events ~action_elements
   with
   | Ok (b, _, _, _, _) ->
       let root = Ledger.merkle_root ledger in
-      let elapsed = Time.diff (Time.now ()) start in
+      let elapsed = Time_float.diff (Time_float_unix.now ()) start in
       printf
         !"Result of application %d: %B (took %s): new root %s\n%!"
         i b
-        Time.(Span.to_string elapsed)
+        Time_float.(Span.to_string elapsed)
         (Ledger_hash.to_base58_check root) ;
       elapsed
   | Error e ->
@@ -236,7 +237,7 @@ let test ~privkey_path ~ledger_path ?prev_block_path ~first_partition_slots
       Ledger.remove_and_reparent_exn ledger ledger )
   in
   let stop_tracing =
-    if tracing then (fun x -> Mina_tracing.stop () ; x) else ident
+    if tracing then (fun x -> Mina_tracing.stop () ; x) else Fn.id
   in
   let results = ref [] in
   let init_root = Ledger.merkle_root init_ledger in
@@ -248,7 +249,7 @@ let test ~privkey_path ~ledger_path ?prev_block_path ~first_partition_slots
       let prep_steps_len = Float.of_int (List.length preparation_steps) in
       let prep_steps_total_time =
         List.fold preparation_steps ~init:Float.zero ~f:(fun acc time ->
-            acc +. Time.Span.to_ms time )
+            acc +. Time_float.Span.to_ms time )
       in
       prep_steps_total_time /. prep_steps_len
     in
@@ -258,7 +259,8 @@ let test ~privkey_path ~ledger_path ?prev_block_path ~first_partition_slots
         let json =
           `Assoc
             [ ( "final_time"
-              , `String (Printf.sprintf "%.2f" (Time.Span.to_ms final_time)) )
+              , `String
+                  (Printf.sprintf "%.2f" (Time_float.Span.to_ms final_time)) )
             ; ( "preparation_steps_mean"
               , `String (Printf.sprintf "%.2f" preparation_steps_mean) )
             ]
@@ -268,7 +270,7 @@ let test ~privkey_path ~ledger_path ?prev_block_path ~first_partition_slots
         ()
   in
   printf !"Init root %s\n%!" (Ledger_hash.to_base58_check init_root) ;
-  Deferred.List.fold (List.init rounds ~f:ident) ~init:(init_ledger, [])
+  Deferred.List.fold (List.init rounds ~f:Fn.id) ~init:(init_ledger, [])
     ~f:(fun (ledger, ledgers) i ->
       let%bind () =
         if tracing && i = 1 then Mina_tracing.start "." else Deferred.unit

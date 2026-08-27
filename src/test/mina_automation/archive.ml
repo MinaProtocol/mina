@@ -118,5 +118,5 @@ let start t =
      5 s to start listening, and a block sent before then is silently
      lost.  [wait_db_ready] alone is not a gate either — the schema is
      loaded before this process starts. *)
-  let%map () = after (Time.Span.of_sec 5.) in
+  let%map () = after (Time_float.Span.of_sec 5.) in
   Process.{ process; config = t.config }

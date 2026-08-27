@@ -18,4 +18,4 @@ val evergrowing : log_filename:string -> Logger.Transport.t
     On linking this library, this is used to override the JS-safe
     implementation given in [Logger.Time.pretty_to_string].
 *)
-val time_pretty_to_string : Core.Time.t -> string
+val time_pretty_to_string : Core.Time_float.t -> string

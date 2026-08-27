@@ -19,23 +19,10 @@ let
     builtins.removeAttrs (opam-nix.opamListToQuery export.installed)
     [ "check_opam_switch" ];
 
-  # Extra packages which are not in opam.export but useful for development, such as an LSP server.
-  extra-packages = with implicit-deps; {
-    dune-rpc = "3.5.0";
-    dyn = "3.5.0";
-    fiber = "3.5.0";
-    chrome-trace = "3.5.0";
-    ocaml-lsp-server = "1.15.1-4.14";
-    ocamlc-loc = "3.5.0";
-    ocaml-system = ocaml;
-    ocamlformat-rpc-lib = "0.22.4";
-    omd = "1.3.2";
-    ordering = "3.5.0";
-    pp = "1.1.2";
-    ppx_yojson_conv_lib = "v0.15.0";
-    stdune = "3.5.0";
-    xdg = dune;
-  };
+  # Extra packages which are not in opam.export but useful for development.
+  # The v0.16-series export already carries the LSP server, ocamlformat and the
+  # dune component libraries, so only the system compiler alias remains here.
+  extra-packages = with implicit-deps; { ocaml-system = ocaml; };
 
   implicit-deps-overlay = self: super:
     (if pkgs.stdenv.isDarwin then {
@@ -51,10 +38,6 @@ let
       # https://github.com/Drup/ocaml-lmdb/issues/41
       lmdb = super.lmdb.overrideAttrs
         (oa: { buildInputs = oa.buildInputs ++ [ self.conf-pkg-config ]; });
-
-      # Doesn't have an explicit dependency on ctypes-foreign
-      ctypes = super.ctypes.overrideAttrs
-        (oa: { buildInputs = oa.buildInputs ++ [ self.ctypes-foreign ]; });
 
       # Can't find sodium-static and ctypes
       sodium = super.sodium.overrideAttrs {

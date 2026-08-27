@@ -1,6 +1,6 @@
 (* stake_delegation.ml *)
 
-open Core_kernel
+open Core
 open Signature_lib
 
 [%%versioned

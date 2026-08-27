@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Rosetta_lib
 open Alcotest
 module Amount_of = Rosetta_lib.Amount_of
@@ -8,8 +8,7 @@ module Partial = Rosetta_lib.User_command_info.Partial
 let partial_testable =
   Alcotest.testable
     (fun fmt t ->
-      Format.fprintf fmt "%s" (Sexplib.Sexp.to_string_hum (Partial.sexp_of_t t))
-      )
+      Format.fprintf fmt "%s" (Sexplib.Sexp.to_string_hum (Partial.sexp_of_t t)) )
     Partial.equal
 
 let test_payment_round_trip () =
