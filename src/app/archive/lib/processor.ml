@@ -5779,6 +5779,21 @@ let add_genesis_accounts ~logger ~(runtime_config_opt : Runtime_config.t option)
                   ~constraint_constants:precomputed_values.constraint_constants
                   genesis_block ~accounts_accessed:[] ~accounts_created:[]
               in
+              (* Adopt whatever is already pointing at this block.
+
+                 An archive that ingested blocks before it was given a
+                 configuration stored the first of them with parent_id NULL,
+                 because its parent was not there. Inserting the parent now does
+                 not fix that by itself: the ordinary block path calls
+                 set_parent_id_if_null on every insert, and this one does not go
+                 through it. *)
+              let%bind.Deferred.Result () =
+                Block.set_parent_id_if_null
+                  (module Conn)
+                  ~parent_hash:
+                    (State_hash.With_state_hashes.state_hash genesis_block)
+                  ~parent_id:genesis_block_id
+              in
               let%bind.Deferred.Result { ledger_hash; _ } =
                 Block.load (module Conn) ~id:genesis_block_id
               in
