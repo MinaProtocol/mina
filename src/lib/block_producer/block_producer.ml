@@ -1171,10 +1171,13 @@ let produce ~genesis_breadcrumb ~context:(module Context : CONTEXT) ~prover
               [%log internal] "Wait_for_confirmation" ;
               [%log debug] ~metadata
                 "Waiting for block $state_hash to be inserted into frontier" ;
+              let registration =
+                Transition_registry.register transition_registry
+                  protocol_state_hashes.state_hash
+              in
               Deferred.choose
                 [ Deferred.choice
-                    (Transition_registry.register transition_registry
-                       protocol_state_hashes.state_hash )
+                    (Transition_registry.wait registration)
                     (Fn.const (Ok `Transition_accepted))
                 ; Deferred.choice
                     ( Block_time.Timeout.create time_controller
@@ -1194,6 +1197,7 @@ let produce ~genesis_breadcrumb ~context:(module Context : CONTEXT) ~prover
                 ]
               >>= function
               | `Transition_accepted ->
+                  Transition_registry.unregister registration ;
                   [%log internal] "Transition_accepted" ;
                   [%log info] ~metadata
                     "Generated transition $state_hash was accepted into \
@@ -1207,6 +1211,7 @@ let produce ~genesis_breadcrumb ~context:(module Context : CONTEXT) ~prover
                   (* FIXME #3167: this should be fatal, and more
                      importantly, shouldn't happen.
                   *)
+                  Transition_registry.unregister registration ;
                   [%log internal] "Transition_accept_timeout" ;
                   let msg : (_, unit, string, unit) format4 =
                     "Timed out waiting for generated transition $state_hash to \
@@ -1735,10 +1740,13 @@ let run_precomputed ~context:(module Context : CONTEXT) ~verifier ~trust_system
           in
           [%log debug] ~metadata
             "Waiting for block $state_hash to be inserted into frontier" ;
+          let registration =
+            Transition_registry.register transition_registry
+              protocol_state_hashes.state_hash
+          in
           Deferred.choose
             [ Deferred.choice
-                (Transition_registry.register transition_registry
-                   protocol_state_hashes.state_hash )
+                (Transition_registry.wait registration)
                 (Fn.const (Ok `Transition_accepted))
             ; Deferred.choice
                 ( Block_time.Timeout.create time_controller
@@ -1749,6 +1757,7 @@ let run_precomputed ~context:(module Context : CONTEXT) ~verifier ~trust_system
             ]
           >>= function
           | `Transition_accepted ->
+              Transition_registry.unregister registration ;
               [%log info] ~metadata
                 "Generated transition $state_hash was accepted into transition \
                  frontier" ;
@@ -1757,6 +1766,7 @@ let run_precomputed ~context:(module Context : CONTEXT) ~verifier ~trust_system
               (* FIXME #3167: this should be fatal, and more importantly,
                  shouldn't happen.
               *)
+              Transition_registry.unregister registration ;
               [%log fatal] ~metadata
                 "Timed out waiting for generated transition $state_hash to \
                  enter transition frontier. Continuing to produce new blocks \
