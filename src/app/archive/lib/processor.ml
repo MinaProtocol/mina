@@ -4979,13 +4979,11 @@ module Hardfork_finaliser = struct
                    itself unable to do anything, so say so rather than return
                    in silence. *)
                 [%log info]
-                  "Not settling the fork boundary yet: another session \
-                   holds                    the repair lock. If no other \
-                   archive is running against                    this \
-                   database, look for a leftover backend: SELECT \
-                   pid,                    query FROM pg_stat_activity JOIN \
-                   pg_locks USING (pid) WHERE                    locktype = \
-                   'advisory'. This will be retried." ;
+                  "Not settling the fork boundary yet: another session holds \
+                   the repair lock. If no other archive is running against \
+                   this database, look for a leftover backend: SELECT pid, \
+                   query FROM pg_stat_activity JOIN pg_locks USING (pid) WHERE \
+                   locktype = 'advisory'. This will be retried." ;
                 return ()
             | true -> (
                 let%bind result =
@@ -4994,9 +4992,9 @@ module Hardfork_finaliser = struct
                 match result with
                 | Error reason ->
                     [%log info]
-                      "Not settling the fork boundary yet: $reason. This will \
-                       be retried."
-                      ~metadata:[ ("reason", `String (describe reason)) ] ;
+                      "Not settling the fork boundary yet: %s. This will be \
+                       retried."
+                      (describe reason) ;
                     let%map (_ : bool) = unlock conn in
                     ()
                 | Ok (fork_block, ancestry) ->
@@ -5012,26 +5010,6 @@ module Hardfork_finaliser = struct
                         ; ("count", `Int marked)
                         ] ) ) )
       pool
-
-  (** Keep attempting until the boundary is settled.
-
-      Runs in the background while the archive serves reads. The repair only
-      writes [chain_status], so there is nothing to coordinate with ingest. *)
-  let run ~logger ~required_confirmations ?(interval = Time.Span.of_sec 60.)
-      ~pool () =
-    Deferred.repeat_until_finished () (fun () ->
-        let%bind () =
-          match%map attempt ~logger ~required_confirmations ~pool with
-          | Ok () ->
-              ()
-          | Error e ->
-              [%log warn]
-                "Could not settle the fork boundary: $error. This will be \
-                 retried."
-                ~metadata:[ ("error", `String (Caqti_error.show e)) ]
-        in
-        let%map () = after interval in
-        `Repeat () )
 end
 
 (** Put the fork genesis block into the database.
@@ -5186,58 +5164,6 @@ module Fork_genesis_block = struct
                    chain now links to the pre-fork one."
                   ~metadata:[ ("state_hash", `String state_hash) ] ;
                 return (Ok `Inserted) ) )
-
-  (** How long the ledger is expected to take to appear, and how often to look
-      while that is still the expectation.
-
-      The daemon writes the tarballs as it generates the configuration, and
-      something else puts them where this archive can fetch them. That upload
-      is not instant and it is not this archive's to observe, so the first
-      stretch is treated as ordinary waiting. *)
-  let brisk_interval = Time.Span.of_sec 30.
-
-  let brisk_for = Time.Span.of_min 15.
-
-  let patient_interval = Time.Span.of_min 5.
-
-  (** Keep trying until the block is in place.
-
-      Never gives up. Stopping would leave the archive permanently without the
-      fork genesis block, and nothing would say so; an upload that arrives an
-      hour late should still be picked up. What changes with time is the noise:
-      for the first [brisk_for] this is expected waiting and is logged as such,
-      and after that it is something an operator should look at. *)
-  let run ~logger ~genesis_constants ~constraint_constants ~pool () =
-    let started = Time.now () in
-    Deferred.repeat_until_finished () (fun () ->
-        let waited = Time.diff (Time.now ()) started in
-        let still_expected = Time.Span.( < ) waited brisk_for in
-        let%bind () =
-          match%map
-            attempt ~logger ~genesis_constants ~constraint_constants ~pool
-          with
-          | Ok `Inserted | Ok `Already_present ->
-              ()
-          | Error No_fork_recorded ->
-              (* Ordinary on a database that has never seen a fork. *)
-              ()
-          | Error reason when still_expected ->
-              [%log info]
-                "Cannot insert the fork genesis block yet: %s. This will be \
-                 retried."
-                (describe reason)
-          | Error reason ->
-              [%log warn]
-                "Still cannot insert the fork genesis block after %s: %s. The \
-                 genesis ledger has not arrived. This will keep being retried, \
-                 and will succeed on its own once the ledger is uploaded."
-                (Time.Span.to_string_hum waited)
-                (describe reason)
-        in
-        let%map () =
-          after (if still_expected then brisk_interval else patient_interval)
-        in
-        `Repeat () )
 end
 
 (** Load an era's genesis ledger accounts.
@@ -5448,30 +5374,107 @@ module Genesis_accounts = struct
                                   , `String (Int64.to_string genesis_height) )
                                 ] ;
                             Ok `Loaded ) ) ) ) )
+end
 
-  (** Keep trying until the accounts are in place.
+(** The hand-over, in order.
 
-      Slow on purpose: an attempt may fetch and materialise a ledger of tens of
-      megabytes. Nothing waits on this -- the archive is already serving, the
-      boundary is already repaired, and the only consequence of it never
-      finishing is that untouched accounts answer zero, which is the position
-      today. *)
-  let run ~logger ~genesis_constants ~constraint_constants
-      ?(interval = Time.Span.of_min 10.) ~pool () =
-    Deferred.repeat_until_finished () (fun () ->
+    Three things have to happen to a database after a fork: the post-fork
+    genesis block goes in, the boundary the fork stranded is settled, and the
+    era's genesis accounts are loaded. Each used to run on its own timer, and
+    the order they happened in was whatever the timers produced.
+
+    They are sequenced here instead, behind one gate: the genesis ledger.
+
+    Only the genesis block strictly needs that ledger. The boundary repair needs
+    nothing but the blocks already in the database, so it could go first and
+    finish sooner. It deliberately does not. A database with its chain_status
+    rewritten, no genesis block and no genesis accounts is three different
+    half-states to recognise and reason about; one that has not started yet is
+    one. The blocks in question have been stranded since the fork, so a wait
+    measured in minutes buys that simplicity cheaply.
+
+    Every step is idempotent, so a pass that stops early costs only the pass. *)
+module Hand_over = struct
+  (** How long the ledger is expected to take, and how often to look while that
+      is still the expectation. The daemon writes the tarballs as it generates
+      the configuration and something else uploads them; that is not instant,
+      and not this archive's to observe. *)
+  let brisk_interval = Time.Span.of_sec 30.
+
+  let brisk_for = Time.Span.of_min 15.
+
+  let patient_interval = Time.Span.of_min 5.
+
+  (** One pass. Stops at the first step that cannot finish. *)
+  let attempt ~logger ~genesis_constants ~constraint_constants
+      ~required_confirmations ~pool ~still_expected =
+    let open Deferred.Let_syntax in
+    match%bind
+      Fork_genesis_block.attempt ~logger ~genesis_constants
+        ~constraint_constants ~pool
+    with
+    | Error Fork_genesis_block.No_fork_recorded ->
+        (* Ordinary on a database that has never seen a fork. *)
+        return ()
+    | Error reason ->
+        let detail = Fork_genesis_block.describe reason in
+        if still_expected then
+          [%log info]
+            "The hand-over is waiting on the genesis ledger: %s. Nothing else \
+             runs until it is here."
+            detail
+        else
+          [%log warn]
+            "The hand-over is still waiting on the genesis ledger: %s. Nothing \
+             else runs until it is here. This keeps being retried and will \
+             carry on by itself once the ledger is uploaded."
+            detail ;
+        return ()
+    | Ok (`Inserted | `Already_present) -> (
+        (* The ledger is in hand, so the rest of the hand-over may run. Each of
+           these reports its own outcome and declines for its own reasons. *)
         let%bind () =
           match%map
-            attempt ~logger ~genesis_constants ~constraint_constants ~pool
+            Hardfork_finaliser.attempt ~logger ~required_confirmations ~pool
           with
-          | Ok (`Loaded | `Already_loaded | `No_fork_recorded) ->
+          | Ok () ->
               ()
-          | Error msg ->
-              [%log info]
-                "Cannot load the genesis accounts yet: $reason. This will be \
+          | Error e ->
+              [%log warn]
+                "Could not settle the fork boundary: $error. This will be \
                  retried."
-                ~metadata:[ ("reason", `String msg) ]
+                ~metadata:[ ("error", `String (Caqti_error.show e)) ]
         in
-        let%map () = after interval in
+        match%map
+          Genesis_accounts.attempt ~logger ~genesis_constants
+            ~constraint_constants ~pool
+        with
+        | Ok (`Loaded | `Already_loaded | `No_fork_recorded) ->
+            ()
+        | Error msg ->
+            [%log info]
+              "Cannot load the genesis accounts yet: %s. This will be retried."
+              msg )
+
+  (** Keep going until there is nothing left to do.
+
+      Never gives up. An archive that quietly stopped trying would be worse than
+      one that keeps asking, and an upload that lands an hour late should still
+      be picked up. What changes with time is only how loudly it says so. *)
+  let run ~logger ~genesis_constants ~constraint_constants
+      ~required_confirmations ~pool () =
+    let started = Time.now () in
+    Deferred.repeat_until_finished () (fun () ->
+        let still_expected =
+          Time.Span.( < ) (Time.diff (Time.now ()) started) brisk_for
+        in
+        let%bind () =
+          attempt ~logger ~genesis_constants ~constraint_constants
+            ~required_confirmations ~pool ~still_expected
+        in
+        let%map () =
+          after (if still_expected then brisk_interval else patient_interval)
+        in
         `Repeat () )
 end
 
@@ -5937,23 +5940,12 @@ let setup_server ~proof_cache_db ~(genesis_constants : Genesis_constants.t)
                      Deferred.unit ) ) )
       |> don't_wait_for ;
       (*Update archive metrics*)
-      (* Settle the fork boundary, if a fork has been recorded. A no-op on a
-         database that has never seen one, so it needs no flag to disable: it
-         runs in the background and only ever writes chain_status. *)
-      Hardfork_finaliser.run ~logger
+      (* The hand-over a fork leaves behind: the genesis block, the stranded
+         boundary, the genesis accounts, in that order and all behind the
+         genesis ledger. A no-op on a database that has never seen a fork, so it
+         needs no flag to disable. *)
+      Hand_over.run ~logger ~genesis_constants ~constraint_constants
         ~required_confirmations:hardfork_confirmations ~pool ()
-      |> don't_wait_for ;
-      (* Put the fork genesis block in place, so the post-fork chain links to
-         the pre-fork one. Independent of the repair above: neither waits on the
-         other, and both are no-ops until a fork is recorded. *)
-      Fork_genesis_block.run ~logger ~genesis_constants ~constraint_constants
-        ~pool ()
-      |> don't_wait_for ;
-      (* Last step of the hand-over, and the only one whose failure costs
-         nothing else: everything about the fork is already correct by the time
-         this runs. *)
-      Genesis_accounts.run ~logger ~genesis_constants ~constraint_constants
-        ~pool ()
       |> don't_wait_for ;
       serve_metrics_server ~logger ~metrics_server_port ~missing_blocks_width
         ~block_window_duration_ms:constraint_constants.block_window_duration_ms
