@@ -5091,11 +5091,18 @@ module Fork_genesis_block = struct
         | Error msg ->
             Deferred.return (Error (Ledger_unavailable msg))
         | Ok runtime_config -> (
+            (* Caught, not just matched on. Resolving a configuration raises for
+               anything the Error case does not cover -- a state hash that is
+               not base58 gets as far as building the constraint constants and
+               throws there -- and this runs on a loop in a process that has an
+               archive to serve. An unusable configuration is a reason to say so
+               and try again later, never a reason to take the process down. *)
             match%map
-              Genesis_ledger_helper.init_from_config_file ~logger
-                ~proof_level:Genesis_constants.Compiled.proof_level
-                ~genesis_constants ~constraint_constants runtime_config
-                ~cli_proof_level:None
+              Monitor.try_with_join_or_error ~here:[%here] (fun () ->
+                  Genesis_ledger_helper.init_from_config_file ~logger
+                    ~proof_level:Genesis_constants.Compiled.proof_level
+                    ~genesis_constants ~constraint_constants runtime_config
+                    ~cli_proof_level:None )
             with
             | Error err ->
                 Error (Ledger_unavailable (Error.to_string_hum err))
