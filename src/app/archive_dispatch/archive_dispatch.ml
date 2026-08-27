@@ -81,9 +81,12 @@ let parse_config_lines lines =
                nothing else about shell syntax is honoured. *)
             let v = String.strip v in
             let v =
-              if String.length v >= 2
-                 && ( (String.is_prefix v ~prefix:"\"" && String.is_suffix v ~suffix:"\"")
-                    || (String.is_prefix v ~prefix:"'" && String.is_suffix v ~suffix:"'") )
+              if
+                String.length v >= 2
+                && ( String.is_prefix v ~prefix:"\""
+                     && String.is_suffix v ~suffix:"\""
+                   || String.is_prefix v ~prefix:"'"
+                      && String.is_suffix v ~suffix:"'" )
               then String.sub v ~pos:1 ~len:(String.length v - 2)
               else v
             in
@@ -131,7 +134,7 @@ let read_config path =
       }
 
 (* ------------------------------------------------------------------ *)
-(* Which era is the schema in                                          *)
+(* Which era the database is in                                        *)
 (* ------------------------------------------------------------------ *)
 
 type schema_era =
@@ -139,6 +142,48 @@ type schema_era =
   | Postfork
   | Migration_in_progress of string
   | Unknown_version of string
+
+(** Whether a daemon has told this archive that a fork happened.
+
+    The second half of the routing question, and the half that says something
+    about the chain rather than about the schema. A missing table is not a
+    failure: an archive that predates automode has no [hardfork_state], and no
+    fork has been announced to it. *)
+let fork_recorded_in_database ~(config : config) =
+  match
+    Or_error.try_with ~backtrace:false (fun () ->
+        let conn =
+          try new Postgresql.connection ~conninfo:config.postgres_uri ()
+          with Postgresql.Error e -> failwith (Postgresql.string_of_error e)
+        in
+        Exn.protect
+          ~f:(fun () ->
+            let result = conn#exec "SELECT count(*) FROM hardfork_state" in
+            match result#status with
+            | Postgresql.Tuples_ok when result#ntuples > 0 ->
+                not (String.equal (result#getvalue 0 0) "0")
+            | Postgresql.Tuples_ok ->
+                false
+            | _ ->
+                failwith result#error )
+          ~finally:(fun () -> conn#finish) )
+  with
+  | Ok recorded ->
+      Ok recorded
+  | Error err ->
+      let msg = Error.to_string_hum err in
+      if String.is_substring msg ~substring:"hardfork_state" then Ok false
+      else
+        Error
+          (Refuse
+             { reason = "database_unreachable"
+             ; detail =
+                 sprintf
+                   "could not read hardfork_state: %s. Refusing to guess a \
+                    runtime -- the archive cannot work without its database in \
+                    any case."
+                   msg
+             } )
 
 (** Ask the database which era its schema is in.
 
@@ -151,15 +196,14 @@ let schema_era_of_database ~(config : config) =
     Or_error.try_with ~backtrace:false (fun () ->
         let conn =
           try new Postgresql.connection ~conninfo:config.postgres_uri ()
-          with Postgresql.Error e ->
-            failwith (Postgresql.string_of_error e)
+          with Postgresql.Error e -> failwith (Postgresql.string_of_error e)
         in
         Exn.protect
           ~f:(fun () ->
             let result =
               conn#exec
-                "SELECT protocol_version, status FROM migration_history \
-                 ORDER BY commit_start_at DESC LIMIT 1"
+                "SELECT protocol_version, status FROM migration_history ORDER \
+                 BY commit_start_at DESC LIMIT 1"
             in
             match result#status with
             | Postgresql.Tuples_ok when result#ntuples = 0 ->
@@ -170,9 +214,9 @@ let schema_era_of_database ~(config : config) =
                 `Row (result#getvalue 0 0, result#getvalue 0 1)
             | _ ->
                 failwith result#error )
-          (* Postgresql raises its own exception type, whose default printer
-             says nothing useful. *)
-          ~finally:(fun () -> conn#finish ) )
+            (* Postgresql raises its own exception type, whose default printer
+               says nothing useful. *)
+          ~finally:(fun () -> conn#finish) )
   with
   | Error err ->
       let msg = Error.to_string_hum err in
@@ -196,7 +240,8 @@ let schema_era_of_database ~(config : config) =
   | Ok (`Row (version, status)) ->
       if not (String.equal status "applied") then
         Ok (Migration_in_progress status)
-      else if String.equal version config.prefork_protocol_version then Ok Prefork
+      else if String.equal version config.prefork_protocol_version then
+        Ok Prefork
       else if String.equal version config.postfork_protocol_version then
         Ok Postfork
       else Ok (Unknown_version version)
@@ -208,13 +253,37 @@ let schema_era_of_database ~(config : config) =
 let resolve ~(config : config) ~invoked_as ~args =
   let open Result.Let_syntax in
   let%bind era = schema_era_of_database ~config in
+  let%bind fork_recorded = fork_recorded_in_database ~config in
   let%bind runtime =
-    match era with
-    | Prefork ->
+    (* Two signals, because the schema alone does not say which chain this
+       database holds. Operators upgrade the schema ahead of the fork -- devnet
+       upgraded roughly six hours before its mesa fork -- and for that whole
+       window the schema reads post-fork while the daemon is still pre-fork and
+       still speaking the old wire format. Routing on the schema alone would
+       start the wrong archive against it.
+
+       So the fork record decides which chain, and the schema decides whether
+       the database is ready for it. *)
+    match (era, fork_recorded) with
+    | Prefork, false ->
         Ok config.prefork_runtime
-    | Postfork ->
+    | Postfork, false ->
+        (* The schema is ready and nothing has forked yet. *)
+        Ok config.prefork_runtime
+    | Prefork, true ->
+        Error
+          (Refuse
+             { reason = "schema_not_upgraded"
+             ; detail =
+                 "a hard fork is recorded in this database but its schema is \
+                  still the pre-fork one. The post-fork archive will not run \
+                  against it. Apply the schema upgrade, or start the archive \
+                  with --hardfork-handling migrate-exit so it applies the \
+                  upgrade itself."
+             } )
+    | Postfork, true ->
         Ok config.postfork_runtime
-    | Migration_in_progress status ->
+    | Migration_in_progress status, _ ->
         Error
           (Refuse
              { reason = "migration_in_progress"
@@ -225,7 +294,7 @@ let resolve ~(config : config) ~invoked_as ~args =
                     started until it settles."
                    status
              } )
-    | Unknown_version version ->
+    | Unknown_version version, _ ->
         Error
           (Refuse
              { reason = "unknown_protocol_version"
@@ -239,7 +308,8 @@ let resolve ~(config : config) ~invoked_as ~args =
              } )
   in
   let binary =
-    Filename.concat (Filename.concat config.runtimes_base_path runtime)
+    Filename.concat
+      (Filename.concat config.runtimes_base_path runtime)
       invoked_as
   in
   match Sys_unix.file_exists binary with
@@ -264,7 +334,9 @@ let explain ~(config : config) ~config_file ~invoked_as outcome =
     config.prefork_runtime config.postfork_runtime ;
   printf "  protocol versions : pre-fork %s, post-fork %s\n"
     config.prefork_protocol_version config.postfork_protocol_version ;
-  printf "  decided by        : migration_history in the archive database\n" ;
+  printf
+    "  decided by        : hardfork_state (has a fork been announced) and \
+     migration_history (is the schema ready for it)\n" ;
   match outcome with
   | Run { runtime; binary; _ } ->
       printf "  chose             : %s\n" runtime ;
@@ -342,5 +414,5 @@ let () =
             (* Replace this process rather than spawning: the caller's
                supervisor is watching this pid, and signals must reach the
                runtime directly. *)
-            never_returns
-              (Core_unix.exec ~prog:binary ~argv ~use_path:false ()) )
+            never_returns (Core_unix.exec ~prog:binary ~argv ~use_path:false ())
+      )
