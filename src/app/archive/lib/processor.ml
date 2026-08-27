@@ -5376,11 +5376,16 @@ module Genesis_accounts = struct
                 | Error msg ->
                     return (Error msg)
                 | Ok runtime_config -> (
+                    (* Caught rather than only matched on, for the same reason
+                       as in [Fork_genesis_block.build]: resolving a
+                       configuration raises for what the Error case does not
+                       cover, and this runs on a loop inside a live archive. *)
                     match%bind
-                      Genesis_ledger_helper.init_from_config_file ~logger
-                        ~proof_level:Genesis_constants.Compiled.proof_level
-                        ~genesis_constants ~constraint_constants runtime_config
-                        ~cli_proof_level:None
+                      Monitor.try_with_join_or_error ~here:[%here] (fun () ->
+                          Genesis_ledger_helper.init_from_config_file ~logger
+                            ~proof_level:Genesis_constants.Compiled.proof_level
+                            ~genesis_constants ~constraint_constants
+                            runtime_config ~cli_proof_level:None )
                     with
                     | Error err ->
                         return (Error (Error.to_string_hum err))
