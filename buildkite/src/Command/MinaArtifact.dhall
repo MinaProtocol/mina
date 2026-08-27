@@ -74,6 +74,7 @@ let PackagingSpec =
           , deb_legacy_githash_config : Text
           , docker_publish : DockerPublish.Type
           , docker_repo : DockerRepo.Type
+          , generic : Bool
           , suffix : Optional Text
           , if_ : Optional B/If
           , includeIf : List Expr.Type
@@ -97,6 +98,7 @@ let PackagingSpec =
           , arch = Arch.Type.Amd64
           , docker_publish = DockerPublish.Type.Essential
           , docker_repo = DockerRepo.Type.InternalEurope
+          , generic = False
           , if_ = None B/If
           , includeIf = [] : List Expr.Type
           , excludeIf = [] : List Expr.Type
@@ -233,11 +235,32 @@ let nameSuffix
 
 let selfName
     : PackagingSpec.Type -> Text
-    = \(spec : PackagingSpec.Type) -> "${spec.prefix}${nameSuffix spec}"
+    =     \(spec : PackagingSpec.Type)
+      ->        if spec.generic
+
+          then  "${spec.prefix}Generic${baseNameSuffix spec}"
+
+          else  "${spec.prefix}${nameSuffix spec}"
 
 let genericBuildName
     : PackagingSpec.Type -> Text
     = \(spec : PackagingSpec.Type) -> "${spec.prefix}${baseNameSuffix spec}"
+
+let genericPackagingName
+    : PackagingSpec.Type -> Text
+    =
+      -- The job that builds the network-less packages of a codename:
+      -- mina-generic, mina-archive-generic, mina-rosetta-generic and the
+      -- tools. Every image of that codename installs some of them, whatever
+      -- network it is for, so they belong to one job rather than to whichever
+      -- network happened to also build them.
+      --
+      -- Not genericBuildName, which is the same text with no Generic segment
+      -- and names the APP build. The two were the same job for as long as the
+      -- devnet job was called MinaArtifact<Codename>; keeping them apart is
+      -- the point of this name.
+          \(spec : PackagingSpec.Type)
+      ->  "${spec.prefix}Generic${baseNameSuffix spec}"
 
 let DockerService =
       { service : Docker.Type, network : Network.Type, profile : Profiles.Type }
@@ -570,12 +593,14 @@ let docker_step
                 -- job names: Network.namePrefixSegment is empty for devnet, so
                 -- the devnet job IS the network-less one and needs nothing
                 -- added.
-                merge
-                  { Devnet = [] : List Command.TaggedKey.Type
-                  , Mainnet =
-                    [ { name = genericBuildName spec, key = "build-deb-pkg" } ]
-                  }
-                  (primaryNetwork spec)
+                      if spec.generic
+
+                then  [] : List Command.TaggedKey.Type
+
+                else  [ { name = genericPackagingName spec
+                        , key = "build-deb-pkg"
+                        }
+                      ]
 
           let deps
               : List Command.TaggedKey.Type
@@ -600,14 +625,18 @@ let docker_step
                 Some (BaseImage.imageFor spec.debVersion spec.arch)
 
           let dependsOnGeneric =
-                  deps
-                # [ { name = genericBuildName spec
-                    , key =
-                        "${Docker.lowerName
-                             Docker.Type.DaemonGeneric}-${Network.lowerName
-                                                            genericNetwork}-docker-image"
-                    }
-                  ]
+                      if spec.generic
+
+                then  deps
+
+                else    deps
+                      # [ { name = genericPackagingName spec
+                          , key =
+                              "${Docker.lowerName
+                                   Docker.Type.DaemonGeneric}-${Network.lowerName
+                                                                  genericNetwork}-docker-image"
+                          }
+                        ]
 
           let size = Size.XLarge
 
@@ -832,7 +861,7 @@ let pipelineBuilder
           , spec = JobSpec::{
             , dirtyWhen = DebianVersions.dirtyWhen spec.debVersion
             , path = "Release"
-            , name = "${spec.prefix}${nameSuffix spec}"
+            , name = selfName spec
             , tags = spec.tags
             , scope = spec.scope
             , includeIf = spec.includeIf
@@ -877,7 +906,7 @@ let packagePipeline
           , spec = JobSpec::{
             , dirtyWhen = DebianVersions.packageDirtyWhen
             , path = "Release"
-            , name = "${spec.prefix}${nameSuffix spec}"
+            , name = selfName spec
             , tags = spec.tags
             , scope = spec.scope
             , includeIf = spec.includeIf
