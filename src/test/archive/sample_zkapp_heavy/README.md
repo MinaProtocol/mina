@@ -42,6 +42,11 @@ would upload. `--limit N` replays only the first N blocks and `--skip-build` reu
 existing `archive_blocks.exe`, which together make a local run quick; `--help` lists the
 rest.
 
+Nothing is published if the replay ingested no block, or if more than
+`--max-failed-blocks` (0 by default) failed to insert: `archive_blocks` exits 0 even when
+every block fails, and a zeroed result reads on the dashboards as a leak-free build. On
+any failure the tail of the `archive_blocks` log is printed.
+
 ## Regenerate / refresh the corpus (the zkApp-heavy load test)
 
 Use the co-located `generate_corpus.py`. It bootstraps a small local network, submits
