@@ -767,6 +767,25 @@ let docker_step
                 }
                 entry.service
 
+let deferDockerPublish
+    : Optional Text
+    =
+      -- Set by a release pipeline to hold every image back until the packaging
+      -- stage has finished, so images and debians are published together
+      -- rather than image by image as each job lands.
+      --
+      -- Presence is the whole signal; there are only two outcomes.
+      Some env:MINA_RELEASE_DEFER_DOCKER_PUBLISH as Text ? None Text
+
+let deferred
+    : Bool
+    = Prelude.Optional.fold
+        Text
+        deferDockerPublish
+        Bool
+        (\(_ : Text) -> True)
+        False
+
 let docker_commands
     : PackagingSpec.Type -> List Command.Type
     =     \(spec : PackagingSpec.Type)
@@ -793,6 +812,13 @@ let docker_commands
                           //  { deb_release =
                                   DebianChannel.effective spec.channel
                               , docker_repo = spec.docker_repo
+                              , docker_publish =
+                                        if deferred
+
+                                  then  DockerPublish.Type.Disabled
+
+                                  else  s.docker_publish
+                              , save_to_ci_cache = deferred
                               }
                         )
                 )
