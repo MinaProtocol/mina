@@ -358,6 +358,15 @@ case "${SERVICE}" in
         DOCKERFILE_PATH="$TEMP_DOCKERFILE"
         DOCKER_TARGET="${INPUT_DOCKER_TARGET:-mina-rosetta}"
         ;;
+    mina-bootstrap)
+        # Self-contained image: the Dockerfile compiles the Go binary from
+        # src/app/bootstrap/ itself (no .deb / base-image-from-apt-repo needed),
+        # so the build context is the repo root. .dockerignore allowlists
+        # src/app/bootstrap/**/* so the context stays small. The deb_*/network
+        # build args the common invocation passes are simply unused here.
+        DOCKERFILE_PATH="dockerfiles/Dockerfile-mina-bootstrap"
+        DOCKER_CONTEXT="."
+        ;;
     mina-rosetta-configured)
         DOCKERFILE_PATH="dockerfiles/Dockerfile-install-config"
         SERVICE="mina-rosetta"
