@@ -5118,12 +5118,23 @@ module Hardfork_finaliser = struct
       pool
 end
 
-(** Put the fork genesis block into the database.
+(** Put the fork genesis block into the database, when nobody else has.
 
-    Without it the first post-fork block is inserted with [parent_id] NULL: the
+    Usually somebody has. The archive subscribes to the daemon's
+    [New_breadcrumbs] view, that view is seeded with the frontier's root, and a
+    broadcast pipe hands a new reader the current value -- so a post-fork daemon
+    whose root is still its genesis block delivers it as the first thing the
+    archive hears. Integration tests that run an archive across a fork exercise
+    that path, and the boundary is normally linked with nobody doing anything.
+
+    It is a delivery rather than a guarantee. The daemon sends once and does not
+    replay, so an archive that was down when the post-fork daemon started misses
+    it, as does one that first connects after the frontier root has advanced
+    past the genesis, or one restored from a backup taken before the fork. Then
+    the first produced post-fork block is stored with [parent_id] NULL: the
     chain is severed at the boundary, canonicalisation cannot walk across it,
-    and the missing-block metrics misread. Nothing raises an error when that
-    happens, which is why it is worth doing automatically.
+    and the missing-block metrics misread, with nothing raising an error. This
+    is the fallback for that, and the reason it also relinks.
 
     The block cannot be built from the configuration alone. Its consensus state
     needs the genesis ledger's total currency, which no configuration carries,
