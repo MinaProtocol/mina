@@ -2,11 +2,11 @@ open Core
 
 (** The outcome of verifying a submission.
 
-    [verified] and [validation_error] are two views of the same fact, and each
-    output site builds them separately, which leaves them free to disagree.
-    This gathers both encodings in one place so the pairing can be stated as a
-    test. The encodings here reproduce what the output sites do today; the
-    tests below say what they should do, and currently fail. *)
+    [verified] and [validation_error] are two views of the same fact, so both
+    are always emitted together from here: a submission is verified exactly
+    when it carries no validation error. Building the two fields separately at
+    each output site is what let them disagree, reporting [verified: true]
+    alongside a proof failure. *)
 module Verification_status = struct
   type t = Verified | Failed of string
 
@@ -20,13 +20,13 @@ module Verification_status = struct
     | Verified ->
         [ ("verified", `Bool true); ("validation_error", `Null) ]
     | Failed e ->
-        [ ("verified", `Bool true); ("validation_error", `String e) ]
+        [ ("verified", `Bool false); ("validation_error", `String e) ]
 
   let to_cassandra_updates = function
     | Verified ->
-        [ ("verified", "true") ]
+        [ ("verified", "true"); ("validation_error", "NULL") ]
     | Failed e ->
-        [ ("verified", "true"); ("validation_error", sprintf "'%s'" e) ]
+        [ ("verified", "false"); ("validation_error", sprintf "'%s'" e) ]
 
   let%test_module "verified and validation_error cannot disagree" =
     ( module struct
