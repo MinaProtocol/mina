@@ -101,10 +101,10 @@ def parse_args():
 def load_build_env():
     """Apply `opam env` to this process, as `eval $(opam config env)` would.
 
-    archive_blocks reaches mina_base, whose kimchi bindings need the Rust
-    toolchain, so the cargo directory joins PATH as well.
+    The toolchain image already carries the Go and Rust directories in PATH,
+    but not the opam switch: the image sets no opam variables, and the job
+    overrides the entrypoint, so nothing sources them.
     """
-    os.environ["PATH"] = "/home/opam/.cargo/bin:" + os.environ.get("PATH", "")
     out = subprocess.run(
         ["opam", "env", "--shell=sh"], check=True, capture_output=True, text=True
     )
