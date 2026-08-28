@@ -21,6 +21,7 @@ in  Pipeline.build
       , spec = JobSpec::{
         , dirtyWhen =
           [ S.strictlyStart (S.contains "src/lib/mina_caqti")
+          , S.strictlyStart (S.contains "src/app/archive")
           , S.strictlyStart (S.contains "src/app/archive_blocks")
           , S.strictlyStart (S.contains "src/test/archive/sample_zkapp_heavy")
           , S.strictlyStart
