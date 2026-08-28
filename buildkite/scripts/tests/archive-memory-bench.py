@@ -33,10 +33,6 @@ import time
 from pathlib import Path
 from urllib.parse import urlsplit, urlunsplit
 
-# archive_blocks is still initialising below this RSS; those samples would
-# understate the growth, so they are dropped before the metrics are computed.
-STARTUP_RSS_KIB = 50_000
-
 CURVE_HEADER = "elapsed_s,blocks_done,ab_rss_kib,pg_rss_kib"
 
 # how many lines of the archive_blocks log to print when blocks fail to insert
@@ -180,23 +176,34 @@ class Postgres:
         """Whether create_schema.sql was loaded into the database in use."""
         return self.query("select to_regclass('public.blocks') is not null") == ["t"]
 
-    def client_backend_pids(self):
-        # psql connects with the same URI as archive_blocks, so current_database()
-        # is by construction the database being benchmarked.
-        return self.query(
-            "select pid from pg_stat_activity "
+    def sample(self):
+        """(blocks stored, total RSS in KiB of the backends serving the ingest).
+
+        Both numbers come from a single psql call: each call opens a backend of
+        its own, and a second call racing the first one's exit would count that
+        dying backend in the RSS. psql connects with the same URI as
+        archive_blocks, so current_database() is by construction the database
+        being benchmarked.
+        """
+        rows = self.query(
+            "select (select count(*) from blocks), "
+            "coalesce(string_agg(pid::text, ' '), '') from pg_stat_activity "
             "where datname=current_database() and backend_type='client backend' "
             "and pid<>pg_backend_pid()"
         )
-
-    def backend_rss_kib(self):
-        total = 0
-        for pid in self.client_backend_pids():
+        if not rows:
+            return 0, 0
+        blocks, _, pids = rows[0].partition("|")
+        rss = 0
+        for pid in pids.split():
             try:
-                total += read_vm_rss_kib(int(pid))
+                rss += read_vm_rss_kib(int(pid))
             except ValueError:
                 continue
-        return total
+        try:
+            return int(blocks), rss
+        except ValueError:
+            return 0, rss
 
 
 def unpack_corpus(archive, destination, limit=0):
@@ -211,6 +218,11 @@ def unpack_corpus(archive, destination, limit=0):
 
 
 def count_lines(path):
+    """Lines in a file, or 0 if it is not there.
+
+    archive_blocks buffers its --successful-files / --failed-files lists until
+    it exits, so these counts are the final verdict, not live progress.
+    """
     try:
         with open(path, encoding="utf-8", errors="replace") as handle:
             return sum(1 for _ in handle)
@@ -242,6 +254,8 @@ def feed_and_sample(archive_blocks, blocks, postgres, workdir, sample_interval):
     successful.touch()
     failed.touch()
     log = workdir / "archive_blocks.log"
+    # progress is read from the database, so start from whatever it already holds
+    blocks_before, _ = postgres.sample()
 
     with log.open("w", encoding="utf-8") as handle:
         process = subprocess.Popen(
@@ -265,12 +279,14 @@ def feed_and_sample(archive_blocks, blocks, postgres, workdir, sample_interval):
         curve = []
         started = time.monotonic()
         while process.poll() is None:
+            archive_rss = read_vm_rss_kib(process.pid)
+            blocks_stored, backend_rss = postgres.sample()
             curve.append(
                 (
                     int(time.monotonic() - started),
-                    count_lines(successful),
-                    read_vm_rss_kib(process.pid),
-                    postgres.backend_rss_kib(),
+                    blocks_stored - blocks_before,
+                    archive_rss,
+                    backend_rss,
                 )
             )
             time.sleep(sample_interval)
@@ -284,24 +300,37 @@ def feed_and_sample(archive_blocks, blocks, postgres, workdir, sample_interval):
     return curve, ingest_seconds, count_lines(successful), count_lines(failed), log
 
 
+def steady_samples(curve):
+    """The samples taken after archive_blocks has finished starting up.
+
+    Ingestion begins at the first sample that reports a block written; the
+    samples before it cover process start-up, whose ramp would be counted as
+    growth. Deciding this from the curve itself -- rather than from a fixed
+    RSS threshold -- keeps the baseline correct whatever the binary's
+    footprint becomes. A run too short for any sample to catch a block falls
+    back to the first sample with a known RSS.
+    """
+    for index, row in enumerate(curve):
+        if row[1] > 0:
+            return curve[index:]
+    return [row for row in curve if row[2] > 0]
+
+
 def compute_metrics(curve):
     """Archive RSS growth, PG-backend RSS peak and the tail-average of it.
 
-    The pre-init startup samples are dropped, then the archive's growth is
-    measured across the remaining ones. The tail average covers the final third
-    of the run -- the sustained level once the zkApp-heavy tail is ingested.
-    Peak and tail-mean both track the leak monotonically.
+    The start-up samples are dropped, then the archive's growth is measured
+    across the remaining ones. The tail average covers the final third of the
+    run -- the sustained level once the zkApp-heavy tail is ingested. Peak and
+    tail-mean both track the leak monotonically.
     """
-    steady = [row for row in curve if row[2] > STARTUP_RSS_KIB]
+    steady = steady_samples(curve)
     archive_growth = steady[-1][2] - steady[0][2] if steady else 0
 
     backend = [row[3] for row in steady if row[3] > 0]
     peak = max(backend, default=0)
     tail = backend[2 * len(backend) // 3 :]
-    if backend:
-        tail_average = sum(tail) // len(tail) if tail else peak
-    else:
-        tail_average = 0
+    tail_average = sum(tail) // len(tail) if tail else 0
     return archive_growth, peak, tail_average
 
 
