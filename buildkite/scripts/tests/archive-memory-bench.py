@@ -16,7 +16,9 @@ written as InfluxDB line protocol so buildkite/scripts/bench/send.sh uploads it,
 using the same measurement/tag convention as the mina_caqti micro-benchmark.
 
 The PostgreSQL instance -- with the archive schema already loaded -- is provided
-by RunWithPostgres, which exports POSTGRES_URI / POSTGRES_DB.
+by RunWithPostgres, which exports PG_CONN (the URI of the archive database),
+POSTGRES_URI (the same server, but with no database in its path) and
+POSTGRES_DB. See resolve_archive_uri below for how the three are reconciled.
 """
 
 import argparse
@@ -28,6 +30,7 @@ import tarfile
 import tempfile
 import time
 from pathlib import Path
+from urllib.parse import urlsplit, urlunsplit
 
 # archive_blocks is still initialising below this RSS; those samples would
 # understate the growth, so they are dropped before the metrics are computed.
@@ -121,12 +124,34 @@ def read_vm_rss_kib(pid):
     return 0
 
 
+def resolve_archive_uri():
+    """The URI of the database the archive schema was loaded into.
+
+    RunWithPostgres exports two URIs that differ: PG_CONN names the archive
+    database, while POSTGRES_URI carries no database in its path, so libpq
+    falls back to `dbname = user` and archive_blocks would reach the empty
+    `postgres` database instead. PG_CONN is therefore preferred; a bare
+    POSTGRES_URI is joined with POSTGRES_DB.
+    """
+    for name in ("PG_CONN", "POSTGRES_URI"):
+        uri = os.environ.get(name)
+        if not uri:
+            continue
+        parts = urlsplit(uri)
+        if parts.path.strip("/"):
+            return uri
+        database = os.environ.get("POSTGRES_DB")
+        if not database:
+            sys.exit(f"{name} names no database and POSTGRES_DB is not set")
+        return urlunsplit(parts._replace(path=f"/{database}"))
+    sys.exit("PG_CONN or POSTGRES_URI must be set")
+
+
 class Postgres:
     """The psql queries this benchmark needs."""
 
-    def __init__(self, uri, database):
+    def __init__(self, uri):
         self.uri = uri
-        self.database = database
 
     def query(self, sql):
         result = subprocess.run(
@@ -137,10 +162,20 @@ class Postgres:
         )
         return [line.strip() for line in result.stdout.splitlines() if line.strip()]
 
+    def database(self):
+        names = self.query("select current_database()")
+        return names[0] if names else "unknown"
+
+    def has_archive_schema(self):
+        """Whether create_schema.sql was loaded into the database in use."""
+        return self.query("select to_regclass('public.blocks') is not null") == ["t"]
+
     def client_backend_pids(self):
+        # psql connects with the same URI as archive_blocks, so current_database()
+        # is by construction the database being benchmarked.
         return self.query(
             "select pid from pg_stat_activity "
-            f"where datname='{self.database}' and backend_type='client backend' "
+            "where datname=current_database() and backend_type='client backend' "
             "and pid<>pg_backend_pid()"
         )
 
@@ -263,13 +298,15 @@ def main():
     root = repo_root()
     os.chdir(root)
 
-    postgres_uri = os.environ.get("POSTGRES_URI")
-    if not postgres_uri:
-        sys.exit("POSTGRES_URI must be set")
-    database = os.environ.get("POSTGRES_DB")
-    if not database:
-        sys.exit("POSTGRES_DB must be set")
-    postgres = Postgres(postgres_uri, database)
+    postgres = Postgres(resolve_archive_uri())
+    database = postgres.database()
+    print(f"Benchmarking against database '{database}'")
+    if not postgres.has_archive_schema():
+        sys.exit(
+            f"database '{database}' carries no archive schema; "
+            "load src/app/archive/create_schema.sql into the database "
+            "PG_CONN points at"
+        )
 
     archive_blocks = root / "_build/default/src/app/archive_blocks/archive_blocks.exe"
     if not args.skip_build:

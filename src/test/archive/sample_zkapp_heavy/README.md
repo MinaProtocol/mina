@@ -24,15 +24,15 @@ result is published to the perf-infra InfluxDB (measurement `archive_memory_benc
 
 ## Run it locally
 
-The database it connects to comes from the environment, as in CI: `POSTGRES_URI` with the
-archive schema already loaded, and `POSTGRES_DB` (used to find the serving backends in
-`pg_stat_activity`).
+The database it connects to comes from the environment, as in CI: `PG_CONN`, the URI of a
+database with the archive schema already loaded. `POSTGRES_URI` is accepted as well; when
+it carries no database in its path -- which is how CI exports it -- `POSTGRES_DB` names
+the database to join onto it.
 
 ```bash
 nix develop mina
 # from the repo root, against a database created with src/app/archive/create_schema.sql:
-export POSTGRES_URI=postgres://user:password@localhost:5432/archive_bench
-export POSTGRES_DB=archive_bench
+export PG_CONN=postgres://user:password@localhost:5432/archive_bench
 ./buildkite/scripts/tests/archive-memory-bench.py --perf-file /tmp/archive_memory.perf
 ```
 
