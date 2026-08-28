@@ -112,7 +112,7 @@ let create (module Context : CONTEXT) (config : Config.t) ~sinks
   (* The node status RPC is implemented directly in go, serving a string which
      is periodically updated. This is so that one can make this RPC on a node even
      if that node is at its connection limit. *)
-  Clock.every' (Time.Span.of_min 1.) (fun () ->
+  Clock.every' (Time_float.Span.of_min 1.) (fun () ->
       O1trace.thread "update_node_status" (fun () ->
           match%bind get_node_status network with
           | Error _ ->
@@ -211,19 +211,25 @@ let broadcast_state t state =
   Gossip_net.Any.broadcast_state t.gossip_net (With_hash.data state)
 
 let broadcast_transaction_pool_diff ?nonce t diff =
-  [%str_log' trace t.logger]
-    (Gossip_transaction_pool_diff
-       { fee_payer_summaries = List.map ~f:User_command.fee_payer_summary diff }
-    ) ;
+  (* the summaries cost a base58 encoding, and so a hash, for every command in
+     the diff; a structured event is serialised before it is filtered, so
+     without this they are paid for whether or not anything logs them *)
+  if Logger.would_log t.logger Logger.Level.Trace then
+    [%str_log' trace t.logger]
+      (Gossip_transaction_pool_diff
+         { fee_payer_summaries = List.map ~f:User_command.fee_payer_summary diff
+         } ) ;
   Mina_metrics.(Gauge.inc_one Network.transaction_pool_diff_broadcasted) ;
   Gossip_net.Any.broadcast_transaction_pool_diff ?nonce t.gossip_net diff
 
 let broadcast_snark_pool_diff ?nonce t diff =
   Mina_metrics.(Gauge.inc_one Network.snark_pool_diff_broadcasted) ;
-  [%str_log' trace t.logger]
-    (Gossip_snark_pool_diff
-       { work = Option.value_exn (Snark_pool.Resource_pool.Diff.to_compact diff)
-       } ) ;
+  if Logger.would_log t.logger Logger.Level.Trace then
+    [%str_log' trace t.logger]
+      (Gossip_snark_pool_diff
+         { work =
+             Option.value_exn (Snark_pool.Resource_pool.Diff.to_compact diff)
+         } ) ;
   Gossip_net.Any.broadcast_snark_pool_diff ?nonce t.gossip_net diff
 
 let find_map xs ~f =
@@ -299,7 +305,7 @@ let try_non_preferred_peers (type b) t input peers ~rpc :
                     Actions.
                       ( Fulfilled_request
                       , Some ("Nonpreferred peer returned valid response", [])
-                      ))
+                      ) )
               in
               return (Ok (Envelope.Incoming.map envelope ~f:(Fn.const data)))
           | Connected { data = Ok None; _ } ->
@@ -326,7 +332,7 @@ let rpc_peer_then_random (type b) t peer_id input ~rpc :
               record t.trust_system t.logger peer
                 Actions.
                   ( Fulfilled_request
-                  , Some ("Preferred peer returned valid response", []) ))
+                  , Some ("Preferred peer returned valid response", []) ) )
       in
       return (Ok (Envelope.Incoming.wrap ~data:response ~sender))
   | Connected { data = Ok None; sender; _ } ->
@@ -338,7 +344,7 @@ let rpc_peer_then_random (type b) t peer_id input ~rpc :
                 Actions.
                   ( No_reply_from_preferred_peer
                   , Some ("When querying preferred peer, got no response", [])
-                  ))
+                  ) )
         | Local ->
             return ()
       in
@@ -354,7 +360,7 @@ let rpc_peer_then_random (type b) t peer_id input ~rpc :
                   ( Outgoing_connection_error
                   , Some
                       ( "Error while doing RPC"
-                      , [ ("error", Error_json.error_to_yojson e) ] ) ))
+                      , [ ("error", Error_json.error_to_yojson e) ] ) ) )
         | Local ->
             return ()
       in
@@ -419,8 +425,9 @@ let glue_sync_ledger :
     let global_stop = Pipe_lib.Linear_pipe.closed query_reader in
     let knowledge h peer =
       match%map
-        query_peer ~heartbeat_timeout ~timeout:(Time.Span.of_sec 10.) t
-          peer.Peer.peer_id Rpcs.Answer_sync_ledger_query (h, Num_accounts)
+        query_peer ~heartbeat_timeout
+          ~timeout:(Time_float.Span.of_sec 10.)
+          t peer.Peer.peer_id Rpcs.Answer_sync_ledger_query (h, Num_accounts)
       with
       | Connected { data = Ok _; _ } ->
           `Call (fun (h', _) -> Ledger_hash.equal h' h)
@@ -443,7 +450,8 @@ let glue_sync_ledger :
             then don't_wait_for (Broadcast_pipe.Writer.write root_hash_w h) ) ;
         let%map rs =
           query_peer' ~how:`Parallel ~heartbeat_timeout
-            ~timeout:(Time.Span.of_sec (Float.of_int (List.length qs) *. 2.))
+            ~timeout:
+              (Time_float.Span.of_sec (Float.of_int (List.length qs) *. 2.))
             t peer.peer_id Rpcs.Answer_sync_ledger_query qs
         in
         match rs with

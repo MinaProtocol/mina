@@ -55,10 +55,10 @@ let make_hashed_ledgers (config : Runtime_config.t) :
   let epoch_data =
     Option.map opt_epoch_data
       ~f:(fun
-           ((staking, staking_seed), opt_next)
-           :
-           Genesis_data.Hashed.t Genesis_data.Epoch.tt
-         ->
+          ((staking, staking_seed), opt_next)
+          :
+          Genesis_data.Hashed.t Genesis_data.Epoch.tt
+        ->
         { staking =
             { ledger =
                 { Genesis_data.Hashed.hash =

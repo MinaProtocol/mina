@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 
 let mina_lib' : Mina_lib.t option ref = ref None
 

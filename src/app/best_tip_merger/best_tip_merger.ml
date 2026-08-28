@@ -118,7 +118,7 @@ module Input = struct
                       let parent =
                         state.state.protocol_state.previous_state_hash
                       in
-                      if State_hash.Set.mem acc'.seen_state_hashes parent then
+                      if Set.mem acc'.seen_state_hashes parent then
                         (* no longer a root because a node for its parent was seen*)
                         Hashtbl.remove acc'.init_states root ) ;
                   { acc' with peers }
@@ -317,8 +317,7 @@ let main ~input_dir ~output_dir ~output_format ~min_peers () =
   let%map files =
     Sys.ls_dir input_dir
     >>| List.filter_map ~f:(fun n ->
-            if Filename.check_suffix n ".log" then Some (input_dir ^/ n)
-            else None )
+        if Filename.check_suffix n ".log" then Some (input_dir ^/ n) else None )
   in
   let t : Input.t =
     { Input.all_states = Hashtbl.create (module State_hash)
@@ -361,58 +360,58 @@ let main ~input_dir ~output_dir ~output_format ~min_peers () =
 
 let () =
   Command.(
-    run
+    Command_unix.run
       (let open Let_syntax in
-      Command.async
-        ~summary:
-          "Consolidates best tip history from multiple log files into a rose \
-           tree representation"
-        (let%map input_dir =
-           Param.flag "--input-dir" ~aliases:[ "-input-dir" ]
-             ~doc:
-               "PATH Directory containing one or more mina-best-tip.log files"
-             Param.(required string)
-         and output_dir =
-           Param.flag "--output-dir" ~aliases:[ "-output-dir" ]
-             ~doc:"PATH Directory to save the output"
-             Param.(required string)
-         and output_format =
-           Param.flag "--output-format" ~aliases:[ "-output-format" ]
-             ~doc:
-               "Full|Compact Information shown for each block. Full= Protocol \
-                state and Compact= Current state hash, previous state hash, \
-                blockchain length, and global slot. Default: Compact"
-             Param.(optional string)
-         and log_json = Cli_lib.Flag.Log.json
-         and log_level = Cli_lib.Flag.Log.level
-         and min_peers =
-           Param.flag "--min-peers" ~aliases:[ "-min-peers" ]
-             ~doc:
-               "Int(>0) Keep blocks that were accepted by at least min-peers \
-                number of peers and prune the rest (Default=1)"
-             Param.(optional int)
-         in
-         let output_format =
-           match output_format with
-           | Some "Full" | Some "full" ->
-               `Full
-           | Some "Compact" | Some "compact" | None ->
-               `Compact
-           | Some x ->
-               failwith
-                 (sprintf
-                    "Invalid value %s for output-format. Currently supported \
-                     formats are Full or Compact"
-                    x )
-         in
-         let min_peers =
-           match min_peers with
-           | Some x when x > 0 ->
-               x
-           | None ->
-               1
-           | _ ->
-               failwith "Invalid value for min-peers"
-         in
-         Cli_lib.Stdout_log.setup log_json log_level ;
-         main ~input_dir ~output_dir ~output_format ~min_peers )))
+       Command.async
+         ~summary:
+           "Consolidates best tip history from multiple log files into a rose \
+            tree representation"
+         (let%map input_dir =
+            Param.flag "--input-dir" ~aliases:[ "-input-dir" ]
+              ~doc:
+                "PATH Directory containing one or more mina-best-tip.log files"
+              Param.(required string)
+          and output_dir =
+            Param.flag "--output-dir" ~aliases:[ "-output-dir" ]
+              ~doc:"PATH Directory to save the output"
+              Param.(required string)
+          and output_format =
+            Param.flag "--output-format" ~aliases:[ "-output-format" ]
+              ~doc:
+                "Full|Compact Information shown for each block. Full= Protocol \
+                 state and Compact= Current state hash, previous state hash, \
+                 blockchain length, and global slot. Default: Compact"
+              Param.(optional string)
+          and log_json = Cli_lib.Flag.Log.json
+          and log_level = Cli_lib.Flag.Log.level
+          and min_peers =
+            Param.flag "--min-peers" ~aliases:[ "-min-peers" ]
+              ~doc:
+                "Int(>0) Keep blocks that were accepted by at least min-peers \
+                 number of peers and prune the rest (Default=1)"
+              Param.(optional int)
+          in
+          let output_format =
+            match output_format with
+            | Some "Full" | Some "full" ->
+                `Full
+            | Some "Compact" | Some "compact" | None ->
+                `Compact
+            | Some x ->
+                failwith
+                  (sprintf
+                     "Invalid value %s for output-format. Currently supported \
+                      formats are Full or Compact"
+                     x )
+          in
+          let min_peers =
+            match min_peers with
+            | Some x when x > 0 ->
+                x
+            | None ->
+                1
+            | _ ->
+                failwith "Invalid value for min-peers"
+          in
+          Cli_lib.Stdout_log.setup log_json log_level ;
+          main ~input_dir ~output_dir ~output_format ~min_peers ) ) )

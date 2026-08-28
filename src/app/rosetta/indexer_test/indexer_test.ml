@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Async
 
 type async_pool = (Caqti_async.connection, Caqti_error.t) Mina_caqti.Pool.t
@@ -22,9 +22,9 @@ let archive_uri_arg =
     Cmdliner.Arg.conv ~docv:"URI" (parse, print)
   in
   let doc = "Postgres database URI" in
-  let env = Cmdliner.Arg.env_var ~doc "ARCHIVE_URI" in
+  let env = Cmdliner.Cmd.Env.info "ARCHIVE_URI" ~doc in
   Cmdliner.Arg.(
-    required & opt (some pool) None & info [ "archive_uri" ] ~env ~doc)
+    required & opt (some pool) None & info [ "archive_uri" ] ~env ~doc )
 
 let ok_or_failwith show result =
   Result.ok_or_failwith @@ Result.map_error ~f:show result
@@ -484,7 +484,7 @@ module Account_identifier = struct
           Deferred.return
           @@ (info.fee_payer, `Token_id Rosetta_lib.Amount_of.Token_id.default)
              :: List.map info.account_updates ~f:(fun { account; token; _ } ->
-                    (account, token) )
+                 (account, token) )
 
         let check (`Pk address, `Token_id token_id)
             (`Pk address', `Token_id token_id') =
@@ -719,14 +719,13 @@ module Offset_limit = struct
       (fun ppf transaction ->
         Fmt.string ppf
           Rosetta_models.(
-            transaction.Block_transaction.block_identifier.Block_identifier.hash)
-        )
+            transaction.Block_transaction.block_identifier.Block_identifier.hash ) )
       (fun t_1 t_2 ->
         String.equal
           Rosetta_models.(
-            t_1.Block_transaction.block_identifier.Block_identifier.hash)
+            t_1.Block_transaction.block_identifier.Block_identifier.hash )
           Rosetta_models.(
-            t_2.Block_transaction.block_identifier.Block_identifier.hash) )
+            t_2.Block_transaction.block_identifier.Block_identifier.hash ) )
 
   let to_query ~offset ~limit =
     let offset = Option.map offset ~f:Int64.of_int in
@@ -791,7 +790,7 @@ module Offset_limit = struct
         Alcotest.(
           check
             (list transaction_testable)
-            "transactions_1 = transactions_2" transactions_1 transactions_2) )
+            "transactions_1 = transactions_2" transactions_1 transactions_2 ) )
 
   let test_suite =
     let open Alcotest_async in
@@ -1058,7 +1057,7 @@ module Zkapp_account_creation_fee = struct
     let module Zkapp_ops =
       Lib.Commands_common.Zkapp_command_info.T (Deferred.Result) in
     let%map ops =
-      Deferred.List.concat_map commands ~f:(fun command ->
+      Deferred.List.concat_map ~how:`Sequential commands ~f:(fun command ->
           Zkapp_ops.to_operations command
           >>| ok_or_failwith Rosetta_lib.Errors.show )
     in
@@ -1105,4 +1104,4 @@ let () =
           ; Offset_limit.test_suite
           ; Zkapp_account_update_multiplicity.test_suite
           ; Zkapp_account_creation_fee.test_suite
-          ]) )
+          ] ) )

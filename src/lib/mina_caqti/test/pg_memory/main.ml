@@ -276,7 +276,7 @@ let insert_multi_scenario ~shape_idx =
   { name
   ; describe =
       ( if List.is_empty distractors then "v text (no distractor columns)"
-      else sprintf "v text; distractors: %s" (describe_cols distractors) )
+        else sprintf "v text; distractors: %s" (describe_cols distractors) )
   ; setup =
       (fun ~table ->
         sprintf
@@ -436,7 +436,7 @@ let influx_lines ~measurement ~tags (results : result list) =
         ; sprintf "iterations=%di" r.iterations
         ]
         @ Option.value_map r.backend_kib_final ~default:[] ~f:(fun kib ->
-              [ sprintf "backend_kib_final=%di" kib ] )
+            [ sprintf "backend_kib_final=%di" kib ] )
       in
       sprintf "%s,%s,scenario=%s %s %d" (sanitize measurement) tag_str
         (sanitize r.name)
@@ -449,7 +449,7 @@ let main ~uri ~iterations ~sample_every ~shapes ~assert_max_prepared
   printf "uri=%s iterations=%d sample_every=%d shapes=%d\n" (Uri.to_string uri)
     iterations sample_every shapes ;
   let%bind results =
-    Deferred.List.map (scenarios ~shapes)
+    Deferred.List.map (scenarios ~shapes) ~how:`Sequential
       ~f:(run_scenario ~uri ~iterations ~sample_every)
   in
   printf "\n== summary ==\n" ;

@@ -8,7 +8,7 @@ let dispatch rpc shutdown_on_disconnect query address =
   let%map res =
     Rpc.Connection.with_client
       ~handshake_timeout:
-        (Time.Span.of_sec
+        (Time_float.Span.of_sec
            Node_config_unconfigurable_constants.rpc_handshake_timeout_sec )
       ~heartbeat_config:
         (Rpc.Connection.Heartbeat_config.create
@@ -82,7 +82,7 @@ let main ~logger ~proof_level ~constraint_constants ~signature_kind
         in
         [%log info] "No jobs available. Napping for $time seconds"
           ~metadata:[ ("time", `Float random_delay) ] ;
-        let%bind () = after (Time.Span.of_sec random_delay) in
+        let%bind () = after (Time_float.Span.of_sec random_delay) in
         go ()
     | Ok (Some partitioned_spec) -> (
         let address_json =
@@ -164,48 +164,50 @@ let command_from_rpcs ~commit_id ~proof_level:default_proof_level
     ~constraint_constants =
   Command.async ~summary:"Snark worker"
     (let open Command.Let_syntax in
-    let%map_open daemon_port =
-      flag "--daemon-address" ~aliases:[ "daemon-address" ]
-        (required (Arg_type.create Host_and_port.of_string))
-        ~doc:"HOST-AND-PORT address daemon is listening on"
-    and proof_level =
-      flag "--proof-level" ~aliases:[ "proof-level" ]
-        (optional (Arg_type.create Genesis_constants.Proof_level.of_string))
-        ~doc:"full|check|none"
-    and shutdown_on_disconnect =
-      flag "--shutdown-on-disconnect"
-        ~aliases:[ "shutdown-on-disconnect" ]
-        (optional bool)
-        ~doc:"true|false Shutdown when disconnected from daemon (default:true)"
-    and log_json = Cli_lib.Flag.Log.json
-    and log_level = Cli_lib.Flag.Log.level
-    and file_log_level = Cli_lib.Flag.Log.file_log_level
-    and conf_dir = Cli_lib.Flag.conf_dir in
-    fun () ->
-      let signature_kind = Mina_signature_kind.t_DEPRECATED in
-      let logger =
-        Logger.create () ~metadata:[ ("process", `String "Snark Worker") ]
-      in
-      let proof_level = Option.value ~default:default_proof_level proof_level in
-      Cli_lib.Stdout_log.setup log_json log_level ;
-      Option.value_map ~default:() conf_dir ~f:(fun conf_dir ->
-          let logrotate_max_size = 1024 * 10 in
-          let logrotate_num_rotate = 1 in
-          Logger.Consumer_registry.register ~commit_id
-            ~id:Logger.Logger_id.snark_worker
-            ~processor:(Logger.Processor.raw ~log_level:file_log_level ())
-            ~transport:
-              (Logger_file_system.dumb_logrotate ~directory:conf_dir
-                 ~log_filename:"mina-snark-worker.log"
-                 ~max_size:logrotate_max_size ~num_rotate:logrotate_num_rotate )
-            () ) ;
-      Signal.handle [ Signal.term ] ~f:(fun _signal ->
-          [%log info]
-            !"Received signal to terminate. Aborting snark worker process" ;
-          Core.exit 0 ) ;
-      main ~logger ~proof_level ~constraint_constants ~signature_kind
-        daemon_port
-        (Option.value ~default:true shutdown_on_disconnect))
+     let%map_open daemon_port =
+       flag "--daemon-address" ~aliases:[ "daemon-address" ]
+         (required (Arg_type.create Host_and_port.of_string))
+         ~doc:"HOST-AND-PORT address daemon is listening on"
+     and proof_level =
+       flag "--proof-level" ~aliases:[ "proof-level" ]
+         (optional (Arg_type.create Genesis_constants.Proof_level.of_string))
+         ~doc:"full|check|none"
+     and shutdown_on_disconnect =
+       flag "--shutdown-on-disconnect"
+         ~aliases:[ "shutdown-on-disconnect" ]
+         (optional bool)
+         ~doc:"true|false Shutdown when disconnected from daemon (default:true)"
+     and log_json = Cli_lib.Flag.Log.json
+     and log_level = Cli_lib.Flag.Log.level
+     and file_log_level = Cli_lib.Flag.Log.file_log_level
+     and conf_dir = Cli_lib.Flag.conf_dir in
+     fun () ->
+       let signature_kind = Mina_signature_kind.t_DEPRECATED in
+       let logger =
+         Logger.create () ~metadata:[ ("process", `String "Snark Worker") ]
+       in
+       let proof_level =
+         Option.value ~default:default_proof_level proof_level
+       in
+       Cli_lib.Stdout_log.setup log_json log_level ;
+       Option.value_map ~default:() conf_dir ~f:(fun conf_dir ->
+           let logrotate_max_size = 1024 * 10 in
+           let logrotate_num_rotate = 1 in
+           Logger.Consumer_registry.register ~commit_id
+             ~id:Logger.Logger_id.snark_worker
+             ~processor:(Logger.Processor.raw ~log_level:file_log_level ())
+             ~transport:
+               (Logger_file_system.dumb_logrotate ~directory:conf_dir
+                  ~log_filename:"mina-snark-worker.log"
+                  ~max_size:logrotate_max_size ~num_rotate:logrotate_num_rotate )
+             () ) ;
+       Signal.handle [ Signal.term ] ~f:(fun _signal ->
+           [%log info]
+             !"Received signal to terminate. Aborting snark worker process" ;
+           Core.exit 0 ) ;
+       main ~logger ~proof_level ~constraint_constants ~signature_kind
+         daemon_port
+         (Option.value ~default:true shutdown_on_disconnect) )
 
 let arguments ~proof_level ~daemon_address ~shutdown_on_disconnect ~conf_dir
     ~log_json ~log_level ~file_log_level =

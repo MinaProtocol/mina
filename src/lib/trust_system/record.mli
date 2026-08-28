@@ -18,6 +18,6 @@ end
 val decay_rate : float
 
 module Make (Now : sig
-  val now : unit -> Core.Time.t
+  val now : unit -> Core.Time_float.t
 end) : S
 [@@warning "-67"]

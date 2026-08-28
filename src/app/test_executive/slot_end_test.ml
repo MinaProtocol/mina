@@ -30,16 +30,16 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       requires_graphql = true
     ; genesis_ledger =
         (let open Test_account in
-        [ create ~account_name:"receiver-key" ~balance:"9999999" ()
-        ; create ~account_name:"sender-1-key" ~balance:"0" ()
-        ; create ~account_name:"sender-2-key" ~balance:"0" ()
-        ; create ~account_name:"sender-3-key" ~balance:"0" ()
-        ; create ~account_name:"snark-node-key" ~balance:"0" ()
-        ]
-        @ List.init num_extra_keys ~f:(fun i ->
-              create
-                ~account_name:(sprintf "%s-%d" sender_account_prefix i)
-                ~balance:"1000" () ))
+         [ create ~account_name:"receiver-key" ~balance:"9999999" ()
+         ; create ~account_name:"sender-1-key" ~balance:"0" ()
+         ; create ~account_name:"sender-2-key" ~balance:"0" ()
+         ; create ~account_name:"sender-3-key" ~balance:"0" ()
+         ; create ~account_name:"snark-node-key" ~balance:"0" ()
+         ]
+         @ List.init num_extra_keys ~f:(fun i ->
+             create
+               ~account_name:(sprintf "%s-%d" sender_account_prefix i)
+               ~balance:"1000" () ) )
     ; block_producers =
         [ { node_name = "receiver"; account_name = "receiver-key" }
         ; { node_name = "sender-1"; account_name = "sender-1-key" }
@@ -78,11 +78,10 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let receiver = Network.block_producer_exn network "receiver" in
     let%bind receiver_pub_key = pub_key_of_node receiver in
     let bp_senders =
-      String.Map.remove (Network.block_producers network) "receiver"
-      |> String.Map.data
+      Map.remove (Network.block_producers network) "receiver" |> Map.data
     in
     let sender_kps =
-      String.Map.fold (Network.genesis_keypairs network) ~init:[]
+      Map.fold (Network.genesis_keypairs network) ~init:[]
         ~f:(fun ~key ~data acc ->
           if String.is_prefix key ~prefix:sender_account_prefix then data :: acc
           else acc )
@@ -102,8 +101,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     let all_nodes = Network.all_mina_nodes network in
     let%bind () =
-      wait_for t
-        (Wait_condition.nodes_to_initialize (String.Map.data all_nodes))
+      wait_for t (Wait_condition.nodes_to_initialize (Map.data all_nodes))
     in
     let genesis_timestamp =
       Block_time.to_time_exn
@@ -111,8 +109,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
            (Network.genesis_constants network).protocol.genesis_state_timestamp
     in
     let end_t =
-      Time.add genesis_timestamp
-        (Time.Span.of_ms @@ float_of_int (num_slots * window_ms))
+      Time_float.add genesis_timestamp
+        (Time_float.Span.of_ms @@ float_of_int (num_slots * window_ms))
     in
     let slot_tx_end =
       Mina_numbers.Global_slot_since_hard_fork.of_int slot_tx_end
@@ -159,11 +157,10 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       section "blocks produced before slot_tx_end"
         ( ok_if_true "only empty blocks were produced before slot_tx_end"
         @@ List.exists blocks ~f:(fun block ->
-               Mina_numbers.Global_slot_since_hard_fork.(
-                 block.slot < slot_tx_end)
-               && ( block.command_transaction_count <> 0
-                  || block.snark_work_count <> 0
-                  || Currency.Amount.(block.coinbase <> zero) ) ) )
+            Mina_numbers.Global_slot_since_hard_fork.(block.slot < slot_tx_end)
+            && ( block.command_transaction_count <> 0
+               || block.snark_work_count <> 0
+               || Currency.Amount.(block.coinbase <> zero) ) ) )
     in
     let%bind () =
       section "blocks produced after slot_tx_end"
@@ -178,7 +175,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
              in
              ok_if_true msg
                ( Mina_numbers.Global_slot_since_hard_fork.(
-                   block.slot < slot_tx_end)
+                   block.slot < slot_tx_end )
                || block.command_transaction_count = 0
                   && block.snark_work_count = 0
                   && Currency.Amount.(block.coinbase = zero) ) ) )
@@ -187,13 +184,13 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       section "blocks produced before slot_chain_end"
         ( ok_if_true "no block produced before slot_chain_end"
         @@ List.exists blocks ~f:(fun block ->
-               Mina_numbers.Global_slot_since_hard_fork.(
-                 block.slot < slot_chain_end) ) )
+            Mina_numbers.Global_slot_since_hard_fork.(
+              block.slot < slot_chain_end ) ) )
     in
     section "no blocks produced after slot_chain_end"
       ( ok_if_true "blocks produced after slot_chain_end"
       @@ not
       @@ List.exists blocks ~f:(fun block ->
-             Mina_numbers.Global_slot_since_hard_fork.(
-               block.slot >= slot_chain_end) ) )
+          Mina_numbers.Global_slot_since_hard_fork.(block.slot >= slot_chain_end) )
+      )
 end

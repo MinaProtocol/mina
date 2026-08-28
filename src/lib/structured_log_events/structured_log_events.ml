@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 
 type t = ..
 
@@ -33,7 +33,7 @@ let parse_exn id json_pairs =
                message.
             *)
             List.filter json_pairs ~f:(fun (field_name, _) ->
-                Set.mem repr.arguments field_name )
+                Core.Set.mem repr.arguments field_name )
           in
           match repr.parse json_pairs with
           | Some t ->
@@ -73,7 +73,7 @@ let register_constructor = Registry.register_constructor
 
 let dump_registered_events () =
   List.map !Registry.reprs ~f:(fun { event_name; id; arguments; _ } ->
-      (event_name, id, Set.to_list arguments) )
+      (event_name, id, Core.Set.to_list arguments) )
 
 let check_interpolations_exn ~msg_loc msg label_names =
   (* don't use Logproc_lib, which depends on C++ code

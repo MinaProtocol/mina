@@ -5,6 +5,8 @@
   alcotest
   core
   core_kernel
+  core_unix.filename_unix
+  core_unix.sys_unix
   bin_prot
   ;; local libraries
   multi_key_file_storage

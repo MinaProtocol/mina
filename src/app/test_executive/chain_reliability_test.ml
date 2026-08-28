@@ -22,10 +22,10 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       requires_graphql = true
     ; genesis_ledger =
         (let open Test_account in
-        [ Test_account.create ~account_name:"node-a-key" ~balance:"1000" ()
-        ; create ~account_name:"node-b-key" ~balance:"1000" ()
-        ; create ~account_name:"node-c-key" ~balance:"0" ()
-        ])
+         [ Test_account.create ~account_name:"node-a-key" ~balance:"1000" ()
+         ; create ~account_name:"node-b-key" ~balance:"1000" ()
+         ; create ~account_name:"node-c-key" ~balance:"0" ()
+         ] )
     ; block_producers =
         [ { node_name = "node-a"; account_name = "node-a-key" }
         ; { node_name = "node-b"; account_name = "node-b-key" }
@@ -40,8 +40,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let all_mina_nodes = Network.all_mina_nodes network in
     let%bind () =
       wait_for t
-        (Wait_condition.nodes_to_initialize
-           (Core.String.Map.data all_mina_nodes) )
+        (Wait_condition.nodes_to_initialize (Core.Map.data all_mina_nodes))
     in
     let node_a = Network.block_producer_exn network "node-a" in
     let node_b = Network.block_producer_exn network "node-b" in
@@ -67,7 +66,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                 ~soft_timeout:(Network_time_span.Slots 3)
                 ~hard_timeout:
                   (Network_time_span.Literal
-                     (Time.Span.of_ms (15. *. 60. *. 1000.)) ) ) )
+                     (Time_float.Span.of_ms (15. *. 60. *. 1000.)) ) ) )
     in
     let print_chains (labeled_chain_list : (string * string list) list) =
       List.iter labeled_chain_list ~f:(fun labeled_chain ->
@@ -105,8 +104,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
          further block production is needed. if previous sections change, then this
          may need to be re-adjusted*)
       (let%bind (labeled_chains : (string * string list) list) =
-         Malleable_error.List.map (Core.String.Map.data all_mina_nodes)
-           ~f:(fun node ->
+         Malleable_error.List.map (Core.Map.data all_mina_nodes) ~f:(fun node ->
              let%map chain =
                Integration_test_lib.Graphql_requests.must_get_best_chain ~logger
                  (Node.get_ingress_uri node)

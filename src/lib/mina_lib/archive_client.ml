@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Async_kernel
 open Pipe_lib
 
@@ -85,44 +85,46 @@ let run ~logger ~precomputed_values
       Async.Pipe.iter reader ~f:(fun breadcrumbs ->
           breadcrumbs
           |> List.map ~f:(fun breadcrumb ->
-                 let start = Time.now () in
-                 let diff =
-                   Archive_lib.Diff.Builder.breadcrumb_added ~precomputed_values
-                     ~logger breadcrumb
-                 in
-                 let diff_time = Time.now () in
-                 [%log debug]
-                   "Archive data generation for $state_hash took $time ms"
-                   ~metadata:
-                     [ ( "state_hash"
-                       , Mina_base.State_hash.to_yojson
-                           (Transition_frontier.Breadcrumb.state_hash breadcrumb)
-                       )
-                     ; ( "time"
-                       , `Float (Time.Span.to_ms (Time.diff diff_time start)) )
-                     ] ;
-                 dispatch archive_location ~logger (Transition_frontier diff)
-                 >>| function
-                 | Ok () ->
-                     [%log debug]
-                       "Dispatched archive data for $state_hash, took $time ms"
-                       ~metadata:
-                         [ ( "state_hash"
-                           , Mina_base.State_hash.to_yojson
-                               (Transition_frontier.Breadcrumb.state_hash
-                                  breadcrumb ) )
-                         ; ( "time"
-                           , `Float
-                               (Time.Span.to_ms
-                                  (Time.diff (Time.now ()) diff_time) ) )
-                         ]
-                 | Error e ->
-                     [%log warn]
-                       ~metadata:
-                         [ ("error", Error_json.error_to_yojson e)
-                         ; ( "breadcrumb"
-                           , Transition_frontier.Breadcrumb.to_yojson breadcrumb
-                           )
-                         ]
-                       "Could not send breadcrumb to archive: $error" )
+              let start = Time_float.now () in
+              let diff =
+                Archive_lib.Diff.Builder.breadcrumb_added ~precomputed_values
+                  ~logger breadcrumb
+              in
+              let diff_time = Time_float.now () in
+              [%log debug]
+                "Archive data generation for $state_hash took $time ms"
+                ~metadata:
+                  [ ( "state_hash"
+                    , Mina_base.State_hash.to_yojson
+                        (Transition_frontier.Breadcrumb.state_hash breadcrumb)
+                    )
+                  ; ( "time"
+                    , `Float
+                        (Time_float.Span.to_ms
+                           (Time_float.diff diff_time start) ) )
+                  ] ;
+              dispatch archive_location ~logger (Transition_frontier diff)
+              >>| function
+              | Ok () ->
+                  [%log debug]
+                    "Dispatched archive data for $state_hash, took $time ms"
+                    ~metadata:
+                      [ ( "state_hash"
+                        , Mina_base.State_hash.to_yojson
+                            (Transition_frontier.Breadcrumb.state_hash
+                               breadcrumb ) )
+                      ; ( "time"
+                        , `Float
+                            (Time_float.Span.to_ms
+                               (Time_float.diff (Time_float.now ()) diff_time) )
+                        )
+                      ]
+              | Error e ->
+                  [%log warn]
+                    ~metadata:
+                      [ ("error", Error_json.error_to_yojson e)
+                      ; ( "breadcrumb"
+                        , Transition_frontier.Breadcrumb.to_yojson breadcrumb )
+                      ]
+                    "Could not send breadcrumb to archive: $error" )
           |> Deferred.all_unit ) )

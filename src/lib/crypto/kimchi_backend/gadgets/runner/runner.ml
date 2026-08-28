@@ -11,7 +11,7 @@ let generate_and_verify_proof ?cs circuit =
         cs
     | None ->
         Impl.constraint_system ~input_typ:Impl.Typ.unit
-          ~return_typ:Impl.Typ.unit (fun () () -> circuit ())
+          ~return_typ:Impl.Typ.unit (fun () () -> circuit () )
   in
   (* Generate the indexes from the constraint system *)
   let proof_keypair =
@@ -20,8 +20,10 @@ let generate_and_verify_proof ?cs circuit =
   let prover_index = Tick.Keypair.pk proof_keypair in
   let proof, (() as _public_output) =
     Impl.generate_witness_conv
-      ~f:(fun { Impl.Proof_inputs.auxiliary_inputs; public_inputs }
-              next_statement_hashed ->
+      ~f:(fun
+          { Impl.Proof_inputs.auxiliary_inputs; public_inputs }
+          next_statement_hashed
+        ->
         let proof =
           (* Only block_on_async for testing; do not do this in production!! *)
           Promise.block_on_async_exn (fun () ->

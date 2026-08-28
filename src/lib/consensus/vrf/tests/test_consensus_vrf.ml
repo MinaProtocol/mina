@@ -6,7 +6,7 @@
       src/lib/consensus/vrf/tests/test_consensus_vrf.exe
 *)
 
-open Core_kernel
+open Core
 
 let test_hash_checked_and_unchecked () =
   let open Quickcheck.Generator.Let_syntax in
@@ -27,7 +27,7 @@ let test_hash_checked_and_unchecked () =
       (Test_util.test_equal ~equal:Snark_params.Tick.Field.equal
          Snark_params.Tick.Typ.(
            Consensus_vrf.Message.typ ~constraint_constants
-           * Snark_params.Tick.Inner_curve.typ)
+           * Snark_params.Tick.Inner_curve.typ )
          Consensus_vrf.Output.typ
          (fun (msg, g) -> Consensus_vrf.Output.Checked.hash msg g)
          (fun (msg, g) -> Consensus_vrf.Output.hash ~constraint_constants msg g) )

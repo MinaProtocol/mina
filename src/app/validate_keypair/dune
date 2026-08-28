@@ -5,7 +5,9 @@
  (modes native)
  (libraries
   ;; opam libraries
+  core
   core_kernel
+  core_unix.command_unix
   async
   async_unix
   ;; local libraries

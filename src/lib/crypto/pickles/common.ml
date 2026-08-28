@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Pickles_types
 open Import
 open Backend
@@ -52,7 +52,7 @@ let hash_messages_for_next_step_proof ~app_state
        ~app_state )
 
 let when_profiling profiling default =
-  match Option.map (Sys.getenv_opt "PICKLES_PROFILING") ~f:String.lowercase with
+  match Option.map (Sys.getenv "PICKLES_PROFILING") ~f:String.lowercase with
   | None | Some ("0" | "false") ->
       default
   | Some _ ->
@@ -61,10 +61,11 @@ let when_profiling profiling default =
 let time lab f =
   when_profiling
     (fun () ->
-      let start = Time.now () in
+      let start = Time_float.now () in
       let x = f () in
-      let stop = Time.now () in
-      printf "%s: %s\n%!" lab (Time.Span.to_string_hum (Time.diff stop start)) ;
+      let stop = Time_float.now () in
+      printf "%s: %s\n%!" lab
+        (Time_float.Span.to_string_hum (Time_float.diff stop start)) ;
       x )
     f ()
 

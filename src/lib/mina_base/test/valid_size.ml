@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Mina_base.Zkapp_command
 open Mina_base
 

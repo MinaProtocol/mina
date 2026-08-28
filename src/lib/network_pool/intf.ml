@@ -1,5 +1,5 @@
 open Async_kernel
-open Core_kernel
+open Core
 open Mina_base
 open Mina_transaction
 open Pipe_lib
@@ -149,7 +149,7 @@ module type Resource_pool_intf = sig
       remove it from the set of potentially-rebroadcastable item.
   *)
   val get_rebroadcastable :
-    t -> has_timed_out:(Time.t -> [ `Timed_out | `Ok ]) -> Diff.t list
+    t -> has_timed_out:(Time_float.t -> [ `Timed_out | `Ok ]) -> Diff.t list
 end
 
 module type Broadcast_callback = sig
@@ -224,7 +224,7 @@ module type Network_pool_base_intf = sig
     -> logger:Logger.t
     -> log_gossip_heard:bool
     -> on_remote_push:(unit -> unit Deferred.t)
-    -> block_window_duration:Time.Span.t
+    -> block_window_duration:Time_float.Span.t
     -> t * Remote_sink.t * Local_sink.t
 
   val of_resource_pool_and_diffs :
@@ -234,7 +234,7 @@ module type Network_pool_base_intf = sig
     -> tf_diffs:transition_frontier_diff Strict_pipe.Reader.t
     -> log_gossip_heard:bool
     -> on_remote_push:(unit -> unit Deferred.t)
-    -> block_window_duration:Time.Span.t
+    -> block_window_duration:Time_float.Span.t
     -> t * Remote_sink.t * Local_sink.t
 
   val resource_pool : t -> resource_pool

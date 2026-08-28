@@ -1,6 +1,6 @@
-open Core_kernel
+open Core
 
-type 'a scheduled = { job : 'a; scheduled : Time.t }
+type 'a scheduled = { job : 'a; scheduled : Time_float.t }
 
 module Make (Id : Hashtbl.Key) (Spec : T) = struct
   type job = (Spec.t, Id.t) Snark_work_lib.With_job_meta.t
@@ -29,7 +29,7 @@ module Make (Id : Hashtbl.Key) (Spec : T) = struct
             None
         | `Stop_reschedule (job : job) ->
             assert (Id.compare job.job_id job_id = 0) ;
-            let rescheduled_job = { job; scheduled = Time.now () } in
+            let rescheduled_job = { job; scheduled = Time_float.now () } in
             Hashtbl.set t.index ~key:job_id ~data:rescheduled_job ;
             Deque.enqueue_back t.timeline job_id ;
             Some rescheduled_job )
@@ -38,7 +38,7 @@ module Make (Id : Hashtbl.Key) (Spec : T) = struct
 
   let add_now ~id ~job t =
     match
-      Hashtbl.add ~key:id ~data:{ job; scheduled = Time.now () } t.index
+      Hashtbl.add ~key:id ~data:{ job; scheduled = Time_float.now () } t.index
     with
     | `Ok ->
         Deque.enqueue_back t.timeline id ;

@@ -453,8 +453,8 @@ let%test_module "Archive node unit tests" =
        reuse the existing row; before the fix it selected by the full
        {value; NULL; NULL} tuple, missed the owned row, and the subsequent
        INSERT violated [tokens_value_key]. *)
-    let%test_unit "Token: re-adding an owned token as ownerless reuses the \
-                   existing row" =
+    let%test_unit
+        "Token: re-adding an owned token as ownerless reuses the existing row" =
       let conn = Lazy.force conn_lazy in
       Thread_safe.block_on_async_exn
       @@ fun () ->
@@ -464,7 +464,7 @@ let%test_module "Archive node unit tests" =
         let open Deferred.Result.Let_syntax in
         let%bind () = Processor.Token.add_all_if_don't_exist conn tree in
         let%bind owned_id = Processor.Token.find conn owned_token_id in
-        Token_id.Table.clear Processor.Token_owners.owner_tbl ;
+        Hashtbl.clear Processor.Token_owners.owner_tbl ;
         let%map reused_id =
           Processor.Token.add_if_doesn't_exist conn owned_token_id
         in
@@ -484,8 +484,9 @@ let%test_module "Archive node unit tests" =
        reports zero balances at the fork block. [add_genesis_accounts] -- the
        routine the [populate-genesis-accounts] toolbox command invokes -- must
        backfill the full fork genesis ledger onto that existing block. *)
-    let%test_unit "Accounts_accessed: add_genesis_accounts backfills the fork \
-                   genesis ledger onto an existing fork genesis block" =
+    let%test_unit
+        "Accounts_accessed: add_genesis_accounts backfills the fork genesis \
+         ledger onto an existing fork genesis block" =
       let pool = Lazy.force conn_pool_lazy in
       Thread_safe.block_on_async_exn
       @@ fun () ->
@@ -656,7 +657,7 @@ let%test_module "Archive node unit tests" =
                            delete_older_than)
                     else
                       let%map.Async () =
-                        Deferred.List.iter
+                        Deferred.List.iter ~how:`Sequential
                           (Transition_frontier.Breadcrumb.commands breadcrumb)
                           ~f:(fun cmd ->
                             match%map.Async
@@ -692,7 +693,7 @@ let%test_module "Archive node unit tests" =
                            delete_older_than)
                     else
                       let%map.Async () =
-                        Deferred.List.iter
+                        Deferred.List.iter ~how:`Sequential
                           (Transition_frontier.Breadcrumb.commands breadcrumb)
                           ~f:(fun cmd ->
                             match%map.Async

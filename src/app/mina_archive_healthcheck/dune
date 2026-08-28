@@ -4,7 +4,8 @@
  (public_name mina-archive-healthcheck)
  (libraries
   ;; opam libraries
-  core_kernel
+  core
+  core_unix.command_unix
   async
   async_kernel
   async_unix

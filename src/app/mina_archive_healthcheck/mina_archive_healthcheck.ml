@@ -3,7 +3,7 @@
    Every subcommand: run one query set, turn the answer into a
    [Report.t] with a pure evaluator, hand it to [emit]. *)
 
-open Core_kernel
+open Core
 open Async
 module Q = Archive_health_queries
 
@@ -57,12 +57,12 @@ let postgres_uri_flag =
                postgres://user@localhost:5432/archive). Defaults to $%s."
               postgres_uri_env )
          (optional string) )
-      ~f:resolve_postgres_uri)
+      ~f:resolve_postgres_uri )
 
 let json_flag =
   Command.Param.(
     flag "--json" ~aliases:[ "-j" ] ~doc:" Output as JSON instead of text"
-      no_arg)
+      no_arg )
 
 let max_delay_flag =
   Command.Param.(
@@ -72,7 +72,7 @@ let max_delay_flag =
            "SECONDS Maximum acceptable archive-tip staleness, i.e. (now - \
             latest block timestamp); fail if it exceeds this (default: %d)"
            default_max_delay )
-      (optional_with_default default_max_delay int))
+      (optional_with_default default_max_delay int) )
 
 let max_missing_flag =
   Command.Param.(
@@ -80,7 +80,7 @@ let max_missing_flag =
       ~doc:
         (sprintf "N Maximum acceptable missing blocks (default: %d)"
            default_max_missing )
-      (optional_with_default default_max_missing int))
+      (optional_with_default default_max_missing int) )
 
 let max_unparented_flag =
   Command.Param.(
@@ -88,7 +88,7 @@ let max_unparented_flag =
       ~doc:
         (sprintf "N Maximum acceptable unparented blocks (default: %d)"
            default_max_unparented )
-      (optional_with_default default_max_unparented int))
+      (optional_with_default default_max_unparented int) )
 
 let server_host_flag =
   Command.Param.(
@@ -96,7 +96,7 @@ let server_host_flag =
       ~doc:
         (sprintf "HOST Archive server host to probe (default: %s)"
            default_server_host )
-      (optional_with_default default_server_host string))
+      (optional_with_default default_server_host string) )
 
 let missing_blocks_width_flag =
   Command.Param.(
@@ -104,12 +104,13 @@ let missing_blocks_width_flag =
       ~doc:
         (sprintf "N Block window for missing blocks check (default: %d)"
            default_missing_blocks_width )
-      (optional_with_default default_missing_blocks_width int))
+      (optional_with_default default_missing_blocks_width int) )
 
 (* [blocks.timestamp] is epoch milliseconds held as text (see
    create_schema.sql), so comparisons are in the same unit. *)
 let now_ms () =
-  Time.now () |> Time.to_span_since_epoch |> Time.Span.to_ms |> Int64.of_float
+  Time_float.now () |> Time_float.to_span_since_epoch |> Time_float.Span.to_ms
+  |> Int64.of_float
 
 module Failure = struct
   (* Kept as a variant so the reason survives from where it is detected
@@ -406,7 +407,7 @@ let probe_server ~host ~port =
   match%map
     Monitor.try_with (fun () ->
         Tcp.with_connection
-          ~timeout:(Time.Span.of_int_sec server_connect_timeout_sec)
+          ~timeout:(Time_float.Span.of_int_sec server_connect_timeout_sec)
           (Tcp.Where_to_connect.of_host_and_port
              (Host_and_port.create ~host ~port) )
           (fun _socket _reader _writer -> Deferred.unit) )
@@ -523,8 +524,8 @@ let evaluate_readiness ~now ~max_delay ~max_missing ~max_unparented
   let problems =
     recency_problems
     @ ( if missing_blocks > max_missing then
-        [ sprintf "missing blocks %d > %d" missing_blocks max_missing ]
-      else [] )
+          [ sprintf "missing blocks %d > %d" missing_blocks max_missing ]
+        else [] )
     @
     if unparented_blocks > max_unparented then
       [ sprintf "unparented blocks %d > %d" unparented_blocks max_unparented ]
@@ -544,7 +545,7 @@ let db_ready_command =
        setup_logging ~json ;
        let%bind report =
          probe ~postgres_uri ~kind:Report.Probe ~evaluate:evaluate_db_ready
-           (fun db -> Q.Max_block_height.run db ())
+           (fun db -> Q.Max_block_height.run db () )
        in
        emit ~json report )
 
@@ -557,7 +558,7 @@ let block_height_command =
        setup_logging ~json ;
        let%bind report =
          probe ~postgres_uri ~kind:Report.Probe ~evaluate:evaluate_block_height
-           (fun db -> Q.Max_block_height.run db ())
+           (fun db -> Q.Max_block_height.run db () )
        in
        emit ~json report )
 
@@ -663,14 +664,15 @@ let server_ready_command =
    expiry the last failure is wrapped in [Timed_out]. *)
 let rec poll ~start ~deadline ~interval ~kind attempt =
   let elapsed () =
-    Float.to_int (Time.Span.to_sec (Time.diff (Time.now ()) start))
+    Float.to_int
+      (Time_float.Span.to_sec (Time_float.diff (Time_float.now ()) start))
   in
   let%bind metrics, outcome = attempt () in
   match outcome with
   | Ok () ->
       return (Report.of_evaluation ~kind (metrics, Ok ()))
   | Error failure ->
-      if Time.( >= ) (Time.now ()) deadline then
+      if Time_float.( >= ) (Time_float.now ()) deadline then
         return
           (Report.fail ~kind ?metrics
              (Failure.Timed_out
@@ -684,7 +686,7 @@ let rec poll ~start ~deadline ~interval ~kind attempt =
               , Option.value_map metrics ~default:`Null ~f:(fun metrics ->
                     `Assoc (Metrics.to_json_fields metrics) ) )
             ] ;
-        let%bind () = after (Time.Span.of_int_sec interval) in
+        let%bind () = after (Time_float.Span.of_int_sec interval) in
         poll ~start ~deadline ~interval ~kind attempt )
 
 let wait_command =
@@ -730,8 +732,10 @@ let wait_command =
      fun () ->
        setup_logging ~json ;
        let kind = Report.Wait { db_only } in
-       let start = Time.now () in
-       let deadline = Time.add start (Time.Span.of_int_sec timeout) in
+       let start = Time_float.now () in
+       let deadline =
+         Time_float.add start (Time_float.Span.of_int_sec timeout)
+       in
        (* One pool for every poll, not one per iteration. *)
        match
          Mina_caqti.connect_pool ~max_size:4 (Uri.of_string postgres_uri)
@@ -781,7 +785,7 @@ let wait_command =
            emit ~json report )
 
 let () =
-  Command.run
+  Command_unix.run
     (Command.group
        ~summary:
          "Mina archive healthcheck CLI — lightweight probe commands for \

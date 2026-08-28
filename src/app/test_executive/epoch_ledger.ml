@@ -66,8 +66,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let all_mina_nodes = Network.all_mina_nodes network in
     let%bind () =
       wait_for t
-        (Wait_condition.nodes_to_initialize
-           (Core.String.Map.data all_mina_nodes) )
+        (Wait_condition.nodes_to_initialize (Core.Map.data all_mina_nodes))
     in
     (* Since I made the balances of block producers in genesis ledger and next
        epoch ledgers to be 0, then blocks would only be produced, if the

@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Snark_params
 open Tick
 open Unsigned_extended
@@ -37,7 +37,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
     let zero = UInt64.zero
 
     module Controller = struct
-      type t = unit -> Time.Span.t [@@deriving sexp]
+      type t = unit -> Time_float.Span.t [@@deriving sexp]
 
       (* NB: All instances are identical by construction (see basic below). *)
       let equal _ _ = true
@@ -77,7 +77,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
             let offset =
               let env = "MINA_TIME_OFFSET" in
               let env_offset =
-                match Core_kernel.Sys.getenv_opt env with
+                match Sys.getenv env with
                 | Some tm ->
                     Int.of_string tm
                 | None ->
@@ -89,7 +89,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                         [ ("env", `String env); ("default", `Int default) ] ;
                     default
               in
-              Core_kernel.Time.Span.of_int_sec env_offset
+              Time_float.Span.of_int_sec env_offset
             in
             time_offset := Some offset ;
             offset
@@ -132,9 +132,11 @@ module Make_str (_ : Wire_types.Concrete) = struct
       module Bits = B.UInt64
       include B.Snarkable.UInt64 (Tick)
 
-      let of_time_span s = UInt64.of_int64 (Int64.of_float (Time.Span.to_ms s))
+      let of_time_span s =
+        UInt64.of_int64 (Int64.of_float (Time_float.Span.to_ms s))
 
-      let to_time_span s = Time.Span.of_ms (Int64.to_float (UInt64.to_int64 s))
+      let to_time_span s =
+        Time_float.Span.of_ms (Int64.to_float (UInt64.to_int64 s))
 
       let to_time_ns_span s =
         Time_ns.Span.of_ms (Int64.to_float (UInt64.to_int64 s))
@@ -164,7 +166,8 @@ module Make_str (_ : Wire_types.Concrete) = struct
 
     let of_time t =
       UInt64.of_int64
-        (Int64.of_float (Time.Span.to_ms (Time.to_span_since_epoch t)))
+        (Int64.of_float
+           (Time_float.Span.to_ms (Time_float.to_span_since_epoch t)) )
 
     (* None when t >= 2^63 (unrepresentable in float-backed Time.t). *)
     let to_time_opt t =
@@ -172,7 +175,8 @@ module Make_str (_ : Wire_types.Concrete) = struct
       if Int64.(t_int64 < zero) then None
       else
         Some
-          (Time.of_span_since_epoch (Time.Span.of_ms (Int64.to_float t_int64)))
+          (Time_float.of_span_since_epoch
+             (Time_float.Span.of_ms (Int64.to_float t_int64)) )
 
     let to_time_exn t =
       match to_time_opt t with
@@ -181,14 +185,14 @@ module Make_str (_ : Wire_types.Concrete) = struct
       | None ->
           failwith
             "Block_time.to_time_exn: timestamp >= 2^63 is not representable as \
-             Core.Time.t"
+             Time_float.t"
 
-    let now offset = of_time (Time.sub (Time.now ()) (offset ()))
+    let now offset = of_time (Time_float.sub (Time_float.now ()) (offset ()))
 
     let field_var_to_unpacked (x : Tick.Field.Var.t) =
       Tick.Field.Checked.unpack ~length:64 x
 
-    let epoch = of_time Time.epoch
+    let epoch = of_time Time_float.epoch
 
     let add x y = UInt64.add x y
 
@@ -227,8 +231,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
       Int64.(int64_ns / 1_000_000L) |> UInt64.of_int64
 
     let to_system_time (offset : Controller.t) (t : t) =
-      of_span_since_epoch
-        Span.(to_span_since_epoch t + of_time_span (offset ()))
+      of_span_since_epoch Span.(to_span_since_epoch t + of_time_span (offset ()))
 
     let to_string_system_time_exn (offset : Controller.t) (t : t) : string =
       to_system_time offset t |> to_string_exn
@@ -253,8 +256,9 @@ module Make_str (_ : Wire_types.Concrete) = struct
       let%map int64_time_span = Int64.(gen_incl zero max_value) in
       of_span_since_epoch @@ Span.of_ms int64_time_span
 
-    let%test "to_string_exn is total and round-trips through of_string_exn \
-              across the full uint64 range" =
+    let%test
+        "to_string_exn is total and round-trips through of_string_exn across \
+         the full uint64 range" =
       List.for_all
         [ zero
         ; of_uint64 (UInt64.of_int 1_000)

@@ -65,23 +65,23 @@ let test_case (test_data : t) =
           (Error.to_string_hum e) ()
   in
 
-  let sleep_duration = Time.Span.of_sec 10.0 in
+  let sleep_duration = Time_float.Span.of_sec 10.0 in
 
   let max_archive_memory = 1024.0 in
   let max_postgres_memory = 4096.0 in
 
   (* Set the duration for the archive process *)
-  let expected_duration = Time.Span.of_min 10.0 in
+  let expected_duration = Time_float.Span.of_min 10.0 in
 
   [%log info] "Max Archive Memory: %s MiB" (Float.to_string max_archive_memory) ;
   [%log info] "Max Postgres Memory: %s MiB"
     (Float.to_string max_postgres_memory) ;
-  [%log info] "Sleep Duration: %s" (Time.Span.to_string sleep_duration) ;
+  [%log info] "Sleep Duration: %s" (Time_float.Span.to_string sleep_duration) ;
 
-  let start_time = Time.now () in
+  let start_time = Time_float.now () in
   let rec loop () =
-    let executed_duration = Time.(diff (now ()) start_time) in
-    if Time.Span.(executed_duration > expected_duration) then
+    let executed_duration = Time_float.(diff (now ()) start_time) in
+    if Time_float.Span.(executed_duration > expected_duration) then
       return Mina_automation_fixture.Intf.Passed
     else
       match Archive.Process.get_memory_usage_mib process with

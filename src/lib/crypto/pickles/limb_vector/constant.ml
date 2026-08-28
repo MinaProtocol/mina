@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Pickles_types
 
 type 'n t = (Int64.t, 'n) Vector.t [@@deriving sexp_of]
@@ -6,8 +6,8 @@ type 'n t = (Int64.t, 'n) Vector.t [@@deriving sexp_of]
 let to_bits t =
   Vector.to_list t
   |> List.concat_map ~f:(fun n ->
-         let test_bit i = Int64.(shift_right n i land one = one) in
-         List.init 64 ~f:test_bit )
+      let test_bit i = Int64.(shift_right n i land one = one) in
+      List.init 64 ~f:test_bit )
 
 module Hex64 = struct
   module T = struct

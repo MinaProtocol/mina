@@ -94,4 +94,4 @@ let command =
        printf "Node status mock server listening on port %d\n" port ;
        Deferred.never () )
 
-let () = Command.run command
+let () = Command_unix.run command

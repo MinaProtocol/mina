@@ -31,7 +31,7 @@ let () =
     | Some { base = Accounts accs; _ } ->
         List.map ~f:Runtime_config.Accounts.Single.to_account accs
   in
-  Command.run
+  Command_unix.run
     (Bench.make_command
        [ Bench.Test.create ~name:"parse_runtime_config"
            (load_daemon_cfg runtime_config)

@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Async_kernel
 open Pipe_lib
 open Network_peer
@@ -473,7 +473,7 @@ end = struct
         ; ("hash", Hash.to_yojson expected)
         ]
       "Expecting children parent $parent_address, expected: $hash" ;
-    Addr.Table.add_exn t.waiting_parents ~key:parent_addr ~data:expected
+    Hashtbl.add_exn t.waiting_parents ~key:parent_addr ~data:expected
 
   let expect_content : 'a t -> Addr.t -> Hash.t -> unit =
    fun t addr expected ->
@@ -482,7 +482,7 @@ end = struct
       ~metadata:
         [ ("address", Addr.to_yojson addr); ("hash", Hash.to_yojson expected) ]
       "Expecting content addr $address, expected: $hash" ;
-    Addr.Table.add_exn t.waiting_content ~key:addr ~data:expected
+    Hashtbl.add_exn t.waiting_content ~key:addr ~data:expected
 
   (** Given an address and the accounts below that address, fill in the tree
       with them. *)
@@ -495,7 +495,7 @@ end = struct
          | `Content_length_mismatch of int * int  (** received, capacity *) ] =
    fun t addr content ->
     let open (val t.context) in
-    let expected = Addr.Table.find_exn t.waiting_content addr in
+    let expected = Hashtbl.find_exn t.waiting_content addr in
     let capacity = 1 lsl Addr.height ~ledger_depth:(MT.depth t.tree) addr in
     if List.length content > capacity then
       (* Content longer than the subtree under [addr] is rejected and requeued;
@@ -506,7 +506,7 @@ end = struct
       (* We might write the wrong data to the underlying ledger here, but if so
          we'll requeue the address and it'll be overwritten. *)
       MT.set_all_accounts_rooted_at_exn t.tree addr content ;
-      Addr.Table.remove t.waiting_content addr ;
+      Hashtbl.remove t.waiting_content addr ;
       [%log trace]
         ~metadata:
           [ ("address", Addr.to_yojson addr)
@@ -566,13 +566,13 @@ end = struct
       let ledger_depth = MT.depth t.tree in
       let expected =
         Option.value_exn ~message:"Forgot to wait for a node"
-          (Addr.Table.find t.waiting_parents addr)
+          (Hashtbl.find t.waiting_parents addr)
       in
       let merged =
         merge_many nodes (ledger_depth - Addr.depth addr) subtree_depth
       in
       if Hash.equal expected merged then (
-        Addr.Table.remove t.waiting_parents addr ;
+        Hashtbl.remove t.waiting_parents addr ;
         let addresses = intermediate_range ledger_depth addr subtree_depth in
         let addresses_and_hashes = Array.zip_exn addresses nodes in
 
@@ -659,10 +659,10 @@ end = struct
       (* FIXME: bug when height=0 https://github.com/o1-labs/nanobit/issues/365 *)
       let actual = complete_with_empties content_hash height ledger_depth in
       if Hash.equal actual rh then (
-        Addr.Table.clear t.waiting_parents ;
+        Hashtbl.clear t.waiting_parents ;
         (* We should use this information to set the empty account slots empty and
            start syncing at the content root. See #1972. *)
-        Addr.Table.clear t.waiting_content ;
+        Hashtbl.clear t.waiting_content ;
         handle_node t (Addr.root ()) rh ;
         `Success )
       else `Hash_mismatch (rh, actual)

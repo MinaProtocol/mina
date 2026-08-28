@@ -75,36 +75,36 @@ let schema =
       ; io_field "extensions_error" ~typ:int
           ~args:Arg.[]
           ~resolve:(fun _ () -> Error (Field_error.Extension ("custom", "json")))
-      ])
+      ] )
 
 let message_without_extensions_test () =
   let query = "{ string_error }" in
   test_query schema () query
     (`Assoc
-      [ ( "errors"
-        , `List
-            [ `Assoc
-                [ ("message", `String "error string")
-                ; ("path", `List [ `String "string_error" ])
-                ]
-            ] )
-      ; ("data", `Assoc [ ("string_error", `Null) ])
-      ] )
+       [ ( "errors"
+         , `List
+             [ `Assoc
+                 [ ("message", `String "error string")
+                 ; ("path", `List [ `String "string_error" ])
+                 ]
+             ] )
+       ; ("data", `Assoc [ ("string_error", `Null) ])
+       ] )
 
 let message_with_extensions_test () =
   let query = "{ extensions_error }" in
   test_query schema () query
     (`Assoc
-      [ ( "errors"
-        , `List
-            [ `Assoc
-                [ ("message", `String "")
-                ; ("path", `List [ `String "extensions_error" ])
-                ; ("extensions", `Assoc [ ("custom", `String "json") ])
-                ]
-            ] )
-      ; ("data", `Assoc [ ("extensions_error", `Null) ])
-      ] )
+       [ ( "errors"
+         , `List
+             [ `Assoc
+                 [ ("message", `String "")
+                 ; ("path", `List [ `String "extensions_error" ])
+                 ; ("extensions", `Assoc [ ("custom", `String "json") ])
+                 ]
+             ] )
+       ; ("data", `Assoc [ ("extensions_error", `Null) ])
+       ] )
 
 let () =
   Alcotest.run "GraphQL Custom Error Tests"

@@ -59,7 +59,7 @@ include (
   end :
     sig
       val public_key : Public_key.t Command.Arg_type.t
-        [@@deprecated "Use public_key_compressed in commandline args"]
+      [@@deprecated "Use public_key_compressed in commandline args"]
     end )
 
 let token_id =
@@ -97,9 +97,10 @@ let hd_index =
   Command.Arg_type.map Command.Param.string ~f:Mina_numbers.Hd_index.of_string
 
 let ip_address =
-  Command.Arg_type.map Command.Param.string ~f:Unix.Inet_addr.of_string
+  Command.Arg_type.map Command.Param.string ~f:Core_unix.Inet_addr.of_string
 
-let cidr_mask = Command.Arg_type.map Command.Param.string ~f:Unix.Cidr.of_string
+let cidr_mask =
+  Command.Arg_type.map Command.Param.string ~f:Core_unix.Cidr.of_string
 
 let log_level =
   Command.Arg_type.map Command.Param.string ~f:(fun log_level_str_with_case ->

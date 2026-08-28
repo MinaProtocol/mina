@@ -6,7 +6,7 @@
     Subject:    Test zkApp accounts.
  *)
 
-open Core_kernel
+open Core
 open Snark_params.Tick
 open Mina_base
 open Zkapp_account
