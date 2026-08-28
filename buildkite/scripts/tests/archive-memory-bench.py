@@ -24,6 +24,7 @@ POSTGRES_DB. See resolve_archive_uri below for how the three are reconciled.
 import argparse
 import os
 import shlex
+import shutil
 import subprocess
 import sys
 import tarfile
@@ -37,6 +38,9 @@ from urllib.parse import urlsplit, urlunsplit
 STARTUP_RSS_KIB = 50_000
 
 CURVE_HEADER = "elapsed_s,blocks_done,ab_rss_kib,pg_rss_kib"
+
+# how many lines of the archive_blocks log to print when blocks fail to insert
+LOG_TAIL_LINES = 60
 
 
 def repo_root():
@@ -83,6 +87,12 @@ def parse_args():
         type=int,
         default=0,
         help="replay only the first N blocks of the corpus (0 = all)",
+    )
+    parser.add_argument(
+        "--max-failed-blocks",
+        type=int,
+        default=0,
+        help="publish nothing if more blocks than this fail to insert",
     )
     parser.add_argument(
         "--skip-build",
@@ -208,6 +218,19 @@ def count_lines(path):
         return 0
 
 
+def print_log_tail(log, lines=LOG_TAIL_LINES):
+    """Print the last lines of the archive_blocks log, for diagnosis."""
+    try:
+        text = log.read_text(encoding="utf-8", errors="replace")
+    except OSError as error:
+        print(f"could not read {log}: {error}")
+        return
+    tail = text.splitlines()[-lines:]
+    print(f"=== last {len(tail)} lines of {log} ===")
+    for line in tail:
+        print(line)
+
+
 def feed_and_sample(archive_blocks, blocks, postgres, workdir, sample_interval):
     """Run archive_blocks over the corpus, sampling both sides once a second.
 
@@ -254,8 +277,8 @@ def feed_and_sample(archive_blocks, blocks, postgres, workdir, sample_interval):
         ingest_seconds = int(time.monotonic() - started)
 
     if process.returncode != 0:
-        print("archive_blocks failed:")
-        print(log.read_text(encoding="utf-8", errors="replace"))
+        print(f"archive_blocks exited with {process.returncode}")
+        print_log_tail(log)
         sys.exit(1)
 
     return curve, ingest_seconds, count_lines(successful), count_lines(failed), log
@@ -293,6 +316,28 @@ def influx_line(measurement, fields, tags):
     return f"{sanitize(measurement)},{tag_text} {field_text} {time.time_ns()}"
 
 
+def check_ingest(blocks_ok, blocks_failed, max_failed, log):
+    """Refuse to publish a result that measured nothing.
+
+    archive_blocks exits 0 even when every block fails to insert: a per-block
+    error is logged and the file is appended to --failed-files. Without this
+    gate such a run publishes zeroed metrics, which read on the dashboards as
+    a leak-free build.
+    """
+    if blocks_failed:
+        print_log_tail(log)
+    if not blocks_ok:
+        sys.exit(
+            f"no block was ingested ({blocks_failed} failed); "
+            "refusing to publish a zero measurement"
+        )
+    if blocks_failed > max_failed:
+        sys.exit(
+            f"{blocks_failed} blocks failed to insert, more than the "
+            f"{max_failed} allowed; refusing to publish"
+        )
+
+
 def main():
     args = parse_args()
     root = repo_root()
@@ -318,13 +363,18 @@ def main():
 
     print("Unpacking the static zkApp-heavy corpus...")
     workdir = Path(tempfile.mkdtemp())
-    blocks = unpack_corpus(root / args.corpus, workdir, args.limit)
-    print(f"  {len(blocks)} precomputed blocks")
+    try:
+        blocks = unpack_corpus(root / args.corpus, workdir, args.limit)
+        print(f"  {len(blocks)} precomputed blocks")
 
-    print("Feeding blocks and sampling memory...")
-    curve, ingest_seconds, blocks_ok, blocks_failed, _log = feed_and_sample(
-        archive_blocks, blocks, postgres, workdir, args.sample_interval
-    )
+        print("Feeding blocks and sampling memory...")
+        curve, ingest_seconds, blocks_ok, blocks_failed, log = feed_and_sample(
+            archive_blocks, blocks, postgres, workdir, args.sample_interval
+        )
+        check_ingest(blocks_ok, blocks_failed, args.max_failed_blocks, log)
+    finally:
+        shutil.rmtree(workdir, ignore_errors=True)
+
     archive_growth, backend_peak, backend_tail_average = compute_metrics(curve)
     blocks_per_sec = blocks_ok / ingest_seconds if ingest_seconds > 0 else 0.0
 
