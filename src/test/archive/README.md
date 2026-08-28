@@ -81,3 +81,77 @@ As a result archive database will now have blocks which are a part of chain from
 Replayer component tests uses postgres database only. It need to be accessible from host machine
 
 
+
+## Archive automode component test
+
+A second component test exercises the archive's automatic hard fork hand-over
+rather than the replayer:
+
+```
+./buildkite/scripts/archive-automode-test.sh --pg {connection_string}
+```
+
+### The database
+
+Not a fixture in this folder. The test runs against **devnet as it really was**
+three hours before the mesa fork:
+
+```
+https://storage.googleapis.com/mina-archive-dumps/devnet-archive-dump-2026-08-19_1700.sql.tar.gz
+```
+
+CI pulls it with `RunWithPostgres.ScriptOrArchive.OnlineTarGzDump`, the same way
+`RosettaBlockRaceTest` pulls a mainnet dump. It is used unmodified: 681253
+blocks, **no post-fork blocks at all**, and 401 stranded pending with the fork
+block (height 545433, slot 859399) among them.
+
+That last point is why a fork-crossing dump will not do. You can make a
+post-fork dump *look* pre-fork by deleting the new era, but the schema
+underneath is still the post-fork one, so the upgrade step is never exercised
+and the starting state is something no archive was ever in. This dump needs no
+such surgery.
+
+Only two small files live here, in `prefork_devnet_db`:
+
+- `hardfork-config.json` -- the fork stanza the devnet daemon generated. Note
+  `global_slot_since_genesis` is **859560**, the *scheduled* genesis slot, while
+  the fork block records 859399. That 161-slot gap is real and is what a
+  hand-written seed cannot reproduce.
+- `post-fork-genesis.sql` -- the mesa chain's genesis block, every value taken
+  from `devnet-archive-dump-2026-08-20_0000`. It stands in for the post-fork
+  daemon delivering that block. `parent_id` is looked up by state hash because
+  block ids are assigned per archive instance and do not agree between dumps,
+  and `chain_status` is `pending` because that is what a freshly delivered block
+  looks like.
+
+### What it checks
+
+Two things in order, and the distinction between them is the point of the test.
+
+The archive **accepts the configuration as soon as it arrives**: it writes a
+`hardfork_state` row, which it keeps across restarts. Accepting the
+announcement and acting on it are separate, though. While no post-fork genesis
+block is present the archive must **change no block**, because the fork block is
+so far attested only by that one message and nothing has corroborated it. Its
+`finalized_at` stays NULL for as long as that holds.
+
+Once the genesis block arrives -- its parent hash is the fork block's, so the
+chain itself now confirms what the daemon said -- the repair runs and
+`finalized_at` is stamped. The stranded band must then heal: every block up to
+the fork canonical, the blocks off that chain orphaned, and the post-fork
+genesis left alone.
+
+### The schema upgrade
+
+devnet ran `upgrade_to_mesa.sql` a few hours before the fork, so this database
+is already at 4.0.0/0.0.6 and the script takes its **reapply** path. That is
+what creates `hardfork_state`, which the released 0.0.6 did not have -- worth
+knowing, because it means a database reporting 0.0.6 may or may not carry the
+automode tables.
+
+### Confirmations
+
+The archive requires blocks above the fork block before it settles, 20 by
+default. This test uses the default: devnet's window between `slot_tx_end` and
+`slot_chain_end` left 60 blocks above the fork block, so the shipped threshold
+is what the fork actually has to satisfy.
