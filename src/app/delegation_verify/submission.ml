@@ -249,11 +249,9 @@ module Cassandra = struct
                (List.hd_exn @@ String.split ~on:' ' submission.submitted_at)
                (shard @@ Time.of_string submission.submitted_at)
                submission.submitted_at submission.submitter )
-          [ ("validation_error", sprintf "'%s'" (Error.to_string_hum e))
-          ; ("raw_block", "NULL")
-          ; ("snark_work", "NULL")
-          ; ("verified", "true")
-          ]
+          ( [ ("raw_block", "NULL"); ("snark_work", "NULL") ]
+          @ Delegation_verify_lib.Verification_status.(
+              to_cassandra_updates (Failed (Error.to_string_hum e))) )
 end
 
 module Stdin = struct
@@ -297,7 +295,7 @@ module Stdin = struct
      attached. So here we extract the data from the payload and combine it with the
      submission JSON. *)
   let output () submission output =
-    let results =
+    let payload_fields =
       match output with
       | Ok (payload : Output.t) ->
           [ ( "state_hash"
@@ -309,17 +307,20 @@ module Stdin = struct
           ; ( "slot"
             , `Int (Mina_numbers.Global_slot_since_genesis.to_int payload.slot)
             )
-          ; ("verified", `Bool true)
-          ; ("validation_error", `Null)
           ]
-      | Error e ->
+      | Error _ ->
           [ ("state_hash", `Null)
           ; ("parent", `Null)
           ; ("height", `Null)
           ; ("slot", `Null)
-          ; ("verified", `Bool true)
-          ; ("validation_error", `String (Error.to_string_hum e))
           ]
+    in
+    (* Derived from the same [output] as the payload above, so [verified] and
+       [validation_error] cannot disagree. *)
+    let results =
+      payload_fields
+      @ Delegation_verify_lib.Verification_status.(
+          to_json_fields (of_or_error output))
     in
     Json.json_update results submission
     |> Yojson.Safe.to_channel Out_channel.stdout ;
