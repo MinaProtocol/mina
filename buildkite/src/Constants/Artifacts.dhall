@@ -18,6 +18,12 @@ let Artifact
       | DaemonPrefork
       | DaemonAutoHardfork
       | DaemonAutomode
+      | ArchivePrefork
+      | ArchiveAutoHardfork
+      | ArchiveAutomode
+      | RosettaPrefork
+      | RosettaAutoHardfork
+      | RosettaAutomode
       | DaemonConfig
       | LogProc
       | Archive
@@ -40,6 +46,12 @@ let AllButTests =
       , Artifact.DaemonPrefork
       , Artifact.DaemonAutoHardfork
       , Artifact.DaemonAutomode
+      , Artifact.ArchivePrefork
+      , Artifact.ArchiveAutoHardfork
+      , Artifact.ArchiveAutomode
+      , Artifact.RosettaPrefork
+      , Artifact.RosettaAutoHardfork
+      , Artifact.RosettaAutomode
       , Artifact.DaemonAppsOnly
       , Artifact.DaemonConfig
       , Artifact.LogProc
@@ -74,6 +86,12 @@ let capitalName =
             , DaemonLegacyHardfork = "DaemonLegacyHardfork"
             , DaemonAutoHardfork = "DaemonAutoHardfork"
             , DaemonAutomode = "DaemonAutomode"
+            , ArchivePrefork = "ArchivePrefork"
+            , ArchiveAutoHardfork = "ArchiveAutoHardfork"
+            , ArchiveAutomode = "ArchiveAutomode"
+            , RosettaPrefork = "RosettaPrefork"
+            , RosettaAutoHardfork = "RosettaAutoHardfork"
+            , RosettaAutomode = "RosettaAutomode"
             , DaemonAppsOnly = "DaemonAppsOnly"
             , DaemonConfig = "DaemonConfig"
             , LogProc = "LogProc"
@@ -100,6 +118,12 @@ let lowerName =
             , DaemonLegacyHardfork = "daemon_hardfork"
             , DaemonAutoHardfork = "daemon_auto_hardfork"
             , DaemonAutomode = "daemon_automode"
+            , ArchivePrefork = "archive_prefork"
+            , ArchiveAutoHardfork = "archive_auto_hardfork"
+            , ArchiveAutomode = "archive_automode"
+            , RosettaPrefork = "rosetta_prefork"
+            , RosettaAutoHardfork = "rosetta_auto_hardfork"
+            , RosettaAutomode = "rosetta_automode"
             , DaemonAppsOnly = "daemon_apps_only"
             , DaemonConfig = "daemon_config"
             , LogProc = "logproc"
@@ -126,6 +150,12 @@ let dockerServiceName =
             , DaemonLegacyHardfork = "mina-daemon-legacy-hardfork"
             , DaemonAutoHardfork = "mina-daemon-auto-hardfork"
             , DaemonAutomode = ""
+            , ArchivePrefork = ""
+            , ArchiveAutoHardfork = "mina-archive-auto-hardfork"
+            , ArchiveAutomode = ""
+            , RosettaPrefork = ""
+            , RosettaAutoHardfork = "mina-rosetta-auto-hardfork"
+            , RosettaAutomode = ""
             , DaemonAppsOnly = "mina-daemon"
             , Archive = "mina-archive"
             , TestExecutive = "mina-test-executive"
@@ -154,6 +184,12 @@ let dockerName =
             , DaemonAutoHardfork = dockerServiceName artifact
             , DaemonAppsOnly = dockerServiceName artifact
             , DaemonAutomode = dockerServiceName artifact
+            , ArchivePrefork = dockerServiceName artifact
+            , ArchiveAutoHardfork = dockerServiceName artifact
+            , ArchiveAutomode = dockerServiceName artifact
+            , RosettaPrefork = dockerServiceName artifact
+            , RosettaAutoHardfork = dockerServiceName artifact
+            , RosettaAutomode = dockerServiceName artifact
             , Archive = dockerServiceName artifact
             , TestExecutive = dockerServiceName artifact
             , LogProc = dockerServiceName artifact
@@ -189,6 +225,14 @@ let toDebianName =
             , DaemonAutoHardfork =
                 "daemon_${Network.lowerName network}_postfork"
             , DaemonAutomode = "daemon_${Network.lowerName network}_automode"
+            , ArchivePrefork = "archive_${Network.lowerName network}_prefork"
+            , ArchiveAutoHardfork =
+                "archive_${Network.lowerName network}_postfork"
+            , ArchiveAutomode = "archive_${Network.lowerName network}_automode"
+            , RosettaPrefork = "rosetta_${Network.lowerName network}_prefork"
+            , RosettaAutoHardfork =
+                "rosetta_${Network.lowerName network}_postfork"
+            , RosettaAutomode = "rosetta_${Network.lowerName network}_automode"
             , DaemonAppsOnly = "daemon_${Network.lowerName network}_generic"
             , LogProc = "logproc"
             , Archive = "archive_${Network.lowerName network}"
@@ -222,6 +266,12 @@ let toDebianNames =
                           , DaemonLegacyHardfork = [ toDebianName a network ]
                           , DaemonAutoHardfork = [ toDebianName a network ]
                           , DaemonAutomode = [ toDebianName a network ]
+                          , ArchivePrefork = [ toDebianName a network ]
+                          , ArchiveAutoHardfork = [ toDebianName a network ]
+                          , ArchiveAutomode = [ toDebianName a network ]
+                          , RosettaPrefork = [ toDebianName a network ]
+                          , RosettaAutoHardfork = [ toDebianName a network ]
+                          , RosettaAutomode = [ toDebianName a network ]
                           , DaemonConfig = [ toDebianName a network ]
                           , DaemonAppsOnly = [ toDebianName a network ]
                           , Archive = [ toDebianName a network ]
@@ -296,6 +346,14 @@ let dockerTag =
                     "${spec.version}${network_part}${extraordinary_profile_part}${extra_build_flags_part}"
                 , DaemonPrefork = ""
                 , DaemonAutomode = ""
+                , ArchivePrefork = ""
+                , ArchiveAutomode = ""
+                , ArchiveAutoHardfork =
+                    "${spec.version}${network_part}${extraordinary_profile_part}"
+                , RosettaPrefork = ""
+                , RosettaAutomode = ""
+                , RosettaAutoHardfork =
+                    "${spec.version}${network_part}${extraordinary_profile_part}"
                 , DaemonLegacyHardfork =
                     "${spec.version}${network_part}${extraordinary_profile_part}"
                 , DaemonAutoHardfork =

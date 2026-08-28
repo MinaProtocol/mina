@@ -230,6 +230,20 @@ case "${SERVICE}" in
         DOCKERFILE_PATH="dockerfiles/Dockerfile-mina-archive"
         DOCKER_CONTEXT="dockerfiles/"
         ;;
+    mina-archive-auto-hardfork)
+        # Both schema eras in one image, with mina-archive-dispatch choosing
+        # between them from the archive database.
+        DOCKERFILE_PATH="dockerfiles/Dockerfile-mina-archive-auto-hardfork"
+        DOCKER_CONTEXT="dockerfiles/"
+        ;;
+    mina-rosetta-auto-hardfork)
+        # The same image definition as mina-rosetta, pointed at the automode
+        # packages: the umbrella pins both eras, so only the names change.
+        DOCKERFILE_PATH="dockerfiles/Dockerfile-mina-rosetta"
+        DOCKER_CONTEXT="dockerfiles/"
+        SERVICE="mina-rosetta"
+        CUSTOM_ARG="${CUSTOM_ARG} --build-arg deb_variant=-automode"
+        ;;
     mina-daemon)
         DOCKERFILE_PATH="dockerfiles/Dockerfile-mina-daemon"
         DOCKER_CONTEXT="dockerfiles/"

@@ -34,9 +34,17 @@ ENV BUILD_FLAGS_SUFFIX=${build_flags_suffix}
 # possible values:
 # - mina-devnet
 # - mina-devnet-lightnet etc.
-ENV MINA_DEB=mina-${network}${SUFFIX}
-ENV MINA_ARCHIVE_DEB=mina-archive-${network}${BUILD_FLAGS_SUFFIX}
-ENV MINA_ROSETTA_DEB=mina-rosetta-${network}
+# Selects the automode packages instead of the plain ones, so a single image
+# definition serves both. Empty by default, "-automode" for a hardfork image.
+#
+# The automode metapackages pin their prefork and postfork dependencies to exact
+# versions, so naming the umbrella is enough -- apt pulls both eras, and the
+# pre-fork one at its own version rather than this image's.
+ARG deb_variant=""
+
+ENV MINA_DEB=mina-${network}${SUFFIX}${deb_variant}
+ENV MINA_ARCHIVE_DEB=mina-archive-${network}${BUILD_FLAGS_SUFFIX}${deb_variant}
+ENV MINA_ROSETTA_DEB=mina-rosetta-${network}${deb_variant}
 
 
 # We do not install the below platform-specific dependencies,

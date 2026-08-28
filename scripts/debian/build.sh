@@ -43,6 +43,14 @@ resolve_and_build_package() {
     return
   fi
 
+  # The archive and Rosetta split the same three ways the daemon does, because
+  # both are compiled against one schema era and a fork needs both sides
+  # installed with something choosing between them.
+  if [[ "$package" =~ ^(archive|rosetta)_(mainnet|devnet|mesa)_(prefork|postfork|automode)$ ]]; then
+    "build_${BASH_REMATCH[1]}_${BASH_REMATCH[3]}_deb" "${BASH_REMATCH[2]}"
+    return
+  fi
+
   if [[ "$package" =~ ^prefork_(mainnet|devnet|mesa)_genesis_ledger$ ]]; then
     build_prefork_genesis_ledger_deb "${BASH_REMATCH[1]}"
     return

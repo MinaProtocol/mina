@@ -298,6 +298,54 @@ let docker_step
                 , CreatePreforkGenesis = [] : List DockerImage.ReleaseSpec.Type
                 , DaemonPrefork = [] : List DockerImage.ReleaseSpec.Type
                 , DaemonAutomode = [] : List DockerImage.ReleaseSpec.Type
+                , ArchivePrefork = [] : List DockerImage.ReleaseSpec.Type
+                , ArchiveAutomode = [] : List DockerImage.ReleaseSpec.Type
+                , RosettaPrefork = [] : List DockerImage.ReleaseSpec.Type
+                , RosettaAutomode = [] : List DockerImage.ReleaseSpec.Type
+                , ArchiveAutoHardfork =
+                  [ DockerImage.ReleaseSpec::{
+                    , deps =
+                          deps
+                        # DockerVersion.dependsOn
+                            DockerVersion.DepsSpec::{
+                            , codename = DockerVersion.ofDebian spec.debVersion
+                            , network = spec.network
+                            , profile = spec.profile
+                            , artifact = Artifacts.Type.Archive
+                            }
+                    , service = Artifacts.Type.ArchiveAutoHardfork
+                    , network = spec.network
+                    , deb_codename = spec.debVersion
+                    , deb_profile = spec.profile
+                    , build_flags = spec.buildFlags
+                    , docker_publish = spec.docker_publish
+                    , deb_repo = DebianRepo.Type.Local
+                    , deb_legacy_version = spec.deb_legacy_version
+                    , size = size
+                    }
+                  ]
+                , RosettaAutoHardfork =
+                  [ DockerImage.ReleaseSpec::{
+                    , deps =
+                          deps
+                        # DockerVersion.dependsOn
+                            DockerVersion.DepsSpec::{
+                            , codename = DockerVersion.ofDebian spec.debVersion
+                            , network = spec.network
+                            , profile = spec.profile
+                            , artifact = Artifacts.Type.Rosetta
+                            }
+                    , service = Artifacts.Type.RosettaAutoHardfork
+                    , network = spec.network
+                    , deb_codename = spec.debVersion
+                    , deb_profile = spec.profile
+                    , build_flags = spec.buildFlags
+                    , docker_publish = spec.docker_publish
+                    , deb_repo = DebianRepo.Type.Local
+                    , deb_legacy_version = spec.deb_legacy_version
+                    , size = size
+                    }
+                  ]
                 , BatchTxn =
                   [ DockerImage.ReleaseSpec::{
                     , deps = deps
