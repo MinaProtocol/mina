@@ -99,11 +99,21 @@ def parse_args():
     return parser.parse_args()
 
 
-def run(command, **kwargs):
-    """Run a command, returning its stdout and never raising on failure."""
+def run(command, quiet=False, **kwargs):
+    """Run a command and return its stdout, never raising on failure.
+
+    A failure is reported rather than swallowed: an empty stdout otherwise
+    resurfaces much later as a no-op send_raw, which says nothing about the
+    keypair or zkApp command that actually failed. Callers that poll -- where a
+    failure is the expected answer until the network is up -- pass quiet=True.
+    """
     result = subprocess.run(
         command, capture_output=True, text=True, check=False, **kwargs
     )
+    if result.returncode != 0 and not quiet:
+        log(f"WARNING: {Path(command[0]).name} exited with {result.returncode}")
+        for line in result.stderr.strip().splitlines():
+            log(f"  {line}")
     return result.stdout
 
 
@@ -123,7 +133,8 @@ class Client:
                 self.rest_uri,
                 "--public-key",
                 public_key,
-            ]
+            ],
+            quiet=True,
         )
         accounts = []
         for line in out.splitlines():
@@ -161,19 +172,36 @@ class Client:
         )
 
 
-def strip_leading_output(text, lines):
-    """zkapp_test_transaction prints a preamble before the GraphQL query."""
-    return "\n".join(text.splitlines()[lines:])
+def graphql_query_of(text):
+    """The GraphQL query zkapp_test_transaction printed, without its preamble.
+
+    The command prints keyfile prompts before the query, so the query is
+    located by its own first line rather than by a preamble line count, which
+    would silently truncate the query if that preamble ever gained a line.
+    """
+    lines = text.splitlines()
+    # graphql_zkapp_command emits `mutation MyMutation {`; the other openings
+    # are a fallback should that ever be reshaped.
+    for openings in (("mutation",), ("query", "{")):
+        for index, line in enumerate(lines):
+            if line.lstrip().startswith(openings):
+                return "\n".join(lines[index:])
+    log("WARNING: no GraphQL query found in the zkapp_test_transaction output")
+    return ""
 
 
 def start_network(root, args):
-    """Spawn the local network in the background, returning the process."""
+    """Spawn the local network in the background.
+
+    Returns (process, logfile); the caller closes the log file once the
+    network is down.
+    """
     args.network_dir.mkdir(parents=True, exist_ok=True)
     log(f"bootstrapping local network ({args.whales} whales)...")
     logfile = (args.network_dir / "localnet.log").open("w", encoding="utf-8")
-    # -pl none and long slots keep the network light; a future genesis avoids the
-    # multi-node fork stall at startup.
-    return subprocess.Popen(
+    # --proof-level none and long slots keep the network light; a future genesis
+    # avoids the multi-node fork stall at startup.
+    network = subprocess.Popen(
         [
             str(root / "scripts/mina-local-network/mina-local-network.sh"),
             "--config",
@@ -197,6 +225,7 @@ def start_network(root, args):
         stderr=subprocess.STDOUT,
         start_new_session=True,
     )
+    return network, logfile
 
 
 def wait_for_rest(client, public_key, attempts=120, delay=10):
@@ -219,7 +248,7 @@ def deploy_zkapp_account(zkapp_binary, client, fee_payer, fee_payer_pub, zkapp_k
         return zkapp_pub
     nonce = client.nonce_of(fee_payer_pub)
     log(f"deploying zkApp account (fee-payer=sender nonce={nonce})...")
-    query = strip_leading_output(
+    query = graphql_query_of(
         run(
             [
                 str(zkapp_binary),
@@ -239,8 +268,7 @@ def deploy_zkapp_account(zkapp_binary, client, fee_payer, fee_payer_pub, zkapp_k
                 "--fee",
                 "5",
             ]
-        ),
-        7,
+        )
     )
     client.send_raw(query)
     for _ in range(40):
@@ -259,7 +287,7 @@ def submit_load(zkapp_binary, client, args, fee_payer, fee_payer_pub, zkapp_key)
         f"elems={args.elements_per})..."
     )
     for i in range(args.count):
-        query = strip_leading_output(
+        query = graphql_query_of(
             run(
                 [
                     str(zkapp_binary),
@@ -281,8 +309,7 @@ def submit_load(zkapp_binary, client, args, fee_payer, fee_payer_pub, zkapp_key)
                     "--fee",
                     "5",
                 ]
-            ),
-            5,
+            )
         )
         if '"hash":"' in client.send_raw(query):
             submitted += 1
@@ -373,7 +400,7 @@ def main():
     )
     os.environ.setdefault("MINA_PRIVKEY_PASS", "naughty blue worm")
 
-    network = start_network(root, args)
+    network, logfile = start_network(root, args)
     try:
         fee_payer = args.network_dir / "offline_whale_keys/offline_whale_account_0"
         fee_payer_pub = Path(f"{fee_payer}.pub").read_text(encoding="utf-8").strip()
@@ -419,6 +446,12 @@ def main():
     finally:
         # the network script spawns a process group; take the whole group down
         os.killpg(os.getpgid(network.pid), signal.SIGTERM)
+        try:
+            network.wait(timeout=30)
+        except subprocess.TimeoutExpired:
+            os.killpg(os.getpgid(network.pid), signal.SIGKILL)
+            network.wait()
+        logfile.close()
 
     size_mib = args.output.stat().st_size / (1024 * 1024)
     log(f"wrote {args.output} ({size_mib:.1f} MiB)")
