@@ -19,6 +19,7 @@ let Filter
       | DockerBuild
       | Packaging
       | Publish
+      | Bootstrap
       | Rosetta
       | Hardfork
       | AllDockersAndDebians
@@ -63,6 +64,7 @@ let tags
             , DockerBuild = [ Tag.Type.Docker ]
             , Packaging = [ Tag.Type.Packaging ]
             , Publish = [ Tag.Type.Publish ]
+            , Bootstrap = [ Tag.Type.Bootstrap ]
             , AllTests = [ Tag.Type.Lint, Tag.Type.Release, Tag.Type.Test ]
             , Release = [ Tag.Type.Release ]
             , Promote = [ Tag.Type.Promote ]
@@ -219,6 +221,7 @@ let show
             , DockerBuild = "DockerBuild"
             , Packaging = "Packaging"
             , Publish = "Publish"
+            , Bootstrap = "Bootstrap"
             , Rosetta = "Rosetta"
             , Hardfork = "Hardfork"
             , AllDockersAndDebians = "AllDockersAndDebians"

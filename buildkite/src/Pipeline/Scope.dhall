@@ -15,7 +15,14 @@ let Prelude = ../External/Prelude.dhall
 
 let Extensions = ../Lib/Extensions.dhall
 
-let Scope = < PullRequest | Nightly | MainlineNightly | Weekly | Release >
+let Scope =
+      < PullRequest
+      | Nightly
+      | MainlineNightly
+      | Weekly
+      | Release
+      | BootstrapRelease
+      >
 
 let capitalName =
           \(scope : Scope)
@@ -25,6 +32,7 @@ let capitalName =
             , MainlineNightly = "MainlineNightly"
             , Weekly = "Weekly"
             , Release = "Release"
+            , BootstrapRelease = "BootstrapRelease"
             }
             scope
 
@@ -36,6 +44,7 @@ let lowerName =
             , MainlineNightly = "mainlinenightly"
             , Weekly = "weekly"
             , Release = "release"
+            , BootstrapRelease = "bootstraprelease"
             }
             scope
 

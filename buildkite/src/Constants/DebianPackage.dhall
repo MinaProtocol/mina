@@ -9,6 +9,7 @@ let Package
       | Rosetta
       | TestExecutive
       | TxTools
+      | MinaBootstrap
       | LogProc
       | FunctionalTestSuite
       >
@@ -17,7 +18,11 @@ let MainPackages =
       [ Package.Daemon, Package.Archive, Package.LogProc, Package.Rosetta ]
 
 let AuxiliaryPackages =
-      [ Package.TestExecutive, Package.TxTools, Package.FunctionalTestSuite ]
+      [ Package.TestExecutive
+      , Package.TxTools
+      , Package.MinaBootstrap
+      , Package.FunctionalTestSuite
+      ]
 
 let capitalName =
           \(package : Package)
@@ -26,6 +31,7 @@ let capitalName =
             , Archive = "Archive"
             , TestExecutive = "TestExecutive"
             , TxTools = "TxTools"
+            , MinaBootstrap = "MinaBootstrap"
             , LogProc = "Logproc"
             , Rosetta = "Rosetta"
             , FunctionalTestSuite = "FunctionalTestSuite"
@@ -39,6 +45,7 @@ let lowerName =
             , Archive = "archive"
             , TestExecutive = "test_executive"
             , TxTools = "tx_tools"
+            , MinaBootstrap = "mina_bootstrap"
             , LogProc = "logproc"
             , Rosetta = "rosetta"
             , FunctionalTestSuite = "functional_test_suite"
@@ -59,6 +66,7 @@ let debianName =
             , Archive = "mina-archive"
             , TestExecutive = "mina-test-executive"
             , TxTools = "mina-tx-tools"
+            , MinaBootstrap = "mina-bootstrap"
             , LogProc = "mina-logproc"
             , FunctionalTestSuite = "mina-test-suite"
             }

@@ -12,6 +12,7 @@ let Filter
       | MainlineNightly
       | Weekly
       | Release
+      | BootstrapOnly
       | All
       >
 
@@ -25,6 +26,7 @@ let scopes
             , MainlineNightly = [ Scope.Type.MainlineNightly ]
             , Weekly = [ Scope.Type.Weekly ]
             , Release = [ Scope.Type.Release ]
+            , BootstrapOnly = [ Scope.Type.BootstrapRelease ]
             , All =
               [ Scope.Type.PullRequest
               , Scope.Type.Nightly
@@ -45,6 +47,7 @@ let show
             , MainlineNightly = "mainlinenightly"
             , Weekly = "weekly"
             , Release = "release"
+            , BootstrapOnly = "bootstraponly"
             , All = "all"
             }
             filter

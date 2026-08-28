@@ -289,6 +289,7 @@ let expandDockerServices =
                         ]
                 , TestExecutive = none
                 , TxTools = none
+                , MinaBootstrap = [ mk Docker.Type.MinaBootstrap ]
                 , FunctionalTestSuite = none
                 , DelegationVerifier = [ mk Docker.Type.DelegationVerifier ]
                 , Toolchain = none
@@ -692,6 +693,21 @@ let docker_step
                     , size = size
                     }
                   ]
+                , MinaBootstrap =
+                  [ DockerImage.ReleaseSpec::{
+                    , deps = deps
+                    , service = Docker.Type.MinaBootstrap
+                    , network = network
+                    , deb_codename = spec.debVersion
+                    , deb_profile = profile
+                    , build_flags = spec.buildFlags
+                    , docker_publish = spec.docker_publish
+                    , deb_legacy_version = spec.deb_legacy_version
+                    , arch = spec.arch
+                    , if_ = spec.if_
+                    , size = size
+                    }
+                  ]
                 , DelegationVerifier =
                   [ DockerImage.ReleaseSpec::{
                     , deps = deps
@@ -798,6 +814,46 @@ let docker_commands
                 )
                 flattened_docker_steps
 
+let bootstrap_deb
+    -- mina-bootstrap is a standalone Go binary: it compiles and packages in one
+    -- step and does not restore the tree an app build produced, so unlike
+    -- build_debian it has no depends_on for build-apps.
+    : PackagingSpec.Type -> Command.Type
+    =     \(spec : PackagingSpec.Type)
+      ->  Command.build
+            Command.Config::{
+            , commands =
+                  Toolchain.select
+                    Toolchain.Spec::{
+                    , mode = spec.toolchainSelectMode
+                    , debVersion = spec.debVersion
+                    , arch = spec.arch
+                    , submodules = False
+                    }
+                    [ "MINA_BRANCH=\$BUILDKITE_BRANCH"
+                    , "MINA_COMMIT_SHA1=\$BUILDKITE_COMMIT"
+                    , "MINA_DEB_CODENAME=${DebianVersions.lowerName
+                                             spec.debVersion}"
+                    , "ARCHITECTURE=${Arch.lowerName spec.arch}"
+                    , "MINA_DEB_RELEASE=${DebianChannel.effective spec.channel}"
+                    ]
+                    "make build-mina-bootstrap && ./scripts/debian/build.sh mina_bootstrap"
+                # [ Cmd.run
+                      "./buildkite/scripts/debian/write_to_cache.sh ${DebianVersions.lowerName
+                                                                        spec.debVersion}"
+                  ]
+            , label = "Debian: Build mina-bootstrap ${labelSuffix spec}"
+            , key = "build-deb-pkg${Optional/default Text "" spec.suffix}"
+            , target = Size.Multi
+            , if_ = spec.if_
+            , retries =
+              [ Command.Retry::{
+                , exit_status = Command.ExitStatus.Code +2
+                , limit = Some 2
+                }
+              ]
+            }
+
 let pipelineBuilder
     : PackagingSpec.Type -> List Command.Type -> Pipeline.Config.Type
     =     \(spec : PackagingSpec.Type)
@@ -860,9 +916,15 @@ let packagePipeline
           , steps = [ build_debian spec ] # docker_commands spec
           }
 
+let bootstrapPipeline
+    : PackagingSpec.Type -> Pipeline.Config.Type
+    =     \(spec : PackagingSpec.Type)
+      ->  pipelineBuilder spec ([ bootstrap_deb spec ] # docker_commands spec)
+
 in  { onlyDebianPipeline = onlyDebianPipeline
     , appsPipeline = appsPipeline
     , packagePipeline = packagePipeline
+    , bootstrapPipeline = bootstrapPipeline
     , PackagingSpec = PackagingSpec
     , AppsSpec = AppsSpec
     , labelSuffix = labelSuffix

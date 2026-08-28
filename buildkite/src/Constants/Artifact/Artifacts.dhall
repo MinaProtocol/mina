@@ -28,6 +28,7 @@ let Artifact
       | Rosetta : { network : Network.Type }
       | TestExecutive
       | TxTools
+      | MinaBootstrap
       | FunctionalTestSuite
       | DelegationVerifier
       | Toolchain
@@ -58,6 +59,7 @@ let capitalName =
             , Rosetta = \(a : { network : Network.Type }) -> "Rosetta"
             , TestExecutive = "TestExecutive"
             , TxTools = "TxTools"
+            , MinaBootstrap = "MinaBootstrap"
             , FunctionalTestSuite = "FunctionalTestSuite"
             , DelegationVerifier = "DelegationVerifier"
             , Toolchain = "Toolchain"
@@ -89,6 +91,7 @@ let lowerName =
             , Rosetta = \(a : { network : Network.Type }) -> "rosetta"
             , TestExecutive = "testExecutive"
             , TxTools = "txTools"
+            , MinaBootstrap = "minaBootstrap"
             , FunctionalTestSuite = "functionalTestSuite"
             , DelegationVerifier = "delegationVerifier"
             , Toolchain = "toolchain"
@@ -114,6 +117,7 @@ let isNetworked =
             , Rosetta = \(a : { network : Network.Type }) -> True
             , TestExecutive = False
             , TxTools = False
+            , MinaBootstrap = False
             , FunctionalTestSuite = False
             , DelegationVerifier = False
             , Toolchain = False
@@ -145,6 +149,7 @@ let network =
             , Rosetta = \(a : { network : Network.Type }) -> Some a.network
             , TestExecutive = None Network.Type
             , TxTools = None Network.Type
+            , MinaBootstrap = None Network.Type
             , FunctionalTestSuite = None Network.Type
             , DelegationVerifier = None Network.Type
             , Toolchain = None Network.Type
@@ -192,6 +197,7 @@ let profile =
                 ->  Profiles.fromNetwork a.network
             , TestExecutive = Profiles.Type.Devnet
             , TxTools = Profiles.Type.Devnet
+            , MinaBootstrap = Profiles.Type.Devnet
             , FunctionalTestSuite = Profiles.Type.Devnet
             , DelegationVerifier = Profiles.Type.Devnet
             , Toolchain = Profiles.Type.Devnet
@@ -226,6 +232,7 @@ let toDebian =
             , Rosetta = \(a : { network : Network.Type }) -> Debian.Type.Rosetta
             , TestExecutive = Debian.Type.TestExecutive
             , TxTools = Debian.Type.TxTools
+            , MinaBootstrap = Debian.Type.MinaBootstrap
             , FunctionalTestSuite = Debian.Type.FunctionalTestSuite
             , DelegationVerifier = Debian.Type.DelegationVerifier
             , Toolchain = Debian.Type.DaemonGeneric
@@ -285,6 +292,7 @@ let profileTentTokens =
             , Rosetta = \(a : { network : Network.Type }) -> [] : List Text
             , TestExecutive = [] : List Text
             , TxTools = [] : List Text
+            , MinaBootstrap = [] : List Text
             , FunctionalTestSuite = [] : List Text
             , DelegationVerifier = [] : List Text
             , Toolchain = [] : List Text

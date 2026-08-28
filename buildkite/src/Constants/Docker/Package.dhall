@@ -18,6 +18,7 @@ let Package =
       | RosettaGeneric
       | Rosetta : { network : Network.Type }
       | TxTools
+      | MinaBootstrap
       | DelegationVerifier
       | Toolchain
       | Base
@@ -38,6 +39,7 @@ let capitalName =
             , RosettaGeneric = "RosettaGeneric"
             , Rosetta = \(args : { network : Network.Type }) -> "Rosetta"
             , TxTools = "TxTools"
+            , MinaBootstrap = "MinaBootstrap"
             , DelegationVerifier = "DelegationVerifier"
             , Toolchain = "Toolchain"
             , Base = "Base"
@@ -59,6 +61,7 @@ let lowerName =
             , RosettaGeneric = "rosetta_profile"
             , Rosetta = \(args : { network : Network.Type }) -> "rosetta_config"
             , TxTools = "tx_tools"
+            , MinaBootstrap = "mina_bootstrap"
             , DelegationVerifier = "delegation_verifier"
             , Toolchain = "toolchain"
             , Base = "base"
@@ -78,6 +81,7 @@ let isEssential =
             , RosettaGeneric = True
             , Rosetta = \(args : { network : Network.Type }) -> True
             , TxTools = False
+            , MinaBootstrap = True
             , DelegationVerifier = True
             , Toolchain = True
             , Base = True
@@ -97,6 +101,7 @@ let isGeneric =
             , RosettaGeneric = True
             , Rosetta = \(args : { network : Network.Type }) -> False
             , TxTools = False
+            , MinaBootstrap = False
             , DelegationVerifier = False
             , Toolchain = False
             , Base = False
@@ -116,6 +121,7 @@ let isNetworked =
             , RosettaGeneric = False
             , Rosetta = \(args : { network : Network.Type }) -> True
             , TxTools = False
+            , MinaBootstrap = False
             , DelegationVerifier = False
             , Toolchain = False
             , Base = False
@@ -135,6 +141,7 @@ let isProfiled =
             , RosettaGeneric = False
             , Rosetta = \(args : { network : Network.Type }) -> False
             , TxTools = False
+            , MinaBootstrap = False
             , DelegationVerifier = False
             , Toolchain = False
             , Base = False
@@ -161,6 +168,7 @@ let serviceName =
                     \(args : { network : Network.Type })
                 ->  "mina-rosetta-configured"
             , TxTools = "mina-tx-tools"
+            , MinaBootstrap = "mina-bootstrap"
             , DelegationVerifier = "mina-delegation-verifier"
             , Toolchain = "mina-toolchain"
             , Base = "mina-base"
@@ -184,6 +192,7 @@ let dockerName =
             , RosettaGeneric = "mina-rosetta"
             , Rosetta = \(args : { network : Network.Type }) -> "mina-rosetta"
             , TxTools = "mina-tx-tools"
+            , MinaBootstrap = "mina-bootstrap"
             , DelegationVerifier = "mina-delegation-verifier"
             , Toolchain = "mina-toolchain"
             , Base = "mina-base"

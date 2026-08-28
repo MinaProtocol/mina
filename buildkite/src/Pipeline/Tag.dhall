@@ -37,6 +37,7 @@ let Tag
       | Mesa
       | Packaging
       | Publish
+      | Bootstrap
       >
 
 let capitalName =
@@ -71,6 +72,7 @@ let capitalName =
             , Mesa = "Mesa"
             , Packaging = "Packaging"
             , Publish = "Publish"
+            , Bootstrap = "Bootstrap"
             }
             tag
 
@@ -106,6 +108,7 @@ let lowerName =
             , Mesa = "mesa"
             , Packaging = "packaging"
             , Publish = "publish"
+            , Bootstrap = "bootstrap"
             }
             tag
 

@@ -179,6 +179,7 @@ let generateStep =
                   , Rosetta =
                       \(args : { network : Network.Type }) -> archCustomSuffix
                   , TxTools = ""
+                  , MinaBootstrap = ""
                   , DelegationVerifier = ""
                   , Toolchain = ""
                   }

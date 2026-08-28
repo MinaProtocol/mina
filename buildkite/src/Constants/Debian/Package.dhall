@@ -23,6 +23,7 @@ let Package
       | Rosetta
       | TestExecutive
       | TxTools
+      | MinaBootstrap
       | LogProc
       | FunctionalTestSuite
       | DelegationVerifier
@@ -44,6 +45,7 @@ let All =
       , Package.Rosetta
       , Package.TestExecutive
       , Package.TxTools
+      , Package.MinaBootstrap
       , Package.LogProc
       , Package.FunctionalTestSuite
       , Package.DelegationVerifier
@@ -69,6 +71,7 @@ let AuxiliaryPackages =
       , Package.PreforkGenesisLedger
       , Package.TestExecutive
       , Package.TxTools
+      , Package.MinaBootstrap
       , Package.FunctionalTestSuite
       , Package.DelegationVerifier
       ]
@@ -91,6 +94,7 @@ let index =
             , Rosetta = 12
             , TestExecutive = 13
             , TxTools = 14
+            , MinaBootstrap = 18
             , LogProc = 15
             , FunctionalTestSuite = 16
             , DelegationVerifier = 17
@@ -115,6 +119,7 @@ let isNetworked =
             , Rosetta = True
             , TestExecutive = False
             , TxTools = False
+            , MinaBootstrap = False
             , LogProc = False
             , FunctionalTestSuite = False
             , DelegationVerifier = False
@@ -139,6 +144,7 @@ let capitalName =
             , Rosetta = "Rosetta"
             , TestExecutive = "TestExecutive"
             , TxTools = "TxTools"
+            , MinaBootstrap = "MinaBootstrap"
             , LogProc = "LogProc"
             , FunctionalTestSuite = "FunctionalTestSuite"
             , DelegationVerifier = "DelegationVerifier"
@@ -163,6 +169,7 @@ let lowerName =
             , Rosetta = "rosetta"
             , TestExecutive = "test_executive"
             , TxTools = "tx_tools"
+            , MinaBootstrap = "mina_bootstrap"
             , LogProc = "logproc"
             , FunctionalTestSuite = "functional_test_suite"
             , DelegationVerifier = "delegation_verify"
@@ -191,6 +198,7 @@ let buildToken =
             , Rosetta = "rosetta_${Network.lowerName network}"
             , TestExecutive = "test_executive"
             , TxTools = "tx_tools"
+            , MinaBootstrap = "mina_bootstrap"
             , LogProc = "logproc"
             , FunctionalTestSuite = "functional_test_suite"
             , DelegationVerifier = "delegation_verify"
@@ -232,6 +240,7 @@ let aptName =
             , Rosetta = "mina-rosetta-${Network.lowerName network}"
             , TestExecutive = "mina-test-executive"
             , TxTools = "mina-tx-tools"
+            , MinaBootstrap = "mina-bootstrap"
             , LogProc = "mina-logproc"
             , FunctionalTestSuite = "mina-test-suite"
             , DelegationVerifier = "mina-delegation-verifier"
