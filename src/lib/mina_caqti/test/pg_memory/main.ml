@@ -344,6 +344,78 @@ let upsert_scenario ~shape_idx =
         >>| ignore )
   }
 
+(* [insert_into_cols_returning] is the always-INSERT path: no content lookup
+   and no ON CONFLICT, used for the columns whose UNIQUE constraint was dropped
+   (zkapp_events / zkapp_field_array.element_ids). The generated table
+   therefore carries no UNIQUE either -- adding one would let PostgreSQL
+   deduplicate behind the helper and change what is being measured. *)
+let insert_into_returning_scenario ~shape_idx =
+  let name = sprintf "insert_into_cols_returning_s%d" shape_idx in
+  let cols =
+    generate ~scenario:"shape:insert_into_cols_returning" ~iteration:shape_idx
+      (gen_cols ~min_cols:2 ~max_cols:6)
+    |> force_first_text
+  in
+  { name
+  ; describe = describe_cols cols
+  ; setup =
+      (fun ~table ->
+        sprintf "CREATE TABLE %s (id serial PRIMARY KEY, %s)" table
+          (col_defs cols) )
+  ; teardown = (fun ~table -> sprintf "DROP TABLE %s" table)
+  ; step =
+      (fun ~table conn i ->
+        let (Pack (typ, value)) =
+          generate ~scenario:name ~iteration:i (gen_row cols)
+          |> stamp_first ~tag:(sprintf "k-%d" i)
+          |> pack_row
+        in
+        Mina_caqti.insert_into_cols_returning ~returning:("id", Caqti_type.int)
+          ~table_name:table
+          ~cols:(col_names cols, typ)
+          conn value
+        >>| Mina_caqti.ok_exn ~ctx:name
+        >>| ignore )
+  }
+
+(* [insert_multi_into_col_no_dedup] renders its values into the SQL text and
+   has neither ON CONFLICT nor a SELECT-back, so the column carries no UNIQUE
+   constraint. Every call emits a different VALUES list, so every call is a
+   distinct query string -- the last remaining sprintf-of-values path. *)
+let insert_multi_no_dedup_scenario ~shape_idx =
+  let name = sprintf "insert_multi_into_col_no_dedup_s%d" shape_idx in
+  let distractors =
+    generate ~scenario:"shape:insert_multi_into_col_no_dedup"
+      ~iteration:shape_idx
+      (gen_cols ~min_cols:0 ~max_cols:4)
+  in
+  let distractor_defs =
+    List.map distractors ~f:(fun c ->
+        sprintf ", %s %s NOT NULL DEFAULT %s" c.col_name (sql_ty c.col_ty)
+          (match c.col_ty with Text -> "''" | Int -> "0") )
+    |> String.concat ~sep:""
+  in
+  { name
+  ; describe =
+      ( if List.is_empty distractors then "v text (no distractor columns)"
+      else sprintf "v text; distractors: %s" (describe_cols distractors) )
+  ; setup =
+      (fun ~table ->
+        sprintf "CREATE TABLE %s (id serial PRIMARY KEY, v text NOT NULL%s)"
+          table distractor_defs )
+  ; teardown = (fun ~table -> sprintf "DROP TABLE %s" table)
+  ; step =
+      (fun ~table conn i ->
+        let values =
+          generate ~scenario:name ~iteration:i gen_tokens
+          |> List.mapi ~f:(fun j v -> sprintf "v-%d-%d-%s" i j v)
+        in
+        Mina_caqti.insert_multi_into_col_no_dedup ~table_name:table ~col:"v"
+          conn values
+        >>| Mina_caqti.ok_exn ~ctx:name
+        >>| ignore )
+  }
+
 let scenarios ~shapes : scenario list =
   List.concat_map
     (List.range 0 (Int.max 1 shapes))
@@ -351,6 +423,8 @@ let scenarios ~shapes : scenario list =
       [ select_insert_scenario ~shape_idx
       ; insert_multi_scenario ~shape_idx
       ; upsert_scenario ~shape_idx
+      ; insert_into_returning_scenario ~shape_idx
+      ; insert_multi_no_dedup_scenario ~shape_idx
       ] )
 
 (* A UUID table name per run: the benchmark only ever drops what it created in

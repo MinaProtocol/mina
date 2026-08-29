@@ -26,6 +26,15 @@
 --       A stale or unpublished hash is not fatal -- scripts/docker/build.sh falls back to
 --       inlining the base-deps fragment when the image is not available locally -- so the
 --       only cost of forgetting the bump is losing the reuse.
+-- NOTE: postgres is the server every archive job runs against, through
+--       RunWithPostgres. It was pinned to 12.4-alpine, which is end of life and
+--       predates pg_backend_memory_contexts (PostgreSQL 14+), the view the
+--       mina_caqti and archive memory benchmarks read. 17-alpine also matches
+--       src/app/archive/docker-compose, so a dump taken from a production
+--       archive restores into CI instead of failing on a version mismatch.
+--       It is pulled from Docker Hub rather than the euro-docker-repo mirror
+--       because no 14+ tag has been pushed there; mirror it and repoint this
+--       constant if Docker Hub pull limits start to bite.
 { toolchainBase =
     "europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/ci-toolchain-base:v4"
 , minaToolchainBookworm =
@@ -51,8 +60,7 @@
 , minaBaseJammy.amd64 = "docker.io/minaprotocol/mina-base:86b89d0-jammy-devnet"
 , minaBaseNoble.amd64 = "docker.io/minaprotocol/mina-base:86b89d0-noble-devnet"
 , minaBase = "docker.io/minaprotocol/mina-base:86b89d0-bullseye-devnet"
-, postgres =
-    "europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/postgres:12.4-alpine"
+, postgres = "docker.io/postgres:17-alpine"
 , xrefcheck =
     "europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/dkhamsing/awesome_bot:latest"
 , nixos = "gcr.io/o1labs-192920/nix-unstable:1.0.0"

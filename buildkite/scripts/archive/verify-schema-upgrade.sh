@@ -30,7 +30,7 @@ set -euo pipefail
 
 # --- Constants ---
 POSTGRES_CONTAINER="postgres-schema-test-$$"
-POSTGRES_IMAGE="postgres:12.4-alpine"
+POSTGRES_IMAGE="postgres:17-alpine"
 PG_USER="postgres"
 PG_PASSWORD="postgres"
 REPO_ROOT="$(git rev-parse --show-toplevel)"
