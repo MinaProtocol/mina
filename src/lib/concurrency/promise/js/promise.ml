@@ -26,7 +26,7 @@ external create : (('a -> unit) -> unit) -> 'a t = "deferred_create"
 let to_deferred promise =
   let module Ivar = Async_kernel.Ivar in
   let ivar = Ivar.create () in
-  upon_exn promise (fun x -> Ivar.fill ivar x) ;
+  upon_exn promise (fun x -> Ivar.fill_exn ivar x) ;
   Ivar.read ivar
 
 include Base.Monad.Make (struct

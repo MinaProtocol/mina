@@ -227,7 +227,7 @@ module Snark_worker = struct
               [%log info] "Snark worker process died" ;
               if Ivar.is_full kill_ivar then
                 [%log error] "Ivar.fill bug is here!" ;
-              Ivar.fill kill_ivar () ;
+              Ivar.fill_exn kill_ivar () ;
               Deferred.unit
           | Error (`Exit_non_zero non_zero_error) ->
               [%log fatal]
@@ -291,7 +291,7 @@ module Snark_worker = struct
         Mina_metrics.Process_memory.Snark_worker.set_pid snark_worker_pid ;
         if Ivar.is_full process_ivar then
           [%log' error t.config.logger] "Ivar.fill bug is here!" ;
-        Ivar.fill process_ivar snark_worker_process
+        Ivar.fill_exn process_ivar snark_worker_process
     | `Off _ ->
         [%log' info t.config.logger]
           !"Attempted to turn on snark worker, but snark worker key is set to \
@@ -963,7 +963,7 @@ let add_work t (work : Snark_work_lib.Result.Partitioned.Stable.Latest.t) =
 let add_work_graphql t diff =
   let results_ivar = Ivar.create () in
   Network_pool.Snark_pool.Local_sink.push t.pipes.snark_local_sink
-    (diff, Ivar.fill results_ivar)
+    (diff, Ivar.fill_exn results_ivar)
   |> Deferred.don't_wait_for ;
   Ivar.read results_ivar
 
@@ -993,7 +993,7 @@ let add_transactions t (uc_inputs : User_command_input.t list) =
   let result_ivar = Ivar.create () in
   let cmd_inputs = Signed_command_inputs uc_inputs in
   Strict_pipe.Writer.write t.pipes.user_command_input_writer
-    (cmd_inputs, Ivar.fill result_ivar, get_current_nonce t, get_account t)
+    (cmd_inputs, Ivar.fill_exn result_ivar, get_current_nonce t, get_account t)
   |> Deferred.don't_wait_for ;
   Ivar.read result_ivar
 
@@ -1001,7 +1001,7 @@ let add_full_transactions t user_commands =
   let add_all_txns () =
     let result_ivar = Ivar.create () in
     Network_pool.Transaction_pool.Local_sink.push t.pipes.tx_local_sink
-      (user_commands, Ivar.fill result_ivar)
+      (user_commands, Ivar.fill_exn result_ivar)
     |> Deferred.don't_wait_for ;
     Ivar.read result_ivar
   in
@@ -1033,7 +1033,7 @@ let add_zkapp_transactions t
     let result_ivar = Ivar.create () in
     let cmd_inputs = Zkapp_command_command_inputs zkapp_commands in
     Strict_pipe.Writer.write t.pipes.user_command_input_writer
-      (cmd_inputs, Ivar.fill result_ivar, get_current_nonce t, get_account t)
+      (cmd_inputs, Ivar.fill_exn result_ivar, get_current_nonce t, get_account t)
     |> Deferred.don't_wait_for ;
     Ivar.read result_ivar
   in
