@@ -821,26 +821,15 @@ let docker_step
                 }
                 entry.service
 
-let deferDockerPublish
-    : Optional Text
-    =
-      -- Set by a release pipeline to hold every image back until the packaging
-      -- stage has finished, so images and debians are published together
-      -- rather than image by image as each job lands.
-      --
-      -- Presence is the whole signal; there are only two outcomes.
-      Some env:MINA_RELEASE_DEFER_DOCKER_PUBLISH as Text ? None Text
-
-let deferred
-    : Bool
-    = Prelude.Optional.fold
-        Text
-        deferDockerPublish
-        Bool
-        (\(_ : Text) -> True)
-        False
-
 let docker_commands
+    -- Packaging builds images and writes them to the CI cache. It does not
+    -- push them: pushing is what the publish stage does, for images exactly as
+    -- for debians, so a release puts out everything or nothing.
+    --
+    -- These jobs are shared -- nightly runs them too -- and nightly has no
+    -- publish stage, which is now the whole reason nightly cannot push. It is
+    -- structural rather than conditional: there is no flag to set, and no way
+    -- to set it wrong.
     : PackagingSpec.Type -> List Command.Type
     =     \(spec : PackagingSpec.Type)
       ->  let services =
@@ -867,13 +856,8 @@ let docker_commands
                                   DebianChannel.effective spec.channel
                               , docker_repo =
                                   DockerRepo.effective spec.docker_repo
-                              , docker_publish =
-                                        if deferred
-
-                                  then  DockerPublish.Type.Disabled
-
-                                  else  s.docker_publish
-                              , save_to_ci_cache = deferred
+                              , docker_publish = DockerPublish.Type.Disabled
+                              , save_to_ci_cache = True
                               }
                         )
                 )
