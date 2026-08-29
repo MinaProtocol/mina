@@ -97,8 +97,10 @@ let audit_command =
        Bits 0 to 3 have the meaning they had in mina-missing-blocks-auditor, \
        which this subcommand replaces." )
     (Command.Param.map Config.param ~f:(fun flags () ->
-         let%bind _config, pool, logger = setup ~requires_blocks:false flags in
-         let%bind report = or_die ~logger (Audit.report pool) in
+         let%bind config, pool, logger = setup ~requires_blocks:false flags in
+         let%bind report =
+           or_die ~logger (Audit.report pool ~min_height:config.min_height)
+         in
          Audit.log_report ~logger report ;
          if Audit.Report.is_healthy report then
            [%log info]
@@ -107,10 +109,15 @@ let audit_command =
          else [%log info] "The archive is not healthy; see the report above" ;
          Core.exit (Audit.Report.exit_code report) ) )
 
+(* What a repair pass achieved.  [`Incomplete] is a pass that ran to the end
+   without an internal failure but still left a gap open -- a block that is
+   not in the bucket, an ingest the archive rejected, or the --max-blocks
+   limit.  It has to be told apart from [`Repaired] so that the exit code and
+   the daemon's sleep are honest about it. *)
 let repair_once (config : Config.t) ~pool ~logger ~genesis_constants
     ~constraint_constants ~proof_cache_db =
   let open Deferred.Or_error.Let_syntax in
-  let%bind report = Audit.report pool in
+  let%bind report = Audit.report pool ~min_height:config.min_height in
   Audit.log_report ~logger report ;
   if List.is_empty report.Audit.Report.orphans then (
     [%log info]
@@ -121,14 +128,20 @@ let repair_once (config : Config.t) ~pool ~logger ~genesis_constants
       Guardian.repair config ~pool ~logger ~genesis_constants
         ~constraint_constants ~proof_cache_db
     in
+    let unresolved = outcome.Guardian.unresolved in
     [%log info]
-      "Repair pass finished: $blocks_added blocks added, $branches_left_alone \
-       branches left alone"
+      "Repair pass finished: $blocks_added blocks added, $branches_unresolved \
+       branches still open"
       ~metadata:
         [ ("blocks_added", `Int outcome.Guardian.blocks_added)
-        ; ("branches_left_alone", `Int outcome.Guardian.branches_left_alone)
+        ; ("branches_unresolved", `Int (List.length unresolved))
         ] ;
-    `Repaired
+    if Guardian.is_complete outcome then `Repaired
+    else (
+      List.iter unresolved ~f:(fun u ->
+          [%log error] "Block $state_hash still has no parent: $reason"
+            ~metadata:(Guardian.Unresolved.to_metadata u) ) ;
+      `Incomplete )
 
 let single_run_command ~genesis_constants ~constraint_constants =
   Command.async
@@ -136,17 +149,23 @@ let single_run_command ~genesis_constants ~constraint_constants =
     ~readme:(fun () ->
       "Blocks are downloaded from --precomputed-blocks-url and written \
        directly to the archive database. Exits 0 when the archive holds no \
-       block without a parent, and 1 when a gap could not be closed." )
+       block without a parent, and 1 when a gap could not be closed -- \
+       including when the pass stopped at --max-blocks with gaps left, and for \
+       every --dry-run that found a block it could not fetch." )
     (Command.Param.map Config.param ~f:(fun flags () ->
          let%bind config, pool, logger = setup ~requires_blocks:true flags in
          handle_termination ~logger ;
          let proof_cache_db = Proof_cache_tag.create_identity_db () in
-         let%bind (_ : [ `Already_healthy | `Repaired ]) =
+         let%bind result =
            or_die ~logger
              (repair_once config ~pool ~logger ~genesis_constants
                 ~constraint_constants ~proof_cache_db )
          in
-         Core.exit 0 ) )
+         match result with
+         | `Already_healthy | `Repaired ->
+             Core.exit 0
+         | `Incomplete ->
+             Core.exit 1 ) )
 
 let daemon_command ~genesis_constants ~constraint_constants =
   Command.async
@@ -175,11 +194,19 @@ let daemon_command ~genesis_constants ~constraint_constants =
                let%bind () = sleep config.interval in
                loop ~consecutive_failures:0
            | Ok `Repaired ->
+               (* Only a pass that closed every gap earns the long sleep, the
+                  way the bash guardian slept 6*TIMEOUT after a completed
+                  bootstrap.  A pass that stopped early must come back at the
+                  normal interval, or a rate-limited backfill runs
+                  --idle-multiplier times slower than configured. *)
                let%bind () =
                  sleep
                    (Time_ns.Span.scale config.interval
                       (Int.to_float config.idle_multiplier) )
                in
+               loop ~consecutive_failures:0
+           | Ok `Incomplete ->
+               let%bind () = sleep config.interval in
                loop ~consecutive_failures:0
            | Error err ->
                let consecutive_failures = consecutive_failures + 1 in

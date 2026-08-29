@@ -245,26 +245,31 @@ let test_case (test_data : t) =
        found %d such blocks"
       what unparented () ;
 
-  (* 5. And the gap is no longer reported.  The sample archive does not reach
-     back to a canonical genesis block, so its lowest block still has no
-     parent; the guardian reports that separately and it is not a gap. *)
-  let%map final_audit =
+  (* 5. And the audit is clean.  The sample archive does not reach back to a
+     genesis block, so --min-height is what makes a clean result reachable at
+     all: it tells the guardian where this archive is meant to start, and the
+     lowest block is then the bottom of the archive rather than a gap. *)
+  let%bind final_audit =
     run_guardian ~min_height ~archive_uri ~precomputed_blocks:good_source
       ~run_mode:Audit ()
   in
   let what = "audit after the repair" in
+  assert_succeeded ~what final_audit ;
   assert_output_mentions ~what final_audit.stdout
-    "The archive holds no genesis block" ;
-  if
-    String.is_substring final_audit.stdout ~substring:"\"missing_blocks_gap\":"
-    && not
-         (String.is_substring final_audit.stdout
-            ~substring:"\"missing_blocks_gap\":null" )
-  then
+    "There are no missing blocks in the archive db" ;
+
+  (* 6. Without --min-height the same archive is not clean, because nothing
+     says where it is supposed to start: bit 4 reports that it reaches no
+     genesis block. *)
+  let%map audit_without_floor =
+    run_guardian ~archive_uri ~precomputed_blocks:good_source ~run_mode:Audit ()
+  in
+  let what = "audit without --min-height" in
+  if not (Int.equal (audit_without_floor.exit_code land 16) 16) then
     failwithf
-      "%s: the archive must have no measurable gap left, but the audit still \
-       reports one.\n\
+      "%s: bit 4 of the exit code must be set when the archive reaches no \
+       genesis block and no floor was given, but the exit code was %d.\n\
        Output:\n\
        %s"
-      what final_audit.stdout () ;
+      what audit_without_floor.exit_code audit_without_floor.stdout () ;
   Mina_automation_fixture.Intf.Passed

@@ -126,14 +126,30 @@ let resolve_archive_uri (flags : flags) =
              and DB_NAME (unset: %s)"
             (String.concat ~sep:", " missing) )
 
-(** The connection string with the password replaced, safe to log. *)
+(* Query parameters a libpq connection URI may carry a secret in.  The
+   PostgreSQL driver accepts them, so they can appear in PG_CONN. *)
+let secret_query_params = [ "password"; "sslpassword" ]
+
+(** The connection string with every secret replaced, safe to log.  A libpq
+    URI can hold the password in the userinfo or in the query string, so both
+    are covered. *)
 let redacted_archive_uri uri =
-  Uri.to_string
-    ( match Uri.password uri with
+  let uri =
+    match Uri.password uri with
     | None ->
         uri
     | Some _ ->
-        Uri.with_password uri (Some "REDACTED") )
+        Uri.with_password uri (Some "REDACTED")
+  in
+  let query =
+    List.map (Uri.query uri) ~f:(fun (key, values) ->
+        if
+          List.mem secret_query_params (String.lowercase key)
+            ~equal:String.equal
+        then (key, List.map values ~f:(fun _ -> "REDACTED"))
+        else (key, values) )
+  in
+  Uri.to_string (Uri.with_query uri query)
 
 let positive_span name value =
   if Float.( > ) value 0. then Ok (Time_ns.Span.of_sec value)
@@ -171,7 +187,7 @@ let resolve ~requires_blocks (flags : flags) =
       in
       match blocks_url with
       | Some url when List.is_empty missing ->
-          let%map source = Block_source.create (Uri.of_string url) in
+          let%map source = Block_source.create url in
           Some source
       | _ ->
           Or_error.errorf
@@ -180,13 +196,27 @@ let resolve ~requires_blocks (flags : flags) =
              so both the URL and the network name are needed."
             (String.concat ~sep:" and " missing)
   in
-  let%bind interval =
-    positive_span "--interval (TIMEOUT)"
-      (Option.value
-         (Option.first_some flags.interval
-            (Option.bind (env "TIMEOUT") ~f:Float.of_string_opt) )
-         ~default:default_interval_seconds )
+  let%bind interval_seconds =
+    match flags.interval with
+    | Some seconds ->
+        Ok seconds
+    | None -> (
+        match env "TIMEOUT" with
+        | None ->
+            Ok default_interval_seconds
+        | Some raw -> (
+            (* Reject a TIMEOUT that is not a number rather than silently
+               falling back to the default poll interval. *)
+            match Float.of_string_opt raw with
+            | Some seconds ->
+                Ok seconds
+            | None ->
+                Or_error.errorf
+                  "TIMEOUT must be a number of seconds, but it is %S. Use \
+                   --interval to set it on the command line."
+                  raw ) )
   in
+  let%bind interval = positive_span "--interval (TIMEOUT)" interval_seconds in
   let%bind http_timeout =
     positive_span "--http-timeout"
       (Option.value flags.http_timeout ~default:default_http_timeout_seconds)
@@ -400,6 +430,16 @@ let%test_module "config" =
              archive_uri = Some "postgres://u:p@h:5432/archive"
            ; interval = Some 0.
            } )
+
+    let%test "a query-string password is redacted too" =
+      let redacted =
+        redacted_archive_uri
+          (Uri.of_string
+             "postgres://u@h:5432/db?password=hunter2&sslmode=require" )
+      in
+      (not (String.is_substring redacted ~substring:"hunter2"))
+      && String.is_substring redacted ~substring:"REDACTED"
+      && String.is_substring redacted ~substring:"sslmode=require"
 
     let%test "an unknown block format is rejected" =
       Or_error.is_error

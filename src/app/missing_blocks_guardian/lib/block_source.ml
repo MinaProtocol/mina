@@ -23,34 +23,44 @@ type t =
     there, and asking again cannot change that.  [Transient] may be retried. *)
 type failure = Permanent of Error.t | Transient of Error.t
 
+let error_of_failure = function Permanent e | Transient e -> e
+
 let strip_trailing_slashes = String.rstrip ~drop:(Char.equal '/')
 
-let create uri =
-  let unsupported scheme =
-    Or_error.errorf
-      "unsupported scheme %S in the precomputed blocks URL %S. Supported \
-       schemes are http, https and file (a bare path is read as a local \
-       directory)"
-      scheme (Uri.to_string uri)
-  in
-  match Uri.scheme uri with
-  | Some ("http" | "https") ->
-      if Option.is_none (Uri.host uri) then
-        Or_error.errorf "the precomputed blocks URL %S has no host"
-          (Uri.to_string uri)
-      else Ok (Http (Uri.with_path uri (strip_trailing_slashes (Uri.path uri))))
-  | Some "file" ->
-      let path = strip_trailing_slashes (Uri.path uri) in
-      if String.is_empty path then
-        Or_error.errorf "the file URL %S has no path" (Uri.to_string uri)
-      else Ok (Directory path)
-  | Some scheme ->
-      unsupported scheme
-  | None ->
-      let path = strip_trailing_slashes (Uri.to_string uri) in
-      if String.is_empty path then
-        Or_error.error_string "the precomputed blocks URL is empty"
-      else Ok (Directory path)
+(** Read the block source setting.
+
+    The scheme decides how the value is read.  A value with no scheme is taken
+    as a filesystem path exactly as written, not round-tripped through [Uri]:
+    parsing "/data/mina blocks" as a URI and printing it back yields
+    "/data/mina%20blocks", so the guardian would look in a directory that does
+    not exist and name a path the operator never typed. *)
+let create raw =
+  let raw = String.strip raw in
+  if String.is_empty raw then
+    Or_error.error_string "the precomputed blocks URL is empty"
+  else
+    let uri = Uri.of_string raw in
+    match Option.map (Uri.scheme uri) ~f:String.lowercase with
+    | Some ("http" | "https") ->
+        if Option.is_none (Uri.host uri) then
+          Or_error.errorf "the precomputed blocks URL %S has no host" raw
+        else
+          Ok (Http (Uri.with_path uri (strip_trailing_slashes (Uri.path uri))))
+    | Some "file" ->
+        (* Accept both "file:///dir" and the authority-less "file:/dir" that
+           [Uri.make ~scheme:"file" ~path] produces. *)
+        let path = strip_trailing_slashes (Uri.path uri) in
+        if String.is_empty path then
+          Or_error.errorf "the file URL %S has no path" raw
+        else Ok (Directory path)
+    | Some scheme ->
+        Or_error.errorf
+          "unsupported scheme %S in the precomputed blocks URL %S. Supported \
+           schemes are http, https and file (a bare path is read as a local \
+           directory)"
+          scheme raw
+    | None ->
+        Ok (Directory (strip_trailing_slashes raw))
 
 (** Full location of one block file, for logs and error messages. *)
 let location t ~name =
@@ -99,14 +109,27 @@ let parse_json ~where body =
 let fetch_http uri ~name ~timeout =
   let url = Uri.with_path uri (Uri.path uri ^ "/" ^ name) in
   let url_string = Uri.to_string url in
+  (* [interrupt] is handed to the client so that a timed out request is really
+     torn down.  Wrapping the call in [with_timeout] alone abandons the
+     deferred but leaves the socket and its reader open until the peer closes
+     it, which in daemon mode leaks one connection per timed out attempt. *)
+  let interrupt = Ivar.create () in
   let get () =
-    let%bind response, body = Cohttp_async.Client.get url in
+    let%bind response, body =
+      Cohttp_async.Client.get ~interrupt:(Ivar.read interrupt) url
+    in
     let%map body = Cohttp_async.Body.to_string body in
     (response, body)
   in
   match%bind
     Monitor.try_with ~here:[%here] ~extract_exn:true (fun () ->
-        Clock_ns.with_timeout timeout (get ()) )
+        let%map result = Clock_ns.with_timeout timeout (get ()) in
+        ( match result with
+        | `Timeout ->
+            Ivar.fill_if_empty interrupt ()
+        | _ ->
+            () ) ;
+        result )
   with
   | Error exn ->
       (* DNS failure, connection refused, TLS failure, connection reset.  All
@@ -232,21 +255,26 @@ let fetch_once t ~name ~timeout =
 
 (** Fetch one block file and return its JSON.  Retries only failures that can
     plausibly succeed on a second attempt; a 404 or a malformed body fails
-    immediately, because retrying it only delays the real message. *)
+    immediately, because retrying it only delays the real message.
+
+    The {!failure} is handed back to the caller rather than flattened into an
+    [Error.t], so that a branch whose block is simply not in the bucket can be
+    set aside while the other branches are still repaired. *)
 let fetch t ~name ~timeout ~retries ~retry_delay ~logger =
   let rec go attempt =
     match%bind fetch_once t ~name ~timeout with
     | Ok json ->
-        Deferred.Or_error.return json
+        Deferred.return (Ok json)
     | Error (Permanent err) ->
-        Deferred.return (Error err)
+        Deferred.return (Error (Permanent err))
     | Error (Transient err) ->
         if attempt >= retries then
           Deferred.return
             (Error
-               (Error.tag err
-                  ~tag:(sprintf "giving up after %d attempts" (attempt + 1)) )
-            )
+               (Transient
+                  (Error.tag err
+                     ~tag:(sprintf "giving up after %d attempts" (attempt + 1)) )
+               ) )
         else (
           [%log warn] "Retrying download of $block_file after a transient error"
             ~metadata:
@@ -262,29 +290,37 @@ let fetch t ~name ~timeout ~retries ~retry_delay ~logger =
 
 let%test_module "block source" =
   ( module struct
-    let uri = Uri.of_string
-
     let ok_exn = Or_error.ok_exn
 
     let%test "https base URL keeps its path and drops the trailing slash" =
       String.equal
         (location
-           (ok_exn (create (uri "https://example.com/blocks/")))
+           (ok_exn (create "https://example.com/blocks/"))
            ~name:"net-3-hash.json" )
         "https://example.com/blocks/net-3-hash.json"
 
+    let%test "an authority-less file URL is read as a directory" =
+      String.equal
+        (location (ok_exn (create "file:/tmp/out")) ~name:"b.json")
+        "/tmp/out/b.json"
+
     let%test "file URL is read as a directory" =
       String.equal
-        (location (ok_exn (create (uri "file:///tmp/out"))) ~name:"b.json")
+        (location (ok_exn (create "file:///tmp/out")) ~name:"b.json")
         "/tmp/out/b.json"
 
     let%test "a bare path is read as a directory" =
       String.equal
-        (location (ok_exn (create (uri "/tmp/out"))) ~name:"b.json")
+        (location (ok_exn (create "/tmp/out")) ~name:"b.json")
         "/tmp/out/b.json"
 
+    let%test "a bare path with a space is not percent encoded" =
+      String.equal
+        (location (ok_exn (create "/tmp/mina blocks")) ~name:"b.json")
+        "/tmp/mina blocks/b.json"
+
     let%test "an unsupported scheme is rejected" =
-      Or_error.is_error (create (uri "gs://some-bucket/blocks"))
+      Or_error.is_error (create "gs://some-bucket/blocks")
 
     let%test "block file names carry the network prefix and the height" =
       String.equal
