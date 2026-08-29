@@ -18,9 +18,36 @@ caching, see the epic) shows up most.
 It replays these blocks through the real archive insert path
 (`archive_blocks --precomputed` → `Processor.add_block_aux_precomputed` → the
 `Mina_caqti` helpers) directly into a fresh PostgreSQL, and samples the resident memory
-of both the `archive_blocks` process and the serving PostgreSQL backend. A leaking build
-grows the backend RSS roughly with blocks ingested; a fixed build keeps it flat. The
-result is published to the perf-infra InfluxDB (measurement `archive_memory_bench`).
+of both the `archive_blocks` process and the serving PostgreSQL backend. The result is
+published to the perf-infra InfluxDB (measurement `archive_memory_bench`).
+
+Two properties make those samples readable.
+
+**The Caqti pool is pinned to one connection that is never recycled.** Caqti keys its
+prepared-statement cache per connection, so the leak accumulates only while a connection
+stays open. By default `archive_blocks` spreads the ingest over several pooled
+connections and Caqti retires each one after `CAQTI_POOL_MAX_USE_COUNT` uses (100), which
+throws the accumulated plan cache away. The benchmark therefore exports
+`CAQTI_POOL_MAX_SIZE=1`, `CAQTI_POOL_MAX_IDLE_SIZE=1`, `CAQTI_POOL_MAX_IDLE_AGE=none` and
+`CAQTI_POOL_MAX_USE_COUNT=none`. `--no-pin-pool` turns this off, for comparison only. The
+summary reports how many backends were seen and how often the backend changed; anything
+other than one stable backend means the numbers understate the leak.
+
+**Growth is measured against inserted zkApp arrays, not against elapsed time.** The
+corpus is a chain, so its zkApp commands land near the end of the replay. Against time,
+"the heavy blocks started" and "memory is leaking" look the same. The benchmark therefore
+counts the rows in `zkapp_field_array` and `zkapp_events` — the inserts that drive the
+leaking helpers — and fits a least-squares line of RSS against that count, reporting
+`pg_backend_rss_kib_per_1k_arrays` with its r². The end-to-end difference, the peak and
+the tail average are still reported, but the slope is the leak measurement.
+
+No baseline and no threshold are applied. The archive is known to leak, and has always
+leaked; this job measures the size of it, it does not decide whether to fail.
+
+PostgreSQL 14 or newer is expected (CI runs `postgres:17-alpine`). The benchmark warns on
+an older server and still runs — its own RSS samples come from `/proc` — but
+`pg_backend_memory_contexts`, which the companion `mina_caqti` micro-benchmark reads,
+does not exist before 14.
 
 ## Run it locally
 
@@ -37,8 +64,8 @@ export PG_CONN=postgres://user:password@localhost:5432/archive_bench
 ```
 
 It builds `archive_blocks`, unpacks this corpus, feeds it, and prints the growth curve, a
-summary (archive RSS growth, PG-backend RSS peak, tail average), and the InfluxDB line it
-would upload. `--limit N` replays only the first N blocks and `--skip-build` reuses an
+summary (archive RSS growth and slope, PG-backend RSS peak, tail average and slope,
+backend stability), and the InfluxDB line it would upload. `--limit N` replays only the first N blocks and `--skip-build` reuses an
 existing `archive_blocks.exe`, which together make a local run quick; `--help` lists the
 rest.
 
