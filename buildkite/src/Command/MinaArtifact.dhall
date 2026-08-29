@@ -610,7 +610,7 @@ let docker_step
           let withDocker =
                     \(dep : Docker.Type)
                 ->    deps
-                    # [ { name = selfName spec
+                    # [ { name = "${selfName spec}Docker"
                         , key = "${Docker.lowerName dep}${netSeg}"
                         }
                       ]
@@ -630,7 +630,7 @@ let docker_step
                 then  deps
 
                 else    deps
-                      # [ { name = genericPackagingName spec
+                      # [ { name = "${genericPackagingName spec}Docker"
                           , key =
                               "${Docker.lowerName
                                    Docker.Type.DaemonGeneric}-${Network.lowerName
@@ -922,12 +922,41 @@ let packagePipeline
             , includeIf = spec.includeIf
             , excludeIf = spec.excludeIf
             }
-          , steps = [ build_debian spec ] # docker_commands spec
+          , steps = [ build_debian spec ]
+          }
+
+let dockerPipeline
+    : PackagingSpec.Type -> Pipeline.Config.Type
+    =
+      -- The images of a packaging spec, as a job of their own.
+      --
+      -- Separate from the debians because scope is a property of a job and the
+      -- two belong to different pipelines. Nightly needs the debians --
+      -- HardforkPackageConversion and DebianAutomodeTransitionTestMainnet both
+      -- wait on build-deb-pkg -- and needs no image at all, so building images
+      -- there produced 21 tarballs a night that nothing ever read.
+      --
+      -- selfName is deliberately left alone: the docker steps name it in their
+      -- depends_on, and what they wait for is the debian job, which is where
+      -- the packages they install are built.
+          \(spec : PackagingSpec.Type)
+      ->  Pipeline.Config::{
+          , spec = JobSpec::{
+            , dirtyWhen = DebianVersions.packageDirtyWhen
+            , path = "Release"
+            , name = "${selfName spec}Docker"
+            , tags = spec.tags
+            , scope = [ PipelineScope.Type.Release ]
+            , includeIf = spec.includeIf
+            , excludeIf = spec.excludeIf
+            }
+          , steps = docker_commands spec
           }
 
 in  { onlyDebianPipeline = onlyDebianPipeline
     , appsPipeline = appsPipeline
     , packagePipeline = packagePipeline
+    , dockerPipeline = dockerPipeline
     , PackagingSpec = PackagingSpec
     , AppsSpec = AppsSpec
     , labelSuffix = labelSuffix
