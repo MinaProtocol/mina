@@ -36,8 +36,9 @@ let chain_length_error = 2
 
 let chain_status_error = 3
 
-(* The archive holds no genesis block and no post-hard-fork first block.  The
-   auditor used to die with an opaque Caqti error in this case. *)
+(* The archive holds no genesis block and no post-hard-fork first block, and
+   the operator did not say with --min-height where the chain is meant to
+   start.  The auditor used to die with an opaque Caqti error in this case. *)
 let genesis_block_error = 4
 
 module Report = struct
@@ -48,6 +49,10 @@ module Report = struct
               all, so there is no gap to measure -- the orphan is the bottom
               of the archive. *)
     ; genesis_or_fork_height : int option
+    ; min_height : int option
+          (** Height the operator declared as the start of this archive, if
+              any.  A truncated or post-hard-fork archive has no genesis block
+              to find, so with [--min-height] set that is not an error. *)
     ; highest_canonical : int64 option
     ; pending_below_canonical : int64
     ; canonical_chain_length : int64
@@ -58,7 +63,8 @@ module Report = struct
     let bits = ref 0 in
     let set n = bits := !bits lor (1 lsl n) in
     if not (List.is_empty t.orphans) then set missing_blocks_error ;
-    if Option.is_none t.genesis_or_fork_height then set genesis_block_error ;
+    if Option.is_none t.genesis_or_fork_height && Option.is_none t.min_height
+    then set genesis_block_error ;
     if not (Int64.equal t.pending_below_canonical Int64.zero) then
       set pending_blocks_error ;
     Option.iter t.highest_canonical ~f:(fun highest ->
@@ -90,16 +96,24 @@ let genesis_or_fork_height pool =
     the cheap query the backfill loop repeats after every ingested block; it
     deliberately avoids the recursive canonical-chain query of a full
     {!report}. *)
-let missing_parents pool =
+let missing_parents pool ~min_height =
   let open Deferred.Or_error.Let_syntax in
   let%bind raw =
     query pool ~what:"querying blocks with no parent" (fun db ->
         Sql.Unparented_blocks_detail.run db () )
   in
   let%map genesis_height = genesis_or_fork_height pool in
+  (* A block is not missing a parent when there is no parent it could have:
+     the genesis or first post-hard-fork block, a block at height 1, or -- on
+     an archive the operator declared as starting higher up -- any block at or
+     below [--min-height].  Those are the bottom of the archive, not a gap. *)
+  let floor = Option.value min_height ~default:1 in
   let orphans =
     List.filter_map raw ~f:(fun (block_id, state_hash, height, parent_hash) ->
-        if Option.exists genesis_height ~f:(Int.equal height) then None
+        if
+          Option.exists genesis_height ~f:(Int.equal height)
+          || Int.( <= ) height floor
+        then None
         else Some { Orphan.block_id; state_hash; height; parent_hash } )
     |> List.sort ~compare:(fun a b -> Int.compare a.Orphan.height b.height)
   in
@@ -111,9 +125,9 @@ let preflight pool =
   query pool ~what:"counting blocks in the archive" (fun db ->
       Sql.Block_count.run db () )
 
-let report pool =
+let report pool ~min_height =
   let open Deferred.Or_error.Let_syntax in
-  let%bind orphans, genesis_or_fork_height = missing_parents pool in
+  let%bind orphans, genesis_or_fork_height = missing_parents pool ~min_height in
   let%bind orphans =
     Deferred.Or_error.List.map ~how:`Sequential orphans ~f:(fun orphan ->
         let%map gap =
@@ -134,6 +148,7 @@ let report pool =
       return
         { Report.orphans
         ; genesis_or_fork_height
+        ; min_height
         ; highest_canonical = None
         ; pending_below_canonical = Int64.zero
         ; canonical_chain_length = Int64.zero
@@ -157,6 +172,7 @@ let report pool =
       in
       { Report.orphans
       ; genesis_or_fork_height
+      ; min_height
       ; highest_canonical = Some highest_canonical
       ; pending_below_canonical
       ; canonical_chain_length = List.length canonical_chain |> Int64.of_int
@@ -166,10 +182,17 @@ let report pool =
 (* The messages below are the ones [mina-missing-blocks-auditor] emitted, kept
    verbatim so that log-scraping alerts keep matching. *)
 let log_report ~logger (t : Report.t) =
-  ( match t.genesis_or_fork_height with
-  | Some _ ->
+  [%log info] "Querying missing blocks" ;
+  ( match (t.genesis_or_fork_height, t.min_height) with
+  | Some _, _ ->
       ()
-  | None ->
+  | None, Some min_height ->
+      [%log info]
+        "The archive holds no genesis block and no first post-hard-fork block. \
+         --min-height says it is meant to start at $min_height, so blocks \
+         below that are not reported as missing."
+        ~metadata:[ ("min_height", `Int min_height) ]
+  | None, None ->
       [%log error]
         "The archive holds no genesis block and no first post-hard-fork block. \
          Every block below the earliest stored block will be reported as \
