@@ -64,7 +64,7 @@ module Submit_internal_log = struct
 
   let rpc : (query, response) Async.Rpc.Rpc.t =
     Async.Rpc.Rpc.create ~name:"Submit_internal_log" ~version:0 ~bin_query
-      ~bin_response
+      ~bin_response ~include_in_error_count:Only_on_exn
 end
 
 let dispatch_remote_log (log, where_to_connect) =
