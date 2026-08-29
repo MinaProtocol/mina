@@ -11,11 +11,21 @@
    stdio
    alcotest
    cmdliner
+   cohttp
+   cohttp-async
+   uri
    ;; mina libraries
    mina_automation
    mina_automation.fixture
    mina_automation.runner)
- 
+ ;; The tests shell out to the guardian binary, so make sure it is built
+ ;; before the tests run.  At runtime the path is resolved via
+ ;; [Executor.PathFinder] (look in [_build/default] first, fall back
+ ;; to PATH for deb-installed packages), so this dep is purely a
+ ;; build-ordering constraint.
+ (deps
+   ../../../app/missing_blocks_guardian/missing_blocks_guardian.exe
+   ../../../app/archive_blocks/archive_blocks.exe)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version ppx_jane ppx_mina ppx_compare)))
 
