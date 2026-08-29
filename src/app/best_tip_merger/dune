@@ -9,7 +9,6 @@
   core_unix.command_unix
   async_kernel
   stdio
-  base.caml
   yojson
   lib
   core_kernel

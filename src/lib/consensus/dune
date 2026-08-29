@@ -12,7 +12,6 @@
   async_unix
   async_kernel
   sexplib0
-  base.caml
   integers
   async
   core

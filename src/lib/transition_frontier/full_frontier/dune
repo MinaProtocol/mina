@@ -5,7 +5,6 @@
   ;;opam libraries
   integers
   core
-  base.caml
   core_kernel
   sexplib0
   base.base_internalhash_types

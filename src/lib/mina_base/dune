@@ -9,7 +9,6 @@
   async_kernel
   base
   base.base_internalhash_types
-  base.caml
   base_quickcheck
   bin_prot.shape
   core_kernel

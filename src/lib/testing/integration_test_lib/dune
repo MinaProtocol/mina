@@ -25,7 +25,6 @@
   ;; opam libraries
   result
   base.base_internalhash_types
-  base.caml
   base
   uri
   sexplib0

@@ -18,7 +18,6 @@
   ppx_inline_test.config
   async_unix
   sexplib0
-  base.caml
   base.base_internalhash_types
   splittable_random
   lmdb

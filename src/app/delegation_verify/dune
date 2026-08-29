@@ -12,7 +12,6 @@
   core_unix.time_float_unix
   stdio
   base
-  base.caml
   ppx_deriving_yojson.runtime
   yojson
   base64

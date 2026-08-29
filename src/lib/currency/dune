@@ -8,7 +8,6 @@
   ;; opam libraries
   base
   base.base_internalhash_types
-  base.caml
   bin_prot.shape
   core_kernel
   integers
