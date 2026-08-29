@@ -15,8 +15,8 @@ change. `mina-missing-blocks-auditor` no longer exists: run
 
 ## Why one app
 
-Three failures were possible with the two-tool arrangement, and each of them
-is now a named, terminating error.
+Four failures were possible with the two-tool arrangement, and each of them is
+now named and reported.
 
 1. **A block that is not in the bucket was ingested anyway.** `curl -s` reports
    success for a 404 and writes the bucket's XML or HTML error page to the
@@ -33,6 +33,10 @@ is now a named, terminating error.
    or hard-fork block has a block with no parent at its lowest height forever,
    so the walk ran down past height 1 asking for blocks that cannot exist. The
    walk now stops at height 1, or at `--min-height`, and says why.
+4. **One bad branch hid all the others.** The bash loop only ever looked at the
+   first block the auditor reported, so a branch it could not close blocked
+   every other gap behind it. A branch that cannot be closed is now set aside
+   and reported, and the pass continues with the rest.
 
 There is also no longer a dependency on `jq`, `curl` or `psql` at run time.
 
@@ -55,10 +59,27 @@ to 3 have the meaning they had in `mina-missing-blocks-auditor`.
 | 1 | 2 | some blocks below the highest canonical block are still `pending` |
 | 2 | 4 | the canonical chain is shorter than the highest canonical height |
 | 3 | 8 | a block on the canonical chain has another chain status |
-| 4 | 16 | the archive holds no genesis block and no first post-hard-fork block |
+| 4 | 16 | the archive holds no genesis block and no first post-hard-fork block, and no `--min-height` was given |
 
-`single-run` and `daemon` exit 0 when they finish with no gap left, and 1 when
-a gap could not be closed.
+On an archive that starts at a hard fork or was restored from a truncated
+dump, pass `--min-height` to `audit` as well. It tells the audit where the
+chain is meant to start, so the lowest block counts as the bottom of the
+archive rather than a missing parent, and a healthy archive of that shape can
+return 0.
+
+`single-run` exits 0 only when no gap is left. It exits 1 when a gap could not
+be closed, which includes a pass that stopped at `--max-blocks` with gaps
+remaining, and any `--dry-run` that found a block it could not fetch.
+
+Note that the bash script this replaces always exited 0 from its `audit`
+subcommand. A wrapper of the form `mina-missing-blocks-guardian audit && ...`
+now sees the bit mask, as it would have from `mina-missing-blocks-auditor`.
+
+One branch that cannot be closed does not stop the others. A block that is not
+in the bucket, or one the archive rejects, sets that branch aside; the pass
+carries on with the remaining branches and reports every branch it left open
+at the end. This matters because the walk goes lowest first: without it, one
+unreachable block at the bottom of the archive would hide every gap above it.
 
 ## Settings
 
@@ -77,12 +98,12 @@ These flags are new and have no environment variable:
 
 | Flag | Default | Meaning |
 | --- | --- | --- |
-| `--idle-multiplier` | `6` | in `daemon` mode, wait this many times `--interval` after a pass that added blocks |
+| `--idle-multiplier` | `6` | in `daemon` mode, wait this many times `--interval` after a pass that closed every gap. A pass that left a gap open comes back at the normal interval |
 | `--http-timeout` | `60` | seconds allowed for one block download |
 | `--retries` | `3` | extra attempts for a download that failed for a transient reason. A missing or malformed block is never retried |
 | `--retry-delay` | `5` | seconds between download attempts |
 | `--max-blocks` | no limit | stop after adding this many blocks in one repair pass |
-| `--min-height` | `1` | refuse to fetch a block below this height |
+| `--min-height` | `1` | treat this height as the bottom of the archive: never fetch below it, and do not report the block there as missing a parent |
 | `--max-consecutive-failures` | `5` | exit in `daemon` mode after this many failed passes in a row. `0` means never exit |
 | `--dry-run` | off | report and validate what would be downloaded, and write nothing |
 
