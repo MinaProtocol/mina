@@ -18,7 +18,7 @@
 # it is a behaviour-preserving no-op for any caller that has not opted in.
 #
 # Some debs ship "binaries" that are actually in-repo shell scripts (e.g. the
-# missing-blocks guardian). For those, set APPS_BARE_SCRIPTS: a comma-separated
+# hardfork dispatcher). For those, set APPS_BARE_SCRIPTS: a comma-separated
 # list of <repo-path>:<install-as> pairs. When the bare restore is taken, each
 # script is installed onto PATH as /usr/local/bin/<install-as>, mirroring the deb.
 #

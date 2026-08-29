@@ -1,7 +1,7 @@
 (** Shared SQL queries for archive node health monitoring.
 
     These queries are used by the archive healthcheck CLI, the
-    missing blocks auditor, and archive metrics reporting. *)
+    missing blocks guardian, and archive metrics reporting. *)
 
 (** Maximum block height stored in the archive database.
     Returns 0 if the database is empty. *)

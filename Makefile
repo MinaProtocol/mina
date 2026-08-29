@@ -249,7 +249,7 @@ build-archive-utils: ocaml_checks reformat-diff ## Build archive node and relate
 		src/app/replayer/replayer.exe \
 		src/app/archive_blocks/archive_blocks.exe \
 		src/app/extract_blocks/extract_blocks.exe \
-		src/app/missing_blocks_auditor/missing_blocks_auditor.exe \
+		src/app/missing_blocks_guardian/missing_blocks_guardian.exe \
 		src/app/archive_hardfork_toolbox/archive_hardfork_toolbox.exe \
 		src/app/dump_slot_ledger/dump_slot_ledger.exe \
 		src/app/mina_archive_healthcheck/mina_archive_healthcheck.exe \
@@ -324,12 +324,12 @@ build-replayer: ocaml_checks ## Build the replayer tool
 		--profile=$(DUNE_PROFILE) \
 		&& echo "✅ Build complete"
 
-.PHONY: build-missing-blocks-auditor
-build-missing-blocks-auditor: ocaml_checks ## Build missing blocks auditor tool
-	$(info 🏗️  Building missing blocks auditor tool with profile $(DUNE_PROFILE) and commit $(GITLONGHASH))
+.PHONY: build-missing-blocks-guardian
+build-missing-blocks-guardian: ocaml_checks ## Build missing blocks guardian tool
+	$(info 🏗️  Building missing blocks guardian tool with profile $(DUNE_PROFILE) and commit $(GITLONGHASH))
 	@(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && \
 	dune build \
-		src/app/missing_blocks_auditor/missing_blocks_auditor.exe \
+		src/app/missing_blocks_guardian/missing_blocks_guardian.exe \
 		--profile=$(DUNE_PROFILE) \
 		&& echo "✅ Build complete"
 

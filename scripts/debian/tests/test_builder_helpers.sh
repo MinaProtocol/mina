@@ -162,7 +162,6 @@ assert_archive_binaries() {
     assert_file_captured "$captured_files" "usr/local/bin/mina-extract-blocks"
     assert_file_captured "$captured_files" "usr/local/bin/mina-archive-hardfork-toolbox"
     assert_file_captured "$captured_files" "usr/local/bin/mina-missing-blocks-guardian"
-    assert_file_captured "$captured_files" "usr/local/bin/mina-missing-blocks-auditor"
     assert_file_captured "$captured_files" "usr/local/bin/mina-replayer"
 }
 
@@ -366,7 +365,7 @@ MOCKEXE
     create_mock_exe "default/src/app/archive_blocks/archive_blocks.exe"
     create_mock_exe "default/src/app/extract_blocks/extract_blocks.exe"
     create_mock_exe "default/src/app/archive_hardfork_toolbox/archive_hardfork_toolbox.exe"
-    create_mock_exe "default/src/app/missing_blocks_auditor/missing_blocks_auditor.exe"
+    create_mock_exe "default/src/app/missing_blocks_guardian/missing_blocks_guardian.exe"
     create_mock_exe "default/src/app/replayer/replayer.exe"
     create_mock_exe "default/src/app/zkapp_test_transaction/zkapp_test_transaction.exe"
     create_mock_exe "default/src/app/delegation_verify/delegation_verify.exe"
@@ -384,9 +383,6 @@ MOCKEXE
     create_mock_exe "scripts/hardfork/create_runtime_config.sh" "$PROJECT_ROOT"
     create_mock_exe "scripts/hardfork/mina-verify-packaged-fork-config" "$PROJECT_ROOT"
     create_mock_exe "scripts/hardfork/dispatcher.sh" "$PROJECT_ROOT"
-
-    # archive scripts
-    create_mock_exe "scripts/archive/missing-blocks-guardian.sh" "$PROJECT_ROOT"
 
     # rocksdb storage converter (packaged by the storage toolbox deb)
     create_mock_exe "scripts/rocksdb/convert-to-legacy.sh" "$PROJECT_ROOT"

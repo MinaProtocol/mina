@@ -171,14 +171,18 @@ O(1) Labs nightly backup into that new database. If this data is persisted
 across reboots/deployments then the `init-db.sh` script will short-circuit and
 refuse to restore from the database backup.
 
-#### download-missing-blocks.sh
+#### mina-missing-blocks-guardian
 
-In all cases, `download-missing-blocks.sh` will check the database every 5
-minutes for any gaps / missing blocks until the first missing block is
-encountered. Once this happens, `mina-missing-blocks-auditor` will return the
-state hash and block height for whichever blocks are missing, and the script
-will download them one at a time from O(1) Labs JSON block backups until the
-missing blocks auditor reaches the genesis block.
+In all cases, `mina-missing-blocks-guardian daemon` will check the database at
+the interval given by `--interval` (`TIMEOUT`, 10 minutes by default) for any
+gaps / missing blocks. Once a block with no parent is found, the guardian
+downloads the parent blocks one at a time from the O(1) Labs JSON block backups
+and writes them into the archive, until the archive reaches the genesis block or
+the first block after a hard fork.
+
+A download that returns a 404, an error page, or a body that is not a block
+stops the run with a message naming the URL and the HTTP status, instead of
+being written into the archive as if it were a block.
 
 If the data in PostgreSQL is really stale (>24 hours), it would likely be
 better/quicker to delete the `/data/` directory and force `init-db.sh` to
