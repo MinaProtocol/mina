@@ -45,17 +45,25 @@ open Async
 let exec_oneshot sql =
   Caqti_request.Infix.(Caqti_type.unit ->. Caqti_type.unit) ~oneshot:true sql
 
-(* Both signals in one round trip. [sum] is deliberately NOT coalesced: a NULL
-   means "nothing to measure" and stays distinguishable from a genuine zero.
-   Cached query plans live under CacheMemoryContext as child contexts
-   (CachedPlanSource / CachedPlan), so the backend total tracks the same growth
-   as a secondary, corroborating signal to the deterministic prepared-statement
-   count. *)
+(* Both signals in one round trip, read on the connection doing the work --
+   [pg_prepared_statements] and [pg_backend_memory_contexts] are both
+   session-local, so no outside observer can obtain either.
+
+   The byte figure sums the plan cache alone: every prepared statement adds one
+   [CachedPlanSource] context and one [CachedPlanQuery] context under
+   CacheMemoryContext, and nothing else does. Summing every context instead
+   would fold in roughly a megabyte of execution-time contexts that come and go
+   with each query and would swamp a small leak; measured on PostgreSQL 17, the
+   filtered figure is exact and perfectly linear, while the unfiltered one is
+   not. The parent CacheMemoryContext block is excluded too, being a constant
+   512 KiB that only dilutes the rate. The sum is coalesced because an
+   unprepared session legitimately matches no context at all. *)
 let sample_req =
   Caqti_request.Infix.(Caqti_type.unit ->! Caqti_type.(t2 int (option int)))
     ~oneshot:true
     "SELECT (SELECT count(*)::int FROM pg_prepared_statements), (SELECT \
-     sum(total_bytes)::bigint FROM pg_backend_memory_contexts)"
+     coalesce(sum(total_bytes), 0)::bigint FROM pg_backend_memory_contexts \
+     WHERE name LIKE 'Cached%')"
 
 (* [pg_backend_memory_contexts] only exists on PostgreSQL 14+; on older servers
    the query above fails to parse, and this is all we can measure. *)
@@ -85,7 +93,7 @@ module Sampler = struct
           t.backend_memory <- false ;
           printf
             "   (note: pg_backend_memory_contexts unavailable on this server \
-             (<PG14); backend_KiB not measured)\n" ;
+             (<PG14); plan-cache bytes not measured)\n" ;
           prepared_only t.conn >>| fun prepared -> (prepared, None) )
     else prepared_only t.conn >>| fun prepared -> (prepared, None)
 end
@@ -94,8 +102,10 @@ type result =
   { name : string
   ; prepared_final : int
   ; per_call : float
-  ; backend_kib_final : int option
+  ; plan_cache_kib_final : int option
         (* [None] on servers without [pg_backend_memory_contexts] (<PG14) *)
+  ; plan_cache_growth_kib : int option
+  ; plan_cache_bytes_per_call : float option
   ; iterations : int
   }
 
@@ -450,19 +460,19 @@ let run_scenario ~uri ~iterations ~sample_every (s : scenario) =
   let sampler = Sampler.create conn in
   printf "\n== scenario: %s (table %s) ==\n" s.name table ;
   printf "   shape: %s\n" s.describe ;
-  printf "   %-10s %-12s %-14s\n" "calls" "prepared" "backend_KiB" ;
+  printf "   %-10s %-12s %-16s\n" "calls" "prepared" "plancache_KiB" ;
   let sample_and_print calls =
     let%map prepared, bytes = Sampler.sample sampler in
-    printf "   %-10d %-12d %-14s\n" calls prepared
+    printf "   %-10d %-12d %-16s\n" calls prepared
       (Option.value_map bytes ~default:"n/a" ~f:(fun b ->
            Int.to_string (b / 1024) ) ) ;
     (prepared, bytes)
   in
-  let%bind prepared0, _ = sample_and_print 0 in
+  let%bind prepared0, bytes0 = sample_and_print 0 in
   let%bind final_prepared, final_bytes =
     Deferred.List.fold
       (List.range 1 (iterations + 1))
-      ~init:(prepared0, None)
+      ~init:(prepared0, bytes0)
       ~f:(fun acc i ->
         let%bind () = s.step ~table conn i in
         if i % sample_every = 0 || i = iterations then sample_and_print i
@@ -473,17 +483,39 @@ let run_scenario ~uri ~iterations ~sample_every (s : scenario) =
     >>| Mina_caqti.ok_exn ~ctx:(sprintf "teardown[%s]" s.name)
   in
   let per_call = Float.of_int final_prepared /. Float.of_int iterations in
-  let backend_kib_final = Option.map final_bytes ~f:(fun b -> b / 1024) in
+  let plan_cache_kib_final = Option.map final_bytes ~f:(fun b -> b / 1024) in
+  (* growth against the zero-call baseline, so a session that starts with a
+     warm cache does not read as a leak *)
+  let plan_cache_growth =
+    match (bytes0, final_bytes) with
+    | Some before, Some after ->
+        Some (after - before)
+    | _ ->
+        None
+  in
+  let plan_cache_growth_kib =
+    Option.map plan_cache_growth ~f:(fun b -> b / 1024)
+  in
+  let plan_cache_bytes_per_call =
+    Option.map plan_cache_growth ~f:(fun b ->
+        Float.of_int b /. Float.of_int iterations )
+  in
   printf
     "   RESULT scenario=%s iterations=%d prepared_final=%d \
-     prepared_per_call=%.3f backend_KiB_final=%s\n"
+     prepared_per_call=%.3f plan_cache_KiB_final=%s plan_cache_KiB_growth=%s \
+     plan_cache_bytes_per_call=%s\n"
     s.name iterations final_prepared per_call
-    (Option.value_map backend_kib_final ~default:"n/a" ~f:Int.to_string) ;
+    (Option.value_map plan_cache_kib_final ~default:"n/a" ~f:Int.to_string)
+    (Option.value_map plan_cache_growth_kib ~default:"n/a" ~f:Int.to_string)
+    (Option.value_map plan_cache_bytes_per_call ~default:"n/a"
+       ~f:(sprintf "%.1f") ) ;
   let%map () = C.disconnect () in
   { name = s.name
   ; prepared_final = final_prepared
   ; per_call
-  ; backend_kib_final
+  ; plan_cache_kib_final
+  ; plan_cache_growth_kib
+  ; plan_cache_bytes_per_call
   ; iterations
   }
 
@@ -500,17 +532,21 @@ let influx_lines ~measurement ~tags (results : result list) =
     List.map tags ~f:(fun (k, v) -> sprintf "%s=%s" k (sanitize v))
     |> String.concat ~sep:","
   in
-  (* [backend_kib_final] is omitted rather than sent as 0 where the server has no
-     [pg_backend_memory_contexts]: a constant-zero series charts as a real
-     measurement, whereas a missing one is visibly missing. *)
+  (* the plan-cache fields are omitted rather than sent as 0 where the server
+     has no [pg_backend_memory_contexts]: a constant-zero series charts as a
+     real measurement, whereas a missing one is visibly missing. *)
   List.map results ~f:(fun r ->
       let fields =
         [ sprintf "prepared_final=%di" r.prepared_final
         ; sprintf "prepared_per_call=%.6f" r.per_call
         ; sprintf "iterations=%di" r.iterations
         ]
-        @ Option.value_map r.backend_kib_final ~default:[] ~f:(fun kib ->
-              [ sprintf "backend_kib_final=%di" kib ] )
+        @ Option.value_map r.plan_cache_kib_final ~default:[] ~f:(fun kib ->
+              [ sprintf "plan_cache_kib_final=%di" kib ] )
+        @ Option.value_map r.plan_cache_growth_kib ~default:[] ~f:(fun kib ->
+              [ sprintf "plan_cache_growth_kib=%di" kib ] )
+        @ Option.value_map r.plan_cache_bytes_per_call ~default:[]
+            ~f:(fun bytes -> [ sprintf "plan_cache_bytes_per_call=%.6f" bytes ])
       in
       sprintf "%s,%s,scenario=%s %s %d" (sanitize measurement) tag_str
         (sanitize r.name)
@@ -528,8 +564,10 @@ let main ~uri ~iterations ~sample_every ~shapes ~assert_max_prepared
   in
   printf "\n== summary ==\n" ;
   List.iter results ~f:(fun r ->
-      printf "   %-32s prepared_final=%-8d per_call=%.3f\n" r.name
-        r.prepared_final r.per_call ) ;
+      printf "   %-36s prepared_final=%-8d per_call=%-8.3f bytes_per_call=%s\n"
+        r.name r.prepared_final r.per_call
+        (Option.value_map r.plan_cache_bytes_per_call ~default:"n/a"
+           ~f:(sprintf "%.1f") ) ) ;
   let lines = influx_lines ~measurement ~tags results in
   ( match influxdb_file with
   | None ->
