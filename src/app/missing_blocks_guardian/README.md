@@ -8,10 +8,11 @@ gaps it finds. It replaces two tools that used to do this together:
 | `mina-missing-blocks-auditor` (OCaml) | reported blocks with no parent and gaps in the chain statuses | the `audit` subcommand |
 | `mina-missing-blocks-guardian` (bash) | ran the auditor, piped its log through `jq`, downloaded the parent block with `curl` and gave it to `mina-archive-blocks` | the `single-run` and `daemon` subcommands |
 
-The subcommands, the environment variables and the log messages are the ones
-the bash script used, so a deployment that ran the script does not have to
-change. `mina-missing-blocks-auditor` no longer exists: run
-`mina-missing-blocks-guardian audit --archive-uri URI` in its place.
+The subcommands, the environment variables and the per-block log messages are
+the ones the bash script used, so a deployment that ran the script does not have
+to change. `mina-missing-blocks-auditor` no longer exists: run
+`mina-missing-blocks-guardian audit --archive-uri URI` in its place. The exit
+codes are simpler than either tool's — see below.
 
 ## Why one app
 
@@ -48,38 +49,49 @@ There is also no longer a dependency on `jq`, `curl` or `psql` at run time.
 | `single-run` | Audits, fills every gap it can, then exits. |
 | `daemon` | Repeats `single-run` on a timer, forever. |
 
-### Exit code of `audit`
+### Exit codes
 
-The exit code is a bit mask, so several problems are reported at once. Bits 0
-to 3 have the meaning they had in `mina-missing-blocks-auditor`.
+Every subcommand answers the same way: **0 when there is nothing wrong, 1 when
+there is.** There is no bit mask to decode — each problem is logged as an error
+line naming what is wrong, and one run reports all of them.
 
-| Bit | Value | Meaning |
-| --- | --- | --- |
-| 0 | 1 | some blocks have no parent in the archive |
-| 1 | 2 | some blocks below the highest canonical block are still `pending` |
-| 2 | 4 | the canonical chain is shorter than the highest canonical height |
-| 3 | 8 | a block on the canonical chain has another chain status |
-| 4 | 16 | the archive holds no genesis block and no first post-hard-fork block, and no `--min-height` was given |
+`audit` exits 1 when any of these holds:
+
+- some blocks have no parent in the archive;
+- the archive holds no genesis block and no first post-hard-fork block, and no
+  `--min-height` was given;
+- the archive holds no canonical block at all;
+- some blocks at or below the highest canonical block are still `pending`;
+- the canonical chain is shorter than the range of heights it covers;
+- a block along the canonical chain has another chain status.
 
 On an archive that starts at a hard fork or was restored from a truncated
-dump, pass `--min-height` to `audit` as well. It tells the audit where the
-chain is meant to start, so the lowest block counts as the bottom of the
-archive rather than a missing parent, and a healthy archive of that shape can
-return 0.
+dump, pass `--min-height` to `audit` as well. It says where the chain is meant
+to start, so the earliest block counts as the bottom of the archive rather than
+a missing parent, and the chain length is measured from there. Without it such
+an archive can never report healthy.
 
-`single-run` exits 0 only when no gap is left. It exits 1 when a gap could not
-be closed, which includes a pass that stopped at `--max-blocks` with gaps
-remaining, and any `--dry-run` that found a block it could not fetch.
+`single-run` exits 1 when a gap is left: a block that is not in the block
+source, one the archive rejected, a pass that stopped at `--max-blocks` with
+gaps remaining, or any `--dry-run` that found a block it could not fetch.
 
-Note that the bash script this replaces always exited 0 from its `audit`
-subcommand. A wrapper of the form `mina-missing-blocks-guardian audit && ...`
-now sees the bit mask, as it would have from `mina-missing-blocks-auditor`.
+A failure to run at all — an unreachable database, an un-migrated schema, a
+missing or malformed setting — also exits 1, with a fatal log line saying what
+is wrong.
+
+`daemon` runs until it is stopped, and exits 1 after
+`--max-consecutive-failures` passes fail in a row.
 
 One branch that cannot be closed does not stop the others. A block that is not
 in the bucket, or one the archive rejects, sets that branch aside; the pass
-carries on with the remaining branches and reports every branch it left open
-at the end. This matters because the walk goes lowest first: without it, one
+carries on with the remaining branches and reports every branch it left open at
+the end. This matters because the walk goes lowest first: without it, one
 unreachable block at the bottom of the archive would hide every gap above it.
+
+> `mina-missing-blocks-auditor` returned a bit mask, and the bash `audit`
+> subcommand always returned 0. Both are replaced by the plain 0 or 1 above. A
+> script that tested particular bits should test the exit status instead and
+> read the logged problems for detail.
 
 ## Settings
 
@@ -103,7 +115,7 @@ These flags are new and have no environment variable:
 | `--retries` | `3` | extra attempts for a download that failed for a transient reason. A missing or malformed block is never retried |
 | `--retry-delay` | `5` | seconds between download attempts |
 | `--max-blocks` | no limit | stop after adding this many blocks in one repair pass |
-| `--min-height` | `1` | treat this height as the bottom of the archive: never fetch below it, and do not report the block there as missing a parent |
+| `--min-height` | `1` | treat this height as the bottom of the archive: never fetch below it, do not report the block there as missing a parent, and measure the canonical chain from it |
 | `--max-consecutive-failures` | `5` | exit in `daemon` mode after this many failed passes in a row. `0` means never exit |
 | `--dry-run` | off | report and validate what would be downloaded, and write nothing |
 

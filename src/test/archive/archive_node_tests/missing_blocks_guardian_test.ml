@@ -97,6 +97,28 @@ let lowest_height ~archive_uri =
   count ~archive_uri ~what:"read the lowest block height"
     "SELECT MIN(height) FROM blocks"
 
+(* Blocks written straight into the archive by [mina-archive-blocks] are all
+   [pending]: canonicalization is the running archive node's job, and there is
+   none here.  An archive where nothing is canonical is a problem the audit
+   reports in its own right, so mark the chain from the tip downwards
+   canonical before asking whether the archive is healthy. *)
+let canonicalize_chain ~archive_uri =
+  let connection = Psql.Conn_str archive_uri in
+  match%map
+    Psql.run_command ~connection
+      "WITH RECURSIVE chain AS ( SELECT id, parent_id FROM (SELECT id, \
+       parent_id FROM blocks WHERE height = (SELECT MAX(height) FROM blocks) \
+       ORDER BY id LIMIT 1) tip UNION ALL SELECT b.id, b.parent_id FROM blocks \
+       b JOIN chain ON b.id = chain.parent_id ) UPDATE blocks SET chain_status \
+       = (CASE WHEN id IN (SELECT id FROM chain) THEN 'canonical' ELSE \
+       'orphaned' END)::chain_status_type"
+  with
+  | Ok (_ : string) ->
+      ()
+  | Error err ->
+      failwith
+        ("Failed to canonicalize the sample chain: " ^ Error.to_string_hum err)
+
 let run_guardian ?min_height ~archive_uri ~precomputed_blocks ~run_mode () =
   Missing_blocks_guardian.run_capturing Missing_blocks_guardian.default
     ~config:
@@ -249,6 +271,7 @@ let test_case (test_data : t) =
      genesis block, so --min-height is what makes a clean result reachable at
      all: it tells the guardian where this archive is meant to start, and the
      lowest block is then the bottom of the archive rather than a gap. *)
+  let%bind () = canonicalize_chain ~archive_uri in
   let%bind final_audit =
     run_guardian ~min_height ~archive_uri ~precomputed_blocks:good_source
       ~run_mode:Audit ()
@@ -258,18 +281,16 @@ let test_case (test_data : t) =
   assert_output_mentions ~what final_audit.stdout
     "There are no missing blocks in the archive db" ;
 
-  (* 6. Without --min-height the same archive is not clean, because nothing
-     says where it is supposed to start: bit 4 reports that it reaches no
-     genesis block. *)
+  (* 6. Without --min-height the same archive is not healthy, because nothing
+     says where it is supposed to start: the earliest block is reported as
+     missing a parent and the archive reaches no genesis block. *)
   let%map audit_without_floor =
     run_guardian ~archive_uri ~precomputed_blocks:good_source ~run_mode:Audit ()
   in
   let what = "audit without --min-height" in
-  if not (Int.equal (audit_without_floor.exit_code land 16) 16) then
-    failwithf
-      "%s: bit 4 of the exit code must be set when the archive reaches no \
-       genesis block and no floor was given, but the exit code was %d.\n\
-       Output:\n\
-       %s"
-      what audit_without_floor.exit_code audit_without_floor.stdout () ;
+  assert_failed ~what audit_without_floor ;
+  assert_output_mentions ~what audit_without_floor.stdout
+    "The archive holds no genesis block" ;
+  assert_output_mentions ~what audit_without_floor.stdout
+    "Block has no parent in archive db" ;
   Mina_automation_fixture.Intf.Passed

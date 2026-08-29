@@ -85,29 +85,26 @@ let audit_command =
        chain statuses"
     ~readme:(fun () ->
       "Nothing is written to the database.\n\n\
-       The exit code is a bit mask, so several problems can be reported at once:\n\
-      \  bit 0 (1)  some blocks have no parent in the archive\n\
-      \  bit 1 (2)  some blocks below the highest canonical block are still \
-       pending\n\
-      \  bit 2 (4)  the canonical chain is shorter than the highest canonical \
-       height\n\
-      \  bit 3 (8)  a block on the canonical chain has another chain status\n\
-      \  bit 4 (16) the archive holds no genesis block and no first \
-       post-hard-fork block\n\n\
-       Bits 0 to 3 have the meaning they had in mina-missing-blocks-auditor, \
-       which this subcommand replaces." )
+       Exits 0 when the archive is healthy and 1 when it is not. Every problem \
+       found is logged as an error naming what is wrong, so one run reports \
+       all of them:\n\
+      \  - some blocks have no parent in the archive\n\
+      \  - the archive holds no genesis block and no first post-hard-fork \
+       block, and no --min-height was given\n\
+      \  - the archive holds no canonical block at all\n\
+      \  - some blocks at or below the highest canonical block are still pending\n\
+      \  - the canonical chain is shorter than the range of heights it covers\n\
+      \  - a block along the canonical chain has another chain status\n\n\
+       On an archive that starts at a hard fork or was restored from a \
+       truncated dump, pass --min-height so that its earliest block counts as \
+       the bottom of the archive rather than a missing block." )
     (Command.Param.map Config.param ~f:(fun flags () ->
          let%bind config, pool, logger = setup ~requires_blocks:false flags in
          let%bind report =
            or_die ~logger (Audit.report pool ~min_height:config.min_height)
          in
          Audit.log_report ~logger report ;
-         if Audit.Report.is_healthy report then
-           [%log info]
-             "This archive node is synced with no missing blocks back to \
-              genesis"
-         else [%log info] "The archive is not healthy; see the report above" ;
-         Core.exit (Audit.Report.exit_code report) ) )
+         Core.exit (if Audit.Report.is_healthy report then 0 else 1) ) )
 
 (* What a repair pass achieved.  [`Incomplete] is a pass that ran to the end
    without an internal failure but still left a gap open -- a block that is
@@ -119,10 +116,7 @@ let repair_once (config : Config.t) ~pool ~logger ~genesis_constants
   let open Deferred.Or_error.Let_syntax in
   let%bind report = Audit.report pool ~min_height:config.min_height in
   Audit.log_report ~logger report ;
-  if List.is_empty report.Audit.Report.orphans then (
-    [%log info]
-      "This archive node is synced with no missing blocks back to genesis" ;
-    return `Already_healthy )
+  if List.is_empty report.Audit.Report.orphans then return `Already_healthy
   else
     let%map outcome =
       Guardian.repair config ~pool ~logger ~genesis_constants
