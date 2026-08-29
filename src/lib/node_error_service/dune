@@ -13,6 +13,7 @@
   cohttp
   async_kernel
   core_kernel.uuid
+  core_unix.uuid
   integers
   ;; local libraries
   error_json

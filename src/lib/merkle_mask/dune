@@ -28,6 +28,7 @@
   core
   core_kernel
   core_kernel.uuid
+  core_unix.uuid
   integers
   sexplib0
   stdio

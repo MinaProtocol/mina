@@ -21,6 +21,7 @@
   base
   result
   core_kernel.uuid
+  core_unix.uuid
   async_rpc_kernel
   sexp_diff
   ;; local libraries

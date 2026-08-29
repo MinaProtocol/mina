@@ -39,6 +39,7 @@
   child_processes
   coda_genesis_ledger
   core_kernel.uuid
+  core_unix.uuid
   genesis_constants
   merkle_ledger
   protocol_version

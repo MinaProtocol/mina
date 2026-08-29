@@ -4,6 +4,7 @@
  (libraries
   ;;opam libraries
   core_kernel.uuid
+  core_unix.uuid
   core_kernel
   core
   ;;local libraries
