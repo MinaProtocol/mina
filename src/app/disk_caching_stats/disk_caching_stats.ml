@@ -597,7 +597,7 @@ let serial_bench (type a) ~(name : string)
   let read_timer = Timer.init () in
   let hash_timer = Timer.init () in
   for i = 1 to bench_count do
-    let random = Splittable_random.State.of_int i in
+    let random = Splittable_random.of_int i in
     let sample = Quickcheck.Generator.generate ~size ~random gen in
     let size = bin_class.writer.size sample in
     let buf = Bigstring.create size in

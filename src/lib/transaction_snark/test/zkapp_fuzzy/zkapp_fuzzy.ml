@@ -143,7 +143,7 @@ let generate_zkapp_commands_and_apply_them_consecutively_5_times ~successful
              $zkapp_command for details" ;
           successful := false
     in
-    Splittable_random.State.split random
+    Splittable_random.split random
   in
   let tests = List.init 5 ~f:(fun i -> test i) in
   Deferred.List.fold tests ~init:random ~f:(fun random test -> test random)
@@ -194,7 +194,7 @@ let generate_zkapp_commands_and_apply_them_freshly ~successful
            details" ;
         successful := false
   in
-  Splittable_random.State.split random
+  Splittable_random.split random
 
 let mk_invalid_test ~successful ~max_account_updates ~type_of_failure
     ~expected_failure_status ~individual_test_timeout random =
@@ -251,7 +251,7 @@ let mk_invalid_test ~successful ~max_account_updates ~type_of_failure
            for details" ;
         successful := false
   in
-  Splittable_random.State.split random
+  Splittable_random.split random
 
 let test_timed_account ~successful ~max_account_updates ~individual_test_timeout
     random =
@@ -300,7 +300,7 @@ let test_timed_account ~successful ~max_account_updates ~individual_test_timeout
           "Timed account test failed, see $exn and $zkapp_command for details" ;
         successful := false
   in
-  Splittable_random.State.split random
+  Splittable_random.split random
 
 let () =
   Command_unix.run
@@ -328,7 +328,7 @@ let () =
           let open Mina_generators.Zkapp_command_generators in
           let open Transaction_status.Failure in
           let max_account_updates = 3 in
-          let random = Splittable_random.State.of_int seed in
+          let random = Splittable_random.of_int seed in
           let successful = ref true in
           let rec loop random =
             generate_zkapp_commands_and_apply_them_consecutively_5_times
