@@ -6,9 +6,7 @@ module For_tests : sig
   val mk_dummy_proof :
        statement:
          ( Pasta_bindings.Fp.t
-         , ( Mina_wire_types.Currency.M.Amount.V1.t
-           , Sgn.Stable.V1.t )
-           Mina_wire_types.Signed_poly.V1.t
+         , Mina_wire_types.Currency.M.Amount.V1.t
          , Mina_wire_types.Mina_base_pending_coinbase.M.Stack_versioned.V1.t
          , Mina_base.Fee_excess.Stable.V2.t
          , 'a

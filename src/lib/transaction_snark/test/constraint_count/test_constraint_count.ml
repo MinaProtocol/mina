@@ -50,43 +50,43 @@ type profile_expected_values =
 
 let dev_expected_values =
   { transaction_merge =
-      { constraints = 564
+      { constraints = 568
       ; public_input_size = 298
-      ; auxiliary_input_size = 1761
-      ; digest = "bdabeb841fc2361392dd6ac6e541a944"
+      ; auxiliary_input_size = 1843
+      ; digest = "b69d1b6cd6804c77a3ecaa1dcc0b8aee"
       }
   ; transaction_base =
-      { constraints = 12864
+      { constraints = 12877
       ; public_input_size = 298
-      ; auxiliary_input_size = 37375
-      ; digest = "84bc56d329c4c4fc1568a5a431373b64"
+      ; auxiliary_input_size = 37511
+      ; digest = "8bfa307456fa9dd8e674059a412eb414"
       }
   ; zkapp_opt_signed_opt_signed =
-      { constraints = 16321
+      { constraints = 16334
       ; public_input_size = 298
-      ; auxiliary_input_size = 73353
-      ; digest = "471126c9da562837da265347db388edf"
+      ; auxiliary_input_size = 73489
+      ; digest = "29933b2934ac2be1d2ad971192f29612"
       }
   ; zkapp_opt_signed =
-      { constraints = 8913
+      { constraints = 8926
       ; public_input_size = 298
-      ; auxiliary_input_size = 40463
-      ; digest = "6922e2397468e7f88ef7a52b0779a6c1"
+      ; auxiliary_input_size = 40599
+      ; digest = "578e94634eb8ce36409a7e47aa7a2057"
       }
   ; zkapp_proved =
-      { constraints = 5136
+      { constraints = 5149
       ; public_input_size = 298
-      ; auxiliary_input_size = 39029
-      ; digest = "4dd774a3dfb922dc016c920a5e479163"
+      ; auxiliary_input_size = 39165
+      ; digest = "175f595e71ac83ebca6043c50974fc9f"
       }
   }
 
 let devnet_expected_values =
   { transaction_merge =
-      { constraints = 564
+      { constraints = 568
       ; public_input_size = 298
-      ; auxiliary_input_size = 1761
-      ; digest = "bdabeb841fc2361392dd6ac6e541a944"
+      ; auxiliary_input_size = 1843
+      ; digest = "b69d1b6cd6804c77a3ecaa1dcc0b8aee"
       }
   ; transaction_base =
       { constraints = 15357
@@ -116,10 +116,10 @@ let devnet_expected_values =
 
 let lightnet_expected_values =
   { transaction_merge =
-      { constraints = 564
+      { constraints = 568
       ; public_input_size = 298
-      ; auxiliary_input_size = 1761
-      ; digest = "bdabeb841fc2361392dd6ac6e541a944"
+      ; auxiliary_input_size = 1843
+      ; digest = "b69d1b6cd6804c77a3ecaa1dcc0b8aee"
       }
   ; transaction_base =
       { constraints = 15357
@@ -149,10 +149,10 @@ let lightnet_expected_values =
 
 let mainnet_expected_values =
   { transaction_merge =
-      { constraints = 564
+      { constraints = 568
       ; public_input_size = 298
-      ; auxiliary_input_size = 1761
-      ; digest = "bdabeb841fc2361392dd6ac6e541a944"
+      ; auxiliary_input_size = 1843
+      ; digest = "b69d1b6cd6804c77a3ecaa1dcc0b8aee"
       }
   ; transaction_base =
       { constraints = 15357

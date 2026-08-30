@@ -5,17 +5,24 @@ module Impl = Pickles.Impls.Step
 [%%versioned
 module Stable = struct
   module V2 = struct
-    type ('ledger, 'pending_coinbase_stack, 'local_state, 'fee_excess) t =
+    type ( 'ledger
+         , 'pending_coinbase_stack
+         , 'local_state
+         , 'fee_excess
+         , 'amount )
+         t =
           ( 'ledger
           , 'pending_coinbase_stack
           , 'local_state
-          , 'fee_excess )
+          , 'fee_excess
+          , 'amount )
           Mina_wire_types.Mina_state.Registers.V2.t =
       { first_pass_ledger : 'ledger
       ; second_pass_ledger : 'ledger
       ; pending_coinbase_stack : 'pending_coinbase_stack
       ; local_state : 'local_state
       ; fee_excess : 'fee_excess
+      ; total_currency : 'amount
       }
     [@@deriving compare, equal, hash, sexp, yojson, hlist, fields]
   end
@@ -27,12 +34,14 @@ let gen =
   and second_pass_ledger = Frozen_ledger_hash.gen
   and pending_coinbase_stack = Pending_coinbase.Stack.gen
   and local_state = Local_state.gen
-  and fee_excess = Fee_excess.gen in
+  and fee_excess = Fee_excess.gen
+  and total_currency = Currency.Amount.gen in
   { first_pass_ledger
   ; second_pass_ledger
   ; pending_coinbase_stack
   ; local_state
   ; fee_excess
+  ; total_currency
   }
 
 let to_input
@@ -41,6 +50,7 @@ let to_input
     ; pending_coinbase_stack
     ; local_state
     ; fee_excess
+    ; total_currency
     } =
   Array.reduce_exn ~f:Random_oracle.Input.Chunked.append
     [| Frozen_ledger_hash.to_input first_pass_ledger
@@ -48,6 +58,7 @@ let to_input
      ; Pending_coinbase.Stack.to_input pending_coinbase_stack
      ; Local_state.to_input local_state
      ; Fee_excess.to_input fee_excess
+     ; Currency.Amount.to_input total_currency
     |]
 
 let typ spec =
@@ -59,7 +70,8 @@ module Value = struct
     ( Frozen_ledger_hash.t
     , Pending_coinbase.Stack.t
     , Local_state.t
-    , Fee_excess.t )
+    , Fee_excess.t
+    , Currency.Amount.t )
     Stable.Latest.t
   [@@deriving compare, equal, sexp, yojson, hash]
 
@@ -69,7 +81,8 @@ module Value = struct
         ( Frozen_ledger_hash.t
         , unit
         , Local_state.t
-        , Fee_excess.t )
+        , Fee_excess.t
+        , Currency.Amount.t )
         Stable.Latest.t
       [@@deriving compare, equal, sexp, yojson, hash]
     end in
@@ -85,7 +98,8 @@ module Checked = struct
     ( Ledger_hash.var
     , Pending_coinbase.Stack.var
     , Local_state.Checked.t
-    , Fee_excess.var )
+    , Fee_excess.var
+    , Currency.Amount.var )
     t
 
   let to_input
@@ -94,6 +108,7 @@ module Checked = struct
       ; pending_coinbase_stack
       ; local_state
       ; fee_excess
+      ; total_currency
       } =
     let open Snark_params.Tick.Checked.Let_syntax in
     let%map fee_excess = Fee_excess.to_input_checked fee_excess in
@@ -103,6 +118,7 @@ module Checked = struct
        ; Pending_coinbase.Stack.var_to_input pending_coinbase_stack
        ; Local_state.Checked.to_input local_state
        ; fee_excess
+       ; Currency.Amount.var_to_input total_currency
       |]
 
   let equal t1 t2 =
@@ -115,5 +131,6 @@ module Checked = struct
       ~local_state:(fun acc f ->
         Local_state.Checked.equal' (Field.get f t1) (Field.get f t2) @ acc )
       ~fee_excess:(f !Fee_excess.equal_checked)
+      ~total_currency:(f !Currency.Amount.equal_var)
     |> Impl.Boolean.all
 end

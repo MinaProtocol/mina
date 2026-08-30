@@ -56,11 +56,14 @@ let create_value ~blockchain_state ~consensus_transition
 
 let genesis ~constraint_constants ~consensus_constants ~genesis_ledger
     ~genesis_body_reference : value =
+  let genesis_total_currency =
+    Consensus.Genesis_data.genesis_ledger_total_currency ~ledger:genesis_ledger
+  in
   let genesis_ledger = Lazy.force genesis_ledger in
   { Poly.blockchain_state =
       Blockchain_state.genesis ~constraint_constants ~consensus_constants
         ~genesis_ledger_hash:(Mina_ledger.Ledger.merkle_root genesis_ledger)
-        ~genesis_body_reference
+        ~genesis_total_currency ~genesis_body_reference
   ; consensus_transition = Consensus.Data.Consensus_transition.genesis
   ; pending_coinbase_update = Pending_coinbase.Update.genesis
   }
