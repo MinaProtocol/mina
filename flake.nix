@@ -12,7 +12,7 @@
   };
 
   inputs.utils.url = "github:gytis-ivaskevicius/flake-utils-plus";
-  inputs.nixpkgs.url = "github:nixos/nixpkgs/nixos-24.11-small";
+  inputs.nixpkgs.url = "github:nixos/nixpkgs/nixos-25.11-small";
   inputs.nixpkgs-old.url = "github:nixos/nixpkgs/nixos-23.05-small";
   inputs.nixpkgs-unstable.url = "github:nixos/nixpkgs/nixos-unstable";
 
