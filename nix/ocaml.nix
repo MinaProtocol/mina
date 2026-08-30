@@ -81,6 +81,15 @@ let
 
       core =
         super.core.overrideAttrs { propagatedBuildInputs = [ pkgs.tzdata ]; };
+
+      # nixpkgs removes `pg_config` from the `postgresql` output and ships it as
+      # a separate package, but conf-postgresql's depext only pulls in
+      # `postgresql`. Without this, this package's dune `discover` rule fails
+      # with "/bin/sh: pg_config: not found".
+      postgresql = super.postgresql.overrideAttrs (oa: {
+        nativeBuildInputs = oa.nativeBuildInputs
+          ++ [ pkgs.postgresql.pg_config ];
+      });
     };
 
   scope =
