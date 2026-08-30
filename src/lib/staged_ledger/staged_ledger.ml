@@ -1999,7 +1999,6 @@ module T = struct
           ; coinbase = res.coinbase
           ; internal_command_statuses =
               [] (*updated later based on application result*)
-          ; padding = None
           } )
     in
     let pre_diff_with_two (res : Resources.t) :
@@ -2012,7 +2011,6 @@ module T = struct
       ; coinbase = res.coinbase
       ; internal_command_statuses =
           [] (*updated later based on application result*)
-      ; padding = None
       }
     in
     let end_log ((res : Resources.t), (log : Diff_creation_log.t)) =
@@ -3361,7 +3359,6 @@ let%test_module "staged ledger tests" =
                  ; commands = List.take txns slots
                  ; coinbase = Zero
                  ; internal_command_statuses = []
-                 ; padding = None
                  }
                , None )
         | Some (_, _) ->
@@ -3371,7 +3368,6 @@ let%test_module "staged ledger tests" =
                 ; commands = List.take txns slots
                 ; coinbase = Zero
                 ; internal_command_statuses = []
-                ; padding = None
                 }
               , Some
                   { completed_works =
@@ -3380,7 +3376,6 @@ let%test_module "staged ledger tests" =
                   ; commands = txns_in_second_diff
                   ; coinbase = Zero
                   ; internal_command_statuses = []
-                  ; padding = None
                   } )
       in
       let empty_diff = Staged_ledger_diff.empty_diff in
@@ -4814,7 +4809,6 @@ let%test_module "staged ledger tests" =
                   ; commands = cmds
                   ; coinbase = Zero
                   ; internal_command_statuses = [ Applied ]
-                  ; padding = None
                   }
                 in
                 { diff = (pre_diff, None) }
