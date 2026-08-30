@@ -1746,14 +1746,9 @@ module T = struct
           1
 
     let slots_occupied t =
-      let fee_for_self =
-        match t.budget with
-        | Error _ ->
-            0
-        | Ok b ->
-            if Fee.(b > Fee.zero) then 1 else 0
-      in
-      let total_fee_transfer_pks = t.other_prover_count + fee_for_self in
+      (* The receiver's own share of the transaction fees is paid by the
+         coinbase, so it costs no slot of its own. *)
+      let total_fee_transfer_pks = t.other_prover_count in
       t.commands_count + ((total_fee_transfer_pks + 1) / 2) + coinbase_added t
 
     let space_available res =
