@@ -4,8 +4,8 @@ open Core
 module Stable = struct
   [@@@no_toplevel_latest_type]
 
-  module V2 = struct
-    type t = { staged_ledger_diff : Diff.Stable.V3.t }
+  module V3 = struct
+    type t = { staged_ledger_diff : Diff.Stable.V4.t }
     [@@deriving equal, fields, sexp]
 
     let to_latest = Fn.id

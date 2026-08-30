@@ -11,15 +11,15 @@ open Mina_state
 module Wire_types = Mina_wire_types.Mina_block.Header
 
 module Make_sig (A : Wire_types.Types.S) = struct
-  module type S = Header_intf.Full with type Stable.V3.t = A.V3.t
+  module type S = Header_intf.Full with type Stable.V4.t = A.V4.t
 end
 
 module Make_str (A : Wire_types.Concrete) = struct
   [%%versioned
   module Stable = struct
-    module V3 = struct
-      type t = A.V3.t =
-        { protocol_state : Protocol_state.Value.Stable.V3.t
+    module V4 = struct
+      type t = A.V4.t =
+        { protocol_state : Protocol_state.Value.Stable.V4.t
         ; protocol_state_proof : (Proof.Stable.V3.t[@sexp.opaque])
         ; delta_block_chain_proof :
             (* TODO: abstract *)

@@ -63,7 +63,7 @@ module type Blockchain_state = sig
       , Body_reference.t
       , Amount.Signed.t
       , Pending_coinbase.Stack_versioned.Stable.V1.t
-      , Fee_excess.Stable.V1.t
+      , Fee_excess.Stable.V2.t
       , unit )
       Poly.t
     [@@deriving sexp]

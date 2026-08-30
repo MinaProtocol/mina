@@ -6893,7 +6893,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "OBJECT",
-                  "name": "FeeExcess",
+                  "name": "SignedFee",
                   "ofType": null
                 }
               },
@@ -10840,81 +10840,6 @@
           "possibleTypes": null
         },
         {
-          "kind": "OBJECT",
-          "name": "FeeExcess",
-          "description": "Fee excess divided into left, right components",
-          "fields": [
-            {
-              "name": "feeTokenLeft",
-              "description": "Token id for left component of fee excess",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "TokenId",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "feeExcessLeft",
-              "description": "Fee for left component of fee excess",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "OBJECT",
-                  "name": "SignedFee",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "feeTokenRight",
-              "description": "Token id for right component of fee excess",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "TokenId",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "feeExcessRight",
-              "description": "Fee for right component of fee excess",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "OBJECT",
-                  "name": "SignedFee",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            }
-          ],
-          "inputFields": null,
-          "interfaces": [],
-          "enumValues": null,
-          "possibleTypes": null
-        },
-        {
           "kind": "ENUM",
           "name": "sign",
           "description": null,
@@ -11434,7 +11359,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "OBJECT",
-                  "name": "FeeExcess",
+                  "name": "SignedFee",
                   "ofType": null
                 }
               },

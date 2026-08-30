@@ -8,7 +8,7 @@ module type S = sig
   module Stable : sig
     [@@@no_toplevel_latest_type]
 
-    module V3 : sig
+    module V4 : sig
       type nonrec t = t [@@deriving compare, equal, sexp, yojson, hash]
 
       val to_latest : t -> t

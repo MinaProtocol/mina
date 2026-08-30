@@ -234,7 +234,7 @@ val get_staged_ledger_aux_and_pending_coinbases_at_hash :
 val get_completed_checked_snarks :
      t
   -> Peer.t
-  -> (Transaction_snark_work.Stable.V3.t list, Error.t) result Deferred.t
+  -> (Transaction_snark_work.Stable.V4.t list, Error.t) result Deferred.t
 
 val ban_notify :
   t -> Network_peer.Peer.t -> Time_float.t -> unit Deferred.Or_error.t

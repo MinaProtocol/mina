@@ -269,8 +269,7 @@ module Mina_base = struct
     Assert_equal0V1
       (O.Pending_coinbase.Hash_versioned.Stable)
       (W.Pending_coinbase.Hash_versioned)
-  include Assert_equal2V1 (O.Fee_excess.Poly.Stable) (W.Fee_excess.Poly)
-  include Assert_equal0V1 (O.Fee_excess.Stable) (W.Fee_excess)
+  include Assert_equal0V2 (O.Fee_excess.Stable) (W.Fee_excess)
   include
     Assert_equal0V2
       (O.Transaction_status.Failure.Stable)
@@ -328,22 +327,22 @@ module Mina_state = struct
   include Assert_equal3V1 (O.Registers.Stable) (W.Registers)
   include Assert_equal0V1 (O.Local_state.Stable) (W.Local_state)
   include
-    Assert_equal0V2 (O.Blockchain_state.Value.Stable) (W.Blockchain_state.Value)
-  include Assert_equal0 (O.Blockchain_state.Value) (W.Blockchain_state.Value.V2)
+    Assert_equal0V3 (O.Blockchain_state.Value.Stable) (W.Blockchain_state.Value)
+  include Assert_equal0 (O.Blockchain_state.Value) (W.Blockchain_state.Value.V3)
   include
     Assert_equal4V1
       (O.Protocol_state.Body.Poly.Stable)
       (W.Protocol_state.Body.Poly)
   include
-    Assert_equal0V3
+    Assert_equal0V4
       (O.Protocol_state.Body.Value.Stable)
       (W.Protocol_state.Body.Value)
   include
-    Assert_equal0V3 (O.Protocol_state.Value.Stable) (W.Protocol_state.Value)
+    Assert_equal0V4 (O.Protocol_state.Value.Stable) (W.Protocol_state.Value)
   include
-    Assert_equal0V2 (O.Snarked_ledger_state.Stable) (W.Snarked_ledger_state)
+    Assert_equal0V3 (O.Snarked_ledger_state.Stable) (W.Snarked_ledger_state)
   include
-    Assert_equal0V2
+    Assert_equal0V3
       (O.Snarked_ledger_state.With_sok.Stable)
       (W.Snarked_ledger_state.With_sok)
 end
@@ -364,20 +363,20 @@ end
 module Transaction_snark = struct
   module O = Transaction_snark
   module W = WT.Transaction_snark
-  include Assert_equal0V3 (O.Stable) (W)
+  include Assert_equal0V4 (O.Stable) (W)
 end
 
 module Transaction_snark_work = struct
   module O = Transaction_snark_work
   module W = WT.Transaction_snark_work
-  include Assert_equal0V2 (O.Statement.Stable) (W.Statement)
-  include Assert_equal0V3 (O.Stable) (W)
+  include Assert_equal0V3 (O.Statement.Stable) (W.Statement)
+  include Assert_equal0V4 (O.Stable) (W)
 end
 
 module Ledger_proof = struct
   module O = Ledger_proof
   module W = WT.Ledger_proof
-  include Assert_equal0V3 (O.Stable) (W)
+  include Assert_equal0V4 (O.Stable) (W)
 end
 
 module Protocol_version = struct
@@ -391,7 +390,7 @@ module Network_pool = struct
   module W = WT.Network_pool
   include Assert_equal1V1 (O.Priced_proof.Stable) (W.Priced_proof)
   include
-    Assert_equal0V3
+    Assert_equal0V4
       (O.Snark_pool.Diff_versioned.Stable)
       (W.Snark_pool.Diff_versioned)
 end
@@ -421,5 +420,5 @@ end
 module Mina_block = struct
   module O = Mina_block
   module W = WT.Mina_block
-  include Assert_equal0V3 (O.Header.Stable) (W.Header)
+  include Assert_equal0V4 (O.Header.Stable) (W.Header)
 end

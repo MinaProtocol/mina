@@ -43,10 +43,10 @@ end
 module Protocol_state = struct
   [%%versioned
   module Stable = struct
-    module V3 = struct
+    module V4 = struct
       type t =
         { previous_state_hash : State_hash.Stable.V1.t
-        ; blockchain_state : Mina_state.Blockchain_state.Value.Stable.V2.t
+        ; blockchain_state : Mina_state.Blockchain_state.Value.Stable.V3.t
         ; consensus_state : Consensus.Data.Consensus_state.Value.Stable.V3.t
         }
 
@@ -59,13 +59,13 @@ end
 module Stable = struct
   [@@@no_toplevel_latest_type]
 
-  module V3 = struct
+  module V4 = struct
     type t =
       { creator : Public_key.Compressed.Stable.V1.t
       ; winner : Public_key.Compressed.Stable.V1.t
-      ; protocol_state : Protocol_state.Stable.V3.t
+      ; protocol_state : Protocol_state.Stable.V4.t
       ; transactions : Transactions.Stable.V3.t
-      ; snark_jobs : Transaction_snark_work.Info.Stable.V2.t list
+      ; snark_jobs : Transaction_snark_work.Info.Stable.V3.t list
       ; proof : Proof.Stable.V3.t
       }
 

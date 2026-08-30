@@ -30,9 +30,9 @@ end
 module Stable : sig
   [@@@no_toplevel_latest_type]
 
-  module V2 : sig
+  module V3 : sig
     type t =
-      (Single_spec.Stable.V3.t, Sub_zkapp_spec.Stable.V2.t) Poly.Stable.V1.t
+      (Single_spec.Stable.V4.t, Sub_zkapp_spec.Stable.V3.t) Poly.Stable.V1.t
     [@@deriving sexp, yojson]
 
     val to_latest : t -> t

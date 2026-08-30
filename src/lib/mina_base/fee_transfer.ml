@@ -108,10 +108,14 @@ module Make_str (A : Wire_types.Concrete) = struct
   include Comparable.Make (Stable.Latest)
 
   let fee_excess ft =
-    ft
-    |> One_or_two.map ~f:(fun { fee_token; fee; _ } ->
-        (fee_token, Currency.Fee.Signed.(negate (of_unsigned fee))) )
-    |> Fee_excess.of_one_or_two
+    let excess { Single.fee; _ } =
+      Currency.Fee.Signed.(negate (of_unsigned fee))
+    in
+    match ft with
+    | `One single ->
+        Ok (excess single)
+    | `Two (single1, single2) ->
+        Fee_excess.combine (excess single1) (excess single2)
 
   let receiver_pks t =
     One_or_two.to_list (One_or_two.map ~f:Single.receiver_pk t)

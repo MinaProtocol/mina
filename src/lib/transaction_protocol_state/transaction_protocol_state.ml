@@ -3,8 +3,8 @@ open Core
 module Block_data = struct
   [%%versioned
   module Stable = struct
-    module V3 = struct
-      type t = Mina_state.Protocol_state.Body.Value.Stable.V3.t
+    module V4 = struct
+      type t = Mina_state.Protocol_state.Body.Value.Stable.V4.t
       [@@deriving sexp]
 
       let to_latest = Fn.id
@@ -19,10 +19,10 @@ end
 module Poly = struct
   [%%versioned
   module Stable = struct
-    module V3 = struct
+    module V4 = struct
       type 'a t =
         { transaction : 'a
-        ; block_data : Block_data.Stable.V3.t
+        ; block_data : Block_data.Stable.V4.t
         ; global_slot : Mina_numbers.Global_slot_since_genesis.Stable.V1.t
         }
       [@@deriving sexp]
@@ -32,8 +32,8 @@ end
 
 [%%versioned
 module Stable = struct
-  module V3 = struct
-    type 'a t = 'a Poly.Stable.V3.t [@@deriving sexp]
+  module V4 = struct
+    type 'a t = 'a Poly.Stable.V4.t [@@deriving sexp]
   end
 end]
 

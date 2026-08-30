@@ -84,9 +84,9 @@ module Root_transition = struct
     module Stable = struct
       [@@@no_toplevel_latest_type]
 
-      module V5 = struct
+      module V6 = struct
         type t =
-          { new_root : Root_data.Limited.Stable.V4.t
+          { new_root : Root_data.Limited.Stable.V5.t
           ; garbage : Node_list.Lite.Stable.V1.t
           ; just_emitted_a_proof : bool
           }
@@ -102,8 +102,8 @@ module Root_transition = struct
       module Stable = struct
         [@@@no_toplevel_latest_type]
 
-        module V5 = struct
-          type t = Lite_binable.Stable.V5.t
+        module V6 = struct
+          type t = Lite_binable.Stable.V6.t
 
           let to_latest = Fn.id
         end
@@ -112,7 +112,7 @@ module Root_transition = struct
 
     [%%versioned_binable
     module Stable = struct
-      module V5 = struct
+      module V6 = struct
         type t = lite root_transition
 
         module T_nonbinable = struct
@@ -124,12 +124,12 @@ module Root_transition = struct
                ; just_emitted_a_proof
                ; old_root_scan_state = Lite
                } :
-                t ) : Binable_arg.Stable.V5.t =
+                t ) : Binable_arg.Stable.V6.t =
             { new_root; garbage; just_emitted_a_proof }
 
           let of_binable
               ({ new_root; garbage; just_emitted_a_proof } :
-                Binable_arg.Stable.V5.t ) : t =
+                Binable_arg.Stable.V6.t ) : t =
             { new_root
             ; garbage
             ; old_root_scan_state = Lite
@@ -138,7 +138,7 @@ module Root_transition = struct
         end
 
         include
-          Binable.Of_binable_without_uuid (Binable_arg.Stable.V5) (T_nonbinable)
+          Binable.Of_binable_without_uuid (Binable_arg.Stable.V6) (T_nonbinable)
 
         let to_latest = Fn.id
       end
