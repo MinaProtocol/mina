@@ -2396,9 +2396,15 @@ module Make_str (A : Wire_types.Concrete) = struct
                 current_global_slot pending_coinbase_stack_init
             in
             let%bind computed_pending_coinbase_stack_after =
-              let coinbase =
-                (Account_id.Checked.public_key receiver, payload.body.amount)
+              (* The stack records the minted coinbase, which is what the
+                 blockchain snark checks against the protocol's coinbase
+                 amount. The fee remainder is currency the block already
+                 collected, so it is not part of that. *)
+              let%bind minted =
+                Amount.Checked.sub payload.body.amount
+                  (Amount.Checked.of_fee fee_remainder)
               in
+              let coinbase = (Account_id.Checked.public_key receiver, minted) in
               let%bind stack' =
                 Pending_coinbase.Stack.Checked.push_coinbase coinbase
                   pending_coinbase_stack_with_state
