@@ -73,7 +73,7 @@ module Root_transition : sig
   module Lite : sig
     [%%versioned:
     module Stable : sig
-      module V5 : sig
+      module V6 : sig
         type t = lite root_transition
       end
     end]

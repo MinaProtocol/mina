@@ -279,15 +279,12 @@ let fee_excess ({ body = { tag; amount; _ }; common = { fee; _ } } : t) =
   match tag with
   | Payment | Stake_delegation ->
       (* For all user commands, the fee excess is just the fee. *)
-      Fee_excess.of_single (Token_id.default, Fee.Signed.of_unsigned fee)
+      Fee.Signed.of_unsigned fee
   | Fee_transfer ->
-      let excess =
-        Option.value_exn (Amount.add_fee amount fee)
-        |> Amount.to_fee |> Fee.Signed.of_unsigned |> Fee.Signed.negate
-      in
-      Fee_excess.of_single (Token_id.default, excess)
+      Option.value_exn (Amount.add_fee amount fee)
+      |> Amount.to_fee |> Fee.Signed.of_unsigned |> Fee.Signed.negate
   | Coinbase ->
-      Fee_excess.of_single (Token_id.default, Fee.Signed.zero)
+      Fee.Signed.zero
 
 let expected_supply_increase (payload : payload) =
   let tag = payload.body.tag in
