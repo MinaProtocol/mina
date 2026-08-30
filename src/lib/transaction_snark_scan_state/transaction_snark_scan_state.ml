@@ -1159,22 +1159,19 @@ let apply_ordered_txns_stepwise ?(stop_at_last_coinbase = false) ordered_txns
           ~k:(fun first_pass_ledger_hash partially_applied_txns ->
             (*Apply second pass of previous tree's transactions, if any*)
             apply_previous_incomplete_txns previous_incomplete ~k:(fun () ->
-                let continue_previous_tree's_txns =
-                  (* If this is a continuation from previous tree for the same block (incomplete txns in both sets) then do second pass now*)
-                  (*The previous tree left transactions of this block
-                    pending, and this group defers nothing further, so the
-                    block's first pass finishes here and its second pass can
-                    run. A non-empty [current_incomplete] means the block
-                    carries on into the next tree -- with the coinbase last,
-                    that is where its first pass ends -- so the second pass has
-                    to keep waiting.*)
-                  previous_not_empty
-                  && List.is_empty txns_per_block.current_incomplete
+                let block_first_pass_ends_here =
+                  (*A block carried over from the previous tree can have its
+                    second pass once its first pass is complete, which is where
+                    its coinbase is: a coinbase is a block's last transaction.
+                    Inferring this from whether anything was deferred is what
+                    the old condition did, and it does not survive the coinbase
+                    moving to the end of the block.*)
+                  previous_not_empty && block_contains_coinbase txns_per_block
                 in
                 let do_second_pass =
                   (*if transactions completed in the same tree; do second pass now*)
                   (not (List.is_empty txns_per_block.second_pass))
-                  || continue_previous_tree's_txns
+                  || block_first_pass_ends_here
                 in
                 if do_second_pass then
                   apply_txns_second_pass partially_applied_txns ~k:(fun () ->
