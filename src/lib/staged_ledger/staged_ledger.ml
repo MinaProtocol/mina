@@ -1525,7 +1525,7 @@ module T = struct
       ; other_prover_fees : Fee.t Or_error.t
             (*fees in [fee_transfers] owed to provers other than [receiver_pk]*)
       ; add_coinbase : bool
-      ; coinbase : Coinbase.Fee_transfer.t Staged_ledger_diff.At_most_two.t
+      ; coinbase : Coinbase.Fee_transfer.t Staged_ledger_diff.At_most_one.t
       ; supercharge_coinbase : bool
       ; receiver_pk : Public_key.Compressed.t
       ; budget : Fee.t Or_error.t
@@ -1560,10 +1560,10 @@ module T = struct
 
     let coinbase_work
         ~(constraint_constants : Genesis_constants.Constraint_constants.t)
-        ?(is_two = false) (works : Transaction_snark_work.Checked.t list)
+        (works : Transaction_snark_work.Checked.t list)
         ~is_coinbase_receiver_new ~supercharge_coinbase =
       let open Option.Let_syntax in
-      let min1, min2 = cheapest_two_work works in
+      let min1, _min2 = cheapest_two_work works in
       let diff ws ws' =
         List.filter ws ~f:(fun w ->
             List.mem ws'
@@ -1584,61 +1584,14 @@ module T = struct
         else Some coinbase_amount
       in
       let stmt = Transaction_snark_work.Checked.statement in
-      if is_two then
-        match (min1, min2) with
-        | None, _ ->
-            None
-        | Some w, None ->
-            if Amount.(of_fee (Transaction_snark_work.Checked.fee w) <= budget)
-            then
-              let cb =
-                Staged_ledger_diff.At_most_two.Two
-                  (Option.map (coinbase_ft w) ~f:(fun ft -> (ft, None)))
-              in
-              Some (cb, diff works [ stmt w ])
-            else
-              let cb = Staged_ledger_diff.At_most_two.Two None in
-              Some (cb, works)
-        | Some w1, Some w2 ->
-            let%map sum =
-              Fee.add
-                (Transaction_snark_work.Checked.fee w1)
-                (Transaction_snark_work.Checked.fee w2)
-            in
-            if Amount.(of_fee sum <= budget) then
-              let cb =
-                Staged_ledger_diff.At_most_two.Two
-                  (Option.map (coinbase_ft w1) ~f:(fun ft ->
-                       (ft, coinbase_ft w2) ) )
-                (* Why add work without checking if work constraints are
-                   satisfied? If we reach here then it means that we are trying to
-                   fill the last two slots of the tree with coinbase trnasactions
-                   and if there's any work in [works] then that has to be included,
-                   either in the coinbase or as fee transfers that gets paid by
-                   the transaction fees. So having it as coinbase ft will at least
-                   reduce the slots occupied by fee transfers *)
-              in
-              (cb, diff works [ stmt w1; stmt w2 ])
-            else if
-              Amount.(of_fee (Transaction_snark_work.Checked.fee w1) <= budget)
-            then
-              let cb =
-                Staged_ledger_diff.At_most_two.Two
-                  (Option.map (coinbase_ft w1) ~f:(fun ft -> (ft, None)))
-              in
-              (cb, diff works [ stmt w1 ])
-            else
-              let cb = Staged_ledger_diff.At_most_two.Two None in
-              (cb, works)
-      else
-        Option.map min1 ~f:(fun w ->
-            if Amount.(of_fee (Transaction_snark_work.Checked.fee w) <= budget)
-            then
-              let cb = Staged_ledger_diff.At_most_two.One (coinbase_ft w) in
-              (cb, diff works [ stmt w ])
-            else
-              let cb = Staged_ledger_diff.At_most_two.One None in
-              (cb, works) )
+      Option.map min1 ~f:(fun w ->
+          if Amount.(of_fee (Transaction_snark_work.Checked.fee w) <= budget)
+          then
+            let cb = Staged_ledger_diff.At_most_one.One (coinbase_ft w) in
+            (cb, diff works [ stmt w ])
+          else
+            let cb = Staged_ledger_diff.At_most_one.One None in
+            (cb, works) )
 
     let cw_unchecked work = List.map work ~f:Transaction_snark_work.forget
 
@@ -1755,7 +1708,7 @@ module T = struct
     let reselect_coinbase_work ~constraint_constants t =
       let coinbase, rem_cw =
         match t.coinbase with
-        | Staged_ledger_diff.At_most_two.Zero ->
+        | Staged_ledger_diff.At_most_one.Zero ->
             (t.coinbase, t.completed_work_rev)
         | One _ -> (
             match
@@ -1767,19 +1720,6 @@ module T = struct
                 (One None, t.completed_work_rev)
             | Some (ft, rem_cw) ->
                 (ft, rem_cw) )
-        | Two _ -> (
-            match
-              coinbase_work ~constraint_constants t.completed_work_rev
-                ~is_two:true
-                ~is_coinbase_receiver_new:t.is_coinbase_receiver_new
-                ~supercharge_coinbase:t.supercharge_coinbase
-            with
-            | None ->
-                (Two None, t.completed_work_rev)
-                (* Check for work constraint will be done in
-                   [check_constraints_and_update] *)
-            | Some (fts', rem_cw) ->
-                (fts', rem_cw) )
       in
       let singles = singles_of_remaining_work rem_cw in
       let fee_transfers =
@@ -1800,12 +1740,10 @@ module T = struct
 
     let coinbase_added t =
       match t.coinbase with
-      | Staged_ledger_diff.At_most_two.Zero ->
+      | Staged_ledger_diff.At_most_one.Zero ->
           0
       | One _ ->
           1
-      | Two _ ->
-          2
 
     let slots_occupied t =
       let fee_for_self =
@@ -1885,18 +1823,12 @@ module T = struct
           { new_t with budget = updated_budget }
         in
         match t.coinbase with
-        | Staged_ledger_diff.At_most_two.Zero ->
+        | Staged_ledger_diff.At_most_one.Zero ->
             t
         | One None ->
-            { t with coinbase = Staged_ledger_diff.At_most_two.Zero }
-        | Two None ->
-            { t with coinbase = One None }
-        | Two (Some (ft, None)) ->
-            { t with coinbase = One (Some ft) }
+            { t with coinbase = Staged_ledger_diff.At_most_one.Zero }
         | One (Some ft) ->
             update_fee_transfers t ft Zero
-        | Two (Some (ft1, Some ft2)) ->
-            update_fee_transfers t ft2 (One (Some ft1))
       in
       match t.commands_rev with
       | [] ->
@@ -1946,52 +1878,45 @@ module T = struct
       let cw_count = t.completed_work_count in
       cw_count > 0 && cw_count >= slots
 
-    let incr_coinbase_part_by ~constraint_constants t count =
+    let incr_coinbase ~constraint_constants t =
       let open Or_error.Let_syntax in
       let incr = function
-        | Staged_ledger_diff.At_most_two.Zero ->
-            Ok (Staged_ledger_diff.At_most_two.One None)
-        | One None ->
-            Ok (Two None)
-        | One (Some ft) ->
-            Ok (Two (Some (ft, None)))
-        | _ ->
-            Or_error.error_string "Coinbase count cannot be more than two"
+        | Staged_ledger_diff.At_most_one.Zero ->
+            Ok (Staged_ledger_diff.At_most_one.One None)
+        | One _ ->
+            Or_error.error_string "Coinbase count cannot be more than one"
       in
-      let by_one res =
-        let res' =
-          match res.discarded.completed_work with
-          (* Add one from the discarded list to [completed_work_rev] and then
-             select a work from [completed_work_rev] except the one already used *)
-          | w :: rem_work ->
-              let%map coinbase = incr res.coinbase in
-              let res' =
-                { res with
-                  completed_work_rev = w :: res.completed_work_rev
-                ; completed_work_count = res.completed_work_count + 1
-                ; discarded = { res.discarded with completed_work = rem_work }
-                ; coinbase
-                }
-              in
-              reselect_coinbase_work ~constraint_constants res'
-          | [] ->
-              let%bind coinbase = incr res.coinbase in
-              let res = { res with coinbase } in
-              if work_done res then Ok res
-              else
-                Or_error.error_string
-                  "Could not increment coinbase transaction count because of \
-                   insufficient work"
-        in
-        match res' with
-        | Ok res'' ->
-            res''
-        | Error e ->
-            [%log' error t.logger] "Error when increasing coinbase: $error"
-              ~metadata:[ ("error", Error_json.error_to_yojson e) ] ;
-            res
+      let res' =
+        match t.discarded.completed_work with
+        (* Add one from the discarded list to [completed_work_rev] and then
+           select a work from [completed_work_rev] except the one already used *)
+        | w :: rem_work ->
+            let%map coinbase = incr t.coinbase in
+            let res' =
+              { t with
+                completed_work_rev = w :: t.completed_work_rev
+              ; completed_work_count = t.completed_work_count + 1
+              ; discarded = { t.discarded with completed_work = rem_work }
+              ; coinbase
+              }
+            in
+            reselect_coinbase_work ~constraint_constants res'
+        | [] ->
+            let%bind coinbase = incr t.coinbase in
+            let res = { t with coinbase } in
+            if work_done res then Ok res
+            else
+              Or_error.error_string
+                "Could not increment coinbase transaction count because of \
+                 insufficient work"
       in
-      match count with `One -> by_one t | `Two -> by_one (by_one t)
+      match res' with
+      | Ok res'' ->
+          res''
+      | Error e ->
+          [%log' error t.logger] "Error when increasing coinbase: $error"
+            ~metadata:[ ("error", Error_json.error_to_yojson e) ] ;
+          t
   end
 
   let rec check_constraints_and_update ~constraint_constants
@@ -2068,21 +1993,10 @@ module T = struct
         , User_command.Valid.t )
         Staged_ledger_diff.Pre_diff_one.t =
       O1trace.sync_thread "create_staged_ledger_pre_diff_with_one" (fun () ->
-          let to_at_most_one = function
-            | Staged_ledger_diff.At_most_two.Zero ->
-                Staged_ledger_diff.At_most_one.Zero
-            | One x ->
-                One x
-            | _ ->
-                [%log error]
-                  "Error creating staged ledger diff: Should have at most one \
-                   coinbase in the second pre_diff" ;
-                Zero
-          in
           (* We have to reverse here because we only know they work in THIS order *)
           { Staged_ledger_diff.Pre_diff_one.commands = List.rev res.commands_rev
           ; completed_works = List.rev res.completed_work_rev
-          ; coinbase = to_at_most_one res.coinbase
+          ; coinbase = res.coinbase
           ; internal_command_statuses =
               [] (*updated later based on application result*)
           ; padding = None
@@ -2143,10 +2057,8 @@ module T = struct
             partitions.first ~add_coinbase:false logger
             ~is_coinbase_receiver_new ~supercharge_coinbase `First
         in
-        let incr_coinbase_and_compute res count =
-          let new_res =
-            Resources.incr_coinbase_part_by ~constraint_constants res count
-          in
+        let incr_coinbase_and_compute res =
+          let new_res = Resources.incr_coinbase ~constraint_constants res in
           if Resources.space_available new_res then
             (* All slots could not be filled either because of budget
                constraints or not enough work done. Don't create the second
@@ -2183,16 +2095,17 @@ module T = struct
                 (* generate the next prediff with a coinbase at least *)
                 let res2 = second_pre_diff res y ~add_coinbase:true cw_seq_2 in
                 ((res, log1), Some res2)
-            | 1 ->
-                (* There's a slot available in the first partition, fill it with
-                   coinbase and create another pre_diff for the slots in the second
-                   partiton with the remaining user commands and work *)
-                incr_coinbase_and_compute res `One
-            | 2 ->
-                (* There are two slots which cannot be filled using user
-                   commands, so we split the coinbase into two parts and fill those
-                   two spots *)
-                incr_coinbase_and_compute res `Two
+            | 1 | 2 ->
+                (* There are slots available in the first partition which cannot
+                   be filled using user commands. Fill one with the coinbase and
+                   create another pre_diff for the slots in the second partition
+                   with the remaining user commands and work.
+
+                   Where two slots were free the first partition is still one
+                   short after adding the coinbase, and
+                   [incr_coinbase_and_compute] falls back to a diff that does
+                   not reach the partition boundary. *)
+                incr_coinbase_and_compute res
             | _ ->
                 (* Too many slots left in the first partition. Either there
                    wasn't enough work to add transactions or there weren't enough
@@ -2752,18 +2665,12 @@ let%test_module "staged ledger tests" =
            { fee; proofs = proofs ~fee ~prover stmts; prover } )
 
     let coinbase_first_prediff = function
-      | Staged_ledger_diff.At_most_two.Zero ->
+      | Staged_ledger_diff.At_most_one.Zero ->
           (0, [])
       | One None ->
           (1, [])
       | One (Some ft) ->
           (1, [ ft ])
-      | Two None ->
-          (2, [])
-      | Two (Some (ft, None)) ->
-          (2, [ ft ])
-      | Two (Some (ft1, Some ft2)) ->
-          (2, [ ft1; ft2 ])
 
     let coinbase_second_prediff = function
       | Staged_ledger_diff.At_most_one.Zero ->
@@ -3906,9 +3813,8 @@ let%test_module "staged ledger tests" =
                     ~default:Staged_ledger_diff.At_most_one.Zero ~f:(fun d ->
                       d.coinbase ) )
               with
-              | ( Staged_ledger_diff.At_most_two.Zero
-                , Staged_ledger_diff.At_most_one.Zero )
-              | Two None, Zero ->
+              | ( Staged_ledger_diff.At_most_one.Zero
+                , Staged_ledger_diff.At_most_one.Zero ) ->
                   ()
               | One ft_opt, Zero ->
                   Option.value_map ft_opt ~default:() ~f:(fun single ->
@@ -3921,13 +3827,6 @@ let%test_module "staged ledger tests" =
                       let work =
                         List.hd_exn (sorted_work_from_diff2 second_pre_diff_opt)
                       in
-                      assert_same_fee single work.fee )
-              | Two (Some (ft, ft_opt)), Zero ->
-                  let work_done = sorted_work_from_diff1 first_pre_diff in
-                  let work = List.hd_exn work_done in
-                  assert_same_fee ft work.fee ;
-                  Option.value_map ft_opt ~default:() ~f:(fun single ->
-                      let work = List.hd_exn (List.drop work_done 1) in
                       assert_same_fee single work.fee )
               | _ ->
                   failwith @@ "Incorrect coinbase in the diff "
