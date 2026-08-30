@@ -42,7 +42,8 @@ let%test_module "Transaction union tests" =
       let merkle_root t = Frozen_ledger_hash.of_ledger_hash @@ merkle_root t
     end
 
-    let of_user_command' (sok_digest : Sok_message.Digest.t) ledger
+    let of_user_command' ?(source_fee_excess = Fee_excess.zero)
+        (sok_digest : Sok_message.Digest.t) ledger
         (user_command : Signed_command.With_valid_signature.t) init_stack
         pending_coinbase_stack_state state_body handler =
       let module T = (val Lazy.force U.snark_module) in
@@ -73,8 +74,11 @@ let%test_module "Transaction union tests" =
               ~source_first_pass_ledger:source ~target_first_pass_ledger:target
               ~source_second_pass_ledger:target
               ~target_second_pass_ledger:target ~connecting_ledger_left:target
-              ~connecting_ledger_right:target ~sok_digest
-              ~fee_excess:(Or_error.ok_exn (Transaction.fee_excess txn))
+              ~connecting_ledger_right:target ~sok_digest ~source_fee_excess
+              ~target_fee_excess:
+                (Or_error.ok_exn
+                   (Fee_excess.combine source_fee_excess
+                      (Or_error.ok_exn (Transaction.fee_excess txn)) ) )
               ~supply_increase:user_command_supply_increase
               ~pending_coinbase_stack_state
           in
@@ -527,8 +531,10 @@ let%test_module "Transaction union tests" =
                 (Ledger.merkle_root ledger)
                 (Sparse_ledger.merkle_root sparse_ledger) ;
               let proof23 =
-                of_user_command' sok_digest ledger t2
-                  pending_coinbase_stack_state2.init_stack
+                of_user_command'
+                  ~source_fee_excess:
+                    (Transaction_snark.statement proof12).target.fee_excess
+                  sok_digest ledger t2 pending_coinbase_stack_state2.init_stack
                   pending_coinbase_stack_state2.pc state_body2
                   (unstage @@ Sparse_ledger.handler sparse_ledger)
               in

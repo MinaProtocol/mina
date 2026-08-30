@@ -108,7 +108,11 @@ query pendingSnarkWork {
       target_first_pass_ledger_hash: targetFirstPassLedgerHash
       source_second_pass_ledger_hash: sourceSecondPassLedgerHash
       target_second_pass_ledger_hash: targetSecondPassLedgerHash
-      fee_excess: feeExcess {
+      source_fee_excess: sourceFeeExcess {
+        sign
+        feeMagnitude
+      }
+      target_fee_excess: targetFeeExcess {
         sign
         feeMagnitude
       }

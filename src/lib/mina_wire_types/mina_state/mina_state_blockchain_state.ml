@@ -19,7 +19,7 @@ module Poly = struct
           , 'fee_excess
           , 'sok_digest
           , 'local_state )
-          Mina_state_snarked_ledger_state.Poly.V2.t
+          Mina_state_snarked_ledger_state.Poly.V3.t
       ; timestamp : 'time
       ; body_reference : 'body_reference
       }

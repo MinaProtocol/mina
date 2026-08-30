@@ -36,7 +36,7 @@ module Poly : sig
             , 'fee_excess
             , 'sok_digest
             , 'local_state )
-            Snarked_ledger_state.Poly.Stable.V2.t
+            Snarked_ledger_state.Poly.Stable.V3.t
         ; timestamp : 'time
         ; body_reference : 'body_reference
         }
