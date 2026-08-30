@@ -173,7 +173,8 @@ module Job_view = struct
         ( Frozen_ledger_hash.t
         , Pending_coinbase.Stack_versioned.t
         , Mina_state.Local_state.t
-        , Fee_excess.t )
+        , Fee_excess.t
+        , Currency.Amount.t )
         Mina_state.Registers.t
       [@@deriving to_yojson]
     end in
@@ -182,7 +183,6 @@ module Job_view = struct
         [ ("Work_id", `Int (Transaction_snark.Statement.hash s))
         ; ("Source", R.to_yojson s.source)
         ; ("Target", R.to_yojson s.target)
-        ; ("Supply Increase", Currency.Amount.Signed.to_yojson s.supply_increase)
         ]
     in
     let job_to_yojson =
@@ -368,16 +368,30 @@ let create_expected_statement ~constraint_constants
         pending_coinbase_with_state
   in
   let%bind fee_excess = Transaction.fee_excess transaction in
-  (*The excess this transaction starts from is part of the statement being
-    checked; what has to follow from the witness is the excess it ends with.*)
+  (*The excess and total currency this transaction starts from are part of the
+    statement being checked; what has to follow from the witness is where it
+    ends up.*)
   let source_fee_excess = statement.source.fee_excess in
-  let%map target_fee_excess = Fee_excess.combine source_fee_excess fee_excess in
+  let%bind target_fee_excess =
+    Fee_excess.combine source_fee_excess fee_excess
+  in
+  let source_total_currency = statement.source.total_currency in
+  let%map target_total_currency =
+    match
+      Currency.Amount.add_signed_flagged source_total_currency supply_increase
+    with
+    | total, `Overflow false ->
+        Ok total
+    | _, `Overflow true ->
+        Or_error.error_string "Total currency out of range"
+  in
   { Transaction_snark.Statement.Poly.source =
       { first_pass_ledger = source_first_pass_merkle_root
       ; second_pass_ledger = source_second_pass_merkle_root
       ; pending_coinbase_stack = statement.source.pending_coinbase_stack
       ; local_state = empty_local_state
       ; fee_excess = source_fee_excess
+      ; total_currency = source_total_currency
       }
   ; target =
       { first_pass_ledger = target_first_pass_merkle_root
@@ -385,10 +399,10 @@ let create_expected_statement ~constraint_constants
       ; pending_coinbase_stack = pending_coinbase_after
       ; local_state = empty_local_state
       ; fee_excess = target_fee_excess
+      ; total_currency = target_total_currency
       }
   ; connecting_ledger_left = connecting_merkle_root
   ; connecting_ledger_right = connecting_merkle_root
-  ; supply_increase
   ; sok_digest = ()
   }
 
@@ -635,7 +649,8 @@ struct
          ( Frozen_ledger_hash.t
          , Pending_coinbase.Stack.t
          , Mina_state.Local_state.t
-         , Fee_excess.t )
+         , Fee_excess.t
+         , Currency.Amount.t )
          Mina_state.Registers.t ) =
     let clarify_error cond err =
       if not cond then Or_error.errorf "%s : %s" error_prefix err else Ok ()
@@ -685,7 +700,6 @@ struct
           ; target
           ; connecting_ledger_left = _
           ; connecting_ledger_right = _
-          ; supply_increase = _
           ; sok_digest = ()
           } as t ) ->
         let open Or_error.Let_syntax in
@@ -899,6 +913,22 @@ let incomplete_txns_from_recent_proof_tree t =
           , `Border_block_continued_in_the_next_tree true )
   in
   (proof, txns)
+
+(** The registers that the scan state currently ends at: the target of the most
+    recently enqueued transaction, or of the last emitted proof if nothing is
+    pending. New base statements have to chain from these. *)
+let latest_target_registers t =
+  let pending =
+    Parallel_scan.pending_data t.scan_state
+    |> List.filter ~f:(Fn.non List.is_empty)
+  in
+  match List.last pending with
+  | Some txns ->
+      Option.map (List.last txns) ~f:(fun (txn : Transaction_with_witness.t) ->
+          txn.statement.target )
+  | None ->
+      Option.map (latest_ledger_proof t) ~f:(fun p ->
+          (Ledger_proof.Cached.statement p).target )
 
 let staged_transactions t =
   let ( previous_incomplete

@@ -15,17 +15,18 @@ module Types : sig
               ( 'ledger_hash
               , 'pending_coinbase
               , 'local_state
-              , 'fee_excess )
+              , 'fee_excess
+              , 'amount )
               Mina_state_registers.V2.t
           ; target :
               ( 'ledger_hash
               , 'pending_coinbase
               , 'local_state
-              , 'fee_excess )
+              , 'fee_excess
+              , 'amount )
               Mina_state_registers.V2.t
           ; connecting_ledger_left : 'ledger_hash
           ; connecting_ledger_right : 'ledger_hash
-          ; supply_increase : 'amount
           ; sok_digest : 'sok_digest
           }
       end
@@ -34,7 +35,7 @@ module Types : sig
     module V3 : sig
       type t =
         ( Mina_base.Frozen_ledger_hash.V1.t
-        , (Currency.Amount.V1.t, Sgn_type.Sgn.V1.t) Signed_poly.V1.t
+        , Currency.Amount.V1.t
         , Mina_base.Pending_coinbase.Stack_versioned.V1.t
         , Mina_base.Fee_excess.V2.t
         , unit
@@ -46,7 +47,7 @@ module Types : sig
       module V3 : sig
         type t =
           ( Mina_base.Ledger_hash.V1.t
-          , (Currency.Amount.V1.t, Sgn_type.Sgn.V1.t) Signed_poly.V1.t
+          , Currency.Amount.V1.t
           , Mina_base.Pending_coinbase.Stack_versioned.V1.t
           , Mina_base.Fee_excess.V2.t
           , Mina_base.Sok_message.Digest.V1.t
@@ -71,17 +72,18 @@ module type Concrete = sig
             ( 'ledger_hash
             , 'pending_coinbase
             , 'local_state
-            , 'fee_excess )
+            , 'fee_excess
+            , 'amount )
             Mina_state_registers.V2.t
         ; target :
             ( 'ledger_hash
             , 'pending_coinbase
             , 'local_state
-            , 'fee_excess )
+            , 'fee_excess
+            , 'amount )
             Mina_state_registers.V2.t
         ; connecting_ledger_left : 'ledger_hash
         ; connecting_ledger_right : 'ledger_hash
-        ; supply_increase : 'amount
         ; sok_digest : 'sok_digest
         }
     end
@@ -90,7 +92,7 @@ module type Concrete = sig
   module V3 : sig
     type t =
       ( Mina_base.Frozen_ledger_hash.V1.t
-      , (Currency.Amount.V1.t, Sgn_type.Sgn.V1.t) Signed_poly.V1.t
+      , Currency.Amount.V1.t
       , Mina_base.Pending_coinbase.Stack_versioned.V1.t
       , Mina_base.Fee_excess.V2.t
       , unit
@@ -102,7 +104,7 @@ module type Concrete = sig
     module V3 : sig
       type t =
         ( Mina_base.Ledger_hash.V1.t
-        , (Currency.Amount.V1.t, Sgn_type.Sgn.V1.t) Signed_poly.V1.t
+        , Currency.Amount.V1.t
         , Mina_base.Pending_coinbase.Stack_versioned.V1.t
         , Mina_base.Fee_excess.V2.t
         , Mina_base.Sok_message.Digest.V1.t

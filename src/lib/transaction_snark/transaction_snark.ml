@@ -1915,7 +1915,10 @@ module Make_str (A : Wire_types.Concrete) = struct
                 , V.create (fun () -> !witness.global_second_pass_ledger) )
             ; fee_excess =
                 Amount.Signed.Checked.of_fee statement.source.fee_excess
-            ; supply_increase = Amount.Signed.(Checked.constant zero)
+            ; supply_increase =
+                Amount.Signed.(Checked.constant zero)
+                (*The segment's supply increase is a delta; the registers record
+                where the total currency starts and ends.*)
             ; protocol_state =
                 Mina_state.Protocol_state.Body.view_checked state_body
             ; block_global_slot
@@ -2099,8 +2102,17 @@ module Make_str (A : Wire_types.Concrete) = struct
                  statement.connecting_ledger_right ) ) ;
         with_label __LOC__ (fun () ->
             run_checked
-              (Amount.Signed.Checked.assert_equal statement.supply_increase
-                 global.supply_increase ) ) ;
+              (let open Tick.Checked.Let_syntax in
+               let%bind target_total_currency, `Overflow overflow =
+                 Amount.Checked.add_signed_flagged
+                   statement.source.total_currency global.supply_increase
+               in
+               let%bind () =
+                 Tick.Checked.return
+                   (Boolean.Assert.is_true (Boolean.not overflow))
+               in
+               Amount.Checked.assert_equal target_total_currency
+                 statement.target.total_currency ) ) ;
         with_label __LOC__ (fun () ->
             run_checked
               (* The global state starts from the source register's excess (see
@@ -3143,9 +3155,19 @@ module Make_str (A : Wire_types.Concrete) = struct
         ; [%with_label_ "valid connecting ledgers"] (fun () ->
               Frozen_ledger_hash.assert_equal statement.connecting_ledger_left
                 statement.connecting_ledger_right )
-        ; [%with_label_ "equal supply_increases"] (fun () ->
-              Currency.Amount.Signed.Checked.assert_equal supply_increase
-                statement.supply_increase )
+        ; [%with_label_ "total currency accumulates into the target register"]
+            (fun () ->
+              let open Tick.Checked.Let_syntax in
+              let%bind target_total_currency, `Overflow overflow =
+                Currency.Amount.Checked.add_signed_flagged
+                  statement.source.total_currency supply_increase
+              in
+              let%bind () =
+                [%with_label_ "Total currency is in range"] (fun () ->
+                    Boolean.Assert.is_true (Boolean.not overflow) )
+              in
+              Currency.Amount.Checked.assert_equal target_total_currency
+                statement.target.total_currency )
         ; [%with_label_ "fee excess accumulates into the target register"]
             (fun () ->
               let open Tick.Checked.Let_syntax in
@@ -3253,9 +3275,6 @@ module Make_str (A : Wire_types.Concrete) = struct
             in
             Boolean.Assert.is_true valid_pending_coinbase_stack_transition )
       in
-      let%bind supply_increase =
-        Amount.Signed.Checked.add s1.supply_increase s2.supply_increase
-      in
       let%bind () =
         make_checked (fun () ->
             Local_state.Checked.assert_equal s.source.local_state
@@ -3282,9 +3301,17 @@ module Make_str (A : Wire_types.Concrete) = struct
           ; [%with_label_ "equal target fee excess"] (fun () ->
                 Fee_excess.assert_equal_checked s.target.fee_excess
                   s2.target.fee_excess )
-          ; [%with_label_ "equal supply increases"] (fun () ->
-                Amount.Signed.Checked.assert_equal supply_increase
-                  s.supply_increase )
+          ; [%with_label_ "total currency connects at the merge point"]
+              (fun () ->
+                Amount.Checked.assert_equal
+                  s1.Statement.Poly.target.total_currency
+                  s2.Statement.Poly.source.total_currency )
+          ; [%with_label_ "equal source total currency"] (fun () ->
+                Amount.Checked.assert_equal s.source.total_currency
+                  s1.source.total_currency )
+          ; [%with_label_ "equal target total currency"] (fun () ->
+                Amount.Checked.assert_equal s.target.total_currency
+                  s2.target.total_currency )
           ; [%with_label_ "equal source fee payment ledger hashes"] (fun () ->
                 Frozen_ledger_hash.assert_equal s.source.first_pass_ledger
                   s1.source.first_pass_ledger )
@@ -3431,9 +3458,21 @@ module Make_str (A : Wire_types.Concrete) = struct
       Base.transaction_union_handler handler transaction state_body global_slot
         init_stack
     in
+    (*These standalone helpers cover a single transaction, so any total currency
+      that makes the transition representable will do.*)
+    let source_total_currency, target_total_currency =
+      match Currency.Amount.Signed.sgn supply_increase with
+      | Sgn.Neg ->
+          ( Currency.Amount.Signed.magnitude supply_increase
+          , Currency.Amount.zero )
+      | Sgn.Pos ->
+          ( Currency.Amount.zero
+          , Currency.Amount.Signed.magnitude supply_increase )
+    in
     let statement : Statement.With_sok.t =
-      Statement.Poly.with_empty_local_state ~supply_increase
-        ~source_first_pass_ledger ~target_first_pass_ledger
+      Statement.Poly.with_empty_local_state ~source_total_currency
+        ~target_total_currency ~source_first_pass_ledger
+        ~target_first_pass_ledger
         ~source_second_pass_ledger:target_first_pass_ledger
         ~target_second_pass_ledger:target_first_pass_ledger
         ~pending_coinbase_stack_state ~source_fee_excess:Fee_excess.zero
@@ -3509,9 +3548,20 @@ module Make_str (A : Wire_types.Concrete) = struct
       Base.transaction_union_handler handler transaction state_body global_slot
         init_stack
     in
+    (*These standalone helpers cover a single transaction, so any total currency
+      that makes the transition representable will do.*)
+    let source_total_currency, target_total_currency =
+      match Currency.Amount.Signed.sgn supply_increase with
+      | Sgn.Neg ->
+          ( Currency.Amount.Signed.magnitude supply_increase
+          , Currency.Amount.zero )
+      | Sgn.Pos ->
+          ( Currency.Amount.zero
+          , Currency.Amount.Signed.magnitude supply_increase )
+    in
     let statement : Statement.With_sok.t =
-      Statement.Poly.with_empty_local_state ~supply_increase
-        ~source_fee_excess:Fee_excess.zero
+      Statement.Poly.with_empty_local_state ~source_total_currency
+        ~target_total_currency ~source_fee_excess:Fee_excess.zero
         ~target_fee_excess:(Transaction_union.fee_excess transaction)
         ~sok_digest ~source_first_pass_ledger ~target_first_pass_ledger
         ~source_second_pass_ledger:target_first_pass_ledger
@@ -3669,7 +3719,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         { stack_hash = Call_stack_digest.cons h_f h_tl; elt = f } :: tl
 
   let zkapp_command_witnesses_exn ~signature_kind ~constraint_constants
-      ~global_slot ~state_body ~fee_excess
+      ~global_slot ~state_body ~fee_excess ~total_currency
       (zkapp_commands_with_context :
         ( [ `Pending_coinbase_init_stack of Pending_coinbase.Stack.t ]
         * [ `Pending_coinbase_of_statement of Pending_coinbase_stack_state.t ]
@@ -3945,21 +3995,25 @@ module Make_str (A : Wire_types.Concrete) = struct
         in
         let source_fee_excess = Amount.Signed.to_fee source_global.fee_excess in
         let target_fee_excess = Amount.Signed.to_fee target_global.fee_excess in
-        let supply_increase =
-          (* capture only the difference in supply increase *)
-          match
-            Amount.Signed.(
-              add target_global.supply_increase
-                (negate source_global.supply_increase) )
-          with
-          | None ->
+        (*The global state accumulates a supply increase relative to where the
+          witnesses started; the registers record the total currency it reaches
+          either side of this segment.*)
+        let total_currency_at supply_increase =
+          match Amount.add_signed_flagged total_currency supply_increase with
+          | total, `Overflow false ->
+              total
+          | _, `Overflow true ->
               failwith
                 (sprintf
-                   !"unexpected supply increase. source %{sexp: \
-                     Amount.Signed.t} target %{sexp: Amount.Signed.t}"
-                   target_global.supply_increase source_global.supply_increase )
-          | Some supply_increase ->
-              supply_increase
+                   !"unexpected supply increase %{sexp: Amount.Signed.t} \
+                     against total currency %{sexp: Amount.t}"
+                   supply_increase total_currency )
+        in
+        let source_total_currency =
+          total_currency_at source_global.supply_increase
+        in
+        let target_total_currency =
+          total_currency_at target_global.supply_increase
         in
         let call_stack_hash s =
           List.hd s
@@ -3988,6 +4042,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                   ; ledger = source_local_ledger
                   }
               ; fee_excess = source_fee_excess
+              ; total_currency = source_total_currency
               }
           ; target =
               { first_pass_ledger = target_first_pass_ledger_root
@@ -4002,10 +4057,10 @@ module Make_str (A : Wire_types.Concrete) = struct
                   ; ledger = target_local_ledger
                   }
               ; fee_excess = target_fee_excess
+              ; total_currency = target_total_currency
               }
           ; connecting_ledger_left = connecting_ledger
           ; connecting_ledger_right = connecting_ledger
-          ; supply_increase
           ; sok_digest = Sok_message.Digest.default
           }
         in

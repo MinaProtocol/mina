@@ -1097,7 +1097,14 @@ let pending_snark_work =
                                          (to_signed_fee_exn
                                             w.source_fee_excess.sign
                                             w.source_fee_excess.feeMagnitude ) ) ) )
-                          ; supply_increase = w.supply_increase
+                          ; supply_increase =
+                              (* The total currency is a register either side of
+                                 the work, so the supply it adds is the
+                                 difference. *)
+                              Option.value_exn
+                                ~message:"supply increase out of range"
+                                (Currency.Amount.sub w.target_total_currency
+                                   w.source_total_currency )
                           ; source_first_pass_ledger_hash =
                               w.source_first_pass_ledger_hash
                           ; target_first_pass_ledger_hash =

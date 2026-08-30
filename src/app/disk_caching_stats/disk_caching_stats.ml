@@ -203,7 +203,8 @@ module Values (S : Sample) = struct
            (Mina_state.Snarked_ledger_state.genesis
               ~genesis_ledger_hash:
                 (Mina_base.Frozen_ledger_hash.of_ledger_hash
-                   Mina_base.Ledger_hash.empty_hash ) )
+                   Mina_base.Ledger_hash.empty_hash )
+              ~genesis_total_currency:Currency.Amount.zero )
          ~fee:(fee ()) ~prover:(public_key ()) )
 
   let one_priced_proof () :
@@ -382,6 +383,7 @@ module Values (S : Sample) = struct
             ; pending_coinbase_stack = pending_coinbase_stack ()
             ; local_state = local_state ()
             ; fee_excess = fee_excess ()
+            ; total_currency = Currency.Amount.zero
             }
         ; target =
             { first_pass_ledger = field ()
@@ -389,11 +391,10 @@ module Values (S : Sample) = struct
             ; pending_coinbase_stack = pending_coinbase_stack ()
             ; local_state = local_state ()
             ; fee_excess = fee_excess ()
+            ; total_currency = Currency.Amount.zero
             }
         ; connecting_ledger_left = field ()
         ; connecting_ledger_right = field ()
-        ; supply_increase =
-            (* TODO: insure uniqueness *) Currency.Amount.Signed.zero
         ; sok_digest = ()
         }
       ~init_stack:(pending_coinbase_stack ())

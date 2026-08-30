@@ -37,18 +37,18 @@
     {v
     | Circuit                     | Constraints | Public Input | Auxiliary Input |
     |-----------------------------|-------------|--------------|-----------------|
-    | transaction-merge           | 564         | 298          | 1,761           |
-    | transaction-base            | 12,864      | 298          | 37,375          |
-    | zkapp-opt_signed-opt_signed | 16,321      | 298          | 73,353          |
-    | zkapp-opt_signed            | 8,913       | 298          | 40,463          |
-    | zkapp-proved                | 5,136       | 298          | 39,029          |
+    | transaction-merge           | 568         | 298          | 1,843           |
+    | transaction-base            | 12,877      | 298          | 37,511          |
+    | zkapp-opt_signed-opt_signed | 16,334      | 298          | 73,489          |
+    | zkapp-opt_signed            | 8,926       | 298          | 40,599          |
+    | zkapp-proved                | 5,149       | 298          | 39,165          |
     v}
 
     {b Devnet profile:}
     {v
     | Circuit                     | Constraints | Public Input | Auxiliary Input |
     |-----------------------------|-------------|--------------|-----------------|
-    | transaction-merge           | 564         | 298          | 1,761           |
+    | transaction-merge           | 568         | 298          | 1,843           |
     | transaction-base            | 15,357      | 298          | 63,806          |
     | zkapp-opt_signed-opt_signed | 16,206      | 298          | 74,242          |
     | zkapp-opt_signed            | 8,883       | 298          | 41,170          |
@@ -59,7 +59,7 @@
     {v
     | Circuit                     | Constraints | Public Input | Auxiliary Input |
     |-----------------------------|-------------|--------------|-----------------|
-    | transaction-merge           | 564         | 298          | 1,761           |
+    | transaction-merge           | 568         | 298          | 1,843           |
     | transaction-base            | 15,357      | 298          | 63,806          |
     | zkapp-opt_signed-opt_signed | 16,206      | 298          | 74,242          |
     | zkapp-opt_signed            | 8,883       | 298          | 41,170          |
@@ -70,7 +70,7 @@
     {v
     | Circuit                     | Constraints | Public Input | Auxiliary Input |
     |-----------------------------|-------------|--------------|-----------------|
-    | transaction-merge           | 564         | 298          | 1,761           |
+    | transaction-merge           | 568         | 298          | 1,843           |
     | transaction-base            | 15,357      | 298          | 63,806          |
     | zkapp-opt_signed-opt_signed | 16,206      | 298          | 74,242          |
     | zkapp-opt_signed            | 8,883       | 298          | 41,170          |
@@ -274,6 +274,7 @@ module type Full = sig
     -> global_slot:Mina_numbers.Global_slot_since_genesis.t
     -> state_body:Transaction_protocol_state.Block_data.t
     -> fee_excess:Currency.Amount.Signed.t
+    -> total_currency:Currency.Amount.t
     -> ( [ `Pending_coinbase_init_stack of Pending_coinbase.Stack.t ]
        * [ `Pending_coinbase_of_statement of Pending_coinbase_stack_state.t ]
        * [ `Ledger of Mina_ledger.Ledger.t

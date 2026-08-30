@@ -158,7 +158,7 @@ let check_zkapp_command_with_merges_exn ?(logger = logger_null)
             Or_error.try_with (fun () ->
                 Transaction_snark.zkapp_command_witnesses_exn ~signature_kind
                   ~constraint_constants ~global_slot ~state_body
-                  ~fee_excess:Amount.Signed.zero
+                  ~fee_excess:Amount.Signed.zero ~total_currency:Amount.zero
                   [ ( `Pending_coinbase_init_stack init_stack
                     , `Pending_coinbase_of_statement
                         (pending_coinbase_state_stack ~state_body_hash
@@ -215,6 +215,7 @@ let check_zkapp_command_with_merges_exn ?(logger = logger_null)
                         ; pending_coinbase_stack = init_stack
                         ; local_state = Mina_state.Local_state.empty ()
                         ; fee_excess = Fee_excess.zero
+                        ; total_currency = Currency.Amount.zero
                         }
                     ; target =
                         { first_pass_ledger = first_pass_ledger_target_hash
@@ -224,13 +225,19 @@ let check_zkapp_command_with_merges_exn ?(logger = logger_null)
                               global_slot init_stack
                         ; local_state = Mina_state.Local_state.empty ()
                         ; fee_excess = Zkapp_command.fee_excess zkapp_command
+                        ; total_currency =
+                            (let supply_increase =
+                               Mina_transaction_logic.Transaction_applied
+                               .supply_increase ~constraint_constants
+                                 applied_txn
+                               |> Or_error.ok_exn
+                             in
+                             fst
+                               (Currency.Amount.add_signed_flagged
+                                  Currency.Amount.zero supply_increase ) )
                         }
                     ; connecting_ledger_left = connecting_ledger
                     ; connecting_ledger_right = connecting_ledger
-                    ; supply_increase =
-                        Mina_transaction_logic.Transaction_applied
-                        .supply_increase ~constraint_constants applied_txn
-                        |> Or_error.ok_exn
                     ; sok_digest = ()
                     }
                   in

@@ -34,7 +34,7 @@ module Value = struct
       , Mina_state_local_state.V1.t
       , Block_time.V1.t
       , Consensus.Body_reference.V1.t
-      , (Currency.Amount.V1.t, Sgn_type.Sgn.V1.t) Signed_poly.V1.t
+      , Currency.Amount.V1.t
       , Mina_base.Pending_coinbase.Stack_versioned.V1.t
       , Mina_base.Fee_excess.V2.t
       , unit )

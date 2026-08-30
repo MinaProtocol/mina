@@ -43,6 +43,7 @@ let%test_module "Transaction union tests" =
     end
 
     let of_user_command' ?(source_fee_excess = Fee_excess.zero)
+        ?(source_total_currency = Currency.Amount.zero)
         (sok_digest : Sok_message.Digest.t) ledger
         (user_command : Signed_command.With_valid_signature.t) init_stack
         pending_coinbase_stack_state state_body handler =
@@ -63,6 +64,16 @@ let%test_module "Transaction union tests" =
         }
       in
       let user_command_supply_increase = Currency.Amount.Signed.zero in
+      let target_total_currency =
+        match
+          Currency.Amount.add_signed_flagged source_total_currency
+            user_command_supply_increase
+        with
+        | total, `Overflow false ->
+            total
+        | _, `Overflow true ->
+            failwith "total currency out of range"
+      in
       Async.Thread_safe.block_on_async_exn (fun () ->
           let statement =
             let txn =
@@ -79,7 +90,7 @@ let%test_module "Transaction union tests" =
                 (Or_error.ok_exn
                    (Fee_excess.combine source_fee_excess
                       (Or_error.ok_exn (Transaction.fee_excess txn)) ) )
-              ~supply_increase:user_command_supply_increase
+              ~source_total_currency ~target_total_currency
               ~pending_coinbase_stack_state
           in
           T.of_user_command ~init_stack ~statement user_command_in_block handler )

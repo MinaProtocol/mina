@@ -116,7 +116,8 @@ query pendingSnarkWork {
         sign
         feeMagnitude
       }
-      supply_increase : supplyIncrease
+      source_total_currency: sourceTotalCurrency
+      target_total_currency: targetTotalCurrency
       work_id: workId
       }
     }
