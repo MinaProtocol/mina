@@ -1385,6 +1385,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           ~amount:
             (Option.value_exn (Amount.sub max_coinbase_amount coinbase.amount))
           ~receiver:coinbase.receiver ~fee_transfer:None
+          ~fee_remainder:Currency.Fee.zero
         |> Or_error.ok_exn
       in
       let t_with_state =

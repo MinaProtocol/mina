@@ -207,7 +207,10 @@ let of_transition block tracked_participants
           { acc_transactions with
             fee_transfers = fee_transfers @ acc_transactions.fee_transfers
           }
-      | { data = Coinbase { Coinbase.amount; fee_transfer; receiver }; _ } ->
+      | { data =
+            Coinbase { Coinbase.amount; fee_transfer; receiver; fee_remainder }
+        ; _
+        } ->
           let fee_transfer =
             Option.map
               ~f:(fun ft ->
@@ -215,10 +218,22 @@ let of_transition block tracked_participants
                 , Fee_transfer_type.Fee_transfer_via_coinbase ) )
               fee_transfer
           in
+          (* The fee remainder is paid to the coinbase receiver by the coinbase
+             transaction, but it is a fee payment rather than newly minted
+             currency, so it is reported separately from the coinbase amount. *)
+          let remainder_transfer =
+            Option.some_if
+              (not (Currency.Fee.equal fee_remainder Currency.Fee.zero))
+              ( Mina_base.Fee_transfer.Single.create ~receiver_pk:receiver
+                  ~fee:fee_remainder ~fee_token:Mina_base.Token_id.default
+              , Fee_transfer_type.Fee_transfer_via_coinbase )
+          in
           let fee_transfers =
-            List.append
-              (Option.to_list fee_transfer)
-              acc_transactions.fee_transfers
+            List.concat
+              [ Option.to_list fee_transfer
+              ; Option.to_list remainder_transfer
+              ; acc_transactions.fee_transfers
+              ]
           in
           { acc_transactions with
             fee_transfers

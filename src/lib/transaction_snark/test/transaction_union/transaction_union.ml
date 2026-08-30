@@ -130,6 +130,7 @@ let%test_module "Transaction union tests" =
             (Some
                (Coinbase.Fee_transfer.create ~receiver_pk:other
                   ~fee:U.constraint_constants.account_creation_fee ) )
+          ~fee_remainder:Currency.Fee.zero
         |> Or_error.ok_exn
       in
       let transaction = Mina_transaction.Transaction.Coinbase cb in
@@ -390,6 +391,7 @@ let%test_module "Transaction union tests" =
                         ~amount:(Currency.Amount.of_nanomina_int_exn reward)
                         ~receiver:receiver.account.public_key
                         ~fee_transfer:(List.hd fts)
+                        ~fee_remainder:Currency.Fee.zero
                       |> Or_error.ok_exn
                     in
                     (Option.value ~default:[] (List.tl fts), cb :: cbs) )
@@ -2058,10 +2060,12 @@ let%test_module "Transaction union tests" =
             ( Coinbase.create
                 ~amount:(Currency.Amount.of_mina_int_exn 10)
                 ~receiver:receivers.(1) ~fee_transfer:(Some ft)
+                ~fee_remainder:Currency.Fee.zero
               |> Or_error.ok_exn
             , Coinbase.create
                 ~amount:(Currency.Amount.of_mina_int_exn 10)
                 ~receiver:receivers.(1) ~fee_transfer:None
+                ~fee_remainder:Currency.Fee.zero
               |> Or_error.ok_exn )
           in
           let transactions : Mina_transaction.Transaction.Valid.t list =
@@ -2441,6 +2445,7 @@ let%test_module "legacy transactions using zkApp accounts" =
       let coinbase1 =
         let ft = Coinbase.Fee_transfer.create ~receiver_pk:spec.receiver ~fee in
         Coinbase.create ~amount ~receiver:snapp_pk ~fee_transfer:(Some ft)
+          ~fee_remainder:Currency.Fee.zero
         |> Or_error.ok_exn
       in
       U.test_transaction_union ?expected_failure ledger
@@ -2449,6 +2454,7 @@ let%test_module "legacy transactions using zkApp accounts" =
       let coinbase2 =
         let ft = Coinbase.Fee_transfer.create ~receiver_pk:snapp_pk ~fee in
         Coinbase.create ~amount ~receiver:spec.receiver ~fee_transfer:(Some ft)
+          ~fee_remainder:Currency.Fee.zero
         |> Or_error.ok_exn
       in
       U.test_transaction_union ?expected_failure ledger
@@ -2462,6 +2468,7 @@ let%test_module "legacy transactions using zkApp accounts" =
       let coinbase3 =
         let ft = Coinbase.Fee_transfer.create ~receiver_pk:snapp_pk ~fee in
         Coinbase.create ~amount ~receiver:snapp_pk2 ~fee_transfer:(Some ft)
+          ~fee_remainder:Currency.Fee.zero
         |> Or_error.ok_exn
       in
       U.test_transaction_union

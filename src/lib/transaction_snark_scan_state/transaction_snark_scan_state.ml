@@ -28,7 +28,7 @@ module Transaction_with_witness = struct
       *)
       type t =
         { transaction_with_status :
-            Mina_transaction.Transaction.Stable.V3.t With_status.Stable.V2.t
+            Mina_transaction.Transaction.Stable.V4.t With_status.Stable.V2.t
         ; state_hash : State_hash.Stable.V1.t * State_body_hash.Stable.V1.t
         ; statement : Transaction_snark.Statement.Stable.V3.t
         ; init_stack : Pending_coinbase.Stack_versioned.Stable.V1.t

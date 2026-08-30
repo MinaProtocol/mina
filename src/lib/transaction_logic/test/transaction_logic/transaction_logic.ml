@@ -133,7 +133,9 @@ let coinbase_order_of_created_accounts_is_correct ~with_fee_transfer () =
     else None
   in
   let coinbase_txn =
-    Or_error.ok_exn @@ Coinbase.create ~amount ~receiver ~fee_transfer
+    Or_error.ok_exn
+    @@ Coinbase.create ~amount ~receiver ~fee_transfer
+         ~fee_remainder:Currency.Fee.zero
   in
   let accounts =
     []

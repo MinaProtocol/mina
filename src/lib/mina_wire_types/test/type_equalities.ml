@@ -254,7 +254,7 @@ module Mina_base = struct
   include Assert_equal0V2 (O.Fee_transfer.Stable) (W.Fee_transfer)
   include
     Assert_equal0V1 (O.Coinbase_fee_transfer.Stable) (W.Coinbase_fee_transfer)
-  include Assert_equal0V1 (O.Coinbase.Stable) (W.Coinbase)
+  include Assert_equal0V2 (O.Coinbase.Stable) (W.Coinbase)
   include Assert_equal2V1 (O.With_stack_hash.Stable) (W.With_stack_hash)
   include
     Assert_equal3V1
@@ -328,7 +328,7 @@ end
 module Mina_transaction = struct
   module O = Mina_transaction.Transaction
   module W = WT.Mina_transaction
-  include Assert_equal1V2 (O.Poly.Stable) (W.Poly)
+  include Assert_equal1V3 (O.Poly.Stable) (W.Poly)
 end
 
 module Mina_state = struct
