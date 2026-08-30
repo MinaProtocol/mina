@@ -2277,6 +2277,19 @@ module Make_str (A : Wire_types.Concrete) = struct
         Transaction_union.Tag.Unpacked.is_fee_transfer tag
       in
       let is_coinbase = Transaction_union.Tag.Unpacked.is_coinbase tag in
+      let%bind () =
+        (* [fee_remainder] is witnessed rather than carried in the payload, so
+           nothing but this constrains it for the transaction kinds that do not
+           use it. Pin it to zero there, so that it cannot be used to move the
+           fee excess or the supply increase of any other transaction. *)
+        [%with_label_ "Fee remainder is zero unless this is a coinbase"]
+          (fun () ->
+            let zero = Fee.var_of_t Fee.zero in
+            let%bind remainder_if_not_coinbase =
+              Fee.Checked.if_ is_coinbase ~then_:zero ~else_:fee_remainder
+            in
+            Fee.Checked.assert_equal remainder_if_not_coinbase zero )
+      in
       let fee_token = payload.common.fee_token in
       let%bind fee_token_default =
         make_checked (fun () ->
