@@ -85,19 +85,14 @@ type ('t, 'w) t =
     Unlike a transaction, a coinbase (including the fee transfer) just requires one slot
     in the jobs queue.
 
-    The minimum number of slots required to add a single transaction is three (at
-    worst case number of provers: when each pair of proofs is from a different
-    prover). One slot for the transaction and two slots for fee transfers.
+    Fee transfers pay up to two provers each, so the slots a transaction
+    occupies are one for itself plus, at worst, one shared fee transfer slot.
 
-    When the diff is split into two prediffs (why? refer to #687) and if after
-    adding transactions, the first prediff has slots remaining which cannot
-    accommodate transactions, then one of them takes the coinbase and the rest
-    are filled with padding transactions.
-
-    It is also possible that the first prediff may have no slots left after
-    adding transactions (for example, when there are three slots and maximum
-    number of provers), in which case, we simply add one coinbase as part of the
-    second prediff.
+    When the diff is split into two prediffs (why? refer to #687), exactly one
+    of them carries the coinbase. It is possible for the first prediff to have
+    no slots left after adding transactions (for example, when there are three
+    slots and maximum number of provers), in which case we add the coinbase as
+    part of the second prediff.
 *)
 let create_coinbase coinbase_parts ~(receiver : Public_key.Compressed.t)
     ~coinbase_amount =
@@ -138,18 +133,6 @@ module Transaction_data = struct
     ; fee_transfers : Fee_transfer.t list
     }
 end
-
-(* A padding transaction occupies a scan state slot without moving any funds, so
-   that a block can fill a partition it would otherwise leave short.
-
-   Its receiver must already exist in the ledger. A fee transfer that creates an
-   account pays the account creation fee out of the amount transferred, which a
-   zero-valued transfer cannot cover, and the resulting error aborts the whole
-   application rather than recording a failed status. *)
-let padding_transactions padding =
-  List.map (Option.to_list padding) ~f:(fun receiver_pk ->
-      Fee_transfer.create_single ~receiver_pk ~fee:Currency.Fee.zero
-        ~fee_token:Token_id.default )
 
 module Transaction_data_getter (T : Transaction_snark_work.S) = struct
   let create_fee_transfers completed_works delta public_key coinbase_fts =
@@ -255,8 +238,8 @@ let get_individual_info (type c)
        -> c With_status.t list
        -> 'work list
        -> (c With_status.t Transaction_data.t, Error.t) result ) coinbase_parts
-    ~receiver ~coinbase_amount ~padding (commands : c With_status.t list)
-    completed_works ~internal_command_statuses ~to_user_command =
+    ~receiver ~coinbase_amount (commands : c With_status.t list) completed_works
+    ~internal_command_statuses ~to_user_command =
   let open Result.Let_syntax in
   let%bind
       { Transaction_data.commands; coinbases = coinbase_parts; fee_transfers } =
@@ -265,9 +248,7 @@ let get_individual_info (type c)
   in
   let internal_commands =
     List.map coinbase_parts ~f:(fun t -> Transaction.Coinbase t)
-    @ List.map
-        (fee_transfers @ padding_transactions padding)
-        ~f:(fun t -> Transaction.Fee_transfer t)
+    @ List.map fee_transfers ~f:(fun t -> Transaction.Fee_transfer t)
   in
   let%map internal_commands_with_statuses =
     Or_error.try_with (fun () ->
@@ -320,7 +301,7 @@ let compute_statuses
     (Staged_ledger_diff.With_valid_signatures_and_proofs.diff, _) result =
   let open Result.Let_syntax in
   (* project transactions into a sequence of transactions *)
-  let project_transactions ~coinbase_parts ~commands ~completed_works ~padding =
+  let project_transactions ~coinbase_parts ~commands ~completed_works =
     let%map { Transaction_data.commands; coinbases; fee_transfers } =
       Transaction_data_getter_checked.get_transaction_data coinbase_parts
         ~receiver:coinbase_receiver ~coinbase_amount commands
@@ -330,9 +311,7 @@ let compute_statuses
     List.map commands ~f:(fun t ->
         Transaction.Command (User_command.forget_check t) )
     @ List.map coinbases ~f:(fun t -> Transaction.Coinbase t)
-    @ List.map
-        (fee_transfers @ padding_transactions padding)
-        ~f:(fun t -> Transaction.Fee_transfer t)
+    @ List.map fee_transfers ~f:(fun t -> Transaction.Fee_transfer t)
   in
   let project_transactions_pre_diff_two
       (p :
@@ -342,7 +321,7 @@ let compute_statuses
       match p.coinbase with Zero -> `Zero | One x -> `One x
     in
     project_transactions ~coinbase_parts ~commands:p.commands
-      ~completed_works:p.completed_works ~padding:p.padding
+      ~completed_works:p.completed_works
   in
   let project_transactions_pre_diff_one
       (p :
@@ -352,7 +331,7 @@ let compute_statuses
       match p.coinbase with Zero -> `Zero | One x -> `One x
     in
     project_transactions ~coinbase_parts ~commands:p.commands
-      ~completed_works:p.completed_works ~padding:p.padding
+      ~completed_works:p.completed_works
   in
   (* partition a sequence of transactions with statuses into user commands with statuses and internal command statuses *)
   let split_transaction_statuses txns_with_statuses =
@@ -429,7 +408,7 @@ let get_impl (type c) ~get_transaction_data
     get_individual_info ~get_transaction_data coinbase_parts
       ~receiver:coinbase_receiver t1.commands t1.completed_works
       ~coinbase_amount ~internal_command_statuses:t1.internal_command_statuses
-      ~padding:t1.padding ~to_user_command
+      ~to_user_command
   in
   let apply_pre_diff_with_at_most_one (t2 : _ Staged_ledger_diff.Pre_diff_one.t)
       =
@@ -439,7 +418,7 @@ let get_impl (type c) ~get_transaction_data
     get_individual_info ~get_transaction_data coinbase_added
       ~receiver:coinbase_receiver t2.commands t2.completed_works
       ~coinbase_amount ~internal_command_statuses:t2.internal_command_statuses
-      ~padding:t2.padding ~to_user_command
+      ~to_user_command
   in
   let%bind () = check_coinbase diff in
   let%bind p1 = apply_pre_diff_with_at_most_two (fst diff) in
