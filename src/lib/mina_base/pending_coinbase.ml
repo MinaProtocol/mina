@@ -411,12 +411,8 @@ module Make_str (A : Wire_types.Concrete) = struct
     module Action = struct
       [%%versioned
       module Stable = struct
-        module V1 = struct
-          type t =
-            | Update_none
-            | Update_one
-            | Update_two_coinbase_in_first
-            | Update_two_coinbase_in_second
+        module V2 = struct
+          type t = Update_none | Update_one | Update_two_coinbase_in_second
           [@@deriving equal, sexp, to_yojson]
 
           let to_latest = Fn.id
@@ -430,20 +426,21 @@ module Make_str (A : Wire_types.Concrete) = struct
             (false, false)
         | Update_one ->
             (true, false)
-        | Update_two_coinbase_in_first ->
-            (false, true)
         | Update_two_coinbase_in_second ->
             (true, true)
 
+      (* [(false, true)] used to mean two stacks with the coinbase in the first
+         of them, which a block whose coinbase is its last transaction cannot
+         produce. [Checked.assert_valid] rules it out in-circuit. *)
       let of_bits = function
         | false, false ->
             Update_none
         | true, false ->
             Update_one
-        | false, true ->
-            Update_two_coinbase_in_first
         | true, true ->
             Update_two_coinbase_in_second
+        | false, true ->
+            failwith "Pending_coinbase.Update.Action: unused bit pattern"
 
       let var_of_t t =
         let x, y = to_bits t in
@@ -457,10 +454,10 @@ module Make_str (A : Wire_types.Concrete) = struct
       module Checked = struct
         let no_update (b0, b1) = Boolean.((not b0) &&& not b1)
 
-        let update_two_stacks_coinbase_in_first (b0, b1) =
-          Boolean.((not b0) &&& b1)
-
         let update_two_stacks_coinbase_in_second (b0, b1) = Boolean.(b0 &&& b1)
+
+        (* Three of the four bit patterns name an action; reject the fourth. *)
+        let assert_valid (b0, b1) = Boolean.Assert.any [ b0; Boolean.not b1 ]
       end
     end
 
@@ -477,8 +474,8 @@ module Make_str (A : Wire_types.Concrete) = struct
 
     [%%versioned
     module Stable = struct
-      module V1 = struct
-        type t = (Action.Stable.V1.t, Amount.Stable.V1.t) Poly.Stable.V1.t
+      module V2 = struct
+        type t = (Action.Stable.V2.t, Amount.Stable.V1.t) Poly.Stable.V1.t
         [@@deriving sexp, to_yojson]
 
         let to_latest = Fn.id
@@ -880,6 +877,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                   Find_index_of_newest_stacks act ) )
         in
         let equal_to_zero x = Amount.(equal_var x (var_of_t zero)) in
+        let%bind () = Update.Action.Checked.assert_valid action in
         let%bind no_update = Update.Action.Checked.no_update action in
         let update_state_stack (stack : Stack.var) =
           (*get previous stack to carry-forward the stack of state body hashes*)
@@ -952,12 +950,9 @@ module Make_str (A : Wire_types.Concrete) = struct
           let%bind add_coinbase =
             Update.Action.Checked.update_two_stacks_coinbase_in_second action
           in
-          let%bind update_state =
-            let%bind update_second_stack =
-              Update.Action.Checked.update_two_stacks_coinbase_in_first action
-            in
-            Boolean.(update_second_stack ||| add_coinbase)
-          in
+          (* The second stack is only touched when the block reaches it, which
+             is exactly when it carries the coinbase. *)
+          let update_state = add_coinbase in
           let%bind stack =
             let%bind stack_with_state =
               Stack.Checked.push_state state_body_hash global_slot

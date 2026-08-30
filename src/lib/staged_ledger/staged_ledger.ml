@@ -1082,7 +1082,7 @@ module T = struct
       let txns_for_partition2 = List.drop transactions slots in
       [%log internal] "Update_ledger_and_get_statements"
         ~metadata:[ ("partition", `String "both") ] ;
-      let%map
+      let%bind
           ( data
           , updated_stack1
           , updated_stack2
@@ -1095,28 +1095,37 @@ module T = struct
       in
       [%log internal] "Update_ledger_and_get_statements_done" ;
       let second_has_data = List.length txns_for_partition2 > 0 in
-      let pending_coinbase_action, stack_update =
+      let%map pending_coinbase_action, stack_update =
         match (coinbase_in_first_partition, second_has_data) with
         | true, true ->
-            ( Pending_coinbase.Update.Action.Update_two_coinbase_in_first
-            , `Update_two (updated_stack1, updated_stack2) )
-        (* updated_stack2 does not have coinbase and but has the state from the
-           previous stack *)
+            (* The coinbase is a block's last transaction, so a diff that puts
+               one in the first partition while the second still has
+               transactions of its own is malformed. There is no longer an
+               action that describes it. *)
+            Deferred.Result.fail
+              (Staged_ledger_error.Unexpected
+                 (Error.of_string
+                    "Coinbase in the first partition, but the second partition \
+                     has transactions" ) )
         | true, false ->
             (* updated_stack1 has some new coinbase but parition 2 has no
                data and so we have only one stack to update *)
-            (Update_one, `Update_one updated_stack1)
+            Deferred.Result.return
+              ( Pending_coinbase.Update.Action.Update_one
+              , `Update_one updated_stack1 )
         | false, true ->
             (* updated_stack1 just has the new state. [updated stack2] might
                have coinbase, definitely has some data and therefore will have a
                non-dummy state. *)
-            ( Update_two_coinbase_in_second
-            , `Update_two (updated_stack1, updated_stack2) )
+            Deferred.Result.return
+              ( Pending_coinbase.Update.Action.Update_two_coinbase_in_second
+              , `Update_two (updated_stack1, updated_stack2) )
         | false, false ->
             (* a diff consists of only non-coinbase transactions. This is
                currently not possible because a diff will have a coinbase at the
                very least, so don't update anything? *)
-            (Update_none, `Update_none)
+            Deferred.Result.return
+              (Pending_coinbase.Update.Action.Update_none, `Update_none)
       in
       [%log internal] "Update_coinbase_stack_done"
         ~metadata:
