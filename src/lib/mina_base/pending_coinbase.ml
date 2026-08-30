@@ -578,10 +578,6 @@ module Make_str (A : Wire_types.Concrete) = struct
     (* Total number of stacks *)
     let max_coinbase_stack_count ~depth = Int.pow 2 depth
 
-    let chain if_ b ~then_ ~else_ =
-      let%bind then_ = then_ and else_ = else_ in
-      if_ b ~then_ ~else_
-
     (*pair of coinbase and state stacks*)
     module Stack = struct
       module Poly = struct
@@ -910,14 +906,20 @@ module Make_str (A : Wire_types.Concrete) = struct
             Currency.Amount.Checked.if_ supercharge_coinbase
               ~then_:supercharged_coinbase ~else_:coinbase_amount
           in
-          let%bind rem_amount =
-            Currency.Amount.Checked.sub total_coinbase_amount amount
+          (*A block has at most one coinbase, and it may not exceed the
+            protocol's amount for the block. The subtraction is what enforces
+            that; its result is no longer a second coinbase to push.*)
+          let%bind () =
+            with_label __LOC__ (fun () ->
+                let%map (_ : Currency.Amount.var) =
+                  Currency.Amount.Checked.sub total_coinbase_amount amount
+                in
+                () )
           in
           let%bind no_coinbase_in_this_stack =
             Update.Action.Checked.update_two_stacks_coinbase_in_second action
           in
           let%bind amount1_equal_to_zero = equal_to_zero amount in
-          let%bind amount2_equal_to_zero = equal_to_zero rem_amount in
           (*if no update then coinbase amount has to be zero*)
           let%bind () =
             with_label __LOC__ (fun () ->
@@ -929,19 +931,10 @@ module Make_str (A : Wire_types.Concrete) = struct
           let%bind no_coinbase =
             Boolean.(no_update ||| no_coinbase_in_this_stack)
           in
-          (* TODO: Optimize here since we are pushing twice to the same stack *)
-          let%bind stack_with_amount1 =
+          let%bind stack_with_coinbase =
             Stack.Checked.push_coinbase (coinbase_receiver, amount) stack
           in
-          let%bind stack_with_amount2 =
-            Stack.Checked.push_coinbase
-              (coinbase_receiver, rem_amount)
-              stack_with_amount1
-          in
-          chain Stack.if_ no_coinbase ~then_:(return stack)
-            ~else_:
-              (Stack.if_ amount2_equal_to_zero ~then_:stack_with_amount1
-                 ~else_:stack_with_amount2 )
+          Stack.if_ no_coinbase ~then_:stack ~else_:stack_with_coinbase
         in
         (*This is for the second stack for when transactions in a block occupy
           two trees of the scan state; the second tree will carry-forward the state

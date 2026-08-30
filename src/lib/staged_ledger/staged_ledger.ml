@@ -1236,17 +1236,10 @@ module T = struct
         |> to_staged_ledger_or_error
 
   let coinbase_for_blockchain_snark = function
-    | [] ->
-        Ok Currency.Amount.zero
-    | [ amount ] ->
-        Ok amount
-    | [ amount1; _ ] ->
-        Ok amount1
-    | _ ->
-        Error
-          (Staged_ledger_error.Pre_diff
-             (Pre_diff_info.Error.Coinbase_error "More than two coinbase parts")
-          )
+    | None ->
+        Currency.Amount.zero
+    | Some amount ->
+        amount
 
   let apply_diff ?(skip_verification = false) ~logger ~constraint_constants
       ~global_slot ~current_state_view ~state_and_body_hash ~log_prefix
@@ -1262,7 +1255,7 @@ module T = struct
     in
     let new_mask = Ledger.Mask.create ~depth:(Ledger.depth t.ledger) () in
     let new_ledger = Ledger.register_mask t.ledger new_mask in
-    let transactions, works, commands_count, coinbases = pre_diff_info in
+    let transactions, works, commands_count, coinbase = pre_diff_info in
     let accounts_accessed =
       List.fold_left ~init:Account_id.Set.empty transactions ~f:(fun set txn ->
           Set.union set
@@ -1295,7 +1288,7 @@ module T = struct
         [ ("transactions", `Int (List.length transactions))
         ; ("works", `Int (List.length works))
         ; ("commands_count", `Int commands_count)
-        ; ("coinbases", `Int (List.length coinbases))
+        ; ("coinbases", `Int (if Option.is_some coinbase then 1 else 0))
         ; ("spots_available", `Int spots_available)
         ; ("proofs_waiting", `Int proofs_waiting)
         ; ("max_throughput", `Int max_throughput)
@@ -1383,9 +1376,7 @@ module T = struct
           |> Deferred.return )
     in
     let%bind () = yield_result () in
-    let%bind coinbase_amount =
-      Deferred.return (coinbase_for_blockchain_snark coinbases)
-    in
+    let coinbase_amount = coinbase_for_blockchain_snark coinbase in
     let%bind latest_pending_coinbase_stack =
       Pending_coinbase.latest_stack ~is_new_stack:false
         updated_pending_coinbase_collection'
@@ -1410,7 +1401,7 @@ module T = struct
     [%log debug]
       ~metadata:
         [ ("user_command_count", `Int commands_count)
-        ; ("coinbase_count", `Int (List.length coinbases))
+        ; ("coinbase_count", `Int (if Option.is_some coinbase then 1 else 0))
         ; ("spots_available", `Int spots_available)
         ; ("proof_bundles_waiting", `Int proofs_waiting)
         ; ("work_count", `Int (List.length works))
