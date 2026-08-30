@@ -846,9 +846,8 @@ module T = struct
         current_state_view
     in
     (*The excess a partition ends with is the one the next partition starts
-      from. Both are zero in practice, since [check_zero_fee_excess] requires
-      each partition's transactions to settle their own fees, but the excess is
-      threaded rather than assumed.*)
+      from. A block that spans the boundary leaves a non-zero excess behind it,
+      to be settled by the coinbase in the partition that follows.*)
     let end_fee_excess pre_stmts ~default =
       Option.value_map (List.last pre_stmts) ~default
         ~f:(fun (p : Pre_statement.t) -> p.target_fee_excess )
@@ -1004,10 +1003,11 @@ module T = struct
       if Fee_excess.is_zero fee_excess then Ok ()
       else Error (Non_zero_fee_excess (slots, txns))
     in
-    let%bind () = check (List.take data (fst partitions.first)) partitions in
-    Option.value_map ~default:(Result.return ())
-      ~f:(fun _ -> check (List.drop data (fst partitions.first)) partitions)
-      partitions.second
+    (*A block settles its own fees: the coinbase that ends it pays out whatever
+      its transaction fees did not spend on provers. That is a property of the
+      block, not of either side of a scan state boundary the block happens to
+      span, so it is checked across the whole of the diff.*)
+    check data partitions
 
   let update_coinbase_stack_and_get_data_impl ~logger ~constraint_constants
       ~global_slot ~first_partition_slots:slots ~no_second_partition
@@ -2741,17 +2741,6 @@ let%test_module "staged ledger tests" =
       |> Sequence.to_list
 
     (* Fee excess at top level ledger proofs should always be zero *)
-    let assert_fee_excess : Ledger_proof.Cached.t option -> unit =
-     fun proof_opt ->
-      let source_fee_excess, target_fee_excess =
-        Option.value_map ~default:(Fee_excess.zero, Fee_excess.zero) proof_opt
-          ~f:(fun proof ->
-            let stmt = Ledger_proof.Cached.statement proof in
-            (stmt.source.fee_excess, stmt.target.fee_excess) )
-      in
-      assert (Fee_excess.is_zero source_fee_excess) ;
-      assert (Fee_excess.is_zero target_fee_excess)
-
     let transaction_capacity =
       Int.pow 2 constraint_constants.transaction_capacity_log_2
 
@@ -2877,8 +2866,8 @@ let%test_module "staged ledger tests" =
                         !sl.scan_state
                     in
                     let target_snarked_ledger =
-                      let stmt = Ledger_proof.Cached.statement proof in
-                      stmt.target.first_pass_ledger
+                      Mina_state.Snarked_ledger_state.snarked_ledger_hash
+                        (Ledger_proof.Cached.statement proof)
                     in
                     [%test_eq: Ledger_hash.t] target_snarked_ledger
                       (Ledger.merkle_root snarked_ledger) ;
@@ -2926,7 +2915,6 @@ let%test_module "staged ledger tests" =
                 ~f:(fun _ -> proof_count + 1)
                 ledger_proof
             in
-            assert_fee_excess ledger_proof ;
             let cmds_applied_this_iter =
               List.length @@ Staged_ledger_diff.commands diff
             in
@@ -3599,7 +3587,7 @@ let%test_module "staged ledger tests" =
               ( state_hashes.state_hash
               , state_hashes.state_body_hash |> Option.value_exn )
             in
-            let%map proof, diff =
+            let%map _proof, diff =
               create_and_apply ~global_slot ~state_and_body_hash
                 ~protocol_state_view:current_state_view ~signature_kind sl
                 cmds_this_iter
@@ -3607,7 +3595,6 @@ let%test_module "staged ledger tests" =
                    (List.take work_list proofs_available_this_iter)
                    provers )
             in
-            assert_fee_excess proof ;
             let cmds_applied_this_iter =
               List.length @@ Staged_ledger_diff.commands diff
             in
@@ -4025,7 +4012,6 @@ let%test_module "staged ledger tests" =
             check_pending_coinbase proof ~supercharge_coinbase ~sl_before
               ~sl_after:!sl state_and_body_hash global_slot pc_update
               ~is_new_stack ;
-            assert_fee_excess proof ;
             let cmds_applied_this_iter =
               List.length @@ Staged_ledger_diff.commands diff
             in
@@ -4827,7 +4813,7 @@ let%test_module "staged ledger tests" =
                     Staged_ledger_diff.Pre_diff_with_at_most_two_coinbase.t =
                   { completed_works = []
                   ; commands = cmds
-                  ; coinbase = Zero
+                  ; coinbase = One None
                   ; internal_command_statuses = [ Applied ]
                   }
                 in

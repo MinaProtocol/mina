@@ -196,15 +196,38 @@ module Transaction_data_getter (T : Transaction_snark_work.S) = struct
       ~f:(fun x -> Ok x)
       (Currency.Fee.sub budget total_work_fee)
 
-  let get_transaction_data (type update a b c) coinbase_parts ~receiver
-      ~coinbase_amount
-      ~(to_user_command : c -> (update, a, b) User_command.with_forest)
-      (commands : c list) (completed_works : T.t list) :
+  let get_transaction_data (type c) coinbase_parts ~receiver ~coinbase_amount
+      ~fee_remainder (commands : c list) (completed_works : T.t list) :
       (c Transaction_data.t, Error.t) Result.t =
     let open Result.Let_syntax in
     let coinbase_fts =
       match coinbase_parts with `Zero -> [] | `One x -> Option.to_list x
     in
+    let txn_works_others =
+      List.filter completed_works ~f:(fun w ->
+          not (Public_key.Compressed.equal receiver (T.prover w)) )
+    in
+    let%bind coinbase =
+      O1trace.sync_thread "create_coinbase" (fun () ->
+          create_coinbase coinbase_parts ~receiver ~coinbase_amount
+            ~fee_remainder )
+    in
+    let%map fee_transfers =
+      create_fee_transfers txn_works_others coinbase_fts
+    in
+    { Transaction_data.commands; coinbase; fee_transfers }
+
+  (* Whatever the transaction fees do not spend on provers is paid to the
+     coinbase receiver by the coinbase itself, rather than by a fee transfer of
+     its own.
+
+     It is a property of the whole diff rather than of either pre-diff. A block
+     whose transactions span two scan state trees has its commands on one side
+     and, since the coinbase is its last transaction, the coinbase on the
+     other: only the side carrying the coinbase can pay the remainder out. *)
+  let total_fee_remainder (type update a b c) ~receiver
+      ~(to_user_command : c -> (update, a, b) User_command.with_forest)
+      ~coinbase_fts (commands : c list) (completed_works : T.t list) =
     let coinbase_work_fees =
       sum_fees ~f:Coinbase.Fee_transfer.fee coinbase_fts |> Or_error.ok_exn
     in
@@ -212,22 +235,7 @@ module Transaction_data_getter (T : Transaction_snark_work.S) = struct
       List.filter completed_works ~f:(fun w ->
           not (Public_key.Compressed.equal receiver (T.prover w)) )
     in
-    (* Whatever the transaction fees do not spend on provers is paid to the
-       coinbase receiver by the coinbase itself, rather than by a fee transfer
-       of its own. *)
-    let%bind delta =
-      fee_remainder commands txn_works_others coinbase_work_fees
-        ~to_user_command
-    in
-    let%bind coinbase =
-      O1trace.sync_thread "create_coinbase" (fun () ->
-          create_coinbase coinbase_parts ~receiver ~coinbase_amount
-            ~fee_remainder:delta )
-    in
-    let%map fee_transfers =
-      create_fee_transfers txn_works_others coinbase_fts
-    in
-    { Transaction_data.commands; coinbase; fee_transfers }
+    fee_remainder commands txn_works_others coinbase_work_fees ~to_user_command
 end
 
 module Transaction_data_getter_unchecked =
@@ -242,16 +250,16 @@ let get_individual_info (type c)
           [< `One of Coinbase_fee_transfer.t option | `Zero ]
        -> receiver:Public_key.Compressed.t
        -> coinbase_amount:Currency.Amount.t
-       -> to_user_command:(c With_status.t -> (_, _, _) User_command.with_forest)
+       -> fee_remainder:Currency.Fee.t
        -> c With_status.t list
        -> 'work list
        -> (c With_status.t Transaction_data.t, Error.t) result ) coinbase_parts
-    ~receiver ~coinbase_amount (commands : c With_status.t list) completed_works
-    ~internal_command_statuses ~to_user_command =
+    ~receiver ~coinbase_amount ~fee_remainder (commands : c With_status.t list)
+    completed_works ~internal_command_statuses =
   let open Result.Let_syntax in
   let%bind { Transaction_data.commands; coinbase; fee_transfers } =
-    get_transaction_data coinbase_parts ~receiver ~coinbase_amount commands
-      completed_works ~to_user_command
+    get_transaction_data coinbase_parts ~receiver ~coinbase_amount
+      ~fee_remainder commands completed_works
   in
   (* The coinbase is the last transaction of the block: every fee payment
      precedes it, so the fee excess it settles is the whole of what the block
@@ -309,13 +317,49 @@ let compute_statuses
     ~coinbase_receiver ~coinbase_amount ~global_slot ~txn_state_view ~ledger :
     (Staged_ledger_diff.With_valid_signatures_and_proofs.diff, _) result =
   let open Result.Let_syntax in
+  let ( (p1 :
+          ( Transaction_snark_work.Checked.t
+          , _ )
+          Staged_ledger_diff.Pre_diff_two.t )
+      , (p2 :
+          ( Transaction_snark_work.Checked.t
+          , _ )
+          Staged_ledger_diff.Pre_diff_one.t
+          option ) ) =
+    diff
+  in
+  let coinbase_fts =
+    let of_at_most_one = function
+      | Staged_ledger_diff.At_most_one.Zero ->
+          []
+      | One x ->
+          Option.to_list x
+    in
+    of_at_most_one p1.coinbase
+    @ Option.value_map p2 ~default:[] ~f:(fun d -> of_at_most_one d.coinbase)
+  in
+  let%bind total_fee_remainder =
+    Transaction_data_getter_checked.total_fee_remainder
+      ~receiver:coinbase_receiver ~to_user_command:User_command.forget_check
+      ~coinbase_fts
+      (p1.commands @ Option.value_map p2 ~default:[] ~f:(fun d -> d.commands))
+      ( p1.completed_works
+      @ Option.value_map p2 ~default:[] ~f:(fun d -> d.completed_works) )
+  in
+  (* Only the pre-diff carrying the coinbase can pay the remainder out. *)
+  let remainder_for = function
+    | Staged_ledger_diff.At_most_one.Zero ->
+        Currency.Fee.zero
+    | One _ ->
+        total_fee_remainder
+  in
   (* project transactions into a sequence of transactions *)
-  let project_transactions ~coinbase_parts ~commands ~completed_works =
+  let project_transactions ~coinbase_parts ~commands ~completed_works
+      ~fee_remainder =
     let%map { Transaction_data.commands; coinbase; fee_transfers } =
       Transaction_data_getter_checked.get_transaction_data coinbase_parts
-        ~receiver:coinbase_receiver ~coinbase_amount commands
+        ~receiver:coinbase_receiver ~coinbase_amount ~fee_remainder commands
         (completed_works : Transaction_snark_work.Checked.t list)
-        ~to_user_command:User_command.forget_check
     in
     List.map commands ~f:(fun t ->
         Transaction.Command (User_command.forget_check t) )
@@ -331,6 +375,7 @@ let compute_statuses
     in
     project_transactions ~coinbase_parts ~commands:p.commands
       ~completed_works:p.completed_works
+      ~fee_remainder:(remainder_for p.coinbase)
   in
   let project_transactions_pre_diff_one
       (p :
@@ -341,6 +386,7 @@ let compute_statuses
     in
     project_transactions ~coinbase_parts ~commands:p.commands
       ~completed_works:p.completed_works
+      ~fee_remainder:(remainder_for p.coinbase)
   in
   (* partition a sequence of transactions with statuses into user commands with statuses and internal command statuses *)
   let split_transaction_statuses txns_with_statuses =
@@ -359,7 +405,6 @@ let compute_statuses
         | Transaction.Fee_transfer _ | Transaction.Coinbase _ ->
             Either.Second status )
   in
-  let p1, p2 = diff in
   let%bind num_p1_txns, txns =
     let%map p1_txns = project_transactions_pre_diff_two p1
     and p2_txns =
@@ -391,7 +436,7 @@ let compute_statuses
   in
   (p1', p2')
 
-let get_impl (type c) ~get_transaction_data
+let get_impl (type c) ~get_transaction_data ~total_fee_remainder
     ~(constraint_constants : Genesis_constants.Constraint_constants.t)
     ~(to_user_command : c With_status.t -> (_, _, _) User_command.with_forest)
     ~diff ~coinbase_receiver ~coinbase_amount =
@@ -409,6 +454,32 @@ let get_impl (type c) ~get_transaction_data
                  constraint_constants.coinbase_amount ) ) )
       ~f:(fun x -> Ok x)
   in
+  let t1, t2 = diff in
+  let coinbase_fts =
+    let of_at_most_one = function
+      | Staged_ledger_diff.At_most_one.Zero ->
+          []
+      | One x ->
+          Option.to_list x
+    in
+    of_at_most_one t1.Staged_ledger_diff.Pre_diff_two.coinbase
+    @ Option.value_map t2 ~default:[] ~f:(fun d ->
+        of_at_most_one d.Staged_ledger_diff.Pre_diff_one.coinbase )
+  in
+  let%bind total_fee_remainder =
+    total_fee_remainder ~receiver:coinbase_receiver ~to_user_command
+      ~coinbase_fts
+      (t1.commands @ Option.value_map t2 ~default:[] ~f:(fun d -> d.commands))
+      ( t1.completed_works
+      @ Option.value_map t2 ~default:[] ~f:(fun d -> d.completed_works) )
+  in
+  (* Only the pre-diff carrying the coinbase can pay the remainder out. *)
+  let remainder_for = function
+    | Staged_ledger_diff.At_most_one.Zero ->
+        Currency.Fee.zero
+    | One _ ->
+        total_fee_remainder
+  in
   let apply_pre_diff_with_at_most_two (t1 : _ Staged_ledger_diff.Pre_diff_two.t)
       =
     let coinbase_parts =
@@ -416,8 +487,9 @@ let get_impl (type c) ~get_transaction_data
     in
     get_individual_info ~get_transaction_data coinbase_parts
       ~receiver:coinbase_receiver t1.commands t1.completed_works
-      ~coinbase_amount ~internal_command_statuses:t1.internal_command_statuses
-      ~to_user_command
+      ~coinbase_amount
+      ~fee_remainder:(remainder_for t1.coinbase)
+      ~internal_command_statuses:t1.internal_command_statuses
   in
   let apply_pre_diff_with_at_most_one (t2 : _ Staged_ledger_diff.Pre_diff_one.t)
       =
@@ -426,8 +498,9 @@ let get_impl (type c) ~get_transaction_data
     in
     get_individual_info ~get_transaction_data coinbase_added
       ~receiver:coinbase_receiver t2.commands t2.completed_works
-      ~coinbase_amount ~internal_command_statuses:t2.internal_command_statuses
-      ~to_user_command
+      ~coinbase_amount
+      ~fee_remainder:(remainder_for t2.coinbase)
+      ~internal_command_statuses:t2.internal_command_statuses
   in
   let%bind () = check_coinbase diff in
   let%bind p1 = apply_pre_diff_with_at_most_two (fst diff) in
@@ -456,7 +529,7 @@ let get ~check ~constraint_constants ~coinbase_receiver ~supercharge_coinbase t
       Error (Error.Verification_failed e)
   | Ok (Ok diff) ->
       let open Transaction_data_getter_unchecked in
-      get_impl ~get_transaction_data ~constraint_constants
+      get_impl ~get_transaction_data ~total_fee_remainder ~constraint_constants
         ~to_user_command:(Fn.compose User_command.forget_check With_status.data)
         ~diff:diff.diff ~coinbase_receiver
         ~coinbase_amount:
@@ -467,8 +540,8 @@ let get_unchecked ~constraint_constants ~coinbase_receiver ~supercharge_coinbase
     (t : Staged_ledger_diff.With_valid_signatures_and_proofs.t) =
   let t = Staged_ledger_diff.forget_proof_checks t in
   let open Transaction_data_getter_unchecked in
-  get_impl ~get_transaction_data ~constraint_constants ~diff:t.diff
-    ~coinbase_receiver
+  get_impl ~get_transaction_data ~total_fee_remainder ~constraint_constants
+    ~diff:t.diff ~coinbase_receiver
     ~to_user_command:(Fn.compose User_command.forget_check With_status.data)
     ~coinbase_amount:
       (Staged_ledger_diff.With_valid_signatures.coinbase ~constraint_constants
@@ -479,7 +552,7 @@ let get_transactions_stable ~constraint_constants ~coinbase_receiver
   let open Result.Let_syntax in
   let open Transaction_data_getter_stable in
   let%map transactions, _, _, _ =
-    get_impl ~get_transaction_data ~constraint_constants
+    get_impl ~get_transaction_data ~total_fee_remainder ~constraint_constants
       ~to_user_command:With_status.data ~diff ~coinbase_receiver
       ~coinbase_amount:
         (Staged_ledger_diff.Diff.Stable.Latest.coinbase ~constraint_constants
@@ -492,7 +565,7 @@ let get_transactions ~constraint_constants ~coinbase_receiver
   let open Result.Let_syntax in
   let open Transaction_data_getter_unchecked in
   let%map transactions, _, _, _ =
-    get_impl ~get_transaction_data ~constraint_constants
+    get_impl ~get_transaction_data ~total_fee_remainder ~constraint_constants
       ~to_user_command:With_status.data ~diff ~coinbase_receiver
       ~coinbase_amount:
         (Staged_ledger_diff.Diff.coinbase ~constraint_constants

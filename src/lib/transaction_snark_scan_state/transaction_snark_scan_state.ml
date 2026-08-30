@@ -745,11 +745,19 @@ struct
               Transaction_snark.Statement.merge statement t |> Or_error.ignore_m )
         and () = check_registers registers_end target
         and () =
-          (*[check_registers] pins the excess the scan state ends with; the
-            excess it starts from must be settled too.*)
-          clarify_error
-            (Fee_excess.is_zero source.fee_excess)
-            "nonzero fee excess"
+          (*[check_registers] pins the excess the scan state ends with. The one
+            it starts from is whatever the last emitted proof left behind,
+            which the merge above pins; a block that spans the boundary leaves
+            it non-zero, to be settled by the coinbase in the next chunk. With
+            no proof emitted yet there is nothing to connect to, and the scan
+            state starts settled.*)
+          match last_proof_statement with
+          | Some _ ->
+              Ok ()
+          | None ->
+              clarify_error
+                (Fee_excess.is_zero source.fee_excess)
+                "nonzero fee excess"
         in
         ()
 
@@ -1105,20 +1113,35 @@ let apply_ordered_txns_stepwise ?(stop_at_last_coinbase = false) ordered_txns
           ~k:(fun () -> Ok (`Complete first_pass_ledger_hash))
           previous_incomplete
     | txns_per_block :: ordered_txns' ->
+        let previous_not_empty =
+          match previous_incomplete with
+          | Unapplied txns ->
+              not (List.is_empty txns)
+          | Partially_applied txns ->
+              not (List.is_empty txns)
+        in
+        (*An unapplied previous-incomplete set is the earlier part of a block
+          that the previous proof's range cut in half, and the ledger this
+          replay starts from predates all of it. So it is the leading part of
+          this block's first pass rather than something to apply afterwards:
+          the rest of the block, in this tree, has to be applied on top of it.
+
+          A partially applied set was produced by this replay, and its second
+          pass still follows the first pass of the rest of its block.*)
+        let leading, previous_incomplete =
+          match previous_incomplete with
+          | Unapplied txns ->
+              (txns, Previous_incomplete_txns.Unapplied [])
+          | Partially_applied _ as partially_applied ->
+              ([], partially_applied)
+        in
         (*Apply first pass of a blocks transactions either new or continued from previous tree*)
-        apply_txns_first_pass txns_per_block.first_pass
+        apply_txns_first_pass (leading @ txns_per_block.first_pass)
           ~k:(fun first_pass_ledger_hash partially_applied_txns ->
             (*Apply second pass of previous tree's transactions, if any*)
             apply_previous_incomplete_txns previous_incomplete ~k:(fun () ->
                 let continue_previous_tree's_txns =
                   (* If this is a continuation from previous tree for the same block (incomplete txns in both sets) then do second pass now*)
-                  let previous_not_empty =
-                    match previous_incomplete with
-                    | Unapplied txns ->
-                        not (List.is_empty txns)
-                    | Partially_applied txns ->
-                        not (List.is_empty txns)
-                  in
                   previous_not_empty
                   && not (List.is_empty txns_per_block.current_incomplete)
                 in
