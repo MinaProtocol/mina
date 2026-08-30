@@ -940,21 +940,59 @@ let latest_ledger_proof_and_txs' t =
   in
   (proof, txns)
 
+(*A block's coinbase is its last transaction, so a block that contains one is
+  finalised by the range that covers it. The ledger recorded as of the latest
+  coinbase is the ledger after the last such block; the blocks after it are
+  covered by the range but not finalised by it.*)
+let block_contains_coinbase (block : _ Transactions_ordered.Poly.t) =
+  List.exists block.first_pass ~f:(fun (txn : Transaction_with_witness.t) ->
+      match txn.transaction_with_status.data with
+      | Mina_transaction.Transaction.Coinbase _ ->
+          true
+      | _ ->
+          false )
+
+let up_to_last_coinbase ordered_txns =
+  List.rev ordered_txns
+  |> List.drop_while ~f:(fun block -> not (block_contains_coinbase block))
+  |> List.rev
+
+let after_last_coinbase ordered_txns =
+  List.rev ordered_txns
+  |> List.take_while ~f:(fun block -> not (block_contains_coinbase block))
+  |> List.rev
+
 let incomplete_txns_from_recent_proof_tree t =
   let open Option.Let_syntax in
   let%map proof, txns_per_block = latest_ledger_proof_and_txs' t in
-  let txns =
-    match List.last txns_per_block with
+  (*The snarked ledger is the one recorded as of the latest coinbase, so what
+    remains outstanding relative to it is what this range covers but does not
+    apply in full. That is two things. The blocks after the last coinbase are
+    not finalised by this range at all. And the last block that is finalised
+    may still have a second pass that falls in the next tree: a coinbase being
+    a block's last transaction puts the first pass boundary at the block
+    boundary, but it does not stop the second pass from lagging across a tree
+    edge.*)
+  let spillover =
+    match List.last (up_to_last_coinbase txns_per_block) with
     | None ->
+        []
+    | Some block ->
+        block.Transactions_ordered.Poly.current_incomplete
+  in
+  let txns =
+    match (spillover, after_last_coinbase txns_per_block) with
+    | [], [] ->
         ([], `Border_block_continued_in_the_next_tree false)
-    | Some txns_in_last_block ->
-        (*First pass ledger is considered as the snarked ledger, so any account update whether completed in the same tree or not should be included in the next tree *)
-        if not (List.is_empty txns_in_last_block.second_pass) then
-          ( txns_in_last_block.second_pass
-          , `Border_block_continued_in_the_next_tree false )
-        else
-          ( txns_in_last_block.current_incomplete
-          , `Border_block_continued_in_the_next_tree true )
+    | _, [] ->
+        (*Only the trailing second pass is left; its block's transactions are
+          otherwise applied, so it stands on its own rather than continuing.*)
+        (spillover, `Border_block_continued_in_the_next_tree false)
+    | _, unfinalised ->
+        ( spillover
+          @ List.concat_map unfinalised ~f:(fun block ->
+              block.Transactions_ordered.Poly.first_pass )
+        , `Border_block_continued_in_the_next_tree true )
   in
   (proof, txns)
 
@@ -1006,25 +1044,6 @@ let staged_transactions t =
   List.concat txns
 
 (* written in continuation passing style so that implementation can be used both sync and async *)
-(*A block's coinbase is its last transaction, so a block that contains one is
-  wholly within the range being replayed. The ledger recorded as of the latest
-  coinbase is therefore the ledger after the last such block, and the trailing
-  transactions of a block the range cuts in half are not part of it. They are
-  replayed on the next round, when they arrive as that round's previous
-  incomplete transactions.*)
-let block_contains_coinbase (block : _ Transactions_ordered.Poly.t) =
-  List.exists block.first_pass ~f:(fun (txn : Transaction_with_witness.t) ->
-      match txn.transaction_with_status.data with
-      | Mina_transaction.Transaction.Coinbase _ ->
-          true
-      | _ ->
-          false )
-
-let up_to_last_coinbase ordered_txns =
-  List.rev ordered_txns
-  |> List.drop_while ~f:(fun block -> not (block_contains_coinbase block))
-  |> List.rev
-
 let apply_ordered_txns_stepwise ?(stop_at_last_coinbase = false) ordered_txns
     ~ledger ~get_protocol_state ~apply_first_pass ~apply_second_pass =
   let open Or_error.Let_syntax in
@@ -1142,8 +1161,15 @@ let apply_ordered_txns_stepwise ?(stop_at_last_coinbase = false) ordered_txns
             apply_previous_incomplete_txns previous_incomplete ~k:(fun () ->
                 let continue_previous_tree's_txns =
                   (* If this is a continuation from previous tree for the same block (incomplete txns in both sets) then do second pass now*)
+                  (*The previous tree left transactions of this block
+                    pending, and this group defers nothing further, so the
+                    block's first pass finishes here and its second pass can
+                    run. A non-empty [current_incomplete] means the block
+                    carries on into the next tree -- with the coinbase last,
+                    that is where its first pass ends -- so the second pass has
+                    to keep waiting.*)
                   previous_not_empty
-                  && not (List.is_empty txns_per_block.current_incomplete)
+                  && List.is_empty txns_per_block.current_incomplete
                 in
                 let do_second_pass =
                   (*if transactions completed in the same tree; do second pass now*)
