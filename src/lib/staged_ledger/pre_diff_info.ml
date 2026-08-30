@@ -95,7 +95,7 @@ type ('t, 'w) t =
     part of the second prediff.
 *)
 let create_coinbase coinbase_parts ~(receiver : Public_key.Compressed.t)
-    ~coinbase_amount =
+    ~coinbase_amount ~fee_remainder =
   let open Result.Let_syntax in
   let coinbase_or_error = function
     | Ok x ->
@@ -105,11 +105,15 @@ let create_coinbase coinbase_parts ~(receiver : Public_key.Compressed.t)
   in
   match coinbase_parts with
   | `Zero ->
-      return []
+      if Currency.Fee.equal fee_remainder Currency.Fee.zero then return []
+      else
+        Error
+          (Error.Coinbase_error
+             "A block with no coinbase has no way to pay out its fee excess" )
   | `One x ->
       let%map cb =
         Coinbase.create ~amount:coinbase_amount ~receiver ~fee_transfer:x
-          ~fee_remainder:Currency.Fee.zero
+          ~fee_remainder
         |> coinbase_or_error
       in
       [ cb ]
@@ -136,11 +140,10 @@ module Transaction_data = struct
 end
 
 module Transaction_data_getter (T : Transaction_snark_work.S) = struct
-  let create_fee_transfers completed_works delta public_key coinbase_fts =
+  let create_fee_transfers completed_works coinbase_fts =
     let open Result.Let_syntax in
     let singles =
-      (if Currency.Fee.(equal zero delta) then [] else [ (public_key, delta) ])
-      @ List.filter_map completed_works ~f:(fun w ->
+      List.filter_map completed_works ~f:(fun w ->
           let fee = T.fee w in
           if Currency.Fee.equal fee Currency.Fee.zero then None
           else Some (T.prover w, fee) )
@@ -199,12 +202,8 @@ module Transaction_data_getter (T : Transaction_snark_work.S) = struct
       (commands : c list) (completed_works : T.t list) :
       (c Transaction_data.t, Error.t) Result.t =
     let open Result.Let_syntax in
-    let%bind coinbases =
-      O1trace.sync_thread "create_coinbase" (fun () ->
-          create_coinbase coinbase_parts ~receiver ~coinbase_amount )
-    in
     let coinbase_fts =
-      List.concat_map coinbases ~f:(fun cb -> Option.to_list cb.fee_transfer)
+      match coinbase_parts with `Zero -> [] | `One x -> Option.to_list x
     in
     let coinbase_work_fees =
       sum_fees ~f:Coinbase.Fee_transfer.fee coinbase_fts |> Or_error.ok_exn
@@ -213,12 +212,20 @@ module Transaction_data_getter (T : Transaction_snark_work.S) = struct
       List.filter completed_works ~f:(fun w ->
           not (Public_key.Compressed.equal receiver (T.prover w)) )
     in
+    (* Whatever the transaction fees do not spend on provers is paid to the
+       coinbase receiver by the coinbase itself, rather than by a fee transfer
+       of its own. *)
     let%bind delta =
       fee_remainder commands txn_works_others coinbase_work_fees
         ~to_user_command
     in
+    let%bind coinbases =
+      O1trace.sync_thread "create_coinbase" (fun () ->
+          create_coinbase coinbase_parts ~receiver ~coinbase_amount
+            ~fee_remainder:delta )
+    in
     let%map fee_transfers =
-      create_fee_transfers txn_works_others delta receiver coinbase_fts
+      create_fee_transfers txn_works_others coinbase_fts
     in
     { Transaction_data.commands; coinbases; fee_transfers }
 end

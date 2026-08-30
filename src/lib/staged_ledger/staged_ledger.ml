@@ -1796,18 +1796,13 @@ module T = struct
           1
 
     let slots_occupied t =
-      let fee_for_self =
-        match t.budget with
-        | Error _ ->
-            0
-        | Ok b ->
-            if Fee.(b > Fee.zero) then 1 else 0
-      in
+      (* The receiver's own share of the transaction fees is paid by the
+         coinbase, so it costs no slot of its own. *)
       let other_provers =
         Map.filter_keys t.fee_transfers
           ~f:(Fn.compose not (Public_key.Compressed.equal t.receiver_pk))
       in
-      let total_fee_transfer_pks = Map.length other_provers + fee_for_self in
+      let total_fee_transfer_pks = Map.length other_provers in
       Sequence.length t.commands_rev
       + ((total_fee_transfer_pks + 1) / 2)
       + coinbase_added t
