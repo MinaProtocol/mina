@@ -3224,6 +3224,17 @@ module Make_str (A : Wire_types.Concrete) = struct
               in
               Fee_excess.assert_equal_checked target_fee_excess
                 statement.target.fee_excess )
+          (*Every fee payment of a block precedes its coinbase, and the coinbase
+            pays out whatever they left over, so a coinbase leaves no unsettled
+            fees behind it. This is what ties the remainder a coinbase claims to
+            the excess the block actually accumulated.*)
+        ; [%with_label_ "a coinbase settles the fee excess"] (fun () ->
+              let open Tick.Checked.Let_syntax in
+              let%bind excess_is_zero =
+                Fee_excess.equal_checked statement.target.fee_excess
+                  (Fee_excess.var_of_t Fee_excess.zero)
+              in
+              Boolean.Assert.any [ Boolean.not is_coinbase; excess_is_zero ] )
           (*A coinbase moves the recorded post-coinbase state on to where this
             transition ends; anything else carries it through untouched.*)
         ; [%with_label_ "post-coinbase state tracks the latest coinbase"]
