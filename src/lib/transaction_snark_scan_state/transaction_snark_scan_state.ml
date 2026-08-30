@@ -998,7 +998,26 @@ let staged_transactions t =
   List.concat txns
 
 (* written in continuation passing style so that implementation can be used both sync and async *)
-let apply_ordered_txns_stepwise ?(stop_at_first_pass = false) ordered_txns
+(*A block's coinbase is its last transaction, so a block that contains one is
+  wholly within the range being replayed. The ledger recorded as of the latest
+  coinbase is therefore the ledger after the last such block, and the trailing
+  transactions of a block the range cuts in half are not part of it. They are
+  replayed on the next round, when they arrive as that round's previous
+  incomplete transactions.*)
+let block_contains_coinbase (block : _ Transactions_ordered.Poly.t) =
+  List.exists block.first_pass ~f:(fun (txn : Transaction_with_witness.t) ->
+      match txn.transaction_with_status.data with
+      | Mina_transaction.Transaction.Coinbase _ ->
+          true
+      | _ ->
+          false )
+
+let up_to_last_coinbase ordered_txns =
+  List.rev ordered_txns
+  |> List.drop_while ~f:(fun block -> not (block_contains_coinbase block))
+  |> List.rev
+
+let apply_ordered_txns_stepwise ?(stop_at_last_coinbase = false) ordered_txns
     ~ledger ~get_protocol_state ~apply_first_pass ~apply_second_pass =
   let open Or_error.Let_syntax in
   let module Previous_incomplete_txns = struct
@@ -1085,15 +1104,6 @@ let apply_ordered_txns_stepwise ?(stop_at_first_pass = false) ordered_txns
         apply_previous_incomplete_txns
           ~k:(fun () -> Ok (`Complete first_pass_ledger_hash))
           previous_incomplete
-    | [ txns_per_block ] when stop_at_first_pass ->
-        (*Last block; don't apply second pass. This is for snarked ledgers which are first pass ledgers*)
-        apply_txns_first_pass txns_per_block.first_pass
-          ~k:(fun first_pass_ledger_hash _partially_applied_txns ->
-            (*Skip previous_incomplete: If there are previous_incomplete txns
-              then there’d be at least two sets of txns_per_block and the
-              previous_incomplete txns will be applied when processing the first
-              set. The subsequent sets shouldn’t have any previous-incomplete.*)
-            apply_txns (Unapplied []) [] ~first_pass_ledger_hash ~signature_kind )
     | txns_per_block :: ordered_txns' ->
         (*Apply first pass of a blocks transactions either new or continued from previous tree*)
         apply_txns_first_pass txns_per_block.first_pass
@@ -1126,6 +1136,10 @@ let apply_ordered_txns_stepwise ?(stop_at_first_pass = false) ordered_txns
                   apply_txns (Partially_applied partially_applied_txns)
                     ordered_txns' ~first_pass_ledger_hash ~signature_kind ) )
   in
+  let ordered_txns =
+    if stop_at_last_coinbase then up_to_last_coinbase ordered_txns
+    else ordered_txns
+  in
   let previous_incomplete =
     Option.value_map (List.hd ordered_txns)
       ~default:(Previous_incomplete_txns.Unapplied [])
@@ -1139,7 +1153,7 @@ let apply_ordered_txns_stepwise ?(stop_at_first_pass = false) ordered_txns
   in
   apply_txns previous_incomplete ordered_txns ~first_pass_ledger_hash
 
-let apply_ordered_txns_sync ?stop_at_first_pass ordered_txns ~ledger
+let apply_ordered_txns_sync ?stop_at_last_coinbase ordered_txns ~ledger
     ~get_protocol_state ~apply_first_pass ~apply_second_pass ~signature_kind =
   let rec run = function
     | Ok (`Continue k) ->
@@ -1150,10 +1164,10 @@ let apply_ordered_txns_sync ?stop_at_first_pass ordered_txns ~ledger
         Error err
   in
   run
-  @@ apply_ordered_txns_stepwise ?stop_at_first_pass ordered_txns ~ledger
+  @@ apply_ordered_txns_stepwise ?stop_at_last_coinbase ordered_txns ~ledger
        ~get_protocol_state ~apply_first_pass ~apply_second_pass ~signature_kind
 
-let apply_ordered_txns_async ?stop_at_first_pass ordered_txns
+let apply_ordered_txns_async ?stop_at_last_coinbase ordered_txns
     ?(async_batch_size = 10) ~ledger ~get_protocol_state ~apply_first_pass
     ~apply_second_pass ~signature_kind =
   let open Deferred.Result.Let_syntax in
@@ -1172,7 +1186,7 @@ let apply_ordered_txns_async ?stop_at_first_pass ordered_txns
         Deferred.return (Error err)
   in
   run
-  @@ apply_ordered_txns_stepwise ?stop_at_first_pass ordered_txns ~ledger
+  @@ apply_ordered_txns_stepwise ?stop_at_last_coinbase ordered_txns ~ledger
        ~get_protocol_state ~apply_first_pass ~apply_second_pass ~signature_kind
 
 let get_snarked_ledger_sync ~ledger ~get_protocol_state ~apply_first_pass
@@ -1181,7 +1195,7 @@ let get_snarked_ledger_sync ~ledger ~get_protocol_state ~apply_first_pass
   | None ->
       Or_error.errorf "No transactions found"
   | Some (_, txns_per_block) ->
-      apply_ordered_txns_sync ~stop_at_first_pass:true txns_per_block ~ledger
+      apply_ordered_txns_sync ~stop_at_last_coinbase:true txns_per_block ~ledger
         ~get_protocol_state ~apply_first_pass ~apply_second_pass ~signature_kind
       |> Or_error.ignore_m
 
@@ -1191,7 +1205,7 @@ let get_snarked_ledger_async ?async_batch_size ~ledger ~get_protocol_state
   | None ->
       Deferred.Or_error.errorf "No transactions found"
   | Some (_, txns_per_block) ->
-      apply_ordered_txns_async ~stop_at_first_pass:true txns_per_block
+      apply_ordered_txns_async ~stop_at_last_coinbase:true txns_per_block
         ?async_batch_size ~ledger ~get_protocol_state ~apply_first_pass
         ~apply_second_pass ~signature_kind
       |> Deferred.Or_error.ignore_m

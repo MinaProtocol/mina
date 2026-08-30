@@ -510,7 +510,11 @@ module Make_str (A : Wire_types.Concrete) = struct
       }
   end
 
-  let snarked_ledger_hash (t : _ Poly.t) = Registers.first_pass_ledger t.target
+  (*The ledger the protocol surfaces is the one recorded as of the latest
+    coinbase, which is a block boundary, rather than the first pass ledger,
+    which is wherever the scan state's chunk happened to end.*)
+  let snarked_ledger_hash (t : _ Poly.t) =
+    Registers.ledger_after_coinbase t.target
 
   let validate_ledgers_at_merge (type a error bool)
       (module L : Ledger_hash_intf

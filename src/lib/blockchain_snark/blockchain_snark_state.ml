@@ -184,9 +184,14 @@ let%snarkydef_ step ~(logger : Logger.t)
   let%bind total_currency =
     (* The total currency only moves when the txn statement represents a new
        ledger transition; the transaction snark is what proves the new value
-       follows from the old one, so consensus no longer accumulates it. *)
+       follows from the old one, so consensus no longer accumulates it.
+
+       It is the supply as of the latest coinbase, to match the ledger the
+       protocol surfaces: an epoch ledger and its total currency have to
+       describe the same state. *)
     Currency.Amount.Checked.if_ txn_stmt_ledger_hashes_didn't_change
-      ~then_:previous_total_currency ~else_:txn_snark.target.total_currency
+      ~then_:previous_total_currency
+      ~else_:txn_snark.target.total_supply_after_coinbase
   in
   let%bind `Success updated_consensus_state, consensus_state =
     with_label __LOC__ (fun () ->
@@ -287,7 +292,7 @@ let%snarkydef_ step ~(logger : Logger.t)
         [ ledger_statement_valid
           (* The proof has to continue the total currency from where consensus
              left it, which is what makes [total_currency] above sound. *)
-        ; Currency.Amount.equal_var txn_snark.source.total_currency
+        ; Currency.Amount.equal_var txn_snark.source.total_supply_after_coinbase
             previous_total_currency
           (* A ledger proof no longer has to settle the fees of the
              transactions it covers: its range can end part way through a
