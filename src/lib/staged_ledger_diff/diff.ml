@@ -79,12 +79,13 @@ module Pre_diff_two = struct
   module Stable = struct
     [@@@no_toplevel_latest_type]
 
-    module V2 = struct
+    module V3 = struct
       type ('a, 'b) t =
         { completed_works : 'a list
         ; commands : 'b list
         ; coinbase : Ft.Stable.V1.t At_most_two.Stable.V1.t
         ; internal_command_statuses : Transaction_status.Stable.V2.t list
+        ; padding : Signature_lib.Public_key.Compressed.Stable.V1.t option
         }
       [@@deriving equal, compare, sexp, yojson]
     end
@@ -95,6 +96,7 @@ module Pre_diff_two = struct
     ; commands : 'b list
     ; coinbase : Ft.t At_most_two.t
     ; internal_command_statuses : Transaction_status.t list
+    ; padding : Signature_lib.Public_key.Compressed.t option
     }
   [@@deriving equal, compare, sexp, yojson]
 
@@ -103,6 +105,7 @@ module Pre_diff_two = struct
     ; commands = List.map t.commands ~f:f2
     ; coinbase = t.coinbase
     ; internal_command_statuses = t.internal_command_statuses
+    ; padding = t.padding
     }
 end
 
@@ -111,12 +114,13 @@ module Pre_diff_one = struct
   module Stable = struct
     [@@@no_toplevel_latest_type]
 
-    module V2 = struct
+    module V3 = struct
       type ('a, 'b) t =
         { completed_works : 'a list
         ; commands : 'b list
         ; coinbase : Ft.Stable.V1.t At_most_one.Stable.V1.t
         ; internal_command_statuses : Transaction_status.Stable.V2.t list
+        ; padding : Signature_lib.Public_key.Compressed.Stable.V1.t option
         }
       [@@deriving equal, compare, sexp, yojson]
     end
@@ -127,6 +131,7 @@ module Pre_diff_one = struct
     ; commands : 'b list
     ; coinbase : Ft.t At_most_one.t
     ; internal_command_statuses : Transaction_status.t list
+    ; padding : Signature_lib.Public_key.Compressed.t option
     }
   [@@deriving equal, compare, sexp, yojson]
 
@@ -135,6 +140,7 @@ module Pre_diff_one = struct
     ; commands = List.map t.commands ~f:f2
     ; coinbase = t.coinbase
     ; internal_command_statuses = t.internal_command_statuses
+    ; padding = t.padding
     }
 end
 
@@ -147,7 +153,7 @@ module Pre_diff_with_at_most_two_coinbase = struct
       type t =
         ( Transaction_snark_work.Stable.V4.t
         , User_command.Stable.V3.t With_status.Stable.V2.t )
-        Pre_diff_two.Stable.V2.t
+        Pre_diff_two.Stable.V3.t
       [@@deriving equal, sexp, yojson]
 
       let to_latest = Fn.id
@@ -181,7 +187,7 @@ module Pre_diff_with_at_most_one_coinbase = struct
       type t =
         ( Transaction_snark_work.Stable.V4.t
         , User_command.Stable.V3.t With_status.Stable.V2.t )
-        Pre_diff_one.Stable.V2.t
+        Pre_diff_one.Stable.V3.t
       [@@deriving equal, sexp, yojson]
 
       let to_latest = Fn.id
@@ -287,6 +293,7 @@ module Stable = struct
             ; commands = []
             ; coinbase = At_most_two.Zero
             ; internal_command_statuses = []
+            ; padding = None
             }
           , None )
       }
@@ -332,6 +339,7 @@ module With_valid_signatures_and_proofs = struct
           ; commands = []
           ; coinbase = At_most_two.Zero
           ; internal_command_statuses = []
+          ; padding = None
           }
         , None )
     }
@@ -403,6 +411,7 @@ let validate_commands (t : t)
         ; commands = commands1
         ; coinbase = d1.coinbase
         ; internal_command_statuses = d1.internal_command_statuses
+        ; padding = d1.padding
         }
       in
       let p2 =
@@ -412,6 +421,7 @@ let validate_commands (t : t)
               ; commands = commands2
               ; coinbase = d2.coinbase
               ; internal_command_statuses = d2.internal_command_statuses
+              ; padding = d2.padding
               } )
       in
       ({ diff = (p1, p2) } : With_valid_signatures.t) )
@@ -424,6 +434,7 @@ let forget_proof_checks (d : With_valid_signatures_and_proofs.t) :
     ; commands = d1.commands
     ; coinbase = d1.coinbase
     ; internal_command_statuses = d1.internal_command_statuses
+    ; padding = d1.padding
     }
   in
   let p2 =
@@ -433,6 +444,7 @@ let forget_proof_checks (d : With_valid_signatures_and_proofs.t) :
         ; commands = d2.commands
         ; coinbase = d2.coinbase
         ; internal_command_statuses = d2.internal_command_statuses
+        ; padding = d2.padding
         } )
   in
   { diff = (p1, p2) }
@@ -448,6 +460,7 @@ let forget_pre_diff_with_at_most_two
         pre_diff.commands
   ; coinbase = pre_diff.coinbase
   ; internal_command_statuses = pre_diff.internal_command_statuses
+  ; padding = pre_diff.padding
   }
 
 let forget_pre_diff_with_at_most_one
@@ -460,6 +473,7 @@ let forget_pre_diff_with_at_most_one
         pre_diff.commands
   ; coinbase = pre_diff.coinbase
   ; internal_command_statuses = pre_diff.internal_command_statuses
+  ; padding = pre_diff.padding
   }
 
 let forget (t : With_valid_signatures_and_proofs.t) =
@@ -505,6 +519,7 @@ let empty_diff : t =
         ; commands = []
         ; coinbase = At_most_two.Zero
         ; internal_command_statuses = []
+        ; padding = None
         }
       , None )
   }
@@ -515,6 +530,7 @@ let is_empty = function
           ; commands = []
           ; coinbase = At_most_two.Zero
           ; internal_command_statuses = []
+          ; padding = None
           }
         , None )
     } ->

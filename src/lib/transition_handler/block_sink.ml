@@ -405,12 +405,14 @@ let%test_module "malformed gossiped block is handled gracefully" =
               ; commands = []
               ; coinbase = Staged_ledger_diff.At_most_two.One None
               ; internal_command_statuses = []
+              ; padding = None
               }
             , Some
                 { completed_works = []
                 ; commands = []
                 ; coinbase = Staged_ledger_diff.At_most_one.One None
                 ; internal_command_statuses = []
+                ; padding = None
                 } )
         }
       in
