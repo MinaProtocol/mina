@@ -726,20 +726,9 @@ let get_snarked_ledger_full t state_hash_opt =
                     t.config.precomputed_values.constraint_constants
               in
               let apply_second_pass = Ledger.apply_transaction_second_pass in
-              let apply_first_pass_sparse_ledger ~global_slot ~txn_state_view
-                  sparse_ledger txn =
-                let open Or_error.Let_syntax in
-                let%map _ledger, partial_txn =
-                  Mina_ledger.Sparse_ledger.apply_transaction_first_pass
-                    ~constraint_constants:
-                      t.config.precomputed_values.constraint_constants
-                    ~global_slot ~txn_state_view sparse_ledger txn
-                in
-                partial_txn
-              in
               Staged_ledger.Scan_state.get_snarked_ledger_async ~ledger
                 ~get_protocol_state ~apply_first_pass ~apply_second_pass
-                ~apply_first_pass_sparse_ledger ~signature_kind
+                ~signature_kind
                 (Staged_ledger.scan_state
                    (Transition_frontier.Breadcrumb.staged_ledger b) )
               |> Deferred.Result.map_error ~f:(fun e ->

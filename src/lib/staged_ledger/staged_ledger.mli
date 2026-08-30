@@ -81,13 +81,6 @@ module Scan_state : sig
          (   Ledger.t
           -> Ledger.Transaction_partially_applied.t
           -> Mina_transaction_logic.Transaction_applied.t Or_error.t )
-    -> apply_first_pass_sparse_ledger:
-         (   global_slot:Mina_numbers.Global_slot_since_genesis.t
-          -> txn_state_view:Mina_base.Zkapp_precondition.Protocol_state.View.t
-          -> Mina_ledger.Sparse_ledger.t
-          -> Mina_transaction.Transaction.t
-          -> Mina_ledger.Sparse_ledger.T.Transaction_partially_applied.t
-             Or_error.t )
     -> signature_kind:Mina_signature_kind.t
     -> t
     -> unit Or_error.t
@@ -113,13 +106,6 @@ module Scan_state : sig
          (   Ledger.t
           -> Ledger.Transaction_partially_applied.t
           -> Mina_transaction_logic.Transaction_applied.t Or_error.t )
-    -> apply_first_pass_sparse_ledger:
-         (   global_slot:Mina_numbers.Global_slot_since_genesis.t
-          -> txn_state_view:Mina_base.Zkapp_precondition.Protocol_state.View.t
-          -> Mina_ledger.Sparse_ledger.t
-          -> Mina_transaction.Transaction.t
-          -> Mina_ledger.Sparse_ledger.T.Transaction_partially_applied.t
-             Or_error.t )
     -> signature_kind:Mina_signature_kind.t
     -> t
     -> unit Deferred.Or_error.t

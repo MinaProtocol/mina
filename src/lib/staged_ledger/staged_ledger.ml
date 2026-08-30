@@ -485,21 +485,11 @@ module T = struct
       Ledger.apply_transaction_first_pass ~signature_kind ~constraint_constants
     in
     let apply_second_pass = Ledger.apply_transaction_second_pass in
-    let apply_first_pass_sparse_ledger ~global_slot ~txn_state_view
-        sparse_ledger txn =
-      let open Or_error.Let_syntax in
-      let%map _ledger, partial_txn =
-        Mina_ledger.Sparse_ledger.apply_transaction_first_pass
-          ~constraint_constants ~global_slot ~txn_state_view sparse_ledger txn
-      in
-      partial_txn
-    in
     let%bind (`First_pass_ledger_hash first_pass_ledger_target) =
       Scan_state.get_staged_ledger_async
         ~async_batch_size:transaction_application_scheduler_batch_size
         ~ledger:snarked_ledger ~get_protocol_state:get_state ~apply_first_pass
-        ~apply_second_pass ~apply_first_pass_sparse_ledger ~signature_kind
-        scan_state
+        ~apply_second_pass ~signature_kind scan_state
     in
     let staged_ledger_hash = Ledger.merkle_root snarked_ledger in
     let%bind () =
@@ -2873,15 +2863,6 @@ let%test_module "staged ledger tests" =
                   ~constraint_constants
               in
               let apply_second_pass = Ledger.apply_transaction_second_pass in
-              let apply_first_pass_sparse_ledger ~global_slot ~txn_state_view
-                  sparse_ledger txn =
-                let%map.Or_error _ledger, partial_txn =
-                  Mina_ledger.Sparse_ledger.apply_transaction_first_pass
-                    ~constraint_constants ~global_slot ~txn_state_view
-                    sparse_ledger txn
-                in
-                partial_txn
-              in
               let get_state state_hash =
                 Ok (Hashtbl.find_exn state_tbl state_hash)
               in
@@ -2892,8 +2873,7 @@ let%test_module "staged ledger tests" =
                     let%map res =
                       Sl.Scan_state.get_snarked_ledger_async
                         ~ledger:snarked_ledger ~get_protocol_state:get_state
-                        ~apply_first_pass ~apply_second_pass
-                        ~apply_first_pass_sparse_ledger ~signature_kind
+                        ~apply_first_pass ~apply_second_pass ~signature_kind
                         !sl.scan_state
                     in
                     let target_snarked_ledger =
