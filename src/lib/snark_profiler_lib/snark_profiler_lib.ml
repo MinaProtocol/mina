@@ -141,6 +141,10 @@ module Transaction_key = struct
         ~state_body:Transaction_snark_tests.Util.genesis_state_body
         ~fee_excess:Currency.Amount.Signed.zero
         ~total_currency:Currency.Amount.zero
+        ~ledger_after_coinbase:
+          (Frozen_ledger_hash.of_ledger_hash
+             (Mina_ledger.Ledger.merkle_root ledger) )
+        ~total_supply_after_coinbase:Currency.Amount.zero
         [ ( `Pending_coinbase_init_stack Pending_coinbase.Stack.empty
           , `Pending_coinbase_of_statement
               { Transaction_snark.Pending_coinbase_stack_state.source =
@@ -602,6 +606,9 @@ let profile_user_command (module T : Transaction_snark.S) ~genesis_constants
                      ; local_state = Mina_state.Local_state.empty ()
                      ; fee_excess = Fee_excess.zero
                      ; total_currency = Currency.Amount.zero
+                     ; ledger_after_coinbase =
+                         Sparse_ledger.merkle_root source_ledger
+                     ; total_supply_after_coinbase = Currency.Amount.zero
                      }
                  ; target =
                      { first_pass_ledger = target_hash
@@ -613,6 +620,10 @@ let profile_user_command (module T : Transaction_snark.S) ~genesis_constants
                      ; fee_excess =
                          Transaction.fee_excess txn |> Or_error.ok_exn
                      ; total_currency =
+                         Transaction.expected_supply_increase txn
+                         |> Or_error.ok_exn
+                     ; ledger_after_coinbase = target_hash
+                     ; total_supply_after_coinbase =
                          Transaction.expected_supply_increase txn
                          |> Or_error.ok_exn
                      }

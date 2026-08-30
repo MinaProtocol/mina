@@ -832,6 +832,18 @@ let registers : (Mina_lib.t, Mina_state.Registers.Value.t option) typ =
           ~doc:"Total currency in the ledger at this point"
           ~typ:(non_null amount)
           ~resolve:(fun _ ({ total_currency; _ } : _ M.t) -> total_currency)
+      ; field "ledgerAfterCoinbase"
+          ~args:Arg.[]
+          ~doc:"Second-pass ledger hash as of the most recent coinbase"
+          ~typ:(non_null ledger_hash)
+          ~resolve:(fun _ ({ ledger_after_coinbase; _ } : _ M.t) ->
+            ledger_after_coinbase )
+      ; field "totalSupplyAfterCoinbase"
+          ~args:Arg.[]
+          ~doc:"Total currency as of the most recent coinbase"
+          ~typ:(non_null amount)
+          ~resolve:(fun _ ({ total_supply_after_coinbase; _ } : _ M.t) ->
+            total_supply_after_coinbase )
       ]
 
 let snarked_ledger_state :

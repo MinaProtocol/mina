@@ -96,6 +96,10 @@ module type Full = sig
     val with_empty_local_state :
          source_total_currency:'amount
       -> target_total_currency:'amount
+      -> source_ledger_after_coinbase:'ledger_hash
+      -> target_ledger_after_coinbase:'ledger_hash
+      -> source_total_supply_after_coinbase:'amount
+      -> target_total_supply_after_coinbase:'amount
       -> source_fee_excess:'fee_excess
       -> target_fee_excess:'fee_excess
       -> sok_digest:'sok_digest
