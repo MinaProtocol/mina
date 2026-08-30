@@ -682,6 +682,10 @@ struct
         clarify_error
           (Fee_excess.equal reg1.fee_excess reg2.fee_excess)
           "did not connect with fee excess"
+      and () =
+        clarify_error
+          (Currency.Amount.equal reg1.total_currency reg2.total_currency)
+          "did not connect with total currency"
       in
       ()
     in
