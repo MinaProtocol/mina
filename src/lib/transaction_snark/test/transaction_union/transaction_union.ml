@@ -44,6 +44,8 @@ let%test_module "Transaction union tests" =
 
     let of_user_command' ?(source_fee_excess = Fee_excess.zero)
         ?(source_total_currency = Currency.Amount.zero)
+        ?source_ledger_after_coinbase
+        ?(source_total_supply_after_coinbase = Currency.Amount.zero)
         (sok_digest : Sok_message.Digest.t) ledger
         (user_command : Signed_command.With_valid_signature.t) init_stack
         pending_coinbase_stack_state state_body handler =
@@ -64,6 +66,11 @@ let%test_module "Transaction union tests" =
         }
       in
       let user_command_supply_increase = Currency.Amount.Signed.zero in
+      (*These fixtures only build signed-command statements, never coinbases,
+        so the post-coinbase state passes straight through.*)
+      let source_ledger_after_coinbase =
+        Option.value source_ledger_after_coinbase ~default:source
+      in
       let target_total_currency =
         match
           Currency.Amount.add_signed_flagged source_total_currency
@@ -91,7 +98,11 @@ let%test_module "Transaction union tests" =
                    (Fee_excess.combine source_fee_excess
                       (Or_error.ok_exn (Transaction.fee_excess txn)) ) )
               ~source_total_currency ~target_total_currency
-              ~pending_coinbase_stack_state
+              ~source_ledger_after_coinbase
+              ~target_ledger_after_coinbase:source_ledger_after_coinbase
+              ~source_total_supply_after_coinbase
+              ~target_total_supply_after_coinbase:
+                source_total_supply_after_coinbase ~pending_coinbase_stack_state
           in
           T.of_user_command ~init_stack ~statement user_command_in_block handler )
 
@@ -542,10 +553,14 @@ let%test_module "Transaction union tests" =
                 (Ledger.merkle_root ledger)
                 (Sparse_ledger.merkle_root sparse_ledger) ;
               let proof23 =
-                of_user_command'
-                  ~source_fee_excess:
-                    (Transaction_snark.statement proof12).target.fee_excess
-                  sok_digest ledger t2 pending_coinbase_stack_state2.init_stack
+                let stmt12 = Transaction_snark.statement proof12 in
+                of_user_command' ~source_fee_excess:stmt12.target.fee_excess
+                  ~source_total_currency:stmt12.target.total_currency
+                  ~source_ledger_after_coinbase:
+                    stmt12.target.ledger_after_coinbase
+                  ~source_total_supply_after_coinbase:
+                    stmt12.target.total_supply_after_coinbase sok_digest ledger
+                  t2 pending_coinbase_stack_state2.init_stack
                   pending_coinbase_stack_state2.pc state_body2
                   (unstage @@ Sparse_ledger.handler sparse_ledger)
               in
