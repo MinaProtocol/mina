@@ -274,17 +274,6 @@ let%snarkydef_ step ~(logger : Logger.t)
     in
     let%bind txn_snark_input_correct =
       let open Checked in
-      let%bind () =
-        (* The fee excess is carried in the registers, so a ledger proof that
-           settles all of the fees it collects starts and ends at zero. This is
-           the same requirement as the previous accumulated excess being zero,
-           given that the scan state's excess starts at zero. *)
-        Fee_excess.(
-          Checked.all_unit
-            [ assert_equal_checked (var_of_t zero) txn_snark.source.fee_excess
-            ; assert_equal_checked (var_of_t zero) txn_snark.target.fee_excess
-            ] )
-      in
       let ledger_statement_valid =
         Impl.make_checked (fun () ->
             Snarked_ledger_state.(
@@ -300,6 +289,14 @@ let%snarkydef_ step ~(logger : Logger.t)
              left it, which is what makes [total_currency] above sound. *)
         ; Currency.Amount.equal_var txn_snark.source.total_currency
             previous_total_currency
+          (* A ledger proof no longer has to settle the fees of the
+             transactions it covers: its range can end part way through a
+             block, with the coinbase that pays them out falling in the next
+             proof. The transaction snark requires the excess to be zero at
+             every coinbase, so it is enough here that a proof picks up the
+             excess where the previous one put it down. *)
+        ; Fee_excess.equal_checked txn_snark.source.fee_excess
+            previous_ledger_statement.target.fee_excess
         ; Pending_coinbase.Stack.equal_var
             txn_snark.source.pending_coinbase_stack
             pending_coinbase_source_stack
