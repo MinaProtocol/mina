@@ -80,6 +80,7 @@ let non_pc_registers_equal_var t1 t2 =
           acc )
         ~local_state:(fun acc f ->
           Local_state.Checked.equal' (F.get f t1) (F.get f t2) @ acc )
+        ~fee_excess:(f !Fee_excess.equal_checked)
       |> Impl.Boolean.all )
 
 let txn_statement_ledger_hashes_equal
@@ -277,7 +278,15 @@ let%snarkydef_ step ~(logger : Logger.t)
     let%bind txn_snark_input_correct =
       let open Checked in
       let%bind () =
-        Fee_excess.(assert_equal_checked (var_of_t zero) txn_snark.fee_excess)
+        (* The fee excess is carried in the registers, so a ledger proof that
+           settles all of the fees it collects starts and ends at zero. This is
+           the same requirement as the previous accumulated excess being zero,
+           given that the scan state's excess starts at zero. *)
+        Fee_excess.(
+          Checked.all_unit
+            [ assert_equal_checked (var_of_t zero) txn_snark.source.fee_excess
+            ; assert_equal_checked (var_of_t zero) txn_snark.target.fee_excess
+            ] )
       in
       let ledger_statement_valid =
         Impl.make_checked (fun () ->

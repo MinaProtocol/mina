@@ -588,13 +588,16 @@ let work_statement =
           ~args:Arg.[]
           ~resolve:(fun _ { Transaction_snark.Statement.Poly.target; _ } ->
             target.second_pass_ledger )
-      ; field "feeExcess" ~typ:(non_null signed_fee)
-          ~doc:
-            "Total transaction fee that is not accounted for in the transition \
-             from source ledger to target ledger"
+      ; field "sourceFeeExcess" ~typ:(non_null signed_fee)
+          ~doc:"Unsettled transaction fees at the source ledger"
           ~args:Arg.[]
-          ~resolve:(fun _ ({ fee_excess; _ } : Transaction_snark.Statement.t) ->
-            fee_excess )
+          ~resolve:(fun _ ({ source; _ } : Transaction_snark.Statement.t) ->
+            source.fee_excess )
+      ; field "targetFeeExcess" ~typ:(non_null signed_fee)
+          ~doc:"Unsettled transaction fees at the target ledger"
+          ~args:Arg.[]
+          ~resolve:(fun _ ({ target; _ } : Transaction_snark.Statement.t) ->
+            target.fee_excess )
       ; field "supplyIncrease" ~typ:(non_null amount)
           ~doc:"Increase in total supply"
           ~args:Arg.[]
@@ -822,6 +825,11 @@ let registers : (Mina_lib.t, Mina_state.Registers.Value.t option) typ =
           ~args:Arg.[]
           ~doc:"Local state" ~typ:(non_null local_state)
           ~resolve:(fun _ ({ local_state; _ } : _ M.t) -> local_state)
+      ; field "feeExcess"
+          ~args:Arg.[]
+          ~doc:"Transaction fees collected but not yet settled"
+          ~typ:(non_null signed_fee)
+          ~resolve:(fun _ ({ fee_excess; _ } : _ M.t) -> fee_excess)
       ]
 
 let snarked_ledger_state :
@@ -851,10 +859,6 @@ let snarked_ledger_state :
           ~args:Arg.[]
           ~typ:(non_null signed_amount)
           ~resolve:(fun _ ({ supply_increase; _ } : _ M.t) -> supply_increase)
-      ; field "feeExcess"
-          ~args:Arg.[]
-          ~typ:(non_null signed_fee)
-          ~resolve:(fun _ ({ fee_excess; _ } : _ M.t) -> fee_excess)
       ; field "sokDigest"
           ~args:Arg.[]
           ~doc:"Placeholder for SOK digest" ~typ:string

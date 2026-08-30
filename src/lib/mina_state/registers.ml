@@ -4,16 +4,18 @@ module Impl = Pickles.Impls.Step
 
 [%%versioned
 module Stable = struct
-  module V1 = struct
-    type ('ledger, 'pending_coinbase_stack, 'local_state) t =
+  module V2 = struct
+    type ('ledger, 'pending_coinbase_stack, 'local_state, 'fee_excess) t =
           ( 'ledger
           , 'pending_coinbase_stack
-          , 'local_state )
-          Mina_wire_types.Mina_state.Registers.V1.t =
+          , 'local_state
+          , 'fee_excess )
+          Mina_wire_types.Mina_state.Registers.V2.t =
       { first_pass_ledger : 'ledger
       ; second_pass_ledger : 'ledger
       ; pending_coinbase_stack : 'pending_coinbase_stack
       ; local_state : 'local_state
+      ; fee_excess : 'fee_excess
       }
     [@@deriving compare, equal, hash, sexp, yojson, hlist, fields]
   end
@@ -24,20 +26,28 @@ let gen =
   let%map first_pass_ledger = Frozen_ledger_hash.gen
   and second_pass_ledger = Frozen_ledger_hash.gen
   and pending_coinbase_stack = Pending_coinbase.Stack.gen
-  and local_state = Local_state.gen in
-  { first_pass_ledger; second_pass_ledger; pending_coinbase_stack; local_state }
+  and local_state = Local_state.gen
+  and fee_excess = Fee_excess.gen in
+  { first_pass_ledger
+  ; second_pass_ledger
+  ; pending_coinbase_stack
+  ; local_state
+  ; fee_excess
+  }
 
 let to_input
     { first_pass_ledger
     ; second_pass_ledger
     ; pending_coinbase_stack
     ; local_state
+    ; fee_excess
     } =
   Array.reduce_exn ~f:Random_oracle.Input.Chunked.append
     [| Frozen_ledger_hash.to_input first_pass_ledger
      ; Frozen_ledger_hash.to_input second_pass_ledger
      ; Pending_coinbase.Stack.to_input pending_coinbase_stack
      ; Local_state.to_input local_state
+     ; Fee_excess.to_input fee_excess
     |]
 
 let typ spec =
@@ -48,13 +58,19 @@ module Value = struct
   type t =
     ( Frozen_ledger_hash.t
     , Pending_coinbase.Stack.t
-    , Local_state.t )
+    , Local_state.t
+    , Fee_excess.t )
     Stable.Latest.t
   [@@deriving compare, equal, sexp, yojson, hash]
 
   let connected t t' =
     let module Without_pending_coinbase_stack = struct
-      type t = (Frozen_ledger_hash.t, unit, Local_state.t) Stable.Latest.t
+      type t =
+        ( Frozen_ledger_hash.t
+        , unit
+        , Local_state.t
+        , Fee_excess.t )
+        Stable.Latest.t
       [@@deriving compare, equal, sexp, yojson, hash]
     end in
     Without_pending_coinbase_stack.equal
@@ -66,28 +82,38 @@ end
 
 module Checked = struct
   type nonrec t =
-    (Ledger_hash.var, Pending_coinbase.Stack.var, Local_state.Checked.t) t
+    ( Ledger_hash.var
+    , Pending_coinbase.Stack.var
+    , Local_state.Checked.t
+    , Fee_excess.var )
+    t
 
   let to_input
       { first_pass_ledger
       ; second_pass_ledger
       ; pending_coinbase_stack
       ; local_state
+      ; fee_excess
       } =
+    let open Snark_params.Tick.Checked.Let_syntax in
+    let%map fee_excess = Fee_excess.to_input_checked fee_excess in
     Array.reduce_exn ~f:Random_oracle.Input.Chunked.append
       [| Frozen_ledger_hash.var_to_input first_pass_ledger
        ; Frozen_ledger_hash.var_to_input second_pass_ledger
        ; Pending_coinbase.Stack.var_to_input pending_coinbase_stack
        ; Local_state.Checked.to_input local_state
+       ; fee_excess
       |]
 
   let equal t1 t2 =
     let ( ! ) eq x1 x2 = Impl.run_checked (eq x1 x2) in
     let f eq acc field = eq (Field.get field t1) (Field.get field t2) :: acc in
-    Fields.fold ~init:[] ~first_pass_ledger:(f !Frozen_ledger_hash.equal_var)
+    Fields.fold ~init:[]
+      ~first_pass_ledger:(f !Frozen_ledger_hash.equal_var)
       ~second_pass_ledger:(f !Frozen_ledger_hash.equal_var)
       ~pending_coinbase_stack:(f !Pending_coinbase.Stack.equal_var)
       ~local_state:(fun acc f ->
         Local_state.Checked.equal' (Field.get f t1) (Field.get f t2) @ acc )
+      ~fee_excess:(f !Fee_excess.equal_checked)
     |> Impl.Boolean.all
 end

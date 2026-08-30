@@ -381,18 +381,19 @@ module Values (S : Sample) = struct
             ; second_pass_ledger = field ()
             ; pending_coinbase_stack = pending_coinbase_stack ()
             ; local_state = local_state ()
+            ; fee_excess = fee_excess ()
             }
         ; target =
             { first_pass_ledger = field ()
             ; second_pass_ledger = field ()
             ; pending_coinbase_stack = pending_coinbase_stack ()
             ; local_state = local_state ()
+            ; fee_excess = fee_excess ()
             }
         ; connecting_ledger_left = field ()
         ; connecting_ledger_right = field ()
         ; supply_increase =
             (* TODO: insure uniqueness *) Currency.Amount.Signed.zero
-        ; fee_excess = fee_excess ()
         ; sok_digest = ()
         }
       ~init_stack:(pending_coinbase_stack ())

@@ -40,6 +40,9 @@ let to_input_checked :
 let assert_equal_checked : var -> var -> unit Checked.t =
   Fee.Signed.Checked.assert_equal
 
+let equal_checked : var -> var -> Boolean.var Checked.t =
+  Fee.Signed.Checked.equal
+
 (** Combine the fee excesses from two transitions. *)
 let combine (t1 : t) (t2 : t) : t Or_error.t =
   match Fee.Signed.add t1 t2 with

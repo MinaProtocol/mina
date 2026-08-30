@@ -25,7 +25,8 @@ module Pre_statement = struct
     { partially_applied_transaction : Ledger.Transaction_partially_applied.t
     ; expected_status : Transaction_status.t
     ; accounts_accessed : Account_id.t list
-    ; fee_excess : Fee_excess.t
+    ; source_fee_excess : Fee_excess.t
+    ; target_fee_excess : Fee_excess.t
     ; first_pass_ledger_witness : Sparse_ledger.t
     ; first_pass_ledger_source_hash : Ledger_hash.t
     ; first_pass_ledger_target_hash : Ledger_hash.t
@@ -338,6 +339,7 @@ module T = struct
       ; second_pass_ledger = second_pass_ledger_end
       ; local_state = Mina_state.Local_state.empty ()
       ; pending_coinbase_stack
+      ; fee_excess = Fee_excess.zero
       }
     in
     let statement_check = `Partial in
@@ -370,6 +372,7 @@ module T = struct
         ~last_proof_statement
         ~registers_end:
           { local_state = Mina_state.Local_state.empty ()
+          ; fee_excess = Fee_excess.zero
           ; first_pass_ledger = first_pass_ledger_target
           ; second_pass_ledger =
               Frozen_ledger_hash.of_ledger_hash (Ledger.merkle_root ledger)
@@ -396,6 +399,7 @@ module T = struct
         ~last_proof_statement
         ~registers_end:
           { local_state = Mina_state.Local_state.empty ()
+          ; fee_excess = Fee_excess.zero
           ; first_pass_ledger = first_pass_ledger_target
           ; second_pass_ledger =
               Frozen_ledger_hash.of_ledger_hash (Ledger.merkle_root ledger)
@@ -549,7 +553,7 @@ module T = struct
     else Some constraint_constants.coinbase_amount
 
   let apply_single_transaction_first_pass ~constraint_constants ~global_slot
-      ~signature_kind ledger
+      ~signature_kind ~(source_fee_excess : Fee_excess.t) ledger
       (pending_coinbase_stack_state : Stack_state_with_init_stack.t)
       txn_with_status (txn_state_view : Zkapp_precondition.Protocol_state.View.t)
       :
@@ -563,6 +567,12 @@ module T = struct
     let accounts_accessed = Transaction.accounts_referenced txn in
     let%bind fee_excess =
       to_staged_ledger_or_error (Transaction.fee_excess txn)
+    in
+    (*The fee excess is a register threaded through the base statements, so this
+      transaction's fees accumulate into the excess it starts from.*)
+    let%bind target_fee_excess =
+      to_staged_ledger_or_error
+        (Fee_excess.combine source_fee_excess fee_excess)
     in
     let source_ledger_hash = Ledger.merkle_root ledger in
     let ledger_witness =
@@ -584,7 +594,8 @@ module T = struct
     ( { Pre_statement.partially_applied_transaction
       ; expected_status
       ; accounts_accessed
-      ; fee_excess
+      ; source_fee_excess
+      ; target_fee_excess
       ; first_pass_ledger_witness = ledger_witness
       ; first_pass_ledger_source_hash = source_ledger_hash
       ; first_pass_ledger_target_hash = target_ledger_hash
@@ -635,21 +646,22 @@ module T = struct
              (txn_with_expected_status, actual_status) )
     in
     let statement =
-      { Mina_wire_types.Mina_state_snarked_ledger_state.Poly.V2.source =
+      { Mina_wire_types.Mina_state_snarked_ledger_state.Poly.V3.source =
           { first_pass_ledger = pre_stmt.first_pass_ledger_source_hash
           ; second_pass_ledger = second_pass_ledger_source_hash
           ; pending_coinbase_stack = pre_stmt.pending_coinbase_stack_source
           ; local_state = empty_local_state
+          ; fee_excess = pre_stmt.source_fee_excess
           }
       ; target =
           { first_pass_ledger = pre_stmt.first_pass_ledger_target_hash
           ; second_pass_ledger = second_pass_ledger_target_hash
           ; pending_coinbase_stack = pre_stmt.pending_coinbase_stack_target
           ; local_state = empty_local_state
+          ; fee_excess = pre_stmt.target_fee_excess
           }
       ; connecting_ledger_left = connecting_ledger
       ; connecting_ledger_right = connecting_ledger
-      ; fee_excess = pre_stmt.fee_excess
       ; supply_increase
       ; sok_digest = ()
       }
@@ -666,10 +678,10 @@ module T = struct
     , Mina_transaction_logic.Transaction_applied.new_accounts applied_txn )
 
   let apply_transactions_first_pass ~yield ~constraint_constants ~global_slot
-      ~signature_kind ledger init_pending_coinbase_stack_state ts
-      current_state_view =
+      ~signature_kind ~init_fee_excess ledger init_pending_coinbase_stack_state
+      ts current_state_view =
     let open Deferred.Result.Let_syntax in
-    let apply pending_coinbase_stack_state txn =
+    let apply ~source_fee_excess pending_coinbase_stack_state txn =
       match
         List.find (Transaction.public_keys txn.With_status.data) ~f:(fun pk ->
             Option.is_none (Signature_lib.Public_key.decompress pk) )
@@ -678,18 +690,21 @@ module T = struct
           Error (Staged_ledger_error.Invalid_public_key pk)
       | None ->
           apply_single_transaction_first_pass ~constraint_constants ~global_slot
-            ~signature_kind ledger pending_coinbase_stack_state txn
-            current_state_view
+            ~signature_kind ~source_fee_excess ledger
+            pending_coinbase_stack_state txn current_state_view
     in
-    let%map res_rev, pending_coinbase_stack_state =
+    let%map res_rev, pending_coinbase_stack_state, _fee_excess =
       Mina_stdlib.Deferred.Result.List.fold ts
-        ~init:([], init_pending_coinbase_stack_state)
-        ~f:(fun (acc, pending_coinbase_stack_state) t ->
+        ~init:([], init_pending_coinbase_stack_state, init_fee_excess)
+        ~f:(fun (acc, pending_coinbase_stack_state, source_fee_excess) t ->
           let%bind pre_witness, pending_coinbase_stack_state' =
-            Deferred.return (apply pending_coinbase_stack_state t)
+            Deferred.return
+              (apply ~source_fee_excess pending_coinbase_stack_state t)
           in
           let%map () = yield () in
-          (pre_witness :: acc, pending_coinbase_stack_state') )
+          ( pre_witness :: acc
+          , pending_coinbase_stack_state'
+          , pre_witness.Pre_statement.target_fee_excess ) )
     in
     (List.rev res_rev, pending_coinbase_stack_state.pc.target)
 
@@ -712,7 +727,7 @@ module T = struct
     let open Deferred.Result.Let_syntax in
     let state_body_hash = snd state_and_body_hash in
     let ts, ts_opt = tss in
-    let apply_first_pass working_stack ts =
+    let apply_first_pass ~init_fee_excess working_stack ts =
       let working_stack_with_state =
         push_state working_stack state_body_hash global_slot
       in
@@ -721,14 +736,24 @@ module T = struct
         ; init_stack = working_stack
         }
       in
-      apply_transactions_first_pass ~constraint_constants ~global_slot ledger
-        init_pending_coinbase_stack_state ts current_state_view
+      apply_transactions_first_pass ~constraint_constants ~global_slot
+        ~init_fee_excess ledger init_pending_coinbase_stack_state ts
+        current_state_view
+    in
+    (*The excess a partition ends with is the one the next partition starts
+      from. Both are zero in practice, since [check_zero_fee_excess] requires
+      each partition's transactions to settle their own fees, but the excess is
+      threaded rather than assumed.*)
+    let end_fee_excess pre_stmts ~default =
+      Option.value_map (List.last pre_stmts) ~default
+        ~f:(fun (p : Pre_statement.t) -> p.target_fee_excess )
     in
     let yield =
       yield_result_every ~n:transaction_application_scheduler_batch_size
     in
     let%bind pre_stmts1, updated_stack1 =
-      apply_first_pass ~yield ~signature_kind current_stack ts
+      apply_first_pass ~yield ~signature_kind ~init_fee_excess:Fee_excess.zero
+        current_stack ts
     in
     let%bind pre_stmts2, updated_stack2 =
       match ts_opt with
@@ -738,7 +763,10 @@ module T = struct
           let current_stack2 =
             Pending_coinbase.Stack.create_with current_stack
           in
-          apply_first_pass ~yield ~signature_kind current_stack2 ts
+          apply_first_pass ~yield ~signature_kind
+            ~init_fee_excess:
+              (end_fee_excess pre_stmts1 ~default:Fee_excess.zero)
+            current_stack2 ts
     in
     let first_pass_ledger_end = Ledger.merkle_root ledger in
     let%map txns_with_witnesses =
@@ -2678,11 +2706,14 @@ let%test_module "staged ledger tests" =
     (* Fee excess at top level ledger proofs should always be zero *)
     let assert_fee_excess : Ledger_proof.Cached.t option -> unit =
      fun proof_opt ->
-      let fee_excess =
-        Option.value_map ~default:Fee_excess.zero proof_opt ~f:(fun proof ->
-            (Ledger_proof.Cached.statement proof).fee_excess )
+      let source_fee_excess, target_fee_excess =
+        Option.value_map ~default:(Fee_excess.zero, Fee_excess.zero) proof_opt
+          ~f:(fun proof ->
+            let stmt = Ledger_proof.Cached.statement proof in
+            (stmt.source.fee_excess, stmt.target.fee_excess) )
       in
-      assert (Fee_excess.is_zero fee_excess)
+      assert (Fee_excess.is_zero source_fee_excess) ;
+      assert (Fee_excess.is_zero target_fee_excess)
 
     let transaction_capacity =
       Int.pow 2 constraint_constants.transaction_capacity_log_2

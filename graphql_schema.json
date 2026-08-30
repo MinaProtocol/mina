@@ -6885,8 +6885,24 @@
               "deprecationReason": null
             },
             {
-              "name": "feeExcess",
-              "description": "Total transaction fee that is not accounted for in the transition from source ledger to target ledger",
+              "name": "sourceFeeExcess",
+              "description": "Unsettled transaction fees at the source ledger",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "OBJECT",
+                  "name": "SignedFee",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "targetFeeExcess",
+              "description": "Unsettled transaction fees at the target ledger",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -11258,6 +11274,22 @@
               },
               "isDeprecated": false,
               "deprecationReason": null
+            },
+            {
+              "name": "feeExcess",
+              "description": "Transaction fees collected but not yet settled",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "OBJECT",
+                  "name": "SignedFee",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
             }
           ],
           "inputFields": null,
@@ -11344,22 +11376,6 @@
                 "ofType": {
                   "kind": "OBJECT",
                   "name": "SignedAmount",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "feeExcess",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "OBJECT",
-                  "name": "SignedFee",
                   "ofType": null
                 }
               },

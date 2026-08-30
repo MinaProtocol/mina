@@ -25,7 +25,8 @@ module type S = sig
        Mina_state.Snarked_ledger_state.t
     -> ( Frozen_ledger_hash.t
        , Pending_coinbase.Stack_versioned.t
-       , Mina_state.Local_state.t )
+       , Mina_state.Local_state.t
+       , Mina_base.Fee_excess.t )
        Mina_state.Registers.t
 
   val statement : t -> Mina_state.Snarked_ledger_state.t
@@ -38,7 +39,8 @@ module type S = sig
        Mina_state.Snarked_ledger_state.With_sok.t
     -> ( Frozen_ledger_hash.t
        , Pending_coinbase.Stack_versioned.t
-       , Mina_state.Local_state.t )
+       , Mina_state.Local_state.t
+       , Mina_base.Fee_excess.t )
        Mina_state.Registers.t
 
   val underlying_proof : t -> Proof.t

@@ -599,6 +599,7 @@ let profile_user_command (module T : Transaction_snark.S) ~genesis_constants
                      ; second_pass_ledger = target_hash
                      ; pending_coinbase_stack = coinbase_stack_source
                      ; local_state = Mina_state.Local_state.empty ()
+                     ; fee_excess = Fee_excess.zero
                      }
                  ; target =
                      { first_pass_ledger = target_hash
@@ -607,6 +608,8 @@ let profile_user_command (module T : Transaction_snark.S) ~genesis_constants
                          coinbase_stack_target ~genesis_constants
                            ~constraint_constants
                      ; local_state = Mina_state.Local_state.empty ()
+                     ; fee_excess =
+                         Transaction.fee_excess txn |> Or_error.ok_exn
                      }
                  ; connecting_ledger_left = target_hash
                  ; connecting_ledger_right = target_hash
@@ -617,7 +620,6 @@ let profile_user_command (module T : Transaction_snark.S) ~genesis_constants
                       in
                       let sgn = Sgn.Pos in
                       Currency.Amount.Signed.create ~magnitude ~sgn )
-                 ; fee_excess = Transaction.fee_excess txn |> Or_error.ok_exn
                  }
                ~init_stack:coinbase_stack_source
                { Transaction_protocol_state.Poly.transaction = valid_txn

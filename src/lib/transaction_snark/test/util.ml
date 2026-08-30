@@ -207,13 +207,14 @@ let check_zkapp_command_with_merges_exn ?(logger = logger_null)
                   in
                   (*Expected transaction statement*)
                   let stmt : Transaction_snark.Statement.t =
-                    { Mina_wire_types.Mina_state_snarked_ledger_state.Poly.V2
+                    { Mina_wire_types.Mina_state_snarked_ledger_state.Poly.V3
                       .source =
                         { first_pass_ledger =
                             Sparse_ledger.merkle_root first_pass_ledger_witness
                         ; second_pass_ledger = second_pass_ledger_source_hash
                         ; pending_coinbase_stack = init_stack
                         ; local_state = Mina_state.Local_state.empty ()
+                        ; fee_excess = Fee_excess.zero
                         }
                     ; target =
                         { first_pass_ledger = first_pass_ledger_target_hash
@@ -222,10 +223,10 @@ let check_zkapp_command_with_merges_exn ?(logger = logger_null)
                             Pending_coinbase.Stack.push_state state_body_hash
                               global_slot init_stack
                         ; local_state = Mina_state.Local_state.empty ()
+                        ; fee_excess = Zkapp_command.fee_excess zkapp_command
                         }
                     ; connecting_ledger_left = connecting_ledger
                     ; connecting_ledger_right = connecting_ledger
-                    ; fee_excess = Zkapp_command.fee_excess zkapp_command
                     ; supply_increase =
                         Mina_transaction_logic.Transaction_applied
                         .supply_increase ~constraint_constants applied_txn

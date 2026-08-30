@@ -2,7 +2,6 @@ open Core
 open Async
 open Mina_base
 open Mina_transaction
-open Currency
 module Ledger = Mina_ledger.Ledger
 module Sparse_ledger = Mina_ledger.Sparse_ledger
 
@@ -173,7 +172,8 @@ module Job_view = struct
       type t =
         ( Frozen_ledger_hash.t
         , Pending_coinbase.Stack_versioned.t
-        , Mina_state.Local_state.t )
+        , Mina_state.Local_state.t
+        , Fee_excess.t )
         Mina_state.Registers.t
       [@@deriving to_yojson]
     end in
@@ -182,7 +182,6 @@ module Job_view = struct
         [ ("Work_id", `Int (Transaction_snark.Statement.hash s))
         ; ("Source", R.to_yojson s.source)
         ; ("Target", R.to_yojson s.target)
-        ; ("Fee Excess", Fee.Signed.to_yojson s.fee_excess)
         ; ("Supply Increase", Currency.Amount.Signed.to_yojson s.supply_increase)
         ]
     in
@@ -368,22 +367,27 @@ let create_expected_statement ~constraint_constants
     | _ ->
         pending_coinbase_with_state
   in
-  let%map fee_excess = Transaction.fee_excess transaction in
+  let%bind fee_excess = Transaction.fee_excess transaction in
+  (*The excess this transaction starts from is part of the statement being
+    checked; what has to follow from the witness is the excess it ends with.*)
+  let source_fee_excess = statement.source.fee_excess in
+  let%map target_fee_excess = Fee_excess.combine source_fee_excess fee_excess in
   { Transaction_snark.Statement.Poly.source =
       { first_pass_ledger = source_first_pass_merkle_root
       ; second_pass_ledger = source_second_pass_merkle_root
       ; pending_coinbase_stack = statement.source.pending_coinbase_stack
       ; local_state = empty_local_state
+      ; fee_excess = source_fee_excess
       }
   ; target =
       { first_pass_ledger = target_first_pass_merkle_root
       ; second_pass_ledger = target_second_pass_merkle_root
       ; pending_coinbase_stack = pending_coinbase_after
       ; local_state = empty_local_state
+      ; fee_excess = target_fee_excess
       }
   ; connecting_ledger_left = connecting_merkle_root
   ; connecting_ledger_right = connecting_merkle_root
-  ; fee_excess
   ; supply_increase
   ; sok_digest = ()
   }
@@ -630,7 +634,8 @@ struct
       ~(registers_end :
          ( Frozen_ledger_hash.t
          , Pending_coinbase.Stack.t
-         , Mina_state.Local_state.t )
+         , Mina_state.Local_state.t
+         , Fee_excess.t )
          Mina_state.Registers.t ) =
     let clarify_error cond err =
       if not cond then Or_error.errorf "%s : %s" error_prefix err else Ok ()
@@ -658,6 +663,10 @@ struct
           (Mina_transaction_logic.Zkapp_command_logic.Local_state.Value.equal
              reg1.local_state reg2.local_state )
           "did not connect with local state"
+      and () =
+        clarify_error
+          (Fee_excess.equal reg1.fee_excess reg2.fee_excess)
+          "did not connect with fee excess"
       in
       ()
     in
@@ -672,8 +681,7 @@ struct
         Option.value_map ~default:(Ok ()) last_proof_statement
           ~f:(fun statement -> check_registers statement.target registers_end )
     | Ok
-        ( { fee_excess
-          ; source = _
+        ( { source
           ; target
           ; connecting_ledger_left = _
           ; connecting_ledger_right = _
@@ -687,7 +695,11 @@ struct
               Transaction_snark.Statement.merge statement t |> Or_error.ignore_m )
         and () = check_registers registers_end target
         and () =
-          clarify_error (Fee_excess.is_zero fee_excess) "nonzero fee excess"
+          (*[check_registers] pins the excess the scan state ends with; the
+            excess it starts from must be settled too.*)
+          clarify_error
+            (Fee_excess.is_zero source.fee_excess)
+            "nonzero fee excess"
         in
         ()
 

@@ -1913,7 +1913,8 @@ module Make_str (A : Wire_types.Concrete) = struct
             ; second_pass_ledger =
                 ( statement.source.second_pass_ledger
                 , V.create (fun () -> !witness.global_second_pass_ledger) )
-            ; fee_excess = Amount.Signed.(Checked.constant zero)
+            ; fee_excess =
+                Amount.Signed.Checked.of_fee statement.source.fee_excess
             ; supply_increase = Amount.Signed.(Checked.constant zero)
             ; protocol_state =
                 Mina_state.Protocol_state.Body.view_checked state_body
@@ -2102,14 +2103,11 @@ module Make_str (A : Wire_types.Concrete) = struct
                  global.supply_increase ) ) ;
         with_label __LOC__ (fun () ->
             run_checked
-              (let expected = statement.fee_excess in
-               (* The global state that this segment starts from has a zero
-                  excess (see [init] above), so the segment's excess is just
-                  the excess that the global state ends with. *)
-               let got : Fee_excess.var =
-                 Amount.Signed.Checked.to_fee global.fee_excess
-               in
-               Fee_excess.assert_equal_checked expected got ) ) ;
+              (* The global state starts from the source register's excess (see
+                 [init] above) and accumulates this segment's fees into it, so
+                 the excess it ends with is the target register's. *)
+              (Fee_excess.assert_equal_checked statement.target.fee_excess
+                 (Amount.Signed.Checked.to_fee global.fee_excess) ) ) ;
         (Stdlib.( ! ) zkapp_input, `Must_verify (Stdlib.( ! ) must_verify))
 
       (* Horrible hack :( *)
@@ -3148,8 +3146,15 @@ module Make_str (A : Wire_types.Concrete) = struct
         ; [%with_label_ "equal supply_increases"] (fun () ->
               Currency.Amount.Signed.Checked.assert_equal supply_increase
                 statement.supply_increase )
-        ; [%with_label_ "equal fee excesses"] (fun () ->
-              Fee_excess.assert_equal_checked fee_excess statement.fee_excess )
+        ; [%with_label_ "fee excess accumulates into the target register"]
+            (fun () ->
+              let open Tick.Checked.Let_syntax in
+              let%bind target_fee_excess =
+                Fee_excess.combine_checked statement.source.fee_excess
+                  fee_excess
+              in
+              Fee_excess.assert_equal_checked target_fee_excess
+                statement.target.fee_excess )
         ]
 
     let rule ~signature_kind ~constraint_constants : _ Pickles.Inductive_rule.t
@@ -3235,10 +3240,6 @@ module Make_str (A : Wire_types.Concrete) = struct
           Typ.(Statement.With_sok.typ * Statement.With_sok.typ)
           ~request:(As_prover.return Statements_to_merge)
       in
-      let%bind fee_excess =
-        Fee_excess.combine_checked s1.Statement.Poly.fee_excess
-          s2.Statement.Poly.fee_excess
-      in
       let%bind () =
         with_label __LOC__ (fun () ->
             let%bind valid_pending_coinbase_stack_transition =
@@ -3271,8 +3272,16 @@ module Make_str (A : Wire_types.Concrete) = struct
       in
       let%map () =
         Checked.all_unit
-          [ [%with_label_ "equal fee excesses"] (fun () ->
-                Fee_excess.assert_equal_checked fee_excess s.fee_excess )
+          [ [%with_label_ "fee excess connects at the merge point"] (fun () ->
+                Fee_excess.assert_equal_checked
+                  s1.Statement.Poly.target.fee_excess
+                  s2.Statement.Poly.source.fee_excess )
+          ; [%with_label_ "equal source fee excess"] (fun () ->
+                Fee_excess.assert_equal_checked s.source.fee_excess
+                  s1.source.fee_excess )
+          ; [%with_label_ "equal target fee excess"] (fun () ->
+                Fee_excess.assert_equal_checked s.target.fee_excess
+                  s2.target.fee_excess )
           ; [%with_label_ "equal supply increases"] (fun () ->
                 Amount.Signed.Checked.assert_equal supply_increase
                   s.supply_increase )
@@ -3427,8 +3436,8 @@ module Make_str (A : Wire_types.Concrete) = struct
         ~source_first_pass_ledger ~target_first_pass_ledger
         ~source_second_pass_ledger:target_first_pass_ledger
         ~target_second_pass_ledger:target_first_pass_ledger
-        ~pending_coinbase_stack_state
-        ~fee_excess:(Transaction_union.fee_excess transaction)
+        ~pending_coinbase_stack_state ~source_fee_excess:Fee_excess.zero
+        ~target_fee_excess:(Transaction_union.fee_excess transaction)
         ~sok_digest ~connecting_ledger_left:target_first_pass_ledger
         ~connecting_ledger_right:target_first_pass_ledger
     in
@@ -3502,7 +3511,8 @@ module Make_str (A : Wire_types.Concrete) = struct
     in
     let statement : Statement.With_sok.t =
       Statement.Poly.with_empty_local_state ~supply_increase
-        ~fee_excess:(Transaction_union.fee_excess transaction)
+        ~source_fee_excess:Fee_excess.zero
+        ~target_fee_excess:(Transaction_union.fee_excess transaction)
         ~sok_digest ~source_first_pass_ledger ~target_first_pass_ledger
         ~source_second_pass_ledger:target_first_pass_ledger
         ~target_second_pass_ledger:target_first_pass_ledger
@@ -3933,21 +3943,8 @@ module Make_str (A : Wire_types.Concrete) = struct
           ; block_global_slot = global_slot
           }
         in
-        let fee_excess =
-          (* capture only the difference in the fee excess *)
-          match
-            Amount.Signed.(
-              add target_global.fee_excess (negate source_global.fee_excess) )
-          with
-          | None ->
-              failwith
-                (sprintf
-                   !"unexpected fee excess. source %{sexp: Amount.Signed.t} \
-                     target %{sexp: Amount.Signed.t}"
-                   target_global.fee_excess source_global.fee_excess )
-          | Some balance_change ->
-              Amount.Signed.to_fee balance_change
-        in
+        let source_fee_excess = Amount.Signed.to_fee source_global.fee_excess in
+        let target_fee_excess = Amount.Signed.to_fee target_global.fee_excess in
         let supply_increase =
           (* capture only the difference in supply increase *)
           match
@@ -3990,6 +3987,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                   ; call_stack = call_stack_hash source_local.call_stack
                   ; ledger = source_local_ledger
                   }
+              ; fee_excess = source_fee_excess
               }
           ; target =
               { first_pass_ledger = target_first_pass_ledger_root
@@ -4003,11 +4001,11 @@ module Make_str (A : Wire_types.Concrete) = struct
                   ; call_stack = call_stack_hash target_local.call_stack
                   ; ledger = target_local_ledger
                   }
+              ; fee_excess = target_fee_excess
               }
           ; connecting_ledger_left = connecting_ledger
           ; connecting_ledger_right = connecting_ledger
           ; supply_increase
-          ; fee_excess
           ; sok_digest = Sok_message.Digest.default
           }
         in
