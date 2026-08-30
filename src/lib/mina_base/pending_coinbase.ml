@@ -906,21 +906,26 @@ module Make_str (A : Wire_types.Concrete) = struct
             Currency.Amount.Checked.if_ supercharge_coinbase
               ~then_:supercharged_coinbase ~else_:coinbase_amount
           in
-          (*A block has at most one coinbase, and it may not exceed the
-            protocol's amount for the block. The subtraction is what enforces
-            that; its result is no longer a second coinbase to push.*)
+          (*A block has exactly one coinbase unless it has no transactions at
+            all, and that coinbase is for the protocol's whole amount for the
+            block. Note this is [no_update] rather than [no_coinbase]: a block
+            that reaches the second stack still has a coinbase, it is just not
+            in this stack.*)
           let%bind () =
             with_label __LOC__ (fun () ->
-                let%map (_ : Currency.Amount.var) =
-                  Currency.Amount.Checked.sub total_coinbase_amount amount
+                let%bind expected_amount =
+                  Currency.Amount.Checked.if_ no_update
+                    ~then_:Currency.Amount.(var_of_t zero)
+                    ~else_:total_coinbase_amount
                 in
-                () )
+                Currency.Amount.Checked.assert_equal amount expected_amount )
           in
           let%bind no_coinbase_in_this_stack =
             Update.Action.Checked.update_two_stacks_coinbase_in_second action
           in
           let%bind amount1_equal_to_zero = equal_to_zero amount in
-          (*if no update then coinbase amount has to be zero*)
+          (*Kept alongside the check above so that the no-coinbase case does not
+            rest on the configured coinbase amount being non-zero.*)
           let%bind () =
             with_label __LOC__ (fun () ->
                 let%bind check =
