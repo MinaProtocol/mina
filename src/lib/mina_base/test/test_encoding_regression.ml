@@ -118,7 +118,7 @@ let test_coinbase_encoding () =
   let t =
     Coinbase.create ~receiver:pk
       ~amount:(Currency.Amount.of_nanomina_int_exn 1_000_000_000)
-      ~fee_transfer:None
+      ~fee_transfer:None ~fee_remainder:Currency.Fee.zero
     |> Or_error.ok_exn
   in
   let got = Coinbase.to_base58_check t in

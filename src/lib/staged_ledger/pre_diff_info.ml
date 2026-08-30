@@ -109,6 +109,7 @@ let create_coinbase coinbase_parts ~(receiver : Public_key.Compressed.t)
   | `One x ->
       let%map cb =
         Coinbase.create ~amount:coinbase_amount ~receiver ~fee_transfer:x
+          ~fee_remainder:Currency.Fee.zero
         |> coinbase_or_error
       in
       [ cb ]

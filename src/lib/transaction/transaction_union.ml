@@ -6,17 +6,26 @@ open Currency
 module Tag = Transaction_union_tag
 module Payload = Transaction_union_payload
 
-type ('payload, 'pk, 'signature) t_ =
-  { payload : 'payload; signer : 'pk; signature : 'signature }
+(** [fee_remainder] is the part of the coinbase's credited amount that comes
+    from the block's unsettled fee excess rather than from minting. It is not
+    part of the payload, and so not covered by the signature: it is pinned
+    instead by the fee excess registers of the statement, which a coinbase moves
+    by exactly its negation. *)
+type ('payload, 'pk, 'signature, 'fee) t_ =
+  { payload : 'payload
+  ; signer : 'pk
+  ; signature : 'signature
+  ; fee_remainder : 'fee
+  }
 [@@deriving equal, sexp, hash, hlist]
 
-type t = (Payload.t, Public_key.t, Signature.t) t_
+type t = (Payload.t, Public_key.t, Signature.t, Fee.t) t_
 
-type var = (Payload.var, Public_key.var, Signature.var) t_
+type var = (Payload.var, Public_key.var, Signature.var, Fee.var) t_
 
 let typ : (var, t) Typ.t =
   Typ.of_hlistable
-    [ Payload.typ; Public_key.typ; Schnorr.Chunked.Signature.typ ]
+    [ Payload.typ; Public_key.typ; Schnorr.Chunked.Signature.typ; Fee.typ ]
     ~var_to_hlist:t__to_hlist ~var_of_hlist:t__of_hlist
     ~value_to_hlist:t__to_hlist ~value_of_hlist:t__of_hlist
 
@@ -37,8 +46,9 @@ let of_transaction : Signed_command.t Transaction.Poly.t -> t = function
       { payload = Transaction_union_payload.of_user_command_payload payload
       ; signer
       ; signature
+      ; fee_remainder = Fee.zero
       }
-  | Coinbase { receiver; fee_transfer; amount } ->
+  | Coinbase { receiver; fee_transfer; amount; fee_remainder } ->
       let { Coinbase.Fee_transfer.receiver_pk = other_pk; fee = other_amount } =
         Option.value
           ~default:
@@ -58,12 +68,16 @@ let of_transaction : Signed_command.t Transaction.Poly.t -> t = function
               { source_pk = other_pk
               ; receiver_pk = receiver
               ; token_id = Token_id.default
-              ; amount
+              ; (* The circuit works from the total credited to the receiver;
+                   [fee_remainder] says how much of it came from the excess
+                   rather than from minting. *)
+                amount = Option.value_exn (Amount.add_fee amount fee_remainder)
               ; tag = Tag.Coinbase
               }
           }
       ; signer = Public_key.decompress_exn other_pk
       ; signature = Signature.dummy
+      ; fee_remainder
       }
   | Fee_transfer tr -> (
       let two { Fee_transfer.receiver_pk = pk1; fee = fee1; fee_token }
@@ -88,6 +102,7 @@ let of_transaction : Signed_command.t Transaction.Poly.t -> t = function
             }
         ; signer = Public_key.decompress_exn pk2
         ; signature = Signature.dummy
+        ; fee_remainder = Fee.zero
         }
       in
       match Fee_transfer.to_singles tr with
@@ -97,7 +112,9 @@ let of_transaction : Signed_command.t Transaction.Poly.t -> t = function
       | `Two (t1, t2) ->
           two t1 t2 )
 
-let fee_excess (t : t) = Transaction_union_payload.fee_excess t.payload
+let fee_excess (t : t) =
+  Transaction_union_payload.fee_excess ~fee_remainder:t.fee_remainder t.payload
 
 let expected_supply_increase (t : t) =
-  Transaction_union_payload.expected_supply_increase t.payload
+  Transaction_union_payload.expected_supply_increase
+    ~fee_remainder:t.fee_remainder t.payload

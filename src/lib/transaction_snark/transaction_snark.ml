@@ -292,7 +292,8 @@ module Make_str (A : Wire_types.Concrete) = struct
           ~(constraint_constants : Genesis_constants.Constraint_constants.t)
           ~txn_global_slot ~(fee_payer_account : Account.t)
           ~(receiver_account : Account.t) ~(source_account : Account.t)
-          ({ payload; signature = _; signer = _ } : Transaction_union.t) =
+          ({ payload; signature = _; signer = _; fee_remainder = _ } :
+            Transaction_union.t ) =
         match payload.body.tag with
         | Fee_transfer | Coinbase ->
             (* Not user commands, return no failure. *)
@@ -2249,7 +2250,8 @@ module Make_str (A : Wire_types.Concrete) = struct
         (shifted : (module Inner_curve.Checked.Shifted.S with type t = shifted))
         fee_payment_root global_slot pending_coinbase_stack_init
         pending_coinbase_stack_before pending_coinbase_after state_body
-        ({ signer; signature; payload } as txn : Transaction_union.var) =
+        ({ signer; signature; payload; fee_remainder } as txn :
+          Transaction_union.var ) =
       let tag = payload.body.tag in
       let is_user_command =
         Transaction_union.Tag.Unpacked.is_user_command tag
@@ -3038,8 +3040,12 @@ module Make_str (A : Wire_types.Concrete) = struct
            - fee transfer:     - payload.body.amount - payload.common.fee
         *)
         let open Amount in
-        chain Signed.Checked.if_ is_coinbase
-          ~then_:(return (Signed.Checked.of_unsigned (var_of_t zero)))
+        let coinbase_excess =
+          (* A coinbase discharges the excess it pays out to its receiver. *)
+          Signed.Checked.negate
+            (Signed.Checked.of_unsigned (Checked.of_fee fee_remainder))
+        in
+        chain Signed.Checked.if_ is_coinbase ~then_:(return coinbase_excess)
           ~else_:
             (let user_command_excess =
                Signed.Checked.of_unsigned (Checked.of_fee payload.common.fee)
@@ -3067,8 +3073,15 @@ module Make_str (A : Wire_types.Concrete) = struct
       let%bind supply_increase =
         [%with_label_ "Calculate supply increase"] (fun () ->
             let%bind expected_supply_increase =
+              (* [payload.body.amount] is everything the coinbase credits; the
+                 part taken from the fee excess already exists, so only the
+                 remainder is newly minted. *)
+              let%bind minted =
+                Amount.Checked.sub payload.body.amount
+                  (Amount.Checked.of_fee fee_remainder)
+              in
               Amount.Signed.Checked.if_ is_coinbase
-                ~then_:(Amount.Signed.Checked.of_unsigned payload.body.amount)
+                ~then_:(Amount.Signed.Checked.of_unsigned minted)
                 ~else_:Amount.(Signed.Checked.of_unsigned (var_of_t zero))
             in
             let%bind amt0, `Overflow overflow0 =

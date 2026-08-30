@@ -4,11 +4,11 @@ open Mina_base
 module Poly = struct
   [%%versioned
   module Stable = struct
-    module V2 = struct
-      type 'command t = 'command Mina_wire_types.Mina_transaction.Poly.V2.t =
+    module V3 = struct
+      type 'command t = 'command Mina_wire_types.Mina_transaction.Poly.V3.t =
         | Command of 'command
         | Fee_transfer of Fee_transfer.Stable.V2.t
-        | Coinbase of Coinbase.Stable.V1.t
+        | Coinbase of Coinbase.Stable.V2.t
       [@@deriving sexp, compare, equal, hash, yojson]
 
       let to_latest = Fn.id
@@ -33,8 +33,8 @@ end
 module Stable = struct
   [@@@no_toplevel_latest_type]
 
-  module V3 = struct
-    type t = User_command.Stable.V3.t Poly.Stable.V2.t
+  module V4 = struct
+    type t = User_command.Stable.V3.t Poly.Stable.V3.t
     [@@deriving sexp, compare, equal, hash, yojson]
 
     let to_latest = Fn.id
