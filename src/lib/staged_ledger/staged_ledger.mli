@@ -165,7 +165,7 @@ module Diff_creation_diagnostics : sig
   [@@deriving to_yojson]
 
   val coinbase_parts :
-    Coinbase.Fee_transfer.t Staged_ledger_diff.At_most_two.t -> int
+    Coinbase.Fee_transfer.t Staged_ledger_diff.At_most_one.t -> int
 end
 
 module Staged_ledger_error : sig

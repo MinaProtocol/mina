@@ -1,21 +1,6 @@
 open Core
 open Mina_base
 
-module At_most_two : sig
-  type 'a t = Zero | One of 'a option | Two of ('a * 'a option) option
-  [@@deriving equal, compare, sexp, yojson]
-
-  module Stable : sig
-    module V1 : sig
-      type 'a t = Zero | One of 'a option | Two of ('a * 'a option) option
-      [@@deriving equal, compare, sexp, yojson, bin_io, version]
-    end
-  end
-  with type 'a V1.t = 'a t
-
-  val increase : 'a t -> 'a list -> 'a t Or_error.t
-end
-
 module At_most_one : sig
   type 'a t = Zero | One of 'a option
   [@@deriving equal, compare, sexp, yojson]
@@ -38,7 +23,7 @@ module Pre_diff_two : sig
       type ('a, 'b) t =
         { completed_works : 'a list
         ; commands : 'b list
-        ; coinbase : Coinbase.Fee_transfer.Stable.V1.t At_most_two.Stable.V1.t
+        ; coinbase : Coinbase.Fee_transfer.Stable.V1.t At_most_one.Stable.V1.t
         ; internal_command_statuses : Transaction_status.Stable.V2.t list
         ; padding : Signature_lib.Public_key.Compressed.Stable.V1.t option
         }

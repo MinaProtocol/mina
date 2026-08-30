@@ -403,7 +403,7 @@ let%test_module "malformed gossiped block is handled gracefully" =
         { diff =
             ( { completed_works = []
               ; commands = []
-              ; coinbase = Staged_ledger_diff.At_most_two.One None
+              ; coinbase = Staged_ledger_diff.At_most_one.One None
               ; internal_command_statuses = []
               ; padding = None
               }

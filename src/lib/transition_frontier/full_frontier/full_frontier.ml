@@ -743,7 +743,7 @@ module Metrics = struct
     match (d1.coinbase, d2) with
     | Zero, None | Zero, Some { coinbase = Zero; _ } ->
         false
-    | Zero, Some { coinbase = One _; _ } | One _, _ | Two _, _ ->
+    | Zero, Some { coinbase = One _; _ } | One _, _ ->
         true
 
   let intprop f b = Unsigned.UInt32.to_int (f (Breadcrumb.consensus_state b))
