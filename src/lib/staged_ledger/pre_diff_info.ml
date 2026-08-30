@@ -254,9 +254,12 @@ let get_individual_info (type c)
     get_transaction_data coinbase_parts ~receiver ~coinbase_amount commands
       completed_works ~to_user_command
   in
+  (* The coinbase is the last transaction of the block: every fee payment
+     precedes it, so the fee excess it settles is the whole of what the block
+     collected, and the ledger it leaves behind is the block's final one. *)
   let internal_commands =
-    List.map coinbase_parts ~f:(fun t -> Transaction.Coinbase t)
-    @ List.map fee_transfers ~f:(fun t -> Transaction.Fee_transfer t)
+    List.map fee_transfers ~f:(fun t -> Transaction.Fee_transfer t)
+    @ List.map coinbase_parts ~f:(fun t -> Transaction.Coinbase t)
   in
   let%map internal_commands_with_statuses =
     Or_error.try_with (fun () ->
@@ -318,8 +321,8 @@ let compute_statuses
     in
     List.map commands ~f:(fun t ->
         Transaction.Command (User_command.forget_check t) )
-    @ List.map coinbases ~f:(fun t -> Transaction.Coinbase t)
     @ List.map fee_transfers ~f:(fun t -> Transaction.Fee_transfer t)
+    @ List.map coinbases ~f:(fun t -> Transaction.Coinbase t)
   in
   let project_transactions_pre_diff_two
       (p :
