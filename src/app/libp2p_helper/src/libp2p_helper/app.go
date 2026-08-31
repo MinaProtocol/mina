@@ -14,6 +14,7 @@ import (
 
 	capnp "capnproto.org/go/capnp/v3"
 	"github.com/go-errors/errors"
+	logging "github.com/ipfs/go-log/v2"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	net "github.com/libp2p/go-libp2p/core/network"
 	peer "github.com/libp2p/go-libp2p/core/peer"
@@ -22,10 +23,24 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
+var ValidatorCleanupInterval = initDurationEnv("LIBP2P_VALIDATOR_CLEANUP_INTERVAL_DURATION", 30*time.Second)
+var ValidatorCleanupGrace = initDurationEnv("LIBP2P_VALIDATOR_CLEANUP_GRACE_DURATION", 1*time.Hour)
+
+func initDurationEnv(envVar string, defaultVal time.Duration) time.Duration {
+	if s := os.Getenv(envVar); s != "" {
+		d, err := time.ParseDuration(s)
+		if err == nil && d > 0 {
+			return d
+		}
+		fmt.Fprintf(os.Stderr, "WARNING: %s=%q is not a positive duration, using default %s\n", envVar, s, defaultVal)
+	}
+	return defaultVal
+}
+
 func newApp() *app {
 	outChan := make(chan *capnp.Message, 1<<12) // 4096 messages stacked
 	ctx := context.Background()
-	return &app{
+	app := &app{
 		P2p:                      nil,
 		Ctx:                      ctx,
 		_subs:                    make(map[uint64]subscription),
@@ -40,6 +55,17 @@ func newApp() *app {
 		metricsServer:            nil,
 		bitswapCtx:               NewBitswapCtx(ctx, outChan),
 	}
+	return app
+}
+
+// StartBackgroundTasks launches the helper's periodic maintenance tasks. It is
+// called from the Configure handler rather than newApp so the tasks never read
+// app.P2p before it is assigned; the logger is passed in for the same reason,
+// and sync.Once keeps a repeated Configure from starting a second copy.
+func (app *app) StartBackgroundTasks(logger logging.StandardLogger) {
+	app.backgroundTasksOnce.Do(func() {
+		go app.startValidatorCleanup(logger)
+	})
 }
 
 func (app *app) SetConnectionHandlers() {
@@ -145,7 +171,11 @@ func (app *app) WriteStream(streamId uint64, data []byte) error {
 
 func (app *app) AddValidator() (uint64, chan pubsub.ValidationResult) {
 	seqno := app.NextId()
-	ch := make(chan pubsub.ValidationResult)
+	// Buffered so a late Validation push (arriving after the validate
+	// goroutine timed out and stopped receiving) doesn't block its handler
+	// goroutine forever. Each validator sees exactly one send: the push
+	// handler removes the entry via RemoveValidator before sending.
+	ch := make(chan pubsub.ValidationResult, 1)
 	app.validatorMutex.Lock()
 	defer app.validatorMutex.Unlock()
 	app._validators[seqno] = new(validationStatus)
@@ -158,6 +188,36 @@ func (app *app) TimeoutValidator(seqno uint64) {
 	app.validatorMutex.Lock()
 	defer app.validatorMutex.Unlock()
 	app._validators[seqno].TimedOutAt = &now
+}
+
+// cleanupTimedOutValidators removes validator entries that have been
+// timed out for longer than ValidatorCleanupGrace. Validators time out
+// after 5min from libp2p; this sweep runs after an additional 1-hour
+// grace period to give OCaml time to respond with a Validation push.
+func (app *app) cleanupTimedOutValidators(logger logging.StandardLogger) {
+	app.validatorMutex.Lock()
+	defer app.validatorMutex.Unlock()
+
+	now := time.Now()
+	removed := 0
+	for seqno, st := range app._validators {
+		if st.TimedOutAt != nil && now.Sub(*st.TimedOutAt) > ValidatorCleanupGrace {
+			delete(app._validators, seqno)
+			removed++
+			logger.Debugf("validator cleanup: removed timed-out validator seqno=%d age=%s", seqno, now.Sub(*st.TimedOutAt))
+		}
+	}
+	if removed > 0 {
+		logger.Infof("validator cleanup: removed %d stale validators (timed out >%s), remaining=%d", removed, ValidatorCleanupGrace, len(app._validators))
+	}
+}
+
+func (app *app) startValidatorCleanup(logger logging.StandardLogger) {
+	ticker := time.NewTicker(ValidatorCleanupInterval)
+	defer ticker.Stop()
+	for range ticker.C {
+		app.cleanupTimedOutValidators(logger)
+	}
 }
 
 func (app *app) RemoveValidator(seqno uint64) (*validationStatus, bool) {

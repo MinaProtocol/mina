@@ -446,6 +446,7 @@ func (msg ConfigureReq) handle(app *app, seqno uint64) (*capnp.Message, func()) 
 	app.P2p = helper
 	app.bitswapCtx.engine = helper.Bitswap
 	app.bitswapCtx.storage = helper.BitswapStorage
+	app.StartBackgroundTasks(helper.Logger)
 
 	opts := []pubsub.Option{
 		pubsub.WithFloodPublish(m.Flood()),

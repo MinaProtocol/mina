@@ -71,6 +71,7 @@ type app struct {
 
 	bitswapCtx                *BitswapCtx
 	setConnectionHandlersOnce sync.Once
+	backgroundTasksOnce       sync.Once
 }
 
 type subscription struct {
