@@ -6885,8 +6885,8 @@
               "deprecationReason": null
             },
             {
-              "name": "feeExcess",
-              "description": "Total transaction fee that is not accounted for in the transition from source ledger to target ledger",
+              "name": "sourceFeeExcess",
+              "description": "Unsettled transaction fees at the source ledger",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -6901,8 +6901,24 @@
               "deprecationReason": null
             },
             {
-              "name": "supplyIncrease",
-              "description": "Increase in total supply",
+              "name": "targetFeeExcess",
+              "description": "Unsettled transaction fees at the target ledger",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "OBJECT",
+                  "name": "SignedFee",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "sourceTotalCurrency",
+              "description": "Total currency at the source ledger",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -6913,19 +6929,19 @@
                   "ofType": null
                 }
               },
-              "isDeprecated": true,
-              "deprecationReason": "Use supplyChange"
+              "isDeprecated": false,
+              "deprecationReason": null
             },
             {
-              "name": "supplyChange",
-              "description": "Increase/Decrease in total supply",
+              "name": "targetTotalCurrency",
+              "description": "Total currency at the target ledger",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
                 "ofType": {
-                  "kind": "OBJECT",
-                  "name": "SignedAmount",
+                  "kind": "SCALAR",
+                  "name": "Amount",
                   "ofType": null
                 }
               },
@@ -11258,6 +11274,38 @@
               },
               "isDeprecated": false,
               "deprecationReason": null
+            },
+            {
+              "name": "feeExcess",
+              "description": "Transaction fees collected but not yet settled",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "OBJECT",
+                  "name": "SignedFee",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "totalCurrency",
+              "description": "Total currency in the ledger at this point",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Amount",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
             }
           ],
           "inputFields": null,
@@ -11328,38 +11376,6 @@
                 "ofType": {
                   "kind": "SCALAR",
                   "name": "LedgerHash",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "supplyIncrease",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "OBJECT",
-                  "name": "SignedAmount",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "feeExcess",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "OBJECT",
-                  "name": "SignedFee",
                   "ofType": null
                 }
               },

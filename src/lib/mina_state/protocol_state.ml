@@ -304,6 +304,7 @@ module Make_str (A : Wire_types.Concrete) = struct
               ~consensus_constants
               ~genesis_ledger_hash:
                 (Consensus.Genesis_data.Hashed.hash genesis_ledger)
+              ~genesis_total_currency:genesis_ledger.total_currency
               ~genesis_body_reference
         ; genesis_state_hash = State_hash.of_hash Outside_hash_image.t
         ; consensus_state =

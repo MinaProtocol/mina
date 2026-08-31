@@ -363,6 +363,7 @@ module Test_helpers : sig
     -> no_second_partition:bool
     -> is_new_stack:bool
     -> signature_kind:Mina_signature_kind.t
+    -> init_total_currency:Currency.Amount.t
     -> Ledger.t
     -> Pending_coinbase.t
     -> Transaction.t With_status.t list
@@ -379,6 +380,7 @@ module Test_helpers : sig
              Pending_coinbase.Stack_versioned.t
              * Pending_coinbase.Stack_versioned.t ]
          * [> `First_pass_ledger_end of Frozen_ledger_hash.t ]
+         * [> `Total_currency_end of Currency.Amount.t ]
        , Staged_ledger_error.t )
        Deferred.Result.t
 end

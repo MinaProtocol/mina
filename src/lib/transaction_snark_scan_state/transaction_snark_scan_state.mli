@@ -95,6 +95,11 @@ val fill_work_and_enqueue_transactions :
 
 val latest_ledger_proof : t -> Ledger_proof.Cached.t option
 
+(** The registers the scan state currently ends at; new base statements chain
+    from these. [None] when the scan state is empty and no proof has been
+    emitted. *)
+val latest_target_registers : t -> Mina_state.Registers.Value.t option
+
 (** Apply transactions coorresponding to the last emitted proof based on the
     two-pass system- first pass includes legacy transactions and zkapp payments
     and the second pass includes account updates. [ignore_incomplete] is to

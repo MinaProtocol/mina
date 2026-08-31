@@ -540,11 +540,16 @@ let generate_next_state ~commit_id ~zkapp_cmd_limit ~constraint_constants
                   previous_protocol_state |> Protocol_state.blockchain_state
                   |> Blockchain_state.genesis_ledger_hash
                 in
-                let supply_increase =
+                let total_currency =
+                  (* The total currency only moves when a proof is emitted;
+                     otherwise it stays where consensus already has it. *)
                   Option.value_map ledger_proof_opt
                     ~f:(fun proof ->
-                      (Ledger_proof.Cached.statement proof).supply_increase )
-                    ~default:Currency.Amount.Signed.zero
+                      (Ledger_proof.Cached.statement proof).target
+                        .total_currency )
+                    ~default:
+                      (Consensus.Data.Consensus_state.total_currency
+                         (Protocol_state.consensus_state previous_protocol_state) )
                 in
                 let body_reference =
                   Staged_ledger_diff.Body.compute_reference
@@ -574,7 +579,7 @@ let generate_next_state ~commit_id ~zkapp_cmd_limit ~constraint_constants
                       ~previous_protocol_state ~blockchain_state ~current_time
                       ~block_data ~supercharge_coinbase
                       ~snarked_ledger_hash:previous_ledger_hash
-                      ~genesis_ledger_hash ~supply_increase ~logger
+                      ~genesis_ledger_hash ~total_currency ~logger
                       ~constraint_constants ) )
           in
           lift_sync (fun () ->

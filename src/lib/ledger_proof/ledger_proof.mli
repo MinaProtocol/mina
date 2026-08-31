@@ -6,14 +6,12 @@ module For_tests : sig
   val mk_dummy_proof :
        statement:
          ( Pasta_bindings.Fp.t
-         , ( Mina_wire_types.Currency.M.Amount.V1.t
-           , Sgn.Stable.V1.t )
-           Mina_wire_types.Signed_poly.V1.t
+         , Mina_wire_types.Currency.M.Amount.V1.t
          , Mina_wire_types.Mina_base_pending_coinbase.M.Stack_versioned.V1.t
          , Mina_base.Fee_excess.Stable.V2.t
          , 'a
          , Mina_state.Local_state.Stable.V1.t )
-         Mina_wire_types.Mina_state_snarked_ledger_state.M.Poly.V2.t
+         Mina_wire_types.Mina_state_snarked_ledger_state.M.Poly.V3.t
     -> fee:Mina_wire_types.Currency.M.Fee.V1.t
     -> prover:Mina_base_import.Public_key.Compressed.Stable.Latest.t
     -> t

@@ -67,6 +67,16 @@ module Assert_equal4V1
     (W : V1S4 with type ('a, 'b, 'c, 'd) V1.t = ('a, 'b, 'c, 'd) O.V1.t) =
 struct end
 
+module Assert_equal4V2
+    (O : V2S4)
+    (W : V2S4 with type ('a, 'b, 'c, 'd) V2.t = ('a, 'b, 'c, 'd) O.V2.t) =
+struct end
+
+module Assert_equal5V2
+    (O : V2S5)
+    (W : V2S5 with type ('a, 'b, 'c, 'd, 'e) V2.t = ('a, 'b, 'c, 'd, 'e) O.V2.t) =
+struct end
+
 module Assert_equal8V1
     (O : V1S8)
     (W :
@@ -324,7 +334,7 @@ end
 module Mina_state = struct
   module O = Mina_state
   module W = WT.Mina_state
-  include Assert_equal3V1 (O.Registers.Stable) (W.Registers)
+  include Assert_equal5V2 (O.Registers.Stable) (W.Registers)
   include Assert_equal0V1 (O.Local_state.Stable) (W.Local_state)
   include
     Assert_equal0V3 (O.Blockchain_state.Value.Stable) (W.Blockchain_state.Value)

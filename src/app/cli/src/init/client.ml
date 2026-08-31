@@ -1084,10 +1084,27 @@ let pending_snark_work =
                           { Cli_lib.Graphql_types.Pending_snark_work.Work
                             .work_id = w.work_id
                           ; fee_excess =
+                              (* The excess is now a register either side of
+                                 the work, so what the work settles is the
+                                 difference between them. *)
                               Currency.Amount.Signed.of_fee
-                                (to_signed_fee_exn w.fee_excess.sign
-                                   w.fee_excess.feeMagnitude )
-                          ; supply_increase = w.supply_increase
+                                (Option.value_exn ~message:"fee excess overflow"
+                                   (Currency.Fee.Signed.add
+                                      (to_signed_fee_exn
+                                         w.target_fee_excess.sign
+                                         w.target_fee_excess.feeMagnitude )
+                                      (Currency.Fee.Signed.negate
+                                         (to_signed_fee_exn
+                                            w.source_fee_excess.sign
+                                            w.source_fee_excess.feeMagnitude ) ) ) )
+                          ; supply_increase =
+                              (* The total currency is a register either side of
+                                 the work, so the supply it adds is the
+                                 difference. *)
+                              Option.value_exn
+                                ~message:"supply increase out of range"
+                                (Currency.Amount.sub w.target_total_currency
+                                   w.source_total_currency )
                           ; source_first_pass_ledger_hash =
                               w.source_first_pass_ledger_hash
                           ; target_first_pass_ledger_hash =

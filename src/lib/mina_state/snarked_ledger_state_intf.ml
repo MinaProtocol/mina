@@ -63,7 +63,7 @@ module type Full = sig
   module Poly : sig
     [%%versioned:
     module Stable : sig
-      module V2 : sig
+      module V3 : sig
         type ( 'ledger_hash
              , 'amount
              , 'pending_coinbase
@@ -74,17 +74,19 @@ module type Full = sig
           { source :
               ( 'ledger_hash
               , 'pending_coinbase
-              , 'local_state )
-              Registers.Stable.V1.t
+              , 'local_state
+              , 'fee_excess
+              , 'amount )
+              Registers.Stable.V2.t
           ; target :
               ( 'ledger_hash
               , 'pending_coinbase
-              , 'local_state )
-              Registers.Stable.V1.t
+              , 'local_state
+              , 'fee_excess
+              , 'amount )
+              Registers.Stable.V2.t
           ; connecting_ledger_left : 'ledger_hash
           ; connecting_ledger_right : 'ledger_hash
-          ; supply_increase : 'amount
-          ; fee_excess : 'fee_excess
           ; sok_digest : 'sok_digest
           }
         [@@deriving compare, equal, hash, sexp, yojson]
@@ -92,8 +94,10 @@ module type Full = sig
     end]
 
     val with_empty_local_state :
-         supply_increase:'amount
-      -> fee_excess:'fee_excess
+         source_total_currency:'amount
+      -> target_total_currency:'amount
+      -> source_fee_excess:'fee_excess
+      -> target_fee_excess:'fee_excess
       -> sok_digest:'sok_digest
       -> source_first_pass_ledger:'ledger_hash
       -> target_first_pass_ledger:'ledger_hash
@@ -165,19 +169,19 @@ module type Full = sig
     module V3 : sig
       type t =
         ( Frozen_ledger_hash.Stable.V1.t
-        , (Amount.Stable.V1.t, Sgn.Stable.V1.t) Signed_poly.Stable.V1.t
+        , Amount.Stable.V1.t
         , Pending_coinbase.Stack_versioned.Stable.V1.t
         , Fee_excess.Stable.V2.t
         , unit
         , Local_state.Stable.V1.t )
-        Poly.Stable.V2.t
+        Poly.Stable.V3.t
       [@@deriving compare, equal, hash, sexp, yojson]
     end
   end]
 
   type var =
     ( Frozen_ledger_hash.var
-    , Currency.Amount.Signed.var
+    , Currency.Amount.var
     , Pending_coinbase.Stack.var
     , Fee_excess.var
     , unit
@@ -191,7 +195,10 @@ module type Full = sig
 
   val display : Stable.Latest.t -> display
 
-  val genesis : genesis_ledger_hash:Frozen_ledger_hash.t -> t
+  val genesis :
+       genesis_ledger_hash:Frozen_ledger_hash.t
+    -> genesis_total_currency:Currency.Amount.t
+    -> t
 
   val to_input : t -> Tick.Field.t Random_oracle.Input.Chunked.t
 
@@ -213,12 +220,12 @@ module type Full = sig
       module V3 : sig
         type t =
           ( Frozen_ledger_hash.Stable.V1.t
-          , (Amount.Stable.V1.t, Sgn.Stable.V1.t) Signed_poly.Stable.V1.t
+          , Amount.Stable.V1.t
           , Pending_coinbase.Stack_versioned.Stable.V1.t
           , Fee_excess.Stable.V2.t
           , Sok_message.Digest.Stable.V1.t
           , Local_state.Stable.V1.t )
-          Poly.Stable.V2.t
+          Poly.Stable.V3.t
         [@@deriving compare, equal, hash, sexp, yojson]
       end
     end]
@@ -228,11 +235,14 @@ module type Full = sig
 
     val display : Stable.Latest.t -> display
 
-    val genesis : genesis_ledger_hash:Frozen_ledger_hash.t -> t
+    val genesis :
+         genesis_ledger_hash:Frozen_ledger_hash.t
+      -> genesis_total_currency:Currency.Amount.t
+      -> t
 
     type var =
       ( Frozen_ledger_hash.var
-      , Amount.Signed.var
+      , Amount.var
       , Pending_coinbase.Stack.var
       , Fee_excess.var
       , Sok_message.Digest.Checked.t

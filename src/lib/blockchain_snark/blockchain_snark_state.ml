@@ -80,6 +80,8 @@ let non_pc_registers_equal_var t1 t2 =
           acc )
         ~local_state:(fun acc f ->
           Local_state.Checked.equal' (F.get f t1) (F.get f t2) @ acc )
+        ~fee_excess:(f !Fee_excess.equal_checked)
+        ~total_currency:(f !Currency.Amount.equal_var)
       |> Impl.Boolean.all )
 
 let txn_statement_ledger_hashes_equal
@@ -106,17 +108,8 @@ let txn_statement_ledger_hashes_equal
         !(Frozen_ledger_hash.equal_var s1.connecting_ledger_right
             s2.connecting_ledger_right )
       in
-      let supply_increase_eq =
-        !(Currency.Amount.Signed.Checked.equal s1.supply_increase
-            s2.supply_increase )
-      in
-      Impl.Boolean.all
-        [ source_eq
-        ; target_eq
-        ; left_ledger_eq
-        ; right_ledger_eq
-        ; supply_increase_eq
-        ] )
+
+      Impl.Boolean.all [ source_eq; target_eq; left_ledger_eq; right_ledger_eq ] )
 
 (* Blockchain_snark ~old ~nonce ~ledger_snark ~ledger_hash ~timestamp ~new_hash
       Input:
@@ -182,19 +175,22 @@ let%snarkydef_ step ~(logger : Logger.t)
       (previous_state |> Protocol_state.blockchain_state).ledger_proof_statement
       { txn_snark with sok_digest = () }
   in
-  let%bind supply_increase =
-    (* only increase the supply if the txn statement represents a new ledger transition *)
-    Currency.Amount.(
-      Signed.Checked.if_ txn_stmt_ledger_hashes_didn't_change
-        ~then_:
-          (Signed.create_var ~magnitude:(var_of_t zero) ~sgn:Sgn.Checked.pos)
-        ~else_:txn_snark.supply_increase )
+  let previous_total_currency =
+    Consensus.Data.Consensus_state.total_currency_var
+      (Protocol_state.consensus_state previous_state)
+  in
+  let%bind total_currency =
+    (* The total currency only moves when the txn statement represents a new
+       ledger transition; the transaction snark is what proves the new value
+       follows from the old one, so consensus no longer accumulates it. *)
+    Currency.Amount.Checked.if_ txn_stmt_ledger_hashes_didn't_change
+      ~then_:previous_total_currency ~else_:txn_snark.target.total_currency
   in
   let%bind `Success updated_consensus_state, consensus_state =
     with_label __LOC__ (fun () ->
         Consensus_state_hooks.next_state_checked ~constraint_constants
           ~prev_state:previous_state ~prev_state_hash:previous_state_hash
-          transition supply_increase )
+          transition total_currency )
   in
   let global_slot =
     Consensus.Data.Consensus_state.global_slot_since_genesis_var consensus_state
@@ -277,7 +273,15 @@ let%snarkydef_ step ~(logger : Logger.t)
     let%bind txn_snark_input_correct =
       let open Checked in
       let%bind () =
-        Fee_excess.(assert_equal_checked (var_of_t zero) txn_snark.fee_excess)
+        (* The fee excess is carried in the registers, so a ledger proof that
+           settles all of the fees it collects starts and ends at zero. This is
+           the same requirement as the previous accumulated excess being zero,
+           given that the scan state's excess starts at zero. *)
+        Fee_excess.(
+          Checked.all_unit
+            [ assert_equal_checked (var_of_t zero) txn_snark.source.fee_excess
+            ; assert_equal_checked (var_of_t zero) txn_snark.target.fee_excess
+            ] )
       in
       let ledger_statement_valid =
         Impl.make_checked (fun () ->
@@ -290,6 +294,10 @@ let%snarkydef_ step ~(logger : Logger.t)
          in the statement required?*)
       all
         [ ledger_statement_valid
+          (* The proof has to continue the total currency from where consensus
+             left it, which is what makes [total_currency] above sound. *)
+        ; Currency.Amount.equal_var txn_snark.source.total_currency
+            previous_total_currency
         ; Pending_coinbase.Stack.equal_var
             txn_snark.source.pending_coinbase_stack
             pending_coinbase_source_stack

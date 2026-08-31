@@ -36,7 +36,7 @@ module Poly : sig
             , 'fee_excess
             , 'sok_digest
             , 'local_state )
-            Snarked_ledger_state.Poly.Stable.V2.t
+            Snarked_ledger_state.Poly.Stable.V3.t
         ; timestamp : 'time
         ; body_reference : 'body_reference
         }
@@ -55,7 +55,7 @@ module Value : sig
         , Local_state.Stable.V1.t
         , Block_time.Stable.V1.t
         , Consensus.Body_reference.Stable.V1.t
-        , (Amount.Stable.V1.t, Sgn.Stable.V1.t) Signed_poly.Stable.V1.t
+        , Amount.Stable.V1.t
         , Pending_coinbase.Stack_versioned.Stable.V1.t
         , Fee_excess.Stable.V2.t
         , unit )
@@ -75,7 +75,7 @@ include
       , Local_state.Checked.t
       , Block_time.Checked.t
       , Consensus.Body_reference.var
-      , Currency.Amount.Signed.var
+      , Currency.Amount.var
       , Pending_coinbase.Stack.var
       , Fee_excess.var
       , unit )
@@ -129,6 +129,7 @@ val negative_one :
      constraint_constants:Genesis_constants.Constraint_constants.t
   -> consensus_constants:Consensus.Constants.t
   -> genesis_ledger_hash:Ledger_hash.t
+  -> genesis_total_currency:Currency.Amount.t
   -> genesis_body_reference:Consensus.Body_reference.t
   -> Value.t
 
@@ -136,6 +137,7 @@ val genesis :
      constraint_constants:Genesis_constants.Constraint_constants.t
   -> consensus_constants:Consensus.Constants.t
   -> genesis_ledger_hash:Ledger_hash.t
+  -> genesis_total_currency:Currency.Amount.t
   -> genesis_body_reference:Consensus.Body_reference.t
   -> Value.t
 

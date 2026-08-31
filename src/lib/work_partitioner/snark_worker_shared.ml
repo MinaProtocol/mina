@@ -58,7 +58,10 @@ let extract_zkapp_segment_works ~m:(module M : S)
           ~constraint_constants:M.constraint_constants
           ~global_slot:witness.block_global_slot
           ~state_body:witness.protocol_state_body
-          ~fee_excess:Currency.Amount.Signed.zero
+            (*The segment statements have to chain from the excess that the
+              transaction's own statement starts at, not from zero.*)
+          ~fee_excess:(Currency.Amount.Signed.of_fee input.source.fee_excess)
+          ~total_currency:input.source.total_currency
           [ ( `Pending_coinbase_init_stack witness.init_stack
             , `Pending_coinbase_of_statement
                 { Transaction_snark.Pending_coinbase_stack_state.source =
