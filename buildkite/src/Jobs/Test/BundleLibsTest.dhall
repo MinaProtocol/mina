@@ -21,6 +21,7 @@ in  Pipeline.build
           [ S.exactly "buildkite/scripts/bundle-libs" "sh"
           , S.strictlyStart (S.contains "buildkite/scripts/tests")
           , S.exactly "buildkite/scripts/build-artifact" "sh"
+          , S.strictlyStart (S.contains "buildkite/scripts/cache")
           , S.strictlyStart (S.contains "buildkite/scripts/apps")
           , S.exactly "buildkite/src/Jobs/Test/BundleLibsTest" "dhall"
           ]
@@ -39,6 +40,15 @@ in  Pipeline.build
               [ Cmd.run "./buildkite/scripts/tests/test_bundle_libs.sh" ]
             , label = "Shared-library bundling tests"
             , key = "bundle-libs-tests"
+            , target = Size.Small
+            , docker = None Docker.Type
+            }
+        , Command.build
+            Command.Config::{
+            , commands =
+              [ Cmd.run "./buildkite/scripts/tests/test_portable_cache.sh" ]
+            , label = "Portable bundle cache round-trip tests"
+            , key = "portable-cache-tests"
             , target = Size.Small
             , docker = None Docker.Type
             }

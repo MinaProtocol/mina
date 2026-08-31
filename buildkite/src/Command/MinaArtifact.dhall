@@ -437,6 +437,18 @@ let build_apps
                                                                   spec.debVersion} ${appsSpecVariant
                                                                                        spec}"
 
+          let portableCacheWrite =
+              -- Publishes _build_portable when the build produced one. The
+              -- step is unconditional and the script exits 0 when there is no
+              -- bundle, because whether a build is portable is decided by
+              -- MINA_BUILD_PORTABLE in the job's environment -- there is no
+              -- portable-ness in the types to branch on here, deliberately.
+                    \(spec : AppsSpec.Type)
+                ->  Cmd.run
+                      "./buildkite/scripts/apps/write_portable_to_cache.sh ${DebianVersions.lowerName
+                                                                               spec.debVersion} ${appsSpecVariant
+                                                                                                    spec}"
+
           in  Command.build
                 Command.Config::{
                 , commands =
@@ -454,6 +466,7 @@ let build_apps
                           "./buildkite/scripts/apps/write_build_manifest_to_cache.sh ${DebianVersions.lowerName
                                                                                          spec.debVersion} ${appsSpecTreeVariant
                                                                                                               spec}"
+                      , portableCacheWrite spec
                       ]
                 , label = "Build apps: ${appsLabelSuffix spec}"
                 , key = "build-apps"
