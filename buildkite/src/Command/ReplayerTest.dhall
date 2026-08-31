@@ -27,7 +27,7 @@ in  { step =
                             "./src/test/archive/sample_db/archive_db.sql"
                         )
                     )
-                    ContainerImages.minaToolchainBullseye.amd64
+                    ContainerImages.minaToolchainNoble.amd64
                     debs
                     "./buildkite/scripts/replayer-test.sh"
                 , Cmd.run

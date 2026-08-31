@@ -78,9 +78,7 @@ let Spec =
           , networks = [ Network.Type.Mainnet, Network.Type.Devnet ]
           , backend = "local"
           , codenames =
-            [ DebianVersions.DebVersion.Focal
-            , DebianVersions.DebVersion.Bullseye
-            ]
+            [ DebianVersions.DebVersion.Focal, DebianVersions.DebVersion.Noble ]
           , channel = DebianChannel.Type.Compatible
           , depends_on = [] : List Command.TaggedKey.Type
           , docker_repo = DockerRepo.Type.Internal
@@ -96,7 +94,7 @@ let publish
     =     \(spec : Spec.Type)
       ->  let target_version =
                 spec.target_version
-                  DebianVersions.DebVersion.Bullseye
+                  DebianVersions.DebVersion.Noble
                   spec.channel
                   spec.branch
                   spec.profile
@@ -143,7 +141,7 @@ let publish
                 Prelude.List.indexed
                   Text
                   ( spec.new_docker_tags
-                      DebianVersions.DebVersion.Bullseye
+                      DebianVersions.DebVersion.Noble
                       spec.channel
                       spec.branch
                       spec.profile

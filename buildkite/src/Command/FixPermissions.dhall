@@ -11,7 +11,7 @@ let command
     =     \(arch : Arch.Type)
       ->  let image =
                 merge
-                  { Amd64 = ContainerImages.minaToolchainBullseye.amd64
+                  { Amd64 = ContainerImages.minaToolchainNoble.amd64
                   , Arm64 = ContainerImages.minaToolchainBookworm.arm64
                   }
                   arch

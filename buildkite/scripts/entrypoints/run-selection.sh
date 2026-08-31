@@ -415,7 +415,7 @@ for file in "${!JOB_STEPS[@]}"; do
                 [[ -n "$d" ]] && deb_patterns+=("$d")
             done
 
-            # Not every job builds every package: MinaArtifactOnlyDebianBullseye
+            # Not every job builds every package: MinaArtifactOnlyDebianNoble
             # builds a subset, and a codename may carry packages another does
             # not. A job with none of the wanted packages is left out, and the
             # run stops only if NO job had any -- which is what a mistyped name

@@ -11,7 +11,7 @@ let PipelineTag = ../../Pipeline/Tag.dhall
 in  Pipeline.build
       ( ArtifactPipelines.appsPipeline
           ArtifactPipelines.AppsSpec::{
-          , debVersion = DebianVersions.DebVersion.Bullseye
+          , debVersion = DebianVersions.DebVersion.Noble
           , buildFlags = BuildFlags.Type.Instrumented
           , tags =
             [ PipelineTag.Type.Long
@@ -19,7 +19,7 @@ in  Pipeline.build
             , PipelineTag.Type.Docker
             , PipelineTag.Type.Devnet
             , PipelineTag.Type.Amd64
-            , PipelineTag.Type.Bullseye
+            , PipelineTag.Type.Noble
             ]
           }
       )
