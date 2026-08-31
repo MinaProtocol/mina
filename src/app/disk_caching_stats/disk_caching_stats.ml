@@ -384,6 +384,8 @@ module Values (S : Sample) = struct
             ; local_state = local_state ()
             ; fee_excess = fee_excess ()
             ; total_currency = Currency.Amount.zero
+            ; ledger_after_coinbase = field ()
+            ; total_supply_after_coinbase = Currency.Amount.zero
             }
         ; target =
             { first_pass_ledger = field ()
@@ -392,6 +394,8 @@ module Values (S : Sample) = struct
             ; local_state = local_state ()
             ; fee_excess = fee_excess ()
             ; total_currency = Currency.Amount.zero
+            ; ledger_after_coinbase = field ()
+            ; total_supply_after_coinbase = Currency.Amount.zero
             }
         ; connecting_ledger_left = field ()
         ; connecting_ledger_right = field ()

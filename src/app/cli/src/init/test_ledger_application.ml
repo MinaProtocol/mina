@@ -160,8 +160,13 @@ let apply_txs ~transfer_parties_get_actions_events ~action_elements
       ~first_partition_slots ~is_new_stack:(not no_new_stack)
       ~no_second_partition:(not has_second_partition) ~constraint_constants
       ~logger ~global_slot ~signature_kind:Mina_signature_kind.Testnet
-      ~init_total_currency:Currency.Amount.zero ledger pending_coinbase zkapps'
-      prev_state_view
+      ~init_carried:
+        { Staged_ledger.Carried_registers.total_currency = Currency.Amount.zero
+        ; ledger_after_coinbase =
+            Frozen_ledger_hash.of_ledger_hash (Ledger.merkle_root ledger)
+        ; total_supply_after_coinbase = Currency.Amount.zero
+        }
+      ledger pending_coinbase zkapps' prev_state_view
       (prev_protocol_state_hash, prev_protocol_state_body_hash)
   with
   | Ok (b, _, _, _, _, _) ->

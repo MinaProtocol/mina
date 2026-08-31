@@ -6,5 +6,7 @@ module V2 = struct
     ; local_state : 'local_state
     ; fee_excess : 'fee_excess
     ; total_currency : 'amount
+    ; ledger_after_coinbase : 'ledger
+    ; total_supply_after_coinbase : 'amount
     }
 end

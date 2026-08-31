@@ -62,6 +62,8 @@ let extract_zkapp_segment_works ~m:(module M : S)
               transaction's own statement starts at, not from zero.*)
           ~fee_excess:(Currency.Amount.Signed.of_fee input.source.fee_excess)
           ~total_currency:input.source.total_currency
+          ~ledger_after_coinbase:input.source.ledger_after_coinbase
+          ~total_supply_after_coinbase:input.source.total_supply_after_coinbase
           [ ( `Pending_coinbase_init_stack witness.init_stack
             , `Pending_coinbase_of_statement
                 { Transaction_snark.Pending_coinbase_stack_state.source =

@@ -343,6 +343,16 @@ module For_tests : sig
   module Application_state = Application_state
 end
 
+(** The register values a base statement carries forward from the one before
+    it, as opposed to those that follow from the ledger or the transaction. *)
+module Carried_registers : sig
+  type t =
+    { total_currency : Currency.Amount.t
+    ; ledger_after_coinbase : Frozen_ledger_hash.t
+    ; total_supply_after_coinbase : Currency.Amount.t
+    }
+end
+
 module Test_helpers : sig
   val dummy_state_and_view :
        ?global_slot:Mina_numbers.Global_slot_since_genesis.t
@@ -363,7 +373,7 @@ module Test_helpers : sig
     -> no_second_partition:bool
     -> is_new_stack:bool
     -> signature_kind:Mina_signature_kind.t
-    -> init_total_currency:Currency.Amount.t
+    -> init_carried:Carried_registers.t
     -> Ledger.t
     -> Pending_coinbase.t
     -> Transaction.t With_status.t list
@@ -380,7 +390,7 @@ module Test_helpers : sig
              Pending_coinbase.Stack_versioned.t
              * Pending_coinbase.Stack_versioned.t ]
          * [> `First_pass_ledger_end of Frozen_ledger_hash.t ]
-         * [> `Total_currency_end of Currency.Amount.t ]
+         * [> `Carried_end of Carried_registers.t ]
        , Staged_ledger_error.t )
        Deferred.Result.t
 end

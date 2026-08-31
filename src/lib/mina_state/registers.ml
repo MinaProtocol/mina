@@ -23,6 +23,8 @@ module Stable = struct
       ; local_state : 'local_state
       ; fee_excess : 'fee_excess
       ; total_currency : 'amount
+      ; ledger_after_coinbase : 'ledger
+      ; total_supply_after_coinbase : 'amount
       }
     [@@deriving compare, equal, hash, sexp, yojson, hlist, fields]
   end
@@ -35,13 +37,17 @@ let gen =
   and pending_coinbase_stack = Pending_coinbase.Stack.gen
   and local_state = Local_state.gen
   and fee_excess = Fee_excess.gen
-  and total_currency = Currency.Amount.gen in
+  and total_currency = Currency.Amount.gen
+  and ledger_after_coinbase = Frozen_ledger_hash.gen
+  and total_supply_after_coinbase = Currency.Amount.gen in
   { first_pass_ledger
   ; second_pass_ledger
   ; pending_coinbase_stack
   ; local_state
   ; fee_excess
   ; total_currency
+  ; ledger_after_coinbase
+  ; total_supply_after_coinbase
   }
 
 let to_input
@@ -51,6 +57,8 @@ let to_input
     ; local_state
     ; fee_excess
     ; total_currency
+    ; ledger_after_coinbase
+    ; total_supply_after_coinbase
     } =
   Array.reduce_exn ~f:Random_oracle.Input.Chunked.append
     [| Frozen_ledger_hash.to_input first_pass_ledger
@@ -59,6 +67,8 @@ let to_input
      ; Local_state.to_input local_state
      ; Fee_excess.to_input fee_excess
      ; Currency.Amount.to_input total_currency
+     ; Frozen_ledger_hash.to_input ledger_after_coinbase
+     ; Currency.Amount.to_input total_supply_after_coinbase
     |]
 
 let typ spec =
@@ -109,6 +119,8 @@ module Checked = struct
       ; local_state
       ; fee_excess
       ; total_currency
+      ; ledger_after_coinbase
+      ; total_supply_after_coinbase
       } =
     let open Snark_params.Tick.Checked.Let_syntax in
     let%map fee_excess = Fee_excess.to_input_checked fee_excess in
@@ -119,6 +131,8 @@ module Checked = struct
        ; Local_state.Checked.to_input local_state
        ; fee_excess
        ; Currency.Amount.var_to_input total_currency
+       ; Frozen_ledger_hash.var_to_input ledger_after_coinbase
+       ; Currency.Amount.var_to_input total_supply_after_coinbase
       |]
 
   let equal t1 t2 =
@@ -132,5 +146,7 @@ module Checked = struct
         Local_state.Checked.equal' (Field.get f t1) (Field.get f t2) @ acc )
       ~fee_excess:(f !Fee_excess.equal_checked)
       ~total_currency:(f !Currency.Amount.equal_var)
+      ~ledger_after_coinbase:(f !Frozen_ledger_hash.equal_var)
+      ~total_supply_after_coinbase:(f !Currency.Amount.equal_var)
     |> Impl.Boolean.all
 end

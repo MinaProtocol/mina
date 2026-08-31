@@ -385,6 +385,27 @@ let create_expected_statement ~constraint_constants
     | _, `Overflow true ->
         Or_error.error_string "Total currency out of range"
   in
+  (*A coinbase moves the recorded post-coinbase state on to where this
+    transition ends; anything else carries it through.*)
+  let source_ledger_after_coinbase = statement.source.ledger_after_coinbase in
+  let source_total_supply_after_coinbase =
+    statement.source.total_supply_after_coinbase
+  in
+  let is_coinbase =
+    match transaction with
+    | Mina_transaction.Transaction.Coinbase _ ->
+        true
+    | Command _ | Fee_transfer _ ->
+        false
+  in
+  let target_ledger_after_coinbase =
+    if is_coinbase then target_second_pass_merkle_root
+    else source_ledger_after_coinbase
+  in
+  let target_total_supply_after_coinbase =
+    if is_coinbase then target_total_currency
+    else source_total_supply_after_coinbase
+  in
   { Transaction_snark.Statement.Poly.source =
       { first_pass_ledger = source_first_pass_merkle_root
       ; second_pass_ledger = source_second_pass_merkle_root
@@ -392,6 +413,8 @@ let create_expected_statement ~constraint_constants
       ; local_state = empty_local_state
       ; fee_excess = source_fee_excess
       ; total_currency = source_total_currency
+      ; ledger_after_coinbase = source_ledger_after_coinbase
+      ; total_supply_after_coinbase = source_total_supply_after_coinbase
       }
   ; target =
       { first_pass_ledger = target_first_pass_merkle_root
@@ -400,6 +423,8 @@ let create_expected_statement ~constraint_constants
       ; local_state = empty_local_state
       ; fee_excess = target_fee_excess
       ; total_currency = target_total_currency
+      ; ledger_after_coinbase = target_ledger_after_coinbase
+      ; total_supply_after_coinbase = target_total_supply_after_coinbase
       }
   ; connecting_ledger_left = connecting_merkle_root
   ; connecting_ledger_right = connecting_merkle_root
@@ -686,6 +711,13 @@ struct
         clarify_error
           (Currency.Amount.equal reg1.total_currency reg2.total_currency)
           "did not connect with total currency"
+      and () =
+        clarify_error
+          ( Frozen_ledger_hash.equal reg1.ledger_after_coinbase
+              reg2.ledger_after_coinbase
+          && Currency.Amount.equal reg1.total_supply_after_coinbase
+               reg2.total_supply_after_coinbase )
+          "did not connect with the post-coinbase state"
       in
       ()
     in

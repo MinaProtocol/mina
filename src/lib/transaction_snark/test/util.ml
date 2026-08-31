@@ -166,6 +166,9 @@ let check_zkapp_command_with_merges_exn ?(logger = logger_null)
                 Transaction_snark.zkapp_command_witnesses_exn ~signature_kind
                   ~constraint_constants ~global_slot ~state_body
                   ~fee_excess:Amount.Signed.zero ~total_currency
+                  ~ledger_after_coinbase:
+                    (Sparse_ledger.merkle_root first_pass_ledger_witness)
+                  ~total_supply_after_coinbase:Amount.zero
                   [ ( `Pending_coinbase_init_stack init_stack
                     , `Pending_coinbase_of_statement
                         (pending_coinbase_state_stack ~state_body_hash
@@ -223,6 +226,9 @@ let check_zkapp_command_with_merges_exn ?(logger = logger_null)
                         ; local_state = Mina_state.Local_state.empty ()
                         ; fee_excess = Fee_excess.zero
                         ; total_currency
+                        ; ledger_after_coinbase =
+                            Sparse_ledger.merkle_root first_pass_ledger_witness
+                        ; total_supply_after_coinbase = Currency.Amount.zero
                         }
                     ; target =
                         { first_pass_ledger = first_pass_ledger_target_hash
@@ -242,6 +248,10 @@ let check_zkapp_command_with_merges_exn ?(logger = logger_null)
                              fst
                                (Currency.Amount.add_signed_flagged
                                   total_currency supply_increase ) )
+                            (*A zkApp command is never a coinbase.*)
+                        ; ledger_after_coinbase =
+                            Sparse_ledger.merkle_root first_pass_ledger_witness
+                        ; total_supply_after_coinbase = Currency.Amount.zero
                         }
                     ; connecting_ledger_left = connecting_ledger
                     ; connecting_ledger_right = connecting_ledger
