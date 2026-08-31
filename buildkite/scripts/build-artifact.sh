@@ -122,6 +122,22 @@ if [[ "${MINA_BUILD_PORTABLE:-0}" == "1" ]]; then
       "$portable_bin/$exe_name" "lib" "libexec/$exe_name" "$loader"
   done
 
+  # The closure, written into the bundle so it travels with it. This is the
+  # audit surface: which SONAMEs the artifact set actually needs, answerable
+  # only from a real build.
+  report="$portable_root/closure-report.txt"
+  {
+    echo "# portable bundle closure"
+    echo "# codename=${MINA_DEB_CODENAME:-unknown} arch=$(uname -m) loader=${loader}"
+    echo "# binary<TAB>library"
+    for source_exe in "${source_exes[@]}"; do
+      bundle_report "$source_exe"
+    done | sort -u
+  } > "$report"
+
   echo "Portable bundle: ${#source_exes[@]} binaries, \
 $(find "$portable_lib" -type f | wc -l) libraries, loader $loader"
+  echo "Distinct libraries in the closure: \
+$(grep -vc '^#' "$report" || true) binary/library pairs, \
+$(grep -v '^#' "$report" | cut -f2 | sort -u | wc -l) distinct"
 fi

@@ -124,3 +124,21 @@ bundle_missing() {
 
   ldd "$exe" 2>/dev/null | sed -nE 's|^[[:space:]]*([^[:space:]]+) => not found$|\1|p'
 }
+
+# Echo one "<binary><TAB><library>" line per library $exe resolves, for the
+# closure audit. Sorted and deduplicated across the whole bundle this answers
+# "what does the artifact set actually depend on", which is otherwise only
+# knowable by building mina and running ldd by hand.
+#
+# It reports basenames, not paths: the paths are build-image specific and the
+# question is which SONAMEs travel with us.
+bundle_report() {
+  local exe="$1" lib
+  command -v ldd >/dev/null 2>&1 || return 0
+
+  ldd "$exe" 2>/dev/null \
+    | sed -nE 's|.*=> (/[^ ]+) \(0x[0-9a-f]+\)$|\1|p' \
+    | while read -r lib; do
+        printf '%s\t%s\n' "$(basename "$exe")" "$(basename "$lib")"
+      done
+}
