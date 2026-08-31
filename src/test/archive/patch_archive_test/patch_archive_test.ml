@@ -109,6 +109,18 @@ let main ~db_uri ~network_data_folder () =
         else None )
     |> Array.of_list
   in
+
+  let%bind () =
+    if Array.is_empty candidate_blocks then (
+      printf
+        "No extracted block matches state hash %s. The sample database and the \
+         pinned candidate block have drifted apart; pick a new orphan-branch \
+         block to withhold.\n"
+        missing_block_state_hash ;
+      exit 1 )
+    else Deferred.unit
+  in
+
   let missing_blocks =
     Array.slice (knuth_shuffle candidate_blocks) 0 missing_blocks_count
   in
