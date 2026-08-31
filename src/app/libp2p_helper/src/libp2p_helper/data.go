@@ -72,6 +72,7 @@ type app struct {
 	bitswapCtx                *BitswapCtx
 	setConnectionHandlersOnce sync.Once
 	backgroundTasksOnce       sync.Once
+	workerSem                 chan struct{}
 }
 
 type subscription struct {
