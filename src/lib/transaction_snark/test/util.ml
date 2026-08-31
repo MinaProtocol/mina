@@ -93,6 +93,13 @@ let check_zkapp_command_with_merges_exn ?(logger = logger_null)
   let ignore_outside_snark = Option.value ~default:false ignore_outside_snark in
   let state_view = Mina_state.Protocol_state.Body.view state_body in
   let state_body_hash = Mina_state.Protocol_state.Body.hash state_body in
+  (*The registers record the total currency the transaction starts from, and a
+    zkApp command that creates an account burns the creation fee. Starting from
+    zero would underflow, so start from the protocol's total currency, which is
+    what the block producer carries in.*)
+  let total_currency =
+    state_view.Zkapp_precondition.Protocol_state.Poly.total_currency
+  in
   let global_slot =
     Option.value global_slot
       ~default:
@@ -158,7 +165,7 @@ let check_zkapp_command_with_merges_exn ?(logger = logger_null)
             Or_error.try_with (fun () ->
                 Transaction_snark.zkapp_command_witnesses_exn ~signature_kind
                   ~constraint_constants ~global_slot ~state_body
-                  ~fee_excess:Amount.Signed.zero ~total_currency:Amount.zero
+                  ~fee_excess:Amount.Signed.zero ~total_currency
                   [ ( `Pending_coinbase_init_stack init_stack
                     , `Pending_coinbase_of_statement
                         (pending_coinbase_state_stack ~state_body_hash
@@ -215,7 +222,7 @@ let check_zkapp_command_with_merges_exn ?(logger = logger_null)
                         ; pending_coinbase_stack = init_stack
                         ; local_state = Mina_state.Local_state.empty ()
                         ; fee_excess = Fee_excess.zero
-                        ; total_currency = Currency.Amount.zero
+                        ; total_currency
                         }
                     ; target =
                         { first_pass_ledger = first_pass_ledger_target_hash
@@ -234,7 +241,7 @@ let check_zkapp_command_with_merges_exn ?(logger = logger_null)
                              in
                              fst
                                (Currency.Amount.add_signed_flagged
-                                  Currency.Amount.zero supply_increase ) )
+                                  total_currency supply_increase ) )
                         }
                     ; connecting_ledger_left = connecting_ledger
                     ; connecting_ledger_right = connecting_ledger
