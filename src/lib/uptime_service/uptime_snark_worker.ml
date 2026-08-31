@@ -19,10 +19,13 @@ end
     is a valid proof of the *empty* sok message, which [delegation_verify]
     rejects with "proof's sok message digest does not match the sok message". *)
 let select_terminal_segment ~sok_digest ~staged_ledger_hash segments =
-  ignore (sok_digest : Sok_message.Digest.t) ;
   Mina_stdlib.Nonempty_list.find segments
     ~f:(fun (_, _, (s : Transaction_snark.Statement.With_sok.t)) ->
       Ledger_hash.(s.target.second_pass_ledger = staged_ledger_hash) )
+  |> Option.map ~f:(fun (witness, spec, statement) ->
+         ( witness
+         , spec
+         , Mina_state.Snarked_ledger_state.Poly.{ statement with sok_digest } ) )
 
 let%test_module "terminal zkapp segment selection" =
   ( module struct
