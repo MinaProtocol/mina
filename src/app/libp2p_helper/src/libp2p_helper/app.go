@@ -27,6 +27,10 @@ var ValidatorCleanupInterval = initDurationEnv("LIBP2P_VALIDATOR_CLEANUP_INTERVA
 var ValidatorCleanupGrace = initDurationEnv("LIBP2P_VALIDATOR_CLEANUP_GRACE_DURATION", 1*time.Hour)
 var WorkerPoolSize = initIntEnv("LIBP2P_WORKER_POOL_SIZE", 256)
 var StreamWriteTimeout = initDurationEnv("LIBP2P_STREAM_WRITE_TIMEOUT_DURATION", 60*time.Second)
+var LeakMonitorInterval = initDurationEnv("LIBP2P_LEAK_MONITOR_INTERVAL_DURATION", 5*time.Minute)
+var LeakWarnStreams = initIntEnv("LIBP2P_LEAK_WARN_STREAMS", 500)
+var LeakWarnSubs = initIntEnv("LIBP2P_LEAK_WARN_SUBS", 500)
+var LeakWarnValidators = initIntEnv("LIBP2P_LEAK_WARN_VALIDATORS", 5000)
 
 func initDurationEnv(envVar string, defaultVal time.Duration) time.Duration {
 	if s := os.Getenv(envVar); s != "" {
@@ -79,6 +83,7 @@ func newApp() *app {
 func (app *app) StartBackgroundTasks(logger logging.StandardLogger) {
 	app.backgroundTasksOnce.Do(func() {
 		go app.startValidatorCleanup(logger)
+		go app.startLeakMonitor(logger)
 	})
 }
 
@@ -140,8 +145,12 @@ func (app *app) ResetAddedPeers() {
 func (app *app) AddStream(stream_ net.Stream) uint64 {
 	streamIdx := app.NextId()
 	app.streamsMutex.Lock()
-	defer app.streamsMutex.Unlock()
 	app._streams[streamIdx] = &stream{stream: stream_}
+	count := len(app._streams)
+	app.streamsMutex.Unlock()
+	if app.P2p != nil {
+		app.P2p.Logger.Debugf("stream count: %d streams (added stream %d)", count, streamIdx)
+	}
 	return streamIdx
 }
 
@@ -202,9 +211,13 @@ func (app *app) AddValidator() (uint64, chan pubsub.ValidationResult) {
 	// handler removes the entry via RemoveValidator before sending.
 	ch := make(chan pubsub.ValidationResult, 1)
 	app.validatorMutex.Lock()
-	defer app.validatorMutex.Unlock()
 	app._validators[seqno] = new(validationStatus)
 	app._validators[seqno].Completion = ch
+	count := len(app._validators)
+	app.validatorMutex.Unlock()
+	if app.P2p != nil {
+		app.P2p.Logger.Debugf("validator count: %d (added validator %d)", count, seqno)
+	}
 	return seqno, ch
 }
 
@@ -245,6 +258,35 @@ func (app *app) startValidatorCleanup(logger logging.StandardLogger) {
 	}
 }
 
+// startLeakMonitor periodically checks stream/subscription/validator
+// collection sizes and logs a warning if any exceed their threshold.
+// This helps detect OCaml-side leaks where close/unsubscribe RPCs are
+// never sent, causing memory growth in the Go helper.
+func (app *app) startLeakMonitor(logger logging.StandardLogger) {
+	ticker := time.NewTicker(LeakMonitorInterval)
+	defer ticker.Stop()
+	for range ticker.C {
+		app.reportCollectionSizes(logger)
+	}
+}
+
+func (app *app) reportCollectionSizes(logger logging.StandardLogger) {
+	app.streamsMutex.RLock()
+	streams := len(app._streams)
+	app.streamsMutex.RUnlock()
+	app.subsMutex.Lock()
+	subs := len(app._subs)
+	app.subsMutex.Unlock()
+	app.validatorMutex.Lock()
+	validators := len(app._validators)
+	app.validatorMutex.Unlock()
+
+	if streams > LeakWarnStreams || subs > LeakWarnSubs || validators > LeakWarnValidators {
+		logger.Warnf("resource leak check: streams=%d (warn>%d), subs=%d (warn>%d), validators=%d (warn>%d)",
+			streams, LeakWarnStreams, subs, LeakWarnSubs, validators, LeakWarnValidators)
+	}
+}
+
 func (app *app) RemoveValidator(seqno uint64) (*validationStatus, bool) {
 	app.validatorMutex.Lock()
 	defer app.validatorMutex.Unlock()
@@ -268,8 +310,12 @@ func (app *app) GetTopic(topicName string) (*pubsub.Topic, bool) {
 
 func (app *app) AddSubscription(subId uint64, sub subscription) {
 	app.subsMutex.Lock()
-	defer app.subsMutex.Unlock()
 	app._subs[subId] = sub
+	count := len(app._subs)
+	app.subsMutex.Unlock()
+	if app.P2p != nil {
+		app.P2p.Logger.Debugf("subscription count: %d (added sub %d)", count, subId)
+	}
 }
 
 func (app *app) RemoveSubscription(subId uint64) (subscription, bool) {
