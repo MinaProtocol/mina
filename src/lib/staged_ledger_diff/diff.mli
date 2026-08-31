@@ -1,21 +1,6 @@
 open Core
 open Mina_base
 
-module At_most_two : sig
-  type 'a t = Zero | One of 'a option | Two of ('a * 'a option) option
-  [@@deriving equal, compare, sexp, yojson]
-
-  module Stable : sig
-    module V1 : sig
-      type 'a t = Zero | One of 'a option | Two of ('a * 'a option) option
-      [@@deriving equal, compare, sexp, yojson, bin_io, version]
-    end
-  end
-  with type 'a V1.t = 'a t
-
-  val increase : 'a t -> 'a list -> 'a t Or_error.t
-end
-
 module At_most_one : sig
   type 'a t = Zero | One of 'a option
   [@@deriving equal, compare, sexp, yojson]
@@ -34,11 +19,11 @@ end
 module Pre_diff_two : sig
   [%%versioned:
   module Stable : sig
-    module V2 : sig
+    module V3 : sig
       type ('a, 'b) t =
         { completed_works : 'a list
         ; commands : 'b list
-        ; coinbase : Coinbase.Fee_transfer.Stable.V1.t At_most_two.Stable.V1.t
+        ; coinbase : Coinbase.Fee_transfer.Stable.V1.t At_most_one.Stable.V1.t
         ; internal_command_statuses : Transaction_status.Stable.V2.t list
         }
       [@@deriving equal, compare, sexp, yojson]
@@ -51,7 +36,7 @@ end
 module Pre_diff_one : sig
   [%%versioned:
   module Stable : sig
-    module V2 : sig
+    module V3 : sig
       type ('a, 'b) t =
         { completed_works : 'a list
         ; commands : 'b list
@@ -74,7 +59,7 @@ module Pre_diff_with_at_most_two_coinbase : sig
       type t =
         ( Transaction_snark_work.Stable.V4.t
         , User_command.Stable.V3.t With_status.Stable.V2.t )
-        Pre_diff_two.Stable.V2.t
+        Pre_diff_two.Stable.V3.t
       [@@deriving equal, sexp, yojson]
 
       val to_latest : t -> t
@@ -93,7 +78,7 @@ module Pre_diff_with_at_most_one_coinbase : sig
       type t =
         ( Transaction_snark_work.Stable.V4.t
         , User_command.Stable.V3.t With_status.Stable.V2.t )
-        Pre_diff_one.Stable.V2.t
+        Pre_diff_one.Stable.V3.t
       [@@deriving equal, sexp, yojson]
 
       val to_latest : t -> t

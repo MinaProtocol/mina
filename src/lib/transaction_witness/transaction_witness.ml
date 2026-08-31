@@ -147,7 +147,7 @@ module Stable = struct
 
   module V4 = struct
     type t =
-      { transaction : Mina_transaction.Transaction.Stable.V3.t
+      { transaction : Mina_transaction.Transaction.Stable.V4.t
       ; first_pass_ledger : Mina_ledger.Sparse_ledger.Stable.V3.t
       ; second_pass_ledger : Mina_ledger.Sparse_ledger.Stable.V3.t
       ; protocol_state_body : Mina_state.Protocol_state.Body.Value.Stable.V4.t

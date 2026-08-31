@@ -150,9 +150,9 @@ end
 module Coinbase_applied = struct
   [%%versioned
   module Stable = struct
-    module V2 = struct
+    module V3 = struct
       type t =
-        { coinbase : Coinbase.Stable.V1.t With_status.Stable.V2.t
+        { coinbase : Coinbase.Stable.V2.t With_status.Stable.V2.t
         ; new_accounts : Account_id.Stable.V2.t list
         ; burned_tokens : Currency.Amount.Stable.V1.t
         }
@@ -168,7 +168,7 @@ module Varying : sig
   module Stable : sig
     [@@@no_toplevel_latest_type]
 
-    module V3 : sig
+    module V4 : sig
       type t [@@deriving sexp, to_yojson]
     end
   end]
@@ -190,11 +190,11 @@ end = struct
   module Stable = struct
     [@@@no_toplevel_latest_type]
 
-    module V3 = struct
+    module V4 = struct
       type t =
         | Command of Command_applied.Stable.V3.t
         | Fee_transfer of Fee_transfer_applied.Stable.V2.t
-        | Coinbase of Coinbase_applied.Stable.V2.t
+        | Coinbase of Coinbase_applied.Stable.V3.t
       [@@deriving sexp, to_yojson]
 
       let to_latest = Fn.id
@@ -230,9 +230,9 @@ end
 module Stable = struct
   [@@@no_toplevel_latest_type]
 
-  module V3 = struct
+  module V4 = struct
     type t =
-      { previous_hash : Ledger_hash.Stable.V1.t; varying : Varying.Stable.V3.t }
+      { previous_hash : Ledger_hash.Stable.V1.t; varying : Varying.Stable.V4.t }
     [@@deriving sexp, to_yojson]
 
     let to_latest = Fn.id

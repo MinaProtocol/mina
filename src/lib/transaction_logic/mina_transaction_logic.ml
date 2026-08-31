@@ -2069,9 +2069,12 @@ module Make (L : Ledger_intf.S) :
   *)
   let apply_coinbase ~constraint_constants ~txn_global_slot t
       (* TODO: Better system needed for making atomic changes. Could use a monad. *)
-        ({ receiver; fee_transfer; amount = coinbase_amount } as cb : Coinbase.t)
-      =
+        ({ receiver; fee_transfer; amount = _; fee_remainder = _ } as cb :
+          Coinbase.t ) =
     let open Or_error.Let_syntax in
+    (* Everything the coinbase credits: the minted amount plus the fee excess it
+       discharges to the same receiver. *)
+    let%bind coinbase_amount = Coinbase.total_credited cb in
     let%bind
         ( receiver_reward
         , new_accounts1

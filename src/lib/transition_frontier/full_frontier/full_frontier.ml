@@ -510,16 +510,6 @@ let move_root ({ context = (module Context); _ } as t) ~new_root_hash
           ~constraint_constants:Context.constraint_constants
       in
       let apply_second_pass = Ledger.apply_transaction_second_pass in
-      let apply_first_pass_sparse_ledger ~global_slot ~txn_state_view
-          sparse_ledger txn =
-        let open Or_error.Let_syntax in
-        let%map _ledger, partial_txn =
-          Mina_ledger.Sparse_ledger.apply_transaction_first_pass
-            ~constraint_constants:Context.constraint_constants ~txn_state_view
-            ~global_slot sparse_ledger txn
-        in
-        partial_txn
-      in
       let get_protocol_state state_hash =
         match find_protocol_state t state_hash with
         | Some s ->
@@ -531,7 +521,7 @@ let move_root ({ context = (module Context); _ } as t) ~new_root_hash
       Or_error.ok_exn
         (Staged_ledger.Scan_state.get_snarked_ledger_sync ~ledger:mt
            ~get_protocol_state ~apply_first_pass ~apply_second_pass
-           ~apply_first_pass_sparse_ledger ~signature_kind
+           ~signature_kind
            (Staged_ledger.scan_state
               (Breadcrumb.staged_ledger new_root_node.breadcrumb) ) ) ;
       (*Check that the new snarked ledger is as expected*)
@@ -743,7 +733,7 @@ module Metrics = struct
     match (d1.coinbase, d2) with
     | Zero, None | Zero, Some { coinbase = Zero; _ } ->
         false
-    | Zero, Some { coinbase = One _; _ } | One _, _ | Two _, _ ->
+    | Zero, Some { coinbase = One _; _ } | One _, _ ->
         true
 
   let intprop f b = Unsigned.UInt32.to_int (f (Breadcrumb.consensus_state b))

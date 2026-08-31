@@ -15,7 +15,7 @@ module Stable : sig
     val transactions :
          constraint_constants:Genesis_constants.Constraint_constants.t
       -> t
-      -> Transaction.Stable.V3.t With_status.t list
+      -> Transaction.Stable.V4.t With_status.t list
   end
 end]
 

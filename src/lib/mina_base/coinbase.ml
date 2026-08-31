@@ -5,7 +5,7 @@ open Mina_base_import
 module Wire_types = Mina_wire_types.Mina_base.Coinbase
 
 module Make_sig (A : Wire_types.Types.S) = struct
-  module type S = Coinbase_intf.Full with type Stable.V1.t = A.V1.t
+  module type S = Coinbase_intf.Full with type Stable.V2.t = A.V2.t
 end
 
 module Make_str (A : Wire_types.Concrete) = struct
@@ -13,11 +13,12 @@ module Make_str (A : Wire_types.Concrete) = struct
 
   [%%versioned
   module Stable = struct
-    module V1 = struct
-      type t = A.V1.t =
+    module V2 = struct
+      type t = A.V2.t =
         { receiver : Public_key.Compressed.Stable.V1.t
         ; amount : Currency.Amount.Stable.V1.t
         ; fee_transfer : Fee_transfer.Stable.V1.t option
+        ; fee_remainder : Currency.Fee.Stable.V1.t
         }
       [@@deriving sexp, compare, equal, hash, yojson]
 
@@ -48,6 +49,14 @@ module Make_str (A : Wire_types.Concrete) = struct
 
   let fee_transfer t = t.fee_transfer
 
+  let fee_remainder t = t.fee_remainder
+
+  let total_credited { amount; fee_remainder; _ } =
+    Option.value_map
+      ~default:(Or_error.error_string "Coinbase amount overflow")
+      ~f:Or_error.return
+      (Currency.Amount.add amount (Currency.Amount.of_fee fee_remainder))
+
   let account_access_statuses t (status : Transaction_status.t) =
     let access_status =
       match status with Applied -> `Accessed | Failed _ -> `Not_accessed
@@ -68,15 +77,19 @@ module Make_str (A : Wire_types.Concrete) = struct
     List.map (account_access_statuses t Transaction_status.Applied)
       ~f:(fun (acct_id, _status) -> acct_id )
 
-  let is_valid { amount; fee_transfer; _ } =
-    match fee_transfer with
-    | None ->
+  (* The fee transfer is paid out of everything the coinbase credits, which
+     includes the fee excess it discharges as well as the minted amount. *)
+  let is_valid ({ fee_transfer; _ } as t) =
+    match (fee_transfer, total_credited t) with
+    | None, Ok _ ->
         true
-    | Some { fee; _ } ->
-        Currency.Amount.(of_fee fee <= amount)
+    | Some { fee; _ }, Ok credited ->
+        Currency.Amount.(of_fee fee <= credited)
+    | _, Error _ ->
+        false
 
-  let create ~amount ~receiver ~fee_transfer =
-    let t = { receiver; amount; fee_transfer } in
+  let create ~amount ~receiver ~fee_transfer ~fee_remainder =
+    let t = { receiver; amount; fee_transfer; fee_remainder } in
     if is_valid t then
       let adjusted_fee_transfer =
         Option.bind fee_transfer ~f:(fun fee_transfer ->
@@ -89,19 +102,25 @@ module Make_str (A : Wire_types.Concrete) = struct
       Ok { t with fee_transfer = adjusted_fee_transfer }
     else Or_error.error_string "Coinbase.create: invalid coinbase"
 
-  let expected_supply_increase { receiver = _; amount; fee_transfer } =
+  (* Only the minted [amount] adds to the supply; the fee remainder is currency
+     that already exists, moved out of the unsettled fee excess. *)
+  let expected_supply_increase ({ amount; fee_transfer; _ } as t) =
+    let open Or_error.Let_syntax in
+    let%bind credited = total_credited t in
     match fee_transfer with
     | None ->
         Ok amount
     | Some { fee; _ } ->
-        Currency.Amount.sub amount (Currency.Amount.of_fee fee)
+        Currency.Amount.sub credited (Currency.Amount.of_fee fee)
         |> Option.value_map
              ~f:(fun _ -> Ok amount)
              ~default:(Or_error.error_string "Coinbase underflow")
 
+  (* A coinbase discharges the excess it carries, so its own excess is the
+     negation of that remainder. *)
   let fee_excess t =
     Or_error.map (expected_supply_increase t) ~f:(fun _increase ->
-        Fee_excess.empty )
+        ({ magnitude = t.fee_remainder; sgn = Sgn.Neg } : Fee_excess.t) )
 
   module Gen = struct
     let gen ~(constraint_constants : Genesis_constants.Constraint_constants.t) =
@@ -143,7 +162,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         | _ ->
             fee_transfer
       in
-      ( { receiver; amount; fee_transfer }
+      ( { receiver; amount; fee_transfer; fee_remainder = Currency.Fee.zero }
       , `Supercharged_coinbase supercharged_coinbase )
 
     let with_random_receivers ~keys ~min_amount ~max_amount ~fee_transfer =
@@ -168,7 +187,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         | _ ->
             fee_transfer
       in
-      { receiver; amount; fee_transfer }
+      { receiver; amount; fee_transfer; fee_remainder = Currency.Fee.zero }
   end
 end
 

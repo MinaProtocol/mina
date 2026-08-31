@@ -5,16 +5,17 @@ module type Full = sig
   module Fee_transfer = Coinbase_fee_transfer
 
   module Stable : sig
-    module V1 : sig
+    module V2 : sig
       type t = private
         { receiver : Public_key.Compressed.Stable.V1.t
         ; amount : Currency.Amount.Stable.V1.t
         ; fee_transfer : Fee_transfer.Stable.V1.t option
+        ; fee_remainder : Currency.Fee.Stable.V1.t
         }
       [@@deriving sexp, bin_io, compare, equal, version, hash, yojson]
     end
 
-    module Latest = V1
+    module Latest = V2
   end
 
   (* bin_io intentionally omitted in deriving list *)
@@ -22,6 +23,7 @@ module type Full = sig
     { receiver : Public_key.Compressed.t
     ; amount : Currency.Amount.t
     ; fee_transfer : Fee_transfer.t option
+    ; fee_remainder : Currency.Fee.t
     }
   [@@deriving sexp, compare, equal, hash, yojson]
 
@@ -44,10 +46,17 @@ module type Full = sig
 
   val accounts_referenced : t -> Account_id.t list
 
+  val fee_remainder : t -> Currency.Fee.t
+
+  (** The total amount credited by the coinbase: the minted [amount] plus the
+      fee excess it discharges. *)
+  val total_credited : t -> Currency.Amount.t Or_error.t
+
   val create :
        amount:Currency.Amount.t
     -> receiver:Public_key.Compressed.t
     -> fee_transfer:Fee_transfer.t option
+    -> fee_remainder:Currency.Fee.t
     -> t Or_error.t
 
   val expected_supply_increase : t -> Currency.Amount.t Or_error.t
