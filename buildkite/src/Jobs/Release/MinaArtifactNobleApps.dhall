@@ -12,6 +12,7 @@ in  Pipeline.build
       ( ArtifactPipelines.appsPipeline
           ArtifactPipelines.AppsSpec::{
           , debVersion = DebianVersions.DebVersion.Noble
+          , extraBuildEnvs = [ "MINA_BUILD_PORTABLE=1" ]
           , tags =
             [ PipelineTag.Type.Long
             , PipelineTag.Type.Release
