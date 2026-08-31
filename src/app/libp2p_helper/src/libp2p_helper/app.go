@@ -25,6 +25,7 @@ import (
 
 var ValidatorCleanupInterval = initDurationEnv("LIBP2P_VALIDATOR_CLEANUP_INTERVAL_DURATION", 30*time.Second)
 var ValidatorCleanupGrace = initDurationEnv("LIBP2P_VALIDATOR_CLEANUP_GRACE_DURATION", 1*time.Hour)
+var StreamWriteTimeout = initDurationEnv("LIBP2P_STREAM_WRITE_TIMEOUT_DURATION", 60*time.Second)
 
 func initDurationEnv(envVar string, defaultVal time.Duration) time.Duration {
 	if s := os.Getenv(envVar); s != "" {
@@ -150,6 +151,16 @@ func (app *app) WriteStream(streamId uint64, data []byte) error {
 	if stream, ok := app.getStream(streamId); ok {
 		stream.mutex.Lock()
 		defer stream.mutex.Unlock()
+
+		// Bound the write. libp2p stream writes have no deadline of their
+		// own: a peer that stops reading blocks here indefinitely on muxer
+		// flow control, holding this stream's mutex for as long as it lasts.
+		// A peer that cannot accept a write within the timeout is treated
+		// like any other write failure below: the stream is removed and
+		// closed.
+		if err := stream.stream.SetWriteDeadline(time.Now().Add(StreamWriteTimeout)); err != nil {
+			app.P2p.Logger.Debugf("failed to set write deadline on stream %d: %s", streamId, err)
+		}
 
 		if n, err := stream.stream.Write(data); err != nil {
 			// TODO check that it's correct to error out, not repeat writing

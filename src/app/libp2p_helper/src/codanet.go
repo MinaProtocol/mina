@@ -646,6 +646,13 @@ func (h *Helper) handleNodeStatusStreams(s network.Stream) {
 	h.NodeStatusMutex.RLock()
 	status := h.NodeStatus
 	h.NodeStatusMutex.RUnlock()
+	// Bound the write: without a deadline a peer that stops reading blocks
+	// this goroutine (and the stream it holds) indefinitely on muxer flow
+	// control. NodeStatusTimeout is already how long we are willing to spend
+	// on one of these streams.
+	if err := s.SetWriteDeadline(time.Now().Add(NodeStatusTimeout)); err != nil {
+		logger.Debugf("failed to set write deadline on node status stream: %s", err)
+	}
 	n, err := s.Write(status)
 	if err != nil {
 		logger.Error("failed to write to stream", err)
