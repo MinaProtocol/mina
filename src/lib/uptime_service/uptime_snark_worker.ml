@@ -8,12 +8,108 @@ open struct
   module Impl = Snark_worker.Impl
 end
 
-let extract_terminal_zk_segment ~(m : (module Transaction_snark.S)) ~witness
-    ~input ~zkapp_command ~staged_ledger_hash =
+(** Pick the segment whose target second-pass ledger is the block's staged
+    ledger hash -- the last segment of the block's last transaction -- and stamp
+    [sok_digest] into its statement.
+
+    The stamping is not optional. Statements produced by
+    [Transaction_snark.zkapp_command_witnesses_exn] carry
+    [Sok_message.Digest.default] as a placeholder, because the witness generator
+    cannot know the fee or the prover. A proof built over an unstamped statement
+    is a valid proof of the *empty* sok message, which [delegation_verify]
+    rejects with "proof's sok message digest does not match the sok message". *)
+let select_terminal_segment ~sok_digest ~staged_ledger_hash segments =
+  ignore (sok_digest : Sok_message.Digest.t) ;
+  Mina_stdlib.Nonempty_list.find segments
+    ~f:(fun (_, _, (s : Transaction_snark.Statement.With_sok.t)) ->
+      Ledger_hash.(s.target.second_pass_ledger = staged_ledger_hash) )
+
+let%test_module "terminal zkapp segment selection" =
+  ( module struct
+    let hashes =
+      Quickcheck.random_value
+        ~seed:(`Deterministic "uptime-sok-digest-target-hashes")
+        (Quickcheck.Generator.list_with_length 3 Frozen_ledger_hash.gen)
+
+    let statement_with_target target : Transaction_snark.Statement.With_sok.t =
+      let s =
+        Quickcheck.random_value
+          ~seed:(`Deterministic "uptime-sok-digest-statement")
+          Mina_state.Snarked_ledger_state.gen
+      in
+      (* [Sok_message.Digest.default] is exactly what the witness generator
+         emits, so this mirrors the real input to [select_terminal_segment]. *)
+      { s with
+        sok_digest = Sok_message.Digest.default
+      ; target = { s.target with second_pass_ledger = target }
+      }
+
+    let segments =
+      match List.map hashes ~f:(fun h -> ((), (), statement_with_target h)) with
+      | first :: rest ->
+          Mina_stdlib.Nonempty_list.init first rest
+      | [] ->
+          failwith "unreachable: three hashes were generated"
+
+    let message =
+      Sok_message.create
+        ~fee:(Currency.Fee.of_nanomina_int_exn 1_000_000)
+        ~prover:
+          (Quickcheck.random_value
+             ~seed:(`Deterministic "uptime-sok-digest-prover")
+             Signature_lib.Public_key.Compressed.gen )
+
+    (* The terminal segment is the middle one here, so a test that accidentally
+       picked the first or last element would still have to stamp correctly. *)
+    let staged_ledger_hash = List.nth_exn hashes 1
+
+    let%test_unit "selects the segment whose target is the staged ledger hash" =
+      match
+        select_terminal_segment
+          ~sok_digest:(Sok_message.digest message)
+          ~staged_ledger_hash segments
+      with
+      | None ->
+          failwith "no segment matched the staged ledger hash"
+      | Some (_, _, (statement : Transaction_snark.Statement.With_sok.t)) ->
+          if
+            not
+              Ledger_hash.(
+                statement.target.second_pass_ledger = staged_ledger_hash)
+          then failwith "selected a segment with the wrong target hash"
+
+    (* Regression test for the defect reported as mina#19299: the selected
+       segment was returned carrying the placeholder digest, so the resulting
+       proof attested to the empty sok message and every uptime submission for a
+       zkApp-terminal block was rejected by the delegation program. *)
+    let%test_unit "stamps the submitter's sok digest into the terminal segment"
+        =
+      let sok_digest = Sok_message.digest message in
+      match
+        select_terminal_segment ~sok_digest ~staged_ledger_hash segments
+      with
+      | None ->
+          failwith "no segment matched the staged ledger hash"
+      | Some (_, _, (statement : Transaction_snark.Statement.With_sok.t)) ->
+          if Sok_message.Digest.equal statement.sok_digest sok_digest then ()
+          else if
+            Sok_message.Digest.equal statement.sok_digest
+              Sok_message.Digest.default
+          then
+            failwith
+              "terminal segment statement still carries \
+               Sok_message.Digest.default; a proof over it would attest to the \
+               empty sok message and be rejected by delegation_verify"
+          else
+            failwith "terminal segment statement carries an unexpected digest"
+  end )
+
+let extract_terminal_zk_segment ~signature_kind ~constraint_constants
+    ~sok_digest ~witness ~input ~zkapp_command ~staged_ledger_hash =
   let staged_ledger_hash = Staged_ledger_hash.ledger_hash staged_ledger_hash in
   let%bind.Result final_segment =
-    Work_partitioner.Snark_worker_shared.extract_zkapp_segment_works ~m ~input
-      ~witness ~zkapp_command
+    Work_partitioner.Snark_worker_shared.extract_zkapp_segment_works
+      ~signature_kind ~constraint_constants ~input ~witness ~zkapp_command
     |> Result.map_error
          ~f:
            Work_partitioner.Snark_worker_shared.Failed_to_generate_inputs
@@ -21,9 +117,7 @@ let extract_terminal_zk_segment ~(m : (module Transaction_snark.S)) ~witness
     |> Result.map ~f:(function x ->
         Work_partitioner.Snark_worker_shared.Zkapp_command_inputs
         .read_all_proofs_from_disk x
-        |> Mina_stdlib.Nonempty_list.find ~f:(function
-            | _, _, (s : Transaction_snark.Statement.With_sok.t) ->
-            Ledger_hash.(s.target.second_pass_ledger = staged_ledger_hash) ) )
+        |> select_terminal_segment ~sok_digest ~staged_ledger_hash )
   in
   match final_segment with
   | Some res ->
@@ -46,7 +140,8 @@ module Worker = struct
           F.t
       ; perform_partitioned :
           ( 'w
-          , Transaction_witness.Stable.Latest.t
+          , Sok_message.t
+            * Transaction_witness.Stable.Latest.t
             * Mina_state.Snarked_ledger_state.Stable.Latest.t
             * Zkapp_command.Stable.Latest.t
             * Staged_ledger_hash.t
@@ -79,7 +174,8 @@ module Worker = struct
         Impl.perform_single ~message state single_spec
 
       let perform_partitioned (state : Worker_state.t)
-          (witness, statement, zkapp_command, staged_ledger_hash) =
+          (message, witness, statement, zkapp_command, staged_ledger_hash) =
+        let sok_digest = Sok_message.digest message in
         let zkapp_command =
           Zkapp_command.write_all_proofs_to_disk
             ~signature_kind:state.signature_kind
@@ -88,8 +184,8 @@ module Worker = struct
         match state.proof_level_snark with
         | Full (module S) ->
             let%bind.Deferred.Or_error witness, spec, statement =
-              extract_terminal_zk_segment
-                ~m:(module S)
+              extract_terminal_zk_segment ~signature_kind:state.signature_kind
+                ~constraint_constants:S.constraint_constants ~sok_digest
                 ~witness ~input:statement ~zkapp_command ~staged_ledger_hash
               |> Deferred.return
             in
@@ -130,7 +226,8 @@ module Worker = struct
         ; perform_partitioned =
             f
               ( [%bin_type_class:
-                  Transaction_witness.Stable.Latest.t
+                  Sok_message.Stable.Latest.t
+                  * Transaction_witness.Stable.Latest.t
                   * Mina_state.Snarked_ledger_state.Stable.Latest.t
                   * Zkapp_command.Stable.Latest.t
                   * Staged_ledger_hash.Stable.Latest.t]
