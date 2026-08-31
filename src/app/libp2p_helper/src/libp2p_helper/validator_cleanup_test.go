@@ -61,6 +61,19 @@ func TestLateValidationPushSendDoesNotBlock(t *testing.T) {
 	}
 }
 
+// Regression test: a Validation push can remove a validator entry in the
+// window between the validate goroutine observing ctx.Done() and calling
+// TimeoutValidator. Marking a missing entry must not panic.
+func TestTimeoutValidatorAfterRemovalDoesNotPanic(t *testing.T) {
+	testApp := newValidatorTestApp()
+
+	seqno, _ := testApp.AddValidator()
+	_, found := testApp.RemoveValidator(seqno)
+	require.True(t, found)
+
+	require.NotPanics(t, func() { testApp.TimeoutValidator(seqno) })
+}
+
 func TestInitDurationEnvRejectsInvalid(t *testing.T) {
 	def := 42 * time.Second
 	t.Setenv("LIBP2P_TEST_DURATION_ENV", "bogus")

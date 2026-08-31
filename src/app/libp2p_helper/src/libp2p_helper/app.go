@@ -225,7 +225,11 @@ func (app *app) TimeoutValidator(seqno uint64) {
 	now := time.Now()
 	app.validatorMutex.Lock()
 	defer app.validatorMutex.Unlock()
-	app._validators[seqno].TimedOutAt = &now
+	// The entry is gone if a Validation push raced this timeout and removed
+	// it first; there is nothing left to mark in that case.
+	if st, found := app._validators[seqno]; found {
+		st.TimedOutAt = &now
+	}
 }
 
 // cleanupTimedOutValidators removes validator entries that have been
