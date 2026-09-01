@@ -65,9 +65,14 @@ let Spec =
       }
 
 let bareBinaries =
+    -- rosetta-client is required by scripts/tests/rosetta-helper.sh, which
+    -- both the sanity and the load test source.  Restoring every binary
+    -- here makes restore-or-install.sh skip the deb install, so anything
+    -- the tests call must be listed.
           "mina.exe:mina"
       ++  ",archive.exe:mina-archive"
       ++  ",rosetta.exe:mina-rosetta"
+      ++  ",rosetta_client_cli.exe:rosetta-client"
       ++  ",libp2p_helper:libp2p_helper"
 
 let envExports =
