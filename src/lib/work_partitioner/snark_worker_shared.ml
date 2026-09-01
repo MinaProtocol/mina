@@ -8,11 +8,11 @@ module Zkapp_command_inputs = struct
   module Stable = struct
     [@@@no_toplevel_latest_type]
 
-    module V2 = struct
+    module V3 = struct
       type t =
         ( Zkapp_command_segment.Witness.Stable.V2.t
         * Zkapp_command_segment.Basic.Stable.V1.t
-        * Statement.With_sok.Stable.V2.t )
+        * Statement.Stable.V2.t )
         Nonempty_list.Stable.V1.t
       [@@deriving sexp, to_yojson]
 
@@ -23,7 +23,7 @@ module Zkapp_command_inputs = struct
   type t =
     ( Zkapp_command_segment.Witness.t
     * Zkapp_command_segment.Basic.t
-    * Statement.With_sok.t )
+    * Statement.t )
     Nonempty_list.t
 
   let read_all_proofs_from_disk : t -> Stable.Latest.t =

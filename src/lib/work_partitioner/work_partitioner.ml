@@ -132,10 +132,19 @@ let schedule_from_any_pending_zkapp_command ~(partitioner : t) :
 
 let convert_zkapp_command_from_selector ~partitioner ~job ~pairing
     unscheduled_segments =
+  (* [Zkapp_command_inputs] statements are sok-less: the witness generator knows
+     neither the fee nor the prover. The authoritative sok message is the one on
+     the job, which is what the worker re-derives from on arrival. *)
+  let sok_digest =
+    Mina_base.Sok_message.digest job.Work.With_job_meta.sok_message
+  in
   let unscheduled_segments =
     Snark_worker_shared.Zkapp_command_inputs.read_all_proofs_from_disk
       unscheduled_segments
     |> Mina_stdlib.Nonempty_list.map ~f:(fun (witness, spec, statement) ->
+        let statement =
+          Mina_state.Snarked_ledger_state.Poly.{ statement with sok_digest }
+        in
         Work.Spec.Sub_zkapp.Stable.Latest.Segment { statement; witness; spec } )
   in
   let pending_zkapp_command, first_segment, first_range =

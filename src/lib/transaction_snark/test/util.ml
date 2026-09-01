@@ -245,11 +245,21 @@ let check_zkapp_command_with_merges_exn ?(logger = logger_null)
                       | (witness, spec, stmt) :: rest ->
                           let open Async.Deferred.Or_error.Let_syntax in
                           let start = Time_float.now () in
+                          (* [zkapp_command_witnesses_exn] returns sok-less
+                             statements; these tests assert on the transition,
+                             not on any submitter, so stamp the empty digest
+                             explicitly. *)
+                          let with_sok stmt =
+                            Mina_state.Snarked_ledger_state.Poly.
+                              { stmt with
+                                sok_digest = Sok_message.Digest.default
+                              }
+                          in
                           let%bind p1 =
                             Async.Deferred.Or_error.try_with ~here:[%here]
                               (fun () ->
-                                T.of_zkapp_command_segment_exn ~statement:stmt
-                                  ~witness ~spec )
+                                T.of_zkapp_command_segment_exn
+                                  ~statement:(with_sok stmt) ~witness ~spec )
                           in
                           let%map result =
                             Async.Deferred.List.fold ~init:(Ok p1) rest
@@ -259,7 +269,8 @@ let check_zkapp_command_with_merges_exn ?(logger = logger_null)
                                   Async.Deferred.Or_error.try_with ~here:[%here]
                                     (fun () ->
                                       T.of_zkapp_command_segment_exn
-                                        ~statement:stmt ~witness ~spec )
+                                        ~statement:(with_sok stmt) ~witness
+                                        ~spec )
                                 in
                                 let sok_digest =
                                   Sok_message.create ~fee:Fee.zero

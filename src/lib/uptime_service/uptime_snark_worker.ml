@@ -12,17 +12,21 @@ end
     ledger hash -- the last segment of the block's last transaction -- and stamp
     [sok_digest] into its statement.
 
-    The stamping is not optional. Statements produced by
-    [Transaction_snark.zkapp_command_witnesses_exn] carry
-    [Sok_message.Digest.default] as a placeholder, because the witness generator
-    cannot know the fee or the prover. A proof built over an unstamped statement
-    is a valid proof of the *empty* sok message, which [delegation_verify]
-    rejects with "proof's sok message digest does not match the sok message". *)
+    The stamping is where the sok digest enters the statement at all.
+    [Transaction_snark.zkapp_command_witnesses_exn] returns a sok-less
+    [Statement.t], because the witness generator knows neither the fee nor the
+    prover, so this is the only place the submitter's digest can be applied. A
+    proof built over the wrong digest is a valid proof of the *wrong* sok
+    message, which [delegation_verify] rejects with "proof's sok message digest
+    does not match the sok message". *)
 let select_terminal_segment ~sok_digest ~staged_ledger_hash segments =
-  ignore (sok_digest : Sok_message.Digest.t) ;
   Mina_stdlib.Nonempty_list.find segments
-    ~f:(fun (_, _, (s : Transaction_snark.Statement.With_sok.t)) ->
+    ~f:(fun (_, _, (s : Transaction_snark.Statement.t)) ->
       Ledger_hash.(s.target.second_pass_ledger = staged_ledger_hash) )
+  |> Option.map ~f:(fun (witness, spec, statement) ->
+      ( witness
+      , spec
+      , Mina_state.Snarked_ledger_state.Poly.{ statement with sok_digest } ) )
 
 let%test_module "terminal zkapp segment selection" =
   ( module struct
@@ -31,18 +35,14 @@ let%test_module "terminal zkapp segment selection" =
         ~seed:(`Deterministic "uptime-sok-digest-target-hashes")
         (Quickcheck.Generator.list_with_length 3 Frozen_ledger_hash.gen)
 
-    let statement_with_target target : Transaction_snark.Statement.With_sok.t =
+    let statement_with_target target : Transaction_snark.Statement.t =
       let s =
         Quickcheck.random_value
           ~seed:(`Deterministic "uptime-sok-digest-statement")
           Mina_state.Snarked_ledger_state.gen
       in
-      (* [Sok_message.Digest.default] is exactly what the witness generator
-         emits, so this mirrors the real input to [select_terminal_segment]. *)
-      { s with
-        sok_digest = Sok_message.Digest.default
-      ; target = { s.target with second_pass_ledger = target }
-      }
+      (* Sok-less, exactly as the witness generator emits it. *)
+      { s with target = { s.target with second_pass_ledger = target } }
 
     let segments =
       match List.map hashes ~f:(fun h -> ((), (), statement_with_target h)) with
@@ -75,13 +75,17 @@ let%test_module "terminal zkapp segment selection" =
           if
             not
               Ledger_hash.(
-                statement.target.second_pass_ledger = staged_ledger_hash)
+                statement.target.second_pass_ledger = staged_ledger_hash )
           then failwith "selected a segment with the wrong target hash"
 
     (* Regression test for the defect reported as mina#19299: the selected
        segment was returned carrying the placeholder digest, so the resulting
        proof attested to the empty sok message and every uptime submission for a
-       zkApp-terminal block was rejected by the delegation program. *)
+       zkApp-terminal block was rejected by the delegation program.
+
+       Since [zkapp_command_witnesses_exn] became sok-less, omitting the stamp
+       here is a type error rather than a silent placeholder, so this now guards
+       against stamping the *wrong* digest rather than none at all. *)
     let%test_unit "stamps the submitter's sok digest into the terminal segment"
         =
       let sok_digest = Sok_message.digest message in
