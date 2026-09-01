@@ -19,6 +19,12 @@ end
     proof built over the wrong digest is a valid proof of the *wrong* sok
     message, which [delegation_verify] rejects with "proof's sok message digest
     does not match the sok message". *)
+
+(* [find] returns the first match, so a zkApp command whose second pass leaves
+   the ledger root unchanged yields the fee-payer segment rather than the last
+   one. That is harmless here: [delegation_verify] uses the work only for the
+   digest comparison and the Pickles check, and everything it emits is derived
+   from the block. *)
 let select_terminal_segment ~sok_digest ~staged_ledger_hash segments =
   Mina_stdlib.Nonempty_list.find segments
     ~f:(fun (_, _, (s : Transaction_snark.Statement.t)) ->

@@ -12,15 +12,11 @@
   sexplib0
   ;; local libraries
   currency
-  genesis_constants
   mina_base
-  mina_generators
   mina_ledger
-  mina_numbers
   mina_state
-  mina_transaction
-  precomputed_values
   signature_lib
   snark_work_lib
   transaction_snark
+  transaction_snark_test_helpers
   transaction_witness))

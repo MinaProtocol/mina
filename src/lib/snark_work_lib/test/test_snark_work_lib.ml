@@ -14,20 +14,7 @@
 
 open Core
 open Mina_base
-
-let constraint_constants =
-  Genesis_constants.For_unit_tests.Constraint_constants.t
-
-let genesis_constants = Genesis_constants.For_unit_tests.t
-
-let signature_kind = Mina_signature_kind.Testnet
-
-let global_slot = Mina_numbers.Global_slot_since_genesis.of_int 2
-
-let protocol_state_body =
-  lazy
-    ( (Lazy.force Precomputed_values.for_unit_tests).protocol_state_with_hashes
-        .data |> Mina_state.Protocol_state.body )
+module Fixture = Transaction_snark_test_helpers.Zkapp_segment_fixture
 
 let sok_message =
   Sok_message.create
@@ -37,61 +24,33 @@ let sok_message =
          ~seed:(`Deterministic "snark-work-lib-segment-prover")
          Signature_lib.Public_key.Compressed.gen )
 
-(** One real segment. The generator defaults its verification key to
-    [Pickles.Side_loaded.Verification_key.dummy] and
-    [zkapp_command_witnesses_exn] only applies transaction logic, so no proving
-    circuit is compiled here. *)
+(** One real segment. Nothing here proves anything, so no proving circuit is
+    compiled. *)
 let segment =
   lazy
-    (let user_command, _fee_payer_keypair, _keymap, ledger =
-       Quickcheck.random_value
-         ~seed:(`Deterministic "snark-work-lib-zkapp-segment")
-         (Mina_generators.User_command_generators.zkapp_command_with_ledger
-            ~genesis_constants ~constraint_constants () )
-     in
-     let zkapp_command =
-       match user_command with
-       | User_command.Zkapp_command zkapp_command ->
-           Zkapp_command.Valid.forget zkapp_command
-       | User_command.Signed_command _ ->
-           failwith "generator produced a signed command, expected a zkApp one"
-     in
-     let state_body = Lazy.force protocol_state_body in
-     let state_body_hash = Mina_state.Protocol_state.Body.hash state_body in
-     let second_pass_ledger =
-       let mask =
-         Mina_ledger.Ledger.Mask.create
-           ~depth:(Mina_ledger.Ledger.depth ledger)
-           ()
-       in
-       let registered = Mina_ledger.Ledger.register_mask ledger mask in
-       let _partial =
-         Mina_ledger.Ledger.apply_transaction_first_pass ~signature_kind
-           ~constraint_constants ~global_slot
-           ~txn_state_view:(Mina_state.Protocol_state.Body.view state_body)
-           registered
-           (Mina_transaction.Transaction.Command (Zkapp_command zkapp_command))
-         |> Or_error.ok_exn
-       in
-       registered
+    (let fixture = Fixture.create ~seed:"snark-work-lib-zkapp-segment" in
+     let state_body_hash =
+       Mina_state.Protocol_state.Body.hash fixture.state_body
      in
      let witness, spec, statement =
-       Transaction_snark.zkapp_command_witnesses_exn ~signature_kind
-         ~constraint_constants ~global_slot ~state_body
+       Transaction_snark.zkapp_command_witnesses_exn
+         ~signature_kind:Fixture.signature_kind
+         ~constraint_constants:Fixture.constraint_constants
+         ~global_slot:fixture.global_slot ~state_body:fixture.state_body
          ~fee_excess:Currency.Amount.Signed.zero
          [ ( `Pending_coinbase_init_stack Pending_coinbase.Stack.empty
            , `Pending_coinbase_of_statement
                { Transaction_snark.Pending_coinbase_stack_state.source =
                    Pending_coinbase.Stack.empty
                ; target =
-                   Pending_coinbase.Stack.push_state state_body_hash global_slot
-                     Pending_coinbase.Stack.empty
+                   Pending_coinbase.Stack.push_state state_body_hash
+                     fixture.global_slot Pending_coinbase.Stack.empty
                }
-           , `Ledger ledger
-           , `Ledger second_pass_ledger
+           , `Ledger fixture.first_pass_ledger
+           , `Ledger fixture.second_pass_ledger
            , `Connecting_ledger_hash
-               (Mina_ledger.Ledger.merkle_root second_pass_ledger)
-           , zkapp_command )
+               (Mina_ledger.Ledger.merkle_root fixture.second_pass_ledger)
+           , fixture.zkapp_command )
          ]
        |> List.hd_exn
      in

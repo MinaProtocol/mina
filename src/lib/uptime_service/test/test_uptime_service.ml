@@ -17,86 +17,45 @@
     [delegation_verify]. *)
 
 open Core
-open Async
 open Mina_base
+module Fixture = Transaction_snark_test_helpers.Zkapp_segment_fixture
 
-let constraint_constants =
-  Genesis_constants.For_unit_tests.Constraint_constants.t
-
-let genesis_constants = Genesis_constants.For_unit_tests.t
-
-let signature_kind = Mina_signature_kind.Testnet
-
-let protocol_state_body =
-  lazy
-    ( (Lazy.force Precomputed_values.for_unit_tests).protocol_state_with_hashes
-        .data |> Mina_state.Protocol_state.body )
-
-(** A ledger plus a zkApp command that applies cleanly against it. The generator
-    defaults its verification key to [Pickles.Side_loaded.Verification_key.dummy],
-    so no proving circuit is compiled here. *)
-let generate_zkapp_command_and_ledger () =
-  let user_command, _fee_payer_keypair, _keymap, ledger =
-    Quickcheck.random_value
-      ~seed:(`Deterministic "uptime-service-zkapp-terminal-segment")
-      (Mina_generators.User_command_generators.zkapp_command_with_ledger
-         ~genesis_constants ~constraint_constants () )
+(** Mirrors what the daemon hands the uptime snark worker: both sparse ledgers
+    are snapshotted before the second pass runs, since the witness records the
+    ledgers each pass starts from. *)
+let build_witness (fixture : Fixture.t) =
+  let accounts_referenced =
+    Zkapp_command.accounts_referenced fixture.zkapp_command
   in
-  match user_command with
-  | User_command.Zkapp_command zkapp_command ->
-      (Zkapp_command.Valid.forget zkapp_command, ledger)
-  | User_command.Signed_command _ ->
-      failwith "generator produced a signed command, expected a zkApp command"
-
-(** Mirrors what the daemon hands the uptime snark worker: the transaction is
-    applied first-pass against a mask, and the resulting ledgers become the
-    witness's sparse ledgers. *)
-let build_witness ~ledger ~zkapp_command ~global_slot =
-  let state_body = Lazy.force protocol_state_body in
-  let second_pass_ledger =
-    let mask =
-      Mina_ledger.Ledger.Mask.create ~depth:(Mina_ledger.Ledger.depth ledger) ()
-    in
-    let registered = Mina_ledger.Ledger.register_mask ledger mask in
-    let _partial =
-      Mina_ledger.Ledger.apply_transaction_first_pass ~signature_kind
-        ~constraint_constants ~global_slot
-        ~txn_state_view:(Mina_state.Protocol_state.Body.view state_body)
-        registered
-        (Mina_transaction.Transaction.Command (Zkapp_command zkapp_command))
-      |> Or_error.ok_exn
-    in
-    registered
-  in
-  let accounts_referenced = Zkapp_command.accounts_referenced zkapp_command in
   let sparse_of l =
     Mina_ledger.Sparse_ledger.of_ledger_subset_exn l accounts_referenced
   in
-  ( Transaction_witness.read_all_proofs_from_disk
-      { Transaction_witness.transaction =
-          Mina_transaction.Transaction.Command (Zkapp_command zkapp_command)
-      ; first_pass_ledger = sparse_of ledger
-      ; second_pass_ledger = sparse_of second_pass_ledger
-      ; protocol_state_body = state_body
-      ; init_stack = Pending_coinbase.Stack.empty
-      ; status = Mina_base.Transaction_status.Applied
-      ; block_global_slot = global_slot
-      }
-  , second_pass_ledger )
+  Transaction_witness.read_all_proofs_from_disk
+    { Transaction_witness.transaction = Fixture.transaction fixture
+    ; first_pass_ledger = sparse_of fixture.first_pass_ledger
+    ; second_pass_ledger = sparse_of fixture.second_pass_ledger
+    ; protocol_state_body = fixture.state_body
+    ; init_stack = Pending_coinbase.Stack.empty
+    ; status = Mina_base.Transaction_status.Applied
+    ; block_global_slot = fixture.global_slot
+    }
 
 (** Only [source.pending_coinbase_stack], [target.pending_coinbase_stack] and
     [connecting_ledger_left] are read out of this by the extraction path, so the
     remaining fields are left at their genesis values. *)
-let build_input ~ledger ~global_slot =
-  let state_body = Lazy.force protocol_state_body in
-  let state_body_hash = Mina_state.Protocol_state.Body.hash state_body in
+let build_input (fixture : Fixture.t) =
+  let state_body_hash =
+    Mina_state.Protocol_state.Body.hash fixture.state_body
+  in
   let genesis_ledger_hash =
-    Mina_ledger.Ledger.merkle_root ledger |> Frozen_ledger_hash.of_ledger_hash
+    Mina_ledger.Ledger.merkle_root fixture.first_pass_ledger
+    |> Frozen_ledger_hash.of_ledger_hash
   in
   let base = Mina_state.Snarked_ledger_state.genesis ~genesis_ledger_hash in
   let source_stack = Pending_coinbase.Stack.empty in
   let target_stack =
-    Pending_coinbase.Stack.push_state state_body_hash global_slot source_stack
+    Pending_coinbase.Stack.push_state state_body_hash fixture.global_slot
+      source_stack
   in
   { base with
     source = { base.source with pending_coinbase_stack = source_stack }
@@ -108,8 +67,8 @@ let staged_ledger_hash_of ledger_hash =
   Staged_ledger_hash.of_aux_ledger_and_coinbase_hash
     (Staged_ledger_hash.Aux_hash.of_bytes (String.make 32 '\000'))
     ledger_hash
-    ( Pending_coinbase.create ~depth:constraint_constants.pending_coinbase_depth
-        ()
+    ( Pending_coinbase.create
+        ~depth:Fixture.constraint_constants.pending_coinbase_depth ()
     |> Or_error.ok_exn )
 
 let sok_message =
@@ -120,23 +79,40 @@ let sok_message =
          Signature_lib.Public_key.Compressed.gen )
 
 let test_terminal_segment_is_stamped () =
-  let global_slot = Mina_numbers.Global_slot_since_genesis.of_int 2 in
-  let zkapp_command, ledger = generate_zkapp_command_and_ledger () in
-  let witness, second_pass_ledger =
-    build_witness ~ledger ~zkapp_command ~global_slot
-  in
-  let input = build_input ~ledger ~global_slot in
+  let fixture = Fixture.create ~seed:"uptime-service-zkapp-terminal-segment" in
+  let witness = build_witness fixture in
+  let input = build_input fixture in
   (* The block's staged ledger hash is the ledger the block ends on, which is
-     what makes the last segment of the last transaction the terminal one. *)
+     what makes the last segment of the last transaction the terminal one. That
+     is the root *after* the second pass, not the first-pass root: every
+     first-pass segment statement carries the untouched second-pass ledger as
+     its target, so selecting on the first-pass root would match the fee-payer
+     segment and never exercise terminal selection at all. *)
+  let first_pass_root =
+    Mina_ledger.Ledger.merkle_root fixture.second_pass_ledger
+  in
   let staged_ledger_hash =
-    Mina_ledger.Ledger.merkle_root second_pass_ledger
+    Fixture.finish_second_pass fixture
     |> Frozen_ledger_hash.of_ledger_hash |> staged_ledger_hash_of
   in
+  (* Guards the point above: if this command's second pass happened to leave the
+     root alone, the hash below would not distinguish the terminal segment from
+     the fee-payer one and the assertion would prove nothing. *)
+  if
+    Ledger_hash.equal first_pass_root
+      (Staged_ledger_hash.ledger_hash staged_ledger_hash)
+  then
+    failwith
+      "the generated zkApp command's second pass left the ledger root \
+       unchanged, so the terminal segment is not distinguishable by target \
+       hash; pick a different generator seed"
+  else () ;
   let sok_digest = Sok_message.digest sok_message in
   match
     Uptime_service.Uptime_snark_worker.extract_terminal_zk_segment
-      ~signature_kind ~constraint_constants ~sok_digest ~witness ~input
-      ~zkapp_command ~staged_ledger_hash
+      ~signature_kind:Fixture.signature_kind
+      ~constraint_constants:Fixture.constraint_constants ~sok_digest ~witness
+      ~input ~zkapp_command:fixture.zkapp_command ~staged_ledger_hash
   with
   | Error e ->
       failwithf "could not extract the terminal zkApp segment: %s"
