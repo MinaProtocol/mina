@@ -16,5 +16,6 @@
 module Defaults = Defaults
 module Http = Http
 module Data = Data
+module Construction = Construction
 module Errors = Errors
 module Models = Rosetta_models
