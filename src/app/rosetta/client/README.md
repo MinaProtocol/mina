@@ -23,8 +23,17 @@ rosetta-client
 ├── mempool
 │   ├── list
 │   └── transaction    --tx-hash H
-└── search
-    └── transactions   [--address B62q...] [--tx-hash H] [--limit N]
+├── search
+│   └── transactions   [--address B62q...] [--tx-hash H] [--limit N]
+├── construction
+│   ├── derive         --public-key-json JSON [--metadata-json JSON]
+│   ├── preprocess     --operations-json JSON [--metadata-json JSON]
+│   ├── metadata       --options-json JSON [--public-keys-json JSON]
+│   ├── payloads       --operations-json JSON [--metadata-json JSON] [--public-keys-json JSON]
+│   ├── parse          --signed|--unsigned --transaction STR
+│   ├── combine        --unsigned-transaction STR --signatures-json JSON
+│   ├── hash           --signed-transaction STR
+│   └── submit         --signed-transaction STR
 ```
 
 `block transaction` is deliberately absent: Mina's Rosetta server returns
@@ -66,6 +75,10 @@ rosetta-client network options \
 export MINA_ROSETTA_URI=http://rosetta.example.com:3087
 export MINA_ROSETTA_NETWORK=mainnet
 rosetta-client network options
+
+# Construction flow:
+rosetta-client construction derive \
+  --public-key-json '{"hex_bytes":"abcd","curve_type":"pallas"}'
 ```
 
 ## Output contract
@@ -73,14 +86,18 @@ rosetta-client network options
 On success, the response body is printed as pretty JSON on stdout (or
 compact JSON with `--compact`), followed by a single newline.  Exit 0.
 
-On failure — HTTP non-2xx or a transport error — the tool prints a short
-diagnostic on stderr and exits 1.  The diagnostic is produced by the
-`Rosetta_client.Errors` module and is guaranteed to:
+On failure — HTTP non-2xx, transport error, invalid JSON input, or a
+`--*-json` payload that does not match the Rosetta model the endpoint
+expects — the tool prints a short diagnostic on stderr and exits 1.  The
+diagnostic is produced by the `Rosetta_client.Errors` module and is
+guaranteed to:
 
 - Never leak raw OCaml exception syntax (no `Unix_error`, no `(Unix. ...)`).
 - Never dump multi-kilobyte HTTP bodies verbatim; Rosetta error envelopes
   are parsed and rendered as `HTTP <code>: <message>`.
 
 The HTTP client, the endpoint wrappers and the error formatting live in
-`src/lib/rosetta_client/`; `rosetta_client_cli.ml` holds only the flags,
-the subcommand tree and the output.
+`src/lib/rosetta_client/`.  Inside this binary, `rosetta_client_cli.ml`
+holds the flags, the subcommand tree and the output; `payload.ml` holds
+the decoding of the JSON-valued flags into Rosetta models, and neither
+prints nor exits.

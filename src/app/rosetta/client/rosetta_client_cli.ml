@@ -135,6 +135,23 @@ let tx_hash_filter_flag =
 
 let block_index_flag ~doc = Command.Param.(flag "--index" ~doc (optional int))
 
+let metadata_json_flag =
+  Command.Param.(
+    flag "--metadata-json" ~doc:"JSON Optional metadata object"
+      (optional string) )
+
+let operations_json_flag =
+  Command.Param.(
+    flag "--operations-json" ~doc:"JSON Operations array" (required string) )
+
+let public_keys_json_flag =
+  Command.Param.(
+    flag "--public-keys-json" ~doc:"JSON PublicKey array" (optional string) )
+
+let signed_transaction_flag =
+  Command.Param.(
+    flag "--signed-transaction" ~doc:"STR Signed tx blob" (required string) )
+
 (* ---------- Data API subcommands ---------- *)
 
 let cmd_network_list =
@@ -235,6 +252,164 @@ let search_group =
   Command.group ~summary:"Rosetta /search/* endpoints"
     [ ("transactions", cmd_search_transactions) ]
 
+(* ---------- Construction API subcommands ---------- *)
+
+(* [Payload] reports a bad flag as an error; this is where that error
+   becomes a diagnostic on stderr and a non-zero exit. *)
+let or_exit = function
+  | Ok value ->
+      value
+  | Error e ->
+      emit_error (Error.to_string_hum e) ;
+      Stdlib.exit 1
+
+let required_flag label of_yojson s = or_exit (Payload.model ~label of_yojson s)
+
+let optional_flag label of_yojson s =
+  or_exit (Payload.model_opt ~label of_yojson s)
+
+(* [metadata] and [options] stay raw JSON: the Rosetta schema leaves both
+   free-form, so there is no model to decode them into. *)
+let raw_json_flag label s = or_exit (Payload.json ~label s)
+
+let optional_raw_json_flag label s = or_exit (Payload.json_opt ~label s)
+
+let cmd_construction_derive =
+  Command.async ~summary:"POST /construction/derive"
+    (let%map_open.Command g = global_flags_param
+     and public_key =
+       flag "--public-key-json"
+         ~doc:
+           "JSON Rosetta PublicKey object (e.g. \
+            '{\"hex_bytes\":\"...\",\"curve_type\":\"pallas\"}')"
+         (required string)
+     and metadata = metadata_json_flag in
+     fun () ->
+       let pk =
+         required_flag "--public-key-json" [%of_yojson: RM.Public_key.t]
+           public_key
+       in
+       let md = optional_raw_json_flag "--metadata-json" metadata in
+       run g ~call:(fun c ->
+           MRC.Construction.derive c ~public_key:pk ?metadata:md () ) )
+
+let cmd_construction_preprocess =
+  Command.async ~summary:"POST /construction/preprocess"
+    (let%map_open.Command g = global_flags_param
+     and operations = operations_json_flag
+     and metadata = metadata_json_flag in
+     fun () ->
+       let ops =
+         required_flag "--operations-json" [%of_yojson: RM.Operation.t list]
+           operations
+       in
+       let md = optional_raw_json_flag "--metadata-json" metadata in
+       run g ~call:(fun c ->
+           MRC.Construction.preprocess c ~operations:ops ?metadata:md () ) )
+
+let cmd_construction_metadata =
+  Command.async ~summary:"POST /construction/metadata"
+    (let%map_open.Command g = global_flags_param
+     and options =
+       flag "--options-json" ~doc:"JSON Options object" (required string)
+     and public_keys = public_keys_json_flag in
+     fun () ->
+       let opts = raw_json_flag "--options-json" options in
+       let pks =
+         optional_flag "--public-keys-json" [%of_yojson: RM.Public_key.t list]
+           public_keys
+       in
+       run g ~call:(fun c ->
+           MRC.Construction.metadata c ~options:opts ?public_keys:pks () ) )
+
+let cmd_construction_payloads =
+  Command.async ~summary:"POST /construction/payloads"
+    (let%map_open.Command g = global_flags_param
+     and operations = operations_json_flag
+     and metadata = metadata_json_flag
+     and public_keys = public_keys_json_flag in
+     fun () ->
+       let ops =
+         required_flag "--operations-json" [%of_yojson: RM.Operation.t list]
+           operations
+       in
+       let md = optional_raw_json_flag "--metadata-json" metadata in
+       let pks =
+         optional_flag "--public-keys-json" [%of_yojson: RM.Public_key.t list]
+           public_keys
+       in
+       run g ~call:(fun c ->
+           MRC.Construction.payloads c ~operations:ops ?metadata:md
+             ?public_keys:pks () ) )
+
+let cmd_construction_parse =
+  Command.async ~summary:"POST /construction/parse"
+    (let%map_open.Command g = global_flags_param
+     and signed = flag "--signed" ~doc:" Transaction is signed" no_arg
+     and unsigned = flag "--unsigned" ~doc:" Transaction is unsigned" no_arg
+     and transaction =
+       flag "--transaction" ~doc:"STR Transaction blob" (required string)
+     in
+     fun () ->
+       let signed =
+         match (signed, unsigned) with
+         | true, true ->
+             emit_error "--signed and --unsigned are mutually exclusive" ;
+             Stdlib.exit 1
+         | false, false ->
+             emit_error "parse: one of --signed or --unsigned is required" ;
+             Stdlib.exit 1
+         | true, false ->
+             true
+         | false, true ->
+             false
+       in
+       run g ~call:(fun c -> MRC.Construction.parse c ~signed ~transaction) )
+
+let cmd_construction_combine =
+  Command.async ~summary:"POST /construction/combine"
+    (let%map_open.Command g = global_flags_param
+     and unsigned_transaction =
+       flag "--unsigned-transaction" ~doc:"STR Unsigned tx blob"
+         (required string)
+     and signatures =
+       flag "--signatures-json" ~doc:"JSON Signatures array" (required string)
+     in
+     fun () ->
+       let sigs =
+         required_flag "--signatures-json" [%of_yojson: RM.Signature.t list]
+           signatures
+       in
+       run g ~call:(fun c ->
+           MRC.Construction.combine c ~unsigned_transaction ~signatures:sigs )
+    )
+
+let cmd_construction_hash =
+  Command.async ~summary:"POST /construction/hash"
+    (let%map_open.Command g = global_flags_param
+     and signed_transaction = signed_transaction_flag in
+     fun () ->
+       run g ~call:(fun c -> MRC.Construction.hash c ~signed_transaction) )
+
+let cmd_construction_submit =
+  Command.async ~summary:"POST /construction/submit"
+    (let%map_open.Command g = global_flags_param
+     and signed_transaction = signed_transaction_flag in
+     fun () ->
+       run g ~call:(fun c -> MRC.Construction.submit c ~signed_transaction) )
+
+let construction_group =
+  Command.group ~summary:"Rosetta /construction/* endpoints"
+    [ ("derive", cmd_construction_derive)
+    ; ("preprocess", cmd_construction_preprocess)
+    ; ("metadata", cmd_construction_metadata)
+    ; ("payloads", cmd_construction_payloads)
+    ; ("parse", cmd_construction_parse)
+    ; ("combine", cmd_construction_combine)
+    ; ("hash", cmd_construction_hash)
+    ; ("submit", cmd_construction_submit)
+    ]
+
 (* ---------- Top-level ---------- *)
 
 let () =
@@ -248,4 +423,5 @@ let () =
        ; ("account", account_group)
        ; ("mempool", mempool_group)
        ; ("search", search_group)
+       ; ("construction", construction_group)
        ] )
