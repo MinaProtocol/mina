@@ -25,7 +25,7 @@ module type S = sig
     Intf.Network_pool_base_intf
       with type resource_pool := Resource_pool.t
        and type resource_pool_diff :=
-        Mina_wire_types.Network_pool.Snark_pool.Diff_versioned.V2.t
+        Mina_wire_types.Network_pool.Snark_pool.Diff_versioned.V3.t
        and type resource_pool_diff_verified := Resource_pool.Diff.Cached.t
        and type transition_frontier := transition_frontier
        and type config := Resource_pool.Config.t
@@ -83,11 +83,11 @@ module Diff_versioned : sig
   module Stable : sig
     [@@@no_toplevel_latest_type]
 
-    module V2 : sig
-      type t = Mina_wire_types.Network_pool.Snark_pool.Diff_versioned.V2.t =
+    module V3 : sig
+      type t = Mina_wire_types.Network_pool.Snark_pool.Diff_versioned.V3.t =
         | Add_solved_work of
             Transaction_snark_work.Statement.Stable.V2.t
-            * Ledger_proof.Stable.V2.t One_or_two.Stable.V1.t
+            * Ledger_proof.Stable.V3.t One_or_two.Stable.V1.t
               Priced_proof.Stable.V1.t
         | Empty
       [@@deriving equal]

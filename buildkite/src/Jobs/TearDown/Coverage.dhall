@@ -24,7 +24,7 @@ in  Pipeline.build
         [ Command.build
             Command.Config::{
             , commands =
-                RunInToolchain.runInToolchain
+                RunInToolchain.runInDefaultToolchain
                   [ "COVERALLS_TOKEN" ]
                   "buildkite/scripts/finish-coverage-data-upload.sh"
             , label = "Finish coverage data gathering"

@@ -19,8 +19,9 @@
   base.caml
   cohttp
   uri
-  ;; local libraries
-  kimchi_bindings
+   ;; local libraries
+   backoff
+   kimchi_bindings
   kimchi_types
   pasta_bindings
   network_peer

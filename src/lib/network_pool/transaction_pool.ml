@@ -41,8 +41,8 @@ module Diff_versioned = struct
   module Stable = struct
     [@@@no_toplevel_latest_type]
 
-    module V2 = struct
-      type t = User_command.Stable.V2.t list [@@deriving sexp, yojson, hash]
+    module V3 = struct
+      type t = User_command.Stable.V3.t list [@@deriving sexp, yojson, hash]
 
       let to_latest = Fn.id
     end
@@ -164,8 +164,8 @@ module Diff_versioned = struct
     module Stable = struct
       [@@@no_toplevel_latest_type]
 
-      module V3 = struct
-        type t = (User_command.Stable.V2.t * Diff_error.Stable.V3.t) list
+      module V4 = struct
+        type t = (User_command.Stable.V3.t * Diff_error.Stable.V3.t) list
         [@@deriving sexp, yojson, compare]
 
         let to_latest = Fn.id
@@ -892,6 +892,16 @@ struct
                                 account"
                              (Base_ledger.get validation_ledger loc) )
                  in
+                 (* The dropped commands leave the pool here, so their vk
+                    refcounts must be decremented to match the increments
+                    made when they were added. *)
+                 let dec_vk_refcounts =
+                   Vk_refcount_table.lift_hashed t.verification_key_table
+                     (fun vk_table ~account_id ~vk ->
+                       Vk_refcount_table.dec vk_table ~account_id
+                         ~vk_hash:vk.hash )
+                 in
+                 Sequence.iter dropped ~f:dec_vk_refcounts ;
                  let dropped_locally_generated =
                    Sequence.filter dropped ~f:(fun cmd ->
                        let find_remove_bool tbl =
@@ -2677,6 +2687,41 @@ let%test_module _ =
           assert_pool_txs t (List.drop independent_cmds 3) ;
           Deferred.unit )
 
+    let%test_unit "vk refcounts are decremented for commands dropped when the \
+                   transition frontier is recreated (zkapps)" =
+      Thread_safe.block_on_async_exn (fun () ->
+          (* Set up initial frontier *)
+          let%bind t = setup_test () in
+          assert_pool_txs t [] ;
+          let%bind zkapp_cmds = mk_zkapp_commands_single_block 7 t.txn_pool in
+          let%bind () = add_commands' t zkapp_cmds in
+          assert_pool_txs t zkapp_cmds ;
+          let vk_table_size () =
+            Hashtbl.length t.txn_pool.verification_key_table.verification_keys
+          in
+          (* With the deterministic generator seed, at least one command sets
+             the single shared vk, so the table holds exactly one entry;
+             asserting it also guards the final check against passing
+             vacuously. *)
+          [%test_eq: int] 1 (vk_table_size ()) ;
+          (* Destroy initial frontier *)
+          Broadcast_pipe.Writer.close t.best_tip_diff_w ;
+          let%bind _ = Broadcast_pipe.Writer.write t.frontier_pipe_w None in
+          (* Set up a second frontier whose ledger invalidates every zkApp
+             command in the pool *)
+          let ((_, ledger_ref2) as frontier2), _best_tip_diff_w2 =
+            Mock_transition_frontier.create ()
+          in
+          List.iter (List.range 0 7) ~f:(fun idx ->
+              modify_ledger !ledger_ref2 ~idx ~balance:20_000_000_000_000
+                ~nonce:5 ) ;
+          let%bind _ =
+            Broadcast_pipe.Writer.write t.frontier_pipe_w (Some frontier2)
+          in
+          assert_pool_txs t [] ;
+          [%test_eq: int] 0 (vk_table_size ()) ;
+          Deferred.unit )
+
     let%test_unit "transaction replacement works" =
       let signature_kind = Mina_signature_kind.Testnet in
       Thread_safe.block_on_async_exn
@@ -3453,7 +3498,7 @@ let%test_module _ =
               ~receiver_idx ~amount ~signature_kind ()
     end
 
-    (** appends a and b to the end of c, taking an element of a or b at random, 
+    (** appends a and b to the end of c, taking an element of a or b at random,
        continuing until both a and b run out of elements
     *)
     let rec gen_merge (a : 'a list) (b : 'a list) (c : 'a list) =

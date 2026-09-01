@@ -14,16 +14,13 @@ let DebianVersions = ../../Constants/DebianVersions.dhall
 
 let BuildFlags = ../../Constants/BuildFlags.dhall
 
-let Profiles = ../../Constants/Profiles.dhall
-
 let Docker = ../../Command/Docker/Type.dhall
 
 let Size = ../../Command/Size.dhall
 
 let dependsOn =
-        DebianVersions.dependsOn
-          DebianVersions.DepsSpec::{ profile = Profiles.Type.Lightnet }
-      # DebianVersions.dependsOn
+        DebianVersions.appDependsOn DebianVersions.DepsSpec::{=}
+      # DebianVersions.appDependsOn
           DebianVersions.DepsSpec::{ build_flag = BuildFlags.Type.Instrumented }
 
 let buildTestCmd
@@ -34,7 +31,7 @@ let buildTestCmd
           in  Command.build
                 Command.Config::{
                 , commands =
-                    RunInToolchain.runInToolchain
+                    RunInToolchain.runInDefaultToolchain
                       (   [ "DUNE_INSTRUMENT_WITH=bisect_ppx"
                           , "COVERALLS_TOKEN"
                           ]

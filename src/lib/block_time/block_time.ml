@@ -166,11 +166,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
       UInt64.of_int64
         (Int64.of_float (Time.Span.to_ms (Time.to_span_since_epoch t)))
 
-    (* [Block_time.t] is an unsigned uint64 millisecond count, but Core's
-       [Time.t] is float-backed and cannot faithfully represent values
-       >= 2^63.  [UInt64.to_int64] maps exactly those values to a negative
-       [Int64], which is the predicate below.  This is the ONE genuinely
-       partial conversion out of the unsigned-uint64 domain. *)
+    (* None when t >= 2^63 (unrepresentable in float-backed Time.t). *)
     let to_time_opt t =
       let t_int64 = UInt64.to_int64 t in
       if Int64.(t_int64 < zero) then None
@@ -222,11 +218,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
 
     let to_uint64 : t -> UInt64.t = to_span_since_epoch
 
-    (* Total, unsigned-decimal serialization.  [Block_time.t] is an unsigned
-       uint64, so its decimal form is always lossless and byte-identical to
-       the derived yojson/sexp encoding across the whole 0 .. 2^64-1 range.
-       (The [_exn] suffix is retained only to avoid a wide call-site rename;
-       this can no longer raise.) *)
+    (* Total; the _exn suffix is retained to avoid a call-site rename. *)
     let to_string_exn t = UInt64.to_string (to_uint64 t)
 
     let of_time_ns ns : t =
@@ -241,11 +233,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
     let to_string_system_time_exn (offset : Controller.t) (t : t) : string =
       to_system_time offset t |> to_string_exn
 
-    (* Parse an unsigned decimal string in 0 .. 2^64-1.  Reject a leading '-'
-       explicitly: [UInt64.of_string] silently wraps a negative literal into a
-       huge value, and negative timestamps are not representable.  Inverse of
-       [to_string_exn] for in-range input; byte-identical to the previous
-       [Int64.of_string] parse for values < 2^63. *)
+    (* Reject leading '-'; UInt64.of_string silently wraps negatives. *)
     let of_string_exn string =
       if String.is_prefix string ~prefix:"-" then
         failwithf "Block_time.of_string_exn: negative timestamp %s" string () ;

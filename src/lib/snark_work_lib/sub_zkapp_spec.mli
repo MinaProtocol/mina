@@ -4,17 +4,17 @@ open Core_kernel
 module Stable : sig
   [@@@no_toplevel_latest_type]
 
-  module V1 : sig
+  module V2 : sig
     type t =
       | Segment of
           { statement : Transaction_snark.Statement.With_sok.Stable.V2.t
           ; witness :
-              Transaction_snark.Zkapp_command_segment.Witness.Stable.V1.t
+              Transaction_snark.Zkapp_command_segment.Witness.Stable.V2.t
           ; spec : Transaction_snark.Zkapp_command_segment.Basic.Stable.V1.t
           }
       | Merge of
-          { proof1 : Ledger_proof.Stable.V2.t
-          ; proof2 : Ledger_proof.Stable.V2.t
+          { proof1 : Ledger_proof.Stable.V3.t
+          ; proof2 : Ledger_proof.Stable.V3.t
           }
     [@@deriving sexp, yojson]
 

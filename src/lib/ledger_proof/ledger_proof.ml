@@ -5,8 +5,8 @@ module type S = Ledger_proof_intf.S
 
 [%%versioned
 module Stable = struct
-  module V2 = struct
-    type t = Transaction_snark.Stable.V2.t
+  module V3 = struct
+    type t = Transaction_snark.Stable.V3.t
     [@@deriving compare, equal, sexp, yojson, hash]
 
     let to_latest = Fn.id
@@ -16,6 +16,8 @@ end]
 let statement (t : t) = Transaction_snark.statement t
 
 let statement_with_sok (t : t) = Transaction_snark.statement_with_sok t
+
+let sok_digest (t : t) = Transaction_snark.sok_digest t
 
 let statement_target (t : Mina_state.Snarked_ledger_state.t) = t.target
 
@@ -58,13 +60,14 @@ module Cached = struct
 end
 
 module For_tests = struct
-  let mk_dummy_proof statement =
-    create ~statement ~sok_digest:Sok_message.Digest.default
-      ~proof:(Lazy.force Proof.transaction_dummy)
+  let mk_dummy_proof ~statement ~fee ~prover =
+    let sok_digest = Sok_message.create ~fee ~prover |> Sok_message.digest in
+    create ~statement ~sok_digest ~proof:(Lazy.force Proof.transaction_dummy)
 
   module Cached = struct
-    let mk_dummy_proof statement =
-      Cached.create ~statement ~sok_digest:Sok_message.Digest.default
+    let mk_dummy_proof ~statement ~fee ~prover =
+      let sok_digest = Sok_message.create ~fee ~prover |> Sok_message.digest in
+      Cached.create ~statement ~sok_digest
         ~proof:(Lazy.force Proof.For_tests.transaction_dummy_tag)
   end
 end

@@ -5,10 +5,6 @@ module Get_all_transactions =
 [%graphql
 {|
     query all_transactions {
-      initialPeers
-      daemonStatus {
-        chainId
-      }
       pooledUserCommands(publicKey: null) {
         hash @ppxCustom(module: "Scalars.String_json")
       }
@@ -19,11 +15,6 @@ module Get_transactions_by_hash =
 [%graphql
 {|
     query all_transactions_by_hash($hashes: [String!]) {
-      initialPeers
-      daemonStatus {
-        chainId
-        peers { host }
-      }
       pooledUserCommands(hashes: $hashes) {
         hash @ppxCustom(module: "Scalars.String_json")
         amount @ppxCustom(module: "Scalars.UInt64")
@@ -94,8 +85,6 @@ module All = struct
             Result.return
               { Get_all_transactions.pooledUserCommands =
                   [| { hash = "TXN_1" }; { hash = "TXN_2" } |]
-              ; initialPeers = [||]
-              ; daemonStatus = { chainId = "dummy" }
               } )
       ; validate_network_choice = Network.Validate_choice.Mock.succeed
       }

@@ -1,14 +1,16 @@
 let S = ../../Lib/SelectFiles.dhall
 
+let Cmd = ../../Lib/Cmds.dhall
+
 let Pipeline = ../../Pipeline/Dsl.dhall
 
 let PipelineTag = ../../Pipeline/Tag.dhall
 
 let JobSpec = ../../Pipeline/JobSpec.dhall
 
-let Artifacts = ../../Constants/Artifacts.dhall
+let DebianVersions = ../../Constants/DebianVersions.dhall
 
-let Dockers = ../../Constants/DockerVersions.dhall
+let ContainerImages = ../../Constants/ContainerImages.dhall
 
 let BuildFlags = ../../Constants/BuildFlags.dhall
 
@@ -19,13 +21,13 @@ let Size = ../../Command/Size.dhall
 let RunWithPostgres = ../../Command/RunWithPostgres.dhall
 
 let dependsOn =
-      Dockers.dependsOn
-        Dockers.DepsSpec::{
-        , buildFlags = BuildFlags.Type.Instrumented
-        , artifact = Artifacts.Type.FunctionalTestSuite
-        }
+      DebianVersions.appDependsOn
+        DebianVersions.DepsSpec::{ build_flag = BuildFlags.Type.Instrumented }
 
 let key = "archive-hardfork-toolbox-test"
+
+let debs =
+      "mina-archive-generic-instrumented,mina-devnet-profile,mina-archive-devnet-instrumented"
 
 in  Pipeline.build
       Pipeline.Config::{
@@ -53,8 +55,10 @@ in  Pipeline.build
         [ Command.build
             Command.Config::{
             , commands =
-              [ RunWithPostgres.runInDockerWithPostgresConn
-                  ([] : List Text)
+              [ RunWithPostgres.runInToolchainWithPostgresAndDebs
+                  [ "APPS_BUILD_FLAG=instrumented"
+                  , "APPS_BARE_BINARIES=archive_hardfork_toolbox.exe:mina-archive-hardfork-toolbox"
+                  ]
                   ( Some
                       ( RunWithPostgres.ScriptOrArchive.Archive
                           { Script = "post_upgrade_archive.sql"
@@ -63,18 +67,17 @@ in  Pipeline.build
                           }
                       )
                   )
-                  ( Artifacts.fullDockerTag
-                      Artifacts.Tag::{
-                      , artifact = Artifacts.Type.FunctionalTestSuite
-                      , buildFlags = BuildFlags.Type.Instrumented
-                      }
-                  )
+                  ContainerImages.minaToolchainBullseye.amd64
+                  debs
                   (     "scripts/tests/archive-hardfork-toolbox/runner.sh --mode pre-fork"
                     ++  " && scripts/tests/archive-hardfork-toolbox/runner.sh --mode upgrade"
-                    ++  " && buildkite/scripts/upload-partial-coverage-data.sh ${key} "
                   )
-              , RunWithPostgres.runInDockerWithPostgresConn
-                  ([] : List Text)
+              , Cmd.run
+                  "buildkite/scripts/upload-partial-coverage-data.sh ${key}"
+              , RunWithPostgres.runInToolchainWithPostgresAndDebs
+                  [ "APPS_BUILD_FLAG=instrumented"
+                  , "APPS_BARE_BINARIES=archive_hardfork_toolbox.exe:mina-archive-hardfork-toolbox"
+                  ]
                   ( Some
                       ( RunWithPostgres.ScriptOrArchive.Archive
                           { Script = "hf_archive.sql"
@@ -83,13 +86,11 @@ in  Pipeline.build
                           }
                       )
                   )
-                  ( Artifacts.fullDockerTag
-                      Artifacts.Tag::{
-                      , artifact = Artifacts.Type.FunctionalTestSuite
-                      , buildFlags = BuildFlags.Type.Instrumented
-                      }
-                  )
-                  "scripts/tests/archive-hardfork-toolbox/runner.sh --mode post-fork && buildkite/scripts/upload-partial-coverage-data.sh ${key} "
+                  ContainerImages.minaToolchainBullseye.amd64
+                  debs
+                  "scripts/tests/archive-hardfork-toolbox/runner.sh --mode post-fork"
+              , Cmd.run
+                  "buildkite/scripts/upload-partial-coverage-data.sh ${key}"
               ]
             , label = "Archive: Hardfork Toolbox Test"
             , key = key

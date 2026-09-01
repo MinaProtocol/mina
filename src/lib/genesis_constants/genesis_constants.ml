@@ -234,10 +234,11 @@ module T = struct
     { protocol : Protocol.Stable.Latest.t
     ; txpool_max_size : int
     ; num_accounts : int option
-    ; zkapp_proof_update_cost : float
-    ; zkapp_signed_single_update_cost : float
-    ; zkapp_signed_pair_update_cost : float
-    ; zkapp_transaction_cost_limit : float
+    ; max_zkapp_segment_per_transaction : int
+          (** The maximum number of segments allowed per zkapp command. A
+              segment is either: a proof, a signed single update, or a signed
+              pair update. Transactions with a number of segments equal to this
+              limit are valid. *)
     ; max_event_elements : int
     ; max_action_elements : int
     ; zkapp_cmd_limit_hardcap : int
@@ -413,11 +414,8 @@ module Make (Node_config : Node_config_intf.S) : S = struct
         }
     ; txpool_max_size = pool_max_size
     ; num_accounts = None
-    ; zkapp_proof_update_cost = Node_config.zkapp_proof_update_cost
-    ; zkapp_signed_single_update_cost =
-        Node_config.zkapp_signed_single_update_cost
-    ; zkapp_signed_pair_update_cost = Node_config.zkapp_signed_pair_update_cost
-    ; zkapp_transaction_cost_limit = Node_config.zkapp_transaction_cost_limit
+    ; max_zkapp_segment_per_transaction =
+        Node_config.max_zkapp_segment_per_transaction
     ; max_event_elements = Node_config.max_event_elements
     ; max_action_elements = Node_config.max_action_elements
     ; zkapp_cmd_limit_hardcap = Node_config.zkapp_cmd_limit_hardcap
@@ -428,18 +426,22 @@ end
 
 module For_unit_tests = Make (Node_config_for_unit_tests)
 
-module Compiled : sig
+module type Profiled_S = sig
   val genesis_constants : t
 
   val constraint_constants : Constraint_constants.t
 
   val proof_level : Proof_level.t
-end = struct
-  include Make (Node_config)
-
-  let genesis_constants = t
-
-  let constraint_constants = Constraint_constants.t
-
-  let proof_level = Proof_level.t
 end
+
+let profiled =
+  Memo.unit (fun () : (module Profiled_S) ->
+      ( module struct
+        include Make (Node_config)
+
+        let genesis_constants = t
+
+        let constraint_constants = Constraint_constants.t
+
+        let proof_level = Proof_level.t
+      end ) )

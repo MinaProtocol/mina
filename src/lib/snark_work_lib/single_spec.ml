@@ -50,10 +50,10 @@ end
 module Stable = struct
   [@@@no_toplevel_latest_type]
 
-  module V1 = struct
+  module V3 = struct
     type t =
-      ( Transaction_witness.Stable.V2.t
-      , Ledger_proof.Stable.V2.t )
+      ( Transaction_witness.Stable.V3.t
+      , Ledger_proof.Stable.V3.t )
       Poly.Stable.V2.t
     [@@deriving sexp, yojson]
 

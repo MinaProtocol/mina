@@ -56,7 +56,7 @@ val request_partitioned_work :
      sok_message:Mina_base.Sok_message.t
   -> work_from_selector:work_from_selector
   -> partitioner:t
-  -> ( Snark_work_lib.Spec.Partitioned.Stable.V1.t
+  -> ( Snark_work_lib.Spec.Partitioned.Stable.Latest.t
      , Snark_worker_shared.Failed_to_generate_inputs.t )
      Result.t
      option
@@ -73,6 +73,6 @@ type submit_result =
           in [w] to be submitted to the work selector *)
 
 val submit_partitioned_work :
-     result:Snark_work_lib.Result.Partitioned.Stable.V1.t
+     result:Snark_work_lib.Result.Partitioned.Stable.V2.t
   -> partitioner:t
   -> submit_result

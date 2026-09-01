@@ -30,6 +30,12 @@
 
 set -euo pipefail
 
+# Get the directory of this script
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Source the library functions
+source "$SCRIPT_DIR/monorepo_lib.sh"
+
 show_help() {
   cat << EOF
 Usage: $(basename "$0") [OPTIONS]
@@ -153,197 +159,6 @@ else
   exit 1
 fi
 
-find_closest_ancestor() {
-  CURRENT_COMMIT=$(git rev-parse HEAD)
-  closest_branch=""
-  min_distance=""
-  for branch in "${MAINLINE_BRANCHES[@]}"; do
-    ancestor=$(git merge-base "$CURRENT_COMMIT" "origin/$branch")
-    distance=$(git rev-list --count "${ancestor}..${CURRENT_COMMIT}")
-    echo "Branch $branch: $distance commits from current commit ($CURRENT_COMMIT) via ancestor $ancestor" >&2
-    # Use <= so that branches later in MAINLINE_BRANCHES array win ties
-    # This makes the order in --mainline-branches meaningful for priority
-    if [[ -z "$min_distance" || $distance -le $min_distance ]]; then
-      min_distance=$distance
-      closest_branch=$branch
-    fi
-  done
-  echo "$closest_branch"
-}
-
-
-has_matching_tags() {
-  local tags="$1"
-  local filter_any="$2"
-  local filter_all="$3"
-  shift 3
-  local desired_tags=("$@")
-
-  local match_count=0
-
-  for want in "${desired_tags[@]}"; do
-
-    if WANT="$want" \
-       yq -e '.[] | select((downcase) == (env(WANT) | downcase))' \
-       <<< "$tags" \
-       >/dev/null 2>&1
-    then
-      match_count=$((match_count+1))
-    fi
-  done
-
-  if $filter_any && [[ $match_count -ge 1 ]]; then
-    echo 1
-  elif $filter_all && [[ $match_count -eq ${#desired_tags[@]} ]]; then
-    echo 1
-  else
-    echo 0
-  fi
-}
-
-scope_matches() {
-  local scope="$1"
-  shift
-  local desired_scopes=("$@")
-  local match_count=0
-
- for want in "${desired_scopes[@]}"; do
-    # yq v4 doesn't have --arg, so we use env(WANT)
-    if WANT="$want" \
-       yq -e '.[] | select((downcase) == (env(WANT) | downcase))' \
-       <<< "$scope" \
-         >/dev/null 2>&1
-    then
-      match_count=$((match_count+1))
-      break
-    fi
-  done
-
-  echo $(( match_count == 1 ? 1 : 0 ))
-}
-
-check_exclude_if() {
-  local file="$1"
-  local job_name="$2"
-  local closest_ancestor="$3"
-
-  # Check if excludeIf exists
-  local exclude_if_count
-  exclude_if_count=$(yq -r '.spec.excludeIf | length' "$file")
-
-  if [[ "$exclude_if_count" == "null" || "$exclude_if_count" -eq 0 ]]; then
-    echo 0
-    return
-  fi
-
-  # Check each excludeIf condition
-  for ((i=0; i<exclude_if_count; i++)); do
-    # Safely read ancestor and reason fields - they may not exist
-    local ancestor reason
-    ancestor=$(yq -r ".spec.excludeIf[$i].ancestor // \"\"" "$file")
-    reason=$(yq -r ".spec.excludeIf[$i].reason // \"\"" "$file")
-
-    # Skip this item if it doesn't have ancestor field (not an ancestor-based exclusion)
-    if [[ -z "$ancestor" || "$ancestor" == "null" ]]; then
-      echo "⚠️  Skipping excludeIf[$i] for $job_name: no 'ancestor' field found (possibly different exclusion type)" >&2
-      continue
-    fi
-
-    echo "Evaluating excludeIf[$i]: ancestor=$ancestor, reason=$reason, closest_ancestor=$closest_ancestor" >&2
-
-    # Case-insensitive comparison
-    local ancestor_lower closest_ancestor_lower
-    ancestor_lower=$(echo "$ancestor" | tr '[:upper:]' '[:lower:]')
-    closest_ancestor_lower=$(echo "$closest_ancestor" | tr '[:upper:]' '[:lower:]')
-
-    if [[ "$ancestor_lower" == "$closest_ancestor_lower" ]]; then
-      if [[ -n "$reason" && "$reason" != "null" ]]; then
-        echo "❌🚫 $job_name excluded based on excludeIf condition: $reason" >&2
-      else
-        echo "❌🚫 $job_name excluded based on excludeIf condition (ancestor: $ancestor)" >&2
-      fi
-      echo 1
-      return
-    fi
-  done
-
-  echo 0
-}
-
-check_include_if() {
-  local file="$1"
-  local job_name="$2"
-  local closest_ancestor="$3"
-
-  # Check if includeIf exists
-  local include_if_count
-  include_if_count=$(yq -r '.spec.includeIf | length' "$file")
-
-  # If no includeIf conditions, include by default
-  if [[ "$include_if_count" == "null" || "$include_if_count" -eq 0 ]]; then
-    echo 1
-    return
-  fi
-
-  # Check each includeIf condition
-  for ((i=0; i<include_if_count; i++)); do
-    # Safely read ancestor and reason fields - they may not exist
-    local ancestor reason
-    ancestor=$(yq -r ".spec.includeIf[$i].ancestor // \"\"" "$file")
-    reason=$(yq -r ".spec.includeIf[$i].reason // \"\"" "$file")
-
-    # Skip this item if it doesn't have ancestor field (not an ancestor-based inclusion)
-    if [[ -z "$ancestor" || "$ancestor" == "null" ]]; then
-      echo "⚠️  Skipping includeIf[$i] for $job_name: no 'ancestor' field found (possibly different inclusion type)" >&2
-      continue
-    fi
-
-    echo "Evaluating includeIf[$i]: ancestor=$ancestor, reason=$reason, closest_ancestor=$closest_ancestor" >&2
-
-    # Case-insensitive comparison
-    local ancestor_lower closest_ancestor_lower
-    ancestor_lower=$(echo "$ancestor" | tr '[:upper:]' '[:lower:]')
-    closest_ancestor_lower=$(echo "$closest_ancestor" | tr '[:upper:]' '[:lower:]')
-
-    if [[ "$ancestor_lower" == "$closest_ancestor_lower" ]]; then
-      if [[ -n "$reason" && "$reason" != "null" ]]; then
-        echo "✅ $job_name included based on includeIf condition: $reason" >&2
-      else
-        echo "✅ $job_name included based on includeIf condition (ancestor: $ancestor)" >&2
-      fi
-      echo 1
-      return
-    fi
-  done
-
-  # If we have includeIf conditions but none matched, exclude the job
-  echo "❌🚫 $job_name excluded: none of the includeIf conditions matched" >&2
-  echo 0
-}
-
-select_job() {
-  local selection_full="$1"
-  local selection_triaged="$2"
-  local file="$3"
-  local job_name="$4"
-  local git_diff_file="$5"
-
-  if [[ "$selection_full" == true ]]; then
-    echo 1
-  elif [[ "$selection_triaged" == true ]]; then
-    # Use yq to properly parse the YAML string (handles escape sequences correctly)
-    dirtyWhen=$(yq -r '.' "${file%.yml}.dirtywhen")
-    if [[ "${DEBUG:-false}" == true ]]; then
-      echo "Dirty when for $job_name: $dirtyWhen" >&2
-    fi
-    if grep -E "$dirtyWhen" "$git_diff_file" > /dev/null; then
-      echo 1
-    else
-      echo 0
-    fi
-  fi
-}
-
 # Check for forced closest ancestor via environment variable
 # Used only in testing or if git is on fire
 if [[ -n "${FORCE_CLOSEST_ANCESTOR:-}" ]]; then
@@ -352,7 +167,12 @@ else
   closest_ancestor=$(find_closest_ancestor)
 fi
 
-find "$JOBS" -type f -name "*.yml" | while read -r file; do
+# Phase 1: triage. Collect every job that passes tags, scope, dirty-when and
+# include/exclude filters into the SELECTED_FILES set. Nothing is uploaded yet:
+# their dependencies must be pulled in first (Phase 2).
+declare -A SELECTED_FILES=()
+
+while IFS= read -r file; do
   tags=$(yq .spec.tags "$file")
   scope=$(yq .spec.scope "$file")
   job_name=$(yq -r .spec.name "$file")
@@ -377,6 +197,14 @@ find "$JOBS" -type f -name "*.yml" | while read -r file; do
     continue
   fi
 
+  # Check if both includeIf and excludeIf are set - this is not allowed
+  has_include_if=$(yq -r '.spec.includeIf | length' "$file")
+  has_exclude_if=$(yq -r '.spec.excludeIf | length' "$file")
+  if [[ "$has_include_if" != "null" && "$has_include_if" -gt 0 && "$has_exclude_if" != "null" && "$has_exclude_if" -gt 0 ]]; then
+    echo "❌ Error: $job_name has both includeIf and excludeIf set. This is not allowed. Please use only one of them." >&2
+    exit 1
+  fi
+
   is_excluded=$(check_exclude_if "$file" "$job_name" "$closest_ancestor")
 
   if [[ $is_excluded -eq 1 ]]; then
@@ -390,14 +218,59 @@ find "$JOBS" -type f -name "*.yml" | while read -r file; do
   fi
 
   echo "✅ Including job $job_name in build "
+  SELECTED_FILES["$file"]=1
+done < <(find "$JOBS" -type f -name "*.yml")
+
+# Phase 2: dependency resolution. A selected job may depend on a build job whose
+# own dirty-when did not match, so triage would not upload it. Pull only such
+# "would not be selected" prerequisites into the run set.
+#
+# A dependency is pulled ONLY when select_job would reject it on its own. If it
+# would be selected, its own triage step already uploads it -- and re-uploading
+# it here would duplicate the step key. That matters for full/multi-phase runs
+# (e.g. nightly): every job is selected in full mode, so nothing is ever pulled,
+# and cross-phase duplicates (a build selected in one phase, depended on from
+# another) are avoided. select_job is phase-independent (it only looks at the
+# selection mode and the job's own dirty-when), so the decision is consistent
+# regardless of which phase's tag/scope filter is running.
+build_step_index "$JOBS"
+
+declare -A TO_UPLOAD=()
+for file in "${!SELECTED_FILES[@]}"; do
+  TO_UPLOAD["$file"]=1
+done
+
+for file in "${!SELECTED_FILES[@]}"; do
+  while IFS= read -r dep_file; do
+    [[ -z "$dep_file" ]] && continue
+    [[ -n "${TO_UPLOAD[$dep_file]-}" ]] && continue
+
+    dep_name=$(yq -r .spec.name "$dep_file")
+
+    # Skip dependencies that triage would select on their own; their dedicated
+    # step already uploads them (pulling would duplicate the step key).
+    dep_selected=$(select_job "$SELECTION_FULL" "$SELECTION_TRIAGED" "$dep_file" "$dep_name" "$GIT_DIFF_FILE")
+    if [[ "$dep_selected" -eq 1 ]]; then
+      echo "↩️  Skipping dependency $dep_name: already selected by its own triage step" >&2
+      continue
+    fi
+
+    TO_UPLOAD["$dep_file"]=1
+    sel_name=$(yq -r .spec.name "$file")
+    echo "➕ Including dependency job $dep_name (required by $sel_name)"
+  done < <(resolve_transitive_deps "$file")
+done
+
+# Phase 3: upload every job in the run set exactly once.
+for file in "${!TO_UPLOAD[@]}"; do
+  job_name=$(yq -r .spec.name "$file")
 
   if [[ "$DRY_RUN" == true ]]; then
-      printf " -> 🛑 Dry run enabled, skipping upload for job: %s\n" "$job_name"
-  else
-    job_path=$(yq -r .spec.path "$file")
-
-    ./buildkite/scripts/pipeline/upload.sh "(./buildkite/src/Jobs/$job_path/$job_name.dhall).pipeline"
-    printf " -> ✅ Uploaded job: %s\n" "$job_name"
+    printf " -> 🛑 Dry run enabled, skipping upload for job: %s\n" "$job_name"
+    continue
   fi
 
+  job_path=$(yq -r .spec.path "$file")
+  ./buildkite/scripts/pipeline/upload.sh "(./buildkite/src/Jobs/$job_path/$job_name.dhall).pipeline"
+  printf " -> ✅ Uploaded job: %s\n" "$job_name"
 done

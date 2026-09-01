@@ -4,7 +4,7 @@ open Mina_base
 module Stable : sig
   [@@@no_toplevel_latest_type]
 
-  module V2 : sig
+  module V3 : sig
     type t [@@deriving equal]
 
     val hashes : t -> State_hash.State_hashes.t

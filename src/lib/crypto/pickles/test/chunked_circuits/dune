@@ -1,5 +1,5 @@
 (tests
- (names chunks2 chunks4 chunks8)
+ (names chunks2 chunks2_roundtrip chunks4 chunks8)
  (libraries
   ;; opam libraries
   alcotest

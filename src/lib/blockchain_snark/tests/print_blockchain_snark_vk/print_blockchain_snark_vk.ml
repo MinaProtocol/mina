@@ -8,13 +8,13 @@ open Core_kernel
 
 let () =
   Format.eprintf "Profile: %s@." Node_config.profile ;
+  let (module G) = Genesis_constants.profiled () in
   Async.Thread_safe.block_on_async_exn (fun () ->
       let () = Format.eprintf "Generating transaction snark circuit..@." in
       let module Transaction_snark_instance = Transaction_snark.Make (struct
         let signature_kind = Mina_signature_kind.t_DEPRECATED
 
-        let constraint_constants =
-          Genesis_constants.Compiled.constraint_constants
+        let constraint_constants = G.constraint_constants
 
         let proof_level = Genesis_constants.Proof_level.Full
       end) in
@@ -22,8 +22,7 @@ let () =
       let before = Time.now () in
       let module Blockchain_snark_instance =
       Blockchain_snark.Blockchain_snark_state.Make (struct
-        let constraint_constants =
-          Genesis_constants.Compiled.constraint_constants
+        let constraint_constants = G.constraint_constants
 
         let proof_level = Genesis_constants.Proof_level.Full
 

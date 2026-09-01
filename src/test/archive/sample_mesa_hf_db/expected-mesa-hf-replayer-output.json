@@ -1,8 +1,8 @@
 {
-  "start_slot_since_genesis": 1960,
+  "start_slot_since_genesis": 3120,
   "genesis_ledger": {
-    "hash": "jxXoV4Q8aiMrUzNkQko1xmPVhajeR6YmNhqDrLJNzQbBanvNZiE",
-    "s3_data_hash": "2d3fbe4cdc2ea276c3459f120cb65b816a5c6d9e5aa951eb5491c3605a4b1712",
+    "hash": "jwGBjjyVaQ3EL6k3oGy98DqkAw4Sxdw9jnYLgFKEswthMQR3mNb",
+    "s3_data_hash": "2cf677ef9e3346d8be722d4afda4b4fc1b79968181dca92e53c780be995062ba",
     "add_genesis_winner": false
   }
 }

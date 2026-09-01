@@ -27,5 +27,11 @@ test-large: ../../libp2p_ipc/libp2p_ipc.capnp.go
 		&& $(GO) test -timeout 40m -run "^TestBitswapMedium$$" \
 		&& $(GO) test -timeout 40m -run "^TestBitswapJumbo$$"
 
+test-pubsub: ../../libp2p_ipc/libp2p_ipc.capnp.go
+	cd src/libp2p_helper \
+		&& (ulimit -n 65536 || true) \
+		&& $(GO) test -timeout 40m -run "^TestPubsubMsgIdFun$$" \
+		&& $(GO) test -timeout 40m -run "^TestPubsubMsgIdFunLongTopic$$"
+
 clean:
 	rm -rf result ../../libp2p_ipc/libp2p_ipc.capnp.go

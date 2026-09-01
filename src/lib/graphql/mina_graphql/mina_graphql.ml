@@ -1543,13 +1543,22 @@ module Mutations = struct
             else
               let clean_config = Option.value ~default:false clean_config in
               let conf_dir = (Mina_lib.config mina).conf_dir in
+              let persistent_root_location =
+                (Mina_lib.config mina).persistent_root_location
+              in
+              let persistent_frontier_location =
+                (Mina_lib.config mina).persistent_frontier_location
+              in
+              let epoch_ledger_location =
+                (Mina_lib.config mina).epoch_ledger_location
+              in
               if clean_config then
                 Exit_handlers.register_async_shutdown_handler
                   ~logger:(Mina_lib.config mina).logger
                   ~description:"Remove configuration data"
                   ~tier:DestroyConfigAndLedgers (fun () ->
                     let epoch_ledger_json_file =
-                      conf_dir ^/ "epoch_ledger.json"
+                      epoch_ledger_location ^/ ".json"
                     in
                     let%bind () =
                       match%bind Sys.file_exists epoch_ledger_json_file with
@@ -1577,9 +1586,7 @@ module Mutations = struct
                               let staking_uuid = find_uuid "staking" in
                               let next_uuid = find_uuid "next" in
                               let rm_epoch_ledger uuid =
-                                let path =
-                                  conf_dir ^/ sprintf "epoch_ledger%s" uuid
-                                in
+                                let path = epoch_ledger_location ^ uuid in
                                 match%bind Sys.file_exists path with
                                 | `Yes ->
                                     Mina_stdlib_unix.File_system.remove_dir path
@@ -1594,11 +1601,12 @@ module Mutations = struct
                           Deferred.unit
                     in
                     let files_to_remove =
-                      [ "epoch_ledger.json"; "root" ^/ "root" ]
+                      [ epoch_ledger_json_file
+                      ; persistent_root_location ^/ "root"
+                      ]
                     in
                     let%bind () =
-                      Deferred.List.iter files_to_remove ~f:(fun file ->
-                          let path = conf_dir ^/ file in
+                      Deferred.List.iter files_to_remove ~f:(fun path ->
                           match%bind Sys.file_exists path with
                           | `Yes ->
                               Sys.remove path
@@ -1606,10 +1614,11 @@ module Mutations = struct
                               Deferred.unit )
                     in
                     let dirs_to_remove =
-                      [ "root" ^/ "snarked_ledger"; "frontier" ]
+                      [ persistent_root_location ^/ "snarked_ledger"
+                      ; persistent_frontier_location
+                      ]
                     in
-                    Deferred.List.iter dirs_to_remove ~f:(fun dir ->
-                        let path = conf_dir ^/ dir in
+                    Deferred.List.iter dirs_to_remove ~f:(fun path ->
                         match%bind Sys.file_exists path with
                         | `Yes ->
                             Mina_stdlib_unix.File_system.remove_dir path
@@ -2807,7 +2816,7 @@ module Queries = struct
         match encoding_opt with
         | Some `BASE64 ->
             Bin_prot.Writer.to_string
-              Mina_state.Protocol_state.Value.Stable.V2.bin_t.writer
+              Mina_state.Protocol_state.Value.Stable.Latest.bin_t.writer
               protocol_state
             |> Base64.encode_exn
         | Some `JSON | None ->

@@ -53,8 +53,9 @@ let main ~genesis_constants ~constraint_constants conf_dir : unit Deferred.t =
   print_heap_usage "Transaction_snark.Statement.t" transaction_snark_statement
 
 let () =
-  let genesis_constants = Genesis_constants.Compiled.genesis_constants in
-  let constraint_constants = Genesis_constants.Compiled.constraint_constants in
+  let (module G) = Genesis_constants.profiled () in
+  let genesis_constants = G.genesis_constants in
+  let constraint_constants = G.constraint_constants in
   Command.(
     run
       (async ~summary:"Print heap usage of selected Mina data structures"

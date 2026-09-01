@@ -11,7 +11,6 @@ NETWORK_NAME=""
 CONFIG_JSON_GZ_URL=""
 CODENAME=""
 CACHED_BUILDKITE_BUILD_ID=""
-
 while [[ $# -gt 0 ]]; do
   case $1 in
     --network)
@@ -30,7 +29,11 @@ while [[ $# -gt 0 ]]; do
       CACHED_BUILDKITE_BUILD_ID="$2"
       shift 2
       ;;
+    -h|--help)
+      usage
+      ;;
     *)
+      echo "Unknown argument: $1" >&2
       usage
       ;;
   esac
@@ -49,6 +52,7 @@ if [[ -z "$CODENAME" ]]; then
   echo "Error: --codename is required."
   usage
 fi
+
 
 echo "--- Restoring cached build artifacts for apps/${CODENAME}/"
 

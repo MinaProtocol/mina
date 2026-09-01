@@ -7,7 +7,7 @@ open Core_kernel
 open Async
 
 module Ledger_proof_list = struct
-  type t = Ledger_proof.Stable.V2.t list [@@deriving bin_io_unversioned]
+  type t = Ledger_proof.Stable.V3.t list [@@deriving bin_io_unversioned]
 end
 
 let read_proofs proofs_file =

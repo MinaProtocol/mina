@@ -1,0 +1,42 @@
+ARG deb_version=latest
+ARG deb_codename=bullseye
+ARG deb_profile=devnet
+ARG docker_repo=gcr.io/o1labs-192920
+ARG image_name=mina-daemon
+ARG custom_suffix=""
+ARG build_flags_suffix=""
+ARG deb_arch="all"
+ARG version=latest
+
+# Profiled daemon image: the network-agnostic generic daemon base plus a baked
+# profile tent package (mina-${profile}-generic, or mina-lightnet / mina-dev for
+# those profiles), which pulls in the profile hint package and drops
+# /etc/coda/build_config/PROFILE so the runtime selects this profile by default.
+# It is FROM the single network-free generic image,
+# mirroring how Dockerfile-install-config layers the per-network config
+# package on top:  mina-generic -> mina-${profile}-generic -> mina-${network}
+FROM ${docker_repo}/${image_name}:${version}-generic${build_flags_suffix}${custom_suffix}
+
+# In multi-stage builds, Docker requires ARG variables to be re-declared after
+# each FROM to make them available in that stage.
+ARG deb_version
+ARG deb_arch
+ARG deb_profile
+
+WORKDIR /root/
+
+# The profile tent package is staged into the build context's _debs/ directory by
+# scripts/docker/build.sh (DownloadOnly mode via read_all_from_cache.sh) and
+# installed directly from the local filesystem (no apt repo / no apt index).
+# Devnet/Mainnet ship as mina-${deb_profile}-generic; Lightnet and Dev ship as
+# mina-${deb_profile} (no -generic suffix).
+COPY scripts/install-mina-debs.sh /usr/local/bin/install-mina-debs.sh
+COPY _debs /opt/mina-local-debs
+RUN chmod +x /usr/local/bin/install-mina-debs.sh \
+  && case "${deb_profile}" in \
+       lightnet|dev) profile_pkg="mina-${deb_profile}"; PROFILE_DEB="${profile_pkg}" ;; \
+       *) profile_pkg="mina-${deb_profile}-generic"; PROFILE_DEB="mina-${deb_profile}-profile" ;; \
+     esac \
+  && /usr/local/bin/install-mina-debs.sh \
+       "${profile_pkg}=${deb_version}" \
+       "${PROFILE_DEB}=${deb_version}"
