@@ -255,7 +255,27 @@ for port in "${ports[@]}"; do
     --graphql-uri http://127.0.0.1:${MINA_GRAPHQL_PORT}/graphql \
     --log-level ${LOG_LEVEL} \
     --port ${port} &
-  sleep 5
+  # Wait for the HTTP listener to bind.  We intentionally do NOT probe a
+  # functional Rosetta endpoint here: at this point the Mina daemon isn't
+  # running yet, and any Rosetta route that calls the daemon (e.g.
+  # /network/list) would fail for the full timeout.  Functional readiness
+  # is exercised later by `rosetta-cli configuration:validate` and the
+  # subsequent sweeps, once the daemon is up.
+  echo "Waiting for Rosetta on port ${port} to bind..."
+  for i in $(seq 1 60); do
+    # ":" opens the connection and closes it; "echo" would also write a
+    # newline, which Rosetta logs as a malformed request line on every
+    # attempt.
+    if (: > "/dev/tcp/127.0.0.1/${port}") 2>/dev/null; then
+      echo "Rosetta on port ${port} is listening"
+      break
+    fi
+    if [ "$i" -eq 60 ]; then
+      echo "ERROR: Rosetta on port ${port} did not bind within 60s"
+      exit 1
+    fi
+    sleep 1
+  done
 done
 
 # Mina Archive
