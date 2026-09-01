@@ -504,49 +504,61 @@ let setup_local_server ?(client_trustlist = []) ~rest_server_port
           return @@ Itn_logger.log ~process ~timestamp ~message ~metadata () )
     ]
   in
+  (* The snark-worker RPCs are versioned, so they are implemented for every
+     registered version rather than only the newest. A worker dispatches the
+     version it was compiled against and never negotiates down, so a daemon that
+     serves [Stable.Latest] alone leaves pre-upgrade workers stuck in
+     [Snark_worker.Entry]'s retry backoff, getting Unimplemented_rpc forever. *)
+  let implement_versioned name f () ~version:_ query =
+    O1trace.thread ("serve_" ^ name) (fun () -> f query)
+  in
   let snark_worker_impls =
-    [ implement Snark_worker.Rpcs.Get_work.Stable.Latest.rpc (fun () () ->
-          match Mina_lib.request_work mina with
-          | None ->
-              Deferred.return None
-          | Some (Ok spec) ->
-              [%log debug] "responding to a Get_work request with some new work"
-                ~metadata:
-                  [ ( "work_id"
-                    , Snark_work_lib.(
-                        Spec.Partitioned.Poly.get_id spec |> Id.Any.to_yojson )
-                    )
-                  ] ;
+    Snark_worker.Rpcs.Get_work.implement_multi
+      (implement_versioned Snark_worker.Rpcs.Get_work.name (fun () ->
+           match Mina_lib.request_work mina with
+           | None ->
+               Deferred.return None
+           | Some (Ok spec) ->
+               [%log debug]
+                 "responding to a Get_work request with some new work"
+                 ~metadata:
+                   [ ( "work_id"
+                     , Snark_work_lib.(
+                         Spec.Partitioned.Poly.get_id spec |> Id.Any.to_yojson )
+                     )
+                   ] ;
 
-              Mina_metrics.(Counter.inc_one Snark_work.snark_work_assigned_rpc) ;
-              Deferred.return (Some spec)
-          | Some (Error (`Failed_to_generate_inputs (zkapp_cmd, e))) ->
-              let open Mina_base.Zkapp_command in
-              [%log error]
-                "Mina_lib.request_work failed to generate inputs for a zkapp \
-                 command"
-                ~metadata:
-                  [ ("error", `String (Error.to_string_hum e))
-                  ; ( "zkapp_cmd"
-                    , Stable.Latest.to_yojson
-                      @@ read_all_proofs_from_disk zkapp_cmd )
-                  ] ;
-              Deferred.return None )
-    ; implement Snark_worker.Rpcs.Submit_work.Stable.Latest.rpc
-        (fun () (result : Snark_work_lib.Result.Partitioned.Stable.Latest.t) ->
-          [%log debug] "received completed work from a snark worker"
-            ~metadata:[ ("work_id", Snark_work_lib.Id.Any.to_yojson result.id) ] ;
-          Mina_metrics.(
-            Counter.inc_one Snark_work.completed_snark_work_received_rpc ) ;
-          Deferred.return @@ Mina_lib.add_work mina result )
-    ; implement Snark_worker.Rpcs.Failed_to_generate_snark.Stable.Latest.rpc
-        (fun () (error, _) ->
-          [%str_log error]
-            (Snark_worker.Events.Generating_snark_work_failed
-               { error = Error_json.error_to_yojson error } ) ;
-          Mina_metrics.(Counter.inc_one Snark_work.snark_work_failed_rpc) ;
-          Deferred.unit )
-    ]
+               Mina_metrics.(Counter.inc_one Snark_work.snark_work_assigned_rpc) ;
+               Deferred.return (Some spec)
+           | Some (Error (`Failed_to_generate_inputs (zkapp_cmd, e))) ->
+               let open Mina_base.Zkapp_command in
+               [%log error]
+                 "Mina_lib.request_work failed to generate inputs for a zkapp \
+                  command"
+                 ~metadata:
+                   [ ("error", `String (Error.to_string_hum e))
+                   ; ( "zkapp_cmd"
+                     , Stable.Latest.to_yojson
+                       @@ read_all_proofs_from_disk zkapp_cmd )
+                   ] ;
+               Deferred.return None ) )
+    @ Snark_worker.Rpcs.Submit_work.implement_multi
+        (implement_versioned Snark_worker.Rpcs.Submit_work.name
+           (fun (result : Snark_work_lib.Result.Partitioned.Stable.Latest.t) ->
+             [%log debug] "received completed work from a snark worker"
+               ~metadata:
+                 [ ("work_id", Snark_work_lib.Id.Any.to_yojson result.id) ] ;
+             Mina_metrics.(
+               Counter.inc_one Snark_work.completed_snark_work_received_rpc ) ;
+             Deferred.return @@ Mina_lib.add_work mina result ) )
+    @ Snark_worker.Rpcs.Failed_to_generate_snark.implement_multi
+        (implement_versioned Snark_worker.Rpcs.Failed_to_generate_snark.name
+           (fun (error, _) ->
+             [%str_log error]
+               (Snark_worker.Events.Generating_snark_work_failed
+                  { error = Error_json.error_to_yojson error } ) ;
+             Mina_metrics.(Counter.inc_one Snark_work.snark_work_failed_rpc) ;
+             Deferred.unit ) )
   in
   let create_graphql_server_with_auth ~mk_context ?auth_keys ~bind_to_address
       ~schema ~server_description ~require_auth port =

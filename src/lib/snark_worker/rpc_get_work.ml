@@ -48,6 +48,10 @@ module Stable = struct
      from the job's own sok message, and the upgrade drops a field that is known
      to be a placeholder.
 
+     Retaining a version only helps if the daemon actually serves it: the RPC
+     server must implement this with [implement_multi], not [Rpc.Rpc.implement]
+     on a pinned [Stable.Latest.rpc]. See [Mina_run.setup_local_server].
+
      Note that a worker does not negotiate: [entry.ml] dispatches a pinned
      [Stable.Latest.rpc]. So this buys daemon-newer-than-worker only. A V5
      worker against a V4-only daemon still fails to get work, and daemons must
