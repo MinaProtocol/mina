@@ -28,6 +28,21 @@ source "${SCRIPTPATH}"/../../buildkite/scripts/docker/gar-cache.sh
 # skipped and leak the file. Expands to a no-op rm when no temp file was made.
 trap 'rm -f "${TEMP_DOCKERFILE:-}"' EXIT
 
+# The CI image cache is zstd-compressed, so both directions need the tool: the
+# save at the end of this script, and the load of a base image below.
+function ensure_zstd () {
+  if command -v zstd >/dev/null 2>&1; then
+    return
+  fi
+  echo "zstd not found on host; installing (required for the CI image cache)"
+  if ! command -v apt-get >/dev/null 2>&1; then
+    echo "ERROR: zstd missing and no apt-get available to install it"
+    exit 1
+  fi
+  ${SUDO:-sudo} apt-get update -qq
+  ${SUDO:-sudo} apt-get install -y --no-install-recommends zstd
+}
+
 function usage() {
   if [[ -n "$1" ]]; then
     echo -e "${RED}☞  $1${CLEAR}\n";
@@ -433,9 +448,48 @@ if [[ "${DOCKERFILE_PATH}" == "dockerfiles/Dockerfile-install-config" || "${DOCK
     # generic base is per-network ("<version>-<network>-generic"). GENERIC_NETWORK_SEG
     # is "" for daemon and "-<network>" for rosetta.
     _dep_tag="${_dep_version}${GENERIC_NETWORK_SEG}-generic${_dep_build_flags}${_dep_custom}"
-    _rewritten_repo="$(rewrite_docker_repo_via_gar_cache "${DOCKER_REGISTRY}" "${_dep_image_name}" "${_dep_tag}")"
-    DOCKER_REPO_ARG="--build-arg docker_repo=${_rewritten_repo}"
-    unset _dep_image_name _dep_version _dep_build_flags _dep_custom _dep_tag _rewritten_repo
+    _dep_ref="${DOCKER_REGISTRY}/${_dep_image_name}:${_dep_tag}"
+    _dep_is_local=0
+
+    # The generic base is built by a different job, on a different agent, and a
+    # packaging job does not push what it builds: the image reaches this job
+    # through the CI cache, the same cache this build writes its own image to at
+    # the end. So look there when the base is not already in the local image
+    # store, because nothing else will put it within reach.
+    #
+    # The cache is keyed by the hash tag, not by the readable tag the FROM line
+    # names. That is not a problem: build.sh saves both tags into one archive
+    # ("docker save $TAG $HASHTAG"), so loading by hash restores the readable
+    # tag with it.
+    #
+    # A miss is not an error. A pipeline that publishes as it builds leaves the
+    # base in a registry instead, and the FROM resolves from there as before.
+    if docker image inspect "${_dep_ref}" > /dev/null 2>&1; then
+        echo "Base image ${_dep_ref} is already in the local image store"
+        _dep_is_local=1
+    elif [[ -n "${SAVE_TO_CI_CACHE_ROOT:-}" ]]; then
+        # Mirrors HASHTAG_VERSION_PART in helper.sh. A generic base always
+        # carries the network in its hash tag, even where its readable tag does
+        # not: the daemon's generic image is network-free by name only.
+        _dep_hashtag="${DOCKER_REGISTRY}/${_dep_image_name}:${GITHASH}-${DEB_CODENAME##*=}-${NETWORK##*=}-generic${_dep_build_flags}${PLATFORM_SUFFIX}${CUSTOM_SUFFIX}"
+        ensure_zstd
+        if CACHE_ROOT="${SAVE_TO_CI_CACHE_ROOT}" "${SCRIPTPATH}"/../../buildkite/scripts/docker/load_from_cache.sh "${_dep_hashtag}"; then
+            _dep_is_local=1
+        else
+            echo "Base image ${_dep_ref} is not in the CI cache; leaving the FROM to resolve it from a registry"
+        fi
+    fi
+
+    if [[ "${_dep_is_local}" == "0" ]]; then
+        _rewritten_repo="$(rewrite_docker_repo_via_gar_cache "${DOCKER_REGISTRY}" "${_dep_image_name}" "${_dep_tag}")"
+        DOCKER_REPO_ARG="--build-arg docker_repo=${_rewritten_repo}"
+    fi
+    # Where the base is already local, docker_repo stays as it is, naming the
+    # registry the loaded tag carries. Rewriting it to the pull-through cache
+    # would send the FROM looking for a manifest under a name we do not have.
+
+    unset _dep_image_name _dep_version _dep_build_flags _dep_custom _dep_tag \
+          _dep_ref _dep_is_local _dep_hashtag _rewritten_repo
 fi
 
 # FORCE_DOCKER_OVERWRITE — when set (to any non-empty value), allows pushing a
@@ -475,16 +529,7 @@ if [[ -n "${SAVE_TO_CI_CACHE_ROOT:-}" ]]; then
 
   FULL_IMAGE_PATH="${SAVE_TO_CI_CACHE_ROOT}/${SERVICE}/${HASHTAG_VERSION_PART}.tar.zst"
 
-  if ! command -v zstd >/dev/null 2>&1; then
-    echo "zstd not found on host; installing (required for --save-to-ci-cache)"
-    if command -v apt-get >/dev/null 2>&1; then
-      ${SUDO:-sudo} apt-get update -qq
-      ${SUDO:-sudo} apt-get install -y --no-install-recommends zstd
-    else
-      echo "ERROR: zstd missing and no apt-get available to install it"
-      exit 1
-    fi
-  fi
+  ensure_zstd
 
   # Hard sanity check: fail if --load did not produce the expected local image.
   docker image inspect "$TAG"

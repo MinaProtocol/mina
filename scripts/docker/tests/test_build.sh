@@ -161,6 +161,21 @@ setup_stub_docker() {
 echo "$*" >> "${DOCKER_CALLS_FILE:-/dev/null}"
 if [[ "${1:-}" == "buildx" && "${2:-}" == "build" ]]; then
     printf '%s\n' "$@" > "${DOCKER_ARGS_FILE}"
+    # A build puts every tag it names into the local image store.
+    _want_tag=0
+    for _arg in "$@"; do
+        if [[ "$_want_tag" == "1" ]]; then
+            echo "$_arg" >> "${DOCKER_LOCAL_IMAGES_FILE:-/dev/null}"
+            _want_tag=0
+        elif [[ "$_arg" == "-t" ]]; then
+            _want_tag=1
+        fi
+    done
+    exit 0
+fi
+# "docker tag" gives an image a second name in the local store.
+if [[ "${1:-}" == "tag" ]]; then
+    echo "${3:-}" >> "${DOCKER_LOCAL_IMAGES_FILE:-/dev/null}"
     exit 0
 fi
 # "docker network inspect" gives the gateway of the bridge network.
@@ -176,9 +191,35 @@ if [[ "${1:-}" == "manifest" ]]; then
     [[ -n "${STUB_TAG_IN_REGISTRY:-}" ]] && exit 0
     exit 1
 fi
+# "docker image inspect" asks the local image store whether a tag is there.
+# build.sh uses it to decide whether it must fetch the base image of a layered
+# build, so the stub must answer truthfully too: the local store holds only
+# what STUB_LOCAL_IMAGES names, and that is nothing unless a test says so.
+if [[ "${1:-}" == "image" && "${2:-}" == "inspect" ]]; then
+    for _known in ${STUB_LOCAL_IMAGES:-}; do
+        [[ "$_known" == "${3:-}" ]] && exit 0
+    done
+    grep -qFx -- "${3:-}" "${DOCKER_LOCAL_IMAGES_FILE:-/dev/null}" 2>/dev/null && exit 0
+    exit 1
+fi
 exit 0
 STUB
     chmod +x "${STUB_DIR}/docker"
+
+    # The CI image cache is zstd-compressed. The stub keeps the tests free of
+    # the real tool: it decompresses a file argument by copying it, and
+    # compresses standard input the same way.
+    cat > "${STUB_DIR}/zstd" <<'ZSTUB'
+#!/usr/bin/env bash
+for _last; do :; done
+if [[ -f "${_last:-}" ]]; then
+    cat "$_last"
+else
+    cat
+fi
+exit 0
+ZSTUB
+    chmod +x "${STUB_DIR}/zstd"
 }
 
 teardown_stub_docker() {
@@ -194,25 +235,28 @@ teardown_stub_docker() {
 run_build() {
     local args_file="$1"
     shift
-    rm -f "$args_file" "${args_file}.calls"
+    rm -f "$args_file" "${args_file}.calls" "${args_file}.images"
     set +e
     ( cd "$REPO_ROOT" && \
       PATH="${STUB_DIR}:${PATH}" \
       DOCKER_ARGS_FILE="$args_file" \
       DOCKER_CALLS_FILE="${args_file}.calls" \
+      DOCKER_LOCAL_IMAGES_FILE="${args_file}.images" \
       OVERRIDE_GITHASH="abcdefgh" \
       OVERRIDE_TAG="3.0.0" \
       BRANCH_NAME="test-branch" \
       MINA_DEB_CODENAME="bullseye" \
       KEEP_MY_TAGS_INTACT="true" \
       STUB_TAG_IN_REGISTRY="${STUB_TAG_IN_REGISTRY:-}" \
+      STUB_LOCAL_IMAGES="${STUB_LOCAL_IMAGES:-}" \
+      DISK_CLEANUP=0 \
       FORCE_DOCKER_OVERWRITE="${FORCE_DOCKER_OVERWRITE:-}" \
       CI="" BUILDKITE="" GITHUB_ACTIONS="" \
       SKIP_GITBRANCH="" \
       ./scripts/docker/build.sh "$@" ) > "${args_file}.log" 2>&1
     LAST_EXIT=$?
     set -e
-    touch "$args_file" "${args_file}.calls"
+    touch "$args_file" "${args_file}.calls" "${args_file}.images"
 }
 
 ################################################################################
@@ -442,6 +486,129 @@ test_rosetta_configured_keeps_the_rosetta_name() {
         "testreg/mina-rosetta:3.0.0-test-branch-abcdefg-bullseye-devnet"
 }
 
+# A layered build is FROM an image another job built. That job does not push
+# it, so the image travels in the CI image cache, and this build must look for
+# it there. The cache names a file by the hash tag, one directory for each
+# service.
+#
+# Without this, every profiled image failed to build: buildx asked a registry
+# for a base image that nothing had pushed to it.
+test_generic_base_is_loaded_from_the_ci_cache() {
+    local args="${STUB_DIR}/base-from-cache.args"
+    local cache="${STUB_DIR}/cache-hit"
+    mkdir -p "${cache}/mina-daemon"
+    echo "an image" > "${cache}/mina-daemon/abcdefg-bullseye-devnet-generic.tar.zst"
+
+    run_build "$args" \
+        --service mina-daemon-profiled --version 3.1.0 --network devnet \
+        --docker-registry testreg --deb-build-flags none \
+        --save-to-ci-cache "$cache"
+
+    assert_eq "exit code" 0 "$LAST_EXIT"
+    assert_called "the base image is loaded" "${args}.calls" "^load$"
+    assert_has_line "the build still runs" "$args" \
+        "dockerfiles/Dockerfile-install-profile"
+}
+
+# The instrumented base is a separate image, with its own file in the cache.
+test_instrumented_generic_base_is_loaded_from_the_ci_cache() {
+    local args="${STUB_DIR}/base-instrumented.args"
+    local cache="${STUB_DIR}/cache-instrumented"
+    mkdir -p "${cache}/mina-daemon"
+    echo "an image" > \
+        "${cache}/mina-daemon/abcdefg-bullseye-devnet-generic-instrumented.tar.zst"
+
+    run_build "$args" \
+        --service mina-daemon-profiled --version 3.1.0 --network devnet \
+        --docker-registry testreg --deb-build-flags instrumented \
+        --save-to-ci-cache "$cache"
+
+    assert_eq "exit code" 0 "$LAST_EXIT"
+    assert_called "the base image is loaded" "${args}.calls" "^load$"
+}
+
+# A lightnet image is FROM the plain generic base, not from a lightnet one:
+# the profile is what this build adds.
+test_lightnet_takes_the_plain_generic_base() {
+    local args="${STUB_DIR}/base-lightnet.args"
+    local cache="${STUB_DIR}/cache-lightnet"
+    mkdir -p "${cache}/mina-daemon"
+    echo "an image" > "${cache}/mina-daemon/abcdefg-bullseye-devnet-generic.tar.zst"
+
+    run_build "$args" \
+        --service mina-daemon-profiled --version 3.1.0 --network devnet \
+        --docker-registry testreg --deb-profile lightnet --deb-build-flags none \
+        --save-to-ci-cache "$cache"
+
+    assert_eq "exit code" 0 "$LAST_EXIT"
+    assert_called "the base image is loaded" "${args}.calls" "^load$"
+}
+
+# Each service reads its own directory of the cache.
+test_rosetta_reads_the_rosetta_directory_of_the_cache() {
+    local args="${STUB_DIR}/base-rosetta.args"
+    local cache="${STUB_DIR}/cache-rosetta"
+    mkdir -p "${cache}/mina-rosetta"
+    echo "an image" > "${cache}/mina-rosetta/abcdefg-bullseye-devnet-generic.tar.zst"
+
+    run_build "$args" \
+        --service mina-rosetta-configured --version 3.1.0 --network devnet \
+        --docker-registry testreg --deb-build-flags none \
+        --image-name mina-rosetta --save-to-ci-cache "$cache"
+
+    assert_eq "exit code" 0 "$LAST_EXIT"
+    assert_called "the base image is loaded" "${args}.calls" "^load$"
+}
+
+# An image that is already in the local store is not loaded a second time.
+test_a_local_base_image_is_not_loaded() {
+    local args="${STUB_DIR}/base-local.args"
+    local cache="${STUB_DIR}/cache-local"
+    mkdir -p "${cache}/mina-daemon"
+    echo "an image" > "${cache}/mina-daemon/abcdefg-bullseye-devnet-generic.tar.zst"
+
+    STUB_LOCAL_IMAGES="testreg/mina-daemon:3.1.0-generic" \
+    run_build "$args" \
+        --service mina-daemon-profiled --version 3.1.0 --network devnet \
+        --docker-registry testreg --deb-build-flags none \
+        --save-to-ci-cache "$cache"
+
+    assert_eq "exit code" 0 "$LAST_EXIT"
+    assert_not_called "nothing is loaded" "${args}.calls" "^load$"
+}
+
+# A base image that is in no cache is not an error. A pipeline that pushes as
+# it builds leaves the base in a registry, and the FROM line finds it there.
+test_a_base_image_in_no_cache_does_not_stop_the_build() {
+    local args="${STUB_DIR}/base-miss.args"
+    local cache="${STUB_DIR}/cache-empty"
+    mkdir -p "$cache"
+
+    run_build "$args" \
+        --service mina-daemon-profiled --version 3.1.0 --network devnet \
+        --docker-registry testreg --deb-build-flags none \
+        --save-to-ci-cache "$cache"
+
+    assert_eq "exit code" 0 "$LAST_EXIT"
+    assert_not_called "nothing is loaded" "${args}.calls" "^load$"
+    assert_has_line "the build still runs" "$args" \
+        "dockerfiles/Dockerfile-install-profile"
+}
+
+# A build that does not use the CI cache does not read it, and still names the
+# registry of the build in docker_repo.
+test_a_build_without_the_ci_cache_reads_no_cache() {
+    local args="${STUB_DIR}/base-nocache.args"
+
+    run_build "$args" \
+        --service mina-daemon-profiled --version 3.1.0 --network devnet \
+        --docker-registry testreg --deb-build-flags none
+
+    assert_eq "exit code" 0 "$LAST_EXIT"
+    assert_not_called "nothing is loaded" "${args}.calls" "^load$"
+    assert_has_line "registry" "$args" "docker_repo=testreg"
+}
+
 test_toolchain_joins_the_stage_files() {
     local args="${STUB_DIR}/toolchain.args"
     run_build "$args" \
@@ -656,6 +823,13 @@ main() {
     run_test test_profiled_lightnet_suffix
     run_test test_profiled_instrumented_suffix
     run_test test_rosetta_configured_keeps_the_rosetta_name
+    run_test test_generic_base_is_loaded_from_the_ci_cache
+    run_test test_instrumented_generic_base_is_loaded_from_the_ci_cache
+    run_test test_lightnet_takes_the_plain_generic_base
+    run_test test_rosetta_reads_the_rosetta_directory_of_the_cache
+    run_test test_a_local_base_image_is_not_loaded
+    run_test test_a_base_image_in_no_cache_does_not_stop_the_build
+    run_test test_a_build_without_the_ci_cache_reads_no_cache
     run_test test_toolchain_joins_the_stage_files
     run_test test_delegation_verifier
     run_test test_suffix_order_is_generic_lightnet_instrumented
