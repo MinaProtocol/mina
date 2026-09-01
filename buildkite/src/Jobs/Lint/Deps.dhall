@@ -14,6 +14,10 @@ let Size = ../../Command/Size.dhall
 
 let RunInToolchain = ../../Command/RunInToolchain.dhall
 
+let B = ../../External/Buildkite.dhall
+
+let B/SoftFail = B.definitions/commandStep/properties/soft_fail/Type
+
 let ContainerImages = ../../Constants/ContainerImages.dhall
 
 in  Pipeline.build
@@ -48,6 +52,7 @@ in  Pipeline.build
             , label = "Dependency graph: budget, layering, unused deps"
             , key = "check-deps"
             , target = Size.Multi
+            , soft_fail = Some (B/SoftFail.Boolean True)
             , docker = None Docker.Type
             , artifact_paths = [ S.contains "deps-advice.txt" ]
             }
