@@ -25,10 +25,28 @@ let network_identifier t =
 (* Append an endpoint path to the (already normalised) base path.  A
    base URI may carry a path of its own -- a Rosetta server behind a
    reverse proxy at http://host/rosetta -- so the endpoint is appended to
-   [Uri.path base] instead of replacing it. *)
+   [Uri.path base] instead of replacing it.
+
+   [Uri.resolve] would do this by the RFC 3986 merge rules, but it needs
+   the base to end in a slash and the endpoint not to start with one,
+   which is a paragraph of explanation for a concatenation. *)
 let join_uri base path =
   let path = if String.is_prefix path ~prefix:"/" then path else "/" ^ path in
   Uri.with_path base (Uri.path base ^ path)
+
+let%test_unit "an endpoint path joins the base URI" =
+  let check base expect =
+    [%test_eq: string]
+      (Uri.to_string
+         (join_uri (normalize_base (Uri.of_string base)) "/network/status") )
+      expect
+  in
+  check "http://localhost:3087" "http://localhost:3087/network/status" ;
+  check "http://localhost:3087/" "http://localhost:3087/network/status" ;
+  (* A Rosetta server behind a reverse proxy keeps its path prefix. *)
+  check "http://host/rosetta" "http://host/rosetta/network/status" ;
+  check "http://host/rosetta/" "http://host/rosetta/network/status" ;
+  check "http://host/rosetta//" "http://host/rosetta/network/status"
 
 (* One request/response exchange: enforces [t.timeout], folds all
    transport/decode failures into the error channel, and renders any
