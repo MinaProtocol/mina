@@ -5,7 +5,7 @@
    the required/optional split and the nesting all come from the schema
    rather than from hand-written JSON objects. *)
 
-open Core_kernel
+open Core
 module RM = Rosetta_models
 
 (* A Mina token id travels in [account_identifier.metadata], which the

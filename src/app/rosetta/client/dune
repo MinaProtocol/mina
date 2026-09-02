@@ -5,7 +5,7 @@
  (libraries
   ;; opam libraries
   core
-  core_kernel
+  core_unix.command_unix
   core_unix
   async
   async.async_command

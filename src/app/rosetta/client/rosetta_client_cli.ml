@@ -21,7 +21,7 @@
    The values they fall back to when unset live in
    [Rosetta_client.Defaults]. *)
 
-open Core_kernel
+open Core
 open Async
 module MRC = Rosetta_client
 module RM = MRC.Models
@@ -238,7 +238,7 @@ let search_group =
 (* ---------- Top-level ---------- *)
 
 let () =
-  Command.run
+  Command_unix.run
     (Command.group
        ~summary:
          "Mina Rosetta client CLI — curl-on-steroids for a running Rosetta \

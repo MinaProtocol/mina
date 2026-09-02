@@ -40,7 +40,7 @@ let run_cli ?(env = []) args =
     | Error (`Exit_non_zero n) ->
         n
     | Error (`Signal s) ->
-        128 + Signal.to_system_int s
+        128 + Signal_unix.to_system_int s
   in
   (code, out, err)
 

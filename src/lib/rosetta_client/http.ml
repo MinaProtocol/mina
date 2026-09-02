@@ -1,6 +1,6 @@
 (* HTTP core for the Rosetta client library.  See [http.mli]. *)
 
-open Core_kernel
+open Core
 open Async
 
 type t =

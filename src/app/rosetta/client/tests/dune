@@ -12,6 +12,7 @@
   core
   core_kernel
   core_unix
+  core_unix.signal_unix
   core_unix.filename_unix
   core_unix.sys_unix
   stdio

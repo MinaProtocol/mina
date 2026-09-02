@@ -1,7 +1,7 @@
 (* Fallback values and environment-variable names shared by every
    Rosetta CLI.  See [defaults.mli]. *)
 
-open Core_kernel
+open Core
 
 let uri_env_var = "MINA_ROSETTA_URI"
 
