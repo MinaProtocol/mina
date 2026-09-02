@@ -149,13 +149,16 @@ function wait_for_sync() {
 # Arguments:
 #   $1 - test data array name (passed by reference)
 #   $@ - rosetta-client subcommand and its flags
+#
+# --timeout goes last: it is a leaf-command flag, and Command.group
+# accepts nothing but a subcommand name in that first position.
 function rosetta_client() {
     declare -n __test_data=$1
     shift
 
     MINA_ROSETTA_URI="${__test_data[address]}" \
     MINA_ROSETTA_NETWORK="${__test_data[id]}" \
-        rosetta-client --timeout "${ROSETTA_CLIENT_TIMEOUT}" "$@"
+        rosetta-client "$@" --timeout "${ROSETTA_CLIENT_TIMEOUT}"
 }
 
 function test_network_status() {
