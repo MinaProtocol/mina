@@ -74,8 +74,7 @@ On success, the response body is printed as pretty JSON on stdout (or
 compact JSON with `--compact`), followed by a single newline.  Exit 0.
 
 On failure — HTTP non-2xx or a transport error — the tool prints a short
-diagnostic on stderr and exits 1.  The diagnostic is produced by the
-`Rosetta_client.Errors` module and is guaranteed to:
+diagnostic on stderr and exits 1.  The diagnostic is guaranteed to:
 
 - Never leak raw OCaml exception syntax (no `Unix_error`, no `(Unix. ...)`).
 - Never dump multi-kilobyte HTTP bodies verbatim; Rosetta error envelopes

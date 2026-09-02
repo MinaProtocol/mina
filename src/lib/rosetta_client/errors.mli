@@ -8,8 +8,8 @@
 (** [format_http_body ~status ~body] renders a non-2xx HTTP response as
     a short diagnostic like ["HTTP 500: Network doesn't exist"]. If
     [body] is a Rosetta error envelope ({"code":_,"message":_,...}), the
-    [message] field is used; otherwise the body is included truncated to
-    [max_body_chars] characters. *)
+    [message] field is used; otherwise the body is included, truncated
+    to a fixed cap. *)
 val format_http_body : status:int -> body:string -> string
 
 (** [format_exn ~url e] renders a transport exception (typically from
@@ -17,8 +17,3 @@ val format_http_body : status:int -> body:string -> string
     ["connection refused to http://localhost:9999"].  No raw OCaml
     exception syntax leaks through. *)
 val format_exn : url:Uri.t -> exn -> string
-
-(** Character cap used by [format_http_body] when falling back to the
-    raw body.  Exposed so callers can reference the same bound in tests
-    and documentation. *)
-val max_body_chars : int
