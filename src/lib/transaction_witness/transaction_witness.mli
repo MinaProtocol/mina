@@ -9,7 +9,7 @@ module Zkapp_command_segment_witness : sig
   module Stable : sig
     [@@@no_toplevel_latest_type]
 
-    module V2 : sig
+    module V3 : sig
       type t =
         { global_first_pass_ledger : Sparse_ledger.Stable.V3.t
         ; global_second_pass_ledger : Sparse_ledger.Stable.V3.t
@@ -38,7 +38,7 @@ module Zkapp_command_segment_witness : sig
             , bool )
             Mina_transaction_logic.Zkapp_command_logic.Start_data.Stable.V1.t
             list
-        ; state_body : Mina_state.Protocol_state.Body.Value.Stable.V3.t
+        ; state_body : Mina_state.Protocol_state.Body.Value.Stable.V4.t
         ; init_stack : Pending_coinbase.Stack_versioned.Stable.V1.t
         ; block_global_slot : Mina_numbers.Global_slot_since_genesis.Stable.V1.t
         }
@@ -88,12 +88,12 @@ end
 module Stable : sig
   [@@@no_toplevel_latest_type]
 
-  module V3 : sig
+  module V4 : sig
     type t =
       { transaction : Mina_transaction.Transaction.Stable.V3.t
       ; first_pass_ledger : Mina_ledger.Sparse_ledger.Stable.V3.t
       ; second_pass_ledger : Mina_ledger.Sparse_ledger.Stable.V3.t
-      ; protocol_state_body : Mina_state.Protocol_state.Body.Value.Stable.V3.t
+      ; protocol_state_body : Mina_state.Protocol_state.Body.Value.Stable.V4.t
       ; init_stack : Mina_base.Pending_coinbase.Stack_versioned.Stable.V1.t
       ; status : Mina_base.Transaction_status.Stable.V2.t
       ; block_global_slot : Mina_numbers.Global_slot_since_genesis.Stable.V1.t

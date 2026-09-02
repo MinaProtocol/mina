@@ -4,17 +4,17 @@ open Core
 module Stable = struct
   [@@@no_toplevel_latest_type]
 
-  module V2 = struct
+  module V3 = struct
     type t =
       | Segment of
-          { statement : Transaction_snark.Statement.With_sok.Stable.V2.t
+          { statement : Transaction_snark.Statement.With_sok.Stable.V3.t
           ; witness :
-              Transaction_snark.Zkapp_command_segment.Witness.Stable.V2.t
+              Transaction_snark.Zkapp_command_segment.Witness.Stable.V3.t
           ; spec : Transaction_snark.Zkapp_command_segment.Basic.Stable.V1.t
           }
       | Merge of
-          { proof1 : Ledger_proof.Stable.V3.t
-          ; proof2 : Ledger_proof.Stable.V3.t
+          { proof1 : Ledger_proof.Stable.V4.t
+          ; proof2 : Ledger_proof.Stable.V4.t
           }
     [@@deriving sexp, yojson]
 

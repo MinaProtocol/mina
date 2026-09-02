@@ -70,9 +70,9 @@ module Pre_diff_with_at_most_two_coinbase : sig
     (Transaction_snark_work.t, User_command.t With_status.t) Pre_diff_two.t
 
   module Stable : sig
-    module V3 : sig
+    module V4 : sig
       type t =
-        ( Transaction_snark_work.Stable.V3.t
+        ( Transaction_snark_work.Stable.V4.t
         , User_command.Stable.V3.t With_status.Stable.V2.t )
         Pre_diff_two.Stable.V2.t
       [@@deriving equal, sexp, yojson]
@@ -80,7 +80,7 @@ module Pre_diff_with_at_most_two_coinbase : sig
       val to_latest : t -> t
     end
 
-    module Latest = V3
+    module Latest = V4
   end
 end
 
@@ -89,9 +89,9 @@ module Pre_diff_with_at_most_one_coinbase : sig
     (Transaction_snark_work.t, User_command.t With_status.t) Pre_diff_one.t
 
   module Stable : sig
-    module V3 : sig
+    module V4 : sig
       type t =
-        ( Transaction_snark_work.Stable.V3.t
+        ( Transaction_snark_work.Stable.V4.t
         , User_command.Stable.V3.t With_status.Stable.V2.t )
         Pre_diff_one.Stable.V2.t
       [@@deriving equal, sexp, yojson]
@@ -99,7 +99,7 @@ module Pre_diff_with_at_most_one_coinbase : sig
       val to_latest : t -> t
     end
 
-    module Latest = V3
+    module Latest = V4
   end
 end
 
@@ -109,10 +109,10 @@ module Diff : sig
     * Pre_diff_with_at_most_one_coinbase.t option
 
   module Stable : sig
-    module V3 : sig
+    module V4 : sig
       type t =
-        Pre_diff_with_at_most_two_coinbase.Stable.V3.t
-        * Pre_diff_with_at_most_one_coinbase.Stable.V3.t option
+        Pre_diff_with_at_most_two_coinbase.Stable.V4.t
+        * Pre_diff_with_at_most_one_coinbase.Stable.V4.t option
 
       val coinbase :
            constraint_constants:Genesis_constants.Constraint_constants.t
@@ -123,7 +123,7 @@ module Diff : sig
       val to_latest : t -> t
     end
 
-    module Latest = V3
+    module Latest = V4
   end
 
   val coinbase :
@@ -136,8 +136,8 @@ end
 type t = { diff : Diff.t } [@@deriving fields]
 
 module Stable : sig
-  module V3 : sig
-    type t = { diff : Diff.Stable.V3.t }
+  module V4 : sig
+    type t = { diff : Diff.Stable.V4.t }
     [@@deriving bin_io, equal, sexp, version, yojson]
 
     val to_latest : t -> t
@@ -147,7 +147,7 @@ module Stable : sig
     val completed_works : t -> Transaction_snark_work.Stable.Latest.t list
   end
 
-  module Latest = V3
+  module Latest = V4
 end
 
 val write_all_proofs_to_disk :

@@ -38,9 +38,9 @@ include Versioned_rpc.Both_convert.Plain.Make (Master)
 
 [%%versioned_rpc
 module Stable = struct
-  module V3 = struct
+  module V4 = struct
     module T = struct
-      type query = Result.Partitioned.Stable.V2.t
+      type query = Result.Partitioned.Stable.V3.t
 
       type response = [ `SpecUnmatched | `Removed | `Ok ]
 
@@ -57,5 +57,5 @@ module Stable = struct
     include Register (T)
   end
 
-  module Latest = V3
+  module Latest = V4
 end]

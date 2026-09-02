@@ -73,12 +73,12 @@ module Stable = struct
 
   [@@@with_versioned_json]
 
-  module V4 = struct
+  module V5 = struct
     type t = T.t =
       { scheduled_time : Block_time.Stable.V1.t
-      ; protocol_state : Protocol_state.Value.Stable.V3.t
+      ; protocol_state : Protocol_state.Value.Stable.V4.t
       ; protocol_state_proof : Mina_base.Proof.Stable.V3.t
-      ; staged_ledger_diff : Legacy_format.Staged_ledger_diff.Stable.V2.t
+      ; staged_ledger_diff : Legacy_format.Staged_ledger_diff.Stable.V3.t
             (* TODO: Delete this or find out why it is here. *)
       ; delta_transition_chain_proof :
           Frozen_ledger_hash.Stable.V1.t * Frozen_ledger_hash.Stable.V1.t list

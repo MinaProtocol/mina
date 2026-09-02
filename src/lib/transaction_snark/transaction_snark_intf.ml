@@ -98,7 +98,7 @@ module type Full = sig
 
   [%%versioned:
   module Stable : sig
-    module V3 : sig
+    module V4 : sig
       type t [@@deriving compare, equal, sexp, yojson, hash]
     end
   end]

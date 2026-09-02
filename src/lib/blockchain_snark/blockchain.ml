@@ -4,10 +4,10 @@ open Mina_state
 
 [%%versioned
 module Stable = struct
-  module V3 = struct
+  module V4 = struct
     module T = struct
       type t =
-        { state : Protocol_state.Value.Stable.V3.t; proof : Proof.Stable.V3.t }
+        { state : Protocol_state.Value.Stable.V4.t; proof : Proof.Stable.V3.t }
       [@@deriving fields, sexp, yojson]
     end
 

@@ -12,7 +12,7 @@ module Wire_types = Mina_wire_types.Transaction_snark
 let proof_cache = ref None
 
 module Make_sig (A : Wire_types.Types.S) = struct
-  module type S = Transaction_snark_intf.Full with type Stable.V3.t = A.V3.t
+  module type S = Transaction_snark_intf.Full with type Stable.V4.t = A.V4.t
 end
 
 module Make_str (A : Wire_types.Concrete) = struct
@@ -76,9 +76,9 @@ module Make_str (A : Wire_types.Concrete) = struct
 
   [%%versioned
   module Stable = struct
-    module V3 = struct
+    module V4 = struct
       type t =
-        ( Mina_state.Snarked_ledger_state.With_sok.Stable.V2.t
+        ( Mina_state.Snarked_ledger_state.With_sok.Stable.V3.t
         , Proof.Stable.V3.t )
         Proof_carrying_data.Stable.V1.t
       [@@deriving compare, equal, sexp, version, yojson, hash]
@@ -91,7 +91,7 @@ module Make_str (A : Wire_types.Concrete) = struct
 
   let statement
       (t :
-        ( Mina_state.Snarked_ledger_state.With_sok.Stable.V2.t
+        ( Mina_state.Snarked_ledger_state.With_sok.Stable.V3.t
         , _ )
         Proof_carrying_data.t ) =
     { t.data with sok_digest = () }
@@ -2103,13 +2103,11 @@ module Make_str (A : Wire_types.Concrete) = struct
         with_label __LOC__ (fun () ->
             run_checked
               (let expected = statement.fee_excess in
+               (* The global state that this segment starts from has a zero
+                  excess (see [init] above), so the segment's excess is just
+                  the excess that the global state ends with. *)
                let got : Fee_excess.var =
-                 { fee_token_l = Token_id.(Checked.constant default)
-                 ; fee_excess_l = Amount.Signed.Checked.to_fee global.fee_excess
-                 ; fee_token_r = Token_id.(Checked.constant default)
-                 ; fee_excess_r =
-                     Amount.Signed.Checked.to_fee (fst init).fee_excess
-                 }
+                 Amount.Signed.Checked.to_fee global.fee_excess
                in
                Fee_excess.assert_equal_checked expected got ) ) ;
         (Stdlib.( ! ) zkapp_input, `Must_verify (Stdlib.( ! ) must_verify))
@@ -3129,28 +3127,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           statement.source.pending_coinbase_stack
           statement.target.pending_coinbase_stack state_body t
       in
-      let%bind fee_excess =
-        (* Use the default token for the fee excess if it is zero.
-           This matches the behaviour of [Fee_excess.rebalance], which allows
-           [verify_complete_merge] to verify a proof without knowledge of the
-           particular fee tokens used.
-        *)
-        let%bind fee_excess_zero =
-          Amount.Signed.Checked.equal fee_excess
-            Amount.Signed.(Checked.constant zero)
-        in
-        let%map fee_token_l =
-          make_checked (fun () ->
-              Token_id.Checked.if_ fee_excess_zero
-                ~then_:Token_id.(Checked.constant default)
-                ~else_:t.payload.common.fee_token )
-        in
-        { Fee_excess.fee_token_l
-        ; fee_excess_l = Amount.Signed.Checked.to_fee fee_excess
-        ; fee_token_r = Token_id.(Checked.constant default)
-        ; fee_excess_r = Fee.Signed.(Checked.constant zero)
-        }
-      in
+      let fee_excess = Amount.Signed.Checked.to_fee fee_excess in
       let%bind () =
         [%with_label_ "local state check"] (fun () ->
             make_checked (fun () ->
@@ -3958,25 +3935,18 @@ module Make_str (A : Wire_types.Concrete) = struct
         in
         let fee_excess =
           (* capture only the difference in the fee excess *)
-          let fee_excess =
-            match
-              Amount.Signed.(
-                add target_global.fee_excess (negate source_global.fee_excess) )
-            with
-            | None ->
-                failwith
-                  (sprintf
-                     !"unexpected fee excess. source %{sexp: Amount.Signed.t} \
-                       target %{sexp: Amount.Signed.t}"
-                     target_global.fee_excess source_global.fee_excess )
-            | Some balance_change ->
-                balance_change
-          in
-          { fee_token_l = Token_id.default
-          ; fee_excess_l = Amount.Signed.to_fee fee_excess
-          ; Mina_base.Fee_excess.fee_token_r = Token_id.default
-          ; fee_excess_r = Fee.Signed.zero
-          }
+          match
+            Amount.Signed.(
+              add target_global.fee_excess (negate source_global.fee_excess) )
+          with
+          | None ->
+              failwith
+                (sprintf
+                   !"unexpected fee excess. source %{sexp: Amount.Signed.t} \
+                     target %{sexp: Amount.Signed.t}"
+                   target_global.fee_excess source_global.fee_excess )
+          | Some balance_change ->
+              Amount.Signed.to_fee balance_change
         in
         let supply_increase =
           (* capture only the difference in supply increase *)

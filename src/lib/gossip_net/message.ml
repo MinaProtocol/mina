@@ -25,19 +25,19 @@ end
 include Master.T
 include Versioned_rpc.Both_convert.One_way.Make (Master)
 
-module V3 = struct
+module V4 = struct
   module T = struct
     type msg =
-      | New_state of Mina_block.Stable.V3.t
+      | New_state of Mina_block.Stable.V4.t
       | Snark_pool_diff of
-          Snark_pool.Diff_versioned.Stable.V3.t
+          Snark_pool.Diff_versioned.Stable.V4.t
           Network_pool.With_nonce.Stable.V1.t
       | Transaction_pool_diff of
           Transaction_pool.Diff_versioned.Stable.V3.t
           Network_pool.With_nonce.Stable.V1.t
     [@@deriving bin_io, version { rpc }]
 
-    type snark_pool_diff_msg = Snark_pool.Diff_versioned.Stable.V3.t
+    type snark_pool_diff_msg = Snark_pool.Diff_versioned.Stable.V4.t
 
     type transaction_pool_diff_msg = Transaction_pool.Diff_versioned.Stable.V3.t
 
@@ -71,7 +71,7 @@ module V3 = struct
         "transaction pool diff"
 end
 
-module Latest = V3
+module Latest = V4
 
 [%%define_locally Latest.(summary)]
 

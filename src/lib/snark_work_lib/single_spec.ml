@@ -3,11 +3,11 @@ open Core
 module Poly = struct
   [%%versioned
   module Stable = struct
-    module V2 = struct
+    module V3 = struct
       type ('witness, 'ledger_proof) t =
-        | Transition of Transaction_snark.Statement.Stable.V2.t * 'witness
+        | Transition of Transaction_snark.Statement.Stable.V3.t * 'witness
         | Merge of
-            Transaction_snark.Statement.Stable.V2.t
+            Transaction_snark.Statement.Stable.V3.t
             * 'ledger_proof
             * 'ledger_proof
       [@@deriving sexp, yojson]
@@ -50,11 +50,11 @@ end
 module Stable = struct
   [@@@no_toplevel_latest_type]
 
-  module V3 = struct
+  module V4 = struct
     type t =
-      ( Transaction_witness.Stable.V3.t
-      , Ledger_proof.Stable.V3.t )
-      Poly.Stable.V2.t
+      ( Transaction_witness.Stable.V4.t
+      , Ledger_proof.Stable.V4.t )
+      Poly.Stable.V3.t
     [@@deriving sexp, yojson]
 
     let to_latest = Fn.id

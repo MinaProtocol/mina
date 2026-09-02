@@ -33,12 +33,12 @@ end
 module Stable = struct
   [@@@no_toplevel_latest_type]
 
-  module V3 = struct
+  module V4 = struct
     type t =
-      { snark_transition : Snark_transition.Value.Stable.V2.t
-      ; ledger_proof : Ledger_proof.Stable.V3.t option
+      { snark_transition : Snark_transition.Value.Stable.V3.t
+      ; ledger_proof : Ledger_proof.Stable.V4.t option
       ; prover_state : Consensus.Data.Prover_state.Stable.V3.t
-      ; staged_ledger_diff : Staged_ledger_diff.Stable.V3.t
+      ; staged_ledger_diff : Staged_ledger_diff.Stable.V4.t
       }
 
     let to_latest = Fn.id

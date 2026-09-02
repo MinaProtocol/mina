@@ -22,9 +22,9 @@ end
 module Stable = struct
   [@@@no_toplevel_latest_type]
 
-  module V2 = struct
+  module V3 = struct
     type t =
-      (Single_spec.Stable.V3.t, Ledger_proof.Stable.V3.t) Poly.Stable.V1.t
+      (Single_spec.Stable.V4.t, Ledger_proof.Stable.V4.t) Poly.Stable.V1.t
 
     let to_latest = Fn.id
   end

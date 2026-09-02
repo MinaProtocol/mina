@@ -1,3 +1,3 @@
-module V3 = struct
-  type t = Transaction_snark.V3.t
+module V4 = struct
+  type t = Transaction_snark.V4.t
 end

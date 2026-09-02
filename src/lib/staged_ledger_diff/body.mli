@@ -2,12 +2,12 @@
 module Stable : sig
   [@@@no_toplevel_latest_type]
 
-  module V2 : sig
-    type t = { staged_ledger_diff : Diff.Stable.V3.t } [@@deriving equal, sexp]
+  module V3 : sig
+    type t = { staged_ledger_diff : Diff.Stable.V4.t } [@@deriving equal, sexp]
 
-    val create : Diff.Stable.V3.t -> t
+    val create : Diff.Stable.V4.t -> t
 
-    val staged_ledger_diff : t -> Diff.Stable.V3.t
+    val staged_ledger_diff : t -> Diff.Stable.V4.t
   end
 end]
 

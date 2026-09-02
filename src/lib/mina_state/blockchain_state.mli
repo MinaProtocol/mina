@@ -48,7 +48,7 @@ end
 module Value : sig
   [%%versioned:
   module Stable : sig
-    module V2 : sig
+    module V3 : sig
       type t =
         ( Staged_ledger_hash.Stable.V1.t
         , Frozen_ledger_hash.Stable.V1.t
@@ -57,7 +57,7 @@ module Value : sig
         , Consensus.Body_reference.Stable.V1.t
         , (Amount.Stable.V1.t, Sgn.Stable.V1.t) Signed_poly.Stable.V1.t
         , Pending_coinbase.Stack_versioned.Stable.V1.t
-        , Fee_excess.Stable.V1.t
+        , Fee_excess.Stable.V2.t
         , unit )
         Poly.Stable.V2.t
       [@@deriving sexp, equal, compare, hash, yojson]

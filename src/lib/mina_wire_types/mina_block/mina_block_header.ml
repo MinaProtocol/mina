@@ -2,14 +2,14 @@ open Utils
 
 module Types = struct
   module type S = sig
-    module V3 : S0
+    module V4 : S0
   end
 end
 
 module type Concrete = sig
-  module V3 : sig
+  module V4 : sig
     type t =
-      { protocol_state : Mina_state_protocol_state.Value.V3.t
+      { protocol_state : Mina_state_protocol_state.Value.V4.t
       ; protocol_state_proof : Mina_base.Proof.V3.t
       ; delta_block_chain_proof :
           Data_hash_lib.State_hash.V1.t * Mina_base_state_body_hash.V1.t list
@@ -20,9 +20,9 @@ module type Concrete = sig
 end
 
 module M = struct
-  module V3 = struct
+  module V4 = struct
     type t =
-      { protocol_state : Mina_state_protocol_state.Value.V3.t
+      { protocol_state : Mina_state_protocol_state.Value.V4.t
       ; protocol_state_proof : Mina_base.Proof.V3.t
       ; delta_block_chain_proof :
           Data_hash_lib.State_hash.V1.t * Mina_base_state_body_hash.V1.t list
