@@ -5,12 +5,14 @@
     leak raw OCaml exception syntax (e.g. [(Unix_error ...)]) or dump
     multi-kilobyte HTTP bodies verbatim. *)
 
-(** [format_http_body ~status ~body] renders a non-2xx HTTP response as
-    a short diagnostic like ["HTTP 500: Network doesn't exist"]. If
+(** [format_http_body ~url ~status ~body] renders a non-2xx HTTP
+    response as a short diagnostic like
+    ["HTTP 500 from http://host/network/status: Network doesn't exist"].
+    If
     [body] is a Rosetta error envelope ({"code":_,"message":_,...}), the
     [message] field is used; otherwise the body is included, truncated
     to a fixed cap. *)
-val format_http_body : status:int -> body:string -> string
+val format_http_body : url:Uri.t -> status:int -> body:string -> string
 
 (** [format_invalid_json ~url ~body] renders a 2xx response whose body
     is not JSON, with the body collapsed to one line and truncated to

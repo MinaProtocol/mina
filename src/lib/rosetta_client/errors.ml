@@ -42,16 +42,17 @@ let try_parse_envelope body =
       | Error _ ->
           None )
 
-let format_http_body ~status ~body =
+let format_http_body ~url ~status ~body =
+  let prefix = sprintf "HTTP %d from %s" status (Uri.to_string url) in
   match try_parse_envelope body with
   | Some msg ->
       (* [truncate], not just [single_line]: Mina's Rosetta propagates
          Postgres and GraphQL errors into [message], so the envelope can
          carry as much text as a raw body. *)
-      sprintf "HTTP %d: %s" status (truncate msg)
+      sprintf "%s: %s" prefix (truncate msg)
   | None ->
-      if String.is_empty (String.strip body) then sprintf "HTTP %d" status
-      else sprintf "HTTP %d: %s" status (truncate body)
+      if String.is_empty (String.strip body) then prefix
+      else sprintf "%s: %s" prefix (truncate body)
 
 let format_invalid_json ~url ~body =
   sprintf "invalid JSON response from %s: %s" (Uri.to_string url)
@@ -80,23 +81,28 @@ let format_exn ~url exn =
          leaks raw OCaml exception constructor syntax. *)
       sprintf "request to %s failed" url_s
 
+let test_url = Uri.of_string "http://localhost:3087/network/status"
+
+let render_http_body ~status ~body =
+  format_http_body ~url:test_url ~status ~body
+
 let%test_unit "format_http_body parses Rosetta envelope" =
   let body =
     {|{"code":4,"message":"Network doesn't exist","details":{"x":1}}|}
   in
   [%test_eq: string]
-    (format_http_body ~status:500 ~body)
-    "HTTP 500: Network doesn't exist"
+    (render_http_body ~status:500 ~body)
+    "HTTP 500 from http://localhost:3087/network/status: Network doesn't exist"
 
 let%test_unit "format_http_body falls back to truncated body on non-envelope" =
   let body = "Internal Server Error" in
   [%test_eq: string]
-    (format_http_body ~status:500 ~body)
-    "HTTP 500: Internal Server Error"
+    (render_http_body ~status:500 ~body)
+    "HTTP 500 from http://localhost:3087/network/status: Internal Server Error"
 
 let%test_unit "format_http_body truncates very long bodies" =
   let body = String.make (max_body_chars + 100) 'x' in
-  let rendered = format_http_body ~status:502 ~body in
+  let rendered = render_http_body ~status:502 ~body in
   [%test_pred: string] (String.is_substring ~substring:"truncated") rendered
 
 let%test_unit "format_http_body truncates a long envelope message" =
@@ -104,18 +110,20 @@ let%test_unit "format_http_body truncates a long envelope message" =
   let body = Yojson.Safe.to_string (`Assoc [ ("message", `String message) ]) in
   [%test_pred: string]
     (String.is_substring ~substring:"truncated")
-    (format_http_body ~status:500 ~body)
+    (render_http_body ~status:500 ~body)
 
 let%test_unit "format_http_body renders a multi-line body on one line" =
   let body = "<html>\n<head><title>502 Bad Gateway</title></head>\n</html>" in
-  let rendered = format_http_body ~status:502 ~body in
+  let rendered = render_http_body ~status:502 ~body in
   [%test_pred: string] (fun s -> not (String.contains s '\n')) rendered ;
   [%test_pred: string]
     (String.is_substring ~substring:"502 Bad Gateway")
     rendered
 
 let%test_unit "format_http_body handles empty body" =
-  [%test_eq: string] (format_http_body ~status:504 ~body:"") "HTTP 504"
+  [%test_eq: string]
+    (render_http_body ~status:504 ~body:"")
+    "HTTP 504 from http://localhost:3087/network/status"
 
 let%test_unit "format_invalid_json is one line and bounded" =
   let url = Uri.of_string "http://localhost:3087/block" in
