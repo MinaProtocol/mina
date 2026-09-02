@@ -105,16 +105,6 @@ let account_balance t ~address ?token_id ?block_index () =
   Http.post_json t ~path:"/account/balance"
     ~body:(RM.Account_balance_request.to_yojson request)
 
-let account_coins t ~address ?(include_mempool = false) () =
-  let request =
-    RM.Account_coins_request.create
-      (Http.network_identifier t)
-      (account_identifier address)
-      include_mempool
-  in
-  Http.post_json t ~path:"/account/coins"
-    ~body:(RM.Account_coins_request.to_yojson request)
-
 let mempool t = Http.post_json t ~path:"/mempool" ~body:(network_request t)
 
 let mempool_transaction t ~tx_hash =

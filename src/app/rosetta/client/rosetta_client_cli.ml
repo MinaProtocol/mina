@@ -181,20 +181,15 @@ let cmd_account_balance =
        run g ~call:(fun c ->
            MRC.Data.account_balance c ~address ?token_id ?block_index () ) )
 
-let cmd_account_coins =
-  Command.async ~summary:"POST /account/coins"
-    (let%map_open.Command g = global_flags_param
-     and address = address_flag
-     and include_mempool =
-       flag "--include-mempool" ~doc:" Include mempool transactions" no_arg
-     in
-     fun () ->
-       run g ~call:(fun c ->
-           MRC.Data.account_coins c ~address ~include_mempool () ) )
+(* Note: there is no [account coins] subcommand.  Mina's Rosetta server
+   does not implement /account/coins -- it routes /account/balance and
+   404s the rest -- and the coins model is a UTXO notion that an
+   account-based chain has nothing to say about, which is why
+   /network/options advertises "mempool_coins": false. *)
 
 let account_group =
   Command.group ~summary:"Rosetta /account/* endpoints"
-    [ ("balance", cmd_account_balance); ("coins", cmd_account_coins) ]
+    [ ("balance", cmd_account_balance) ]
 
 let cmd_mempool_list =
   Command.async ~summary:"POST /mempool"
