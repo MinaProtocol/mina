@@ -16,23 +16,20 @@ services:
     ports:
       - '${POSTGRES_PORT}:5432'
 
+  # Downloads the published archive dump, applies the recommended Postgres
+  # tuning, and loads it. mina-provision derives the dump location and file
+  # name from MINA_NETWORK, so no dump URL or prefix is configured here.
   bootstrap_db:
-    image: '${MINA_ARCHIVE_IMAGE}'
+    image: '${MINA_PROVISION_IMAGE}'
     environment:
+      MINA_NETWORK: ${MINA_NETWORK}
       PGPASSWORD: ${POSTGRES_PASSWORD}
     command:
-      - bash
-      - -c
-      - |
-        set -eo pipefail
-        curl -fSL -O ${ARCHIVE_DUMP_BASE_URL}/${ARCHIVE_DUMP_PREFIX}-$$(date +%F_0000).sql.tar.gz
-        tar -zxvf ${ARCHIVE_DUMP_PREFIX}-$$(date +%F_0000).sql.tar.gz
-        psql postgres://${POSTGRES_USER}@postgres:5432/${POSTGRES_DB} \
-          -c "ALTER SYSTEM SET max_connections = 500" \
-          -c "ALTER SYSTEM SET max_locks_per_transaction = 100" \
-          -c "ALTER SYSTEM SET max_pred_locks_per_relation = 100" \
-          -c "ALTER SYSTEM SET max_pred_locks_per_transaction = 5000"
-        psql postgres://${POSTGRES_USER}@postgres:5432/${POSTGRES_DB} -f ${ARCHIVE_DUMP_PREFIX}-$$(date +%F_0000).sql
+      - archive
+      - --pg-uri
+      - postgres://${POSTGRES_USER}@postgres:5432/${POSTGRES_DB}
+      - --work-dir
+      - /tmp
     depends_on:
       postgres:
         condition: service_healthy
