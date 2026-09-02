@@ -6,14 +6,8 @@
   ;; opam libraries
   core
   core_unix.command_unix
-  core_unix
   async
   async.async_command
-  async_kernel
-  async_unix
-  cohttp
-  cohttp-async
-  ppx_deriving_yojson.runtime
   uri
   yojson
   ;; local libraries
@@ -21,4 +15,4 @@
  (instrumentation
   (backend bisect_ppx))
  (preprocess
-  (pps ppx_version ppx_let ppx_here ppx_deriving_yojson)))
+  (pps ppx_version ppx_let)))

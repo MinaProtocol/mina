@@ -2,7 +2,7 @@
 ;;
 ;; These exercise only subcommands that don't need a running Rosetta
 ;; server: --help for each subgroup and the clean error paths of the
-;; HTTP and JSON-validation code.
+;; HTTP code.
 
 (test
  (name test_rosetta_client)
@@ -11,15 +11,7 @@
   alcotest
   async
   core
-  core_kernel
-  core_unix
-  core_unix.signal_unix
-  core_unix.filename_unix
-  core_unix.sys_unix
-  stdio
-  yojson
-  ;; mina libraries
-  rosetta_client)
+  core_unix.signal_unix)
  (deps ../rosetta_client_cli.exe)
  (instrumentation
   (backend bisect_ppx))
