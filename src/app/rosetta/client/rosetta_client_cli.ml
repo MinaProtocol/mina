@@ -12,14 +12,8 @@
    failure, prints a short human-readable diagnostic on stderr and exits
    non-zero; the diagnostic never leaks raw OCaml exception syntax.
 
-   Environment variables (each one is overridden by the matching flag):
-
-   - [MINA_ROSETTA_URI] — default for [--rosetta-uri].
-   - [MINA_ROSETTA_BLOCKCHAIN] — default for [--blockchain].
-   - [MINA_ROSETTA_NETWORK] — default for [--network].
-
-   The values they fall back to when unset live in
-   [Rosetta_client.Defaults]. *)
+   The connection flags, the environment variables that override their
+   defaults and the values behind those live in [Rosetta_client.Flags]. *)
 
 open Core
 open Async
@@ -37,56 +31,21 @@ let default_timeout = 30.0
 (* ---------- Global flags shared by every leaf command ---------- *)
 
 (* A record that every subcommand's [let%map_open] can pull in with a
-   single line.  Keeps per-command preludes short. *)
-type global_flags =
-  { base_uri : string
-  ; blockchain : string
-  ; network : string
-  ; timeout : float
-  ; compact : bool
-  }
+   single line.  Keeps per-command preludes short.  The connection flags
+   -- and the environment variables behind them -- belong to
+   [MRC.Flags], which hands back a client already built from them. *)
+type global_flags = { client : MRC.Http.t; compact : bool }
 
 let global_flags_param =
   let open Command.Let_syntax in
-  let open Command.Param in
-  let%map base_uri =
-    flag "--rosetta-uri"
-      ~doc:
-        (sprintf "URI Rosetta base URL (default: %s, overridable via $%s)"
-           (MRC.Defaults.base_uri_from_env ())
-           MRC.Defaults.uri_env_var )
-      (optional_with_default (MRC.Defaults.base_uri_from_env ()) string)
-  and blockchain =
-    flag "--blockchain"
-      ~doc:
-        (sprintf
-           "NAME network_identifier.blockchain (default: %s, overridable via \
-            $%s)"
-           (MRC.Defaults.blockchain_from_env ())
-           MRC.Defaults.blockchain_env_var )
-      (optional_with_default (MRC.Defaults.blockchain_from_env ()) string)
-  and network =
-    flag "--network"
-      ~doc:
-        (sprintf
-           "NAME network_identifier.network (default: %s, overridable via $%s)"
-           (MRC.Defaults.network_from_env ())
-           MRC.Defaults.network_env_var )
-      (optional_with_default (MRC.Defaults.network_from_env ()) string)
-  and timeout =
-    flag "--timeout"
-      ~doc:
-        (sprintf "SECONDS HTTP request timeout (default: %.0f)" default_timeout)
-      (optional_with_default default_timeout float)
+  let%map client =
+    MRC.Flags.client ~timeout:(MRC.Flags.timeout ~default:default_timeout)
   and compact =
-    flag "--compact" ~doc:" Emit compact JSON instead of indented (pretty)"
-      no_arg
+    Command.Param.flag "--compact"
+      ~doc:" Emit compact JSON instead of indented (pretty)"
+      Command.Param.no_arg
   in
-  { base_uri; blockchain; network; timeout; compact }
-
-let client_of_globals g =
-  MRC.Http.create ~base_uri:(Uri.of_string g.base_uri) ~blockchain:g.blockchain
-    ~network:g.network ~timeout:g.timeout ()
+  { client; compact }
 
 (* Single JSON record on stdout, with a trailing newline.  Bypasses
    Async's [print_*] wrappers so the output flushes even when we take
@@ -108,8 +67,7 @@ let emit_error msg =
    and exit 1).  Wraps the "happy path" so each leaf command stays a
    one-liner. *)
 let run g ~(call : MRC.Http.t -> Yojson.Safe.t Deferred.Or_error.t) =
-  let client = client_of_globals g in
-  match%map call client with
+  match%map call g.client with
   | Ok j ->
       emit_json g j
   | Error e ->

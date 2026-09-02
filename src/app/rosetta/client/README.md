@@ -45,9 +45,10 @@ Every leaf command accepts:
 | `--compact` | off | | Emit compact JSON instead of indented. |
 
 A flag always wins over its environment variable.  Export the variables
-to talk to the same server repeatedly without repeating the flags.  Their
-fallback values live in `Rosetta_client.Defaults`, so every binary built
-on the library falls back to the same place.
+to talk to the same server repeatedly without repeating the flags.  The
+flags themselves live in `Rosetta_client.Flags` and their fallbacks in
+`Rosetta_client.Defaults`, so every binary built on the library offers
+the same flags and falls back to the same place.
 
 ## Examples
 
