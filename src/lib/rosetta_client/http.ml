@@ -19,14 +19,6 @@ let create ~base_uri ?(blockchain = Defaults.blockchain)
     ?(network = Defaults.network) ?(timeout = Defaults.http_timeout) () =
   { base_uri = normalize_base base_uri; blockchain; network; timeout }
 
-let base_uri t = t.base_uri
-
-let blockchain t = t.blockchain
-
-let network t = t.network
-
-let timeout t = t.timeout
-
 let network_identifier t =
   Rosetta_models.Network_identifier.create t.blockchain t.network
 
@@ -127,11 +119,6 @@ let post_json t ~path ~body =
       Cohttp_async.Client.post ~interrupt ~headers:request_headers
         ~body:(Cohttp_async.Body.of_string body_str)
         uri )
-
-let get_json t ~path =
-  let uri = join_uri t.base_uri path in
-  with_request t ~uri ~describe:"GET" ~make_req:(fun ~interrupt ->
-      Cohttp_async.Client.get ~interrupt ~headers:response_headers uri )
 
 (* Regression guard: when a response's body stalls, the timeout must
    close the connection, not merely stop waiting on it.  The server here
