@@ -74,8 +74,11 @@ rosetta-client network options
 On success, the response body is printed as pretty JSON on stdout (or
 compact JSON with `--compact`), followed by a single newline.  Exit 0.
 
-On failure — HTTP non-2xx or a transport error — the tool prints a short
-diagnostic on stderr and exits 1.  The diagnostic is guaranteed to:
+On failure — HTTP non-2xx or a transport error — the tool logs a short
+diagnostic to stderr through Mina's `Logger` and exits 1.  Stdout stays
+the data channel: it carries the response and nothing else, so a caller
+can pipe it into `jq` without filtering log lines out first.  The
+diagnostic is guaranteed to:
 
 - Never leak raw OCaml exception syntax (no `Unix_error`, no `(Unix. ...)`).
 - Never dump multi-kilobyte HTTP bodies verbatim; Rosetta error envelopes
