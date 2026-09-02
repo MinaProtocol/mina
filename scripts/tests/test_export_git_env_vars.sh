@@ -13,9 +13,9 @@ set -uo pipefail
 # scripts/export-git-env-vars.sh must take its git facts from
 # MINA_GIT_ENV_FILE when one is named, and from the checkout when none is.
 #
-# buildkite/scripts/git-env/{write,read}_from_cache.sh must put that file in
-# the CI cache and get it back, so a job that compiles nothing can be told what
-# the binaries it is wrapping were built from. That matters most for
+# buildkite/scripts/git-env/{pin,read_from_cache}.sh must fix one identity for
+# a build, before any job that reads one runs, and inherit it from the app
+# build when this build compiled nothing. That matters most for
 # GITHASH_CONFIG, which names the genesis config the daemon auto-loads: derived
 # from the wrapping job's own checkout it names the wrong commit and the
 # package holds a config its daemon will not look for.
@@ -185,7 +185,7 @@ test_an_incomplete_pin_is_an_error() {
 # The CI cache round trip
 ################################################################################
 
-# What the app build writes is what a later job reads back.
+# What the prepare step pins is what every later job reads back.
 test_the_pin_survives_the_cache() {
     local cache="${TMP_ROOT}/cache" dest="${TMP_ROOT}/fetched" out head
     mkdir -p "$cache" "$dest"
@@ -194,8 +194,8 @@ test_the_pin_survives_the_cache() {
     ( cd "$REPO_ROOT" && \
       CACHE_BASE_URL="$cache" BUILDKITE_BUILD_ID="a-build" BUILDKITE_BRANCH="a-branch" \
       OVERRIDE_TAG="4.5.6" \
-      ./buildkite/scripts/git-env/write_to_cache.sh ) >/dev/null 2>&1
-    assert_eq "the writer succeeds" "0" "$?"
+      ./buildkite/scripts/git-env/pin.sh ) >/dev/null 2>&1
+    assert_eq "the pin succeeds" "0" "$?"
 
     local fetched
     fetched="$( cd "$REPO_ROOT" && \
@@ -209,29 +209,74 @@ test_the_pin_survives_the_cache() {
     assert_eq "the githash round trips" "$head" "$(sed -n 2p <<<"$out")"
 }
 
-# A packaging job reads the app build's root, not its own, which is how the
-# identity reaches a build that compiled nothing.
-test_the_reader_follows_the_apps_root() {
-    local cache="${TMP_ROOT}/cache2" dest="${TMP_ROOT}/fetched2" fetched
+# A packaging build compiles nothing, so it takes the identity of the app build
+# it is wrapping and copies it into its own root -- where every one of its own
+# jobs then finds it, without any of them knowing where the binaries came from.
+test_a_packaging_build_inherits_the_apps_identity() {
+    local cache="${TMP_ROOT}/cache2" dest="${TMP_ROOT}/fetched2" fetched out
     mkdir -p "$cache" "$dest"
 
     ( cd "$REPO_ROOT" && \
       CACHE_BASE_URL="$cache" BUILDKITE_BUILD_ID="the-app-build" BUILDKITE_BRANCH="a-branch" \
       OVERRIDE_TAG="4.5.6" \
-      ./buildkite/scripts/git-env/write_to_cache.sh ) >/dev/null 2>&1
+      ./buildkite/scripts/git-env/pin.sh ) >/dev/null 2>&1
+
+    # A different commit is checked out here; it must not be what comes out.
+    ( cd "$REPO_ROOT" && \
+      CACHE_BASE_URL="$cache" BUILDKITE_BUILD_ID="the-packaging-build" \
+      MINA_APPS_CACHE_ROOT="the-app-build" BUILDKITE_BRANCH="another-branch" \
+      OVERRIDE_TAG="9.9.9" \
+      ./buildkite/scripts/git-env/pin.sh ) >/dev/null 2>&1
+    assert_eq "the inheriting pin succeeds" "0" "$?"
 
     fetched="$( cd "$REPO_ROOT" && \
       CACHE_BASE_URL="$cache" BUILDKITE_BUILD_ID="the-packaging-build" \
-      MINA_APPS_CACHE_ROOT="the-app-build" \
       ./buildkite/scripts/git-env/read_from_cache.sh "$dest" 2>/dev/null )"
+    assert_eq "the packaging build has its own copy" "${dest}/git-env.json" "$fetched"
 
-    assert_eq "found through MINA_APPS_CACHE_ROOT" "${dest}/git-env.json" "$fetched"
+    out="$(MINA_GIT_ENV_FILE="$fetched" export_vars ./scripts/export-git-env-vars.sh GITTAG)"
+    assert_eq "it describes the app build, not this checkout" "4.5.6" "$out"
+}
+
+# Pinning twice in one build must not move the identity: the second stage of a
+# release pipeline uploads prepare again, and it has to keep what stage one set.
+test_a_second_stage_keeps_the_first_pin() {
+    local cache="${TMP_ROOT}/cache3" dest="${TMP_ROOT}/fetched3" fetched out
+    mkdir -p "$cache" "$dest"
+
+    for tag in 4.5.6 9.9.9; do
+        ( cd "$REPO_ROOT" && \
+          CACHE_BASE_URL="$cache" BUILDKITE_BUILD_ID="a-build" BUILDKITE_BRANCH="a-branch" \
+          OVERRIDE_TAG="$tag" \
+          ./buildkite/scripts/git-env/pin.sh ) >/dev/null 2>&1
+    done
+
+    fetched="$( cd "$REPO_ROOT" && \
+      CACHE_BASE_URL="$cache" BUILDKITE_BUILD_ID="a-build" \
+      ./buildkite/scripts/git-env/read_from_cache.sh "$dest" 2>/dev/null )"
+    out="$(MINA_GIT_ENV_FILE="$fetched" export_vars ./scripts/export-git-env-vars.sh GITTAG)"
+    assert_eq "the first pin stands" "4.5.6" "$out"
+}
+
+# Being told the binaries come from elsewhere, and finding no identity there,
+# is a fault. Deriving from this checkout instead is the exact mistake that
+# puts the wrong config_<hash>.json into a package, and it would say nothing.
+test_wrapping_an_unpinned_build_is_an_error() {
+    local cache="${TMP_ROOT}/cache4"
+    mkdir -p "$cache"
+
+    ( cd "$REPO_ROOT" && \
+      CACHE_BASE_URL="$cache" BUILDKITE_BUILD_ID="the-packaging-build" \
+      MINA_APPS_CACHE_ROOT="a-build-that-never-pinned" BUILDKITE_BRANCH="a-branch" \
+      OVERRIDE_TAG="1.1.1" \
+      ./buildkite/scripts/git-env/pin.sh ) >/dev/null 2>&1
+    assert_nonzero_exit "no identity to inherit" "$?"
 }
 
 # Nothing pinned is an ordinary outcome, not a failure: plenty of callers run
 # where there is no cache at all.
 test_a_cache_without_a_pin_is_not_an_error() {
-    local cache="${TMP_ROOT}/empty" dest="${TMP_ROOT}/fetched3"
+    local cache="${TMP_ROOT}/empty" dest="${TMP_ROOT}/fetched5"
     mkdir -p "$cache" "$dest"
 
     ( cd "$REPO_ROOT" && \
@@ -239,7 +284,6 @@ test_a_cache_without_a_pin_is_not_an_error() {
       ./buildkite/scripts/git-env/read_from_cache.sh "$dest" ) >/dev/null 2>&1
     assert_nonzero_exit "the reader reports the miss" "$?"
 
-    # and the wrapper carries on deriving from the checkout
     local out
     out="$( cd "$REPO_ROOT" && \
       CACHE_BASE_URL="$cache" BUILDKITE_BUILD_ID="a-build" BUILDKITE_BRANCH="a-branch" \
@@ -261,7 +305,9 @@ main() {
     run_test test_an_unreadable_pin_is_an_error
     run_test test_an_incomplete_pin_is_an_error
     run_test test_the_pin_survives_the_cache
-    run_test test_the_reader_follows_the_apps_root
+    run_test test_a_packaging_build_inherits_the_apps_identity
+    run_test test_a_second_stage_keeps_the_first_pin
+    run_test test_wrapping_an_unpinned_build_is_an_error
     run_test test_a_cache_without_a_pin_is_not_an_error
 
     teardown
