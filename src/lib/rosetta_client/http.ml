@@ -93,19 +93,17 @@ let with_request t ~uri ~make_req ~describe =
             Deferred.Or_error.error_string
               (Errors.format_invalid_json ~url:uri ~body:body_str) )
 
-(* Every Rosetta endpoint answers JSON; only the ones we send a body to
-   also need to declare the request's own content type.  [request_headers]
-   is derived from [response_headers] so the shared Accept is stated once. *)
-let response_headers = Cohttp.Header.init_with "Accept" "application/json"
-
-let request_headers =
-  Cohttp.Header.add response_headers "Content-Type" "application/json"
+(* Both sides of every Rosetta exchange are JSON: we send a JSON body
+   and we only know how to read a JSON answer. *)
+let json_headers =
+  Cohttp.Header.of_list
+    [ ("Accept", "application/json"); ("Content-Type", "application/json") ]
 
 let post_json t ~path ~body =
   let uri = join_uri t.base_uri path in
   let body_str = Yojson.Safe.to_string body in
   with_request t ~uri ~describe:"POST" ~make_req:(fun ~interrupt ->
-      Cohttp_async.Client.post ~interrupt ~headers:request_headers
+      Cohttp_async.Client.post ~interrupt ~headers:json_headers
         ~body:(Cohttp_async.Body.of_string body_str)
         uri )
 
