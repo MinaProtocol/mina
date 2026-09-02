@@ -3,12 +3,7 @@
    messages that are safe to splat into a [{"error": "..."}] JSON field:
    no raw OCaml exception syntax, no giant HTTP bodies. *)
 
-open Core_kernel
-
-(* Use [Core.Unix] for the [Unix.Unix_error] constructor (Core_kernel
-   shadows Unix).  Aliased locally so the pattern-match syntax stays
-   natural. *)
-module Unix = Core.Unix
+open Core
 
 let max_body_chars = 500
 
@@ -61,18 +56,18 @@ let format_http_body ~status ~body =
 let format_exn ~url exn =
   let url_s = Uri.to_string url in
   match exn with
-  | Unix.Unix_error (Unix.ECONNREFUSED, _, _) ->
+  | Core_unix.Unix_error (Core_unix.ECONNREFUSED, _, _) ->
       sprintf "connection refused to %s" url_s
-  | Unix.Unix_error (Unix.ETIMEDOUT, _, _) ->
+  | Core_unix.Unix_error (Core_unix.ETIMEDOUT, _, _) ->
       sprintf "timeout connecting to %s" url_s
-  | Unix.Unix_error (Unix.ENETUNREACH, _, _) ->
+  | Core_unix.Unix_error (Core_unix.ENETUNREACH, _, _) ->
       sprintf "network unreachable to %s" url_s
-  | Unix.Unix_error (Unix.EHOSTUNREACH, _, _) ->
+  | Core_unix.Unix_error (Core_unix.EHOSTUNREACH, _, _) ->
       sprintf "host unreachable to %s" url_s
-  | Unix.Unix_error (Unix.ECONNRESET, _, _) ->
+  | Core_unix.Unix_error (Core_unix.ECONNRESET, _, _) ->
       sprintf "connection reset by %s" url_s
-  | Unix.Unix_error (err, _, _) ->
-      sprintf "request to %s failed: %s" url_s (Unix.Error.message err)
+  | Core_unix.Unix_error (err, _, _) ->
+      sprintf "request to %s failed: %s" url_s (Core_unix.Error.message err)
   | Failure m ->
       sprintf "request to %s failed: %s" url_s m
   | _ ->
@@ -120,13 +115,15 @@ let%test_unit "format_http_body handles empty body" =
 
 let%test_unit "format_exn ECONNREFUSED is readable" =
   let url = Uri.of_string "http://localhost:9999" in
-  let exn = Unix.Unix_error (Unix.ECONNREFUSED, "connect", "127.0.0.1:9999") in
+  let exn =
+    Core_unix.Unix_error (Core_unix.ECONNREFUSED, "connect", "127.0.0.1:9999")
+  in
   [%test_eq: string] (format_exn ~url exn)
     "connection refused to http://localhost:9999"
 
 let%test_unit "format_exn never leaks OCaml Unix_error syntax" =
   let url = Uri.of_string "http://example.invalid" in
-  let exn = Unix.Unix_error (Unix.ECONNREFUSED, "connect", "x") in
+  let exn = Core_unix.Unix_error (Core_unix.ECONNREFUSED, "connect", "x") in
   let s = format_exn ~url exn in
   [%test_pred: string]
     (fun s -> not (String.is_substring s ~substring:"Unix_error"))
@@ -137,6 +134,6 @@ let%test_unit "format_exn never leaks OCaml Unix_error syntax" =
 
 let%test_unit "format_exn handles ETIMEDOUT" =
   let url = Uri.of_string "http://slow.example" in
-  let exn = Unix.Unix_error (Unix.ETIMEDOUT, "connect", "x") in
+  let exn = Core_unix.Unix_error (Core_unix.ETIMEDOUT, "connect", "x") in
   [%test_eq: string] (format_exn ~url exn)
     "timeout connecting to http://slow.example"

@@ -1,6 +1,6 @@
 (* HTTP core for the Rosetta client library.  See [http.mli]. *)
 
-open Core_kernel
+open Core
 open Async
 
 type t =
@@ -81,7 +81,7 @@ let with_request t ~uri ~make_req ~describe =
   let result =
     Deferred.Or_error.try_with ~here:[%here] ~extract_exn:true exchange
   in
-  match%bind Async.with_timeout (Time.Span.of_sec t.timeout) result with
+  match%bind Async.with_timeout (Time_float.Span.of_sec t.timeout) result with
   | `Timeout ->
       Ivar.fill_if_empty timed_out () ;
       Option.iter (Ivar.peek body_pipe) ~f:Pipe.close_read ;
@@ -165,7 +165,7 @@ let%test_unit "a timed-out response body closes its connection" =
             Error.to_string_hum e ) ;
       let%bind () =
         match%map
-          Async.with_timeout (Time.Span.of_sec 5.0) (Ivar.read hung_up)
+          Async.with_timeout (Time_float.Span.of_sec 5.0) (Ivar.read hung_up)
         with
         | `Timeout ->
             failwith "the timed-out request left its connection open"

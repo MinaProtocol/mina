@@ -4,7 +4,7 @@
  (libraries
   ;; opam libraries
   core
-  core_kernel
+  core_unix
   async
   cohttp
   cohttp-async
