@@ -9,6 +9,7 @@
    Core.Unix.Unix_error, etc.).  See [assert_no_ocaml_exn_leak]. *)
 
 open Core
+open Async
 
 (* Path to the binary under test.  dune places the test executable in
    the same directory as its deps, so [../rosetta_client_cli.exe] is reachable from
@@ -18,31 +19,29 @@ let bin =
   let here = Filename.dirname (Array.get (Sys.get_argv ()) 0) in
   Filename.concat here "../rosetta_client_cli.exe"
 
-let read_all_fd fd =
-  let ic = Core_unix.in_channel_of_descr fd in
-  let s = In_channel.input_all ic in
-  In_channel.close ic ; s
-
 (* Spawn the CLI with [args] and an optional env extension, capture
-   stdout and stderr, return [(exit_code, stdout, stderr)]. *)
+   stdout and stderr, return [(exit_code, stdout, stderr)].
+
+   [collect_output_and_wait] drains both pipes concurrently and closes
+   the child's stdin.  Reading one to EOF and only then the other would
+   deadlock as soon as a child wrote more than a pipe buffer to the one
+   we are not reading. *)
 let run_cli ?(env = []) args =
-  let pi = Core_unix.create_process_env ~prog:bin ~args ~env:(`Extend env) () in
-  (* Close stdin immediately so the child gets EOF if it ever tried to
-     read. *)
-  Core_unix.close pi.stdin ;
-  let out = read_all_fd pi.stdout in
-  let err = read_all_fd pi.stderr in
-  let status = Core_unix.waitpid pi.pid in
-  let code =
-    match status with
-    | Ok () ->
-        0
-    | Error (`Exit_non_zero n) ->
-        n
-    | Error (`Signal s) ->
-        128 + Signal_unix.to_system_int s
-  in
-  (code, out, err)
+  Thread_safe.block_on_async_exn (fun () ->
+      let%bind process =
+        Process.create_exn ~prog:bin ~args ~env:(`Extend env) ()
+      in
+      let%map output = Process.collect_output_and_wait process in
+      let code =
+        match output.exit_status with
+        | Ok () ->
+            0
+        | Error (`Exit_non_zero n) ->
+            n
+        | Error (`Signal s) ->
+            128 + Signal_unix.to_system_int s
+      in
+      (code, output.stdout, output.stderr) )
 
 (* Regression guard: no user-facing output must contain raw OCaml
    exception syntax.  The triggering bug for this whole cleanup was

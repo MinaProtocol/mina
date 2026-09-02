@@ -9,6 +9,7 @@
  (libraries
   ;; opam libraries
   alcotest
+  async
   core
   core_kernel
   core_unix
@@ -23,4 +24,4 @@
  (instrumentation
   (backend bisect_ppx))
  (preprocess
-  (pps ppx_version)))
+  (pps ppx_version ppx_let)))
