@@ -1,0 +1,20 @@
+(executable
+ (package rosetta)
+ (name rosetta_client_cli)
+ (public_name rosetta-client)
+ (libraries
+  ;; opam libraries
+  core
+  core_unix.command_unix
+  async
+  async.async_command
+  uri
+  yojson
+  ;; local libraries
+  interpolator_lib
+  logger
+  rosetta_client)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_version ppx_let ppx_mina)))
