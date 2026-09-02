@@ -338,7 +338,8 @@ rosetta-connectivity.sh
 ```
 
 ### External Dependencies:
-- **curl**: HTTP request execution
+- **rosetta-client**: Rosetta API requests (ships in the `mina-rosetta` package)
+- **curl**: HTTP request execution (the daemon's GraphQL endpoint)
 - **jq**: JSON response parsing and validation
 - **psql**: PostgreSQL database connectivity (load testing)
 - **docker**: Container management (connectivity testing)
