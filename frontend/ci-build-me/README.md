@@ -6,7 +6,11 @@ For JS code, only `src/index.js` was modified.
 
 This proxy listens on a webhook via a Google Cloud Function and conditionally starts the Mina buildkite pipeline.
 
-We currently dispatch a build the moment the `ci-build-me` label is added and any time commits are pushed to a pull-request that has this label attached to it.
+A build is dispatched by a **comment** on a pull request: the function handles
+`issue_comment.created` events and nothing else. Labels do not trigger anything
+-- an earlier version of this function dispatched on the `ci-build-me` label,
+and that handler is gone. The comment author must be a *public* member of the
+`MinaProtocol` organization.
 
 ## Commands
 

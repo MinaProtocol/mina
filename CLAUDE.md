@@ -207,7 +207,8 @@ dune runtest src/lib/mina_lib
 - `packages.o1test.net` - Unsigned, legacy multichannel repo
 
 ## CI/PR Process
-- Full CI run need `!ci-nightly-me` comment for CI to run
-- PRs from main repo need `!ci-build-me` label
+- CI is triggered by a PR **comment**, never by a label: comment `!ci-build-me` for standard CI, `!ci-nightly-me` for the nightly/end-to-end pipeline
+- Most commands are matched against the whole comment body, so post the command alone with no extra prose
+- The comment author must be a public member of the MinaProtocol org
 - Code must be formatted with `make reformat` before commits
 - CI uses Docker images from `europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/`
