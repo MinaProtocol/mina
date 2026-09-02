@@ -19,7 +19,7 @@ let single_line s =
 let truncate s =
   let s = single_line s in
   if String.length s <= max_body_chars then s
-  else String.sub s ~pos:0 ~len:max_body_chars ^ "... (truncated)"
+  else String.prefix s max_body_chars ^ "... (truncated)"
 
 (* The [message] of a Rosetta error envelope
    ({"code":_,"message":_,"retriable":_,...}).  We decode only that one
@@ -52,6 +52,10 @@ let format_http_body ~status ~body =
   | None ->
       if String.is_empty (String.strip body) then sprintf "HTTP %d" status
       else sprintf "HTTP %d: %s" status (truncate body)
+
+let format_invalid_json ~url ~body =
+  sprintf "invalid JSON response from %s: %s" (Uri.to_string url)
+    (truncate body)
 
 let format_exn ~url exn =
   let url_s = Uri.to_string url in
@@ -112,6 +116,16 @@ let%test_unit "format_http_body renders a multi-line body on one line" =
 
 let%test_unit "format_http_body handles empty body" =
   [%test_eq: string] (format_http_body ~status:504 ~body:"") "HTTP 504"
+
+let%test_unit "format_invalid_json is one line and bounded" =
+  let url = Uri.of_string "http://localhost:3087/block" in
+  let body = "<html>\n" ^ String.make (max_body_chars + 100) 'x' in
+  let rendered = format_invalid_json ~url ~body in
+  [%test_pred: string] (fun s -> not (String.contains s '\n')) rendered ;
+  [%test_pred: string] (String.is_substring ~substring:"truncated") rendered ;
+  [%test_pred: string]
+    (String.is_substring ~substring:"http://localhost:3087/block")
+    rendered
 
 let%test_unit "format_exn ECONNREFUSED is readable" =
   let url = Uri.of_string "http://localhost:9999" in

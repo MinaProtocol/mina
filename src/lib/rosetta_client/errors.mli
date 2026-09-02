@@ -12,6 +12,11 @@
     to a fixed cap. *)
 val format_http_body : status:int -> body:string -> string
 
+(** [format_invalid_json ~url ~body] renders a 2xx response whose body
+    is not JSON, with the body collapsed to one line and truncated to
+    the same cap as {!format_http_body}. *)
+val format_invalid_json : url:Uri.t -> body:string -> string
+
 (** [format_exn ~url e] renders a transport exception (typically from
     Cohttp_async or Async_unix) as a short diagnostic like
     ["connection refused to http://localhost:9999"].  No raw OCaml

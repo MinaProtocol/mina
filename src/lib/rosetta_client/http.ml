@@ -93,12 +93,8 @@ let with_request t ~uri ~make_req ~describe =
         | Ok j ->
             Deferred.Or_error.return j
         | Error _ ->
-            Deferred.Or_error.errorf
-              "invalid JSON response from %s (first 200 chars: %s)"
-              (Uri.to_string uri)
-              ( if String.length body_str > 200 then
-                  String.sub body_str ~pos:0 ~len:200
-                else body_str ) )
+            Deferred.Or_error.error_string
+              (Errors.format_invalid_json ~url:uri ~body:body_str) )
 
 (* Every Rosetta endpoint answers JSON; only the ones we send a body to
    also need to declare the request's own content type.  [request_headers]
