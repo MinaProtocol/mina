@@ -93,7 +93,10 @@ let client_of_globals g =
    Async's [print_*] wrappers so the output flushes even when we take
    the [Stdlib.exit] fast path. *)
 let emit_json g json =
-  let s = if g.compact then MRC.Http.compact json else MRC.Http.pretty json in
+  let s =
+    if g.compact then Yojson.Safe.to_string json
+    else Yojson.Safe.pretty_to_string json
+  in
   Stdlib.print_string s ; Stdlib.print_newline () ; Stdlib.flush Stdlib.stdout
 
 let emit_error msg =
