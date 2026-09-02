@@ -47,9 +47,10 @@ let global_flags_param =
   in
   { client; compact }
 
-(* Single JSON record on stdout, with a trailing newline.  Bypasses
-   Async's [print_*] wrappers so the output flushes even when we take
-   the [Stdlib.exit] fast path. *)
+(* Single JSON record on stdout, with a trailing newline.  Stdout is
+   this CLI's data channel -- scripts/tests/rosetta-helper.sh pipes it
+   straight into jq -- so the payload goes out raw, unprefixed and
+   unlabelled.  Diagnostics go the other way, through [Logger] below. *)
 let emit_json g json =
   let s =
     if g.compact then Yojson.Safe.to_string json
@@ -57,11 +58,22 @@ let emit_json g json =
   in
   Stdlib.print_string s ; Stdlib.print_newline () ; Stdlib.flush Stdlib.stdout
 
-let emit_error msg =
-  (* No raw OCaml exception text leaks: [msg] is produced by
-     [MRC.Errors] formatters or by the CLI itself. *)
-  Stdlib.prerr_string (msg ^ "\n") ;
-  Stdlib.flush Stdlib.stderr
+(* Diagnostics go to stderr through [Logger], which is where every other
+   Mina binary sends them, so a rosetta-client run in a pod is collected
+   and filtered like the daemon beside it. *)
+let logger = Logger.create ~id:"rosetta-client" ()
+
+let setup_logging () =
+  Logger.Consumer_registry.register ~id:"rosetta-client"
+    ~processor:
+      (Logger.Processor.pretty ~log_level:Logger.Level.Info
+         ~config:
+           { Interpolator_lib.Interpolator.mode = Inline
+           ; max_interpolation_length = 50
+           ; pretty_print = true
+           } )
+    ~transport:(Logger.Transport.raw Stdlib.prerr_endline)
+    ()
 
 (* Run a client call, emit the result as JSON (or the error on stderr
    and exit 1).  Wraps the "happy path" so each leaf command stays a
@@ -71,7 +83,9 @@ let run g ~(call : MRC.Http.t -> Yojson.Safe.t Deferred.Or_error.t) =
   | Ok j ->
       emit_json g j
   | Error e ->
-      emit_error (Error.to_string_hum e) ;
+      (* The message comes from the library's error formatters, so no
+         raw OCaml exception text reaches the log. *)
+      [%log error] "%s" (Error.to_string_hum e) ;
       Stdlib.exit 1
 
 (* ---------- Flags reused by more than one subcommand ---------- *)
@@ -127,7 +141,7 @@ let cmd_block_get =
      fun () ->
        match (index, hash) with
        | None, None ->
-           emit_error "block get: one of --index or --hash is required" ;
+           [%log error] "block get: one of --index or --hash is required" ;
            Stdlib.exit 1
        | _ ->
            run g ~call:(fun c -> MRC.Data.block c ?index ?hash ()) )
@@ -198,6 +212,7 @@ let search_group =
 (* ---------- Top-level ---------- *)
 
 let () =
+  setup_logging () ;
   Command_unix.run
     (Command.group
        ~summary:
