@@ -30,10 +30,6 @@ let join_uri base path =
   let path = if String.is_prefix path ~prefix:"/" then path else "/" ^ path in
   Uri.with_path base (Uri.path base ^ path)
 
-let pretty j = Yojson.Safe.pretty_to_string j
-
-let compact j = Yojson.Safe.to_string j
-
 (* One request/response exchange: enforces [t.timeout], folds all
    transport/decode failures into the error channel, and renders any
    error via [Errors] so callers never see raw OCaml exception text.

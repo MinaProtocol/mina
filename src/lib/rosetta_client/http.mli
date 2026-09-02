@@ -34,9 +34,3 @@ val post_json :
   -> path:string
   -> body:Yojson.Safe.t
   -> Yojson.Safe.t Async.Deferred.Or_error.t
-
-(** Pretty-print (indented) a JSON value to a string. *)
-val pretty : Yojson.Safe.t -> string
-
-(** Compact-print a JSON value to a string. *)
-val compact : Yojson.Safe.t -> string
