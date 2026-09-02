@@ -437,17 +437,6 @@ let build_apps
                                                                   spec.debVersion} ${appsSpecVariant
                                                                                        spec}"
 
-          let gitEnvPin =
-              -- The commit these binaries were built from, recorded beside
-              -- them, because every job after this one wraps them from a
-              -- checkout that need not be the same commit. Writing it here and
-              -- not in the packaging job is the whole point: identity has to
-              -- travel with the binaries.
-              --
-              -- Idempotent, and every app-build variant writes the same file
-              -- for a build, so which of them runs last does not matter.
-                Cmd.run "./buildkite/scripts/git-env/write_to_cache.sh"
-
           in  Command.build
                 Command.Config::{
                 , commands =
@@ -465,7 +454,6 @@ let build_apps
                           "./buildkite/scripts/apps/write_build_manifest_to_cache.sh ${DebianVersions.lowerName
                                                                                          spec.debVersion} ${appsSpecTreeVariant
                                                                                                               spec}"
-                      , gitEnvPin
                       ]
                 , label = "Build apps: ${appsLabelSuffix spec}"
                 , key = "build-apps"

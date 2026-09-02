@@ -25,16 +25,35 @@ let scopeFilter = env:BUILDKITE_PIPELINE_SCOPE as Text ? "All"
 
 let filterMode = env:BUILDKITE_PIPELINE_FILTER_MODE as Text ? "Any"
 
+let jobName = "prepare"
+
+let pinKey =
+    -- The triage step waits for this one, and the triage step is what uploads
+    -- every other job in the stage. So the git identity is fixed before
+    -- anything that reads it exists, instead of being written by whichever job
+    -- happens to reach it first.
+      "pin-git-env"
+
 let config
     : Pipeline.Config.Type
     = Pipeline.Config::{
       , spec = JobSpec::{
-        , name = "prepare"
+        , name = jobName
         , dirtyWhen = [ SelectFiles.everything ]
         }
       , steps =
         [ Command.build
             Command.Config::{
+            , commands = [ Cmd.run "./buildkite/scripts/git-env/pin.sh" ]
+            , label = "Pin the git environment"
+            , key = pinKey
+            , target = Size.Small
+            , docker = None Docker.Type
+            }
+        , Command.build
+            Command.Config::{
+            , depends_on =
+              [ Command.TaggedKey::{ name = jobName, key = pinKey } ]
             , commands =
               [ Cmd.run "export BUILDKITE_PIPELINE_MODE=${mode}"
               , Cmd.run "export BUILDKITE_PIPELINE_JOB_SELECTION=${selection}"
