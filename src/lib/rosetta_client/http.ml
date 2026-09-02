@@ -84,7 +84,7 @@ let with_request t ~uri ~make_req ~describe =
       let code = Cohttp.Code.code_of_status status in
       if code < 200 || code >= 300 then
         Deferred.Or_error.error_string
-          (Errors.format_http_body ~status:code ~body:body_str)
+          (Errors.format_http_body ~url:uri ~status:code ~body:body_str)
       else
         match Yojson.Safe.from_string body_str with
         | json ->
