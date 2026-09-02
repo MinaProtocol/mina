@@ -87,7 +87,12 @@ diagnostic is guaranteed to:
 
 - Never leak raw OCaml exception syntax (no `Unix_error`, no `(Unix. ...)`).
 - Never dump multi-kilobyte HTTP bodies verbatim; Rosetta error envelopes
-  are parsed and rendered as `HTTP <code>: <message>`.
+  are parsed and rendered as `HTTP <code> from <url>: <message>`.
+
+One class of message does not go through the logger: a command line that
+does not parse (`--bogus`, an unknown subcommand) is reported by Core's
+`Command` itself, unprefixed and untimestamped, before any request is
+made.  `Command_unix.run` offers no hook for it.
 
 The HTTP client, the endpoint wrappers and the error formatting live in
 `src/lib/rosetta_client/`; `rosetta_client_cli.ml` holds only the flags,

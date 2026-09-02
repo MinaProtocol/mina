@@ -221,6 +221,14 @@ let search_group =
 
 (* ---------- Top-level ---------- *)
 
+(* Everything this CLI reports goes through [Logger], but not everything
+   the binary prints: [Command_unix.run] writes its own parse errors
+   ("unknown flag --bogus") straight to stderr and exits, and exposes no
+   hook to intercept them -- [when_parsing_succeeds] is the only
+   callback, and it fires after a successful parse.  Capturing those
+   would mean reimplementing the runner around an exception Core does
+   not export, so they stay as Core writes them: one line, on stderr,
+   before any request is made. *)
 let () =
   setup_logging () ;
   Command_unix.run
