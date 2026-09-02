@@ -34,7 +34,7 @@ Pull requests on CI will run the ['Build Mina daemon debian package' job](https:
 * `git add genesis_ledgers/phase_three/config.json && git commit`
 * push the branch and open a pull request
   - It's good practice to add a title like `[DO NOT MERGE] Generate genesis proof for foo`
-* set CI to run on the pull request by adding the `ci-build-me` label, or by commenting `!ci-build-me`
+* set CI to run on the pull request by commenting `!ci-build-me` (the comment must be exactly that; labels do not trigger CI)
 * when CI has finished, close the pull request
 
 ### Manually generate the proof and upload to CI
