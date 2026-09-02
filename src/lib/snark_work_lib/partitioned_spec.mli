@@ -30,9 +30,9 @@ end
 module Stable : sig
   [@@@no_toplevel_latest_type]
 
-  module V2 : sig
+  module V3 : sig
     type t =
-      (Single_spec.Stable.V3.t, Sub_zkapp_spec.Stable.V2.t) Poly.Stable.V1.t
+      (Single_spec.Stable.V3.t, Sub_zkapp_spec.Stable.V3.t) Poly.Stable.V1.t
     [@@deriving sexp, yojson]
 
     val to_latest : t -> t
@@ -40,6 +40,22 @@ module Stable : sig
     val statement : t -> Transaction_snark.Statement.t
 
     val sok_message : t -> Mina_base.Sok_message.t
+  end
+
+  module V2 : sig
+    type t =
+      (Single_spec.Stable.V3.t, Sub_zkapp_spec.Stable.V2.t) Poly.Stable.V1.t
+    [@@deriving sexp, yojson]
+
+    val statement : t -> Transaction_snark.Statement.t
+
+    val sok_message : t -> Mina_base.Sok_message.t
+
+    (** Upgrade, for reading a query from a pre-V3 worker. *)
+    val to_latest : t -> V3.t
+
+    (** Downgrade, for serving a pre-V3 worker. *)
+    val of_v3 : V3.t -> t
   end
 end]
 

@@ -12,7 +12,7 @@ module Zkapp_command_inputs = struct
       type t =
         ( Zkapp_command_segment.Witness.Stable.V2.t
         * Zkapp_command_segment.Basic.Stable.V1.t
-        * Statement.With_sok.Stable.V2.t )
+        * Statement.Stable.V2.t )
         Nonempty_list.Stable.V1.t
       [@@deriving sexp, to_yojson]
 
@@ -23,7 +23,7 @@ module Zkapp_command_inputs = struct
   type t =
     ( Zkapp_command_segment.Witness.t
     * Zkapp_command_segment.Basic.t
-    * Statement.With_sok.t )
+    * Statement.t )
     Nonempty_list.t
 
   let read_all_proofs_from_disk : t -> Stable.Latest.t =
@@ -46,17 +46,18 @@ module Failed_to_generate_inputs = struct
     |> Error.tag ~tag:"failed to generate inputs for zkapp command"
 end
 
-let extract_zkapp_segment_works ~m:(module M : S)
+(* Only [signature_kind] and [constraint_constants] are needed here, so they
+   are taken directly rather than via a [Transaction_snark.S] module. That keeps
+   this callable without compiling a proving circuit, which matters for tests. *)
+let extract_zkapp_segment_works ~signature_kind ~constraint_constants
     ~(input : Mina_state.Snarked_ledger_state.t)
     ~(witness : Transaction_witness.Stable.Latest.t)
     ~(zkapp_command : Zkapp_command.t) :
     (Zkapp_command_inputs.t, Failed_to_generate_inputs.t) Result.t =
   let inputs =
     Or_error.try_with (fun () ->
-        Transaction_snark.zkapp_command_witnesses_exn
-          ~signature_kind:M.signature_kind
-          ~constraint_constants:M.constraint_constants
-          ~global_slot:witness.block_global_slot
+        Transaction_snark.zkapp_command_witnesses_exn ~signature_kind
+          ~constraint_constants ~global_slot:witness.block_global_slot
           ~state_body:witness.protocol_state_body
           ~fee_excess:Currency.Amount.Signed.zero
           [ ( `Pending_coinbase_init_stack witness.init_stack

@@ -3999,7 +3999,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           |> Option.value_map ~default:Call_stack_digest.empty
                ~f:With_stack_hash.stack_hash
         in
-        let statement : Statement.With_sok.t =
+        let statement : Statement.t =
           let target_first_pass_ledger_root =
             Sparse_ledger.merkle_root target_global.first_pass_ledger
           in
@@ -4038,7 +4038,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           ; connecting_ledger_right = connecting_ledger
           ; supply_increase
           ; fee_excess
-          ; sok_digest = Sok_message.Digest.default
+          ; sok_digest = ()
           }
         in
         (w, spec, statement) :: witnesses )

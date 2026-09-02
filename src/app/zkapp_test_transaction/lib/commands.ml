@@ -56,6 +56,12 @@ let print_witnesses ~constraint_constants ~proof_level witnesses =
   end) in
   Async.Deferred.List.iter ~how:`Sequential (List.rev witnesses)
     ~f:(fun (witness, spec, statement) ->
+      (* A debug dump with no submitter: [zkapp_command_witnesses_exn] returns a
+         sok-less statement, and there is no fee or prover here to stamp with. *)
+      let statement =
+        Mina_state.Snarked_ledger_state.Poly.
+          { statement with sok_digest = Mina_base.Sok_message.Digest.default }
+      in
       printf "%s"
         (sprintf
            !"current witness \
