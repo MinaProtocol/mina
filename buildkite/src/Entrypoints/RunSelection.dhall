@@ -43,6 +43,8 @@ let Cmd = ../Lib/Cmds.dhall
 
 let Command = ../Command/Base.dhall
 
+let PinGitEnv = ../Command/PinGitEnv.dhall
+
 let Docker = ../Command/Docker/Type.dhall
 
 let JobSpec = ../Pipeline/JobSpec.dhall
@@ -63,16 +65,20 @@ let commands =
       Cmd.run
         "./buildkite/scripts/entrypoints/run-selection.sh --jobs ./buildkite/src/gen --debug "
 
+let jobName = "run-selection"
+
 let config
     : Pipeline.Config.Type
     = Pipeline.Config::{
       , spec = JobSpec::{
-        , name = "run-selection"
+        , name = jobName
         , dirtyWhen = [ SelectFiles.everything ]
         }
       , steps =
-        [ Command.build
+        [ PinGitEnv.step
+        , Command.build
             Command.Config::{
+            , depends_on = PinGitEnv.dependsOn jobName
             , commands = prefixCommands # [ commands ]
             , label = "Run selection"
             , key = "cmds"

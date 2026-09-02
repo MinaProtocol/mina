@@ -17,6 +17,8 @@ let Cmd = ../Lib/Cmds.dhall
 
 let Command = ../Command/Base.dhall
 
+let PinGitEnv = ../Command/PinGitEnv.dhall
+
 let ContainerImages = ../Constants/ContainerImages.dhall
 
 let FixPermissions = ../Command/FixPermissions.dhall
@@ -97,8 +99,10 @@ let promote_nightly =
                     , tags = [ PipelineTag.Type.Promote ]
                     }
                   , steps =
-                    [ Command.build
+                    [ PinGitEnv.step
+                    , Command.build
                         Command.Config::{
+                        , depends_on = PinGitEnv.dependsOn "PromoteNightly"
                         , commands =
                               [ FixPermissions.command Architecture.Type.Amd64 ]
                             # [ buildGoBinaryCmd ]

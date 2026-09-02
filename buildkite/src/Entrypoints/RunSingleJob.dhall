@@ -4,6 +4,8 @@ let Cmd = ../Lib/Cmds.dhall
 
 let Command = ../Command/Base.dhall
 
+let PinGitEnv = ../Command/PinGitEnv.dhall
+
 let Docker = ../Command/Docker/Type.dhall
 
 let JobSpec = ../Pipeline/JobSpec.dhall
@@ -40,8 +42,11 @@ in      \(args : { name : Text })
                   , dirtyWhen = [ SelectFiles.everything ]
                   }
                 , steps =
-                  [ Command.build
+                  [ PinGitEnv.step
+                  , Command.build
                       Command.Config::{
+                      , depends_on =
+                          PinGitEnv.dependsOn "run-single-job-${args.name}"
                       , commands = prefixCommands # [ commands args.name ]
                       , label = "Run Single Job ${args.name}"
                       , key = "cmds"
