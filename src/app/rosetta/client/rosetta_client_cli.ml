@@ -60,7 +60,13 @@ let emit_json g json =
 
 (* Diagnostics go to stderr through [Logger], which is where every other
    Mina binary sends them, so a rosetta-client run in a pod is collected
-   and filtered like the daemon beside it. *)
+   and filtered like the daemon beside it.
+
+   The interpolation cap is high enough to hold any diagnostic the
+   library produces (a body is truncated to [Errors.max_body_chars]),
+   because a message that exceeds it is dropped from the line and
+   printed under it -- which for a one-line CLI error is worse than the
+   quotes interpolation adds. *)
 let logger = Logger.create ~id:"rosetta-client" ()
 
 let setup_logging () =
@@ -69,7 +75,7 @@ let setup_logging () =
       (Logger.Processor.pretty ~log_level:Logger.Level.Info
          ~config:
            { Interpolator_lib.Interpolator.mode = Inline
-           ; max_interpolation_length = 50
+           ; max_interpolation_length = 4096
            ; pretty_print = true
            } )
     ~transport:(Logger.Transport.raw Stdlib.prerr_endline)
@@ -83,9 +89,18 @@ let run g ~(call : MRC.Http.t -> Yojson.Safe.t Deferred.Or_error.t) =
   | Ok j ->
       emit_json g j
   | Error e ->
-      (* The message comes from the library's error formatters, so no
-         raw OCaml exception text reaches the log. *)
-      [%log error] "%s" (Error.to_string_hum e) ;
+      (* As metadata, not as the message: a server's error text reaches
+         us verbatim, and Postgres and GraphQL errors -- which Mina's
+         Rosetta propagates into the envelope -- are full of "$1"
+         placeholders.  A "$" in a log message is either an
+         interpolation with no metadata behind it or a parse failure,
+         and either way Logger replaces the whole line with "invalid
+         log call: " and the "$"s rewritten to ".".
+
+         The text comes from the library's error formatters, so no raw
+         OCaml exception syntax reaches the log. *)
+      [%log error] "$error"
+        ~metadata:[ ("error", `String (Error.to_string_hum e)) ] ;
       Stdlib.exit 1
 
 (* ---------- Flags reused by more than one subcommand ---------- *)
