@@ -75,11 +75,19 @@ let format_exn ~url exn =
       sprintf "request to %s failed: %s" url_s (Core_unix.Error.message err)
   | Failure m ->
       sprintf "request to %s failed: %s" url_s m
-  | _ ->
-      (* Last-resort fallback for exceptions we haven't pattern-matched
-         above. Keep the message generic so user-visible output never
-         leaks raw OCaml exception constructor syntax. *)
-      sprintf "request to %s failed" url_s
+  | exn -> (
+      (* Last resort.  An exception whose sexp is a bare atom is
+         carrying a message, and printing it beats printing nothing:
+         cohttp answers a URI with no port -- [--rosetta-uri
+         localhost:3087] -- with "Net.lookup: failed to get TCP port
+         form Uri", which names the mistake exactly.  Anything else is
+         a constructor, and rendering that is the raw OCaml exception
+         syntax this module promises never to print. *)
+      match Exn.sexp_of_t exn with
+      | Sexp.Atom message ->
+          sprintf "request to %s failed: %s" url_s (truncate message)
+      | _ ->
+          sprintf "request to %s failed" url_s )
 
 let test_url = Uri.of_string "http://localhost:3087/network/status"
 
@@ -153,6 +161,20 @@ let%test_unit "format_exn never leaks OCaml Unix_error syntax" =
   [%test_pred: string]
     (fun s -> not (String.is_substring s ~substring:"Unix."))
     s
+
+exception Undiagnosable_failure
+
+let%test_unit "format_exn keeps a message-carrying exception's text" =
+  let url = Uri.of_string "http://example.invalid" in
+  let exn = Error.to_exn (Error.of_string "Net.lookup: no TCP port in Uri") in
+  [%test_eq: string] (format_exn ~url exn)
+    "request to http://example.invalid failed: Net.lookup: no TCP port in Uri"
+
+let%test_unit "format_exn renders a constructor as no more than a failure" =
+  let url = Uri.of_string "http://example.invalid" in
+  [%test_eq: string]
+    (format_exn ~url Undiagnosable_failure)
+    "request to http://example.invalid failed"
 
 let%test_unit "format_exn handles ETIMEDOUT" =
   let url = Uri.of_string "http://slow.example" in
