@@ -437,6 +437,26 @@ check-snarky-submodule: ## Check the snarky submodule
 	./scripts/check-snarky-submodule.sh
 
 #######################################
+## Dependency checks
+
+.PHONY: check-deps
+check-deps: ## Check the OCaml dependency graph against its baseline
+	python3 maintenance/deps/main.py check
+
+.PHONY: deps-advice
+deps-advice: ## Report OCaml dependencies that look removable
+	python3 maintenance/deps/main.py advise
+
+.PHONY: deps-baseline
+deps-baseline: ## Re-pin the dependency baseline after an intended change
+	python3 maintenance/deps/main.py baseline
+
+.PHONY: deps-dot
+deps-dot: ## Write the dependency graph to maintenance/deps.dot (render with graphviz)
+	python3 maintenance/deps/main.py dot > maintenance/deps.dot
+	@echo "wrote maintenance/deps.dot; render with: dot -Tpng maintenance/deps.dot > maintenance/deps.png"
+
+#######################################
 ## Bash checks
 
 .PHONY: check-bash
