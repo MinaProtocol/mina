@@ -24,7 +24,6 @@
 open Core
 open Async
 module MRC = Rosetta_client
-module RM = MRC.Models
 
 (* Seconds allowed for one request/response exchange with the Rosetta
    server, from sending the request to reading the last byte of the

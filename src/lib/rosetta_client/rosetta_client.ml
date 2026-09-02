@@ -9,5 +9,4 @@
 module Defaults = Defaults
 module Http = Http
 module Data = Data
-module Errors = Errors
 module Models = Rosetta_models
