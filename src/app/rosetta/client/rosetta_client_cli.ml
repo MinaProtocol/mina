@@ -1,9 +1,9 @@
 (* rosetta_client CLI — a curl-on-steroids for the Rosetta API.
 
    This file owns the command-line surface: the flags, the subcommand
-   tree, and how a result or an error reaches the terminal.  Decoding a
-   JSON-valued flag into the model an endpoint expects is in
-   [payload.ml], which neither prints nor exits.
+   tree, and how a result or an error reaches the terminal.  Everything
+   else -- the transport, the request bodies, the error rendering --
+   lives in the [rosetta_client] library.
 
    Every subcommand POSTs to a single Rosetta endpoint through the
    [Rosetta_client] library, auto-injects the network_identifier
