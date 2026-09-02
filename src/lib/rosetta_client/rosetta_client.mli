@@ -14,6 +14,7 @@
     ]} *)
 
 module Defaults = Defaults
+module Flags = Flags
 module Http = Http
 module Data = Data
 module Models = Rosetta_models

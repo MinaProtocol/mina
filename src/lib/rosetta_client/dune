@@ -6,6 +6,7 @@
   core
   core_unix
   async
+  async.async_command
   cohttp
   cohttp-async
   ppx_deriving_yojson.runtime
