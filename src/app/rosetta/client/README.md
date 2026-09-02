@@ -18,8 +18,7 @@ rosetta-client
 ├── block
 │   └── get            --index N | --hash H
 ├── account
-│   ├── balance        --address B62q... [--token-id T] [--index N]
-│   └── coins          --address B62q... [--include-mempool]
+│   └── balance        --address B62q... [--token-id T] [--index N]
 ├── mempool
 │   ├── list
 │   └── transaction    --tx-hash H
@@ -31,6 +30,12 @@ rosetta-client
 every transaction inline in `/block`, does not implement
 `/block/transaction`, and would answer 404.  Use `block get` and filter
 the returned transactions by hash.
+
+`account coins` is absent for the same reason.  The server routes
+`/account/balance` and answers 404 to everything else under `/account/`,
+and the coins model is a UTXO notion that an account-based chain has
+nothing to say about — `/network/options` advertises
+`"mempool_coins": false`.
 
 ## Global flags
 

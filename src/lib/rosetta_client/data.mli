@@ -45,12 +45,11 @@ val account_balance :
   -> unit
   -> Yojson.Safe.t Async.Deferred.Or_error.t
 
-val account_coins :
-     Http.t
-  -> address:string
-  -> ?include_mempool:bool
-  -> unit
-  -> Yojson.Safe.t Async.Deferred.Or_error.t
+(* /account/coins is absent for the same reason as /block/transaction:
+   Mina's Rosetta does not implement it.  [Account.router] routes
+   ["balance"] and answers 404 to everything else, and the coins model
+   is a UTXO notion that an account-based chain has nothing to say
+   about -- /network/options advertises [mempool_coins = false]. *)
 
 val mempool : Http.t -> Yojson.Safe.t Async.Deferred.Or_error.t
 
