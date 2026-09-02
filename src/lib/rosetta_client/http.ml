@@ -66,20 +66,19 @@ let with_request t ~uri ~make_req ~describe =
     let%map chunks = Pipe.to_list pipe in
     (response, String.concat chunks)
   in
-  let result =
-    Deferred.Or_error.try_with ~here:[%here] ~extract_exn:true exchange
-  in
+  (* [Monitor.try_with], not its [Or_error] flavour: the failure we want
+     is the exception itself, which is what [Errors.format_exn] matches
+     on.  Going through [Error.t] would only mean wrapping it and
+     unwrapping it again. *)
+  let result = Monitor.try_with ~extract_exn:true exchange in
   match%bind Async.with_timeout (Time_float.Span.of_sec t.timeout) result with
   | `Timeout ->
       Ivar.fill_if_empty timed_out () ;
       Option.iter (Ivar.peek body_pipe) ~f:Pipe.close_read ;
       Deferred.Or_error.errorf "timeout after %.1fs: %s %s" t.timeout describe
         (Uri.to_string uri)
-  | `Result (Error e) ->
-      let msg =
-        match Error.to_exn e with exn -> Errors.format_exn ~url:uri exn
-      in
-      Deferred.Or_error.error_string msg
+  | `Result (Error exn) ->
+      Deferred.Or_error.error_string (Errors.format_exn ~url:uri exn)
   | `Result (Ok (response, body_str)) -> (
       let status = Cohttp_async.Response.status response in
       let code = Cohttp.Code.code_of_status status in
@@ -87,12 +86,10 @@ let with_request t ~uri ~make_req ~describe =
         Deferred.Or_error.error_string
           (Errors.format_http_body ~status:code ~body:body_str)
       else
-        match
-          Or_error.try_with (fun () -> Yojson.Safe.from_string body_str)
-        with
-        | Ok j ->
-            Deferred.Or_error.return j
-        | Error _ ->
+        match Yojson.Safe.from_string body_str with
+        | json ->
+            Deferred.Or_error.return json
+        | exception _ ->
             Deferred.Or_error.error_string
               (Errors.format_invalid_json ~url:uri ~body:body_str) )
 
