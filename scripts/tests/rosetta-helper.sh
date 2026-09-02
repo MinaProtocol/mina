@@ -135,7 +135,7 @@ function wait_for_sync() {
         fi
 
         if [[ $(date +%s) -gt $end_time ]]; then
-            echo "❌  Timeout reached. Rosetta did not sync within $TIMEOUT seconds"
+            echo "❌  Timeout reached. Rosetta did not sync within $__timeout seconds"
             exit 1
         fi
 
