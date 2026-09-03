@@ -8,7 +8,6 @@
   core_unix.command_unix
   async
   async.async_command
-  uri
   yojson
   ;; local libraries
   interpolator_lib
