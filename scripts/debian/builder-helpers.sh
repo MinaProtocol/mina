@@ -261,25 +261,6 @@ install_mina_service() {
     ../scripts/mina.service > "${BUILDDIR}/usr/lib/systemd/user/mina.service"
 }
 
-# Copies hardfork scripts and generates bash completion into a debian package.
-# Does NOT install mina.service (the config package owns it, see
-# install_mina_service).
-copy_common_daemon_utils() {
-  echo "copy_common_daemon_utils inputs:"
-
-  local MINA_BIN="${1:-${BUILDDIR}/usr/local/bin/mina}"
-
-  copy_hf_related_scripts
-
-  # Support bash completion
-  # NOTE: We do not list bash-completion as a required package,
-  #       but it needs to be present for this to be effective
-  mkdir -p "${BUILDDIR}/etc/bash_completion.d"
-  env COMMAND_OUTPUT_INSTALLATION_BASH=1 "${MINA_BIN}" > \
-    "${BUILDDIR}/etc/bash_completion.d/mina"
-
-}
-
 # Copies common daemon binaries only to debian package
 copy_common_daemon_apps() {
 
@@ -876,9 +857,9 @@ copy_common_daemon_post_automode_apps_and_configs() {
     fi
   fi
 
-  # Generate bash completion for the postfork runtime. mina.service is shipped
-  # by the mina-<network>-config package, not here, to avoid dpkg conflicts.
-  copy_common_daemon_utils "${automode_postfork_dir}/mina"
+  # mina.service is shipped by the mina-<network>-config package, not here, to
+  # avoid dpkg conflicts.
+  copy_hf_related_scripts
 
 }
 
@@ -892,11 +873,11 @@ build_daemon_postfork_deb() {
 
   echo "--- Building ${network} postfork deb for hardfork automode:"
 
-  # The postfork runtime ships /etc/bash_completion.d/mina (and shares the
-  # /usr/local/bin/mina dispatcher), which also lives in the network-free
-  # mina-generic package. Declare Replaces/Breaks on mina-generic so the two are
-  # mutually exclusive and the automode<->generic transition resolves cleanly
-  # instead of failing with a dpkg "trying to overwrite" file conflict.
+  # The postfork runtime shares the /usr/local/bin/mina dispatcher, which also
+  # lives in the network-free mina-generic package. Declare Replaces/Breaks on
+  # mina-generic so the two are mutually exclusive and the automode<->generic
+  # transition resolves cleanly instead of failing with a dpkg "trying to
+  # overwrite" file conflict.
   create_control_file "$package_name" "${SHARED_DEPS}${DAEMON_DEPS}" \
     'Mina Protocol Client and Daemon' "${SUGGESTED_DEPS}" "mina-generic"
 
@@ -1023,7 +1004,7 @@ build_daemon_generic_deb() {
 
   copy_common_daemon_apps
 
-  copy_common_daemon_utils
+  copy_hf_related_scripts
 
   build_deb "${MINA_GENERIC_DEB_NAME}"
 
