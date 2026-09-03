@@ -237,6 +237,12 @@ module Protocol = struct
 
       external write : bool option -> t -> string -> unit
         = "caml_pasta_fp_plonk_index_write"
+
+      external read_cached : string -> SRS.Fp.t -> string -> t
+        = "caml_pasta_fp_plonk_index_read_cached"
+
+      external write_cached : string -> t -> string -> unit
+        = "caml_pasta_fp_plonk_index_write_cached"
     end
 
     module Fq = struct
@@ -273,6 +279,12 @@ module Protocol = struct
 
       external write : bool option -> t -> string -> unit
         = "caml_pasta_fq_plonk_index_write"
+
+      external read_cached : string -> SRS.Fq.t -> string -> t
+        = "caml_pasta_fq_plonk_index_read_cached"
+
+      external write_cached : string -> t -> string -> unit
+        = "caml_pasta_fq_plonk_index_write_cached"
     end
   end
 
