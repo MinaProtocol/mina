@@ -3910,6 +3910,51 @@ let b_correct_wrap_circuit (inputs : Impls.Wrap.Field.t array) () =
   let _b_correct = equal b_used b_actual in
   ()
 
+(* [pow_] at the Wrap field, the same square-and-multiply. *)
+let pow_wrap (x : Impls.Wrap.Field.t) n =
+  let open Impls.Wrap.Field in
+  let square x = x * x in
+  let rec pow x n =
+    if n = 0 then one
+    else if n = 1 then x
+    else
+      let y = pow (square x) Int.(n / 2) in
+      if n mod 2 = 0 then y else x * y
+  in
+  pow x n
+
+(* Sub-circuit: plonk_checks_passed on the Wrap side (Wrap_verifier.finalize_other_proof,
+   step 10). The Tock twin of [plonk_checks_passed_circuit]: the same 18-input layout,
+   the claim a Type2 shifted value. Defined and dumped last so every earlier fixture is
+   untouched. *)
+let plonk_checks_passed_wrap_circuit (inputs : Impls.Wrap.Field.t array) () =
+  let open Impls.Wrap.Field in
+  let alpha = inputs.(0) in
+  let beta = inputs.(1) in
+  let gamma = inputs.(2) in
+  let zkp = inputs.(3) in
+  let z_omega = inputs.(4) in
+  let sigma = Array.init 6 ~f:(fun i -> inputs.(Int.(5 + i))) in
+  let w = Array.init 6 ~f:(fun i -> inputs.(Int.(11 + i))) in
+  let claimed_perm = inputs.(17) in
+  let alpha_pow_21 = pow_wrap alpha 21 in
+  let init = z_omega * beta * alpha_pow_21 * zkp in
+  let raw_perm =
+    Array.foldi sigma ~init ~f:(fun i acc s ->
+      acc * (gamma + (beta * s) + w.(i)))
+    |> negate
+  in
+  let shift2 =
+    Pickles_types.Shifted_value.Type2.Shift.(
+      map ~f:constant (create (module Impls.Wrap.Field.Constant)))
+  in
+  let (Pickles_types.Shifted_value.Type2.Shifted_value perm_shifted) =
+    Pickles_types.Shifted_value.Type2.of_field (module Impls.Wrap.Field) ~shift:shift2
+      raw_perm
+  in
+  let _result = equal claimed_perm perm_shifted in
+  ()
+
 let run ~output_dir =
   let dump_step name circuit ~input_typ ~return_typ =
     dump_tick_with_labels output_dir name circuit ~input_typ ~return_typ
@@ -4229,7 +4274,10 @@ let run ~output_dir =
     ~input_typ:array127_wrap ~return_typ:WrapImpl.Typ.unit ;
   let array20_wrap = WrapImpl.Typ.array ~length:20 WrapImpl.Field.typ in
   dump_wrap "b_correct_wrap_circuit" b_correct_wrap_circuit
-    ~input_typ:array20_wrap ~return_typ:WrapImpl.Typ.unit
+    ~input_typ:array20_wrap ~return_typ:WrapImpl.Typ.unit ;
+  let array18_wrap = WrapImpl.Typ.array ~length:18 WrapImpl.Field.typ in
+  dump_wrap "plonk_checks_passed_wrap_circuit" plonk_checks_passed_wrap_circuit
+    ~input_typ:array18_wrap ~return_typ:WrapImpl.Typ.unit
   (* The `schnorr_verify_step_circuit` fixture is NOT dumped here. It is
      produced by the standalone `dump_schnorr_verify_circuit.exe`, which
      compiles the shared production verifier in `Dump_schnorr_circuit_lib`
