@@ -3975,6 +3975,134 @@ let expand_plonk_wrap_circuit (inputs : Impls.Wrap.Field.t array) () =
   let _zetaw = Impls.Wrap.Field.mul generator zeta in
   ()
 
+(* Sub-circuit: challenge_digest on the Wrap side (Wrap_verifier.finalize_other_proof,
+   step 4a): a plain sponge over both previous-challenge vectors — the wrap side has no
+   proofs-verified mask — squeezed once. Input layout (32 fields): prev_challenges[0] at
+   0-15, prev_challenges[1] at 16-31. Defined and dumped last. *)
+let challenge_digest_wrap_circuit (inputs : Impls.Wrap.Field.t array) () =
+  let open Pickles_types in
+  let sponge_params =
+    Sponge.Params.map Tock_field_sponge.params ~f:Impls.Wrap.Field.constant
+  in
+  let prev_challenges =
+    Vector.[
+      Vector.init Nat.N16.n ~f:(fun j -> inputs.(j)) ;
+      Vector.init Nat.N16.n ~f:(fun j -> inputs.(16 + j))
+    ]
+  in
+  let _challenge_digest =
+    let sponge = Wrap_main_inputs.Sponge.create sponge_params in
+    Vector.iter prev_challenges
+      ~f:(Vector.iter ~f:(Wrap_main_inputs.Sponge.absorb sponge)) ;
+    Wrap_main_inputs.Sponge.squeeze sponge
+  in
+  ()
+
+(* Sub-circuit: sponge_and_challenges on the Wrap side (Wrap_verifier.finalize_other_proof,
+   step 4): the plain challenge digest, the fr-sponge schedule, xi by squeeze_scalar and r
+   by squeeze_challenge, both expanded through the Step inner curve's endomorphism.
+   Input layout (122 fields): the step layout without the mask —
+     0-31:    prev_challenges (2 x 16)
+     32:      sponge_digest_before_evaluations
+     33:      ft_eval1
+     34-35:   public_input (zeta, zetaw)
+     36-65:   w[0..14] pairs
+     66-95:   coefficients[0..14] pairs
+     96-97:   z pair
+     98-109:  s[0..5] pairs
+     110-121: selectors[0..5] pairs
+   Defined and dumped last. *)
+let sponge_and_challenges_wrap_circuit (inputs : Impls.Wrap.Field.t array) () =
+  let open Pickles_types in
+  let open Kimchi_backend_common.Plonk_types in
+  let single x = [| x |] in
+  let eval_pair i = (single inputs.(i), single inputs.(i + 1)) in
+  let sponge_params =
+    Sponge.Params.map Tock_field_sponge.params ~f:Impls.Wrap.Field.constant
+  in
+  let prev_challenges =
+    Vector.[
+      Vector.init Nat.N16.n ~f:(fun j -> inputs.(j)) ;
+      Vector.init Nat.N16.n ~f:(fun j -> inputs.(16 + j))
+    ]
+  in
+  let sponge =
+    let sponge = Wrap_main_inputs.Sponge.create sponge_params in
+    Wrap_main_inputs.Sponge.absorb sponge inputs.(32) ;
+    sponge
+  in
+  let challenge_digest =
+    let s = Wrap_main_inputs.Sponge.create sponge_params in
+    Vector.iter prev_challenges
+      ~f:(Vector.iter ~f:(Wrap_main_inputs.Sponge.absorb s)) ;
+    Wrap_main_inputs.Sponge.squeeze s
+  in
+  Wrap_main_inputs.Sponge.absorb sponge challenge_digest ;
+  Wrap_main_inputs.Sponge.absorb sponge inputs.(33) ;
+  Array.iter ~f:(Wrap_main_inputs.Sponge.absorb sponge) (single inputs.(34)) ;
+  Array.iter ~f:(Wrap_main_inputs.Sponge.absorb sponge) (single inputs.(35)) ;
+  let evals_evals :
+    ( Impls.Wrap.Field.t array * Impls.Wrap.Field.t array
+    , Impls.Wrap.Boolean.var )
+    Evals.In_circuit.t =
+    { w = Vector.init Nat.N15.n ~f:(fun j -> eval_pair (36 + 2 * j))
+    ; coefficients = Vector.init Nat.N15.n ~f:(fun j -> eval_pair (66 + 2 * j))
+    ; z = eval_pair 96
+    ; s = Vector.init Nat.N6.n ~f:(fun j -> eval_pair (98 + 2 * j))
+    ; generic_selector = eval_pair 110
+    ; poseidon_selector = eval_pair 112
+    ; complete_add_selector = eval_pair 114
+    ; mul_selector = eval_pair 116
+    ; emul_selector = eval_pair 118
+    ; endomul_scalar_selector = eval_pair 120
+    ; range_check0_selector = Opt.Nothing
+    ; range_check1_selector = Opt.Nothing
+    ; foreign_field_add_selector = Opt.Nothing
+    ; foreign_field_mul_selector = Opt.Nothing
+    ; xor_selector = Opt.Nothing
+    ; rot_selector = Opt.Nothing
+    ; lookup_aggregation = Opt.Nothing
+    ; lookup_table = Opt.Nothing
+    ; lookup_sorted = Vector.init Nat.N5.n ~f:(fun _ -> Opt.Nothing)
+    ; runtime_lookup_table = Opt.Nothing
+    ; runtime_lookup_table_selector = Opt.Nothing
+    ; xor_lookup_selector = Opt.Nothing
+    ; lookup_gate_lookup_selector = Opt.Nothing
+    ; range_check_lookup_selector = Opt.Nothing
+    ; foreign_field_mul_lookup_selector = Opt.Nothing
+    }
+  in
+  let xs = Evals.In_circuit.to_absorption_sequence evals_evals in
+  List.iter xs ~f:(fun opt ->
+    let absorb = Array.iter ~f:(Wrap_main_inputs.Sponge.absorb sponge) in
+    match opt with
+    | Nothing -> ()
+    | Just (x1, x2) -> absorb x1 ; absorb x2
+    | Maybe _ -> () ) ;
+  let assert_128_bits a =
+    ignore
+      ( Scalar_challenge.to_field_checked (module Impls.Wrap)
+          (Import.Scalar_challenge.create a)
+          ~endo:Endo.Step_inner_curve.scalar
+        : Impls.Wrap.Field.t )
+  in
+  let lowest_128_bits ~constrain_low_bits x =
+    Util.Wrap.lowest_128_bits ~constrain_low_bits ~assert_128_bits x
+  in
+  let xi =
+    lowest_128_bits ~constrain_low_bits:false (Wrap_main_inputs.Sponge.squeeze sponge)
+  in
+  let r_actual =
+    lowest_128_bits ~constrain_low_bits:true (Wrap_main_inputs.Sponge.squeeze sponge)
+  in
+  let scalar =
+    Scalar_challenge.to_field_checked (module Impls.Wrap)
+      ~endo:Endo.Step_inner_curve.scalar
+  in
+  let _xi_field = scalar (Import.Scalar_challenge.create xi) in
+  let _r_field = scalar (Import.Scalar_challenge.create r_actual) in
+  ()
+
 let run ~output_dir =
   let dump_step name circuit ~input_typ ~return_typ =
     dump_tick_with_labels output_dir name circuit ~input_typ ~return_typ
@@ -4300,7 +4428,13 @@ let run ~output_dir =
     ~input_typ:array18_wrap ~return_typ:WrapImpl.Typ.unit ;
   let array4_wrap = WrapImpl.Typ.array ~length:4 WrapImpl.Field.typ in
   dump_wrap "expand_plonk_wrap_circuit" expand_plonk_wrap_circuit
-    ~input_typ:array4_wrap ~return_typ:WrapImpl.Typ.unit
+    ~input_typ:array4_wrap ~return_typ:WrapImpl.Typ.unit ;
+  let array32_wrap = WrapImpl.Typ.array ~length:32 WrapImpl.Field.typ in
+  dump_wrap "challenge_digest_wrap_circuit" challenge_digest_wrap_circuit
+    ~input_typ:array32_wrap ~return_typ:WrapImpl.Typ.unit ;
+  let array122_wrap = WrapImpl.Typ.array ~length:122 WrapImpl.Field.typ in
+  dump_wrap "sponge_and_challenges_wrap_circuit" sponge_and_challenges_wrap_circuit
+    ~input_typ:array122_wrap ~return_typ:WrapImpl.Typ.unit
   (* The `schnorr_verify_step_circuit` fixture is NOT dumped here. It is
      produced by the standalone `dump_schnorr_verify_circuit.exe`, which
      compiles the shared production verifier in `Dump_schnorr_circuit_lib`
