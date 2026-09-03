@@ -83,12 +83,21 @@ end
 module type Arithmetic_intf = sig
   type t
 
+  (** [add a b] returns [Some (a + b)] if the result fits in [t], or [None] on
+      overflow. *)
   val add : t -> t -> t option
 
+  (** [add_flagged a b] returns the (possibly wrapped) sum together with an
+      [`Overflow] flag that is [true] when the true result exceeds the
+      representable range. *)
   val add_flagged : t -> t -> t * [ `Overflow of bool ]
 
+  (** [sub a b] returns [Some (a - b)] when [a >= b], or [None] on underflow
+      (i.e. when [b > a]). *)
   val sub : t -> t -> t option
 
+  (** [sub_flagged a b] returns the (possibly wrapped) difference together with
+      an [`Underflow] flag that is [true] when [b > a]. *)
   val sub_flagged : t -> t -> t * [ `Underflow of bool ]
 
   val ( + ) : t -> t -> t option
@@ -254,6 +263,14 @@ module type S = sig
        and type signed_var := Signed.var
        and type value := t
 
+  (** [add_signed_flagged x s] adds the signed delta [s] to the unsigned
+      [x] and returns the (possibly wrapped) result paired with
+      [`Overflow b]. The flag [b] is [true] whenever the true result is
+      out of the representable range, regardless of direction: it is set
+      both when a positive delta pushes the result above [max_int]
+      (overflow) and when a negative delta would take the result below
+      zero (underflow). The single [`Overflow] tag therefore covers both
+      cases. *)
   val add_signed_flagged : t -> Signed.t -> t * [ `Overflow of bool ]
 end
 
@@ -337,6 +354,13 @@ module type Full = sig
 
     val add_fee : t -> Fee.t -> t option
 
+    (** [add_signed_flagged x s] adds the signed delta [s] to the
+        unsigned amount [x] and returns the (possibly wrapped) result
+        paired with [`Overflow b]. The flag [b] is [true] whenever the
+        true result is out of range, regardless of direction: a positive
+        delta that pushes past [max_int] (overflow) and a negative delta
+        that would drop the result below zero (underflow) are both
+        reported via the same [`Overflow] tag. *)
     val add_signed_flagged : t -> Signed.t -> t * [ `Overflow of bool ]
 
     module Checked : sig
@@ -444,6 +468,9 @@ module type Full = sig
   end
   [@@warning "-32"]
 
+  (** A fee rate, expressed as a fee per unit of computational
+      "weight" (e.g. fee per unit of SNARK work). Internally
+      represented as a rational number [fee / weight]. *)
   module Fee_rate : sig
     type t
 
@@ -459,16 +486,23 @@ module type Full = sig
 
     val to_q : t -> Q.t
 
-    (** construct a fee rate from a fee and a weight *)
+    (** [make fee weight] constructs the rational fee rate
+        [fee / weight]. Returns [None] iff the resulting rational falls
+        outside the representable range (in particular, when the
+        denominator does not fit in an [int32]). *)
     val make : Fee.t -> int -> t option
 
-    (** construct a fee rate from a fee and a weight *)
+    (** Same as {!make}, but raises if the fee rate is not
+        representable. *)
     val make_exn : Fee.t -> int -> t
 
-    (** convert to uint64, if the fee rate is equivalent to an integer. *)
+    (** [to_uint64 r] returns [Some n] when the rate [r] is exactly the
+        integer [n] (i.e. its denominator is [1]), and [None] for
+        non-integer rates. *)
     val to_uint64 : t -> uint64 option
 
-    (** convert to uint64, if the fee rate is equivalent to an integer. *)
+    (** Same as {!to_uint64}, but raises when the rate is not an
+        integer. *)
     val to_uint64_exn : t -> uint64
 
     val mul : t -> t -> t option
