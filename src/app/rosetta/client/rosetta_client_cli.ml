@@ -13,7 +13,8 @@
    non-zero; the diagnostic never leaks raw OCaml exception syntax.
 
    The connection flags, the environment variables that override their
-   defaults and the values behind those live in [Rosetta_client.Flags]. *)
+   defaults and the values behind those live in [Rosetta_client.Flags],
+   and are shared with [rosetta-healthcheck]. *)
 
 open Core
 open Async
@@ -22,10 +23,10 @@ module MRC = Rosetta_client
 (* Seconds allowed for one request/response exchange with the Rosetta
    server, from sending the request to reading the last byte of the
    response body.  This is deliberately longer than
-   [MRC.Defaults.http_timeout], which is sized for a readiness probe that
-   wants a quick verdict: this CLI is used interactively, for queries such
-   as a /search/transactions sweep that legitimately take much longer than
-   a probe would wait. *)
+   [MRC.Defaults.http_timeout]: a healthcheck probe wants a quick verdict,
+   whereas this CLI is used interactively for queries such as a
+   /search/transactions sweep that legitimately take much longer than a
+   probe would wait. *)
 let default_timeout = 30.0
 
 (* ---------- Global flags shared by every leaf command ---------- *)

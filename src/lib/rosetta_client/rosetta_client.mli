@@ -1,7 +1,8 @@
 (** Mina Rosetta client library.
 
-    Thin HTTP client and typed Rosetta API surface, used by
-    [rosetta-client] (the generic CLI).
+    Thin HTTP client and typed Rosetta API surface, shared by
+    [rosetta-client] (the generic CLI) and [rosetta-healthcheck] (which
+    only exposes readiness probes).
 
     {[
       open Async
