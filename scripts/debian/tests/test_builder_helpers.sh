@@ -152,7 +152,6 @@ assert_daemon_utils() {
     local captured_files="$1"
     assert_file_captured "$captured_files" "usr/local/bin/mina-hf-create-runtime-config"
     assert_file_captured "$captured_files" "usr/local/bin/mina-verify-packaged-fork-config"
-    assert_file_captured "$captured_files" "etc/bash_completion.d/mina"
 }
 
 assert_archive_binaries() {
@@ -326,10 +325,6 @@ MOCKGIT
         mkdir -p "$(dirname "${base}/${path}")"
         cat > "${base}/${path}" << 'MOCKEXE'
 #!/bin/bash
-if [[ "${COMMAND_OUTPUT_INSTALLATION_BASH:-}" == "1" ]]; then
-    echo "# mock bash completion for mina"
-    exit 0
-fi
 echo "mock binary"
 MOCKEXE
         chmod +x "${base}/${path}"
