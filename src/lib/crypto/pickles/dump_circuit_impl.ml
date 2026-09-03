@@ -3739,6 +3739,129 @@ let per_proof_witness_typ_check_circuit () () =
 
 (* ---- Entry point ---- *)
 
+(* Sub-circuit: combined_inner_product on the Wrap side
+   (defined and dumped LAST so the __LOC__ labels and the shared internal
+   variable counter of every earlier fixture are untouched)
+   (Wrap_verifier.finalize_other_proof, steps 8b-8c). The Tock twin of
+   [cip_circuit]: no proofs-verified mask (every sg_eval is present) and the
+   claimed value is a Type2 shifted value.
+
+   Input layout (127 fields):
+     0-15:    prev_challenges[0] (16 fields)
+     16-31:   prev_challenges[1] (16 fields)
+     32:      zeta
+     33:      zetaw
+     34:      xi (already expanded to full field)
+     35:      r (already expanded to full field)
+     36:      ft_eval0 (precomputed from PlonK relation)
+     37:      ft_eval1
+     38:      public_input at zeta
+     39:      public_input at zetaw
+     40-82:   evals at zeta (43 fields: z, 6 selectors, 15 w, 15 coeff, 6 s)
+     83-125:  evals at zetaw (43 fields: same structure)
+     126:     claimed_cip (Type2 shifted value inner)
+*)
+let cip_wrap_circuit (inputs : Impls.Wrap.Field.t array) () =
+  let open Impls.Wrap in
+  let open Pickles_types in
+  let open Kimchi_backend_common.Plonk_types in
+  let single x = [| x |] in
+  let prev_challenges =
+    Vector.[
+      Vector.init Nat.N16.n ~f:(fun j -> inputs.(j)) ;
+      Vector.init Nat.N16.n ~f:(fun j -> inputs.(16 + j))
+    ]
+  in
+  let zeta = inputs.(32) in
+  let zetaw = inputs.(33) in
+  let xi = inputs.(34) in
+  let r = inputs.(35) in
+  let ft_eval0 = inputs.(36) in
+  let ft_eval1 = inputs.(37) in
+  let public_input_zeta = single inputs.(38) in
+  let public_input_zetaw = single inputs.(39) in
+  let evals_at base : (Field.t array, Boolean.var) Evals.In_circuit.t =
+    { w = Vector.init Nat.N15.n ~f:(fun j -> single inputs.(base + 7 + j))
+    ; coefficients = Vector.init Nat.N15.n ~f:(fun j -> single inputs.(base + 22 + j))
+    ; z = single inputs.(base)
+    ; s = Vector.init Nat.N6.n ~f:(fun j -> single inputs.(base + 37 + j))
+    ; generic_selector = single inputs.(base + 1)
+    ; poseidon_selector = single inputs.(base + 2)
+    ; complete_add_selector = single inputs.(base + 3)
+    ; mul_selector = single inputs.(base + 4)
+    ; emul_selector = single inputs.(base + 5)
+    ; endomul_scalar_selector = single inputs.(base + 6)
+    ; range_check0_selector = Opt.Nothing
+    ; range_check1_selector = Opt.Nothing
+    ; foreign_field_add_selector = Opt.Nothing
+    ; foreign_field_mul_selector = Opt.Nothing
+    ; xor_selector = Opt.Nothing
+    ; rot_selector = Opt.Nothing
+    ; lookup_aggregation = Opt.Nothing
+    ; lookup_table = Opt.Nothing
+    ; lookup_sorted = Vector.init Nat.N5.n ~f:(fun _ -> Opt.Nothing)
+    ; runtime_lookup_table = Opt.Nothing
+    ; runtime_lookup_table_selector = Opt.Nothing
+    ; xor_lookup_selector = Opt.Nothing
+    ; lookup_gate_lookup_selector = Opt.Nothing
+    ; range_check_lookup_selector = Opt.Nothing
+    ; foreign_field_mul_lookup_selector = Opt.Nothing
+    }
+  in
+  let evals_zeta = evals_at 40 in
+  let evals_zetaw = evals_at 83 in
+  let claimed_cip = inputs.(126) in
+  (* Challenge polynomials from prev_challenges; no mask on the wrap side *)
+  let sg_olds =
+    Vector.map prev_challenges ~f:(fun chals ->
+        unstage (Wrap_verifier.challenge_polynomial (module Field)
+                   (Vector.to_array chals)) )
+  in
+  let sg_evals pt = Vector.map sg_olds ~f:(fun f -> f pt) in
+  let sg_evals1 = sg_evals zeta in
+  let sg_evals2 = sg_evals zetaw in
+  (* Build combine function matching wrap_verifier.ml step 8b *)
+  let combine ~ft ~sg_evals x_hat
+      (e : (Field.t array, Boolean.var) Evals.In_circuit.t) =
+    let a =
+      Evals.In_circuit.to_list e
+      |> List.map ~f:(function
+           | Opt.Nothing ->
+               [||]
+           | Just a ->
+               Array.map a ~f:Opt.just
+           | Maybe (b, a) ->
+               Array.map a ~f:(Opt.maybe b) )
+    in
+    let sg_evals =
+      Vector.map sg_evals ~f:(fun x -> [| Opt.just x |]) |> Vector.to_list
+    in
+    let v =
+      List.append sg_evals
+        (Array.map ~f:Opt.just x_hat :: [| Opt.just ft |] :: a)
+    in
+    Common.combined_evaluation (module Impls.Wrap) ~xi v
+  in
+  (* Compute actual CIP: combine_zeta + r * combine_zetaw
+     OCaml right-to-left: zetaw combine computed first *)
+  let open Field in
+  let actual_cip =
+    combine ~ft:ft_eval0 ~sg_evals:sg_evals1 public_input_zeta evals_zeta
+    + r
+      * combine ~ft:ft_eval1 ~sg_evals:sg_evals2 public_input_zetaw evals_zetaw
+  in
+  (* Compare with claimed CIP via Type2.to_field *)
+  let shift2 =
+    Shifted_value.Type2.Shift.(
+      map ~f:constant (create (module Constant)))
+  in
+  let expected =
+    Shifted_value.Type2.to_field (module Field) ~shift:shift2
+      (Shifted_value.Type2.Shifted_value claimed_cip)
+  in
+  let _result = equal expected actual_cip in
+  ()
+
 let run ~output_dir =
   let dump_step name circuit ~input_typ ~return_typ =
     dump_tick_with_labels output_dir name circuit ~input_typ ~return_typ
@@ -4049,7 +4172,13 @@ let run ~output_dir =
      sequence before downstream step_main / wrap_main / witness
      comparisons. *)
   dump_step "app_circuit_chunks2" app_circuit_chunks2
-    ~input_typ:Impl.Typ.unit ~return_typ:Impl.Typ.unit
+    ~input_typ:Impl.Typ.unit ~return_typ:Impl.Typ.unit ;
+  (* The Wrap-side combined inner product, dumped last: the dump run shares one
+     internal variable counter across circuits and the labels embed __LOC__
+     line numbers, so appending here leaves every earlier fixture byte-identical. *)
+  let array127_wrap = WrapImpl.Typ.array ~length:127 WrapImpl.Field.typ in
+  dump_wrap "cip_wrap_circuit" cip_wrap_circuit
+    ~input_typ:array127_wrap ~return_typ:WrapImpl.Typ.unit
   (* The `schnorr_verify_step_circuit` fixture is NOT dumped here. It is
      produced by the standalone `dump_schnorr_verify_circuit.exe`, which
      compiles the shared production verifier in `Dump_schnorr_circuit_lib`
