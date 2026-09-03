@@ -35,8 +35,18 @@ let decode of_yojson response =
       | Ok response ->
           Async.Deferred.Or_error.return response
       | Error msg ->
+          (* [of_yojson] reports the field it stopped at, which is the
+             useful half of the diagnostic; say what that means around
+             it.  A generated model rejects a response only when a
+             required field is absent or ill-typed -- an unknown extra
+             field decodes fine -- so this is a server that does not
+             speak the schema this build was generated from, not a
+             server that is down.  A caller which treats every error as
+             an outage would otherwise report it as one. *)
           Async.Deferred.Or_error.errorf
-            "response did not match Rosetta schema: %s" msg )
+            "server's response does not match the Rosetta schema this build \
+             expects (at %s)"
+            msg )
 
 let%test_unit "decode parses a matching response and rejects a mismatch" =
   Async.Thread_safe.block_on_async_exn (fun () ->
