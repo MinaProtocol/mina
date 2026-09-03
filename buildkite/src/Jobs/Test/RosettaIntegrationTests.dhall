@@ -41,6 +41,7 @@ let bareBinaries =
       ++  ",signer.exe:mina-ocaml-signer"
       ++  ",zkapp_test_transaction.exe:mina-zkapp-test-transaction"
       ++  ",indexer_test.exe:mina-rosetta-indexer-test"
+      ++  ",rosetta_healthcheck.exe:rosetta-healthcheck"
       ++  ",libp2p_helper:libp2p_helper"
 
 let envExports =

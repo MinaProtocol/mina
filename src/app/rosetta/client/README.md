@@ -7,6 +7,9 @@ subcommand maps to a single endpoint, auto-injects
 `network_identifier`, and prints the response as JSON (pretty by default,
 `--compact` for one-line output).
 
+For readiness probes, see the sibling
+[`rosetta-healthcheck`](../healthcheck/README.md) binary.
+
 ## Subcommand tree
 
 ```
@@ -50,8 +53,9 @@ Every leaf command accepts:
 | `--compact` | off | | Emit compact JSON instead of indented. |
 
 A flag always wins over its environment variable.  Export the variables
-to talk to the same server repeatedly without repeating the flags.  The
-flags themselves live in `Rosetta_client.Flags` and their fallbacks in
+to talk to the same server repeatedly without repeating the flags; the
+same three variables are read by `rosetta-healthcheck`.  The flags
+themselves live in `Rosetta_client.Flags` and their fallbacks in
 `Rosetta_client.Defaults`, so every binary built on the library offers
 the same flags and falls back to the same place.
 
