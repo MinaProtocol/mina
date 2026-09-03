@@ -18,7 +18,11 @@
 
 (** [decode of_yojson response] parses [response] through a generated
     Rosetta model's [of_yojson].  A response that does not match the
-    schema becomes an error rather than an exception. *)
+    schema becomes an error rather than an exception, and one that names
+    the offending field and says what a mismatch means: the models
+    ignore unknown fields, so only a missing or ill-typed required field
+    fails, which is a schema-version disagreement rather than a sick
+    server. *)
 val decode :
      (Yojson.Safe.t -> ('a, string) Result.t)
   -> Yojson.Safe.t Async.Deferred.Or_error.t
