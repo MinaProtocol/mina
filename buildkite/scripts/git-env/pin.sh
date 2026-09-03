@@ -22,10 +22,12 @@
 # real job -- which is what makes it a barrier rather than a race. It resolves
 # the identity in this order:
 #
-#   1. already pinned for this build   a later stage upload of the same build
-#   2. MINA_APPS_CACHE_ROOT            inherit the app build being wrapped
-#   3. MINA_READ_CACHE_ROOT            inherit the build being published
-#   4. this checkout                   this build compiles its own binaries
+#   1. already pinned for this build     a later stage upload of the same build
+#   2. MINA_APPS_CACHE_ROOT              inherit the app build being wrapped
+#   3. MINA_READ_CACHE_ROOT, or          inherit the build being published, or
+#      BUILDKITE_PIPELINE_FROM_BUILD     the one an artifact run was told to
+#                                        take its binaries and packages from
+#   4. this checkout                     this build compiles its own binaries
 #
 # and writes the result into this build's own root. Every reader then looks in
 # one place, its own root, and no reader has to know where the binaries came
@@ -39,6 +41,17 @@ CLEAR='\033[0m'
 RED='\033[0;31m'
 
 GIT_ENV_CACHE_PATH="git-env.json"
+
+# --from on an artifact run means "take the binaries and the packages from that
+# build", which makes that build's commit the one to describe. It arrives as
+# BUILDKITE_PIPELINE_FROM_BUILD and run-selection.sh puts it on every step it
+# uploads as MINA_READ_CACHE_ROOT, so the two mean the same thing here and an
+# explicit MINA_READ_CACHE_ROOT wins.
+#
+# Resolved in this script rather than by the caller so that every entrypoint
+# gets it without having to know, and so no pipeline definition has to spell a
+# shell expansion through Dhall's escaping.
+FROM_BUILD="${MINA_READ_CACHE_ROOT:-${BUILDKITE_PIPELINE_FROM_BUILD:-}}"
 
 TMP_DIR="$(mktemp -d)"
 trap 'rm -rf "$TMP_DIR"' EXIT
@@ -83,8 +96,8 @@ fi
 
 if [[ -n "${MINA_APPS_CACHE_ROOT:-}" ]]; then
   inherit_from "${MINA_APPS_CACHE_ROOT}" "the app build being packaged"
-elif [[ -n "${MINA_READ_CACHE_ROOT:-}" ]]; then
-  inherit_from "${MINA_READ_CACHE_ROOT}" "the build being published"
+elif [[ -n "${FROM_BUILD}" ]]; then
+  inherit_from "${FROM_BUILD}" "the build this one takes its artifacts from"
 else
   # This build compiles its own binaries, so its checkout is the answer.
   # shellcheck disable=SC1090,SC1091
