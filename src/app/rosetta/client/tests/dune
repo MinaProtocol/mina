@@ -2,16 +2,17 @@
 ;;
 ;; These exercise only subcommands that don't need a running Rosetta
 ;; server: --help for each subgroup and the clean error paths of the
-;; HTTP code.
+;; HTTP code.  The spawning and the assertions live in
+;; rosetta_cli_test_helpers, shared with the rosetta-healthcheck suite.
 
 (test
  (name test_rosetta_client)
  (libraries
   ;; opam libraries
   alcotest
-  async
   core
-  core_unix.signal_unix)
+  ;; local libraries
+  rosetta_cli_test_helpers)
  (deps ../rosetta_client_cli.exe)
  (instrumentation
   (backend bisect_ppx))

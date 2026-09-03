@@ -246,6 +246,28 @@ psql -f ./src/test/archive/sample_db/archive_db.sql "${INDEXER_PG_CONN}"
 mina-rosetta-indexer-test --archive_uri "${INDEXER_PG_CONN}"
 sudo -u postgres dropdb "${INDEXER_DBNAME}"
 
+echo "=========================== NEGATIVE TEST: healthcheck against not-yet-running Rosetta ==========================="
+# Sanity check: before Rosetta is up, `rosetta-healthcheck ready` must
+# fail cleanly.  Catches regressions in error formatting and exit codes
+# (e.g. raw OCaml [Unix_error] leaking through to stderr on ECONNREFUSED).
+set +e
+NEGATIVE_OUTPUT=$(rosetta-healthcheck ready \
+  --rosetta-uri "http://127.0.0.1:${MINA_ROSETTA_ONLINE_PORT}" \
+  --json 2>&1)
+NEGATIVE_EXIT=$?
+set -e
+if [ "$NEGATIVE_EXIT" -eq 0 ]; then
+  echo "ERROR: healthcheck reported READY before Rosetta was started" >&2
+  echo "Output: $NEGATIVE_OUTPUT" >&2
+  exit 1
+fi
+if echo "$NEGATIVE_OUTPUT" | grep -q "Unix_error\|Unix\.\|Core\.Unix"; then
+  echo "ERROR: healthcheck leaked raw OCaml exception syntax" >&2
+  echo "Output: $NEGATIVE_OUTPUT" >&2
+  exit 1
+fi
+echo "   ✅  healthcheck correctly reported not-ready with a clean error"
+
 # Mina Rosetta
 echo "=========================== STARTING ROSETTA API ONLINE AND OFFLINE INSTANCES ==========================="
 ports=("$MINA_ROSETTA_ONLINE_PORT" "$MINA_ROSETTA_OFFLINE_PORT")
