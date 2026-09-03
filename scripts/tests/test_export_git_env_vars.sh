@@ -258,6 +258,32 @@ test_a_second_stage_keeps_the_first_pin() {
     assert_eq "the first pin stands" "4.5.6" "$out"
 }
 
+# An artifact run started with --from is told which build to take its binaries
+# and packages from through BUILDKITE_PIPELINE_FROM_BUILD, and that build's
+# commit is the one to describe. Resolved here so no entrypoint has to.
+test_from_build_is_inherited_like_a_read_root() {
+    local cache="${TMP_ROOT}/cache-from" dest="${TMP_ROOT}/fetched-from" fetched out
+    mkdir -p "$cache" "$dest"
+
+    ( cd "$REPO_ROOT" && \
+      CACHE_BASE_URL="$cache" BUILDKITE_BUILD_ID="the-source-build" BUILDKITE_BRANCH="a-branch" \
+      OVERRIDE_TAG="4.5.6" \
+      ./buildkite/scripts/git-env/pin.sh ) >/dev/null 2>&1
+
+    ( cd "$REPO_ROOT" && \
+      CACHE_BASE_URL="$cache" BUILDKITE_BUILD_ID="the-artifact-run" \
+      BUILDKITE_PIPELINE_FROM_BUILD="the-source-build" BUILDKITE_BRANCH="another-branch" \
+      OVERRIDE_TAG="9.9.9" \
+      ./buildkite/scripts/git-env/pin.sh ) >/dev/null 2>&1
+    assert_eq "the inheriting pin succeeds" "0" "$?"
+
+    fetched="$( cd "$REPO_ROOT" && \
+      CACHE_BASE_URL="$cache" BUILDKITE_BUILD_ID="the-artifact-run" \
+      ./buildkite/scripts/git-env/read_from_cache.sh "$dest" 2>/dev/null )"
+    out="$(MINA_GIT_ENV_FILE="$fetched" export_vars ./scripts/export-git-env-vars.sh GITTAG)"
+    assert_eq "it describes the build it took its artifacts from" "4.5.6" "$out"
+}
+
 # Being told the binaries come from elsewhere, and finding no identity there,
 # is a fault. Deriving from this checkout instead is the exact mistake that
 # puts the wrong config_<hash>.json into a package, and it would say nothing.
@@ -307,6 +333,7 @@ main() {
     run_test test_the_pin_survives_the_cache
     run_test test_a_packaging_build_inherits_the_apps_identity
     run_test test_a_second_stage_keeps_the_first_pin
+    run_test test_from_build_is_inherited_like_a_read_root
     run_test test_wrapping_an_unpinned_build_is_an_error
     run_test test_a_cache_without_a_pin_is_not_an_error
 
