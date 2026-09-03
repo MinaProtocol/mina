@@ -3862,6 +3862,54 @@ let cip_wrap_circuit (inputs : Impls.Wrap.Field.t array) () =
   let _result = equal expected actual_cip in
   ()
 
+(* Sub-circuit: b_correct on the Wrap side (Wrap_verifier.finalize_other_proof,
+   step 9). The Tock twin of [b_correct_circuit]: the challenges expand through the
+   Step inner curve's endomorphism and the claim is a Type2 shifted value.
+   Defined and dumped last so every earlier fixture is untouched.
+
+   Input layout (20 fields):
+     0-15:  bulletproof_challenges (16 scalar_challenge inners)
+     16:    zeta (already expanded)
+     17:    zetaw (already expanded)
+     18:    r (already expanded)
+     19:    claimed_b (Type2 shifted value)
+*)
+let b_correct_wrap_circuit (inputs : Impls.Wrap.Field.t array) () =
+  let open Impls.Wrap in
+  let open Pickles_types in
+  let scalar =
+    Scalar_challenge.to_field_checked (module Impls.Wrap)
+      ~endo:Endo.Step_inner_curve.scalar
+  in
+  let bulletproof_challenges =
+    Vector.init Nat.N16.n ~f:(fun i ->
+      { Import.Bulletproof_challenge.prechallenge =
+          { Kimchi_types.inner = inputs.(i) } })
+  in
+  let expanded_challenges =
+    Vector.map bulletproof_challenges ~f:(fun b ->
+      Import.Bulletproof_challenge.pack b |> scalar)
+  in
+  let zeta = inputs.(16) in
+  let zetaw = inputs.(17) in
+  let r = inputs.(18) in
+  let claimed_b = Shifted_value.Type2.Shifted_value inputs.(19) in
+  let shift2 =
+    Shifted_value.Type2.Shift.(
+      map ~f:Field.constant (create (module Field.Constant)))
+  in
+  let challenge_poly =
+    Staged.unstage
+      (Wrap_verifier.challenge_polynomial
+         (module Field)
+         (Vector.to_array expanded_challenges))
+  in
+  let open Field in
+  let b_actual = challenge_poly zeta + (r * challenge_poly zetaw) in
+  let b_used = Shifted_value.Type2.to_field (module Field) ~shift:shift2 claimed_b in
+  let _b_correct = equal b_used b_actual in
+  ()
+
 let run ~output_dir =
   let dump_step name circuit ~input_typ ~return_typ =
     dump_tick_with_labels output_dir name circuit ~input_typ ~return_typ
@@ -4178,7 +4226,10 @@ let run ~output_dir =
      line numbers, so appending here leaves every earlier fixture byte-identical. *)
   let array127_wrap = WrapImpl.Typ.array ~length:127 WrapImpl.Field.typ in
   dump_wrap "cip_wrap_circuit" cip_wrap_circuit
-    ~input_typ:array127_wrap ~return_typ:WrapImpl.Typ.unit
+    ~input_typ:array127_wrap ~return_typ:WrapImpl.Typ.unit ;
+  let array20_wrap = WrapImpl.Typ.array ~length:20 WrapImpl.Field.typ in
+  dump_wrap "b_correct_wrap_circuit" b_correct_wrap_circuit
+    ~input_typ:array20_wrap ~return_typ:WrapImpl.Typ.unit
   (* The `schnorr_verify_step_circuit` fixture is NOT dumped here. It is
      produced by the standalone `dump_schnorr_verify_circuit.exe`, which
      compiles the shared production verifier in `Dump_schnorr_circuit_lib`
