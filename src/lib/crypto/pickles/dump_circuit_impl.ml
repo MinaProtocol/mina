@@ -3955,6 +3955,26 @@ let plonk_checks_passed_wrap_circuit (inputs : Impls.Wrap.Field.t array) () =
   let _result = equal claimed_perm perm_shifted in
   ()
 
+(* Sub-circuit: expand_plonk on the Wrap side (Wrap_verifier.finalize_other_proof,
+   step 1). The Tock twin of [expand_plonk_circuit]: the same 4-input layout, the
+   challenges expanded through the Step inner curve's endomorphism, zetaw from the Tock
+   generator at log2 15. Defined and dumped last so every earlier fixture is untouched. *)
+let expand_plonk_wrap_circuit (inputs : Impls.Wrap.Field.t array) () =
+  let scalar =
+    Scalar_challenge.to_field_checked (module Impls.Wrap)
+      ~endo:Endo.Step_inner_curve.scalar
+  in
+  let _alpha = scalar { Kimchi_types.inner = inputs.(0) } in
+  let _beta = inputs.(1) in
+  let _gamma = inputs.(2) in
+  let zeta = scalar { Kimchi_types.inner = inputs.(3) } in
+  let generator =
+    Backend.Tock.Field.domain_generator ~log2_size:15
+    |> Impls.Wrap.Field.constant
+  in
+  let _zetaw = Impls.Wrap.Field.mul generator zeta in
+  ()
+
 let run ~output_dir =
   let dump_step name circuit ~input_typ ~return_typ =
     dump_tick_with_labels output_dir name circuit ~input_typ ~return_typ
@@ -4277,7 +4297,10 @@ let run ~output_dir =
     ~input_typ:array20_wrap ~return_typ:WrapImpl.Typ.unit ;
   let array18_wrap = WrapImpl.Typ.array ~length:18 WrapImpl.Field.typ in
   dump_wrap "plonk_checks_passed_wrap_circuit" plonk_checks_passed_wrap_circuit
-    ~input_typ:array18_wrap ~return_typ:WrapImpl.Typ.unit
+    ~input_typ:array18_wrap ~return_typ:WrapImpl.Typ.unit ;
+  let array4_wrap = WrapImpl.Typ.array ~length:4 WrapImpl.Field.typ in
+  dump_wrap "expand_plonk_wrap_circuit" expand_plonk_wrap_circuit
+    ~input_typ:array4_wrap ~return_typ:WrapImpl.Typ.unit
   (* The `schnorr_verify_step_circuit` fixture is NOT dumped here. It is
      produced by the standalone `dump_schnorr_verify_circuit.exe`, which
      compiles the shared production verifier in `Dump_schnorr_circuit_lib`
