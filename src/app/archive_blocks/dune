@@ -1,7 +1,7 @@
-(executable
- (package archive_blocks)
- (name archive_blocks)
- (public_name archive_blocks)
+(library
+ (name archive_blocks_lib)
+ (modules archive_blocks_lib)
+ (public_name archive_blocks.lib)
  (libraries
   ;; opam libraries
   async
@@ -29,3 +29,14 @@
   (backend bisect_ppx))
  (preprocess
   (pps ppx_version ppx_mina ppx_let ppx_hash ppx_compare ppx_sexp_conv)))
+
+(executable
+ (package archive_blocks)
+ (name archive_blocks)
+ (public_name archive_blocks)
+ (modules archive_blocks)
+ (libraries archive_blocks_lib)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_version)))

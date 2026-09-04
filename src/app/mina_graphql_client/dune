@@ -1,7 +1,7 @@
-(executable
- (name mina_graphql_client_app)
- (package mina_graphql_client_app)
- (public_name mina-graphql-client)
+(library
+ (name mina_graphql_client_app_lib)
+ (public_name mina_graphql_client_app.lib)
+ (modules mina_graphql_client_app_lib)
  (libraries
   core_unix.command_unix
   ;; opam libraries
@@ -23,3 +23,12 @@
   sync_status)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version ppx_let ppx_mina)))
+
+(executable
+ (name mina_graphql_client_app)
+ (package mina_graphql_client_app)
+ (public_name mina-graphql-client)
+ (modules mina_graphql_client_app)
+ (libraries mina_graphql_client_app_lib)
+ (instrumentation (backend bisect_ppx))
+ (preprocess (pps ppx_version)))

@@ -1,8 +1,7 @@
-(executable
- (package validate_keypair)
- (name validate_keypair)
- (public_name validate_keypair)
- (modes native)
+(library
+ (name validate_keypair_lib)
+ (public_name validate_keypair.lib)
+ (modules validate_keypair_lib)
  (libraries
   ;; opam libraries
   core
@@ -19,3 +18,15 @@
  (preprocess
   (pps ppx_version ppx_let ppx_sexp_conv))
  (flags -short-paths -w @a-4-29-40-41-42-44-45-48-58-59-60))
+
+(executable
+ (package validate_keypair)
+ (name validate_keypair)
+ (public_name validate_keypair)
+ (modes native)
+ (modules validate_keypair)
+ (libraries validate_keypair_lib)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_version)))

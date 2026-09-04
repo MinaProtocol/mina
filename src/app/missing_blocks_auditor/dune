@@ -1,7 +1,7 @@
-(executable
- (package missing_blocks_auditor)
- (name missing_blocks_auditor)
- (public_name missing_blocks_auditor)
+(library
+ (name missing_blocks_auditor_lib)
+ (modules missing_blocks_auditor_lib sql)
+ (public_name missing_blocks_auditor.lib)
  (libraries
   ;; opam libraries
   core
@@ -25,3 +25,14 @@
   (backend bisect_ppx))
  (preprocess
   (pps ppx_mina ppx_version ppx_let)))
+
+(executable
+ (package missing_blocks_auditor)
+ (name missing_blocks_auditor)
+ (public_name missing_blocks_auditor)
+ (modules missing_blocks_auditor)
+ (libraries missing_blocks_auditor_lib)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_version)))
