@@ -8,6 +8,11 @@
   base
   core
   async
+  async_ssl
+  cohttp
+  cohttp-async
+  conduit-async
+  uri
   core_kernel
   stdio
   async_kernel
@@ -16,6 +21,9 @@
   logger)
  (instrumentation
   (backend bisect_ppx))
+ (inline_tests
+  (flags -verbose -show-counts))
  (preprocess
-  (pps ppx_mina ppx_version ppx_here ppx_let ppx_custom_printf))
+  (pps ppx_mina ppx_version ppx_here ppx_let ppx_custom_printf ppx_inline_test
+    ppx_assert))
  (implements cache_dir))
