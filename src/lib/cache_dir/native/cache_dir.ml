@@ -12,26 +12,24 @@ let s3_keys_bucket_prefix =
 
 let manual_install_path = "/var/lib/coda"
 
-let brew_install_path =
-  match
-    let p = Core_unix.open_process_in "brew --prefix 2>/dev/null" in
-    let r = In_channel.input_lines p in
-    (r, Core_unix.close_process_in p)
-  with
-  | brew :: _, Ok () ->
-      brew ^ "/var/coda"
-  | _ ->
-      "/usr/local/var/coda"
+(* Homebrew's prefix on Intel and on Apple Silicon. Both are listed
+   unconditionally rather than asking [brew --prefix]: these are read-only
+   lookup paths and a nonexistent one is simply skipped, whereas the query
+   costs a subprocess at module initialization on every platform, Linux
+   included. *)
+let brew_install_paths = [ "/usr/local/var/coda"; "/opt/homebrew/var/coda" ]
 
 let cache =
   let dir d w = Key_cache.Spec.On_disk { directory = d; should_write = w } in
-  [ dir manual_install_path false
-  ; dir brew_install_path false
-  ; dir s3_install_path false
-  ; dir autogen_path true
-  ; Key_cache.Spec.S3
-      { bucket_prefix = s3_keys_bucket_prefix; install_path = s3_install_path }
-  ]
+  ( [ dir manual_install_path false ]
+  @ List.map brew_install_paths ~f:(fun d -> dir d false) )
+  @ [ dir s3_install_path false
+    ; dir autogen_path true
+    ; Key_cache.Spec.S3
+        { bucket_prefix = s3_keys_bucket_prefix
+        ; install_path = s3_install_path
+        }
+    ]
 
 let env_path =
   match Sys.getenv "MINA_KEYS_PATH" with
@@ -42,12 +40,9 @@ let env_path =
 
 let possible_paths base =
   List.map
-    [ env_path
-    ; brew_install_path
-    ; s3_install_path
-    ; autogen_path
-    ; manual_install_path
-    ] ~f:(fun d -> d ^/ base )
+    ( (env_path :: brew_install_paths)
+    @ [ s3_install_path; autogen_path; manual_install_path ] )
+    ~f:(fun d -> d ^/ base)
 
 let load_from_s3 s3_bucket_prefix s3_install_path ~logger =
   let%bind () = Unix.mkdir ~p:() (Filename.dirname s3_install_path) in

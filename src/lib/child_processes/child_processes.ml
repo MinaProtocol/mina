@@ -77,8 +77,14 @@ let get_project_root () =
 let get_mina_binary () =
   let open Async in
   let open Deferred.Or_error.Let_syntax in
-  let%bind os = Process.run ~prog:"uname" ~args:[ "-s" ] () in
-  if String.equal os "Darwin\n" then
+  (* [/proc/PID/exe] is the whole point of the Linux branch below, so testing
+     for it directly beats asking [uname] in a subprocess. *)
+  if Sys_unix.file_exists_exn "/proc/self/exe" then
+    (* FIXME for finding the executable relative to the install path this should
+       deference the symlink if possible. *)
+    Deferred.Or_error.return
+      (Unix.getpid () |> Pid.to_int |> sprintf "/proc/%d/exe")
+  else
     let open Ctypes in
     let ns_get_executable_path =
       Foreign.foreign "_NSGetExecutablePath"
@@ -96,11 +102,6 @@ let get_mina_binary () =
     in
     let s = string_from_ptr buf ~length:(!@count |> Unsigned.UInt32.to_int) in
     List.hd_exn @@ String.split s ~on:(Char.of_int 0 |> Option.value_exn)
-  else
-    (* FIXME for finding the executable relative to the install path this should
-       deference the symlink if possible. *)
-    Deferred.Or_error.return
-      (Unix.getpid () |> Pid.to_int |> sprintf "/proc/%d/exe")
 
 (** Check the PID file and delete it. This method does not currently attempt to
     kill the process that created it; we rely on the child exiting on its own in

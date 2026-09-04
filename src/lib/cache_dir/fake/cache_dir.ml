@@ -10,7 +10,7 @@ let s3_keys_bucket_prefix =
 
 let manual_install_path = "/var/lib/coda"
 
-let brew_install_path = "/usr/local/var/coda"
+let brew_install_paths = [ "/usr/local/var/coda"; "/opt/homebrew/var/coda" ]
 
 let cache = []
 
@@ -18,12 +18,9 @@ let env_path = manual_install_path
 
 let possible_paths base =
   List.map
-    [ env_path
-    ; brew_install_path
-    ; s3_install_path
-    ; autogen_path
-    ; manual_install_path
-    ] ~f:(fun d -> d ^ "/" ^ base )
+    ( (env_path :: brew_install_paths)
+    @ [ s3_install_path; autogen_path; manual_install_path ] )
+    ~f:(fun d -> d ^ "/" ^ base)
 
 let load_from_s3 _s3_bucket_prefix _s3_install_path ~logger:_ =
   Deferred.Or_error.fail (Error.createf "Cannot load files from S3")

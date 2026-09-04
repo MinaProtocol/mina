@@ -210,9 +210,15 @@ let create ~logger ~constraint_constants ~wallets ~new_blocks
                                let f = Stdlib.open_out tmp_file in
                                fprintf f "%s" json ;
                                Stdlib.close_out f ;
+                               let args =
+                                 [ "cp"
+                                 ; "-n"
+                                 ; tmp_file
+                                 ; Printf.sprintf "gs://%s/%s" bucket name
+                                 ]
+                               in
                                let command =
-                                 Printf.sprintf "gsutil cp -n %s gs://%s/%s"
-                                   tmp_file bucket name
+                                 String.concat ~sep:" " ("gsutil" :: args)
                                in
                                let%map output =
                                  (* This double-wrapping of [try_with]s is protection
@@ -225,8 +231,8 @@ let create ~logger ~constraint_constants ~wallets ~new_blocks
                                  Deferred.Or_error.try_with_join ~here:[%here]
                                    (fun () ->
                                      Or_error.try_with (fun () ->
-                                         Async.Process.run () ~prog:"bash"
-                                           ~args:[ "-c"; command ]
+                                         Async.Process.run () ~prog:"gsutil"
+                                           ~args
                                          |> Deferred.Result.map_error
                                               ~f:(Error.tag ~tag:__LOC__) )
                                      |> Result.map_error

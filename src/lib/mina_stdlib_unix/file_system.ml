@@ -8,13 +8,6 @@ let dir_exists dir =
     Unix.File_kind.equal (Unix.Stats.kind stat) `Directory
   else return false
 
-let remove_dir dir =
-  let%bind _ =
-    Monitor.try_with ~here:[%here] (fun () ->
-        Process.run_exn ~prog:"rm" ~args:[ "-rf"; dir ] () )
-  in
-  Deferred.unit
-
 let rec rmrf path =
   match Sys_unix.is_directory path with
   | `Yes ->
@@ -24,6 +17,15 @@ let rec rmrf path =
   | _ ->
       if [%equal: [ `Yes | `No | `Unknown ]] (Sys_unix.file_exists path) `Yes
       then Sys_unix.remove path
+
+(* Errors are deliberately swallowed: every caller uses this for best-effort
+   cleanup of a directory it is about to stop caring about. *)
+let remove_dir dir =
+  let%bind _ =
+    Monitor.try_with ~here:[%here] (fun () ->
+        In_thread.run (fun () -> rmrf dir) )
+  in
+  Deferred.unit
 
 let try_finally ~(f : unit -> 'a Deferred.t) ~(finally : unit -> unit Deferred.t)
     =
