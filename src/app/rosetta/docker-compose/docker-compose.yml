@@ -25,6 +25,10 @@ services:
       MINA_NETWORK: ${MINA_NETWORK}
     command:
       - archive
+      # Leave an existing archive alone. Without this, every `compose down &&
+      # up` re-downloads the dump and imports it over a database that has
+      # advanced since, losing the blocks collected in between.
+      - --if-present=skip
       - --pg-uri
       - postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       - --work-dir
