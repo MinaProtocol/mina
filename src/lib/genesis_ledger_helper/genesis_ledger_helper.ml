@@ -701,14 +701,19 @@ module Genesis_proof = struct
   let generate_inputs ~(light_proof : Light.t) ~runtime_config ~ledger
       ~genesis_epoch_data =
     let protocol_state_with_hashes =
-      let genesis_ledger = Consensus.Genesis_data.Ledger.to_hashed ledger in
-      let genesis_epoch_data =
-        Consensus.Genesis_data.Epoch.to_hashed genesis_epoch_data
-      in
-      Mina_state.Genesis_protocol_state.t ~genesis_ledger ~genesis_epoch_data
+      Mina_state.Genesis_protocol_state.t
+        ~genesis_ledger:(Consensus.Genesis_data.Ledger.to_hashed ledger)
+        ~genesis_epoch_data:
+          (Consensus.Genesis_data.Epoch.to_hashed genesis_epoch_data)
         ~constraint_constants:light_proof.constraint_constants
         ~consensus_constants:light_proof.consensus_constants
         ~genesis_body_reference:light_proof.genesis_body_reference
+    in
+    let constraint_system_digests =
+      Genesis_proof.constraint_system_digests
+        ~signature_kind:light_proof.signature_kind
+        ~proof_level:light_proof.proof_level
+        ~constraint_constants:light_proof.constraint_constants
     in
     { Genesis_proof.Inputs.runtime_config
     ; constraint_constants = light_proof.constraint_constants
@@ -717,7 +722,7 @@ module Genesis_proof = struct
     ; genesis_epoch_data
     ; consensus_constants = light_proof.consensus_constants
     ; protocol_state_with_hashes
-    ; constraint_system_digests = None
+    ; constraint_system_digests
     ; genesis_constants = light_proof.genesis_constants
     ; genesis_body_reference = light_proof.genesis_body_reference
     ; signature_kind = light_proof.signature_kind

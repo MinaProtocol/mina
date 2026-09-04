@@ -988,6 +988,10 @@ module Make (L : Ledger_intf.S) :
       let verification_key_perm_fallback_to_signature_with_older_version =
         Permissions.Auth_required
         .verification_key_perm_fallback_to_signature_with_older_version
+
+      let access_perm_fallback_to_signature_with_older_version =
+        Permissions.Auth_required
+        .access_perm_fallback_to_signature_with_older_version
     end
 
     module Txn_version = struct
@@ -1113,9 +1117,6 @@ module Make (L : Ledger_intf.S) :
 
         let set_verification_key_auth : t -> Controller.t =
          fun a -> fst a.permissions.set_verification_key
-
-        let set_verification_key_txn_version : t -> Txn_version.t =
-         fun a -> snd a.permissions.set_verification_key
 
         let set_zkapp_uri : t -> Controller.t =
          fun a -> a.permissions.set_zkapp_uri
@@ -1266,9 +1267,22 @@ module Make (L : Ledger_intf.S) :
 
       let set_voting_for voting_for (a : t) = { a with voting_for }
 
+      type txn_version = Txn_version.t
+
+      let txn_version (a : t) : txn_version =
+        snd a.permissions.set_verification_key
+
       let permissions (a : t) = a.permissions
 
       let set_permissions permissions (a : t) = { a with permissions }
+
+      let set_txn_version_to_current (a : t) =
+        let set_verification_key =
+          ( fst a.permissions.set_verification_key
+          , Mina_numbers.Txn_version.current )
+        in
+        let permissions = { a.permissions with set_verification_key } in
+        { a with permissions }
     end
 
     module Amount = struct

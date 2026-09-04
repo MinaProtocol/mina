@@ -155,6 +155,7 @@ module Base_node_config = struct
     ; ("RAYON_NUM_THREADS", "8")
     ; ("MINA_PRIVKEY_PASS", "naughty blue worm")
     ; ("MINA_LIBP2P_PASS", "")
+    ; ("LIBP2P_ENABLE_MDNS", "true")
     ]
 
   let to_list t =

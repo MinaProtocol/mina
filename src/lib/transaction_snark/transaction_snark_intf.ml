@@ -123,15 +123,13 @@ module type Full = sig
     Pickles.Tag.t
 
   val verify :
-       key:Pickles.Verification_key.t
-    -> (t * Sok_message.t) list
-    -> unit Or_error.t Async.Deferred.t
+    key:Pickles.Verification_key.t -> t list -> unit Or_error.t Async.Deferred.t
 
   module Verification : sig
     module type S = sig
       val tag : tag
 
-      val verify : (t * Sok_message.t) list -> unit Or_error.t Async.Deferred.t
+      val verify : t list -> unit Or_error.t Async.Deferred.t
 
       val id : Pickles.Verification_key.Id.t Async.Deferred.t Lazy.t
 

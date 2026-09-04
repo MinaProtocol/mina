@@ -23,6 +23,13 @@ ENV SUFFIX=${deb_suffix:+-${deb_suffix}}
 # - mina-archive-devnet-lightnet etc.
 ENV MINA_DEB=mina-archive-${network}${SUFFIX}
 
+# The per-network config package ships the runtime config JSON and, for hardfork
+# networks, the genesis ledger tarball(s) into /var/lib/coda. Bundling it lets
+# `mina-archive-hardfork-toolbox populate-genesis-accounts` (and `mina-archive
+# run --config-file`) resolve the fork genesis ledger locally -- no S3/network --
+# to backfill accounts_accessed for the fork genesis block.
+ENV MINA_CONFIG_DEB=mina-${network}-config
+
 ENV DEBIAN_FRONTEND noninteractive
 RUN echo "Building image with version $deb_codename $deb_release $deb_version"
 
@@ -86,10 +93,11 @@ ENV PATH="/opt/google-cloud-sdk/bin:${PATH}"
 ENV USE_GKE_GCLOUD_AUTH_PLUGIN=True
 
 
-# archive-node package
+# archive-node package (+ per-network config so the hardfork toolbox can
+# resolve the fork genesis ledger from /var/lib/coda)
 RUN echo "deb [trusted=yes] ${deb_repo} $deb_codename $deb_release" > /etc/apt/sources.list.d/o1.list \
   && apt-get update --quiet --yes \
-  && apt-get install --no-install-recommends --quiet --yes "${MINA_DEB}=$deb_version" \
+  && apt-get install --no-install-recommends --quiet --yes "${MINA_DEB}=$deb_version" "${MINA_CONFIG_DEB}=$deb_version" \
   && rm -rf /var/lib/apt/lists/*
 
 ENTRYPOINT ["/usr/bin/dumb-init", "/entrypoint.sh"]

@@ -259,8 +259,9 @@ let default () = { config = Config.default (); executor = Executor.AutoDetect }
 
 let client t = Client.create ~port:t.config.client_port ~executor:t.executor ()
 
-let start ?hardfork_handling ?block_producer_key ?config_files ?peer_list_url
-    ?(start_filtered_logs = default_init_log_filters) ?env t =
+let start ?hardfork_handling ?block_producer_key ?config_files ?env
+    ?peer_list_url ?node_status_url ?node_error_url ?simplified_node_stats
+    ?(start_filtered_logs = default_init_log_filters) t =
   let open Deferred.Let_syntax in
   let base_args =
     [ "daemon"
@@ -286,6 +287,15 @@ let start ?hardfork_handling ?block_producer_key ?config_files ?peer_list_url
   let opt_arg key value_opt =
     match value_opt with None -> [] | Some value -> [ key; value ]
   in
+  let bool_flag key value_opt =
+    match value_opt with
+    | Some true ->
+        [ key; "true" ]
+    | Some false ->
+        [ key; "false" ]
+    | None ->
+        []
+  in
   let config_file_args =
     match config_files with
     | None ->
@@ -301,6 +311,9 @@ let start ?hardfork_handling ?block_producer_key ?config_files ?peer_list_url
     base_args
     @ opt_arg "--hardfork-handling" hardfork_handling
     @ opt_arg "--block-producer-key" block_producer_key
+    @ opt_arg "--node-status-url" node_status_url
+    @ opt_arg "--node-error-url" node_error_url
+    @ bool_flag "--simplified-node-stats" simplified_node_stats
     @ config_file_args
     @ opt_arg "--peer-list-url" peer_list_url
     @ start_filtered_log_args

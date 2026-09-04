@@ -11,7 +11,7 @@
   bindings_js.web_backend
   logger.fake
   pasta_bindings.backend.none)
- (link_deps ../../web/plonk_wasm.js ../../web/plonk_wasm_bg.wasm)
+ (link_deps ../../web/kimchi_wasm.js ../../web/kimchi_wasm_bg.wasm)
  (instrumentation
   (backend bisect_ppx))
  (preprocess

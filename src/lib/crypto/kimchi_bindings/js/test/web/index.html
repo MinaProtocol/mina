@@ -59,10 +59,10 @@
       document.getElementById("discover_tests").addEventListener("click", discover_tests);
     </script>
     <script type="module">
-      import init, * as plonk_wasm from "./plonk_wasm.js";
-      window.plonk_wasm = plonk_wasm;
+      import init, * as kimchi_wasm from "./kimchi_wasm.js";
+      window.kimchi_wasm = kimchi_wasm;
       await init();
-      plonk_wasm.initThreadPool(navigator.hardwareConcurrency);
+      kimchi_wasm.initThreadPool(navigator.hardwareConcurrency);
       /* Don't load the script until we're done initialising. */
       var newScript = document.createElement("script");
       newScript.src = "./chrome_test.bc.js";

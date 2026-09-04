@@ -480,16 +480,25 @@ let validate_staged_ledger_diff ?skip_staged_ledger_verification ~logger
   let global_slot = Consensus_state.global_slot_since_genesis consensus_state in
   let body = Block.body block in
   let apply_start_time = Core.Time.now () in
-  let body_ref_from_header = Blockchain_state.body_reference blockchain_state in
-  let body_ref_computed =
-    Staged_ledger_diff.Body.compute_reference
-      ~tag:Mina_net2.Bitswap_tag.(to_enum Body)
-    @@ Staged_ledger_diff.Body.read_all_proofs_from_disk body
-  in
   let%bind.Deferred.Result () =
-    if Blake2.equal body_ref_computed body_ref_from_header then
-      Deferred.Result.return ()
-    else Deferred.Result.fail `Invalid_body_reference
+    match skip_staged_ledger_verification with
+    | Some `All ->
+        (* Block was already validated before persistence; body reference
+           cannot have changed. Skip the expensive proof deserialization
+           and hashing. *)
+        Deferred.Result.return ()
+    | _ ->
+        let body_ref_from_header =
+          Blockchain_state.body_reference blockchain_state
+        in
+        let body_ref_computed =
+          Staged_ledger_diff.Body.compute_reference
+            ~tag:Mina_net2.Bitswap_tag.(to_enum Body)
+          @@ Staged_ledger_diff.Body.read_all_proofs_from_disk body
+        in
+        if Blake2.equal body_ref_computed body_ref_from_header then
+          Deferred.Result.return ()
+        else Deferred.Result.fail `Invalid_body_reference
   in
   let%bind.Deferred.Result ( `Ledger_proof proof_opt
                            , `Staged_ledger transitioned_staged_ledger

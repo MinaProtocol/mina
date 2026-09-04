@@ -1,0 +1,16 @@
+(executable
+ (name node_status_mock_server)
+ (package mina_command_line_tests)
+ (public_name mina-node-status-mock-server)
+ (libraries
+  ;; opam libraries
+  async
+  core
+  cohttp
+  cohttp-async
+  uri
+  yojson)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_version ppx_jane)))

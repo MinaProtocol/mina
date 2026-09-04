@@ -14,8 +14,8 @@ let
     };
   toolchainHashes = {
     "1.92.0" = "sha256-sqSWJDUxc+zaz1nBWMAJKTAGBuGWP25GCftIOlCEAtA=";
-    "nightly-2024-09-05" =
-      "sha256-3aoA7PuH09g8F+60uTUQhnHrb/ARDLueSOD08ZVsWe0=";
+    "nightly-2025-12-11" =
+      "sha256-Z8PetnKGSZjqRtodJ20XqBoTe2qNG0RaklrVW7AQ3JE=";
     # copy the placeholder line with the correct toolchain name when adding a new toolchain
     # That is,
     # 1. Put the correct version name;
@@ -99,6 +99,7 @@ in {
       # Using the same toolchain which is used by the local stubs crate
       ../src/lib/crypto/kimchi_bindings/stubs/rust-toolchain.toml;
     rust_platform = rustPlatformFor toolchain.rust;
+    lock = ../src/lib/crypto/proof-systems/Cargo.lock;
   in rust_platform.buildRustPackage {
     pname = "kimchi_stubs_static_lib";
     version = "0.1.0";
@@ -109,8 +110,8 @@ in {
     buildInputs = with final; lib.optional stdenv.isDarwin libiconv;
     cargoLock = let fixupLockFile = path: builtins.readFile path;
     in {
-      lockFileContents =
-        fixupLockFile ../src/lib/crypto/proof-systems/Cargo.lock;
+      lockFileContents = fixupLockFile lock;
+      outputHashes = narHashesFromCargoLock lock;
     };
     buildPhase = ''
       cargo build -p kimchi-stubs --release --lib
@@ -159,10 +160,10 @@ in {
       version = deps.wasm-bindgen.version;
       src = final.fetchCrate {
         inherit pname version;
-        sha256 = "sha256-IPxP68xtNSpwJjV2yNMeepAS0anzGl02hYlSTvPocz8=";
+        sha256 = "sha256-M6WuGl7EruNopHZbqBpucu4RWz44/MSdv6f0zkYw+44=";
       };
 
-      cargoHash = "sha256-pBeQaG6i65uJrJptZQLuIaCb/WCQMhba1Z1OhYqA8Zc=";
+      cargoHash = "sha256-/zJzxtzOZuGyvDLdJNEQFPzFHC6IbEiWOeZYrKgGxEk=";
       nativeBuildInputs = [ final.pkg-config ];
 
       buildInputs = with final;
@@ -172,11 +173,18 @@ in {
           libiconv
         ];
 
-      checkInputs = [ final.nodejs ];
-
-      # other tests, like --test=wasm-bindgen, require it to be ran in the
-      # wasm-bindgen monorepo
-      cargoTestFlags = [ "--test=reference" ];
+      # wasm-bindgen-cli >= 0.2.100 no longer ships the `reference` test target
+      # in the crates.io tarball, so the old `--test=reference` check fails with:
+      # "error: no test target named `reference`".
+      #
+      # Keep a basic CI guardrail by smoke-testing the installed binary instead.
+      doCheck = false;
+      doInstallCheck = true;
+      installCheckPhase = ''
+        runHook preInstallCheck
+        "$out/bin/wasm-bindgen" --version | grep -F "wasm-bindgen ${version}"
+        runHook postInstallCheck
+      '';
     };
   in rustPlatform.buildRustPackage {
     pname = "plonk_wasm";
@@ -211,9 +219,17 @@ in {
       runHook preBuild
       (
       set -x
-      export RUSTFLAGS="-C target-feature=+atomics,+bulk-memory,+mutable-globals -C link-arg=--max-memory=4294967296"
-      wasm-pack build --mode no-install --target nodejs --out-dir $out/nodejs plonk-wasm -- --features nodejs -Z build-std=panic_abort,std
-      wasm-pack build --mode no-install --target web --out-dir $out/web plonk-wasm -Z build-std=panic_abort,std
+      export RUSTFLAGS="\
+      -C target-feature=+atomics,+bulk-memory,+mutable-globals \
+      -C link-arg=--import-memory \
+      -C link-arg=--shared-memory \
+      -C link-arg=--export=__wasm_init_tls \
+      -C link-arg=--export=__tls_base \
+      -C link-arg=--export=__tls_size \
+      -C link-arg=--export=__tls_align \
+      -C link-arg=--max-memory=4294967296"
+      wasm-pack build --mode no-install --target nodejs --out-dir $out/nodejs kimchi-wasm -- -Z build-std=panic_abort,std --features nodejs
+      wasm-pack build --mode no-install --target web --out-dir $out/web kimchi-wasm -- -Z build-std=panic_abort,std
       )
       runHook postBuild
     '';
@@ -223,11 +239,27 @@ in {
     cargoBuildFeatures = [ "nodejs" ];
   };
 
+  # Keep the historical package name expected by ocaml/javascript Nix code.
+  kimchi_wasm = final.plonk_wasm;
+
   # Jobs/Lint/Rust.dhall
   trace-tool = final.rustPlatform.buildRustPackage rec {
     pname = "trace-tool";
     version = "0.1.0";
     src = ../src/app/trace-tool;
     cargoLock.lockFile = ../src/app/trace-tool/Cargo.lock;
+  };
+
+  minimina = final.rustPlatform.buildRustPackage rec {
+    pname = "minimina";
+    version = "0.2.0";
+    src = ../src/app/minimina;
+    cargoLock.lockFile = ../src/app/minimina/Cargo.lock;
+    nativeBuildInputs = [ final.pkg-config ];
+    buildInputs = with final;
+      [ openssl ] ++ lib.optionals stdenv.isDarwin [
+        darwin.apple_sdk.frameworks.Security
+        libiconv
+      ];
   };
 }

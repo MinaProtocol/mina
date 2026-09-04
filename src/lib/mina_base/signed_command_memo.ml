@@ -214,16 +214,17 @@ module Make_str (_ : Wire_types.Concrete) = struct
   let to_plaintext (memo : t) : string Or_error.t =
     if is_bytes memo then
       match length memo with
-      | Some len ->
+      | Some len when Int.(len + 2 <= String.length memo) ->
           Ok (String.sub memo ~pos:2 ~len)
-      | None ->
+      | Some _ | None ->
           Error (Error.of_string "Invalid memo")
     else Error (Error.of_string "Memo does not contain text bytes")
 
   let to_digest (memo : t) : string Or_error.t =
     if is_digest memo then
       match length memo with
-      | Some len when len = digest_length ->
+      | Some len when Int.(len = digest_length && len + 2 <= String.length memo)
+        ->
           Ok (String.sub memo ~pos:2 ~len)
       | Some _ | None ->
           Error (Error.of_string "Invalid memo")
@@ -327,6 +328,16 @@ module Make_str (_ : Wire_types.Concrete) = struct
           |> typ.value_of_fields
         in
         [%test_eq: string] memo memo_read
+
+      let%test_unit "malformed short bytes memo does not crash to_string_hum" =
+        (* tag = bytes (0x01), declared length = 1, but no data byte present *)
+        let memo : t = "\x01\x01" in
+        ignore (to_string_hum memo : string)
+
+      let%test_unit "malformed short digest memo does not crash to_string_hum" =
+        (* tag = digest (0x00), declared length = 32, only 2 bytes present *)
+        let memo : t = "\x00\x20" in
+        ignore (to_string_hum memo : string)
     end )
 end
 

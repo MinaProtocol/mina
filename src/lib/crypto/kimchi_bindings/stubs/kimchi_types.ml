@@ -152,10 +152,6 @@ type nonrec gate_type =
   | EndoMul
   | EndoMulScalar
   | Lookup
-  | CairoClaim
-  | CairoInstruction
-  | CairoFlags
-  | CairoTransition
   | RangeCheck0
   | RangeCheck1
   | ForeignFieldAdd

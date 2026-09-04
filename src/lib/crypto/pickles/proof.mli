@@ -111,6 +111,10 @@ type ('s, 'mlmb) with_data =
 
 type 'mlmb t = (unit, 'mlmb) with_data
 
+module For_tests : sig
+  val append_lr_entry : 'mlmb t -> 'mlmb t
+end
+
 val dummy :
   'h Pickles_types.Nat.t -> 'r Pickles_types.Nat.t -> domain_log2:int -> 'h t
 

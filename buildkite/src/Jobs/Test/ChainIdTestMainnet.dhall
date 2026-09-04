@@ -17,7 +17,7 @@ let deps =
         Dockers.DepsSpec::{ network = network, profile = Profile.Type.Mainnet }
 
 let expectedChainId =
-      "a7351abc7ddf2ea92d1b38cc8e636c271c1dfd2c081c637f62ebc2af34eb7cc1"
+      "6bc1d75e39f3bbe2bd0418160775c6655d5854c1121dc5044c70e4481e4476c0"
 
 in  ChainIdTest.makeTest
       "ChainIdTestMainnet"
