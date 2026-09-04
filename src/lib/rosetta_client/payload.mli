@@ -32,14 +32,17 @@ val model :
   -> string
   -> 'a Or_error.t
 
-(** [unknown_keys ~path input output] lists the dotted paths of the keys
-    in [input] that are missing from [output], where [output] is [input]
-    decoded into a model and re-encoded.
+(** [unknown_keys ~roundtrip json] lists the dotted paths of the keys in
+    [json] that the model ignored, where [roundtrip] decodes a document
+    through that model and re-encodes it ([None] if it does not decode).
 
     The generated models decode with [strict = false], so a misspelled
-    field is dropped in silence; the round trip is what turns that
-    silence back into an error.  A key whose value is [null], [[]] or
-    [{}] is never reported: those are the values a [\[@default\]]
-    swallows on the way out, so their absence says nothing about whether
-    the key was understood.  Exposed for testing. *)
-val unknown_keys : path:string -> Yojson.Safe.t -> Yojson.Safe.t -> string list
+    field is dropped in silence.  A key is called ignored when
+    overwriting its value leaves the round trip's output unchanged: a
+    key the model reads either shows the new value or rejects it, so
+    this separates an unrecognised key from a recognised one that
+    happens to hold its [\[@default\]].  Exposed for testing. *)
+val unknown_keys :
+     roundtrip:(Yojson.Safe.t -> Yojson.Safe.t option)
+  -> Yojson.Safe.t
+  -> string list
