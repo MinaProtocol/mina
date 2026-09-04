@@ -38,6 +38,14 @@ resolve_and_build_package() {
     return
   fi
 
+  # The archive and Rosetta split the same way the daemon does, because both are
+  # compiled against one schema era. This branch holds the pre-fork sources, so
+  # only the prefork halves are built here.
+  if [[ "$package" =~ ^(archive|rosetta)_(mainnet|devnet)_prefork$ ]]; then
+    "build_${BASH_REMATCH[1]}_prefork_deb" "${BASH_REMATCH[2]}"
+    return
+  fi
+
   if [[ "$package" =~ ^daemon_(mainnet|devnet)_(config|generic|hardfork_config|prefork)$ ]]; then
     "build_daemon_${BASH_REMATCH[2]}_deb" "${BASH_REMATCH[1]}"
     return

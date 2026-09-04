@@ -23,6 +23,8 @@ in  Pipeline.build
             , Artifacts.Type.DaemonAppsOnly
             , Artifacts.Type.DaemonConfig
             , Artifacts.Type.DaemonPrefork
+            , Artifacts.Type.ArchivePrefork
+            , Artifacts.Type.RosettaPrefork
             , Artifacts.Type.Archive
             , Artifacts.Type.Rosetta
             , Artifacts.Type.ZkappTestTransaction

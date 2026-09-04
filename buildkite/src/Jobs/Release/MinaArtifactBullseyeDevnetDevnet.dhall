@@ -16,6 +16,8 @@ in  Pipeline.build
             , Artifacts.Type.DaemonAppsOnly
             , Artifacts.Type.DaemonConfig
             , Artifacts.Type.DaemonPrefork
+            , Artifacts.Type.ArchivePrefork
+            , Artifacts.Type.RosettaPrefork
             , Artifacts.Type.CreatePreforkGenesis
             , Artifacts.Type.LogProc
             , Artifacts.Type.Archive

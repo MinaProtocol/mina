@@ -714,35 +714,122 @@ build_daemon_hardfork_config_deb() {
 # Sets up archive daemon, archive blocks tool, extract blocks tool,
 # missing blocks utilities, replayer, and SQL migration scripts.
 #
+# Copies the archive binaries into a directory.
+#
+# Takes the destination so that the prefork package can place a whole runtime
+# under /usr/lib/mina/<codename>/ while the ordinary package puts it on the
+# PATH. Every binary here is compiled against one schema era, which is why a
+# hard fork needs a second copy of all of them rather than just a second
+# archive.
+copy_common_archive_apps() {
+  local dest="${1}"
+
+  mkdir -p "${dest}"
+
+  cp ./default/src/app/archive/archive.exe \
+    "${dest}/mina-archive"
+  cp ./default/src/app/archive_blocks/archive_blocks.exe \
+    "${dest}/mina-archive-blocks"
+  cp ./default/src/app/extract_blocks/extract_blocks.exe \
+    "${dest}/mina-extract-blocks"
+  cp ./default/src/app/archive_hardfork_toolbox/archive_hardfork_toolbox.exe \
+    "${dest}/mina-archive-hardfork-toolbox"
+  cp ./default/src/app/missing_blocks_auditor/missing_blocks_auditor.exe \
+    "${dest}/mina-missing-blocks-auditor"
+  cp ./default/src/app/replayer/replayer.exe \
+    "${dest}/mina-replayer"
+  cp ./default/src/app/dump_slot_ledger/dump_slot_ledger.exe \
+    "${dest}/mina-dump-slot-ledger"
+}
+
+# Copies the Rosetta binaries into a directory, for the same reason.
+copy_common_rosetta_apps() {
+  local dest="${1}"
+  local network="${2}"
+
+  local signature
+  signature=$(signature_of_network "$network")
+
+  mkdir -p "${dest}"
+
+  cp "./default/src/app/rosetta/rosetta_${signature}_signatures.exe" \
+    "${dest}/mina-rosetta"
+  cp "./default/src/app/rosetta/ocaml-signer/signer_${signature}_signatures.exe" \
+    "${dest}/mina-ocaml-signer"
+  cp ./default/src/app/rosetta/indexer_test/indexer_test.exe \
+    "${dest}/mina-rosetta-indexer-test"
+}
+
 copy_common_archive_configs() {
   local ARCHIVE_DEB="${1}"
 
-  mkdir -p "${BUILDDIR}/usr/local/bin"
-
-  cp ./default/src/app/archive/archive.exe \
-    "${BUILDDIR}/usr/local/bin/mina-archive"
-  cp ./default/src/app/archive_blocks/archive_blocks.exe \
-    "${BUILDDIR}/usr/local/bin/mina-archive-blocks"
-  cp ./default/src/app/extract_blocks/extract_blocks.exe \
-    "${BUILDDIR}/usr/local/bin/mina-extract-blocks"
-  cp ./default/src/app/archive_hardfork_toolbox/archive_hardfork_toolbox.exe \
-    "${BUILDDIR}/usr/local/bin/mina-archive-hardfork-toolbox"
+  copy_common_archive_apps "${BUILDDIR}/usr/local/bin"
 
   mkdir -p "${BUILDDIR}/etc/mina/archive"
   cp ../scripts/archive/missing-blocks-guardian.sh \
     "${BUILDDIR}/usr/local/bin/mina-missing-blocks-guardian"
 
-  cp ./default/src/app/missing_blocks_auditor/missing_blocks_auditor.exe \
-    "${BUILDDIR}/usr/local/bin/mina-missing-blocks-auditor"
-  cp ./default/src/app/replayer/replayer.exe \
-    "${BUILDDIR}/usr/local/bin/mina-replayer"
-  cp ./default/src/app/dump_slot_ledger/dump_slot_ledger.exe \
-    "${BUILDDIR}/usr/local/bin/mina-dump-slot-ledger"
-
   rsync -Huav ../src/app/archive/*.sql "${BUILDDIR}/etc/mina/archive"
 
   build_deb "$ARCHIVE_DEB"
 }
+
+## ARCHIVE AND ROSETTA PREFORK PACKAGES ##
+
+# The pre-fork halves of the archive and Rosetta automode packages.
+#
+# Every archive and Rosetta binary is compiled against one schema era, so a hard
+# fork replaces all of them. The automode arrangement installs both eras side by
+# side and lets a dispatcher choose; this branch holds the pre-fork sources, so
+# it builds the pre-fork halves.
+#
+# Their post-fork siblings, the umbrella packages and the dispatcher itself all
+# live on the post-fork branch. Nothing here needs them: these packages only
+# have to exist in the repository at the version the umbrella pins.
+
+#
+# Builds mina-archive-NETWORK-prefork-POSTFORK_CODENAME
+#
+# Binaries only, under /usr/lib/mina/${CURRENT_CODENAME}. Nothing on the PATH --
+# the dispatcher, which ships with the post-fork package, is what puts anything
+# there. No SQL either: the upgrade script moves a database between eras and
+# must be the post-fork copy that runs.
+#
+build_archive_prefork_deb() {
+
+  local network="$1"
+  local package_name="mina-archive-${network}-prefork-${POSTFORK_CODENAME}"
+
+  echo "------------------------------------------------------------"
+  echo "--- Building archive prefork deb for ${network}:"
+
+  create_control_file "${package_name}" "${ARCHIVE_DEPS}" \
+    "Mina Archive Node and tools for the pre-fork era of ${network}"
+
+  copy_common_archive_apps "${AUTOMODE_CURRENT_DIR}"
+
+  build_deb "${package_name}"
+}
+
+#
+# Builds mina-rosetta-NETWORK-prefork-POSTFORK_CODENAME
+#
+build_rosetta_prefork_deb() {
+
+  local network="$1"
+  local package_name="mina-rosetta-${network}-prefork-${POSTFORK_CODENAME}"
+
+  echo "------------------------------------------------------------"
+  echo "--- Building rosetta prefork deb for ${network}:"
+
+  create_control_file "${package_name}" "${SHARED_DEPS}" \
+    "Mina Rosetta API for the pre-fork era of ${network}" "${SUGGESTED_DEPS}"
+
+  copy_common_rosetta_apps "${AUTOMODE_CURRENT_DIR}" "${network}"
+
+  build_deb "${package_name}"
+}
+## END ARCHIVE AND ROSETTA PREFORK PACKAGES ##
 
 ## ARCHIVE PACKAGE ##
 

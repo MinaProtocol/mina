@@ -20,6 +20,8 @@ in  Pipeline.build
             , Artifacts.Type.DaemonAppsOnly
             , Artifacts.Type.DaemonAutoHardfork
             , Artifacts.Type.DaemonPrefork
+            , Artifacts.Type.ArchivePrefork
+            , Artifacts.Type.RosettaPrefork
             , Artifacts.Type.DaemonConfig
             , Artifacts.Type.LogProc
             , Artifacts.Type.Archive
