@@ -98,7 +98,8 @@ compact JSON with `--compact`), followed by a single newline.  Exit 0.
 
 On failure — HTTP non-2xx, a transport error, invalid JSON input, or a
 `--*-json` payload that does not match the Rosetta model the endpoint
-expects — the tool logs a short diagnostic to stderr through Mina's
+expects (a wrong shape, an unrecognised field, or a non-object where the
+schema wants one) — the tool logs a short diagnostic to stderr through Mina's
 `Logger` and exits 1.  Stdout stays the data channel: it carries the
 response and nothing else, so a caller can pipe it into `jq` without
 filtering log lines out first.  The diagnostic is guaranteed to:
@@ -112,8 +113,7 @@ does not parse (`--bogus`, an unknown subcommand) is reported by Core's
 `Command` itself, unprefixed and untimestamped, before any request is
 made.  `Command_unix.run` offers no hook for it.
 
-The HTTP client, the endpoint wrappers and the error formatting live in
-`src/lib/rosetta_client/`.  Inside this binary, `rosetta_client_cli.ml`
-holds the flags, the subcommand tree and the output; `payload.ml` holds
-the decoding of the JSON-valued flags into Rosetta models, and neither
-prints nor exits.
+The HTTP client, the endpoint wrappers, the decoding of the JSON-valued
+flags into Rosetta models (`payload.ml`) and the error formatting live in
+`src/lib/rosetta_client/`; `rosetta_client_cli.ml` holds only the flags,
+the subcommand tree and the output.
