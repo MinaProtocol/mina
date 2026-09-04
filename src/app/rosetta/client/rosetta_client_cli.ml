@@ -83,17 +83,6 @@ let setup_logging () =
     ~transport:(Logger.Transport.raw Stdlib.prerr_endline)
     ()
 
-(* As metadata, not as the message: a server's error text reaches us
-   verbatim, and Postgres and GraphQL errors -- which Mina's Rosetta
-   propagates into the envelope -- are full of "$1" placeholders.  A "$"
-   in a log message is either an interpolation with no metadata behind it
-   or a parse failure, and either way Logger replaces the whole line with
-   "invalid log call: " and the "$"s rewritten to ".".
-
-   The text comes from the library's error formatters, so no raw OCaml
-   exception syntax reaches the log. *)
-let log_error msg = [%log error] "$error" ~metadata:[ ("error", `String msg) ]
-
 (* Run a client call, emit the result as JSON (or the error on stderr
    and exit 1).  Wraps the "happy path" so each leaf command stays a
    one-liner. *)
@@ -102,7 +91,18 @@ let run g ~(call : MRC.Http.t -> Yojson.Safe.t Deferred.Or_error.t) =
   | Ok j ->
       emit_json g j
   | Error e ->
-      log_error (Error.to_string_hum e) ;
+      (* As metadata, not as the message: a server's error text reaches
+         us verbatim, and Postgres and GraphQL errors -- which Mina's
+         Rosetta propagates into the envelope -- are full of "$1"
+         placeholders.  A "$" in a log message is either an
+         interpolation with no metadata behind it or a parse failure,
+         and either way Logger replaces the whole line with "invalid
+         log call: " and the "$"s rewritten to ".".
+
+         The text comes from the library's error formatters, so no raw
+         OCaml exception syntax reaches the log. *)
+      [%log error] "$error"
+        ~metadata:[ ("error", `String (Error.to_string_hum e)) ] ;
       Stdlib.exit 1
 
 (* ---------- Flags reused by more than one subcommand ---------- *)
@@ -175,7 +175,7 @@ let cmd_block_get =
      fun () ->
        match (index, hash) with
        | None, None ->
-           log_error "block get: one of --index or --hash is required" ;
+           [%log error] "block get: one of --index or --hash is required" ;
            Stdlib.exit 1
        | _ ->
            run g ~call:(fun c -> MRC.Data.block c ?index ?hash ()) )
@@ -241,12 +241,15 @@ let search_group =
 (* ---------- Construction API subcommands ---------- *)
 
 (* [MRC.Payload] reports a bad flag as an error; this is where that
-   error becomes a diagnostic on stderr and a non-zero exit. *)
+   error becomes a diagnostic on stderr and a non-zero exit.  As
+   metadata rather than as the message for the reason [run] gives: the
+   text quotes the caller's own field names, so it can carry a "$". *)
 let or_exit = function
   | Ok value ->
       value
   | Error e ->
-      log_error (Error.to_string_hum e) ;
+      [%log error] "$error"
+        ~metadata:[ ("error", `String (Error.to_string_hum e)) ] ;
       Stdlib.exit 1
 
 (* The model a JSON flag decodes into, paired with the encoder the
@@ -339,10 +342,10 @@ let cmd_construction_parse =
        let signed =
          match (signed, unsigned) with
          | true, true ->
-             log_error "--signed and --unsigned are mutually exclusive" ;
+             [%log error] "--signed and --unsigned are mutually exclusive" ;
              Stdlib.exit 1
          | false, false ->
-             log_error "parse: one of --signed or --unsigned is required" ;
+             [%log error] "parse: one of --signed or --unsigned is required" ;
              Stdlib.exit 1
          | true, false ->
              true
