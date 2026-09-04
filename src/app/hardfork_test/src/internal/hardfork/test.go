@@ -20,6 +20,7 @@ type HardforkTest struct {
 	Client         *client.Client
 	Logger         *utils.Logger
 	ScriptDir      string
+	vestingAccount *vestingAccount
 	runningCmds    []*exec.Cmd
 	runningCmdsMux sync.Mutex
 	ctx            context.Context
@@ -27,9 +28,12 @@ type HardforkTest struct {
 }
 
 // NewHardforkTest creates a new instance of the hardfork test
-func NewHardforkTest(cfg *config.Config) *HardforkTest {
+func NewHardforkTest(cfg *config.Config) (*HardforkTest, error) {
 	ctx, cancel := context.WithCancel(context.Background())
-	cfg.InitDaemonInfos()
+	if err := cfg.InitDaemonInfos(); err != nil {
+		cancel()
+		return nil, err
+	}
 	return &HardforkTest{
 		Config:      cfg,
 		Client:      client.NewClient(cfg.HTTPClientTimeoutSeconds, cfg.ClientMaxRetries),
@@ -38,7 +42,7 @@ func NewHardforkTest(cfg *config.Config) *HardforkTest {
 		runningCmds: make([]*exec.Cmd, 0),
 		ctx:         ctx,
 		cancel:      cancel,
-	}
+	}, nil
 }
 
 // gracefulShutdown attempts to gracefully shutdown a process with timeout
@@ -119,6 +123,13 @@ func (t *HardforkTest) Run() error {
 	defer t.cleanupAllProcesses()
 
 	t.Logger.Info("===== Starting Hardfork Test =====")
+
+	// Seed a timed/vesting account into the pre-fork genesis ledger so we can
+	// verify the Mesa slot-reduction vesting update after the fork (see vesting.go).
+	if err := t.SetupVestingAccount(); err != nil {
+		return err
+	}
+	defer t.CleanupVestingAccount()
 
 	// Calculate main network genesis timestamp
 	mainGenesisTs := time.Now().Unix() + int64(t.Config.MainDelayMin*60)

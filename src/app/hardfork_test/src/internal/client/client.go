@@ -121,7 +121,8 @@ func (block *BlockData) NonEmpty() bool {
 func (block BlockData) String() string {
 	b, err := json.MarshalIndent(block, "", "  ")
 	if err != nil {
-		return fmt.Sprintf("%+v", block)
+		type blockData BlockData
+		return fmt.Sprintf("%+v", blockData(block))
 	}
 	return string(b)
 }
@@ -249,6 +250,63 @@ func (c *Client) ForkConfig(port int) (gjson.Result, error) {
 	}
 
 	return result.Get("data.fork_config"), nil
+}
+
+// accountTiming mirrors the GraphQL account timing/balance response. All
+// numeric fields are decoded from the stringified integers GraphQL returns:
+// amounts/balances are in nanomina and times are global-slot numbers.
+type accountTiming struct {
+	Timing *struct {
+		InitialMinimumBalance int64 `json:"initialMinimumBalance,string"`
+		CliffTime             int64 `json:"cliffTime,string"`
+		CliffAmount           int64 `json:"cliffAmount,string"`
+		VestingPeriod         int64 `json:"vestingPeriod,string"`
+		VestingIncrement      int64 `json:"vestingIncrement,string"`
+	} `json:"timing"`
+	Balance struct {
+		Total  int64 `json:"total,string"`
+		Liquid int64 `json:"liquid,string"`
+	} `json:"balance"`
+}
+
+const accountTimingQuery = `
+account(publicKey: "%s") {
+  timing {
+    initialMinimumBalance
+    cliffTime
+    cliffAmount
+    vestingPeriod
+    vestingIncrement
+  }
+  balance {
+    total
+    liquid
+  }
+}
+`
+
+// AccountTiming queries the timing parameters and balances of the account with
+// the given public key.
+func (c *Client) AccountTiming(port int, pubKey string) (*accountTiming, error) {
+	result, err := c.query(port, fmt.Sprintf(accountTimingQuery, pubKey))
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		Data struct {
+			Account *accountTiming `json:"account"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal([]byte(result.Raw), &response); err != nil {
+		return nil, fmt.Errorf("failed to decode account timing response: %w", err)
+	}
+
+	if response.Data.Account == nil {
+		return nil, fmt.Errorf("account %s not found at port %d", pubKey, port)
+	}
+
+	return response.Data.Account, nil
 }
 
 func (c *Client) NumUserCommandsInBestChain(port int) (int, error) {
