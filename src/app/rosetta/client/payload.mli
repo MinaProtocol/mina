@@ -11,7 +11,7 @@
     is reported against the flag that carried it, before a request is
     sent. *)
 
-open Core_kernel
+open Core
 
 (** [json ~label s] parses [s] as JSON.  [label] is the flag name, and
     appears in the error. *)

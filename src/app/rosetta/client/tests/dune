@@ -2,7 +2,8 @@
 ;;
 ;; These exercise only subcommands that don't need a running Rosetta
 ;; server: --help for each subgroup and the clean error paths of the
-;; HTTP and JSON-validation code.
+;; HTTP code.  The spawning and the assertions live in
+;; rosetta_cli_test_helpers, shared with the rosetta-healthcheck suite.
 
 (test
  (name test_rosetta_client)
@@ -10,16 +11,10 @@
   ;; opam libraries
   alcotest
   core
-  core_kernel
-  core_unix
-  core_unix.filename_unix
-  core_unix.sys_unix
-  stdio
-  yojson
-  ;; mina libraries
-  rosetta_client)
+  ;; local libraries
+  rosetta_cli_test_helpers)
  (deps ../rosetta_client_cli.exe)
  (instrumentation
   (backend bisect_ppx))
  (preprocess
-  (pps ppx_version)))
+  (pps ppx_version ppx_let)))

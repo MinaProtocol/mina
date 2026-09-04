@@ -229,6 +229,7 @@ build-mina: ocaml_checks reformat-diff libp2p_helper build ## Build mina apps
 		src/app/cli/src/mina.exe \
 		src/app/rosetta/rosetta.exe \
 		src/app/rosetta/ocaml-signer/signer.exe \
+		src/app/rosetta/healthcheck/rosetta_healthcheck.exe \
 		src/app/rosetta/client/rosetta_client_cli.exe \
 		&& echo "✅ Build complete"
 
@@ -296,6 +297,7 @@ build-rosetta: ocaml_checks ## Build Rosetta API components
 		src/app/archive/archive.exe \
 		src/app/rosetta/rosetta.exe \
 		src/app/rosetta/ocaml-signer/signer.exe \
+		src/app/rosetta/healthcheck/rosetta_healthcheck.exe \
 		src/app/rosetta/client/rosetta_client_cli.exe \
 		--profile=$(DUNE_PROFILE) \
 		&& echo "✅ Build complete"
@@ -435,6 +437,26 @@ check-format: ocaml_checks ## Check formatting of OCaml code
 .PHONY: check-snarky-submodule
 check-snarky-submodule: ## Check the snarky submodule
 	./scripts/check-snarky-submodule.sh
+
+#######################################
+## Dependency checks
+
+.PHONY: check-deps
+check-deps: ## Check the OCaml dependency graph against its baseline
+	python3 maintenance/deps/main.py check
+
+.PHONY: deps-advice
+deps-advice: ## Report OCaml dependencies that look removable
+	python3 maintenance/deps/main.py advise
+
+.PHONY: deps-baseline
+deps-baseline: ## Re-pin the dependency baseline after an intended change
+	python3 maintenance/deps/main.py baseline
+
+.PHONY: deps-dot
+deps-dot: ## Write the dependency graph to maintenance/deps.dot (render with graphviz)
+	python3 maintenance/deps/main.py dot > maintenance/deps.dot
+	@echo "wrote maintenance/deps.dot; render with: dot -Tpng maintenance/deps.dot > maintenance/deps.png"
 
 #######################################
 ## Bash checks

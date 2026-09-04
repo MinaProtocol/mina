@@ -1,13 +1,14 @@
 (executable
  (package rosetta)
- (name rosetta_client_cli)
- (public_name rosetta-client)
+ (name rosetta_healthcheck)
+ (public_name rosetta-healthcheck)
  (libraries
   ;; opam libraries
   core
   core_unix.command_unix
   async
   async.async_command
+  ppx_deriving_yojson.runtime
   yojson
   ;; local libraries
   interpolator_lib
@@ -16,4 +17,4 @@
  (instrumentation
   (backend bisect_ppx))
  (preprocess
-  (pps ppx_version ppx_let ppx_mina)))
+  (pps ppx_version ppx_let ppx_deriving_yojson ppx_mina)))

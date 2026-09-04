@@ -7,6 +7,9 @@ subcommand maps to a single endpoint, auto-injects
 `network_identifier`, and prints the response as JSON (pretty by default,
 `--compact` for one-line output).
 
+For readiness probes, see the sibling
+[`rosetta-healthcheck`](../healthcheck/README.md) binary.
+
 ## Subcommand tree
 
 ```
@@ -18,8 +21,7 @@ rosetta-client
 ├── block
 │   └── get            --index N | --hash H
 ├── account
-│   ├── balance        --address B62q... [--token-id T] [--index N]
-│   └── coins          --address B62q... [--include-mempool]
+│   └── balance        --address B62q... [--token-id T] [--index N]
 ├── mempool
 │   ├── list
 │   └── transaction    --tx-hash H
@@ -41,6 +43,12 @@ every transaction inline in `/block`, does not implement
 `/block/transaction`, and would answer 404.  Use `block get` and filter
 the returned transactions by hash.
 
+`account coins` is absent for the same reason.  The server routes
+`/account/balance` and answers 404 to everything else under `/account/`,
+and the coins model is a UTXO notion that an account-based chain has
+nothing to say about — `/network/options` advertises
+`"mempool_coins": false`.
+
 ## Global flags
 
 Every leaf command accepts:
@@ -54,9 +62,11 @@ Every leaf command accepts:
 | `--compact` | off | | Emit compact JSON instead of indented. |
 
 A flag always wins over its environment variable.  Export the variables
-to talk to the same server repeatedly without repeating the flags.  Their
-fallback values live in `Rosetta_client.Defaults`, so every binary built
-on the library falls back to the same place.
+to talk to the same server repeatedly without repeating the flags; the
+same three variables are read by `rosetta-healthcheck`.  The flags
+themselves live in `Rosetta_client.Flags` and their fallbacks in
+`Rosetta_client.Defaults`, so every binary built on the library offers
+the same flags and falls back to the same place.
 
 ## Examples
 
@@ -86,15 +96,21 @@ rosetta-client construction derive \
 On success, the response body is printed as pretty JSON on stdout (or
 compact JSON with `--compact`), followed by a single newline.  Exit 0.
 
-On failure — HTTP non-2xx, transport error, invalid JSON input, or a
+On failure — HTTP non-2xx, a transport error, invalid JSON input, or a
 `--*-json` payload that does not match the Rosetta model the endpoint
-expects — the tool prints a short diagnostic on stderr and exits 1.  The
-diagnostic is produced by the `Rosetta_client.Errors` module and is
-guaranteed to:
+expects — the tool logs a short diagnostic to stderr through Mina's
+`Logger` and exits 1.  Stdout stays the data channel: it carries the
+response and nothing else, so a caller can pipe it into `jq` without
+filtering log lines out first.  The diagnostic is guaranteed to:
 
 - Never leak raw OCaml exception syntax (no `Unix_error`, no `(Unix. ...)`).
 - Never dump multi-kilobyte HTTP bodies verbatim; Rosetta error envelopes
-  are parsed and rendered as `HTTP <code>: <message>`.
+  are parsed and rendered as `HTTP <code> from <url>: <message>`.
+
+One class of message does not go through the logger: a command line that
+does not parse (`--bogus`, an unknown subcommand) is reported by Core's
+`Command` itself, unprefixed and untimestamped, before any request is
+made.  `Command_unix.run` offers no hook for it.
 
 The HTTP client, the endpoint wrappers and the error formatting live in
 `src/lib/rosetta_client/`.  Inside this binary, `rosetta_client_cli.ml`

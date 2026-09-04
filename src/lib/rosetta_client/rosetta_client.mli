@@ -1,7 +1,8 @@
 (** Mina Rosetta client library.
 
-    Thin HTTP client and typed Rosetta API surface, used by
-    [rosetta-client] (the generic CLI).
+    Thin HTTP client and typed Rosetta API surface, shared by
+    [rosetta-client] (the generic CLI) and [rosetta-healthcheck] (which
+    only exposes readiness probes).
 
     {[
       open Async
@@ -14,8 +15,8 @@
     ]} *)
 
 module Defaults = Defaults
+module Flags = Flags
 module Http = Http
 module Data = Data
 module Construction = Construction
-module Errors = Errors
 module Models = Rosetta_models

@@ -9,59 +9,11 @@
    Core.Unix.Unix_error, etc.).  See [assert_no_ocaml_exn_leak]. *)
 
 open Core
+open Rosetta_cli_test_helpers
 
-(* Path to the binary under test.  dune places the test executable in
-   the same directory as its deps, so [../rosetta_client_cli.exe] is reachable from
-   wherever dune chooses to [chdir] into.  We resolve it once relative
-   to [Sys.get_argv ().(0)] so the tests survive dune sandboxing. *)
-let bin =
-  let here = Filename.dirname (Array.get (Sys.get_argv ()) 0) in
-  Filename.concat here "../rosetta_client_cli.exe"
+let bin = exe_beside_test "rosetta_client_cli.exe"
 
-let read_all_fd fd =
-  let ic = Core_unix.in_channel_of_descr fd in
-  let s = In_channel.input_all ic in
-  In_channel.close ic ; s
-
-(* Spawn the CLI with [args] and an optional env extension, capture
-   stdout and stderr, return [(exit_code, stdout, stderr)]. *)
-let run_cli ?(env = []) args =
-  let pi = Core_unix.create_process_env ~prog:bin ~args ~env:(`Extend env) () in
-  (* Close stdin immediately so the child gets EOF if it ever tried to
-     read. *)
-  Core_unix.close pi.stdin ;
-  let out = read_all_fd pi.stdout in
-  let err = read_all_fd pi.stderr in
-  let status = Core_unix.waitpid pi.pid in
-  let code =
-    match status with
-    | Ok () ->
-        0
-    | Error (`Exit_non_zero n) ->
-        n
-    | Error (`Signal s) ->
-        128 + Signal.to_system_int s
-  in
-  (code, out, err)
-
-(* Regression guard: no user-facing output must contain raw OCaml
-   exception syntax.  The triggering bug for this whole cleanup was
-   connection-refused paths leaking [Unix_error] through to stderr. *)
-let assert_no_ocaml_exn_leak label s =
-  let needles = [ "Unix_error"; "(Unix."; "Core.Unix" ] in
-  List.iter needles ~f:(fun needle ->
-      if String.is_substring s ~substring:needle then
-        Alcotest.failf "%s: output leaked OCaml exception syntax (%s):\n%s"
-          label needle s )
-
-let contains ?(case_insensitive = false) s ~sub =
-  if case_insensitive then
-    String.is_substring (String.lowercase s) ~substring:(String.lowercase sub)
-  else String.is_substring s ~substring:sub
-
-let check_contains ~label s ~sub =
-  if not (contains s ~sub) then
-    Alcotest.failf "%s: expected to contain %S, got:\n%s" label sub s
+let run_cli ?env args = run_cli ~bin ?env args
 
 (* ---------- Tests ---------- *)
 
