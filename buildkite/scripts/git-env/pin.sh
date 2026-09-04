@@ -33,6 +33,14 @@
 # one place, its own root, and no reader has to know where the binaries came
 # from.
 #
+# Everything it says goes to standard error. An entrypoint that renders a
+# pipeline writes that pipeline to standard output and is invoked as
+#
+#   ./buildkite/scripts/entrypoints/<entrypoint>.sh | buildkite-agent pipeline upload
+#
+# so a single line on standard output from here would be uploaded as part of
+# the pipeline, and the upload would fail on it.
+#
 # Usage: pin.sh
 
 set -euo pipefail
@@ -62,9 +70,9 @@ function already_pinned () {
 }
 
 function publish () {
-  echo "--- Pinning the git environment of this build"
-  cat "$1"
-  ./buildkite/scripts/cache/manager.sh write --override "$1" "$GIT_ENV_CACHE_PATH"
+  echo "--- Pinning the git environment of this build" >&2
+  cat "$1" >&2
+  ./buildkite/scripts/cache/manager.sh write --override "$1" "$GIT_ENV_CACHE_PATH" >&2
 }
 
 # Take the identity of the build whose output this one is wrapping. Its absence
@@ -74,7 +82,7 @@ function publish () {
 function inherit_from () {
   local __root="$1" __why="$2"
 
-  echo "--- Taking the git environment from ${__why} (${__root})"
+  echo "--- Taking the git environment from ${__why} (${__root})" >&2
 
   if ! ./buildkite/scripts/cache/manager.sh read \
         --root "${__root}" "$GIT_ENV_CACHE_PATH" "$TMP_DIR" >/dev/null 2>&1; then
@@ -89,8 +97,8 @@ function inherit_from () {
 }
 
 if already_pinned; then
-  echo "--- This build is already pinned"
-  cat "${TMP_DIR}/${GIT_ENV_CACHE_PATH}"
+  echo "--- This build is already pinned" >&2
+  cat "${TMP_DIR}/${GIT_ENV_CACHE_PATH}" >&2
   exit 0
 fi
 
@@ -100,8 +108,11 @@ elif [[ -n "${FROM_BUILD}" ]]; then
   inherit_from "${FROM_BUILD}" "the build this one takes its artifacts from"
 else
   # This build compiles its own binaries, so its checkout is the answer.
+  # Sourced with standard output redirected: export-git-env-vars.sh and the
+  # scripts it reaches print as they go, and none of that may reach a caller
+  # that is rendering a pipeline.
   # shellcheck disable=SC1090,SC1091
-  source ./buildkite/scripts/export-git-env-vars.sh
+  source ./buildkite/scripts/export-git-env-vars.sh >&2
 
   LOCAL_FILE="${TMP_DIR}/${GIT_ENV_CACHE_PATH}"
   write_git_env_file "$LOCAL_FILE"
