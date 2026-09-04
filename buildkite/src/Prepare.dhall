@@ -14,6 +14,8 @@ let Cmd = ./Lib/Cmds.dhall
 
 let Command = ./Command/Base.dhall
 
+let PinGitEnv = ./Command/PinGitEnv.dhall
+
 let Docker = ./Command/Docker/Type.dhall
 
 let JobSpec = ./Pipeline/JobSpec.dhall
@@ -32,16 +34,20 @@ let scopeFilter = env:BUILDKITE_PIPELINE_SCOPE as Text ? "All"
 
 let filterMode = env:BUILDKITE_PIPELINE_FILTER_MODE as Text ? "Any"
 
+let jobName = "prepare"
+
 let config
     : Pipeline.Config.Type
     = Pipeline.Config::{
       , spec = JobSpec::{
-        , name = "prepare"
+        , name = jobName
         , dirtyWhen = [ SelectFiles.everything ]
         }
       , steps =
-        [ Command.build
+        [ PinGitEnv.step
+        , Command.build
             Command.Config::{
+            , depends_on = PinGitEnv.dependsOn jobName
             , commands =
               [ Cmd.run "./buildkite/scripts/pipeline/validate-release-env.sh"
               , Cmd.run "export BUILDKITE_PIPELINE_MODE=${mode}"
