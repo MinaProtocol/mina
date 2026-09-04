@@ -175,7 +175,7 @@ let cmd_block_get =
      fun () ->
        match (index, hash) with
        | None, None ->
-           [%log error] "block get: one of --index or --hash is required" ;
+           log_error "block get: one of --index or --hash is required" ;
            Stdlib.exit 1
        | _ ->
            run g ~call:(fun c -> MRC.Data.block c ?index ?hash ()) )
@@ -240,8 +240,8 @@ let search_group =
 
 (* ---------- Construction API subcommands ---------- *)
 
-(* [Payload] reports a bad flag as an error; this is where that error
-   becomes a diagnostic on stderr and a non-zero exit. *)
+(* [MRC.Payload] reports a bad flag as an error; this is where that
+   error becomes a diagnostic on stderr and a non-zero exit. *)
 let or_exit = function
   | Ok value ->
       value
@@ -249,21 +249,31 @@ let or_exit = function
       log_error (Error.to_string_hum e) ;
       Stdlib.exit 1
 
-let required_flag label of_yojson s = or_exit (Payload.model ~label of_yojson s)
+(* The model a JSON flag decodes into, paired with the encoder the
+   unknown-field check needs. *)
+let public_key = ([%of_yojson: RM.Public_key.t], [%to_yojson: RM.Public_key.t])
 
-let optional_flag label of_yojson s =
-  or_exit (Payload.model_opt ~label of_yojson s)
+let public_keys =
+  ([%of_yojson: RM.Public_key.t list], [%to_yojson: RM.Public_key.t list])
+
+let operations =
+  ([%of_yojson: RM.Operation.t list], [%to_yojson: RM.Operation.t list])
+
+let signatures =
+  ([%of_yojson: RM.Signature.t list], [%to_yojson: RM.Signature.t list])
+
+let model_flag label (of_yojson, to_yojson) s =
+  or_exit (MRC.Payload.model ~label ~of_yojson ~to_yojson s)
 
 (* [metadata] and [options] stay raw JSON: the Rosetta schema leaves both
-   free-form, so there is no model to decode them into. *)
-let raw_json_flag label s = or_exit (Payload.json ~label s)
-
-let optional_raw_json_flag label s = or_exit (Payload.json_opt ~label s)
+   free-form apart from requiring an object, so there is no model to
+   decode them into. *)
+let object_flag label s = or_exit (MRC.Payload.json_object ~label s)
 
 let cmd_construction_derive =
   Command.async ~summary:"POST /construction/derive"
     (let%map_open.Command g = global_flags_param
-     and public_key =
+     and pk_json =
        flag "--public-key-json"
          ~doc:
            "JSON Rosetta PublicKey object (e.g. \
@@ -271,25 +281,19 @@ let cmd_construction_derive =
          (required string)
      and metadata = metadata_json_flag in
      fun () ->
-       let pk =
-         required_flag "--public-key-json" [%of_yojson: RM.Public_key.t]
-           public_key
-       in
-       let md = optional_raw_json_flag "--metadata-json" metadata in
+       let pk = model_flag "--public-key-json" public_key pk_json in
+       let md = Option.map metadata ~f:(object_flag "--metadata-json") in
        run g ~call:(fun c ->
            MRC.Construction.derive c ~public_key:pk ?metadata:md () ) )
 
 let cmd_construction_preprocess =
   Command.async ~summary:"POST /construction/preprocess"
     (let%map_open.Command g = global_flags_param
-     and operations = operations_json_flag
+     and ops_json = operations_json_flag
      and metadata = metadata_json_flag in
      fun () ->
-       let ops =
-         required_flag "--operations-json" [%of_yojson: RM.Operation.t list]
-           operations
-       in
-       let md = optional_raw_json_flag "--metadata-json" metadata in
+       let ops = model_flag "--operations-json" operations ops_json in
+       let md = Option.map metadata ~f:(object_flag "--metadata-json") in
        run g ~call:(fun c ->
            MRC.Construction.preprocess c ~operations:ops ?metadata:md () ) )
 
@@ -298,12 +302,11 @@ let cmd_construction_metadata =
     (let%map_open.Command g = global_flags_param
      and options =
        flag "--options-json" ~doc:"JSON Options object" (required string)
-     and public_keys = public_keys_json_flag in
+     and pks_json = public_keys_json_flag in
      fun () ->
-       let opts = raw_json_flag "--options-json" options in
+       let opts = object_flag "--options-json" options in
        let pks =
-         optional_flag "--public-keys-json" [%of_yojson: RM.Public_key.t list]
-           public_keys
+         Option.map pks_json ~f:(model_flag "--public-keys-json" public_keys)
        in
        run g ~call:(fun c ->
            MRC.Construction.metadata c ~options:opts ?public_keys:pks () ) )
@@ -311,18 +314,14 @@ let cmd_construction_metadata =
 let cmd_construction_payloads =
   Command.async ~summary:"POST /construction/payloads"
     (let%map_open.Command g = global_flags_param
-     and operations = operations_json_flag
+     and ops_json = operations_json_flag
      and metadata = metadata_json_flag
-     and public_keys = public_keys_json_flag in
+     and pks_json = public_keys_json_flag in
      fun () ->
-       let ops =
-         required_flag "--operations-json" [%of_yojson: RM.Operation.t list]
-           operations
-       in
-       let md = optional_raw_json_flag "--metadata-json" metadata in
+       let ops = model_flag "--operations-json" operations ops_json in
+       let md = Option.map metadata ~f:(object_flag "--metadata-json") in
        let pks =
-         optional_flag "--public-keys-json" [%of_yojson: RM.Public_key.t list]
-           public_keys
+         Option.map pks_json ~f:(model_flag "--public-keys-json" public_keys)
        in
        run g ~call:(fun c ->
            MRC.Construction.payloads c ~operations:ops ?metadata:md
@@ -358,14 +357,11 @@ let cmd_construction_combine =
      and unsigned_transaction =
        flag "--unsigned-transaction" ~doc:"STR Unsigned tx blob"
          (required string)
-     and signatures =
+     and sigs_json =
        flag "--signatures-json" ~doc:"JSON Signatures array" (required string)
      in
      fun () ->
-       let sigs =
-         required_flag "--signatures-json" [%of_yojson: RM.Signature.t list]
-           signatures
-       in
+       let sigs = model_flag "--signatures-json" signatures sigs_json in
        run g ~call:(fun c ->
            MRC.Construction.combine c ~unsigned_transaction ~signatures:sigs )
     )

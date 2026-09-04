@@ -15,12 +15,26 @@ let bin = exe_beside_test "rosetta_client_cli.exe"
 
 let run_cli ?env args = run_cli ~bin ?env args
 
+(* A flag the CLI rejects locally: exit 1, a diagnostic naming the flag
+   (or whatever [needle] identifies the complaint), and no request made
+   -- the dead port makes a request that escaped validation fail loudly
+   instead of quietly succeeding. *)
+let expect_flag_rejected ~label ~needle args =
+  let code, out, err =
+    run_cli (args @ [ "--rosetta-uri"; "http://127.0.0.1:1" ])
+  in
+  Alcotest.(check int) (label ^ " exit") 1 code ;
+  assert_no_ocaml_exn_leak (label ^ " stdout") out ;
+  assert_no_ocaml_exn_leak (label ^ " stderr") err ;
+  check_contains ~label (out ^ "\n" ^ err) ~sub:needle
+
 (* ---------- Tests ---------- *)
 
 let test_help_root () =
   let code, out, err = run_cli [ "--help" ] in
   Alcotest.(check int) "--help exit" 0 code ;
   check_contains ~label:"--help root lists network" out ~sub:"network" ;
+  check_contains ~label:"--help root lists search" out ~sub:"search" ;
   check_contains ~label:"--help root lists construction" out ~sub:"construction" ;
   assert_no_ocaml_exn_leak "--help root stderr" err
 
@@ -130,6 +144,50 @@ let test_construction_derive_schema_mismatch () =
        stderr=%s"
       out err
 
+(* A flag payload the model accepts but does not fully understand: the
+   generated models decode non-strictly, so without the round-trip check
+   "typo" would be dropped and the request sent as if it were correct. *)
+let test_construction_derive_unknown_field () =
+  expect_flag_rejected ~label:"construction derive (unknown field)"
+    ~needle:"typo"
+    [ "construction"
+    ; "derive"
+    ; "--public-key-json"
+    ; {|{"hex_bytes":"aabb","curve_type":"pallas","typo":1}|}
+    ]
+
+(* The Rosetta schema leaves [options] free-form but still types it as
+   an object, so a bare scalar is refused here rather than sent. *)
+let test_construction_metadata_non_object_options () =
+  expect_flag_rejected ~label:"construction metadata (non-object options)"
+    ~needle:"options-json"
+    [ "construction"; "metadata"; "--options-json"; "5" ]
+
+(* ppx_deriving_yojson reports a list-shaped mismatch with no message;
+   the diagnostic must not trail off after a bare colon. *)
+let test_construction_preprocess_list_mismatch () =
+  let code, out, err =
+    run_cli
+      [ "construction"
+      ; "preprocess"
+      ; "--operations-json"
+      ; {|{"a":1}|}
+      ; "--rosetta-uri"
+      ; "http://127.0.0.1:1"
+      ]
+  in
+  Alcotest.(check int) "construction preprocess (bad list) exit" 1 code ;
+  assert_no_ocaml_exn_leak "construction preprocess stderr" err ;
+  check_contains ~label:"names the flag"
+    (out ^ "\n" ^ err)
+    ~sub:"operations-json" ;
+  if String.is_suffix (String.strip (out ^ err)) ~suffix:":" then
+    Alcotest.failf
+      "construction preprocess (bad list): diagnostic ends in a bare colon:\n\
+       stdout=%s\n\
+       stderr=%s"
+      out err
+
 (* ---------- Runner ---------- *)
 
 let () =
@@ -150,5 +208,14 @@ let () =
         ; ( "construction derive schema mismatch"
           , `Quick
           , test_construction_derive_schema_mismatch )
+        ; ( "construction derive unknown field"
+          , `Quick
+          , test_construction_derive_unknown_field )
+        ; ( "construction metadata non-object options"
+          , `Quick
+          , test_construction_metadata_non_object_options )
+        ; ( "construction preprocess list mismatch"
+          , `Quick
+          , test_construction_preprocess_list_mismatch )
         ] )
     ]
