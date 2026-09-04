@@ -5,7 +5,7 @@
    the required/optional split and the nesting all come from the schema
    rather than from hand-written JSON objects. *)
 
-open Core_kernel
+open Core
 module RM = Rosetta_models
 
 (* A Mina token id travels in [account_identifier.metadata], which the
@@ -26,14 +26,57 @@ let account_identifier ?token_id address =
 let partial_block_identifier ?index ?hash () =
   { RM.Partial_block_identifier.index = Option.map index ~f:Int64.of_int; hash }
 
-let decode_response response ~endpoint of_yojson =
+(* One decoder for every endpoint, rather than a typed twin per
+   endpoint: the raw call is the primitive, and a caller that wants the
+   model says which one it wants. *)
+let decode of_yojson response =
   Async.Deferred.Or_error.bind response ~f:(fun json ->
       match of_yojson json with
       | Ok response ->
           Async.Deferred.Or_error.return response
       | Error msg ->
+          (* [of_yojson] reports the field it stopped at, which is the
+             useful half of the diagnostic; say what that means around
+             it.  A generated model rejects a response only when a
+             required field is absent or ill-typed -- an unknown extra
+             field decodes fine -- so this is a server that does not
+             speak the schema this build was generated from, not a
+             server that is down.  A caller which treats every error as
+             an outage would otherwise report it as one. *)
           Async.Deferred.Or_error.errorf
-            "%s response did not match Rosetta schema: %s" endpoint msg )
+            "server's response does not match the Rosetta schema this build \
+             expects (at %s)"
+            msg )
+
+let%test_unit "decode parses a matching response and rejects a mismatch" =
+  Async.Thread_safe.block_on_async_exn (fun () ->
+      let open Async in
+      let network_list =
+        `Assoc
+          [ ( "network_identifiers"
+            , `List
+                [ `Assoc
+                    [ ("blockchain", `String "mina")
+                    ; ("network", `String "testnet")
+                    ]
+                ] )
+          ]
+      in
+      let%bind matching =
+        decode RM.Network_list_response.of_yojson
+          (Deferred.Or_error.return network_list)
+      in
+      [%test_eq: int]
+        (List.length
+           (Or_error.ok_exn matching)
+             .RM.Network_list_response.network_identifiers )
+        1 ;
+      let%map mismatched =
+        decode RM.Network_list_response.of_yojson
+          (Deferred.Or_error.return (`Assoc []))
+      in
+      [%test_pred: unit Or_error.t] Or_error.is_error
+        (Or_error.map mismatched ~f:ignore) )
 
 (* A request whose only content is the network_identifier: /network/status,
    /network/options and /mempool all take this shape. *)
@@ -45,23 +88,11 @@ let network_list t =
   Http.post_json t ~path:"/network/list"
     ~body:(RM.Metadata_request.to_yojson (RM.Metadata_request.create ()))
 
-let network_list_response t =
-  decode_response (network_list t) ~endpoint:"/network/list"
-    RM.Network_list_response.of_yojson
-
 let network_status t =
   Http.post_json t ~path:"/network/status" ~body:(network_request t)
 
-let network_status_response t =
-  decode_response (network_status t) ~endpoint:"/network/status"
-    RM.Network_status_response.of_yojson
-
 let network_options t =
   Http.post_json t ~path:"/network/options" ~body:(network_request t)
-
-let network_options_response t =
-  decode_response (network_options t) ~endpoint:"/network/options"
-    RM.Network_options_response.of_yojson
 
 let block t ?index ?hash () =
   let request =
@@ -83,16 +114,6 @@ let account_balance t ~address ?token_id ?block_index () =
   in
   Http.post_json t ~path:"/account/balance"
     ~body:(RM.Account_balance_request.to_yojson request)
-
-let account_coins t ~address ?(include_mempool = false) () =
-  let request =
-    RM.Account_coins_request.create
-      (Http.network_identifier t)
-      (account_identifier address)
-      include_mempool
-  in
-  Http.post_json t ~path:"/account/coins"
-    ~body:(RM.Account_coins_request.to_yojson request)
 
 let mempool t = Http.post_json t ~path:"/mempool" ~body:(network_request t)
 

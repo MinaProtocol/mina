@@ -259,7 +259,9 @@ module type Full = sig
       * the witness information for the segment, to be passed to the prover
       * the segment kind, identifying the type of proof that will be generated
       * the proof statement, describing the transition between the states before
-      and after the segment
+      and after the segment. It carries no sok digest: this function knows
+      neither the fee nor the prover, so the caller must stamp one from its own
+      [Sok_message.t] before handing the statement to a prover.
       * the list of calculated 'snapp statements', corresponding to the expected
       public input of any snapp zkapp_command in the current segment.
 
@@ -285,7 +287,7 @@ module type Full = sig
        list
     -> ( Zkapp_command_segment.Witness.t
        * Zkapp_command_segment.Basic.t
-       * Statement.With_sok.t )
+       * Statement.t )
        list
 
   module Make (Inputs : sig

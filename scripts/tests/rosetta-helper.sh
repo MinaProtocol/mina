@@ -2,15 +2,14 @@
 
 # Helper functions for Rosetta API sanity and load tests.
 
-# network_identifier.blockchain, for the raw curl calls below.  It is
-# "mina" on every Mina network, which is also what rosetta-client
-# defaults to, so rosetta-client calls do not pass it at all.
-readonly BLOCKCHAIN="mina"
-
+# For the daemon's GraphQL endpoint, the one call here that does not go
+# to Rosetta.  rosetta-client sets its own headers.
 readonly DEFAULT_HEADERS=(--header "Accept: application/json" --header "Content-Type: application/json")
 
 # Seconds allowed for one rosetta-client request.  The curl calls these
-# tests used before had no timeout at all, and rosetta-load.sh exists to
+# tests used before had no timeout at all -- including the one in the
+# sync-wait loop, which polls a server that is by definition not
+# answering yet -- and rosetta-load.sh exists to
 # put the server under load, where a /search/transactions sweep can take
 # minutes; the CLI's own 30s default would turn that load into a test
 # failure.  300s is the http_timeout the rosetta-cli audit config uses
@@ -109,7 +108,13 @@ function wait_for_sync() {
     local network_status_response=""
 
     while true; do
-        network_status_response=$(curl --no-progress-meter --request POST "${__test_data[address]}/network/status" "${DEFAULT_HEADERS[@]}" --data-raw "{\"network_identifier\":{\"blockchain\":\"$BLOCKCHAIN\",\"network\":\"${__test_data[id]}\"}}" 2> /dev/null)
+        # A server that is down, bootstrapping or wedged is the normal
+        # case in this loop, so swallow the failure and let the empty
+        # response fall through to the "bootstrap stage" branch below:
+        # this must keep retrying until the deadline, not abort -- which
+        # is also what makes it safe under the `set -e` in
+        # rosetta-load.sh.
+        network_status_response=$(rosetta_client "$1" network status --compact 2> /dev/null || true)
         sync_status=$(echo "$network_status_response" | jq '.sync_status.stage')
 
         if [[ "$sync_status" == "\"Synced\"" ]]; then
@@ -130,7 +135,7 @@ function wait_for_sync() {
         fi
 
         if [[ $(date +%s) -gt $end_time ]]; then
-            echo "❌  Timeout reached. Rosetta did not sync within $TIMEOUT seconds"
+            echo "❌  Timeout reached. Rosetta did not sync within $__timeout seconds"
             exit 1
         fi
 
@@ -149,13 +154,16 @@ function wait_for_sync() {
 # Arguments:
 #   $1 - test data array name (passed by reference)
 #   $@ - rosetta-client subcommand and its flags
+#
+# --timeout goes last: it is a leaf-command flag, and Command.group
+# accepts nothing but a subcommand name in that first position.
 function rosetta_client() {
     declare -n __test_data=$1
     shift
 
     MINA_ROSETTA_URI="${__test_data[address]}" \
     MINA_ROSETTA_NETWORK="${__test_data[id]}" \
-        rosetta-client --timeout "${ROSETTA_CLIENT_TIMEOUT}" "$@"
+        rosetta-client "$@" --timeout "${ROSETTA_CLIENT_TIMEOUT}"
 }
 
 function test_network_status() {

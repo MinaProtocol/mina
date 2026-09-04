@@ -132,6 +132,8 @@ let schedule_from_any_pending_zkapp_command ~(partitioner : t) :
 
 let convert_zkapp_command_from_selector ~partitioner ~job ~pairing
     unscheduled_segments =
+  (* Both the segment statements and the wire spec are sok-less; the
+     authoritative sok message rides on the job, in [With_job_meta]. *)
   let unscheduled_segments =
     Snark_worker_shared.Zkapp_command_inputs.read_all_proofs_from_disk
       unscheduled_segments
@@ -158,8 +160,11 @@ let convert_single_work_from_selector ~(partitioner : t)
       match witness.transaction with
       | Command (Zkapp_command zkapp_command) ->
           let witness = Transaction_witness.read_all_proofs_from_disk witness in
+          let (module M) = partitioner.transaction_snark in
           Snark_worker_shared.extract_zkapp_segment_works
-            ~m:partitioner.transaction_snark ~input ~witness ~zkapp_command
+            ~signature_kind:M.signature_kind
+            ~constraint_constants:M.constraint_constants ~input ~witness
+            ~zkapp_command
           |> Result.map
                ~f:
                  (convert_zkapp_command_from_selector ~partitioner ~job ~pairing)

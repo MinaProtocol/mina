@@ -1,9 +1,9 @@
 (* rosetta_client CLI — a curl-on-steroids for the Rosetta API.
 
    This file owns the command-line surface: the flags, the subcommand
-   tree, and how a result or an error reaches the terminal.  Decoding a
-   JSON-valued flag into the model an endpoint expects is in
-   [payload.ml], which neither prints nor exits.
+   tree, and how a result or an error reaches the terminal.  Everything
+   else -- the transport, the request bodies, the error rendering --
+   lives in the [rosetta_client] library.
 
    Every subcommand POSTs to a single Rosetta endpoint through the
    [Rosetta_client] library, auto-injects the network_identifier
@@ -12,16 +12,11 @@
    failure, prints a short human-readable diagnostic on stderr and exits
    non-zero; the diagnostic never leaks raw OCaml exception syntax.
 
-   Environment variables (each one is overridden by the matching flag):
+   The connection flags, the environment variables that override their
+   defaults and the values behind those live in [Rosetta_client.Flags],
+   and are shared with [rosetta-healthcheck]. *)
 
-   - [MINA_ROSETTA_URI] — default for [--rosetta-uri].
-   - [MINA_ROSETTA_BLOCKCHAIN] — default for [--blockchain].
-   - [MINA_ROSETTA_NETWORK] — default for [--network].
-
-   The values they fall back to when unset live in
-   [Rosetta_client.Defaults]. *)
-
-open Core_kernel
+open Core
 open Async
 module MRC = Rosetta_client
 module RM = MRC.Models
@@ -29,89 +24,85 @@ module RM = MRC.Models
 (* Seconds allowed for one request/response exchange with the Rosetta
    server, from sending the request to reading the last byte of the
    response body.  This is deliberately longer than
-   [MRC.Defaults.http_timeout], which is sized for a readiness probe that
-   wants a quick verdict: this CLI is used interactively, for queries such
-   as a /search/transactions sweep that legitimately take much longer than
-   a probe would wait. *)
+   [MRC.Defaults.http_timeout]: a healthcheck probe wants a quick verdict,
+   whereas this CLI is used interactively for queries such as a
+   /search/transactions sweep that legitimately take much longer than a
+   probe would wait. *)
 let default_timeout = 30.0
 
 (* ---------- Global flags shared by every leaf command ---------- *)
 
 (* A record that every subcommand's [let%map_open] can pull in with a
-   single line.  Keeps per-command preludes short. *)
-type global_flags =
-  { base_uri : string
-  ; blockchain : string
-  ; network : string
-  ; timeout : float
-  ; compact : bool
-  }
+   single line.  Keeps per-command preludes short.  The connection flags
+   -- and the environment variables behind them -- belong to
+   [MRC.Flags], which hands back a client already built from them. *)
+type global_flags = { client : MRC.Http.t; compact : bool }
 
 let global_flags_param =
   let open Command.Let_syntax in
-  let open Command.Param in
-  let%map base_uri =
-    flag "--rosetta-uri"
-      ~doc:
-        (sprintf "URI Rosetta base URL (default: %s, overridable via $%s)"
-           (MRC.Defaults.base_uri_from_env ())
-           MRC.Defaults.uri_env_var )
-      (optional_with_default (MRC.Defaults.base_uri_from_env ()) string)
-  and blockchain =
-    flag "--blockchain"
-      ~doc:
-        (sprintf
-           "NAME network_identifier.blockchain (default: %s, overridable via \
-            $%s)"
-           (MRC.Defaults.blockchain_from_env ())
-           MRC.Defaults.blockchain_env_var )
-      (optional_with_default (MRC.Defaults.blockchain_from_env ()) string)
-  and network =
-    flag "--network"
-      ~doc:
-        (sprintf
-           "NAME network_identifier.network (default: %s, overridable via $%s)"
-           (MRC.Defaults.network_from_env ())
-           MRC.Defaults.network_env_var )
-      (optional_with_default (MRC.Defaults.network_from_env ()) string)
-  and timeout =
-    flag "--timeout"
-      ~doc:
-        (sprintf "SECONDS HTTP request timeout (default: %.0f)" default_timeout)
-      (optional_with_default default_timeout float)
+  let%map client =
+    MRC.Flags.client ~timeout:(MRC.Flags.timeout ~default:default_timeout)
   and compact =
-    flag "--compact" ~doc:" Emit compact JSON instead of indented (pretty)"
-      no_arg
+    Command.Param.flag "--compact"
+      ~doc:" Emit compact JSON instead of indented (pretty)"
+      Command.Param.no_arg
   in
-  { base_uri; blockchain; network; timeout; compact }
+  { client; compact }
 
-let client_of_globals g =
-  MRC.Http.create ~base_uri:(Uri.of_string g.base_uri) ~blockchain:g.blockchain
-    ~network:g.network ~timeout:g.timeout ()
-
-(* Single JSON record on stdout, with a trailing newline.  Bypasses
-   Async's [print_*] wrappers so the output flushes even when we take
-   the [Stdlib.exit] fast path. *)
+(* Single JSON record on stdout, with a trailing newline.  Stdout is
+   this CLI's data channel -- scripts/tests/rosetta-helper.sh pipes it
+   straight into jq -- so the payload goes out raw, unprefixed and
+   unlabelled.  Diagnostics go the other way, through [Logger] below. *)
 let emit_json g json =
-  let s = if g.compact then MRC.Http.compact json else MRC.Http.pretty json in
+  let s =
+    if g.compact then Yojson.Safe.to_string json
+    else Yojson.Safe.pretty_to_string json
+  in
   Stdlib.print_string s ; Stdlib.print_newline () ; Stdlib.flush Stdlib.stdout
 
-let emit_error msg =
-  (* No raw OCaml exception text leaks: [msg] is produced by
-     [MRC.Errors] formatters or by the CLI itself. *)
-  Stdlib.prerr_string (msg ^ "\n") ;
-  Stdlib.flush Stdlib.stderr
+(* Diagnostics go to stderr through [Logger], which is where every other
+   Mina binary sends them, so a rosetta-client run in a pod is collected
+   and filtered like the daemon beside it.
+
+   The interpolation cap is high enough to hold any diagnostic the
+   library produces (a body is truncated to [Errors.max_body_chars]),
+   because a message that exceeds it is dropped from the line and
+   printed under it -- which for a one-line CLI error is worse than the
+   quotes interpolation adds. *)
+let logger = Logger.create ~id:"rosetta-client" ()
+
+let setup_logging () =
+  Logger.Consumer_registry.register ~id:"rosetta-client"
+    ~processor:
+      (Logger.Processor.pretty ~log_level:Logger.Level.Info
+         ~config:
+           { Interpolator_lib.Interpolator.mode = Inline
+           ; max_interpolation_length = 4096
+           ; pretty_print = true
+           } )
+    ~transport:(Logger.Transport.raw Stdlib.prerr_endline)
+    ()
+
+(* As metadata, not as the message: a server's error text reaches us
+   verbatim, and Postgres and GraphQL errors -- which Mina's Rosetta
+   propagates into the envelope -- are full of "$1" placeholders.  A "$"
+   in a log message is either an interpolation with no metadata behind it
+   or a parse failure, and either way Logger replaces the whole line with
+   "invalid log call: " and the "$"s rewritten to ".".
+
+   The text comes from the library's error formatters, so no raw OCaml
+   exception syntax reaches the log. *)
+let log_error msg = [%log error] "$error" ~metadata:[ ("error", `String msg) ]
 
 (* Run a client call, emit the result as JSON (or the error on stderr
    and exit 1).  Wraps the "happy path" so each leaf command stays a
    one-liner. *)
 let run g ~(call : MRC.Http.t -> Yojson.Safe.t Deferred.Or_error.t) =
-  let client = client_of_globals g in
-  match%map call client with
+  match%map call g.client with
   | Ok j ->
       emit_json g j
   | Error e ->
-      emit_error (Error.to_string_hum e) ;
+      log_error (Error.to_string_hum e) ;
       Stdlib.exit 1
 
 (* ---------- Flags reused by more than one subcommand ---------- *)
@@ -184,7 +175,7 @@ let cmd_block_get =
      fun () ->
        match (index, hash) with
        | None, None ->
-           emit_error "block get: one of --index or --hash is required" ;
+           [%log error] "block get: one of --index or --hash is required" ;
            Stdlib.exit 1
        | _ ->
            run g ~call:(fun c -> MRC.Data.block c ?index ?hash ()) )
@@ -209,20 +200,15 @@ let cmd_account_balance =
        run g ~call:(fun c ->
            MRC.Data.account_balance c ~address ?token_id ?block_index () ) )
 
-let cmd_account_coins =
-  Command.async ~summary:"POST /account/coins"
-    (let%map_open.Command g = global_flags_param
-     and address = address_flag
-     and include_mempool =
-       flag "--include-mempool" ~doc:" Include mempool transactions" no_arg
-     in
-     fun () ->
-       run g ~call:(fun c ->
-           MRC.Data.account_coins c ~address ~include_mempool () ) )
+(* Note: there is no [account coins] subcommand.  Mina's Rosetta server
+   does not implement /account/coins -- it routes /account/balance and
+   404s the rest -- and the coins model is a UTXO notion that an
+   account-based chain has nothing to say about, which is why
+   /network/options advertises "mempool_coins": false. *)
 
 let account_group =
   Command.group ~summary:"Rosetta /account/* endpoints"
-    [ ("balance", cmd_account_balance); ("coins", cmd_account_coins) ]
+    [ ("balance", cmd_account_balance) ]
 
 let cmd_mempool_list =
   Command.async ~summary:"POST /mempool"
@@ -260,7 +246,7 @@ let or_exit = function
   | Ok value ->
       value
   | Error e ->
-      emit_error (Error.to_string_hum e) ;
+      log_error (Error.to_string_hum e) ;
       Stdlib.exit 1
 
 let required_flag label of_yojson s = or_exit (Payload.model ~label of_yojson s)
@@ -354,10 +340,10 @@ let cmd_construction_parse =
        let signed =
          match (signed, unsigned) with
          | true, true ->
-             emit_error "--signed and --unsigned are mutually exclusive" ;
+             log_error "--signed and --unsigned are mutually exclusive" ;
              Stdlib.exit 1
          | false, false ->
-             emit_error "parse: one of --signed or --unsigned is required" ;
+             log_error "parse: one of --signed or --unsigned is required" ;
              Stdlib.exit 1
          | true, false ->
              true
@@ -412,8 +398,17 @@ let construction_group =
 
 (* ---------- Top-level ---------- *)
 
+(* Everything this CLI reports goes through [Logger], but not everything
+   the binary prints: [Command_unix.run] writes its own parse errors
+   ("unknown flag --bogus") straight to stderr and exits, and exposes no
+   hook to intercept them -- [when_parsing_succeeds] is the only
+   callback, and it fires after a successful parse.  Capturing those
+   would mean reimplementing the runner around an exception Core does
+   not export, so they stay as Core writes them: one line, on stderr,
+   before any request is made. *)
 let () =
-  Command.run
+  setup_logging () ;
+  Command_unix.run
     (Command.group
        ~summary:
          "Mina Rosetta client CLI — curl-on-steroids for a running Rosetta \

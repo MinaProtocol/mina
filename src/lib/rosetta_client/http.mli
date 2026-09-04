@@ -20,14 +20,6 @@ val create :
   -> unit
   -> t
 
-val base_uri : t -> Uri.t
-
-val blockchain : t -> string
-
-val network : t -> string
-
-val timeout : t -> float
-
 (** The network_identifier injected into every request body that needs
     one. *)
 val network_identifier : t -> Rosetta_models.Network_identifier.t
@@ -42,13 +34,3 @@ val post_json :
   -> path:string
   -> body:Yojson.Safe.t
   -> Yojson.Safe.t Async.Deferred.Or_error.t
-
-(** GET variant of {!post_json}.  Rosetta endpoints are POST-only in
-    practice, but this is useful for sidecar endpoints and tests. *)
-val get_json : t -> path:string -> Yojson.Safe.t Async.Deferred.Or_error.t
-
-(** Pretty-print (indented) a JSON value to a string. *)
-val pretty : Yojson.Safe.t -> string
-
-(** Compact-print a JSON value to a string. *)
-val compact : Yojson.Safe.t -> string

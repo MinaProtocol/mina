@@ -1,6 +1,6 @@
 (* Decoding of the JSON-valued command-line flags.  See [payload.mli]. *)
 
-open Core_kernel
+open Core
 
 let json ~label s =
   match Or_error.try_with (fun () -> Yojson.Safe.from_string s) with

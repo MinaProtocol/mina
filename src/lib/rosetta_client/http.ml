@@ -1,6 +1,6 @@
 (* HTTP core for the Rosetta client library.  See [http.mli]. *)
 
-open Core_kernel
+open Core
 open Async
 
 type t =
@@ -19,28 +19,34 @@ let create ~base_uri ?(blockchain = Defaults.blockchain)
     ?(network = Defaults.network) ?(timeout = Defaults.http_timeout) () =
   { base_uri = normalize_base base_uri; blockchain; network; timeout }
 
-let base_uri t = t.base_uri
-
-let blockchain t = t.blockchain
-
-let network t = t.network
-
-let timeout t = t.timeout
-
 let network_identifier t =
   Rosetta_models.Network_identifier.create t.blockchain t.network
 
 (* Append an endpoint path to the (already normalised) base path.  A
    base URI may carry a path of its own -- a Rosetta server behind a
    reverse proxy at http://host/rosetta -- so the endpoint is appended to
-   [Uri.path base] instead of replacing it. *)
+   [Uri.path base] instead of replacing it.
+
+   [Uri.resolve] would do this by the RFC 3986 merge rules, but it needs
+   the base to end in a slash and the endpoint not to start with one,
+   which is a paragraph of explanation for a concatenation. *)
 let join_uri base path =
   let path = if String.is_prefix path ~prefix:"/" then path else "/" ^ path in
   Uri.with_path base (Uri.path base ^ path)
 
-let pretty j = Yojson.Safe.pretty_to_string j
-
-let compact j = Yojson.Safe.to_string j
+let%test_unit "an endpoint path joins the base URI" =
+  let check base expect =
+    [%test_eq: string]
+      (Uri.to_string
+         (join_uri (normalize_base (Uri.of_string base)) "/network/status") )
+      expect
+  in
+  check "http://localhost:3087" "http://localhost:3087/network/status" ;
+  check "http://localhost:3087/" "http://localhost:3087/network/status" ;
+  (* A Rosetta server behind a reverse proxy keeps its path prefix. *)
+  check "http://host/rosetta" "http://host/rosetta/network/status" ;
+  check "http://host/rosetta/" "http://host/rosetta/network/status" ;
+  check "http://host/rosetta//" "http://host/rosetta/network/status"
 
 (* One request/response exchange: enforces [t.timeout], folds all
    transport/decode failures into the error channel, and renders any
@@ -78,60 +84,46 @@ let with_request t ~uri ~make_req ~describe =
     let%map chunks = Pipe.to_list pipe in
     (response, String.concat chunks)
   in
-  let result =
-    Deferred.Or_error.try_with ~here:[%here] ~extract_exn:true exchange
-  in
-  match%bind Async.with_timeout (Time.Span.of_sec t.timeout) result with
+  (* [Monitor.try_with], not its [Or_error] flavour: the failure we want
+     is the exception itself, which is what [Errors.format_exn] matches
+     on.  Going through [Error.t] would only mean wrapping it and
+     unwrapping it again. *)
+  let result = Monitor.try_with ~extract_exn:true exchange in
+  match%bind Async.with_timeout (Time_float.Span.of_sec t.timeout) result with
   | `Timeout ->
       Ivar.fill_if_empty timed_out () ;
       Option.iter (Ivar.peek body_pipe) ~f:Pipe.close_read ;
       Deferred.Or_error.errorf "timeout after %.1fs: %s %s" t.timeout describe
         (Uri.to_string uri)
-  | `Result (Error e) ->
-      let msg =
-        match Error.to_exn e with exn -> Errors.format_exn ~url:uri exn
-      in
-      Deferred.Or_error.error_string msg
+  | `Result (Error exn) ->
+      Deferred.Or_error.error_string (Errors.format_exn ~url:uri exn)
   | `Result (Ok (response, body_str)) -> (
       let status = Cohttp_async.Response.status response in
       let code = Cohttp.Code.code_of_status status in
       if code < 200 || code >= 300 then
         Deferred.Or_error.error_string
-          (Errors.format_http_body ~status:code ~body:body_str)
+          (Errors.format_http_body ~url:uri ~status:code ~body:body_str)
       else
-        match
-          Or_error.try_with (fun () -> Yojson.Safe.from_string body_str)
-        with
-        | Ok j ->
-            Deferred.Or_error.return j
-        | Error _ ->
-            Deferred.Or_error.errorf
-              "invalid JSON response from %s (first 200 chars: %s)"
-              (Uri.to_string uri)
-              ( if String.length body_str > 200 then
-                  String.sub body_str ~pos:0 ~len:200
-                else body_str ) )
+        match Yojson.Safe.from_string body_str with
+        | json ->
+            Deferred.Or_error.return json
+        | exception _ ->
+            Deferred.Or_error.error_string
+              (Errors.format_invalid_json ~url:uri ~body:body_str) )
 
-(* Every Rosetta endpoint answers JSON; only the ones we send a body to
-   also need to declare the request's own content type.  [request_headers]
-   is derived from [response_headers] so the shared Accept is stated once. *)
-let response_headers = Cohttp.Header.init_with "Accept" "application/json"
-
-let request_headers =
-  Cohttp.Header.add response_headers "Content-Type" "application/json"
+(* Both sides of every Rosetta exchange are JSON: we send a JSON body
+   and we only know how to read a JSON answer. *)
+let json_headers =
+  Cohttp.Header.of_list
+    [ ("Accept", "application/json"); ("Content-Type", "application/json") ]
 
 let post_json t ~path ~body =
   let uri = join_uri t.base_uri path in
   let body_str = Yojson.Safe.to_string body in
   with_request t ~uri ~describe:"POST" ~make_req:(fun ~interrupt ->
-      Cohttp_async.Client.post ~interrupt ~headers:request_headers
+      Cohttp_async.Client.post ~interrupt ~headers:json_headers
         ~body:(Cohttp_async.Body.of_string body_str)
         uri )
-
-let get_json t ~path =
-  let uri = join_uri t.base_uri path in
-  with_request t ~uri ~describe:"GET" ~make_req:(fun ~interrupt ->
-      Cohttp_async.Client.get ~interrupt ~headers:response_headers uri )
 
 (* Regression guard: when a response's body stalls, the timeout must
    close the connection, not merely stop waiting on it.  The server here
@@ -165,7 +157,7 @@ let%test_unit "a timed-out response body closes its connection" =
             Error.to_string_hum e ) ;
       let%bind () =
         match%map
-          Async.with_timeout (Time.Span.of_sec 5.0) (Ivar.read hung_up)
+          Async.with_timeout (Time_float.Span.of_sec 5.0) (Ivar.read hung_up)
         with
         | `Timeout ->
             failwith "the timed-out request left its connection open"
