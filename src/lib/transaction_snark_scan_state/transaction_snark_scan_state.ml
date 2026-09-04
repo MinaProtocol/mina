@@ -214,11 +214,32 @@ module Stable = struct
 
     let to_latest = Fn.id
 
+    (* Serialize in a single [bin_write_t] pass into a shared buffer, growing
+       it on [Buffer_short]. This yields exactly the bytes [Binable.to_string]
+       would, but skips the [bin_size_t] pass, which for proofs is as expensive
+       as the write itself. *)
+    let single_pass_writer (type a) buf (module M : Binable.S with type t = a)
+        (x : a) : string =
+      let rec go () =
+        match M.bin_write_t !buf ~pos:0 x with
+        | len ->
+            Bigstring.To_string.sub !buf ~pos:0 ~len
+        | exception Bin_prot.Common.Buffer_short ->
+            buf := Bigstring.create (2 * Bigstring.length !buf) ;
+            go ()
+      in
+      go ()
+
     let hash (t : t) =
+      let buf = ref (Bigstring.create (1 lsl 16)) in
+      let proof_to_string =
+        single_pass_writer buf (module Ledger_proof_with_sok_message.Stable.V2)
+      in
+      let witness_to_string =
+        single_pass_writer buf (module Transaction_with_witness.Stable.V2)
+      in
       let state_hash =
-        Parallel_scan.State.hash t.scan_state
-          (Binable.to_string (module Ledger_proof_with_sok_message.Stable.V2))
-          (Binable.to_string (module Transaction_with_witness.Stable.V2))
+        Parallel_scan.State.hash t.scan_state proof_to_string witness_to_string
       in
       let ( previous_incomplete_zkapp_updates
           , `Border_block_continued_in_the_next_tree continue_in_next_tree ) =
@@ -227,8 +248,7 @@ module Stable = struct
       let incomplete_updates =
         List.fold ~init:(Digestif.SHA256.init ())
           previous_incomplete_zkapp_updates ~f:(fun h t ->
-            Digestif.SHA256.feed_string h
-            @@ Binable.to_string (module Transaction_with_witness.Stable.V2) t )
+            Digestif.SHA256.feed_string h @@ witness_to_string t )
         |> Digestif.SHA256.get
       in
       let continue_in_next_tree =

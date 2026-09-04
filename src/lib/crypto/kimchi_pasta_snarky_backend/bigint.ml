@@ -97,6 +97,7 @@ module Make
     let bin_write_t buf ~pos t =
       let bytes = to_bytes t in
       let len = length_in_bytes in
+      Bin_prot.Common.check_next buf (pos + len) ;
       Bigstring.From_bytes.blit ~src:bytes ~src_pos:0 ~len:length_in_bytes
         ~dst:buf ~dst_pos:pos ;
       pos + len
