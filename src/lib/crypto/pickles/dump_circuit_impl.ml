@@ -1056,6 +1056,60 @@ let sponge_and_challenges_circuit (inputs : Impl.Field.t array) () =
   let _r_field = scalar (Import.Scalar_challenge.create r_actual) in
   ()
 
+(* Sub-circuit: fq_sponge_transcript (incrementally_verify_proof steps 1-3)
+   The group side's Fiat-Shamir schedule over the plain sponge, step_verifier.ml:567-705:
+   absorb the index digest, sg_old, x_hat, w_comm; squeeze beta, gamma by
+   squeeze_challenge; absorb z_comm; squeeze alpha by squeeze_scalar; absorb t_comm;
+   squeeze zeta by squeeze_scalar; squeeze the digest. One chunk.
+
+   Input layout (53 fields):
+     0:     index_digest
+     1-4:   sg_old[0..1] (x, y)
+     5-6:   x_hat (x, y)
+     7-36:  w_comm[0..14] (x, y)
+     37-38: z_comm (x, y)
+     39-52: t_comm[0..6] (x, y)
+*)
+let fq_sponge_transcript_circuit (inputs : Impl.Field.t array) () =
+  let sponge_params =
+    Sponge.Params.map Tick_field_sponge.params ~f:Impl.Field.constant
+  in
+  let sponge = Step_main_inputs.Sponge.create sponge_params in
+  let absorb x = Step_main_inputs.Sponge.absorb sponge (`Field x) in
+  let absorb_pt i = absorb inputs.(i) ; absorb inputs.(i + 1) in
+  let assert_128_bits a =
+    ignore
+      ( Scalar_challenge.to_field_checked (module Impl)
+          (Import.Scalar_challenge.create a)
+          ~endo:Endo.Wrap_inner_curve.scalar
+        : Impl.Field.t )
+  in
+  let squeeze_challenge () =
+    let x = Step_main_inputs.Sponge.squeeze sponge in
+    Util.Step.lowest_128_bits ~constrain_low_bits:true ~assert_128_bits x
+  in
+  let squeeze_scalar () =
+    let x = Step_main_inputs.Sponge.squeeze sponge in
+    Util.Step.lowest_128_bits ~constrain_low_bits:false ~assert_128_bits x
+  in
+  absorb inputs.(0) ;
+  absorb_pt 1 ;
+  absorb_pt 3 ;
+  absorb_pt 5 ;
+  for j = 0 to 14 do
+    absorb_pt (7 + (2 * j))
+  done ;
+  let _beta = squeeze_challenge () in
+  let _gamma = squeeze_challenge () in
+  absorb_pt 37 ;
+  let _alpha = squeeze_scalar () in
+  for j = 0 to 6 do
+    absorb_pt (39 + (2 * j))
+  done ;
+  let _zeta = squeeze_scalar () in
+  let _digest = Step_main_inputs.Sponge.squeeze sponge in
+  ()
+
 (* Sub-circuit 7: combined_inner_product (Step 11)
    Computes the combined inner product used in bulletproof verification:
      CIP = sum_j xi^j f_j(zeta) + r * sum_j xi^j f_j(zetaw)
@@ -4189,6 +4243,9 @@ let run ~output_dir =
   let array124_field = Impl.Typ.array ~length:124 Impl.Field.typ in
   dump_step "sponge_and_challenges_step_circuit" sponge_and_challenges_circuit
     ~input_typ:array124_field ~return_typ:Impl.Typ.unit ;
+  let array53_field = Impl.Typ.array ~length:53 Impl.Field.typ in
+  dump_step "fq_sponge_transcript_step_circuit" fq_sponge_transcript_circuit
+    ~input_typ:array53_field ~return_typ:Impl.Typ.unit ;
   let array129_field = Impl.Typ.array ~length:129 Impl.Field.typ in
   dump_step "cip_step_circuit" cip_circuit
     ~input_typ:array129_field ~return_typ:Impl.Typ.unit ;
