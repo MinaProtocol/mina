@@ -284,6 +284,35 @@ test_from_build_is_inherited_like_a_read_root() {
     assert_eq "it describes the build it took its artifacts from" "4.5.6" "$out"
 }
 
+# An entrypoint that renders a pipeline writes it to standard output and is
+# invoked as "<entrypoint>.sh | buildkite-agent pipeline upload", so one line
+# on standard output from the pin would be uploaded as part of the pipeline.
+test_the_pin_says_nothing_on_standard_output() {
+    local cache="${TMP_ROOT}/cache-quiet" out
+    mkdir -p "$cache"
+
+    # A fresh pin, which is the noisiest path: it derives and writes.
+    out="$( cd "$REPO_ROOT" && \
+      CACHE_BASE_URL="$cache" BUILDKITE_BUILD_ID="a-build" BUILDKITE_BRANCH="a-branch" \
+      OVERRIDE_TAG="4.5.6" \
+      ./buildkite/scripts/git-env/pin.sh 2>/dev/null )"
+    assert_eq "nothing on stdout when pinning" "" "$out"
+
+    # And again, now that it is already pinned.
+    out="$( cd "$REPO_ROOT" && \
+      CACHE_BASE_URL="$cache" BUILDKITE_BUILD_ID="a-build" BUILDKITE_BRANCH="a-branch" \
+      OVERRIDE_TAG="4.5.6" \
+      ./buildkite/scripts/git-env/pin.sh 2>/dev/null )"
+    assert_eq "nothing on stdout when already pinned" "" "$out"
+
+    # And when inheriting.
+    out="$( cd "$REPO_ROOT" && \
+      CACHE_BASE_URL="$cache" BUILDKITE_BUILD_ID="another-build" \
+      MINA_APPS_CACHE_ROOT="a-build" BUILDKITE_BRANCH="a-branch" OVERRIDE_TAG="4.5.6" \
+      ./buildkite/scripts/git-env/pin.sh 2>/dev/null )"
+    assert_eq "nothing on stdout when inheriting" "" "$out"
+}
+
 # Being told the binaries come from elsewhere, and finding no identity there,
 # is a fault. Deriving from this checkout instead is the exact mistake that
 # puts the wrong config_<hash>.json into a package, and it would say nothing.
@@ -334,6 +363,7 @@ main() {
     run_test test_a_packaging_build_inherits_the_apps_identity
     run_test test_a_second_stage_keeps_the_first_pin
     run_test test_from_build_is_inherited_like_a_read_root
+    run_test test_the_pin_says_nothing_on_standard_output
     run_test test_wrapping_an_unpinned_build_is_an_error
     run_test test_a_cache_without_a_pin_is_not_an_error
 
