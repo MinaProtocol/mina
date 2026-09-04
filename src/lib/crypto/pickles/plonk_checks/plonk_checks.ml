@@ -9,6 +9,13 @@ let num_chunks_by_default = 1
 
 let zk_rows_by_default = 3
 
+let zk_rows_for_num_chunks = function
+  | 1 ->
+      zk_rows_by_default
+  | num_chunks ->
+      let permuts = 7 in
+      ((2 * (permuts + 1) * num_chunks) - 2 + permuts) / permuts
+
 type 'field plonk_domain =
   < vanishing_polynomial : 'field -> 'field
   ; shifts : 'field Plonk_types.Shifts.t
