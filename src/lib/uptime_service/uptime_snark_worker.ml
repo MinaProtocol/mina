@@ -45,7 +45,8 @@ module Worker = struct
           F.t
       ; perform_partitioned :
           ( 'w
-          , Transaction_witness.Stable.Latest.t
+          , Sok_message.t
+            * Transaction_witness.Stable.Latest.t
             * Mina_state.Snarked_ledger_state.Stable.Latest.t
             * Zkapp_command.Stable.Latest.t
             * Staged_ledger_hash.t
@@ -77,7 +78,7 @@ module Worker = struct
         Impl.perform_single ~message state single_spec
 
       let perform_partitioned (state : Worker_state.t)
-          (witness, statement, zkapp_command, staged_ledger_hash) =
+          (message, witness, statement, zkapp_command, staged_ledger_hash) =
         let zkapp_command =
           Zkapp_command.write_all_proofs_to_disk
             ~signature_kind:state.signature_kind
@@ -90,6 +91,12 @@ module Worker = struct
                 ~m:(module S)
                 ~witness ~input:statement ~zkapp_command ~staged_ledger_hash
               |> Deferred.return
+            in
+            (* [zkapp_command_witnesses_exn] emits [Sok_message.Digest.default];
+               stamping the submitter's digest here is what makes the proof
+               attest to the right sok message (mina#19299). *)
+            let statement =
+              { statement with sok_digest = Sok_message.digest message }
             in
 
             Snark_worker.Impl.measure_runtime ~logger:state.logger
@@ -128,7 +135,8 @@ module Worker = struct
         ; perform_partitioned =
             f
               ( [%bin_type_class:
-                  Transaction_witness.Stable.Latest.t
+                  Sok_message.Stable.Latest.t
+                  * Transaction_witness.Stable.Latest.t
                   * Mina_state.Snarked_ledger_state.Stable.Latest.t
                   * Zkapp_command.Stable.Latest.t
                   * Staged_ledger_hash.Stable.Latest.t]
