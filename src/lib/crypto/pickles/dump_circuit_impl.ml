@@ -4029,6 +4029,77 @@ let expand_plonk_wrap_circuit (inputs : Impls.Wrap.Field.t array) () =
   let _zetaw = Impls.Wrap.Field.mul generator zeta in
   ()
 
+(* Sub-circuit: fq_sponge_transcript on the Wrap side (Wrap_verifier.incrementally_verify_proof
+   steps 1-13, wrap_verifier.ml:904-1408): the group side's Fiat-Shamir schedule over the
+   conditional sponge -- the index digest, sg_old guarded by the proofs-verified mask, x_hat,
+   w_comm; beta, gamma by Opt.challenge; z_comm; alpha by Opt.scalar_challenge; t_comm; zeta by
+   Opt.scalar_challenge; then the conversion to a regular sponge and the digest squeeze.
+   One chunk.
+
+   Input layout (55 fields):
+     0-1:   sg_old mask bits (Boolean.Unsafe.of_cvar)
+     2:     index_digest
+     3-6:   sg_old[0..1] (x, y)
+     7-8:   x_hat (x, y)
+     9-38:  w_comm[0..14] (x, y)
+     39-40: z_comm (x, y)
+     41-54: t_comm[0..6] (x, y)
+*)
+let fq_sponge_transcript_wrap_circuit (inputs : Impls.Wrap.Field.t array) () =
+  let module Opt_sponge = struct
+    include Opt_sponge.Make (Impls.Wrap) (Wrap_main_inputs.Sponge.Permutation)
+  end
+  in
+  let sponge_params =
+    Sponge.Params.map Tock_field_sponge.params ~f:Impls.Wrap.Field.constant
+  in
+  let sponge = Opt_sponge.create sponge_params in
+  let as_bool (x : Impls.Wrap.Field.t) : Impls.Wrap.Boolean.var =
+    Impls.Wrap.Boolean.Unsafe.of_cvar x
+  in
+  let absorb b x = Opt_sponge.absorb sponge (b, x) in
+  let absorb_pt b i = absorb b inputs.(i) ; absorb b inputs.(i + 1) in
+  let assert_128_bits a =
+    ignore
+      ( Scalar_challenge.to_field_checked (module Impls.Wrap)
+          (Import.Scalar_challenge.create a)
+          ~endo:Endo.Step_inner_curve.scalar
+        : Impls.Wrap.Field.t )
+  in
+  let lowest_128_bits ~constrain_low_bits x =
+    Util.Wrap.lowest_128_bits ~constrain_low_bits ~assert_128_bits x
+  in
+  let squeeze_challenge () =
+    lowest_128_bits ~constrain_low_bits:true (Opt_sponge.squeeze sponge)
+  in
+  let squeeze_scalar () =
+    lowest_128_bits ~constrain_low_bits:false (Opt_sponge.squeeze sponge)
+  in
+  absorb Impls.Wrap.Boolean.true_ inputs.(2) ;
+  absorb_pt (as_bool inputs.(0)) 3 ;
+  absorb_pt (as_bool inputs.(1)) 5 ;
+  absorb_pt Impls.Wrap.Boolean.true_ 7 ;
+  for j = 0 to 14 do
+    absorb_pt Impls.Wrap.Boolean.true_ (9 + (2 * j))
+  done ;
+  let _beta = squeeze_challenge () in
+  let _gamma = squeeze_challenge () in
+  absorb_pt Impls.Wrap.Boolean.true_ 39 ;
+  let _alpha = squeeze_scalar () in
+  for k = 0 to 6 do
+    absorb_pt Impls.Wrap.Boolean.true_ (41 + (2 * k))
+  done ;
+  let _zeta = squeeze_scalar () in
+  let regular =
+    match sponge with
+    | { state; sponge_state = Squeezed n; params; needs_final_permute_if_empty = _ } ->
+        Wrap_main_inputs.Sponge.make ~state ~sponge_state:(Squeezed n) ~params
+    | { sponge_state = Absorbing _; _ } ->
+        assert false
+  in
+  let _digest = Wrap_main_inputs.Sponge.squeeze regular in
+  ()
+
 (* Sub-circuit: challenge_digest on the Wrap side (Wrap_verifier.finalize_other_proof,
    step 4a): a plain sponge over both previous-challenge vectors — the wrap side has no
    proofs-verified mask — squeezed once. Input layout (32 fields): prev_challenges[0] at
@@ -4491,7 +4562,10 @@ let run ~output_dir =
     ~input_typ:array32_wrap ~return_typ:WrapImpl.Typ.unit ;
   let array122_wrap = WrapImpl.Typ.array ~length:122 WrapImpl.Field.typ in
   dump_wrap "sponge_and_challenges_wrap_circuit" sponge_and_challenges_wrap_circuit
-    ~input_typ:array122_wrap ~return_typ:WrapImpl.Typ.unit
+    ~input_typ:array122_wrap ~return_typ:WrapImpl.Typ.unit ;
+  let array55_field_wrap = WrapImpl.Typ.array ~length:55 WrapImpl.Field.typ in
+  dump_wrap "fq_sponge_transcript_wrap_circuit" fq_sponge_transcript_wrap_circuit
+    ~input_typ:array55_field_wrap ~return_typ:WrapImpl.Typ.unit
   (* The `schnorr_verify_step_circuit` fixture is NOT dumped here. It is
      produced by the standalone `dump_schnorr_verify_circuit.exe`, which
      compiles the shared production verifier in `Dump_schnorr_circuit_lib`
