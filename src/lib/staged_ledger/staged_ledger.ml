@@ -2200,18 +2200,56 @@ module T = struct
                 ~txn_state_view:current_state_view
                 ~signature_kind:Mina_signature_kind.t_DEPRECATED
             in
+            (* How many commands can survive packing, given the work we
+               actually hold. Applying more than this is wasted: every extra
+               candidate is applied to the validating ledger and then discarded
+               by [check_constraints_and_update] for want of work to pay for
+               its slot.
+
+               The bound mirrors [Resources.work_constraint_satisfied]: a
+               prediff's commands fit if it has all the work its partition
+               needs, or if it stays under the slots that need no new work, or
+               if it holds at least as much work as it occupies slots. Slots
+               occupied is at least the command count, so this is an upper
+               bound on commands, never an under-estimate of what could fit.
+
+               The second prediff draws its candidates from the first one's
+               discards, so the limit has to be the sum across partitions --
+               bounding by the first alone would starve the second. The margin
+               covers the coinbase slots, which are not commands. *)
+            let candidate_limit =
+              let command_bound (max_space, max_jobs) cw_count =
+                if cw_count >= max_jobs then max_space
+                else Int.max (max_space - max_jobs) cw_count
+              in
+              let first_work = snd partitions.first in
+              let bound_first =
+                command_bound partitions.first
+                  (Sequence.length
+                     (Sequence.take completed_works_seq first_work) )
+              in
+              let bound_second =
+                Option.value_map partitions.second ~default:0 ~f:(fun second ->
+                    command_bound second
+                      (Sequence.length
+                         (Sequence.drop completed_works_seq first_work) ) )
+              in
+              (* never ask for more than the scan state can hold anyway *)
+              Int.min
+                (Scan_state.free_space t.scan_state)
+                (bound_first + bound_second + 2)
+            in
             (* Transactions in reverse order for faster removal if there is no
                space when creating the diff *)
             let valid_on_this_ledger, invalid_on_this_ledger =
               Sequence.fold_until transactions_by_fee
                 ~init:
                   (Application_state.Valid_user_command.init
-                     ?zkapp_limit:zkapp_cmd_limit
-                     ~total_limit:(Scan_state.free_space t.scan_state) )
+                     ?zkapp_limit:zkapp_cmd_limit ~total_limit:candidate_limit )
                 ~f:
                   (Application_state.Valid_user_command.try_applying_txn ~apply
-                     ~logger )
-                ~finish:(fun state -> (state.valid_seq, state.invalid))
+                     ~logger ) ~finish:(fun state ->
+                  (state.valid_seq, state.invalid) )
             in
             [%log internal] "Generate_staged_ledger_diff" ;
             let diff, log =
