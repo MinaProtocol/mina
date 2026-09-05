@@ -35,8 +35,13 @@ COPY --chown=opam:opam opam.export ./
 # Set environment variables *before* running OPAM commands
 ENV OPAMYES=1
 
-# Update repo and install the switch. Cleaning in the same layer so the build
-# logs and caches never land in an image layer.
+# Update repo and install the switch. `opam update` re-fetches the package index
+# that stage 1 deleted after creating the compiler switch: the index is ~90 MB
+# and is dead weight once the switch is built, but a layer only reclaims what it
+# deletes itself, so it has to be fetched and dropped inside this one RUN.
+# Cleaning here likewise keeps the build logs and caches out of the image.
 RUN opam update \
   && opam switch import opam.export --yes \
-  && opam clean --logs -cs --quiet
+  && opam clean --logs -cs --quiet \
+  && rm -r "$HOME/.opam/repo/default" "$HOME"/.opam/repo/state-*.cache \
+  && opam switch list

@@ -41,11 +41,6 @@ ARG GO_CAPNP_VERSION=v3.0.0-alpha.5
 # - src/lib/crypto/kimchi_bindings/stubs/rust-toolchain.toml
 # - src/lib/crypto/proof-systems/rust-toolchain.toml
 ARG RUST_VERSION=1.92.0
-# Nightly Rust Version used for WebAssembly builds
-# This should stay in line with the value of the variable
-# $NIGHTLY_RUST_VERSION defined in:
-# - src/lib/crypto/proof-systems/Makefile
-ARG RUST_NIGHTLY=2024-09-05
 
 # --- OS package dependencies
 # Organized as two alphabetized lists, first libraries and then tools/other packages
@@ -129,10 +124,18 @@ RUN case "${TARGETARCH}" in \
 
 # --- Golang install of a given GO_VERSION (add -v for spam output of each file from the go dist)
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
-RUN curl -s "https://dl.google.com/go/go${GO_VERSION}.linux-${TARGETARCH}.tar.gz" | tar -xz -C /usr/lib/
+# test/, api/, doc/ and misc/ are not needed to compile anything; dropped in the
+# extract layer, where the space is actually reclaimed.
+RUN curl -s "https://dl.google.com/go/go${GO_VERSION}.linux-${TARGETARCH}.tar.gz" | tar -xz -C /usr/lib/ \
+  && rm -r /usr/lib/go/test /usr/lib/go/api /usr/lib/go/doc /usr/lib/go/misc \
+  && /usr/lib/go/bin/go version
 
 # --- Rust install via rustup-init to a given RUST_VERSION
-# --- Additionally, install RUST_NIGHTLY via rustup
+# Stable only, and without rust-src or the wasm32 target: nothing in this repo
+# builds wasm from this image. The one nightly consumer,
+# src/lib/crypto/kimchi_bindings/wasm/rust-toolchain.toml, pins its own nightly,
+# and src/lib/crypto/proof-systems/Makefile adds rust-src for that nightly
+# itself, so rustup fetches what it needs when someone actually builds wasm.
 # For more about rustup-init see: https://github.com/rust-lang/rustup/blob/master/README.md
 # As opposed to introducing another shell script here (that mostly just determines the platform)
 # we just download the binary for the only platform we care about in this docker environment
@@ -149,13 +152,6 @@ RUN case "${TARGETARCH}" in \
   && /tmp/rustup-init -y --default-toolchain \
     "${RUST_VERSION}" \
     --profile minimal \
-    --component rust-src \
-    --target wasm32-unknown-unknown \
-  && "$HOME/.cargo/bin/rustup" toolchain install "nightly-${RUST_NIGHTLY}" \
-    --profile minimal \
-    --component rust-src \
-    --target wasm32-unknown-unknown \
-    --no-self-update \
   && rm /tmp/rustup-init
 USER root
 
@@ -187,19 +183,23 @@ ENV PATH="$PATH:/usr/lib/go/bin:$HOME/.cargo/bin"
 # our direct dependencies are removed. opam fetches the commit itself, so there
 # is no separate clone to keep around: a standalone clone would only be a second
 # copy of the same index (~385 MB) next to the one under ~/.opam/repo/default.
+# One RUN on purpose: the package index this fetches is ~90 MB and is dead
+# weight once the switch exists, and a layer only reclaims what it deletes
+# itself -- deleting it in any later layer would leave it in this one.
+# We pin the opam-repo SHA so this step gets
+# cache-busted when we update the opam repo
 RUN opam init --disable-sandboxing \
     -k git \
     -a "https://github.com/ocaml/opam-repository.git#${OPAM_REPOSITORY_COMMIT}" \
-    --bare
-# We pin the opam-repo SHA so this step gets 
-# cache-busted when we update the opam repo
-RUN opam repository add --yes \
+    --bare \
+  && opam repository add --yes \
     --all \
     --set-default o1-labs \
     https://github.com/o1-labs/opam-repository.git#${O1LABS_OPAM_REPOSITORY_COMMIT} \
   && opam switch create "${OCAML_VERSION}${OCAML_REVISION}" \
     "${OCAML_PACKAGE}${OCAML_VERSION}${OCAML_REVISION}${OCAML_VARIANT}" \
-  && opam switch "${OCAML_VERSION}${OCAML_REVISION}"
+  && opam switch "${OCAML_VERSION}${OCAML_REVISION}" \
+  && rm -r /home/opam/.opam/repo/default /home/opam/.opam/repo/state-*.cache
 
 WORKDIR /home/opam
 
