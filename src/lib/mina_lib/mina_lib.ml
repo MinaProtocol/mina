@@ -1128,6 +1128,21 @@ let last_epoch_delegators t ~pk =
   in
   find_delegators last_epoch_delegatee_table pk
 
+(* OCaml 4 compacted the major heap automatically once wasted space passed
+   [max_overhead]; OCaml 5 dropped that trigger, so a daemon holds its
+   high-water mark between the scheduled compactions below. This restores the
+   memory-driven trigger, deferring — like [perform_compaction] — whenever a
+   block is being produced, so the stop-the-world pause never lands on a slot. *)
+let install_compaction_alarm t =
+  Gc_compaction.install ~logger:t.config.logger
+    ~should_compact:(fun () ->
+      match !(t.block_production_status) with
+      | `Free ->
+          true
+      | `Producing | `Producing_in_ms _ ->
+          false )
+    ()
+
 let perform_compaction compaction_interval t =
   match compaction_interval with
   | None ->
@@ -1460,6 +1475,7 @@ let start t =
           t.config.precomputed_values.genesis_constants.zkapp_cmd_limit_hardcap
   ) ;
   perform_compaction t.config.compile_config.compaction_interval t ;
+  install_compaction_alarm t ;
   let () =
     match t.config.node_status_url with
     | Some node_status_url ->

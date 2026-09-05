@@ -1,0 +1,14 @@
+(library
+ (name gc_compaction)
+ (public_name gc_compaction)
+ (inline_tests
+  (flags -verbose -show-counts))
+ (libraries
+  ;;opam libraries
+  ppx_inline_test.config
+  ;;local libraries
+  logger)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_inline_test ppx_mina ppx_version)))

@@ -53,6 +53,10 @@ let command_run =
      in
      fun () ->
        let logger = Logger.create () in
+       (* OCaml 5 dropped automatic heap compaction, so a long-lived process
+          holds its high-water mark. The archive ingests blocks indefinitely and
+          has no latency-critical section to schedule around. *)
+       Gc_compaction.install ~logger () ;
 
        let (module G) = Genesis_constants.profiled () in
        let genesis_constants = G.genesis_constants in

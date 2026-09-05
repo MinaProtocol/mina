@@ -14,6 +14,7 @@
   archive_lib
   block_time
   cli_lib
+  gc_compaction
   genesis_constants
   logger
   mina_runtime_config

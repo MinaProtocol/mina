@@ -191,6 +191,9 @@ let command ?signature_kind ~minimum_user_command_fee ~account_creation_fee () =
   fun () ->
     let logger = Logger.create () in
     Cli.logger_setup log_json log_level ;
+    (* OCaml 5 dropped automatic heap compaction, so a long-lived process holds
+       its high-water mark. Rosetta serves queries indefinitely. *)
+    Gc_compaction.install ~logger () ;
     let pool =
       lazy
         (let open Deferred.Result.Let_syntax in
