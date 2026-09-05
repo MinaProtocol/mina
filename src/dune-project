@@ -91,6 +91,7 @@
 (package (name mina_base))
 (package (name mina_batch_txn))
 (package (name mina_block))
+(package (name mina_box))
 (package (name mina_caqti))
 (package (name mina_command_line_tests))
 (package (name mina_commands))
