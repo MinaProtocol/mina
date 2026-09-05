@@ -1101,11 +1101,9 @@ copy_common_archive_configs() {
     "${BUILDDIR}/usr/local/bin/mina-archive-hardfork-toolbox"
 
   mkdir -p "${BUILDDIR}/etc/mina/archive"
-  cp ../scripts/archive/missing-blocks-guardian.sh \
+  cp ./default/src/app/missing_blocks_guardian/missing_blocks_guardian.exe \
     "${BUILDDIR}/usr/local/bin/mina-missing-blocks-guardian"
 
-  cp ./default/src/app/missing_blocks_auditor/missing_blocks_auditor.exe \
-    "${BUILDDIR}/usr/local/bin/mina-missing-blocks-auditor"
   cp ./default/src/app/replayer/replayer.exe \
     "${BUILDDIR}/usr/local/bin/mina-replayer"
   cp ./default/src/app/dump_slot_ledger/dump_slot_ledger.exe \

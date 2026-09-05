@@ -1,0 +1,23 @@
+(executable
+ (package missing_blocks_guardian)
+ (name missing_blocks_guardian)
+ (public_name missing_blocks_guardian)
+ (modules missing_blocks_guardian)
+ (libraries
+  ;; opam libraries
+  async
+  async.async_command
+  async_unix
+  core
+  core_kernel
+  core_unix.command_unix
+  ;; local libraries
+  genesis_constants
+  logger
+  mina_caqti
+  missing_blocks_guardian_lib
+  proof_cache_tag)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_mina ppx_version ppx_let)))

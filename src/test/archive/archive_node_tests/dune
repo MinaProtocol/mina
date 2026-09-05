@@ -11,6 +11,9 @@
    stdio
    alcotest
    cmdliner
+   cohttp
+   cohttp-async
+   uri
    ;; mina libraries
    mina_automation
    mina_automation.fixture
@@ -21,6 +24,9 @@
  ;; [Executor.PathFinder] (look in [_build/default] first, fall back
  ;; to PATH for deb-installed packages), so this dep is purely a
  ;; build-ordering constraint.
- (deps ../../../app/mina_archive_healthcheck/mina_archive_healthcheck.exe)
+ (deps
+   ../../../app/mina_archive_healthcheck/mina_archive_healthcheck.exe
+   ../../../app/missing_blocks_guardian/missing_blocks_guardian.exe
+   ../../../app/archive_blocks/archive_blocks.exe)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_compare ppx_here ppx_let ppx_mina ppx_version)))

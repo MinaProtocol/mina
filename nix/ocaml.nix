@@ -373,7 +373,7 @@ let
             src/app/archive/archive.exe \
             src/app/archive_blocks/archive_blocks.exe \
             src/app/extract_blocks/extract_blocks.exe \
-            src/app/missing_blocks_auditor/missing_blocks_auditor.exe \
+            src/app/missing_blocks_guardian/missing_blocks_guardian.exe \
             src/app/replayer/replayer.exe \
             src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe
           # TODO figure out purpose of the line below
@@ -411,7 +411,7 @@ let
           cp src/app/generate_keypair/generate_keypair.exe $generate_keypair/bin/generate_keypair
           cp src/app/archive/archive.exe $archive/bin/mina-archive
           cp src/app/archive_blocks/archive_blocks.exe $archive/bin/mina-archive-blocks
-          cp src/app/missing_blocks_auditor/missing_blocks_auditor.exe $archive/bin/mina-missing-blocks-auditor
+          cp src/app/missing_blocks_guardian/missing_blocks_guardian.exe $archive/bin/mina-missing-blocks-guardian
           cp src/app/replayer/replayer.exe $archive/bin/mina-replayer
           cp -R _doc/_html $out/share/doc/html
           # cp src/lib/mina_base/sample_keypairs.json $sample/share/mina
