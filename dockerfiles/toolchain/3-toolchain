@@ -27,7 +27,6 @@ RUN apt-get update --yes \
     libgmp10 \
     libgomp1 \
     lsb-release \
-    pandoc \
     patchelf \
     postgresql \
     postgresql-contrib \
@@ -70,24 +69,48 @@ RUN curl -L -o influxdb2-client-${INFLUXDB_CLI_VERSION}-linux-${TARGETARCH}.tar.
     && rm influxdb2-client-${INFLUXDB_CLI_VERSION}-linux-${TARGETARCH}.tar.gz \
     && rm -rf influx_dir
 
-# --- Docker Daemon
+# --- Docker CLI
+# Only the client: no CI job reaches a daemon from inside this image. Jobs that
+# run docker (scripts/docker/build.sh, buildx, the cache verifier) are host-level
+# Cmd.run steps using the agent's docker, and the two ways a step runs *in* this
+# image -- Cmd.runInDocker and the docker#v3.5.0 plugin -- mount no docker
+# socket. So dockerd, containerd, ctr, runc and docker-proxy in the static
+# bundle (~130 MB of its ~175 MB) have nothing to do here.
 RUN case "${TARGETARCH}" in \
         "amd64") DOCKER_ARCH="x86_64" ;; \
         "arm64") DOCKER_ARCH="aarch64" ;; \
         *) echo "Unsupported arch: ${TARGETARCH}"; exit 1 ;; \
     esac; \
     curl -sL https://download.docker.com/linux/static/stable/${DOCKER_ARCH}/docker-${DOCKER_VERSION}.tgz \
-    | tar --extract --gzip --strip-components 1 --directory=/usr/bin --file=-
+    | tar --extract --gzip --strip-components 1 --directory=/usr/bin --file=- docker/docker \
+    && docker --version
 
 # --- Google Cloud tools
+# The SDK ships its own CPython under platform/bundledpythonunix (253 MB);
+# python3 is already installed above, so point the SDK at it and drop the bundle.
+# Every rm here is deliberately without -f: a path that stops existing in a newer
+# SDK must fail the build loudly, not silently save nothing. gcloud and gsutil
+# are both used by CI (buildkite/scripts/gsutil-upload.sh and friends) and stay.
+ENV CLOUDSDK_PYTHON=/usr/bin/python3
+
+# Trimming happens in the same layer as the install: a later RUN would leave the
+# full-size layer in the image. bq has no caller in this repo and does not
+# survive a `components update` being run in this image, which CI never does.
+# Both paths below were checked against the 476.0.0 tarball.
 RUN case "${TARGETARCH}" in \
         "amd64") GCLOUD_ARCH="x86_64" ;; \
         "arm64") GCLOUD_ARCH="arm" ;; \
         *) echo "Unsupported arch: ${TARGETARCH}"; exit 1 ;; \
     esac; \
     curl -sSfL "https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-cli-${GCLOUD_VERSION}-linux-${GCLOUD_ARCH}.tar.gz" | \
-    tar -xz -C /opt/ && \
-    /opt/google-cloud-sdk/bin/gcloud components install kubectl --quiet
+    tar -xz -C /opt/ \
+    && /opt/google-cloud-sdk/bin/gcloud components install kubectl --quiet \
+    && /opt/google-cloud-sdk/bin/gcloud components remove bq --quiet \
+    && rm -r /opt/google-cloud-sdk/platform/bundledpythonunix \
+    && rm /opt/google-cloud-sdk/RELEASE_NOTES \
+    && /opt/google-cloud-sdk/bin/gcloud version \
+    && /opt/google-cloud-sdk/bin/gsutil version \
+    && find /opt/google-cloud-sdk -type d -name __pycache__ -prune -exec rm -rf {} +
 
 ENV PATH="/opt/google-cloud-sdk/bin:${PATH}"
 
@@ -128,6 +151,7 @@ RUN case "${TARGETARCH}" in \
     curl "https://awscli.amazonaws.com/awscli-exe-linux-${AWS_ARCH}.zip" -o "awscliv2.zip" \
     && unzip awscliv2.zip \
     && ./aws/install \
-    && rm -rf awscliv2.zip aws
+    && rm -r awscliv2.zip aws \
+    && aws --version
 
 USER opam
