@@ -131,12 +131,7 @@ let get_hw_info () =
   in
   if Option.is_some linux_info then
     let linux_hw_progs =
-      [ ("cat", [ "/etc/os-release" ])
-      ; ("lscpu", [])
-      ; ("lsgpu", [])
-      ; ("lsmem", [])
-      ; ("lsblk", [])
-      ]
+      [ ("lscpu", []); ("lsgpu", []); ("lsmem", []); ("lsblk", []) ]
     in
     let%map outputs =
       Deferred.List.map ~how:`Sequential linux_hw_progs ~f:(fun (prog, args) ->
@@ -153,7 +148,18 @@ let get_hw_info () =
           in
           return ((header :: output) @ [ "" ]) )
     in
-    Some (Option.value_exn linux_info :: List.concat outputs)
+    let os_release =
+      let file = "/etc/os-release" in
+      let contents =
+        match In_channel.read_lines file with
+        | lines ->
+            lines
+        | exception exn ->
+            [ sprintf "Error: %s" (Exn.to_string exn) ]
+      in
+      (sprintf "*** Contents of '%s' ***\n" file :: contents) @ [ "" ]
+    in
+    Some ((Option.value_exn linux_info :: os_release) @ List.concat outputs)
   else (* TODO: Mac, other Unixes *)
     return None
 
@@ -210,12 +216,39 @@ let export_logs_to_tar ?basename ~conf_dir =
   let tmp_dir =
     Filename_unix.temp_dir ~in_dir:"/tmp" ("mina-logs_" ^ basename) ""
   in
-  let files_in_dir dir = List.map files ~f:(fun file -> dir ^/ file) in
-  let conf_dir_files = files_in_dir conf_dir in
-  let%bind _result0 =
-    Process.run ~prog:"cp" ~args:(("-p" :: conf_dir_files) @ [ tmp_dir ]) ()
+  (* Snapshot the files before archiving them: the daemon keeps writing to its
+     logs, and tar would otherwise read them as they change underneath it.
+     Permissions and timestamps are carried over, as [cp -p] used to do. *)
+  let copy_file file =
+    let open Deferred.Let_syntax in
+    let src = conf_dir ^/ file and dst = tmp_dir ^/ file in
+    match%map
+      Monitor.try_with ~here:[%here] (fun () ->
+          let%bind stats = Unix.stat src in
+          let%bind () =
+            Reader.with_file src ~f:(fun reader ->
+                Writer.with_file dst ~f:(fun writer ->
+                    Writer.transfer writer (Reader.pipe reader)
+                      (Writer.write writer) ) )
+          in
+          let%bind () = Unix.chmod dst ~perm:stats.Unix.Stats.perm in
+          let seconds t =
+            Time_float.Span.to_sec (Time_float.to_span_since_epoch t)
+          in
+          Unix.utimes dst
+            ~access:(seconds stats.Unix.Stats.atime)
+            ~modif:(seconds stats.Unix.Stats.mtime) )
+    with
+    | Ok () ->
+        true
+    | Error _exn ->
+        (* A log file can be rotated away underneath us; archive the rest. *)
+        false
   in
-  let%bind _result1 =
+  let%bind.Deferred copied =
+    Deferred.List.filter ~how:`Sequential files ~f:copy_file
+  in
+  let%bind _result =
     Process.run ~prog:"tar"
       ~args:
         ( [ "-C"
@@ -224,13 +257,8 @@ let export_logs_to_tar ?basename ~conf_dir =
             "-czf"
           ; tarfile
           ]
-        @ files )
+        @ copied )
       ()
   in
-  let tmp_dir_files = files_in_dir tmp_dir in
-  let open Deferred.Let_syntax in
-  let%bind () =
-    Deferred.List.iter ~how:`Sequential tmp_dir_files ~f:Unix.remove
-  in
-  let%bind () = Unix.rmdir tmp_dir in
+  let%bind.Deferred () = Mina_stdlib_unix.File_system.remove_dir tmp_dir in
   Deferred.Or_error.return tarfile
