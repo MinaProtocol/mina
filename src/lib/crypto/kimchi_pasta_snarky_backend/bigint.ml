@@ -24,6 +24,11 @@ module type Bindings = sig
   val to_bytes : t -> Bytes.t
 
   val of_bytes : Bytes.t -> t
+
+  (** Same encoding as [to_bytes], written at [buf.{pos}]. *)
+  val to_bytes_into : t -> Bigstring.t -> int -> unit
+
+  val of_bytes_from : Bigstring.t -> int -> t
 end
 
 module type Intf = sig
@@ -96,21 +101,18 @@ module Make
     let bin_size_t _ = length_in_bytes
 
     let bin_write_t buf ~pos t =
-      let bytes = to_bytes t in
       let len = length_in_bytes in
-      Bigstring.From_bytes.blit ~src:bytes ~src_pos:0 ~len:length_in_bytes
-        ~dst:buf ~dst_pos:pos ;
+      Bin_prot.Common.check_next buf (pos + len) ;
+      to_bytes_into t buf pos ;
       pos + len
 
     let bin_read_t buf ~pos_ref =
-      let remaining_bytes = Bigstring.length buf - !pos_ref in
       let len = length_in_bytes in
-      if remaining_bytes < len then
-        failwithf "Bigint.bin_read_t: Expected %d bytes, got %d"
-          M.length_in_bytes remaining_bytes () ;
-      let bytes = Bigstring.To_bytes.sub ~pos:!pos_ref ~len buf in
-      pos_ref := len + !pos_ref ;
-      of_bytes bytes
+      let pos = !pos_ref in
+      Bin_prot.Common.check_next buf (pos + len) ;
+      let t = of_bytes_from buf pos in
+      pos_ref := pos + len ;
+      t
   end)
 
   let of_numeral s ~base = of_numeral s (String.length s) base

@@ -25,6 +25,23 @@ module BigInt256 = struct
 
   external of_bytes : bytes -> t = "caml_bigint_256_of_bytes"
 
+  external to_bytes_into :
+       t
+    -> ( char
+       , Stdlib.Bigarray.int8_unsigned_elt
+       , Stdlib.Bigarray.c_layout )
+       Stdlib.Bigarray.Array1.t
+    -> int
+    -> unit = "caml_bigint_256_to_bytes_into"
+
+  external of_bytes_from :
+       ( char
+       , Stdlib.Bigarray.int8_unsigned_elt
+       , Stdlib.Bigarray.c_layout )
+       Stdlib.Bigarray.Array1.t
+    -> int
+    -> t = "caml_bigint_256_of_bytes_from"
+
   external deep_copy : t -> t = "caml_bigint_256_deep_copy"
 end
 
@@ -94,6 +111,23 @@ module Fp = struct
 
   external of_bytes : bytes -> t = "caml_pasta_fp_of_bytes"
 
+  external to_bytes_into :
+       t
+    -> ( char
+       , Stdlib.Bigarray.int8_unsigned_elt
+       , Stdlib.Bigarray.c_layout )
+       Stdlib.Bigarray.Array1.t
+    -> int
+    -> unit = "caml_pasta_fp_to_bytes_into"
+
+  external of_bytes_from :
+       ( char
+       , Stdlib.Bigarray.int8_unsigned_elt
+       , Stdlib.Bigarray.c_layout )
+       Stdlib.Bigarray.Array1.t
+    -> int
+    -> t = "caml_pasta_fp_of_bytes_from"
+
   external deep_copy : t -> t = "caml_pasta_fp_deep_copy"
 end
 
@@ -162,6 +196,23 @@ module Fq = struct
   external to_bytes : t -> bytes = "caml_pasta_fq_to_bytes"
 
   external of_bytes : bytes -> t = "caml_pasta_fq_of_bytes"
+
+  external to_bytes_into :
+       t
+    -> ( char
+       , Stdlib.Bigarray.int8_unsigned_elt
+       , Stdlib.Bigarray.c_layout )
+       Stdlib.Bigarray.Array1.t
+    -> int
+    -> unit = "caml_pasta_fq_to_bytes_into"
+
+  external of_bytes_from :
+       ( char
+       , Stdlib.Bigarray.int8_unsigned_elt
+       , Stdlib.Bigarray.c_layout )
+       Stdlib.Bigarray.Array1.t
+    -> int
+    -> t = "caml_pasta_fq_of_bytes_from"
 
   external deep_copy : t -> t = "caml_pasta_fq_deep_copy"
 end
