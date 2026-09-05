@@ -24,7 +24,7 @@ in  { step =
                             "https://storage.googleapis.com/mina-archive-dumps/mainnet-archive-dump-2025-11-11_0000.sql.tar.gz"
                         )
                     )
-                    ContainerImages.minaToolchainBullseye.amd64
+                    ContainerImages.minaToolchainNoble.amd64
                     debs
                     "./buildkite/scripts/tests/rosetta/block-race-test.sh"
                 ]

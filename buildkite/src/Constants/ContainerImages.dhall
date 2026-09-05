@@ -1,5 +1,5 @@
 -- TODO: Automatically push, tag, and update images #4862
--- NOTE: minaToolchain is the default image for various jobs, set to minaToolchainBullseye
+-- NOTE: minaToolchain is the default image for various jobs, set to minaToolchainNoble
 -- NOTE: minaToolchainBullseye is also used for building Ubuntu Focal packages in CI
 -- NOTE: minaToolchainBookworm is also used for building Ubuntu Jammy packages in CI
 -- NOTE: minaReleaseToolkit bundles the deb-toolkit binary and is published by
@@ -39,8 +39,7 @@
     "docker.io/minaprotocol/mina-toolchain:44e9e82-noble-devnet"
 , minaToolchainJammy.amd64 =
     "docker.io/minaprotocol/mina-toolchain:44e9e82-jammy-devnet"
-, minaToolchain =
-    "docker.io/minaprotocol/mina-toolchain:44e9e82-bullseye-devnet"
+, minaToolchain = "docker.io/minaprotocol/mina-toolchain:44e9e82-noble-devnet"
 , minaBaseBookworm =
     { amd64 = "docker.io/minaprotocol/mina-base:86b89d0-bookworm-devnet"
     , arm64 = "docker.io/minaprotocol/mina-base:86b89d0-bookworm-devnet-arm64"
@@ -50,7 +49,7 @@
 , minaBaseFocal.amd64 = "docker.io/minaprotocol/mina-base:86b89d0-focal-devnet"
 , minaBaseJammy.amd64 = "docker.io/minaprotocol/mina-base:86b89d0-jammy-devnet"
 , minaBaseNoble.amd64 = "docker.io/minaprotocol/mina-base:86b89d0-noble-devnet"
-, minaBase = "docker.io/minaprotocol/mina-base:86b89d0-bullseye-devnet"
+, minaBase = "docker.io/minaprotocol/mina-base:86b89d0-noble-devnet"
 , postgres =
     "europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/postgres:12.4-alpine"
 , xrefcheck =

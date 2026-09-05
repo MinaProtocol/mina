@@ -6,10 +6,13 @@ let Pipeline = ../../Pipeline/Dsl.dhall
 
 let PipelineTag = ../../Pipeline/Tag.dhall
 
+let PipelineScope = ../../Pipeline/Scope.dhall
+
 in  Pipeline.build
       ( ArtifactPipelines.appsPipeline
           ArtifactPipelines.AppsSpec::{
           , debVersion = DebianVersions.DebVersion.Bullseye
+          , scope = [ PipelineScope.Type.Weekly, PipelineScope.Type.Release ]
           , tags =
             [ PipelineTag.Type.Long
             , PipelineTag.Type.Release

@@ -6,8 +6,6 @@ let Pipeline = ../../Pipeline/Dsl.dhall
 
 let PipelineTag = ../../Pipeline/Tag.dhall
 
-let PipelineScope = ../../Pipeline/Scope.dhall
-
 in  Pipeline.build
       ( ArtifactPipelines.appsPipeline
           ArtifactPipelines.AppsSpec::{
@@ -20,6 +18,5 @@ in  Pipeline.build
             , PipelineTag.Type.Amd64
             , PipelineTag.Type.Noble
             ]
-          , scope = [ PipelineScope.Type.Weekly, PipelineScope.Type.Release ]
           }
       )
