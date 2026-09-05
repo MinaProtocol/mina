@@ -46,7 +46,7 @@ let singleton_properties () =
         match add_res with
         | Ok (_, pool', dropped) ->
             assert_pool_consistency pool' ;
-            assert (Sequence.is_empty dropped) ;
+            assert (List.is_empty dropped) ;
             [%test_eq: int] (size pool') 1 ;
             assert (
               [%equal:
@@ -55,8 +55,8 @@ let singleton_properties () =
             let dropped', pool'' = remove_lowest_fee pool' in
             assert (
               [%equal:
-                Transaction_hash.User_command_with_valid_signature.t Sequence.t]
-                dropped' (Sequence.singleton cmd) ) ;
+                Transaction_hash.User_command_with_valid_signature.t list]
+                dropped' [ cmd ] ) ;
             assert (equal pool pool'')
         | _ ->
             failwith "should've succeeded" )
@@ -112,7 +112,7 @@ let sequential_adds_all_valid () =
             in
             match add_res with
             | Ok (_, pool', dropped) ->
-                assert (Sequence.is_empty dropped) ;
+                assert (List.is_empty dropped) ;
                 assert_pool_consistency pool' ;
                 pool := pool' ;
                 go rest
@@ -257,7 +257,7 @@ let replacement () =
             match add_from_gossip_exn t cmd init_nonce init_balance with
             | Ok (_, t', removed) ->
                 assert_pool_consistency t' ;
-                assert (Sequence.is_empty removed) ;
+                assert (List.is_empty removed) ;
                 t'
             | _ ->
                 failwith
@@ -310,7 +310,7 @@ let replacement () =
       if Amount.(currency_consumed_post_replace <= init_balance) then
         match add_res with
         | Ok (_, t', dropped) ->
-            assert (not (Sequence.is_empty dropped)) ;
+            assert (not (List.is_empty dropped)) ;
             assert_pool_consistency t'
         | Error e ->
             Command_error.sexp_of_t e |> Sexp.to_string_hum |> failwith
@@ -348,7 +348,7 @@ let remove_lowest_fee () =
     List.fold_left cmds ~init:empty ~f:insert_cmd |> remove_lowest_fee
   in
   (* check that the lowest fee per wu command is returned *)
-  assert (Sequence.(equal cmd_equal removed @@ singleton cmd_lowest_fee))
+  assert (List.equal cmd_equal removed [ cmd_lowest_fee ])
   |> fun () ->
   (* check that the lowest fee per wu command is removed from
      applicable_by_fee *)
@@ -429,7 +429,7 @@ let add_to_pool ~nonce ~balance pool cmd =
     |> Result.map_error ~f:(Fn.compose Sexp.to_string Command_error.sexp_of_t)
     |> Result.ok_or_failwith
   in
-  assert (Sequence.is_empty dropped) ;
+  assert (List.is_empty dropped) ;
   assert_pool_consistency pool' ;
   pool'
 
@@ -501,9 +501,7 @@ let commit_to_pool ledger pool cmd expected_drops =
     List.map
       ~f:Transaction_hash.User_command_with_valid_signature.transaction_hash
   in
-  [%test_eq: Transaction_hash.t list]
-    (lower (Sequence.to_list dropped))
-    (lower expected_drops) ;
+  [%test_eq: Transaction_hash.t list] (lower dropped) (lower expected_drops) ;
   assert_pool_consistency pool ;
   pool
 
@@ -753,7 +751,7 @@ let revalidation_drops_nothing_unless_ledger_changed () =
         Indexed_pool.revalidate pool ~logger `Entire_pool (fun aid ->
             Map.find_exn account_map (Account_id.public_key aid) )
       in
-      assert (Sequence.is_empty dropped) ;
+      assert (List.is_empty dropped) ;
       assert (Indexed_pool.equal pool pool') ;
       let to_apply = Indexed_pool.transactions ~logger pool in
       let to_apply' = Indexed_pool.transactions ~logger pool' in
@@ -805,8 +803,7 @@ let application_invalidates_applied_transactions () =
       in
       assert_pool_consistency pool ;
       [%test_eq: Transaction_hash.Set.t]
-        ( Sequence.to_list dropped |> List.map ~f:txn_hash
-        |> Transaction_hash.Set.of_list )
+        (List.map dropped ~f:txn_hash |> Transaction_hash.Set.of_list)
         ( List.take txns app_count
         |> List.map ~f:(Fn.compose txn_hash sgn_cmd_to_txn)
         |> Transaction_hash.Set.of_list ) )
@@ -952,3 +949,86 @@ let transaction_replacement_insufficient_balance () =
       assert_pool_consistency pool ;
       [%test_eq: int] (Indexed_pool.size pool) 3 ;
       [%test_eq: int] (Indexed_pool.size pool') 2 )
+
+let hash_set cmds = List.map cmds ~f:txn_hash |> Transaction_hash.Set.of_list
+
+(* [Indexed_pool.diff] is what makes the refcount table derivable from the pool
+   rather than mirrored alongside it, so pin that it reports exactly the
+   membership change, in both directions, for each operation that drops
+   commands. *)
+let diff_reports_membership_changes () =
+  Quickcheck.test ~trials:100 gen_accounts_and_transactions
+    ~f:(fun (account_map, txns) ->
+      let pool = pool_of_transactions ~init:empty ~account_map txns in
+      let check ~before ~after ~expect_removed =
+        let { Indexed_pool.Membership_diff.added; removed } =
+          Indexed_pool.diff ~before ~after
+        in
+        [%test_eq: Transaction_hash.Set.t] (hash_set removed)
+          (hash_set expect_removed) ;
+        assert (List.is_empty added) ;
+        (* Reading the same pair backwards turns removals into additions. *)
+        let { Indexed_pool.Membership_diff.added; removed } =
+          Indexed_pool.diff ~before:after ~after:before
+        in
+        [%test_eq: Transaction_hash.Set.t] (hash_set added)
+          (hash_set expect_removed) ;
+        assert (List.is_empty removed)
+      in
+      (* A pool against itself has no difference at all. *)
+      check ~before:pool ~after:pool ~expect_removed:[] ;
+      (* The generator can produce a sender with no transactions at all. *)
+      if Indexed_pool.size pool > 0 then (
+        let dropped, pool' = Indexed_pool.remove_lowest_fee pool in
+        assert (not (List.is_empty dropped)) ;
+        check ~before:pool ~after:pool' ~expect_removed:dropped ;
+        (* Revalidation against emptied accounts is a second, much larger
+           membership change, exercising the diff over many drops at once
+           rather than the single queue [remove_lowest_fee] takes. *)
+        let pool'', dropped' =
+          Indexed_pool.revalidate pool' ~logger `Entire_pool (fun _ ->
+              Account.empty )
+        in
+        check ~before:pool' ~after:pool'' ~expect_removed:dropped' ) )
+
+(* The subset scope iterates the subset and looks each sender up, rather than
+   folding every sender in the pool and filtering. The two must agree exactly
+   when the subset is every sender -- including on the order drops come back
+   in, since dropping one sender's queue can change the currency reserved for
+   another whose commands spend from it.
+
+   Compared on drops, size and contents rather than [Indexed_pool.equal]:
+   [equal] is not reflexive across two separately computed results here. On
+   roughly 2% of generated inputs it reports two identical `Entire_pool
+   revalidations of the same pool as different, so it cannot serve as the
+   oracle. That predates this test. *)
+let revalidate_subset_matches_entire_pool () =
+  Quickcheck.test ~trials:100 gen_accounts_and_transactions
+    ~f:(fun (account_map, txns) ->
+      let pool = pool_of_transactions ~init:empty ~account_map txns in
+      let every_sender =
+        Indexed_pool.get_all pool
+        |> List.map ~f:(fun cmd ->
+            Transaction_hash.User_command_with_valid_signature.command cmd
+            |> User_command.fee_payer )
+        |> Account_id.Set.of_list
+      in
+      (* Emptied accounts, so revalidation actually drops something. *)
+      let lookup _ = Account.empty in
+      let entire_pool, dropped_entire =
+        Indexed_pool.revalidate pool ~logger `Entire_pool lookup
+      in
+      let subset, dropped_subset =
+        Indexed_pool.revalidate pool ~logger (`Subset every_sender) lookup
+      in
+      [%test_eq: Transaction_hash.t list]
+        (List.map dropped_entire ~f:txn_hash)
+        (List.map dropped_subset ~f:txn_hash) ;
+      [%test_eq: int] (Indexed_pool.size entire_pool) (Indexed_pool.size subset) ;
+      [%test_eq: Transaction_hash.Set.t]
+        ( Indexed_pool.get_all entire_pool
+        |> List.map ~f:txn_hash |> Transaction_hash.Set.of_list )
+        ( Indexed_pool.get_all subset
+        |> List.map ~f:txn_hash |> Transaction_hash.Set.of_list ) ;
+      assert_pool_consistency entire_pool ;
+      assert_pool_consistency subset )
