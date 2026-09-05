@@ -51,7 +51,12 @@ let gen_application_state : Application_state.t Quickcheck.Generator.t =
   }
 
 let apply_against_non_empty_scan_state () =
-  Quickcheck.test
+  (* Each trial generates a zkApp command together with a ledger to apply it
+     against, which is far and away the expensive part of this test. The
+     property under test is how [try_applying_txn] accounts for the space
+     remaining, so a hundred trials exercise it as well as the default ten
+     thousand do. *)
+  Quickcheck.test ~trials:100
     (Quickcheck.Generator.tuple2 gen_apply_and_txn gen_application_state)
     ~f:(fun ((apply, txn), state) ->
       match Application_state.try_applying_txn ~apply state txn with
