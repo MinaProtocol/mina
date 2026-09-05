@@ -165,14 +165,16 @@ test_resolve_simple_tokens() {
   assert_eq "daemon_storage_toolbox" "mina-daemon-storage-toolbox" "$(resolve_deb_output daemon_storage_toolbox)"
 }
 
+test_resolve_runtime_token() {
+  assert_eq "runtime" "mina-runtime-develop" "$(resolve_deb_output runtime)"
+}
+
 test_resolve_rosetta_tokens() {
-  assert_eq "rosetta_generic" "mina-rosetta-generic"  "$(resolve_deb_output rosetta_generic)"
   assert_eq "rosetta_mainnet" "mina-rosetta-mainnet"  "$(resolve_deb_output rosetta_mainnet)"
   assert_eq "rosetta_devnet"  "mina-rosetta-devnet"   "$(resolve_deb_output rosetta_devnet)"
 }
 
 test_resolve_archive_tokens() {
-  assert_eq "archive_generic" "mina-archive-generic"   "$(resolve_deb_output archive_generic)"
   assert_eq "archive_mainnet" "mina-archive-mainnet"   "$(resolve_deb_output archive_mainnet)"
   assert_eq "archive_devnet"  "${MINA_ARCHIVE_DEB_NAME}" "$(resolve_deb_output archive_devnet)"
 }
@@ -180,8 +182,6 @@ test_resolve_archive_tokens() {
 test_resolve_daemon_tokens() {
   assert_eq "daemon_mainnet"              "mina-mainnet"              "$(resolve_deb_output daemon_mainnet)"
   assert_eq "daemon_devnet"               "mina-devnet"               "$(resolve_deb_output daemon_devnet)"
-  assert_eq "daemon_mainnet_config"       "mina-mainnet-config"       "$(resolve_deb_output daemon_mainnet_config)"
-  assert_eq "daemon_devnet_config"        "mina-devnet-config"        "$(resolve_deb_output daemon_devnet_config)"
   assert_eq "daemon_mainnet_hardfork_config" "mina-mainnet-config"    "$(resolve_deb_output daemon_mainnet_hardfork_config)"
   assert_eq "daemon_devnet_hardfork_config"  "mina-devnet-config"     "$(resolve_deb_output daemon_devnet_hardfork_config)"
   assert_eq "daemon_mainnet_prefork"   "mina-mainnet-prefork-mesa"   "$(resolve_deb_output daemon_mainnet_prefork)"
@@ -197,8 +197,6 @@ test_resolve_profile_tokens() {
   assert_eq "profile_devnet"          "mina-devnet-profile"   "$(resolve_deb_output profile_devnet)"
   assert_eq "profile_lightnet"        "mina-lightnet"         "$(resolve_deb_output profile_lightnet)"
   assert_eq "profile_dev"             "mina-dev"              "$(resolve_deb_output profile_dev)"
-  assert_eq "profile_mainnet_generic" "mina-mainnet-generic"  "$(resolve_deb_output profile_mainnet_generic)"
-  assert_eq "profile_devnet_generic"  "mina-devnet-generic"   "$(resolve_deb_output profile_devnet_generic)"
 }
 
 test_resolve_prefork_genesis_tokens() {
@@ -214,29 +212,6 @@ test_resolve_prefork_genesis_tokens() {
 # Tests: Duplicate output detection (may exit via validate_unique_outputs)
 ################################################################################
 
-test_generic_tokens_produce_same_output() {
-  local generic_out mainnet_out devnet_out
-  generic_out=$(resolve_deb_output daemon_generic)
-  mainnet_out=$(resolve_deb_output daemon_mainnet_generic)
-  devnet_out=$(resolve_deb_output daemon_devnet_generic)
-  assert_eq "canonical/mainnet generic produce same output" "$generic_out" "$mainnet_out"
-  assert_eq "mainnet/devnet generic produce same output" "$mainnet_out" "$devnet_out"
-}
-
-test_config_and_hardfork_config_collide_mainnet() {
-  local regular hf
-  regular=$(resolve_deb_output daemon_mainnet_config)
-  hf=$(resolve_deb_output daemon_mainnet_hardfork_config)
-  assert_eq "mainnet config/hardfork_config collide" "$regular" "$hf"
-}
-
-test_config_and_hardfork_config_collide_devnet() {
-  local regular hf
-  regular=$(resolve_deb_output daemon_devnet_config)
-  hf=$(resolve_deb_output daemon_devnet_hardfork_config)
-  assert_eq "devnet config/hardfork_config collide" "$regular" "$hf"
-}
-
 test_distinct_tokens_produce_different_outputs() {
   local a b
   a=$(resolve_deb_output daemon_mainnet)
@@ -249,18 +224,19 @@ test_distinct_tokens_produce_different_outputs() {
 
 # validate_unique_outputs exits non-zero on duplicates.
 # Run in a subshell via run_test_in_subshell.
-test_validate_rejects_generic_duplicate() {
-  local -a bad=("daemon_generic" "daemon_mainnet_generic")
+test_validate_rejects_duplicate() {
+  local -a bad=("runtime" "runtime")
   if validate_unique_outputs bad 2>/dev/null; then
     echo "FAIL: expected reject" >&2
     exit 1
   fi
 }
 
-test_validate_rejects_hardfork_config_duplicate() {
-  local -a bad=("daemon_mainnet_config" "daemon_mainnet_hardfork_config")
+test_validate_rejects_retired_generic_token() {
+  # The generic packages are retired; their tokens must fail loudly.
+  local -a bad=("daemon_generic")
   if validate_unique_outputs bad 2>/dev/null; then
-    echo "FAIL: expected reject" >&2
+    echo "FAIL: expected reject for retired token" >&2
     exit 1
   fi
 }
@@ -448,21 +424,11 @@ WRAPPER
 # Tests: DEB_SUFFIX affects generic output name (no exit calls)
 ################################################################################
 
-test_generic_output_with_lightnet_suffix() {
-  local saved_suffix="${DEB_SUFFIX:-}"
-  DEB_SUFFIX="lightnet"
-  assert_eq "generic with lightnet suffix" \
-    "mina-generic-lightnet" "$(resolve_deb_output daemon_generic)"
-  assert_eq "generic with lightnet suffix (devnet token)" \
-    "mina-generic-lightnet" "$(resolve_deb_output daemon_devnet_generic)"
-  DEB_SUFFIX="${saved_suffix}"
-}
-
-test_generic_output_with_instrumented_suffix() {
+test_runtime_output_with_instrumented_suffix() {
   local saved_suffix="${DEB_SUFFIX:-}"
   DEB_SUFFIX="-instrumented"
-  assert_eq "generic with -instrumented suffix" \
-    "mina-generic-instrumented" "$(resolve_deb_output daemon_generic)"
+  assert_eq "runtime with -instrumented suffix" \
+    "mina-runtime-develop-instrumented" "$(resolve_deb_output runtime)"
   DEB_SUFFIX="${saved_suffix}"
 }
 
@@ -512,6 +478,7 @@ main_tests() {
 
   # resolve_deb_output correctness (no exit calls)
   run_test_direct test_resolve_simple_tokens
+  run_test_direct test_resolve_runtime_token
   run_test_direct test_resolve_rosetta_tokens
   run_test_direct test_resolve_archive_tokens
   run_test_direct test_resolve_daemon_tokens
@@ -519,14 +486,11 @@ main_tests() {
   run_test_direct test_resolve_prefork_genesis_tokens
 
   # Collision assertions
-  run_test_direct test_generic_tokens_produce_same_output
-  run_test_direct test_config_and_hardfork_config_collide_mainnet
-  run_test_direct test_config_and_hardfork_config_collide_devnet
   run_test_direct test_distinct_tokens_produce_different_outputs
 
   # Validate duplicate rejection (may exit)
-  run_test_in_subshell test_validate_rejects_generic_duplicate
-  run_test_in_subshell test_validate_rejects_hardfork_config_duplicate
+  run_test_in_subshell test_validate_rejects_duplicate
+  run_test_in_subshell test_validate_rejects_retired_generic_token
   run_test_in_subshell test_validate_accepts_distinct_tokens
   run_test_in_subshell test_validate_rejects_unknown_token
 
@@ -539,8 +503,7 @@ main_tests() {
   run_test_in_subshell test_parallel_reports_a_failing_worker
 
   # DEB_SUFFIX variants
-  run_test_direct test_generic_output_with_lightnet_suffix
-  run_test_direct test_generic_output_with_instrumented_suffix
+  run_test_direct test_runtime_output_with_instrumented_suffix
 
   # build_deb memoization replaced with error (may exit)
   run_test_in_subshell test_build_deb_errors_on_existing_deb

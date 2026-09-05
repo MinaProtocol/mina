@@ -64,38 +64,60 @@ else
   # The daemon resolves its profile from MINA_PROFILE first and only falls back to
   # this file, so tests needing a different profile (e.g. single-node-tests) set
   # MINA_PROFILE themselves and override the devnet default.
-  generic_profile_needed=0
+  runtime_profile_needed=0
   concrete_profile_present=0
   for i in "${debs[@]}"; do
     case $i in
-      mina-generic*)
-        generic_profile_needed=1
+      mina-runtime-*)
+        runtime_profile_needed=1
       ;;
-      mina-devnet|mina-mainnet|mina-devnet-generic|mina-mainnet-generic|mina-devnet-profile|mina-mainnet-profile|mina-lightnet|mina-dev)
+      mina-devnet|mina-mainnet|mina-devnet-profile|mina-mainnet-profile|mina-lightnet|mina-dev)
         concrete_profile_present=1
       ;;
     esac
   done
-  if [ "$generic_profile_needed" == "1" ] && [ "$concrete_profile_present" == "0" ]; then
+  if [ "$runtime_profile_needed" == "1" ] && [ "$concrete_profile_present" == "0" ]; then
     fetch_deb $LOCAL_DEB_FOLDER "debians/$MINA_DEB_CODENAME/mina-devnet-profile_*"
   fi
+
+  # The L2 packages (mina-<network>, mina-archive-<network>,
+  # mina-rosetta-<network>) carry only symlinks and configuration; the binaries
+  # live in the mina-runtime-<mina-codename> (L1) package they depend on.
+  # apt-get resolves mina-package dependencies only from local .deb files, so
+  # fetch the matching runtime flavor (and the profile leaf) alongside any L2
+  # request.
+  fetch_runtime_for() {
+    local pkg="$1"
+    local runtime="mina-runtime-develop"
+    case $pkg in
+      *-instrumented) runtime="${runtime}-instrumented" ;;
+    esac
+    fetch_deb $LOCAL_DEB_FOLDER "debians/$MINA_DEB_CODENAME/${runtime}_*"
+  }
+
+  fetch_profile_for() {
+    local pkg="$1"
+    case $pkg in
+      *mainnet*) fetch_deb $LOCAL_DEB_FOLDER "debians/$MINA_DEB_CODENAME/mina-mainnet-profile_*" ;;
+      *devnet*)  fetch_deb $LOCAL_DEB_FOLDER "debians/$MINA_DEB_CODENAME/mina-devnet-profile_*" ;;
+    esac
+  }
+
   for i in "${debs[@]}"; do
     case $i in
-      mina-generic*)
-        # Download mina-logproc too
-          fetch_deb $LOCAL_DEB_FOLDER "debians/$MINA_DEB_CODENAME/mina-logproc*"
+      mina-runtime-*)
+        # The runtime depends on mina-logproc.
+        fetch_deb $LOCAL_DEB_FOLDER "debians/$MINA_DEB_CODENAME/mina-logproc*"
       ;;
-      mina-devnet|mina-mainnet|mina-mesa)
-        # Download mina-logproc and sub debians (apps and config) too
-          fetch_deb $LOCAL_DEB_FOLDER "debians/$MINA_DEB_CODENAME/mina-logproc*"
-          fetch_deb $LOCAL_DEB_FOLDER "debians/$MINA_DEB_CODENAME/${i}-config*"
+      mina-devnet|mina-mainnet|mina-devnet-instrumented|mina-mainnet-instrumented)
+        fetch_deb $LOCAL_DEB_FOLDER "debians/$MINA_DEB_CODENAME/mina-logproc*"
+        fetch_runtime_for "$i"
+        fetch_profile_for "$i"
       ;;
-      mina-devnet-instrumented|mina-mainnet-instrumented|mina-mesa-instrumented)
-        # Instrumented daemon depends on mina-logproc and the non-instrumented
-        # network-config deb (config files are the same for both flavors).
-          network_pkg=${i%-instrumented}
-          fetch_deb $LOCAL_DEB_FOLDER "debians/$MINA_DEB_CODENAME/mina-logproc*"
-          fetch_deb $LOCAL_DEB_FOLDER "debians/$MINA_DEB_CODENAME/${network_pkg}-config*"
+      mina-archive-*|mina-rosetta-*)
+        fetch_deb $LOCAL_DEB_FOLDER "debians/$MINA_DEB_CODENAME/mina-logproc*"
+        fetch_runtime_for "$i"
+        fetch_profile_for "$i"
       ;;
       mina-*-prefork*)
         # Download mina-logproc legacy too

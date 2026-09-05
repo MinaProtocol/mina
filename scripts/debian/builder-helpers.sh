@@ -48,6 +48,11 @@ SUGGESTED_DEPS="jq, curl, wget"
 
 TEST_EXECUTIVE_DEPS=", mina-logproc, python3, docker-ce "
 
+# ARCHIVE_DEPS is not consumed directly any more: it is a strict subset of
+# SHARED_DEPS + DAEMON_DEPS on every codename, so build_runtime_deb uses the
+# latter as the union.  Kept so the archive dependency set stays documented
+# per codename and the subset claim stays checkable.
+# shellcheck disable=SC2034
 case "${MINA_DEB_CODENAME}" in
   noble)
     SHARED_DEPS="libssl3t64, libgmp10, libgomp1, tzdata, liblmdb0"
@@ -76,23 +81,12 @@ esac
 
 MINA_DEB_NAME="mina-devnet"
 MINA_ARCHIVE_DEB_NAME="mina-archive-devnet"
-DUNE_PROFILE="${DUNE_PROFILE:-dev}"
 DEB_SUFFIX=""
 
-
-# Add suffix to debian to distinguish different profiles
-# (mainnet/devnet/lightnet)
-case "${DUNE_PROFILE}" in
-  lightnet)
-    # use dune profile as suffix but replace underscore to dashes so deb
-    # builder won't complain
-    _SUFFIX=${DUNE_PROFILE//_/-}
-    DEB_SUFFIX="${_SUFFIX}"
-    MINA_DEB_NAME="${MINA_DEB_NAME}-${DEB_SUFFIX}"
-    MINA_ARCHIVE_DEB_NAME="${MINA_ARCHIVE_DEB_NAME}-${DEB_SUFFIX}"
-    ;;
-esac
-
+# The only build-time package flavor is instrumentation (bisect_ppx coverage).
+# Profiles — including lightnet — are selected at runtime via MINA_PROFILE /
+# the PROFILE file, so they no longer produce differently-named binaries; the
+# old DUNE_PROFILE=lightnet deb suffix is gone.
 
 #Add suffix to debian to distinguish instrumented packages
 if [[ -v DUNE_INSTRUMENT_WITH ]]; then
@@ -104,6 +98,49 @@ fi
 
 # Allow override via environment (set by build.sh for isolated parallel workers).
 BUILDDIR="${BUILDDIR:-deb_build}"
+
+# ---------------------------------------------------------------------------
+# Runtime directory layout (busybox-style multicall binary)
+# ---------------------------------------------------------------------------
+
+# Mina era codenames.  Each runtime lives in /usr/lib/mina/<codename>/.
+# RUNTIME_CODENAME names the era this branch builds: "develop" here; a release
+# branch sets it to its era name.  CURRENT/POSTFORK_CODENAME are the automode
+# hardfork pair (two runtimes behind a dispatcher) and keep their own names.
+RUNTIME_CODENAME="${RUNTIME_CODENAME:-develop}"
+CURRENT_CODENAME=berkeley
+POSTFORK_CODENAME=mesa
+
+# Applets provided by the mina-box multicall binary: every OCaml executable
+# that ships in a production package.  Installed names resolve through
+# symlinks: /usr/local/bin/<name> (L2 package, relative symlink)
+#   -> /usr/lib/mina/${RUNTIME_CODENAME}/<name> (L1 runtime package)
+#   -> mina-box.
+MINA_BOX_DAEMON_APPLETS=(
+  mina
+  mina-create-genesis
+  mina-generate-keypair
+  mina-validate-keypair
+  mina-standalone-snark-worker
+  mina-healthcheck
+  mina-graphql-client
+)
+MINA_BOX_ARCHIVE_APPLETS=(
+  mina-archive
+  mina-archive-blocks
+  mina-extract-blocks
+  mina-archive-hardfork-toolbox
+  mina-missing-blocks-auditor
+  mina-replayer
+  mina-dump-slot-ledger
+  mina-archive-healthcheck
+)
+MINA_BOX_ROSETTA_APPLETS=(
+  mina-rosetta
+  mina-ocaml-signer
+  rosetta-healthcheck
+  rosetta-client
+)
 
 # Function to ease creation of Debian package control files
 create_control_file() {
@@ -261,39 +298,42 @@ install_mina_service() {
     ../scripts/mina.service > "${BUILDDIR}/usr/lib/systemd/user/mina.service"
 }
 
-# Copies common daemon binaries only to debian package
-copy_common_daemon_apps() {
+# Populates a runtime directory (/usr/lib/mina/<mina-codename>/ inside the
+# package staging tree) with the mina-box multicall binary, one symlink per
+# applet, and the two binaries that are deliberately not part of the union:
+# the Go libp2p helper and the standalone rocksdb scanner.
+copy_runtime_dir() {
 
-  echo "copy_common_daemon_apps inputs:"
+  local target_dir="$1"
 
-  local TARGET_ROOT_DIR="${1:-${BUILDDIR}/usr/local/bin}"
+  echo "copy_runtime_dir target: ${target_dir}"
 
-  echo "Target Root Dir: ${TARGET_ROOT_DIR}"
+  mkdir -p "${target_dir}"
 
-  mkdir -p "${TARGET_ROOT_DIR}"
-
+  cp ./default/src/app/mina_box/mina_box.exe \
+    "${target_dir}/mina-box"
   cp ../src/app/libp2p_helper/result/bin/libp2p_helper \
-    "${TARGET_ROOT_DIR}/coda-libp2p_helper"
-  cp ./default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe \
-    "${TARGET_ROOT_DIR}/mina-create-genesis"
-  cp ./default/src/app/generate_keypair/generate_keypair.exe \
-    "${TARGET_ROOT_DIR}/mina-generate-keypair"
-  cp ./default/src/app/validate_keypair/validate_keypair.exe \
-    "${TARGET_ROOT_DIR}/mina-validate-keypair"
-  cp ./default/src/lib/snark_worker/standalone/run_snark_worker.exe \
-    "${TARGET_ROOT_DIR}/mina-standalone-snark-worker"
+    "${target_dir}/coda-libp2p_helper"
   cp ./default/src/app/rocksdb-scanner/rocksdb_scanner.exe \
-    "${TARGET_ROOT_DIR}/mina-rocksdb-scanner"
-  cp ./default/src/app/mina_healthcheck/mina_healthcheck.exe \
-    "${TARGET_ROOT_DIR}/mina-healthcheck"
+    "${target_dir}/mina-rocksdb-scanner"
 
-  cp ./default/src/app/cli/src/mina.exe \
-    "${TARGET_ROOT_DIR}/mina"
+  local applet
+  for applet in "${MINA_BOX_DAEMON_APPLETS[@]}" \
+                "${MINA_BOX_ARCHIVE_APPLETS[@]}" \
+                "${MINA_BOX_ROSETTA_APPLETS[@]}"; do
+    ln -sf mina-box "${target_dir}/${applet}"
+  done
+}
 
-  # GraphQL client utility (used by CI scripts; replaces ad-hoc curl invocations)
-  cp ./default/src/app/mina_graphql_client/mina_graphql_client_app.exe \
-    "${TARGET_ROOT_DIR}/mina-graphql-client"
-
+# Creates relative symlinks in /usr/local/bin pointing into the runtime
+# directory.  Usage: link_runtime_applets <installed-name>...
+link_runtime_applets() {
+  mkdir -p "${BUILDDIR}/usr/local/bin"
+  local applet
+  for applet in "$@"; do
+    ln -sf "../../lib/mina/${RUNTIME_CODENAME}/${applet}" \
+      "${BUILDDIR}/usr/local/bin/${applet}"
+  done
 }
 
 # Function to DRY copying config files into daemon packages
@@ -482,62 +522,17 @@ build_functional_test_suite_deb() {
 }
 ## END TEST SUITE PACKAGE ##
 
-## ROSETTA GENERIC PACKAGE ##
+## ROSETTA PACKAGE (L2) ##
 
 #
-# Builds mina-rosetta-generic package for Rosetta API without network awareness
+# Builds mina-rosetta-NETWORK package for Rosetta API on specified network.
 #
-# Output: mina-rosetta-generic_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
-# Dependencies: ${SHARED_DEPS}
+# Output: mina-rosetta-${NETWORK}${DEB_SUFFIX}_${MINA_DEB_VERSION}_all.deb
+# Dependencies: mina-runtime-<mina-codename> (binaries) and the profile package
+# (PROFILE hint).
 #
-# Rosetta API implementation
-#
-build_rosetta_generic_deb() {
-
-  echo "--- Building rosetta generic deb"
-
-  local package_name="mina-rosetta-generic${DEB_SUFFIX}"
-
-  create_control_file "${package_name}" "${SHARED_DEPS}" \
-    'Mina Protocol Rosetta Generic' "${SUGGESTED_DEPS}"
-
-  mkdir -p "${BUILDDIR}/usr/local/bin"
-
-
-  # Copy rosetta-based Binaries
-  cp "./default/src/app/rosetta/rosetta.exe" \
-    "${BUILDDIR}/usr/local/bin/mina-rosetta"
-  cp "./default/src/app/rosetta/ocaml-signer/signer.exe" \
-    "${BUILDDIR}/usr/local/bin/mina-ocaml-signer"
-  cp ./default/src/app/rosetta/healthcheck/rosetta_healthcheck.exe \
-    "${BUILDDIR}/usr/local/bin/rosetta-healthcheck"
-  cp ./default/src/app/rosetta/client/rosetta_client_cli.exe \
-    "${BUILDDIR}/usr/local/bin/rosetta-client"
-
-  mkdir -p "${BUILDDIR}/etc/mina/rosetta/"{rosetta-cli-config,scripts}
-
-  # --- Copy artifacts
-  cp ../src/app/rosetta/scripts/* "${BUILDDIR}/etc/mina/rosetta/scripts"
-  cp ../src/app/rosetta/rosetta-cli-config/*.json \
-    "${BUILDDIR}/etc/mina/rosetta/rosetta-cli-config"
-  cp ../src/app/rosetta/rosetta-cli-config/*.ros \
-    "${BUILDDIR}/etc/mina/rosetta/rosetta-cli-config"
-  cp ./default/src/app/rosetta/indexer_test/indexer_test.exe \
-    "${BUILDDIR}/usr/local/bin/mina-rosetta-indexer-test"
-
-  build_deb "${package_name}"
-}
-## END ROSETTA GENERIC PACKAGE ##
-
-## ROSETTA PACKAGE ##
-
-#
-# Builds mina-rosetta-NETWORK package for Rosetta API on specified network
-#
-# Output: mina-rosetta-${NETWORK}_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
-# Dependencies: ${SHARED_DEPS}
-#
-# Rosetta API implementation for specified network
+# Architecture: all — it carries only symlinks into the runtime directory plus
+# arch-independent configuration.
 #
 build_rosetta_deb() {
 
@@ -550,16 +545,34 @@ build_rosetta_deb() {
     *) echo "Unknown network: ${network}" >&2; exit 1 ;;
   esac
 
-  echo "--- Building ${network} rosetta tent metapackage"
+  echo "--- Building ${network} rosetta deb"
 
   local package_name="mina-rosetta-${network}${DEB_SUFFIX}"
 
-  local depends="mina-rosetta-generic${DEB_SUFFIX} (=${MINA_DEB_VERSION}), mina-${profile}-profile (=${MINA_DEB_VERSION})"
+  local depends="mina-runtime-${RUNTIME_CODENAME} (=${MINA_DEB_VERSION}), mina-${profile}-profile (=${MINA_DEB_VERSION})"
 
+  local saved_arch="${ARCHITECTURE}"
+  ARCHITECTURE=all
+
+  # Replaces/Breaks the retired binary-carrying package so an in-place upgrade
+  # hands /usr/local/bin/mina-rosetta etc. over cleanly.
   create_control_file "${package_name}" "${depends}" \
-    "Mina Protocol Rosetta Client for ${network}"
+    "Mina Protocol Rosetta Client for ${network}" "${SUGGESTED_DEPS}" \
+    "mina-rosetta-generic${DEB_SUFFIX} (<< ${MINA_DEB_VERSION})"
+
+  link_runtime_applets "${MINA_BOX_ROSETTA_APPLETS[@]}"
+
+  mkdir -p "${BUILDDIR}/etc/mina/rosetta/"{rosetta-cli-config,scripts}
+
+  # --- Copy artifacts
+  cp ../src/app/rosetta/scripts/* "${BUILDDIR}/etc/mina/rosetta/scripts"
+  cp ../src/app/rosetta/rosetta-cli-config/*.json \
+    "${BUILDDIR}/etc/mina/rosetta/rosetta-cli-config"
+  cp ../src/app/rosetta/rosetta-cli-config/*.ros \
+    "${BUILDDIR}/etc/mina/rosetta/rosetta-cli-config"
 
   build_deb "${package_name}"
+  ARCHITECTURE="${saved_arch}"
 }
 ## END ROSETTA PACKAGE ##
 
@@ -600,6 +613,10 @@ build_profile_deb() {
   # binaries live in the network-free mina-generic package. The profile
   # package has no apt dependency on generic — the tent metapackage
   # (mina-${network}) is responsible for pulling all three layers together.
+  # The PROFILE hint is a text file, so the package is Architecture: all.
+  local saved_arch="${ARCHITECTURE}"
+  ARCHITECTURE=all
+
   create_control_file "${package_name}" "" \
     "Mina profile for network ${profile}" "" "${breaks_pkgs}"
 
@@ -608,76 +625,17 @@ build_profile_deb() {
   printf '%s' "${profile}" > "${BUILDDIR}/etc/coda/build_config/PROFILE"
 
   build_deb "${package_name}"
+  ARCHITECTURE="${saved_arch}"
 }
 ## END PACKAGE ##
 
-## PROFILE-GENERIC TENT PACKAGE ##
+## (profile-generic tent package retired: L2 packages depend on the runtime directly) ##
 
-#
-# Builds mina-${PROFILE}-generic convenience tent for Devnet/Mainnet profiles.
-# Lightnet and Dev don't use this — they ship directly as mina-${profile}.
-#
-# This is an empty metapackage that depends on mina-generic (the daemon
-# binaries) and mina-${PROFILE}-profile (the PROFILE hint file), so that
-# `apt-get install mina-devnet-generic` pulls in a working daemon with the
-# correct profile baked in. It Replaces the old mina-${PROFILE} monolithic
-# package.
-#
-build_profile_generic_tent_deb() {
-
-  local profile="$1"
-
-  echo "--- Building ${profile}-generic tent metapackage:"
-
-  local package_name="mina-${profile}-generic"
-
-  local depends="mina-generic (=${MINA_DEB_VERSION}), mina-${profile}-profile (=${MINA_DEB_VERSION})"
-
-  create_control_file "${package_name}" "${depends}" \
-    "Mina Protocol metapackage for ${profile} (installs generic and profile packages)" \
-    "" "mina-${profile} (<< ${MINA_DEB_VERSION})"
-
-  build_deb "${package_name}"
-}
-## END PROFILE-GENERIC TENT PACKAGE ##
-
-## CONFIG PACKAGE ##
-build_daemon_config_deb() {
-
-  local network="$1"
-
-  echo "--- Building ${network} config deb without keys:"
-
-  local package_name="mina-${network}-config"
-
-  # Config package contains only architecture-independent configuration data
-  # (no binaries), so we build it with Architecture: all to make it usable on
-  # all supported architectures.
-
-  # Save and override architecture to "all" for the config package; restore
-  # the original architecture after building the package.
-  local saved_arch="${ARCHITECTURE}"
-  ARCHITECTURE=all
-
-  create_control_file "${package_name}" "" \
-     "Mina Protocol Config for daemons running under ${network}" "" "mina-${network} (<< ${MINA_DEB_VERSION})"
-
-  copy_common_daemon_configs "${network}"
-
-  # The config package owns mina.service so that exactly one co-installed
-  # package ships it, with the correct per-network seed peer URL.
-  install_mina_service "${network}"
-
-  build_deb "${package_name}"
-  ARCHITECTURE="${saved_arch}"
-}
-## END CONFIG PACKAGE ##
+## (regular config package retired: merged into the daemon L2 package;
+## the hardfork config package below still owns the name mina-<network>-config) ##
 
 ## PREFORK PACKAGE ##
 
-# For automode purpose. We need to control location for both runtimes
-CURRENT_CODENAME=berkeley
-POSTFORK_CODENAME=mesa
 # AUTOMODE_CURRENT_DIR and AUTOMODE_POSTFORK_DIR are no longer computed at source
 # time.  They depend on BUILDDIR, which is overridden per worker in parallel
 # builds.  Each function that needs these paths computes them locally so they
@@ -706,7 +664,7 @@ build_daemon_prefork_deb() {
   create_control_file "${package_name}" "${SHARED_DEPS}${DAEMON_DEPS}" \
     "Mina Protocol Client and Daemon for prefork under network ${network}" "${SUGGESTED_DEPS}"
 
-  copy_common_daemon_apps "$automode_current_dir"
+  copy_runtime_dir "$automode_current_dir"
 
   build_deb "${package_name}"
 }
@@ -834,8 +792,7 @@ copy_common_daemon_post_automode_apps_and_configs() {
 
   # Copy binaries to separate directory as we need both berkeley and mesa binaries for automode packages
   # and they share the same dispatcher and some common apps,
-  mkdir -p "${automode_postfork_dir}"
-  copy_common_daemon_apps "${automode_postfork_dir}"
+  copy_runtime_dir "${automode_postfork_dir}"
 
   # Create symlinks for shared apps in the main bin directory that
   # dispatch to the correct runtime based on env var set in /etc/default/mina-dispatch
@@ -875,13 +832,17 @@ build_daemon_postfork_deb() {
 
   echo "--- Building ${network} postfork deb for hardfork automode:"
 
-  # The postfork runtime shares the /usr/local/bin/mina dispatcher, which also
-  # lives in the network-free mina-generic package. Declare Replaces/Breaks on
-  # mina-generic so the two are mutually exclusive and the automode<->generic
-  # transition resolves cleanly instead of failing with a dpkg "trying to
-  # overwrite" file conflict.
+  # The postfork runtime owns /usr/local/bin (the dispatcher and its applet
+  # symlinks, plus the hardfork helper scripts), which the normal daemon
+  # packages own outside automode.  The unversioned Replaces/Breaks make the
+  # two mutually exclusive in BOTH directions: installing postfork removes the
+  # normal daemon's claim on those paths, and reinstalling the normal daemon
+  # (mina-${network} in the runtime-dir layout, mina-generic in the develop
+  # nightlies that predate it) forces apt to remove postfork instead of dying
+  # on a dpkg "trying to overwrite" file conflict.
   create_control_file "$package_name" "${SHARED_DEPS}${DAEMON_DEPS}" \
-    'Mina Protocol Client and Daemon' "${SUGGESTED_DEPS}" "mina-generic"
+    'Mina Protocol Client and Daemon' "${SUGGESTED_DEPS}" \
+    "mina-generic, mina-${network}"
 
   copy_common_daemon_post_automode_apps_and_configs "${network}"
 
@@ -934,85 +895,102 @@ build_daemon_automode_deb() {
 }
 ## END AUTOMODE METAPACKAGE ##
 
-## TENT METAPACKAGE ##
+## DAEMON PACKAGE (L2) ##
 
 #
-# Builds mina-NETWORK transitional metapackage (tent package)
+# Builds mina-NETWORK package: the network-specific layer over the runtime.
 #
-# Output: mina-${NETWORK}_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
+# Output: mina-${NETWORK}_${MINA_DEB_VERSION}_all.deb
 #
-# The old monolithic mina-${NETWORK} is now split into three layers:
-#   mina-generic (binaries) + mina-${NETWORK}-profile (profile) + mina-${NETWORK}-config
-# This empty tent metapackage carries the legacy name and depends on all three,
-# so `apt-get install mina-${NETWORK}` still pulls in a working daemon.
-# It Conflicts with mina-${NETWORK}-automode (hardfork) since they are mutually
-# exclusive, and Replaces mina-${NETWORK} (<< V) to cleanly take over from
-# the old monolithic package.
+# Carries the applet symlinks into the runtime directory, the genesis
+# configuration that the retired mina-${NETWORK}-config package used to own,
+# mina.service, and the hardfork helper scripts.  Binaries live in
+# mina-runtime-<mina-codename> (L1); the PROFILE hint in mina-<profile>-profile.
 #
-build_daemon_tent_deb() {
+build_daemon_deb() {
 
   local network="$1"
 
-  echo "--- Building ${network} tent metapackage:"
+  echo "--- Building ${network} daemon deb"
 
   local package_name="mina-${network}"
 
   # network-to-profile is 1:1 for the main networks (devnet, mainnet)
   local profile="${network}"
 
-  local depends="mina-${profile}-generic (=${MINA_DEB_VERSION}), mina-${network}-config (=${MINA_DEB_VERSION})"
+  local depends="mina-runtime-${RUNTIME_CODENAME} (=${MINA_DEB_VERSION}), mina-${profile}-profile (=${MINA_DEB_VERSION})"
 
+  local saved_arch="${ARCHITECTURE}"
+  ARCHITECTURE=all
+
+  # Replaces/Breaks hand over /usr/local/bin/mina etc. from every package
+  # that ever owned those names: mina-${network}-generic (the shipped
+  # binary-carrying package on release lineages), mina-generic (the develop
+  # nightlies' split layout), and the config files from the regular
+  # mina-${network}-config package (whose name the hardfork config package
+  # still uses at newer versions).  The pre-split monolithic mina-${network}
+  # upgrades by name.
   create_control_file "${package_name}" "${depends}" \
-    "Mina Protocol metapackage for ${network} (installs generic, profile and config packages)" \
-    "" "" "" \
+    "Mina Protocol daemon for ${network} (symlinks and configuration over the Mina runtime)" \
+    "${SUGGESTED_DEPS}" \
+    "mina-generic (<< ${MINA_DEB_VERSION}), mina-${network}-generic (<< ${MINA_DEB_VERSION}), mina-${network}-config (<< ${MINA_DEB_VERSION})" \
+    "" \
     "mina-${network}-automode"
 
-  build_deb "${package_name}"
-}
-## END TENT METAPACKAGE ##
-
-## GENERIC PACKAGE ##
-
-#
-# Builds Generic daemon package with no profile nor network awareness.
-#
-# Output: ${MINA_GENERIC_DEB_NAME}_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
-# Where MINA_GENERIC_DEB_NAME can be:
-#   - "mina-generic" (default)
-#
-# Dependencies: ${SHARED_DEPS}${DAEMON_DEPS}
-#
-# Generic daemon without specified signatures or configs (like ledgers etc.).
-#
-build_daemon_generic_deb() {
-
-  echo "--- Building Mina Generic package"
-
-  local _suffix="${DEB_SUFFIX#-}"
-  MINA_GENERIC_DEB_NAME="mina-generic${_suffix:+-${_suffix}}"
-
-  # A flavored generic (mina-generic-instrumented, mina-generic-lightnet) must
-  # satisfy the flavor-neutral "mina-generic" dependency declared by the profile
-  # packages, so it provides that virtual name at the same version. The plain
-  # "mina-generic" build needs no Provides (it already carries that name).
-  local provides=""
-  if [ "${MINA_GENERIC_DEB_NAME}" != "mina-generic" ]; then
-    provides="mina-generic (= ${MINA_DEB_VERSION})"
-  fi
-
-  create_control_file "${MINA_GENERIC_DEB_NAME}" "${SHARED_DEPS}${DAEMON_DEPS}" \
-    "Mina Protocol Client and Daemon for the Generic usage" \
-    "${SUGGESTED_DEPS}" "" "${provides}"
-
-  copy_common_daemon_apps
+  link_runtime_applets "${MINA_BOX_DAEMON_APPLETS[@]}" \
+    coda-libp2p_helper mina-rocksdb-scanner
 
   copy_hf_related_scripts
 
-  build_deb "${MINA_GENERIC_DEB_NAME}"
+  copy_common_daemon_configs "${network}"
+
+  # This package owns mina.service (the retired config package used to), with
+  # the correct per-network seed peer URL.
+  install_mina_service "${network}"
+
+  build_deb "${package_name}"
+  ARCHITECTURE="${saved_arch}"
+}
+## END DAEMON PACKAGE ##
+
+## RUNTIME PACKAGE (L1) ##
+
+#
+# Builds the mina-runtime-<mina-codename> package: the single binary directory
+# every L2 package symlinks into.
+#
+# Output: mina-runtime-${RUNTIME_CODENAME}[-instrumented]_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
+# Dependencies: union of daemon and archive dependencies.  Network-free: the
+# signature kind is resolved at runtime via MINA_PROFILE / the PROFILE file.
+#
+build_runtime_deb() {
+
+  echo "--- Building Mina runtime package"
+
+  local _suffix="${DEB_SUFFIX#-}"
+  local package_name="mina-runtime-${RUNTIME_CODENAME}${_suffix:+-${_suffix}}"
+
+  # The instrumented runtime must satisfy the flavor-neutral dependency
+  # declared by the L2 packages, so it provides the plain name at the same
+  # version (mirrors the old mina-generic scheme).
+  local provides=""
+  if [ "${package_name}" != "mina-runtime-${RUNTIME_CODENAME}" ]; then
+    provides="mina-runtime-${RUNTIME_CODENAME} (= ${MINA_DEB_VERSION})"
+  fi
+
+  # ARCHIVE_DEPS is a strict subset of SHARED_DEPS + DAEMON_DEPS on every
+  # supported codename, so the union of daemon and archive dependencies is
+  # exactly SHARED_DEPS + DAEMON_DEPS.
+  create_control_file "${package_name}" "${SHARED_DEPS}${DAEMON_DEPS}" \
+    "Mina Protocol runtime: every Mina binary for one runtime, as one multicall binary" \
+    "${SUGGESTED_DEPS}" "" "${provides}"
+
+  copy_runtime_dir "${BUILDDIR}/usr/lib/mina/${RUNTIME_CODENAME}"
+
+  build_deb "${package_name}"
 
 }
-
-## END MAINNET GENERIC PACKAGE ##
+## END RUNTIME PACKAGE ##
 
 copy_common_daemon_hardfork_configs() {
   local NETWORK_NAME="${1}"
@@ -1077,62 +1055,20 @@ build_daemon_hardfork_config_deb() {
 
 ## END HARDFORK PACKAGE ##
 
-#
-# Copies common binaries and configuration for archive packages
-#
-# Parameters:
-#   $1 - Archive package name (used for build_deb call)
-#
-# Sets up archive daemon, archive blocks tool, extract blocks tool,
-# missing blocks utilities, replayer, and SQL migration scripts.
-#
-copy_common_archive_configs() {
-  local ARCHIVE_DEB="${1}"
-
-  mkdir -p "${BUILDDIR}/usr/local/bin"
-
-  cp ./default/src/app/archive/archive.exe \
-    "${BUILDDIR}/usr/local/bin/mina-archive"
-  cp ./default/src/app/archive_blocks/archive_blocks.exe \
-    "${BUILDDIR}/usr/local/bin/mina-archive-blocks"
-  cp ./default/src/app/extract_blocks/extract_blocks.exe \
-    "${BUILDDIR}/usr/local/bin/mina-extract-blocks"
-  cp ./default/src/app/archive_hardfork_toolbox/archive_hardfork_toolbox.exe \
-    "${BUILDDIR}/usr/local/bin/mina-archive-hardfork-toolbox"
-
-  mkdir -p "${BUILDDIR}/etc/mina/archive"
-  cp ../scripts/archive/missing-blocks-guardian.sh \
-    "${BUILDDIR}/usr/local/bin/mina-missing-blocks-guardian"
-
-  cp ./default/src/app/missing_blocks_auditor/missing_blocks_auditor.exe \
-    "${BUILDDIR}/usr/local/bin/mina-missing-blocks-auditor"
-  cp ./default/src/app/replayer/replayer.exe \
-    "${BUILDDIR}/usr/local/bin/mina-replayer"
-  cp ./default/src/app/dump_slot_ledger/dump_slot_ledger.exe \
-    "${BUILDDIR}/usr/local/bin/mina-dump-slot-ledger"
-  cp ./default/src/app/mina_archive_healthcheck/mina_archive_healthcheck.exe \
-    "${BUILDDIR}/usr/local/bin/mina-archive-healthcheck"
-
-  rsync -Huav ../src/app/archive/*.sql "${BUILDDIR}/etc/mina/archive"
-
-  build_deb "$ARCHIVE_DEB"
-}
-
-## ARCHIVE PACKAGE ##
+## ARCHIVE PACKAGE (L2) ##
 
 #
-# Builds mina-archive-devnet package for devnet archive node
+# Builds mina-archive-NETWORK package for the archive node.
 #
 # Output:
-# - If network is one of mainnet: mina-archive-${NETWORK}_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
-# - O.w. if network is devnet: mina-archive-devnet-generic${DEB_SUFFIX}_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
-#   Where DEB_SUFFIX can be:
-#     - "" (empty, default)
-#     - "-lightnet" (if DUNE_PROFILE=lightnet)
-#     - "-instrumented" (if DUNE_INSTRUMENT_WITH is set)
-#     - "-lightnet-instrumented" (both conditions)
-# Dependencies: ${ARCHIVE_DEPS} (libssl, libgomp, libpq-dev, libjemalloc)
-# Archive node package for devnet with all archive utilities and SQL scripts.
+# - If network is mainnet: mina-archive-mainnet${DEB_SUFFIX}_${MINA_DEB_VERSION}_all.deb
+# - If network is devnet:  ${MINA_ARCHIVE_DEB_NAME}_${MINA_DEB_VERSION}_all.deb
+#   (profile/instrumentation suffixes are encoded in MINA_ARCHIVE_DEB_NAME)
+#
+# Carries the archive applet symlinks into the runtime directory, the
+# missing-blocks guardian script, and the SQL migration scripts.  Binaries
+# live in mina-runtime-<mina-codename> (L1).
+#
 build_archive_deb () {
 
   local network="$1"
@@ -1154,38 +1090,30 @@ build_archive_deb () {
       ;;
   esac
 
-  echo "--- Building archive ${network} tent metapackage"
+  echo "--- Building archive ${network} deb"
 
-  local depends="mina-archive-generic${DEB_SUFFIX} (=${MINA_DEB_VERSION}), mina-${profile}-profile (=${MINA_DEB_VERSION})"
+  local depends="mina-runtime-${RUNTIME_CODENAME} (=${MINA_DEB_VERSION}), mina-${profile}-profile (=${MINA_DEB_VERSION})"
 
-  create_control_file "${package_name}" "${depends}" "Mina Archive Node for network ${network}"
+  local saved_arch="${ARCHITECTURE}"
+  ARCHITECTURE=all
+
+  # Replaces/Breaks hands /usr/local/bin/mina-archive etc. over from the
+  # retired binary-carrying mina-archive-generic package.
+  create_control_file "${package_name}" "${depends}" \
+    "Mina Archive Node for network ${network}" "" \
+    "mina-archive-generic${DEB_SUFFIX} (<< ${MINA_DEB_VERSION})"
+
+  link_runtime_applets "${MINA_BOX_ARCHIVE_APPLETS[@]}"
+
+  mkdir -p "${BUILDDIR}/etc/mina/archive"
+  mkdir -p "${BUILDDIR}/usr/local/bin"
+  cp ../scripts/archive/missing-blocks-guardian.sh \
+    "${BUILDDIR}/usr/local/bin/mina-missing-blocks-guardian"
+
+  rsync -Huav ../src/app/archive/*.sql "${BUILDDIR}/etc/mina/archive"
 
   build_deb "${package_name}"
-
-}
-## END ARCHIVE PACKAGE ##
-
-
-#
-# Builds mina-archive-generic package for archive node. No profile nor network awareness, relies on
-# generic configuration from config package and profile package.
-#
-# Output:
-# - mina-archive-generic${DEB_SUFFIX}_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
-#   Where DEB_SUFFIX can be:
-#     - "" (empty, default)
-#     - "-instrumented" (if DUNE_INSTRUMENT_WITH is set)
-# Dependencies: ${ARCHIVE_DEPS} (libssl, libgomp, libpq-dev, libjemalloc)
-# Archive node package for devnet with all archive utilities and SQL scripts.
-build_archive_generic_deb () {
-
-  local package_name="mina-archive-generic${DEB_SUFFIX}"
-
-  echo "--- Building archive generic deb"
-
-  create_control_file "${package_name}" "${ARCHIVE_DEPS}" "Mina Archive Node for generic usage"
-
-  copy_common_archive_configs "${package_name}"
+  ARCHITECTURE="${saved_arch}"
 
 }
 ## END ARCHIVE PACKAGE ##
