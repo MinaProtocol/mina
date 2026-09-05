@@ -203,124 +203,6 @@ module Get_some_initial_peers = struct
 end]
 
 [%%versioned_rpc
-module Get_staged_ledger_aux_and_pending_coinbases_at_hash = struct
-  type nonrec ctx = ctx
-
-  module Master = struct
-    let name = "get_staged_ledger_aux_and_pending_coinbases_at_hash"
-
-    module T = struct
-      type query = State_hash.t
-
-      type response =
-        ( Staged_ledger.Scan_state.Stable.Latest.t
-        * Ledger_hash.t
-        * Pending_coinbase.t
-        * Mina_state.Protocol_state.value list )
-        option
-    end
-
-    module Caller = T
-    module Callee = T
-  end
-
-  include Master.T
-
-  let sent_counter =
-    Mina_metrics.Network
-    .get_staged_ledger_aux_and_pending_coinbases_at_hash_rpcs_sent
-
-  let received_counter =
-    Mina_metrics.Network
-    .get_staged_ledger_aux_and_pending_coinbases_at_hash_rpcs_received
-
-  let failed_request_counter =
-    Mina_metrics.Network
-    .get_staged_ledger_aux_and_pending_coinbases_at_hash_rpc_requests_failed
-
-  let failed_response_counter =
-    Mina_metrics.Network
-    .get_staged_ledger_aux_and_pending_coinbases_at_hash_rpc_responses_failed
-
-  module M = Versioned_rpc.Both_convert.Plain.Make (Master)
-  include M
-
-  include Perf_histograms.Rpc.Plain.Extend (struct
-    include M
-    include Master
-  end)
-
-  module V3 = struct
-    module T = struct
-      type query = State_hash.Stable.V1.t
-
-      type response =
-        ( Staged_ledger.Scan_state.Stable.V3.t
-        * Ledger_hash.Stable.V1.t
-        * Pending_coinbase.Stable.V2.t
-        * Mina_state.Protocol_state.Value.Stable.V3.t list )
-        option
-
-      let query_of_caller_model = Fn.id
-
-      let callee_model_of_query = Fn.id
-
-      let response_of_callee_model = Fn.id
-
-      let caller_model_of_response = Fn.id
-    end
-
-    module T' =
-      Perf_histograms.Rpc.Plain.Decorate_bin_io
-        (struct
-          include M
-          include Master
-        end)
-        (T)
-
-    include T'
-    include Register (T')
-  end
-
-  let receipt_trust_action_message hash =
-    ( "Staged ledger and pending coinbases at hash: $hash"
-    , [ ("hash", State_hash.to_yojson hash) ] )
-
-  let log_request_received ~logger:_ ~sender:_ _request = ()
-
-  let response_is_successful = Option.is_some
-
-  let handle_request (module Context : CONTEXT) ~version:_ request =
-    let open Context in
-    let hash = Envelope.Incoming.data request in
-    let result =
-      let%bind.Option frontier = get_transition_frontier () in
-      Sync_handler.get_staged_ledger_aux_and_pending_coinbases_at_hash ~logger
-        ~frontier hash
-    in
-    match result with
-    | None ->
-        Trust_system.(
-          record_envelope_sender trust_system logger
-            (Envelope.Incoming.sender request)
-            Actions.
-              (Requested_unknown_item, Some (receipt_trust_action_message hash)) )
-        >>| const None
-    | Some (scan_state, expected_merkle_root, pending_coinbases, protocol_states)
-      ->
-        return
-          (Some
-             ( Staged_ledger.Scan_state.read_all_proofs_from_disk scan_state
-             , expected_merkle_root
-             , pending_coinbases
-             , protocol_states ) )
-
-  let rate_limit_budget = (4, `Per Time_float.Span.minute)
-
-  let rate_limit_cost = Fn.const 1
-end]
-
-[%%versioned_rpc
 module Answer_sync_ledger_query = struct
   type nonrec ctx = ctx
 
@@ -447,6 +329,109 @@ module Answer_sync_ledger_query = struct
     result
 
   let rate_limit_budget = (Int.pow 2 17, `Per Time_float.Span.minute)
+
+  let rate_limit_cost = Fn.const 1
+end]
+
+[%%versioned_rpc
+module Answer_scan_state_query = struct
+  type nonrec ctx = ctx
+
+  module Master = struct
+    let name = "answer_scan_state_query"
+
+    module T = struct
+      (* One RPC rather than three, following [Answer_sync_ledger_query]: a
+         bootstrapping node asks for a manifest, then bands, then payloads, and
+         a single query type lets a downloader batch them together. *)
+      type query = Staged_ledger.Scan_state.Sync.Query.t
+
+      type response = Staged_ledger.Scan_state.Sync.Answer.t option
+    end
+
+    module Caller = T
+    module Callee = T
+  end
+
+  include Master.T
+
+  let sent_counter = Mina_metrics.Network.answer_scan_state_query_rpcs_sent
+
+  let received_counter =
+    Mina_metrics.Network.answer_scan_state_query_rpcs_received
+
+  let failed_request_counter =
+    Mina_metrics.Network.answer_scan_state_query_rpc_requests_failed
+
+  let failed_response_counter =
+    Mina_metrics.Network.answer_scan_state_query_rpc_responses_failed
+
+  module M = Versioned_rpc.Both_convert.Plain.Make (Master)
+  include M
+
+  include Perf_histograms.Rpc.Plain.Extend (struct
+    include M
+    include Master
+  end)
+
+  module V1 = struct
+    module T = struct
+      type query = Staged_ledger.Scan_state.Sync.Query.Stable.V1.t
+
+      type response = Staged_ledger.Scan_state.Sync.Answer.Stable.V1.t option
+
+      let query_of_caller_model = Fn.id
+
+      let callee_model_of_query = Fn.id
+
+      let response_of_callee_model = Fn.id
+
+      let caller_model_of_response = Fn.id
+    end
+
+    module T' =
+      Perf_histograms.Rpc.Plain.Decorate_bin_io
+        (struct
+          include M
+          include Master
+        end)
+        (T)
+
+    include T'
+    include Register (T')
+  end
+
+  let receipt_trust_action_message query =
+    ( "Answer_scan_state_query: $query"
+    , [ ( "query"
+        , `String
+            (Sexp.to_string
+               (Staged_ledger.Scan_state.Sync.Query.sexp_of_t query) ) )
+      ] )
+
+  let log_request_received ~logger:_ ~sender:_ _request = ()
+
+  let response_is_successful = Option.is_some
+
+  let handle_request (module Context : CONTEXT) ~version:_ request =
+    let open Context in
+    let query = Envelope.Incoming.data request in
+    let answer =
+      let%bind.Option frontier = get_transition_frontier () in
+      Sync_handler.answer_scan_state_query ~frontier query
+    in
+    match answer with
+    | Some _ ->
+        return answer
+    | None ->
+        Trust_system.(
+          record_envelope_sender trust_system logger
+            (Envelope.Incoming.sender request)
+            Actions.
+              (Requested_unknown_item, Some (receipt_trust_action_message query)) )
+        >>| const None
+
+  let rate_limit_budget = (Int.pow 2 15, `Per Time_float.Span.minute)
 
   let rate_limit_cost = Fn.const 1
 end]
@@ -1189,12 +1174,10 @@ end]
 type ('query, 'response) rpc =
   | Get_some_initial_peers :
       (Get_some_initial_peers.query, Get_some_initial_peers.response) rpc
-  | Get_staged_ledger_aux_and_pending_coinbases_at_hash :
-      ( Get_staged_ledger_aux_and_pending_coinbases_at_hash.query
-      , Get_staged_ledger_aux_and_pending_coinbases_at_hash.response )
-      rpc
   | Answer_sync_ledger_query :
       (Answer_sync_ledger_query.query, Answer_sync_ledger_query.response) rpc
+  | Answer_scan_state_query :
+      (Answer_scan_state_query.query, Answer_scan_state_query.response) rpc
   | Get_transition_chain :
       (Get_transition_chain.query, Get_transition_chain.response) rpc
   | Get_transition_knowledge :
@@ -1213,8 +1196,8 @@ type any_rpc = Rpc : ('q, 'r) rpc -> any_rpc
 
 let all_rpcs =
   [ Rpc Get_some_initial_peers
-  ; Rpc Get_staged_ledger_aux_and_pending_coinbases_at_hash
   ; Rpc Answer_sync_ledger_query
+  ; Rpc Answer_scan_state_query
   ; Rpc Get_best_tip
   ; Rpc Get_ancestry
   ; Rpc Get_transition_knowledge
@@ -1228,10 +1211,10 @@ let implementation : type q r.
     (q, r) rpc -> (ctx, q, r) Gossip_net.rpc_implementation = function
   | Get_some_initial_peers ->
       (module Get_some_initial_peers)
-  | Get_staged_ledger_aux_and_pending_coinbases_at_hash ->
-      (module Get_staged_ledger_aux_and_pending_coinbases_at_hash)
   | Answer_sync_ledger_query ->
       (module Answer_sync_ledger_query)
+  | Answer_scan_state_query ->
+      (module Answer_scan_state_query)
   | Get_transition_chain ->
       (module Get_transition_chain)
   | Get_transition_knowledge ->
