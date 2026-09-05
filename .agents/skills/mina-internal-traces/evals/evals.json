@@ -1,0 +1,20 @@
+{
+  "skill_name": "mina-internal-traces",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "I'm debugging a Mina node and have ~/.mina-config/internal-tracing/internal-trace.jsonl plus prover-internal-trace.jsonl. Figure out what kind of trace these are, summarize the biggest gaps, and tell me where the checkpoints come from in the repo.",
+      "expected_output": "Classifies these as OCaml Mina internal tracing JSONL files, uses the bundled summarizer or equivalent parsing, includes prover subprocess file, and points to src/lib/internal_tracing plus [%log internal] producers."
+    },
+    {
+      "id": 2,
+      "prompt": "Does mina client start-internal-tracing turn on the internal_tracing::checkpoint! calls in proof-systems/kimchi/src/prover.rs? Investigate the repo before answering.",
+      "expected_output": "Explains the distinction between OCaml Internal_tracing and Rust proof-system internal-tracing, cites the CLI/RPC/toggle path and the absence of production start_tracing/take_traces usage for Kimchi traces."
+    },
+    {
+      "id": 3,
+      "prompt": "I have trace/12345.trace from running mina daemon --tracing. Convert or inspect it and don't confuse it with internal-trace.jsonl.",
+      "expected_output": "Classifies this as O1Trace/WebKit binary tracing, points to Mina_tracing and src/app/trace-tool, and does not use the JSONL internal trace workflow."
+    }
+  ]
+}
