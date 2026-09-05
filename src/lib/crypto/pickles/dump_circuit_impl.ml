@@ -3580,6 +3580,57 @@ let bullet_reduce_step_circuit (inputs : Impl.Field.t array) () =
   in
   ()
 
+(* Sub-circuit: check_bulletproof on the Step side (Step_verifier.check_bulletproof,
+   the bulletproof half of incrementally_verify_proof), from a sponge at
+   sponge_before_evaluations. Input layout (170 fields): the sponge state at 0-2 (mode
+   Squeezed 1), xi at 3, the 47 commitment bases at 4-97 (two sg_old, x_hat, ft_comm,
+   z_comm, six index commitments, 15 w_comm, 15 coefficients, six sigma_comm; all
+   unconditional on the step side), the 15 (L, R) pairs at 98-157, delta at 158-159,
+   the challenge polynomial commitment at 160-161, then the Type2-shifted scalars
+   z_1, z_2, combined_inner_product, b as (sDiv2, sOdd) pairs at 162-169. *)
+let check_bulletproof_step_circuit (inputs : Impl.Field.t array) () =
+  let open Pickles_types in
+  let sponge_params =
+    Sponge.Params.map Tick_field_sponge.params ~f:Impl.Field.constant
+  in
+  let sponge =
+    Step_main_inputs.Sponge.make
+      ~state:[| inputs.(0); inputs.(1); inputs.(2) |]
+      ~sponge_state:(Squeezed 1) ~params:sponge_params
+  in
+  let xi = Import.Scalar_challenge.create inputs.(3) in
+  let pt i : Step_main_inputs.Inner_curve.t = (inputs.(i), inputs.(i + 1)) in
+  let without_degree_bound =
+    Vector.append
+      (Vector.init Nat.N2.n ~f:(fun j -> [| pt (4 + (2 * j)) |]))
+      (Vector.init Nat.N45.n ~f:(fun j -> [| pt (8 + (2 * j)) |]))
+      (snd (Nat.N2.add Nat.N45.n))
+  in
+  let lr = Array.init 15 ~f:(fun j -> (pt (98 + (4 * j)), pt (100 + (4 * j)))) in
+  let shifted i =
+    Shifted_value.Type2.Shifted_value
+      (inputs.(i), Impl.Boolean.Unsafe.of_cvar inputs.(i + 1))
+  in
+  let opening =
+    { Import.Types.Step.Bulletproof.lr
+    ; delta = pt 158
+    ; z_1 = shifted 162
+    ; z_2 = shifted 164
+    ; challenge_polynomial_commitment = pt 160
+    }
+  in
+  let advice =
+    { Import.Types.Step.Bulletproof.Advice.b = shifted 168
+    ; combined_inner_product = shifted 166
+    }
+  in
+  let _success, _challenges =
+    Step_verifier.check_bulletproof ~sponge ~xi ~advice
+      ~polynomials:(without_degree_bound, Vector.[])
+      ~opening
+  in
+  ()
+
 (* group_map on Step field (Pallas inner curve). Input: 1 field *)
 let group_map_step_circuit (inputs : Impl.Field.t array) () =
   let open Impl in
@@ -4100,6 +4151,57 @@ let fq_sponge_transcript_wrap_circuit (inputs : Impls.Wrap.Field.t array) () =
   let _digest = Wrap_main_inputs.Sponge.squeeze regular in
   ()
 
+(* Sub-circuit: check_bulletproof on the Wrap side (Wrap_verifier.check_bulletproof),
+   from a sponge at sponge_before_evaluations. Input layout (172 fields): the sponge
+   state at 0-2 (mode Squeezed 1), xi at 3, the two sg_old mask bits at 4-5, the 47
+   commitment bases at 6-99 (two sg_old under the mask, then x_hat, ft_comm, z_comm, six
+   index commitments, 15 w_comm, 15 coefficients, six sigma_comm), the 16 (L, R) pairs
+   at 100-163, delta at 164-165, the challenge polynomial commitment at 166-167, then
+   the Type1-shifted scalars z_1, z_2, combined_inner_product, b at 168-171. *)
+let check_bulletproof_wrap_circuit (inputs : Impls.Wrap.Field.t array) () =
+  let open Pickles_types in
+  let sponge_params =
+    Sponge.Params.map Tock_field_sponge.params ~f:Impls.Wrap.Field.constant
+  in
+  let sponge =
+    Wrap_main_inputs.Sponge.make
+      ~state:[| inputs.(0); inputs.(1); inputs.(2) |]
+      ~sponge_state:(Squeezed 1) ~params:sponge_params
+  in
+  let xi = Import.Scalar_challenge.create inputs.(3) in
+  let as_bool (x : Impls.Wrap.Field.t) : Impls.Wrap.Boolean.var =
+    Impls.Wrap.Boolean.Unsafe.of_cvar x
+  in
+  let pt i : Wrap_main_inputs.Inner_curve.t = (inputs.(i), inputs.(i + 1)) in
+  let without_degree_bound =
+    Vector.append
+      (Vector.init Nat.N2.n ~f:(fun j ->
+           Opt.Maybe (as_bool inputs.(4 + j), [| `Finite (pt (6 + (2 * j))) |]) ))
+      (Vector.init Nat.N45.n ~f:(fun j -> Opt.just [| `Finite (pt (10 + (2 * j))) |]))
+      (snd (Nat.N2.add Nat.N45.n))
+  in
+  let lr = Array.init 16 ~f:(fun j -> (pt (100 + (4 * j)), pt (102 + (4 * j)))) in
+  let shifted i = Shifted_value.Type1.Shifted_value inputs.(i) in
+  let openings_proof =
+    { Plonk_types.Openings.Bulletproof.lr
+    ; delta = pt 164
+    ; z_1 = shifted 168
+    ; z_2 = shifted 169
+    ; challenge_polynomial_commitment = pt 166
+    }
+  in
+  let advice =
+    { Import.Types.Step.Bulletproof.Advice.b = shifted 171
+    ; combined_inner_product = shifted 170
+    }
+  in
+  let _success, _challenges =
+    Wrap_verifier.check_bulletproof ~sponge ~xi ~advice
+      ~polynomials:(without_degree_bound, Vector.[])
+      ~openings_proof
+  in
+  ()
+
 (* Sub-circuit: challenge_digest on the Wrap side (Wrap_verifier.finalize_other_proof,
    step 4a): a plain sponge over both previous-challenge vectors — the wrap side has no
    proofs-verified mask — squeezed once. Input layout (32 fields): prev_challenges[0] at
@@ -4434,6 +4536,9 @@ let run ~output_dir =
   let array75_field = Impl.Typ.array ~length:75 Impl.Field.typ in
   dump_step "bullet_reduce_step_circuit" bullet_reduce_step_circuit
     ~input_typ:array75_field ~return_typ:Impl.Typ.unit ;
+  let array170_field = Impl.Typ.array ~length:170 Impl.Field.typ in
+  dump_step "check_bulletproof_step_circuit" check_bulletproof_step_circuit
+    ~input_typ:array170_field ~return_typ:Impl.Typ.unit ;
   let array1_field = Impl.Typ.array ~length:1 Impl.Field.typ in
   dump_step "group_map_step_circuit" group_map_step_circuit
     ~input_typ:array1_field ~return_typ:Impl.Typ.unit ;
@@ -4565,7 +4670,10 @@ let run ~output_dir =
     ~input_typ:array122_wrap ~return_typ:WrapImpl.Typ.unit ;
   let array55_field_wrap = WrapImpl.Typ.array ~length:55 WrapImpl.Field.typ in
   dump_wrap "fq_sponge_transcript_wrap_circuit" fq_sponge_transcript_wrap_circuit
-    ~input_typ:array55_field_wrap ~return_typ:WrapImpl.Typ.unit
+    ~input_typ:array55_field_wrap ~return_typ:WrapImpl.Typ.unit ;
+  let array172_field_wrap = WrapImpl.Typ.array ~length:172 WrapImpl.Field.typ in
+  dump_wrap "check_bulletproof_wrap_circuit" check_bulletproof_wrap_circuit
+    ~input_typ:array172_field_wrap ~return_typ:WrapImpl.Typ.unit
   (* The `schnorr_verify_step_circuit` fixture is NOT dumped here. It is
      produced by the standalone `dump_schnorr_verify_circuit.exe`, which
      compiles the shared production verifier in `Dump_schnorr_circuit_lib`

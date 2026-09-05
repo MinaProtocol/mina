@@ -647,3 +647,24 @@ module For_tests_only : sig
            Composition_types.Bulletproof_challenge.t
            array )
 end
+
+(** The in-circuit IPA opening check (the bulletproof half of
+    {!incrementally_verify_proof}), exposed for the circuit dumps: from the sponge at
+    [sponge_before_evaluations], the success bit and the round prechallenges. *)
+val check_bulletproof :
+     sponge:Step_main_inputs.Sponge.t
+  -> xi:Impl.Field.t Import.Scalar_challenge.t
+  -> advice:
+       Other_field.t Pickles_types.Shifted_value.Type2.t
+       Import.Types.Step.Bulletproof.Advice.t
+  -> polynomials:
+       (Impl.Field.t Tuple_lib.Double.t array, 'a) Pickles_types.Vector.t
+       * ( (Impl.Boolean.var * Inner_curve.t)
+           Pickles_types.Plonk_types.Poly_comm.With_degree_bound.t
+         , 'b )
+         Pickles_types.Vector.t
+  -> opening:
+       (Inner_curve.t, Other_field.t Pickles_types.Shifted_value.Type2.t)
+       Import.Types.Step.Bulletproof.t
+  -> [> `Success of Impl.Boolean.var ]
+     * Scalar_challenge.t Import.Bulletproof_challenge.t array

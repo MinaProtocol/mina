@@ -566,3 +566,29 @@ val choose_key :
        , Impl.Boolean.var )
        Pickles_types.Opt.t )
      index'
+
+(** The in-circuit IPA opening check (the bulletproof half of
+    {!incrementally_verify_proof}), exposed for the circuit dumps: from the sponge at
+    [sponge_before_evaluations], the success bit and the round prechallenges. *)
+val check_bulletproof :
+     sponge:Wrap_main_inputs.Sponge.t
+  -> xi:Scalar_challenge.t
+  -> advice:
+       Other_field.Packed.t Pickles_types.Shifted_value.Type1.t
+       Import.Types.Step.Bulletproof.Advice.t
+  -> polynomials:
+       ( ( [ `Finite of Wrap_main_inputs.Inner_curve.t
+           | `Maybe_finite of
+             Wrap_main_inputs.Impl.Boolean.var * Wrap_main_inputs.Inner_curve.t ]
+           array
+         , Wrap_main_inputs.Impl.Boolean.var )
+         Pickles_types.Opt.t
+       , 'a )
+       Pickles_types.Vector.t
+       * ('b, 'c) Pickles_types.Vector.t
+  -> openings_proof:
+       ( Wrap_main_inputs.Inner_curve.t
+       , Other_field.Packed.t Pickles_types.Shifted_value.Type1.t )
+       Pickles_types.Plonk_types.Openings.Bulletproof.t
+  -> [> `Success of Wrap_main_inputs.Impl.Boolean.var ]
+     * Scalar_challenge.t Import.Bulletproof_challenge.t array
