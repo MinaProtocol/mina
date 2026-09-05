@@ -20,7 +20,7 @@ let
     [ "check_opam_switch" ];
 
   # Extra packages which are not in opam.export but useful for development.
-  # The v0.16-series export already carries the LSP server, ocamlformat and the
+  # The v0.17-series export already carries the LSP server, ocamlformat and the
   # dune component libraries, so only the system compiler alias remains here.
   extra-packages = with implicit-deps; { ocaml-system = ocaml; };
 
