@@ -92,7 +92,6 @@
           '';
     in {
       overlays = {
-        crates-io = import ./nix/crates-io.nix;
         misc = import ./nix/misc.nix;
         rust = import ./nix/rust.nix;
         go = import ./nix/go.nix;
