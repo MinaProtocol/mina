@@ -70,14 +70,21 @@ RUN curl -L -o influxdb2-client-${INFLUXDB_CLI_VERSION}-linux-${TARGETARCH}.tar.
     && rm influxdb2-client-${INFLUXDB_CLI_VERSION}-linux-${TARGETARCH}.tar.gz \
     && rm -rf influx_dir
 
-# --- Docker Daemon
+# --- Docker CLI
+# Only the client: no CI job reaches a daemon from inside this image. Jobs that
+# run docker (scripts/docker/build.sh, buildx, the cache verifier) are host-level
+# Cmd.run steps using the agent's docker, and the two ways a step runs *in* this
+# image -- Cmd.runInDocker and the docker#v3.5.0 plugin -- mount no docker
+# socket. So dockerd, containerd, ctr, runc and docker-proxy in the static
+# bundle (~130 MB of its ~175 MB) have nothing to do here.
 RUN case "${TARGETARCH}" in \
         "amd64") DOCKER_ARCH="x86_64" ;; \
         "arm64") DOCKER_ARCH="aarch64" ;; \
         *) echo "Unsupported arch: ${TARGETARCH}"; exit 1 ;; \
     esac; \
     curl -sL https://download.docker.com/linux/static/stable/${DOCKER_ARCH}/docker-${DOCKER_VERSION}.tgz \
-    | tar --extract --gzip --strip-components 1 --directory=/usr/bin --file=-
+    | tar --extract --gzip --strip-components 1 --directory=/usr/bin --file=- docker/docker \
+    && docker --version
 
 # --- Google Cloud tools
 # The SDK ships its own CPython under platform/bundledpythonunix (253 MB);
