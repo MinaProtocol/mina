@@ -1,7 +1,7 @@
-(executable
- (package rosetta)
- (name rosetta_healthcheck)
- (public_name rosetta-healthcheck)
+(library
+ (name rosetta_healthcheck_applet)
+ (public_name rosetta.healthcheck_applet)
+ (modules rosetta_healthcheck_applet health_probes health_output)
  (libraries
   ;; opam libraries
   core
@@ -18,3 +18,14 @@
   (backend bisect_ppx))
  (preprocess
   (pps ppx_version ppx_let ppx_deriving_yojson ppx_mina)))
+
+(executable
+ (package rosetta)
+ (name rosetta_healthcheck)
+ (public_name rosetta-healthcheck)
+ (modules rosetta_healthcheck)
+ (libraries rosetta_healthcheck_applet)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_version)))

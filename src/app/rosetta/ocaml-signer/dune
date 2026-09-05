@@ -39,13 +39,24 @@
    ppx_version
    ppx_compare)))
 
+(library
+ (name signer_applet)
+ (public_name signer.applet)
+ (modes native)
+ (modules signer_applet)
+ (libraries signer_cli async core_kernel base core_unix.command_unix)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_version)))
+
 (executable
  (package signer)
  (name signer)
  (public_name signer)
  (modes native)
  (modules signer)
- (libraries signer_cli async core_kernel base)
+ (libraries signer_applet)
  (instrumentation
   (backend bisect_ppx))
  (preprocess

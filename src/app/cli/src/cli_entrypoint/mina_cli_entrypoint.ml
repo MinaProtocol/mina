@@ -2281,7 +2281,7 @@ let print_version_help coda_exe version =
 
 let print_version_info () = Core.printf "Commit %s\n" Mina_version.commit_id
 
-let () =
+let run () =
   try
     Random.self_init () ;
     let itn_features = Sys.getenv "ITN_FEATURES" |> Option.is_some in
@@ -2310,5 +2310,3 @@ let () =
     in
     [%log fatal] "Unhandled top level exception: $exn"
       ~metadata:[ ("exn", exn_json) ]
-
-let linkme = ()

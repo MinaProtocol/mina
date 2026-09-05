@@ -1,5 +1,6 @@
 (library
  (name runtime_genesis_ledger_lib)
+ (public_name runtime_genesis_ledger.lib)
  (libraries
   ;;local libraries
   currency

@@ -1,6 +1,7 @@
-(executable
- (name runtime_genesis_ledger)
- (public_name runtime_genesis_ledger)
+(library
+ (name runtime_genesis_ledger_applet)
+ (public_name runtime_genesis_ledger.applet)
+ (modules runtime_genesis_ledger_applet)
  (libraries
   core_unix.command_unix
   ;;opam libraries
@@ -31,3 +32,13 @@
   (backend bisect_ppx))
  (preprocess
   (pps ppx_mina ppx_version ppx_let ppx_deriving_yojson)))
+
+(executable
+ (name runtime_genesis_ledger)
+ (public_name runtime_genesis_ledger)
+ (modules runtime_genesis_ledger)
+ (libraries runtime_genesis_ledger_applet)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_version)))
