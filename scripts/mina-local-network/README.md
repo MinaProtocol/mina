@@ -118,6 +118,17 @@ You can now spawn networks without certain components:
 ./scripts/mina-local-network/mina-local-network.sh --seed "at:SEED_PEER_ID"
 ```
 
+**Combine block-producer roles** (fewer daemons): with `--seed-is-whale` and/or
+`--snark-coordinator-is-whale`, the seed and/or snark coordinator additionally
+run as whale block producers, consuming the leading whale accounts instead of
+spawning them as standalone whale daemons. For example, the following runs the
+network as just two daemons (seed+whale and snark-coordinator+whale) plus two
+snark workers:
+```shell
+./scripts/mina-local-network/mina-local-network.sh \
+  -w 2 -f 0 -n 0 --seed-is-whale --snark-coordinator-is-whale
+```
+
 ### Config Inheritance Modes
 
 The `--config` parameter supports three modes:
