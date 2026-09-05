@@ -42,6 +42,10 @@ let
       # Can't find sodium-static and ctypes
       sodium = super.sodium.overrideAttrs {
         NIX_CFLAGS_COMPILE = "-I${pkgs.sodium-static.dev}/include";
+        # TEMPORARY: static-link libsodium so built binaries need no
+        # libsodium.so at runtime. Drop once the portable build bundles
+        # shared libraries.
+        SODIUM_STATIC = "1";
         propagatedBuildInputs = [ pkgs.sodium-static ];
         preBuild = ''
           export LD_LIBRARY_PATH="${super.ctypes}/lib/ocaml/${super.ocaml.version}/site-lib/ctypes";
