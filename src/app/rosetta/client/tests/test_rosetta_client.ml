@@ -2,7 +2,7 @@
 
    These exercise only the subcommands that don't need a running
    Rosetta server: --help for each subgroup and the clean error paths of
-   the HTTP code.
+   the HTTP and JSON-validation code.
 
    The regression guard we care most about is that user-visible error
    output never leaks raw OCaml exception syntax (e.g. Unix_error,
@@ -15,6 +15,19 @@ let bin = exe_beside_test "rosetta_client_cli.exe"
 
 let run_cli ?env args = run_cli ~bin ?env args
 
+(* A flag the CLI rejects locally: exit 1, a diagnostic naming the flag
+   (or whatever [needle] identifies the complaint), and no request made
+   -- the dead port makes a request that escaped validation fail loudly
+   instead of quietly succeeding. *)
+let expect_flag_rejected ~label ~needle args =
+  let code, out, err =
+    run_cli (args @ [ "--rosetta-uri"; "http://127.0.0.1:1" ])
+  in
+  Alcotest.(check int) (label ^ " exit") 1 code ;
+  assert_no_ocaml_exn_leak (label ^ " stdout") out ;
+  assert_no_ocaml_exn_leak (label ^ " stderr") err ;
+  check_contains ~label (out ^ "\n" ^ err) ~sub:needle
+
 (* ---------- Tests ---------- *)
 
 let test_help_root () =
@@ -22,6 +35,7 @@ let test_help_root () =
   Alcotest.(check int) "--help exit" 0 code ;
   check_contains ~label:"--help root lists network" out ~sub:"network" ;
   check_contains ~label:"--help root lists search" out ~sub:"search" ;
+  check_contains ~label:"--help root lists construction" out ~sub:"construction" ;
   assert_no_ocaml_exn_leak "--help root stderr" err
 
 let test_help_network () =
@@ -31,6 +45,13 @@ let test_help_network () =
   check_contains ~label:"network --help lists status" out ~sub:"status" ;
   check_contains ~label:"network --help lists options" out ~sub:"options" ;
   assert_no_ocaml_exn_leak "network --help stderr" err
+
+let test_help_construction () =
+  let code, out, err = run_cli [ "construction"; "--help" ] in
+  Alcotest.(check int) "construction --help exit" 0 code ;
+  check_contains ~label:"construction --help lists derive" out ~sub:"derive" ;
+  check_contains ~label:"construction --help lists submit" out ~sub:"submit" ;
+  assert_no_ocaml_exn_leak "construction --help stderr" err
 
 let test_connection_refused_clean_error () =
   (* Port 1 is privileged and reliably refuses on loopback. *)
@@ -65,6 +86,108 @@ let test_block_get_missing_args () =
   if String.is_empty (String.strip combined) then
     Alcotest.failf "block get (no --index/--hash): expected a diagnostic"
 
+let test_construction_derive_invalid_json () =
+  let code, out, err =
+    run_cli
+      [ "construction"
+      ; "derive"
+      ; "--public-key-json"
+      ; "{not valid"
+      ; "--rosetta-uri"
+      ; "http://127.0.0.1:1"
+      ]
+  in
+  if code = 0 then
+    Alcotest.failf "construction derive (bad JSON): expected non-zero exit" ;
+  assert_no_ocaml_exn_leak "construction derive stdout" out ;
+  assert_no_ocaml_exn_leak "construction derive stderr" err ;
+  let combined = out ^ "\n" ^ err in
+  if
+    not
+      ( contains ~case_insensitive:true combined ~sub:"json"
+      || contains combined ~sub:"public-key-json" )
+  then
+    Alcotest.failf
+      "construction derive (bad JSON): stderr should mention JSON, got:\n\
+       stdout=%s\n\
+       stderr=%s"
+      out err
+
+(* Valid JSON that is not a Rosetta PublicKey: the CLI decodes flag
+   payloads into the endpoint's model, so this must be rejected locally
+   with the flag name rather than sent to the server. *)
+let test_construction_derive_schema_mismatch () =
+  let code, out, err =
+    run_cli
+      [ "construction"
+      ; "derive"
+      ; "--public-key-json"
+      ; {|{"hex_bytes":"aabb"}|}
+      ; "--rosetta-uri"
+      ; "http://127.0.0.1:1"
+      ]
+  in
+  if code = 0 then
+    Alcotest.failf "construction derive (bad schema): expected non-zero exit" ;
+  assert_no_ocaml_exn_leak "construction derive stdout" out ;
+  assert_no_ocaml_exn_leak "construction derive stderr" err ;
+  let combined = out ^ "\n" ^ err in
+  if
+    not
+      ( contains ~case_insensitive:true combined ~sub:"schema"
+      || contains combined ~sub:"public-key-json" )
+  then
+    Alcotest.failf
+      "construction derive (bad schema): stderr should name the flag or the \n\
+       schema, got:\n\
+       stdout=%s\n\
+       stderr=%s"
+      out err
+
+(* A flag payload the model accepts but does not fully understand: the
+   generated models decode non-strictly, so without the round-trip check
+   "typo" would be dropped and the request sent as if it were correct. *)
+let test_construction_derive_unknown_field () =
+  expect_flag_rejected ~label:"construction derive (unknown field)"
+    ~needle:"typo"
+    [ "construction"
+    ; "derive"
+    ; "--public-key-json"
+    ; {|{"hex_bytes":"aabb","curve_type":"pallas","typo":1}|}
+    ]
+
+(* The Rosetta schema leaves [options] free-form but still types it as
+   an object, so a bare scalar is refused here rather than sent. *)
+let test_construction_metadata_non_object_options () =
+  expect_flag_rejected ~label:"construction metadata (non-object options)"
+    ~needle:"options-json"
+    [ "construction"; "metadata"; "--options-json"; "5" ]
+
+(* ppx_deriving_yojson reports a list-shaped mismatch with no message;
+   the diagnostic must not trail off after a bare colon. *)
+let test_construction_preprocess_list_mismatch () =
+  let code, out, err =
+    run_cli
+      [ "construction"
+      ; "preprocess"
+      ; "--operations-json"
+      ; {|{"a":1}|}
+      ; "--rosetta-uri"
+      ; "http://127.0.0.1:1"
+      ]
+  in
+  Alcotest.(check int) "construction preprocess (bad list) exit" 1 code ;
+  assert_no_ocaml_exn_leak "construction preprocess stderr" err ;
+  check_contains ~label:"names the flag"
+    (out ^ "\n" ^ err)
+    ~sub:"operations-json" ;
+  if String.is_suffix (String.strip (out ^ err)) ~suffix:":" then
+    Alcotest.failf
+      "construction preprocess (bad list): diagnostic ends in a bare colon:\n\
+       stdout=%s\n\
+       stderr=%s"
+      out err
+
 (* ---------- Runner ---------- *)
 
 let () =
@@ -72,11 +195,27 @@ let () =
     [ ( "help"
       , [ ("root", `Quick, test_help_root)
         ; ("network", `Quick, test_help_network)
+        ; ("construction", `Quick, test_help_construction)
         ] )
     ; ( "error paths"
       , [ ( "connection refused is clean"
           , `Quick
           , test_connection_refused_clean_error )
         ; ("block get missing args", `Quick, test_block_get_missing_args)
+        ; ( "construction derive invalid JSON"
+          , `Quick
+          , test_construction_derive_invalid_json )
+        ; ( "construction derive schema mismatch"
+          , `Quick
+          , test_construction_derive_schema_mismatch )
+        ; ( "construction derive unknown field"
+          , `Quick
+          , test_construction_derive_unknown_field )
+        ; ( "construction metadata non-object options"
+          , `Quick
+          , test_construction_metadata_non_object_options )
+        ; ( "construction preprocess list mismatch"
+          , `Quick
+          , test_construction_preprocess_list_mismatch )
         ] )
     ]
