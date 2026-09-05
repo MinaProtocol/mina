@@ -255,16 +255,6 @@ module Make = struct
   struct
     open Bin_prot
 
-    module Tc = Cata (struct
-      type 'a t = 'a Type_class.t
-
-      let pair = Type_class.bin_pair
-
-      let cnv t = Type_class.cnv Fn.id t
-
-      let unit = Type_class.bin_unit
-    end)
-
     module Shape = Cata (struct
       type _ t = Shape.t
 
@@ -275,73 +265,59 @@ module Make = struct
       let unit = Shape.bin_shape_unit
     end)
 
-    module Size = Cata (struct
-      type 'a t = 'a Size.sizer
-
-      let pair = Size.bin_size_pair
-
-      let cnv a_to_b _b_to_a b_sizer a = b_sizer (a_to_b a)
-
-      let unit = Size.bin_size_unit
-    end)
-
-    module Write = Cata (struct
-      type 'a t = 'a Write.writer
-
-      let pair = Write.bin_write_pair
-
-      let cnv a_to_b _b_to_a b_writer buf ~pos a = b_writer buf ~pos (a_to_b a)
-
-      let unit = Write.bin_write_unit
-    end)
-
-    module Writer = Cata (struct
-      type 'a t = 'a Type_class.writer
-
-      let pair = Type_class.bin_writer_pair
-
-      let cnv a_to_b _b_to_a b_writer = Type_class.cnv_writer a_to_b b_writer
-
-      let unit = Type_class.bin_writer_unit
-    end)
-
-    module Reader = Cata (struct
-      type 'a t = 'a Type_class.reader
-
-      let pair = Type_class.bin_reader_pair
-
-      let cnv _a_to_b b_to_a b_reader = Type_class.cnv_reader b_to_a b_reader
-
-      let unit = Type_class.bin_reader_unit
-    end)
-
-    module Read = Cata (struct
-      type 'a t = 'a Read.reader
-
-      let pair = Read.bin_read_pair
-
-      let cnv _a_to_b b_to_a b_reader buf ~pos_ref =
-        b_to_a (b_reader buf ~pos_ref)
-
-      let unit = Read.bin_read_unit
-    end)
-
     let bin_shape_t sh = Shape.f N.n sh
 
-    let bin_size_t sz = Size.f N.n sz
+    (* Encoding: the elements in order, then [unit] (the [Cata] nested-pair
+       layout). *)
+    let bin_size_t : type a. a Size.sizer -> (a, N.n) t -> int =
+     fun sz v ->
+      let rec go : type n. int -> (a, n) t -> int =
+       fun acc -> function
+         | [] ->
+             acc + Size.bin_size_unit ()
+         | x :: xs ->
+             go (acc + sz x) xs
+      in
+      go 0 v
 
-    let bin_write_t wr = Write.f N.n wr
+    let bin_write_t : type a. a Write.writer -> (a, N.n) t Write.writer =
+     fun wr buf ~pos v ->
+      let rec go : type n. int -> (a, n) t -> int =
+       fun pos -> function
+         | [] ->
+             Write.bin_write_unit buf ~pos ()
+         | x :: xs ->
+             go (wr buf ~pos x) xs
+      in
+      go pos v
 
-    let bin_writer_t wr = Writer.f N.n wr
-
-    let bin_t tc = Tc.f N.n tc
-
-    let bin_reader_t re = Reader.f N.n re
-
-    let bin_read_t re = Read.f N.n re
+    let bin_read_t : type a. a Read.reader -> (a, N.n) t Read.reader =
+     fun re buf ~pos_ref ->
+      let rec go : type n. n Nat.t -> (a, n) t = function
+        | Z ->
+            Read.bin_read_unit buf ~pos_ref ;
+            []
+        | S n ->
+            let x = re buf ~pos_ref in
+            let xs = go n in
+            x :: xs
+      in
+      go N.n
 
     let __bin_read_t__ _f _buf ~pos_ref _vint =
       Common.raise_variant_wrong_type "vector" !pos_ref
+
+    let bin_writer_t (wr : _ Type_class.writer) : _ Type_class.writer =
+      { size = bin_size_t wr.size; write = bin_write_t wr.write }
+
+    let bin_reader_t (re : _ Type_class.reader) : _ Type_class.reader =
+      { read = bin_read_t re.read; vtag_read = __bin_read_t__ re.read }
+
+    let bin_t (tc : _ Type_class.t) : _ Type_class.t =
+      { shape = bin_shape_t tc.shape
+      ; writer = bin_writer_t tc.writer
+      ; reader = bin_reader_t tc.reader
+      }
   end
 end
 
