@@ -163,6 +163,13 @@ module Space_partition : sig
   end]
 end
 
+(**Per-tree counts reported by {!metrics}.*)
+module Tree_metrics : sig
+  type t =
+    { available_space : int; base_jobs_todo : int; merge_jobs_todo : int }
+  [@@deriving equal, sexp]
+end
+
 module Job_view : sig
   module Extra : sig
     [%%versioned:
@@ -297,5 +304,8 @@ val next_on_new_tree : ('merge, 'base) State.t -> bool
     scan results are yet to computed*)
 val pending_data : ('merge, 'base) State.t -> 'base list list
 
-(**update tree level metrics*)
-val update_metrics : ('merge, 'base) State.t -> unit Or_error.t
+(**Per-tree counts for the daemon's gauges, oldest tree first. Setting the
+   gauges is the caller's business: it is a few lines, and it is the only
+   reason the scan state would otherwise need to know that Prometheus
+   exists.*)
+val metrics : ('merge, 'base) State.t -> Tree_metrics.t list
