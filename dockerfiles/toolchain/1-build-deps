@@ -183,19 +183,13 @@ ENV PATH="$PATH:/usr/lib/go/bin:$HOME/.cargo/bin"
 # --- OCaml install of a given OCAML_VERSION via opam switch
 # additionally initializes opam with sandboxing disabled, as we did not install
 # bubblewrap above.
-RUN git clone \
-  https://github.com/ocaml/opam-repository.git \
-  --depth 1 \
-  /home/opam/opam-repository
-# Pin OPAM repo to specific commit, o.w. after this commit some of our direct
-# dependencies are removed
-WORKDIR /home/opam/opam-repository
-RUN git fetch origin "${OPAM_REPOSITORY_COMMIT}" \
-  && git checkout "${OPAM_REPOSITORY_COMMIT}"
-
+# The repository is pinned to a specific commit, o.w. after that commit some of
+# our direct dependencies are removed. opam fetches the commit itself, so there
+# is no separate clone to keep around: a standalone clone would only be a second
+# copy of the same index (~385 MB) next to the one under ~/.opam/repo/default.
 RUN opam init --disable-sandboxing \
     -k git \
-    -a /home/opam/opam-repository \
+    -a "https://github.com/ocaml/opam-repository.git#${OPAM_REPOSITORY_COMMIT}" \
     --bare
 # We pin the opam-repo SHA so this step gets 
 # cache-busted when we update the opam repo
