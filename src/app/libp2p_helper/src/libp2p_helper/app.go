@@ -14,6 +14,7 @@ import (
 
 	capnp "capnproto.org/go/capnp/v3"
 	"github.com/go-errors/errors"
+	logging "github.com/ipfs/go-log/v2"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	net "github.com/libp2p/go-libp2p/core/network"
 	peer "github.com/libp2p/go-libp2p/core/peer"
@@ -22,10 +23,41 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
+var ValidatorCleanupInterval = initDurationEnv("LIBP2P_VALIDATOR_CLEANUP_INTERVAL_DURATION", 30*time.Second)
+var ValidatorCleanupGrace = initDurationEnv("LIBP2P_VALIDATOR_CLEANUP_GRACE_DURATION", 1*time.Hour)
+var WorkerPoolSize = initIntEnv("LIBP2P_WORKER_POOL_SIZE", 256)
+var StreamWriteTimeout = initDurationEnv("LIBP2P_STREAM_WRITE_TIMEOUT_DURATION", 60*time.Second)
+var LeakMonitorInterval = initDurationEnv("LIBP2P_LEAK_MONITOR_INTERVAL_DURATION", 5*time.Minute)
+var LeakWarnStreams = initIntEnv("LIBP2P_LEAK_WARN_STREAMS", 500)
+var LeakWarnSubs = initIntEnv("LIBP2P_LEAK_WARN_SUBS", 500)
+var LeakWarnValidators = initIntEnv("LIBP2P_LEAK_WARN_VALIDATORS", 5000)
+
+func initDurationEnv(envVar string, defaultVal time.Duration) time.Duration {
+	if s := os.Getenv(envVar); s != "" {
+		d, err := time.ParseDuration(s)
+		if err == nil && d > 0 {
+			return d
+		}
+		fmt.Fprintf(os.Stderr, "WARNING: %s=%q is not a positive duration, using default %s\n", envVar, s, defaultVal)
+	}
+	return defaultVal
+}
+
+func initIntEnv(envVar string, defaultVal int) int {
+	if s := os.Getenv(envVar); s != "" {
+		v, err := strconv.Atoi(s)
+		if err == nil && v > 0 {
+			return v
+		}
+		fmt.Fprintf(os.Stderr, "WARNING: %s=%q is not a positive integer, using default %d\n", envVar, s, defaultVal)
+	}
+	return defaultVal
+}
+
 func newApp() *app {
 	outChan := make(chan *capnp.Message, 1<<12) // 4096 messages stacked
 	ctx := context.Background()
-	return &app{
+	app := &app{
 		P2p:                      nil,
 		Ctx:                      ctx,
 		_subs:                    make(map[uint64]subscription),
@@ -39,7 +71,20 @@ func newApp() *app {
 		metricsCollectionStarted: false,
 		metricsServer:            nil,
 		bitswapCtx:               NewBitswapCtx(ctx, outChan),
+		workerSem:                make(chan struct{}, WorkerPoolSize),
 	}
+	return app
+}
+
+// StartBackgroundTasks launches the helper's periodic maintenance tasks. It is
+// called from the Configure handler rather than newApp so the tasks never read
+// app.P2p before it is assigned; the logger is passed in for the same reason,
+// and sync.Once keeps a repeated Configure from starting a second copy.
+func (app *app) StartBackgroundTasks(logger logging.StandardLogger) {
+	app.backgroundTasksOnce.Do(func() {
+		go app.startValidatorCleanup(logger)
+		go app.startLeakMonitor(logger)
+	})
 }
 
 func (app *app) SetConnectionHandlers() {
@@ -65,16 +110,30 @@ func (app *app) NextId() uint64 {
 func (app *app) AddPeers(infos ...peer.AddrInfo) {
 	app.addedPeersMutex.Lock()
 	defer app.addedPeersMutex.Unlock()
-	app._addedPeers = append(app._addedPeers, infos...)
+	// Deduplicate by peer ID so repeated AddPeer calls for the same peers
+	// (e.g. reconnect loops) don't grow the slice unboundedly. The latest
+	// AddrInfo wins, keeping the freshest addresses.
+	for _, info := range infos {
+		replaced := false
+		for i, existing := range app._addedPeers {
+			if existing.ID == info.ID {
+				app._addedPeers[i] = info
+				replaced = true
+				break
+			}
+		}
+		if !replaced {
+			app._addedPeers = append(app._addedPeers, info)
+		}
+	}
 }
 
-// GetAddedPeers returns list of peers
-//
-// Elements of returned slice should never be modified!
+// GetAddedPeers returns a snapshot of the added peers. A copy is returned
+// because AddPeers may overwrite elements in place after the lock is released.
 func (app *app) GetAddedPeers() []peer.AddrInfo {
 	app.addedPeersMutex.RLock()
 	defer app.addedPeersMutex.RUnlock()
-	return app._addedPeers
+	return append([]peer.AddrInfo(nil), app._addedPeers...)
 }
 
 func (app *app) ResetAddedPeers() {
@@ -86,8 +145,12 @@ func (app *app) ResetAddedPeers() {
 func (app *app) AddStream(stream_ net.Stream) uint64 {
 	streamIdx := app.NextId()
 	app.streamsMutex.Lock()
-	defer app.streamsMutex.Unlock()
 	app._streams[streamIdx] = &stream{stream: stream_}
+	count := len(app._streams)
+	app.streamsMutex.Unlock()
+	if app.P2p != nil {
+		app.P2p.Logger.Debugf("stream count: %d streams (added stream %d)", count, streamIdx)
+	}
 	return streamIdx
 }
 
@@ -111,6 +174,17 @@ func (app *app) WriteStream(streamId uint64, data []byte) error {
 		stream.mutex.Lock()
 		defer stream.mutex.Unlock()
 
+		// Bound the write. libp2p stream writes have no deadline of their
+		// own: a peer that stops reading blocks here indefinitely on muxer
+		// flow control, holding both the stream mutex and a slot in the
+		// bounded worker pool. Enough stalled peers would stop the helper
+		// from processing stdin at all. A peer that cannot accept a write
+		// within the timeout is treated like any other write failure below:
+		// the stream is removed and closed.
+		if err := stream.stream.SetWriteDeadline(time.Now().Add(StreamWriteTimeout)); err != nil {
+			app.P2p.Logger.Debugf("failed to set write deadline on stream %d: %s", streamId, err)
+		}
+
 		if n, err := stream.stream.Write(data); err != nil {
 			// TODO check that it's correct to error out, not repeat writing
 			_, has := app.RemoveStream(streamId)
@@ -131,11 +205,19 @@ func (app *app) WriteStream(streamId uint64, data []byte) error {
 
 func (app *app) AddValidator() (uint64, chan pubsub.ValidationResult) {
 	seqno := app.NextId()
-	ch := make(chan pubsub.ValidationResult)
+	// Buffered so a late Validation push (arriving after the validate
+	// goroutine timed out and stopped receiving) doesn't block its handler
+	// goroutine forever. Each validator sees exactly one send: the push
+	// handler removes the entry via RemoveValidator before sending.
+	ch := make(chan pubsub.ValidationResult, 1)
 	app.validatorMutex.Lock()
-	defer app.validatorMutex.Unlock()
 	app._validators[seqno] = new(validationStatus)
 	app._validators[seqno].Completion = ch
+	count := len(app._validators)
+	app.validatorMutex.Unlock()
+	if app.P2p != nil {
+		app.P2p.Logger.Debugf("validator count: %d (added validator %d)", count, seqno)
+	}
 	return seqno, ch
 }
 
@@ -143,7 +225,70 @@ func (app *app) TimeoutValidator(seqno uint64) {
 	now := time.Now()
 	app.validatorMutex.Lock()
 	defer app.validatorMutex.Unlock()
-	app._validators[seqno].TimedOutAt = &now
+	// The entry is gone if a Validation push raced this timeout and removed
+	// it first; there is nothing left to mark in that case.
+	if st, found := app._validators[seqno]; found {
+		st.TimedOutAt = &now
+	}
+}
+
+// cleanupTimedOutValidators removes validator entries that have been
+// timed out for longer than ValidatorCleanupGrace. Validators time out
+// after 5min from libp2p; this sweep runs after an additional 1-hour
+// grace period to give OCaml time to respond with a Validation push.
+func (app *app) cleanupTimedOutValidators(logger logging.StandardLogger) {
+	app.validatorMutex.Lock()
+	defer app.validatorMutex.Unlock()
+
+	now := time.Now()
+	removed := 0
+	for seqno, st := range app._validators {
+		if st.TimedOutAt != nil && now.Sub(*st.TimedOutAt) > ValidatorCleanupGrace {
+			delete(app._validators, seqno)
+			removed++
+			logger.Debugf("validator cleanup: removed timed-out validator seqno=%d age=%s", seqno, now.Sub(*st.TimedOutAt))
+		}
+	}
+	if removed > 0 {
+		logger.Infof("validator cleanup: removed %d stale validators (timed out >%s), remaining=%d", removed, ValidatorCleanupGrace, len(app._validators))
+	}
+}
+
+func (app *app) startValidatorCleanup(logger logging.StandardLogger) {
+	ticker := time.NewTicker(ValidatorCleanupInterval)
+	defer ticker.Stop()
+	for range ticker.C {
+		app.cleanupTimedOutValidators(logger)
+	}
+}
+
+// startLeakMonitor periodically checks stream/subscription/validator
+// collection sizes and logs a warning if any exceed their threshold.
+// This helps detect OCaml-side leaks where close/unsubscribe RPCs are
+// never sent, causing memory growth in the Go helper.
+func (app *app) startLeakMonitor(logger logging.StandardLogger) {
+	ticker := time.NewTicker(LeakMonitorInterval)
+	defer ticker.Stop()
+	for range ticker.C {
+		app.reportCollectionSizes(logger)
+	}
+}
+
+func (app *app) reportCollectionSizes(logger logging.StandardLogger) {
+	app.streamsMutex.RLock()
+	streams := len(app._streams)
+	app.streamsMutex.RUnlock()
+	app.subsMutex.Lock()
+	subs := len(app._subs)
+	app.subsMutex.Unlock()
+	app.validatorMutex.Lock()
+	validators := len(app._validators)
+	app.validatorMutex.Unlock()
+
+	if streams > LeakWarnStreams || subs > LeakWarnSubs || validators > LeakWarnValidators {
+		logger.Warnf("resource leak check: streams=%d (warn>%d), subs=%d (warn>%d), validators=%d (warn>%d)",
+			streams, LeakWarnStreams, subs, LeakWarnSubs, validators, LeakWarnValidators)
+	}
 }
 
 func (app *app) RemoveValidator(seqno uint64) (*validationStatus, bool) {
@@ -169,8 +314,12 @@ func (app *app) GetTopic(topicName string) (*pubsub.Topic, bool) {
 
 func (app *app) AddSubscription(subId uint64, sub subscription) {
 	app.subsMutex.Lock()
-	defer app.subsMutex.Unlock()
 	app._subs[subId] = sub
+	count := len(app._subs)
+	app.subsMutex.Unlock()
+	if app.P2p != nil {
+		app.P2p.Logger.Debugf("subscription count: %d (added sub %d)", count, subId)
+	}
 }
 
 func (app *app) RemoveSubscription(subId uint64) (subscription, bool) {

@@ -244,6 +244,7 @@ type Helper struct {
 	BandwidthCounter  *metrics.BandwidthCounter
 	MsgStats          *MessageStats
 	NodeStatus        []byte
+	NodeStatusMutex   sync.RWMutex // protects NodeStatus: written by SetNodeStatus handler, read by handleNodeStatusStreams
 	HeartbeatPeer     func(peer.ID)
 }
 
@@ -638,11 +639,25 @@ func (h *Helper) handleNodeStatusStreams(s network.Stream) {
 		}
 	}()
 
-	n, err := s.Write(h.NodeStatus)
+	// Snapshot under the read lock: these goroutines race with the
+	// SetNodeStatus handler replacing NodeStatus. The slice itself is never
+	// mutated after publication, so using the snapshot without the lock is
+	// safe and avoids holding it across a slow network write.
+	h.NodeStatusMutex.RLock()
+	status := h.NodeStatus
+	h.NodeStatusMutex.RUnlock()
+	// Bound the write: without a deadline a peer that stops reading blocks
+	// this goroutine (and the stream it holds) indefinitely on muxer flow
+	// control. NodeStatusTimeout is already how long we are willing to spend
+	// on one of these streams.
+	if err := s.SetWriteDeadline(time.Now().Add(NodeStatusTimeout)); err != nil {
+		logger.Debugf("failed to set write deadline on node status stream: %s", err)
+	}
+	n, err := s.Write(status)
 	if err != nil {
 		logger.Error("failed to write to stream", err)
 		return
-	} else if n != len(h.NodeStatus) {
+	} else if n != len(status) {
 		// TODO repeat writing, not log error
 		logger.Error("failed to write all data to stream")
 		return

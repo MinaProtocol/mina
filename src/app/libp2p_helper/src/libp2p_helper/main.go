@@ -199,6 +199,18 @@ func main() {
 			return
 		}
 
-		go app.handleIncomingMsg(&msg)
+		app.dispatchIncoming(&msg)
 	}
+}
+
+// dispatchIncoming runs an incoming message handler on the bounded worker
+// pool. When the pool is full it blocks until a slot frees up: messages are
+// RPC requests and pushes from the daemon, so dropping them would leave the
+// OCaml side waiting forever on a response. Backpressure on stdin is safe.
+func (app *app) dispatchIncoming(msg *ipc.Libp2pHelperInterface_Message) {
+	app.workerSem <- struct{}{}
+	go func() {
+		defer func() { <-app.workerSem }()
+		app.handleIncomingMsg(msg)
+	}()
 }
