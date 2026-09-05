@@ -1,7 +1,7 @@
 #################################################################################################
 # The "mina-daemon" stage
 # - Continues from the shared base-deps image.
-# - Installs the CONFIGLESS generic daemon deb (mina-generic) plus the storage toolbox debs
+# - Installs the CONFIGLESS runtime deb (mina-runtime-develop) plus the storage toolbox debs
 #   (everything daemon-specific EXCEPT the create-prefork-genesis package, which lives in the
 #   dedicated opt-in genesis stage).
 # - Creates the mina user, copies entrypoint/healthcheck/cron/puppeteer scripts and sets the
@@ -19,13 +19,17 @@ ARG deb_suffix
 
 # if --build-arg deb_suffix is defined, add hyphen at beginning.
 ENV SUFFIX=${deb_suffix:+-${deb_suffix}}
-# Construct the daemon debian package name from the suffix. The daemon binaries
-# now ship in the network-agnostic generic package (profile/network selected at
-# runtime), so the package name no longer embeds the network. This stage is
-# invoked with deb_suffix=generic[-variant], yielding e.g.:
-# - mina-generic
-# - mina-generic-lightnet / mina-generic-instrumented etc.
-ENV MINA_DEB=mina${SUFFIX}
+# The daemon binaries ship in the network-free mina-runtime-develop package: one
+# multicall mina-box binary plus applet symlinks under /usr/lib/mina/develop/.
+# This stage is invoked with deb_suffix=generic[-variant]; the leading
+# "generic" segment is translated to the runtime package name in the RUN step
+# below (e.g. generic-instrumented -> mina-runtime-develop-instrumented).
+#
+# The runtime directory goes on PATH so `mina`, `mina-healthcheck` etc. resolve
+# in this configless image exactly as they did when the binaries lived in
+# /usr/local/bin.  The L2 network packages (installed by
+# Dockerfile-install-config) additionally provide /usr/local/bin symlinks.
+ENV PATH=/usr/lib/mina/develop:$PATH
 
 # Storage toolbox for fixing daemon storage
 ENV MINA_STORAGE_DEB=mina-daemon-storage-toolbox
@@ -51,6 +55,7 @@ COPY scripts/install-mina-debs.sh /usr/local/bin/install-mina-debs.sh
 COPY _debs /opt/mina-local-debs
 RUN echo "Building image with version $deb_version from repo $deb_release $deb_codename for network $network" \
   && chmod +x /usr/local/bin/install-mina-debs.sh \
+  && MINA_DEB="mina-runtime-develop${SUFFIX#-generic}" \
   && mina_debs=( \
        "${MINA_DEB}=$deb_version" \
        "mina-logproc=$deb_version" \

@@ -53,9 +53,7 @@ let MainPackages =
       [ Package.DaemonGeneric
       , Package.DaemonConfig
       , Package.Archive
-      , Package.ArchiveGeneric
       , Package.LogProc
-      , Package.RosettaGeneric
       , Package.Rosetta
       ]
 
@@ -175,8 +173,8 @@ let buildToken =
       ->  \(network : Network.Type)
       ->  merge
             { Profile = "profile_${Profile.lowerName profile}"
-            , DaemonGeneric = "daemon_generic"
-            , DaemonConfig = "daemon_${Network.lowerName network}_config"
+            , DaemonGeneric = "runtime"
+            , DaemonConfig = "daemon_${Network.lowerName network}"
             , DaemonHardforkConfig =
                 "daemon_${Network.lowerName network}_hardfork_config"
             , DaemonAutomode = "daemon_${Network.lowerName network}_automode"
@@ -216,8 +214,8 @@ let aptName =
       ->  \(network : Network.Type)
       ->  merge
             { Profile = Profile.profileName profile
-            , DaemonGeneric = "mina-generic"
-            , DaemonConfig = "mina-${Network.lowerName network}-config"
+            , DaemonGeneric = "mina-runtime-develop"
+            , DaemonConfig = "mina-${Network.lowerName network}"
             , DaemonHardforkConfig = "mina-${Network.lowerName network}-config"
             , DaemonAutomode = "mina-${Network.lowerName network}-automode"
             , DaemonPostfork = "mina-${Network.lowerName network}-postfork-mesa"
@@ -266,19 +264,43 @@ let test_profile_apt =
       :     "mina-devnet-profile"
         ===  aptName Package.Profile Profile.Type.Devnet Network.Type.Devnet
 
-let test_daemon_config_token =
+let test_daemon_token =
         assert
-      :     "daemon_devnet_config"
+      :     "daemon_devnet"
         ===  buildToken
                Package.DaemonConfig
                Profile.Type.Devnet
                Network.Type.Devnet
 
-let test_daemon_config_apt =
+let test_daemon_apt =
+        assert
+      :     "mina-devnet"
+        ===  aptName
+               Package.DaemonConfig
+               Profile.Type.Devnet
+               Network.Type.Devnet
+
+let test_runtime_token =
+        assert
+      :     "runtime"
+        ===  buildToken
+               Package.DaemonGeneric
+               Profile.Type.Devnet
+               Network.Type.Devnet
+
+let test_runtime_apt =
+        assert
+      :     "mina-runtime-develop"
+        ===  aptName
+               Package.DaemonGeneric
+               Profile.Type.Devnet
+               Network.Type.Devnet
+
+let test_hardfork_config_apt =
         assert
       :     "mina-devnet-config"
         ===  aptName
-               Package.DaemonConfig
+               Package.DaemonHardforkConfig
                Profile.Type.Devnet
                Network.Type.Devnet
 

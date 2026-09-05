@@ -1,15 +1,16 @@
 #!/usr/bin/env bash
 
 # Integration test for the full automode transition lifecycle:
-#   mina-generic (v1) → mina-devnet-automode (v2) → mina-generic (v3)
+#   mina-NETWORK (v1) → mina-NETWORK-automode (v2) → mina-NETWORK (v3)
 #
-# In the split package layout the "normal" daemon is mina-NETWORK-generic
-# (binaries, owns /usr/local/bin/mina) + mina-NETWORK-config (config + service).
+# In the runtime-dir layout the "normal" daemon is mina-NETWORK (L2: applet
+# symlinks + config + service) over mina-runtime-develop (the mina-box binary
+# directory) and the mina-NETWORK-profile leaf.
 #
 # Validates that:
-# - mina-NETWORK-generic + -config install cleanly
-# - mina-NETWORK-automode replaces the generic daemon via apt
-# - mina-NETWORK-generic (higher version) replaces automode and restores layout
+# - mina-NETWORK + runtime + profile install cleanly
+# - mina-NETWORK-automode replaces the normal daemon via apt
+# - mina-NETWORK (higher version) replaces automode and restores the layout
 # - No automode-specific files remain after the final transition
 #
 # Prerequisites:
@@ -101,21 +102,21 @@ else
     SUDO="sudo"
 fi
 
-# In the split layout the normal daemon binaries live in the network-free
-# mina-generic package (not the legacy monolithic mina-NETWORK), so that is the
-# package we install, reversion and assert on for the v1/v3 "normal" states. The
-# per-profile generic layer (mina-NETWORK-generic) ships only the PROFILE hint.
-PKG_DAEMON="mina-generic"
+# In the runtime-dir layout the normal daemon is the per-network L2 package
+# (symlinks + config + service) over the network-free runtime package; the
+# PROFILE hint lives in the profile leaf.  The automode metapackage still
+# depends on mina-NETWORK-config, which in the real hardfork pipeline is the
+# hardfork config package; the normal pipeline no longer builds a deb of that
+# name, so this test synthesizes a stand-in from the L2 package (see below).
+PKG_DAEMON="mina-${NETWORK}"
+PKG_RUNTIME="mina-runtime-develop"
 PKG_AUTOMODE="mina-${NETWORK}-automode"
 PKG_CONFIG="mina-${NETWORK}-config"
-# Profile leaf package (just the PROFILE hint, no deps).
-# PKG_PROFILE is the profile tent (depends on mina-generic + profile leaf).
-PKG_PROFILE="mina-${NETWORK}-generic"
 PKG_PROFILE_LEAF="mina-${NETWORK}-profile"
 PKG_POSTFORK="mina-${NETWORK}-postfork-mesa"
 PKG_PREFORK="mina-${NETWORK}-prefork-mesa"
 
-# Automode-specific paths that should NOT exist after restoring the generic daemon
+# Automode-specific paths that should NOT exist after restoring the normal daemon
 AUTOMODE_PATHS=(
     "/usr/local/bin/mina-dispatch"
     "/etc/default/mina-dispatch"
@@ -123,11 +124,14 @@ AUTOMODE_PATHS=(
     "/usr/lib/mina/berkeley"
 )
 
-# Normal daemon paths (shipped by mina-NETWORK-generic) that SHOULD exist after restore
+# Normal daemon paths (L2 symlinks resolving into the runtime dir) that SHOULD
+# exist after restore.  -e follows symlinks, so this also proves the runtime
+# directory behind them is installed.
 DAEMON_PATHS=(
     "/usr/local/bin/mina"
     "/usr/local/bin/coda-libp2p_helper"
     "/usr/local/bin/mina-create-genesis"
+    "/usr/lib/mina/develop/mina-box"
 )
 
 ################################################################################
@@ -138,15 +142,14 @@ log_info "=== Step 1: Download debs from cache ==="
 
 # Download all relevant debs for this codename
 fetch_deb "${DEB_DIR}" "debians/${CODENAME}/${PKG_DAEMON}_*"
+fetch_deb "${DEB_DIR}" "debians/${CODENAME}/${PKG_RUNTIME}_*"
 fetch_deb "${DEB_DIR}" "debians/${CODENAME}/${PKG_AUTOMODE}_*"
-fetch_deb "${DEB_DIR}" "debians/${CODENAME}/${PKG_CONFIG}_*"
 fetch_deb "${DEB_DIR}" "debians/${CODENAME}/${PKG_POSTFORK}_*"
 fetch_deb "${DEB_DIR}" "debians/${CODENAME}/mina-logproc_*"
 
 # Download the legacy prefork deb from the persistent legacy cache.
 # The automode metapackage depends on prefork at PREFORK_LEGACY_VERSION (not the
 # current build version), so we need the real legacy deb to satisfy that constraint.
-fetch_deb "${DEB_DIR}" "debians/${CODENAME}/${PKG_PROFILE}_*"
 fetch_deb "${DEB_DIR}" "debians/${CODENAME}/${PKG_PROFILE_LEAF}_*"
 fetch_legacy_deb "${DEB_DIR}" "debians/${CODENAME}/${PKG_PREFORK}_*"
 
@@ -161,12 +164,11 @@ log_info "=== Step 2: Create versioned package variants ==="
 
 # Original version from the build
 ORIG_DAEMON_DEB=$(ls "${DEB_DIR}"/${PKG_DAEMON}_*.deb | head -1)
+ORIG_RUNTIME_DEB=$(ls "${DEB_DIR}"/${PKG_RUNTIME}_*.deb | head -1)
 ORIG_AUTOMODE_DEB=$(ls "${DEB_DIR}"/${PKG_AUTOMODE}_*.deb | head -1)
-ORIG_CONFIG_DEB=$(ls "${DEB_DIR}"/${PKG_CONFIG}_*.deb | head -1)
 ORIG_POSTFORK_DEB=$(ls "${DEB_DIR}"/${PKG_POSTFORK}_*.deb | head -1)
 ORIG_LOGPROC_DEB=$(ls "${DEB_DIR}"/mina-logproc_*.deb | head -1)
 ORIG_PREFORK_DEB=$(ls "${DEB_DIR}"/${PKG_PREFORK}_*.deb | head -1)
-ORIG_PROFILE_DEB=$(ls "${DEB_DIR}"/${PKG_PROFILE}_*.deb | head -1)
 ORIG_PROFILE_LEAF_DEB=$(ls "${DEB_DIR}"/${PKG_PROFILE_LEAF}_*.deb | head -1)
 
 reversion_deb() {
@@ -194,7 +196,14 @@ dep_pinned_version() {
         | tr -d ' '
 }
 
-reversion_legacy_daemon_deb() {
+# The automode metapackage depends on mina-NETWORK-config (=v), which in the
+# real hardfork pipeline is the hardfork config package.  The normal pipeline
+# no longer builds a deb of that name (its content merged into the L2
+# mina-NETWORK package), so we synthesize a stand-in from the L2 deb: rename
+# it, strip its symlinks and service file (the postfork package owns
+# /usr/local/bin in automode, and the metapackage conflicts with
+# mina-NETWORK), and drop its control relationships.
+make_config_standin_deb() {
     local input_deb="$1"
     local new_version="$2"
     local output_deb="$3"
@@ -202,13 +211,16 @@ reversion_legacy_daemon_deb() {
 
     rm -rf "${session_dir}"
     "${SESSION_DIR}/deb-session-open.sh" "${input_deb}" "${session_dir}"
-    "${SESSION_DIR}/deb-session-reversion.sh" --update-deps "${session_dir}" "${new_version}"
-    sed -i -E "s/, ${PKG_PROFILE} \\([^)]*\\)//" "${session_dir}/control/control"
-    if grep -q "^Depends:.*${PKG_PROFILE}" "${session_dir}/control/control"; then
-        log_error "Legacy ${PKG_DAEMON} package should not depend on ${PKG_PROFILE}"
-        grep -E "^(Package|Version|Depends):" "${session_dir}/control/control" || true
-        exit 1
-    fi
+    "${SESSION_DIR}/deb-session-rename-package.sh" "${session_dir}" "${PKG_CONFIG}"
+    # The L2 package's /usr/local/bin entries are symlinks whose targets do not
+    # exist inside the session tree, so deb-session-remove.sh ([[ -f ]]) cannot
+    # match them; edit the data tree directly (the documented mutable half of a
+    # session).  The stand-in must keep only the config payload: the postfork
+    # package owns /usr/local/bin in automode, and mina.service belongs to the
+    # package that owns the daemon.
+    rm -rf "${session_dir}/data/usr/local" "${session_dir}/data/usr/lib"
+    sed -i -E "/^(Depends|Conflicts|Replaces|Breaks|Provides):/d" "${session_dir}/control/control"
+    "${SESSION_DIR}/deb-session-reversion.sh" "${session_dir}" "${new_version}"
     "${SESSION_DIR}/deb-session-save.sh" "${session_dir}" "${output_deb}"
     rm -rf "${session_dir}"
 }
@@ -217,12 +229,13 @@ V1="1.0.0-transition-test"
 V2="2.0.0-transition-test"
 V3="3.0.0-transition-test"
 
-# V1: generic daemon + config + logproc (pre-hardfork)
-reversion_deb "${ORIG_DAEMON_DEB}"  "${V1}" "${REPO_DIR}/${PKG_DAEMON}_${V1}_amd64.deb"
-# V1: mina-devnet + config + logproc (pre-hardfork, before profile packages)
-reversion_legacy_daemon_deb "${ORIG_DAEMON_DEB}" "${V1}" "${REPO_DIR}/${PKG_DAEMON}_${V1}_amd64.deb"
-reversion_deb "${ORIG_CONFIG_DEB}"  "${V1}" "${REPO_DIR}/${PKG_CONFIG}_${V1}_all.deb"
-reversion_deb "${ORIG_LOGPROC_DEB}" "${V1}" "${REPO_DIR}/mina-logproc_${V1}_amd64.deb"
+# V1: normal daemon (L2 + runtime + profile leaf) + logproc (pre-hardfork).
+# Reversioning the L2 package rewrites its (=) pins on the runtime and profile
+# leaf, so those are reversioned in lockstep.
+reversion_deb "${ORIG_DAEMON_DEB}"       "${V1}" "${REPO_DIR}/${PKG_DAEMON}_${V1}_all.deb"
+reversion_deb "${ORIG_RUNTIME_DEB}"      "${V1}" "${REPO_DIR}/${PKG_RUNTIME}_${V1}_amd64.deb"
+reversion_deb "${ORIG_PROFILE_LEAF_DEB}" "${V1}" "${REPO_DIR}/${PKG_PROFILE_LEAF}_${V1}_all.deb"
+reversion_deb "${ORIG_LOGPROC_DEB}"      "${V1}" "${REPO_DIR}/mina-logproc_${V1}_amd64.deb"
 
 # The automode metapackage pins prefork to an EXACT version — the legacy
 # PREFORK_LEGACY_VERSION baked in at build time, which is NOT rewritten when the
@@ -245,18 +258,17 @@ log_info "Automode pins ${PKG_PREFORK} to exact version: ${EXPECTED_PREFORK_VERS
 reversion_deb "${ORIG_PREFORK_DEB}" "${EXPECTED_PREFORK_VERSION}" \
     "${REPO_DIR}/${PKG_PREFORK}_${EXPECTED_PREFORK_VERSION}_amd64.deb"
 
-# V2: automode + postfork + config + logproc (hardfork)
+# V2: automode + postfork + config stand-in + logproc (hardfork)
 reversion_deb "${ORIG_AUTOMODE_DEB}" "${V2}" "${REPO_DIR}/${PKG_AUTOMODE}_${V2}_all.deb"
 reversion_deb "${ORIG_POSTFORK_DEB}" "${V2}" "${REPO_DIR}/${PKG_POSTFORK}_${V2}_amd64.deb"
-reversion_deb "${ORIG_CONFIG_DEB}"   "${V2}" "${REPO_DIR}/${PKG_CONFIG}_${V2}_all.deb"
+make_config_standin_deb "${ORIG_DAEMON_DEB}" "${V2}" "${REPO_DIR}/${PKG_CONFIG}_${V2}_all.deb"
 reversion_deb "${ORIG_LOGPROC_DEB}"  "${V2}" "${REPO_DIR}/mina-logproc_${V2}_amd64.deb"
 
-# V3: generic daemon + config + profile + logproc (post-hardfork, back to normal)
-reversion_deb "${ORIG_DAEMON_DEB}"  "${V3}" "${REPO_DIR}/${PKG_DAEMON}_${V3}_amd64.deb"
-reversion_deb "${ORIG_CONFIG_DEB}"  "${V3}" "${REPO_DIR}/${PKG_CONFIG}_${V3}_all.deb"
-reversion_deb "${ORIG_LOGPROC_DEB}" "${V3}" "${REPO_DIR}/mina-logproc_${V3}_amd64.deb"
-reversion_deb "${ORIG_PROFILE_DEB}" "${V3}" "${REPO_DIR}/${PKG_PROFILE}_${V3}_amd64.deb"
-reversion_deb "${ORIG_PROFILE_LEAF_DEB}" "${V3}" "${REPO_DIR}/${PKG_PROFILE_LEAF}_${V3}_amd64.deb"
+# V3: normal daemon again (post-hardfork, back to normal)
+reversion_deb "${ORIG_DAEMON_DEB}"       "${V3}" "${REPO_DIR}/${PKG_DAEMON}_${V3}_all.deb"
+reversion_deb "${ORIG_RUNTIME_DEB}"      "${V3}" "${REPO_DIR}/${PKG_RUNTIME}_${V3}_amd64.deb"
+reversion_deb "${ORIG_PROFILE_LEAF_DEB}" "${V3}" "${REPO_DIR}/${PKG_PROFILE_LEAF}_${V3}_all.deb"
+reversion_deb "${ORIG_LOGPROC_DEB}"      "${V3}" "${REPO_DIR}/mina-logproc_${V3}_amd64.deb"
 
 log_info "Versioned packages:"
 ls -la "${REPO_DIR}"/*.deb
@@ -279,14 +291,15 @@ log_info "=== Step 3: Resolve local .deb files per stage ==="
 # correct one matching the dependency constraint is available to apt.
 mapfile -t PREFORK_DEBS < <(ls "${REPO_DIR}"/"${PKG_PREFORK}"_*.deb)
 
-# V1: mina-devnet + config + logproc (pre-hardfork)
+# V1: normal daemon (pre-hardfork)
 V1_DEBS=(
-    "${REPO_DIR}/${PKG_DAEMON}_${V1}_amd64.deb"
-    "${REPO_DIR}/${PKG_CONFIG}_${V1}_all.deb"
+    "${REPO_DIR}/${PKG_DAEMON}_${V1}_all.deb"
+    "${REPO_DIR}/${PKG_RUNTIME}_${V1}_amd64.deb"
+    "${REPO_DIR}/${PKG_PROFILE_LEAF}_${V1}_all.deb"
     "${REPO_DIR}/mina-logproc_${V1}_amd64.deb"
 )
 
-# V2: automode + postfork + config + logproc (+ prefork files) (hardfork)
+# V2: automode + postfork + config stand-in + logproc (+ prefork files)
 V2_DEBS=(
     "${REPO_DIR}/${PKG_AUTOMODE}_${V2}_all.deb"
     "${REPO_DIR}/${PKG_POSTFORK}_${V2}_amd64.deb"
@@ -295,21 +308,13 @@ V2_DEBS=(
     "${PREFORK_DEBS[@]}"
 )
 
-# V3: mina-generic + config + profile + logproc (post-hardfork, back to normal)
-#
-# The network-free mina-generic daemon deliberately carries NO hard dependency
-# on a network profile package: the same deb is reused for every network, and
-# the generic docker image must be installable on its own (see commit dropping
-# the profile dependency from the generic/archive packages). Instead, the
-# profile is layered on top per-network — exactly how the "one generic + per
-# profile profiled" docker images are assembled. The transition test mirrors
-# that real deployment shape by co-installing the matching profile package
-# alongside generic + config in the final post-hardfork state.
+# V3: normal daemon again (post-hardfork).  The L2 package Conflicts the
+# automode metapackage, so apt removes it; the config stand-in is Broken by the
+# L2 package (Breaks mina-NETWORK-config), so it goes too.
 V3_DEBS=(
-    "${REPO_DIR}/${PKG_DAEMON}_${V3}_amd64.deb"
-    "${REPO_DIR}/${PKG_CONFIG}_${V3}_all.deb"
-    "${REPO_DIR}/${PKG_PROFILE}_${V3}_amd64.deb"
-    "${REPO_DIR}/${PKG_PROFILE_LEAF}_${V3}_amd64.deb"
+    "${REPO_DIR}/${PKG_DAEMON}_${V3}_all.deb"
+    "${REPO_DIR}/${PKG_RUNTIME}_${V3}_amd64.deb"
+    "${REPO_DIR}/${PKG_PROFILE_LEAF}_${V3}_all.deb"
     "${REPO_DIR}/mina-logproc_${V3}_amd64.deb"
 )
 
@@ -327,18 +332,13 @@ $SUDO apt-get install -y --allow-downgrades --no-install-recommends "${V1_DEBS[@
 log_info "Installed ${PKG_DAEMON} v1"
 dpkg -l "${PKG_DAEMON}" 2>/dev/null | tail -1
 
-if dpkg -l "${PKG_PROFILE}" 2>/dev/null | grep -q "^ii"; then
-    log_error "${PKG_PROFILE} should not be installed in v1"
+# Verify mina resolves through the runtime dir, not the dispatcher
+if [[ "$(readlink /usr/local/bin/mina)" != "../../lib/mina/develop/mina" ]]; then
+    log_error "/usr/local/bin/mina should be a relative symlink into the runtime dir in v1"
+    ls -la /usr/local/bin/mina || true
     exit 1
 fi
-log_info "PASS: ${PKG_PROFILE} is not installed in v1"
-
-# Verify mina binary is a real file (not a symlink to dispatcher)
-if [[ -L "/usr/local/bin/mina" ]]; then
-    log_error "/usr/local/bin/mina should be a real binary in v1, not a symlink"
-    exit 1
-fi
-log_info "PASS: /usr/local/bin/mina is a real binary"
+log_info "PASS: /usr/local/bin/mina points into the runtime dir"
 
 # Verify no automode paths exist
 for path in "${AUTOMODE_PATHS[@]}"; do
@@ -372,7 +372,7 @@ log_info "Package state after automode install:"
 dpkg -l "${PKG_AUTOMODE}" 2>/dev/null | tail -1 || true
 dpkg -l "${PKG_POSTFORK}" 2>/dev/null | tail -1 || true
 dpkg -l "${PKG_PREFORK}" 2>/dev/null | tail -1 || true
-dpkg -l "${PKG_PROFILE}" 2>/dev/null | tail -1 || true
+dpkg -l "${PKG_PROFILE_LEAF}" 2>/dev/null | tail -1 || true
 dpkg -l "${PKG_DAEMON}" 2>/dev/null | tail -1 || true
 
 # the generic daemon should be removed (replaced by automode)
@@ -390,11 +390,12 @@ fi
 log_info "PASS: mina-dispatch present"
 
 # /usr/local/bin/mina should be a symlink to mina-dispatch
-if [[ ! -L "/usr/local/bin/mina" ]]; then
-    log_error "/usr/local/bin/mina should be a symlink in automode"
+if [[ "$(readlink /usr/local/bin/mina)" != "mina-dispatch" ]]; then
+    log_error "/usr/local/bin/mina should be a symlink to mina-dispatch in automode"
+    ls -la /usr/local/bin/mina || true
     exit 1
 fi
-log_info "PASS: /usr/local/bin/mina is a symlink (automode dispatcher)"
+log_info "PASS: /usr/local/bin/mina is a symlink to the automode dispatcher"
 
 ################################################################################
 # Step 6: Restore generic daemon v3 (post-hardfork, back to normal)
@@ -426,11 +427,11 @@ if ! dpkg -l "${PKG_DAEMON}" 2>/dev/null | grep -q "^ii"; then
 fi
 log_info "PASS: ${PKG_DAEMON} v3 installed"
 
-if ! dpkg -l "${PKG_PROFILE}" 2>/dev/null | grep -q "^ii"; then
-    log_error "${PKG_PROFILE} should be installed alongside ${PKG_DAEMON} v3 in the post-hardfork state"
+if ! dpkg -l "${PKG_PROFILE_LEAF}" 2>/dev/null | grep -q "^ii"; then
+    log_error "${PKG_PROFILE_LEAF} should be installed alongside ${PKG_DAEMON} v3 in the post-hardfork state"
     exit 1
 fi
-log_info "PASS: ${PKG_PROFILE} installed (layered on top of the generic daemon)"
+log_info "PASS: ${PKG_PROFILE_LEAF} installed"
 
 # Automode metapackage should be gone
 if dpkg -l "${PKG_AUTOMODE}" 2>/dev/null | grep -q "^ii"; then
@@ -452,12 +453,13 @@ if dpkg -l "${PKG_PREFORK}" 2>/dev/null | grep -q "^ii"; then
 fi
 log_info "PASS: ${PKG_PREFORK} removed"
 
-# Verify /usr/local/bin/mina is a real binary again (not a symlink)
-if [[ -L "/usr/local/bin/mina" ]]; then
-    log_error "/usr/local/bin/mina should be a real binary after restore, not a symlink"
+# Verify /usr/local/bin/mina resolves through the runtime dir again
+if [[ "$(readlink /usr/local/bin/mina)" != "../../lib/mina/develop/mina" ]]; then
+    log_error "/usr/local/bin/mina should point into the runtime dir after restore"
+    ls -la /usr/local/bin/mina || true
     exit 1
 fi
-log_info "PASS: /usr/local/bin/mina is a real binary again"
+log_info "PASS: /usr/local/bin/mina points into the runtime dir again"
 
 # Verify daemon binaries exist
 for path in "${DAEMON_PATHS[@]}"; do

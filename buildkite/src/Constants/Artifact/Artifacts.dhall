@@ -244,29 +244,16 @@ let toDebianToken =
             (resolvedNetwork artifact)
 
 let profileTentTokens =
-    -- The mina-<network>-generic tent, as a debian build token, for the
-    -- artifacts that have one.
-    --
-    -- The tent is an apt convenience metapackage: it holds no files and depends
-    -- on mina-generic and mina-<network>-profile, so that `apt-get install
-    -- mina-devnet-generic` gives a working daemon with the profile baked in. It
-    -- therefore belongs to the job that builds that profile, which is the job
-    -- that holds the matching DaemonProfiled artifact, and to no other.
-    --
-    -- Lightnet and Dev have no tent: they ship directly as mina-<profile>.
+    -- The mina-<network>-generic tents are retired: the L2 packages
+    -- (mina-<network>) depend on the runtime directly, so no artifact calls
+    -- for extra tent tokens any more.  The mechanism stays because callers
+    -- concatenate its output into the token list.
           \(artifact : Artifact)
       ->  merge
             { Daemon = \(a : { network : Network.Type }) -> [] : List Text
             , DaemonGeneric = [] : List Text
             , DaemonProfiled =
-                    \(a : { profile : Profiles.Type })
-                ->  merge
-                      { Devnet = [ "profile_devnet_generic" ]
-                      , Mainnet = [ "profile_mainnet_generic" ]
-                      , Lightnet = [] : List Text
-                      , Dev = [] : List Text
-                      }
-                      a.profile
+                \(a : { profile : Profiles.Type }) -> [] : List Text
             , DaemonLegacyHardfork =
                 \(a : { network : Network.Type }) -> [] : List Text
             , DaemonAutoHardfork =

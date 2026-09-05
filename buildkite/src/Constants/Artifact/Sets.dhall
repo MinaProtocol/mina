@@ -58,7 +58,8 @@ let sets
           , "daemon_profile-*-docker-image"
           , "daemon_config-*-docker-image"
           ]
-        , debians = [ "daemon_generic", "daemon_*_config", "profile_*" ]
+        , debians =
+          [ "runtime", "daemon_devnet", "daemon_mainnet", "profile_*" ]
         , description = "the daemon: apps only, profiled and configured"
         }
       , { name = "archive"

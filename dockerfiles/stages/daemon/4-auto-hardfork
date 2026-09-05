@@ -8,7 +8,7 @@
 # - Installs the POSTFORK metapackage (mina-${network}-postfork-mesa) at deb_version and then the
 #   legacy PREFORK package at deb_legacy_version, so one image can run either side of the fork.
 #   This is why it cannot extend the mina-daemon stage: that stage installs the generic daemon
-#   package (mina-generic), which is a different package set.
+#   package set (mina-runtime-develop + mina-<network>), which is a different one.
 # - Sets MINA_HARDFORK_STATE_DIR; the entrypoint/user/puppeteer tail matches the daemon stage.
 #################################################################################################
 FROM base-deps AS mina-daemon-auto-hardfork
