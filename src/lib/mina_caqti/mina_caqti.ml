@@ -458,8 +458,11 @@ let insert_multi_into_col ~(table_name : string)
 let insert_into_cols_returning ~(returning : string * 'r Caqti_type.t)
     ~(table_name : string) ?tannot ~(cols : string list * 'cols Caqti_type.t)
     (module Conn : CONNECTION) (value : 'cols) =
+  (* The request is built freshly on every call (its SQL depends on
+     [table_name]/[cols]); pass [~oneshot:true] so it is not registered as a
+     prepared statement that accumulates in the backend plan cache. *)
   Conn.find
-    ( Caqti_request.Infix.(snd cols ->! snd returning)
+    ( Caqti_request.Infix.(snd cols ->! snd returning) ~oneshot:true
     @@ insert_into_cols ~returning:(fst returning) ~table_name ?tannot
          ~cols:(fst cols) () )
     value
@@ -481,8 +484,10 @@ let upsert_into_cols_returning ~(on_conflict : string)
     ~(returning : string * 'r Caqti_type.t) ~(table_name : string) ?tannot
     ~(cols : string list * 'cols Caqti_type.t) (module Conn : CONNECTION)
     (value : 'cols) =
+  (* Built per call; ~oneshot:true keeps it out of the backend plan cache. This
+     upsert runs for every block, so without it the cache grows unbounded. *)
   Conn.find
-    ( Caqti_request.Infix.(snd cols ->! snd returning)
+    ( Caqti_request.Infix.(snd cols ->! snd returning) ~oneshot:true
     @@ upsert_into_cols ~on_conflict ~returning:(fst returning) ~table_name
          ?tannot ~cols:(fst cols) () )
     value
@@ -500,12 +505,17 @@ let insert_multi_into_col_no_dedup ~(table_name : string) ~(col : string)
   | [] ->
       return []
   | _ ->
+      (* The values are sprintf-interpolated into the SQL, so every batch is a
+         distinct query string; ~oneshot:true stops each one from being cached
+         as a prepared statement. This is the zkApp field-array insert path, so
+         the interpolation makes the leak grow with zkApp event/action volume. *)
       let insert =
         sprintf "INSERT INTO %s (%s) VALUES %s RETURNING id" table_name col
           (sep_by_comma ~parenthesis:true values)
       in
       Conn.collect_list
-        Caqti_request.Infix.((Caqti_type.unit ->* Caqti_type.int) insert)
+        (Caqti_request.Infix.(Caqti_type.unit ->* Caqti_type.int)
+           ~oneshot:true insert )
         ()
 
 (** Unwrap a Caqti result, raising on error. [ctx] names the operation being
