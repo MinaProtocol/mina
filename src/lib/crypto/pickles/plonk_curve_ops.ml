@@ -203,8 +203,8 @@ struct
         scale_fast_unpack base scalar ~num_bits )
 
   let scale_fast base s ~num_bits =
-    let r, _bits = scale_fast_unpack base s ~num_bits in
-    r
+    let r, bits = scale_fast_unpack base s ~num_bits in
+    (if num_bits >= Field.size_in_bits then Field.Assert.equal Field.zero (bits.(num_bits - 1) :> Field.t)) ; r
 
   module type Scalar_field_intf = sig
     module Constant : sig
@@ -278,4 +278,13 @@ struct
       ~num_bits
 
   let scale_fast a b = with_label __LOC__ (fun () -> scale_fast a b)
+
+  (* On [scale_fast]'s top-bit pin (kept on one line above so that the [__LOC__] labels of
+     this file are undisturbed): at the full field width a [num_bits]-bit string is not a
+     unique decomposition of the packed scalar — [t] and [t + modulus] both fit below
+     [2^num_bits] for almost every [t], and they decode to different multiples of the base.
+     Pinning the top bit to zero, as [scale_fast2] pins the bits above its split, makes the
+     ladder run on the canonical decomposition. The scalars this excludes — shifted values in
+     [[2^(num_bits-1), modulus)] — are a negligible fraction of the field. The pin is an
+     [Equal] constraint against the cached zero, so it costs wiring, not a row. *)
 end
