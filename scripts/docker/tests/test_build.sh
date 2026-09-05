@@ -450,6 +450,10 @@ test_toolchain_joins_the_stage_files() {
     assert_matches "a temporary Dockerfile holds the joined stages" "$args" \
         "^/tmp/Dockerfile-toolchain\."
     assert_has_line "the toolchain tag has no network" "$args" "testreg/mina-toolchain:3.1.0"
+    # opam.export is copied into the "dockerfiles/" build context for the COPY in
+    # 2-opam-deps, and the EXIT trap must take it back out again.
+    assert_file_absent "the staged opam.export does not stay in the build context" \
+        "${REPO_ROOT}/dockerfiles/opam.export"
 }
 
 test_delegation_verifier() {

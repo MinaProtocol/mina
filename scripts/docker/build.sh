@@ -25,8 +25,9 @@ source "${SCRIPTPATH}"/../../buildkite/scripts/docker/gar-cache.sh
 # into a temp file (see the SERVICE case below); they all assign the same
 # variable, so one trap cleans up whichever branch ran -- including on the early
 # `exit 1` paths and on a failed docker build, where a tail-of-script rm would be
-# skipped and leak the file. Expands to a no-op rm when no temp file was made.
-trap 'rm -f "${TEMP_DOCKERFILE:-}"' EXIT
+# skipped and leak the file. The same trap removes any file staged into the build
+# context. Expands to a no-op rm when neither was made.
+trap 'rm -f "${TEMP_DOCKERFILE:-}" "${STAGED_CONTEXT_FILE:-}"' EXIT
 
 function usage() {
   if [[ -n "$1" ]]; then
@@ -350,6 +351,11 @@ case "${SERVICE}" in
         TEMP_DOCKERFILE=$(mktemp "${TMPDIR:-/tmp}"/Dockerfile-toolchain.XXXXXX)
         cat dockerfiles/toolchain/1-build-deps dockerfiles/toolchain/2-opam-deps dockerfiles/toolchain/3-toolchain > "$TEMP_DOCKERFILE"
         DOCKERFILE_PATH="$TEMP_DOCKERFILE"
+        # 2-opam-deps COPYs opam.export, which lives at the repo root while the
+        # build context is "dockerfiles/". Stage a copy in the context; the EXIT
+        # trap removes it so it never shows up as an untracked file.
+        STAGED_CONTEXT_FILE="${DOCKER_CONTEXT%/}/opam.export"
+        cp opam.export "$STAGED_CONTEXT_FILE"
         ;;
     mina-rosetta)
         # Staged build: rosetta's own heavy base + mina-rosetta stage.

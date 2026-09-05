@@ -1,25 +1,19 @@
 #################################################################################################
 # The "opam-deps" Stage
 # - Continues from the build-deps image
-# - Installs all opam dependencies and pins from mina's github
-# - Includes the entire mina codebase and submodules in "${MINA_DIR}" (must be writable by opam user)
+# - Installs all opam dependencies from the repo's opam.export
 # - Largely mirrors/replaces ./scripts/setup-opam.sh
 #################################################################################################
 FROM build-deps AS opam-deps
 
-# location of repo used for pins and external package commits
+# location of the directory holding opam.export
 ARG MINA_DIR=mina
-# branch to checkout for opam dependencies
+# Declared but unused: scripts/docker/build.sh passes --build-arg MINA_BRANCH and
+# MINA_REPO to every service, and an undeclared build arg warns on each build.
 ARG MINA_BRANCH=compatible
-# mina repository to pull from
 ARG MINA_REPO=https://github.com/MinaProtocol/mina
 
-# location of external packages
-ARG EXTERNAL_PKG_DIR=$MINA_DIR/src/external
-
-# don't keep build directories
-# to force reinstall of pinned packages from Mina sources
-# and to keep Docker image reasonable size
+# don't keep build directories, to keep the image size reasonable
 ENV OPAMKEEPBUILDDIR false
 ENV OPAMREUSEBUILDDIR false
 # Limit logs for opam install errors to 20 lines per error
@@ -29,27 +23,20 @@ ENV OPAMERRLOGLEN 20
 
 USER opam
 
-# --- Shallow clone the Mina repo, only focused on the given MINA_BRANCH
-# git will clone into an empty dir, but this also helps us set the workdir in advance
-RUN git clone \
-  -b "${MINA_BRANCH}" \
-  --depth 1 \
-  --shallow-submodules \
-  --recurse-submodules \
-  "${MINA_REPO}" "${HOME}/${MINA_DIR}"
-
 WORKDIR $HOME/$MINA_DIR
+
+# opam.export is the only file the switch import needs: it contains no git or
+# pinned packages, so no mina sources or submodules have to be present. Copying
+# it (instead of cloning a branch HEAD) also keeps the multi-hour switch layer
+# below cache-keyed on this file's content rather than on a moving branch tip.
+# scripts/docker/build.sh stages opam.export into the "dockerfiles/" build context.
+COPY --chown=opam:opam opam.export ./
 
 # Set environment variables *before* running OPAM commands
 ENV OPAMYES=1
 
-# Update repo and install the switch (sources must be available locally!)
-RUN opam update && \
-    opam switch import opam.export --yes
-
-# --- Pin external packages / submodules
-# TODO: Would be really nice to pull this script, the git submodules, and opam.export exclusively in this stage
-# Remove .ppx and the .ppx-cache so they can be built on each run
-RUN eval "$(opam config env)" \
-  && scripts/pin-external-packages.sh \
+# Update repo and install the switch. Cleaning in the same layer so the build
+# logs and caches never land in an image layer.
+RUN opam update \
+  && opam switch import opam.export --yes \
   && opam clean --logs -cs --quiet
