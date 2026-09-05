@@ -37,6 +37,8 @@ resolve_deb_output() {
 
   case "$token" in
     # Simple single-name packages
+    runtime)               local _sfx="${DEB_SUFFIX#-}"
+                           echo "mina-runtime-${RUNTIME_CODENAME:-develop}${_sfx:+-${_sfx}}" ;;
     logproc)               echo "mina-logproc" ;;
     minimina)              echo "minimina" ;;
     tx_tools)              echo "mina-tx-tools" ;;
@@ -46,32 +48,22 @@ resolve_deb_output() {
     daemon_storage_toolbox) echo "mina-daemon-storage-toolbox" ;;
 
     # Rosetta packages
-    rosetta_generic) echo "mina-rosetta-generic${DEB_SUFFIX}" ;;
     rosetta_mainnet) echo "mina-rosetta-mainnet${DEB_SUFFIX}" ;;
     rosetta_devnet)  echo "mina-rosetta-devnet${DEB_SUFFIX}" ;;
 
     # Archive packages
-    archive_generic) echo "mina-archive-generic${DEB_SUFFIX}" ;;
     archive_mainnet) echo "mina-archive-mainnet${DEB_SUFFIX}" ;;
     archive_devnet)  echo "${MINA_ARCHIVE_DEB_NAME}" ;;
 
-    # Daemon tent metapackages
+    # Daemon L2 packages
     daemon_mainnet) echo "mina-mainnet" ;;
     daemon_devnet)  echo "mina-devnet" ;;
 
-    # Config packages (regular and hardfork produce the same name;
-    # requesting both in one invocation is a user error detected below.)
-    daemon_mainnet_config)          echo "mina-mainnet-config" ;;
-    daemon_devnet_config)           echo "mina-devnet-config" ;;
+    # Hardfork config packages (own the mina-<network>-config name; the
+    # regular config packages are retired — their content lives in the daemon
+    # L2 packages now.)
     daemon_mainnet_hardfork_config) echo "mina-mainnet-config" ;;
     daemon_devnet_hardfork_config)  echo "mina-devnet-config" ;;
-
-    # Generic daemon package — network-agnostic. `daemon_generic` is the
-    # canonical token emitted by Dhall; the networked aliases are accepted for
-    # compatibility, but requesting any pair in one invocation is a bug.
-    daemon_generic|daemon_mainnet_generic|daemon_devnet_generic)
-      local _sfx="${DEB_SUFFIX#-}"
-      echo "mina-generic${_sfx:+-${_sfx}}" ;;
 
     # Prefork / postfork / automode
     daemon_mainnet_prefork)  echo "mina-mainnet-prefork-${POSTFORK_CODENAME:-mesa}" ;;
@@ -86,10 +78,6 @@ resolve_deb_output() {
     profile_devnet)  echo "mina-devnet-profile" ;;
     profile_lightnet) echo "mina-lightnet" ;;
     profile_dev)      echo "mina-dev" ;;
-
-    # Profile-generic tent metapackages
-    profile_mainnet_generic) echo "mina-mainnet-generic" ;;
-    profile_devnet_generic)  echo "mina-devnet-generic" ;;
 
     # Prefork genesis ledger packages
     prefork_mainnet_genesis_ledger) echo "mina-create-mainnet-prefork-genesis-ledger" ;;
@@ -121,16 +109,11 @@ resolve_and_build_package() {
   fi
 
   if [[ "$package" =~ ^daemon_(mainnet|devnet)$ ]]; then
-    build_daemon_tent_deb "${BASH_REMATCH[1]}"
+    build_daemon_deb "${BASH_REMATCH[1]}"
     return
   fi
 
-  if [[ "$package" == "daemon_generic" ]]; then
-    build_daemon_generic_deb
-    return
-  fi
-
-  if [[ "$package" =~ ^daemon_(mainnet|devnet)_(config|generic|hardfork_config|prefork|postfork|automode)$ ]]; then
+  if [[ "$package" =~ ^daemon_(mainnet|devnet)_(hardfork_config|prefork|postfork|automode)$ ]]; then
     "build_daemon_${BASH_REMATCH[2]}_deb" "${BASH_REMATCH[1]}"
     return
   fi
@@ -142,11 +125,6 @@ resolve_and_build_package() {
 
   if [[ "$package" =~ ^profile_(mainnet|devnet|lightnet|dev)$ ]]; then
     "build_profile_deb" "${BASH_REMATCH[1]}"
-    return
-  fi
-
-  if [[ "$package" =~ ^profile_(mainnet|devnet)_generic$ ]]; then
-    build_profile_generic_tent_deb "${BASH_REMATCH[1]}"
     return
   fi
 
@@ -188,22 +166,16 @@ validate_unique_outputs() {
 # ---------------------------------------------------------------------------
 
 default_targets=(
+  runtime
   profile_devnet
-  profile_devnet_generic
   profile_mainnet
-  profile_mainnet_generic
   profile_lightnet
   logproc
-  archive_generic
   archive_devnet
   archive_mainnet
   tx_tools
   daemon_mainnet
-  daemon_mainnet_config
-  daemon_generic
   daemon_devnet
-  daemon_devnet_config
-  rosetta_generic
   rosetta_mainnet
   rosetta_devnet
   test_executive

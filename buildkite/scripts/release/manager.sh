@@ -13,7 +13,8 @@
 # - FIX: Repair Debian repository manifests when needed
 # - PERSIST: Archive artifacts to long-term storage backends
 #
-# Supported artifacts: mina-daemon, mina-archive, mina-rosetta, mina-logproc, mina-config, mina-automode, mina-prefork, mina-postfork, mina-generic, rosetta-generic, mina-postfork-mesa, mina-prefork-mesa, minimina
+# Supported artifacts: mina-daemon, mina-archive, mina-rosetta, mina-logproc, mina-config, mina-automode, mina-prefork, mina-postfork, mina-runtime, mina-generic, rosetta-generic, mina-postfork-mesa, mina-prefork-mesa, minimina
+# (mina-runtime is the busybox-style runtime package mina-runtime-develop; mina-generic and rosetta-generic remain for promoting releases that predate it)
 #
 # Artifacts that carry a docker image as well as a debian package:
 #   mina-daemon (mina-daemon), mina-generic (mina-daemon), mina-archive (mina-archive),
@@ -149,7 +150,7 @@ function main_help(){
     echo " architectures: $DEFAULT_ARCHITECTURES"
     echo ""
     echo "Available values: "
-    echo " artifacts: mina-logproc,mina-archive,mina-rosetta,mina-daemon,mina-config,mina-automode,mina-prefork,mina-postfork,mina-generic,rosetta-generic,mina-postfork-mesa,mina-prefork-mesa,minimina"
+    echo " artifacts: mina-logproc,mina-archive,mina-rosetta,mina-daemon,mina-config,mina-automode,mina-prefork,mina-postfork,mina-runtime,mina-generic,rosetta-generic,mina-postfork-mesa,mina-prefork-mesa,minimina"
     echo " networks: devnet,mainnet"
     echo " codenames: bullseye,focal"
     echo " channels: unstable,alpha,beta,stable"
@@ -193,6 +194,10 @@ function get_suffix() {
         ;;
         mina-generic)
             echo "-$__network$__profile_part"
+        ;;
+        mina-runtime)
+            # Network-free runtime package; flavors carry the profile part.
+            echo "$__profile_part"
         ;;
         mina-config|mina-automode|mina-prefork|mina-postfork|rosetta-generic|mina-postfork-mesa|mina-prefork-mesa)
             echo "-$__network"
@@ -257,6 +262,18 @@ function get_artifact_with_suffix() {
             # Single network/profile-agnostic daemon package; the profile
             # (incl. lightnet) is selected at runtime via MINA_PROFILE.
             echo "mina-generic"
+        ;;
+        mina-runtime)
+            # The busybox-style runtime package: one mina-box multicall binary
+            # per Mina era codename; network-free, instrumented as suffix.
+            case $__profile in
+                instrumented)
+                    echo "mina-runtime-develop-$__profile"
+                ;;
+                *)
+                    echo "mina-runtime-develop"
+                ;;
+            esac
         ;;
         rosetta-generic)
             echo "mina-rosetta-$__network-generic"

@@ -3,9 +3,10 @@
 # - Continues from the shared base-deps image.
 # - Adds the archive-specific dependencies (postgresql, postgresql-contrib, apt-utils, man),
 #   the archive entrypoint, the healthcheck-utilities fetch and the archive deb install.
-# - With the 3-layer packaging split, the per-network archive package is an empty tent that
-#   depends on mina-archive-generic and the profile leaf package; since there is no apt repo
-#   to resolve the closure (local debs only), those deps are passed explicitly.
+# - With the runtime-dir packaging split, the per-network archive package carries symlinks
+#   into /usr/lib/mina/develop and depends on mina-runtime-develop plus the profile leaf package;
+#   since there is no apt repo to resolve the closure (local debs only), those deps are
+#   passed explicitly.
 #################################################################################################
 FROM base-deps AS mina-archive
 
@@ -27,21 +28,20 @@ ENV BUILD_FLAGS_SUFFIX=${build_flags_suffix}
 # - mina-archive-devnet-lightnet etc.
 ENV MINA_DEB=mina-archive-${network}${SUFFIX}
 
-# The per-network config package ships the runtime config JSON and, for hardfork
-# networks, the genesis ledger tarball(s) into /var/lib/coda. Bundling it lets
-# `mina-archive-hardfork-toolbox populate-genesis-accounts` (and `mina-archive
-# run --config-file`) resolve the fork genesis ledger locally -- no S3, no
-# network -- to backfill accounts_accessed for the fork genesis block.
+# The per-network daemon L2 package (mina-<network>) ships the runtime config
+# JSON and genesis data into /var/lib/coda (the retired mina-<network>-config
+# package used to). Bundling it lets `mina-archive-hardfork-toolbox
+# populate-genesis-accounts` (and `mina-archive run --config-file`) resolve the
+# fork genesis ledger locally -- no S3, no network -- to backfill
+# accounts_accessed for the fork genesis block.
 #
 # Unlike the daemon (see stages/daemon/2-mina-daemon), the archive image can carry a
 # config safely: its entrypoint never picks up /var/lib/coda/* implicitly, so
-# these files stay inert unless a command names them via --config-file. The
-# archive image is also already per-network, so there is no network-free generic
-# base for the -configured pattern to layer onto.
+# these files stay inert unless a command names them via --config-file.
 #
 # Architecture: all, and no profile/build-flag suffix -- the package is named
-# mina-<network>-config for every variant.
-ENV MINA_CONFIG_DEB=mina-${network}-config
+# mina-<network> for every variant.
+ENV MINA_CONFIG_DEB=mina-${network}
 
 ENV DEBIAN_FRONTEND noninteractive
 RUN echo "Building image with version $deb_codename $deb_release $deb_version"
@@ -65,10 +65,10 @@ RUN mkdir /healthcheck && curl https://raw.githubusercontent.com/MinaProtocol/mi
 # Installed DIRECTLY from the local build context: scripts/docker/build.sh stages
 # the freshly-built .deb files under _debs, which we COPY to /opt/mina-local-debs,
 # and install-mina-debs.sh installs the resolved .deb file with a single apt-get
-# call (no apt repo / no apt index). With the 3-layer split, the per-network
-# archive package is an empty tent that depends on mina-archive-generic and the
-# profile leaf package. These deps must be passed explicitly.
-ENV MINA_ARCHIVE_GENERIC_DEB=mina-archive-generic${BUILD_FLAGS_SUFFIX}
+# call (no apt repo / no apt index). With the runtime-dir split, the
+# per-network archive package depends on mina-runtime-develop (the binaries) and
+# the profile leaf package. These deps must be passed explicitly.
+ENV MINA_RUNTIME_DEB=mina-runtime-develop${BUILD_FLAGS_SUFFIX}
 COPY scripts/install-mina-debs.sh /usr/local/bin/install-mina-debs.sh
 COPY _debs /opt/mina-local-debs
 RUN chmod +x /usr/local/bin/install-mina-debs.sh \
@@ -76,7 +76,8 @@ RUN chmod +x /usr/local/bin/install-mina-debs.sh \
   && APT_NO_DOWNGRADE=1 \
      /usr/local/bin/install-mina-debs.sh \
        "${MINA_DEB}=$deb_version" \
-       "${MINA_ARCHIVE_GENERIC_DEB}=$deb_version" \
+       "${MINA_RUNTIME_DEB}=$deb_version" \
+       "mina-logproc=$deb_version" \
        "${PROFILE_DEB}=$deb_version" \
        "${MINA_CONFIG_DEB}=$deb_version"
 

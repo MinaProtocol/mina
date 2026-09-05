@@ -22,9 +22,7 @@ in  Pipeline.build
             , Artifacts.Type.DaemonProfiled { profile = Profile.Type.Devnet }
             , Artifacts.Type.CreatePreforkGenesis
                 { network = Network.Type.Devnet }
-            , Artifacts.Type.ArchiveGeneric
             , Artifacts.Type.Archive { network = Network.Type.Devnet }
-            , Artifacts.Type.RosettaGeneric
             , Artifacts.Type.Rosetta { network = Network.Type.Devnet }
             , Artifacts.Type.LogProc
             , Artifacts.Type.TxTools

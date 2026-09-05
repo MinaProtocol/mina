@@ -5,9 +5,9 @@
 # 1. Installs the current (pre-split) mina-devnet from packages.o1test.net
 # 2. Records config files and version before upgrade
 # 3. Downloads the new debian(s) from Hetzner cache
-# 4. Upgrades to the new layout: the monolithic mina-devnet is replaced by
-#    mina-generic (binaries) + mina-devnet-config (config + service),
-#    which declare Replaces/Breaks against the old mina-devnet.
+# 4. Upgrades to the new layout: mina-devnet (L2 symlinks + config) over
+#    mina-runtime-develop (the mina-box binary directory), which declare
+#    Replaces/Breaks against the old binary-carrying packages.
 # 5. Verifies config files and version after upgrade
 
 set -euox pipefail
@@ -25,9 +25,10 @@ CHANNEL="${CHANNEL:-alpha}"
 # whose migration we are exercising.
 PACKAGE="${PACKAGE:-mina-devnet}"
 # INSTALL_PACKAGES is the comma-separated set we upgrade TO from cache (step 4).
-# In the split layout the daemon is mina-generic + mina-devnet-config.
-INSTALL_PACKAGES="${INSTALL_PACKAGES:-mina-generic,mina-devnet-config}"
-NEW_DEBIAN_PATH="${NEW_DEBIAN_PATH:-}"  # Path pattern in cache, e.g., "debians/bullseye/mina-generic_*.deb"
+# In the runtime-dir layout the daemon is mina-devnet (L2 symlinks + config),
+# which pulls mina-runtime-develop (binaries) and mina-devnet-profile with it.
+INSTALL_PACKAGES="${INSTALL_PACKAGES:-mina-devnet}"
+NEW_DEBIAN_PATH="${NEW_DEBIAN_PATH:-}"  # Path pattern in cache, e.g., "debians/bullseye/mina-runtime-develop_*.deb"
 
 # Don't prompt for answers during apt-get install
 export DEBIAN_FRONTEND=noninteractive
@@ -63,12 +64,12 @@ function usage() {
     echo "  -c, --codename      Debian codename (default: bullseye)"
     echo "  -C, --channel       Repository channel (default: alpha)"
     echo "  -p, --package       Pre-split package to install from repo (default: mina-devnet)"
-    echo "  -i, --install-packages  Comma-separated packages to upgrade to (default: mina-generic,mina-devnet-config)"
+    echo "  -i, --install-packages  Comma-separated packages to upgrade to (default: mina-devnet)"
     echo "  -n, --new-debian    Path to new debian in cache, used to derive version (required)"
     echo "  -h, --help          Show this help message"
     echo ""
     echo "Example:"
-    echo "  $0 --new-debian 'debians/bullseye/mina-generic_*.deb'"
+    echo "  $0 --new-debian 'debians/bullseye/mina-runtime-develop_*.deb'"
 }
 
 # Function to extract the first 8 characters of the commit hash from a version string
