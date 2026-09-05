@@ -12,7 +12,7 @@ module Get_transaction_status = struct
 
   let rpc : (query, response) Rpc.Rpc.t =
     Rpc.Rpc.create ~name:"Get_transaction_status" ~version:0 ~bin_query
-      ~bin_response
+      ~bin_response ~include_in_error_count:Only_on_exn
 end
 
 module Send_user_commands = struct
@@ -28,7 +28,7 @@ module Send_user_commands = struct
 
   let rpc : (query, response) Rpc.Rpc.t =
     Rpc.Rpc.create ~name:"Send_user_commands" ~version:0 ~bin_query
-      ~bin_response
+      ~bin_response ~include_in_error_count:Only_on_exn
 end
 
 module Send_zkapp_commands = struct
@@ -40,7 +40,7 @@ module Send_zkapp_commands = struct
 
   let rpc : (query, response) Rpc.Rpc.t =
     Rpc.Rpc.create ~name:"Send_zkapp_commands" ~version:0 ~bin_query
-      ~bin_response
+      ~bin_response ~include_in_error_count:Only_on_exn
 end
 
 module Get_ledger = struct
@@ -51,6 +51,7 @@ module Get_ledger = struct
 
   let rpc : (query, response) Rpc.Rpc.t =
     Rpc.Rpc.create ~name:"Get_ledger" ~version:0 ~bin_query ~bin_response
+      ~include_in_error_count:Only_on_exn
 end
 
 module Get_snarked_ledger = struct
@@ -61,7 +62,7 @@ module Get_snarked_ledger = struct
 
   let rpc : (query, response) Rpc.Rpc.t =
     Rpc.Rpc.create ~name:"Get_snarked_ledger" ~version:0 ~bin_query
-      ~bin_response
+      ~bin_response ~include_in_error_count:Only_on_exn
 end
 
 module Get_staking_ledger = struct
@@ -72,7 +73,7 @@ module Get_staking_ledger = struct
 
   let rpc : (query, response) Rpc.Rpc.t =
     Rpc.Rpc.create ~name:"Get_staking_ledger" ~version:0 ~bin_query
-      ~bin_response
+      ~bin_response ~include_in_error_count:Only_on_exn
 end
 
 module Get_balance = struct
@@ -83,6 +84,7 @@ module Get_balance = struct
 
   let rpc : (query, response) Rpc.Rpc.t =
     Rpc.Rpc.create ~name:"Get_balance" ~version:0 ~bin_query ~bin_response
+      ~include_in_error_count:Only_on_exn
 end
 
 module Get_trust_status = struct
@@ -96,6 +98,7 @@ module Get_trust_status = struct
 
   let rpc : (query, response) Rpc.Rpc.t =
     Rpc.Rpc.create ~name:"Get_trust_status" ~version:0 ~bin_query ~bin_response
+      ~include_in_error_count:Only_on_exn
 end
 
 module Get_trust_status_all = struct
@@ -109,7 +112,7 @@ module Get_trust_status_all = struct
 
   let rpc : (query, response) Rpc.Rpc.t =
     Rpc.Rpc.create ~name:"Get_trust_status_all" ~version:0 ~bin_query
-      ~bin_response
+      ~bin_response ~include_in_error_count:Only_on_exn
 end
 
 module Reset_trust_status = struct
@@ -123,7 +126,7 @@ module Reset_trust_status = struct
 
   let rpc : (query, response) Rpc.Rpc.t =
     Rpc.Rpc.create ~name:"Reset_trust_status" ~version:0 ~bin_query
-      ~bin_response
+      ~bin_response ~include_in_error_count:Only_on_exn
 end
 
 module Verify_proof = struct
@@ -137,6 +140,7 @@ module Verify_proof = struct
 
   let rpc : (query, response) Rpc.Rpc.t =
     Rpc.Rpc.create ~name:"Verify_proof" ~version:0 ~bin_query ~bin_response
+      ~include_in_error_count:Only_on_exn
 end
 
 module Get_inferred_nonce = struct
@@ -147,7 +151,7 @@ module Get_inferred_nonce = struct
 
   let rpc : (query, response) Rpc.Rpc.t =
     Rpc.Rpc.create ~name:"Get_inferred_nonce" ~version:0 ~bin_query
-      ~bin_response
+      ~bin_response ~include_in_error_count:Only_on_exn
 end
 
 module Get_nonce = struct
@@ -158,6 +162,7 @@ module Get_nonce = struct
 
   let rpc : (query, response) Rpc.Rpc.t =
     Rpc.Rpc.create ~name:"Get_nonce" ~version:0 ~bin_query ~bin_response
+      ~include_in_error_count:Only_on_exn
 end
 
 module Get_status = struct
@@ -167,6 +172,7 @@ module Get_status = struct
 
   let rpc : (query, response) Rpc.Rpc.t =
     Rpc.Rpc.create ~name:"Get_status" ~version:0 ~bin_query ~bin_response
+      ~include_in_error_count:Only_on_exn
 end
 
 (* ITN internal logs from prover and verifier *)
@@ -179,6 +185,7 @@ module Clear_hist_status = struct
 
   let rpc : (query, response) Rpc.Rpc.t =
     Rpc.Rpc.create ~name:"Clear_hist_status" ~version:0 ~bin_query ~bin_response
+      ~include_in_error_count:Only_on_exn
 end
 
 module Get_public_keys_with_details = struct
@@ -189,7 +196,7 @@ module Get_public_keys_with_details = struct
 
   let rpc : (query, response) Rpc.Rpc.t =
     Rpc.Rpc.create ~name:"Get_public_keys_with_details" ~version:0 ~bin_query
-      ~bin_response
+      ~bin_response ~include_in_error_count:Only_on_exn
 end
 
 module Get_public_keys = struct
@@ -199,6 +206,7 @@ module Get_public_keys = struct
 
   let rpc : (query, response) Rpc.Rpc.t =
     Rpc.Rpc.create ~name:"Get_public_keys" ~version:0 ~bin_query ~bin_response
+      ~include_in_error_count:Only_on_exn
 end
 
 module Stop_daemon = struct
@@ -208,6 +216,7 @@ module Stop_daemon = struct
 
   let rpc : (query, response) Rpc.Rpc.t =
     Rpc.Rpc.create ~name:"Stop_daemon" ~version:0 ~bin_query ~bin_response
+      ~include_in_error_count:Only_on_exn
 end
 
 module Snark_job_list = struct
@@ -217,6 +226,7 @@ module Snark_job_list = struct
 
   let rpc : (query, response) Rpc.Rpc.t =
     Rpc.Rpc.create ~name:"Snark_job_list" ~version:0 ~bin_query ~bin_response
+      ~include_in_error_count:Only_on_exn
 end
 
 module Snark_pool_list = struct
@@ -226,6 +236,7 @@ module Snark_pool_list = struct
 
   let rpc : (query, response) Rpc.Rpc.t =
     Rpc.Rpc.create ~name:"Snark_pool_list" ~version:0 ~bin_query ~bin_response
+      ~include_in_error_count:Only_on_exn
 end
 
 module Start_tracing = struct
@@ -235,6 +246,7 @@ module Start_tracing = struct
 
   let rpc : (query, response) Rpc.Rpc.t =
     Rpc.Rpc.create ~name:"Start_tracing" ~version:0 ~bin_query ~bin_response
+      ~include_in_error_count:Only_on_exn
 end
 
 module Stop_tracing = struct
@@ -244,6 +256,7 @@ module Stop_tracing = struct
 
   let rpc : (query, response) Rpc.Rpc.t =
     Rpc.Rpc.create ~name:"Stop_tracing" ~version:0 ~bin_query ~bin_response
+      ~include_in_error_count:Only_on_exn
 end
 
 module Start_internal_tracing = struct
@@ -253,7 +266,7 @@ module Start_internal_tracing = struct
 
   let rpc : (query, response) Rpc.Rpc.t =
     Rpc.Rpc.create ~name:"Start_internal_tracing" ~version:0 ~bin_query
-      ~bin_response
+      ~bin_response ~include_in_error_count:Only_on_exn
 end
 
 module Stop_internal_tracing = struct
@@ -263,7 +276,7 @@ module Stop_internal_tracing = struct
 
   let rpc : (query, response) Rpc.Rpc.t =
     Rpc.Rpc.create ~name:"Stop_internal_tracing" ~version:0 ~bin_query
-      ~bin_response
+      ~bin_response ~include_in_error_count:Only_on_exn
 end
 
 module Visualization = struct
@@ -275,7 +288,7 @@ module Visualization = struct
 
     let rpc : (query, response) Rpc.Rpc.t =
       Rpc.Rpc.create ~name:"Visualize_frontier" ~version:0 ~bin_query
-        ~bin_response
+        ~bin_response ~include_in_error_count:Only_on_exn
   end
 
   module Registered_masks = struct
@@ -285,7 +298,7 @@ module Visualization = struct
 
     let rpc : (query, response) Rpc.Rpc.t =
       Rpc.Rpc.create ~name:"Visualize_registered_masks" ~version:0 ~bin_query
-        ~bin_response
+        ~bin_response ~include_in_error_count:Only_on_exn
   end
 end
 
@@ -296,6 +309,7 @@ module Add_trustlist = struct
 
   let rpc : (query, response) Rpc.Rpc.t =
     Rpc.Rpc.create ~name:"Add_trustlist" ~version:0 ~bin_query ~bin_response
+      ~include_in_error_count:Only_on_exn
 end
 
 module Remove_trustlist = struct
@@ -305,6 +319,7 @@ module Remove_trustlist = struct
 
   let rpc : (query, response) Rpc.Rpc.t =
     Rpc.Rpc.create ~name:"Remove_trustlist" ~version:0 ~bin_query ~bin_response
+      ~include_in_error_count:Only_on_exn
 end
 
 module Get_trustlist = struct
@@ -314,6 +329,7 @@ module Get_trustlist = struct
 
   let rpc : (query, response) Rpc.Rpc.t =
     Rpc.Rpc.create ~name:"Get_trustlist" ~version:0 ~bin_query ~bin_response
+      ~include_in_error_count:Only_on_exn
 end
 
 module Get_node_status = struct
@@ -324,6 +340,7 @@ module Get_node_status = struct
 
   let rpc : (query, response) Rpc.Rpc.t =
     Rpc.Rpc.create ~name:"Get_node_status" ~version:0 ~bin_query ~bin_response
+      ~include_in_error_count:Only_on_exn
 end
 
 module Get_object_lifetime_statistics = struct
@@ -333,7 +350,7 @@ module Get_object_lifetime_statistics = struct
 
   let rpc : (query, response) Rpc.Rpc.t =
     Rpc.Rpc.create ~name:"Get_object_lifetime_statistics" ~version:0 ~bin_query
-      ~bin_response
+      ~bin_response ~include_in_error_count:Only_on_exn
 end
 
 module Generate_hardfork_config = struct
@@ -344,5 +361,5 @@ module Generate_hardfork_config = struct
 
   let rpc : (query, response) Rpc.Rpc.t =
     Rpc.Rpc.create ~name:"Generate_hardfork_config" ~version:0 ~bin_query
-      ~bin_response
+      ~bin_response ~include_in_error_count:Only_on_exn
 end

@@ -7,7 +7,6 @@
   async
   yojson
   sexplib0
-  base.caml
   core_kernel
   bin_prot.shape
   ;; local libraries

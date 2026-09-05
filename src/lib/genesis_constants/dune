@@ -10,7 +10,6 @@
   base
   bin_prot.shape
   core_kernel
-  base.caml
   sexplib0
   integers
   ;; local libraries

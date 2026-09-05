@@ -445,7 +445,7 @@ let exists_deferred ?request:req ?compute typ =
       (* ..and fill it when the value we want to read resolves. *)
       Deferred.upon
         (As_prover.read (Typ.prover_value ()) requested)
-        (fun _ -> Ivar.fill !deferred ()) ) ;
+        (fun _ -> Ivar.fill_exn !deferred ()) ) ;
   (* Await the [Deferred.t] if we're generating the witness, otherwise we
      immediately bind over the filled Ivar and continue.
   *)

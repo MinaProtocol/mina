@@ -9,7 +9,6 @@
   async
   core
   async_kernel
-  base.caml
   sexplib0
   async_unix
   ;;local libraries

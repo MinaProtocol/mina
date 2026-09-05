@@ -12,7 +12,6 @@
   core_kernel
   core
   async_kernel
-  base.caml
   sexplib0
   digestif
   ;; local libraries

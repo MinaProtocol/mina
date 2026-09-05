@@ -8,7 +8,6 @@
   zarith
   bignum.bigint
   bin_prot.shape
-  base.caml
   core
   sexplib0
   core_kernel

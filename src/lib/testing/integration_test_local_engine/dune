@@ -36,7 +36,6 @@
   sexplib0
   stdio
   result
-  base.caml
   integers
   re2
   ;; local libraries

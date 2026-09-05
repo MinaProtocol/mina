@@ -12,5 +12,5 @@
  (instrumentation
   (backend bisect_ppx))
  (preprocess
-  (pps ppx_here ppx_jane ppx_let ppx_mina ppx_version))
+  (pps ppx_here ppx_let ppx_mina ppx_version ppx_compare ppx_enumerate))
  (synopsis "Coordinated, tiered daemon shutdown handlers"))

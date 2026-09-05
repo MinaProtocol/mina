@@ -4,7 +4,6 @@
   ;; opam libraries
   alcotest
   base
-  base.caml
   core_kernel
   integers
   ppx_inline_test.config

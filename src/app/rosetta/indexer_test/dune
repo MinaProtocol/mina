@@ -15,4 +15,10 @@
  (instrumentation
   (backend bisect_ppx))
  (preprocess
-  (pps ppx_mina ppx_jane ppx_string ppx_deriving.make)))
+  (pps
+   ppx_mina
+   ppx_string
+   ppx_deriving.make
+   ppx_compare
+   ppx_custom_printf
+   ppx_let)))

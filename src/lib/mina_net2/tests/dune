@@ -10,7 +10,6 @@
   core_kernel
   sexplib0
   bin_prot.shape
-  base.caml
   ;; local libraries
   mina_net2
   mina_stdlib

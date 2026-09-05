@@ -56,7 +56,7 @@ let%test_unit "invalid transactions do not dirty the ledger" =
   let ledger = Ledger.create_ephemeral ~depth:4 () in
   let sender_sk, receiver_sk =
     Quickcheck.Generator.generate ~size:0
-      ~random:(Splittable_random.State.of_int 100)
+      ~random:(Splittable_random.of_int 100)
       (Quickcheck.Generator.tuple2 Signature_lib.Private_key.gen
          Signature_lib.Private_key.gen )
   in

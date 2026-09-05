@@ -305,13 +305,12 @@ let account_access_statuses (t : (_, _, _) with_forest)
   Call_forest.fold t.account_updates ~init ~f:(fun acc p ->
       (Account_update.account_id p, status_sym) :: acc )
   |> List.rev
-  |> Staged.unstage
-       (List.stable_dedup_staged ~compare:(fun (a1, s1) (a2, s2) ->
-            let c = Account_id.compare a1 a2 in
-            if c <> 0 then c
-            else
-              let to_int = function `Accessed -> 0 | `Not_accessed -> 1 in
-              Int.compare (to_int s1) (to_int s2) ) )
+  |> List.stable_dedup ~compare:(fun (a1, s1) (a2, s2) ->
+      let c = Account_id.compare a1 a2 in
+      if c <> 0 then c
+      else
+        let to_int = function `Accessed -> 0 | `Not_accessed -> 1 in
+        Int.compare (to_int s1) (to_int s2) )
 
 let accounts_referenced (t : (_, _, _) with_forest) =
   List.map (account_access_statuses t Applied) ~f:(fun (acct_id, _status) ->

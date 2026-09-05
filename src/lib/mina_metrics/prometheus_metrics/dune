@@ -18,7 +18,6 @@
   base.base_internalhash_types
   uri
   async_unix
-  base.caml
   ;; local libraries
   logger
   o1trace

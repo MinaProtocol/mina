@@ -5,7 +5,6 @@
   ;; opam libraries
   ppx_inline_test.config
   bignum.bigint
-  base.caml
   base
   base64
   core_kernel

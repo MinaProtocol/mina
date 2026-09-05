@@ -84,10 +84,22 @@ in {
     sourceRoot = "source/lib/crypto/kimchi_bindings/stubs";
     nativeBuildInputs = [ final.ocamlPackages_mina.ocaml ];
     buildInputs = with final; lib.optional stdenv.isDarwin libiconv;
-    cargoLock = let fixupLockFile = path: builtins.readFile path;
+    # The in-tree .cargo/config.toml replaces crates.io and the ocaml-gen git
+    # source with kimchi-stubs-vendors, which is what the dune build needs.
+    # Here nix does its own vendoring from Cargo.lock and writes an equivalent
+    # replacement into $CARGO_HOME, keying the git source *with* the `#<rev>`
+    # fragment the lockfile carries. Cargo refuses to let one source be defined
+    # under two names, so keep only the build flags and let nix vendor.
+    postPatch = ''
+      printf '[build]\nrustflags = ["-C", "link-args=-Wl,-undefined,dynamic_lookup"]\n' \
+        > .cargo/config.toml
+    '';
+    cargoLock = let
+      fixupLockFile = path: builtins.readFile path;
+      lock = ../src/lib/crypto/kimchi_bindings/stubs/Cargo.lock;
     in {
-      lockFileContents =
-        fixupLockFile ../src/lib/crypto/kimchi_bindings/stubs/Cargo.lock;
+      lockFileContents = fixupLockFile lock;
+      outputHashes = narHashesFromCargoLock lock;
     };
     # FIXME: tests fail
     doCheck = false;
@@ -163,7 +175,7 @@ in {
         sha256 = "sha256-M6WuGl7EruNopHZbqBpucu4RWz44/MSdv6f0zkYw+44=";
       };
 
-      cargoHash = "sha256-/zJzxtzOZuGyvDLdJNEQFPzFHC6IbEiWOeZYrKgGxEk=";
+      cargoHash = "sha256-ElDatyOwdKwHg3bNH/1pcxKI7LXkhsotlDPQjiLHBwA=";
       nativeBuildInputs = [ final.pkg-config ];
 
       buildInputs = with final;

@@ -138,7 +138,7 @@ module Wrap : sig
           - Header: metadata about the SNARK keys
           - Hash: MD5 hash for integrity checking *)
       type t = Core.Type_equal.Id.Uid.t * Snark_keys_header.t * Core.Md5.t
-      [@@deriving sexp]
+      [@@deriving sexp_of]
 
       (** Convert verification key identifier to a human-readable string. *)
       val to_string : t -> string

@@ -3,6 +3,7 @@
  (public_name fake_network)
  (libraries
   core_unix
+  core_unix.uuid
   ;; opam libraries
   async
   async_unix

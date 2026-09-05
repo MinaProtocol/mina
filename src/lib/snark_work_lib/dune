@@ -5,7 +5,6 @@
   (flags -verbose -show-counts))
  (libraries
   ;; opam libraries
-  base.caml
   bin_prot.shape
   core
   core_kernel

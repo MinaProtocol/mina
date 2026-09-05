@@ -197,7 +197,7 @@ let generate_zkapp_txn (keypair : Signature_lib.Keypair.t) (ledger : Ledger.t)
     Mina_generators.Zkapp_command_generators.gen_protocol_state_precondition
       protocol_state_predicate_view
     |> Base_quickcheck.Generator.generate ~size:1
-         ~random:(Splittable_random.State.create Random.State.default)
+         ~random:(Splittable_random.create Random.State.default)
   in
   let%bind zkapp_command =
     Transaction_snark.For_tests.create_trivial_predicate_snapp
