@@ -1,7 +1,7 @@
-(executable
- (package replayer)
- (name replayer)
- (public_name replayer)
+(library
+ (name replayer_lib)
+ (modules replayer_lib sql)
+ (public_name replayer.lib)
  (libraries
   ;; opam libraries
   stdio
@@ -76,3 +76,14 @@
    ppx_compare
    ppx_deriving_yojson
    h_list.ppx)))
+
+(executable
+ (package replayer)
+ (name replayer)
+ (public_name replayer)
+ (modules replayer)
+ (libraries replayer_lib)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_version)))
