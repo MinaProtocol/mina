@@ -121,6 +121,26 @@ var caml_pasta_fp_to_bytes = tsBindings.caml_pasta_fp_to_bytes;
 // Requires: tsBindings
 var caml_pasta_fp_of_bytes = tsBindings.caml_pasta_fp_of_bytes;
 
+// Provides: caml_pasta_fp_to_bytes_into
+// Requires: tsBindings, caml_ba_set_1, caml_bytes_unsafe_get
+function caml_pasta_fp_to_bytes_into(x, buf, pos) {
+  var bytes = tsBindings.caml_pasta_fp_to_bytes(x);
+  for (var i = 0; i < 32; i++) {
+    caml_ba_set_1(buf, pos + i, caml_bytes_unsafe_get(bytes, i));
+  }
+  return 0;
+}
+
+// Provides: caml_pasta_fp_of_bytes_from
+// Requires: tsBindings, caml_ba_get_1, caml_create_bytes, caml_bytes_unsafe_set
+function caml_pasta_fp_of_bytes_from(buf, pos) {
+  var bytes = caml_create_bytes(32);
+  for (var i = 0; i < 32; i++) {
+    caml_bytes_unsafe_set(bytes, i, caml_ba_get_1(buf, pos + i));
+  }
+  return tsBindings.caml_pasta_fp_of_bytes(bytes);
+}
+
 // Provides: caml_pasta_fp_deep_copy
 // Requires: tsBindings
 var caml_pasta_fp_deep_copy = tsBindings.caml_pasta_fp_deep_copy;
@@ -247,6 +267,26 @@ var caml_pasta_fq_to_bytes = tsBindings.caml_pasta_fq_to_bytes;
 // Provides: caml_pasta_fq_of_bytes
 // Requires: tsBindings
 var caml_pasta_fq_of_bytes = tsBindings.caml_pasta_fq_of_bytes;
+
+// Provides: caml_pasta_fq_to_bytes_into
+// Requires: tsBindings, caml_ba_set_1, caml_bytes_unsafe_get
+function caml_pasta_fq_to_bytes_into(x, buf, pos) {
+  var bytes = tsBindings.caml_pasta_fq_to_bytes(x);
+  for (var i = 0; i < 32; i++) {
+    caml_ba_set_1(buf, pos + i, caml_bytes_unsafe_get(bytes, i));
+  }
+  return 0;
+}
+
+// Provides: caml_pasta_fq_of_bytes_from
+// Requires: tsBindings, caml_ba_get_1, caml_create_bytes, caml_bytes_unsafe_set
+function caml_pasta_fq_of_bytes_from(buf, pos) {
+  var bytes = caml_create_bytes(32);
+  for (var i = 0; i < 32; i++) {
+    caml_bytes_unsafe_set(bytes, i, caml_ba_get_1(buf, pos + i));
+  }
+  return tsBindings.caml_pasta_fq_of_bytes(bytes);
+}
 
 // Provides: caml_pasta_fq_deep_copy
 // Requires: tsBindings

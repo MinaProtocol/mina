@@ -22,6 +22,18 @@ module type Bindings = sig
   val to_bytes : t -> bytes
 
   val of_bytes : bytes -> t
+
+  (** Same encoding as [to_bytes], written at [buf.{pos}]. *)
+  val to_bytes_into :
+       t
+    -> (char, Bigarray.int8_unsigned_elt, Bigarray.c_layout) Bigarray.Array1.t
+    -> int
+    -> unit
+
+  val of_bytes_from :
+       (char, Bigarray.int8_unsigned_elt, Bigarray.c_layout) Bigarray.Array1.t
+    -> int
+    -> t
 end
 
 module type Intf = sig
@@ -62,6 +74,18 @@ module type Intf = sig
   val to_bytes : t -> bytes
 
   val of_bytes : bytes -> t
+
+  (** Same encoding as [to_bytes], written at [buf.{pos}]. *)
+  val to_bytes_into :
+       t
+    -> (char, Bigarray.int8_unsigned_elt, Bigarray.c_layout) Bigarray.Array1.t
+    -> int
+    -> unit
+
+  val of_bytes_from :
+       (char, Bigarray.int8_unsigned_elt, Bigarray.c_layout) Bigarray.Array1.t
+    -> int
+    -> t
 
   val num_limbs : int
 
@@ -125,6 +149,18 @@ module Make : functor
   val to_bytes : t -> bytes
 
   val of_bytes : bytes -> t
+
+  (** Same encoding as [to_bytes], written at [buf.{pos}]. *)
+  val to_bytes_into :
+       t
+    -> (char, Bigarray.int8_unsigned_elt, Bigarray.c_layout) Bigarray.Array1.t
+    -> int
+    -> unit
+
+  val of_bytes_from :
+       (char, Bigarray.int8_unsigned_elt, Bigarray.c_layout) Bigarray.Array1.t
+    -> int
+    -> t
 
   val num_limbs : int
 

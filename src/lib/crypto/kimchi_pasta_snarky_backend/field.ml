@@ -15,6 +15,11 @@ module type Input_intf = sig
 
   val of_bigint : Bigint.t -> t
 
+  (** Same encoding as [Bigint.to_bytes (to_bigint t)], written at [buf.{pos}]. *)
+  val to_bytes_into : t -> Bigstring.t -> int -> unit
+
+  val of_bytes_from : Bigstring.t -> int -> t
+
   val of_int : int -> t
 
   val domain_generator : int -> t
@@ -195,6 +200,33 @@ module Make (F : Input_intf) :
 
             let of_binable = of_bigint
           end)
+
+      (* Same encoding as the [Of_binable] instance above, without the
+         intermediate bigint and bytes. *)
+      let bin_size_t (_ : t) = Bigint.length_in_bytes
+
+      let bin_write_t buf ~pos (x : t) =
+        let len = Bigint.length_in_bytes in
+        Bin_prot.Common.check_next buf (pos + len) ;
+        to_bytes_into x buf pos ;
+        pos + len
+
+      let bin_read_t buf ~pos_ref : t =
+        let len = Bigint.length_in_bytes in
+        let pos = !pos_ref in
+        Bin_prot.Common.check_next buf (pos + len) ;
+        let x = of_bytes_from buf pos in
+        pos_ref := pos + len ;
+        x
+
+      let bin_writer_t : t Bin_prot.Type_class.writer =
+        { size = bin_size_t; write = bin_write_t }
+
+      let bin_reader_t : t Bin_prot.Type_class.reader =
+        { read = bin_read_t; vtag_read = __bin_read_t__ }
+
+      let bin_t : t Bin_prot.Type_class.t =
+        { shape = bin_shape_t; writer = bin_writer_t; reader = bin_reader_t }
 
       include
         Sexpable.Of_sexpable
