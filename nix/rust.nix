@@ -146,7 +146,11 @@ in {
   };
 
   plonk_wasm = let
-    lock = ../src/lib/crypto/proof-systems/Cargo.lock;
+    src = final.lib.sourceByRegex ../src [
+      "^lib(/crypto(/kimchi_bindings(/wasm(/.*)?)?)?)?$"
+      "^lib(/crypto(/proof-systems(/.*)?)?)?$"
+    ];
+    lock = src + "/lib/crypto/proof-systems/Cargo.lock";
 
     deps = builtins.listToAttrs (map (pkg: {
       inherit (pkg) name;
@@ -189,14 +193,11 @@ in {
   in rustPlatform.buildRustPackage {
     pname = "plonk_wasm";
     version = "0.1.0";
-    src = final.lib.sourceByRegex ../src [
-      "^lib(/crypto(/kimchi_bindings(/wasm(/.*)?)?)?)?$"
-      "^lib(/crypto(/proof-systems(/.*)?)?)?$"
-    ];
+    inherit src;
     sourceRoot = "source/lib/crypto/proof-systems";
     nativeBuildInputs = [ final.wasm-pack wasm-bindgen-cli ];
     buildInputs = with final; lib.optional stdenv.isDarwin libiconv;
-    cargoLock.lockFile = lock;
+    cargoLock.lockFileContents = builtins.readFile lock;
     cargoLock.outputHashes = narHashesFromCargoLock lock;
 
     # Without this env variable, wasm pack attempts to create cache dir in root
