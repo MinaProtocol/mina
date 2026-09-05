@@ -25,8 +25,17 @@ rosetta-client
 ├── mempool
 │   ├── list
 │   └── transaction    --tx-hash H
-└── search
-    └── transactions   [--address B62q...] [--tx-hash H] [--limit N]
+├── search
+│   └── transactions   [--address B62q...] [--tx-hash H] [--limit N]
+├── construction
+│   ├── derive         --public-key-json JSON [--metadata-json JSON]
+│   ├── preprocess     --operations-json JSON [--metadata-json JSON]
+│   ├── metadata       --options-json JSON [--public-keys-json JSON]
+│   ├── payloads       --operations-json JSON [--metadata-json JSON] [--public-keys-json JSON]
+│   ├── parse          --signed|--unsigned --transaction STR
+│   ├── combine        --unsigned-transaction STR --signatures-json JSON
+│   ├── hash           --signed-transaction STR
+│   └── submit         --signed-transaction STR
 ```
 
 `block transaction` is deliberately absent: Mina's Rosetta server returns
@@ -76,6 +85,10 @@ rosetta-client network options \
 export MINA_ROSETTA_URI=http://rosetta.example.com:3087
 export MINA_ROSETTA_NETWORK=mainnet
 rosetta-client network options
+
+# Construction flow:
+rosetta-client construction derive \
+  --public-key-json '{"hex_bytes":"abcd","curve_type":"pallas"}'
 ```
 
 ## Output contract
@@ -83,11 +96,13 @@ rosetta-client network options
 On success, the response body is printed as pretty JSON on stdout (or
 compact JSON with `--compact`), followed by a single newline.  Exit 0.
 
-On failure — HTTP non-2xx or a transport error — the tool logs a short
-diagnostic to stderr through Mina's `Logger` and exits 1.  Stdout stays
-the data channel: it carries the response and nothing else, so a caller
-can pipe it into `jq` without filtering log lines out first.  The
-diagnostic is guaranteed to:
+On failure — HTTP non-2xx, a transport error, invalid JSON input, or a
+`--*-json` payload that does not match the Rosetta model the endpoint
+expects (a wrong shape, an unrecognised field, or a non-object where the
+schema wants one) — the tool logs a short diagnostic to stderr through Mina's
+`Logger` and exits 1.  Stdout stays the data channel: it carries the
+response and nothing else, so a caller can pipe it into `jq` without
+filtering log lines out first.  The diagnostic is guaranteed to:
 
 - Never leak raw OCaml exception syntax (no `Unix_error`, no `(Unix. ...)`).
 - Never dump multi-kilobyte HTTP bodies verbatim; Rosetta error envelopes
@@ -98,6 +113,7 @@ does not parse (`--bogus`, an unknown subcommand) is reported by Core's
 `Command` itself, unprefixed and untimestamped, before any request is
 made.  `Command_unix.run` offers no hook for it.
 
-The HTTP client, the endpoint wrappers and the error formatting live in
+The HTTP client, the endpoint wrappers, the decoding of the JSON-valued
+flags into Rosetta models (`payload.ml`) and the error formatting live in
 `src/lib/rosetta_client/`; `rosetta_client_cli.ml` holds only the flags,
 the subcommand tree and the output.
