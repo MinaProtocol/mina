@@ -11,11 +11,13 @@ let Filter
       | LongAndVeryLong
       | TearDownOnly
       | ToolchainsOnly
+      | BaseDockersOnly
       | AllTests
       | Release
       | Promote
       | DebianBuild
       | DockerBuild
+      | Packaging
       | Rosetta
       | Hardfork
       | AllDockersAndDebians
@@ -55,8 +57,10 @@ let tags
             , Long = [ Tag.Type.Long ]
             , TearDownOnly = [ Tag.Type.TearDown ]
             , ToolchainsOnly = [ Tag.Type.Toolchain ]
+            , BaseDockersOnly = [ Tag.Type.Base ]
             , DebianBuild = [ Tag.Type.Debian ]
             , DockerBuild = [ Tag.Type.Docker ]
+            , Packaging = [ Tag.Type.Packaging ]
             , AllTests = [ Tag.Type.Lint, Tag.Type.Release, Tag.Type.Test ]
             , Release = [ Tag.Type.Release ]
             , Promote = [ Tag.Type.Promote ]
@@ -204,12 +208,14 @@ let show
             , LongAndVeryLong = "LongAndVeryLong"
             , Long = "Long"
             , ToolchainsOnly = "Toolchain"
+            , BaseDockersOnly = "BaseDockersOnly"
             , TearDownOnly = "TearDownOnly"
             , AllTests = "AllTests"
             , Release = "Release"
             , Promote = "Promote"
             , DebianBuild = "DebianBuild"
             , DockerBuild = "DockerBuild"
+            , Packaging = "Packaging"
             , Rosetta = "Rosetta"
             , Hardfork = "Hardfork"
             , AllDockersAndDebians = "AllDockersAndDebians"

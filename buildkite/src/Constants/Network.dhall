@@ -4,37 +4,36 @@ let List/any = Prelude.List.any
 
 let Network
     : Type
-    = < Devnet | Mainnet | PreMesa1 >
+    = < Devnet | Mainnet >
 
 let capitalName =
           \(network : Network)
-      ->  merge
-            { Devnet = "Devnet", Mainnet = "Mainnet", PreMesa1 = "PreMesa1" }
-            network
+      ->  merge { Devnet = "Devnet", Mainnet = "Mainnet" } network
 
 let lowerName =
           \(network : Network)
-      ->  merge
-            { Devnet = "devnet"
-            , Mainnet = "mainnet"
-            , PreMesa1 = "hetzner-pre-mesa-1"
-            }
-            network
+      ->  merge { Devnet = "devnet", Mainnet = "mainnet" } network
 
 let debianSuffix =
           \(network : Network)
+      ->  merge { Devnet = "devnet", Mainnet = "mainnet" } network
+
+let namePrefixSegment =
+      \(network : Network) -> merge { Devnet = "", Mainnet = "Mainnet" } network
+
+let peerListUrl =
+          \(network : Network)
       ->  merge
-            { Devnet = "devnet"
-            , Mainnet = "mainnet"
-            , PreMesa1 = "hetzner-pre-mesa-1"
+            { Devnet = "https://bootnodes.minaprotocol.com/networks/devnet.txt"
+            , Mainnet =
+                "https://bootnodes.minaprotocol.com/networks/mainnet.txt"
             }
             network
 
 let toLabelSegment = \(network : Network) -> "-${debianSuffix network}"
 
 let requiresMainnetBuild =
-          \(network : Network)
-      ->  merge { Devnet = False, Mainnet = True, PreMesa1 = False } network
+      \(network : Network) -> merge { Devnet = False, Mainnet = True } network
 
 let buildMainnetEnv =
           \(network : Network)
@@ -55,7 +54,9 @@ let foldMinaBuildMainnetEnv =
 in  { Type = Network
     , capitalName = capitalName
     , lowerName = lowerName
+    , namePrefixSegment = namePrefixSegment
     , debianSuffix = debianSuffix
+    , peerListUrl = peerListUrl
     , toLabelSegment = toLabelSegment
     , requiresMainnetBuild = requiresMainnetBuild
     , foldMinaBuildMainnetEnv = foldMinaBuildMainnetEnv

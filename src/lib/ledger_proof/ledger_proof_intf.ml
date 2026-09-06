@@ -8,7 +8,7 @@ module type S = sig
   module Stable : sig
     [@@@no_toplevel_latest_type]
 
-    module V2 : sig
+    module V3 : sig
       type nonrec t = t [@@deriving compare, equal, sexp, yojson, hash]
 
       val to_latest : t -> t
@@ -31,6 +31,8 @@ module type S = sig
   val statement : t -> Mina_state.Snarked_ledger_state.t
 
   val statement_with_sok : t -> Mina_state.Snarked_ledger_state.With_sok.t
+
+  val sok_digest : t -> Sok_message.Digest.t
 
   val statement_with_sok_target :
        Mina_state.Snarked_ledger_state.With_sok.t

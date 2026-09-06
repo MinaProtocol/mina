@@ -376,16 +376,29 @@ let select_cols_from_id ~(table_name : string) ~(cols : string list) : string =
    The optional `tannot` function maps column names to type annotations.
    No type annotation is included if `tannot` returns an empty string. *)
 let insert_into_cols ~(returning : string) ~(table_name : string)
-    ?(tannot : string -> string option = Fn.const None) ~(cols : string list) ()
-    : string =
+    ?(tannot : string -> string option = Fn.const None) ~(cols : string list)
+    ?(on_conflict : string option) () : string =
   let values =
     List.map cols ~f:(fun col ->
         match tannot col with None -> "?" | Some tannot -> "?::" ^ tannot )
     |> String.concat ~sep:", "
   in
-  sprintf "INSERT INTO %s (%s) VALUES (%s) RETURNING %s" table_name
-    (String.concat ~sep:", " cols)
-    values returning
+  let insert =
+    sprintf "INSERT INTO %s (%s) VALUES (%s)" table_name
+      (String.concat ~sep:", " cols)
+      values
+  in
+  match on_conflict with
+  | Some col ->
+      let assignments =
+        String.split col ~on:',' |> List.map ~f:String.strip
+        |> List.map ~f:(fun col -> sprintf "%s = EXCLUDED.%s" col col)
+        |> String.concat ~sep:", "
+      in
+      sprintf "%s ON CONFLICT (%s) DO UPDATE SET %s RETURNING %s" insert col
+        assignments returning
+  | None ->
+      sprintf "%s RETURNING %s" insert returning
 
 (* run `select_cols` and return the result, if found
    if not found, run `insert_into_cols` and return the result
@@ -442,12 +455,76 @@ let insert_multi_into_col ~(table_name : string)
       (Caqti_type.unit ->* Caqti_type.(t2 (snd col) int)) search)
     ()
 
-let query ~f pool =
-  match%bind Pool.use f pool with
+(* Like the [None] branch of [select_insert_into_cols]: always INSERT and return
+   the new [returning] value. Performs NO content lookup/dedup, so it is safe for
+   columns without a UNIQUE constraint or index (e.g. the unbounded int[]
+   zkapp_events/zkapp_field_array.element_ids whose UNIQUE/index was dropped). *)
+let insert_into_cols_returning ~(returning : string * 'r Caqti_type.t)
+    ~(table_name : string) ?tannot ~(cols : string list * 'cols Caqti_type.t)
+    (module Conn : CONNECTION) (value : 'cols) =
+  Conn.find
+    ( Caqti_request.Infix.(snd cols ->! snd returning)
+    @@ insert_into_cols ~returning:(fst returning) ~table_name ?tannot
+         ~cols:(fst cols) () )
+    value
+
+(* Like [insert_into_cols] but generates an upsert:
+   INSERT INTO table (cols) VALUES (params)
+   ON CONFLICT (on_conflict) DO UPDATE SET on_conflict = EXCLUDED.on_conflict
+   RETURNING returning.
+   The DO UPDATE is a no-op that returns the existing row's id when a conflict
+   occurs, preventing UNIQUE violation errors under concurrent insertion. *)
+let upsert_into_cols ~(on_conflict : string) ~(returning : string)
+    ~(table_name : string) ?(tannot : string -> string option = Fn.const None)
+    ~(cols : string list) () : string =
+  insert_into_cols ~returning ~table_name ~tannot ~cols ~on_conflict ()
+
+(* Upsert with ON CONFLICT, returning the id of either the newly inserted row
+   or the existing row that caused the conflict. *)
+let upsert_into_cols_returning ~(on_conflict : string)
+    ~(returning : string * 'r Caqti_type.t) ~(table_name : string) ?tannot
+    ~(cols : string list * 'cols Caqti_type.t) (module Conn : CONNECTION)
+    (value : 'cols) =
+  Conn.find
+    ( Caqti_request.Infix.(snd cols ->! snd returning)
+    @@ upsert_into_cols ~on_conflict ~returning:(fst returning) ~table_name
+         ?tannot ~cols:(fst cols) () )
+    value
+
+(* No-dedup multi-row insert of one column's pre-rendered SQL literals, returning
+   the new ids in VALUES order (a single INSERT ... RETURNING returns rows in
+   VALUES order in PostgreSQL). Unlike [insert_multi_into_col] there is NO
+   ON CONFLICT and NO content SELECT-back, so it does not require a UNIQUE
+   constraint and never deduplicates: identical inputs yield distinct rows. Used
+   for zkapp_field_array.element_ids after its UNIQUE/index was dropped. *)
+let insert_multi_into_col_no_dedup ~(table_name : string) ~(col : string)
+    (module Conn : CONNECTION) (values : string list) =
+  let open Deferred.Result.Let_syntax in
+  match values with
+  | [] ->
+      return []
+  | _ ->
+      let insert =
+        sprintf "INSERT INTO %s (%s) VALUES %s RETURNING id" table_name col
+          (sep_by_comma ~parenthesis:true values)
+      in
+      Conn.collect_list
+        Caqti_request.Infix.((Caqti_type.unit ->* Caqti_type.int) insert)
+        ()
+
+(** Unwrap a Caqti result, raising on error. [ctx] names the operation being
+    performed and is prepended to the message. *)
+let ok_exn ?ctx = function
   | Ok v ->
-      return v
+      v
   | Error msg ->
-      failwithf "Error querying db, error: %s" (Caqti_error.show msg) ()
+      failwithf "%sError querying db, error: %s"
+        (Option.value_map ctx ~default:"" ~f:(sprintf "%s: "))
+        (Caqti_error.show msg) ()
+
+let query ~f pool =
+  let%map res = Pool.use f pool in
+  ok_exn res
 
 (** functions to retrieve an item from the db, where the input has
     option type; the resulting option is converted to a suitable type
@@ -455,11 +532,8 @@ let query ~f pool =
 let make_get_opt ~of_option ~f item_opt =
   let%map res_opt =
     Option.value_map item_opt ~default:(return None) ~f:(fun item ->
-        match%map f item with
-        | Ok v ->
-            Some v
-        | Error msg ->
-            failwithf "Error querying db, error: %s" (Caqti_error.show msg) () )
+        let%map res = f item in
+        Some (ok_exn res) )
   in
   of_option res_opt
 

@@ -30,7 +30,11 @@ let precomputed_blocks_comparator left right =
   let scan_height name = Scanf.sscanf name "%_s@-%d-%_s" Fn.id in
   let left_height = scan_height left in
   let right_height = scan_height right in
-  Int.compare left_height right_height
+  match Int.compare left_height right_height with
+  | 0 ->
+      String.compare left right
+  | order ->
+      order
 
 let sort_archive_files files : string list =
   files

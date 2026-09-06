@@ -45,6 +45,10 @@ SYNC_FILTER=""
 OVERRIDE_COMMIT=""
 LIST_JOBS=false
 LIST_STEPS=false
+SKIP_TOOLCHAIN_CHECK=false
+PULL_TOOLCHAIN=false
+AUTO_FIX_PERMS=false
+JOB_FILE=""
 
 # Populated by load_env_file, used by patch_docker_command
 USER_ENV_DOCKER_FLAGS=""
@@ -182,6 +186,10 @@ Options:
   --env-file FILE    File with KEY=VALUE pairs passed to all commands (including Docker)
   --list             List available job names and exit
   --list-steps       List steps in the job and exit (requires job name)
+  --skip-toolchain-check   Don't verify toolchain images before running
+  --pull-toolchain         docker pull each toolchain image up-front
+  --auto-fix-perms         Automatically run \`sudo chown\` to recover from
+                           container-owned files (UID 1000) without prompting
   -h, --help         Show this help
 
 Examples:
@@ -217,6 +225,9 @@ parse_args() {
       --env-file)   ENV_FILE="$2"; shift 2;;
       --list)       LIST_JOBS=true; shift;;
       --list-steps) LIST_STEPS=true; shift;;
+      --skip-toolchain-check) SKIP_TOOLCHAIN_CHECK=true; shift;;
+      --pull-toolchain)       PULL_TOOLCHAIN=true; shift;;
+      --auto-fix-perms)       AUTO_FIX_PERMS=true; shift;;
       -h|--help)    usage; exit 0;;
       -*)           err "Unknown option: $1"; usage; exit 1;;
       *)            JOB_NAME="$1"; shift;;
@@ -260,7 +271,7 @@ load_env_file() {
 
 # Step 1: Source env-file & export all Buildkite environment variables.
 setup_environment() {
-  step_banner "1/5" "Setting up environment"
+  step_banner "1/6" "Setting up environment"
 
   load_env_file
 
@@ -338,7 +349,7 @@ setup_environment() {
 
 # Step 2: Generate pipeline YAMLs from Dhall (or reuse existing ones).
 generate_pipelines() {
-  step_banner "2/5" "Generating pipeline YAMLs"
+  step_banner "2/6" "Generating pipeline YAMLs"
 
   # Auto-enable skip-dump when listing with --jobs-dir provided
   if [[ ( "$LIST_JOBS" == true || "$LIST_STEPS" == true ) && -n "$JOBS_DIR" ]]; then
@@ -378,9 +389,82 @@ rsync_tolerant() {
   fi
 }
 
+# ==============================================================================
+# Permission recovery — Docker containers in this pipeline run as opam (UID
+# 1000) by default (see buildkite/src/Lib/Cmds.dhall). When the host user's
+# UID differs, files written into the bind-mounted worktree end up unwritable
+# from the host. We detect this and recover with sudo chown.
+# ==============================================================================
+
+# Find files in the worktree not owned by the current host user. Runs `find`
+# with prunes for .git and the .claude worktree dir. Outputs nothing on
+# stdout; uses exit code 0 = foreign-owned files exist, 1 = clean.
+foreign_files_present() {
+  local hit
+  hit=$(find "$MINA_ROOT" \
+    \( -path "$MINA_ROOT/.git" -o -path "$MINA_ROOT/.claude/worktrees" \) -prune \
+    -o ! -user "$USER" -print -quit 2>/dev/null) || true
+  [[ -n "$hit" ]]
+}
+
+# Count foreign-owned files (slow — full traversal).
+count_foreign_files() {
+  find "$MINA_ROOT" \
+    \( -path "$MINA_ROOT/.git" -o -path "$MINA_ROOT/.claude/worktrees" \) -prune \
+    -o ! -user "$USER" -print 2>/dev/null | wc -l
+}
+
+# Recover ownership of any files in the worktree not owned by the current
+# user. Uses sudo. Honors $AUTO_FIX_PERMS to skip the confirmation prompt.
+# Safe to call when there's nothing to recover (returns silently).
+recover_perms() {
+  if ! foreign_files_present; then
+    return 0
+  fi
+
+  local count
+  count=$(count_foreign_files)
+  warn "Found $count file(s) in $MINA_ROOT not owned by $USER (UID $(id -u))."
+  warn "These were written by a container running as opam (UID 1000)."
+
+  if [[ "$AUTO_FIX_PERMS" != true ]]; then
+    if ! [ -t 0 ]; then
+      err "Stdin is not a TTY; cannot prompt. Re-run with --auto-fix-perms."
+      return 1
+    fi
+    local ans
+    read -r -p "Run 'sudo chown -R $(id -u):$(id -g)' on those files now? [y/N] " ans
+    if [[ ! "$ans" =~ ^[Yy] ]]; then
+      err "Skipping chown. Subsequent runs may fail until ownership is fixed."
+      return 1
+    fi
+  else
+    echo "Auto-fixing ownership (--auto-fix-perms)..."
+  fi
+
+  sudo find "$MINA_ROOT" \
+    \( -path "$MINA_ROOT/.git" -o -path "$MINA_ROOT/.claude/worktrees" \) -prune \
+    -o ! -user "$USER" -exec chown -h "$(id -u):$(id -g)" {} + 2>/dev/null
+  echo "Ownership recovered."
+}
+
+# Trap handler — runs on script exit (success, error, or signal). Recovers
+# perms so the next run starts clean. Preserves the original exit code.
+cleanup_perms_on_exit() {
+  local rc=$?
+  # Don't fight set -e during cleanup
+  set +e
+  if [[ -n "${MINA_ROOT:-}" && -d "$MINA_ROOT" ]] && foreign_files_present; then
+    echo ""
+    log "Post-run: foreign-owned files detected, recovering permissions"
+    recover_perms || true
+  fi
+  return $rc
+}
+
 # Step 3: Sync cache folders from Hetzner via rsync.
 sync_legacy_cache() {
-  step_banner "3/5" "Syncing cache from Hetzner"
+  step_banner "3/6" "Syncing cache from Hetzner"
 
   if [[ "$SKIP_SYNC" == true ]]; then
     echo "Skipping cache sync"
@@ -435,7 +519,7 @@ sync_legacy_cache() {
 
 # Step 4: Ensure local storagebox and shared directories are usable.
 validate_directories() {
-  step_banner "4/5" "Validating local directories"
+  step_banner "4/6" "Validating local directories"
 
   require_dir_writable "$LOCAL_STORAGEBOX" "Local storagebox directory"
 
@@ -446,22 +530,21 @@ validate_directories() {
 
   require_dir_writable "/var/buildkite/shared" "Shared buildkite state directory"
 
-  # Check ownership of _build if it was created by a previous Docker run as a
-  # different UID (e.g. root). Stale ownership causes permission errors inside
-  # the container which bind-mounts the workdir.
-  if [[ -d "$MINA_ROOT/_build" ]]; then
-    local build_owner
-    build_owner=$(stat -c '%u' "$MINA_ROOT/_build")
-    if [[ "$build_owner" != "$(id -u)" ]]; then
-      err "_build directory is owned by UID $build_owner (you are $(id -u))"
-      err "Fix with:"
-      err "  sudo chown -R \$(id -u):\$(id -g) $MINA_ROOT/_build"
+  # Check for stale ownership across the whole worktree. Containers run as
+  # opam (UID 1000) and write into the bind-mounted /workdir, so files
+  # appear on the host owned by UID 1000 regardless of the host user. If the
+  # host user is also UID 1000 this is a no-op.
+  if foreign_files_present; then
+    if ! recover_perms; then
+      err "Cannot continue with broken file ownership."
       exit 1
     fi
+  fi
 
-    # dune-build-root files cache absolute paths. Stale host paths (instead of
-    # /workdir) cause cargo to fail inside the container. Remove them so dune
-    # regenerates with the correct container paths.
+  # dune-build-root files cache absolute paths. Stale host paths (instead of
+  # /workdir) cause cargo to fail inside the container. Remove them so dune
+  # regenerates with the correct container paths.
+  if [[ -d "$MINA_ROOT/_build" ]]; then
     local stale
     stale=$(find "$MINA_ROOT/_build" -name dune-build-root -exec grep -L '^/workdir' {} + 2>/dev/null || true)
     if [[ -n "$stale" ]]; then
@@ -499,7 +582,7 @@ patch_docker_command() {
   # Note: We intentionally do NOT use --user flag. The container runs as opam
   # (UID 1000) which typically matches the host user's UID, allowing sudo to
   # work inside the container for apt operations.
-  local docker_flags="--env APTLY_ROOT=/tmp/aptly --env LOCAL_BK_RUN=${LOCAL_BK_RUN}${USER_ENV_DOCKER_FLAGS}"
+  local docker_flags="--env LOCAL_BK_RUN=${LOCAL_BK_RUN}${USER_ENV_DOCKER_FLAGS}"
   [[ -n "${OVERRIDE_GITHASH:-}" ]] && docker_flags+=" --env OVERRIDE_GITHASH=${OVERRIDE_GITHASH}"
   cmd=$(printf '%s\n' "$cmd" | sed "s|docker run -it|docker run -it ${docker_flags}|g")
 
@@ -540,10 +623,77 @@ execute_step() {
   fi
 }
 
+# Extract unique container image references from JOB_FILE's command strings.
+# Looks for the o1labs/anthropic-style fully-qualified image names embedded
+# in `docker run` lines.
+extract_job_images() {
+  yq -r '.pipeline.steps[].commands[]?, .pipeline.steps[].command? // empty' "$JOB_FILE" 2>/dev/null \
+    | grep -oE '(europe-west3-docker\.pkg\.dev|gcr\.io|docker\.io)/[a-zA-Z0-9._/-]+(:[a-zA-Z0-9._-]+)?' \
+    | sort -u
+}
+
+# Verify the toolchain images this job needs are reachable. Reports each as
+# `local-cached`, `pull-needed`, or `unreachable`. Fails fast if anything is
+# unreachable so the user doesn't burn 30 minutes before discovering an auth
+# issue. Honors --skip-toolchain-check and --pull-toolchain.
+verify_toolchain() {
+  step_banner "5/6" "Verifying toolchain images"
+
+  if [[ "$SKIP_TOOLCHAIN_CHECK" == true ]]; then
+    echo "Skipping toolchain verification (--skip-toolchain-check)"
+    return 0
+  fi
+
+  if ! command -v docker &>/dev/null; then
+    warn "docker not in PATH; cannot verify toolchain"
+    return 0
+  fi
+
+  find_job_file
+  local images
+  images=$(extract_job_images)
+  if [[ -z "$images" ]]; then
+    echo "No container images referenced in this job."
+    return 0
+  fi
+
+  local unreachable=0
+  while IFS= read -r img; do
+    [[ -z "$img" ]] && continue
+    printf '  %-80s ' "$img"
+    if docker image inspect "$img" >/dev/null 2>&1; then
+      echo -e "\033[1;32mlocal-cached\033[0m"
+    elif docker manifest inspect "$img" >/dev/null 2>&1; then
+      echo -e "\033[1;33mpull-needed\033[0m"
+      if [[ "$PULL_TOOLCHAIN" == true ]]; then
+        echo "    pulling..."
+        if ! docker pull "$img"; then
+          err "Failed to pull $img"
+          unreachable=$((unreachable + 1))
+        fi
+      fi
+    else
+      echo -e "\033[1;31munreachable\033[0m"
+      unreachable=$((unreachable + 1))
+    fi
+  done <<< "$images"
+
+  if [[ "$unreachable" -gt 0 ]]; then
+    err "$unreachable image(s) unreachable. Possible causes:"
+    err "  - Not authenticated to the registry. Try:"
+    err "      gcloud auth configure-docker europe-west3-docker.pkg.dev"
+    err "  - Network problem reaching the registry."
+    err "  - Image tag in ContainerImages.dhall is stale."
+    err "Re-run with --skip-toolchain-check to bypass this verification."
+    exit 1
+  fi
+}
+
 # Find job YAML file by spec.name (case-insensitive) or filename.
-# Sets the global JOB_FILE variable or exits with an error.
+# Sets the global JOB_FILE variable or exits with an error. Idempotent:
+# returns immediately if JOB_FILE is already set.
 find_job_file() {
-  JOB_FILE=""
+  [[ -n "$JOB_FILE" ]] && return 0
   local job_name_lower
   job_name_lower=$(to_lower "$JOB_NAME")
 
@@ -573,9 +723,9 @@ find_job_file() {
 # Step 5: Locate the job, iterate its steps, and execute them.
 run_job() {
   if [[ "$LIST_STEPS" == true ]]; then
-    step_banner "5/5" "Listing steps for '$JOB_NAME'"
+    step_banner "6/6" "Listing steps for '$JOB_NAME'"
   else
-    step_banner "5/5" "Running job '$JOB_NAME'"
+    step_banner "6/6" "Running job '$JOB_NAME'"
   fi
 
   if ! command -v yq &>/dev/null; then
@@ -672,6 +822,12 @@ run_job() {
 # Main
 # ==============================================================================
 parse_args "$@"
+
+# Register the perms-recovery trap as early as possible so a Ctrl-C between
+# steps still leaves the worktree in a usable state. cleanup_perms_on_exit
+# is a no-op when there's nothing to fix.
+trap cleanup_perms_on_exit EXIT
+
 setup_environment
 generate_pipelines
 
@@ -685,6 +841,7 @@ fi
 if [[ "$LIST_STEPS" != true ]]; then
   sync_legacy_cache
   validate_directories
+  verify_toolchain
 fi
 
 run_job

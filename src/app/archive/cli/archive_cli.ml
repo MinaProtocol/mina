@@ -27,7 +27,7 @@ let command_run =
                heights max(1, h-n) and h (default %d)"
               Archive_lib.Metrics.default_missing_blocks_width )
          (optional int)
-     and postgres = Flag.Uri.Archive.postgres
+     and postgres = Lazy.force Flag.Uri.Archive.postgres
      and runtime_config_file =
        flag "--config-file" ~aliases:[ "-config-file" ] (optional string)
          ~doc:"PATH to the configuration file containing the genesis ledger"
@@ -53,10 +53,10 @@ let command_run =
      in
      fun () ->
        let logger = Logger.create () in
-       let genesis_constants = Genesis_constants.Compiled.genesis_constants in
-       let constraint_constants =
-         Genesis_constants.Compiled.constraint_constants
-       in
+
+       let (module G) = Genesis_constants.profiled () in
+       let genesis_constants = G.genesis_constants in
+       let constraint_constants = G.constraint_constants in
        Stdout_log.setup log_json log_level ;
        let proof_cache_db = Proof_cache_tag.create_identity_db () in
        [%log info] "Starting archive process; built with commit $commit"
@@ -92,7 +92,7 @@ let command_prune =
          ~doc:
            "timestamp Delete blocks that are older than the given timestamp. \
             Format: 2000-00-00 12:00:00+0100"
-     and postgres = Flag.Uri.Archive.postgres in
+     and postgres = Lazy.force Flag.Uri.Archive.postgres in
      fun () ->
        let logger = Logger.create () in
        let timestamp =

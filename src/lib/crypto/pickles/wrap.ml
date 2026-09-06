@@ -112,7 +112,7 @@ module For_tests_only = struct
       | Some x ->
           x
       | None ->
-          O.([| p_eval_1 o |], [| p_eval_2 o |])
+          O.(p_eval_1 o, p_eval_2 o)
     in
     let scalar_chal f =
       Scalar_challenge.map ~f:Challenge.Constant.of_tick_field (f o)

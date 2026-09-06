@@ -66,11 +66,11 @@ module Public_key = struct
     | Some id ->
         return id
     | None ->
-        let public_key = Public_key.Compressed.to_base58_check t in
-        Conn.find
-          (Mina_caqti.find_req Caqti_type.string Caqti_type.int
-             "INSERT INTO public_keys (value) VALUES (?) RETURNING id" )
-          public_key
+        Mina_caqti.upsert_into_cols_returning ~on_conflict:"value"
+          ~returning:("id", Caqti_type.int) ~table_name:"public_keys"
+          ~cols:([ "value" ], Caqti_type.string)
+          (module Conn)
+          (Public_key.Compressed.to_base58_check t)
 end
 
 (* Unlike other modules here, `Token_owners` does not correspond with a database table *)
@@ -195,12 +195,31 @@ module Token = struct
     let open Deferred.Result.Let_syntax in
     let value = Token_id.to_string token_id in
     match Token_owners.find_owner token_id with
-    | None ->
+    | None -> (
         (* not necessarily the default token *)
-        Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
-          ~table_name ~cols:(Fields.names, typ)
-          (module Conn)
-          { value; owner_public_key_id = None; owner_token_id = None }
+        (* The [value] column is UNIQUE ([tokens_value_key]). A row for this
+           value may already exist with an owner set (e.g. inserted by block
+           processing for a custom token), while here we have no owner info
+           because [Token_owners] is not populated on this path (the genesis
+           account insertion does not pre-populate it). Selecting by the full
+           {value; NULL; NULL} tuple would miss such an owned row and the
+           subsequent INSERT would violate [tokens_value_key]. So look up by
+           value alone first and reuse the existing id if present. *)
+        match%bind find_opt (module Conn) token_id with
+        | Some id ->
+            return id
+        | None ->
+            (* Atomic upsert on value (tokens_value_key): under concurrent
+               insertion two transactions can both pass find_opt and collide.
+               Owner metadata is a deterministic function of value (derived
+               token ids produce consistent owners; the default no-owner token
+               has a distinct fixed value), so any conflict row already has
+               the correct owner metadata (or none, which is also correct). *)
+            Mina_caqti.upsert_into_cols_returning ~on_conflict:"value"
+              ~returning:("id", Caqti_type.int) ~table_name
+              ~cols:(Fields.names, typ)
+              (module Conn)
+              { value; owner_public_key_id = None; owner_token_id = None } )
     | Some acct_id -> (
         assert (not @@ Token_id.(equal default) token_id) ;
         assert (
@@ -224,8 +243,14 @@ module Token = struct
         | None ->
             let owner_public_key_id = Some owner_public_key_id in
             let owner_token_id = Some owner_token_id in
-            Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
-              ~table_name ~cols:(Fields.names, typ)
+            (* Atomic upsert on value (tokens_value_key): two concurrent
+               inserters can both pass find_opt and collide. Owner metadata
+               is a deterministic function of value (see no-owner path), so
+               any conflict row already has correct owner_public_key_id /
+               owner_token_id. *)
+            Mina_caqti.upsert_into_cols_returning ~on_conflict:"value"
+              ~returning:("id", Caqti_type.int) ~table_name
+              ~cols:(Fields.names, typ)
               (module Conn)
               { value; owner_public_key_id; owner_token_id } )
 
@@ -385,7 +410,7 @@ module Zkapp_field_array = struct
         ~f:(Zkapp_field.add_if_doesn't_exist (module Conn))
       >>| Array.of_list
     in
-    Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
+    Mina_caqti.insert_into_cols_returning ~returning:("id", Caqti_type.int)
       ~table_name
       ~cols:([ "element_ids" ], Mina_caqti.array_int_typ)
       ~tannot:(function "element_ids" -> Some "int[]" | _ -> None)
@@ -556,8 +581,8 @@ module Zkapp_verification_keys = struct
       Zkapp_verification_key_hashes.add_if_doesn't_exist (module Conn) vk.hash
     in
     let value = { verification_key; hash_id } in
-    Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
-      ~table_name ~cols:(Fields.names, typ)
+    Mina_caqti.upsert_into_cols_returning ~on_conflict:"verification_key"
+      ~returning:("id", Caqti_type.int) ~table_name ~cols:(Fields.names, typ)
       (module Conn)
       value
 
@@ -1313,9 +1338,10 @@ module Snarked_ledger_hash = struct
     | Some id ->
         return id
     | None ->
-        Conn.find
-          (find_req Caqti_type.string Caqti_type.int
-             "INSERT INTO snarked_ledger_hashes (value) VALUES (?) RETURNING id" )
+        Mina_caqti.upsert_into_cols_returning ~on_conflict:"value"
+          ~returning:("id", Caqti_type.int) ~table_name:"snarked_ledger_hashes"
+          ~cols:([ "value" ], Caqti_type.string)
+          (module Conn)
           hash
 
   let load (module Conn : Mina_caqti.CONNECTION) id =
@@ -1503,83 +1529,70 @@ module Zkapp_events = struct
 
   let table_name = "zkapp_events"
 
-  module Field_array_map = Map.Make (struct
-    type t = int array [@@deriving sexp]
+  (* Account_update.Body.Events'.t is `field array list` (a list of arrays of
+     fields). We insert in batched, NON-deduplicated steps:
 
-    let compare = Array.compare Int.compare
-  end)
+     1. flatten to all field strings and insert them (zkapp_field keeps its
+        UNIQUE(field) constraint, so this step still dedups by content);
+     2. for each event (a field array), render its field ids as an int[] literal
+        and insert them all into zkapp_field_array in one query, taking the
+        returned ids POSITIONALLY (in VALUES order) — NO content dedup, since
+        zkapp_field_array.element_ids has no UNIQUE/index (a btree over the
+        unbounded int[] overflows Postgres' 2704-byte key limit for max-cost
+        zkApps);
+     3. insert that array of field_array ids into zkapp_events (also no dedup).
 
-  (* Account_update.Body.Events'.t is defined as `field array list`,
-     which is ismorphic to a list of list of fields.
-
-     We are batching the insertion of field and field_array to optimize
-     the speed of archiving max-cost zkapps.
-
-     1. we flatten the list of list of fields to get all the field elements
-     2. insert all the field elements in one query
-     3. construct a map "M" from `field_id` to `field` by querying against the zkapp_field table
-     4. use "M" and the list of list of fields to compute the list of list of field_ids
-     5. insert all list of `list of field_ids` in one query
-     6. construct a map "M'" from `field_array_id` to `field_id array` by querying against
-        the zkapp_field_array table
-     7. use "M'" and the list of list of field_ids to compute the list of field_array_ids
-     8. insert the list of field_arrays
-  *)
+     The EMPTY case (events = []) is represented as NULL: we create NO zkapp_events
+     row and return None, so account_update_body.events_id/actions_id store NULL.
+     This eliminates the dominant duplicate (the empty {} array) structurally
+     rather than via content dedup. Returns [int option]. *)
   let add_if_doesn't_exist (module Conn : Mina_caqti.CONNECTION)
       (events : Account_update.Body.Events'.t) =
     let open Deferred.Result.Let_syntax in
-    let%bind field_array_id_list =
-      if not @@ List.is_empty events then
-        let field_list_list =
-          List.map events ~f:(fun field_array ->
-              Array.map field_array ~f:Pickles.Backend.Tick.Field.to_string
-              |> Array.to_list )
-        in
-        let fields = field_list_list |> List.concat in
-        let%bind field_id_list_list =
-          if not @@ List.is_empty fields then
-            let%map field_map =
-              Mina_caqti.insert_multi_into_col ~table_name:"zkapp_field"
-                ~col:("field", Caqti_type.string)
-                (module Conn)
-                fields
-              >>| String.Map.of_alist_exn
-            in
-            let field_id_list_list =
-              List.map field_list_list ~f:(List.map ~f:(Map.find_exn field_map))
-            in
-            field_id_list_list
-          else
-            (* if there's no fields, then we must have some list of empty lists *)
-            return @@ List.map field_list_list ~f:(fun _ -> [])
-        in
-        (* this conversion should be done by caqti using `typ`, FIX this in the future *)
-        let field_array_list =
-          List.map field_id_list_list ~f:(fun id_list ->
-              List.map id_list ~f:Int.to_string
-              |> String.concat ~sep:", " |> sprintf "{%s}" )
-        in
-        let%map field_array_map =
-          Mina_caqti.insert_multi_into_col ~table_name:"zkapp_field_array"
-            ~col:("element_ids", Mina_caqti.array_int_typ)
-            (module Conn)
-            field_array_list
-          >>| Field_array_map.of_alist_exn
-        in
-        let field_array_id_list =
-          List.map field_id_list_list ~f:(fun field_id_list ->
-              Map.find_exn field_array_map (Array.of_list field_id_list) )
-          |> Array.of_list
-        in
-        field_array_id_list
-      else return @@ Array.of_list []
-    in
-    Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
-      ~table_name
-      ~cols:([ "element_ids" ], Mina_caqti.array_int_typ)
-      ~tannot:(function "element_ids" -> Some "int[]" | _ -> None)
-      (module Conn)
-      field_array_id_list
+    if List.is_empty events then return None
+    else
+      let field_list_list =
+        List.map events ~f:(fun field_array ->
+            Array.map field_array ~f:Pickles.Backend.Tick.Field.to_string
+            |> Array.to_list )
+      in
+      let fields = field_list_list |> List.concat in
+      let%bind field_id_list_list =
+        if not @@ List.is_empty fields then
+          let%map field_map =
+            Mina_caqti.insert_multi_into_col ~table_name:"zkapp_field"
+              ~col:("field", Caqti_type.string)
+              (module Conn)
+              fields
+            >>| String.Map.of_alist_exn
+          in
+          List.map field_list_list ~f:(List.map ~f:(Map.find_exn field_map))
+        else
+          (* no fields => a non-empty list of empty events; each maps to {} *)
+          return @@ List.map field_list_list ~f:(fun _ -> [])
+      in
+      (* this conversion should be done by caqti using `typ`, FIX this in the future *)
+      let field_array_list =
+        List.map field_id_list_list ~f:(fun id_list ->
+            List.map id_list ~f:Int.to_string
+            |> String.concat ~sep:", " |> sprintf "{%s}" )
+      in
+      let%bind field_array_ids =
+        Mina_caqti.insert_multi_into_col_no_dedup
+          ~table_name:"zkapp_field_array" ~col:"element_ids"
+          (module Conn)
+          field_array_list
+      in
+      let element_ids = Array.of_list field_array_ids in
+      let%map id =
+        Mina_caqti.insert_into_cols_returning ~returning:("id", Caqti_type.int)
+          ~table_name
+          ~cols:([ "element_ids" ], Mina_caqti.array_int_typ)
+          ~tannot:(function "element_ids" -> Some "int[]" | _ -> None)
+          (module Conn)
+          element_ids
+      in
+      Some id
 
   let load (module Conn : Mina_caqti.CONNECTION) id =
     Conn.find
@@ -1594,8 +1607,8 @@ module Zkapp_account_update_body = struct
     ; update_id : int
     ; balance_change : string
     ; increment_nonce : bool
-    ; events_id : int
-    ; actions_id : int
+    ; events_id : int option
+    ; actions_id : int option
     ; call_data_id : int
     ; call_depth : int
     ; zkapp_network_precondition_id : int
@@ -1616,8 +1629,8 @@ module Zkapp_account_update_body = struct
         ; int
         ; string
         ; bool
-        ; int
-        ; int
+        ; option int
+        ; option int
         ; int
         ; int
         ; int
@@ -1958,12 +1971,15 @@ module User_command = struct
                 |> Unsigned.UInt32.to_int64 )
           in
           (* TODO: Converting these uint64s to int64 can overflow; see #5419 *)
-          Conn.find
-            (find_req typ Caqti_type.int
-               (Mina_caqti.insert_into_cols ~returning:"id" ~table_name
-                  ~tannot:(function
-                    | "command_type" -> Some "user_command_type" | _ -> None )
-                  ~cols:Fields.names () ) )
+          (* Atomic upsert keyed on hash instead of plain INSERT: under concurrent
+             block insertion two transactions can both pass the find_opt check
+             above and collide on user_commands_hash_key. *)
+          Mina_caqti.upsert_into_cols_returning ~on_conflict:"hash"
+            ~returning:("id", Caqti_type.int) ~table_name
+            ~tannot:(function
+              | "command_type" -> Some "user_command_type" | _ -> None )
+            ~cols:(Fields.names, typ)
+            (module Conn)
             { command_type =
                 ( match via with
                 | `Ident ->
@@ -2005,12 +2021,14 @@ module User_command = struct
           let%bind receiver_id =
             Public_key.add_if_doesn't_exist (module Conn) user_cmd.receiver
           in
-          Conn.find
-            (find_req typ Caqti_type.int
-               (Mina_caqti.insert_into_cols ~returning:"id" ~table_name
-                  ~tannot:(function
-                    | "command_type" -> Some "user_command_type" | _ -> None )
-                  ~cols:Fields.names () ) )
+          (* Atomic upsert keyed on hash instead of plain INSERT:
+             concurrent block insertion can race past find_opt. *)
+          Mina_caqti.upsert_into_cols_returning ~on_conflict:"hash"
+            ~returning:("id", Caqti_type.int) ~table_name
+            ~tannot:(function
+              | "command_type" -> Some "user_command_type" | _ -> None )
+            ~cols:(Fields.names, typ)
+            (module Conn)
             { command_type = user_cmd.command_type
             ; fee_payer_id
             ; source_id
@@ -2058,9 +2076,13 @@ module User_command = struct
         @@ Mina_caqti.select_cols_from_id ~table_name ~cols:Fields.names )
         id
 
-    let add_if_doesn't_exist ~logger (module Conn : Mina_caqti.CONNECTION)
+    let add_without_find_opt ~logger (module Conn : Mina_caqti.CONNECTION)
         (ps : Zkapp_command.t) =
+      (* Skip find_opt; go straight to child builds + upsert. *)
       let open Deferred.Result.Let_syntax in
+      let transaction_hash =
+        Transaction_hash.hash_zkapp_command_with_hashes ps
+      in
       let zkapp_command = Zkapp_command.to_simple ps in
       let%bind zkapp_fee_payer_body_id =
         Metrics.time ~label:"Zkapp_fee_payer_body.add" ~logger
@@ -2077,16 +2099,35 @@ module User_command = struct
         >>| Array.of_list
       in
       let memo = ps.memo |> Signed_command_memo.to_base58_check in
-      let hash =
-        Transaction_hash.hash_zkapp_command_with_hashes ps
-        |> Transaction_hash.to_base58_check
-      in
-      Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
-        ~table_name:"zkapp_commands" ~cols:(Fields.names, typ)
+      let hash = Transaction_hash.to_base58_check transaction_hash in
+      (* Atomic upsert keyed on hash instead of select-then-insert:
+         under concurrent block insertion, two transactions can both pass
+         the find_opt check above, build child rows with different ids
+         (zkapp_field_array has no UNIQUE), and collide on
+         zkapp_commands_hash_key.  ON CONFLICT (hash) DO UPDATE SET
+         hash = EXCLUDED.hash is a no-op that returns the existing id. *)
+      Mina_caqti.upsert_into_cols_returning ~on_conflict:"hash"
+        ~returning:("id", Caqti_type.int) ~table_name:"zkapp_commands"
+        ~cols:(Fields.names, typ)
         ~tannot:(function
           | "zkapp_account_updates_ids" -> Some "int[]" | _ -> None )
         (module Conn)
         { zkapp_fee_payer_body_id; zkapp_account_updates_ids; memo; hash }
+
+    let add_if_doesn't_exist ~logger (module Conn : Mina_caqti.CONNECTION)
+        (ps : Zkapp_command.t) =
+      let open Deferred.Result.Let_syntax in
+      let transaction_hash =
+        Transaction_hash.hash_zkapp_command_with_hashes ps
+      in
+      (* Dedup on hash alone: same command in sibling blocks reuses existing row.
+         Building child rows unconditionally is wasteful and, with non-deduping
+         child tables, can lead to UNIQUE collisions on zkapp_commands_hash_key. *)
+      match%bind find_opt (module Conn) ~transaction_hash with
+      | Some id ->
+          return id
+      | None ->
+          add_without_find_opt ~logger (module Conn) ps
   end
 
   let via (t : User_command.t) : [ `Zkapp_command | `Ident ] =
@@ -2129,6 +2170,16 @@ module Internal_command = struct
 
   let table_name = "internal_commands"
 
+  let insert_sql =
+    {sql| INSERT INTO internal_commands
+           (command_type, receiver_id, fee, hash)
+          VALUES (?::internal_command_type, ?, ?, ?)
+          ON CONFLICT (hash, command_type)
+          DO UPDATE SET hash = EXCLUDED.hash,
+            command_type = EXCLUDED.command_type
+          RETURNING id
+    |sql}
+
   let find_opt (module Conn : Mina_caqti.CONNECTION)
       ~(v1_transaction_hash : bool) ~(transaction_hash : Transaction_hash.t)
       ~(command_type : string) =
@@ -2165,13 +2216,14 @@ module Internal_command = struct
         let%bind receiver_id =
           Public_key.add_if_doesn't_exist (module Conn) internal_cmd.receiver
         in
-        Conn.find
-          (find_req typ Caqti_type.int
-             (Mina_caqti.insert_into_cols ~returning:"id" ~table_name
-                ~tannot:(function
-                  | "command_type" -> Some "internal_command_type" | _ -> None
-                  )
-                ~cols:Fields.names () ) )
+        (* Atomic upsert keyed on (hash, command_type) instead of plain INSERT:
+           concurrent block insertion can race past find_opt. *)
+        Mina_caqti.upsert_into_cols_returning ~on_conflict:"hash,command_type"
+          ~returning:("id", Caqti_type.int) ~table_name
+          ~tannot:(function
+            | "command_type" -> Some "internal_command_type" | _ -> None )
+          ~cols:(Fields.names, typ)
+          (module Conn)
           { command_type = internal_cmd.command_type
           ; receiver_id
           ; fee = Currency.Fee.to_string internal_cmd.fee
@@ -2233,12 +2285,7 @@ module Fee_transfer = struct
           Public_key.add_if_doesn't_exist (module Conn) pk
         in
         Conn.find
-          (find_req typ Caqti_type.int
-             {sql| INSERT INTO internal_commands
-                    (command_type, receiver_id, fee, hash)
-                   VALUES (?::internal_command_type, ?, ?, ?)
-                   RETURNING id
-             |sql} )
+          (find_req typ Caqti_type.int Internal_command.insert_sql)
           { kind
           ; receiver_id
           ; fee =
@@ -2282,12 +2329,7 @@ module Coinbase = struct
           Public_key.add_if_doesn't_exist (module Conn) pk
         in
         Conn.find
-          (find_req typ Caqti_type.int
-             {sql| INSERT INTO internal_commands
-                    (command_type, receiver_id, fee, hash)
-                   VALUES (?::internal_command_type, ?, ?, ?)
-                   RETURNING id
-             |sql} )
+          (find_req typ Caqti_type.int Internal_command.insert_sql)
           { receiver_id
           ; amount =
               Coinbase.amount t |> Currency.Amount.to_uint64
@@ -2998,17 +3040,19 @@ module Block = struct
         let consensus_state = Protocol_state.consensus_state protocol_state in
         let blockchain_state = Protocol_state.blockchain_state protocol_state in
         let%bind block_id =
-          Conn.find
-            (find_req typ Caqti_type.int
-               (Mina_caqti.insert_into_cols ~returning:"id" ~table_name
-                  ~tannot:(function
-                    | "chain_status" ->
-                        Some "chain_status_type"
-                    | "sub_window_densities" ->
-                        Some "bigint[]"
-                    | _ ->
-                        None )
-                  ~cols:Fields.names () ) )
+          (* Atomic upsert keyed on state_hash instead of plain INSERT:
+             concurrent block insertion can race past find_opt. *)
+          Mina_caqti.upsert_into_cols_returning ~on_conflict:"state_hash"
+            ~returning:("id", Caqti_type.int) ~table_name
+            ~tannot:(function
+              | "chain_status" ->
+                  Some "chain_status_type"
+              | "sub_window_densities" ->
+                  Some "bigint[]"
+              | _ ->
+                  None )
+            ~cols:(Fields.names, typ)
+            (module Conn)
             { state_hash = hash |> State_hash.to_base58_check
             ; parent_id
             ; parent_hash =
@@ -4698,12 +4742,12 @@ let add_genesis_accounts ~logger ~(runtime_config_opt : Runtime_config.t option)
   | None ->
       Deferred.unit
   | Some runtime_config -> (
+      let (module G) = Genesis_constants.profiled () in
       let%bind precomputed_values =
         match%map
           Genesis_ledger_helper.init_from_config_file ~logger
-            ~proof_level:Genesis_constants.Compiled.proof_level
-            ~genesis_constants ~constraint_constants runtime_config
-            ~cli_proof_level:None
+            ~proof_level:G.proof_level ~genesis_constants ~constraint_constants
+            runtime_config ~cli_proof_level:None
         with
         | Ok precomputed_values ->
             precomputed_values
@@ -4968,6 +5012,9 @@ let setup_server ~proof_cache_db ~(genesis_constants : Genesis_constants.t)
       Async.never ()
 
 module For_test = struct
+  let add_zkapp_command_without_find_opt =
+    User_command.Zkapp_command.add_without_find_opt
+
   let assert_parent_exist ~parent_id ~parent_hash conn =
     let open Deferred.Result.Let_syntax in
     match parent_id with

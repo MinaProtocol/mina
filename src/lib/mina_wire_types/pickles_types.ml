@@ -20,6 +20,9 @@ module Nat = struct
   type fifteen = z s s s s s s s s s s s s s s s
 
   type sixteen = z s s s s s s s s s s s s s s s s
+
+  type thirty_two =
+    z s s s s s s s s s s s s s s s s s s s s s s s s s s s s s s s s
 end
 
 module Vector = struct
@@ -92,7 +95,7 @@ module Plonk_types = struct
       end
     end
 
-    module V1 = struct
+    module V2 = struct
       type ('f, 'f_multi) t =
         { evals :
             ('f_multi * 'f_multi, 'f_multi * 'f_multi) With_public_input.V1.t

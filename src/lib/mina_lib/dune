@@ -22,7 +22,8 @@
   result
   bin_prot.shape
   ;; local libraries
-  mina_stdlib
+   backoff
+   mina_stdlib
   transition_chain_prover
   best_tip_prover
   proof_carrying_data

@@ -73,7 +73,7 @@ module M = struct
 
     module Base = struct
       module Wrap = struct
-        module V2 = struct
+        module V3 = struct
           type digest_constant =
             Pickles_types.Nat.four Pickles_limb_vector.Constant.t
 
@@ -95,7 +95,7 @@ module M = struct
             ; prev_evals :
                 ( Snark_params.Tick.Field.t
                 , Snark_params.Tick.Field.t array )
-                Pickles_types.Plonk_types.All_evals.V1.t
+                Pickles_types.Plonk_types.All_evals.V2.t
                   (* A job half-done may be worse than not done at all.
                      TODO: Migrate Plonk_types here, and actually include the
                      *wire* type, not this in-memory version.
@@ -118,13 +118,13 @@ module M = struct
               Pickles_types.Vector.t )
             Pickles_reduced_messages_for_next_proof_over_same_field.Step.V1.t
           )
-          Base.Wrap.V2.t
+          Base.Wrap.V3.t
           -> ('s, 'mlmb) with_data
 
     type 'mlmb t = (unit, 'mlmb) with_data
 
     module Proofs_verified_2 = struct
-      module V2 = struct
+      module V3 = struct
         type nonrec t = Pickles_types.Nat.two t
       end
     end
@@ -158,7 +158,7 @@ module M = struct
     end
 
     module Proof = struct
-      module V2 = struct
+      module V3 = struct
         type t = Verification_key.Max_width.n Proof.t
       end
     end
@@ -171,7 +171,7 @@ module Types = struct
       type 'a t
 
       module Proofs_verified_2 : sig
-        module V2 : sig
+        module V3 : sig
           type nonrec t = Pickles_types.Nat.two t
         end
       end
@@ -189,7 +189,7 @@ module Types = struct
       end
 
       module Proof : sig
-        module V2 : sig
+        module V3 : sig
           type t = Verification_key.Max_width.n Proof.t
         end
       end

@@ -13,8 +13,9 @@
   core_kernel
   rpc_parallel
   sexplib0
-  ;; local libraries
-  blockchain_snark
+   ;; local libraries
+   backoff
+   blockchain_snark
   child_processes
   error_json
   genesis_constants

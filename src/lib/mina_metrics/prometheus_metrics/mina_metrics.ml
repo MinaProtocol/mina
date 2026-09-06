@@ -1054,6 +1054,76 @@ module Network = struct
     let help = "# of failed connections for rpc requests" in
     Counter.v "rpc_connections_failed" ~help ~namespace ~subsystem
 
+  let stream_queue_messages_max_family =
+    let help =
+      "Maximum queued libp2p stream messages among active streams by protocol \
+       and queue"
+    in
+    Gauge.v_labels "stream_queue_messages_max"
+      ~label_names:[ "protocol"; "queue" ] ~help ~namespace ~subsystem
+
+  let stream_queue_messages_sum_family =
+    let help =
+      "Total queued libp2p stream messages among active streams by protocol \
+       and queue"
+    in
+    Gauge.v_labels "stream_queue_messages_sum"
+      ~label_names:[ "protocol"; "queue" ] ~help ~namespace ~subsystem
+
+  let stream_queue_bytes_max_family =
+    let help =
+      "Maximum approximate queued libp2p stream bytes among active streams by \
+       protocol and queue"
+    in
+    Gauge.v_labels "stream_queue_bytes_max" ~label_names:[ "protocol"; "queue" ]
+      ~help ~namespace ~subsystem
+
+  let stream_queue_bytes_sum_family =
+    let help =
+      "Total approximate queued libp2p stream bytes among active streams by \
+       protocol and queue"
+    in
+    Gauge.v_labels "stream_queue_bytes_sum" ~label_names:[ "protocol"; "queue" ]
+      ~help ~namespace ~subsystem
+
+  let stream_queue_discarded_messages_family =
+    let help =
+      "Total libp2p stream messages discarded while releasing queued stream \
+       data"
+    in
+    Counter.v_labels "stream_queue_discarded_messages"
+      ~label_names:[ "protocol"; "queue"; "reason" ]
+      ~help ~namespace ~subsystem
+
+  let stream_queue_discarded_bytes_family =
+    let help =
+      "Total approximate libp2p stream bytes discarded while releasing queued \
+       stream data"
+    in
+    Counter.v_labels "stream_queue_discarded_bytes"
+      ~label_names:[ "protocol"; "queue"; "reason" ]
+      ~help ~namespace ~subsystem
+
+  let stream_queue_messages_max ~protocol ~queue =
+    Gauge.labels stream_queue_messages_max_family [ protocol; queue ]
+
+  let stream_queue_messages_sum ~protocol ~queue =
+    Gauge.labels stream_queue_messages_sum_family [ protocol; queue ]
+
+  let stream_queue_bytes_max ~protocol ~queue =
+    Gauge.labels stream_queue_bytes_max_family [ protocol; queue ]
+
+  let stream_queue_bytes_sum ~protocol ~queue =
+    Gauge.labels stream_queue_bytes_sum_family [ protocol; queue ]
+
+  let stream_queue_discarded_messages ~protocol ~queue ~reason =
+    Counter.labels stream_queue_discarded_messages_family
+      [ protocol; queue; reason ]
+
+  let stream_queue_discarded_bytes ~protocol ~queue ~reason =
+    Counter.labels stream_queue_discarded_bytes_family
+      [ protocol; queue; reason ]
+
   module Gauge_map = Metric_map (struct
     type t = Gauge.t
 

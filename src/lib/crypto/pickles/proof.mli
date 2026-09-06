@@ -30,7 +30,7 @@ module Base : sig
     module Stable : sig
       [@@@no_toplevel_latest_type]
 
-      module V2 : sig
+      module V3 : sig
         type ('messages_for_next_wrap_proof, 'messages_for_next_step_proof) t =
           { statement :
               ( Limb_vector.Constant.Hex64.Stable.V1.t
@@ -54,7 +54,7 @@ module Base : sig
           ; prev_evals :
               ( Backend.Tick.Field.Stable.V1.t
               , Backend.Tick.Field.Stable.V1.t array )
-              Pickles_types.Plonk_types.All_evals.Stable.V1.t
+              Pickles_types.Plonk_types.All_evals.Stable.V2.t
           ; proof : Wrap_wire_proof.Stable.V1.t
           }
         [@@deriving compare, sexp, hash, equal]
@@ -68,7 +68,7 @@ module Base : sig
           *)
       ( 'messages_for_next_wrap_proof
       , 'messages_for_next_step_proof )
-      Mina_wire_types.Pickles.Concrete_.Proof.Base.Wrap.V2.t =
+      Mina_wire_types.Pickles.Concrete_.Proof.Base.Wrap.V3.t =
       { statement :
           ( Import.Challenge.Constant.t
           , Import.Challenge.Constant.t Import.Scalar_challenge.t
@@ -111,6 +111,10 @@ type ('s, 'mlmb) with_data =
 
 type 'mlmb t = (unit, 'mlmb) with_data
 
+module For_tests : sig
+  val append_lr_entry : 'mlmb t -> 'mlmb t
+end
+
 val dummy :
   'h Pickles_types.Nat.t -> 'r Pickles_types.Nat.t -> domain_log2:int -> 'h t
 
@@ -134,7 +138,7 @@ module Make (MLMB : Pickles_types.Nat.Intf) : sig
           Import.Step_bp_vec.t
           Max_proofs_verified_at_most.t )
         Base.Messages_for_next_proof_over_same_field.Step.t )
-      Base.Wrap.Stable.V2.t
+      Base.Wrap.Stable.V3.t
     [@@deriving compare, sexp, yojson, hash, equal]
   end
 
@@ -156,7 +160,7 @@ module Proofs_verified_2 : sig
 
   [%%versioned:
   module Stable : sig
-    module V2 : sig
+    module V3 : sig
       include module type of T with module Repr := T.Repr
 
       include Plonkish_prelude.Sigs.VERSIONED
@@ -173,7 +177,7 @@ module Proofs_verified_max : sig
 
   [%%versioned:
   module Stable : sig
-    module V2 : sig
+    module V3 : sig
       include module type of T with module Repr := T.Repr
 
       include Plonkish_prelude.Sigs.VERSIONED

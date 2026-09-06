@@ -60,8 +60,9 @@ type constants =
 [@@deriving to_yojson]
 
 let default_constants =
+  let (module G) = Genesis_constants.profiled () in
   let protocol =
-    { Genesis_constants.Compiled.genesis_constants.protocol with
+    { G.genesis_constants.protocol with
       k = 20
     ; delta = 0
     ; slots_per_epoch = 3 * 8 * 20
@@ -70,12 +71,9 @@ let default_constants =
     }
   in
   { genesis_constants =
-      { Genesis_constants.Compiled.genesis_constants with
-        protocol
-      ; txpool_max_size = 3000
-      }
-  ; constraint_constants = Genesis_constants.Compiled.constraint_constants
-  ; compile_config = Mina_compile_config.Compiled.t
+      { G.genesis_constants with protocol; txpool_max_size = 3000 }
+  ; constraint_constants = G.constraint_constants
+  ; compile_config = Mina_compile_config.of_node_config (module Node_config)
   }
 
 let proof_config_default : Runtime_config.Proof_keys.t =

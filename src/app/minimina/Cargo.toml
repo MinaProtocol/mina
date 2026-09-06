@@ -32,3 +32,6 @@ assets = [
     ["target/release/minimina", "usr/bin/", "755"],
     ["README.md", "usr/share/doc/minimina/README", "644"],
 ]
+
+[dev-dependencies]
+quickcheck = "1"

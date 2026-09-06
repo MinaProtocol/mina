@@ -100,8 +100,22 @@ let
 
   dune-nix = inputs.dune-nix.lib.${pkgs.system};
 
-  base-libs = dune-nix.squashOpamNixDeps scope.ocaml.version
-    (pkgs.lib.attrVals (builtins.attrNames implicit-deps) scope);
+  # Some post-Mesa dependency closures expose duplicate OCaml package dirs,
+  # such as site-lib/toplevel. Keep the first one instead of failing while
+  # squashing the opam dependencies.
+  base-libs =
+    (dune-nix.squashOpamNixDeps scope.ocaml.version
+      (pkgs.lib.attrVals (builtins.attrNames implicit-deps) scope)).overrideAttrs
+      (old: {
+        installPhase = builtins.replaceStrings [
+          ''ln -s "$d" "$out/lib/ocaml/${scope.ocaml.version}/site-lib/"''
+        ] [
+          ''
+            target="$out/lib/ocaml/${scope.ocaml.version}/site-lib/$(basename "$d")"
+            [ -e "$target" ] || ln -s "$d" "$target"
+          ''
+        ] old.installPhase;
+      });
 
   dune-description = pkgs.stdenv.mkDerivation {
     pname = "dune-description";
@@ -445,6 +459,23 @@ let
       });
 
       with-instrumentation = wrapMina self.with-instrumentation-dev { };
+
+      mina-graphql-client-dev = self.mina-dev.overrideAttrs (s: {
+        pname = "mina-graphql-client";
+        outputs = [ "out" ];
+
+        buildPhase = ''
+          dune build --display=short src/app/mina_graphql_client/mina_graphql_client_app.exe
+        '';
+
+        installPhase = ''
+          mkdir -p $out/bin
+          cp _build/default/src/app/mina_graphql_client/mina_graphql_client_app.exe $out/bin/mina-graphql-client
+          remove-references-to -t $(dirname $(dirname $(command -v ocaml))) $out/bin/mina-graphql-client
+        '';
+      });
+
+      mina-graphql-client = wrapMina self.mina-graphql-client-dev { };
 
       mainnet-pkg = self.mina-dev.overrideAttrs (s: {
         version = "mainnet";

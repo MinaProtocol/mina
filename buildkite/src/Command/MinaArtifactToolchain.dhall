@@ -18,9 +18,9 @@ let toolchainPipeline =
             Pipeline.Config::{
             , spec = JobSpec::{
               , dirtyWhen =
-                [ S.strictlyStart (S.contains "dockerfiles/stages/1-")
-                , S.strictlyStart (S.contains "dockerfiles/stages/2-")
-                , S.strictlyStart (S.contains "dockerfiles/stages/3-")
+                [ S.strictlyStart (S.contains "dockerfiles/toolchain/1-")
+                , S.strictlyStart (S.contains "dockerfiles/toolchain/2-")
+                , S.strictlyStart (S.contains "dockerfiles/toolchain/3-")
                 , S.strictlyStart
                     ( S.contains
                         "buildkite/src/Jobs/Release/MinaToolchainArtifact"

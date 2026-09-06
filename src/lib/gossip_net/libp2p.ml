@@ -198,14 +198,20 @@ module Make (Rpc_interface : RPC_INTERFACE) :
       *)
       let read_r, read_w = Pipe.create () in
       let underlying_r, underlying_w = Mina_net2.Libp2p_stream.pipes stream in
+      Mina_net2.Libp2p_stream.register_rpc_adapter_queue stream read_r ;
       don't_wait_for
         (Pipe.iter underlying_r ~f:(fun msg ->
+             Mina_net2.Libp2p_stream.record_rpc_adapter_enqueue stream
+               ~bytes:(String.length msg) ;
              Pipe.write_without_pushback_if_open read_w msg ;
              Deferred.unit ) ) ;
       let transport =
         Async_rpc_kernel.Pipe_transport.(create Kind.string read_r underlying_w)
       in
-      transport
+      let cleanup ~reason =
+        Mina_net2.Libp2p_stream.release_buffers stream ~reason
+      in
+      (transport, cleanup)
 
     (* peers_snapshot is updated every 30 seconds.
 *)
@@ -377,7 +383,9 @@ module Make (Rpc_interface : RPC_INTERFACE) :
                   Mina_net2.open_protocol net2 ~on_handler_error:`Raise
                     ~protocol:rpc_transport_proto (fun stream ->
                       let peer = Mina_net2.Libp2p_stream.remote_peer stream in
-                      let transport = prepare_stream_transport stream in
+                      let transport, cleanup =
+                        prepare_stream_transport stream
+                      in
                       let open Deferred.Let_syntax in
                       match%bind
                         Async_rpc_kernel.Rpc.Connection.create ~implementations
@@ -391,6 +399,7 @@ module Make (Rpc_interface : RPC_INTERFACE) :
                           let%bind () =
                             Async_rpc_kernel.Rpc.Transport.close transport
                           in
+                          cleanup ~reason:`Handshake_failed ;
                           don't_wait_for
                             (Mina_net2.reset_stream net2 stream >>| ignore) ;
                           Trust_system.(
@@ -413,6 +422,7 @@ module Make (Rpc_interface : RPC_INTERFACE) :
                               ~reason:(Info.of_string "connection completed")
                               rpc_connection
                           in
+                          cleanup ~reason:`Handler_done ;
                           match%map Mina_net2.reset_stream net2 stream with
                           | Error e ->
                               [%log' warn config.logger]
@@ -899,10 +909,12 @@ module Make (Rpc_interface : RPC_INTERFACE) :
       with
       | Ok stream ->
           let peer = Mina_net2.Libp2p_stream.remote_peer stream in
-          let transport = prepare_stream_transport stream in
-          try_call_rpc ?heartbeat_timeout ?timeout t peer transport rpc
-            rpc_input
-          >>| fun data ->
+          let transport, cleanup = prepare_stream_transport stream in
+          let%map data =
+            try_call_rpc ?heartbeat_timeout ?timeout t peer transport rpc
+              rpc_input
+          in
+          cleanup ~reason:`Handler_done ;
           Connected (Envelope.Incoming.wrap_peer ~data ~sender:peer)
       | Error e ->
           Mina_metrics.(Counter.inc_one Network.rpc_connections_failed) ;
@@ -916,17 +928,19 @@ module Make (Rpc_interface : RPC_INTERFACE) :
       with
       | Ok stream ->
           let peer = Mina_net2.Libp2p_stream.remote_peer stream in
-          let transport = prepare_stream_transport stream in
+          let transport, cleanup = prepare_stream_transport stream in
           let (module Impl) = Rpc_interface.implementation rpc in
-          try_call_rpc_with_dispatch ?heartbeat_timeout ?timeout
-            ~rpc_counter:Impl.sent_counter
-            ~rpc_failed_counter:Impl.failed_request_counter ~rpc_name:Impl.name
-            t peer transport
-            (fun conn qs ->
-              Deferred.Or_error.List.map ?how qs ~f:(fun q ->
-                  Impl.dispatch_multi conn q ) )
-            qs
-          >>| fun data ->
+          let%map data =
+            try_call_rpc_with_dispatch ?heartbeat_timeout ?timeout
+              ~rpc_counter:Impl.sent_counter
+              ~rpc_failed_counter:Impl.failed_request_counter
+              ~rpc_name:Impl.name t peer transport
+              (fun conn qs ->
+                Deferred.Or_error.List.map ?how qs ~f:(fun q ->
+                    Impl.dispatch_multi conn q ) )
+              qs
+          in
+          cleanup ~reason:`Handler_done ;
           Connected (Envelope.Incoming.wrap_peer ~data ~sender:peer)
       | Error e ->
           Mina_metrics.(Counter.inc_one Network.rpc_connections_failed) ;

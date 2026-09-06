@@ -347,6 +347,20 @@ module Network : sig
 
   val rpc_connections_failed : Counter.t
 
+  val stream_queue_messages_max : protocol:string -> queue:string -> Gauge.t
+
+  val stream_queue_messages_sum : protocol:string -> queue:string -> Gauge.t
+
+  val stream_queue_bytes_max : protocol:string -> queue:string -> Gauge.t
+
+  val stream_queue_bytes_sum : protocol:string -> queue:string -> Gauge.t
+
+  val stream_queue_discarded_messages :
+    protocol:string -> queue:string -> reason:string -> Counter.t
+
+  val stream_queue_discarded_bytes :
+    protocol:string -> queue:string -> reason:string -> Counter.t
+
   module Ipc_latency_histogram : Histogram
 
   module Rpc_latency_histogram : Histogram

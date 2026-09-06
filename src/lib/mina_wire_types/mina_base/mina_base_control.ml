@@ -7,6 +7,6 @@ module Poly = struct
   end
 end
 
-module V2 = struct
-  type t = (Pickles.Side_loaded.Proof.V2.t, Mina_base_signature.V1.t) Poly.V1.t
+module V3 = struct
+  type t = (Pickles.Side_loaded.Proof.V3.t, Mina_base_signature.V1.t) Poly.V1.t
 end

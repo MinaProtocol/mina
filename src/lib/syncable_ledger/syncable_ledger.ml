@@ -71,38 +71,6 @@ module Answer = struct
                 contains all non-empty nodes has this hash. *)
       [@@deriving sexp, yojson]
     end
-
-    module V1 = struct
-      type ('hash, 'account) t =
-        | Child_hashes_are of 'hash * 'hash
-            (** The requested address's children have these hashes **)
-        | Contents_are of 'account list
-            (** The requested address has these accounts *)
-        | Num_accounts of int * 'hash
-            (** There are this many accounts and the smallest subtree that
-                contains all non-empty nodes has this hash. *)
-      [@@deriving sexp, yojson]
-
-      let to_latest acct_to_latest = function
-        | Child_hashes_are (h1, h2) ->
-            V2.Child_hashes_are [| h1; h2 |]
-        | Contents_are accts ->
-            V2.Contents_are (List.map ~f:acct_to_latest accts)
-        | Num_accounts (i, h) ->
-            V2.Num_accounts (i, h)
-
-      (* Not a standard versioning function *)
-
-      (** Attempts to downgrade v2 -> v1 *)
-      let from_v2 : ('a, 'b) V2.t -> ('a, 'b) t Or_error.t = function
-        | Child_hashes_are h ->
-            if Array.length h = 2 then Ok (Child_hashes_are (h.(0), h.(1)))
-            else Or_error.error_string "can't downgrade wide query"
-        | Contents_are accs ->
-            Ok (Contents_are accs)
-        | Num_accounts (n, h) ->
-            Ok (Num_accounts (n, h))
-    end
   end]
 end
 
@@ -631,7 +599,6 @@ end = struct
 
   (** Compute the hash of an empty tree of the specified height. *)
   let empty_hash_at_height h =
-    (* Defensive: no current caller violates this; guards later changes. *)
     assert (
       h >= 0 || failwith (sprintf "empty_hash_at_height: negative height %d" h) ) ;
     let rec go prev ctr =
@@ -643,7 +610,6 @@ end = struct
       height of that hash in the tree and the height of the whole tree, compute
       the hash of the whole tree. *)
   let complete_with_empties hash start_height result_height =
-    (* Defensive: no current caller violates this; guards later changes. *)
     assert (
       start_height <= result_height
       || failwith

@@ -6,13 +6,11 @@ let PipelineTag = ../../Pipeline/Tag.dhall
 
 let JobSpec = ../../Pipeline/JobSpec.dhall
 
-let Command = ../../Command/Base.dhall
+let MiniminaCommand = ../../Command/Minimina.dhall
 
-let Docker = ../../Command/Docker/Type.dhall
+let B = ../../External/Buildkite.dhall
 
-let Size = ../../Command/Size.dhall
-
-let RunInToolchain = ../../Command/RunInToolchain.dhall
+let B/SoftFail = B.definitions/commandStep/properties/soft_fail/Type
 
 in  Pipeline.build
       Pipeline.Config::{
@@ -20,6 +18,7 @@ in  Pipeline.build
         , dirtyWhen =
           [ S.contains "src/app/minimina"
           , S.strictlyStart (S.contains "buildkite/src/Jobs/Release/Minimina")
+          , S.strictlyStart (S.contains "buildkite/src/Command/Minimina")
           , S.contains "scripts/debian/builder-helpers.sh"
           ]
         , path = "Release"
@@ -30,17 +29,5 @@ in  Pipeline.build
           , PipelineTag.Type.Stable
           ]
         }
-      , steps =
-        [ Command.build
-            Command.Config::{
-            , commands =
-                RunInToolchain.runInToolchain
-                  ([] : List Text)
-                  "PATH=/home/opam/.cargo/bin:\$PATH cargo build --release --manifest-path src/app/minimina/Cargo.toml && ./buildkite/scripts/cache/manager.sh write-to-dir src/app/minimina/target/release/minimina minimina && mkdir -p _build && MINA_DEB_CODENAME=bullseye ./scripts/debian/build.sh minimina && ./buildkite/scripts/cache/manager.sh write-to-dir '_build/minimina_*.deb' debians/bullseye/"
-            , label = "Build minimina"
-            , key = "build-minimina"
-            , target = Size.Small
-            , docker = None Docker.Type
-            }
-        ]
+      , steps = [ MiniminaCommand.buildStep (None B/SoftFail) ]
       }

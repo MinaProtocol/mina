@@ -2,8 +2,6 @@
 
 set -eox pipefail
 
-([ -z ${DUNE_PROFILE+x} ]) && echo "required env vars were not provided" && exit 1
-
 # shellcheck disable=SC1090
 source ~/.profile
 
@@ -23,9 +21,7 @@ make libp2p_helper
 
 make build-logproc
 
-[[ ${MINA_BUILD_MAINNET} ]] && make build-mainnet-sigs
-
-make build-devnet-sigs
+make build-mina
 
 make build-daemon-utils
 

@@ -238,9 +238,8 @@ module Vrf = struct
       Exceptions.handle_nicely
       @@ fun () ->
       let env = Secrets.Keypair.env in
-      let constraint_constants =
-        Genesis_constants.Compiled.constraint_constants
-      in
+      let (module G) = Genesis_constants.profiled () in
+      let constraint_constants = G.constraint_constants in
       if Option.is_some (Sys.getenv env) then
         eprintf "Using password from environment variable %s\n" env ;
       let open Deferred.Let_syntax in
@@ -304,9 +303,8 @@ module Vrf = struct
       let%map_open privkey_path = Flag.privkey_read_path in
       Exceptions.handle_nicely
       @@ fun () ->
-      let constraint_constants =
-        Genesis_constants.Compiled.constraint_constants
-      in
+      let (module G) = Genesis_constants.profiled () in
+      let constraint_constants = G.constraint_constants in
       let env = Secrets.Keypair.env in
       if Option.is_some (Sys.getenv env) then
         eprintf "Using password from environment variable %s\n" env ;
@@ -369,9 +367,8 @@ module Vrf = struct
       ( Command.Param.return @@ Exceptions.handle_nicely
       @@ fun () ->
       let open Deferred.Let_syntax in
-      let constraint_constants =
-        Genesis_constants.Compiled.constraint_constants
-      in
+      let (module G) = Genesis_constants.profiled () in
+      let constraint_constants = G.constraint_constants in
       (* TODO-someday: constraint constants from config file. *)
       let lexbuf = Lexing.from_channel In_channel.stdin in
       let lexer = Yojson.init_lexer () in

@@ -30,6 +30,19 @@ end
 
 module Sql = struct
   module Balance_from_last_relevant_command = struct
+    (* The most recent block at or below the requested height that touched the
+       account, together with the account's total balance and nonce as of that
+       block. Decoded from the [(height, global_slot, balance, nonce)] SQL row. *)
+    type t =
+      { block_height : int64
+      ; block_global_slot_since_genesis : int64
+      ; total_balance : int64
+            (* The account's whole balance, i.e. locked + liquid. The split
+               between the locked (still-vesting) and liquid portions is
+               derived per requested slot; see [liquid_balance_at_slot]. *)
+      ; nonce : int64
+      }
+
     let query_pending =
       Mina_caqti.find_opt_req
         Caqti_type.(t3 string int64 string)
@@ -111,14 +124,31 @@ module Sql = struct
           (module Conn)
           ~height:requested_block_height
       in
-      Conn.find_opt
-        (if has_canonical_height then query_canonical else query_pending)
-        (address, requested_block_height, token_id)
+      let%map row_opt =
+        Conn.find_opt
+          (if has_canonical_height then query_canonical else query_pending)
+          (address, requested_block_height, token_id)
+      in
+      Option.map row_opt
+        ~f:(fun
+             ( ( block_height
+               , block_global_slot_since_genesis
+               , total_balance
+               , nonce )
+             , timing_id )
+           ->
+          ( { block_height
+            ; block_global_slot_since_genesis
+            ; total_balance
+            ; nonce
+            }
+          , timing_id ) )
   end
 
-  let compute_incremental_balance
-      (timing_info : Archive_lib.Processor.Timing_info.t) ~start_slot ~end_slot
-      =
+  (* The account's minimum (locked) balance at [global_slot], per its vesting
+     schedule. [Mina_base.Account.min_balance_at_slot] clamps at zero. *)
+  let min_balance_at_slot (timing_info : Archive_lib.Processor.Timing_info.t)
+      ~global_slot : Unsigned.UInt64.t =
     let cliff_time =
       Mina_numbers.Global_slot_since_genesis.of_int
         (Int.of_int64_exn timing_info.cliff_time)
@@ -134,21 +164,50 @@ module Sql = struct
     let initial_minimum_balance =
       MinaCurrency.Balance.of_string timing_info.initial_minimum_balance
     in
-    Mina_base.Account.incremental_balance_between_slots ~start_slot ~end_slot
-      ~cliff_time ~cliff_amount ~vesting_period ~vesting_increment
-      ~initial_minimum_balance
+    Mina_base.Account.min_balance_at_slot ~global_slot ~cliff_time ~cliff_amount
+      ~vesting_period ~vesting_increment ~initial_minimum_balance
+    |> MinaCurrency.Balance.to_amount |> MinaCurrency.Amount.to_uint64
+
+  (* Pure computation of an account's liquid (unlocked) balance at [end_slot],
+     given its [total_balance] and (optional) vesting schedule. Extracted so it
+     can be exercised directly by inline tests -- the surrounding
+     [find_current_balance] is only reachable behind a database handle.
+
+     The liquid balance is the total minus the portion still locked by the
+     vesting schedule at [end_slot]:  liquid(end) = total - min_balance(end).
+     On valid data the locked portion is a subset of the total, so the
+     subtraction is exact. We deliberately do NOT clamp: if the data is corrupt
+     (min_balance > total) we fail with an [`Invariant_violation] error rather
+     than an unsigned subtraction that would wrap to ~2^64. Clamping instead
+     would mask the corruption as a healthy fully-locked account. The error is
+     returned as [Errors.t] so callers can thread it straight through the
+     Rosetta error monad. *)
+  let liquid_balance_at_slot ~total_balance ~timing_info_opt ~end_slot :
+      (Unsigned.UInt64.t, Errors.t) Result.t =
+    match timing_info_opt with
+    | None ->
+        (* No vesting schedule: the whole balance is liquid. *)
+        Ok total_balance
+    | Some timing_info ->
+        let min_balance =
+          min_balance_at_slot timing_info ~global_slot:end_slot
+        in
+        if Unsigned.UInt64.compare min_balance total_balance > 0 then
+          Error
+            (Errors.create
+               ~context:
+                 (Printf.sprintf "locked balance %s exceeds total balance %s"
+                    (Unsigned.UInt64.to_string min_balance)
+                    (Unsigned.UInt64.to_string total_balance) )
+               `Invariant_violation )
+        else Ok (Unsigned.UInt64.sub total_balance min_balance)
 
   let find_current_balance (module Conn : Mina_caqti.CONNECTION)
-      ~requested_block_global_slot_since_genesis ~last_relevant_command_info
-      ?timing_id () =
+      ~requested_block_global_slot_since_genesis
+      ~(last_relevant_command : Balance_from_last_relevant_command.t) ?timing_id
+      () =
     let open Deferred.Result.Let_syntax in
     let open Unsigned in
-    let ( _
-        , last_relevant_command_global_slot_since_genesis
-        , last_relevant_command_balance
-        , nonce ) =
-      last_relevant_command_info
-    in
     let%bind timing_info_opt =
       match timing_id with
       | Some timing_id ->
@@ -161,37 +220,111 @@ module Sql = struct
       Mina_numbers.Global_slot_since_genesis.of_uint32
         (Unsigned.UInt32.of_int64 requested_block_global_slot_since_genesis)
     in
-    let%bind liquid_balance, nonce =
-      match timing_info_opt with
-      | None ->
-          (* This account has no special vesting, so just use its last
-             known balance from the command.*)
-          Deferred.Result.return
-            (last_relevant_command_balance, UInt64.of_int64 nonce)
-      | Some timing_info ->
-          (* This block was in the genesis ledger and has been
-             involved in at least one user or internal command. We need
-             to compute the change in its balance between the most recent
-             command and the start block (if it has vesting it may have
-             changed). *)
-          let incremental_balance_between_slots =
-            compute_incremental_balance timing_info
-              ~start_slot:
-                (Mina_numbers.Global_slot_since_genesis.of_int
-                   (Int.of_int64_exn
-                      last_relevant_command_global_slot_since_genesis ) )
-              ~end_slot
-          in
-          Deferred.Result.return
-            ( UInt64.Infix.(
-                UInt64.of_int64 last_relevant_command_balance
-                + incremental_balance_between_slots)
-              |> UInt64.to_int64
-            , UInt64.of_int64 nonce )
+    (* This block was in the genesis ledger and may have an active vesting
+       schedule, so the liquid portion of its (unchanged) total balance depends
+       on the requested slot. *)
+    let%bind liquid_balance =
+      liquid_balance_at_slot
+        ~total_balance:(UInt64.of_int64 last_relevant_command.total_balance)
+        ~timing_info_opt ~end_slot
+      |> Result.map ~f:UInt64.to_int64
+      |> Deferred.return
     in
-    let total_balance = last_relevant_command_balance in
+    let nonce = UInt64.of_int64 last_relevant_command.nonce in
+    let total_balance = last_relevant_command.total_balance in
     let balance_info : Balance_info.t = { liquid_balance; total_balance } in
     Deferred.Result.return (balance_info, nonce)
+
+  let%test_module "historical vesting liquid balance" =
+    ( module struct
+      module Slot = Mina_numbers.Global_slot_since_genesis
+
+      let uint64 = Unsigned.UInt64.of_int
+
+      let timing ~initial_minimum_balance ~cliff_time ~cliff_amount
+          ~vesting_period ~vesting_increment :
+          Archive_lib.Processor.Timing_info.t =
+        { account_identifier_id = 0
+        ; initial_minimum_balance = Int.to_string initial_minimum_balance
+        ; cliff_time = Int64.of_int cliff_time
+        ; cliff_amount = Int.to_string cliff_amount
+        ; vesting_period = Int64.of_int vesting_period
+        ; vesting_increment = Int.to_string vesting_increment
+        }
+
+      (* Fixture: an account whose entire balance is its initial minimum
+         balance, observed at various points in its vesting schedule.
+
+           initial_minimum_balance = 100   total = 100
+           cliff_time = 10   cliff_amount = 0
+           vesting_period = 1   vesting_increment = 10
+
+         At end_slot 12 -> 2 vesting periods past the cliff ->
+           min_balance(12) = 100 - 2*10 = 80
+           liquid(12)      = total - min_balance(12) = 20
+           locked(12)      = 80
+
+         The historical underflow bug instead computed
+           liquid = total + incremental = 100 + (min(0) - min(12)) = 120,
+         exceeding total and wrapping locked = total - liquid to ~2^64. These
+         tests guard against any regression to that arithmetic. *)
+      let total = uint64 100
+
+      let timing_info =
+        Some
+          (timing ~initial_minimum_balance:100 ~cliff_time:10 ~cliff_amount:0
+             ~vesting_period:1 ~vesting_increment:10 )
+
+      let liquid_result ?(total = total) end_ =
+        liquid_balance_at_slot ~total_balance:total ~timing_info_opt:timing_info
+          ~end_slot:(Slot.of_int end_)
+
+      (* Unwrap for the valid cases: none of these fixtures corrupt the data,
+         so [liquid_balance_at_slot] must return [Ok]. *)
+      let liquid end_ =
+        match liquid_result end_ with
+        | Ok l ->
+            l
+        | Error _ ->
+            failwith "unexpected Invariant_violation on valid fixture"
+
+      let%test "liquid never exceeds total (partially vested)" =
+        Unsigned.UInt64.compare (liquid 12) total <= 0
+
+      let%test "locked never underflows (locked <= total)" =
+        let l = liquid 12 in
+        Unsigned.UInt64.compare (Unsigned.UInt64.sub total l) total <= 0
+
+      let%test "liquid = total - min_balance(end_slot)" =
+        Unsigned.UInt64.equal (liquid 12) (uint64 20)
+
+      let%test "pre-cliff: liquid = total - initial_minimum_balance" =
+        (* Before the cliff nothing has unlocked, so the liquid balance is
+           total minus the still-fully-locked min balance (here, zero). *)
+        Unsigned.UInt64.equal (liquid 5) (uint64 0)
+
+      let%test "fully vested: liquid = total, locked = 0" =
+        Unsigned.UInt64.equal (liquid 1000) total
+
+      let%test "untimed account is fully liquid" =
+        match
+          liquid_balance_at_slot ~total_balance:total ~timing_info_opt:None
+            ~end_slot:(Slot.of_int 12)
+        with
+        | Ok l ->
+            Unsigned.UInt64.equal l total
+        | Error _ ->
+            false
+
+      let%test "corrupt data (locked > total) fails, not wraps" =
+        (* total 50 but the schedule still locks 100 at slot 5: rather than
+           wrap [50 - 100] to ~2^64, we must surface an error. *)
+        match liquid_result ~total:(uint64 50) 5 with
+        | Ok _ ->
+            false
+        | Error _ ->
+            true
+    end )
 
   let run (module Conn : Mina_caqti.CONNECTION) ~block_query ~address ~token_id
       =
@@ -219,7 +352,7 @@ module Sql = struct
             , block_info.global_slot_since_genesis
             , block_info.state_hash )
     in
-    let%bind last_relevant_command_info_opt =
+    let%bind last_relevant_command_opt =
       Balance_from_last_relevant_command.run
         (module Conn)
         ~requested_block_height ~address ~token_id
@@ -232,17 +365,17 @@ module Sql = struct
       }
     in
     let%bind balance_info, nonce =
-      match last_relevant_command_info_opt with
+      match last_relevant_command_opt with
       | None ->
           (* account doesn' exist yet at the request block, return zero balance *)
           let nonce = Unsigned.UInt64.of_int 0 in
           Deferred.Result.return
             ({ Balance_info.liquid_balance = 0L; total_balance = 0L }, nonce)
-      | Some (last_relevant_command_info, timing_id) ->
+      | Some (last_relevant_command, timing_id) ->
           find_current_balance
             (module Conn)
-            ~requested_block_global_slot_since_genesis
-            ~last_relevant_command_info ~timing_id ()
+            ~requested_block_global_slot_since_genesis ~last_relevant_command
+            ~timing_id ()
     in
     Deferred.Result.return (requested_block_identifier, balance_info, nonce)
 end
@@ -363,27 +496,44 @@ module Balance = struct
               Amount_of.token (`Token_id token_id) )
             total_balance
         in
-        let locked_balance = Unsigned.UInt64.sub total_balance liquid_balance in
-        let metadata =
-          `Assoc
-            [ ( "locked_balance"
-              , `Intlit (Unsigned.UInt64.to_string locked_balance) )
-            ; ( "liquid_balance"
-              , `Intlit (Unsigned.UInt64.to_string liquid_balance) )
-            ; ( "total_balance"
-              , `Intlit (Unsigned.UInt64.to_string total_balance) )
-            ]
-        in
-        { amount with metadata = Some metadata }
+        (* The liquid (unlocked) balance can never exceed the total balance.
+           If it does, the unsigned [total - liquid] below would wrap to ~2^64
+           -- exactly the historical underflow bug. Fail fast so the corruption
+           is surfaced rather than silently served. *)
+        if Unsigned.UInt64.compare liquid_balance total_balance > 0 then
+          M.fail
+            (Errors.create
+               ~context:
+                 (Printf.sprintf
+                    "liquid balance %s exceeds total balance %s for account %s"
+                    (Unsigned.UInt64.to_string liquid_balance)
+                    (Unsigned.UInt64.to_string total_balance)
+                    address )
+               `Invariant_violation )
+        else
+          let locked_balance =
+            Unsigned.UInt64.sub total_balance liquid_balance
+          in
+          let metadata =
+            `Assoc
+              [ ( "locked_balance"
+                , `Intlit (Unsigned.UInt64.to_string locked_balance) )
+              ; ( "liquid_balance"
+                , `Intlit (Unsigned.UInt64.to_string liquid_balance) )
+              ; ( "total_balance"
+                , `Intlit (Unsigned.UInt64.to_string total_balance) )
+              ]
+          in
+          M.return { amount with metadata = Some metadata }
       in
       let%bind block_query =
         Query.of_partial_identifier' req.block_identifier
       in
-      let%map ( block_identifier
-              , liquid_balance
-              , total_balance
-              , nonce
-              , created_via_historical_lookup ) =
+      let%bind ( block_identifier
+               , liquid_balance
+               , total_balance
+               , nonce
+               , created_via_historical_lookup ) =
         match block_query with
         | Some _ ->
             let%map block_identifier, { liquid_balance; total_balance }, nonce =
@@ -425,9 +575,11 @@ module Balance = struct
                        "Error getting balance from GraphQL (node still \
                         bootstrapping?)" ) ) )
       in
-
+      let%map balance_amount =
+        make_balance_amount ~liquid_balance ~total_balance
+      in
       { Account_balance_response.block_identifier
-      ; balances = [ make_balance_amount ~liquid_balance ~total_balance ]
+      ; balances = [ balance_amount ]
       ; metadata =
           Some
             (`Assoc
