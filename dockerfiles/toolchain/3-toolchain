@@ -27,7 +27,6 @@ RUN apt-get update --yes \
     libgmp10 \
     libgomp1 \
     lsb-release \
-    pandoc \
     patchelf \
     postgresql \
     postgresql-contrib \
@@ -92,8 +91,7 @@ RUN case "${TARGETARCH}" in \
 # over the bundle, and python3 is already installed above, so the bundle is never
 # used -- it is excluded at extraction rather than deleted afterwards, so the
 # 253 MB is never written on either arch. gcloud and gsutil themselves stay: CI
-# uses both (buildkite/scripts/gsutil-upload.sh and friends). gcloud and gsutil
-# are both used by CI (buildkite/scripts/gsutil-upload.sh and friends) and stay.
+# uses both (buildkite/scripts/gsutil-upload.sh and friends).
 ENV CLOUDSDK_PYTHON=/usr/bin/python3
 
 # What cannot be excluded is trimmed in the install's own RUN layer, or the layer
@@ -162,6 +160,7 @@ RUN case "${TARGETARCH}" in \
     curl "https://awscli.amazonaws.com/awscli-exe-linux-${AWS_ARCH}.zip" -o "awscliv2.zip" \
     && unzip awscliv2.zip \
     && ./aws/install \
-    && rm -rf awscliv2.zip aws
+    && rm -r awscliv2.zip aws \
+    && aws --version
 
 USER opam
