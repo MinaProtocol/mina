@@ -3555,7 +3555,9 @@ module Block = struct
         in
         let%map entries =
           Conn.collect_list
-            (Mina_caqti.collect_req Caqti_type.unit
+            (* SQL embeds the values being looked up, so it differs per
+               call and must not be memoised *)
+            (Mina_caqti.collect_req ~oneshot:true Caqti_type.unit
                Caqti_type.(t2 typ int)
                query )
             ()
@@ -3574,7 +3576,8 @@ module Block = struct
           String.concat ~sep:"," @@ List.map ~f:(render_row typ) values
         in
         Conn.collect_list
-          (Mina_caqti.collect_req Caqti_type.unit Caqti_type.int
+          (* values are rendered into the SQL: per-call text, never shared *)
+          (Mina_caqti.collect_req ~oneshot:true Caqti_type.unit Caqti_type.int
              (sprintf "INSERT INTO %s (%s) VALUES %s RETURNING id" table
                 fields_sql values_sql ) )
           () )
@@ -4065,7 +4068,8 @@ module Block = struct
       let ids_sql = String.concat ~sep:"," ids in
       let parent_ids_sql = String.concat ~sep:"," parent_ids in
       Conn.exec
-        (Mina_caqti.exec_req Caqti_type.unit
+        (* ids are rendered into the SQL: per-call text, never shared *)
+        (Mina_caqti.exec_req ~oneshot:true Caqti_type.unit
            (sprintf
               "UPDATE %s AS b SET parent_id = data.parent_id FROM (SELECT \
                unnest(array[%s]) as id, unnest(array[%s]) as parent_id) AS \
