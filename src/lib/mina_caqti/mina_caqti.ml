@@ -111,6 +111,147 @@ module Request_cache = struct
     |> List.map ~f:(fun (sql, n) -> (n, String.prefix sql 200))
 end
 
+(* Interned row types.
+
+   [Caqti_type.t2] and friends mint a fresh product identity on every
+   evaluation, and [Caqti_type.unify] -- which is what makes the request cache
+   below sound -- compares products by that identity. So a query whose
+   parameter type is written inline, [Caqti_type.(t2 int int)], gets a type
+   that unifies with nothing but itself, and its request can never be shared.
+
+   These combinators return the SAME type value for the same component types,
+   by searching the types already built and reusing the one whose components
+   [unify]. Call sites can then keep writing the type where it reads best,
+   inline, and still land on the cached request. Interning is closed under
+   itself: nested products come back interned too, so the components of a
+   later lookup are identity-equal and unify in turn.
+
+   Only products are interned. [Caqti_type.custom] carries encode/decode
+   functions that cannot be compared, so two customs must never be treated as
+   the same type -- those are expected to be named once in their table module,
+   as {!Type_spec.custom_type} users already do. *)
+module Typ = struct
+  (* the field types, re-exported so [Typ.(t2 int int)] reads like the
+     [Caqti_type] it replaces. Fields unify structurally, so they need no
+     interning. *)
+  let int = Caqti_type.int
+
+  let int32 = Caqti_type.int32
+
+  let int64 = Caqti_type.int64
+
+  let string = Caqti_type.string
+
+  let bool = Caqti_type.bool
+
+  let float = Caqti_type.float
+
+  let unit = Caqti_type.unit
+
+  let option = Caqti_type.option
+
+  type pair =
+    | P : 'a Caqti_type.t * 'b Caqti_type.t * ('a * 'b) Caqti_type.t -> pair
+
+  (* Small and append-only: one entry per distinct pair shape in the source,
+     a handful in practice, so a list scan costs less than hashing would. *)
+  let pairs : pair list ref = ref []
+
+  let t2 : type a b. a Caqti_type.t -> b Caqti_type.t -> (a * b) Caqti_type.t =
+   fun a b ->
+    let rec search = function
+      | [] ->
+          let t = Caqti_type.t2 a b in
+          pairs := P (a, b, t) :: !pairs ;
+          t
+      | P (a', b', t) :: rest -> (
+          match (Caqti_type.unify a' a, Caqti_type.unify b' b) with
+          | Some Caqti_type.Equal, Some Caqti_type.Equal ->
+              t
+          | _ ->
+              search rest )
+    in
+    search !pairs
+
+  (* [t3]/[t4] are flat tuples in Caqti, not nested pairs, so each arity is
+     interned against its own table rather than composed out of [t2]. *)
+  type triple =
+    | T :
+        'a Caqti_type.t
+        * 'b Caqti_type.t
+        * 'c Caqti_type.t
+        * ('a * 'b * 'c) Caqti_type.t
+        -> triple
+
+  let triples : triple list ref = ref []
+
+  let t3 : type a b c.
+         a Caqti_type.t
+      -> b Caqti_type.t
+      -> c Caqti_type.t
+      -> (a * b * c) Caqti_type.t =
+   fun a b c ->
+    let rec search = function
+      | [] ->
+          let t = Caqti_type.t3 a b c in
+          triples := T (a, b, c, t) :: !triples ;
+          t
+      | T (a', b', c', t) :: rest -> (
+          match
+            (Caqti_type.unify a' a, Caqti_type.unify b' b, Caqti_type.unify c' c)
+          with
+          | Some Caqti_type.Equal, Some Caqti_type.Equal, Some Caqti_type.Equal
+            ->
+              t
+          | _ ->
+              search rest )
+    in
+    search !triples
+
+  type quad =
+    | Q :
+        'a Caqti_type.t
+        * 'b Caqti_type.t
+        * 'c Caqti_type.t
+        * 'd Caqti_type.t
+        * ('a * 'b * 'c * 'd) Caqti_type.t
+        -> quad
+
+  let quads : quad list ref = ref []
+
+  let t4 : type a b c d.
+         a Caqti_type.t
+      -> b Caqti_type.t
+      -> c Caqti_type.t
+      -> d Caqti_type.t
+      -> (a * b * c * d) Caqti_type.t =
+   fun a b c d ->
+    let rec search = function
+      | [] ->
+          let t = Caqti_type.t4 a b c d in
+          quads := Q (a, b, c, d, t) :: !quads ;
+          t
+      | Q (a', b', c', d', t) :: rest -> (
+          match
+            ( Caqti_type.unify a' a
+            , Caqti_type.unify b' b
+            , Caqti_type.unify c' c
+            , Caqti_type.unify d' d )
+          with
+          | ( Some Caqti_type.Equal
+            , Some Caqti_type.Equal
+            , Some Caqti_type.Equal
+            , Some Caqti_type.Equal ) ->
+              t
+          | _ ->
+              search rest )
+    in
+    search !quads
+
+  let interned () =
+    List.length !pairs + List.length !triples + List.length !quads
+end
+
 (* The request constructors. Every query in the tree is built through these,
    which is what keeps the prepared-statement count bounded no matter where the
    call site puts them; scripts/lint_caqti_requests.sh keeps [Caqti_request]
@@ -793,6 +934,30 @@ let%test_module "request cache" =
       let b = find_req (mk ()) Caqti_type.int query in
       let after = (Request_cache.stats ()).repeat_misses in
       (not (phys_equal a b)) && after > before
+
+    (* [Typ] exists so that a type written inline still shares. If interning
+       ever broke, the request cache would silently stop sharing every query
+       whose type is built at the call site. *)
+    let%test "an interned pair is the same object as an equal one" =
+      phys_equal Typ.(t2 int int) Typ.(t2 int int)
+      && phys_equal Typ.(t3 int string int64) Typ.(t3 int string int64)
+      && phys_equal Typ.(t4 int int int int) Typ.(t4 int int int int)
+
+    let%test "interning distinguishes different component types" =
+      (* different shapes must not be conflated: [unify] is the predicate the
+         request cache trusts, so ask it rather than [phys_equal], which would
+         not even typecheck across two different row types *)
+      Option.is_none (Caqti_type.unify Typ.(t2 int int) Typ.(t2 int string))
+
+    let%test "interning nests: a pair of pairs shares too" =
+      phys_equal Typ.(t2 (t2 int string) int) Typ.(t2 (t2 int string) int)
+
+    let%test "a type written inline at the call site still shares its request" =
+      let query = sql 6 in
+      let a = find_req Typ.(t2 int string) Caqti_type.int query in
+      let b = find_req Typ.(t2 int string) Caqti_type.int query in
+      phys_equal a b
+
     let%test "a shared type is not counted as a repeat miss" =
       let before = (Request_cache.stats ()).repeat_misses in
       let query = sql 5 in
