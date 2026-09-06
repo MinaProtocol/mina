@@ -15,6 +15,16 @@
       Block_time.diff                                (window durations)
     v}
 
+    A shipped network config is in one of two states, and this test checks
+    whichever one the network is in:
+
+    - [Scheduled]: the next hard fork is armed. The config declares the whole
+      stop-slot family, and the daemon must derive from it the times that were
+      communicated to node operators.
+    - [Forked]: that hard fork has happened, and the config the network now
+      ships is the fork config it produced. No stop slots are declared any
+      more, and the recorded fork must be the one the schedule aimed at.
+
     The test supplies two things: the runtime config of the network under test,
     and that network's compiled constants. The latter are needed because this
     test binary is not built with the target network's profile -- under the
@@ -24,9 +34,10 @@
     Counters: [slot_tx_end] and [slot_chain_end] are
     [Global_slot_since_hard_fork], counted from the network's last hard fork
     genesis. A fork config's [proof.fork.global_slot_since_genesis] is a
-    different counter; the two must never be compared directly. For devnet the
-    fork base is 445860, so the hard fork genesis slot expressed in that other
-    counter is 445860 + 413700 = 859560. *)
+    different counter; the two must never be compared directly. They meet only
+    at the fork itself: the new fork config's [global_slot_since_genesis] is
+    the previous one's plus the hard fork genesis slot. For devnet that is
+    445860 + 413700 = 859560. *)
 
 open Core
 
@@ -36,6 +47,34 @@ module Network_constants = struct
     { constraint_constants : Genesis_constants.Constraint_constants.t
     ; genesis_constants : Genesis_constants.t
     }
+end
+
+(** Reading a shipped runtime config the way the daemon reads it. *)
+module Config = struct
+  let of_file path =
+    Yojson.Safe.from_file path |> Runtime_config.of_yojson
+    |> Result.map_error ~f:Error.of_string
+    |> Or_error.ok_exn
+
+  (** Same merge the daemon performs: the runtime config overrides the compiled
+      genesis constants. *)
+  let genesis_constants ~(network : Network_constants.t)
+      (config : Runtime_config.t) =
+    Genesis_ledger_helper.make_genesis_constants ~logger:(Logger.null ())
+      ~default:network.genesis_constants config
+    |> Or_error.ok_exn
+
+  (** The genesis time the config declares, formatted the same way the daemon
+      logs slot times in [mina_run.ml]. *)
+  let genesis_time ~network config =
+    let genesis_constants = genesis_constants ~network config in
+    Genesis_constants.to_time genesis_constants.protocol.genesis_state_timestamp
+    |> Time_float.to_string_iso8601_basic ~zone:Time_float.Zone.utc
+
+  (** [proof.fork], set once the network has hard forked. *)
+  let fork (config : Runtime_config.t) =
+    Option.bind config.proof ~f:(fun (proof : Runtime_config.Proof_keys.t) ->
+        proof.fork )
 end
 
 (** The schedule a runtime config declares, plus the daemon-derived quantities
@@ -55,36 +94,40 @@ module Schedule = struct
     | None ->
         failwithf "runtime config: %s is not set" field ()
 
+  (** [None] when the config arms no hard fork at all -- the state a config is
+      in between forks. A config that sets only part of the family is a bug, so
+      that case still fails. *)
   let of_config ~(network : Network_constants.t) (config : Runtime_config.t) =
-    (* Same merge the daemon performs: runtime config overrides the compiled
-       genesis constants, then consensus constants are derived from those. *)
-    let genesis_constants =
-      Genesis_ledger_helper.make_genesis_constants ~logger:(Logger.null ())
-        ~default:network.genesis_constants config
-      |> Or_error.ok_exn
-    in
-    let consensus_constants =
-      Consensus.Constants.create
-        ~constraint_constants:network.constraint_constants
-        ~protocol_constants:genesis_constants.protocol
-    in
-    { slot_tx_end =
-        require "daemon.slot_tx_end" (Runtime_config.slot_tx_end config)
-    ; slot_chain_end =
-        require "daemon.slot_chain_end" (Runtime_config.slot_chain_end config)
-    ; hard_fork_genesis_slot_delta =
-        require "daemon.hard_fork_genesis_slot_delta"
-          (Runtime_config.hard_fork_genesis_slot_delta config)
-    ; hard_fork_genesis_slot =
-        require "scheduled hard fork genesis slot"
-          (Runtime_config.scheduled_hard_fork_genesis_slot config)
-    ; consensus_constants
-    }
+    match
+      ( Runtime_config.slot_tx_end config
+      , Runtime_config.slot_chain_end config
+      , Runtime_config.hard_fork_genesis_slot_delta config )
+    with
+    | None, None, None ->
+        None
+    | _ ->
+        let genesis_constants = Config.genesis_constants ~network config in
+        let consensus_constants =
+          Consensus.Constants.create
+            ~constraint_constants:network.constraint_constants
+            ~protocol_constants:genesis_constants.protocol
+        in
+        Some
+          { slot_tx_end =
+              require "daemon.slot_tx_end" (Runtime_config.slot_tx_end config)
+          ; slot_chain_end =
+              require "daemon.slot_chain_end"
+                (Runtime_config.slot_chain_end config)
+          ; hard_fork_genesis_slot_delta =
+              require "daemon.hard_fork_genesis_slot_delta"
+                (Runtime_config.hard_fork_genesis_slot_delta config)
+          ; hard_fork_genesis_slot =
+              require "scheduled hard fork genesis slot"
+                (Runtime_config.scheduled_hard_fork_genesis_slot config)
+          ; consensus_constants
+          }
 
-  let of_file ~network path =
-    Yojson.Safe.from_file path |> Runtime_config.of_yojson
-    |> Result.map_error ~f:Error.of_string
-    |> Or_error.ok_exn |> of_config ~network
+  let of_file ~network path = of_config ~network (Config.of_file path)
 
   let slot_tx_end t = t.slot_tx_end
 
@@ -138,9 +181,10 @@ module Schedule = struct
       (Consensus.Data.Consensus_time.slot (consensus_time t slot))
 end
 
-(** What a network's schedule is expected to be. *)
+(** What a network's config is expected to declare. *)
 module Expected = struct
-  type t =
+  (** An armed schedule, and the times the daemon must derive from it. *)
+  type schedule =
     { slot_tx_end : int
     ; slot_chain_end : int
     ; hard_fork_genesis_slot_delta : int
@@ -154,13 +198,38 @@ module Expected = struct
     ; tx_end_epoch : int
     ; tx_end_slot_in_epoch : int
     }
+
+  (** A schedule that has run its course: the config is now the fork config
+      that hard fork produced. *)
+  type forked =
+    { genesis_time : string  (** [genesis.genesis_state_timestamp]. *)
+    ; previous_fork_slot_since_genesis : int
+          (** [proof.fork.global_slot_since_genesis] of the config this one
+              replaced, i.e. the base of the [Global_slot_since_hard_fork]
+              counter the schedule was expressed in. *)
+    ; hard_fork_genesis_slot : int
+          (** The genesis slot the schedule aimed at, since that base. *)
+    ; fork_slot_since_genesis : int
+          (** [proof.fork.global_slot_since_genesis] of this config. *)
+    ; fork_blockchain_length : int  (** [proof.fork.blockchain_length]. *)
+    }
+
+  (* Both networks are [Forked] right now, so nothing builds a [Scheduled]
+     value; the warning is silenced rather than the branch deleted, because
+     arming the next hard fork means setting the stop slots in the shipped
+     config and flipping the expectation below back to [Scheduled]. *)
+  type t = Scheduled of schedule | Forked of forked [@@warning "-37"]
 end
 
-let suite ~network ~(expected : Expected.t) ~config_path =
+let case name f = Alcotest.test_case name `Quick f
+
+let scheduled_suite ~network ~(expected : Expected.schedule) ~config_path =
   let open Expected in
-  let schedule () = Schedule.of_file ~network config_path in
+  let schedule () =
+    Schedule.require "daemon stop slot schedule"
+      (Schedule.of_file ~network config_path)
+  in
   let slot = Mina_numbers.Global_slot_since_hard_fork.to_int in
-  let case name f = Alcotest.test_case name `Quick f in
   [ case "configured slots are the agreed values" (fun () ->
         let t = schedule () in
         Alcotest.(check int)
@@ -227,6 +296,39 @@ let suite ~network ~(expected : Expected.t) ~config_path =
           (Schedule.slot_in_epoch t s) )
   ]
 
+let forked_suite ~network ~(expected : Expected.forked) ~config_path =
+  let open Expected in
+  let config () = Config.of_file config_path in
+  let fork () = Schedule.require "proof.fork" (Config.fork (config ())) in
+  [ case "no hard fork is armed any more" (fun () ->
+        Alcotest.(check bool)
+          "daemon declares no stop slot schedule" true
+          (Option.is_none (Schedule.of_config ~network (config ()))) )
+  ; case "config is the fork config the schedule produced" (fun () ->
+        Alcotest.(check int)
+          "expected fork slot is chain start + hard fork genesis slot"
+          expected.fork_slot_since_genesis
+          ( expected.previous_fork_slot_since_genesis
+          + expected.hard_fork_genesis_slot ) ;
+        Alcotest.(check int)
+          "proof.fork.global_slot_since_genesis"
+          expected.fork_slot_since_genesis (fork ()).global_slot_since_genesis ;
+        Alcotest.(check int)
+          "proof.fork.blockchain_length" expected.fork_blockchain_length
+          (fork ()).blockchain_length )
+  ; case "hard fork genesis is at the agreed time" (fun () ->
+        Alcotest.(check string)
+          "genesis time" expected.genesis_time
+          (Config.genesis_time ~network (config ())) )
+  ]
+
+let suite ~network ~(expected : Expected.t) ~config_path =
+  match expected with
+  | Expected.Scheduled expected ->
+      scheduled_suite ~network ~expected ~config_path
+  | Expected.Forked expected ->
+      forked_suite ~network ~expected ~config_path
+
 (* ------------------------------------------------------------------ *)
 (* devnet                                                             *)
 (* ------------------------------------------------------------------ *)
@@ -254,20 +356,18 @@ let devnet : Network_constants.t =
       }
   }
 
+(* Devnet hard forked on 2026-08-19, at the end of the schedule this test used
+   to check: slot_tx_end 413540, slot_chain_end 413640, delta 60, so hard fork
+   genesis slot 413700 counted from the previous fork base 445860. The config
+   devnet now ships is the fork config that produced. *)
 let devnet_expected : Expected.t =
-  { slot_tx_end = 413540
-  ; slot_chain_end = 413640
-  ; hard_fork_genesis_slot_delta = 60
-  ; hard_fork_genesis_slot = 413700
-  ; tx_end_time = "2026-08-19T10:00:00.000000Z"
-  ; chain_end_time = "2026-08-19T15:00:00.000000Z"
-  ; hard_fork_genesis_time = "2026-08-19T18:00:00.000000Z"
-  ; empty_block_hours = 5
-  ; downtime_hours = 3
-  ; no_transaction_hours = 8
-  ; tx_end_epoch = 57
-  ; tx_end_slot_in_epoch = 6560
-  }
+  Forked
+    { genesis_time = "2026-08-19T18:00:00.000000Z"
+    ; previous_fork_slot_since_genesis = 445860
+    ; hard_fork_genesis_slot = 413700
+    ; fork_slot_since_genesis = 859560
+    ; fork_blockchain_length = 545433
+    }
 
 (* Copied next to the test executable by the rule in ./dune, so the assertions
    run against the config that actually ships. *)
@@ -299,23 +399,17 @@ let mainnet : Network_constants.t =
       }
   }
 
-(* Mainnet's genesis is 2024-06-05T00:00:00Z, two months later than devnet's,
-   so the same wall-clock schedule sits at different slot numbers. Reusing
-   devnet's 413540/413640 here would place the stop almost two months late. *)
+(* Mainnet hard forked on 2026-09-03, two weeks after devnet, at the end of its
+   own schedule: slot_tx_end 393800, slot_chain_end 393900, delta 60, so hard
+   fork genesis slot 393960 counted from the previous fork base 564480. *)
 let mainnet_expected : Expected.t =
-  { slot_tx_end = 393800
-  ; slot_chain_end = 393900
-  ; hard_fork_genesis_slot_delta = 60
-  ; hard_fork_genesis_slot = 393960
-  ; tx_end_time = "2026-09-03T10:00:00.000000Z"
-  ; chain_end_time = "2026-09-03T15:00:00.000000Z"
-  ; hard_fork_genesis_time = "2026-09-03T18:00:00.000000Z"
-  ; empty_block_hours = 5
-  ; downtime_hours = 3
-  ; no_transaction_hours = 8
-  ; tx_end_epoch = 55
-  ; tx_end_slot_in_epoch = 1100
-  }
+  Forked
+    { genesis_time = "2026-09-03T18:00:00.000000Z"
+    ; previous_fork_slot_since_genesis = 564480
+    ; hard_fork_genesis_slot = 393960
+    ; fork_slot_since_genesis = 958440
+    ; fork_blockchain_length = 548146
+    }
 
 let mainnet_config_path = "mainnet.json"
 
