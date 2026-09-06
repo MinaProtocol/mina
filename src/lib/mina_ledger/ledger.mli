@@ -232,8 +232,14 @@ val gen_initial_ledger_state : init_state Quickcheck.Generator.t
 (** Apply a generated state to a blank, concrete ledger. *)
 val apply_initial_ledger_state : t -> init_state -> unit
 
-module Ledger_inner :
-  Ledger_intf.S with type t = t and type location = Location.t
+module Ledger_inner : sig
+  include Ledger_intf.S with type t = t and type location = Location.t
+
+  module Converting_for_tests : sig
+    val with_converting_ledger_exn :
+      logger:Logger.t -> depth:int -> f:(t * Hardfork_db.t -> 'a) -> 'a
+  end
+end
 
 module For_tests : sig
   open Currency
