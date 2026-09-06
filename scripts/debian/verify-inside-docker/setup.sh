@@ -16,9 +16,16 @@ TRUSTED_FLAG="${7:-[trusted=yes]}"
 echo "Installing $PACKAGE=$VERSION from $REPO ($CODENAME/$CHANNEL)"
 
 apt-get update > /dev/null
-apt-get install -y lsb-release ca-certificates wget gnupg > /dev/null
+
+# ca-certificates alone is enough to fetch from an https repo with
+# [trusted=yes]; wget/gnupg are only needed to import the signing key for
+# signed repos.  Keep the installs separate: on EOL codenames (e.g. bullseye
+# after Aug 2026) parts of the security pool 404, and one unrelated 404 in a
+# shared apt transaction would take ca-certificates down with it.
+apt-get install -y ca-certificates > /dev/null
 
 if [[ "$SIGNED" == "1" ]]; then
+  apt-get install -y wget gnupg > /dev/null
   wget -q "https://${REPO}/repo-signing-key.gpg" -O /etc/apt/trusted.gpg.d/minaprotocol.gpg
   TRUSTED_FLAG=""
 fi
