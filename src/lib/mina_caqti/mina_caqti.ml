@@ -356,11 +356,66 @@ let exec_req : type a.
           Hashtbl.set zero ~key:s ~data:(E (t, Caqti_type.unit, req)) ;
         req
 
-module type CONNECTION = sig
-  include Caqti_async.CONNECTION
+(* A request built by this module.
 
+   Outside the library this type is private, so a request can only be obtained
+   from the constructors above -- and the connection below accepts nothing
+   else. That is what keeps the memoisation from being bypassed: not a
+   convention, but the only way to get a value the connection will take. *)
+type ('a, 'b, 'm) query = ('a, 'b, 'm) Caqti_request.t
+  constraint 'm = [< `Zero | `One | `Many ]
+
+(* The connection surface Mina uses, restated over [query] rather than
+   included from Caqti_async, whose members would take any request at all.
+   Anything Caqti offers that is missing here can be added; it is deliberately
+   the set the tree actually calls. *)
+module type CONNECTION = sig
   (** Code expects any queries to differing sources to never interfere. *)
   val source : Uri.t
+
+  val find :
+       ('a, 'b, [< `One ]) query
+    -> 'a
+    -> ('b, [> Caqti_error.call_or_retrieve ]) Deferred.Result.t
+
+  val find_opt :
+       ('a, 'b, [< `Zero | `One ]) query
+    -> 'a
+    -> ('b option, [> Caqti_error.call_or_retrieve ]) Deferred.Result.t
+
+  val collect_list :
+       ('a, 'b, [< `Zero | `One | `Many ]) query
+    -> 'a
+    -> ('b list, [> Caqti_error.call_or_retrieve ]) Deferred.Result.t
+
+  val fold :
+       ('a, 'b, [< `Zero | `One | `Many ]) query
+    -> ('b -> 'c -> 'c)
+    -> 'a
+    -> 'c
+    -> ('c, [> Caqti_error.call_or_retrieve ]) Deferred.Result.t
+
+  val exec :
+       ('a, unit, [< `Zero ]) query
+    -> 'a
+    -> (unit, [> Caqti_error.call_or_retrieve ]) Deferred.Result.t
+
+  val populate :
+       table:string
+    -> columns:string list
+    -> 'a Caqti_type.t
+    -> ('a, 'err) Caqti_async.Stream.t
+    -> ( unit
+       , [> Caqti_error.call_or_retrieve | `Congested of 'err ] )
+       Deferred.Result.t
+
+  val start : unit -> (unit, [> Caqti_error.transact ]) Deferred.Result.t
+
+  val commit : unit -> (unit, [> Caqti_error.transact ]) Deferred.Result.t
+
+  val rollback : unit -> (unit, [> Caqti_error.transact ]) Deferred.Result.t
+
+  val disconnect : unit -> unit Deferred.t
 end
 
 module Wrap
@@ -852,6 +907,15 @@ let insert_multi_into_col_no_dedup ~(table_name : string) ~(col : string)
       Conn.collect_list
         (collect_req ~oneshot:true Caqti_type.unit Caqti_type.int insert)
         ()
+
+(** Render a query for a log line, with its parameters when given. *)
+let query_to_string ?params (q : _ query) =
+  let buffer = Buffer.create 128 in
+  let ppf = Format.formatter_of_buffer buffer in
+  Option.value_map params ~default:(Caqti_request.pp ppf q) ~f:(fun params ->
+      Caqti_request.make_pp_with_param () ppf (q, params) ) ;
+  Format.pp_print_flush ppf () ;
+  Buffer.contents buffer
 
 (** Unwrap a Caqti result, raising on error. [ctx] names the operation being
     performed and is prepended to the message. *)

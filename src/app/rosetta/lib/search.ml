@@ -298,17 +298,6 @@ module Sql = struct
     in
     [%string "%{block_filter} AND (%{filters'})"]
 
-  let request_to_string ?params req =
-    let buffer = Buffer.create 128 in
-    let ppf = Format.formatter_of_buffer buffer in
-    let () =
-      Option.value_map params ~default:(Caqti_request.pp ppf req)
-        ~f:(fun params ->
-          Caqti_request.make_pp_with_param () ppf (req, params) )
-    in
-    let () = Format.pp_print_flush ppf () in
-    Buffer.contents buffer
-
   module Block_extras = struct
     type t = { block_hash : string; block_height : int64 }
     [@@deriving hlist, fields]
@@ -508,7 +497,8 @@ module Sql = struct
         Mina_caqti.collect_req Params.typ Caqti_type.(t2 int64 typ) query_string
       in
       [%log debug] "Running SQL query $query"
-        ~metadata:[ ("query", `String (request_to_string ~params query)) ] ;
+        ~metadata:
+          [ ("query", `String (Mina_caqti.query_to_string ~params query)) ] ;
       match%map Conn.collect_list query params with
       | [] ->
           (0L, [])
@@ -784,7 +774,8 @@ module Sql = struct
         @@ query_string ~offset ~limit input.filter.op_type input.operator
       in
       [%log debug] "Running SQL query $query"
-        ~metadata:[ ("query", `String (request_to_string ~params query)) ] ;
+        ~metadata:
+          [ ("query", `String (Mina_caqti.query_to_string ~params query)) ] ;
       match%map Conn.collect_list query params with
       | [] ->
           (0L, [])
@@ -964,7 +955,8 @@ module Sql = struct
       let params = Params.of_query input in
       let query = query ~offset ~limit input.filter.op_type input.operator in
       [%log debug] "Running SQL query $query"
-        ~metadata:[ ("query", `String (request_to_string ~params query)) ] ;
+        ~metadata:
+          [ ("query", `String (Mina_caqti.query_to_string ~params query)) ] ;
       match%map Conn.collect_list query params with
       | [] ->
           (0L, [])

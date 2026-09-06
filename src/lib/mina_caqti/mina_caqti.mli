@@ -16,6 +16,15 @@ open Mina_base
     [scripts/lint_caqti_requests.sh] -- and they memoise on the SQL text, so a
     call site cannot leak that way whatever it does with the result. *)
 
+(** A request built by this library.
+
+    The type is private, so a value can only come from the constructors below,
+    and {!CONNECTION} accepts nothing else. Bypassing the memoisation is
+    therefore not a matter of convention: a hand-built [Caqti_request.t] is not
+    something any connection here will run. *)
+type ('a, 'b, 'm) query = private ('a, 'b, 'm) Caqti_request.t
+  constraint 'm = [< `Zero | `One | `Many ]
+
 (** [find_req pt rt sql] is a request returning exactly one row.
 
     The request is shared with every other call passing the same [sql] whose
@@ -30,7 +39,7 @@ val find_req :
   -> 'a Caqti_type.t
   -> 'b Caqti_type.t
   -> string
-  -> ('a, 'b, [ `One ]) Caqti_request.t
+  -> ('a, 'b, [ `One ]) query
 
 (** as {!find_req}, for a request returning zero or one row *)
 val find_opt_req :
@@ -38,7 +47,7 @@ val find_opt_req :
   -> 'a Caqti_type.t
   -> 'b Caqti_type.t
   -> string
-  -> ('a, 'b, [ `Zero | `One ]) Caqti_request.t
+  -> ('a, 'b, [ `Zero | `One ]) query
 
 (** as {!find_req}, for a request returning any number of rows *)
 val collect_req :
@@ -46,14 +55,11 @@ val collect_req :
   -> 'a Caqti_type.t
   -> 'b Caqti_type.t
   -> string
-  -> ('a, 'b, [ `Zero | `One | `Many ]) Caqti_request.t
+  -> ('a, 'b, [ `Zero | `One | `Many ]) query
 
 (** as {!find_req}, for a request returning no rows *)
 val exec_req :
-     ?oneshot:bool
-  -> 'a Caqti_type.t
-  -> string
-  -> ('a, unit, [ `Zero ]) Caqti_request.t
+  ?oneshot:bool -> 'a Caqti_type.t -> string -> ('a, unit, [ `Zero ]) query
 
 (** Row types that can be shared.
 
@@ -125,11 +131,57 @@ end
 
 (** {1 Connections} *)
 
+(** The connection surface Mina uses, stated over {!query} rather than included
+    from Caqti_async, whose members would take any request at all. Anything
+    Caqti offers that is missing here can be added; it is deliberately the set
+    the tree actually calls. *)
 module type CONNECTION = sig
-  include Caqti_async.CONNECTION
-
   (** Code expects any queries to differing sources to never interfere. *)
   val source : Uri.t
+
+  val find :
+       ('a, 'b, [< `One ]) query
+    -> 'a
+    -> ('b, [> Caqti_error.call_or_retrieve ]) Deferred.Result.t
+
+  val find_opt :
+       ('a, 'b, [< `Zero | `One ]) query
+    -> 'a
+    -> ('b option, [> Caqti_error.call_or_retrieve ]) Deferred.Result.t
+
+  val collect_list :
+       ('a, 'b, [< `Zero | `One | `Many ]) query
+    -> 'a
+    -> ('b list, [> Caqti_error.call_or_retrieve ]) Deferred.Result.t
+
+  val fold :
+       ('a, 'b, [< `Zero | `One | `Many ]) query
+    -> ('b -> 'c -> 'c)
+    -> 'a
+    -> 'c
+    -> ('c, [> Caqti_error.call_or_retrieve ]) Deferred.Result.t
+
+  val exec :
+       ('a, unit, [< `Zero ]) query
+    -> 'a
+    -> (unit, [> Caqti_error.call_or_retrieve ]) Deferred.Result.t
+
+  val populate :
+       table:string
+    -> columns:string list
+    -> 'a Caqti_type.t
+    -> ('a, 'err) Caqti_async.Stream.t
+    -> ( unit
+       , [> Caqti_error.call_or_retrieve | `Congested of 'err ] )
+       Deferred.Result.t
+
+  val start : unit -> (unit, [> Caqti_error.transact ]) Deferred.Result.t
+
+  val commit : unit -> (unit, [> Caqti_error.transact ]) Deferred.Result.t
+
+  val rollback : unit -> (unit, [> Caqti_error.transact ]) Deferred.Result.t
+
+  val disconnect : unit -> unit Deferred.t
 end
 
 module Pool : sig
@@ -162,6 +214,9 @@ val query :
         -> ('a, ([< Caqti_error.t ] as 'e)) Deferred.Result.t )
   -> ((module Caqti_async.CONNECTION), 'e) Pool.t
   -> 'a Deferred.t
+
+(** Render a query for a log line, with its parameters when given. *)
+val query_to_string : ?params:'a -> ('a, 'b, 'm) query -> string
 
 (** Unwrap a Caqti result, raising on error. [ctx] names the operation being
     performed and is prepended to the message. *)
