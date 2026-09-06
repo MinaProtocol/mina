@@ -1,4 +1,5 @@
 open Mina_base
+open Core_kernel
 
 (** This is the base signature for a full frontier, shared by any implementation
  *  of a full frontier. Currently, this includes the internal [Full_frontier]
@@ -44,4 +45,9 @@ module type S = sig
   val precomputed_values : t -> Precomputed_values.t
 
   val genesis_constants : t -> Genesis_constants.t
+
+  module Protocol_states_for_root_scan_state : T
+
+  val protocol_states_for_root_scan_state :
+    t -> Protocol_states_for_root_scan_state.t
 end

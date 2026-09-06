@@ -18,6 +18,7 @@ module Catchup_state = Catchup_state
 module Full_catchup_tree = Full_catchup_tree
 module Catchup_hash_tree = Catchup_hash_tree
 module Root_ledger = Mina_ledger.Root
+module Util = Full_frontier.Util
 
 module type CONTEXT = sig
   val logger : Logger.t
@@ -33,7 +34,10 @@ module type CONTEXT = sig
   val signature_kind : Mina_signature_kind.t
 end
 
-include Frontier_intf.S
+include
+  Frontier_intf.S
+    with module Protocol_states_for_root_scan_state := Full_frontier
+                                                       .Protocol_states_for_root_scan_state
 
 type Structured_log_events.t += Added_breadcrumb_user_commands
   [@@deriving register_event]
