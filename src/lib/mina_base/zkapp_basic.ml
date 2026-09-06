@@ -208,13 +208,51 @@ module Set_or_keep = struct
       (Flagged_option.of_option ~default (to_option t))
 end
 
+(** Optional precondition for zkApp account updates.
+
+    zkApp account updates can specify preconditions that must hold for the update
+    to be valid. For each precondition field, the account update can either:
+    - [Check value]: Assert the on-chain state matches [value]
+    - [Ignore]: Skip checking this precondition
+
+    This allows zkApps to be selective about which state they depend on. For example,
+    an account update might check that the account nonce is in a specific range
+    (for replay protection) while ignoring the account balance.
+
+    {2 Usage}
+
+    Used throughout {!Zkapp_precondition} to wrap precondition fields:
+
+    {b Account preconditions} ([Zkapp_precondition.Account]):
+    - [balance]: Check account balance is in range
+    - [nonce]: Check nonce is in range (replay protection)
+    - [receipt_chain_hash]: Check receipt chain hash matches
+    - [delegate]: Check delegation target
+    - [state]: Check zkApp state fields
+    - [action_state]: Check action state
+    - [proved_state]: Check proved state flag
+    - [is_new]: Check if account is newly created
+
+    {b Protocol state preconditions} ([Zkapp_precondition.Protocol_state]):
+    - [snarked_ledger_hash]: Check snarked ledger hash
+    - [blockchain_length]: Check blockchain length is in range
+    - [min_window_density]: Check minimum window density
+    - [total_currency]: Check total currency in circulation
+    - [global_slot_since_genesis]: Check global slot
+    - [epoch_data]: Check staking/next epoch data (ledger hash, seed, checkpoints)
+
+    {2 Implementations}
+
+    - {b Unchecked} ([Or_ignore.t]): Used in transaction application on the ledger.
+    - {b Checked} ([Or_ignore.Checked.t]): Used in-circuit during SNARK verification.
+      Internally represented as a [Flagged_option] with a [Boolean.var] flag. *)
 module Or_ignore = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
       type 'a t = 'a Mina_wire_types.Mina_base.Zkapp_basic.Or_ignore.V1.t =
-        | Check of 'a
-        | Ignore
+        | Check of 'a  (** Assert the on-chain state matches this value. *)
+        | Ignore  (** Do not check this precondition. *)
       [@@deriving sexp, equal, compare, hash, yojson]
     end
   end]
