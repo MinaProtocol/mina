@@ -4825,11 +4825,17 @@ let add_genesis_accounts ~logger ~(runtime_config_opt : Runtime_config.t option)
               | Some acct ->
                   (index, acct) )
         in
+        (* Chunk the ids and materialise accounts per batch: reading all
+           accounts up front holds every genesis account in memory (~550 MiB
+           for mainnet) for the whole insertion. [chunks_length] bounds the
+           Postgres transaction, not the archive's own heap. *)
         let%bind list_of_results =
-          List.map account_ids ~f:(fun acct_id ->
-              acccount_with_index_of_id ~ledger acct_id )
-          |> List.chunks_of ~length:chunks_length
-          |> Deferred.List.mapi ~how:`Sequential ~f:(fun i batch ->
+          List.chunks_of account_ids ~length:chunks_length
+          |> Deferred.List.mapi ~how:`Sequential ~f:(fun i id_batch ->
+              let batch =
+                List.map id_batch ~f:(fun acct_id ->
+                    acccount_with_index_of_id ~ledger acct_id )
+              in
               match%bind
                 Pool.use
                   (fun (module Conn : CONNECTION) ->
