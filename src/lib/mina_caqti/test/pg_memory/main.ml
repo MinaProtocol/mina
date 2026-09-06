@@ -1,7 +1,8 @@
 (* pg_memory/main.ml -- postgres memory-usage benchmark for Mina_caqti.
 
-   Several helpers in {!Mina_caqti} build a fresh [Caqti_request.t] on every
-   call (the SQL text is derived from runtime [~table_name]/[~cols] arguments).
+   Several helpers in {!Mina_caqti} derive their SQL text from runtime
+   [~table_name]/[~cols] arguments, so a naive implementation builds a fresh
+   request object on every call.
    Caqti keys its per-connection prepared-statement cache by request-object
    identity, so a fresh request per call makes the PostgreSQL backend register
    a new server-side prepared statement (PREPARE _caqtiN) that lives for the
