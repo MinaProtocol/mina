@@ -1,7 +1,6 @@
 open Core
 open Async
 open Archive_hardfork_toolbox_lib
-open Caqti_request.Infix
 
 module Block = struct
   type t =
@@ -49,7 +48,7 @@ module TestDb = struct
 
   let drop_database_if_exists conn_str db_name =
     let sql_string = sprintf "DROP DATABASE IF EXISTS %s" db_name in
-    let mutation = Caqti_type.(unit ->. unit) sql_string in
+    let mutation = Mina_caqti.exec_req Caqti_type.unit sql_string in
     with_pool conn_str (fun pool ->
         Deferred.Or_error.try_with (fun () ->
             Mina_caqti.query pool ~f:(fun (module Conn : Sql.CONNECTION) ->
@@ -57,7 +56,7 @@ module TestDb = struct
 
   let create_database conn_str db_name =
     let sql_string = sprintf "CREATE DATABASE %s" db_name in
-    let mutation = Caqti_type.(unit ->. unit) sql_string in
+    let mutation = Mina_caqti.exec_req Caqti_type.unit sql_string in
     with_pool conn_str (fun pool ->
         Deferred.Or_error.try_with (fun () ->
             Mina_caqti.query pool ~f:(fun (module Conn : Sql.CONNECTION) ->
@@ -100,7 +99,7 @@ module TestDb = struct
     in
     let mutations =
       [ chain_status_type_schema; protocol_versions_schema; blocks_schema ]
-      |> List.map ~f:Caqti_type.(unit ->. unit)
+      |> List.map ~f:(Mina_caqti.exec_req Caqti_type.unit)
     in
     with_pool conn_str ~db_name (fun pool ->
         Deferred.Or_error.try_with (fun () ->
@@ -115,7 +114,8 @@ module TestDb = struct
 
   let insert_protocol_versions conn_str db_name versions =
     let query =
-      Caqti_type.(t3 int int int ->. unit)
+      Mina_caqti.exec_req
+        Caqti_type.(t3 int int int)
         {sql|
           INSERT INTO protocol_versions
             (transaction, network, patch)
@@ -146,11 +146,11 @@ module TestDb = struct
               block
             in
             let query =
-              ( Caqti_type.(
-                  t3
-                    (t4 int string (option int) string)
-                    (t4 int int int int) string )
-              ->. Caqti_type.unit )
+              (Mina_caqti.exec_req
+                 Caqti_type.(
+                   t3
+                     (t4 int string (option int) string)
+                     (t4 int int int int) string ) )
                 {sql|
                   INSERT INTO blocks
                     (id, state_hash, parent_id, parent_hash, height,
@@ -173,7 +173,7 @@ module TestDb = struct
 
   let get_all_blocks conn_str db_name =
     let query =
-      (Caqti_type.unit ->* Caqti_type.(t2 string string))
+      (Mina_caqti.collect_req Caqti_type.unit Caqti_type.(t2 string string))
         {sql|
           SELECT state_hash, chain_status
           FROM blocks
