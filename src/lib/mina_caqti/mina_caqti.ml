@@ -4,14 +4,216 @@ open Async
 open Core
 open Mina_base
 
-(* custom Caqti types for generating type annotations on queries *)
-let find_req t u s = Caqti_request.Infix.(t ->! u) s
+(* Caqti keys BOTH the server-side PREPARE and its own per-connection cache by
+   request-object identity, so a [Caqti_request.t] built afresh on every call
+   accumulates a prepared statement per call on every pooled connection, for
+   the life of that connection (#18857). Its documented remedy is to define
+   each request once in module scope, but nothing enforces that, and a call
+   site that gets it wrong leaks silently rather than failing.
 
-let find_opt_req t u s = Caqti_request.Infix.(t ->? u) s
+   So the constructors below memoise instead of relying on every call site:
+   the request is keyed by its SQL text, and a cached request is only handed
+   back when [Caqti_type.unify] certifies that the parameter and row types
+   match. That is a type-equality proof from Caqti itself, which is what makes
+   the shared cache sound without [Obj.magic].
 
-let collect_req t u s = Caqti_request.Infix.(t ->* u) s
+   A query whose SQL text embeds its values differs on every call and must NOT
+   be memoised -- pass [~oneshot:true], which is also what tells Caqti not to
+   prepare it at all. *)
+module Request_cache = struct
+  type 'm entry =
+    | E :
+        'a Caqti_type.t * 'b Caqti_type.t * ('a, 'b, 'm) Caqti_request.t
+        -> 'm entry
 
-let exec_req t s = Caqti_request.Infix.(t ->. Caqti_type.unit) s
+  (* The key set is the set of distinct SQL texts in the source, so it is
+     bounded by construction: ~150 across the archive today. The cap is a
+     tripwire for the one way that can stop being true -- a query whose text
+     varies per call reaching the memoised path -- not a working limit.
+
+     Note there is deliberately no eviction. Dropping an entry would not
+     release anything: the prepared statement lives in the driver's
+     per-connection table and on the server, both keyed by the request
+     identity we would be discarding, and Caqti frees them only via
+     [deallocate] on the very request object or on disconnect. Evicting would
+     therefore keep the leak while hiding it from these counters, and force a
+     re-PREPARE the next time the query ran. Refusing to grow, and saying so,
+     is the honest failure mode. *)
+  let max_entries = 512
+
+  let hits = ref 0
+
+  let first_builds = ref 0
+
+  (* A repeat miss means the SQL was cached but the types did not unify, i.e.
+     the call site builds its [Caqti_type.t] per call (an inline [t2]/[t3] or
+     [custom] mints a fresh identity every time) and so can never share. Those
+     still leak; the count is the regression signal. *)
+  let repeat_misses : int String.Table.t = String.Table.create ()
+
+  let capped = ref false
+
+  let one : [ `One ] entry String.Table.t = String.Table.create ()
+
+  let zero_or_one : [ `Zero | `One ] entry String.Table.t =
+    String.Table.create ()
+
+  let many : [ `Zero | `One | `Many ] entry String.Table.t =
+    String.Table.create ()
+
+  let zero : [ `Zero ] entry String.Table.t = String.Table.create ()
+
+  let entries () =
+    Hashtbl.length one + Hashtbl.length zero_or_one + Hashtbl.length many
+    + Hashtbl.length zero
+
+  let note_repeat_miss sql =
+    Hashtbl.update repeat_misses sql ~f:(function None -> 1 | Some n -> n + 1)
+
+  (* [true] once the cache is full: new SQL is then built [~oneshot:true],
+     which is slower but registers nothing, so the failure mode is lost
+     throughput rather than unbounded memory. *)
+  let room_for sql =
+    if entries () < max_entries then true
+    else (
+      if not !capped then (
+        capped := true ;
+        eprintf
+          "mina_caqti: request cache reached %d entries; further queries run \
+           un-prepared. A query whose SQL text varies per call has reached the \
+           memoised path and should pass ~oneshot:true. First offender: %s\n\
+           %!"
+          max_entries (String.prefix sql 200) ) ;
+      false )
+
+  type stats =
+    { hits : int
+    ; first_builds : int
+    ; repeat_misses : int
+    ; entries : int
+    ; capped : bool
+    }
+
+  let stats () =
+    { hits = !hits
+    ; first_builds = !first_builds
+    ; repeat_misses =
+        Hashtbl.fold repeat_misses ~init:0 ~f:(fun ~key:_ ~data acc ->
+            acc + data )
+    ; entries = entries ()
+    ; capped = !capped
+    }
+
+  (* the SQL of each call site that cannot share its request, worst first *)
+  let repeat_miss_report () =
+    Hashtbl.to_alist repeat_misses
+    |> List.sort ~compare:(fun (_, a) (_, b) -> Int.descending a b)
+    |> List.map ~f:(fun (sql, n) -> (n, String.prefix sql 200))
+end
+
+(* The request constructors. Every query in the tree is built through these,
+   which is what keeps the prepared-statement count bounded no matter where the
+   call site puts them; scripts/lint_caqti_requests.sh keeps [Caqti_request]
+   itself out of the rest of the tree.
+
+   [Caqti_request.t]'s multiplicity parameter is constrained, which a locally
+   abstract type cannot carry, so the lookup is written out once per
+   multiplicity rather than shared. *)
+let find_req : type a b.
+       ?oneshot:bool
+    -> a Caqti_type.t
+    -> b Caqti_type.t
+    -> string
+    -> (a, b, [ `One ]) Caqti_request.t =
+ fun ?(oneshot = false) t u s ->
+  let open Request_cache in
+  let build () = Caqti_request.Infix.(t ->! u) ~oneshot s in
+  if oneshot then build ()
+  else
+    match Hashtbl.find one s with
+    | Some (E (t', u', req)) -> (
+        match (Caqti_type.unify t' t, Caqti_type.unify u' u) with
+        | Some Caqti_type.Equal, Some Caqti_type.Equal ->
+            incr hits ; req
+        | _ ->
+            note_repeat_miss s ; build () )
+    | None ->
+        incr first_builds ;
+        let req = build () in
+        if room_for s then Hashtbl.set one ~key:s ~data:(E (t, u, req)) ;
+        req
+
+let find_opt_req : type a b.
+       ?oneshot:bool
+    -> a Caqti_type.t
+    -> b Caqti_type.t
+    -> string
+    -> (a, b, [ `Zero | `One ]) Caqti_request.t =
+ fun ?(oneshot = false) t u s ->
+  let open Request_cache in
+  let build () = Caqti_request.Infix.(t ->? u) ~oneshot s in
+  if oneshot then build ()
+  else
+    match Hashtbl.find zero_or_one s with
+    | Some (E (t', u', req)) -> (
+        match (Caqti_type.unify t' t, Caqti_type.unify u' u) with
+        | Some Caqti_type.Equal, Some Caqti_type.Equal ->
+            incr hits ; req
+        | _ ->
+            note_repeat_miss s ; build () )
+    | None ->
+        incr first_builds ;
+        let req = build () in
+        if room_for s then Hashtbl.set zero_or_one ~key:s ~data:(E (t, u, req)) ;
+        req
+
+let collect_req : type a b.
+       ?oneshot:bool
+    -> a Caqti_type.t
+    -> b Caqti_type.t
+    -> string
+    -> (a, b, [ `Zero | `One | `Many ]) Caqti_request.t =
+ fun ?(oneshot = false) t u s ->
+  let open Request_cache in
+  let build () = Caqti_request.Infix.(t ->* u) ~oneshot s in
+  if oneshot then build ()
+  else
+    match Hashtbl.find many s with
+    | Some (E (t', u', req)) -> (
+        match (Caqti_type.unify t' t, Caqti_type.unify u' u) with
+        | Some Caqti_type.Equal, Some Caqti_type.Equal ->
+            incr hits ; req
+        | _ ->
+            note_repeat_miss s ; build () )
+    | None ->
+        incr first_builds ;
+        let req = build () in
+        if room_for s then Hashtbl.set many ~key:s ~data:(E (t, u, req)) ;
+        req
+
+let exec_req : type a.
+       ?oneshot:bool
+    -> a Caqti_type.t
+    -> string
+    -> (a, unit, [ `Zero ]) Caqti_request.t =
+ fun ?(oneshot = false) t s ->
+  let open Request_cache in
+  let build () = Caqti_request.Infix.(t ->. Caqti_type.unit) ~oneshot s in
+  if oneshot then build ()
+  else
+    match Hashtbl.find zero s with
+    | Some (E (t', u', req)) -> (
+        match (Caqti_type.unify t' t, Caqti_type.unify u' Caqti_type.unit) with
+        | Some Caqti_type.Equal, Some Caqti_type.Equal ->
+            incr hits ; req
+        | _ ->
+            note_repeat_miss s ; build () )
+    | None ->
+        incr first_builds ;
+        let req = build () in
+        if room_for s then
+          Hashtbl.set zero ~key:s ~data:(E (t, Caqti_type.unit, req)) ;
+        req
 
 module type CONNECTION = sig
   include Caqti_async.CONNECTION
@@ -404,7 +606,7 @@ let select_insert_into_cols ~(select : string * 'select Caqti_type.t)
     (module Conn : CONNECTION) (value : 'cols) =
   let open Deferred.Result.Let_syntax in
   Conn.find_opt
-    ( Caqti_request.Infix.(snd cols ->? snd select)
+    ( find_opt_req (snd cols) (snd select)
     @@ select_cols ~select:(fst select) ~table_name ?tannot ~cols:(fst cols) ()
     )
     value
@@ -413,7 +615,7 @@ let select_insert_into_cols ~(select : string * 'select Caqti_type.t)
       return id
   | None ->
       Conn.find
-        ( Caqti_request.Infix.(snd cols ->! snd select)
+        ( find_req (snd cols) (snd select)
         @@ insert_into_cols ~returning:(fst select) ~table_name ?tannot
              ~cols:(fst cols) () )
         value
@@ -422,6 +624,9 @@ let sep_by_comma ?(parenthesis = false) xs =
   List.map xs ~f:(if parenthesis then sprintf "('%s')" else sprintf "'%s'")
   |> String.concat ~sep:", "
 
+(* The values are rendered into the SQL text, so the statement differs on every
+   call: it cannot be shared and is built [~oneshot:true], which keeps Caqti
+   from preparing it at all. (Binding them as parameters instead is #18860.) *)
 let insert_multi_into_col ~(table_name : string)
     ~(col : string * 'col Caqti_type.t) (module Conn : CONNECTION)
     (values : string list) =
@@ -435,11 +640,7 @@ let insert_multi_into_col ~(table_name : string)
       (sep_by_comma ~parenthesis:true values)
       (fst col)
   in
-  let%bind () =
-    Conn.exec
-      (Caqti_request.Infix.(Caqti_type.unit ->. Caqti_type.unit) insert)
-      ()
-  in
+  let%bind () = Conn.exec (exec_req ~oneshot:true Caqti_type.unit insert) () in
   let search =
     sprintf
       {sql| SELECT %s, id FROM %s
@@ -447,8 +648,9 @@ let insert_multi_into_col ~(table_name : string)
       (fst col) table_name (fst col) (sep_by_comma values)
   in
   Conn.collect_list
-    Caqti_request.Infix.(
-      (Caqti_type.unit ->* Caqti_type.(t2 (snd col) int)) search )
+    (collect_req ~oneshot:true Caqti_type.unit
+       Caqti_type.(t2 (snd col) int)
+       search )
     ()
 
 (* Like the [None] branch of [select_insert_into_cols]: always INSERT and return
@@ -459,7 +661,7 @@ let insert_into_cols_returning ~(returning : string * 'r Caqti_type.t)
     ~(table_name : string) ?tannot ~(cols : string list * 'cols Caqti_type.t)
     (module Conn : CONNECTION) (value : 'cols) =
   Conn.find
-    ( Caqti_request.Infix.(snd cols ->! snd returning)
+    ( find_req (snd cols) (snd returning)
     @@ insert_into_cols ~returning:(fst returning) ~table_name ?tannot
          ~cols:(fst cols) () )
     value
@@ -482,7 +684,7 @@ let upsert_into_cols_returning ~(on_conflict : string)
     ~(cols : string list * 'cols Caqti_type.t) (module Conn : CONNECTION)
     (value : 'cols) =
   Conn.find
-    ( Caqti_request.Infix.(snd cols ->! snd returning)
+    ( find_req (snd cols) (snd returning)
     @@ upsert_into_cols ~on_conflict ~returning:(fst returning) ~table_name
          ?tannot ~cols:(fst cols) () )
     value
@@ -492,7 +694,9 @@ let upsert_into_cols_returning ~(on_conflict : string)
    VALUES order in PostgreSQL). Unlike [insert_multi_into_col] there is NO
    ON CONFLICT and NO content SELECT-back, so it does not require a UNIQUE
    constraint and never deduplicates: identical inputs yield distinct rows. Used
-   for zkapp_field_array.element_ids after its UNIQUE/index was dropped. *)
+   for zkapp_field_array.element_ids after its UNIQUE/index was dropped.
+   As in [insert_multi_into_col] the values are rendered into the SQL, so the
+   request is [~oneshot:true]. *)
 let insert_multi_into_col_no_dedup ~(table_name : string) ~(col : string)
     (module Conn : CONNECTION) (values : string list) =
   let open Deferred.Result.Let_syntax in
@@ -505,7 +709,7 @@ let insert_multi_into_col_no_dedup ~(table_name : string) ~(col : string)
           (sep_by_comma ~parenthesis:true values)
       in
       Conn.collect_list
-        Caqti_request.Infix.((Caqti_type.unit ->* Caqti_type.int) insert)
+        (collect_req ~oneshot:true Caqti_type.unit Caqti_type.int insert)
         ()
 
 (** Unwrap a Caqti result, raising on error. [ctx] names the operation being
@@ -548,3 +752,53 @@ let get_zkapp_or_ignore (item_opt : 'arg option)
 let get_opt_item (arg_opt : 'arg option)
     ~(f : 'arg -> ('res, _) Deferred.Result.t) : 'res option Deferred.t =
   make_get_opt ~of_option:Fn.id ~f arg_opt
+
+let%test_module "request cache" =
+  ( module struct
+    (* The point of the cache is object identity: Caqti prepares and caches per
+       request object, so "the same query twice" must be physically the same
+       value, not merely an equal one. *)
+    let sql n = sprintf "SELECT id FROM cache_test_%d WHERE value = ?" n
+
+    let%test "the same query with the same types is the same object" =
+      let a = find_req Caqti_type.string Caqti_type.int (sql 1) in
+      let b = find_req Caqti_type.string Caqti_type.int (sql 1) in
+      phys_equal a b
+
+    let%test "different multiplicities do not collide" =
+      let a = find_req Caqti_type.string Caqti_type.int (sql 2) in
+      let b = find_opt_req Caqti_type.string Caqti_type.int (sql 2) in
+      (* [b] cannot be [a]: their types differ. Distinct tables, so both are
+         cached, and each is stable across calls. *)
+      phys_equal b (find_opt_req Caqti_type.string Caqti_type.int (sql 2))
+      && phys_equal a (find_req Caqti_type.string Caqti_type.int (sql 2))
+
+    let%test "a oneshot request is never shared" =
+      let a = find_req ~oneshot:true Caqti_type.string Caqti_type.int (sql 3) in
+      let b = find_req ~oneshot:true Caqti_type.string Caqti_type.int (sql 3) in
+      (not (phys_equal a b))
+      (* and it does not poison the cache for the shared path *)
+      && phys_equal
+           (find_req Caqti_type.string Caqti_type.int (sql 3))
+           (find_req Caqti_type.string Caqti_type.int (sql 3))
+
+    (* A call site that builds its [Caqti_type.t] inside the function gets a
+       fresh product identity every call, so it can never share -- this is the
+       failure the repeat-miss counter exists to make visible. *)
+    let%test "a per-call type is counted as a repeat miss" =
+      let before = (Request_cache.stats ()).repeat_misses in
+      let query = sql 4 in
+      let mk () = Caqti_type.(t2 string string) in
+      let a = find_req (mk ()) Caqti_type.int query in
+      let b = find_req (mk ()) Caqti_type.int query in
+      let after = (Request_cache.stats ()).repeat_misses in
+      (not (phys_equal a b)) && after > before
+    let%test "a shared type is not counted as a repeat miss" =
+      let before = (Request_cache.stats ()).repeat_misses in
+      let query = sql 5 in
+      let typ = Caqti_type.(t2 string string) in
+      let a = find_req typ Caqti_type.int query in
+      let b = find_req typ Caqti_type.int query in
+      let after = (Request_cache.stats ()).repeat_misses in
+      phys_equal a b && after = before
+  end )
