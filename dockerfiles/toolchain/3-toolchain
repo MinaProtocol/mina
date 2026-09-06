@@ -63,11 +63,9 @@ RUN if [ "${TARGETARCH}" = "amd64" ]; then \
 # --- influx db tool
 # Custom version, with lock only on manifest upload
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
-RUN curl -L -o influxdb2-client-${INFLUXDB_CLI_VERSION}-linux-${TARGETARCH}.tar.gz https://download.influxdata.com/influxdb/releases/influxdb2-client-${INFLUXDB_CLI_VERSION}-linux-${TARGETARCH}.tar.gz \
-    && mkdir -p "influx_dir" && tar xvzf influxdb2-client-${INFLUXDB_CLI_VERSION}-linux-${TARGETARCH}.tar.gz -C influx_dir \
-    && cp influx_dir/influx /usr/local/bin/ \
-    && rm influxdb2-client-${INFLUXDB_CLI_VERSION}-linux-${TARGETARCH}.tar.gz \
-    && rm -rf influx_dir
+RUN curl -sSfL "https://download.influxdata.com/influxdb/releases/influxdb2-client-${INFLUXDB_CLI_VERSION}-linux-${TARGETARCH}.tar.gz" \
+    | tar -xz -C /usr/local/bin ./influx \
+    && influx version
 
 # --- Docker CLI
 # Only the client: no CI job reaches a daemon from inside this image. Jobs that
