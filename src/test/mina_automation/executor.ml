@@ -25,7 +25,15 @@ end
 (* application ran inside docker container *)
 module DockerContext = struct
   type t =
-    { image : string; workdir : string; volume : string; network : string }
+    { image : string
+    ; workdir : string option
+    ; volumes : string list
+    ; network : string
+    ; rm : bool
+    }
+
+  let create ~image ?workdir ~volumes ~network ?(rm = false) () =
+    { image; workdir; volumes; network; rm }
 end
 
 let logger = Logger.create ()
@@ -112,11 +120,33 @@ module Make (P : AppPaths) = struct
   let run_from_debian_in_background ?prefix ~(args : string list) ?env () =
     in_background ?prefix ~app:PathFinder.Paths.official_name ~args ?env ()
 
+  let run_from_docker_in_background ~(ctx : DockerContext.t) ~args ?env () =
+    let env_args =
+      match env with
+      | Some (`Extend vars) ->
+          List.concat_map vars ~f:(fun (k, v) -> [ "-e"; k ^ "=" ^ v ])
+      | _ ->
+          []
+    in
+    let workdir_args =
+      match ctx.workdir with Some w -> [ "-w"; w ] | None -> []
+    in
+    let volume_args = List.concat_map ctx.volumes ~f:(fun v -> [ "-v"; v ]) in
+    let rm_args = if ctx.rm then [ "--rm" ] else [] in
+    let docker_args =
+      [ "run"; "--network"; ctx.network ]
+      @ rm_args @ volume_args @ workdir_args @ env_args
+      @ [ ctx.image; P.official_name ]
+      @ args
+    in
+    (* Don't pass env to in_background - env vars are encoded as docker -e args *)
+    in_background ~app:"docker" ~args:docker_args ()
+
   let run_from_docker ~(ctx : DockerContext.t) ~args () =
     let docker = Docker.Client.default in
     let cmd = [ P.official_name ] @ args in
     Docker.Client.run_cmd_in_image docker ~image:ctx.image ~cmd
-      ~workdir:ctx.workdir ~volume:ctx.volume ~network:ctx.network
+      ?workdir:ctx.workdir ~volumes:ctx.volumes ~network:ctx.network
 
   let run_impl t ~(args : string list) ?env ~f_local ~f_debian ~f_dune ~f_docker
       () =
@@ -153,11 +183,8 @@ module Make (P : AppPaths) = struct
         run_from_debian_in_background ~args ~prefix ?env () )
       ~f_dune:(fun ~args ~prefix ?env () ->
         run_from_dune_in_background ~args ~prefix ?env () )
-      ~f_docker:(fun ~args:_ ~ctx:_ () ->
-        raise
-          (Failure
-             "Cannot run docker in background yet. Maybe you need \
-              src/app/test_executive approach?" ) )
+      ~f_docker:(fun ~args ~ctx () ->
+        run_from_docker_in_background ~ctx ~args ?env () )
       ()
 
   let run t ~(args : string list) ?env ?ignore_failure () =
