@@ -884,12 +884,6 @@ let get_zkapp_set_or_keep (item_opt : 'arg option)
     'res Zkapp_basic.Set_or_keep.t Deferred.t =
   make_get_opt ~of_option:Zkapp_basic.Set_or_keep.of_option ~f item_opt
 
-(** convert options to Check or Ignore for zkApps-related results *)
-let get_zkapp_or_ignore (item_opt : 'arg option)
-    ~(f : 'arg -> ('res, _) Deferred.Result.t) :
-    'res Zkapp_basic.Or_ignore.t Deferred.t =
-  make_get_opt item_opt ~of_option:Zkapp_basic.Or_ignore.of_option ~f
-
 let get_opt_item (arg_opt : 'arg option)
     ~(f : 'arg -> ('res, _) Deferred.Result.t) : 'res option Deferred.t =
   make_get_opt ~of_option:Fn.id ~f arg_opt
