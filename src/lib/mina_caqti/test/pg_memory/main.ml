@@ -42,8 +42,7 @@ open Async
 
 (* Instrumentation / DDL requests are marked [~oneshot:true] so that running
    them does NOT itself add to the prepared-statement count we are measuring. *)
-let exec_oneshot sql =
-  Caqti_request.Infix.(Caqti_type.unit ->. Caqti_type.unit) ~oneshot:true sql
+let exec_oneshot sql = Mina_caqti.exec_req ~oneshot:true Caqti_type.unit sql
 
 (* Both signals in one round trip. [sum] is deliberately NOT coalesced: a NULL
    means "nothing to measure" and stays distinguishable from a genuine zero.
@@ -52,16 +51,16 @@ let exec_oneshot sql =
    as a secondary, corroborating signal to the deterministic prepared-statement
    count. *)
 let sample_req =
-  Caqti_request.Infix.(Caqti_type.unit ->! Caqti_type.(t2 int (option int)))
-    ~oneshot:true
+  Mina_caqti.find_req ~oneshot:true Caqti_type.unit
+    Caqti_type.(t2 int (option int))
     "SELECT (SELECT count(*)::int FROM pg_prepared_statements), (SELECT \
      sum(total_bytes)::bigint FROM pg_backend_memory_contexts)"
 
 (* [pg_backend_memory_contexts] only exists on PostgreSQL 14+; on older servers
    the query above fails to parse, and this is all we can measure. *)
 let prepared_only_req =
-  Caqti_request.Infix.(Caqti_type.unit ->! Caqti_type.int)
-    ~oneshot:true "SELECT count(*)::int FROM pg_prepared_statements"
+  Mina_caqti.find_req ~oneshot:true Caqti_type.unit Caqti_type.int
+    "SELECT count(*)::int FROM pg_prepared_statements"
 
 module Sampler = struct
   (* Whether the backend-memory view exists is discovered by using it, not by
@@ -129,7 +128,13 @@ type col = { col_name : string; col_ty : col_ty }
 
 type cell = Cell_text of string | Cell_int of int
 
-type packed_row = Pack : 'a Caqti_type.t * 'a -> packed_row
+(* The generated shape determines the row type, so the [Caqti_type.t] is built
+   once per scenario and only the values vary per call -- which is how a table
+   module in the archive holds its [typ]. It matters here: [Mina_caqti]'s
+   request cache validates a hit with [Caqti_type.unify], and a product type
+   rebuilt per call has a fresh identity every time, so a scenario that rebuilt
+   it would measure the un-shareable case rather than the real one. *)
+type packed_ty = Pack_ty : 'a Caqti_type.t * (cell list -> 'a) -> packed_ty
 
 let gen_token =
   let open Quickcheck.Generator.Let_syntax in
@@ -171,21 +176,31 @@ let generate ~scenario ~iteration gen =
     gen
 
 (* helpers under test take typed params, so ints go through as ints *)
-let pack_cell = function
-  | Cell_text s ->
-      Pack (Caqti_type.string, s)
-  | Cell_int i ->
-      Pack (Caqti_type.int, i)
-
-let rec pack_row = function
+let rec row_ty (cols : col list) =
+  let shape_mismatch () = failwith "row_ty: row does not match its shape" in
+  match cols with
   | [] ->
-      failwith "pack_row: empty row"
-  | [ cell ] ->
-      pack_cell cell
-  | cell :: rest ->
-      let (Pack (t, v)) = pack_cell cell in
-      let (Pack (t', v')) = pack_row rest in
-      Pack (Caqti_type.t2 t t', (v, v'))
+      failwith "row_ty: empty shape"
+  | [ c ] -> (
+      match c.col_ty with
+      | Text ->
+          Pack_ty
+            ( Caqti_type.string
+            , function [ Cell_text s ] -> s | _ -> shape_mismatch () )
+      | Int ->
+          Pack_ty
+            ( Caqti_type.int
+            , function [ Cell_int i ] -> i | _ -> shape_mismatch () ) )
+  | c :: rest ->
+      let (Pack_ty (t, encode)) = row_ty [ c ] in
+      let (Pack_ty (t', encode')) = row_ty rest in
+      Pack_ty
+        ( Caqti_type.t2 t t'
+        , function
+          | cell :: cells ->
+              (encode [ cell ], encode' cells)
+          | [] ->
+              shape_mismatch () )
 
 (* calls that must never collide with an earlier call's row get the iteration
    index stamped into their first cell; shapes generate the first column as
@@ -242,20 +257,23 @@ let select_insert_scenario ~shape_idx =
           (String.concat ~sep:", " (col_names cols)) )
   ; teardown = (fun ~table -> sprintf "DROP TABLE %s" table)
   ; step =
-      (fun ~table conn i ->
-        (* distinct key each call -> SELECT miss then INSERT: exercises BOTH
-           of the requests this helper builds per call *)
-        let (Pack (typ, value)) =
-          generate ~scenario:name ~iteration:i (gen_row cols)
-          |> stamp_first ~tag:(sprintf "k-%d" i)
-          |> pack_row
-        in
-        Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
-          ~table_name:table
-          ~cols:(col_names cols, typ)
-          conn value
-        >>| Mina_caqti.ok_exn ~ctx:name
-        >>| ignore )
+      (let (Pack_ty (typ, encode)) = row_ty cols in
+       fun ~table conn i ->
+         (* distinct key each call -> SELECT miss then INSERT: exercises BOTH
+            of this helper's requests. The helper is called afresh every
+            iteration, which is what a call site looks like; the cache is what
+            keeps that from preparing a new statement each time. *)
+         let value =
+           generate ~scenario:name ~iteration:i (gen_row cols)
+           |> stamp_first ~tag:(sprintf "k-%d" i)
+           |> encode
+         in
+         Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
+           ~table_name:table
+           ~cols:(col_names cols, typ)
+           conn value
+         >>| Mina_caqti.ok_exn ~ctx:name
+         >>| ignore )
   }
 
 let insert_multi_scenario ~shape_idx =
@@ -323,25 +341,27 @@ let upsert_scenario ~shape_idx =
           (String.concat ~sep:", " (col_names keys)) )
   ; teardown = (fun ~table -> sprintf "DROP TABLE %s" table)
   ; step =
-      (fun ~table conn i ->
-        (* every second call reuses the previous key, so the ON CONFLICT DO
+      (let (Pack_ty (typ, encode)) = row_ty cols in
+       fun ~table conn i ->
+         (* every second call reuses the previous key, so the ON CONFLICT DO
            UPDATE branch is exercised as well as the plain insert *)
-        let key_index = if i % 2 = 0 then i - 1 else i in
-        let key_cells =
-          generate ~scenario:(name ^ ":key") ~iteration:key_index (gen_row keys)
-          |> stamp_first ~tag:(sprintf "k-%d" key_index)
-        in
-        let payload_cells =
-          generate ~scenario:(name ^ ":payload") ~iteration:i (gen_row payload)
-        in
-        let (Pack (typ, value)) = pack_row (key_cells @ payload_cells) in
-        Mina_caqti.upsert_into_cols_returning
-          ~on_conflict:(String.concat ~sep:"," (col_names keys))
-          ~returning:("id", Caqti_type.int) ~table_name:table
-          ~cols:(col_names cols, typ)
-          conn value
-        >>| Mina_caqti.ok_exn ~ctx:name
-        >>| ignore )
+         let key_index = if i % 2 = 0 then i - 1 else i in
+         let key_cells =
+           generate ~scenario:(name ^ ":key") ~iteration:key_index
+             (gen_row keys)
+           |> stamp_first ~tag:(sprintf "k-%d" key_index)
+         in
+         let payload_cells =
+           generate ~scenario:(name ^ ":payload") ~iteration:i (gen_row payload)
+         in
+         Mina_caqti.upsert_into_cols_returning
+           ~on_conflict:(String.concat ~sep:"," (col_names keys))
+           ~returning:("id", Caqti_type.int) ~table_name:table
+           ~cols:(col_names cols, typ)
+           conn
+           (encode (key_cells @ payload_cells))
+         >>| Mina_caqti.ok_exn ~ctx:name
+         >>| ignore )
   }
 
 let scenarios ~shapes : scenario list =
@@ -444,7 +464,7 @@ let influx_lines ~measurement ~tags (results : result list) =
         ts_ns )
 
 let main ~uri ~iterations ~sample_every ~shapes ~assert_max_prepared
-    ~influxdb_file ~measurement ~tags () =
+    ~assert_no_repeat_misses ~influxdb_file ~measurement ~tags () =
   printf "mina_caqti postgres memory-usage benchmark\n" ;
   printf "uri=%s iterations=%d sample_every=%d shapes=%d\n" (Uri.to_string uri)
     iterations sample_every shapes ;
@@ -456,6 +476,18 @@ let main ~uri ~iterations ~sample_every ~shapes ~assert_max_prepared
   List.iter results ~f:(fun r ->
       printf "   %-32s prepared_final=%-8d per_call=%.3f\n" r.name
         r.prepared_final r.per_call ) ;
+  (* Client-side counterpart of the prepared-statement count: every request
+     [Mina_caqti] could not share is one it had to rebuild, and a rebuilt
+     request is what puts a new statement on the connection. A repeat miss --
+     the SQL was cached but the types did not unify -- means a call site builds
+     its [Caqti_type.t] per call and can never share, so it is a regression
+     even when the prepared count still looks bounded on this workload. *)
+  let cache = Mina_caqti.Request_cache.stats () in
+  printf "\n== request cache ==\n" ;
+  printf "   hits=%d first_builds=%d repeat_misses=%d entries=%d capped=%b\n"
+    cache.hits cache.first_builds cache.repeat_misses cache.entries cache.capped ;
+  List.iter (Mina_caqti.Request_cache.repeat_miss_report ()) ~f:(fun (n, sql) ->
+      printf "   repeat-miss x%d: %s\n" n sql ) ;
   let lines = influx_lines ~measurement ~tags results in
   ( match influxdb_file with
   | None ->
@@ -481,6 +513,15 @@ let main ~uri ~iterations ~sample_every ~shapes ~assert_max_prepared
             eprintf "   %s: prepared_final=%d\n" r.name r.prepared_final ) ;
         Core.exit 1 )
       else printf "\nOK: all scenarios <= --assert-max-prepared=%d\n" limit ) ;
+  if assert_no_repeat_misses && (cache.repeat_misses > 0 || cache.capped) then (
+    eprintf
+      "\n\
+      \       FAIL: the request cache could not share %d request(s)%s. Each \
+       one prepares a fresh statement per call; name the query's Caqti_type at \
+       module level, or pass ~oneshot:true if its SQL text varies per call.\n"
+      cache.repeat_misses
+      (if cache.capped then " and the cache hit its entry cap" else "") ;
+    Core.exit 1 ) ;
   return ()
 
 let () =
@@ -505,6 +546,12 @@ let () =
      and assert_max_prepared =
        flag "--assert-max-prepared" (optional int)
          ~doc:"K fail if any scenario's final prepared count exceeds K"
+     and assert_no_repeat_misses =
+       flag "--assert-no-repeat-misses" no_arg
+         ~doc:
+           " fail if any query could not share its request (a call site \
+            building its Caqti_type per call), or if the request cache hit its \
+            entry cap"
      and influxdb_file =
        flag "--influxdb-file" (optional string)
          ~doc:"PATH write InfluxDB line protocol (one point per scenario) here"
@@ -566,5 +613,6 @@ let () =
              @ opt_tag "network" network
            in
            main ~uri:(Uri.of_string u) ~iterations ~sample_every ~shapes
-             ~assert_max_prepared ~influxdb_file ~measurement ~tags () )
+             ~assert_max_prepared ~assert_no_repeat_misses ~influxdb_file
+             ~measurement ~tags () )
   |> Command_unix.run
