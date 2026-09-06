@@ -866,11 +866,9 @@ module Submit = struct
       [@@deriving hlist]
 
       let params_typ =
-        let open Mina_caqti.Type_spec in
-        let spec = Caqti_type.[ int64; string; string; string; string ] in
-        let encode t = Ok (hlist_to_tuple spec (params_to_hlist t)) in
-        let decode t = Ok (params_of_hlist (tuple_to_hlist spec t)) in
-        Caqti_type.custom ~encode ~decode (to_rep spec)
+        Mina_caqti.Type_spec.custom_type ~to_hlist:params_to_hlist
+          ~of_hlist:params_of_hlist
+          Caqti_type.[ int64; string; string; string; string ]
 
       let query =
         Mina_caqti.find_opt_req params_typ Caqti_type.string
