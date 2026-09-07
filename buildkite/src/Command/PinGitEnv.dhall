@@ -15,11 +15,13 @@
 -- that does the entrypoint's work depend on it, with `dependsOn`.
 --
 --     , steps =
---       [ PinGitEnv.step
+--       [ PinGitEnv.step stage
 --       , Command.build
 --           Command.Config::{
---           , depends_on = PinGitEnv.dependsOn jobName
+--           , depends_on = PinGitEnv.dependsOn jobName stage
 --           , ...
+--
+-- where `stage` is the discriminator described below.
 --
 -- The depended-on step is always the one that uploads or runs everything else,
 -- which is what makes this a barrier rather than an ordering to reason about:
@@ -31,8 +33,23 @@
 -- inside one.
 --
 -- Which identity gets pinned is buildkite/scripts/git-env/pin.sh's decision,
--- not this file's. Nothing is passed here, so there is no environment to
--- escape and no way for an entrypoint to disagree with another about it.
+-- not this file's. Nothing is passed to the script, so there is no environment
+-- to escape and no way for an entrypoint to disagree with another about it.
+--
+-- The discriminator is the one thing a caller must supply. Buildkite step keys
+-- are unique per BUILD, not per upload, and an entrypoint can be uploaded more
+-- than once in one build: a release pipeline uploads Prepare.dhall for each of
+-- its stages, and the second upload of a constant key is rejected with
+--
+--   422 The key "_prepare-pin-git-env" has already been used by another step
+--
+-- which fails the build rather than the step. So pass whatever already makes
+-- that entrypoint's own step key unique -- for Prepare.dhall that is the
+-- stage's selection, tag filter and scope -- and pass "" only where the
+-- entrypoint really is uploaded once per build.
+--
+-- Running the pin once per stage costs nothing: pin.sh finds the identity the
+-- first stage wrote and keeps it.
 
 let Cmd = ../Lib/Cmds.dhall
 
@@ -42,21 +59,26 @@ let Docker = ./Docker/Type.dhall
 
 let Size = ./Size.dhall
 
-let key = "pin-git-env"
+let keyFor
+    : Text -> Text
+    = \(discriminator : Text) -> "pin-git-env${discriminator}"
 
 let step
-    : Command.Type
-    = Command.build
-        Command.Config::{
-        , commands = [ Cmd.run "./buildkite/scripts/git-env/pin.sh" ]
-        , label = "Pin the git environment"
-        , key = key
-        , target = Size.Small
-        , docker = None Docker.Type
-        }
+    : Text -> Command.Type
+    =     \(discriminator : Text)
+      ->  Command.build
+            Command.Config::{
+            , commands = [ Cmd.run "./buildkite/scripts/git-env/pin.sh" ]
+            , label = "Pin the git environment"
+            , key = keyFor discriminator
+            , target = Size.Small
+            , docker = None Docker.Type
+            }
 
 let dependsOn
-    : Text -> List Command.TaggedKey.Type
-    = \(jobName : Text) -> [ Command.TaggedKey::{ name = jobName, key = key } ]
+    : Text -> Text -> List Command.TaggedKey.Type
+    =     \(jobName : Text)
+      ->  \(discriminator : Text)
+      ->  [ Command.TaggedKey::{ name = jobName, key = keyFor discriminator } ]
 
-in  { key = key, step = step, dependsOn = dependsOn }
+in  { keyFor = keyFor, step = step, dependsOn = dependsOn }

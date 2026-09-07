@@ -42,11 +42,11 @@ in      \(args : { name : Text })
                   , dirtyWhen = [ SelectFiles.everything ]
                   }
                 , steps =
-                  [ PinGitEnv.step
+                  [ PinGitEnv.step ""
                   , Command.build
                       Command.Config::{
                       , depends_on =
-                          PinGitEnv.dependsOn "run-single-job-${args.name}"
+                          PinGitEnv.dependsOn "run-single-job-${args.name}" ""
                       , commands = prefixCommands # [ commands args.name ]
                       , label = "Run Single Job ${args.name}"
                       , key = "cmds"

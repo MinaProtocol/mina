@@ -349,6 +349,43 @@ test_a_cache_without_a_pin_is_not_an_error() {
 }
 
 ################################################################################
+# Step keys
+################################################################################
+
+# Buildkite step keys are unique per build, not per upload, and a release
+# pipeline uploads Prepare.dhall once for each of its stages. A constant pin key
+# was rejected on the second upload with
+#
+#   422 The key "_prepare-pin-git-env" has already been used by another step
+#
+# which fails the build rather than the step. Every stage must render a key of
+# its own, the way the triage step already did.
+test_each_stage_renders_its_own_pin_key() {
+    if ! command -v dhall-to-yaml >/dev/null 2>&1; then
+        echo -n "(no dhall-to-yaml, skipped) "
+        return 0
+    fi
+
+    local first second
+    first="$( cd "$REPO_ROOT" && BUILDKITE_PIPELINE_FILTER=FastOnly \
+        dhall-to-yaml --quoted <<< './buildkite/src/Prepare.dhall' \
+        | grep -o "_prepare-pin-git-env[^']*" | head -1 )"
+    second="$( cd "$REPO_ROOT" && BUILDKITE_PIPELINE_FILTER=LongAndVeryLong \
+        dhall-to-yaml --quoted <<< './buildkite/src/Prepare.dhall' \
+        | grep -o "_prepare-pin-git-env[^']*" | head -1 )"
+
+    if [[ -z "$first" || -z "$second" ]]; then
+        log_fail "no pin step was rendered"
+        return 0
+    fi
+    if [[ "$first" == "$second" ]]; then
+        log_fail "two stages rendered the same key '${first}'; the second upload is rejected"
+    else
+        log_pass
+    fi
+}
+
+################################################################################
 
 main() {
     setup
@@ -366,6 +403,7 @@ main() {
     run_test test_the_pin_says_nothing_on_standard_output
     run_test test_wrapping_an_unpinned_build_is_an_error
     run_test test_a_cache_without_a_pin_is_not_an_error
+    run_test test_each_stage_renders_its_own_pin_key
 
     teardown
 

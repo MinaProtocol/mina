@@ -75,10 +75,10 @@ let config
         , dirtyWhen = [ SelectFiles.everything ]
         }
       , steps =
-        [ PinGitEnv.step
+        [ PinGitEnv.step ""
         , Command.build
             Command.Config::{
-            , depends_on = PinGitEnv.dependsOn jobName
+            , depends_on = PinGitEnv.dependsOn jobName ""
             , commands = prefixCommands # [ commands ]
             , label = "Run selection"
             , key = "cmds"
