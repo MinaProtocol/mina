@@ -15,11 +15,13 @@
 -- that does the entrypoint's work depend on it, with `dependsOn`.
 --
 --     , steps =
---       [ PinGitEnv.step
+--       [ PinGitEnv.step stage
 --       , Command.build
 --           Command.Config::{
---           , depends_on = PinGitEnv.dependsOn jobName
+--           , depends_on = PinGitEnv.dependsOn jobName stage
 --           , ...
+--
+-- where `stage` is the discriminator described below.
 --
 -- The depended-on step is always the one that uploads or runs everything else,
 -- which is what makes this a barrier rather than an ordering to reason about:
