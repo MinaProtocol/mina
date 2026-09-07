@@ -315,10 +315,6 @@ let build_breadcrumb ~transactions ~context ~precomputed_values ~verifier
       ~winner_pk ~block_reward_threshold:None ~zkapp_cmd_limit:None
       ~zkapp_cmd_limit_hardcap:128 ~slot_tx_end:None ~slot_chain_end:None
       ~signature_kind:Testnet
-    |> Interruptible.force
-    >>| Result.map_error ~f:(fun () ->
-            Error.of_string "unexpected interruption" )
-    >>| Or_error.ok_exn
     >>| Option.value_exn ?here:None ?error:None
           ~message:"generate_next_state failed"
   in
