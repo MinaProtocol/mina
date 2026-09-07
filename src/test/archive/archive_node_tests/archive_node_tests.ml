@@ -40,6 +40,16 @@ let () =
                ( module Mina_automation_fixture.Archive.Make_FixtureWithBootstrap
                           (Upgrade_archive) ) )
         ] )
+    ; ( "missing_blocks_guardian"
+      , [ test_case
+            "Report and close a gap in the archive, and refuse a block source \
+             that answers 404 or an error page"
+            `Quick
+            (Runner.run_blocking
+               ( module Mina_automation_fixture.Archive
+                        .Make_FixtureWithoutBootstrap
+                          (Missing_blocks_guardian_test) ) )
+        ] )
     ; ( "live_upgrade_archive"
       , [ test_case
             "Recreate database from precomputed blocks. Meanwhile run upgrade \
