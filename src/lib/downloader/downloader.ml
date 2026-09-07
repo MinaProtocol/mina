@@ -600,7 +600,8 @@ end = struct
   end
 
   type t =
-    { mutable next_flush : (unit, unit) Clock.Event.t option
+    { mutable proposed_new_flush_at : Time.t option
+    ; mutable flush_scheduled : bool
     ; mutable all_peers : Peer.Set.t
     ; pending : Job.t Q.t
     ; downloading : (Peer.t * Job.t * Time.t) Key.Table.t
@@ -661,16 +662,37 @@ end = struct
 
   let kill_job _t j = Ivar.fill_if_empty j.J.res (Error `Finished)
 
+  let hard_flush_batch_rate = 3
+
+  (* WARN: we should ensure we're always enqueuing jobs before invoking
+     [flush_soon], o.w. this function can delay flushing indefinitely *)
   let flush_soon t =
-    Option.iter t.next_flush ~f:(fun e -> Clock.Event.abort_if_possible e ()) ;
-    t.next_flush <-
-      Some
-        (Clock.Event.run_after max_wait
-           (* <-- TODO: pretty sure this is a bug (this can infinitely delay flushes *)
-             (fun () ->
-             if not (Strict_pipe.Writer.is_closed t.flush_w) then
-               Strict_pipe.Writer.write t.flush_w () )
-           () )
+    let flush_now () =
+      if not (Strict_pipe.Writer.is_closed t.flush_w) then
+        Strict_pipe.Writer.write t.flush_w () ;
+      t.flush_scheduled <- false ;
+      t.proposed_new_flush_at <- None
+    in
+    let rec schedule_flush ~at =
+      let%bind () = after Time.(diff at (now ())) in
+      match t.proposed_new_flush_at with
+      | None ->
+          Deferred.return @@ flush_now ()
+      | Some proposed_new_flush_at ->
+          let possible_delayed_flush_time =
+            Time.add proposed_new_flush_at max_wait
+          in
+          if
+            Time.is_later possible_delayed_flush_time ~than:at
+            && Q.length t.pending < t.max_batch_size * hard_flush_batch_rate
+          then schedule_flush ~at:possible_delayed_flush_time
+          else Deferred.return @@ flush_now ()
+    in
+    if not t.flush_scheduled then (
+      t.flush_scheduled <- true ;
+      Deferred.don't_wait_for (schedule_flush ~at:Time.(add (now ()) max_wait))
+      )
+    else t.proposed_new_flush_at <- Some (Time.now ())
 
   let cancel t h =
     let job =
@@ -692,7 +714,7 @@ end = struct
   let enqueue t e =
     match Q.enqueue t.pending e with
     | `Ok ->
-        jobs_added t ; `Ok
+        jobs_added t ; flush_soon t ; `Ok
     | `Key_already_present ->
         `Key_already_present
 
@@ -719,7 +741,8 @@ end = struct
     |> don't_wait_for
 
   let tear_down
-      ( { next_flush
+      ( { proposed_new_flush_at = _
+        ; flush_scheduled = _
         ; all_peers = _
         ; flush_w
         ; get = _
@@ -742,7 +765,6 @@ end = struct
       | Some j ->
           kill_job t j ; clear_queue q
     in
-    Option.iter next_flush ~f:(fun e -> Clock.Event.abort_if_possible e ()) ;
     Strict_pipe.Writer.close flush_w ;
     Useful_peers.tear_down useful_peers ;
     Strict_pipe.Writer.close got_new_peers_w ;
@@ -776,8 +798,7 @@ end = struct
               enqueue_exn t
                 { x with
                   attempts = Map.set x.attempts ~key:peer ~data:Attempt.download
-                } ) ;
-          flush_soon t
+                } )
         in
         List.iter xs ~f:(fun x ->
             Hashtbl.set t.downloading ~key:x.key ~data:(peer, x, Time.now ()) ) ;
@@ -854,8 +875,7 @@ end = struct
                       { x with
                         attempts =
                           Map.set x.attempts ~key:peer ~data:Attempt.download
-                      } ) ;
-                flush_soon t ) )
+                      } ) ) )
 
   let to_yojson t : Yojson.Safe.t =
     check_invariant t ;
@@ -968,7 +988,8 @@ end = struct
     let t =
       { all_peers = Peer.Set.of_list all_peers
       ; pending = Q.create ()
-      ; next_flush = None
+      ; proposed_new_flush_at = None
+      ; flush_scheduled = false
       ; flush_r
       ; flush_w
       ; jobs_added_bvar = Bvar.create ()
@@ -1089,7 +1110,6 @@ end = struct
     | Some x, None | None, Some (_, x, _) ->
         x
     | None, None ->
-        flush_soon t ;
         let e = { J.key; attempts; res = Ivar.create () } in
         enqueue_exn t e ; e
 end
