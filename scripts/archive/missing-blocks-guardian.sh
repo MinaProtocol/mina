@@ -109,10 +109,20 @@ populate_db() {
   tempfile=$(mktemp)
   echo  "${ARCHIVE_BLOCKS} --${BLOCKS_FORMAT} --archive-uri ${1} ${2}"
   ${ARCHIVE_BLOCKS} "--${BLOCKS_FORMAT}" --archive-uri "${1}" "${2}" > "$tempfile"
-  
-  if [ $? -ne 0 ]; then
-    echo $'[ERROR] mina-archive-blocks failed. The database remains unhealthy.\n Make sure the environment variables are set correctly and the database is accessible.'
-    rm "${2}" "$tempfile"
+  archive_blocks_exit=$?
+
+  # NOTE: mina-archive-blocks exits 0 even when it fails to add a block. After
+  # exhausting its internal retries it logs an "Error"-level entry ("Error when
+  # adding block") and rolls back the transaction, yet still returns exit code 0.
+  # Trusting the exit code alone makes bootstrap() re-download and re-attempt the
+  # very same un-addable block forever -- a silent infinite loop. So treat an
+  # Error-level log line as a failure too, and surface the underlying cause so the
+  # operator can act on it instead of the run spinning unnoticed.
+  if [ "$archive_blocks_exit" -ne 0 ] || grep -Eq '"level"[[:space:]]*:[[:space:]]*"Error"' "$tempfile"; then
+    echo $'[ERROR] mina-archive-blocks failed to add the block. The database remains unhealthy.'
+    echo "[ERROR] Diagnostics from ${ARCHIVE_BLOCKS} (exit code ${archive_blocks_exit}):"
+    jq -rs '.[] | select(.level == "Error" or .level == "Warn") | "  [\(.level)] \(.message): \(.metadata.error // "")"' "$tempfile" 2>/dev/null | tail -n 5
+    rm -f "${2}" "$tempfile"
     exit 1
   fi
   jq -rs '"[BOOTSTRAP] Populated database with block: \(.[-1].message)"' < "$tempfile"
