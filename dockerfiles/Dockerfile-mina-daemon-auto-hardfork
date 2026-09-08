@@ -12,10 +12,19 @@ ARG network
 ARG deb_release
 ARG deb_legacy_version
 ARG deb_repo
+ARG apt_cache_url=""
 
 ENV DEBIAN_FRONTEND noninteractive
 
 ENV MINA_DEB=mina-${network}-postfork-mesa
+
+# Optional: configure APT caching proxy (bypass proxy for deb_repo). Same
+# call the sibling Dockerfile-mina-daemon makes; this image was the only
+# bullseye consumer without it, so it hit the expired upstream
+# bullseye-security Release with no mirror to fall back on.
+COPY scripts/configure-apt-proxy.sh /usr/local/bin/configure-apt-proxy.sh
+RUN chmod +x /usr/local/bin/configure-apt-proxy.sh \
+  && /usr/local/bin/configure-apt-proxy.sh "$apt_cache_url" "$deb_repo"
 
 # Install ca-certificates using HTTP
 RUN apt-get update --quiet --yes \
