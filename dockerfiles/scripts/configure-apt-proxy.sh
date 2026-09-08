@@ -290,8 +290,18 @@ if apt-get update --quiet \
     # steps (dockerfiles/stages/1-base-deps "Switch to HTTPS") branch on
     # `[ -f /etc/apt/sources.list ]` and would otherwise sed a file that does
     # not exist. Third-party lists under sources.list.d are left untouched.
-    if [ -f /etc/apt/sources.list ]; then
+    #
+    # This script runs more than once per image: in 1-base-deps, and again in
+    # every stage that starts FROM a published mina-base (2-mina-daemon,
+    # 4-auto-hardfork, 2-mina-archive) because CI reuses that base via
+    # --base-image and skips 1-base-deps entirely. Only back up a NON-EMPTY
+    # sources.list, and never overwrite an existing backup, so a second run on
+    # an already-emptied base cannot clobber the real upstream list with an
+    # empty file.
+    if [ -s /etc/apt/sources.list ] && [ ! -f /etc/apt/sources.list.disabled-by-deb-mirror ]; then
         cp /etc/apt/sources.list /etc/apt/sources.list.disabled-by-deb-mirror
+    fi
+    if [ -f /etc/apt/sources.list ]; then
         : > /etc/apt/sources.list
     fi
     # deb822 layout (bookworm and newer base images).
@@ -309,6 +319,20 @@ else
     # fails fatally on a source it cannot fetch, so keeping mirror-*.list around
     # would break the very build we are trying to rescue.
     rm -f "$MIRROR_LIST"
+    # If an earlier run of this script (1-base-deps, or the published mina-base
+    # this stage starts FROM) already made the mirror authoritative, the distro
+    # sources are empty/moved aside. Put them back, or apt is left with no OS
+    # package source at all.
+    if [ ! -s /etc/apt/sources.list ] && [ -s /etc/apt/sources.list.disabled-by-deb-mirror ]; then
+        cp /etc/apt/sources.list.disabled-by-deb-mirror /etc/apt/sources.list
+        echo "--- restored /etc/apt/sources.list from the deb-mirror backup ---"
+    fi
+    for deb822 in /etc/apt/sources.list.d/debian.sources \
+                  /etc/apt/sources.list.d/ubuntu.sources; do
+        if [ ! -f "$deb822" ] && [ -f "${deb822}.disabled-by-deb-mirror" ]; then
+            mv "${deb822}.disabled-by-deb-mirror" "$deb822"
+        fi
+    done
     # Upstream is all we have left, and for an EOL codename its Release file is
     # expired. Signatures are still verified; only Valid-Until is skipped.
     echo 'Acquire::Check-Valid-Until "false";' > /etc/apt/apt.conf.d/99no-valid-until
@@ -329,6 +353,8 @@ FBEOF
 fi
 
 echo "--- effective OS package sources ---"
-cat /etc/apt/sources.list 2>/dev/null
-cat /etc/apt/sources.list.d/*.list 2>/dev/null
+# Informational only. `|| true` matters: under `set -e`, an unmatched *.list
+# glob (nothing left in sources.list.d after the fallback removed the mirror
+# list) would make cat fail and turn a successful fallback into a failed RUN.
+cat /etc/apt/sources.list /etc/apt/sources.list.d/*.list 2>/dev/null || true
 echo "------------------------"
