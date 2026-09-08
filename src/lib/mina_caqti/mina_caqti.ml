@@ -19,7 +19,21 @@ open Mina_base
 
    A query whose SQL text embeds its values differs on every call and must NOT
    be memoised -- pass [~oneshot:true], which is also what tells Caqti not to
-   prepare it at all. *)
+   prepare it at all.
+
+   On deleting this module. Caqti 2.2 grew the same thing upstream, and better:
+   a per-connection cache keyed by the rendered query together with a
+   [Row_type.unify] of the parameter and row types -- the design below -- plus
+   a third prepare policy, [Dynamic], which releases a connection's prepared
+   statement once the request object is collected. That is what the counters
+   and the cap here stand in for.
+
+   We cannot take it. [caqti-async.2.1.1] is the last release that builds
+   against async v0.16; 2.1.2 onwards require [async_kernel >= v0.17.0], which
+   is why this repo pins [caqti.2.1.2] against [caqti-async.2.1.1] already. So
+   the upgrade waits on the core v0.17 work, and note that even at Caqti 3.0
+   [Caqti_request.create] still maps [~oneshot:false] to the leaking [Static]
+   policy -- [Dynamic] is reachable only through the newer template API. *)
 module Request_cache = struct
   type 'm entry =
     | E :
@@ -129,7 +143,13 @@ end
    Only products are interned. [Caqti_type.custom] carries encode/decode
    functions that cannot be compared, so two customs must never be treated as
    the same type -- those are expected to be named once in their table module,
-   as {!Type_spec.custom_type} users already do. *)
+   as {!Type_spec.custom_type} users already do.
+
+   This module goes away at Caqti 3.0, not at 2.2: [Row_type.t2] there is built
+   on a constructor tag shared by every [t2], so two separately evaluated
+   [t2 int int] unify on their own. Up to and including 2.2 each evaluation
+   mints its own tag, so interning is the only way an inline type reaches a
+   cached request. *)
 module Typ = struct
   (* the field types, re-exported so [Typ.(t2 int int)] reads like the
      [Caqti_type] it replaces. Fields unify structurally, so they need no
