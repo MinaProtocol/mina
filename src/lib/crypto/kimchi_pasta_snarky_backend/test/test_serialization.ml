@@ -114,8 +114,7 @@ module Bigint = Kimchi_pasta_snarky_backend.Bigint256
 
 let len = Bigint.length_in_bytes
 
-let check_bigint (name, decimal) =
-  let b = Bigint.of_decimal_string decimal in
+let check_bigint_value name b =
   let expected = Bytes.to_string (Bigint.to_bytes b) in
   Alcotest.(check bool)
     (name ^ ": of_bytes inverts to_bytes")
@@ -149,8 +148,24 @@ let check_bigint (name, decimal) =
     true
     (Bigint.compare b (Bigint.of_bigstring buf' offset) = 0)
 
+let check_bigint (name, decimal) =
+  check_bigint_value name (Bigint.of_decimal_string decimal)
+
 let test_bigint_values () =
   List.iter ~f:check_bigint (around_zero @ limb_patterns @ full_width_patterns)
+
+(* Seeded pseudo-random 32-byte strings, on top of the hand-picked values:
+   every bit pattern is a valid [Bigint], so this sweeps beyond the limb
+   boundaries, and a failure names its seed. *)
+let random_bytes seed =
+  let rs = Random.State.make [| seed |] in
+  Bytes.init len ~f:(fun _ -> Char.of_int_exn (Random.State.int rs 256))
+
+let test_bigint_random () =
+  for seed = 0 to 999 do
+    check_bigint_value (sprintf "seed %d" seed)
+      (Bigint.of_bytes (random_bytes seed))
+  done
 
 let test_bigint_buffer_short () =
   let b = Bigint.of_decimal_string "1" in
@@ -176,14 +191,8 @@ module Make_field
 struct
   module Bigint = Field.Bigint
 
-  let check_field (name, decimal) =
-    let b = Bigint.of_decimal_string decimal in
-    let x = Field.of_bigint b in
-    let expected = Bytes.to_string (Bigint.to_bytes b) in
-    Alcotest.(check string)
-      (name ^ ": to_bigint round trip")
-      expected
-      (Bytes.to_string (Bigint.to_bytes (Field.to_bigint x))) ;
+  let check_field_value name x =
+    let expected = Bytes.to_string (Bigint.to_bytes (Field.to_bigint x)) in
     Alcotest.(check int)
       (name ^ ": bin_size_t") len
       (Field.Stable.Latest.bin_size_t x) ;
@@ -214,6 +223,24 @@ struct
       (name ^ ": of_bigstring inverts blit_to_bigstring")
       true
       (Field.equal x (Field.of_bigstring buf' offset))
+
+  let check_field (name, decimal) =
+    let b = Bigint.of_decimal_string decimal in
+    let x = Field.of_bigint b in
+    Alcotest.(check string)
+      (name ^ ": to_bigint round trip")
+      (Bytes.to_string (Bigint.to_bytes b))
+      (Bytes.to_string (Bigint.to_bytes (Field.to_bigint x))) ;
+    check_field_value name x
+
+  (* Seeded pseudo-random elements, on top of the hand-picked values: the
+     in-place instances must agree with [Bigint.to_bytes] on arbitrary
+     elements, not only at the limb boundaries, and a failure names its
+     seed. *)
+  let test_random_elements () =
+    for seed = 0 to 999 do
+      check_field_value (sprintf "rng seed %d" seed) (Field.rng seed)
+    done
 
   (* The negatives, with their decimal values cross-checked against field
      arithmetic so that a wrong constant cannot pass. *)
@@ -253,6 +280,7 @@ struct
     [ test_case "around zero" `Quick test_around_zero
     ; test_case "around the modulus" `Quick test_around_modulus
     ; test_case "limb patterns" `Quick test_limb_patterns
+    ; test_case "random elements" `Quick test_random_elements
     ; test_case "buffer short" `Quick test_buffer_short
     ]
 end
@@ -298,6 +326,7 @@ let () =
     [ ( "Bigint256"
       , [ test_case "around zero, limb patterns, full width" `Quick
             test_bigint_values
+        ; test_case "random bytes" `Quick test_bigint_random
         ; test_case "buffer short" `Quick test_bigint_buffer_short
         ] )
     ; ("Fp", Fp.tests)

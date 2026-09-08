@@ -23,13 +23,19 @@ module type Bindings = sig
 
   val of_bytes : bytes -> t
 
-  (** Same encoding as [to_bytes], written at [buf.{pos}]. *)
+  (** [blit_to_bigstring t buf pos] writes the encoding of [t], the same 32
+      little-endian bytes as [to_bytes t], to [buf.{pos} .. buf.{pos + 31}],
+      allocating nothing. Raises [Invalid_argument] when that window does not
+      fit in [buf]. *)
   val blit_to_bigstring :
        t
     -> (char, Bigarray.int8_unsigned_elt, Bigarray.c_layout) Bigarray.Array1.t
     -> int
     -> unit
 
+  (** [of_bigstring buf pos] reads the value written by [blit_to_bigstring]
+      at [buf.{pos} .. buf.{pos + 31}]. Raises [Invalid_argument] when the
+      window does not fit in [buf]. *)
   val of_bigstring :
        (char, Bigarray.int8_unsigned_elt, Bigarray.c_layout) Bigarray.Array1.t
     -> int
@@ -75,13 +81,19 @@ module type Intf = sig
 
   val of_bytes : bytes -> t
 
-  (** Same encoding as [to_bytes], written at [buf.{pos}]. *)
+  (** [blit_to_bigstring t buf pos] writes the encoding of [t], the same 32
+      little-endian bytes as [to_bytes t], to [buf.{pos} .. buf.{pos + 31}],
+      allocating nothing. Raises [Invalid_argument] when that window does not
+      fit in [buf]. *)
   val blit_to_bigstring :
        t
     -> (char, Bigarray.int8_unsigned_elt, Bigarray.c_layout) Bigarray.Array1.t
     -> int
     -> unit
 
+  (** [of_bigstring buf pos] reads the value written by [blit_to_bigstring]
+      at [buf.{pos} .. buf.{pos + 31}]. Raises [Invalid_argument] when the
+      window does not fit in [buf]. *)
   val of_bigstring :
        (char, Bigarray.int8_unsigned_elt, Bigarray.c_layout) Bigarray.Array1.t
     -> int
@@ -150,13 +162,19 @@ module Make : functor
 
   val of_bytes : bytes -> t
 
-  (** Same encoding as [to_bytes], written at [buf.{pos}]. *)
+  (** [blit_to_bigstring t buf pos] writes the encoding of [t], the same 32
+      little-endian bytes as [to_bytes t], to [buf.{pos} .. buf.{pos + 31}],
+      allocating nothing. Raises [Invalid_argument] when that window does not
+      fit in [buf]. *)
   val blit_to_bigstring :
        t
     -> (char, Bigarray.int8_unsigned_elt, Bigarray.c_layout) Bigarray.Array1.t
     -> int
     -> unit
 
+  (** [of_bigstring buf pos] reads the value written by [blit_to_bigstring]
+      at [buf.{pos} .. buf.{pos + 31}]. Raises [Invalid_argument] when the
+      window does not fit in [buf]. *)
   val of_bigstring :
        (char, Bigarray.int8_unsigned_elt, Bigarray.c_layout) Bigarray.Array1.t
     -> int

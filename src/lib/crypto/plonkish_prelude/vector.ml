@@ -296,6 +296,10 @@ module Make = struct
 
     let bin_read_t : type a. a Read.reader -> (a, N.n) t Read.reader =
      fun re buf ~pos_ref ->
+      (* The element read and the recursive call are sequenced with [let]s
+         on purpose: [re buf ~pos_ref :: go n] would leave the order to
+         OCaml's unspecified constructor-argument evaluation and read the
+         vector backwards. *)
       let rec go : type n. n Nat.t -> (a, n) t = function
         | Z ->
             Read.bin_read_unit buf ~pos_ref ;
