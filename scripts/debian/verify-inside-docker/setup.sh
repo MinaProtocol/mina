@@ -15,6 +15,13 @@ TRUSTED_FLAG="${7:-[trusted=yes]}"
 
 echo "Installing $PACKAGE=$VERSION from $REPO ($CODENAME/$CHANNEL)"
 
+# bullseye left LTS at the end of Aug 2026 and its security Release file is no
+# longer re-signed, so apt rejects the stale metadata outright.  Drop only the
+# freshness check, and only there; signatures are still verified.
+if [[ "$CODENAME" == "bullseye" ]]; then
+  echo 'Acquire::Check-Valid-Until "false";' > /etc/apt/apt.conf.d/99no-valid-until
+fi
+
 apt-get update
 
 # ca-certificates alone is enough to fetch from an https repo with
