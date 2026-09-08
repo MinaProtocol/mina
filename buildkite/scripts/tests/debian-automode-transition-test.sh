@@ -236,7 +236,12 @@ log_info "=== Step 3: Start local apt repository ==="
 
 # Add local repo to apt sources
 $SUDO bash -c "echo 'deb [trusted=yes] http://localhost:${APTLY_PORT}/ ${CODENAME} unstable' > /etc/apt/sources.list.d/transition-test.list"
-$SUDO apt-get update
+# Via update.sh rather than a bare apt-get update: this test defaults to
+# bullseye, whose upstream security pocket now serves an expired Release and
+# fails apt outright. update.sh disables just that pocket and retries, and it
+# also bypasses the APT proxy for localhost, where aptly serves the debians
+# under test.
+./buildkite/scripts/debian/update.sh --verbose
 
 log_info "Available packages:"
 apt-cache showpkg "${PKG_DAEMON}" 2>/dev/null | head -20 || true
