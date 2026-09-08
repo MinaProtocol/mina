@@ -85,6 +85,57 @@ let test_dumb_logrotate_resumes_from_oldest () =
         "mina.log.2 was preserved (newest)" "newest\n"
         (get_contents "mina.log.2") )
 
+(* a fixed timestamp, so a rendered record can be compared in full *)
+let message ?(level = Logger.Level.Info) ?(metadata = []) text =
+  { Logger.Message.timestamp = Logger.Time.epoch
+  ; level
+  ; source = Some (Logger.Source.create ~module_:__MODULE__ ~location:__LOC__)
+  ; message = text
+  ; metadata = String.Map.of_alist_exn metadata
+  ; event_id = None
+  }
+
+(* renders one message through a pretty consumer of its own and returns what
+   the transport was handed *)
+let pretty_render ~id ?(mode = Interpolator_lib.Interpolator.Inline) msg =
+  let emitted = ref None in
+  Logger.Consumer_registry.register ~id
+    ~processor:
+      (Logger.Processor.pretty ~log_level:Logger.Level.Spam
+         ~config:
+           { Interpolator_lib.Interpolator.mode
+           ; max_interpolation_length = 50
+           ; pretty_print = true
+           } )
+    ~transport:(Logger.Transport.raw (fun line -> emitted := Some line))
+    () ;
+  Logger.raw (Logger.create ~id ()) msg ;
+  Option.value_exn !emitted ~message:"the pretty processor emitted nothing"
+
+let test_pretty_renders_a_record_without_metadata_on_one_line () =
+  Alcotest.(check string)
+    "no trailing line"
+    "1970-01-01 00:00:00 UTC [Error] block get: one of --index or --hash is \
+     required"
+    (pretty_render ~id:"pretty_no_metadata"
+       (message ~level:Logger.Level.Error
+          "block get: one of --index or --hash is required" ) )
+
+let test_pretty_renders_interpolated_metadata_on_one_line () =
+  Alcotest.(check string)
+    "no trailing line" {|1970-01-01 00:00:00 UTC [Info] connected to "1.2.3.4"|}
+    (pretty_render ~id:"pretty_interpolated"
+       (message ~metadata:[ ("peer", `String "1.2.3.4") ] "connected to $peer") )
+
+let test_pretty_keeps_metadata_left_over_by_interpolation () =
+  Alcotest.(check string)
+    "each leftover key on its own indented line"
+    "1970-01-01 00:00:00 UTC [Info] rotated\n  count: 2\n  reason: \"size\""
+    (pretty_render ~id:"pretty_extra" ~mode:Interpolator_lib.Interpolator.After
+       (message
+          ~metadata:[ ("count", `Int 2); ("reason", `String "size") ]
+          "rotated" ) )
+
 let () =
   let open Alcotest in
   run "Logger"
@@ -93,5 +144,13 @@ let () =
             test_dumb_logrotate_rotates_logs_when_expected
         ; test_case "resumes rotation from oldest log" `Quick
             test_dumb_logrotate_resumes_from_oldest
+        ] )
+    ; ( "pretty"
+      , [ test_case "renders a record without metadata on one line" `Quick
+            test_pretty_renders_a_record_without_metadata_on_one_line
+        ; test_case "renders interpolated metadata on one line" `Quick
+            test_pretty_renders_interpolated_metadata_on_one_line
+        ; test_case "keeps metadata left over by interpolation" `Quick
+            test_pretty_keeps_metadata_left_over_by_interpolation
         ] )
     ]
