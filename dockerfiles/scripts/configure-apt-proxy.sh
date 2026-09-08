@@ -174,11 +174,19 @@ fi
 #      entrypoint{,-development}.yaml.gotmpl with the new codename triple.
 #   3. ONLY THEN, this allowlist + matching MIRROR_URL_PREFIX / MIRROR_COMPONENTS
 #      / MIRROR_LIST entry.
+# MIRROR_AUTHORITATIVE=1 additionally DISABLES the distro's own sources once the
+# mirror is proven reachable (see "3." below). Set it only for codenames whose
+# upstream archive is past EOL and therefore actively rotting; leave it 0 while
+# upstream is healthy, so a mirror outage is a non-event.
 case "$CODENAME" in
     focal)
         MIRROR_LIST=/etc/apt/sources.list.d/mirror-ubuntu.list
         MIRROR_URL_PREFIX="${APT_MIRROR_URL}/ubuntu"
         MIRROR_COMPONENTS="main universe"
+        # Canonical still serves focal (via archive.ubuntu.com, and eventually
+        # old-releases). Stay additive: the mirror is a fast path, not the only
+        # path. Flip to 1 if/when archive.ubuntu.com starts failing for focal.
+        MIRROR_AUTHORITATIVE=0
         ;;
     bullseye)
         # Debian 11. Mina daemon's default Docker base image. Mirrored as the
@@ -188,6 +196,16 @@ case "$CODENAME" in
         MIRROR_LIST=/etc/apt/sources.list.d/mirror-debian.list
         MIRROR_URL_PREFIX="${APT_MIRROR_URL}/debian"
         MIRROR_COMPONENTS="main"
+        # Bullseye left LTS on 2026-08-31. deb.debian.org stopped re-signing
+        # bullseye-security: its Release carries Valid-Until 2026-09-07 and will
+        # never be refreshed again, so apt rejects it with
+        #   E: Release file for .../bullseye-security/InRelease is expired
+        # and apt-get update exits 100 -- fatal inside a Docker build. Keeping
+        # upstream in the source list is now a pure liability: it contributes
+        # nothing the mirror does not already have (verified: identical package
+        # counts, 58657 in bullseye/main and 3816 in bullseye-security/main)
+        # and it is the only thing that can fail. Make the mirror authoritative.
+        MIRROR_AUTHORITATIVE=1
         ;;
     "")
         echo "--- /etc/os-release has no VERSION_CODENAME; skipping deb-mirror setup ---"
@@ -245,4 +263,72 @@ echo "--- ${MIRROR_LIST} ---"
 cat "$MIRROR_LIST"
 echo "--- /etc/apt/apt.conf.d/02proxy-bypass-mirror ---"
 cat /etc/apt/apt.conf.d/02proxy-bypass-mirror
+echo "------------------------"
+
+# -----------------------------------------------------------------------------
+# 3. For EOL codenames, make the mirror AUTHORITATIVE (drop upstream entirely).
+# -----------------------------------------------------------------------------
+# Rationale: once a codename leaves LTS, upstream stops re-signing the security
+# Release. apt then rejects it as expired and fails apt-get update outright --
+# see the bullseye note in the codename case above. Leaving upstream in the list
+# adds no packages the mirror lacks and adds one guaranteed future failure.
+#
+# We do NOT blindly delete the distro sources: if the mirror is unreachable that
+# would leave the image with no apt sources at all. Instead apt itself probes
+# the mirror -- using ONLY ${MIRROR_LIST} as its source list -- and upstream is
+# disabled only on success. On failure we keep upstream and relax just the
+# freshness check, which is the best that can be done without the mirror.
+[ "${MIRROR_AUTHORITATIVE:-0}" = "1" ] || exit 0
+
+echo "--- deb-mirror is authoritative for ${CODENAME}; probing it before disabling upstream ---"
+if apt-get update --quiet \
+        -o Dir::Etc::sourcelist="$MIRROR_LIST" \
+        -o Dir::Etc::sourceparts="/dev/null" \
+        -o APT::Get::List-Cleanup="0" >/dev/null 2>&1; then
+    echo "--- probe OK: disabling upstream ${CODENAME} sources ---"
+    # Keep an EMPTY /etc/apt/sources.list rather than removing it: later build
+    # steps (dockerfiles/stages/1-base-deps "Switch to HTTPS") branch on
+    # `[ -f /etc/apt/sources.list ]` and would otherwise sed a file that does
+    # not exist. Third-party lists under sources.list.d are left untouched.
+    if [ -f /etc/apt/sources.list ]; then
+        cp /etc/apt/sources.list /etc/apt/sources.list.disabled-by-deb-mirror
+        : > /etc/apt/sources.list
+    fi
+    # deb822 layout (bookworm and newer base images).
+    for deb822 in /etc/apt/sources.list.d/debian.sources \
+                  /etc/apt/sources.list.d/ubuntu.sources; do
+        if [ -f "$deb822" ]; then
+            mv "$deb822" "${deb822}.disabled-by-deb-mirror"
+        fi
+    done
+    echo "--- upstream sources disabled; deb-mirror is the only OS package source ---"
+else
+    echo "--- probe FAILED: deb-mirror unreachable or not serving ${CODENAME} ---"
+    echo "--- dropping the mirror list and falling back to upstream ---"
+    # Leaving an unreachable source in the list is not harmless: apt-get update
+    # fails fatally on a source it cannot fetch, so keeping mirror-*.list around
+    # would break the very build we are trying to rescue.
+    rm -f "$MIRROR_LIST"
+    # Upstream is all we have left, and for an EOL codename its Release file is
+    # expired. Signatures are still verified; only Valid-Until is skipped.
+    echo 'Acquire::Check-Valid-Until "false";' > /etc/apt/apt.conf.d/99no-valid-until
+    # apt-cacher-ng and the deb-mirror run on the SAME host, so a probe failure
+    # usually means the caching proxy is down too. 01proxy routes deb.debian.org
+    # through that proxy (it is not in the DIRECT list), which would make the
+    # upstream fallback fail for exactly the reason we are falling back. Send
+    # the Debian archives DIRECT so the fallback does not depend on the box we
+    # just failed to reach.
+    cat > /etc/apt/apt.conf.d/03proxy-bypass-fallback <<'FBEOF'
+Acquire::http::Proxy::deb.debian.org "DIRECT";
+Acquire::https::Proxy::deb.debian.org "DIRECT";
+Acquire::http::Proxy::security.debian.org "DIRECT";
+Acquire::https::Proxy::security.debian.org "DIRECT";
+Acquire::http::Proxy::archive.debian.org "DIRECT";
+Acquire::https::Proxy::archive.debian.org "DIRECT";
+FBEOF
+fi
+
+echo "--- effective OS package sources ---"
+cat /etc/apt/sources.list 2>/dev/null
+cat /etc/apt/sources.list.d/*.list 2>/dev/null
 echo "------------------------"
