@@ -140,14 +140,14 @@ let check_bigint (name, decimal) =
     (Bigint.compare b b' = 0) ;
   Alcotest.(check int) (name ^ ": bin_read_t advances") (offset + len) !pos_ref ;
   let buf' = fresh_buffer len in
-  Bigint.to_bytes_into b buf' offset ;
+  Bigint.blit_to_bigstring b buf' offset ;
   Alcotest.(check string)
-    (name ^ ": to_bytes_into matches to_bytes")
+    (name ^ ": blit_to_bigstring matches to_bytes")
     expected (bytes_at buf' ~len) ;
   Alcotest.(check bool)
-    (name ^ ": of_bytes_from inverts to_bytes_into")
+    (name ^ ": of_bigstring inverts blit_to_bigstring")
     true
-    (Bigint.compare b (Bigint.of_bytes_from buf' offset) = 0)
+    (Bigint.compare b (Bigint.of_bigstring buf' offset) = 0)
 
 let test_bigint_values () =
   List.iter ~f:check_bigint (around_zero @ limb_patterns @ full_width_patterns)
@@ -206,14 +206,14 @@ struct
       (name ^ ": bin_read_t advances")
       (offset + len) !pos_ref ;
     let buf' = fresh_buffer len in
-    Field.to_bytes_into x buf' offset ;
+    Field.blit_to_bigstring x buf' offset ;
     Alcotest.(check string)
-      (name ^ ": to_bytes_into matches Bigint.to_bytes")
+      (name ^ ": blit_to_bigstring matches Bigint.to_bytes")
       expected (bytes_at buf' ~len) ;
     Alcotest.(check bool)
-      (name ^ ": of_bytes_from inverts to_bytes_into")
+      (name ^ ": of_bigstring inverts blit_to_bigstring")
       true
-      (Field.equal x (Field.of_bytes_from buf' offset))
+      (Field.equal x (Field.of_bigstring buf' offset))
 
   (* The negatives, with their decimal values cross-checked against field
      arithmetic so that a wrong constant cannot pass. *)

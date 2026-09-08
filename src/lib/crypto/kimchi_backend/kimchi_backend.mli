@@ -40,9 +40,9 @@ module Kimchi_backend_common : sig
 
       val of_bigint : Bigint.t -> t
 
-      val to_bytes_into : t -> Core.Bigstring.t -> int -> unit
+      val blit_to_bigstring : t -> Core.Bigstring.t -> int -> unit
 
-      val of_bytes_from : Core.Bigstring.t -> int -> t
+      val of_bigstring : Core.Bigstring.t -> int -> t
 
       val of_int : int -> t
 

@@ -16,9 +16,9 @@ module type Input_intf = sig
   val of_bigint : Bigint.t -> t
 
   (** Same encoding as [Bigint.to_bytes (to_bigint t)], written at [buf.{pos}]. *)
-  val to_bytes_into : t -> Bigstring.t -> int -> unit
+  val blit_to_bigstring : t -> Bigstring.t -> int -> unit
 
-  val of_bytes_from : Bigstring.t -> int -> t
+  val of_bigstring : Bigstring.t -> int -> t
 
   val of_int : int -> t
 
@@ -208,14 +208,14 @@ module Make (F : Input_intf) :
       let bin_write_t buf ~pos (x : t) =
         let len = Bigint.length_in_bytes in
         Bin_prot.Common.check_next buf (pos + len) ;
-        to_bytes_into x buf pos ;
+        blit_to_bigstring x buf pos ;
         pos + len
 
       let bin_read_t buf ~pos_ref : t =
         let len = Bigint.length_in_bytes in
         let pos = !pos_ref in
         Bin_prot.Common.check_next buf (pos + len) ;
-        let x = of_bytes_from buf pos in
+        let x = of_bigstring buf pos in
         pos_ref := pos + len ;
         x
 

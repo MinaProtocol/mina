@@ -25,22 +25,22 @@ module BigInt256 = struct
 
   external of_bytes : bytes -> t = "caml_bigint_256_of_bytes"
 
-  external to_bytes_into :
+  external blit_to_bigstring :
        t
     -> ( char
        , Stdlib.Bigarray.int8_unsigned_elt
        , Stdlib.Bigarray.c_layout )
        Stdlib.Bigarray.Array1.t
     -> int
-    -> unit = "caml_bigint_256_to_bytes_into"
+    -> unit = "caml_bigint_256_blit_to_bigstring"
 
-  external of_bytes_from :
+  external of_bigstring :
        ( char
        , Stdlib.Bigarray.int8_unsigned_elt
        , Stdlib.Bigarray.c_layout )
        Stdlib.Bigarray.Array1.t
     -> int
-    -> t = "caml_bigint_256_of_bytes_from"
+    -> t = "caml_bigint_256_of_bigstring"
 
   external deep_copy : t -> t = "caml_bigint_256_deep_copy"
 end
@@ -111,22 +111,22 @@ module Fp = struct
 
   external of_bytes : bytes -> t = "caml_pasta_fp_of_bytes"
 
-  external to_bytes_into :
+  external blit_to_bigstring :
        t
     -> ( char
        , Stdlib.Bigarray.int8_unsigned_elt
        , Stdlib.Bigarray.c_layout )
        Stdlib.Bigarray.Array1.t
     -> int
-    -> unit = "caml_pasta_fp_to_bytes_into"
+    -> unit = "caml_pasta_fp_blit_to_bigstring"
 
-  external of_bytes_from :
+  external of_bigstring :
        ( char
        , Stdlib.Bigarray.int8_unsigned_elt
        , Stdlib.Bigarray.c_layout )
        Stdlib.Bigarray.Array1.t
     -> int
-    -> t = "caml_pasta_fp_of_bytes_from"
+    -> t = "caml_pasta_fp_of_bigstring"
 
   external deep_copy : t -> t = "caml_pasta_fp_deep_copy"
 end
@@ -197,22 +197,22 @@ module Fq = struct
 
   external of_bytes : bytes -> t = "caml_pasta_fq_of_bytes"
 
-  external to_bytes_into :
+  external blit_to_bigstring :
        t
     -> ( char
        , Stdlib.Bigarray.int8_unsigned_elt
        , Stdlib.Bigarray.c_layout )
        Stdlib.Bigarray.Array1.t
     -> int
-    -> unit = "caml_pasta_fq_to_bytes_into"
+    -> unit = "caml_pasta_fq_blit_to_bigstring"
 
-  external of_bytes_from :
+  external of_bigstring :
        ( char
        , Stdlib.Bigarray.int8_unsigned_elt
        , Stdlib.Bigarray.c_layout )
        Stdlib.Bigarray.Array1.t
     -> int
-    -> t = "caml_pasta_fq_of_bytes_from"
+    -> t = "caml_pasta_fq_of_bigstring"
 
   external deep_copy : t -> t = "caml_pasta_fq_deep_copy"
 end

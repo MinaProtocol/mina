@@ -26,9 +26,9 @@ module type Bindings = sig
   val of_bytes : Bytes.t -> t
 
   (** Same encoding as [to_bytes], written at [buf.{pos}]. *)
-  val to_bytes_into : t -> Bigstring.t -> int -> unit
+  val blit_to_bigstring : t -> Bigstring.t -> int -> unit
 
-  val of_bytes_from : Bigstring.t -> int -> t
+  val of_bigstring : Bigstring.t -> int -> t
 end
 
 module type Intf = sig
@@ -102,14 +102,14 @@ module Make
     let bin_write_t buf ~pos t =
       let len = length_in_bytes in
       Bin_prot.Common.check_next buf (pos + len) ;
-      to_bytes_into t buf pos ;
+      blit_to_bigstring t buf pos ;
       pos + len
 
     let bin_read_t buf ~pos_ref =
       let len = length_in_bytes in
       let pos = !pos_ref in
       Bin_prot.Common.check_next buf (pos + len) ;
-      let t = of_bytes_from buf pos in
+      let t = of_bigstring buf pos in
       pos_ref := pos + len ;
       t
   end)
