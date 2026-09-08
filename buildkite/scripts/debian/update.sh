@@ -268,8 +268,16 @@ run_apt_update() {
     # Bypass any configured APT proxy for localhost
     eval "$(./buildkite/scripts/debian/apt-proxy-bypass.sh localhost)"
 
+    # bullseye left LTS at the end of Aug 2026 and its security Release file is
+    # no longer re-signed, so apt rejects the stale metadata outright.  Drop
+    # only the freshness check, and only there; signatures are still verified.
+    local stale_opts=""
+    if grep -q '^VERSION_CODENAME=bullseye$' /etc/os-release 2>/dev/null; then
+        stale_opts="-o Acquire::Check-Valid-Until=false"
+    fi
+
     log "Running apt-get update..."
-    if ! ${SUDO_CMD} apt-get update $APT_PROXY_BYPASS_OPTS; then
+    if ! ${SUDO_CMD} apt-get update $stale_opts $APT_PROXY_BYPASS_OPTS; then
         error "apt-get update failed"
         return 1
     fi
