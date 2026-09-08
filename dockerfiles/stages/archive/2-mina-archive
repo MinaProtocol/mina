@@ -49,6 +49,17 @@ RUN echo "Building image with version $deb_codename $deb_release $deb_version"
 COPY scripts/archive-entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
+# Re-establish the apt sources before this stage's first apt-get update. CI
+# builds this stage FROM the published mina-base (scripts/docker/build.sh
+# --base-image) and skips 1-base-deps entirely, so the configure-apt-proxy.sh
+# baked into that base can predate the current script and the base's apt
+# sources can be stale (e.g. an upstream pocket that has since expired).
+# Re-running it here is idempotent when 1-base-deps already did the work.
+ARG apt_cache_url=""
+COPY scripts/configure-apt-proxy.sh /usr/local/bin/configure-apt-proxy.sh
+RUN chmod +x /usr/local/bin/configure-apt-proxy.sh \
+  && /usr/local/bin/configure-apt-proxy.sh "$apt_cache_url"
+
 # Archive-specific dependencies (the shared deps + gcloud come from base-deps).
 RUN apt-get update --quiet --yes \
     && apt-get install --quiet --yes --no-install-recommends \
