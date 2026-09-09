@@ -221,6 +221,7 @@
 (package (name uptime_service))
 (package (name user_command_input))
 (package (name validate_keypair))
+(package (name verification_keys))
 (package (name verifier))
 (package (name visualization))
 (package (name vrf_evaluator))

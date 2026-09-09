@@ -103,7 +103,15 @@ dune build --force src/lib/node_config   # rebuild node_config for the chosen pr
 dune runtest \
     src/lib/blockchain_snark/tests \
     src/lib/transaction_snark/test/constraint_count \
-    src/lib/transaction_snark/test/print_transaction_snark_vk
+    src/lib/transaction_snark/test/print_transaction_snark_vk \
+    genesis_ledgers
+```
+
+`genesis_ledgers` checks the shipped verification keys: `mainnet` under the mainnet profile, `devnet` and `mesa` under the devnet profile. A mismatch is accepted the same way as the other fixtures, either after the fact or in the same command:
+
+```bash
+dune promote
+dune runtest genesis_ledgers --auto-promote
 ```
 
 In CI these are run for each profile separately by `buildkite/scripts/profile-dependent-tests.sh`.

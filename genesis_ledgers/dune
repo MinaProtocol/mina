@@ -1,0 +1,112 @@
+; The verification keys a daemon verifies blocks with depend on the constraint
+; constants, which these configs change through their fork constants. So each
+; config has a key file next to it, and these rules regenerate that file and
+; diff it against the committed one. A config change that moves the keys fails
+; here instead of shipping a package whose keys reject every block, and
+; `dune promote` writes the new keys back.
+;
+; The keys also depend on the compiled profile, which is fixed at build time by
+; DUNE_PROFILE, so each network's rules only run under the profile its package
+; is built with: mainnet under mainnet, devnet and mesa under devnet.
+;
+; The prover comparison below is the other half of the check: regenerating from
+; the same circuits cannot catch a bug those circuits share, so the keys are
+; also compared against the ones a real prover hands out. It costs about 20s per
+; network, because the prover's step keys come from the shared key cache rather
+; than being generated.
+;
+; Only the networks that ship a config package have keys; a hardfork config is
+; generated at packaging time and its nodes compute the keys at start instead.
+
+(rule
+ (enabled_if
+  (= %{profile} mainnet))
+ (targets mainnet_verification_keys.bin.computed)
+ (deps
+  (:config mainnet.json)
+  (:exe ../src/lib/verification_keys/tests/generate_verification_keys.exe))
+ (action
+  (run %{exe} --config-file %{config} --output-file %{targets})))
+
+(rule
+ (alias runtest)
+ (enabled_if
+  (= %{profile} mainnet))
+ (deps
+  (:orig mainnet_verification_keys.bin)
+  (:computed mainnet_verification_keys.bin.computed))
+ (action
+  (diff %{orig} %{computed})))
+
+(rule
+ (alias runtest)
+ (enabled_if
+  (= %{profile} mainnet))
+ (deps
+  (:config mainnet.json)
+  (:keys mainnet_verification_keys.bin)
+  (:exe ../src/lib/verification_keys/tests/verification_keys_match_prover.exe))
+ (action
+  (run %{exe} check --config-file %{config} --keys-file %{keys})))
+
+(rule
+ (enabled_if
+  (= %{profile} devnet))
+ (targets devnet_verification_keys.bin.computed)
+ (deps
+  (:config devnet.json)
+  (:exe ../src/lib/verification_keys/tests/generate_verification_keys.exe))
+ (action
+  (run %{exe} --config-file %{config} --output-file %{targets})))
+
+(rule
+ (alias runtest)
+ (enabled_if
+  (= %{profile} devnet))
+ (deps
+  (:orig devnet_verification_keys.bin)
+  (:computed devnet_verification_keys.bin.computed))
+ (action
+  (diff %{orig} %{computed})))
+
+(rule
+ (alias runtest)
+ (enabled_if
+  (= %{profile} devnet))
+ (deps
+  (:config devnet.json)
+  (:keys devnet_verification_keys.bin)
+  (:exe ../src/lib/verification_keys/tests/verification_keys_match_prover.exe))
+ (action
+  (run %{exe} check --config-file %{config} --keys-file %{keys})))
+
+(rule
+ (enabled_if
+  (= %{profile} devnet))
+ (targets mesa_verification_keys.bin.computed)
+ (deps
+  (:config mesa.json)
+  (:exe ../src/lib/verification_keys/tests/generate_verification_keys.exe))
+ (action
+  (run %{exe} --config-file %{config} --output-file %{targets})))
+
+(rule
+ (alias runtest)
+ (enabled_if
+  (= %{profile} devnet))
+ (deps
+  (:orig mesa_verification_keys.bin)
+  (:computed mesa_verification_keys.bin.computed))
+ (action
+  (diff %{orig} %{computed})))
+
+(rule
+ (alias runtest)
+ (enabled_if
+  (= %{profile} devnet))
+ (deps
+  (:config mesa.json)
+  (:keys mesa_verification_keys.bin)
+  (:exe ../src/lib/verification_keys/tests/verification_keys_match_prover.exe))
+ (action
+  (run %{exe} check --config-file %{config} --keys-file %{keys})))

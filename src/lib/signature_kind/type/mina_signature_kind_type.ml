@@ -1,7 +1,7 @@
 open Core_kernel
 
 type t = Testnet | Mainnet | Other_network of string
-[@@deriving bin_io_unversioned, to_yojson]
+[@@deriving bin_io_unversioned, equal, to_yojson]
 
 let to_directory_name = function
   | Mainnet ->

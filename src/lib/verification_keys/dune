@@ -1,0 +1,36 @@
+(library
+ (name verification_keys)
+ (public_name verification_keys)
+ (inline_tests
+  (flags -verbose -show-counts))
+ (libraries
+  ;; opam libraries
+  core
+  core_unix.filename_unix
+  core_unix.sys_unix
+  async
+  bin_prot.shape
+  ppx_inline_test.config
+  yojson
+  ;; local libraries
+  cache_dir
+  error_json
+  genesis_constants
+  logger
+  mina_node_config
+  mina_stdlib
+  mina_signature_kind
+  mina_version
+  pickles
+  verifier)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps
+   ppx_mina
+   ppx_version
+   ppx_bin_prot
+   ppx_let
+   ppx_assert
+   ppx_deriving_yojson
+   ppx_inline_test)))
