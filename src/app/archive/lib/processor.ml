@@ -1562,6 +1562,7 @@ module Zkapp_events = struct
         let%map field_array_map =
           Mina_caqti.insert_multi_into_col ~table_name:"zkapp_field_array"
             ~col:("element_ids", Mina_caqti.array_int_typ)
+            ~no_unique_constraint:"int[]"
             (module Conn)
             field_array_list
           >>| Field_array_map.of_alist_exn
