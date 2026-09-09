@@ -265,10 +265,6 @@ val get_filtered_log_entries : t -> int -> string list * bool
 (** The blockchain SNARK verification key this node validates blocks with. *)
 val blockchain_verification_key : t -> Pickles.Verification_key.t
 
-val prover : t -> Prover.t
-
-val vrf_evaluator : t -> Vrf_evaluator.t
-
 val genesis_ledger : t -> Mina_ledger.Ledger.t Lazy.t
 
 val vrf_evaluation_state : t -> Block_producer.Vrf_evaluation_state.t

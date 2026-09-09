@@ -50,10 +50,15 @@ type snark_worker =
   ; kill_ivar : unit Ivar.t
   }
 
+(* Both subprocesses exist exactly when this node has block production keys, so
+   they are one value rather than two options: there is no such thing as a node
+   with a prover and no VRF evaluator, and the type should not admit one. *)
+type block_production_processes =
+  { prover : Prover.t; vrf_evaluator : Vrf_evaluator.t }
+
 type processes =
-  { prover : Prover.t
+  { block_production : block_production_processes option
   ; verifier : Verifier.t
-  ; vrf_evaluator : Vrf_evaluator.t
   ; mutable snark_worker :
       [ `On of snark_worker * Currency.Fee.t | `Off of Currency.Fee.t ]
   ; uptime_snark_worker_opt : Uptime_service.Uptime_snark_worker.t option
@@ -1428,35 +1433,37 @@ let start t =
     t.block_production_status := block_production_status ;
     t.next_producer_timing <- Some next_producer_timing
   in
-  ( if
-    not
-      (Keypair.And_compressed_pk.Set.is_empty t.config.block_production_keypairs)
-  then
-    let module Context =
-    ( val context ~proof_cache_db:t.proof_cache_db ~commit_id:t.commit_id
-            ~signature_kind:t.signature_kind t.config )
-    in
-    Block_producer.run
-      ~context:(module Context)
-      ~vrf_evaluator:t.processes.vrf_evaluator ~verifier:t.processes.verifier
-      ~set_next_producer_timing ~prover:t.processes.prover
-      ~trust_system:t.config.trust_system
-      ~transaction_resource_pool:
-        (Network_pool.Transaction_pool.resource_pool
-           t.components.transaction_pool )
-      ~get_completed_work:
-        (Network_pool.Snark_pool.get_completed_work t.components.snark_pool)
-      ~time_controller:t.config.time_controller
-      ~coinbase_receiver:t.coinbase_receiver
-      ~consensus_local_state:t.config.consensus_local_state
-      ~frontier_reader:t.components.transition_frontier
-      ~transition_writer:t.pipes.producer_transition_writer
-      ~log_block_creation:t.config.log_block_creation
-      ~block_reward_threshold:t.config.block_reward_threshold
-      ~block_produced_bvar:t.components.block_produced_bvar
-      ~vrf_evaluation_state:t.vrf_evaluation_state ~net:t.components.net
-      ~zkapp_cmd_limit_hardcap:
-        t.config.precomputed_values.genesis_constants.zkapp_cmd_limit_hardcap ) ;
+  (* These subprocesses exist exactly when this node has block production keys,
+     so matching on them is the same guard as testing the keypair set. *)
+  ( match t.processes.block_production with
+  | None ->
+      ()
+  | Some { prover; vrf_evaluator } ->
+      let module Context =
+      ( val context ~proof_cache_db:t.proof_cache_db ~commit_id:t.commit_id
+              ~signature_kind:t.signature_kind t.config )
+      in
+      Block_producer.run
+        ~context:(module Context)
+        ~vrf_evaluator ~verifier:t.processes.verifier ~set_next_producer_timing
+        ~prover ~trust_system:t.config.trust_system
+        ~transaction_resource_pool:
+          (Network_pool.Transaction_pool.resource_pool
+             t.components.transaction_pool )
+        ~get_completed_work:
+          (Network_pool.Snark_pool.get_completed_work t.components.snark_pool)
+        ~time_controller:t.config.time_controller
+        ~coinbase_receiver:t.coinbase_receiver
+        ~consensus_local_state:t.config.consensus_local_state
+        ~frontier_reader:t.components.transition_frontier
+        ~transition_writer:t.pipes.producer_transition_writer
+        ~log_block_creation:t.config.log_block_creation
+        ~block_reward_threshold:t.config.block_reward_threshold
+        ~block_produced_bvar:t.components.block_produced_bvar
+        ~vrf_evaluation_state:t.vrf_evaluation_state ~net:t.components.net
+        ~zkapp_cmd_limit_hardcap:
+          t.config.precomputed_values.genesis_constants.zkapp_cmd_limit_hardcap
+  ) ;
   perform_compaction t.config.compile_config.compaction_interval t ;
   let () =
     match t.config.node_status_url with
@@ -1815,30 +1822,6 @@ let create ~commit_id ?wallets (config : Config.t) =
               ~constraint_constants
               ~proof_level:config.precomputed_values.proof_level ()
           in
-          let%bind prover =
-            Monitor.try_with ~here:[%here]
-              ~rest:
-                (`Call
-                  (fun exn ->
-                    let err = Error.of_exn ~backtrace:`Get exn in
-                    [%log' warn config.logger]
-                      "unhandled exception from daemon-side prover server: $exn"
-                      ~metadata:[ ("exn", Error_json.error_to_yojson err) ] ) )
-              (fun () ->
-                O1trace.thread "manage_prover_subprocess" (fun () ->
-                    let%bind prover =
-                      Prover.create ~commit_id ~logger:config.logger
-                        ~enable_internal_tracing:
-                          (Internal_tracing.is_enabled ())
-                        ~internal_trace_filename:"prover-internal-trace.jsonl"
-                        ~proof_level:config.precomputed_values.proof_level
-                        ~constraint_constants ~pids:config.pids
-                        ~conf_dir:config.conf_dir ~signature_kind ()
-                    in
-                    let%map () = set_itn_data (module Prover) prover in
-                    prover ) )
-            >>| Result.ok_exn
-          in
           let%bind verifier =
             Monitor.try_with ~here:[%here]
               ~rest:
@@ -1877,29 +1860,64 @@ let create ~commit_id ?wallets (config : Config.t) =
                   [%log' warn config.logger]
                     "Failed to toggle verifier internal tracing: $error"
                     ~metadata:[ ("error", Error_json.error_to_yojson error) ] ) ) ;
-          Internal_tracing.register_toggle_callback (fun enabled ->
-              let%map result = Prover.toggle_internal_tracing prover enabled in
-              Or_error.iter_error result ~f:(fun error ->
-                  [%log' warn config.logger]
-                    "Failed to toggle prover internal tracing: $error"
-                    ~metadata:[ ("error", Error_json.error_to_yojson error) ] ) ) ;
-          let%bind vrf_evaluator =
-            Monitor.try_with ~here:[%here]
-              ~rest:
-                (`Call
-                  (fun exn ->
-                    let err = Error.of_exn ~backtrace:`Get exn in
-                    [%log' warn config.logger]
-                      "unhandled exception from daemon-side vrf evaluator \
-                       server: $exn"
-                      ~metadata:[ ("exn", Error_json.error_to_yojson err) ] ) )
-              (fun () ->
-                O1trace.thread "manage_vrf_evaluator_subprocess" (fun () ->
-                    Vrf_evaluator.create ~commit_id ~constraint_constants
-                      ~pids:config.pids ~logger:config.logger
-                      ~conf_dir:config.conf_dir ~consensus_constants
-                      ~keypairs:config.block_production_keypairs ) )
-            >>| Result.ok_exn
+          (* Neither subprocess does any work on a node that produces no blocks:
+             every path into the prover runs through [Block_producer.run], and
+             the VRF is never evaluated without keys to evaluate it for. They
+             cost ~1.43GB and ~122MB respectively, so they are started together
+             or not at all. *)
+          let%bind block_production =
+            if Set.is_empty config.block_production_keypairs then
+              Deferred.return None
+            else
+              let on_failure name exn =
+                let err = Error.of_exn ~backtrace:`Get exn in
+                [%log' warn config.logger]
+                  "unhandled exception from daemon-side $process server: $exn"
+                  ~metadata:
+                    [ ("process", `String name)
+                    ; ("exn", Error_json.error_to_yojson err)
+                    ]
+              in
+              let%bind prover =
+                Monitor.try_with ~here:[%here]
+                  ~rest:(`Call (on_failure "prover"))
+                  (fun () ->
+                    O1trace.thread "manage_prover_subprocess" (fun () ->
+                        let%bind prover =
+                          Prover.create ~commit_id ~logger:config.logger
+                            ~enable_internal_tracing:
+                              (Internal_tracing.is_enabled ())
+                            ~internal_trace_filename:
+                              "prover-internal-trace.jsonl"
+                            ~proof_level:config.precomputed_values.proof_level
+                            ~constraint_constants ~pids:config.pids
+                            ~conf_dir:config.conf_dir ~signature_kind ()
+                        in
+                        let%map () = set_itn_data (module Prover) prover in
+                        prover ) )
+                >>| Result.ok_exn
+              in
+              Internal_tracing.register_toggle_callback (fun enabled ->
+                  let%map result =
+                    Prover.toggle_internal_tracing prover enabled
+                  in
+                  Or_error.iter_error result ~f:(fun error ->
+                      [%log' warn config.logger]
+                        "Failed to toggle prover internal tracing: $error"
+                        ~metadata:
+                          [ ("error", Error_json.error_to_yojson error) ] ) ) ;
+              let%map vrf_evaluator =
+                Monitor.try_with ~here:[%here]
+                  ~rest:(`Call (on_failure "vrf evaluator"))
+                  (fun () ->
+                    O1trace.thread "manage_vrf_evaluator_subprocess" (fun () ->
+                        Vrf_evaluator.create ~commit_id ~constraint_constants
+                          ~pids:config.pids ~logger:config.logger
+                          ~conf_dir:config.conf_dir ~consensus_constants
+                          ~keypairs:config.block_production_keypairs ) )
+                >>| Result.ok_exn
+              in
+              Some { prover; vrf_evaluator }
           in
           let snark_worker =
             Option.value_map config.snark_worker_config.initial_snark_worker_key
@@ -2574,11 +2592,10 @@ let create ~commit_id ?wallets (config : Config.t) =
           ; next_producer_timing = None
           ; verification_keys
           ; processes =
-              { prover
+              { block_production
               ; verifier
               ; snark_worker
               ; uptime_snark_worker_opt
-              ; vrf_evaluator
               }
           ; initialization_finish_signal
           ; components =
@@ -2644,10 +2661,6 @@ let get_filtered_log_entries
 
 let blockchain_verification_key { verification_keys; _ } =
   verification_keys.Verification_keys.blockchain
-
-let prover { processes = { prover; _ }; _ } = prover
-
-let vrf_evaluator { processes = { vrf_evaluator; _ }; _ } = vrf_evaluator
 
 let genesis_ledger t = Genesis_proof.genesis_ledger t.config.precomputed_values
 
