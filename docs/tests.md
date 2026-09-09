@@ -103,7 +103,6 @@ dune build --force src/lib/node_config   # rebuild node_config for the chosen pr
 dune runtest \
     src/lib/blockchain_snark/tests \
     src/lib/transaction_snark/test/constraint_count \
-    src/lib/transaction_snark/test/print_transaction_snark_vk \
     genesis_ledgers
 ```
 
