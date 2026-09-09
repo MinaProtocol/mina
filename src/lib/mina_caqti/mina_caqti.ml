@@ -413,29 +413,62 @@ let sep_by_comma ?(parenthesis = false) xs =
   List.map xs ~f:(if parenthesis then sprintf "('%s')" else sprintf "'%s'")
   |> String.concat ~sep:", "
 
+(* Insert the values that aren't in the table yet, then return the id of
+   every value, inserted or pre-existing.
+
+   Deduplication is normally left to the column's UNIQUE constraint, through
+   `ON CONFLICT DO NOTHING`. `no_unique_constraint` names the SQL type of a
+   column that may have none — `upgrade_to_mesa.sql` drops the one over
+   `zkapp_field_array.element_ids`, as a btree over an unbounded `int[]`
+   overflows Postgres' index row size limit, and Postgres rejects an
+   `ON CONFLICT` target with no matching constraint. Then the queries
+   deduplicate on their own, casting the values to that type to compare them
+   against the column.
+
+   ponytail: that comparison is a sequential scan with no index over the
+   column, as is already true of the `select_insert_into_cols` lookups over
+   the same columns. Give the column an index if backfill speed matters. *)
 let insert_multi_into_col ~(table_name : string)
-    ~(col : string * 'col Caqti_type.t) (module Conn : CONNECTION)
-    (values : string list) =
+    ~(col : string * 'col Caqti_type.t) ?no_unique_constraint
+    (module Conn : CONNECTION) (values : string list) =
   let open Deferred.Result.Let_syntax in
-  let insert =
-    sprintf
-      {sql| INSERT INTO %s (%s) VALUES %s
+  let insert, search =
+    match no_unique_constraint with
+    | None ->
+        ( sprintf
+            {sql| INSERT INTO %s (%s) VALUES %s
             ON CONFLICT (%s)
             DO NOTHING |sql}
-      table_name (fst col)
-      (sep_by_comma ~parenthesis:true values)
-      (fst col)
+            table_name (fst col)
+            (sep_by_comma ~parenthesis:true values)
+            (fst col)
+        , sprintf
+            {sql| SELECT %s, id FROM %s
+            WHERE %s in (%s) |sql}
+            (fst col) table_name (fst col) (sep_by_comma values) )
+    | Some tannot ->
+        let cast = "::" ^ tannot in
+        ( sprintf
+            {sql| INSERT INTO %s (%s)
+            SELECT DISTINCT vals.value%s FROM (VALUES %s) AS vals (value)
+            WHERE NOT EXISTS (SELECT 1 FROM %s WHERE %s = vals.value%s) |sql}
+            table_name (fst col) cast
+            (sep_by_comma ~parenthesis:true values)
+            table_name (fst col) cast
+          (* `DISTINCT ON` because without the constraint the table may
+             already hold duplicates of a value, and callers key a map by
+             value *)
+        , sprintf
+            {sql| SELECT DISTINCT ON (%s) %s, id FROM %s
+            WHERE %s in (%s)
+            ORDER BY %s, id |sql}
+            (fst col) (fst col) table_name (fst col) (sep_by_comma values)
+            (fst col) )
   in
   let%bind () =
     Conn.exec
       (Caqti_request.Infix.(Caqti_type.unit ->. Caqti_type.unit) insert)
       ()
-  in
-  let search =
-    sprintf
-      {sql| SELECT %s, id FROM %s
-            WHERE %s in (%s) |sql}
-      (fst col) table_name (fst col) (sep_by_comma values)
   in
   Conn.collect_list
     Caqti_request.Infix.(
