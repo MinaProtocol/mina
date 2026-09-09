@@ -699,7 +699,8 @@ module Network_manager = struct
        fails after the full timeout with nothing to go on. *)
     let log_service_tasks bad_service_statuses =
       let open Deferred.Let_syntax in
-      Deferred.List.iter bad_service_statuses ~f:(fun (service_name, _) ->
+      Deferred.List.iter ~how:`Sequential bad_service_statuses
+        ~f:(fun (service_name, _) ->
           match%map
             Util.run_cmd_or_error "/" "docker"
               [ "service"; "ps"; "--no-trunc"; service_name ]
@@ -831,8 +832,7 @@ module Network_manager = struct
       ; deployed = false
       ; genesis_keypairs = network_config.genesis_keypairs
       ; images =
-          Docker_compose.Dockerfile.StringMap.data
-            (Network_config.to_docker network_config).services
+          Core.Map.data (Network_config.to_docker network_config).services
           |> List.map ~f:(fun (service : Docker_compose.Dockerfile.Service.t) ->
               service.image )
           |> List.dedup_and_sort ~compare:String.compare
@@ -857,7 +857,7 @@ module Network_manager = struct
      so log it and let the deploy proceed. *)
   let pull_images ~logger images =
     let open Deferred.Let_syntax in
-    Deferred.List.iter images ~f:(fun image ->
+    Deferred.List.iter ~how:`Sequential images ~f:(fun image ->
         [%log info] "Pulling image $image"
           ~metadata:[ ("image", `String image) ] ;
         match%map Util.run_cmd_or_error "/" "docker" [ "pull"; image ] with
