@@ -15,12 +15,11 @@ module Make (Inductive_rule : Inductive_rule.Intf) : sig
            and type statement = 'a_value )
     -> (module Pickles_types.Nat.Add.Intf with type n = 'max_proofs_verified)
     -> self_branches:'self_branches Pickles_types.Nat.t
-    -> local_signature:
-         'local_signature Pickles_types.Hlist.H1.T(Pickles_types.Nat).t
+    -> prev_requests:
+         'local_signature
+         Pickles_types.Hlist.H1.T(Requests.Prev_request_packed).t
     -> local_signature_length:
          ('local_signature, 'proofs_verified) Pickles_types.Hlist.Length.t
-    -> local_branches_length:
-         ('local_branches, 'proofs_verified) Pickles_types.Hlist.Length.t
     -> proofs_verified:
          ('prev_vars, 'proofs_verified) Pickles_types.Hlist.Length.t
     -> lte:('proofs_verified, 'max_proofs_verified) Pickles_types.Nat.Lte.t

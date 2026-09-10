@@ -1,0 +1,21 @@
+(executable
+ (name bench_ipa)
+ (modes native)
+ (libraries
+  core
+  async
+  async_unix
+  promise
+  pickles
+  pickles_types
+  pickles.backend
+  snarky.backendless
+  kimchi_backend
+  kimchi_pasta
+  kimchi_pasta.basic
+  kimchi_bindings
+  key_cache
+  logger
+  snark_keys_header)
+ (preprocess
+  (pps ppx_version ppx_jane)))
