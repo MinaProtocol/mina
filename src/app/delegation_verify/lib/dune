@@ -1,0 +1,12 @@
+(library
+ (name delegation_verify_lib)
+ (libraries
+  ;;opam libraries
+  core
+  yojson)
+ (inline_tests
+  (flags -verbose -show-counts))
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_jane)))

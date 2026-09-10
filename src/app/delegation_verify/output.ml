@@ -28,8 +28,8 @@ let valid_payload_to_cassandra_updates (p : t) =
     , Printf.sprintf "'%s'" @@ State_hash.to_base58_check p.state_hash )
   ; ("raw_block", "NULL")
   ; ("snark_work", "NULL")
-  ; ("verified", "true")
   ]
+  @ Delegation_verify_lib.Verification_status.(to_cassandra_updates Verified)
 
 let display valid_payload =
   printf "%s\n" @@ Yojson.Safe.to_string
