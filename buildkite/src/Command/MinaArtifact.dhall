@@ -408,6 +408,7 @@ let commonBuildEnvs =
                 , "PREFORK_LEGACY_VERSION=${spec.deb_legacy_version}"
                 , "PREFORK_GITHASH_CONFIG=${spec.deb_legacy_githash_config}"
                 , "MINA_DEB_RELEASE=${DebianChannel.effective spec.channel}"
+                , "MINA_APPS_CACHE_ROOT"
                 ]
               # BuildFlags.buildEnvs spec.buildFlags
               # spec.extraBuildEnvs
@@ -490,6 +491,30 @@ let buildDebianFromApps
                               spec} ./buildkite/scripts/debian/build-from-cache.sh ${treeVariant
                                                                                        spec} ${tokens}"
 
+let appsFromAnotherBuild
+    : Optional Text
+    =
+      -- Set when MINA_APPS_CACHE_ROOT names an earlier build, which is what a
+      -- packaging-only pipeline does. See restore_build_tree.sh.
+      Some env:MINA_APPS_CACHE_ROOT as Text ? None Text
+
+let dependsOnApps
+    : PackagingSpec.Type -> List Command.TaggedKey.Type
+    =
+      -- Nothing to wait for when the apps came from an earlier build.
+      --
+      -- The dependency names a job by key, and a packaging-only pipeline does
+      -- not select the app build at all, so the key is absent and Buildkite
+      -- leaves every packaging step in waiting_failed: no job runs, no job
+      -- fails, and the build reports failure with nothing in it to look at.
+          \(spec : PackagingSpec.Type)
+      ->  Prelude.Optional.fold
+            Text
+            appsFromAnotherBuild
+            (List Command.TaggedKey.Type)
+            (\(_ : Text) -> [] : List Command.TaggedKey.Type)
+            [ { name = appsJobName spec, key = "build-apps" } ]
+
 let build_debian
     : PackagingSpec.Type -> Command.Type
     =     \(spec : PackagingSpec.Type)
@@ -505,7 +530,7 @@ let build_debian
                   ]
             , label = "Debian: Build ${labelSuffix spec}"
             , key = "build-deb-pkg${Optional/default Text "" spec.suffix}"
-            , depends_on = [ { name = appsJobName spec, key = "build-apps" } ]
+            , depends_on = dependsOnApps spec
             , target = Size.Multi
             , if_ = spec.if_
             , retries =
