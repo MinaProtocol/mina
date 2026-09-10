@@ -244,6 +244,43 @@ module Ledger_inner = struct
     module Base = Any_ledger.M
   end)
 
+  (** [Hash] with the hashing taken out: both [merge] and [hash_account] are
+      constant. The hash type is unchanged, so a structure built over this
+      still attaches to one built over the real [Hash]; what changes is that
+      it computes nothing, and so the values it reports are meaningless. *)
+  module Do_not_hash = struct
+    include Hash.Stable.Latest
+
+    let merge ~height:_ _ _ = empty_account
+
+    let hash_account _ = empty_account
+  end
+
+  (** A mask that does no hashing, for ledgers that are written to and then
+      discarded without their merkle hashes ever being read. Every operation
+      is the one {!Mask} has; the difference is entirely in the [Hash] it is
+      built over. It is statically a different type from {!Mask}, so the two
+      cannot be confused. *)
+  module Non_hashing_mask :
+    Merkle_mask.Masking_merkle_tree_intf.S
+      with module Location = Location_at_depth
+       and module Attached.Addr = Location_at_depth.Addr
+      with type account := Account.t
+       and type key := Public_key.Compressed.t
+       and type token_id := Token_id.t
+       and type token_id_set := Token_id.Set.t
+       and type account_id := Account_id.t
+       and type account_id_set := Account_id.Set.t
+       and type hash := Hash.t
+       and type location := Location_at_depth.t
+       and type parent := Any_ledger.M.t
+       and type maps_t := Mask_maps.t =
+  Merkle_mask.Masking_merkle_tree.Make (struct
+    include Inputs
+    module Base = Any_ledger.M
+    module Hash = Do_not_hash
+  end)
+
   module Maskable :
     Merkle_mask.Maskable_merkle_tree_intf.S
       with module Location = Location_at_depth
@@ -267,6 +304,17 @@ module Ledger_inner = struct
     module Mask = Mask
 
     let mask_to_base m = Any_ledger.cast (module Mask.Attached) m
+  end)
+
+  (** {!Maskable} for {!Non_hashing_mask}. Masks of the two kinds are
+      registered separately, as they must be: they are different types. *)
+  module Non_hashing_maskable = Merkle_mask.Maskable_merkle_tree.Make (struct
+    include Inputs
+    module Base = Any_ledger.M
+    module Hash = Do_not_hash
+    module Mask = Non_hashing_mask
+
+    let mask_to_base m = Any_ledger.cast (module Non_hashing_mask.Attached) m
   end)
 
   include Mask.Attached
@@ -535,6 +583,116 @@ end
 
 include Ledger_inner
 include Mina_transaction_logic.Make (Ledger_inner)
+
+(** A ledger that does not maintain its merkle hashes.
+
+    A block producer picks the transactions for a block by applying candidates
+    to a throwaway ledger and keeping nothing but the accept/reject answer.
+    Maintaining hashes for such a ledger is wasted work: an account hash, a
+    fetch of the merkle path being updated and a merge per level, for every
+    account a candidate touches and every account it creates. This is
+    transaction logic instantiated over a mask that computes none of it.
+
+    Every operation below is the corresponding one on that mask, unchanged --
+    nothing here has to avoid hashing, because there is no hashing underneath
+    to avoid. What the ledger reports as its root, and every merkle path
+    through it, is therefore meaningless; the type is abstract outside this
+    module so that those values cannot reach anything that would believe
+    them. *)
+module Non_hashing_ledger = struct
+  module Attached = Non_hashing_mask.Attached
+
+  module L :
+    Ledger_intf.S
+      with type t = Non_hashing_mask.Attached.t
+       and type location = Location.t = struct
+    type t = Attached.t
+
+    type location = Location.t
+
+    let get = Attached.get
+
+    let location_of_account = Attached.location_of_account
+
+    let set = Attached.set
+
+    let get_or_create_account = Attached.get_or_create_account
+
+    (* Neither this ledger's root nor its parent's: the mask underneath
+       reports whatever a merge of nothing gives. Transaction logic reads it
+       only to stamp it into a [previous_hash] field, and nothing on this path
+       reads that field back, so no caller can be misled by it. *)
+    let merkle_root t =
+      Ledger_hash.of_hash (Attached.merkle_root t :> Random_oracle.Digest.t)
+
+    (* [Ledger_inner] builds the definitions below on top of the mask it uses;
+       they are repeated here over this one, unchanged. *)
+    let create_new_account t account_id account =
+      Or_error.try_with (fun () ->
+          let action, _ =
+            get_or_create_account t account_id account |> Or_error.ok_exn
+          in
+          if [%equal: [ `Existed | `Added ]] action `Existed then
+            failwith
+              (sprintf
+                 !"Could not create a new account with pk \
+                   %{sexp:Public_key.Compressed.t}: Account already exists"
+                 (Account_id.public_key account_id) ) )
+
+    let get_or_create t account_id =
+      let open Or_error.Let_syntax in
+      let%bind action, loc =
+        get_or_create_account t account_id (Account.initialize account_id)
+      in
+      let%map account =
+        Result.of_option (get t loc)
+          ~error:
+            (Error.of_string
+               "get_or_create: Account was not found in the ledger after \
+                creation" )
+      in
+      (action, account, loc)
+
+    let empty ~depth () =
+      Non_hashing_mask.set_parent
+        (Non_hashing_mask.create ~depth ())
+        (Any_ledger.cast (module Null) (Null.create ~depth ()))
+
+    let with_ledger ~depth ~f = f (empty ~depth ())
+
+    let create_masked (t : t) : t =
+      Non_hashing_mask.set_parent
+        (Non_hashing_mask.create ~depth:(Attached.depth t) ())
+        (Any_ledger.cast (module Attached) t)
+
+    let apply_mask (_t : t) ~(masked : t) = Attached.commit masked
+  end
+
+  include L
+  include Mina_transaction_logic.Make (L)
+
+  type unattached_mask = Non_hashing_mask.t
+
+  (** Open a non-hashing ledger over [ledger]. Writes are held in a mask of
+      its own and are never committed, so [ledger] is left untouched. *)
+  let of_ledger (ledger : Ledger_inner.t) : t =
+    Non_hashing_mask.set_parent
+      (Non_hashing_mask.create ~depth:(Ledger_inner.depth ledger) ())
+      (Any_ledger.cast (module Mask.Attached) ledger)
+
+  let create_mask (t : t) = Non_hashing_mask.create ~depth:(Attached.depth t) ()
+
+  let register_mask (t : t) (mask : unattached_mask) : t =
+    let accumulated = Attached.to_accumulated t in
+    Non_hashing_maskable.register_mask ~accumulated
+      (Any_ledger.cast (module Attached) t)
+      mask
+
+  let commit = Attached.commit
+
+  let unregister_mask_exn ~loc (mask : t) : unattached_mask =
+    Non_hashing_maskable.unregister_mask_exn ~loc mask
+end
 
 (* use mask to restore ledger after application *)
 let merkle_root_after_zkapp_command_exn ~constraint_constants ~global_slot
