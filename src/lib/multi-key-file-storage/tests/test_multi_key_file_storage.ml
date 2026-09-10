@@ -78,7 +78,7 @@ let test_custom_filename_key () =
   let filename x = Data_hash_lib.State_hash.to_decimal_string x ^ ".dat" in
   let state_hash : Data_hash_lib.State_hash.t =
     Base_quickcheck.Generator.generate Data_hash_lib.State_hash.gen ~size:1
-      ~random:(Splittable_random.State.create Random.State.default)
+      ~random:(Splittable_random.create Random.State.default)
   in
   let module M = Make_custom (struct
     type filename_key = Data_hash_lib.State_hash.t

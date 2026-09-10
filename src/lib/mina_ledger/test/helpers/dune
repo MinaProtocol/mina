@@ -3,7 +3,6 @@
  (libraries
   ;; opam libraries
   base
-  base.caml
   core_kernel
   core
   integers

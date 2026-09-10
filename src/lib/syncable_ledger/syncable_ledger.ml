@@ -595,7 +595,7 @@ end = struct
     else (
       if Ivar.is_full t.validity_listener then
         [%log error] "Ivar.fill bug is here!" ;
-      Ivar.fill t.validity_listener `Ok )
+      Ivar.fill_exn t.validity_listener `Ok )
 
   (** Compute the hash of an empty tree of the specified height. *)
   let empty_hash_at_height h =

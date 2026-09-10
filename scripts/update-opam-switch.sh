@@ -22,15 +22,15 @@ switch_dir=opam_switches/"$sum"
 # - dockerfiles/toolchain/1-build-deps
 # - opam.export
 # - scripts/update_opam_switch.sh
-ocaml_version=4.14.2
+ocaml_version=5.3.0
 
 # The version must be the same as the version used in:
 # - dockerfiles/toolchain/1-build-deps
 # - flake.nix (and flake.lock after running
 #   `nix flake update opam-repository`).
 # - scripts/update_opam_switch.sh
-OPAM_REPOSITORY_COMMIT=3e41859015888fe8240e84dfc5f31bfa12a557e8
-O1LABS_OPAM_REPOSITORY_COMMIT=2bb1c7f64e025320b1ff242ca99a9dc23a4924c0
+OPAM_REPOSITORY_COMMIT=b67925313b4101a79bf6945806c2966cb7800d02
+O1LABS_OPAM_REPOSITORY_COMMIT=1b2663d7f326fc095dad03abb56fd3349e508743
 
 if [[ -d _opam ]]; then
     read -rp "Directory '_opam' exists and will be removed. You can also bypass the check by setting the variable BYPASS_OPAM_SWITCH_UPDATE to any value. Continue? [y/N] " \

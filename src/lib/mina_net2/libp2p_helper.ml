@@ -219,7 +219,7 @@ let handle_incoming_message t msg ~handle_push_message =
               with
               | Some ivar ->
                   (* Invariant: no ivar is filled when they're in [t.outstanding_requests] *)
-                  Ivar.fill ivar
+                  Ivar.fill_exn ivar
                     (Libp2p_ipc.rpc_response_to_or_error rpc_response)
               | None ->
                   [%log' error t.logger]
@@ -299,7 +299,7 @@ let spawn ?(allow_multiple_instances = false) ~logger ~pids ~conf_dir
                     Core.print_endline line ) ;
                 Deferred.unit )
           in
-          Ivar.fill t.stderr_finished () ) ;
+          Ivar.fill_exn t.stderr_finished () ) ;
       O1trace.background_thread "handle_libp2p_ipc_incoming" (fun () ->
           Child_processes.stdout process
           |> Libp2p_ipc.read_incoming_messages

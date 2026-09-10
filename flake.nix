@@ -12,9 +12,8 @@
   };
 
   inputs.utils.url = "github:gytis-ivaskevicius/flake-utils-plus";
-  inputs.nixpkgs.url = "github:nixos/nixpkgs/nixos-24.11-small";
+  inputs.nixpkgs.url = "github:nixos/nixpkgs/nixos-25.11-small";
   inputs.nixpkgs-old.url = "github:nixos/nixpkgs/nixos-23.05-small";
-  inputs.nixpkgs-unstable.url = "github:nixos/nixpkgs/nixos-unstable";
 
   inputs.nix-npm-buildPackage.url = "github:serokell/nix-npm-buildpackage";
   inputs.nix-npm-buildPackage.inputs.nixpkgs.follows = "nixpkgs";
@@ -30,7 +29,7 @@
   inputs.describe-dune.inputs.nixpkgs.follows = "nixpkgs";
   inputs.describe-dune.inputs.flake-utils.follows = "utils";
 
-  inputs.o1-opam-repository.url = "github:o1-labs/opam-repository/2bb1c7f64e025320b1ff242ca99a9dc23a4924c0";
+  inputs.o1-opam-repository.url = "github:o1-labs/opam-repository/1b2663d7f326fc095dad03abb56fd3349e508743";
   inputs.o1-opam-repository.flake = false;
 
   # The version must be the same as the version used in:
@@ -39,7 +38,7 @@
   #   `nix flake update opam-repository`).
   # - scripts/update-opam-switch.sh
   inputs.opam-repository.url =
-    "github:ocaml/opam-repository/3e41859015888fe8240e84dfc5f31bfa12a557e8";
+    "github:ocaml/opam-repository/b67925313b4101a79bf6945806c2966cb7800d02";
   inputs.opam-repository.flake = false;
 
   inputs.nixpkgs-mozilla.url = "github:mozilla/nixpkgs-mozilla";
@@ -61,7 +60,7 @@
 
   outputs = inputs@{ self, nixpkgs, utils, nix-npm-buildPackage
     , opam-nix, opam-repository, nixpkgs-mozilla, flake-buildkite-pipeline
-    , nix-utils, flockenzeit, nixpkgs-old, nixpkgs-unstable, ... }:
+    , nix-utils, flockenzeit, nixpkgs-old, ... }:
     let
       inherit (nixpkgs) lib;
 
@@ -93,7 +92,6 @@
           '';
     in {
       overlays = {
-        crates-io = import ./nix/crates-io.nix;
         misc = import ./nix/misc.nix;
         rust = import ./nix/rust.nix;
         go = import ./nix/go.nix;
@@ -273,14 +271,6 @@
         };
     } // utils.lib.eachDefaultSystem (system:
       let
-        # Helper function to map dependencies to current nixpkgs equivalents
-        mapDepsToCurrentPkgs = pkgs: deps:
-          map (dep:
-            if pkgs ? ${dep.pname or dep.name or ""} then
-              pkgs.${dep.pname or dep.name or ""}
-            else
-              dep) deps;
-
         # Helper function to disable compression libraries in cmake flags
         disableCompressionLibs = flags:
           builtins.filter (flag: flag != [ ]) (map (flag:
@@ -291,27 +281,19 @@
             else
               flag) flags);
 
-        rocksdbOverlay = pkgs: prev: {
-          rocksdb-mina = let
-            # Get the full derivation from unstable but build with current nixpkgs
-            unstableRocksdb =
-              (nixpkgs-unstable.legacyPackages.${system}.rocksdb.override {
-                enableShared = false;
-                enableLiburing = false;
-                bzip2 = null;
-                lz4 = null;
-                snappy = null;
-                zlib = null;
-                zstd = null;
-              });
-          in pkgs.stdenv.mkDerivation (unstableRocksdb.drvAttrs // {
-            cmakeFlags =
-              disableCompressionLibs unstableRocksdb.drvAttrs.cmakeFlags;
-            # Override the build environment to use current nixpkgs toolchain
-            nativeBuildInputs = mapDepsToCurrentPkgs pkgs
-              (unstableRocksdb.nativeBuildInputs or [ ]);
-            buildInputs =
-              mapDepsToCurrentPkgs pkgs (unstableRocksdb.buildInputs or [ ]);
+        rocksdbOverlay = _: prev: {
+          # rocksdb hardcodes -DWITH_BZ2=1 and friends regardless of whether the
+          # corresponding inputs are null, so the flags have to be rewritten too.
+          rocksdb-mina = (prev.rocksdb.override {
+            enableShared = false;
+            enableLiburing = false;
+            bzip2 = null;
+            lz4 = null;
+            snappy = null;
+            zlib = null;
+            zstd = null;
+          }).overrideAttrs (old: {
+            cmakeFlags = disableCompressionLibs old.cmakeFlags;
           });
         };
         go119Overlay = (_: _: {

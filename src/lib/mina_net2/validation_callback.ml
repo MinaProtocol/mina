@@ -132,6 +132,6 @@ let fire_if_not_already_fired cb result =
   if not (is_expired cb) then
     if Ivar.is_full cb.signal then
       [%log' error (Logger.create ())] "Ivar.fill bug is here!"
-    else Ivar.fill cb.signal result
+    else Ivar.fill_exn cb.signal result
 
 let set_message_type t x = t.message_type <- x

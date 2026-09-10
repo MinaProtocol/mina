@@ -21,7 +21,7 @@ module Deferred_block = struct
         try Ok (Binable.of_string (module Mina_block.Stable.Latest) contents)
         with _ -> Error (Error.of_string "Fail to decode block")
       in
-      Async.Ivar.fill v r
+      Async.Ivar.fill_exn v r
     in
     Deferred.create compute
 

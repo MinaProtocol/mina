@@ -80,7 +80,7 @@ let with_request t ~uri ~make_req ~describe =
   let exchange () =
     let%bind response, body = make_req ~interrupt:(Ivar.read timed_out) in
     let pipe = Cohttp_async.Body.to_pipe body in
-    Ivar.fill body_pipe pipe ;
+    Ivar.fill_exn body_pipe pipe ;
     let%map chunks = Pipe.to_list pipe in
     (response, String.concat chunks)
   in

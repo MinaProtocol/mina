@@ -47,7 +47,7 @@ module type S = sig
     val dummy : t Lazy.t
 
     module Id : sig
-      type t [@@deriving sexp, equal]
+      type t [@@deriving sexp_of, equal]
 
       val dummy : unit -> t
 

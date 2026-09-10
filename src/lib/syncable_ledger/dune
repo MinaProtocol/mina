@@ -8,7 +8,6 @@
   async_kernel
   core_kernel
   bin_prot.shape
-  base.caml
   sexplib0
   core
   async

@@ -17,7 +17,6 @@
   bin_prot.shape
   async_kernel
   core
-  base.caml
   cohttp
   uri
    ;; local libraries

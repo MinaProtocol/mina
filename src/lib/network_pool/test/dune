@@ -6,7 +6,6 @@
   async_kernel
   async_unix
   base
-  base.caml
   base.base_internalhash_types
   core_kernel
   core

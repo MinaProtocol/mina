@@ -3,7 +3,6 @@
  (libraries
   ;; opam libraries
   stdio
-  base.caml
   sexplib0
   core_kernel
   compiler-libs

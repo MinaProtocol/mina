@@ -267,7 +267,7 @@ let send_zkapps ~(genesis_constants : Genesis_constants.t)
                      ~available_public_keys:unused_pks ~genesis_constants
                      ~constraint_constants () )
                ~size:1
-               ~random:(Splittable_random.State.create Random.State.default)
+               ~random:(Splittable_random.create Random.State.default)
     in
     match zkapp_dummy_opt_res with
     | Error e ->

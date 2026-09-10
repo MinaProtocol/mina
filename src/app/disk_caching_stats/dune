@@ -38,7 +38,6 @@
   core_unix.time_float_unix
   core_kernel
   base
-  base.caml
   bin_prot
   splittable_random
   sexplib0)

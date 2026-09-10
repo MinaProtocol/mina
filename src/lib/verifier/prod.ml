@@ -520,7 +520,7 @@ let create ~logger ?(enable_internal_tracing = false) ?internal_trace_filename
              match%bind create_worker () with
              | Ok worker ->
                  on_worker worker ;
-                 Ivar.fill new_worker worker ;
+                 Ivar.fill_exn new_worker worker ;
                  return ()
              | Error err ->
                  [%log error]

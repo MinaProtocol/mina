@@ -16,13 +16,13 @@
   async_kernel
   async_unix
   base.base_internalhash_types
-  base.caml
   base58_check
   bin_prot.shape
   codable
   core
   core_kernel
   core_kernel.uuid
+  core_unix.uuid
   currency
   data_hash_lib
   key_value_database

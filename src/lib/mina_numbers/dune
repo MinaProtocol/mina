@@ -7,7 +7,6 @@
  (libraries
   ;; opam libraries
   result
-  base.caml
   bin_prot.shape
   bignum.bigint
   core_kernel

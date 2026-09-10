@@ -396,7 +396,7 @@ let%test_module "all-ipc test" =
               ( if String.equal env.data msgs.topic_a_msg_1 then
                   check_msg env cb topic_a_received_1 ad.a_peerid `Accept
                 else raise UnexpectedState ;
-                Ivar.fill topic_a_received_ivar () ) )
+                Ivar.fill_exn topic_a_received_ivar () ) )
         >>| Or_error.ok_exn
       in
       (* Subscribe to topic "c" *)

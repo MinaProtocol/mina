@@ -88,7 +88,7 @@ module Filesystem = struct
                   Error (Error.of_string e)
             in
             t :: acc )
-        |> Ivar.fill ivar )
+        |> Ivar.fill_exn ivar )
 
   let load_block (submission : submission) { block_dir; _ } =
     Deferred.create (fun ivar ->
@@ -97,7 +97,7 @@ module Filesystem = struct
         in
         ( try Ok (In_channel.read_all block_path)
           with _ -> Error (Error.of_string "Fail to load block") )
-        |> Ivar.fill ivar )
+        |> Ivar.fill_exn ivar )
 
   let output _ (_submission : submission) = function
     | Ok payload ->

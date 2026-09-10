@@ -363,17 +363,6 @@ taken from nixpkgs with some overlays applied. All the dependencies are then
 provided to the final Mina derivation. See [./ocaml.nix](./ocaml.nix) for more
 details.
 
-### Crate downloads go through `static.crates.io`
-
-crates.io answers 403 to any `User-Agent` starting with `curl/`, which is what
-nixpkgs' `fetchurl` sends, so every crate fetched through
-`https://crates.io/api/v1/crates/...` fails on a binary-cache miss. The
-[./crates-io.nix](./crates-io.nix) overlay rewrites those URLs to
-`static.crates.io`, which has no such gate — the same change upstream nixpkgs
-made in `f830e6112` (nixos-25.11). Crate fetches are fixed-output derivations,
-so the rewrite moves no store paths and keeps existing cache entries valid. The
-overlay can be dropped once the nixpkgs pin moves past the upstream fix.
-
 ### Why are Rust, Go and OCaml bits built separately?
 
 In order to enforce reproducibility, Nix doesn't generally allow networking from

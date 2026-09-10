@@ -6,7 +6,6 @@
   core_kernel
   sexplib0
   bin_prot.shape
-  base.caml
   base.base_internalhash_types
   core
   ;; local libraries

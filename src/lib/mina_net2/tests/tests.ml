@@ -134,7 +134,7 @@ let%test_module "Mina network tests" =
               go 1000
               >>| fun () ->
               Pipe.close w ;
-              Ivar.fill handler_finished () )
+              Ivar.fill_exn handler_finished () )
           >>| Or_error.ok_exn
         in
         let%bind stream =

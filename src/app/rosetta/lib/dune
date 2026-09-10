@@ -17,13 +17,13 @@
   caqti-async
   cohttp-async
   archive_lib
-  base.caml
   async_kernel
   uri
   core
   sexplib0
   ;;local libraries
   cli_lib
+  gc_compaction
   mina_wire_types
   mina_signature_kind
   mina_base.import

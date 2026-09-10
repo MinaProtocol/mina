@@ -284,7 +284,7 @@ module Make_test_edge_cases (Input : Input_intf) = struct
                Linear_pipe.write aw
                  (root_hash, query, Envelope.Incoming.local answ)
            | `Failure_as_expected ->
-               Ivar.fill got_failure_ivar true ;
+               Ivar.fill_exn got_failure_ivar true ;
                Deferred.unit ) ) ;
     Async.Thread_safe.block_on_async_exn (fun () ->
         let deferred_res =

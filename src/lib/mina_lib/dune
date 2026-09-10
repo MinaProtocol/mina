@@ -19,7 +19,6 @@
   incremental
   core_kernel
   async_kernel
-  base.caml
   base.base_internalhash_types
   uri
   stdio
@@ -63,6 +62,7 @@
   pipe_lib
   user_command_input
   logger
+  gc_compaction
   child_processes
   secrets
   work_selector

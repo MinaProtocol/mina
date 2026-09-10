@@ -42,6 +42,9 @@ WORKDIR $HOME/$MINA_DIR
 
 # Set environment variables *before* running OPAM commands
 ENV OPAMYES=1
+# TEMPORARY: static-link libsodium so built binaries need no libsodium.so at
+# runtime. Drop once the portable build bundles shared libraries.
+ENV SODIUM_STATIC=1
 
 # Update repo and install the switch (sources must be available locally!)
 RUN opam update && \

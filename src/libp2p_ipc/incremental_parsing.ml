@@ -385,7 +385,7 @@ module Fragment_stream = struct
         let remaining' = remaining - len in
         if remaining' <= 0 then (
           t.outstanding_read_request <- None ;
-          Ivar.fill signal () )
+          Ivar.fill_exn signal () )
         else t.outstanding_read_request <- Some (remaining', signal) )
 
   let read_now_exn t amount_to_read =

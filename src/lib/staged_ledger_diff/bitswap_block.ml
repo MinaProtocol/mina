@@ -296,7 +296,7 @@ let%test_module "bitswap blocks" =
       let data_length = max_block_size * 10 in
       let data =
         Quickcheck.Generator.generate ~size:1
-          ~random:(Splittable_random.State.of_int 0)
+          ~random:(Splittable_random.of_int 0)
           (String.gen_with_length data_length Char.quickcheck_generator)
         |> Bigstring.of_string
       in

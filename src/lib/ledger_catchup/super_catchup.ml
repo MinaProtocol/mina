@@ -1640,7 +1640,7 @@ let%test_module "Ledger_catchup tests" =
                     Mina_stdlib.Rose_tree.root (List.hd_exn breadcrumbs)
                     |> Tuple2.get1 |> Cache_lib.Cached.invalidate_with_success
                   in
-                  Ivar.fill ivar () ; breadcrumb )
+                  Ivar.fill_exn ivar () ; breadcrumb )
         in
         let%bind () =
           Transition_frontier.add_breadcrumb_exn my_peer.state.frontier

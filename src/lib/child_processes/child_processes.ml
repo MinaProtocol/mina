@@ -284,7 +284,7 @@ let start_custom :
      [%log trace] "child process %s died" name ;
      don't_wait_for (Writer.close @@ Process.stdin process) ;
      let%bind () = Sys.remove lock_path in
-     Ivar.fill terminated_ivar termination_status ;
+     Ivar.fill_exn terminated_ivar termination_status ;
      let log_bad_termination () =
        let exit_or_signal =
          match termination_status with

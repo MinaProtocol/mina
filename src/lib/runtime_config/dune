@@ -8,7 +8,6 @@
   async_unix
   core_kernel
   bin_prot.shape
-  base.caml
   base
   base64
   integers

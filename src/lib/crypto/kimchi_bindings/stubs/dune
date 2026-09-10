@@ -46,6 +46,7 @@
  (targets libkimchi_stubs.a)
  (deps
   Cargo.toml
+  Cargo.lock
   rust-toolchain.toml
   (source_tree src)
   (source_tree kimchi-stubs-vendors)
@@ -158,6 +159,7 @@
  (deps
   ../../../../.ocamlformat
   Cargo.toml
+  Cargo.lock
   rust-toolchain.toml
   (source_tree src)
   (source_tree kimchi-stubs-vendors)
@@ -168,7 +170,9 @@
  (action
   (progn
    (run rm -rf ./target)
-   (run rm -f ./Cargo.lock)
+   ;; note: Cargo.lock is deliberately *not* deleted here. `ocaml-gen` is
+   ;; vendored from a git source (see Cargo.toml), and cargo refuses to
+   ;; resolve a vendored git source offline without a pre-existing lockfile.
    (setenv
     CARGO_TARGET_DIR
     "%{read:../dune-build-root}/cargo_kimchi_bindgen"

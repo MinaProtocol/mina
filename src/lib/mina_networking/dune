@@ -4,7 +4,6 @@
  (library_flags -linkall)
  (libraries
   ;; opam libraries
-  base.caml
   async_rpc_kernel
   result
   core

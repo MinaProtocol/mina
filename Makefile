@@ -10,7 +10,7 @@ endef
 ## Configuration
 
 # Current OCaml version
-OCAML_VERSION = "4.14.2"
+OCAML_VERSION = "5.3.0"
 
 # machine word size
 WORD_SIZE = "64"

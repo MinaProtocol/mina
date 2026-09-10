@@ -59,7 +59,7 @@ include (
     let state_hash_for_bench =
       lazy
         (Base_quickcheck.Generator.generate gen ~size:1
-           ~random:(Splittable_random.State.create Random.State.default) )
+           ~random:(Splittable_random.create Random.State.default) )
 
     let%bench "State_hash decimal encode" =
       to_decimal_string (Lazy.force state_hash_for_bench)

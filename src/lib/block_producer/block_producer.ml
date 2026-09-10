@@ -199,7 +199,7 @@ end = struct
     | Some (ivar, _) ->
         if Ivar.is_full ivar then
           [%log' error (Logger.create ())] "Ivar.fill bug is here!" ;
-        Ivar.fill ivar () ;
+        Ivar.fill_exn ivar () ;
         t.task <- None
     | None ->
         ()
@@ -227,7 +227,7 @@ let lift_sync f =
     (Deferred.create (fun ivar ->
          if Ivar.is_full ivar then
            [%log' error (Logger.create ())] "Ivar.fill bug is here!" ;
-         Ivar.fill ivar (f ()) ) )
+         Ivar.fill_exn ivar (f ()) ) )
 
 module Singleton_scheduler : sig
   type t
@@ -843,14 +843,14 @@ let genesis_breadcrumb_creator ~context:(module Context : CONTEXT) prover =
             (Genesis_proof.to_inputs precomputed_values)
         with
         | Ok res ->
-            Ivar.fill genesis_breadcrumb_ivar (Ok res) ;
+            Ivar.fill_exn genesis_breadcrumb_ivar (Ok res) ;
             return (Ok res)
         | Error err ->
             [%log error] "Failed to generate genesis breadcrumb: $error"
               ~metadata:[ ("error", Error_json.error_to_yojson err) ] ;
             if retries > 0 then go (retries - 1)
             else (
-              Ivar.fill genesis_breadcrumb_ivar (Error err) ;
+              Ivar.fill_exn genesis_breadcrumb_ivar (Error err) ;
               return (Error err) )
       in
       go max_num_retries )

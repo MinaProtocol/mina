@@ -1874,7 +1874,7 @@ let%test_module _ =
                   ~account_state_tbl:(Account_id.Table.create ())
                   ~generate_new_accounts:false ~ledger () ) )
             ~size:100
-            ~random:(Splittable_random.State.create Random.State.default) )
+            ~random:(Splittable_random.create Random.State.default) )
       in
       ()
 
@@ -1901,7 +1901,7 @@ let%test_module _ =
                   ~account_state_tbl:(Account_id.Table.create ())
                   ~generate_new_accounts:false ~ledger () ) )
             ~size:100
-            ~random:(Splittable_random.State.create Random.State.default) )
+            ~random:(Splittable_random.create Random.State.default) )
       in
       ()
 
@@ -1909,7 +1909,7 @@ let%test_module _ =
         (generator : Zkapp_command.t Quickcheck.Generator.t) =
       let command =
         Quickcheck.Generator.generate generator ~size:1
-          ~random:(Splittable_random.State.create Random.State.default)
+          ~random:(Splittable_random.create Random.State.default)
       in
       let account_updates =
         Zkapp_command.Call_forest.to_list command.account_updates
@@ -2023,7 +2023,7 @@ let%test_module _ =
             ~pk:focal_pk ~fee_payer_pk:fee_payer_account.public_key
             ~account_state_tbl ~vk ~genesis_constants ()
         in
-        let random = Splittable_random.State.create Random.State.default in
+        let random = Splittable_random.create Random.State.default in
         let cmd1 = Quickcheck.Generator.generate gen ~size:1 ~random in
         let cmd2 = Quickcheck.Generator.generate gen ~size:1 ~random in
         let cache = ref Zkapp_statement.Map.empty in

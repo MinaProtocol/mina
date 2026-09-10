@@ -32,4 +32,4 @@
  (instrumentation
   (backend bisect_ppx))
  (preprocess
-  (pps ppx_version ppx_jane ppx_compare ppx_mina)))
+  (pps ppx_version ppx_compare ppx_mina ppx_let)))

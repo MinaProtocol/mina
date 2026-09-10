@@ -9,7 +9,6 @@
   core_unix.command_unix
   async_kernel
   stdio
-  base.caml
   yojson
   lib
   core_kernel
@@ -45,6 +44,8 @@
    ppx_mina
    ppx_deriving.show
    ppx_deriving_yojson
-   ppx_jane
    ppx_version
-   ppx_compare)))
+   ppx_compare
+   ppx_hash
+   ppx_let
+   ppx_sexp_conv)))
