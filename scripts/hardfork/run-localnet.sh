@@ -113,7 +113,19 @@ NODE_ARGS_2=( --libp2p-keypair "$PWD/$CONF_DIR/libp2p_2" )
 "$MINA_EXE" libp2p generate-keypair --privkey-path $CONF_DIR/libp2p_2 
 
 if [[ "$CUSTOM_CONF" == "" ]] && [[ ! -f $CONF_DIR/ledger.json ]]; then
-  ( cd $CONF_DIR && "$SCRIPT_DIR/../prepare-test-ledger.sh" --exit-on-old-ledger -c 100000 -b 1000000 "$(cat bp.pub)" >ledger.json )
+  _bp_key="$(cat $CONF_DIR/bp.pub)"
+  _spec=$(jq -n \
+    --arg key "$_bp_key" \
+    '{
+      source: {type: "gcs-epoch", exit_on_old_ledger: true},
+      transforms: [
+        {type: "remove-accounts", keys: [$key]},
+        {type: "reassign-delegation", to: [$key], delegation_cutoff: 100000},
+        {type: "add-accounts", entries: [{pk: $key, balance: "1000000"}]},
+        {type: "strip-receipt-chain-hash", delegate_keys: [$key]}
+      ]
+    }')
+  "$SCRIPT_DIR/../patch-ledger/run.sh" --spec "$_spec" --output "$CONF_DIR/ledger.json"
 fi
 
 if [[ "$SLOT_TX_END" != "" ]]; then
