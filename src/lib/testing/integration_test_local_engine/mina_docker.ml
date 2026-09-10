@@ -429,6 +429,7 @@ module Network_manager = struct
     ; services_by_id : Docker_network.Service_to_deploy.t Core.String.Map.t
     ; mutable deployed : bool
     ; genesis_keypairs : Network_keypair.t Core.String.Map.t
+    ; images : string list
     }
 
   let get_current_running_stacks =
@@ -692,6 +693,32 @@ module Network_manager = struct
             | _ ->
                 failwith "Unexpected format for docker service output" ) )
     in
+    (* `docker service ls` only ever says 0/1; the reason a task will not start
+       -- an unpullable image, an unschedulable constraint -- is carried by the
+       task, and only `docker service ps` prints it. Without this the deploy
+       fails after the full timeout with nothing to go on. *)
+    let log_service_tasks bad_service_statuses =
+      let open Deferred.Let_syntax in
+      Deferred.List.iter ~how:`Sequential bad_service_statuses
+        ~f:(fun (service_name, _) ->
+          match%map
+            Util.run_cmd_or_error "/" "docker"
+              [ "service"; "ps"; "--no-trunc"; service_name ]
+          with
+          | Ok output ->
+              [%log error] "Tasks of $service_name: $tasks"
+                ~metadata:
+                  [ ("service_name", `String service_name)
+                  ; ("tasks", `String output)
+                  ]
+          | Error error ->
+              [%log warn] "Could not inspect tasks of $service_name: $error"
+                ~metadata:
+                  [ ("service_name", `String service_name)
+                  ; ("error", `String (Error.to_string_hum error))
+                  ] )
+    in
+    let tasks_logged = ref false in
     let rec poll n =
       [%log debug] "Checking Docker service statuses, n=%d" n ;
       let%bind service_statuses = get_service_statuses () in
@@ -716,6 +743,13 @@ module Network_manager = struct
               )
             ] ;
         let%bind () =
+          if !tasks_logged then return ()
+          else (
+            tasks_logged := true ;
+            Deferred.bind ~f:Malleable_error.return
+              (log_service_tasks bad_service_statuses) )
+        in
+        let%bind () =
           after poll_interval |> Deferred.bind ~f:Malleable_error.return
         in
         poll (n - 1) )
@@ -727,6 +761,10 @@ module Network_manager = struct
                    [ ("service_name", `String service_name)
                    ; ("status", `String status)
                    ] ) )
+        in
+        let%bind () =
+          Deferred.bind ~f:Malleable_error.return
+            (log_service_tasks bad_service_statuses)
         in
         [%log fatal]
           "Not all services could be deployed in time: $bad_service_statuses"
@@ -793,16 +831,55 @@ module Network_manager = struct
       ; services_by_id
       ; deployed = false
       ; genesis_keypairs = network_config.genesis_keypairs
+      ; images =
+          Core.Map.data (Network_config.to_docker network_config).services
+          |> List.map ~f:(fun (service : Docker_compose.Dockerfile.Service.t) ->
+              service.image )
+          |> List.dedup_and_sort ~compare:String.compare
       }
     in
     [%log info] "Initializing docker swarm" ;
     Malleable_error.return t
 
+  (* A swarm task's image is pulled by the node's own dockerd, not by the CLI
+     that ran `docker stack deploy`. dockerd does not read the CLI's
+     credHelpers, and on the CI agents it is not covered by the docker shim
+     that routes GAR pulls through the registry cache, so it cannot fetch a
+     private image at all: the task is Rejected with "No such image" and
+     retried forever, and the stack never converges.
+
+     Pulling through the CLI first removes the node's need for a registry: a
+     locally present image satisfies the task outright.
+
+     Best-effort on purpose. An image built locally and never pushed -- a
+     developer's own tag -- has no registry to be pulled from, and that must
+     not fail the run. When the pull fails the node may still have the image,
+     so log it and let the deploy proceed. *)
+  let pull_images ~logger images =
+    let open Deferred.Let_syntax in
+    Deferred.List.iter ~how:`Sequential images ~f:(fun image ->
+        [%log info] "Pulling image $image"
+          ~metadata:[ ("image", `String image) ] ;
+        match%map Util.run_cmd_or_error "/" "docker" [ "pull"; image ] with
+        | Ok _ ->
+            ()
+        | Error error ->
+            [%log warn]
+              "Could not pull $image; continuing, the node must already have \
+               it locally: $error"
+              ~metadata:
+                [ ("image", `String image)
+                ; ("error", `String (Error.to_string_hum error))
+                ] )
+
   let deploy t =
     let logger = t.logger in
     if t.deployed then failwith "network already deployed" ;
-    [%log info] "Deploying stack '%s' from %s" t.stack_name t.docker_dir ;
     let open Malleable_error.Let_syntax in
+    let%bind () =
+      Deferred.bind ~f:Malleable_error.return (pull_images ~logger t.images)
+    in
+    [%log info] "Deploying stack '%s' from %s" t.stack_name t.docker_dir ;
     let%bind (_ : string) =
       Util.run_cmd_or_hard_error t.docker_dir "docker"
         [ "stack"; "deploy"; "-c"; t.docker_compose_file_path; t.stack_name ]

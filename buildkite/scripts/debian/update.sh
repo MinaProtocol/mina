@@ -261,6 +261,97 @@ restore_repos() {
 # Returns:
 #   0 on success, 1 on failure
 #######################################
+#######################################
+# Comment out the source lines apt reported as carrying an expired Release.
+#
+# When a distribution leaves LTS its security pocket stops being re-signed:
+# bullseye left LTS on 2026-08-31, so
+#   http://deb.debian.org/debian-security bullseye-security
+# now serves a Release whose Valid-Until has passed and will never be
+# refreshed. apt reports
+#   E: Release file for .../bullseye-security/InRelease is expired
+# and exits non-zero, which is fatal for every caller of this script.
+#
+# The o1Labs deb-mirror already carries that pocket in full (see the bullseye
+# note in dockerfiles/scripts/configure-apt-proxy.sh), so on CI images the
+# expired upstream entry contributes nothing and is the only thing that can
+# fail. This is the same policy configure-apt-proxy.sh applies at image build
+# time via MIRROR_AUTHORITATIVE, applied at run time to images that were built
+# before that flag existed.
+#
+# We act only on the exact URL+suite apt named, never on a hardcoded codename
+# list, and we refuse to act at all if it would leave apt with no sources --
+# an image with no deb-mirror must keep its expired upstream and fail loudly
+# rather than silently lose every package source.
+#
+# Globals:
+#   SUDO_CMD
+# Arguments:
+#   $1 - file holding the captured apt-get update output
+# Returns:
+#   0 if at least one source was disabled, 1 otherwise
+#######################################
+disable_expired_release_sources() {
+    local apt_output="$1"
+    local expired base suite disabled=0
+
+    # "E: Release file for <base>/dists/<suite>/InRelease is expired (...)"
+    expired=$(sed -nE \
+        's|^E: Release file for (https?://.+)/dists/([^/]+)/(InRelease\|Release) is expired.*|\1 \2|p' \
+        "${apt_output}" | sort -u)
+
+    if [[ -z "${expired}" ]]; then
+        return 1
+    fi
+
+    local -a source_files=()
+    [[ -f /etc/apt/sources.list ]] && source_files+=(/etc/apt/sources.list)
+    while IFS= read -r f; do
+        source_files+=("${f}")
+    done < <(find "${APT_SOURCES_DIR}" -maxdepth 1 -name '*.list' 2>/dev/null)
+
+    if [[ ${#source_files[@]} -eq 0 ]]; then
+        return 1
+    fi
+
+    # Count the deb lines that would survive before touching anything: if the
+    # expired pocket is all we have, disabling it is worse than the failure.
+    # Sum in bash: bc is not present in a plain Debian/Ubuntu base image.
+    local total_before=0 survivors n
+    while IFS= read -r n; do
+        total_before=$(( total_before + n ))
+    done < <(grep -chE '^[[:space:]]*deb(-src)?[[:space:]]' "${source_files[@]}")
+
+    local match_count=0
+    while read -r base suite; do
+        [[ -n "${base}" ]] || continue
+        # Anchored on the exact repository URL and suite apt named. The
+        # optional [options] block is what carries [trusted=yes] / [arch=...].
+        while IFS= read -r n; do
+            match_count=$(( match_count + n ))
+        done < <(grep -chE \
+            "^[[:space:]]*deb(-src)?[[:space:]]+(\\[[^]]*\\][[:space:]]+)?${base//\//\\/}/?[[:space:]]+${suite}([[:space:]]|\$)" \
+            "${source_files[@]}")
+    done <<< "${expired}"
+
+    survivors=$(( total_before - match_count ))
+    if [[ "${survivors}" -le 0 ]]; then
+        error "every remaining apt source carries an expired Release; refusing to disable them all"
+        return 1
+    fi
+
+    while read -r base suite; do
+        [[ -n "${base}" ]] || continue
+        log "Disabling expired apt source: ${base} ${suite}"
+        ${SUDO_CMD} sed -i -E \
+            "s|^([[:space:]]*deb(-src)?[[:space:]]+(\\[[^]]*\\][[:space:]]+)?${base//\//\\/}/?[[:space:]]+${suite}([[:space:]].*)?)\$|# disabled by update.sh (expired Release): \\1|" \
+            "${source_files[@]}"
+        disabled=1
+    done <<< "${expired}"
+
+    [[ "${disabled}" -eq 1 ]]
+}
+
 run_apt_update() {
     if [[ "${DRY_RUN}" == "true" ]]; then
         log "DRY RUN: Would run: ${SUDO_CMD} apt-get update"
@@ -270,13 +361,30 @@ run_apt_update() {
     # Bypass any configured APT proxy for localhost
     eval "$(./buildkite/scripts/debian/apt-proxy-bypass.sh localhost)"
 
+    # Captured as well as streamed: the retry below has to know WHICH source
+    # apt objected to, and CI still wants the live output.
+    local apt_output
+    apt_output="$(mktemp)"
+
     log "Running apt-get update..."
-    if ! ${SUDO_CMD} apt-get update $APT_PROXY_BYPASS_OPTS; then
-        error "apt-get update failed"
-        return 1
+    if ${SUDO_CMD} apt-get update $APT_PROXY_BYPASS_OPTS 2>&1 | tee "${apt_output}"; then
+        rm -f "${apt_output}"
+        log "apt-get update completed successfully"
+        return 0
     fi
-    
-    log "apt-get update completed successfully"
+
+    if disable_expired_release_sources "${apt_output}"; then
+        log "Retrying apt-get update without the expired sources..."
+        if ${SUDO_CMD} apt-get update $APT_PROXY_BYPASS_OPTS; then
+            rm -f "${apt_output}"
+            log "apt-get update completed successfully"
+            return 0
+        fi
+    fi
+
+    rm -f "${apt_output}"
+    error "apt-get update failed"
+    return 1
 }
 
 #######################################
