@@ -404,13 +404,6 @@ let handle_push_message t push_message =
           in
           match Hashtbl.find t.subscriptions subscription_id with
           | Some (Subscription.E sub) ->
-              (* Run gossip validation for every topic inside an exception
-                 boundary. Validation drives the topic's sink, and the libp2p
-                 protocol requires a validation response per message; an
-                 unhandled exception on this path would otherwise escape to the
-                 net2 monitor. Catch it, reject the message, and log. The [`Log]
-                 rest-handler also turns exceptions from detached
-                 ([don't_wait_for]) sink work into log lines. *)
               upon
                 (Monitor.try_with ~rest:`Log (fun () ->
                      O1trace.thread "validate_libp2p_gossip" (fun () ->

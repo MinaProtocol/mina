@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-set -e
+set -ex
 
 usage() {
   echo "Usage: $0 --network NETWORK_NAME --config-url CONFIG_JSON_GZ_URL --runtime-ledger RUNTIME_GENESIS_LEDGER --logproc LOGPROC --output-dir OUTPUT_DIR"
@@ -20,6 +20,8 @@ CONFIG_JSON_GZ_URL=""
 RUNTIME_GENESIS_LEDGER=""
 LOGPROC="cat"
 OUTPUT_DIR="hardfork_ledgers"
+
+TMP=$(mktemp -d)
 
 while [[ $# -gt 0 ]]; do
   case $1 in
@@ -93,15 +95,21 @@ if [ ! -f "${FORKING_FROM_CONFIG_JSON}" ]; then
 fi
 
 echo "--- Download and extract previous network config"
-curl -sL "$CONFIG_JSON_GZ_URL" | gunzip > config.json
+curl -sL "$CONFIG_JSON_GZ_URL" | gunzip > "$TMP/config.json"
+
+# make sure files does not have genesis key
+jq 'del(.genesis)' "$TMP/config.json" > "$TMP/fork_config_no_genesis.json"
+
 
 echo "--- Generate hardfork ledger tarballs"
 mkdir "$OUTPUT_DIR"
 
-"$RUNTIME_GENESIS_LEDGER" --config-file config.json --genesis-dir "$OUTPUT_DIR"/ --hash-output-file hashes.json | tee runtime_genesis_ledger.log | $LOGPROC
+jq 'del(.genesis)' "$FORKING_FROM_CONFIG_JSON" > "$TMP/config_no_genesis.json"
+
+"$RUNTIME_GENESIS_LEDGER" --pad-app-state --config-file "$TMP/fork_config_no_genesis.json" --prefork-genesis-config "$TMP/config_no_genesis.json" --genesis-dir "$OUTPUT_DIR"/ --hash-output-file hashes.json | tee runtime_genesis_ledger.log | $LOGPROC
 
 echo "--- Create hardfork config"
-FORK_CONFIG_JSON=config.json LEDGER_HASHES_JSON=hashes.json scripts/hardfork/create_runtime_config.sh > new_config.json
+FORK_CONFIG_JSON="$TMP/fork_config_no_genesis.json" LEDGER_HASHES_JSON=hashes.json scripts/hardfork/create_runtime_config.sh > new_config.json
 
 echo "--- New genesis config"
 cat new_config.json

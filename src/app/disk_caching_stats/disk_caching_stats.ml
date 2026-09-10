@@ -199,10 +199,12 @@ module Values (S : Sample) = struct
   let ledger_proof () : Ledger_proof.t =
     bin_copy ~bin_class:Ledger_proof.Stable.Latest.bin_t
       (Ledger_proof.For_tests.mk_dummy_proof
-         (Mina_state.Snarked_ledger_state.genesis
-            ~genesis_ledger_hash:
-              (Mina_base.Frozen_ledger_hash.of_ledger_hash
-                 Mina_base.Ledger_hash.empty_hash ) ) )
+         ~statement:
+           (Mina_state.Snarked_ledger_state.genesis
+              ~genesis_ledger_hash:
+                (Mina_base.Frozen_ledger_hash.of_ledger_hash
+                   Mina_base.Ledger_hash.empty_hash ) )
+         ~fee:(fee ()) ~prover:(public_key ()) )
 
   let one_priced_proof () :
       Ledger_proof.t One_or_two.t Network_pool.Priced_proof.t =
@@ -364,10 +366,15 @@ module Values (S : Sample) = struct
 
   let base_work varying witness :
       Transaction_snark_scan_state.Transaction_with_witness.t =
-    { transaction_with_info = { previous_hash = field (); varying = varying () }
-    ; state_hash = (state_hash (), field ())
-    ; statement =
-        (*Transaction_snark.Statement.Stable.V2.t*)
+    let transaction_with_info : Mina_transaction_logic.Transaction_applied.t =
+      { previous_hash = field (); varying = varying () }
+    in
+    Transaction_snark_scan_state.Transaction_with_witness.create
+      ~transaction_with_status:
+        (Mina_transaction_logic.Transaction_applied.transaction_with_status
+           transaction_with_info )
+      ~state_hash:(state_hash (), field ())
+      ~statement:
         { source =
             { first_pass_ledger = field ()
             ; second_pass_ledger = field ()
@@ -387,11 +394,10 @@ module Values (S : Sample) = struct
         ; fee_excess = fee_excess ()
         ; sok_digest = ()
         }
-    ; init_stack = Base (pending_coinbase_stack ())
-    ; first_pass_ledger_witness = witness ()
-    ; second_pass_ledger_witness = witness ()
-    ; block_global_slot = global_slot_since_genesis ()
-    }
+      ~init_stack:(pending_coinbase_stack ())
+      ~first_pass_ledger_witness:(witness ())
+      ~second_pass_ledger_witness:(witness ())
+      ~block_global_slot:(global_slot_since_genesis ())
 
   let zkapp_command_base_work ~config () :
       Transaction_snark_scan_state.Transaction_with_witness.t =

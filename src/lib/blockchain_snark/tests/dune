@@ -1,11 +1,19 @@
 (tests
- (names test_blockchain_snark)
+ (names test_blockchain_snark test_blockchain_step_ledger_proof)
  (libraries
   alcotest
   blockchain_snark
+  coda_genesis_ledger
+  consensus
   core_kernel
+  currency
   genesis_constants
+  mina_base
+  mina_ledger
+  mina_state
   node_config
-  snark_params)
+  snark_params
+  staged_ledger_diff
+  transaction_snark)
  (preprocess
   (pps ppx_jane)))

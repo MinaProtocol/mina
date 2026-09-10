@@ -57,7 +57,7 @@ module Valid_while = struct
 end
 
 module Account = struct
-  module V2 = struct
+  module V3 = struct
     type t =
       { balance : Currency.Balance.V1.t Numeric.V1.t
       ; nonce : Mina_numbers.Account_nonce.V1.t Numeric.V1.t
@@ -67,7 +67,7 @@ module Account = struct
           Public_key.Compressed.V1.t Mina_base_zkapp_basic.Or_ignore.V1.t
       ; state :
           Snark_params.Tick.Field.t Mina_base_zkapp_basic.Or_ignore.V1.t
-          Mina_base_zkapp_state.V.V1.t
+          Mina_base_zkapp_state.V.V2.t
       ; action_state :
           Snark_params.Tick.Field.t Mina_base_zkapp_basic.Or_ignore.V1.t
       ; proved_state : bool Mina_base_zkapp_basic.Or_ignore.V1.t

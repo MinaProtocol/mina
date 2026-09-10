@@ -81,6 +81,10 @@ module type S = sig
   module Proof : sig
     type 'mlmb t
 
+    module For_tests : sig
+      val append_lr_entry : 'mlmb t -> 'mlmb t
+    end
+
     val dummy : 'm Nat.t -> _ Nat.t -> domain_log2:int -> 'm t
 
     module Make (MLMB : Nat.Intf) : sig

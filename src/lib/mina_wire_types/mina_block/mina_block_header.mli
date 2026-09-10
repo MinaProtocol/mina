@@ -2,14 +2,14 @@ open Utils
 
 module Types : sig
   module type S = sig
-    module V2 : S0
+    module V3 : S0
   end
 end
 
 module type Concrete = sig
-  module V2 : sig
+  module V3 : sig
     type t =
-      { protocol_state : Mina_state_protocol_state.Value.V2.t
+      { protocol_state : Mina_state_protocol_state.Value.V3.t
       ; protocol_state_proof : Mina_base.Proof.V2.t
       ; delta_block_chain_proof :
           Data_hash_lib.State_hash.V1.t * Mina_base_state_body_hash.V1.t list
@@ -27,4 +27,4 @@ module Make
     (Signature : Local_sig) (_ : functor (A : Concrete) -> Signature(A).S) :
   Signature(M).S
 
-include Types.S with module V2 = M.V2
+include Types.S with module V3 = M.V3

@@ -146,10 +146,6 @@ module Base
         } -> (
         O1trace.sync_thread (sprintf "handle_%s_gossip" trace_label)
         @@ fun () ->
-        (* Handle a gossiped pool diff inside an exception boundary. Some steps
-           run before [Diff.verify] (e.g. [log_internal] renders each command,
-           which can raise on a malformed memo), and this receive path has no
-           ambient exception handler, so catch here and drop the message. *)
         let handle () =
           let%bind () = on_push () in
           let env' = Msg.convert msg in

@@ -57,9 +57,6 @@
   block_time
   zkapps_examples)
  (library_flags -linkall)
- (inline_tests
-  (flags -verbose -show-counts)
-  (deps proof_cache.json))
  (preprocess
   (pps ppx_mina ppx_snarky ppx_version ppx_jane ppx_sexp_conv))
  (instrumentation

@@ -26,6 +26,7 @@ in  Pipeline.build
             , Artifacts.Type.Rosetta
             , Artifacts.Type.RosettaAppsOnly
             , Artifacts.Type.DaemonAutoHardfork
+            , Artifacts.Type.DaemonAutomode
             , Artifacts.Type.DaemonAppsOnly
             , Artifacts.Type.ZkappTestTransaction
             , Artifacts.Type.CreatePreforkGenesis

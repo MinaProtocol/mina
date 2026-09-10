@@ -16,7 +16,7 @@ echo "--- Running mina chain-id command"
 
 MINA_CONFIG_FILE="${MINA_CONFIG_FILE:-/var/lib/coda/${MINA_DEBIAN_NETWORK}.json}"
 
-ACTUAL_CHAIN_ID=$(mina internal chain-id --config-file ${MINA_CONFIG_FILE} 2>/dev/null | tail -n1)
+ACTUAL_CHAIN_ID=$(mina internal chain-id --config-file ${MINA_CONFIG_FILE} | tail -n1)
 
 echo "Expected Chain ID: ${EXPECTED_CHAIN_ID}"
 echo "Actual Chain ID: ${ACTUAL_CHAIN_ID}"
