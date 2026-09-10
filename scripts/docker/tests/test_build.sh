@@ -208,6 +208,7 @@ run_build() {
       STUB_TAG_IN_REGISTRY="${STUB_TAG_IN_REGISTRY:-}" \
       FORCE_DOCKER_OVERWRITE="${FORCE_DOCKER_OVERWRITE:-}" \
       CI="" BUILDKITE="" GITHUB_ACTIONS="" \
+      SKIP_GITBRANCH="" \
       ./scripts/docker/build.sh "$@" ) > "${args_file}.log" 2>&1
     LAST_EXIT=$?
     set -e
