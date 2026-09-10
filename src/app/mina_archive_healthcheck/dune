@@ -1,7 +1,7 @@
-(executable
- (package mina_archive_healthcheck)
- (name mina_archive_healthcheck)
- (public_name mina-archive-healthcheck)
+(library
+ (name mina_archive_healthcheck_lib)
+ (modules mina_archive_healthcheck_lib)
+ (public_name mina_archive_healthcheck.lib)
  (libraries
   ;; opam libraries
   core
@@ -25,3 +25,14 @@
   (backend bisect_ppx))
  (preprocess
   (pps ppx_version ppx_let ppx_sexp_conv ppx_deriving_yojson ppx_mina)))
+
+(executable
+ (package mina_archive_healthcheck)
+ (name mina_archive_healthcheck)
+ (public_name mina-archive-healthcheck)
+ (modules mina_archive_healthcheck)
+ (libraries mina_archive_healthcheck_lib)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_version)))
