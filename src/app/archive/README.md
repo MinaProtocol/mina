@@ -158,15 +158,28 @@ database directly.
 Recovering Blocks from Precomputed Block Logs
 ---------------------------------------------
 
-The Mina daemon supports two options for preserving precomputed blocks that
+The Mina daemon supports three options for preserving precomputed blocks that
 can be used to recover missing archive data:
 
-- `--precomputed-blocks-file PATH`: Write precomputed blocks directly to a
-  dedicated file. Each block is written as a single-line JSON object (one
-  block per line). This is the **recommended approach** for archiving
-  precomputed blocks.
+- `--precomputed-blocks-dir DIR`: Write each precomputed block to its own file
+  in `DIR`, named `<network>-<height>-<state-hash>.json`. This is the
+  **recommended approach**. The name is the same one the precomputed block
+  bucket gives its objects, so the directory can be uploaded to that bucket
+  unchanged, and any tool that already reads the bucket can read the directory.
+  Each file is written under a temporary name and renamed into place, so a
+  reader never sees a partly written block. `DIR` must exist; the daemon
+  refuses to start if it does not.
+- `--precomputed-blocks-file PATH`: **Deprecated.** Append every block to one
+  file as a single-line JSON object. The file grows without limit, nothing
+  rotates it, and finding one block means reading the whole file. Use
+  `--precomputed-blocks-dir` instead.
 - `--log-precomputed-blocks true`: Include precomputed blocks inline in the
   standard daemon log output.
+
+Blocks are written by a background job, so a slow disk delays the dump rather
+than block processing. If that job falls more than 16 blocks behind, the oldest
+queued blocks are dropped and each drop is logged as an error naming the block,
+so a gap in the dump is always visible in the log.
 
 ### Warning: Log Truncation
 
@@ -191,18 +204,23 @@ A truncated precomputed block cannot be imported into the archive database.
 ### Recommended Configuration
 
 To reliably preserve precomputed blocks for archive recovery, use the
-`--precomputed-blocks-file` flag instead of `--log-precomputed-blocks`:
+`--precomputed-blocks-dir` flag instead of `--log-precomputed-blocks`:
 
 ```shell
+$ mkdir -p /path/to/precomputed-blocks
 $ mina daemon \
     --archive-address 3086 \
-    --precomputed-blocks-file /path/to/precomputed-blocks.log \
+    --precomputed-blocks-dir /path/to/precomputed-blocks \
     [other options]
 ```
 
-This writes each precomputed block directly to the specified file as a
-single JSON line, bypassing the logging subsystem entirely and avoiding any
-size-based truncation.
+This writes each precomputed block to its own file, bypassing the logging
+subsystem entirely and avoiding any size-based truncation:
+
+```
+/path/to/precomputed-blocks/mainnet-548147-3NKHyxzg....json
+/path/to/precomputed-blocks/mainnet-548148-3NLZmKAD....json
+```
 
 If you must use `--log-precomputed-blocks` with an external logging service,
 ensure that service is configured to handle log entries of at least 10 MB (a conservative guideline, as blocks of several MB have been observed in practice).
