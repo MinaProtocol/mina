@@ -100,7 +100,6 @@ let archiveBuildSpec =
       ArtifactPipelines.PackagingSpec::{
       , artifacts =
         [ Artifacts.Type.Archive { network = network }
-        , Artifacts.Type.ArchiveGeneric
         , Artifacts.Type.DaemonProfiled { profile = profile }
         , Artifacts.Type.Daemon { network = network }
         ]
@@ -141,8 +140,7 @@ let daemonStep =
             , commands =
                   ArtifactPipelines.buildDebianFromApps
                     daemonBuildSpec
-                    "${ArtifactPipelines.debianTokens
-                         daemonBuildSpec} profile_devnet_generic"
+                    "${ArtifactPipelines.debianTokens daemonBuildSpec}"
                 # [ DockerFromLocalDebs.buildImages
                       debVersion
                       [ genericImage, profiledImage ]

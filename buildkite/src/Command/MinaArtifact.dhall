@@ -315,7 +315,7 @@ let profileTents
       -- Both tents used to be appended to EVERY packaging job. Two jobs of one
       -- codename then built the same two packages and wrote them into the same
       -- cache directory at the same time, and a codename with no mainnet job
-      -- still shipped mina-mainnet-generic, whose dependency
+      -- still shipped the mainnet tent, whose dependency
       -- mina-mainnet-profile that codename never builds -- an uninstallable
       -- package. A tent now goes with the profile it names.
           \(spec : PackagingSpec.Type)
@@ -533,7 +533,7 @@ let docker_step
                 -- directory of the build cache, which every packaging job of
                 -- that codename writes into. So a mainnet image needs the
                 -- packages of the network-less job as well as its own: the
-                -- mainnet archive image installs mina-archive-generic, and the
+                -- mainnet archive image installs the archive package, and the
                 -- mainnet job builds archive_mainnet and not archive_generic.
                 --
                 -- That was already true and nothing said so. Both jobs happened

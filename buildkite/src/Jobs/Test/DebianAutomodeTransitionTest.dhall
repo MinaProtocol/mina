@@ -53,8 +53,7 @@ let buildSpec =
       }
 
 let debianTokens =
-      "${ArtifactPipelines.debianTokens
-           buildSpec} daemon_devnet_automode profile_devnet_generic"
+      "${ArtifactPipelines.debianTokens buildSpec} daemon_devnet_automode"
 
 let buildTestCmd
     : Text -> Text -> List { name : Text, key : Text } -> Size -> Command.Type
