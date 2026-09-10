@@ -1,4 +1,5 @@
 use kimchi::circuits::{
+    berkeley_columns::{BerkeleyChallengeTerm, Column},
     expr::FeatureFlag,
     lookup::{
         lookups::{LookupFeatures, LookupPattern, LookupPatterns},
@@ -12,6 +13,7 @@ use kimchi_stubs::{
     arkworks::{bigint_256::*, group_affine::*, group_projective::*, pasta_fp::*, pasta_fq::*},
     field_vector::{fp::*, fq::*},
     gate_vector::{fp::*, fq::*},
+    linearization::*,
     oracles::{fp::*, fq::*, CamlOracles},
     pasta_fp_plonk_index::*,
     pasta_fp_plonk_proof::*,
@@ -122,6 +124,11 @@ fn generate_types_bindings(mut w: impl std::io::Write, env: &mut Env) {
     decl_type!(w, env, CamlCircuitGate<T1> => "circuit_gate");
 
     decl_type!(w, env, CurrOrNext => "curr_or_next");
+
+    decl_type!(w, env, Column => "column");
+    decl_type!(w, env, BerkeleyChallengeTerm => "challenge_term");
+    decl_type!(w, env, CamlConstantTerm => "constant_term");
+    decl_type!(w, env, CamlPolishToken => "polish_token");
 
     decl_type!(w, env, CamlOracles<T1> => "oracles");
     decl_module!(w, env, "VerifierIndex", {
@@ -485,6 +492,11 @@ fn generate_kimchi_bindings(mut w: impl std::io::Write, env: &mut Env) {
                 decl_func!(w, env, caml_pasta_fq_plonk_proof_dummy => "dummy");
                 decl_func!(w, env, caml_pasta_fq_plonk_proof_deep_copy => "deep_copy");
             });
+        });
+
+        decl_module!(w, env, "Linearization", {
+            decl_func!(w, env, fp_linearization_tokens => "fp_linearization_tokens");
+            decl_func!(w, env, fq_linearization_tokens => "fq_linearization_tokens");
         });
     });
 }
