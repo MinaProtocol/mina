@@ -1,8 +1,7 @@
-(executable
- (package archive)
- (name archive)
- (public_name archive)
- (modules archive)
+(library
+ (name archive_applet)
+ (public_name archive.applet)
+ (modules archive_applet)
  (modes native)
  (libraries archive_cli async async_unix core core_kernel core_unix.command_unix mina_version)
  (instrumentation
@@ -10,3 +9,14 @@
  (preprocess
   (pps ppx_version)))
 
+(executable
+ (package archive)
+ (name archive)
+ (public_name archive)
+ (modules archive)
+ (modes native)
+ (libraries archive_applet)
+ (instrumentation
+  (backend bisect_ppx --bisect-sigterm))
+ (preprocess
+  (pps ppx_version)))

@@ -1,7 +1,7 @@
-(executable
- (package rosetta)
- (name rosetta_client_cli)
- (public_name rosetta-client)
+(library
+ (name rosetta_client_applet)
+ (public_name rosetta.client_applet)
+ (modules rosetta_client_applet)
  (libraries
   ;; opam libraries
   core
@@ -17,3 +17,14 @@
   (backend bisect_ppx))
  (preprocess
   (pps ppx_version ppx_let ppx_mina)))
+
+(executable
+ (package rosetta)
+ (name rosetta_client_cli)
+ (public_name rosetta-client)
+ (modules rosetta_client_cli)
+ (libraries rosetta_client_applet)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_version)))
