@@ -1383,7 +1383,26 @@ let all_work_pairs t
       | Error e ->
           Stop (Error e) )
 
-let update_metrics t = Parallel_scan.update_metrics t.scan_state
+let update_metrics t =
+  Or_error.try_with (fun () ->
+      List.iteri (Parallel_scan.metrics t.scan_state)
+        ~f:(fun
+            i
+            { Parallel_scan.Tree_metrics.available_space
+            ; base_jobs_todo
+            ; merge_jobs_todo
+            }
+          ->
+          let name = sprintf "tree%d" i in
+          Mina_metrics.(
+            Gauge.set (Scan_state_metrics.scan_state_available_space ~name) )
+            (Int.to_float available_space) ;
+          Mina_metrics.(
+            Gauge.set (Scan_state_metrics.scan_state_base_snarks ~name) )
+            (Int.to_float base_jobs_todo) ;
+          Mina_metrics.(
+            Gauge.set (Scan_state_metrics.scan_state_merge_snarks ~name) )
+            (Int.to_float merge_jobs_todo) ) )
 
 let fill_work_and_enqueue_transactions t ~logger transactions work =
   let open Or_error.Let_syntax in

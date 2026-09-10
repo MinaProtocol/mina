@@ -195,6 +195,13 @@ module Space_partition = struct
   end]
 end
 
+(**Per-tree counts for the daemon's gauges, oldest tree first.*)
+module Tree_metrics = struct
+  type t =
+    { available_space : int; base_jobs_todo : int; merge_jobs_todo : int }
+  [@@deriving equal, sexp]
+end
+
 (**View of a job for json output*)
 module Job_view = struct
   module Extra = struct
@@ -1312,21 +1319,14 @@ let incr_sequence_no : type a b. (a, b) t -> (unit, a, b) State_or_error.t =
     put state
   else put { state with curr_job_seq_no = state.curr_job_seq_no + 1 }
 
-let update_metrics t =
-  Or_error.try_with (fun () ->
-      List.rev (Mina_stdlib.Nonempty_list.to_list t.trees)
-      |> List.iteri ~f:(fun i t ->
-          let name = sprintf "tree%d" i in
-          Mina_metrics.(
-            Gauge.set (Scan_state_metrics.scan_state_available_space ~name) )
-            (Int.to_float @@ Tree.available_space t) ;
-          let base_job_count, merge_job_count = Tree.todo_job_count t in
-          Mina_metrics.(
-            Gauge.set (Scan_state_metrics.scan_state_base_snarks ~name) )
-            (Int.to_float @@ base_job_count) ;
-          Mina_metrics.(
-            Gauge.set (Scan_state_metrics.scan_state_merge_snarks ~name) )
-            (Int.to_float @@ merge_job_count) ) )
+let metrics t =
+  List.rev (Mina_stdlib.Nonempty_list.to_list t.trees)
+  |> List.map ~f:(fun tree ->
+      let base_jobs_todo, merge_jobs_todo = Tree.todo_job_count tree in
+      { Tree_metrics.available_space = Tree.available_space tree
+      ; base_jobs_todo
+      ; merge_jobs_todo
+      } )
 
 let update_helper :
        data:'base list
