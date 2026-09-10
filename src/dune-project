@@ -196,6 +196,7 @@
 (package (name snarky_blake2))
 (package (name snarky_curves))
 (package (name snarky_field_extensions))
+(package (name snarky_foreign_field))
 (package (name snarky_group_map))
 (package (name snarky_log))
 (package (name snarky_taylor))
