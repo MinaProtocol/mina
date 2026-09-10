@@ -23,8 +23,7 @@ in  { step =
                     , "NETWORK_DATA_FOLDER=src/test/archive/sample_db"
                     , "APPS_BUILD_FLAG=instrumented"
                     , "MINA_PROFILE=devnet"
-                    , "APPS_BARE_BINARIES=patch_archive_test.exe:mina-patch-archive-test,extract_blocks.exe:mina-extract-blocks,missing_blocks_auditor.exe:mina-missing-blocks-auditor,archive_blocks.exe:mina-archive-blocks,replayer.exe:mina-replayer,mina.exe:mina,runtime_genesis_ledger.exe:mina-create-genesis"
-                    , "APPS_BARE_SCRIPTS=scripts/archive/missing-blocks-guardian.sh:mina-missing-blocks-guardian"
+                    , "APPS_BARE_BINARIES=patch_archive_test.exe:mina-patch-archive-test,extract_blocks.exe:mina-extract-blocks,missing_blocks_guardian.exe:mina-missing-blocks-guardian,archive_blocks.exe:mina-archive-blocks,replayer.exe:mina-replayer,mina.exe:mina,runtime_genesis_ledger.exe:mina-create-genesis"
                     ]
                     ( Some
                         ( RunWithPostgres.ScriptOrArchive.Script
