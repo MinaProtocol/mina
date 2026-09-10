@@ -34,8 +34,9 @@ RUN echo "deb [trusted=yes] ${deb_repo} $deb_codename $deb_release" | tee /etc/a
   && apt-get install --quiet --yes --no-install-recommends --allow-downgrades "mina-delegation-verify=$deb_version" \
   && rm -rf /var/lib/apt/lists/*
 
-# awscli and cqlsh-expansion are used by the delegation verification tool
-RUN apt-get update && apt-get install -y --no-install-recommends tzdata python3 python3-pip python3-venv jq wget dnsutils gawk \
+# awscli and cqlsh-expansion are used by the delegation verification tool;
+# curl is used by the daemon to download genesis/epoch ledger artifacts
+RUN apt-get update && apt-get install -y --no-install-recommends tzdata python3 python3-pip python3-venv curl jq wget dnsutils gawk \
   && rm -rf /var/lib/apt/lists/*
 
 # Create a virtual environment for Python tools
