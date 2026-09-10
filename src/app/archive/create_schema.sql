@@ -139,7 +139,11 @@ CREATE TABLE zkapp_field_array
 /* Fixed-width arrays of algebraic fields, given as id's from
    zkapp_field
 
-   Any element of the array may be NULL, per the NULL convention
+   Any element of the array may be NULL, per the NULL convention.
+
+   No UNIQUE constraint here: a unique index treats two NULLs as distinct, so it
+   would not deduplicate rows that contain NULL. Deduplicating this table needs
+   UNIQUE NULLS NOT DISTINCT, which requires PostgreSQL 15 or later.
 */
 CREATE TABLE zkapp_states_nullable
 ( id                       serial           PRIMARY KEY
@@ -177,7 +181,13 @@ CREATE TABLE zkapp_states_nullable
 , element31                 int		    REFERENCES zkapp_field(id)
 );
 
-/* like zkapp_states_nullable, but elements are not NULL */
+/* like zkapp_states_nullable, but elements are not NULL.
+   The UNIQUE constraint makes the content dedup atomic (INSERT .. ON CONFLICT)
+   instead of a racy SELECT-then-INSERT. All 32 columns are NOT NULL, so the
+   constraint really does reject duplicates. 32 int columns give a btree key of
+   about 132 bytes, far below Postgres' 2704-byte limit -- unlike the unbounded
+   int[] element_ids of zkapp_events/zkapp_field_array, whose UNIQUE had to be
+   dropped. */
 CREATE TABLE zkapp_states
 ( id                       serial           PRIMARY KEY
 , element0                 int              NOT NULL REFERENCES zkapp_field(id)
@@ -212,9 +222,10 @@ CREATE TABLE zkapp_states
 , element29                 int              NOT NULL REFERENCES zkapp_field(id)
 , element30                 int              NOT NULL REFERENCES zkapp_field(id)
 , element31                 int              NOT NULL REFERENCES zkapp_field(id)
+, CONSTRAINT zkapp_states_elements_key UNIQUE (element0, element1, element2, element3, element4, element5, element6, element7, element8, element9, element10, element11, element12, element13, element14, element15, element16, element17, element18, element19, element20, element21, element22, element23, element24, element25, element26, element27, element28, element29, element30, element31)
 );
 
-/* like zkapp_states, but for action states */
+/* like zkapp_states, but for action states (see zkapp_states on the UNIQUE) */
 CREATE TABLE zkapp_action_states
 ( id                       serial           PRIMARY KEY
 , element0                 int              NOT NULL REFERENCES zkapp_field(id)
@@ -222,6 +233,7 @@ CREATE TABLE zkapp_action_states
 , element2                 int              NOT NULL REFERENCES zkapp_field(id)
 , element3                 int              NOT NULL REFERENCES zkapp_field(id)
 , element4                 int              NOT NULL REFERENCES zkapp_field(id)
+, CONSTRAINT zkapp_action_states_elements_key UNIQUE (element0, element1, element2, element3, element4)
 );
 
 /* the element_ids are non-NULL, and refer to zkapp_field_array

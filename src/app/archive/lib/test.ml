@@ -418,6 +418,64 @@ let%test_module "Archive node unit tests" =
       | Error e ->
           failwith @@ Caqti_error.show e
 
+    (* Regression test for the duplicate [zkapp_states] rows that made
+       [mina-archive-hardfork-toolbox populate-genesis-accounts] fail with
+       "Received 2 tuples, expected at most one". The table had no UNIQUE
+       constraint and was content-deduplicated by a non-atomic
+       SELECT-then-INSERT, so two writers could both find no row and both
+       insert. The resulting duplicate pair then made every later lookup of
+       that content fail permanently. The dedup is now an atomic upsert against
+       [zkapp_states_elements_key], and the constraint makes the duplicate pair
+       impossible in the first place. *)
+    let%test_unit "Zkapp_states: dedup is idempotent and duplicate rows are \
+                   rejected" =
+      let conn = Lazy.force conn_lazy in
+      Thread_safe.block_on_async_exn
+      @@ fun () ->
+      (* Any valid app_state works: both assertions hold whether or not the row
+         already exists from an earlier run. *)
+      let app_state = Zkapp_account.default.app_state in
+      let%bind () =
+        match%map
+          let open Deferred.Result.Let_syntax in
+          let%bind id =
+            Processor.Zkapp_states.add_if_doesn't_exist conn app_state
+          in
+          let%map id' =
+            Processor.Zkapp_states.add_if_doesn't_exist conn app_state
+          in
+          [%test_result: int] ~expect:id id'
+        with
+        | Ok () ->
+            ()
+        | Error e ->
+            failwith @@ Caqti_error.show e
+      in
+      (* The pre-fix insert path: a bare INSERT of the same content. The UNIQUE
+         constraint must reject it. *)
+      match%map
+        let open Deferred.Result.Let_syntax in
+        let%bind element_ids =
+          Mina_caqti.deferred_result_list_map
+            (Zkapp_state.V.to_list app_state)
+            ~f:(Processor.Zkapp_field.add_if_doesn't_exist conn)
+        in
+        let t =
+          Pickles_types.Vector.of_list_and_length_exn element_ids
+            Zkapp_state.Max_state_size.n
+        in
+        Mina_caqti.insert_into_cols_returning ~returning:("id", Caqti_type.int)
+          ~table_name:"zkapp_states"
+          ~cols:(Processor.Zkapp_states.names, Processor.Zkapp_states.typ)
+          conn t
+      with
+      | Ok _ ->
+          failwith
+            "inserting a duplicate zkapp_states row succeeded; the \
+             zkapp_states_elements_key UNIQUE constraint is missing"
+      | Error _ ->
+          ()
+
     (* Regression test for the hardfork "fork genesis" bug that breaks Rosetta
        balance reconciliation at the fork boundary. A hard fork restarts the
        chain at a genesis block whose [blockchain_length] is [fork.blockchain_length
