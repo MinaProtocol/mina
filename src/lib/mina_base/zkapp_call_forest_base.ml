@@ -523,7 +523,7 @@ let forget_hashes_and_proofs_and_aux p =
 module With_hashes_and_data = struct
   [%%versioned
   module Stable = struct
-    module V1 = struct
+    module V2 = struct
       type ('update, 'data) t =
         ( 'update * 'data
         , Digest.Account_update.Stable.V1.t
@@ -584,9 +584,9 @@ module With_hashes = struct
   module Stable = struct
     [@@@no_toplevel_latest_type]
 
-    module V1 = struct
+    module V2 = struct
       type t =
-        ( Account_update.Stable.V1.t
+        ( Account_update.Stable.V2.t
         , Digest.Account_update.Stable.V1.t
         , Digest.Forest.Stable.V1.t )
         Stable.V1.t
