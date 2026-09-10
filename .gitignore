@@ -51,3 +51,4 @@ Pipfile.lock
 _coverage/
 
 CLAUDE.local.md
+/.claude/

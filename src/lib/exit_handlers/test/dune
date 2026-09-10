@@ -1,0 +1,14 @@
+(tests
+ (names test_exit_handlers)
+ (libraries
+  ;; opam libraries
+  alcotest-async
+  async
+  core_kernel
+  ;; local libraries
+  exit_handlers
+  logger)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_assert ppx_let ppx_version)))

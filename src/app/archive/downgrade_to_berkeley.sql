@@ -2,6 +2,11 @@
 -- Mina rollback: from mesa to berkeley
 -- + remove zkapp_states.element31..element8 (int)
 -- + remove zkapp_states_nullable.element31..element8 (int)
+-- NOTE: the element_ids UNIQUE/index drop and the events_id/actions_id NULL change
+--   are intentionally NOT reversed here (lossy): post-fix data may hold duplicate
+--   element_ids arrays and NULL events_id/actions_id, and a btree over the
+--   unbounded int[] overflows Postgres' 2704-byte key limit, so the old Berkeley
+--   UNIQUE/index/NOT NULL cannot be restored without manual dedup + backfill.
 -- + record status in migration_history
 -- ============================================================================
 
@@ -18,7 +23,7 @@ SET archive.current_protocol_version = '4.0.0';
 -- Post-HF protocol version. This one corresponds to Mesa, specifically
 SET archive.target_protocol_version = '3.0.0';
 -- The version of this script. If you modify the script, please bump the version
-SET archive.migration_version = '0.0.5';
+SET archive.migration_version = '0.0.6';
 
 -- TODO: put below in a common script
 
@@ -202,6 +207,15 @@ SELECT pg_temp.try_remove_zkapp_states_nullable_element(11);
 SELECT pg_temp.try_remove_zkapp_states_nullable_element(10);
 SELECT pg_temp.try_remove_zkapp_states_nullable_element(9);
 SELECT pg_temp.try_remove_zkapp_states_nullable_element(8);
+
+-- 3b. The element_ids UNIQUE/index drop and events_id/actions_id NULL change are
+-- intentionally NOT reversed (lossy; see header). Restoring them on post-fix data
+-- would fail (duplicate arrays, NULL FKs, btree key overflow); operators must
+-- de-duplicate + backfill manually first.
+DO $$
+BEGIN
+    RAISE NOTICE 'downgrade: leaving zkapp_{events,field_array}.element_ids without UNIQUE/index and events_id/actions_id nullable (cannot be safely restored on post-fix data)';
+END $$;
 
 -- 4. Update schema_history
 

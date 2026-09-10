@@ -630,11 +630,15 @@ let calculate_diffs ({ context = (module Context); _ } as t) breadcrumb =
       (* reverse diffs so that they are applied in the correct order *)
       List.rev diffs )
 
+type 'mutant apply_diff_result =
+  | Applied of { mutant : 'mutant; new_root : State_hash.t option }
+  | Duplicate
+
 (* TODO: refactor metrics tracking outside of apply_diff (could maybe even be an extension?) *)
 let apply_diff (type mutant) t (diff : (Diff.full, mutant) Diff.t)
-    ~enable_epoch_ledger_sync : mutant * State_hash.t option =
+    ~enable_epoch_ledger_sync : mutant apply_diff_result =
   match diff with
-  | New_node (Full breadcrumb) ->
+  | New_node (Full breadcrumb) -> (
       let breadcrumb_hash = Breadcrumb.state_hash breadcrumb in
       let parent_hash = Breadcrumb.parent_hash breadcrumb in
       let parent_node = Hashtbl.find_exn t.table parent_hash in
@@ -644,25 +648,26 @@ let apply_diff (type mutant) t (diff : (Diff.full, mutant) Diff.t)
         ; length = parent_node.length + 1
         }
       in
-      ( match Hashtbl.add t.table ~key:breadcrumb_hash ~data:node with
+      match Hashtbl.add t.table ~key:breadcrumb_hash ~data:node with
       | `Duplicate ->
           [%log' error t.logger]
             "Same block ($state_hash) was applied to transition frontier more \
              than once; this could indicate that you are running multiple \
              block producers with the same keypair"
-            ~metadata:[ ("state_hash", State_hash.to_yojson breadcrumb_hash) ]
+            ~metadata:[ ("state_hash", State_hash.to_yojson breadcrumb_hash) ] ;
+          Duplicate
       | `Ok ->
           Hashtbl.set t.table ~key:parent_hash
             ~data:
               { parent_node with
                 successor_hashes =
                   breadcrumb_hash :: parent_node.successor_hashes
-              } ) ;
-      ((), None)
+              } ;
+          Applied { mutant = (); new_root = None } )
   | Best_tip_changed new_best_tip ->
       let old_best_tip = t.best_tip in
       t.best_tip <- new_best_tip ;
-      (old_best_tip, None)
+      Applied { mutant = old_best_tip; new_root = None }
   | Root_transitioned { new_root; garbage = Full garbage; _ } ->
       let new_root_hash =
         (Root_data.Limited.Stable.Latest.hashes new_root).state_hash
@@ -675,7 +680,7 @@ let apply_diff (type mutant) t (diff : (Diff.full, mutant) Diff.t)
       move_root t ~new_root_hash ~new_root_protocol_states ~garbage
         ~enable_epoch_ledger_sync ;
       [%log' internal t.logger] "Move_frontier_root_done" ;
-      (old_root_hash, Some new_root_hash)
+      Applied { mutant = old_root_hash; new_root = Some new_root_hash }
 
 module Metrics = struct
   (* The max length of a path disjoint from the best tip path. O(n) *)
@@ -891,16 +896,20 @@ let apply_diffs ({ context = (module Context); _ } as t) diffs
   let new_root, diffs_with_mutants =
     List.fold diffs ~init:(None, [])
       ~f:(fun (prev_root, diffs_with_mutants) (Diff.Full.E.E diff) ->
-        let mutant, new_root = apply_diff t diff ~enable_epoch_ledger_sync in
-        update_metrics_with_diff t diff ;
-        let new_root =
-          match new_root with
-          | None ->
-              prev_root
-          | Some state_hash ->
-              Some { state_hash }
-        in
-        (new_root, Diff.Full.With_mutant.E (diff, mutant) :: diffs_with_mutants) )
+        match apply_diff t diff ~enable_epoch_ledger_sync with
+        | Duplicate ->
+            (prev_root, diffs_with_mutants)
+        | Applied { mutant; new_root } ->
+            update_metrics_with_diff t diff ;
+            let new_root =
+              match new_root with
+              | None ->
+                  prev_root
+              | Some state_hash ->
+                  Some { state_hash }
+            in
+            ( new_root
+            , Diff.Full.With_mutant.E (diff, mutant) :: diffs_with_mutants ) )
   in
   [%log' trace t.logger] "after applying diffs to full frontier" ;
   if

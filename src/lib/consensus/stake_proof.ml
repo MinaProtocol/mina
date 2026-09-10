@@ -6,12 +6,12 @@ open Signature_lib
 module Stable = struct
   [@@@no_toplevel_latest_type]
 
-  module V2 = struct
+  module V3 = struct
     type t =
       { delegator : Account.Index.Stable.V1.t
       ; delegator_pk : Public_key.Compressed.Stable.V1.t
       ; coinbase_receiver_pk : Public_key.Compressed.Stable.V1.t
-      ; ledger : Mina_ledger.Sparse_ledger.Stable.V2.t
+      ; ledger : Mina_ledger.Sparse_ledger.Stable.V3.t
       ; producer_private_key : Private_key.Stable.V1.t
       ; producer_public_key : Public_key.Stable.V1.t
       }

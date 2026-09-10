@@ -52,6 +52,7 @@ The [Node Developers](https://docs.minaprotocol.com/node-developers) docs contai
 - [Developer README](README-dev.md)
 - [Running a demo node](docs/demo.md)
 - [Lifecycle of a payment](https://docs.minaprotocol.com/node-operators/lifecycle-of-a-payment)
+- [MiniMina](src/app/minimina/README.md) - CLI tool for spinning up local Mina networks
 
 ## Community
 

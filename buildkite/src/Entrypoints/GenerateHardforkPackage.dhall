@@ -132,6 +132,13 @@ let generateTarballsCommand =
                   }
                   spec.use_artifacts_from_buildkite_build
 
+          let genesis_timestamp_env =
+                merge
+                  { Some = \(ts : Text) -> [ "GENESIS_TIMESTAMP=" ++ ts ]
+                  , None = [] : List Text
+                  }
+                  spec.genesis_timestamp
+
           in  Command.build
                 Command.Config::{
                 , commands =
@@ -139,7 +146,12 @@ let generateTarballsCommand =
                       Toolchain.SelectionMode.ByDebianAndArch
                       codename.DebVersion
                       codename.Arch
-                      [ "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY" ]
+                      (   [ "AWS_ACCESS_KEY_ID"
+                          , "AWS_SECRET_ACCESS_KEY"
+                          , "GENESIS_TIMESTAMP"
+                          ]
+                        # genesis_timestamp_env
+                      )
                       (     "./buildkite/scripts/hardfork/release/generate-fork-config-and-ledger-tarballs.sh "
                         ++  "--network ${Network.lowerName spec.network} "
                         ++  "--config-url ${spec.config_json_gz_url} "
@@ -260,6 +272,23 @@ let generateDockerForCodename =
                             , version =
                                 "${version}-${DebianVersions.lowerName
                                                 codename.DebVersion}"
+                            , deb_version = spec.version
+                            , step_key_suffix =
+                                "-${DebianVersions.lowerName
+                                      codename.DebVersion}-docker-image"
+                            }
+                          , DockerImage.ReleaseSpec::{
+                            , deps = dependsOnBuildHfDebian
+                            , service = Artifacts.Type.Archive
+                            , network = spec.network
+                            , deb_codename = codename.DebVersion
+                            , deb_install_mode =
+                                DockerImage.DebianInstallMode.ThroughLocalRepo
+                            , deb_profile = profile
+                            , deb_legacy_version = spec.deb_legacy_version
+                            , deb_storage_repair_version = Some
+                                spec.deb_storage_repair_version
+                            , size = spec.size
                             , deb_version = spec.version
                             , step_key_suffix =
                                 "-${DebianVersions.lowerName

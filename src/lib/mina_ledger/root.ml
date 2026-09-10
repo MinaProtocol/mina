@@ -181,7 +181,7 @@ module T = struct
         ; hardfork_slot
         } ->
         let module Converting_ledger = Ledger.Make_converting (struct
-          let convert = Account.Hardfork.migrate_from_berkeley ~hardfork_slot
+          let convert = Account.Hardfork.migrate_to_mesa ~hardfork_slot
         end) in
         let config : Converting_ledger.Config.t =
           { primary_directory; converting_directory }
@@ -198,7 +198,7 @@ module T = struct
         Stable_db (Ledger.Db.create ~depth ())
     | Converting_db hardfork_slot ->
         let module Converting_ledger = Ledger.Make_converting (struct
-          let convert = Account.Hardfork.migrate_from_berkeley ~hardfork_slot
+          let convert = Account.Hardfork.migrate_to_mesa ~hardfork_slot
         end) in
         Converting_db
           ( (module Converting_ledger)
@@ -276,7 +276,7 @@ module T = struct
     let addrs_and_accounts =
       List.mapi stable_locations_and_accounts ~f:(fun i acct ->
           ( Ledger.Hardfork_db.Addr.of_int_exn ~ledger_depth i
-          , Account.Hardfork.migrate_from_berkeley ~hardfork_slot acct ) )
+          , Account.Hardfork.migrate_to_mesa ~hardfork_slot acct ) )
     in
     let rec set_chunks accounts =
       let%bind () = Async_unix.Scheduler.yield () in
@@ -304,7 +304,7 @@ module T = struct
                ~message:"Invariant: database must be in a directory"
         in
         let module Converting_ledger = Ledger.Make_converting (struct
-          let convert = Account.Hardfork.migrate_from_berkeley ~hardfork_slot
+          let convert = Account.Hardfork.migrate_to_mesa ~hardfork_slot
         end) in
         let converting_config =
           Converting_ledger.Config.with_primary ~directory_name

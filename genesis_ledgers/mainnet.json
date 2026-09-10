@@ -28,6 +28,9 @@
   },
   "daemon": {
     "network_id": "mainnet",
-    "peer_list_url": "https://bootnodes.minaprotocol.com/networks/mainnet.txt"
+    "peer_list_url": "https://bootnodes.minaprotocol.com/networks/mainnet.txt",
+    "slot_tx_end": 393800,
+    "slot_chain_end": 393900,
+    "hard_fork_genesis_slot_delta": 60
   }
 }

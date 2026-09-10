@@ -11,7 +11,7 @@ type catchup_job_states = Transition_frontier.Full_catchup_tree.job_states =
   ; to_verify : int
   ; to_build_breadcrumb : int
   }
-[@@deriving to_yojson]
+[@@deriving yojson]
 
 type rpc_count =
   { get_some_initial_peers : int
@@ -26,11 +26,11 @@ type rpc_count =
   ; get_best_tip : int
   ; get_epoch_ledger : int
   }
-[@@deriving to_yojson]
+[@@deriving yojson]
 
 type gossip_count =
   { new_state : int; transaction_pool_diff : int; snark_pool_diff : int }
-[@@deriving to_yojson]
+[@@deriving yojson]
 
 type block =
   { hash : Mina_base.State_hash.t
@@ -47,7 +47,7 @@ type block =
       | `Mismatched_protocol_version ]
       option
   }
-[@@deriving to_yojson]
+[@@deriving yojson]
 
 type sysinfo =
   { uptime : string
@@ -58,7 +58,7 @@ type sysinfo =
   ; free_swap : int64
   ; procs : int
   }
-[@@deriving to_yojson]
+[@@deriving yojson]
 
 let node_status_version = 2
 
@@ -87,7 +87,7 @@ type node_status_data =
   ; sysinfo : sysinfo
   ; block_producer_public_key : string option
   }
-[@@deriving to_yojson]
+[@@deriving yojson]
 
 module Simplified = struct
   type t =

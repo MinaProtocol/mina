@@ -12,6 +12,7 @@ import (
 	// importing this automatically registers the pprof api to our metrics server
 	_ "net/http/pprof"
 
+	"codanet"
 	ipc "libp2p_ipc"
 
 	capnp "capnproto.org/go/capnp/v3"
@@ -92,6 +93,7 @@ func main() {
 	helperLog := logging.Logger("helper top-level JSON handling")
 
 	helperLog.Infof("libp2p_helper has the following logging subsystems active: %v", logging.GetSubsystems())
+	helperLog.Infof("private IP filtering: allow_private_ips=%v", codanet.WithPrivate)
 
 	setLogLevel := func(name, level string) {
 		err := logging.SetLogLevel(name, level)
@@ -140,6 +142,16 @@ func main() {
 	decoder := capnp.NewDecoder(os.Stdin)
 
 	app := newApp()
+
+	app.NoMDNS = os.Getenv("LIBP2P_ENABLE_MDNS") != "true"
+	// Configure mDNS (local network peer discovery)
+	// mDNS is DISABLED by default for security (prevents private IP scanning on cloud providers)
+	// Only enable it for local development/testing by setting LIBP2P_ENABLE_MDNS=true
+	if app.NoMDNS {
+		helperLog.Info("mDNS discovery disabled (default) - use LIBP2P_ENABLE_MDNS=true to enable for local development")
+	} else {
+		helperLog.Info("mDNS discovery enabled via LIBP2P_ENABLE_MDNS")
+	}
 
 	go func() {
 		for {

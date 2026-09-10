@@ -52,7 +52,7 @@ SOURCE_TAG="${PULL_REGISTRY}/${NAME}:${VERSION}${DOCKER_ARCH_SUFFIX}"
 
 echo "📎 Adding new tag ($TAG) for docker ${SOURCE_TAG}"
 echo "   📥 pulling ${SOURCE_TAG}"
-docker pull $QUIET ${SOURCE_TAG}
+docker pull $QUIET --platform "linux/${ARCH}" ${SOURCE_TAG}
 
 if [[ -z "$PUSH_REGISTRY" ]]; then
   PUSH_REGISTRY=$PULL_REGISTRY

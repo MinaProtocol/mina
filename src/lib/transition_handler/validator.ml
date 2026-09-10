@@ -191,16 +191,20 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~time_controller
                         ; ("header", Mina_block.Header.to_yojson header)
                         ] ) )
               in
-              let transition_time =
-                Mina_block.Header.protocol_state header
-                |> Protocol_state.blockchain_state |> Blockchain_state.timestamp
-                |> Block_time.to_time_exn
-              in
-              Perf_histograms.add_span
-                ~name:"accepted_transition_remote_latency"
-                (Core_kernel.Time.diff
-                   Block_time.(now time_controller |> to_time_exn)
-                   transition_time ) ;
+              ( match
+                  Block_time.to_time_exn
+                    ( Mina_block.Header.protocol_state header
+                    |> Protocol_state.blockchain_state
+                    |> Blockchain_state.timestamp )
+                with
+              | transition_time ->
+                  Perf_histograms.add_span
+                    ~name:"accepted_transition_remote_latency"
+                    (Core_kernel.Time.diff
+                       Block_time.(now time_controller |> to_time_exn)
+                       transition_time )
+              | exception _ ->
+                  () ) ;
               [%log internal] "Validate_transition_done" ;
               Writer.write valid_transition_writer (b_or_h', `Valid_cb vc)
           | Error (`In_frontier _) | Error (`In_process _) ->
