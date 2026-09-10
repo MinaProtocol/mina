@@ -22,6 +22,7 @@ SNARK_COORDINATOR_PEER_KEY="CAESQFjWdR18zKuCssN+Fi33fah9f5QGebOCc9xTITR8cdoyC+bk
 # Inputs (set to default values)
 
 WHALES=2
+LAZY_WHALES=0
 FISH=1
 NODES=1
 LOG_LEVEL="Trace"
@@ -94,6 +95,9 @@ help() {
 
 -w   |--whales <#>                       | Number of BP Whale Nodes (bigger stake) to spin-up
                                          |   Default: ${WHALES}
+--lazy-whales <#>                        | Number of extra whale accounts to create in the genesis ledger
+                                         |   without launching a block producer for them (dormant stake)
+                                         |   Default: ${LAZY_WHALES}
 -f   |--fish <#>                         | Number of BP Fish Nodes (less stake) to spin-up
                                          |   Default: ${FISH}
 -n   |--nodes <#>                        | Number of non block-producing nodes to spin-up
@@ -523,6 +527,10 @@ while [[ "$#" -gt 0 ]]; do
     WHALES="${2}"
     shift
     ;;
+  --lazy-whales)
+    LAZY_WHALES="${2}"
+    shift
+    ;;
   -f | --fish)
     FISH="${2}"
     shift
@@ -729,6 +737,13 @@ if [ "${ZKAPP_TRANSACTIONS}" = "true" ] && [ "${WHALES}" -lt 2 ]; then
     exit 1
 fi
 
+# Lazy whales are extra whale accounts without block producers; they only make
+# sense alongside at least one active whale
+if [ "${LAZY_WHALES}" -gt 0 ] && [ "${WHALES}" -lt 1 ]; then
+    echo "Error: --lazy-whales requires at least 1 active Whale node."
+    exit 1
+fi
+
 # ================================================
 # Create the Genesis Ledger
 
@@ -763,9 +778,13 @@ if [ ! -d "${ROOT}" ]; then
     generate-keypair "${ROOT}"/online_fish_keys/online_fish_account_${i}
     generate-libp2p-keypair "${ROOT}"/libp2p_keys/fish_${i}
   done
-  for ((i = 0; i < WHALES; i++)); do
+  # Account keypairs are generated for lazy whales too, but no libp2p keypair:
+  # no daemon is ever launched for them, leaving their stake dormant
+  for ((i = 0; i < WHALES + LAZY_WHALES; i++)); do
     generate-keypair "${ROOT}"/offline_whale_keys/offline_whale_account_${i}
     generate-keypair "${ROOT}"/online_whale_keys/online_whale_account_${i}
+  done
+  for ((i = 0; i < WHALES; i++)); do
     generate-libp2p-keypair "${ROOT}"/libp2p_keys/whale_${i}
   done
   for ((i = 0; i < NODES; i++)); do
@@ -821,6 +840,7 @@ if ${DEMO_MODE}; then
   # Set the default values for demo mode
   SNARK_WORKERS_COUNT=0
   WHALES=0
+  LAZY_WHALES=0
   FISH=0
   NODES=0
 
@@ -876,7 +896,7 @@ load_config() {
     reset)
       echo "Making the Ledger..." 
       python3 scripts/mina-local-network/generate-mina-local-network-ledger.py \
-        --num-whale-accounts "${WHALES}" \
+        --num-whale-accounts "$((WHALES + LAZY_WHALES))" \
         --num-fish-accounts "${FISH}" \
         --offline-whale-accounts-directory "${ROOT}"/offline_whale_keys \
         --offline-fish-accounts-directory "${ROOT}"/offline_fish_keys \

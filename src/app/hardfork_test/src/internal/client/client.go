@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/MinaProtocol/mina/src/app/hardfork_test/src/internal/currency"
 	"github.com/tidwall/gjson"
 )
 
@@ -112,6 +113,16 @@ type BlockData struct {
 	NumUserCommands int    `json:"num_user_commands"`
 	NumFeeTransfers int    `json:"num_fee_transfers"`
 	Coinbase        string `json:"coinbase"`
+	// Public key of the account that produced this block (creatorAccount).
+	// Empty for the genesis block, which is not VRF-produced and whose query
+	// does not request the field.
+	Creator string `json:"creator"`
+	// Currency amounts, read from the GraphQL integer-nanomina string scalars via
+	// gjson .Uint() at construction (NOT the decimal-mina currency.UnmarshalJSON
+	// path — see currency.Nanomina). On a post-fork (v2) build the staking epoch
+	// ledger's totalCurrency field carries total_stake.
+	TotalCurrency              currency.Nanomina `json:"total_currency"`
+	StakingLedgerTotalCurrency currency.Nanomina `json:"staking_ledger_total_currency"`
 }
 
 func (block *BlockData) NonEmpty() bool {
@@ -121,7 +132,7 @@ func (block *BlockData) NonEmpty() bool {
 func (block BlockData) String() string {
 	b, err := json.MarshalIndent(block, "", "  ")
 	if err != nil {
-		return fmt.Sprintf("%+v", block)
+		return fmt.Sprintf("BlockData(unmarshalable: %v)", err)
 	}
 	return string(b)
 }
@@ -134,8 +145,9 @@ genesisBlock {
       blockHeight
       slotSinceGenesis
       epoch
+      totalCurrency
       stakingEpochData {
-        ledger { hash }
+        ledger { hash totalCurrency }
         seed
       }
       nextEpochData {
@@ -159,13 +171,15 @@ genesisBlock {
 const blocksQueryWithLimit = `
 bestChain (maxLength: %d){
   commandTransactionCount
+  creatorAccount { publicKey }
   protocolState {
     consensusState {
       blockHeight
       slotSinceGenesis
       epoch
+      totalCurrency
       stakingEpochData {
-        ledger { hash }
+        ledger { hash totalCurrency }
         seed
       }
       nextEpochData {
@@ -186,21 +200,31 @@ bestChain (maxLength: %d){
 }
 `
 
+// nanominaAt reads a GraphQL amount at path as an integer-nanomina scalar. The
+// daemon serializes amounts as nanomina uint64 strings, so .Uint() is the
+// correct decoder here — NOT the decimal-mina currency.UnmarshalJSON path.
+func nanominaAt(value gjson.Result, path string) currency.Nanomina {
+	return currency.Nanomina(value.Get(path).Uint())
+}
+
 func parseBlock(value gjson.Result) *BlockData {
 	block := &BlockData{
-		StateHash:       value.Get("stateHash").String(),
-		BlockHeight:     int(value.Get("protocolState.consensusState.blockHeight").Int()),
-		Slot:            int(value.Get("protocolState.consensusState.slotSinceGenesis").Int()),
-		CurEpochHash:    value.Get("protocolState.consensusState.stakingEpochData.ledger.hash").String(),
-		CurEpochSeed:    value.Get("protocolState.consensusState.stakingEpochData.seed").String(),
-		NextEpochHash:   value.Get("protocolState.consensusState.nextEpochData.ledger.hash").String(),
-		NextEpochSeed:   value.Get("protocolState.consensusState.nextEpochData.seed").String(),
-		StagedHash:      value.Get("protocolState.blockchainState.stagedLedgerHash").String(),
-		SnarkedHash:     value.Get("protocolState.blockchainState.snarkedLedgerHash").String(),
-		Epoch:           int(value.Get("protocolState.consensusState.epoch").Int()),
-		NumUserCommands: int(value.Get("commandTransactionCount").Int()),
-		NumFeeTransfers: len(value.Get("transactions.feeTransfer").Array()),
-		Coinbase:        value.Get("transactions.coinbase").String(),
+		StateHash:                  value.Get("stateHash").String(),
+		BlockHeight:                int(value.Get("protocolState.consensusState.blockHeight").Int()),
+		Slot:                       int(value.Get("protocolState.consensusState.slotSinceGenesis").Int()),
+		CurEpochHash:               value.Get("protocolState.consensusState.stakingEpochData.ledger.hash").String(),
+		CurEpochSeed:               value.Get("protocolState.consensusState.stakingEpochData.seed").String(),
+		NextEpochHash:              value.Get("protocolState.consensusState.nextEpochData.ledger.hash").String(),
+		NextEpochSeed:              value.Get("protocolState.consensusState.nextEpochData.seed").String(),
+		StagedHash:                 value.Get("protocolState.blockchainState.stagedLedgerHash").String(),
+		SnarkedHash:                value.Get("protocolState.blockchainState.snarkedLedgerHash").String(),
+		Epoch:                      int(value.Get("protocolState.consensusState.epoch").Int()),
+		NumUserCommands:            int(value.Get("commandTransactionCount").Int()),
+		NumFeeTransfers:            len(value.Get("transactions.feeTransfer").Array()),
+		Coinbase:                   value.Get("transactions.coinbase").String(),
+		Creator:                    value.Get("creatorAccount.publicKey").String(),
+		TotalCurrency:              nanominaAt(value, "protocolState.consensusState.totalCurrency"),
+		StakingLedgerTotalCurrency: nanominaAt(value, "protocolState.consensusState.stakingEpochData.ledger.totalCurrency"),
 	}
 
 	return block
@@ -249,6 +273,20 @@ func (c *Client) ForkConfig(port int) (gjson.Result, error) {
 	}
 
 	return result.Get("data.fork_config"), nil
+}
+
+// AccountDelegate returns the delegate of the account with the given public
+// key, or ("", nil) if the account exists and has no delegate (unstaked).
+func (c *Client) AccountDelegate(port int, pk string) (string, error) {
+	result, err := c.query(port, fmt.Sprintf(`account(publicKey: %q) { delegate }`, pk))
+	if err != nil {
+		return "", err
+	}
+	account := result.Get("data.account")
+	if !account.Exists() || account.Type == gjson.Null {
+		return "", fmt.Errorf("account %s not found at port %d", pk, port)
+	}
+	return account.Get("delegate").String(), nil
 }
 
 func (c *Client) NumUserCommandsInBestChain(port int) (int, error) {

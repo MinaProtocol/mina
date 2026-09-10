@@ -1,6 +1,8 @@
 package app
 
 import (
+	"fmt"
+
 	"github.com/MinaProtocol/mina/src/app/hardfork_test/src/internal/config"
 	"github.com/MinaProtocol/mina/src/app/hardfork_test/src/internal/hardfork"
 	"github.com/spf13/cobra"
@@ -32,6 +34,10 @@ Example:
     --fork-mina-exe /path/to/mina-fork --fork-runtime-genesis-ledger /path/to/runtime_genesis_ledger-fork
 `,
 	RunE: func(cmd *cobra.Command, args []string) error {
+		if !cfg.UnstakingTest && cmd.Flags().Changed("num-lazy-whales") {
+			return fmt.Errorf("--num-lazy-whales requires --unstaking-test")
+		}
+
 		// Validate required arguments
 		if err := cfg.Validate(); err != nil {
 			return err
@@ -87,6 +93,10 @@ func init() {
 	rootCmd.Flags().IntVar(&cfg.ClientMaxRetries, "client-max-retries", cfg.ClientMaxRetries, "Maximum number of retries for client requests")
 
 	rootCmd.Flags().Var(&cfg.ForkMethods, "allow-fork-method", "Implementation of fork to use")
+
+	// Unstaking test mode
+	rootCmd.Flags().BoolVar(&cfg.UnstakingTest, "unstaking-test", cfg.UnstakingTest, "Enable unstaking test mode: dilute the pre-fork VRF denominator with lazy whales and unstake them at the fork")
+	rootCmd.Flags().IntVar(&cfg.NumLazyWhales, "num-lazy-whales", cfg.NumLazyWhales, "Number of lazy whale accounts (whales without a block producer); requires --unstaking-test")
 
 	rootCmd.MarkFlagRequired("main-mina-exe")
 	rootCmd.MarkFlagRequired("main-runtime-genesis-ledger")
