@@ -1,6 +1,56 @@
 # An overlay defining Rust parts&dependencies of Mina
 final: prev:
 let
+  # crates.io answers 403 to any `User-Agent` starting with `curl/`, which is
+  # exactly what nixpkgs' `fetchurl` sends, so a crate fetch fails on any
+  # binary-cache miss:
+  #
+  #     trying https://crates.io/api/v1/crates/ansi_term/0.12.1/download
+  #     curl: (22) The requested URL returned error: 403
+  #     error: cannot download crate-ansi_term-0.12.1.tar.gz from any mirror
+  #
+  # `static.crates.io` is the CDN crates.io points cargo itself at: no
+  # User-Agent gate, and no crawler rate limit either. Upstream nixpkgs made the
+  # same switch in f830e6112, which landed in nixos-25.11; we pin
+  # nixos-24.11-small, so point the cargo fetches at it here instead.
+  #
+  # This is deliberately confined to the Rust build path rather than done by
+  # wrapping `fetchurl` for the whole package set: newer nixpkgs call fetchers
+  # with function-form arguments, which a set-wide wrapper cannot merge into,
+  # and the resulting failure lands on every unrelated fetcher.
+  #
+  # Crate fetches are fixed-output derivations, so a crate's output path depends
+  # only on the derivation name and the checksum, never on the URL: every
+  # existing binary-cache entry for a crate tarball stays valid.
+  #
+  # Drop all of this once the nixpkgs pin moves past the upstream fix.
+  staticCratesDl = "https://static.crates.io/crates";
+
+  # `importCargoLock` is the only consumer of the `fetchurl` argument, and it
+  # always calls it with a literal attribute set holding a single `url`.
+  fetchCrateTarball = args:
+    let
+      inherit (final.lib) hasPrefix removePrefix;
+      apiPrefix = "https://crates.io/api/v1/crates/";
+    in prev.fetchurl (args // {
+      url = if hasPrefix apiPrefix args.url then
+        "${staticCratesDl}/${removePrefix apiPrefix args.url}"
+      else
+        args.url;
+    });
+
+  withStaticCrates = platform:
+    let
+      importCargoLock =
+        platform.importCargoLock.override { fetchurl = fetchCrateTarball; };
+    in platform // {
+      inherit importCargoLock;
+      buildRustPackage =
+        platform.buildRustPackage.override { inherit importCargoLock; };
+    };
+
+  defaultRustPlatform = withStaticCrates prev.rustPlatform;
+
   rustPlatformFor = rust:
     let
       rustWithTargetPlatforms = rust // {
@@ -8,10 +58,10 @@ let
         targetPlatforms = final.lib.platforms.all;
         badTargetPlatforms = [ ];
       };
-    in prev.makeRustPlatform {
+    in withStaticCrates (prev.makeRustPlatform {
       cargo = rustWithTargetPlatforms;
       rustc = rustWithTargetPlatforms;
-    };
+    });
   toolchainHashes = {
     "1.92.0" = "sha256-sqSWJDUxc+zaz1nBWMAJKTAGBuGWP25GCftIOlCEAtA=";
     "nightly-2025-12-11" =
@@ -139,7 +189,7 @@ in {
   });
 
   # Work around https://github.com/rust-lang/wg-cargo-std-aware/issues/23
-  kimchi-rust-std-deps = final.rustPlatform.importCargoLock {
+  kimchi-rust-std-deps = defaultRustPlatform.importCargoLock {
     lockFile = final.runCommand "cargo.lock" { } ''
       cp ${final.kimchi-rust.rust-src}/lib/rustlib/src/rust/library/Cargo.lock $out
     '';
@@ -160,6 +210,7 @@ in {
       version = deps.wasm-bindgen.version;
       src = final.fetchCrate {
         inherit pname version;
+        registryDl = staticCratesDl;
         sha256 = "sha256-M6WuGl7EruNopHZbqBpucu4RWz44/MSdv6f0zkYw+44=";
       };
 
@@ -243,14 +294,14 @@ in {
   kimchi_wasm = final.plonk_wasm;
 
   # Jobs/Lint/Rust.dhall
-  trace-tool = final.rustPlatform.buildRustPackage rec {
+  trace-tool = defaultRustPlatform.buildRustPackage rec {
     pname = "trace-tool";
     version = "0.1.0";
     src = ../src/app/trace-tool;
     cargoLock.lockFile = ../src/app/trace-tool/Cargo.lock;
   };
 
-  minimina = final.rustPlatform.buildRustPackage rec {
+  minimina = defaultRustPlatform.buildRustPackage rec {
     pname = "minimina";
     version = "0.2.0";
     src = ../src/app/minimina;
