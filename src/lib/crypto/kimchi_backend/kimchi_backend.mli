@@ -44,14 +44,14 @@ module Kimchi_backend_common : sig
           32 little-endian bytes as [Bigint.to_bytes (to_bigint t)], to
           [buf.{pos} .. buf.{pos + 31}], allocating nothing. Raises
           [Invalid_argument] when that window does not fit in [buf]. *)
-      val blit_to_bigstring : t -> Core.Bigstring.t -> int -> unit
+      val blit_to_bigstring : t -> Core_kernel.Bigstring.t -> int -> unit
 
       (** [of_bigstring buf pos] reads the element written by
           [blit_to_bigstring] at [buf.{pos} .. buf.{pos + 31}]. Raises
           [Invalid_argument] when the window does not fit in [buf], and
           [Failure] when the bytes are not a canonical element, i.e. encode a
           value at or above the modulus. *)
-      val of_bigstring : Core.Bigstring.t -> int -> t
+      val of_bigstring : Core_kernel.Bigstring.t -> int -> t
 
       val of_int : int -> t
 

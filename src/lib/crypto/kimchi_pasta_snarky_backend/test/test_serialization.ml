@@ -3,7 +3,7 @@
    values where a limb-wise implementation can go wrong: around zero, around
    the modulus, and with every subset of the four 64-bit limbs populated. *)
 
-open Core
+open Core_kernel
 
 (* Every subset of the four limbs: "min" sets the lowest bit of each chosen
    limb, "max" saturates it. The top limb of "max" is capped at 2^62 - 1 so
