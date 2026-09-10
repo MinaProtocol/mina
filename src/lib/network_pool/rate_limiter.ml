@@ -109,7 +109,7 @@ module Lru_table (Q : Hash_queue.S) = struct
     | Some { elts; _ } -> (
         match Queue.peek elts with
         | Some (_, time) ->
-            time
+            Time_float.add time interval
         | None ->
             Time_float.now () )
 end
@@ -184,3 +184,67 @@ let summary ({ by_ip; by_peer_id } : t) =
               } )
             :: acc )
     }
+
+let%test_module "backoff" =
+  ( module struct
+    let sender : Envelope.Sender.t =
+      Remote
+        { host = Core_unix.Inet_addr.of_string "127.0.0.1"
+        ; libp2p_port = 0
+        ; peer_id = ""
+        }
+
+    (* [create] scales the capacity it is given onto [interval], so offering
+       the period as [interval] makes the resulting capacity exactly [n]. *)
+    let create_with_capacity n = create ~capacity:(n, `Per interval)
+
+    let add_exn t ~now ~score =
+      match add t sender ~now ~score with
+      | `Within_capacity ->
+          ()
+      | `Capacity_exceeded ->
+          failwith "expected the sender to be within capacity"
+
+    (* start from the epoch rather than the current time: the arithmetic below
+       is then exact, where spans against a present-day timestamp are not *)
+    let start = Time_float.epoch
+
+    (* The first operation by a sender only creates its record, and records no
+       entry against it; the entry carrying a timestamp is the second. Fill a
+       limiter of capacity one, so that its single entry dates from [start]. *)
+    let at_capacity_since_start () =
+      let t = create_with_capacity 1 in
+      add_exn t ~now:start ~score:0 ;
+      add_exn t ~now:start ~score:1 ;
+      t
+
+    let%test_unit "an entry expires an interval after it was added" =
+      let t = at_capacity_since_start () in
+      [%test_eq: Time_float_unix.t] (next_expires t sender)
+        (Time_float.add start interval)
+
+    let%test_unit "a sender over capacity waits out the rest of the interval" =
+      let t = at_capacity_since_start () in
+      let elapsed = Time_float.Span.scale interval 0.25 in
+      let now = Time_float.add start elapsed in
+      ( match add t sender ~now ~score:1 with
+      | `Capacity_exceeded ->
+          ()
+      | `Within_capacity ->
+          failwith "expected the sender to be over capacity" ) ;
+      (* what is left of the interval, not the age of the entry *)
+      [%test_eq: Time_float_unix.Span.t]
+        (Time_float.diff (next_expires t sender) now)
+        (Time_float.Span.( - ) interval elapsed)
+
+    let%test_unit "the wait is positive and never exceeds the interval" =
+      let t = at_capacity_since_start () in
+      List.iter [ 0.; 0.5; 0.9 ] ~f:(fun fraction ->
+          let now =
+            Time_float.add start (Time_float.Span.scale interval fraction)
+          in
+          let wait = Time_float.diff (next_expires t sender) now in
+          [%test_pred: Time_float_unix.Span.t]
+            (fun wait -> Time_float.Span.(wait > zero && wait <= interval))
+            wait )
+  end )
