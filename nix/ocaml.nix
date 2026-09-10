@@ -354,7 +354,6 @@ let
         KIMCHI_WASM_WEB = "${pkgs.kimchi_wasm}/web";
 
         configurePhase = ''
-          export MINA_ROOT="$PWD"
           export -f patchShebangs isScript
           fd . --type executable -x bash -c "patchShebangs {}"
           export -n patchShebangs isScript
