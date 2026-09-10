@@ -4,6 +4,7 @@ import (
 	cryptorand "crypto/rand"
 	"fmt"
 	gonet "net"
+	"os"
 	"sync"
 	"time"
 
@@ -29,10 +30,19 @@ import (
 // its low-water peer mark: starts at the min, doubles up to the max
 // ponytail: fixed exponential backoff, no jitter; add jitter if many nodes
 // end up starved at once and their queries synchronise
-const (
-	discoveryMinInterval = time.Second
-	discoveryMaxInterval = time.Minute * 5
+// overridable via env vars for operators who need a different cadence; a
+// missing or unparseable value falls back to the default
+var (
+	discoveryMinInterval = envDuration("MINA_LIBP2P_DISCOVERY_MIN_INTERVAL", time.Second)
+	discoveryMaxInterval = envDuration("MINA_LIBP2P_DISCOVERY_MAX_INTERVAL", time.Minute*5)
 )
+
+func envDuration(name string, def time.Duration) time.Duration {
+	if d, err := time.ParseDuration(os.Getenv(name)); err == nil {
+		return d
+	}
+	return def
+}
 
 type BeginAdvertisingReqT = ipc.Libp2pHelperInterface_BeginAdvertising_Request
 type BeginAdvertisingReq BeginAdvertisingReqT
