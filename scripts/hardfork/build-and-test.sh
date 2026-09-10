@@ -116,7 +116,7 @@ if [ -n "${BUILDKITE:-}" ]; then
     exit 1
   fi
 
-  git fetch origin
+  git fetch origin ${BUILDKITE_PULL_REQUEST:+"+refs/pull/${BUILDKITE_PULL_REQUEST}/head"}
 fi
 
 # 1. Build PREFORK as a prefork build;
