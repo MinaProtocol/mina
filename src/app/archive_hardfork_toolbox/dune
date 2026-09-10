@@ -59,10 +59,9 @@
    ppx_deriving_yojson
    ppx_version)))
 
-(executable
- (package archive_hardfork_toolbox)
- (name archive_hardfork_toolbox)
- (public_name archive_hardfork_toolbox)
+(library
+ (name archive_hardfork_toolbox_applet)
+ (public_name archive_hardfork_toolbox.applet)
  (libraries
   ;; opam libraries
   async_unix
@@ -106,7 +105,7 @@
   signature_lib
   unsigned_extended
   with_hash)
- (modules archive_hardfork_toolbox)
+ (modules archive_hardfork_toolbox_applet)
  (instrumentation
   (backend bisect_ppx))
  (preprocess
@@ -118,3 +117,14 @@
    ppx_sexp_conv
    ppx_string
    ppx_version)))
+
+(executable
+ (package archive_hardfork_toolbox)
+ (name archive_hardfork_toolbox)
+ (public_name archive_hardfork_toolbox)
+ (modules archive_hardfork_toolbox)
+ (libraries archive_hardfork_toolbox_applet)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_version)))

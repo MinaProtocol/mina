@@ -1,0 +1,34 @@
+(executable
+ (package mina_box)
+ (name mina_box)
+ (public_name mina-box)
+ (modules mina_box)
+ (modes native)
+ (libraries
+  unix
+  ;; applets in this dune project
+  mina_cli_entrypoint
+  disk_cache.lmdb
+  archive_applet
+  archive_blocks_lib
+  archive_hardfork_toolbox_applet
+  mina_archive_healthcheck_lib
+  dump_slot_ledger_lib
+  extract_blocks_lib
+  generate_keypair_lib
+  mina_graphql_client_app_lib
+  mina_healthcheck_applet
+  missing_blocks_auditor_lib
+  replayer_lib
+  run_snark_worker_applet
+  validate_keypair_lib
+  ;; applets from vendored dune projects
+  rosetta.applet
+  rosetta.client_applet
+  rosetta.healthcheck_applet
+  runtime_genesis_ledger.applet
+  signer.applet)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_version)))

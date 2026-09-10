@@ -190,6 +190,7 @@ build: ocaml_checks reformat-diff libp2p_helper ## Build the main project execut
 		src/lib/snark_worker/standalone/run_snark_worker.exe \
 		src/app/mina_graphql_client/mina_graphql_client_app.exe \
 		src/app/mina_healthcheck/mina_healthcheck.exe \
+		src/app/mina_box/mina_box.exe \
 		--profile=$(DUNE_PROFILE) \
 		&& echo "✅ Build complete"
 

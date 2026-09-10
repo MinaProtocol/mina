@@ -1,7 +1,7 @@
-(executable
- (name run_snark_worker)
- (package mina_snark_worker)
- (public_name mina-standalone-snark-worker)
+(library
+ (name run_snark_worker_applet)
+ (public_name mina_snark_worker.applet)
+ (modules run_snark_worker_applet)
  (libraries
   ;; opam libraries
   async
@@ -39,3 +39,14 @@
    graphql_ppx
    --
    %{read-lines:../../../graphql-ppx-config.inc})))
+
+(executable
+ (name run_snark_worker)
+ (package mina_snark_worker)
+ (public_name mina-standalone-snark-worker)
+ (modules run_snark_worker)
+ (libraries run_snark_worker_applet)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_version)))
