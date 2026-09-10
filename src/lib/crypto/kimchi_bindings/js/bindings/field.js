@@ -133,7 +133,10 @@ function caml_pasta_fp_blit_to_bigstring(x, buf, pos) {
 function caml_pasta_fp_of_bigstring(buf, pos) {
   var bytes = caml_create_bytes(32);
   caml_bigstring_blit_ba_to_bytes(buf, pos, bytes, 0, 32);
-  return tsBindings.caml_pasta_fp_of_bytes(bytes);
+  // The TS bindings implement to_bytes for fields as the bigint encoding and
+  // leave of_bytes unimplemented; read back through the same bigint path.
+  // of_bigint rejects values at or above the modulus, matching the Rust stub.
+  return tsBindings.caml_pasta_fp_of_bigint(tsBindings.caml_bigint_256_of_bytes(bytes));
 }
 
 // Provides: caml_pasta_fp_deep_copy
@@ -275,7 +278,8 @@ function caml_pasta_fq_blit_to_bigstring(x, buf, pos) {
 function caml_pasta_fq_of_bigstring(buf, pos) {
   var bytes = caml_create_bytes(32);
   caml_bigstring_blit_ba_to_bytes(buf, pos, bytes, 0, 32);
-  return tsBindings.caml_pasta_fq_of_bytes(bytes);
+  // See caml_pasta_fp_of_bigstring.
+  return tsBindings.caml_pasta_fq_of_bigint(tsBindings.caml_bigint_256_of_bytes(bytes));
 }
 
 // Provides: caml_pasta_fq_deep_copy
