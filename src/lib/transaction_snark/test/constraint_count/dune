@@ -1,12 +1,35 @@
-(tests
- (names test_constraint_count)
+(executable
+ (name print_circuit_stats)
  (libraries
-  alcotest
+  core
   core_kernel
   genesis_constants
   mina_signature_kind
   node_config
   snark_params
-  transaction_snark)
+  transaction_snark
+  yojson)
+ (instrumentation
+  (backend bisect_ppx))
  (preprocess
-  (pps ppx_jane)))
+  (pps ppx_version ppx_jane)))
+
+; Generate the circuit statistics JSON for the current `DUNE_PROFILE`.
+; The output file name includes the profile because constraint counts depend on
+; configuration parameters such as the ledger depth.
+
+(rule
+ (target %{profile}_circuit_stats.json.computed)
+ (deps print_circuit_stats.exe)
+ (action
+  (with-stdout-to
+   %{target}
+   (run %{deps}))))
+
+(rule
+ (deps
+  (:orig %{profile}_circuit_stats.json)
+  (:computed %{profile}_circuit_stats.json.computed))
+ (alias runtest)
+ (action
+  (diff %{orig} %{computed})))
