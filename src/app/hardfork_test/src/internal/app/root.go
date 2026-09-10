@@ -38,7 +38,11 @@ Example:
 		}
 
 		// Create and run the hardfork test
-		return hardfork.NewHardforkTest(cfg).Run()
+		test, err := hardfork.NewHardforkTest(cfg)
+		if err != nil {
+			return err
+		}
+		return test.Run()
 	},
 }
 
@@ -53,6 +57,12 @@ func init() {
 	rootCmd.Flags().StringVar(&cfg.MainRuntimeGenesisLedger, "main-runtime-genesis-ledger", "", "Path to the main runtime genesis ledger executable (required)")
 	rootCmd.Flags().StringVar(&cfg.ForkMinaExe, "fork-mina-exe", "", "Path to the fork Mina executable (required)")
 	rootCmd.Flags().StringVar(&cfg.ForkRuntimeGenesisLedger, "fork-runtime-genesis-ledger", "", "Path to the fork runtime genesis ledger executable (required)")
+
+	// Network size. These also bound how many fork methods can be requested at
+	// once, since every --allow-fork-method needs at least one daemon.
+	rootCmd.Flags().IntVar(&cfg.NumWhales, "num-whales", cfg.NumWhales, "Number of whale (block-producer) accounts; whales beyond those absorbed by the seed/snark-coordinator run as standalone daemons")
+	rootCmd.Flags().IntVar(&cfg.NumFish, "num-fish", cfg.NumFish, "Number of fish (smaller block-producer) daemons")
+	rootCmd.Flags().IntVar(&cfg.NumNodes, "num-nodes", cfg.NumNodes, "Number of plain (non-block-producing) daemons")
 
 	// Test configuration
 	rootCmd.Flags().IntVar(&cfg.SlotTxEnd, "slot-tx-end", cfg.SlotTxEnd, "Slot at which transactions should end")
