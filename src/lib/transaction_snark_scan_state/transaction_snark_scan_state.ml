@@ -197,32 +197,26 @@ module Job_view = struct
         ]
     in
     let job_to_yojson =
+      (* [seq_no] is gone from the scan state, and a merge node's status is
+         always [Todo] now that a completed merge is cleared rather than
+         marked; only a base still has one worth reporting. *)
       match value with
-      | BEmpty ->
+      | Base_empty ->
           `Assoc [ ("B", `List []) ]
-      | MEmpty ->
+      | Merge_empty ->
           `Assoc [ ("M", `List []) ]
-      | MPart x ->
+      | Merge_part x ->
           `Assoc [ ("M", `List [ statement_to_yojson x ]) ]
-      | MFull (x, y, { seq_no; status }) ->
+      | Merge_full { left; right } ->
           `Assoc
             [ ( "M"
-              , `List
-                  [ statement_to_yojson x
-                  ; statement_to_yojson y
-                  ; `Int seq_no
-                  ; `Assoc
-                      [ ( "Status"
-                        , `String (Parallel_scan.Job_status.to_string status) )
-                      ]
-                  ] )
+              , `List [ statement_to_yojson left; statement_to_yojson right ] )
             ]
-      | BFull (x, { seq_no; status }) ->
+      | Base_full { job; status } ->
           `Assoc
             [ ( "B"
               , `List
-                  [ statement_to_yojson x
-                  ; `Int seq_no
+                  [ statement_to_yojson job
                   ; `Assoc
                       [ ( "Status"
                         , `String (Parallel_scan.Job_status.to_string status) )
@@ -235,18 +229,35 @@ end
 
 type job = Available_job.t
 
+(* Both payload types carry their own hash — a SHA256 of their [bin_prot]
+   encoding — which is exactly what the scan state's Merkle tree needs, and
+   why maintaining that tree costs no proof hashing. *)
+let payload_digest :
+    ( Ledger_proof_with_hash.t
+    , Transaction_with_witness.t )
+    Parallel_scan.Payload_digest.t =
+  { merge = (fun (x : Ledger_proof_with_hash.t) -> x.hash)
+  ; base = (fun (x : Transaction_with_witness.t) -> x.hash)
+  }
+
+let stable_payload_digest :
+    ( Ledger_proof.Stable.V3.t
+    , Transaction_with_witness.Stable.V3.t )
+    Parallel_scan.Payload_digest.t =
+  { merge = Ledger_proof_with_hash.hash; base = Transaction_with_witness.hash }
+
+(* The scan state's own commitment needs no callbacks: it is a Merkle tree
+   whose digests the structure already maintains. [tx_witness_hash] is still
+   needed for [previous_incomplete_zkapp_updates], which sits alongside the
+   scan state rather than in it. *)
 let hash_generic : type a b.
-       ledger_proof_hash:(a -> string)
-    -> tx_witness_hash:(b -> string)
-    -> (a, b) Parallel_scan.State.t
+       tx_witness_hash:(b -> string)
+    -> (a, b) Parallel_scan.t
        * (b list * [ `Border_block_continued_in_the_next_tree of bool ])
     -> Staged_ledger_hash.Aux_hash.t =
- fun ~ledger_proof_hash ~tx_witness_hash
+ fun ~tx_witness_hash
      (parallel_scan_state, previous_incomplete_zkapp_updates) ->
-  let state_hash =
-    Parallel_scan.State.hash parallel_scan_state ledger_proof_hash
-      tx_witness_hash
-  in
+  let state_hash = Parallel_scan.hash parallel_scan_state in
   let ( previous_incomplete_zkapp_updates
       , `Border_block_continued_in_the_next_tree continue_in_next_tree ) =
     previous_incomplete_zkapp_updates
@@ -267,38 +278,37 @@ let hash_generic : type a b.
 (*Scan state and any zkapp updates that were applied to the to the most recent
    snarked ledger but are from the tree just before the tree corresponding to
    the snarked ledger*)
-[%%versioned
-module Stable = struct
-  [@@@no_toplevel_latest_type]
 
-  module V3 = struct
-    type t =
-      { scan_state :
-          ( Ledger_proof.Stable.V3.t
-          , Transaction_with_witness.Stable.V3.t )
-          Parallel_scan.State.Stable.V1.t
-      ; previous_incomplete_zkapp_updates :
-          Transaction_with_witness.Stable.V3.t list
-          * [ `Border_block_continued_in_the_next_tree of bool ]
-      }
+(** The stored shape: proofs read back off disk, digests carried rather than
+    derived.
 
-    let to_latest = Fn.id
+    Unversioned, because nothing untrusted parses it. A scan state reaches
+    another node through the sync protocol, in verified fragments; what remains
+    here is the frontier's own persistence, and its database carries a version
+    of its own for that. *)
+module Stored = struct
+  type t =
+    { scan_state :
+        ( Ledger_proof.Stable.V3.t
+        , Transaction_with_witness.Stable.V3.t )
+        Parallel_scan.Wire.t
+    ; previous_incomplete_zkapp_updates :
+        Transaction_with_witness.Stable.V3.t list
+        * [ `Border_block_continued_in_the_next_tree of bool ]
+    }
+  [@@deriving bin_io_unversioned]
 
-    let hash (t : t) =
-      hash_generic
-        ~ledger_proof_hash:(fun (x : Ledger_proof.Stable.V3.t) ->
-          Ledger_proof_with_hash.hash x )
-        ~tx_witness_hash:(fun (x : Transaction_with_witness.Stable.V3.t) ->
-          Transaction_with_witness.hash x )
-        (t.scan_state, t.previous_incomplete_zkapp_updates)
-  end
-end]
+  let hash (t : t) =
+    hash_generic
+      ~tx_witness_hash:(fun (x : Transaction_with_witness.Stable.V3.t) ->
+        Transaction_with_witness.hash x )
+      ( Parallel_scan.of_wire t.scan_state ~payload_digest:stable_payload_digest
+      , t.previous_incomplete_zkapp_updates )
+end
 
 type t =
   { scan_state :
-      ( Ledger_proof_with_hash.t
-      , Transaction_with_witness.t )
-      Parallel_scan.State.t
+      (Ledger_proof_with_hash.t, Transaction_with_witness.t) Parallel_scan.t
   ; previous_incomplete_zkapp_updates :
       Transaction_with_witness.t list
       * [ `Border_block_continued_in_the_next_tree of bool ]
@@ -306,7 +316,6 @@ type t =
 
 let hash (t : t) =
   hash_generic
-    ~ledger_proof_hash:(fun (x : Ledger_proof_with_hash.t) -> x.hash)
     ~tx_witness_hash:(fun (x : Transaction_with_witness.t) -> x.hash)
     (t.scan_state, t.previous_incomplete_zkapp_updates)
 
@@ -412,7 +421,7 @@ module Make_statement_scanner (Verifier : sig
     -> unit Or_error.t Deferred.Or_error.t
 end) =
 struct
-  module Fold = Parallel_scan.State.Make_foldable (Deferred)
+  module Fold = Parallel_scan.Make_foldable (Deferred)
 
   module Timer = struct
     module Info = struct
@@ -524,13 +533,13 @@ struct
     in
     let fold_step_a (acc_statement, acc_pc) job =
       match job with
-      | Parallel_scan.Merge.Job.Part merge ->
+      | Parallel_scan.Merge_node.Part merge ->
           let statement = merge_to_statement merge in
           let%map acc_stmt =
             merge_acc ~proofs:[ merge ] acc_statement statement
           in
           (acc_stmt, acc_pc)
-      | Empty | Full { status = Parallel_scan.Job_status.Done; _ } ->
+      | Empty ->
           return (acc_statement, acc_pc)
       | Full { left; right; _ } ->
           let stmt1 = merge_to_statement left in
@@ -587,7 +596,7 @@ struct
     in
     let fold_step_d (acc_statement, acc_pc) job =
       match job with
-      | Parallel_scan.Base.Job.Empty ->
+      | Parallel_scan.Base_node.Empty ->
           return (acc_statement, acc_pc)
       | Full
           { status = Parallel_scan.Job_status.Done
@@ -603,14 +612,14 @@ struct
     in
     let%bind.Deferred res =
       Fold.fold_chronological_until tree ~init:(None, None)
-        ~f_merge:(fun acc (_weight, job) ->
+        ~f_merge:(fun acc job ->
           let open Container.Continue_or_stop in
           match%map.Deferred fold_step_a acc job with
           | Ok next ->
               Continue next
           | e ->
               Stop e )
-        ~f_base:(fun acc (_weight, job) ->
+        ~f_base:(fun acc job ->
           let open Container.Continue_or_stop in
           match%map.Deferred fold_step_d acc job with
           | Ok next ->
@@ -1282,7 +1291,7 @@ let snark_job_list_json t =
       Ledger_proof.Cached.statement a.data
     in
     let fd (d : Transaction_with_witness.t) = d.statement in
-    Parallel_scan.view_jobs_with_position t.scan_state fa fd
+    Parallel_scan.job_views t.scan_state ~f_merge:fa ~f_base:fd
   in
   Yojson.Safe.to_string
     (`List
@@ -1383,7 +1392,28 @@ let all_work_pairs t
       | Error e ->
           Stop (Error e) )
 
-let update_metrics t = Parallel_scan.update_metrics t.scan_state
+(* The scan state reports numbers; turning them into gauges is this side's
+   business, which is why it no longer needs to know that Prometheus exists. *)
+let update_metrics t =
+  Or_error.try_with (fun () ->
+      List.iteri (Parallel_scan.metrics t.scan_state)
+        ~f:(fun
+            i
+            { Parallel_scan.Tree_metrics.available_space
+            ; base_jobs_todo
+            ; merge_jobs_todo
+            }
+          ->
+          let name = sprintf "tree%d" i in
+          Mina_metrics.(
+            Gauge.set (Scan_state_metrics.scan_state_available_space ~name) )
+            (Float.of_int available_space) ;
+          Mina_metrics.(
+            Gauge.set (Scan_state_metrics.scan_state_base_snarks ~name) )
+            (Float.of_int base_jobs_todo) ;
+          Mina_metrics.(
+            Gauge.set (Scan_state_metrics.scan_state_merge_snarks ~name) )
+            (Float.of_int merge_jobs_todo) ) )
 
 let fill_work_and_enqueue_transactions t ~logger transactions work =
   let open Or_error.Let_syntax in
@@ -1400,7 +1430,7 @@ let fill_work_and_enqueue_transactions t ~logger transactions work =
   in
   let work_list = List.concat_map ~f:deconstruct_work work in
   let%bind proof_opt, updated_scan_state =
-    Parallel_scan.update t.scan_state ~completed_jobs:work_list
+    Parallel_scan.update t.scan_state ~payload_digest ~completed_jobs:work_list
       ~data:transactions
   in
   [%log internal] "@metadata"
@@ -1496,8 +1526,505 @@ let check_required_protocol_states t ~protocol_states =
   let%map () = check_length protocol_states_assoc in
   protocol_states_assoc
 
+(** Serving and receiving a scan state piece by piece.
+
+    {!Parallel_scan_sync} holds the protocol; this is where it meets the real
+    payload types. Two facts make the join simple, and neither is a
+    coincidence:
+
+    - A payload's digest is [SHA256] of its [bin_prot] encoding — that is what
+      [Transaction_with_witness.hash] and [Ledger_proof_with_hash.hash] already
+      compute, because the scan state wanted a cheap hash long before it wanted
+      a Merkle tree. So a received payload is checked against the digest that
+      names it {e without being parsed}: bad bytes are rejected before they
+      reach a decoder.
+    - The digests the tree holds are [Aux_hash.t], which is a raw string, so
+      the protocol's digests and the scan state's are the same thing. *)
+module Sync = struct
+  (* [Responder.t] below shadows the scan state's own [t]; name it first. *)
+  type nonrec scan_state = t
+
+  module Address = Parallel_scan_sync.Address
+  module Cursors = Parallel_scan_sync.Cursors
+  module Band = Parallel_scan_sync.Band
+
+  (* A payload digest, which is what the tree holds and what names a payload
+     on the wire — a raw string, not the block's [Staged_ledger_hash.Aux_hash.t]
+     even though both are SHA256. *)
+  let digest_of_bytes bytes : string =
+    Digestif.SHA256.(feed_string (init ()) bytes |> get) |> Aux_hash.of_sha256
+
+  (** What a syncing node fetches first.
+
+      It covers the scan state {e and} the incomplete zkApp updates beside it,
+      because the block commits to both together: {!verify} reassembles
+      [hash_generic] from the manifest alone and compares against the
+      [Aux_hash.t] in the block. Nothing else is trusted until that passes. *)
+  module Manifest = struct
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type t =
+          { scan_state : Parallel_scan_sync.Manifest.Stable.V1.t
+          ; previous_incomplete :
+              Mina_stdlib.Bounded_types.String.Stable.V1.t
+              Mina_stdlib.Bounded_types.ArrayN4000.Stable.V1.t
+          ; border_block_continued_in_the_next_tree : bool
+          ; ledger_hash : Ledger_hash.Stable.V1.t
+          ; pending_coinbase : Pending_coinbase.Stable.V2.t
+          }
+        [@@deriving sexp]
+
+        let to_latest = Fn.id
+      end
+    end]
+
+    type t = Stable.Latest.t =
+      { scan_state : Parallel_scan_sync.Manifest.t
+      ; previous_incomplete : string array
+      ; border_block_continued_in_the_next_tree : bool
+      ; ledger_hash : Ledger_hash.t
+      ; pending_coinbase : Pending_coinbase.t
+      }
+    [@@deriving sexp]
+
+    (* Mirrors [hash_generic]; if that changes, this has to change with it, and
+       the round-trip test below is what says so. *)
+    let aux_hash t =
+      let scan_state_hash = Parallel_scan_sync.Manifest.root t.scan_state in
+      let incomplete_updates =
+        Array.fold ~init:(Digestif.SHA256.init ()) t.previous_incomplete
+          ~f:(fun h digest -> Digestif.SHA256.feed_string h digest )
+        |> Digestif.SHA256.get
+      in
+      let continued =
+        Digestif.SHA256.digest_string
+          (Bool.to_string t.border_block_continued_in_the_next_tree)
+      in
+      [ scan_state_hash; incomplete_updates; continued ]
+      |> List.fold ~init:(Digestif.SHA256.init ()) ~f:(fun h d ->
+          Digestif.SHA256.feed_string h (Digestif.SHA256.to_raw_string d) )
+      |> Digestif.SHA256.get |> Staged_ledger_hash.Aux_hash.of_sha256
+
+    let ledger_hash t = t.ledger_hash
+
+    let pending_coinbase t = t.pending_coinbase
+
+    (** The block commits to the aux hash, the ledger hash and the pending
+        coinbase together, as one staged ledger hash — so that is what a
+        manifest is checked against. Verifying only the aux hash would leave
+        the other two for a peer to lie about. *)
+    let staged_ledger_hash t =
+      Staged_ledger_hash.of_aux_ledger_and_coinbase_hash (aux_hash t)
+        t.ledger_hash t.pending_coinbase
+
+    let verify t ~expected =
+      if Staged_ledger_hash.equal (staged_ledger_hash t) expected then Ok ()
+      else
+        Or_error.error_string
+          "scan state manifest does not match the staged ledger hash in the \
+           block"
+  end
+
+  (** What one peer asks another for.
+
+      A band is addressed by the digest of the tree it belongs to rather than
+      by that tree's position, and payloads by their own digests, so a peer can
+      answer from whatever it happens to hold — its forest need not be at the
+      same height as the asker's. Only the manifest is tied to a particular
+      block. *)
+  module Query = struct
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type t =
+          | Manifest of State_hash.Stable.V1.t
+          | Band of
+              { scan_state : State_hash.Stable.V1.t
+              ; tree : Mina_stdlib.Bounded_types.String.Stable.V1.t
+              ; root : Address.Stable.V1.t
+              ; height : int
+              }
+          | Payloads of
+              { scan_state : State_hash.Stable.V1.t
+              ; digests :
+                  Mina_stdlib.Bounded_types.String.Stable.V1.t
+                  Mina_stdlib.Bounded_types.ArrayN64.Stable.V1.t
+              }
+          | Protocol_states of State_hash.Stable.V1.t
+        [@@deriving sexp]
+
+        let to_latest = Fn.id
+      end
+    end]
+
+    type t = Stable.Latest.t =
+      | Manifest of State_hash.t
+      | Band of
+          { scan_state : State_hash.t
+          ; tree : string
+          ; root : Address.t
+          ; height : int
+          }
+      | Payloads of { scan_state : State_hash.t; digests : string array }
+      | Protocol_states of State_hash.t
+          (** the states the scan state at this hash needs; the responder works
+              out which those are, since it has the assembled scan state and the
+              asker does not yet *)
+    [@@deriving sexp]
+
+    (** Every query names the scan state it is about, so any peer holding that
+        root can answer it. Without this a band could only be served by a peer
+        that had already described the forest it belongs to, which pins a whole
+        sync to one peer. *)
+    let scan_state : t -> State_hash.t = function
+      | Manifest hash | Protocol_states hash ->
+          hash
+      | Band { scan_state; _ } | Payloads { scan_state; _ } ->
+          scan_state
+
+    (** How many payloads one query may ask for. A responder does the work of
+        serialising each, so this is the lever on how much a single message can
+        cost it. *)
+    let max_payloads_per_query = 64
+  end
+
+  module Answer = struct
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type t =
+          | Manifest of Manifest.Stable.V1.t
+          | Band of Band.Stable.V1.t
+          | Payloads of
+              ( Mina_stdlib.Bounded_types.String.Stable.V1.t
+              * Mina_stdlib.Bounded_types.String.Stable.V1.t )
+              Mina_stdlib.Bounded_types.ArrayN64.Stable.V1.t
+              (** digest and its bytes; a payload the responder does not hold
+                  is simply absent, and the asker tries elsewhere *)
+          | Protocol_states of
+              Mina_state.Protocol_state.Value.Stable.V3.t
+              Mina_stdlib.Bounded_types.ArrayN4000.Stable.V1.t
+        [@@deriving sexp]
+
+        let to_latest = Fn.id
+      end
+    end]
+
+    type t = Stable.Latest.t =
+      | Manifest of Manifest.t
+      | Band of Band.t
+      | Payloads of (string * string) array
+      | Protocol_states of Mina_state.Protocol_state.value array
+    [@@deriving sexp]
+  end
+
+  (** A peer's side. Built once per scan state and answers any number of
+      requests against it: the skeleton so bands can be cut without rebuilding
+      it each time, and an index so a payload can be found by digest rather
+      than by position — which is what lets a peer serve a payload it holds
+      even when its own forest has moved on. *)
+  module Responder = struct
+    type payload =
+      | Merge of Ledger_proof_with_hash.t
+      | Base of Transaction_with_witness.t
+
+    type nonrec t =
+      { skeleton : (string, string) Parallel_scan.t
+      ; trees_by_digest :
+          (string, (string, string) Parallel_scan.Tree.t) Hashtbl.t
+      ; manifest : Manifest.t
+      ; payloads : (string, payload) Hashtbl.t
+      }
+
+    let create (t : scan_state) ~ledger_hash ~pending_coinbase =
+      let payloads = Hashtbl.create (module String) in
+      let note key data = Hashtbl.set payloads ~key ~data in
+      Parallel_scan.fold_chronological t.scan_state ~init:()
+        ~f_merge:(fun () node ->
+          match node with
+          | Parallel_scan.Merge_node.Empty ->
+              ()
+          | Part x ->
+              note x.hash (Merge x)
+          | Full { left; right } ->
+              note left.hash (Merge left) ;
+              note right.hash (Merge right) )
+        ~f_base:(fun () node ->
+          match node with
+          | Parallel_scan.Base_node.Empty ->
+              ()
+          | Full { job; _ } ->
+              note job.hash (Base job) ) ;
+      Option.iter (Parallel_scan.last_emitted_value t.scan_state)
+        ~f:(fun (proof, data) ->
+          note proof.hash (Merge proof) ;
+          List.iter data ~f:(fun d -> note d.hash (Base d)) ) ;
+      let previous_incomplete, `Border_block_continued_in_the_next_tree border =
+        t.previous_incomplete_zkapp_updates
+      in
+      List.iter previous_incomplete ~f:(fun d -> note d.hash (Base d)) ;
+      let skeleton = Parallel_scan.skeleton t.scan_state ~payload_digest in
+      let trees_by_digest = Hashtbl.create (module String) in
+      List.iter (Parallel_scan.trees skeleton) ~f:(fun tree ->
+          Hashtbl.set trees_by_digest
+            ~key:
+              (Digestif.SHA256.to_raw_string (Parallel_scan.Tree.digest tree))
+            ~data:tree ) ;
+      { skeleton
+      ; trees_by_digest
+      ; manifest =
+          { Manifest.scan_state =
+              Parallel_scan_sync.Manifest.of_state t.scan_state ~payload_digest
+          ; previous_incomplete =
+              Array.of_list_map previous_incomplete ~f:(fun d -> d.hash)
+          ; border_block_continued_in_the_next_tree = border
+          ; ledger_hash
+          ; pending_coinbase
+          }
+      ; payloads
+      }
+
+    let manifest t = t.manifest
+
+    let band t ~tree ~root ~height =
+      Option.map (Hashtbl.find t.trees_by_digest tree) ~f:(fun tree ->
+          Band.of_tree tree ~root ~height )
+
+    (** The bytes a peer sends for one payload: its [bin_prot] encoding, which
+        is what its digest is taken over. Serialised per request rather than up
+        front, so the index costs pointers rather than megabytes. *)
+    let payload_bytes t ~digest =
+      Option.map (Hashtbl.find t.payloads digest) ~f:(function
+        | Merge { With_hash.data = proof; _ } ->
+            Binable.to_string
+              (module Ledger_proof.Stable.Latest)
+              (Ledger_proof.Cached.read_proof_from_disk proof)
+        | Base witness ->
+            Binable.to_string
+              (module Transaction_with_witness.Stable.Latest)
+              (Transaction_with_witness.read_all_proofs_from_disk witness) )
+
+    (** Answer one query. All the protocol knowledge lives here rather than in
+        the RPC handler, which only moves bytes. *)
+    let respond t (query : Query.t) =
+      match query with
+      | Query.Manifest _ ->
+          Some (Answer.Manifest (manifest t))
+      | Query.Band { tree; root; height; _ } ->
+          Option.map (band t ~tree ~root ~height) ~f:(fun band ->
+              Answer.Band band )
+      | Query.Protocol_states _ ->
+          (* answered by the sync handler, which can reach the frontier; a
+             responder only knows its scan state *)
+          None
+      | Query.Payloads { digests; _ } ->
+          Some
+            (Answer.Payloads
+               ( Array.sub digests ~pos:0
+                   ~len:
+                     (Int.min (Array.length digests)
+                        Query.max_payloads_per_query )
+               |> Array.filter_map ~f:(fun digest ->
+                   Option.map (payload_bytes t ~digest) ~f:(fun bytes ->
+                       (digest, bytes) ) ) ) )
+  end
+
+  module Request = Parallel_scan_sync.Request
+
+  (** Where a scan state sync has got to, for [mina client status].
+
+      A sync runs inside the bootstrap controller, which has no transition
+      frontier to hang progress off the way catchup does, so the controller
+      publishes here and the daemon's status reads it. [None] means no sync is
+      running. *)
+  module Progress = struct
+    type t =
+      { bands_outstanding : int; payloads_received : int; payloads_known : int }
+
+    let current : t option ref = ref None
+
+    let report t = current := t
+
+    let get () = !current
+
+    (** As [(label, count)] pairs, which is how the daemon status already
+        renders the equivalent for catchup. *)
+    let to_entries t =
+      [ ("Bands outstanding", t.bands_outstanding)
+      ; ("Payloads received", t.payloads_received)
+      ; ("Payloads known", t.payloads_known)
+      ]
+  end
+
+  (** A syncing node's side.
+
+      Reception accumulates outside any scan state: the real type has
+      invariants a half-received one violates, so nothing is built until
+      everything has arrived and been checked.
+
+      The [previous_incomplete_zkapp_updates] are tracked here rather than by
+      {!Parallel_scan_sync.Builder}, because they sit beside the scan state
+      rather than in it — no node names them, only the manifest does. *)
+  module Builder = struct
+    type t =
+      { inner : Parallel_scan_sync.Builder.t
+      ; manifest : Manifest.t
+      ; incomplete : (string, string option) Hashtbl.t
+            (** digest -> bytes for the incomplete updates, [None] until it
+                arrives *)
+      ; state_hash : State_hash.t
+            (** carried into every query, so any peer holding this root can
+                answer it *)
+      }
+
+    (** Check the manifest against the staged ledger hash in the block, then
+        open a builder on it. [band_height] is how much of a tree to ask a peer
+        for at a time. *)
+    let create manifest ~state_hash ~expected ~band_height =
+      let open Or_error.Let_syntax in
+      (* This is the only place the chain is consulted; everything after it is
+         checked against something this established. *)
+      let%map () = Manifest.verify manifest ~expected in
+      let incomplete = Hashtbl.create (module String) in
+      Array.iter manifest.previous_incomplete ~f:(fun digest ->
+          if not (Hashtbl.mem incomplete digest) then
+            Hashtbl.set incomplete ~key:digest ~data:None ) ;
+      let inner =
+        Parallel_scan_sync.Builder.create manifest.scan_state
+          ~expected:(Parallel_scan_sync.Manifest.root manifest.scan_state)
+          ~band_height
+        |> Or_error.ok_exn
+        (* cannot fail: the digest is recomputed from this same manifest, and
+           [Manifest.verify] above is what ties it to the block *)
+      in
+      { inner; manifest; incomplete; state_hash }
+
+    let wanted t =
+      Parallel_scan_sync.Builder.wanted t.inner
+      @ ( Hashtbl.to_alist t.incomplete
+        |> List.filter_map ~f:(fun (digest, bytes) ->
+            Option.some_if (Option.is_none bytes) (Request.Payload digest) ) )
+
+    let add_band t ~tree band =
+      Parallel_scan_sync.Builder.add_band t.inner ~tree band
+
+    (** Take a payload. Its digest is recomputed from the bytes, so bad bytes
+        are rejected here — before anything tries to decode them. *)
+    let add_payload t ~bytes =
+      let digest = digest_of_bytes bytes in
+      if Hashtbl.mem t.incomplete digest then
+        Ok (Hashtbl.set t.incomplete ~key:digest ~data:(Some bytes))
+      else
+        Parallel_scan_sync.Builder.add_payload t.inner ~digest_of_bytes ~bytes
+
+    (** What to ask peers for next, in the form that goes on the wire.
+
+        A band request names its tree by digest rather than by position, so the
+        index the builder thinks in is resolved here; payload requests are
+        batched up to what one query may carry. *)
+    let queries t =
+      let bands, payloads =
+        List.partition_map (wanted t) ~f:(function
+          | Request.Band { tree; root; height } ->
+              First
+                (Query.Band
+                   { scan_state = t.state_hash
+                   ; tree = fst (List.nth_exn t.manifest.scan_state.trees tree)
+                   ; root
+                   ; height
+                   } )
+          | Request.Payload digest ->
+              Second digest )
+      in
+      bands
+      @ List.map (List.chunks_of payloads ~length:Query.max_payloads_per_query)
+          ~f:(fun batch ->
+            Query.Payloads
+              { scan_state = t.state_hash; digests = Array.of_list batch } )
+
+    (** Take an answer, paired with the query that asked for it. The pairing is
+        what tells us which tree a band belongs to — an answer does not say so
+        itself, and the downloader hands both back together anyway. *)
+    let add_answer t ~(query : Query.t) (answer : Answer.t) =
+      let open Or_error.Let_syntax in
+      match (query, answer) with
+      | Query.Band { tree; _ }, Answer.Band band ->
+          let%bind index =
+            match
+              List.findi t.manifest.scan_state.trees ~f:(fun _ (digest, _) ->
+                  String.equal digest tree )
+            with
+            | Some (index, _) ->
+                Ok index
+            | None ->
+                Or_error.error_string "band for a tree not in the manifest"
+          in
+          add_band t ~tree:index band
+      | Query.Payloads _, Answer.Payloads payloads ->
+          Array.map payloads ~f:(fun (_digest, bytes) -> add_payload t ~bytes)
+          |> Array.to_list |> Or_error.all_unit
+      | Query.Manifest _, Answer.Manifest _ ->
+          (* the builder was created from a manifest; it never asks for one *)
+          Ok ()
+      | _ ->
+          Or_error.error_string "answer does not match the query"
+
+    let outstanding t =
+      let `Bands bands, `Payloads payloads =
+        Parallel_scan_sync.Builder.outstanding t.inner
+      in
+      ( `Bands bands
+      , `Payloads (payloads + Hashtbl.count t.incomplete ~f:Option.is_none) )
+
+    (** A snapshot for the daemon status. The known count grows as bands reveal
+        what is underneath them, so early in a sync it understates the work
+        left. *)
+    let progress t =
+      let `Bands bands, `Payloads _ = outstanding t in
+      let `Received received, `Known known =
+        Parallel_scan_sync.Builder.payload_progress t.inner
+      in
+      { Progress.bands_outstanding = bands
+      ; payloads_received =
+          received + Hashtbl.count t.incomplete ~f:Option.is_some
+      ; payloads_known = known + Hashtbl.length t.incomplete
+      }
+
+    (** Assemble the serialised scan state, ready for
+        {!write_all_proofs_to_disk}. Fails while anything is outstanding. *)
+    let finish t =
+      let open Or_error.Let_syntax in
+      let merge_of_bytes =
+        Binable.of_string (module Ledger_proof.Stable.Latest)
+      in
+      let base_of_bytes =
+        Binable.of_string (module Transaction_with_witness.Stable.Latest)
+      in
+      let%bind incomplete =
+        List.map (Array.to_list t.manifest.previous_incomplete)
+          ~f:(fun digest ->
+            match Hashtbl.find t.incomplete digest with
+            | Some (Some bytes) ->
+                Ok (base_of_bytes bytes)
+            | _ ->
+                Or_error.error_string "an incomplete zkApp update never arrived" )
+        |> Or_error.all
+      in
+      let%map scan_state =
+        Parallel_scan_sync.Builder.finish t.inner ~merge_of_bytes ~base_of_bytes
+      in
+      { Stored.scan_state = Parallel_scan.to_wire scan_state
+      ; previous_incomplete_zkapp_updates =
+          ( incomplete
+          , `Border_block_continued_in_the_next_tree
+              t.manifest.border_block_continued_in_the_next_tree )
+      }
+  end
+end
+
 let write_all_proofs_to_disk ~signature_kind ~proof_cache_db
-    { Stable.Latest.scan_state = uncached
+    { Stored.scan_state = uncached
     ; previous_incomplete_zkapp_updates = tx_list, border_status
     } =
   let f1 proof =
@@ -1506,11 +2033,16 @@ let write_all_proofs_to_disk ~signature_kind ~proof_cache_db
     ; hash = Ledger_proof_with_hash.hash proof
     }
   in
+  (* This is where the serialised form becomes the live one, and so where the
+     digest cache the wire format leaves out is rebuilt. Both maps preserve
+     payload digests — the cached and uncached representations carry the same
+     [hash] — so the digests survive the change of representation. *)
   { scan_state =
-      Parallel_scan.State.map uncached ~f1
-        ~f2:
-          (Transaction_with_witness.write_all_proofs_to_disk ~signature_kind
-             ~proof_cache_db )
+      Parallel_scan.of_wire uncached ~payload_digest:stable_payload_digest
+      |> Parallel_scan.map ~f_merge:f1
+           ~f_base:
+             (Transaction_with_witness.write_all_proofs_to_disk ~signature_kind
+                ~proof_cache_db )
   ; previous_incomplete_zkapp_updates =
       ( List.map
           ~f:
@@ -1528,10 +2060,11 @@ let read_all_proofs_from_disk
     Ledger_proof.Cached.read_proof_from_disk proof
   in
   let scan_state =
-    Parallel_scan.State.map ~f1
-      ~f2:Transaction_with_witness.read_all_proofs_from_disk cached
+    Parallel_scan.map ~f_merge:f1
+      ~f_base:Transaction_with_witness.read_all_proofs_from_disk cached
+    |> Parallel_scan.to_wire
   in
-  Stable.Latest.
+  Stored.
     { scan_state
     ; previous_incomplete_zkapp_updates =
         ( List.map ~f:Transaction_with_witness.read_all_proofs_from_disk tx_list

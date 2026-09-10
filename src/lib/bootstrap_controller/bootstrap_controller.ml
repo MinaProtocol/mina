@@ -279,6 +279,213 @@ let download_snarked_ledger ~trust_system ~preferred_peers ~transition_graph
      Sync_ledger.Root.destroy root_sync_ledger ;
      data )
 
+(** How much of a tree to ask for in one band. A band holds
+    [2^(height+1) - 1] nodes, so this bounds a single message independently of
+    how deep the scan state is — which is the whole reason bands are addressed
+    by subtree rather than by tree. *)
+let scan_state_band_height = 3
+
+(** Multi-peer fetching for the scan state sync protocol.
+
+    Every query names the scan state it is about, so any peer still holding
+    that root can answer any of them. That is what makes a downloader usable
+    here: keys are queries, and a query one peer will not answer is retried
+    against another rather than failing the sync. *)
+module Scan_state_downloader = struct
+  module Key = struct
+    module T = struct
+      type t = Staged_ledger.Scan_state.Sync.Query.t
+
+      let sexp_of_t = Staged_ledger.Scan_state.Sync.Query.sexp_of_t
+
+      let t_of_sexp = Staged_ledger.Scan_state.Sync.Query.t_of_sexp
+
+      (* Queries are identified by their sexp: the type is a plain variant with
+         no derived compare or hash, and a sync asks for few enough of them
+         that rendering one per comparison does not matter. *)
+      let tag t = Sexp.to_string (sexp_of_t t)
+
+      let to_yojson t = `String (tag t)
+
+      let compare a b = String.compare (tag a) (tag b)
+
+      let hash_fold_t state t = String.hash_fold_t state (tag t)
+
+      let hash t = String.hash (tag t)
+    end
+
+    include T
+    include Comparable.Make (T)
+    include Hashable.Make (T)
+  end
+
+  include
+    Downloader.Make
+      (Key)
+      (struct
+        type t = unit [@@deriving to_yojson]
+
+        let download : t = ()
+
+        let worth_retrying () = true
+      end)
+      (struct
+        type t =
+          Staged_ledger.Scan_state.Sync.Query.t
+          * Staged_ledger.Scan_state.Sync.Answer.t
+
+        let key = fst
+      end)
+      (struct
+        type t = unit
+      end)
+end
+
+(** Fetch a scan state in verifiable fragments instead of as one blob.
+
+    Returns what the whole-scan-state RPC returned, so the rest of bootstrap is
+    unchanged — but a failure now costs one fragment rather than the entire
+    state, and every fragment is checked against the staged ledger hash in the
+    block before it is believed.
+
+    [fetch] answers a round of queries, and is where the two strategies differ:
+    one pins the whole sync to a single peer, the other spreads it over as many
+    as will answer. Everything else — what to ask for, and what to believe — is
+    the same either way.
+
+    Bands are asked for at [band_height] levels at a time. That knob is what
+    keeps a single message bounded however deep the scan state gets. *)
+let download_scan_state ~logger ~state_hash ~expected_staged_ledger_hash
+    ~band_height ~fetch =
+  let open Deferred.Or_error.Let_syntax in
+  let module Sync = Staged_ledger.Scan_state.Sync in
+  let fetch_one query =
+    match%bind fetch [ query ] with
+    | [ (_, answer) ] ->
+        return answer
+    | _ ->
+        Deferred.Or_error.error_string
+          "a single scan state query came back with several answers"
+  in
+  let%bind manifest =
+    match%bind fetch_one (Sync.Query.Manifest state_hash) with
+    | Sync.Answer.Manifest manifest ->
+        return manifest
+    | _ ->
+        Deferred.Or_error.error_string
+          "peer answered a scan state manifest query with something else"
+  in
+  (* The only point at which the chain is consulted. Everything after this is
+     checked against digests this established. *)
+  let%bind builder =
+    Deferred.return
+      (Sync.Builder.create manifest ~state_hash
+         ~expected:expected_staged_ledger_hash ~band_height )
+  in
+  (* A round asks for everything currently wanted. Rounds repeat because a band
+     reveals the payloads beneath it and a peer may answer a payload batch
+     partially, so what is outstanding legitimately grows as well as shrinks.
+     What cannot happen twice is the same set of queries: that is a peer which
+     will not supply what it has already been asked for, and repeating only
+     wastes its time and ours. *)
+  let rec drive previous =
+    match Sync.Builder.queries builder with
+    | [] ->
+        return ()
+    | queries ->
+        let asked =
+          List.map queries ~f:(fun query ->
+              Sexp.to_string (Sync.Query.sexp_of_t query) )
+          |> List.sort ~compare:String.compare
+        in
+        if List.equal String.equal asked previous then
+          Deferred.Or_error.error_string
+            "scan state sync repeated a round of queries without progress"
+        else
+          let%bind answers = fetch queries in
+          let%bind () =
+            Deferred.return
+              ( List.map answers ~f:(fun (query, answer) ->
+                    Sync.Builder.add_answer builder ~query answer )
+              |> Or_error.all_unit )
+          in
+          Sync.Progress.report (Some (Sync.Builder.progress builder)) ;
+          drive asked
+  in
+  Sync.Progress.report (Some (Sync.Builder.progress builder)) ;
+  let%bind () = drive [] in
+  let%bind scan_state = Deferred.return (Sync.Builder.finish builder) in
+  let%map protocol_states =
+    match%bind fetch_one (Sync.Query.Protocol_states state_hash) with
+    | Sync.Answer.Protocol_states states ->
+        return (Array.to_list states)
+    | _ ->
+        Deferred.Or_error.error_string
+          "peer answered a protocol states query with something else"
+  in
+  [%log debug]
+    ~metadata:[ ("state_hash", State_hash.to_yojson state_hash) ]
+    "fetched scan state for $state_hash in fragments" ;
+  ( scan_state
+  , Sync.Manifest.ledger_hash manifest
+  , Sync.Manifest.pending_coinbase manifest
+  , protocol_states )
+
+(** Ask one peer for a whole round, in order.
+
+    Simple and predictable, and the peer will already have the responder it
+    built for the manifest, so it answers without rebuilding an index. Its
+    weakness is that one unhelpful peer ends the sync. *)
+let fetch_scan_state_from_peer ~network ~peer_id queries =
+  let open Deferred.Or_error.Let_syntax in
+  let%bind answers =
+    Mina_networking.answer_scan_state_queries network peer_id queries
+  in
+  match List.zip queries answers with
+  | Ok pairs ->
+      return pairs
+  | Unequal_lengths ->
+      Deferred.Or_error.error_string
+        "peer answered a different number of scan state queries than it was \
+         asked"
+
+(** Which fetch strategy a sync uses.
+
+    Both drive the same protocol over the same messages, so a running network
+    can be synced either way and the two compared directly. The downloader is
+    the default: it is the one that survives a peer going away mid-sync. *)
+let scan_state_sync_strategy () =
+  match Sys.getenv "MINA_SCAN_STATE_SYNC" with
+  | Some "pinned" ->
+      `Pinned
+  | Some "downloader" | None ->
+      `Downloader
+  | Some other ->
+      failwithf "unknown MINA_SCAN_STATE_SYNC %s, expected pinned|downloader"
+        other ()
+
+(** Ask whichever peers will answer, retrying elsewhere on failure.
+
+    The downloader handles the peer selection, batching and retry; a round
+    finishes when every query in it has an answer from someone. *)
+let fetch_scan_state_from_downloader ~downloader queries =
+  let open Deferred.Or_error.Let_syntax in
+  let jobs =
+    List.map queries ~f:(fun query ->
+        Scan_state_downloader.download downloader ~key:query
+          ~attempts:Peer.Map.empty )
+  in
+  let%map results =
+    Deferred.Or_error.List.map jobs ~how:`Parallel ~f:(fun job ->
+        match%map.Deferred Scan_state_downloader.Job.result job with
+        | Ok (answer, _attempts) ->
+            Ok (Envelope.Incoming.data answer)
+        | Error `Finished ->
+            Or_error.error_string
+              "scan state download was cancelled before it finished" )
+  in
+  results
+
 let handle_scan_state_and_aux ~logger ~expected_staged_ledger_hash
     ~temp_snarked_ledger ~verifier ~constraint_constants ~signature_kind
     ~proof_cache_db t
@@ -291,7 +498,7 @@ let handle_scan_state_and_aux ~logger ~expected_staged_ledger_hash
         let open Deferred.Or_error.Let_syntax in
         let received_staged_ledger_hash =
           Staged_ledger_hash.of_aux_ledger_and_coinbase_hash
-            (Staged_ledger.Scan_state.Stable.Latest.hash scan_state_uncached)
+            (Staged_ledger.Scan_state.Stored.hash scan_state_uncached)
             expected_merkle_root pending_coinbases
         in
         [%log debug]
@@ -461,9 +668,43 @@ let run_cycle ~context:(module Context : CONTEXT) ~trust_system ~verifier
     let%bind
         staged_ledger_data_download_time, staged_ledger_data_download_result =
       time_deferred
-        (Mina_networking.get_staged_ledger_aux_and_pending_coinbases_at_hash
-           t.network sender.peer_id hash )
+        (let stop = Ivar.create () in
+         let finish result = Ivar.fill_if_empty stop () ; result in
+         match scan_state_sync_strategy () with
+         | `Pinned ->
+             download_scan_state ~logger ~state_hash:hash
+               ~expected_staged_ledger_hash ~band_height:scan_state_band_height
+               ~fetch:
+                 (fetch_scan_state_from_peer ~network:t.network
+                    ~peer_id:sender.peer_id )
+         | `Downloader ->
+             let%bind.Deferred downloader =
+               Scan_state_downloader.create ~stop:(Ivar.read stop) ~logger
+                 ~trust_system:t.trust_system ~preferred:[ sender ]
+                 ~max_batch_size:8
+                 ~get:(fun peer queries ->
+                   fetch_scan_state_from_peer ~network:t.network
+                     ~peer_id:peer.peer_id queries )
+                 ~peers:(fun () -> Mina_networking.peers t.network)
+                 ~knowledge_context:(Pipe_lib.Broadcast_pipe.create () |> fst)
+                   (* every peer is assumed to be able to answer; a peer
+                      that cannot simply fails and the query is retried
+                      elsewhere, which is cheaper than asking each of them
+                      what they hold *)
+                 ~knowledge:(fun () _peer -> Deferred.return `All)
+                 ()
+             in
+             let%map.Deferred result =
+               download_scan_state ~logger ~state_hash:hash
+                 ~expected_staged_ledger_hash
+                 ~band_height:scan_state_band_height
+                 ~fetch:(fetch_scan_state_from_downloader ~downloader)
+             in
+             finish result )
     in
+    (* the sync is over either way; nothing should still be reporting progress
+       for it *)
+    Staged_ledger.Scan_state.Sync.Progress.report None ;
     match staged_ledger_data_download_result with
     | Error err ->
         Deferred.return (staged_ledger_data_download_time, (None, Error err))

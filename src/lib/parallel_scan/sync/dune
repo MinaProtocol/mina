@@ -1,6 +1,6 @@
 (library
- (name parallel_scan)
- (public_name parallel_scan)
+ (name parallel_scan_sync)
+ (public_name parallel_scan.sync)
  (inline_tests
   (flags -verbose -show-counts))
  (libraries
@@ -9,19 +9,18 @@
   digestif
   ;; local libraries
   mina_stdlib
+  parallel_scan
   ppx_version.runtime)
  (preprocess
   (pps
    ppx_assert
-   ppx_bin_prot
    ppx_compare
-   ppx_custom_printf
+   ppx_hash
    ppx_inline_test
    ppx_let
-   ppx_mina
    ppx_sexp_conv
    ppx_sexp_message
    ppx_version))
  (instrumentation
   (backend bisect_ppx))
- (synopsis "Parallel scan over an infinite stream (incremental map-reduce)"))
+ (synopsis "Fragment-wise synchronisation of a parallel scan state"))

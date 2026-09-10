@@ -27,7 +27,7 @@ module Transition_frontier = struct
             list
         }
     | Root_transitioned of
-        Transition_frontier.Diff.Root_transition.Lite.Stable.Latest.t
+        Transition_frontier.Diff.Root_transition.Lite.Stored.t
     | Bootstrap of { lost_blocks : State_hash.Stable.Latest.t list }
   [@@deriving bin_io_unversioned]
 end

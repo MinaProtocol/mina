@@ -49,17 +49,6 @@ module Rpcs : sig
     type response = Peer.t list
   end
 
-  module Get_staged_ledger_aux_and_pending_coinbases_at_hash : sig
-    type query = State_hash.t
-
-    type response =
-      ( Staged_ledger.Scan_state.Stable.Latest.t
-      * Ledger_hash.t
-      * Pending_coinbase.t
-      * Mina_state.Protocol_state.value list )
-      option
-  end
-
   module Answer_sync_ledger_query : sig
     type query = Ledger_hash.t * Sync_ledger.Query.t
 
@@ -67,6 +56,12 @@ module Rpcs : sig
       ( Sync_ledger.Answer.t
       , Mina_stdlib.Bounded_types.Wrapped_error.Stable.V1.t )
       Result.t
+  end
+
+  module Answer_scan_state_query : sig
+    type query = Staged_ledger.Scan_state.Sync.Query.t
+
+    type response = Staged_ledger.Scan_state.Sync.Answer.t option
   end
 
   module Get_transition_chain : sig
@@ -124,12 +119,10 @@ module Rpcs : sig
   type ('query, 'response) rpc = ('query, 'response) Rpcs.rpc =
     | Get_some_initial_peers :
         (Get_some_initial_peers.query, Get_some_initial_peers.response) rpc
-    | Get_staged_ledger_aux_and_pending_coinbases_at_hash :
-        ( Get_staged_ledger_aux_and_pending_coinbases_at_hash.query
-        , Get_staged_ledger_aux_and_pending_coinbases_at_hash.response )
-        rpc
     | Answer_sync_ledger_query :
         (Answer_sync_ledger_query.query, Answer_sync_ledger_query.response) rpc
+    | Answer_scan_state_query :
+        (Answer_scan_state_query.query, Answer_scan_state_query.response) rpc
     | Get_transition_chain :
         (Get_transition_chain.query, Get_transition_chain.response) rpc
     | Get_transition_knowledge :
@@ -221,15 +214,13 @@ val get_transition_chain :
   -> State_hash.t list
   -> Mina_block.Stable.Latest.t list Deferred.Or_error.t
 
-val get_staged_ledger_aux_and_pending_coinbases_at_hash :
+(** Ask one peer a batch of scan state sync queries, answered in order over a
+    single stream. *)
+val answer_scan_state_queries :
      t
   -> Peer.Id.t
-  -> State_hash.t
-  -> ( Staged_ledger.Scan_state.Stable.Latest.t
-     * Ledger_hash.t
-     * Pending_coinbase.t
-     * Mina_state.Protocol_state.value list )
-     Deferred.Or_error.t
+  -> Staged_ledger.Scan_state.Sync.Query.t list
+  -> Staged_ledger.Scan_state.Sync.Answer.t list Deferred.Or_error.t
 
 val get_completed_checked_snarks :
      t

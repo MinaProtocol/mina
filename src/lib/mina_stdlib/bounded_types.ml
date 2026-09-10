@@ -5,6 +5,10 @@ module N16 = struct
   let max_array_len = 16
 end
 
+module N64 = struct
+  let max_array_len = 64
+end
+
 module N4000 = struct
   let max_array_len = 4000
 end
@@ -163,4 +167,5 @@ module Wrapped_error = struct
 end
 
 module ArrayN16 = ArrayN (N16)
+module ArrayN64 = ArrayN (N64)
 module ArrayN4000 = ArrayN (N4000)
