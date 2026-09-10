@@ -46,22 +46,17 @@ var caml_bigint_256_to_bytes = tsBindings.caml_bigint_256_to_bytes;
 var caml_bigint_256_of_bytes = tsBindings.caml_bigint_256_of_bytes;
 
 // Provides: caml_bigint_256_blit_to_bigstring
-// Requires: tsBindings, caml_ba_set_1, caml_bytes_unsafe_get
+// Requires: tsBindings, caml_bigstring_blit_bytes_to_ba
 function caml_bigint_256_blit_to_bigstring(x, buf, pos) {
-  var bytes = tsBindings.caml_bigint_256_to_bytes(x);
-  for (var i = 0; i < 32; i++) {
-    caml_ba_set_1(buf, pos + i, caml_bytes_unsafe_get(bytes, i));
-  }
+  caml_bigstring_blit_bytes_to_ba(tsBindings.caml_bigint_256_to_bytes(x), 0, buf, pos, 32);
   return 0;
 }
 
 // Provides: caml_bigint_256_of_bigstring
-// Requires: tsBindings, caml_ba_get_1, caml_create_bytes, caml_bytes_unsafe_set
+// Requires: tsBindings, caml_bigstring_blit_ba_to_bytes, caml_create_bytes
 function caml_bigint_256_of_bigstring(buf, pos) {
   var bytes = caml_create_bytes(32);
-  for (var i = 0; i < 32; i++) {
-    caml_bytes_unsafe_set(bytes, i, caml_ba_get_1(buf, pos + i));
-  }
+  caml_bigstring_blit_ba_to_bytes(buf, pos, bytes, 0, 32);
   return tsBindings.caml_bigint_256_of_bytes(bytes);
 }
 
