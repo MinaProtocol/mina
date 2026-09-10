@@ -792,7 +792,8 @@ let docker_commands
                         (     s
                           //  { deb_release =
                                   DebianChannel.effective spec.channel
-                              , docker_repo = spec.docker_repo
+                              , docker_repo =
+                                  DockerRepo.effective spec.docker_repo
                               }
                         )
                 )
