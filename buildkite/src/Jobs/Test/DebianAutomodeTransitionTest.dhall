@@ -30,7 +30,7 @@ let devnet = Network.Type.Devnet
 
 let profile = Profiles.Type.Devnet
 
-let debVersion = DebianVersions.DebVersion.Bullseye
+let debVersion = DebianVersions.DebVersion.Noble
 
 let dependsOnDevnet =
       DebianVersions.appDependsOn
@@ -72,7 +72,7 @@ let buildTestCmd
                         debianTokens
                     # RunInToolchain.runInToolchain
                         RunInToolchain.Config::{
-                        , image = ContainerImages.minaToolchainBullseye.amd64
+                        , image = ContainerImages.minaToolchainNoble.amd64
                         , environment = [ "LOCAL_DEB_SOURCE_DIR=_build" ]
                         , innerScript =
                             ''

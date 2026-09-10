@@ -52,7 +52,7 @@ let Spec =
           , key : Text
           }
       , default =
-          { codenames = [ DebianVersions.DebVersion.Bullseye ]
+          { codenames = [ DebianVersions.DebVersion.Noble ]
           , channel = DebianChannel.Type.Unstable
           , debianRepo = DebianRepo.Type.Unstable
           , verify = True

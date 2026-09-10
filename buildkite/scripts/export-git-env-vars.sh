@@ -3,7 +3,7 @@
 # Export all variables from inner script
 set -a
 
-export MINA_DEB_CODENAME=${MINA_DEB_CODENAME:=bullseye}
+export MINA_DEB_CODENAME=${MINA_DEB_CODENAME:=noble}
 
 if [[ -n "$BUILDKITE_BRANCH" ]]; then
    # shellcheck disable=SC1090

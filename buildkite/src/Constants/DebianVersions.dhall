@@ -43,7 +43,7 @@ let DepsSpec =
           , arch : Arch.Type
           }
       , default =
-          { deb_version = DebVersion.Bullseye
+          { deb_version = DebVersion.Noble
           , network = Network.Type.Devnet
           , profile = Profiles.Type.Devnet
           , build_flag = BuildFlags.Type.None
@@ -91,7 +91,7 @@ let minimalDirtyWhen =
           "sh"
       ]
 
-let bullseyeDirtyWhen =
+let primaryDirtyWhen =
         [ S.strictlyStart (S.contains "src")
         , S.strictly (S.contains "Makefile")
         , S.exactly "buildkite/scripts/connect/connect-to-network" "sh"
@@ -106,10 +106,10 @@ let dirtyWhen =
           \(debVersion : DebVersion)
       ->  merge
             { Bookworm = minimalDirtyWhen
-            , Bullseye = bullseyeDirtyWhen
+            , Bullseye = minimalDirtyWhen
             , Jammy = minimalDirtyWhen
             , Focal = minimalDirtyWhen
-            , Noble = minimalDirtyWhen
+            , Noble = primaryDirtyWhen
             }
             debVersion
 

@@ -1,5 +1,7 @@
 let ArtifactPipelines = ../../Command/MinaArtifact.dhall
 
+let DebianVersions = ../../Constants/DebianVersions.dhall
+
 let Artifacts = ../../Constants/Artifact/Artifacts.dhall
 
 let Profile = ../../Constants/Profiles.dhall
@@ -15,6 +17,7 @@ let PipelineTag = ../../Pipeline/Tag.dhall
 in  Pipeline.build
       ( ArtifactPipelines.packagePipeline
           ArtifactPipelines.PackagingSpec::{
+          , debVersion = DebianVersions.DebVersion.Noble
           , artifacts =
             [ Artifacts.Type.Daemon { network = Network.Type.Devnet }
             , Artifacts.Type.DaemonGeneric
@@ -38,7 +41,7 @@ in  Pipeline.build
             , PipelineTag.Type.Docker
             , PipelineTag.Type.Devnet
             , PipelineTag.Type.Amd64
-            , PipelineTag.Type.Bullseye
+            , PipelineTag.Type.Noble
             ]
           }
       )

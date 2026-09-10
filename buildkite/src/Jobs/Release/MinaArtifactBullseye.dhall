@@ -1,10 +1,14 @@
 let ArtifactPipelines = ../../Command/MinaArtifact.dhall
 
+let DebianVersions = ../../Constants/DebianVersions.dhall
+
 let Artifacts = ../../Constants/Artifact/Artifacts.dhall
 
 let Pipeline = ../../Pipeline/Dsl.dhall
 
 let PipelineTag = ../../Pipeline/Tag.dhall
+
+let PipelineScope = ../../Pipeline/Scope.dhall
 
 let Network = ../../Constants/Network.dhall
 
@@ -13,6 +17,7 @@ let Profile = ../../Constants/Profiles.dhall
 in  Pipeline.build
       ( ArtifactPipelines.packagePipeline
           ArtifactPipelines.PackagingSpec::{
+          , debVersion = DebianVersions.DebVersion.Bullseye
           , artifacts =
             [ Artifacts.Type.Daemon { network = Network.Type.Devnet }
             , Artifacts.Type.DaemonGeneric
@@ -34,6 +39,7 @@ in  Pipeline.build
             , Artifacts.Type.DaemonStorageToolbox
             , Artifacts.Type.FunctionalTestSuite
             ]
+          , scope = [ PipelineScope.Type.Weekly, PipelineScope.Type.Release ]
           , tags =
             [ PipelineTag.Type.Packaging
             , PipelineTag.Type.Release

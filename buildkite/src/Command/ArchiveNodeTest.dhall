@@ -29,7 +29,7 @@ in  { step =
                             "src/test/archive/sample_db/archive_db.sql"
                         )
                     )
-                    ContainerImages.minaToolchainBullseye.amd64
+                    ContainerImages.minaToolchainNoble.amd64
                     "mina-test-suite,mina-generic-instrumented,mina-archive-generic-instrumented,mina-devnet-profile,mina-archive-devnet-instrumented"
                     "./scripts/tests/archive-node-test.sh"
                 , Cmd.run

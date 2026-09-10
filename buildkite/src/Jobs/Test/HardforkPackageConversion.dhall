@@ -1,4 +1,4 @@
--- Converts a daemon .deb built by MinaArtifactBullseye into its hardfork
+-- Converts a daemon .deb built by MinaArtifactNoble into its hardfork
 -- variant, so it can only run in a stage that also runs the packaging jobs.
 --
 -- Hence the Packaging tag rather than Fast. Tagged Fast, the nightly's FastOnly
