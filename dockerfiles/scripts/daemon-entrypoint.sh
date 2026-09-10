@@ -55,7 +55,6 @@ fi
 mkdir -p .mina-config
 
 set +e # Allow remaining commands to fail without exiting early
-rm -f .mina-config/.mina-lock
 
 # Export variables that the daemon would read directly
 export MINA_PRIVKEY_PASS MINA_LIBP2P_PASS UPTIME_PRIVKEY_PASS
