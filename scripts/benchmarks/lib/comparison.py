@@ -50,6 +50,7 @@ class Comparison:
     yellow_delta: float
     red_delta: float
     verdict: Verdict
+    unit: str = ""
 
     @property
     def deviation(self):
@@ -64,18 +65,31 @@ class Comparison:
         delta = self.red_delta if self.verdict is Verdict.red else self.yellow_delta
         return self.average + delta if self.deviation >= 0 else self.average - delta
 
+    def quantity(self, value):
+        """
+         Renders a number in the unit it was measured in, when there is one.
+
+         Limits carry the float noise of a ratio applied to a moving average,
+         which no reader of a benchmark log needs, so they are rounded.
+        """
+        rounded = round(value, 2)
+        return f"{rounded} {self.unit}" if self.unit else f"{rounded}"
+
     @property
     def message(self):
         moved = "exceeds" if self.deviation >= 0 else "dropped below"
         if self.verdict is Verdict.red:
             return (f"{self.name} {moved} red threshold "
-                    f"({self.value} against {self.limit}). failing the build")
+                    f"({self.quantity(self.value)} against "
+                    f"{self.quantity(self.limit)}). failing the build")
         if self.verdict is Verdict.yellow:
             return (f"WARNING: {self.name} {moved} yellow threshold "
-                    f"({self.value} against {self.limit})")
-        return (f"comparison succesful for {self.name}. {self.value} is within "
-                f"threshold [yellow={self.average + self.yellow_delta},"
-                f"red={self.average + self.red_delta}]")
+                    f"({self.quantity(self.value)} against "
+                    f"{self.quantity(self.limit)})")
+        return (f"comparison succesful for {self.name}. "
+                f"{self.quantity(self.value)} is within threshold "
+                f"[yellow={self.quantity(self.average + self.yellow_delta)},"
+                f"red={self.quantity(self.average + self.red_delta)}]")
 
 
 def _grade(excess, yellow_delta, red_delta):
@@ -98,12 +112,13 @@ def _demote(verdict):
 
 
 def compare_measurement(name, value, average, yellow_ratio, red_ratio,
-                        policy=Policy.upward):
+                        policy=Policy.upward, unit=""):
     """
      Weighs a measurement against the moving average of its history.
 
      The ratios are fractions of the average, so 0.3 allows a 30% move before
-     the red verdict.
+     the red verdict. Unit names what was measured so messages can report it,
+     and never affects the verdict.
     """
     yellow_delta = abs(average) * yellow_ratio
     red_delta = abs(average) * red_ratio
@@ -123,4 +138,5 @@ def compare_measurement(name, value, average, yellow_ratio, red_ratio,
                       average=average,
                       yellow_delta=yellow_delta,
                       red_delta=red_delta,
-                      verdict=verdict)
+                      verdict=verdict,
+                      unit=unit)

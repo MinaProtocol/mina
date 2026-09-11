@@ -33,13 +33,23 @@ class MeasurementColumn(HeaderColumn):
 class FieldColumn(HeaderColumn):
     """
         Column header which represents influx field header.
-        It has additional unit field which can be formatted as part of name
         Currently field is always a double (there was no need so far for different type)
+
+        Two units live here and they are not interchangeable:
+
+        - unit is baked into the influx field name by __str__, which is what
+          queries filter on, so changing it on an existing column orphans every
+          historical sample of that series
+        - display_unit is only ever shown to a reader, so it is safe to add or
+          correct at any time. Spell it out in full, "words" rather than "w",
+          so no one has to guess what a benchmark log is counting. It falls
+          back to unit when not given.
     """
 
-    def __init__(self, name, pos, unit=None):
+    def __init__(self, name, pos, unit=None, display_unit=None):
         HeaderColumn.__init__(self, name, influx_kind="double", pos=pos)
         self.unit = unit
+        self.display_unit = unit if display_unit is None else display_unit
 
     def __str__(self):
         if self.unit:

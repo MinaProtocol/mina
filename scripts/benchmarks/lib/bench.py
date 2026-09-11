@@ -133,7 +133,8 @@ class Benchmark(abc.ABC):
                             average=float(records[-1]["_value"]),
                             yellow_ratio=yellow_threshold,
                             red_ratio=red_threshold,
-                            policy=policy)
+                            policy=policy,
+                            unit=field.display_unit)
 
                         logger.debug(
                             f"calculated thresholds: [red={comparison.red_delta},yellow={comparison.yellow_delta}]"
@@ -171,11 +172,11 @@ class JaneStreetBenchmark(Benchmark, ABC):
 
     """
     name = MeasurementColumn("Name", 0)
-    time_per_runs = FieldColumn("Time/Run", 1, "us")
-    cycles_per_runs = FieldColumn("Cycls/Run", 2, "kc")
-    minor_words_per_runs = FieldColumn("mWd/Run", 3, "w")
-    major_words_per_runs = FieldColumn("mjWd/Run", 4, "w")
-    promotions_per_runs = FieldColumn("Prom/Run", 5, "w")
+    time_per_runs = FieldColumn("Time/Run", 1, "us", display_unit="microseconds")
+    cycles_per_runs = FieldColumn("Cycls/Run", 2, "kc", display_unit="kilocycles")
+    minor_words_per_runs = FieldColumn("mWd/Run", 3, "w", display_unit="words")
+    major_words_per_runs = FieldColumn("mjWd/Run", 4, "w", display_unit="words")
+    promotions_per_runs = FieldColumn("Prom/Run", 5, "w", display_unit="words")
     category = TagColumn("category", 6)
     branch = TagColumn("gitbranch", 7)
 
@@ -391,7 +392,7 @@ class LedgerApplyBenchmark(Benchmark):
     """
 
     name = MeasurementColumn("Name", 0)
-    time = FieldColumn("time",  1, "ms")
+    time = FieldColumn("time",  1, "ms", display_unit="milliseconds")
     preps_mean = FieldColumn("preps mean",  2, "")
     category = TagColumn("category", 3)
     branch = TagColumn("gitbranch", 4)
@@ -455,7 +456,7 @@ class ArchiveBenchmark(Benchmark):
     """
 
     name = MeasurementColumn("Name", 0)
-    time = FieldColumn("time",  1, "ms")
+    time = FieldColumn("time",  1, "ms", display_unit="milliseconds")
     category = TagColumn("category", 2)
     branch = TagColumn("gitbranch", 3)
 
@@ -614,8 +615,8 @@ class SnarkBenchmark(Benchmark):
     proofs_updates = FieldColumn("proofs updates", 1, "")
     nonproofs_pairs = FieldColumn("non-proof pairs", 2, "")
     nonproofs_singles = FieldColumn("non-proof singles", 3, "")
-    verification_time = FieldColumn("verification time", 4, "[s]")
-    proving_time = FieldColumn("value", 5, "[s]")
+    verification_time = FieldColumn("verification time", 4, "[s]", display_unit="seconds")
+    proving_time = FieldColumn("value", 5, "[s]", display_unit="seconds")
     category = TagColumn("category", 6)
     branch = TagColumn("gitbranch", 7)
 
@@ -710,8 +711,8 @@ class HeapUsageBenchmark(Benchmark):
     """
 
     name = MeasurementColumn("Name", 0)
-    heap_words = FieldColumn("heap words", 1, "")
-    bytes = FieldColumn("bytes", 2, "")
+    heap_words = FieldColumn("heap words", 1, "", display_unit="words")
+    bytes = FieldColumn("bytes", 2, "", display_unit="bytes")
     category = TagColumn("category", 3)
     branch = TagColumn("gitbranch", 4)
 

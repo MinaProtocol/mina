@@ -74,6 +74,33 @@ class TestCompareMeasurement(unittest.TestCase):
         self.assertIn("exceeds red threshold", comparison.message)
         self.assertIn("1500.0 against 1300.0", comparison.message)
 
+    def test_message_reports_the_unit_when_there_is_one(self):
+        comparison = compare_measurement(name="Parallel_scan.Merge.t",
+                                         value=1500.0,
+                                         average=self.average,
+                                         yellow_ratio=self.yellow,
+                                         red_ratio=self.red,
+                                         unit="words")
+        self.assertIn("1500.0 words against 1300.0 words", comparison.message)
+
+    def test_message_reports_the_unit_on_success_too(self):
+        comparison = compare_measurement(name="Parallel_scan.Merge.t",
+                                         value=1000.0,
+                                         average=self.average,
+                                         yellow_ratio=self.yellow,
+                                         red_ratio=self.red,
+                                         unit="bytes")
+        self.assertIn("1000.0 bytes is within threshold", comparison.message)
+        self.assertIn("yellow=1100.0 bytes", comparison.message)
+
+    def test_message_omits_the_unit_for_a_bare_count(self):
+        comparison = compare_measurement(name="proofs updates",
+                                         value=1500.0,
+                                         average=self.average,
+                                         yellow_ratio=self.yellow,
+                                         red_ratio=self.red)
+        self.assertIn("1500.0 against 1300.0", comparison.message)
+
     def test_message_reports_the_direction_of_a_drop(self):
         comparison = compare_measurement(name="Parallel_scan.Merge.t",
                                          value=500.0,
