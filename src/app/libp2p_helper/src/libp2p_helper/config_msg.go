@@ -446,6 +446,7 @@ func (msg ConfigureReq) handle(app *app, seqno uint64) (*capnp.Message, func()) 
 	app.P2p = helper
 	app.bitswapCtx.engine = helper.Bitswap
 	app.bitswapCtx.storage = helper.BitswapStorage
+	app.StartBackgroundTasks(helper.Logger)
 
 	opts := []pubsub.Option{
 		pubsub.WithFloodPublish(m.Flood()),
@@ -621,7 +622,12 @@ func (m SetNodeStatusReq) handle(app *app, seqno uint64) (*capnp.Message, func()
 	if err != nil {
 		return mkRpcRespError(seqno, badRPC(err))
 	}
-	app.P2p.NodeStatus = status
+	app.P2p.NodeStatusMutex.Lock()
+	// Copy status bytes to decouple from the capnp message arena.
+	// Otherwise Go GC keeps the entire arena (56MB+) alive as long as
+	// NodeStatus references it, causing OOM under concurrent load.
+	app.P2p.NodeStatus = append([]byte(nil), status...)
+	app.P2p.NodeStatusMutex.Unlock()
 	return mkRpcRespSuccess(seqno, func(m *ipc.Libp2pHelperInterface_RpcResponseSuccess) {
 		_, err := m.NewSetNodeStatus()
 		panicOnErr(err)

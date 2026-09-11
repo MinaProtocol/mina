@@ -100,6 +100,7 @@ func newTestAppWithMaxConnsAndCtxAndGrace(t *testing.T, privkey crypto.PrivKey, 
 		metricsServer:            nil,
 		metricsCollectionStarted: false,
 		bitswapCtx:               bitswapCtx,
+		workerSem:                make(chan struct{}, WorkerPoolSize),
 	}
 }
 
