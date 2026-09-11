@@ -472,10 +472,15 @@ let create ~logger ?(enable_internal_tracing = false) ?internal_trace_filename
           ~metadata:[ ("exit_code", `Int n) ] ;
         Async.exit 1
     | Ok (Error (`Signal signal)) ->
-        let signal_str = Signal.to_string signal in
-        [%log fatal] "Prover terminated due to signal, terminating daemon"
-          ~metadata:[ ("signal", `String signal_str) ] ;
-        Async.exit 1
+        if Async_unix.Shutdown.is_shutting_down () then (
+          [%log info] "Prover terminated due to signal during shutdown"
+            ~metadata:[ ("signal", `String (Signal.to_string signal)) ] ;
+          Deferred.unit )
+        else
+          let signal_str = Signal.to_string signal in
+          [%log fatal] "Prover terminated due to signal, terminating daemon"
+            ~metadata:[ ("signal", `String signal_str) ] ;
+          Async.exit 1
     | Error err ->
         let err_str = Error.to_string_hum err in
         [%log fatal] "Error waiting on prover process, terminating daemon"
