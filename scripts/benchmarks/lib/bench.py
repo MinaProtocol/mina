@@ -8,7 +8,8 @@ import json
 import os
 from enum import Enum
 import logging
-from lib.utils import isclose, assert_cmd
+from lib.utils import assert_cmd
+from lib.comparison import Policy, Verdict, compare_measurement
 from lib.influx import *
 
 import csv
@@ -92,7 +93,8 @@ class Benchmark(abc.ABC):
         """
         pass
 
-    def compare(self, result_file, yellow_threshold, red_threshold):
+    def compare(self, result_file, yellow_threshold, red_threshold,
+                policy=Policy.upward):
         """
          Compares actual measurements against thresholds (yellow,red)
 
@@ -101,7 +103,9 @@ class Benchmark(abc.ABC):
          - implements influx csv format:
            https://docs.influxdata.com/influxdb/cloud/reference/syntax/annotated-csv/extended/
 
-         It gets moving average from influx db and adds grace values (yellow,red) to handle measurements skew.
+         It gets moving average from influx db and hands each measurement to
+         lib.comparison, which decides the verdict. Policy selects which
+         directions of change count against a measurement.
 
         """
         with open(result_file, newline='') as csvfile:
@@ -116,8 +120,6 @@ class Benchmark(abc.ABC):
                     result = self.influx_client.query_moving_average(
                         name, branch, str(field), self.branch_header())
 
-                    print(f"result: {result}")
-                    
                     records = result[-1].records if (result is not None) and (len(result) > 0) else []
 
                     if len(records) < self.influx_client.moving_average_size :
@@ -125,28 +127,25 @@ class Benchmark(abc.ABC):
                             f"Skipping comparison for {name} as there are no enough ({self.influx_client.moving_average_size}) historical data available yet"
                         )
                     else:
-                        average = float(records[-1]["_value"])
-
-                        current_red_threshold = average * red_threshold
-                        current_yellow_threshold = average * yellow_threshold
+                        comparison = compare_measurement(
+                            name=name,
+                            value=value,
+                            average=float(records[-1]["_value"]),
+                            yellow_ratio=yellow_threshold,
+                            red_ratio=red_threshold,
+                            policy=policy)
 
                         logger.debug(
-                            f"calculated thresholds: [red={current_red_threshold},yellow={current_yellow_threshold}]"
+                            f"calculated thresholds: [red={comparison.red_delta},yellow={comparison.yellow_delta}]"
                         )
 
-                        if isclose(value + red_threshold, average):
-                            logger.error(
-                                f"{name} measurement exceeds time greatly ({value + current_red_threshold} against {average}). failing the build"
-                            )
+                        if comparison.verdict is Verdict.red:
+                            logger.error(comparison.message)
                             exit(1)
-                        elif isclose(value + yellow_threshold, average):
-                            logger.warning(
-                                f"WARNING: {name} measurement exceeds expected time ({value + current_yellow_threshold} against {average})"
-                            )
+                        elif comparison.verdict is Verdict.yellow:
+                            logger.warning(comparison.message)
                         else:
-                            logger.info(
-                                f"comparison succesful for {name}. {value} is less than threshold [yellow={average + current_yellow_threshold},red={average + current_red_threshold}]"
-                            )
+                            logger.info(comparison.message)
 
     def upload(self, file):
         self.influx_client.upload_csv(file)

@@ -47,6 +47,13 @@ compare_bench.add_argument("--red-threshold",help="defines how many percent curr
                            type=float,
                            choices=[Range(0.0, 1.0)],
                            default=0.2)
+compare_bench.add_argument("--policy",
+                               help="which directions of change count against a measurement: "
+                                    "upward fails only on a rise, upward-warn-on-drop also warns on a steep fall, "
+                                    "symmetric fails on any move outside the band",
+                               type=Policy,
+                               choices=list(Policy),
+                               default=Policy.upward)
 
 upload_bench = subparsers.add_parser('upload')
 upload_bench.add_argument("--infile")
@@ -68,6 +75,13 @@ test_bench.add_argument("--red-threshold",
                         type=float,
                         choices=[Range(0.0, 1.0)],
                         default=0.2)
+test_bench.add_argument("--policy",
+                            help="which directions of change count against a measurement: "
+                                 "upward fails only on a rise, upward-warn-on-drop also warns on a steep fall, "
+                                 "symmetric fails on any move outside the band",
+                            type=Policy,
+                            choices=list(Policy),
+                            default=Policy.upward)
 test_bench.add_argument("--branch", help="branch which was used in tests")
 test_bench.add_argument("--genesis-ledger-path", default="./genesis_ledgers/devnet.json", help="Applicable only for ledger-export benchmark. Location of genesis config file")
 test_bench.add_argument('-m','--mainline-branches', action='append', help='Defines mainline branch. If values of \'--branch\' parameter is among mainline branches then result will be uploaded')
@@ -133,7 +147,8 @@ if args.cmd == "parse":
 
 
 if args.cmd == "compare":
-    bench.compare(args.infile, args.yellow_threshold, args.red_threshold)
+    bench.compare(args.infile, args.yellow_threshold, args.red_threshold,
+                  args.policy)
 
 if args.cmd == "upload":
     bench.upload(args.infile)
@@ -151,7 +166,8 @@ if args.cmd == "test":
             branch=args.branch)
 
     [
-        bench.compare(file, args.yellow_threshold, args.red_threshold)
+        bench.compare(file, args.yellow_threshold, args.red_threshold,
+                      args.policy)
         for file in files
     ]
 

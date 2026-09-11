@@ -5,10 +5,6 @@ from enum import Enum
 logger = logging.getLogger(__name__)
 
 
-def isclose(a, b, rel_tol=1e-09, abs_tol=0.0):
-    return abs(a - b) <= max(rel_tol * max(abs(a), abs(b)), abs_tol)
-
-
 def assert_cmd(cmd, envs=None):
     logger.debug(f"running command {cmd}")
     result = subprocess.run(cmd,
