@@ -275,7 +275,7 @@ struct
     with_label __LOC__ (fun () ->
         Field.Assert.equal Field.((of_int 2 * s_div_2) + (s_odd :> Field.t)) s ) ;
     scale_fast2 g (Pickles_types.Shifted_value.Type2.Shifted_value s_parts)
-      ~num_bits
+      ~num_bits:(if num_bits >= Field.size_in_bits then num_bits - 1 else num_bits)
 
   let scale_fast a b = with_label __LOC__ (fun () -> scale_fast a b)
 
@@ -286,5 +286,15 @@ struct
      Pinning the top bit to zero, as [scale_fast2] pins the bits above its split, makes the
      ladder run on the canonical decomposition. The scalars this excludes — shifted values in
      [[2^(num_bits-1), modulus)] — are a negligible fraction of the field. The pin is an
-     [Equal] constraint against the cached zero, so it costs wiring, not a row. *)
+     [Equal] constraint against the cached zero, so it costs wiring, not a row.
+
+     [scale_fast2'] has the same ambiguity one level up (kept on one line above for the same
+     reason): its split [2 s_div_2 + s_odd = s] is an equation in the circuit field, and with
+     [s_div_2] only bounded below [2^(num_bits-1)] both [s] and [s + modulus] solve it for
+     almost every [s] — the two decoding to different multiples of the base. At the full field
+     width it therefore runs [scale_fast2] at [num_bits - 1], which pins one more bit of
+     [s_div_2] (the same ladder: the chunk count is unchanged), so [2 s_div_2 + s_odd] is
+     below [2^(num_bits-1)] and the decomposition is canonical. This is the top-bit-zero
+     assumption [With_top_bit0] names, made a constraint: the scalars it excludes are again
+     those in [[2^(num_bits-1), modulus)]. *)
 end
