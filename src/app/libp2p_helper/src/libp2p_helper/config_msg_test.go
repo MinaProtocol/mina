@@ -379,3 +379,11 @@ func TestSetNodeStatus(t *testing.T) {
 
 	require.Equal(t, testStatus, testApp.P2p.NodeStatus)
 }
+
+func TestEnvDuration(t *testing.T) {
+	require.Equal(t, time.Second, envDuration("MINA_TEST_UNSET_DURATION", time.Second))
+	t.Setenv("MINA_TEST_DURATION", "not a duration")
+	require.Equal(t, time.Second, envDuration("MINA_TEST_DURATION", time.Second))
+	t.Setenv("MINA_TEST_DURATION", "250ms")
+	require.Equal(t, 250*time.Millisecond, envDuration("MINA_TEST_DURATION", time.Second))
+}

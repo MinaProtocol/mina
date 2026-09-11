@@ -4,6 +4,7 @@ import (
 	cryptorand "crypto/rand"
 	"fmt"
 	gonet "net"
+	"os"
 	"sync"
 	"time"
 
@@ -20,9 +21,28 @@ import (
 	peer "github.com/libp2p/go-libp2p/core/peer"
 	peerstore "github.com/libp2p/go-libp2p/core/peerstore"
 	discovery "github.com/libp2p/go-libp2p/p2p/discovery/routing"
+	dutil "github.com/libp2p/go-libp2p/p2p/discovery/util"
 	"github.com/multiformats/go-multiaddr"
 	"golang.org/x/crypto/blake2b"
 )
+
+// how often to re-read the DHT membership directory while the node is below
+// its low-water peer mark: starts at the min, doubles up to the max
+// ponytail: fixed exponential backoff, no jitter; add jitter if many nodes
+// end up starved at once and their queries synchronise
+// overridable via env vars for operators who need a different cadence; a
+// missing or unparseable value falls back to the default
+var (
+	discoveryMinInterval = envDuration("MINA_LIBP2P_DISCOVERY_MIN_INTERVAL", time.Second)
+	discoveryMaxInterval = envDuration("MINA_LIBP2P_DISCOVERY_MAX_INTERVAL", time.Minute*5)
+)
+
+func envDuration(name string, def time.Duration) time.Duration {
+	if d, err := time.ParseDuration(os.Getenv(name)); err == nil {
+		return d
+	}
+	return def
+}
 
 type BeginAdvertisingReqT = ipc.Libp2pHelperInterface_BeginAdvertising_Request
 type BeginAdvertisingReq BeginAdvertisingReqT
@@ -104,25 +124,49 @@ func (msg BeginAdvertisingReq) handle(app *app, seqno uint64) (*capnp.Message, f
 			return mkRpcRespError(seqno, badp2p(err))
 		}
 
-		time.Sleep(time.Millisecond * 100)
 		app.P2p.Logger.Debugf("beginning DHT advertising")
 
-		_, err = routingDiscovery.Advertise(app.Ctx, app.P2p.Rendezvous)
-		if err != nil {
-			app.P2p.Logger.Error("failed to routing advertise: ", err.Error())
-			return mkRpcRespError(seqno, badp2p(err))
-		}
-
 		go func() {
-			peerCh, err := routingDiscovery.FindPeers(app.Ctx, app.P2p.Rendezvous)
-			if err != nil {
-				app.P2p.Logger.Error("error while trying to find some peers: ", err.Error())
+			// Bootstrap is asynchronous, and both advertising and lookups walk
+			// the routing table towards the key, so wait for the table to have
+			// someone in it before either starts.
+			for app.P2p.Dht.WAN.RoutingTable().Size()+app.P2p.Dht.LAN.RoutingTable().Size() == 0 {
+				select {
+				case <-time.After(time.Millisecond * 200):
+				case <-app.Ctx.Done():
+					return
+				}
 			}
 
-			for peer := range peerCh {
-				foundPeerCh <- peerDiscovery{
-					info:   peer,
-					source: PEER_DISCOVERY_SOURCE_ROUTING,
+			// dutil.Advertise republishes the provider record before it
+			// expires; routingDiscovery.Advertise on its own publishes once.
+			dutil.Advertise(app.Ctx, routingDiscovery, app.P2p.Rendezvous)
+
+			wait := discoveryMinInterval
+			for {
+				connInfo := app.P2p.ConnectionManager.GetInfo()
+				if connInfo.ConnCount >= connInfo.LowWater {
+					wait = discoveryMinInterval
+				} else {
+					peerCh, err := routingDiscovery.FindPeers(app.Ctx, app.P2p.Rendezvous)
+					if err != nil {
+						app.P2p.Logger.Error("error while trying to find some peers: ", err.Error())
+					} else {
+						for peer := range peerCh {
+							foundPeerCh <- peerDiscovery{
+								info:   peer,
+								source: PEER_DISCOVERY_SOURCE_ROUTING,
+							}
+						}
+					}
+					if wait < discoveryMaxInterval {
+						wait *= 2
+					}
+				}
+				select {
+				case <-time.After(wait):
+				case <-app.Ctx.Done():
+					return
 				}
 			}
 		}()
