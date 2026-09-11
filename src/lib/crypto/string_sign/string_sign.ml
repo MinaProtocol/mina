@@ -1,4 +1,9 @@
-(* string_sign.ml -- signatures for strings *)
+(* string_sign.ml -- signatures for strings
+
+   DEPRECATED: This library should not be used anymore. The implementation
+   has been moved to signature_lib. Please use signature_lib.Schnorr.Legacy
+   or signature_lib.Schnorr.Chunked directly for signing operations.
+*)
 
 module Inner_curve = Snark_params.Tick.Inner_curve
 open Signature_lib
