@@ -4,7 +4,7 @@ set -eox pipefail
 
 YELLOW_THRESHOLD="0.1"
 RED_THRESHOLD="0.3"
-BRANCH="${BRANCH:-BUILDKITE_BRANCH}"
+BRANCH="${BRANCH:-${BUILDKITE_BRANCH:-local}}"
 
 while [[ "$#" -gt 0 ]]; do case $1 in
   heap-usage) BENCHMARK="heap-usage"; ;;
@@ -124,18 +124,28 @@ fi
 
 # Feed the bench data to mina-bench-upload: it parses the output, uploads the
 # records to InfluxDB (creds from the INFLUX_* env set by Benchmarks.toEnvList)
-# and runs the historical-mean regression check against the union of the
-# mainline branches (a wider, more stable baseline than a single branch, which
-# matters for noisy timing benches). A red regression exits non-zero.
-compare_flags=()
-for b in develop compatible master; do compare_flags+=(--compare-branch "$b"); done
+# and runs the historical-mean regression check against develop's history. A
+# red regression exits non-zero.
+#
+# Only mainline branches upload: a pull request build is tagged with its own
+# branch name and checked against develop, but never written to InfluxDB.
+#
+# The baseline is develop alone. compatible and master are still written by the
+# Python harness in different units (ns 1e6x, cycles 1e3x), so a union with
+# them averages incompatible values. Widen it again once those are corrected.
+upload_flags=()
+case "$BRANCH" in
+  develop|compatible|master) upload_flags=(--upload) ;;
+  *) echo "run.sh: branch '$BRANCH' is not mainline; skipping upload" ;;
+esac
+compare_flags=(--compare-branch develop)
 if [[ -n "$UPLOAD_INPUT" ]]; then
   # Parse-only bench: read the file the job's preCommands generated.
   mina-bench-upload \
     --format "$UPLOAD_FORMAT" \
     --input "$UPLOAD_INPUT" \
     --branch "$BRANCH" \
-    --upload \
+    "${upload_flags[@]}" \
     --check-regression \
     --yellow "$YELLOW_THRESHOLD" \
     --red "$RED_THRESHOLD" \
@@ -144,7 +154,7 @@ else
   run_ported_bench | mina-bench-upload \
     --format "$UPLOAD_FORMAT" \
     --branch "$BRANCH" \
-    --upload \
+    "${upload_flags[@]}" \
     --check-regression \
     --yellow "$YELLOW_THRESHOLD" \
     --red "$RED_THRESHOLD" \
