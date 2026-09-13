@@ -1,6 +1,5 @@
 open Async
 open Core
-open Caqti_request.Infix
 
 module type CONNECTION = Mina_caqti.CONNECTION
 
@@ -87,7 +86,7 @@ let chain_of_query_until_inclusive =
 
 let latest_state_hash (module Conn : CONNECTION) =
   let query =
-    Caqti_type.(unit ->! string)
+    Mina_caqti.find_req Caqti_type.unit Caqti_type.string
       {%string|
         SELECT state_hash from blocks order by height desc limit 1;
       |}
@@ -99,7 +98,7 @@ let latest_state_hash (module Conn : CONNECTION) =
 let first_block_of_protocol_version (module Conn : CONNECTION)
     ~(v : Protocol_version.t) =
   let query =
-    (Protocol_version.typ ->? Block_info.typ)
+    (Mina_caqti.find_opt_req Protocol_version.typ Block_info.typ)
       {%string|
         SELECT blocks.id, height, state_hash, protocol_versions.transaction, protocol_versions.network, protocol_versions.patch
         FROM blocks INNER JOIN protocol_versions
@@ -116,7 +115,7 @@ let first_block_of_protocol_version (module Conn : CONNECTION)
 
 let block_info_by_state_hash (module Conn : CONNECTION) ~state_hash =
   let query =
-    Caqti_type.(string ->? Block_info.typ)
+    Mina_caqti.find_opt_req Caqti_type.string Block_info.typ
       {%string|
         SELECT blocks.id, height, state_hash, protocol_versions.transaction, protocol_versions.network, protocol_versions.patch
         FROM blocks INNER JOIN protocol_versions
@@ -129,7 +128,7 @@ let block_info_by_state_hash (module Conn : CONNECTION) ~state_hash =
 
 let blocks_info_by_height (module Conn : CONNECTION) ~height =
   let query =
-    Caqti_type.(int64 ->* Block_info.typ)
+    Mina_caqti.collect_req Caqti_type.int64 Block_info.typ
       {%string|
         SELECT blocks.id, height, state_hash, protocol_versions.transaction, protocol_versions.network, protocol_versions.patch
         FROM blocks INNER JOIN protocol_versions
@@ -146,7 +145,7 @@ let blocks_info_by_height (module Conn : CONNECTION) ~height =
    protocol version is the pre-fork one whose chain we want to finalize. *)
 let parent_of_latest_fork_block (module Conn : CONNECTION) =
   let query =
-    Caqti_type.(unit ->? Block_info.typ)
+    Mina_caqti.find_opt_req Caqti_type.unit Block_info.typ
       {%string|
         SELECT parent.id, parent.height, parent.state_hash, pv.transaction, pv.network, pv.patch
         FROM blocks fork
@@ -210,7 +209,7 @@ end
    when there is no hard fork above the target (e.g. the tip is pre-fork). *)
 let fork_block_above_height (module Conn : CONNECTION) ~height =
   let query =
-    Caqti_type.(int64 ->? Fork_context.typ)
+    Mina_caqti.find_opt_req Caqti_type.int64 Fork_context.typ
       {%string|
         SELECT fork.state_hash, fork.height, fork.global_slot_since_genesis,
                fork.chain_status::text, parent.state_hash, parent.height
@@ -230,10 +229,11 @@ let fork_block_above_height (module Conn : CONNECTION) ~height =
 let blocks_to_orphan (module Conn : CONNECTION) ~canonical_block_ids
     ~stop_at_slot ~fork_boundary_slot ~protocol_version =
   let query =
-    Caqti_type.(
-      t4 (option int) Mina_caqti.array_int_typ Protocol_version.typ
-        (option int64)
-      ->* t3 int64 string string )
+    Mina_caqti.collect_req
+      Caqti_type.(
+        t4 (option int) Mina_caqti.array_int_typ Protocol_version.typ
+          (option int64) )
+      Caqti_type.(t3 int64 string string)
       {%string|
         SELECT height, state_hash, chain_status::text
         FROM blocks
@@ -267,10 +267,11 @@ let blocks_to_orphan (module Conn : CONNECTION) ~canonical_block_ids
 let conversion_summary_counts (module Conn : CONNECTION) ~canonical_block_ids
     ~stop_at_slot ~fork_boundary_slot ~protocol_version =
   let query =
-    Caqti_type.(
-      t4 (option int) Mina_caqti.array_int_typ Protocol_version.typ
-        (option int64)
-      ->! t4 int int int int )
+    Mina_caqti.find_req
+      Caqti_type.(
+        t4 (option int) Mina_caqti.array_int_typ Protocol_version.typ
+          (option int64) )
+      Caqti_type.(t4 int int int int)
       {%string|
         SELECT
           COUNT(*) FILTER (WHERE id = ANY($2::int[]))::int,
@@ -303,7 +304,8 @@ let conversion_summary_counts (module Conn : CONNECTION) ~canonical_block_ids
    whole ancestry (most of which is already canonical). *)
 let noncanonical_blocks_in_set (module Conn : CONNECTION) ~canonical_block_ids =
   let query =
-    Caqti_type.(Mina_caqti.array_int_typ ->* t3 int64 string string)
+    Mina_caqti.collect_req Mina_caqti.array_int_typ
+      Caqti_type.(t3 int64 string string)
       {%string|
         SELECT height, state_hash, chain_status::text
         FROM blocks
@@ -317,10 +319,10 @@ let noncanonical_blocks_in_set (module Conn : CONNECTION) ~canonical_block_ids =
 let mark_pending_blocks_as_canonical_or_orphaned (module Conn : CONNECTION)
     ~canonical_block_ids ~stop_at_slot ~fork_boundary_slot ~protocol_version =
   let mutation =
-    Caqti_type.(
-      t4 (option int) Mina_caqti.array_int_typ Protocol_version.typ
-        (option int64)
-      ->. Caqti_type.unit )
+    Mina_caqti.exec_req
+      Caqti_type.(
+        t4 (option int) Mina_caqti.array_int_typ Protocol_version.typ
+          (option int64) )
       {%string|
         UPDATE blocks
         SET chain_status = CASE
@@ -353,7 +355,9 @@ let mark_pending_blocks_as_canonical_or_orphaned (module Conn : CONNECTION)
 let blocks_between_both_inclusive (module Conn : CONNECTION) ~latest_block_id
     ~oldest_block_id : (Block_info.t list, Caqti_error.t) Deferred.Result.t =
   let query =
-    Caqti_type.(t2 int int ->* Block_info.typ)
+    Mina_caqti.collect_req
+      Caqti_type.(t2 int int)
+      Block_info.typ
       {%string|
         %{chain_of_query_until_inclusive}
         SELECT chain.id, height, state_hash, protocol_versions.transaction, protocol_versions.network, protocol_versions.patch
@@ -367,7 +371,9 @@ let blocks_between_both_inclusive (module Conn : CONNECTION) ~latest_block_id
 let is_in_best_chain (module Conn : CONNECTION) ~tip_hash ~check_hash
     ~check_height ~check_slot =
   let query =
-    Caqti_type.(t4 string string int int64 ->! bool)
+    Mina_caqti.find_req
+      Caqti_type.(t4 string string int int64)
+      Caqti_type.bool
       {%string|
         %{chain_of_query}
         SELECT EXISTS (
@@ -383,7 +389,9 @@ let is_in_best_chain (module Conn : CONNECTION) ~tip_hash ~check_hash
 let num_of_confirmations (module Conn : CONNECTION) ~latest_state_hash
     ~fork_slot =
   let query =
-    Caqti_type.(t2 string int ->! int)
+    Mina_caqti.find_req
+      Caqti_type.(t2 string int)
+      Caqti_type.int
       {%string|
         %{chain_of_query}
         SELECT COUNT(*) FROM chain
@@ -393,7 +401,9 @@ let num_of_confirmations (module Conn : CONNECTION) ~latest_state_hash
   Conn.find query (latest_state_hash, fork_slot)
 
 let number_of_commands_since_block_query block_commands_table =
-  Caqti_type.(t2 string int ->! int)
+  Mina_caqti.find_req
+    Caqti_type.(t2 string int)
+    Caqti_type.int
     {%string|
       %{chain_of_query}
       SELECT COUNT(bc.block_id)::int AS command_count
@@ -423,7 +433,8 @@ let number_of_zkapps_commands_since_block (module Conn : CONNECTION)
 
 let last_fork_block (module Conn : CONNECTION) =
   let query =
-    Caqti_type.(unit ->! t2 string int64)
+    Mina_caqti.find_req Caqti_type.unit
+      Caqti_type.(t2 string int64)
       {%string|
         SELECT state_hash, global_slot_since_genesis FROM blocks
         WHERE global_slot_since_hard_fork = 0
@@ -435,7 +446,8 @@ let last_fork_block (module Conn : CONNECTION) =
 
 let fetch_latest_migration_history (module Conn : CONNECTION) =
   let query =
-    Caqti_type.(unit ->? t3 string string string)
+    Mina_caqti.find_opt_req Caqti_type.unit
+      Caqti_type.(t3 string string string)
       {%string|
         SELECT
           status, protocol_version, migration_version
@@ -462,7 +474,8 @@ let fetch_latest_migration_history (module Conn : CONNECTION) =
 
 let fetch_last_filled_block (module Conn : CONNECTION) =
   let query =
-    Caqti_type.(unit ->! t3 string int64 int)
+    Mina_caqti.find_req Caqti_type.unit
+      Caqti_type.(t3 string int64 int)
       {%string|
         SELECT b.state_hash, b.global_slot_since_genesis, b.height
         FROM blocks b

@@ -466,6 +466,10 @@ check-bash: ## Run shellcheck on bash scripts
 	shellcheck ./scripts/**/*.sh -S warning
 	shellcheck ./buildkite/scripts/**/*.sh -S warning
 
+.PHONY: check-caqti
+check-caqti: ## Check that Caqti requests are built through Mina_caqti (see #18857)
+	./scripts/lint_caqti_requests.sh
+
 .PHONY: check-docker
 check-docker: ## Run hadolint on Docker files
 ifdef BUILDKITE
