@@ -114,8 +114,7 @@ type t =
       Daemon_rpcs.Types.Status.Next_producer_timing.t option
   ; subscriptions : Mina_subscriptions.t
   ; sync_status : Sync_status.t Mina_incremental.Status.Observer.t
-  ; precomputed_block_writer :
-      ([ `Path of string ] option * [ `Log ] option) ref
+  ; precomputed_block_writer : Precomputed_block_sink.t ref
   ; block_production_status :
       [ `Producing | `Producing_in_ms of float | `Free ] ref
   ; in_memory_reverse_structured_log_messages_for_integration_test :
@@ -2429,15 +2428,36 @@ let create ~commit_id ?wallets (config : Config.t) =
               "Precomputed blocks will be included in logs. These blocks can \
                be very large (potentially several MB each) and may be \
                truncated by logging services or log aggregators with line size \
-               limits. Consider using --precomputed-blocks-file to write \
-               blocks to a dedicated file instead, or ensure your logging \
+               limits. Consider using --precomputed-blocks-dir to write blocks \
+               to a dedicated directory instead, or ensure your logging \
                infrastructure is configured to handle large log entries. \
                Truncated blocks cannot be used for archive recovery." ;
+          Option.iter config.precomputed_blocks_path ~f:(fun path ->
+              [%log' warn config.logger]
+                "--precomputed-blocks-file is deprecated. It appends every \
+                 block to $path, which grows without limit and which nothing \
+                 rotates, and finding one block means reading the whole file. \
+                 Use --precomputed-blocks-dir, which writes one file for each \
+                 block under the name the precomputed block bucket uses."
+                ~metadata:[ ("path", `String path) ] ) ;
+          (* Fail at start rather than once per block: a directory that is
+             missing or is not a directory would otherwise only show up as an
+             error for every block the daemon sees. *)
+          Option.iter config.precomputed_blocks_dir ~f:(fun dir ->
+              match Core.Sys.is_directory dir with
+              | `Yes ->
+                  ()
+              | `No | `Unknown ->
+                  failwithf
+                    "--precomputed-blocks-dir %s is not a directory. Create it \
+                     before starting the daemon."
+                    dir () ) ;
           let precomputed_block_writer =
             ref
-              ( Option.map config.precomputed_blocks_path ~f:(fun path ->
-                    `Path path )
-              , if config.log_precomputed_blocks then Some `Log else None )
+              { Precomputed_block_sink.file = config.precomputed_blocks_path
+              ; dir = config.precomputed_blocks_dir
+              ; log = config.log_precomputed_blocks
+              }
           in
           let subscriptions =
             Mina_subscriptions.create ~logger:config.logger
@@ -2445,6 +2465,8 @@ let create ~commit_id ?wallets (config : Config.t) =
               ~transition_frontier:frontier_broadcast_pipe_r
               ~is_storing_all:config.is_archive_rocksdb
               ~upload_blocks_to_gcloud:config.upload_blocks_to_gcloud
+              ~network_name:
+                (Mina_signature_kind.to_directory_name signature_kind)
               ~time_controller:config.time_controller ~precomputed_block_writer
           in
           let open Mina_incremental.Status in

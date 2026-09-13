@@ -52,6 +52,8 @@ type t =
   ; precomputed_values : Precomputed_values.t
   ; start_time : Time.t
   ; precomputed_blocks_path : string option
+        (** Deprecated; see [precomputed_blocks_dir]. *)
+  ; precomputed_blocks_dir : string option [@default None]
   ; log_precomputed_blocks : bool
   ; start_filtered_logs : string list
   ; upload_blocks_to_gcloud : bool
