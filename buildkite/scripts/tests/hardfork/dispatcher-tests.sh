@@ -493,6 +493,48 @@ assert_dispatch_failed
 echo "PASSED: Genuine path mismatch is still rejected"
 
 # =============================================================================
+# Test 14: Post-fork Config Sanitization
+# =============================================================================
+
+echo ""
+echo "=== Test 14: Post-fork Config Sanitization ==="
+echo "Verifying that pre-fork hardfork stop fields are stripped from config files passed to mesa"
+
+# The sanitized copies only exist inside the container, so read them there and
+# emit {"dispatch": <dispatcher JSON>, "sanitized": [<each sanitized config>]}.
+SANITIZE_DAEMON_JSON="$(activation_marker_dir)/daemon.json"
+SANITIZE_CMD=$(cat <<'EOF'
+echo '{"daemon":{"slot_tx_end":10,"client_port":8302}}' > /tmp/user.json &&
+echo '{"daemon":{"slot_chain_end":20,"hard_fork_genesis_slot_delta":5},"genesis":{"k":290}}' > "$SANITIZE_DAEMON_JSON" &&
+out=$(mina daemon -config-file /tmp/user.json) &&
+for f in $(jq -r '.args[] | select(contains("mina-dispatch-postfork-config"))' <<< "$out"); do
+  jq -c . "$f"
+done | jq -cs --argjson d "$out" '{dispatch: $d, sanitized: .}'
+EOF
+)
+
+run_dispatch_json "$SANITIZE_CMD" marker --env "SANITIZE_DAEMON_JSON=${SANITIZE_DAEMON_JSON}"
+
+if [[ "$DISPATCH_STATUS" -ne 0 ]]; then
+  echo "FAILED: Dispatcher exited non-zero during config sanitization"
+  echo "  Full JSON: $DISPATCH_JSON"
+  exit 1
+fi
+
+# Neither original path reaches the daemon; both are replaced by sanitized
+# copies, with the hardfork config still the last argument.
+assert_json_eq "[.dispatch.args[] | select(. == \"/tmp/user.json\" or . == \"${SANITIZE_DAEMON_JSON}\")] | length" "0"
+assert_json_eq '.sanitized | length' "2"
+assert_json_contains '.dispatch.args[-1]' "mina-dispatch-postfork-config"
+
+# Forbidden fields are gone, unrelated fields survive.
+assert_json_eq '[.sanitized[].daemon | has("slot_tx_end", "slot_chain_end", "hard_fork_genesis_slot_delta")] | any' "false"
+assert_json_eq '.sanitized[0].daemon.client_port' "8302"
+assert_json_eq '.sanitized[1].genesis.k' "290"
+
+echo "PASSED: Pre-fork hardfork fields stripped from post-fork config files"
+
+# =============================================================================
 # Summary
 # =============================================================================
 
