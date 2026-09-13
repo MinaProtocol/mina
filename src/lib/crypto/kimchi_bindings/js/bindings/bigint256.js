@@ -45,6 +45,21 @@ var caml_bigint_256_to_bytes = tsBindings.caml_bigint_256_to_bytes;
 // Requires: tsBindings
 var caml_bigint_256_of_bytes = tsBindings.caml_bigint_256_of_bytes;
 
+// Provides: caml_bigint_256_blit_to_bigstring
+// Requires: tsBindings, caml_bigstring_blit_bytes_to_ba
+function caml_bigint_256_blit_to_bigstring(x, buf, pos) {
+  caml_bigstring_blit_bytes_to_ba(tsBindings.caml_bigint_256_to_bytes(x), 0, buf, pos, 32);
+  return 0;
+}
+
+// Provides: caml_bigint_256_of_bigstring
+// Requires: tsBindings, caml_bigstring_blit_ba_to_bytes, caml_create_bytes
+function caml_bigint_256_of_bigstring(buf, pos) {
+  var bytes = caml_create_bytes(32);
+  caml_bigstring_blit_ba_to_bytes(buf, pos, bytes, 0, 32);
+  return tsBindings.caml_bigint_256_of_bytes(bytes);
+}
+
 // Provides: caml_bigint_256_deep_copy
 // Requires: tsBindings
 var caml_bigint_256_deep_copy = tsBindings.caml_bigint_256_deep_copy

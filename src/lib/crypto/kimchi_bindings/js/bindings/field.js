@@ -121,6 +121,24 @@ var caml_pasta_fp_to_bytes = tsBindings.caml_pasta_fp_to_bytes;
 // Requires: tsBindings
 var caml_pasta_fp_of_bytes = tsBindings.caml_pasta_fp_of_bytes;
 
+// Provides: caml_pasta_fp_blit_to_bigstring
+// Requires: tsBindings, caml_bigstring_blit_bytes_to_ba
+function caml_pasta_fp_blit_to_bigstring(x, buf, pos) {
+  caml_bigstring_blit_bytes_to_ba(tsBindings.caml_pasta_fp_to_bytes(x), 0, buf, pos, 32);
+  return 0;
+}
+
+// Provides: caml_pasta_fp_of_bigstring
+// Requires: tsBindings, caml_bigstring_blit_ba_to_bytes, caml_create_bytes
+function caml_pasta_fp_of_bigstring(buf, pos) {
+  var bytes = caml_create_bytes(32);
+  caml_bigstring_blit_ba_to_bytes(buf, pos, bytes, 0, 32);
+  // The TS bindings implement to_bytes for fields as the bigint encoding and
+  // leave of_bytes unimplemented; read back through the same bigint path.
+  // of_bigint rejects values at or above the modulus, matching the Rust stub.
+  return tsBindings.caml_pasta_fp_of_bigint(tsBindings.caml_bigint_256_of_bytes(bytes));
+}
+
 // Provides: caml_pasta_fp_deep_copy
 // Requires: tsBindings
 var caml_pasta_fp_deep_copy = tsBindings.caml_pasta_fp_deep_copy;
@@ -247,6 +265,22 @@ var caml_pasta_fq_to_bytes = tsBindings.caml_pasta_fq_to_bytes;
 // Provides: caml_pasta_fq_of_bytes
 // Requires: tsBindings
 var caml_pasta_fq_of_bytes = tsBindings.caml_pasta_fq_of_bytes;
+
+// Provides: caml_pasta_fq_blit_to_bigstring
+// Requires: tsBindings, caml_bigstring_blit_bytes_to_ba
+function caml_pasta_fq_blit_to_bigstring(x, buf, pos) {
+  caml_bigstring_blit_bytes_to_ba(tsBindings.caml_pasta_fq_to_bytes(x), 0, buf, pos, 32);
+  return 0;
+}
+
+// Provides: caml_pasta_fq_of_bigstring
+// Requires: tsBindings, caml_bigstring_blit_ba_to_bytes, caml_create_bytes
+function caml_pasta_fq_of_bigstring(buf, pos) {
+  var bytes = caml_create_bytes(32);
+  caml_bigstring_blit_ba_to_bytes(buf, pos, bytes, 0, 32);
+  // See caml_pasta_fp_of_bigstring.
+  return tsBindings.caml_pasta_fq_of_bigint(tsBindings.caml_bigint_256_of_bytes(bytes));
+}
 
 // Provides: caml_pasta_fq_deep_copy
 // Requires: tsBindings

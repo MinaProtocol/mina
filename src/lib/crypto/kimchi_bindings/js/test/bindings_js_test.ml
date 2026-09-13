@@ -16,6 +16,29 @@ module Pasta_fq_index = Protocol.Index.Fq
 module Pasta_fp_verifier_index = Protocol.VerifierIndex.Fp
 module Pasta_fq_verifier_index = Protocol.VerifierIndex.Fq
 
+(* Writes [x] into a sentinel-filled bigstring at a nonzero offset with the
+   in-place codec, checks that exactly the 32 bytes of [to_bytes x] landed
+   there and nothing else was touched, and reads it back. This is the only
+   test of the jsoo glue behind [blit_to_bigstring] / [of_bigstring]. *)
+let check_bigstring_roundtrip ~to_bytes ~blit_to_bigstring ~of_bigstring ~equal
+    x =
+  let open Stdlib.Bigarray in
+  let pos = 4 in
+  let len = 32 in
+  let sentinel = '\xab' in
+  let buf = Array1.create char c_layout (pos + len + 4) in
+  Array1.fill buf sentinel ;
+  blit_to_bigstring x buf pos ;
+  let bytes = to_bytes x in
+  assert (Bytes.length bytes = len) ;
+  for i = 0 to Array1.dim buf - 1 do
+    let expected =
+      if i >= pos && i < pos + len then Bytes.get bytes (i - pos) else sentinel
+    in
+    assert (Char.equal (Array1.get buf i) expected)
+  done ;
+  assert (equal (of_bigstring buf pos) x)
+
 (* NOTE: For nodejs, we need to manually add the following line to the javascript bindings, after imports['env'] has been declared.
    imports['env']['memory'] = new WebAssembly.Memory({initial: 18, maximum: 16384, shared: true});
 *)
@@ -259,6 +282,13 @@ let _ =
          assert (test_bit five 2) ;
          let ten_bytes = to_bytes ten in
          assert (compare (of_bytes ten_bytes) ten = 0) ;
+         let equal a b = compare a b = 0 in
+         check_bigstring_roundtrip ~to_bytes ~blit_to_bigstring ~of_bigstring
+           ~equal ten ;
+         check_bigstring_roundtrip ~to_bytes ~blit_to_bigstring ~of_bigstring
+           ~equal
+           (of_decimal_string
+              "115792089237316195423570985008687907853269984665640564039457584007913129639935" ) ;
          assert (compare (deep_copy six) six = 0)
     end )
 
@@ -317,6 +347,10 @@ let _ =
          assert (equal (of_bytes (to_bytes root_of_unity)) root_of_unity) ;
          let gen = domain_generator 2 in
          assert (equal (of_bytes (to_bytes gen)) gen) ;
+         List.iter
+           (check_bigstring_roundtrip ~to_bytes ~blit_to_bigstring ~of_bigstring
+              ~equal )
+           [ of_int 0; one; rand1; gen; sub (of_int 0) one ] ;
          assert (equal (deep_copy rand2) rand2)
     end )
 
@@ -375,6 +409,10 @@ let _ =
          assert (equal (of_bytes (to_bytes root_of_unity)) root_of_unity) ;
          let gen = domain_generator 2 in
          assert (equal (of_bytes (to_bytes gen)) gen) ;
+         List.iter
+           (check_bigstring_roundtrip ~to_bytes ~blit_to_bigstring ~of_bigstring
+              ~equal )
+           [ of_int 0; one; rand1; gen; sub (of_int 0) one ] ;
          assert (equal (deep_copy rand2) rand2)
     end )
 
