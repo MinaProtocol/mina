@@ -22,6 +22,7 @@
   stdio
   uri
   ;;local libraries
+  verification_keys
   verifier
   ledger_proof
   snark_worker

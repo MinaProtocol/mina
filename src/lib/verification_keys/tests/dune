@@ -1,0 +1,29 @@
+; Regenerates the verification key files committed next to the runtime configs
+; in genesis_ledgers/. The diff rules that keep those files honest live there,
+; alongside the configs whose constants they depend on.
+
+(executables
+ (names generate_verification_keys verification_keys_match_prover)
+ (libraries
+  ;; opam libraries
+  core
+  async
+  core_unix.command_unix
+  core_unix.filename_unix
+  yojson
+  ;; local libraries
+  child_processes
+  genesis_constants
+  genesis_ledger_helper.lib
+  logger
+  mina_node_config
+  mina_signature_kind
+  parallel
+  pickles
+  prover
+  runtime_config
+  verification_keys)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_version ppx_let ppx_custom_printf)))

@@ -222,6 +222,17 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
           "NN Maximum number of logs to store to be made available via GraphQL \
            for incentivized testnet"
     else Command.Param.return None
+  and verification_keys_file =
+    flag "--verification-keys-file"
+      ~aliases:[ "verification-keys-file" ]
+      (optional string)
+      ~doc:
+        (sprintf
+           "PATH File holding the verification keys this node validates blocks \
+            with, generated for the runtime config in use. Defaults to %s; if \
+            neither is present the keys are computed at start, which takes \
+            around 30 seconds and several gigabytes of memory."
+           Verification_keys.default_path )
   and demo_mode =
     flag "--demo-mode" ~aliases:[ "demo-mode" ] no_arg
       ~doc:
@@ -1461,7 +1472,7 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
                  ~wallets_disk_location:(conf_dir ^/ "wallets")
                  ~persistent_root_location:chain_state_locations.root
                  ~persistent_frontier_location:chain_state_locations.frontier
-                 ~epoch_ledger_location
+                 ~epoch_ledger_location ~verification_keys_file
                  ~proof_cache_location:chain_state_locations.proof_cache
                  ~zkapp_vk_cache_location:chain_state_locations.zkapp_vk_cache
                  ~snark_work_fee:snark_work_fee_flag ~time_controller
