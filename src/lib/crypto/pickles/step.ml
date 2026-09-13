@@ -298,7 +298,8 @@ struct
       let module O = Tock.Oracles in
       let o =
         let public_input =
-          tock_public_input_of_statement ~feature_flags
+          tock_public_input_of_statement
+            ~max_proofs_verified:Local_max_proofs_verified.n ~feature_flags
             prev_statement_with_hashes
         in
         O.create dlog_vk
@@ -468,7 +469,7 @@ struct
       let combined_inner_product =
         let e = proof.openings.evals in
         let b_polys =
-          Vector.map
+          List.map
             ~f:(fun chals ->
               unstage (challenge_polynomial (Vector.to_array chals)) )
             (Wrap_hack.pad_challenges prev_challenges)
@@ -480,7 +481,7 @@ struct
           let v : Tock.Field.t array list =
             let a = List.map ~f a in
             List.append
-              (Vector.to_list (Vector.map b_polys ~f:(fun f -> [| f pt |])))
+              (List.map b_polys ~f:(fun f -> [| f pt |]))
               ([| f x_hat |] :: [| ft_eval |] :: a)
           in
           let open Tock.Field in

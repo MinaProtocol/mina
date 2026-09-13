@@ -24,7 +24,22 @@ let tick_shifts, tock_shifts =
 
 let wrap_domains ~proofs_verified =
   let h =
-    match proofs_verified with 0 -> 13 | 1 -> 14 | 2 -> 15 | _ -> assert false
+    (* 15 is the largest wrap domain we support without chunking (the wrap IPA
+       has [Backend.Tock.Rounds.Wrap = Nat.N15] rounds). It is enough for up to
+       6 proofs verified when the verified proofs are narrow (width 0), but
+       only 4 for same-width merges, whose step circuit chunks at width 5. 7+
+       would need a domain of 16, i.e. chunking. *)
+    match proofs_verified with
+    | 0 ->
+        13
+    | 1 ->
+        14
+    | n when n <= 6 ->
+        15
+    | n ->
+        failwithf
+          "wrap_domains: %d proofs verified needs a domain > 2^15 (chunking)" n
+          ()
   in
   { Domains.h = Domain.Pow_2_roots_of_unity h }
 
@@ -169,17 +184,23 @@ module Ipa = struct
   end
 end
 
-let tock_unpadded_public_input_of_statement ~feature_flags prev_statement =
+let tock_unpadded_public_input_of_statement ~max_proofs_verified ~feature_flags
+    prev_statement =
   let input =
-    let (T (typ, _conv, _conv_inv)) = Impls.Wrap.input ~feature_flags () in
+    let (Nat.Max.T (branch_data_width, Nat.Lte.S (Nat.Lte.S _), _)) =
+      Nat.max Nat.N2.n max_proofs_verified
+    in
+    let (T (typ, _conv, _conv_inv)) =
+      Impls.Wrap.input ~branch_data_width ~feature_flags ()
+    in
     Impls.Wrap.generate_public_input typ prev_statement
   in
   List.init
     (Backend.Tock.Field.Vector.length input)
     ~f:(Backend.Tock.Field.Vector.get input)
 
-let tock_public_input_of_statement ~feature_flags s =
-  tock_unpadded_public_input_of_statement ~feature_flags s
+let tock_public_input_of_statement ~max_proofs_verified ~feature_flags s =
+  tock_unpadded_public_input_of_statement ~max_proofs_verified ~feature_flags s
 
 let tick_public_input_of_statement ~max_proofs_verified
     (prev_statement : _ Impls.Step.statement) =

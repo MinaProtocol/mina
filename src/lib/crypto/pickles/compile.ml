@@ -326,6 +326,30 @@ struct
     in
     let module V = H4.To_vector (Local_max_proofs_verifieds) in
     let padded = V.f branches (M.f choices) |> Vector.transpose in
+    (* Consistency guard for wide proofs. Each prev slot's recursion
+       accumulator is padded to [max (2, w)] where [w] is the max proofs-verified
+       across the branches' prevs at that slot. If two branches disagree on that
+       padded width (i.e. [max (2, w)] differs), a narrower prev would be padded
+       to a wider accumulator than it committed to, producing an unsatisfiable
+       circuit. Since any width <= 2 maps to 2, this can only trigger once a
+       width exceeds 2; supporting it needs per-branch (Pseudo-selected)
+       accumulator padding. *)
+    Vector.iteri padded ~f:(fun slot slot_widths ->
+        match
+          List.dedup_and_sort ~compare:Int.compare
+            (List.map (Vector.to_list slot_widths) ~f:(Int.max 2))
+        with
+        | [] | [ _ ] ->
+            ()
+        | widths ->
+            failwithf
+              "Pickles.compile: the branches disagree on the proofs-verified \
+               width of previous-proof slot %d (padded widths: %s). Verifying \
+               proofs of different widths greater than 2 in the same slot \
+               across branches is not yet supported."
+              slot
+              (String.concat ~sep:", " (List.map widths ~f:Int.to_string))
+              () ) ;
     (padded, Maxes.m padded)
 
   module Lazy_keys = struct
@@ -666,7 +690,12 @@ struct
       let disk_key_prover =
         lazy
           (let%map.Promise wrap_main = Lazy.force wrap_main in
-           let (T (typ, conv, _conv_inv)) = input ~feature_flags () in
+           let (Nat.Max.T (branch_data_width, Nat.Lte.S (Nat.Lte.S _), _)) =
+             Nat.max Nat.N2.n Max_proofs_verified.n
+           in
+           let (T (typ, conv, _conv_inv)) =
+             input ~branch_data_width ~feature_flags ()
+           in
            let main x () = wrap_main (conv x) in
            let cs =
              constraint_system ~input_typ:typ ~return_typ:Impls.Wrap.Typ.unit
@@ -695,9 +724,11 @@ struct
       in
       let r =
         Common.time "wrap read or generate " (fun () ->
-            Cache.Wrap.read_or_generate (* Due to Wrap_hack *)
-              ~prev_challenges:2 cache ~s_p:wrap_storable ~s_v:wrap_vk_storable
-              ~lazy_mode disk_key_prover disk_key_verifier )
+            Cache.Wrap.read_or_generate
+              ~prev_challenges:
+                (Nat.to_int (Wrap_hack.padded_length Max_proofs_verified.n))
+              cache ~s_p:wrap_storable ~s_v:wrap_vk_storable ~lazy_mode
+              disk_key_prover disk_key_verifier )
       in
       (r, disk_key_verifier)
     in
@@ -895,9 +926,10 @@ module Side_loaded = struct
         ; wrap_index =
             Plonk_verification_key_evals.map wrap_key ~f:(fun x -> x.(0))
         ; max_proofs_verified =
-            Pickles_base.Proofs_verified.of_nat_exn
-              (Nat.Add.n d.max_proofs_verified)
-        ; actual_wrap_domain_size
+            Pickles_base.Proofs_verified.(
+              to_stable_v2 (of_nat (Nat.Add.n d.max_proofs_verified)) )
+        ; actual_wrap_domain_size =
+            Pickles_base.Proofs_verified.to_stable_v2 actual_wrap_domain_size
         }
         : t )
 

@@ -3364,7 +3364,7 @@ module Make_str (A : Wire_types.Concrete) = struct
 
   let system ~signature_kind ~proof_level ~constraint_constants =
     Pickles.compile () ~cache:Cache_dir.cache ?proof_cache:!proof_cache
-      ~override_wrap_domain:Pickles_base.Proofs_verified.N1
+      ~override_wrap_domain:Pickles_base.Proofs_verified.n1
       ~public_input:(Input Statement.With_sok.typ) ~auxiliary_typ:Typ.unit
       ~max_proofs_verified:(module Nat.N2)
       ~name:"transaction-snark"

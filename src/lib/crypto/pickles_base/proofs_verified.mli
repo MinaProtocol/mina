@@ -1,7 +1,18 @@
 open Pickles_types
 
-(** Represents how many proofs are verified. Currently only [0], [1] or [2] *)
+(** Represents how many proofs are verified. *)
 module Stable : sig
+  module V2 : sig
+    type t = Mina_wire_types.Pickles_base.Proofs_verified.V2.t
+    [@@deriving sexp, compare, yojson, hash, equal]
+
+    include Plonkish_prelude.Sigs.Binable.S with type t := t
+
+    include Plonkish_prelude.Sigs.VERSIONED
+  end
+
+  module Latest = V2
+
   module V1 : sig
     type t = Mina_wire_types.Pickles_base.Proofs_verified.V1.t = N0 | N1 | N2
     [@@deriving sexp, compare, yojson, hash, equal]
@@ -9,58 +20,84 @@ module Stable : sig
     include Plonkish_prelude.Sigs.Binable.S with type t := t
 
     include Plonkish_prelude.Sigs.VERSIONED
+
+    val to_latest : t -> V2.t
   end
 end
 
-type t = Stable.V1.t = N0 | N1 | N2
-[@@deriving sexp, compare, yojson, hash, equal]
+(** A non-negative number of proofs verified. Construct with [of_int_exn] or
+    [of_nat]; read with [to_int] or by coercion. *)
+type t = private int [@@deriving sexp, compare, yojson, hash, equal]
 
-(** [of_nat_exn t_n] converts the type level natural [t_n] to the data type natural.
-    Raise an exception if [t_n] represents a value above or equal to 3 *)
-val of_nat_exn : 'n Nat.t -> t
+(** [of_nat n] converts the type level natural [n] to the data type natural. *)
+val of_nat : 'n Nat.t -> t
 
-(** [of_int_exn n] converts the runtime natural [n] to the data type natural. Raise
-    an exception if the value [n] is above or equal to 3 *)
+(** [of_int_exn n] converts the runtime natural [n] to the data type natural.
+    Raise an exception if [n] is negative. *)
 val of_int_exn : int -> t
 
-(** [to_int v] converts the value [v] to the corresponding integer, i.e [N0 ->
-    0], [N1 -> 1] and [N2 -> 2] *)
+val n0 : t
+
+val n1 : t
+
+val n2 : t
+
 val to_int : t -> int
+
+(** Conversions between the in-memory [t] and the serialised [Stable] encodings. *)
+
+val to_stable_v2 : t -> Stable.V2.t
+
+(** Raise an exception if the value is negative. *)
+val of_stable_v2 : Stable.V2.t -> t
+
+(** Raise an exception if [t] is above 2: [V1] is the encoding the Mina protocol
+    accepts, and is deliberately kept narrow. *)
+val to_stable_v1 : t -> Stable.V1.t
+
+val of_stable_v1 : Stable.V1.t -> t
 
 module One_hot : sig
   open Kimchi_pasta_snarky_backend
 
   module Checked : sig
-    type t = Pickles_types.Nat.N3.n One_hot_vector.Step.t
+    type 'n t = 'n Nat.N3.plus_n One_hot_vector.Step.t
 
-    val to_input : t -> Step_impl.Field.t Random_oracle_input.Chunked.t
+    val to_input : 'n t -> Step_impl.Field.t Random_oracle_input.Chunked.t
   end
 
-  val to_input : zero:'a -> one:'a -> t -> 'a Random_oracle_input.Chunked.t
+  val to_input :
+       'n Nat.N3.plus_n Nat.t
+    -> zero:'a
+    -> one:'a
+    -> t
+    -> 'a Random_oracle_input.Chunked.t
 
-  val typ : (Checked.t, t) Step_impl.Typ.t
+  val typ : 'n Nat.N3.plus_n Nat.t -> ('n Checked.t, t) Step_impl.Typ.t
 end
 
-val to_bool_vec : t -> (bool, Nat.N2.n) Vector.t
+val to_bool_vec : 'n Nat.t -> t -> (bool, 'n) Vector.t
 
-val of_bool_vec : (bool, Nat.N2.n) Vector.t -> t
+val of_bool_vec : (bool, 'n) Vector.t -> t
 
 module Prefix_mask : sig
   open Kimchi_pasta_snarky_backend
 
   module Step : sig
     module Checked : sig
-      type t = (Step_impl.Boolean.var, Nat.N2.n) Vector.t
+      (** Indexed by the full mask width. *)
+      type 'w t = (Step_impl.Boolean.var, 'w) Vector.t
     end
 
-    val typ : (Checked.t, t) Step_impl.Typ.t
+    val typ : 'w Nat.t -> ('w Checked.t, t) Step_impl.Typ.t
   end
 
   module Wrap : sig
     module Checked : sig
-      type t = (Wrap_impl.Boolean.var, Nat.N2.n) Vector.t
+      (** Indexed by the full mask width. *)
+      type 'w t = (Wrap_impl.Boolean.var, 'w) Vector.t
     end
 
-    val typ : (Checked.t, t) Wrap_impl.Typ.t
+    val typ : 'w Nat.t -> ('w Checked.t, t) Wrap_impl.Typ.t
   end
 end

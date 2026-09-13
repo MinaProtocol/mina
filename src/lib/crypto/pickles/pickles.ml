@@ -6,7 +6,9 @@ module Wire_types = Mina_wire_types.Pickles
 module Make_sig (A : Wire_types.Types.S) = struct
   module type S =
     Pickles_intf.S
-      with type Side_loaded.Verification_key.Stable.V2.t =
+      with type Side_loaded.Verification_key.Stable.V3.t =
+        A.Side_loaded.Verification_key.V3.t
+       and type Side_loaded.Verification_key.Stable.V2.t =
         A.Side_loaded.Verification_key.V2.t
        and type 'a Proof.t = 'a A.Proof.t
 end
@@ -232,9 +234,10 @@ module Make_str (_ : Wire_types.Concrete) = struct
           ; wrap_index =
               Plonk_verification_key_evals.map wrap_key ~f:(fun x -> x.(0))
           ; max_proofs_verified =
-              Pickles_base.Proofs_verified.of_nat_exn
-                (Nat.Add.n d.max_proofs_verified)
-          ; actual_wrap_domain_size
+              Pickles_base.Proofs_verified.(
+                to_stable_v2 (of_nat (Nat.Add.n d.max_proofs_verified)) )
+          ; actual_wrap_domain_size =
+              Pickles_base.Proofs_verified.to_stable_v2 actual_wrap_domain_size
           }
           : t )
 
@@ -730,7 +733,9 @@ module Make_str (_ : Wire_types.Concrete) = struct
           in
           let (wrap_pk, wrap_vk), disk_key =
             let open Impls.Wrap in
-            let (T (typ, conv, _conv_inv)) = input ~feature_flags () in
+            let (T (typ, conv, _conv_inv)) =
+              input ~branch_data_width:Nat.N2.n ~feature_flags ()
+            in
             let main x () : unit = wrap_main (conv x) in
             let self_id = Type_equal.Id.uid self.id in
             let disk_key_prover =
@@ -1144,16 +1149,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                           ~shift:Shifts.tick1
                       in
                       let branch_data : Composition_types.Branch_data.t =
-                        { proofs_verified =
-                            ( match actual_proofs_verified with
-                            | Z ->
-                                Composition_types.Branch_data.Proofs_verified.N0
-                            | S Z ->
-                                N1
-                            | S (S Z) ->
-                                N2
-                            | S _ ->
-                                assert false )
+                        { proofs_verified = Nat.to_int actual_proofs_verified
                         ; domain_log2 =
                             Composition_types.Branch_data.Domain_log2.of_int_exn
                               step_vk.domain.log_size_of_group
@@ -1207,7 +1203,8 @@ module Make_str (_ : Wire_types.Concrete) = struct
                     in
                     let%map.Promise next_proof =
                       let (T (input, conv, _conv_inv)) =
-                        Impls.Wrap.input ~feature_flags ()
+                        Impls.Wrap.input ~branch_data_width:Nat.N2.n
+                          ~feature_flags ()
                       in
                       Common.time "wrap proof" (fun () ->
                           Impls.Wrap.generate_witness_conv
@@ -1578,7 +1575,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
         let tag, _, p, Provers.[ step ] =
           Common.time "compile" (fun () ->
               compile_promise () ~public_input:(Input Field.typ)
-                ~override_wrap_domain:Pickles_base.Proofs_verified.N1
+                ~override_wrap_domain:Pickles_base.Proofs_verified.n1
                 ~auxiliary_typ:Typ.unit
                 ~max_proofs_verified:(module Nat.N2)
                 ~name:"blockchain-snark"
@@ -1886,7 +1883,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
         let tag, _, p, Provers.[ step ] =
           Common.time "compile" (fun () ->
               compile_promise () ~public_input:(Input Field.typ)
-                ~override_wrap_domain:Pickles_base.Proofs_verified.N1
+                ~override_wrap_domain:Pickles_base.Proofs_verified.n1
                 ~auxiliary_typ:Typ.unit
                 ~max_proofs_verified:(module Nat.N2)
                 ~name:"blockchain-snark"

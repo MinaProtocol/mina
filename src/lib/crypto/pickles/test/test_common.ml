@@ -25,8 +25,8 @@ let test_wrap_domains_2_proofs () =
   Alcotest.(check int) "domain log2 size for 2 proofs" 15 log2_size
 
 let test_wrap_domains_invalid () =
-  (* Test that wrap_domains raises for any proofs_verified > 2 *)
-  let invalid_values = [ 3; 4; 5; 10; 100; 1000 ] in
+  (* Test that wrap_domains raises for any proofs_verified > 6 *)
+  let invalid_values = [ 7; 8; 100; 1000 ] in
   List.iter invalid_values ~f:(fun proofs_verified ->
       let raises =
         try

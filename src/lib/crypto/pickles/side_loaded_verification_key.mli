@@ -43,9 +43,11 @@ end
 
 module Checked : sig
   type t =
-    { max_proofs_verified : Pickles_base.Proofs_verified.One_hot.Checked.t
+    { max_proofs_verified :
+        Pickles_types.Nat.z Pickles_base.Proofs_verified.One_hot.Checked.t
           (** The maximum of all of the [step_widths]. *)
-    ; actual_wrap_domain_size : Pickles_base.Proofs_verified.One_hot.Checked.t
+    ; actual_wrap_domain_size :
+        Pickles_types.Nat.z Pickles_base.Proofs_verified.One_hot.Checked.t
           (** The actual domain size used by the wrap circuit. *)
     ; wrap_index :
         Step_main_inputs.Inner_curve.t
@@ -68,6 +70,19 @@ end
 
 [%%versioned:
 module Stable : sig
+  module V3 : sig
+    type t =
+      ( Backend.Tock.Curve.Affine.t
+      , Pickles_base.Proofs_verified.Stable.V2.t
+      , Vk.t )
+      Poly.Stable.V2.t
+    [@@deriving hash, sexp, compare, equal, yojson]
+
+    include Codable.Base58_check_intf with type t := t
+
+    include Codable.Base64_intf with type t := t
+  end
+
   module V2 : sig
     type t =
       ( Backend.Tock.Curve.Affine.t
@@ -87,6 +102,13 @@ type t = Stable.Latest.t [@@deriving hash, sexp, compare, equal]
 val dummy : t
 
 val dummy_with_wrap_vk : t Lazy.t
+
+(** [to_stable_v2 t] downgrades the verification key to its [V2] wire encoding.
+    Raises if the key verifies more than 2 proofs. *)
+val to_stable_v2 : t -> Stable.V2.t
+
+(** [of_stable_v2 t] upgrades the [V2] wire encoding to the in-memory key. *)
+val of_stable_v2 : Stable.V2.t -> t
 
 include Codable.Base58_check_intf with type t := t
 
