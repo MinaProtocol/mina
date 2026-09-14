@@ -474,8 +474,13 @@ module Zkapp_states = struct
       Pickles_types.Vector.of_list_and_length_exn element_ids
         Mina_base.Zkapp_state.Max_state_size.n
     in
-    Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
-      ~table_name ~cols:(names, typ)
+    (* Atomic upsert against [zkapp_states_elements_key]. A plain
+       SELECT-then-INSERT is not atomic: two writers can both find no row and
+       both insert, and the resulting duplicate pair makes every later content
+       lookup fail with "Received 2 tuples, expected at most one". *)
+    Mina_caqti.upsert_into_cols_returning
+      ~on_conflict:(String.concat ~sep:"," names)
+      ~returning:("id", Caqti_type.int) ~table_name ~cols:(names, typ)
       (module Conn)
       t
 
@@ -511,8 +516,11 @@ module Zkapp_action_states = struct
       Pickles_types.Vector.of_list_and_length_exn element_ids
         Pickles_types.Nat.N5.n
     in
-    Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
-      ~table_name ~cols:(names, typ)
+    (* Atomic upsert against [zkapp_action_states_elements_key]; see
+       [Zkapp_states.add_if_doesn't_exist]. *)
+    Mina_caqti.upsert_into_cols_returning
+      ~on_conflict:(String.concat ~sep:"," names)
+      ~returning:("id", Caqti_type.int) ~table_name ~cols:(names, typ)
       (module Conn)
       t
 
@@ -2646,8 +2654,16 @@ module Zkapp_account = struct
     let%bind zkapp_uri_id =
       Zkapp_uri.add_if_doesn't_exist (module Conn) zkapp_uri
     in
-    Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
-      ~table_name ~cols:(Fields.names, typ)
+    (* Atomic upsert against [zkapp_accounts_content_key]; see
+       [Zkapp_states.add_if_doesn't_exist]. The conflict target repeats that
+       index's expressions, including the COALESCE that folds a NULL
+       verification_key_id onto a sentinel, so it must be kept in step with
+       create_schema.sql. *)
+    Mina_caqti.upsert_into_cols_returning
+      ~on_conflict:
+        "app_state_id, COALESCE(verification_key_id, -1), zkapp_version, \
+         action_state_id, last_action_slot, proved_state, zkapp_uri_id"
+      ~returning:("id", Caqti_type.int) ~table_name ~cols:(Fields.names, typ)
       (module Conn)
       { app_state_id
       ; verification_key_id

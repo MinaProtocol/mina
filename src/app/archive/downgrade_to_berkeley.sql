@@ -2,6 +2,14 @@
 -- Mina rollback: from mesa to berkeley
 -- + remove zkapp_states.element31..element8 (int)
 -- + remove zkapp_states_nullable.element31..element8 (int)
+-- NOTE: the zkapp_{states,action_states} element UNIQUE constraints and the
+--   zkapp_accounts content unique index are intentionally NOT dropped here.
+--   The rollback target is the same post-fork binary, which deduplicates those
+--   tables with INSERT .. ON CONFLICT. Without the matching constraint every
+--   such insert fails with "there is no unique or exclusion constraint matching
+--   the ON CONFLICT specification", so dropping them would produce a database
+--   the binary cannot write to. Rows merged by the upgrade are not split back
+--   apart either; that is not lossy, the duplicates carried no information.
 -- NOTE: the element_ids UNIQUE/index drop and the events_id/actions_id NULL change
 --   are intentionally NOT reversed here (lossy): post-fix data may hold duplicate
 --   element_ids arrays and NULL events_id/actions_id, and a btree over the

@@ -418,6 +418,113 @@ let%test_module "Archive node unit tests" =
       | Error e ->
           failwith @@ Caqti_error.show e
 
+    (* Regression test for the duplicate [zkapp_states] rows that made
+       [mina-archive-hardfork-toolbox populate-genesis-accounts] fail with
+       "Received 2 tuples, expected at most one". The table had no UNIQUE
+       constraint and was content-deduplicated by a non-atomic
+       SELECT-then-INSERT, so two writers could both find no row and both
+       insert. The resulting duplicate pair then made every later lookup of
+       that content fail permanently. The dedup is now an atomic upsert against
+       [zkapp_states_elements_key], and the constraint makes the duplicate pair
+       impossible in the first place. *)
+    let%test_unit "Zkapp_states: dedup is idempotent and duplicate rows are \
+                   rejected" =
+      let conn = Lazy.force conn_lazy in
+      Thread_safe.block_on_async_exn
+      @@ fun () ->
+      (* Any valid app_state works: both assertions hold whether or not the row
+         already exists from an earlier run. *)
+      let app_state = Zkapp_account.default.app_state in
+      let%bind () =
+        match%map
+          let open Deferred.Result.Let_syntax in
+          let%bind id =
+            Processor.Zkapp_states.add_if_doesn't_exist conn app_state
+          in
+          let%map id' =
+            Processor.Zkapp_states.add_if_doesn't_exist conn app_state
+          in
+          [%test_result: int] ~expect:id id'
+        with
+        | Ok () ->
+            ()
+        | Error e ->
+            failwith @@ Caqti_error.show e
+      in
+      (* The pre-fix insert path: a bare INSERT of the same content. The UNIQUE
+         constraint must reject it. *)
+      match%map
+        let open Deferred.Result.Let_syntax in
+        let%bind element_ids =
+          Mina_caqti.deferred_result_list_map
+            (Zkapp_state.V.to_list app_state)
+            ~f:(Processor.Zkapp_field.add_if_doesn't_exist conn)
+        in
+        let t =
+          Pickles_types.Vector.of_list_and_length_exn element_ids
+            Zkapp_state.Max_state_size.n
+        in
+        Mina_caqti.insert_into_cols_returning ~returning:("id", Caqti_type.int)
+          ~table_name:"zkapp_states"
+          ~cols:(Processor.Zkapp_states.names, Processor.Zkapp_states.typ)
+          conn t
+      with
+      | Ok _ ->
+          failwith
+            "inserting a duplicate zkapp_states row succeeded; the \
+             zkapp_states_elements_key UNIQUE constraint is missing"
+      | Error _ ->
+          ()
+
+    (* Same defect one level up the chain, and the reason a plain UNIQUE is not
+       enough here: [zkapp_accounts.verification_key_id] is nullable, and a
+       btree unique index treats two NULLs as distinct. [Zkapp_account.default]
+       has no verification key, so this exercises exactly the NULL case that a
+       column-list UNIQUE would let through. The dedup is an atomic upsert
+       against the expression index [zkapp_accounts_content_key]. *)
+    let%test_unit "Zkapp_account: dedup is idempotent and duplicate rows are \
+                   rejected, with a NULL verification_key_id" =
+      let conn = Lazy.force conn_lazy in
+      Thread_safe.block_on_async_exn
+      @@ fun () ->
+      let zkapp_account = Zkapp_account.default in
+      [%test_result: bool] ~expect:true
+        (Option.is_none zkapp_account.verification_key) ;
+      let%bind fields =
+        match%map
+          let open Deferred.Result.Let_syntax in
+          let%bind id =
+            Processor.Zkapp_account.add_if_doesn't_exist conn zkapp_account
+          in
+          let%bind id' =
+            Processor.Zkapp_account.add_if_doesn't_exist conn zkapp_account
+          in
+          [%test_result: int] ~expect:id id' ;
+          Processor.Zkapp_account.load conn id
+        with
+        | Ok fields ->
+            fields
+        | Error e ->
+            failwith @@ Caqti_error.show e
+      in
+      [%test_result: int option] ~expect:None fields.verification_key_id ;
+      (* The pre-fix insert path: a bare INSERT of the same content. The unique
+         index must reject it even though verification_key_id is NULL. *)
+      match%map
+        Mina_caqti.insert_into_cols_returning ~returning:("id", Caqti_type.int)
+          ~table_name:"zkapp_accounts"
+          ~cols:
+            (Processor.Zkapp_account.Fields.names, Processor.Zkapp_account.typ)
+          conn fields
+      with
+      | Ok _ ->
+          failwith
+            "inserting a duplicate zkapp_accounts row succeeded; the \
+             zkapp_accounts_content_key unique index is missing or does not \
+             fold a NULL verification_key_id"
+      | Error _ ->
+          ()
+
     (* Regression test for the hardfork "fork genesis" bug that breaks Rosetta
        balance reconciliation at the fork boundary. A hard fork restarts the
        chain at a genesis block whose [blockchain_length] is [fork.blockchain_length
@@ -524,10 +631,74 @@ let%test_module "Archive node unit tests" =
           ~runtime_config_opt:(Some runtime_config) ~genesis_constants
           ~chunks_length:100 ~constraint_constants pool
       in
-      let%map after = count_accounts_accessed genesis_block_id in
+      let%bind after = count_accounts_accessed genesis_block_id in
       (* The fix: every fork genesis ledger account is now attached to the
          fork genesis block. *)
-      [%test_result: int] ~expect:num_accounts after
+      [%test_result: int] ~expect:num_accounts after ;
+      (* Re-running must be safe. An operator whose first run died part way
+         through -- for example on a duplicate zkApp row, which fails only the
+         accounts that hit it and leaves the rest inserted -- has to run the
+         command again over a block that already holds most of its accounts.
+         Reproduce that: drop one account, then feed the whole ledger back
+         through the same batch insert [add_genesis_accounts] uses. The missing
+         row must come back and the rows already present must be found by
+         content and skipped, not re-inserted, which would violate
+         accounts_accessed_pkey.
+
+         [add_genesis_accounts] itself is not called a second time here: it
+         re-reads the genesis ledger, and a second RocksDB handle on the same
+         ledger cache directory in one process fails on the LOCK file. Each
+         toolbox run is a fresh process, so that limit is the test's, not the
+         command's. *)
+      let batch =
+        let ledger =
+          Precomputed_values.genesis_ledger precomputed_values |> Lazy.force
+        in
+        let%map account_ids = Mina_ledger.Ledger.accounts ledger in
+        Account_id.Set.to_list account_ids
+        |> List.map ~f:(fun acct_id ->
+               let loc =
+                 Option.value_exn
+                   (Mina_ledger.Ledger.location_of_account ledger acct_id)
+               in
+               ( Mina_ledger.Ledger.index_of_account_exn ledger acct_id
+               , Option.value_exn (Mina_ledger.Ledger.get ledger loc) ) )
+      in
+      let%bind batch = batch in
+      let%bind () =
+        match%map
+          Mina_caqti.Pool.use
+            (fun (module Conn : Mina_caqti.CONNECTION) ->
+              Conn.exec
+                (Mina_caqti.exec_req Caqti_type.int
+                   "DELETE FROM accounts_accessed WHERE ctid IN (SELECT ctid \
+                    FROM accounts_accessed WHERE block_id = ? LIMIT 1)" )
+                genesis_block_id )
+            pool
+        with
+        | Ok () ->
+            ()
+        | Error e ->
+            failwith @@ Caqti_error.show e
+      in
+      let%bind partial = count_accounts_accessed genesis_block_id in
+      [%test_result: int] ~expect:(num_accounts - 1) partial ;
+      let%bind () =
+        match%map
+          Mina_caqti.Pool.use
+            (fun (module Conn : Mina_caqti.CONNECTION) ->
+              Processor.Accounts_accessed.add_accounts_if_don't_exist
+                (module Conn)
+                genesis_block_id batch )
+            pool
+        with
+        | Ok _ ->
+            ()
+        | Error e ->
+            failwith @@ Caqti_error.show e
+      in
+      let%map after_rerun = count_accounts_accessed genesis_block_id in
+      [%test_result: int] ~expect:num_accounts after_rerun
 
     (*
     let%test_unit "Block: read and write with pruning" =

@@ -139,7 +139,14 @@ CREATE TABLE zkapp_field_array
 /* Fixed-width arrays of algebraic fields, given as id's from
    zkapp_field
 
-   Any element of the array may be NULL, per the NULL convention
+   Any element of the array may be NULL, per the NULL convention.
+
+   No content constraint here yet, so this table keeps the racy
+   SELECT-then-INSERT dedup. A plain UNIQUE would not help: a btree unique index
+   treats two NULLs as distinct, and every element is nullable. It needs the
+   same treatment as zkapp_accounts_content_key -- a unique index over
+   COALESCE(elementN, -1) -- tracked in issue #19449 along with the other tables
+   that still lack one.
 */
 CREATE TABLE zkapp_states_nullable
 ( id                       serial           PRIMARY KEY
@@ -177,7 +184,13 @@ CREATE TABLE zkapp_states_nullable
 , element31                 int		    REFERENCES zkapp_field(id)
 );
 
-/* like zkapp_states_nullable, but elements are not NULL */
+/* like zkapp_states_nullable, but elements are not NULL.
+   The UNIQUE constraint makes the content dedup atomic (INSERT .. ON CONFLICT)
+   instead of a racy SELECT-then-INSERT. All 32 columns are NOT NULL, so the
+   constraint really does reject duplicates. 32 int columns give a btree key of
+   about 132 bytes, far below Postgres' 2704-byte limit -- unlike the unbounded
+   int[] element_ids of zkapp_events/zkapp_field_array, whose UNIQUE had to be
+   dropped. */
 CREATE TABLE zkapp_states
 ( id                       serial           PRIMARY KEY
 , element0                 int              NOT NULL REFERENCES zkapp_field(id)
@@ -212,9 +225,10 @@ CREATE TABLE zkapp_states
 , element29                 int              NOT NULL REFERENCES zkapp_field(id)
 , element30                 int              NOT NULL REFERENCES zkapp_field(id)
 , element31                 int              NOT NULL REFERENCES zkapp_field(id)
+, CONSTRAINT zkapp_states_elements_key UNIQUE (element0, element1, element2, element3, element4, element5, element6, element7, element8, element9, element10, element11, element12, element13, element14, element15, element16, element17, element18, element19, element20, element21, element22, element23, element24, element25, element26, element27, element28, element29, element30, element31)
 );
 
-/* like zkapp_states, but for action states */
+/* like zkapp_states, but for action states (see zkapp_states on the UNIQUE) */
 CREATE TABLE zkapp_action_states
 ( id                       serial           PRIMARY KEY
 , element0                 int              NOT NULL REFERENCES zkapp_field(id)
@@ -222,6 +236,7 @@ CREATE TABLE zkapp_action_states
 , element2                 int              NOT NULL REFERENCES zkapp_field(id)
 , element3                 int              NOT NULL REFERENCES zkapp_field(id)
 , element4                 int              NOT NULL REFERENCES zkapp_field(id)
+, CONSTRAINT zkapp_action_states_elements_key UNIQUE (element0, element1, element2, element3, element4)
 );
 
 /* the element_ids are non-NULL, and refer to zkapp_field_array
@@ -328,6 +343,19 @@ CREATE TABLE zkapp_accounts
 , proved_state         bool    NOT NULL
 , zkapp_uri_id         int     NOT NULL     REFERENCES zkapp_uris(id)
 );
+
+/* Makes the content dedup of zkapp_accounts atomic (INSERT .. ON CONFLICT)
+   instead of a racy SELECT-then-INSERT; see zkapp_states.
+
+   This is a unique index, not a UNIQUE constraint, because verification_key_id
+   is nullable and a btree unique index treats two NULLs as distinct: a plain
+   UNIQUE would let two rows with no verification key both exist and poison that
+   content. Folding the NULL to the sentinel -1 restores the intended meaning.
+   The sentinel cannot collide with a real value: zkapp_verification_keys.id is
+   a serial and therefore positive. UNIQUE NULLS NOT DISTINCT would say this
+   directly, but it needs PostgreSQL 15 and the archive supports 12. */
+CREATE UNIQUE INDEX zkapp_accounts_content_key ON zkapp_accounts
+  (app_state_id, COALESCE(verification_key_id, -1), zkapp_version, action_state_id, last_action_slot, proved_state, zkapp_uri_id);
 
 CREATE TABLE zkapp_token_id_bounds
 ( id                       serial           PRIMARY KEY
