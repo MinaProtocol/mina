@@ -18,10 +18,12 @@ let Docker = ../../Command/Docker/Type.dhall
 
 let Size = ../../Command/Size.dhall
 
+let Arch = ../../Constants/Arch.dhall
+
 let dependsOnDevnet =
       DebianVersions.dependsOn
         DebianVersions.DepsSpec::{
-        , deb_version = DebianVersions.DebVersion.Bullseye
+        , deb_version = DebianVersions.DebVersion.Bookworm
         , network = Network.Type.Devnet
         }
 
@@ -36,15 +38,16 @@ let buildTestCmd
           in  Command.build
                 Command.Config::{
                 , commands =
-                    RunInToolchain.runInToolchainBullseye
+                    RunInToolchain.runInToolchainBookworm
+                      Arch.Type.Amd64
                       ([] : List Text)
                       ''
                       ./buildkite/scripts/tests/debian-automode-transition-test.sh \
-                        --codename bullseye \
+                        --codename bookworm \
                         --network ${network}
                       ''
                 , label =
-                    "Debian automode transition test (bullseye, ${network})"
+                    "Debian automode transition test (bookworm, ${network})"
                 , key = key
                 , target = cmd_target
                 , docker = None Docker.Type

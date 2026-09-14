@@ -5,7 +5,7 @@ SCRIPTPATH="${SCRIPTPATH:-"$( cd "$(dirname "$0")" ; pwd -P )"}"
 BUILD_DIR=${BUILD_DIR:-"${SCRIPTPATH}/../../_build"}
 BUILD_URL=${BUILD_URL:-${BUILDKITE_BUILD_URL:-"local build from '$(hostname)' \
   host"}}
-MINA_DEB_CODENAME=${MINA_DEB_CODENAME:-"bullseye"}
+MINA_DEB_CODENAME=${MINA_DEB_CODENAME:-"bookworm"}
 MINA_DEB_VERSION=${MINA_DEB_VERSION:-"0.0.0-experimental"}
 MINA_DEB_RELEASE=${MINA_DEB_RELEASE:-"unstable"}
 ARCHITECTURE=${ARCHITECTURE:-"amd64"}

@@ -9,7 +9,7 @@ YELLOW='\033[0;33m'
 
 # Configuration - can be overridden via environment variables
 REPO="${REPO:-packages.o1test.net}"
-CODENAME="${CODENAME:-bullseye}"
+CODENAME="${CODENAME:-bookworm}"
 CHANNEL="${CHANNEL:-alpha}"
 PACKAGE="${PACKAGE:-mina-devnet}"
 VERSION="${VERSION:-"3.3.0-alpha1*"}"
@@ -39,7 +39,7 @@ function usage() {
     echo ""
     echo "Options:"
     echo "  -r, --repo          Repository URL (default: packages.o1test.net)"
-    echo "  -c, --codename      Debian codename (default: bullseye)"
+    echo "  -c, --codename      Debian codename (default: bookworm)"
     echo "  -C, --channel       Repository channel (default: alpha)"
     echo "  -p, --package       Package name (default: mina-devnet)"
     echo "  -v, --version       Package version (default: 3.3.0-alpha1*)"
