@@ -3,7 +3,7 @@
 # Archive Schema Upgrade Verification Test
 #
 # This script verifies that applying upgrade_to_mesa.sql to the source
-# (Berkeley/compatible) schema produces the same schema as the target
+# (Berkeley, prefork/berkeley) schema produces the same schema as the target
 # (Mesa/develop) branch's create_schema.sql, and that downgrade_to_berkeley.sql
 # reverses the upgrade correctly.
 #
@@ -14,7 +14,7 @@
 #   verify-schema-upgrade.sh [OPTIONS]
 #
 # OPTIONS:
-#   -s, --source-branch BRANCH   Source (pre-upgrade) branch (default: compatible)
+#   -s, --source-branch BRANCH   Source (pre-upgrade) branch (default: prefork/berkeley)
 #   -t, --target-branch BRANCH   Target (post-upgrade) branch (default: develop)
 #   -h, --help                   Show this help message
 #
@@ -30,12 +30,14 @@ set -euo pipefail
 
 # --- Constants ---
 POSTGRES_CONTAINER="postgres-schema-test-$$"
-POSTGRES_IMAGE="postgres:12.4-alpine"
+# PostgreSQL 13 is the minimum for the archive upgrade scripts: on 12,
+# ADD COLUMN IF NOT EXISTS still adds the column's inline REFERENCES constraint.
+POSTGRES_IMAGE="postgres:13-alpine"
 PG_USER="postgres"
 PG_PASSWORD="postgres"
 REPO_ROOT="$(git rev-parse --show-toplevel)"
 
-SOURCE_BRANCH="compatible"
+SOURCE_BRANCH="prefork/berkeley"
 TARGET_BRANCH="develop"
 
 # --- Argument Parsing ---
@@ -118,6 +120,7 @@ create_db() {
 #   - DEFAULT <integer> clauses (upgrade sets runtime-dependent defaults)
 #   - Sequence setval calls (differ due to data inserts during upgrade)
 #   - Comments and blank lines (timestamps, pg_dump version)
+#   - \restrict/\unrestrict lines (random per-dump key, newer pg_dump)
 dump_and_normalize() {
     local db="$1"
     local output_file="$2"
@@ -128,6 +131,7 @@ dump_and_normalize() {
         -U "$PG_USER" "$db" \
     | grep -v '^--' \
     | grep -v '^$' \
+    | grep -v -E '^\\(un)?restrict ' \
     | awk '/^CREATE TYPE.*migration_status/{skip=1} skip && /\);/{skip=0; next} !skip' \
     | sed -E 's/ DEFAULT [0-9]+//g' \
     | sed '/^SELECT pg_catalog.setval/d' \
