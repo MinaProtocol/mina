@@ -631,10 +631,74 @@ let%test_module "Archive node unit tests" =
           ~runtime_config_opt:(Some runtime_config) ~genesis_constants
           ~chunks_length:100 ~constraint_constants pool
       in
-      let%map after = count_accounts_accessed genesis_block_id in
+      let%bind after = count_accounts_accessed genesis_block_id in
       (* The fix: every fork genesis ledger account is now attached to the
          fork genesis block. *)
-      [%test_result: int] ~expect:num_accounts after
+      [%test_result: int] ~expect:num_accounts after ;
+      (* Re-running must be safe. An operator whose first run died part way
+         through -- for example on a duplicate zkApp row, which fails only the
+         accounts that hit it and leaves the rest inserted -- has to run the
+         command again over a block that already holds most of its accounts.
+         Reproduce that: drop one account, then feed the whole ledger back
+         through the same batch insert [add_genesis_accounts] uses. The missing
+         row must come back and the rows already present must be found by
+         content and skipped, not re-inserted, which would violate
+         accounts_accessed_pkey.
+
+         [add_genesis_accounts] itself is not called a second time here: it
+         re-reads the genesis ledger, and a second RocksDB handle on the same
+         ledger cache directory in one process fails on the LOCK file. Each
+         toolbox run is a fresh process, so that limit is the test's, not the
+         command's. *)
+      let batch =
+        let ledger =
+          Precomputed_values.genesis_ledger precomputed_values |> Lazy.force
+        in
+        let%map account_ids = Mina_ledger.Ledger.accounts ledger in
+        Account_id.Set.to_list account_ids
+        |> List.map ~f:(fun acct_id ->
+               let loc =
+                 Option.value_exn
+                   (Mina_ledger.Ledger.location_of_account ledger acct_id)
+               in
+               ( Mina_ledger.Ledger.index_of_account_exn ledger acct_id
+               , Option.value_exn (Mina_ledger.Ledger.get ledger loc) ) )
+      in
+      let%bind batch = batch in
+      let%bind () =
+        match%map
+          Mina_caqti.Pool.use
+            (fun (module Conn : Mina_caqti.CONNECTION) ->
+              Conn.exec
+                (Mina_caqti.exec_req Caqti_type.int
+                   "DELETE FROM accounts_accessed WHERE ctid IN (SELECT ctid \
+                    FROM accounts_accessed WHERE block_id = ? LIMIT 1)" )
+                genesis_block_id )
+            pool
+        with
+        | Ok () ->
+            ()
+        | Error e ->
+            failwith @@ Caqti_error.show e
+      in
+      let%bind partial = count_accounts_accessed genesis_block_id in
+      [%test_result: int] ~expect:(num_accounts - 1) partial ;
+      let%bind () =
+        match%map
+          Mina_caqti.Pool.use
+            (fun (module Conn : Mina_caqti.CONNECTION) ->
+              Processor.Accounts_accessed.add_accounts_if_don't_exist
+                (module Conn)
+                genesis_block_id batch )
+            pool
+        with
+        | Ok _ ->
+            ()
+        | Error e ->
+            failwith @@ Caqti_error.show e
+      in
+      let%map after_rerun = count_accounts_accessed genesis_block_id in
+      [%test_result: int] ~expect:num_accounts after_rerun
 
     (*
     let%test_unit "Block: read and write with pruning" =
