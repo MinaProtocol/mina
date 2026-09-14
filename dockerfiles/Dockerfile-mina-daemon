@@ -1,3 +1,8 @@
+# !!!CI-FENCE-BEGIN demo canary: the daemon image must build on bullseye-slim; update this fence if the base image changes
+# #!/usr/bin/env bash
+# grep -q '^ARG image=.*debian:bullseye-slim$' dockerfiles/Dockerfile-mina-daemon ||
+#   { echo "base image is no longer bullseye-slim"; exit 1; }
+# !!!CI-FENCE-END
 ARG image=europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/debian:bullseye-slim
 FROM ${image}
 
