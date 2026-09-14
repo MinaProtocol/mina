@@ -1149,7 +1149,9 @@ module Make_str (_ : Wire_types.Concrete) = struct
                           ~shift:Shifts.tick1
                       in
                       let branch_data : Composition_types.Branch_data.t =
-                        { proofs_verified = Nat.to_int actual_proofs_verified
+                        { proofs_verified =
+                            Composition_types.Branch_data.Proofs_verified.(
+                              to_stable_v2 (of_nat actual_proofs_verified) )
                         ; domain_log2 =
                             Composition_types.Branch_data.Domain_log2.of_int_exn
                               step_vk.domain.log_size_of_group

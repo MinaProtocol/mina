@@ -428,8 +428,8 @@ let dummy_wrap_vk :
          } ) )
 
 let dummy : t =
-  { max_proofs_verified = 2
-  ; actual_wrap_domain_size = 2
+  { max_proofs_verified = N2
+  ; actual_wrap_domain_size = N2
   ; wrap_index =
       (let g = Backend.Tock.Curve.(to_affine_exn one) in
        { sigma_comm = Vector.init Plonk_types.Permuts.n ~f:(fun _ -> g)

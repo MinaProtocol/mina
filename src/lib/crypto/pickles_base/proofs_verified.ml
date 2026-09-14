@@ -8,9 +8,14 @@ module Stable = struct
   [@@@no_toplevel_latest_type]
 
   module V2 = struct
-    (* Any non-negative count. For [0], [1] and [2] the bin_prot encoding is
-       byte-identical to [V1]'s constructor tags. *)
-    type t = int [@@deriving sexp, compare, yojson, hash, equal]
+    (* For [N0], [N1] and [N2] every encoding (bin_prot, sexp, JSON) matches
+       [V1]. [N_other n] is only valid for [n > 2]. *)
+    type t = Mina_wire_types.Pickles_base.Proofs_verified.V2.t =
+      | N0
+      | N1
+      | N2
+      | N_other of int
+    [@@deriving sexp, compare, yojson, hash, equal]
 
     let to_latest = Fn.id
   end
@@ -19,13 +24,13 @@ module Stable = struct
     type t = Mina_wire_types.Pickles_base.Proofs_verified.V1.t = N0 | N1 | N2
     [@@deriving sexp, compare, yojson, hash, equal]
 
-    let to_latest : t -> V2.t = function N0 -> 0 | N1 -> 1 | N2 -> 2
+    let to_latest : t -> V2.t = function N0 -> N0 | N1 -> N1 | N2 -> N2
   end
 end]
 
 [@@@warning "+4"]
 
-type t = int [@@deriving sexp, compare, yojson, hash, equal]
+type t = int [@@deriving compare, hash, equal]
 
 let to_int : t -> int = Fn.id
 
@@ -67,9 +72,34 @@ let n1 : t = 1
 
 let n2 : t = 2
 
-let to_stable_v2 (x : t) : Stable.V2.t = x
+let to_stable_v2 (x : t) : Stable.V2.t =
+  match x with 0 -> N0 | 1 -> N1 | 2 -> N2 | n -> N_other n
 
-let of_stable_v2 (x : Stable.V2.t) : t = of_int_exn x
+let of_stable_v2 (x : Stable.V2.t) : t =
+  match x with
+  | N0 ->
+      0
+  | N1 ->
+      1
+  | N2 ->
+      2
+  | N_other n when n > 2 ->
+      n
+  | N_other n ->
+      failwithf "Proofs_verified.of_stable_v2: non-canonical N_other %d" n ()
+
+(* Text encodings go through [Stable.V2], so they keep the [N0]/[N1]/[N2]
+   spelling. *)
+let sexp_of_t t = Stable.V2.sexp_of_t (to_stable_v2 t)
+
+let t_of_sexp s = of_stable_v2 (Stable.V2.t_of_sexp s)
+
+let to_yojson t = Stable.V2.to_yojson (to_stable_v2 t)
+
+let of_yojson j =
+  Result.bind (Stable.V2.of_yojson j) ~f:(fun x ->
+      Result.try_with (fun () -> of_stable_v2 x)
+      |> Result.map_error ~f:Exn.to_string )
 
 (* [V1] is the encoding the Mina protocol accepts (ledger verification keys,
    side-loaded proofs). Keeping it narrow is deliberate: widening [V1] would be
@@ -86,7 +116,7 @@ let to_stable_v1 (x : t) : Stable.V1.t =
       failwithf "Proofs_verified.to_stable_v1: %d proofs verified exceeds V1" n
         ()
 
-let of_stable_v1 : Stable.V1.t -> t = Stable.V1.to_latest
+let of_stable_v1 (x : Stable.V1.t) : t = of_stable_v2 (Stable.V1.to_latest x)
 
 (* The prefix mask is right-aligned: the [to_int t] set bits sit at the end of
    the vector, e.g. [1] over width 2 is [false; true]. This matches the

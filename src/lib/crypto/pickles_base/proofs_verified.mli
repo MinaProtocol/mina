@@ -3,7 +3,11 @@ open Pickles_types
 (** Represents how many proofs are verified. *)
 module Stable : sig
   module V2 : sig
-    type t = Mina_wire_types.Pickles_base.Proofs_verified.V2.t
+    type t = Mina_wire_types.Pickles_base.Proofs_verified.V2.t =
+      | N0
+      | N1
+      | N2
+      | N_other of int
     [@@deriving sexp, compare, yojson, hash, equal]
 
     include Plonkish_prelude.Sigs.Binable.S with type t := t
@@ -48,7 +52,7 @@ val to_int : t -> int
 
 val to_stable_v2 : t -> Stable.V2.t
 
-(** Raise an exception if the value is negative. *)
+(** Raise an exception on the non-canonical [N_other n] with [n <= 2]. *)
 val of_stable_v2 : Stable.V2.t -> t
 
 (** Raise an exception if [t] is above 2: [V1] is the encoding the Mina protocol

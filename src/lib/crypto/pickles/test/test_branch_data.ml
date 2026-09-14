@@ -16,7 +16,9 @@ let all_branch_data n =
     (List.init (Nat.to_int n + 1) ~f:Fn.id)
     ~f:(fun proofs_verified ->
       List.map [ 0; 1; 13; 16; 255 ] ~f:(fun d ->
-          { Branch_data.proofs_verified
+          { Branch_data.proofs_verified =
+              Branch_data.Proofs_verified.(
+                to_stable_v2 (of_int_exn proofs_verified) )
           ; domain_log2 = Branch_data.Domain_log2.of_int_exn d
           } ) )
 

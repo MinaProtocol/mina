@@ -246,7 +246,9 @@ module For_tests_only = struct
                   ~domain:tick_domain ~ft_eval1:proof.proof.openings.ft_eval1
                   ~plonk:tick_plonk_minimal )
         ; branch_data =
-            { proofs_verified = Nat.to_int actual_proofs_verified
+            { proofs_verified =
+                Branch_data.Proofs_verified.(
+                  to_stable_v2 (of_nat actual_proofs_verified) )
             ; domain_log2 =
                 Branch_data.Domain_log2.of_int_exn
                   step_vk.domain.log_size_of_group
