@@ -145,8 +145,8 @@ CREATE TABLE zkapp_field_array
    SELECT-then-INSERT dedup. A plain UNIQUE would not help: a btree unique index
    treats two NULLs as distinct, and every element is nullable. It needs the
    same treatment as zkapp_accounts_content_key -- a unique index over
-   COALESCE(elementN, -1) -- which is tracked separately along with the other
-   tables that still lack one.
+   COALESCE(elementN, -1) -- tracked in issue #19449 along with the other tables
+   that still lack one.
 */
 CREATE TABLE zkapp_states_nullable
 ( id                       serial           PRIMARY KEY
