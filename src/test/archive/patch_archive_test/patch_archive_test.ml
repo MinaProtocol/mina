@@ -100,7 +100,7 @@ let main ~db_uri ~network_data_folder () =
      has an intact canonical chain to validate after patching.
   *)
   let missing_block_state_hash =
-    "3NKSqLA8BWMgHHkX4TqkVQjTmHLkXBumBb2aSBS3myzHQGopXC9x"
+    "3NKPMux2LPVLyz4UaoxVn7pE2cdRf7nfTXrxzLi745uDyHa8XGCb"
   in
   let candidate_blocks =
     List.filter_mapi extensional_files ~f:(fun i file ->
