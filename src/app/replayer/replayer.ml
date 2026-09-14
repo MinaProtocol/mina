@@ -628,7 +628,7 @@ let try_slot ~logger pool slot =
 
 let write_replayer_checkpoint ~logger ~ledger ~last_global_slot_since_genesis
     ~max_canonical_slot ~checkpoint_output_folder_opt ~checkpoint_file_prefix
-    ~migration_mode ~input =
+    ~input =
   if Int64.( <= ) last_global_slot_since_genesis max_canonical_slot then (
     (* start replaying at the slot after the one we've just finished with *)
     let start_slot_since_genesis = Int64.succ last_global_slot_since_genesis in
