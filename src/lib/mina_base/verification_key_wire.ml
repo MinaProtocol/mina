@@ -32,16 +32,11 @@ module Stable = struct
 
       (* don't send hash over the wire; restore hash on receipt *)
 
-      (* The in-memory key is the widened [Side_loaded_verification_key.t], but
-         the ledger keeps the [V2] encoding, which only admits keys verifying
-         at most 2 proofs. This is why [Stable.V1] keeps its version number:
-         the bytes are unchanged, and [to_stable_v2] raises for a wider key. *)
-
-      let to_binable (t : t) = Side_loaded_verification_key.to_stable_v2 t.data
+      let to_binable (t : t) = t.data
 
       let of_binable vk : t =
-        let data = Side_loaded_verification_key.of_stable_v2 vk in
-        let hash = digest_vk data in
+        let data = vk in
+        let hash = digest_vk vk in
         { data; hash }
     end
 
