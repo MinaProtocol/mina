@@ -83,7 +83,7 @@ let PackagingSpec =
           { prefix = "MinaArtifact"
           , artifacts = [ Artifact.Type.LogProc ]
           , buildScript = "./buildkite/scripts/build-release.sh"
-          , debVersion = DebianVersions.DebVersion.Bullseye
+          , debVersion = DebianVersions.DebVersion.Bookworm
           , buildFlags = BuildFlags.Type.None
           , toolchainSelectMode = Toolchain.SelectionMode.ByDebianAndArch
           , tags = [ PipelineTag.Type.Long, PipelineTag.Type.Release ]
@@ -133,7 +133,7 @@ let AppsSpec =
       , default =
           { prefix = "MinaArtifact"
           , nameSegment = ""
-          , debVersion = DebianVersions.DebVersion.Bullseye
+          , debVersion = DebianVersions.DebVersion.Bookworm
           , buildFlags = BuildFlags.Type.None
           , arch = Arch.Type.Amd64
           , toolchainSelectMode = Toolchain.SelectionMode.ByDebianAndArch
@@ -205,7 +205,7 @@ let labelSuffix
     =
       -- The network is named here, and not only in the name of the job, because
       -- one codename has a devnet packaging step AND a mainnet one. Without it
-      -- both read "Debian: Build Bullseye" and the two look like the same work
+      -- both read "Debian: Build Bookworm" and the two look like the same work
       -- done twice, which is what they are not: they build different packages.
       --
       -- Network.capitalName and not Network.namePrefixSegment, which is empty

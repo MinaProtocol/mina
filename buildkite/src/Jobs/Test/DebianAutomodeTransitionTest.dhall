@@ -30,7 +30,7 @@ let devnet = Network.Type.Devnet
 
 let profile = Profiles.Type.Devnet
 
-let debVersion = DebianVersions.DebVersion.Bullseye
+let debVersion = DebianVersions.DebVersion.Bookworm
 
 let dependsOnDevnet =
       DebianVersions.appDependsOn
@@ -72,17 +72,17 @@ let buildTestCmd
                         debianTokens
                     # RunInToolchain.runInToolchain
                         RunInToolchain.Config::{
-                        , image = ContainerImages.minaToolchainBullseye.amd64
+                        , image = ContainerImages.minaToolchainBookworm.amd64
                         , environment = [ "LOCAL_DEB_SOURCE_DIR=_build" ]
                         , innerScript =
                             ''
                             ./buildkite/scripts/tests/debian-automode-transition-test.sh \
-                              --codename bullseye \
+                              --codename bookworm \
                               --network ${network}
                             ''
                         }
                 , label =
-                    "Debian automode transition test (bullseye, ${network})"
+                    "Debian automode transition test (bookworm, ${network})"
                 , key = key
                 , target = cmd_target
                 , docker = None Docker.Type
