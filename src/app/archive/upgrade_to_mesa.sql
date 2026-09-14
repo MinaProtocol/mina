@@ -5,8 +5,9 @@
 -- + drop UNIQUE/index on zkapp_{events,field_array}.element_ids (btree overflow
 --   for max-cost zkApps); these rows are no longer content-deduplicated
 -- + make zkapp_account_update_body.events_id/actions_id nullable (NULL = empty)
--- + deduplicate zkapp_{states,action_states} and add a UNIQUE constraint on
---   their element columns, so the content dedup becomes atomic
+-- + deduplicate zkapp_{states,action_states,accounts} (bottom-up, children
+--   first) and add a UNIQUE constraint / unique index on their content columns,
+--   so the content dedup becomes atomic
 -- + record status in migration_history
 -- =============================================================================
 
@@ -95,7 +96,7 @@ BEGIN
         ) VALUES (
             target_protocol_version,
             target_migration_version,
-            'Upgrade from Berkeley to Mesa. Add {zkapp_states,zkapp_states_nullable}.element8..element31 (int); drop zkapp_{events,field_array}.element_ids UNIQUE/index (no dedup); make zkapp_account_update_body.{events_id,actions_id} nullable (NULL=empty); dedup zkapp_{states,action_states} and add UNIQUE on their element columns',
+            'Upgrade from Berkeley to Mesa. Add {zkapp_states,zkapp_states_nullable}.element8..element31 (int); drop zkapp_{events,field_array}.element_ids UNIQUE/index (no dedup); make zkapp_account_update_body.{events_id,actions_id} nullable (NULL=empty); dedup zkapp_{states,action_states,accounts} and constrain their content columns',
             'starting'::migration_status
         );
     ELSIF 
@@ -256,14 +257,24 @@ DROP INDEX IF EXISTS idx_zkapp_events_element_ids;
 ALTER TABLE zkapp_account_update_body ALTER COLUMN events_id DROP NOT NULL;
 ALTER TABLE zkapp_account_update_body ALTER COLUMN actions_id DROP NOT NULL;
 
--- 3c. Deduplicate zkapp_states / zkapp_action_states and constrain them.
--- Both tables were content-deduplicated by a non-atomic SELECT-then-INSERT and
--- had no UNIQUE constraint, so two concurrent writers could both miss and both
--- insert. Every later lookup of that content then failed permanently with
+-- 3c. Deduplicate zkapp_states / zkapp_action_states / zkapp_accounts and
+-- constrain them.
+-- All three tables were content-deduplicated by a non-atomic SELECT-then-INSERT
+-- and had no UNIQUE constraint, so two concurrent writers could both miss and
+-- both insert. Every later lookup of that content then failed permanently with
 -- "Received 2 tuples, expected at most one". Merge the existing duplicates,
--- repoint the referencing rows, then add the UNIQUE constraint that makes the
--- dedup atomic. All idempotent: with no duplicates and the constraint already
+-- repoint the referencing rows, then add the constraint that makes the dedup
+-- atomic. All idempotent: with no duplicates and the constraint already
 -- present, this is a no-op.
+--
+-- ORDER MATTERS. The tables form a chain:
+--     zkapp_states        <- zkapp_accounts.app_state_id
+--     zkapp_action_states <- zkapp_accounts.action_state_id
+--     zkapp_accounts      <- accounts_accessed.zkapp_id
+-- Repointing a child merges rows of the parent that were previously distinct,
+-- so a parent can only be deduplicated after its children. Deduplicating
+-- zkapp_accounts first would leave a fresh duplicate pair behind and the
+-- failure would come straight back.
 
 -- 3c.i  zkapp_states: zkapp_accounts.app_state_id is the only reference.
 CREATE TEMP TABLE zkapp_states_dups AS
@@ -301,9 +312,42 @@ WHERE id IN (SELECT dup_id FROM zkapp_action_states_dups);
 
 DROP TABLE zkapp_action_states_dups;
 
--- 3c.iii Add the UNIQUE constraints. ALTER TABLE ADD CONSTRAINT is not
---        idempotent on its own, so guard on pg_constraint. Building the index
---        takes an ACCESS EXCLUSIVE lock; the statement_timeout above bounds it.
+-- 3c.iii zkapp_accounts: accounts_accessed.zkapp_id is the only reference.
+--        Must run after 3c.i and 3c.ii, which can merge previously distinct
+--        zkapp_accounts rows into identical ones.
+CREATE TEMP TABLE zkapp_accounts_dups AS
+SELECT (array_agg(id ORDER BY id))[1]          AS keep_id
+     , unnest((array_agg(id ORDER BY id))[2:]) AS dup_id
+FROM zkapp_accounts t
+GROUP BY to_jsonb(t) - 'id'
+HAVING count(*) > 1;
+
+-- Unlike 3c.i and 3c.ii, which repoint the 5-figure zkapp_accounts, this one
+-- repoints accounts_accessed: tens of millions of rows with no index on
+-- zkapp_id, so the UPDATE is a sequential scan. Skip it unless there is
+-- something to repoint, which is the normal case.
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM zkapp_accounts_dups) THEN
+        UPDATE accounts_accessed a
+        SET    zkapp_id = d.keep_id
+        FROM   zkapp_accounts_dups d
+        WHERE  a.zkapp_id = d.dup_id;
+
+        DELETE FROM zkapp_accounts
+        WHERE id IN (SELECT dup_id FROM zkapp_accounts_dups);
+    END IF;
+END
+$$;
+
+DROP TABLE zkapp_accounts_dups;
+
+-- 3c.iv Add the constraints. ALTER TABLE ADD CONSTRAINT is not idempotent on
+--       its own, so guard on pg_constraint. Building the index takes an
+--       ACCESS EXCLUSIVE lock; the statement_timeout above bounds it.
+--       zkapp_accounts gets a unique INDEX rather than a UNIQUE constraint,
+--       because its verification_key_id is nullable and a btree unique index
+--       treats two NULLs as distinct; see create_schema.sql.
 DO $$
 BEGIN
     IF NOT EXISTS (
@@ -320,10 +364,13 @@ BEGIN
         ALTER TABLE zkapp_action_states
           ADD CONSTRAINT zkapp_action_states_elements_key UNIQUE (element0, element1, element2, element3, element4);
     END IF;
+
+    CREATE UNIQUE INDEX IF NOT EXISTS zkapp_accounts_content_key
+      ON zkapp_accounts (app_state_id, COALESCE(verification_key_id, -1), zkapp_version, action_state_id, last_action_slot, proved_state, zkapp_uri_id);
 EXCEPTION
     WHEN OTHERS THEN
         PERFORM pg_temp.set_migration_status('failed'::migration_status);
-        RAISE EXCEPTION 'An error occurred while adding the zkapp state UNIQUE constraints: %', SQLERRM;
+        RAISE EXCEPTION 'An error occurred while adding the zkapp dedup constraints: %', SQLERRM;
 END
 $$;
 

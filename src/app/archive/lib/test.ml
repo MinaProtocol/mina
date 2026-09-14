@@ -476,6 +476,55 @@ let%test_module "Archive node unit tests" =
       | Error _ ->
           ()
 
+    (* Same defect one level up the chain, and the reason a plain UNIQUE is not
+       enough here: [zkapp_accounts.verification_key_id] is nullable, and a
+       btree unique index treats two NULLs as distinct. [Zkapp_account.default]
+       has no verification key, so this exercises exactly the NULL case that a
+       column-list UNIQUE would let through. The dedup is an atomic upsert
+       against the expression index [zkapp_accounts_content_key]. *)
+    let%test_unit "Zkapp_account: dedup is idempotent and duplicate rows are \
+                   rejected, with a NULL verification_key_id" =
+      let conn = Lazy.force conn_lazy in
+      Thread_safe.block_on_async_exn
+      @@ fun () ->
+      let zkapp_account = Zkapp_account.default in
+      [%test_result: bool] ~expect:true
+        (Option.is_none zkapp_account.verification_key) ;
+      let%bind fields =
+        match%map
+          let open Deferred.Result.Let_syntax in
+          let%bind id =
+            Processor.Zkapp_account.add_if_doesn't_exist conn zkapp_account
+          in
+          let%bind id' =
+            Processor.Zkapp_account.add_if_doesn't_exist conn zkapp_account
+          in
+          [%test_result: int] ~expect:id id' ;
+          Processor.Zkapp_account.load conn id
+        with
+        | Ok fields ->
+            fields
+        | Error e ->
+            failwith @@ Caqti_error.show e
+      in
+      [%test_result: int option] ~expect:None fields.verification_key_id ;
+      (* The pre-fix insert path: a bare INSERT of the same content. The unique
+         index must reject it even though verification_key_id is NULL. *)
+      match%map
+        Mina_caqti.insert_into_cols_returning ~returning:("id", Caqti_type.int)
+          ~table_name:"zkapp_accounts"
+          ~cols:
+            (Processor.Zkapp_account.Fields.names, Processor.Zkapp_account.typ)
+          conn fields
+      with
+      | Ok _ ->
+          failwith
+            "inserting a duplicate zkapp_accounts row succeeded; the \
+             zkapp_accounts_content_key unique index is missing or does not \
+             fold a NULL verification_key_id"
+      | Error _ ->
+          ()
+
     (* Regression test for the hardfork "fork genesis" bug that breaks Rosetta
        balance reconciliation at the fork boundary. A hard fork restarts the
        chain at a genesis block whose [blockchain_length] is [fork.blockchain_length

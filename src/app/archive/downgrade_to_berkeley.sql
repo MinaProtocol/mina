@@ -2,7 +2,8 @@
 -- Mina rollback: from mesa to berkeley
 -- + remove zkapp_states.element31..element8 (int)
 -- + remove zkapp_states_nullable.element31..element8 (int)
--- + drop the zkapp_{states,action_states} element UNIQUE constraints
+-- + drop the zkapp_{states,action_states} element UNIQUE constraints and the
+--   zkapp_accounts content unique index
 --   (rows merged by the upgrade are NOT split back apart; that is not lossy,
 --   the duplicates carried no information)
 -- NOTE: the element_ids UNIQUE/index drop and the events_id/actions_id NULL change
@@ -115,13 +116,15 @@ BEGIN
     END IF;
 END$$;
 
--- 1b. Drop the zkapp state UNIQUE constraints added by the Mesa upgrade.
+-- 1b. Drop the zkapp dedup constraints added by the Mesa upgrade.
 -- Berkeley has no such constraints. zkapp_states' constraint would also be
 -- dropped implicitly by removing element8..element31 below, but drop it
--- explicitly so the rollback is not order-dependent. zkapp_action_states keeps
--- all its columns, so its constraint must be dropped here. Idempotent.
+-- explicitly so the rollback is not order-dependent. zkapp_action_states and
+-- zkapp_accounts keep all their columns, so theirs must be dropped here.
+-- Idempotent.
 ALTER TABLE zkapp_states DROP CONSTRAINT IF EXISTS zkapp_states_elements_key;
 ALTER TABLE zkapp_action_states DROP CONSTRAINT IF EXISTS zkapp_action_states_elements_key;
+DROP INDEX IF EXISTS zkapp_accounts_content_key;
 
 -- 2. `zkapp_states`: Remove columns element31..element8
 

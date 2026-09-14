@@ -389,14 +389,16 @@ let insert_into_cols ~(returning : string) ~(table_name : string)
       values
   in
   match on_conflict with
-  | Some col ->
-      let assignments =
-        String.split col ~on:',' |> List.map ~f:String.strip
-        |> List.map ~f:(fun col -> sprintf "%s = EXCLUDED.%s" col col)
-        |> String.concat ~sep:", "
-      in
-      sprintf "%s ON CONFLICT (%s) DO UPDATE SET %s RETURNING %s" insert col
-        assignments returning
+  | Some conflict_target ->
+      (* DO UPDATE, not DO NOTHING: only DO UPDATE makes RETURNING yield the
+         row that caused the conflict. The assignment is a deliberate no-op
+         write of the first column; its only purpose is to produce that row.
+         [conflict_target] is copied verbatim so it may name index expressions
+         such as `COALESCE(col, -1)`, which is why the assignment is not
+         derived from it. *)
+      let col = List.hd_exn cols in
+      sprintf "%s ON CONFLICT (%s) DO UPDATE SET %s = EXCLUDED.%s RETURNING %s"
+        insert conflict_target col col returning
   | None ->
       sprintf "%s RETURNING %s" insert returning
 
@@ -470,7 +472,7 @@ let insert_into_cols_returning ~(returning : string * 'r Caqti_type.t)
 
 (* Like [insert_into_cols] but generates an upsert:
    INSERT INTO table (cols) VALUES (params)
-   ON CONFLICT (on_conflict) DO UPDATE SET on_conflict = EXCLUDED.on_conflict
+   ON CONFLICT (on_conflict) DO UPDATE SET col0 = EXCLUDED.col0
    RETURNING returning.
    The DO UPDATE is a no-op that returns the existing row's id when a conflict
    occurs, preventing UNIQUE violation errors under concurrent insertion. *)
@@ -483,7 +485,11 @@ let upsert_into_cols ~(on_conflict : string) ~(returning : string)
    or the existing row that caused the conflict. Unlike
    [select_insert_into_cols] this is atomic: it needs no separate content
    lookup, so concurrent writers cannot both miss and both insert. It requires
-   a UNIQUE constraint (or unique index) on [on_conflict]. *)
+   a UNIQUE constraint (or unique index) whose definition [on_conflict] matches:
+   either a comma-separated column list, or, for a table with a nullable dedup
+   column, the expressions of a unique index such as
+   "a, COALESCE(b, -1), c". A plain column list over a nullable column would not
+   deduplicate, because a btree unique index treats two NULLs as distinct. *)
 let upsert_into_cols_returning ~(on_conflict : string)
     ~(returning : string * 'r Caqti_type.t) ~(table_name : string) ?tannot
     ~(cols : string list * 'cols Caqti_type.t) (module Conn : CONNECTION)

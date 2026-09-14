@@ -141,9 +141,12 @@ CREATE TABLE zkapp_field_array
 
    Any element of the array may be NULL, per the NULL convention.
 
-   No UNIQUE constraint here: a unique index treats two NULLs as distinct, so it
-   would not deduplicate rows that contain NULL. Deduplicating this table needs
-   UNIQUE NULLS NOT DISTINCT, which requires PostgreSQL 15 or later.
+   No content constraint here yet, so this table keeps the racy
+   SELECT-then-INSERT dedup. A plain UNIQUE would not help: a btree unique index
+   treats two NULLs as distinct, and every element is nullable. It needs the
+   same treatment as zkapp_accounts_content_key -- a unique index over
+   COALESCE(elementN, -1) -- which is tracked separately along with the other
+   tables that still lack one.
 */
 CREATE TABLE zkapp_states_nullable
 ( id                       serial           PRIMARY KEY
@@ -340,6 +343,19 @@ CREATE TABLE zkapp_accounts
 , proved_state         bool    NOT NULL
 , zkapp_uri_id         int     NOT NULL     REFERENCES zkapp_uris(id)
 );
+
+/* Makes the content dedup of zkapp_accounts atomic (INSERT .. ON CONFLICT)
+   instead of a racy SELECT-then-INSERT; see zkapp_states.
+
+   This is a unique index, not a UNIQUE constraint, because verification_key_id
+   is nullable and a btree unique index treats two NULLs as distinct: a plain
+   UNIQUE would let two rows with no verification key both exist and poison that
+   content. Folding the NULL to the sentinel -1 restores the intended meaning.
+   The sentinel cannot collide with a real value: zkapp_verification_keys.id is
+   a serial and therefore positive. UNIQUE NULLS NOT DISTINCT would say this
+   directly, but it needs PostgreSQL 15 and the archive supports 12. */
+CREATE UNIQUE INDEX zkapp_accounts_content_key ON zkapp_accounts
+  (app_state_id, COALESCE(verification_key_id, -1), zkapp_version, action_state_id, last_action_slot, proved_state, zkapp_uri_id);
 
 CREATE TABLE zkapp_token_id_bounds
 ( id                       serial           PRIMARY KEY
