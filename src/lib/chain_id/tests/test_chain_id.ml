@@ -1,5 +1,5 @@
 let expected_chain_id =
-  "f56cf7a9f60f8e8316aac2458750d72affb23fd6f9f87d6c1549dada0edb1e6c"
+  "08a9587da393a6729a6bc4b68a6ce30d8b2d3ec780a8cc6298a4add48f71426f"
 
 let test_of_precomputed_values () =
   let pv = Lazy.force Precomputed_values.for_unit_tests in
