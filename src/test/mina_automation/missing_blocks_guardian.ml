@@ -90,6 +90,6 @@ let run_capturing t ~config =
     | Error (`Signal signal) ->
         (* Report a signal as a non-zero code so callers can treat it as a
            failure without a second case. *)
-        128 + Signal_unix.to_system_int signal
+        128 + Signal.to_system_int signal
   in
   { exit_code; stdout = output.stdout; stderr = output.stderr }
