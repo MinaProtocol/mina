@@ -1832,6 +1832,7 @@ module Epoch_data = struct
       { seed : string
       ; ledger_hash_id : int
       ; total_currency : string
+      ; total_stake : string option
       ; start_checkpoint : string
       ; lock_checkpoint : string
       ; epoch_length : int64
@@ -1844,11 +1845,12 @@ module Epoch_data = struct
 
   let typ =
     Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
-      Caqti_type.[ string; int; string; string; string; int64 ]
+      Caqti_type.[ string; int; string; option string; string; string; int64 ]
 
   let table_name = "epoch_data"
 
   let add_if_doesn't_exist (module Conn : Mina_caqti.CONNECTION)
+      ~(total_stake : Currency.Amount.t option)
       (t : Mina_base.Epoch_data.Value.t) =
     let open Deferred.Result.Let_syntax in
     let Mina_base.Epoch_ledger.Poly.{ hash; total_currency } =
@@ -1859,6 +1861,7 @@ module Epoch_data = struct
     in
     let seed = t.seed |> Epoch_seed.to_base58_check in
     let total_currency = Currency.Amount.to_string total_currency in
+    let total_stake = Option.map ~f:Currency.Amount.to_string total_stake in
     let start_checkpoint = t.start_checkpoint |> State_hash.to_base58_check in
     let lock_checkpoint = t.lock_checkpoint |> State_hash.to_base58_check in
     let epoch_length =
@@ -1871,6 +1874,7 @@ module Epoch_data = struct
       { seed
       ; ledger_hash_id
       ; total_currency
+      ; total_stake
       ; start_checkpoint
       ; lock_checkpoint
       ; epoch_length
@@ -1886,6 +1890,7 @@ module Epoch_data = struct
         Mina_base.Epoch_data.Poly.t ) =
     add_if_doesn't_exist
       (module Conn)
+      ~total_stake:(Some t.ledger.total_stake)
       { t with ledger = Consensus.Data.Epoch_ledger.to_zkapp_view t.ledger }
 
   let load (module Conn : Mina_caqti.CONNECTION) id =
@@ -2894,6 +2899,7 @@ module Block = struct
     ; min_window_density : int64
     ; sub_window_densities : int64 array
     ; total_currency : string
+    ; total_stake : string option
     ; ledger_hash : string
     ; height : int64
     ; global_slot_since_hard_fork : int64
@@ -2920,6 +2926,7 @@ module Block = struct
         ; int64
         ; Mina_caqti.array_int64_typ
         ; string
+        ; option string
         ; string
         ; int64
         ; int64
@@ -3089,6 +3096,11 @@ module Block = struct
             ; total_currency =
                 consensus_state |> Consensus.Data.Consensus_state.total_currency
                 |> Currency.Amount.to_string
+            ; total_stake =
+                Some
+                  ( consensus_state
+                  |> Consensus.Data.Consensus_state.total_stake
+                  |> Currency.Amount.to_string )
             ; ledger_hash =
                 blockchain_state |> Blockchain_state.staged_ledger_hash
                 |> Staged_ledger_hash.ledger_hash |> Ledger_hash.to_base58_check
@@ -3398,11 +3410,13 @@ module Block = struct
     (* zkapps are currently unsupported in the batch implementation of this function *)
     assert (List.for_all blocks ~f:(fun block -> List.is_empty block.zkapp_cmds)) ;
 
-    let epoch_data_to_repr (e : Mina_base.Epoch_data.t)
+    let epoch_data_to_repr
+        ((e, total_stake) : Mina_base.Epoch_data.t * Currency.Amount.t option)
         ~(find_ledger_hash_id : Ledger_hash.t -> int) : Epoch_data.t =
       { seed = Epoch_seed.to_base58_check e.seed
       ; ledger_hash_id = find_ledger_hash_id e.ledger.hash
       ; total_currency = Currency.Amount.to_string e.ledger.total_currency
+      ; total_stake = Option.map ~f:Currency.Amount.to_string total_stake
       ; start_checkpoint = State_hash.to_base58_check e.start_checkpoint
       ; lock_checkpoint = State_hash.to_base58_check e.lock_checkpoint
       ; epoch_length =
@@ -3721,15 +3735,21 @@ module Block = struct
     in
 
     let missing_block_staking_epochs =
-      List.map missing_blocks ~f:(fun { staking_epoch_data; _ } ->
-          staking_epoch_data )
+      List.map missing_blocks
+        ~f:(fun { staking_epoch_data; staking_epoch_total_stake; _ } ->
+          (staking_epoch_data, staking_epoch_total_stake) )
     in
     let missing_block_next_epochs =
-      List.map missing_blocks ~f:(fun { next_epoch_data; _ } -> next_epoch_data)
+      List.map missing_blocks
+        ~f:(fun { next_epoch_data; next_epoch_total_stake; _ } ->
+          (next_epoch_data, next_epoch_total_stake) )
     in
     let all_missing_epochs =
       Staged.unstage
-        (List.stable_dedup_staged ~compare:Mina_base.Epoch_data.compare)
+        (List.stable_dedup_staged
+           ~compare:
+             [%compare:
+               Mina_base.Epoch_data.t * Currency.Amount.Stable.Latest.t option] )
         (missing_block_staking_epochs @ missing_block_next_epochs)
     in
 
@@ -3738,7 +3758,8 @@ module Block = struct
           snarked_ledger_hash )
     in
     let missing_epoch_ledger_hashes =
-      List.map all_missing_epochs ~f:(fun { ledger = { hash; _ }; _ } -> hash)
+      List.map all_missing_epochs ~f:(fun ({ ledger = { hash; _ }; _ }, _) ->
+          hash )
     in
     let all_missing_ledger_hashes =
       Staged.unstage
@@ -3894,11 +3915,13 @@ module Block = struct
                 Map.find_exn ledger_hash_ids block.snarked_ledger_hash
             ; staking_epoch_data_id =
                 Map.find_exn epoch_ids
-                  (epoch_data_to_repr block.staking_epoch_data
+                  (epoch_data_to_repr
+                     (block.staking_epoch_data, block.staking_epoch_total_stake)
                      ~find_ledger_hash_id:(Map.find_exn ledger_hash_ids) )
             ; next_epoch_data_id =
                 Map.find_exn epoch_ids
-                  (epoch_data_to_repr block.next_epoch_data
+                  (epoch_data_to_repr
+                     (block.next_epoch_data, block.next_epoch_total_stake)
                      ~find_ledger_hash_id:(Map.find_exn ledger_hash_ids) )
             ; min_window_density =
                 block.min_window_density |> Mina_numbers.Length.to_uint32
@@ -3910,6 +3933,8 @@ module Block = struct
                     |> Unsigned.UInt32.to_int64 )
                 |> Array.of_list
             ; total_currency = Currency.Amount.to_string block.total_currency
+            ; total_stake =
+                Option.map ~f:Currency.Amount.to_string block.total_stake
             ; ledger_hash = block.ledger_hash |> Ledger_hash.to_base58_check
             ; height = block.height |> Unsigned.UInt32.to_int64
             ; global_slot_since_hard_fork =
@@ -4146,10 +4171,13 @@ module Block = struct
           let%bind staking_epoch_data_id =
             Epoch_data.add_if_doesn't_exist
               (module Conn)
+              ~total_stake:block.staking_epoch_total_stake
               block.staking_epoch_data
           in
           let%bind next_epoch_data_id =
-            Epoch_data.add_if_doesn't_exist (module Conn) block.next_epoch_data
+            Epoch_data.add_if_doesn't_exist
+              (module Conn)
+              ~total_stake:block.next_epoch_total_stake block.next_epoch_data
           in
           let%bind protocol_version_id =
             let transaction =
@@ -4204,6 +4232,8 @@ module Block = struct
                     |> Unsigned.UInt32.to_int64 )
                 |> Array.of_list
             ; total_currency = Currency.Amount.to_string block.total_currency
+            ; total_stake =
+                Option.map ~f:Currency.Amount.to_string block.total_stake
             ; ledger_hash = block.ledger_hash |> Ledger_hash.to_base58_check
             ; height = block.height |> Unsigned.UInt32.to_int64
             ; global_slot_since_hard_fork =

@@ -457,6 +457,7 @@ CREATE TABLE epoch_data
 , seed             text   NOT NULL
 , ledger_hash_id   int    NOT NULL REFERENCES snarked_ledger_hashes(id)
 , total_currency   text   NOT NULL
+, total_stake      text
 , start_checkpoint text   NOT NULL
 , lock_checkpoint  text   NOT NULL
 , epoch_length     bigint NOT NULL
@@ -488,6 +489,7 @@ CREATE TABLE blocks
 , min_window_density           bigint   NOT NULL
 , sub_window_densities         bigint[] NOT NULL
 , total_currency               text     NOT NULL
+, total_stake                  text
 , ledger_hash                  text     NOT NULL
 , height                       bigint   NOT NULL
 , global_slot_since_hard_fork  bigint   NOT NULL
@@ -592,3 +594,20 @@ CREATE TABLE blocks_zkapp_commands
 CREATE INDEX idx_blocks_zkapp_commands_block_id ON blocks_zkapp_commands(block_id);
 CREATE INDEX idx_blocks_zkapp_commands_zkapp_command_id ON blocks_zkapp_commands(zkapp_command_id);
 CREATE INDEX idx_blocks_zkapp_commands_sequence_no ON blocks_zkapp_commands(sequence_no);
+
+/* Schema version history. The upgrade and downgrade scripts next to this file
+   check and extend it, so a fresh archive records the version it was created
+   at. Keep the row below in sync with the latest upgrade script.
+*/
+CREATE TYPE migration_status AS ENUM ('starting', 'applied', 'failed');
+
+CREATE TABLE migration_history
+( commit_start_at   timestamptz       NOT NULL DEFAULT now() PRIMARY KEY
+, protocol_version  text              NOT NULL
+, migration_version text              NOT NULL
+, description       text              NOT NULL
+, status            migration_status  NOT NULL
+);
+
+INSERT INTO migration_history (protocol_version, migration_version, description, status)
+VALUES ('5.0.0', '0.0.1', 'Created from create_schema.sql', 'applied');

@@ -86,6 +86,13 @@ module Epoch_ledger = struct
             ~typ:(non_null @@ Currency_graphql.Graphql_scalars.Amount.typ ())
             ~args:Arg.[]
             ~resolve:(fun _ { Poly.total_currency; _ } -> total_currency)
+        ; field "totalStake"
+            ~doc:
+              "Total balance of the accounts in this ledger that delegate to \
+               someone, the denominator of the VRF threshold"
+            ~typ:(non_null @@ Currency_graphql.Graphql_scalars.Amount.typ ())
+            ~args:Arg.[]
+            ~resolve:(fun _ { Poly.total_stake; _ } -> total_stake)
         ]
 end
 
@@ -157,6 +164,12 @@ module Consensus_state = struct
             ~typ:(non_null amount)
             ~args:Arg.[]
             ~resolve:(const total_currency)
+        ; field "totalStake"
+            ~doc:
+              "Total balance of accounts that delegate to someone at this block"
+            ~typ:(non_null amount)
+            ~args:Arg.[]
+            ~resolve:(const total_stake)
         ; field "stakingEpochData"
             ~typ:(non_null @@ Epoch_data.typ "StakingEpochData")
             ~args:Arg.[]
