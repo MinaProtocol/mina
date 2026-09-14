@@ -1,5 +1,18 @@
 #!/bin/bash
 
+# Prefer the identity the app build pinned; a downstream job's own checkout is
+# not the commit its binaries came from. A caller-set MINA_GIT_ENV_FILE wins
+# over the cache; a miss falls back to deriving from the checkout.
+if [[ -z "${MINA_GIT_ENV_FILE:-}" ]]; then
+   _GIT_ENV_DIR="$(mktemp -d)"
+   if _GIT_ENV_FETCHED="$(./buildkite/scripts/git-env/read_from_cache.sh "$_GIT_ENV_DIR")"; then
+      export MINA_GIT_ENV_FILE="$_GIT_ENV_FETCHED"
+   else
+      rm -rf "$_GIT_ENV_DIR"
+   fi
+   unset _GIT_ENV_DIR _GIT_ENV_FETCHED
+fi
+
 # Export all variables from inner script
 set -a
 
