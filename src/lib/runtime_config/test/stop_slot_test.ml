@@ -214,9 +214,11 @@ module Expected = struct
     ; fork_blockchain_length : int  (** [proof.fork.blockchain_length]. *)
     }
 
-  (* Devnet has forked; mainnet's fork is still armed in the shipped config, so
-     both constructors are in use on this branch. *)
-  type t = Scheduled of schedule | Forked of forked
+  (* Both networks are [Forked] right now, so nothing builds a [Scheduled]
+     value; the warning is silenced rather than the branch deleted, because
+     arming the next hard fork means setting the stop slots in the shipped
+     config and flipping the expectation below back to [Scheduled]. *)
+  type t = Scheduled of schedule | Forked of forked [@@warning "-37"]
 end
 
 let case name f = Alcotest.test_case name `Quick f
@@ -399,26 +401,16 @@ let mainnet : Network_constants.t =
       }
   }
 
-(* Mainnet's fork is still armed on this branch: mainnet.json carries the stop
-   slots, so the schedule is checked rather than the fork config it will
-   produce. Mainnet's genesis is 2024-06-05T00:00:00Z, two months later than
-   devnet's, so the same wall-clock schedule sits at different slot numbers;
-   reusing devnet's 413540/413640 here would place the stop almost two months
-   late. *)
+(* Mainnet hard forked on 2026-09-03, two weeks after devnet, at the end of its
+   own schedule: slot_tx_end 393800, slot_chain_end 393900, delta 60, so hard
+   fork genesis slot 393960 counted from the previous fork base 564480. *)
 let mainnet_expected : Expected.t =
-  Scheduled
-    { slot_tx_end = 393800
-    ; slot_chain_end = 393900
-    ; hard_fork_genesis_slot_delta = 60
+  Forked
+    { genesis_time = "2026-09-03T18:00:00.000000Z"
+    ; previous_fork_slot_since_genesis = 564480
     ; hard_fork_genesis_slot = 393960
-    ; tx_end_time = "2026-09-03T10:00:00.000000Z"
-    ; chain_end_time = "2026-09-03T15:00:00.000000Z"
-    ; hard_fork_genesis_time = "2026-09-03T18:00:00.000000Z"
-    ; empty_block_hours = 5
-    ; downtime_hours = 3
-    ; no_transaction_hours = 8
-    ; tx_end_epoch = 55
-    ; tx_end_slot_in_epoch = 1100
+    ; fork_slot_since_genesis = 958440
+    ; fork_blockchain_length = 548146
     }
 
 let mainnet_config_path = "mainnet.json"
