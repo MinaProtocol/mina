@@ -146,7 +146,7 @@ let query pool ~what f =
 
 let genesis_or_fork_height pool =
   query pool ~what:"querying the genesis or first hard-fork block height"
-    (fun db -> Sql.GenesisOrFirstForkBlockHeight.run db () )
+    (fun db -> Sql.GenesisOrFirstForkBlockHeight.run db ())
 
 (** Blocks whose parent is absent from the archive, excluding the genesis or
     first post-hard-fork block, which has no parent by construction.  This is
@@ -195,7 +195,7 @@ let report pool ~min_height =
   in
   let%bind highest_canonical =
     query pool ~what:"querying the greatest height of canonical blocks"
-      (fun db -> Sql.Chain_status.run_highest_canonical db () )
+      (fun db -> Sql.Chain_status.run_highest_canonical db ())
   in
   match highest_canonical with
   | None ->
