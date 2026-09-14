@@ -244,7 +244,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
             Malleable_error.soft_error_format ~value:()
               "Error: delegate mismatch in account %s.  \n\
                In the genesis ledger: %s.  \n\
-               On the original blockchain: %s." genesis_account.pk
+               On the original blockchain: %s."
+              genesis_account.pk
               (show_opt Fn.id genesis_account.delegate)
               (show_opt Public_key.Compressed.to_base58_check
                  gql_account.delegate )

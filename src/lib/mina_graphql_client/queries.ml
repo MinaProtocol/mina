@@ -88,8 +88,8 @@ module Send_delegation =
 |}]
 
 module Send_delegation_with_raw_sig =
-[%graphql
-{|
+  [%graphql
+  {|
  mutation (
  $input:SendDelegationInput!,
  $rawSignature: String!

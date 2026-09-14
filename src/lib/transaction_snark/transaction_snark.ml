@@ -2666,7 +2666,7 @@ module Make_str (A : Wire_types.Concrete) = struct
       let%bind is_unstaking_tx =
         let%bind receiver_is_empty =
           Public_key.Compressed.Checked.(
-            equal empty (Account_id.Checked.public_key receiver))
+            equal empty (Account_id.Checked.public_key receiver) )
         in
         Boolean.(is_stake_delegation &&& receiver_is_empty)
       in

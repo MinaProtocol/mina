@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Mina_base
 open Mina_base_test_helpers
 open Signature_lib
@@ -38,12 +38,12 @@ let signed_command
                { body
                ; common =
                    (let open Signed_command.Payload.Common.Poly in
-                   { fee
-                   ; fee_payer_pk = sender.pk
-                   ; nonce = sender.nonce
-                   ; valid_until
-                   ; memo = Signed_command_memo.dummy
-                   })
+                    { fee
+                    ; fee_payer_pk = sender.pk
+                    ; nonce = sender.nonce
+                    ; valid_until
+                    ; memo = Signed_command_memo.dummy
+                    } )
                }
          ; signer = signer_pk
          ; signature = Signature.dummy

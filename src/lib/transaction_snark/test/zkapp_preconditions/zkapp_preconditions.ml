@@ -738,7 +738,7 @@ let%test_module "Account precondition tests" =
         List.fold [ token_creator; token_holder ]
           ~init:Public_key.Compressed.Map.empty
           ~f:(fun map { Signature_lib.Keypair.private_key; public_key } ->
-            Public_key.Compressed.Map.add_exn map
+            Map.add_exn map
               ~key:(Public_key.compress public_key)
               ~data:private_key )
       in

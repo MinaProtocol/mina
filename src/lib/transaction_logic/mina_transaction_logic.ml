@@ -601,7 +601,7 @@ module Make (L : Ledger_intf.S) :
                 (* Allow delegation to the empty public key (unstaking) *)
                 if
                   Signature_lib.Public_key.Compressed.(
-                    equal (Account_id.public_key receiver) empty)
+                    equal (Account_id.public_key receiver) empty )
                 then return ()
                 else Result.fail Transaction_status.Failure.Receiver_not_present
           in
