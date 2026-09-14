@@ -1,45 +1,26 @@
 # Missing Blocks Guardian
 
 `mina-missing-blocks-guardian` audits a Mina archive database and fills the
-gaps it finds. It replaces two tools that used to do this together:
+gaps it finds.
 
-| Replaced tool | What it did | Where it went |
-| --- | --- | --- |
-| `mina-missing-blocks-auditor` (OCaml) | reported blocks with no parent and gaps in the chain statuses | the `audit` subcommand |
-| `mina-missing-blocks-guardian` (bash) | ran the auditor, piped its log through `jq`, downloaded the parent block with `curl` and gave it to `mina-archive-blocks` | the `single-run` and `daemon` subcommands |
+An archive has a gap when it holds a block whose parent is not there. The
+guardian finds every such block, downloads the missing parent from a block
+source, and writes it to the archive, repeating until the branch reaches a
+block the archive already holds. It can also report the gaps without touching
+anything.
 
-The subcommands, the environment variables and the per-block log messages are
-the ones the bash script used, so a deployment that ran the script does not have
-to change. `mina-missing-blocks-auditor` no longer exists: run
-`mina-missing-blocks-guardian audit --archive-uri URI` in its place. The exit
-codes are simpler than either tool's — see below.
+Every response from the block source is checked for its status code, its
+content type and its JSON before the bytes reach the database, so a bucket
+that answers with an error page cannot be stored as if it were a block. Blocks
+are written through the archive library in process, so a block the archive
+rejects reports the reason the archive gave. Nothing is run as a subprocess,
+and neither `jq`, `curl` nor `psql` is needed.
 
-## Why one app
-
-Four failures were possible with the two-tool arrangement, and each of them is
-now named and reported.
-
-1. **A block that is not in the bucket was ingested anyway.** `curl -s` reports
-   success for a 404 and writes the bucket's XML or HTML error page to the
-   block file. That file reached `mina-archive-blocks`, which failed with a
-   JSON parse error naming neither the URL nor the HTTP status. Every response
-   is now checked for its status code, its content type and its JSON, and a 404
-   says which URL was asked for and what to check.
-2. **A failed ingest looked like a success.** `mina-archive-blocks` exits 0
-   even when every block it was given failed to be added, so the bash loop kept
-   downloading the same block forever. The archive library is now called
-   directly, so the `Caqti_error` for a rejected block is reported, and a block
-   that is accepted without being stored is caught by a progress check.
-3. **A walk with no floor.** An archive that does not reach back to a genesis
-   or hard-fork block has a block with no parent at its lowest height forever,
-   so the walk ran down past height 1 asking for blocks that cannot exist. The
-   walk now stops at height 1, or at `--min-height`, and says why.
-4. **One bad branch hid all the others.** The bash loop only ever looked at the
-   first block the auditor reported, so a branch it could not close blocked
-   every other gap behind it. A branch that cannot be closed is now set aside
-   and reported, and the pass continues with the rest.
-
-There is also no longer a dependency on `jq`, `curl` or `psql` at run time.
+The walk has a floor. It stops at height 1, or at `--min-height` on an archive
+that starts at a hard fork, so it never asks for a block that cannot exist.
+And a branch it cannot close is set aside with its reason and reported at the
+end, rather than stopping the pass: the walk goes lowest first, so one
+unreachable block at the bottom would otherwise hide every gap above it.
 
 ## Subcommands
 
@@ -88,15 +69,10 @@ carries on with the remaining branches and reports every branch it left open at
 the end. This matters because the walk goes lowest first: without it, one
 unreachable block at the bottom of the archive would hide every gap above it.
 
-> `mina-missing-blocks-auditor` returned a bit mask, and the bash `audit`
-> subcommand always returned 0. Both are replaced by the plain 0 or 1 above. A
-> script that tested particular bits should test the exit status instead and
-> read the logged problems for detail.
-
 ## Settings
 
-Every setting can be given as a command line flag or as the environment
-variable the bash guardian read. The flag wins when both are given.
+Every setting can be given as a command line flag or as an environment
+variable. The flag wins when both are given.
 
 | Flag | Environment variable | Default | Meaning |
 | --- | --- | --- | --- |
@@ -106,7 +82,7 @@ variable the bash guardian read. The flag wins when both are given.
 | `--block-format` | `BLOCKS_FORMAT` | `precomputed` | `precomputed` or `extensional` |
 | `--interval` | `TIMEOUT` | `600` | seconds between checks in `daemon` mode |
 
-These flags are new and have no environment variable:
+These flags have no environment variable:
 
 | Flag | Default | Meaning |
 | --- | --- | --- |
@@ -119,8 +95,8 @@ These flags are new and have no environment variable:
 | `--max-consecutive-failures` | `5` | exit in `daemon` mode after this many failed passes in a row. `0` means never exit |
 | `--dry-run` | off | report and validate what would be downloaded, and write nothing |
 
-`MISSING_BLOCKS_AUDITOR` and `ARCHIVE_BLOCKS` are no longer used, because this
-app audits and ingests by itself. A warning is logged if either is set.
+`MISSING_BLOCKS_AUDITOR` and `ARCHIVE_BLOCKS` are not used: the guardian
+audits and ingests by itself. A warning is logged if either is set.
 
 ### Block file names
 
@@ -193,9 +169,8 @@ $ mina-missing-blocks-guardian single-run --min-height 296373 ...
 
 ## Output
 
-The output is the JSON log lines the Mina logger writes, so `mina-logproc` and
-`jq` read it as before. The audit keeps the messages the auditor used, for
-example:
+The output is the JSON log lines the Mina logger writes, so `mina-logproc`
+and `jq` read it. The audit logs one line per finding, for example:
 
 ```
 [Info] Querying missing blocks
