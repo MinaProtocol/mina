@@ -33,7 +33,11 @@
 
 MOCK_REPO_CONTAINER="mina-release-mock-repo-$$"
 MOCK_REPO_NETWORK="mina-release-mock-net-$$"
-MOCK_REPO_IMAGE="${MOCK_REPO_IMAGE:-minio/minio:latest}"
+# quay.io, not Docker Hub: MinIO no longer publishes a publicly pullable
+# minio/minio there, so an agent without Docker Hub credentials fails with
+# "pull access denied ... may require 'docker login'". The tag is pinned so
+# that a MinIO release cannot change the tests underneath us.
+MOCK_REPO_IMAGE="${MOCK_REPO_IMAGE:-quay.io/minio/minio:RELEASE.2025-02-28T09-55-16Z}"
 MOCK_REPO_ACCESS_KEY="minioadmin"
 MOCK_REPO_SECRET_KEY="minioadmin"
 

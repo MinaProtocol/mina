@@ -414,8 +414,13 @@ The test suite is designed with safety in mind:
 2. **"MinIO did not become healthy within 60s"**:
    - The mock repository failed to start. The container logs are printed after
      the message.
-   - Check that docker can pull `minio/minio:latest`, or point
+   - Check that docker can pull
+     `quay.io/minio/minio:RELEASE.2025-02-28T09-55-16Z`, or point
      `MOCK_REPO_IMAGE` at a mirror.
+   - The image comes from **quay.io, not Docker Hub**. MinIO no longer
+     publishes a publicly pullable `minio/minio` on Docker Hub, so an agent
+     without Docker Hub credentials fails with `pull access denied ... may
+     require 'docker login'`.
 
 3. **"Package not found" errors**:
    - The fixture seeding failed, or a test asked for a version the mock was
