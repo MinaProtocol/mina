@@ -11,7 +11,8 @@ let test () =
     Pickles.compile ~public_input:(Pickles.Inductive_rule.Input Typ.unit)
       ~auxiliary_typ:Typ.unit
       ~max_proofs_verified:(module Nat.N0)
-      ~num_chunks:2 ~override_wrap_domain:N1 ~name:"chunked_circuits"
+      ~num_chunks:2 ~override_wrap_domain:Pickles_base.Proofs_verified.n1
+      ~name:"chunked_circuits"
       ~choices:(fun ~self:_ ->
         [ { identifier = "2^16"
           ; prevs = []

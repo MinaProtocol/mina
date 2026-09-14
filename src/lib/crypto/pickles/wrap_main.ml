@@ -40,7 +40,7 @@ let pack_statement max_proofs_verified t =
   let open Types.Step in
   Spec.pack
     (module Impl)
-    (module Branch_data.Checked.Wrap)
+    ~branch_data_pack:Branch_data.Checked.Wrap.pack ~branch_data_width:Nat.N2.n
     (Statement.spec max_proofs_verified Backend.Tock.Rounds.n)
     (Statement.to_data t)
 
@@ -180,11 +180,16 @@ let wrap_main
           in
           let () =
             with_label __LOC__ (fun () ->
-                (* Check that the branch_data public-input is correct *)
+                (* Check that the branch_data public-input is correct. The mask
+                   is at least 2 bits wide (for wire compatibility) but grows to
+                   hold one bit per possibly-verified proof. *)
+                let (Nat.Max.T (mask_width, Nat.Lte.S (Nat.Lte.S _), _)) =
+                  Nat.max Nat.N2.n Max_proofs_verified.n
+                in
                 Branch_data.Checked.Wrap.pack
                   { proofs_verified_mask =
                       Vector.extend_front_exn actual_proofs_verified_mask
-                        Nat.N2.n Boolean.false_
+                        mask_width Boolean.false_
                   ; domain_log2
                   }
                 |> Field.Assert.equal branch_data )
@@ -407,10 +412,16 @@ let wrap_main
                         Wrap_hack.Checked.pad_challenges
                           old_bulletproof_challenges
                       in
+                      (* The accumulator is padded to [max (2, local max)]; the
+                         proofs-verified count passed here must match. *)
+                      let (module Padded_proofs_verified) =
+                        Nat.Add.create
+                          (Vector.length old_bulletproof_challenges)
+                      in
                       let finalized, chals =
                         with_label __LOC__ (fun () ->
                             Wrap_verifier.finalize_other_proof
-                              (module Wrap_hack.Padded_length)
+                              (module Padded_proofs_verified)
                               ~domain:
                                 (wrap_domain :> _ Plonk_checks.plonk_domain)
                               ~sponge ~old_bulletproof_challenges

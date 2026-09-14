@@ -1,3 +1,5 @@
+open Pickles_types
+
 module type S = sig
   open Core
   module Proofs_verified = Pickles_base.Proofs_verified
@@ -15,6 +17,16 @@ module type S = sig
 
   [%%versioned:
   module Stable : sig
+    [@@@no_toplevel_latest_type]
+
+    module V2 : sig
+      type t =
+        { proofs_verified : Proofs_verified.Stable.V2.t
+        ; domain_log2 : Domain_log2.Stable.V1.t
+        }
+      [@@deriving hlist, compare, sexp, yojson, hash, equal]
+    end
+
     module V1 : sig
       type t =
         { proofs_verified : Proofs_verified.Stable.V1.t
@@ -24,18 +36,26 @@ module type S = sig
     end
   end]
 
+  (* In-memory representation; coincides with the [V2] wire encoding. *)
+  type t =
+    { proofs_verified : Proofs_verified.Stable.V2.t
+    ; domain_log2 : Domain_log2.Stable.V1.t
+    }
+  [@@deriving hlist, compare, sexp, yojson, hash, equal]
+
   module Checked : sig
     module Step : sig
       open Kimchi_pasta_snarky_backend.Step_impl
 
       type field_var = Field.t
 
-      type t =
-        { proofs_verified_mask : Proofs_verified.Prefix_mask.Step.Checked.t
+      (* Indexed by the full mask width. *)
+      type 'w t =
+        { proofs_verified_mask : 'w Proofs_verified.Prefix_mask.Step.Checked.t
         ; domain_log2 : Field.t
         }
 
-      val pack : t -> Field.t
+      val pack : _ t -> Field.t
     end
 
     module Wrap : sig
@@ -43,12 +63,13 @@ module type S = sig
 
       type field_var = Field.t
 
-      type t =
-        { proofs_verified_mask : Proofs_verified.Prefix_mask.Wrap.Checked.t
+      (* Indexed by the full mask width. *)
+      type 'w t =
+        { proofs_verified_mask : 'w Proofs_verified.Prefix_mask.Wrap.Checked.t
         ; domain_log2 : Field.t
         }
 
-      val pack : t -> Field.t
+      val pack : _ t -> Field.t
     end
   end
 
@@ -56,17 +77,33 @@ module type S = sig
 
   val typ :
        assert_16_bits:(Impls.Step_impl.Field.t -> unit)
-    -> (Checked.Step.t, t) Impls.Step_impl.Typ.t
+    -> 'w Nat.t
+    -> ('w Checked.Step.t, t) Impls.Step_impl.Typ.t
 
   val wrap_typ :
        assert_16_bits:(Impls.Wrap_impl.Field.t -> unit)
-    -> (Checked.Wrap.t, t) Impls.Wrap_impl.Typ.t
+    -> 'w Nat.t
+    -> ('w Checked.Wrap.t, t) Impls.Wrap_impl.Typ.t
 
-  val packed_typ : (Impls.Step_impl.Field.t, t) Impls.Step_impl.Typ.t
+  val packed_typ :
+    'w Nat.t -> (Impls.Step_impl.Field.t, t) Impls.Step_impl.Typ.t
 
-  val wrap_packed_typ : (Impls.Wrap_impl.Field.t, t) Impls.Wrap_impl.Typ.t
+  val wrap_packed_typ :
+    'w Nat.t -> (Impls.Wrap_impl.Field.t, t) Impls.Wrap_impl.Typ.t
 
-  val length_in_bits : int
+  val length_in_bits : _ Nat.t -> int
+
+  val pack :
+       (module Snarky_backendless.Snark_intf.Run with type field = 'f)
+    -> _ Nat.t
+    -> t
+    -> 'f
+
+  val unpack :
+       (module Snarky_backendless.Snark_intf.Run with type field = 'f)
+    -> 'w Nat.t
+    -> 'f
+    -> t
 
   val domain : t -> Pickles_base.Domain.t
 end

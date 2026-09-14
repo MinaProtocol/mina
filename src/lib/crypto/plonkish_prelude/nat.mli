@@ -37,6 +37,23 @@ module Lte : sig
   val trans : ('a, 'b) t -> ('b, 'c) t -> ('a, 'c) t
 end
 
+module Max : sig
+  (** The larger of two type-level naturals, with witnesses that both are at
+      most it. *)
+  type ('a, 'b) t = T : 'c nat * ('a, 'c) Lte.t * ('b, 'c) Lte.t -> ('a, 'b) t
+end
+
+val max : 'a nat -> 'b nat -> ('a, 'b) Max.t
+
+module Max_type : sig
+  (** [('a, 'b) t] is the type-level maximum of ['a] and ['b], as an abstract
+      type nameable purely from ['a] and ['b] (no existential). *)
+  type (_, _) t
+
+  (** The maximum of ['a] and ['b] as a natural of type [('a, 'b) t]. *)
+  val nat : 'a nat -> 'b nat -> ('a, 'b) t nat
+end
+
 module Add : sig
   module type Intf = sig
     type _ plus_n

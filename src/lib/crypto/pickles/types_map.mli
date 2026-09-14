@@ -89,7 +89,8 @@ module For_step : sig
         inner_curve_var array Pickles_types.Plonk_verification_key_evals.t
     ; wrap_domain :
         [ `Known of Import.Domain.t
-        | `Side_loaded of Pickles_base.Proofs_verified.One_hot.Checked.t ]
+        | `Side_loaded of Nat.z Pickles_base.Proofs_verified.One_hot.Checked.t
+        ]
     ; step_domains :
         [ `Known of (Import.Domains.t, 'branches) Pickles_types.Vector.t
         | `Side_loaded ]

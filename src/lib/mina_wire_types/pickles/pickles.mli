@@ -18,12 +18,20 @@ module Types : sig
           type n = Pickles_types.Nat.two
         end
 
+        module V3 : sig
+          type t
+        end
+
         module V2 : sig
           type t
         end
       end
 
       module Proof : sig
+        module V4 : sig
+          type t = Verification_key.Max_width.n Proof.t
+        end
+
         module V3 : sig
           type t = Verification_key.Max_width.n Proof.t
         end
@@ -142,7 +150,7 @@ module Concrete_ : sig
                 , challenge_constant Kimchi_types.scalar_challenge
                   Pickles_bulletproof_challenge.V1.t
                   step_bp_vec
-                , Pickles_composition_types.Branch_data.V1.t )
+                , Pickles_composition_types.Branch_data.V2.t )
                 Pickles_composition_types.Wrap.Statement.Minimal.V1.t
             ; prev_evals :
                 ( Snark_params.Tick.Field.t
@@ -192,6 +200,14 @@ module Concrete_ : sig
       type tock_curve_affine =
         Snark_params.Tick.Field.t * Snark_params.Tick.Field.t
 
+      module V3 : sig
+        type t =
+          ( tock_curve_affine
+          , Pickles_base.Proofs_verified.V2.t
+          , Vk.t )
+          Pickles_base.Side_loaded_verification_key.Poly.V2.t
+      end
+
       module V2 : sig
         type t =
           ( tock_curve_affine
@@ -206,6 +222,10 @@ module Concrete_ : sig
     end
 
     module Proof : sig
+      module V4 : sig
+        type t = Verification_key.Max_width.n Proof.t
+      end
+
       module V3 : sig
         type t = Verification_key.Max_width.n Proof.t
       end
@@ -217,7 +237,9 @@ module M : Types.S
 
 module type Concrete =
   Types.S
-    with type Side_loaded.Verification_key.V2.t =
+    with type Side_loaded.Verification_key.V3.t =
+      Concrete_.Side_loaded.Verification_key.V3.t
+     and type Side_loaded.Verification_key.V2.t =
       Concrete_.Side_loaded.Verification_key.V2.t
      and type Backend.Tick.Field.V1.t = Pasta_bindings.Fp.t
      and type 'a Proof.t = 'a Concrete_.Proof.t

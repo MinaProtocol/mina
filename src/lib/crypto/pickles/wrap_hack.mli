@@ -1,5 +1,12 @@
 module Padded_length = Pickles_types.Nat.N2
 
+(** [padded_length n] is [max (Padded_length, n)], the width the accumulator
+    is padded to. The wrap keypair must be generated for this many previous
+    challenges. *)
+val padded_length :
+     'n Pickles_types.Nat.t
+  -> (Padded_length.n, 'n) Pickles_types.Nat.Max_type.t Pickles_types.Nat.t
+
 val pad_accumulator :
      (Backend.Tock.Proof.Challenge_polynomial.t, 'a) Pickles_types.Vector.t
   -> ( Kimchi_pasta.Pallas_based_plonk.Proof.G.Affine.Stable.V1.t
@@ -25,11 +32,10 @@ val pad_challenges :
        Pickles_types.Vector.t
      , 'a )
      Pickles_types.Vector.t
-  -> ( ( Backend.Tock.Field.t
-       , Pickles_types.Nat.z Backend.Tock.Rounds.plus_n )
-       Pickles_types.Vector.t
-     , Pickles_types.Nat.z Padded_length.plus_n )
+  -> ( Backend.Tock.Field.t
+     , Pickles_types.Nat.z Backend.Tock.Rounds.plus_n )
      Pickles_types.Vector.t
+     list
 
 module Checked : sig
   val pad_challenges :
@@ -41,13 +47,13 @@ module Checked : sig
     -> ( ( Impls.Wrap.Field.t
          , Pickles_types.Nat.z Backend.Tock.Rounds.plus_n )
          Pickles_types.Vector.t
-       , Pickles_types.Nat.z Padded_length.plus_n )
+       , (Padded_length.n, 'a) Pickles_types.Nat.Max_type.t )
        Pickles_types.Vector.t
 
   val pad_commitments :
        (Impls.Step.Field.t Tuple_lib.Double.t, 'a) Pickles_types.Vector.t
     -> ( Impls.Step.Field.t Tuple_lib.Double.t
-       , Pickles_types.Nat.z Padded_length.plus_n )
+       , (Padded_length.n, 'a) Pickles_types.Nat.Max_type.t )
        Pickles_types.Vector.t
 
   val dummy_messages_for_next_wrap_proof_sponge_states :

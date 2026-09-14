@@ -6,6 +6,8 @@ module Make_sig (A : Wire_types.Types.S) = struct
     Branch_data_intf.S
       with type Domain_log2.Stable.V1.t = A.Domain_log2.V1.t
        and type Stable.V1.t = A.V1.t
+       and type Stable.V2.t = A.V2.t
+       and type t = A.V2.t
 end
 
 module Make_str (A : Wire_types.Concrete) = struct
@@ -24,6 +26,9 @@ module Make_str (A : Wire_types.Concrete) = struct
       end
     end]
 
+    (* Fixed by [t = char]. *)
+    let length_in_bits = 8
+
     let of_int_exn : int -> t = Char.of_int_exn
 
     let of_bits_msb (bs : bool list) : t =
@@ -36,14 +41,28 @@ module Make_str (A : Wire_types.Concrete) = struct
         (module Impl : Snarky_backendless.Snark_intf.Run with type field = f)
         (x : f) : t =
       Impl.Field.Constant.unpack x
-      |> Fn.flip List.take 8 |> List.rev |> of_bits_msb
+      |> Fn.flip List.take length_in_bits
+      |> List.rev |> of_bits_msb
   end
 
   (* We pack this into a single field element as follows:
-     First 2 bits: proofs_verified
-     Next 8 bits: domain_log2 *)
+     First 2 bits: the low bits of the proofs_verified mask
+     Next [Domain_log2.length_in_bits] bits: domain_log2
+     Remaining bits: the rest of the proofs_verified mask *)
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
+    module V2 = struct
+      type t = A.V2.t =
+        { proofs_verified : Proofs_verified.Stable.V2.t
+        ; domain_log2 : Domain_log2.Stable.V1.t
+        }
+      [@@deriving hlist, compare, sexp, yojson, hash, equal]
+
+      let to_latest = Fn.id
+    end
+
     module V1 = struct
       type t = A.V1.t =
         { proofs_verified : Proofs_verified.Stable.V1.t
@@ -51,36 +70,69 @@ module Make_str (A : Wire_types.Concrete) = struct
         }
       [@@deriving hlist, compare, sexp, yojson, hash, equal]
 
-      let to_latest = Fn.id
+      let to_latest { proofs_verified; domain_log2 } =
+        { V2.proofs_verified =
+            Proofs_verified.Stable.V1.to_latest proofs_verified
+        ; domain_log2
+        }
     end
   end]
 
-  let length_in_bits = 10
+  (* The in-memory representation coincides with the [V2] wire encoding: the
+     [proofs_verified] field is the serialised [Proofs_verified.Stable.V2.t],
+     not the standalone in-memory [Proofs_verified.t]. The two are bridged at
+     the circuit boundary in [pack]/[unpack]/[typ] below. *)
+  type t = Stable.Latest.t =
+    { proofs_verified : Proofs_verified.Stable.V2.t
+    ; domain_log2 : Domain_log2.Stable.V1.t
+    }
+  [@@deriving hlist, compare, sexp, yojson, hash, equal]
 
-  let pack (type f)
-      (module Impl : Snarky_backendless.Snark_intf.Run with type field = f)
-      ({ proofs_verified; domain_log2 } : t) : f =
-    let open Impl.Field.Constant in
-    let double x = x + x in
-    let times4 x = double (double x) in
-    let domain_log2 = of_int (Char.to_int domain_log2) in
-    (* shift domain_log2 over by 2 bits (multiply by 4) *)
-    times4 domain_log2
-    + project
-        (Pickles_types.Vector.to_list
-           (Proofs_verified.to_bool_vec proofs_verified) )
+  (* [n] is the width of the proofs-verified prefix mask (at least 2). *)
+  let length_in_bits (n : _ Pickles_types.Nat.t) =
+    Pickles_types.Nat.to_int n + Domain_log2.length_in_bits
 
-  let unpack (type f)
-      (module Impl : Snarky_backendless.Snark_intf.Run with type field = f)
-      (x : f) : t =
-    match Impl.Field.Constant.unpack x with
-    | x0 :: x1 :: y0 :: y1 :: y2 :: y3 :: y4 :: y5 :: y6 :: y7 :: _ ->
-        { proofs_verified = Proofs_verified.of_bool_vec [ x0; x1 ]
-        ; domain_log2 =
-            Domain_log2.of_bits_msb [ y7; y6; y5; y4; y3; y2; y1; y0 ]
-        }
+  (* The packing arithmetic, shared by the out-of-circuit and in-circuit
+     encoders so the layout is written down once. *)
+  let pack_layout ~of_int ~add ~mul ~pack_bits mask domain_log2 =
+    let domain_log2_shift = of_int (1 lsl 2) in
+    let mask_rest_shift = of_int (1 lsl (2 + Domain_log2.length_in_bits)) in
+    let ( + ) = add and ( * ) = mul in
+    match mask with
+    | x0 :: x1 :: proofs_verified_rest ->
+        (mask_rest_shift * pack_bits proofs_verified_rest)
+        + (domain_log2_shift * domain_log2)
+        + pack_bits [ x0; x1 ]
     | _ ->
         assert false
+
+  let pack (type f)
+      (module Impl : Snarky_backendless.Snark_intf.Run with type field = f) n
+      ({ proofs_verified; domain_log2 } : t) : f =
+    let open Impl.Field.Constant in
+    pack_layout ~of_int ~add:( + ) ~mul:( * ) ~pack_bits:project
+      (Pickles_types.Vector.to_list
+         (Proofs_verified.to_bool_vec n
+            (Proofs_verified.of_stable_v2 proofs_verified) ) )
+      (of_int (Char.to_int domain_log2))
+
+  let unpack (type f)
+      (module Impl : Snarky_backendless.Snark_intf.Run with type field = f) n
+      (x : f) : t =
+    let open Pickles_types in
+    let mask_low, rest = List.split_n (Impl.Field.Constant.unpack x) 2 in
+    let domain_log2_bits, mask_rest =
+      List.split_n rest Domain_log2.length_in_bits
+    in
+    let mask =
+      Vector.of_list_and_length_exn
+        (mask_low @ List.take mask_rest (Nat.to_int n - 2))
+        n
+    in
+    { proofs_verified =
+        Proofs_verified.to_stable_v2 (Proofs_verified.of_bool_vec mask)
+    ; domain_log2 = Domain_log2.of_bits_msb (List.rev domain_log2_bits)
+    }
 
   open Kimchi_pasta_snarky_backend
 
@@ -90,17 +142,17 @@ module Make_str (A : Wire_types.Concrete) = struct
 
       type field_var = Field.t
 
-      type t =
-        { proofs_verified_mask : Proofs_verified.Prefix_mask.Step.Checked.t
+      type 'w t =
+        { proofs_verified_mask : 'w Proofs_verified.Prefix_mask.Step.Checked.t
         ; domain_log2 : Field.t
         }
       [@@deriving hlist]
 
-      let pack ({ proofs_verified_mask; domain_log2 } : t) : Field.t =
+      let pack ({ proofs_verified_mask; domain_log2 } : _ t) : Field.t =
         let open Field in
-        let four = of_int 4 in
-        (four * domain_log2)
-        + pack (Pickles_types.Vector.to_list proofs_verified_mask)
+        pack_layout ~of_int ~add:( + ) ~mul:( * ) ~pack_bits:pack
+          (Pickles_types.Vector.to_list proofs_verified_mask)
+          domain_log2
     end
 
     module Wrap = struct
@@ -108,40 +160,44 @@ module Make_str (A : Wire_types.Concrete) = struct
 
       type field_var = Field.t
 
-      type t =
-        { proofs_verified_mask : Proofs_verified.Prefix_mask.Wrap.Checked.t
+      type 'w t =
+        { proofs_verified_mask : 'w Proofs_verified.Prefix_mask.Wrap.Checked.t
         ; domain_log2 : Field.t
         }
       [@@deriving hlist]
 
-      let pack ({ proofs_verified_mask; domain_log2 } : t) : Field.t =
+      let pack ({ proofs_verified_mask; domain_log2 } : _ t) : Field.t =
         let open Field in
-        let four = of_int 4 in
-        (four * domain_log2)
-        + pack (Pickles_types.Vector.to_list proofs_verified_mask)
+        pack_layout ~of_int ~add:( + ) ~mul:( * ) ~pack_bits:pack
+          (Pickles_types.Vector.to_list proofs_verified_mask)
+          domain_log2
     end
   end
 
-  let packed_typ =
+  let packed_typ n =
     Step_impl.Typ.transport Step_impl.Typ.field
-      ~there:(pack (module Step_impl))
-      ~back:(unpack (module Step_impl))
+      ~there:(pack (module Step_impl) n)
+      ~back:(unpack (module Step_impl) n)
 
-  let wrap_packed_typ =
+  let wrap_packed_typ n =
     Wrap_impl.Typ.transport Wrap_impl.Typ.field
-      ~there:(pack (module Wrap_impl))
-      ~back:(unpack (module Wrap_impl))
+      ~there:(pack (module Wrap_impl) n)
+      ~back:(unpack (module Wrap_impl) n)
 
   let typ
       ~(* We actually only need it to be less than 252 bits in order to pack
           the whole branch_data struct safely, but it's cheapest to check that it's
           under 16 bits *)
-      (assert_16_bits : Step_impl.Field.t -> unit) :
-      (Checked.Step.t, t) Step_impl.Typ.t =
+      (assert_16_bits : Step_impl.Field.t -> unit) n :
+      ('n Checked.Step.t, t) Step_impl.Typ.t =
     let open Step_impl in
     let proofs_verified_mask :
-        (Proofs_verified.Prefix_mask.Step.Checked.t, Proofs_verified.t) Typ.t =
-      Proofs_verified.Prefix_mask.Step.typ
+        ( 'n Proofs_verified.Prefix_mask.Step.Checked.t
+        , Proofs_verified.Stable.V2.t )
+        Typ.t =
+      Typ.transport
+        (Proofs_verified.Prefix_mask.Step.typ n)
+        ~there:Proofs_verified.of_stable_v2 ~back:Proofs_verified.to_stable_v2
     in
     let domain_log2 : (Field.t, Domain_log2.t) Typ.t =
       let (Typ t) =
@@ -161,12 +217,16 @@ module Make_str (A : Wire_types.Concrete) = struct
       ~(* We actually only need it to be less than 252 bits in order to pack
           the whole branch_data struct safely, but it's cheapest to check that it's
           under 16 bits *)
-      (assert_16_bits : Wrap_impl.Field.t -> unit) :
-      (Checked.Wrap.t, t) Wrap_impl.Typ.t =
+      (assert_16_bits : Wrap_impl.Field.t -> unit) n :
+      ('n Checked.Wrap.t, t) Wrap_impl.Typ.t =
     let open Wrap_impl in
     let proofs_verified_mask :
-        (Proofs_verified.Prefix_mask.Wrap.Checked.t, Proofs_verified.t) Typ.t =
-      Proofs_verified.Prefix_mask.Wrap.typ
+        ( 'n Proofs_verified.Prefix_mask.Wrap.Checked.t
+        , Proofs_verified.Stable.V2.t )
+        Typ.t =
+      Typ.transport
+        (Proofs_verified.Prefix_mask.Wrap.typ n)
+        ~there:Proofs_verified.of_stable_v2 ~back:Proofs_verified.to_stable_v2
     in
     let domain_log2 : (Field.t, Domain_log2.t) Typ.t =
       let (Typ t) =
@@ -187,3 +247,18 @@ module Make_str (A : Wire_types.Concrete) = struct
 end
 
 include Wire_types.Make (Make_sig) (Make_str)
+
+(* Downgrade the in-memory (latest) branch data to its [V1] wire encoding.
+   Raises if the number of proofs verified cannot be represented in [V1]. *)
+let to_stable_v1 ({ proofs_verified; domain_log2 } : t) : Stable.V1.t =
+  { proofs_verified =
+      Proofs_verified.to_stable_v1
+        (Proofs_verified.of_stable_v2 proofs_verified)
+  ; domain_log2
+  }
+
+(* Upgrade the [V1] wire encoding to the in-memory (latest) branch data. *)
+let of_stable_v1 ({ proofs_verified; domain_log2 } : Stable.V1.t) : t =
+  { proofs_verified = Proofs_verified.Stable.V1.to_latest proofs_verified
+  ; domain_log2
+  }

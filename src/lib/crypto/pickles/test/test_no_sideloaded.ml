@@ -232,7 +232,7 @@ module Tree_proof = struct
   let _tag, _, p, Provers.[ step ] =
     Common.time "compile" (fun () ->
         compile_promise () ~public_input:(Input Field.typ)
-          ~override_wrap_domain:Pickles_base.Proofs_verified.N1
+          ~override_wrap_domain:Pickles_base.Proofs_verified.n1
           ~auxiliary_typ:Typ.unit
           ~max_proofs_verified:(module Pickles_types.Nat.N2)
           ~name:"blockchain-snark"
@@ -343,7 +343,7 @@ module Tree_proof_return = struct
   let _tag, _, p, Provers.[ step ] =
     Common.time "compile" (fun () ->
         compile_promise () ~public_input:(Output Field.typ)
-          ~override_wrap_domain:Pickles_base.Proofs_verified.N1
+          ~override_wrap_domain:Pickles_base.Proofs_verified.n1
           ~auxiliary_typ:Typ.unit
           ~max_proofs_verified:(module Pickles_types.Nat.N2)
           ~name:"blockchain-snark"
@@ -524,6 +524,675 @@ module Auxiliary_return = struct
            Proof.verify_promise [ (input, proof) ] ) )
 end
 
+(* Probe: exercise [compile] with a maximum of 3 proofs verified, to start
+   unwinding the hard-coded maximum of 2. The branch verifies three
+   (base-case) [No_recursion] proofs. *)
+module Tree_proof_n3 = struct
+  type _ Snarky_backendless.Request.t +=
+    | Proof0 : Pickles_types.Nat.N0.n Proof.t Snarky_backendless.Request.t
+    | Proof1 : Pickles_types.Nat.N0.n Proof.t Snarky_backendless.Request.t
+    | Proof2 : Pickles_types.Nat.N0.n Proof.t Snarky_backendless.Request.t
+
+  let handler (p0 : _ Proof.t) (p1 : _ Proof.t) (p2 : _ Proof.t)
+      (Snarky_backendless.Request.With { request; respond }) =
+    match request with
+    | Proof0 ->
+        respond (Provide p0)
+    | Proof1 ->
+        respond (Provide p1)
+    | Proof2 ->
+        respond (Provide p2)
+    | _ ->
+        respond Unhandled
+
+  let tag, _, p, Provers.[ step ] =
+    Common.time "compile" (fun () ->
+        compile_promise () ~public_input:(Input Field.typ)
+          ~auxiliary_typ:Typ.unit
+          ~max_proofs_verified:(module Pickles_types.Nat.N3)
+          ~name:"tree-proof-n3"
+          ~choices:(fun ~self:_ ->
+            [ { identifier = "main"
+              ; feature_flags = Pickles_types.Plonk_types.Features.none_bool
+              ; prevs = [ No_recursion.tag; No_recursion.tag; No_recursion.tag ]
+              ; main =
+                  (fun { public_input = _self } ->
+                    dummy_constraints () ;
+                    let proof0 =
+                      exists (Typ.prover_value ()) ~request:(fun () -> Proof0)
+                    in
+                    let proof1 =
+                      exists (Typ.prover_value ()) ~request:(fun () -> Proof1)
+                    in
+                    let proof2 =
+                      exists (Typ.prover_value ()) ~request:(fun () -> Proof2)
+                    in
+                    Promise.return
+                      { Inductive_rule.previous_proof_statements =
+                          [ { public_input = Field.zero
+                            ; proof = proof0
+                            ; proof_must_verify = Boolean.true_
+                            }
+                          ; { public_input = Field.zero
+                            ; proof = proof1
+                            ; proof_must_verify = Boolean.true_
+                            }
+                          ; { public_input = Field.zero
+                            ; proof = proof2
+                            ; proof_must_verify = Boolean.true_
+                            }
+                          ]
+                      ; public_output = ()
+                      ; auxiliary_output = ()
+                      } )
+              }
+            ] ) )
+
+  module Proof = (val p)
+
+  let example =
+    let _, no_proof = No_recursion.example in
+    let (), (), b0 =
+      Common.time "tree n3 b0" (fun () ->
+          Promise.block_on_async_exn (fun () ->
+              step
+                ~handler:(handler no_proof no_proof no_proof)
+                Field.Constant.zero ) )
+    in
+    (Field.Constant.zero, b0)
+
+  let test_verify () =
+    let input, proof = example in
+    Or_error.ok_exn
+      (Promise.block_on_async_exn (fun () ->
+           Proof.verify_promise [ (input, proof) ] ) )
+end
+
+(* Extension probe: a circuit with [max_proofs_verified = 1] that verifies the
+   [max_proofs_verified = 3] proof produced above. This exercises consuming a
+   wider proof (whose branch_data mask is 3 bits) inside a narrower circuit. *)
+module Verify_n3 = struct
+  type _ Snarky_backendless.Request.t +=
+    | N3_proof : Pickles_types.Nat.N3.n Proof.t Snarky_backendless.Request.t
+
+  let handler (proof : _ Proof.t)
+      (Snarky_backendless.Request.With { request; respond }) =
+    match request with
+    | N3_proof ->
+        respond (Provide proof)
+    | _ ->
+        respond Unhandled
+
+  let _tag, _, p, Provers.[ step ] =
+    Common.time "compile" (fun () ->
+        compile_promise () ~public_input:(Input Field.typ)
+          ~auxiliary_typ:Typ.unit
+          ~max_proofs_verified:(module Pickles_types.Nat.N1)
+          ~name:"verify-n3"
+          ~choices:(fun ~self:_ ->
+            [ { identifier = "main"
+              ; feature_flags = Pickles_types.Plonk_types.Features.none_bool
+              ; prevs = [ Tree_proof_n3.tag ]
+              ; main =
+                  (fun { public_input = _self } ->
+                    dummy_constraints () ;
+                    let proof =
+                      exists (Typ.prover_value ()) ~request:(fun () -> N3_proof)
+                    in
+                    Promise.return
+                      { Inductive_rule.previous_proof_statements =
+                          [ { public_input = Field.zero
+                            ; proof
+                            ; proof_must_verify = Boolean.true_
+                            }
+                          ]
+                      ; public_output = ()
+                      ; auxiliary_output = ()
+                      } )
+              }
+            ] ) )
+
+  module Proof = (val p)
+
+  let example =
+    let _n3_input, n3_proof = Tree_proof_n3.example in
+    let (), (), b0 =
+      Common.time "verify n3 b0" (fun () ->
+          Promise.block_on_async_exn (fun () ->
+              step ~handler:(handler n3_proof) Field.Constant.zero ) )
+    in
+    (Field.Constant.zero, b0)
+
+  let test_verify () =
+    let input, proof = example in
+    Or_error.ok_exn
+      (Promise.block_on_async_exn (fun () ->
+           Proof.verify_promise [ (input, proof) ] ) )
+end
+
+(* Self-recursion probe: a max_proofs_verified = 3 rule that verifies three
+   [self] proofs. Exercises the base case (proof_must_verify = false) and a
+   recursive invocation (proof_must_verify = true). *)
+module Self_recursion_3 = struct
+  type _ Snarky_backendless.Request.t +=
+    | P0 : Pickles_types.Nat.N3.n Proof.t Snarky_backendless.Request.t
+    | P1 : Pickles_types.Nat.N3.n Proof.t Snarky_backendless.Request.t
+    | P2 : Pickles_types.Nat.N3.n Proof.t Snarky_backendless.Request.t
+
+  let handler (p0 : _ Proof.t) (p1 : _ Proof.t) (p2 : _ Proof.t)
+      (Snarky_backendless.Request.With { request; respond }) =
+    match request with
+    | P0 ->
+        respond (Provide p0)
+    | P1 ->
+        respond (Provide p1)
+    | P2 ->
+        respond (Provide p2)
+    | _ ->
+        respond Unhandled
+
+  let _tag, _, p, Provers.[ step ] =
+    Common.time "compile" (fun () ->
+        compile_promise () ~public_input:(Input Field.typ)
+          ~auxiliary_typ:Typ.unit
+          ~max_proofs_verified:(module Pickles_types.Nat.N3)
+          ~name:"self-recursion-3"
+          ~choices:(fun ~self ->
+            [ { identifier = "main"
+              ; feature_flags = Pickles_types.Plonk_types.Features.none_bool
+              ; prevs = [ self; self; self ]
+              ; main =
+                  (fun { public_input = self_input } ->
+                    dummy_constraints () ;
+                    let is_base_case = Field.equal Field.zero self_input in
+                    let proof_must_verify = Boolean.not is_base_case in
+                    let p0 =
+                      exists (Typ.prover_value ()) ~request:(fun () -> P0)
+                    in
+                    let p1 =
+                      exists (Typ.prover_value ()) ~request:(fun () -> P1)
+                    in
+                    let p2 =
+                      exists (Typ.prover_value ()) ~request:(fun () -> P2)
+                    in
+                    Promise.return
+                      { Inductive_rule.previous_proof_statements =
+                          [ { public_input = Field.zero
+                            ; proof = p0
+                            ; proof_must_verify
+                            }
+                          ; { public_input = Field.zero
+                            ; proof = p1
+                            ; proof_must_verify
+                            }
+                          ; { public_input = Field.zero
+                            ; proof = p2
+                            ; proof_must_verify
+                            }
+                          ]
+                      ; public_output = ()
+                      ; auxiliary_output = ()
+                      } )
+              }
+            ] ) )
+
+  module Proof = (val p)
+
+  let example =
+    let dummy : Pickles_types.Nat.N3.n Pickles.Proof.t =
+      Pickles.Proof.dummy Pickles_types.Nat.N3.n Pickles_types.Nat.N3.n
+        ~domain_log2:16
+    in
+    (* Base case: self = 0, proofs are dummies, proof_must_verify = false. *)
+    let (), (), b0 =
+      Common.time "self-rec-3 b0" (fun () ->
+          Promise.block_on_async_exn (fun () ->
+              step ~handler:(handler dummy dummy dummy) Field.Constant.zero ) )
+    in
+    Or_error.ok_exn
+      (Promise.block_on_async_exn (fun () ->
+           Proof.verify_promise [ (Field.Constant.zero, b0) ] ) ) ;
+    (* Recursive case: self = 1, verifies three copies of the base proof. *)
+    let (), (), b1 =
+      Common.time "self-rec-3 b1" (fun () ->
+          Promise.block_on_async_exn (fun () ->
+              step ~handler:(handler b0 b0 b0) Field.Constant.one ) )
+    in
+    (Field.Constant.one, b1)
+
+  let test_verify () =
+    let input, proof = example in
+    Or_error.ok_exn
+      (Promise.block_on_async_exn (fun () ->
+           Proof.verify_promise [ (input, proof) ] ) )
+end
+
+(* A clean width-2 proof system (two [No_recursion] proofs, no
+   override_wrap_domain) usable as the narrow prev in the mixed-width test. *)
+module Tree_proof_n2 = struct
+  type _ Snarky_backendless.Request.t +=
+    | R0 : Pickles_types.Nat.N0.n Proof.t Snarky_backendless.Request.t
+    | R1 : Pickles_types.Nat.N0.n Proof.t Snarky_backendless.Request.t
+
+  let handler (p0 : _ Proof.t) (p1 : _ Proof.t)
+      (Snarky_backendless.Request.With { request; respond }) =
+    match request with
+    | R0 ->
+        respond (Provide p0)
+    | R1 ->
+        respond (Provide p1)
+    | _ ->
+        respond Unhandled
+
+  let _tag, _, p, Provers.[ step ] =
+    Common.time "compile" (fun () ->
+        compile_promise () ~public_input:(Input Field.typ)
+          ~override_wrap_domain:Pickles_base.Proofs_verified.n1
+          ~auxiliary_typ:Typ.unit
+          ~max_proofs_verified:(module Pickles_types.Nat.N2)
+          ~name:"tree-proof-n2"
+          ~choices:(fun ~self:_ ->
+            [ { identifier = "main"
+              ; feature_flags = Pickles_types.Plonk_types.Features.none_bool
+              ; prevs = [ No_recursion.tag; No_recursion.tag ]
+              ; main =
+                  (fun { public_input = _self } ->
+                    dummy_constraints () ;
+                    let p0 =
+                      exists (Typ.prover_value ()) ~request:(fun () -> R0)
+                    in
+                    let p1 =
+                      exists (Typ.prover_value ()) ~request:(fun () -> R1)
+                    in
+                    Promise.return
+                      { Inductive_rule.previous_proof_statements =
+                          [ { public_input = Field.zero
+                            ; proof = p0
+                            ; proof_must_verify = Boolean.true_
+                            }
+                          ; { public_input = Field.zero
+                            ; proof = p1
+                            ; proof_must_verify = Boolean.true_
+                            }
+                          ]
+                      ; public_output = ()
+                      ; auxiliary_output = ()
+                      } )
+              }
+            ] ) )
+
+  module Proof = (val p)
+
+  let example =
+    let _, no_proof = No_recursion.example in
+    let (), (), b0 =
+      Common.time "tree n2 b0" (fun () ->
+          Promise.block_on_async_exn (fun () ->
+              step ~handler:(handler no_proof no_proof) Field.Constant.zero ) )
+    in
+    (Field.Constant.zero, b0)
+
+  let test_verify () =
+    let input, proof = example in
+    Or_error.ok_exn
+      (Promise.block_on_async_exn (fun () ->
+           Proof.verify_promise [ (input, proof) ] ) )
+end
+
+(* Width-4 probe: confirm 3 isn't a special case by verifying four
+   (base-case) [No_recursion] proofs. *)
+module Tree_proof_n4 = struct
+  type _ Snarky_backendless.Request.t +=
+    | Q0 : Pickles_types.Nat.N0.n Proof.t Snarky_backendless.Request.t
+    | Q1 : Pickles_types.Nat.N0.n Proof.t Snarky_backendless.Request.t
+    | Q2 : Pickles_types.Nat.N0.n Proof.t Snarky_backendless.Request.t
+    | Q3 : Pickles_types.Nat.N0.n Proof.t Snarky_backendless.Request.t
+
+  let handler (p0 : _ Proof.t) (p1 : _ Proof.t) (p2 : _ Proof.t)
+      (p3 : _ Proof.t) (Snarky_backendless.Request.With { request; respond }) =
+    match request with
+    | Q0 ->
+        respond (Provide p0)
+    | Q1 ->
+        respond (Provide p1)
+    | Q2 ->
+        respond (Provide p2)
+    | Q3 ->
+        respond (Provide p3)
+    | _ ->
+        respond Unhandled
+
+  let _tag, _, p, Provers.[ step ] =
+    Common.time "compile" (fun () ->
+        compile_promise () ~public_input:(Input Field.typ)
+          ~auxiliary_typ:Typ.unit
+          ~max_proofs_verified:(module Pickles_types.Nat.N4)
+          ~name:"tree-proof-n4"
+          ~choices:(fun ~self:_ ->
+            [ { identifier = "main"
+              ; feature_flags = Pickles_types.Plonk_types.Features.none_bool
+              ; prevs =
+                  [ No_recursion.tag
+                  ; No_recursion.tag
+                  ; No_recursion.tag
+                  ; No_recursion.tag
+                  ]
+              ; main =
+                  (fun { public_input = _self } ->
+                    dummy_constraints () ;
+                    let p0 =
+                      exists (Typ.prover_value ()) ~request:(fun () -> Q0)
+                    in
+                    let p1 =
+                      exists (Typ.prover_value ()) ~request:(fun () -> Q1)
+                    in
+                    let p2 =
+                      exists (Typ.prover_value ()) ~request:(fun () -> Q2)
+                    in
+                    let p3 =
+                      exists (Typ.prover_value ()) ~request:(fun () -> Q3)
+                    in
+                    Promise.return
+                      { Inductive_rule.previous_proof_statements =
+                          [ { public_input = Field.zero
+                            ; proof = p0
+                            ; proof_must_verify = Boolean.true_
+                            }
+                          ; { public_input = Field.zero
+                            ; proof = p1
+                            ; proof_must_verify = Boolean.true_
+                            }
+                          ; { public_input = Field.zero
+                            ; proof = p2
+                            ; proof_must_verify = Boolean.true_
+                            }
+                          ; { public_input = Field.zero
+                            ; proof = p3
+                            ; proof_must_verify = Boolean.true_
+                            }
+                          ]
+                      ; public_output = ()
+                      ; auxiliary_output = ()
+                      } )
+              }
+            ] ) )
+
+  module Proof = (val p)
+
+  let example =
+    let _, no_proof = No_recursion.example in
+    let (), (), b0 =
+      Common.time "tree n4 b0" (fun () ->
+          Promise.block_on_async_exn (fun () ->
+              step
+                ~handler:(handler no_proof no_proof no_proof no_proof)
+                Field.Constant.zero ) )
+    in
+    (Field.Constant.zero, b0)
+
+  let test_verify () =
+    let input, proof = example in
+    Or_error.ok_exn
+      (Promise.block_on_async_exn (fun () ->
+           Proof.verify_promise [ (input, proof) ] ) )
+end
+
+(* The consistency guard must reject a multi-branch circuit whose branches
+   verify prevs of different widths (one width-3, one narrower) in the same
+   slot, rather than silently producing an unsatisfiable circuit. *)
+module Mixed_widths_rejected = struct
+  type _ Snarky_backendless.Request.t +=
+    | Wide : Pickles_types.Nat.N3.n Proof.t Snarky_backendless.Request.t
+    | Narrow : Pickles_types.Nat.N0.n Proof.t Snarky_backendless.Request.t
+
+  let attempt () =
+    let _tag, _, _p, Provers.[ _; _ ] =
+      Common.time "compile mixed-rejected" (fun () ->
+          compile_promise () ~public_input:(Input Field.typ)
+            ~auxiliary_typ:Typ.unit
+            ~max_proofs_verified:(module Pickles_types.Nat.N1)
+            ~name:"mixed-widths-rejected"
+            ~choices:(fun ~self:_ ->
+              [ { identifier = "wide"
+                ; feature_flags = Pickles_types.Plonk_types.Features.none_bool
+                ; prevs = [ Tree_proof_n3.tag ]
+                ; main =
+                    (fun { public_input = _self } ->
+                      dummy_constraints () ;
+                      let proof =
+                        exists (Typ.prover_value ()) ~request:(fun () -> Wide)
+                      in
+                      Promise.return
+                        { Inductive_rule.previous_proof_statements =
+                            [ { public_input = Field.zero
+                              ; proof
+                              ; proof_must_verify = Boolean.true_
+                              }
+                            ]
+                        ; public_output = ()
+                        ; auxiliary_output = ()
+                        } )
+                }
+              ; { identifier = "narrow"
+                ; feature_flags = Pickles_types.Plonk_types.Features.none_bool
+                ; prevs = [ No_recursion.tag ]
+                ; main =
+                    (fun { public_input = _self } ->
+                      dummy_constraints () ;
+                      let proof =
+                        exists (Typ.prover_value ()) ~request:(fun () ->
+                            Narrow )
+                      in
+                      Promise.return
+                        { Inductive_rule.previous_proof_statements =
+                            [ { public_input = Field.zero
+                              ; proof
+                              ; proof_must_verify = Boolean.true_
+                              }
+                            ]
+                        ; public_output = ()
+                        ; auxiliary_output = ()
+                        } )
+                }
+              ] ) )
+    in
+    ()
+
+  let test_rejected () =
+    match attempt () with
+    | () ->
+        failwith
+          "expected the consistency guard to reject the mixed-width \
+           configuration"
+    | exception Failure msg ->
+        assert (Core.String.is_substring msg ~substring:"proofs-verified width")
+end
+
+(* Width-5 probe: verify 5 base proofs. *)
+module Tree_proof_n5 = struct
+  type _ Snarky_backendless.Request.t +=
+    | Proof_req : Pickles_types.Nat.N0.n Proof.t Snarky_backendless.Request.t
+
+  let handler (proof : _ Proof.t)
+      (Snarky_backendless.Request.With { request; respond }) =
+    match request with
+    | Proof_req ->
+        respond (Provide proof)
+    | _ ->
+        respond Unhandled
+
+  let _tag, _, p, Provers.[ step ] =
+    Common.time "compile" (fun () ->
+        compile_promise () ~public_input:(Input Field.typ)
+          ~auxiliary_typ:Typ.unit
+          ~max_proofs_verified:(module Pickles_types.Nat.N5)
+          ~name:"tree-proof-n5"
+          ~choices:(fun ~self:_ ->
+            [ { identifier = "main"
+              ; feature_flags = Pickles_types.Plonk_types.Features.none_bool
+              ; prevs =
+                  [ No_recursion.tag
+                  ; No_recursion.tag
+                  ; No_recursion.tag
+                  ; No_recursion.tag
+                  ; No_recursion.tag
+                  ]
+              ; main =
+                  (fun { public_input = _self } ->
+                    dummy_constraints () ;
+                    Promise.return
+                      { Inductive_rule.previous_proof_statements =
+                          [ { public_input = Field.zero
+                            ; proof =
+                                exists (Typ.prover_value ()) ~request:(fun () ->
+                                    Proof_req )
+                            ; proof_must_verify = Boolean.true_
+                            }
+                          ; { public_input = Field.zero
+                            ; proof =
+                                exists (Typ.prover_value ()) ~request:(fun () ->
+                                    Proof_req )
+                            ; proof_must_verify = Boolean.true_
+                            }
+                          ; { public_input = Field.zero
+                            ; proof =
+                                exists (Typ.prover_value ()) ~request:(fun () ->
+                                    Proof_req )
+                            ; proof_must_verify = Boolean.true_
+                            }
+                          ; { public_input = Field.zero
+                            ; proof =
+                                exists (Typ.prover_value ()) ~request:(fun () ->
+                                    Proof_req )
+                            ; proof_must_verify = Boolean.true_
+                            }
+                          ; { public_input = Field.zero
+                            ; proof =
+                                exists (Typ.prover_value ()) ~request:(fun () ->
+                                    Proof_req )
+                            ; proof_must_verify = Boolean.true_
+                            }
+                          ]
+                      ; public_output = ()
+                      ; auxiliary_output = ()
+                      } )
+              }
+            ] ) )
+
+  module Proof = (val p)
+
+  let example =
+    let _, no_proof = No_recursion.example in
+    let (), (), b0 =
+      Common.time "tree n5 b0" (fun () ->
+          Promise.block_on_async_exn (fun () ->
+              step ~handler:(handler no_proof) Field.Constant.zero ) )
+    in
+    (Field.Constant.zero, b0)
+
+  let test_verify () =
+    let input, proof = example in
+    Or_error.ok_exn
+      (Promise.block_on_async_exn (fun () ->
+           Proof.verify_promise [ (input, proof) ] ) )
+end
+
+(* Width-6 probe: verify 6 base proofs. *)
+module Tree_proof_n6 = struct
+  type _ Snarky_backendless.Request.t +=
+    | Proof_req : Pickles_types.Nat.N0.n Proof.t Snarky_backendless.Request.t
+
+  let handler (proof : _ Proof.t)
+      (Snarky_backendless.Request.With { request; respond }) =
+    match request with
+    | Proof_req ->
+        respond (Provide proof)
+    | _ ->
+        respond Unhandled
+
+  let _tag, _, p, Provers.[ step ] =
+    Common.time "compile" (fun () ->
+        compile_promise () ~public_input:(Input Field.typ)
+          ~auxiliary_typ:Typ.unit
+          ~max_proofs_verified:(module Pickles_types.Nat.N6)
+          ~name:"tree-proof-n6"
+          ~choices:(fun ~self:_ ->
+            [ { identifier = "main"
+              ; feature_flags = Pickles_types.Plonk_types.Features.none_bool
+              ; prevs =
+                  [ No_recursion.tag
+                  ; No_recursion.tag
+                  ; No_recursion.tag
+                  ; No_recursion.tag
+                  ; No_recursion.tag
+                  ; No_recursion.tag
+                  ]
+              ; main =
+                  (fun { public_input = _self } ->
+                    dummy_constraints () ;
+                    Promise.return
+                      { Inductive_rule.previous_proof_statements =
+                          [ { public_input = Field.zero
+                            ; proof =
+                                exists (Typ.prover_value ()) ~request:(fun () ->
+                                    Proof_req )
+                            ; proof_must_verify = Boolean.true_
+                            }
+                          ; { public_input = Field.zero
+                            ; proof =
+                                exists (Typ.prover_value ()) ~request:(fun () ->
+                                    Proof_req )
+                            ; proof_must_verify = Boolean.true_
+                            }
+                          ; { public_input = Field.zero
+                            ; proof =
+                                exists (Typ.prover_value ()) ~request:(fun () ->
+                                    Proof_req )
+                            ; proof_must_verify = Boolean.true_
+                            }
+                          ; { public_input = Field.zero
+                            ; proof =
+                                exists (Typ.prover_value ()) ~request:(fun () ->
+                                    Proof_req )
+                            ; proof_must_verify = Boolean.true_
+                            }
+                          ; { public_input = Field.zero
+                            ; proof =
+                                exists (Typ.prover_value ()) ~request:(fun () ->
+                                    Proof_req )
+                            ; proof_must_verify = Boolean.true_
+                            }
+                          ; { public_input = Field.zero
+                            ; proof =
+                                exists (Typ.prover_value ()) ~request:(fun () ->
+                                    Proof_req )
+                            ; proof_must_verify = Boolean.true_
+                            }
+                          ]
+                      ; public_output = ()
+                      ; auxiliary_output = ()
+                      } )
+              }
+            ] ) )
+
+  module Proof = (val p)
+
+  let example =
+    let _, no_proof = No_recursion.example in
+    let (), (), b0 =
+      Common.time "tree n6 b0" (fun () ->
+          Promise.block_on_async_exn (fun () ->
+              step ~handler:(handler no_proof) Field.Constant.zero ) )
+    in
+    (Field.Constant.zero, b0)
+
+  let test_verify () =
+    let input, proof = example in
+    Or_error.ok_exn
+      (Promise.block_on_async_exn (fun () ->
+           Proof.verify_promise [ (input, proof) ] ) )
+end
+
 let () =
   let open Alcotest in
   run "Pickles no sideloaded"
@@ -539,4 +1208,14 @@ let () =
       , [ test_case "verify" `Quick Add_one_return.test_verify ] )
     ; ( "Auxiliary return"
       , [ test_case "verify" `Quick Auxiliary_return.test_verify ] )
+    ; ("Tree proof N3", [ test_case "verify" `Quick Tree_proof_n3.test_verify ])
+    ; ("Verify N3", [ test_case "verify" `Quick Verify_n3.test_verify ])
+    ; ("Tree proof N2", [ test_case "verify" `Quick Tree_proof_n2.test_verify ])
+    ; ( "Self recursion 3"
+      , [ test_case "verify" `Quick Self_recursion_3.test_verify ] )
+    ; ("Tree proof N4", [ test_case "verify" `Quick Tree_proof_n4.test_verify ])
+    ; ( "Mixed widths rejected"
+      , [ test_case "rejected" `Quick Mixed_widths_rejected.test_rejected ] )
+    ; ("Tree proof N5", [ test_case "verify" `Quick Tree_proof_n5.test_verify ])
+    ; ("Tree proof N6", [ test_case "verify" `Quick Tree_proof_n6.test_verify ])
     ]

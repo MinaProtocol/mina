@@ -1299,13 +1299,15 @@ module Step = struct
 
       let typ fq ~assert_16_bits =
         let open In_circuit in
-        Spec.typ fq ~assert_16_bits (spec Backend.Tock.Rounds.n)
+        Spec.typ fq ~assert_16_bits ~branch_data_width:Nat.N2.n
+          (spec Backend.Tock.Rounds.n)
         |> Step_impl.Typ.transport ~there:to_data ~back:of_data
         |> Step_impl.Typ.transport_var ~there:to_data ~back:of_data
 
       let wrap_typ fq ~assert_16_bits =
         let open In_circuit in
-        Spec.wrap_typ fq ~assert_16_bits (spec Backend.Tock.Rounds.n)
+        Spec.wrap_typ fq ~assert_16_bits ~branch_data_width:Nat.N2.n
+          (spec Backend.Tock.Rounds.n)
         |> Wrap_impl.Typ.transport ~there:to_data ~back:of_data
         |> Wrap_impl.Typ.transport_var ~there:to_data ~back:of_data
     end
@@ -1331,7 +1333,8 @@ module Step = struct
         Vector.wrap_typ' (Vector.map proofs_verified ~f:per_proof)
       in
       let messages_for_next_step_proof =
-        Spec.wrap_typ fq ~assert_16_bits (B Spec.Digest)
+        Spec.wrap_typ fq ~assert_16_bits ~branch_data_width:Nat.N2.n
+          (B Spec.Digest)
       in
       Wrap_impl.Typ.of_hlistable
         [ unfinalized_proofs; messages_for_next_step_proof ]
