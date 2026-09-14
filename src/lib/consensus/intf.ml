@@ -224,6 +224,7 @@ module type State_hooks = sig
     -> snarked_ledger_hash:Mina_base.Frozen_ledger_hash.t
     -> genesis_ledger_hash:Mina_base.Frozen_ledger_hash.t
     -> supply_increase:Currency.Amount.Signed.t
+    -> stake_change:Currency.Amount.Signed.t
     -> logger:Logger.t
     -> constraint_constants:Genesis_constants.Constraint_constants.t
     -> protocol_state * consensus_transition
@@ -237,6 +238,7 @@ module type State_hooks = sig
     -> prev_state:protocol_state_var
     -> prev_state_hash:Mina_base.State_hash.var
     -> snark_transition_var
+    -> Currency.Amount.Signed.var
     -> Currency.Amount.Signed.var
     -> ([ `Success of Snark_params.Tick.Boolean.var ] * consensus_state_var)
        Snark_params.Tick.Checked.t
@@ -299,12 +301,13 @@ module type S = sig
     module Hashed : sig
       type t =
         { total_currency : Currency.Amount.t
+        ; total_stake : Currency.Amount.t
         ; hash : Mina_base.Frozen_ledger_hash.t
         }
 
       val hash : t -> Mina_base.Frozen_ledger_hash.t
 
-      val zero_total_currency : t -> t
+      val zero_totals : t -> t
     end
 
     module Epoch : sig
@@ -325,7 +328,7 @@ module type S = sig
 
       val to_hashed : Genesis_ledger.Packed.t t -> Hashed.t t
 
-      val zero_total_currency : Hashed.t t -> Hashed.t t
+      val zero_totals : Hashed.t t -> Hashed.t t
     end
 
     module Ledger : sig
@@ -336,6 +339,46 @@ module type S = sig
   end
 
   module Data : sig
+    module Epoch_ledger : sig
+      module Poly : sig
+        [%%versioned:
+        module Stable : sig
+          module V1 : sig
+            type ('ledger_hash, 'amount) t =
+              { hash : 'ledger_hash
+              ; total_currency : 'amount
+              ; total_stake : 'amount
+              }
+            [@@deriving sexp, equal, compare, hash, yojson, hlist]
+          end
+        end]
+      end
+
+      module Value : sig
+        [%%versioned:
+        module Stable : sig
+          module V1 : sig
+            type t =
+              ( Frozen_ledger_hash0.Stable.V1.t
+              , Amount.Stable.V1.t )
+              Poly.Stable.V1.t
+            [@@deriving sexp, equal, compare, hash, yojson]
+
+            val to_latest : t -> t
+          end
+        end]
+      end
+
+      type var = (Frozen_ledger_hash0.var, Amount.var) Poly.t
+
+      val typ : (var, Value.t) Snark_params.Tick.Typ.t
+
+      (** The zkApp precondition view, which does not carry the total stake. *)
+      val to_zkapp_view : Value.t -> Mina_base.Epoch_ledger.Value.t
+
+      val var_to_zkapp_view : var -> Mina_base.Epoch_ledger.var
+    end
+
     module Local_state : sig
       module Snapshot : sig
         type t
@@ -591,13 +634,41 @@ module type S = sig
 
       val total_currency_var : var -> Amount.Checked.t
 
-      val staking_epoch_data_var : var -> Mina_base.Epoch_data.var
+      val staking_epoch_data_var :
+           var
+        -> ( Epoch_ledger.var
+           , Epoch_seed.var
+           , State_hash.var
+           , State_hash.var
+           , Length.Checked.t )
+           Mina_base.Epoch_data.Poly.t
 
-      val staking_epoch_data : Value.t -> Mina_base.Epoch_data.Value.t
+      val staking_epoch_data :
+           Value.t
+        -> ( Epoch_ledger.Value.t
+           , Epoch_seed.t
+           , State_hash.t
+           , State_hash.t
+           , Length.t )
+           Mina_base.Epoch_data.Poly.t
 
-      val next_epoch_data_var : var -> Mina_base.Epoch_data.var
+      val next_epoch_data_var :
+           var
+        -> ( Epoch_ledger.var
+           , Epoch_seed.var
+           , State_hash.var
+           , State_hash.var
+           , Length.Checked.t )
+           Mina_base.Epoch_data.Poly.t
 
-      val next_epoch_data : Value.t -> Mina_base.Epoch_data.Value.t
+      val next_epoch_data :
+           Value.t
+        -> ( Epoch_ledger.Value.t
+           , Epoch_seed.t
+           , State_hash.t
+           , State_hash.t
+           , Length.t )
+           Mina_base.Epoch_data.Poly.t
 
       val curr_slot : Value.t -> Slot.t
 
@@ -609,6 +680,8 @@ module type S = sig
         Value.t -> Mina_numbers.Global_slot_since_hard_fork.t
 
       val total_currency : Value.t -> Amount.t
+
+      val total_stake : Value.t -> Amount.t
 
       val global_slot_since_genesis :
         Value.t -> Mina_numbers.Global_slot_since_genesis.t
@@ -647,7 +720,7 @@ module type S = sig
       module Stable : sig
         module V3 : sig
           type t =
-            { epoch_ledger : Mina_base.Epoch_ledger.Value.Stable.V1.t
+            { epoch_ledger : Epoch_ledger.Value.Stable.V1.t
             ; epoch_seed : Mina_base.Epoch_seed.Stable.V1.t
             ; epoch : Mina_numbers.Length.Stable.V1.t
             ; global_slot : Mina_numbers.Global_slot_since_hard_fork.Stable.V1.t

@@ -124,9 +124,15 @@ let fill_in_block pool (block : Archive_lib.Processor.Block.t) :
     ; snarked_ledger_hash
     ; staking_epoch_data
     ; next_epoch_data
+    ; staking_epoch_total_stake =
+        Option.map staking_epoch_data_raw.total_stake
+          ~f:Currency.Amount.of_string
+    ; next_epoch_total_stake =
+        Option.map next_epoch_data_raw.total_stake ~f:Currency.Amount.of_string
     ; min_window_density
     ; sub_window_densities
     ; total_currency
+    ; total_stake = Option.map block.total_stake ~f:Currency.Amount.of_string
     ; ledger_hash
     ; height
     ; global_slot_since_hard_fork

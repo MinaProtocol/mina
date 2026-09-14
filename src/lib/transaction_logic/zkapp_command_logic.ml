@@ -59,6 +59,8 @@ module type Balance_intf = sig
   val sub_amount_flagged : t -> amount -> t * [ `Underflow of bool ]
 
   val add_signed_amount_flagged : t -> signed_amount -> t * [ `Overflow of bool ]
+
+  val to_amount : t -> amount
 end
 
 module type Receipt_chain_hash_intf = sig
@@ -220,6 +222,7 @@ module Local_state = struct
         ; full_transaction_commitment : 'comm
         ; excess : 'signed_amount
         ; supply_increase : 'signed_amount
+        ; stake_change : 'signed_amount
         ; ledger : 'ledger
         ; success : 'bool
         ; account_update_index : 'length
@@ -272,8 +275,8 @@ module Local_state = struct
             } )
     }
 
-  let typ stack_frame call_stack excess supply_increase ledger bool comm length
-      failure_status_tbl =
+  let typ stack_frame call_stack excess supply_increase stake_change ledger bool
+      comm length failure_status_tbl =
     Pickles.Impls.Step.Typ.of_hlistable
       [ stack_frame
       ; call_stack
@@ -281,6 +284,7 @@ module Local_state = struct
       ; comm
       ; excess
       ; supply_increase
+      ; stake_change
       ; ledger
       ; bool
       ; length
@@ -770,7 +774,13 @@ module type Inputs_intf = sig
        and type amount := Amount.t
        and type signed_amount := Amount.Signed.t
 
-  module Public_key : Iffable with type bool := Bool.t
+  module Public_key : sig
+    include Iffable with type bool := Bool.t
+
+    val empty : t
+
+    val equal : t -> t -> Bool.t
+  end
 
   module Token_id : Token_id_intf with type bool := Bool.t
 
@@ -966,6 +976,10 @@ module type Inputs_intf = sig
     val supply_increase : t -> Amount.Signed.t
 
     val set_supply_increase : t -> Amount.Signed.t -> t
+
+    val stake_change : t -> Amount.Signed.t
+
+    val set_stake_change : t -> Amount.Signed.t -> t
 
     val block_global_slot : t -> Global_slot_since_genesis.t
   end
@@ -1279,6 +1293,15 @@ module Make (Inputs : Inputs_intf) = struct
       { local_state with stack_frame = remaining; call_stack }
     in
     let local_state = Local_state.add_new_failure_status_bucket local_state in
+    let stake_of_account a =
+      let is_staked =
+        Bool.not (Public_key.equal (Account.delegate a) Public_key.empty)
+      in
+      Amount.if_ is_staked
+        ~then_:(Balance.to_amount (Account.balance a))
+        ~else_:Amount.zero
+    in
+    let pre_stake = stake_of_account a in
     (* Register verification key, in case it needs to be 'side-loaded' to
        verify a zkapp proof.
     *)
@@ -1289,20 +1312,10 @@ module Make (Inputs : Inputs_intf) = struct
         (Account_update.token_id account_update)
         (a, inclusion_proof)
     in
-    (* delegate to public key if new account using default token *)
+    (* Ensure new accounts have no delegate. *)
     let a =
-      let self_delegate =
-        let account_update_token_id = Account_update.token_id account_update in
-        Bool.(
-          account_is_new
-          &&& Token_id.equal account_update_token_id Token_id.default )
-      in
-      (* in-SNARK, a new account has the empty public key here
-         in that case, use the public key from the account update, not the account
-      *)
       Account.set_delegate
-        (Public_key.if_ self_delegate
-           ~then_:(Account_update.public_key account_update)
+        (Public_key.if_ account_is_new ~then_:Public_key.empty
            ~else_:(Account.delegate a) )
         a
     in
@@ -1717,9 +1730,7 @@ module Make (Inputs : Inputs_intf) = struct
     (* Update delegate. *)
     let a, local_state =
       let delegate = Account_update.Update.delegate account_update in
-      (* for new accounts using the default token, we've already
-         set the delegate to the public key
-      *)
+      (* for new accounts, we've already initialized the delegate to None *)
       let base_delegate = Account.delegate a in
       let has_permission =
         Controller.check ~proof_verifies ~signature_verifies
@@ -1865,9 +1876,36 @@ module Make (Inputs : Inputs_intf) = struct
     let is_last_account_update =
       Call_forest.is_empty (Stack_frame.calls remaining)
     in
+    (* Compute this step's contribution to stake_change as
+         post_stake − pre_stake
+       where stake = (if is_staked then balance else 0) per the
+       Definition section of docs/unstaking-stake-change.md. *)
+    let step_stake_delta, stake_overflow =
+      let post_stake = stake_of_account a in
+      let delta, `Overflow overflow =
+        Amount.Signed.add_flagged
+          (Amount.Signed.of_unsigned post_stake)
+          (Amount.Signed.negate (Amount.Signed.of_unsigned pre_stake))
+      in
+      (delta, overflow)
+    in
+    let local_state =
+      Local_state.add_check local_state Overflow Bool.(not stake_overflow)
+    in
+    let new_local_stake_change, local_stake_change_overflow =
+      let res, `Overflow overflow =
+        Amount.Signed.add_flagged local_state.stake_change step_stake_delta
+      in
+      (res, overflow)
+    in
+    let local_state =
+      Local_state.add_check local_state Overflow
+        Bool.(not local_stake_change_overflow)
+    in
     let local_state =
       { local_state with
         ledger = new_ledger
+      ; stake_change = new_local_stake_change
       ; transaction_commitment =
           Transaction_commitment.if_ is_last_account_update
             ~then_:Transaction_commitment.empty
@@ -1951,12 +1989,42 @@ module Make (Inputs : Inputs_intf) = struct
         Global_state.set_first_pass_ledger ~should_update:is_fee_payer
           global_state local_state.ledger
       in
+      (* Move the fee_payer's accumulated stake_change out of [local_state]
+         and into [global_state] — the fee_payer's effects always stick,
+         even if the remaining account_updates roll back. The local
+         accumulator is then zeroed so subsequent updates accumulate from
+         scratch; their accumulated value is committed to [global_state]
+         only at the last update on success. Without this reset, the
+         fee_payer's delta would be double-counted on success and dropped
+         on failure. *)
+      let new_global_stake_change_after_fp, fp_stake_overflow =
+        let res, `Overflow overflow =
+          Amount.Signed.add_flagged
+            (Global_state.stake_change global_state)
+            local_state.stake_change
+        in
+        (res, overflow)
+      in
+      let local_state =
+        Local_state.add_check local_state Overflow
+          Bool.(not (is_fee_payer &&& fp_stake_overflow))
+      in
+      let global_state =
+        Global_state.set_stake_change global_state
+          (Amount.Signed.if_ is_fee_payer
+             ~then_:new_global_stake_change_after_fp
+             ~else_:(Global_state.stake_change global_state) )
+      in
       let local_state =
         { local_state with
           ledger =
             Inputs.Ledger.if_ is_fee_payer
               ~then_:(Global_state.second_pass_ledger global_state)
               ~else_:local_state.ledger
+        ; stake_change =
+            Amount.Signed.if_ is_fee_payer
+              ~then_:Amount.(Signed.of_unsigned zero)
+              ~else_:local_state.stake_change
         }
       in
       (local_state, global_state)
@@ -1973,6 +2041,19 @@ module Make (Inputs : Inputs_intf) = struct
     (* If this is the last party and there were no failures, update the second
        pass ledger and the supply increase.
     *)
+    let new_global_stake_change_after_local_update, local_update_stake_overflow
+        =
+      let res, `Overflow overflow =
+        Amount.Signed.add_flagged
+          (Global_state.stake_change global_state)
+          local_state.stake_change
+      in
+      (res, overflow)
+    in
+    let local_state =
+      Local_state.add_check local_state Overflow
+        Bool.(not (is_last_account_update &&& local_update_stake_overflow))
+    in
     let global_state =
       let is_successful_last_party =
         Bool.(is_last_account_update &&& local_state.success)
@@ -1982,6 +2063,12 @@ module Make (Inputs : Inputs_intf) = struct
           (Amount.Signed.if_ is_successful_last_party
              ~then_:new_global_supply_increase
              ~else_:(Global_state.supply_increase global_state) )
+      in
+      let global_state =
+        Global_state.set_stake_change global_state
+          (Amount.Signed.if_ is_successful_last_party
+             ~then_:new_global_stake_change_after_local_update
+             ~else_:(Global_state.stake_change global_state) )
       in
       Global_state.set_second_pass_ledger
         ~should_update:is_successful_last_party global_state local_state.ledger
@@ -2015,6 +2102,10 @@ module Make (Inputs : Inputs_intf) = struct
           Amount.Signed.if_ is_last_account_update
             ~then_:Amount.(Signed.of_unsigned zero)
             ~else_:local_state.supply_increase
+      ; stake_change =
+          Amount.Signed.if_ is_last_account_update
+            ~then_:Amount.(Signed.of_unsigned zero)
+            ~else_:local_state.stake_change
       ; will_succeed =
           Bool.if_ is_last_account_update ~then_:Bool.true_
             ~else_:local_state.will_succeed

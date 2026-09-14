@@ -25,7 +25,22 @@ module type Concrete = sig
 
   module Data : sig
     module Epoch_ledger : sig
-      include module type of Mina_base.Epoch_ledger
+      module Poly : sig
+        module V1 : sig
+          type ('ledger_hash, 'amount) t =
+            { hash : 'ledger_hash
+            ; total_currency : 'amount
+            ; total_stake : 'amount
+            }
+        end
+      end
+
+      module Value : sig
+        module V1 : sig
+          type t =
+            (Mina_base.Frozen_ledger_hash0.V1.t, Currency.Amount.V1.t) Poly.V1.t
+        end
+      end
     end
 
     module Epoch_data : sig
@@ -77,6 +92,7 @@ module type Concrete = sig
             ; sub_window_densities : 'length list
             ; last_vrf_output : 'vrf_output
             ; total_currency : 'amount
+            ; total_stake : 'amount
             ; curr_global_slot_since_hard_fork : 'global_slot
             ; global_slot_since_genesis : 'global_slot_since_genesis
             ; staking_epoch_data : 'staking_epoch_data

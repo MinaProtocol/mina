@@ -10429,6 +10429,22 @@
               },
               "isDeprecated": false,
               "deprecationReason": null
+            },
+            {
+              "name": "totalStake",
+              "description": "Total balance of the accounts in this ledger that delegate to someone, the denominator of the VRF threshold",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Amount",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
             }
           ],
           "inputFields": null,
@@ -10615,6 +10631,22 @@
             {
               "name": "totalCurrency",
               "description": "Total currency in circulation at this block",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Amount",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "totalStake",
+              "description": "Total balance of accounts that delegate to someone at this block",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -12895,7 +12927,7 @@
             },
             {
               "name": "delegate",
-              "description": "The public key to which you are delegating - if you are not delegating to anybody, this would return your public key",
+              "description": "The public key to which you are delegating, or null if you are not delegating to anybody (i.e. unstaked)",
               "args": [],
               "type": {
                 "kind": "SCALAR",
@@ -12907,7 +12939,7 @@
             },
             {
               "name": "delegateAccount",
-              "description": "The account to which you are delegating - if you are not delegating to anybody, this would return your public key",
+              "description": "The account to which you are delegating, or null if you are not delegating to anybody (i.e. unstaked)",
               "args": [],
               "type": { "kind": "OBJECT", "name": "Account", "ofType": null },
               "isDeprecated": false,

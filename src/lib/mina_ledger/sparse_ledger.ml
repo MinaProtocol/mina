@@ -107,6 +107,17 @@ let%test_unit "of_ledger_subset_exn with keys that don't exist works" =
 
 module T = Mina_transaction_logic.Make (L)
 
+(** Convenience: compute the stake_change of an applied transaction using
+    [pre] and [post] sparse-ledger snapshots for account lookups. *)
+let stake_change_of_applied ~pre ~post applied =
+  let lookup sl id =
+    Option.try_with (fun () -> get_exn sl (find_index_exn sl id))
+  in
+  Mina_transaction_logic.Transaction_applied.(
+    transaction applied
+    |> stake_change_of_transaction ~get_account_pre:(lookup pre)
+         ~get_account_post:(lookup post) )
+
 let apply_transaction_logic f t x =
   let t' = ref t in
   let%map.Or_error app = f t' x in
@@ -143,6 +154,7 @@ let apply_zkapp_first_pass_unchecked_with_states ~constraint_constants
           ; second_pass_ledger = _ (*expected to be empty*)
           ; fee_excess
           ; supply_increase
+          ; stake_change
           ; protocol_state
           ; block_global_slot
           }
@@ -152,6 +164,7 @@ let apply_zkapp_first_pass_unchecked_with_states ~constraint_constants
         ; second_pass_ledger
         ; fee_excess
         ; supply_increase
+        ; stake_change
         ; protocol_state
         ; block_global_slot
         }
@@ -166,6 +179,7 @@ let apply_zkapp_second_pass_unchecked_with_states ~init ledger c =
           ; second_pass_ledger
           ; fee_excess
           ; supply_increase
+          ; stake_change
           ; protocol_state
           ; block_global_slot
           }
@@ -175,6 +189,7 @@ let apply_zkapp_second_pass_unchecked_with_states ~init ledger c =
         ; second_pass_ledger = !second_pass_ledger
         ; fee_excess
         ; supply_increase
+        ; stake_change
         ; protocol_state
         ; block_global_slot
         }

@@ -27,31 +27,31 @@ type circuit_stats =
   }
 
 let dev_expected_values =
-  { constraints = 9266
+  { constraints = 9389
   ; public_input_size = 1
-  ; auxiliary_input_size = 31987
-  ; digest = "81ef2a46071ad8c4c5380461808ec15a"
+  ; auxiliary_input_size = 32950
+  ; digest = "02e97e22ae13c36361f05946d6b3af5a"
   }
 
 let devnet_expected_values =
-  { constraints = 10322
+  { constraints = 10445
   ; public_input_size = 1
-  ; auxiliary_input_size = 39459
-  ; digest = "9ea67872932cb16dd03c1654b7b83b76"
+  ; auxiliary_input_size = 40422
+  ; digest = "4fbcf840d1cd7d9e290f00b99f314383"
   }
 
 let lightnet_expected_values =
-  { constraints = 10224
+  { constraints = 10347
   ; public_input_size = 1
-  ; auxiliary_input_size = 38421
-  ; digest = "c8aca19d2a26c07c05e259d2b59ff643"
+  ; auxiliary_input_size = 39384
+  ; digest = "b269920bfbce65d4ac5d32f0be33003e"
   }
 
 let mainnet_expected_values =
-  { constraints = 10322
+  { constraints = 10445
   ; public_input_size = 1
-  ; auxiliary_input_size = 39459
-  ; digest = "9ea67872932cb16dd03c1654b7b83b76"
+  ; auxiliary_input_size = 40422
+  ; digest = "4fbcf840d1cd7d9e290f00b99f314383"
   }
 
 let expected_values =

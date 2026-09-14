@@ -19,6 +19,7 @@ module type S = sig
       ; second_pass_ledger : ledger
       ; fee_excess : Amount.Signed.t
       ; supply_increase : Amount.Signed.t
+      ; stake_change : Amount.Signed.t
       ; protocol_state : Zkapp_precondition.Protocol_state.View.t
       ; block_global_slot : Mina_numbers.Global_slot_since_genesis.t
             (* Slot of block when the transaction is applied. NOTE: This is at least 1 slot after the protocol_state's view, which is for the *previous* slot. *)
@@ -598,7 +599,12 @@ module Make (L : Ledger_intf.S) :
             | `Existing _ ->
                 return ()
             | `New ->
-                Result.fail Transaction_status.Failure.Receiver_not_present
+                (* Allow delegation to the empty public key (unstaking) *)
+                if
+                  Signature_lib.Public_key.Compressed.(
+                    equal (Account_id.public_key receiver) empty )
+                then return ()
+                else Result.fail Transaction_status.Failure.Receiver_not_present
           in
           let%bind () =
             Result.ok_if_true
@@ -615,10 +621,12 @@ module Make (L : Ledger_intf.S) :
                 ~txn_global_slot:current_global_slot ~account:fee_payer_account
               |> Result.map_error ~f:timing_error_to_user_command_status
             in
-            { fee_payer_account with
-              delegate = Some (Account_id.public_key receiver)
-            ; timing
-            }
+            let new_delegate =
+              let pk = Account_id.public_key receiver in
+              if Signature_lib.Public_key.Compressed.(equal pk empty) then None
+              else Some pk
+            in
+            { fee_payer_account with delegate = new_delegate; timing }
           in
           ( [ (fee_payer_location, fee_payer_account) ]
           , Transaction_applied.Signed_command_applied.Body.Stake_delegation
@@ -750,6 +758,7 @@ module Make (L : Ledger_intf.S) :
       ; second_pass_ledger : L.t
       ; fee_excess : Amount.Signed.t
       ; supply_increase : Amount.Signed.t
+      ; stake_change : Amount.Signed.t
       ; protocol_state : Zkapp_precondition.Protocol_state.View.t
       ; block_global_slot : Global_slot_since_genesis.t
       }
@@ -775,6 +784,10 @@ module Make (L : Ledger_intf.S) :
     let supply_increase { supply_increase; _ } = supply_increase
 
     let set_supply_increase t supply_increase = { t with supply_increase }
+
+    let stake_change { stake_change; _ } = stake_change
+
+    let set_stake_change t stake_change = { t with stake_change }
 
     let block_global_slot { block_global_slot; _ } = block_global_slot
   end
@@ -968,6 +981,10 @@ module Make (L : Ledger_intf.S) :
       type t = Public_key.Compressed.t
 
       let if_ = value_if
+
+      let empty = Public_key.Compressed.empty
+
+      let equal = Public_key.Compressed.equal
     end
 
     module Controller = struct
@@ -1649,6 +1666,7 @@ module Make (L : Ledger_intf.S) :
             L.empty ~depth:0 ()
         ; fee_excess
         ; supply_increase
+        ; stake_change = Currency.Amount.Signed.zero
         ; block_global_slot = global_slot
         }
       , { stack_frame =
@@ -1662,6 +1680,7 @@ module Make (L : Ledger_intf.S) :
         ; full_transaction_commitment = Inputs.Transaction_commitment.empty
         ; excess = Currency.Amount.(Signed.of_unsigned zero)
         ; supply_increase = Currency.Amount.(Signed.of_unsigned zero)
+        ; stake_change = Currency.Amount.(Signed.of_unsigned zero)
         ; ledger = L.empty ~depth:0 ()
         ; success = true
         ; account_update_index = Inputs.Index.zero

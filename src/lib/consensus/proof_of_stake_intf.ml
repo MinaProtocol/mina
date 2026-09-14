@@ -25,10 +25,6 @@ module type Full = sig
 
       val min_window_density : Value.t -> Mina_numbers.Length.t
 
-      val staking_epoch_data : Value.t -> Mina_base.Epoch_data.Value.t
-
-      val next_epoch_data : Value.t -> Mina_base.Epoch_data.Value.t
-
       (* unsafe modules for creating dummy states when doing vrf evaluations *)
       (* TODO: refactor code so that [Hooks.next_proposal] does not require a full [Consensus_state] *)
       module Unsafe : sig

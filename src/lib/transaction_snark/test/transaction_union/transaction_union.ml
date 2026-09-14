@@ -76,6 +76,7 @@ let%test_module "Transaction union tests" =
               ~connecting_ledger_right:target ~sok_digest
               ~fee_excess:(Or_error.ok_exn (Transaction.fee_excess txn))
               ~supply_increase:user_command_supply_increase
+              ~stake_change:Currency.Amount.Signed.zero
               ~pending_coinbase_stack_state
           in
           T.of_user_command ~init_stack ~statement user_command_in_block handler )
@@ -149,6 +150,11 @@ let%test_module "Transaction union tests" =
               ~constraint_constants applied_transaction
             |> Or_error.ok_exn
           in
+          let stake_change =
+            Sparse_ledger.stake_change_of_applied ~pre:sparse_ledger
+              ~post:sparse_ledger_after applied_transaction
+            |> Or_error.ok_exn
+          in
           Transaction_snark.check_transaction ~signature_kind txn_in_block
             (unstage (Sparse_ledger.handler sparse_ledger))
             ~constraint_constants:U.constraint_constants
@@ -161,7 +167,7 @@ let%test_module "Transaction union tests" =
             ~init_stack:pending_coinbase_init
             ~pending_coinbase_stack_state:
               { source = source_stack; target = pending_coinbase_stack_target }
-            ~supply_increase )
+            ~supply_increase ~stake_change )
 
     let%test_unit "coinbase with new state body hash" =
       Test_util.with_randomness 123456789 (fun () ->
@@ -228,12 +234,31 @@ let%test_module "Transaction union tests" =
                 in
                 Currency.Amount.Signed.create ~magnitude ~sgn:Sgn.Neg
               in
+              let stake_change =
+                let sparse_ledger_after, applied =
+                  Result.( >>= )
+                    (Sparse_ledger.apply_transaction_first_pass
+                       ~constraint_constants ~global_slot:current_global_slot
+                       ~txn_state_view:
+                         (Mina_state.Protocol_state.Body.view state_body)
+                       sparse_ledger
+                       (Mina_transaction.Transaction.Command
+                          (Signed_command (Signed_command.forget_check t1)) ) )
+                    (fun (sl, partially_applied) ->
+                      Sparse_ledger.apply_transaction_second_pass sl
+                        partially_applied )
+                  |> Or_error.ok_exn
+                in
+                Sparse_ledger.stake_change_of_applied ~pre:sparse_ledger
+                  ~post:sparse_ledger_after applied
+                |> Or_error.ok_exn
+              in
               Transaction_snark.check_user_command ~signature_kind
                 ~constraint_constants ~sok_message
                 ~source_first_pass_ledger:(Ledger.merkle_root ledger)
                 ~target_first_pass_ledger ~init_stack:pending_coinbase_stack
                 ~pending_coinbase_stack_state
-                ~supply_increase:user_command_supply_increase
+                ~supply_increase:user_command_supply_increase ~stake_change
                 { transaction = t1
                 ; block_data = state_body
                 ; global_slot = current_global_slot
@@ -896,7 +921,6 @@ let%test_module "Transaction union tests" =
               in
               let signer = wallets.(0).private_key in
               let fee_payer_pk = wallets.(0).account.public_key in
-              let source_pk = fee_payer_pk in
               let receiver_pk = wallets.(1).account.public_key in
               let fee_token = Token_id.default in
               let accounts =
@@ -917,10 +941,7 @@ let%test_module "Transaction union tests" =
               assert (
                 Balance.equal fee_payer_account.balance
                   expected_fee_payer_balance ) ;
-              assert (
-                Public_key.Compressed.equal
-                  (Option.value_exn fee_payer_account.delegate)
-                  source_pk ) ;
+              assert (Option.is_none fee_payer_account.delegate) ;
               assert (Option.is_none receiver_account) ) )
 
     let%test_unit "delegation delegator does not exist" =

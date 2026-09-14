@@ -194,6 +194,7 @@ module Job_view = struct
                   ]
               ] )
         ; ("Supply Increase", Currency.Amount.Signed.to_yojson s.supply_increase)
+        ; ("Stake Change", Currency.Amount.Signed.to_yojson s.stake_change)
         ]
     in
     let job_to_yojson =
@@ -340,7 +341,8 @@ let create_expected_statement ~constraint_constants
   let%bind
       ( target_first_pass_merkle_root
       , target_second_pass_merkle_root
-      , supply_increase ) =
+      , supply_increase
+      , stake_change ) =
     let%bind first_pass_ledger_after_apply, partially_applied_transaction =
       Sparse_ledger.apply_transaction_first_pass ~constraint_constants
         ~global_slot:block_global_slot ~txn_state_view:state_view
@@ -358,13 +360,32 @@ let create_expected_statement ~constraint_constants
       Sparse_ledger.merkle_root second_pass_ledger_after_apply
       |> Frozen_ledger_hash.of_ledger_hash
     in
-    let%map supply_increase =
+    let%bind supply_increase =
       Mina_transaction_logic.Transaction_applied.supply_increase
         ~constraint_constants applied_transaction
     in
+    let%bind stake_change_first_pass =
+      Sparse_ledger.stake_change_of_applied ~pre:first_pass_ledger_witness
+        ~post:first_pass_ledger_after_apply applied_transaction
+    in
+    let%bind stake_change_second_pass =
+      Sparse_ledger.stake_change_of_applied ~pre:second_pass_ledger_witness
+        ~post:second_pass_ledger_after_apply applied_transaction
+    in
+    let%map stake_change =
+      Option.value_map
+        (Currency.Amount.Signed.add stake_change_first_pass
+           stake_change_second_pass )
+        ~default:
+          (Or_error.error_string
+             "create_expected_statement: stake_change overflow combining \
+              first- and second-pass deltas" )
+        ~f:Or_error.return
+    in
     ( target_first_pass_merkle_root
     , target_second_pass_merkle_root
-    , supply_increase )
+    , supply_increase
+    , stake_change )
   in
   let pending_coinbase_after =
     let state_body_hash = snd state_hash in
@@ -395,6 +416,7 @@ let create_expected_statement ~constraint_constants
   ; connecting_ledger_right = connecting_merkle_root
   ; fee_excess
   ; supply_increase
+  ; stake_change
   ; sok_digest = ()
   }
 
@@ -688,6 +710,7 @@ struct
           ; connecting_ledger_left = _
           ; connecting_ledger_right = _
           ; supply_increase = _
+          ; stake_change = _
           ; sok_digest = ()
           } as t ) ->
         let open Or_error.Let_syntax in
@@ -1035,6 +1058,7 @@ let apply_ordered_txns_stepwise ?(stop_at_first_pass = false) ordered_txns
             ; second_pass_ledger = ledger
             ; fee_excess = t.global_state.fee_excess
             ; supply_increase = t.global_state.supply_increase
+            ; stake_change = t.global_state.stake_change
             ; protocol_state = t.global_state.protocol_state
             ; block_global_slot = t.global_state.block_global_slot
             }
@@ -1048,6 +1072,7 @@ let apply_ordered_txns_stepwise ?(stop_at_first_pass = false) ordered_txns
                 t.local_state.full_transaction_commitment
             ; excess = t.local_state.excess
             ; supply_increase = t.local_state.supply_increase
+            ; stake_change = t.local_state.stake_change
             ; ledger
             ; success = t.local_state.success
             ; account_update_index = t.local_state.account_update_index

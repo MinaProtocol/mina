@@ -4,9 +4,12 @@ CONN_STR=$1
 # Pick the tip as the highest block (longest chain), not the block with the
 # greatest global_slot: with forks a stale orphan can hold the max slot, which
 # would canonicalize the wrong (gapped) chain. A 2nd arg pins an explicit tip.
+# LIMIT in SQL rather than `| head -n1`: this file is sourced under
+# `set -o pipefail`, where head closing the pipe early on a multi-row result
+# (several blocks at the max height) kills psql with SIGPIPE and aborts the caller.
 LAST_BLOCK_HASH=${2:-$(psql -U postgres $CONN_STR -t -c \
-  'SELECT state_hash from blocks where height = (SELECT MAX(height) from blocks) ORDER BY state_hash;' \
-  | head -n1 | xargs )}
+  'SELECT state_hash from blocks where height = (SELECT MAX(height) from blocks) ORDER BY state_hash LIMIT 1;' \
+  | xargs )}
 
 echo LAST_BLOCK_HASH: $LAST_BLOCK_HASH
 

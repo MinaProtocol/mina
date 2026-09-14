@@ -205,6 +205,25 @@ let check_zkapp_command_with_merges_exn ?(logger = logger_null)
                     Ledger.apply_transaction_second_pass ledger partial_stmt
                     |> Or_error.ok_exn
                   in
+                  let stake_change =
+                    let get_pre id =
+                      Option.try_with (fun () ->
+                          Sparse_ledger.get_exn first_pass_ledger_witness
+                            (Sparse_ledger.find_index_exn
+                               first_pass_ledger_witness id ) )
+                    in
+                    let get_post id =
+                      Option.bind
+                        (Ledger.location_of_account ledger id)
+                        ~f:(Ledger.get ledger)
+                    in
+                    Mina_transaction_logic.Transaction_applied
+                    .stake_change_of_transaction ~get_account_pre:get_pre
+                      ~get_account_post:get_post
+                      (Mina_transaction_logic.Transaction_applied.transaction
+                         applied_txn )
+                    |> Or_error.ok_exn
+                  in
                   (*Expected transaction statement*)
                   let stmt : Transaction_snark.Statement.t =
                     { Mina_wire_types.Mina_state_snarked_ledger_state.Poly.V2
@@ -230,6 +249,7 @@ let check_zkapp_command_with_merges_exn ?(logger = logger_null)
                         Mina_transaction_logic.Transaction_applied
                         .supply_increase ~constraint_constants applied_txn
                         |> Or_error.ok_exn
+                    ; stake_change
                     ; sok_digest = ()
                     }
                   in
@@ -697,6 +717,24 @@ let test_transaction_union ?expected_failure ?txn_global_slot ledger txn =
           ~constraint_constants txn
         |> Or_error.ok_exn )
   in
+  let stake_change =
+    Option.value_map applied_transaction ~default:Amount.Signed.zero
+      ~f:(fun applied ->
+        let get_pre id =
+          Option.try_with (fun () ->
+              Sparse_ledger.get_exn sparse_ledger
+                (Sparse_ledger.find_index_exn sparse_ledger id) )
+        in
+        let get_post id =
+          Option.bind
+            (Ledger.location_of_account ledger id)
+            ~f:(Ledger.get ledger)
+        in
+        Mina_transaction_logic.Transaction_applied.stake_change_of_transaction
+          ~get_account_pre:get_pre ~get_account_post:get_post
+          (Mina_transaction_logic.Transaction_applied.transaction applied)
+        |> Or_error.ok_exn )
+  in
   let k () =
     Transaction_snark.check_transaction ~constraint_constants ~sok_message
       ~source_first_pass_ledger ~target_first_pass_ledger
@@ -706,7 +744,7 @@ let test_transaction_union ?expected_failure ?txn_global_slot ledger txn =
             pending_coinbase_stack
         ; target = pending_coinbase_stack_target
         }
-      ~supply_increase
+      ~supply_increase ~stake_change
       { transaction = txn; block_data = state_body; global_slot }
       (unstage @@ Sparse_ledger.handler sparse_ledger)
       ~signature_kind

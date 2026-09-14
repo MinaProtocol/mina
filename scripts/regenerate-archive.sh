@@ -63,7 +63,9 @@ export MINA_GRAPHQL_CLIENT_EXE=_build/default/src/app/mina_graphql_client/mina_g
 # The network now writes daemon.json / genesis_ledger.json directly under ROOT (~/.mina-network)
 LOCAL_NETWORK_DATA_FOLDER="${HOME}"/.mina-network
 
-trap "pkill -f mina-local-network" EXIT
+# `|| true`: once the network is already stopped pkill finds nothing and exits 1,
+# and an EXIT trap's status becomes the script's, failing a successful run.
+trap "pkill -f mina-local-network || true" EXIT
 
 # stop mina-local-network once enough blocks have been produced.
 # Note: the network drops & recreates the archive DB on startup, so the

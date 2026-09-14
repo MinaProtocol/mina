@@ -59,10 +59,8 @@ let create (config : Test_config.Test_account.t list) =
           { default with
             pk = Public_key.Compressed.to_string pk
           ; sk = Some (Private_key.to_base58_check sk)
-          ; balance =
-              Balance.of_mina_string_exn balance
-              (* delegation currently unsupported *)
-          ; delegate = None
+          ; balance = Balance.of_mina_string_exn balance
+          ; delegate = Some (Public_key.Compressed.to_string pk)
           ; timing
           ; permissions =
               Option.map

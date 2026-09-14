@@ -23,28 +23,28 @@
     {v
     | Circuit         | Constraints | Public Input | Auxiliary Input |
     |-----------------|-------------|--------------|-----------------|
-    | blockchain-step | 9,266       | 1            | 31,987          |
+    | blockchain-step | 9,389       | 1            | 32,950          |
     v}
 
     {b Devnet profile:}
     {v
     | Circuit         | Constraints | Public Input | Auxiliary Input |
     |-----------------|-------------|--------------|-----------------|
-    | blockchain-step | 10,322      | 1            | 39,459          |
+    | blockchain-step | 10,445      | 1            | 40,422          |
     v}
 
     {b Lightnet profile:}
     {v
     | Circuit         | Constraints | Public Input | Auxiliary Input |
     |-----------------|-------------|--------------|-----------------|
-    | blockchain-step | 10,224      | 1            | 38,421          |
+    | blockchain-step | 10,347      | 1            | 39,384          |
     v}
 
     {b Mainnet profile:}
     {v
     | Circuit         | Constraints | Public Input | Auxiliary Input |
     |-----------------|-------------|--------------|-----------------|
-    | blockchain-step | 10,322      | 1            | 39,459          |
+    | blockchain-step | 10,445      | 1            | 40,422          |
     v}
 
     If these values change, update the tables above and the expected values in

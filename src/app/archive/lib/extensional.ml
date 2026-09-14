@@ -129,8 +129,15 @@ module Block = struct
         ; snarked_ledger_hash : Frozen_ledger_hash.Stable.V1.t
         ; staking_epoch_data : Mina_base.Epoch_data.Value.Stable.V1.t
         ; next_epoch_data : Mina_base.Epoch_data.Value.Stable.V1.t
+              (* Epoch ledger total stakes, absent for blocks archived before the
+           total stake was recorded. *)
+        ; staking_epoch_total_stake : Currency.Amount.Stable.V1.t option
+              [@default None]
+        ; next_epoch_total_stake : Currency.Amount.Stable.V1.t option
+              [@default None]
         ; min_window_density : Mina_numbers.Length.Stable.V1.t
         ; total_currency : Currency.Amount.Stable.V1.t
+        ; total_stake : Currency.Amount.Stable.V1.t option [@default None]
         ; sub_window_densities : Mina_numbers.Length.Stable.V1.t list
         ; ledger_hash : Ledger_hash.Stable.V1.t
         ; height : Unsigned_extended.UInt32.Stable.V1.t
