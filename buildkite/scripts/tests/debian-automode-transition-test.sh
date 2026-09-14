@@ -51,14 +51,14 @@ log_error() { echo -e "${RED}[ERROR]${CLEAR} $*"; }
 # CLI
 ################################################################################
 
-CODENAME="bullseye"
+CODENAME="bookworm"
 NETWORK="devnet"
 
 usage() {
     echo "Usage: $0 [OPTIONS]"
     echo ""
     echo "Options:"
-    echo "  -c, --codename    Debian codename (default: bullseye)"
+    echo "  -c, --codename    Debian codename (default: bookworm)"
     echo "  -N, --network     Network name (default: devnet)"
     echo "  -h, --help        Show this help"
 }

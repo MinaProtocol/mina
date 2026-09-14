@@ -181,7 +181,7 @@ Options:
   --step KEY         Run only the step matching this key (substring match)
   --start-from KEY   Start execution from this step (skip all previous steps)
   --build-id ID      Reuse a specific BUILDKITE_BUILD_ID (for resuming/debugging)
-  --sync-filter PFX  Only sync files matching prefix (e.g. "debians/bullseye/mina-devnet")
+  --sync-filter PFX  Only sync files matching prefix (e.g. "debians/bookworm/mina-devnet")
   --commit HASH      Override git commit hash (sets OVERRIDE_GITHASH for version strings)
   --env-file FILE    File with KEY=VALUE pairs passed to all commands (including Docker)
   --list             List available job names and exit
@@ -202,7 +202,7 @@ Examples:
   $(basename "$0") --skip-dump --jobs-dir /tmp/pipelines --step "build-deb" RosettaDevnetConnect
   $(basename "$0") --start-from "upload-ledger" RosettaDevnetConnect
   $(basename "$0") --build-id abc123-def456 --start-from "step-3" MyJob  # Resume from specific build
-  $(basename "$0") --sync-filter "debians/bullseye/mina-config" MyJob   # Sync only matching files
+  $(basename "$0") --sync-filter "debians/bookworm/mina-config" MyJob   # Sync only matching files
 EOF
 }
 
@@ -485,9 +485,9 @@ sync_legacy_cache() {
   # Build rsync filter flags: include only files matching the prefix
   local filter_flags=()
   if [[ -n "$SYNC_FILTER" ]]; then
-    # For a filter like "debians/bullseye/mina-devnet" we need:
-    #   --include 'debians/' --include 'debians/bullseye/'
-    #   --include 'debians/bullseye/mina-devnet*' --exclude '*'
+    # For a filter like "debians/bookworm/mina-devnet" we need:
+    #   --include 'debians/' --include 'debians/bookworm/'
+    #   --include 'debians/bookworm/mina-devnet*' --exclude '*'
     local filter_dir filter_base
     filter_dir=$(dirname "$SYNC_FILTER")
     filter_base=$(basename "$SYNC_FILTER")

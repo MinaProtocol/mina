@@ -1,4 +1,4 @@
--- Installs and upgrades the mainnet .debs built by MinaArtifactMainnetBullseye,
+-- Installs and upgrades the mainnet .debs built by MinaArtifactMainnetBookworm,
 -- so it belongs to the stage that builds them.
 --
 -- Hence the Packaging tag rather than Long: the nightly's LongAndVeryLong stage
@@ -36,13 +36,13 @@ let Profiles = ../../Constants/Profiles.dhall
 let dependsOnMainnet =
         DebianVersions.dependsOn
           DebianVersions.DepsSpec::{
-          , deb_version = DebianVersions.DebVersion.Bullseye
+          , deb_version = DebianVersions.DebVersion.Bookworm
           , network = Network.Type.Mainnet
           , profile = Profiles.Type.Mainnet
           }
       # DebianVersions.dependsOn
           DebianVersions.DepsSpec::{
-          , deb_version = DebianVersions.DebVersion.Bullseye
+          , deb_version = DebianVersions.DebVersion.Bookworm
           }
 
 let dirtyWhen =
@@ -75,15 +75,15 @@ in  Pipeline.build
             , commands =
                 RunInToolchain.runInToolchain
                   RunInToolchain.Config::{
-                  , image = ContainerImages.minaToolchainBullseye.amd64
+                  , image = ContainerImages.minaToolchainBookworm.amd64
                   , innerScript =
                       ''
                       ./buildkite/scripts/tests/debian-automode-transition-test.sh \
-                        --codename bullseye \
+                        --codename bookworm \
                         --network mainnet
                       ''
                   }
-            , label = "Debian automode transition test (bullseye, mainnet)"
+            , label = "Debian automode transition test (bookworm, mainnet)"
             , key = "debian-automode-transition-test-mainnet"
             , target = Size.Large
             , docker = None Docker.Type

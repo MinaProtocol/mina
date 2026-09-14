@@ -64,7 +64,7 @@ let Spec =
           }
       , default =
           { codenames =
-            [ { DebVersion = DebianVersions.DebVersion.Bullseye
+            [ { DebVersion = DebianVersions.DebVersion.Bookworm
               , Arch = Arch.Type.Amd64
               }
             ]
