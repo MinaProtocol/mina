@@ -227,9 +227,8 @@ let daemon_command ~genesis_constants ~constraint_constants =
          loop ~consecutive_failures:0 ) )
 
 let () =
-  let (module G) = Genesis_constants.profiled () in
-  let genesis_constants = G.genesis_constants in
-  let constraint_constants = G.constraint_constants in
+  let genesis_constants = Genesis_constants.Compiled.genesis_constants in
+  let constraint_constants = Genesis_constants.Compiled.constraint_constants in
   Command_unix.run
     (Command.group
        ~summary:

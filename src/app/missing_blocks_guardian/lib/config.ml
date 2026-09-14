@@ -111,7 +111,7 @@ let resolve_archive_uri (flags : flags) =
       in
       match (user, password, host, port, db) with
       | Some user, Some password, Some host, Some port, Some db -> (
-          match Int.of_string_opt port with
+          match Option.try_with (fun () -> Int.of_string port) with
           | None ->
               Or_error.errorf "DB_PORT must be a port number, but it is %S" port
           | Some port ->
@@ -179,10 +179,10 @@ let resolve ~requires_blocks (flags : flags) =
       let missing =
         List.filter_opt
           [ ( if Option.is_none blocks_url then
-                Some "--precomputed-blocks-url (or PRECOMPUTED_BLOCKS_URL)"
-              else None )
+              Some "--precomputed-blocks-url (or PRECOMPUTED_BLOCKS_URL)"
+            else None )
           ; ( if Option.is_none network then Some "--network (or MINA_NETWORK)"
-              else None )
+            else None )
           ]
       in
       match blocks_url with
@@ -207,7 +207,7 @@ let resolve ~requires_blocks (flags : flags) =
         | Some raw -> (
             (* Reject a TIMEOUT that is not a number rather than silently
                falling back to the default poll interval. *)
-            match Float.of_string_opt raw with
+            match Option.try_with (fun () -> Float.of_string raw) with
             | Some seconds ->
                 Ok seconds
             | None ->
