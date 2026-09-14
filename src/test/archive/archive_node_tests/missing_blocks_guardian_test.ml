@@ -57,9 +57,9 @@ module Mock_bucket = struct
       Cohttp_async.Server.create_expert
         ~on_handler_error:
           (`Call
-             (fun _net exn ->
-               [%log warn] "Mock bucket handler error: $error"
-                 ~metadata:[ ("error", `String (Exn.to_string exn)) ] ) )
+            (fun _net exn ->
+              [%log warn] "Mock bucket handler error: $error"
+                ~metadata:[ ("error", `String (Exn.to_string exn)) ] ) )
         Async.Tcp.Where_to_listen.of_port_chosen_by_os
         (fun ~body:_ _sock _req ->
           let%map response =

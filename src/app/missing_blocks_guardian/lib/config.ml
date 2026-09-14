@@ -85,71 +85,10 @@ let obsolete_env_vars_in_use () =
 
 let flag_or_env flag env_name = Option.first_some flag (env env_name)
 
-(** Build the archive URI. Preferred sources, in order: [--archive-uri], then
-    [PG_CONN], then the five [DB_*] and [PGPASSWORD] variables the bash
-    guardian assembled the connection string from. *)
-let resolve_archive_uri (flags : flags) =
-  match flag_or_env flags.archive_uri "PG_CONN" with
-  | Some uri ->
-      Ok (Uri.of_string uri)
-  | None -> (
-      let user = env "DB_USERNAME" in
-      let password = env "PGPASSWORD" in
-      let host = env "DB_HOST" in
-      let port = env "DB_PORT" in
-      let db = env "DB_NAME" in
-      let missing =
-        List.filter_map
-          [ ("DB_USERNAME", user)
-          ; ("PGPASSWORD", password)
-          ; ("DB_HOST", host)
-          ; ("DB_PORT", port)
-          ; ("DB_NAME", db)
-          ]
-          ~f:(fun (name, value) ->
-            if Option.is_none value then Some name else None )
-      in
-      match (user, password, host, port, db) with
-      | Some user, Some password, Some host, Some port, Some db -> (
-          match Option.try_with (fun () -> Int.of_string port) with
-          | None ->
-              Or_error.errorf "DB_PORT must be a port number, but it is %S" port
-          | Some port ->
-              Ok
-                (Uri.make ~scheme:"postgres"
-                   ~userinfo:(user ^ ":" ^ password)
-                   ~host ~port ~path:("/" ^ db) () ) )
-      | _ ->
-          Or_error.errorf
-            "no archive database to connect to. Pass --archive-uri, or set \
-             PG_CONN, or set all of DB_USERNAME, PGPASSWORD, DB_HOST, DB_PORT \
-             and DB_NAME (unset: %s)"
-            (String.concat ~sep:", " missing) )
-
-(* Query parameters a libpq connection URI may carry a secret in.  The
-   PostgreSQL driver accepts them, so they can appear in PG_CONN. *)
-let secret_query_params = [ "password"; "sslpassword" ]
-
-(** The connection string with every secret replaced, safe to log.  A libpq
-    URI can hold the password in the userinfo or in the query string, so both
-    are covered. *)
-let redacted_archive_uri uri =
-  let uri =
-    match Uri.password uri with
-    | None ->
-        uri
-    | Some _ ->
-        Uri.with_password uri (Some "REDACTED")
-  in
-  let query =
-    List.map (Uri.query uri) ~f:(fun (key, values) ->
-        if
-          List.mem secret_query_params (String.lowercase key)
-            ~equal:String.equal
-        then (key, List.map values ~f:(fun _ -> "REDACTED"))
-        else (key, values) )
-  in
-  Uri.to_string (Uri.with_query uri query)
+(* The connection URI and its redaction live in {!Archive_uri}: how a libpq
+   URI is shaped is a separate concern from which flag or variable a setting
+   comes from. *)
+let redacted_archive_uri = Archive_uri.redacted
 
 let positive_span name value =
   if Float.( > ) value 0. then Ok (Time_ns.Span.of_sec value)
@@ -161,7 +100,7 @@ let non_negative name value =
 
 let resolve ~requires_blocks (flags : flags) =
   let open Or_error.Let_syntax in
-  let%bind archive_uri = resolve_archive_uri flags in
+  let%bind archive_uri = Archive_uri.resolve ~flag:flags.archive_uri ~env in
   let%bind format =
     match flag_or_env flags.block_format "BLOCKS_FORMAT" with
     | None ->
@@ -383,13 +322,6 @@ let%test_module "config" =
       | Error _ ->
           false
 
-    let%test "the password is not in the redacted URI" =
-      let redacted =
-        redacted_archive_uri (Uri.of_string "postgres://u:hunter2@h:5432/db")
-      in
-      (not (String.is_substring redacted ~substring:"hunter2"))
-      && String.is_substring redacted ~substring:"REDACTED"
-
     let%test "a URI without a password is left alone" =
       String.equal
         (redacted_archive_uri (Uri.of_string "postgres://u@h:5432/db"))
@@ -430,16 +362,6 @@ let%test_module "config" =
              archive_uri = Some "postgres://u:p@h:5432/archive"
            ; interval = Some 0.
            } )
-
-    let%test "a query-string password is redacted too" =
-      let redacted =
-        redacted_archive_uri
-          (Uri.of_string
-             "postgres://u@h:5432/db?password=hunter2&sslmode=require" )
-      in
-      (not (String.is_substring redacted ~substring:"hunter2"))
-      && String.is_substring redacted ~substring:"REDACTED"
-      && String.is_substring redacted ~substring:"sslmode=require"
 
     let%test "an unknown block format is rejected" =
       Or_error.is_error

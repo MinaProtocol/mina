@@ -36,9 +36,7 @@ let is_complete t = List.is_empty t.unresolved
 
 let describe_state pool ~logger ~when_ =
   match%map
-    Mina_caqti.Pool.use
-      (fun db -> Sql.Max_block_height.run db ())
-      pool
+    Mina_caqti.Pool.use (fun db -> Sql.Max_block_height.run db ()) pool
   with
   | Ok height ->
       [%log info] "Archive state $when: the highest block height is $height"
@@ -88,9 +86,7 @@ let dry_run (config : Config.t) ~pool ~source ~network ~logger =
                     ] ;
                 None
             | Error failure ->
-                let reason =
-                  Error.to_string_hum (Block_source.error_of_failure failure)
-                in
+                let reason = Error.to_string_hum failure in
                 [%log error]
                   "Dry run: the parent of $state_hash cannot be fetched: \
                    $reason"
@@ -172,8 +168,7 @@ let backfill (config : Config.t) ~pool ~source ~network ~logger
              branch at the bottom would otherwise hide every gap above it. *)
           match fetched with
           | Error failure ->
-              set_aside_with
-                (Error.to_string_hum (Block_source.error_of_failure failure))
+              set_aside_with (Error.to_string_hum failure)
           | Ok json -> (
               let%bind.Deferred ingested =
                 Ingest.add ~format:config.format ~pool ~logger
