@@ -1,0 +1,5 @@
+{ Type = { exit_status : Optional (./properties/exit_status/Type ) 
+} 
+, default = { exit_status = None ((./properties/exit_status/Type )) 
+} 
+}

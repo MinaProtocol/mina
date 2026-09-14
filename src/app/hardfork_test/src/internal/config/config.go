@@ -2,9 +2,16 @@ package config
 
 import (
 	"fmt"
+	"math/rand"
 	"os"
+	"path/filepath"
 	"time"
 )
+
+// WARN: ensure we're always using the same consensus param here and in mina-local-network!
+// TODO: make these configurable
+const ProtocolK = 10
+const ProtocolSlotPerEpoch = 48
 
 // Config represents the application configuration parameters
 type Config struct {
@@ -34,9 +41,8 @@ type Config struct {
 	MainSlot int
 	ForkSlot int
 
-	// Delay before genesis slot in minutes
-	MainDelay int
-	ForkDelay int
+	MainDelayMin int
+	HfSlotDelta  int
 
 	// Configuration for network sizes
 	NumWhales int
@@ -60,7 +66,11 @@ type Config struct {
 	UserCommandCheckMaxIterations int // Max iterations to check for user commands in blocks
 	ForkEarliestBlockMaxRetries   int // Max retries to wait for earliest block in fork network
 	HTTPClientTimeoutSeconds      int // HTTP client timeout for GraphQL requests
-	GraphQLMaxRetries             int // Max number of retries for GraphQL requests
+	ClientMaxRetries              int // Max number of retries for client requests
+
+	ForkMethods ForkMethodSet
+
+	DaemonInfos []DaemonInfo
 }
 
 // DefaultConfig returns the default configuration with values
@@ -72,14 +82,14 @@ func DefaultConfig() *Config {
 		BestChainQueryFrom:            25,
 		MainSlot:                      30,
 		ForkSlot:                      30,
-		MainDelay:                     8,
-		ForkDelay:                     8,
+		MainDelayMin:                  7,
+		HfSlotDelta:                   30, // if this is too small and fork network is spawned after fork genesis, it'll fail to create any block
 		NumWhales:                     2,
-		NumFish:                       1,
-		NumNodes:                      1,
-		PaymentInterval:               10,
+		NumFish:                       0,
+		NumNodes:                      0,
+		PaymentInterval:               20,
 		ShutdownTimeoutMinutes:        10,
-		PollingIntervalSeconds:        5,
+		PollingIntervalSeconds:        8,
 		ForkConfigRetryDelaySeconds:   60,
 		ForkConfigMaxRetries:          15,
 		NoNewBlocksWaitSeconds:        300, // 5 minutes
@@ -87,14 +97,132 @@ func DefaultConfig() *Config {
 		ForkEarliestBlockMaxRetries:   10,
 		HTTPClientTimeoutSeconds:      600,
 		// ^ fork config take really long time to complete (2-3 minutes)
-		GraphQLMaxRetries: 5,
+		ClientMaxRetries: 5,
 
 		SeedStartPort:        3000,
 		SnarkCoordinatorPort: 7000,
 		WhaleStartPort:       4000,
 		FishStartPort:        5000,
 		NodeStartPort:        6000,
+
+		ForkMethods: make(ForkMethodSet),
 	}
+}
+
+// TODO: ensure integrity of ports in hf-test-go and mina-local-network
+
+type PortType int
+
+const (
+	PORT_CLIENT PortType = iota
+	PORT_REST
+	PORT_EXTERNAL
+	PORT_DAEMON_METRICS
+	PORT_LIBP2P_METRICS
+)
+const PORT_PER_NODE = 6
+
+type DaemonInfo struct {
+	StartPort  int
+	Name       string
+	ForkMethod ForkMethod
+}
+
+func (d *DaemonInfo) Port(ty PortType) int {
+	return d.StartPort + int(ty)
+}
+
+func (d *DaemonInfo) NodeDirRel(root string) string {
+	return filepath.Join(root, "nodes", d.Name)
+}
+
+func (c *Config) InitDaemonInfos() {
+	result := []DaemonInfo{
+		{
+			StartPort:  c.SeedStartPort,
+			Name:       "seed",
+			ForkMethod: c.ForkMethods.RandomChoose(),
+		},
+		{
+			StartPort:  c.SnarkCoordinatorPort,
+			Name:       "snark_coordinator",
+			ForkMethod: c.ForkMethods.RandomChoose(),
+		},
+	}
+
+	for whale_id := 0; whale_id < c.NumWhales; whale_id++ {
+		result = append(result, DaemonInfo{
+			StartPort:  c.WhaleStartPort + whale_id*PORT_PER_NODE,
+			Name:       fmt.Sprintf("whale_%d", whale_id),
+			ForkMethod: c.ForkMethods.RandomChoose(),
+		})
+	}
+
+	for fish_id := 0; fish_id < c.NumFish; fish_id++ {
+		result = append(result, DaemonInfo{
+			StartPort:  c.FishStartPort + fish_id*PORT_PER_NODE,
+			Name:       fmt.Sprintf("fish_%d", fish_id),
+			ForkMethod: c.ForkMethods.RandomChoose(),
+		})
+	}
+
+	for node_id := 0; node_id < c.NumNodes; node_id++ {
+		result = append(result, DaemonInfo{
+			StartPort:  c.NodeStartPort + node_id*PORT_PER_NODE,
+			Name:       fmt.Sprintf("plain_%d", node_id),
+			ForkMethod: c.ForkMethods.RandomChoose(),
+		})
+	}
+
+	// NOTE: ensure there's at least one daemon not running in auto mode, o.w. we
+	// can't check on anything after slot-chain-end
+	allAuto := true
+	for _, info := range result {
+		if info.ForkMethod != Auto {
+			allAuto = false
+		}
+	}
+	if allAuto {
+		nonAutoForkMethods := []ForkMethod{Legacy, Advanced}
+		result[rand.Intn(len(result))].ForkMethod = nonAutoForkMethods[rand.Intn(len(nonAutoForkMethods))]
+	}
+
+	c.DaemonInfos = result
+}
+
+func (c *Config) AllDaemonSatisfying(tag string, pred func(*DaemonInfo) bool) []*DaemonInfo {
+	candidates := []*DaemonInfo{}
+	for i := range c.DaemonInfos {
+		info := &c.DaemonInfos[i]
+		if pred(info) {
+			candidates = append(candidates, info)
+		}
+	}
+	return candidates
+}
+
+func (c *Config) AnyDaemon() *DaemonInfo {
+	if len(c.DaemonInfos) == 0 {
+		panic(fmt.Sprintf("No daemon is in network!"))
+	}
+	return &c.DaemonInfos[rand.Intn(len(c.DaemonInfos))]
+}
+
+func (c *Config) AnyDaemonSatisfying(tag string, pred func(*DaemonInfo) bool) *DaemonInfo {
+	candidates := c.AllDaemonSatisfying(tag, pred)
+	if len(candidates) == 0 {
+		panic(fmt.Sprintf("No daemon satify condition %s!", tag))
+	}
+	return candidates[rand.Intn(len(candidates))]
+}
+
+func (c *Config) ForkGenesisTsGivenMainGenesisTs(mainGenesisTs int64) int64 {
+	forkGenesisSlot := c.SlotChainEnd + c.HfSlotDelta
+	return mainGenesisTs + int64(forkGenesisSlot*c.MainSlot)
+}
+
+func (c *Config) MainSlotChainEnd(mainGenesisTs int64) time.Time {
+	return time.Unix(mainGenesisTs+int64(c.SlotChainEnd*c.MainSlot), 0)
 }
 
 // Validate checks if the configuration is valid
@@ -143,7 +271,7 @@ func (c *Config) Validate() error {
 // FormatTimestamp formats a UNIX timestamp into the format used by the shell script
 func FormatTimestamp(unixTs int64) string {
 	t := time.Unix(unixTs, 0).UTC()
-	return t.Format("2006-01-02 15:04:05+00:00")
+	return t.Format(time.RFC3339)
 }
 
 // validateExecutable checks if a file exists and has executable permissions

@@ -453,13 +453,13 @@ end
 module Account = struct
   [%%versioned
   module Stable = struct
-    module V2 = struct
-      type t = Mina_wire_types.Mina_base.Zkapp_precondition.Account.V2.t =
+    module V3 = struct
+      type t = Mina_wire_types.Mina_base.Zkapp_precondition.Account.V3.t =
         { balance : Balance.Stable.V1.t Numeric.Stable.V1.t
         ; nonce : Account_nonce.Stable.V1.t Numeric.Stable.V1.t
         ; receipt_chain_hash : Receipt.Chain_hash.Stable.V1.t Hash.Stable.V1.t
         ; delegate : Public_key.Compressed.Stable.V1.t Eq_data.Stable.V1.t
-        ; state : F.Stable.V1.t Eq_data.Stable.V1.t Zkapp_state.V.Stable.V1.t
+        ; state : F.Stable.V1.t Eq_data.Stable.V1.t Zkapp_state.V.Stable.V2.t
         ; action_state : F.Stable.V1.t Eq_data.Stable.V1.t
         ; proved_state : bool Eq_data.Stable.V1.t
         ; is_new : bool Eq_data.Stable.V1.t
@@ -1174,9 +1174,9 @@ module Protocol_state = struct
       let epoch_data
           ({ ledger; seed; start_checkpoint; lock_checkpoint; epoch_length } :
             _ Epoch_data.Poly.t ) (t : _ Epoch_data.Poly.t) =
-        ignore seed ;
         epoch_ledger ledger t.ledger
-        @ [ Hash.(check_checked Tc.state_hash)
+        @ [ Hash.(check_checked Tc.epoch_seed) seed t.seed
+          ; Hash.(check_checked Tc.state_hash)
               start_checkpoint t.start_checkpoint
           ; Hash.(check_checked Tc.state_hash) lock_checkpoint t.lock_checkpoint
           ; Numeric.(Checked.check Tc.length) epoch_length t.epoch_length
@@ -1294,7 +1294,7 @@ module Protocol_state = struct
           _ Epoch_data.Poly.t ) (t : _ Epoch_data.Poly.t) =
       let l s = sprintf "%s_%s" label s in
       let%bind () = epoch_ledger ledger t.ledger in
-      ignore seed ;
+      let%bind () = Hash.(check ~label:(l "seed") Tc.epoch_seed) seed t.seed in
       let%bind () =
         Hash.(check ~label:(l "start_check_point") Tc.state_hash)
           start_checkpoint t.start_checkpoint
@@ -1499,9 +1499,9 @@ module Other = struct
 
   [%%versioned
   module Stable = struct
-    module V2 = struct
+    module V3 = struct
       type t =
-        ( Account.Stable.V2.t
+        ( Account.Stable.V3.t
         , Account_state.Stable.V1.t Transition.Stable.V1.t
         , F.Stable.V1.t Hash.Stable.V1.t )
         Poly.Stable.V1.t
@@ -1574,11 +1574,11 @@ end
 
 [%%versioned
 module Stable = struct
-  module V2 = struct
+  module V3 = struct
     type t =
-      ( Account.Stable.V2.t
+      ( Account.Stable.V3.t
       , Protocol_state.Stable.V1.t
-      , Other.Stable.V2.t
+      , Other.Stable.V3.t
       , Public_key.Compressed.Stable.V1.t Eq_data.Stable.V1.t )
       Poly.Stable.V1.t
     [@@deriving sexp, equal, yojson, hash, compare]

@@ -13,7 +13,11 @@
     -o
     %{target}.gz
     https://storage.googleapis.com/o1labs-ci-test-data/precomputed-blocks/hetzner-itn-1-1795-3NL9Vn7Rg1mz8cS1gVxFkVPsjESG1Zu1XRpMLRQAz3W24hctRoD6.json.gz)
-   (run gzip -d %{target}.gz))))
+   (run gzip -d %{target}.gz)
+   ; It seems unreasonable to regenerate the whole json to increment the version number
+   ; Once less trivial changes are added we should regenerate it and fix the version number
+   (run sed -i s/3/4/ %{target})
+   )))
 
 (rule
  (enabled_if

@@ -2,6 +2,9 @@
 -- Mina migration: from berkeley to mesa
 -- + extend zkapp_states_nullable with element8..element31 (int)
 -- + extend zkapp_states with element8..element31 (int)
+-- + drop UNIQUE/index on zkapp_{events,field_array}.element_ids (btree overflow
+--   for max-cost zkApps); these rows are no longer content-deduplicated
+-- + make zkapp_account_update_body.events_id/actions_id nullable (NULL = empty)
 -- + record status in migration_history
 -- =============================================================================
 
@@ -18,7 +21,7 @@ SET archive.current_protocol_version = '3.0.0';
 -- Post-HF protocol version. This one corresponds to Mesa, specifically
 SET archive.target_protocol_version = '4.0.0';
 -- The version of this script. If you modify the script, please bump the version
-SET archive.migration_version = '0.0.5';
+SET archive.migration_version = '0.0.6';
 
 -- TODO: put below in a common script
 
@@ -90,7 +93,7 @@ BEGIN
         ) VALUES (
             target_protocol_version,
             target_migration_version,
-            'Upgrade from Berkeley to Mesa. Add {zkapp_states,zkapp_states_nullable}.element8..element31 (int)',
+            'Upgrade from Berkeley to Mesa. Add {zkapp_states,zkapp_states_nullable}.element8..element31 (int); drop zkapp_{events,field_array}.element_ids UNIQUE/index (no dedup); make zkapp_account_update_body.{events_id,actions_id} nullable (NULL=empty)',
             'starting'::migration_status
         );
     ELSIF 
@@ -238,6 +241,18 @@ SELECT pg_temp.add_zkapp_states_element(28);
 SELECT pg_temp.add_zkapp_states_element(29);
 SELECT pg_temp.add_zkapp_states_element(30);
 SELECT pg_temp.add_zkapp_states_element(31);
+
+-- 3b. Drop the UNIQUE constraint + standalone btree index on the unbounded int[]
+-- element_ids columns: a btree key over a ~1024-element array exceeds Postgres'
+-- 2704-byte limit, failing inserts for max-cost zkApps. These rows are no longer
+-- content-deduplicated. Also make events_id/actions_id nullable so an empty
+-- events/actions list is stored as NULL (no zkapp_events row). All idempotent.
+ALTER TABLE zkapp_field_array DROP CONSTRAINT IF EXISTS zkapp_field_array_element_ids_key;
+DROP INDEX IF EXISTS idx_zkapp_field_array_element_ids;
+ALTER TABLE zkapp_events DROP CONSTRAINT IF EXISTS zkapp_events_element_ids_key;
+DROP INDEX IF EXISTS idx_zkapp_events_element_ids;
+ALTER TABLE zkapp_account_update_body ALTER COLUMN events_id DROP NOT NULL;
+ALTER TABLE zkapp_account_update_body ALTER COLUMN actions_id DROP NOT NULL;
 
 -- 4. Update schema_history
 

@@ -13,7 +13,8 @@ curl -L "$LEDGER_URL" | tar -x -C "$LEDGER_DIR"
 
 chmod 700 "$LEDGER_DIR"
 
-sudo apt-get update
+./buildkite/scripts/debian/update.sh
+
 sudo apt-get install -y python3
 
 ./scripts/rosetta/test-block-race.sh \

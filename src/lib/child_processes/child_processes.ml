@@ -102,10 +102,11 @@ let get_mina_binary () =
     Deferred.Or_error.return
       (Unix.getpid () |> Pid.to_int |> sprintf "/proc/%d/exe")
 
-(* Check the PID file, and if it exists and corresponds to a currently running
-   process, kill that process. This runs when the daemon starts, and should
-   *not* be used to kill a process that was started during this run of the
-   daemon.
+(** Check the PID file and delete it. This method does not currently attempt to
+    kill the process that created it; we rely on the child exiting on its own in
+    a timely fashion after the daemon exits if the daemon happened to shut down
+    in a disorderly fashion. Once the lock file scheme used in this library is
+    replaced with something more robust, this cleanup can be done safely.
 *)
 let maybe_kill_and_unlock : string -> Filename.t -> Logger.t -> unit Deferred.t
     =
@@ -139,24 +140,33 @@ let maybe_kill_and_unlock : string -> Filename.t -> Logger.t -> unit Deferred.t
       | Some pid ->
           [%log debug] "Found PID file for %s %s with contents %s" name lockpath
             pid_str ;
+          (* Temporarily disable cleaning up the old process - because of PID
+             reuse, it is unsafe to try killing the process with PID in the lock
+             file. TODO: rely on the child to create the lock file and keep it
+             open as long as it runs, and replace reading the PID from the file
+             and calling [Signal.send] with the linux syscalls pidfd_open and
+             pidfd_send_signal, if possible. *)
+          let try_killing_previous_instance = false in
           let%bind () =
-            match Signal.send Signal.term (`Pid pid) with
-            | `No_such_process ->
-                [%log debug] "Couldn't kill %s with PID %s, does not exist" name
-                  pid_str ;
-                Deferred.unit
-            | `Ok -> (
-                [%log debug] "Successfully sent TERM signal to %s (%s)" name
-                  pid_str ;
-                let%map () = after (Time.Span.of_sec 0.5) in
-                match Signal.send Signal.kill (`Pid pid) with
-                | `No_such_process ->
-                    ()
-                | `Ok ->
-                    [%log error]
-                      "helper process %s (%s) didn't die after being sent \
-                       TERM, KILLed it"
-                      name pid_str )
+            if try_killing_previous_instance then
+              match Signal.send Signal.term (`Pid pid) with
+              | `No_such_process ->
+                  [%log debug] "Couldn't kill %s with PID %s, does not exist"
+                    name pid_str ;
+                  Deferred.unit
+              | `Ok -> (
+                  [%log debug] "Successfully sent TERM signal to %s (%s)" name
+                    pid_str ;
+                  let%map () = after (Time.Span.of_sec 0.5) in
+                  match Signal.send Signal.kill (`Pid pid) with
+                  | `No_such_process ->
+                      ()
+                  | `Ok ->
+                      [%log error]
+                        "helper process %s (%s) didn't die after being sent \
+                         TERM, KILLed it"
+                        name pid_str )
+            else Deferred.unit
           in
           try_cleanup_lock_file ~pid_metadata:(`Int (Pid.to_int pid)) () )
   | `Unknown | `No ->
@@ -424,29 +434,31 @@ let%test_module _ =
           assert (Option.is_some @@ termination_status process) ;
           Deferred.unit )
 
-    let%test_unit "if you spawn two processes it kills the earlier one" =
-      async_with_temp_dir (fun conf_dir ->
-          let open Deferred.Let_syntax in
-          let mk_process () =
-            start_custom ~logger ~name ~git_root_relative_path ~conf_dir
-              ~args:[ "loop" ] ~stdout:`Chunks ~stderr:`Chunks
-              ~termination:`Ignore ()
-          in
-          let%bind process1 =
-            mk_process () |> Deferred.map ~f:Or_error.ok_exn
-          in
-          let%bind process2 =
-            mk_process () |> Deferred.map ~f:Or_error.ok_exn
-          in
-          let%bind () = after process_wait_timeout in
-          [%test_eq: Unix.Exit_or_signal.t Or_error.t option]
-            (termination_status process1)
-            (Some (Ok (Error (`Signal Core.Signal.term)))) ;
-          [%test_eq: Unix.Exit_or_signal.t Or_error.t option]
-            (termination_status process2)
-            None ;
-          let%bind _ = kill process2 in
-          Deferred.unit )
+    (* Temporarily disabled until maybe_kill_and_unlock and the child
+       process lock file scheme are fixed *)
+    (* let%test_unit "if you spawn two processes it kills the earlier one" =
+       async_with_temp_dir (fun conf_dir ->
+           let open Deferred.Let_syntax in
+           let mk_process () =
+             start_custom ~logger ~name ~git_root_relative_path ~conf_dir
+               ~args:[ "loop" ] ~stdout:`Chunks ~stderr:`Chunks
+               ~termination:`Ignore ()
+           in
+           let%bind process1 =
+             mk_process () |> Deferred.map ~f:Or_error.ok_exn
+           in
+           let%bind process2 =
+             mk_process () |> Deferred.map ~f:Or_error.ok_exn
+           in
+           let%bind () = after process_wait_timeout in
+           [%test_eq: Unix.Exit_or_signal.t Or_error.t option]
+             (termination_status process1)
+             (Some (Ok (Error (`Signal Core.Signal.term)))) ;
+           [%test_eq: Unix.Exit_or_signal.t Or_error.t option]
+             (termination_status process2)
+             None ;
+           let%bind _ = kill process2 in
+           Deferred.unit ) *)
 
     let%test_unit "if the lockfile already exists, then it would be cleaned" =
       async_with_temp_dir (fun conf_dir ->

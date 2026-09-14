@@ -82,12 +82,13 @@ The Rosetta API test suite consists of four main scripts that work together to p
 
 **Usage**:
 ```bash
-./rosetta-sanity.sh [--network mainnet|devnet] [--address <address>] [--wait-for-sync] [--timeout <seconds>]
+./rosetta-sanity.sh [--network mainnet|devnet] [--address <address>] [--daemon-graphql-address <address>] [--wait-for-sync] [--timeout <seconds>]
 ```
 
 **Command-line Options**:
 - `--network`: Target network (mainnet or devnet, default: mainnet)
 - `--address`: Override Rosetta API endpoint address
+- `--daemon-graphql-address`: Override daemon GraphQL endpoint address (default: http://localhost:3085/graphql)
 - `--wait-for-sync`: Wait for Rosetta to sync before running tests
 - `--timeout`: Sync timeout in seconds (default: 900)
 
@@ -124,6 +125,9 @@ The Rosetta API test suite consists of four main scripts that work together to p
 
 # Devnet testing with custom endpoint
 ./rosetta-sanity.sh --network devnet --address http://localhost:3087
+
+# Testing with custom Rosetta and daemon endpoints
+./rosetta-sanity.sh --network devnet --address http://localhost:3087 --daemon-graphql-address http://localhost:3085/graphql
 
 # Wait for sync before testing
 ./rosetta-sanity.sh --network mainnet --wait-for-sync --timeout 1200
@@ -283,7 +287,7 @@ The script loads realistic test data from the archive database:
 ./rosetta-connectivity.sh --tag 3.0.3-bullseye-mainnet --network mainnet --run-load-test
 
 # Custom timeout for slow environments
-./rosetta-connectivity.sh --tag 3.0.3-bullseye-testnet-generic --timeout 1800
+./rosetta-connectivity.sh --tag 3.0.3-bullseye-devnet-generic --timeout 1800
 ```
 
 ## Integration and Dependencies

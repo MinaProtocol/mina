@@ -1,4 +1,12 @@
-(** Pending_coinbase is to keep track of all the coinbase transactions that have been applied to the ledger but for which there is no ledger proof yet. Every ledger proof corresponds to a sequence of coinbase transactions which is part of all the transactions it proves. Each of these sequences[Stack] are stored using the merkle tree representation. The stacks are operated in a FIFO manner by keeping track of its positions in the merkle tree. Whenever a ledger proof is emitted, the oldest stack is removed from the tree and when a new coinbase is applied, the latest stack is updated with the new coinbase.
+(** Pending_coinbase is to keep track of all the coinbase transactions that have
+    been applied to the ledger but for which there is no ledger proof yet. Every
+    ledger proof corresponds to a sequence of coinbase transactions which is
+    part of all the transactions it proves. Each of these sequences [Stack] are
+    stored using the merkle tree representation. The stacks are operated in a
+    FIFO manner by keeping track of its positions in the merkle tree. Whenever a
+    ledger proof is emitted, the oldest stack is removed from the tree and when
+    a new coinbase is applied, the latest stack is updated with the new
+    coinbase.
     The operations on the merkle tree of coinbase stacks include:
     1) adding a new singleton stack
     2) updating the latest stack when a new coinbase is added to it
@@ -6,9 +14,12 @@
 
     A stack can be either be created or modified by pushing a coinbase on to it.
 
-    This module also provides an interface for the checked computations required required to prove it in snark
+    This module also provides an interface for the checked computations required
+    required to prove it in snark
 
-    Stack operations are done for transaction snarks and tree operations are done for the blockchain snark*)
+    Stack operations are done for transaction snarks and tree operations are
+    done for the blockchain snark
+*)
 
 open Core_kernel
 open Snark_params
@@ -245,26 +256,29 @@ module type S = sig
 
   val create : depth:int -> unit -> t Or_error.t
 
-  (** Delete the oldest stack*)
+  (** Delete the oldest stack *)
   val remove_coinbase_stack : depth:int -> t -> (Stack.t * t) Or_error.t
 
-  (** Root of the merkle tree that has stacks as leaves*)
+  (** Root of the merkle tree that has stacks as leaves *)
   val merkle_root : t -> Hash.t
 
   val handler :
     depth:int -> t -> is_new_stack:bool -> (request -> response) Staged.t
 
-  (** Update the current working stack or if [is_new_stack] add as the new working stack*)
+  (** Update the current working stack or if [is_new_stack] add as the new
+      working stack *)
   val update_coinbase_stack :
     depth:int -> t -> Stack.t -> is_new_stack:bool -> t Or_error.t
 
-  (** Stack that is currently being updated. if [is_new_stack] then a new stack is returned*)
+  (** Stack that is currently being updated. if [is_new_stack] then a new stack
+      is returned *)
   val latest_stack : t -> is_new_stack:bool -> Stack.t Or_error.t
 
-  (** The stack that corresponds to the next ledger proof that is to be generated*)
+  (** The stack that corresponds to the next ledger proof that is to be
+      generated *)
   val oldest_stack : t -> Stack.t Or_error.t
 
-  (** Hash of the auxiliary data (everything except the merkle root (Hash.t))*)
+  (** Hash of the auxiliary data (everything except the merkle root (Hash.t)) *)
   val hash_extra : t -> string
 
   module Checked : sig
@@ -294,9 +308,11 @@ module type S = sig
     val get : depth:int -> var -> Address.var -> Stack.var Tick.Checked.t
 
     (**
-       [update_stack t ~is_new_stack updated_stack] implements the following spec:
+       [update_stack t ~is_new_stack updated_stack] implements the following
+       spec:
        - gets the address[addr] of the latest stack or a new stack
-       - finds a coinbase stack in [t] at path [addr] and pushes the coinbase_data on to the stack
+       - finds a coinbase stack in [t] at path [addr] and pushes the
+         coinbase_data on to the stack
        - returns a root [t'] of the tree
     *)
     val add_coinbase :
@@ -313,7 +329,8 @@ module type S = sig
        [pop_coinbases t pk updated_stack] implements the following spec:
 
        - gets the address[addr] of the oldest stack.
-       - finds a coinbase stack in [t] at path [addr] and replaces it with empty stack if a [proof_emitted] is true
+       - finds a coinbase stack in [t] at path [addr] and replaces it with empty
+         stack if a [proof_emitted] is true
        - returns a root [t'] of the tree
     *)
     val pop_coinbases :

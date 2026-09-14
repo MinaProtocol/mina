@@ -44,7 +44,7 @@ let DepsSpec =
           }
       , default =
           { deb_version = DebVersion.Bullseye
-          , network = Network.Type.TestnetGeneric
+          , network = Network.Type.Devnet
           , profile = Profiles.Type.Devnet
           , build_flag = BuildFlags.Type.None
           , step = "build"
@@ -87,6 +87,7 @@ let minimalDirtyWhen =
       , S.strictlyStart (S.contains "scripts/rosetta")
       , S.exactly "scripts/rosetta/test-block-race" "sh"
       , S.exactly "scripts/version-linter" "py"
+      , S.strictlyStart (S.contains "src/test")
       , S.exactly
           "buildkite/scripts/version-linter-patch-missing-type-shapes"
           "sh"
@@ -113,10 +114,13 @@ let dirtyWhen =
             }
             debVersion
 
+let overrideEnvs = [ "OVERRIDE_TAG", "OVERRIDE_GITHASH", "SKIP_GITBRANCH" ]
+
 in  { DebVersion = DebVersion
     , capitalName = capitalName
     , lowerName = lowerName
     , dependsOn = dependsOn
     , dirtyWhen = dirtyWhen
     , DepsSpec = DepsSpec
+    , overrideEnvs = overrideEnvs
     }

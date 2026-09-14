@@ -2,53 +2,15 @@ package hardfork
 
 import (
 	"fmt"
-	"math/rand"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strconv"
 	"time"
 
+	"github.com/MinaProtocol/mina/src/app/hardfork_test/src/internal/client"
 	"github.com/MinaProtocol/mina/src/app/hardfork_test/src/internal/config"
 )
-
-// TODO: ensure integrity of ports in hf-test-go and mina-local-network
-
-type PortType int
-
-const (
-	PORT_CLIENT PortType = iota
-	PORT_REST
-	PORT_EXTERNAL
-	PORT_DAEMON_METRICS
-	PORT_LIBP2P_METRICS
-)
-
-func (t *HardforkTest) AllPortOfType(ty PortType) []int {
-	all_ports := []int{t.Config.SeedStartPort, t.Config.SnarkCoordinatorPort}
-
-	for i := 0; i < t.Config.NumWhales; i++ {
-		all_ports = append(all_ports, t.Config.WhaleStartPort+i*6)
-	}
-	for i := 0; i < t.Config.NumFish; i++ {
-		all_ports = append(all_ports, t.Config.FishStartPort+i*6)
-	}
-
-	for i := 0; i < t.Config.NumNodes; i++ {
-		all_ports = append(all_ports, t.Config.NodeStartPort+i*6)
-	}
-	for i := range all_ports {
-		all_ports[i] += int(ty)
-	}
-	return all_ports
-}
-
-func (t *HardforkTest) AnyPortOfType(ty PortType) int {
-	candidates_ports := t.AllPortOfType(ty)
-
-	idx := rand.Intn(len(candidates_ports))
-	return candidates_ports[idx]
-}
 
 func (t *HardforkTest) startLocalNetwork(minaExecutable string, profile string, extraArgs []string) (*exec.Cmd, error) {
 
@@ -64,7 +26,7 @@ func (t *HardforkTest) startLocalNetwork(minaExecutable string, profile string, 
 		"--whales", strconv.Itoa(t.Config.NumWhales),
 		"--fish", strconv.Itoa(t.Config.NumFish),
 		"--nodes", strconv.Itoa(t.Config.NumNodes),
-		"--log-level", "Error",
+		"--log-level", "Info",
 		"--file-log-level", "Trace",
 		"--value-transfer-txns",
 		"--transaction-interval", strconv.Itoa(t.Config.PaymentInterval),
@@ -90,55 +52,36 @@ func (t *HardforkTest) startLocalNetwork(minaExecutable string, profile string, 
 }
 
 // RunMainNetwork starts the main network
-func (t *HardforkTest) RunMainNetwork(mainGenesisTs int64) (*exec.Cmd, error) {
+func (t *HardforkTest) RunMainNetwork(extraFilesRoot string, mainGenesisTs int64) (*exec.Cmd, error) {
 
 	mainGenesisTimestamp := config.FormatTimestamp(mainGenesisTs)
 
-	return t.startLocalNetwork(t.Config.MainMinaExe, "main", []string{
+	args := []string{
 		"--update-genesis-timestamp", fmt.Sprintf("fixed:%s", mainGenesisTimestamp),
 		"--config", "reset",
 		"--override-slot-time", strconv.Itoa(t.Config.MainSlot * 1000),
 		"--slot-transaction-end", strconv.Itoa(t.Config.SlotTxEnd),
 		"--slot-chain-end", strconv.Itoa(t.Config.SlotChainEnd),
-	})
+		"--hardfork-genesis-slot-delta", strconv.Itoa(t.Config.HfSlotDelta),
+		"--extra-files-root", extraFilesRoot,
+	}
+
+	return t.startLocalNetwork(t.Config.MainMinaExe, "main", args)
 }
 
 // RunForkNetwork starts the fork network with hardfork configuration
-func (t *HardforkTest) RunForkNetwork(configFile, forkLedgersDir string) (*exec.Cmd, error) {
+func (t *HardforkTest) RunForkNetwork() (*exec.Cmd, error) {
 	return t.startLocalNetwork(t.Config.ForkMinaExe, "fork", []string{
-		"--update-genesis-timestamp", fmt.Sprintf("delay_sec:%d", t.Config.ForkDelay*60),
-		"--config", fmt.Sprintf("inherit_with:%s,%s", configFile, forkLedgersDir),
+		"--config", "inherit",
 		"--override-slot-time", strconv.Itoa(t.Config.ForkSlot * 1000)},
 	)
 }
 
-// WaitForBlockHeight waits until the specified block height is reached
-func (t *HardforkTest) WaitForBlockHeight(port int, minHeight int, timeout time.Duration) error {
-	deadline := time.Now().Add(timeout)
-
-	for time.Now().Before(deadline) {
-		height, err := t.Client.GetHeight(port)
-		if err != nil {
-			t.Logger.Debug("Failed to get block height: %v", err)
-			time.Sleep(time.Duration(t.Config.PollingIntervalSeconds) * time.Second)
-			continue
-		}
-
-		if height >= minHeight {
-			return nil
-		}
-
-		time.Sleep(time.Duration(t.Config.PollingIntervalSeconds) * time.Second)
-	}
-
-	return fmt.Errorf("timed out waiting for block height >= %d", minHeight)
-}
-
 // WaitUntilBestChainQuery calculates and waits until it's time to query the best chain
-func (t *HardforkTest) WaitUntilBestChainQuery(slotDurationSec int, chainStartDelaySec int) {
-	sleepDuration := time.Duration(slotDurationSec*t.Config.BestChainQueryFrom)*time.Second +
-		time.Duration(chainStartDelaySec*60)*time.Second
-
-	t.Logger.Info("Sleeping for %v until best chain query...", sleepDuration)
-	time.Sleep(sleepDuration)
+func (t *HardforkTest) WaitUntilBestChainQuery(slotDurationSec int, genesisSlot int) {
+	t.WaitForBestTip(t.Config.AnyDaemon().Port(config.PORT_REST), func(block client.BlockData) bool {
+		return block.Slot >= t.Config.BestChainQueryFrom+genesisSlot
+	}, fmt.Sprintf("best tip reached slot %d", t.Config.BestChainQueryFrom),
+		time.Duration(2*t.Config.BestChainQueryFrom*slotDurationSec)*time.Second,
+	)
 }

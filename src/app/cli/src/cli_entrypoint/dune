@@ -4,22 +4,23 @@
  (modes native)
  (libraries
   ;;opam libraries
-  stdio
+  async
   async_kernel
   async_unix
+  async.async_command
   base
-  core_kernel
-  core
+  base.caml
   bin_prot
   bin_prot.shape
-  init
-  async
+  core_kernel
+  core
   core.daemon
-  base.caml
-  uri
-  async.async_command
+  init
+  memtrace
   result
   sexplib0
+  stdio
+  uri
   ;;local libraries
   verifier
   ledger_proof

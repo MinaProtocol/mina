@@ -22,7 +22,7 @@ type ForkConfigData struct {
 // ExtractForkConfig extracts the fork configuration from the network
 func (t *HardforkTest) GetForkConfig(port int) ([]byte, error) {
 	for attempt := 1; attempt <= t.Config.ForkConfigMaxRetries; attempt++ {
-		forkConfig, err := t.Client.GetForkConfig(port)
+		forkConfig, err := t.Client.ForkConfig(port)
 		if err != nil {
 			t.Logger.Error("Failed to get fork config: %v", err)
 			continue
@@ -30,6 +30,7 @@ func (t *HardforkTest) GetForkConfig(port int) ([]byte, error) {
 		forkConfigBytes := []byte(forkConfig.Raw)
 
 		if !bytes.Equal(forkConfigBytes, []byte("null")) {
+			t.Logger.Info("Successfully queried fork config on node port %d", port)
 			return forkConfigBytes, nil
 		}
 
@@ -43,7 +44,7 @@ func (t *HardforkTest) GetForkConfig(port int) ([]byte, error) {
 }
 
 // CreateRuntimeConfig creates the runtime configuration for the fork
-func (t *HardforkTest) CreateRuntimeConfig(forkGenesisTimestamp, forkConfigPath, configFile, baseConfigFile, forkHashesFile string) ([]byte, error) {
+func (t *HardforkTest) PatchRuntimeConfigLegacy(forkGenesisTimestamp, forkConfigPath, configFile, baseConfigFile, forkHashesFile string) ([]byte, error) {
 	cmd := exec.Command(filepath.Join(t.ScriptDir, "create_runtime_config.sh"))
 	cmd.Env = append(os.Environ(),
 		"GENESIS_TIMESTAMP="+forkGenesisTimestamp,

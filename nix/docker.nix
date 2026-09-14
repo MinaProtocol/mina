@@ -1,7 +1,7 @@
-{ lib, dockerTools, buildEnv, ocamlPackages_mina, runCommand, dumb-init
-, coreutils, findutils, bashInteractive, python3, libp2p_helper, procps
-, postgresql, curl, jq, stdenv, rsync, bash, gnutar, gzip, currentTime
-, flockenzeit, }:
+{ lib, dockerTools, buildEnv, ocamlPackages_mina, linkFarm, runCommand
+, dumb-init, tzdata, coreutils,  findutils, bashInteractive, python3, libp2p_helper, procps
+, postgresql, curl, jq, stdenv, rsync, bash, gnutar, gzip, cacert, currentTime
+, flockenzeit }:
 let
   created = flockenzeit.lib.ISO-8601 currentTime;
 
@@ -36,31 +36,46 @@ let
     '';
   };
 
-  mkFullImage = name: packages: additional_envs:
-    dockerTools.streamLayeredImage {
-      name = "${name}-full";
-      inherit created;
-      contents = [
-        dumb-init
-        coreutils
-        findutils
-        bashInteractive
-        python3
-        libp2p_helper
-        procps
-        curl
-        jq
-      ] ++ packages;
-      extraCommands = ''
-        mkdir root tmp
-        chmod 777 tmp
-      '';
-      config = {
-        env = [ "MINA_TIME_OFFSET=0" ] ++ additional_envs;
-        WorkingDir = "/root";
-        cmd = [ "/bin/dumb-init" "/entrypoint.sh" ];
-      };
+  localtime = linkFarm "localtime" [{
+    name = "etc/localtime";
+    path = "${tzdata}/share/zoneinfo/UTC";
+  }];
+
+  zoneinfo = linkFarm "zoneinfo" [{
+    name = "usr/share/zoneinfo";
+    path = "${tzdata}/share/zoneinfo";
+  }];
+
+  mkFullImage = name: packages: dockerTools.streamLayeredImage {
+    name = "${name}-full";
+    inherit created;
+    contents = [
+      dumb-init
+      coreutils
+      findutils
+      bashInteractive
+      python3
+      libp2p_helper
+      procps
+      curl
+      jq
+      cacert
+      localtime
+      zoneinfo
+    ] ++ packages;
+    extraCommands = ''
+      mkdir root tmp
+      chmod 777 tmp
+    '';
+    config = {
+      env = [
+        "MINA_TIME_OFFSET=0"
+        "SSL_CERT_FILE=${cacert}/etc/ssl/certs/ca-bundle.crt"
+      ];
+      WorkingDir = "/root";
+      cmd = [ "/bin/dumb-init" "/entrypoint.sh" ];
     };
+  };
 in {
   mina-image-slim = dockerTools.streamLayeredImage {
     name = "mina";

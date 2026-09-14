@@ -9,15 +9,15 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/MinaProtocol/mina/src/app/hardfork_test/src/internal/client"
 	"github.com/MinaProtocol/mina/src/app/hardfork_test/src/internal/config"
-	"github.com/MinaProtocol/mina/src/app/hardfork_test/src/internal/graphql"
 	"github.com/MinaProtocol/mina/src/app/hardfork_test/src/internal/utils"
 )
 
 // HardforkTest represents the main hardfork test logic
 type HardforkTest struct {
 	Config         *config.Config
-	Client         *graphql.Client
+	Client         *client.Client
 	Logger         *utils.Logger
 	ScriptDir      string
 	runningCmds    []*exec.Cmd
@@ -29,9 +29,10 @@ type HardforkTest struct {
 // NewHardforkTest creates a new instance of the hardfork test
 func NewHardforkTest(cfg *config.Config) *HardforkTest {
 	ctx, cancel := context.WithCancel(context.Background())
+	cfg.InitDaemonInfos()
 	return &HardforkTest{
 		Config:      cfg,
-		Client:      graphql.NewClient(cfg.HTTPClientTimeoutSeconds, cfg.GraphQLMaxRetries),
+		Client:      client.NewClient(cfg.HTTPClientTimeoutSeconds, cfg.ClientMaxRetries),
 		Logger:      utils.NewLogger(),
 		ScriptDir:   cfg.ScriptDir,
 		runningCmds: make([]*exec.Cmd, 0),
@@ -60,9 +61,15 @@ func (t *HardforkTest) gracefulShutdown(cmd *exec.Cmd, processName string) {
 	case <-shutdownTimeout.C:
 		t.Logger.Info("%s process did not stop gracefully after %d minutes, forcing kill", processName, t.Config.ShutdownTimeoutMinutes)
 		cmd.Process.Kill()
-	case <-processDone:
-		t.Logger.Info("%s process stopped gracefully", processName)
+	case err := <-processDone:
 		shutdownTimeout.Stop()
+		if err != nil {
+			if exitErr, ok := err.(*exec.ExitError); ok && exitErr.ExitCode() != 0 {
+				t.Logger.Error("%s shutdown was incomplete (exit code %d), some nodes may not have been stopped cleanly", processName, exitErr.ExitCode())
+			}
+		} else {
+			t.Logger.Info("%s process stopped gracefully", processName)
+		}
 	}
 }
 
@@ -114,24 +121,33 @@ func (t *HardforkTest) Run() error {
 	t.Logger.Info("===== Starting Hardfork Test =====")
 
 	// Calculate main network genesis timestamp
-	mainGenesisTs := time.Now().Unix() + int64(t.Config.MainDelay*60)
+	mainGenesisTs := time.Now().Unix() + int64(t.Config.MainDelayMin*60)
 
 	// Phase 1: Run and validate main network
 	t.Logger.Info("Phase 1: Running main network...")
-	forkConfigBytes, analysis, err := t.RunMainNetworkPhase(mainGenesisTs)
+
+	beforeShutdown := func(t *HardforkTest, analysis *BlockAnalysisResult) error {
+		t.Logger.Info("Phase 2: Forking with fork method `%s`...", t.Config.ForkMethods)
+
+		if err := t.ForkPhase(analysis, mainGenesisTs); err != nil {
+			return err
+		}
+		return nil
+	}
+
+	analysis, err := t.RunMainNetworkPhase(mainGenesisTs, beforeShutdown)
 	if err != nil {
 		return err
 	}
 
-	t.Logger.Info("Phase 2: Forking the legacy way...")
+	t.Logger.Info("Phase 3: Cleaning up main config and moving fork config into correct location...")
 
-	forkData, err := t.LegacyForkPhase(analysis, forkConfigBytes, mainGenesisTs)
-	if err != nil {
+	if err := t.CleanUpNetworkForForkPhase(); err != nil {
 		return err
 	}
 
-	t.Logger.Info("Phase 3: Running fork network...")
-	if err := t.RunForkNetworkPhase(analysis.LatestNonEmptyBlock.BlockHeight, *forkData, mainGenesisTs); err != nil {
+	t.Logger.Info("Phase 4: Running fork network...")
+	if err := t.RunForkNetworkPhase(analysis.Consensus.LastBlockBeforeTxEnd.BlockHeight, mainGenesisTs); err != nil {
 		return err
 	}
 

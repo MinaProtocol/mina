@@ -4,23 +4,15 @@ let List/any = Prelude.List.any
 
 let Network
     : Type
-    = < Devnet
-      | Mainnet
-      | TestnetGeneric
-      | DevnetLegacy
-      | MainnetLegacy
-      | PreMesa1
-      >
+    = < Devnet | Mainnet | PreMesa1 | Mesa >
 
 let capitalName =
           \(network : Network)
       ->  merge
             { Devnet = "Devnet"
             , Mainnet = "Mainnet"
-            , TestnetGeneric = "TestnetGeneric"
-            , DevnetLegacy = "DevnetLegacy"
-            , MainnetLegacy = "MainnetLegacy"
             , PreMesa1 = "PreMesa1"
+            , Mesa = "Mesa"
             }
             network
 
@@ -29,10 +21,8 @@ let lowerName =
       ->  merge
             { Devnet = "devnet"
             , Mainnet = "mainnet"
-            , TestnetGeneric = "testnet_generic"
-            , DevnetLegacy = "devnet_pre_hardfork"
-            , MainnetLegacy = "mainnet_pre_hardfork"
             , PreMesa1 = "hetzner-pre-mesa-1"
+            , Mesa = "mesa"
             }
             network
 
@@ -41,23 +31,31 @@ let debianSuffix =
       ->  merge
             { Devnet = "devnet"
             , Mainnet = "mainnet"
-            , TestnetGeneric = "testnet-generic"
-            , DevnetLegacy = "devnet-pre-hardfork"
-            , MainnetLegacy = "mainnet-pre-hardfork"
             , PreMesa1 = "hetzner-pre-mesa-1"
+            , Mesa = "mesa"
             }
             network
+
+let peerListUrl =
+          \(network : Network)
+      ->  merge
+            { Devnet =
+                "https://storage.googleapis.com/seed-lists/devnet_seeds.txt"
+            , Mainnet =
+                "https://storage.googleapis.com/seed-lists/mainnet_seeds.txt"
+            , PreMesa1 =
+                "https://storage.googleapis.com/o1labs-gitops-infrastructure/mina-mesa-network/mina-mesa-network-seeds.txt"
+            , Mesa =
+                "https://storage.googleapis.com/o1labs-gitops-infrastructure/mina-mesa-network/mina-mesa-network-seeds.txt"
+            }
+            network
+
+let toLabelSegment = \(network : Network) -> "-${debianSuffix network}"
 
 let requiresMainnetBuild =
           \(network : Network)
       ->  merge
-            { Devnet = True
-            , Mainnet = True
-            , TestnetGeneric = True
-            , DevnetLegacy = True
-            , MainnetLegacy = True
-            , PreMesa1 = False
-            }
+            { Devnet = False, Mainnet = True, PreMesa1 = False, Mesa = False }
             network
 
 let buildMainnetEnv =
@@ -80,6 +78,8 @@ in  { Type = Network
     , capitalName = capitalName
     , lowerName = lowerName
     , debianSuffix = debianSuffix
+    , peerListUrl = peerListUrl
+    , toLabelSegment = toLabelSegment
     , requiresMainnetBuild = requiresMainnetBuild
     , foldMinaBuildMainnetEnv = foldMinaBuildMainnetEnv
     , buildMainnetEnv = buildMainnetEnv

@@ -8,7 +8,7 @@ module Fork_config = struct
     ; blockchain_length : int (* number of blocks produced since genesis *)
     ; global_slot_since_genesis : int (* global slot since genesis *)
     }
-  [@@deriving yojson, bin_io_unversioned]
+  [@@deriving yojson, bin_io_unversioned, equal]
 
   let gen =
     let open Quickcheck.Generator.Let_syntax in
@@ -464,10 +464,7 @@ module Json_layout = struct
     type t =
       { txpool_max_size : int option [@default None]
       ; peer_list_url : string option [@default None]
-      ; zkapp_proof_update_cost : float option [@default None]
-      ; zkapp_signed_single_update_cost : float option [@default None]
-      ; zkapp_signed_pair_update_cost : float option [@default None]
-      ; zkapp_transaction_cost_limit : float option [@default None]
+      ; max_zkapp_segment_per_transaction : int option [@default None]
       ; max_event_elements : int option [@default None]
       ; max_action_elements : int option [@default None]
       ; zkapp_cmd_limit_hardcap : int option [@default None]
@@ -804,9 +801,11 @@ module Accounts = struct
       }
 
     let gen =
-      Quickcheck.Generator.map Mina_base.Account.gen ~f:(fun a ->
+      Quickcheck.Generator.map
+        ~f:(fun a ->
           (* This will never fail with a proper account generator. *)
           of_account a |> Or_error.ok_exn )
+        Mina_base.Account.gen
   end
 
   type single = Single.t =
@@ -1271,10 +1270,7 @@ module Daemon = struct
   type t = Json_layout.Daemon.t =
     { txpool_max_size : int option
     ; peer_list_url : string option
-    ; zkapp_proof_update_cost : float option [@default None]
-    ; zkapp_signed_single_update_cost : float option [@default None]
-    ; zkapp_signed_pair_update_cost : float option [@default None]
-    ; zkapp_transaction_cost_limit : float option [@default None]
+    ; max_zkapp_segment_per_transaction : int option [@default None]
     ; max_event_elements : int option [@default None]
     ; max_action_elements : int option [@default None]
     ; zkapp_cmd_limit_hardcap : int option [@default None]
@@ -1303,18 +1299,9 @@ module Daemon = struct
     { txpool_max_size =
         opt_fallthrough ~default:t1.txpool_max_size t2.txpool_max_size
     ; peer_list_url = opt_fallthrough ~default:t1.peer_list_url t2.peer_list_url
-    ; zkapp_proof_update_cost =
-        opt_fallthrough ~default:t1.zkapp_proof_update_cost
-          t2.zkapp_proof_update_cost
-    ; zkapp_signed_single_update_cost =
-        opt_fallthrough ~default:t1.zkapp_signed_single_update_cost
-          t2.zkapp_signed_single_update_cost
-    ; zkapp_signed_pair_update_cost =
-        opt_fallthrough ~default:t1.zkapp_signed_pair_update_cost
-          t2.zkapp_signed_pair_update_cost
-    ; zkapp_transaction_cost_limit =
-        opt_fallthrough ~default:t1.zkapp_transaction_cost_limit
-          t2.zkapp_transaction_cost_limit
+    ; max_zkapp_segment_per_transaction =
+        opt_fallthrough ~default:t1.max_zkapp_segment_per_transaction
+          t2.max_zkapp_segment_per_transaction
     ; max_event_elements =
         opt_fallthrough ~default:t1.max_event_elements t2.max_event_elements
     ; max_action_elements =
@@ -1343,10 +1330,7 @@ module Daemon = struct
   let gen =
     let open Quickcheck.Generator.Let_syntax in
     let%bind txpool_max_size = Int.gen_incl 0 1000 in
-    let%bind zkapp_proof_update_cost = Float.gen_incl 0.0 100.0 in
-    let%bind zkapp_signed_single_update_cost = Float.gen_incl 0.0 100.0 in
-    let%bind zkapp_signed_pair_update_cost = Float.gen_incl 0.0 100.0 in
-    let%bind zkapp_transaction_cost_limit = Float.gen_incl 0.0 100.0 in
+    let%bind max_zkapp_segment_per_transaction = Int.gen_incl 0 50 in
     let%bind max_event_elements = Int.gen_incl 0 100 in
     let%bind zkapp_cmd_limit_hardcap = Int.gen_incl 0 1000 in
     let%bind minimum_user_command_fee =
@@ -1355,10 +1339,7 @@ module Daemon = struct
     let%map max_action_elements = Int.gen_incl 0 1000 in
     { txpool_max_size = Some txpool_max_size
     ; peer_list_url = None
-    ; zkapp_proof_update_cost = Some zkapp_proof_update_cost
-    ; zkapp_signed_single_update_cost = Some zkapp_signed_single_update_cost
-    ; zkapp_signed_pair_update_cost = Some zkapp_signed_pair_update_cost
-    ; zkapp_transaction_cost_limit = Some zkapp_transaction_cost_limit
+    ; max_zkapp_segment_per_transaction = Some max_zkapp_segment_per_transaction
     ; max_event_elements = Some max_event_elements
     ; max_action_elements = Some max_action_elements
     ; zkapp_cmd_limit_hardcap = Some zkapp_cmd_limit_hardcap
@@ -1609,9 +1590,9 @@ let ledger_of_hashes ~root_hash ~s3_data_hash () =
     ; add_genesis_winner = Some false
     }
 
-let make_fork_config ~staged_ledger ~global_slot_since_genesis ~state_hash
-    ~blockchain_length ~staking_ledger ~staking_epoch_seed ~next_epoch_ledger
-    ~next_epoch_seed =
+let make_fork_config ~staged_ledger ~genesis_state_timestamp
+    ~global_slot_since_genesis ~state_hash ~blockchain_length ~staking_ledger
+    ~staking_epoch_seed ~next_epoch_ledger ~next_epoch_seed =
   let open Async.Deferred.Or_error.Let_syntax in
   let global_slot_since_genesis =
     Mina_numbers.Global_slot_since_genesis.to_int global_slot_since_genesis
@@ -1660,13 +1641,21 @@ let make_fork_config ~staged_ledger ~global_slot_since_genesis ~state_hash
     }
   in
   make
-  (* add_genesis_winner must be set to false, because this
-     config effectively creates a continuation of the current
-     blockchain state and therefore the genesis ledger already
-     contains the winner of the previous block. No need to
-     artificially add it. In fact, it wouldn't work at all,
-     because the new node would try to create this account at
-     startup, even though it already exists, leading to an error.*)
+    ~genesis:
+      { genesis_state_timestamp = Some genesis_state_timestamp
+      ; k = None
+      ; delta = None
+      ; slots_per_epoch = None
+      ; slots_per_sub_window = None
+      ; grace_period_slots = None
+      }
+      (* add_genesis_winner must be set to false, because this
+         config effectively creates a continuation of the current
+         blockchain state and therefore the genesis ledger already
+         contains the winner of the previous block. No need to
+         artificially add it. In fact, it wouldn't work at all,
+         because the new node would try to create this account at
+         startup, even though it already exists, leading to an error.*)
     ~epoch_data
     ~ledger:
       { base = Accounts accounts

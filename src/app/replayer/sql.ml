@@ -6,6 +6,7 @@ module Block_info = struct
   type t =
     { id : int
     ; global_slot_since_genesis : int64
+    ; global_slot_since_hard_fork : int64
     ; state_hash : string
     ; ledger_hash : string
     ; snarked_ledger_hash_id : int
@@ -14,7 +15,7 @@ module Block_info = struct
 
   let typ =
     Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
-      Caqti_type.[ int; int64; string; string; int ]
+      Caqti_type.[ int; int64; int64; string; string; int ]
 
   (* find all blocks, working back from block with given state hash *)
   let query =
@@ -22,17 +23,18 @@ module Block_info = struct
       Caqti_type.(t2 string int64)
       typ
       {sql| WITH RECURSIVE chain AS (
-              SELECT id,parent_id,global_slot_since_genesis,state_hash,ledger_hash, snarked_ledger_hash_id FROM blocks b                                                                                                                                                           WHERE b.state_hash = $1
+              SELECT id,parent_id,global_slot_since_genesis,global_slot_since_hard_fork,state_hash,ledger_hash, snarked_ledger_hash_id FROM blocks b                                                                                                                                                           WHERE b.state_hash = $1
 
               UNION ALL
 
-              SELECT b.id,b.parent_id,b.global_slot_since_genesis,b.state_hash,b.ledger_hash, b.snarked_ledger_hash_id FROM blocks b
+              SELECT b.id,b.parent_id,b.global_slot_since_genesis,b.global_slot_since_hard_fork,b.state_hash,b.ledger_hash, b.snarked_ledger_hash_id FROM blocks b
 
               INNER JOIN chain
 
               ON b.id = chain.parent_id AND chain.id <> chain.parent_id                                                                                                                                                                                 )
 
-           SELECT id,global_slot_since_genesis,state_hash,ledger_hash, snarked_ledger_hash_id FROM chain c                                                                                                                                                                      WHERE c.global_slot_since_genesis >= $2                                                                                                                                                                                                 |sql}
+           SELECT id,global_slot_since_genesis,global_slot_since_hard_fork,state_hash,ledger_hash, snarked_ledger_hash_id FROM chain c                                                                                                                                                                      WHERE c.global_slot_since_genesis >= $2
+      |sql}
 
   let run (module Conn : Mina_caqti.CONNECTION) ~state_hash ~start_slot =
     Conn.collect_list query (state_hash, start_slot)
@@ -103,6 +105,14 @@ module Block = struct
 
   let get_height (module Conn : Mina_caqti.CONNECTION) ~block_id =
     Conn.find get_height_query block_id
+
+  let get_height_by_state_hash_query =
+    Mina_caqti.find_req Caqti_type.string Caqti_type.int64
+      {sql| SELECT height FROM blocks WHERE state_hash = $1 |sql}
+
+  let get_height_by_state_hash (module Conn : Mina_caqti.CONNECTION) state_hash
+      =
+    Conn.find get_height_by_state_hash_query state_hash
 
   let max_slot_query =
     Mina_caqti.find_req Caqti_type.unit Caqti_type.int64
@@ -448,19 +458,11 @@ module Epoch_data = struct
 end
 
 module Parent_block = struct
-  (* fork block is parent of block with the given state hash *)
-  let query_parent_state_hash =
+  let query_parent_hash =
     Mina_caqti.find_req Caqti_type.string Caqti_type.string
-      {sql| SELECT parent.state_hash FROM blocks AS parent
-
-            INNER JOIN
-
-            (SELECT parent_id FROM blocks WHERE state_hash = ?) AS epoch_ledgers_block
-
-            ON epoch_ledgers_block.parent_id = parent.id
+      {sql| SELECT parent_hash FROM blocks WHERE state_hash = ?
       |sql}
 
-  let get_parent_state_hash (module Conn : Mina_caqti.CONNECTION)
-      epoch_ledgers_state_hash =
-    Conn.find query_parent_state_hash epoch_ledgers_state_hash
+  let get_parent_hash (module Conn : Mina_caqti.CONNECTION) state_hash =
+    Conn.find query_parent_hash state_hash
 end

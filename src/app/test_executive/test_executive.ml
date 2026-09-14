@@ -56,7 +56,10 @@ let tests : test list =
   ; ( "chain-reliability"
     , (module Chain_reliability_test.Make : Intf.Test.Functor_intf) )
   ; ("epoch-ledger", (module Epoch_ledger.Make : Intf.Test.Functor_intf))
+  ; ( "genesis-export"
+    , (module Genesis_export_test.Make : Intf.Test.Functor_intf) )
   ; ("gossip-consis", (module Gossip_consistency.Make : Intf.Test.Functor_intf))
+  ; ("ledger-export", (module Genesis_export_test.Make : Intf.Test.Functor_intf))
   ; ("post-hard-fork", (module Post_hard_fork.Make : Intf.Test.Functor_intf))
   ; ("medium-bootstrap", (module Medium_bootstrap.Make : Intf.Test.Functor_intf))
   ; ("payments", (module Payments_test.Make : Intf.Test.Functor_intf))
@@ -401,6 +404,15 @@ let main inputs =
         in
         let%bind () = Malleable_error.List.iter non_seed_pods ~f:start_print in
         [%log info] "Daemons started" ;
+        let archive_nodes =
+          Engine.Network.archive_nodes network |> Core.String.Map.data
+        in
+        let%bind () =
+          Malleable_error.List.iter archive_nodes ~f:(fun archive_node ->
+              let node_id = Engine.Network.Node.id archive_node in
+              Engine.Network.Node.tail_mina_logs_to_file ~logger archive_node
+                ~log_file:(sprintf "%s-%s.local.test.log" test_name node_id) )
+        in
         [%log trace] "executing test" ;
         T.run ~config:test_config network dsl )
   in

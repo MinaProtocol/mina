@@ -78,12 +78,52 @@ module Token_owners = struct
   (* hash table of token owners, updated for each block *)
   let owner_tbl : Account_id.t Token_id.Table.t = Token_id.Table.create ()
 
-  let add_if_doesn't_exist token_id owner =
+  let add_to_owner_tbl token_id owner =
     match Token_id.Table.add owner_tbl ~key:token_id ~data:owner with
     | `Ok | `Duplicate ->
         ()
 
+  let populate_owner_tbl tokens_used =
+    List.iter tokens_used ~f:(fun (token_id, owner) ->
+        match owner with
+        | None ->
+            ()
+        | Some acct_id ->
+            add_to_owner_tbl token_id acct_id )
+
   let find_owner token_id = Token_id.Table.find owner_tbl token_id
+
+  (** Topologically sort a list of token_ids so that owner tokens appear
+      before the tokens they own. Uses [owner_tbl] to look up dependencies.
+      Tokens without owners (or whose owner's token is not in the input set)
+      come first. *)
+  let toposort_tokens (token_ids : Token_id.t list) =
+    let token_set = Set.of_list (module Token_id) token_ids in
+    let parent_in_set tid =
+      match Token_id.Table.find owner_tbl tid with
+      | Some acct_id ->
+          let parent = Account_id.token_id acct_id in
+          if Set.mem token_set parent then Some parent else None
+      | None ->
+          None
+    in
+    let rec visit (visited, acc) tid =
+      if Set.mem visited tid then (visited, acc)
+      else
+        let visited = Set.add visited tid in
+        let visited, acc =
+          match parent_in_set tid with
+          | Some parent ->
+              visit (visited, acc) parent
+          | None ->
+              (visited, acc)
+        in
+        (visited, tid :: acc)
+    in
+    let _, sorted =
+      List.fold token_ids ~init:(Set.empty (module Token_id), []) ~f:visit
+    in
+    List.rev sorted
 end
 
 module Token = struct
@@ -147,16 +187,32 @@ module Token = struct
          |sql} )
       (id, owner_public_key_id, owner_token_id)
 
+  (** Look up a single token ID in the archive database, adding it if it doesn't
+      already exist. As a consequence of the archive database schema, this
+      method will fail if the token ID has an owner and that owner is not
+      already in the archive database. See [Token.add_all_if_don't_exist]. *)
   let add_if_doesn't_exist (module Conn : CONNECTION) token_id =
     let open Deferred.Result.Let_syntax in
     let value = Token_id.to_string token_id in
     match Token_owners.find_owner token_id with
-    | None ->
+    | None -> (
         (* not necessarily the default token *)
-        Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
-          ~table_name ~cols:(Fields.names, typ)
-          (module Conn)
-          { value; owner_public_key_id = None; owner_token_id = None }
+        (* The [value] column is UNIQUE ([tokens_value_key]). A row for this
+           value may already exist with an owner set (e.g. inserted by block
+           processing for a custom token), while here we have no owner info
+           because [Token_owners] is not populated on this path (the genesis
+           account insertion does not pre-populate it). Selecting by the full
+           {value; NULL; NULL} tuple would miss such an owned row and the
+           subsequent INSERT would violate [tokens_value_key]. So look up by
+           value alone first and reuse the existing id if present. *)
+        match%bind find_opt (module Conn) token_id with
+        | Some id ->
+            return id
+        | None ->
+            Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
+              ~table_name ~cols:(Fields.names, typ)
+              (module Conn)
+              { value; owner_public_key_id = None; owner_token_id = None } )
     | Some acct_id -> (
         assert (not @@ Token_id.(equal default) token_id) ;
         assert (
@@ -184,6 +240,28 @@ module Token = struct
               ~table_name ~cols:(Fields.names, typ)
               (module Conn)
               { value; owner_public_key_id; owner_token_id } )
+
+  (** Add a list of tokens to the [Token_owners] table, and insert them all into
+      the archive if they do not already exist. This method is careful to insert
+      the parent token IDs in the list before their children, to account for the
+      assumptions made by [Token.add_if_doesn't_exist]. This method will still
+      fail if there is a token in the [tokens_used] with an owner that has a
+      token ID that is (a) not in the archive already and (b) not somewhere else
+      in the [tokens_used] list.
+
+      The intended pattern of use for this method is to collect all the tokens
+      mentioned in the data to be added to the archive in a single [tokens_used]
+      list, then run this method so subsequent [Token.add_if_doesn't_exist]
+      calls during data processing will succeed. *)
+  let add_all_if_don't_exist (module Conn : CONNECTION) tokens_used =
+    let open Deferred.Result.Let_syntax in
+    Token_owners.populate_owner_tbl tokens_used ;
+    let sorted_token_ids =
+      Token_owners.toposort_tokens (List.map tokens_used ~f:fst)
+    in
+    Mina_stdlib.Deferred.Result.List.iter sorted_token_ids ~f:(fun token_id ->
+        let%bind (_ : int) = add_if_doesn't_exist (module Conn) token_id in
+        return () )
 end
 
 module Voting_for = struct
@@ -319,7 +397,7 @@ module Zkapp_field_array = struct
         ~f:(Zkapp_field.add_if_doesn't_exist (module Conn))
       >>| Array.of_list
     in
-    Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
+    Mina_caqti.insert_into_cols_returning ~returning:("id", Caqti_type.int)
       ~table_name
       ~cols:([ "element_ids" ], Mina_caqti.array_int_typ)
       ~tannot:(function "element_ids" -> Some "int[]" | _ -> None)
@@ -1437,83 +1515,70 @@ module Zkapp_events = struct
 
   let table_name = "zkapp_events"
 
-  module Field_array_map = Map.Make (struct
-    type t = int array [@@deriving sexp]
+  (* Account_update.Body.Events'.t is `field array list` (a list of arrays of
+     fields). We insert in batched, NON-deduplicated steps:
 
-    let compare = Array.compare Int.compare
-  end)
+     1. flatten to all field strings and insert them (zkapp_field keeps its
+        UNIQUE(field) constraint, so this step still dedups by content);
+     2. for each event (a field array), render its field ids as an int[] literal
+        and insert them all into zkapp_field_array in one query, taking the
+        returned ids POSITIONALLY (in VALUES order) — NO content dedup, since
+        zkapp_field_array.element_ids has no UNIQUE/index (a btree over the
+        unbounded int[] overflows Postgres' 2704-byte key limit for max-cost
+        zkApps);
+     3. insert that array of field_array ids into zkapp_events (also no dedup).
 
-  (* Account_update.Body.Events'.t is defined as `field array list`,
-     which is ismorphic to a list of list of fields.
-
-     We are batching the insertion of field and field_array to optimize
-     the speed of archiving max-cost zkapps.
-
-     1. we flatten the list of list of fields to get all the field elements
-     2. insert all the field elements in one query
-     3. construct a map "M" from `field_id` to `field` by querying against the zkapp_field table
-     4. use "M" and the list of list of fields to compute the list of list of field_ids
-     5. insert all list of `list of field_ids` in one query
-     6. construct a map "M'" from `field_array_id` to `field_id array` by querying against
-        the zkapp_field_array table
-     7. use "M'" and the list of list of field_ids to compute the list of field_array_ids
-     8. insert the list of field_arrays
-  *)
+     The EMPTY case (events = []) is represented as NULL: we create NO zkapp_events
+     row and return None, so account_update_body.events_id/actions_id store NULL.
+     This eliminates the dominant duplicate (the empty {} array) structurally
+     rather than via content dedup. Returns [int option]. *)
   let add_if_doesn't_exist (module Conn : Mina_caqti.CONNECTION)
       (events : Account_update.Body.Events'.t) =
     let open Deferred.Result.Let_syntax in
-    let%bind field_array_id_list =
-      if not @@ List.is_empty events then
-        let field_list_list =
-          List.map events ~f:(fun field_array ->
-              Array.map field_array ~f:Pickles.Backend.Tick.Field.to_string
-              |> Array.to_list )
-        in
-        let fields = field_list_list |> List.concat in
-        let%bind field_id_list_list =
-          if not @@ List.is_empty fields then
-            let%map field_map =
-              Mina_caqti.insert_multi_into_col ~table_name:"zkapp_field"
-                ~col:("field", Caqti_type.string)
-                (module Conn)
-                fields
-              >>| String.Map.of_alist_exn
-            in
-            let field_id_list_list =
-              List.map field_list_list ~f:(List.map ~f:(Map.find_exn field_map))
-            in
-            field_id_list_list
-          else
-            (* if there's no fields, then we must have some list of empty lists *)
-            return @@ List.map field_list_list ~f:(fun _ -> [])
-        in
-        (* this conversion should be done by caqti using `typ`, FIX this in the future *)
-        let field_array_list =
-          List.map field_id_list_list ~f:(fun id_list ->
-              List.map id_list ~f:Int.to_string
-              |> String.concat ~sep:", " |> sprintf "{%s}" )
-        in
-        let%map field_array_map =
-          Mina_caqti.insert_multi_into_col ~table_name:"zkapp_field_array"
-            ~col:("element_ids", Mina_caqti.array_int_typ)
-            (module Conn)
-            field_array_list
-          >>| Field_array_map.of_alist_exn
-        in
-        let field_array_id_list =
-          List.map field_id_list_list ~f:(fun field_id_list ->
-              Map.find_exn field_array_map (Array.of_list field_id_list) )
-          |> Array.of_list
-        in
-        field_array_id_list
-      else return @@ Array.of_list []
-    in
-    Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
-      ~table_name
-      ~cols:([ "element_ids" ], Mina_caqti.array_int_typ)
-      ~tannot:(function "element_ids" -> Some "int[]" | _ -> None)
-      (module Conn)
-      field_array_id_list
+    if List.is_empty events then return None
+    else
+      let field_list_list =
+        List.map events ~f:(fun field_array ->
+            Array.map field_array ~f:Pickles.Backend.Tick.Field.to_string
+            |> Array.to_list )
+      in
+      let fields = field_list_list |> List.concat in
+      let%bind field_id_list_list =
+        if not @@ List.is_empty fields then
+          let%map field_map =
+            Mina_caqti.insert_multi_into_col ~table_name:"zkapp_field"
+              ~col:("field", Caqti_type.string)
+              (module Conn)
+              fields
+            >>| String.Map.of_alist_exn
+          in
+          List.map field_list_list ~f:(List.map ~f:(Map.find_exn field_map))
+        else
+          (* no fields => a non-empty list of empty events; each maps to {} *)
+          return @@ List.map field_list_list ~f:(fun _ -> [])
+      in
+      (* this conversion should be done by caqti using `typ`, FIX this in the future *)
+      let field_array_list =
+        List.map field_id_list_list ~f:(fun id_list ->
+            List.map id_list ~f:Int.to_string
+            |> String.concat ~sep:", " |> sprintf "{%s}" )
+      in
+      let%bind field_array_ids =
+        Mina_caqti.insert_multi_into_col_no_dedup
+          ~table_name:"zkapp_field_array" ~col:"element_ids"
+          (module Conn)
+          field_array_list
+      in
+      let element_ids = Array.of_list field_array_ids in
+      let%map id =
+        Mina_caqti.insert_into_cols_returning ~returning:("id", Caqti_type.int)
+          ~table_name
+          ~cols:([ "element_ids" ], Mina_caqti.array_int_typ)
+          ~tannot:(function "element_ids" -> Some "int[]" | _ -> None)
+          (module Conn)
+          element_ids
+      in
+      Some id
 
   let load (module Conn : Mina_caqti.CONNECTION) id =
     Conn.find
@@ -1528,8 +1593,8 @@ module Zkapp_account_update_body = struct
     ; update_id : int
     ; balance_change : string
     ; increment_nonce : bool
-    ; events_id : int
-    ; actions_id : int
+    ; events_id : int option
+    ; actions_id : int option
     ; call_data_id : int
     ; call_depth : int
     ; zkapp_network_precondition_id : int
@@ -1550,8 +1615,8 @@ module Zkapp_account_update_body = struct
         ; int
         ; string
         ; bool
-        ; int
-        ; int
+        ; option int
+        ; option int
         ; int
         ; int
         ; int
@@ -1995,32 +2060,46 @@ module User_command = struct
     let add_if_doesn't_exist ~logger (module Conn : Mina_caqti.CONNECTION)
         (ps : Zkapp_command.t) =
       let open Deferred.Result.Let_syntax in
-      let zkapp_command = Zkapp_command.to_simple ps in
-      let%bind zkapp_fee_payer_body_id =
-        Metrics.time ~label:"Zkapp_fee_payer_body.add" ~logger
-        @@ fun () ->
-        Zkapp_fee_payer_body.add_if_doesn't_exist
-          (module Conn)
-          zkapp_command.fee_payer.body
-      in
-      let%bind zkapp_account_updates_ids =
-        Metrics.time ~label:"Zkapp_account_update.add" ~logger
-        @@ fun () ->
-        Mina_caqti.deferred_result_list_map zkapp_command.account_updates
-          ~f:(Zkapp_account_update.add_if_doesn't_exist ~logger (module Conn))
-        >>| Array.of_list
-      in
-      let memo = ps.memo |> Signed_command_memo.to_base58_check in
-      let hash =
+      let transaction_hash =
         Transaction_hash.hash_zkapp_command_with_hashes ps
-        |> Transaction_hash.to_base58_check
       in
-      Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
-        ~table_name:"zkapp_commands" ~cols:(Fields.names, typ)
-        ~tannot:(function
-          | "zkapp_account_updates_ids" -> Some "int[]" | _ -> None )
-        (module Conn)
-        { zkapp_fee_payer_body_id; zkapp_account_updates_ids; memo; hash }
+      (* A zkapp command is uniquely identified by its transaction hash. The same
+         command can occur in more than one block (e.g. forked sibling blocks at
+         the same height share a transaction), so dedup on the hash alone and
+         reuse the existing row. Building the child rows unconditionally is both
+         wasteful and, once zkapp_field_array/zkapp_events are inserted without
+         dedup, unsafe: re-minting child ids makes the full-tuple match in
+         select_insert_into_cols miss and fall through to an INSERT that collides
+         on zkapp_commands_hash_key. *)
+      match%bind find_opt (module Conn) ~transaction_hash with
+      | Some id ->
+          return id
+      | None ->
+          let zkapp_command = Zkapp_command.to_simple ps in
+          let%bind zkapp_fee_payer_body_id =
+            Metrics.time ~label:"Zkapp_fee_payer_body.add" ~logger
+            @@ fun () ->
+            Zkapp_fee_payer_body.add_if_doesn't_exist
+              (module Conn)
+              zkapp_command.fee_payer.body
+          in
+          let%bind zkapp_account_updates_ids =
+            Metrics.time ~label:"Zkapp_account_update.add" ~logger
+            @@ fun () ->
+            Mina_caqti.deferred_result_list_map zkapp_command.account_updates
+              ~f:
+                (Zkapp_account_update.add_if_doesn't_exist ~logger
+                   (module Conn) )
+            >>| Array.of_list
+          in
+          let memo = ps.memo |> Signed_command_memo.to_base58_check in
+          let hash = Transaction_hash.to_base58_check transaction_hash in
+          Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
+            ~table_name:"zkapp_commands" ~cols:(Fields.names, typ)
+            ~tannot:(function
+              | "zkapp_account_updates_ids" -> Some "int[]" | _ -> None )
+            (module Conn)
+            { zkapp_fee_payer_body_id; zkapp_account_updates_ids; memo; hash }
   end
 
   let via (t : User_command.t) : [ `Zkapp_command | `Ident ] =
@@ -4482,15 +4561,6 @@ let add_block_aux ?(retries = 3) ~logger ~genesis_constants ~pool ~add_block
     ~hash ~delete_older_than ~tokens_used block =
   let state_hash = hash block in
   let add () =
-    [%log info]
-      "Populating token owners table for block with state hash $state_hash"
-      ~metadata:[ ("state_hash", Mina_base.State_hash.to_yojson state_hash) ] ;
-    List.iter tokens_used ~f:(fun (token_id, owner) ->
-        match owner with
-        | None ->
-            ()
-        | Some acct_id ->
-            Token_owners.add_if_doesn't_exist token_id acct_id ) ;
     Mina_caqti.Pool.use
       (fun (module Conn : Mina_caqti.CONNECTION) ->
         let%bind res =
@@ -4503,7 +4573,16 @@ let add_block_aux ?(retries = 3) ~logger ~genesis_constants ~pool ~add_block
             O1trace.thread "archive_processor.add_block"
             @@ fun () ->
             Metrics.time ~label:"add_block" ~logger
-            @@ fun () -> add_block (module Conn : Mina_caqti.CONNECTION) block
+            @@ fun () ->
+            [%log info]
+              "Populating token owners table for block with state hash \
+               $state_hash"
+              ~metadata:
+                [ ("state_hash", Mina_base.State_hash.to_yojson state_hash) ] ;
+            let%bind () =
+              Token.add_all_if_don't_exist (module Conn) tokens_used
+            in
+            add_block (module Conn : Mina_caqti.CONNECTION) block
           in
           (* if an existing block has a parent hash that's for the block just added,
              set its parent id

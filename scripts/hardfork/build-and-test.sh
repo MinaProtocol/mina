@@ -1,16 +1,58 @@
 #!/usr/bin/env bash
 
-# This scripts builds master and current branch with nix
+# This scripts builds a designated PREFORK branch and current branch with nix
 # 0. Prepare environment if needed
-# 1. Build master as a prefork build;
-# 2. Upload to nix cache, the reason for not uploading cache for following 2 
+# 1. Build PREFORK as a prefork build;
+# 2. Build "develop" branch as a postfork build
+# 3. Upload to nix cache, the reason for not uploading cache for following 2 
 # steps is that they change for each PR. 
-# 3. Build current branch as a postfork build;
 # 4. Build hardfork_test on current branch;
 # 5. Execute hardfork_test on them.
 
 # Step 0. Prepare environment if needed
 set -eux -o pipefail
+
+PREFORK=""
+EXTRA_ARGS=()
+
+USAGE="Usage: $0 --fork-from <PREFORK> [ADDITONAL ARGS TO HF TEST...]"
+usage() {
+  if (( $# > 0 )); then
+    echo "$1" >&2
+    echo "$USAGE"
+    exit 1
+  else
+    echo "$USAGE"
+    exit 0
+  fi
+}
+
+# ---- argument parsing --------------------------------------------------------
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --fork-from)
+      # ensure value exists
+      if [[ $# -lt 2 ]]; then
+        usage "Error: $1 requires an argument."
+      fi
+      PREFORK="$2"
+      shift 2
+      ;;
+    --help|-h)
+      usage
+      ;;
+    *)
+      EXTRA_ARGS+=("$1")
+      shift
+      ;;
+  esac
+done
+
+if [[ -z "$PREFORK" ]]; then
+  usage "Error: --fork-from must be provided."
+fi
+
+export MINA_PROFILE="devnet"
 
 NIX_OPTS=( --accept-flake-config --experimental-features 'nix-command flakes' )
 
@@ -46,8 +88,15 @@ pushd "$(git rev-parse --show-toplevel)"
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 
 if [ -n "${BUILDKITE:-}" ]; then
+  git config --global --add safe.directory /workdir
+fi
+
+TEST_COMMIT="$(git rev-parse HEAD)"
+
+
+if [ -n "${BUILDKITE:-}" ]; then
   # This is a CI run, ensure nix docker has everything what we want.
-  nix-env -iA unstable.{curl,git-lfs,gnused,jq,python311}
+  nix-env -iA unstable.{curl,gawk,git-lfs,gnused,jq,python311}
 
   python -m venv .venv
   source .venv/bin/activate
@@ -70,12 +119,17 @@ if [ -n "${BUILDKITE:-}" ]; then
   git fetch origin
 fi
 
-# 1. Build master as a prefork build;
-git checkout origin/master
+# 1. Build PREFORK as a prefork build;
+git checkout $PREFORK
 git submodule update --init --recursive --depth 1
 nix "${NIX_OPTS[@]}" build "$PWD?submodules=1#devnet" --out-link "prefork-devnet"
 
-# 2. Upload to nix cache 
+# 2. Build "develop" branch as a postfork build
+git checkout develop
+git submodule update --init --recursive --depth 1
+nix "${NIX_OPTS[@]}" build "$PWD?submodules=1#devnet" --out-link "postfork-devnet"
+
+# 3. Upload to nix cache 
 
 if [[ -n "${NIX_CACHE_GCP_ID:-}" ]] && [[ -n "${NIX_CACHE_GCP_SECRET:-}" ]]; then
   mkdir -p $HOME/.aws
@@ -90,18 +144,16 @@ EOF
     --stdin </tmp/nix-paths
 fi
 
-# 3. Build current branch as a postfork build;
-git checkout -
-git submodule update --init --recursive --depth 1
-nix "${NIX_OPTS[@]}" build "$PWD?submodules=1#devnet" --out-link "postfork-devnet"
-
 # 4. Build hardfork_test on current branch;
+git checkout "$TEST_COMMIT"
+git submodule update --init --recursive --depth 1
 nix "${NIX_OPTS[@]}" build "$PWD?submodules=1#hardfork_test" --out-link "hardfork_test"
 
 # 5. Execute hardfork_test on them.
 
-SLOT_TX_END=${SLOT_TX_END:-$((40))}
-SLOT_CHAIN_END=${SLOT_CHAIN_END:-$((SLOT_TX_END+5))}
+SLOT_TX_END=${SLOT_TX_END:-$((RANDOM%120+30))}      
+# WARN: ensure SLOT_CHAIN_END - SLOT_TX_END > k is always true!
+SLOT_CHAIN_END=${SLOT_CHAIN_END:-$((SLOT_TX_END+8))}
 
 NETWORK_ROOT=$(mktemp -d --tmpdir hardfork-network.XXXXXXX)
 
@@ -113,6 +165,7 @@ hardfork_test/bin/hardfork_test \
   --slot-tx-end "$SLOT_TX_END" \
   --slot-chain-end "$SLOT_CHAIN_END" \
   --script-dir "$SCRIPT_DIR" \
-  --root "$NETWORK_ROOT"
+  --root "$NETWORK_ROOT" \
+  "${EXTRA_ARGS[@]}"
 
 popd

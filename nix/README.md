@@ -363,6 +363,17 @@ taken from nixpkgs with some overlays applied. All the dependencies are then
 provided to the final Mina derivation. See [./ocaml.nix](./ocaml.nix) for more
 details.
 
+### Crate downloads go through `static.crates.io`
+
+crates.io answers 403 to any `User-Agent` starting with `curl/`, which is what
+nixpkgs' `fetchurl` sends, so every crate fetched through
+`https://crates.io/api/v1/crates/...` fails on a binary-cache miss. The
+[./crates-io.nix](./crates-io.nix) overlay rewrites those URLs to
+`static.crates.io`, which has no such gate — the same change upstream nixpkgs
+made in `f830e6112` (nixos-25.11). Crate fetches are fixed-output derivations,
+so the rewrite moves no store paths and keeps existing cache entries valid. The
+overlay can be dropped once the nixpkgs pin moves past the upstream fix.
+
 ### Why are Rust, Go and OCaml bits built separately?
 
 In order to enforce reproducibility, Nix doesn't generally allow networking from
@@ -390,6 +401,34 @@ specified explicitly. This is the hash you're updating by running
 what is a code coverage of end-to-end/manual tests performed over mina under development. 
 Additionally there is a docker image available which wraps up above mina build into full mina image. 
 One can prepare it using command: `$(nix build mina#mina-image-instr-full --print-out-paths) | docker load`
+
+### Test coverage
+
+Coverage instrumentation is already configured in all dune files via `(instrumentation (backend bisect_ppx))`. To run tests with coverage from a nix shell:
+
+```
+nix develop mina
+
+# Run tests with coverage for a specific library
+DUNE_INSTRUMENT_WITH=bisect_ppx dune runtest src/lib/base58_check --force
+
+# Run tests with coverage for multiple libraries
+DUNE_INSTRUMENT_WITH=bisect_ppx dune runtest src/lib/base58_check src/lib/merkle_ledger --force
+
+# Generate per-file coverage summary
+bisect-ppx-report summary --coverage-path=_build/default --per-file
+
+# Generate HTML coverage report
+bisect-ppx-report html --coverage-path=_build/default --tree --ignore-missing-files
+# Open _coverage/index.html in a browser
+
+# Use the display_summary tool to see coverage for files modified in develop
+bisect-ppx-report summary --coverage-path=_build/default --per-file > /tmp/summary.txt
+dune exec src/app/coverage_utils/display_summary/main.exe -- /tmp/summary.txt | column -t
+```
+
+Setting `DUNE_INSTRUMENT_WITH=bisect_ppx` can also be used in CI to enable coverage
+without modifying any build scripts.
 
 ### Discovering all the packages this Flake provides
 
@@ -561,30 +600,6 @@ If you don't do this, Nix may not always yell at you right away
 somehow, but not correctly filled in). It will however fail with a
 strange error during the build, when it fails to find a
 dependency. Make sure you do this!
-
-### git LFS
-
-If you have git LFS installed and configured on your system, the build may fail with strange errors similar to this:
-
-```
-Downloading docs/res/all_data_structures.dot.png (415 KB)
-Error downloading object: docs/res/all_data_structures.dot.png (fed6771): Smudge error: Error downloading docs/res/all_data_structures.dot.png (fed6771190a9b063246074bbfe3b1fc0ba4240fdc41abcf026d5bc449ca4f9b8): batch request: missing protocol: ""
-
-Errors logged to /tmp/nix-115798-1/lfs/logs/20220121T113801.442266054.log
-Use `git lfs logs last` to view the log.
-error: external filter 'git-lfs filter-process' failed
-fatal: docs/res/all_data_structures.dot.png: smudge filter lfs failed
-error: program 'git' failed with exit code 128
-(use '--show-trace' to show detailed location information)
-```
-
-You can fix this by setting `GIT_LFS_SKIP_SMUDGE=1` env variable, e.g. by running
-
-```
-export GIT_LFS_SKIP_SMUDGE=1
-```
-
-Before running any `nix` commands.
 
 ### `Warning: ignoring untrusted substituter`
 
