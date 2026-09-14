@@ -4,6 +4,70 @@ open Async
 open Core_kernel
 open Mina_base
 
+(* HACK: Caqti 2.0.1 has no [Caqti_type.unify], and Caqti >= 2.1 cannot be
+   pinned here (caqti-async 2.1 needs core >= v0.16.1). This shadow adds the
+   2.1 [unify] and [Equal] so the code below reads as it does on develop.
+
+   Fields, options and annotations compare structurally, as upstream does.
+   Products are the unsound part: upstream 2.1 treats two products as equal
+   iff they carry the same identity tag minted at construction, i.e. iff they
+   are the same object. 2.0.1 has no tag, so we test [phys_equal] directly and
+   the type proof has to be a cast. The cast is wrong only for a product value
+   that is itself polymorphic in its type (e.g. [product None proj_end]), which
+   nothing in the tree builds.
+
+   Delete this module once this branch reaches Caqti >= 2.1. *)
+module Caqti_type = struct
+  include Caqti_type
+
+  type (_, _) eq = Equal : ('a, 'a) eq
+
+  let unify_field : type a b. a Field.t -> b Field.t -> (a, b) eq option =
+   fun f1 f2 ->
+    match (f1, f2) with
+    | Bool, Bool ->
+        Some Equal
+    | Int, Int ->
+        Some Equal
+    | Int16, Int16 ->
+        Some Equal
+    | Int32, Int32 ->
+        Some Equal
+    | Int64, Int64 ->
+        Some Equal
+    | Float, Float ->
+        Some Equal
+    | String, String ->
+        Some Equal
+    | Octets, Octets ->
+        Some Equal
+    | Pdate, Pdate ->
+        Some Equal
+    | Ptime, Ptime ->
+        Some Equal
+    | Ptime_span, Ptime_span ->
+        Some Equal
+    | Enum n1, Enum n2 when String.equal n1 n2 ->
+        Some Equal
+    | _ ->
+        None
+
+  let rec unify : type a b. a t -> b t -> (a, b) eq option =
+   fun t1 t2 ->
+    match (t1, t2) with
+    | Field f1, Field f2 ->
+        unify_field f1 f2
+    | Option t1, Option t2 -> (
+        match unify t1 t2 with Some Equal -> Some Equal | None -> None )
+    | Annot (`Redacted, t1), Annot (`Redacted, t2) ->
+        unify t1 t2
+    | Product _, Product _ when phys_equal (Obj.repr t1) (Obj.repr t2) ->
+        (* HACK: see above; this is the only unchecked step. *)
+        Some (Obj.magic (Equal : (a, a) eq))
+    | _ ->
+        None
+end
+
 (* custom Caqti types for generating type annotations on queries *)
 let find_req t u s = Caqti_request.Infix.(t ->! u) s
 
