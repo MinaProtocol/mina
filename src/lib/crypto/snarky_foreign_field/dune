@@ -1,0 +1,12 @@
+(library
+ (name snarky_foreign_field)
+ (public_name snarky_foreign_field)
+ (libraries
+  core_kernel
+  bignum.bigint
+  snarky.backendless
+  kimchi_pasta_snarky_backend)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_version ppx_jane)))
