@@ -8,6 +8,19 @@ let should_dump_circuit_data () =
   | _ ->
       false
 
+(* The mmap-backed proving-key cache trades a MessagePack deserialization
+   step for a POD file format that can be loaded in a single [mmap(2)]
+   syscall and ~one memcpy per field element. Enabled via the
+   [MINA_USE_MMAP_CACHE] environment variable during rollout; once we flip
+   the default, the old MessagePack path remains as a fallback until it is
+   retired. *)
+let use_mmap_cache () =
+  match Sys.getenv_opt "MINA_USE_MMAP_CACHE" with
+  | Some "true" | Some "1" | Some "yes" ->
+      true
+  | _ ->
+      false
+
 module Step = struct
   module Key = struct
     module Proving = struct
@@ -43,39 +56,63 @@ module Step = struct
     Key_cache.Sync.Disk_storable.t
 
   let storable =
+    let read_legacy (header : Snark_keys_header.t) ~path ~cs =
+      Or_error.try_with_join (fun () ->
+          let open Or_error.Let_syntax in
+          let%map header_read, index =
+            Snark_keys_header.read_with_header
+              ~read_data:(fun ~offset ->
+                Kimchi_bindings.Protocol.Index.Fp.read (Some offset)
+                  (Backend.Tick.Keypair.load_urs ()) )
+              path
+          in
+          [%test_eq: int] header.header_version header_read.header_version ;
+          [%test_eq: Snark_keys_header.Kind.t] header.kind header_read.kind ;
+          [%test_eq: Snark_keys_header.Constraint_constants.t]
+            header.constraint_constants header_read.constraint_constants ;
+          [%test_eq: string] header.constraint_system_hash
+            header_read.constraint_system_hash ;
+          { Backend.Tick.Keypair.index; cs } )
+    in
+    let read_mmap (key : Key.Proving.t) ~path ~cs =
+      Or_error.try_with (fun () ->
+          let identifier = Key.Proving.to_string key in
+          let index =
+            Kimchi_bindings.Protocol.Index.Fp.read_cached identifier
+              (Backend.Tick.Keypair.load_urs ())
+              path
+          in
+          { Backend.Tick.Keypair.index; cs } )
+    in
+    let write_legacy (header : Snark_keys_header.t) cs
+        (t : Backend.Tick.Keypair.t) path =
+      (* Conditionally dump extra circuit data based on environment variable *)
+      if should_dump_circuit_data () then (
+        let logger = Logger.create () in
+        Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+          "Dumping Step circuit data to %s" path ;
+        Kimchi_pasta_constraint_system.Vesta_constraint_system
+        .dump_extra_circuit_data cs path ) ;
+      Or_error.try_with (fun () ->
+          Snark_keys_header.write_with_header
+            ~expected_max_size_log2:33 (* 8 GB should be enough *)
+            ~append_data:
+              (Kimchi_bindings.Protocol.Index.Fp.write (Some true) t.index)
+            header path )
+    in
+    let write_mmap (key : Key.Proving.t) (t : Backend.Tick.Keypair.t) path =
+      Or_error.try_with (fun () ->
+          let identifier = Key.Proving.to_string key in
+          Kimchi_bindings.Protocol.Index.Fp.write_cached identifier t.index
+            path )
+    in
     Key_cache.Sync.Disk_storable.simple Key.Proving.to_string
-      (fun (_, header, _, cs) ~path ->
-        Or_error.try_with_join (fun () ->
-            let open Or_error.Let_syntax in
-            let%map header_read, index =
-              Snark_keys_header.read_with_header
-                ~read_data:(fun ~offset ->
-                  Kimchi_bindings.Protocol.Index.Fp.read (Some offset)
-                    (Backend.Tick.Keypair.load_urs ()) )
-                path
-            in
-            [%test_eq: int] header.header_version header_read.header_version ;
-            [%test_eq: Snark_keys_header.Kind.t] header.kind header_read.kind ;
-            [%test_eq: Snark_keys_header.Constraint_constants.t]
-              header.constraint_constants header_read.constraint_constants ;
-            [%test_eq: string] header.constraint_system_hash
-              header_read.constraint_system_hash ;
-            { Backend.Tick.Keypair.index; cs } ) )
-      (fun (_, header, _, cs) t path ->
-        (* Conditionally dump extra circuit data based on environment variable *)
-        if should_dump_circuit_data () then (
-          let logger = Logger.create () in
-          Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-            "Dumping Step circuit data to %s" path ;
-          Kimchi_pasta_constraint_system.Vesta_constraint_system
-          .dump_extra_circuit_data cs path ) ;
-        Or_error.try_with (fun () ->
-            Snark_keys_header.write_with_header
-              ~expected_max_size_log2:33 (* 8 GB should be enough *)
-              ~append_data:
-                (Kimchi_bindings.Protocol.Index.Fp.write (Some true)
-                   t.Backend.Tick.Keypair.index )
-              header path ) )
+      (fun ((_, header, _, cs) as key) ~path ->
+        if use_mmap_cache () then read_mmap key ~path ~cs
+        else read_legacy header ~path ~cs )
+      (fun ((_, header, _, cs) as key) t path ->
+        if use_mmap_cache () then write_mmap key t path
+        else write_legacy header cs t path )
 
   let vk_storable =
     Key_cache.Sync.Disk_storable.simple Key.Verification.to_string
@@ -182,38 +219,62 @@ module Wrap = struct
     (Key.Verification.t, Verification_key.t) Key_cache.Sync.Disk_storable.t
 
   let storable =
+    let read_legacy (header : Snark_keys_header.t) ~path ~cs =
+      Or_error.try_with_join (fun () ->
+          let open Or_error.Let_syntax in
+          let%map header_read, index =
+            Snark_keys_header.read_with_header
+              ~read_data:(fun ~offset ->
+                Kimchi_bindings.Protocol.Index.Fq.read (Some offset)
+                  (Backend.Tock.Keypair.load_urs ()) )
+              path
+          in
+          [%test_eq: int] header.header_version header_read.header_version ;
+          [%test_eq: Snark_keys_header.Kind.t] header.kind header_read.kind ;
+          [%test_eq: Snark_keys_header.Constraint_constants.t]
+            header.constraint_constants header_read.constraint_constants ;
+          [%test_eq: string] header.constraint_system_hash
+            header_read.constraint_system_hash ;
+          { Backend.Tock.Keypair.index; cs } )
+    in
+    let read_mmap (key : Key.Proving.t) ~path ~cs =
+      Or_error.try_with (fun () ->
+          let identifier = Key.Proving.to_string key in
+          let index =
+            Kimchi_bindings.Protocol.Index.Fq.read_cached identifier
+              (Backend.Tock.Keypair.load_urs ())
+              path
+          in
+          { Backend.Tock.Keypair.index; cs } )
+    in
+    let write_legacy (header : Snark_keys_header.t) cs
+        (t : Backend.Tock.Keypair.t) path =
+      if should_dump_circuit_data () then (
+        let logger = Logger.create () in
+        Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+          "Dumping Wrap circuit data to %s" path ;
+        Kimchi_pasta_constraint_system.Pallas_constraint_system
+        .dump_extra_circuit_data cs path ) ;
+      Or_error.try_with (fun () ->
+          Snark_keys_header.write_with_header
+            ~expected_max_size_log2:33 (* 8 GB should be enough *)
+            ~append_data:
+              (Kimchi_bindings.Protocol.Index.Fq.write (Some true) t.index)
+            header path )
+    in
+    let write_mmap (key : Key.Proving.t) (t : Backend.Tock.Keypair.t) path =
+      Or_error.try_with (fun () ->
+          let identifier = Key.Proving.to_string key in
+          Kimchi_bindings.Protocol.Index.Fq.write_cached identifier t.index
+            path )
+    in
     Key_cache.Sync.Disk_storable.simple Key.Proving.to_string
-      (fun (_, header, cs) ~path ->
-        Or_error.try_with_join (fun () ->
-            let open Or_error.Let_syntax in
-            let%map header_read, index =
-              Snark_keys_header.read_with_header
-                ~read_data:(fun ~offset ->
-                  Kimchi_bindings.Protocol.Index.Fq.read (Some offset)
-                    (Backend.Tock.Keypair.load_urs ()) )
-                path
-            in
-            [%test_eq: int] header.header_version header_read.header_version ;
-            [%test_eq: Snark_keys_header.Kind.t] header.kind header_read.kind ;
-            [%test_eq: Snark_keys_header.Constraint_constants.t]
-              header.constraint_constants header_read.constraint_constants ;
-            [%test_eq: string] header.constraint_system_hash
-              header_read.constraint_system_hash ;
-            { Backend.Tock.Keypair.index; cs } ) )
-      (fun (_, header, cs) t path ->
-        (* Conditionally dump extra circuit data based on environment variable *)
-        if should_dump_circuit_data () then (
-          let logger = Logger.create () in
-          Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-            "Dumping Wrap circuit data to %s" path ;
-          Kimchi_pasta_constraint_system.Pallas_constraint_system
-          .dump_extra_circuit_data cs path ) ;
-        Or_error.try_with (fun () ->
-            Snark_keys_header.write_with_header
-              ~expected_max_size_log2:33 (* 8 GB should be enough *)
-              ~append_data:
-                (Kimchi_bindings.Protocol.Index.Fq.write (Some true) t.index)
-              header path ) )
+      (fun ((_, header, cs) as key) ~path ->
+        if use_mmap_cache () then read_mmap key ~path ~cs
+        else read_legacy header ~path ~cs )
+      (fun ((_, header, cs) as key) t path ->
+        if use_mmap_cache () then write_mmap key t path
+        else write_legacy header cs t path )
 
   let vk_storable =
     Key_cache.Sync.Disk_storable.simple Key.Verification.to_string
