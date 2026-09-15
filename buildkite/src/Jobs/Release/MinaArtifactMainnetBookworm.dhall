@@ -18,23 +18,22 @@ in  Pipeline.build
       ( ArtifactPipelines.packagePipeline
           ArtifactPipelines.PackagingSpec::{
           , artifacts =
-            [ Artifacts.Type.Daemon { network = Network.Type.Devnet }
-            , Artifacts.Type.DaemonProfiled { profile = Profile.Type.Lightnet }
-            , Artifacts.Type.DaemonProfiled { profile = Profile.Type.Devnet }
-            , Artifacts.Type.DaemonPrefork { network = Network.Type.Devnet }
-            , Artifacts.Type.DaemonPostfork { network = Network.Type.Devnet }
+            [ Artifacts.Type.Daemon { network = Network.Type.Mainnet }
+            , Artifacts.Type.DaemonProfiled { profile = Profile.Type.Mainnet }
+            , Artifacts.Type.DaemonPrefork { network = Network.Type.Mainnet }
+            , Artifacts.Type.DaemonPostfork { network = Network.Type.Mainnet }
             , Artifacts.Type.DaemonAutoHardfork
-                { network = Network.Type.Devnet }
+                { network = Network.Type.Mainnet }
             , Artifacts.Type.CreatePreforkGenesis
-                { network = Network.Type.Devnet }
-            , Artifacts.Type.Archive { network = Network.Type.Devnet }
-            , Artifacts.Type.Rosetta { network = Network.Type.Devnet }
+                { network = Network.Type.Mainnet }
+            , Artifacts.Type.Archive { network = Network.Type.Mainnet }
+            , Artifacts.Type.Rosetta { network = Network.Type.Mainnet }
             ]
           , tags =
             [ PipelineTag.Type.Packaging
             , PipelineTag.Type.Release
             , PipelineTag.Type.Docker
-            , PipelineTag.Type.Devnet
+            , PipelineTag.Type.Mainnet
             , PipelineTag.Type.Amd64
             , PipelineTag.Type.Bookworm
             ]

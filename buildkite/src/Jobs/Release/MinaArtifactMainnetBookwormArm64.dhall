@@ -14,28 +14,28 @@ let Network = ../../Constants/Network.dhall
 
 let Profile = ../../Constants/Profiles.dhall
 
+let Arch = ../../Constants/Arch.dhall
+
 in  Pipeline.build
       ( ArtifactPipelines.packagePipeline
           ArtifactPipelines.PackagingSpec::{
           , artifacts =
-            [ Artifacts.Type.Daemon { network = Network.Type.Devnet }
-            , Artifacts.Type.DaemonProfiled { profile = Profile.Type.Lightnet }
-            , Artifacts.Type.DaemonProfiled { profile = Profile.Type.Devnet }
-            , Artifacts.Type.DaemonPrefork { network = Network.Type.Devnet }
-            , Artifacts.Type.DaemonPostfork { network = Network.Type.Devnet }
-            , Artifacts.Type.DaemonAutoHardfork
-                { network = Network.Type.Devnet }
+            [ Artifacts.Type.Daemon { network = Network.Type.Mainnet }
+            , Artifacts.Type.DaemonProfiled { profile = Profile.Type.Mainnet }
+            , Artifacts.Type.DaemonPrefork { network = Network.Type.Mainnet }
+            , Artifacts.Type.DaemonPostfork { network = Network.Type.Mainnet }
             , Artifacts.Type.CreatePreforkGenesis
-                { network = Network.Type.Devnet }
-            , Artifacts.Type.Archive { network = Network.Type.Devnet }
-            , Artifacts.Type.Rosetta { network = Network.Type.Devnet }
+                { network = Network.Type.Mainnet }
+            , Artifacts.Type.Archive { network = Network.Type.Mainnet }
+            , Artifacts.Type.Rosetta { network = Network.Type.Mainnet }
             ]
+          , arch = Arch.Type.Arm64
           , tags =
             [ PipelineTag.Type.Packaging
             , PipelineTag.Type.Release
             , PipelineTag.Type.Docker
-            , PipelineTag.Type.Devnet
-            , PipelineTag.Type.Amd64
+            , PipelineTag.Type.Mainnet
+            , PipelineTag.Type.Arm64
             , PipelineTag.Type.Bookworm
             ]
           , debVersion = DebianVersions.DebVersion.Bookworm
