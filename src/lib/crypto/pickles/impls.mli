@@ -284,9 +284,7 @@ module Wrap : sig
         (e.g., lookup arguments, runtime tables)
       @return A specification mapping circuit variables to constants *)
   val input :
-       branch_data_width:
-         'n Pickles_types.Nat.s Pickles_types.Nat.s Pickles_types.Nat.t
-    -> feature_flags:Opt.Flag.t Plonk_types.Features.Full.t
+       feature_flags:Opt.Flag.t Plonk_types.Features.Full.t
     -> unit
     -> ( ( Impl.Field.t
          , Impl.Field.t Composition_types.Scalar_challenge.t

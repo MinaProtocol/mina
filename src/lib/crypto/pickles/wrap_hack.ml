@@ -10,9 +10,8 @@ open Pickles_types
 
    To simplify the implementation when the number of proofs-verified
    varies across proof systems (being either 0, 1, or 2) we secretly
-   pad the accumulator so that it always has at least 2 vectors, padding
-   with dummy vectors. An accumulator of [n > 2] vectors is not padded, so the
-   padded width is [max (2, n)].
+   pad the accumulator so that it always has exactly 2 vectors, padding
+   with dummy vectors.
 
    We also then pad with the corresponding dummy commitments when proving
    wrap statements, as in `pad_accumulator` which is used in wrap.ml.
@@ -24,26 +23,24 @@ open Pickles_types
 
 module Padded_length = Nat.N2
 
-(* The padded accumulator width for [n] accumulator vectors:
-   [max (Padded_length, n)]. *)
-let padded_length n = Nat.Max_type.nat Padded_length.n n
+(* Pad up to length 2 by preprending dummy values. *)
+let pad_vector (type a) ~dummy (v : (a, _) Vector.t) =
+  Vector.extend_front_exn v Padded_length.n dummy
 
-(* Pad (at the front) up to [padded_length] by prepending [dummy]. *)
-let pad_front ~dummy v =
-  Vector.extend_front_exn v (padded_length (Vector.length v)) dummy
+(* Specialized padding function. *)
+let pad_challenges (chalss : (_ Vector.t, _) Vector.t) =
+  pad_vector ~dummy:(Lazy.force Dummy.Ipa.Wrap.challenges_computed) chalss
 
-let pad_challenges chalss =
-  Vector.to_list
-    (pad_front chalss ~dummy:(Lazy.force Dummy.Ipa.Wrap.challenges_computed))
-
+(* Specialized padding function. *)
 let pad_accumulator (xs : (Tock.Proof.Challenge_polynomial.t, _) Vector.t) =
-  let dummy =
-    { Tock.Proof.Challenge_polynomial.commitment = Lazy.force Dummy.Ipa.Wrap.sg
-    ; challenges =
-        Vector.to_array (Lazy.force Dummy.Ipa.Wrap.challenges_computed)
-    }
-  in
-  Vector.to_list (pad_front xs ~dummy)
+  pad_vector xs
+    ~dummy:
+      { Tock.Proof.Challenge_polynomial.commitment =
+          Lazy.force Dummy.Ipa.Wrap.sg
+      ; challenges =
+          Vector.to_array (Lazy.force Dummy.Ipa.Wrap.challenges_computed)
+      }
+  |> Vector.to_list
 
 (* Hash the me only, padding first. *)
 let hash_messages_for_next_wrap_proof (type n)
@@ -53,9 +50,7 @@ let hash_messages_for_next_wrap_proof (type n)
       Composition_types.Wrap.Proof_state.Messages_for_next_wrap_proof.t ) =
   let t =
     { t with
-      old_bulletproof_challenges =
-        pad_front t.old_bulletproof_challenges
-          ~dummy:(Lazy.force Dummy.Ipa.Wrap.challenges_computed)
+      old_bulletproof_challenges = pad_challenges t.old_bulletproof_challenges
     }
   in
   Tock_field_sponge.digest Tock_field_sponge.params
@@ -63,23 +58,8 @@ let hash_messages_for_next_wrap_proof (type n)
      .to_field_elements t ~g1:(fun ((x, y) : Tick.Curve.Affine.t) -> [ x; y ] )
     )
 
-(* Pad the messages_for_next_wrap_proof of a proof to the side-loaded width.
-   Unlike [pad_front], this pads to exactly [Side_loaded_verification_key.Width.Max],
-   the protocol's cap on proofs verified by a side-loaded proof. *)
+(* Pad the messages_for_next_wrap_proof of a proof *)
 let pad_proof (type mlmb) (T p : mlmb Proof.t) : Proof.Proofs_verified_max.t =
-  let old_bulletproof_challenges =
-    p.statement.proof_state.messages_for_next_wrap_proof
-      .old_bulletproof_challenges
-  in
-  let max_width = Side_loaded_verification_key.Width.Max.n in
-  if
-    Nat.to_int (Vector.length old_bulletproof_challenges) > Nat.to_int max_width
-  then
-    failwithf
-      "Side-loaded proofs may verify at most %d proofs; this proof verifies %d"
-      (Nat.to_int max_width)
-      (Nat.to_int (Vector.length old_bulletproof_challenges))
-      () ;
   T
     { p with
       statement =
@@ -89,25 +69,29 @@ let pad_proof (type mlmb) (T p : mlmb Proof.t) : Proof.Proofs_verified_max.t =
               messages_for_next_wrap_proof =
                 { p.statement.proof_state.messages_for_next_wrap_proof with
                   old_bulletproof_challenges =
-                    Vector.extend_front_exn old_bulletproof_challenges max_width
-                      Dummy.Ipa.Wrap.challenges
+                    pad_vector
+                      p.statement.proof_state.messages_for_next_wrap_proof
+                        .old_bulletproof_challenges
+                      ~dummy:Dummy.Ipa.Wrap.challenges
                 }
             }
         }
     }
 
 module Checked = struct
-  let pad_challenges chalss =
-    pad_front chalss
+  let pad_challenges (chalss : (_ Vector.t, _) Vector.t) =
+    pad_vector
       ~dummy:
         (Vector.map ~f:Impls.Wrap.Field.constant
            (Lazy.force Dummy.Ipa.Wrap.challenges_computed) )
+      chalss
 
-  let pad_commitments commitments =
-    pad_front commitments
+  let pad_commitments (commitments : _ Vector.t) =
+    pad_vector
       ~dummy:
         (Tuple_lib.Double.map ~f:Impls.Step.Field.constant
            (Lazy.force Dummy.Ipa.Wrap.sg) )
+      commitments
 
   (* We precompute the sponge states that would result from absorbing
      0, 1, or 2 dummy challenge vectors. This is used to speed up hashing
@@ -139,15 +123,13 @@ module Checked = struct
         Composition_types.Wrap.Proof_state.Messages_for_next_wrap_proof.t ) =
     let open Wrap_main_inputs in
     let sponge =
-      (* The sponge states we would reach if we absorbed the padding challenges
-         that [pad_front] prepends. *)
+      (* The sponge states we would reach if we absorbed the padding challenges *)
       let s = Sponge.create sponge_params in
-      let num_padding =
-        Nat.to_int (padded_length max_proofs_verified)
-        - Nat.to_int max_proofs_verified
-      in
       let state, sponge_state =
-        (Lazy.force dummy_messages_for_next_wrap_proof_sponge_states).(num_padding)
+        (Lazy.force dummy_messages_for_next_wrap_proof_sponge_states).(2
+                                                                       - Nat
+                                                                         .to_int
+                                                                           max_proofs_verified)
       in
       { s with
         state = Array.map state ~f:Impls.Wrap.Field.constant

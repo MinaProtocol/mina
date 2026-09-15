@@ -501,9 +501,9 @@ struct
       ~(domain :
          [ `Known of Domain.t
          | `Side_loaded of
-           Nat.z Composition_types.Branch_data.Proofs_verified.One_hot.Checked.t
-         ] ) ~srs ~verification_key:(m : _ Plonk_verification_key_evals.t) ~xi
-      ~sponge ~sponge_after_index
+           Composition_types.Branch_data.Proofs_verified.One_hot.Checked.t ] )
+      ~srs ~verification_key:(m : _ Plonk_verification_key_evals.t) ~xi ~sponge
+      ~sponge_after_index
       ~(public_input :
          [ `Field of Field.t | `Packed_bits of Field.t * int ] array )
       ~(sg_old : (_, Proofs_verified.n) Vector.t) ~advice
@@ -542,7 +542,9 @@ struct
            from all previous proofs. Absorbing them into the transcript binds
            this proof to its predecessors. Padded to a fixed length to support
            variable numbers of previous proofs. *)
-        let sg_old = Wrap_hack.Checked.pad_commitments sg_old in
+        let sg_old : (_, Wrap_hack.Padded_length.n) Vector.t =
+          Wrap_hack.Checked.pad_commitments sg_old
+        in
         Vector.iter ~f:(absorb sponge PC) sg_old ;
         (* == IVC Step 3: Compute public input commitment (x_hat) ==
            Compute the commitment to the public input polynomial using
@@ -641,27 +643,9 @@ struct
         let bulletproof_challenges =
           let num_commitments_without_degree_bound = Nat.N45.n in
           (* Collect all polynomial commitments for the IPA *)
-          let sg_old_commitments = Vector.map sg_old ~f:(fun g -> [| g |]) in
-          (* [sg_old] is padded to [max (2, proofs_verified)]; build the append
-             witness from its actual length rather than a fixed [Padded_length]. *)
-          let (module Sg_old_length) =
-            Nat.Add.create (Vector.length sg_old_commitments)
-          in
-          let sg_old_add_witness =
-            let sum, adds =
-              Sg_old_length.add num_commitments_without_degree_bound
-            in
-            let module La = Core.Type_equal.Lift (struct
-              type 'a t =
-                ('a, Nat.N45.n, Nat.N45.n Sg_old_length.plus_n) Nat.Adds.t
-            end) in
-            ignore sum ;
-            Core.Type_equal.conv
-              (Core.Type_equal.sym (La.lift Sg_old_length.eq))
-              adds
-          in
           let without_degree_bound =
-            Vector.append sg_old_commitments
+            Vector.append
+              (Vector.map sg_old ~f:(fun g -> [| g |]))
               ( [| x_hat |] :: [| ft_comm |] :: z_comm :: m.generic_comm
               :: m.psm_comm :: m.complete_add_comm :: m.mul_comm :: m.emul_comm
               :: m.endomul_scalar_comm
@@ -671,7 +655,9 @@ struct
                    (snd
                       Plonk_types.(
                         Columns.add (fst (Columns.add Permuts_minus_1.n)) ) ) )
-              sg_old_add_witness
+              (snd
+                 (Wrap_hack.Padded_length.add
+                    num_commitments_without_degree_bound ) )
           in
           with_label "check_bulletproof" (fun () ->
               check_bulletproof ~sponge:sponge_before_evaluations ~xi ~advice
@@ -795,7 +781,7 @@ struct
 
   let domain_for_compiled (type branches)
       (domains : (Domains.t, branches) Vector.t)
-      (branch_data : _ Branch_data.Checked.Step.t) :
+      (branch_data : Branch_data.Checked.Step.t) :
       Field.t Plonk_checks.plonk_domain =
     let (T unique_domains) =
       List.map (Vector.to_list domains) ~f:Domains.h
@@ -860,7 +846,7 @@ struct
         , _
         , _
         , _
-        , 'bdw Branch_data.Checked.Step.t
+        , Branch_data.Checked.Step.t
         , _ )
         Types.Wrap.Proof_state.Deferred_values.In_circuit.t )
       { Plonk_types.All_evals.In_circuit.ft_eval1; evals } =
@@ -873,11 +859,6 @@ struct
       ~assert_equal:Boolean.Assert.( = ) ~feature_flags:plonk.feature_flags
       evals.evals ;
     let actual_width_mask = branch_data.proofs_verified_mask in
-    (* The mask is [max (2, proofs_verified)] bits wide; the actual proofs
-       verified is always at most that. *)
-    let proofs_verified_lte_mask =
-      Nat.lte_exn Proofs_verified.n (Vector.length actual_width_mask)
-    in
     let T = Proofs_verified.eq in
     (* You use the NEW bulletproof challenges to check b. Not the old ones. *)
     (* == Step 2: Scalar challenge conversion ==
@@ -927,7 +908,8 @@ struct
       let sg_evals pt =
         Vector.map2
           ~f:(fun keep f -> (keep, f pt))
-          (Vector.trim_front actual_width_mask proofs_verified_lte_mask)
+          (Vector.trim_front actual_width_mask
+             (Nat.lte_exn Proofs_verified.n Nat.N2.n) )
           sg_olds
       in
       (sg_evals plonk.zeta, sg_evals zetaw)
@@ -942,8 +924,10 @@ struct
       let challenge_digest =
         let opt_sponge = Opt_sponge.create sponge_params in
         Vector.iter2
-          (Vector.trim_front actual_width_mask proofs_verified_lte_mask)
-          prev_challenges ~f:(fun keep chals ->
+          (Vector.trim_front actual_width_mask
+             (Nat.lte_exn Proofs_verified.n Nat.N2.n) )
+          prev_challenges
+          ~f:(fun keep chals ->
             Vector.iter chals ~f:(fun chal ->
                 Opt_sponge.absorb opt_sponge (keep, chal) ) ) ;
         Opt_sponge.squeeze opt_sponge
@@ -1265,15 +1249,10 @@ struct
        into the public input format expected by the wrap circuit. *)
     let public_input :
         [ `Field of Field.t | `Packed_bits of Field.t * int ] array =
-      (* The verified proof's branch_data mask is [max (2, proofs_verified)]
-         bits wide; pack it at that width. *)
-      let (Nat.Max.T (branch_data_width, _, _)) =
-        Nat.max Nat.N2.n (Nat.Add.n proofs_verified)
-      in
       with_label "pack_statement" (fun () ->
           Spec.pack
             (module Impl)
-            ~branch_data_pack:Branch_data.Checked.Step.pack ~branch_data_width
+            (module Branch_data.Checked.Step)
             (Types.Wrap.Statement.In_circuit.spec
                (module Impl)
                lookup_parameters feature_flags )
