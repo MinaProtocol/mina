@@ -52,7 +52,7 @@ let Spec =
           , includeIf : List Expr.Type
           }
       , default =
-          { dockerType = Dockers.Type.Bullseye
+          { dockerType = Dockers.Type.Bookworm
           , network = Network.Type.Devnet
           , additionalDirtyWhen = [] : List S.Type
           , softFail = B/SoftFail.Boolean False

@@ -15,7 +15,7 @@
 #
 # Supported artifacts: mina-daemon, mina-archive, mina-rosetta, mina-logproc, mina-config, mina-automode, mina-prefork, mina-postfork, mina-generic, rosetta-generic, mina-postfork-mesa, mina-prefork-mesa, minimina
 # Supported networks: devnet, mainnet
-# Supported platforms: Debian (bullseye, focal), Docker (GCR, Docker.io)
+# Supported platforms: Debian (bookworm, focal), Docker (GCR, Docker.io)
 # Supported channels: unstable, alpha, beta, stable
 # Supported backends: Google Cloud Storage (gs), Hetzner, local filesystem
 #
@@ -46,7 +46,7 @@ PS4='debug($LINENO) ${FUNCNAME[0]:+${FUNCNAME[0]}}(): ';
 
 DEFAULT_ARTIFACTS="mina-logproc,mina-archive,mina-rosetta,mina-daemon"
 DEFAULT_NETWORKS="devnet,mainnet"
-DEFAULT_CODENAMES="bullseye,focal"
+DEFAULT_CODENAMES="bookworm,focal"
 DEFAULT_ARCHITECTURES="amd64"
 DEFAULT_PROFILE=devnet
 
