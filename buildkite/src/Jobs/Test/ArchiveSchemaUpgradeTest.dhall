@@ -22,8 +22,8 @@ in  Pipeline.build
         , dirtyWhen =
           [ S.exactly "src/app/archive/create_schema" "sql"
           , S.exactly "src/app/archive/drop_tables" "sql"
-          , S.exactly "src/app/archive/upgrade_to_mesa" "sql"
-          , S.exactly "src/app/archive/downgrade_to_berkeley" "sql"
+          , S.exactly "src/app/archive/upgrade" "sql"
+          , S.exactly "src/app/archive/downgrade" "sql"
           , S.exactly "buildkite/src/Jobs/Test/ArchiveSchemaUpgradeTest" "dhall"
           , S.exactly "buildkite/scripts/archive/verify-schema-upgrade" "sh"
           ]

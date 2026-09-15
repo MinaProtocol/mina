@@ -2,9 +2,9 @@
 
 # Archive Schema Upgrade Verification Test
 #
-# This script verifies that applying upgrade_to_mesa.sql to the source
+# This script verifies that applying upgrade.sql to the source
 # (Berkeley/compatible) schema produces the same schema as the target
-# (Mesa/develop) branch's create_schema.sql, and that downgrade_to_berkeley.sql
+# (Mesa/develop) branch's create_schema.sql, and that downgrade.sql
 # reverses the upgrade correctly.
 #
 # The upgrade/downgrade scripts are always taken from the current working tree,
@@ -149,7 +149,7 @@ dump_and_normalize() {
 # Strip that documented delta from both sides before comparing.
 #
 # TODO: the upgrade arm of this tolerance is only needed because compatible's
-# released upgrade_to_mesa.sql never dropped the element_ids UNIQUE/index and the
+# released upgrade.sql never dropped the element_ids UNIQUE/index and the
 # events_id/actions_id NOT NULL, while develop's does. Once compatible's migration
 # carries those DROPs, stop normalizing the upgrade comparison (Test 1) and let it
 # assert the constraints are gone; the downgrade arm (Test 2) stays either way,
@@ -206,8 +206,8 @@ main() {
     git show "origin/${SOURCE_BRANCH}:src/app/archive/create_schema.sql" > "$source_schema_file"
     git show "origin/${TARGET_BRANCH}:src/app/archive/create_schema.sql" > "$target_schema_file"
 
-    local upgrade_script="${REPO_ROOT}/src/app/archive/upgrade_to_mesa.sql"
-    local downgrade_script="${REPO_ROOT}/src/app/archive/downgrade_to_berkeley.sql"
+    local upgrade_script="${REPO_ROOT}/src/app/archive/upgrade.sql"
+    local downgrade_script="${REPO_ROOT}/src/app/archive/downgrade.sql"
 
     # Verify upgrade/downgrade scripts exist in working tree
     for f in "$upgrade_script" "$downgrade_script"; do
@@ -224,7 +224,7 @@ main() {
     # --- Test 1: Upgrade path produces correct schema ---
     echo ""
     echo "=== Test 1: Upgrade path verification ==="
-    echo "  Expected: ${SOURCE_BRANCH} schema + upgrade_to_mesa.sql == ${TARGET_BRANCH} schema"
+    echo "  Expected: ${SOURCE_BRANCH} schema + upgrade.sql == ${TARGET_BRANCH} schema"
     echo "            except documented Berkeley/Mesa element_ids constraint deltas"
 
     create_db "archive_fresh"
@@ -236,8 +236,8 @@ main() {
     echo "Applying ${SOURCE_BRANCH}'s create_schema.sql to upgrade database..."
     run_psql "archive_upgraded" -f "/tmp/source_schema.sql"
 
-    echo "Applying upgrade_to_mesa.sql..."
-    run_psql "archive_upgraded" -f "/workdir/src/app/archive/upgrade_to_mesa.sql"
+    echo "Applying upgrade.sql..."
+    run_psql "archive_upgraded" -f "/workdir/src/app/archive/upgrade.sql"
 
     local schema_fresh="/tmp/schema_fresh_$$.sql"
     local schema_upgraded="/tmp/schema_upgraded_$$.sql"
@@ -254,7 +254,7 @@ main() {
         echo ""
         echo "FAIL: Schema mismatch between upgrade path and fresh create"
         echo "  Left:  ${TARGET_BRANCH}'s create_schema.sql applied directly"
-        echo "  Right: ${SOURCE_BRANCH}'s create_schema.sql + upgrade_to_mesa.sql"
+        echo "  Right: ${SOURCE_BRANCH}'s create_schema.sql + upgrade.sql"
         exit 1
     fi
 
@@ -272,8 +272,8 @@ main() {
 
     echo "Applying ${SOURCE_BRANCH}'s create_schema.sql + upgrade + downgrade..."
     run_psql "archive_downgraded" -f "/tmp/source_schema.sql"
-    run_psql "archive_downgraded" -f "/workdir/src/app/archive/upgrade_to_mesa.sql"
-    run_psql "archive_downgraded" -f "/workdir/src/app/archive/downgrade_to_berkeley.sql"
+    run_psql "archive_downgraded" -f "/workdir/src/app/archive/upgrade.sql"
+    run_psql "archive_downgraded" -f "/workdir/src/app/archive/downgrade.sql"
 
     local schema_source_ref="/tmp/schema_source_ref_$$.sql"
     local schema_downgraded="/tmp/schema_downgraded_$$.sql"
