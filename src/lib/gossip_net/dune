@@ -10,7 +10,6 @@
   async.async_rpc
   async_kernel
   base
-  base.caml
   bin_prot.shape
   async_rpc_kernel
   async

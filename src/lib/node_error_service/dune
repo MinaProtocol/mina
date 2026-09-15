@@ -13,8 +13,8 @@
   cohttp
   async_kernel
   core_kernel.uuid
+  core_unix.uuid
   integers
-  base.caml
   ;; local libraries
   error_json
   transition_frontier_base

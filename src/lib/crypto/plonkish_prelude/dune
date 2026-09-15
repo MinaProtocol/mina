@@ -28,7 +28,6 @@
   (backend bisect_ppx))
  (libraries
   ;; opam libraries
-  base.caml
   bin_prot.shape
   result
   sexplib0

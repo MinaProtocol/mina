@@ -3716,8 +3716,7 @@ module Block = struct
       List.map missing_blocks ~f:(fun { next_epoch_data; _ } -> next_epoch_data)
     in
     let all_missing_epochs =
-      Staged.unstage
-        (List.stable_dedup_staged ~compare:Mina_base.Epoch_data.compare)
+      List.stable_dedup ~compare:Mina_base.Epoch_data.compare
         (missing_block_staking_epochs @ missing_block_next_epochs)
     in
 
@@ -3729,8 +3728,7 @@ module Block = struct
       List.map all_missing_epochs ~f:(fun { ledger = { hash; _ }; _ } -> hash)
     in
     let all_missing_ledger_hashes =
-      Staged.unstage
-        (List.stable_dedup_staged ~compare:Ledger_hash.compare)
+      List.stable_dedup ~compare:Ledger_hash.compare
         (missing_snarked_ledger_hashes @ missing_epoch_ledger_hashes)
     in
 
@@ -3749,8 +3747,7 @@ module Block = struct
           List.bind zkapp_cmds ~f:Extensional.Zkapp_command.accounts_referenced )
     in
     let all_missing_accounts =
-      Staged.unstage
-        (List.stable_dedup_staged ~compare:Account_id.compare)
+      List.stable_dedup ~compare:Account_id.compare
         ( missing_user_cmd_accounts @ missing_internal_cmd_accounts
         @ missing_zkapp_cmd_accounts )
     in
@@ -3768,9 +3765,7 @@ module Block = struct
       List.map all_missing_accounts ~f:Account_id.public_key
     in
     let all_missing_public_keys =
-      Staged.unstage
-        (List.stable_dedup_staged
-           ~compare:Signature_lib.Public_key.Compressed.compare )
+      List.stable_dedup ~compare:Signature_lib.Public_key.Compressed.compare
         (missing_block_creators @ missing_block_winners @ missing_account_keys)
     in
 
@@ -3843,8 +3838,7 @@ module Block = struct
 
     (* We only expect a single protocol version at any migration, so we use the old non-batched functions here (which already cache ids) *)
     let all_protocol_versions =
-      Staged.unstage
-        (List.stable_dedup_staged ~compare:Protocol_version.compare)
+      List.stable_dedup ~compare:Protocol_version.compare
         (List.map blocks ~f:(fun block -> block.protocol_version))
     in
     let%bind protocol_version_ids =
@@ -3948,7 +3942,7 @@ module Block = struct
               (user_cmd_to_repr
                  ~find_public_key_id:(Map.find_exn public_key_ids) )
             block.user_cmds )
-      |> Staged.unstage (List.stable_dedup_staged ~compare:compare_by_hash)
+      |> List.stable_dedup ~compare:compare_by_hash
       |> differential_insert
            (module String)
            ~get_key:(fun { hash; _ } -> hash)
@@ -4020,8 +4014,7 @@ module Block = struct
               (internal_cmd_to_repr
                  ~find_public_key_id:(Map.find_exn public_key_ids) )
             block.internal_cmds )
-      |> Staged.unstage
-           (List.stable_dedup_staged ~compare:compare_by_primary_key)
+      |> List.stable_dedup ~compare:compare_by_primary_key
       |> differential_insert
            (module Internal_command_primary_key)
            ~get_key:Internal_command_primary_key.of_command ~get_value:Fn.id

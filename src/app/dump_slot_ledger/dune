@@ -2,7 +2,7 @@
   (name dump_slot_ledger_lib)
  (modules dump_slot_ledger_lib)
   (libraries
-    async base base.caml caqti caqti-driver-postgresql core
+    async base caqti caqti-driver-postgresql core
     core_unix.command_unix cli_lib mina_caqti
     yojson
     )

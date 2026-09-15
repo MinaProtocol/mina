@@ -39,7 +39,7 @@ let create a =
          in
          if Ivar.is_full !downstream_flushed_v then
            [%log' error (Logger.create ())] "Ivar.fill bug is here!" ;
-         Ivar.fill !downstream_flushed_v () ;
+         Ivar.fill_exn !downstream_flushed_v () ;
          Deferred.unit ) ) ;
   (t, t)
 

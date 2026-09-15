@@ -66,18 +66,18 @@ let copy_bigstring t : Bigstring.t =
   new_t
 
 let to_alist t : (Bigstring.t * Bigstring.t) list =
-  let iterator = Rocks.Iterator.create t.db in
-  Rocks.Iterator.seek_to_last iterator ;
-  (* iterate backwards and cons, to build list sorted by key *)
-  let rec loop accum =
-    if Rocks.Iterator.is_valid iterator then (
-      let key = copy_bigstring (Rocks.Iterator.get_key iterator) in
-      let value = copy_bigstring (Rocks.Iterator.get_value iterator) in
-      Rocks.Iterator.prev iterator ;
-      loop ((key, value) :: accum) )
-    else accum
-  in
-  loop []
+  Rocks.Iterator.with_t t.db ~f:(fun iterator ->
+      Rocks.Iterator.seek_to_last iterator ;
+      (* iterate backwards and cons, to build list sorted by key *)
+      let rec loop accum =
+        if Rocks.Iterator.is_valid iterator then (
+          let key = copy_bigstring (Rocks.Iterator.get_key iterator) in
+          let value = copy_bigstring (Rocks.Iterator.get_value iterator) in
+          Rocks.Iterator.prev iterator ;
+          loop ((key, value) :: accum) )
+        else accum
+      in
+      loop [] )
 
 let foldi :
        t
@@ -85,17 +85,17 @@ let foldi :
     -> f:(int -> 'a -> key:Bigstring.t -> data:Bigstring.t -> 'a)
     -> 'a =
  fun t ~init ~f ->
-  let iterator = Rocks.Iterator.create t.db in
-  Rocks.Iterator.seek_to_first iterator ;
-  let rec loop i accum =
-    if Rocks.Iterator.is_valid iterator then (
-      let key = copy_bigstring (Rocks.Iterator.get_key iterator) in
-      let data = copy_bigstring (Rocks.Iterator.get_value iterator) in
-      Rocks.Iterator.next iterator ;
-      loop (i + 1) (f i accum ~key ~data) )
-    else accum
-  in
-  loop 0 init
+  Rocks.Iterator.with_t t.db ~f:(fun iterator ->
+      Rocks.Iterator.seek_to_first iterator ;
+      let rec loop i accum =
+        if Rocks.Iterator.is_valid iterator then (
+          let key = copy_bigstring (Rocks.Iterator.get_key iterator) in
+          let data = copy_bigstring (Rocks.Iterator.get_value iterator) in
+          Rocks.Iterator.next iterator ;
+          loop (i + 1) (f i accum ~key ~data) )
+        else accum
+      in
+      loop 0 init )
 
 let fold_until :
        t
@@ -108,14 +108,15 @@ let fold_until :
     -> finish:('a -> 'b)
     -> 'b =
  fun t ~init ~f ~finish ->
-  let iterator = Rocks.Iterator.create t.db in
-  Rocks.Iterator.seek_to_first iterator ;
-  let rec loop accum =
-    if Rocks.Iterator.is_valid iterator then (
-      let key = copy_bigstring (Rocks.Iterator.get_key iterator) in
-      let data = copy_bigstring (Rocks.Iterator.get_value iterator) in
-      Rocks.Iterator.next iterator ;
-      match f accum ~key ~data with Stop _ -> accum | Continue v -> loop v )
-    else accum
-  in
-  finish @@ loop init
+  finish
+  @@ Rocks.Iterator.with_t t.db ~f:(fun iterator ->
+      Rocks.Iterator.seek_to_first iterator ;
+      let rec loop accum =
+        if Rocks.Iterator.is_valid iterator then (
+          let key = copy_bigstring (Rocks.Iterator.get_key iterator) in
+          let data = copy_bigstring (Rocks.Iterator.get_value iterator) in
+          Rocks.Iterator.next iterator ;
+          match f accum ~key ~data with Stop _ -> accum | Continue v -> loop v )
+        else accum
+      in
+      loop init )

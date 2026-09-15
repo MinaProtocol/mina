@@ -80,9 +80,7 @@ let data t =
   let collected_transitions = Hashtbl.data t |> List.concat in
   assert (
     Stdlib.List.compare_lengths collected_transitions
-      (Staged.unstage
-         (List.stable_dedup_staged ~compare:Poly.compare)
-         collected_transitions )
+      (List.stable_dedup ~compare:Poly.compare collected_transitions)
     = 0 )
   (* TODO: make this assertion more efficient *) ;
   collected_transitions

@@ -18,7 +18,7 @@ module T = struct
           List.iter ls ~f:(fun ivar ->
               if Ivar.is_full ivar then
                 [%log' error (Logger.create ())] "Ivar.fill bug is here!" ;
-              Ivar.fill ivar () ) ;
+              Ivar.fill_exn ivar () ) ;
           None
       | None ->
           None )

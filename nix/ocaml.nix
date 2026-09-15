@@ -20,7 +20,7 @@ let
     [ "check_opam_switch" ];
 
   # Extra packages which are not in opam.export but useful for development.
-  # The v0.16-series export already carries the LSP server, ocamlformat and the
+  # The v0.17-series export already carries the LSP server, ocamlformat and the
   # dune component libraries, so only the system compiler alias remains here.
   extra-packages = with implicit-deps; { ocaml-system = ocaml; };
 
@@ -42,6 +42,10 @@ let
       # Can't find sodium-static and ctypes
       sodium = super.sodium.overrideAttrs {
         NIX_CFLAGS_COMPILE = "-I${pkgs.sodium-static.dev}/include";
+        # TEMPORARY: static-link libsodium so built binaries need no
+        # libsodium.so at runtime. Drop once the portable build bundles
+        # shared libraries.
+        SODIUM_STATIC = "1";
         propagatedBuildInputs = [ pkgs.sodium-static ];
         preBuild = ''
           export LD_LIBRARY_PATH="${super.ctypes}/lib/ocaml/${super.ocaml.version}/site-lib/ctypes";

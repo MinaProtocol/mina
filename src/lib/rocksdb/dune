@@ -10,10 +10,10 @@
   async_kernel
   async_unix
   base.base_internalhash_types
-  base.caml
   core
   core_kernel
   core_kernel.uuid
+  core_unix.uuid
   ppx_inline_test.config
   rocks
   sexplib0

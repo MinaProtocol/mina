@@ -506,7 +506,7 @@ let generate_txs ~valid_until ~nonce_ref ~n_zkapp_txs ~n_payments ~n_blocks
                      (Public_key.compress fee_payer_keypair.public_key)
                    ~account_state_tbl ~vk ~genesis_constants () )
                 ~size:1
-                ~random:(Splittable_random.State.create Random.State.default)
+                ~random:(Splittable_random.create Random.State.default)
             in
             (* Sign the fee payer with the real key (the generator uses
                Signature.dummy). Account updates use Proof auth so they

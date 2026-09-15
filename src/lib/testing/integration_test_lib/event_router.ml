@@ -58,7 +58,7 @@ module Make (Engine : Intf.Engine.S) () :
           | `Continue ->
               None
           | `Stop result ->
-              Ivar.fill handler_finished_ivar result ;
+              Ivar.fill_exn handler_finished_ivar result ;
               Some handler_id )
     in
     unregister_event_handlers_by_id handlers
@@ -90,7 +90,7 @@ module Make (Engine : Intf.Engine.S) () :
     let (Event_subscription (id, ivar, event_type)) = event_subscription in
     unregister_event_handlers_by_id t.handlers
       (Event_type.Event_type event_type) [ id ] ;
-    Ivar.fill ivar cancellation
+    Ivar.fill_exn ivar cancellation
 
   let await event_subscription =
     let (Event_subscription (_, ivar, _)) = event_subscription in

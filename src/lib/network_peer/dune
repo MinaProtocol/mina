@@ -10,7 +10,6 @@
   core_kernel
   bin_prot.shape
   sexplib0
-  base.caml
   base.base_internalhash_types
   result
   async_kernel

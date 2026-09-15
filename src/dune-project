@@ -42,6 +42,7 @@
 (package (name fake_network))
 (package (name fields_derivers))
 (package (name filtered_external_transition))
+(package (name gc_compaction))
 (package (name generated_graphql_queries))
 (package (name generate_keypair))
 (package (name genesis_constants))

@@ -360,7 +360,7 @@ module Accounts = struct
         Quickcheck.Generator.create (fun ~size ~random ->
             let rec gen_balances_rev n balance balances_tl accounts =
               if n > 0 then
-                let new_random = Splittable_random.State.split random in
+                let new_random = Splittable_random.split random in
                 let account =
                   (* Manually generate an account using the [generate] primitive. *)
                   Quickcheck.Generator.generate ~size ~random:new_random

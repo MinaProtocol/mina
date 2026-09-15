@@ -3,7 +3,7 @@
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## Project Overview
-Mina Protocol is a lightweight blockchain that maintains constant size by using recursive zk-SNARKs. The codebase is primarily written in OCaml (4.14.2) with additional components in Go (libp2p helper) and Rust (cryptographic implementations via proof-systems submodule).
+Mina Protocol is a lightweight blockchain that maintains constant size by using recursive zk-SNARKs. The codebase is primarily written in OCaml (5.3.0) with additional components in Go (libp2p helper) and Rust (cryptographic implementations via proof-systems submodule).
 
 ## Build Commands
 
@@ -150,7 +150,7 @@ Profiles are defined as `.mlh` files in `src/config/` and selected via `--profil
 - **Transaction Pool**: Mempool for pending transactions
 
 ### Important Constraints
-- OCaml 4.14.2 is required (not compatible with OCaml 5)
+- OCaml 5.3.0 is required
 - Dune 3.1+ required
 - System ulimits need adjustment for builds: `ulimit -s 65532; ulimit -n 10240`
 - Builds require significant RAM (10GB+)

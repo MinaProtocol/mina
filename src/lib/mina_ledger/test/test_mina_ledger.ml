@@ -236,7 +236,7 @@ module Root_test = struct
 end
 
 let () =
-  let random = Splittable_random.State.create Random.State.default in
+  let random = Splittable_random.create Random.State.default in
   Async.Thread_safe.block_on_async_exn (fun () ->
       Alcotest_async.run "Mina Ledger"
         [ ( "Root"

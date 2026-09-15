@@ -40,7 +40,7 @@ let test_case (test_data : t) =
    in
    [%log info] "Finished executing upgrade script"
      ~metadata:[ ("result", `String result) ] ;
-   Ivar.fill upgrade_script_finished () )
+   Ivar.fill_exn upgrade_script_finished () )
   |> Deferred.don't_wait_for ;
   Archive.Process.start_logging test_data.archive ~log_file ;
 

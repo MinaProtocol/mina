@@ -25,7 +25,7 @@ module Step = struct
 
     module Verification = struct
       type t = Type_equal.Id.Uid.t * Snark_keys_header.t * int * Md5.t
-      [@@deriving sexp]
+      [@@deriving sexp_of]
 
       let to_string : t -> _ = function
         | _id, header, n, _h ->
@@ -151,7 +151,7 @@ module Wrap = struct
   module Key = struct
     module Verification = struct
       type t = Type_equal.Id.Uid.t * Snark_keys_header.t * Md5.t
-      [@@deriving sexp]
+      [@@deriving sexp_of]
 
       let equal ((_, x1, y1) : t) ((_, x2, y2) : t) =
         [%equal: unit * Md5.t] ((* TODO: *) ignore x1, y1) (ignore x2, y2)

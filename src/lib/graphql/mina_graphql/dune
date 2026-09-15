@@ -7,7 +7,6 @@
   integers
   bignum
   async_kernel
-  base.caml
   base.base_internalhash_types
   re2
   graphql-async

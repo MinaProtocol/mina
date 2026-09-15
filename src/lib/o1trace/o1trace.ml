@@ -150,7 +150,7 @@ let%test_module "thread tests" =
       Hashtbl.clear Thread.threads ;
       Thread_safe.block_on_async_exn (fun () ->
           let s = Ivar.create () in
-          f (Ivar.fill s) ;
+          f (Ivar.fill_exn s) ;
           let%bind () = Ivar.read s in
           Writer.(flushed (Lazy.force stdout)) )
 

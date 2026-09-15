@@ -20,7 +20,6 @@
   rocks
   integers
   async_kernel
-  base.caml
   base
   core
   core_kernel

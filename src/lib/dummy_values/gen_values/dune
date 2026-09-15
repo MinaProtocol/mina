@@ -5,7 +5,6 @@
   ;; opam libraries
   async_unix
   stdio
-  base.caml
   core
   async
   ppxlib

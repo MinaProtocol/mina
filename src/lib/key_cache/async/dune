@@ -9,7 +9,6 @@
   async_unix
   core_kernel
   base
-  base.caml
   ;; local libraries
   key_cache
   logger)

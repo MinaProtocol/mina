@@ -80,38 +80,39 @@ let rec determine_outcome : type p r partial.
             | `Valid r ->
                 if Ivar.is_full elt.res then
                   [%log error] "Ivar.fill bug is here!" ;
-                Ivar.fill elt.res (Ok (Ok r)) ;
+                Ivar.fill_exn elt.res (Ok (Ok r)) ;
                 None
             | `Invalid_keys keys ->
                 if Ivar.is_full elt.res then
                   [%log error] "Ivar.fill bug is here!" ;
-                Ivar.fill elt.res (Ok (Error (`Invalid_keys keys))) ;
+                Ivar.fill_exn elt.res (Ok (Error (`Invalid_keys keys))) ;
                 None
             | `Invalid_signature keys ->
                 if Ivar.is_full elt.res then
                   [%log error] "Ivar.fill bug is here!" ;
-                Ivar.fill elt.res (Ok (Error (`Invalid_signature keys))) ;
+                Ivar.fill_exn elt.res (Ok (Error (`Invalid_signature keys))) ;
                 None
             | `Invalid_proof err ->
                 if Ivar.is_full elt.res then
                   [%log error] "Ivar.fill bug is here!" ;
-                Ivar.fill elt.res (Ok (Error (`Invalid_proof err))) ;
+                Ivar.fill_exn elt.res (Ok (Error (`Invalid_proof err))) ;
                 None
             | `Missing_verification_key keys ->
                 if Ivar.is_full elt.res then
                   [%log error] "Ivar.fill bug is here!" ;
-                Ivar.fill elt.res (Ok (Error (`Missing_verification_key keys))) ;
+                Ivar.fill_exn elt.res
+                  (Ok (Error (`Missing_verification_key keys))) ;
                 None
             | `Unexpected_verification_key keys ->
                 if Ivar.is_full elt.res then
                   [%log error] "Ivar.fill bug is here!" ;
-                Ivar.fill elt.res
+                Ivar.fill_exn elt.res
                   (Ok (Error (`Unexpected_verification_key keys))) ;
                 None
             | `Mismatched_authorization_kind keys ->
                 if Ivar.is_full elt.res then
                   [%log error] "Ivar.fill bug is here!" ;
-                Ivar.fill elt.res
+                Ivar.fill_exn elt.res
                   (Ok (Error (`Mismatched_authorization_kind keys))) ;
                 None
             | `Potentially_invalid (new_hint, err) ->
@@ -124,7 +125,7 @@ let rec determine_outcome : type p r partial.
           return ()
       | [ ({ res; _ }, _, err) ] ->
           if Ivar.is_full res then [%log error] "Ivar.fill bug is here!" ;
-          Ivar.fill res (Ok (Error (`Invalid_proof err))) ;
+          Ivar.fill_exn res (Ok (Error (`Invalid_proof err))) ;
           (* If there is a potentially invalid proof in this batch of size 1, then
              that proof is itself invalid. *)
           return ()

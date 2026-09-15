@@ -14,6 +14,7 @@
   archive_lib
   block_time
   cli_lib
+  gc_compaction
   genesis_constants
   logger
   mina_runtime_config
@@ -22,4 +23,4 @@
  (instrumentation
   (backend bisect_ppx --bisect-sigterm))
  (preprocess
-  (pps ppx_jane ppx_mina ppx_version)))
+  (pps ppx_mina ppx_version ppx_let)))

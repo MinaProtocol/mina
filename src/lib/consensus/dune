@@ -12,7 +12,6 @@
   async_unix
   async_kernel
   sexplib0
-  base.caml
   integers
   async
   core
@@ -22,6 +21,7 @@
   base
   result
   core_kernel.uuid
+  core_unix.uuid
   async_rpc_kernel
   sexp_diff
   ;; local libraries

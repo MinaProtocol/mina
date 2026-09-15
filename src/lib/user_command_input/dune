@@ -8,7 +8,6 @@
   core_kernel
   async_kernel
   sexplib0
-  base.caml
   async
   ;; local libraries
   logger

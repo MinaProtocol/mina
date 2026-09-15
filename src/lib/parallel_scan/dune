@@ -16,7 +16,6 @@
   lens
   async_kernel
   bin_prot.shape
-  base.caml
   async_unix
   ;; local libraries
   mina_metrics

@@ -6,7 +6,6 @@
   (flags -verbose -show-counts))
  (libraries
   ;; opam libraries
-  base.caml
   core_kernel
   sexplib0
   base
