@@ -112,7 +112,8 @@ BEGIN
         RAISE EXCEPTION 
           'Could not apply migration to current protocol & migration version: (%, %)', 
           latest_protocol_version,
-          latest_migration_version;
+          latest_migration_version
+          USING HINT = 'An archive already on Mesa from an earlier migration_version can add the user_commands account indexes with add_user_commands_account_indexes.sql';
     END IF;
 END$$;
 
@@ -257,13 +258,46 @@ ALTER TABLE zkapp_account_update_body ALTER COLUMN actions_id DROP NOT NULL;
 
 -- 3c. Index the user_commands account columns. Account lookups such as Rosetta
 -- /search/transactions filter on them and otherwise scan the whole table.
--- A plain CREATE INDEX does not block reads, but blocks inserts into
--- user_commands while it builds (seconds per index on mainnet). On a live
--- archive, run add_user_commands_account_indexes.sql first (CONCURRENTLY); these
--- statements are then no-ops.
-CREATE INDEX IF NOT EXISTS idx_user_commands_fee_payer_id ON user_commands(fee_payer_id);
-CREATE INDEX IF NOT EXISTS idx_user_commands_source_id    ON user_commands(source_id);
-CREATE INDEX IF NOT EXISTS idx_user_commands_receiver_id  ON user_commands(receiver_id);
+-- Valid indexes are detected from the catalog and left untouched (CREATE INDEX
+-- IF NOT EXISTS would still take a SHARE lock on user_commands first). An
+-- invalid index, left by an interrupted CONCURRENTLY build, is rebuilt.
+-- A build blocks inserts into user_commands (not reads) for its whole duration.
+-- On a live archive, build the indexes beforehand with
+-- add_user_commands_account_indexes.sql (CONCURRENTLY), which reduces this step
+-- to a catalog check.
+CREATE FUNCTION pg_temp.ensure_user_commands_index(p_index TEXT, p_column TEXT)
+RETURNS VOID AS $$
+DECLARE
+    is_valid BOOLEAN;
+BEGIN
+    SELECT i.indisvalid INTO is_valid
+    FROM pg_index i
+    JOIN pg_class c ON c.oid = i.indexrelid
+    JOIN pg_namespace n ON n.oid = c.relnamespace
+    WHERE n.nspname = 'public' AND c.relname = p_index;
+
+    IF is_valid THEN
+        RAISE DEBUG 'Index % already present and valid', p_index;
+        RETURN;
+    END IF;
+
+    IF is_valid IS NOT NULL THEN
+        RAISE NOTICE 'Rebuilding invalid index %', p_index;
+        EXECUTE format('DROP INDEX public.%I', p_index);
+    END IF;
+
+    EXECUTE format('CREATE INDEX %I ON public.user_commands(%I)', p_index, p_column);
+
+EXCEPTION
+    WHEN OTHERS THEN
+        PERFORM pg_temp.set_migration_status('failed'::migration_status);
+        RAISE EXCEPTION 'An error occurred while creating index %: %', p_index, SQLERRM;
+END
+$$ LANGUAGE plpgsql;
+
+SELECT pg_temp.ensure_user_commands_index('idx_user_commands_fee_payer_id', 'fee_payer_id');
+SELECT pg_temp.ensure_user_commands_index('idx_user_commands_source_id', 'source_id');
+SELECT pg_temp.ensure_user_commands_index('idx_user_commands_receiver_id', 'receiver_id');
 
 -- 4. Update schema_history
 
