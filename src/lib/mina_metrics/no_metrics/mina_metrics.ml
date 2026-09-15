@@ -126,6 +126,8 @@ module Transaction_pool = struct
 
   let vk_refcount_table_size : Gauge.t = ()
 
+  let vk_refcount_leaks_detected : Counter.t = ()
+
   let zkapp_transactions_added_to_pool : Counter.t = ()
 
   let zkapp_transaction_size : Counter.t = ()
