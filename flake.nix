@@ -412,6 +412,21 @@
             mina-image-slim mina-image-full mina-archive-image-full
             mina-image-devnet-generic mina-archive-image-devnet;
           mina-deb = debianPackages.mina;
+
+          # The portable tree: one producer, consumed by the Debian packages and
+          # the docker images alike (nix/portable.nix). devnet first because
+          # that is the build NixBuildTest already puts in the shared cache.
+          mina-portable-devnet =
+            pkgs.callPackage ./nix/portable.nix { } {
+              name = "mina-portable-devnet";
+              commit = inputs.self.sourceInfo.rev or "<dirty>";
+              exes = {
+                mina = "${ocamlPackages.devnet-pkg.out}/bin/mina";
+                logproc = "${ocamlPackages.devnet-pkg.out}/bin/logproc";
+                mina-libp2p_helper =
+                  "${pkgs.libp2p_helper}/bin/mina-libp2p_helper";
+              };
+            };
           impure-shell = (import ./nix/impure-shell.nix pkgs).inputDerivation;
         }) // {
           inherit (ocamlPackages) pkgs;
