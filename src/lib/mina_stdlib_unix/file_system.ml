@@ -15,6 +15,11 @@ let remove_dir dir =
   in
   Deferred.unit
 
+let copy_dir src dst =
+  Monitor.try_with ~here:[%here] (fun () ->
+      Process.run_exn ~prog:"cp" ~args:[ "-r"; src; dst ] () )
+  |> Deferred.Result.map ~f:ignore
+
 let rec rmrf path =
   match Core.Sys.is_directory path with
   | `Yes ->
