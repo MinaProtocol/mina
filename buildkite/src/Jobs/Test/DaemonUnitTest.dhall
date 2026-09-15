@@ -43,6 +43,7 @@ in  Pipeline.build
       , spec =
           let unitDirtyWhen =
                 [ S.strictlyStart (S.contains "src")
+                , S.strictlyStart (S.contains "genesis_ledgers")
                 , S.strictly (S.contains "Makefile")
                 , S.exactly "buildkite/src/Jobs/Test/DaemonUnitTest" "dhall"
                 , S.exactly "buildkite/src/Constants/ContainerImages" "dhall"
