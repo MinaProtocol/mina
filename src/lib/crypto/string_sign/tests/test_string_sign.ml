@@ -169,9 +169,7 @@ let test_secret_key_between_scalar_field_and_base_field () =
   (* Combined generator for both signature kind and offset *)
   let combined_gen =
     let open Quickcheck.Generator.Let_syntax in
-    let%bind signature_kind =
-      Mina_signature_kind_type.signature_kind_gen seed
-    in
+    let%bind signature_kind = Mina_signature_kind.signature_kind_gen seed in
     let%map offset = offset_gen in
     (signature_kind, offset)
   in
@@ -196,10 +194,10 @@ let test_regression_signature () =
   let inputs =
     [ ( Signature_lib.Private_key.of_string_exn
           "28948022309329048855892746252171976963363056481941560715954676764349967630337"
-      , Mina_signature_kind_type.Mainnet )
+      , Mina_signature_kind.Mainnet )
     ; ( Signature_lib.Private_key.of_string_exn
           "28948022309329048855892746252171976963363056481941560715954676764349967630337"
-      , Mina_signature_kind_type.Testnet )
+      , Mina_signature_kind.Testnet )
     ]
   in
   let exp_output =
