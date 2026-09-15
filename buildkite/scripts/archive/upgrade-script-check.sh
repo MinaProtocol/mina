@@ -23,7 +23,7 @@
 # FILES MONITORED:
 #   - src/app/archive/create_schema.sql
 #   - src/app/archive/drop_table.sql
-#   - src/app/archive/upgrade_to_mesa.sql (required when above files change)
+#   - src/app/archive/upgrade.sql (required when above files change)
 
 set -euo pipefail
 
@@ -141,8 +141,8 @@ main() {
     )
 
     local scripts=(
-        "src/app/archive/upgrade_to_mesa.sql"
-        "src/app/archive/downgrade_to_berkeley.sql"
+        "src/app/archive/upgrade.sql"
+        "src/app/archive/downgrade.sql"
     )
 
     # Check if either monitored file has changes
