@@ -9,7 +9,8 @@ module Application_state =
 
 type apply =
      User_command.t Transaction.t_
-  -> Staged_ledger.Ledger.Transaction_partially_applied.t Or_error.t
+  -> Staged_ledger.Ledger.Non_hashing_ledger.Transaction_partially_applied.t
+     Or_error.t
 
 let gen_apply_and_txn : (apply * User_command.Valid.t) Quickcheck.Generator.t =
   let open Quickcheck.Generator in
@@ -27,7 +28,8 @@ let gen_apply_and_txn : (apply * User_command.Valid.t) Quickcheck.Generator.t =
   in
   let apply =
     Transaction_snark.Transaction_validator.apply_transaction_first_pass
-      ~constraint_constants ~global_slot validating_ledger
+      ~constraint_constants ~global_slot
+      (Staged_ledger.Ledger.Non_hashing_ledger.of_ledger validating_ledger)
       ~txn_state_view:current_state_view
       ~signature_kind:Mina_signature_kind.Testnet
   in
