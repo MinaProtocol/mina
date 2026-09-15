@@ -81,7 +81,7 @@ Note: There is no `make test` target. Use `dune runtest` directly.
 - `zkapp_test_transaction/` - zkApp test transaction utility
 - `zkapps_examples/` - zkApp example programs
 - `replayer/` - Blockchain replay utility
-- `missing_blocks_auditor/` - Audit for missing blocks
+- `missing_blocks_guardian/` - Audit an archive database for missing blocks and backfill them
 - `extract_blocks/` / `archive_blocks/` - Block extraction and archival
 - `hardfork_test/` - Hard fork testing utilities
 - `minimina/` - CLI tool for spinning up local Mina networks (Rust, built with Cargo)
