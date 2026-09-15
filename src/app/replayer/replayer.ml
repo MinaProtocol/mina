@@ -773,6 +773,8 @@ let apply_hard_fork_migration ~logger
     Mina_numbers.Global_slot_since_genesis.to_int new_start_slot_since_genesis
     |> Int64.of_int
   in
+  (* the post-fork chain has its own epoch ledgers, so the epoch ledger hash
+     targets start empty and nothing has been seen yet *)
   let hard_fork_input : input =
     { target_epoch_ledgers_state_hash = None
     ; start_slot_since_genesis = new_start_slot_int64
@@ -787,6 +789,9 @@ let apply_hard_fork_migration ~logger
         }
     ; first_pass_ledger_hashes = []
     ; last_snarked_ledger_hash = None
+    ; target_epoch_ledger_hashes = None
+    ; has_seen_staking_epoch_ledger_hash = (false, 0L)
+    ; has_seen_next_epoch_ledger_hash = (false, 0L)
     }
   in
   let input_json = input_to_yojson hard_fork_input in
