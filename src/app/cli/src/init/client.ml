@@ -2524,6 +2524,7 @@ let advanced ~itn_features =
     ; ("set-coinbase-receiver", set_coinbase_receiver_graphql)
     ; ("runtime-config", runtime_config)
     ; ("vrf", Cli_lib.Commands.Vrf.command_group)
+    ; ("vrf-evaluation-stream", Vrf_evaluation_stream.command)
     ; ("thread-graph", thread_graph)
     ; ("print-signature-kind", signature_kind)
     ; ("generate-hardfork-config", generate_hardfork_config)
