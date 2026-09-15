@@ -143,7 +143,7 @@ let publish
                 Prelude.List.indexed
                   Text
                   ( spec.new_docker_tags
-                      DebianVersions.DebVersion.Bullseye
+                      DebianVersions.DebVersion.Bookworm
                       spec.channel
                       spec.branch
                       spec.profile
