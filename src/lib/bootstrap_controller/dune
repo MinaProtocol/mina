@@ -23,6 +23,7 @@
   consensus
   currency
   data_hash_lib
+  downloader
   error_json
   fake_network
   genesis_constants

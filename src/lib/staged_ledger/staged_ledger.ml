@@ -2723,7 +2723,72 @@ let%test_module "staged ledger tests" =
           in
           iter_cmds_acc (List.drop cmds cmds_applied_count) counts_rest acc' f
 
+    (* The scan state's commitment is a Merkle tree whose digests the live
+       structure maintains but the serialised form deliberately omits, so
+       reading one back has to rebuild them. If that rebuild produced anything
+       other than what was there, a node would come back from a restart
+       disagreeing with the chain about its own staged ledger hash — and it
+       would do so silently. Check it on every block of every scenario. *)
+
     (** Generic test framework. *)
+    let assert_scan_state_serialises (sl : Sl.t) =
+      let live = Sl.scan_state sl in
+      let stable = Sl.Scan_state.read_all_proofs_from_disk live in
+      let round_tripped =
+        Binable.of_string
+          (module Sl.Scan_state.Stored)
+          (Binable.to_string (module Sl.Scan_state.Stored) stable)
+      in
+      [%test_eq: Staged_ledger_hash.Aux_hash.t] (Sl.Scan_state.hash live)
+        (Sl.Scan_state.Stored.hash round_tripped)
+
+    (* Sync a scan state out of one node and back into another, the way
+       bootstrap will: verify the manifest against the block's commitment,
+       then answer every request the builder makes from a responder built over
+       the original, then check the result is the state we started from.
+
+       This is the whole protocol end to end, minus the transport. *)
+    let assert_scan_state_syncs (sl : Sl.t) =
+      let module Sync = Sl.Scan_state.Sync in
+      let source = Sl.scan_state sl in
+      let expected = Sl.hash sl in
+      let responder =
+        Sync.Responder.create source
+          ~ledger_hash:(Staged_ledger_hash.ledger_hash expected)
+          ~pending_coinbase:(Sl.pending_coinbase_collection sl)
+      in
+      let builder =
+        (* A responder answers from the scan state it was built over, so which
+           hash the queries name only matters to a node routing them through
+           its frontier. *)
+        Or_error.ok_exn
+          (Sync.Builder.create
+             (Sync.Responder.manifest responder)
+             ~state_hash:State_hash.dummy ~expected ~band_height:2 )
+      in
+      let rec drive rounds =
+        if rounds > 500 then failwith "scan state sync did not converge" ;
+        match Sync.Builder.queries builder with
+        | [] ->
+            ()
+        | queries ->
+            List.iter queries ~f:(fun query ->
+                match Sync.Responder.respond responder query with
+                | None ->
+                    failwithf "responder could not answer %s"
+                      (Sexp.to_string (Sync.Query.sexp_of_t query))
+                      ()
+                | Some answer ->
+                    Or_error.ok_exn
+                      (Sync.Builder.add_answer builder ~query answer) ) ;
+            drive (rounds + 1)
+      in
+      drive 0 ;
+      let rebuilt = Or_error.ok_exn (Sync.Builder.finish builder) in
+      [%test_eq: Staged_ledger_hash.Aux_hash.t]
+        (Sl.Scan_state.hash source)
+        (Sl.Scan_state.Stored.hash rebuilt)
+
     let test_simple :
            global_slot:int
         -> signature_kind:Mina_signature_kind.t
@@ -2869,6 +2934,8 @@ let%test_module "staged ledger tests" =
                 ledger_proof
             in
             assert_fee_excess ledger_proof ;
+            assert_scan_state_serialises !sl ;
+            assert_scan_state_syncs !sl ;
             let cmds_applied_this_iter =
               List.length @@ Staged_ledger_diff.commands diff
             in

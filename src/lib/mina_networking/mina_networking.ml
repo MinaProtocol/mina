@@ -369,10 +369,42 @@ let rpc_peer_then_random (type b) t peer_id input ~rpc :
       (* Since we couldn't connect, we have no IP to ban. *)
       retry ()
 
-let get_staged_ledger_aux_and_pending_coinbases_at_hash t inet_addr input =
-  rpc_peer_then_random t inet_addr input
-    ~rpc:Rpcs.Get_staged_ledger_aux_and_pending_coinbases_at_hash
-  >>|? Envelope.Incoming.data
+(** Ask one peer a batch of scan state sync queries, in order.
+
+    Pinned to one peer, unlike most of the requests here, and batched, unlike
+    almost all of them.
+
+    Pinned because a scan state sync is a session: the manifest fixes the
+    digests that every later answer is checked against, and only the peer that
+    served it holds a responder keyed by them. Spreading the follow-up queries
+    over random peers asks nodes about a forest they have never described.
+
+    Batched because [query_peer] opens a fresh libp2p stream and runs a full
+    RPC handshake per call, and a sync asks for many fragments. [query_peer']
+    runs a whole list down one stream, so the cost is one stream per round of
+    the protocol rather than one per fragment.
+
+    Unlike the whole-scan-state RPC this replaces, a failed call costs the
+    fragments of one round rather than the entire state. Multi-peer fetching
+    wants the downloader, which can pin per band. *)
+let answer_scan_state_queries t peer_id queries =
+  let open Deferred.Let_syntax in
+  match%map
+    query_peer' ~how:`Sequential t peer_id Rpcs.Answer_scan_state_query queries
+  with
+  | Connected { data = Ok answers; _ } -> (
+      match Option.all answers with
+      | Some answers ->
+          Ok answers
+      | None ->
+          Or_error.errorf
+            !"Peer %{sexp:Network_peer.Peer.Id.t} declined part of a scan \
+              state query batch"
+            peer_id )
+  | Connected { data = Error e; _ } ->
+      Error e
+  | Failed_to_connect e ->
+      Error (Error.tag e ~tag:"failed-to-connect")
 
 let get_ancestry t inet_addr input =
   rpc_peer_then_random t inet_addr input ~rpc:Rpcs.Get_ancestry
