@@ -1,0 +1,39 @@
+[project]
+name = "mina-ci"
+version = "0.1.0"
+description = "Mina Protocol Python CI layer, driven by Dagger (library mode)."
+requires-python = ">=3.10"
+# Plain PyPI dependency — no vendored/generated client. Pinned to the same
+# minor as the Dagger engine we run against so the client API stays in lockstep.
+dependencies = [
+    "cyclopts>=4.22.1",
+    "dagger-io>=0.21.7,<0.22",
+    "pydantic>=2.13.4",
+]
+
+[project.scripts]
+mina-ci = "mina_ci.__main__:main"
+
+[build-system]
+requires = ["uv_build>=0.8.4,<0.9.0"]
+build-backend = "uv_build"
+
+[tool.ruff]
+line-length = 120
+target-version = "py310"
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "B",   # flake8-bugbear
+    "C4",  # flake8-comprehensions
+    "UP",  # pyupgrade
+    "SIM", # flake8-simplify
+]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
