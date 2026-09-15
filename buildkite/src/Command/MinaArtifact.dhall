@@ -768,6 +768,14 @@ let docker_step
                 entry.service
 
 let docker_commands
+    -- Packaging builds images and writes them to the CI cache. It does not
+    -- push them: pushing is what the publish stage does, for images exactly as
+    -- for debians, so a release puts out everything or nothing.
+    --
+    -- These jobs are shared -- nightly runs them too -- and nightly has no
+    -- publish stage, which is now the whole reason nightly cannot push. It is
+    -- structural rather than conditional: there is no flag to set, and no way
+    -- to set it wrong.
     : PackagingSpec.Type -> List Command.Type
     =     \(spec : PackagingSpec.Type)
       ->  let services =
@@ -793,6 +801,8 @@ let docker_commands
                           //  { deb_release =
                                   DebianChannel.effective spec.channel
                               , docker_repo = spec.docker_repo
+                              , docker_publish = DockerPublish.Type.Disabled
+                              , save_to_ci_cache = True
                               }
                         )
                 )
