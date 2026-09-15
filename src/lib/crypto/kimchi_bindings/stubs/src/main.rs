@@ -156,6 +156,8 @@ fn generate_pasta_bindings(mut w: impl std::io::Write, env: &mut Env) {
         decl_func!(w, env, caml_bigint_256_test_bit => "test_bit");
         decl_func!(w, env, caml_bigint_256_to_bytes => "to_bytes");
         decl_func!(w, env, caml_bigint_256_of_bytes => "of_bytes");
+        decl_func!(w, env, caml_bigint_256_blit_to_bigstring => "blit_to_bigstring");
+        decl_func!(w, env, caml_bigint_256_of_bigstring => "of_bigstring");
         decl_func!(w, env, caml_bigint_256_deep_copy => "deep_copy");
     });
 
@@ -193,6 +195,8 @@ fn generate_pasta_bindings(mut w: impl std::io::Write, env: &mut Env) {
         decl_func!(w, env, caml_pasta_fp_domain_generator => "domain_generator");
         decl_func!(w, env, caml_pasta_fp_to_bytes => "to_bytes");
         decl_func!(w, env, caml_pasta_fp_of_bytes => "of_bytes");
+        decl_func!(w, env, caml_pasta_fp_blit_to_bigstring => "blit_to_bigstring");
+        decl_func!(w, env, caml_pasta_fp_of_bigstring => "of_bigstring");
         decl_func!(w, env, caml_pasta_fp_deep_copy => "deep_copy");
     });
 
@@ -230,6 +234,8 @@ fn generate_pasta_bindings(mut w: impl std::io::Write, env: &mut Env) {
         decl_func!(w, env, caml_pasta_fq_domain_generator => "domain_generator");
         decl_func!(w, env, caml_pasta_fq_to_bytes => "to_bytes");
         decl_func!(w, env, caml_pasta_fq_of_bytes => "of_bytes");
+        decl_func!(w, env, caml_pasta_fq_blit_to_bigstring => "blit_to_bigstring");
+        decl_func!(w, env, caml_pasta_fq_of_bigstring => "of_bigstring");
         decl_func!(w, env, caml_pasta_fq_deep_copy => "deep_copy");
     });
 

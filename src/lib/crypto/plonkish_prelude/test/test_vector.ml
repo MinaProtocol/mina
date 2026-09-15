@@ -23,11 +23,65 @@ let test_split () =
   assert (
     List.for_all2_exn v_4_list (List.init 4 ~f:(fun i -> 6 + i)) ~f:Int.equal )
 
+(* [Vector_n.Stable.V1] encodes the elements in order followed by the unit
+   byte, the layout the [Cata] nested-pair combinators produced before the
+   sizer, writer and reader were hand-rolled. These pin the literal bytes:
+   a self-consistent change to writer and reader still round-trips, but
+   would split from nodes running the old code, since [Vector_2] through
+   [Vector_32] are in the proof encoding. *)
+let test_bin_prot_layout () =
+  let module V4 = Plonkish_prelude.Vector.Vector_4 in
+  let v = V4.of_list_exn [ 1; 2; 3; 4 ] in
+  let expected = "\001\002\003\004\000" in
+  Alcotest.(check int)
+    "bin_size_t" (String.length expected)
+    (V4.Stable.V1.bin_size_t Int.bin_size_t v) ;
+  let buf = Bigstring.create 32 in
+  let len = V4.Stable.V1.bin_write_t Int.bin_write_t buf ~pos:0 v in
+  Alcotest.(check string)
+    "bin_write_t bytes" expected
+    (Bigstring.To_string.sub buf ~pos:0 ~len) ;
+  let pos_ref = ref 0 in
+  let v' = V4.Stable.V1.bin_read_t Int.bin_read_t buf ~pos_ref in
+  Alcotest.(check (list int))
+    "bin_read_t inverts" [ 1; 2; 3; 4 ] (V4.to_list v') ;
+  Alcotest.(check int) "bin_read_t consumes the unit byte" len !pos_ref
+
+(* Nested vectors keep the inner unit byte after each inner vector, then the
+   outer one. *)
+let test_bin_prot_layout_nested () =
+  let module V2 = Plonkish_prelude.Vector.Vector_2 in
+  let module V4 = Plonkish_prelude.Vector.Vector_4 in
+  let vv =
+    V2.of_list_exn
+      [ V4.of_list_exn [ 1; 2; 3; 4 ]; V4.of_list_exn [ 5; 6; 7; 8 ] ]
+  in
+  let expected = "\001\002\003\004\000\005\006\007\008\000\000" in
+  let inner_write = V4.Stable.V1.bin_write_t Int.bin_write_t in
+  let inner_read = V4.Stable.V1.bin_read_t Int.bin_read_t in
+  Alcotest.(check int)
+    "bin_size_t" (String.length expected)
+    (V2.Stable.V1.bin_size_t (V4.Stable.V1.bin_size_t Int.bin_size_t) vv) ;
+  let buf = Bigstring.create 32 in
+  let len = V2.Stable.V1.bin_write_t inner_write buf ~pos:0 vv in
+  Alcotest.(check string)
+    "bin_write_t bytes" expected
+    (Bigstring.To_string.sub buf ~pos:0 ~len) ;
+  let pos_ref = ref 0 in
+  let vv' = V2.Stable.V1.bin_read_t inner_read buf ~pos_ref in
+  Alcotest.(check (list (list int)))
+    "bin_read_t inverts"
+    [ [ 1; 2; 3; 4 ]; [ 5; 6; 7; 8 ] ]
+    (List.map (V2.to_list vv') ~f:V4.to_list) ;
+  Alcotest.(check int) "bin_read_t consumes both unit bytes" len !pos_ref
+
 let tests =
   let open Alcotest in
   [ ( "Vectors"
     , [ test_case "test initialize with correct size" `Quick
           test_initialize_with_correct_size
       ; test_case "test split" `Quick test_split
+      ; test_case "bin_prot layout" `Quick test_bin_prot_layout
+      ; test_case "bin_prot layout, nested" `Quick test_bin_prot_layout_nested
       ] )
   ]
