@@ -35,9 +35,7 @@ let Spec =
           { artifacts = [] : List Docker.Type
           , networks = [ Network.Type.Mainnet, Network.Type.Devnet ]
           , codenames =
-            [ DebianVersions.DebVersion.Focal
-            , DebianVersions.DebVersion.Bullseye
-            ]
+            [ DebianVersions.DebVersion.Focal, DebianVersions.DebVersion.Noble ]
           , published_to_docker_io = False
           , profile = Profiles.Type.Devnet
           , buildFlag = BuildFlags.Type.None

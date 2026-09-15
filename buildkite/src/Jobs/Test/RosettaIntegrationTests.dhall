@@ -73,12 +73,12 @@ in  Pipeline.build
                   ]
                 # RunInToolchain.runInToolchain
                     RunInToolchain.Config::{
-                    , image = ContainerImages.minaToolchainBullseye.amd64
+                    , image = ContainerImages.minaToolchainNoble.amd64
                     , environment = envExports
                     , innerScript =
                         "buildkite/scripts/tests/rosetta/integration-tests.sh"
                     }
-            , label = "Rosetta integration tests Bullseye"
+            , label = "Rosetta integration tests Noble"
             , key = "rosetta-integration-tests-bullseye"
             , target = Size.Small
             , artifact_paths = [ S.contains "test_output/artifacts/*" ]

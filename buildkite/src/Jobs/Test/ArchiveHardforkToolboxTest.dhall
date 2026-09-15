@@ -67,7 +67,7 @@ in  Pipeline.build
                           }
                       )
                   )
-                  ContainerImages.minaToolchainBullseye.amd64
+                  ContainerImages.minaToolchainNoble.amd64
                   debs
                   (     "scripts/tests/archive-hardfork-toolbox/runner.sh --mode pre-fork"
                     ++  " && scripts/tests/archive-hardfork-toolbox/runner.sh --mode upgrade"
@@ -86,7 +86,7 @@ in  Pipeline.build
                           }
                       )
                   )
-                  ContainerImages.minaToolchainBullseye.amd64
+                  ContainerImages.minaToolchainNoble.amd64
                   debs
                   "scripts/tests/archive-hardfork-toolbox/runner.sh --mode post-fork"
               , Cmd.run

@@ -14,9 +14,9 @@
 -- It used to start one layer higher: the .deb files came from the packaging
 -- job's cache (read_all_from_cache.sh) and the profiled daemon was FROM the
 -- registry-published generic image, so this job depended on
--- `MinaArtifactBullseye`'s build-deb-pkg AND its daemon_apps_only docker step.
+-- `MinaArtifactNoble`'s build-deb-pkg AND its daemon_apps_only docker step.
 -- That dependency is a large part of why the Debian and Docker builds run at
--- all in nightly. Now the only dependency is `MinaArtifactBullseyeApps`.
+-- all in nightly. Now the only dependency is `MinaArtifactNobleApps`.
 --
 -- The daemon step therefore builds the generic image itself before the profiled
 -- one that is FROM it -- in the same step, on the same agent, so the local

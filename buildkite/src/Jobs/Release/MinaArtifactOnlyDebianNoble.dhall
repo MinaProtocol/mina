@@ -1,5 +1,7 @@
 let ArtifactPipelines = ../../Command/MinaArtifact.dhall
 
+let DebianVersions = ../../Constants/DebianVersions.dhall
+
 let Artifacts = ../../Constants/Artifact/Artifacts.dhall
 
 let Pipeline = ../../Pipeline/Dsl.dhall
@@ -15,6 +17,7 @@ let Profile = ../../Constants/Profiles.dhall
 in  Pipeline.build
       ( ArtifactPipelines.onlyDebianPipeline
           ArtifactPipelines.PackagingSpec::{
+          , debVersion = DebianVersions.DebVersion.Noble
           , artifacts =
             [ Artifacts.Type.Daemon { network = Network.Type.Devnet }
             , Artifacts.Type.DaemonProfiled { profile = Profile.Type.Devnet }

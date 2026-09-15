@@ -14,7 +14,7 @@
 # the variant string:
 #   apps/<codename>[/<variant>]/<exe>
 # with
-#   codename : $MINA_DEB_CODENAME (default bullseye)
+#   codename : $MINA_DEB_CODENAME (default noble)
 #   variant  : derived from $APPS_BUILD_FLAG ("instrumented") and $APPS_ARCH
 #              ("arm64"). It names only what deviates from the default build, so
 #              a standard amd64 build has NO variant segment and its binaries sit
@@ -46,7 +46,7 @@ if [[ ! -v BUILDKITE_BUILD_ID ]]; then
   exit 1
 fi
 
-CODENAME="${MINA_DEB_CODENAME:-bullseye}"
+CODENAME="${MINA_DEB_CODENAME:-noble}"
 
 segments=()
 [[ "${APPS_BUILD_FLAG:-}" == "instrumented" ]] && segments+=("instrumented")

@@ -49,7 +49,7 @@ let network = Network.Type.Devnet
 
 let profile = Profiles.Type.Devnet
 
-let debVersion = DebianVersions.DebVersion.Bullseye
+let debVersion = DebianVersions.DebVersion.Noble
 
 let arch = Arch.Type.Amd64
 
