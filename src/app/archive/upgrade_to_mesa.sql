@@ -5,6 +5,7 @@
 -- + drop UNIQUE/index on zkapp_{events,field_array}.element_ids (btree overflow
 --   for max-cost zkApps); these rows are no longer content-deduplicated
 -- + make zkapp_account_update_body.events_id/actions_id nullable (NULL = empty)
+-- + index user_commands.{fee_payer_id,source_id,receiver_id} for account lookups
 -- + record status in migration_history
 -- =============================================================================
 
@@ -21,7 +22,7 @@ SET archive.current_protocol_version = '3.0.0';
 -- Post-HF protocol version. This one corresponds to Mesa, specifically
 SET archive.target_protocol_version = '4.0.0';
 -- The version of this script. If you modify the script, please bump the version
-SET archive.migration_version = '0.0.6';
+SET archive.migration_version = '0.0.7';
 
 -- TODO: put below in a common script
 
@@ -93,7 +94,7 @@ BEGIN
         ) VALUES (
             target_protocol_version,
             target_migration_version,
-            'Upgrade from Berkeley to Mesa. Add {zkapp_states,zkapp_states_nullable}.element8..element31 (int); drop zkapp_{events,field_array}.element_ids UNIQUE/index (no dedup); make zkapp_account_update_body.{events_id,actions_id} nullable (NULL=empty)',
+            'Upgrade from Berkeley to Mesa. Add {zkapp_states,zkapp_states_nullable}.element8..element31 (int); drop zkapp_{events,field_array}.element_ids UNIQUE/index (no dedup); make zkapp_account_update_body.{events_id,actions_id} nullable (NULL=empty); index user_commands.{fee_payer_id,source_id,receiver_id}',
             'starting'::migration_status
         );
     ELSIF 
@@ -111,7 +112,8 @@ BEGIN
         RAISE EXCEPTION 
           'Could not apply migration to current protocol & migration version: (%, %)', 
           latest_protocol_version,
-          latest_migration_version;
+          latest_migration_version
+          USING HINT = 'An archive already on Mesa from an earlier migration_version can add the user_commands account indexes with add_user_commands_account_indexes.sql';
     END IF;
 END$$;
 
@@ -253,6 +255,49 @@ ALTER TABLE zkapp_events DROP CONSTRAINT IF EXISTS zkapp_events_element_ids_key;
 DROP INDEX IF EXISTS idx_zkapp_events_element_ids;
 ALTER TABLE zkapp_account_update_body ALTER COLUMN events_id DROP NOT NULL;
 ALTER TABLE zkapp_account_update_body ALTER COLUMN actions_id DROP NOT NULL;
+
+-- 3c. Index the user_commands account columns. Account lookups such as Rosetta
+-- /search/transactions filter on them and otherwise scan the whole table.
+-- Valid indexes are detected from the catalog and left untouched (CREATE INDEX
+-- IF NOT EXISTS would still take a SHARE lock on user_commands first). An
+-- invalid index, left by an interrupted CONCURRENTLY build, is rebuilt.
+-- A build blocks inserts into user_commands (not reads) for its whole duration.
+-- On a live archive, build the indexes beforehand with
+-- add_user_commands_account_indexes.sql (CONCURRENTLY), which reduces this step
+-- to a catalog check.
+CREATE FUNCTION pg_temp.ensure_user_commands_index(p_index TEXT, p_column TEXT)
+RETURNS VOID AS $$
+DECLARE
+    is_valid BOOLEAN;
+BEGIN
+    SELECT i.indisvalid INTO is_valid
+    FROM pg_index i
+    JOIN pg_class c ON c.oid = i.indexrelid
+    JOIN pg_namespace n ON n.oid = c.relnamespace
+    WHERE n.nspname = 'public' AND c.relname = p_index;
+
+    IF is_valid THEN
+        RAISE DEBUG 'Index % already present and valid', p_index;
+        RETURN;
+    END IF;
+
+    IF is_valid IS NOT NULL THEN
+        RAISE NOTICE 'Rebuilding invalid index %', p_index;
+        EXECUTE format('DROP INDEX public.%I', p_index);
+    END IF;
+
+    EXECUTE format('CREATE INDEX %I ON public.user_commands(%I)', p_index, p_column);
+
+EXCEPTION
+    WHEN OTHERS THEN
+        PERFORM pg_temp.set_migration_status('failed'::migration_status);
+        RAISE EXCEPTION 'An error occurred while creating index %: %', p_index, SQLERRM;
+END
+$$ LANGUAGE plpgsql;
+
+SELECT pg_temp.ensure_user_commands_index('idx_user_commands_fee_payer_id', 'fee_payer_id');
+SELECT pg_temp.ensure_user_commands_index('idx_user_commands_source_id', 'source_id');
+SELECT pg_temp.ensure_user_commands_index('idx_user_commands_receiver_id', 'receiver_id');
 
 -- 4. Update schema_history
 

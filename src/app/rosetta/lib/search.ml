@@ -366,7 +366,16 @@ module Sql = struct
             ; int64
             ]
 
-      let query_string operator op_type =
+      (* [by_account]: a single account bounds the result (see [by_account]
+         below), so candidate commands are looked up from that account's public
+         key through the user_commands account indexes. Without a bounding
+         account the command-driven join is kept: enumerating candidates for
+         every public key would be much slower.
+
+         In both cases, visible blocks (canonical, or pending above the
+         canonical tip) are filtered per joined row, instead of materializing a
+         copy of every canonical block on each request. *)
+      let query_string ~by_account operator op_type =
         let op_type_filters =
           Option.map op_type ~f:(function
             | `Fee_payment ->
@@ -394,9 +403,34 @@ module Sql = struct
             ~op_status_field:"buc.status" ~address_fields:[ "pk.value" ]
             ~op_type_filters operator
         in
-        [%string
-          {sql|
-            SELECT DISTINCT ON (buc.block_id, buc.user_command_id, buc.sequence_no) %{fields}
+        let source, account_match =
+          if by_account then
+            ( {sql|
+            FROM public_keys pk
+            /* Candidate commands for the account: one equality lookup per
+               account column, each served by its user_commands index. With the
+               single OR join condition instead, the planner can badly
+               overestimate the matches and hash-join all of
+               blocks_user_commands. */
+            CROSS JOIN LATERAL (
+              SELECT id FROM user_commands WHERE fee_payer_id = pk.id
+              UNION
+              SELECT id FROM user_commands WHERE source_id = pk.id
+              UNION
+              SELECT id FROM user_commands WHERE receiver_id = pk.id
+            ) candidates
+            INNER JOIN user_commands u
+              ON u.id = candidates.id
+            INNER JOIN blocks_user_commands buc
+              ON buc.user_command_id = u.id
+            INNER JOIN blocks b
+              ON buc.block_id = b.id|sql}
+            , {sql|(pk.id = u.fee_payer_id
+                OR (buc.status = 'applied' AND (pk.id = u.source_id OR pk.id = u.receiver_id)))
+              AND |sql}
+            )
+          else
+            ( {sql|
             FROM user_commands u
             INNER JOIN blocks_user_commands buc
               ON buc.user_command_id = u.id
@@ -404,8 +438,16 @@ module Sql = struct
               ON pk.id = u.fee_payer_id
                 OR (buc.status = 'applied' AND (pk.id = u.source_id OR pk.id = u.receiver_id))
             INNER JOIN blocks b
-              ON buc.block_id = b.id
-            WHERE %{filters}
+              ON buc.block_id = b.id|sql}
+            , "" )
+        in
+        [%string
+          {sql|
+            SELECT DISTINCT ON (buc.block_id, buc.user_command_id, buc.sequence_no) %{fields}%{source}
+            WHERE %{account_match}(b.chain_status = 'canonical'
+                OR (b.chain_status = 'pending'
+                  AND b.height > (SELECT max_height FROM max_canonical_height)))
+              AND %{filters}
           |sql}]
     end
 
@@ -443,19 +485,16 @@ module Sql = struct
       Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
         Caqti_type.[ Cte.typ; string; string; string; option int64 ]
 
-    let query_string ~offset ~limit op_type operator =
+    let query_string ~by_account ~offset ~limit op_type operator =
       let fields = String.concat ~sep:"," [ "id_count.total_count"; fields ] in
       let offset = offset_sql offset in
       let limit = limit_sql limit in
       [%string
         {sql|
           WITH
-            canonical_blocks AS (SELECT * FROM blocks WHERE chain_status = 'canonical'),
-            max_canonical_height AS (SELECT MAX(height) as max_height FROM canonical_blocks),
-            pending_blocks AS (SELECT b.* FROM blocks b, max_canonical_height WHERE height > max_height AND chain_status = 'pending'),
-            blocks AS (SELECT * FROM canonical_blocks UNION ALL SELECT * FROM pending_blocks),
+            max_canonical_height AS (SELECT MAX(height) as max_height FROM blocks WHERE chain_status = 'canonical'),
             user_command_info AS (
-              %{Cte.query_string operator op_type}
+              %{Cte.query_string ~by_account operator op_type}
             ),
             id_count AS (
               SELECT COUNT(*) AS total_count FROM user_command_info
@@ -496,11 +535,25 @@ module Sql = struct
             ORDER BY u.block_id, u.id, u.sequence_no
         |sql}]
 
+    (* One account bounds the result only when an account or address filter is
+       present and filters are combined with AND (the default). With OR, rows
+       matching any other filter are returned too, so no single account can
+       drive the query. *)
+    let by_account { Transaction_query.operator; filter; _ } =
+      let has_account =
+        Option.is_some filter.Transaction_query.Filter.account_identifier
+        || Option.is_some filter.address
+      in
+      let conjunctive =
+        match operator with None | Some `And -> true | Some `Or -> false
+      in
+      has_account && conjunctive
+
     let run (module Conn : Mina_caqti.CONNECTION) ~logger ~offset ~limit input =
       let open Deferred.Result.Let_syntax in
       let params = Params.of_query input in
       let query_string =
-        query_string ~offset ~limit
+        query_string ~by_account:(by_account input) ~offset ~limit
           Transaction_query.(input.filter.Filter.op_type)
           input.operator
       in

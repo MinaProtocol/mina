@@ -154,6 +154,17 @@ dump_and_normalize() {
 # carries those DROPs, stop normalizing the upgrade comparison (Test 1) and let it
 # assert the constraints are gone; the downgrade arm (Test 2) stays either way,
 # since the downgrade is deliberately lossy.
+#
+# The user_commands account indexes (idx_user_commands_{fee_payer_id,source_id,
+# receiver_id}) are added by create_schema.sql and upgrade_to_mesa.sql and are
+# intentionally kept by downgrade_to_berkeley.sql (additive, valid on Berkeley).
+# They are stripped from both sides so the comparison holds while a branch's
+# create_schema.sql does not have them yet, and for the retained-on-downgrade
+# case.
+#
+# TODO: once compatible and develop both create these indexes in
+# create_schema.sql, stop stripping them from the upgrade comparison (Test 1) so
+# it asserts the upgrade creates them; the downgrade arm (Test 2) stays.
 normalize_known_schema_deltas() {
     local schema_file="$1"
     local tmp_file="${schema_file}.known_downgrade_deltas"
@@ -173,6 +184,9 @@ normalize_known_schema_deltas() {
             next
         }
         /^CREATE INDEX idx_zkapp_(events|field_array)_element_ids ON public\.zkapp_(events|field_array) USING btree \(element_ids\);$/ {
+            next
+        }
+        /^CREATE INDEX idx_user_commands_(fee_payer_id|source_id|receiver_id) ON public\.user_commands USING btree \((fee_payer_id|source_id|receiver_id)\);$/ {
             next
         }
         {
