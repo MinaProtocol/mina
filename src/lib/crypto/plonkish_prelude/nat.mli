@@ -27,6 +27,9 @@ module Adds : sig
     | S : ('a, 'b, 'c) t -> ('a s, 'b, 'c s) t
 
   val add_zr : 'n nat -> ('n, z, 'n) t
+
+  (** [bump] reindexes [a + b = c] as [a + (b+1) = (c+1)]. *)
+  val bump : ('a, 'b, 'c) t -> ('a, 'b s, 'c s) t
 end
 
 module Lte : sig
@@ -35,6 +38,13 @@ module Lte : sig
   val refl : 'n nat -> ('n, 'n) t
 
   val trans : ('a, 'b) t -> ('b, 'c) t -> ('a, 'c) t
+
+  (** The complement of [n <= m]: the gap [g] with [g + n = m], as an
+      existentially-typed nat together with the addition witness. *)
+  type ('n, 'm) complement =
+    | Complement : 'g nat * ('g, 'n, 'm) Adds.t -> ('n, 'm) complement
+
+  val complement : ('n, 'm) t -> 'm nat -> ('n, 'm) complement
 end
 
 module Add : sig
