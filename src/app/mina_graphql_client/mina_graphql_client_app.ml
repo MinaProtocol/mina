@@ -297,6 +297,60 @@ let set_snark_fee_command =
          | Error e ->
              `Assoc [ ("error", Error_json.error_to_yojson e) ] ) )
 
+let sync_status_command =
+  Command.async ~summary:"Query daemon sync status"
+    (let%map_open.Command uri_str = graphql_uri_flag
+     and raw =
+       flag "--raw" no_arg
+         ~doc:"Print just the bare status string (e.g. SYNCED) instead of JSON"
+     in
+     fun () ->
+       let logger = if raw then Logger.null () else Logger.create () in
+       let node_uri = Uri.of_string uri_str in
+       let%map result =
+         Mina_graphql_client.Client.get_sync_status ~logger node_uri
+       in
+       match (result, raw) with
+       | Ok status, true ->
+           print_endline status
+       | Error e, true ->
+           prerr_endline (Yojson.Safe.to_string (Error_json.error_to_yojson e)) ;
+           Core.exit 1
+       | Ok status, false ->
+           Yojson.Safe.pretty_to_channel Out_channel.stdout
+             (`Assoc [ ("sync_status", `String status) ])
+       | Error e, false ->
+           Yojson.Safe.pretty_to_channel Out_channel.stdout
+             (`Assoc [ ("error", Error_json.error_to_yojson e) ]) )
+
+let network_id_command =
+  Command.async ~summary:"Query daemon network ID"
+    (let%map_open.Command uri_str = graphql_uri_flag
+     and raw =
+       flag "--raw" no_arg
+         ~doc:
+           "Print just the bare network id string (e.g. mina:devnet) instead \
+            of JSON"
+     in
+     fun () ->
+       let logger = if raw then Logger.null () else Logger.create () in
+       let node_uri = Uri.of_string uri_str in
+       let%map result =
+         Mina_graphql_client.Client.get_network_id ~logger node_uri
+       in
+       match (result, raw) with
+       | Ok network_id, true ->
+           print_endline network_id
+       | Error e, true ->
+           prerr_endline (Yojson.Safe.to_string (Error_json.error_to_yojson e)) ;
+           Core.exit 1
+       | Ok network_id, false ->
+           Yojson.Safe.pretty_to_channel Out_channel.stdout
+             (`Assoc [ ("network_id", `String network_id) ])
+       | Error e, false ->
+           Yojson.Safe.pretty_to_channel Out_channel.stdout
+             (`Assoc [ ("error", Error_json.error_to_yojson e) ]) )
+
 let () =
   Command.run
     (Command.group ~summary:"Mina GraphQL client utility"
@@ -309,4 +363,6 @@ let () =
        ; ("delegation", delegation_command)
        ; ("set-snark-worker", set_snark_worker_command)
        ; ("set-snark-fee", set_snark_fee_command)
+       ; ("sync-status", sync_status_command)
+       ; ("network-id", network_id_command)
        ] )
