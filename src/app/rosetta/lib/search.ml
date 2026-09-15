@@ -397,15 +397,31 @@ module Sql = struct
         [%string
           {sql|
             SELECT DISTINCT ON (buc.block_id, buc.user_command_id, buc.sequence_no) %{fields}
-            FROM user_commands u
+            FROM public_keys pk
+            /* Candidate commands for the account: one equality lookup per
+               account column, each served by its own index. A single OR join
+               condition cannot be estimated by the planner, which then scans
+               all of user_commands and blocks_user_commands. */
+            CROSS JOIN LATERAL (
+              SELECT id FROM user_commands WHERE fee_payer_id = pk.id
+              UNION
+              SELECT id FROM user_commands WHERE source_id = pk.id
+              UNION
+              SELECT id FROM user_commands WHERE receiver_id = pk.id
+            ) candidates
+            INNER JOIN user_commands u
+              ON u.id = candidates.id
             INNER JOIN blocks_user_commands buc
               ON buc.user_command_id = u.id
-            INNER JOIN public_keys pk
-              ON pk.id = u.fee_payer_id
-                OR (buc.status = 'applied' AND (pk.id = u.source_id OR pk.id = u.receiver_id))
             INNER JOIN blocks b
               ON buc.block_id = b.id
-            WHERE %{filters}
+            WHERE (pk.id = u.fee_payer_id
+                OR (buc.status = 'applied' AND (pk.id = u.source_id OR pk.id = u.receiver_id)))
+              /* canonical blocks, plus pending blocks above the canonical tip */
+              AND (b.chain_status = 'canonical'
+                OR (b.chain_status = 'pending'
+                  AND b.height > (SELECT max_height FROM max_canonical_height)))
+              AND %{filters}
           |sql}]
     end
 
@@ -450,10 +466,10 @@ module Sql = struct
       [%string
         {sql|
           WITH
-            canonical_blocks AS (SELECT * FROM blocks WHERE chain_status = 'canonical'),
-            max_canonical_height AS (SELECT MAX(height) as max_height FROM canonical_blocks),
-            pending_blocks AS (SELECT b.* FROM blocks b, max_canonical_height WHERE height > max_height AND chain_status = 'pending'),
-            blocks AS (SELECT * FROM canonical_blocks UNION ALL SELECT * FROM pending_blocks),
+            /* The visible-block rule (canonical, or pending above the canonical
+               tip) is applied per joined row in user_command_info, rather than
+               materializing a copy of every canonical block on each request. */
+            max_canonical_height AS (SELECT MAX(height) as max_height FROM blocks WHERE chain_status = 'canonical'),
             user_command_info AS (
               %{Cte.query_string operator op_type}
             ),

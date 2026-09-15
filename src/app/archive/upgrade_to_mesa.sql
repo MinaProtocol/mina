@@ -5,6 +5,7 @@
 -- + drop UNIQUE/index on zkapp_{events,field_array}.element_ids (btree overflow
 --   for max-cost zkApps); these rows are no longer content-deduplicated
 -- + make zkapp_account_update_body.events_id/actions_id nullable (NULL = empty)
+-- + index user_commands.{fee_payer_id,source_id,receiver_id} for account lookups
 -- + record status in migration_history
 -- =============================================================================
 
@@ -21,7 +22,7 @@ SET archive.current_protocol_version = '3.0.0';
 -- Post-HF protocol version. This one corresponds to Mesa, specifically
 SET archive.target_protocol_version = '4.0.0';
 -- The version of this script. If you modify the script, please bump the version
-SET archive.migration_version = '0.0.6';
+SET archive.migration_version = '0.0.7';
 
 -- TODO: put below in a common script
 
@@ -93,7 +94,7 @@ BEGIN
         ) VALUES (
             target_protocol_version,
             target_migration_version,
-            'Upgrade from Berkeley to Mesa. Add {zkapp_states,zkapp_states_nullable}.element8..element31 (int); drop zkapp_{events,field_array}.element_ids UNIQUE/index (no dedup); make zkapp_account_update_body.{events_id,actions_id} nullable (NULL=empty)',
+            'Upgrade from Berkeley to Mesa. Add {zkapp_states,zkapp_states_nullable}.element8..element31 (int); drop zkapp_{events,field_array}.element_ids UNIQUE/index (no dedup); make zkapp_account_update_body.{events_id,actions_id} nullable (NULL=empty); index user_commands.{fee_payer_id,source_id,receiver_id}',
             'starting'::migration_status
         );
     ELSIF 
@@ -253,6 +254,16 @@ ALTER TABLE zkapp_events DROP CONSTRAINT IF EXISTS zkapp_events_element_ids_key;
 DROP INDEX IF EXISTS idx_zkapp_events_element_ids;
 ALTER TABLE zkapp_account_update_body ALTER COLUMN events_id DROP NOT NULL;
 ALTER TABLE zkapp_account_update_body ALTER COLUMN actions_id DROP NOT NULL;
+
+-- 3c. Index the user_commands account columns. Account lookups such as Rosetta
+-- /search/transactions filter on them and otherwise scan the whole table.
+-- A plain CREATE INDEX does not block reads, but blocks inserts into
+-- user_commands while it builds (seconds per index on mainnet). On a live
+-- archive, run add_user_commands_account_indexes.sql first (CONCURRENTLY); these
+-- statements are then no-ops.
+CREATE INDEX IF NOT EXISTS idx_user_commands_fee_payer_id ON user_commands(fee_payer_id);
+CREATE INDEX IF NOT EXISTS idx_user_commands_source_id    ON user_commands(source_id);
+CREATE INDEX IF NOT EXISTS idx_user_commands_receiver_id  ON user_commands(receiver_id);
 
 -- 4. Update schema_history
 

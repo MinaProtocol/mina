@@ -7,6 +7,8 @@
 --   element_ids arrays and NULL events_id/actions_id, and a btree over the
 --   unbounded int[] overflows Postgres' 2704-byte key limit, so the old Berkeley
 --   UNIQUE/index/NOT NULL cannot be restored without manual dedup + backfill.
+-- NOTE: the user_commands account indexes are kept: they are additive and valid
+--   on the Berkeley schema too.
 -- + record status in migration_history
 -- ============================================================================
 
@@ -23,7 +25,7 @@ SET archive.current_protocol_version = '4.0.0';
 -- Post-HF protocol version. This one corresponds to Mesa, specifically
 SET archive.target_protocol_version = '3.0.0';
 -- The version of this script. If you modify the script, please bump the version
-SET archive.migration_version = '0.0.6';
+SET archive.migration_version = '0.0.7';
 
 -- TODO: put below in a common script
 
@@ -215,6 +217,13 @@ SELECT pg_temp.try_remove_zkapp_states_nullable_element(8);
 DO $$
 BEGIN
     RAISE NOTICE 'downgrade: leaving zkapp_{events,field_array}.element_ids without UNIQUE/index and events_id/actions_id nullable (cannot be safely restored on post-fix data)';
+END $$;
+
+-- 3c. The user_commands account indexes are intentionally kept: they are
+-- additive, valid on the Berkeley schema, and speed up account lookups there too.
+DO $$
+BEGIN
+    RAISE NOTICE 'downgrade: keeping idx_user_commands_{fee_payer_id,source_id,receiver_id}';
 END $$;
 
 -- 4. Update schema_history
