@@ -166,11 +166,22 @@ module Make_str (_ : Wire_types.Concrete) = struct
       UInt64.of_int64
         (Int64.of_float (Time.Span.to_ms (Time.to_span_since_epoch t)))
 
-    (* TODO: Time.t can't hold the full uint64 range, so this can fail for large t *)
-    let to_time_exn t =
+    (* None when t >= 2^63 (unrepresentable in float-backed Time.t). *)
+    let to_time_opt t =
       let t_int64 = UInt64.to_int64 t in
-      if Int64.(t_int64 < zero) then failwith "converting to negative timestamp" ;
-      Time.of_span_since_epoch (Time.Span.of_ms (Int64.to_float t_int64))
+      if Int64.(t_int64 < zero) then None
+      else
+        Some
+          (Time.of_span_since_epoch (Time.Span.of_ms (Int64.to_float t_int64)))
+
+    let to_time_exn t =
+      match to_time_opt t with
+      | Some tm ->
+          tm
+      | None ->
+          failwith
+            "Block_time.to_time_exn: timestamp >= 2^63 is not representable as \
+             Core.Time.t"
 
     let now offset = of_time (Time.sub (Time.now ()) (offset ()))
 
@@ -207,11 +218,8 @@ module Make_str (_ : Wire_types.Concrete) = struct
 
     let to_uint64 : t -> UInt64.t = to_span_since_epoch
 
-    (* TODO: this can fail if the input has more than 63 bits, because it would be serialized to a negative number string *)
-    let to_string_exn t =
-      let t_int64 = UInt64.to_int64 t in
-      if Int64.(t_int64 < zero) then failwith "converting to negative timestamp" ;
-      Int64.to_string t_int64
+    (* Total; the _exn suffix is retained to avoid a call-site rename. *)
+    let to_string_exn t = UInt64.to_string (to_uint64 t)
 
     let of_time_ns ns : t =
       let int64_ns = ns |> Time_ns.to_int63_ns_since_epoch |> Int63.to_int64 in
@@ -225,8 +233,11 @@ module Make_str (_ : Wire_types.Concrete) = struct
     let to_string_system_time_exn (offset : Controller.t) (t : t) : string =
       to_system_time offset t |> to_string_exn
 
+    (* Reject leading '-'; UInt64.of_string silently wraps negatives. *)
     let of_string_exn string =
-      Int64.of_string string |> Span.of_ms |> of_span_since_epoch
+      if String.is_prefix string ~prefix:"-" then
+        failwithf "Block_time.of_string_exn: negative timestamp %s" string () ;
+      UInt64.of_string string |> of_uint64
 
     let gen_incl time_beginning time_end =
       let open Quickcheck.Let_syntax in
@@ -241,6 +252,29 @@ module Make_str (_ : Wire_types.Concrete) = struct
       let open Quickcheck.Let_syntax in
       let%map int64_time_span = Int64.(gen_incl zero max_value) in
       of_span_since_epoch @@ Span.of_ms int64_time_span
+
+    let%test "to_string_exn is total and round-trips through of_string_exn \
+              across the full uint64 range" =
+      List.for_all
+        [ zero
+        ; of_uint64 (UInt64.of_int 1_000)
+        ; of_uint64 (UInt64.of_string "9223372036854775807") (* 2^63 - 1 *)
+        ; of_uint64 (UInt64.of_string "9223372036854775808") (* 2^63 *)
+        ; of_uint64 UInt64.max_int
+        ]
+        ~f:(fun t ->
+          String.equal
+            (of_string_exn (to_string_exn t) |> to_string_exn)
+            (to_string_exn t) )
+
+    let%test "to_time_opt is None exactly on high-bit (>= 2^63) timestamps" =
+      Option.is_none (to_time_opt (of_uint64 UInt64.max_int))
+      && Option.is_none
+           (to_time_opt (of_uint64 (UInt64.of_string "9223372036854775808")))
+      && Option.is_some (to_time_opt (of_uint64 (UInt64.of_int 1_000)))
+
+    let%test "of_string_exn rejects negative input" =
+      Or_error.is_error (Or_error.try_with (fun () -> of_string_exn "-1"))
   end
 
   include Time

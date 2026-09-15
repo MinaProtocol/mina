@@ -11,6 +11,7 @@ ARG network=mainnet
 ARG deb_repo="http://packages.o1test.net"
 ARG deb_profile
 ARG deb_suffix
+ARG apt_cache_url=""
 
 ARG GCLOUD_VERSION=476.0.0
 
@@ -22,11 +23,23 @@ ENV SUFFIX=${deb_suffix:+-${deb_suffix}}
 # - mina-archive-devnet-lightnet etc.
 ENV MINA_DEB=mina-archive-${network}${SUFFIX}
 
+# The per-network config package ships the runtime config JSON and, for hardfork
+# networks, the genesis ledger tarball(s) into /var/lib/coda. Bundling it lets
+# `mina-archive-hardfork-toolbox populate-genesis-accounts` (and `mina-archive
+# run --config-file`) resolve the fork genesis ledger locally -- no S3/network --
+# to backfill accounts_accessed for the fork genesis block.
+ENV MINA_CONFIG_DEB=mina-${network}-config
+
 ENV DEBIAN_FRONTEND noninteractive
 RUN echo "Building image with version $deb_codename $deb_release $deb_version"
 
 COPY scripts/archive-entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
+
+# Optional: configure APT caching proxy (bypass proxy for deb_repo)
+COPY scripts/configure-apt-proxy.sh /usr/local/bin/configure-apt-proxy.sh
+RUN chmod +x /usr/local/bin/configure-apt-proxy.sh \
+  && /usr/local/bin/configure-apt-proxy.sh "$apt_cache_url" "$deb_repo"
 
 # Install ca-certificates using HTTP
 RUN apt-get update --quiet --yes \
@@ -73,7 +86,6 @@ RUN case "${TARGETARCH}" in \
     esac; \
     curl -sSfL "https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-cli-${GCLOUD_VERSION}-linux-${GCLOUD_ARCH}.tar.gz" | \
     tar -xz -C /opt/ && \
-    /opt/google-cloud-sdk/install.sh --quiet && \
     /opt/google-cloud-sdk/bin/gcloud components install gke-gcloud-auth-plugin kubectl --quiet
 
 ENV PATH="/opt/google-cloud-sdk/bin:${PATH}"
@@ -81,10 +93,11 @@ ENV PATH="/opt/google-cloud-sdk/bin:${PATH}"
 ENV USE_GKE_GCLOUD_AUTH_PLUGIN=True
 
 
-# archive-node package
+# archive-node package (+ per-network config so the hardfork toolbox can
+# resolve the fork genesis ledger from /var/lib/coda)
 RUN echo "deb [trusted=yes] ${deb_repo} $deb_codename $deb_release" > /etc/apt/sources.list.d/o1.list \
   && apt-get update --quiet --yes \
-  && apt-get install --no-install-recommends --quiet --yes "${MINA_DEB}=$deb_version" \
+  && apt-get install --no-install-recommends --quiet --yes "${MINA_DEB}=$deb_version" "${MINA_CONFIG_DEB}=$deb_version" \
   && rm -rf /var/lib/apt/lists/*
 
 ENTRYPOINT ["/usr/bin/dumb-init", "/entrypoint.sh"]

@@ -7,7 +7,7 @@ if [[ $# -ne 1 ]]; then
     exit 1
 fi
 
-TESTNET_NAME="${TESTNET_NAME:-testnet-generic}"
+TESTNET_NAME="${TESTNET_NAME:-devnet-generic}"
 
 git config --global --add safe.directory /workdir
 
@@ -16,7 +16,7 @@ source buildkite/scripts/debian/update.sh --verbose
 source buildkite/scripts/handle-fork.sh
 source buildkite/scripts/export-git-env-vars.sh
 
-pip3 install sexpdata==1.0.0
+pip3 install sexpdata==1.0.0 requests
 
 source ./buildkite/scripts/refresh_code.sh
 

@@ -10,8 +10,7 @@ type t =
   ; blockchain_verification_key : Pickles.Verification_key.t
   ; transaction_verification_key : Pickles.Verification_key.t
   ; verify_transaction_snarks :
-         (Ledger_proof.t * Mina_base.Sok_message.t) list
-      -> unit Or_error.t Or_error.t Deferred.t
+      Ledger_proof.t list -> unit Or_error.t Or_error.t Deferred.t
   ; signature_kind : Mina_signature_kind.t
   }
 
@@ -48,23 +47,7 @@ let create ~logger:_ ?enable_internal_tracing:_ ?internal_trace_filename:_
         | Error e ->
             failwith (Error.to_string_hum e) )
     | Check | No_check ->
-        (* Don't check if the proof has default sok, becasue they were probably not
-           intended to be checked. If it has some value then check that against the
-           message passed.
-           This is particularly used to test that invalid proofs are not added to the
-           snark pool
-        *)
-        if
-          List.for_all ts ~f:(fun (proof, message) ->
-              let msg_digest = Sok_message.digest message in
-              let sok_digest = Transaction_snark.sok_digest proof in
-              Sok_message.Digest.(equal sok_digest default)
-              || Mina_base.Sok_message.Digest.equal sok_digest msg_digest )
-        then Deferred.Or_error.return (Ok ())
-        else
-          Deferred.Or_error.return
-            (Or_error.error_string
-               "Transaction_snark.verify: Mismatched sok_message" )
+        Deferred.Or_error.return (Ok ())
   in
 
   Deferred.return
@@ -90,6 +73,7 @@ let verify_commands { proof_level; signature_kind; _ }
       * Mina_base.Zkapp_statement.t
       * Pickles.Side_loaded.Proof.t )
       list
+      * Error.t
     | Common.invalid ]
     list
     Deferred.Or_error.t =
@@ -138,9 +122,12 @@ let verify_commands { proof_level; signature_kind; _ }
             invalid
         | Ok (`Assuming []) ->
             valid cmd
-        | Ok (`Assuming xs) ->
-            if Or_error.is_ok all_verified then valid cmd
-            else `Valid_assuming xs
+        | Ok (`Assuming xs) -> (
+            match all_verified with
+            | Ok () ->
+                valid cmd
+            | Error err ->
+                `Valid_assuming (xs, err) )
       in
       Ok (List.map2_exn cs results ~f)
 

@@ -1,5 +1,7 @@
 let ArtifactPipelines = ../../Command/MinaArtifact.dhall
 
+let DebianVersions = ../../Constants/DebianVersions.dhall
+
 let Network = ../../Constants/Network.dhall
 
 let Artifacts = ../../Constants/Artifacts.dhall
@@ -17,14 +19,18 @@ in  Pipeline.build
           ArtifactPipelines.MinaBuildSpec::{
           , artifacts =
             [ Artifacts.Type.Daemon
+            , Artifacts.Type.DaemonAppsOnly
             , Artifacts.Type.DaemonAutoHardfork
+            , Artifacts.Type.DaemonAutomode
             , Artifacts.Type.DaemonConfig
             , Artifacts.Type.DaemonPrefork
             , Artifacts.Type.LogProc
             , Artifacts.Type.Archive
             , Artifacts.Type.Rosetta
+            , Artifacts.Type.RosettaAppsOnly
             , Artifacts.Type.ZkappTestTransaction
             , Artifacts.Type.CreatePreforkGenesis
+            , Artifacts.Type.DaemonStorageToolbox
             ]
           , network = Network.Type.Mainnet
           , tags =
@@ -36,6 +42,7 @@ in  Pipeline.build
             , PipelineTag.Type.Amd64
             , PipelineTag.Type.Bullseye
             ]
+          , debVersion = DebianVersions.DebVersion.Bullseye
           , profile = Profiles.Type.Mainnet
           , scope =
             [ PipelineScope.Type.MainlineNightly, PipelineScope.Type.Release ]

@@ -33,19 +33,21 @@ let Spec =
           , archs : List Arch.Type
           , buildFlag : BuildFlags.Type
           , repo : DockerRepo.Type
+          , generic : Bool
           }
       , default =
           { artifacts = [] : List Package.Type
           , networks = [ Network.Type.Mainnet, Network.Type.Devnet ]
           , codenames =
             [ DebianVersions.DebVersion.Focal
-            , DebianVersions.DebVersion.Bullseye
+            , DebianVersions.DebVersion.Bookworm
             ]
           , published_to_docker_io = False
           , profile = Profiles.Type.Devnet
           , buildFlag = BuildFlags.Type.None
           , archs = [ Arch.Type.Amd64 ]
           , repo = DockerRepo.Type.InternalEurope
+          , generic = False
           }
       }
 
@@ -106,6 +108,8 @@ let verify
                   }
                   spec.buildFlag
 
+          let genericFlag = if spec.generic then " --generic " else ""
+
           in      ". ./buildkite/scripts/export-git-env-vars.sh && "
               ++  "./buildkite/scripts/release/manager.sh verify "
               ++  "--artifacts ${joinArtifacts spec} "
@@ -116,6 +120,7 @@ let verify
               ++  profileFlag
               ++  archFlag
               ++  buildFlag
+              ++  genericFlag
               ++  "--only-dockers "
 
 in  { verify = verify, Spec = Spec }

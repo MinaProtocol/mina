@@ -333,6 +333,10 @@ If you add a new package in the Mina repository or as a submodule, you must do a
 
 2. Update [`dockerfiles/stages/`](dockerfiles/stages) with the required packages
 
+## Tests
+
+For a comprehensive guide on all kinds of tests in the codebase and how to run them, see [docs/tests.md](docs/tests.md).
+
 ## Common Dune tasks
 
 To run unit tests for a single library, do `dune runtest lib/$LIBNAME`.

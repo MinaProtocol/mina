@@ -50,8 +50,9 @@ let rec check_and_set_lockfile ~logger conf_dir =
       | Ok () ->
           [%log debug] "Created daemon lockfile $lockfile"
             ~metadata:[ ("lockfile", `String lockfile) ] ;
-          Mina_stdlib_unix.Exit_handlers.register_async_shutdown_handler ~logger
-            ~description:"Remove daemon lockfile" (fun () ->
+          Exit_handlers.register_async_shutdown_handler ~logger
+            ~description:"Remove daemon lockfile" ~tier:ReleaseDaemonLockfile
+            (fun () ->
               match%bind Sys.file_exists lockfile with
               | `Yes ->
                   Unix.unlink lockfile

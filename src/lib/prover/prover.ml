@@ -12,13 +12,13 @@ module Extend_blockchain_input = struct
   module Stable = struct
     [@@@no_toplevel_latest_type]
 
-    module V2 = struct
+    module V3 = struct
       type t =
-        { chain : Blockchain.Stable.V2.t
-        ; next_state : Protocol_state.Value.Stable.V2.t
+        { chain : Blockchain.Stable.V3.t
+        ; next_state : Protocol_state.Value.Stable.V3.t
         ; block : Snark_transition.Value.Stable.V2.t
         ; ledger_proof : Ledger_proof.Stable.V2.t option
-        ; prover_state : Consensus.Data.Prover_state.Stable.V2.t
+        ; prover_state : Consensus.Data.Prover_state.Stable.V3.t
         ; pending_coinbase : Pending_coinbase_witness.Stable.V2.t
         }
 
@@ -55,7 +55,7 @@ module Worker_state = struct
 
     val toggle_internal_tracing : bool -> unit
 
-    val set_itn_logger_data : daemon_port:int -> unit
+    val set_itn_logger_data : daemon_port:int option -> unit
 
     val get_blockchain_verification_key :
       unit -> Pickles.Verification_key.t Deferred.t
@@ -303,7 +303,7 @@ module Functions = struct
         Deferred.unit )
 
   let set_itn_logger_data =
-    create bin_int bin_unit (fun w daemon_port ->
+    create (bin_option bin_int) bin_unit (fun w daemon_port ->
         let (module M) = Worker_state.get w in
         M.set_itn_logger_data ~daemon_port ;
         Deferred.unit )
@@ -331,7 +331,7 @@ module Worker = struct
           ('w, Extend_blockchain_input.t, Blockchain.t Or_error.t) F.t
       ; verify_blockchain : ('w, Blockchain.t, unit Or_error.t) F.t
       ; toggle_internal_tracing : ('w, bool, unit) F.t
-      ; set_itn_logger_data : ('w, int, unit) F.t
+      ; set_itn_logger_data : ('w, int option, unit) F.t
       ; get_blockchain_verification_key :
           ('w, unit, Pickles.Verification_key.t) F.t
       ; get_transaction_verification_key :

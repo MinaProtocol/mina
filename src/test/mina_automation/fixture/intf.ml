@@ -1,11 +1,12 @@
+open Core
 open Async
 
-type test_result = Passed | Failed of string | Warning of string
+type test_result = Passed | Failed of Error.t | Warning of string
 
 module type TestCase = sig
   type t
 
-  val test_case : t -> test_result Deferred.Or_error.t
+  val test_case : t -> test_result Deferred.t
 end
 
 module type TestCaseWithSetup = sig
@@ -13,7 +14,7 @@ module type TestCaseWithSetup = sig
 
   val setup : unit -> t
 
-  val test_case : t -> test_result Deferred.Or_error.t
+  val test_case : t -> test_result Deferred.t
 end
 
 module type Fixture = sig
@@ -32,7 +33,7 @@ module type Fixture = sig
   **)
   val setup : unit -> t Deferred.Or_error.t
 
-  val test_case : t -> test_result Deferred.Or_error.t
+  val test_case : t -> test_result Deferred.t
 
   val teardown : t -> unit Deferred.Or_error.t
 

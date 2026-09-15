@@ -14,16 +14,20 @@
   yojson
   result
   uri
+  cohttp
+  cohttp-async
   ;; mina libraries
   init
   logger
   currency
   integration_test_lib
+  mina_graphql_client
   mina_runtime_config
   mina_caqti
   mina_ledger
   mina_base
   mina_block
+  node_status_service
   cmdliner)
  (instrumentation
   (backend bisect_ppx))

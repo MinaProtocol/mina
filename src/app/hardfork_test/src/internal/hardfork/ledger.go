@@ -18,7 +18,7 @@ type LedgerHashes struct {
 
 // GenerateForkLedgers generates the hardfork ledgers using the specified executable
 func (t *HardforkTest) GenerateForkLedgers(executablePath, forkConfigPath, ledgersDir, hashesFile string) error {
-	t.Logger.Info("Generating hardfork ledgers...")
+	t.Logger.Info("Generating hardfork ledgers with %s...", executablePath)
 
 	// Create hardfork ledgers directory
 	os.RemoveAll(ledgersDir)
@@ -30,6 +30,9 @@ func (t *HardforkTest) GenerateForkLedgers(executablePath, forkConfigPath, ledge
 		"--config-file", forkConfigPath,
 		"--genesis-dir", ledgersDir,
 		"--hash-output-file", hashesFile,
+		// Forking to mesa need App State size to be expanded to 32
+		// TODO: Consider design the test so this pad app state size is only applied when forking into Mesa
+		"--pad-app-state",
 	)
 
 	cmd.Stdout = os.Stdout
@@ -43,7 +46,7 @@ func (t *HardforkTest) GenerateForkLedgers(executablePath, forkConfigPath, ledge
 	return nil
 }
 
-func (t *HardforkTest) GenerateAndValidateHashesAndLedgers(analysis *BlockAnalysisResult, forkConfigPath, preforkLedgersDir, prepatchForkConfig string) error {
+func (t *HardforkTest) GenerateAndValidateHashesAndLedgers(analysis BlockAnalysisResult, forkConfigPath, preforkLedgersDir, prepatchForkConfig string) error {
 	// Generate prefork ledgers using main network executable
 	if err := t.GenerateForkLedgers(t.Config.MainRuntimeGenesisLedger, forkConfigPath, preforkLedgersDir, prepatchForkConfig); err != nil {
 		return err

@@ -88,6 +88,10 @@ Priority: optional
 Architecture: amd64
 Suite: unstable
 Maintainer: Mina Protocol <test@example.com>
+Depends: libssl1.1, libffi7, mina-devnet-config (>=1.0)
+Replaces: mina-devnet (<< 1.0)
+Breaks: mina-devnet (<< 1.0)
+Conflicts: mina-devnet (<< 1.0)
 Description: Sample package for deb-session tests
 EOF
 
@@ -196,6 +200,32 @@ log "Testing deb-session-reversion.sh"
 CURRENT_VERSION=$(awk '/^Version:/ {print $2}' "$SESSION_DIR/control/control")
 if [[ "$CURRENT_VERSION" != "2.0.0-rc1" ]]; then
   fail "control file not updated with new version (got: $CURRENT_VERSION)"
+fi
+
+# Verify versioned dependencies were updated
+CURRENT_DEPENDS=$(grep '^Depends:' "$SESSION_DIR/control/control")
+if [[ "$CURRENT_DEPENDS" != *"mina-devnet-config (>=2.0.0-rc1)"* ]]; then
+  fail "Depends not updated with new version (got: $CURRENT_DEPENDS)"
+fi
+
+CURRENT_REPLACES=$(grep '^Replaces:' "$SESSION_DIR/control/control")
+if [[ "$CURRENT_REPLACES" != *"mina-devnet (<< 2.0.0-rc1)"* ]]; then
+  fail "Replaces not updated with new version (got: $CURRENT_REPLACES)"
+fi
+
+CURRENT_BREAKS=$(grep '^Breaks:' "$SESSION_DIR/control/control")
+if [[ "$CURRENT_BREAKS" != *"mina-devnet (<< 2.0.0-rc1)"* ]]; then
+  fail "Breaks not updated with new version (got: $CURRENT_BREAKS)"
+fi
+
+CURRENT_CONFLICTS=$(grep '^Conflicts:' "$SESSION_DIR/control/control")
+if [[ "$CURRENT_CONFLICTS" != *"mina-devnet (<< 2.0.0-rc1)"* ]]; then
+  fail "Conflicts not updated with new version (got: $CURRENT_CONFLICTS)"
+fi
+
+# Verify non-versioned dependencies were NOT changed
+if [[ "$CURRENT_DEPENDS" != *"libssl1.1"* ]] || [[ "$CURRENT_DEPENDS" != *"libffi7"* ]]; then
+  fail "Non-versioned dependencies were corrupted (got: $CURRENT_DEPENDS)"
 fi
 
 # ------------------------------------------------------------------------------

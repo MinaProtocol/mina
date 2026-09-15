@@ -8,7 +8,7 @@ source "$SCRIPT_DIR/deb-session-common.sh"
 
 usage() {
   cat <<EOF
-Usage: $0 <session-dir> <new-version>
+Usage: $0 [OPTIONS] <session-dir> <new-version>
 
 Replaces the Version field in the Debian package control file.
 
@@ -16,15 +16,33 @@ Arguments:
   <session-dir>         Session directory created by deb-session-open.sh
   <new-version>         New version string (e.g., "2.0.0-rc1")
 
+Options:
+  --update-deps         Also update dependency version constraints (=, >=, <=)
+                        that reference the old version to the new version
+
 Example:
-  # Change package version
+  # Change package version only
   $0 ./my-session 2.0.0-rc1
 
+  # Change package version and update pinned dependency versions
+  $0 --update-deps ./my-session 2.0.0-rc1
+
 Notes:
-  - Only modifies the Version: field in the control file
+  - Only modifies the Version: field in the control file (unless --update-deps)
   - Package name, architecture, and all other metadata remain unchanged
 EOF
 }
+
+UPDATE_DEPS=false
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --update-deps) UPDATE_DEPS=true; shift ;;
+    -h|--help) usage; exit 0 ;;
+    -*) echo "ERROR: Unknown option: $1" >&2; usage; exit 1 ;;
+    *) break ;;
+  esac
+done
 
 if [[ $# -ne 2 ]]; then
   usage
@@ -73,6 +91,16 @@ fi
 # Update the Version field
 sed -i "s/^Version: .*$/Version: $NEW_VERSION/" "$CONTROL_FILE"
 
+# Optionally update dependency version constraints
+if [[ "$UPDATE_DEPS" == "true" ]]; then
+  echo "Updating dependency version constraints..."
+  sed -i "s/(= *${OLD_VERSION})/(= ${NEW_VERSION})/g" "$CONTROL_FILE"
+  sed -i "s/(>= *${OLD_VERSION})/(>= ${NEW_VERSION})/g" "$CONTROL_FILE"
+  sed -i "s/(<= *${OLD_VERSION})/(<= ${NEW_VERSION})/g" "$CONTROL_FILE"
+  sed -i "s/(>> *${OLD_VERSION})/(>> ${NEW_VERSION})/g" "$CONTROL_FILE"
+  sed -i "s/(<< *${OLD_VERSION})/(<< ${NEW_VERSION})/g" "$CONTROL_FILE"
+fi
+
 # Verify the change
 UPDATED_VERSION=$(grep '^Version:' "$CONTROL_FILE" | awk '{print $2}' || true)
 
@@ -84,6 +112,26 @@ if [[ "$UPDATED_VERSION" != "$NEW_VERSION" ]]; then
 fi
 
 echo "✓ Version replaced successfully"
+
+# Update versioned references in dependency fields (Depends, Replaces, Breaks)
+# When a dependency pins the old version (e.g. "mina-devnet-config (>=1.0.0)"),
+# replace it with the new version so the package stays internally consistent.
+ESCAPED_OLD=$(sed 's/[.[\*^$/]/\\&/g' <<< "$OLD_VERSION")
+ESCAPED_NEW=$(sed 's/[&/]/\\&/g' <<< "$NEW_VERSION")
+
+DEP_CHANGED=0
+for FIELD in Depends Replaces Breaks Conflicts; do
+  if grep -q "^${FIELD}:.*${ESCAPED_OLD}" "$CONTROL_FILE"; then
+    sed -i "/^${FIELD}:/s/${ESCAPED_OLD}/${ESCAPED_NEW}/g" "$CONTROL_FILE"
+    DEP_CHANGED=1
+    echo "✓ Updated $OLD_VERSION → $NEW_VERSION in ${FIELD} field"
+  fi
+done
+
+if [[ "$DEP_CHANGED" -eq 0 ]]; then
+  echo "  (no versioned dependencies referencing $OLD_VERSION found)"
+fi
+
 echo ""
 echo "Updated control file:"
-grep -E "^(Package|Version|Architecture):" "$CONTROL_FILE" || true
+grep -E "^(Package|Version|Architecture|Depends|Replaces|Breaks|Conflicts):" "$CONTROL_FILE" || true

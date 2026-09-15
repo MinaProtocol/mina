@@ -17,6 +17,6 @@ let deps =
         Dockers.DepsSpec::{ network = network, profile = Profile.Type.Devnet }
 
 let expectedChainId =
-      "29936104443aaf264a7f0192ac64b1c7173198c1ed404c1bcff5e562e05eb7f6"
+      "8c6312664c60ecc4c0c695e69f6301692c0b20f354b55e08e69a289f3d373e50"
 
 in  ChainIdTest.makeTest "ChainIdTestDevnet" scopes deps network expectedChainId

@@ -26,7 +26,8 @@
   unsigned_extended
   mina_compile_config
   mina_wire_types
-  integration_test_lib
+  mina_graphql_client
+  cli_lib
   logger
   mina_stdlib)
  (instrumentation

@@ -24,8 +24,13 @@ in  Pipeline.build
             , Artifacts.Type.LogProc
             , Artifacts.Type.Archive
             , Artifacts.Type.Rosetta
+            , Artifacts.Type.RosettaAppsOnly
+            , Artifacts.Type.DaemonAutoHardfork
+            , Artifacts.Type.DaemonAutomode
+            , Artifacts.Type.DaemonAppsOnly
             , Artifacts.Type.ZkappTestTransaction
             , Artifacts.Type.CreatePreforkGenesis
+            , Artifacts.Type.DaemonStorageToolbox
             ]
           , network = Network.Type.Mainnet
           , tags =
