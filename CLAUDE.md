@@ -38,7 +38,7 @@ Mina Protocol is a lightweight blockchain that maintains constant size by using 
 - `./scripts/testone.sh <test-file> [test-name]` - Run a single test file
 
 ### CI Test Execution
-- `./buildkite/scripts/unit-test.sh <profile> <path>` - Run tests as done in CI (builds first, retries failures once)
+- `./buildkite/scripts/unit-test.sh <dune-profile> <path>` - Run tests as done in CI (builds first, retries failures once). The profile arg exists only because some old tests still dispatch on `DUNE_PROFILE`; it also gets exported as `MINA_PROFILE`.
 
 ### Coverage Testing
 - `make test-coverage` - Run tests with coverage instrumentation
@@ -99,12 +99,12 @@ Note: There is no `make test` target. Use `dune runtest` directly.
 - `ledger/` - Merkle tree ledger implementation
 - `staged_ledger/` - Transaction processing pipeline
 
-### Build Profiles (`src/config/`)
-Profiles are defined as `.mlh` files in `src/config/` and selected via `--profile` in dune:
-- `dev` - Development (default). Small ledger depth (10), proof_level=check, fast 2s blocks
-- `devnet` - Devnet. Full ledger depth (35), proof_level=full, 3min blocks, testnet signatures
-- `mainnet` - Production. Full ledger depth (35), proof_level=full, 3min blocks, mainnet signatures
-- `lightnet` - Lightweight test network. Full ledger depth (35), proof_level=none, 20s blocks
+### Node Profiles (runtime, `MINA_PROFILE`)
+Profiles are no longer selected at build time (the old `src/config/*.mlh` + `--profile` mechanism is gone). A single binary selects its profile at **runtime** via the `MINA_PROFILE` env var, resolved in `src/lib/node_config/profiled/node_config_profiled.ml` (legacy fallback: `/etc/coda/build_config/PROFILE`; default: `dev`):
+- `dev` - Development (default). Small ledger depth, proof_level=check, fast blocks
+- `devnet` - Devnet. Full ledger depth, proof_level=full, testnet signatures
+- `mainnet` - Production. Full ledger depth, proof_level=full, mainnet signatures
+- `lightnet` - Lightweight test network. proof_level=none
 
 ### CI/CD (`buildkite/`)
 - Pipeline defined in **Dhall** (typed configuration language) in `buildkite/src/`
@@ -159,6 +159,7 @@ Profiles are defined as `.mlh` files in `src/config/` and selected via `--profil
 ## Development Workflow
 
 ### Before Building
+0. Nix is the recommended way to get dependencies (see `nix/README.md`); manual dependency management is fragile. In a Nix devshell, skip `make switch`.
 1. Set up the opam switch: `make switch`
 2. Initialize git submodules: `git submodule update --init --recursive`
 3. Build libp2p helper: `make libp2p_helper`
