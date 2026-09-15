@@ -1,4 +1,13 @@
-[ "BUILDKITE_AGENT_ACCESS_TOKEN"
+-- Environment variables forwarded into every dockerised job, as --env flags.
+--
+-- PIP_BREAK_SYSTEM_PACKAGES states that the interpreter in these containers
+-- belongs to the image rather than to the distribution. From Debian 12 on, the
+-- system Python carries a PEP 668 marker and pip refuses to install into it
+-- without this. Older pip, in the bullseye/focal/jammy images, ignores the
+-- variable, so one setting is correct for every codename.
+[ "PIP_BREAK_SYSTEM_PACKAGES=1"
+, "BUILDKITE_AGENT_ACCESS_TOKEN"
+, "BUILDKITE_AGENT_WRITE_TOKEN"
 , "BUILDKITE_PIPELINE_PROVIDER"
 , "BUILDKITE_BRANCH"
 , "BUILDKITE_SOURCE"
@@ -52,4 +61,6 @@
 , "SLOT_TX_END"
 , "MINA_LOG_LEVEL"
 , "MINA_LEDGER_S3_BUCKET"
+, "GITHUB_TOKEN"
+, "GIT_CONFIG_PARAMETERS"
 ]

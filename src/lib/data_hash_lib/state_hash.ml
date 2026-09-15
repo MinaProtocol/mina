@@ -20,6 +20,8 @@ let to_decimal_string = to_decimal_string
 
 let of_decimal_string = of_decimal_string
 
+let to_hex_string = Field.to_hex_string
+
 (* Data hash versioned boilerplate below *)
 
 [%%versioned
@@ -50,3 +52,22 @@ let deriver obj =
       ~of_string:of_base58_check_exn
     |> needs_custom_js ~name:"StateHash" ~js_type:field)
     obj
+
+include (
+  struct
+    (* Some inline benchmarks *)
+    let state_hash_for_bench =
+      lazy
+        (Base_quickcheck.Generator.generate gen ~size:1
+           ~random:(Splittable_random.State.create Random.State.default) )
+
+    let%bench "State_hash decimal encode" =
+      to_decimal_string (Lazy.force state_hash_for_bench)
+
+    let%bench "State_hash base58 encode" =
+      to_base58_check (Lazy.force state_hash_for_bench)
+
+    let%bench "State_hash hex encode" =
+      to_hex_string (Lazy.force state_hash_for_bench)
+  end :
+    sig end )

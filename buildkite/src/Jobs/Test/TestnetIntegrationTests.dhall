@@ -45,6 +45,7 @@ in  Pipeline.build
         , TestExecutive.executeLocal "block-reward" dependsOn
         , TestExecutive.executeLocal "chain-reliability" dependsOn
         , TestExecutive.executeLocal "epoch-ledger" dependsOn
+        , TestExecutive.executeLocal "genesis-export" dependsOn
         , TestExecutive.executeLocal "gossip-consis" dependsOn
         , TestExecutive.executeLocal "medium-bootstrap" dependsOn
         , TestExecutive.executeLocal "payments" dependsOn

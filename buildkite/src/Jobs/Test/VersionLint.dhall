@@ -32,13 +32,13 @@ let buildTestCmd
             Command.Config::{
             , commands =
                   RunInToolchain.runInToolchain
-                    ([] : List Text)
+                    DebianVersions.overrideEnvs
                     "buildkite/scripts/dump-mina-type-shapes.sh"
                 # RunInToolchain.runInToolchain
-                    ([] : List Text)
+                    DebianVersions.overrideEnvs
                     "buildkite/scripts/version-linter-patch-missing-type-shapes.sh ${release_branch}"
                 # RunInToolchain.runInToolchain
-                    ([] : List Text)
+                    DebianVersions.overrideEnvs
                     "buildkite/scripts/version-linter.sh ${release_branch}"
             , label = "Versioned type linter for ${release_branch}"
             , key = "version-linter-${release_branch}"
@@ -59,6 +59,8 @@ in  Pipeline.build
                 , S.exactly
                     "buildkite/scripts/version-linter-patch-missing-type-shapes"
                     "sh"
+                , S.exactly "buildkite/scripts/dump-mina-type-shapes" "sh"
+                , S.exactly "buildkite/scripts/gsutil-upload" "sh"
                 ]
 
           in  JobSpec::{

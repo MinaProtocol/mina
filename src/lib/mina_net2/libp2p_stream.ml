@@ -34,6 +34,8 @@ let protocol { protocol; _ } = protocol
 
 let remote_peer { peer; _ } = peer
 
+let state { state; _ } = state
+
 let pipes { incoming_r; outgoing_w; _ } = (incoming_r, outgoing_w)
 
 let data_received { incoming_w; _ } data =
@@ -124,7 +126,7 @@ let stream_closed ~logger ~who_closed t =
         [ ("who_closed", `String (name_of_participant who_closed))
         ; ("old_stream_state", `String (show_state old_state))
         ] ;
-  `Stream_should_be_released (equal_state FullyOpen t.state)
+  `Stream_should_be_released (equal_state FullyClosed t.state)
 
 let max_chunk_size = 16777216 (* 16 MiB *)
 

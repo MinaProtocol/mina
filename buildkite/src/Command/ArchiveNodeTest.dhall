@@ -1,7 +1,3 @@
-let B = ../External/Buildkite.dhall
-
-let B/SoftFail = B.definitions/commandStep/properties/soft_fail/Type
-
 let Artifacts = ../Constants/Artifacts.dhall
 
 let Command = ./Base.dhall
@@ -23,19 +19,22 @@ in  { step =
                     [ "ARCHIVE_TEST_APP=mina-archive-node-test"
                     , "MINA_TEST_NETWORK_DATA=/etc/mina/test/archive/sample_db"
                     ]
-                    "src/test/archive/sample_db/archive_db.sql"
+                    ( Some
+                        ( RunWithPostgres.ScriptOrArchive.Script
+                            "src/test/archive/sample_db/archive_db.sql"
+                        )
+                    )
                     ( Artifacts.fullDockerTag
                         Artifacts.Tag::{
                         , artifact = Artifacts.Type.FunctionalTestSuite
                         , buildFlags = BuildFlags.Type.Instrumented
                         }
                     )
-                    "./scripts/tests/archive-node-test.sh && buildkite/scripts/upload-partial-coverage-data.sh ${key} && ls -al && ./buildkite/scripts/cache/manager.sh write archive.perf archive-node-test"
+                    "./scripts/tests/archive-node-test.sh && buildkite/scripts/upload-partial-coverage-data.sh ${key} && ls -al && ./buildkite/scripts/cache/manager.sh write-to-dir archive.perf archive-node-test"
                 ]
               , label = "Archive: Node Test"
               , key = key
               , target = Size.Large
-              , soft_fail = Some (B/SoftFail.Boolean True)
               , depends_on = dependsOn
               }
     }

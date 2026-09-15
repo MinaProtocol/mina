@@ -57,10 +57,10 @@ module Zkapp_command_applied = struct
   module Stable = struct
     [@@@no_toplevel_latest_type]
 
-    module V1 = struct
+    module V2 = struct
       type t =
-        { accounts : (Account_id.Stable.V2.t * Account.Stable.V2.t option) list
-        ; command : Zkapp_command.Stable.V1.t With_status.Stable.V2.t
+        { accounts : (Account_id.Stable.V2.t * Account.Stable.V3.t option) list
+        ; command : Zkapp_command.Stable.V2.t With_status.Stable.V2.t
         ; new_accounts : Account_id.Stable.V2.t list
         }
       [@@deriving sexp, to_yojson]
@@ -101,10 +101,10 @@ module Command_applied = struct
   module Stable = struct
     [@@@no_toplevel_latest_type]
 
-    module V2 = struct
+    module V3 = struct
       type t =
         | Signed_command of Signed_command_applied.Stable.V2.t
-        | Zkapp_command of Zkapp_command_applied.Stable.V1.t
+        | Zkapp_command of Zkapp_command_applied.Stable.V2.t
       [@@deriving sexp, to_yojson]
 
       let to_latest = Fn.id
@@ -168,7 +168,7 @@ module Varying : sig
   module Stable : sig
     [@@@no_toplevel_latest_type]
 
-    module V2 : sig
+    module V3 : sig
       type t [@@deriving sexp, to_yojson]
     end
   end]
@@ -190,9 +190,9 @@ end = struct
   module Stable = struct
     [@@@no_toplevel_latest_type]
 
-    module V2 = struct
+    module V3 = struct
       type t =
-        | Command of Command_applied.Stable.V2.t
+        | Command of Command_applied.Stable.V3.t
         | Fee_transfer of Fee_transfer_applied.Stable.V2.t
         | Coinbase of Coinbase_applied.Stable.V2.t
       [@@deriving sexp, to_yojson]
@@ -230,9 +230,9 @@ end
 module Stable = struct
   [@@@no_toplevel_latest_type]
 
-  module V2 = struct
+  module V3 = struct
     type t =
-      { previous_hash : Ledger_hash.Stable.V1.t; varying : Varying.Stable.V2.t }
+      { previous_hash : Ledger_hash.Stable.V1.t; varying : Varying.Stable.V3.t }
     [@@deriving sexp, to_yojson]
 
     let to_latest = Fn.id
@@ -313,6 +313,19 @@ let supply_increase :
   in
   Option.value_map total ~default:(Or_error.error_string "overflow")
     ~f:(fun v -> Ok v)
+
+let transaction : t -> Transaction.t =
+ fun { varying; _ } ->
+  match varying with
+  | Command (Signed_command { common = { user_command = { data; _ }; _ }; _ })
+    ->
+      Transaction.Command (User_command.Signed_command data)
+  | Command (Zkapp_command { command = { data; _ }; _ }) ->
+      Transaction.Command (User_command.Zkapp_command data)
+  | Fee_transfer { fee_transfer = { data; _ }; _ } ->
+      Transaction.Fee_transfer data
+  | Coinbase { coinbase = { data; _ }; _ } ->
+      Transaction.Coinbase data
 
 let transaction_with_status : t -> Transaction.t With_status.t =
  fun { varying; _ } ->

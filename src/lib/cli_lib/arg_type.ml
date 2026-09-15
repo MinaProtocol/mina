@@ -78,6 +78,10 @@ let global_slot =
   Command.Arg_type.map Command.Param.int
     ~f:Mina_numbers.Global_slot_since_genesis.of_int
 
+let hardfork_slot =
+  Command.Arg_type.map Command.Param.int
+    ~f:Mina_numbers.Global_slot_since_hard_fork.of_int
+
 let txn_fee =
   Command.Arg_type.map Command.Param.string ~f:Currency.Fee.of_mina_string_exn
 
@@ -146,3 +150,17 @@ let work_selection_method_to_module :
       (module Work_selector.Selection_methods.Random)
   | Random_offset ->
       (module Work_selector.Selection_methods.Random_offset)
+
+module Hardfork_handling = struct
+  type t = Keep_running | Migrate_exit
+
+  let of_string = function
+    | "keep-running" ->
+        Keep_running
+    | "migrate-exit" ->
+        Migrate_exit
+    | _ ->
+        failwith "Invalid hardfork handling"
+
+  let arg = Command.Arg_type.map Command.Param.string ~f:of_string
+end

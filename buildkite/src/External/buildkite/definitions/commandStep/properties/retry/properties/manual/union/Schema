@@ -1,0 +1,9 @@
+{ Type = { allowed : Optional (./properties/allowed/Type ) 
+, permit_on_passed : Optional (./properties/permit_on_passed/Type ) 
+, reason : Optional (./properties/reason/Type ) 
+} 
+, default = { allowed = None ((./properties/allowed/Type )) 
+, permit_on_passed = None ((./properties/permit_on_passed/Type )) 
+, reason = None ((./properties/reason/Type )) 
+} 
+}

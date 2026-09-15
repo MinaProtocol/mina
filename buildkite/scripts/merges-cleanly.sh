@@ -21,6 +21,8 @@ fi
 # Fetch a fresh copy of the target branch
 source buildkite/scripts/refresh_code.sh
 
+git fetch origin "${BRANCH}"
+
 # Check mergeability. We use flags so that
 # * `--no-commit` stops us from updating the index with a merge commit,
 # * `--no-ff` stops us from updating the index to the HEAD, if the merge is a

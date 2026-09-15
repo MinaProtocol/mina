@@ -3,13 +3,15 @@ open Mina_base
 open Mina_generators
 open Mina_numbers
 open Mina_transaction
-open Staged_ledger
+
+module Application_state =
+  Staged_ledger.For_tests.Application_state.Valid_user_command
 
 type apply =
      User_command.t Transaction.t_
-  -> Ledger.Transaction_partially_applied.t Or_error.t
+  -> Staged_ledger.Ledger.Transaction_partially_applied.t Or_error.t
 
-let gen_apply_and_txn : (apply * Application_state.txn) Quickcheck.Generator.t =
+let gen_apply_and_txn : (apply * User_command.Valid.t) Quickcheck.Generator.t =
   let open Quickcheck.Generator in
   let open Let_syntax in
   let constraint_constants =
@@ -20,7 +22,9 @@ let gen_apply_and_txn : (apply * Application_state.txn) Quickcheck.Generator.t =
       ~genesis_constants:Genesis_constants.For_unit_tests.t ()
   in
   let%map global_slot = Global_slot_since_genesis.gen in
-  let current_state_view = Test_helpers.dummy_state_view ~global_slot () in
+  let current_state_view =
+    Staged_ledger.Test_helpers.dummy_state_view ~global_slot ()
+  in
   let apply =
     Transaction_snark.Transaction_validator.apply_transaction_first_pass
       ~constraint_constants ~global_slot validating_ledger

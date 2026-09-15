@@ -81,6 +81,8 @@ module Make_base (Inputs : Intf.Inputs.Intf) :
 
     let set_at_index_exn (T ((module Base), t)) = Base.set_at_index_exn t
 
+    let get_at_index (T ((module Base), t)) = Base.get_at_index t
+
     let get_at_index_exn (T ((module Base), t)) = Base.get_at_index_exn t
 
     let set_batch ?hash_cache (T ((module Base), t)) =
@@ -117,6 +119,8 @@ module Make_base (Inputs : Intf.Inputs.Intf) :
     let tokens (T ((module Base), t)) pk = Base.tokens t pk
 
     let token_owners (T ((module Base), t)) = Base.token_owners t
+
+    let iteri_untrusted (T ((module Base), t)) = Base.iteri_untrusted t
 
     let iteri (T ((module Base), t)) = Base.iteri t
 

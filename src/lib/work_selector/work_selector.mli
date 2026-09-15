@@ -23,9 +23,6 @@ module Selection_methods : sig
   module Random_offset : Selection_method_intf
 end
 
-(** remove the specified work from seen jobs *)
-val remove : State.t -> Transaction_snark.Statement.t One_or_two.t -> unit
-
 (** Seen/Unseen jobs that are not in the snark pool yet *)
 val pending_work_statements :
      snark_pool:snark_pool

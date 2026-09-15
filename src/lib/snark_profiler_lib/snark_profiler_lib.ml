@@ -12,7 +12,7 @@ module Sparse_ledger = struct
   let merkle_root t = Frozen_ledger_hash.of_ledger_hash @@ merkle_root t
 end
 
-let create_ledger_and_transactions
+let create_ledger_and_transactions ~signature_kind
     ~(constraint_constants : Genesis_constants.Constraint_constants.t)
     num_transactions :
     Mina_ledger.Ledger.t * _ User_command.t_ Transaction.t_ list =
@@ -39,7 +39,6 @@ let create_ledger_and_transactions
         ~memo:Signed_command_memo.dummy ~valid_until:None
         ~body:(Payment { receiver_pk = to_pk; amount })
     in
-    let signature_kind = Mina_signature_kind.t_DEPRECATED in
     Signed_command.sign ~signature_kind from_kp payload
   in
   let nonces =
@@ -116,9 +115,8 @@ module Transaction_key = struct
   include Hashable.Make (T)
 
   let of_zkapp_command
-      ~(constraint_constants : Genesis_constants.Constraint_constants.t) ~ledger
-      (p : Zkapp_command.t) =
-    let signature_kind = Mina_signature_kind.t_DEPRECATED in
+      ~(constraint_constants : Genesis_constants.Constraint_constants.t)
+      ~signature_kind ~ledger (p : Zkapp_command.t) =
     let second_pass_ledger =
       let new_mask =
         Mina_ledger.Ledger.Mask.create
@@ -192,9 +190,8 @@ let create_ledger_and_zkapps ?(min_num_updates = 1) ?(num_proof_updates = 0)
     ~(proof_cache_db : Proof_cache_tag.cache_db)
     ~(genesis_constants : Genesis_constants.t)
     ~(constraint_constants : Genesis_constants.Constraint_constants.t)
-    ~max_num_updates () :
+    ~max_num_updates ~signature_kind () :
     (Mina_ledger.Ledger.t * Zkapp_command.t list) Async.Deferred.t =
-  let signature_kind = Mina_signature_kind.t_DEPRECATED in
   let `VK verification_key, `Prover prover =
     Transaction_snark.For_tests.create_trivial_snapp ()
   in
@@ -403,7 +400,7 @@ let create_ledger_and_zkapps ?(min_num_updates = 1) ?(num_proof_updates = 0)
                in
                let combination =
                  Transaction_key.of_zkapp_command ~constraint_constants ~ledger
-                   p
+                   ~signature_kind p
                in
                let perm_string =
                  List.fold ~init:"S" account_updates
@@ -462,7 +459,7 @@ let rec pair_up = function
 let state_body ~logger ~(genesis_constants : Genesis_constants.t)
     ~(constraint_constants : Genesis_constants.Constraint_constants.t) =
   lazy
-    (let genesis_epoch_data = Consensus.Genesis_epoch_data.compiled in
+    (let genesis_epoch_data = Consensus.Genesis_data.Epoch.compiled in
      let consensus_constants =
        Consensus.Constants.create ~constraint_constants
          ~protocol_constants:genesis_constants.protocol
@@ -480,8 +477,11 @@ let state_body ~logger ~(genesis_constants : Genesis_constants.t)
        let logger = logger
      end) in
      Mina_state.Genesis_protocol_state.t
-       ~genesis_ledger:(module Test_genesis_ledger)
-       ~genesis_epoch_data ~constraint_constants ~consensus_constants
+       ~genesis_ledger:
+         (Consensus.Genesis_data.Ledger.to_hashed (module Test_genesis_ledger))
+       ~genesis_epoch_data:
+         (Consensus.Genesis_data.Epoch.to_hashed genesis_epoch_data)
+       ~constraint_constants ~consensus_constants
        ~genesis_body_reference:Staged_ledger_diff.genesis_body_reference
      |> With_hash.data |> Mina_state.Protocol_state.body )
 
@@ -573,8 +573,7 @@ let profile_user_command (module T : Transaction_snark.S) ~genesis_constants
          ~f:(fun ((max_span, source_ledger, coinbase_stack_source), proofs)
                  (target_ledger, applied) ->
            let txn =
-             With_status.data
-             @@ Mina_ledger.Ledger.transaction_of_applied applied
+             Mina_transaction_logic.Transaction_applied.transaction applied
            in
            (* the txn was already valid before apply, we are just recasting it here after application *)
            let (`If_this_is_used_it_should_have_a_comment_justifying_it
@@ -664,7 +663,7 @@ let profile_user_command (module T : Transaction_snark.S) ~genesis_constants
 
 let profile_zkapps
     ~(constraint_constants : Genesis_constants.Constraint_constants.t) ~verifier
-    ledger zkapp_commands =
+    ~signature_kind ledger zkapp_commands =
   let open Async.Deferred.Let_syntax in
   let tm0 = Core.Unix.gettimeofday () in
   let%map () =
@@ -732,7 +731,7 @@ let profile_zkapps
           { Time_values.verification_time; proving_time = zkapp_span }
         in
         let combination =
-          Transaction_key.of_zkapp_command ~ledger zkapp_command
+          Transaction_key.of_zkapp_command ~ledger ~signature_kind zkapp_command
         in
         Transaction_key.Table.change transaction_combinations
           (combination ~constraint_constants) ~f:(fun data_opt ->
@@ -775,8 +774,8 @@ let profile_zkapps
   format_time_span total_time
 
 let check_base_snarks ~genesis_constants ~constraint_constants ~logger
-    sparse_ledger0 (transitions : Transaction.Valid.t list) preeval =
-  let signature_kind = Mina_signature_kind.t_DEPRECATED in
+    ~signature_kind sparse_ledger0 (transitions : Transaction.Valid.t list)
+    preeval =
   ignore
     ( let sok_message =
         Sok_message.create ~fee:Currency.Fee.zero
@@ -795,8 +794,8 @@ let check_base_snarks ~genesis_constants ~constraint_constants ~logger
       |> List.fold ~init:sparse_ledger0
            ~f:(fun source_ledger (target_ledger, applied_txn) ->
              let txn =
-               With_status.data
-               @@ Mina_ledger.Ledger.transaction_of_applied applied_txn
+               Mina_transaction_logic.Transaction_applied.transaction
+                 applied_txn
              in
              (* the txn was already valid before apply, we are just recasting it here after application *)
              let (`If_this_is_used_it_should_have_a_comment_justifying_it
@@ -840,8 +839,8 @@ let check_base_snarks ~genesis_constants ~constraint_constants ~logger
   Async.Deferred.return "Base constraint system satisfied"
 
 let generate_base_snarks_witness ~genesis_constants ~constraint_constants
-    ~logger sparse_ledger0 (transitions : Transaction.Valid.t list) preeval =
-  let signature_kind = Mina_signature_kind.t_DEPRECATED in
+    ~logger ~signature_kind sparse_ledger0
+    (transitions : Transaction.Valid.t list) preeval =
   ignore
     ( let sok_message =
         Sok_message.create ~fee:Currency.Fee.zero
@@ -860,8 +859,8 @@ let generate_base_snarks_witness ~genesis_constants ~constraint_constants
       |> List.fold ~init:sparse_ledger0
            ~f:(fun source_ledger (target_ledger, applied_txn) ->
              let txn =
-               With_status.data
-               @@ Mina_ledger.Ledger.transaction_of_applied applied_txn
+               Mina_transaction_logic.Transaction_applied.transaction
+                 applied_txn
              in
              (* the txn was already valid before apply, we are just recasting it here after application *)
              let (`If_this_is_used_it_should_have_a_comment_justifying_it

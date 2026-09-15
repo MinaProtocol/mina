@@ -267,6 +267,9 @@ let%snarkydef_ step ~(logger : Logger.t)
     let current_ledger_statement =
       (Protocol_state.blockchain_state new_state).ledger_proof_statement
     in
+    let previous_ledger_statement =
+      (Protocol_state.blockchain_state previous_state).ledger_proof_statement
+    in
     let pending_coinbase_source_stack =
       Pending_coinbase.Stack.Checked.create_with deleted_stack
     in
@@ -274,9 +277,6 @@ let%snarkydef_ step ~(logger : Logger.t)
       let open Checked in
       let%bind () =
         Fee_excess.(assert_equal_checked (var_of_t zero) txn_snark.fee_excess)
-      in
-      let previous_ledger_statement =
-        (Protocol_state.blockchain_state previous_state).ledger_proof_statement
       in
       let ledger_statement_valid =
         Impl.make_checked (fun () ->
@@ -311,6 +311,16 @@ let%snarkydef_ step ~(logger : Logger.t)
     let%bind () =
       with_label __LOC__ (fun () ->
           Boolean.Assert.any [ txn_snark_input_correct; nothing_changed ] )
+    in
+    let%bind () =
+      (* Structural consistency constraint on the step transition. *)
+      let%bind ledger_statements_equal =
+        txn_statement_ledger_hashes_equal previous_ledger_statement
+          current_ledger_statement
+      in
+      with_label __LOC__ (fun () ->
+          Boolean.Assert.any
+            [ Boolean.not nothing_changed; ledger_statements_equal ] )
     in
     let transaction_snark_should_verifiy = Boolean.not nothing_changed in
     let%bind result =
@@ -454,20 +464,21 @@ end
 
 let verify ts ~key = Pickles.verify (module Nat.N2) (module Statement) key ts
 
+(** Return the constraint system for the blockchain-step circuit. *)
+let step_constraint_system ~proof_level ~constraint_constants =
+  let main x =
+    let open Tick in
+    let%map _ =
+      step ~proof_level ~constraint_constants ~logger:(Logger.create ()) x
+    in
+    ()
+  in
+  Tick.constraint_system ~input_typ:Statement.typ ~return_typ:Tick.Typ.unit main
+
 let constraint_system_digests ~proof_level ~constraint_constants () =
   let digest = Tick.R1CS_constraint_system.digest in
   [ ( "blockchain-step"
-    , digest
-        (let main x =
-           let open Tick in
-           let%map _ =
-             step ~proof_level ~constraint_constants ~logger:(Logger.create ())
-               x
-           in
-           ()
-         in
-         Tick.constraint_system ~input_typ:Statement.typ
-           ~return_typ:Tick.Typ.unit main ) )
+    , digest (step_constraint_system ~proof_level ~constraint_constants) )
   ]
 
 module Make (T : sig

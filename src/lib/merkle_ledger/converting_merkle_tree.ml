@@ -109,6 +109,8 @@ end)
 
   let to_list_sequential t = Primary_ledger.to_list_sequential t.primary_ledger
 
+  let iteri_untrusted t ~f = Primary_ledger.iteri_untrusted t.primary_ledger ~f
+
   let iteri t ~f = Primary_ledger.iteri t.primary_ledger ~f
 
   let foldi t ~init ~f = Primary_ledger.foldi t.primary_ledger ~init ~f
@@ -179,6 +181,8 @@ end)
       (List.map
          ~f:(fun (loc, account) -> (loc, convert account))
          located_accounts )
+
+  let get_at_index t idx = Primary_ledger.get_at_index t.primary_ledger idx
 
   let get_at_index_exn t idx =
     Primary_ledger.get_at_index_exn t.primary_ledger idx
@@ -264,17 +268,17 @@ struct
     Primary_db.num_accounts db1 = Converting_db.num_accounts db2
     &&
     let is_synced = ref true in
-    Primary_db.iteri db1 ~f:(fun idx stable_account ->
-        let expected_unstable_account = convert stable_account in
-        let actual_unstable_account = Converting_db.get_at_index_exn db2 idx in
+    Primary_db.iteri_untrusted db1 ~f:(fun idx stable_account ->
+        let expected_unstable_account = Option.map ~f:convert stable_account in
+        let actual_unstable_account = Converting_db.get_at_index db2 idx in
         if
           not
-            (Inputs.converted_equal expected_unstable_account
+            (Option.equal Inputs.converted_equal expected_unstable_account
                actual_unstable_account )
         then is_synced := false ) ;
     !is_synced
 
-  let create ~config ~logger ~depth () =
+  let create ~config ~logger ~depth ?(assert_synced = false) () =
     let primary_directory_name, converting_directory_name =
       match config with
       | Config.Temporary ->
@@ -294,9 +298,13 @@ struct
     let db2 =
       Converting_db.create ?directory_name:db2_directory_name ~depth ()
     in
-    if Converting_db.num_accounts db2 = 0 then of_ledgers_with_migration db1 db2
+    if Converting_db.num_accounts db2 = 0 then (
+      if assert_synced then failwith "Converting DB is empty!" ;
+      of_ledgers_with_migration db1 db2 )
     else if dbs_synced db1 db2 then of_ledgers db1 db2
     else (
+      if assert_synced then
+        failwith "Converting DB is not in sync with primary DB!" ;
       [%log warn]
         "Migrating DB desync, cleaning up unstable DB and remigrating..." ;
       Converting_db.close db2 ;

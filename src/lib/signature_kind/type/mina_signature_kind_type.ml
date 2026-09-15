@@ -3,6 +3,14 @@ open Core_kernel
 type t = Testnet | Mainnet | Other_network of string
 [@@deriving bin_io_unversioned, to_yojson]
 
+let to_directory_name = function
+  | Mainnet ->
+      "mainnet"
+  | Testnet ->
+      "devnet"
+  | Other_network s ->
+      "other-network-" ^ s
+
 (** Generator for random signature kinds. It takes a seed as a parameter for
     generating random strings. *)
 let signature_kind_gen seed =

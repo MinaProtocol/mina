@@ -41,8 +41,8 @@ module Diff_versioned = struct
   module Stable = struct
     [@@@no_toplevel_latest_type]
 
-    module V2 = struct
-      type t = User_command.Stable.V2.t list [@@deriving sexp, yojson, hash]
+    module V3 = struct
+      type t = User_command.Stable.V3.t list [@@deriving sexp, yojson, hash]
 
       let to_latest = Fn.id
     end
@@ -164,8 +164,8 @@ module Diff_versioned = struct
     module Stable = struct
       [@@@no_toplevel_latest_type]
 
-      module V3 = struct
-        type t = (User_command.Stable.V2.t * Diff_error.Stable.V3.t) list
+      module V4 = struct
+        type t = (User_command.Stable.V3.t * Diff_error.Stable.V3.t) list
         [@@deriving sexp, yojson, compare]
 
         let to_latest = Fn.id
@@ -1713,8 +1713,12 @@ let%test_module _ =
         let compile_time_genesis =
           (*not using Precomputed_values.for_unit_test because of dependency cycle*)
           Mina_state.Genesis_protocol_state.t
-            ~genesis_ledger:Genesis_ledger.for_unit_tests
-            ~genesis_epoch_data:Consensus.Genesis_epoch_data.for_unit_tests
+            ~genesis_ledger:
+              (Consensus.Genesis_data.Ledger.to_hashed
+                 Genesis_ledger.for_unit_tests )
+            ~genesis_epoch_data:
+              (Consensus.Genesis_data.Epoch.to_hashed
+                 Consensus.Genesis_data.Epoch.for_unit_tests )
             ~constraint_constants ~consensus_constants
             ~genesis_body_reference:Staged_ledger_diff.genesis_body_reference
         in
@@ -2016,7 +2020,7 @@ let%test_module _ =
       in
       let%map zkapp_command =
         Transaction_snark.For_tests.single_account_update ~constraint_constants
-          spec
+          ~signature_kind spec
       in
       Or_error.ok_exn
         (Zkapp_command.Verifiable.create ~failed:false
@@ -3449,7 +3453,7 @@ let%test_module _ =
               ~receiver_idx ~amount ~signature_kind ()
     end
 
-    (** appends a and b to the end of c, taking an element of a or b at random, 
+    (** appends a and b to the end of c, taking an element of a or b at random,
        continuing until both a and b run out of elements
     *)
     let rec gen_merge (a : 'a list) (b : 'a list) (c : 'a list) =

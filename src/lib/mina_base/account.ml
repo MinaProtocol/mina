@@ -250,7 +250,7 @@ module Timing = Account_timing
 module Binable_arg = struct
   [%%versioned
   module Stable = struct
-    module V2 = struct
+    module V3 = struct
       type t =
         { public_key : Public_key.Compressed.Stable.V1.t
         ; token_id : Token_id.Stable.V2.t
@@ -262,7 +262,7 @@ module Binable_arg = struct
         ; voting_for : State_hash.Stable.V1.t
         ; timing : Timing.Stable.V2.t
         ; permissions : Permissions.Stable.V2.t
-        ; zkapp : Zkapp_account.Stable.V2.t option
+        ; zkapp : Zkapp_account.Stable.V3.t option
         }
       [@@deriving sexp, equal, hash, compare, yojson]
 
@@ -277,8 +277,8 @@ let check = Fn.id
 
 [%%versioned_binable
 module Stable = struct
-  module V2 = struct
-    type t = Binable_arg.Stable.V2.t =
+  module V3 = struct
+    type t = Binable_arg.Stable.V3.t =
       { public_key : Public_key.Compressed.Stable.V1.t
       ; token_id : Token_id.Stable.V2.t
       ; token_symbol : Token_symbol.Stable.V1.t
@@ -289,13 +289,13 @@ module Stable = struct
       ; voting_for : State_hash.Stable.V1.t
       ; timing : Timing.Stable.V2.t
       ; permissions : Permissions.Stable.V2.t
-      ; zkapp : Zkapp_account.Stable.V2.t option
+      ; zkapp : Zkapp_account.Stable.V3.t option
       }
     [@@deriving sexp, equal, hash, compare, yojson, hlist, fields]
 
     include
       Binable.Of_binable_without_uuid
-        (Binable_arg.Stable.V2)
+        (Binable_arg.Stable.V3)
         (struct
           type nonrec t = t
 
@@ -668,6 +668,9 @@ let empty =
 
 let empty_digest = lazy (digest empty)
 
+let empty_account_string =
+  lazy (Bin_prot.Writer.to_string Stable.Latest.bin_writer_t empty)
+
 let create account_id balance =
   let public_key = Account_id.public_key account_id in
   let token_id = Account_id.token_id account_id in
@@ -911,12 +914,47 @@ let liquid_balance_at_slot ~global_slot (account : t) =
               ~vesting_period ~vesting_increment ~initial_minimum_balance ) )
       |> Option.value_exn
 
+(** Apply the vesting parameter update to an account's timing information. See
+    [Timing.Slot_reduction_update] for usage notes. *)
+let slot_reduction_update ~hardfork_slot (account : t) =
+  let timing =
+    account.timing |> Timing.to_record
+    |> Timing.slot_reduction_update ~hardfork_slot
+    |> Timing.of_record
+  in
+  { account with timing }
+
+let gen_with_private_key ?balance ?token_id :
+    (Signature_lib.Private_key.t * t) Quickcheck.Generator.t =
+  let open Quickcheck.Let_syntax in
+  let%bind keypair = Signature_lib.Keypair.gen in
+  let%bind token_id =
+    Option.value_map ~default:Token_id.gen ~f:Quickcheck.Generator.return
+      token_id
+  in
+  let%map balance =
+    Option.value_map ~default:Currency.Balance.gen
+      ~f:Quickcheck.Generator.return balance
+  in
+  let account_id =
+    let pk = Signature_lib.Public_key.compress keypair.public_key in
+    Account_id.create pk token_id
+  in
+  let account = create account_id balance in
+  (keypair.private_key, account)
+
 let gen : t Quickcheck.Generator.t =
   let open Quickcheck.Let_syntax in
   let%bind public_key = Public_key.Compressed.gen in
   let%bind token_id = Token_id.gen in
   let%map balance = Currency.Balance.gen in
   create (Account_id.create public_key token_id) balance
+
+let gen_zkapp_account_with_private_key ?balance ?token_id :
+    (Signature_lib.Private_key.t * t) Quickcheck.Generator.t =
+  let open Quickcheck.Let_syntax in
+  let%map sk, account = gen_with_private_key ?balance ?token_id in
+  (sk, { account with zkapp = Some Zkapp_account.default })
 
 let gen_with_constrained_balance ~low ~high : t Quickcheck.Generator.t =
   let open Quickcheck.Let_syntax in
@@ -1043,6 +1081,7 @@ let deriver obj =
 
     - The zkapp state size increase from 8 to 32 slots. Migration: padding the
       zkapp state size with 24 zero field elements.
+    - Applied slot reduction update, fixing vesting parameters
 *)
 module Hardfork = struct
   type t =
@@ -1061,23 +1100,54 @@ module Hardfork = struct
   [@@deriving
     sexp, equal, hash, compare, yojson, hlist, fields, bin_io_unversioned]
 
-  let of_stable (account : Stable.Latest.t) : t =
-    { public_key = account.public_key
-    ; token_id = account.token_id
-    ; token_symbol = account.token_symbol
-    ; balance = account.balance
-    ; nonce = account.nonce
-    ; receipt_chain_hash = account.receipt_chain_hash
-    ; delegate = account.delegate
-    ; voting_for = account.voting_for
-    ; timing = account.timing
-    ; permissions = account.permissions
-    ; zkapp = Option.map ~f:Zkapp_account.Hardfork.of_stable account.zkapp
+  (* This function converts current account to Mesa account *)
+  let migrate_to_mesa ~hardfork_slot:_
+      ({ public_key
+       ; token_id
+       ; token_symbol
+       ; balance
+       ; nonce
+       ; receipt_chain_hash
+       ; delegate
+       ; voting_for
+       ; timing
+       ; permissions
+       ; zkapp
+       } :
+        Stable.Latest.t ) : t =
+    { public_key
+    ; token_id
+    ; token_symbol
+    ; balance
+    ; nonce
+    ; receipt_chain_hash
+    ; delegate
+    ; voting_for
+    ; timing
+    ; permissions
+    ; zkapp
     }
 
   let balance { balance; _ } = balance
 
-  let empty = of_stable empty
+  (** An empty Mesa account. Note that this is not [of_stable] on the empty
+      Berkeley account, because [of_stable] deliberately avoids changing the
+      permissions of accounts. For that reason we use the anticipated Mesa
+      [Permissions.Hardfork.user_default] permissions explicitly.
+  *)
+  let empty : t =
+    { public_key = Public_key.Compressed.empty
+    ; token_id = Token_id.default
+    ; token_symbol = Token_symbol.default
+    ; balance = Balance.zero
+    ; nonce = Nonce.zero
+    ; receipt_chain_hash = Receipt.Chain_hash.empty
+    ; delegate = None
+    ; voting_for = State_hash.dummy
+    ; timing = Timing.Untimed
+    ; permissions = Permissions.Hardfork.user_default
+    ; zkapp = None
+    }
 
   let identifier ({ public_key; token_id; _ } : t) =
     Account_id.create public_key token_id
@@ -1109,6 +1179,8 @@ module Hardfork = struct
       (Random_oracle.pack_input (to_input t))
 
   let empty_digest = lazy (digest empty)
+
+  let empty_account_string = lazy (Bin_prot.Writer.to_string bin_writer_t empty)
 end
 
 (* An unstable account is needed when we're doing ledger migration. The main

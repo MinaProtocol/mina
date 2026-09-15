@@ -22,6 +22,8 @@ module type CONTEXT = sig
   val vrf_poll_interval : Time.Span.t
 
   val proof_cache_db : Proof_cache_tag.cache_db
+
+  val signature_kind : Mina_signature_kind.t
 end
 
 type Structured_log_events.t += Block_produced
@@ -172,7 +174,7 @@ let generate_next_state ~commit_id ~zkapp_cmd_limit ~constraint_constants
     ~previous_protocol_state ~time_controller ~staged_ledger ~transactions
     ~get_completed_work ~logger ~(block_data : Consensus.Data.Block_data.t)
     ~winner_pk ~scheduled_time ~log_block_creation ~block_reward_threshold
-    ~zkapp_cmd_limit_hardcap ~slot_tx_end ~slot_chain_end =
+    ~zkapp_cmd_limit_hardcap ~slot_tx_end ~slot_chain_end ~signature_kind =
   let open Interruptible.Let_syntax in
   let global_slot_since_hard_fork =
     Consensus.Data.Block_data.global_slot block_data
@@ -284,20 +286,26 @@ let generate_next_state ~commit_id ~zkapp_cmd_limit ~constraint_constants
               ~state_and_body_hash:
                 (previous_protocol_state_hash, previous_protocol_state_body_hash)
               ~coinbase_receiver ~supercharge_coinbase ~zkapp_cmd_limit_hardcap
+              ~signature_kind
           with
           | Ok
-              ( `Hash_after_applying next_staged_ledger_hash
-              , `Ledger_proof ledger_proof_opt
+              ( `Ledger_proof ledger_proof_opt
               , `Staged_ledger transitioned_staged_ledger
+              , `Accounts_created _
               , `Pending_coinbase_update (is_new_stack, pending_coinbase_update)
               ) ->
+              [%log internal] "Hash_new_staged_ledger" ;
+              let staged_ledger_hash =
+                Staged_ledger.hash transitioned_staged_ledger
+              in
+              [%log internal] "Hash_new_staged_ledger_done" ;
               (*staged_ledger remains unchanged and transitioned_staged_ledger is discarded because the external transtion created out of this diff will be applied in Transition_frontier*)
               ignore
               @@ Mina_ledger.Ledger.unregister_mask_exn ~loc:__LOC__
                    (Staged_ledger.ledger transitioned_staged_ledger) ;
               Some
                 ( (match diff with Ok diff -> diff | Error _ -> assert false)
-                , next_staged_ledger_hash
+                , staged_ledger_hash
                 , ledger_proof_opt
                 , is_new_stack
                 , pending_coinbase_update )
@@ -350,7 +358,7 @@ let generate_next_state ~commit_id ~zkapp_cmd_limit ~constraint_constants
                 in
                 let ledger_proof_statement =
                   match ledger_proof_opt with
-                  | Some (proof, _) ->
+                  | Some proof ->
                       Ledger_proof.Cached.statement proof
                   | None ->
                       let state =
@@ -365,7 +373,7 @@ let generate_next_state ~commit_id ~zkapp_cmd_limit ~constraint_constants
                 in
                 let supply_increase =
                   Option.value_map ledger_proof_opt
-                    ~f:(fun (proof, _) ->
+                    ~f:(fun proof ->
                       (Ledger_proof.Cached.statement proof).supply_increase )
                     ~default:Currency.Amount.Signed.zero
                 in
@@ -416,7 +424,7 @@ let generate_next_state ~commit_id ~zkapp_cmd_limit ~constraint_constants
                         (Consensus.Data.Block_data.prover_state block_data)
                       ~staged_ledger_diff:(Staged_ledger_diff.forget diff)
                       ~ledger_proof:
-                        (Option.map ledger_proof_opt ~f:(fun (proof, _) ->
+                        (Option.map ledger_proof_opt ~f:(fun proof ->
                              Ledger_proof.Cached.read_proof_from_disk proof ) ) )
               in
               let witness =
@@ -638,12 +646,6 @@ module Vrf_evaluation_state = struct
     poll ~logger ~vrf_evaluator ~vrf_poll_interval t
 end
 
-let validate_genesis_protocol_state_block ~genesis_state_hash (b, v) =
-  Validation.validate_genesis_protocol_state ~genesis_state_hash
-    (With_hash.map ~f:Mina_block.header b, v)
-  |> Result.map
-       ~f:(Fn.flip Validation.with_body (Mina_block.body @@ With_hash.data b))
-
 let log_bootstrap_mode ~logger () =
   [%log info] "Pausing block production while bootstrapping"
 
@@ -709,10 +711,10 @@ let produce ~genesis_breadcrumb ~context:(module Context : CONTEXT) ~prover
           (Transition_frontier.extensions frontier)
           Transition_registry
       in
-      let crumb = Transition_frontier.best_tip frontier in
-      let crumb =
+      let%bind crumb =
+        let best_tip = Transition_frontier.best_tip frontier in
         let crumb_global_slot_since_genesis =
-          Breadcrumb.protocol_state crumb
+          Breadcrumb.protocol_state best_tip
           |> Protocol_state.consensus_state
           |> Consensus.Data.Consensus_state.global_slot_since_genesis
         in
@@ -723,13 +725,26 @@ let produce ~genesis_breadcrumb ~context:(module Context : CONTEXT) ~prover
         if
           Mina_numbers.Global_slot_since_genesis.equal
             crumb_global_slot_since_genesis block_global_slot_since_genesis
-        then
+        then (
           (* We received a block for this slot over the network before
              attempting to produce our own. Build upon its parent instead
              of attempting (and failing) to build upon the block itself.
           *)
-          Transition_frontier.find_exn frontier (Breadcrumb.parent_hash crumb)
-        else crumb
+          match
+            Transition_frontier.find frontier (Breadcrumb.parent_hash best_tip)
+          with
+          | Some parent ->
+              return parent
+          | None ->
+              [%log error]
+                "Aborting block production: parent of $best_tip not found in \
+                 frontier (unexpected case, there is likely a bug somewhere)"
+                ~metadata:
+                  [ ( "best_tip"
+                    , State_hash.to_yojson (Breadcrumb.state_hash best_tip) )
+                  ] ;
+              Interruptible.lift (Deferred.never ()) (Deferred.return ()) )
+        else return best_tip
       in
       let start = Block_time.now time_controller in
       [%log info]
@@ -781,7 +796,7 @@ let produce ~genesis_breadcrumb ~context:(module Context : CONTEXT) ~prover
           ~transactions ~get_completed_work ~logger ~log_block_creation
           ~winner_pk:winner_pubkey ~block_reward_threshold
           ~zkapp_cmd_limit:!zkapp_cmd_limit ~zkapp_cmd_limit_hardcap
-          ~slot_tx_end ~slot_chain_end
+          ~slot_tx_end ~slot_chain_end ~signature_kind
       in
       [%log internal] "Generate_next_state_done" ;
       match next_state_opt with
@@ -887,7 +902,7 @@ let produce ~genesis_breadcrumb ~context:(module Context : CONTEXT) ~prover
                 |> Fn.flip Validation.with_body body
                 |> Validation.skip_protocol_versions_validation
                      `This_block_has_valid_protocol_versions
-                |> validate_genesis_protocol_state_block
+                |> Validation.validate_genesis_protocol_state_block
                      ~genesis_state_hash:
                        (Protocol_state.genesis_state_hash
                           ~state_hash:(Some previous_state_hash)
@@ -897,9 +912,9 @@ let produce ~genesis_breadcrumb ~context:(module Context : CONTEXT) ~prover
                 >>= Validation.validate_frontier_dependencies
                       ~to_header:Mina_block.header
                       ~context:(module Context)
-                      ~root_block:
+                      ~root_consensus_state:
                         ( Transition_frontier.root frontier
-                        |> Breadcrumb.block_with_hash )
+                        |> Breadcrumb.consensus_state_with_hashes )
                       ~is_block_in_frontier:
                         (Fn.compose Option.is_some
                            (Transition_frontier.find frontier) )
@@ -1216,6 +1231,19 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
     ~block_reward_threshold ~block_produced_bvar ~vrf_evaluation_state ~net
     ~zkapp_cmd_limit_hardcap =
   let open Context in
+  Option.iter block_reward_threshold ~f:(fun threshold ->
+      if Currency.Amount.(threshold > constraint_constants.coinbase_amount) then
+        [%log warn]
+          "Minimum block reward threshold $threshold is greater than the \
+           coinbase amount $coinbase_amount. This node may produce empty \
+           blocks unless transaction fees or supercharged coinbase raise the \
+           block reward above the threshold"
+          ~metadata:
+            [ ("threshold", Currency.Amount.to_yojson threshold)
+            ; ( "coinbase_amount"
+              , Currency.Amount.to_yojson constraint_constants.coinbase_amount
+              )
+            ] ) ;
   O1trace.sync_thread "produce_blocks" (fun () ->
       let genesis_breadcrumb =
         genesis_breadcrumb_creator ~context:(module Context) prover
@@ -1448,8 +1476,8 @@ let run_precomputed ~context:(module Context : CONTEXT) ~verifier ~trust_system
           in
           let body =
             Body.create
-              (Staged_ledger_diff.write_all_proofs_to_disk ~proof_cache_db
-                 staged_ledger_diff )
+              (Staged_ledger_diff.write_all_proofs_to_disk ~signature_kind
+                 ~proof_cache_db staged_ledger_diff )
           in
           let%bind transition =
             let open Result.Let_syntax in
@@ -1464,7 +1492,7 @@ let run_precomputed ~context:(module Context : CONTEXT) ~verifier ~trust_system
                  `This_block_has_valid_protocol_versions
             |> Validation.skip_proof_validation
                  `This_block_was_generated_internally
-            |> validate_genesis_protocol_state_block
+            |> Validation.validate_genesis_protocol_state_block
                  ~genesis_state_hash:
                    (Protocol_state.genesis_state_hash
                       ~state_hash:(Some previous_protocol_state_hash)
@@ -1472,9 +1500,9 @@ let run_precomputed ~context:(module Context : CONTEXT) ~verifier ~trust_system
             >>= Validation.validate_frontier_dependencies
                   ~to_header:Mina_block.header
                   ~context:(module Context)
-                  ~root_block:
+                  ~root_consensus_state:
                     ( Transition_frontier.root frontier
-                    |> Breadcrumb.block_with_hash )
+                    |> Breadcrumb.consensus_state_with_hashes )
                   ~is_block_in_frontier:
                     (Fn.compose Option.is_some
                        (Transition_frontier.find frontier) )

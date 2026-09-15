@@ -16,10 +16,10 @@ module Make_sig (A : Wire_types.Types.S) = struct
         , 'consensus_state
         , 'constants )
         A.Body.Poly.V1.t
-       and type Body.Value.Stable.V2.t = A.Body.Value.V2.t
+       and type Body.Value.Stable.V3.t = A.Body.Value.V3.t
        and type ('state_hash, 'body) Poly.Stable.V1.t =
         ('state_hash, 'body) A.Poly.V1.t
-       and type Value.Stable.V2.t = A.Value.V2.t
+       and type Value.Stable.V3.t = A.Value.V3.t
 end
 
 module Make_str (A : Wire_types.Concrete) = struct
@@ -70,11 +70,11 @@ module Make_str (A : Wire_types.Concrete) = struct
     module Value = struct
       [%%versioned
       module Stable = struct
-        module V2 = struct
+        module V3 = struct
           type t =
             ( State_hash.Stable.V1.t
             , Blockchain_state.Value.Stable.V2.t
-            , Consensus.Data.Consensus_state.Value.Stable.V2.t
+            , Consensus.Data.Consensus_state.Value.Stable.V3.t
             , Protocol_constants_checked.Value.Stable.V1.t )
             Poly.Stable.V1.t
           [@@deriving equal, ord, bin_io, hash, sexp, yojson, version]
@@ -187,9 +187,9 @@ module Make_str (A : Wire_types.Concrete) = struct
   module Value = struct
     [%%versioned
     module Stable = struct
-      module V2 = struct
+      module V3 = struct
         type t =
-          (State_hash.Stable.V1.t, Body.Value.Stable.V2.t) Poly.Stable.V1.t
+          (State_hash.Stable.V1.t, Body.Value.Stable.V3.t) Poly.Stable.V1.t
         [@@deriving sexp, hash, compare, equal, yojson]
 
         let to_latest = Fn.id
@@ -293,8 +293,9 @@ module Make_str (A : Wire_types.Concrete) = struct
           hash
     else state.body.genesis_state_hash
 
-  let negative_one ~genesis_ledger ~genesis_epoch_data ~constraint_constants
-      ~consensus_constants ~genesis_body_reference =
+  let negative_one ~(genesis_ledger : Consensus.Genesis_data.Hashed.t)
+      ~genesis_epoch_data ~constraint_constants ~consensus_constants
+      ~genesis_body_reference =
     { Poly.Stable.Latest.previous_state_hash =
         State_hash.of_hash Outside_hash_image.t
     ; body =
@@ -302,8 +303,7 @@ module Make_str (A : Wire_types.Concrete) = struct
             Blockchain_state.negative_one ~constraint_constants
               ~consensus_constants
               ~genesis_ledger_hash:
-                (Mina_ledger.Ledger.merkle_root
-                   (Lazy.force (Genesis_ledger.Packed.t genesis_ledger)) )
+                (Consensus.Genesis_data.Hashed.hash genesis_ledger)
               ~genesis_body_reference
         ; genesis_state_hash = State_hash.of_hash Outside_hash_image.t
         ; consensus_state =

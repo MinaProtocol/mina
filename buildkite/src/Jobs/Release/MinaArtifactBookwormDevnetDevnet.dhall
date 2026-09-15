@@ -1,14 +1,10 @@
 let ArtifactPipelines = ../../Command/MinaArtifact.dhall
 
-let DebianVersions = ../../Constants/DebianVersions.dhall
-
 let Artifacts = ../../Constants/Artifacts.dhall
 
 let Pipeline = ../../Pipeline/Dsl.dhall
 
 let PipelineTag = ../../Pipeline/Tag.dhall
-
-let PipelineScope = ../../Pipeline/Scope.dhall
 
 let Network = ../../Constants/Network.dhall
 
@@ -17,20 +13,30 @@ in  Pipeline.build
           ArtifactPipelines.MinaBuildSpec::{
           , artifacts =
             [ Artifacts.Type.Daemon
+            , Artifacts.Type.DaemonAppsOnly
+            , Artifacts.Type.DaemonConfig
+            , Artifacts.Type.DaemonAutoHardfork
+            , Artifacts.Type.DaemonAutomode
+            , Artifacts.Type.DaemonPrefork
+            , Artifacts.Type.CreatePreforkGenesis
             , Artifacts.Type.LogProc
             , Artifacts.Type.Archive
             , Artifacts.Type.Rosetta
+            , Artifacts.Type.TestExecutive
+            , Artifacts.Type.RosettaAppsOnly
             , Artifacts.Type.ZkappTestTransaction
-            , Artifacts.Type.CreateLegacyGenesis
+            , Artifacts.Type.DelegationVerifier
+            , Artifacts.Type.DaemonStorageToolbox
             ]
           , network = Network.Type.Devnet
           , tags =
             [ PipelineTag.Type.Long
             , PipelineTag.Type.Release
             , PipelineTag.Type.Docker
+            , PipelineTag.Type.Rosetta
+            , PipelineTag.Type.Devnet
+            , PipelineTag.Type.Amd64
+            , PipelineTag.Type.Bookworm
             ]
-          , debVersion = DebianVersions.DebVersion.Bookworm
-          , scope =
-            [ PipelineScope.Type.MainlineNightly, PipelineScope.Type.Release ]
           }
       )

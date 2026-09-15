@@ -10,6 +10,12 @@ module type S = sig
 
   type accumulated_t
 
+  type maps_t
+
+  val append_maps : attached_mask -> maps_t -> unit
+
+  val get_maps : attached_mask -> maps_t
+
   (* registering a mask makes it an active child of the parent Merkle tree
      - reads to the mask that fail are delegated to the parent
      - writes to the parent notify the child mask

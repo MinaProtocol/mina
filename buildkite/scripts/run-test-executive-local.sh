@@ -25,31 +25,22 @@ fi
 cleanup
 
 TEST_NAME="$1"
+DOCKER_REPO="$2"
+MINA_DOCKER_NAME="mina-daemon"
+MINA_ARCHIVE_DOCKER_NAME="mina-archive"
 
-MINA_IMAGE="gcr.io/o1labs-192920/mina-daemon:$MINA_DOCKER_TAG-berkeley"
-ARCHIVE_IMAGE="gcr.io/o1labs-192920/mina-archive:$MINA_DOCKER_TAG-berkeley"
+
+MINA_IMAGE="$DOCKER_REPO/$MINA_DOCKER_NAME:$MINA_DOCKER_TAG-devnet-generic"
+ARCHIVE_IMAGE="$DOCKER_REPO/$MINA_ARCHIVE_DOCKER_NAME:$MINA_DOCKER_TAG-devnet"
 
 if [[ "${TEST_NAME:0:15}" == "block-prod-prio" ]] && [[ "$RUN_OPT_TESTS" == "" ]]; then
   echo "Skipping $TEST_NAME"
   exit 0
 fi
 
-# Don't prompt for answers during apt-get install
-export DEBIAN_FRONTEND=noninteractive
-
-apt-get update
-apt-get install -y git \
-  apt-transport-https \
-  aptly \
-  ca-certificates \
-  curl \
-  docker \
-  docker-compose-plugin \
-  docker-ce \
-  tzdata
-
 git config --global --add safe.directory /workdir
 
+source buildkite/scripts/debian/update.sh --verbose
 
 source buildkite/scripts/debian/install.sh "mina-test-executive"
 
