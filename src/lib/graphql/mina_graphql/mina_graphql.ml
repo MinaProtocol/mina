@@ -1337,9 +1337,21 @@ module Mutations = struct
                       Utils.account_of_kp fee_payer_keypair ledger ) )
               |> Result.map_error ~f:(const "fee payer not in the ledger")
             in
+            let custom_token_opt =
+              if zkapp_command_details.non_default_token then
+                Some
+                  (Itn_zkapps.create_custom_token
+                     ~owner:(Signature_lib.Keypair.create ()) )
+              else None
+            in
+            let token_keypairs =
+              Option.value_map custom_token_opt ~default:[]
+                ~f:Itn_zkapps.token_keypairs
+            in
             let keymap =
               List.map
-                (zkapp_account_keypairs @ fee_payer_keypairs @ unused_keypairs)
+                ( zkapp_account_keypairs @ fee_payer_keypairs @ unused_keypairs
+                @ token_keypairs )
                 ~f:(fun { public_key; private_key } ->
                   (Public_key.compress public_key, private_key) )
               |> Public_key.Compressed.Map.of_alist_exn
@@ -1361,24 +1373,33 @@ module Mutations = struct
             upon (deploy_zkapps_do ()) (function
               | None ->
                   ()
-              | Some ledger ->
-                  let account_state_tbl =
-                    let get_account ids role =
-                      List.map ids ~f:(fun id ->
-                          (id, (Utils.account_of_id id ledger, role)) )
-                    in
-                    Account_id.Table.of_alist_exn
-                      ( get_account fee_payer_ids `Fee_payer
-                      @ get_account zkapp_account_ids `Ordinary_participant )
-                  in
-                  let tm_next = Time.add (Time.now ()) wait_span in
-                  don't_wait_for
-                  @@ Itn_zkapps.send_zkapps ~genesis_constants
-                       ~constraint_constants ~fee_payer_array ~scheduler_tbl
-                       ~uuid ~keymap ~unused_pks ~stop_signal ~mina
-                       ~zkapp_command_details ~wait_span ~logger ~tm_end
-                       ~account_state_tbl tm_next
-                       (List.length zkapp_account_keypairs) ) ;
+              | Some ledger -> (
+                  match custom_token_opt with
+                  | Some ct ->
+                      don't_wait_for
+                      @@ Itn_zkapps.run_custom_token_load ~constraint_constants
+                           ~mina ~logger ~fee_payer_array ~scheduler_tbl ~keymap
+                           ~zkapp_command_details ~stop_signal ~tm_end
+                           ~wait_span ~uuid ~ct
+                  | None ->
+                      let account_state_tbl =
+                        let get_account ids role =
+                          List.map ids ~f:(fun id ->
+                              (id, (Utils.account_of_id id ledger, role)) )
+                        in
+                        Account_id.Table.of_alist_exn
+                          ( get_account fee_payer_ids `Fee_payer
+                          @ get_account zkapp_account_ids `Ordinary_participant
+                          )
+                      in
+                      let tm_next = Time.add (Time.now ()) wait_span in
+                      don't_wait_for
+                      @@ Itn_zkapps.send_zkapps ~genesis_constants
+                           ~constraint_constants ~fee_payer_array ~scheduler_tbl
+                           ~uuid ~keymap ~unused_pks ~stop_signal ~mina
+                           ~zkapp_command_details ~wait_span ~logger ~tm_end
+                           ~account_state_tbl tm_next
+                           (List.length zkapp_account_keypairs) ) ) ;
             Ok (Uuid.to_string uuid) )
 
     let stop_scheduled_transactions =
