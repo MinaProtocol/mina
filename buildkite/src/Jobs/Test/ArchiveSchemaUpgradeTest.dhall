@@ -42,7 +42,7 @@ in  Pipeline.build
             Command.Config::{
             , commands =
               [ Cmd.run
-                  "buildkite/scripts/archive/verify-schema-upgrade.sh --source-branch compatible --target-branch develop"
+                  "buildkite/scripts/archive/verify-schema-upgrade.sh --source-branch prefork/berkeley --target-branch develop"
               ]
             , label = "Archive: Schema upgrade verification"
             , key = "archive-schema-upgrade-test"
