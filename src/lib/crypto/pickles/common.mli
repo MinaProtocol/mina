@@ -123,6 +123,9 @@ module Max_degree : sig
 
   (** Log base 2 of the maximum degree for step circuits. *)
   val step_log2 : int
+
+  (** Log base 2 of the maximum total step rows supported across chunks. *)
+  val max_total_step_rows_log2 : int -> int
 end
 
 (** {2 Field Shifts} *)
