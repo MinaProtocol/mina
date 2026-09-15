@@ -23,6 +23,9 @@ in  Pipeline.build
           , S.strictlyStart (S.contains "scripts/docker/tests")
           , S.strictlyStart (S.contains "dockerfiles")
           , S.exactly "scripts/export-git-env-vars" "sh"
+          , S.exactly "buildkite/scripts/export-git-env-vars" "sh"
+          , S.strictlyStart (S.contains "buildkite/scripts/git-env")
+          , S.exactly "scripts/tests/test_export_git_env_vars" "sh"
           , S.exactly "buildkite/src/Jobs/Test/DockerBuildScriptTest" "dhall"
           ]
         , path = "Test"
@@ -40,6 +43,15 @@ in  Pipeline.build
             , commands = [ Cmd.run "./scripts/docker/tests/test_build.sh" ]
             , label = "Docker build script tests"
             , key = "docker-build-script-tests"
+            , target = Size.Small
+            , docker = None Docker.Type
+            }
+        , Command.build
+            Command.Config::{
+            , commands =
+              [ Cmd.run "./scripts/tests/test_export_git_env_vars.sh" ]
+            , label = "Git env pin tests"
+            , key = "git-env-pin-tests"
             , target = Size.Small
             , docker = None Docker.Type
             }
