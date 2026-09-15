@@ -63,6 +63,20 @@ func (s *ForkMethodSet) String() string {
 	return fmt.Sprintf("[%s]", result)
 }
 
+// Methods returns the fork methods in the set as a slice. The order is
+// non-deterministic (Go map iteration), which is fine for callers that assign
+// methods to daemons and shuffle afterwards.
+func (s *ForkMethodSet) Methods() []ForkMethod {
+	if s == nil {
+		return nil
+	}
+	methods := make([]ForkMethod, 0, len(*s))
+	for m := range *s {
+		methods = append(methods, m)
+	}
+	return methods
+}
+
 func (s *ForkMethodSet) RandomChoose() ForkMethod {
 	if s == nil || len(*s) == 0 {
 		panic("choosing fork method from empty set")

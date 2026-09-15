@@ -148,6 +148,15 @@ func (t *HardforkTest) RunForkNetworkPhase(latestPreForkHeight int, mainGenesisT
 		return err
 	}
 
+	// Validate the injected vesting account had its timing correctly adjusted by
+	// the Mesa slot-reduction update on every fork-network daemon. The
+	// timing-parameter assertion is run first on all daemons (deterministic), then
+	// the liquid-balance watch runs across all daemons before the slots past the
+	// cliff have elapsed, so it can observe the account still locked.
+	if err := t.ValidateVestingOnForkNetwork(int(expectedGenesisSlot)); err != nil {
+		return err
+	}
+
 	// Validate user commands in blocks
 	if err := t.ValidateBlockWithUserCommandCreatedForkNetwork(t.Config.AnyDaemon().Port(config.PORT_REST)); err != nil {
 		return err
@@ -195,7 +204,7 @@ func (t *HardforkTest) legacyFork(daemon config.DaemonInfo, analysis BlockAnalys
 
 	prepatchLedgersDir := filepath.Join(forkDataPrepatchPath, "ledgers")
 	prepatchHashesFile := filepath.Join(forkDataPrepatchPath, "ledger_hashes.json")
-	if err := t.GenerateAndValidateHashesAndLedgers(analysis, prepatchConfigFile, prepatchLedgersDir, prepatchHashesFile); err != nil {
+	if err := t.RegenerateAndValidatePrepatchLedgerHashes(analysis, prepatchConfigFile, prepatchLedgersDir, prepatchHashesFile); err != nil {
 		return err
 	}
 
@@ -208,7 +217,17 @@ func (t *HardforkTest) legacyFork(daemon config.DaemonInfo, analysis BlockAnalys
 	preforkGenesisConfigFile := filepath.Join(t.Config.Root, "daemon.json")
 	forkHashesFile := filepath.Join(forkDataPath, "ledger_hashes.json")
 
-	patchedConfigBytes, err := t.PatchForkConfigAndGenerateLedgersLegacy(&analysis, prepatchConfigFile, patchedLedgersDir, forkHashesFile, patchedConfigFile, preforkGenesisConfigFile, forkGenesisTs, mainGenesisTs)
+	if err := t.GenerateLegacyPostforkGenesisLedgers(
+		prepatchConfigFile, patchedLedgersDir, forkHashesFile, preforkGenesisConfigFile,
+	); err != nil {
+		return err
+	}
+
+	forkGenesisTimestamp := config.FormatTimestamp(forkGenesisTs)
+	patchedConfigBytes, err := t.PatchRuntimeConfigLegacy(
+		forkGenesisTimestamp, prepatchConfigFile, patchedConfigFile,
+		preforkGenesisConfigFile, forkHashesFile,
+	)
 	if err != nil {
 		return err
 	}

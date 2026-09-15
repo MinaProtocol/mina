@@ -3,8 +3,8 @@
 # This scripts builds a designated PREFORK branch and current branch with nix
 # 0. Prepare environment if needed
 # 1. Build PREFORK as a prefork build;
-# 2. Build "develop" branch as a postfork build
-# 3. Upload to nix cache, the reason for not uploading cache for following 2 
+# 2. Build the current (test) branch as a postfork build
+# 3. Upload to nix cache, the reason for not uploading cache for following 2
 # steps is that they change for each PR. 
 # 4. Build hardfork_test on current branch;
 # 5. Execute hardfork_test on them.
@@ -13,9 +13,10 @@
 set -eux -o pipefail
 
 PREFORK=""
+POSTFORK=""
 EXTRA_ARGS=()
 
-USAGE="Usage: $0 --fork-from <PREFORK> [ADDITONAL ARGS TO HF TEST...]"
+USAGE="Usage: $0 --fork-from <PREFORK> [--fork-into <POSTFORK>] [ADDITIONAL ARGS TO HF TEST...]"
 usage() {
   if (( $# > 0 )); then
     echo "$1" >&2
@@ -36,6 +37,14 @@ while [[ $# -gt 0 ]]; do
         usage "Error: $1 requires an argument."
       fi
       PREFORK="$2"
+      shift 2
+      ;;
+    --fork-into)
+      # ensure value exists
+      if [[ $# -lt 2 ]]; then
+        usage "Error: $1 requires an argument."
+      fi
+      POSTFORK="$2"
       shift 2
       ;;
     --help|-h)
@@ -91,7 +100,11 @@ if [ -n "${BUILDKITE:-}" ]; then
   git config --global --add safe.directory /workdir
 fi
 
-TEST_COMMIT="$(git rev-parse HEAD)"
+# Prefer the symbolic branch name so checkouts below leave the working tree on a
+# named branch; a detached HEAD (plain `git checkout <sha>`) can confuse nix
+# flake evaluation. Fall back to the commit SHA when already detached (e.g. CI).
+TEST_REF="$(git symbolic-ref --quiet --short HEAD || git rev-parse HEAD)"
+POSTFORK="${POSTFORK:-origin/develop}"
 
 
 if [ -n "${BUILDKITE:-}" ]; then
@@ -120,12 +133,12 @@ if [ -n "${BUILDKITE:-}" ]; then
 fi
 
 # 1. Build PREFORK as a prefork build;
-git checkout $PREFORK
+git checkout "$PREFORK"
 git submodule update --init --recursive --depth 1
 nix "${NIX_OPTS[@]}" build "$PWD?submodules=1#devnet" --out-link "prefork-devnet"
 
-# 2. Build "develop" branch as a postfork build
-git checkout develop
+# 2. Build the postfork branch.
+git checkout "$POSTFORK"
 git submodule update --init --recursive --depth 1
 nix "${NIX_OPTS[@]}" build "$PWD?submodules=1#devnet" --out-link "postfork-devnet"
 
@@ -145,7 +158,7 @@ EOF
 fi
 
 # 4. Build hardfork_test on current branch;
-git checkout "$TEST_COMMIT"
+git checkout "$TEST_REF"
 git submodule update --init --recursive --depth 1
 nix "${NIX_OPTS[@]}" build "$PWD?submodules=1#hardfork_test" --out-link "hardfork_test"
 nix "${NIX_OPTS[@]}" build "$PWD?submodules=1#mina-graphql-client" --out-link "mina-graphql-client"
