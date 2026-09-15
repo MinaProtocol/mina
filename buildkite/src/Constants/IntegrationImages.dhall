@@ -30,7 +30,7 @@ let network = Network.Type.Devnet
 
 let profile = Profiles.Type.Devnet
 
-let debVersion = DebianVersions.DebVersion.Bullseye
+let debVersion = DebianVersions.DebVersion.Bookworm
 
 let keySpec =
           \(service : Docker.Type)

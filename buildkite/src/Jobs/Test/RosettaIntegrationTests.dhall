@@ -46,7 +46,7 @@ let bareBinaries =
 
 let envExports =
       [ "MINA_NETWORK_DEB=${Network.lowerName network}"
-      , "MINA_DEB_CODENAME=bullseye"
+      , "MINA_DEB_CODENAME=bookworm"
       , "MINA_PROFILE=${Network.lowerName network}"
       , "APPS_BARE_BINARIES=${bareBinaries}"
       ]
@@ -69,17 +69,17 @@ in  Pipeline.build
             Command.Config::{
             , commands =
                   [ Cmd.run
-                      "export MINA_DEB_CODENAME=bullseye && source ./buildkite/scripts/export-git-env-vars.sh && echo \\\${MINA_DOCKER_TAG}"
+                      "export MINA_DEB_CODENAME=bookworm && source ./buildkite/scripts/export-git-env-vars.sh && echo \\\${MINA_DOCKER_TAG}"
                   ]
                 # RunInToolchain.runInToolchain
                     RunInToolchain.Config::{
-                    , image = ContainerImages.minaToolchainBullseye.amd64
+                    , image = ContainerImages.minaToolchainBookworm.amd64
                     , environment = envExports
                     , innerScript =
                         "buildkite/scripts/tests/rosetta/integration-tests.sh"
                     }
-            , label = "Rosetta integration tests Bullseye"
-            , key = "rosetta-integration-tests-bullseye"
+            , label = "Rosetta integration tests Bookworm"
+            , key = "rosetta-integration-tests-bookworm"
             , target = Size.Small
             , artifact_paths = [ S.contains "test_output/artifacts/*" ]
             , depends_on =

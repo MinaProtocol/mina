@@ -6,6 +6,8 @@ let Pipeline = ../../Pipeline/Dsl.dhall
 
 let PipelineTag = ../../Pipeline/Tag.dhall
 
+let PipelineScope = ../../Pipeline/Scope.dhall
+
 in  Pipeline.build
       ( ArtifactPipelines.appsPipeline
           ArtifactPipelines.AppsSpec::{
@@ -14,11 +16,10 @@ in  Pipeline.build
             [ PipelineTag.Type.Long
             , PipelineTag.Type.Release
             , PipelineTag.Type.Docker
-            , PipelineTag.Type.Rosetta
             , PipelineTag.Type.Devnet
-            , PipelineTag.Type.Mainnet
             , PipelineTag.Type.Amd64
             , PipelineTag.Type.Bullseye
             ]
+          , scope = [ PipelineScope.Type.Weekly, PipelineScope.Type.Release ]
           }
       )

@@ -39,7 +39,7 @@ let imageFor
                   arch
             , Bullseye = ContainerImages.minaToolchainBullseye.amd64
             , Jammy = ContainerImages.minaToolchainJammy.amd64
-            , Focal = ContainerImages.minaToolchain
+            , Focal = ContainerImages.minaToolchainBullseye.amd64
             , Noble = ContainerImages.minaToolchainNoble.amd64
             }
             debVersion

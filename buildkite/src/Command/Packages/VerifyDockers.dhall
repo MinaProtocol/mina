@@ -36,7 +36,7 @@ let Spec =
           , networks = [ Network.Type.Mainnet, Network.Type.Devnet ]
           , codenames =
             [ DebianVersions.DebVersion.Focal
-            , DebianVersions.DebVersion.Bullseye
+            , DebianVersions.DebVersion.Bookworm
             ]
           , published_to_docker_io = False
           , profile = Profiles.Type.Devnet

@@ -48,7 +48,7 @@ let DepsSpec =
           , suffix : Text
           }
       , default =
-          { codename = Docker.Bullseye
+          { codename = Docker.Bookworm
           , prefix = "MinaArtifact"
           , network = Network.Type.Devnet
           , profile = Profiles.Type.Devnet
