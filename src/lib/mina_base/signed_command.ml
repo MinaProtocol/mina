@@ -417,7 +417,23 @@ module Make_str (_ : Wire_types.Concrete) = struct
   let public_keys t =
     let fee_payer = fee_payer_pk t in
     let receiver = receiver_pk t in
-    [ fee_payer; receiver ]
+    (* [Public_key.Compressed.empty] is a deliberately-chosen non-curve-point
+       used as the "no delegate" sentinel for unstaking. When it appears as
+       the receiver of a [Stake_delegation], there is no real key to
+       validate and it must be allowed through so that opt-out transactions
+       are not rejected at the submission / verifier layers. For a
+       [Payment], however, allowing the empty receiver through would let
+       users create an unspendable account at the zero address and burn the
+       transferred funds — so payments must still reject it via the normal
+       curve-point check. *)
+    match
+      (Signed_command_payload.body (payload t) : Signed_command_payload.Body.t)
+    with
+    | Stake_delegation _
+      when Public_key.Compressed.equal receiver Public_key.Compressed.empty ->
+        [ fee_payer ]
+    | _ ->
+        [ fee_payer; receiver ]
 
   let check_valid_keys t =
     List.for_all (public_keys t) ~f:(fun pk ->

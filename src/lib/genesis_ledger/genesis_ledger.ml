@@ -370,6 +370,12 @@ module Test = Register (Balances (Test_ledger))
 module Unit_test_ledger = Make (struct
   include Test
 
+  let accounts =
+    Lazy.map Test.accounts ~f:(fun accts ->
+        List.map accts ~f:(fun (sk, account) ->
+            (* you need to manually self delegate here so genesis BPs have stake *)
+            (sk, { account with delegate = Some account.public_key }) ) )
+
   let directory = `Ephemeral
 
   let depth =

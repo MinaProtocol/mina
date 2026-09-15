@@ -1,5 +1,8 @@
+(* The chain id commits to the transaction snark verification key, so it
+   changes whenever the transaction circuit does. On failure, Alcotest prints
+   the computed value; copy it here. *)
 let expected_chain_id =
-  "f56cf7a9f60f8e8316aac2458750d72affb23fd6f9f87d6c1549dada0edb1e6c"
+  "ecaf827b4c80ea76fd65e526ae4068649549f87f084671636ea7aa74b62e860f"
 
 let test_of_precomputed_values () =
   let pv = Lazy.force Precomputed_values.for_unit_tests in
