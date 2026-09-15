@@ -300,6 +300,21 @@ module Ledger = struct
           accounts_with_keys
     in
 
+    (* Genesis accounts must not delegate to the empty address. An account
+       with no delegate has no stake, so a genesis ledger whose accounts all
+       omit one carries no stake at all and the network it starts never
+       produces a block. An account that does not name a delegate therefore
+       delegates to itself. *)
+    let self_delegate_when_unset accounts_with_keys =
+      List.map accounts_with_keys
+        ~f:(fun ((key, account) : _ * Mina_base.Account.t) ->
+          match account.delegate with
+          | Some _ ->
+              (key, account)
+          | None ->
+              (key, { account with delegate = Some account.public_key }) )
+    in
+
     let add_genesis_winner_account accounts =
       (* We allow configurations to explicitly override adding the genesis
          winner, so that we can guarantee a certain ledger layout for
@@ -339,7 +354,9 @@ module Ledger = struct
           Some
             ( lazy
               (patch_accounts_version
-                 (add_genesis_winner_account (Accounts.to_full accounts)) ) )
+                 (add_genesis_winner_account
+                    (self_delegate_when_unset (Accounts.to_full accounts)) ) )
+              )
       | Named name -> (
           match Genesis_ledger.fetch_ledger name with
           | Some (module M) ->
@@ -348,7 +365,10 @@ module Ledger = struct
                   [ ("ledger", `String ledger_name_prefix)
                   ; ("ledger_name", `String name)
                   ] ;
-              Some (Lazy.map ~f:add_genesis_winner_account M.accounts)
+              Some
+                (Lazy.map M.accounts ~f:(fun accounts ->
+                     add_genesis_winner_account
+                       (self_delegate_when_unset accounts) ) )
           | None ->
               [%log trace]
                 "Could not find a built-in $ledger named $ledger_name"
