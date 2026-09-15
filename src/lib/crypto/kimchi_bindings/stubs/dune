@@ -35,7 +35,41 @@
    (echo "-C target-feature=-bmi2,-adx"))))
 
 ;;
-;; rules to build the static library for kimchi
+;; Extra RUSTFLAGS needed only when linking the cdylib (dllkimchi_stubs.so).
+;;
+;; The cdylib references undefined caml_* runtime symbols that are resolved at
+;; load time from the host executable. macOS's linker rejects undefined symbols
+;; by default, so it needs -undefined dynamic_lookup; Linux allows them in a
+;; shared object with no flag. This must be threaded through RUSTFLAGS rather
+;; than .cargo/config.toml, because the RUSTFLAGS env var set above overrides
+;; config-file rustflags entirely (they do not merge).
+;;
+
+(rule
+ (enabled_if
+  (= %{ocaml-config:system} macosx))
+ (targets dll_rustflags.sexp)
+ (action
+  (with-stdout-to
+   dll_rustflags.sexp
+   (echo "-C link-args=-Wl,-undefined,dynamic_lookup"))))
+
+(rule
+ (enabled_if
+  (<> %{ocaml-config:system} macosx))
+ (targets dll_rustflags.sexp)
+ (action
+  (with-stdout-to
+   dll_rustflags.sexp
+   (echo ""))))
+
+;;
+;; rules to build the static library and shared stubs for kimchi
+;;
+;; A single cargo build emits both libkimchi_stubs.a (staticlib, linked
+;; statically into native binaries) and the cdylib, which is copied to
+;; dllkimchi_stubs.so and dlopened only by OCaml bytecode / utop builds. The
+;; kimchi-stubs manifest lists both staticlib and cdylib in its crate-type.
 ;;
 
 ;; note: to build Mina, nix will set `KIMCHI_STUBS` and ignore this rule
@@ -43,7 +77,7 @@
 (rule
  (enabled_if
   (= %{env:KIMCHI_STUBS=n} n))
- (targets libkimchi_stubs.a)
+ (targets libkimchi_stubs.a dllkimchi_stubs.so)
  (deps
   Cargo.toml
   rust-toolchain.toml
@@ -57,7 +91,7 @@
   (progn
    (setenv
     RUSTFLAGS
-    %{read:rustflags.sexp}
+    "%{read:rustflags.sexp} %{read:dll_rustflags.sexp}"
     (run
      cargo
      build
@@ -70,7 +104,12 @@
    (run
     cp
     %{read:../dune-build-root}/cargo_kimchi_stubs/release/libkimchi_stubs.a
-    .))))
+    .)
+   ;; The same build emits the cdylib as libkimchi_stubs.so on Linux and
+   ;; libkimchi_stubs.dylib on macOS; copy whichever exists to the OCaml dll
+   ;; name (OCaml uses the .so suffix for dll stubs on both platforms).
+   (system
+    "cp %{read:../dune-build-root}/cargo_kimchi_stubs/release/libkimchi_stubs.so dllkimchi_stubs.so 2>/dev/null || cp %{read:../dune-build-root}/cargo_kimchi_stubs/release/libkimchi_stubs.dylib dllkimchi_stubs.so"))))
 
 ;; this is used by nix
 
