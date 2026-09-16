@@ -26,7 +26,6 @@
  (modes native)
  (libraries
   lib
-  mina_signature_kind.testnet
   async
   core_kernel
   base
@@ -47,7 +46,6 @@
  (modes native)
  (libraries
   lib
-  mina_signature_kind.mainnet
   async
   core_kernel
   base

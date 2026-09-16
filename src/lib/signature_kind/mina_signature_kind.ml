@@ -25,3 +25,12 @@ let signature_kind_gen seed =
       let gen = Base_quickcheck.Generator.string in
       let random_string = Quickcheck.random_value ~seed gen in
       return (Other_network random_string)
+
+let t_DEPRECATED =
+  match Node_config.network with
+  | "testnet" ->
+      Testnet
+  | "mainnet" ->
+      Mainnet
+  | _ ->
+      Other_network Node_config.network
