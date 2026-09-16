@@ -58,18 +58,18 @@ in  Pipeline.build
             Command.Config::{
             , commands =
               [ Cmd.run
-                  "export MINA_DEB_CODENAME=bullseye && source ./buildkite/scripts/export-git-env-vars.sh"
+                  "export MINA_DEB_CODENAME=bookworm && source ./buildkite/scripts/export-git-env-vars.sh"
               , Cmd.run
                   "buildkite/scripts/tests/hardfork/dispatcher-tests.sh --docker ${hardforkDocker}"
               ]
             , label = "Auto Hardfork: Dispatcher Tests"
-            , key = "auto-hardfork-dispatcher-tests-bullseye"
+            , key = "auto-hardfork-dispatcher-tests-bookworm"
             , target = Size.Small
             , artifact_paths = [ S.contains "test_output/artifacts/*" ]
             , depends_on =
                 Dockers.dependsOn
                   Dockers.DepsSpec::{
-                  , codename = Dockers.Type.Bullseye
+                  , codename = Dockers.Type.Bookworm
                   , artifact = Artifacts.Type.DaemonAutoHardfork
                   , network = network
                   }

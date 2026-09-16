@@ -46,8 +46,9 @@ test_manager_promote_unsigned_real() {
         --skip-cache-invalidation \
         --only-debians 2>&1 | tee "${TEST_TEMP_DIR}/promote_unsigned_real.log"; then
 
+        # No settling delay: the mock repository is a local MinIO container,
+        # which is strongly consistent, unlike the S3 bucket this used to hit.
         log_info "Verifying promoted package exists..."
-        sleep 60  # Give S3 a moment to sync
 
         if assert_package_exists \
             "Manager promote command (unsigned, real)" \
@@ -56,7 +57,6 @@ test_manager_promote_unsigned_real() {
             "${TEST_CODENAME}" \
             "${TEST_COMPONENT_TEST}" \
             "${TEST_BUCKET}" \
-            "${TEST_REGION}" \
             "${TEST_ARCH}"; then
             return 0
         else
@@ -104,7 +104,6 @@ test_manager_promote_signed_real() {
         --only-debians 2>&1 | tee "${TEST_TEMP_DIR}/promote_signed_real.log"; then
 
         log_info "Verifying promoted package exists in signed repository..."
-        sleep 5  # Give S3 a moment to sync
 
         if assert_package_exists \
             "Manager promote command (signed, real)" \
@@ -113,7 +112,6 @@ test_manager_promote_signed_real() {
             "${SIGNED_TEST_CODENAME}" \
             "${TEST_COMPONENT_TEST}" \
             "${SIGNED_TEST_BUCKET}" \
-            "${TEST_REGION}" \
             "${SIGNED_TEST_ARCH}"; then
             return 0
         else

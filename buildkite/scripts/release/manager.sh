@@ -15,7 +15,7 @@
 #
 # Supported artifacts: mina-daemon, mina-archive, mina-rosetta, mina-logproc, mina-config, mina-automode, mina-prefork, mina-postfork, mina-generic, rosetta-generic, mina-postfork-mesa, mina-prefork-mesa, minimina
 # Supported networks: devnet, mainnet
-# Supported platforms: Debian (bullseye, focal), Docker (GCR, Docker.io)
+# Supported platforms: Debian (bookworm, focal), Docker (GCR, Docker.io)
 # Supported channels: unstable, alpha, beta, stable
 # Supported backends: Google Cloud Storage (gs), Hetzner, local filesystem
 #
@@ -46,7 +46,7 @@ PS4='debug($LINENO) ${FUNCNAME[0]:+${FUNCNAME[0]}}(): ';
 
 DEFAULT_ARTIFACTS="mina-logproc,mina-archive,mina-rosetta,mina-daemon"
 DEFAULT_NETWORKS="devnet,mainnet"
-DEFAULT_CODENAMES="bullseye,focal"
+DEFAULT_CODENAMES="bookworm,focal"
 DEFAULT_ARCHITECTURES="amd64"
 DEFAULT_PROFILE=devnet
 
@@ -58,6 +58,12 @@ DEBIAN_REPO=packages.o1test.net
 
 SCRIPTPATH="$( cd "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
 SUBCOMMAND_TAB="        "
+
+# Sets DEB_S3_REGION_ARG, DEB_S3_ENDPOINT_ARGS and deb_s3_object_url().
+# DEB_S3_ENDPOINT_ARGS is empty unless DEB_S3_ENDPOINT redirects deb-s3 at an
+# S3-compatible server, which is how the test suite runs without AWS.
+# shellcheck source=scripts/debian/deb-s3-common.sh
+source "$SCRIPTPATH/../../../scripts/debian/deb-s3-common.sh"
 HETZNER_USER=u434410
 HETZNER_HOST=u434410-sub2.your-storagebox.de
 HETZNER_KEY=${HETZNER_KEY:-$HOME/.ssh/id_rsa}
@@ -107,13 +113,19 @@ function prefix_cmd {
     "${CMD[@]}" 1> >(sed "s/^/${PREF}/") 2> >(sed "s/^/${PREF}/" 1>&2)
 }
 
-# Extract bucket name from potentially full S3 URL
-# Input: s3.us-west-2.amazonaws.com/bucket-name or just bucket-name
+# Extract bucket name from a repository reference.
+# Input:  s3.us-west-2.amazonaws.com/bucket-name
+#         http://mock-repo:9000/bucket-name
+#         bucket-name
 # Output: bucket-name
+#
+# A bare bucket name contains no slash, so it is returned unchanged. That keeps
+# the CNAME-shaped repositories (nightly.apt.packages.minaprotocol.com and
+# friends) working, since for those the bucket name is the domain.
 function extract_bucket_name() {
     local __repo=$1
-    # Strip s3 prefix patterns like "s3.us-west-2.amazonaws.com/" or "s3.amazonaws.com/"
-    echo "$__repo" | sed -E 's|^s3(\.[^/]+)?\.amazonaws\.com/||'
+    # Strip an optional scheme, then an optional host[:port] path segment.
+    echo "$__repo" | sed -E -e 's|^[a-zA-Z][a-zA-Z0-9+.-]*://||' -e 's|^[^/]+/||'
 }
 
 function main_help(){
@@ -643,7 +655,7 @@ function promote_debian() {
         # Download the .deb from S3
         mkdir -p "$DEBIAN_CACHE_FOLDER/$__codename"
         local __input_deb="$DEBIAN_CACHE_FOLDER/$__codename/${__artifact_full_name}_${__source_version}_${__arch}.deb"
-        wget "https://s3.us-west-2.amazonaws.com/${__debian_bucket}/pool/${__codename}/m/mi/${__artifact_full_name}_${__source_version}_${__arch}.deb" \
+        wget "$(deb_s3_object_url "$__debian_bucket" "pool/${__codename}/m/mi/${__artifact_full_name}_${__source_version}_${__arch}.deb")" \
             -O "$__input_deb"
 
         # Open session and modify
@@ -2097,7 +2109,6 @@ function fix(){
     local __codenames="$DEFAULT_CODENAMES"
     local __channel
     local __bucket_arg="--bucket=packages.o1test.net"
-    local __s3_region_arg="--s3-region=us-west-2"
 
 
     while [ ${#} -gt 0 ]; do
@@ -2137,7 +2148,8 @@ function fix(){
             deb-s3 verify \
             --fix-manifests \
             $__bucket_arg \
-            $__s3_region_arg \
+            $DEB_S3_REGION_ARG \
+            "${DEB_S3_ENDPOINT_ARGS[@]}" \
             --codename=${__codename} \
             --component=${__channel}
         done
@@ -2877,7 +2889,7 @@ function check_debian_package() {
 
     # Use deb-s3 list to check if package exists
     local output
-    output=$(deb-s3 list --bucket="$__bucket" --s3-region=us-west-2 --component "$__component" --codename "$__codename" --arch "$__arch" 2>/dev/null || echo "")
+    output=$(deb-s3 list --bucket="$__bucket" $DEB_S3_REGION_ARG "${DEB_S3_ENDPOINT_ARGS[@]}" --component "$__component" --codename "$__codename" --arch "$__arch" 2>/dev/null || echo "")
 
     # Check if the package with the version exists
     if echo "$output" | grep -q "${__package_name}_${__version}_${__arch}.deb"; then
@@ -3026,7 +3038,7 @@ function progress(){
                     
                     # Fetch all packages for this codename/release/arch combination once
                     local available_packages
-                    available_packages=$(deb-s3 list --bucket="$bucket" --s3-region=us-west-2 --component "$__release" --codename "$codename" --arch "$arch" 2>/dev/null || echo "")
+                    available_packages=$(deb-s3 list --bucket="$bucket" $DEB_S3_REGION_ARG "${DEB_S3_ENDPOINT_ARGS[@]}" --component "$__release" --codename "$codename" --arch "$arch" 2>/dev/null || echo "")
 
                     for artifact in "${__artifacts_arr[@]}"; do
                         # Handle artifacts that need network suffix

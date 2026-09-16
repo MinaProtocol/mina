@@ -15,7 +15,7 @@ let runner =
             { Bookworm = RunInToolchain.runInToolchainBookworm arch
             , Bullseye = RunInToolchain.runInToolchainBullseye
             , Jammy = RunInToolchain.runInToolchainJammy
-            , Focal = RunInToolchain.runInToolchain
+            , Focal = RunInToolchain.runInToolchainBullseye
             , Noble = RunInToolchain.runInToolchainNoble
             }
             debVersion

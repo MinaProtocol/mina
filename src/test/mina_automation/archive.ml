@@ -47,9 +47,9 @@ module Scripts = struct
     | `DropTables ->
         "drop_tables.sql"
     | `Upgrade ->
-        "upgrade_to_mesa.sql"
+        "upgrade.sql"
     | `Rollback ->
-        "downgrade_to_berkeley.sql"
+        "downgrade.sql"
 
   let filepath t =
     let file = file t in
