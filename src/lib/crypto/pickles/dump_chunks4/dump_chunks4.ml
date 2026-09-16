@@ -16,7 +16,7 @@ let () =
       ~auxiliary_typ:Typ.unit
       ~max_proofs_verified:(module Nat.N0)
       ~num_chunks:4
-      ~override_wrap_domain:Pickles_base.Proofs_verified.N1
+      ~override_wrap_domain:Pickles_base.Proofs_verified.N2
       ~name:"chunks4"
       ~choices:(fun ~self:_ ->
         [ { identifier = "2^17"
