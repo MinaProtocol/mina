@@ -43,6 +43,7 @@ let rec absorb :
       absorb ty1 t1 ; absorb ty2 t2
 
 module Make (Impl : Kimchi_pasta_snarky_backend.Snark_intf) = struct
+  module Bignum_bigint = Bigint
   open Impl
 
   (** [ones_vector (module I) ~first_zero n] returns a vector of booleans of
@@ -76,7 +77,34 @@ module Make (Impl : Kimchi_pasta_snarky_backend.Snark_intf) = struct
           let y = exists Field.typ ~compute:As_prover.(fun () -> read_var x) in
           Field.Assert.equal x y ; y )
 
-  let lowest_128_bits ~constrain_low_bits ~assert_128_bits x =
+  (* [c mod 2^128] and [c / 2^128], as field constants. *)
+  let split_constant_128 (c : Bignum_bigint.t) :
+      Field.Constant.t * Field.Constant.t =
+    let to_field b = Bigint.(to_field (of_bignum_bigint b)) in
+    let pow2_128 = Bignum_bigint.(shift_left one 128) in
+    ( to_field Bignum_bigint.(c % pow2_128)
+    , to_field (Bignum_bigint.shift_right c 128) )
+
+  (* Asserts [lo + 2^128 hi < bound] as integers, for [lo] and [hi] below
+     [2^128]: [hi <= bound_hi], and [lo <= bound_lo - 1] when
+     [hi = bound_hi]. A caller that does not range-check [lo] relies on its
+     consumers to bound it. *)
+  let assert_split_below ~assert_128_bits ~lo ~hi (bound : Bignum_bigint.t) =
+    let bound_lo, bound_hi = split_constant_128 bound in
+    assert_128_bits Field.(constant bound_hi - hi) ;
+    let hi_is_top = Field.equal hi (Field.constant bound_hi) in
+    let d =
+      Field.if_ hi_is_top
+        ~then_:Field.(constant Constant.(bound_lo - one) - lo)
+        ~else_:Field.one
+    in
+    assert_128_bits d
+
+  (* Splits [x] as [lo + 2^128 hi] below [bound], with [hi] and, under
+     [constrain_low_bits], [lo] range-checked to 128 bits, and returns
+     [lo]. *)
+  let split_128_below ~constrain_low_bits ~assert_128_bits
+      (bound : Bignum_bigint.t) x =
     let pow2 =
       (* 2 ^ n *)
       let rec pow2 x i =
@@ -97,7 +125,13 @@ module Make (Impl : Kimchi_pasta_snarky_backend.Snark_intf) = struct
     assert_128_bits hi ;
     if constrain_low_bits then assert_128_bits lo ;
     Field.Assert.equal x Field.(lo + scale hi (pow2 128)) ;
+    assert_split_below ~assert_128_bits ~lo ~hi bound ;
     lo
+
+  (* The low half of [x]'s canonical representative: the split below the
+     field modulus, so the prover has no alias to choose. *)
+  let lowest_128_bits ~constrain_low_bits ~assert_128_bits x =
+    split_128_below ~constrain_low_bits ~assert_128_bits Field.size x
 end
 
 module Step = Make (Kimchi_pasta_snarky_backend.Step_impl)
