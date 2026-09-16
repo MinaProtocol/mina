@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Signature_lib
 
 let signature_kind = Mina_signature_kind.Testnet
