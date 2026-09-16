@@ -13,10 +13,10 @@ sudo chown $(id -u):$(id -g) /var/storagebox /var/buildkite/shared
 ./run_job.sh --list
 
 # Dry-run to see what commands would execute
-./run_job.sh --dry-run MinaArtifactBullseyeDevnet
+./run_job.sh --dry-run MinaArtifactBookwormDevnetDevnet
 
 # Run a specific job
-./run_job.sh MinaArtifactBullseyeDevnet
+./run_job.sh MinaArtifactBookwormDevnetDevnet
 
 # Run with custom environment variables
 cat > my-env.txt << 'EOF'
@@ -143,7 +143,6 @@ These are derived from your local git state:
 |----------|---------|-------------|
 | `LOCAL_BK_RUN` | `1` | Indicates local execution (scripts can check this) |
 | `SKIP_DOCKER_PRUNE` | `1` | Prevents docker system prune |
-| `GIT_LFS_SKIP_SMUDGE` | `1` | Skips LFS file download |
 | `APTLY_ROOT` | `/tmp/aptly` | Writable directory for aptly database (avoids ~/.aptly permission issues) |
 
 ### Cache Configuration
@@ -241,10 +240,10 @@ Options:
 ./run_job.sh --list-steps --jobs-dir ./jobs GenerateHardforkPackage
 
 # See what commands a job would run
-./run_job.sh --dry-run MinaArtifactBullseyeDevnet
+./run_job.sh --dry-run MinaArtifactBookwormDevnetDevnet
 
 # Run a specific step within a job
-./run_job.sh --step "build-deb-pkg" MinaArtifactBullseyeDevnet
+./run_job.sh --step "build-deb-pkg" MinaArtifactBookwormDevnetDevnet
 
 # Start from a specific step (skip earlier steps)
 ./run_job.sh --start-from "upload-ledger" GenerateHardforkPackage
@@ -253,10 +252,10 @@ Options:
 ./run_job.sh --build-id abc123-def456 --start-from "step-3" GenerateHardforkPackage
 
 # Reuse previously generated pipelines (faster iteration)
-./run_job.sh --skip-dump --jobs-dir /tmp/pipelines MinaArtifactBullseyeDevnet
+./run_job.sh --skip-dump --jobs-dir /tmp/pipelines MinaArtifactBookwormDevnetDevnet
 
 # Skip Hetzner sync (if you don't need legacy cache)
-./run_job.sh --skip-sync MinaArtifactBullseyeDevnet
+./run_job.sh --skip-sync MinaArtifactBookwormDevnetDevnet
 
 # Run with custom environment variables
 ./run_job.sh --env-file ./my-env.txt --step "build-deb-pkg-noble" HardforkPackageGenerationNew

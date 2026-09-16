@@ -84,6 +84,7 @@ Note: There is no `make test` target. Use `dune runtest` directly.
 - `missing_blocks_auditor/` - Audit for missing blocks
 - `extract_blocks/` / `archive_blocks/` - Block extraction and archival
 - `hardfork_test/` - Hard fork testing utilities
+- `minimina/` - CLI tool for spinning up local Mina networks (Rust, built with Cargo)
 - `runtime_genesis_ledger/` - Runtime genesis ledger generator
 - `logproc/` - Log processing utility
 - `delegation_verify/` - Delegation verification

@@ -46,6 +46,8 @@ let Toolchain = ../Constants/Toolchain.dhall
 
 let Arch = ../Constants/Arch.dhall
 
+let Expr = ../Pipeline/Expr.dhall
+
 let MinaBuildSpec =
       { Type =
           { prefix : Text
@@ -67,12 +69,14 @@ let MinaBuildSpec =
           , docker_publish : DockerPublish.Type
           , suffix : Optional Text
           , if_ : Optional B/If
+          , includeIf : List Expr.Type
+          , excludeIf : List Expr.Type
           }
       , default =
           { prefix = "MinaArtifact"
           , artifacts = Artifacts.AllButTests
           , buildScript = "./buildkite/scripts/build-release.sh"
-          , debVersion = DebianVersions.DebVersion.Bullseye
+          , debVersion = DebianVersions.DebVersion.Bookworm
           , profile = Profiles.Type.Devnet
           , buildFlags = BuildFlags.Type.None
           , network = Network.Type.Devnet
@@ -83,11 +87,13 @@ let MinaBuildSpec =
           , debianRepo = DebianRepo.Type.Unstable
           , extraBuildEnvs = [] : List Text
           , suffix = None Text
-          , deb_legacy_version = "3.3.0-compatible-4fa3a5b"
+          , deb_legacy_version = "3.5.0-mainnet-stop-slot-8110ede"
           , deb_storage_repair_version = "3.3.0-master-35445f7"
           , arch = Arch.Type.Amd64
           , docker_publish = DockerPublish.Type.Essential
           , if_ = None B/If
+          , includeIf = [] : List Expr.Type
+          , excludeIf = [] : List Expr.Type
           }
       }
 
@@ -111,11 +117,6 @@ let nameSuffix
                                                                      spec.buildFlags}${Arch.nameSuffix
                                                                                          spec.arch}"
 
-let sizeFromArch
-    : Arch.Type -> Size
-    =     \(arch : Arch.Type)
-      ->  merge { Arm64 = Size.Arm64, Amd64 = Size.XLarge } arch
-
 let build_artifacts
     : MinaBuildSpec.Type -> Command.Type
     =     \(spec : MinaBuildSpec.Type)
@@ -135,6 +136,7 @@ let build_artifacts
                                                  spec.debVersion}"
                         , "ARCHITECTURE=${Arch.lowerName spec.arch}"
                         , Network.buildMainnetEnv spec.network
+                        , "PREFORK_LEGACY_VERSION=${spec.deb_legacy_version}"
                         ]
                       # BuildFlags.buildEnvs spec.buildFlags
                       # spec.extraBuildEnvs
@@ -152,8 +154,7 @@ let build_artifacts
                   ]
             , label = "Debian: Build ${labelSuffix spec}"
             , key = "build-deb-pkg${Optional/default Text "" spec.suffix}"
-            , target =
-                merge { Amd64 = Size.Multi, Arm64 = Size.Arm64 } spec.arch
+            , target = Size.Multi
             , if_ = spec.if_
             , retries =
               [ Command.Retry::{
@@ -181,7 +182,7 @@ let docker_step
                   , arch = spec.arch
                   }
 
-          let size = sizeFromArch spec.arch
+          let size = Size.XLarge
 
           in  merge
                 { Daemon =
@@ -296,6 +297,7 @@ let docker_step
                 , LogProc = [] : List DockerImage.ReleaseSpec.Type
                 , CreatePreforkGenesis = [] : List DockerImage.ReleaseSpec.Type
                 , DaemonPrefork = [] : List DockerImage.ReleaseSpec.Type
+                , DaemonAutomode = [] : List DockerImage.ReleaseSpec.Type
                 , BatchTxn =
                   [ DockerImage.ReleaseSpec::{
                     , deps = deps
@@ -479,6 +481,8 @@ let pipelineBuilder
             , name = "${spec.prefix}${nameSuffix spec}"
             , tags = spec.tags
             , scope = spec.scope
+            , includeIf = spec.includeIf
+            , excludeIf = spec.excludeIf
             }
           , steps = steps
           }

@@ -405,7 +405,7 @@
           granular = ocamlPackages.default;
           default = ocamlPackages.mina;
           inherit (pkgs)
-            libp2p_helper kimchi_bindings_stubs snarky_js validation trace-tool
+            libp2p_helper kimchi_bindings_stubs snarky_js validation trace-tool minimina
             zkapp-cli hardfork_test;
           inherit (dockerImages)
             mina-image-slim mina-image-full mina-archive-image-full

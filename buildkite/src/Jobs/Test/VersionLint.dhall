@@ -59,6 +59,8 @@ in  Pipeline.build
                 , S.exactly
                     "buildkite/scripts/version-linter-patch-missing-type-shapes"
                     "sh"
+                , S.exactly "buildkite/scripts/dump-mina-type-shapes" "sh"
+                , S.exactly "buildkite/scripts/gsutil-upload" "sh"
                 ]
 
           in  JobSpec::{

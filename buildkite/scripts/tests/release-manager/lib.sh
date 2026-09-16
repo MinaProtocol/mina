@@ -12,24 +12,37 @@ NC='\033[0m' # No Color
 
 BACKEND="local"
 
+# Mock Debian repository (MinIO container + synthetic fixture packages).
+# shellcheck source=buildkite/scripts/tests/release-manager/mock-repo.sh
+source "$(dirname "${BASH_SOURCE[0]}")/mock-repo.sh"
+
+# Repository configuration.
+#
+# Both repositories are mocked by a throwaway MinIO container, so none of the
+# names below refer to anything outside this test run. See mock-repo.sh for why
+# the live S3 buckets were retired.
+#
+# The *_EXTERNAL_URL and DEBIAN_SIGN_KEY values are filled in by
+# bootstrap_test_environment once the mock is up, because the port and the
+# signing key are chosen at run time.
+
 # Test configuration - unsigned repository
-TEST_BUCKET="test.packages.o1test.net"
-TEST_BUCKET_EXTERNAL_URL="s3.us-west-2.amazonaws.com/test.packages.o1test.net"
+TEST_BUCKET="test-packages"
+TEST_BUCKET_EXTERNAL_URL=""
 TEST_REGION="us-west-2"
-TEST_CODENAME="bullseye"
+TEST_CODENAME="bookworm"
 TEST_COMPONENT_CI="ci"
 TEST_COMPONENT_TEST="test"
 TEST_ARCH="amd64"
 
 # Test configuration - signed repository
-SIGNED_TEST_BUCKET="signed.tests.packages.o1test.net"
-SIGNED_TEST_BUCKET_EXTERNAL_URL="s3.us-west-2.amazonaws.com/signed.tests.packages.o1test.net"
-SIGNED_TEST_COMPONENT="ci"
+SIGNED_TEST_BUCKET="signed-test-packages"
+SIGNED_TEST_BUCKET_EXTERNAL_URL=""
 SIGNED_TEST_CODENAME="bookworm"
 SIGNED_TEST_ARCH="arm64"
 SIGNED_TEST_COMPONENT="test"
 
-DEBIAN_SIGN_KEY="386E9DAC378726A48ED5CE56ADB30D9ACE02F414"
+DEBIAN_SIGN_KEY=""
 
 # Generate random suffix for promote operations
 RANDOM_SUFFIX="test-$(date +%s)-${RANDOM}"
@@ -74,6 +87,16 @@ assert_success() {
     fi
 }
 
+# Every deb-s3 call in the tests goes through the mock endpoint. Fail loudly
+# rather than send an empty --endpoint if the mock was never started.
+deb_s3_test() {
+    deb-s3 "$1" \
+        --endpoint="${DEB_S3_ENDPOINT:?mock repository is not running}" \
+        --force-path-style \
+        --s3-region="${TEST_REGION}" \
+        "${@:2}"
+}
+
 assert_package_exists() {
     local test_name="$1"
     local package_name="$2"
@@ -81,17 +104,15 @@ assert_package_exists() {
     local codename="$4"
     local component="$5"
     local bucket="$6"
-    local region="$7"
-    local arch="$8"
+    local arch="$7"
 
     TESTS_TOTAL=$((TESTS_TOTAL + 1))
 
     log_info "Checking if package ${package_name} version ${version} exists in ${codename}/${component}"
 
     # List packages and check if our package exists
-    if deb-s3 list \
+    if deb_s3_test list \
         --bucket="${bucket}" \
-        --s3-region="${region}" \
         --codename="${codename}" \
         --component="${component}" \
         --arch="${arch}" 2>/dev/null | grep -q "^${package_name}[[:space:]]\+${version}"; then
@@ -124,7 +145,8 @@ presetup_tools() {
         if ! command -v gem &> /dev/null; then
             log_info "RubyGems not found. Installing Ruby and RubyGems..."
             if command -v apt-get &> /dev/null; then
-                apt-get update && apt-get install -y ruby ruby-dev build-essential
+                source ./buildkite/scripts/debian/update.sh --verbose
+                apt-get install -y ruby ruby-dev build-essential
             else
                 log_error "Could not install Ruby"
                 exit 1
@@ -162,15 +184,24 @@ check_prerequisites() {
         return 1
     fi
 
-    # Check AWS credentials
-    if [ -z "${AWS_ACCESS_KEY_ID}" ] || [ -z "${AWS_SECRET_ACCESS_KEY}" ]; then
-        log_warn "AWS credentials not set. Some tests may fail."
-        log_warn "Set AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY environment variables."
+    # The mock repository needs docker to run MinIO and the verification
+    # containers, dpkg-deb to build the fixture packages, curl to poll MinIO's
+    # health endpoint, and gpg to make the throwaway signing key. No AWS
+    # credentials are required: mock_repo_start sets its own.
+    if ! command -v docker &> /dev/null; then
+        missing_deps+=("docker (runs the mock repository and the verification containers)")
     fi
 
-    # Optional: Check for GPG (needed for signed repo tests)
+    if ! command -v dpkg-deb &> /dev/null; then
+        missing_deps+=("dpkg-deb (builds the fixture packages; install with: apt-get install dpkg-dev)")
+    fi
+
+    if ! command -v curl &> /dev/null; then
+        missing_deps+=("curl (polls the mock repository health endpoint)")
+    fi
+
     if ! command -v gpg &> /dev/null; then
-        optional_deps+=("gpg (for signed repository tests)")
+        missing_deps+=("gpg (signs the mock repository)")
     fi
 
     # Caller-provided optional deps
@@ -217,6 +248,8 @@ setup_test_environment() {
 cleanup_test_environment() {
     log_info "Cleaning up test environment..."
 
+    mock_repo_stop
+
     if [ -n "${TEST_TEMP_DIR}" ] && [ -d "${TEST_TEMP_DIR}" ]; then
         rm -rf "${TEST_TEMP_DIR}"
         log_info "Removed temporary directory: ${TEST_TEMP_DIR}"
@@ -254,7 +287,25 @@ bootstrap_test_environment() {
     fi
 
     setup_test_environment
+
+    # Register the trap before starting the mock, so that a failure part-way
+    # through mock_repo_start still removes the container and the network.
     trap cleanup_test_environment EXIT
+
+    mock_repo_start \
+        "${TEST_CODENAME}" \
+        "${TEST_ARCH}" \
+        "${SIGNED_TEST_ARCH}" \
+        "${TEST_COMPONENT_CI}"
+
+    # The repository URLs handed to manager.sh are consumed inside the
+    # verification containers, which are siblings of the MinIO container on the
+    # mock network, so they use the container-internal address.
+    TEST_BUCKET_EXTERNAL_URL="${MOCK_REPO_INTERNAL_ENDPOINT}/${TEST_BUCKET}"
+    # Used by test-e2e.sh only.
+    # shellcheck disable=SC2034
+    SIGNED_TEST_BUCKET_EXTERNAL_URL="${MOCK_REPO_INTERNAL_ENDPOINT}/${SIGNED_TEST_BUCKET}"
+    DEBIAN_SIGN_KEY="${MOCK_REPO_SIGN_KEY}"
 }
 
 ###############################################################################
@@ -275,7 +326,6 @@ test_verify_test_packages() {
         "${TEST_CODENAME}" \
         "${TEST_COMPONENT_CI}" \
         "${TEST_BUCKET}" \
-        "${TEST_REGION}" \
         "${TEST_ARCH}"
 
 
@@ -286,7 +336,6 @@ test_verify_test_packages() {
         "${TEST_CODENAME}" \
         "${TEST_COMPONENT_CI}" \
         "${TEST_BUCKET}" \
-        "${TEST_REGION}" \
         "${TEST_ARCH}"
 }
 
@@ -411,9 +460,8 @@ test_list_packages() {
     log_info "========================================="
 
     log_info "Listing all packages in ${TEST_COMPONENT_CI} component..."
-    if deb-s3 list \
+    if deb_s3_test list \
         --bucket="${TEST_BUCKET}" \
-        --s3-region="${TEST_REGION}" \
         --codename="${TEST_CODENAME}" \
         --component="${TEST_COMPONENT_CI}" \
         --arch="${TEST_ARCH}" > "${TEST_TEMP_DIR}/packages_list.txt" 2>&1; then

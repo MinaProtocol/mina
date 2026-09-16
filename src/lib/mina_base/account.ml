@@ -250,7 +250,7 @@ module Timing = Account_timing
 module Binable_arg = struct
   [%%versioned
   module Stable = struct
-    module V2 = struct
+    module V3 = struct
       type t =
         { public_key : Public_key.Compressed.Stable.V1.t
         ; token_id : Token_id.Stable.V2.t
@@ -262,7 +262,7 @@ module Binable_arg = struct
         ; voting_for : State_hash.Stable.V1.t
         ; timing : Timing.Stable.V2.t
         ; permissions : Permissions.Stable.V2.t
-        ; zkapp : Zkapp_account.Stable.V2.t option
+        ; zkapp : Zkapp_account.Stable.V3.t option
         }
       [@@deriving sexp, equal, hash, compare, yojson]
 
@@ -277,8 +277,8 @@ let check = Fn.id
 
 [%%versioned_binable
 module Stable = struct
-  module V2 = struct
-    type t = Binable_arg.Stable.V2.t =
+  module V3 = struct
+    type t = Binable_arg.Stable.V3.t =
       { public_key : Public_key.Compressed.Stable.V1.t
       ; token_id : Token_id.Stable.V2.t
       ; token_symbol : Token_symbol.Stable.V1.t
@@ -289,13 +289,13 @@ module Stable = struct
       ; voting_for : State_hash.Stable.V1.t
       ; timing : Timing.Stable.V2.t
       ; permissions : Permissions.Stable.V2.t
-      ; zkapp : Zkapp_account.Stable.V2.t option
+      ; zkapp : Zkapp_account.Stable.V3.t option
       }
     [@@deriving sexp, equal, hash, compare, yojson, hlist, fields]
 
     include
       Binable.Of_binable_without_uuid
-        (Binable_arg.Stable.V2)
+        (Binable_arg.Stable.V3)
         (struct
           type nonrec t = t
 
@@ -1100,39 +1100,33 @@ module Hardfork = struct
   [@@deriving
     sexp, equal, hash, compare, yojson, hlist, fields, bin_io_unversioned]
 
-  let of_stable (account : Stable.Latest.t) : t =
-    { public_key = account.public_key
-    ; token_id = account.token_id
-    ; token_symbol = account.token_symbol
-    ; balance = account.balance
-    ; nonce = account.nonce
-    ; receipt_chain_hash = account.receipt_chain_hash
-    ; delegate = account.delegate
-    ; voting_for = account.voting_for
-    ; timing = account.timing
-    ; permissions = account.permissions
-    ; zkapp = Option.map ~f:Zkapp_account.Hardfork.of_stable account.zkapp
+  (* This function converts current account to Mesa account *)
+  let migrate_to_mesa ~hardfork_slot:_
+      ({ public_key
+       ; token_id
+       ; token_symbol
+       ; balance
+       ; nonce
+       ; receipt_chain_hash
+       ; delegate
+       ; voting_for
+       ; timing
+       ; permissions
+       ; zkapp
+       } :
+        Stable.Latest.t ) : t =
+    { public_key
+    ; token_id
+    ; token_symbol
+    ; balance
+    ; nonce
+    ; receipt_chain_hash
+    ; delegate
+    ; voting_for
+    ; timing
+    ; permissions
+    ; zkapp
     }
-
-  (** Convert a Mesa account to a stable Berkeley account. Raises if we can't 
-      convert. *)
-  let to_stable_exn (account : t) : Stable.Latest.t =
-    { public_key = account.public_key
-    ; token_id = account.token_id
-    ; token_symbol = account.token_symbol
-    ; balance = account.balance
-    ; nonce = account.nonce
-    ; receipt_chain_hash = account.receipt_chain_hash
-    ; delegate = account.delegate
-    ; voting_for = account.voting_for
-    ; timing = account.timing
-    ; permissions = account.permissions
-    ; zkapp = Option.map ~f:Zkapp_account.Hardfork.to_stable_exn account.zkapp
-    }
-
-  (* This function converts Berkeley account to Mesa account *)
-  let migrate_from_berkeley ~hardfork_slot (account : Stable.Latest.t) : t =
-    slot_reduction_update ~hardfork_slot account |> of_stable
 
   let balance { balance; _ } = balance
 
@@ -1187,17 +1181,6 @@ module Hardfork = struct
   let empty_digest = lazy (digest empty)
 
   let empty_account_string = lazy (Bin_prot.Writer.to_string bin_writer_t empty)
-
-  let%test_unit "of_stable followed by to_stable_exn is identity" =
-    let gen_with_optional_zkapp : Stable.Latest.t Quickcheck.Generator.t =
-      let open Quickcheck.Generator.Let_syntax in
-      let%bind base_account = gen in
-      let%map zkapp = Option.quickcheck_generator Zkapp_account.gen in
-      { base_account with zkapp }
-    in
-    Quickcheck.test gen_with_optional_zkapp ~f:(fun original ->
-        let roundtripped = to_stable_exn @@ of_stable original in
-        [%test_eq: Stable.Latest.t] original roundtripped )
 end
 
 (* An unstable account is needed when we're doing ledger migration. The main

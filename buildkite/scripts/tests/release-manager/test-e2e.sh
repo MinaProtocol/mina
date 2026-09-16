@@ -14,7 +14,7 @@ source "${SCRIPT_DIR}/lib.sh"
 # Docker configuration (E2E only)
 DOCKER_SOURCE_REGISTRY="minaprotocol"
 DOCKER_SOURCE_IMAGE="mina-daemon"
-DOCKER_SOURCE_TAG="3.3.0-8c0c2e6-bookworm-mainnet-arm64"
+DOCKER_SOURCE_TAG="3.3.0-8c0c2e6-bookworm-mainnet"
 DOCKER_TARGET_REGISTRY="europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo"
 DOCKER_TARGET_IMAGE="mina-daemon"
 
@@ -46,8 +46,9 @@ test_manager_promote_unsigned_real() {
         --skip-cache-invalidation \
         --only-debians 2>&1 | tee "${TEST_TEMP_DIR}/promote_unsigned_real.log"; then
 
+        # No settling delay: the mock repository is a local MinIO container,
+        # which is strongly consistent, unlike the S3 bucket this used to hit.
         log_info "Verifying promoted package exists..."
-        sleep 60  # Give S3 a moment to sync
 
         if assert_package_exists \
             "Manager promote command (unsigned, real)" \
@@ -56,7 +57,6 @@ test_manager_promote_unsigned_real() {
             "${TEST_CODENAME}" \
             "${TEST_COMPONENT_TEST}" \
             "${TEST_BUCKET}" \
-            "${TEST_REGION}" \
             "${TEST_ARCH}"; then
             return 0
         else
@@ -104,7 +104,6 @@ test_manager_promote_signed_real() {
         --only-debians 2>&1 | tee "${TEST_TEMP_DIR}/promote_signed_real.log"; then
 
         log_info "Verifying promoted package exists in signed repository..."
-        sleep 5  # Give S3 a moment to sync
 
         if assert_package_exists \
             "Manager promote command (signed, real)" \
@@ -113,7 +112,6 @@ test_manager_promote_signed_real() {
             "${SIGNED_TEST_CODENAME}" \
             "${TEST_COMPONENT_TEST}" \
             "${SIGNED_TEST_BUCKET}" \
-            "${TEST_REGION}" \
             "${SIGNED_TEST_ARCH}"; then
             return 0
         else
@@ -157,9 +155,12 @@ test_docker_promote_to_gcp() {
         return 0
     fi
 
-    # Pull source image from Docker Hub
+    # Pull source image from Docker Hub.
+    # The source tag is an arch-suffixed single-arch image, so --platform is
+    # redundant; passing it triggers a docker/containerd parser bug on some
+    # agents that treats the whole image ref as a platform specifier.
     log_info "Pulling source image from Docker Hub..."
-    if ! docker pull --platform linux/arm64 "${source_image}" 2>&1 | tee "${TEST_TEMP_DIR}/docker_pull.log"; then
+    if ! docker pull "${source_image}" 2>&1 | tee "${TEST_TEMP_DIR}/docker_pull.log"; then
         log_error "Failed to pull source image"
         assert_success "Docker promote to GCP Artifact Registry" 1
         return 1

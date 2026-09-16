@@ -30,6 +30,9 @@ func (t *HardforkTest) GenerateForkLedgers(executablePath, forkConfigPath, ledge
 		"--config-file", forkConfigPath,
 		"--genesis-dir", ledgersDir,
 		"--hash-output-file", hashesFile,
+		// Forking to mesa need App State size to be expanded to 32
+		// TODO: Consider design the test so this pad app state size is only applied when forking into Mesa
+		"--pad-app-state",
 	)
 
 	cmd.Stdout = os.Stdout

@@ -1,0 +1,183 @@
+{
+  "snark-node": {
+    "pk": "B62qqYWdCfrjEznYNc7fsve5Rk5wuho9KwZa2bntKZBdshz1M6RsBna",
+    "sk": "EKERBeqQE7GLuD9xtCBCGYNAyXpYX8UnXBTkg6rbvwT2LKPYiDdF",
+    "role": "Snark_coordinator",
+    "docker_image": "gcr.io/o1labs-192920/mina-daemon:2.0.0berkeley-rc1-1551e2f-bullseye-berkeley",
+    "git_build": null,
+    "worker_nodes": 2,
+    "snark_worker_fee": "0.0001",
+    "libp2p_pass": "naughty blue worm",
+    "libp2p_keyfile": "./tests/data/large_network/libp2p_keys/snark-node.json",
+    "libp2p_keypair": {
+      "box_primitive": "xsalsa20poly1305",
+      "pw_primitive": "argon2i",
+      "nonce": "72WDo7T8QvmPR7qfSTKis9sSsUTEvQmKdkVFhMX",
+      "pwsalt": "9pZZDkPfHon1QRz1fpRfWcdrMxrj",
+      "pwdiff": [
+        134217728,
+        6
+      ],
+      "ciphertext": "7KcRjB15J9ACY85oN65QLEYj1RoZhszko1bb2HyRTzaD9di2RTc9bqshmywagEN6tenFnmSAVJHk5h5GEk8w99dsDH8K1UKTAamv1TPQ2qn7a6nVMZvjPQ8CFBNJDBbtGrgPQyJXypVqQprEqvy8fyKGcxn7kuhDkg6hJXp1mZkQEEDee35LmDx5E35PegeJnzMJroQHcqt2CH9rbofJdtLji74yv2yVdi1Z7YrMRmahm37gWfMTcUcSQ6VAbpTG76thtxhCgvC8HNScbvZEWzraP9b2eD4KtWAh7"
+    },
+    "libp2p_peerid": "12D3KooWQrjXYmEqStHNPGo1A2mEf3oNtmKLhDtZJzJiRah7VSBk"
+  },
+  "archive-node": {
+    "pk": "B62qjw6nhuPRERVeUwwEdT7KAcEg7D8pUiKdDmf7Ny1W7utcq9UKw1q",
+    "sk": "EKFbpuwm2ALsgDXy7NSpmEaDF62W6ULMSzdV8haSCaHeizFCHcDm",
+    "role": "Archive_node",
+    "docker_image": "gcr.io/o1labs-192920/mina-daemon:2.0.0berkeley-rc1-1551e2f-bullseye-berkeley",
+    "archive_image": "gcr.io/o1labs-192920/mina-archive:2.0.0berkeley-rc1-1551e2f-bullseye",
+    "git_build": null,
+    "schema_files": [
+      "https://raw.githubusercontent.com/MinaProtocol/mina/1551e2f/src/app/archive/create_schema.sql",
+      "https://raw.githubusercontent.com/MinaProtocol/mina/1551e2f/src/app/archive/zkapp_tables.sql"
+    ],
+    "libp2p_pass": "naughty blue worm",
+    "libp2p_keyfile": "./tests/data/large_network/libp2p_keys/archive_node.json",
+    "libp2p_keypair": {
+      "box_primitive": "xsalsa20poly1305",
+      "pw_primitive": "argon2i",
+      "nonce": "8fsRcrEWjiKnb1UbGh7kMZPKiGjNqjTFzwHV4vK",
+      "pwsalt": "BWkyixriD2T7QjDoaC4xKF8AinCj",
+      "pwdiff": [
+        134217728,
+        6
+      ],
+      "ciphertext": "6ZCNWsbQfyTP4igYgcfnJtUbkYFnEqqSe3dU7Q1UARpgBys9v94n8Q7vCzgoKpUmdTd6XAqHxUafCMxsiMwgMS8fUmuT9DPyNwwBHoRWUbqEP4CctSwrYBcRYcejA4dDwKU655DPf4M5qbchezN9epm2rk7nuYBey2nJcAFnvxrukKr4obWGCmRQ5WSAi7G2s174KcfNiEDYvodKN5Wgoq4sf1JDoDbe6wxXsf4t74w5DyWFCMRSdr55jp3fxDVUBbBs2xyMmro8RwBpwUBuMMa8YVNsuZpBHqtqi"
+    },
+    "libp2p_peerid": "12D3KooWJGNYJVwQcc1PrbHe5of3wMVZ7tpeUjLLHmbiLwYTDvhU"
+  },
+  "receiver": {
+    "pk": "B62qqeMgtLhKkmZNDvAGsw9pqGw51uXpTf5ar8JDMzvSekmuF5zUtDe",
+    "sk": "EKF4pbSdHbXjSXJLWhcgqH3gLzcihNH7uxhxpsoB74JabufNT2p2",
+    "privkey_path": "./tests/data/large_network/block_producer_keys/receiver.json",
+    "role": "Block_producer",
+    "docker_image": "gcr.io/o1labs-192920/mina-daemon:2.0.0berkeley-rc1-1551e2f-bullseye-berkeley",
+    "git_build": null,
+    "libp2p_pass": "naughty blue worm",
+    "libp2p_keyfile": "./tests/data/large_network/libp2p_keys/receiver.json",
+    "libp2p_keypair": {
+      "box_primitive": "xsalsa20poly1305",
+      "pw_primitive": "argon2i",
+      "nonce": "7BYHqKYh3ARDBx4m5hPJdpEnZwq39KmA6hsjUDx",
+      "pwsalt": "ALjNXUCxQRHh5t5UL4XiHaJugKkw",
+      "pwdiff": [
+        134217728,
+        6
+      ],
+      "ciphertext": "7iiBnzYTfZ1r4VirvEXEeDqC7YUQko3EiES28pHDSfxx2tCCjkXjTgtdDjBx8ZqwEzd97X4RRPmbG9F3y6wpe2md7SyM2ZHbXjNTF58nkh7zcXGtQWvcd49r1zMvcC5vHNoA3FR1d1gZcydj89x4oqTL13qwDwwEWFapPJhX3DgZW7ck3gp2BRziwGhx4wur3io628yqvzmNqx6a3qiAskzD5XHPb3ZGuv7bMkzqu6QejebDzsMqPpgPGgcQBgHXMJtyoEAQvFaEpmN2mwDUJcWVcPXRq6NxXkexk"
+    },
+    "libp2p_peerid": "12D3KooWPct9Lcb7VAnooskBUQDRU4Bv9asGiUjpRwWTKh2n1T4y"
+  },
+  "empty_node-1": {
+    "pk": "B62qmYAQhLdmfcXwDTZCmEqvrhEfN5TT4GgVANeknoGbhW1u4zHWFdv",
+    "sk": "EKEDFANcgihUz6X8kkZKoB1VNr38zJUaCDYbtbaarKbpMKzCKuH1",
+    "privkey_path": "./tests/data/large_network/block_producer_keys/empty_node-1.json",
+    "role": "Block_producer",
+    "docker_image": "gcr.io/o1labs-192920/mina-daemon:2.0.0berkeley-rc1-1551e2f-bullseye-berkeley",
+    "git_build": null,
+    "libp2p_pass": "naughty blue worm",
+    "libp2p_keyfile": "./tests/data/large_network/libp2p_keys/empty_node-1.json",
+    "libp2p_keypair": {
+      "box_primitive": "xsalsa20poly1305",
+      "pw_primitive": "argon2i",
+      "nonce": "7B9Npw89Zo9x7CksgiVNGyfu4tsf1umwSBwFBYo",
+      "pwsalt": "9EW2HarWYoXmWwQDfYf6fgujNGRB",
+      "pwdiff": [
+        134217728,
+        6
+      ],
+      "ciphertext": "6etWtxYDg1he7CngoRzabJKzpBUy59x3R9fqMBJfh1PnapPSu3eVMQqSpVGc7PQJSNxUDhNahbuJ5KSS599EhWWtoawaEujMfrsAztaAP9WBwjVDHJP7e5kn2FfbW3w3yzWZkehoctadd8o2mNgsh9cxtqDYv2biu2VRrS64xcEkrECuktFEwZp4fBbQpJbcyA6AXnnJqUo3h594dRyKWVvC6DzN9u6EFVkvLtisoF7w9GJiSVVC7GERUHz5voaBPtcpqnXPENWCFqpFAh834FDUHxZ3nDyQko6vR"
+    },
+    "libp2p_peerid": "12D3KooWGLzZGX448Pca62vX81SHaHn5GJiz2pT6WmSp97RrZNdw"
+  },
+  "empty_node-2": {
+    "pk": "B62qmYAQhLdmfcXwDTZCmEqvrhEfN5TT4GgVANeknoGbhW1u4zHWFdv",
+    "sk": "EKEDFANcgihUz6X8kkZKoB1VNr38zJUaCDYbtbaarKbpMKzCKuH1",
+    "privkey_path": "./tests/data/large_network/block_producer_keys/empty_node-2.json",
+    "role": "Block_producer",
+    "docker_image": "gcr.io/o1labs-192920/mina-daemon:2.0.0berkeley-rc1-1551e2f-bullseye-berkeley",
+    "git_build": null,
+    "libp2p_pass": "naughty blue worm",
+    "libp2p_keyfile": "./tests/data/large_network/libp2p_keys/empty_node-2.json",
+    "libp2p_keypair": {
+      "box_primitive": "xsalsa20poly1305",
+      "pw_primitive": "argon2i",
+      "nonce": "6aJ9baqCV3EaLZawosX2AwiaArzrps1nHGRZ4bL",
+      "pwsalt": "98jaJvXwNBtfJFwRoSHp7bhG77Wt",
+      "pwdiff": [
+        134217728,
+        6
+      ],
+      "ciphertext": "8sc99v29LijfavNj6nEWKHwDhaCA4i3ZV3jr6oBbzaU3FnUsm4DRUh8eMLz7kk75v9fa1iSXCGibA3u6dR3CBGnRPkZNJ3UbTcWWGByXwV9omqPHvRKUvUCWwXoV7SdWuqRj5vt77gDe6q5GUhKQitLmoAJ11UuV9unJ6pGSWDyNJcEmWnnJZUchDhpHwULm2kKaq31qddvjo9hm6a4g44Q4RyEWmPGGryS9JSUmQk3q2exqCWpwWYULwXkX7GBpu5Uz5RBhNKD6CxN2FbfjdGxQkqWzMCRYVwJzJ"
+    },
+    "libp2p_peerid": "12D3KooWCpjoES36jaKh7WqxgPdxU1CzokeZeJjLfat8yvSpw9wj"
+  },
+  "observer": {
+    "pk": "B62qmYAQhLdmfcXwDTZCmEqvrhEfN5TT4GgVANeknoGbhW1u4zHWFdv",
+    "sk": "EKEDFANcgihUz6X8kkZKoB1VNr38zJUaCDYbtbaarKbpMKzCKuH1",
+    "privkey_path": "./tests/data/large_network/block_producer_keys/observer.json",
+    "role": "Block_producer",
+    "docker_image": "gcr.io/o1labs-192920/mina-daemon:2.0.0berkeley-rc1-1551e2f-bullseye-berkeley",
+    "git_build": null,
+    "libp2p_pass": "naughty blue worm",
+    "libp2p_keyfile": "./tests/data/large_network/libp2p_keys/observer.json",
+    "libp2p_keypair": {
+      "box_primitive": "xsalsa20poly1305",
+      "pw_primitive": "argon2i",
+      "nonce": "6oVbGBqvzUh2goVXhKSZkk4DNn9cBD6XhFpzPGN",
+      "pwsalt": "BBiWTvj1AuyzqSgPwZujpLox9epJ",
+      "pwdiff": [
+        134217728,
+        6
+      ],
+      "ciphertext": "7XPSsSes13Etw8GB4nUfZMZPNDw9FnWxNsLLZWhRigKHboeWPvi864ra8Tywrxi6fUS9gv9nGwAbAY8wsrxKuBzzmgRb1ezPmNmcXtTW7DPzzS1jQrd173UZ8sTZ1HDZQPMw7uz1rudMscpTtoyeqWthR5fKQjy5DADc5e6zzvpmeySRtfsv1kPWbyRxDHpM2n91zFcPpRjdBZRHYcGdwbPJnuVoJY9jnXUxgCeCnv3nDoHZHDkxXY5wGT144SbKmpUwXFBtZ6ujbyK2nvirFKUfiJJKKoygg4b7n"
+    },
+    "libp2p_peerid": "12D3KooWKtt86KQPTAonKMWQoT9ovTqPTjfzDmfC8ZU3PKteALM1"
+  },
+  "seed-0": {
+    "pk": "B62qowPv8ofMDxhWCxUpHFpNRcnzhQLH4QzW5bSHA7FZCN1vVRoEHYW",
+    "sk": "EKEmQoyTKdFqKuAz58jA7iAM8UKAzuyfPFKcjFQavCBVgYWC8y2Y",
+    "privkey_path": null,
+    "role": "Seed_node",
+    "docker_image": "gcr.io/o1labs-192920/mina-daemon:2.0.0berkeley-rc1-1551e2f-bullseye-berkeley",
+    "git_build": null,
+    "libp2p_pass": "naughty blue worm",
+    "libp2p_keyfile": "./tests/data/large_network/libp2p_keys/seed-0.json",
+    "libp2p_keypair": {
+      "box_primitive": "xsalsa20poly1305",
+      "pw_primitive": "argon2i",
+      "nonce": "7iSNxTQMkhSQ7Pd7cmCp5UstHctoY1GKXK7dJnM",
+      "pwsalt": "B688uJsbGjqjFaxuT6dcNQrKgEuv",
+      "pwdiff": [
+        134217728,
+        6
+      ],
+      "ciphertext": "8jhZ15ZxD6RTb7RpiLpe3ktx9AAnq61QBbMpdCBoqUvPHkmwgqkjURVfEHq8A1J4NRDB993dwLB1ivUeSd1fqLGQsgoqcfX26ssREuFqKogX3K1cE25dmufhR3wD1vQC8kvmHgxupzJmmDeJu8jpNYQF16bgLpohYCYYLxtLBsCEJ3VMc4VGs8eEjyoGRms8jsoGSLXmqqLGCtLzZA2rVAyaF7jFV7WccYhjVcRs3pfDScxiXFBTBhNTGKQ3whoF9biShx4jd1XyFPNQx7VkyD1uVUfAf4ojQAntn"
+    },
+    "libp2p_peerid": "12D3KooWAczQboC9gNP9yUeD536oaVidJZ1CywojEQXFkwJv3PeD"
+  },
+  "seed-1": {
+    "pk": "B62qnPHPekSGA2h39jpLE1X9LYAfjsYug3qerZhhdo8wdnTAw3kgm2c",
+    "sk": "EKDmEM9PvTrwD2AwB1qsSqWwyzf7ZVawzVxk4xwXG5XYRxhGiQdy",
+    "privkey_path": null,
+    "role": "Seed_node",
+    "docker_image": "gcr.io/o1labs-192920/mina-daemon:2.0.0berkeley-rc1-1551e2f-bullseye-berkeley",
+    "git_build": null,
+    "libp2p_pass": "naughty blue worm",
+    "libp2p_keyfile": "./tests/data/large_network/libp2p_keys/seed-1.json",
+    "libp2p_keypair": {
+      "box_primitive": "xsalsa20poly1305",
+      "pw_primitive": "argon2i",
+      "nonce": "7fCw67cGBRBYCTbedP6VPXocM7JxJUCdvfPFstw",
+      "pwsalt": "9Vi4jkVGkQj1rKhF1AdHshLndC2J",
+      "pwdiff": [
+        134217728,
+        6
+      ],
+      "ciphertext": "8ZYVnqEEfwsaQKafXC5LwtYwUpqF3Vx4Vf1f9F1QXMG4srgYrUZcmGdXEHEadpVQMwuaKT6T1pPgvcUiSrbTbxWaQucKuXuTBttK1yTDjegWX5cKCBJDNvpdXFsJkz3bv4j149pJ7SH6K96WZ2veJyKWcXRgzsW5AgeoMpFpTWvNKupYmnppREfN7Zo2krV3qQM7dxUhfs4yzK9XMfCq7GsVWpmD5y1DG8R1zp8ht2Krf62vpPSW9xLwibs7tKd78p9zz7ZyHARLQiiP1AWj1uNoqfgvJSQu6Pr7B"
+    },
+    "libp2p_peerid": "12D3KooWNecYnfe2qQn4hA9HBKnYmiNADM2zk6oRFL5APXshAXYv"
+  }
+}

@@ -96,6 +96,12 @@ if [[ -z "${CONFIG_JSON_GZ_URL:-}" ]]; then
   usage "CONFIG_JSON_GZ_URL environment variable is required"
 fi
 
+# Validate GENESIS_TIMESTAMP is in UTC (must end with 'Z') to avoid
+# inconsistencies between auto hardfork mode (UTC) and legacy pipeline (local time)
+if [[ -n "${GENESIS_TIMESTAMP:-}" && ! "${GENESIS_TIMESTAMP}" =~ Z$ ]]; then
+  usage "GENESIS_TIMESTAMP must be in UTC format (ending with 'Z'), got: ${GENESIS_TIMESTAMP}"
+fi
+
 # Format GENESIS_TIMESTAMP as Optional Text for Dhall
 if [[ -z "${GENESIS_TIMESTAMP:-}" ]]; then
   GENESIS_TIMESTAMP="(None Text)"

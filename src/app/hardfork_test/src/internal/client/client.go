@@ -118,6 +118,14 @@ func (block *BlockData) NonEmpty() bool {
 	return block.NumUserCommands > 0 || block.NumFeeTransfers > 0 || block.Coinbase != "0"
 }
 
+func (block BlockData) String() string {
+	b, err := json.MarshalIndent(block, "", "  ")
+	if err != nil {
+		return fmt.Sprintf("%+v", block)
+	}
+	return string(b)
+}
+
 const genesisBlockQuery = `
 genesisBlock {
   commandTransactionCount

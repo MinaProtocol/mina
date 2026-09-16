@@ -16,7 +16,7 @@ source buildkite/scripts/debian/update.sh --verbose
 source buildkite/scripts/handle-fork.sh
 source buildkite/scripts/export-git-env-vars.sh
 
-pip3 install sexpdata==1.0.0
+pip3 install sexpdata==1.0.0 requests
 
 source ./buildkite/scripts/refresh_code.sh
 

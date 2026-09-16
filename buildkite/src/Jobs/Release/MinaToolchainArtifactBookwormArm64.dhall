@@ -17,5 +17,5 @@ in  MinaArtifactToolchain.pipeline
       , no_cache = True
       , deb_install_mode = DockerImage.DebianInstallMode.NoInstall
       , arch = Arch.Type.Arm64
-      , size = Size.Arm64
+      , size = Size.XLarge
       }

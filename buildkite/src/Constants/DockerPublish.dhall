@@ -22,6 +22,7 @@ let isEssential =
             , FunctionalTestSuite = True
             , Toolchain = True
             , DaemonAutoHardfork = True
+            , DaemonAutomode = False
             , DaemonLegacyHardfork = True
             , CreatePreforkGenesis = False
             , DelegationVerifier = True

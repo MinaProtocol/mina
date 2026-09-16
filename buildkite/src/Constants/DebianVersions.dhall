@@ -43,7 +43,7 @@ let DepsSpec =
           , arch : Arch.Type
           }
       , default =
-          { deb_version = DebVersion.Bullseye
+          { deb_version = DebVersion.Bookworm
           , network = Network.Type.Devnet
           , profile = Profiles.Type.Devnet
           , build_flag = BuildFlags.Type.None
@@ -87,12 +87,13 @@ let minimalDirtyWhen =
       , S.strictlyStart (S.contains "scripts/rosetta")
       , S.exactly "scripts/rosetta/test-block-race" "sh"
       , S.exactly "scripts/version-linter" "py"
+      , S.strictlyStart (S.contains "src/test")
       , S.exactly
           "buildkite/scripts/version-linter-patch-missing-type-shapes"
           "sh"
       ]
 
-let bullseyeDirtyWhen =
+let bookwormDirtyWhen =
         [ S.strictlyStart (S.contains "src")
         , S.strictly (S.contains "Makefile")
         , S.exactly "buildkite/scripts/connect/connect-to-network" "sh"
@@ -105,8 +106,8 @@ let bullseyeDirtyWhen =
 let dirtyWhen =
           \(debVersion : DebVersion)
       ->  merge
-            { Bookworm = minimalDirtyWhen
-            , Bullseye = bullseyeDirtyWhen
+            { Bookworm = bookwormDirtyWhen
+            , Bullseye = minimalDirtyWhen
             , Jammy = minimalDirtyWhen
             , Focal = minimalDirtyWhen
             , Noble = minimalDirtyWhen

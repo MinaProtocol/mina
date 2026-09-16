@@ -61,9 +61,15 @@ func (t *HardforkTest) gracefulShutdown(cmd *exec.Cmd, processName string) {
 	case <-shutdownTimeout.C:
 		t.Logger.Info("%s process did not stop gracefully after %d minutes, forcing kill", processName, t.Config.ShutdownTimeoutMinutes)
 		cmd.Process.Kill()
-	case <-processDone:
-		t.Logger.Info("%s process stopped gracefully", processName)
+	case err := <-processDone:
 		shutdownTimeout.Stop()
+		if err != nil {
+			if exitErr, ok := err.(*exec.ExitError); ok && exitErr.ExitCode() != 0 {
+				t.Logger.Error("%s shutdown was incomplete (exit code %d), some nodes may not have been stopped cleanly", processName, exitErr.ExitCode())
+			}
+		} else {
+			t.Logger.Info("%s process stopped gracefully", processName)
+		}
 	}
 }
 

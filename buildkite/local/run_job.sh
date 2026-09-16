@@ -177,7 +177,7 @@ Options:
   --step KEY         Run only the step matching this key (substring match)
   --start-from KEY   Start execution from this step (skip all previous steps)
   --build-id ID      Reuse a specific BUILDKITE_BUILD_ID (for resuming/debugging)
-  --sync-filter PFX  Only sync files matching prefix (e.g. "debians/bullseye/mina-devnet")
+  --sync-filter PFX  Only sync files matching prefix (e.g. "debians/bookworm/mina-devnet")
   --commit HASH      Override git commit hash (sets OVERRIDE_GITHASH for version strings)
   --env-file FILE    File with KEY=VALUE pairs passed to all commands (including Docker)
   --list             List available job names and exit
@@ -194,7 +194,7 @@ Examples:
   $(basename "$0") --skip-dump --jobs-dir /tmp/pipelines --step "build-deb" RosettaDevnetConnect
   $(basename "$0") --start-from "upload-ledger" RosettaDevnetConnect
   $(basename "$0") --build-id abc123-def456 --start-from "step-3" MyJob  # Resume from specific build
-  $(basename "$0") --sync-filter "debians/bullseye/mina-config" MyJob   # Sync only matching files
+  $(basename "$0") --sync-filter "debians/bookworm/mina-config" MyJob   # Sync only matching files
 EOF
 }
 
@@ -287,7 +287,6 @@ setup_environment() {
   # --- Static CI constants ---
   export BUILDKITE="${BUILDKITE:-true}"
   export CI="${CI:-true}"
-  export GIT_LFS_SKIP_SMUDGE=1
   export SKIP_DOCKER_PRUNE=1
   export BUILDKIT_PROGRESS="${BUILDKIT_PROGRESS:-plain}"
   export BUILDKITE_COMMIT_RESOLVED="${BUILDKITE_COMMIT_RESOLVED:-true}"
@@ -402,9 +401,9 @@ sync_legacy_cache() {
   # Build rsync filter flags: include only files matching the prefix
   local filter_flags=()
   if [[ -n "$SYNC_FILTER" ]]; then
-    # For a filter like "debians/bullseye/mina-devnet" we need:
-    #   --include 'debians/' --include 'debians/bullseye/'
-    #   --include 'debians/bullseye/mina-devnet*' --exclude '*'
+    # For a filter like "debians/bookworm/mina-devnet" we need:
+    #   --include 'debians/' --include 'debians/bookworm/'
+    #   --include 'debians/bookworm/mina-devnet*' --exclude '*'
     local filter_dir filter_base
     filter_dir=$(dirname "$SYNC_FILTER")
     filter_base=$(basename "$SYNC_FILTER")
@@ -500,7 +499,7 @@ patch_docker_command() {
   # Note: We intentionally do NOT use --user flag. The container runs as opam
   # (UID 1000) which typically matches the host user's UID, allowing sudo to
   # work inside the container for apt operations.
-  local docker_flags="--env GIT_LFS_SKIP_SMUDGE=1 --env APTLY_ROOT=/tmp/aptly --env LOCAL_BK_RUN=${LOCAL_BK_RUN}${USER_ENV_DOCKER_FLAGS}"
+  local docker_flags="--env APTLY_ROOT=/tmp/aptly --env LOCAL_BK_RUN=${LOCAL_BK_RUN}${USER_ENV_DOCKER_FLAGS}"
   [[ -n "${OVERRIDE_GITHASH:-}" ]] && docker_flags+=" --env OVERRIDE_GITHASH=${OVERRIDE_GITHASH}"
   cmd=$(printf '%s\n' "$cmd" | sed "s|docker run -it|docker run -it ${docker_flags}|g")
 

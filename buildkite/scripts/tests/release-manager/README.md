@@ -29,23 +29,43 @@ The test suite includes the following test cases:
 
 ### Test Configuration
 
-The tests use the following configuration:
+Both Debian repositories are **mocked**. `mock-repo.sh` starts a MinIO container
+for the duration of the run, creates the two buckets in it, and seeds them with
+fixture packages it builds itself. Nothing outside the run is read or written,
+so the tests need no AWS account, no live bucket, and no production signing key.
+
+The mock is reached in two ways at once:
+
+| Reader | Address | Why |
+|---|---|---|
+| `deb-s3`, `aws`, the test scripts | `http://127.0.0.1:<ephemeral>` | They run on the agent and use the published port. |
+| `apt` inside a verification container | `http://mina-release-mock-repo-<pid>:9000` | It is a sibling container on the mock's docker network. |
+
+The port is chosen by docker at run time, so parallel agents never collide.
 
 **Unsigned Repository:**
-- **Test Bucket**: `test.packages.o1test.net`
-- **Test Region**: `us-west-2`
-- **Test Codename**: `bullseye`
+- **Test Bucket**: `test-packages` (in the mock)
+- **Test Region**: `us-west-2` (claimed, not used - MinIO ignores it)
+- **Test Codename**: `bookworm`
 - **Test Component (CI)**: `ci`
 - **Test Component (Promote Target)**: `test`
 - **Test Architecture**: `amd64`
 
 **Signed Repository:**
-- **Test Bucket**: `signed.test.packages.o1test.net`
-- **Test Region**: `us-west-2`
-- **Test Codename**: `bullseye`
-- **Test Component**: `ci`
-- **Signing Key**: `386E9DAC378726A48ED5CE56ADB30D9ACE02F414`
-- **Test Architecture**: `amd64`
+- **Test Bucket**: `signed-test-packages` (in the mock)
+- **Test Codename**: `bookworm`
+- **Test Component**: `test`
+- **Signing Key**: generated per run, discarded at the end
+- **Test Architecture**: `arm64`
+
+**Why the repository is served over plain HTTP**
+
+The retired buckets were served over HTTPS. A base image without a trust store
+therefore failed with `Certificate verification failed: The certificate is NOT
+trusted`, whatever the real cause was. Over HTTP the verification container
+needs no `ca-certificates` and, for an unsigned repository, contacts the Debian
+archive not at all. See `scripts/debian/verify-inside-docker/setup.sh`, which
+now installs only the packages the repository URL actually requires.
 
 **Docker Configuration:**
 - **Source Registry**: Docker Hub (`minaprotocol`)
@@ -64,12 +84,24 @@ The tests use the following configuration:
 
 **Debian Packages:**
 
-The test suite expects the following packages to be available in the test repository:
+`mock-repo.sh` builds these with `dpkg-deb` at the start of every run and seeds
+them into the `bookworm/ci` component. Nothing has to be uploaded by hand.
 
-1. `mina-devnet_3.3.0-alpha1-compatible-918b8c0_amd64.deb`
-2. `mina-logproc_3.3.0-beta1-dkijania-berkeley-automode-05a597d_amd64.deb`
+| Package | Version | Arch | Repository |
+|---|---|---|---|
+| `mina-devnet` | `3.3.0-alpha1-compatible-918b8c0` | amd64 | unsigned |
+| `mina-logproc` | `3.3.0-beta1-dkijania-berkeley-automode-05a597d` | amd64 | unsigned |
+| `mina-archive-devnet` | `3.3.0-8c0c2e6` | arm64 | signed |
 
-These packages should be uploaded to the `test.packages.o1test.net` bucket in the `bullseye/ci` component.
+Each fixture is about 1 KB, against 260 MB for the real packages they replace.
+They contain no Mina code, but they are not empty shells: the daemon-shaped
+fixture ships a stub `mina` binary that reports a commit hash and a matching
+`/var/lib/coda/config_<hash>.json`, which is exactly the pair that
+`scripts/verify/check-daemon.sh` compares. That check therefore runs for real.
+
+The limit of the approach: the fixtures declare no dependencies, so the tests do
+not exercise dependency resolution or any real Mina binary. They test the
+release manager, not the packages.
 
 **Docker Images:**
 
@@ -99,25 +131,26 @@ Before running the tests, ensure you have the following installed:
    pip install awscli
    ```
 
-3. **AWS Credentials**: Set up AWS credentials with access to the test buckets
+3. **Docker** (required): runs the mock repository and every verification
+   container.
    ```bash
-   export AWS_ACCESS_KEY_ID="your-access-key"
-   export AWS_SECRET_ACCESS_KEY="your-secret-key"
-   export AWS_DEFAULT_REGION="us-west-2"
+   # On Ubuntu/Debian:
+   sudo apt-get update && sudo apt-get install docker.io
+   docker ps
    ```
 
-4. **GPG Key** (optional, for signed repository non-dry-run tests): Import the Debian signing key
+4. **dpkg-deb, gpg, curl** (required): build the fixture packages, make the
+   throwaway signing key, and poll the mock for readiness.
    ```bash
-   # Import from Google Cloud Secret Manager (if available)
-   gcloud secrets versions access latest --secret="o1labsDebianRepoKey" | gpg --import
-
-   # Verify key is imported (should show key 386E9DAC378726A48ED5CE56ADB30D9ACE02F414)
-   gpg --list-secret-keys
+   sudo apt-get install dpkg-dev gnupg curl
    ```
 
-   Note: Signed repository tests will skip non-dry-run operations if the GPG key is not available.
+   **No AWS credentials are needed.** `mock_repo_start` sets its own against
+   MinIO. **No production signing key is needed** either: the signed repository
+   is signed with a key generated for the run and deleted afterwards.
 
-5. **Docker** (optional, for Docker promotion tests):
+5. **Docker Hub / Google Cloud SDK** (optional, for the Docker promotion test
+   only - it is the one test that still uses real registries):
    ```bash
    # Install Docker
    # On Ubuntu/Debian:
@@ -163,18 +196,22 @@ The test script will output:
 Example:
 ```
 [INFO] Starting Release Manager Test Suite
-[INFO] Test bucket (unsigned): test.packages.o1test.net
-[INFO] Test bucket (signed): signed.test.packages.o1test.net
+[INFO] Test bucket (unsigned): test-packages
+[INFO] Test bucket (signed): signed-test-packages
 [INFO] Test region: us-west-2
-[INFO] Test codename: bullseye
+[INFO] Test codename: bookworm
 [INFO] Random suffix: test-1736789012-12345
+[mock-repo] starting MinIO container mina-release-mock-repo-141860
+[mock-repo] MinIO healthy at http://127.0.0.1:32768
+[mock-repo] signing key A5C5017843D320100901B293E53DE1B629F63C3D
+[mock-repo] seeded bookworm/ci
 ...
 [INFO] ✅ TEST PASSED: List packages in test repository
 [INFO] ✅ TEST PASSED: mina-devnet test package exists
 [INFO] ✅ TEST PASSED: Manager verify command dry-run
 [INFO] Using random target version: 3.3.0-alpha1-test-1736789012-12345
 [INFO] ✅ TEST PASSED: Manager promote command (unsigned, dry-run)
-[INFO] Using signing key: 386E9DAC378726A48ED5CE56ADB30D9ACE02F414
+[INFO] Using signing key: A5C5017843D320100901B293E53DE1B629F63C3D
 [INFO] ✅ TEST PASSED: Manager promote command (signed, dry-run)
 [INFO] ✅ TEST PASSED: Manager publish command (signed, dry-run)
 
@@ -235,87 +272,73 @@ The test is automatically run in CI when changes are detected in:
 
 ### Environment Variables
 
-The CI job requires the following environment variables:
-- `AWS_ACCESS_KEY_ID`: AWS access key for S3 operations
-- `AWS_SECRET_ACCESS_KEY`: AWS secret key for S3 operations
-- `AWS_DEFAULT_REGION`: AWS region (set to `us-west-2`)
+The Debian tests need none. The mock sets its own credentials and exports the
+variables the release scripts read:
+
+| Variable | Set by | Meaning |
+|---|---|---|
+| `DEB_S3_ENDPOINT` | `mock_repo_start` | Redirects every `deb-s3` call at the mock. Unset in production, where the arguments are exactly what they were before. |
+| `DEB_S3_REGION` | `mock_repo_start` | Region claimed in those calls (default `us-west-2`). |
+| `MINA_VERIFY_DOCKER_NETWORK` | `mock_repo_start` | Docker network that `scripts/debian/verify.sh` attaches its containers to. |
+
+`DEB_S3_ENDPOINT` is honoured by `scripts/debian/deb-s3-common.sh`, which both
+`manager.sh` and `scripts/debian/publish.sh` source. It is the only hook the
+production code needed for this; when it is unset, behaviour is unchanged.
+
+The Docker promotion test still needs a Docker Hub pull and a `gcloud`
+authentication, and skips itself when they are absent.
 
 ## Test Repository Setup
 
-### Creating Test Packages
+There is none to do. `mock_repo_start` (in `mock-repo.sh`) performs the whole
+setup at the start of every run and `mock_repo_stop` removes it afterwards,
+from the `EXIT` trap, so an interrupted run cleans up too:
 
-If you need to recreate or update the test packages:
+1. Create a docker network and start MinIO on an ephemeral loopback port.
+2. Wait for `/minio/health/live`, for at most 60 seconds.
+3. Create `test-packages` and `signed-test-packages`, each with an anonymous
+   read policy so that `apt` can fetch without credentials.
+4. Generate the throwaway signing key and upload its public half to
+   `signed-test-packages/repo-signing-key.gpg`, which is where
+   `setup.sh` looks for it.
+5. Build the fixture packages and upload them into `bookworm/ci`, signing the
+   ones that go to the signed repository.
 
-1. **Build or obtain test Debian packages**:
-   ```bash
-   # Example: Copy existing packages for testing
-   cp _build/mina-devnet_*.deb /tmp/test-packages/
-   cp _build/mina-logproc_*.deb /tmp/test-packages/
-   ```
+### Inspecting the mock while a test runs
 
-2. **Upload to test repository**:
-   ```bash
-   deb-s3 upload \
-     --bucket test.packages.o1test.net \
-     --s3-region us-west-2 \
-     --codename bullseye \
-     --component ci \
-     --arch amd64 \
-     /tmp/test-packages/*.deb
-   ```
-
-### Listing Test Packages
-
-To see what packages are in the test repository:
+The container name is `mina-release-mock-repo-<pid>`. To look inside it from
+another shell during a run:
 
 ```bash
+export AWS_ACCESS_KEY_ID=minioadmin AWS_SECRET_ACCESS_KEY=minioadmin
+ENDPOINT="http://127.0.0.1:$(docker port mina-release-mock-repo-<pid> 9000/tcp | head -1 | sed 's/.*://')"
+
+aws --endpoint-url "$ENDPOINT" s3 ls s3://test-packages/dists/bookworm/
+
 deb-s3 list \
-  --bucket test.packages.o1test.net \
+  --bucket test-packages \
+  --endpoint "$ENDPOINT" \
+  --force-path-style \
   --s3-region us-west-2 \
-  --codename bullseye \
+  --codename bookworm \
   --component ci \
   --arch amd64
 ```
 
-### Cleaning Up Test Packages
+### Adding a fixture package
 
-If you need to remove test packages:
+Add a call to `_mock_repo_build_deb` in `mock_repo_start`, then upload it with
+`_mock_repo_deb_s3 upload`. `_mock_repo_build_deb` decides the payload from the
+package name: `mina-logproc` gets a marker binary, `mina-archive*` gets a stub
+archive binary, and anything else is treated as daemon-shaped and gets the stub
+`mina` plus its matching genesis config.
 
-```bash
-# Note: deb-s3 doesn't have a direct delete command
-# Use AWS CLI to remove files from S3 bucket
-aws s3 rm s3://test.packages.o1test.net/pool/... --recursive
-```
+### Pointing the tests at a real repository
 
-### Setting Up Signed Test Repository
-
-The tests also use a signed repository at `signed.test.packages.o1test.net`. To set this up:
-
-1. **Create the S3 bucket** (if not exists):
-   ```bash
-   aws s3 mb s3://signed.test.packages.o1test.net --region us-west-2
-   ```
-
-2. **Upload test packages with signing**:
-   ```bash
-   deb-s3 upload \
-     --bucket signed.test.packages.o1test.net \
-     --s3-region us-west-2 \
-     --codename bullseye \
-     --component ci \
-     --arch amd64 \
-     --sign 386E9DAC378726A48ED5CE56ADB30D9ACE02F414 \
-     /tmp/test-packages/*.deb
-   ```
-
-3. **Verify signed repository**:
-   ```bash
-   deb-s3 list \
-     --bucket signed.test.packages.o1test.net \
-     --s3-region us-west-2 \
-     --codename bullseye \
-     --component ci
-   ```
+Set `DEB_S3_ENDPOINT` yourself before the suite runs and the release scripts
+will use it instead. Leaving it unset makes them talk to AWS, which is what
+production does. Note that the test scripts themselves still address the bucket
+names in `lib.sh`, so a real run needs those changed as well.
 
 ## Extending the Tests
 
@@ -356,20 +379,24 @@ The test script provides several helper functions:
 - `log_error <message>`: Log error message in red
 - `log_warn <message>`: Log warning message in yellow
 - `assert_success <test_name> <exit_code>`: Assert command succeeded (exit_code=0)
-- `assert_package_exists <test_name> <package> <version> <codename> <component>`: Assert package exists in repository
+- `assert_package_exists <test_name> <package> <version> <codename> <component> <bucket> <arch>`: Assert package exists in repository
 
 ## Safety Features
 
 The test suite is designed with safety in mind:
 
-1. **Test Repositories**: Uses dedicated test repositories, not production
-   - `test.packages.o1test.net` for unsigned packages
-   - `signed.test.packages.o1test.net` for signed packages
-   - `europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo` for Docker images
+1. **Mocked Repositories**: The Debian tests cannot reach any real repository.
+   Both buckets live in a MinIO container that exists only for the run, so a
+   mistake in the release manager cannot damage a published repository, and a
+   test cannot be broken by one.
+   - `test-packages` for unsigned packages (in the mock)
+   - `signed-test-packages` for signed packages (in the mock)
+   - `europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo` for Docker
+     images - this one **is** a real registry, used by the Docker promotion
+     test only
 2. **Random Suffixes**: All promote operations use unique random suffixes to avoid conflicts
 3. **Dry-run Tests First**: Tests run dry-run operations before non-dry-run ones
 4. **Graceful Skipping**: Tests automatically skip if required tools are not available:
-   - Signed promote tests skip if GPG key is not imported
    - Docker tests skip if Docker is not installed
    - GCP tests skip if gcloud is not authenticated
 5. **Isolated Environment**: Uses temporary directory for test artifacts
@@ -384,14 +411,29 @@ The test suite is designed with safety in mind:
 1. **"deb-s3 not found"**:
    - Solution: Install deb-s3 with `gem install deb-s3`
 
-2. **"AWS credentials not set"**:
-   - Solution: Set `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` environment variables
+2. **"MinIO did not become healthy within 60s"**:
+   - The mock repository failed to start. The container logs are printed after
+     the message.
+   - Check that docker can pull
+     `quay.io/minio/minio:RELEASE.2025-02-28T09-55-16Z`, or point
+     `MOCK_REPO_IMAGE` at a mirror.
+   - The image comes from **quay.io, not Docker Hub**. MinIO no longer
+     publishes a publicly pullable `minio/minio` on Docker Hub, so an agent
+     without Docker Hub credentials fails with `pull access denied ... may
+     require 'docker login'`.
 
 3. **"Package not found" errors**:
-   - Solution: Verify test packages exist in the test repository
-   - Run: `deb-s3 list --bucket test.packages.o1test.net --s3-region us-west-2 --codename bullseye --component ci`
+   - The fixture seeding failed, or a test asked for a version the mock was
+     never seeded with.
+   - See **Inspecting the mock while a test runs** above to list what is
+     actually there.
 
-4. **"Manager script not found"**:
+4. **"Certificate verification failed" from apt**:
+   - This should no longer be possible for the mock, which is plain HTTP. If it
+     appears, the repository URL reaching `setup.sh` has a `https://` scheme,
+     so check what `TEST_BUCKET_EXTERNAL_URL` was set to.
+
+5. **"Manager script not found"**:
    - Solution: Ensure you're running the test from the repository root or the script can find the manager
    - Check path: `buildkite/scripts/release/manager.sh`
 
@@ -453,8 +495,13 @@ Potential enhancements for the test suite:
    - Currently using direct docker commands
    - Could test manager.sh Docker promotion features
 9. **Multiple Codename Tests**: Test promotion across different Debian codenames
-   - Currently focused on bullseye
-   - Could test focal, noble, jammy, bookworm
+   - Currently focused on bookworm
+   - Could test focal, noble, jammy, bullseye. The mock makes this cheap: the
+     codename is only a path inside MinIO, and the verification container image
+     follows from it.
+10. **Dependency resolution**: The fixture packages declare no dependencies, so
+    nothing tests that a published package can actually be satisfied. A fixture
+    with a `Depends:` line on a real distribution package would cover it.
 
 ## Contributing
 

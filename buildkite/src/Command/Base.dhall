@@ -132,7 +132,6 @@ let targetToAgent =
             , QA = toMap { qa = "true" }
             , Perf = toMap { performance = "true" }
             , Multi = toMap { generic_multi = "true" }
-            , Arm64 = toMap { arm64_static = "true" }
             }
             target
 

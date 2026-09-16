@@ -352,7 +352,6 @@ func main() {
 		"CODENAMES_CONFIG":                   resolvedCodenamesConfig,
 		"NETWORK":                            *network,
 		"REPO":                               *repo,
-		"GIT_LFS_SKIP_SMUDGE":               "1",
 		"MINA_LEDGER_S3_BUCKET":             *ledgerBucket,
 		"VERSION":                            *version,
 		"CONFIG_JSON_GZ_URL":                resolvedConfigURL,
@@ -360,7 +359,6 @@ func main() {
 		"PRECOMPUTED_FORK_BLOCK_PREFIX":     *precomputedPrefix,
 		"USE_ARTIFACTS_FROM_BUILDKITE_BUILD": *useArtifactsFrom,
 		"USE_GENERIC_DOCKERS_FROM_VERSION":   "",
-		"HARDFORK_GENESIS_SLOT_DELTA":        "",
 	}
 
 	// Print configuration

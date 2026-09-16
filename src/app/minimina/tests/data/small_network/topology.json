@@ -1,0 +1,46 @@
+{
+  "receiver": {
+    "pk": "B62qmabsxin5ukW6E1UJXhTx1wKn6WurScBRjPs42Z6mriP7FKhvWmy",
+    "sk": "EKFFrQVB9tmtHVxAGBqvZYUy9Wm2e5ERwNh4dgZpjyLsT6nfpmPS",
+    "privkey_path": "./tests/data/small_network/block_producer_keys/receiver.json",
+    "role": "Block_producer",
+    "docker_image": "gcr.io/o1labs-192920/mina-daemon:2.0.0berkeley-rc1-1551e2f-bullseye-berkeley",
+    "git_build": null,
+    "libp2p_pass": "naughty blue worm",
+    "libp2p_keyfile": "./tests/data/small_network/libp2p_keys/receiver.json",
+    "libp2p_keypair": {
+      "box_primitive": "xsalsa20poly1305",
+      "pw_primitive": "argon2i",
+      "nonce": "7k8rgRbRLaFLoDEQUc1Fx1RXbK3XRUscs2FdZaG",
+      "pwsalt": "BTMRm2WJ1QAN1wpYMXznspujvpE4",
+      "pwdiff": [
+        134217728,
+        6
+      ],
+      "ciphertext": "8CPahZRVNk42dJ4xf5ifBeZckeoskTDHydPatdh8uS6jKH5maHvPUnjbYSMZm5kaT6He5vQVkCy82YpWopMksrGvK9DaGdsTt6iBQyDBQBzSRzVMSQcFnD7RjdR5a7yBkqjebTFZK9imfUfsV1TUTCSR4H3V6y2dxLGpC7bmxy6NNNA1XanVi3YWgwKLyj3FwAXDZ3RTWZvrLNk3PhodkuzrUeT8pbpPjvmNDQEwRmhBHDs5Bs8sX4uBPsrpf5JriD6CHqZK1RSnksdVYJJpnqGUGPsqkcnhgZoDr"
+    },
+    "libp2p_peerid": "12D3KooWLrGMoFa7wVsg5pLGxiENMcPm7macqEVmb1trjiUnjKsV"
+  },
+  "seed-0": {
+    "pk": "B62qjsFXPCKWseqopuLs1q1fkvuAphbLWmGfn5WLV7DfnNr9mxWN7oe",
+    "sk": "EKDyUS6K9wkVGiYrvJhtZHSMjeW4JEMiWCXGNco4ZEkbMN9qSeQk",
+    "privkey_path": null,
+    "role": "Seed_node",
+    "docker_image": "gcr.io/o1labs-192920/mina-daemon:2.0.0berkeley-rc1-1551e2f-bullseye-berkeley",
+    "git_build": null,
+    "libp2p_pass": "naughty blue worm",
+    "libp2p_keyfile": "./tests/data/small_network/libp2p_keys/seed-0.json",
+    "libp2p_keypair": {
+      "box_primitive": "xsalsa20poly1305",
+      "pw_primitive": "argon2i",
+      "nonce": "8XXAh3zkvxL5txVyYTvLSRRw65ufFxRLagbXzxv",
+      "pwsalt": "BKHpmPcLun4N2GEsCkEYiNhr6aHL",
+      "pwdiff": [
+        134217728,
+        6
+      ],
+      "ciphertext": "9Fbj5DiYYy24bVSVSCHfDQL4bScKVe5kXGJywpCgTRdszt4MkHhPvuyJNDAxvc2iNAi5os5tsZa9sMqRTih9Q1oGRQuAEdWQXo9Yg2tpHjqxACj1D9vBBSERNPbQb69ykfwDCZNKdEby9fFsiLjzqmr38gQiZK4frY9UhjisaWVD7zSB68qhPyugM2BzVawL6KgZ6faXpzDHMzK1psBxsuRRSnP5SmqX87B2DfHbg5Dq1M8MHS9MLrLYxUmuuV6jRtbFt94A4WkFeZX2DxdtyRVPQ2GF6TWk1PAu3"
+    },
+    "libp2p_peerid": "12D3KooWE9mzv3PRfz2ALZnq2xH1sg2S4xGJYnRV5TnuRH5igy6h"
+  }
+}

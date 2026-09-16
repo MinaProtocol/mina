@@ -76,7 +76,7 @@ let ReleaseSpec =
           , repo = "\\\${BUILDKITE_REPO}"
           , deb_install_mode = DebianInstallMode.ThroughLocalRepo
           , deb_root_folder = "\\\${BUILDKITE_BUILD_ID}"
-          , deb_codename = DebianVersions.DebVersion.Bullseye
+          , deb_codename = DebianVersions.DebVersion.Bookworm
           , deb_release = "unstable"
           , deb_version = "\\\${MINA_DEB_VERSION}"
           , deb_legacy_version = "3.1.1-alpha1-compatible-14a8b92"
@@ -115,6 +115,8 @@ let generateStep =
       ->  let exportMinaDebCmd =
                 "export MINA_DEB_CODENAME=${DebianVersions.lowerName
                                               spec.deb_codename}"
+
+          let exportBranchNameCmd = "export BRANCH_NAME=${spec.branch}"
 
           let maybeCacheOption = if spec.no_cache then "--no-cache" else ""
 
@@ -165,6 +167,7 @@ let generateStep =
                   , DaemonAppsOnly = ""
                   , DaemonPrefork = ""
                   , DaemonAutoHardfork = ""
+                  , DaemonAutomode = ""
                   , LogProc = ""
                   , Archive = ""
                   , TestExecutive = ""
@@ -212,19 +215,7 @@ let generateStep =
 
           let pruneDockerImages =
                     "if [ -z \"\\\${SKIP_DOCKER_PRUNE:-}\" ]; then "
-                ++  "docker system prune --all --force "
-                ++  merge
-                      { Arm64 = ""
-                      , XLarge = "--filter until=24h"
-                      , Large = "--filter until=24h"
-                      , Medium = "--filter until=24h"
-                      , Small = "--filter until=24h"
-                      , Integration = "--filter until=24h"
-                      , QA = "--filter until=24h"
-                      , Multi = "--filter until=24h"
-                      , Perf = "--filter until=24h"
-                      }
-                      spec.size
+                ++  "docker system prune --all --force --filter until=24h"
                 ++  "; else echo 'Skipping docker prune due to SKIP_DOCKER_PRUNE'; fi"
 
           let loadOnlyArg =
@@ -264,6 +255,8 @@ let generateStep =
           let remoteRepoCmds =
                 [ Cmd.run
                     (     exportMinaDebCmd
+                      ++  " && "
+                      ++  exportBranchNameCmd
                       ++  " && source ./buildkite/scripts/export-git-env-vars.sh "
                       ++  " && "
                       ++  buildDockerCmd
@@ -280,6 +273,8 @@ let generateStep =
                     [ Cmd.run
                         (     exportMinaDebCmd
                           ++  " && "
+                          ++  exportBranchNameCmd
+                          ++  " && "
                           ++  pruneDockerImages
                           ++  maybeStartDebianRepo
                           ++  " && source ./buildkite/scripts/export-git-env-vars.sh "
@@ -293,7 +288,7 @@ let generateStep =
                   spec.deb_repo
 
           let target =
-                merge { Arm64 = Size.Arm64, Amd64 = Size.XLarge } spec.arch
+                merge { Arm64 = Size.XLarge, Amd64 = Size.XLarge } spec.arch
 
           in  Command.build
                 Command.Config::{
