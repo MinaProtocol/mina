@@ -6,14 +6,15 @@ open Snark_params.Tick
 open Let_syntax
 open Currency
 
-(* A pending coinbase is basically a Merkle tree of "stacks", each of which contains two hashes. The first hash
-   is computed from the components in the coinbase via a "push" operation. The second hash, a protocol
-   state hash, is computed from the state *body* hash in the coinbase.
-   The "add_coinbase" operation takes a coinbase, retrieves the latest stack, or creates a new one, and does
-   a push.
+(* A pending coinbase is basically a Merkle tree of "stacks", each of which
+   contains two hashes. The first hash is computed from the components in the
+   coinbase via a "push" operation. The second hash, a protocol state hash, is
+   computed from the state *body* hash in the coinbase.
+   The "add_coinbase" operation takes a coinbase, retrieves the latest stack, or
+   creates a new one, and does a push.
 
-   A pending coinbase also contains a stack id, used to determine the chronology of stacks, so we can know
-   which is the oldest, and which is the newest stack.
+   A pending coinbase also contains a stack id, used to determine the chronology
+   of stacks, so we can know which is the oldest, and which is the newest stack.
 
    The name "stack" here is a misnomer: see issue #3226
 *)
@@ -677,10 +678,14 @@ module Make_str (A : Wire_types.Concrete) = struct
           || Coinbase_stack.(equal empty second.Poly.data)
         in
         let state_stack_connected =
-          (*1. same as old stack or
-            2. new stack initialized with the stack state of last block. Not possible to know this unless we track all the stack states because they are updated once per block (init=curr)
-            3. [second] could be a new stack initialized with the latest state of [first] or
-            4. [second] starts from the previous state of [first]. This is not available in either [first] or [second] *)
+          (* 1. same as old stack or
+             2. new stack initialized with the stack state of last block. Not
+                possible to know this unless we track all the stack states because
+                they are updated once per block (init=curr)
+             3. [second] could be a new stack initialized with the latest state
+                of [first] or
+             4. [second] starts from the previous state of [first]. This is not
+                available in either [first] or [second] *)
           equal_state_hash first second
           || Stack_hash.equal second.state.init second.state.curr
           || Stack_hash.equal first.state.curr second.state.curr
@@ -745,7 +750,8 @@ module Make_str (A : Wire_types.Concrete) = struct
     end
 
     module Hash = struct
-      (* the type below triggers the ppx derivers to insert unused `rec` flags, so we ignore such warnings *)
+      (* the type below triggers the ppx derivers to insert unused `rec` flags,
+         so we ignore such warnings *)
       [@@@warning "-39"]
 
       type t = Hash_builder.t constraint t = Hash_versioned.t

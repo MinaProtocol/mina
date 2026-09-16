@@ -50,8 +50,11 @@ let genesis_state_body =
     let open Staged_ledger_diff in
     (*not using Precomputed_values.for_unit_test because of dependency cycle*)
     Mina_state.Genesis_protocol_state.t
-      ~genesis_ledger:Genesis_ledger.(Packed.t for_unit_tests)
-      ~genesis_epoch_data:Consensus.Genesis_epoch_data.for_unit_tests
+      ~genesis_ledger:
+        (Consensus.Genesis_data.Ledger.to_hashed Genesis_ledger.for_unit_tests)
+      ~genesis_epoch_data:
+        (Consensus.Genesis_data.Epoch.to_hashed
+           Consensus.Genesis_data.Epoch.for_unit_tests )
       ~constraint_constants ~consensus_constants ~genesis_body_reference
   in
   compile_time_genesis.data |> Mina_state.Protocol_state.body
@@ -538,7 +541,7 @@ let check_balance pk balance ledger =
 
 (** Test legacy transactions*)
 let test_transaction_union ?expected_failure ?txn_global_slot ledger txn =
-  let signature_kind = Mina_signature_kind.t_DEPRECATED in
+  let signature_kind = Mina_signature_kind.Testnet in
   let open Mina_transaction in
   let to_preunion (t : Transaction.t) =
     match t with

@@ -20,18 +20,21 @@ let Network = ../../Constants/Network.dhall
 
 let RunWithPostgres = ../../Command/RunWithPostgres.dhall
 
-let network = Network.Type.Berkeley
+let network = Network.Type.Devnet
 
 let dirtyWhen =
       [ S.strictlyStart (S.contains "src")
       , S.exactly "buildkite/src/Jobs/Test/RosettaIntegrationTests" "dhall"
-      , S.exactly "buildkite/scripts/rosetta-integration-tests" "sh"
-      , S.exactly "buildkite/scripts/rosetta-integration-tests-fast" "sh"
+      , S.exactly "buildkite/scripts/tests/rosetta-integration-tests" "sh"
+      , S.exactly "dockerfiles/Dockerfile-mina-rosetta" ""
       ]
 
 let rosettaDocker =
       Artifacts.fullDockerTag
-        Artifacts.Tag::{ artifact = Artifacts.Type.Rosetta, network = network }
+        Artifacts.Tag::{
+        , artifact = Artifacts.Type.RosettaAppsOnly
+        , network = network
+        }
 
 in  Pipeline.build
       Pipeline.Config::{
@@ -43,6 +46,7 @@ in  Pipeline.build
           [ PipelineTag.Type.Long
           , PipelineTag.Type.Test
           , PipelineTag.Type.Stable
+          , PipelineTag.Type.Rosetta
           ]
         }
       , steps =
@@ -50,24 +54,29 @@ in  Pipeline.build
             Command.Config::{
             , commands =
               [ Cmd.run
-                  "export MINA_DEB_CODENAME=bullseye && source ./buildkite/scripts/export-git-env-vars.sh && echo \\\${MINA_DOCKER_TAG}"
+                  "export MINA_DEB_CODENAME=bookworm && source ./buildkite/scripts/export-git-env-vars.sh && echo \\\${MINA_DOCKER_TAG}"
               , RunWithPostgres.runInDockerWithPostgresConn
                   ([] : List Text)
-                  "./src/test/archive/sample_db/archive_db.sql"
+                  ( Some
+                      ( RunWithPostgres.ScriptOrArchive.Script
+                          "./src/test/archive/sample_db/archive_db.sql"
+                      )
+                  )
                   rosettaDocker
                   "./buildkite/scripts/rosetta-indexer-test.sh"
               , Cmd.runInDocker
                   Cmd.Docker::{ image = rosettaDocker }
-                  "buildkite/scripts/rosetta-integration-tests-fast.sh"
+                  "buildkite/scripts/tests/rosetta-integration-tests.sh"
               ]
-            , label = "Rosetta integration tests Bullseye"
-            , key = "rosetta-integration-tests-bullseye"
+            , label = "Rosetta integration tests Bookworm"
+            , key = "rosetta-integration-tests-bookworm"
             , target = Size.Small
+            , artifact_paths = [ S.contains "test_output/artifacts/*" ]
             , depends_on =
                 Dockers.dependsOn
                   Dockers.DepsSpec::{
-                  , codename = Dockers.Type.Bullseye
-                  , artifact = Artifacts.Type.Rosetta
+                  , codename = Dockers.Type.Bookworm
+                  , artifact = Artifacts.Type.RosettaAppsOnly
                   , network = network
                   }
             }

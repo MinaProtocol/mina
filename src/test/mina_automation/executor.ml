@@ -33,9 +33,6 @@ let logger = Logger.create ()
 module Make_PathFinder (P : AppPaths) = struct
   module Paths = P
 
-  let paths =
-    Option.value_map ~f:(String.split ~on:':') ~default:[] (Sys.getenv "PATH")
-
   let built_name = Printf.sprintf "_build/default/%s" P.dune_name
 
   let exists_at_path path prefix =
@@ -51,7 +48,7 @@ module Make_PathFinder (P : AppPaths) = struct
         Deferred.return (Some built_name)
     | _ -> (
         match%bind
-          Deferred.List.find_map ~f:(exists_at_path P.official_name) paths
+          Deferred.List.find_map ~f:(exists_at_path P.official_name) Utils.paths
         with
         | Some _ ->
             Deferred.return (Some P.official_name)
@@ -128,12 +125,12 @@ module Make (P : AppPaths) = struct
     | AutoDetect -> (
         match%bind Sys.file_exists PathFinder.built_name with
         | `Yes ->
-            f_local ~args ~prefix:PathFinder.built_name ?env ()
+            f_local ~args ~prefix:"" ?env ()
         | _ -> (
             match%bind
               Deferred.List.find_map
                 ~f:(PathFinder.exists_at_path PathFinder.Paths.official_name)
-                PathFinder.paths
+                Utils.paths
             with
             | Some prefix ->
                 f_debian ~args ~prefix ?env ()
@@ -144,7 +141,7 @@ module Make (P : AppPaths) = struct
     | Debian ->
         f_debian ~args ~prefix:"" ?env ()
     | Local ->
-        f_local ~args ~prefix:PathFinder.built_name ?env ()
+        f_local ~args ~prefix:"" ?env ()
     | Docker ctx ->
         f_docker ~args ~ctx ()
 

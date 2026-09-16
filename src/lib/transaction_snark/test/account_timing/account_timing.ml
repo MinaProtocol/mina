@@ -1674,7 +1674,7 @@ let%test_module "account timing check" =
       in
       let zkapp_command, _, _, _ =
         ( Transaction_snark.For_tests.deploy_snapp ~constraint_constants
-            create_timed_account_spec
+            ~signature_kind create_timed_account_spec
         , timed_account_id
         , create_timed_account_spec.snapp_update
         , zkapp_keypair )
@@ -2269,7 +2269,7 @@ let%test_module "account timing check" =
       in
       let create_timed_account_zkapp_command, _, _, _ =
         ( Transaction_snark.For_tests.deploy_snapp ~no_auth:true
-            ~constraint_constants create_timed_account_spec
+            ~constraint_constants ~signature_kind create_timed_account_spec
         , timing_account_id
         , create_timed_account_spec.snapp_update
         , zkapp_keypair )

@@ -13,8 +13,15 @@
   stdio
   alcotest
   cmdliner
+  cohttp
+  cohttp-async
+  uri
+  yojson
   ;; mina libraries
-  init)
+  init
+  mina_automation
+  mina_automation.fixture
+  mina_automation.runner)
  (instrumentation
   (backend bisect_ppx))
  (preprocess

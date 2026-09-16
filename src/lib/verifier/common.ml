@@ -34,16 +34,19 @@ let invalid_to_error (invalid : invalid) : Error.t =
   | `Invalid_proof err ->
       Error.tag ~tag:"Invalid_proof" err
 
-let check_signed_command c =
-  let signature_kind = Mina_signature_kind.t_DEPRECATED in
-  if not (Signed_command.check_valid_keys c) then
-    Result.Error (`Invalid_keys (Signed_command.public_keys c))
-  else
-    match Signed_command.check_only_for_signature ~signature_kind c with
-    | Some _ ->
-        Result.Ok (`Assuming [])
-    | None ->
-        Result.Error (`Invalid_signature (Signed_command.public_keys c))
+let check_signed_command ~signature_kind c =
+  let public_keys = Signed_command.public_keys c in
+  let invalid_keys =
+    List.filter public_keys ~f:(fun pk ->
+        Option.is_none (Signature_lib.Public_key.decompress pk) )
+  in
+  match (invalid_keys, Signed_command.check_signature ~signature_kind c) with
+  | [], true ->
+      Result.Ok (`Assuming [])
+  | (_ :: _ as invalid_keys), _ ->
+      Error (`Invalid_keys invalid_keys)
+  | _, false ->
+      Error (`Invalid_signature (Signed_command.public_keys c))
 
 let collect_vk_assumption
     ( (p : (Account_update.Body.t, _ Control.Poly.t, _) Account_update.Poly.t)
@@ -79,9 +82,8 @@ let collect_vk_assumptions zkapp_command =
      .to_zkapp_command_with_hashes_list
   |> List.fold_result ~f:collect_vk_assumption' ~init:[]
 
-let check_signatures_of_zkapp_command (zkapp_command : _ Zkapp_command.Poly.t) :
-    (unit, invalid) Result.t =
-  let signature_kind = Mina_signature_kind.t_DEPRECATED in
+let check_signatures_of_zkapp_command ~signature_kind
+    (zkapp_command : _ Zkapp_command.Poly.t) : (unit, invalid) Result.t =
   let account_updates_hash =
     Zkapp_command.Call_forest.hash
       zkapp_command.Zkapp_command.Poly.account_updates
@@ -98,7 +100,6 @@ let check_signatures_of_zkapp_command (zkapp_command : _ Zkapp_command.Poly.t) :
            (Account_update.of_fee_payer fee_payer) )
   in
   let check_signature s pk msg =
-    let signature_kind = Mina_signature_kind.t_DEPRECATED in
     match Signature_lib.Public_key.decompress pk with
     | None ->
         Error (`Invalid_keys [ pk ])
@@ -132,17 +133,22 @@ let check_signatures_of_zkapp_command (zkapp_command : _ Zkapp_command.Poly.t) :
                (`Mismatched_authorization_kind
                  [ Account_id.public_key @@ Account_update.account_id p ] ) )
 
-let check : _ With_status.t -> ([ `Assuming of _ list ], invalid) Result.t =
-  function
+let check ~signature_kind (cmd : _ With_status.t) :
+    ([ `Assuming of _ list ], invalid) Result.t =
+  match cmd with
   | { With_status.data = User_command.Signed_command c; status = _ } ->
-      check_signed_command c
+      check_signed_command ~signature_kind c
   | { With_status.data = Zkapp_command verifiable; status = Failed _ } ->
       let command = Zkapp_command.of_verifiable verifiable in
-      let%map.Result () = check_signatures_of_zkapp_command command in
+      let%map.Result () =
+        check_signatures_of_zkapp_command ~signature_kind command
+      in
       `Assuming []
   | { With_status.data = Zkapp_command verifiable; status = Applied } ->
       let command = Zkapp_command.of_verifiable verifiable in
-      let%bind.Result () = check_signatures_of_zkapp_command command in
+      let%bind.Result () =
+        check_signatures_of_zkapp_command ~signature_kind command
+      in
       let%map.Result assuming = collect_vk_assumptions verifiable in
       `Assuming assuming
 

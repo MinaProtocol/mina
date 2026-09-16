@@ -34,12 +34,7 @@ in  Pipeline.build
         [ Command.build
             Command.Config::{
             , commands =
-                RunInToolchain.runInToolchain
-                  ([] : List Text)
-                  (     "sudo apt-get update"
-                    ++  " && sudo apt-get install shellcheck"
-                    ++  " && make check-bash "
-                  )
+                RunInToolchain.runInToolchain ([] : List Text) "make check-bash"
             , label = "Bash: shellcheck"
             , key = "check-bash"
             , target = Size.Multi

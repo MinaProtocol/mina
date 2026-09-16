@@ -105,7 +105,7 @@ module Sql = struct
       String.concat ~sep:"," fields
 
     let query_count_canonical_at_height =
-      Caqti_request.find Caqti_type.int64 Caqti_type.int64
+      Mina_caqti.find_req Caqti_type.int64 Caqti_type.int64
         {sql| SELECT COUNT(*) FROM blocks
               WHERE height = ?
               AND chain_status = 'canonical'
@@ -113,7 +113,7 @@ module Sql = struct
 
     let query_height_canonical =
       let c_fields = block_fields ~prefix:"c." () in
-      Caqti_request.find_opt Caqti_type.int64 typ
+      Mina_caqti.find_opt_req Caqti_type.int64 typ
         (* The archive database will only reconcile the canonical columns for
          * blocks older than k + epsilon
          *)
@@ -136,7 +136,7 @@ module Sql = struct
       let fields = block_fields () in
       let b_fields = block_fields ~prefix:"b." () in
       let c_fields = block_fields ~prefix:"c." () in
-      Caqti_request.find_opt Caqti_type.int64 typ
+      Mina_caqti.find_opt_req Caqti_type.int64 typ
         (* According to the clarification of the Rosetta spec here
          * https://community.rosetta-api.org/t/querying-block-by-just-its-index/84/3 ,
          * it is important to select only the block on the canonical chain for a
@@ -181,7 +181,7 @@ module Sql = struct
 
     let query_hash =
       let b_fields = block_fields ~prefix:"b." () in
-      Caqti_request.find_opt Caqti_type.string typ
+      Mina_caqti.find_opt_req Caqti_type.string typ
         [%string
           {|
          SELECT b.id,
@@ -198,8 +198,8 @@ module Sql = struct
 
     let query_both =
       let b_fields = block_fields ~prefix:"b." () in
-      Caqti_request.find_opt
-        Caqti_type.(tup2 string int64)
+      Mina_caqti.find_opt_req
+        Caqti_type.(t2 string int64)
         typ
         [%string
           {|
@@ -218,7 +218,7 @@ module Sql = struct
 
     let query_by_id =
       let b_fields = block_fields ~prefix:"b." () in
-      Caqti_request.find_opt Caqti_type.int typ
+      Mina_caqti.find_opt_req Caqti_type.int typ
         [%string
           {|
          SELECT b.id,
@@ -235,7 +235,7 @@ module Sql = struct
 
     let query_best =
       let b_fields = block_fields ~prefix:"b." () in
-      Caqti_request.find_opt Caqti_type.unit typ
+      Mina_caqti.find_opt_req Caqti_type.unit typ
         [%string
           {|
          SELECT b.id,
@@ -252,18 +252,17 @@ module Sql = struct
          LIMIT 1
         |}]
 
-    let run_by_id (module Conn : Caqti_async.CONNECTION) id =
+    let run_by_id (module Conn : Mina_caqti.CONNECTION) id =
       Conn.find_opt query_by_id id
 
-    let run_has_canonical_height (module Conn : Caqti_async.CONNECTION) ~height
-        =
+    let run_has_canonical_height (module Conn : Mina_caqti.CONNECTION) ~height =
       let open Deferred.Result.Let_syntax in
       let%map num_canonical_at_height =
         Conn.find query_count_canonical_at_height height
       in
       Int64.( > ) num_canonical_at_height Int64.zero
 
-    let run (module Conn : Caqti_async.CONNECTION) = function
+    let run (module Conn : Mina_caqti.CONNECTION) = function
       | Some (`This (`Height h)) ->
           let open Deferred.Result.Let_syntax in
           let%bind has_canonical_height =
@@ -273,7 +272,7 @@ module Sql = struct
           else
             let%bind max_height =
               Conn.find
-                (Caqti_request.find Caqti_type.unit Caqti_type.int64
+                (Mina_caqti.find_req Caqti_type.unit Caqti_type.int64
                    {sql| SELECT MAX(height) FROM blocks |sql} )
                 ()
             in
@@ -324,8 +323,7 @@ module Sql = struct
 
     let typ =
       Caqti_type.(
-        tup3 int Archive_lib.Processor.User_command.Signed_command.typ
-          Extras.typ)
+        t3 int Archive_lib.Processor.User_command.Signed_command.typ Extras.typ)
 
     let fields =
       String.concat ~sep:","
@@ -334,8 +332,8 @@ module Sql = struct
            Archive_lib.Processor.User_command.Signed_command.Fields.names
 
     let query =
-      Caqti_request.collect
-        Caqti_type.(tup2 int string)
+      Mina_caqti.collect_req
+        Caqti_type.(t2 int string)
         typ
         [%string
           {|
@@ -386,7 +384,7 @@ module Sql = struct
            AND (t.value = ? OR t.id IS NULL)
         |}]
 
-    let run (module Conn : Caqti_async.CONNECTION) id =
+    let run (module Conn : Mina_caqti.CONNECTION) id =
       Conn.collect_list query (id, Mina_base.Token_id.(to_string default))
   end
 
@@ -534,9 +532,9 @@ module Sql = struct
             ON ic_coinbase_receiver.receiver_id = coinbase_receiver_pk.id
     |sql}]
 
-    let run (module Conn : Caqti_async.CONNECTION) id =
+    let run (module Conn : Mina_caqti.CONNECTION) id =
       Conn.collect_list
-        (Caqti_request.collect Caqti_type.(tup2 int string) typ query)
+        (Mina_caqti.collect_req Caqti_type.(t2 int string) typ query)
         (id, Mina_base.Token_id.(to_string default))
 
     let to_info t =
@@ -599,6 +597,7 @@ module Sql = struct
         { body : Archive_lib.Processor.Zkapp_account_update_body.t
         ; account : string
         ; token : string
+        ; creation_fee : int64 option
         }
       [@@deriving hlist]
 
@@ -608,6 +607,7 @@ module Sql = struct
              ~f:(fun n -> "zaub." ^ n)
         @ [ "pk_update_body.value as account"
           ; "token_update_body.value as token"
+          ; "ac.creation_fee"
           ]
 
       let account t = `Pk t.account
@@ -620,6 +620,7 @@ module Sql = struct
             [ Archive_lib.Processor.Zkapp_account_update_body.typ
             ; string
             ; string
+            ; option int64
             ]
     end
 
@@ -661,25 +662,66 @@ module Sql = struct
            ON zfpb.public_key_id = pk_fee_payer.id
          INNER JOIN blocks b
            ON bzc.block_id = b.id
+         -- Expand the account-updates array positionally: an id may appear more
+         -- than once (identical updates share a single zkapp_account_update row),
+         -- and each occurrence is a distinct on-chain application. `= ANY(array)`
+         -- would collapse repeats to one row, dropping (N-1) balance-change ops.
+         -- LATERAL ... ON true keeps fee-payer-only commands (empty/NULL array).
+         LEFT JOIN LATERAL
+           unnest (zc.zkapp_account_updates_ids) WITH ORDINALITY
+             AS au_ref (au_id, au_ord) ON true
          LEFT JOIN zkapp_account_update zau
-           ON zau.id = ANY (zc.zkapp_account_updates_ids)
+           ON zau.id = au_ref.au_id
          LEFT JOIN zkapp_account_update_body zaub
            ON zaub.id = zau.body_id
          LEFT JOIN account_identifiers ai_update_body
            ON zaub.account_identifier_id = ai_update_body.id
+         -- The ledger charges the creation fee once per account it creates, but
+         -- the creating update surfaces on more than one row here: identical
+         -- updates share a single zkapp_account_update row, so it can appear
+         -- under several applied commands of the block, and a command's array
+         -- may repeat its id -- each repeat being expanded to its own row by
+         -- the unnest above. Bill the first such row only, ordering by
+         -- (command, position in the array); the subquery therefore has to
+         -- expand the array positionally too, or repeats would be invisible to
+         -- it and every repeat would be billed.
+         LEFT JOIN accounts_created ac
+           ON bzc.block_id = ac.block_id
+           AND ai_update_body.id = ac.account_identifier_id
+           AND bzc.status = 'applied'
+           AND zaub.implicit_account_creation_fee
+           AND NOT EXISTS (
+             SELECT 1
+             FROM blocks_zkapp_commands bzc2
+             INNER JOIN zkapp_commands zc2
+               ON zc2.id = bzc2.zkapp_command_id
+             CROSS JOIN LATERAL
+               unnest (zc2.zkapp_account_updates_ids) WITH ORDINALITY
+                 AS au_ref2 (au_id, au_ord)
+             INNER JOIN zkapp_account_update zau2
+               ON zau2.id = au_ref2.au_id
+             INNER JOIN zkapp_account_update_body zaub2
+               ON zaub2.id = zau2.body_id
+             WHERE bzc2.block_id = bzc.block_id
+               AND bzc2.status = 'applied'
+               AND zaub2.implicit_account_creation_fee
+               AND zaub2.account_identifier_id = ai_update_body.id
+               AND (bzc2.sequence_no, zc2.id, au_ref2.au_ord)
+                   < (bzc.sequence_no, zc.id, au_ref.au_ord)
+           )
          LEFT JOIN public_keys pk_update_body
            ON ai_update_body.public_key_id = pk_update_body.id
          LEFT JOIN tokens token_update_body
            ON token_update_body.id = ai_update_body.token_id
          WHERE bzc.block_id = ?
           AND (token_update_body.value = ? OR token_update_body.id IS NULL)
-         ORDER BY zc.id, bzc.sequence_no
+         ORDER BY zc.id, bzc.sequence_no, au_ref.au_ord
       |}]
 
     let query =
-      Caqti_request.collect Caqti_type.(tup2 int string) typ query_string
+      Mina_caqti.collect_req Caqti_type.(t2 int string) typ query_string
 
-    let run (module Conn : Caqti_async.CONNECTION) id =
+    let run (module Conn : Mina_caqti.CONNECTION) id =
       Conn.collect_list query (id, Mina_base.Token_id.(to_string default))
 
     module Make_common (M : sig
@@ -752,6 +794,8 @@ module Sql = struct
           ; use_full_commitment = body.use_full_commitment
           ; status
           ; token = Zkapp_account_update.token upd
+          ; creation_fee =
+              Option.map upd.creation_fee ~f:Unsigned.UInt64.of_int64
           } )
 
     let account_updates_and_command_to_info account_updates
@@ -790,7 +834,7 @@ module Sql = struct
     end)
   end
 
-  let run (module Conn : Caqti_async.CONNECTION) input =
+  let run (module Conn : Mina_caqti.CONNECTION) input =
     let module Result = struct
       include Result
 
@@ -948,12 +992,12 @@ module Specific = struct
     module Mock = T (Result)
 
     let real :
-        logger:Logger.t -> db:(module Caqti_async.CONNECTION) -> 'gql Real.t =
+        logger:Logger.t -> db:(module Mina_caqti.CONNECTION) -> 'gql Real.t =
      fun ~logger ~db ->
       { logger
       ; db_block =
           (fun query ->
-            let (module Conn : Caqti_async.CONNECTION) = db in
+            let (module Conn : Mina_caqti.CONNECTION) = db in
             Sql.run (module Conn) query )
       ; validate_network_choice = Network.Validate_choice.Real.validate
       }

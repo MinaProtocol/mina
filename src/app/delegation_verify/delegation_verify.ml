@@ -10,8 +10,8 @@ let get_filenames =
   | filenames ->
       filenames
 
-let verify_snark_work ~verify_transaction_snarks ~proof ~message =
-  verify_transaction_snarks [ (proof, message) ]
+let verify_snark_work ~verify_transaction_snarks ~proof =
+  verify_transaction_snarks [ proof ]
 
 let config_flag =
   let open Command.Param in
@@ -62,11 +62,11 @@ let instantiate_verify_functions ~logger ~genesis_constants
           @@ Runtime_config.of_yojson config_json
         in
         Genesis_ledger_helper.init_from_config_file ~logger ~proof_level
-          ~constraint_constants ~genesis_constants config ~cli_proof_level
+          ~constraint_constants ~genesis_constants ~cli_proof_level config
       in
       let%map.Deferred precomputed_values =
         match precomputed_values with
-        | Ok (precomputed_values, _) ->
+        | Ok precomputed_values ->
             Deferred.return precomputed_values
         | Error _ ->
             Output.display_error "fail to read config file" ;
@@ -108,7 +108,19 @@ module Make_verifier (Source : Submission.Data_source) = struct
               Mina_base.Sok_message.create ~fee:snark_work_fee
                 ~prover:(Source.submitter submission)
             in
-            verify_snark_work ~verify_transaction_snarks ~proof ~message
+            let%bind () =
+              Deferred.return
+              @@
+              if
+                Sok_message.Digest.equal
+                  (Sok_message.digest message)
+                  (Ledger_proof.sok_digest proof)
+              then Ok ()
+              else
+                Or_error.error_string
+                  "proof's sok message digest does not match the sok message"
+            in
+            verify_snark_work ~verify_transaction_snarks ~proof
       else return ()
     in
     let header = Mina_block.Stable.Latest.header block in
@@ -153,7 +165,8 @@ let filesystem_command =
       let%map_open block_dir = block_dir_flag
       and inputs = anon (sequence ("filename" %: Filename.arg_type))
       and no_checks = no_checks_flag
-      and config_file = config_flag in
+      and config_file = config_flag
+      and signature_kind = Cli_lib.Flag.signature_kind in
       fun () ->
         let logger = Logger.create () in
         let genesis_constants = Genesis_constants.Compiled.genesis_constants in
@@ -161,7 +174,6 @@ let filesystem_command =
           Genesis_constants.Compiled.constraint_constants
         in
         let proof_level = Genesis_constants.Compiled.proof_level in
-        let signature_kind = Mina_signature_kind.t_DEPRECATED in
         let%bind.Deferred verify_blockchain_snarks, verify_transaction_snarks =
           instantiate_verify_functions ~logger config_file ~genesis_constants
             ~constraint_constants ~proof_level ~cli_proof_level:None
@@ -193,7 +205,8 @@ let cassandra_command =
       and config_file = config_flag
       and keyspace = keyspace_flag
       and period_start = timestamp
-      and period_end = timestamp in
+      and period_end = timestamp
+      and signature_kind = Cli_lib.Flag.signature_kind in
       fun () ->
         let open Deferred.Let_syntax in
         let logger = Logger.create () in
@@ -202,8 +215,6 @@ let cassandra_command =
           Genesis_constants.Compiled.constraint_constants
         in
         let proof_level = Genesis_constants.Compiled.proof_level in
-
-        let signature_kind = Mina_signature_kind.t_DEPRECATED in
         let%bind.Deferred verify_blockchain_snarks, verify_transaction_snarks =
           instantiate_verify_functions ~logger config_file ~genesis_constants
             ~constraint_constants ~proof_level ~cli_proof_level:None
@@ -234,7 +245,9 @@ let stdin_command =
   Command.async
     ~summary:"Verify submissions and blocks read from standard input"
     Command.Let_syntax.(
-      let%map_open config_file = config_flag and no_checks = no_checks_flag in
+      let%map_open config_file = config_flag
+      and no_checks = no_checks_flag
+      and signature_kind = Cli_lib.Flag.signature_kind in
       fun () ->
         let open Deferred.Let_syntax in
         let logger = Logger.create () in
@@ -243,7 +256,6 @@ let stdin_command =
           Genesis_constants.Compiled.constraint_constants
         in
         let proof_level = Genesis_constants.Compiled.proof_level in
-        let signature_kind = Mina_signature_kind.t_DEPRECATED in
         let%bind.Deferred verify_blockchain_snarks, verify_transaction_snarks =
           instantiate_verify_functions ~logger config_file ~genesis_constants
             ~constraint_constants ~proof_level ~cli_proof_level:None

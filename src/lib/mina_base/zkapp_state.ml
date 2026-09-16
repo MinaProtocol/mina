@@ -1,10 +1,10 @@
 open Core_kernel
 open Pickles_types
-module Max_state_size = Nat.N8
+module Max_state_size = Nat.N32
 
 module State_length_vec :
   Vector.VECTOR with type 'a t = ('a, Max_state_size.n) Vector.vec =
-  Vector.Vector_8
+  Vector.Vector_32
 
 module V = struct
   (* Think about versioning here! These vector types *will* change
@@ -17,7 +17,7 @@ module V = struct
   module Stable = struct
     [@@@no_toplevel_latest_type]
 
-    module V1 = struct
+    module V2 = struct
       type 'a t = 'a State_length_vec.Stable.V1.t
       [@@deriving compare, yojson, sexp, hash, equal]
     end
@@ -50,8 +50,8 @@ module Value = struct
   module Stable = struct
     [@@@no_toplevel_latest_type]
 
-    module V1 = struct
-      type t = Zkapp_basic.F.Stable.V1.t V.Stable.V1.t
+    module V2 = struct
+      type t = Zkapp_basic.F.Stable.V1.t V.Stable.V2.t
       [@@deriving sexp, equal, yojson, hash, compare]
 
       let to_latest = Fn.id
@@ -61,6 +61,14 @@ module Value = struct
   type t = Zkapp_basic.F.t V.t [@@deriving sexp, equal, yojson, hash, compare]
 
   let (_ : (t, Stable.Latest.t) Type_equal.t) = Type_equal.T
+
+  let gen : t Quickcheck.Generator.t =
+    let open Quickcheck.Generator.Let_syntax in
+    let%map fields =
+      Quickcheck.Generator.list_with_length max_size_int
+        Snark_params.Tick.Field.gen
+    in
+    V.of_list_exn fields
 end
 
 let to_input (t : _ V.t) ~f =
@@ -71,3 +79,21 @@ let deriver inner obj =
   iso ~map:V.of_list_exn ~contramap:V.to_list
     ((list ~static_length:max_size_int @@ inner @@ o ()) (o ()))
     obj
+
+module Hardfork = struct
+  module Max_state_size = Nat.N32
+
+  module State_length_vec :
+    Vector.VECTOR with type 'a t = ('a, Max_state_size.n) Vector.vec =
+    Vector.Vector_32
+
+  module V = struct
+    type 'a t = 'a State_length_vec.Stable.V1.t
+    [@@deriving sexp, equal, hash, compare, yojson, bin_io_unversioned]
+  end
+
+  module Value = struct
+    type t = Zkapp_basic.F.Stable.V1.t V.t
+    [@@deriving sexp, equal, hash, compare, yojson, bin_io_unversioned]
+  end
+end

@@ -63,10 +63,10 @@ let of_ledger_subset_exn_impl ~path_query ~path_add (oledger : Ledger.t) keys =
       ~f:(fun (sl, accs, ne_paths, epaths) (key, mloc) ->
         process_location sl key (mloc, accs, ne_paths, epaths) )
   in
-  Debug_assert.debug_assert (fun () ->
-      [%test_eq: Ledger_hash.t]
-        (Ledger.merkle_root oledger)
-        ((merkle_root sl :> Random_oracle.Digest.t) |> Ledger_hash.of_hash) ) ;
+  assert (
+    Ledger_hash.equal
+      (Ledger.merkle_root oledger)
+      ((merkle_root sl :> Random_oracle.Digest.t) |> Ledger_hash.of_hash) ) ;
   sl
 
 let of_ledger_subset_exn =

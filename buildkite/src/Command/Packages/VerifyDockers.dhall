@@ -14,6 +14,14 @@ let Artifact = ../../Constants/Artifacts.dhall
 
 let DebianVersions = ../../Constants/DebianVersions.dhall
 
+let Arch = ../../Constants/Arch.dhall
+
+let BuildFlags = ../../Constants/BuildFlags.dhall
+
+let Profiles = ../../Constants/Profiles.dhall
+
+let DockerRepo = ../../Constants/DockerRepo.dhall
+
 let Spec =
       { Type =
           { artifacts : List Artifact.Type
@@ -21,17 +29,25 @@ let Spec =
           , version : Text
           , codenames : List DebianVersions.DebVersion
           , published_to_docker_io : Bool
-          , suffix : Optional Text
+          , profile : Profiles.Type
+          , archs : List Arch.Type
+          , buildFlag : BuildFlags.Type
+          , repo : DockerRepo.Type
+          , generic : Bool
           }
       , default =
           { artifacts = [] : List Package.Type
           , networks = [ Network.Type.Mainnet, Network.Type.Devnet ]
           , codenames =
             [ DebianVersions.DebVersion.Focal
-            , DebianVersions.DebVersion.Bullseye
+            , DebianVersions.DebVersion.Bookworm
             ]
           , published_to_docker_io = False
-          , suffix = None Text
+          , profile = Profiles.Type.Devnet
+          , buildFlag = BuildFlags.Type.None
+          , archs = [ Arch.Type.Amd64 ]
+          , repo = DockerRepo.Type.InternalEurope
+          , generic = False
           }
       }
 
@@ -47,7 +63,7 @@ let joinNetworks
             ( Prelude.List.map
                 Network.Type
                 Text
-                (\(network : Network.Type) -> Network.lowerName network)
+                (\(network : Network.Type) -> Network.debianSuffix network)
                 spec.networks
             )
 
@@ -65,20 +81,46 @@ let joinCodenames
                 spec.codenames
             )
 
+let joinArchitectures
+    : Spec.Type -> Text
+    =     \(spec : Spec.Type)
+      ->  join
+            ","
+            ( Prelude.List.map
+                Arch.Type
+                Text
+                (\(arch : Arch.Type) -> Arch.lowerName arch)
+                spec.archs
+            )
+
 let verify
     : Spec.Type -> Text
     =     \(spec : Spec.Type)
-      ->      ". ./buildkite/scripts/export-git-env-vars.sh && "
-          ++  "./buildkite/scripts/release/manager.sh verify "
-          ++  "--artifacts ${joinArtifacts spec} "
-          ++  "--networks ${joinNetworks spec} "
-          ++  "--version ${spec.version} "
-          ++  "--codenames ${joinCodenames spec} "
-          ++  merge
-                { None = ""
-                , Some = \(suffix : Text) -> "--docker-suffix ${suffix} "
-                }
-                spec.suffix
-          ++  "--only-dockers "
+      ->  let archFlag = "--archs " ++ joinArchitectures spec ++ " "
+
+          let profileFlag = "--profile ${Profiles.lowerName spec.profile} "
+
+          let buildFlag =
+                merge
+                  { None = ""
+                  , Instrumented =
+                      "--build-flag ${BuildFlags.lowerName spec.buildFlag} "
+                  }
+                  spec.buildFlag
+
+          let genericFlag = if spec.generic then " --generic " else ""
+
+          in      ". ./buildkite/scripts/export-git-env-vars.sh && "
+              ++  "./buildkite/scripts/release/manager.sh verify "
+              ++  "--artifacts ${joinArtifacts spec} "
+              ++  "--networks ${joinNetworks spec} "
+              ++  "--version ${spec.version} "
+              ++  "--codenames ${joinCodenames spec} "
+              ++  "--docker-repo ${DockerRepo.show spec.repo} "
+              ++  profileFlag
+              ++  archFlag
+              ++  buildFlag
+              ++  genericFlag
+              ++  "--only-dockers "
 
 in  { verify = verify, Spec = Spec }

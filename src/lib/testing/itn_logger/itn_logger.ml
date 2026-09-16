@@ -49,7 +49,7 @@ let daemon_where_to_connect, set_daemon_port =
       (Host_and_port.create ~host:"127.0.0.1" ~port)
   in
   let where = ref None in
-  let set port = where := Some (mk_where port) in
+  let set port = where := Option.map ~f:mk_where port in
   let get_where () = !where in
   (get_where, set)
 
@@ -67,46 +67,37 @@ module Submit_internal_log = struct
       ~bin_response
 end
 
-let dispatch_remote_log log =
+let dispatch_remote_log (log, where_to_connect) =
   let open Async.Deferred.Let_syntax in
   let rpc = Submit_internal_log.rpc in
-  match daemon_where_to_connect () with
-  | None ->
-      (* daemon port is set just after verifier, prover are created
-         so should never happen
-      *)
-      eprintf "No daemon port set for ITN logger" ;
-      Async.Deferred.unit
-  | Some where_to_connect -> (
-      let%map res =
-        Async.Rpc.Connection.with_client
-          ~handshake_timeout:
-            (Time.Span.of_sec
-               Node_config_unconfigurable_constants.rpc_handshake_timeout_sec )
-          ~heartbeat_config:
-            (Async.Rpc.Connection.Heartbeat_config.create
-               ~timeout:
-                 (Time_ns.Span.of_sec
-                    Node_config_unconfigurable_constants
-                    .rpc_heartbeat_timeout_sec )
-               ~send_every:
-                 (Time_ns.Span.of_sec
-                    Node_config_unconfigurable_constants
-                    .rpc_heartbeat_send_every_sec )
-               () )
-          where_to_connect
-          (fun conn -> Async.Rpc.Rpc.dispatch rpc conn log)
-      in
-      (* not ideal that errors are not themselves logged *)
-      match res with
-      | Ok (Ok ()) ->
-          ()
-      | Ok (Error err) ->
-          eprintf "Error sending internal log via RPC: %s"
-            (Error.to_string_mach err)
-      | Error exn ->
-          eprintf "Exception when sending internal log via RPC: %s"
-            (Exn.to_string_mach exn) )
+  let%map res =
+    Async.Rpc.Connection.with_client
+      ~handshake_timeout:
+        (Time.Span.of_sec
+           Node_config_unconfigurable_constants.rpc_handshake_timeout_sec )
+      ~heartbeat_config:
+        (Async.Rpc.Connection.Heartbeat_config.create
+           ~timeout:
+             (Time_ns.Span.of_sec
+                Node_config_unconfigurable_constants.rpc_heartbeat_timeout_sec )
+           ~send_every:
+             (Time_ns.Span.of_sec
+                Node_config_unconfigurable_constants
+                .rpc_heartbeat_send_every_sec )
+           () )
+      where_to_connect
+      (fun conn -> Async.Rpc.Rpc.dispatch rpc conn log)
+  in
+  (* not ideal that errors are not themselves logged *)
+  match res with
+  | Ok (Ok ()) ->
+      ()
+  | Ok (Error err) ->
+      eprintf "Error sending internal log via RPC: %s"
+        (Error.to_string_mach err)
+  | Error exn ->
+      eprintf "Exception when sending internal log via RPC: %s"
+        (Exn.to_string_mach exn)
 
 (* Used to ensure that no more than one log message is in-flight at
    a time to guarantee sequential processing. *)
@@ -126,8 +117,8 @@ let sequential_log_writer_pipe = sequential_dispatcher_loop ()
     to the daemon, resulting in a recursive call of type (2)
 *)
 let log ?process ~timestamp ~message ~metadata () =
-  match get_process_kind () with
-  | Some process ->
+  match (daemon_where_to_connect (), get_process_kind ()) with
+  | Some where_to_connect, Some process ->
       (* prover or verifier, send log to daemon
 
          we can't Bin_prot-serialize JSON, so make it a string
@@ -136,8 +127,9 @@ let log ?process ~timestamp ~message ~metadata () =
         List.map metadata ~f:(fun (s, json) -> (s, Yojson.Safe.to_string json))
       in
       let remote_log = { timestamp; message; metadata; process } in
-      Async.Pipe.write_without_pushback sequential_log_writer_pipe remote_log
-  | None ->
+      Async.Pipe.write_without_pushback sequential_log_writer_pipe
+        (remote_log, where_to_connect)
+  | None, None ->
       (* daemon *)
       (* convert JSON to Basic.t in queue, so we don't have to in GraphQL response *)
       let metadata =
@@ -155,6 +147,9 @@ let log ?process ~timestamp ~message ~metadata () =
       if Queue.length log_queue > get_queue_bound () then
         ignore (Queue.dequeue_exn log_queue : t) ;
       incr_counter ()
+  | _, _ ->
+      (* ignoring: this is not daemon, and daemon didn't provide the port *)
+      ()
 
 let get_logs start_log_id =
   let filtered_queue =

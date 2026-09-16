@@ -4,9 +4,9 @@ let JobSpec = ../../Pipeline/JobSpec.dhall
 
 let Pipeline = ../../Pipeline/Dsl.dhall
 
-let PipelineMode = ../../Pipeline/Mode.dhall
-
 let PipelineTag = ../../Pipeline/Tag.dhall
+
+let PipelineScope = ../../Pipeline/Scope.dhall
 
 let TestExecutive = ../../Command/TestExecutive.dhall
 
@@ -38,13 +38,14 @@ in  Pipeline.build
           , PipelineTag.Type.Test
           , PipelineTag.Type.Stable
           ]
-        , mode = PipelineMode.Type.Stable
+        , scope = PipelineScope.AllButPullRequest
         }
       , steps =
         [ TestExecutive.executeLocal "block-prod-prio" dependsOn
         , TestExecutive.executeLocal "block-reward" dependsOn
         , TestExecutive.executeLocal "chain-reliability" dependsOn
         , TestExecutive.executeLocal "epoch-ledger" dependsOn
+        , TestExecutive.executeLocal "genesis-export" dependsOn
         , TestExecutive.executeLocal "gossip-consis" dependsOn
         , TestExecutive.executeLocal "medium-bootstrap" dependsOn
         , TestExecutive.executeLocal "payments" dependsOn

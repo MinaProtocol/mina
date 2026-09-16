@@ -403,7 +403,8 @@ let compute_statuses
   let split_transaction_statuses txns_with_statuses =
     List.partition_map txns_with_statuses ~f:(fun txn_applied ->
         let { With_status.data = txn; status } =
-          Mina_ledger.Ledger.transaction_of_applied txn_applied
+          Mina_transaction_logic.Transaction_applied.transaction_with_status
+            txn_applied
         in
         match txn with
         | Transaction.Command cmd ->
@@ -425,7 +426,8 @@ let compute_statuses
   in
   let%map txns_with_statuses =
     Transaction_snark.Transaction_validator.apply_transactions
-      ~constraint_constants ~global_slot ~txn_state_view ledger txns
+      ~constraint_constants ~global_slot ~txn_state_view
+      ~signature_kind:Mina_signature_kind.t_DEPRECATED ledger txns
     |> Result.map_error ~f:(fun err -> Error.Unexpected err)
   in
   let p1_txns_with_statuses, p2_txns_with_statuses =

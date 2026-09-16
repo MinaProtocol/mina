@@ -14254,7 +14254,19 @@
               "deprecationReason": null
             },
             {
-              "name": "snarkWorkerTransitionTime",
+              "name": "snarkWorkerZkappTransitionTime",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "OBJECT",
+                "name": "Histogram",
+                "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "snarkWorkerNonzkappTransitionTime",
               "description": null,
               "args": [],
               "type": {
