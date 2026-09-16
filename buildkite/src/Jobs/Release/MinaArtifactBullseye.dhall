@@ -44,7 +44,6 @@ in  Pipeline.build
             , Artifacts.Type.Rosetta { network = Network.Type.Mainnet }
             , Artifacts.Type.LogProc
             , Artifacts.Type.TxTools
-            , Artifacts.Type.DelegationVerifier
             , Artifacts.Type.DaemonStorageToolbox
             ]
           , tags =
