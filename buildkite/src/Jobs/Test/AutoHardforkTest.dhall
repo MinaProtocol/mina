@@ -49,7 +49,7 @@ let network = Network.Type.Devnet
 
 let profile = Profiles.Type.Devnet
 
-let debVersion = DebianVersions.DebVersion.Bullseye
+let debVersion = DebianVersions.DebVersion.Bookworm
 
 let arch = Arch.Type.Amd64
 
@@ -119,7 +119,7 @@ in  Pipeline.build
                       "buildkite/scripts/tests/hardfork/dispatcher-tests.sh --docker ${hardforkDocker}"
                   ]
             , label = "Auto Hardfork: Dispatcher Tests"
-            , key = "auto-hardfork-dispatcher-tests-bullseye"
+            , key = "auto-hardfork-dispatcher-tests-bookworm"
             , target = Size.XLarge
             , artifact_paths = [ S.contains "test_output/artifacts/*" ]
             , depends_on =

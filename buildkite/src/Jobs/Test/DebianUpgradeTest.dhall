@@ -30,7 +30,7 @@ let network = Network.Type.Devnet
 
 let profile = Profiles.Type.Devnet
 
-let debVersion = DebianVersions.DebVersion.Bullseye
+let debVersion = DebianVersions.DebVersion.Bookworm
 
 let dependsOn =
       DebianVersions.appDependsOn
@@ -64,19 +64,19 @@ let buildTestCmd
                         (ArtifactPipelines.debianTokens buildSpec)
                     # RunInToolchain.runInToolchain
                         RunInToolchain.Config::{
-                        , image = ContainerImages.minaToolchainBullseye.amd64
+                        , image = ContainerImages.minaToolchainBookworm.amd64
                         , environment = [ "LOCAL_DEB_SOURCE_DIR=_build" ]
                         , innerScript =
                             ''
                             ./buildkite/scripts/tests/debian-upgrade-test.sh \
-                              --codename bullseye \
+                              --codename bookworm \
                               --channel alpha \
                               --package mina-devnet \
                               --install-packages mina-generic,mina-devnet-config \
-                              --new-debian "debians/bullseye/mina-generic_*.deb"
+                              --new-debian "debians/bookworm/mina-generic_*.deb"
                             ''
                         }
-                , label = "Debian upgrade test (bullseye)"
+                , label = "Debian upgrade test (bookworm)"
                 , key = key
                 , target = cmd_target
                 , docker = None Docker.Type

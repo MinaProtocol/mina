@@ -43,7 +43,7 @@ let DepsSpec =
           , arch : Arch.Type
           }
       , default =
-          { deb_version = DebVersion.Bullseye
+          { deb_version = DebVersion.Bookworm
           , network = Network.Type.Devnet
           , profile = Profiles.Type.Devnet
           , build_flag = BuildFlags.Type.None
@@ -91,7 +91,7 @@ let minimalDirtyWhen =
           "sh"
       ]
 
-let bullseyeDirtyWhen =
+let bookwormDirtyWhen =
         [ S.strictlyStart (S.contains "src")
         , S.strictly (S.contains "Makefile")
         , S.exactly "buildkite/scripts/connect/connect-to-network" "sh"
@@ -105,8 +105,8 @@ let bullseyeDirtyWhen =
 let dirtyWhen =
           \(debVersion : DebVersion)
       ->  merge
-            { Bookworm = minimalDirtyWhen
-            , Bullseye = bullseyeDirtyWhen
+            { Bookworm = bookwormDirtyWhen
+            , Bullseye = minimalDirtyWhen
             , Jammy = minimalDirtyWhen
             , Focal = minimalDirtyWhen
             , Noble = minimalDirtyWhen
@@ -126,7 +126,7 @@ let packageDirtyWhen =
     -- selected by its own dirty-when would not be left with a dangling
     -- dependency on a packaging job that had not been selected. monorepo.sh
     -- resolves dependencies itself now (phase 2): selecting DebianUpgradeTest
-    -- pulls MinaArtifactBullseye in regardless of this list, so listing the
+    -- pulls MinaArtifactBookworm in regardless of this list, so listing the
     -- tests here only made packaging run on changes it does not depend on.
       [ S.exactly "buildkite/src/Constants/DebianVersions" "dhall"
       , S.exactly "buildkite/src/Constants/ContainerImages" "dhall"

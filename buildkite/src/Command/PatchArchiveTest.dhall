@@ -31,7 +31,7 @@ in  { step =
                             "./src/test/archive/sample_db/archive_db.sql"
                         )
                     )
-                    ContainerImages.minaToolchainBullseye.amd64
+                    ContainerImages.minaToolchainBookworm.amd64
                     debs
                     "./scripts/patch-archive-test.sh"
                 , Cmd.run

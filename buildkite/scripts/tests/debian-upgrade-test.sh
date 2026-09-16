@@ -19,7 +19,7 @@ YELLOW='\033[0;33m'
 
 # Configuration - can be overridden via environment variables
 REPO="${REPO:-packages.o1test.net}"
-CODENAME="${CODENAME:-bullseye}"
+CODENAME="${CODENAME:-bookworm}"
 CHANNEL="${CHANNEL:-alpha}"
 # PACKAGE is the pre-split package we install from the public repo (step 1) and
 # whose migration we are exercising.
@@ -27,7 +27,7 @@ PACKAGE="${PACKAGE:-mina-devnet}"
 # INSTALL_PACKAGES is the comma-separated set we upgrade TO from cache (step 4).
 # In the split layout the daemon is mina-generic + mina-devnet-config.
 INSTALL_PACKAGES="${INSTALL_PACKAGES:-mina-generic,mina-devnet-config}"
-NEW_DEBIAN_PATH="${NEW_DEBIAN_PATH:-}"  # Path pattern in cache, e.g., "debians/bullseye/mina-generic_*.deb"
+NEW_DEBIAN_PATH="${NEW_DEBIAN_PATH:-}"  # Path pattern in cache, e.g., "debians/bookworm/mina-generic_*.deb"
 
 # Don't prompt for answers during apt-get install
 export DEBIAN_FRONTEND=noninteractive
@@ -60,7 +60,7 @@ function usage() {
     echo ""
     echo "Options:"
     echo "  -r, --repo          Repository URL (default: packages.o1test.net)"
-    echo "  -c, --codename      Debian codename (default: bullseye)"
+    echo "  -c, --codename      Debian codename (default: bookworm)"
     echo "  -C, --channel       Repository channel (default: alpha)"
     echo "  -p, --package       Pre-split package to install from repo (default: mina-devnet)"
     echo "  -i, --install-packages  Comma-separated packages to upgrade to (default: mina-generic,mina-devnet-config)"
@@ -68,7 +68,7 @@ function usage() {
     echo "  -h, --help          Show this help message"
     echo ""
     echo "Example:"
-    echo "  $0 --new-debian 'debians/bullseye/mina-generic_*.deb'"
+    echo "  $0 --new-debian 'debians/bookworm/mina-generic_*.deb'"
 }
 
 # Function to extract the first 8 characters of the commit hash from a version string

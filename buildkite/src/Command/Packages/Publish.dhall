@@ -79,7 +79,7 @@ let Spec =
           , backend = "local"
           , codenames =
             [ DebianVersions.DebVersion.Focal
-            , DebianVersions.DebVersion.Bullseye
+            , DebianVersions.DebVersion.Bookworm
             ]
           , channel = DebianChannel.Type.Compatible
           , depends_on = [] : List Command.TaggedKey.Type
@@ -96,7 +96,7 @@ let publish
     =     \(spec : Spec.Type)
       ->  let target_version =
                 spec.target_version
-                  DebianVersions.DebVersion.Bullseye
+                  DebianVersions.DebVersion.Bookworm
                   spec.channel
                   spec.branch
                   spec.profile
@@ -143,7 +143,7 @@ let publish
                 Prelude.List.indexed
                   Text
                   ( spec.new_docker_tags
-                      DebianVersions.DebVersion.Bullseye
+                      DebianVersions.DebVersion.Bookworm
                       spec.channel
                       spec.branch
                       spec.profile
