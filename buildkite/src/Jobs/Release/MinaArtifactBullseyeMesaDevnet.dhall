@@ -28,7 +28,6 @@ in  Pipeline.build
             , Artifacts.Type.Rosetta
             , Artifacts.Type.ZkappTestTransaction
             , Artifacts.Type.CreatePreforkGenesis
-            , Artifacts.Type.DelegationVerifier
             ]
           , network = Network.Type.Mesa
           , tags =
