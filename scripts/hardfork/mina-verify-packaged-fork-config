@@ -146,7 +146,7 @@ source_build_fallback() {
 
 MINA_EXE=${MINA_EXE:-$(source_build_fallback mina ./_build/default/src/app/cli/src/mina.exe)}
 MINA_GENESIS_EXE=${MINA_GENESIS_EXE:-$(source_build_fallback mina-create-genesis ./_build/default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe)}
-MINA_LEGACY_GENESIS_EXE=${MINA_LEGACY_GENESIS_EXE:-$(source_build_fallback mina-create-legacy-genesis ./runtime_genesis_ledger_of_mainnet.exe)}
+MINA_LEGACY_GENESIS_EXE=${MINA_LEGACY_GENESIS_EXE:-$(source_build_fallback mina-create-prefork-genesis ./runtime_genesis_ledger_of_mainnet.exe)}
 CREATE_RUNTIME_CONFIG=${CREATE_RUNTIME_CONFIG:-$(source_build_fallback mina-hf-create-runtime-config ./scripts/hardfork/create_runtime_config.sh)}
 MINA_ROCKSDB_SCANNER=${MINA_ROCKSDB_SCANNER:-$(source_build_fallback mina-rocksdb-scanner ./_build/default/src/app/rocksdb-scanner/rocksdb_scanner.exe)}
 GSUTIL=${GSUTIL:-$(command -v gsutil || echo "")}

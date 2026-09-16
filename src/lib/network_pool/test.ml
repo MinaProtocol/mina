@@ -46,13 +46,19 @@ let%test_module "network pool test" =
           (Quickcheck.random_value ~seed:(`Deterministic "network_pool_test")
              Transaction_snark.Statement.gen )
       in
+      let fee_ =
+        { Mina_base.Fee_with_prover.fee = Currency.Fee.zero
+        ; prover = Signature_lib.Public_key.Compressed.empty
+        }
+      in
       let priced_proof =
         { Priced_proof.proof =
-            One_or_two.map ~f:Ledger_proof.For_tests.mk_dummy_proof work
-        ; fee =
-            { fee = Currency.Fee.zero
-            ; prover = Signature_lib.Public_key.Compressed.empty
-            }
+            One_or_two.map
+              ~f:(fun statement ->
+                Ledger_proof.For_tests.mk_dummy_proof ~statement ~fee:fee_.fee
+                  ~prover:fee_.prover )
+              work
+        ; fee = fee_
         }
       in
       Async.Thread_safe.block_on_async_exn (fun () ->
@@ -100,16 +106,22 @@ let%test_module "network pool test" =
         |> Sequence.to_list
       in
       let per_reader = work_count / 2 in
+      let fee_ =
+        { Mina_base.Fee_with_prover.fee = Currency.Fee.zero
+        ; prover = Signature_lib.Public_key.Compressed.empty
+        }
+      in
       let create_work work =
         Mock_snark_pool.Resource_pool.Diff.Add_solved_work
           ( work
           , Priced_proof.
               { proof =
-                  One_or_two.map ~f:Ledger_proof.For_tests.mk_dummy_proof work
-              ; fee =
-                  { fee = Currency.Fee.zero
-                  ; prover = Signature_lib.Public_key.Compressed.empty
-                  }
+                  One_or_two.map
+                    ~f:(fun statement ->
+                      Ledger_proof.For_tests.mk_dummy_proof ~statement
+                        ~fee:fee_.fee ~prover:fee_.prover )
+                    work
+              ; fee = fee_
               } )
       in
       let verify_unsolved_work () =

@@ -29,6 +29,7 @@ type HardforkTest struct {
 // NewHardforkTest creates a new instance of the hardfork test
 func NewHardforkTest(cfg *config.Config) *HardforkTest {
 	ctx, cancel := context.WithCancel(context.Background())
+	cfg.InitDaemonInfos()
 	return &HardforkTest{
 		Config:      cfg,
 		Client:      client.NewClient(cfg.HTTPClientTimeoutSeconds, cfg.ClientMaxRetries),
@@ -60,9 +61,15 @@ func (t *HardforkTest) gracefulShutdown(cmd *exec.Cmd, processName string) {
 	case <-shutdownTimeout.C:
 		t.Logger.Info("%s process did not stop gracefully after %d minutes, forcing kill", processName, t.Config.ShutdownTimeoutMinutes)
 		cmd.Process.Kill()
-	case <-processDone:
-		t.Logger.Info("%s process stopped gracefully", processName)
+	case err := <-processDone:
 		shutdownTimeout.Stop()
+		if err != nil {
+			if exitErr, ok := err.(*exec.ExitError); ok && exitErr.ExitCode() != 0 {
+				t.Logger.Error("%s shutdown was incomplete (exit code %d), some nodes may not have been stopped cleanly", processName, exitErr.ExitCode())
+			}
+		} else {
+			t.Logger.Info("%s process stopped gracefully", processName)
+		}
 	}
 }
 
@@ -118,24 +125,13 @@ func (t *HardforkTest) Run() error {
 
 	// Phase 1: Run and validate main network
 	t.Logger.Info("Phase 1: Running main network...")
-	forkDataChan := make(chan ForkData, 1)
 
 	beforeShutdown := func(t *HardforkTest, analysis *BlockAnalysisResult) error {
-		t.Logger.Info("Phase 2: Forking with fork method `%s`...", t.Config.ForkMethod.String())
+		t.Logger.Info("Phase 2: Forking with fork method `%s`...", t.Config.ForkMethods)
 
-		var forkData *ForkData
-		var err error
-		switch t.Config.ForkMethod {
-		case config.Legacy:
-			forkData, err = t.LegacyForkPhase(analysis, mainGenesisTs)
-		case config.Advanced:
-			forkData, err = t.AdvancedForkPhase(analysis, mainGenesisTs)
-		}
-
-		if err != nil {
+		if err := t.ForkPhase(analysis, mainGenesisTs); err != nil {
 			return err
 		}
-		forkDataChan <- *forkData
 		return nil
 	}
 
@@ -144,8 +140,14 @@ func (t *HardforkTest) Run() error {
 		return err
 	}
 
-	t.Logger.Info("Phase 3: Running fork network...")
-	if err := t.RunForkNetworkPhase(analysis.Consensus.LastBlockBeforeTxEnd.BlockHeight, <-forkDataChan, mainGenesisTs); err != nil {
+	t.Logger.Info("Phase 3: Cleaning up main config and moving fork config into correct location...")
+
+	if err := t.CleanUpNetworkForForkPhase(); err != nil {
+		return err
+	}
+
+	t.Logger.Info("Phase 4: Running fork network...")
+	if err := t.RunForkNetworkPhase(analysis.Consensus.LastBlockBeforeTxEnd.BlockHeight, mainGenesisTs); err != nil {
 		return err
 	}
 

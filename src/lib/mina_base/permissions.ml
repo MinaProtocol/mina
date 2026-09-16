@@ -72,6 +72,12 @@ module Auth_required = struct
     | t ->
         t
 
+  let access_perm_fallback_to_signature_with_older_version = function
+    | Proof ->
+        Signature
+    | t ->
+        t
+
   (* permissions such that [check permission (Proof _)] is true *)
   let gen_for_proof_authorization : t Quickcheck.Generator.t =
     Quickcheck.Generator.of_list [ None; Either; Proof ]
@@ -294,10 +300,20 @@ module Auth_required = struct
          that the proof should verify. *)
       (result, `proof_must_verify (didn't_fail_yet &&& not signature_sufficient))
 
+    (* proof/either/impossible -> signature *)
     let verification_key_perm_fallback_to_signature_with_older_version
         ({ signature_sufficient; _ } as t : t) =
       if_
         Pickles.Impls.Step.Boolean.(not signature_sufficient)
+        ~then_:(constant Signature) ~else_:t
+
+    (* proof/either -> signature *)
+    let access_perm_fallback_to_signature_with_older_version
+        ({ signature_sufficient; constant = signature_is_constant; _ } as t : t)
+        =
+      if_
+        Pickles.Impls.Step.Boolean.(
+          (not signature_sufficient) && not signature_is_constant)
         ~then_:(constant Signature) ~else_:t
   end
 
@@ -649,7 +665,7 @@ let%test_unit "json value" =
         setPermissions: "Signature",
         setVerificationKey: {
           auth: "Signature",
-          txnVersion: "3"
+          txnVersion: "4"
           },
         setZkappUri: "Signature",
         editActionState: "Signature",

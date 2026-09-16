@@ -1,24 +1,28 @@
 open Core
 open Async
 
-module Hex_util = struct
-  (* Converts Bigstring to hex string *)
-  let to_hex bs =
-    Bigstring.to_string bs
-    |> String.concat_map ~f:(fun c -> sprintf "%02x" (Char.to_int c))
+module Hex_helpers = struct
+  exception CantDeserializeHex of string
 
-  (* Converts hex string to Bigstring *)
-  let of_hex hex_str =
-    let hex_str = String.strip hex_str in
-    let len = String.length hex_str in
-    if len % 2 <> 0 then failwithf "Invalid hex string length %d" len () ;
-    let bs = Bigstring.create (len / 2) in
-    for i = 0 to (len / 2) - 1 do
-      let byte_str = String.sub hex_str ~pos:(i * 2) ~len:2 in
-      let byte = Int.of_string ("0x" ^ byte_str) in
-      Bigstring.set_int8_exn bs ~pos:i byte
-    done ;
-    bs
+  let of_bigstring = Fn.compose Hex.Safe.to_hex Bigstring.to_string
+
+  let to_bigstring input =
+    match Hex.Safe.of_hex input with
+    | Some str ->
+        Bigstring.of_string str
+    | None ->
+        raise (CantDeserializeHex input)
+end
+
+module Rocksdb_helpers = struct
+  exception DbNonExistent of string
+
+  let safe_open path =
+    match%map Sys.is_directory path with
+    | `Yes ->
+        Rocksdb.Database.create path
+    | _ ->
+        raise (DbNonExistent path)
 end
 
 let dump_cmd =
@@ -29,14 +33,31 @@ let dump_cmd =
        flag "--output-file" (required string) ~doc:"PATH to output hex file"
      in
      fun () ->
-       let db = Rocksdb.Database.create db_path in
+       let%bind db = Rocksdb_helpers.safe_open db_path in
        let kv_pairs = Rocksdb.Database.to_alist db in
-       let%bind writer = Writer.open_file output_file in
-       List.iter kv_pairs ~f:(fun (k, v) ->
-           Writer.writef writer "%s : %s\n" (Hex_util.to_hex k)
-             (Hex_util.to_hex v) ) ;
-       let%bind () = Writer.close writer in
-       Rocksdb.Database.close db ;
+       let%bind writer =
+         match%map
+           Monitor.try_with (fun () -> Writer.open_file output_file)
+         with
+         | Ok writer ->
+             writer
+         | Error exn ->
+             Exn.reraise exn
+             @@ sprintf "Can't write to hex dump needed to dump the DB at %s"
+                  output_file
+       in
+       let%bind () =
+         Monitor.protect
+           (fun () ->
+             List.iter kv_pairs ~f:(fun (k, v) ->
+                 Writer.writef writer "%s : %s\n"
+                   (Hex_helpers.of_bigstring k)
+                   (Hex_helpers.of_bigstring v) ) ;
+             Deferred.unit )
+           ~finally:(fun () ->
+             let%map () = Writer.close writer in
+             Rocksdb.Database.close db )
+       in
        printf "Dump complete: %s\n" output_file ;
        Writer.flushed (Lazy.force Writer.stdout) )
 
@@ -49,13 +70,22 @@ let restore_cmd =
      in
      fun () ->
        let db = Rocksdb.Database.create db_path in
-       let%bind reader = Reader.open_file input_file in
+       let%bind reader =
+         match%map Monitor.try_with (fun () -> Reader.open_file input_file) with
+         | Ok reader ->
+             reader
+         | Error exn ->
+             Exn.reraise exn
+             @@ sprintf "Can't read hex dump needed to restore the DB at %s"
+                  input_file
+       in
        let kv_of_line line =
          Scanf.sscanf line "%s : %s" (fun k_hex v_hex ->
-             let key = Hex_util.of_hex k_hex in
-             let data = Hex_util.of_hex v_hex in
+             let key = Hex_helpers.to_bigstring k_hex in
+             let data = Hex_helpers.to_bigstring v_hex in
              (key, data) )
        in
+       (* NOTE: This number here is choosen randomly, we can tune later *)
        let chunk_size = 256 in
        let buffer = Queue.create ~capacity:chunk_size () in
        let process_batch () =

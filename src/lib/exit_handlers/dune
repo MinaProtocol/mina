@@ -1,0 +1,16 @@
+(library
+ (name exit_handlers)
+ (public_name exit_handlers)
+ (library_flags -linkall)
+ (libraries
+  ;; opam libraries
+  async_kernel
+  async_unix
+  core_kernel
+  ;; local libraries
+  logger)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_here ppx_jane ppx_let ppx_mina ppx_version))
+ (synopsis "Coordinated, tiered daemon shutdown handlers"))

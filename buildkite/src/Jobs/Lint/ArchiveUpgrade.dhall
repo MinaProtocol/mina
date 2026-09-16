@@ -16,14 +16,18 @@ let Docker = ../../Command/Docker/Type.dhall
 
 let Size = ../../Command/Size.dhall
 
+let Expr = ../../Pipeline/Expr.dhall
+
+let MainlineBranch = ../../Pipeline/MainlineBranch.dhall
+
 in  Pipeline.build
       Pipeline.Config::{
       , spec = JobSpec::{
         , dirtyWhen =
           [ SelectFiles.exactly "src/app/archive/create_schema" "sql"
           , SelectFiles.exactly "src/app/archive/drop_tables" "sql"
-          , SelectFiles.exactly "src/app/archive/upgrade_to_mesa" "sql"
-          , SelectFiles.exactly "src/app/archive/downgrade_to_berkeley" "sql"
+          , SelectFiles.exactly "src/app/archive/upgrade" "sql"
+          , SelectFiles.exactly "src/app/archive/downgrade" "sql"
           , SelectFiles.exactly "buildkite/src/Jobs/Lint/ArchiveUpgrade" "dhall"
           , SelectFiles.exactly
               "buildkite/scripts/archive/upgrade-script-check"
@@ -33,6 +37,12 @@ in  Pipeline.build
         , name = "ArchiveUpgrade"
         , scope = PipelineScope.PullRequestOnly
         , tags = [ PipelineTag.Type.Fast, PipelineTag.Type.Lint ]
+        , includeIf =
+          [ Expr.Type.DescendantOf
+              { ancestor = MainlineBranch.Type.Develop
+              , reason = "Only run on Develop descendants"
+              }
+          ]
         }
       , steps =
         [ Command.build

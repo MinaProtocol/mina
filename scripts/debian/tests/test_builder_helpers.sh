@@ -128,7 +128,9 @@ assert_captured_file_contains() {
     if [[ -f "$file" ]] && grep -qF "$pattern" "$file"; then
         log_pass
     else
-        log_fail "File '${path}' does not contain '${pattern}'"
+        local file_content
+        file_content=`cat ${file}`
+        log_fail "File '${path}'(content: ${file_content}) does not contain '${pattern}'"
     fi
 }
 
@@ -289,6 +291,10 @@ case "$*" in
         echo "1.0.0" ;;
     "rev-parse --short=8 --verify HEAD")
         echo "abcd1234" ;;
+    "rev-parse --short=8 ef01abc")
+        echo "ef01abcd" ;;
+    rev-parse\ --short=8\ *)
+        echo "fatal: ambiguous argument" >&2; exit 128 ;;
     name-rev\ --name-only*)
         echo "test-branch" ;;
     "tag --points-at HEAD")
@@ -359,6 +365,7 @@ MOCKEXE
     create_mock_exe "default/src/app/replayer/replayer.exe"
     create_mock_exe "default/src/app/zkapp_test_transaction/zkapp_test_transaction.exe"
     create_mock_exe "default/src/app/delegation_verify/delegation_verify.exe"
+    create_mock_exe "default/src/app/dump_slot_ledger/dump_slot_ledger.exe"
 
     #---------------------------------------------------------------------------
     # Source files under PROJECT_ROOT (referenced via ../ from BUILD_DIR)
@@ -370,6 +377,7 @@ MOCKEXE
     # hardfork scripts
     create_mock_exe "scripts/hardfork/create_runtime_config.sh" "$PROJECT_ROOT"
     create_mock_exe "scripts/hardfork/mina-verify-packaged-fork-config" "$PROJECT_ROOT"
+    create_mock_exe "scripts/hardfork/dispatcher.sh" "$PROJECT_ROOT"
 
     # archive scripts
     create_mock_exe "scripts/archive/missing-blocks-guardian.sh" "$PROJECT_ROOT"
@@ -395,6 +403,7 @@ SVCEOF
     mkdir -p "${PROJECT_ROOT}/genesis_ledgers"
     echo '{"genesis": "mainnet"}' > "${PROJECT_ROOT}/genesis_ledgers/mainnet.json"
     echo '{"genesis": "devnet"}' > "${PROJECT_ROOT}/genesis_ledgers/devnet.json"
+    echo '{"genesis": "mesa"}' > "${PROJECT_ROOT}/genesis_ledgers/mesa.json"
 
     # rosetta scripts and configs
     create_mock_exe "src/app/rosetta/scripts/run.sh" "$PROJECT_ROOT"
@@ -540,7 +549,7 @@ test_build_functional_test_suite_deb() {
 ################################################################################
 
 test_build_rosetta_mainnet_deb() {
-    safe_build build_rosetta_mainnet_deb || { log_fail "build exited non-zero"; return; }
+    safe_build build_rosetta_deb mainnet || { log_fail "build exited non-zero"; return; }
 
     load_captured_state
     assert_eq "deb name" "mina-rosetta-mainnet" "$CAPTURED_DEB_NAME"
@@ -554,23 +563,11 @@ test_build_rosetta_mainnet_deb() {
 }
 
 test_build_rosetta_devnet_deb() {
-    safe_build build_rosetta_devnet_deb || { log_fail "build exited non-zero"; return; }
+    safe_build build_rosetta_deb devnet || { log_fail "build exited non-zero"; return; }
 
     load_captured_state
     assert_eq "deb name" "mina-rosetta-devnet" "$CAPTURED_DEB_NAME"
     assert_control_field "$CAPTURED_CONTROL" "Package" "mina-rosetta-devnet"
-    assert_control_contains "$CAPTURED_CONTROL" "Suggests" "jq"
-
-    assert_rosetta_binaries "$CAPTURED_FILES"
-    assert_rosetta_configs "$CAPTURED_FILES"
-}
-
-test_build_rosetta_testnet_generic_deb() {
-    safe_build build_rosetta_testnet_generic_deb || { log_fail "build exited non-zero"; return; }
-
-    load_captured_state
-    assert_eq "deb name" "mina-rosetta-testnet-generic" "$CAPTURED_DEB_NAME"
-    assert_control_field "$CAPTURED_CONTROL" "Package" "mina-rosetta-testnet-generic"
     assert_control_contains "$CAPTURED_CONTROL" "Suggests" "jq"
 
     assert_rosetta_binaries "$CAPTURED_FILES"
@@ -582,7 +579,7 @@ test_build_rosetta_testnet_generic_deb() {
 ################################################################################
 
 test_build_daemon_mainnet_deb() {
-    safe_build build_daemon_mainnet_deb || { log_fail "build exited non-zero"; return; }
+    safe_build build_daemon_deb mainnet || { log_fail "build exited non-zero"; return; }
 
     load_captured_state
     assert_eq "deb name" "mina-mainnet" "$CAPTURED_DEB_NAME"
@@ -593,7 +590,8 @@ test_build_daemon_mainnet_deb() {
     assert_control_contains "$CAPTURED_CONTROL" "Depends" "libffi7"
     assert_control_contains "$CAPTURED_CONTROL" "Depends" "libjemalloc2"
     assert_control_contains "$CAPTURED_CONTROL" "Depends" "mina-logproc"
-    assert_control_contains "$CAPTURED_CONTROL" "Depends" "mina-mainnet-config"
+    # Config dependency is pinned to the exact build version
+    assert_control_contains "$CAPTURED_CONTROL" "Depends" "mina-mainnet-config (=${EXPECTED_VERSION})"
     assert_control_contains "$CAPTURED_CONTROL" "Suggests" "jq"
     assert_control_contains "$CAPTURED_CONTROL" "Replaces" "mina-mainnet"
     assert_control_has_field "$CAPTURED_CONTROL" "Breaks"
@@ -613,15 +611,16 @@ test_build_daemon_mainnet_deb() {
 }
 
 test_build_daemon_mainnet_config_deb() {
-    safe_build build_daemon_mainnet_config_deb || { log_fail "build exited non-zero"; return; }
+    safe_build build_daemon_config_deb mainnet || { log_fail "build exited non-zero"; return; }
 
     load_captured_state
     assert_eq "deb name" "mina-mainnet-config" "$CAPTURED_DEB_NAME"
     assert_control_field "$CAPTURED_CONTROL" "Package" "mina-mainnet-config"
+    assert_control_field "$CAPTURED_CONTROL" "Architecture" "all"
 
     # Config-only package: no Depends on libraries
     assert_control_no_field "$CAPTURED_CONTROL" "Depends"
-    assert_control_contains "$CAPTURED_CONTROL" "Suggests" "jq"
+    assert_control_field "$CAPTURED_CONTROL" "Suggests" ""
     assert_control_has_field "$CAPTURED_CONTROL" "Replaces"
     assert_control_has_field "$CAPTURED_CONTROL" "Breaks"
 
@@ -637,12 +636,13 @@ test_build_daemon_mainnet_config_deb() {
 }
 
 test_build_daemon_devnet_deb() {
-    safe_build build_daemon_devnet_deb || { log_fail "build exited non-zero"; return; }
+    safe_build build_daemon_deb devnet || { log_fail "build exited non-zero"; return; }
 
     load_captured_state
     assert_eq "deb name" "mina-devnet" "$CAPTURED_DEB_NAME"
     assert_control_field "$CAPTURED_CONTROL" "Package" "mina-devnet"
-    assert_control_contains "$CAPTURED_CONTROL" "Depends" "mina-devnet-config"
+    # Config dependency is pinned to the exact build version
+    assert_control_contains "$CAPTURED_CONTROL" "Depends" "mina-devnet-config (=${EXPECTED_VERSION})"
     assert_control_contains "$CAPTURED_CONTROL" "Depends" "mina-logproc"
     assert_control_contains "$CAPTURED_CONTROL" "Suggests" "jq"
     assert_control_contains "$CAPTURED_CONTROL" "Replaces" "mina-devnet"
@@ -657,11 +657,12 @@ test_build_daemon_devnet_deb() {
 }
 
 test_build_daemon_devnet_config_deb() {
-    safe_build build_daemon_devnet_config_deb || { log_fail "build exited non-zero"; return; }
+    safe_build build_daemon_config_deb devnet || { log_fail "build exited non-zero"; return; }
 
     load_captured_state
     assert_eq "deb name" "mina-devnet-config" "$CAPTURED_DEB_NAME"
     assert_control_field "$CAPTURED_CONTROL" "Package" "mina-devnet-config"
+    assert_control_field "$CAPTURED_CONTROL" "Architecture" "all"
     assert_control_no_field "$CAPTURED_CONTROL" "Depends"
 
     assert_file_captured "$CAPTURED_FILES" "var/lib/coda/config_${EXPECTED_GITHASH_CONFIG}.json"
@@ -676,7 +677,7 @@ test_build_daemon_devnet_config_deb() {
 ################################################################################
 
 test_build_daemon_mainnet_prefork_deb() {
-    safe_build build_daemon_mainnet_prefork_deb || { log_fail "build exited non-zero"; return; }
+    safe_build build_daemon_prefork_deb mainnet || { log_fail "build exited non-zero"; return; }
 
     load_captured_state
     assert_eq "deb name" "mina-mainnet-prefork-mesa" "$CAPTURED_DEB_NAME"
@@ -696,7 +697,7 @@ test_build_daemon_mainnet_prefork_deb() {
 }
 
 test_build_daemon_devnet_prefork_deb() {
-    safe_build build_daemon_devnet_prefork_deb || { log_fail "build exited non-zero"; return; }
+    safe_build build_daemon_prefork_deb devnet || { log_fail "build exited non-zero"; return; }
 
     load_captured_state
     assert_eq "deb name" "mina-devnet-prefork-mesa" "$CAPTURED_DEB_NAME"
@@ -709,16 +710,151 @@ test_build_daemon_devnet_prefork_deb() {
 }
 
 ################################################################################
-# Tests: Testnet Generic package
+# Tests: Postfork packages
 ################################################################################
 
-test_build_daemon_testnet_generic_deb() {
-    safe_build build_daemon_testnet_generic_deb || { log_fail "build exited non-zero"; return; }
+test_build_daemon_devnet_postfork_deb() {
+    export PREFORK_LEGACY_VERSION="3.3.0-compatible-ef01abc"
+
+    safe_build build_daemon_postfork_deb devnet || { log_fail "build exited non-zero"; return; }
 
     load_captured_state
-    # Default name (no lightnet, no instrumentation)
-    assert_eq "deb name" "mina-testnet-generic" "$CAPTURED_DEB_NAME"
-    assert_control_field "$CAPTURED_CONTROL" "Package" "mina-testnet-generic"
+    assert_eq "deb name" "mina-devnet-postfork-mesa" "$CAPTURED_DEB_NAME"
+    assert_control_field "$CAPTURED_CONTROL" "Package" "mina-devnet-postfork-mesa"
+    assert_control_contains "$CAPTURED_CONTROL" "Depends" "libssl1.1"
+    assert_control_contains "$CAPTURED_CONTROL" "Suggests" "jq"
+
+    # Postfork binaries in mesa directory
+    assert_common_daemon_binaries "$CAPTURED_FILES" "usr/lib/mina/mesa"
+
+    # Dispatcher and symlinks in default location
+    assert_file_captured "$CAPTURED_FILES" "usr/local/bin/mina-dispatch"
+    assert_file_captured "$CAPTURED_FILES" "usr/local/bin/mina"
+
+    # Config files (config_<hash>.json, <network>.json) are provided by
+    # the mina-<network>-config package, not the postfork package
+    assert_file_not_captured "$CAPTURED_FILES" "var/lib/coda/config_${EXPECTED_GITHASH_CONFIG}.json"
+    assert_file_not_captured "$CAPTURED_FILES" "var/lib/coda/devnet.json"
+
+    # Config for prefork daemon (resolved 8-char hash from legacy version)
+    assert_file_captured "$CAPTURED_FILES" "var/lib/coda/config_ef01abcd.json"
+
+    # Prefork config should have correct content
+    assert_captured_file_contains "$CAPTURED_LAST_BUILD_DIR" \
+        "var/lib/coda/config_ef01abcd.json" "devnet"
+
+    unset PREFORK_LEGACY_VERSION
+}
+
+test_build_daemon_mainnet_postfork_deb() {
+    export PREFORK_LEGACY_VERSION="3.3.0-compatible-ef01abc"
+
+    safe_build build_daemon_postfork_deb mainnet || { log_fail "build exited non-zero"; return; }
+
+    load_captured_state
+    assert_eq "deb name" "mina-mainnet-postfork-mesa" "$CAPTURED_DEB_NAME"
+    assert_control_field "$CAPTURED_CONTROL" "Package" "mina-mainnet-postfork-mesa"
+
+    # Postfork config comes from the config package, not this one
+    assert_file_not_captured "$CAPTURED_FILES" "var/lib/coda/config_${EXPECTED_GITHASH_CONFIG}.json"
+
+    # Prefork config shipped here (different hash)
+    assert_file_captured "$CAPTURED_FILES" "var/lib/coda/config_ef01abcd.json"
+
+    unset PREFORK_LEGACY_VERSION
+}
+
+test_build_daemon_postfork_deb_without_prefork_version() {
+    # When PREFORK_LEGACY_VERSION is not set, no config files should be shipped
+    # (config comes from the mina-<network>-config package)
+    unset PREFORK_LEGACY_VERSION 2>/dev/null || true
+
+    safe_build build_daemon_postfork_deb devnet || { log_fail "build exited non-zero"; return; }
+
+    load_captured_state
+
+    # No config files at all — neither postfork nor prefork
+    local config_count
+    config_count=$(echo "$CAPTURED_FILES" | grep -c "config_" || true)
+    if [[ "$config_count" -eq 0 ]]; then
+        log_pass
+    else
+        log_fail "Expected 0 config_*.json files, got ${config_count}"
+    fi
+}
+
+test_build_daemon_postfork_deb_unresolvable_prefork_hash() {
+    # When the prefork hash can't be resolved by git, warn but don't fail
+    export PREFORK_LEGACY_VERSION="3.3.0-compatible-badhash"
+
+    safe_build build_daemon_postfork_deb devnet || { log_fail "build exited non-zero"; return; }
+
+    load_captured_state
+
+    # No config files — postfork config comes from config package,
+    # and prefork config can't be shipped because hash is unresolvable
+    local config_count
+    config_count=$(echo "$CAPTURED_FILES" | grep -c "config_" || true)
+    if [[ "$config_count" -eq 0 ]]; then
+        log_pass
+    else
+        log_fail "Expected 0 config_*.json (unresolvable prefork hash), got ${config_count}"
+    fi
+
+    unset PREFORK_LEGACY_VERSION
+}
+
+################################################################################
+# Tests: Automode metapackages
+################################################################################
+
+test_build_daemon_devnet_automode_deb() {
+    safe_build build_daemon_automode_deb devnet || { log_fail "build exited non-zero"; return; }
+
+    load_captured_state
+    assert_eq "deb name" "mina-devnet-automode" "$CAPTURED_DEB_NAME"
+    assert_control_field "$CAPTURED_CONTROL" "Package" "mina-devnet-automode"
+    assert_control_field "$CAPTURED_CONTROL" "Architecture" "amd64"
+    # Prefork/postfork runtimes are pinned to the exact build version
+    assert_control_contains "$CAPTURED_CONTROL" "Depends" "mina-devnet-postfork-mesa (=${EXPECTED_VERSION})"
+    assert_control_contains "$CAPTURED_CONTROL" "Depends" "mina-devnet-prefork-mesa (=${EXPECTED_VERSION})"
+    assert_control_contains "$CAPTURED_CONTROL" "Replaces" "mina-devnet"
+    assert_control_contains "$CAPTURED_CONTROL" "Breaks" "mina-devnet"
+    assert_control_contains "$CAPTURED_CONTROL" "Provides" "mina-devnet"
+    assert_control_contains "$CAPTURED_CONTROL" "Conflicts" "mina-devnet"
+
+    # Metapackage should have NO binaries
+    assert_file_not_captured "$CAPTURED_FILES" "usr/local/bin/mina"
+}
+
+test_build_daemon_mainnet_automode_deb() {
+    safe_build build_daemon_automode_deb mainnet || { log_fail "build exited non-zero"; return; }
+
+    load_captured_state
+    assert_eq "deb name" "mina-mainnet-automode" "$CAPTURED_DEB_NAME"
+    assert_control_field "$CAPTURED_CONTROL" "Package" "mina-mainnet-automode"
+    assert_control_field "$CAPTURED_CONTROL" "Architecture" "amd64"
+    # Prefork/postfork runtimes are pinned to the exact build version
+    assert_control_contains "$CAPTURED_CONTROL" "Depends" "mina-mainnet-postfork-mesa (=${EXPECTED_VERSION})"
+    assert_control_contains "$CAPTURED_CONTROL" "Depends" "mina-mainnet-prefork-mesa (=${EXPECTED_VERSION})"
+    assert_control_contains "$CAPTURED_CONTROL" "Replaces" "mina-mainnet"
+    assert_control_contains "$CAPTURED_CONTROL" "Breaks" "mina-mainnet"
+    assert_control_contains "$CAPTURED_CONTROL" "Provides" "mina-mainnet"
+    assert_control_contains "$CAPTURED_CONTROL" "Conflicts" "mina-mainnet"
+
+    assert_file_not_captured "$CAPTURED_FILES" "usr/local/bin/mina"
+}
+
+################################################################################
+# Tests: Generic packages
+################################################################################
+
+test_build_daemon_devnet_generic_deb() {
+    safe_build build_daemon_generic_deb devnet || { log_fail "build exited non-zero"; return; }
+
+    load_captured_state
+    assert_eq "deb name" "mina-devnet-generic" "$CAPTURED_DEB_NAME"
+    assert_control_field "$CAPTURED_CONTROL" "Package" "mina-devnet-generic"
     assert_control_contains "$CAPTURED_CONTROL" "Depends" "libssl1.1"
     assert_control_contains "$CAPTURED_CONTROL" "Depends" "mina-logproc"
     assert_control_contains "$CAPTURED_CONTROL" "Suggests" "jq"
@@ -727,8 +863,27 @@ test_build_daemon_testnet_generic_deb() {
     assert_common_daemon_binaries "$CAPTURED_FILES"
     assert_daemon_utils "$CAPTURED_FILES"
 
-    # testnet-generic gets devnet.json but NOT as magic config
-    assert_file_captured "$CAPTURED_FILES" "var/lib/coda/devnet.json"
+    # Generic packages have no config files
+    assert_file_not_captured "$CAPTURED_FILES" "var/lib/coda/devnet.json"
+    assert_file_not_captured "$CAPTURED_FILES" "var/lib/coda/config_${EXPECTED_GITHASH_CONFIG}.json"
+}
+
+test_build_daemon_mainnet_generic_deb() {
+    safe_build build_daemon_generic_deb mainnet || { log_fail "build exited non-zero"; return; }
+
+    load_captured_state
+    assert_eq "deb name" "mina-mainnet-generic" "$CAPTURED_DEB_NAME"
+    assert_control_field "$CAPTURED_CONTROL" "Package" "mina-mainnet-generic"
+    assert_control_contains "$CAPTURED_CONTROL" "Depends" "libssl1.1"
+    assert_control_contains "$CAPTURED_CONTROL" "Depends" "mina-logproc"
+    assert_control_contains "$CAPTURED_CONTROL" "Suggests" "jq"
+    assert_control_contains "$CAPTURED_CONTROL" "Replaces" "mina-mainnet"
+
+    assert_common_daemon_binaries "$CAPTURED_FILES"
+    assert_daemon_utils "$CAPTURED_FILES"
+
+    # Generic packages have no config files
+    assert_file_not_captured "$CAPTURED_FILES" "var/lib/coda/mainnet.json"
     assert_file_not_captured "$CAPTURED_FILES" "var/lib/coda/config_${EXPECTED_GITHASH_CONFIG}.json"
 }
 
@@ -737,7 +892,7 @@ test_build_daemon_testnet_generic_deb() {
 ################################################################################
 
 test_build_archive_devnet_deb() {
-    safe_build build_archive_devnet_deb || { log_fail "build exited non-zero"; return; }
+    safe_build build_archive_deb devnet || { log_fail "build exited non-zero"; return; }
 
     load_captured_state
     assert_eq "deb name" "mina-archive-devnet" "$CAPTURED_DEB_NAME"
@@ -754,21 +909,8 @@ test_build_archive_devnet_deb() {
     assert_file_captured "$CAPTURED_FILES" "etc/mina/archive/migrations.sql"
 }
 
-test_build_archive_testnet_generic_deb() {
-    safe_build build_archive_testnet_generic_deb || { log_fail "build exited non-zero"; return; }
-
-    load_captured_state
-    # Default name (no suffix)
-    assert_eq "deb name" "mina-archive-testnet-generic" "$CAPTURED_DEB_NAME"
-    assert_control_field "$CAPTURED_CONTROL" "Package" "mina-archive-testnet-generic"
-    assert_control_contains "$CAPTURED_CONTROL" "Depends" "libpq-dev"
-
-    assert_archive_binaries "$CAPTURED_FILES"
-    assert_file_captured "$CAPTURED_FILES" "etc/mina/archive/create_schema.sql"
-}
-
 test_build_archive_mainnet_deb() {
-    safe_build build_archive_mainnet_deb || { log_fail "build exited non-zero"; return; }
+    safe_build build_archive_deb mainnet || { log_fail "build exited non-zero"; return; }
 
     load_captured_state
     assert_eq "deb name" "mina-archive-mainnet" "$CAPTURED_DEB_NAME"
@@ -789,11 +931,12 @@ test_build_daemon_devnet_hardfork_config_deb() {
     export RUNTIME_CONFIG_JSON="${TEST_TMPDIR}/fork_config.json"
     export LEDGER_TARBALLS="${TEST_TMPDIR}/ledger1.tar.gz ${TEST_TMPDIR}/ledger2.tar.gz"
 
-    safe_build build_daemon_devnet_hardfork_config_deb || { log_fail "build exited non-zero"; return; }
+    safe_build build_daemon_hardfork_config_deb devnet || { log_fail "build exited non-zero"; return; }
 
     load_captured_state
     assert_eq "deb name" "mina-devnet-config" "$CAPTURED_DEB_NAME"
     assert_control_field "$CAPTURED_CONTROL" "Package" "mina-devnet-config"
+    assert_control_field "$CAPTURED_CONTROL" "Architecture" "all"
     assert_control_no_field "$CAPTURED_CONTROL" "Depends"
 
     # Hardfork runtime config replaces the standard one
@@ -816,30 +959,16 @@ test_build_daemon_devnet_hardfork_config_deb() {
     unset RUNTIME_CONFIG_JSON LEDGER_TARBALLS
 }
 
-# This test documents a BUG: build_daemon_testnet_generic_hardfork_config_deb
-# passes "berkeley" to copy_common_daemon_hardfork_configs, which calls
-# copy_common_daemon_configs("berkeley"). That function does not recognize
-# "berkeley" as a valid network name and calls exit 1.
-test_build_daemon_testnet_generic_hardfork_config_deb_fails() {
-    export RUNTIME_CONFIG_JSON="${TEST_TMPDIR}/fork_config.json"
-    export LEDGER_TARBALLS="${TEST_TMPDIR}/ledger1.tar.gz"
-
-    safe_build build_daemon_testnet_generic_hardfork_config_deb
-    local rc=$?
-
-    unset RUNTIME_CONFIG_JSON LEDGER_TARBALLS
-    return $rc
-}
-
 test_build_daemon_mainnet_hardfork_config_deb() {
     export RUNTIME_CONFIG_JSON="${TEST_TMPDIR}/fork_config.json"
     export LEDGER_TARBALLS="${TEST_TMPDIR}/ledger1.tar.gz ${TEST_TMPDIR}/ledger2.tar.gz"
 
-    safe_build build_daemon_mainnet_hardfork_config_deb || { log_fail "build exited non-zero"; return; }
+    safe_build build_daemon_hardfork_config_deb mainnet || { log_fail "build exited non-zero"; return; }
 
     load_captured_state
     assert_eq "deb name" "mina-mainnet-config" "$CAPTURED_DEB_NAME"
     assert_control_field "$CAPTURED_CONTROL" "Package" "mina-mainnet-config"
+    assert_control_field "$CAPTURED_CONTROL" "Architecture" "all"
     assert_control_no_field "$CAPTURED_CONTROL" "Depends"
     assert_control_contains "$CAPTURED_CONTROL" "Replaces" "mina-mainnet"
 
@@ -855,6 +984,45 @@ test_build_daemon_mainnet_hardfork_config_deb() {
 
     assert_file_captured "$CAPTURED_FILES" "var/lib/coda/mainnet.json"
     assert_captured_file_contains "$CAPTURED_LAST_BUILD_DIR" "var/lib/coda/mainnet.json" '{"fork": true}'
+
+    unset RUNTIME_CONFIG_JSON LEDGER_TARBALLS
+}
+
+################################################################################
+# Tests: Architecture restoration after config packages
+################################################################################
+
+# Verifies that building a config deb (Architecture: all) followed by a
+# non-config deb preserves the original architecture for the second package.
+test_config_deb_restores_architecture() {
+    # Build config package (sets ARCHITECTURE=all internally)
+    safe_build build_daemon_config_deb devnet || { log_fail "build exited non-zero"; return; }
+
+    # ARCHITECTURE should be restored to "amd64" after build_daemon_config_deb
+    assert_eq "ARCHITECTURE restored after config deb" "amd64" "$ARCHITECTURE"
+
+    # Build a non-config package and verify it uses the original architecture
+    safe_build build_logproc_deb || { log_fail "build exited non-zero"; return; }
+
+    load_captured_state
+    assert_control_field "$CAPTURED_CONTROL" "Architecture" "amd64"
+}
+
+test_hardfork_config_deb_restores_architecture() {
+    export RUNTIME_CONFIG_JSON="${TEST_TMPDIR}/fork_config.json"
+    export LEDGER_TARBALLS="${TEST_TMPDIR}/ledger1.tar.gz ${TEST_TMPDIR}/ledger2.tar.gz"
+
+    # Build hardfork config package (sets ARCHITECTURE=all internally)
+    safe_build build_daemon_hardfork_config_deb devnet || { log_fail "build exited non-zero"; return; }
+
+    # ARCHITECTURE should be restored to "amd64" after build_daemon_hardfork_config_deb
+    assert_eq "ARCHITECTURE restored after hardfork config deb" "amd64" "$ARCHITECTURE"
+
+    # Build a non-config package and verify it uses the original architecture
+    safe_build build_logproc_deb || { log_fail "build exited non-zero"; return; }
+
+    load_captured_state
+    assert_control_field "$CAPTURED_CONTROL" "Architecture" "amd64"
 
     unset RUNTIME_CONFIG_JSON LEDGER_TARBALLS
 }
@@ -889,7 +1057,7 @@ test_build_delegation_verify_deb() {
 }
 
 test_build_prefork_devnet_genesis_ledger_deb() {
-    safe_build build_prefork_devnet_genesis_ledger_deb || { log_fail "build exited non-zero"; return; }
+    safe_build build_prefork_genesis_ledger_deb devnet || { log_fail "build exited non-zero"; return; }
 
     load_captured_state
     assert_eq "deb name" "mina-create-devnet-prefork-genesis-ledger" "$CAPTURED_DEB_NAME"
@@ -900,7 +1068,7 @@ test_build_prefork_devnet_genesis_ledger_deb() {
 }
 
 test_build_prefork_mainnet_genesis_ledger_deb() {
-    safe_build build_prefork_mainnet_genesis_ledger_deb || { log_fail "build exited non-zero"; return; }
+    safe_build build_prefork_genesis_ledger_deb mainnet || { log_fail "build exited non-zero"; return; }
 
     load_captured_state
     assert_eq "deb name" "mina-create-mainnet-prefork-genesis-ledger" "$CAPTURED_DEB_NAME"
@@ -927,55 +1095,55 @@ test_build_prefork_testnet_generic_genesis_ledger_deb() {
 
 test_build_daemon_devnet_lightnet_naming() {
     # Simulate lightnet profile naming
-    local saved_name="${MINA_DEVNET_DEB_NAME}"
-    MINA_DEVNET_DEB_NAME="mina-devnet-lightnet"
+    local saved_name="${MINA_DEB_NAME}"
+    MINA_DEB_NAME="mina-devnet-lightnet"
 
-    safe_build build_daemon_devnet_deb || { log_fail "build exited non-zero"; return; }
+    safe_build build_daemon_deb devnet || { log_fail "build exited non-zero"; return; }
 
     load_captured_state
     assert_eq "deb name" "mina-devnet-lightnet" "$CAPTURED_DEB_NAME"
     assert_control_field "$CAPTURED_CONTROL" "Package" "mina-devnet-lightnet"
 
-    MINA_DEVNET_DEB_NAME="${saved_name}"
-}
-
-test_build_daemon_testnet_generic_lightnet_naming() {
-    local saved_name="${MINA_DEB_NAME}"
-    MINA_DEB_NAME="mina-testnet-generic-lightnet"
-
-    safe_build build_daemon_testnet_generic_deb || { log_fail "build exited non-zero"; return; }
-
-    load_captured_state
-    assert_eq "deb name" "mina-testnet-generic-lightnet" "$CAPTURED_DEB_NAME"
-    assert_control_field "$CAPTURED_CONTROL" "Package" "mina-testnet-generic-lightnet"
-
     MINA_DEB_NAME="${saved_name}"
 }
 
-test_build_archive_testnet_generic_suffix_naming() {
+test_build_daemon_devnet_generic_lightnet_naming() {
     local saved_suffix="${DEB_SUFFIX}"
-    DEB_SUFFIX="-lightnet"
+    DEB_SUFFIX="lightnet"
 
-    safe_build build_archive_testnet_generic_deb || { log_fail "build exited non-zero"; return; }
+    safe_build build_daemon_generic_deb devnet || { log_fail "build exited non-zero"; return; }
 
     load_captured_state
-    assert_eq "deb name" "mina-archive-testnet-generic-lightnet" "$CAPTURED_DEB_NAME"
-    assert_control_field "$CAPTURED_CONTROL" "Package" "mina-archive-testnet-generic-lightnet"
+    assert_eq "deb name" "mina-devnet-generic-lightnet" "$CAPTURED_DEB_NAME"
+    assert_control_field "$CAPTURED_CONTROL" "Package" "mina-devnet-generic-lightnet"
 
     DEB_SUFFIX="${saved_suffix}"
 }
 
-test_build_daemon_devnet_instrumented_naming() {
-    local saved_name="${MINA_DEVNET_DEB_NAME}"
-    MINA_DEVNET_DEB_NAME="mina-devnet-instrumented"
+test_build_archive_devnet_suffix_naming() {
+    local saved_name="${MINA_ARCHIVE_DEB_NAME}"
+    MINA_ARCHIVE_DEB_NAME="mina-archive-devnet-lightnet"
 
-    safe_build build_daemon_devnet_deb || { log_fail "build exited non-zero"; return; }
+    safe_build build_archive_deb devnet || { log_fail "build exited non-zero"; return; }
+
+    load_captured_state
+    assert_eq "deb name" "mina-archive-devnet-lightnet" "$CAPTURED_DEB_NAME"
+    assert_control_field "$CAPTURED_CONTROL" "Package" "mina-archive-devnet-lightnet"
+
+    MINA_ARCHIVE_DEB_NAME="${saved_name}"
+}
+
+test_build_daemon_devnet_instrumented_naming() {
+    local saved_name="${MINA_DEB_NAME}"
+    MINA_DEB_NAME="mina-devnet-instrumented"
+
+    safe_build build_daemon_deb devnet || { log_fail "build exited non-zero"; return; }
 
     load_captured_state
     assert_eq "deb name" "mina-devnet-instrumented" "$CAPTURED_DEB_NAME"
     assert_control_field "$CAPTURED_CONTROL" "Package" "mina-devnet-instrumented"
 
-    MINA_DEVNET_DEB_NAME="${saved_name}"
+    MINA_DEB_NAME="${saved_name}"
 }
 
 ################################################################################
@@ -1014,7 +1182,7 @@ test_codename_noble_archive_deps() {
     local saved_archive="${ARCHIVE_DEPS}"
     ARCHIVE_DEPS="${NOBLE_ARCHIVE_DEPS}"
 
-    safe_build build_archive_devnet_deb || { log_fail "build exited non-zero"; return; }
+    safe_build build_archive_deb devnet || { log_fail "build exited non-zero"; return; }
 
     load_captured_state
     assert_control_contains "$CAPTURED_CONTROL" "Depends" "libssl3t64"
@@ -1066,7 +1234,6 @@ main() {
     # Rosetta packages
     run_test test_build_rosetta_mainnet_deb
     run_test test_build_rosetta_devnet_deb
-    run_test test_build_rosetta_testnet_generic_deb
 
     # Daemon packages
     run_test test_build_daemon_mainnet_deb
@@ -1079,14 +1246,23 @@ main() {
     run_test test_build_daemon_devnet_prefork_deb
     run_test test_build_prefork_devnet_genesis_ledger_deb
     run_test test_build_prefork_mainnet_genesis_ledger_deb
-    run_test test_build_prefork_testnet_generic_genesis_ledger_deb
 
-    # Testnet generic
-    run_test test_build_daemon_testnet_generic_deb
+    # Postfork packages
+    run_test test_build_daemon_devnet_postfork_deb
+    run_test test_build_daemon_mainnet_postfork_deb
+    run_test test_build_daemon_postfork_deb_without_prefork_version
+    run_test test_build_daemon_postfork_deb_unresolvable_prefork_hash
+
+    # Automode metapackages
+    run_test test_build_daemon_devnet_automode_deb
+    run_test test_build_daemon_mainnet_automode_deb
+
+    # Generic packages
+    run_test test_build_daemon_devnet_generic_deb
+    run_test test_build_daemon_mainnet_generic_deb
 
     # Archive packages
     run_test test_build_archive_devnet_deb
-    run_test test_build_archive_testnet_generic_deb
     run_test test_build_archive_mainnet_deb
 
     # Hardfork config packages
@@ -1099,19 +1275,20 @@ main() {
 
     # Naming variants
     run_test test_build_daemon_devnet_lightnet_naming
-    run_test test_build_daemon_testnet_generic_lightnet_naming
-    run_test test_build_archive_testnet_generic_suffix_naming
+    run_test test_build_daemon_devnet_generic_lightnet_naming
+    run_test test_build_archive_devnet_suffix_naming
     run_test test_build_daemon_devnet_instrumented_naming
 
     # Codename dependency variants
     run_test test_codename_noble_deps
     run_test test_codename_noble_archive_deps
 
+    # Architecture restoration after config packages
+    run_test test_config_deb_restores_architecture
+    run_test test_hardfork_config_deb_restores_architecture
+
     # Control file structure
     run_test test_control_file_common_fields
-
-    # Known broken functions (expected to fail)
-    run_test_expect_fail test_build_daemon_testnet_generic_hardfork_config_deb_fails
 
     # Cleanup
     teardown_test_environment

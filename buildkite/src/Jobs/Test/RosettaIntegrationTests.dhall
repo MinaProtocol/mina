@@ -20,7 +20,7 @@ let Network = ../../Constants/Network.dhall
 
 let RunWithPostgres = ../../Command/RunWithPostgres.dhall
 
-let network = Network.Type.TestnetGeneric
+let network = Network.Type.Devnet
 
 let dirtyWhen =
       [ S.strictlyStart (S.contains "src")
@@ -31,7 +31,10 @@ let dirtyWhen =
 
 let rosettaDocker =
       Artifacts.fullDockerTag
-        Artifacts.Tag::{ artifact = Artifacts.Type.Rosetta, network = network }
+        Artifacts.Tag::{
+        , artifact = Artifacts.Type.RosettaAppsOnly
+        , network = network
+        }
 
 in  Pipeline.build
       Pipeline.Config::{
@@ -51,7 +54,7 @@ in  Pipeline.build
             Command.Config::{
             , commands =
               [ Cmd.run
-                  "export MINA_DEB_CODENAME=bullseye && source ./buildkite/scripts/export-git-env-vars.sh && echo \\\${MINA_DOCKER_TAG}"
+                  "export MINA_DEB_CODENAME=bookworm && source ./buildkite/scripts/export-git-env-vars.sh && echo \\\${MINA_DOCKER_TAG}"
               , RunWithPostgres.runInDockerWithPostgresConn
                   ([] : List Text)
                   ( Some
@@ -65,15 +68,15 @@ in  Pipeline.build
                   Cmd.Docker::{ image = rosettaDocker }
                   "buildkite/scripts/tests/rosetta-integration-tests.sh"
               ]
-            , label = "Rosetta integration tests Bullseye"
-            , key = "rosetta-integration-tests-bullseye"
+            , label = "Rosetta integration tests Bookworm"
+            , key = "rosetta-integration-tests-bookworm"
             , target = Size.Small
             , artifact_paths = [ S.contains "test_output/artifacts/*" ]
             , depends_on =
                 Dockers.dependsOn
                   Dockers.DepsSpec::{
-                  , codename = Dockers.Type.Bullseye
-                  , artifact = Artifacts.Type.Rosetta
+                  , codename = Dockers.Type.Bookworm
+                  , artifact = Artifacts.Type.RosettaAppsOnly
                   , network = network
                   }
             }

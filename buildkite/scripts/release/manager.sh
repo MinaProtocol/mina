@@ -13,9 +13,9 @@
 # - FIX: Repair Debian repository manifests when needed
 # - PERSIST: Archive artifacts to long-term storage backends
 #
-# Supported artifacts: mina-daemon, mina-archive, mina-rosetta, mina-logproc
+# Supported artifacts: mina-daemon, mina-archive, mina-rosetta, mina-logproc, mina-config, mina-automode, mina-prefork, mina-postfork, mina-generic, rosetta-generic, mina-postfork-mesa, mina-prefork-mesa, minimina
 # Supported networks: devnet, mainnet
-# Supported platforms: Debian (bullseye, focal), Docker (GCR, Docker.io)
+# Supported platforms: Debian (bookworm, focal), Docker (GCR, Docker.io)
 # Supported channels: unstable, alpha, beta, stable
 # Supported backends: Google Cloud Storage (gs), Hetzner, local filesystem
 #
@@ -46,7 +46,7 @@ PS4='debug($LINENO) ${FUNCNAME[0]:+${FUNCNAME[0]}}(): ';
 
 DEFAULT_ARTIFACTS="mina-logproc,mina-archive,mina-rosetta,mina-daemon"
 DEFAULT_NETWORKS="devnet,mainnet"
-DEFAULT_CODENAMES="bullseye,focal"
+DEFAULT_CODENAMES="bookworm,focal"
 DEFAULT_ARCHITECTURES="amd64"
 DEFAULT_PROFILE=devnet
 
@@ -58,6 +58,12 @@ DEBIAN_REPO=packages.o1test.net
 
 SCRIPTPATH="$( cd "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
 SUBCOMMAND_TAB="        "
+
+# Sets DEB_S3_REGION_ARG, DEB_S3_ENDPOINT_ARGS and deb_s3_object_url().
+# DEB_S3_ENDPOINT_ARGS is empty unless DEB_S3_ENDPOINT redirects deb-s3 at an
+# S3-compatible server, which is how the test suite runs without AWS.
+# shellcheck source=scripts/debian/deb-s3-common.sh
+source "$SCRIPTPATH/../../../scripts/debian/deb-s3-common.sh"
 HETZNER_USER=u434410
 HETZNER_HOST=u434410-sub2.your-storagebox.de
 HETZNER_KEY=${HETZNER_KEY:-$HOME/.ssh/id_rsa}
@@ -107,13 +113,19 @@ function prefix_cmd {
     "${CMD[@]}" 1> >(sed "s/^/${PREF}/") 2> >(sed "s/^/${PREF}/" 1>&2)
 }
 
-# Extract bucket name from potentially full S3 URL
-# Input: s3.us-west-2.amazonaws.com/bucket-name or just bucket-name
+# Extract bucket name from a repository reference.
+# Input:  s3.us-west-2.amazonaws.com/bucket-name
+#         http://mock-repo:9000/bucket-name
+#         bucket-name
 # Output: bucket-name
+#
+# A bare bucket name contains no slash, so it is returned unchanged. That keeps
+# the CNAME-shaped repositories (nightly.apt.packages.minaprotocol.com and
+# friends) working, since for those the bucket name is the domain.
 function extract_bucket_name() {
     local __repo=$1
-    # Strip s3 prefix patterns like "s3.us-west-2.amazonaws.com/" or "s3.amazonaws.com/"
-    echo "$__repo" | sed -E 's|^s3(\.[^/]+)?\.amazonaws\.com/||'
+    # Strip an optional scheme, then an optional host[:port] path segment.
+    echo "$__repo" | sed -E -e 's|^[a-zA-Z][a-zA-Z0-9+.-]*://||' -e 's|^[^/]+/||'
 }
 
 function main_help(){
@@ -142,7 +154,7 @@ function main_help(){
     echo " architectures: $DEFAULT_ARCHITECTURES"
     echo ""
     echo "Available values: "
-    echo " artifacts: mina-logproc,mina-archive,mina-rosetta,mina"
+    echo " artifacts: mina-logproc,mina-archive,mina-rosetta,mina-daemon,mina-config,mina-automode,mina-prefork,mina-postfork,mina-generic,rosetta-generic,mina-postfork-mesa,mina-prefork-mesa,minimina"
     echo " networks: devnet,mainnet"
     echo " codenames: bullseye,focal"
     echo " channels: unstable,alpha,beta,stable"
@@ -182,6 +194,9 @@ function get_suffix() {
             echo "-$__network"
         ;;
         mina-archive)
+            echo "-$__network"
+        ;;
+        mina-config|mina-automode|mina-prefork|mina-postfork|mina-generic|rosetta-generic|mina-postfork-mesa|mina-prefork-mesa)
             echo "-$__network"
         ;;
         *)
@@ -227,6 +242,30 @@ function get_artifact_with_suffix() {
         ;;
         mina-archive)
             echo "mina-archive-$__network"
+        ;;
+        mina-config)
+            echo "mina-$__network-config"
+        ;;
+        mina-automode)
+            echo "mina-$__network-automode"
+        ;;
+        mina-prefork)
+            echo "mina-$__network-prefork-mesa"
+        ;;
+        mina-postfork)
+            echo "mina-$__network-postfork-mesa"
+        ;;
+        mina-generic)
+            echo "mina-$__network-generic"
+        ;;
+        rosetta-generic)
+            echo "mina-rosetta-$__network-generic"
+        ;;
+        mina-postfork-mesa)
+            echo "mina-$__network-postfork-mesa"
+        ;;
+        mina-prefork-mesa)
+            echo "mina-$__network-prefork-mesa"
         ;;
         *)
             echo "$__artifact"
@@ -444,9 +483,20 @@ function publish_debian() {
     local __new_artifact_name=${15:-""}
     local __skip_cache_invalidation=${SKIP_CACHE_INVALIDATION:-0}
 
-    get_cached_debian_or_download $__backend $__artifact $__codename "$__network" "$__arch" "$__profile"
     local __artifact_full_name
     __artifact_full_name=$(get_artifact_with_suffix $__artifact $__network $__profile)
+
+    if [[ -z ${__new_artifact_name+x} || -z ${__new_artifact_name} || ${__new_artifact_name} == "" ]]; then
+        __new_artifact_name=$__artifact_full_name
+    fi
+
+    echo " 🍥  Publishing $__artifact debian to $__channel channel with $__target_version version"
+    echo "     📦  Target debian version: $(calculate_debian_version $__artifact $__target_version $__codename "$__network" "$__arch")"
+    if [[ $__dry_run == 1 ]]; then
+        return 0
+    fi
+
+    get_cached_debian_or_download $__backend $__artifact $__codename "$__network" "$__arch" "$__profile"
     local __deb=$DEBIAN_CACHE_FOLDER/$__codename/"${__artifact_full_name}"
 
     if [[ $__debian_sign_key != "" ]]; then
@@ -456,11 +506,6 @@ function publish_debian() {
         local __sign_arg=()
         local __signed_arg=""
     fi
-
-    if [[ -z ${__new_artifact_name+x} || -z ${__new_artifact_name} || ${__new_artifact_name} == "" ]]; then
-        __new_artifact_name=$__artifact_full_name
-    fi
-
 
     if [[ $__source_version != "$__target_version" ]]; then
         echo " 🗃️  Rebuilding $__artifact debian from $__source_version to $__target_version"
@@ -479,8 +524,6 @@ function publish_debian() {
         rm -rf "$__session_dir"
     fi
 
-    echo " 🍥  Publishing $__artifact debian to $__channel channel with $__target_version version"
-    echo "     📦  Target debian version: $(calculate_debian_version $__artifact $__target_version $__codename "$__network" "$__arch")"
     if [[ $__dry_run == 0 ]]; then
         # shellcheck disable=SC2068,SC2046
         prefix_cmd "$SUBCOMMAND_TAB" source $SCRIPTPATH/../../../scripts/debian/publish.sh \
@@ -574,7 +617,7 @@ function promote_debian() {
     local __dry_run=$9
     local __debian_repo=${10}
     local __arch=${11}
-    local __debian_sign_key=${12}
+    local __debian_sign_key=${12:-""}
     local __skip_cache_invalidation=${SKIP_CACHE_INVALIDATION:-0}
 
     if [[ $__debian_sign_key != "" ]]; then
@@ -601,7 +644,7 @@ function promote_debian() {
         # Download the .deb from S3
         mkdir -p "$DEBIAN_CACHE_FOLDER/$__codename"
         local __input_deb="$DEBIAN_CACHE_FOLDER/$__codename/${__artifact_full_name}_${__source_version}_${__arch}.deb"
-        wget "https://s3.us-west-2.amazonaws.com/${__debian_bucket}/pool/${__codename}/m/mi/${__artifact_full_name}_${__source_version}_${__arch}.deb" \
+        wget "$(deb_s3_object_url "$__debian_bucket" "pool/${__codename}/m/mi/${__artifact_full_name}_${__source_version}_${__arch}.deb")" \
             -O "$__input_deb"
 
         # Open session and modify
@@ -893,7 +936,7 @@ function publish(){
         for artifact in "${__artifacts_arr[@]}"; do
             for __codename in "${__codenames_arr[@]}"; do
                     case $artifact in
-                            mina-logproc)
+                            mina-logproc|minimina)
 
                                 if [[ $__only_dockers == 0 ]]; then
                                         publish_debian $artifact \
@@ -995,6 +1038,102 @@ function publish(){
 
                                     if [[ $__only_debians == 0 ]]; then
                                         promote_and_verify_docker $artifact $__source_version $__target_version $__codename $network $__profile $__source_docker_repo $__target_docker_repo $__verify $__arch $__dry_run
+                                    fi
+                                done
+                            ;;
+                            mina-config)
+                                for network in "${__networks_arr[@]}"; do
+                                    if [[ $__only_dockers == 0 ]]; then
+                                        publish_debian $artifact \
+                                                $__codename \
+                                                $__source_version \
+                                                $__target_version \
+                                                $__channel \
+                                                $network \
+                                                $__profile \
+                                                $__verify \
+                                                $__dry_run \
+                                                $__backend \
+                                                $__debian_repo \
+                                                "all" \
+                                                "$__force_upload_debians" \
+                                                "$__debian_sign_key"
+                                    fi
+
+                                    if [[ $__only_debians == 0 ]]; then
+                                        echo "ℹ️  There is no $artifact docker image to publish. skipping"
+                                    fi
+                                done
+                            ;;
+                            mina-automode|mina-prefork|mina-postfork)
+                                for network in "${__networks_arr[@]}"; do
+                                    if [[ $__only_dockers == 0 ]]; then
+                                        publish_debian $artifact \
+                                                $__codename \
+                                                $__source_version \
+                                                $__target_version \
+                                                $__channel \
+                                                $network \
+                                                $__profile \
+                                                $__verify \
+                                                $__dry_run \
+                                                $__backend \
+                                                $__debian_repo \
+                                                "$__arch" \
+                                                "$__force_upload_debians" \
+                                                "$__debian_sign_key"
+                                    fi
+
+                                    if [[ $__only_debians == 0 ]]; then
+                                        echo "ℹ️  There is no $artifact docker image to publish. skipping"
+                                    fi
+                                done
+                            ;;
+                            mina-generic|rosetta-generic)
+                                for network in "${__networks_arr[@]}"; do
+                                    if [[ $__only_dockers == 0 ]]; then
+                                        publish_debian $artifact \
+                                                $__codename \
+                                                $__source_version \
+                                                $__target_version \
+                                                $__channel \
+                                                $network \
+                                                $__profile \
+                                                $__verify \
+                                                $__dry_run \
+                                                $__backend \
+                                                $__debian_repo \
+                                                "$__arch" \
+                                                "$__force_upload_debians" \
+                                                "$__debian_sign_key"
+                                    fi
+
+                                    if [[ $__only_debians == 0 ]]; then
+                                        promote_and_verify_docker $artifact $__source_version $__target_version $__codename $network $__profile $__source_docker_repo $__target_docker_repo $__verify $__arch $__dry_run
+                                    fi
+                                done
+                            ;;
+                            mina-postfork-mesa|mina-prefork-mesa)
+                                for network in "${__networks_arr[@]}"; do
+                                    if [[ $__only_dockers == 0 ]]; then
+                                        publish_debian $artifact \
+                                                $__codename \
+                                                $__source_version \
+                                                $__target_version \
+                                                $__channel \
+                                                $network \
+                                                $__profile \
+                                                $__verify \
+                                                $__dry_run \
+                                                $__backend \
+                                                $__debian_repo \
+                                                "$__arch" \
+                                                "$__force_upload_debians" \
+                                                "$__debian_sign_key"
+                                    fi
+
+                                    if [[ $__only_debians == 0 ]]; then
+                                        echo "ℹ️  There is no $artifact docker image to publish. skipping"
                                     fi
                                 done
                             ;;
@@ -1265,7 +1404,7 @@ function promote(){
     for artifact in "${__artifacts_arr[@]}"; do
         for __codename in "${__codenames_arr[@]}"; do
                     case $artifact in
-                        mina-logproc)
+                        mina-logproc|minimina)
 
                             if [[ $__only_dockers == 0 ]]; then
                                 promote_debian $artifact \
@@ -1283,7 +1422,7 @@ function promote(){
                             fi
 
                             if [[ $__only_debians == 0 ]]; then
-                                echo "   ℹ️  There is no mina-logproc docker image to promote. skipping"
+                                echo "   ℹ️  There is no $artifact docker image to promote. skipping"
                             fi
 
 
@@ -1354,6 +1493,94 @@ function promote(){
                                 fi
                             done
                         ;;
+                        mina-config)
+                            for network in "${__networks_arr[@]}"; do
+                                if [[ $__only_dockers == 0 ]]; then
+                                    promote_debian $artifact \
+                                        $__codename \
+                                        $__source_version \
+                                        $__target_version \
+                                        $__source_channel \
+                                        $__target_channel \
+                                        $network \
+                                        $__verify \
+                                        $__dry_run \
+                                        $__debian_repo \
+                                        "all" \
+                                        $__debian_sign_key
+                                fi
+
+                                if [[ $__only_debians == 0 ]]; then
+                                    echo "   ℹ️  There is no $artifact docker image to promote. skipping"
+                                fi
+                            done
+                        ;;
+                        mina-automode|mina-prefork|mina-postfork)
+                            for network in "${__networks_arr[@]}"; do
+                                if [[ $__only_dockers == 0 ]]; then
+                                    promote_debian $artifact \
+                                        $__codename \
+                                        $__source_version \
+                                        $__target_version \
+                                        $__source_channel \
+                                        $__target_channel \
+                                        $network \
+                                        $__verify \
+                                        $__dry_run \
+                                        $__debian_repo \
+                                        "$__arch" \
+                                        $__debian_sign_key
+                                fi
+
+                                if [[ $__only_debians == 0 ]]; then
+                                    echo "   ℹ️  There is no $artifact docker image to promote. skipping"
+                                fi
+                            done
+                        ;;
+                        mina-generic|rosetta-generic)
+                            for network in "${__networks_arr[@]}"; do
+                                if [[ $__only_dockers == 0 ]]; then
+                                    promote_debian $artifact \
+                                        $__codename \
+                                        $__source_version \
+                                        $__target_version \
+                                        $__source_channel \
+                                        $__target_channel \
+                                        $network \
+                                        $__verify \
+                                        $__dry_run \
+                                        $__debian_repo \
+                                        "$__arch" \
+                                        $__debian_sign_key
+                                fi
+
+                                if [[ $__only_debians == 0 ]]; then
+                                    promote_and_verify_docker $artifact $__source_version $__target_version $__codename $network $__profile $__source_docker_repo $__target_docker_repo $__verify $__arch $__dry_run
+                                fi
+                            done
+                        ;;
+                        mina-postfork-mesa|mina-prefork-mesa)
+                            for network in "${__networks_arr[@]}"; do
+                                if [[ $__only_dockers == 0 ]]; then
+                                    promote_debian $artifact \
+                                        $__codename \
+                                        $__source_version \
+                                        $__target_version \
+                                        $__source_channel \
+                                        $__target_channel \
+                                        $network \
+                                        $__verify \
+                                        $__dry_run \
+                                        $__debian_repo \
+                                        "$__arch" \
+                                        $__debian_sign_key
+                                fi
+
+                                if [[ $__only_debians == 0 ]]; then
+                                    echo "   ℹ️  There is no $artifact docker image to promote. skipping"
+                                fi
+                            done
+                        ;;
                         *)
                             echo "❌ Unknown artifact: $artifact"
                             exit 1
@@ -1391,6 +1618,7 @@ function verify_help(){
     printf "  %-25s %s\n" "--arch" "[string] architecture (amd64 or arm64)";
     printf "  %-25s %s\n" "--profile" "[string] build profile to publish. e.g lightnet, mainnet. default: $DEFAULT_PROFILE";
     printf "  %-25s %s\n" "--build-flag" "[string] build flag which was used while building mina. e.g instrumented";
+    printf "  %-25s %s\n" "--generic" "[bool] verify generic docker images (with -generic suffix in tag)";
     echo ""
     echo "Example:"
     echo ""
@@ -1405,26 +1633,24 @@ function combine_docker_suffixes() {
     local network=$1
     local __profile=$2
     local __build_flag=$3
+    local __generic=${4:-0}
 
-    if [[ "$__profile" == "lightnet" ]]; then
-        local __docker_suffix=$__profile
-    else
-        local __docker_suffix=""
+    local __parts=("${network}")
+
+    if [[ "$__generic" == "1" ]]; then
+        __parts+=("generic")
     fi
 
     if [[ -n "$__build_flag" ]]; then
-        if [[ -n "$__docker_suffix" ]]; then
-            echo "-${network}-${__docker_suffix}-${__build_flag}"
-        else
-            echo "-${network}-${__build_flag}"
-        fi
-    else
-        if [[ -n "$__docker_suffix" ]]; then
-            echo "-${network}-${__docker_suffix}"
-        else
-            echo "-${network}"
-        fi
+        __parts+=("$__build_flag")
     fi
+
+    if [[ "$__profile" == "lightnet" ]]; then
+        __parts+=("$__profile")
+    fi
+
+    local IFS='-'
+    echo "-${__parts[*]}"
 }
 
 function verify(){
@@ -1445,6 +1671,7 @@ function verify(){
     local __profile=$DEFAULT_PROFILE
     local __docker_repo="$DEFAULT_DOCKER_REPO"
     local __build_flag=""
+    local __generic=0
 
     while [ ${#} -gt 0 ]; do
         error_message="Error: a value is needed for '$1'";
@@ -1504,6 +1731,10 @@ function verify(){
                 __build_flag=${2:?$error_message}
                 shift 2;
             ;;
+            --generic )
+                __generic=1
+                shift 1;
+            ;;
             * )
                 echo -e "${RED} !! Unknown option: $1${CLEAR}\n";
                 echo "";
@@ -1527,6 +1758,7 @@ function verify(){
     echo " - Architectures: $__archs"
     echo " - Profile: $__profile"
     echo " - Build flag: $__build_flag"
+    echo " - Generic: $__generic"
     echo ""
 
     # Only require deb-s3 and aws if we are dealing with debians
@@ -1551,7 +1783,7 @@ function verify(){
         for artifact in "${__artifacts_arr[@]}"; do
             for __codename in "${__codenames_arr[@]}"; do
                         case $artifact in
-                            mina-logproc)
+                            mina-logproc|minimina)
 
                                 if [[ $__only_dockers == 0 ]]; then
                                         echo "     📋  Verifying: $artifact debian on $__channel channel with $__version version for $__codename codename"
@@ -1567,7 +1799,7 @@ function verify(){
                                 fi
 
                                 if [[ $__only_debians == 0 ]]; then
-                                    echo "    ℹ️  There is no mina-logproc docker image. skipping"
+                                    echo "    ℹ️  There is no $artifact docker image. skipping"
                                 fi
 
                             ;;
@@ -1577,7 +1809,7 @@ function verify(){
                                         __artifact_full_name=$(get_artifact_with_suffix $artifact $network)
 
                                 local __docker_suffix_combined
-                                __docker_suffix_combined=$(combine_docker_suffixes "$network" "$__profile" "$__build_flag")
+                                __docker_suffix_combined=$(combine_docker_suffixes "$network" "$__profile" "$__build_flag" "$__generic")
 
                                 if [[ $__only_dockers == 0 ]]; then
 
@@ -1619,7 +1851,7 @@ function verify(){
                                 __artifact_full_name=$(get_artifact_with_suffix $artifact $network)
 
                                 local __docker_suffix_combined
-                                __docker_suffix_combined=$(combine_docker_suffixes "$network" "$__profile" "$__build_flag")
+                                __docker_suffix_combined=$(combine_docker_suffixes "$network" "$__profile" "$__build_flag" "$__generic")
 
                                 if [[ $__only_dockers == 0 ]]; then
 
@@ -1662,7 +1894,7 @@ function verify(){
                                     __artifact_full_name=$(get_artifact_with_suffix $artifact $network $__profile)
 
                                     local __docker_suffix_combined
-                                    __docker_suffix_combined=$(combine_docker_suffixes "$network" "$__profile" "$__build_flag")
+                                    __docker_suffix_combined=$(combine_docker_suffixes "$network" "$__profile" "$__build_flag" "$__generic")
 
 
                                 if [[ $__only_dockers == 0 ]]; then
@@ -1691,6 +1923,124 @@ function verify(){
                                             -a "$__arch"
 
                                         echo ""
+                                    fi
+                                done
+                            ;;
+                            mina-config)
+                                for network in "${__networks_arr[@]}"; do
+                                    local __artifact_full_name
+                                    __artifact_full_name=$(get_artifact_with_suffix $artifact $network)
+
+                                    if [[ $__only_dockers == 0 ]]; then
+                                        echo "     📋  Verifying: $__artifact_full_name debian on $__channel channel with $__version version for $__codename codename"
+                                        echo ""
+
+                                        prefix_cmd "$SUBCOMMAND_TAB" $SCRIPTPATH/../../../scripts/debian/verify.sh \
+                                            -p $__artifact_full_name \
+                                            --version $__version \
+                                            -m $__codename \
+                                            -r $__debian_repo \
+                                            -c $__channel \
+                                            -a "all" \
+                                            ${__signed_debian_repo:+--signed}
+
+                                        echo ""
+                                    fi
+
+                                    if [[ $__only_debians == 0 ]]; then
+                                        echo "    ℹ️  There is no $artifact docker image. skipping"
+                                    fi
+                                done
+                            ;;
+                            mina-automode|mina-prefork|mina-postfork)
+                                for network in "${__networks_arr[@]}"; do
+                                    local __artifact_full_name
+                                    __artifact_full_name=$(get_artifact_with_suffix $artifact $network)
+
+                                    if [[ $__only_dockers == 0 ]]; then
+                                        echo "     📋  Verifying: $__artifact_full_name debian on $__channel channel with $__version version for $__codename codename"
+                                        echo ""
+
+                                        prefix_cmd "$SUBCOMMAND_TAB" $SCRIPTPATH/../../../scripts/debian/verify.sh \
+                                            -p $__artifact_full_name \
+                                            --version $__version \
+                                            -m $__codename \
+                                            -r $__debian_repo \
+                                            -c $__channel \
+                                            -a "$__arch" \
+                                            ${__signed_debian_repo:+--signed}
+
+                                        echo ""
+                                    fi
+
+                                    if [[ $__only_debians == 0 ]]; then
+                                        echo "    ℹ️  There is no $artifact docker image. skipping"
+                                    fi
+                                done
+                            ;;
+                            mina-generic|rosetta-generic)
+                                for network in "${__networks_arr[@]}"; do
+                                    local __artifact_full_name
+                                    __artifact_full_name=$(get_artifact_with_suffix $artifact $network)
+
+                                    local __docker_suffix_combined
+                                    __docker_suffix_combined=$(combine_docker_suffixes "$network" "$__profile" "$__build_flag" "$__generic")
+
+                                    if [[ $__only_dockers == 0 ]]; then
+                                        echo "     📋  Verifying: $__artifact_full_name debian on $__channel channel with $__version version for $__codename codename"
+                                        echo ""
+
+                                        prefix_cmd "$SUBCOMMAND_TAB" $SCRIPTPATH/../../../scripts/debian/verify.sh \
+                                            -p $__artifact_full_name \
+                                            --version $__version \
+                                            -m $__codename \
+                                            -r $__debian_repo \
+                                            -c $__channel \
+                                            -a "$__arch" \
+                                            ${__signed_debian_repo:+--signed}
+
+                                        echo ""
+                                    fi
+
+                                    if [[ $__only_debians == 0 ]]; then
+                                        echo "      📋  Verifying: $artifact docker on $(calculate_docker_tag "$__docker_repo" $__artifact_full_name $__version $__codename "$network" "$__arch" )"
+                                        echo ""
+
+                                        prefix_cmd "$SUBCOMMAND_TAB" $SCRIPTPATH/../../../scripts/docker/verify.sh \
+                                            -p "$artifact" \
+                                            -v $__version \
+                                            -c "$__codename" \
+                                            -s "$__docker_suffix_combined" \
+                                            -r "$__docker_repo" \
+                                            -a "$__arch"
+
+                                        echo ""
+                                    fi
+                                done
+                            ;;
+                            mina-postfork-mesa|mina-prefork-mesa)
+                                for network in "${__networks_arr[@]}"; do
+                                    local __artifact_full_name
+                                    __artifact_full_name=$(get_artifact_with_suffix $artifact $network)
+
+                                    if [[ $__only_dockers == 0 ]]; then
+                                        echo "     📋  Verifying: $__artifact_full_name debian on $__channel channel with $__version version for $__codename codename"
+                                        echo ""
+
+                                        prefix_cmd "$SUBCOMMAND_TAB" $SCRIPTPATH/../../../scripts/debian/verify.sh \
+                                            -p $__artifact_full_name \
+                                            --version $__version \
+                                            -m $__codename \
+                                            -r $__debian_repo \
+                                            -c $__channel \
+                                            -a "$__arch" \
+                                            ${__signed_debian_repo:+--signed}
+
+                                        echo ""
+                                    fi
+
+                                    if [[ $__only_debians == 0 ]]; then
+                                        echo "    ℹ️  There is no $artifact docker image. skipping"
                                     fi
                                 done
                             ;;
@@ -1740,7 +2090,6 @@ function fix(){
     local __codenames="$DEFAULT_CODENAMES"
     local __channel
     local __bucket_arg="--bucket=packages.o1test.net"
-    local __s3_region_arg="--s3-region=us-west-2"
 
 
     while [ ${#} -gt 0 ]; do
@@ -1780,7 +2129,8 @@ function fix(){
             deb-s3 verify \
             --fix-manifests \
             $__bucket_arg \
-            $__s3_region_arg \
+            $DEB_S3_REGION_ARG \
+            "${DEB_S3_ENDPOINT_ARGS[@]}" \
             --codename=${__codename} \
             --component=${__channel}
         done
@@ -2520,7 +2870,7 @@ function check_debian_package() {
 
     # Use deb-s3 list to check if package exists
     local output
-    output=$(deb-s3 list --bucket="$__bucket" --s3-region=us-west-2 --component "$__component" --codename "$__codename" --arch "$__arch" 2>/dev/null || echo "")
+    output=$(deb-s3 list --bucket="$__bucket" $DEB_S3_REGION_ARG "${DEB_S3_ENDPOINT_ARGS[@]}" --component "$__component" --codename "$__codename" --arch "$__arch" 2>/dev/null || echo "")
 
     # Check if the package with the version exists
     if echo "$output" | grep -q "${__package_name}_${__version}_${__arch}.deb"; then
@@ -2664,12 +3014,12 @@ function progress(){
                     
                     # Fetch all packages for this codename/release/arch combination once
                     local available_packages
-                    available_packages=$(deb-s3 list --bucket="$bucket" --s3-region=us-west-2 --component "$__release" --codename "$codename" --arch "$arch" 2>/dev/null || echo "")
+                    available_packages=$(deb-s3 list --bucket="$bucket" $DEB_S3_REGION_ARG "${DEB_S3_ENDPOINT_ARGS[@]}" --component "$__release" --codename "$codename" --arch "$arch" 2>/dev/null || echo "")
 
                     for artifact in "${__artifacts_arr[@]}"; do
                         # Handle artifacts that need network suffix
                         case $artifact in
-                            mina-logproc)
+                            mina-logproc|minimina)
                                 local package_name="$artifact"
                                 ((total_debian_checks=total_debian_checks+1))
 
@@ -2706,7 +3056,31 @@ function progress(){
                                     fi
                                 fi
                                 ;;
-                            mina-daemon|mina-rosetta)
+                            mina-daemon|mina-rosetta|mina-generic|rosetta-generic|mina-postfork-mesa|mina-prefork-mesa)
+                                local package_with_suffix
+                                package_with_suffix=$(get_artifact_with_suffix "$artifact" "$__network")
+
+                                ((total_debian_checks=total_debian_checks+1))
+                                if echo "$available_packages" | awk '{print $1, $2, $3}' | grep -q "^${package_with_suffix} ${__version} ${arch}$"; then
+                                    echo "      ✅  $package_with_suffix"
+                                    ((passed_debian_checks=passed_debian_checks+1))
+                                else
+                                    echo "      ❌  $package_with_suffix - MISSING"
+                                fi
+                                ;;
+                            mina-config)
+                                local package_with_suffix
+                                package_with_suffix=$(get_artifact_with_suffix "$artifact" "$__network")
+
+                                ((total_debian_checks=total_debian_checks+1))
+                                if echo "$available_packages" | awk '{print $1, $2, $3}' | grep -q "^${package_with_suffix} ${__version} all$"; then
+                                    echo "      ✅  $package_with_suffix"
+                                    ((passed_debian_checks=passed_debian_checks+1))
+                                else
+                                    echo "      ❌  $package_with_suffix - MISSING"
+                                fi
+                                ;;
+                            mina-automode|mina-prefork|mina-postfork)
                                 local package_with_suffix
                                 package_with_suffix=$(get_artifact_with_suffix "$artifact" "$__network")
 
@@ -2745,8 +3119,8 @@ function progress(){
         echo ""
 
         for artifact in "${__artifacts_arr[@]}"; do
-            # Skip mina-logproc as it has no docker image
-            if [[ "$artifact" == "mina-logproc" ]]; then
+            # Skip artifacts that have no docker image
+            if [[ "$artifact" == "mina-logproc" || "$artifact" == "minimina" || "$artifact" == "mina-config" || "$artifact" == "mina-automode" || "$artifact" == "mina-prefork" || "$artifact" == "mina-postfork" || "$artifact" == "mina-postfork-mesa" || "$artifact" == "mina-prefork-mesa" ]]; then
                 continue
             fi
 

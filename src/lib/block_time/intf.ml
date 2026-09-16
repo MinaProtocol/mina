@@ -4,6 +4,9 @@ module type S = sig
   open Snark_params
   open Snark_bits
 
+  (** Unsigned uint64 milliseconds since epoch.  All uint64-domain operations
+      are total; only conversion to float-backed [Core.Time.t] is partial
+      (values >= 2^63), isolated in {!to_time_opt}. *)
   module Time : sig
     type t [@@deriving sexp, compare, yojson]
 
@@ -104,6 +107,7 @@ module type S = sig
 
       val of_time_span : Time.Span.t -> t
 
+      (** Lossy for large spans; never raises. *)
       val to_time_span : t -> Time.Span.t
 
       module Bits : Bits_intf.Convertible_bits with type t := t
@@ -183,6 +187,10 @@ module type S = sig
 
     val of_time : Time.t -> t
 
+    (** [None] when [t >= 2^63] (unrepresentable as [Time.t]). *)
+    val to_time_opt : t -> Time.t option
+
+    (** Raises when [t >= 2^63]. *)
     val to_time_exn : t -> Time.t
 
     val now : Controller.t -> t
@@ -197,14 +205,16 @@ module type S = sig
 
     val of_time_ns : Time_ns.t -> t
 
+    (** Total; the [_exn] suffix is retained to avoid a rename. *)
     val to_string_exn : t -> string
 
-    (** Strip time offset *)
+    (** Strip time offset.  Total; never raises. *)
     val to_string_system_time_exn : Controller.t -> t -> string
 
     (** Strip time offset *)
     val to_system_time : Controller.t -> t -> t
 
+    (** Parse unsigned decimal; rejects leading '-'. *)
     val of_string_exn : string -> t
 
     val gen_incl : t -> t -> t Quickcheck.Generator.t
