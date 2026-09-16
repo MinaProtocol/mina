@@ -32,3 +32,5 @@ let constraint_constants =
   { Genesis_constants.For_unit_tests.Constraint_constants.t with
     account_creation_fee = Fee.of_mina_int_exn 1
   }
+
+let signature_kind = Mina_signature_kind.Testnet

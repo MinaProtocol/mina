@@ -12,7 +12,7 @@
   async
   core
   ;; local libraries
-  bounded_types
+  mina_stdlib
   mina_wire_types
   genesis_constants
   mina_base.import
@@ -34,7 +34,6 @@
   mina_metrics
   pipe_lib
   transition_handler
-  mina_stdlib
   transition_frontier
   consensus
   mina_base
@@ -47,7 +46,6 @@
   logger
   trust_system
   error_json
-  rose_tree
   transition_frontier_base
   network_pool
   staged_ledger_diff

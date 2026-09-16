@@ -18,8 +18,9 @@ module Stable = struct
       ; ban_statuses :
           (Peer.Stable.V1.t * Trust_system.Peer_status.Stable.V1.t) list
       ; k_block_hashes_and_timestamps :
-          (State_hash.Stable.V1.t * Bounded_types.String.Stable.V1.t) list
-      ; git_commit : Bounded_types.String.Stable.V1.t
+          (State_hash.Stable.V1.t * Mina_stdlib.Bounded_types.String.Stable.V1.t)
+          list
+      ; git_commit : Mina_stdlib.Bounded_types.String.Stable.V1.t
       ; uptime_minutes : int
       ; block_height_opt : int option [@default None]
       }
@@ -42,8 +43,9 @@ module Stable = struct
       ; ban_statuses :
           (Peer.Stable.V1.t * Trust_system.Peer_status.Stable.V1.t) list
       ; k_block_hashes_and_timestamps :
-          (State_hash.Stable.V1.t * Bounded_types.String.Stable.V1.t) list
-      ; git_commit : Bounded_types.String.Stable.V1.t
+          (State_hash.Stable.V1.t * Mina_stdlib.Bounded_types.String.Stable.V1.t)
+          list
+      ; git_commit : Mina_stdlib.Bounded_types.String.Stable.V1.t
       ; uptime_minutes : int
       }
     [@@deriving to_yojson, of_yojson]

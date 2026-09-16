@@ -3,42 +3,42 @@
  (public_name verifier)
  (libraries
   ;; opam libraries
-  base.caml
   async
-  core_kernel
   async_kernel
-  rpc_parallel
-  sexplib0
+  async_unix
   base
+  base.caml
   bin_prot.shape
   core
-  async_unix
+  core_kernel
+  rpc_parallel
+  sexplib0
   ;; local libraries
-  kimchi_backend
-  logger.file_system
-  error_json
-  transaction_snark
-  random_oracle_input
-  child_processes
-  logger
-  itn_logger
-  ledger_proof
-  snark_params
   blockchain_snark
-  mina_base
-  mina_state
-  pickles
+  child_processes
+  error_json
   genesis_constants
-  signature_lib
-  pickles.backend
-  random_oracle
-  o1trace
-  mina_base.import
+  internal_tracing
+  itn_logger
+  kimchi_backend
   kimchi_pasta
   kimchi_pasta.basic
-  with_hash
+  ledger_proof
+  logger
+  logger.file_system
+  mina_base
+  mina_base.import
+  mina_state
+  o1trace
+  pickles
+  pickles.backend
+  random_oracle
+  random_oracle_input
+  signature_lib
+  snark_params
   snarky.backendless
-  internal_tracing)
+  transaction_snark
+  with_hash)
  (instrumentation
   (backend bisect_ppx))
  (preprocess

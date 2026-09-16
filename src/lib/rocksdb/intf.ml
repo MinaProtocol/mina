@@ -1,3 +1,5 @@
+open Core_kernel
+
 module Key = struct
   module type S = sig
     type 'a t

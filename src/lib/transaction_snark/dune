@@ -13,7 +13,7 @@
   splittable_random
   ;; local libraries
   bitstring_lib
-  bounded_types
+  mina_stdlib
   cache_dir
   coda_genesis_ledger
   consensus

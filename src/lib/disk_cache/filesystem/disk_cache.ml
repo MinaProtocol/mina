@@ -1,5 +1,9 @@
 (* Cache proofs using the filesystem, one file per proof. *)
 
+(* TODO:
+   figure out the reason why filesystem cache is much more disk hungry;
+   It takes 4~5 times disk space than LMDB cache. *)
+
 open Core
 
 module Make (B : sig

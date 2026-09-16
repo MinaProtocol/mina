@@ -24,7 +24,7 @@
   yojson
   ;; local libraries
   block_time
-  bounded_types
+  mina_stdlib
   currency
   data_hash_lib
   genesis_constants

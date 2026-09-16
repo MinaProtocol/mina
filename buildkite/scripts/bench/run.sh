@@ -2,8 +2,6 @@
 
 set -eox pipefail
 
-# Don't prompt for answers during apt-get install
-
 YELLOW_THRESHOLD="0.1"
 RED_THRESHOLD="0.3"
 EXTRA_ARGS="${EXTRA_ARGS:-}"
@@ -15,6 +13,11 @@ MAINLINE_BRANCHES="-m develop -m compatible -m master -m dkijania/bench_for_ledg
 while [[ "$#" -gt 0 ]]; do case $1 in
   heap-usage) BENCHMARK="heap-usage"; ;;
   mina-base) BENCHMARK="mina-base"; ;;
+  archive) 
+    BENCHMARK="archive"; 
+    EXTRA_ARGS="--no-run ${EXTRA_ARGS}" 
+
+  ;;
   ledger-export) 
     BENCHMARK="ledger-export"
     EXTRA_ARGS="--genesis-ledger-path ./genesis_ledgers/devnet.json"

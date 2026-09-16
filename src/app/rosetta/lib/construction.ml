@@ -618,13 +618,14 @@ module Parse = struct
             -> unit
             -> (bool, Errors.t) M.t
         ; lift : 'a 'e. ('a, 'e) Result.t -> ('a, 'e) M.t
+        ; signature_kind : Mina_signature_kind.t
         }
     end
 
     module Real = T (Deferred.Result)
     module Mock = T (Result)
 
-    let real : Real.t =
+    let real ~signature_kind : Real.t =
       { verify_payment_signature =
           (fun ~payment ~signature () ->
             let open Deferred.Result in
@@ -675,11 +676,11 @@ module Parse = struct
               Signed_command_payload.create ~fee ~fee_payer_pk ~nonce
                 ~valid_until ~memo ~body
             in
-            let signature_kind = Mina_signature_kind.t_DEPRECATED in
             Option.is_some
             @@ Signed_command.create_with_signature_checked ~signature_kind
                  signature signer payload )
       ; lift = Deferred.return
+      ; signature_kind
       }
   end
 
@@ -871,7 +872,7 @@ module Submit = struct
         Caqti_type.custom ~encode ~decode (to_rep spec)
 
       let query =
-        Caqti_request.find_opt params_typ Caqti_type.string
+        Mina_caqti.find_opt_req params_typ Caqti_type.string
           {sql| SELECT uc.id FROM user_commands uc
                 INNER JOIN public_keys AS pks ON pks.id = uc.source_id
                 INNER JOIN public_keys AS pkr ON pkr.id = uc.receiver_id
@@ -881,7 +882,7 @@ module Submit = struct
                 AND uc.amount = $4
                 AND uc.fee = $5 |sql}
 
-      let run (module Conn : Caqti_async.CONNECTION) ~nonce ~source ~receiver
+      let run (module Conn : Mina_caqti.CONNECTION) ~nonce ~source ~receiver
           ~amount ~fee =
         let open Unsigned_extended in
         Conn.find_opt query
@@ -929,7 +930,7 @@ module Submit = struct
     module Mock = T (Result)
 
     let real :
-           db:(module Caqti_async.CONNECTION)
+           db:(module Mina_caqti.CONNECTION)
         -> graphql_uri:Uri.t
         -> minimum_user_command_fee:Mina_currency.Fee.t
         -> ( 'gql_payment
@@ -1082,8 +1083,8 @@ module Submit = struct
   module Mock = Impl (Result)
 end
 
-let router ~get_graphql_uri_or_error ~with_db ~logger ~account_creation_fee
-    ~minimum_user_command_fee (route : string list) body =
+let router ~signature_kind ~get_graphql_uri_or_error ~with_db ~logger
+    ~account_creation_fee ~minimum_user_command_fee (route : string list) body =
   [%log debug] "Handling /construction/ $route"
     ~metadata:[ ("route", `List (List.map route ~f:(fun s -> `String s))) ] ;
   let open Deferred.Result.Let_syntax in
@@ -1151,7 +1152,9 @@ let router ~get_graphql_uri_or_error ~with_db ~logger ~account_creation_fee
         |> Errors.Lift.wrap
       in
       let%map res =
-        Parse.Real.handle ~minimum_user_command_fee ~env:Parse.Env.real req
+        Parse.Real.handle ~minimum_user_command_fee
+          ~env:(Parse.Env.real ~signature_kind)
+          req
         |> Errors.Lift.wrap
       in
       Construction_parse_response.to_yojson res

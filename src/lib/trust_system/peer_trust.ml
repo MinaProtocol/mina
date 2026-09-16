@@ -196,7 +196,7 @@ module Make0 (Inputs : Input_intf) = struct
     let simple_new = Record_inst.to_peer_status new_record in
     let action_fmt, action_metadata = Action.to_log action in
     let log_trust_change () =
-      if Float.(abs (simple_new.trust - simple_old.trust) < epsilon_float) then
+      if Float.(abs (simple_new.trust - simple_old.trust) > epsilon_float) then
         let verb =
           if Float.(simple_new.trust > simple_old.trust) then "Increasing"
           else "Decreasing"
@@ -503,5 +503,5 @@ module Make (Action : Action_intf) = Make0 (struct
   module Action = Action
   include Log_events
 
-  let remove_dir = File_system.remove_dir
+  let remove_dir = Mina_stdlib_unix.File_system.remove_dir
 end)

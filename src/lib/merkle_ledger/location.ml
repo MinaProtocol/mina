@@ -1,180 +1,152 @@
+open Core_kernel
 open Unsigned
+module Bigstring = Mina_stdlib.Bigstring
 
-(* add functions to library module Bigstring so we can derive hash for the type t below *)
-module Bigstring = struct
-  [%%versioned_binable
-  module Stable = struct
-    module V1 = struct
-      type t = Bigstring.Stable.V1.t [@@deriving sexp, compare]
+(* Locations are a bitstring prefixed by a byte. In the case of accounts, the prefix
+ * byte is 0xfe. In the case of a hash node in the merkle tree, the prefix is between
+ * 1 and N (where N is the height of the root of the merkle tree, with 1 representing
+ * the leafs of the tree, and N representing the root of the merkle tree. For account
+ * and node locations, the bitstring represents the path in the tree where that node exists.
+ * For all other locations (generic locations), the prefix is 0xff. Generic locations can contain
+ * any bitstring.
+ * Hence, we can have at most (2^(253 - 1)) accounts, where 253 is just 0xfd.
+ *)
 
-      let to_latest = Fn.id
+module Addr = Merkle_address
 
-      let hash t = Bigstring.to_string t |> String.hash
+module Prefix = struct
+  let generic = UInt8.of_int 0xff
 
-      let hash_fold_t hash_state t =
-        String.hash_fold_t hash_state (Bigstring.to_string t)
+  let account = UInt8.of_int 0xfe
 
-      include Bounded_types.String.Of_stringable (struct
-        type nonrec t = t
-
-        let of_string s = Bigstring.of_string s
-
-        let to_string s = Bigstring.to_string s
-      end)
-    end
-  end]
-
-  [%%define_locally Bigstring.(get, length, create, to_string, set, blit, sub)]
-
-  include Hashable.Make (Stable.Latest)
+  let hash ~ledger_depth depth = UInt8.of_int (ledger_depth - depth)
 end
 
-module T = struct
-  (* Locations are a bitstring prefixed by a byte. In the case of accounts, the prefix
-   * byte is 0xfe. In the case of a hash node in the merkle tree, the prefix is between
-   * 1 and N (where N is the height of the root of the merkle tree, with 1 representing
-   * the leafs of the tree, and N representing the root of the merkle tree. For account
-   * and node locations, the bitstring represents the path in the tree where that node exists.
-   * For all other locations (generic locations), the prefix is 0xff. Generic locations can contain
-   * any bitstring.
-   *)
+type t = Generic of Bigstring.t | Account of Addr.t | Hash of Addr.t
+[@@deriving hash, sexp, compare]
 
-  module Addr = Merkle_address
+let is_generic = function Generic _ -> true | Account _ | Hash _ -> false
 
-  module Prefix = struct
-    let generic = UInt8.of_int 0xff
+let is_account = function Account _ -> true | Generic _ | Hash _ -> false
 
-    let account = UInt8.of_int 0xfe
+let is_hash = function Hash _ -> true | Account _ | Generic _ -> false
 
-    let hash ~ledger_depth depth = UInt8.of_int (ledger_depth - depth)
-  end
+let height ~ledger_depth : t -> int = function
+  | Generic _ ->
+      raise (Invalid_argument "height: generic location has no height")
+  | Account _ ->
+      0
+  | Hash path ->
+      Addr.height ~ledger_depth path
 
-  type t = Generic of Bigstring.t | Account of Addr.t | Hash of Addr.t
-  [@@deriving hash, sexp, compare]
+let root_hash : t = Hash (Addr.root ())
 
-  let is_generic = function Generic _ -> true | Account _ | Hash _ -> false
+let last_direction path =
+  Mina_stdlib.Direction.of_bool (Addr.get path (Addr.depth path - 1) <> 0)
 
-  let is_account = function Account _ -> true | Generic _ | Hash _ -> false
+let build_generic (data : Bigstring.t) : t = Generic data
 
-  let is_hash = function Hash _ -> true | Account _ | Generic _ -> false
+let parse ~ledger_depth (str : Bigstring.t) : (t, unit) Result.t =
+  let prefix = Bigstring.get str 0 |> Char.to_int |> UInt8.of_int in
+  let data = Bigstring.sub str ~pos:1 ~len:(Bigstring.length str - 1) in
+  if UInt8.equal prefix Prefix.generic then Result.return (Generic data)
+  else
+    let path = Addr.of_byte_string (Bigstring.to_string data) in
+    let slice_path = Addr.slice path 0 in
+    if UInt8.equal prefix Prefix.account then
+      Result.return (Account (slice_path ledger_depth))
+    else if UInt8.to_int prefix <= ledger_depth then
+      Result.return (Hash (slice_path (ledger_depth - UInt8.to_int prefix)))
+    else Result.fail ()
 
-  let height ~ledger_depth : t -> int = function
-    | Generic _ ->
-        raise (Invalid_argument "height: generic location has no height")
-    | Account _ ->
-        0
-    | Hash path ->
-        Addr.height ~ledger_depth path
+let prefix_bigstring prefix src =
+  let src_len = Bigstring.length src in
+  let dst = Bigstring.create (src_len + 1) in
+  Bigstring.set dst 0 (Char.of_int_exn (UInt8.to_int prefix)) ;
+  Bigstring.blit ~src ~src_pos:0 ~dst ~dst_pos:1 ~len:src_len ;
+  dst
 
-  let root_hash : t = Hash (Addr.root ())
+let to_path_exn = function
+  | Account path | Hash path ->
+      path
+  | Generic _ ->
+      raise (Invalid_argument "to_path_exn: generic does not have a path")
 
-  let last_direction path =
-    Mina_stdlib.Direction.of_bool (Addr.get path (Addr.depth path - 1) <> 0)
+let serialize ~ledger_depth = function
+  | Generic data ->
+      prefix_bigstring Prefix.generic data
+  | Account path ->
+      assert (Addr.depth path = ledger_depth) ;
+      prefix_bigstring Prefix.account (Addr.serialize ~ledger_depth path)
+  | Hash path ->
+      assert (Addr.depth path <= ledger_depth) ;
+      prefix_bigstring
+        (Prefix.hash ~ledger_depth (Addr.depth path))
+        (Addr.serialize ~ledger_depth path)
 
-  let build_generic (data : Bigstring.t) : t = Generic data
+let parent : t -> t = function
+  | Generic _ ->
+      raise (Invalid_argument "parent: generic locations have no parent")
+  | Account _ ->
+      raise (Invalid_argument "parent: account locations have no parent")
+  | Hash path ->
+      assert (Addr.depth path > 0) ;
+      Hash (Addr.parent_exn path)
 
-  let parse ~ledger_depth (str : Bigstring.t) : (t, unit) Result.t =
-    let prefix = Bigstring.get str 0 |> Char.to_int |> UInt8.of_int in
-    let data = Bigstring.sub str ~pos:1 ~len:(Bigstring.length str - 1) in
-    if UInt8.equal prefix Prefix.generic then Result.return (Generic data)
+let next : t -> t Option.t = function
+  | Generic _ ->
+      raise (Invalid_argument "next: generic locations have no next location")
+  | Account path ->
+      Addr.next path |> Option.map ~f:(fun next -> Account next)
+  | Hash path ->
+      Addr.next path |> Option.map ~f:(fun next -> Hash next)
+
+let prev : t -> t Option.t = function
+  | Generic _ ->
+      raise (Invalid_argument "prev: generic locations have no prev location")
+  | Account path ->
+      Addr.prev path |> Option.map ~f:(fun prev -> Account prev)
+  | Hash path ->
+      Addr.prev path |> Option.map ~f:(fun prev -> Hash prev)
+
+let sibling : t -> t = function
+  | Generic _ ->
+      raise (Invalid_argument "sibling: generic locations have no sibling")
+  | Account path ->
+      Account (Addr.sibling path)
+  | Hash path ->
+      Hash (Addr.sibling path)
+
+let order_siblings (location : t) (base : 'a) (sibling : 'a) : 'a * 'a =
+  match last_direction (to_path_exn location) with
+  | Mina_stdlib.Direction.Left ->
+      (base, sibling)
+  | Mina_stdlib.Direction.Right ->
+      (sibling, base)
+
+(* Returns a reverse of traversal path from top of the tree to the location
+   (direction to take and sibling's hash).contents
+
+   By reverse it means that head of returned list contains direction from
+   location's parent to the location along with the location's sibling.
+*)
+let merkle_path_dependencies_exn (location : t) :
+    (t * Mina_stdlib.Direction.t) list =
+  let rec loop k =
+    if Addr.depth k = 0 then []
     else
-      let path = Addr.of_byte_string (Bigstring.to_string data) in
-      let slice_path = Addr.slice path 0 in
-      if UInt8.equal prefix Prefix.account then
-        Result.return (Account (slice_path ledger_depth))
-      else if UInt8.to_int prefix <= ledger_depth then
-        Result.return (Hash (slice_path (ledger_depth - UInt8.to_int prefix)))
-      else Result.fail ()
+      let sibling = Hash (Addr.sibling k) in
+      let dir = last_direction k in
+      (sibling, dir) :: loop (Addr.parent_exn k)
+  in
+  match location with
+  | Hash addr ->
+      loop addr
+  | Account _ | Generic _ ->
+      failwith "can only get merkle path dependencies of a hash location"
 
-  let prefix_bigstring prefix src =
-    let src_len = Bigstring.length src in
-    let dst = Bigstring.create (src_len + 1) in
-    Bigstring.set dst 0 (Char.of_int_exn (UInt8.to_int prefix)) ;
-    Bigstring.blit ~src ~src_pos:0 ~dst ~dst_pos:1 ~len:src_len ;
-    dst
+type location = t [@@deriving sexp, compare]
 
-  let to_path_exn = function
-    | Account path | Hash path ->
-        path
-    | Generic _ ->
-        raise (Invalid_argument "to_path_exn: generic does not have a path")
-
-  let serialize ~ledger_depth = function
-    | Generic data ->
-        prefix_bigstring Prefix.generic data
-    | Account path ->
-        assert (Addr.depth path = ledger_depth) ;
-        prefix_bigstring Prefix.account (Addr.serialize ~ledger_depth path)
-    | Hash path ->
-        assert (Addr.depth path <= ledger_depth) ;
-        prefix_bigstring
-          (Prefix.hash ~ledger_depth (Addr.depth path))
-          (Addr.serialize ~ledger_depth path)
-
-  let parent : t -> t = function
-    | Generic _ ->
-        raise (Invalid_argument "parent: generic locations have no parent")
-    | Account _ ->
-        raise (Invalid_argument "parent: account locations have no parent")
-    | Hash path ->
-        assert (Addr.depth path > 0) ;
-        Hash (Addr.parent_exn path)
-
-  let next : t -> t Option.t = function
-    | Generic _ ->
-        raise (Invalid_argument "next: generic locations have no next location")
-    | Account path ->
-        Addr.next path |> Option.map ~f:(fun next -> Account next)
-    | Hash path ->
-        Addr.next path |> Option.map ~f:(fun next -> Hash next)
-
-  let prev : t -> t Option.t = function
-    | Generic _ ->
-        raise (Invalid_argument "prev: generic locations have no prev location")
-    | Account path ->
-        Addr.prev path |> Option.map ~f:(fun prev -> Account prev)
-    | Hash path ->
-        Addr.prev path |> Option.map ~f:(fun prev -> Hash prev)
-
-  let sibling : t -> t = function
-    | Generic _ ->
-        raise (Invalid_argument "sibling: generic locations have no sibling")
-    | Account path ->
-        Account (Addr.sibling path)
-    | Hash path ->
-        Hash (Addr.sibling path)
-
-  let order_siblings (location : t) (base : 'a) (sibling : 'a) : 'a * 'a =
-    match last_direction (to_path_exn location) with
-    | Mina_stdlib.Direction.Left ->
-        (base, sibling)
-    | Mina_stdlib.Direction.Right ->
-        (sibling, base)
-
-  (* Returns a reverse of traversal path from top of the tree to the location
-     (direction to take and sibling's hash).contents
-
-     By reverse it means that head of returned list contains direction from
-     location's parent to the location along with the location's sibling.
-  *)
-  let merkle_path_dependencies_exn (location : t) :
-      (t * Mina_stdlib.Direction.t) list =
-    let rec loop k =
-      if Addr.depth k = 0 then []
-      else
-        let sibling = Hash (Addr.sibling k) in
-        let dir = last_direction k in
-        (sibling, dir) :: loop (Addr.parent_exn k)
-    in
-    match location with
-    | Hash addr ->
-        loop addr
-    | Account _ | Generic _ ->
-        failwith "can only get merkle path dependencies of a hash location"
-
-  type location = t [@@deriving sexp, compare]
-
-  include Comparable.Make (struct
-    type t = location [@@deriving sexp, compare]
-  end)
-end
+include Comparable.Make (struct
+  type t = location [@@deriving sexp, compare]
+end)

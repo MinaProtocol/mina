@@ -40,7 +40,8 @@
   mina_state
   mina_ledger
   mina_base
-  bounded_types
+  mina_stdlib
+  mina_stdlib_unix
   mina_base.import
   mina_transaction
   mina_transaction_logic

@@ -95,8 +95,8 @@ let simple_payment () =
       [%test_pred: Transaction_applied.Stable.Latest.t list Or_error.t]
         Or_error.is_ok
         Or_error.(
-          Transaction_logic.apply_transactions ~constraint_constants
-            ~global_slot ~txn_state_view ledger [ txn ]
+          Transaction_logic.apply_transactions ~signature_kind
+            ~constraint_constants ~global_slot ~txn_state_view ledger [ txn ]
           >>| List.map ~f:Transaction_applied.read_all_proofs_from_disk) )
 
 let simple_payment_signer_different_from_fee_payer () =
@@ -115,8 +115,8 @@ let simple_payment_signer_different_from_fee_payer () =
       expect_failure
         ~error:
           "Cannot pay fees from a public key that did not sign the transaction"
-        (Transaction_logic.apply_transactions ~constraint_constants ~global_slot
-           ~txn_state_view ledger [ txn ] ) )
+        (Transaction_logic.apply_transactions ~signature_kind
+           ~constraint_constants ~global_slot ~txn_state_view ledger [ txn ] ) )
 
 let coinbase_order_of_created_accounts_is_correct ~with_fee_transfer () =
   let amount = Amount.of_mina_int_exn 720 in

@@ -2,44 +2,33 @@ let DebianVersions = ./DebianVersions.dhall
 
 let RunInToolchain = ../Command/RunInToolchain.dhall
 
-let ContainerImages = ./ContainerImages.dhall
+let Arch = ./Arch.dhall
 
 let SelectionMode
     : Type
-    = < ByDebian | Custom : Text >
+    = < ByDebianAndArch | Custom : Text >
 
 let runner =
           \(debVersion : DebianVersions.DebVersion)
+      ->  \(arch : Arch.Type)
       ->  merge
-            { Bookworm = RunInToolchain.runInToolchain
-            , Bullseye = RunInToolchain.runInToolchain
-            , Jammy = RunInToolchain.runInToolchain
-            , Focal = RunInToolchain.runInToolchain
+            { Bookworm = RunInToolchain.runInToolchainBookworm arch
+            , Bullseye = RunInToolchain.runInToolchainBullseye
+            , Jammy = RunInToolchain.runInToolchainJammy
+            , Focal = RunInToolchain.runInToolchainBullseye
+            , Noble = RunInToolchain.runInToolchainNoble
             }
             debVersion
 
 let select =
           \(mode : SelectionMode)
       ->  \(debVersion : DebianVersions.DebVersion)
+      ->  \(arch : Arch.Type)
       ->  merge
-            { ByDebian = runner debVersion
+            { ByDebianAndArch = runner debVersion arch
             , Custom =
-                \(image : Text) -> RunInToolchain.runInToolchainImage image
+                \(image : Text) -> RunInToolchain.runInToolchainImage image arch
             }
             mode
 
-let image =
-          \(debVersion : DebianVersions.DebVersion)
-      ->  merge
-            { Bookworm = ContainerImages.minaToolchain
-            , Bullseye = ContainerImages.minaToolchain
-            , Jammy = ContainerImages.minaToolchain
-            , Focal = ContainerImages.minaToolchain
-            }
-            debVersion
-
-in  { SelectionMode = SelectionMode
-    , select = select
-    , runner = runner
-    , image = image
-    }
+in  { SelectionMode = SelectionMode, select = select, runner = runner }

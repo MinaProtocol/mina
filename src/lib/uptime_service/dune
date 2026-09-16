@@ -1,6 +1,7 @@
 (library
  (name uptime_service)
  (public_name uptime_service)
+ (flags (:standard -w +26))
  (inline_tests
   (flags -verbose -show-counts))
  (libraries
@@ -41,7 +42,7 @@
   mina_block
   daemon_rpcs
   snark_work_lib
-  rfc3339_time
+  mina_stdlib_unix
   ledger_proof
   error_json
   pipe_lib

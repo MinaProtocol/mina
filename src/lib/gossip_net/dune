@@ -41,7 +41,7 @@
   error_json
   block_time
   genesis_constants
-  bounded_types)
+  mina_stdlib)
  (preprocess
   (pps
    ppx_mina

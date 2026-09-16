@@ -18,7 +18,6 @@
   sexplib0
   ;; local libraries
   block_time
-  bounded_types
   child_processes
   coda_genesis_ledger
   consensus

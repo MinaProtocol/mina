@@ -11,7 +11,7 @@ type catchup_job_states = Transition_frontier.Full_catchup_tree.job_states =
   ; to_verify : int
   ; to_build_breadcrumb : int
   }
-[@@deriving to_yojson]
+[@@deriving yojson]
 
 type rpc_count =
   { get_some_initial_peers : int
@@ -26,11 +26,11 @@ type rpc_count =
   ; get_best_tip : int
   ; get_epoch_ledger : int
   }
-[@@deriving to_yojson]
+[@@deriving yojson]
 
 type gossip_count =
   { new_state : int; transaction_pool_diff : int; snark_pool_diff : int }
-[@@deriving to_yojson]
+[@@deriving yojson]
 
 type block =
   { hash : Mina_base.State_hash.t
@@ -47,7 +47,7 @@ type block =
       | `Mismatched_protocol_version ]
       option
   }
-[@@deriving to_yojson]
+[@@deriving yojson]
 
 type sysinfo =
   { uptime : string
@@ -58,7 +58,9 @@ type sysinfo =
   ; free_swap : int64
   ; procs : int
   }
-[@@deriving to_yojson]
+[@@deriving yojson]
+
+let node_status_version = 2
 
 type node_status_data =
   { version : int
@@ -83,8 +85,9 @@ type node_status_data =
   ; pubsub_msg_broadcasted : gossip_count
   ; received_blocks : block list
   ; sysinfo : sysinfo
+  ; block_producer_public_key : string option
   }
-[@@deriving to_yojson]
+[@@deriving yojson]
 
 module Simplified = struct
   type t =
@@ -179,7 +182,8 @@ let reset_gauges () =
   Queue.clear Transition_frontier.rejected_blocks
 
 let start ~commit_id ~logger ~node_status_url ~transition_frontier ~sync_status
-    ~chain_id ~network ~addrs_and_ports ~start_time ~slot_duration =
+    ~chain_id ~network ~addrs_and_ports ~start_time ~slot_duration
+    ~block_producer_public_key_base58 =
   [%log info] "Starting node status service using URL $url"
     ~metadata:[ ("url", `String node_status_url) ] ;
   let five_slots = Time.Span.scale slot_duration 5. in
@@ -238,7 +242,7 @@ let start ~commit_id ~logger ~node_status_url ~transition_frontier ~sync_status
           , `Cpu_usage libp2p_cpu_usage ) ->
           let%bind peers = Mina_networking.peers network in
           let node_status_data =
-            { version = 1
+            { version = node_status_version
             ; block_height_at_best_tip =
                 Transition_frontier.best_tip tf
                 |> Transition_frontier.Breadcrumb.consensus_state
@@ -261,7 +265,7 @@ let start ~commit_id ~logger ~node_status_url ~transition_frontier ~sync_status
             ; ip_address =
                 Node_addrs_and_ports.external_ip addrs_and_ports
                 |> Core.Unix.Inet_addr.to_string
-            ; timestamp = Rfc3339_time.get_rfc3339_time ()
+            ; timestamp = Mina_stdlib_unix.Rfc3339_time.get_rfc3339_time ()
             ; uptime_of_node =
                 Time.Span.to_sec @@ Time.diff (Time.now ()) start_time
             ; peer_count = List.length peers
@@ -403,6 +407,7 @@ let start ~commit_id ~logger ~node_status_url ~transition_frontier ~sync_status
                       ; reason_for_rejection = None
                       } )
             ; sysinfo
+            ; block_producer_public_key = block_producer_public_key_base58
             }
           in
           reset_gauges () ;
@@ -431,7 +436,7 @@ let start_simplified ~commit_id ~logger ~node_status_url ~chain_id ~network
        ; chain_id
        ; peer_id = (Node_addrs_and_ports.to_peer_exn addrs_and_ports).peer_id
        ; peer_count = List.length peers
-       ; timestamp = Rfc3339_time.get_rfc3339_time ()
+       ; timestamp = Mina_stdlib_unix.Rfc3339_time.get_rfc3339_time ()
        ; block_producer_public_key = block_producer_public_key_base58
        }
      in

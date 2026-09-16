@@ -1,0 +1,7 @@
+{ Type = { automatic : Optional (./properties/automatic/Type ) 
+, manual : Optional (./properties/manual/Type ) 
+} 
+, default = { automatic = None ((./properties/automatic/Type )) 
+, manual = None ((./properties/manual/Type )) 
+} 
+}

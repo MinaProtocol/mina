@@ -24,7 +24,7 @@ module User_command = struct
       *)
       type t =
         { sequence_no : int
-        ; command_type : Bounded_types.String.Stable.V1.t
+        ; command_type : Mina_stdlib.Bounded_types.String.Stable.V1.t
         ; fee_payer : Public_key.Compressed.Stable.V1.t
         ; source : Public_key.Compressed.Stable.V1.t
         ; receiver : Public_key.Compressed.Stable.V1.t
@@ -37,7 +37,7 @@ module User_command = struct
         ; hash : Transaction_hash.Stable.V1.t
               [@to_yojson Transaction_hash.to_yojson]
               [@of_yojson Transaction_hash.of_yojson]
-        ; status : Bounded_types.String.Stable.V1.t
+        ; status : Mina_stdlib.Bounded_types.String.Stable.V1.t
         ; failure_reason : Transaction_status.Failure.Stable.V2.t option
         }
       [@@deriving yojson, equal]
@@ -63,13 +63,13 @@ module Internal_command = struct
       type t =
         { sequence_no : int
         ; secondary_sequence_no : int
-        ; command_type : Bounded_types.String.Stable.V1.t
+        ; command_type : Mina_stdlib.Bounded_types.String.Stable.V1.t
         ; receiver : Public_key.Compressed.Stable.V1.t
         ; fee : Currency.Fee.Stable.V1.t
         ; hash : Transaction_hash.Stable.V1.t
               [@to_yojson Transaction_hash.to_yojson]
               [@of_yojson Transaction_hash.of_yojson]
-        ; status : Bounded_types.String.Stable.V1.t
+        ; status : Mina_stdlib.Bounded_types.String.Stable.V1.t
         ; failure_reason : Transaction_status.Failure.Stable.V2.t option
         }
       [@@deriving yojson, equal]
@@ -86,16 +86,16 @@ end
 module Zkapp_command = struct
   [%%versioned
   module Stable = struct
-    module V1 = struct
+    module V2 = struct
       type t =
         { sequence_no : int
         ; fee_payer : Account_update.Body.Fee_payer.Stable.V1.t
-        ; account_updates : Account_update.Body.Simple.Stable.V1.t list
+        ; account_updates : Account_update.Body.Simple.Stable.V2.t list
         ; memo : Signed_command_memo.Stable.V1.t
         ; hash : Transaction_hash.Stable.V1.t
               [@to_yojson Transaction_hash.to_yojson]
               [@of_yojson Transaction_hash.of_yojson]
-        ; status : Bounded_types.String.Stable.V1.t
+        ; status : Mina_stdlib.Bounded_types.String.Stable.V1.t
         ; failure_reasons :
             Transaction_status.Failure.Collection.Display.Stable.V1.t option
         }
@@ -116,7 +116,7 @@ module Block = struct
   module Stable = struct
     [@@@with_versioned_json]
 
-    module V2 = struct
+    module V3 = struct
       (* in accounts_accessed, the int is the ledger index
          in tokens_used, the account id is the token owner
       *)
@@ -141,11 +141,11 @@ module Block = struct
         ; timestamp : Block_time.Stable.V1.t
         ; user_cmds : User_command.Stable.V2.t list
         ; internal_cmds : Internal_command.Stable.V2.t list
-        ; zkapp_cmds : Zkapp_command.Stable.V1.t list
+        ; zkapp_cmds : Zkapp_command.Stable.V2.t list
         ; protocol_version : Protocol_version.Stable.V2.t
         ; proposed_protocol_version : Protocol_version.Stable.V2.t option
         ; chain_status : Chain_status.Stable.V1.t
-        ; accounts_accessed : (int * Account.Stable.V2.t) list
+        ; accounts_accessed : (int * Account.Stable.V3.t) list
         ; accounts_created :
             (Account_id.Stable.V2.t * Currency.Fee.Stable.V1.t) list
         ; tokens_used :

@@ -8,7 +8,7 @@
   ppx_inline_test.config
   ;; local libraries
   currency
-  rose_tree)
+  mina_stdlib)
  (inline_tests
   (flags -verbose -show-counts))
  (instrumentation

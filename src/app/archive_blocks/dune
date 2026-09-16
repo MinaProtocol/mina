@@ -20,7 +20,7 @@
   uri
   ;; local libraries
   archive_lib
-  bounded_types
+  mina_stdlib
   genesis_constants
   logger
   mina_block)

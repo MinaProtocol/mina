@@ -29,7 +29,7 @@ type t =
             , State_hash.t )
             Cached.t
           * Mina_net2.Validation_callback.t option )
-          Rose_tree.t
+          Mina_stdlib.Rose_tree.t
           list
       , crash buffered
       , unit )
@@ -58,7 +58,7 @@ type t =
           , State_hash.t )
           Cached.t
         * Mina_net2.Validation_callback.t option )
-        Rose_tree.t
+        Mina_stdlib.Rose_tree.t
         list )
       Capped_supervisor.t
   }
@@ -68,7 +68,7 @@ let create ~logger ~precomputed_values ~verifier ~trust_system ~frontier
     ~(catchup_breadcrumbs_writer :
        ( ( (Transition_frontier.Breadcrumb.t, State_hash.t) Cached.t
          * Validation_callback.t option )
-         Rose_tree.t
+         Mina_stdlib.Rose_tree.t
          list
          * [ `Ledger_catchup of unit Ivar.t | `Catchup_scheduler ]
        , crash buffered
@@ -113,7 +113,8 @@ let create ~logger ~precomputed_values ~verifier ~trust_system ~frontier
                 $error"
               ~metadata:[ ("error", Error_json.error_to_yojson err) ] ;
             List.iter transition_branches ~f:(fun subtree ->
-                Rose_tree.iter subtree ~f:(fun (cached_transition, vc) ->
+                Mina_stdlib.Rose_tree.iter subtree
+                  ~f:(fun (cached_transition, vc) ->
                     (* TODO consider rejecting the callback in some cases,
                        see https://github.com/MinaProtocol/mina/issues/11087 *)
                     Option.value_map vc ~default:ignore
@@ -171,7 +172,7 @@ let rec extract_subtree t cached_transition =
   let successors =
     Option.value ~default:[] (Hashtbl.find t.collected_transitions hash)
   in
-  Rose_tree.T
+  Mina_stdlib.Rose_tree.T
     ( (cached_transition, Hashtbl.find t.validation_callbacks hash)
     , List.map successors ~f:(extract_subtree t) )
 
@@ -512,7 +513,8 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
                   failwith "pipe closed unexpectedly"
               | `Ok
                   (`Ok
-                    ( [ Rose_tree.T ((received_breadcrumb, _vc), []) ]
+                    ( [ Mina_stdlib.Rose_tree.T ((received_breadcrumb, _vc), [])
+                      ]
                     , `Catchup_scheduler ) ) ->
                   [%test_eq: State_hash.t]
                     (Transition_frontier.Breadcrumb.state_hash

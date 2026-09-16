@@ -20,10 +20,14 @@ module type Inputs_intf = sig
 
   module Transaction : sig
     type t
+
+    val yojson_summary : t -> Yojson.Safe.t
   end
 
   module Transaction_witness : sig
     type t
+
+    val transaction : t -> Transaction.t
   end
 
   module Ledger_proof : sig
@@ -100,8 +104,7 @@ module type State_intf = sig
   type transition_frontier
 
   val init :
-       reassignment_wait:int
-    -> frontier_broadcast_pipe:
+       frontier_broadcast_pipe:
          transition_frontier option Pipe_lib.Broadcast_pipe.Reader.t
     -> logger:Logger.t
     -> t
@@ -116,41 +119,30 @@ module type Lib_intf = sig
     include
       State_intf with type transition_frontier := Inputs.Transition_frontier.t
 
-    val remove_old_assignments : t -> logger:Logger.t -> unit
-
-    (**Jobs that have not been assigned yet*)
-    val all_unseen_works :
-         t
-      -> ( Transaction_witness.t
-         , Ledger_proof.Cached.t )
-         Snark_work_lib.Work.Single.Spec.t
-         One_or_two.t
-         list
-
-    val remove : t -> Transaction_snark.Statement.t One_or_two.t -> unit
-
-    val set :
-         t
+    (** [mark_scheduled t work] Mark [work] as scheduled in [t] *)
+    val mark_scheduled :
+         logger:Logger.t
+      -> t
       -> ( Transaction_witness.t
          , Ledger_proof.Cached.t )
          Snark_work_lib.Work.Single.Spec.t
          One_or_two.t
       -> unit
-  end
 
-  val get_expensive_work :
-       snark_pool:Snark_pool.t
-    -> fee:Fee.t
-    -> ( Transaction_witness.t
-       , Ledger_proof.Cached.t )
-       Snark_work_lib.Work.Single.Spec.t
-       One_or_two.t
-       list
-    -> ( Transaction_witness.t
-       , Ledger_proof.Cached.t )
-       Snark_work_lib.Work.Single.Spec.t
-       One_or_two.t
-       list
+    (** [all_unscheduled_expensive_works ~snark_pool ~fee t] filters out all
+        works in the list that satisfy the predicate
+        [does_not_have_better_fee ~snark_pool ~fee], and are not scheduled yet
+        *)
+    val all_unscheduled_expensive_works :
+         snark_pool:Snark_pool.t
+      -> fee:Fee.t
+      -> t
+      -> ( Transaction_witness.t
+         , Ledger_proof.Cached.t )
+         Snark_work_lib.Work.Single.Spec.t
+         One_or_two.t
+         list
+  end
 
   (**jobs that are not in the snark pool yet*)
   val pending_work_statements :
@@ -160,6 +152,11 @@ module type Lib_intf = sig
     -> Transaction_snark.Statement.t One_or_two.t list
 
   module For_tests : sig
+    (** [does_not_have_better_fee ~snark_pool ~fee stmt] returns true iff the
+        statement [stmt] haven't already been proved already in [snark_pool] or
+        it's been proved with a fee higher than ~fee. The reason for the later
+        condition is that the whole protocol would drop proofs with higher fees
+        if there's a equivalent proof with lower fees *)
     val does_not_have_better_fee :
          snark_pool:Snark_pool.t
       -> fee:Fee.t

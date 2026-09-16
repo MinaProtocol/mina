@@ -13,7 +13,7 @@
   genesis_constants
   data_hash_lib
   mina_ledger
-  bounded_types)
+  mina_stdlib)
  (instrumentation
   (backend bisect_ppx))
  (preprocess

@@ -2,6 +2,8 @@ let BenchBase = ../../Command/Bench/Base.dhall
 
 let Pipeline = ../../Pipeline/Dsl.dhall
 
+let PipelineScope = ../../Pipeline/Scope.dhall
+
 let Size = ../../Command/Size.dhall
 
 let name = "SnarkProfilerUnstable"
@@ -12,6 +14,7 @@ in  Pipeline.build
       ( BenchBase.pipeline
           BenchBase.Spec::{
           , path = "Bench"
+          , scope = PipelineScope.PullRequestOnly
           , name = name
           , label = "Snark Profiler"
           , size = Size.Small

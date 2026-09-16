@@ -38,7 +38,8 @@ let%test_module "Test transaction logic." =
       in
       let%bind ledger = Ledger_helpers.ledger_of_accounts accounts in
       let%map txn, _ =
-        Transaction_logic.apply_zkapp_command_unchecked ~constraint_constants
+        Transaction_logic.apply_zkapp_command_unchecked ~signature_kind
+          ~constraint_constants
           ~global_slot:Global_slot_since_genesis.(of_int 120)
           ~state_view:protocol_state ledger cmd
       in
@@ -469,7 +470,8 @@ let%test_module "Test transaction logic." =
           Generator.create (fun ~size:_ ~random:_ -> Zkapp_basic.F.random ())
         in
         let%map app_state_update =
-          Generator.list_with_length 8 (Zkapp_basic.Set_or_keep.gen gen_field)
+          Generator.list_with_length Mina_base.Zkapp_state.max_size_int
+            (Zkapp_basic.Set_or_keep.gen gen_field)
         in
         let app_state = Zkapp_state.V.of_list_exn app_state_update in
         let txn =

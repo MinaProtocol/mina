@@ -1,7 +1,7 @@
 (executable
  (package patch_archive_test)
  (name patch_archive_test)
- (public_name patch_archive_test)
+ (public_name mina-patch-archive-test)
  (libraries
   async
   async.async_command
@@ -24,8 +24,7 @@
   base.caml
   result
   mina_automation
-  bounded_types)
- (preprocessor_deps ../../../config.mlh)
+  mina_stdlib)
  (instrumentation
   (backend bisect_ppx))
  (preprocess

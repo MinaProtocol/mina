@@ -2,7 +2,7 @@ let BenchBase = ../../Command/Bench/Base.dhall
 
 let Pipeline = ../../Pipeline/Dsl.dhall
 
-let PipelineMode = ../../Pipeline/Mode.dhall
+let PipelineScope = ../../Pipeline/Scope.dhall
 
 let name = "LedgerExportStable"
 
@@ -11,7 +11,7 @@ let bench = "ledger-export"
 in  Pipeline.build
       ( BenchBase.pipeline
           BenchBase.Spec::{
-          , mode = PipelineMode.Type.Stable
+          , scope = PipelineScope.AllButPullRequest
           , path = "Bench"
           , name = name
           , label = "Ledger Export"

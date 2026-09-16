@@ -4,7 +4,7 @@ open Ppxlib
 let error which loc =
   Location.raise_errorf ~loc
     "Type declarations with deriving bin_io or versioning should not use the \
-     '%s' type. Use 'Bounded_types.%s.Stable.V1.t' instead."
+     '%s' type. Use 'Mina_stdlib.Bounded_types.%s.Stable.V1.t' instead."
     which (String.capitalize which)
 
 let has_deriving_extension_with_attrs (attrs : attributes) =

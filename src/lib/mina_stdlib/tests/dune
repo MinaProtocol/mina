@@ -1,14 +1,14 @@
-(test
- (name main)
+(tests
+ (names test_graph_algorithms test_time)
  (libraries
   ;; opam libraries
-  core_kernel
+  alcotest
   async_kernel
   async_unix
   base
+  core_kernel
   sexplib0
   yojson
-  alcotest
   ;; local libraries
   mina_stdlib
   ppx_version.runtime)

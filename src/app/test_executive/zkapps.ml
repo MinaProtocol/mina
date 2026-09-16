@@ -77,12 +77,30 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           ~sender_pub_key ~receiver_pub_key ~amount:Currency.Amount.one ~fee
         >>| ignore )
 
+  let verify_zkapp_txns_included ~logger t zkapp_commands =
+    let zkapp_command_hashes =
+      List.map zkapp_commands ~f:(fun cmd ->
+          Mina_transaction.Transaction_hash.hash_zkapp_command
+            (Zkapp_command.read_all_proofs_from_disk cmd) )
+    in
+    let ns = network_state t in
+    let all_included =
+      List.for_all zkapp_command_hashes ~f:(fun txn_hash ->
+          Map.mem ns.blocks_including_txn txn_hash )
+    in
+    if all_included then (
+      [%log info] "All expected zkapp transactions found in blocks" ;
+      Malleable_error.return () )
+    else
+      Malleable_error.hard_error_string
+        "Not all expected zkapp transactions were included in blocks"
+
   let payment_receiver =
     Signature_lib.(Public_key.compress (Keypair.create ()).public_key)
 
   let send_payment_from_zkapp_account ?expected_failure
       ~(constraint_constants : Genesis_constants.Constraint_constants.t) ~logger
-      ~node_uri (sender : Signature_lib.Keypair.t) nonce =
+      ~node_uri ~signature_kind (sender : Signature_lib.Keypair.t) nonce =
     let sender_pk = Signature_lib.Public_key.compress sender.public_key in
     let receiver_pk = payment_receiver in
     let amount =
@@ -104,7 +122,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       let body = Signed_command_payload.Body.Payment payment_payload in
       { Signed_command_payload.Poly.common; body }
     in
-    let signature_kind = Mina_signature_kind.t_DEPRECATED in
     let raw_signature =
       Signed_command.sign_payload ~signature_kind sender.private_key payload
       |> Signature.Raw.encode
@@ -121,7 +138,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           ~amount ~fee ~nonce ~memo ~valid_until ~raw_signature node_uri
         |> Malleable_error.ignore_m
 
-  let run network t =
+  let run ~config:(Test_config.{ signature_kind; _ } as config) network t =
     let open Malleable_error.Let_syntax in
     let logger = Logger.create () in
     let constants : Test_config.constants =
@@ -179,10 +196,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       in
       Malleable_error.lift
       @@ Transaction_snark.For_tests.deploy_snapp ~constraint_constants
-           zkapp_command_spec
+           ~signature_kind zkapp_command_spec
     in
     let%bind.Deferred zkapp_command_update_permissions, permissions_updated =
-      (* construct a Zkapp_command.t, similar to zkapp_test_transaction update-permissions *)
+      (* construct a Zkapp_command.t, similar to zkapp_test_transaction
+         update-permissions *)
       let nonce = Account.Nonce.zero in
       let memo =
         Signed_command_memo.create_from_string_exn "Zkapp update permissions"
@@ -346,9 +364,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           ; actions = []
           }
         in
-        Transaction_snark.For_tests.single_account_update
-          ~signature_kind:Mina_signature_kind.(Other_network "Invalid")
-          ~constraint_constants spec
+        Transaction_snark.For_tests.single_account_update ~constraint_constants
+          ~signature_kind spec
       in
       ( snapp_update
       , zkapp_command_update_all
@@ -693,7 +710,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       section_hard "Send a valid payment from zkApp account"
         (send_payment_from_zkapp_account ~constraint_constants
            ~node_uri:(Network.Node.get_ingress_uri node)
-           ~logger sender nonce )
+           ~logger ~signature_kind sender nonce )
     in
     let%bind () =
       section_hard "Send a zkApp transaction to update permissions"
@@ -711,8 +728,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       let sender = List.hd_exn zkapp_keypairs in
       let nonce = Account.Nonce.of_int 1 in
       section_hard "Send an invalid payment from zkApp account"
-        (send_payment_from_zkapp_account ~constraint_constants ~logger sender
-           nonce
+        (send_payment_from_zkapp_account ~constraint_constants ~logger
+           ~signature_kind sender nonce
            ~node_uri:(Network.Node.get_ingress_uri node)
            ~expected_failure:
              Network_pool.Transaction_pool.Diff_versioned.Diff_error.(
@@ -925,14 +942,50 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       section_hard "Wait for proof to be emitted"
         (wait_for t
            (Wait_condition.ledger_proofs_emitted_since_genesis
-              ~test_config:(config ~constants) ~num_proofs:1 ) )
+              ~test_config:config ~num_proofs:1 ) )
+    in
+    let proof_state_hash =
+      let ns = network_state t in
+      match ns.proof_block_state_hashes with
+      | hash :: _ ->
+          hash
+      | [] ->
+          failwith "Expected at least one proof block state hash"
+    in
+    [%log info] "Proof emitted at block with state hash $state_hash"
+      ~metadata:[ ("state_hash", State_hash.to_yojson proof_state_hash) ] ;
+    let%bind () =
+      section_hard "Verify all zkapp transactions were included"
+        (verify_zkapp_txns_included ~logger t
+           [ zkapp_command_create_accounts
+           ; zkapp_command_update_permissions
+           ; zkapp_command_update_all
+           ; zkapp_command_mint_token
+           ; zkapp_command_mint_token2
+           ; zkapp_command_token_transfer
+           ; zkapp_command_token_transfer2
+           ] )
     in
     Event_router.cancel (event_router t) snark_work_event_subscription () ;
     Event_router.cancel (event_router t) snark_work_failure_subscription () ;
-    section_hard "Running replayer"
-      (let%bind logs =
-         Network.Node.run_replayer ~logger
-           (List.hd_exn @@ (Network.archive_nodes network |> Core.Map.data))
-       in
-       check_replayer_logs ~logger logs )
+    let archive_node =
+      List.hd_exn @@ (Network.archive_nodes network |> Core.Map.data)
+    in
+    let replayer_result =
+      section_hard "Running replayer"
+        (let%bind logs =
+           Network.Node.run_replayer ~target_state_hash:proof_state_hash ~logger
+             archive_node
+         in
+         check_replayer_logs ~logger logs )
+    in
+    let open Deferred.Let_syntax in
+    match%bind replayer_result with
+    | Ok _ as ok ->
+        Deferred.return ok
+    | Error _ as err ->
+        [%log info] "Final network state on replayer failure: $network_state"
+          ~metadata:
+            [ ("network_state", network_state t |> Network_state.to_yojson) ] ;
+        Deferred.return err
 end

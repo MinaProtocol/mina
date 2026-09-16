@@ -21,6 +21,8 @@ fi
 # Fetch a fresh copy of the target branch
 source buildkite/scripts/refresh_code.sh
 
+git fetch origin "${BRANCH}"
+
 # Check mergeability. We use flags so that
 # * `--no-commit` stops us from updating the index with a merge commit,
 # * `--no-ff` stops us from updating the index to the HEAD, if the merge is a
@@ -35,7 +37,7 @@ if [ $RET -eq 0 ]; then
 else
   # exclude branches for which merging cleanly is not a hard requirement
   if [ "${BUILDKITE_PULL_REQUEST_BASE_BRANCH}" == "o1js-main" ]; then
-    echo "Conflicts were found, but the current branch does not have to merge cleanly. Exiting with code 0."
+    echo "Conflicts were found, but the current branch ($CURRENT) does not have to merge cleanly. Exiting with code 0."
     exit 0
   fi
 

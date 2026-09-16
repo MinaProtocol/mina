@@ -41,28 +41,29 @@ module type CONTEXT = sig
   val ledger_sync_config : Syncable_ledger.daemon_config
 
   val proof_cache_db : Proof_cache_tag.cache_db
+
+  val signature_kind : Mina_signature_kind.t
 end
 
 type ctx = (module CONTEXT)
 
-let validate_protocol_versions ~logger ~trust_system ~rpc_name ~sender blocks =
+let validate_protocol_versions ~logger ~trust_system ~rpc_name ~sender headers =
   let version_errors =
     let invalid_current_versions =
-      List.filter blocks ~f:(fun block ->
-          Mina_block.header block |> Mina_block.Header.current_protocol_version
+      List.filter headers ~f:(fun header ->
+          Mina_block.Header.current_protocol_version header
           |> Protocol_version.is_valid |> not )
     in
 
     let invalid_next_versions =
-      List.filter blocks ~f:(fun block ->
-          Mina_block.header block
-          |> Mina_block.Header.proposed_protocol_version_opt
+      List.filter headers ~f:(fun header ->
+          Mina_block.Header.proposed_protocol_version_opt header
           |> Option.for_all ~f:Protocol_version.is_valid
           |> not )
     in
     let current_version_mismatches =
-      List.filter blocks ~f:(fun block ->
-          Mina_block.header block |> Mina_block.Header.current_protocol_version
+      List.filter headers ~f:(fun header ->
+          Mina_block.Header.current_protocol_version header
           |> Protocol_version.compatible_with_daemon |> not )
     in
     List.map invalid_current_versions ~f:(fun x ->
@@ -75,8 +76,7 @@ let validate_protocol_versions ~logger ~trust_system ~rpc_name ~sender blocks =
     (* NB: these errors aren't always accurate... sometimes we are calling this when we were
            requested to serve an outdated block (requested vs sent) *)
     Deferred.List.iter version_errors ~how:`Parallel
-      ~f:(fun (version_error, block) ->
-        let header = Mina_block.header block in
+      ~f:(fun (version_error, header) ->
         let block_protocol_version =
           Mina_block.Header.current_protocol_version header
         in
@@ -250,15 +250,15 @@ module Get_staged_ledger_aux_and_pending_coinbases_at_hash = struct
     include Master
   end)
 
-  module V2 = struct
+  module V3 = struct
     module T = struct
       type query = State_hash.Stable.V1.t
 
       type response =
-        ( Staged_ledger.Scan_state.Stable.V2.t
+        ( Staged_ledger.Scan_state.Stable.V3.t
         * Ledger_hash.Stable.V1.t
         * Pending_coinbase.Stable.V2.t
-        * Mina_state.Protocol_state.Value.Stable.V2.t list )
+        * Mina_state.Protocol_state.Value.Stable.V3.t list )
         option
 
       let query_of_caller_model = Fn.id
@@ -332,7 +332,7 @@ module Answer_sync_ledger_query = struct
 
       type response =
         (( Sync_ledger.Answer.t
-         , Bounded_types.Wrapped_error.Stable.V1.t )
+         , Mina_stdlib.Bounded_types.Wrapped_error.Stable.V1.t )
          Result.t
         [@version_asserted] )
     end
@@ -362,14 +362,14 @@ module Answer_sync_ledger_query = struct
     include Master
   end)
 
-  module V4 = struct
+  module V5 = struct
     module T = struct
       type query = Ledger_hash.Stable.V1.t * Sync_ledger.Query.Stable.V2.t
       [@@deriving sexp]
 
       type response =
-        (( Sync_ledger.Answer.Stable.V3.t
-         , Bounded_types.Wrapped_error.Stable.V1.t )
+        (( Sync_ledger.Answer.Stable.V4.t
+         , Mina_stdlib.Bounded_types.Wrapped_error.Stable.V1.t )
          Result.t
         [@version_asserted] )
       [@@deriving sexp]
@@ -381,49 +381,6 @@ module Answer_sync_ledger_query = struct
       let response_of_callee_model = Fn.id
 
       let caller_model_of_response = Fn.id
-    end
-
-    module T' =
-      Perf_histograms.Rpc.Plain.Decorate_bin_io
-        (struct
-          include M
-          include Master
-        end)
-        (T)
-
-    include T'
-    include Register (T')
-  end
-
-  module V3 = struct
-    module T = struct
-      type query = Ledger_hash.Stable.V1.t * Sync_ledger.Query.Stable.V1.t
-      [@@deriving sexp]
-
-      type response =
-        (( Sync_ledger.Answer.Stable.V2.t
-         , Bounded_types.Wrapped_error.Stable.V1.t )
-         Result.t
-        [@version_asserted] )
-      [@@deriving sexp]
-
-      let query_of_caller_model : Master.T.query -> query =
-       fun (h, q) -> (h, Sync_ledger.Query.Stable.V1.from_v2 q)
-
-      let callee_model_of_query : query -> Master.T.query =
-       fun (h, q) -> (h, Sync_ledger.Query.Stable.V1.to_latest q)
-
-      let response_of_callee_model : Master.T.response -> response = function
-        | Ok a ->
-            Sync_ledger.Answer.Stable.V2.from_v3 a
-        | Error e ->
-            Error e
-
-      let caller_model_of_response : response -> Master.T.response = function
-        | Ok a ->
-            Ok (Sync_ledger.Answer.Stable.V2.to_latest a)
-        | Error e ->
-            Error e
     end
 
     module T' =
@@ -535,7 +492,7 @@ module Get_transition_chain = struct
     module T = struct
       type query = State_hash.Stable.V1.t list [@@deriving sexp]
 
-      type response = Mina_block.Stable.V2.t list option
+      type response = Mina_block.Stable.V3.t list option
 
       let query_of_caller_model = Fn.id
 
@@ -580,7 +537,7 @@ module Get_transition_chain = struct
           validate_protocol_versions ~logger ~trust_system
             ~rpc_name:"Get_transition_chain"
             ~sender:(Envelope.Incoming.sender request)
-            blocks
+            (List.map blocks ~f:Mina_block.header)
         in
         Option.some_if valid_versions
         @@ List.map ~f:Mina_block.read_all_proofs_from_disk blocks
@@ -925,17 +882,17 @@ module Get_ancestry = struct
     include Master
   end)
 
-  module V2 = struct
+  module V3 = struct
     module T = struct
       type query =
-        ( Consensus.Data.Consensus_state.Value.Stable.V2.t
+        ( Consensus.Data.Consensus_state.Value.Stable.V3.t
         , State_hash.Stable.V1.t )
         With_hash.Stable.V1.t
       [@@deriving sexp]
 
       type response =
-        ( Mina_block.Stable.V2.t
-        , State_body_hash.Stable.V1.t list * Mina_block.Stable.V2.t )
+        ( Mina_block.Stable.V3.t
+        , State_body_hash.Stable.V1.t list * Mina_block.Stable.V3.t )
         Proof_carrying_data.Stable.V1.t
         option
 
@@ -992,11 +949,13 @@ module Get_ancestry = struct
         in
         None
     | Some { proof = chain, base_block; data = block } ->
+        let block = Frontier_base.Breadcrumb.block block in
+        let base_block = Frontier_base.Breadcrumb.block base_block in
         let%map valid_versions =
           validate_protocol_versions ~logger ~trust_system
             ~rpc_name:"Get_ancestry"
             ~sender:(Envelope.Incoming.sender request)
-            [ base_block ]
+            [ Mina_block.header base_block ]
         in
         Option.some_if valid_versions
           { Proof_carrying_data.proof =
@@ -1134,13 +1093,13 @@ module Get_best_tip = struct
     include Master
   end)
 
-  module V2 = struct
+  module V3 = struct
     module T = struct
       type query = unit [@@deriving sexp]
 
       type response =
-        ( Mina_block.Stable.V2.t
-        , State_body_hash.Stable.V1.t list * Mina_block.Stable.V2.t )
+        ( Mina_block.Stable.V3.t
+        , State_body_hash.Stable.V1.t list * Mina_block.Stable.V3.t )
         Proof_carrying_data.Stable.V1.t
         option
 
@@ -1178,11 +1137,7 @@ module Get_best_tip = struct
     let result =
       let open Option.Let_syntax in
       let%bind frontier = get_transition_frontier () in
-      let%map proof_with_data =
-        Best_tip_prover.prove ~context:(module Context) frontier
-      in
-      (* strip hash from proof data *)
-      Proof_carrying_data.map proof_with_data ~f:With_hash.data
+      Best_tip_prover.prove ~context:(module Context) frontier
     in
     match result with
     | None ->
@@ -1195,16 +1150,18 @@ module Get_best_tip = struct
         in
         None
     | Some { data = data_block; proof = chain, proof_block } ->
+        let data_block = Frontier_base.Breadcrumb.block data_block in
+        let proof_block = Frontier_base.Breadcrumb.block proof_block in
         let%map data_valid_versions =
           validate_protocol_versions ~logger ~trust_system
             ~rpc_name:"Get_best_tip (data)"
             ~sender:(Envelope.Incoming.sender request)
-            [ data_block ]
+            [ Mina_block.header data_block ]
         and proof_valid_versions =
           validate_protocol_versions ~logger ~trust_system
             ~rpc_name:"Get_best_tip (proof)"
             ~sender:(Envelope.Incoming.sender request)
-            [ proof_block ]
+            [ Mina_block.header proof_block ]
         in
         Option.some_if
           (data_valid_versions && proof_valid_versions)

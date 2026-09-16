@@ -22,26 +22,25 @@ module Make (Inputs : Inputs_intf.S) = struct
     type t = unit Async.Ivar.t
   end
 
-  type maps_t =
-    { accounts : Account.t Location_binable.Map.t
-    ; token_owners : Account_id.t Token_id.Map.t
-    ; hashes : Hash.t Addr.Map.t
-    ; locations : Location.t Account_id.Map.t
-    ; non_existent_accounts : Account_id.Set.t
-    }
+  type maps_t = Inputs.Mask_maps.t
 
   (** Merges second maps object into the first one,
       potentially overwriting some keys *)
-  let maps_merge base
-      { accounts; token_owners; hashes; locations; non_existent_accounts } =
+  let maps_merge (base : maps_t)
+      ({ accounts; token_owners; hashes; locations; non_existent_accounts } :
+        maps_t ) =
     let combine ~key:_ _ v = v in
-    { accounts = Map.merge_skewed ~combine base.accounts accounts
-    ; token_owners = Map.merge_skewed ~combine base.token_owners token_owners
-    ; hashes = Map.merge_skewed ~combine base.hashes hashes
-    ; locations = Map.merge_skewed ~combine base.locations locations
-    ; non_existent_accounts =
-        Account_id.Set.union base.non_existent_accounts non_existent_accounts
-    }
+    ( { accounts = Map.merge_skewed ~combine base.accounts accounts
+      ; token_owners = Map.merge_skewed ~combine base.token_owners token_owners
+      ; hashes = Map.merge_skewed ~combine base.hashes hashes
+      ; locations = Map.merge_skewed ~combine base.locations locations
+      ; non_existent_accounts =
+          Account_id.Set.(
+            union
+              (diff base.non_existent_accounts @@ of_map_keys locations)
+              non_existent_accounts)
+      }
+      : maps_t )
 
   (** Structure managing cache accumulated since the "base" ledger.
 
@@ -92,12 +91,13 @@ module Make (Inputs : Inputs_intf.S) = struct
   type unattached = t
 
   let empty_maps =
-    { accounts = Location_binable.Map.empty
-    ; token_owners = Token_id.Map.empty
-    ; hashes = Addr.Map.empty
-    ; locations = Account_id.Map.empty
-    ; non_existent_accounts = Account_id.Set.empty
-    }
+    ( { accounts = Location.Map.empty
+      ; token_owners = Token_id.Map.empty
+      ; hashes = Addr.Map.empty
+      ; locations = Account_id.Map.empty
+      ; non_existent_accounts = Account_id.Set.empty
+      }
+      : maps_t )
 
   let create ~depth () =
     { uuid = Uuid_unix.create ()
@@ -201,6 +201,12 @@ module Make (Inputs : Inputs_intf.S) = struct
           acc.current <- f acc.current ;
           acc.next <- f acc.next )
 
+    let get_maps t = assert_is_attached t ; t.maps
+
+    let append_maps t maps =
+      assert_is_attached t ;
+      update_maps t ~f:(Fn.flip maps_merge maps)
+
     let self_set_hash t address hash =
       update_maps t ~f:(fun maps ->
           { maps with hashes = Map.set maps.hashes ~key:address ~data:hash } )
@@ -288,7 +294,7 @@ module Make (Inputs : Inputs_intf.S) = struct
             let cur_addr = Location.to_path_exn cur_loc in
             Addr.is_further_right ~than:cur_addr @@ Location.to_path_exn loc )
       in
-      let self_find ~maps:{ accounts; _ } id =
+      let self_find ~maps:({ accounts; _ } : maps_t) id =
         ( id
         , match Map.find accounts id with
           | None when is_empty id ->
@@ -301,7 +307,9 @@ module Make (Inputs : Inputs_intf.S) = struct
       self_find_or_batch_lookup self_find Base.get_batch t
 
     let empty_hash =
-      Empty_hashes.extensible_cache (module Hash) ~init_hash:Hash.empty_account
+      Mina_stdlib.Empty_hashes.extensible_cache
+        (module Hash)
+        ~init_hash:Hash.empty_account
 
     let self_path_get_hash ~hashes ~current_location height address =
       match Map.find hashes address with
@@ -621,15 +629,14 @@ module Make (Inputs : Inputs_intf.S) = struct
       let hash_cache = t.maps.hashes in
       t.maps <- empty_maps ;
       Base.set_batch ~hash_cache parent account_data ;
-      Debug_assert.debug_assert (fun () ->
-          [%test_result: Hash.t]
-            ~message:
-              "Parent merkle root after committing should be the same as the \
-               old one in the mask"
-            ~expect:old_root_hash (Base.merkle_root parent) ;
-          [%test_result: Hash.t]
-            ~message:"Merkle root of the mask should delegate to the parent now"
-            ~expect:(merkle_root t) (Base.merkle_root parent) ) ;
+      assert (
+        Hash.equal old_root_hash (Base.merkle_root parent)
+        || failwith
+             "Parent merkle root after committing should be the same as the \
+              old one in the mask" ) ;
+      assert (
+        Hash.equal (merkle_root t) (Base.merkle_root parent)
+        || failwith "Merkle root of the mask should delegate to the parent now" ) ;
       t.is_committing <- false
 
     (* copy tables in t; use same parent *)
@@ -777,7 +784,7 @@ module Make (Inputs : Inputs_intf.S) = struct
               failwith "Expected mask current location to represent an account"
           )
 
-    let self_lookup_account ~maps account_id =
+    let self_lookup_account ~(maps : maps_t) account_id =
       if Set.mem maps.non_existent_accounts account_id then Some None
       else Option.map ~f:Option.some @@ Map.find maps.locations account_id
 
@@ -878,10 +885,15 @@ module Make (Inputs : Inputs_intf.S) = struct
       let addr = Location.to_path_exn location in
       Addr.to_int addr
 
-    let get_at_index_exn t index =
+    let get_at_index t index =
       assert_is_attached t ;
       let addr = Addr.of_int_exn ~ledger_depth:t.depth index in
-      get t (Location.Account addr) |> Option.value_exn
+      get t (Location.Account addr)
+
+    let get_at_index_exn t index =
+      assert_is_attached t ;
+      get_at_index t index
+      |> Option.value_exn ~message:"Expected account at index" ~here:[%here]
 
     let set_at_index_exn t index account =
       assert_is_attached t ;
@@ -905,11 +917,17 @@ module Make (Inputs : Inputs_intf.S) = struct
       let%map.Async.Deferred accts = to_list t in
       List.map accts ~f:Account.identifier |> Account_id.Set.of_list
 
-    let iteri t ~f =
+    let iteri_untrusted t ~f =
       assert_is_attached t ;
       let num_accounts = num_accounts t in
       Sequence.range ~stop:`exclusive 0 num_accounts
-      |> Sequence.iter ~f:(fun i -> f i (get_at_index_exn t i))
+      |> Sequence.iter ~f:(fun i -> f i (get_at_index t i))
+
+    let iteri t ~f =
+      iteri_untrusted t ~f:(fun index account_opt ->
+          f index
+            (Option.value_exn ~message:"Expected account at index" ~here:[%here]
+               account_opt ) )
 
     let foldi_with_ignored_accounts t ignored_accounts ~init ~f =
       assert_is_attached t ;
@@ -976,7 +994,7 @@ module Make (Inputs : Inputs_intf.S) = struct
     (* NB: updates the mutable current_location field in t *)
     let get_or_create_account t account_id account =
       assert_is_attached t ;
-      let { locations; non_existent_accounts; _ }, ancestor =
+      let ({ locations; non_existent_accounts; _ } : maps_t), ancestor =
         maps_and_ancestor t
       in
       let add_location () =
@@ -1010,6 +1028,11 @@ module Make (Inputs : Inputs_intf.S) = struct
                 add_location () )
       | Some location ->
           Ok (`Existed, location)
+
+    let all_accounts_on_masks t =
+      let base = get_parent t |> Base.all_accounts_on_masks in
+      let combine ~key:_ _ v = v in
+      Map.merge_skewed ~combine base t.maps.accounts
   end
 
   let set_parent ?accumulated:accumulated_opt t parent =

@@ -7,7 +7,7 @@
   async_unix
   base
   block_time
-  bounded_types
+  mina_stdlib
   core
   core_kernel
   core_unix.command_unix

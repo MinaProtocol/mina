@@ -1433,7 +1433,7 @@ module Openings = struct
               , 'fq )
               Mina_wire_types.Pickles_types.Plonk_types.Openings.Bulletproof.V1
               .t =
-          { lr : ('g * 'g) Bounded_types.ArrayN16.Stable.V1.t
+          { lr : ('g * 'g) Mina_stdlib.Bounded_types.ArrayN16.Stable.V1.t
           ; z_1 : 'fq
           ; z_2 : 'fq
           ; delta : 'g
@@ -1481,7 +1481,7 @@ module Poly_comm = struct
     module Stable = struct
       module V1 = struct
         type 'g_opt t =
-          { unshifted : 'g_opt Bounded_types.ArrayN16.Stable.V1.t
+          { unshifted : 'g_opt Mina_stdlib.Bounded_types.ArrayN16.Stable.V1.t
           ; shifted : 'g_opt
           }
         [@@deriving sexp, compare, yojson, hlist, hash, equal]
@@ -1541,7 +1541,7 @@ module Poly_comm = struct
     [%%versioned
     module Stable = struct
       module V1 = struct
-        type 'g t = 'g Bounded_types.ArrayN16.Stable.V1.t
+        type 'g t = 'g Mina_stdlib.Bounded_types.ArrayN16.Stable.V1.t
         [@@deriving sexp, compare, yojson, hash, equal]
       end
     end]
@@ -1564,7 +1564,7 @@ module Messages = struct
       module V1 = struct
         type 'g t =
               'g Mina_wire_types.Pickles_types.Plonk_types.Messages.Lookup.V1.t =
-          { sorted : 'g Bounded_types.ArrayN16.Stable.V1.t
+          { sorted : 'g Mina_stdlib.Bounded_types.ArrayN16.Stable.V1.t
           ; aggreg : 'g
           ; runtime : 'g option
           }
@@ -1687,7 +1687,7 @@ module Messages = struct
     let lookup =
       Lookup.opt_typ ~uses_lookup:uses_lookups ~lookups_per_row_4
         ~runtime_tables ~dummy:[| dummy |]
-        (wo [ 1 ])
+        (wo [ z ])
     in
     of_hlistable
       [ Plonkish_prelude.Vector.typ (wo w_lens) Columns.n
@@ -1718,7 +1718,7 @@ module Messages = struct
     let lookup =
       Lookup.wrap_opt_typ ~uses_lookup:uses_lookups ~lookups_per_row_4
         ~runtime_tables ~dummy:[| dummy |]
-        (wo [ 1 ])
+        (wo [ z ])
     in
     of_hlistable
       [ Plonkish_prelude.Vector.wrap_typ (wo w_lens) Columns.n
@@ -1756,7 +1756,7 @@ module Shifts = struct
   [%%versioned
   module Stable = struct
     module V2 = struct
-      type 'field t = 'field Bounded_types.ArrayN16.Stable.V1.t
+      type 'field t = 'field Mina_stdlib.Bounded_types.ArrayN16.Stable.V1.t
       [@@deriving sexp, compare, yojson, equal]
     end
   end]

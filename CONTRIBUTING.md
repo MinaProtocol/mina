@@ -90,7 +90,7 @@ There are three main pieces of Mina documentation:
 3. Inline code comments. We are working to provide more comments. We run `ocamldoc` and the generated 
    [OCaml package documentation](https://mina-docs.storage.googleapis.com/index.html) is browsable.
 
-Changes to the software require changes to the documentation. The Mina Docs use a docs-as-code workflow to develop and publish product documentation using the same tools and processes as software code development. All user-impacting updates on the codebase require corresponding updates to the relevant documentation in the docs repo. See the [Docs Contributing Guidelines](https://github.com/o1-labs/docs2/blob/main/CONTRIBUTING.md). 
+Changes to the software require changes to the documentation. The Mina Docs use a docs-as-code workflow to develop and publish product documentation using the same tools and processes as software code development. All user-impacting updates on the codebase require corresponding updates to the relevant documentation in the docs repo.
 
 ## RFCs
 

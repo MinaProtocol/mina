@@ -1,4 +1,5 @@
 open Core_kernel
+include Core_kernel.Time
 
 module Span = struct
   [%%versioned
@@ -9,6 +10,9 @@ module Span = struct
          64bit float. Hence conversion to/from float poses no precision lost.
       *)
       type t = Core_kernel.Time.Stable.Span.V3.t [@@deriving sexp]
+
+      let to_yojson_hum span =
+        `String (Printf.sprintf "%f seconds" (Time.Span.to_sec span))
 
       let to_yojson span = `Float (Time.Span.to_sec span)
 
@@ -22,7 +26,7 @@ module Span = struct
     end
   end]
 
-  [%%define_locally Stable.Latest.(to_yojson, of_yojson)]
+  [%%define_locally Stable.Latest.(to_yojson_hum, to_yojson, of_yojson)]
 
   include Core_kernel.Time.Span
 end

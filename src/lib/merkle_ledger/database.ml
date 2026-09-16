@@ -1,10 +1,11 @@
+open Core_kernel
+
 module Make (Inputs : Intf.Inputs.DATABASE) = struct
-  (* The max depth of a merkle tree can never be greater than 253. *)
+  (* The max depth of a merkle tree can never be greater than 253,
+     due to the way we encode locations. *)
   open Inputs
 
   module Db_error = struct
-    [@@@warning "-4"] (* due to deriving sexp below *)
-
     type t = Account_location_not_found | Out_of_leaves | Malformed_database
     [@@deriving sexp]
   end
@@ -43,7 +44,7 @@ module Make (Inputs : Intf.Inputs.DATABASE) = struct
 
   let depth t = t.depth
 
-  let create ?directory_name ~depth () =
+  let create ?directory_name ?(fresh = false) ~depth () =
     let open Core in
     (* for ^/ and Unix below *)
     assert (depth < 0xfe) ;
@@ -58,6 +59,7 @@ module Make (Inputs : Intf.Inputs.DATABASE) = struct
       | Some name ->
           name
     in
+    if fresh then Mina_stdlib_unix.File_system.rmrf directory ;
     Unix.mkdir_p directory ;
     let kvdb = Kvdb.create directory in
     { uuid
@@ -96,7 +98,9 @@ module Make (Inputs : Intf.Inputs.DATABASE) = struct
     with exn -> close t ; raise exn
 
   let empty_hash =
-    Empty_hashes.extensible_cache (module Hash) ~init_hash:Hash.empty_account
+    Mina_stdlib.Empty_hashes.extensible_cache
+      (module Hash)
+      ~init_hash:Hash.empty_account
 
   let get_raw { kvdb; depth; _ } location =
     Kvdb.get kvdb ~key:(Location.serialize ~ledger_depth:depth location)
@@ -274,9 +278,13 @@ module Make (Inputs : Intf.Inputs.DATABASE) = struct
       Option.map (last_location mdb) ~f:Location.to_path_exn
   end
 
-  let get_at_index_exn mdb index =
+  let get_at_index mdb index =
     let addr = Addr.of_int_exn ~ledger_depth:mdb.depth index in
-    get mdb (Location.Account addr) |> Option.value_exn
+    get mdb (Location.Account addr)
+
+  let get_at_index_exn mdb index =
+    get_at_index mdb index
+    |> Option.value_exn ~message:"Expected account at index" ~here:[%here]
 
   let all_accounts (t : t) =
     match Account_location.last_location_address t with
@@ -568,13 +576,19 @@ module Make (Inputs : Intf.Inputs.DATABASE) = struct
     | Ok location ->
         Ok (`Existed, location)
 
-  let iteri t ~f =
+  let iteri_untrusted t ~f =
     match Account_location.last_location_address t with
     | None ->
         ()
     | Some last_addr ->
         Sequence.range ~stop:`inclusive 0 (Addr.to_int last_addr)
-        |> Sequence.iter ~f:(fun i -> f i (get_at_index_exn t i))
+        |> Sequence.iter ~f:(fun i -> f i (get_at_index t i))
+
+  let iteri t ~f =
+    iteri_untrusted t ~f:(fun index account_opt ->
+        f index
+          (Option.value_exn ~message:"Expected account at index" ~here:[%here]
+             account_opt ) )
 
   (* TODO : if key-value store supports iteration mechanism, like RocksDB,
      maybe use that here, instead of loading all accounts into memory See Issue
@@ -676,4 +690,6 @@ module Make (Inputs : Intf.Inputs.DATABASE) = struct
   let merkle_path_at_index_exn t index =
     let addr = Addr.of_int_exn ~ledger_depth:t.depth index in
     merkle_path_at_addr_exn t addr
+
+  let all_accounts_on_masks _ = Location.Map.empty
 end
