@@ -222,12 +222,12 @@ end
  *                                   `prev_challenges` already populated via
  *                                   Wrap_hack.pad_accumulator (5 top-level
  *                                   keys; same as dump_nrr_fixtures.ml:94)
- *   <output_dir>/wrapping.json    : Pickles wrapping via yojson_full —
+ *   <output_dir>/public_input_skeleton.json : Pickles wrapping via yojson_full —
  *                                   carries deferred-values + branch_data +
  *                                   sponge digest + prev_evals + redundant
  *                                   wire_proof bytes (3 top-level keys; same
  *                                   as dump_nrr_fixtures.ml:101)
- *   <output_dir>/statement.json   : public-state field encoded as yojson.
+ *   <output_dir>/app_statement.json : public-state field encoded as yojson.
  *                                   For No_recursion (Input mode), this is
  *                                   the public INPUT supplied to `step`
  *                                   (= `Field.Constant.zero`); for an
@@ -346,18 +346,18 @@ let dump_child_fixture () =
   in
   write_file "proof.serde.json" proof_json ;
 
-  (* (d) Pickles wrapping → wrapping.json (yojson_full, same as nrr
-     fixture's wrapping.json). Carries deferred-work data the kimchi
+  (* (d) Pickles wrapping → public_input_skeleton.json (yojson_full, same
+     as the nrr fixture's). Carries deferred-work data the kimchi
      proof codec doesn't. *)
   let module ProofM = Pickles.Proof.Make (Nat.N0) in
   let wrapping_json = ProofM.to_yojson_full example_proof in
-  write_file "wrapping.json" (Yojson.Safe.to_string wrapping_json) ;
+  write_file "public_input_skeleton.json" (Yojson.Safe.to_string wrapping_json) ;
 
-  (* (e) Statement → statement.json. For No_recursion this is the
+  (* (e) Statement → app_statement.json. For No_recursion this is the
      public INPUT (= Field.Constant.zero); PS expects the same key
-     ("statement.json") regardless of Input/Output mode. *)
+     ("app_statement.json") regardless of Input/Output mode. *)
   let stmt_json = Pickles.Backend.Tick.Field.to_yojson example_input in
-  write_file "statement.json" (Yojson.Safe.to_string stmt_json) ;
+  write_file "app_statement.json" (Yojson.Safe.to_string stmt_json) ;
 
   Format.printf "=== side-loaded child fixture dump DONE ===@."
 
