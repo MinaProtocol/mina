@@ -248,7 +248,7 @@ struct
            = sum_i r^i < t, pows(beta_i) > *)
         let u =
           let t = Sponge.squeeze_field sponge in
-          group_map t
+          Utils.lower_half_point ~assert_128_bits:(assert_n_bits ~n:128) (group_map t)
         in
         let open Inner_curve in
         let combined_polynomial (* Corresponds to xi in figure 7 of WTS *) =

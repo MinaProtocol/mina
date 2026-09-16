@@ -132,6 +132,28 @@ module Make (Impl : Kimchi_pasta_snarky_backend.Snark_intf) = struct
      field modulus, so the prover has no alias to choose. *)
   let lowest_128_bits ~constrain_low_bits ~assert_128_bits x =
     split_128_below ~constrain_low_bits ~assert_128_bits Field.size x
+
+  (* The IPA base [(x, y)] with the square-root sign pinned: [(x, y')] with
+     [y' = +-y] and [y'] at most [(p - 1) / 2] as an integer. *)
+  let lower_half_point ~assert_128_bits ((x, y) : Field.t * Field.t) =
+    let half = Bignum_bigint.((Field.size + one) / of_int 2) in
+    let is_upper =
+      exists Boolean.typ
+        ~compute:
+          As_prover.(
+            fun () ->
+              let y = Bigint.(to_bignum_bigint (of_field (read_var y))) in
+              Bignum_bigint.(y >= half))
+    in
+    let y =
+      Field.if_ is_upper
+        ~then_:(Field.scale y Field.Constant.(negate one))
+        ~else_:y
+    in
+    ignore
+      ( split_128_below ~constrain_low_bits:true ~assert_128_bits half y
+        : Field.t ) ;
+    (x, y)
 end
 
 module Step = Make (Kimchi_pasta_snarky_backend.Step_impl)

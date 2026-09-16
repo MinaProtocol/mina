@@ -25,6 +25,11 @@ module Make (Impl : Kimchi_pasta_snarky_backend.Snark_intf) : sig
     -> assert_128_bits:(Field.t -> unit)
     -> Field.t
     -> Field.t
+
+  val lower_half_point :
+       assert_128_bits:(Field.t -> unit)
+    -> Field.t * Field.t
+    -> Field.t * Field.t
 end
 
 module Step : module type of Make (Kimchi_pasta_snarky_backend.Step_impl)
