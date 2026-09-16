@@ -43,12 +43,15 @@ let DockerLogin = ./DockerLogin/Type.dhall
 
 let Summon = ./Summon/Type.dhall
 
+let SubmoduleCredentials = ./SubmoduleCredentials/Type.dhall
+
 let Size = ./Size.dhall
 
 let Plugins =
       < Docker : Docker.Type
       | DockerLogin : DockerLogin.Type
       | Summon : Summon.Type
+      | SubmoduleCredentials : SubmoduleCredentials.Type
       >
 
 let B/Command = B.definitions/commandStep/Type Text Text Plugins Plugins
@@ -289,10 +292,22 @@ let build
                           c.summon
                       )
 
+              let submoduleCredentialsPart =
+                    [ toMap
+                        { `MinaProtocol/submodule-credentials#v1.0.0` =
+                            Plugins.SubmoduleCredentials
+                              SubmoduleCredentials::{=}
+                        }
+                    ]
+
               let allPlugins =
                     List/concat
                       (Map.Entry Text Plugins)
-                      (dockerPart # summonPart # dockerLoginPart)
+                      (   submoduleCredentialsPart
+                        # dockerPart
+                        # summonPart
+                        # dockerLoginPart
+                      )
 
               in        if Prelude.List.null (Map.Entry Text Plugins) allPlugins
 
