@@ -339,6 +339,8 @@ case "${SERVICE}" in
         DOCKER_TARGET="${INPUT_DOCKER_TARGET:-mina-daemon-prefork-genesis}"
         ;;
     mina-daemon-auto-hardfork)
+        # Installs the profile package of its network.
+        NEEDS_DEB_PROFILE=1
         if [[ -z "$INPUT_LEGACY_VERSION" ]]; then
           echo "Legacy version is not set for mina-daemon-auto-hardfork."
           echo "Please provide the --deb-legacy-version argument."

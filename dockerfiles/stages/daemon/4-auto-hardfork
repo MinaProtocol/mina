@@ -19,6 +19,7 @@ ARG deb_release=unstable
 ARG deb_codename=bullseye
 ARG network=mainnet
 ARG deb_legacy_version
+ARG deb_profile
 
 ENV MINA_DEB=mina-${network}-postfork-mesa
 
@@ -29,8 +30,9 @@ ENV MINA_DEB=mina-${network}-postfork-mesa
 # freshly-built .deb files (and, via read_all_from_cache.sh, the legacy-root
 # debs) under _debs, which we COPY to /opt/mina-local-debs, and
 # install-mina-debs.sh installs the resolved .deb files with apt-get (no apt
-# repo / no apt index). The postfork metapackage depends on mina-logproc, which
-# has no repo to resolve it, so it is requested explicitly as a local file. The
+# repo / no apt index). The postfork metapackage depends on mina-logproc and on
+# the profile package (the node has no default profile), which have no repo to
+# resolve them, so they are requested explicitly as local files. The
 # prefork package's (unversioned) mina-logproc dependency is already satisfied
 # by that install, so the legacy prefork step only needs the prefork package.
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
@@ -52,7 +54,8 @@ RUN echo "Building image with version $deb_version from repo $deb_release $deb_c
   && chmod +x /usr/local/bin/install-mina-debs.sh \
   && /usr/local/bin/install-mina-debs.sh \
        "${MINA_DEB}=$deb_version" \
-       "mina-logproc=$deb_version"
+       "mina-logproc=$deb_version" \
+       "mina-${deb_profile}-profile=$deb_version"
 
 RUN echo "Installing legacy package with version $deb_legacy_version from repo $deb_release $deb_codename for network $network" \
   && /usr/local/bin/install-mina-debs.sh \
