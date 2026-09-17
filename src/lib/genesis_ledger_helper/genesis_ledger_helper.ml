@@ -300,19 +300,27 @@ module Ledger = struct
           accounts_with_keys
     in
 
-    (* Genesis accounts must not delegate to the empty address. An account
-       with no delegate has no stake, so a genesis ledger whose accounts all
-       omit one carries no stake at all and the network it starts never
-       produces a block. An account that does not name a delegate therefore
-       delegates to itself. *)
-    let self_delegate_when_unset accounts_with_keys =
-      List.map accounts_with_keys
-        ~f:(fun ((key, account) : _ * Mina_base.Account.t) ->
-          match account.delegate with
-          | Some _ ->
-              (key, account)
-          | None ->
-              (key, { account with delegate = Some account.public_key }) )
+    (* An account with no delegate has no stake. A genesis ledger in which no
+       account delegates carries no stake at all, so the network it starts
+       never produces a block. Delegates are not defaulted: an omitted
+       delegate in the config means the account does not stake. *)
+    let warn_if_no_stake accounts_with_keys =
+      let has_stake =
+        List.exists accounts_with_keys
+          ~f:(fun ((_key, account) : _ * Mina_base.Account.t) ->
+            Token_id.equal account.token_id Token_id.default
+            && Option.is_some account.delegate
+            && not
+                 (Currency.Balance.equal account.balance Currency.Balance.zero) )
+      in
+      if not has_stake then
+        [%log error]
+          "No account in the $ledger delegates to anyone, so the ledger \
+           carries no stake and the network cannot produce blocks. Set the \
+           delegate field of the staking accounts in the ledger config; an \
+           omitted delegate means the account does not stake."
+          ~metadata:[ ("ledger", `String ledger_name_prefix) ] ;
+      accounts_with_keys
     in
 
     let add_genesis_winner_account accounts =
@@ -355,8 +363,7 @@ module Ledger = struct
             ( lazy
               (patch_accounts_version
                  (add_genesis_winner_account
-                    (self_delegate_when_unset (Accounts.to_full accounts)) ) )
-              )
+                    (warn_if_no_stake (Accounts.to_full accounts)) ) ) )
       | Named name -> (
           match Genesis_ledger.fetch_ledger name with
           | Some (module M) ->
@@ -367,8 +374,7 @@ module Ledger = struct
                   ] ;
               Some
                 (Lazy.map M.accounts ~f:(fun accounts ->
-                     add_genesis_winner_account
-                       (self_delegate_when_unset accounts) ) )
+                     add_genesis_winner_account (warn_if_no_stake accounts) ) )
           | None ->
               [%log trace]
                 "Could not find a built-in $ledger named $ledger_name"

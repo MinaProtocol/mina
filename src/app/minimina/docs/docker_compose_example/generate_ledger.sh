@@ -22,13 +22,13 @@ cat <<EOF > $genesis_ledger_path
       "pk": "$mina_bp_1_key",
       "sk": null,
       "balance": "11550000.000000000",
-      "delegate": null
+      "delegate": "$mina_bp_1_key"
      },
      {
       "pk": "$mina_bp_2_key",
       "sk": null,
       "balance": "11550000.000000000",
-      "delegate": null
+      "delegate": "$mina_bp_2_key"
      }
     ]
   }
