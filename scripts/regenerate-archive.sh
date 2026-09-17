@@ -11,6 +11,9 @@ PG_HOST=${PG_HOST:-localhost}
 PG_PORT=${PG_PORT:-5432}
 PG_URI="postgresql://${PG_USER}:${PG_PW}@${PG_HOST}:${PG_PORT}/${PG_DB}"
 
+# Node profile for every mina binary this script runs.
+PROFILE=devnet
+
 # go to root of mina repo
 cd "$(dirname -- "${BASH_SOURCE[0]}")"/..
 
@@ -24,7 +27,6 @@ PGPASSWORD="${PG_PW}" createdb \
           -U "${PG_USER}" \
           -h "${PG_HOST}" \
           -p "${PG_PORT}" "${PG_DB}"
-export DUNE_PROFILE=devnet
 PGPASSWORD="${PG_PW}" psql \
           -U "${PG_USER}" \
           -h "${PG_HOST}" \
@@ -37,7 +39,8 @@ dune build \
      src/app/logproc/logproc.exe
 
 # start mina-local-network
-./scripts/mina-local-network/mina-local-network.sh -a -r \
+./scripts/mina-local-network/mina-local-network.sh --profile "${PROFILE}" \
+    -a -r \
     -pu "${PG_USER}" \
     -pd "${PG_DB}" \
     -ppw "${PG_PW}" \
@@ -120,7 +123,7 @@ PGPASSWORD="${PG_PW}" psql \
           -h "${PG_HOST}" \
           -p "${PG_PORT}" \
           "${PG_DB}" < ./src/test/archive/sample_db/archive_db.sql
-dune exec src/app/replayer/replayer.exe -- \
+MINA_PROFILE="${PROFILE}" dune exec src/app/replayer/replayer.exe -- \
      --archive-uri "$PG_URI" \
      --input-file src/test/archive/sample_db/replayer_input_file.json \
      --log-level Trace \
