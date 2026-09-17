@@ -190,13 +190,25 @@ let generateDockerForCodename =
                   }
                 ]
 
+          let daemonProfiled =
+                DockerImage.ReleaseSpec::{
+                , deps = dependsOnBuildHfDebian # dependsOnDaemonOnly
+                , service = Docker.Type.DaemonProfiled { profile = profile }
+                , network = spec.network
+                , deb_codename = codename.DebVersion
+                , deb_profile = profile
+                , deb_install_mode = DockerImage.DebianInstallMode.DownloadOnly
+                , deb_legacy_version = spec.deb_legacy_version
+                , size = spec.size
+                , deb_version = spec.version
+                , step_key_suffix =
+                    "-${DebianVersions.lowerName
+                          codename.DebVersion}-docker-image"
+                }
+
           let dependsOnDaemonProfiled =
                 [ { name = pipelineName
-                  , key =
-                      "${Docker.lowerName
-                           ( Docker.Type.DaemonProfiled { profile = profile }
-                           )}-${Profiles.lowerName
-                                  profile}-${lowerNameCodename}-docker-image"
+                  , key = DockerImage.stepKey daemonProfiled
                   }
                 ]
 
@@ -343,22 +355,7 @@ let generateDockerForCodename =
                           "-${DebianVersions.lowerName
                                 codename.DebVersion}-docker-image"
                       }
-                    , DockerImage.ReleaseSpec::{
-                      , deps = dependsOnBuildHfDebian # dependsOnDaemonOnly
-                      , service =
-                          Docker.Type.DaemonProfiled { profile = profile }
-                      , network = spec.network
-                      , deb_codename = codename.DebVersion
-                      , deb_profile = profile
-                      , deb_install_mode =
-                          DockerImage.DebianInstallMode.DownloadOnly
-                      , deb_legacy_version = spec.deb_legacy_version
-                      , size = spec.size
-                      , deb_version = spec.version
-                      , step_key_suffix =
-                          "-${DebianVersions.lowerName
-                                codename.DebVersion}-docker-image"
-                      }
+                    , daemonProfiled
                     , DockerImage.ReleaseSpec::{
                       , deps = dependsOnBuildHfDebian # dependsOnDaemonProfiled
                       , service = Docker.Type.Daemon { network = spec.network }
