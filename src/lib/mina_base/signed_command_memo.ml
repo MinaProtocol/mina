@@ -1,6 +1,6 @@
 (* signed_command_memo.ml *)
 
-open Core_kernel
+open Core
 open Snark_params
 
 (** See documentation of the {!Mina_wire_types} library *)
@@ -211,6 +211,10 @@ module Make_str (_ : Wire_types.Concrete) = struct
       (Random_oracle.Legacy.pack_input
          (Random_oracle_input.Legacy.bitstring (to_bits memo)) )
 
+  (* Bounds-check the declared-length byte [memo.[1]] against the bytes
+     actually present before [String.sub] (data bytes start at [pos = 2],
+     after the tag and length bytes); a short memo would otherwise raise
+     [Invalid_argument]. *)
   let to_plaintext (memo : t) : string Or_error.t =
     if is_bytes memo then
       match length memo with
@@ -317,14 +321,13 @@ module Make_str (_ : Wire_types.Concrete) = struct
         let memo_var =
           memo |> typ.value_to_fields
           |> (fun (arr, aux) ->
-               ( Array.map arr ~f:(fun x -> Snarky_backendless.Cvar.Constant x)
-               , aux ) )
+          (Array.map arr ~f:(fun x -> Snarky_backendless.Cvar.Constant x), aux) )
           |> typ.var_of_fields
         in
         let memo_read =
           memo_var |> typ.var_to_fields
           |> (fun (arr, aux) ->
-               (Array.map arr ~f:(fun x -> read_constant x), aux) )
+          (Array.map arr ~f:(fun x -> read_constant x), aux) )
           |> typ.value_of_fields
         in
         [%test_eq: string] memo memo_read

@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Mina_state
 
 module type S = sig
@@ -36,7 +36,7 @@ module Stable = struct
   module V3 = struct
     type t =
       { snark_transition : Snark_transition.Value.Stable.V2.t
-      ; ledger_proof : Ledger_proof.Stable.V2.t option
+      ; ledger_proof : Ledger_proof.Stable.V3.t option
       ; prover_state : Consensus.Data.Prover_state.Stable.V3.t
       ; staged_ledger_diff : Staged_ledger_diff.Stable.V3.t
       }

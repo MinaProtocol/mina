@@ -223,6 +223,9 @@ fi
 
 # shellcheck source=/etc/default/mina-dispatch
 source "${SOURCE_FILE}"
+# The runtimes read MINA_PROFILE from the environment and otherwise fall back to
+# the "dev" profile, so it must reach the exec'd binary, not just this shell.
+export MINA_PROFILE
 
 if [[ "$MINA_DISPATCHER_DEBUG" -ne 0 ]]; then
   echo "DEBUG: Loaded configuration from $SOURCE_FILE" >&2

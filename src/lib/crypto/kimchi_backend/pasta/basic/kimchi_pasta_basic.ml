@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Kimchi_backend_common
 
 module Rounds : sig

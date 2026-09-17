@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Currency
 open Mina_base
 open Mina_numbers
@@ -74,10 +74,10 @@ let with_accounts ~f ~account_map ~init txns =
     ~f:(fun (accounts, accum) t ->
       let open Result.Let_syntax in
       let pk = sender_pk t in
-      let a = Public_key.Compressed.Map.find_exn accounts pk in
+      let a = Map.find_exn accounts pk in
       let%map accum' = f accum a t in
       let accounts' =
-        Public_key.Compressed.Map.set accounts ~key:pk
+        Map.set accounts ~key:pk
           ~data:Account.{ a with nonce = Account_nonce.succ a.nonce }
       in
       (accounts', accum') )
@@ -92,7 +92,7 @@ let pool_of_transactions ~init ~account_map txns =
     ~f:(fun p t ->
       let open Account in
       Indexed_pool.For_tests.assert_pool_consistency p ;
-      let a = Public_key.Compressed.Map.find_exn account_map (sender_pk t) in
+      let a = Map.find_exn account_map (sender_pk t) in
       Indexed_pool.add_from_gossip_exn p t a.nonce (Balance.to_amount a.balance)
       |> Result.map ~f:Tuple3.get2 )
   |> Result.map_error ~f:(fun e -> Sexp.to_string @@ Command_error.sexp_of_t e)

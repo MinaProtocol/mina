@@ -11,6 +11,7 @@
   async_unix
   core_kernel
   core
+  core_unix
   base
   async
   base.caml

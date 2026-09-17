@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Async_kernel
 
 let diff_s a b = Time_ns.(Span.to_string_hum (diff a b))

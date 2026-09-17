@@ -7,7 +7,7 @@ let paths =
 
 let possible_locations ~file possible_locations =
   let exists_at_path folder file =
-    match Sys.file_exists (folder ^/ file) with
+    match Sys_unix.file_exists (folder ^/ file) with
     | `Yes ->
         Some (folder ^/ file)
     | _ ->
@@ -30,17 +30,21 @@ let precomputed_blocks_comparator left right =
   let scan_height name = Scanf.sscanf name "%_s@-%d-%_s" Fn.id in
   let left_height = scan_height left in
   let right_height = scan_height right in
-  Int.compare left_height right_height
+  match Int.compare left_height right_height with
+  | 0 ->
+      String.compare left right
+  | order ->
+      order
 
 let sort_archive_files files : string list =
   files
   |> List.sort ~compare:(fun left right ->
-         precomputed_blocks_comparator left right )
+      precomputed_blocks_comparator left right )
 
 let dedup_and_sort_archive_files files : string list =
   files
   |> List.dedup_and_sort ~compare:(fun left right ->
-         precomputed_blocks_comparator left right )
+      precomputed_blocks_comparator left right )
 
 let force_kill process =
   Process.send_signal process Core.Signal.kill ;
@@ -110,10 +114,10 @@ let get_memory_usage_mib_of_user_process process =
   let total_memory_mb =
     lines
     |> List.filter_map ~f:(fun line ->
-           try
-             Scanf.sscanf line "%s %d" (fun proc_name rss ->
-                 if String.equal proc_name process then Some rss else None )
-           with _ -> None )
+        try
+          Scanf.sscanf line "%s %d" (fun proc_name rss ->
+              if String.equal proc_name process then Some rss else None )
+        with _ -> None )
     |> List.fold ~init:0 ~f:( + ) |> Float.of_int
     |> fun kb -> kb /. 1024.0
   in

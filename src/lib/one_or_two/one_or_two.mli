@@ -1,5 +1,5 @@
 (** Simple container of one of two values of a given type. *)
-open Core_kernel
+open Core
 
 open Async_kernel
 

@@ -1,11 +1,11 @@
-open Core_kernel
+open Core
 
-type t = Epochs of int | Slots of int | Literal of Time.Span.t
+type t = Epochs of int | Slots of int | Literal of Time_float.Span.t
 
 let to_span t ~(constants : Test_config.constants) =
   let open Int64 in
   let slots n =
-    Time.Span.of_ms
+    Time_float.Span.of_ms
       (to_float
          (n * of_int constants.constraint_constants.block_window_duration_ms) )
   in
@@ -22,9 +22,9 @@ let to_string ~constants t =
   match t with
   | Epochs n ->
       Printf.sprintf "%d epochs == %s" n
-        (Time.Span.to_string_hum (to_span ~constants t))
+        (Time_float.Span.to_string_hum (to_span ~constants t))
   | Slots n ->
       Printf.sprintf "%d slots == %s" n
-        (Time.Span.to_string_hum (to_span ~constants t))
+        (Time_float.Span.to_string_hum (to_span ~constants t))
   | Literal t ->
-      Time.Span.to_string_hum t
+      Time_float.Span.to_string_hum t

@@ -33,14 +33,14 @@ let%test_module "Roundtrip tests" =
       ( module struct
         module TransactionHash_gen = struct
           include Mina_transaction.Transaction_hash
-          open Core_kernel
+          open Core
 
           let gen =
             Mina_base.Coinbase.Gen.gen
               ~constraint_constants:
                 Genesis_constants.For_unit_tests.Constraint_constants.t
             |> Quickcheck.Generator.map ~f:(fun (coinbase, _) ->
-                   hash_coinbase coinbase )
+                hash_coinbase coinbase )
         end
 
         include Make_test (TransactionHash) (TransactionHash_gen)

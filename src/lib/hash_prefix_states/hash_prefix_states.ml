@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Hash_prefixes
 
 let salt (s : Hash_prefixes.t) = Hash_prefix_create.salt (s :> string)

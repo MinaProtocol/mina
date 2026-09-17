@@ -96,8 +96,8 @@ module Make (Input : Input_intf) = struct
       =
     mk_update_perm_check ~current_auth:Signature ~account_perm:Either ()
 
-  let%test_unit "account update using Signature auth when perm is set to \
-                 Impossible" =
+  let%test_unit
+      "account update using Signature auth when perm is set to Impossible" =
     mk_update_perm_check ~current_auth:Signature ~account_perm:Impossible
       ~failure_expected ()
 
@@ -109,8 +109,8 @@ module Make (Input : Input_intf) = struct
     mk_update_perm_check ~current_auth:Signature ~account_perm:Proof
       ~failure_expected ()
 
-  let%test_unit "account update using Signature auth when perm is set to \
-                 Signature" =
+  let%test_unit
+      "account update using Signature auth when perm is set to Signature" =
     mk_update_perm_check ~current_auth:Signature ~account_perm:Signature ()
 
   let test_non_zkapp_to_zkapp ?(new_account = true) test_spec init_ledger
@@ -138,16 +138,16 @@ module Make (Input : Input_intf) = struct
                 ~constraint_constants:U.constraint_constants test_spec
             in
             ( if new_account then
-              ignore
-                ( Option.value_map
-                    ~f:(fun location ->
-                      Some (Option.value_exn (Ledger.get ledger location)) )
-                    ~default:None
-                    (Ledger.location_of_account ledger zkapp_acc_id)
-                  : Account.t option )
-            else
-              let account = get_account ledger zkapp_acc_id in
-              assert (Option.is_none account.zkapp) ) ;
+                ignore
+                  ( Option.value_map
+                      ~f:(fun location ->
+                        Some (Option.value_exn (Ledger.get ledger location)) )
+                      ~default:None
+                      (Ledger.location_of_account ledger zkapp_acc_id)
+                    : Account.t option )
+              else
+                let account = get_account ledger zkapp_acc_id in
+                assert (Option.is_none account.zkapp) ) ;
             let%map () =
               U.check_zkapp_command_with_merges_exn ledger [ zkapp_command ]
             in

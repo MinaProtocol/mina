@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Snark_params
 open Signature_lib
 

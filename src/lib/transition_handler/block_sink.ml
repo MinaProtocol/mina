@@ -1,5 +1,5 @@
 open Network_peer
-open Core_kernel
+open Core
 open Async
 open Pipe_lib.Strict_pipe
 open Mina_base
@@ -102,7 +102,7 @@ let push sink (b_or_h, `Time_received tm, `Valid_cb cb) =
               |> Protocol_state.blockchain_state |> Blockchain_state.timestamp
               )
           with
-          | (_ : Core.Time.t) ->
+          | (_ : Core.Time_float.t) ->
               true
           | exception _ ->
               false
@@ -136,7 +136,7 @@ let push sink (b_or_h, `Time_received tm, `Valid_cb cb) =
             ( match%map Mina_net2.Validation_callback.await cb with
             | Some `Accept ->
                 let processing_time_span =
-                  Time.diff
+                  Time_float.diff
                     Block_time.(now time_controller |> to_time_exn)
                     processing_start_time
                 in
@@ -151,30 +151,31 @@ let push sink (b_or_h, `Time_received tm, `Valid_cb cb) =
                   ~metadata:[ ("state_hash", State_hash.to_yojson state_hash) ]
             ) ;
           Perf_histograms.add_span ~name:"external_transition_latency"
-            (Core.Time.abs_diff
+            (Core.Time_float.abs_diff
                Block_time.(now time_controller |> to_time_exn)
                ( Mina_block.Header.protocol_state header
                |> Protocol_state.blockchain_state |> Blockchain_state.timestamp
                |> Block_time.to_time_exn ) ) ;
           Mina_metrics.(Gauge.inc_one Network.new_state_received) ;
           ( if log_gossip_heard then
-            let metadata =
-              match b_or_h with
-              | `Block { Envelope.Incoming.data = block; _ } ->
-                  [ ( "block"
-                    , Mina_block.to_logging_yojson
-                      @@ Mina_block.Stable.Latest.header block )
-                  ]
-              | `Header { Envelope.Incoming.data = header; _ } ->
-                  [ ("header", Mina_block.Header.to_yojson header) ]
-            in
-            [%str_log info] ~metadata (Block_received { state_hash; sender }) ) ;
+              let metadata =
+                match b_or_h with
+                | `Block { Envelope.Incoming.data = block; _ } ->
+                    [ ( "block"
+                      , Mina_block.to_logging_yojson
+                        @@ Mina_block.Stable.Latest.header block )
+                    ]
+                | `Header { Envelope.Incoming.data = header; _ } ->
+                    [ ("header", Mina_block.Header.to_yojson header) ]
+              in
+              [%str_log info] ~metadata (Block_received { state_hash; sender })
+          ) ;
           Mina_net2.Validation_callback.set_message_type cb `Block ;
           Mina_metrics.(Counter.inc_one Network.Block.received) ;
           let%bind () =
             match
               Network_pool.Rate_limiter.add rate_limiter sender
-                ~now:(Time.now ()) ~score:1
+                ~now:(Time_float.now ()) ~score:1
             with
             | `Capacity_exceeded ->
                 Internal_tracing.with_state_hash state_hash
@@ -259,7 +260,7 @@ let push sink (b_or_h, `Time_received tm, `Valid_cb cb) =
           Mina_net2.Validation_callback.fire_if_not_already_fired cb `Reject )
 
 let log_rate_limiter_occasionally rl ~logger ~label =
-  let t = Time.Span.of_min 1. in
+  let t = Time_float.Span.of_min 1. in
   every t (fun () ->
       [%log debug]
         ~metadata:[ ("rate_limiter", Network_pool.Rate_limiter.summary rl) ]
@@ -365,8 +366,9 @@ let%test_module "out-of-range block timestamp is handled gracefully" =
     let push_must_not_crash ts =
       Thread_safe.block_on_async_exn (fun () -> push_header_with_timestamp ts)
 
-    let%test_unit "gossip block with timestamp = UInt64.max_int must not crash \
-                   the daemon" =
+    let%test_unit
+        "gossip block with timestamp = UInt64.max_int must not crash the daemon"
+        =
       push_must_not_crash (Block_time.of_uint64 Unsigned.UInt64.max_int)
 
     let%test_unit "gossip block with timestamp = 2^63 is handled gracefully" =
@@ -374,8 +376,8 @@ let%test_module "out-of-range block timestamp is handled gracefully" =
         (Block_time.of_uint64
            (Unsigned.UInt64.of_string "9223372036854775808") )
 
-    let%test_unit "gossip block with timestamp = 2^63 - 1 must not crash the \
-                   daemon" =
+    let%test_unit
+        "gossip block with timestamp = 2^63 - 1 must not crash the daemon" =
       push_must_not_crash
         (Block_time.of_uint64
            (Unsigned.UInt64.of_string "9223372036854775807") )
@@ -448,8 +450,9 @@ let%test_module "malformed gossiped block is handled gracefully" =
         (Pipe_lib.Strict_pipe.Reader.iter reader ~f:(fun _ -> Deferred.unit)) ;
       sink
 
-    let%test_unit "gossip block with unparseable staged-ledger diff is handled \
-                   gracefully" =
+    let%test_unit
+        "gossip block with unparseable staged-ledger diff is handled gracefully"
+        =
       Thread_safe.block_on_async_exn (fun () ->
           let sink = make_sink () in
           let incoming =

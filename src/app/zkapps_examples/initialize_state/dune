@@ -3,6 +3,7 @@
  (libraries
   ;; opam libraries
   base
+  core
   core_kernel
   ;; local libraries
   crypto_params

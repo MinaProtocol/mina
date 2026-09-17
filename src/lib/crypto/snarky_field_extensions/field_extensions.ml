@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 
 module Make_test (F : Intf.Basic) = struct
   let test arg_typ gen_arg sexp_of_arg label unchecked checked =
@@ -7,8 +7,8 @@ module Make_test (F : Intf.Basic) = struct
       let r =
         run_and_check
           (let open Checked.Let_syntax in
-          let%bind x = exists arg_typ ~compute:(As_prover.return x) in
-          checked x >>| As_prover.read F.typ)
+           let%bind x = exists arg_typ ~compute:(As_prover.return x) in
+           checked x >>| As_prover.read F.typ )
         |> Or_error.ok_exn
       in
       r
@@ -105,8 +105,7 @@ module Make (F : Intf.Basic) = struct
               let%bind res =
                 exists typ
                   ~compute:
-                    As_prover.(
-                      map2 (read typ x) (read typ y) ~f:Unchecked.( * ))
+                    As_prover.(map2 (read typ x) (read typ y) ~f:Unchecked.( * ))
               in
               let%map () = assert_r1cs x y res in
               res )
@@ -147,8 +146,7 @@ module Make (F : Intf.Basic) = struct
               return (constant (Unchecked.inv x))
           | None ->
               let%bind res =
-                exists typ
-                  ~compute:As_prover.(map (read typ t) ~f:Unchecked.inv)
+                exists typ ~compute:As_prover.(map (read typ t) ~f:Unchecked.inv)
               in
               let%map () = assert_r1cs t res one in
               res )
@@ -293,7 +291,8 @@ end
    such that x^2 - s does not have a root in F, construct
    the field F(sqrt(s)) = F[x] / (x^2 - s) *)
 module E2
-    (F : Intf.S) (Params : sig
+    (F : Intf.S)
+    (Params : sig
       val non_residue : F.Unchecked.t
 
       val mul_by_non_residue : F.t -> F.t
@@ -431,7 +430,8 @@ module T3 = struct
 end
 
 module E3
-    (F : Intf.S) (Params : sig
+    (F : Intf.S)
+    (Params : sig
       val non_residue : F.Unchecked.t
 
       val frobenius_coeffs_c1 : F.Unchecked.t array
@@ -589,7 +589,8 @@ module E3
 end
 
 module F3
-    (F : Intf.S with type 'a A.t = 'a and type 'a Base.t_ = 'a) (Params : sig
+    (F : Intf.S with type 'a A.t = 'a and type 'a Base.t_ = 'a)
+    (Params : sig
       val non_residue : F.Unchecked.t
 
       val frobenius_coeffs_c1 : F.Unchecked.t array
@@ -692,9 +693,10 @@ module Cyclotomic_square = struct
   end
 
   module Make_F6
-      (F2 : Intf.S_with_primitive_element
-              with type 'a A.t = 'a * 'a
-               and type 'a Base.t_ = 'a)
+      (F2 :
+        Intf.S_with_primitive_element
+          with type 'a A.t = 'a * 'a
+           and type 'a Base.t_ = 'a)
       (Params : sig
         val cubic_non_residue : F2.Impl.Field.t
       end) =
@@ -722,10 +724,11 @@ end
 
 module F6
     (Fq : Intf.S with type 'a A.t = 'a and type 'a Base.t_ = 'a)
-    (Fq2 : Intf.S_with_primitive_element
-             with module Impl = Fq.Impl
-              and type 'a A.t = 'a * 'a
-              and type 'a Base.t_ = 'a Fq.t_)
+    (Fq2 :
+      Intf.S_with_primitive_element
+        with module Impl = Fq.Impl
+         and type 'a A.t = 'a * 'a
+         and type 'a Base.t_ = 'a Fq.t_)
     (Fq3 : sig
       include
         Intf.S_with_primitive_element
@@ -740,7 +743,8 @@ module F6
 
         val frobenius_coeffs_c2 : Fq.Unchecked.t array
       end
-    end) (Params : sig
+    end)
+    (Params : sig
       val frobenius_coeffs_c1 : Fq.Unchecked.t array
     end) =
 struct
@@ -778,7 +782,7 @@ struct
       exists Fq3.typ
         ~compute:
           As_prover.(
-            map2 ~f:Fq3.Unchecked.( * ) (read Fq3.typ a0) (read Fq3.typ b0))
+            map2 ~f:Fq3.Unchecked.( * ) (read Fq3.typ a0) (read Fq3.typ b0) )
       (* v0
            = (a00 + s a01 s^2 a02) (s^2 b02)
          = non_residue a01 b02 + non_residue s a02 b02 + s^2 a00 b02 *)
@@ -836,9 +840,10 @@ struct
 end
 
 module F4
-    (Fq2 : Intf.S_with_primitive_element
-             with type 'a A.t = 'a * 'a
-              and type 'a Base.t_ = 'a)
+    (Fq2 :
+      Intf.S_with_primitive_element
+        with type 'a A.t = 'a * 'a
+         and type 'a Base.t_ = 'a)
     (Params : sig
       val frobenius_coeffs_c1 : Fq2.Impl.Field.t array
     end) =

@@ -4,13 +4,13 @@ let query_test () =
   let query = "{ users { id } }" in
   test_query query
     (`Assoc
-      [ ( "data"
-        , `Assoc
-            [ ( "users"
-              , `List [ `Assoc [ ("id", `Int 1) ]; `Assoc [ ("id", `Int 2) ] ]
-              )
-            ] )
-      ] )
+       [ ( "data"
+         , `Assoc
+             [ ( "users"
+               , `List [ `Assoc [ ("id", `Int 1) ]; `Assoc [ ("id", `Int 2) ] ]
+               )
+             ] )
+       ] )
 
 let mutation_test () =
   let query =
@@ -18,16 +18,16 @@ let mutation_test () =
   in
   test_query query
     (`Assoc
-      [ ( "data"
-        , `Assoc
-            [ ( "add_user"
-              , `List
-                  [ `Assoc [ ("name", `String "Alice") ]
-                  ; `Assoc [ ("name", `String "Bob") ]
-                  ; `Assoc [ ("name", `String "Charlie") ]
-                  ] )
-            ] )
-      ] )
+       [ ( "data"
+         , `Assoc
+             [ ( "add_user"
+               , `List
+                   [ `Assoc [ ("name", `String "Alice") ]
+                   ; `Assoc [ ("name", `String "Bob") ]
+                   ; `Assoc [ ("name", `String "Charlie") ]
+                   ] )
+             ] )
+       ] )
 
 let typename_test () =
   let query = "{ __typename }" in
@@ -38,9 +38,9 @@ let select_operation_no_operations_test () =
   let query = "fragment x on y { z }" in
   test_query query
     (`Assoc
-      [ ( "errors"
-        , `List [ `Assoc [ ("message", `String "No operation found") ] ] )
-      ] )
+       [ ( "errors"
+         , `List [ `Assoc [ ("message", `String "No operation found") ] ] )
+       ] )
 
 let select_operation_one_operation_no_operation_name_test () =
   let query = "query a { a: __typename }" in
@@ -55,17 +55,18 @@ let select_operation_one_operation_missing_operation_name_test () =
   let query = "query a { a: __typename }" in
   test_query query ~operation_name:"b"
     (`Assoc
-      [ ( "errors"
-        , `List [ `Assoc [ ("message", `String "Operation not found") ] ] )
-      ] )
+       [ ( "errors"
+         , `List [ `Assoc [ ("message", `String "Operation not found") ] ] )
+       ] )
 
 let select_operation_multiple_operations_no_operation_name_test () =
   let query = "query a { a: __typename } query b { b: __typename }" in
   test_query query
     (`Assoc
-      [ ( "errors"
-        , `List [ `Assoc [ ("message", `String "Operation name required") ] ] )
-      ] )
+       [ ( "errors"
+         , `List [ `Assoc [ ("message", `String "Operation name required") ] ]
+         )
+       ] )
 
 let select_operation_multiple_operations_matching_operation_name_test () =
   let query = "query a { a: __typename } query b { b: __typename }" in
@@ -76,35 +77,35 @@ let select_operation_multiple_operations_missing_operation_name_test () =
   let query = "query a { a: __typename } query b { b: __typename }" in
   test_query query ~operation_name:"c"
     (`Assoc
-      [ ( "errors"
-        , `List [ `Assoc [ ("message", `String "Operation not found") ] ] )
-      ] )
+       [ ( "errors"
+         , `List [ `Assoc [ ("message", `String "Operation not found") ] ] )
+       ] )
 
 let undefined_field_on_query_root_test () =
   let query = "{ foo { bar } }" in
   test_query query
     (`Assoc
-      [ ( "errors"
-        , `List
-            [ `Assoc
-                [ ( "message"
-                  , `String "Field 'foo' is not defined on type 'query'" )
-                ]
-            ] )
-      ] )
+       [ ( "errors"
+         , `List
+             [ `Assoc
+                 [ ( "message"
+                   , `String "Field 'foo' is not defined on type 'query'" )
+                 ]
+             ] )
+       ] )
 
 let undefined_field_on_object_type_test () =
   let query = "{ users { id foo } }" in
   test_query query
     (`Assoc
-      [ ( "errors"
-        , `List
-            [ `Assoc
-                [ ( "message"
-                  , `String "Field 'foo' is not defined on type 'user'" )
-                ]
-            ] )
-      ] )
+       [ ( "errors"
+         , `List
+             [ `Assoc
+                 [ ( "message"
+                   , `String "Field 'foo' is not defined on type 'user'" )
+                 ]
+             ] )
+       ] )
 
 let fragments_cannot_form_cycles_test () =
   let query =
@@ -126,11 +127,11 @@ let fragments_cannot_form_cycles_test () =
   in
   test_query query
     (`Assoc
-      [ ( "errors"
-        , `List
-            [ `Assoc [ ("message", `String "Fragment cycle detected: F1, F2") ]
-            ] )
-      ] )
+       [ ( "errors"
+         , `List
+             [ `Assoc [ ("message", `String "Fragment cycle detected: F1, F2") ]
+             ] )
+       ] )
 
 let fragments_combine_nested_fields_test () =
   let query =
@@ -150,18 +151,19 @@ let fragments_combine_nested_fields_test () =
   in
   test_query query
     (`Assoc
-      [ ( "data"
-        , `Assoc
-            [ ( "users"
-              , `List
-                  [ `Assoc
-                      [ ("role", `String "admin"); ("name", `String "Alice") ]
-                  ; `Assoc [ ("role", `String "user"); ("name", `String "Bob") ]
-                  ; `Assoc
-                      [ ("role", `String "user"); ("name", `String "Charlie") ]
-                  ] )
-            ] )
-      ] )
+       [ ( "data"
+         , `Assoc
+             [ ( "users"
+               , `List
+                   [ `Assoc
+                       [ ("role", `String "admin"); ("name", `String "Alice") ]
+                   ; `Assoc
+                       [ ("role", `String "user"); ("name", `String "Bob") ]
+                   ; `Assoc
+                       [ ("role", `String "user"); ("name", `String "Charlie") ]
+                   ] )
+             ] )
+       ] )
 
 let introspection_query_test () =
   let query =
@@ -270,28 +272,28 @@ let subscription_test () =
   let query = "subscription { subscribe_to_user { id name } }" in
   test_query query
     (`List
-      [ `Assoc
-          [ ( "data"
-            , `Assoc
-                [ ( "subscribe_to_user"
-                  , `Assoc [ ("id", `Int 1); ("name", `String "Alice") ] )
-                ] )
-          ]
-      ] )
+       [ `Assoc
+           [ ( "data"
+             , `Assoc
+                 [ ( "subscribe_to_user"
+                   , `Assoc [ ("id", `Int 1); ("name", `String "Alice") ] )
+                 ] )
+           ]
+       ] )
 
 let subscription_returns_an_error_test () =
   let query = "subscription { subscribe_to_user(error: true) { id name } }" in
   test_query query
     (`Assoc
-      [ ( "errors"
-        , `List
-            [ `Assoc
-                [ ("message", `String "stream error")
-                ; ("path", `List [ `String "subscribe_to_user" ])
-                ]
-            ] )
-      ; ("data", `Null)
-      ] )
+       [ ( "errors"
+         , `List
+             [ `Assoc
+                 [ ("message", `String "stream error")
+                 ; ("path", `List [ `String "subscribe_to_user" ])
+                 ]
+             ] )
+       ; ("data", `Null)
+       ] )
 
 let subscriptions_exn_inside_the_stream_test () =
   let query = "subscription { subscribe_to_user(raise: true) { id name } }" in
@@ -301,21 +303,21 @@ let subscription_returns_more_than_one_value_test () =
   let query = "subscription { subscribe_to_user(first: 2) { id name } }" in
   test_query query
     (`List
-      [ `Assoc
-          [ ( "data"
-            , `Assoc
-                [ ( "subscribe_to_user"
-                  , `Assoc [ ("id", `Int 1); ("name", `String "Alice") ] )
-                ] )
-          ]
-      ; `Assoc
-          [ ( "data"
-            , `Assoc
-                [ ( "subscribe_to_user"
-                  , `Assoc [ ("id", `Int 2); ("name", `String "Bob") ] )
-                ] )
-          ]
-      ] )
+       [ `Assoc
+           [ ( "data"
+             , `Assoc
+                 [ ( "subscribe_to_user"
+                   , `Assoc [ ("id", `Int 1); ("name", `String "Alice") ] )
+                 ] )
+           ]
+       ; `Assoc
+           [ ( "data"
+             , `Assoc
+                 [ ( "subscribe_to_user"
+                   , `Assoc [ ("id", `Int 2); ("name", `String "Bob") ] )
+                 ] )
+           ]
+       ] )
 
 (* Run tests *)
 let () =

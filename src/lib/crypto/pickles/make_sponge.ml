@@ -1,5 +1,5 @@
 module D = Composition_types.Digest
-open Core_kernel
+open Core
 
 module Rounds = struct
   let rounds_full = 55
@@ -72,7 +72,7 @@ module type S = sig
 
   val digest :
        field Sponge.Params.t
-    -> Inputs.Field.t Core_kernel.Array.t
+    -> Inputs.Field.t Core.Array.t
     -> Import.Types.Digest.Constant.t
 end
 
@@ -140,16 +140,18 @@ end
 
 module Test
     (Impl : Snarky_backendless.Snark_intf.Run)
-    (S_constant : Sponge.Intf.Sponge
-                    with module Field := Impl.Field.Constant
-                     and module State := Sponge.State
-                     and type input := Impl.field
-                     and type digest := Impl.field)
-    (S_checked : Sponge.Intf.Sponge
-                   with module Field := Impl.Field
-                    and module State := Sponge.State
-                    and type input := Impl.Field.t
-                    and type digest := Impl.Field.t) =
+    (S_constant :
+      Sponge.Intf.Sponge
+        with module Field := Impl.Field.Constant
+         and module State := Sponge.State
+         and type input := Impl.field
+         and type digest := Impl.field)
+    (S_checked :
+      Sponge.Intf.Sponge
+        with module Field := Impl.Field
+         and module State := Sponge.State
+         and type input := Impl.Field.t
+         and type digest := Impl.Field.t) =
 struct
   open Impl
 

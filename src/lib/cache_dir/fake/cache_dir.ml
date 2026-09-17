@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Async_kernel
 
 let autogen_path = "/tmp/coda_cache_dir"
@@ -23,7 +23,7 @@ let possible_paths base =
     ; s3_install_path
     ; autogen_path
     ; manual_install_path
-    ] ~f:(fun d -> d ^ "/" ^ base)
+    ] ~f:(fun d -> d ^ "/" ^ base )
 
 let load_from_s3 _s3_bucket_prefix _s3_install_path ~logger:_ =
   Deferred.Or_error.fail (Error.createf "Cannot load files from S3")

@@ -58,7 +58,7 @@ let setup (type n) ~context:(module Context : CONTEXT)
         (* each peer has a distinct IP address, so we lookup frontiers by IP *)
         let peer =
           Network_peer.Peer.create
-            (Unix.Inet_addr.inet4_addr_of_int32 ip)
+            (Core_unix.Inet_addr.inet4_addr_of_int32 ip)
             ~libp2p_port
             ~peer_id:
               (Peer.Id.unsafe_of_string
@@ -291,7 +291,7 @@ module Generator = struct
         ~branch_size:frontier_branch_size ~consensus_local_state ()
     in
     Async.Thread_safe.block_on_async_exn (fun () ->
-        Deferred.List.iter branch
+        Deferred.List.iter ~how:`Sequential branch
           ~f:(Transition_frontier.add_breadcrumb_exn frontier) ) ;
 
     make_peer_state ~frontier ~snark:None ~consensus_local_state

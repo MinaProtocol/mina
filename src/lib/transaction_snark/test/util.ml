@@ -7,9 +7,15 @@ module Impl = Pickles.Impls.Step
 module Zkapp_command_segment = Transaction_snark.Zkapp_command_segment
 module Statement = Transaction_snark.Statement
 
-let constraint_constants = Genesis_constants.Compiled.constraint_constants
+let g = Genesis_constants.profiled ()
 
-let genesis_constants = Genesis_constants.Compiled.genesis_constants
+let constraint_constants =
+  let (module G) = g in
+  G.constraint_constants
+
+let genesis_constants =
+  let (module G) = g in
+  G.genesis_constants
 
 (* Always run tests with proof-level Full *)
 let proof_level = Genesis_constants.Proof_level.Full
@@ -141,12 +147,13 @@ let check_zkapp_command_with_merges_exn ?(logger = logger_null)
       in
       let connecting_ledger = Ledger.merkle_root ledger in
       Async.Deferred.List.iter (List.zip_exn zkapp_commands partial_stmts)
+        ~how:`Sequential
         ~f:(fun
-             ( zkapp_command
-             , ( partial_stmt
-               , first_pass_ledger_witness
-               , first_pass_ledger_target_hash ) )
-           ->
+            ( zkapp_command
+            , ( partial_stmt
+              , first_pass_ledger_witness
+              , first_pass_ledger_target_hash ) )
+          ->
           match
             Or_error.try_with (fun () ->
                 Transaction_snark.zkapp_command_witnesses_exn ~signature_kind
@@ -237,12 +244,22 @@ let check_zkapp_command_with_merges_exn ?(logger = logger_null)
                           failwith "no witnesses generated"
                       | (witness, spec, stmt) :: rest ->
                           let open Async.Deferred.Or_error.Let_syntax in
-                          let start = Time.now () in
+                          let start = Time_float.now () in
+                          (* [zkapp_command_witnesses_exn] returns sok-less
+                             statements; these tests assert on the transition,
+                             not on any submitter, so stamp the empty digest
+                             explicitly. *)
+                          let with_sok stmt =
+                            Mina_state.Snarked_ledger_state.Poly.
+                              { stmt with
+                                sok_digest = Sok_message.Digest.default
+                              }
+                          in
                           let%bind p1 =
                             Async.Deferred.Or_error.try_with ~here:[%here]
                               (fun () ->
-                                T.of_zkapp_command_segment_exn ~statement:stmt
-                                  ~witness ~spec )
+                                T.of_zkapp_command_segment_exn
+                                  ~statement:(with_sok stmt) ~witness ~spec )
                           in
                           let%map result =
                             Async.Deferred.List.fold ~init:(Ok p1) rest
@@ -252,7 +269,8 @@ let check_zkapp_command_with_merges_exn ?(logger = logger_null)
                                   Async.Deferred.Or_error.try_with ~here:[%here]
                                     (fun () ->
                                       T.of_zkapp_command_segment_exn
-                                        ~statement:stmt ~witness ~spec )
+                                        ~statement:(with_sok stmt) ~witness
+                                        ~spec )
                                 in
                                 let sok_digest =
                                   Sok_message.create ~fee:Fee.zero
@@ -267,9 +285,9 @@ let check_zkapp_command_with_merges_exn ?(logger = logger_null)
                             ~metadata:
                               [ ( "duration"
                                 , `String
-                                    Time.(
+                                    Time_float.(
                                       Span.to_short_string
-                                      @@ diff (Time.now ()) start) )
+                                      @@ diff (Time_float.now ()) start ) )
                               ]
                             "transaction snark computation takes $duration" ;
                           result
@@ -319,7 +337,7 @@ let check_zkapp_command_with_merges_exn ?(logger = logger_null)
                             List.fold failures ~init:false ~f:(fun acc f ->
                                 acc
                                 || Mina_base.Transaction_status.Failure.(
-                                     equal failure f) )
+                                     equal failure f ) )
                           in
                           if not failed_as_expected then
                             failwithf
@@ -380,9 +398,7 @@ let gen_snapp_ledger =
   in
   let%map kp =
     Quickcheck.Generator.filter Keypair.gen ~f:(fun kp ->
-        not
-          (Public_key.Compressed.Set.mem pks
-             (Public_key.compress kp.public_key) ) )
+        not (Set.mem pks (Public_key.compress kp.public_key)) )
   in
   (test_spec, kp)
 
@@ -412,37 +428,37 @@ let permissions_from_update ~auth
   { default with
     edit_state =
       ( if
-        Zkapp_state.V.to_list update.app_state
-        |> List.exists ~f:Zkapp_basic.Set_or_keep.is_set
-      then auth
-      else default.edit_state )
+          Zkapp_state.V.to_list update.app_state
+          |> List.exists ~f:Zkapp_basic.Set_or_keep.is_set
+        then auth
+        else default.edit_state )
   ; set_delegate =
       ( if Zkapp_basic.Set_or_keep.is_keep update.delegate then
-        default.set_delegate
-      else auth )
+          default.set_delegate
+        else auth )
   ; set_verification_key =
       ( if Zkapp_basic.Set_or_keep.is_keep update.verification_key then
-        default.set_verification_key
-      else (auth, txn_version) )
+          default.set_verification_key
+        else (auth, txn_version) )
   ; set_permissions =
       ( if Zkapp_basic.Set_or_keep.is_keep update.permissions then
-        default.set_permissions
-      else auth )
+          default.set_permissions
+        else auth )
   ; set_zkapp_uri =
       ( if Zkapp_basic.Set_or_keep.is_keep update.zkapp_uri then
-        default.set_zkapp_uri
-      else auth )
+          default.set_zkapp_uri
+        else auth )
   ; set_token_symbol =
       ( if Zkapp_basic.Set_or_keep.is_keep update.token_symbol then
-        default.set_token_symbol
-      else auth )
+          default.set_token_symbol
+        else auth )
   ; set_voting_for =
       ( if Zkapp_basic.Set_or_keep.is_keep update.voting_for then
-        default.set_voting_for
-      else auth )
+          default.set_voting_for
+        else auth )
   ; set_timing =
       ( if Zkapp_basic.Set_or_keep.is_keep update.timing then default.set_timing
-      else auth )
+        else auth )
   }
 
 module Wallet = struct
@@ -583,7 +599,7 @@ let test_transaction_union ?expected_failure ?txn_global_slot ledger txn =
               ~consensus_state:consensus_state_at_slot
               ~constants:
                 (Protocol_constants_checked.value_of_t
-                   genesis_constants.protocol ))
+                   genesis_constants.protocol ) )
             .body
         in
         let state_body_hash = Mina_state.Protocol_state.Body.hash state_body in
@@ -632,25 +648,25 @@ let test_transaction_union ?expected_failure ?txn_global_slot ledger txn =
     with
     | Ok res ->
         ( if Option.is_some expected_failure then
-          match Ledger.status_of_applied res with
-          | Applied ->
-              failwith
-                (sprintf "Expected Ledger.apply_transaction to fail with %s"
-                   (Transaction_status.Failure.describe
-                      (List.hd_exn (Option.value_exn expected_failure)) ) )
-          | Failed f ->
-              let got_expected_failure =
-                List.equal Transaction_status.Failure.equal
-                  (Option.value_exn expected_failure)
-                  (List.concat f)
-              in
-              if not got_expected_failure then
-                failwithf
-                  !"Transaction failed unexpectedly: expected \
-                    %{sexp:Mina_base.Transaction_status.Failure.t list}, got \
-                    %{sexp:Mina_base.Transaction_status.Failure.t list}"
-                  (Option.value_exn expected_failure)
-                  (List.concat f) () ) ;
+            match Ledger.status_of_applied res with
+            | Applied ->
+                failwith
+                  (sprintf "Expected Ledger.apply_transaction to fail with %s"
+                     (Transaction_status.Failure.describe
+                        (List.hd_exn (Option.value_exn expected_failure)) ) )
+            | Failed f ->
+                let got_expected_failure =
+                  List.equal Transaction_status.Failure.equal
+                    (Option.value_exn expected_failure)
+                    (List.concat f)
+                in
+                if not got_expected_failure then
+                  failwithf
+                    !"Transaction failed unexpectedly: expected \
+                      %{sexp:Mina_base.Transaction_status.Failure.t list}, got \
+                      %{sexp:Mina_base.Transaction_status.Failure.t list}"
+                    (Option.value_exn expected_failure)
+                    (List.concat f) () ) ;
         (false, Some res)
     | Error e ->
         if Option.is_none expected_failure then

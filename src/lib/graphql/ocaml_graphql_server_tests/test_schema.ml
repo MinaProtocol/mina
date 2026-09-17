@@ -20,7 +20,8 @@ let input_role = Schema.Arg.(enum "role" ~values:role_values)
 
 let user =
   Schema.(
-    obj "user" ~fields:(fun _ ->
+    obj "user"
+      ~fields:
         [ field "id" ~typ:(non_null int)
             ~args:Arg.[]
             ~resolve:(fun { ctx = (); _ } p -> p.id)
@@ -30,7 +31,7 @@ let user =
         ; field "role" ~typ:(non_null role)
             ~args:Arg.[]
             ~resolve:(fun _ p -> p.role)
-        ] ))
+        ] )
 
 (* Not available in List before OCaml 4.07 *)
 let list_to_seq n l =
@@ -68,13 +69,13 @@ let schema =
         [ subscription_field "subscribe_to_user" ~typ:(non_null user)
             ~args:
               Arg.
-                [ arg' "error" ~typ:bool ~default:false
-                ; arg' "raise" ~typ:bool ~default:false
-                ; arg' "first" ~typ:int ~default:1
+                [ arg' "error" ~typ:bool ~default:(`Bool false)
+                ; arg' "raise" ~typ:bool ~default:(`Bool false)
+                ; arg' "first" ~typ:int ~default:(`Int 1)
                 ]
             ~resolve:(fun _ return_error raise_in_stream first ->
               if return_error then Error "stream error"
               else if raise_in_stream then
                 Ok (fun () -> Seq.Cons (raise Not_found, fun () -> Seq.Nil))
               else Ok (list_to_seq first !users) )
-        ])
+        ] )

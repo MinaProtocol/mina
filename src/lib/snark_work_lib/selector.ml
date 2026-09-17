@@ -12,7 +12,7 @@
    All types are versioned, because Works distributed by the Selector would need
    to be passed around the network between Coordinater and Snark Worker.
  *)
-open Core_kernel
+open Core
 
 module Single = struct
   module Spec = Single_spec
@@ -24,7 +24,7 @@ module Spec = struct
     [@@@no_toplevel_latest_type]
 
     module V2 = struct
-      type t = Single.Spec.Stable.V2.t Work.Spec.Stable.V1.t
+      type t = Single.Spec.Stable.V3.t Work.Spec.Stable.V1.t
       [@@deriving sexp, yojson]
 
       let to_latest = Fn.id
@@ -41,7 +41,7 @@ module Result = struct
 
     module V2 = struct
       type t =
-        (Spec.Stable.V2.t, Ledger_proof.Stable.V2.t) Work.Result.Stable.V1.t
+        (Spec.Stable.V2.t, Ledger_proof.Stable.V3.t) Work.Result.Stable.V1.t
 
       let to_latest = Fn.id
 

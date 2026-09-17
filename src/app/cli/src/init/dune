@@ -24,7 +24,10 @@
   core_kernel
   core_kernel.uuid
   core
-  core.uuid
+  core_unix
+  core_unix.sys_unix
+  core_unix.signal_unix
+  core_unix.time_float_unix
   base
   async
   cohttp

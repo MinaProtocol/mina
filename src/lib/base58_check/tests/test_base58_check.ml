@@ -1,3 +1,5 @@
+open Core
+
 module M = Base58_check.Make (struct
   let description = "Base58check tests"
 
@@ -31,7 +33,7 @@ let test_invalid_checksum () =
     (* change last byte to invalidate checksum *)
     let new_last_ch =
       if Char.equal last_ch '\xFF' then '\x00'
-      else Core_kernel.Char.of_int_exn (Core_kernel.Char.to_int last_ch + 1)
+      else Char.of_int_exn (Char.to_int last_ch + 1)
     in
     Bytes.set bytes (len - 1) new_last_ch ;
     let encoded_bad_checksum = Bytes.to_string bytes in
@@ -54,7 +56,7 @@ let test_vectors () =
   in
   assert (
     List.for_all
-      (fun (inp, exp_output) ->
+      ~f:(fun (inp, exp_output) ->
         let output = M.encode inp in
         String.equal output exp_output )
       vectors )

@@ -5,7 +5,7 @@
    run benchmarks for all libraries
 *)
 
-open Core_kernel
+open Core
 
 let available_libraries = [ "vrf_lib_tests"; "mina_base"; "data_hash_lib" ]
 
@@ -14,7 +14,7 @@ let run_benchmarks_in_lib libname =
   Inline_benchmarks_public.Runner.main ~libname
 
 let () =
-  match Sys.getenv_opt "BENCHMARK_LIBRARIES" with
+  match Sys.getenv "BENCHMARK_LIBRARIES" with
   | None | Some "" | Some "all" ->
       List.iter available_libraries ~f:run_benchmarks_in_lib
   | Some libs ->

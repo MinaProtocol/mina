@@ -24,10 +24,10 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     ; requires_graphql = true
     ; genesis_ledger =
         (let open Test_account in
-        [ create ~account_name:"node-a-key" ~balance:"1000" ()
-        ; create ~account_name:"node-b-key" ~balance:"1000" ()
-        ; create ~account_name:"node-c-key" ~balance:"0" ()
-        ])
+         [ create ~account_name:"node-a-key" ~balance:"1000" ()
+         ; create ~account_name:"node-b-key" ~balance:"1000" ()
+         ; create ~account_name:"node-c-key" ~balance:"0" ()
+         ] )
     ; block_producers =
         [ { node_name = "node-a"; account_name = "node-a-key" }
         ; { node_name = "node-b"; account_name = "node-b-key" }
@@ -59,8 +59,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let%bind () =
       section_hard "Wait for nodes to initialize"
         (wait_for t
-           (Wait_condition.nodes_to_initialize
-              (Core.String.Map.data all_mina_nodes) ) )
+           (Wait_condition.nodes_to_initialize (Core.Map.data all_mina_nodes)) )
     in
     let node_a = Network.block_producer_exn network "node-a" in
     let node_b = Network.block_producer_exn network "node-b" in
@@ -85,9 +84,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     let%bind () =
       section_hard "network is fully connected after one node was restarted"
-        (let%bind () = Malleable_error.lift (after (Time.Span.of_sec 240.0)) in
+        (let%bind () =
+           Malleable_error.lift (after (Time_float.Span.of_sec 240.0))
+         in
          let%bind final_connectivity_data =
-           fetch_connectivity_data ~logger (Core.String.Map.data all_mina_nodes)
+           fetch_connectivity_data ~logger (Core.Map.data all_mina_nodes)
          in
          assert_peers_completely_connected final_connectivity_data )
     in
@@ -117,9 +118,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
 
     section_hard "network is fully connected after one node was restarted"
-      (let%bind () = Malleable_error.lift (after (Time.Span.of_sec 240.0)) in
+      (let%bind () =
+         Malleable_error.lift (after (Time_float.Span.of_sec 240.0))
+       in
        let%bind final_connectivity_data =
-         fetch_connectivity_data ~logger (Core.String.Map.data all_mina_nodes)
+         fetch_connectivity_data ~logger (Core.Map.data all_mina_nodes)
        in
        assert_peers_completely_connected final_connectivity_data )
 end

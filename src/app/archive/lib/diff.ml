@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Mina_base
 module Breadcrumb = Transition_frontier.Breadcrumb
 
@@ -54,25 +54,25 @@ module Builder = struct
       let senders =
         commands
         |> List.map ~f:(fun { data; _ } ->
-               User_command.(fee_payer (forget_check data)) )
+            User_command.(fee_payer (forget_check data)) )
         |> Account_id.Set.of_list
       in
       Set.to_list senders
       |> List.map ~f:(fun sender ->
-             Option.value_exn
-               (let open Option.Let_syntax in
-               let%bind ledger_location =
-                 Mina_ledger.Ledger.location_of_account ledger sender
-               in
-               let%map { receipt_chain_hash; _ } =
-                 Mina_ledger.Ledger.get ledger ledger_location
-               in
-               (sender, receipt_chain_hash)) )
+          Option.value_exn
+            (let open Option.Let_syntax in
+             let%bind ledger_location =
+               Mina_ledger.Ledger.location_of_account ledger sender
+             in
+             let%map { receipt_chain_hash; _ } =
+               Mina_ledger.Ledger.get ledger ledger_location
+             in
+             (sender, receipt_chain_hash) ) )
     in
     let block_with_hash = Mina_block.Validated.forget validated_block in
     let block = With_hash.data block_with_hash in
     let state_hash = (With_hash.hash block_with_hash).state_hash in
-    let start = Time.now () in
+    let start = Time_float.now () in
     let account_ids_accessed =
       Mina_block.account_ids_accessed
         ~constraint_constants:precomputed_values.constraint_constants block
@@ -91,11 +91,11 @@ module Builder = struct
               let account = Mina_ledger.Ledger.get_at_index_exn ledger index in
               Some (index, account) )
     in
-    let accounts_accessed_time = Time.now () in
+    let accounts_accessed_time = Time_float.now () in
     Metrics.report_time ~logger ~label:"accounts-accessed"
       ~extra_metadata:
         [ ("state_hash", Mina_base.State_hash.to_yojson state_hash) ]
-      (Time.diff accounts_accessed_time start) ;
+      (Time_float.diff accounts_accessed_time start) ;
     let accounts_created =
       let account_creation_fee =
         precomputed_values.constraint_constants.account_creation_fee
@@ -114,11 +114,11 @@ module Builder = struct
           let owner = Mina_ledger.Ledger.token_owner ledger token_id in
           (token_id, owner) )
     in
-    let account_created_time = Time.now () in
+    let account_created_time = Time_float.now () in
     Metrics.report_time ~logger ~label:"accounts-created"
       ~extra_metadata:
         [ ("state_hash", Mina_base.State_hash.to_yojson state_hash) ]
-      (Time.diff account_created_time accounts_accessed_time) ;
+      (Time_float.diff account_created_time accounts_accessed_time) ;
 
     Transition_frontier.Breadcrumb_added
       { block =

@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Mina_ledger
 open Signature_lib
 open Mina_base
@@ -79,7 +79,7 @@ let%test_module "Zkapp tokens tests" =
                       @ Array.to_list token_accounts )
                       ~init:Public_key.Compressed.Map.empty
                       ~f:(fun map { private_key; public_key } ->
-                        Public_key.Compressed.Map.add_exn map
+                        Map.add_exn map
                           ~key:(Public_key.compress public_key)
                           ~data:private_key )
                   in
@@ -261,7 +261,7 @@ let%test_module "Zkapp tokens tests" =
                   Async.Deferred.unit ) ) )
 
     let () =
-      match Sys.getenv_opt "PROOF_CACHE_OUT" with
+      match Sys.getenv "PROOF_CACHE_OUT" with
       | Some path ->
           Yojson.Safe.to_file path @@ Pickles.Proof_cache.to_yojson proof_cache
       | None ->

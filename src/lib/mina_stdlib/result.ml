@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 include Result
 open Let_syntax
 

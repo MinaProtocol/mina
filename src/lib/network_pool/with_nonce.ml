@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 
 (*
   Appending a nonce to messages emitted by transaction and snark pools allows to circumvent

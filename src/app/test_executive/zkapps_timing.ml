@@ -21,10 +21,10 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       requires_graphql = true
     ; genesis_ledger =
         (let open Test_account in
-        [ create ~account_name:"node-a-key" ~balance:"8000000000" ()
-        ; create ~account_name:"node-b-key" ~balance:"1000000000" ()
-        ; create ~account_name:"node-c-key" ~balance:"1000000000" ()
-        ])
+         [ create ~account_name:"node-a-key" ~balance:"8000000000" ()
+         ; create ~account_name:"node-b-key" ~balance:"1000000000" ()
+         ; create ~account_name:"node-c-key" ~balance:"1000000000" ()
+         ] )
     ; block_producers =
         [ { node_name = "node-a"; account_name = "node-a-key" }
         ; { node_name = "node-b"; account_name = "node-b-key" }
@@ -39,11 +39,10 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let all_mina_nodes = Network.all_mina_nodes network in
     let%bind () =
       wait_for t
-        (Wait_condition.nodes_to_initialize
-           (Core.String.Map.data all_mina_nodes) )
+        (Wait_condition.nodes_to_initialize (Core.Map.data all_mina_nodes))
     in
     let block_producer_nodes =
-      Network.block_producers network |> Core.String.Map.data
+      Network.block_producers network |> Core.Map.data
     in
     let node = List.hd_exn block_producer_nodes in
     let constraint_constants = Network.constraint_constants network in
@@ -57,10 +56,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       ; private_key = fee_payer_sk
       }
     in
-    let%bind.Async.Deferred ( zkapp_command_create_account_with_timing
-                            , timing_account_id
-                            , timing_update
-                            , timed_account_keypair ) =
+    let%bind.Async.Deferred
+        ( zkapp_command_create_account_with_timing
+        , timing_account_id
+        , timing_update
+        , timed_account_keypair ) =
       let open Mina_base in
       let fee = Currency.Fee.of_nanomina_int_exn 1_000_000 in
       let amount = Currency.Amount.of_mina_int_exn 10 in
@@ -156,9 +156,10 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     (* Create a timed account that with initial liquid balance being 0, and vesting 1 mina at each slot.
        This account would be used to test the edge case of vesting. See `zkapp_command_transfer_from_third_timed_account`
     *)
-    let%bind.Async.Deferred ( zkapp_command_create_third_account_with_timing
-                            , third_timed_account_id
-                            , third_timed_account_keypair ) =
+    let%bind.Async.Deferred
+        ( zkapp_command_create_third_account_with_timing
+        , third_timed_account_id
+        , third_timed_account_keypair ) =
       let open Mina_base in
       let fee = Currency.Fee.of_nanomina_int_exn 1_000_000 in
       let amount = Currency.Amount.of_mina_int_exn 100 in
@@ -570,7 +571,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         zkapp_command_spec
     in
     let%bind.Deferred () =
-      after (Time.Span.of_ms (float_of_int block_window_duration_ms))
+      after (Time_float.Span.of_ms (float_of_int block_window_duration_ms))
     in
     let%bind () =
       section
@@ -716,9 +717,44 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
              (Error.of_string "Ledger update contains a timing update") ) )
     in
     section_hard "Running replayer"
-      (let%bind logs =
-         Network.Node.run_replayer ~logger
+      (* Without an explicit target the replayer only replays up to the highest
+         canonical block, which in a short-lived test network is genesis, so it
+         emits too few logs. This test does not wait for a ledger proof, so
+         target a recent best-chain block instead. Pick one a couple below the
+         best tip so it is already persisted in the archive (avoiding a race
+         with archive ingestion of the very latest block). *)
+      (let%bind best_chain =
+         Graphql_requests.must_get_best_chain ~logger
+           (Network.Node.get_ingress_uri node)
+       in
+       let open Mina_base in
+       let target_state_hash =
+         match List.rev best_chain with
+         | _tip :: _prev :: deep :: _ ->
+             State_hash.of_base58_check_exn deep.state_hash
+         | _ ->
+             failwith "best chain too short to pick a replayer target"
+       in
+       [%log info] "Replaying archive up to best-chain block $state_hash"
+         ~metadata:[ ("state_hash", State_hash.to_yojson target_state_hash) ] ;
+       let%bind logs =
+         Network.Node.run_replayer ~target_state_hash ~logger
            (List.hd_exn @@ (Network.archive_nodes network |> Core.Map.data))
        in
-       check_replayer_logs ~logger logs )
+       let%bind n = check_replayer_logs ~logger logs in
+       let ns = network_state t in
+       let expected = ns.blocks_generated in
+       if n < expected - 3 || n > expected + 3 then
+         Malleable_error.hard_error_string
+           (sprintf
+              "Replayer replayed %d blocks, expected %d (network \
+               blocks_generated ±3)"
+              n expected )
+       else (
+         if n <> expected then
+           [%log warn]
+             "Replayer block count %d differs from network blocks_generated %d \
+              (diff: %d)"
+             n expected (n - expected) ;
+         Malleable_error.return () ) )
 end

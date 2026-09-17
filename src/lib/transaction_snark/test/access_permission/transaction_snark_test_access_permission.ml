@@ -1,5 +1,5 @@
 open Transaction_snark_tests.Util
-open Core_kernel
+open Core
 open Mina_base
 open Signature_lib
 module Impl = Pickles.Impls.Step
@@ -185,7 +185,7 @@ let%test_module "Access permission tests" =
               (Account.create account_id
                  Currency.Balance.(
                    Option.value_exn
-                     (add_amount zero (Currency.Amount.of_nanomina_int_exn 500))) )
+                     (add_amount zero (Currency.Amount.of_nanomina_int_exn 500)) ) )
           in
           Async.Thread_safe.block_on_async_exn
           @@ fun () ->
@@ -232,7 +232,7 @@ let%test_module "Access permission tests" =
     let%test_unit "Signature with Signature" = run_test Signature Signature
 
     let () =
-      match Sys.getenv_opt "PROOF_CACHE_OUT" with
+      match Sys.getenv "PROOF_CACHE_OUT" with
       | Some path ->
           Yojson.Safe.to_file path @@ Pickles.Proof_cache.to_yojson proof_cache
       | None ->

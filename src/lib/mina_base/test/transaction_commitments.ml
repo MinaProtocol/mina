@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Mina_base.Zkapp_command
 
 let check_two_elements_are_never_the_same () =

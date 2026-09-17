@@ -16,10 +16,12 @@
  (preprocess
   (pps
    h_list.ppx
+   ppx_compare
    ppx_deriving.std
    ppx_deriving_yojson
-   ppx_jane
+   ppx_hash
    ppx_mina
+   ppx_sexp_conv
    ppx_version))
  (modules_without_implementation sigs poly_types)
  (instrumentation
@@ -28,7 +30,6 @@
   ;; opam libraries
   base.caml
   bin_prot.shape
-  core_kernel
   result
   sexplib0
   ;; local libraries

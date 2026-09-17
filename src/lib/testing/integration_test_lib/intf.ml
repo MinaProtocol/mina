@@ -1,5 +1,5 @@
 open Async_kernel
-open Core_kernel
+open Core
 open Mina_base
 open Pipe_lib
 
@@ -177,7 +177,7 @@ module Dsl = struct
     val await_with_timeout :
          t
       -> 'a event_subscription
-      -> timeout_duration:Time.Span.t
+      -> timeout_duration:Time_float.Span.t
       -> timeout_cancellation:'a
       -> 'a Deferred.t
   end

@@ -79,13 +79,13 @@ let%test_module "Mina network tests" =
           ~known_private_ip_nets:[] ~topic_config:[]
         >>| Or_error.ok_exn
       in
-      let%bind () = after (Time.Span.of_sec 10.) in
+      let%bind () = after (Time_float.Span.of_sec 10.) in
       let%bind b_advert = begin_advertising b in
       Or_error.ok_exn b_advert ;
       let%bind c_advert = begin_advertising c in
       Or_error.ok_exn c_advert ;
       (* Give the helpers time to announce and discover each other on localhost *)
-      let%map () = after (Time.Span.of_sec 2.5) in
+      let%map () = after (Time_float.Span.of_sec 2.5) in
       let shutdown () =
         let%bind () = shutdown a in
         let%bind () = shutdown b in
@@ -208,7 +208,7 @@ let%test_module "Mina network tests" =
                      map (Pipe.read' r) ~f:(handle_read tmsg) ) )
                 Fn.id
             ; choice
-                (after @@ Time.Span.of_sec 200.)
+                (after @@ Time_float.Span.of_sec 200.)
                 (fun _ -> failwith "timeout")
             ]
         in

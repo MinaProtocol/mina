@@ -1,8 +1,8 @@
-open Core_kernel
+open Core
 open Async
 
 module Thread : sig
-  type t = Thread.t
+  type t = O1thread.t
 
   val name : t -> string
 
@@ -15,8 +15,8 @@ module Thread : sig
   val dump_thread_graph : unit -> bytes
 
   module Fiber : sig
-    type t = Thread.Fiber.t =
-      { id : int; parent : t option; thread : Thread.t; key : string list }
+    type t = O1thread.Fiber.t =
+      { id : int; parent : t option; thread : O1thread.t; key : string list }
 
     val key : t -> string list
   end

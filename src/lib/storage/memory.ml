@@ -15,7 +15,7 @@ end
 
 let load_with_checksum (type a) (c : a Controller.t) location =
   Deferred.return
-    ( match Location.Table.find c.mem location with
+    ( match Hashtbl.find c.mem location with
     | Some t ->
         Ok t
     | None ->
@@ -27,7 +27,7 @@ let load c location =
 let store_with_checksum (type a) (c : a Controller.t) location (data : a) =
   let checksum = md5 c.tc data in
   Deferred.return
-    ( Location.Table.set c.mem ~key:location ~data:{ checksum; data } ;
+    ( Hashtbl.set c.mem ~key:location ~data:{ checksum; data } ;
       checksum )
 
 let store (c : 'a Controller.t) location data : unit Deferred.t =

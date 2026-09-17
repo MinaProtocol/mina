@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Pickles_types
 open Import
 open Kimchi_pasta.Pasta
@@ -203,7 +203,7 @@ module Stable = struct
       { commitments = c; data = d; index = t }
 
     include
-      Binable.Of_binable
+      Binable.Of_binable_without_uuid
         (Repr.Stable.V2)
         (struct
           type nonrec t = t

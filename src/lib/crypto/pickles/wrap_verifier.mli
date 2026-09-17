@@ -238,7 +238,7 @@ module Impl := Impls.Wrap
 val challenge_polynomial :
      (module Pickles_types.Shifted_value.Field_intf with type t = 'a)
   -> 'a array
-  -> ('a -> 'a) Core_kernel.Staged.t
+  -> ('a -> 'a) Core.Staged.t
 
 (** Type alias for step verification key indices, parameterized by
     commitment type and optional commitment type. *)
@@ -311,7 +311,7 @@ val all_possible_domains :
   , ( Pickles_base.Domain.Stable.V1.t
     , Wrap_hack.Padded_length.n Pickles_types.Nat.s )
     Pickles_types.Vector.t )
-  Core_kernel.Memo.fn
+  Core.Memo.fn
 
 (** The number of possible wrap domains (one for each possible number of
     proofs verified: 0, 1, or 2). *)
@@ -437,8 +437,7 @@ val incrementally_verify_proof :
        Import.Types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit.t
   -> Wrap_main_inputs.Impl.Field.t
      * ( [> `Success of Wrap_main_inputs.Impl.Boolean.var ]
-       * Scalar_challenge.t Import.Bulletproof_challenge.t Core_kernel.Array.t
-       )
+       * Scalar_challenge.t Import.Bulletproof_challenge.t Core.Array.t )
 
 (** {2 Constraint Generation for Proof Finalization} *)
 

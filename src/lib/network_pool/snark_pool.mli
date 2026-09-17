@@ -1,5 +1,5 @@
 open Pipe_lib
-open Core_kernel
+open Core
 
 module type S = sig
   type transition_frontier
@@ -17,7 +17,7 @@ module type S = sig
   module For_tests : sig
     val get_rebroadcastable :
          Resource_pool.t
-      -> has_timed_out:(Core.Time.t -> [ `Timed_out | `Ok ])
+      -> has_timed_out:(Time_float.t -> [ `Timed_out | `Ok ])
       -> Resource_pool.Diff.t list
   end
 
@@ -25,7 +25,7 @@ module type S = sig
     Intf.Network_pool_base_intf
       with type resource_pool := Resource_pool.t
        and type resource_pool_diff :=
-        Mina_wire_types.Network_pool.Snark_pool.Diff_versioned.V2.t
+        Mina_wire_types.Network_pool.Snark_pool.Diff_versioned.V3.t
        and type resource_pool_diff_verified := Resource_pool.Diff.Cached.t
        and type transition_frontier := transition_frontier
        and type config := Resource_pool.Config.t
@@ -67,13 +67,14 @@ module type Transition_frontier_intf = sig
 end
 
 module Make
-    (Base_ledger : Intf.Base_ledger_intf) (Staged_ledger : sig
+    (Base_ledger : Intf.Base_ledger_intf)
+    (Staged_ledger : sig
       type t
 
       val ledger : t -> Base_ledger.t
     end)
-    (Transition_frontier : Transition_frontier_intf
-                             with type staged_ledger := Staged_ledger.t) :
+    (Transition_frontier :
+      Transition_frontier_intf with type staged_ledger := Staged_ledger.t) :
   S with type transition_frontier := Transition_frontier.t
 
 include S with type transition_frontier := Transition_frontier.t
@@ -83,11 +84,11 @@ module Diff_versioned : sig
   module Stable : sig
     [@@@no_toplevel_latest_type]
 
-    module V2 : sig
-      type t = Mina_wire_types.Network_pool.Snark_pool.Diff_versioned.V2.t =
+    module V3 : sig
+      type t = Mina_wire_types.Network_pool.Snark_pool.Diff_versioned.V3.t =
         | Add_solved_work of
             Transaction_snark_work.Statement.Stable.V2.t
-            * Ledger_proof.Stable.V2.t One_or_two.Stable.V1.t
+            * Ledger_proof.Stable.V3.t One_or_two.Stable.V1.t
               Priced_proof.Stable.V1.t
         | Empty
       [@@deriving equal]

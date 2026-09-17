@@ -5,7 +5,7 @@
     Subject:    Test receipts.
  *)
 
-open Core_kernel
+open Core
 open Snark_params.Tick
 open Mina_base
 open Receipt
@@ -23,7 +23,7 @@ let checked_unchecked_equivalence_signed_command () =
           let open Snark_params.Tick.Checked.Let_syntax in
           let payload =
             Transaction_union_payload.(
-              Checked.constant (of_user_command_payload payload))
+              Checked.constant (of_user_command_payload payload) )
           in
           let%map res =
             Checked.cons_signed_command_payload (Signed_command_payload payload)

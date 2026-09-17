@@ -4,9 +4,8 @@ open Mina_base
 let get_ledger_and_breadcrumb mina =
   mina |> Mina_lib.best_tip |> Participating_state.active
   |> Option.map ~f:(fun tip ->
-         ( Transition_frontier.Breadcrumb.staged_ledger tip
-           |> Staged_ledger.ledger
-         , tip ) )
+      ( Transition_frontier.Breadcrumb.staged_ledger tip |> Staged_ledger.ledger
+      , tip ) )
 
 let result_of_exn f v ~error = try Ok (f v) with _ -> Error error
 

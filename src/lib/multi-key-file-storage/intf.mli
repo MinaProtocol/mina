@@ -72,17 +72,15 @@ module type S = sig
     ]}
 *)
   val read :
-       (module Bin_prot.Binable.S with type t = 'a)
-    -> 'a tag
-    -> 'a Core_kernel.Or_error.t
+    (module Bin_prot.Binable.S with type t = 'a) -> 'a tag -> 'a Core.Or_error.t
 
   val read_many :
        (module Bin_prot.Binable.S with type t = 'a)
     -> 'a tag list
-    -> 'a list Core_kernel.Or_error.t
+    -> 'a list Core.Or_error.t
 
   (** Read the bytes stored at the given tag *)
-  val read_bytes : 'a tag -> Bytes.t Core_kernel.Or_error.t
+  val read_bytes : 'a tag -> Bytes.t Core.Or_error.t
 
   (** Get the size of the value stored at the given tag *)
   val size : 'a tag -> int

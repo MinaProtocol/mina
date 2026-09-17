@@ -3,6 +3,7 @@
  (package mina_batch_txn)
  (public_name mina-batch-txn)
  (libraries
+  core_unix.command_unix
   ;; opam libraries
   async.async_command
   integers

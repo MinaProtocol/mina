@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Async_kernel
 module Work = Transaction_snark_work.Statement
 module Ledger_proof = Ledger_proof
@@ -22,10 +22,11 @@ end
 
 module Make
     (Transition_frontier : T)
-    (Pool : Intf.Snark_resource_pool_intf
-              with type transition_frontier := Transition_frontier.t) :
+    (Pool :
+      Intf.Snark_resource_pool_intf
+        with type transition_frontier := Transition_frontier.t) :
   Intf.Snark_pool_diff_intf with type resource_pool := Pool.t = struct
-  type t = Mina_wire_types.Network_pool.Snark_pool.Diff_versioned.V2.t =
+  type t = Mina_wire_types.Network_pool.Snark_pool.Diff_versioned.V3.t =
     | Add_solved_work of Work.t * Ledger_proof.t One_or_two.t Priced_proof.t
     | Empty
 
@@ -43,7 +44,7 @@ module Make
       in
       function
       | Add_solved_work (work, proofs) ->
-          Mina_wire_types.Network_pool.Snark_pool.Diff_versioned.V2
+          Mina_wire_types.Network_pool.Snark_pool.Diff_versioned.V3
           .Add_solved_work
             (work, map_proofs proofs)
       | Empty ->
@@ -57,8 +58,9 @@ module Make
                ~f:(Ledger_proof.Cached.write_proof_to_disk ~proof_cache_db) )
       in
       function
-      | Mina_wire_types.Network_pool.Snark_pool.Diff_versioned.V2
-        .Add_solved_work (work, proofs) ->
+      | Mina_wire_types.Network_pool.Snark_pool.Diff_versioned.V3
+        .Add_solved_work
+          (work, proofs) ->
           (Add_solved_work (work, map_proofs proofs) : t)
       | Empty ->
           Empty
@@ -237,7 +239,7 @@ module Make
         let metadata =
           match sender with
           | Remote addr ->
-              ("sender", `String (Core.Unix.Inet_addr.to_string @@ Peer.ip addr))
+              ("sender", `String (Core_unix.Inet_addr.to_string @@ Peer.ip addr))
               :: metadata
           | Local ->
               metadata
@@ -245,7 +247,7 @@ module Make
         let metadata =
           Option.value_map reason
             ~f:(fun r -> List.cons ("reason", `String r))
-            ~default:ident metadata
+            ~default:Fn.id metadata
         in
         [%log internal] "%s" ("Snark_work_" ^ msg) ~metadata
 end

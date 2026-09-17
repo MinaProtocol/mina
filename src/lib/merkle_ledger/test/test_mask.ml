@@ -84,7 +84,7 @@ module type Test_intf = sig
         -> (* first mask on top of base ledger *)
            mask2:Mask.Attached.t lazy_t
         -> (* second mask on top of the first mask *)
-           'a )
+       'a )
     -> 'a
 end
 
@@ -713,7 +713,7 @@ module Make (Test : Test_intf) = struct
             let harvested = Mask.Attached.all_accounts_on_masks top_ledger in
             let expected =
               Map.merge_skewed middle_map top_map
-                ~combine:(fun ~key:_ _middle top -> top)
+                ~combine:(fun ~key:_ _middle top -> top )
             in
             [%test_eq: Account.t Test.Location.Map.t] harvested expected ) )
 

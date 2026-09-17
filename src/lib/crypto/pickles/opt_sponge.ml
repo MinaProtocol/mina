@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 
 (* This module implements snarky functions for a sponge that can *conditionally* absorb input,
    while branching minimally. Specifically, if absorbing N field elements, this sponge can absorb
@@ -97,7 +97,7 @@ struct
                   let a_j = read Field.typ a.(j) in
                   if read Boolean.typ i_equals_j then
                     Field.Constant.(a_j + read Field.typ x)
-                  else a_j)
+                  else a_j )
         in
         assert_r1cs x (i_equals_j :> Field.t) Field.(a_j' - a.(j)) ;
         a.(j) <- a_j' )

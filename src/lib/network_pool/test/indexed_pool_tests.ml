@@ -6,7 +6,7 @@
     Subject:    Test the indexed pool.
  *)
 
-open Core_kernel
+open Core
 open Currency
 open Mina_base
 open Mina_numbers
@@ -147,8 +147,8 @@ let sequential_adds_all_valid () =
                   fee_token ()
             | Error
                 (Expired
-                  ( `Valid_until valid_until
-                  , `Global_slot_since_genesis global_slot_since_genesis ) ) ->
+                   ( `Valid_until valid_until
+                   , `Global_slot_since_genesis global_slot_since_genesis ) ) ->
                 failwithf
                   !"Expired user command. Current global slot is \
                     %{sexp:Mina_numbers.Global_slot_since_genesis.t} but user \
@@ -289,20 +289,22 @@ let replacement () =
             Option.value_exn
               Option.(
                 currency_consumed cmd
-                >>= fun consumed -> Amount.(consumed + consumed_so_far)) )
+                >>= fun consumed -> Amount.(consumed + consumed_so_far) ) )
       in
       assert (Amount.(currency_consumed_pre_replace <= init_balance)) ;
       let currency_consumed_post_replace =
         Option.value_exn
           (let open Option.Let_syntax in
-          let%bind replaced_currency_consumed =
-            currency_consumed @@ List.nth_exn setup_cmds replaced_idx
-          in
-          let%bind replacer_currency_consumed = currency_consumed replace_cmd in
-          let%bind a =
-            Amount.(currency_consumed_pre_replace - replaced_currency_consumed)
-          in
-          Amount.(a + replacer_currency_consumed))
+           let%bind replaced_currency_consumed =
+             currency_consumed @@ List.nth_exn setup_cmds replaced_idx
+           in
+           let%bind replacer_currency_consumed =
+             currency_consumed replace_cmd
+           in
+           let%bind a =
+             Amount.(currency_consumed_pre_replace - replaced_currency_consumed)
+           in
+           Amount.(a + replacer_currency_consumed) )
       in
       let add_res = add_from_gossip_exn t replace_cmd init_nonce init_balance in
       if Amount.(currency_consumed_post_replace <= init_balance) then
@@ -363,8 +365,8 @@ let remove_lowest_fee () =
 let insert_cmd pool cmd =
   add_from_gossip_exn pool cmd Account_nonce.zero (Amount.of_mina_int_exn 5)
   |> Result.map_error ~f:(fun e ->
-         let sexp = Command_error.sexp_of_t e in
-         Failure (Sexp.to_string sexp) )
+      let sexp = Command_error.sexp_of_t e in
+      Failure (Sexp.to_string sexp) )
   |> Result.ok_exn
   |> fun (_, pool, _) -> pool
 
@@ -681,14 +683,14 @@ let nonce_invariant_violation () =
 let transactions_from_single_sender_ordered_by_nonce () =
   Quickcheck.test
     (let open Quickcheck.Generator.Let_syntax in
-    let%bind sender = Account.gen in
-    let%bind receiver = Account.gen in
-    let%map txns =
-      Stateful_gen.eval_state
-        (gen_txns_from_single_sender_to receiver.public_key)
-        sender
-    in
-    (sender, txns))
+     let%bind sender = Account.gen in
+     let%bind receiver = Account.gen in
+     let%map txns =
+       Stateful_gen.eval_state
+         (gen_txns_from_single_sender_to receiver.public_key)
+         sender
+     in
+     (sender, txns) )
     ~f:(fun (sender, txns) ->
       let account_map = accounts_map [ sender ] in
       let pool =
@@ -749,8 +751,7 @@ let revalidation_drops_nothing_unless_ledger_changed () =
       let pool = pool_of_transactions ~init:empty ~account_map txns in
       let pool', dropped =
         Indexed_pool.revalidate pool ~logger `Entire_pool (fun aid ->
-            Public_key.Compressed.Map.find_exn account_map
-              (Account_id.public_key aid) )
+            Map.find_exn account_map (Account_id.public_key aid) )
       in
       assert (Sequence.is_empty dropped) ;
       assert (Indexed_pool.equal pool pool') ;
@@ -766,7 +767,7 @@ let apply_transactions txns accounts =
   List.fold txns ~init:accounts ~f:(fun m t ->
       let txn = Signed_command.forget_check t in
       let sender = Public_key.compress txn.signer in
-      Public_key.Compressed.Map.update m sender ~f:(function
+      Map.update m sender ~f:(function
         | None ->
             failwith "sender not found"
         | Some a ->
@@ -787,21 +788,20 @@ let txn_hash =
 let application_invalidates_applied_transactions () =
   Quickcheck.test ~trials:1000
     (let open Quickcheck.Generator.Let_syntax in
-    let%bind accounts, txns = gen_accounts_and_transactions in
-    (* Simulate application of some transactions in order to invalidate them. *)
-    let%map app_count = Int.gen_incl 0 (List.length txns) in
-    let updated_accounts =
-      apply_transactions (List.take txns app_count) accounts
-    in
-    (accounts, updated_accounts, txns, app_count))
+     let%bind accounts, txns = gen_accounts_and_transactions in
+     (* Simulate application of some transactions in order to invalidate them. *)
+     let%map app_count = Int.gen_incl 0 (List.length txns) in
+     let updated_accounts =
+       apply_transactions (List.take txns app_count) accounts
+     in
+     (accounts, updated_accounts, txns, app_count) )
     ~f:(fun (initial_accounts, updated_accounts, txns, app_count) ->
       let pool =
         pool_of_transactions ~init:empty ~account_map:initial_accounts txns
       in
       let _pool', dropped =
         Indexed_pool.revalidate ~logger pool `Entire_pool (fun aid ->
-            Public_key.Compressed.Map.find_exn updated_accounts
-              (Account_id.public_key aid) )
+            Map.find_exn updated_accounts (Account_id.public_key aid) )
       in
       assert_pool_consistency pool ;
       [%test_eq: Transaction_hash.Set.t]
@@ -821,20 +821,20 @@ let update_fee (txn : Signed_command.t) fee =
 let transaction_replacement () =
   Quickcheck.test
     (let open Quickcheck in
-    let open Generator.Let_syntax in
-    (* Make sure we can increase the balance later. *)
-    let high = Balance.(sub_amount max_int Amount.one) |> Option.value_exn in
-    let%bind sender =
-      Account.gen_with_constrained_balance ~low:Balance.one ~high
-    in
-    let%bind receiver = Account.gen in
-    let%bind txns =
-      Stateful_gen.eval_state
-        (gen_txns_from_single_sender_to receiver.public_key)
-        sender
-    in
-    let%map to_replace = Generator.of_list txns in
-    (sender, txns, Signed_command.forget_check to_replace))
+     let open Generator.Let_syntax in
+     (* Make sure we can increase the balance later. *)
+     let high = Balance.(sub_amount max_int Amount.one) |> Option.value_exn in
+     let%bind sender =
+       Account.gen_with_constrained_balance ~low:Balance.one ~high
+     in
+     let%bind receiver = Account.gen in
+     let%bind txns =
+       Stateful_gen.eval_state
+         (gen_txns_from_single_sender_to receiver.public_key)
+         sender
+     in
+     let%map to_replace = Generator.of_list txns in
+     (sender, txns, Signed_command.forget_check to_replace) )
     ~f:(fun (sender, txns, to_replace) ->
       let account_map = accounts_map [ sender ] in
       let pool = pool_of_transactions ~init:empty ~account_map txns in
@@ -856,7 +856,7 @@ let transaction_replacement () =
       let _, pool', _ =
         Indexed_pool.add_from_gossip_exn pool t sender.nonce balance
         |> Result.map_error ~f:(fun e ->
-               Sexp.to_string @@ Command_error.sexp_of_t e )
+            Sexp.to_string @@ Command_error.sexp_of_t e )
         |> Result.ok_or_failwith
       in
       assert_pool_consistency pool ;
@@ -864,7 +864,7 @@ let transaction_replacement () =
         let open Account in
         Public_key.decompress sender.public_key
         |> Option.value_exn |> Account_id.of_public_key
-        |> Account_id.Map.find_exn (Indexed_pool.For_tests.all_by_sender pool')
+        |> Map.find_exn (Indexed_pool.For_tests.all_by_sender pool')
       in
       let eq = Transaction_hash.User_command_with_valid_signature.equal in
       let repl =
@@ -888,41 +888,42 @@ let transaction_replacement () =
 let transaction_replacement_insufficient_balance () =
   Quickcheck.test
     (let open Quickcheck.Generator.Let_syntax in
-    let%bind a = Account.gen in
-    let sender = { a with balance = Balance.of_mina_int_exn 31 } in
-    let%map recv = Account.gen in
-    let cmds =
-      List.init 3 ~f:(fun n ->
-          let open Signed_command.Payload in
-          let (`If_this_is_used_it_should_have_a_comment_justifying_it cmd) =
-            Signed_command.Poly.
-              { payload =
-                  Poly.
-                    { common =
-                        Common.Poly.
-                          { fee =
-                              Fee.of_nanomina_int_exn 300_000_000 (* 0.3 Mina *)
-                          ; fee_payer_pk = sender.public_key
-                          ; nonce = Account_nonce.(add sender.nonce @@ of_int n)
-                          ; valid_until = Global_slot_since_genesis.max_value
-                          ; memo = Signed_command_memo.dummy
-                          }
-                    ; body =
-                        Body.Payment
-                          Payment_payload.Poly.
-                            { receiver_pk = recv.public_key
-                            ; amount = Amount.of_mina_int_exn 10
-                            }
-                    }
-              ; signer =
-                  Option.value_exn @@ Public_key.decompress sender.public_key
-              ; signature = Signature.dummy
-              }
-            |> Signed_command.to_valid_unsafe
-          in
-          cmd )
-    in
-    (sender, cmds))
+     let%bind a = Account.gen in
+     let sender = { a with balance = Balance.of_mina_int_exn 31 } in
+     let%map recv = Account.gen in
+     let cmds =
+       List.init 3 ~f:(fun n ->
+           let open Signed_command.Payload in
+           let (`If_this_is_used_it_should_have_a_comment_justifying_it cmd) =
+             Signed_command.Poly.
+               { payload =
+                   Poly.
+                     { common =
+                         Common.Poly.
+                           { fee =
+                               Fee.of_nanomina_int_exn
+                                 300_000_000 (* 0.3 Mina *)
+                           ; fee_payer_pk = sender.public_key
+                           ; nonce = Account_nonce.(add sender.nonce @@ of_int n)
+                           ; valid_until = Global_slot_since_genesis.max_value
+                           ; memo = Signed_command_memo.dummy
+                           }
+                     ; body =
+                         Body.Payment
+                           Payment_payload.Poly.
+                             { receiver_pk = recv.public_key
+                             ; amount = Amount.of_mina_int_exn 10
+                             }
+                     }
+               ; signer =
+                   Option.value_exn @@ Public_key.decompress sender.public_key
+               ; signature = Signature.dummy
+               }
+             |> Signed_command.to_valid_unsafe
+           in
+           cmd )
+     in
+     (sender, cmds) )
     ~f:(fun (sender, txns) ->
       let account_map = accounts_map [ sender ] in
       let pool = pool_of_transactions ~init:empty ~account_map txns in
@@ -943,7 +944,7 @@ let transaction_replacement_insufficient_balance () =
       let _, pool', _ =
         Indexed_pool.add_from_gossip_exn pool t sender.nonce balance
         |> Result.map_error ~f:(fun e ->
-               Sexp.to_string @@ Command_error.sexp_of_t e )
+            Sexp.to_string @@ Command_error.sexp_of_t e )
         |> Result.ok_or_failwith
       in
       (* The last transaction gets discarded, because after the replacement,

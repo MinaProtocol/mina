@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Mina_base
 open Frontier_base
 
@@ -121,68 +121,70 @@ module T = struct
         ~init:
           ( { new_commands = []; removed_commands = []; reorg_best_tip = false }
           , false )
-        ~f:
-          (fun ( ({ new_commands; removed_commands; reorg_best_tip = _ } as acc)
-               , should_broadcast ) -> function
-            | E (Best_tip_changed new_best_tip_hash, old_best_tip_hash) ->
-                let added_to_best_tip_path, removed_from_best_tip_path =
-                  load_paths ~new_best_tip_hash ~old_best_tip_hash t frontier
-                  |> Result.map_error ~f:(fun (hash, message) ->
-                         Error.of_string
-                         @@ sprintf
-                              "failed to retrieve hash %s from frontier in \
-                               best_tip_diff extension: %s"
-                              (State_hash.to_base58_check hash)
-                              message )
-                  |> Or_error.ok_exn
-                in
-                let new_commands =
-                  List.bind added_to_best_tip_path ~f:breadcrumb_commands
-                  @ new_commands
-                in
-                let removed_commands =
-                  List.bind removed_from_best_tip_path ~f:breadcrumb_commands
-                  @ removed_commands
-                in
-                let reorg_best_tip =
-                  not (List.is_empty removed_from_best_tip_path)
-                in
-                let added_transitions =
-                  List.map
-                    ~f:(fun b ->
-                      { Log_event.protocol_state = Breadcrumb.protocol_state b
-                      ; state_hash = Breadcrumb.state_hash b
-                      ; just_emitted_a_proof = Breadcrumb.just_emitted_a_proof b
-                      } )
-                    added_to_best_tip_path
-                in
-                let removed_transitions =
-                  List.map
-                    ~f:(fun b ->
-                      { Log_event.protocol_state = Breadcrumb.protocol_state b
-                      ; state_hash = Breadcrumb.state_hash b
-                      ; just_emitted_a_proof = Breadcrumb.just_emitted_a_proof b
-                      } )
-                    removed_from_best_tip_path
-                in
-                let event =
-                  Log_event.New_best_tip_event
-                    { added_transitions; removed_transitions; reorg_best_tip }
-                in
-                [%str_log' debug t.logger]
-                  ~metadata:
-                    [ ( "no_of_added_breadcrumbs"
-                      , `Int (List.length added_to_best_tip_path) )
-                    ; ( "no_of_removed_breadcrumbs"
-                      , `Int (List.length removed_from_best_tip_path) )
-                    ]
-                  event ;
-                [%str_log' best_tip_diff t.best_tip_diff_logger] event ;
-                ({ new_commands; removed_commands; reorg_best_tip }, true)
-            | E (New_node (Full _), _) ->
-                (acc, should_broadcast)
-            | E (Root_transitioned _, _) ->
-                (acc, should_broadcast) )
+        ~f:(fun
+            ( ({ new_commands; removed_commands; reorg_best_tip = _ } as acc)
+            , should_broadcast )
+          ->
+          function
+          | E (Best_tip_changed new_best_tip_hash, old_best_tip_hash) ->
+              let added_to_best_tip_path, removed_from_best_tip_path =
+                load_paths ~new_best_tip_hash ~old_best_tip_hash t frontier
+                |> Result.map_error ~f:(fun (hash, message) ->
+                    Error.of_string
+                    @@ sprintf
+                         "failed to retrieve hash %s from frontier in \
+                          best_tip_diff extension: %s"
+                         (State_hash.to_base58_check hash)
+                         message )
+                |> Or_error.ok_exn
+              in
+              let new_commands =
+                List.bind added_to_best_tip_path ~f:breadcrumb_commands
+                @ new_commands
+              in
+              let removed_commands =
+                List.bind removed_from_best_tip_path ~f:breadcrumb_commands
+                @ removed_commands
+              in
+              let reorg_best_tip =
+                not (List.is_empty removed_from_best_tip_path)
+              in
+              let added_transitions =
+                List.map
+                  ~f:(fun b ->
+                    { Log_event.protocol_state = Breadcrumb.protocol_state b
+                    ; state_hash = Breadcrumb.state_hash b
+                    ; just_emitted_a_proof = Breadcrumb.just_emitted_a_proof b
+                    } )
+                  added_to_best_tip_path
+              in
+              let removed_transitions =
+                List.map
+                  ~f:(fun b ->
+                    { Log_event.protocol_state = Breadcrumb.protocol_state b
+                    ; state_hash = Breadcrumb.state_hash b
+                    ; just_emitted_a_proof = Breadcrumb.just_emitted_a_proof b
+                    } )
+                  removed_from_best_tip_path
+              in
+              let event =
+                Log_event.New_best_tip_event
+                  { added_transitions; removed_transitions; reorg_best_tip }
+              in
+              [%str_log' debug t.logger]
+                ~metadata:
+                  [ ( "no_of_added_breadcrumbs"
+                    , `Int (List.length added_to_best_tip_path) )
+                  ; ( "no_of_removed_breadcrumbs"
+                    , `Int (List.length removed_from_best_tip_path) )
+                  ]
+                event ;
+              [%str_log' best_tip_diff t.best_tip_diff_logger] event ;
+              ({ new_commands; removed_commands; reorg_best_tip }, true)
+          | E (New_node (Full _), _) ->
+              (acc, should_broadcast)
+          | E (Root_transitioned _, _) ->
+              (acc, should_broadcast) )
     in
     Option.some_if should_broadcast view
 end

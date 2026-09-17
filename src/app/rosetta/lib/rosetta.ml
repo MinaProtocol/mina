@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Async
 open Rosetta_lib
 
@@ -21,14 +21,14 @@ let router ~signature_kind ~graphql_uri ~minimum_user_command_fee
     let%bind pool = Lazy.force pool in
     Mina_caqti.Pool.use (fun db -> f ~db) pool
     |> Deferred.Result.map_error ~f:(function
-         | `App e ->
-             `App e
-         | `Connect_failed _e ->
-             `App (Errors.create (`Sql "Connect failed"))
-         | `Connect_rejected _e ->
-             `App (Errors.create (`Sql "Connect rejected"))
-         | `Post_connect _e ->
-             `App (Errors.create (`Sql "Post connect error")) )
+      | `App e ->
+          `App e
+      | `Connect_failed _e ->
+          `App (Errors.create (`Sql "Connect failed"))
+      | `Connect_rejected _e ->
+          `App (Errors.create (`Sql "Connect rejected"))
+      | `Post_connect _e ->
+          `App (Errors.create (`Sql "Post connect error")) )
   in
   let with_db' f =
     Deferred.Result.map_error (with_db f) ~f:(function
@@ -38,33 +38,37 @@ let router ~signature_kind ~graphql_uri ~minimum_user_command_fee
       | `App _ as x ->
           x )
   in
-  try
-    match route with
-    | "network" :: tl ->
-        Network.router tl body ~get_graphql_uri_or_error ~logger
-          ~with_db:with_db' ~minimum_user_command_fee
-    | "account" :: tl ->
-        let%bind graphql_uri = get_graphql_uri_or_error () in
-        Account.router tl body ~graphql_uri ~logger ~with_db
-          ~minimum_user_command_fee
-    | "mempool" :: tl when not safe_mode ->
-        let%bind graphql_uri = get_graphql_uri_or_error () in
-        Mempool.router tl body ~graphql_uri ~logger ~minimum_user_command_fee
-    | "block" :: tl ->
-        let%bind graphql_uri = get_graphql_uri_or_error () in
-        Block.router tl body ~graphql_uri ~logger ~with_db:with_db'
-          ~minimum_user_command_fee
-    | "construction" :: tl when not safe_mode ->
-        Construction.router tl body ~signature_kind ~get_graphql_uri_or_error
-          ~logger ~with_db:with_db' ~minimum_user_command_fee
-          ~account_creation_fee
-    | "search" :: tl ->
-        let%bind graphql_uri = get_graphql_uri_or_error () in
-        Search.router tl body ~graphql_uri ~logger ~with_db:with_db'
-          ~minimum_user_command_fee
-    | _ ->
-        Deferred.return (Error `Page_not_found)
-  with exn -> Deferred.return (Error (`Exception exn))
+  Monitor.try_with ~extract_exn:true (fun () ->
+      match route with
+      | "network" :: tl ->
+          Network.router tl body ~get_graphql_uri_or_error ~logger
+            ~with_db:with_db' ~minimum_user_command_fee
+      | "account" :: tl ->
+          let%bind graphql_uri = get_graphql_uri_or_error () in
+          Account.router tl body ~graphql_uri ~logger ~with_db
+            ~minimum_user_command_fee
+      | "mempool" :: tl when not safe_mode ->
+          let%bind graphql_uri = get_graphql_uri_or_error () in
+          Mempool.router tl body ~graphql_uri ~logger ~minimum_user_command_fee
+      | "block" :: tl ->
+          let%bind graphql_uri = get_graphql_uri_or_error () in
+          Block.router tl body ~graphql_uri ~logger ~with_db:with_db'
+            ~minimum_user_command_fee
+      | "construction" :: tl when not safe_mode ->
+          Construction.router tl body ~signature_kind ~get_graphql_uri_or_error
+            ~logger ~with_db:with_db' ~minimum_user_command_fee
+            ~account_creation_fee
+      | "search" :: tl ->
+          let%bind graphql_uri = get_graphql_uri_or_error () in
+          Search.router tl body ~graphql_uri ~logger ~with_db:with_db'
+            ~minimum_user_command_fee
+      | _ ->
+          Deferred.return (Error `Page_not_found) )
+  |> Deferred.map ~f:(function
+    | Ok x ->
+        x
+    | Error exn ->
+        Error (`Exception exn) )
 
 let pg_log_data ~logger ~pool : unit Deferred.t =
   match%bind Lazy.force pool with
@@ -98,7 +102,7 @@ let pg_log_data ~logger ~pool : unit Deferred.t =
               [%log error] "Could not get Postgresql system data"
                 ~metadata:[ ("error", `String (Caqti_error.show err)) ]
         in
-        let%bind () = after (Time.Span.of_sec pg_data_interval) in
+        let%bind () = after (Time_float.Span.of_sec pg_data_interval) in
         go ()
       in
       go ()
@@ -190,55 +194,55 @@ let command ?signature_kind ~minimum_user_command_fee ~account_creation_fee () =
     let pool =
       lazy
         (let open Deferred.Result.Let_syntax in
-        let%bind archive_uri =
-          match archive_uri with
-          | None ->
-              Deferred.Result.fail
-                (`App (Errors.create (`Sql "No archive URI set")))
-          | Some archive_uri ->
-              Deferred.Result.return archive_uri
-        in
-        let max_pool_size =
-          try
-            let v = Sys.getenv "MINA_ROSETTA_MAX_DB_POOL_SIZE" in
-            int_of_string (Option.value_exn v)
-          with _ ->
-            failwith
-              "MINA_ROSETTA_MAX_DB_POOL_SIZE not set or invalid. Please set \
-               this to a number (try 64 or 128)"
-        in
-        match Mina_caqti.connect_pool ~max_size:max_pool_size archive_uri with
-        | Error e ->
-            [%log error]
-              ~metadata:[ ("error", `String (Caqti_error.show e)) ]
-              "Failed to create a caqti pool to postgres. Error: $error" ;
-            Deferred.Result.fail (`App (Errors.create (`Sql "Connect failed")))
-        | Ok pool ->
-            Deferred.Result.return pool)
+         let%bind archive_uri =
+           match archive_uri with
+           | None ->
+               Deferred.Result.fail
+                 (`App (Errors.create (`Sql "No archive URI set")))
+           | Some archive_uri ->
+               Deferred.Result.return archive_uri
+         in
+         let max_pool_size =
+           try
+             let v = Sys.getenv "MINA_ROSETTA_MAX_DB_POOL_SIZE" in
+             int_of_string (Option.value_exn v)
+           with _ ->
+             failwith
+               "MINA_ROSETTA_MAX_DB_POOL_SIZE not set or invalid. Please set \
+                this to a number (try 64 or 128)"
+         in
+         match Mina_caqti.connect_pool ~max_size:max_pool_size archive_uri with
+         | Error e ->
+             [%log error]
+               ~metadata:[ ("error", `String (Caqti_error.show e)) ]
+               "Failed to create a caqti pool to postgres. Error: $error" ;
+             Deferred.Result.fail (`App (Errors.create (`Sql "Connect failed")))
+         | Ok pool ->
+             Deferred.Result.return pool )
     in
     don't_wait_for (pg_log_data ~logger ~pool) ;
     let%bind server =
       Cohttp_async.Server.create_expert ~max_connections:128
         ~on_handler_error:
           (`Call
-            (fun _net exn ->
-              let metadata =
-                [ ("error", `String (Exn.to_string_mach exn))
-                ; ("context", `String "rest_server")
-                ]
-              in
-              let env_var = "MINA_ROSETTA_TERMINATE_ON_SERVER_ERROR" in
-              match Sys.getenv env_var with
-              | None ->
-                  [%log error]
-                    "Exception while handling Rosetta server request: $error"
-                    ~metadata
-              | Some _ ->
-                  [%log fatal]
-                    "Exception while handling Rosetta server request: $error. \
-                     Terminating because environment variable %s is set"
-                    env_var ~metadata ;
-                  ignore (exit 1) ) )
+             (fun _net exn ->
+               let metadata =
+                 [ ("error", `String (Exn.to_string_mach exn))
+                 ; ("context", `String "rest_server")
+                 ]
+               in
+               let env_var = "MINA_ROSETTA_TERMINATE_ON_SERVER_ERROR" in
+               match Sys.getenv env_var with
+               | None ->
+                   [%log error]
+                     "Exception while handling Rosetta server request: $error"
+                     ~metadata
+               | Some _ ->
+                   [%log fatal]
+                     "Exception while handling Rosetta server request: $error. \
+                      Terminating because environment variable %s is set"
+                     env_var ~metadata ;
+                   ignore (exit 1) ) )
         (Async.Tcp.Where_to_listen.bind_to All_addresses (On_port port))
         (server_handler ~signature_kind ~pool ~graphql_uri ~logger
            ~minimum_user_command_fee ~account_creation_fee ~safe_mode )
@@ -247,3 +251,58 @@ let command ?signature_kind ~minimum_user_command_fee ~account_creation_fee () =
       ~metadata:[ ("port", `Int port) ]
       "Rosetta process running on http://localhost:$port" ;
     Cohttp_async.Server.close_finished server
+
+let%test_module "router" =
+  ( module struct
+    let%test_unit "unknown route returns page_not_found" =
+      let pool =
+        lazy (Deferred.Result.fail (`App (Errors.create `Graphql_uri_not_set)))
+      in
+      let result =
+        Thread_safe.block_on_async_exn (fun () ->
+            router ~signature_kind:Mina_signature_kind.Testnet ~graphql_uri:None
+              ~minimum_user_command_fee:Currency.Fee.zero
+              ~account_creation_fee:Currency.Fee.zero ~pool
+              ~logger:(Logger.null ()) ~safe_mode:false [ "unknown" ] `Null )
+      in
+      match result with
+      | Error `Page_not_found ->
+          ()
+      | _ ->
+          failwith "expected Error `Page_not_found"
+
+    let%test_unit "Monitor.try_with catches sync exception" =
+      let result =
+        Thread_safe.block_on_async_exn (fun () ->
+            Monitor.try_with ~extract_exn:true (fun () ->
+                failwith "test sync exception" )
+            |> Deferred.map ~f:(function
+              | Ok _ ->
+                  Error `Unexpected_ok
+              | Error _ ->
+                  Ok () ) )
+      in
+      match result with
+      | Ok () ->
+          ()
+      | Error `Unexpected_ok ->
+          failwith "expected exception to be caught"
+
+    let%test_unit "Monitor.try_with exception maps to Exception error variant" =
+      let result =
+        Thread_safe.block_on_async_exn (fun () ->
+            Monitor.try_with ~extract_exn:true (fun () ->
+                failwith "router exception test" )
+            |> Deferred.map ~f:(function
+              | Ok x ->
+                  x
+              | Error exn ->
+                  Error (`Exception exn) ) )
+      in
+      match result with
+      | Error (`Exception exn) ->
+          let msg = Exn.to_string exn in
+          assert (String.is_substring msg ~substring:"router exception test")
+      | Ok _ ->
+          failwith "expected Error (`Exception _)"
+  end )

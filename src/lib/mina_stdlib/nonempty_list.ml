@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 
 (* A non-empty list is a tuple of the head and the rest (as a list) *)
 [%%versioned

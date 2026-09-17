@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Snark_params.Tick
 
 let parity y = Bigint.(test_bit (of_field y) 0)
@@ -259,7 +259,7 @@ module Uncompressed = struct
       exists Typ.field
         ~compute:
           As_prover.(
-            map (read Compressed.typ c) ~f:(fun c -> snd (decompress_exn c)))
+            map (read Compressed.typ c) ~f:(fun c -> snd (decompress_exn c)) )
     in
     let%map () = Inner_curve.Checked.Assert.on_curve (x, y)
     and () = parity_var y >>= Boolean.Assert.(( = ) is_odd) in

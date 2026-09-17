@@ -1,5 +1,5 @@
 open Async_kernel
-open Core_kernel
+open Core
 
 module Make (Data : sig
   type t
@@ -11,7 +11,7 @@ struct
 
   let initialize _path ~logger:_ = Deferred.Result.return ()
 
-  let get () = ident
+  let get () = Fn.id
 
-  let put () = ident
+  let put () = Fn.id
 end

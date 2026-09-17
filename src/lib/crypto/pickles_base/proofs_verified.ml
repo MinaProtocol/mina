@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Pickles_types
 
 [@@@warning "-4"] (* sexp-related fragile pattern-matching warning *)
@@ -128,7 +128,7 @@ module One_hot = struct
       Random_oracle_input.Chunked.packeds
         (Array.map
            Pickles_types.(
-             Vector.to_array (t :> (Step_impl.Boolean.var, Nat.N3.n) Vector.t))
+             Vector.to_array (t :> (Step_impl.Boolean.var, Nat.N3.n) Vector.t) )
            ~f:(fun b -> ((b :> Step_impl.Field.t), 1)) )
   end
 

@@ -11,7 +11,7 @@ val transaction_dummy : t lazy_t
 module Stable : sig
   [@@@no_toplevel_latest_type]
 
-  module V2 : sig
+  module V3 : sig
     type nonrec t = t [@@deriving equal, compare, sexp, hash, yojson]
 
     val to_yojson_full : t -> Yojson.Safe.t

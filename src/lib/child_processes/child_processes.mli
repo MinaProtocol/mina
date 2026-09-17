@@ -1,6 +1,6 @@
 (** Management of starting, tracking, and killing child processes. *)
 
-open Core_kernel
+open Core
 open Async
 open Pipe_lib
 

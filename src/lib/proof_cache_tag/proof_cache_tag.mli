@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Async_kernel
 
 type t [@@deriving sexp_of, to_yojson]

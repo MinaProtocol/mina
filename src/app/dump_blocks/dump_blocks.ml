@@ -54,7 +54,7 @@ let encoded_block =
           failwith "invalid format" )
 
 let () =
-  let open Core_kernel in
+  let open Core in
   Backtrace.elide := false ;
   Async.Scheduler.set_record_backtraces true
 
@@ -142,7 +142,7 @@ let command =
        match conf with
        | Conf (None, outs) ->
            let verifier = verifier () in
-           Core_kernel.Quickcheck.test
+           Core.Quickcheck.test
              (gen_breadcrumb ~verifier ())
              ~trials:1 ~f:(f ?parent outs)
        | Conf (Some { encoding; filename }, outs) ->

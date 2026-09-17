@@ -22,6 +22,14 @@ The test suite includes the following test cases:
 5. **Manager Promote Command - Signed (Dry-run)**: Tests promotion in signed repository with GPG signing key
 6. **Manager Publish Command - Signed (Dry-run)**: Tests publishing to signed repository with GPG signing key
 
+The suite also covers the per-artifact dry-run cases in `run_dry_run_tests`
+(`mina-config`, `mina-generic`, `rosetta-generic`, `mina-automode`, mixed
+artifact lists, and rejection of an unknown artifact). The two `mina-automode`
+cases pin the docker image name: that artifact publishes as
+`mina-daemon-auto-hardfork`, not under its own name, so they assert the exact
+`mina-daemon-auto-hardfork:<version>-<codename>-<network>` tag appears in the
+publish and promote output.
+
 **Non-dry-run Tests (Actual operations that make changes):**
 7. **Manager Promote - Unsigned (Real)**: Actually promotes packages in unsigned test repository with verification
 8. **Manager Promote - Signed (Real)**: Actually promotes packages in signed test repository with GPG signing and verification

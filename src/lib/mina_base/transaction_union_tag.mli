@@ -1,5 +1,5 @@
 (* transaction_union_tag.ml *)
-open Core_kernel
+open Core
 open Snark_params.Tick
 
 type t = Payment | Stake_delegation | Fee_transfer | Coinbase

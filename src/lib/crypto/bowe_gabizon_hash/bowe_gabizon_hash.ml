@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 
 module Make (Inputs : Inputs_intf.S) = struct
   open Inputs

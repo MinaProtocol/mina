@@ -1,6 +1,6 @@
 (** Common gadget helpers. *)
 
-open Core_kernel
+open Core
 module Bignum_bigint = Snarky_backendless.Backend_extended.Bignum_bigint
 module Circuit = Kimchi_pasta_snarky_backend.Step_impl
 

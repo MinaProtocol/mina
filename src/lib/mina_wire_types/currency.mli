@@ -25,8 +25,8 @@ module M : Types.S
 module type Local_sig = Signature(Types).S
 
 module Make
-    (Signature : Local_sig) (_ : functor (A : Concrete) -> Signature(A).S) :
-  Signature(M).S
+    (Signature : Local_sig)
+    (_ : functor (A : Concrete) -> Signature(A).S) : Signature(M).S
 
 (** Finally, we expose only the types from {!Types.S} but we clarify that the
     types here are the same that those from {!M}. In some cases this is

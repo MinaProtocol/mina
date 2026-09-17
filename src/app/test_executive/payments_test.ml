@@ -26,25 +26,25 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       requires_graphql = true
     ; genesis_ledger =
         (let open Test_account in
-        [ create ~account_name:"untimed-node-a-key" ~balance:"400000" ()
-        ; create ~account_name:"untimed-node-b-key" ~balance:"300000" ()
-        ; create ~account_name:"timed-node-c-key" ~balance:"30000"
-            ~timing:
-              (make_timing ~min_balance:10_000_000_000_000 ~cliff_time:8
-                 ~cliff_amount:0 ~vesting_period:4
-                 ~vesting_increment:5_000_000_000_000 )
-            (* 30_000_000_000_000 mina is the total. initially, the balance will
+         [ create ~account_name:"untimed-node-a-key" ~balance:"400000" ()
+         ; create ~account_name:"untimed-node-b-key" ~balance:"300000" ()
+         ; create ~account_name:"timed-node-c-key" ~balance:"30000"
+             ~timing:
+               (make_timing ~min_balance:10_000_000_000_000 ~cliff_time:8
+                  ~cliff_amount:0 ~vesting_period:4
+                  ~vesting_increment:5_000_000_000_000 )
+             (* 30_000_000_000_000 mina is the total. initially, the balance will
                be 10k mina. after 8 global slots, the cliff is hit, although the
                cliff amount is 0. 4 slots after that, 5_000_000_000_000 mina will
                vest, and 4 slots after that another 5_000_000_000_000 will vest,
                and then twice again, for a total of 30k mina all fully liquid and
                unlocked at the end of the schedule*)
-            ()
-        ; create ~account_name:"snark-node-key1" ~balance:"0" ()
-        ; create ~account_name:"snark-node-key2" ~balance:"0" ()
-        ; create ~account_name:"fish1" ~balance:"100" ()
-        ; create ~account_name:"fish2" ~balance:"100" ()
-        ])
+             ()
+         ; create ~account_name:"snark-node-key1" ~balance:"0" ()
+         ; create ~account_name:"snark-node-key2" ~balance:"0" ()
+         ; create ~account_name:"fish1" ~balance:"100" ()
+         ; create ~account_name:"fish2" ~balance:"100" ()
+         ] )
     ; block_producers =
         [ { node_name = "untimed-node-a"; account_name = "untimed-node-a-key" }
         ; { node_name = "untimed-node-b"; account_name = "untimed-node-b-key" }
@@ -72,8 +72,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let all_mina_nodes = Network.all_mina_nodes network in
     let%bind () =
       wait_for t
-        (Wait_condition.nodes_to_initialize
-           (Core.String.Map.data all_mina_nodes) )
+        (Wait_condition.nodes_to_initialize (Core.Map.data all_mina_nodes))
     in
     let untimed_node_a = Network.block_producer_exn network "untimed-node-a" in
     let untimed_node_b = Network.block_producer_exn network "untimed-node-b" in
@@ -241,38 +240,38 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         "attempt to send again the same signed transaction command as before \
          to conduct a replay attack. expecting a bad nonce"
         (let open Deferred.Let_syntax in
-        match%bind
-          Integration_test_lib.Graphql_requests.send_payment_with_raw_sig
-            (Network.Node.get_ingress_uri untimed_node_b)
-            ~logger
-            ~sender_pub_key:(Signed_command_payload.fee_payer_pk payload)
-            ~receiver_pub_key:(Signed_command_payload.receiver_pk payload)
-            ~amount ~fee
-            ~nonce:(Signed_command_payload.nonce payload)
-            ~memo ~valid_until ~raw_signature
-        with
-        | Ok { nonce; _ } ->
-            Malleable_error.soft_error_format ~value:()
-              "Replay attack succeeded, but it should fail because the nonce \
-               is old.  attempted nonce: %d"
-              (Unsigned.UInt32.to_int nonce)
-        | Error error ->
-            (* expect GraphQL error due to bad nonce *)
-            let err_str = Error.to_string_mach error in
-            let err_str_lowercase = String.lowercase err_str in
-            if
-              String.is_substring
-                ~substring:"either different from inferred nonce"
-                err_str_lowercase
-            then (
-              [%log info] "Got expected bad nonce error from GraphQL" ;
-              Malleable_error.return () )
-            else (
-              [%log error]
-                "Payment failed in GraphQL, but for unexpected reason: %s"
-                err_str ;
-              Malleable_error.soft_error_format ~value:()
-                "Payment failed for unexpected reason: %s" err_str ))
+         match%bind
+           Integration_test_lib.Graphql_requests.send_payment_with_raw_sig
+             (Network.Node.get_ingress_uri untimed_node_b)
+             ~logger
+             ~sender_pub_key:(Signed_command_payload.fee_payer_pk payload)
+             ~receiver_pub_key:(Signed_command_payload.receiver_pk payload)
+             ~amount ~fee
+             ~nonce:(Signed_command_payload.nonce payload)
+             ~memo ~valid_until ~raw_signature
+         with
+         | Ok { nonce; _ } ->
+             Malleable_error.soft_error_format ~value:()
+               "Replay attack succeeded, but it should fail because the nonce \
+                is old.  attempted nonce: %d"
+               (Unsigned.UInt32.to_int nonce)
+         | Error error ->
+             (* expect GraphQL error due to bad nonce *)
+             let err_str = Error.to_string_mach error in
+             let err_str_lowercase = String.lowercase err_str in
+             if
+               String.is_substring
+                 ~substring:"either different from inferred nonce"
+                 err_str_lowercase
+             then (
+               [%log info] "Got expected bad nonce error from GraphQL" ;
+               Malleable_error.return () )
+             else (
+               [%log error]
+                 "Payment failed in GraphQL, but for unexpected reason: %s"
+                 err_str ;
+               Malleable_error.soft_error_format ~value:()
+                 "Payment failed for unexpected reason: %s" err_str ) )
     in
     let%bind () =
       section
@@ -280,40 +279,40 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
          but changing the nonce, to conduct a replay attack.  expecting an \
          Invalid_signature"
         (let open Deferred.Let_syntax in
-        match%bind
-          Integration_test_lib.Graphql_requests.send_payment_with_raw_sig
-            (Network.Node.get_ingress_uri untimed_node_a)
-            ~logger
-            ~sender_pub_key:(Signed_command_payload.fee_payer_pk payload)
-            ~receiver_pub_key:(Signed_command_payload.receiver_pk payload)
-            ~amount ~fee
-            ~nonce:
-              (Mina_numbers.Account_nonce.succ
-                 (Signed_command_payload.nonce payload) )
-            ~memo ~valid_until ~raw_signature
-        with
-        | Ok { nonce = returned_nonce; _ } ->
-            Malleable_error.soft_error_format ~value:()
-              "Replay attack succeeded, but it should fail because the \
-               signature is wrong.  payload nonce: %d.  returned nonce: %d"
-              (Unsigned.UInt32.to_int (Signed_command_payload.nonce payload))
-              (Unsigned.UInt32.to_int returned_nonce)
-        | Error error ->
-            (* expect GraphQL error due to invalid signature *)
-            let err_str = Error.to_string_mach error in
-            let err_str_lowercase = String.lowercase err_str in
-            if
-              String.is_substring ~substring:"invalid_signature"
-                err_str_lowercase
-            then (
-              [%log info] "Got expected invalid signature error from GraphQL" ;
-              Malleable_error.return () )
-            else (
-              [%log error]
-                "Payment failed in GraphQL, but for unexpected reason: %s"
-                err_str ;
-              Malleable_error.soft_error_format ~value:()
-                "Payment failed, but for unexpected reason: %s" err_str ))
+         match%bind
+           Integration_test_lib.Graphql_requests.send_payment_with_raw_sig
+             (Network.Node.get_ingress_uri untimed_node_a)
+             ~logger
+             ~sender_pub_key:(Signed_command_payload.fee_payer_pk payload)
+             ~receiver_pub_key:(Signed_command_payload.receiver_pk payload)
+             ~amount ~fee
+             ~nonce:
+               (Mina_numbers.Account_nonce.succ
+                  (Signed_command_payload.nonce payload) )
+             ~memo ~valid_until ~raw_signature
+         with
+         | Ok { nonce = returned_nonce; _ } ->
+             Malleable_error.soft_error_format ~value:()
+               "Replay attack succeeded, but it should fail because the \
+                signature is wrong.  payload nonce: %d.  returned nonce: %d"
+               (Unsigned.UInt32.to_int (Signed_command_payload.nonce payload))
+               (Unsigned.UInt32.to_int returned_nonce)
+         | Error error ->
+             (* expect GraphQL error due to invalid signature *)
+             let err_str = Error.to_string_mach error in
+             let err_str_lowercase = String.lowercase err_str in
+             if
+               String.is_substring ~substring:"invalid_signature"
+                 err_str_lowercase
+             then (
+               [%log info] "Got expected invalid signature error from GraphQL" ;
+               Malleable_error.return () )
+             else (
+               [%log error]
+                 "Payment failed in GraphQL, but for unexpected reason: %s"
+                 err_str ;
+               Malleable_error.soft_error_format ~value:()
+                 "Payment failed, but for unexpected reason: %s" err_str ) )
     in
     let%bind () =
       section "send a single payment from timed account using available liquid"
@@ -550,9 +549,38 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
               ~txn_hash:hash ~node_included_in:`Any_node ) )
     in
     section_hard "running replayer"
-      (let%bind logs =
-         Network.Node.run_replayer ~logger
+      (* Without an explicit target the replayer only replays up to the highest
+         canonical block, which in a short-lived test network is genesis, so it
+         emits too few logs. Target a recent proof block instead: it is deep in
+         the chain and therefore already persisted in the archive. *)
+      (let proof_state_hash =
+         let ns = network_state t in
+         match ns.proof_block_state_hashes with
+         | hash :: _ ->
+             hash
+         | [] ->
+             failwith "Expected at least one proof block state hash"
+       in
+       [%log info] "Replaying archive up to proof block $state_hash"
+         ~metadata:[ ("state_hash", State_hash.to_yojson proof_state_hash) ] ;
+       let%bind logs =
+         Network.Node.run_replayer ~target_state_hash:proof_state_hash ~logger
            (List.hd_exn @@ (Network.archive_nodes network |> Core.Map.data))
        in
-       check_replayer_logs ~logger logs )
+       let%bind n = check_replayer_logs ~logger logs in
+       let ns = network_state t in
+       let expected = ns.blocks_generated in
+       if n < expected - 3 || n > expected + 3 then
+         Malleable_error.hard_error_string
+           (sprintf
+              "Replayer replayed %d blocks, expected %d (network \
+               blocks_generated ±3)"
+              n expected )
+       else (
+         if n <> expected then
+           [%log warn]
+             "Replayer block count %d differs from network blocks_generated %d \
+              (diff: %d)"
+             n expected (n - expected) ;
+         Malleable_error.return () ) )
 end

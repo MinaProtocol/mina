@@ -18,7 +18,6 @@
    ppx_mina
    ppx_version
    ppx_deriving_yojson
-   ppx_jane
    ppx_deriving.std
    h_list.ppx))
  (instrumentation
@@ -27,7 +26,7 @@
   ;; opam libraries
   sexplib0
   result
-  core_kernel
+  core
   base.caml
   bin_prot.shape
   ;; local libraries

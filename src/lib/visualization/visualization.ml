@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 
 (** [Visualization] is a set of tools that lets a client visualize complex data
     structures like the transition_frontier *)

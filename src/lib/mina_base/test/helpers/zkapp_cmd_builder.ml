@@ -1,4 +1,4 @@
-open! Core_kernel
+open Core
 open Currency
 open Mina_base
 open Mina_numbers
@@ -24,12 +24,10 @@ let get_nonce_exn (pk : Public_key.Compressed.t) :
     Monad_lib.State.t =
   let open Monad_lib in
   let open State.Let_syntax in
-  let%bind nonce =
-    State.getf (fun m -> Public_key.Compressed.Map.find_exn m pk)
-  in
+  let%bind nonce = State.getf (fun m -> Map.find_exn m pk) in
   let%map () =
     State.modify ~f:(fun m ->
-        Public_key.Compressed.Map.set m ~key:pk ~data:(Account_nonce.succ nonce) )
+        Map.set m ~key:pk ~data:(Account_nonce.succ nonce) )
   in
   nonce
 

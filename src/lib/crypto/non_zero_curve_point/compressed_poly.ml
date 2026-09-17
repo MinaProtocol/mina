@@ -1,6 +1,6 @@
 (* compressed_poly.ml -- versioned type with parameters for compressed curve point *)
 
-open Core_kernel
+open Core
 
 module Poly = struct
   [%%versioned

@@ -25,4 +25,4 @@
  (instrumentation
   (backend bisect_ppx))
  (preprocess
-  (pps ppx_mina ppx_version ppx_deriving_yojson ppx_jane ppx_deriving.make)))
+  (pps ppx_custom_printf ppx_let ppx_mina ppx_deriving_yojson ppx_deriving.make ppx_sexp_conv ppx_version)))

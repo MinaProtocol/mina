@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 
 let max_log_line_length = 1 lsl 20
 
@@ -26,12 +26,13 @@ end
 
 (* Core modules extended with Yojson converters *)
 module Time = struct
-  include Time
+  include Time_float
 
-  let to_yojson t = `String (Time.to_string_abs t ~zone:Zone.utc)
+  let to_yojson t = `String (Time_float.to_string_abs t ~zone:Zone.utc)
 
   let of_yojson json =
-    json |> Yojson.Safe.Util.to_string |> fun s -> Ok (Time.of_string s)
+    json |> Yojson.Safe.Util.to_string
+    |> fun s -> Ok (Time_float.of_string_with_utc_offset s)
 
   let pp ppf timestamp =
     (* This used to be
@@ -41,9 +42,9 @@ module Time = struct
        don't want to load that just for the pretty printing. Instead,
        we simulate it here.
     *)
-    let zone = Time.Zone.utc in
-    let date, time = Time.to_date_ofday ~zone timestamp in
-    let time_parts = Time.Ofday.to_parts time in
+    let zone = Time_float.Zone.utc in
+    let date, time = Time_float.to_date_ofday ~zone timestamp in
+    let time_parts = Time_float.Ofday.to_parts time in
     Format.fprintf ppf "%i-%02d-%02d %02d:%02d:%02d UTC" (Date.year date)
       (Date.month date |> Month.to_int)
       (Date.day date) time_parts.hr time_parts.min time_parts.sec
@@ -72,7 +73,7 @@ module Metadata = struct
 
       let to_latest = Fn.id
 
-      let to_yojson t = `Assoc (String.Map.to_alist t)
+      let to_yojson t = `Assoc (Map.to_alist t)
 
       let of_yojson = function
         | `Assoc alist ->
@@ -101,13 +102,13 @@ module Metadata = struct
 
   let of_alist_exn = String.Map.of_alist_exn
 
-  let mem = String.Map.mem
+  let mem = Map.mem
 
   let extend (t : t) alist =
     List.fold_left alist ~init:t ~f:(fun acc (key, data) ->
-        String.Map.set acc ~key ~data )
+        Map.set acc ~key ~data )
 
-  let merge (a : t) (b : t) = extend a (String.Map.to_alist b)
+  let merge (a : t) (b : t) = extend a (Map.to_alist b)
 end
 
 let global_metadata = ref []
@@ -144,6 +145,10 @@ module Processor = struct
     type t
 
     val process : t -> Message.t -> string option
+
+    (** Whether this processor could emit a message logged at this level.
+        A processor that could not lets a caller skip building one. *)
+    val accepts : t -> Level.t -> bool
   end
 
   type t = T : (module S with type t = 't) * 't -> t
@@ -154,6 +159,8 @@ module Processor = struct
     type t = Level.t
 
     let create ~log_level = log_level
+
+    let accepts log_level level = Level.compare level log_level >= 0
 
     let process log_level (msg : Message.t) =
       if Level.compare msg.level log_level < 0 then None
@@ -176,6 +183,10 @@ module Processor = struct
 
     let create (set : t) = set
 
+    (* selects on the event's identity rather than its level, so a message at
+       any level may be emitted *)
+    let accepts _ _ = true
+
     let process (set : t) (message : Message.t) : string option =
       let%bind.Option event_id = message.event_id in
       let%map.Option () = if Set.mem set event_id then Some () else None in
@@ -187,6 +198,8 @@ module Processor = struct
       { log_level : Level.t; config : Interpolator_lib.Interpolator.config }
 
     let create ~log_level ~config = { log_level; config }
+
+    let accepts { log_level; _ } level = Level.compare level log_level >= 0
 
     let process { log_level; config } (msg : Message.t) =
       let open Message in
@@ -207,7 +220,7 @@ module Processor = struct
               Format.asprintf "@[<v 2>%a [%a] %s@,%a@]" Time.pp msg.timestamp
                 Level.pp msg.level str
                 (Format.pp_print_list ~pp_sep:Format.pp_print_cut
-                   (fun ppf (k, v) -> Format.fprintf ppf "%s: %s" k v) )
+                   (fun ppf (k, v) -> Format.fprintf ppf "%s: %s" k v ) )
                 extra
             in
             Some msg
@@ -277,16 +290,24 @@ module Consumer_registry = struct
   type id = string
 
   let register ?commit_id ~(id : id) ~processor ~transport () =
-    Consumer_tbl.add_multi t ~key:id ~data:{ processor; transport; commit_id }
+    Hashtbl.add_multi t ~key:id ~data:{ processor; transport; commit_id }
+
+  let consumers_for ~id =
+    match Hashtbl.find t id with
+    | Some consumers ->
+        consumers
+    | None ->
+        [ Lazy.force default_consumer ]
+
+  (* a message reaches every consumer, so any one of them accepting it is
+     reason enough to build it *)
+  let accepts ~id level =
+    List.exists (consumers_for ~id)
+      ~f:(fun { processor = Processor.T ((module Processor), processor); _ } ->
+        Processor.accepts processor level )
 
   let rec broadcast_log_message ~id msg =
-    let consumers =
-      match Hashtbl.find t id with
-      | Some consumers ->
-          consumers
-      | None ->
-          [ Lazy.force default_consumer ]
-    in
+    let consumers = consumers_for ~id in
     List.iter consumers ~f:(fun consumer ->
         let { processor = Processor.T ((module Processor), processor)
             ; transport = Transport.T ((module Transport), transport)
@@ -300,7 +321,7 @@ module Consumer_registry = struct
         let msg =
           Option.value_map ~default:msg commit_id' ~f:(fun cid ->
               let metadata =
-                String.Map.set ~key:"commit_id" ~data:(`String cid)
+                Map.set ~key:"commit_id" ~data:(`String cid)
                   msg.Message.metadata
               in
               { msg with metadata } )
@@ -339,6 +360,8 @@ type t =
 
 let metadata t = t.metadata
 
+let would_log t level = (not t.null) && Consumer_registry.accepts ~id:t.id level
+
 let create ?(metadata = []) ?(id = "default") ?(itn_features = false) () =
   { null = false
   ; metadata = Metadata.extend Metadata.empty metadata
@@ -376,11 +399,11 @@ let make_message (t : t) ~level ~module_ ~location ~metadata ~message ~event_id
   ; message
   ; metadata =
       ( if skip_merge_global_metadata then
-        Metadata.extend Metadata.empty metadata
-      else
-        Metadata.extend
-          (Metadata.merge (Metadata.of_alist_exn global_metadata') t.metadata)
-          metadata )
+          Metadata.extend Metadata.empty metadata
+        else
+          Metadata.extend
+            (Metadata.merge (Metadata.of_alist_exn global_metadata') t.metadata)
+            metadata )
   ; event_id
   }
 

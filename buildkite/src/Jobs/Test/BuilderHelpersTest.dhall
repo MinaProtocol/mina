@@ -42,5 +42,14 @@ in  Pipeline.build
             , target = Size.Small
             , docker = None Docker.Type
             }
+        , Command.build
+            Command.Config::{
+            , commands =
+              [ Cmd.run "./scripts/debian/tests/test_build_parallel.sh" ]
+            , label = "Debian parallel-build tests"
+            , key = "build-parallel-tests"
+            , target = Size.Small
+            , docker = None Docker.Type
+            }
         ]
       }

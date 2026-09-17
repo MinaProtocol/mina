@@ -42,7 +42,7 @@ end
 module type Local_sig = Utils.Signature(Types).S
 
 module Make
-    (Signature : Local_sig) (F : functor (A : Concrete) -> Signature(A).S) :
-  Signature(M).S
+    (Signature : Local_sig)
+    (F : functor (A : Concrete) -> Signature(A).S) : Signature(M).S
 
 include Types.S with module With_valid_signature = M.With_valid_signature
