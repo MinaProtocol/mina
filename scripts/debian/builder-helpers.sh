@@ -22,7 +22,7 @@ source "${SCRIPTPATH}/../export-git-env-vars.sh"
 # SUGGESTED_DEPS should only be used for Suggests, not Depends.
 SUGGESTED_DEPS="jq, curl, wget"
 
-TEST_EXECUTIVE_DEPS=", mina-logproc, python3, docker-ce "
+TEST_EXECUTIVE_DEPS=", mina-logproc, python3, docker-ce, libpq5 "
 
 case "${MINA_DEB_CODENAME}" in
   noble)

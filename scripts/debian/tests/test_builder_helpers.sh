@@ -503,6 +503,9 @@ test_build_test_executive_deb() {
     assert_control_contains "$CAPTURED_CONTROL" "Depends" "mina-logproc"
     assert_control_contains "$CAPTURED_CONTROL" "Depends" "python3"
     assert_control_contains "$CAPTURED_CONTROL" "Depends" "docker-ce"
+    # test_executive reaches libpq through mina_graphql -> archive_lib ->
+    # caqti-driver-postgresql, so it needs libpq5 at run time.
+    assert_control_contains "$CAPTURED_CONTROL" "Depends" "libpq5"
 
     assert_file_captured "$CAPTURED_FILES" "usr/local/bin/mina-test-executive"
 }
