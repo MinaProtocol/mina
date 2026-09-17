@@ -3,11 +3,11 @@
 # - builds stateless verification tool
 # - should not include any data related to joining a specific network, only the node software itself
 #################################################################################################
-ARG image=europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/debian:bullseye-slim
+ARG image=europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/debian:bookworm-slim
 FROM ${image}
 
 ARG deb_version
-ARG deb_codename=bullseye
+ARG deb_codename=bookworm
 ARG deb_release=unstable
 ARG network=mainnet
 ARG deb_repo="http://packages.o1test.net"
