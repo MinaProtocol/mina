@@ -281,6 +281,23 @@ if [[ "$MINA_DISPATCHER_DEBUG" -ne 0 ]]; then
 fi
 
 # =============================================================================
+# Runtime Profile Check
+# =============================================================================
+
+# The node has no default profile: it reads MINA_PROFILE from its environment or
+# /etc/coda/build_config/PROFILE (shipped by the mina-<profile>-profile package).
+# The MINA_PROFILE sourced above only locates the activation marker; it is not
+# exported, and choosing the runtime's profile is not this script's job. So only
+# check that the runtime will find one, and fail here with a clear message
+# instead of inside the runtime.
+if [[ -z "$(printenv MINA_PROFILE || true)" && ! -s /etc/coda/build_config/PROFILE ]]; then
+  dispatch_fail 1 profile_not_set \
+    "mina-dispatch ERROR: the $runtime runtime has no node profile" \
+    "  Neither MINA_PROFILE is exported nor /etc/coda/build_config/PROFILE exists." \
+    "  Install the mina-${MINA_PROFILE}-profile package, or export MINA_PROFILE."
+fi
+
+# =============================================================================
 # Command Resolution
 # =============================================================================
 
