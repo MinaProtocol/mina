@@ -493,6 +493,34 @@ assert_dispatch_failed
 echo "PASSED: Genuine path mismatch is still rejected"
 
 # =============================================================================
+# Test 14: MINA_PROFILE Reaches The Selected Runtime
+# =============================================================================
+
+echo ""
+echo "=== Test 14: MINA_PROFILE Exported To Runtime ==="
+echo "Verifying that MINA_PROFILE from /etc/default/mina-dispatch reaches the exec'd runtime"
+
+# Neither runtime package ships /etc/coda/build_config/PROFILE, so without the
+# variable the node silently falls back to the "dev" profile. Swap each runtime's
+# mina for a probe that prints the variable, then go through the dispatcher.
+# shellcheck disable=SC2016 # expanded inside the container, not here
+PROBE_SETUP='. /etc/default/mina-dispatch && for rt in berkeley mesa; do printf "#!/bin/sh\necho MINA_PROFILE=\${MINA_PROFILE:-unset}\n" > "$RUNTIMES_BASE_PATH/$rt/mina"; done && unset MINA_PROFILE'
+
+for marker_setup in "" "$(create_activation_marker) && "; do
+  PROBE_OUTPUT=$(docker run --entrypoint bash "$DOCKER_IMAGE" \
+    -c "${PROBE_SETUP} && ${marker_setup}mina --version" 2>/dev/null)
+
+  if [[ "$PROBE_OUTPUT" != "MINA_PROFILE=${PROFILE}" ]]; then
+    echo "FAILED: runtime should see MINA_PROFILE=${PROFILE}"
+    echo "  Marker setup: ${marker_setup:-none}"
+    echo "  Actual output: $PROBE_OUTPUT"
+    exit 1
+  fi
+done
+
+echo "PASSED: MINA_PROFILE reaches both runtimes"
+
+# =============================================================================
 # Summary
 # =============================================================================
 
