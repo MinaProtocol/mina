@@ -16,6 +16,7 @@ let Spec =
       { Type =
           { dependsOn : List Command.TaggedKey.Type
           , mina_suffix : Text
+          , mina_profile : Text
           , testnet : Text
           , wait_between_graphql_poll : Text
           , sync_timeout : Text
@@ -37,7 +38,7 @@ in  { Spec = Spec
               , commands =
                   RunInToolchain.runInDefaultToolchain
                     DebianVersions.overrideEnvs
-                    "./buildkite/scripts/connect/connect-to-network.sh --mina-debian-network ${spec.mina_suffix} --network-name ${spec.testnet} --wait-between-polling ${spec.wait_between_graphql_poll} --sync-timeout ${spec.sync_timeout} --peer-list-url ${spec.peer_list_url}"
+                    "./buildkite/scripts/connect/connect-to-network.sh --mina-debian-network ${spec.mina_suffix} --mina-profile ${spec.mina_profile} --network-name ${spec.testnet} --wait-between-polling ${spec.wait_between_graphql_poll} --sync-timeout ${spec.sync_timeout} --peer-list-url ${spec.peer_list_url}"
               , label = "Connect to ${spec.testnet}"
               , soft_fail = Some spec.soft_fail
               , key = "connect-to-${spec.testnet}"
