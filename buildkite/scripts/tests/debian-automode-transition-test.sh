@@ -288,10 +288,11 @@ V1_DEBS=(
     "${REPO_DIR}/mina-logproc_${V1}_amd64.deb"
 )
 
-# V2: automode + postfork + config + logproc (+ prefork files) (hardfork)
+# V2: automode + postfork + profile + config + logproc (+ prefork files) (hardfork)
 V2_DEBS=(
     "${REPO_DIR}/${PKG_AUTOMODE}_${V2}_all.deb"
     "${REPO_DIR}/${PKG_POSTFORK}_${V2}_amd64.deb"
+    "${REPO_DIR}/${PKG_PROFILE_LEAF}_${V2}_amd64.deb"
     "${REPO_DIR}/${PKG_CONFIG}_${V2}_all.deb"
     "${REPO_DIR}/mina-logproc_${V2}_amd64.deb"
     "${PREFORK_DEBS[@]}"
