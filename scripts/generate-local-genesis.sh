@@ -4,7 +4,7 @@
 # Requires: mina binary (or nix to build it), jq
 #
 # Usage:
-#   ./scripts/generate-local-genesis.sh --mina-binary /path/to/mina --output-dir /tmp/my-genesis
+#   ./scripts/generate-local-genesis.sh --profile devnet --mina-binary /path/to/mina --output-dir /tmp/my-genesis
 #
 # If --mina-binary is not provided, builds via nix.
 # Produces:
@@ -17,6 +17,7 @@ set -euo pipefail
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 
 # Defaults
+PROFILE_ARG=""
 MINA_BINARY=""
 RUNTIME_GENESIS_LEDGER_BINARY=""
 OUTPUT_DIR="$PWD"
@@ -29,6 +30,8 @@ export MINA_PRIVKEY_PASS="${MINA_PRIVKEY_PASS:-}"
 
 while [[ $# -gt 0 ]]; do
   case $1 in
+    --profile)
+      PROFILE_ARG="$2"; shift 2 ;;
     --mina-binary)
       MINA_BINARY="$2"; shift 2 ;;
     --runtime-genesis-ledger-binary)
@@ -42,10 +45,11 @@ while [[ $# -gt 0 ]]; do
     --num-extra-accounts)
       NUM_EXTRA_ACCOUNTS="$2"; shift 2 ;;
     -h|--help)
-      echo "Usage: $0 [--mina-binary PATH] [--runtime-genesis-ledger-binary PATH] [--output-dir DIR] [--faucet-balance MINA] [--timestamp ISO8601] [--num-extra-accounts N]"
+      echo "Usage: $0 --profile PROFILE [--mina-binary PATH] [--runtime-genesis-ledger-binary PATH] [--output-dir DIR] [--faucet-balance MINA] [--timestamp ISO8601] [--num-extra-accounts N]"
       echo ""
       echo "Generates a keypair, a genesis ledger with a fauceted account, and a runtime_config.json."
       echo ""
+      echo "  --profile           Node profile, exported as MINA_PROFILE: dev, devnet, lightnet or mainnet (required)"
       echo "  --faucet-balance    Balance in MINA for the faucet account (default: $FAUCET_BALANCE)"
       echo "  --num-extra-accounts  Number of dummy accounts to pad the ledger (default: $NUM_EXTRA_ACCOUNTS)"
       echo "  --timestamp         Genesis timestamp (default: 1 hour from now)"
@@ -54,6 +58,11 @@ while [[ $# -gt 0 ]]; do
       echo "Unknown option: $1" >&2; exit 1 ;;
   esac
 done
+
+if [[ -z "$PROFILE_ARG" ]]; then
+  echo "Error: --profile is required (dev, devnet, lightnet or mainnet)" >&2; exit 1
+fi
+export MINA_PROFILE="$PROFILE_ARG"
 
 # Dependencies
 if ! command -v jq >/dev/null 2>&1; then
