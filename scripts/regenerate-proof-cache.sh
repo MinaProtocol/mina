@@ -1,4 +1,10 @@
 #!/usr/bin/env bash
+if [[ $# -ne 1 ]]; then
+  echo "Usage: $0 <profile>  (dev, devnet, lightnet or mainnet)" >&2
+  exit 1
+fi
+export MINA_PROFILE=$1
+
 # state in _build can cause non-determinism in proof_caches
 rm -rf _build
 while IFS= read -r DIR; do

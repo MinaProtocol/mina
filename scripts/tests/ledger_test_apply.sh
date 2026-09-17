@@ -23,15 +23,23 @@ SENDER=$TEMP_FOLDER/sender
 
 ACTIONS_EVENTS_OPT="--transfer-parties-get-actions-events"
 FULL_ACTIONS_EVENTS=""
+PROFILE_ARG=""
 
 while [[ "$#" -gt 0 ]]; do case $1 in
   -m|--mina-app) MINA_APP="$2"; shift; shift;;
   -r|--runtime-ledger-app) RUNTIME_LEDGER_APP="$2"; shift; shift;;
+  --profile) PROFILE_ARG="$2"; shift; shift;;
   "$ACTIONS_EVENTS_OPT") 
     # shellcheck disable=SC2034
     FULL_ACTIONS_EVENTS="$ACTIONS_EVENTS_OPT"; shift;;
   *) echo "Unknown parameter passed: $1"; exit 1;;
 esac; done
+
+if [[ -z "$PROFILE_ARG" ]]; then
+  echo "--profile is required (dev, devnet, lightnet or mainnet)" >&2
+  exit 1
+fi
+export MINA_PROFILE="$PROFILE_ARG"
 
 echo "Exporting ledger to $TEMP_FOLDER"
 echo "20k accounts is way less than the size of a mainnet ledger (200k), but good enough for testing"

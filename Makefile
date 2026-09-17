@@ -163,9 +163,10 @@ endif
 
 .PHONY: genesis_ledger
 genesis_ledger: ocaml_checks ## Build runtime genesis ledger
+	$(if $(MINA_PROFILE),,$(error MINA_PROFILE must be set, e.g. make genesis_ledger MINA_PROFILE=devnet))
 	$(info 🏗️  Building runtime_genesis_ledger with profile $(DUNE_PROFILE) and commit $(GITLONGHASH))
 	(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && \
-	env MINA_COMMIT_SHA1=$(GITLONGHASH) \
+	env MINA_PROFILE=$(MINA_PROFILE) MINA_COMMIT_SHA1=$(GITLONGHASH) \
 	dune exec \
 		--profile=$(DUNE_PROFILE) \
 		src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe -- \
