@@ -712,6 +712,19 @@ build_daemon_prefork_deb() {
 }
 ## END PREFORK PACKAGE ##
 
+# Deployment profile of an automode network (devnet/mainnet), not the build-time
+# DUNE_PROFILE. The mesa hardfork deploys with the devnet signature/profile (see
+# Profiles.fromNetwork in buildkite Dhall and dispatcher-tests.sh).
+automode_profile() {
+  case "${1}" in
+    mainnet) echo "mainnet" ;;
+    devnet) echo "devnet" ;;
+    *)
+      echo "Not supported network name provided for post fork deb: ${1}" >&2; exit 1
+      ;;
+  esac
+}
+
 # Function to DRY creating symlinks for shared apps in deb packages
 # for automode runtimes that share the same dispatcher but different runtimes
 create_symlinks_for_shared_apps() {
@@ -725,20 +738,7 @@ create_symlinks_for_shared_apps() {
   # DUNE_PROFILE (which is "dev" for the regular build and would never match the
   # devnet/mainnet activation markers).
   local dispatch_profile
-  case "${NETWORK_NAME}" in
-    mainnet)
-      dispatch_profile="mainnet"
-      ;;
-    # The mesa hardfork deploys with the devnet signature/profile (see
-    # Profiles.fromNetwork in buildkite Dhall and dispatcher-tests.sh), so the
-    # activation marker is auto-fork-mesa-devnet.
-    devnet)
-      dispatch_profile="devnet"
-      ;;
-    *)
-      echo "Not supported network name provided for post fork deb: ${NETWORK_NAME}"; exit 1
-      ;;
-  esac
+  dispatch_profile="$(automode_profile "${NETWORK_NAME}")" || exit 1
 
   mkdir -p "${BUILDDIR}/usr/local/bin"
 
@@ -871,7 +871,8 @@ copy_common_daemon_post_automode_apps_and_configs() {
 build_daemon_postfork_deb() {
   local network="$1"
   local package_name="mina-${network}-postfork-${POSTFORK_CODENAME}"
-
+  local profile
+  profile="$(automode_profile "${network}")" || exit 1
 
   echo "--- Building ${network} postfork deb for hardfork automode:"
 
@@ -880,7 +881,11 @@ build_daemon_postfork_deb() {
   # mina-generic so the two are mutually exclusive and the automode<->generic
   # transition resolves cleanly instead of failing with a dpkg "trying to
   # overwrite" file conflict.
-  create_control_file "$package_name" "${SHARED_DEPS}${DAEMON_DEPS}" \
+  #
+  # The node has no default profile, and mina-dispatch does not pass the
+  # MINA_PROFILE it reads from /etc/default/mina-dispatch to the runtime, so
+  # the runtimes take it from the profile package's PROFILE file.
+  create_control_file "$package_name" "${SHARED_DEPS}${DAEMON_DEPS}, mina-${profile}-profile (=${MINA_DEB_VERSION})" \
     'Mina Protocol Client and Daemon' "${SUGGESTED_DEPS}" "mina-generic"
 
   copy_common_daemon_post_automode_apps_and_configs "${network}"

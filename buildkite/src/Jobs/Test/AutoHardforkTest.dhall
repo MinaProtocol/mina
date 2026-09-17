@@ -73,6 +73,7 @@ let buildSpec =
       ArtifactPipelines.PackagingSpec::{
       , artifacts =
         [ Artifacts.Type.DaemonPostfork { network = network }
+        , Artifacts.Type.DaemonProfiled { profile = profile }
         , Artifacts.Type.LogProc
         ]
       , debVersion = debVersion
