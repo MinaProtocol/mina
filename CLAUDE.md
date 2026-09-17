@@ -32,23 +32,23 @@ Mina Protocol is a lightweight blockchain that maintains constant size by using 
 ## Testing Commands
 
 ### Unit Tests
-- `dune runtest src/lib/<library>` - Run tests for a specific library
-- `dune runtest src/lib --profile=dev` - Run all tests under src/lib
-- `dune exec src/lib/<library>/test/main.exe` - Run tests using explicit executable
-- `./scripts/testone.sh <test-file> [test-name]` - Run a single test file
+- `MINA_PROFILE=dev dune runtest src/lib/<library>` - Run tests for a specific library
+- `MINA_PROFILE=dev dune runtest src/lib --profile=dev` - Run all tests under src/lib
+- `MINA_PROFILE=dev dune exec src/lib/<library>/test/main.exe` - Run tests using explicit executable
+- `MINA_PROFILE=dev ./scripts/testone.sh <test-file> [test-name]` - Run a single test file
 
 ### CI Test Execution
 - `./buildkite/scripts/unit-test.sh <profile> <path>` - Run tests as done in CI (builds first, retries failures once)
 
 ### Coverage Testing
-- `make test-coverage` - Run tests with coverage instrumentation
+- `make test-coverage MINA_PROFILE=dev` - Run tests with coverage instrumentation
 - `make coverage-html` - Generate HTML coverage reports
 - `make coverage-summary` - Generate coverage summary
 
 ### Other Test Commands
 - `make test-ppx` - Test PPX extensions
 
-Note: There is no `make test` target. Use `dune runtest` directly.
+Note: There is no `make test` target. Use `dune runtest` directly. Binaries and tests that link node_config abort unless `MINA_PROFILE` (or /etc/coda/build_config/PROFILE) names a profile; there is no default.
 
 ## Development Commands
 
@@ -166,13 +166,13 @@ Profiles are defined as `.mlh` files in `src/config/` and selected via `--profil
 ### Running Tests
 ```bash
 # Run tests for a specific library
-dune runtest src/lib/mina_lib
+MINA_PROFILE=dev dune runtest src/lib/mina_lib
 
 # Run tests with proper limits
-(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && dune runtest src/lib
+(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && MINA_PROFILE=dev dune runtest src/lib
 
 # Run a single test
-./scripts/testone.sh src/lib/mina_lib/test.ml
+MINA_PROFILE=dev ./scripts/testone.sh src/lib/mina_lib/test.ml
 ```
 
 ### Adding Dependencies
@@ -197,7 +197,7 @@ dune build src/app/cli/src/mina.exe
 dune build -w @check
 
 # Build and run inline tests
-dune runtest src/lib/mina_lib
+MINA_PROFILE=dev dune runtest src/lib/mina_lib
 ```
 
 ## Debian Repositories
