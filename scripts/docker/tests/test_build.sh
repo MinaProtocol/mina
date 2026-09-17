@@ -224,7 +224,8 @@ test_daemon_command() {
     local args="${STUB_DIR}/daemon.args"
     run_build "$args" \
         --service mina-daemon --version 3.1.0 --network devnet \
-        --docker-registry testreg --deb-codename bullseye --deb-build-flags none
+        --docker-registry testreg --deb-codename bullseye --deb-build-flags none \
+        --deb-profile devnet
 
     assert_eq "exit code" 0 "$LAST_EXIT"
     assert_option_value "target" "$args" "--target" "mina-daemon"
@@ -235,7 +236,7 @@ test_daemon_command() {
     assert_has_line "network" "$args" "network=devnet"
     assert_has_line "codename" "$args" "deb_codename=bullseye"
     assert_has_line "release defaults to unstable" "$args" "deb_release=unstable"
-    assert_has_line "profile" "$args" "deb_profile=devnet"
+    assert_has_line "profile reaches the build" "$args" "deb_profile=devnet"
     assert_has_line "architecture defaults to all" "$args" "deb_arch=all"
     assert_has_line "branch defaults to compatible" "$args" "MINA_BRANCH=compatible"
     assert_has_line "the debian version defaults to the version" "$args" "deb_version=3.1.0"

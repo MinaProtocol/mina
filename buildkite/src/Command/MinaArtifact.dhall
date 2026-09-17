@@ -664,7 +664,17 @@ let docker_step
                 , Daemon =
                         \(args : { network : Network.Type })
                     ->  [ DockerImage.ReleaseSpec::{
-                          , deps = dependsOnGeneric
+                          , deps =
+                                dependsOnGeneric
+                              # [ { name = selfName spec
+                                  , key =
+                                      "${Docker.lowerName
+                                           ( Docker.Type.DaemonProfiled
+                                               { profile = profile }
+                                           )}-${Profiles.lowerName
+                                                  profile}-docker-image"
+                                  }
+                                ]
                           , service = Docker.Type.Daemon { network = network }
                           , network = network
                           , deb_codename = spec.debVersion

@@ -187,10 +187,6 @@ fi
 VERSION_ARG="--build-arg version=$VERSION"
 
 
-if [[ -z "${DEB_PROFILE:-}" ]]; then
-  echo "Debian profile is not set. Using the default (devnet)"
-  DEB_PROFILE="devnet"
-fi
 
 if [[ -z "${DEB_BUILD_FLAGS:-}" ]]; then
   DEB_BUILD_FLAGS=""
@@ -268,10 +264,14 @@ function assemble_staged_dockerfile () {
 
 CUSTOM_ARG=${CUSTOM_ARG:-""}
 
-# Network segment of the generic base image that the install-config FROM line
-# pulls. Empty for the daemon (network-free generic), "-<network>" for rosetta
-# (per-network generic). Set per-service below.
-GENERIC_NETWORK_SEG=""
+# Segment of the base image tag that the install-config FROM line pulls,
+# between the version and "-generic". Set per-service below.
+GENERIC_BASE_SEG=""
+
+# Services whose image depends on the node profile: it picks the profile
+# packages they install or the profiled image they are built on. The node has
+# no default profile, so neither does this script. Set per-service below.
+NEEDS_DEB_PROFILE=0
 
 # Target stage to stop at for staged (multi-fragment) Dockerfiles. Each staged
 # service sets a sensible default below; --docker-target overrides it. Empty
@@ -288,6 +288,7 @@ case "${SERVICE}" in
         DOCKER_TARGET="${INPUT_DOCKER_TARGET:-base-deps}"
         ;;
     mina-archive)
+        NEEDS_DEB_PROFILE=1
         # Staged build: shared base-deps + archive-specific stage.
         TEMP_DOCKERFILE=$(mktemp "${TMPDIR:-/tmp}"/Dockerfile-mina-archive.XXXXXX)
         assemble_staged_dockerfile "$TEMP_DOCKERFILE" dockerfiles/stages/archive/2-mina-archive
@@ -311,6 +312,10 @@ case "${SERVICE}" in
         # The --version arg points to the base generic image for the Dockerfile FROM.
         # Override VERSION_ARG to keep it, then set VERSION to current commit for output tags.
         VERSION_ARG_OVERRIDE="--build-arg version=$VERSION"
+        # The base is the profiled image ("<version>-<profile>-generic"): the
+        # network-free generic image has no profile.
+        NEEDS_DEB_PROFILE=1
+        GENERIC_BASE_SEG="-${DEB_PROFILE:-}"
         ;;
     mina-daemon-profiled)
         # Profiled image = the network-free generic base + a baked profile hint
@@ -318,6 +323,7 @@ case "${SERVICE}" in
         # Layered like the configured image.
         DOCKERFILE_PATH="dockerfiles/Dockerfile-install-profile"
         SERVICE="mina-daemon"
+        NEEDS_DEB_PROFILE=1
         VERSION_ARG_OVERRIDE="--build-arg version=$VERSION"
         # Tag is "<version>-<profile>-generic" (devnet/mainnet) or "<version>-lightnet"
         # (lightnet); no network segment.
@@ -352,6 +358,7 @@ case "${SERVICE}" in
         DOCKERFILE_PATH="$TEMP_DOCKERFILE"
         ;;
     mina-rosetta)
+        NEEDS_DEB_PROFILE=1
         # Staged build: rosetta's own heavy base + mina-rosetta stage.
         TEMP_DOCKERFILE=$(mktemp "${TMPDIR:-/tmp}"/Dockerfile-mina-rosetta.XXXXXX)
         cat dockerfiles/stages/rosetta/1-base-deps dockerfiles/stages/rosetta/2-mina-rosetta > "$TEMP_DOCKERFILE"
@@ -363,7 +370,7 @@ case "${SERVICE}" in
         SERVICE="mina-rosetta"
         VERSION_ARG_OVERRIDE="--build-arg version=$VERSION"
         # The rosetta generic base image is still per-network ("<version>-<network>-generic").
-        GENERIC_NETWORK_SEG="-${INPUT_NETWORK}"
+        GENERIC_BASE_SEG="-${INPUT_NETWORK}"
         ;;
     delegation-backend)
         DOCKERFILE_PATH="dockerfiles/Dockerfile-delegation-backend"
@@ -381,6 +388,11 @@ case "${SERVICE}" in
         exit 1
         ;;
 esac
+
+if [[ "${NEEDS_DEB_PROFILE}" -eq 1 && -z "${DEB_PROFILE:-}" ]]; then
+  echo "Debian profile is not set. The ${SERVICE} image depends on it; pass --deb-profile." >&2
+  exit 1
+fi
 
 if [[ -n "${VERSION_ARG_OVERRIDE:-}" ]]; then
   # For services like mina-daemon-configured, the build arg version (base image)
@@ -429,10 +441,9 @@ if [[ "${DOCKERFILE_PATH}" == "dockerfiles/Dockerfile-install-config" || "${DOCK
     # export_docker_tag) and looks like "--build-arg build_flags_suffix=-instrumented".
     _dep_build_flags="${BUILD_FLAGS_SUFFIX_ARG#--build-arg build_flags_suffix=}"
     _dep_custom="${CUSTOM_SUFFIX_ARG#--build-arg custom_suffix=}"
-    # The daemon generic base is network-free ("<version>-generic"); the rosetta
-    # generic base is per-network ("<version>-<network>-generic"). GENERIC_NETWORK_SEG
-    # is "" for daemon and "-<network>" for rosetta.
-    _dep_tag="${_dep_version}${GENERIC_NETWORK_SEG}-generic${_dep_build_flags}${_dep_custom}"
+    # GENERIC_BASE_SEG is "-<profile>" for the daemon (profiled base) and
+    # "-<network>" for rosetta (per-network generic base).
+    _dep_tag="${_dep_version}${GENERIC_BASE_SEG}-generic${_dep_build_flags}${_dep_custom}"
     _rewritten_repo="$(rewrite_docker_repo_via_gar_cache "${DOCKER_REGISTRY}" "${_dep_image_name}" "${_dep_tag}")"
     DOCKER_REPO_ARG="--build-arg docker_repo=${_rewritten_repo}"
     unset _dep_image_name _dep_version _dep_build_flags _dep_custom _dep_tag _rewritten_repo
@@ -464,7 +475,7 @@ if [[ -n "${DOCKER_TARGET:-}" ]]; then
   TARGET_ARG="--target ${DOCKER_TARGET}"
 fi
 
-docker buildx build --load --network=host --progress=plain $PLATFORM $TARGET_ARG $DOCKER_REPO_ARG $NO_CACHE $BUILD_NETWORK $CACHE $NETWORK $IMAGE $DEB_CODENAME $DEB_RELEASE $DEB_VERSION --build-arg deb_profile="$DEB_PROFILE" --build-arg generic_network="$GENERIC_NETWORK_SEG" $DOCKER_DEB_SUFFIX_ARG $BUILD_FLAGS_SUFFIX_ARG $APT_CACHE_ARG $BRANCH $REPO $LEGACY_VERSION $CUSTOM_SUFFIX_ARG $CUSTOM_ARG $DEB_ARCH $IMAGE_NAME_ARG $VERSION_ARG "$DOCKER_CONTEXT" -t "$TAG" -t "$HASHTAG" -f $DOCKERFILE_PATH
+docker buildx build --load --network=host --progress=plain $PLATFORM $TARGET_ARG $DOCKER_REPO_ARG $NO_CACHE $BUILD_NETWORK $CACHE $NETWORK $IMAGE $DEB_CODENAME $DEB_RELEASE $DEB_VERSION --build-arg deb_profile="${DEB_PROFILE:-}" --build-arg generic_base_segment="$GENERIC_BASE_SEG" $DOCKER_DEB_SUFFIX_ARG $BUILD_FLAGS_SUFFIX_ARG $APT_CACHE_ARG $BRANCH $REPO $LEGACY_VERSION $CUSTOM_SUFFIX_ARG $CUSTOM_ARG $DEB_ARCH $IMAGE_NAME_ARG $VERSION_ARG "$DOCKER_CONTEXT" -t "$TAG" -t "$HASHTAG" -f $DOCKERFILE_PATH
 
 # Local hash tag: --save-to-ci-cache saves it, and --load-only consumers look
 # the image up by it. Also set by buildx above, and re-asserted here because the
