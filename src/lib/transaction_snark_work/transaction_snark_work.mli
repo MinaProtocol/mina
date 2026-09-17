@@ -74,7 +74,7 @@ val statement : t -> Statement.t
 val proofs : t -> Ledger_proof.Cached.t One_or_two.t
 
 module Stable : sig
-  module V3 : sig
+  module V2 : sig
     type t [@@deriving bin_io, equal, sexp, version, yojson]
 
     val statement : t -> Statement.Stable.V2.t
@@ -88,9 +88,9 @@ module Stable : sig
     val to_latest : t -> t
   end
 
-  module Latest = V3
+  module Latest = V2
 end
-with type V3.t = Mina_wire_types.Transaction_snark_work.V3.t
+with type V2.t = Mina_wire_types.Transaction_snark_work.V2.t
 
 type unchecked = t
 
