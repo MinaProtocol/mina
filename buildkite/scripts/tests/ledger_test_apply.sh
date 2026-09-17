@@ -17,13 +17,6 @@ source buildkite/scripts/export-git-env-vars.sh
 # either is unavailable.
 export APPS_BUILD_FLAG=instrumented
 
-# The bare cache binary (and the network-free mina-generic-instrumented fallback)
-# resolve the node profile from MINA_PROFILE, defaulting to "dev" (ledger_depth
-# 10) when unset -- too small for the 20k-account test ledger. The .deb daemon
-# gets this from /etc/coda/build_config/PROFILE; set it explicitly here so
-# mina-create-genesis uses the devnet constants (ledger_depth 35).
-export MINA_PROFILE=devnet
-
 if ./buildkite/scripts/apps/restore_binary.sh \
   && ./buildkite/scripts/apps/restore_app.sh runtime_genesis_ledger.exe mina-create-genesis; then
   echo "Using bare mina + mina-create-genesis from apps cache"
@@ -38,6 +31,8 @@ else
   sudo rm -f /var/lib/coda/config_*
 fi
 
+# devnet: dev (ledger_depth 10) is too small for the 20k-account test ledger.
 ./scripts/tests/ledger_test_apply.sh \
+    --profile devnet \
     --mina-app mina \
     --runtime-ledger-app mina-create-genesis
