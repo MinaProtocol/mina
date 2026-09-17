@@ -14,6 +14,9 @@ PG_URI="postgresql://${PG_USER}:${PG_PW}@${PG_HOST}:${PG_PORT}/${PG_DB}"
 # mina-archive server port for the local network (clear of whale/fish/node/snark ports)
 ARCHIVE_PORT=${ARCHIVE_PORT:-3086}
 
+# Node profile for every mina binary this script runs.
+PROFILE=devnet
+
 # go to root of mina repo
 cd "$(dirname -- "${BASH_SOURCE[0]}")"/..
 
@@ -27,7 +30,6 @@ PGPASSWORD="${PG_PW}" createdb \
           -U "${PG_USER}" \
           -h "${PG_HOST}" \
           -p "${PG_PORT}" "${PG_DB}"
-export DUNE_PROFILE=devnet
 PGPASSWORD="${PG_PW}" psql \
           -U "${PG_USER}" \
           -h "${PG_HOST}" \
@@ -50,7 +52,8 @@ export MINA_GRAPHQL_CLIENT_EXE=_build/default/src/app/mina_graphql_client/mina_g
 #   -ap <port>  enable the archive node (replaces the removed boolean -a)
 #   -c reset    generate fresh config/keypairs/ledgers (replaces the removed boolean -r)
 #   -ti 1       run periodic transactions every second (replaces the removed -tf)
-./scripts/mina-local-network/mina-local-network.sh -ap "${ARCHIVE_PORT}" -c reset \
+./scripts/mina-local-network/mina-local-network.sh --profile "${PROFILE}" \
+    -ap "${ARCHIVE_PORT}" -c reset \
     -pu "${PG_USER}" \
     -pd "${PG_DB}" \
     -ppw "${PG_PW}" \
@@ -164,7 +167,7 @@ PGPASSWORD="${PG_PW}" psql \
           -h "${PG_HOST}" \
           -p "${PG_PORT}" \
           "${PG_DB}" < ./src/test/archive/sample_db/archive_db.sql
-dune exec src/app/replayer/replayer.exe -- \
+MINA_PROFILE="${PROFILE}" dune exec src/app/replayer/replayer.exe -- \
      --archive-uri "$PG_URI" \
      --input-file src/test/archive/sample_db/replayer_input_file.json \
      --log-level Trace \
