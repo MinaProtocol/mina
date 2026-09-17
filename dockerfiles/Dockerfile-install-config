@@ -37,3 +37,10 @@ RUN if [ ! -f "mina-${network}-config.deb" ]; then \
     fi && \
     dpkg -i mina-${network}-config.deb && \
     rm mina-${network}-config.deb
+
+# The daemon generic base is profile-free, and the node falls back to the "dev"
+# profile when neither MINA_PROFILE nor /etc/coda/build_config/PROFILE is set.
+# Devnet and mainnet profiles are named after their network. An env var rather
+# than the mina-${network}-profile deb, because the hardfork pipeline builds this
+# image from a context that holds only the config deb.
+ENV MINA_PROFILE=${network}
