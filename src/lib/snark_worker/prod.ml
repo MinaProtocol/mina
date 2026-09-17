@@ -146,8 +146,7 @@ module Impl = struct
         match w.transaction with
         | Command (Zkapp_command zkapp_command) -> (
             let%bind witnesses_specs_stmts =
-              extract_zkapp_segment_works ~signature_kind
-                ~constraint_constants:M.constraint_constants ~input ~witness:w
+              extract_zkapp_segment_works ~m ~input ~witness:w
                 ~zkapp_command:
                   (Zkapp_command.write_all_proofs_to_disk ~signature_kind
                      ~proof_cache_db zkapp_command )
