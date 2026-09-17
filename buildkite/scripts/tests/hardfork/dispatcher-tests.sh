@@ -493,6 +493,36 @@ assert_dispatch_failed
 echo "PASSED: Genuine path mismatch is still rejected"
 
 # =============================================================================
+# Test 14: A Runtime Without A Profile Is Rejected
+# =============================================================================
+
+echo ""
+echo "=== Test 14: Profile Required ==="
+echo "Verifying that the image carries a profile and the dispatcher refuses to run without one"
+
+# The node has no default profile. mina-dispatch reads MINA_PROFILE from
+# /etc/default/mina-dispatch only to find the activation marker; it does not pass
+# it to the runtime. The runtime's profile must come from the profile package.
+IMAGE_PROFILE=$(docker run --rm --entrypoint cat "$DOCKER_IMAGE" /etc/coda/build_config/PROFILE 2>/dev/null || true)
+if [[ "$IMAGE_PROFILE" != "$PROFILE" ]]; then
+  echo "FAILED: image should ship /etc/coda/build_config/PROFILE with '${PROFILE}'"
+  echo "  Actual: '${IMAGE_PROFILE}'"
+  exit 1
+fi
+
+for marker_mode in no-marker marker; do
+  run_dispatch_json "rm -f /etc/coda/build_config/PROFILE && unset MINA_PROFILE && mina --version" "$marker_mode"
+  assert_json_eq '.error' "profile_not_set"
+  assert_dispatch_failed
+
+  # An exported MINA_PROFILE is enough on its own.
+  run_dispatch_json "rm -f /etc/coda/build_config/PROFILE && mina --version" "$marker_mode" --env MINA_PROFILE="$PROFILE"
+  assert_json_eq '.error' "null"
+done
+
+echo "PASSED: Runtime profile is required and shipped"
+
+# =============================================================================
 # Summary
 # =============================================================================
 

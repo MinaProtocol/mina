@@ -248,6 +248,8 @@ reversion_deb "${ORIG_PREFORK_DEB}" "${EXPECTED_PREFORK_VERSION}" \
 # V2: automode + postfork + config + logproc (hardfork)
 reversion_deb "${ORIG_AUTOMODE_DEB}" "${V2}" "${REPO_DIR}/${PKG_AUTOMODE}_${V2}_all.deb"
 reversion_deb "${ORIG_POSTFORK_DEB}" "${V2}" "${REPO_DIR}/${PKG_POSTFORK}_${V2}_amd64.deb"
+# The postfork package pins the profile leaf to its own version.
+reversion_deb "${ORIG_PROFILE_LEAF_DEB}" "${V2}" "${REPO_DIR}/${PKG_PROFILE_LEAF}_${V2}_amd64.deb"
 reversion_deb "${ORIG_CONFIG_DEB}"   "${V2}" "${REPO_DIR}/${PKG_CONFIG}_${V2}_all.deb"
 reversion_deb "${ORIG_LOGPROC_DEB}"  "${V2}" "${REPO_DIR}/mina-logproc_${V2}_amd64.deb"
 
@@ -286,10 +288,11 @@ V1_DEBS=(
     "${REPO_DIR}/mina-logproc_${V1}_amd64.deb"
 )
 
-# V2: automode + postfork + config + logproc (+ prefork files) (hardfork)
+# V2: automode + postfork + profile + config + logproc (+ prefork files) (hardfork)
 V2_DEBS=(
     "${REPO_DIR}/${PKG_AUTOMODE}_${V2}_all.deb"
     "${REPO_DIR}/${PKG_POSTFORK}_${V2}_amd64.deb"
+    "${REPO_DIR}/${PKG_PROFILE_LEAF}_${V2}_amd64.deb"
     "${REPO_DIR}/${PKG_CONFIG}_${V2}_all.deb"
     "${REPO_DIR}/mina-logproc_${V2}_amd64.deb"
     "${PREFORK_DEBS[@]}"

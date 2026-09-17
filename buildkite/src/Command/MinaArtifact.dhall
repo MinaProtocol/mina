@@ -586,6 +586,20 @@ let docker_step
 
           let size = Size.XLarge
 
+          let daemonProfiled =
+                DockerImage.ReleaseSpec::{
+                , deps = dependsOnGeneric
+                , service = Docker.Type.DaemonProfiled { profile = profile }
+                , network = network
+                , deb_codename = spec.debVersion
+                , docker_publish = spec.docker_publish
+                , deb_profile = profile
+                , build_flags = spec.buildFlags
+                , deb_install_mode = DockerImage.DebianInstallMode.DownloadOnly
+                , arch = spec.arch
+                , size = size
+                }
+
           in  merge
                 { DaemonAutoHardfork =
                         \(args : { network : Network.Type })
@@ -646,25 +660,16 @@ let docker_step
                     }
                   ]
                 , DaemonProfiled =
-                        \(args : { profile : Profiles.Type })
-                    ->  [ DockerImage.ReleaseSpec::{
-                          , deps = dependsOnGeneric
-                          , service = entry.service
-                          , network = network
-                          , deb_codename = spec.debVersion
-                          , docker_publish = spec.docker_publish
-                          , deb_profile = profile
-                          , build_flags = spec.buildFlags
-                          , deb_install_mode =
-                              DockerImage.DebianInstallMode.DownloadOnly
-                          , arch = spec.arch
-                          , size = size
-                          }
-                        ]
+                    \(args : { profile : Profiles.Type }) -> [ daemonProfiled ]
                 , Daemon =
                         \(args : { network : Network.Type })
                     ->  [ DockerImage.ReleaseSpec::{
-                          , deps = dependsOnGeneric
+                          , deps =
+                                dependsOnGeneric
+                              # [ { name = selfName spec
+                                  , key = DockerImage.stepKey daemonProfiled
+                                  }
+                                ]
                           , service = Docker.Type.Daemon { network = network }
                           , network = network
                           , deb_codename = spec.debVersion

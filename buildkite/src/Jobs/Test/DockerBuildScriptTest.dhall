@@ -37,7 +37,10 @@ in  Pipeline.build
       , steps =
         [ Command.build
             Command.Config::{
-            , commands = [ Cmd.run "./scripts/docker/tests/test_build.sh" ]
+            , commands =
+              [ Cmd.run "./scripts/docker/tests/test_build.sh"
+              , Cmd.run "./scripts/docker/tests/test_install_config_profile.sh"
+              ]
             , label = "Docker build script tests"
             , key = "docker-build-script-tests"
             , target = Size.Small
