@@ -7,7 +7,7 @@
      dune exec src/app/zkapps_examples/test/optional_custom_gates/zkapp_optional_custom_gates_tests.exe
 *)
 
-open Core_kernel
+open Core
 open Mina_base
 
 module Make_account_info () = struct
@@ -61,7 +61,6 @@ struct
 end
 
 module Account_info = Make_account_info ()
-
 module Circuits = Make_circuits (Account_info)
 
 let account_update =

@@ -1,5 +1,5 @@
 open Alcotest
-open Core_kernel
+open Core
 
 (* NOTE: This serialization is used externally and MUST NOT change.
     If the underlying types change, you should write a conversion, or add

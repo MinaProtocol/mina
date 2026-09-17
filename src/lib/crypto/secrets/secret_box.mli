@@ -12,7 +12,7 @@ General usage pattern:
 {b NOTE:} this will _erase_ the contents of [password] arguments. If you stash them somewhere (you shouldn't outside of tests), you should copy the string before you call these functions.
 *)
 
-open Core_kernel
+open Core
 
 type t [@@deriving sexp, yojson]
 

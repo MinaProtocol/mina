@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Async
 open Unsigned
 open Signature_lib
@@ -107,7 +107,7 @@ module Vrf_distribution = struct
                  | `Produce (proposal_time, _, proposal_data, _) ->
                      Some
                        ( Block_time.(
-                           of_span_since_epoch @@ Span.of_ms proposal_time)
+                           of_span_since_epoch @@ Span.of_ms proposal_time )
                        , proposal_data )
                in
                record_proposal ~staker ~proposal_data ;
@@ -117,7 +117,7 @@ module Vrf_distribution = struct
                  < Global_slot_since_genesis.(
                      epoch
                        (of_slot_number ~constants
-                          (Block_data.global_slot proposal_data) ))
+                          (Block_data.global_slot proposal_data) ) )
                in
                let new_global_slot =
                  Global_slot_since_genesis.of_slot_number ~constants
@@ -396,10 +396,11 @@ let propose_block_onto_chain ~logger ~keys
     Staged_ledger.create_diff previous_staged_ledger ~logger ~self:proposer_pk
       ~transactions_by_fee ~get_completed_work ~coinbase_receiver:`Producer
   in
-  let%map ( `Hash_after_applying next_staged_ledger_hash
-          , `Ledger_proof ledger_proof_opt
-          , `Staged_ledger staged_ledger
-          , `Pending_coinbase_update (is_new_stack, pending_coinbase_update) ) =
+  let%map
+      ( `Hash_after_applying next_staged_ledger_hash
+      , `Ledger_proof ledger_proof_opt
+      , `Staged_ledger staged_ledger
+      , `Pending_coinbase_update (is_new_stack, pending_coinbase_update) ) =
     let%map res =
       Staged_ledger.apply_diff_unchecked previous_staged_ledger ~logger
         staged_ledger_diff ~state_body_hash:previous_protocol_state_body_hash
@@ -490,7 +491,7 @@ let main () =
         (Transport_file_system.dumb_logrotate ~directory:"fuzz_logs"
            ~log_filename:"log"
            ~max_size:(500 * 1024 * 1024)
-           ~num_rotate:1 )) ;
+           ~num_rotate:1 ) ) ;
   don't_wait_for
     (let%bind genesis_transition, genesis_staged_ledger =
        create_genesis_data ()
@@ -537,7 +538,7 @@ let main () =
                @@ Global_slot_since_genesis.(
                     slot
                       (of_slot_number ~constants:consensus_constants
-                         (Block_data.global_slot block_data) )) ) ;
+                         (Block_data.global_slot block_data) ) ) ) ;
              propose_block_onto_chain ~logger ~keys previous_chain proposal )
        in
        loop (UInt32.succ epoch) final_chain

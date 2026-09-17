@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Mina_state
 
 module type S = sig

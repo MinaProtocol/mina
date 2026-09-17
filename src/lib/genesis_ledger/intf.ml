@@ -1,6 +1,6 @@
 open Mina_base
 open Signature_lib
-open Core_kernel
+open Core
 module Root_ledger = Mina_ledger.Root
 
 module Timing = struct

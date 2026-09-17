@@ -40,7 +40,10 @@ val max_rate : float -> float
 
 type Structured_log_events.t +=
   | Peer_banned of
-      { sender_id : Network_peer.Peer.t; expiration : Time.t; action : string }
+      { sender_id : Network_peer.Peer.t
+      ; expiration : Time_float.t
+      ; action : string
+      }
   [@@deriving register_event]
 
 (* FIXME The parameter docs don't render :( *)
@@ -63,7 +66,7 @@ module Make (Action : Action_intf) : sig
       banned. *)
   val upcall_pipe :
        t
-    -> [ `Ban of Network_peer.Peer.t * Time.t
+    -> [ `Ban of Network_peer.Peer.t * Time_float.t
        | `Heartbeat of Network_peer.Peer.t ]
        Strict_pipe.Reader.t
 
@@ -75,13 +78,13 @@ module Make (Action : Action_intf) : sig
   (** Look up the score of all peers associated with an IP and whether they are banned .*)
   val lookup_ip :
        t
-    -> Unix.Inet_addr.Blocking_sexp.t
+    -> Core_unix.Inet_addr.Blocking_sexp.t
     -> (Network_peer.Peer.t * Peer_status.t) list
 
   (** reset status of all peers associated with an IP; return the reset statuses *)
   val reset_ip :
        t
-    -> Unix.Inet_addr.Blocking_sexp.t
+    -> Core_unix.Inet_addr.Blocking_sexp.t
     -> (Network_peer.Peer.t * Peer_status.t) list
 
   (** get all peer, status pairs in the trust system *)

@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Mina_base
 
 module Input = struct
@@ -37,8 +37,10 @@ let verify =
         in
         go acc.state_hash hs
   in
-  fun ({ descendant; generations } : Input.t) (ancestor : Output.t)
-      (proof : Proof.t) ->
+  fun ({ descendant; generations } : Input.t)
+    (ancestor : Output.t)
+    (proof : Proof.t)
+  ->
     List.length proof = generations
     && State_hash.equal descendant (go ancestor proof)
 
@@ -90,8 +92,12 @@ end = struct
             ((acc, full_state_hashes.state_hash, length, body) :: hs)
             full_state_hashes.state_hash length bs
     in
-    fun (t : t) ({ descendant; generations } : Input.t) (ancestor : Output.t)
-        ~ancestor_length (proof : Proof.t) ->
+    fun (t : t)
+      ({ descendant; generations } : Input.t)
+      (ancestor : Output.t)
+      ~ancestor_length
+      (proof : Proof.t)
+    ->
       let open Or_error.Let_syntax in
       let%bind () =
         check (List.length proof = generations) "Wrong proof length"

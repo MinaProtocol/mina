@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Async_kernel
 
 (** The is a monad which is conceptually similar to `Deferred.Or_error.t`,
@@ -271,8 +271,8 @@ end
 let%test_module "malleable error unit tests" =
   ( module struct
     (* we derive custom equality and comparisions for our result type, as the
-       * default behavior of ppx_assert is to use polymorphic equality and comparisons
-       * for results (as to why, I have no clue) *)
+     * default behavior of ppx_assert is to use polymorphic equality and comparisons
+     * for results (as to why, I have no clue) *)
     type 'a inner = ('a Result_accumulator.t, Hard_fail.t) Result.t
     [@@deriving sexp_of]
 
@@ -296,8 +296,8 @@ let%test_module "malleable error unit tests" =
       | Error _, Ok _ ->
           1
 
-    let%test_unit "malleable error test 1: completes int computation when no \
-                   errors" =
+    let%test_unit
+        "malleable error test 1: completes int computation when no errors" =
       Async.Thread_safe.block_on_async_exn (fun () ->
           let open Deferred.Let_syntax in
           let%bind actual =
@@ -311,8 +311,8 @@ let%test_module "malleable error unit tests" =
           let%map expected = T.return 5 in
           [%test_eq: int inner] ~equal:(equal_inner Int.equal) actual expected )
 
-    let%test_unit "malleable error test 2: completes string computation when \
-                   no errors" =
+    let%test_unit
+        "malleable error test 2: completes string computation when no errors" =
       Async.Thread_safe.block_on_async_exn (fun () ->
           let open Deferred.Let_syntax in
           let%bind actual =
@@ -324,8 +324,8 @@ let%test_module "malleable error unit tests" =
           [%test_eq: string inner] ~equal:(equal_inner String.equal) actual
             expected )
 
-    let%test_unit "malleable error test 3: ok result that accumulates soft \
-                   errors" =
+    let%test_unit
+        "malleable error test 3: ok result that accumulates soft errors" =
       Async.Thread_safe.block_on_async_exn (fun () ->
           let open Deferred.Let_syntax in
           let%map actual =
@@ -367,8 +367,8 @@ let%test_module "malleable error unit tests" =
           [%test_eq: string inner] ~equal:(equal_inner String.equal) actual
             expected )
 
-    let%test_unit "malleable error test 5: hard error that accumulates a soft \
-                   error" =
+    let%test_unit
+        "malleable error test 5: hard error that accumulates a soft error" =
       Async.Thread_safe.block_on_async_exn (fun () ->
           let open Deferred.Let_syntax in
           let%map actual =
@@ -391,8 +391,9 @@ let%test_module "malleable error unit tests" =
           [%test_eq: string inner] ~equal:(equal_inner String.equal) actual
             expected )
 
-    let%test_unit "malleable error test 6: hard error with multiple soft \
-                   errors accumulating" =
+    let%test_unit
+        "malleable error test 6: hard error with multiple soft errors \
+         accumulating" =
       Async.Thread_safe.block_on_async_exn (fun () ->
           let open Deferred.Let_syntax in
           let%map actual =

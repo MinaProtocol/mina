@@ -93,7 +93,8 @@ module Context_subtree_depth80 = Make_context (struct
 end)
 
 module Make_test
-    (Input : Input_intf) (Input' : sig
+    (Input : Input_intf)
+    (Input' : sig
       val num_accts : int
     end) =
 struct
@@ -183,7 +184,7 @@ struct
                  desired_root := Ledger.merkle_root l3 ;
                  ignore
                    ( Sync_ledger.new_goal lsync !desired_root ~data:()
-                       ~equal:(fun () () -> true)
+                       ~equal:(fun () () -> true )
                      : [ `New | `Repeat | `Update_data ] ) ;
                  Deferred.unit )
                else
@@ -372,7 +373,8 @@ end
 
 module Db = struct
   module Make
-      (Context : Syncable_ledger.CONTEXT) (Depth : sig
+      (Context : Syncable_ledger.CONTEXT)
+      (Depth : sig
         val depth : int
       end) =
   struct
@@ -564,7 +566,8 @@ end
 
 module Mask = struct
   module Make
-      (Context : Syncable_ledger.CONTEXT) (Input : sig
+      (Context : Syncable_ledger.CONTEXT)
+      (Input : sig
         val depth : int
 
         val mask_layers : int

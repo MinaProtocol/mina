@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Mina_base
 open Mina_transaction
 open Pipe_lib
@@ -36,9 +36,9 @@ let get_status ~frontier_broadcast_pipe ~transaction_pool cmd =
       let in_breadcrumb breadcrumb =
         breadcrumb |> Transition_frontier.Breadcrumb.validated_transition
         |> Mina_block.Validated.valid_commands
-        |> List.exists ~f:(fun { data = found; _ } ->
-               let found' = User_command.forget_check found in
-               User_command.equal_ignoring_proofs_and_hashes_and_aux cmd found' )
+        |> List.exists ~f:(fun { With_status.data = found; _ } ->
+            let found' = User_command.forget_check found in
+            User_command.equal_ignoring_proofs_and_hashes_and_aux cmd found' )
       in
       if List.exists ~f:in_breadcrumb best_tip_path then State.Included
       else if
@@ -150,8 +150,9 @@ let%test_module "transaction_status" =
       let%map () = Async.Scheduler.yield_until_no_jobs_remain () in
       (transaction_pool, local_sink)
 
-    let%test_unit "If the transition frontier currently doesn't exist, the \
-                   status of a sent transaction will be unknown" =
+    let%test_unit
+        "If the transition frontier currently doesn't exist, the status of a \
+         sent transaction will be unknown" =
       Quickcheck.test ~trials:1 gen_user_command ~f:(fun user_command ->
           Backtrace.elide := false ;
           Async.Thread_safe.block_on_async_exn (fun () ->
@@ -169,9 +170,10 @@ let%test_module "transaction_status" =
                 (get_status ~frontier_broadcast_pipe ~transaction_pool
                    (Signed_command user_command) ) ) )
 
-    let%test_unit "A pending transaction is either in the transition frontier \
-                   or transaction pool, but not in the best path of the \
-                   transition frontier" =
+    let%test_unit
+        "A pending transaction is either in the transition frontier or \
+         transaction pool, but not in the best path of the transition frontier"
+        =
       Quickcheck.test ~trials:1
         (Quickcheck.Generator.tuple2 gen_frontier gen_user_command)
         ~f:(fun (frontier, user_command) ->
@@ -194,8 +196,9 @@ let%test_module "transaction_status" =
               [%log info] "Computing status" ;
               [%test_eq: State.t] ~equal:State.equal State.Pending status ) )
 
-    let%test_unit "An unknown transaction does not appear in the transition \
-                   frontier or transaction pool " =
+    let%test_unit
+        "An unknown transaction does not appear in the transition frontier or \
+         transaction pool " =
       let user_commands_generator =
         let open Quickcheck.Generator in
         let open Let_syntax in

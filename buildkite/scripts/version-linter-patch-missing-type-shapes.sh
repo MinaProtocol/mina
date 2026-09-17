@@ -42,7 +42,7 @@ if [[ $FORK == 1 ]]; then
     exit 0
 fi
 
-if ! $(source buildkite/scripts/cache/manager.sh read mina-type-shapes/"$RELEASE_BRANCH_COMMIT"* . 2>/dev/null); then
+if ! gsutil ls "gs://mina-type-shapes/${RELEASE_BRANCH_COMMIT}*" >/dev/null 2>&1; then
     checkout_and_dump $RELEASE_BRANCH_COMMIT
 fi
 

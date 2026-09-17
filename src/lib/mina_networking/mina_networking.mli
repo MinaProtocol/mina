@@ -100,7 +100,7 @@ module Rpcs : sig
 
   module Ban_notify : sig
     (* banned until this time *)
-    type query = Core.Time.t
+    type query = Core.Time_float.t
 
     type response = unit
   end
@@ -122,31 +122,27 @@ module Rpcs : sig
   end
 
   type ('query, 'response) rpc = ('query, 'response) Rpcs.rpc =
-    | Get_some_initial_peers
-        : (Get_some_initial_peers.query, Get_some_initial_peers.response) rpc
-    | Get_staged_ledger_aux_and_pending_coinbases_at_hash
-        : ( Get_staged_ledger_aux_and_pending_coinbases_at_hash.query
-          , Get_staged_ledger_aux_and_pending_coinbases_at_hash.response )
-          rpc
-    | Answer_sync_ledger_query
-        : ( Answer_sync_ledger_query.query
-          , Answer_sync_ledger_query.response )
-          rpc
-    | Get_transition_chain
-        : (Get_transition_chain.query, Get_transition_chain.response) rpc
-    | Get_transition_knowledge
-        : ( Get_transition_knowledge.query
-          , Get_transition_knowledge.response )
-          rpc
-    | Get_transition_chain_proof
-        : ( Get_transition_chain_proof.query
-          , Get_transition_chain_proof.response )
-          rpc
+    | Get_some_initial_peers :
+        (Get_some_initial_peers.query, Get_some_initial_peers.response) rpc
+    | Get_staged_ledger_aux_and_pending_coinbases_at_hash :
+        ( Get_staged_ledger_aux_and_pending_coinbases_at_hash.query
+        , Get_staged_ledger_aux_and_pending_coinbases_at_hash.response )
+        rpc
+    | Answer_sync_ledger_query :
+        (Answer_sync_ledger_query.query, Answer_sync_ledger_query.response) rpc
+    | Get_transition_chain :
+        (Get_transition_chain.query, Get_transition_chain.response) rpc
+    | Get_transition_knowledge :
+        (Get_transition_knowledge.query, Get_transition_knowledge.response) rpc
+    | Get_transition_chain_proof :
+        ( Get_transition_chain_proof.query
+        , Get_transition_chain_proof.response )
+        rpc
     | Get_ancestry : (Get_ancestry.query, Get_ancestry.response) rpc
     | Ban_notify : (Ban_notify.query, Ban_notify.response) rpc
     | Get_best_tip : (Get_best_tip.query, Get_best_tip.response) rpc
-    | Get_completed_snarks
-        : (Get_completed_snarks.query, Get_completed_snarks.response) rpc
+    | Get_completed_snarks :
+        (Get_completed_snarks.query, Get_completed_snarks.response) rpc
 end
 
 module Config : sig
@@ -201,7 +197,7 @@ val get_ancestry :
 
 val get_best_tip :
      ?heartbeat_timeout:Time_ns.Span.t
-  -> ?timeout:Time.Span.t
+  -> ?timeout:Time_float.Span.t
   -> t
   -> Network_peer.Peer.t
   -> ( Mina_block.Stable.Latest.t
@@ -211,7 +207,7 @@ val get_best_tip :
 
 val get_transition_chain_proof :
      ?heartbeat_timeout:Time_ns.Span.t
-  -> ?timeout:Time.Span.t
+  -> ?timeout:Time_float.Span.t
   -> t
   -> Network_peer.Peer.t
   -> State_hash.t
@@ -219,7 +215,7 @@ val get_transition_chain_proof :
 
 val get_transition_chain :
      ?heartbeat_timeout:Time_ns.Span.t
-  -> ?timeout:Time.Span.t
+  -> ?timeout:Time_float.Span.t
   -> t
   -> Network_peer.Peer.t
   -> State_hash.t list
@@ -240,7 +236,8 @@ val get_completed_checked_snarks :
   -> Peer.t
   -> (Transaction_snark_work.Stable.V2.t list, Error.t) result Deferred.t
 
-val ban_notify : t -> Network_peer.Peer.t -> Time.t -> unit Deferred.Or_error.t
+val ban_notify :
+  t -> Network_peer.Peer.t -> Time_float.t -> unit Deferred.Or_error.t
 
 val broadcast_state :
      t
@@ -265,7 +262,7 @@ val glue_sync_ledger :
 
 val query_peer :
      ?heartbeat_timeout:Time_ns.Span.t
-  -> ?timeout:Time.Span.t
+  -> ?timeout:Time_float.Span.t
   -> t
   -> Network_peer.Peer.Id.t
   -> ('q, 'r) Rpcs.rpc

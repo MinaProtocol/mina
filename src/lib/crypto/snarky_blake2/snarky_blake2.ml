@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 
 module type S = sig
   module Impl : Snarky_backendless.Snark_intf.S

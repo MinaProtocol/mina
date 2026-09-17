@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Pickles_types
 
 let bits ~len n = List.init len ~f:(fun i -> (n lsr i) land 1 = 1)
@@ -188,7 +188,10 @@ let to_input (type a) ~(field_of_int : int -> a) :
         ; actual_wrap_domain_size
         ; wrap_index
         ; wrap_vk = _
-        } : _ Random_oracle_input.Chunked.t ->
+        }
+    :
+    _ Random_oracle_input.Chunked.t
+  ->
     List.reduce_exn ~f:append
       [ Proofs_verified.One_hot.to_input ~zero:(field_of_int 0)
           ~one:(field_of_int 1) max_proofs_verified

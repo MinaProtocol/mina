@@ -1,5 +1,5 @@
 open Kimchi_pasta_snarky_backend.Intf
-open Core_kernel
+open Core
 
 module type Inputs_intf = sig
   module Base_field : sig
@@ -122,7 +122,7 @@ module Make (Inputs : Inputs_intf) = struct
                   "Pickles cannot handle point at infinity. Commitments must \
                    be representable in affine coordinates"
             | Finite (x, y) ->
-                (x, y) ) )
+                (x, y) ))
     | _ ->
         assert false
 end

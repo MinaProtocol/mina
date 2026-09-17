@@ -1,11 +1,13 @@
 open Core
 
-module Make (Account : sig
-  type t
-end)
-(Hash : Merkle_ledger.Intf.Hash with type account := Account.t) (Depth : sig
-  val depth : int
-end) =
+module Make
+    (Account : sig
+      type t
+    end)
+    (Hash : Merkle_ledger.Intf.Hash with type account := Account.t)
+    (Depth : sig
+      val depth : int
+    end) =
 struct
   type t = Node of { hash : Hash.t; left : t; right : t } | Leaf of Hash.t
   [@@deriving sexp]
@@ -50,7 +52,10 @@ struct
   let rec get_inner_hash_at_addr_exn = function
     | Leaf hash -> (
         function
-        | [] -> hash | _ :: _ -> failwith "Could not traverse beyond a leaf" )
+        | [] ->
+            hash
+        | _ :: _ ->
+            failwith "Could not traverse beyond a leaf" )
     | Node { hash; left; right } -> (
         function
         | [] ->

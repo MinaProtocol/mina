@@ -122,18 +122,16 @@ module For_tests = struct
         (module Map : Map.S
           with type Key.t = k
            and type Key.comparator_witness = w ) map =
-      List.fold_left (Map.data map) ~init:Set.empty ~f:Set.union
+      List.fold_left (Core.Map.data map) ~init:Set.empty ~f:Set.union
     in
     let all_by_sender =
       Set.of_list
         (List.bind
            ~f:(fun (cmds, _) -> F_sequence.to_list cmds)
-           (Account_id.Map.data pool.all_by_sender) )
+           (Map.data pool.all_by_sender) )
     in
     let all_by_fee = map_to_set (module Fee_rate.Map) pool.all_by_fee in
-    let all_by_hash =
-      Set.of_list @@ Transaction_hash.Map.data pool.all_by_hash
-    in
+    let all_by_hash = Set.of_list @@ Map.data pool.all_by_hash in
     let by_expiration =
       map_to_set
         (module Global_slot_since_genesis.Map)
@@ -147,7 +145,7 @@ module For_tests = struct
         [ all_by_fee; all_by_hash; by_expiration; applicable_by_fee ]
     in
     let all_by_sender' =
-      Account_id.Map.data pool.all_by_sender
+      Map.data pool.all_by_sender
       |> List.map ~f:(fun (cmds, _) -> F_sequence.head_exn cmds)
       |> Set.of_list
     in
@@ -159,7 +157,7 @@ module For_tests = struct
     (* In each sender's queue nonces should be strictly increasing and the
        reserved currency should be equal to the sum of amounts and fees of
        all the commands in the queue. *)
-    Account_id.Map.iteri pool.all_by_sender
+    Map.iteri pool.all_by_sender
       ~f:(fun ~key ~data:(queue, reserved_currency) ->
         [%test_pred:
           Transaction_hash.User_command_with_valid_signature.t F_sequence.t]
@@ -179,7 +177,7 @@ module For_tests = struct
               in
               [%test_pred: Account_nonce.t]
                 (* Last nonce is None only at the very beginning. *)
-                  (fun n ->
+                (fun n ->
                   Option.value_map last_nonce ~default:true
                     ~f:Account_nonce.(( > ) n) )
                 nonce ;
@@ -202,13 +200,13 @@ module For_tests = struct
         fee
     in
     let is_not_empty = Fn.compose not Set.is_empty in
-    Currency.Fee_rate.Map.iteri pool.applicable_by_fee ~f:(fun ~key ~data ->
+    Map.iteri pool.applicable_by_fee ~f:(fun ~key ~data ->
         [%test_pred: Set.t] is_not_empty data ;
         Set.iter data ~f:(check_fee key) ) ;
-    Currency.Fee_rate.Map.iteri pool.all_by_fee ~f:(fun ~key ~data ->
+    Map.iteri pool.all_by_fee ~f:(fun ~key ~data ->
         [%test_pred: Set.t] is_not_empty data ;
         Set.iter data ~f:(check_fee key) ) ;
-    Transaction_hash.Map.iteri pool.all_by_hash ~f:(fun ~key ~data ->
+    Map.iteri pool.all_by_hash ~f:(fun ~key ~data ->
         [%test_eq: Transaction_hash.t]
           (Transaction_hash.User_command_with_valid_signature.transaction_hash
              data )
@@ -249,7 +247,7 @@ let all_from_account :
     -> Transaction_hash.User_command_with_valid_signature.t list =
  fun { all_by_sender; _ } account_id ->
   Option.value_map ~default:[] (Map.find all_by_sender account_id)
-    ~f:(fun (user_commands, _) -> F_sequence.to_list user_commands)
+    ~f:(fun (user_commands, _) -> F_sequence.to_list user_commands )
 
 let get_all { all_by_hash; _ } :
     Transaction_hash.User_command_with_valid_signature.t list =
@@ -266,7 +264,7 @@ let global_slot_since_genesis conf =
   let current_slot =
     Consensus.Data.Consensus_time.(
       of_time_exn ~constants:conf.consensus_constants current_time
-      |> to_global_slot)
+      |> to_global_slot )
   in
   match conf.constraint_constants.fork with
   | Some { global_slot_since_genesis; _ } ->
@@ -275,7 +273,7 @@ let global_slot_since_genesis conf =
         |> Mina_numbers.Global_slot_span.of_uint32
       in
       Mina_numbers.Global_slot_since_genesis.(
-        add global_slot_since_genesis slot_span)
+        add global_slot_since_genesis slot_span )
   | None ->
       (* we're in the genesis "hard fork", so consider current slot as
          since-genesis
@@ -444,7 +442,7 @@ module Update = struct
                   , if
                       Control.(
                         Tag.equal Proof
-                          (tag account_update.Account_update.Poly.authorization))
+                          (tag account_update.Account_update.Poly.authorization) )
                     then proof_updates_count + 1
                     else proof_updates_count ) )
             in
@@ -544,8 +542,7 @@ let transactions ~logger t =
         in
         Some (txn, (applicable_by_fee'', all_by_sender')) )
 
-let run :
-    type a e.
+let run : type a e.
        sender:Account_id.t
     -> t
     -> (Sender_local_state.t ref -> (a, Update.single, e) Writer_result.t)
@@ -596,8 +593,8 @@ let remove_with_dependents_exn :
         Option.value_exn
           (* safe because we check for overflow when we add commands. *)
           (let open Option.Let_syntax in
-          let%bind consumed = currency_consumed cmd' in
-          Currency.Amount.(consumed + acc)) )
+           let%bind consumed = currency_consumed cmd' in
+           Currency.Amount.(consumed + acc) ) )
       Currency.Amount.zero drop_queue
   in
   let reserved_currency' =
@@ -619,10 +616,10 @@ let remove_with_dependents_exn :
     { !state with
       data =
         ( if not (F_sequence.is_empty keep_queue) then
-          Some (keep_queue, reserved_currency')
-        else (
-          assert (Currency.Amount.(equal reserved_currency' zero)) ;
-          None ) )
+            Some (keep_queue, reserved_currency')
+          else (
+            assert (Currency.Amount.(equal reserved_currency' zero)) ;
+            None ) )
     } ;
   F_sequence.to_seq drop_queue
 
@@ -688,10 +685,10 @@ let revalidate :
   in
   Map.fold t_initial.all_by_sender ~init:(t_initial, Sequence.empty)
     ~f:(fun
-         ~key:sender
-         ~data:(queue, currency_reserved)
-         ((t, dropped_acc) as acc)
-       ->
+        ~key:sender
+        ~data:(queue, currency_reserved)
+        ((t, dropped_acc) as acc)
+      ->
       if not (requires_revalidation sender) then acc
       else
         let account : Account.t = f sender in
@@ -755,8 +752,7 @@ let revalidate :
             F_sequence.foldl
               (fun c cmd ->
                 Option.value_exn
-                  Currency.Amount.(c - Option.value_exn (currency_consumed cmd))
-                )
+                  Currency.Amount.(c - Option.value_exn (currency_consumed cmd)) )
               currency_reserved dropped_for_nonce
           in
           let keep_queue, currency_reserved_updated, dropped_for_balance =
@@ -861,7 +857,7 @@ let get_highest_fee :
       (Fn.compose
          Transaction_hash.User_command_with_valid_signature.Set.min_elt_exn
          Tuple2.get2 )
-  @@ Currency.Fee_rate.Map.max_elt t.applicable_by_fee
+  @@ Map.max_elt t.applicable_by_fee
 
 (* Add a command that came in from gossip, or return an error. We need to check
    a whole bunch of conditions here and return the appropriate errors.
@@ -908,13 +904,13 @@ module Add_from_gossip_exn (M : Writer_result.S) = struct
       Consensus.Data.Consensus_time.(
         to_global_slot
           (of_time_exn ~constants:consensus_constants
-             (Block_time.now time_controller) ))
+             (Block_time.now time_controller) ) )
     in
     let%bind () =
       M.of_result
       @@ Result.ok_if_true ~error:After_slot_tx_end
       @@ Option.value_map slot_tx_end ~default:true ~f:(fun slot_tx_end' ->
-             Global_slot_since_hard_fork.(current_global_slot < slot_tx_end') )
+          Global_slot_since_hard_fork.(current_global_slot < slot_tx_end') )
     in
     let unchecked_cmd = Transaction_hash.User_command.of_checked cmd in
     let unchecked = Transaction_hash.User_command.data unchecked_cmd in
@@ -935,7 +931,7 @@ module Add_from_gossip_exn (M : Writer_result.S) = struct
             if Token_id.(equal default) fee_token then return ()
             else Error (Unwanted_fee_token fee_token)
           in
-          consumed)
+          consumed )
     in
     (* C4 *)
     match !by_sender.data with
@@ -958,7 +954,7 @@ module Add_from_gossip_exn (M : Writer_result.S) = struct
                   ~error:(Insufficient_funds (`Balance balance, consumed))
                 (* C2 *)
               in
-              ())
+              () )
         in
         let%map () =
           M.write
@@ -1170,12 +1166,12 @@ let add_from_backtrack :
     Consensus.Data.Consensus_time.(
       to_global_slot
         (of_time_exn ~constants:consensus_constants
-           (Block_time.now time_controller) ))
+           (Block_time.now time_controller) ) )
   in
   let%bind () =
     Result.ok_if_true ~error:Command_error.After_slot_tx_end
     @@ Option.value_map slot_tx_end ~default:true ~f:(fun slot_tx_end' ->
-           Global_slot_since_hard_fork.(current_global_slot < slot_tx_end') )
+        Global_slot_since_hard_fork.(current_global_slot < slot_tx_end') )
   in
   let unchecked =
     Transaction_hash.User_command_with_valid_signature.command cmd

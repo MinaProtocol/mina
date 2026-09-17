@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 
 module type Field_intf = sig
   type t
@@ -109,13 +109,13 @@ module Type1 = struct
     let there (Shifted_value x) = x in
     let back x = Shifted_value x in
     Kimchi_pasta_snarky_backend.Step_impl.Typ.(
-      transport_var (transport f ~there ~back) ~there ~back)
+      transport_var (transport f ~there ~back) ~there ~back )
 
   let wrap_typ f =
     let there (Shifted_value x) = x in
     let back x = Shifted_value x in
     Kimchi_pasta_snarky_backend.Wrap_impl.Typ.(
-      transport_var (transport f ~there ~back) ~there ~back)
+      transport_var (transport f ~there ~back) ~there ~back )
 
   let map (Shifted_value x) ~f = Shifted_value (f x)
 
@@ -173,13 +173,13 @@ module Type2 = struct
     let there (Shifted_value x) = x in
     let back x = Shifted_value x in
     Kimchi_pasta_snarky_backend.Step_impl.Typ.(
-      transport_var (transport f ~there ~back) ~there ~back)
+      transport_var (transport f ~there ~back) ~there ~back )
 
   let wrap_typ f =
     let there (Shifted_value x) = x in
     let back x = Shifted_value x in
     Kimchi_pasta_snarky_backend.Wrap_impl.Typ.(
-      transport_var (transport f ~there ~back) ~there ~back)
+      transport_var (transport f ~there ~back) ~there ~back )
 
   let map (Shifted_value x) ~f = Shifted_value (f x)
 

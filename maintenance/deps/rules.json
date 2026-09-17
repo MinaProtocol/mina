@@ -1,0 +1,75 @@
+{
+  "_comment": [
+    "Layering rules over the dune graph. `from` and `to` are fnmatch patterns",
+    "matched against node ids of the form `<lib|exe>:<dir under src>:<name>`.",
+    "",
+    "  forbidden -- enforced by `make check-deps`; every rule here holds today.",
+    "  pending   -- rules we want; reported by `make deps-advice`, not enforced.",
+    "",
+    "Move a rule from `pending` to `forbidden` in the same PR that fixes it."
+  ],
+  "forbidden": [
+    {
+      "from": "lib:lib/crypto/*",
+      "to": "lib:lib/mina_lib:*",
+      "why": "Cryptographic primitives must not depend on the daemon."
+    },
+    {
+      "from": "lib:lib/crypto/*",
+      "to": "lib:lib/network_pool:*",
+      "why": "Cryptographic primitives must not depend on networking."
+    },
+    {
+      "from": "lib:lib/crypto/*",
+      "to": "lib:lib/graphql/*",
+      "why": "Cryptographic primitives must not depend on the GraphQL layer."
+    },
+    {
+      "from": "lib:lib/mina_base:*",
+      "to": "lib:lib/mina_lib:*",
+      "why": "The base types must not depend on the daemon that consumes them."
+    },
+    {
+      "from": "lib:lib/mina_base:*",
+      "to": "lib:app/*",
+      "why": "Libraries must not depend on applications."
+    },
+    {
+      "from": "lib:lib/*",
+      "to": "exe:*",
+      "why": "Nothing may depend on an executable stanza."
+    },
+    {
+      "from": "exe:app/logproc:*",
+      "to": "lib:lib/mina_base:*",
+      "why": "mina-logproc is a log formatter; it must stay off the protocol stack."
+    },
+    {
+      "from": "lib:lib/mina_caqti:*",
+      "to": "lib:app/*",
+      "why": "The Caqti helpers must not depend on applications."
+    }
+  ],
+  "pending": [
+    {
+      "from": "lib:lib/mina_caqti:*",
+      "to": "lib:lib/mina_base:*",
+      "why": "514 lines of Caqti helpers pull in 101 libraries for Zkapp_basic.Set_or_keep and Zkapp_basic.Or_ignore alone. Moving those four wrappers into archive_lib takes missing_blocks_auditor from 106 libraries to 5."
+    },
+    {
+      "from": "exe:app/generate_keypair:*",
+      "to": "lib:lib/transaction_snark:*",
+      "why": "generate_keypair uses one symbol from cli_lib (Cli_lib.Commands.generate_keypair) and pays 176 libraries for it. Splitting the keypair commands out of cli_lib would make this a bare binary."
+    },
+    {
+      "from": "exe:app/validate_keypair:*",
+      "to": "lib:lib/transaction_snark:*",
+      "why": "Same as generate_keypair: one symbol from cli_lib, 176 libraries of cost."
+    },
+    {
+      "from": "lib:lib/genesis_ledger_helper:*",
+      "to": "lib:lib/cli_lib:*",
+      "why": "genesis_ledger_helper never references Cli_lib, but the edge drags the daemon CLI into the whole archive toolchain."
+    }
+  ]
+}

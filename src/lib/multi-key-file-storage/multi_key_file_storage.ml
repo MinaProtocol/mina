@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 
 (** Buffer size for writing: 128 KB *)
 let default_buffer_size = 131072
@@ -66,8 +66,10 @@ end) :
       =
     let offset = ref init_offset in
     { f =
-        (fun (type a) (module B : Bin_prot.Binable.S with type t = a)
-             (value : a) ->
+        (fun (type a)
+          (module B : Bin_prot.Binable.S with type t = a)
+          (value : a)
+        ->
           (* Serialize the value to a bigstring *)
           let serialized_size = B.bin_size_t value in
           let buf = Bigstring.create serialized_size in
@@ -148,8 +150,7 @@ end) :
       ~binary:true ~f:do_reading
 
   (** Read a value from the database using a tag *)
-  let read :
-      type a.
+  let read : type a.
       (module Bin_prot.Binable.S with type t = a) -> a tag -> a Or_error.t =
    fun (module B : Bin_prot.Binable.S with type t = a) tag ->
     let%bind.Or_error buffer = read_bytes tag in
@@ -177,5 +178,5 @@ end
 include Make_custom (struct
   type filename_key = string
 
-  let filename = ident
+  let filename = Fn.id
 end)

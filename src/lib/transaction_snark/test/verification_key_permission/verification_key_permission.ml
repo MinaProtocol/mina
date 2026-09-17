@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Mina_base
 
 module Test_input : Transaction_snark_tests.Test_zkapp_update.Input_intf =
@@ -21,8 +21,8 @@ struct
   let is_non_zkapp_update = true
 end
 
-let%test_module "Update account verification key permission from mainnet to \
-                 berkeley" =
+let%test_module
+    "Update account verification key permission from mainnet to berkeley" =
   ( module struct
     let proof_cache =
       Result.ok_or_failwith @@ Pickles.Proof_cache.of_yojson
@@ -84,15 +84,15 @@ let%test_module "Update account verification key permission from mainnet to \
             test_spec ~init_ledger ~vk ~zkapp_prover
             ~snapp_pk:(Public_key.compress new_kp.public_key) )
 
-    let%test_unit "change verification key perm to Signature and bump txn \
-                   version" =
+    let%test_unit
+        "change verification key perm to Signature and bump txn version" =
       mk_update_perm_check ~perm_after:Signature ()
 
     let%test_unit "change verification key perm to Proof and bump txn version" =
       mk_update_perm_check ~perm_after:Proof ()
 
-    let%test_unit "change verification key perm to Impossible and bump txn \
-                   version" =
+    let%test_unit
+        "change verification key perm to Impossible and bump txn version" =
       mk_update_perm_check ~perm_after:Impossible ()
 
     let%test_unit "change verification key perm to Either and bump txn version"
@@ -100,7 +100,7 @@ let%test_module "Update account verification key permission from mainnet to \
       mk_update_perm_check ~perm_after:Either ()
 
     let () =
-      match Sys.getenv_opt "PROOF_CACHE_OUT" with
+      match Sys.getenv "PROOF_CACHE_OUT" with
       | Some path ->
           Yojson.Safe.to_file path @@ Pickles.Proof_cache.to_yojson proof_cache
       | None ->

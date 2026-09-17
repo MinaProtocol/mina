@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 module Wire_types = Mina_wire_types.Mina_base.Call_stack_digest
 
 module Make_sig (A : Wire_types.Types.S) = struct

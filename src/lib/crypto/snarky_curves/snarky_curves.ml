@@ -1,5 +1,5 @@
 module Bignum_bigint = Bigint
-open Core_kernel
+open Core
 
 module type Params_intf = sig
   type field
@@ -119,11 +119,13 @@ module type Weierstrass_checked_intf = sig
 end
 
 module Make_weierstrass_checked
-    (F : Snarky_field_extensions.Intf.S) (Scalar : sig
+    (F : Snarky_field_extensions.Intf.S)
+    (Scalar : sig
       type t
 
       val of_int : int -> t
-    end) (Curve : sig
+    end)
+    (Curve : sig
       type t
 
       val random : unit -> t
@@ -140,7 +142,8 @@ module Make_weierstrass_checked
 
       val scale : t -> Scalar.t -> t
     end)
-    (Params : Params_intf with type field := F.Unchecked.t) (Override : sig
+    (Params : Params_intf with type field := F.Unchecked.t)
+    (Override : sig
       val add : (F.t * F.t -> F.t * F.t -> (F.t * F.t) F.Impl.Checked.t) option
     end) :
   Weierstrass_checked_intf
@@ -191,11 +194,11 @@ module Make_weierstrass_checked
       exists typ
         ~compute:
           (let open As_prover in
-          let open Let_syntax in
-          let%map ax = read typ ax
-          and bx = read typ bx
-          and lambda = read typ lambda in
-          Unchecked.(square lambda - (ax + bx)))
+           let open Let_syntax in
+           let%map ax = read typ ax
+           and bx = read typ bx
+           and lambda = read typ lambda in
+           Unchecked.(square lambda - (ax + bx)) )
     in
     let%bind () =
       (* lambda^2 = cx + ax + bx
@@ -207,12 +210,12 @@ module Make_weierstrass_checked
       exists typ
         ~compute:
           (let open As_prover in
-          let open Let_syntax in
-          let%map ax = read typ ax
-          and ay = read typ ay
-          and cx = read typ cx
-          and lambda = read typ lambda in
-          Unchecked.((lambda * (ax - cx)) - ay))
+           let open Let_syntax in
+           let%map ax = read typ ax
+           and ay = read typ ay
+           and cx = read typ cx
+           and lambda = read typ lambda in
+           Unchecked.((lambda * (ax - cx)) - ay) )
     in
     let%map () = assert_r1cs lambda (ax - cx) (cy + ay) in
     (cx, cy)
@@ -283,7 +286,7 @@ module Make_weierstrass_checked
           As_prover.(
             map2 (read typ x_squared) (read typ ay) ~f:(fun x_squared ay ->
                 let open F.Unchecked in
-                (x_squared + x_squared + x_squared + Params.a) * inv (ay + ay) ))
+                (x_squared + x_squared + x_squared + Params.a) * inv (ay + ay) ) )
     in
     let%bind bx =
       exists typ
@@ -291,18 +294,18 @@ module Make_weierstrass_checked
           As_prover.(
             map2 (read typ lambda) (read typ ax) ~f:(fun lambda ax ->
                 let open F.Unchecked in
-                square lambda - (ax + ax) ))
+                square lambda - (ax + ax) ) )
     in
     let%bind by =
       exists typ
         ~compute:
           (let open As_prover in
-          let open Let_syntax in
-          let%map lambda = read typ lambda
-          and ax = read typ ax
-          and ay = read typ ay
-          and bx = read typ bx in
-          F.Unchecked.((lambda * (ax - bx)) - ay))
+           let open Let_syntax in
+           let%map lambda = read typ lambda
+           and ax = read typ ax
+           and ay = read typ ay
+           and bx = read typ bx in
+           F.Unchecked.((lambda * (ax - bx)) - ay) )
     in
     let two = Field.of_int 2 in
     let%map () =

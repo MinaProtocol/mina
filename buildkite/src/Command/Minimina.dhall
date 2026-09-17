@@ -8,6 +8,8 @@ let Size = ./Size.dhall
 
 let RunInToolchain = ./RunInToolchain.dhall
 
+let ContainerImages = ../Constants/ContainerImages.dhall
+
 let B = ../External/Buildkite.dhall
 
 let B/SoftFail = B.definitions/commandStep/properties/soft_fail/Type
@@ -25,9 +27,12 @@ let buildStep
       ->  Command.build
             Command.Config::{
             , commands =
-                RunInToolchain.runInToolchainNoble
-                  [ "ARCHITECTURE=amd64" ]
-                  script
+                RunInToolchain.runInToolchain
+                  RunInToolchain.Config::{
+                  , image = ContainerImages.minaToolchainNoble.amd64
+                  , environment = [ "ARCHITECTURE=amd64" ]
+                  , innerScript = script
+                  }
             , label = "Build minimina (amd64)"
             , key = "build-minimina-amd64"
             , target = Size.Small

@@ -17,5 +17,5 @@ id_short="$(printf "%s" "$id" | cut -c1-8)"
     printf 'let commit_id = "%s"\n' "$id"
     printf 'let commit_id_short = "%s"\n' "$id_short"
 
-    printf 'let print_version () = Core_kernel.printf "Commit %%s\\n%%!" commit_id\n'
+    printf 'let print_version () = Printf.printf "Commit %%s\\n%%!" commit_id\n'
 } > "$1"

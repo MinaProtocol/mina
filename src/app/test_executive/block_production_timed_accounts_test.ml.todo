@@ -1,5 +1,5 @@
 open Integration_test_lib
-open Core_kernel
+open Core
 
 module Make (Engine : Intf.Engine.S) (Dsl : Intf.Dsl.S with module Engine := Engine)  = struct
   open Engine

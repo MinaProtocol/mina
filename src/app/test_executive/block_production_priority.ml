@@ -26,15 +26,15 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       requires_graphql = true
     ; genesis_ledger =
         (let open Test_account in
-        [ create ~account_name:"receiver-key" ~balance:"9999999" ()
-        ; create ~account_name:"empty-bp-key" ~balance:"0" ()
-        ; create ~account_name:"snark-node-key" ~balance:"0" ()
-        ]
-        @ List.init num_extra_keys ~f:(fun i ->
-              let i_str = Int.to_string i in
-              create
-                ~account_name:(String.concat [ "sender-account"; i_str ])
-                ~balance:"10000" () ))
+         [ create ~account_name:"receiver-key" ~balance:"9999999" ()
+         ; create ~account_name:"empty-bp-key" ~balance:"0" ()
+         ; create ~account_name:"snark-node-key" ~balance:"0" ()
+         ]
+         @ List.init num_extra_keys ~f:(fun i ->
+             let i_str = Int.to_string i in
+             create
+               ~account_name:(String.concat [ "sender-account"; i_str ])
+               ~balance:"10000" () ) )
     ; block_producers =
         [ { node_name = "receiver"; account_name = "receiver-key" }
         ; { node_name = "empty_node-1"; account_name = "empty-bp-key" }
@@ -76,23 +76,23 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let observer = Network.block_producer_exn network "observer" in
     let%bind receiver_pub_key = pub_key_of_node receiver in
     let empty_bps =
-      Core.String.Map.remove
-        (Core.String.Map.remove (Network.block_producers network) "receiver")
+      Core.Map.remove
+        (Core.Map.remove (Network.block_producers network) "receiver")
         "observer"
-      |> Core.String.Map.data
+      |> Core.Map.data
     in
     let rec map_remove_keys map ~(keys : string list) =
       match keys with
       | [] ->
           map
       | hd :: tl ->
-          map_remove_keys (Core.String.Map.remove map hd) ~keys:tl
+          map_remove_keys (Core.Map.remove map hd) ~keys:tl
     in
     let sender_kps =
       map_remove_keys
         (Network.genesis_keypairs network)
         ~keys:[ "receiver-key"; "empty-bp-key"; "snark-node-key" ]
-      |> Core.String.Map.data
+      |> Core.Map.data
     in
     let sender_priv_keys =
       List.map sender_kps ~f:(fun kp -> kp.keypair.private_key)
@@ -110,8 +110,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let all_mina_nodes = Network.all_mina_nodes network in
     let%bind () =
       wait_for t
-        (Wait_condition.nodes_to_initialize
-           (Core.String.Map.data all_mina_nodes) )
+        (Wait_condition.nodes_to_initialize (Core.Map.data all_mina_nodes))
     in
     let%bind () =
       section_hard "wait for 3 blocks to be produced (warm-up)"
@@ -125,8 +124,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
            (Network.Node.id observer) )
     in
     let end_t =
-      Time.add (Time.now ())
-        (Time.Span.of_ms @@ float_of_int (num_slots * window_ms))
+      Time_float.add (Time_float.now ())
+        (Time_float.Span.of_ms @@ float_of_int (num_slots * window_ms))
     in
     let%bind () =
       section_hard "spawn transaction sending"
@@ -205,10 +204,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       section
         "ensure \\not\\exists more than \\epsilon block production delays of \
          greater 60s from start slot where we should have produced"
-        (let%bind { block_production_delay =
-                      block_production_delay_histogram_buckets_60s_min
-                  ; _
-                  } =
+        (let%bind
+             { block_production_delay =
+                 block_production_delay_histogram_buckets_60s_min
+             ; _
+             } =
            get_metrics receiver
          in
          let blocks_delayed_over_60s =
@@ -241,5 +241,5 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
               ~soft_timeout:(Network_time_span.Slots 3)
               ~hard_timeout:
                 (Network_time_span.Literal
-                   (Time.Span.of_ms (15. *. 60. *. 1000.)) ) ) )
+                   (Time_float.Span.of_ms (15. *. 60. *. 1000.)) ) ) )
 end

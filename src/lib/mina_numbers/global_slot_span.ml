@@ -1,6 +1,6 @@
 (** Global slot span implementation *)
 
-open Core_kernel
+open Core
 
 (** See documentation of the {!Mina_wire_types} library *)
 module Wire_types = Mina_wire_types.Mina_numbers.Global_slot_span

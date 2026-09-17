@@ -1,8 +1,19 @@
-(executable
-  (name dump_slot_ledger)
+(library
+  (name dump_slot_ledger_lib)
+ (modules dump_slot_ledger_lib)
   (libraries
-    async base base.caml caqti caqti-driver-postgresql core cli_lib mina_caqti
+    async base base.caml caqti caqti-driver-postgresql core
+    core_unix.command_unix cli_lib mina_caqti
     yojson
     )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_deriving_yojson ppx_jane ppx_version )))
+
+(executable
+ (name dump_slot_ledger)
+ (modules dump_slot_ledger)
+ (libraries dump_slot_ledger_lib)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_version)))

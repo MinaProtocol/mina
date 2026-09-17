@@ -40,9 +40,10 @@
  (preprocess
   (pps
    base_quickcheck.ppx_quickcheck
+   ppx_compare
    ppx_deriving_yojson
-   ppx_jane
    ppx_mina
+   ppx_sexp_conv
    ppx_version))
  (instrumentation
   (backend bisect_ppx))

@@ -1,6 +1,6 @@
 (* lint_version_syntax.ml -- static enforcement of syntactic items relating to proper versioning *)
 
-open Core_kernel
+open Core
 open Ppxlib
 open Versioned_util
 
@@ -11,7 +11,7 @@ let errors_as_warnings_ref = ref false
 let make_deriving_validator ~pred err_msg type_decl =
   let derivers =
     Ast_pattern.(
-      attribute ~name:(string "deriving") ~payload:(single_expr_payload __))
+      attribute ~name:(string "deriving") ~payload:(single_expr_payload __) )
   in
   match
     List.find_map type_decl.ptype_attributes ~f:(fun attr ->
@@ -475,6 +475,6 @@ let lint_impl str =
 
 let () =
   Driver.add_arg "-lint-version-syntax-warnings"
-    (Caml.Arg.Set errors_as_warnings_ref)
+    (Stdlib.Arg.Set errors_as_warnings_ref)
     ~doc:" Version syntax errors as warnings" ;
   Ppxlib.Driver.register_transformation name ~lint_impl

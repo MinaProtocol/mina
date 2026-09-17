@@ -4,17 +4,17 @@ open Logproc_lib
 let invalid_line_prefix = "!!! "
 
 let find_timezone () =
-  let ch = Unix.open_process_in {|date +"%z"|} in
+  let ch = Core_unix.open_process_in {|date +"%z"|} in
   let input = Option.value_exn (In_channel.input_line ch) in
   In_channel.close ch ;
-  Time.Zone.of_utc_offset ~hours:(int_of_string input / 100)
+  Time_float_unix.Zone.of_utc_offset ~hours:(int_of_string input / 100)
 
 let format_timestamp ~timezone time =
-  let date, of_day = Time.to_date_ofday ~zone:timezone time in
+  let date, of_day = Time_float_unix.to_date_ofday ~zone:timezone time in
   sprintf "%d-%d-%d %s" (Date.year date)
     (Month.to_int (Date.month date))
     (Date.day date)
-    (Time.Ofday.to_string of_day)
+    (Time_float_unix.Ofday.to_string of_day)
 
 let level_color =
   let open Mina_stdlib.Bash_colors in
@@ -189,11 +189,11 @@ let main timezone_str interpolation_config filter_str =
   (* let filter = Result.ok_or_failwith (Filter.Parser.parse ".level === \"Info\"") in *)
   let timezone =
     if String.is_empty timezone_str then find_timezone ()
-    else Time.Zone.of_string timezone_str
+    else Time_float_unix.Zone.of_string timezone_str
   in
   iter_lines_prefixed_with In_channel.stdin stdout ~prefix:'{'
     ~on_hit:(process_line ~timezone ~interpolation_config ~filter)
-    ~on_miss:(fun () -> Out_channel.output_string stdout invalid_line_prefix)
+    ~on_miss:(fun () -> Out_channel.output_string stdout invalid_line_prefix )
 
 let () =
   let open Cmdliner in
@@ -213,7 +213,7 @@ let () =
         & opt
             (enum [ ("hidden", Hidden); ("inline", Inline); ("after", After) ])
             Inline
-        & info [ "i"; "interpolation-mode" ] ~docv:"MODE" ~doc)
+        & info [ "i"; "interpolation-mode" ] ~docv:"MODE" ~doc )
     in
     let max_interpolation_length =
       let doc =
@@ -224,12 +224,11 @@ let () =
         value & opt int 25
         & info
             [ "m"; "max-interpolation-length" ]
-            ~docv:"MAX_INTERPOLATION_LENGTH" ~doc)
+            ~docv:"MAX_INTERPOLATION_LENGTH" ~doc )
     in
     let pretty_print =
       let doc = "Pretty print json values." in
-      Arg.(
-        value & flag & info [ "p"; "pretty-print" ] ~docv:"PRETTY_PRINT" ~doc)
+      Arg.(value & flag & info [ "p"; "pretty-print" ] ~docv:"PRETTY_PRINT" ~doc)
     in
     let lift_interpolation_config mode max_interpolation_length pretty_print =
       let open Interpolator in
@@ -237,7 +236,7 @@ let () =
     in
     Term.(
       const lift_interpolation_config
-      $ interpolation_mode $ max_interpolation_length $ pretty_print)
+      $ interpolation_mode $ max_interpolation_length $ pretty_print )
   in
   let timezone =
     let doc =
@@ -295,6 +294,6 @@ let () =
           )
       ]
     in
-    Term.info ~version:"0.1" ~doc ~exits:Term.default_exits ~man "logproc"
+    Cmd.info ~version:"0.1" ~doc ~man "logproc"
   in
-  Term.(exit @@ eval (main_term, main_info))
+  exit (Cmd.eval (Cmd.v main_info main_term))

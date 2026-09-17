@@ -34,7 +34,8 @@ module Evaluation = struct
 end
 
 module Make
-    (Impl : Snarky_backendless.Snark_intf.S) (Scalar : sig
+    (Impl : Snarky_backendless.Snark_intf.S)
+    (Scalar : sig
       type t [@@deriving equal, sexp]
 
       val random : unit -> t
@@ -56,7 +57,8 @@ module Make
           val equal : var -> var -> unit Checked.t
         end
       end
-    end) (Group : sig
+    end)
+    (Group : sig
       type t [@@deriving sexp]
 
       val add : t -> t -> t
@@ -76,7 +78,8 @@ module Make
           with module Impl := Impl
            and type unchecked := t
            and type t = var
-    end) (Message : sig
+    end)
+    (Message : sig
       open Impl
 
       type value [@@deriving sexp]
@@ -92,7 +95,8 @@ module Make
       module Checked : sig
         val hash_to_group : var -> Group.var Checked.t
       end
-    end) (Output_hash : sig
+    end)
+    (Output_hash : sig
       type t
 
       type var
@@ -104,7 +108,8 @@ module Make
       module Checked : sig
         val hash : Message.var -> Group.var -> var Impl.Checked.t
       end
-    end) (Hash : sig
+    end)
+    (Hash : sig
       (* I believe this has to be a random oracle *)
 
       val hash_for_proof :
@@ -265,7 +270,7 @@ end = struct
             in
             Group.Checked.(
               scale shifted (negate public_key) (Scalar.Checked.to_bits c)
-                ~init:sg)
+                ~init:sg )
             >>= Shifted.unshift_nonzero
           and b =
             (* s * H(m) - c * scaled_message_hash *)
@@ -277,7 +282,7 @@ end = struct
             Group.Checked.(
               scale shifted
                 (negate scaled_message_hash)
-                (Scalar.Checked.to_bits c) ~init:sx)
+                (Scalar.Checked.to_bits c) ~init:sx )
             >>= Shifted.unshift_nonzero
           in
           Hash.Checked.hash_for_proof message public_key a b
@@ -293,7 +298,8 @@ end
 open Core
 
 module Bigint_scalar
-    (Impl : Snarky_backendless.Snark_intf.S) (M : sig
+    (Impl : Snarky_backendless.Snark_intf.S)
+    (M : sig
       val modulus : Bigint.t
 
       val random : unit -> Bigint.t

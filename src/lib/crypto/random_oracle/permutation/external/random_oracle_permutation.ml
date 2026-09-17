@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 module Inputs = Pickles.Tick_field_sponge.Inputs
 module Ocaml_permutation = Sponge.Poseidon (Inputs)
 module Field = Kimchi_backend.Pasta.Basic.Fp

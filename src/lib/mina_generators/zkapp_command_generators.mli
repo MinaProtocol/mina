@@ -1,5 +1,5 @@
 open Mina_base
-open Core_kernel
+open Core
 
 type balance_change_range_t =
   { min_balance_change : Currency.Amount.t

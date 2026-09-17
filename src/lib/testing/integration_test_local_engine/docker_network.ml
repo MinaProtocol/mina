@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Async
 open Integration_test_lib
 
@@ -111,7 +111,7 @@ module Node = struct
 
   let cp_string_to_container_file container_id ~str ~dest =
     let tmp_file, oc =
-      Caml.Filename.open_temp_file ~temp_dir:Filename.temp_dir_name
+      Stdlib.Filename.open_temp_file ~temp_dir:Filename.temp_dir_name
         "integration_test_cp_string" ".tmp"
     in
     Out_channel.output_string oc str ;
@@ -219,7 +219,7 @@ module Node = struct
                 () )
     in
     let%bind.Deferred () =
-      Deferred.List.iter state_hash_and_blocks
+      Deferred.List.iter ~how:`Sequential state_hash_and_blocks
         ~f:(fun (state_hash_json, block_json) ->
           let double_quoted_state_hash =
             Yojson.Safe.to_string state_hash_json
@@ -327,37 +327,36 @@ let archive_nodes { archive_nodes; _ } = archive_nodes
 
 let all_mina_nodes { seeds; block_producers; snark_coordinators; _ } =
   List.concat
-    [ Core.String.Map.to_alist seeds
-    ; Core.String.Map.to_alist block_producers
-    ; Core.String.Map.to_alist snark_coordinators
+    [ Core.Map.to_alist seeds
+    ; Core.Map.to_alist block_producers
+    ; Core.Map.to_alist snark_coordinators
     ]
   |> Core.String.Map.of_alist_exn
 
 let all_nodes t =
   List.concat
-    [ Core.String.Map.to_alist t.seeds
-    ; Core.String.Map.to_alist t.block_producers
-    ; Core.String.Map.to_alist t.snark_coordinators
-    ; Core.String.Map.to_alist t.snark_workers
+    [ Core.Map.to_alist t.seeds
+    ; Core.Map.to_alist t.block_producers
+    ; Core.Map.to_alist t.snark_coordinators
+    ; Core.Map.to_alist t.snark_workers
     ]
   |> Core.String.Map.of_alist_exn
 
 let all_non_seed_nodes t =
   List.concat
-    [ Core.String.Map.to_alist t.block_producers
-    ; Core.String.Map.to_alist t.snark_coordinators
-    ; Core.String.Map.to_alist t.snark_workers
+    [ Core.Map.to_alist t.block_producers
+    ; Core.Map.to_alist t.snark_coordinators
+    ; Core.Map.to_alist t.snark_workers
     ]
   |> Core.String.Map.of_alist_exn
 
-let node_exn t key = Core.String.Map.find_exn (all_nodes t) key
+let node_exn t key = Core.Map.find_exn (all_nodes t) key
 
-let block_producer_exn t key = Core.String.Map.find_exn (block_producers t) key
+let block_producer_exn t key = Core.Map.find_exn (block_producers t) key
 
 let genesis_keypairs { genesis_keypairs; _ } = genesis_keypairs
 
-let genesis_keypair_exn t key =
-  Core.String.Map.find_exn (genesis_keypairs t) key
+let genesis_keypair_exn t key = Core.Map.find_exn (genesis_keypairs t) key
 
 let all_ids t =
   let deployments = all_nodes t |> Core.Map.to_alist in

@@ -1,6 +1,6 @@
 (* receipt.ml *)
 
-open Core_kernel
+open Core
 module B58_lib = Base58_check
 open Snark_params.Tick
 
@@ -53,7 +53,7 @@ module Chain_hash = struct
       match e with
       | Signed_command_payload payload ->
           Transaction_union_payload.(
-            to_input_legacy (of_user_command_payload payload))
+            to_input_legacy (of_user_command_payload payload) )
     in
     Input.(append x (field (t :> Field.t)))
     |> pack_input
@@ -120,7 +120,7 @@ module Chain_hash = struct
           Checked.hash ~init:Hash_prefix.receipt_chain_zkapp_command
             (Checked.pack_input
                Input.Chunked.(
-                 append index_input (append x (field (var_to_hash_packed t)))) )
+                 append index_input (append x (field (var_to_hash_packed t))) ) )
           |> var_of_hash_packed )
   end
 end

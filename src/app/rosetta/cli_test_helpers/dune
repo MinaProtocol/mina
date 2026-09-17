@@ -1,0 +1,18 @@
+;; Helpers shared by the alcotest suites of the two Rosetta CLIs.
+;;
+;; Both suites spawn a binary and assert on what it printed, and the
+;; needle list in [assert_no_ocaml_exn_leak] is the regression guard
+;; both of them exist for.  One copy, so the guard cannot drift.
+
+(library
+ (name rosetta_cli_test_helpers)
+ (libraries
+  ;; opam libraries
+  alcotest
+  async
+  core
+  core_unix.signal_unix)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_version ppx_let)))

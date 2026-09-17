@@ -69,9 +69,10 @@ struct end
 
 module Assert_equal8V1
     (O : V1S8)
-    (W : V1S8
-           with type ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'h) V1.t =
-             ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'h) O.V1.t) =
+    (W :
+      V1S8
+        with type ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'h) V1.t =
+          ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'h) O.V1.t) =
 struct end
 
 (** {2 Actual tests}

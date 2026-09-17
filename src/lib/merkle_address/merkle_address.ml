@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Bitstring
 
 let depth = bitstring_length
@@ -148,8 +148,8 @@ let extend_exn ~ledger_depth path ~num_bits child_idx =
 let to_int (path : t) : int =
   Sequence.range 0 (depth path)
   |> Sequence.fold ~init:0 ~f:(fun acc i ->
-         let index = depth path - 1 - i in
-         acc + ((if Int.(get path index <> 0) then 1 else 0) lsl i) )
+      let index = depth path - 1 - i in
+      acc + ((if Int.(get path index <> 0) then 1 else 0) lsl i) )
 
 let of_int_exn ~ledger_depth index =
   if Int.(index >= 1 lsl ledger_depth) then failwith "Index is too large"
@@ -159,8 +159,8 @@ let of_int_exn ~ledger_depth index =
       ( Sequence.range ~stride:(-1) ~start:`inclusive ~stop:`inclusive
           (ledger_depth - 1) 0
         |> Sequence.fold ~init:index ~f:(fun i pos ->
-               Bitstring.put buf pos (i % 2) ;
-               i / 2 )
+            Bitstring.put buf pos (i % 2) ;
+            i / 2 )
         : int ) ;
     buf
 
@@ -270,17 +270,15 @@ module Range = struct
 
   let subtree_range_seq ~ledger_depth address =
     let first_node, last_node = subtree_range ~ledger_depth address in
-    Sequence.unfold
-      ~init:(first_node, `Don't_stop)
-      ~f:(function
-        | _, `Stop ->
-            None
-        | current_node, `Don't_stop ->
-            if Int.equal (compare current_node last_node) 0 then
-              Some (current_node, (current_node, `Stop))
-            else
-              Option.map (next current_node) ~f:(fun next_node ->
-                  (current_node, (next_node, `Don't_stop)) ) )
+    Sequence.unfold ~init:(first_node, `Don't_stop) ~f:(function
+      | _, `Stop ->
+          None
+      | current_node, `Don't_stop ->
+          if Int.equal (compare current_node last_node) 0 then
+            Some (current_node, (current_node, `Stop))
+          else
+            Option.map (next current_node) ~f:(fun next_node ->
+                (current_node, (next_node, `Don't_stop)) ) )
 end
 
 module Make_test (Input : sig

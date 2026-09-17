@@ -4,7 +4,7 @@ let PublishPackages = ../Command/Packages/Publish.dhall
 
 let Profile = ../Constants/Profiles.dhall
 
-let Artifact = ../Constants/Artifacts.dhall
+let Artifact = ../Constants/Docker/Package.dhall
 
 let DebianChannel = ../Constants/DebianChannel.dhall
 

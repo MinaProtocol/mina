@@ -145,14 +145,14 @@ module Cassandra = struct
   let submitter ({ submitter; _ } : submission) =
     Public_key.Compressed.of_base58_check_exn submitter
 
-  let zone = Lazy.force Time.Zone.local
+  let zone = Lazy.force Time_float_unix.Zone.local
 
   let shard t =
-    let parts = Time.to_ofday t ~zone |> Time.Ofday.to_parts in
+    let parts = Time_float.to_ofday t ~zone |> Time_float.Ofday.to_parts in
     ((parts.hr * 3600) + (parts.min * 60) + parts.sec) / 144
 
   let shards_range start_time end_time =
-    if Time.Span.(Time.diff end_time start_time > of_day 1.0) then
+    if Time_float.Span.(Time_float.diff end_time start_time > of_day 1.0) then
       List.range ~stop:`inclusive 0 599
     else
       let first_shard = shard start_time in
@@ -165,13 +165,13 @@ module Cassandra = struct
   let comma_sep ~to_str l = List.map ~f:to_str l |> String.concat ~sep:", "
 
   let load_submissions { conf; period_start; period_end } =
-    let start_time = Time.of_string period_start in
-    let end_time = Time.of_string period_end in
-    let start_day = Time.to_date ~zone start_time in
-    let end_day = Time.to_date ~zone end_time in
+    let start_time = Time_float_unix.of_string period_start in
+    let end_time = Time_float_unix.of_string period_end in
+    let start_day = Time_float.to_date ~zone start_time in
+    let end_day = Time_float.to_date ~zone end_time in
     let partition_keys =
       Date.dates_between ~min:start_day ~max:end_day
-      |> List.map ~f:(fun d -> Date.format d "%Y-%m-%d")
+      |> List.map ~f:(fun d -> Date_unix.format d "%Y-%m-%d")
     in
     let shards = shards_range start_time end_time in
     let partition =
@@ -236,7 +236,7 @@ module Cassandra = struct
                "submitted_at_date = '%s' and shard = %d and submitted_at = \
                 '%s' and submitter = '%s'"
                (List.hd_exn @@ String.split ~on:' ' submission.submitted_at)
-               (shard @@ Time.of_string submission.submitted_at)
+               (shard @@ Time_float_unix.of_string submission.submitted_at)
                submission.submitted_at submission.submitter )
           Output.(valid_payload_to_cassandra_updates payload)
     | Error e ->
@@ -247,7 +247,7 @@ module Cassandra = struct
                "submitted_at_date = '%s' and shard = %d and submitted_at = \
                 '%s' and submitter = '%s'"
                (List.hd_exn @@ String.split ~on:' ' submission.submitted_at)
-               (shard @@ Time.of_string submission.submitted_at)
+               (shard @@ Time_float_unix.of_string submission.submitted_at)
                submission.submitted_at submission.submitter )
           [ ("validation_error", sprintf "'%s'" (Error.to_string_hum e))
           ; ("raw_block", "NULL")

@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 
 module Zkapp_command_segment_witness : sig
   open Mina_base

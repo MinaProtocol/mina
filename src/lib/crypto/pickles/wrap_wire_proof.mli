@@ -2,7 +2,7 @@
     aren't used.
 *)
 
-open Core_kernel
+open Core
 open Pickles_types
 module Columns = Nat.N15
 module Columns_vec = Vector.Vector_15

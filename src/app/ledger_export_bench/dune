@@ -3,6 +3,7 @@
  (package mina_ledger_export_benchmark)
  (public_name mina-ledger-export-benchmark)
  (libraries
+  core_unix.command_unix
   base
   core
   core_bench

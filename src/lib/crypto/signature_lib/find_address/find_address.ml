@@ -80,7 +80,7 @@
     compressed public key where we can calculate the `y` coordinate 'valid'.
 *)
 
-open Core_kernel
+open Core
 open Signature_lib
 
 (** Set to `true` for debugging output. *)
@@ -93,7 +93,7 @@ let default_prefix = "zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz"
     `default_prefix` if no positional argument was given.
 *)
 let desired_prefix =
-  try Sys.argv.(1)
+  try (Sys.get_argv ()).(1)
   with _ ->
     Format.eprintf "No prefix provided as first argument, using %s@."
       default_prefix ;

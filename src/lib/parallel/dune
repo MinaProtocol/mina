@@ -8,6 +8,7 @@
   async
   core
   rpc_parallel
+  rpc_parallel.unauthenticated
   async.async_rpc
   core_kernel)
  (preprocess

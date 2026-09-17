@@ -5,7 +5,7 @@
  * @see <https://en.wikipedia.org/wiki/Mina_stdlib.Rose_tree> Wikipedia Article
  *)
 
-open Core_kernel
+open Core
 open Async_kernel
 
 type 'a t = T of 'a * 'a t list [@@deriving yojson]

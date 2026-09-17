@@ -52,7 +52,7 @@ let get_test_field = function
   | `Assoc [ ("data", `Assoc [ ("test", value) ]) ] ->
       value
   | json ->
-      Core_kernel.failwithf "(%s) Unexpected format of JSON response:%s" __LOC__
+      Core.failwithf "(%s) Unexpected format of JSON response:%s" __LOC__
         (Yojson.Basic.to_string json)
         ()
 
@@ -68,14 +68,13 @@ struct
               ~typ:(non_null @@ S.typ ())
               ~args:Arg.[]
               ~resolve:(fun _ () -> value)
-          ])
+          ] )
     in
     test_query schema () "{ test }" (fun response ->
         [%test_eq: G.t] value (S.parse @@ get_test_field response) )
 
   let test_query () =
-    Core_kernel.Quickcheck.test G.gen ~sexp_of:G.sexp_of_t
-      ~f:query_server_and_compare
+    Core.Quickcheck.test G.gen ~sexp_of:G.sexp_of_t ~f:query_server_and_compare
 end
 
 module Make_test

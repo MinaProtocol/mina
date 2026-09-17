@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Async_kernel
 
 let time_offset_sec = 1609459200.
@@ -75,17 +75,11 @@ module Process_memory = struct
   end
 
   module Daemon = Make_rss_gauge ()
-
   module Prover = Make_rss_gauge ()
-
   module Verifier = Make_rss_gauge ()
-
   module Snark_worker = Make_rss_gauge ()
-
   module Uptime_snark_worker = Make_rss_gauge ()
-
   module Vrf_evaluator = Make_rss_gauge ()
-
   module Libp2p_helper = Make_rss_gauge ()
 end
 
@@ -162,15 +156,15 @@ module Network = struct
     let received : Counter.t = ()
 
     module Validation_time = struct
-      let update : Time.Span.t -> unit = Fn.ignore
+      let update : Time_float.Span.t -> unit = Fn.ignore
     end
 
     module Processing_time = struct
-      let update : Time.Span.t -> unit = Fn.ignore
+      let update : Time_float.Span.t -> unit = Fn.ignore
     end
 
     module Rejection_time = struct
-      let update : Time.Span.t -> unit = Fn.ignore
+      let update : Time_float.Span.t -> unit = Fn.ignore
     end
   end
 
@@ -184,15 +178,15 @@ module Network = struct
     let received : Counter.t = ()
 
     module Validation_time = struct
-      let update : Time.Span.t -> unit = Fn.ignore
+      let update : Time_float.Span.t -> unit = Fn.ignore
     end
 
     module Processing_time = struct
-      let update : Time.Span.t -> unit = Fn.ignore
+      let update : Time_float.Span.t -> unit = Fn.ignore
     end
 
     module Rejection_time = struct
-      let update : Time.Span.t -> unit = Fn.ignore
+      let update : Time_float.Span.t -> unit = Fn.ignore
     end
   end
 
@@ -206,15 +200,15 @@ module Network = struct
     let received : Counter.t = ()
 
     module Validation_time = struct
-      let update : Time.Span.t -> unit = Fn.ignore
+      let update : Time_float.Span.t -> unit = Fn.ignore
     end
 
     module Processing_time = struct
-      let update : Time.Span.t -> unit = Fn.ignore
+      let update : Time_float.Span.t -> unit = Fn.ignore
     end
 
     module Rejection_time = struct
-      let update : Time.Span.t -> unit = Fn.ignore
+      let update : Time_float.Span.t -> unit = Fn.ignore
     end
   end
 
@@ -339,6 +333,21 @@ module Network = struct
   let get_epoch_ledger_rpc_responses_failed : Counter.t = ()
 
   let rpc_connections_failed : Counter.t = ()
+
+  let stream_queue_messages_max ~protocol:_ ~queue:_ : Gauge.t = ()
+
+  let stream_queue_messages_sum ~protocol:_ ~queue:_ : Gauge.t = ()
+
+  let stream_queue_bytes_max ~protocol:_ ~queue:_ : Gauge.t = ()
+
+  let stream_queue_bytes_sum ~protocol:_ ~queue:_ : Gauge.t = ()
+
+  let stream_queue_discarded_messages ~protocol:_ ~queue:_ ~reason:_ : Counter.t
+      =
+    ()
+
+  let stream_queue_discarded_bytes ~protocol:_ ~queue:_ ~reason:_ : Counter.t =
+    ()
 
   module Ipc_latency_histogram = Histogram
   module Rpc_latency_histogram = Histogram
@@ -539,7 +548,7 @@ module Block_latency = struct
   module Gossip_time = struct
     let v : Gauge.t = ()
 
-    let update : Time.Span.t -> unit = fun _ -> ()
+    let update : Time_float.Span.t -> unit = fun _ -> ()
 
     let clear : unit -> unit = fun _ -> ()
 
@@ -549,7 +558,7 @@ module Block_latency = struct
   module Inclusion_time = struct
     let v : Gauge.t = ()
 
-    let update : Time.Span.t -> unit = fun _ -> ()
+    let update : Time_float.Span.t -> unit = fun _ -> ()
 
     let clear : unit -> unit = fun _ -> ()
 
@@ -559,7 +568,7 @@ module Block_latency = struct
   module Validation_acceptance_time = struct
     let v : Gauge.t = ()
 
-    let update : Time.Span.t -> unit = fun _ -> ()
+    let update : Time_float.Span.t -> unit = fun _ -> ()
 
     let clear : unit -> unit = fun _ -> ()
 

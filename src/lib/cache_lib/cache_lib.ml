@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 module Intf = Intf
 
 include Impl.Make (struct

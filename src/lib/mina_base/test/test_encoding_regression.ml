@@ -6,7 +6,7 @@
     Subject:    Regression tests for base58 encoding of core types.
  *)
 
-open Core_kernel
+open Core
 open Mina_base
 
 (* Signature.dummy = (Field.one, Inner_curve.Scalar.one) *)

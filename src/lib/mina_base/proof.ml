@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 
 let blockchain_dummy = lazy (Dummy_values.blockchain_proof ())
 

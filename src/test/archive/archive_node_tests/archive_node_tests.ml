@@ -7,7 +7,7 @@ let () =
   Backtrace.elide := false ;
   Async.Scheduler.set_record_backtraces true ;
   let random_seed =
-    Time.(now () |> to_span_since_epoch |> Span.to_ms) |> Int.of_float
+    Time_float.(now () |> to_span_since_epoch |> Span.to_ms) |> Int.of_float
   in
   [%log info] "Initializing random with seed"
     ~metadata:[ ("seed", `Int random_seed) ] ;

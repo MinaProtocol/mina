@@ -34,19 +34,19 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       requires_graphql = true
     ; genesis_ledger =
         (let open Test_account in
-        [ create ~account_name:"bp-1" ~balance:"400000" ()
-        ; create ~account_name:"bp-2" ~balance:"300000" ()
-        ; create ~account_name:"timed-bp" ~balance:"30000"
-            ~timing:
-              (make_timing ~min_balance:10_000_000_000_000 ~cliff_time:8
-                 ~cliff_amount:0 ~vesting_period:4
-                 ~vesting_increment:5_000_000_000_000 )
-            ()
-        ; create ~account_name:"snark-node-1" ~balance:"0" ()
-        ; create ~account_name:"snark-node-2" ~balance:"0" ()
-        ; create ~account_name:"fish-1" ~balance:"100" ()
-        ; create ~account_name:"fish-2" ~balance:"100" ()
-        ])
+         [ create ~account_name:"bp-1" ~balance:"400000" ()
+         ; create ~account_name:"bp-2" ~balance:"300000" ()
+         ; create ~account_name:"timed-bp" ~balance:"30000"
+             ~timing:
+               (make_timing ~min_balance:10_000_000_000_000 ~cliff_time:8
+                  ~cliff_amount:0 ~vesting_period:4
+                  ~vesting_increment:5_000_000_000_000 )
+             ()
+         ; create ~account_name:"snark-node-1" ~balance:"0" ()
+         ; create ~account_name:"snark-node-2" ~balance:"0" ()
+         ; create ~account_name:"fish-1" ~balance:"100" ()
+         ; create ~account_name:"fish-2" ~balance:"100" ()
+         ] )
     ; block_producers =
         [ { node_name = "bp-1-node"; account_name = "bp-1" }
         ; { node_name = "bp-2-node"; account_name = "bp-2" }
@@ -121,32 +121,23 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let all_mina_nodes = Network.all_mina_nodes network in
     let%bind () =
       wait_for t
-        (Wait_condition.nodes_to_initialize
-           (Core.String.Map.data all_mina_nodes) )
+        (Wait_condition.nodes_to_initialize (Core.Map.data all_mina_nodes))
     in
     let node =
-      Core.String.Map.find_exn (Network.block_producers network) "bp-1-node"
+      Core.Map.find_exn (Network.block_producers network) "bp-1-node"
     in
-    let bp1 =
-      Core.String.Map.find_exn (Network.genesis_keypairs network) "bp-1"
-    in
-    let bp2 =
-      Core.String.Map.find_exn (Network.genesis_keypairs network) "bp-2"
-    in
+    let bp1 = Core.Map.find_exn (Network.genesis_keypairs network) "bp-1" in
+    let bp2 = Core.Map.find_exn (Network.genesis_keypairs network) "bp-2" in
     let timed_bp =
-      Core.String.Map.find_exn (Network.genesis_keypairs network) "timed-bp"
+      Core.Map.find_exn (Network.genesis_keypairs network) "timed-bp"
     in
-    let fish1 =
-      Core.String.Map.find_exn (Network.genesis_keypairs network) "fish-1"
-    in
-    let fish2 =
-      Core.String.Map.find_exn (Network.genesis_keypairs network) "fish-2"
-    in
+    let fish1 = Core.Map.find_exn (Network.genesis_keypairs network) "fish-1" in
+    let fish2 = Core.Map.find_exn (Network.genesis_keypairs network) "fish-2" in
     let snark_worker1 =
-      Core.String.Map.find_exn (Network.genesis_keypairs network) "snark-node-1"
+      Core.Map.find_exn (Network.genesis_keypairs network) "snark-node-1"
     in
     let snark_worker2 =
-      Core.String.Map.find_exn (Network.genesis_keypairs network) "snark-node-2"
+      Core.Map.find_exn (Network.genesis_keypairs network) "snark-node-2"
     in
     [%log info] "Node GQL URI: %s."
       (Network.Node.get_ingress_uri node |> Uri.to_string) ;
@@ -252,7 +243,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
             Malleable_error.soft_error_format ~value:()
               "Error: delegate mismatch in account %s.  \n\
                In the genesis ledger: %s.  \n\
-               On the original blockchain: %s." genesis_account.pk
+               On the original blockchain: %s."
+              genesis_account.pk
               (Option.value_exn genesis_account.delegate)
               ( Public_key.Compressed.to_base58_check
               @@ Option.value_exn gql_account.delegate )
@@ -265,7 +257,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           Malleable_error.soft_error_format ~value:()
             "Error: balance mismatch in account %s.  \n\
              In the genesis ledger: %s.  \n\
-             On the original blockchain: %s." genesis_account.pk
+             On the original blockchain: %s."
+            genesis_account.pk
             (Balance.to_string genesis_account.balance)
             (Balance.to_string gql_account.total_balance) )
 end

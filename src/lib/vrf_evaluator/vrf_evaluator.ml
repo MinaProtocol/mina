@@ -224,8 +224,7 @@ module Worker_state = struct
               (Consensus.Data.Vrf.check
                  ~context:(module Context)
                  ~global_slot ~seed:epoch_data.epoch_seed
-                 ~get_delegators:
-                   (Public_key.Compressed.Table.find delegatee_table)
+                 ~get_delegators:(Hashtbl.find delegatee_table)
                  ~producer_private_key:keypair.private_key
                  ~producer_public_key:public_key_compressed ~total_stake )
           in
@@ -236,9 +235,9 @@ module Worker_state = struct
               go keypairs
           | Ok
               (Some
-                ( `Vrf_eval _vrf_string
-                , `Vrf_output vrf_result
-                , `Delegator delegator ) ) ->
+                 ( `Vrf_eval _vrf_string
+                 , `Vrf_output vrf_result
+                 , `Delegator delegator ) ) ->
               [%log info] "Won slot %d in epoch %d" (Slot.to_int slot)
                 (Epoch.to_int epoch) ;
               let slot_won =
@@ -260,7 +259,7 @@ module Worker_state = struct
     let start_consensus_time (epoch_data : Consensus.Data.Epoch_data_for_vrf.t)
         =
       Consensus.Data.Consensus_time.(
-        of_global_slot ~constants:consensus_constants epoch_data.global_slot)
+        of_global_slot ~constants:consensus_constants epoch_data.global_slot )
     in
     let wait_for_state_change () = Ivar.read t.state_changed in
     let scanning generation state_version consensus_time =
@@ -294,9 +293,9 @@ module Worker_state = struct
                 match current with
                 | Some
                     (`Scanning
-                      ( scanning_generation
-                      , scanning_state_version
-                      , consensus_time ) )
+                       ( scanning_generation
+                       , scanning_state_version
+                       , consensus_time ) )
                   when scanning_generation = generation
                        && scanning_state_version = state_version ->
                     consensus_time
@@ -330,7 +329,7 @@ module Worker_state = struct
                 loop current )
               else (
                 mark_progress t (Scanning global_slot) ;
-                let start = Time.now () in
+                let start = Time_float.now () in
                 let keypairs = t.block_producer_keys in
                 let%bind slot_won =
                   evaluate_vrf
@@ -349,7 +348,8 @@ module Worker_state = struct
                       [%log info] "Did not win slot $slot, took $time ms"
                         ~metadata:
                           [ ( "time"
-                            , `Float Time.(Span.to_ms (diff (now ()) start)) )
+                            , `Float
+                                Time_float.(Span.to_ms (diff (now ()) start)) )
                           ; ("slot", Slot.to_yojson slot)
                           ] ;
                       loop (next_slot generation state_version consensus_time)
@@ -357,7 +357,8 @@ module Worker_state = struct
                       [%log info] "Won a slot $slot, took $time ms"
                         ~metadata:
                           [ ( "time"
-                            , `Float Time.(Span.to_ms (diff (now ()) start)) )
+                            , `Float
+                                Time_float.(Span.to_ms (diff (now ()) start)) )
                           ; ("slot", Slot.to_yojson slot)
                           ] ;
                       enqueue_slot_won t slot_won
@@ -466,9 +467,10 @@ module Worker = struct
     end
 
     module Functions
-        (C : Rpc_parallel.Creator
-               with type worker_state := Worker_state.t
-                and type connection_state := Connection_state.t) =
+        (C :
+          Rpc_parallel.Creator
+            with type worker_state := Worker_state.t
+             and type connection_state := Connection_state.t) =
     struct
       let functions =
         let f (i, o, f) =
@@ -508,8 +510,7 @@ type t = { connection : Worker.Connection.t; process : Process.t }
 
 let update_block_producer_keys { connection; process = _ } ~keypairs =
   Worker.Connection.run connection
-    ~f:Worker.functions.update_block_producer_keys
-    ~arg:(Keypair.And_compressed_pk.Set.to_list keypairs)
+    ~f:Worker.functions.update_block_producer_keys ~arg:(Set.to_list keypairs)
 
 let create ~constraint_constants ~pids ~consensus_constants ~conf_dir ~logger
     ~keypairs ~commit_id =
@@ -520,7 +521,8 @@ let create ~constraint_constants ~pids ~consensus_constants ~conf_dir ~logger
   in
   [%log info] "Starting a new vrf-evaluator process" ;
   let%bind connection, process =
-    Worker.spawn_in_foreground_exn ~connection_timeout:(Time.Span.of_min 1.)
+    Worker.spawn_in_foreground_exn
+      ~connection_timeout:(Time_float.Span.of_min 1.)
       ~on_failure ~shutdown_on:Connection_closed ~connection_state_init_arg:()
       { constraint_constants; consensus_constants; conf_dir; logger; commit_id }
   in

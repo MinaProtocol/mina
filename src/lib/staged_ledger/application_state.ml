@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Mina_base
 open Mina_transaction
 
@@ -29,11 +29,10 @@ struct
     }
 
   let add_skipped_txn t (txn : Txn.t) =
-    Account_id.Map.update t.skipped_by_fee_payer (Txn.key txn)
+    Map.update t.skipped_by_fee_payer (Txn.key txn)
       ~f:(Option.value_map ~default:[ txn ] ~f:(List.cons txn))
 
-  let dependency_skipped txn t =
-    Account_id.Map.mem t.skipped_by_fee_payer (Txn.key txn)
+  let dependency_skipped txn t = Map.mem t.skipped_by_fee_payer (Txn.key txn)
 
   let try_applying_txn ?logger ~apply (state : t) (txn : Txn.t) =
     let open Continue_or_stop in
@@ -47,7 +46,7 @@ struct
     | _ -> (
         match
           O1trace.sync_thread "validate_transaction_against_staged_ledger"
-            (fun () -> apply (Transaction.Command (Txn.to_user_command txn)))
+            (fun () -> apply (Transaction.Command (Txn.to_user_command txn)) )
         with
         | Error e ->
             Option.iter logger ~f:(fun logger ->

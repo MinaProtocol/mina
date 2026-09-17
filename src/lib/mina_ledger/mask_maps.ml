@@ -1,5 +1,5 @@
 open Mina_base
-open Core_kernel
+open Core
 
 module ArrayN = Mina_stdlib.Bounded_types.ArrayN (struct
   (* TODO remove hardcoded value: this should bound max. number of ledger updates per block *)
@@ -114,8 +114,8 @@ module F (Location : Merkle_ledger.Location_intf.S) = struct
     else Location.Hash addr
 
   let of_stable ~ledger_depth (stable : Stable.Latest.t) : t =
-    let f_key = ident in
-    let f_value = ident in
+    let f_key = Fn.id in
+    let f_value = Fn.id in
     { accounts =
         Map.of_stable
           ~f_key:(location_of_stable ~ledger_depth)
@@ -142,8 +142,8 @@ module F (Location : Merkle_ledger.Location_intf.S) = struct
     }
 
   let to_stable ~ledger_depth (t : t) : Stable.Latest.t =
-    let f_key = ident in
-    let f_value = ident in
+    let f_key = Fn.id in
+    let f_value = Fn.id in
     { accounts =
         Map.to_stable
           ~f_key:(location_to_stable ~ledger_depth)
@@ -155,6 +155,6 @@ module F (Location : Merkle_ledger.Location_intf.S) = struct
         Map.to_stable ~f_key
           ~f_value:(location_to_stable ~ledger_depth)
           t.locations
-    ; non_existent_accounts = Account_id.Set.to_array t.non_existent_accounts
+    ; non_existent_accounts = Set.to_array t.non_existent_accounts
     }
 end

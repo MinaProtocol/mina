@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Mina_base
 
 let all_equal ~equal ~compare ls =
@@ -8,9 +8,10 @@ let all_equal ~equal ~compare ls =
 module Make
     (Engine : Intf.Engine.S)
     (Event_router : Intf.Dsl.Event_router_intf with module Engine := Engine)
-    (Network_state : Intf.Dsl.Network_state_intf
-                       with module Engine := Engine
-                        and module Event_router := Event_router) =
+    (Network_state :
+      Intf.Dsl.Network_state_intf
+        with module Engine := Engine
+         and module Event_router := Event_router) =
 struct
   open Network_state
   module Node = Engine.Network.Node
@@ -62,8 +63,8 @@ struct
     { id
     ; description
     ; predicate = Network_state_predicate (check (), check)
-    ; soft_timeout = Literal (Time.Span.of_hr 1.0)
-    ; hard_timeout = Literal (Time.Span.of_hr 2.0)
+    ; soft_timeout = Literal (Time_float.Span.of_hr 1.0)
+    ; hard_timeout = Literal (Time_float.Span.of_hr 2.0)
     }
 
   let wait_condition_id t = t.id
@@ -76,11 +77,11 @@ struct
         |> sprintf "[%s] to initialize" )
       ~f:(fun (state : Network_state.t) ->
         List.for_all nodes ~f:(fun node ->
-            String.Map.find state.node_initialization (Node.id node)
+            Map.find state.node_initialization (Node.id node)
             |> Option.value ~default:false ) )
     |> with_timeouts
-         ~soft_timeout:(Literal (Time.Span.of_min 10.0))
-         ~hard_timeout:(Literal (Time.Span.of_min 15.0))
+         ~soft_timeout:(Literal (Time_float.Span.of_min 10.0))
+         ~hard_timeout:(Literal (Time_float.Span.of_min 15.0))
 
   let node_to_initialize node = nodes_to_initialize [ node ]
 
@@ -166,8 +167,8 @@ struct
            'sync_needed' set to %b"
           fresh_data sync_needed
     ; predicate = Network_state_predicate (init, check)
-    ; soft_timeout = Literal (Time.Span.of_min 10.0)
-    ; hard_timeout = Literal (Time.Span.of_min 15.0)
+    ; soft_timeout = Literal (Time_float.Span.of_min 10.0)
+    ; hard_timeout = Literal (Time_float.Span.of_min 15.0)
     }
 
   let block_height_growth ~height_growth =
@@ -197,7 +198,7 @@ struct
       in
       let best_tips =
         List.map nodes ~f:(fun node ->
-            String.Map.find state.best_tips_by_node (Node.id node) )
+            Map.find state.best_tips_by_node (Node.id node) )
       in
       if
         List.for_all best_tips ~f:Option.is_some
@@ -238,10 +239,9 @@ struct
                 |> Option.value ~default:State_hash.Set.empty
               in
               let intersection =
-                State_hash.Set.inter blocks_with_txn_set blocks_seen_by_n
+                Set.inter blocks_with_txn_set blocks_seen_by_n
               in
-              if State_hash.Set.is_empty intersection then
-                Predicate_continuation ()
+              if Set.is_empty intersection then Predicate_continuation ()
               else Predicate_passed )
     in
 
@@ -265,8 +265,7 @@ struct
       sprintf "[%d] snarked_ledgers to be generated since genesis" num_proofs
     in
     let slots_for_first_proof =
-      Test_config.(
-        slots_for_blocks @@ blocks_for_first_ledger_proof test_config)
+      Test_config.(slots_for_blocks @@ blocks_for_first_ledger_proof test_config)
     in
     let slots_for_additional_proofs =
       Test_config.slots_for_blocks (num_proofs - 1)

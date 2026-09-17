@@ -1,6 +1,6 @@
 (* A to-spec signer library that uses internal mina libs *)
 
-open Core_kernel
+open Core
 open Signature_lib
 open Rosetta_lib
 open Rosetta_coding

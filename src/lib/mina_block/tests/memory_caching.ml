@@ -3,7 +3,7 @@
     TODO Consider moving elsewhere.
 *)
 
-open Core_kernel
+open Core
 open Async
 
 module Ledger_proof_list = struct
@@ -25,19 +25,23 @@ let test_mem ~f ~n proofs_file =
   gc_compact () ;
   let init_heap = heap_used () in
   let%bind proofs =
-    Deferred.List.init n ~f:(fun _ -> read_proofs proofs_file >>| List.map ~f)
+    Deferred.List.init n ~how:`Sequential ~f:(fun _ ->
+        read_proofs proofs_file >>| List.map ~f )
     >>| List.concat
   in
   gc_compact () ;
   let growth = heap_used () - init_heap in
-  let%map () = after (Time.Span.of_sec 0.1) in
+  let%map () = after (Time_float.Span.of_sec 0.1) in
   ignore proofs ; growth
 
 let test_do ledger_proofs tmp_dir =
   let%bind proof_cache_db =
     Proof_cache_tag.create_db ~logger:(Logger.null ()) tmp_dir
     >>| function
-    | Ok a -> a | Error _ -> failwith "failed to create proof cache db"
+    | Ok a ->
+        a
+    | Error _ ->
+        failwith "failed to create proof cache db"
   in
   let%bind proofs_file, fd = Unix.mkstemp "_proofs.binio" in
   let%bind () = Fd.close fd in

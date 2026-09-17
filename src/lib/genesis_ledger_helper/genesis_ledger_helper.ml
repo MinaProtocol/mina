@@ -244,7 +244,7 @@ module Ledger = struct
         ] ;
     (* This sleep for 5s is a hack for rocksdb. It seems like rocksdb would need some
        time to stablize *)
-    let%bind () = after (Time.Span.of_int_sec 5) in
+    let%bind () = after (Time_float.Span.of_int_sec 5) in
     match%map
       Tar.create ~root:ledger_dirname ~file:tar_path ~directory:"." ()
     with
@@ -362,7 +362,7 @@ module Ledger = struct
     let%map.Lazy accounts = accounts_lazy in
     Accounts.(
       pad_with_rev_balances (List.rev config.balances) accounts
-      |> pad_to (Option.value ~default:0 config.num_accounts))
+      |> pad_to (Option.value ~default:0 config.num_accounts) )
 
   let packed_genesis_ledger_of_accounts ~genesis_backing_type ~logger ~depth
       accounts : Genesis_ledger.Packed.t =
@@ -739,9 +739,10 @@ let load_config_json filename =
 let print_config ~logger config =
   let ledger_name_json =
     Option.value ~default:`Null
-    @@ let%bind.Option ledger = config.Runtime_config.ledger in
-       let%map.Option name = ledger.name in
-       `String name
+    @@
+    let%bind.Option ledger = config.Runtime_config.ledger in
+    let%map.Option name = ledger.name in
+    `String name
   in
   let ( json_config
       , `Accounts_omitted
@@ -826,7 +827,7 @@ let light_proof_from_runtime_config ~logger ~cli_proof_level
           | Check ->
               Check
           | No_check ->
-              No_check)
+              No_check )
       ; Some compiled_proof_level
       ]
   in

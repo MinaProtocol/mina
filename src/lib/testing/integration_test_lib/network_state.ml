@@ -1,5 +1,5 @@
 open Async_kernel
-open Core_kernel
+open Core
 open Pipe_lib
 open Mina_base
 open Mina_transaction
@@ -13,7 +13,7 @@ module Make
   module Node = Engine.Network.Node
 
   let set_to_yojson ~(element : 'a -> Yojson.Safe.t) s : Yojson.Safe.t =
-    `List (List.map ~f:element (State_hash.Set.to_list s))
+    `List (List.map ~f:element (Set.to_list s))
 
   let map_to_yojson ~(f_key_to_string : 'a -> string) ~f_value_to_yojson m :
       Yojson.Safe.t =
@@ -35,31 +35,30 @@ module Make
     ; num_persisted_frontier_dropped : int
     ; node_initialization : bool String.Map.t
           [@to_yojson
-            map_to_yojson ~f_key_to_string:ident ~f_value_to_yojson:(fun b ->
+            map_to_yojson ~f_key_to_string:Fn.id ~f_value_to_yojson:(fun b ->
                 `Bool b )]
     ; gossip_received : Gossip_state.t String.Map.t
           [@to_yojson
-            map_to_yojson ~f_key_to_string:ident
+            map_to_yojson ~f_key_to_string:Fn.id
               ~f_value_to_yojson:Gossip_state.to_yojson]
     ; best_tips_by_node : State_hash.t String.Map.t
           [@to_yojson
-            map_to_yojson ~f_key_to_string:ident
+            map_to_yojson ~f_key_to_string:Fn.id
               ~f_value_to_yojson:State_hash.to_yojson]
     ; blocks_produced_by_node : State_hash.t list String.Map.t
           [@to_yojson
-            map_to_yojson ~f_key_to_string:ident ~f_value_to_yojson:(fun ls ->
-                `List (List.map State_hash.to_yojson ls) )]
+            map_to_yojson ~f_key_to_string:Fn.id ~f_value_to_yojson:(fun ls ->
+                `List (List.map ~f:State_hash.to_yojson ls) )]
     ; blocks_seen_by_node : State_hash.Set.t String.Map.t
           [@to_yojson
-            map_to_yojson ~f_key_to_string:ident ~f_value_to_yojson:(fun set ->
-                `List
-                  (State_hash.Set.to_list set |> List.map State_hash.to_yojson) )]
+            map_to_yojson ~f_key_to_string:Fn.id ~f_value_to_yojson:(fun set ->
+                `List (Set.to_list set |> List.map ~f:State_hash.to_yojson) )]
     ; blocks_including_txn : State_hash.Set.t Transaction_hash.Map.t
           [@to_yojson
             map_to_yojson ~f_key_to_string:Transaction_hash.to_base58_check
               ~f_value_to_yojson:(set_to_yojson ~element:State_hash.to_yojson)]
     ; proof_block_state_hashes : State_hash.t list
-          [@to_yojson fun ls -> `List (List.map State_hash.to_yojson ls)]
+          [@to_yojson fun ls -> `List (List.map ~f:State_hash.to_yojson ls)]
     }
   [@@deriving to_yojson]
 
@@ -110,8 +109,8 @@ module Make
                     if block_produced.snarked_ledger_generated then 1 else 0
                   in
                   let blocks_produced_by_node_map =
-                    Core.String.Map.update state.blocks_produced_by_node
-                      (Node.id node) ~f:(fun ls_opt ->
+                    Map.update state.blocks_produced_by_node (Node.id node)
+                      ~f:(fun ls_opt ->
                         match ls_opt with
                         | None ->
                             [ block_produced.state_hash ]
@@ -129,9 +128,9 @@ module Make
                   ; blocks_produced_by_node = blocks_produced_by_node_map
                   ; proof_block_state_hashes =
                       ( if block_produced.snarked_ledger_generated then
-                        block_produced.state_hash
-                        :: state.proof_block_state_hashes
-                      else state.proof_block_state_hashes )
+                          block_produced.state_hash
+                          :: state.proof_block_state_hashes
+                        else state.proof_block_state_hashes )
                   }
                 else state ) )
         : _ Event_router.event_subscription ) ;
@@ -149,7 +148,7 @@ module Make
                 Option.value_map diff_application.best_tip_changed
                   ~default:state ~f:(fun new_best_tip ->
                     let best_tips_by_node' =
-                      String.Map.set state.best_tips_by_node ~key:(Node.id node)
+                      Map.set state.best_tips_by_node ~key:(Node.id node)
                         ~data:new_best_tip
                     in
                     { state with best_tips_by_node = best_tips_by_node' } ) ) )
@@ -197,7 +196,7 @@ module Make
                   "Updating network state with initialization event of $node"
                   ~metadata:[ ("node", `String (Node.infra_id node)) ] ;
                 let node_initialization' =
-                  String.Map.set state.node_initialization ~key:(Node.id node)
+                  Map.set state.node_initialization ~key:(Node.id node)
                     ~data:true
                 in
                 { state with node_initialization = node_initialization' } ) )
@@ -280,11 +279,11 @@ module Make
                   "Updating network state with event of $node going offline"
                   ~metadata:[ ("node", `String (Node.infra_id node)) ] ;
                 let node_initialization' =
-                  String.Map.set state.node_initialization ~key:(Node.id node)
+                  Map.set state.node_initialization ~key:(Node.id node)
                     ~data:false
                 in
                 let best_tips_by_node' =
-                  String.Map.remove state.best_tips_by_node (Node.id node)
+                  Map.remove state.best_tips_by_node (Node.id node)
                 in
                 { state with
                   node_initialization = node_initialization'
@@ -300,9 +299,9 @@ module Make
                   "Updating network state with Breadcrumb added to $node"
                   ~metadata:[ ("node", `String (Node.infra_id node)) ] ;
                 let blocks_seen_by_node' =
-                  String.Map.update state.blocks_seen_by_node (Node.id node)
+                  Map.update state.blocks_seen_by_node (Node.id node)
                     ~f:(fun block_set ->
-                      State_hash.Set.add
+                      Set.add
                         (Option.value block_set ~default:State_hash.Set.empty)
                         breadcrumb.state_hash )
                 in
@@ -313,8 +312,8 @@ module Make
                   List.fold transaction_hashes ~init:state.blocks_including_txn
                     ~f:(fun accum hash ->
                       let block_set' =
-                        State_hash.Set.add
-                          ( Transaction_hash.Map.find accum hash
+                        Set.add
+                          ( Map.find accum hash
                           |> Option.value ~default:State_hash.Set.empty )
                           breadcrumb.state_hash
                       in
@@ -322,7 +321,7 @@ module Make
                         "adding or updating txn_hash %s to \
                          state.blocks_including_txn"
                         (Transaction_hash.to_base58_check hash) ;
-                      Transaction_hash.Map.set accum ~key:hash ~data:block_set' )
+                      Map.set accum ~key:hash ~data:block_set' )
                 in
                 { state with
                   blocks_seen_by_node = blocks_seen_by_node'

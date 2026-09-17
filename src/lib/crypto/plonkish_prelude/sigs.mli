@@ -3,10 +3,10 @@
 (** {1 Serialization} *)
 
 (** {2 To and from S-expressions} *)
-module Sexpable = Core_kernel.Sexpable
+module Sexpable = Core.Sexpable
 
 (** {2 To and from binary format} *)
-module Binable = Core_kernel.Binable
+module Binable = Core.Binable
 
 (** {2 Serialization to and from JSON} *)
 

@@ -6,6 +6,7 @@
   ;; opam libraries
   async
   core
+  core_unix.command_unix
   cohttp
   cohttp-async
   uri

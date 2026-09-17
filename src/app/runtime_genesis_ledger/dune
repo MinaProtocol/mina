@@ -2,6 +2,7 @@
  (name runtime_genesis_ledger)
  (public_name runtime_genesis_ledger)
  (libraries
+  core_unix.command_unix
   ;;opam libraries
   base
   core_kernel

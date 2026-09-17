@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 
 (* add functions to library module Bigstring so we can derive hash for the type t below *)
 

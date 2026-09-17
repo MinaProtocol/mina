@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 
 module type S = sig
   module Impl : Snarky_backendless.Snark_intf.S
@@ -108,7 +108,7 @@ module Make (Impl : Snarky_backendless.Snark_intf.S) :
         let max_length =
           Int.(
             ceil_log2
-              (c + (List.length vars * Unchecked.to_int Unsigned.UInt32.max_int)))
+              (c + (List.length vars * Unchecked.to_int Unsigned.UInt32.max_int)) )
         in
         let%map bits =
           Field.Checked.choose_preimage_var ~length:max_length

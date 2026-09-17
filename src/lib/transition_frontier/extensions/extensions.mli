@@ -33,11 +33,11 @@ val notify :
 
 type ('ext, 'view) access =
   | Root_history : (Root_history.t, Root_history.view) access
-  | Snark_pool_refcount
-      : (Snark_pool_refcount.t, Snark_pool_refcount.view) access
+  | Snark_pool_refcount :
+      (Snark_pool_refcount.t, Snark_pool_refcount.view) access
   | Best_tip_diff : (Best_tip_diff.t, Best_tip_diff.view) access
-  | Transition_registry
-      : (Transition_registry.t, Transition_registry.view) access
+  | Transition_registry :
+      (Transition_registry.t, Transition_registry.view) access
   | New_breadcrumbs : (New_breadcrumbs.t, New_breadcrumbs.view) access
 
 val get_extension : t -> ('ext, _) access -> 'ext

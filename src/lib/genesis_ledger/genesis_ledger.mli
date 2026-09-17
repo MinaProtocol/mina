@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Signature_lib
 open Mina_base
 module Ledger = Mina_ledger.Ledger

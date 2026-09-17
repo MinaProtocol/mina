@@ -6,13 +6,11 @@
   async_unix
   stdio
   base.caml
-  ocaml-migrate-parsetree
   core
   async
   ppxlib
   ppxlib.ast
   ppxlib.astlib
-  core_kernel
   compiler-libs
   async_kernel
   ocaml-compiler-libs.common

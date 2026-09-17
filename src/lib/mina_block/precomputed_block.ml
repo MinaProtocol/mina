@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Mina_base
 open Mina_state
 
@@ -36,8 +36,8 @@ module Proof = struct
     | `String str ->
         Or_error.try_with (fun () -> of_bin_string str)
         |> Result.map_error ~f:(fun err ->
-               sprintf "Precomputed_block.Proof.of_yojson: %s"
-                 (Error.to_string_hum err) )
+            sprintf "Precomputed_block.Proof.of_yojson: %s"
+              (Error.to_string_hum err) )
     | json ->
         Proof.of_yojson json
 end
@@ -109,7 +109,7 @@ let of_block ~logger
   let account_ids_accessed =
     Block.account_ids_accessed ~constraint_constants block
   in
-  let start = Time.now () in
+  let start = Time_float.now () in
   let accounts_accessed =
     List.filter_map account_ids_accessed ~f:(fun (acct_id, status) ->
         match status with
@@ -135,13 +135,15 @@ let of_block ~logger
   let header = Block.header block in
   let protocol_version = Header.current_protocol_version header in
   let proposed_protocol_version = Header.proposed_protocol_version_opt header in
-  let accounts_accessed_time = Time.now () in
+  let accounts_accessed_time = Time_float.now () in
   [%log debug]
     "Precomputed block for $state_hash: accounts-accessed took $time ms"
     ~metadata:
       [ ("state_hash", Mina_base.State_hash.to_yojson state_hash)
       ; ( "time"
-        , `Float (Time.Span.to_ms (Time.diff accounts_accessed_time start)) )
+        , `Float
+            (Time_float.Span.to_ms
+               (Time_float.diff accounts_accessed_time start) ) )
       ] ;
   let accounts_created =
     let account_creation_fee = constraint_constants.account_creation_fee in
@@ -159,15 +161,16 @@ let of_block ~logger
         let owner = Mina_ledger.Ledger.token_owner ledger token_id in
         (token_id, owner) )
   in
-  let account_created_time = Time.now () in
+  let account_created_time = Time_float.now () in
   [%log debug]
     "Precomputed block for $state_hash: accounts-created took $time ms"
     ~metadata:
       [ ("state_hash", Mina_base.State_hash.to_yojson state_hash)
       ; ( "time"
         , `Float
-            (Time.Span.to_ms
-               (Time.diff account_created_time accounts_accessed_time) ) )
+            (Time_float.Span.to_ms
+               (Time_float.diff account_created_time accounts_accessed_time) )
+        )
       ] ;
 
   { scheduled_time

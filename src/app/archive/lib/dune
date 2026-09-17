@@ -2,6 +2,7 @@
  (name archive_lib)
  (public_name archive_lib)
  (libraries
+  core_unix
   ;;opam libraries
   async
   async.async_rpc
@@ -24,6 +25,7 @@
   sexplib0
   uri
   ;;local libraries
+  archive_health_queries
   block_time
   mina_stdlib
   child_processes

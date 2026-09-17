@@ -54,7 +54,7 @@ let handle_and_validate sub ~validation_expiration ~(sender : Peer.t)
   let open Libp2p_ipc.Reader.ValidationResult in
   let wrap_message data =
     if
-      Unix.Inet_addr.equal sender.host (Unix.Inet_addr.of_string "127.0.0.1")
+      Core_unix.Inet_addr.(equal sender.host (of_string "127.0.0.1"))
       && Int.equal sender.libp2p_port 0
     then Envelope.Incoming.local data
     else Envelope.Incoming.wrap_peer ~sender ~data

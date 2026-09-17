@@ -55,7 +55,7 @@ module Make (P : AppPaths) : sig
   val run :
        t
     -> args:string list
-    -> ?env:Core.Unix.env
+    -> ?env:Core_unix.env
     -> ?ignore_failure:bool
     -> unit
     -> string Deferred.t
@@ -68,7 +68,7 @@ module Make (P : AppPaths) : sig
   val run_in_background :
        t
     -> args:string list
-    -> ?env:Core.Unix.env
+    -> ?env:Core_unix.env
     -> unit
     -> (string * Process.t) Deferred.t
 end

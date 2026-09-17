@@ -40,15 +40,15 @@ module type Metric_intf = sig
   val ignored : Mina_metrics.Counter.t
 
   module Validation_time : sig
-    val update : Time.Span.t -> unit
+    val update : Time_float.Span.t -> unit
   end
 
   module Processing_time : sig
-    val update : Time.Span.t -> unit
+    val update : Time_float.Span.t -> unit
   end
 
   module Rejection_time : sig
-    val update : Time.Span.t -> unit
+    val update : Time_float.Span.t -> unit
   end
 end
 
@@ -113,11 +113,11 @@ let await cb =
         | `Ok result ->
             let validation_time =
               Time_ns.abs_diff expires_at (Time_ns.now ())
-              |> Time_ns.Span.to_ms |> Time.Span.of_ms
+              |> Time_ns.Span.to_ms |> Time_float.Span.of_ms
             in
             let processing_time =
               Time_ns.abs_diff (Time_ns.now ()) cb.created_at
-              |> Time_ns.Span.to_ms |> Time.Span.of_ms
+              |> Time_ns.Span.to_ms |> Time_float.Span.of_ms
             in
             record_validation_metrics cb.message_type result validation_time
               processing_time ;

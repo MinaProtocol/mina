@@ -12,7 +12,7 @@ module Make_test = Graphql_basic_scalars.Testing.Produce_test
 module VerificationKey_gen = struct
   include Pickles.Side_loaded.Verification_key
 
-  let gen = Core_kernel.Quickcheck.Generator.return dummy
+  let gen = Core.Quickcheck.Generator.return dummy
 end
 
 module Vk = Make_test (VerificationKey) (VerificationKey_gen)
@@ -23,8 +23,8 @@ module VerificationKeyHash_gen = struct
   include Pickles.Backend.Tick.Field
 
   let gen =
-    Core_kernel.Int.quickcheck_generator
-    |> Core_kernel.Quickcheck.Generator.map ~f:Pasta_bindings.Fp.of_int
+    Core.Int.quickcheck_generator
+    |> Core.Quickcheck.Generator.map ~f:Pasta_bindings.Fp.of_int
 end
 
 module Vk_hash = Make_test (VerificationKeyHash) (VerificationKeyHash_gen)

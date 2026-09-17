@@ -1,5 +1,5 @@
 open Async_kernel
-open Core_kernel
+open Core
 open Pipe_lib
 module Timeout = Timeout_lib.Core_time
 
@@ -12,14 +12,14 @@ let broadcast_pipe_fold_until_with_timeout reader ~timeout_duration
     Broadcast_pipe.Reader.iter_until reader ~f:(fun msg ->
         Deferred.return
           ( if !timed_out then true
-          else
-            match f !acc msg with
-            | `Stop x ->
-                result := Some x ;
-                true
-            | `Continue x ->
-                acc := x ;
-                false ) )
+            else
+              match f !acc msg with
+              | `Stop x ->
+                  result := Some x ;
+                  true
+              | `Continue x ->
+                  acc := x ;
+                  false ) )
   in
   match%map Timeout.await () ~timeout_duration read_deferred with
   | `Ok () ->
@@ -31,7 +31,6 @@ let broadcast_pipe_fold_until_with_timeout reader ~timeout_duration
 module Make (Engine : Intf.Engine.S) () :
   Intf.Dsl.S with module Engine := Engine = struct
   module Event_router = Event_router.Make (Engine) ()
-
   module Network_state = Network_state.Make (Engine) (Event_router)
   module Wait_condition =
     Wait_condition.Make (Engine) (Event_router) (Network_state)
@@ -114,7 +113,7 @@ module Make (Engine : Intf.Engine.S) () :
     let hard_timeout =
       Network_time_span.to_span condition.hard_timeout ~constants
     in
-    let start_time = Time.now () in
+    let start_time = Time_float.now () in
     [%log' info t.logger]
       "Waiting for %s (soft_timeout: $soft_timeout, hard_timeout: \
        $hard_timeout)"
@@ -153,7 +152,7 @@ module Make (Engine : Intf.Engine.S) () :
              ] )
     | `Success ->
         let soft_timeout_was_met =
-          Time.(add start_time soft_timeout >= now ())
+          Time_float.(add start_time soft_timeout >= now ())
         in
         if soft_timeout_was_met then (
           [%log' info t.logger] "Finished waiting for %s" condition.description ;
@@ -183,8 +182,7 @@ module Make (Engine : Intf.Engine.S) () :
   let watch_log_errors ~logger ~event_router ~on_fatal_error =
     let log_error_accumulator = empty_log_error_accumulator () in
     ignore
-      ( Event_router.on event_router Event_type.Log_error
-          ~f:(fun node message ->
+      ( Event_router.on event_router Event_type.Log_error ~f:(fun node message ->
             let open Logger.Message in
             let acc =
               match message.level with

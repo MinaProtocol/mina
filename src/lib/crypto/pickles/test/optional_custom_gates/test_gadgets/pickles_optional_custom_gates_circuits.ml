@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Pickles_types
 open Pickles.Impls.Step
 
@@ -172,7 +172,7 @@ let main_foreign_field_mul () =
              let two_to_22 = of_int Int.(2 lsl 22) in
              let two_to_44 = two_to_22 * two_to_22 in
              let two_to_88 = two_to_44 * two_to_44 in
-             two_to_88 - one)
+             two_to_88 - one )
        } ) ;
   add_plonk_constraint
     (Raw { kind = Zero; values = [| fresh_int 0 |]; coeffs = [||] })

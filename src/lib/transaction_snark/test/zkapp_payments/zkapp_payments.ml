@@ -147,7 +147,7 @@ let%test_module "Zkapp payments tests" =
                 merkle_root_after_zkapp_command_exn ledger ~txn_state_view
                   ~global_slot:
                     Mina_numbers.Global_slot_since_genesis.(
-                      succ txn_state_view.global_slot_since_genesis)
+                      succ txn_state_view.global_slot_since_genesis )
                   t1
               in
               let hash_post = Ledger.merkle_root ledger in
@@ -211,10 +211,10 @@ let%test_module "Zkapp payments tests" =
                     ; receivers =
                         (new_receiver, new_receiver_amount)
                         :: ( List.take specs (receiver_count - 1)
-                           |> List.map ~f:(fun s ->
-                                  ( Signature_lib.Public_key.compress
-                                      (fst s.sender).public_key
-                                  , amount ) ) )
+                           |> List.map ~f:(fun (s : Transaction_spec.t) ->
+                               ( Signature_lib.Public_key.compress
+                                   (fst s.sender).public_key
+                               , amount ) ) )
                     ; amount = total_amount
                     ; zkapp_account_keypairs = []
                     ; memo
@@ -281,7 +281,8 @@ let%test_module "Zkapp payments tests" =
                     ; receivers =
                         (new_receiver, amount)
                         :: ( List.take specs (receiver_count - 1)
-                           |> List.map ~f:(fun s -> (s.receiver, amount)) )
+                           |> List.map ~f:(fun s ->
+                               (s.Transaction_spec.receiver, amount) ) )
                     ; amount = total_amount
                     ; zkapp_account_keypairs = []
                     ; memo

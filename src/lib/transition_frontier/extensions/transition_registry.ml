@@ -1,5 +1,5 @@
 open Async_kernel
-open Core_kernel
+open Core
 open Mina_base
 open Frontier_base
 
@@ -13,7 +13,7 @@ module T = struct
   let create ~logger:_ _frontier = (State_hash.Table.create (), ())
 
   let notify t state_hash =
-    State_hash.Table.change t state_hash ~f:(function
+    Hashtbl.change t state_hash ~f:(function
       | Some ls ->
           List.iter ls ~f:(fun ivar ->
               if Ivar.is_full ivar then
@@ -25,7 +25,7 @@ module T = struct
 
   let register t state_hash =
     Deferred.create (fun ivar ->
-        State_hash.Table.update t state_hash ~f:(function
+        Hashtbl.update t state_hash ~f:(function
           | Some ls ->
               ivar :: ls
           | None ->

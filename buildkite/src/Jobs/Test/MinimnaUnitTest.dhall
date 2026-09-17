@@ -34,7 +34,7 @@ in  Pipeline.build
         [ Command.build
             Command.Config::{
             , commands =
-                RunInToolchain.runInToolchain
+                RunInToolchain.runInDefaultToolchain
                   ([] : List Text)
                   "cd src/app/minimina && PATH=/home/opam/.cargo/bin:\$PATH cargo test"
             , label = "Minimina unit tests"

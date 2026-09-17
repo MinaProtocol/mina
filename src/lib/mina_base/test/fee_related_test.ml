@@ -5,7 +5,7 @@
     Subject:    Test zkApp commands (related to fees).
  *)
 
-open Core_kernel
+open Core
 open Mina_base
 
 let feepayer_body_generator = Zkapp_command.gen

@@ -22,12 +22,12 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       requires_graphql = true
     ; genesis_ledger =
         (let open Test_account in
-        [ create ~account_name:"node-a-key" ~balance:"8000000000" ()
-        ; create ~account_name:"node-b-key" ~balance:"1000000000" ()
-        ; create ~account_name:"fish1" ~balance:"3000" ()
-        ; create ~account_name:"fish2" ~balance:"3000" ()
-        ; create ~account_name:"snark-node-key" ~balance:"0" ()
-        ])
+         [ create ~account_name:"node-a-key" ~balance:"8000000000" ()
+         ; create ~account_name:"node-b-key" ~balance:"1000000000" ()
+         ; create ~account_name:"fish1" ~balance:"3000" ()
+         ; create ~account_name:"fish2" ~balance:"3000" ()
+         ; create ~account_name:"snark-node-key" ~balance:"0" ()
+         ] )
     ; block_producers =
         [ { node_name = "node-a"; account_name = "node-a-key" }
         ; { node_name = "node-b"; account_name = "node-b-key" }
@@ -148,14 +148,14 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       }
     in
     let block_producer_nodes =
-      Network.block_producers network |> Core.String.Map.data
+      Network.block_producers network |> Core.Map.data
     in
     (* TODO: capture snark worker processes' failures *)
     let%bind () =
       section_hard "Wait for nodes to initialize"
         (wait_for t
            ( Wait_condition.nodes_to_initialize
-           @@ (Network.all_mina_nodes network |> Core.String.Map.data) ) )
+           @@ (Network.all_mina_nodes network |> Core.Map.data) ) )
     in
     let node = Network.block_producer_exn network "node-a" in
     let constraint_constants = Network.constraint_constants network in
@@ -250,13 +250,14 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       in
       (zkapp_command, new_permissions)
     in
-    let%bind.Deferred ( zkapp_update_all
-                      , zkapp_command_update_all
-                      , zkapp_command_invalid_nonce
-                      , zkapp_command_insufficient_funds
-                      , zkapp_command_insufficient_replace_fee
-                      , zkapp_command_insufficient_fee
-                      , zkapp_command_cross_network_replay ) =
+    let%bind.Deferred
+        ( zkapp_update_all
+        , zkapp_command_update_all
+        , zkapp_command_invalid_nonce
+        , zkapp_command_insufficient_funds
+        , zkapp_command_insufficient_replace_fee
+        , zkapp_command_insufficient_fee
+        , zkapp_command_cross_network_replay ) =
       let amount = Currency.Amount.zero in
       let nonce = Account.Nonce.of_int 1 in
       let memo =
@@ -294,8 +295,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; permissions = Set new_permissions
         ; zkapp_uri = Set new_zkapp_uri
         ; token_symbol = Set new_token_symbol
-        ; timing = (* timing can't be updated for an existing account *)
-                   Keep
+        ; timing =
+            (* timing can't be updated for an existing account *)
+            Keep
         ; voting_for = Set new_voting_for
         }
       in
@@ -427,10 +429,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       in
       Transaction_snark.For_tests.update_states ~constraint_constants spec
     in
-    let%bind.Deferred ( zkapp_command_mint_token
-                      , zkapp_command_mint_token2
-                      , zkapp_command_token_transfer
-                      , zkapp_command_token_transfer2 ) =
+    let%bind.Deferred
+        ( zkapp_command_mint_token
+        , zkapp_command_mint_token2
+        , zkapp_command_token_transfer
+        , zkapp_command_token_transfer2 ) =
       (* similar to tokens tests in transaction_snark/tests/zkapp_tokens.ml
          and `Mina_ledger.Ledger`
 
@@ -464,7 +467,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           ([ token_funder; token_owner ] @ Array.to_list token_accounts)
           ~init:Signature_lib.Public_key.Compressed.Map.empty
           ~f:(fun map { private_key; public_key } ->
-            Signature_lib.Public_key.Compressed.Map.add_exn map
+            Map.add_exn map
               ~key:(Signature_lib.Public_key.compress public_key)
               ~data:private_key )
       in
@@ -733,7 +736,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
            ~node_uri:(Network.Node.get_ingress_uri node)
            ~expected_failure:
              Network_pool.Transaction_pool.Diff_versioned.Diff_error.(
-               to_string_name Fee_payer_not_permitted_to_send) )
+               to_string_name Fee_payer_not_permitted_to_send ) )
     in
     let%bind () =
       section_hard "Verify that updated permissions are in ledger accounts"
@@ -789,24 +792,25 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       let next_slot_time =
         let genesis_timestamp =
           constants.genesis_constants.protocol.genesis_state_timestamp
-          |> Int64.to_float |> Time.Span.of_ms |> Time.of_span_since_epoch
+          |> Int64.to_float |> Time_float.Span.of_ms
+          |> Time_float.of_span_since_epoch
         in
         let block_duration_ms =
           constants.constraint_constants.block_window_duration_ms
           |> Int.to_float
         in
         let current_slot_span_ms =
-          Time.(diff (now ()) genesis_timestamp) |> Time.Span.to_ms
+          Time_float.(diff (now ()) genesis_timestamp) |> Time_float.Span.to_ms
         in
         let target_slot =
           block_duration_ms /. current_slot_span_ms |> Float.round_up
         in
         let target_slot_span_ms =
-          target_slot *. current_slot_span_ms |> Time.Span.of_ms
+          target_slot *. current_slot_span_ms |> Time_float.Span.of_ms
         in
-        Time.add genesis_timestamp target_slot_span_ms
+        Time_float.add genesis_timestamp target_slot_span_ms
       in
-      after Time.(diff (now ()) next_slot_time)
+      after Time_float.(diff (now ()) next_slot_time)
     in
     (* Won't be accepted until the previous transactions are applied *)
     let%bind () =
@@ -977,7 +981,22 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
            Network.Node.run_replayer ~target_state_hash:proof_state_hash ~logger
              archive_node
          in
-         check_replayer_logs ~logger logs )
+         let%bind n = check_replayer_logs ~logger logs in
+         let ns = network_state t in
+         let expected = ns.blocks_generated in
+         if n < expected - 3 || n > expected + 3 then
+           Malleable_error.hard_error_string
+             (sprintf
+                "Replayer replayed %d blocks, expected %d (network \
+                 blocks_generated ±3)"
+                n expected )
+         else (
+           if n <> expected then
+             [%log warn]
+               "Replayer block count %d differs from network blocks_generated \
+                %d (diff: %d)"
+               n expected (n - expected) ;
+           Malleable_error.return () ) )
     in
     let open Deferred.Let_syntax in
     match%bind replayer_result with
